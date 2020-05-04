@@ -128,7 +128,7 @@ QCustomPlot = library('QCustomPlot',
            dependencies : [qt5core, qt5widgets, qt5gui, qt5svg, qt5printsupport, GL],
            install : true)
 
-QCustomPlot_dep = declare_dependency(link_with : QCustomPlot, include_directories:'src', dependencies:[qt5core, qt5widgets, qt5gui])
+QCustomPlot_dep = declare_dependency(link_with : QCustomPlot, include_directories:'src', dependencies:[qt5core, qt5widgets, qt5gui, GL])
 
 test_srcs = [
     'tests/auto/autotest.cpp',
