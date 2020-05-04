@@ -2,9 +2,6 @@ project('QCustomPlot', 'cpp',
   version : '0.1',
   default_options : ['warning_level=3', 'cpp_std=c++17'])
 
-
-add_global_arguments('-DQCUSTOMPLOT_USE_OPENGL', language : 'cpp')
-
 qt5 = import('qt5')
 qt5core = dependency('qt5', modules : 'Core')
 qt5widgets = dependency('qt5', modules : 'Widgets')
@@ -125,6 +122,7 @@ QCustomPlot = library('QCustomPlot',
            'src/selectionrect.cpp',
            'src/vector2d.cpp',
            qcp_moc_files,
+           cpp_args:['-DQCUSTOMPLOT_USE_OPENGL'],
            dependencies : [qt5core, qt5widgets, qt5gui, qt5svg, qt5printsupport, GL],
            install : true)
 
