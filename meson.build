@@ -122,7 +122,7 @@ QCustomPlot = library('QCustomPlot',
            'src/selectionrect.cpp',
            'src/vector2d.cpp',
            qcp_moc_files,
-           cpp_args:['-DQCUSTOMPLOT_USE_OPENGL'],
+           #cpp_args:['-DQCUSTOMPLOT_USE_OPENGL'],
            dependencies : [qt5core, qt5widgets, qt5gui, qt5svg, qt5printsupport, GL],
            install : true)
 
