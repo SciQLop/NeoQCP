@@ -1,5 +1,5 @@
 #include <QtTest/QtTest>
-#include "../../../qcustomplot.h"
+#include <qcp.h>
 
 class TestQCPBars : public QObject
 {
