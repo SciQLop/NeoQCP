@@ -2,13 +2,15 @@ project('QCustomPlot', 'cpp',
   version : '2.1.0',
   default_options : ['warning_level=3', 'cpp_std=c++17'])
 
-qt5 = import('qt5')
-qt5core = dependency('qt5', modules : 'Core')
-qt5widgets = dependency('qt5', modules : 'Widgets')
-qt5gui = dependency('qt5', modules : 'Gui')
-qt5svg = dependency('qt5', modules : 'Svg')
-qt5printsupport = dependency('qt5', modules : 'PrintSupport')
-qt5test = dependency('qt5', modules : 'Test')
+
+qt_sdk=get_option('qt_version')
+qtmod = import(qt_sdk)
+qtcore = dependency(qt_sdk, modules : 'Core')
+qtwidgets = dependency(qt_sdk, modules : 'Widgets')
+qtgui = dependency(qt_sdk, modules : 'Gui')
+qtsvg = dependency(qt_sdk, modules : 'Svg')
+qtprintsupport = dependency(qt_sdk, modules : 'PrintSupport')
+qttest = dependency(qt_sdk, modules : 'Test')
 
 
 GL = dependency('GL')
@@ -66,7 +68,7 @@ qcp_moc_headers = ['src/axis/axis.h',
  'src/selectionrect.h',
  'src/vector2d.h']
 
-qcp_moc_files = qt5.preprocess(moc_headers : qcp_moc_headers)
+qcp_moc_files = qtmod.preprocess(moc_headers : qcp_moc_headers)
 
 QCustomPlot = library('QCustomPlot',
            'src/colorgradient.cpp',
@@ -133,10 +135,10 @@ QCustomPlot = library('QCustomPlot',
            'src/vector2d.cpp',
            qcp_moc_files,
            #cpp_args:['-DQCUSTOMPLOT_USE_OPENGL'],
-           dependencies : [qt5core, qt5widgets, qt5gui, qt5svg, qt5printsupport, GL],
+           dependencies : [qtcore, qtwidgets, qtgui, qtsvg, qtprintsupport, GL],
            install : true)
 
-QCustomPlot_dep = declare_dependency(link_with : QCustomPlot, include_directories:'src', dependencies:[qt5core, qt5widgets, qt5gui, GL, qt5printsupport])
+QCustomPlot_dep = declare_dependency(link_with : QCustomPlot, include_directories:'src', dependencies:[qtcore, qtwidgets, qtgui, GL, qtprintsupport])
 
 test_srcs = [
     'tests/auto/autotest.cpp',
@@ -164,7 +166,7 @@ test_headers = [
     'tests/auto/test-datacontainer/test-datacontainer.h',
     'tests/auto/test-qcplegend/test-qcplegend.h'
 ]
-test_moc_files = qt5.preprocess(moc_headers : test_headers)
+test_moc_files = qtmod.preprocess(moc_headers : test_headers)
 
-auto_tests=executable('auto-tests',test_srcs, test_moc_files, dependencies:[QCustomPlot_dep, qt5test])
+auto_tests=executable('auto-tests',test_srcs, test_moc_files, dependencies:[QCustomPlot_dep, qttest])
 test('test-auto-tests',auto_tests)
