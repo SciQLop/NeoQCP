@@ -196,6 +196,7 @@ enum MarginSide { msLeft     = 0x01 ///< <tt>0x01</tt> left margin
                   ,msNone    = 0x00 ///< <tt>0x00</tt> no margin
                 };
 Q_DECLARE_FLAGS(MarginSides, MarginSide)
+Q_DECLARE_OPERATORS_FOR_FLAGS(MarginSides)
 
 /*!
   Defines what objects of a plot can be forcibly drawn antialiased/not antialiased. If an object is
@@ -221,6 +222,7 @@ enum AntialiasedElement { aeAxes           = 0x0001 ///< <tt>0x0001</tt> Axis ba
                           ,aeNone          = 0x0000 ///< <tt>0x0000</tt> No elements
                         };
 Q_DECLARE_FLAGS(AntialiasedElements, AntialiasedElement)
+Q_DECLARE_OPERATORS_FOR_FLAGS(AntialiasedElements)
 
 /*!
   Defines plotting hints that control various aspects of the quality and speed of plotting.
@@ -235,6 +237,7 @@ enum PlottingHint { phNone              = 0x000 ///< <tt>0x000</tt> No hints are
                     ,phCacheLabels      = 0x004 ///< <tt>0x004</tt> axis (tick) labels will be cached as pixmaps, increasing replot performance.
                   };
 Q_DECLARE_FLAGS(PlottingHints, PlottingHint)
+Q_DECLARE_OPERATORS_FOR_FLAGS(PlottingHints)
 
 /*!
   Defines the mouse interactions possible with QCustomPlot.
@@ -255,6 +258,7 @@ enum Interaction { iNone              = 0x000 ///< <tt>0x000</tt> None of the in
                    ,iSelectPlottablesBeyondAxisRect = 0x100 ///< <tt>0x100</tt> When performing plottable selection/hit tests, this flag extends the sensitive area beyond the axis rect
                  };
 Q_DECLARE_FLAGS(Interactions, Interaction)
+Q_DECLARE_OPERATORS_FOR_FLAGS(Interactions)
 
 /*!
   Defines the behaviour of the selection rect.
