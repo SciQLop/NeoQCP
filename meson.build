@@ -135,6 +135,7 @@ QCustomPlot = library('QCustomPlot',
            'src/vector2d.cpp',
            qcp_moc_files,
            #cpp_args:['-DQCUSTOMPLOT_USE_OPENGL'],
+           include_directories:'src',
            dependencies : [qtcore, qtwidgets, qtgui, qtsvg, qtprintsupport, GL],
            install : true)
 
