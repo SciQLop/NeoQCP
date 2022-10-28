@@ -1,1 +1,2 @@
 option('qt_version', type : 'string', value : 'qt5', description : 'The Qt major version you want to use.')
+option('with_tests', type : 'boolean', value : true, description : 'Build tests')

@@ -141,33 +141,36 @@ QCustomPlot = library('QCustomPlot',
 
 QCustomPlot_dep = declare_dependency(link_with : QCustomPlot, include_directories:'src', dependencies:[qtcore, qtwidgets, qtgui, GL, qtprintsupport])
 
-test_srcs = [
-    'tests/auto/autotest.cpp',
-    'tests/auto/test-qcustomplot/test-qcustomplot.cpp',
-    'tests/auto/test-qcpgraph/test-qcpgraph.cpp',
-    'tests/auto/test-qcpcurve/test-qcpcurve.cpp',
-    'tests/auto/test-qcpbars/test-qcpbars.cpp',
-    'tests/auto/test-qcpfinancial/test-qcpfinancial.cpp',
-    'tests/auto/test-qcplayout/test-qcplayout.cpp',
-    'tests/auto/test-qcpaxisrect/test-qcpaxisrect.cpp',
-    'tests/auto/test-colormap/test-colormap.cpp',
-    'tests/auto/test-datacontainer/test-datacontainer.cpp',
-    'tests/auto/test-qcplegend/test-qcplegend.cpp'
-]
+if get_option('with_tests')
+    test_srcs = [
+        'tests/auto/autotest.cpp',
+        'tests/auto/test-qcustomplot/test-qcustomplot.cpp',
+        'tests/auto/test-qcpgraph/test-qcpgraph.cpp',
+        'tests/auto/test-qcpcurve/test-qcpcurve.cpp',
+        'tests/auto/test-qcpbars/test-qcpbars.cpp',
+        'tests/auto/test-qcpfinancial/test-qcpfinancial.cpp',
+        'tests/auto/test-qcplayout/test-qcplayout.cpp',
+        'tests/auto/test-qcpaxisrect/test-qcpaxisrect.cpp',
+        'tests/auto/test-colormap/test-colormap.cpp',
+        'tests/auto/test-datacontainer/test-datacontainer.cpp',
+        'tests/auto/test-qcplegend/test-qcplegend.cpp'
+    ]
 
-test_headers = [
-'tests/auto/test-qcustomplot/test-qcustomplot.h',
-    'tests/auto/test-qcpgraph/test-qcpgraph.h',
-    'tests/auto/test-qcpcurve/test-qcpcurve.h',
-    'tests/auto/test-qcpbars/test-qcpbars.h',
-    'tests/auto/test-qcpfinancial/test-qcpfinancial.h',
-    'tests/auto/test-qcplayout/test-qcplayout.h',
-    'tests/auto/test-qcpaxisrect/test-qcpaxisrect.h',
-    'tests/auto/test-colormap/test-colormap.h',
-    'tests/auto/test-datacontainer/test-datacontainer.h',
-    'tests/auto/test-qcplegend/test-qcplegend.h'
-]
-test_moc_files = qtmod.preprocess(moc_headers : test_headers)
+    test_headers = [
+    'tests/auto/test-qcustomplot/test-qcustomplot.h',
+        'tests/auto/test-qcpgraph/test-qcpgraph.h',
+        'tests/auto/test-qcpcurve/test-qcpcurve.h',
+        'tests/auto/test-qcpbars/test-qcpbars.h',
+        'tests/auto/test-qcpfinancial/test-qcpfinancial.h',
+        'tests/auto/test-qcplayout/test-qcplayout.h',
+        'tests/auto/test-qcpaxisrect/test-qcpaxisrect.h',
+        'tests/auto/test-colormap/test-colormap.h',
+        'tests/auto/test-datacontainer/test-datacontainer.h',
+        'tests/auto/test-qcplegend/test-qcplegend.h'
+    ]
 
-auto_tests=executable('auto-tests',test_srcs, test_moc_files, dependencies:[QCustomPlot_dep, qttest])
-test('test-auto-tests',auto_tests)
+    test_moc_files = qtmod.preprocess(moc_headers : test_headers)
+
+    auto_tests=executable('auto-tests',test_srcs, test_moc_files, dependencies:[QCustomPlot_dep, qttest])
+    test('test-auto-tests',auto_tests)
+endif
