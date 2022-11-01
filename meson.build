@@ -135,19 +135,28 @@ qcp_src_files = [
     'src/vector2d.cpp'
 ]
 
-QCustomPlot = library('QCustomPlot',
-           qcp_src_files,
-           qcp_moc_files,
-           #cpp_args:['-DQCUSTOMPLOT_USE_OPENGL'],
-           include_directories:'src',
-           dependencies : [qtcore, qtwidgets, qtgui, qtsvg, qtprintsupport, GL],
-           install : true)
+if get_option('build_libs')
+    QCustomPlot = library('QCustomPlot',
+               qcp_src_files,
+               qcp_moc_files,
+               #cpp_args:['-DQCUSTOMPLOT_USE_OPENGL'],
+               include_directories:'src',
+               dependencies : [qtcore, qtwidgets, qtgui, qtsvg, qtprintsupport, GL],
+               install : true)
 
-QCustomPlot_dep = declare_dependency(link_with : QCustomPlot, include_directories:'src', dependencies:[qtcore, qtwidgets, qtgui, GL, qtprintsupport])
+    QCustomPlot_dep = declare_dependency(link_with : QCustomPlot, include_directories:'src', dependencies:[qtcore, qtwidgets, qtgui, GL, qtprintsupport])
+endif
+
 QCustomPlot_src_dep = declare_dependency(sources:[qcp_src_files, qcp_moc_files], include_directories:'src', dependencies:[qtcore, qtwidgets, qtgui, GL, qtprintsupport])
 
 
 if get_option('with_tests')
+    if get_option('build_libs')
+        qcp_dep = QCustomPlot_dep
+    else
+        qcp_dep = QCustomPlot_src_dep
+    endif
+
     test_srcs = [
         'tests/auto/autotest.cpp',
         'tests/auto/test-qcustomplot/test-qcustomplot.cpp',
@@ -177,6 +186,6 @@ if get_option('with_tests')
 
     test_moc_files = qtmod.preprocess(moc_headers : test_headers)
 
-    auto_tests=executable('auto-tests',test_srcs, test_moc_files, dependencies:[QCustomPlot_dep, qttest])
+    auto_tests=executable('auto-tests',test_srcs, test_moc_files, dependencies:[qcp_dep, qttest])
     test('test-auto-tests',auto_tests)
 endif
