@@ -127,7 +127,7 @@ QCustomPlot = static_library('QCustomPlot',
            extra_files:[qcp_moc_headers, 'qcustomplot.h.in']
            )
 
-QCustomPlot_dep = declare_dependency(link_with : QCustomPlot, include_directories:'src', dependencies:[qtdeps, GL])
+QCustomPlot_dep = declare_dependency(link_with : QCustomPlot, include_directories:'src', dependencies:[qtdeps, GL], compile_args:['-DQCUSTOMPLOT_USE_OPENGL'])
 
 test_srcs = [
     'tests/auto/autotest.cpp',
