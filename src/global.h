@@ -132,32 +132,8 @@
 */
 
 // Qt version < 6.2.0: to get metatypes Q_GADGET/Q_ENUMS/Q_FLAGS in namespace we have to make it look like a class during moc-run
-#if QT_VERSION >= 0x060200 // don't use QT_VERSION_CHECK here, some moc versions don't understand it
 namespace QCP {
   Q_NAMESPACE // this is how to add the staticMetaObject to namespaces in newer Qt versions
-#else // Qt version older than 6.2.0
-#  ifndef Q_MOC_RUN
-namespace QCP {
-#  else // not in moc run
-class QCP {
-  Q_GADGET
-  Q_ENUMS(ExportPen)
-  Q_ENUMS(ResolutionUnit)
-  Q_ENUMS(SignDomain)
-  Q_ENUMS(MarginSide)
-  Q_ENUMS(AntialiasedElement)
-  Q_ENUMS(PlottingHint)
-  Q_ENUMS(Interaction)
-  Q_ENUMS(SelectionRectMode)
-  Q_ENUMS(SelectionType)
-  
-  Q_FLAGS(AntialiasedElements)
-  Q_FLAGS(PlottingHints)
-  Q_FLAGS(MarginSides)
-  Q_FLAGS(Interactions)
-public:
-#  endif
-#endif
 
 
 /*!

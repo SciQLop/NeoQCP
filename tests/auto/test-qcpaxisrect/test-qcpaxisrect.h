@@ -1,5 +1,5 @@
 #include <QtTest/QtTest>
-#include "../../../qcustomplot.h"
+#include "qcustomplot.h"
 
 class TestQCPAxisRect : public QObject
 {
