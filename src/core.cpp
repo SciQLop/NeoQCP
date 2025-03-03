@@ -374,16 +374,16 @@ QCustomPlot::QCustomPlot(QWidget *parent) :
   mBufferDevicePixelRatio(1.0), // will be adapted to true value below
   mPlotLayout(nullptr),
   mAutoAddPlottableToLegend(true),
-  mAntialiasedElements(QCP::aeNone),
+  mAntialiasedElements(QCP::aeLegendItems|QCP::aePlottables|QCP::aeItems|QCP::aeAxes|QCP::aeSubGrid|QCP::aeLegend),
   mNotAntialiasedElements(QCP::aeNone),
   mInteractions(QCP::iNone),
   mSelectionTolerance(8),
-  mNoAntialiasingOnDrag(false),
+  mNoAntialiasingOnDrag(true),
   mBackgroundBrush(Qt::white, Qt::SolidPattern),
   mBackgroundScaled(true),
   mBackgroundScaledMode(Qt::KeepAspectRatioByExpanding),
   mCurrentLayer(nullptr),
-  mPlottingHints(QCP::phCacheLabels|QCP::phImmediateRefresh),
+  mPlottingHints(QCP::phImmediateRefresh),
   mMultiSelectModifier(Qt::ControlModifier),
   mSelectionRectMode(QCP::srmNone),
   mSelectionRect(nullptr),
@@ -395,7 +395,7 @@ QCustomPlot::QCustomPlot(QWidget *parent) :
   mReplotQueued(false),
   mReplotTime(0),
   mReplotTimeAverage(0),
-  mOpenGlMultisamples(16),
+  mOpenGlMultisamples(4),
   mOpenGlAntialiasedElementsBackup(QCP::aeNone),
   mOpenGlCacheLabelsBackup(true)
 {
@@ -2262,6 +2262,7 @@ void QCustomPlot::paintEvent(QPaintEvent *event)
   QCPPainter painter(this);
   if (painter.isActive())
   {
+      painter.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing);
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
   painter.setRenderHint(QPainter::HighQualityAntialiasing); // to make Antialiasing look good if using the OpenGL graphicssystem
 #endif
@@ -2710,7 +2711,7 @@ bool QCustomPlot::setupOpenGl()
 {
 #ifdef QCP_OPENGL_FBO
   freeOpenGl();
-  QSurfaceFormat proposedSurfaceFormat;
+  auto  proposedSurfaceFormat = QSurfaceFormat::defaultFormat();
   proposedSurfaceFormat.setSamples(mOpenGlMultisamples);
 #ifdef QCP_OPENGL_OFFSCREENSURFACE
   QOffscreenSurface *surface = new QOffscreenSurface;
