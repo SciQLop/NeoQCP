@@ -2243,11 +2243,7 @@ void QCustomPlot::paintEvent(QPaintEvent *event)
   // detect if the device pixel ratio has changed (e.g. moving window between different DPI screens), and adapt buffers if necessary:
 #ifdef QCP_DEVICEPIXELRATIO_SUPPORTED
 #  ifdef QCP_DEVICEPIXELRATIO_FLOAT
-#if defined(Q_OS_MAC) || defined(Q_OS_WIN)
-  double newDpr = 1.; // not sure why
-#else
   double newDpr = devicePixelRatioF();
-#endif
 #  else
   double newDpr = devicePixelRatio();
 #  endif

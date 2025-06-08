@@ -448,7 +448,11 @@ void QCPPaintBufferGlFbo::draw(QCPPainter *painter) const
   auto ctx = ctx_ref.data();
   if (QOpenGLContext::currentContext() != ctx)
       ctx->makeCurrent(ctx->surface());
-  painter->drawImage(0, 0, mGlFrameBuffer->toImage());
+   QRect targetRect(0, 0, mGlFrameBuffer->width() / mDevicePixelRatio,
+                    + mGlFrameBuffer->height() / mDevicePixelRatio);
+   auto image = mGlFrameBuffer->toImage();
+   image.setDevicePixelRatio(mDevicePixelRatio);
+   painter->drawImage(targetRect, image, image.rect());
 }
 
 /* inherits documentation from base class */
