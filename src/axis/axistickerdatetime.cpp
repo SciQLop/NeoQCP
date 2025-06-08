@@ -137,7 +137,6 @@ void QCPAxisTickerDateTime::setDateTimeSpec(Qt::TimeSpec spec)
   mDateTimeSpec = spec;
 }
 
-# if QT_VERSION >= QT_VERSION_CHECK(5, 2, 0)
 /*!
   Sets the time zone that is used for creating the tick labels from corresponding dates/times. The
   time spec (\ref setDateTimeSpec) is set to \c Qt::TimeZone.
@@ -149,7 +148,6 @@ void QCPAxisTickerDateTime::setTimeZone(const QTimeZone &zone)
   mTimeZone = zone;
   mDateTimeSpec = Qt::TimeZone;
 }
-#endif
 
 /*!
   Sets the tick origin (see \ref QCPAxisTicker::setTickOrigin) in seconds since Epoch (1. Jan 1970,
@@ -264,14 +262,10 @@ QString QCPAxisTickerDateTime::getTickLabel(double tick, const QLocale &locale, 
 {
   Q_UNUSED(precision)
   Q_UNUSED(formatChar)
-# if QT_VERSION >= QT_VERSION_CHECK(5, 2, 0)
   if (mDateTimeSpec == Qt::TimeZone)
     return locale.toString(keyToDateTime(tick).toTimeZone(mTimeZone), mDateTimeFormat);
   else
     return locale.toString(keyToDateTime(tick).toTimeSpec(mDateTimeSpec), mDateTimeFormat);
-# else
-  return locale.toString(keyToDateTime(tick).toTimeSpec(mDateTimeSpec), mDateTimeFormat);
-# endif
 }
 
 /*! \internal
@@ -328,11 +322,7 @@ QVector<double> QCPAxisTickerDateTime::createTickVector(double tickStep, const Q
 */
 QDateTime QCPAxisTickerDateTime::keyToDateTime(double key)
 {
-# if QT_VERSION < QT_VERSION_CHECK(4, 7, 0)
-  return QDateTime::fromTime_t(key).addMSecs((key-(qint64)key)*1000);
-# else
   return QDateTime::fromMSecsSinceEpoch(qint64(key*1000.0));
-# endif
 }
 
 /*! \overload
@@ -348,11 +338,7 @@ QDateTime QCPAxisTickerDateTime::keyToDateTime(double key)
 */
 double QCPAxisTickerDateTime::dateTimeToKey(const QDateTime &dateTime)
 {
-# if QT_VERSION < QT_VERSION_CHECK(4, 7, 0)
-  return dateTime.toTime_t()+dateTime.time().msec()/1000.0;
-# else
   return dateTime.toMSecsSinceEpoch()/1000.0;
-# endif
 }
 
 /*! \overload
@@ -368,11 +354,5 @@ double QCPAxisTickerDateTime::dateTimeToKey(const QDateTime &dateTime)
 */
 double QCPAxisTickerDateTime::dateTimeToKey(const QDate &date, Qt::TimeSpec timeSpec)
 {
-# if QT_VERSION < QT_VERSION_CHECK(4, 7, 0)
-  return QDateTime(date, QTime(0, 0), timeSpec).toTime_t();
-# elif QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
-  return QDateTime(date, QTime(0, 0), timeSpec).toMSecsSinceEpoch()/1000.0;
-# else
   return date.startOfDay(timeSpec).toMSecsSinceEpoch()/1000.0;
-# endif
 }

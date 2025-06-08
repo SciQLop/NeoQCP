@@ -36,16 +36,12 @@ public:
   // getters:
   QString dateTimeFormat() const { return mDateTimeFormat; }
   Qt::TimeSpec dateTimeSpec() const { return mDateTimeSpec; }
-# if QT_VERSION >= QT_VERSION_CHECK(5, 2, 0)
   QTimeZone timeZone() const { return mTimeZone; }
-#endif
   
   // setters:
   void setDateTimeFormat(const QString &format);
   void setDateTimeSpec(Qt::TimeSpec spec);
-# if QT_VERSION >= QT_VERSION_CHECK(5, 2, 0)
   void setTimeZone(const QTimeZone &zone);
-# endif
   void setTickOrigin(double origin); // hides base class method but calls baseclass implementation ("using" throws off IDEs and doxygen)
   void setTickOrigin(const QDateTime &origin);
   
@@ -58,9 +54,7 @@ protected:
   // property members:
   QString mDateTimeFormat;
   Qt::TimeSpec mDateTimeSpec;
-# if QT_VERSION >= QT_VERSION_CHECK(5, 2, 0)
   QTimeZone mTimeZone;
-# endif
   // non-property members:
   enum DateStrategy {dsNone, dsUniformTimeInDay, dsUniformDayInMonth} mDateStrategy;
   

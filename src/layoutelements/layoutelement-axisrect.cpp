@@ -1271,17 +1271,8 @@ void QCPAxisRect::mouseReleaseEvent(QMouseEvent *event, const QPointF &startPos)
 */
 void QCPAxisRect::wheelEvent(QWheelEvent *event)
 {
-#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
-  const double delta = event->delta();
-#else
   const double delta = event->angleDelta().y();
-#endif
-  
-#if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
-  const QPointF pos = event->pos();
-#else
   const QPointF pos = event->position();
-#endif
   
   // Mouse range zooming interaction:
   if (mParentPlot->interactions().testFlag(QCP::iRangeZoom))

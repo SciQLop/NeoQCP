@@ -341,11 +341,7 @@ void QCPColorScale::setRangeDrag(bool enabled)
     mAxisRect.data()->setRangeDrag(QCPAxis::orientation(mType));
   } else
   {
-#if QT_VERSION < QT_VERSION_CHECK(5, 2, 0)
-    mAxisRect.data()->setRangeDrag(nullptr);
-#else
     mAxisRect.data()->setRangeDrag({});
-#endif
   }
 }
 
@@ -368,11 +364,7 @@ void QCPColorScale::setRangeZoom(bool enabled)
     mAxisRect.data()->setRangeZoom(QCPAxis::orientation(mType));
   } else
   {
-#if QT_VERSION < QT_VERSION_CHECK(5, 2, 0)
-    mAxisRect.data()->setRangeDrag(nullptr);
-#else
     mAxisRect.data()->setRangeZoom({});
-#endif
   }
 }
 

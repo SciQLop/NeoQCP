@@ -27,9 +27,7 @@
 #define QCP_AXIS_H
 
 #include "../global.h"
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-  Q_MOC_INCLUDE("layoutelements/layoutelement-axisrect.h") // Qt6 needs this if using forward declared types in Q_PROPERTY; path is relative to .pro
-#endif
+Q_MOC_INCLUDE("layoutelements/layoutelement-axisrect.h") // Qt6 needs this if using forward declared types in Q_PROPERTY; path is relative to .pro
 #include "range.h"
 #include "../vector2d.h"
 #include "../layer.h"

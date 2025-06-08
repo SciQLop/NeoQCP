@@ -475,11 +475,9 @@ void QCPScatterStyle::drawShape(QCPPainter *painter, double x, double y) const
     {
       const double widthHalf = mPixmap.width()*0.5;
       const double heightHalf = mPixmap.height()*0.5;
-#if QT_VERSION < QT_VERSION_CHECK(4, 8, 0)
-      const QRectF clipRect = painter->clipRegion().boundingRect().adjusted(-widthHalf, -heightHalf, widthHalf, heightHalf);
-#else
+
       const QRectF clipRect = painter->clipBoundingRect().adjusted(-widthHalf, -heightHalf, widthHalf, heightHalf);
-#endif
+
       if (clipRect.contains(x, y))
         painter->drawPixmap(qRound(x-widthHalf), qRound(y-heightHalf), mPixmap);
       break;

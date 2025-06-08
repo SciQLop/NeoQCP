@@ -1903,13 +1903,9 @@ void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
   mReplotQueued = false;
   emit beforeReplot();
   
-# if QT_VERSION < QT_VERSION_CHECK(4, 8, 0)
-  QTime replotTimer;
-  replotTimer.start();
-# else
+
   QElapsedTimer replotTimer;
   replotTimer.start();
-# endif
   
   updateLayout();
   // draw all layered objects (grid, axes, plottables, items, legend,...) into their buffers:
@@ -1924,11 +1920,8 @@ void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
   else
     update();
   
-# if QT_VERSION < QT_VERSION_CHECK(4, 8, 0)
-  mReplotTime = replotTimer.elapsed();
-# else
   mReplotTime = replotTimer.nsecsElapsed()*1e-6;
-# endif
+
   if (!qFuzzyIsNull(mReplotTimeAverage))
     mReplotTimeAverage = mReplotTimeAverage*0.9 + mReplotTime*0.1; // exponential moving average with a time constant of 10 last replots
   else
@@ -2035,17 +2028,14 @@ bool QCustomPlot::savePdf(const QString &fileName, int width, int height, QCP::E
   printer.printEngine()->setProperty(QPrintEngine::PPK_DocumentName, pdfTitle);
   QRect oldViewport = viewport();
   setViewport(QRect(0, 0, newWidth, newHeight));
-#if QT_VERSION < QT_VERSION_CHECK(5, 3, 0)
-  printer.setFullPage(true);
-  printer.setPaperSize(viewport().size(), QPrinter::DevicePixel);
-#else
+
   QPageLayout pageLayout;
   pageLayout.setMode(QPageLayout::FullPageMode);
   pageLayout.setOrientation(QPageLayout::Portrait);
   pageLayout.setMargins(QMarginsF(0, 0, 0, 0));
   pageLayout.setPageSize(QPageSize(viewport().size(), QPageSize::Point, QString(), QPageSize::ExactMatch));
   printer.setPageLayout(pageLayout);
-#endif
+
   QCPPainter printpainter;
   if (printpainter.begin(&printer))
   {
@@ -2259,9 +2249,7 @@ void QCustomPlot::paintEvent(QPaintEvent *event)
   if (painter.isActive())
   {
       painter.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing);
-#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
-  painter.setRenderHint(QPainter::HighQualityAntialiasing); // to make Antialiasing look good if using the OpenGL graphicssystem
-#endif
+
     if (mBackgroundBrush.style() != Qt::NoBrush)
       painter.fillRect(mViewport, mBackgroundBrush);
     drawBackground(&painter);
@@ -2481,11 +2469,7 @@ void QCustomPlot::wheelEvent(QWheelEvent *event)
 {
   emit mouseWheel(event);
   
-#if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
-  const QPointF pos = event->pos();
-#else
   const QPointF pos = event->position();
-#endif
   
   // forward event to layerable under cursor:
   foreach (QCPLayerable *candidate, layerableListAt(pos, false))

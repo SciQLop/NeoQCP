@@ -734,9 +734,7 @@ QList<QCPLayoutElement*> QCPLayout::elements(bool recursive) const
 {
   const int c = elementCount();
   QList<QCPLayoutElement*> result;
-#if QT_VERSION >= QT_VERSION_CHECK(4, 7, 0)
   result.reserve(c);
-#endif
   for (int i=0; i<c; ++i)
     result.append(elementAt(i));
   if (recursive)
@@ -1717,9 +1715,7 @@ QList<QCPLayoutElement*> QCPLayoutGrid::elements(bool recursive) const
 {
   QList<QCPLayoutElement*> result;
   const int elCount = elementCount();
-#if QT_VERSION >= QT_VERSION_CHECK(4, 7, 0)
   result.reserve(elCount);
-#endif
   for (int i=0; i<elCount; ++i)
     result.append(elementAt(i));
   if (recursive)
@@ -1956,11 +1952,7 @@ Qt::Alignment QCPLayoutInset::insetAlignment(int index) const
   else
   {
     qDebug() << Q_FUNC_INFO << "Invalid element index:" << index;
-#if QT_VERSION < QT_VERSION_CHECK(5, 2, 0)
-    return nullptr;
-#else
     return {};
-#endif
   }
 }
 

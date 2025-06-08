@@ -64,10 +64,6 @@ QCPPainter::QCPPainter(QPaintDevice *device) :
   mModes(pmDefault),
   mIsAntialiasing(false)
 {
-#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0) // before Qt5, default pens used to be cosmetic if NonCosmeticDefaultPen flag isn't set. So we set it to get consistency across Qt versions.
-  if (isActive())
-    setRenderHint(QPainter::NonCosmeticDefaultPen);
-#endif
 }
 
 /*!
@@ -172,10 +168,6 @@ void QCPPainter::setModes(QCPPainter::PainterModes modes)
 bool QCPPainter::begin(QPaintDevice *device)
 {
   bool result = QPainter::begin(device);
-#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0) // before Qt5, default pens used to be cosmetic if NonCosmeticDefaultPen flag isn't set. So we set it to get consistency across Qt versions.
-  if (result)
-    setRenderHint(QPainter::NonCosmeticDefaultPen);
-#endif
   return result;
 }
 

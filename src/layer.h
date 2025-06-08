@@ -27,9 +27,7 @@
 #define QCP_LAYER_H
 
 #include "global.h"
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-  Q_MOC_INCLUDE("core.h") // Qt6 needs this if using forward declared types in Q_PROPERTY
-#endif
+Q_MOC_INCLUDE("core.h") // Qt6 needs this if using forward declared types in Q_PROPERTY
 #include "paintbuffer.h"
 
 class QCPPainter;
