@@ -12,54 +12,59 @@ QCP_INCLUDE_DIR = include_directories('src')
 
 
 qcp_moc_headers = ['src/axis/axis.h',
- 'src/axis/axisticker.h',
- 'src/axis/axistickerdatetime.h',
- 'src/axis/axistickerfixed.h',
- 'src/axis/axistickerlog.h',
- 'src/axis/axistickerpi.h',
- 'src/axis/axistickertext.h',
- 'src/axis/axistickertime.h',
- 'src/axis/range.h',
- 'src/colorgradient.h',
- 'src/core.h',
- 'src/datacontainer.h',
- 'src/global.h',
- 'src/item.h',
- 'src/items/item-bracket.h',
- 'src/items/item-curve.h',
- 'src/items/item-ellipse.h',
- 'src/items/item-line.h',
- 'src/items/item-pixmap.h',
- 'src/items/item-rect.h',
- 'src/items/item-straightline.h',
- 'src/items/item-text.h',
- 'src/items/item-tracer.h',
- 'src/layer.h',
- 'src/layout.h',
- 'src/layoutelements/layoutelement-axisrect.h',
- 'src/layoutelements/layoutelement-colorscale.h',
- 'src/layoutelements/layoutelement-legend.h',
- 'src/layoutelements/layoutelement-textelement.h',
- 'src/lineending.h',
- 'src/paintbuffer.h',
- 'src/painter.h',
- 'src/plottable.h',
- 'src/plottables/plottable-bars.h',
- 'src/plottables/plottable-colormap.h',
- 'src/plottables/plottable-curve.h',
- 'src/plottables/plottable-errorbar.h',
- 'src/plottables/plottable-financial.h',
- 'src/plottables/plottable-graph.h',
- 'src/plottables/plottable-statisticalbox.h',
- 'src/qcp.h',
- 'src/scatterstyle.h',
- 'src/selection.h',
- 'src/selectiondecorator-bracket.h',
- 'src/selectionrect.h',
- 'src/vector2d.h']
+            'src/axis/axisticker.h',
+            'src/axis/axistickerdatetime.h',
+            'src/axis/axistickerfixed.h',
+            'src/axis/axistickerlog.h',
+            'src/axis/axistickerpi.h',
+            'src/axis/axistickertext.h',
+            'src/axis/axistickertime.h',
+            'src/axis/range.h',
+            'src/axis/labelpainter.h',
+            'src/colorgradient.h',
+            'src/core.h',
+            'src/datacontainer.h',
+            'src/global.h',
+            'src/item.h',
+            'src/items/item-bracket.h',
+            'src/items/item-curve.h',
+            'src/items/item-ellipse.h',
+            'src/items/item-line.h',
+            'src/items/item-pixmap.h',
+            'src/items/item-rect.h',
+            'src/items/item-straightline.h',
+            'src/items/item-text.h',
+            'src/items/item-tracer.h',
+            'src/layer.h',
+            'src/layout.h',
+            'src/layoutelements/layoutelement-axisrect.h',
+            'src/layoutelements/layoutelement-colorscale.h',
+            'src/layoutelements/layoutelement-legend.h',
+            'src/layoutelements/layoutelement-textelement.h',
+            'src/lineending.h',
+            'src/paintbuffer.h',
+            'src/painter.h',
+            'src/plottable.h',
+            'src/plottables/plottable-bars.h',
+            'src/plottables/plottable-colormap.h',
+            'src/plottables/plottable-curve.h',
+            'src/plottables/plottable-errorbar.h',
+            'src/plottables/plottable-financial.h',
+            'src/plottables/plottable-graph.h',
+            'src/plottables/plottable-statisticalbox.h',
+            'src/qcp.h',
+            'src/scatterstyle.h',
+            'src/selection.h',
+            'src/selectiondecorator-bracket.h',
+            'src/selectionrect.h',
+            'src/vector2d.h',
+            'src/polar/layoutelement-angularaxis.h',
+            'src/polar/polargraph.h',
+            'src/polar/polargrid.h',
+            'src/polar/radialaxis.h',
+            ]
 
 qcp_moc_files = qtmod.compile_moc(headers : qcp_moc_headers, include_directories:QCP_INCLUDE_DIR)
-configure_file(input: 'qcustomplot.h.in', copy:true,  output:'qcustomplot.h')
 
 QCustomPlot = static_library('QCustomPlot',
            'src/colorgradient.cpp',
@@ -85,6 +90,7 @@ QCustomPlot = static_library('QCustomPlot',
            'src/axis/axistickertext.cpp',
            'src/axis/axistickertime.cpp',
            'src/axis/range.cpp',
+           'src/axis/labelpainter.cpp',
            'src/colorgradient.cpp',
            'src/core.cpp',
            'src/item.cpp',
@@ -119,43 +125,38 @@ QCustomPlot = static_library('QCustomPlot',
            'src/selectiondecorator-bracket.cpp',
            'src/selectionrect.cpp',
            'src/vector2d.cpp',
+           'src/polar/layoutelement-angularaxis.cpp',
+           'src/polar/polargraph.cpp',
+           'src/polar/polargrid.cpp',
+           'src/polar/radialaxis.cpp',
            qcp_moc_files,           
            include_directories:QCP_INCLUDE_DIR,
            cpp_args:['-DQCUSTOMPLOT_USE_OPENGL'],
            dependencies : [qtdeps, GL],
            install : true,
-           extra_files:[qcp_moc_headers, 'qcustomplot.h.in']
+           extra_files:[qcp_moc_headers, 'src/Profiling.hpp']
            )
 
-QCustomPlot_dep = declare_dependency(link_with : QCustomPlot, include_directories:'src', dependencies:[qtdeps, GL], compile_args:['-DQCUSTOMPLOT_USE_OPENGL'])
+optional_deps = []
 
-test_srcs = [
-    'tests/auto/autotest.cpp',
-    'tests/auto/test-qcustomplot/test-qcustomplot.cpp',
-    'tests/auto/test-qcpgraph/test-qcpgraph.cpp',
-    'tests/auto/test-qcpcurve/test-qcpcurve.cpp',
-    'tests/auto/test-qcpbars/test-qcpbars.cpp',
-    'tests/auto/test-qcpfinancial/test-qcpfinancial.cpp',
-    'tests/auto/test-qcplayout/test-qcplayout.cpp',
-    'tests/auto/test-qcpaxisrect/test-qcpaxisrect.cpp',
-    'tests/auto/test-colormap/test-colormap.cpp',
-    'tests/auto/test-datacontainer/test-datacontainer.cpp',
-    'tests/auto/test-qcplegend/test-qcplegend.cpp'
-]
+if get_option ( 'tracy_enable')
+    if get_option ( 'buildtype') != 'debugoptimized'
+        warning ( 'Profiling builds should set -- buildtype = debugoptimized')
+    endif
+    tracy = dependency ( 'tracy', static : true )
+    optional_deps += [ tracy ]
+endif
 
-test_headers = [
-'tests/auto/test-qcustomplot/test-qcustomplot.h',
-    'tests/auto/test-qcpgraph/test-qcpgraph.h',
-    'tests/auto/test-qcpcurve/test-qcpcurve.h',
-    'tests/auto/test-qcpbars/test-qcpbars.h',
-    'tests/auto/test-qcpfinancial/test-qcpfinancial.h',
-    'tests/auto/test-qcplayout/test-qcplayout.h',
-    'tests/auto/test-qcpaxisrect/test-qcpaxisrect.h',
-    'tests/auto/test-colormap/test-colormap.h',
-    'tests/auto/test-datacontainer/test-datacontainer.h',
-    'tests/auto/test-qcplegend/test-qcplegend.h'
-]
-test_moc_files = qtmod.compile_moc(headers : test_headers)
+QCustomPlot_dep = declare_dependency(link_with : QCustomPlot,
+                                     include_directories:QCP_INCLUDE_DIR,
+                                     dependencies:[qtdeps, GL] + optional_deps,
+                                     compile_args:['-DQCUSTOMPLOT_USE_OPENGL'])
 
-auto_tests=executable('auto-tests',test_srcs, test_moc_files, dependencies:[QCustomPlot_dep, qtdeps, qttest])
-test('test-auto-tests',auto_tests)
+if get_option ( 'with_examples')
+    subdir('examples')
+endif
+
+if get_option ( 'with_tests')
+    subdir('tests')
+endif
+
