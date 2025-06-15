@@ -2230,7 +2230,7 @@ QSize QCustomPlot::sizeHint() const
 void QCustomPlot::paintEvent(QPaintEvent *event)
 {
   Q_UNUSED(event)
-  PROFILE_HERE_N(QCustomPlot::paintEvent)
+    PROFILE_HERE;
   // detect if the device pixel ratio has changed (e.g. moving window between different DPI screens), and adapt buffers if necessary:
 #ifdef QCP_DEVICEPIXELRATIO_SUPPORTED
 #  ifdef QCP_DEVICEPIXELRATIO_FLOAT

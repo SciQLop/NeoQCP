@@ -5,5 +5,5 @@ interactions = executable('interactions',
   'mainwindow.cpp',
   'main.cpp',
   interactions_moc_files,
-  dependencies: [QCustomPlot_dep]
+  dependencies: [NeoQCP_dep]
 )

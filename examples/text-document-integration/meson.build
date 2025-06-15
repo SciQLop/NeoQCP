@@ -6,5 +6,5 @@ text_document_integration = executable('text_document_integration',
   'qcpdocumentobject.cpp',
   'main.cpp',
   text_document_integration_moc_files,
-  dependencies: [QCustomPlot_dep]
+  dependencies: [NeoQCP_dep]
 )

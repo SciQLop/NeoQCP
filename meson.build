@@ -1,12 +1,31 @@
-project('QCustomPlot', 'cpp',
+project('NeoQCP', 'cpp',
   version : '2.1.1',
-  default_options : ['warning_level=3', 'cpp_std=c++17', 'buildtype=release'])
+  default_options : ['warning_level=3', 'cpp_std=c++17', 'buildtype=release'],
+  meson_version : '>=1.1.0',
+  )
 
 qtmod = import('qt6')
 qtdeps = dependency('qt6', modules : ['Core','Widgets','Gui','Svg','PrintSupport', 'OpenGL'], method:'qmake')
 qttest = dependency('qt6', modules : ['Test'])
 
-GL = dependency('GL')
+optional_deps = []
+cpp_args = []
+
+if get_option ( 'tracy_enable')
+    if get_option ( 'buildtype') != 'debugoptimized'
+        warning ( 'Profiling builds should set -- buildtype = debugoptimized')
+    endif
+    tracy = dependency ( 'tracy', static : true )
+    optional_deps += [ tracy ]
+endif
+
+if get_option ( 'with_opengl')
+    GL = dependency('gl', required : true)
+    qtopengl_dep = dependency('qt6', modules : ['OpenGL'], method:'qmake')
+    optional_deps += [ qtopengl_dep, GL ]
+    cpp_args += ['-DQCUSTOMPLOT_USE_OPENGL']
+endif
+
 
 QCP_INCLUDE_DIR = include_directories('src')
 
@@ -66,7 +85,8 @@ qcp_moc_headers = ['src/axis/axis.h',
 
 qcp_moc_files = qtmod.compile_moc(headers : qcp_moc_headers, include_directories:QCP_INCLUDE_DIR)
 
-QCustomPlot = static_library('QCustomPlot',
+
+NeoQCP = static_library('NeoQCP',
            'src/colorgradient.cpp',
            'src/core.cpp',
            'src/item.cpp',
@@ -131,25 +151,17 @@ QCustomPlot = static_library('QCustomPlot',
            'src/polar/radialaxis.cpp',
            qcp_moc_files,           
            include_directories:QCP_INCLUDE_DIR,
-           cpp_args:['-DQCUSTOMPLOT_USE_OPENGL'],
-           dependencies : [qtdeps, GL],
+           cpp_args:cpp_args,
+           dependencies : [qtdeps] + optional_deps,
            install : true,
            extra_files:[qcp_moc_headers, 'src/Profiling.hpp']
            )
 
-optional_deps = []
 
-if get_option ( 'tracy_enable')
-    if get_option ( 'buildtype') != 'debugoptimized'
-        warning ( 'Profiling builds should set -- buildtype = debugoptimized')
-    endif
-    tracy = dependency ( 'tracy', static : true )
-    optional_deps += [ tracy ]
-endif
 
-QCustomPlot_dep = declare_dependency(link_with : QCustomPlot,
+NeoQCP_dep = declare_dependency(link_with : NeoQCP,
                                      include_directories:QCP_INCLUDE_DIR,
-                                     dependencies:[qtdeps, GL] + optional_deps,
+                                     dependencies:[qtdeps] + optional_deps,
                                      compile_args:['-DQCUSTOMPLOT_USE_OPENGL'])
 
 if get_option ( 'with_examples')

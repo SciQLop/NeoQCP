@@ -6,5 +6,5 @@ axis_tags = executable('axis-tags',
   'mainwindow.cpp',
   'main.cpp',
   axis_tags_moc_files,
-  dependencies: [QCustomPlot_dep]
+  dependencies: [NeoQCP_dep]
 )

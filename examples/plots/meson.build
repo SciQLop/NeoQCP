@@ -5,5 +5,5 @@ plots = executable('plots',
   'mainwindow.cpp',
   'main.cpp',
   plots_moc_files,
-  dependencies: [QCustomPlot_dep]
+  dependencies: [NeoQCP_dep]
 )

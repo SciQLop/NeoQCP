@@ -5,5 +5,5 @@ scrollbar_axis_range_control = executable('scrollbar_axis_range_control',
   'mainwindow.cpp',
   'main.cpp',
   scrollbar_axis_range_control_moc_files,
-  dependencies: [QCustomPlot_dep]
+  dependencies: [NeoQCP_dep]
 )
