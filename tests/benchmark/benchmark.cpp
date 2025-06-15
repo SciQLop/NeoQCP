@@ -1,6 +1,6 @@
 #include <QtTest/QtTest>
 
-#include <../../qcustomplot.h>
+#include <qcustomplot.h>
 
 class Benchmark : public QObject
 {
