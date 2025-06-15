@@ -1,6 +1,6 @@
 project('NeoQCP', 'cpp',
   version : '2.1.1',
-  default_options : ['warning_level=3', 'cpp_std=c++17', 'buildtype=release'],
+  default_options : ['warning_level=3', 'cpp_std=c++20', 'buildtype=release'],
   meson_version : '>=1.1.0',
   license : 'GPL3',
   )

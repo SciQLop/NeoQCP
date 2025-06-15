@@ -1,4 +1,5 @@
 # NeoQCP, a QCustomPlot Modernized Fork
+[![Tests](https://github.com/SciQLop/NeoQCP/actions/workflows/tests.yml/badge.svg)](https://github.com/SciQLop/NeoQCP/actions/workflows/tests.yml)
 
 [http://www.qcustomplot.com/images/logo.png](http://www.qcustomplot.com/images/logo.png)
 
@@ -7,29 +8,35 @@ This fork aims at modernizing the excellent [QCustomPlot](https://www.qcustomplo
 ## ✨ Key Improvements
 
 - **Qt6 Exclusive Support**  
-    Dropped legacy Qt4/Qt5 support - focussed for Qt6 only to reduce complexity and leverage modern Qt features
-    
+  Dropped legacy Qt4/Qt5 support - focussed for Qt6 only to reduce complexity and leverage modern Qt features
+
+- **GitHub Actions CI**  
+  Integrated GitHub Actions for continuous integration, ensuring code quality and build stability across platforms
+
 - **Modern Build System**  
-    Replaced qmake with [Meson](https://mesonbuild.com/) for faster, more reliable builds
+  Replaced qmake with [Meson](https://mesonbuild.com/) for faster, more reliable builds
 
 - **[Tracy](https://github.com/wolfpld/tracy) Profiler Integration**
-    Integrated Tracy for real-time performance profiling, allowing you to visualize and optimize your plotting code and NeoQCP itself.
+  Integrated Tracy for real-time performance profiling, allowing you to visualize and optimize your plotting code and
+  NeoQCP itself.
 
 - **Bug Fixes**  
-    Patched critical issues from upstream:
+  Patched critical issues from upstream:
     - Fixed OpenGL context handling with multiple OpenGL widgets
     - Fixed DPI scaling issues with OpenGL on MacOS and Windows
 
-- **Planned Features**  
+- **Planned Features**
     - Support more data containers like `std::vector`, `std::array`, and `std::span`
     - More customization points
     - C++ modernization
     - Experimental improvements:
-      - Support for fp32 with OpenGL
-      - Threaded OpenGL rendering
+        - Support for fp32 with OpenGL
+        - Threaded OpenGL rendering
 
 ## 📥 Installation
+
 ### Prerequisites
+
 - Qt6 Core, Gui, and Widgets modules
 - Meson 1.1.0+
 - Ninja build system
@@ -76,7 +83,6 @@ executable('myapp',
            gui_app: true)
 ```
 
-
 ## 🆚 Migration from QCustomPlot
 
 TBD
@@ -85,11 +91,11 @@ TBD
 
 Run test suite with:
 
-
 ```bash
 meson setup -Dtests=true builddir
 meson test -C builddir
 ```
+
 ## 🤝 Contributing
 
 We welcome contributions! Please follow these guidelines:

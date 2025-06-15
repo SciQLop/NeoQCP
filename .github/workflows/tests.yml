@@ -1,0 +1,88 @@
+name: Tests
+
+on:
+  release:
+    types: [ published ]
+  push:
+  pull_request:
+
+env:
+  QT_VERSION: 6.9.1
+
+jobs:
+  build_and_test:
+    name: Build and test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x86_64
+            qt_host: linux
+          - os: ubuntu-24.04-arm
+            arch: aarch64
+            qt_host: linux_arm64
+          - os: windows-latest
+            arch: x86_64
+            qt_host: windows
+          - os: macos-13  # Intel
+            arch: x86_64
+            qt_host: mac
+          - os: macos-14 # Apple Silicon
+            arch: arm64
+            qt_host: mac
+    steps:
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+        with:
+          arch: amd64
+      - uses: actions/checkout@v4
+      - name: Forward GITHUB_WORKSPACE env var
+        shell: bash
+        run: |
+          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE" >> $GITHUB_ENV
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install dependencies on Linux x86_64
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt update && sudo apt install -y libgl-dev xvfb libatomic1 libglx-dev libegl-dev libxrandr2 libxss1 libxcursor1 libxcomposite1 libasound2-dev libxi6 libxtst6 libglib2.0-bin libdbus-1-3 libxdamage1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libnss3
+          pip install aqtinstall meson ninja
+          aqt install-qt -O "$GITHUB_WORKSPACE"/Qt ${{ matrix.qt_host }} desktop ${{ env.QT_VERSION }}
+          echo "${{ env.GITHUB_WORKSPACE }}/Qt/${{ env.QT_VERSION }}/gcc_64/bin" >> $GITHUB_PATH
+          echo "LD_LIBRARY_PATH=${{ env.GITHUB_WORKSPACE }}/Qt/${{ env.QT_VERSION }}/gcc_64/lib" >> $GITHUB_ENV
+          echo "QT_QPA_PLATFORM=offscreen" >> $GITHUB_ENV
+      - name: Install dependencies on Linux aarch64
+        if: matrix.os == 'ubuntu-24.04-arm'
+        run: |
+          sudo apt update && sudo apt install -y libgl-dev xvfb libatomic1 libglx-dev libegl-dev libxrandr2 libxss1 libxcursor1 libxcomposite1 libasound2-dev libxi6 libxtst6 libglib2.0-bin libdbus-1-3 libxdamage1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libnss3
+          pip install aqtinstall meson ninja
+          aqt install-qt -O "$GITHUB_WORKSPACE"/Qt ${{ matrix.qt_host }} desktop ${{ env.QT_VERSION }} 
+          echo "${{ env.GITHUB_WORKSPACE }}/Qt/${{ env.QT_VERSION }}/gcc_arm64/bin" >> $GITHUB_PATH
+          echo "LD_LIBRARY_PATH=${{ env.GITHUB_WORKSPACE }}/Qt/${{ env.QT_VERSION }}/gcc_arm64/lib" >> $GITHUB_ENV
+          echo "QT_QPA_PLATFORM=offscreen" >> $GITHUB_ENV
+      - name: Install dependencies on Windows
+        if: matrix.os == 'windows-latest'
+        run: |
+          pip install aqtinstall meson ninja
+          aqt install-qt -O ${{ env.GITHUB_WORKSPACE }}\\Qt windows desktop ${{ env.QT_VERSION }} win64_msvc2022_64
+          echo "$env:GITHUB_WORKSPACE\Qt\$env:QT_VERSION\msvc2022_64\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+      - name: Install dependencies on macOS
+        if: matrix.os == 'macos-13' || matrix.os == 'macos-14'
+        run: |
+          pip install aqtinstall meson ninja
+          aqt install-qt -O "${{ env.GITHUB_WORKSPACE }}/Qt" mac desktop ${{ env.QT_VERSION }}
+          echo "${{ env.GITHUB_WORKSPACE }}/Qt/${{ env.QT_VERSION }}/macos/bin" >> $GITHUB_PATH
+          echo "DYLD_FALLBACK_FRAMEWORK_PATH=${{ env.GITHUB_WORKSPACE }}/Qt/${{ env.QT_VERSION }}/macos/lib" >> $GITHUB_ENV
+          echo "MACOSX_DEPLOYMENT_TARGET=12.0" >> $GITHUB_ENV
+      - name: Build
+        run: |
+          meson setup --buildtype debugoptimized build
+          meson compile -C build
+      - name: Test
+        run: |
+          meson test --print-errorlogs --no-rebuild -C build 
+
