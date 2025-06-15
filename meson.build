@@ -2,6 +2,7 @@ project('NeoQCP', 'cpp',
   version : '2.1.1',
   default_options : ['warning_level=3', 'cpp_std=c++17', 'buildtype=release'],
   meson_version : '>=1.1.0',
+  license : 'GPL3',
   )
 
 qtmod = import('qt6')
@@ -27,10 +28,10 @@ if get_option ( 'with_opengl')
 endif
 
 
-QCP_INCLUDE_DIR = include_directories('src')
+NEOQCP_INCLUDE_DIR = include_directories('src')
 
 
-qcp_moc_headers = ['src/axis/axis.h',
+neoqcp_moc_headers = ['src/axis/axis.h',
             'src/axis/axisticker.h',
             'src/axis/axistickerdatetime.h',
             'src/axis/axistickerfixed.h',
@@ -83,7 +84,7 @@ qcp_moc_headers = ['src/axis/axis.h',
             'src/polar/radialaxis.h',
             ]
 
-qcp_moc_files = qtmod.compile_moc(headers : qcp_moc_headers, include_directories:QCP_INCLUDE_DIR)
+neoqcp_moc_files = qtmod.compile_moc(headers: neoqcp_moc_headers, include_directories: NEOQCP_INCLUDE_DIR)
 
 
 NeoQCP = static_library('NeoQCP',
@@ -149,20 +150,20 @@ NeoQCP = static_library('NeoQCP',
            'src/polar/polargraph.cpp',
            'src/polar/polargrid.cpp',
            'src/polar/radialaxis.cpp',
-           qcp_moc_files,           
-           include_directories:QCP_INCLUDE_DIR,
+           neoqcp_moc_files,
+           include_directories: NEOQCP_INCLUDE_DIR,
            cpp_args:cpp_args,
-           dependencies : [qtdeps] + optional_deps,
-           install : true,
-           extra_files:[qcp_moc_headers, 'src/Profiling.hpp']
+           dependencies: [qtdeps] + optional_deps,
+           install: true,
+           extra_files: [neoqcp_moc_headers, 'src/Profiling.hpp']
            )
 
 
 
-NeoQCP_dep = declare_dependency(link_with : NeoQCP,
-                                     include_directories:QCP_INCLUDE_DIR,
-                                     dependencies:[qtdeps] + optional_deps,
-                                     compile_args:['-DQCUSTOMPLOT_USE_OPENGL'])
+NeoQCP_dep = declare_dependency(link_with: NeoQCP,
+                                include_directories: NEOQCP_INCLUDE_DIR,
+                                dependencies: [qtdeps] + optional_deps,
+                                compile_args: ['-DQCUSTOMPLOT_USE_OPENGL'])
 
 if get_option ( 'with_examples')
     subdir('examples')

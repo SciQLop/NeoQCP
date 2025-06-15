@@ -1,5 +1,5 @@
 /*------------------------------------------------------------------------------
--- This file is a part of the QCustomPlot
+-- This file is a part of the NeoQCP project.
 -- Copyright (C) 2025, Plasma Physics Laboratory - CNRS
 --
 -- This program is free software; you can redistribute it and/or modify
