@@ -23,6 +23,8 @@
 **          Version: 2.1.1                                                **
 ****************************************************************************/
 
+#include "Profiling.hpp"
+
 #include "layer.h"
 
 #include "painter.h"
@@ -192,6 +194,7 @@ void QCPLayer::setMode(QCPLayer::LayerMode mode)
 */
 void QCPLayer::draw(QCPPainter *painter)
 {
+  PROFILE_HERE_N("QCPLayer::draw");
   foreach (QCPLayerable *child, mChildren)
   {
     if (child->realVisibility())
@@ -215,6 +218,7 @@ void QCPLayer::draw(QCPPainter *painter)
 */
 void QCPLayer::drawToPaintBuffer()
 {
+    PROFILE_HERE_N("QCPLayer::drawToPaintBuffer");
   if (QSharedPointer<QCPAbstractPaintBuffer> pb = mPaintBuffer.toStrongRef())
   {
     if (QCPPainter *painter = pb->startPainting())

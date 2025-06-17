@@ -1888,6 +1888,8 @@ void QCustomPlot::deselectAll()
 */
 void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
 {
+  PROFILE_HERE;
+  PROFILE_PASS_VALUE_N("OpenGL", this->mOpenGl);
   if (refreshPriority == QCustomPlot::rpQueuedReplot)
   {
     if (!mReplotQueued)
@@ -2230,7 +2232,9 @@ QSize QCustomPlot::sizeHint() const
 void QCustomPlot::paintEvent(QPaintEvent *event)
 {
   Q_UNUSED(event)
-    PROFILE_HERE;
+  PROFILE_FRAME_MARK;
+  PROFILE_HERE;
+  PROFILE_PASS_VALUE(this->openGl());
   // detect if the device pixel ratio has changed (e.g. moving window between different DPI screens), and adapt buffers if necessary:
 #ifdef QCP_DEVICEPIXELRATIO_SUPPORTED
 #  ifdef QCP_DEVICEPIXELRATIO_FLOAT
@@ -2495,6 +2499,7 @@ void QCustomPlot::wheelEvent(QWheelEvent *event)
 */
 void QCustomPlot::draw(QCPPainter *painter)
 {
+  PROFILE_HERE_N("QCustomPlot::draw");
   updateLayout();
   
   // draw viewport background pixmap:
@@ -2526,6 +2531,7 @@ void QCustomPlot::draw(QCPPainter *painter)
 */
 void QCustomPlot::updateLayout()
 {
+  PROFILE_HERE_N("QCustomPlot::updateLayou");
   // run through layout phases:
   mPlotLayout->update(QCPLayoutElement::upPreparation);
   mPlotLayout->update(QCPLayoutElement::upMargins);
@@ -2594,6 +2600,7 @@ void QCustomPlot::drawBackground(QCPPainter *painter)
 */
 void QCustomPlot::setupPaintBuffers()
 {
+    PROFILE_HERE;
   int bufferIndex = 0;
   if (mPaintBuffers.isEmpty())
     mPaintBuffers.append(QSharedPointer<QCPAbstractPaintBuffer>(createPaintBuffer()));

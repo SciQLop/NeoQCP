@@ -27,6 +27,8 @@
 
 #include "painter.h"
 
+#include "Profiling.hpp"
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPAbstractPaintBuffer
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -320,24 +322,28 @@ void QCPPaintBufferGlFbo::donePainting()
 }
 
 /* inherits documentation from base class */
-void QCPPaintBufferGlFbo::draw(QCPPainter *painter) const
-{
-  if (!painter || !painter->isActive())
-  {
-    qDebug() << Q_FUNC_INFO << "invalid or inactive painter passed";
-    return;
-  }
-  if (!mGlFrameBuffer)
-  {
-    qDebug() << Q_FUNC_INFO << "OpenGL frame buffer object doesn't exist, reallocateBuffer was not called?";
-    return;
-  }
-  auto ctx_ref = mGlContext.toStrongRef();
-  auto ctx = ctx_ref.data();
-  if (QOpenGLContext::currentContext() != ctx)
-      ctx->makeCurrent(ctx->surface());
-   QRect targetRect(0, 0, mGlFrameBuffer->width() / mDevicePixelRatio,
-                    + mGlFrameBuffer->height() / mDevicePixelRatio);
+ void QCPPaintBufferGlFbo::draw(QCPPainter *painter) const
+ {
+   PROFILE_HERE_N("QCPPaintBufferGlFbo::draw");
+   if (!painter || !painter->isActive())
+   {
+     qDebug() << Q_FUNC_INFO << "invalid or inactive painter passed";
+     return;
+   }
+   if (!mGlFrameBuffer)
+   {
+     qDebug() << Q_FUNC_INFO << "OpenGL frame buffer object doesn't exist, reallocateBuffer was not called?";
+     return;
+   }
+   auto ctx_ref = mGlContext.toStrongRef();
+   auto ctx = ctx_ref.data();
+   if (QOpenGLContext::currentContext() != ctx)
+       ctx->makeCurrent(ctx->surface());
+
+   const int targetWidth = mGlFrameBuffer->width() / mDevicePixelRatio;
+   const int targetHeight = mGlFrameBuffer->height() / mDevicePixelRatio;
+   QRect targetRect(0, 0, targetWidth, targetHeight);
+
    auto image = mGlFrameBuffer->toImage();
    image.setDevicePixelRatio(mDevicePixelRatio);
    painter->drawImage(targetRect, image, image.rect());

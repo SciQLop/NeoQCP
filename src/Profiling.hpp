@@ -24,16 +24,22 @@
 #ifdef TRACY_ENABLE
 
 #include <tracy/Tracy.hpp>
+
+#define PROFILE_FRAME_MARK FrameMark
 #define PROFILE_HERE ZoneScoped
 #define PROFILE_HERE_N(name) ZoneScopedN(name)
 #define PROFILE_HERE_NC(name, color) ZoneScopedNC(name, color)
 #define PROFILE_PASS_VALUE(value) ZoneValue(value)
+#define PROFILE_PASS_VALUE_N(name, value) ZoneValue(value)
+
 
 #else
 
+#define PROFILE_FRAME_MARK
 #define PROFILE_HERE
 #define PROFILE_HERE_N(name)
 #define PROFILE_HERE_NC(name, color)
 #define PROFILE_PASS_VALUE(value)
+#define PROFILE_PASS_VALUE_N(name, value)
 
 #endif

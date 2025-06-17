@@ -23,6 +23,7 @@
 **          Version: 2.1.1                                                **
 ****************************************************************************/
 
+#include "Profiling.hpp"
 #include "plottable-graph.h"
 
 #include "../painter.h"
@@ -434,6 +435,7 @@ QCPRange QCPGraph::getValueRange(bool &foundRange, QCP::SignDomain inSignDomain,
 /* inherits documentation from base class */
 void QCPGraph::draw(QCPPainter *painter)
 {
+  PROFILE_HERE_N("QCPGraph::draw");
   if (!mKeyAxis || !mValueAxis) { qDebug() << Q_FUNC_INFO << "invalid key or value axis"; return; }
   if (mKeyAxis.data()->range().size() <= 0 || mDataContainer->isEmpty()) return;
   if (mLineStyle == lsNone && mScatterStyle.isNone()) return;
