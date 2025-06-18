@@ -344,9 +344,16 @@ void QCPPaintBufferGlFbo::donePainting()
    const int targetHeight = mGlFrameBuffer->height() / mDevicePixelRatio;
    QRect targetRect(0, 0, targetWidth, targetHeight);
 
-   auto image = mGlFrameBuffer->toImage();
+   auto image = [this](){
+       PROFILE_HERE_N("QOpenGLFramebufferObject::toImage");
+       return this->mGlFrameBuffer->toImage();
+   }();
    image.setDevicePixelRatio(mDevicePixelRatio);
-   painter->drawImage(targetRect, image, image.rect());
+   {
+       PROFILE_HERE_N("QPainter::drawImage");
+       painter->drawImage(targetRect, image, image.rect());
+   }
+
 }
 
 /* inherits documentation from base class */
