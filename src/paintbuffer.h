@@ -33,13 +33,14 @@ class QCPPainter;
 class QCP_LIB_DECL QCPAbstractPaintBuffer
 {
 public:
-  explicit QCPAbstractPaintBuffer(const QSize &size, double devicePixelRatio);
+  explicit QCPAbstractPaintBuffer(const QSize &size, double devicePixelRatio, const QString& layerName);
   virtual ~QCPAbstractPaintBuffer();
   
   // getters:
   QSize size() const { return mSize; }
   bool invalidated() const { return mInvalidated; }
   double devicePixelRatio() const { return mDevicePixelRatio; }
+  QString layerName() const { return mLayerName; }
   
   // setters:
   void setSize(const QSize &size);
@@ -56,6 +57,7 @@ protected:
   // property members:
   QSize mSize;
   double mDevicePixelRatio;
+  QString mLayerName; // the name of the layer this paint buffer belongs to, if applicable
   
   // non-property members:
   bool mInvalidated;
@@ -68,7 +70,7 @@ protected:
 class QCP_LIB_DECL QCPPaintBufferPixmap : public QCPAbstractPaintBuffer
 {
 public:
-  explicit QCPPaintBufferPixmap(const QSize &size, double devicePixelRatio);
+  explicit QCPPaintBufferPixmap(const QSize &size, double devicePixelRatio, const QString& layerName);
   virtual ~QCPPaintBufferPixmap() Q_DECL_OVERRIDE;
   
   // reimplemented virtual methods:
@@ -112,7 +114,7 @@ protected:
 class QCP_LIB_DECL QCPPaintBufferGlFbo : public QCPAbstractPaintBuffer
 {
 public:
-  explicit QCPPaintBufferGlFbo(const QSize &size, double devicePixelRatio, QWeakPointer<QOpenGLContext> glContext, QWeakPointer<QOpenGLPaintDevice> glPaintDevice);
+  explicit QCPPaintBufferGlFbo(const QSize &size, double devicePixelRatio, const QString& layerName,  QWeakPointer<QOpenGLContext> glContext, QWeakPointer<QOpenGLPaintDevice> glPaintDevice);
   virtual ~QCPPaintBufferGlFbo() Q_DECL_OVERRIDE;
   
   // reimplemented virtual methods:

@@ -2603,7 +2603,7 @@ void QCustomPlot::setupPaintBuffers()
     PROFILE_HERE;
   int bufferIndex = 0;
   if (mPaintBuffers.isEmpty())
-    mPaintBuffers.append(QSharedPointer<QCPAbstractPaintBuffer>(createPaintBuffer()));
+    mPaintBuffers.append(QSharedPointer<QCPAbstractPaintBuffer>(createPaintBuffer("default")));
   
   for (int layerIndex = 0; layerIndex < mLayers.size(); ++layerIndex)
   {
@@ -2615,13 +2615,13 @@ void QCustomPlot::setupPaintBuffers()
     {
       ++bufferIndex;
       if (bufferIndex >= mPaintBuffers.size())
-        mPaintBuffers.append(QSharedPointer<QCPAbstractPaintBuffer>(createPaintBuffer()));
+        mPaintBuffers.append(QSharedPointer<QCPAbstractPaintBuffer>(createPaintBuffer(layer->name())));
       layer->mPaintBuffer = mPaintBuffers.at(bufferIndex).toWeakRef();
       if (layerIndex < mLayers.size()-1 && mLayers.at(layerIndex+1)->mode() == QCPLayer::lmLogical) // not last layer, and next one is logical, so prepare another buffer for next layerables
       {
         ++bufferIndex;
         if (bufferIndex >= mPaintBuffers.size())
-          mPaintBuffers.append(QSharedPointer<QCPAbstractPaintBuffer>(createPaintBuffer()));
+          mPaintBuffers.append(QSharedPointer<QCPAbstractPaintBuffer>(createPaintBuffer(layer->name() + "_logical")));
       }
     }
   }
@@ -2645,20 +2645,18 @@ void QCustomPlot::setupPaintBuffers()
   backends (subclasses of \ref QCPAbstractPaintBuffer) are created, initialized with the proper
   size and device pixel ratio, and returned.
 */
-QCPAbstractPaintBuffer *QCustomPlot::createPaintBuffer()
+QCPAbstractPaintBuffer *QCustomPlot::createPaintBuffer(const QString& layerName)
 {
   if (mOpenGl)
   {
 #if defined(QCP_OPENGL_FBO)
-    return new QCPPaintBufferGlFbo(viewport().size(), mBufferDevicePixelRatio, mGlContext, mGlPaintDevice);
-#elif defined(QCP_OPENGL_PBUFFER)
-    return new QCPPaintBufferGlPbuffer(viewport().size(), mBufferDevicePixelRatio, mOpenGlMultisamples);
+    return new QCPPaintBufferGlFbo(viewport().size(), mBufferDevicePixelRatio, layerName, mGlContext, mGlPaintDevice);
 #else
     qDebug() << Q_FUNC_INFO << "OpenGL enabled even though no support for it compiled in, this shouldn't have happened. Falling back to pixmap paint buffer.";
-    return new QCPPaintBufferPixmap(viewport().size(), mBufferDevicePixelRatio);
+    return new QCPPaintBufferPixmap(viewport().size(), mBufferDevicePixelRatio, layerName);
 #endif
   } else
-    return new QCPPaintBufferPixmap(viewport().size(), mBufferDevicePixelRatio);
+    return new QCPPaintBufferPixmap(viewport().size(), mBufferDevicePixelRatio, layerName);
 }
 
 /*!

@@ -116,9 +116,10 @@
 
   Subclasses must call their \ref reallocateBuffer implementation in their respective constructors.
 */
-QCPAbstractPaintBuffer::QCPAbstractPaintBuffer(const QSize &size, double devicePixelRatio) :
+QCPAbstractPaintBuffer::QCPAbstractPaintBuffer(const QSize &size, double devicePixelRatio, const QString& layerName) :
   mSize(size),
   mDevicePixelRatio(devicePixelRatio),
+  mLayerName(layerName),
   mInvalidated(true)
 {
 }
@@ -197,8 +198,8 @@ void QCPAbstractPaintBuffer::setDevicePixelRatio(double ratio)
   Creates a pixmap paint buffer instancen with the specified \a size and \a devicePixelRatio, if
   applicable.
 */
-QCPPaintBufferPixmap::QCPPaintBufferPixmap(const QSize &size, double devicePixelRatio) :
-  QCPAbstractPaintBuffer(size, devicePixelRatio)
+QCPPaintBufferPixmap::QCPPaintBufferPixmap(const QSize &size, double devicePixelRatio, const QString &layerName) :
+  QCPAbstractPaintBuffer(size, devicePixelRatio, layerName)
 {
   QCPPaintBufferPixmap::reallocateBuffer();
 }
@@ -269,8 +270,8 @@ void QCPPaintBufferPixmap::reallocateBuffer()
   QCustomPlot::setupOpenGl and the context and paint device are managed by the parent QCustomPlot
   instance.
 */
-QCPPaintBufferGlFbo::QCPPaintBufferGlFbo(const QSize &size, double devicePixelRatio, QWeakPointer<QOpenGLContext> glContext, QWeakPointer<QOpenGLPaintDevice> glPaintDevice) :
-  QCPAbstractPaintBuffer(size, devicePixelRatio),
+QCPPaintBufferGlFbo::QCPPaintBufferGlFbo(const QSize &size, double devicePixelRatio, const QString& layerName, QWeakPointer<QOpenGLContext> glContext, QWeakPointer<QOpenGLPaintDevice> glPaintDevice) :
+  QCPAbstractPaintBuffer(size, devicePixelRatio, layerName),
   mGlContext(glContext),
   mGlPaintDevice(glPaintDevice),
   mGlFrameBuffer(0)
@@ -325,6 +326,7 @@ void QCPPaintBufferGlFbo::donePainting()
  void QCPPaintBufferGlFbo::draw(QCPPainter *painter) const
  {
    PROFILE_HERE_N("QCPPaintBufferGlFbo::draw");
+   PROFILE_PASS_TXT(mLayerName.toStdString().c_str(), mLayerName.size());
    if (!painter || !painter->isActive())
    {
      qDebug() << Q_FUNC_INFO << "invalid or inactive painter passed";

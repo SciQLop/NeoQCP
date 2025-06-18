@@ -30,6 +30,7 @@
 #define PROFILE_HERE_N(name) ZoneScopedN(name)
 #define PROFILE_HERE_NC(name, color) ZoneScopedNC(name, color)
 #define PROFILE_PASS_VALUE(value) ZoneValue(value)
+#define PROFILE_PASS_TXT(txt, size) ZoneText(txt, size)
 #define PROFILE_PASS_VALUE_N(name, value) ZoneValue(value)
 
 
@@ -41,5 +42,6 @@
 #define PROFILE_HERE_NC(name, color)
 #define PROFILE_PASS_VALUE(value)
 #define PROFILE_PASS_VALUE_N(name, value)
+#define PROFILE_PASS_TXT(txt, size)
 
 #endif

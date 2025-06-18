@@ -293,7 +293,7 @@ protected:
   QList<QCPLayerable*> layerableListAt(const QPointF &pos, bool onlySelectable, QList<QVariant> *selectionDetails=nullptr) const;
   void drawBackground(QCPPainter *painter);
   void setupPaintBuffers();
-  QCPAbstractPaintBuffer *createPaintBuffer();
+  QCPAbstractPaintBuffer *createPaintBuffer(const QString& layerName);
   bool hasInvalidatedPaintBuffers();
   bool setupOpenGl();
   void freeOpenGl();
