@@ -224,6 +224,15 @@ void QCPPaintBufferPixmap::draw(QCPPainter *painter) const
     qDebug() << Q_FUNC_INFO << "invalid or inactive painter passed";
 }
 
+void QCPPaintBufferPixmap::batch_draw(const QList<QSharedPointer<QCPAbstractPaintBuffer> > &buffers, QCPPainter *painter) const
+{
+  PROFILE_HERE_N("QCPPaintBufferPixmap::batch_draw");
+  for (const auto &buffer : buffers)
+  {
+    buffer->draw(painter);
+  }
+}
+
 /* inherits documentation from base class */
 void QCPPaintBufferPixmap::clear(const QColor &color)
 {
@@ -358,6 +367,108 @@ void QCPPaintBufferGlFbo::donePainting()
 
 }
 
+ void QCPPaintBufferGlFbo::batch_draw(const QList<QSharedPointer<QCPAbstractPaintBuffer> > &buffers, QCPPainter *painter) const
+{
+    PROFILE_HERE_N("QCPPaintBufferGlFbo::batch_draw");
+    if (!painter || !painter->isActive())
+    {
+        qDebug() << Q_FUNC_INFO << "invalid or inactive painter passed";
+        return;
+    }
+    if(std::size(buffers) ==1 && buffers.first().data() == this)
+    {
+        // If we are the only buffer, just draw ourselves
+        draw(painter);
+        return;
+    }
+    // If we are not the only buffer, we need to draw all buffers
+    auto ctx_ref = mGlContext.toStrongRef();
+    auto ctx = ctx_ref.data();
+    if (QOpenGLContext::currentContext() != ctx)
+        ctx->makeCurrent(ctx->surface());
+
+    const int targetWidth = mGlFrameBuffer->width() / mDevicePixelRatio;
+    const int targetHeight = mGlFrameBuffer->height() / mDevicePixelRatio;
+    QRect targetRect(0, 0, targetWidth, targetHeight);
+    QOpenGLFramebufferObject destFbo(mGlFrameBuffer->size(), QOpenGLFramebufferObject::CombinedDepthStencil);
+    destFbo.bind();
+    if (!destFbo.isValid() || !destFbo.isBound())
+    {
+        qDebug() << Q_FUNC_INFO << "Destination framebuffer object is not valid";
+        return;
+    }
+
+    glPushAttrib(GL_ALL_ATTRIB_BITS);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glViewport(0, 0, destFbo.width(), destFbo.height());
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    glOrtho(0, destFbo.width(), 0, destFbo.height(), -1, 1);
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_TEXTURE_2D);
+    glColor4f(1.0, 1.0, 1.0, 1.0);
+
+           // Clear the destination buffer before drawing
+    glClearColor(0, 0, 0, 0);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+
+    {
+
+        // FBO to retrieve non multi-sampled buffers texture
+        QOpenGLFramebufferObject resolveFbo(mGlFrameBuffer->size(), QOpenGLFramebufferObject::CombinedDepthStencil);
+        //resolveFbo.bind();
+
+        PROFILE_HERE_N("QOpenGLFramebufferObject::blitFramebuffer");
+        for(auto &buffer: buffers)
+        {
+            auto glBuffer = qSharedPointerCast<QCPPaintBufferGlFbo>(buffer);
+            if (!glBuffer || !glBuffer->mGlFrameBuffer || !glBuffer->mGlFrameBuffer->isValid())
+            {
+                qDebug() << Q_FUNC_INFO << "Invalid buffer passed";
+                continue;
+            }
+            QOpenGLFramebufferObject::blitFramebuffer(
+                &resolveFbo,
+                glBuffer->mGlFrameBuffer,
+                GL_COLOR_BUFFER_BIT, GL_NEAREST
+                );
+            destFbo.bind();
+            glBindTexture(GL_TEXTURE_2D, resolveFbo.texture());
+            glBegin(GL_QUADS);
+            glTexCoord2f(0, 0); glVertex2f(0, 0);
+            glTexCoord2f(1, 0); glVertex2f(destFbo.width(), 0);
+            glTexCoord2f(1, 1); glVertex2f(destFbo.width(), destFbo.height());
+            glTexCoord2f(0, 1); glVertex2f(0, destFbo.height());
+            glEnd();
+        }
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+        glMatrixMode(GL_MODELVIEW);
+        glPopMatrix();
+        glPopAttrib();
+    }
+
+    auto image = [&destFbo](){
+        PROFILE_HERE_N("QOpenGLFramebufferObject::toImage");
+        return destFbo.toImage();
+    }();
+    image.setDevicePixelRatio(mDevicePixelRatio);
+    {
+        PROFILE_HERE_N("QPainter::drawImage");
+        painter->drawImage(targetRect, image, image.rect());
+    }
+}
+
 /* inherits documentation from base class */
 void QCPPaintBufferGlFbo::clear(const QColor &color)
 {
@@ -416,4 +527,6 @@ void QCPPaintBufferGlFbo::reallocateBuffer()
     paintDevice->setSize(mSize*mDevicePixelRatio);
   paintDevice->setDevicePixelRatio(mDevicePixelRatio);
 }
+
+
 #endif // QCP_OPENGL_FBO

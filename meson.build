@@ -26,6 +26,9 @@ if get_option ( 'with_opengl')
     optional_deps += [ qtopengl_dep, GL ]
     cpp_args += ['-DQCUSTOMPLOT_USE_OPENGL']
 endif
+if get_option ( 'enable_batch_drawing')
+    cpp_args += ['-DNEOQCP_BATCH_DRAWING']
+endif
 
 
 NEOQCP_INCLUDE_DIR = include_directories('src')

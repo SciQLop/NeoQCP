@@ -912,8 +912,10 @@ void QCustomPlot::setBufferDevicePixelRatio(double ratio)
   {
 #ifdef QCP_DEVICEPIXELRATIO_SUPPORTED
     mBufferDevicePixelRatio = ratio;
-    foreach (QSharedPointer<QCPAbstractPaintBuffer> buffer, mPaintBuffers)
-      buffer->setDevicePixelRatio(mBufferDevicePixelRatio);
+    for(auto& buffer : mPaintBuffers)
+    {
+        buffer->setDevicePixelRatio(mBufferDevicePixelRatio);
+    }
     // Note: axis label cache has devicePixelRatio as part of cache hash, so no need to manually clear cache here
 #else
     qDebug() << Q_FUNC_INFO << "Device pixel ratios not supported for Qt versions before 5.4";
@@ -1913,10 +1915,14 @@ void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
   updateLayout();
   // draw all layered objects (grid, axes, plottables, items, legend,...) into their buffers:
   setupPaintBuffers();
-  foreach (QCPLayer *layer, mLayers)
+  for (auto& layer: mLayers)
+  {
     layer->drawToPaintBuffer();
-  foreach (QSharedPointer<QCPAbstractPaintBuffer> buffer, mPaintBuffers)
-    buffer->setInvalidated(false);
+  }
+  for(auto& buffer: mPaintBuffers)
+  {
+      buffer->setInvalidated(false);
+  }
   
   if ((refreshPriority == rpRefreshHint && mPlottingHints.testFlag(QCP::phImmediateRefresh)) || refreshPriority==rpImmediateRefresh)
     repaint();
@@ -2258,8 +2264,18 @@ void QCustomPlot::paintEvent(QPaintEvent *event)
     if (mBackgroundBrush.style() != Qt::NoBrush)
       painter.fillRect(mViewport, mBackgroundBrush);
     drawBackground(&painter);
-    foreach (QSharedPointer<QCPAbstractPaintBuffer> buffer, mPaintBuffers)
-      buffer->draw(&painter);
+#ifdef NEOQCP_BATCH_DRAWING
+    if(std::size(mPaintBuffers) > 0)
+    {
+        mPaintBuffers.front()->batch_draw(mPaintBuffers, &painter);
+    }
+
+#else
+    for (const auto& buffer: mPaintBuffers)
+    {
+        buffer->draw(&painter);
+    }
+#endif
   }
 }
 
@@ -2629,7 +2645,7 @@ void QCustomPlot::setupPaintBuffers()
   while (mPaintBuffers.size()-1 > bufferIndex)
     mPaintBuffers.removeLast();
   // resize buffers to viewport size and clear contents:
-  foreach (QSharedPointer<QCPAbstractPaintBuffer> buffer, mPaintBuffers)
+  for (auto& buffer: mPaintBuffers)
   {
     buffer->setSize(viewport().size()); // won't do anything if already correct size
     buffer->clear(Qt::transparent);
@@ -2672,7 +2688,7 @@ QCPAbstractPaintBuffer *QCustomPlot::createPaintBuffer(const QString& layerName)
 */
 bool QCustomPlot::hasInvalidatedPaintBuffers()
 {
-  foreach (QSharedPointer<QCPAbstractPaintBuffer> buffer, mPaintBuffers)
+  for (auto& buffer: mPaintBuffers)
   {
     if (buffer->invalidated())
       return true;
@@ -2821,7 +2837,7 @@ void QCustomPlot::processRectSelection(QRect rect, QMouseEvent *event)
     if (QCPAxisRect *affectedAxisRect = axisRectAt(rectF.topLeft()))
     {
       // determine plottables that were hit by the rect and thus are candidates for selection:
-      foreach (QCPAbstractPlottable *plottable, affectedAxisRect->plottables())
+      for (auto plottable: affectedAxisRect->plottables())
       {
         if (QCPPlottableInterface1D *plottableInterface = plottable->interface1D())
         {
@@ -2847,9 +2863,9 @@ void QCustomPlot::processRectSelection(QRect rect, QMouseEvent *event)
       if (!additive)
       {
         // emit deselection except to those plottables who will be selected afterwards:
-        foreach (QCPLayer *layer, mLayers)
+        for (auto layer: mLayers)
         {
-          foreach (QCPLayerable *layerable, layer->children())
+          for (auto layerable: layer->children())
           {
             if ((potentialSelections.isEmpty() || potentialSelections.constBegin()->first != layerable) && mInteractions.testFlag(layerable->selectionCategory()))
             {
@@ -2933,9 +2949,9 @@ void QCustomPlot::processPointSelection(QMouseEvent *event)
   // deselect all other layerables if not additive selection:
   if (!additive)
   {
-    foreach (QCPLayer *layer, mLayers)
+    for (auto layer: std::as_const(mLayers))
     {
-      foreach (QCPLayerable *layerable, layer->children())
+      for (auto layerable: layer->children())
       {
         if (layerable != clickedLayerable && mInteractions.testFlag(layerable->selectionCategory()))
         {

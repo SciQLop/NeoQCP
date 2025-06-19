@@ -25,6 +25,9 @@ This fork aims at modernizing the excellent [QCustomPlot](https://www.qcustomplo
     - Fixed OpenGL context handling with multiple OpenGL widgets
     - Fixed DPI scaling issues with OpenGL on MacOS and Windows
 
+- **Optimizations**  
+  - Faster OpenGL rendering when using multiple layers 
+
 - **Planned Features**
     - Support more data containers like `std::vector`, `std::array`, and `std::span`
     - More customization points

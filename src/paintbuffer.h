@@ -27,8 +27,9 @@
 #define QCP_PAINTBUFFER_H
 
 #include "global.h"
-
 class QCPPainter;
+
+
 
 class QCP_LIB_DECL QCPAbstractPaintBuffer
 {
@@ -51,6 +52,7 @@ public:
   virtual QCPPainter *startPainting() = 0;
   virtual void donePainting() {}
   virtual void draw(QCPPainter *painter) const = 0;
+  virtual void batch_draw(const QList<QSharedPointer<QCPAbstractPaintBuffer>>& buffers, QCPPainter *painter) const=0;
   virtual void clear(const QColor &color) = 0;
   
 protected:
@@ -66,7 +68,6 @@ protected:
   virtual void reallocateBuffer() = 0;
 };
 
-
 class QCP_LIB_DECL QCPPaintBufferPixmap : public QCPAbstractPaintBuffer
 {
 public:
@@ -76,6 +77,7 @@ public:
   // reimplemented virtual methods:
   virtual QCPPainter *startPainting() Q_DECL_OVERRIDE;
   virtual void draw(QCPPainter *painter) const Q_DECL_OVERRIDE;
+  virtual void batch_draw(const QList<QSharedPointer<QCPAbstractPaintBuffer>>& buffers, QCPPainter *painter) const Q_DECL_OVERRIDE;
   void clear(const QColor &color) Q_DECL_OVERRIDE;
   
 protected:
@@ -85,30 +87,6 @@ protected:
   // reimplemented virtual methods:
   virtual void reallocateBuffer() Q_DECL_OVERRIDE;
 };
-
-
-#ifdef QCP_OPENGL_PBUFFER
-class QCP_LIB_DECL QCPPaintBufferGlPbuffer : public QCPAbstractPaintBuffer
-{
-public:
-  explicit QCPPaintBufferGlPbuffer(const QSize &size, double devicePixelRatio, int multisamples);
-  virtual ~QCPPaintBufferGlPbuffer() Q_DECL_OVERRIDE;
-  
-  // reimplemented virtual methods:
-  virtual QCPPainter *startPainting() Q_DECL_OVERRIDE;
-  virtual void draw(QCPPainter *painter) const Q_DECL_OVERRIDE;
-  void clear(const QColor &color) Q_DECL_OVERRIDE;
-  
-protected:
-  // non-property members:
-  QGLPixelBuffer *mGlPBuffer;
-  int mMultisamples;
-  
-  // reimplemented virtual methods:
-  virtual void reallocateBuffer() Q_DECL_OVERRIDE;
-};
-#endif // QCP_OPENGL_PBUFFER
-
 
 #ifdef QCP_OPENGL_FBO
 class QCP_LIB_DECL QCPPaintBufferGlFbo : public QCPAbstractPaintBuffer
@@ -121,8 +99,9 @@ public:
   virtual QCPPainter *startPainting() Q_DECL_OVERRIDE;
   virtual void donePainting() Q_DECL_OVERRIDE;
   virtual void draw(QCPPainter *painter) const Q_DECL_OVERRIDE;
+  virtual void batch_draw(const QList<QSharedPointer<QCPAbstractPaintBuffer>>& buffers, QCPPainter *painter) const Q_DECL_OVERRIDE;
   void clear(const QColor &color) Q_DECL_OVERRIDE;
-  
+
 protected:
   // non-property members:
   QWeakPointer<QOpenGLContext> mGlContext;

@@ -2,3 +2,4 @@ option('tracy_enable', type : 'boolean', value : false , description : 'Enable p
 option('with_examples', type : 'boolean', value : false , description : 'Enable examples')
 option('with_tests', type : 'boolean', value : true , description : 'Enable tests')
 option('with_opengl', type : 'boolean', value : true , description : 'Enable OpenGL support')
+option('enable_batch_drawing', type : 'boolean', value : true, description : 'Enable experimental batch drawing, makes OpenGL drawing more efficient')
