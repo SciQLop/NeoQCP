@@ -24,14 +24,34 @@ if get_option ( 'with_opengl')
     GL = dependency('gl', required : true)
     qtopengl_dep = dependency('qt6', modules : ['OpenGL'], method:'qmake')
     optional_deps += [ qtopengl_dep, GL ]
-    cpp_args += ['-DQCUSTOMPLOT_USE_OPENGL']
 endif
+
+config_data = configuration_data()
+version = meson.project_version().split('.')
+config_data.set('NEOQCP_VERSION_MAJOR', version[0])
+config_data.set('NEOQCP_VERSION_MINOR', version[1])
+config_data.set('NEOQCP_VERSION_PATCH', version[2])
+config_data.set_quoted('NEOQCP_VERSION', meson.project_version())
+
+config_data.set('QCP_DEVICEPIXELRATIO_SUPPORTED', true)
+config_data.set('QCP_DEVICEPIXELRATIO_FLOAT', true)
+
 if get_option ( 'enable_batch_drawing')
-    cpp_args += ['-DNEOQCP_BATCH_DRAWING']
+    config_data.set('NEOQCP_BATCH_DRAWING', true)
+endif
+if get_option ( 'with_opengl')
+    config_data.set('NEOQCP_USE_OPENGL', true)
+    config_data.set('QCUSTOMPLOT_USE_OPENGL', true)
+    config_data.set('QCP_OPENGL_FBO', true)
+    config_data.set('QCP_OPENGL_OFFSCREENSURFACE', true)
 endif
 
+config_h = configure_file(
+  output : 'neoqcp_config.h',
+  configuration : config_data
+)
 
-NEOQCP_INCLUDE_DIR = include_directories('src')
+NEOQCP_INCLUDE_DIR = include_directories('src','.')
 
 
 neoqcp_moc_headers = ['src/axis/axis.h',
@@ -166,7 +186,7 @@ NeoQCP = static_library('NeoQCP',
 NeoQCP_dep = declare_dependency(link_with: NeoQCP,
                                 include_directories: NEOQCP_INCLUDE_DIR,
                                 dependencies: [qtdeps] + optional_deps,
-                                compile_args: ['-DQCUSTOMPLOT_USE_OPENGL'])
+                                compile_args: cpp_args)
 
 if get_option ( 'with_examples')
     subdir('examples')

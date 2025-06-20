@@ -897,6 +897,7 @@ void QCustomPlot::setOpenGl(bool enabled, int multisampling)
     // recreate all paint buffers:
     mPaintBuffers.clear();
     setupPaintBuffers();
+
 #else
     Q_UNUSED(enabled)
     qDebug()
@@ -2343,9 +2344,9 @@ void QCustomPlot::paintEvent(QPaintEvent* event)
             painter.fillRect(mViewport, mBackgroundBrush);
         drawBackground(&painter);
 #ifdef NEOQCP_BATCH_DRAWING
-        if (std::size(mPaintBuffers) > 0)
+        if (std::size(mPaintBuffers) > 0 && mBatchDrawingHelper)
         {
-            mPaintBuffers.front()->batch_draw(mPaintBuffers, &painter);
+            mBatchDrawingHelper->batch_draw(mPaintBuffers, &painter);
         }
 
 #else
@@ -2767,6 +2768,16 @@ void QCustomPlot::setupPaintBuffers()
         buffer->clear(Qt::transparent);
         buffer->setInvalidated();
     }
+#ifdef NEOQCP_BATCH_DRAWING
+    if (mOpenGl)
+    {
+        if (mBatchDrawingHelper)
+            delete mBatchDrawingHelper;
+
+        mBatchDrawingHelper = new NeoQCPBatchDrawingHelper(
+            viewport().size(), mBufferDevicePixelRatio, mGlContext, mGlPaintDevice);
+    }
+#endif
 }
 
 /*! \internal

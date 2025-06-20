@@ -26,17 +26,12 @@
 #ifndef QCP_GLOBAL_H
 #define QCP_GLOBAL_H
 
+#include "neoqcp_config.h"
+
 // amalgamation: include begin
 #include <QtCore/qglobal.h>
 
 // some Qt version/configuration dependent macros to include or exclude certain code paths:
-#ifdef QCUSTOMPLOT_USE_OPENGL
-#define QCP_OPENGL_FBO
-#define QCP_OPENGL_OFFSCREENSURFACE
-#endif
-
-#define QCP_DEVICEPIXELRATIO_SUPPORTED
-#define QCP_DEVICEPIXELRATIO_FLOAT
 
 #include <QtCore/QCache>
 #include <QtCore/QDateTime>
@@ -76,9 +71,6 @@
 #include <QtCore/QTimeZone>
 
 // amalgamation: include end
-
-#define QCUSTOMPLOT_VERSION_STR "2.1.1"
-#define QCUSTOMPLOT_VERSION 0x020101
 
 // decl definitions for shared library compilation/usage:
 #if defined(QT_STATIC_BUILD)

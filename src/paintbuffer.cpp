@@ -222,16 +222,6 @@ void QCPPaintBufferPixmap::draw(QCPPainter* painter) const
         qDebug() << Q_FUNC_INFO << "invalid or inactive painter passed";
 }
 
-void QCPPaintBufferPixmap::batch_draw(const QList<QSharedPointer<QCPAbstractPaintBuffer>>& buffers,
-                                      QCPPainter* painter) const
-{
-    PROFILE_HERE_N("QCPPaintBufferPixmap::batch_draw");
-    for (const auto& buffer : buffers)
-    {
-        buffer->draw(painter);
-    }
-}
-
 /* inherits documentation from base class */
 void QCPPaintBufferPixmap::clear(const QColor& color)
 {
@@ -287,7 +277,6 @@ QCPPaintBufferGlFbo::QCPPaintBufferGlFbo(const QSize& size, double devicePixelRa
         , mGlContext(glContext)
         , mGlPaintDevice(glPaintDevice)
         , mGlFrameBuffer(0)
-        , mGlImage(nullptr)
 {
     QCPPaintBufferGlFbo::reallocateBuffer();
 }
@@ -373,136 +362,6 @@ void QCPPaintBufferGlFbo::draw(QCPPainter* painter) const
     }
 }
 
-void QCPPaintBufferGlFbo::batch_draw(const QList<QSharedPointer<QCPAbstractPaintBuffer>>& buffers,
-                                     QCPPainter* painter) const
-{
-    PROFILE_HERE_N("QCPPaintBufferGlFbo::batch_draw");
-    if (!painter || !painter->isActive())
-    {
-        qDebug() << Q_FUNC_INFO << "invalid or inactive painter passed";
-        return;
-    }
-    if (std::size(buffers) == 1 && buffers.first().data() == this)
-    {
-        // If we are the only buffer, just draw ourselves
-        draw(painter);
-        return;
-    }
-    // If we are not the only buffer, we need to draw all buffers
-    auto ctx_ref = mGlContext.toStrongRef();
-    auto ctx = ctx_ref.data();
-    if (QOpenGLContext::currentContext() != ctx)
-        ctx->makeCurrent(ctx->surface());
-
-    const int targetWidth = mGlFrameBuffer->width() / mDevicePixelRatio;
-    const int targetHeight = mGlFrameBuffer->height() / mDevicePixelRatio;
-    QRect targetRect(0, 0, targetWidth, targetHeight);
-    if (mGlImage == nullptr)
-    {
-        mGlImage = new QImage(mGlFrameBuffer->size(), QImage::Format_ARGB32_Premultiplied);
-        mGlImage->setDevicePixelRatio(mDevicePixelRatio);
-    }
-    else if (mGlImage->size() != mGlFrameBuffer->size())
-    {
-        delete mGlImage;
-        mGlImage = new QImage(mGlFrameBuffer->size(), QImage::Format_ARGB32_Premultiplied);
-        mGlImage->setDevicePixelRatio(mDevicePixelRatio);
-    }
-    QOpenGLFramebufferObject destFbo(mGlFrameBuffer->size(),
-                                     QOpenGLFramebufferObject::CombinedDepthStencil);
-    destFbo.bind();
-    if (!destFbo.isValid() || !destFbo.isBound())
-    {
-        qDebug() << Q_FUNC_INFO << "Destination framebuffer object is not valid";
-        return;
-    }
-
-    glPushAttrib(GL_ALL_ATTRIB_BITS);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glViewport(0, 0, destFbo.width(), destFbo.height());
-    glMatrixMode(GL_PROJECTION);
-    glPushMatrix();
-    glLoadIdentity();
-    glOrtho(0, destFbo.width(), 0, destFbo.height(), -1, 1);
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
-    glLoadIdentity();
-
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glEnable(GL_TEXTURE_2D);
-    glColor4f(1.0, 1.0, 1.0, 1.0);
-
-    // Clear the destination buffer before drawing
-    glClearColor(0, 0, 0, 0);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-
-    {
-
-        // FBO to retrieve non multi-sampled buffers texture
-        QOpenGLFramebufferObject resolveFbo(mGlFrameBuffer->size(),
-                                            QOpenGLFramebufferObject::CombinedDepthStencil);
-        // resolveFbo.bind();
-
-        PROFILE_HERE_N("QOpenGLFramebufferObject::blitFramebuffer");
-        for (auto& buffer : buffers)
-        {
-            auto glBuffer = qSharedPointerCast<QCPPaintBufferGlFbo>(buffer);
-            if (!glBuffer || !glBuffer->mGlFrameBuffer || !glBuffer->mGlFrameBuffer->isValid())
-            {
-                qDebug() << Q_FUNC_INFO << "Invalid buffer passed";
-                continue;
-            }
-            QOpenGLFramebufferObject::blitFramebuffer(&resolveFbo, glBuffer->mGlFrameBuffer,
-                                                      GL_COLOR_BUFFER_BIT, GL_NEAREST);
-            destFbo.bind();
-            glBindTexture(GL_TEXTURE_2D, resolveFbo.texture());
-            glBegin(GL_QUADS);
-            glTexCoord2f(0, 0);
-            glVertex2f(0, 0);
-            glTexCoord2f(1, 0);
-            glVertex2f(destFbo.width(), 0);
-            glTexCoord2f(1, 1);
-            glVertex2f(destFbo.width(), destFbo.height());
-            glTexCoord2f(0, 1);
-            glVertex2f(0, destFbo.height());
-            glEnd();
-        }
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
-        glMatrixMode(GL_MODELVIEW);
-        glPopMatrix();
-        glPopAttrib();
-    }
-#ifdef NEOQCP_MANUAL_GL_IMAGE
-    glBindTexture(GL_TEXTURE_2D, destFbo.texture());
-    glPixelStorei(GL_PACK_ALIGNMENT, 1);
-    {
-        PROFILE_HERE_N("glGetTexImage");
-        glGetTexImage(GL_TEXTURE_2D, 0, GL_BGRA, GL_UNSIGNED_BYTE, mGlImage->bits());
-    }
-    {
-        PROFILE_HERE_N("QPainter::drawImage");
-        painter->drawImage(targetRect, mGlImage->mirrored(), mGlImage->rect());
-    }
-#else
-    auto image = [&destFbo]()
-    {
-        PROFILE_HERE_N("QOpenGLFramebufferObject::toImage");
-        return destFbo.toImage();
-    }();
-    image.setDevicePixelRatio(mDevicePixelRatio);
-    {
-        PROFILE_HERE_N("QPainter::drawImage");
-        painter->drawImage(targetRect, image, image.rect());
-    }
-#endif
-}
-
 /* inherits documentation from base class */
 void QCPPaintBufferGlFbo::clear(const QColor& color)
 {
@@ -563,5 +422,188 @@ void QCPPaintBufferGlFbo::reallocateBuffer()
     paintDevice->setDevicePixelRatio(mDevicePixelRatio);
 }
 
+#ifdef NEOQCP_BATCH_DRAWING
 
+
+NeoQCPBatchDrawingHelper::NeoQCPBatchDrawingHelper(const QSize& size, double devicePixelRatio,
+                                                   QWeakPointer<QOpenGLContext> glContext,
+                                                   QWeakPointer<QOpenGLPaintDevice> glPaintDevice)
+        : mSize(size)
+        , mDevicePixelRatio(devicePixelRatio)
+        , mGlContext(glContext)
+        , mGlPaintDevice(glPaintDevice)
+        , mGlFrameBuffer(0)
+        , mResolveFbo(nullptr)
+#ifdef NEOQCP_MANUAL_GL_IMAGE
+        , mGlImage(nullptr)
+#endif
+{
+    reallocateBuffer();
+}
+
+NeoQCPBatchDrawingHelper::~NeoQCPBatchDrawingHelper()
+{
+#ifdef NEOQCP_MANUAL_GL_IMAGE
+    if (mGlImage)
+    {
+        delete mGlImage;
+        mGlImage = nullptr;
+    }
+#endif
+    if (mResolveFbo)
+    {
+        delete mResolveFbo;
+        mResolveFbo = nullptr;
+    }
+}
+
+void NeoQCPBatchDrawingHelper::batch_draw(
+    const QList<QSharedPointer<QCPAbstractPaintBuffer>>& buffers, QCPPainter* painter) const
+{
+    PROFILE_HERE_N("QCPPaintBufferGlFbo::batch_draw");
+    if (!painter || !painter->isActive())
+    {
+        qDebug() << Q_FUNC_INFO << "invalid or inactive painter passed";
+        return;
+    }
+    if (std::size(buffers) == 1)
+    {
+        // If we are the only buffer, just draw ourselves
+        buffers[0]->draw(painter);
+        return;
+    }
+    // If we are not the only buffer, we need to draw all buffers
+    auto ctx_ref = mGlContext.toStrongRef();
+    auto ctx = ctx_ref.data();
+    if (QOpenGLContext::currentContext() != ctx)
+        ctx->makeCurrent(ctx->surface());
+
+    const int targetWidth = mGlFrameBuffer->width() / mDevicePixelRatio;
+    const int targetHeight = mGlFrameBuffer->height() / mDevicePixelRatio;
+    QRect targetRect(0, 0, targetWidth, targetHeight);
+
+    mGlFrameBuffer->bind();
+    if (!mGlFrameBuffer->isValid() || !mGlFrameBuffer->isBound())
+    {
+        qDebug() << Q_FUNC_INFO << "Destination framebuffer object is not valid";
+        return;
+    }
+
+    glPushAttrib(GL_ALL_ATTRIB_BITS);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glViewport(0, 0, mGlFrameBuffer->width(), mGlFrameBuffer->height());
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    glOrtho(0, mGlFrameBuffer->width(), 0, mGlFrameBuffer->height(), -1, 1);
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_TEXTURE_2D);
+    glColor4f(1.0, 1.0, 1.0, 1.0);
+
+    // Clear the destination buffer before drawing
+    glClearColor(0, 0, 0, 0);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+
+    {
+
+
+        PROFILE_HERE_N("QOpenGLFramebufferObject::blitFramebuffer");
+        for (auto& buffer : buffers)
+        {
+            auto glBuffer = qSharedPointerCast<QCPPaintBufferGlFbo>(buffer);
+            if (!glBuffer || !glBuffer->mGlFrameBuffer || !glBuffer->mGlFrameBuffer->isValid())
+            {
+                qDebug() << Q_FUNC_INFO << "Invalid buffer passed";
+                continue;
+            }
+            QOpenGLFramebufferObject::blitFramebuffer(mResolveFbo, glBuffer->mGlFrameBuffer,
+                                                      GL_COLOR_BUFFER_BIT, GL_NEAREST);
+            mGlFrameBuffer->bind();
+            glBindTexture(GL_TEXTURE_2D, mResolveFbo->texture());
+            glBegin(GL_QUADS);
+            glTexCoord2f(0, 0);
+            glVertex2f(0, 0);
+            glTexCoord2f(1, 0);
+            glVertex2f(mGlFrameBuffer->width(), 0);
+            glTexCoord2f(1, 1);
+            glVertex2f(mGlFrameBuffer->width(), mGlFrameBuffer->height());
+            glTexCoord2f(0, 1);
+            glVertex2f(0, mGlFrameBuffer->height());
+            glEnd();
+        }
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+        glMatrixMode(GL_MODELVIEW);
+        glPopMatrix();
+        glPopAttrib();
+    }
+#ifdef NEOQCP_MANUAL_GL_IMAGE
+    glBindTexture(GL_TEXTURE_2D, mGlFrameBuffer->texture());
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    {
+        PROFILE_HERE_N("glGetTexImage");
+        glGetTexImage(GL_TEXTURE_2D, 0, GL_BGRA, GL_UNSIGNED_BYTE, mGlImage->bits());
+    }
+    {
+        PROFILE_HERE_N("QPainter::drawImage");
+        painter->drawImage(targetRect, mGlImage->mirrored(), mGlImage->rect());
+    }
+
+#else
+    auto image = [this]()
+    {
+        PROFILE_HERE_N("QOpenGLFramebufferObject::toImage");
+        return mGlFrameBuffer->toImage();
+    }();
+    image.setDevicePixelRatio(mDevicePixelRatio);
+    {
+        PROFILE_HERE_N("QPainter::drawImage");
+        painter->drawImage(targetRect, image, image.rect());
+    }
+#endif
+}
+
+void NeoQCPBatchDrawingHelper::reallocateBuffer()
+{
+
+    if (mGlFrameBuffer)
+    {
+        if (mGlFrameBuffer->isBound())
+            mGlFrameBuffer->release();
+        delete mGlFrameBuffer;
+        mGlFrameBuffer = 0;
+    }
+    mGlFrameBuffer = new QOpenGLFramebufferObject(mSize * mDevicePixelRatio,
+                                                  QOpenGLFramebufferObject::CombinedDepthStencil);
+
+#ifdef NEOQCP_MANUAL_GL_IMAGE
+    if (mGlImage)
+    {
+        delete mGlImage;
+    }
+#endif
+    if (mResolveFbo)
+    {
+        if (mResolveFbo->isBound())
+            mResolveFbo->release();
+        delete mResolveFbo;
+    }
+    mResolveFbo = new QOpenGLFramebufferObject(mSize * mDevicePixelRatio,
+                                               QOpenGLFramebufferObject::CombinedDepthStencil);
+
+#ifdef NEOQCP_MANUAL_GL_IMAGE
+    mGlImage = new QImage(mResolveFbo->size(), QImage::Format_ARGB32_Premultiplied);
+    mGlImage->setDevicePixelRatio(mDevicePixelRatio);
+#endif
+}
+#endif // NEOQCP_BATCH_DRAWING
 #endif // QCP_OPENGL_FBO

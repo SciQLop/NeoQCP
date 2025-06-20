@@ -31,6 +31,7 @@
 #include "global.h"
 #include "paintbuffer.h"
 #include "plottable.h"
+#include "neoqcp_config.h"
 
 class QCPPainter;
 class QCPLayer;
@@ -312,6 +313,9 @@ protected:
     QSharedPointer<QOpenGLContext> mGlContext;
     QSharedPointer<QSurface> mGlSurface;
     QSharedPointer<QOpenGLPaintDevice> mGlPaintDevice;
+#ifdef NEOQCP_BATCH_DRAWING
+    NeoQCPBatchDrawingHelper* mBatchDrawingHelper = nullptr;
+#endif // NEOQCP_BATCH_DRAWING
 #endif
 
     // reimplemented virtual methods:
