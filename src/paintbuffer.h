@@ -107,6 +107,7 @@ protected:
   QWeakPointer<QOpenGLContext> mGlContext;
   QWeakPointer<QOpenGLPaintDevice> mGlPaintDevice;
   QOpenGLFramebufferObject *mGlFrameBuffer;
+  mutable QImage* mGlImage; // used for batch_draw, if needed
   
   // reimplemented virtual methods:
   virtual void reallocateBuffer() Q_DECL_OVERRIDE;

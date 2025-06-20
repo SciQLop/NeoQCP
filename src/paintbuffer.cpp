@@ -283,7 +283,8 @@ QCPPaintBufferGlFbo::QCPPaintBufferGlFbo(const QSize &size, double devicePixelRa
   QCPAbstractPaintBuffer(size, devicePixelRatio, layerName),
   mGlContext(glContext),
   mGlPaintDevice(glPaintDevice),
-  mGlFrameBuffer(0)
+  mGlFrameBuffer(0),
+  mGlImage(nullptr)
 {
   QCPPaintBufferGlFbo::reallocateBuffer();
 }
@@ -314,7 +315,7 @@ QCPPainter *QCPPaintBufferGlFbo::startPainting()
     qDebug() << Q_FUNC_INFO << "OpenGL frame buffer object doesn't exist, reallocateBuffer was not called?";
     return 0;
   }
-  
+
   if (QOpenGLContext::currentContext() != context.data())
     context->makeCurrent(context->surface());
   mGlFrameBuffer->bind();
@@ -368,105 +369,128 @@ void QCPPaintBufferGlFbo::donePainting()
 }
 
  void QCPPaintBufferGlFbo::batch_draw(const QList<QSharedPointer<QCPAbstractPaintBuffer> > &buffers, QCPPainter *painter) const
-{
-    PROFILE_HERE_N("QCPPaintBufferGlFbo::batch_draw");
-    if (!painter || !painter->isActive())
-    {
-        qDebug() << Q_FUNC_INFO << "invalid or inactive painter passed";
-        return;
-    }
-    if(std::size(buffers) ==1 && buffers.first().data() == this)
-    {
-        // If we are the only buffer, just draw ourselves
-        draw(painter);
-        return;
-    }
-    // If we are not the only buffer, we need to draw all buffers
-    auto ctx_ref = mGlContext.toStrongRef();
-    auto ctx = ctx_ref.data();
-    if (QOpenGLContext::currentContext() != ctx)
-        ctx->makeCurrent(ctx->surface());
+ {
+     PROFILE_HERE_N("QCPPaintBufferGlFbo::batch_draw");
+     if (!painter || !painter->isActive())
+     {
+         qDebug() << Q_FUNC_INFO << "invalid or inactive painter passed";
+         return;
+     }
+     if(std::size(buffers) ==1 && buffers.first().data() == this)
+     {
+         // If we are the only buffer, just draw ourselves
+         draw(painter);
+         return;
+     }
+     // If we are not the only buffer, we need to draw all buffers
+     auto ctx_ref = mGlContext.toStrongRef();
+     auto ctx = ctx_ref.data();
+     if (QOpenGLContext::currentContext() != ctx)
+         ctx->makeCurrent(ctx->surface());
 
-    const int targetWidth = mGlFrameBuffer->width() / mDevicePixelRatio;
-    const int targetHeight = mGlFrameBuffer->height() / mDevicePixelRatio;
-    QRect targetRect(0, 0, targetWidth, targetHeight);
-    QOpenGLFramebufferObject destFbo(mGlFrameBuffer->size(), QOpenGLFramebufferObject::CombinedDepthStencil);
-    destFbo.bind();
-    if (!destFbo.isValid() || !destFbo.isBound())
-    {
-        qDebug() << Q_FUNC_INFO << "Destination framebuffer object is not valid";
-        return;
-    }
+     const int targetWidth = mGlFrameBuffer->width() / mDevicePixelRatio;
+     const int targetHeight = mGlFrameBuffer->height() / mDevicePixelRatio;
+     QRect targetRect(0, 0, targetWidth, targetHeight);
+     if (mGlImage==nullptr)
+     {
+         mGlImage = new QImage(mGlFrameBuffer->size(), QImage::Format_ARGB32_Premultiplied);
+         mGlImage->setDevicePixelRatio(mDevicePixelRatio);
+     }
+     else if (mGlImage->size() != mGlFrameBuffer->size())
+     {
+         delete mGlImage;
+         mGlImage = new QImage(mGlFrameBuffer->size(), QImage::Format_ARGB32_Premultiplied);
+         mGlImage->setDevicePixelRatio(mDevicePixelRatio);
+     }
+     QOpenGLFramebufferObject destFbo(mGlFrameBuffer->size(), QOpenGLFramebufferObject::CombinedDepthStencil);
+     destFbo.bind();
+     if (!destFbo.isValid() || !destFbo.isBound())
+     {
+         qDebug() << Q_FUNC_INFO << "Destination framebuffer object is not valid";
+         return;
+     }
 
-    glPushAttrib(GL_ALL_ATTRIB_BITS);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glViewport(0, 0, destFbo.width(), destFbo.height());
-    glMatrixMode(GL_PROJECTION);
-    glPushMatrix();
-    glLoadIdentity();
-    glOrtho(0, destFbo.width(), 0, destFbo.height(), -1, 1);
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
-    glLoadIdentity();
+     glPushAttrib(GL_ALL_ATTRIB_BITS);
+     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+     glViewport(0, 0, destFbo.width(), destFbo.height());
+     glMatrixMode(GL_PROJECTION);
+     glPushMatrix();
+     glLoadIdentity();
+     glOrtho(0, destFbo.width(), 0, destFbo.height(), -1, 1);
+     glMatrixMode(GL_MODELVIEW);
+     glPushMatrix();
+     glLoadIdentity();
 
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glEnable(GL_TEXTURE_2D);
-    glColor4f(1.0, 1.0, 1.0, 1.0);
+     glEnable(GL_BLEND);
+     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+     glEnable(GL_TEXTURE_2D);
+     glColor4f(1.0, 1.0, 1.0, 1.0);
 
-           // Clear the destination buffer before drawing
-    glClearColor(0, 0, 0, 0);
-    glClear(GL_COLOR_BUFFER_BIT);
+            // Clear the destination buffer before drawing
+     glClearColor(0, 0, 0, 0);
+     glClear(GL_COLOR_BUFFER_BIT);
 
 
-    {
+     {
 
-        // FBO to retrieve non multi-sampled buffers texture
-        QOpenGLFramebufferObject resolveFbo(mGlFrameBuffer->size(), QOpenGLFramebufferObject::CombinedDepthStencil);
-        //resolveFbo.bind();
+         // FBO to retrieve non multi-sampled buffers texture
+         QOpenGLFramebufferObject resolveFbo(mGlFrameBuffer->size(), QOpenGLFramebufferObject::CombinedDepthStencil);
+         //resolveFbo.bind();
 
-        PROFILE_HERE_N("QOpenGLFramebufferObject::blitFramebuffer");
-        for(auto &buffer: buffers)
-        {
-            auto glBuffer = qSharedPointerCast<QCPPaintBufferGlFbo>(buffer);
-            if (!glBuffer || !glBuffer->mGlFrameBuffer || !glBuffer->mGlFrameBuffer->isValid())
-            {
-                qDebug() << Q_FUNC_INFO << "Invalid buffer passed";
-                continue;
-            }
-            QOpenGLFramebufferObject::blitFramebuffer(
-                &resolveFbo,
-                glBuffer->mGlFrameBuffer,
-                GL_COLOR_BUFFER_BIT, GL_NEAREST
-                );
-            destFbo.bind();
-            glBindTexture(GL_TEXTURE_2D, resolveFbo.texture());
-            glBegin(GL_QUADS);
-            glTexCoord2f(0, 0); glVertex2f(0, 0);
-            glTexCoord2f(1, 0); glVertex2f(destFbo.width(), 0);
-            glTexCoord2f(1, 1); glVertex2f(destFbo.width(), destFbo.height());
-            glTexCoord2f(0, 1); glVertex2f(0, destFbo.height());
-            glEnd();
-        }
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
-        glMatrixMode(GL_MODELVIEW);
-        glPopMatrix();
-        glPopAttrib();
-    }
-
-    auto image = [&destFbo](){
-        PROFILE_HERE_N("QOpenGLFramebufferObject::toImage");
-        return destFbo.toImage();
-    }();
-    image.setDevicePixelRatio(mDevicePixelRatio);
-    {
-        PROFILE_HERE_N("QPainter::drawImage");
-        painter->drawImage(targetRect, image, image.rect());
-    }
+         PROFILE_HERE_N("QOpenGLFramebufferObject::blitFramebuffer");
+         for(auto &buffer: buffers)
+         {
+             auto glBuffer = qSharedPointerCast<QCPPaintBufferGlFbo>(buffer);
+             if (!glBuffer || !glBuffer->mGlFrameBuffer || !glBuffer->mGlFrameBuffer->isValid())
+             {
+                 qDebug() << Q_FUNC_INFO << "Invalid buffer passed";
+                 continue;
+             }
+             QOpenGLFramebufferObject::blitFramebuffer(
+                 &resolveFbo,
+                 glBuffer->mGlFrameBuffer,
+                 GL_COLOR_BUFFER_BIT, GL_NEAREST
+                 );
+             destFbo.bind();
+             glBindTexture(GL_TEXTURE_2D, resolveFbo.texture());
+             glBegin(GL_QUADS);
+             glTexCoord2f(0, 0); glVertex2f(0, 0);
+             glTexCoord2f(1, 0); glVertex2f(destFbo.width(), 0);
+             glTexCoord2f(1, 1); glVertex2f(destFbo.width(), destFbo.height());
+             glTexCoord2f(0, 1); glVertex2f(0, destFbo.height());
+             glEnd();
+         }
+         glMatrixMode(GL_PROJECTION);
+         glPopMatrix();
+         glMatrixMode(GL_MODELVIEW);
+         glPopMatrix();
+         glPopAttrib();
+     }
+#ifdef NEOQCP_MANUAL_GL_IMAGE
+     glBindTexture(GL_TEXTURE_2D, destFbo.texture());
+     glPixelStorei(GL_PACK_ALIGNMENT, 1);
+     {
+         PROFILE_HERE_N("glGetTexImage");
+         glGetTexImage(GL_TEXTURE_2D, 0, GL_BGRA, GL_UNSIGNED_BYTE, mGlImage->bits());
+     }
+     {
+         PROFILE_HERE_N("QPainter::drawImage");
+         painter->drawImage(targetRect, mGlImage->mirrored(), mGlImage->rect());
+     }
+#else
+     auto image = [&destFbo](){
+         PROFILE_HERE_N("QOpenGLFramebufferObject::toImage");
+         return destFbo.toImage();
+     }();
+     image.setDevicePixelRatio(mDevicePixelRatio);
+     {
+         PROFILE_HERE_N("QPainter::drawImage");
+         painter->drawImage(targetRect, image, image.rect());
+     }
+#endif
 }
 
 /* inherits documentation from base class */
@@ -483,7 +507,7 @@ void QCPPaintBufferGlFbo::clear(const QColor &color)
     qDebug() << Q_FUNC_INFO << "OpenGL frame buffer object doesn't exist, reallocateBuffer was not called?";
     return;
   }
-  
+
   if (QOpenGLContext::currentContext() != context.data())
     context->makeCurrent(context->surface());
   mGlFrameBuffer->bind();
@@ -503,7 +527,7 @@ void QCPPaintBufferGlFbo::reallocateBuffer()
     delete mGlFrameBuffer;
     mGlFrameBuffer = 0;
   }
-  
+
   QSharedPointer<QOpenGLPaintDevice> paintDevice = mGlPaintDevice.toStrongRef();
   QSharedPointer<QOpenGLContext> context = mGlContext.toStrongRef();
   if (!paintDevice)
@@ -516,7 +540,7 @@ void QCPPaintBufferGlFbo::reallocateBuffer()
     qDebug() << Q_FUNC_INFO << "OpenGL context doesn't exist";
     return;
   }
-  
+
   // create new fbo with appropriate size:
   context->makeCurrent(context->surface());
   QOpenGLFramebufferObjectFormat frameBufferFormat;
