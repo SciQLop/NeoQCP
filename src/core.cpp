@@ -2321,19 +2321,12 @@ void QCustomPlot::paintEvent(QPaintEvent* event)
     PROFILE_PASS_VALUE(this->openGl());
     // detect if the device pixel ratio has changed (e.g. moving window between different DPI
     // screens), and adapt buffers if necessary:
-#ifdef QCP_DEVICEPIXELRATIO_SUPPORTED
-#ifdef QCP_DEVICEPIXELRATIO_FLOAT
-    double newDpr = devicePixelRatioF();
-#else
-    double newDpr = devicePixelRatio();
-#endif
-    if (!qFuzzyCompare(mBufferDevicePixelRatio, newDpr))
+    if (const auto newDpr = devicePixelRatioF(); !qFuzzyCompare(mBufferDevicePixelRatio, newDpr))
     {
         setBufferDevicePixelRatio(newDpr);
         replot(QCustomPlot::rpQueuedRefresh);
         return;
     }
-#endif
 
     QCPPainter painter(this);
     if (painter.isActive())
@@ -2594,10 +2587,8 @@ void QCustomPlot::wheelEvent(QWheelEvent* event)
 {
     emit mouseWheel(event);
 
-    const QPointF pos = event->position();
-
     // forward event to layerable under cursor:
-    foreach (QCPLayerable* candidate, layerableListAt(pos, false))
+    for (auto candidate: layerableListAt(event->position(), false))
     {
         event->accept(); // default impl of QCPLayerable's mouse events ignore the event, in that
                          // case propagate to next candidate in list
@@ -2684,6 +2675,7 @@ void QCustomPlot::drawBackground(QCPPainter* painter)
     // Note: background color is handled in individual replot/save functions
 
     // draw background pixmap (on top of fill, if brush specified):
+    PROFILE_HERE_N("QCustomPlot::drawBackground");
     if (!mBackgroundPixmap.isNull())
     {
         if (mBackgroundScaled)
