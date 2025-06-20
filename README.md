@@ -34,6 +34,7 @@ This fork aims at modernizing the excellent [QCustomPlot](https://www.qcustomplo
     - C++ modernization
     - Experimental improvements:
         - Support for fp32 with OpenGL
+        - OpenGL double buffering
         - Threaded OpenGL rendering
 
 ## 📥 Installation
