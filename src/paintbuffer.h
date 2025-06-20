@@ -29,88 +29,99 @@
 #include "global.h"
 class QCPPainter;
 
-
-
 class QCP_LIB_DECL QCPAbstractPaintBuffer
 {
 public:
-  explicit QCPAbstractPaintBuffer(const QSize &size, double devicePixelRatio, const QString& layerName);
-  virtual ~QCPAbstractPaintBuffer();
-  
-  // getters:
-  QSize size() const { return mSize; }
-  bool invalidated() const { return mInvalidated; }
-  double devicePixelRatio() const { return mDevicePixelRatio; }
-  QString layerName() const { return mLayerName; }
-  
-  // setters:
-  void setSize(const QSize &size);
-  void setInvalidated(bool invalidated=true);
-  void setDevicePixelRatio(double ratio);
-  
-  // introduced virtual methods:
-  virtual QCPPainter *startPainting() = 0;
-  virtual void donePainting() {}
-  virtual void draw(QCPPainter *painter) const = 0;
-  virtual void batch_draw(const QList<QSharedPointer<QCPAbstractPaintBuffer>>& buffers, QCPPainter *painter) const=0;
-  virtual void clear(const QColor &color) = 0;
-  
+    explicit QCPAbstractPaintBuffer(const QSize& size, double devicePixelRatio,
+                                    const QString& layerName);
+    virtual ~QCPAbstractPaintBuffer();
+
+    // getters:
+    QSize size() const { return mSize; }
+
+    bool invalidated() const { return mInvalidated; }
+
+    double devicePixelRatio() const { return mDevicePixelRatio; }
+
+    QString layerName() const { return mLayerName; }
+
+    // setters:
+    void setSize(const QSize& size);
+    void setInvalidated(bool invalidated = true);
+    void setDevicePixelRatio(double ratio);
+
+    // introduced virtual methods:
+    virtual QCPPainter* startPainting() = 0;
+
+    virtual void donePainting() { }
+
+    virtual void draw(QCPPainter* painter) const = 0;
+    virtual void batch_draw(const QList<QSharedPointer<QCPAbstractPaintBuffer>>& buffers,
+                            QCPPainter* painter) const
+        = 0;
+    virtual void clear(const QColor& color) = 0;
+
 protected:
-  // property members:
-  QSize mSize;
-  double mDevicePixelRatio;
-  QString mLayerName; // the name of the layer this paint buffer belongs to, if applicable
-  
-  // non-property members:
-  bool mInvalidated;
-  
-  // introduced virtual methods:
-  virtual void reallocateBuffer() = 0;
+    // property members:
+    QSize mSize;
+    double mDevicePixelRatio;
+    QString mLayerName; // the name of the layer this paint buffer belongs to, if applicable
+
+    // non-property members:
+    bool mInvalidated;
+
+    // introduced virtual methods:
+    virtual void reallocateBuffer() = 0;
 };
 
 class QCP_LIB_DECL QCPPaintBufferPixmap : public QCPAbstractPaintBuffer
 {
 public:
-  explicit QCPPaintBufferPixmap(const QSize &size, double devicePixelRatio, const QString& layerName);
-  virtual ~QCPPaintBufferPixmap() Q_DECL_OVERRIDE;
-  
-  // reimplemented virtual methods:
-  virtual QCPPainter *startPainting() Q_DECL_OVERRIDE;
-  virtual void draw(QCPPainter *painter) const Q_DECL_OVERRIDE;
-  virtual void batch_draw(const QList<QSharedPointer<QCPAbstractPaintBuffer>>& buffers, QCPPainter *painter) const Q_DECL_OVERRIDE;
-  void clear(const QColor &color) Q_DECL_OVERRIDE;
-  
+    explicit QCPPaintBufferPixmap(const QSize& size, double devicePixelRatio,
+                                  const QString& layerName);
+    virtual ~QCPPaintBufferPixmap() Q_DECL_OVERRIDE;
+
+    // reimplemented virtual methods:
+    virtual QCPPainter* startPainting() Q_DECL_OVERRIDE;
+    virtual void draw(QCPPainter* painter) const Q_DECL_OVERRIDE;
+    virtual void batch_draw(const QList<QSharedPointer<QCPAbstractPaintBuffer>>& buffers,
+                            QCPPainter* painter) const Q_DECL_OVERRIDE;
+    void clear(const QColor& color) Q_DECL_OVERRIDE;
+
 protected:
-  // non-property members:
-  QPixmap mBuffer;
-  
-  // reimplemented virtual methods:
-  virtual void reallocateBuffer() Q_DECL_OVERRIDE;
+    // non-property members:
+    QPixmap mBuffer;
+
+    // reimplemented virtual methods:
+    virtual void reallocateBuffer() Q_DECL_OVERRIDE;
 };
 
 #ifdef QCP_OPENGL_FBO
 class QCP_LIB_DECL QCPPaintBufferGlFbo : public QCPAbstractPaintBuffer
 {
 public:
-  explicit QCPPaintBufferGlFbo(const QSize &size, double devicePixelRatio, const QString& layerName,  QWeakPointer<QOpenGLContext> glContext, QWeakPointer<QOpenGLPaintDevice> glPaintDevice);
-  virtual ~QCPPaintBufferGlFbo() Q_DECL_OVERRIDE;
-  
-  // reimplemented virtual methods:
-  virtual QCPPainter *startPainting() Q_DECL_OVERRIDE;
-  virtual void donePainting() Q_DECL_OVERRIDE;
-  virtual void draw(QCPPainter *painter) const Q_DECL_OVERRIDE;
-  virtual void batch_draw(const QList<QSharedPointer<QCPAbstractPaintBuffer>>& buffers, QCPPainter *painter) const Q_DECL_OVERRIDE;
-  void clear(const QColor &color) Q_DECL_OVERRIDE;
+    explicit QCPPaintBufferGlFbo(const QSize& size, double devicePixelRatio,
+                                 const QString& layerName, QWeakPointer<QOpenGLContext> glContext,
+                                 QWeakPointer<QOpenGLPaintDevice> glPaintDevice);
+    virtual ~QCPPaintBufferGlFbo() Q_DECL_OVERRIDE;
+
+    // reimplemented virtual methods:
+    virtual QCPPainter* startPainting() Q_DECL_OVERRIDE;
+    virtual void donePainting() Q_DECL_OVERRIDE;
+    virtual void draw(QCPPainter* painter) const Q_DECL_OVERRIDE;
+    virtual void batch_draw(const QList<QSharedPointer<QCPAbstractPaintBuffer>>& buffers,
+                            QCPPainter* painter) const Q_DECL_OVERRIDE;
+    void clear(const QColor& color) Q_DECL_OVERRIDE;
 
 protected:
-  // non-property members:
-  QWeakPointer<QOpenGLContext> mGlContext;
-  QWeakPointer<QOpenGLPaintDevice> mGlPaintDevice;
-  QOpenGLFramebufferObject *mGlFrameBuffer;
-  mutable QImage* mGlImage; // used for batch_draw, if needed
-  
-  // reimplemented virtual methods:
-  virtual void reallocateBuffer() Q_DECL_OVERRIDE;
+    // non-property members:
+    QWeakPointer<QOpenGLContext> mGlContext;
+    QWeakPointer<QOpenGLPaintDevice> mGlPaintDevice;
+    QOpenGLFramebufferObject* mGlFrameBuffer;
+    mutable QImage* mGlImage; // used for batch_draw, if needed
+
+    // reimplemented virtual methods:
+    virtual void reallocateBuffer() Q_DECL_OVERRIDE;
 };
 #endif // QCP_OPENGL_FBO
 

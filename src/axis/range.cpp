@@ -30,10 +30,10 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 /*! \class QCPRange
   \brief Represents the range an axis is encompassing.
-  
+
   contains a \a lower and \a upper double value and provides convenience input, output and
   modification functions.
-  
+
   \see QCPAxis::setRange
 */
 
@@ -111,11 +111,7 @@ const double QCPRange::maxRange = 1e250;
 /*!
   Constructs a range with \a lower and \a upper set to zero.
 */
-QCPRange::QCPRange() :
-  lower(0),
-  upper(0)
-{
-}
+QCPRange::QCPRange() : lower(0), upper(0) { }
 
 /*! \overload
 
@@ -124,11 +120,9 @@ QCPRange::QCPRange() :
   The resulting range will be normalized (see \ref normalize), so if \a lower is not numerically
   smaller than \a upper, they will be swapped.
 */
-QCPRange::QCPRange(double lower, double upper) :
-  lower(lower),
-  upper(upper)
+QCPRange::QCPRange(double lower, double upper) : lower(lower), upper(upper)
 {
-  normalize();
+    normalize();
 }
 
 /*! \overload
@@ -143,12 +137,12 @@ QCPRange::QCPRange(double lower, double upper) :
 
   \see expanded
 */
-void QCPRange::expand(const QCPRange &otherRange)
+void QCPRange::expand(const QCPRange& otherRange)
 {
-  if (lower > otherRange.lower || qIsNaN(lower))
-    lower = otherRange.lower;
-  if (upper < otherRange.upper || qIsNaN(upper))
-    upper = otherRange.upper;
+    if (lower > otherRange.lower || qIsNaN(lower))
+        lower = otherRange.lower;
+    if (upper < otherRange.upper || qIsNaN(upper))
+        upper = otherRange.upper;
 }
 
 /*! \overload
@@ -165,12 +159,11 @@ void QCPRange::expand(const QCPRange &otherRange)
 */
 void QCPRange::expand(double includeCoord)
 {
-  if (lower > includeCoord || qIsNaN(lower))
-    lower = includeCoord;
-  if (upper < includeCoord || qIsNaN(upper))
-    upper = includeCoord;
+    if (lower > includeCoord || qIsNaN(lower))
+        lower = includeCoord;
+    if (upper < includeCoord || qIsNaN(upper))
+        upper = includeCoord;
 }
-
 
 /*! \overload
 
@@ -182,11 +175,11 @@ void QCPRange::expand(double includeCoord)
 
   \see expand
 */
-QCPRange QCPRange::expanded(const QCPRange &otherRange) const
+QCPRange QCPRange::expanded(const QCPRange& otherRange) const
 {
-  QCPRange result = *this;
-  result.expand(otherRange);
-  return result;
+    QCPRange result = *this;
+    result.expand(otherRange);
+    return result;
 }
 
 /*! \overload
@@ -201,97 +194,102 @@ QCPRange QCPRange::expanded(const QCPRange &otherRange) const
 */
 QCPRange QCPRange::expanded(double includeCoord) const
 {
-  QCPRange result = *this;
-  result.expand(includeCoord);
-  return result;
+    QCPRange result = *this;
+    result.expand(includeCoord);
+    return result;
 }
 
 /*!
   Returns this range, possibly modified to not exceed the bounds provided as \a lowerBound and \a
   upperBound. If possible, the size of the current range is preserved in the process.
-  
+
   If the range shall only be bounded at the lower side, you can set \a upperBound to \ref
   QCPRange::maxRange. If it shall only be bounded at the upper side, set \a lowerBound to -\ref
   QCPRange::maxRange.
 */
 QCPRange QCPRange::bounded(double lowerBound, double upperBound) const
 {
-  if (lowerBound > upperBound)
-    qSwap(lowerBound, upperBound);
-  
-  QCPRange result(lower, upper);
-  if (result.lower < lowerBound)
-  {
-    result.lower = lowerBound;
-    result.upper = lowerBound + size();
-    if (result.upper > upperBound || qFuzzyCompare(size(), upperBound-lowerBound))
-      result.upper = upperBound;
-  } else if (result.upper > upperBound)
-  {
-    result.upper = upperBound;
-    result.lower = upperBound - size();
-    if (result.lower < lowerBound || qFuzzyCompare(size(), upperBound-lowerBound))
-      result.lower = lowerBound;
-  }
-  
-  return result;
+    if (lowerBound > upperBound)
+        qSwap(lowerBound, upperBound);
+
+    QCPRange result(lower, upper);
+    if (result.lower < lowerBound)
+    {
+        result.lower = lowerBound;
+        result.upper = lowerBound + size();
+        if (result.upper > upperBound || qFuzzyCompare(size(), upperBound - lowerBound))
+            result.upper = upperBound;
+    }
+    else if (result.upper > upperBound)
+    {
+        result.upper = upperBound;
+        result.lower = upperBound - size();
+        if (result.lower < lowerBound || qFuzzyCompare(size(), upperBound - lowerBound))
+            result.lower = lowerBound;
+    }
+
+    return result;
 }
 
 /*!
   Returns a sanitized version of the range. Sanitized means for logarithmic scales, that
   the range won't span the positive and negative sign domain, i.e. contain zero. Further
   \a lower will always be numerically smaller (or equal) to \a upper.
-  
+
   If the original range does span positive and negative sign domains or contains zero,
   the returned range will try to approximate the original range as good as possible.
   If the positive interval of the original range is wider than the negative interval, the
   returned range will only contain the positive interval, with lower bound set to \a rangeFac or
-  \a rangeFac *\a upper, whichever is closer to zero. Same procedure is used if the negative interval
-  is wider than the positive interval, this time by changing the \a upper bound.
+  \a rangeFac *\a upper, whichever is closer to zero. Same procedure is used if the negative
+  interval is wider than the positive interval, this time by changing the \a upper bound.
 */
 QCPRange QCPRange::sanitizedForLogScale() const
 {
-  double rangeFac = 1e-3;
-  QCPRange sanitizedRange(lower, upper);
-  sanitizedRange.normalize();
-  // can't have range spanning negative and positive values in log plot, so change range to fix it
-  //if (qFuzzyCompare(sanitizedRange.lower+1, 1) && !qFuzzyCompare(sanitizedRange.upper+1, 1))
-  if (sanitizedRange.lower == 0.0 && sanitizedRange.upper != 0.0)
-  {
-    // case lower is 0
-    if (rangeFac < sanitizedRange.upper*rangeFac)
-      sanitizedRange.lower = rangeFac;
-    else
-      sanitizedRange.lower = sanitizedRange.upper*rangeFac;
-  } //else if (!qFuzzyCompare(lower+1, 1) && qFuzzyCompare(upper+1, 1))
-  else if (sanitizedRange.lower != 0.0 && sanitizedRange.upper == 0.0)
-  {
-    // case upper is 0
-    if (-rangeFac > sanitizedRange.lower*rangeFac)
-      sanitizedRange.upper = -rangeFac;
-    else
-      sanitizedRange.upper = sanitizedRange.lower*rangeFac;
-  } else if (sanitizedRange.lower < 0 && sanitizedRange.upper > 0)
-  {
-    // find out whether negative or positive interval is wider to decide which sign domain will be chosen
-    if (-sanitizedRange.lower > sanitizedRange.upper)
+    double rangeFac = 1e-3;
+    QCPRange sanitizedRange(lower, upper);
+    sanitizedRange.normalize();
+    // can't have range spanning negative and positive values in log plot, so change range to fix it
+    // if (qFuzzyCompare(sanitizedRange.lower+1, 1) && !qFuzzyCompare(sanitizedRange.upper+1, 1))
+    if (sanitizedRange.lower == 0.0 && sanitizedRange.upper != 0.0)
     {
-      // negative is wider, do same as in case upper is 0
-      if (-rangeFac > sanitizedRange.lower*rangeFac)
-        sanitizedRange.upper = -rangeFac;
-      else
-        sanitizedRange.upper = sanitizedRange.lower*rangeFac;
-    } else
+        // case lower is 0
+        if (rangeFac < sanitizedRange.upper * rangeFac)
+            sanitizedRange.lower = rangeFac;
+        else
+            sanitizedRange.lower = sanitizedRange.upper * rangeFac;
+    } // else if (!qFuzzyCompare(lower+1, 1) && qFuzzyCompare(upper+1, 1))
+    else if (sanitizedRange.lower != 0.0 && sanitizedRange.upper == 0.0)
     {
-      // positive is wider, do same as in case lower is 0
-      if (rangeFac < sanitizedRange.upper*rangeFac)
-        sanitizedRange.lower = rangeFac;
-      else
-        sanitizedRange.lower = sanitizedRange.upper*rangeFac;
+        // case upper is 0
+        if (-rangeFac > sanitizedRange.lower * rangeFac)
+            sanitizedRange.upper = -rangeFac;
+        else
+            sanitizedRange.upper = sanitizedRange.lower * rangeFac;
     }
-  }
-  // due to normalization, case lower>0 && upper<0 should never occur, because that implies upper<lower
-  return sanitizedRange;
+    else if (sanitizedRange.lower < 0 && sanitizedRange.upper > 0)
+    {
+        // find out whether negative or positive interval is wider to decide which sign domain will
+        // be chosen
+        if (-sanitizedRange.lower > sanitizedRange.upper)
+        {
+            // negative is wider, do same as in case upper is 0
+            if (-rangeFac > sanitizedRange.lower * rangeFac)
+                sanitizedRange.upper = -rangeFac;
+            else
+                sanitizedRange.upper = sanitizedRange.lower * rangeFac;
+        }
+        else
+        {
+            // positive is wider, do same as in case lower is 0
+            if (rangeFac < sanitizedRange.upper * rangeFac)
+                sanitizedRange.lower = rangeFac;
+            else
+                sanitizedRange.lower = sanitizedRange.upper * rangeFac;
+        }
+    }
+    // due to normalization, case lower>0 && upper<0 should never occur, because that implies
+    // upper<lower
+    return sanitizedRange;
 }
 
 /*!
@@ -300,9 +298,9 @@ QCPRange QCPRange::sanitizedForLogScale() const
 */
 QCPRange QCPRange::sanitizedForLinScale() const
 {
-  QCPRange sanitizedRange(lower, upper);
-  sanitizedRange.normalize();
-  return sanitizedRange;
+    QCPRange sanitizedRange(lower, upper);
+    sanitizedRange.normalize();
+    return sanitizedRange;
 }
 
 /*!
@@ -315,12 +313,9 @@ QCPRange QCPRange::sanitizedForLinScale() const
 */
 bool QCPRange::validRange(double lower, double upper)
 {
-  return (lower > -maxRange &&
-          upper < maxRange &&
-          qAbs(lower-upper) > minRange &&
-          qAbs(lower-upper) < maxRange &&
-          !(lower > 0 && qIsInf(upper/lower)) &&
-          !(upper < 0 && qIsInf(lower/upper)));
+    return (lower > -maxRange && upper < maxRange && qAbs(lower - upper) > minRange
+            && qAbs(lower - upper) < maxRange && !(lower > 0 && qIsInf(upper / lower))
+            && !(upper < 0 && qIsInf(lower / upper)));
 }
 
 /*!
@@ -332,12 +327,11 @@ bool QCPRange::validRange(double lower, double upper)
   \li range size above minRange
   \li range size below maxRange
 */
-bool QCPRange::validRange(const QCPRange &range)
+bool QCPRange::validRange(const QCPRange& range)
 {
-  return (range.lower > -maxRange &&
-          range.upper < maxRange &&
-          qAbs(range.lower-range.upper) > minRange &&
-          qAbs(range.lower-range.upper) < maxRange &&
-          !(range.lower > 0 && qIsInf(range.upper/range.lower)) &&
-          !(range.upper < 0 && qIsInf(range.lower/range.upper)));
+    return (range.lower > -maxRange && range.upper < maxRange
+            && qAbs(range.lower - range.upper) > minRange
+            && qAbs(range.lower - range.upper) < maxRange
+            && !(range.lower > 0 && qIsInf(range.upper / range.lower))
+            && !(range.upper < 0 && qIsInf(range.lower / range.upper)));
 }

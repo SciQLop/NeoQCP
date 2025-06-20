@@ -25,10 +25,10 @@
 
 #include "plottable-errorbar.h"
 
-#include "../painter.h"
-#include "../core.h"
 #include "../axis/axis.h"
+#include "../core.h"
 #include "../layoutelements/layoutelement-axisrect.h"
+#include "../painter.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPErrorBarsData
@@ -52,31 +52,21 @@
 /*!
   Constructs an error bar with errors set to zero.
 */
-QCPErrorBarsData::QCPErrorBarsData() :
-  errorMinus(0),
-  errorPlus(0)
-{
-}
+QCPErrorBarsData::QCPErrorBarsData() : errorMinus(0), errorPlus(0) { }
 
 /*!
   Constructs an error bar with equal \a error in both negative and positive direction.
 */
-QCPErrorBarsData::QCPErrorBarsData(double error) :
-  errorMinus(error),
-  errorPlus(error)
-{
-}
+QCPErrorBarsData::QCPErrorBarsData(double error) : errorMinus(error), errorPlus(error) { }
 
 /*!
   Constructs an error bar with negative and positive errors set to \a errorMinus and \a errorPlus,
   respectively.
 */
-QCPErrorBarsData::QCPErrorBarsData(double errorMinus, double errorPlus) :
-  errorMinus(errorMinus),
-  errorPlus(errorPlus)
+QCPErrorBarsData::QCPErrorBarsData(double errorMinus, double errorPlus)
+        : errorMinus(errorMinus), errorPlus(errorPlus)
 {
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPErrorBars
@@ -100,8 +90,8 @@ QCPErrorBarsData::QCPErrorBarsData(double errorMinus, double errorPlus) :
   of the data plottable. You can directly access and manipulate the error bar data via \ref data.
 
   Set either of the plus/minus errors to NaN (<tt>qQNaN()</tt> or
-  <tt>std::numeric_limits<double>::quiet_NaN()</tt>) to not show the respective error bar on the data point at
-  that index.
+  <tt>std::numeric_limits<double>::quiet_NaN()</tt>) to not show the respective error bar on the
+  data point at that index.
 
   \section qcperrorbars-appearance Changing the appearance
 
@@ -123,10 +113,10 @@ QCPErrorBarsData::QCPErrorBarsData(double errorMinus, double errorPlus) :
 /* end of documentation of inline functions */
 
 /*!
-  Constructs an error bars plottable which uses \a keyAxis as its key axis ("x") and \a valueAxis as its value
-  axis ("y"). \a keyAxis and \a valueAxis must reside in the same QCustomPlot instance and not have
-  the same orientation. If either of these restrictions is violated, a corresponding message is
-  printed to the debug output (qDebug), the construction is not aborted, though.
+  Constructs an error bars plottable which uses \a keyAxis as its key axis ("x") and \a valueAxis as
+  its value axis ("y"). \a keyAxis and \a valueAxis must reside in the same QCustomPlot instance and
+  not have the same orientation. If either of these restrictions is violated, a corresponding
+  message is printed to the debug output (qDebug), the construction is not aborted, though.
 
   It is also important that the \a keyAxis and \a valueAxis are the same for the error bars
   plottable and the data plottable that the error bars shall be drawn on (\ref setDataPlottable).
@@ -135,20 +125,18 @@ QCPErrorBarsData::QCPErrorBarsData(double errorMinus, double errorPlus) :
   from \a keyAxis. This QCustomPlot instance takes ownership of the \ref QCPErrorBars, so do not
   delete it manually but use \ref QCustomPlot::removePlottable() instead.
 */
-QCPErrorBars::QCPErrorBars(QCPAxis *keyAxis, QCPAxis *valueAxis) :
-  QCPAbstractPlottable(keyAxis, valueAxis),
-  mDataContainer(new QVector<QCPErrorBarsData>),
-  mErrorType(etValueError),
-  mWhiskerWidth(9),
-  mSymbolGap(10)
+QCPErrorBars::QCPErrorBars(QCPAxis* keyAxis, QCPAxis* valueAxis)
+        : QCPAbstractPlottable(keyAxis, valueAxis)
+        , mDataContainer(new QVector<QCPErrorBarsData>)
+        , mErrorType(etValueError)
+        , mWhiskerWidth(9)
+        , mSymbolGap(10)
 {
-  setPen(QPen(Qt::black, 0));
-  setBrush(Qt::NoBrush);
+    setPen(QPen(Qt::black, 0));
+    setBrush(Qt::NoBrush);
 }
 
-QCPErrorBars::~QCPErrorBars()
-{
-}
+QCPErrorBars::~QCPErrorBars() { }
 
 /*! \overload
 
@@ -170,7 +158,7 @@ QCPErrorBars::~QCPErrorBars()
 */
 void QCPErrorBars::setData(QSharedPointer<QCPErrorBarsDataContainer> data)
 {
-  mDataContainer = data;
+    mDataContainer = data;
 }
 
 /*! \overload
@@ -182,10 +170,10 @@ void QCPErrorBars::setData(QSharedPointer<QCPErrorBarsDataContainer> data)
 
   \see addData
 */
-void QCPErrorBars::setData(const QVector<double> &error)
+void QCPErrorBars::setData(const QVector<double>& error)
 {
-  mDataContainer->clear();
-  addData(error);
+    mDataContainer->clear();
+    addData(error);
 }
 
 /*! \overload
@@ -198,10 +186,10 @@ void QCPErrorBars::setData(const QVector<double> &error)
 
   \see addData
 */
-void QCPErrorBars::setData(const QVector<double> &errorMinus, const QVector<double> &errorPlus)
+void QCPErrorBars::setData(const QVector<double>& errorMinus, const QVector<double>& errorPlus)
 {
-  mDataContainer->clear();
-  addData(errorMinus, errorPlus);
+    mDataContainer->clear();
+    addData(errorMinus, errorPlus);
 }
 
 /*!
@@ -218,22 +206,24 @@ void QCPErrorBars::setData(const QVector<double> &errorMinus, const QVector<doub
   For proper display, care must also be taken that the key and value axes of the \a plottable match
   those configured for this \ref QCPErrorBars instance.
 */
-void QCPErrorBars::setDataPlottable(QCPAbstractPlottable *plottable)
+void QCPErrorBars::setDataPlottable(QCPAbstractPlottable* plottable)
 {
-  if (plottable && qobject_cast<QCPErrorBars*>(plottable))
-  {
-    mDataPlottable = nullptr;
-    qDebug() << Q_FUNC_INFO << "can't set another QCPErrorBars instance as data plottable";
-    return;
-  }
-  if (plottable && !plottable->interface1D())
-  {
-    mDataPlottable = nullptr;
-    qDebug() << Q_FUNC_INFO << "passed plottable doesn't implement 1d interface, can't associate with QCPErrorBars";
-    return;
-  }
-  
-  mDataPlottable = plottable;
+    if (plottable && qobject_cast<QCPErrorBars*>(plottable))
+    {
+        mDataPlottable = nullptr;
+        qDebug() << Q_FUNC_INFO << "can't set another QCPErrorBars instance as data plottable";
+        return;
+    }
+    if (plottable && !plottable->interface1D())
+    {
+        mDataPlottable = nullptr;
+        qDebug()
+            << Q_FUNC_INFO
+            << "passed plottable doesn't implement 1d interface, can't associate with QCPErrorBars";
+        return;
+    }
+
+    mDataPlottable = plottable;
 }
 
 /*!
@@ -242,7 +232,7 @@ void QCPErrorBars::setDataPlottable(QCPAbstractPlottable *plottable)
 */
 void QCPErrorBars::setErrorType(ErrorType type)
 {
-  mErrorType = type;
+    mErrorType = type;
 }
 
 /*!
@@ -251,7 +241,7 @@ void QCPErrorBars::setErrorType(ErrorType type)
 */
 void QCPErrorBars::setWhiskerWidth(double pixels)
 {
-  mWhiskerWidth = pixels;
+    mWhiskerWidth = pixels;
 }
 
 /*!
@@ -261,7 +251,7 @@ void QCPErrorBars::setWhiskerWidth(double pixels)
 */
 void QCPErrorBars::setSymbolGap(double pixels)
 {
-  mSymbolGap = pixels;
+    mSymbolGap = pixels;
 }
 
 /*! \overload
@@ -273,9 +263,9 @@ void QCPErrorBars::setSymbolGap(double pixels)
 
   \see setData
 */
-void QCPErrorBars::addData(const QVector<double> &error)
+void QCPErrorBars::addData(const QVector<double>& error)
 {
-  addData(error, error);
+    addData(error, error);
 }
 
 /*! \overload
@@ -288,14 +278,16 @@ void QCPErrorBars::addData(const QVector<double> &error)
 
   \see setData
 */
-void QCPErrorBars::addData(const QVector<double> &errorMinus, const QVector<double> &errorPlus)
+void QCPErrorBars::addData(const QVector<double>& errorMinus, const QVector<double>& errorPlus)
 {
-  if (errorMinus.size() != errorPlus.size())
-    qDebug() << Q_FUNC_INFO << "minus and plus error vectors have different sizes:" << errorMinus.size() << errorPlus.size();
-  const int n = qMin(errorMinus.size(), errorPlus.size());
-  mDataContainer->reserve(n);
-  for (int i=0; i<n; ++i)
-    mDataContainer->append(QCPErrorBarsData(errorMinus.at(i), errorPlus.at(i)));
+    if (errorMinus.size() != errorPlus.size())
+        qDebug() << Q_FUNC_INFO
+                 << "minus and plus error vectors have different sizes:" << errorMinus.size()
+                 << errorPlus.size();
+    const int n = qMin(errorMinus.size(), errorPlus.size());
+    mDataContainer->reserve(n);
+    for (int i = 0; i < n; ++i)
+        mDataContainer->append(QCPErrorBarsData(errorMinus.at(i), errorPlus.at(i)));
 }
 
 /*! \overload
@@ -309,7 +301,7 @@ void QCPErrorBars::addData(const QVector<double> &errorMinus, const QVector<doub
 */
 void QCPErrorBars::addData(double error)
 {
-  mDataContainer->append(QCPErrorBarsData(error));
+    mDataContainer->append(QCPErrorBarsData(error));
 }
 
 /*! \overload
@@ -324,150 +316,157 @@ void QCPErrorBars::addData(double error)
 */
 void QCPErrorBars::addData(double errorMinus, double errorPlus)
 {
-  mDataContainer->append(QCPErrorBarsData(errorMinus, errorPlus));
+    mDataContainer->append(QCPErrorBarsData(errorMinus, errorPlus));
 }
 
 /* inherits documentation from base class */
 int QCPErrorBars::dataCount() const
 {
-  return mDataContainer->size();
+    return mDataContainer->size();
 }
 
 /* inherits documentation from base class */
 double QCPErrorBars::dataMainKey(int index) const
 {
-  if (mDataPlottable)
-    return mDataPlottable->interface1D()->dataMainKey(index);
-  else
-    qDebug() << Q_FUNC_INFO << "no data plottable set";
-  return 0;
+    if (mDataPlottable)
+        return mDataPlottable->interface1D()->dataMainKey(index);
+    else
+        qDebug() << Q_FUNC_INFO << "no data plottable set";
+    return 0;
 }
 
 /* inherits documentation from base class */
 double QCPErrorBars::dataSortKey(int index) const
 {
-  if (mDataPlottable)
-    return mDataPlottable->interface1D()->dataSortKey(index);
-  else
-    qDebug() << Q_FUNC_INFO << "no data plottable set";
-  return 0;
+    if (mDataPlottable)
+        return mDataPlottable->interface1D()->dataSortKey(index);
+    else
+        qDebug() << Q_FUNC_INFO << "no data plottable set";
+    return 0;
 }
 
 /* inherits documentation from base class */
 double QCPErrorBars::dataMainValue(int index) const
 {
-  if (mDataPlottable)
-    return mDataPlottable->interface1D()->dataMainValue(index);
-  else
-    qDebug() << Q_FUNC_INFO << "no data plottable set";
-  return 0;
+    if (mDataPlottable)
+        return mDataPlottable->interface1D()->dataMainValue(index);
+    else
+        qDebug() << Q_FUNC_INFO << "no data plottable set";
+    return 0;
 }
 
 /* inherits documentation from base class */
 QCPRange QCPErrorBars::dataValueRange(int index) const
 {
-  if (mDataPlottable)
-  {
-    const double value = mDataPlottable->interface1D()->dataMainValue(index);
-    if (index >= 0 && index < mDataContainer->size() && mErrorType == etValueError)
-      return {value-mDataContainer->at(index).errorMinus, value+mDataContainer->at(index).errorPlus};
+    if (mDataPlottable)
+    {
+        const double value = mDataPlottable->interface1D()->dataMainValue(index);
+        if (index >= 0 && index < mDataContainer->size() && mErrorType == etValueError)
+            return { value - mDataContainer->at(index).errorMinus,
+                     value + mDataContainer->at(index).errorPlus };
+        else
+            return { value, value };
+    }
     else
-      return {value, value};
-  } else
-  {
-    qDebug() << Q_FUNC_INFO << "no data plottable set";
-    return {};
-  }
+    {
+        qDebug() << Q_FUNC_INFO << "no data plottable set";
+        return {};
+    }
 }
 
 /* inherits documentation from base class */
 QPointF QCPErrorBars::dataPixelPosition(int index) const
 {
-  if (mDataPlottable)
-    return mDataPlottable->interface1D()->dataPixelPosition(index);
-  else
-    qDebug() << Q_FUNC_INFO << "no data plottable set";
-  return {};
+    if (mDataPlottable)
+        return mDataPlottable->interface1D()->dataPixelPosition(index);
+    else
+        qDebug() << Q_FUNC_INFO << "no data plottable set";
+    return {};
 }
 
 /* inherits documentation from base class */
 bool QCPErrorBars::sortKeyIsMainKey() const
 {
-  if (mDataPlottable)
-  {
-    return mDataPlottable->interface1D()->sortKeyIsMainKey();
-  } else
-  {
-    qDebug() << Q_FUNC_INFO << "no data plottable set";
-    return true;
-  }
+    if (mDataPlottable)
+    {
+        return mDataPlottable->interface1D()->sortKeyIsMainKey();
+    }
+    else
+    {
+        qDebug() << Q_FUNC_INFO << "no data plottable set";
+        return true;
+    }
 }
 
 /*!
   \copydoc QCPPlottableInterface1D::selectTestRect
 */
-QCPDataSelection QCPErrorBars::selectTestRect(const QRectF &rect, bool onlySelectable) const
+QCPDataSelection QCPErrorBars::selectTestRect(const QRectF& rect, bool onlySelectable) const
 {
-  QCPDataSelection result;
-  if (!mDataPlottable)
-    return result;
-  if ((onlySelectable && mSelectable == QCP::stNone) || mDataContainer->isEmpty())
-    return result;
-  if (!mKeyAxis || !mValueAxis)
-    return result;
-  
-  QCPErrorBarsDataContainer::const_iterator visibleBegin, visibleEnd;
-  getVisibleDataBounds(visibleBegin, visibleEnd, QCPDataRange(0, dataCount()));
-  
-  QVector<QLineF> backbones, whiskers;
-  for (QCPErrorBarsDataContainer::const_iterator it=visibleBegin; it!=visibleEnd; ++it)
-  {
-    backbones.clear();
-    whiskers.clear();
-    getErrorBarLines(it, backbones, whiskers);
-    foreach (const QLineF &backbone, backbones)
+    QCPDataSelection result;
+    if (!mDataPlottable)
+        return result;
+    if ((onlySelectable && mSelectable == QCP::stNone) || mDataContainer->isEmpty())
+        return result;
+    if (!mKeyAxis || !mValueAxis)
+        return result;
+
+    QCPErrorBarsDataContainer::const_iterator visibleBegin, visibleEnd;
+    getVisibleDataBounds(visibleBegin, visibleEnd, QCPDataRange(0, dataCount()));
+
+    QVector<QLineF> backbones, whiskers;
+    for (QCPErrorBarsDataContainer::const_iterator it = visibleBegin; it != visibleEnd; ++it)
     {
-      if (rectIntersectsLine(rect, backbone))
-      {
-        result.addDataRange(QCPDataRange(int(it-mDataContainer->constBegin()), int(it-mDataContainer->constBegin()+1)), false);
-        break;
-      }
+        backbones.clear();
+        whiskers.clear();
+        getErrorBarLines(it, backbones, whiskers);
+        foreach (const QLineF& backbone, backbones)
+        {
+            if (rectIntersectsLine(rect, backbone))
+            {
+                result.addDataRange(QCPDataRange(int(it - mDataContainer->constBegin()),
+                                                 int(it - mDataContainer->constBegin() + 1)),
+                                    false);
+                break;
+            }
+        }
     }
-  }
-  result.simplify();
-  return result;
+    result.simplify();
+    return result;
 }
 
 /* inherits documentation from base class */
 int QCPErrorBars::findBegin(double sortKey, bool expandedRange) const
 {
-  if (mDataPlottable)
-  {
-    if (mDataContainer->isEmpty())
-      return 0;
-    int beginIndex = mDataPlottable->interface1D()->findBegin(sortKey, expandedRange);
-    if (beginIndex >= mDataContainer->size())
-      beginIndex = mDataContainer->size()-1;
-    return beginIndex;
-  } else
-    qDebug() << Q_FUNC_INFO << "no data plottable set";
-  return 0;
+    if (mDataPlottable)
+    {
+        if (mDataContainer->isEmpty())
+            return 0;
+        int beginIndex = mDataPlottable->interface1D()->findBegin(sortKey, expandedRange);
+        if (beginIndex >= mDataContainer->size())
+            beginIndex = mDataContainer->size() - 1;
+        return beginIndex;
+    }
+    else
+        qDebug() << Q_FUNC_INFO << "no data plottable set";
+    return 0;
 }
 
 /* inherits documentation from base class */
 int QCPErrorBars::findEnd(double sortKey, bool expandedRange) const
 {
-  if (mDataPlottable)
-  {
-    if (mDataContainer->isEmpty())
-      return 0;
-    int endIndex = mDataPlottable->interface1D()->findEnd(sortKey, expandedRange);
-    if (endIndex > mDataContainer->size())
-      endIndex = mDataContainer->size();
-    return endIndex;
-  } else
-    qDebug() << Q_FUNC_INFO << "no data plottable set";
-  return 0;
+    if (mDataPlottable)
+    {
+        if (mDataContainer->isEmpty())
+            return 0;
+        int endIndex = mDataPlottable->interface1D()->findEnd(sortKey, expandedRange);
+        if (endIndex > mDataContainer->size())
+            endIndex = mDataContainer->size();
+        return endIndex;
+    }
+    else
+        qDebug() << Q_FUNC_INFO << "no data plottable set";
+    return 0;
 }
 
 /*!
@@ -475,271 +474,311 @@ int QCPErrorBars::findEnd(double sortKey, bool expandedRange) const
 
   If \a details is not 0, it will be set to a \ref QCPDataSelection, describing the closest data
   point to \a pos.
-  
+
   \seebaseclassmethod \ref QCPAbstractPlottable::selectTest
 */
-double QCPErrorBars::selectTest(const QPointF &pos, bool onlySelectable, QVariant *details) const
+double QCPErrorBars::selectTest(const QPointF& pos, bool onlySelectable, QVariant* details) const
 {
-  if (!mDataPlottable) return -1;
-  
-  if ((onlySelectable && mSelectable == QCP::stNone) || mDataContainer->isEmpty())
-    return -1;
-  if (!mKeyAxis || !mValueAxis)
-    return -1;
-  
-  if (mKeyAxis.data()->axisRect()->rect().contains(pos.toPoint()) || mParentPlot->interactions().testFlag(QCP::iSelectPlottablesBeyondAxisRect))
-  {
-    QCPErrorBarsDataContainer::const_iterator closestDataPoint = mDataContainer->constEnd();
-    double result = pointDistance(pos, closestDataPoint);
-    if (details)
+    if (!mDataPlottable)
+        return -1;
+
+    if ((onlySelectable && mSelectable == QCP::stNone) || mDataContainer->isEmpty())
+        return -1;
+    if (!mKeyAxis || !mValueAxis)
+        return -1;
+
+    if (mKeyAxis.data()->axisRect()->rect().contains(pos.toPoint())
+        || mParentPlot->interactions().testFlag(QCP::iSelectPlottablesBeyondAxisRect))
     {
-      int pointIndex = int(closestDataPoint-mDataContainer->constBegin());
-      details->setValue(QCPDataSelection(QCPDataRange(pointIndex, pointIndex+1)));
+        QCPErrorBarsDataContainer::const_iterator closestDataPoint = mDataContainer->constEnd();
+        double result = pointDistance(pos, closestDataPoint);
+        if (details)
+        {
+            int pointIndex = int(closestDataPoint - mDataContainer->constBegin());
+            details->setValue(QCPDataSelection(QCPDataRange(pointIndex, pointIndex + 1)));
+        }
+        return result;
     }
-    return result;
-  } else
-    return -1;
+    else
+        return -1;
 }
 
 /* inherits documentation from base class */
-void QCPErrorBars::draw(QCPPainter *painter)
+void QCPErrorBars::draw(QCPPainter* painter)
 {
-  if (!mDataPlottable) return;
-  if (!mKeyAxis || !mValueAxis) { qDebug() << Q_FUNC_INFO << "invalid key or value axis"; return; }
-  if (mKeyAxis.data()->range().size() <= 0 || mDataContainer->isEmpty()) return;
-  
-  // if the sort key isn't the main key, we must check the visibility for each data point/error bar individually
-  // (getVisibleDataBounds applies range restriction, but otherwise can only return full data range):
-  bool checkPointVisibility = !mDataPlottable->interface1D()->sortKeyIsMainKey();
-      
+    if (!mDataPlottable)
+        return;
+    if (!mKeyAxis || !mValueAxis)
+    {
+        qDebug() << Q_FUNC_INFO << "invalid key or value axis";
+        return;
+    }
+    if (mKeyAxis.data()->range().size() <= 0 || mDataContainer->isEmpty())
+        return;
+
+    // if the sort key isn't the main key, we must check the visibility for each data point/error
+    // bar individually (getVisibleDataBounds applies range restriction, but otherwise can only
+    // return full data range):
+    bool checkPointVisibility = !mDataPlottable->interface1D()->sortKeyIsMainKey();
+
     // check data validity if flag set:
 #ifdef QCUSTOMPLOT_CHECK_DATA
-  QCPErrorBarsDataContainer::const_iterator it;
-  for (it = mDataContainer->constBegin(); it != mDataContainer->constEnd(); ++it)
-  {
-    if (QCP::isInvalidData(it->errorMinus, it->errorPlus))
-      qDebug() << Q_FUNC_INFO << "Data point at index" << it-mDataContainer->constBegin() << "invalid." << "Plottable name:" << name();
-  }
+    QCPErrorBarsDataContainer::const_iterator it;
+    for (it = mDataContainer->constBegin(); it != mDataContainer->constEnd(); ++it)
+    {
+        if (QCP::isInvalidData(it->errorMinus, it->errorPlus))
+            qDebug() << Q_FUNC_INFO << "Data point at index" << it - mDataContainer->constBegin()
+                     << "invalid." << "Plottable name:" << name();
+    }
 #endif
-  
-  applyDefaultAntialiasingHint(painter);
-  painter->setBrush(Qt::NoBrush);
-  // loop over and draw segments of unselected/selected data:
-  QList<QCPDataRange> selectedSegments, unselectedSegments, allSegments;
-  getDataSegments(selectedSegments, unselectedSegments);
-  allSegments << unselectedSegments << selectedSegments;
-  QVector<QLineF> backbones, whiskers;
-  for (int i=0; i<allSegments.size(); ++i)
-  {
-    QCPErrorBarsDataContainer::const_iterator begin, end;
-    getVisibleDataBounds(begin, end, allSegments.at(i));
-    if (begin == end)
-      continue;
-    
-    bool isSelectedSegment = i >= unselectedSegments.size();
-    if (isSelectedSegment && mSelectionDecorator)
-      mSelectionDecorator->applyPen(painter);
+
+    applyDefaultAntialiasingHint(painter);
+    painter->setBrush(Qt::NoBrush);
+    // loop over and draw segments of unselected/selected data:
+    QList<QCPDataRange> selectedSegments, unselectedSegments, allSegments;
+    getDataSegments(selectedSegments, unselectedSegments);
+    allSegments << unselectedSegments << selectedSegments;
+    QVector<QLineF> backbones, whiskers;
+    for (int i = 0; i < allSegments.size(); ++i)
+    {
+        QCPErrorBarsDataContainer::const_iterator begin, end;
+        getVisibleDataBounds(begin, end, allSegments.at(i));
+        if (begin == end)
+            continue;
+
+        bool isSelectedSegment = i >= unselectedSegments.size();
+        if (isSelectedSegment && mSelectionDecorator)
+            mSelectionDecorator->applyPen(painter);
+        else
+            painter->setPen(mPen);
+        if (painter->pen().capStyle() == Qt::SquareCap)
+        {
+            QPen capFixPen(painter->pen());
+            capFixPen.setCapStyle(Qt::FlatCap);
+            painter->setPen(capFixPen);
+        }
+        backbones.clear();
+        whiskers.clear();
+        for (QCPErrorBarsDataContainer::const_iterator it = begin; it != end; ++it)
+        {
+            if (!checkPointVisibility || errorBarVisible(int(it - mDataContainer->constBegin())))
+                getErrorBarLines(it, backbones, whiskers);
+        }
+        painter->drawLines(backbones);
+        painter->drawLines(whiskers);
+    }
+
+    // draw other selection decoration that isn't just line/scatter pens and brushes:
+    if (mSelectionDecorator)
+        mSelectionDecorator->drawDecoration(painter, selection());
+}
+
+/* inherits documentation from base class */
+void QCPErrorBars::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
+{
+    applyDefaultAntialiasingHint(painter);
+    painter->setPen(mPen);
+    if (mErrorType == etValueError && mValueAxis && mValueAxis->orientation() == Qt::Vertical)
+    {
+        painter->drawLine(
+            QLineF(rect.center().x(), rect.top() + 2, rect.center().x(), rect.bottom() - 1));
+        painter->drawLine(
+            QLineF(rect.center().x() - 4, rect.top() + 2, rect.center().x() + 4, rect.top() + 2));
+        painter->drawLine(QLineF(rect.center().x() - 4, rect.bottom() - 1, rect.center().x() + 4,
+                                 rect.bottom() - 1));
+    }
     else
-      painter->setPen(mPen);
-    if (painter->pen().capStyle() == Qt::SquareCap)
     {
-      QPen capFixPen(painter->pen());
-      capFixPen.setCapStyle(Qt::FlatCap);
-      painter->setPen(capFixPen);
+        painter->drawLine(
+            QLineF(rect.left() + 2, rect.center().y(), rect.right() - 2, rect.center().y()));
+        painter->drawLine(
+            QLineF(rect.left() + 2, rect.center().y() - 4, rect.left() + 2, rect.center().y() + 4));
+        painter->drawLine(QLineF(rect.right() - 2, rect.center().y() - 4, rect.right() - 2,
+                                 rect.center().y() + 4));
     }
-    backbones.clear();
-    whiskers.clear();
-    for (QCPErrorBarsDataContainer::const_iterator it=begin; it!=end; ++it)
-    {
-      if (!checkPointVisibility || errorBarVisible(int(it-mDataContainer->constBegin())))
-        getErrorBarLines(it, backbones, whiskers);
-    }
-    painter->drawLines(backbones);
-    painter->drawLines(whiskers);
-  }
-  
-  // draw other selection decoration that isn't just line/scatter pens and brushes:
-  if (mSelectionDecorator)
-    mSelectionDecorator->drawDecoration(painter, selection());
 }
 
 /* inherits documentation from base class */
-void QCPErrorBars::drawLegendIcon(QCPPainter *painter, const QRectF &rect) const
+QCPRange QCPErrorBars::getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain) const
 {
-  applyDefaultAntialiasingHint(painter);
-  painter->setPen(mPen);
-  if (mErrorType == etValueError && mValueAxis && mValueAxis->orientation() == Qt::Vertical)
-  {
-    painter->drawLine(QLineF(rect.center().x(), rect.top()+2, rect.center().x(), rect.bottom()-1));
-    painter->drawLine(QLineF(rect.center().x()-4, rect.top()+2, rect.center().x()+4, rect.top()+2));
-    painter->drawLine(QLineF(rect.center().x()-4, rect.bottom()-1, rect.center().x()+4, rect.bottom()-1));
-  } else
-  {
-    painter->drawLine(QLineF(rect.left()+2, rect.center().y(), rect.right()-2, rect.center().y()));
-    painter->drawLine(QLineF(rect.left()+2, rect.center().y()-4, rect.left()+2, rect.center().y()+4));
-    painter->drawLine(QLineF(rect.right()-2, rect.center().y()-4, rect.right()-2, rect.center().y()+4));
-  }
+    if (!mDataPlottable)
+    {
+        foundRange = false;
+        return {};
+    }
+
+    QCPRange range;
+    bool haveLower = false;
+    bool haveUpper = false;
+    QCPErrorBarsDataContainer::const_iterator it;
+    for (it = mDataContainer->constBegin(); it != mDataContainer->constEnd(); ++it)
+    {
+        if (mErrorType == etValueError)
+        {
+            // error bar doesn't extend in key dimension (except whisker but we ignore that here),
+            // so only use data point center
+            const double current = mDataPlottable->interface1D()->dataMainKey(
+                int(it - mDataContainer->constBegin()));
+            if (qIsNaN(current))
+                continue;
+            if (inSignDomain == QCP::sdBoth || (inSignDomain == QCP::sdNegative && current < 0)
+                || (inSignDomain == QCP::sdPositive && current > 0))
+            {
+                if (current < range.lower || !haveLower)
+                {
+                    range.lower = current;
+                    haveLower = true;
+                }
+                if (current > range.upper || !haveUpper)
+                {
+                    range.upper = current;
+                    haveUpper = true;
+                }
+            }
+        }
+        else // mErrorType == etKeyError
+        {
+            const double dataKey = mDataPlottable->interface1D()->dataMainKey(
+                int(it - mDataContainer->constBegin()));
+            if (qIsNaN(dataKey))
+                continue;
+            // plus error:
+            double current = dataKey + (qIsNaN(it->errorPlus) ? 0 : it->errorPlus);
+            if (inSignDomain == QCP::sdBoth || (inSignDomain == QCP::sdNegative && current < 0)
+                || (inSignDomain == QCP::sdPositive && current > 0))
+            {
+                if (current > range.upper || !haveUpper)
+                {
+                    range.upper = current;
+                    haveUpper = true;
+                }
+            }
+            // minus error:
+            current = dataKey - (qIsNaN(it->errorMinus) ? 0 : it->errorMinus);
+            if (inSignDomain == QCP::sdBoth || (inSignDomain == QCP::sdNegative && current < 0)
+                || (inSignDomain == QCP::sdPositive && current > 0))
+            {
+                if (current < range.lower || !haveLower)
+                {
+                    range.lower = current;
+                    haveLower = true;
+                }
+            }
+        }
+    }
+
+    if (haveUpper && !haveLower)
+    {
+        range.lower = range.upper;
+        haveLower = true;
+    }
+    else if (haveLower && !haveUpper)
+    {
+        range.upper = range.lower;
+        haveUpper = true;
+    }
+
+    foundRange = haveLower && haveUpper;
+    return range;
 }
 
 /* inherits documentation from base class */
-QCPRange QCPErrorBars::getKeyRange(bool &foundRange, QCP::SignDomain inSignDomain) const
+QCPRange QCPErrorBars::getValueRange(bool& foundRange, QCP::SignDomain inSignDomain,
+                                     const QCPRange& inKeyRange) const
 {
-  if (!mDataPlottable)
-  {
-    foundRange = false;
-    return {};
-  }
-  
-  QCPRange range;
-  bool haveLower = false;
-  bool haveUpper = false;
-  QCPErrorBarsDataContainer::const_iterator it;
-  for (it = mDataContainer->constBegin(); it != mDataContainer->constEnd(); ++it)
-  {
-    if (mErrorType == etValueError)
+    if (!mDataPlottable)
     {
-      // error bar doesn't extend in key dimension (except whisker but we ignore that here), so only use data point center
-      const double current = mDataPlottable->interface1D()->dataMainKey(int(it-mDataContainer->constBegin()));
-      if (qIsNaN(current)) continue;
-      if (inSignDomain == QCP::sdBoth || (inSignDomain == QCP::sdNegative && current < 0) || (inSignDomain == QCP::sdPositive && current > 0))
-      {
-        if (current < range.lower || !haveLower)
-        {
-          range.lower = current;
-          haveLower = true;
-        }
-        if (current > range.upper || !haveUpper)
-        {
-          range.upper = current;
-          haveUpper = true;
-        }
-      }
-    } else // mErrorType == etKeyError
-    {
-      const double dataKey = mDataPlottable->interface1D()->dataMainKey(int(it-mDataContainer->constBegin()));
-      if (qIsNaN(dataKey)) continue;
-      // plus error:
-      double current = dataKey + (qIsNaN(it->errorPlus) ? 0 : it->errorPlus);
-      if (inSignDomain == QCP::sdBoth || (inSignDomain == QCP::sdNegative && current < 0) || (inSignDomain == QCP::sdPositive && current > 0))
-      {
-        if (current > range.upper || !haveUpper)
-        {
-          range.upper = current;
-          haveUpper = true;
-        }
-      }
-      // minus error:
-      current = dataKey - (qIsNaN(it->errorMinus) ? 0 : it->errorMinus);
-      if (inSignDomain == QCP::sdBoth || (inSignDomain == QCP::sdNegative && current < 0) || (inSignDomain == QCP::sdPositive && current > 0))
-      {
-        if (current < range.lower || !haveLower)
-        {
-          range.lower = current;
-          haveLower = true;
-        }
-      }
+        foundRange = false;
+        return {};
     }
-  }
-  
-  if (haveUpper && !haveLower)
-  {
-    range.lower = range.upper;
-    haveLower = true;
-  } else if (haveLower && !haveUpper)
-  {
-    range.upper = range.lower;
-    haveUpper = true;
-  }
-  
-  foundRange = haveLower && haveUpper;
-  return range;
-}
 
-/* inherits documentation from base class */
-QCPRange QCPErrorBars::getValueRange(bool &foundRange, QCP::SignDomain inSignDomain, const QCPRange &inKeyRange) const
-{
-  if (!mDataPlottable)
-  {
-    foundRange = false;
-    return {};
-  }
-  
-  QCPRange range;
-  const bool restrictKeyRange = inKeyRange != QCPRange();
-  bool haveLower = false;
-  bool haveUpper = false;
-  QCPErrorBarsDataContainer::const_iterator itBegin = mDataContainer->constBegin();
-  QCPErrorBarsDataContainer::const_iterator itEnd = mDataContainer->constEnd();
-  if (mDataPlottable->interface1D()->sortKeyIsMainKey() && restrictKeyRange)
-  {
-    itBegin = mDataContainer->constBegin()+findBegin(inKeyRange.lower, false);
-    itEnd = mDataContainer->constBegin()+findEnd(inKeyRange.upper, false);
-  }
-  for (QCPErrorBarsDataContainer::const_iterator it = itBegin; it != itEnd; ++it)
-  {
-    if (restrictKeyRange)
+    QCPRange range;
+    const bool restrictKeyRange = inKeyRange != QCPRange();
+    bool haveLower = false;
+    bool haveUpper = false;
+    QCPErrorBarsDataContainer::const_iterator itBegin = mDataContainer->constBegin();
+    QCPErrorBarsDataContainer::const_iterator itEnd = mDataContainer->constEnd();
+    if (mDataPlottable->interface1D()->sortKeyIsMainKey() && restrictKeyRange)
     {
-      const double dataKey = mDataPlottable->interface1D()->dataMainKey(int(it-mDataContainer->constBegin()));
-      if (dataKey < inKeyRange.lower || dataKey > inKeyRange.upper)
-        continue;
+        itBegin = mDataContainer->constBegin() + findBegin(inKeyRange.lower, false);
+        itEnd = mDataContainer->constBegin() + findEnd(inKeyRange.upper, false);
     }
-    if (mErrorType == etValueError)
+    for (QCPErrorBarsDataContainer::const_iterator it = itBegin; it != itEnd; ++it)
     {
-      const double dataValue = mDataPlottable->interface1D()->dataMainValue(int(it-mDataContainer->constBegin()));
-      if (qIsNaN(dataValue)) continue;
-      // plus error:
-      double current = dataValue + (qIsNaN(it->errorPlus) ? 0 : it->errorPlus);
-      if (inSignDomain == QCP::sdBoth || (inSignDomain == QCP::sdNegative && current < 0) || (inSignDomain == QCP::sdPositive && current > 0))
-      {
-        if (current > range.upper || !haveUpper)
+        if (restrictKeyRange)
         {
-          range.upper = current;
-          haveUpper = true;
+            const double dataKey = mDataPlottable->interface1D()->dataMainKey(
+                int(it - mDataContainer->constBegin()));
+            if (dataKey < inKeyRange.lower || dataKey > inKeyRange.upper)
+                continue;
         }
-      }
-      // minus error:
-      current = dataValue - (qIsNaN(it->errorMinus) ? 0 : it->errorMinus);
-      if (inSignDomain == QCP::sdBoth || (inSignDomain == QCP::sdNegative && current < 0) || (inSignDomain == QCP::sdPositive && current > 0))
-      {
-        if (current < range.lower || !haveLower)
+        if (mErrorType == etValueError)
         {
-          range.lower = current;
-          haveLower = true;
+            const double dataValue = mDataPlottable->interface1D()->dataMainValue(
+                int(it - mDataContainer->constBegin()));
+            if (qIsNaN(dataValue))
+                continue;
+            // plus error:
+            double current = dataValue + (qIsNaN(it->errorPlus) ? 0 : it->errorPlus);
+            if (inSignDomain == QCP::sdBoth || (inSignDomain == QCP::sdNegative && current < 0)
+                || (inSignDomain == QCP::sdPositive && current > 0))
+            {
+                if (current > range.upper || !haveUpper)
+                {
+                    range.upper = current;
+                    haveUpper = true;
+                }
+            }
+            // minus error:
+            current = dataValue - (qIsNaN(it->errorMinus) ? 0 : it->errorMinus);
+            if (inSignDomain == QCP::sdBoth || (inSignDomain == QCP::sdNegative && current < 0)
+                || (inSignDomain == QCP::sdPositive && current > 0))
+            {
+                if (current < range.lower || !haveLower)
+                {
+                    range.lower = current;
+                    haveLower = true;
+                }
+            }
         }
-      }
-    } else // mErrorType == etKeyError
-    {
-      // error bar doesn't extend in value dimension (except whisker but we ignore that here), so only use data point center
-      const double current = mDataPlottable->interface1D()->dataMainValue(int(it-mDataContainer->constBegin()));
-      if (qIsNaN(current)) continue;
-      if (inSignDomain == QCP::sdBoth || (inSignDomain == QCP::sdNegative && current < 0) || (inSignDomain == QCP::sdPositive && current > 0))
-      {
-        if (current < range.lower || !haveLower)
+        else // mErrorType == etKeyError
         {
-          range.lower = current;
-          haveLower = true;
+            // error bar doesn't extend in value dimension (except whisker but we ignore that here),
+            // so only use data point center
+            const double current = mDataPlottable->interface1D()->dataMainValue(
+                int(it - mDataContainer->constBegin()));
+            if (qIsNaN(current))
+                continue;
+            if (inSignDomain == QCP::sdBoth || (inSignDomain == QCP::sdNegative && current < 0)
+                || (inSignDomain == QCP::sdPositive && current > 0))
+            {
+                if (current < range.lower || !haveLower)
+                {
+                    range.lower = current;
+                    haveLower = true;
+                }
+                if (current > range.upper || !haveUpper)
+                {
+                    range.upper = current;
+                    haveUpper = true;
+                }
+            }
         }
-        if (current > range.upper || !haveUpper)
-        {
-          range.upper = current;
-          haveUpper = true;
-        }
-      }
     }
-  }
-  
-  if (haveUpper && !haveLower)
-  {
-    range.lower = range.upper;
-    haveLower = true;
-  } else if (haveLower && !haveUpper)
-  {
-    range.upper = range.lower;
-    haveUpper = true;
-  }
-  
-  foundRange = haveLower && haveUpper;
-  return range;
+
+    if (haveUpper && !haveLower)
+    {
+        range.lower = range.upper;
+        haveLower = true;
+    }
+    else if (haveLower && !haveUpper)
+    {
+        range.upper = range.lower;
+        haveUpper = true;
+    }
+
+    foundRange = haveLower && haveUpper;
+    return range;
 }
 
 /*! \internal
@@ -753,55 +792,71 @@ QCPRange QCPErrorBars::getValueRange(bool &foundRange, QCP::SignDomain inSignDom
   This method assumes that \a it is a valid iterator within the bounds of this \ref QCPErrorBars
   instance and within the bounds of the associated data plottable.
 */
-void QCPErrorBars::getErrorBarLines(QCPErrorBarsDataContainer::const_iterator it, QVector<QLineF> &backbones, QVector<QLineF> &whiskers) const
+void QCPErrorBars::getErrorBarLines(QCPErrorBarsDataContainer::const_iterator it,
+                                    QVector<QLineF>& backbones, QVector<QLineF>& whiskers) const
 {
-  if (!mDataPlottable) return;
-  
-  int index = int(it-mDataContainer->constBegin());
-  QPointF centerPixel = mDataPlottable->interface1D()->dataPixelPosition(index);
-  if (qIsNaN(centerPixel.x()) || qIsNaN(centerPixel.y()))
-    return;
-  QCPAxis *errorAxis = mErrorType == etValueError ? mValueAxis.data() : mKeyAxis.data();
-  QCPAxis *orthoAxis = mErrorType == etValueError ? mKeyAxis.data() : mValueAxis.data();
-  const double centerErrorAxisPixel = errorAxis->orientation() == Qt::Horizontal ? centerPixel.x() : centerPixel.y();
-  const double centerOrthoAxisPixel = orthoAxis->orientation() == Qt::Horizontal ? centerPixel.x() : centerPixel.y();
-  const double centerErrorAxisCoord = errorAxis->pixelToCoord(centerErrorAxisPixel); // depending on plottable, this might be different from just mDataPlottable->interface1D()->dataMainKey/Value
-  const double symbolGap = mSymbolGap*0.5*errorAxis->pixelOrientation();
-  // plus error:
-  double errorStart, errorEnd;
-  if (!qIsNaN(it->errorPlus))
-  {
-    errorStart = centerErrorAxisPixel+symbolGap;
-    errorEnd = errorAxis->coordToPixel(centerErrorAxisCoord+it->errorPlus);
-    if (errorAxis->orientation() == Qt::Vertical)
+    if (!mDataPlottable)
+        return;
+
+    int index = int(it - mDataContainer->constBegin());
+    QPointF centerPixel = mDataPlottable->interface1D()->dataPixelPosition(index);
+    if (qIsNaN(centerPixel.x()) || qIsNaN(centerPixel.y()))
+        return;
+    QCPAxis* errorAxis = mErrorType == etValueError ? mValueAxis.data() : mKeyAxis.data();
+    QCPAxis* orthoAxis = mErrorType == etValueError ? mKeyAxis.data() : mValueAxis.data();
+    const double centerErrorAxisPixel
+        = errorAxis->orientation() == Qt::Horizontal ? centerPixel.x() : centerPixel.y();
+    const double centerOrthoAxisPixel
+        = orthoAxis->orientation() == Qt::Horizontal ? centerPixel.x() : centerPixel.y();
+    const double centerErrorAxisCoord = errorAxis->pixelToCoord(
+        centerErrorAxisPixel); // depending on plottable, this might be different from just
+                               // mDataPlottable->interface1D()->dataMainKey/Value
+    const double symbolGap = mSymbolGap * 0.5 * errorAxis->pixelOrientation();
+    // plus error:
+    double errorStart, errorEnd;
+    if (!qIsNaN(it->errorPlus))
     {
-      if ((errorStart > errorEnd) != errorAxis->rangeReversed())
-        backbones.append(QLineF(centerOrthoAxisPixel, errorStart, centerOrthoAxisPixel, errorEnd));
-      whiskers.append(QLineF(centerOrthoAxisPixel-mWhiskerWidth*0.5, errorEnd, centerOrthoAxisPixel+mWhiskerWidth*0.5, errorEnd));
-    } else
-    {
-      if ((errorStart < errorEnd) != errorAxis->rangeReversed())
-        backbones.append(QLineF(errorStart, centerOrthoAxisPixel, errorEnd, centerOrthoAxisPixel));
-      whiskers.append(QLineF(errorEnd, centerOrthoAxisPixel-mWhiskerWidth*0.5, errorEnd, centerOrthoAxisPixel+mWhiskerWidth*0.5));
+        errorStart = centerErrorAxisPixel + symbolGap;
+        errorEnd = errorAxis->coordToPixel(centerErrorAxisCoord + it->errorPlus);
+        if (errorAxis->orientation() == Qt::Vertical)
+        {
+            if ((errorStart > errorEnd) != errorAxis->rangeReversed())
+                backbones.append(
+                    QLineF(centerOrthoAxisPixel, errorStart, centerOrthoAxisPixel, errorEnd));
+            whiskers.append(QLineF(centerOrthoAxisPixel - mWhiskerWidth * 0.5, errorEnd,
+                                   centerOrthoAxisPixel + mWhiskerWidth * 0.5, errorEnd));
+        }
+        else
+        {
+            if ((errorStart < errorEnd) != errorAxis->rangeReversed())
+                backbones.append(
+                    QLineF(errorStart, centerOrthoAxisPixel, errorEnd, centerOrthoAxisPixel));
+            whiskers.append(QLineF(errorEnd, centerOrthoAxisPixel - mWhiskerWidth * 0.5, errorEnd,
+                                   centerOrthoAxisPixel + mWhiskerWidth * 0.5));
+        }
     }
-  }
-  // minus error:
-  if (!qIsNaN(it->errorMinus))
-  {
-    errorStart = centerErrorAxisPixel-symbolGap;
-    errorEnd = errorAxis->coordToPixel(centerErrorAxisCoord-it->errorMinus);
-    if (errorAxis->orientation() == Qt::Vertical)
+    // minus error:
+    if (!qIsNaN(it->errorMinus))
     {
-      if ((errorStart < errorEnd) != errorAxis->rangeReversed())
-        backbones.append(QLineF(centerOrthoAxisPixel, errorStart, centerOrthoAxisPixel, errorEnd));
-      whiskers.append(QLineF(centerOrthoAxisPixel-mWhiskerWidth*0.5, errorEnd, centerOrthoAxisPixel+mWhiskerWidth*0.5, errorEnd));
-    } else
-    {
-      if ((errorStart > errorEnd) != errorAxis->rangeReversed())
-        backbones.append(QLineF(errorStart, centerOrthoAxisPixel, errorEnd, centerOrthoAxisPixel));
-      whiskers.append(QLineF(errorEnd, centerOrthoAxisPixel-mWhiskerWidth*0.5, errorEnd, centerOrthoAxisPixel+mWhiskerWidth*0.5));
+        errorStart = centerErrorAxisPixel - symbolGap;
+        errorEnd = errorAxis->coordToPixel(centerErrorAxisCoord - it->errorMinus);
+        if (errorAxis->orientation() == Qt::Vertical)
+        {
+            if ((errorStart < errorEnd) != errorAxis->rangeReversed())
+                backbones.append(
+                    QLineF(centerOrthoAxisPixel, errorStart, centerOrthoAxisPixel, errorEnd));
+            whiskers.append(QLineF(centerOrthoAxisPixel - mWhiskerWidth * 0.5, errorEnd,
+                                   centerOrthoAxisPixel + mWhiskerWidth * 0.5, errorEnd));
+        }
+        else
+        {
+            if ((errorStart > errorEnd) != errorAxis->rangeReversed())
+                backbones.append(
+                    QLineF(errorStart, centerOrthoAxisPixel, errorEnd, centerOrthoAxisPixel));
+            whiskers.append(QLineF(errorEnd, centerOrthoAxisPixel - mWhiskerWidth * 0.5, errorEnd,
+                                   centerOrthoAxisPixel + mWhiskerWidth * 0.5));
+        }
     }
-  }
 }
 
 /*! \internal
@@ -822,57 +877,62 @@ void QCPErrorBars::getErrorBarLines(QCPErrorBarsDataContainer::const_iterator it
   range, only restricted by \a rangeRestriction. Drawing optimization then has to be done on a
   point-by-point basis in the \ref draw method.
 */
-void QCPErrorBars::getVisibleDataBounds(QCPErrorBarsDataContainer::const_iterator &begin, QCPErrorBarsDataContainer::const_iterator &end, const QCPDataRange &rangeRestriction) const
+void QCPErrorBars::getVisibleDataBounds(QCPErrorBarsDataContainer::const_iterator& begin,
+                                        QCPErrorBarsDataContainer::const_iterator& end,
+                                        const QCPDataRange& rangeRestriction) const
 {
-  QCPAxis *keyAxis = mKeyAxis.data();
-  QCPAxis *valueAxis = mValueAxis.data();
-  if (!keyAxis || !valueAxis)
-  {
-    qDebug() << Q_FUNC_INFO << "invalid key or value axis";
-    end = mDataContainer->constEnd();
-    begin = end;
-    return;
-  }
-  if (!mDataPlottable || rangeRestriction.isEmpty())
-  {
-    end = mDataContainer->constEnd();
-    begin = end;
-    return;
-  }
-  if (!mDataPlottable->interface1D()->sortKeyIsMainKey())
-  {
-    // if the sort key isn't the main key, it's not possible to find a contiguous range of visible
-    // data points, so this method then only applies the range restriction and otherwise returns
-    // the full data range. Visibility checks must be done on a per-datapoin-basis during drawing
-    QCPDataRange dataRange(0, mDataContainer->size());
-    dataRange = dataRange.bounded(rangeRestriction);
-    begin = mDataContainer->constBegin()+dataRange.begin();
-    end = mDataContainer->constBegin()+dataRange.end();
-    return;
-  }
-  
-  // get visible data range via interface from data plottable, and then restrict to available error data points:
-  const int n = qMin(mDataContainer->size(), mDataPlottable->interface1D()->dataCount());
-  int beginIndex = mDataPlottable->interface1D()->findBegin(keyAxis->range().lower);
-  int endIndex = mDataPlottable->interface1D()->findEnd(keyAxis->range().upper);
-  int i = beginIndex;
-  while (i > 0 && i < n && i > rangeRestriction.begin())
-  {
-    if (errorBarVisible(i))
-      beginIndex = i;
-    --i;
-  }
-  i = endIndex;
-  while (i >= 0 && i < n && i < rangeRestriction.end())
-  {
-    if (errorBarVisible(i))
-      endIndex = i+1;
-    ++i;
-  }
-  QCPDataRange dataRange(beginIndex, endIndex);
-  dataRange = dataRange.bounded(rangeRestriction.bounded(QCPDataRange(0, mDataContainer->size())));
-  begin = mDataContainer->constBegin()+dataRange.begin();
-  end = mDataContainer->constBegin()+dataRange.end();
+    QCPAxis* keyAxis = mKeyAxis.data();
+    QCPAxis* valueAxis = mValueAxis.data();
+    if (!keyAxis || !valueAxis)
+    {
+        qDebug() << Q_FUNC_INFO << "invalid key or value axis";
+        end = mDataContainer->constEnd();
+        begin = end;
+        return;
+    }
+    if (!mDataPlottable || rangeRestriction.isEmpty())
+    {
+        end = mDataContainer->constEnd();
+        begin = end;
+        return;
+    }
+    if (!mDataPlottable->interface1D()->sortKeyIsMainKey())
+    {
+        // if the sort key isn't the main key, it's not possible to find a contiguous range of
+        // visible data points, so this method then only applies the range restriction and otherwise
+        // returns the full data range. Visibility checks must be done on a per-datapoin-basis
+        // during drawing
+        QCPDataRange dataRange(0, mDataContainer->size());
+        dataRange = dataRange.bounded(rangeRestriction);
+        begin = mDataContainer->constBegin() + dataRange.begin();
+        end = mDataContainer->constBegin() + dataRange.end();
+        return;
+    }
+
+    // get visible data range via interface from data plottable, and then restrict to available
+    // error data points:
+    const int n = qMin(mDataContainer->size(), mDataPlottable->interface1D()->dataCount());
+    int beginIndex = mDataPlottable->interface1D()->findBegin(keyAxis->range().lower);
+    int endIndex = mDataPlottable->interface1D()->findEnd(keyAxis->range().upper);
+    int i = beginIndex;
+    while (i > 0 && i < n && i > rangeRestriction.begin())
+    {
+        if (errorBarVisible(i))
+            beginIndex = i;
+        --i;
+    }
+    i = endIndex;
+    while (i >= 0 && i < n && i < rangeRestriction.end())
+    {
+        if (errorBarVisible(i))
+            endIndex = i + 1;
+        ++i;
+    }
+    QCPDataRange dataRange(beginIndex, endIndex);
+    dataRange
+        = dataRange.bounded(rangeRestriction.bounded(QCPDataRange(0, mDataContainer->size())));
+    begin = mDataContainer->constBegin() + dataRange.begin();
+    end = mDataContainer->constBegin() + dataRange.end();
 }
 
 /*! \internal
@@ -881,37 +941,39 @@ void QCPErrorBars::getVisibleDataBounds(QCPErrorBarsDataContainer::const_iterato
   pixelPoint. This is used to determine whether the error bar was clicked or not, e.g. in \ref
   selectTest. The closest data point to \a pixelPoint is returned in \a closestData.
 */
-double QCPErrorBars::pointDistance(const QPointF &pixelPoint, QCPErrorBarsDataContainer::const_iterator &closestData) const
+double QCPErrorBars::pointDistance(const QPointF& pixelPoint,
+                                   QCPErrorBarsDataContainer::const_iterator& closestData) const
 {
-  closestData = mDataContainer->constEnd();
-  if (!mDataPlottable || mDataContainer->isEmpty())
-    return -1.0;
-  if (!mKeyAxis || !mValueAxis)
-  {
-    qDebug() << Q_FUNC_INFO << "invalid key or value axis";
-    return -1.0;
-  }
-  
-  QCPErrorBarsDataContainer::const_iterator begin, end;
-  getVisibleDataBounds(begin, end, QCPDataRange(0, dataCount()));
-  
-  // calculate minimum distances to error backbones (whiskers are ignored for speed) and find closestData iterator:
-  double minDistSqr = (std::numeric_limits<double>::max)();
-  QVector<QLineF> backbones, whiskers;
-  for (QCPErrorBarsDataContainer::const_iterator it=begin; it!=end; ++it)
-  {
-    getErrorBarLines(it, backbones, whiskers);
-    foreach (const QLineF &backbone, backbones)
+    closestData = mDataContainer->constEnd();
+    if (!mDataPlottable || mDataContainer->isEmpty())
+        return -1.0;
+    if (!mKeyAxis || !mValueAxis)
     {
-      const double currentDistSqr = QCPVector2D(pixelPoint).distanceSquaredToLine(backbone);
-      if (currentDistSqr < minDistSqr)
-      {
-        minDistSqr = currentDistSqr;
-        closestData = it;
-      }
+        qDebug() << Q_FUNC_INFO << "invalid key or value axis";
+        return -1.0;
     }
-  }
-  return qSqrt(minDistSqr);
+
+    QCPErrorBarsDataContainer::const_iterator begin, end;
+    getVisibleDataBounds(begin, end, QCPDataRange(0, dataCount()));
+
+    // calculate minimum distances to error backbones (whiskers are ignored for speed) and find
+    // closestData iterator:
+    double minDistSqr = (std::numeric_limits<double>::max)();
+    QVector<QLineF> backbones, whiskers;
+    for (QCPErrorBarsDataContainer::const_iterator it = begin; it != end; ++it)
+    {
+        getErrorBarLines(it, backbones, whiskers);
+        foreach (const QLineF& backbone, backbones)
+        {
+            const double currentDistSqr = QCPVector2D(pixelPoint).distanceSquaredToLine(backbone);
+            if (currentDistSqr < minDistSqr)
+            {
+                minDistSqr = currentDistSqr;
+                closestData = it;
+            }
+        }
+    }
+    return qSqrt(minDistSqr);
 }
 
 /*! \internal
@@ -921,23 +983,26 @@ double QCPErrorBars::pointDistance(const QPointF &pixelPoint, QCPErrorBarsDataCo
   own key/value data coordinates, doesn't derive from \ref QCPAbstractPlottable1D. See the
   documentation there for details.
 */
-void QCPErrorBars::getDataSegments(QList<QCPDataRange> &selectedSegments, QList<QCPDataRange> &unselectedSegments) const
+void QCPErrorBars::getDataSegments(QList<QCPDataRange>& selectedSegments,
+                                   QList<QCPDataRange>& unselectedSegments) const
 {
-  selectedSegments.clear();
-  unselectedSegments.clear();
-  if (mSelectable == QCP::stWhole) // stWhole selection type draws the entire plottable with selected style if mSelection isn't empty
-  {
-    if (selected())
-      selectedSegments << QCPDataRange(0, dataCount());
+    selectedSegments.clear();
+    unselectedSegments.clear();
+    if (mSelectable == QCP::stWhole) // stWhole selection type draws the entire plottable with
+                                     // selected style if mSelection isn't empty
+    {
+        if (selected())
+            selectedSegments << QCPDataRange(0, dataCount());
+        else
+            unselectedSegments << QCPDataRange(0, dataCount());
+    }
     else
-      unselectedSegments << QCPDataRange(0, dataCount());
-  } else
-  {
-    QCPDataSelection sel(selection());
-    sel.simplify();
-    selectedSegments = sel.dataRanges();
-    unselectedSegments = sel.inverse(QCPDataRange(0, dataCount())).dataRanges();
-  }
+    {
+        QCPDataSelection sel(selection());
+        sel.simplify();
+        selectedSegments = sel.dataRanges();
+        unselectedSegments = sel.inverse(QCPDataRange(0, dataCount())).dataRanges();
+    }
 }
 
 /*! \internal
@@ -951,25 +1016,29 @@ void QCPErrorBars::getDataSegments(QList<QCPDataRange> &selectedSegments, QList<
 */
 bool QCPErrorBars::errorBarVisible(int index) const
 {
-  QPointF centerPixel = mDataPlottable->interface1D()->dataPixelPosition(index);
-  const double centerKeyPixel = mKeyAxis->orientation() == Qt::Horizontal ? centerPixel.x() : centerPixel.y();
-  if (qIsNaN(centerKeyPixel))
-    return false;
-  
-  double keyMin, keyMax;
-  if (mErrorType == etKeyError)
-  {
-    const double centerKey = mKeyAxis->pixelToCoord(centerKeyPixel);
-    const double errorPlus = mDataContainer->at(index).errorPlus;
-    const double errorMinus = mDataContainer->at(index).errorMinus;
-    keyMax = centerKey+(qIsNaN(errorPlus) ? 0 : errorPlus);
-    keyMin = centerKey-(qIsNaN(errorMinus) ? 0 : errorMinus);
-  } else // mErrorType == etValueError
-  {
-    keyMax = mKeyAxis->pixelToCoord(centerKeyPixel+mWhiskerWidth*0.5*mKeyAxis->pixelOrientation());
-    keyMin = mKeyAxis->pixelToCoord(centerKeyPixel-mWhiskerWidth*0.5*mKeyAxis->pixelOrientation());
-  }
-  return ((keyMax > mKeyAxis->range().lower) && (keyMin < mKeyAxis->range().upper));
+    QPointF centerPixel = mDataPlottable->interface1D()->dataPixelPosition(index);
+    const double centerKeyPixel
+        = mKeyAxis->orientation() == Qt::Horizontal ? centerPixel.x() : centerPixel.y();
+    if (qIsNaN(centerKeyPixel))
+        return false;
+
+    double keyMin, keyMax;
+    if (mErrorType == etKeyError)
+    {
+        const double centerKey = mKeyAxis->pixelToCoord(centerKeyPixel);
+        const double errorPlus = mDataContainer->at(index).errorPlus;
+        const double errorMinus = mDataContainer->at(index).errorMinus;
+        keyMax = centerKey + (qIsNaN(errorPlus) ? 0 : errorPlus);
+        keyMin = centerKey - (qIsNaN(errorMinus) ? 0 : errorMinus);
+    }
+    else // mErrorType == etValueError
+    {
+        keyMax = mKeyAxis->pixelToCoord(centerKeyPixel
+                                        + mWhiskerWidth * 0.5 * mKeyAxis->pixelOrientation());
+        keyMin = mKeyAxis->pixelToCoord(centerKeyPixel
+                                        - mWhiskerWidth * 0.5 * mKeyAxis->pixelOrientation());
+    }
+    return ((keyMax > mKeyAxis->range().lower) && (keyMin < mKeyAxis->range().upper));
 }
 
 /*! \internal
@@ -979,16 +1048,16 @@ bool QCPErrorBars::errorBarVisible(int index) const
   \a line is assumed to be either perfectly horizontal or perfectly vertical, as is the case for
   error bar lines.
 */
-bool QCPErrorBars::rectIntersectsLine(const QRectF &pixelRect, const QLineF &line) const
+bool QCPErrorBars::rectIntersectsLine(const QRectF& pixelRect, const QLineF& line) const
 {
-  if (pixelRect.left() > line.x1() && pixelRect.left() > line.x2())
-    return false;
-  else if (pixelRect.right() < line.x1() && pixelRect.right() < line.x2())
-    return false;
-  else if (pixelRect.top() > line.y1() && pixelRect.top() > line.y2())
-    return false;
-  else if (pixelRect.bottom() < line.y1() && pixelRect.bottom() < line.y2())
-    return false;
-  else
-    return true;
+    if (pixelRect.left() > line.x1() && pixelRect.left() > line.x2())
+        return false;
+    else if (pixelRect.right() < line.x1() && pixelRect.right() < line.x2())
+        return false;
+    else if (pixelRect.top() > line.y1() && pixelRect.top() > line.y2())
+        return false;
+    else if (pixelRect.bottom() < line.y1() && pixelRect.bottom() < line.y2())
+        return false;
+    else
+        return true;
 }

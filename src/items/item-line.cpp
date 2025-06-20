@@ -25,8 +25,8 @@
 
 #include "item-line.h"
 
-#include "../painter.h"
 #include "../core.h"
+#include "../painter.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPItemLine
@@ -35,213 +35,218 @@
 /*! \class QCPItemLine
   \brief A line from one point to another
 
-  \image html QCPItemLine.png "Line example. Blue dotted circles are anchors, solid blue discs are positions."
+  \image html QCPItemLine.png "Line example. Blue dotted circles are anchors, solid blue discs are
+  positions."
 
   It has two positions, \a start and \a end, which define the end points of the line.
-  
-  With \ref setHead and \ref setTail you may set different line ending styles, e.g. to create an arrow.
+
+  With \ref setHead and \ref setTail you may set different line ending styles, e.g. to create an
+  arrow.
 */
 
 /*!
   Creates a line item and sets default values.
-  
+
   The created item is automatically registered with \a parentPlot. This QCustomPlot instance takes
   ownership of the item, so do not delete it manually but use QCustomPlot::removeItem() instead.
 */
-QCPItemLine::QCPItemLine(QCustomPlot *parentPlot) :
-  QCPAbstractItem(parentPlot),
-  start(createPosition(QLatin1String("start"))),
-  end(createPosition(QLatin1String("end")))
+QCPItemLine::QCPItemLine(QCustomPlot* parentPlot)
+        : QCPAbstractItem(parentPlot)
+        , start(createPosition(QLatin1String("start")))
+        , end(createPosition(QLatin1String("end")))
 {
-  start->setCoords(0, 0);
-  end->setCoords(1, 1);
-  
-  setPen(QPen(Qt::black));
-  setSelectedPen(QPen(Qt::blue,2));
+    start->setCoords(0, 0);
+    end->setCoords(1, 1);
+
+    setPen(QPen(Qt::black));
+    setSelectedPen(QPen(Qt::blue, 2));
 }
 
-QCPItemLine::~QCPItemLine()
-{
-}
+QCPItemLine::~QCPItemLine() { }
 
 /*!
   Sets the pen that will be used to draw the line
-  
+
   \see setSelectedPen
 */
-void QCPItemLine::setPen(const QPen &pen)
+void QCPItemLine::setPen(const QPen& pen)
 {
-  mPen = pen;
+    mPen = pen;
 }
 
 /*!
   Sets the pen that will be used to draw the line when selected
-  
+
   \see setPen, setSelected
 */
-void QCPItemLine::setSelectedPen(const QPen &pen)
+void QCPItemLine::setSelectedPen(const QPen& pen)
 {
-  mSelectedPen = pen;
+    mSelectedPen = pen;
 }
 
 /*!
   Sets the line ending style of the head. The head corresponds to the \a end position.
-  
+
   Note that due to the overloaded QCPLineEnding constructor, you may directly specify
   a QCPLineEnding::EndingStyle here, e.g. \code setHead(QCPLineEnding::esSpikeArrow) \endcode
-  
+
   \see setTail
 */
-void QCPItemLine::setHead(const QCPLineEnding &head)
+void QCPItemLine::setHead(const QCPLineEnding& head)
 {
-  mHead = head;
+    mHead = head;
 }
 
 /*!
   Sets the line ending style of the tail. The tail corresponds to the \a start position.
-  
+
   Note that due to the overloaded QCPLineEnding constructor, you may directly specify
   a QCPLineEnding::EndingStyle here, e.g. \code setTail(QCPLineEnding::esSpikeArrow) \endcode
-  
+
   \see setHead
 */
-void QCPItemLine::setTail(const QCPLineEnding &tail)
+void QCPItemLine::setTail(const QCPLineEnding& tail)
 {
-  mTail = tail;
+    mTail = tail;
 }
 
 /* inherits documentation from base class */
-double QCPItemLine::selectTest(const QPointF &pos, bool onlySelectable, QVariant *details) const
+double QCPItemLine::selectTest(const QPointF& pos, bool onlySelectable, QVariant* details) const
 {
-  Q_UNUSED(details)
-  if (onlySelectable && !mSelectable)
-    return -1;
-  
-  return qSqrt(QCPVector2D(pos).distanceSquaredToLine(start->pixelPosition(), end->pixelPosition()));
+    Q_UNUSED(details)
+    if (onlySelectable && !mSelectable)
+        return -1;
+
+    return qSqrt(
+        QCPVector2D(pos).distanceSquaredToLine(start->pixelPosition(), end->pixelPosition()));
 }
 
 /* inherits documentation from base class */
-void QCPItemLine::draw(QCPPainter *painter)
+void QCPItemLine::draw(QCPPainter* painter)
 {
-  QCPVector2D startVec(start->pixelPosition());
-  QCPVector2D endVec(end->pixelPosition());
-  if (qFuzzyIsNull((startVec-endVec).lengthSquared()))
-    return;
-  // get visible segment of straight line inside clipRect:
-  int clipPad = int(qMax(mHead.boundingDistance(), mTail.boundingDistance()));
-  clipPad = qMax(clipPad, qCeil(mainPen().widthF()));
-  QLineF line = getRectClippedLine(startVec, endVec, clipRect().adjusted(-clipPad, -clipPad, clipPad, clipPad));
-  // paint visible segment, if existent:
-  if (!line.isNull())
-  {
-    painter->setPen(mainPen());
-    painter->drawLine(line);
-    painter->setBrush(Qt::SolidPattern);
-    if (mTail.style() != QCPLineEnding::esNone)
-      mTail.draw(painter, startVec, startVec-endVec);
-    if (mHead.style() != QCPLineEnding::esNone)
-      mHead.draw(painter, endVec, endVec-startVec);
-  }
+    QCPVector2D startVec(start->pixelPosition());
+    QCPVector2D endVec(end->pixelPosition());
+    if (qFuzzyIsNull((startVec - endVec).lengthSquared()))
+        return;
+    // get visible segment of straight line inside clipRect:
+    int clipPad = int(qMax(mHead.boundingDistance(), mTail.boundingDistance()));
+    clipPad = qMax(clipPad, qCeil(mainPen().widthF()));
+    QLineF line = getRectClippedLine(startVec, endVec,
+                                     clipRect().adjusted(-clipPad, -clipPad, clipPad, clipPad));
+    // paint visible segment, if existent:
+    if (!line.isNull())
+    {
+        painter->setPen(mainPen());
+        painter->drawLine(line);
+        painter->setBrush(Qt::SolidPattern);
+        if (mTail.style() != QCPLineEnding::esNone)
+            mTail.draw(painter, startVec, startVec - endVec);
+        if (mHead.style() != QCPLineEnding::esNone)
+            mHead.draw(painter, endVec, endVec - startVec);
+    }
 }
 
 /*! \internal
 
   Returns the section of the line defined by \a start and \a end, that is visible in the specified
   \a rect.
-  
+
   This is a helper function for \ref draw.
 */
-QLineF QCPItemLine::getRectClippedLine(const QCPVector2D &start, const QCPVector2D &end, const QRect &rect) const
+QLineF QCPItemLine::getRectClippedLine(const QCPVector2D& start, const QCPVector2D& end,
+                                       const QRect& rect) const
 {
-  bool containsStart = rect.contains(qRound(start.x()), qRound(start.y()));
-  bool containsEnd = rect.contains(qRound(end.x()), qRound(end.y()));
-  if (containsStart && containsEnd)
-    return {start.toPointF(), end.toPointF()};
-  
-  QCPVector2D base = start;
-  QCPVector2D vec = end-start;
-  double bx, by;
-  double gamma, mu;
-  QLineF result;
-  QList<QCPVector2D> pointVectors;
+    bool containsStart = rect.contains(qRound(start.x()), qRound(start.y()));
+    bool containsEnd = rect.contains(qRound(end.x()), qRound(end.y()));
+    if (containsStart && containsEnd)
+        return { start.toPointF(), end.toPointF() };
 
-  if (!qFuzzyIsNull(vec.y())) // line is not horizontal
-  {
-    // check top of rect:
-    bx = rect.left();
-    by = rect.top();
-    mu = (by-base.y())/vec.y();
-    if (mu >= 0 && mu <= 1)
+    QCPVector2D base = start;
+    QCPVector2D vec = end - start;
+    double bx, by;
+    double gamma, mu;
+    QLineF result;
+    QList<QCPVector2D> pointVectors;
+
+    if (!qFuzzyIsNull(vec.y())) // line is not horizontal
     {
-      gamma = base.x()-bx + mu*vec.x();
-      if (gamma >= 0 && gamma <= rect.width())
-        pointVectors.append(QCPVector2D(bx+gamma, by));
-    }
-    // check bottom of rect:
-    bx = rect.left();
-    by = rect.bottom();
-    mu = (by-base.y())/vec.y();
-    if (mu >= 0 && mu <= 1)
-    {
-      gamma = base.x()-bx + mu*vec.x();
-      if (gamma >= 0 && gamma <= rect.width())
-        pointVectors.append(QCPVector2D(bx+gamma, by));
-    }
-  }
-  if (!qFuzzyIsNull(vec.x())) // line is not vertical
-  {
-    // check left of rect:
-    bx = rect.left();
-    by = rect.top();
-    mu = (bx-base.x())/vec.x();
-    if (mu >= 0 && mu <= 1)
-    {
-      gamma = base.y()-by + mu*vec.y();
-      if (gamma >= 0 && gamma <= rect.height())
-        pointVectors.append(QCPVector2D(bx, by+gamma));
-    }
-    // check right of rect:
-    bx = rect.right();
-    by = rect.top();
-    mu = (bx-base.x())/vec.x();
-    if (mu >= 0 && mu <= 1)
-    {
-      gamma = base.y()-by + mu*vec.y();
-      if (gamma >= 0 && gamma <= rect.height())
-        pointVectors.append(QCPVector2D(bx, by+gamma));
-    }
-  }
-  
-  if (containsStart)
-    pointVectors.append(start);
-  if (containsEnd)
-    pointVectors.append(end);
-  
-  // evaluate points:
-  if (pointVectors.size() == 2)
-  {
-    result.setPoints(pointVectors.at(0).toPointF(), pointVectors.at(1).toPointF());
-  } else if (pointVectors.size() > 2)
-  {
-    // line probably goes through corner of rect, and we got two points there. single out the point pair with greatest distance:
-    double distSqrMax = 0;
-    QCPVector2D pv1, pv2;
-    for (int i=0; i<pointVectors.size()-1; ++i)
-    {
-      for (int k=i+1; k<pointVectors.size(); ++k)
-      {
-        double distSqr = (pointVectors.at(i)-pointVectors.at(k)).lengthSquared();
-        if (distSqr > distSqrMax)
+        // check top of rect:
+        bx = rect.left();
+        by = rect.top();
+        mu = (by - base.y()) / vec.y();
+        if (mu >= 0 && mu <= 1)
         {
-          pv1 = pointVectors.at(i);
-          pv2 = pointVectors.at(k);
-          distSqrMax = distSqr;
+            gamma = base.x() - bx + mu * vec.x();
+            if (gamma >= 0 && gamma <= rect.width())
+                pointVectors.append(QCPVector2D(bx + gamma, by));
         }
-      }
+        // check bottom of rect:
+        bx = rect.left();
+        by = rect.bottom();
+        mu = (by - base.y()) / vec.y();
+        if (mu >= 0 && mu <= 1)
+        {
+            gamma = base.x() - bx + mu * vec.x();
+            if (gamma >= 0 && gamma <= rect.width())
+                pointVectors.append(QCPVector2D(bx + gamma, by));
+        }
     }
-    result.setPoints(pv1.toPointF(), pv2.toPointF());
-  }
-  return result;
+    if (!qFuzzyIsNull(vec.x())) // line is not vertical
+    {
+        // check left of rect:
+        bx = rect.left();
+        by = rect.top();
+        mu = (bx - base.x()) / vec.x();
+        if (mu >= 0 && mu <= 1)
+        {
+            gamma = base.y() - by + mu * vec.y();
+            if (gamma >= 0 && gamma <= rect.height())
+                pointVectors.append(QCPVector2D(bx, by + gamma));
+        }
+        // check right of rect:
+        bx = rect.right();
+        by = rect.top();
+        mu = (bx - base.x()) / vec.x();
+        if (mu >= 0 && mu <= 1)
+        {
+            gamma = base.y() - by + mu * vec.y();
+            if (gamma >= 0 && gamma <= rect.height())
+                pointVectors.append(QCPVector2D(bx, by + gamma));
+        }
+    }
+
+    if (containsStart)
+        pointVectors.append(start);
+    if (containsEnd)
+        pointVectors.append(end);
+
+    // evaluate points:
+    if (pointVectors.size() == 2)
+    {
+        result.setPoints(pointVectors.at(0).toPointF(), pointVectors.at(1).toPointF());
+    }
+    else if (pointVectors.size() > 2)
+    {
+        // line probably goes through corner of rect, and we got two points there. single out the
+        // point pair with greatest distance:
+        double distSqrMax = 0;
+        QCPVector2D pv1, pv2;
+        for (int i = 0; i < pointVectors.size() - 1; ++i)
+        {
+            for (int k = i + 1; k < pointVectors.size(); ++k)
+            {
+                double distSqr = (pointVectors.at(i) - pointVectors.at(k)).lengthSquared();
+                if (distSqr > distSqrMax)
+                {
+                    pv1 = pointVectors.at(i);
+                    pv2 = pointVectors.at(k);
+                    distSqrMax = distSqr;
+                }
+            }
+        }
+        result.setPoints(pv1.toPointF(), pv2.toPointF());
+    }
+    return result;
 }
 
 /*! \internal
@@ -251,5 +256,5 @@ QLineF QCPItemLine::getRectClippedLine(const QCPVector2D &start, const QCPVector
 */
 QPen QCPItemLine::mainPen() const
 {
-  return mSelected ? mSelectedPen : mPen;
+    return mSelected ? mSelectedPen : mPen;
 }

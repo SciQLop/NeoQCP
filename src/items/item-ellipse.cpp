@@ -25,8 +25,8 @@
 
 #include "item-ellipse.h"
 
-#include "../painter.h"
 #include "../core.h"
+#include "../painter.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPItemEllipse
@@ -35,161 +35,173 @@
 /*! \class QCPItemEllipse
   \brief An ellipse
 
-  \image html QCPItemEllipse.png "Ellipse example. Blue dotted circles are anchors, solid blue discs are positions."
+  \image html QCPItemEllipse.png "Ellipse example. Blue dotted circles are anchors, solid blue discs
+  are positions."
 
-  It has two positions, \a topLeft and \a bottomRight, which define the rect the ellipse will be drawn in.
+  It has two positions, \a topLeft and \a bottomRight, which define the rect the ellipse will be
+  drawn in.
 */
 
 /*!
   Creates an ellipse item and sets default values.
-  
+
   The created item is automatically registered with \a parentPlot. This QCustomPlot instance takes
   ownership of the item, so do not delete it manually but use QCustomPlot::removeItem() instead.
 */
-QCPItemEllipse::QCPItemEllipse(QCustomPlot *parentPlot) :
-  QCPAbstractItem(parentPlot),
-  topLeft(createPosition(QLatin1String("topLeft"))),
-  bottomRight(createPosition(QLatin1String("bottomRight"))),
-  topLeftRim(createAnchor(QLatin1String("topLeftRim"), aiTopLeftRim)),
-  top(createAnchor(QLatin1String("top"), aiTop)),
-  topRightRim(createAnchor(QLatin1String("topRightRim"), aiTopRightRim)),
-  right(createAnchor(QLatin1String("right"), aiRight)),
-  bottomRightRim(createAnchor(QLatin1String("bottomRightRim"), aiBottomRightRim)),
-  bottom(createAnchor(QLatin1String("bottom"), aiBottom)),
-  bottomLeftRim(createAnchor(QLatin1String("bottomLeftRim"), aiBottomLeftRim)),
-  left(createAnchor(QLatin1String("left"), aiLeft)),
-  center(createAnchor(QLatin1String("center"), aiCenter))
+QCPItemEllipse::QCPItemEllipse(QCustomPlot* parentPlot)
+        : QCPAbstractItem(parentPlot)
+        , topLeft(createPosition(QLatin1String("topLeft")))
+        , bottomRight(createPosition(QLatin1String("bottomRight")))
+        , topLeftRim(createAnchor(QLatin1String("topLeftRim"), aiTopLeftRim))
+        , top(createAnchor(QLatin1String("top"), aiTop))
+        , topRightRim(createAnchor(QLatin1String("topRightRim"), aiTopRightRim))
+        , right(createAnchor(QLatin1String("right"), aiRight))
+        , bottomRightRim(createAnchor(QLatin1String("bottomRightRim"), aiBottomRightRim))
+        , bottom(createAnchor(QLatin1String("bottom"), aiBottom))
+        , bottomLeftRim(createAnchor(QLatin1String("bottomLeftRim"), aiBottomLeftRim))
+        , left(createAnchor(QLatin1String("left"), aiLeft))
+        , center(createAnchor(QLatin1String("center"), aiCenter))
 {
-  topLeft->setCoords(0, 1);
-  bottomRight->setCoords(1, 0);
-  
-  setPen(QPen(Qt::black));
-  setSelectedPen(QPen(Qt::blue, 2));
-  setBrush(Qt::NoBrush);
-  setSelectedBrush(Qt::NoBrush);
+    topLeft->setCoords(0, 1);
+    bottomRight->setCoords(1, 0);
+
+    setPen(QPen(Qt::black));
+    setSelectedPen(QPen(Qt::blue, 2));
+    setBrush(Qt::NoBrush);
+    setSelectedBrush(Qt::NoBrush);
 }
 
-QCPItemEllipse::~QCPItemEllipse()
-{
-}
+QCPItemEllipse::~QCPItemEllipse() { }
 
 /*!
   Sets the pen that will be used to draw the line of the ellipse
-  
+
   \see setSelectedPen, setBrush
 */
-void QCPItemEllipse::setPen(const QPen &pen)
+void QCPItemEllipse::setPen(const QPen& pen)
 {
-  mPen = pen;
+    mPen = pen;
 }
 
 /*!
   Sets the pen that will be used to draw the line of the ellipse when selected
-  
+
   \see setPen, setSelected
 */
-void QCPItemEllipse::setSelectedPen(const QPen &pen)
+void QCPItemEllipse::setSelectedPen(const QPen& pen)
 {
-  mSelectedPen = pen;
+    mSelectedPen = pen;
 }
 
 /*!
   Sets the brush that will be used to fill the ellipse. To disable filling, set \a brush to
   Qt::NoBrush.
-  
+
   \see setSelectedBrush, setPen
 */
-void QCPItemEllipse::setBrush(const QBrush &brush)
+void QCPItemEllipse::setBrush(const QBrush& brush)
 {
-  mBrush = brush;
+    mBrush = brush;
 }
 
 /*!
   Sets the brush that will be used to fill the ellipse when selected. To disable filling, set \a
   brush to Qt::NoBrush.
-  
+
   \see setBrush
 */
-void QCPItemEllipse::setSelectedBrush(const QBrush &brush)
+void QCPItemEllipse::setSelectedBrush(const QBrush& brush)
 {
-  mSelectedBrush = brush;
+    mSelectedBrush = brush;
 }
 
 /* inherits documentation from base class */
-double QCPItemEllipse::selectTest(const QPointF &pos, bool onlySelectable, QVariant *details) const
+double QCPItemEllipse::selectTest(const QPointF& pos, bool onlySelectable, QVariant* details) const
 {
-  Q_UNUSED(details)
-  if (onlySelectable && !mSelectable)
-    return -1;
-  
-  QPointF p1 = topLeft->pixelPosition();
-  QPointF p2 = bottomRight->pixelPosition();
-  QPointF center((p1+p2)/2.0);
-  double a = qAbs(p1.x()-p2.x())/2.0;
-  double b = qAbs(p1.y()-p2.y())/2.0;
-  double x = pos.x()-center.x();
-  double y = pos.y()-center.y();
-  
-  // distance to border:
-  double c = 1.0/qSqrt(x*x/(a*a)+y*y/(b*b));
-  double result = qAbs(c-1)*qSqrt(x*x+y*y);
-  // filled ellipse, allow click inside to count as hit:
-  if (result > mParentPlot->selectionTolerance()*0.99 && mBrush.style() != Qt::NoBrush && mBrush.color().alpha() != 0)
-  {
-    if (x*x/(a*a) + y*y/(b*b) <= 1)
-      result = mParentPlot->selectionTolerance()*0.99;
-  }
-  return result;
-}
+    Q_UNUSED(details)
+    if (onlySelectable && !mSelectable)
+        return -1;
 
-/* inherits documentation from base class */
-void QCPItemEllipse::draw(QCPPainter *painter)
-{
-  QPointF p1 = topLeft->pixelPosition();
-  QPointF p2 = bottomRight->pixelPosition();
-  if (p1.toPoint() == p2.toPoint())
-    return;
-  QRectF ellipseRect = QRectF(p1, p2).normalized();
-  const int clipEnlarge = qCeil(mainPen().widthF());
-  QRect clip = clipRect().adjusted(-clipEnlarge, -clipEnlarge, clipEnlarge, clipEnlarge);
-  if (ellipseRect.intersects(clip)) // only draw if bounding rect of ellipse is visible in cliprect
-  {
-    painter->setPen(mainPen());
-    painter->setBrush(mainBrush());
-#ifdef __EXCEPTIONS
-    try // drawEllipse sometimes throws exceptions if ellipse is too big
+    QPointF p1 = topLeft->pixelPosition();
+    QPointF p2 = bottomRight->pixelPosition();
+    QPointF center((p1 + p2) / 2.0);
+    double a = qAbs(p1.x() - p2.x()) / 2.0;
+    double b = qAbs(p1.y() - p2.y()) / 2.0;
+    double x = pos.x() - center.x();
+    double y = pos.y() - center.y();
+
+    // distance to border:
+    double c = 1.0 / qSqrt(x * x / (a * a) + y * y / (b * b));
+    double result = qAbs(c - 1) * qSqrt(x * x + y * y);
+    // filled ellipse, allow click inside to count as hit:
+    if (result > mParentPlot->selectionTolerance() * 0.99 && mBrush.style() != Qt::NoBrush
+        && mBrush.color().alpha() != 0)
     {
-#endif
-      painter->drawEllipse(ellipseRect);
-#ifdef __EXCEPTIONS
-    } catch (...)
-    {
-      qDebug() << Q_FUNC_INFO << "Item too large for memory, setting invisible";
-      setVisible(false);
+        if (x * x / (a * a) + y * y / (b * b) <= 1)
+            result = mParentPlot->selectionTolerance() * 0.99;
     }
+    return result;
+}
+
+/* inherits documentation from base class */
+void QCPItemEllipse::draw(QCPPainter* painter)
+{
+    QPointF p1 = topLeft->pixelPosition();
+    QPointF p2 = bottomRight->pixelPosition();
+    if (p1.toPoint() == p2.toPoint())
+        return;
+    QRectF ellipseRect = QRectF(p1, p2).normalized();
+    const int clipEnlarge = qCeil(mainPen().widthF());
+    QRect clip = clipRect().adjusted(-clipEnlarge, -clipEnlarge, clipEnlarge, clipEnlarge);
+    if (ellipseRect.intersects(
+            clip)) // only draw if bounding rect of ellipse is visible in cliprect
+    {
+        painter->setPen(mainPen());
+        painter->setBrush(mainBrush());
+#ifdef __EXCEPTIONS
+        try // drawEllipse sometimes throws exceptions if ellipse is too big
+        {
 #endif
-  }
+            painter->drawEllipse(ellipseRect);
+#ifdef __EXCEPTIONS
+        }
+        catch (...)
+        {
+            qDebug() << Q_FUNC_INFO << "Item too large for memory, setting invisible";
+            setVisible(false);
+        }
+#endif
+    }
 }
 
 /* inherits documentation from base class */
 QPointF QCPItemEllipse::anchorPixelPosition(int anchorId) const
 {
-  QRectF rect = QRectF(topLeft->pixelPosition(), bottomRight->pixelPosition());
-  switch (anchorId)
-  {
-    case aiTopLeftRim:     return rect.center()+(rect.topLeft()-rect.center())*1/qSqrt(2);
-    case aiTop:            return (rect.topLeft()+rect.topRight())*0.5;
-    case aiTopRightRim:    return rect.center()+(rect.topRight()-rect.center())*1/qSqrt(2);
-    case aiRight:          return (rect.topRight()+rect.bottomRight())*0.5;
-    case aiBottomRightRim: return rect.center()+(rect.bottomRight()-rect.center())*1/qSqrt(2);
-    case aiBottom:         return (rect.bottomLeft()+rect.bottomRight())*0.5;
-    case aiBottomLeftRim:  return rect.center()+(rect.bottomLeft()-rect.center())*1/qSqrt(2);
-    case aiLeft:           return (rect.topLeft()+rect.bottomLeft())*0.5;
-    case aiCenter:         return (rect.topLeft()+rect.bottomRight())*0.5;
-  }
-  
-  qDebug() << Q_FUNC_INFO << "invalid anchorId" << anchorId;
-  return {};
+    QRectF rect = QRectF(topLeft->pixelPosition(), bottomRight->pixelPosition());
+    switch (anchorId)
+    {
+        case aiTopLeftRim:
+            return rect.center() + (rect.topLeft() - rect.center()) * 1 / qSqrt(2);
+        case aiTop:
+            return (rect.topLeft() + rect.topRight()) * 0.5;
+        case aiTopRightRim:
+            return rect.center() + (rect.topRight() - rect.center()) * 1 / qSqrt(2);
+        case aiRight:
+            return (rect.topRight() + rect.bottomRight()) * 0.5;
+        case aiBottomRightRim:
+            return rect.center() + (rect.bottomRight() - rect.center()) * 1 / qSqrt(2);
+        case aiBottom:
+            return (rect.bottomLeft() + rect.bottomRight()) * 0.5;
+        case aiBottomLeftRim:
+            return rect.center() + (rect.bottomLeft() - rect.center()) * 1 / qSqrt(2);
+        case aiLeft:
+            return (rect.topLeft() + rect.bottomLeft()) * 0.5;
+        case aiCenter:
+            return (rect.topLeft() + rect.bottomRight()) * 0.5;
+    }
+
+    qDebug() << Q_FUNC_INFO << "invalid anchorId" << anchorId;
+    return {};
 }
 
 /*! \internal
@@ -199,7 +211,7 @@ QPointF QCPItemEllipse::anchorPixelPosition(int anchorId) const
 */
 QPen QCPItemEllipse::mainPen() const
 {
-  return mSelected ? mSelectedPen : mPen;
+    return mSelected ? mSelectedPen : mPen;
 }
 
 /*! \internal
@@ -209,5 +221,5 @@ QPen QCPItemEllipse::mainPen() const
 */
 QBrush QCPItemEllipse::mainBrush() const
 {
-  return mSelected ? mSelectedBrush : mBrush;
+    return mSelected ? mSelectedBrush : mBrush;
 }
