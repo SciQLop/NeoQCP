@@ -26,8 +26,8 @@
 #include "layoutelement-legend.h"
 
 #include "../core.h"
-#include "../painter.h"
-#include "../plottable.h"
+#include "../painting/painter.h"
+#include "../plottables/plottable.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPAbstractLegendItem

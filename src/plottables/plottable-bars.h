@@ -29,7 +29,7 @@
 #include "../axis/range.h"
 #include "../datacontainer.h"
 #include "../global.h"
-#include "../plottable1d.h"
+#include "../plottables/plottable1d.h"
 
 class QCPPainter;
 class QCPAxis;

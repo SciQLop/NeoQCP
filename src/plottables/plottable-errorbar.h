@@ -28,8 +28,8 @@
 
 #include "../axis/range.h"
 #include "../global.h"
-#include "../painter.h"
-#include "../plottable1d.h"
+#include "../painting/painter.h"
+#include "plottable1d.h"
 
 class QCPPainter;
 class QCPAxis;

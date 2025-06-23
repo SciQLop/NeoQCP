@@ -27,8 +27,8 @@
 
 #include "../axis/axis.h"
 #include "../core.h"
-#include "../painter.h"
-#include "../plottable.h"
+#include "../painting/painter.h"
+#include "../plottables/plottable.h"
 #include "../plottables/plottable-colormap.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

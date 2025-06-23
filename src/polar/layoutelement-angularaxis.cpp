@@ -31,8 +31,8 @@
 #include "../axis/axistickerfixed.h"
 #include "../axis/labelpainter.h"
 #include "../core.h"
-#include "../item.h"
-#include "../painter.h"
+#include "../items/item.h"
+#include "../painting/painter.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPPolarAxisAngular

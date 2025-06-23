@@ -26,7 +26,7 @@
 #include "item-tracer.h"
 
 #include "../core.h"
-#include "../painter.h"
+#include "../painting/painter.h"
 #include "../plottables/plottable-graph.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

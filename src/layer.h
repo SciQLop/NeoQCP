@@ -28,7 +28,7 @@
 
 #include "global.h"
 Q_MOC_INCLUDE("core.h") // Qt6 needs this if using forward declared types in Q_PROPERTY
-#include "paintbuffer.h"
+#include "painting/paintbuffer.h"
 
 class QCPPainter;
 class QCustomPlot;

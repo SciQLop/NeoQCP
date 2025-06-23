@@ -27,8 +27,8 @@
 #include "layoutelement-angularaxis.h"
 
 #include "../core.h"
-#include "../item.h"
-#include "../painter.h"
+#include "../items/item.h"
+#include "../painting/painter.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPPolarAxisRadial

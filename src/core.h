@@ -29,8 +29,8 @@
 #include "axis/axis.h"
 #include "axis/range.h"
 #include "global.h"
-#include "paintbuffer.h"
-#include "plottable.h"
+#include "painting/paintbuffer.h"
+#include "plottables/plottable.h"
 #include "neoqcp_config.h"
 
 class QCPPainter;

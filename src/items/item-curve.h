@@ -27,7 +27,7 @@
 #define QCP_ITEM_CURVE_H
 
 #include "../global.h"
-#include "../item.h"
+#include "item.h"
 #include "../lineending.h"
 
 class QCPPainter;

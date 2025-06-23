@@ -26,10 +26,10 @@
 #include "axis.h"
 
 #include "../core.h"
-#include "../item.h"
+#include "../items/item.h"
 #include "../layoutelements/layoutelement-axisrect.h"
-#include "../painter.h"
-#include "../plottable.h"
+#include "../painting/painter.h"
+#include "../plottables/plottable.h"
 #include "../plottables/plottable-graph.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

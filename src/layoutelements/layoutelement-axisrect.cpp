@@ -28,9 +28,9 @@
 #include "../axis/axis.h"
 #include "../axis/axisticker.h"
 #include "../core.h"
-#include "../item.h"
-#include "../painter.h"
-#include "../plottable.h"
+#include "../items/item.h"
+#include "../painting/painter.h"
+#include "../plottables/plottable.h"
 #include "../plottables/plottable-graph.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

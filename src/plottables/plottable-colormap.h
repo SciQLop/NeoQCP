@@ -30,7 +30,7 @@
 #include "../colorgradient.h"
 #include "../global.h"
 #include "../layoutelements/layoutelement-colorscale.h"
-#include "../plottable.h"
+#include "../plottables/plottable.h"
 
 class QCPPainter;
 class QCPAxis;

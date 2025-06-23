@@ -29,12 +29,12 @@
 
 #include "Profiling.hpp"
 #include "axis/axis.h"
-#include "item.h"
+#include "items/item.h"
 #include "layer.h"
 #include "layoutelements/layoutelement-axisrect.h"
 #include "layoutelements/layoutelement-legend.h"
-#include "painter.h"
-#include "plottable.h"
+#include "painting/painter.h"
+#include "plottables/plottable.h"
 #include "plottables/plottable-graph.h"
 #include "selectionrect.h"
 

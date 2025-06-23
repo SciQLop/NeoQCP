@@ -27,7 +27,7 @@
 #define QCP_ITEM_TRACER_H
 
 #include "../global.h"
-#include "../item.h"
+#include "../items/item.h"
 #include "../plottables/plottable-graph.h"
 
 class QCPPainter;

@@ -29,7 +29,7 @@
 #include "core.h"
 #include "datacontainer.h"
 #include "global.h"
-#include "painter.h"
+#include "painting/painter.h"
 #include "plottable.h"
 
 class QCPPlottableInterface1D

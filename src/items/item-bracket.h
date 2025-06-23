@@ -27,7 +27,7 @@
 #define QCP_ITEM_BRACKET_H
 
 #include "../global.h"
-#include "../item.h"
+#include "item.h"
 
 class QCPPainter;
 class QCustomPlot;
