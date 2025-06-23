@@ -40,6 +40,9 @@ class QCPGraph;
 class QCPLegend;
 class QCPAbstractLegendItem;
 class QCPSelectionRect;
+#ifdef NEOQCP_BATCH_DRAWING
+class NeoQCPBatchDrawingHelper;
+#endif
 
 class QCP_LIB_DECL QCustomPlot : public QWidget
 {

@@ -34,9 +34,15 @@
 #include "layoutelements/layoutelement-axisrect.h"
 #include "layoutelements/layoutelement-legend.h"
 #include "painting/painter.h"
+#include "painting/paintbuffer.h"
+#include "painting/paintbuffer-glfbo.h"
+#include "painting/paintbuffer-pixmap.h"
 #include "plottables/plottable.h"
 #include "plottables/plottable-graph.h"
 #include "selectionrect.h"
+
+#include "neoqcp_config.h"
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCustomPlot
@@ -951,8 +957,12 @@ void QCustomPlot::setBufferDevicePixelRatio(double ratio)
         {
             buffer->setDevicePixelRatio(mBufferDevicePixelRatio);
         }
-        // Note: axis label cache has devicePixelRatio as part of cache hash, so no need to manually
-        // clear cache here
+#ifdef NEOQCP_BATCH_DRAWING
+        if (mBatchDrawingHelper)
+        {
+            mBatchDrawingHelper->setDevicePixelRatio(mBufferDevicePixelRatio);
+        }
+#endif
 #else
         qDebug() << Q_FUNC_INFO << "Device pixel ratios not supported for Qt versions before 5.4";
         mBufferDevicePixelRatio = 1.0;
@@ -2337,15 +2347,17 @@ void QCustomPlot::paintEvent(QPaintEvent* event)
             painter.fillRect(mViewport, mBackgroundBrush);
         drawBackground(&painter);
 #ifdef NEOQCP_BATCH_DRAWING
-        if (std::size(mPaintBuffers) > 0 && mBatchDrawingHelper)
+        if (std::size(mPaintBuffers) > 0 && mBatchDrawingHelper && mOpenGl)
         {
             mBatchDrawingHelper->batch_draw(mPaintBuffers, &painter);
         }
-
-#else
+        else{
+#endif
         for (const auto& buffer : mPaintBuffers)
         {
             buffer->draw(&painter);
+        }
+#ifdef NEOQCP_BATCH_DRAWING
         }
 #endif
     }
@@ -2763,11 +2775,17 @@ void QCustomPlot::setupPaintBuffers()
 #ifdef NEOQCP_BATCH_DRAWING
     if (mOpenGl)
     {
-        if (mBatchDrawingHelper)
-            delete mBatchDrawingHelper;
+        if (!mBatchDrawingHelper)
+        {
+            mBatchDrawingHelper = new NeoQCPBatchDrawingHelper(
+                viewport().size(), mBufferDevicePixelRatio, mGlContext, mGlPaintDevice);
+        }
+        else
+        {
+            mBatchDrawingHelper->setSizeAndDevicePixelRatio(viewport().size(), mBufferDevicePixelRatio);
+        }
 
-        mBatchDrawingHelper = new NeoQCPBatchDrawingHelper(
-            viewport().size(), mBufferDevicePixelRatio, mGlContext, mGlPaintDevice);
+
     }
 #endif
 }
@@ -2841,8 +2859,7 @@ bool QCustomPlot::setupOpenGl()
 #ifdef QCP_OPENGL_OFFSCREENSURFACE
     QOffscreenSurface* surface = new QOffscreenSurface;
 #else
-    QWindow* surface = new QWindow;
-    surface->setSurfaceType(QSurface::OpenGLSurface);
+#error "QCP_OPENGL_OFFSCREENSURFACE must be defined to use OpenGL in QCustomPlot"
 #endif
     surface->setFormat(proposedSurfaceFormat);
     surface->create();
@@ -2873,10 +2890,6 @@ bool QCustomPlot::setupOpenGl()
     }
     mGlPaintDevice = QSharedPointer<QOpenGLPaintDevice>(new QOpenGLPaintDevice);
     return true;
-#elif defined(QCP_OPENGL_PBUFFER)
-    return QGLFormat::hasOpenGL();
-#else
-    return false;
 #endif
 }
 
