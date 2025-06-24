@@ -64,6 +64,12 @@ protected:
 
 #ifdef NEOQCP_BATCH_DRAWING
 
+/**
+ * @brief The NeoQCPBatchDrawingHelper class
+ * helps with batch drawing of multiple QCPPaintBufferGlFbo, in order to improve performance,
+ * all buffers are blended into a single framebuffer object then converted to an image.
+ * This reduces the number of expensive GPU->CPU transfers and allows for more efficient rendering.
+ */
 class QCP_LIB_DECL NeoQCPBatchDrawingHelper
 {
 public:
