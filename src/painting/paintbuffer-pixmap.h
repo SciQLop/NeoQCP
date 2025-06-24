@@ -3,7 +3,7 @@
 **  NeoQCP, a fork of QCustomPlot, an easy to use, modern plotting widget **
 **  for Qt.                                                               **
 **  Copyright (C) 2011-2022 Emanuel Eichhammer (QCustomPlot)              **
-**  Copyright (C) 2024 The NeoQCP Authors                                 **
+**  Copyright (C) 2025 The NeoQCP Authors                                 **
 **                                                                        **
 **  This program is free software: you can redistribute it and/or modify  **
 **  it under the terms of the GNU General Public License as published by  **
