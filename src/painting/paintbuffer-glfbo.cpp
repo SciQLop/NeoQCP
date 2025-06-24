@@ -3,7 +3,7 @@
 **  NeoQCP, a fork of QCustomPlot, an easy to use, modern plotting widget **
 **  for Qt.                                                               **
 **  Copyright (C) 2011-2022 Emanuel Eichhammer (QCustomPlot)              **
-**  Copyright (C) 2024 The NeoQCP Authors                                 **
+**  Copyright (C) 2025 The NeoQCP Authors                                 **
 **                                                                        **
 **  This program is free software: you can redistribute it and/or modify  **
 **  it under the terms of the GNU General Public License as published by  **
@@ -28,6 +28,8 @@
 #include "paintbuffer-glfbo.h"
 #include "painter.h"
 #include "Profiling.hpp"
+
+#include <ranges>
 
 
 #ifdef QCP_OPENGL_FBO
@@ -211,6 +213,8 @@ void QCPPaintBufferGlFbo::reallocateBuffer()
 #ifdef NEOQCP_BATCH_DRAWING
 
 
+
+
 NeoQCPBatchDrawingHelper::NeoQCPBatchDrawingHelper(const QSize& size, double devicePixelRatio,
                                                    QWeakPointer<QOpenGLContext> glContext,
                                                    QWeakPointer<QOpenGLPaintDevice> glPaintDevice)
@@ -252,6 +256,64 @@ NeoQCPBatchDrawingHelper::~NeoQCPBatchDrawingHelper()
     }
 }
 
+static inline void _configureGLTextureRenderState(int width, int height)
+{
+    glPushAttrib(GL_ALL_ATTRIB_BITS);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glViewport(0, 0, width, height);
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    glOrtho(0, width, 0, height, -1, 1);
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_TEXTURE_2D);
+    glColor4f(1.0, 1.0, 1.0, 1.0);
+
+    // Clear the destination buffer before drawing
+    glClearColor(0, 0, 0, 0);
+    glClear(GL_COLOR_BUFFER_BIT);
+}
+
+static inline void _restoreGLRenderState()
+{
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+        glMatrixMode(GL_MODELVIEW);
+        glPopMatrix();
+        glPopAttrib();
+}
+
+static inline void _blendFramebuffers(QOpenGLFramebufferObject* targetFbo, const std::vector<QOpenGLFramebufferObject*>& buffers,
+                        QOpenGLFramebufferObject* resolveFbo)
+{
+    PROFILE_HERE_N("QOpenGLFramebufferObject::blitFramebuffer");
+    for (const auto& mGlFrameBuffer : buffers)
+    {
+        QOpenGLFramebufferObject::blitFramebuffer(resolveFbo, mGlFrameBuffer,
+                                                  GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        targetFbo->bind();
+        glBindTexture(GL_TEXTURE_2D, resolveFbo->texture());
+        glBegin(GL_QUADS);
+        glTexCoord2f(0, 0);
+        glVertex2f(0, 0);
+        glTexCoord2f(1, 0);
+        glVertex2f(targetFbo->width(), 0);
+        glTexCoord2f(1, 1);
+        glVertex2f(targetFbo->width(), targetFbo->height());
+        glTexCoord2f(0, 1);
+        glVertex2f(0, targetFbo->height());
+        glEnd();
+    }
+}
+
 void NeoQCPBatchDrawingHelper::batch_draw(
     const QList<QSharedPointer<QCPAbstractPaintBuffer>>& buffers, QCPPainter* painter) const
 {
@@ -284,63 +346,21 @@ void NeoQCPBatchDrawingHelper::batch_draw(
         return;
     }
 
-    glPushAttrib(GL_ALL_ATTRIB_BITS);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glViewport(0, 0, mGlFrameBuffer->width(), mGlFrameBuffer->height());
-    glMatrixMode(GL_PROJECTION);
-    glPushMatrix();
-    glLoadIdentity();
-    glOrtho(0, mGlFrameBuffer->width(), 0, mGlFrameBuffer->height(), -1, 1);
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
-    glLoadIdentity();
-
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glEnable(GL_TEXTURE_2D);
-    glColor4f(1.0, 1.0, 1.0, 1.0);
-
-    // Clear the destination buffer before drawing
-    glClearColor(0, 0, 0, 0);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-
+    _configureGLTextureRenderState(mGlFrameBuffer->width(), mGlFrameBuffer->height());
+    std::vector<QOpenGLFramebufferObject*> buffersToDraw;
+    buffersToDraw.reserve(buffers.size());
+    for (const auto& buffer : buffers)
     {
-
-
-        PROFILE_HERE_N("QOpenGLFramebufferObject::blitFramebuffer");
-        for (auto& buffer : buffers)
+        if(const auto glBuffer = qSharedPointerCast<QCPPaintBufferGlFbo>(buffer);
+            glBuffer &&
+           glBuffer->mGlFrameBuffer && glBuffer->mGlFrameBuffer->isValid())
         {
-            auto glBuffer = qSharedPointerCast<QCPPaintBufferGlFbo>(buffer);
-            if (!glBuffer || !glBuffer->mGlFrameBuffer || !glBuffer->mGlFrameBuffer->isValid())
-            {
-                qDebug() << Q_FUNC_INFO << "Invalid buffer passed";
-                continue;
-            }
-            QOpenGLFramebufferObject::blitFramebuffer(mResolveFbo, glBuffer->mGlFrameBuffer,
-                                                      GL_COLOR_BUFFER_BIT, GL_NEAREST);
-            mGlFrameBuffer->bind();
-            glBindTexture(GL_TEXTURE_2D, mResolveFbo->texture());
-            glBegin(GL_QUADS);
-            glTexCoord2f(0, 0);
-            glVertex2f(0, 0);
-            glTexCoord2f(1, 0);
-            glVertex2f(mGlFrameBuffer->width(), 0);
-            glTexCoord2f(1, 1);
-            glVertex2f(mGlFrameBuffer->width(), mGlFrameBuffer->height());
-            glTexCoord2f(0, 1);
-            glVertex2f(0, mGlFrameBuffer->height());
-            glEnd();
+            buffersToDraw.push_back(glBuffer->mGlFrameBuffer);
         }
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
-        glMatrixMode(GL_MODELVIEW);
-        glPopMatrix();
-        glPopAttrib();
     }
+    _blendFramebuffers(mGlFrameBuffer, buffersToDraw, mResolveFbo);
+    _restoreGLRenderState();
+
 #ifdef NEOQCP_MANUAL_GL_IMAGE
     glBindTexture(GL_TEXTURE_2D, mGlFrameBuffer->texture());
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
@@ -429,5 +449,8 @@ void NeoQCPBatchDrawingHelper::reallocateBuffer()
     mGlImage->setDevicePixelRatio(mDevicePixelRatio);
 #endif
 }
+
+
 #endif // NEOQCP_BATCH_DRAWING
 #endif // QCP_OPENGL_FBO
+
