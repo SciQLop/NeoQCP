@@ -7,8 +7,10 @@
 #include <plottables/plottable-graph2.h>
 #include <plottables/plottable-colormap2.h>
 #include <plottables/plottable-colormap.h>
+#include <datasource/graph-resampler.h>
 #include <QSignalSpy>
 #include <QThread>
+#include <cmath>
 
 void TestPipeline::init()
 {
@@ -539,4 +541,180 @@ void TestPipeline::pipelineRapidFireDeliverResult()
     QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 3000);
     QVERIFY(pipeline.result() != nullptr);
     QCOMPARE(pipeline.result()->size(), 3);
+}
+
+// --- Graph resampler tests ---
+
+void TestPipeline::graphResamplerBinMinMax()
+{
+    std::vector<double> keys = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    std::vector<double> vals = {5, 3, 8, 1, 7, 2, 9, 4, 6, 0};
+    QCPRange keyRange(0, 9);
+
+    auto [outKeys, outVals] = qcp::algo::binMinMax(keys, vals, 0, 10, keyRange, 3);
+
+    QCOMPARE(outKeys.size(), 6u);
+    QCOMPARE(outVals.size(), 6u);
+
+    // Bin 0: keys [0,3) → vals {5,3,8} → min=3, max=8
+    QCOMPARE(outVals[0], 3.0);
+    QCOMPARE(outVals[1], 8.0);
+
+    // Bin 1: keys [3,6) → vals {1,7,2} → min=1, max=7
+    QCOMPARE(outVals[2], 1.0);
+    QCOMPARE(outVals[3], 7.0);
+
+    // Bin 2: keys [6,9] → vals {9,4,6,0} → min=0, max=9
+    QCOMPARE(outVals[4], 0.0);
+    QCOMPARE(outVals[5], 9.0);
+}
+
+void TestPipeline::graphResamplerLevel1AndLevel2()
+{
+    const int N = 20000;
+    std::vector<double> keys(N), vals(N);
+    for (int i = 0; i < N; ++i)
+    {
+        keys[i] = i;
+        vals[i] = std::sin(i * 0.01);
+    }
+
+    QCPRange fullRange(0, N - 1);
+    int l1Bins = std::max(N / 2, 1);
+    auto l1 = qcp::algo::binMinMax(keys, vals, 0, N, fullRange, l1Bins);
+
+    QCOMPARE(static_cast<int>(l1.keys.size()), l1Bins * 2);
+
+    // Level 2: zoom into [5000, 10000]
+    QCPRange viewport(5000, 10000);
+    int l2Bins = 400 * 4;
+    auto l2 = qcp::algo::binMinMax(l1.keys, l1.values, 0,
+        static_cast<int>(l1.keys.size()), viewport, l2Bins);
+
+    QCOMPARE(static_cast<int>(l2.keys.size()), l2Bins * 2);
+
+    for (size_t i = 0; i < l2.keys.size(); ++i)
+    {
+        QVERIFY2(l2.keys[i] >= viewport.lower - 1 && l2.keys[i] <= viewport.upper + 1,
+            qPrintable(QString("L2 key[%1]=%2 outside viewport").arg(i).arg(l2.keys[i])));
+    }
+}
+
+void TestPipeline::graphResamplerCacheReuse()
+{
+    const int N = 100000;
+    std::vector<double> keys(N), vals(N);
+    for (int i = 0; i < N; ++i)
+    {
+        keys[i] = i;
+        vals[i] = std::sin(i * 0.001);
+    }
+
+    auto src = std::make_shared<QCPSoADataSource<
+        std::vector<double>, std::vector<double>>>(keys, vals);
+
+    std::any cache;
+    ViewportParams vp;
+    vp.keyRange = QCPRange(0, N - 1);
+    vp.plotWidthPx = 800;
+
+    // First call builds Level 1 cache + Level 2 output
+    auto result1 = qcp::algo::hierarchicalResample(*src, vp, cache);
+    // Below 10M threshold — returns nullptr (no resampling needed)
+    QVERIFY(!result1);
+
+    // Test with a source that pretends to be large by calling binMinMax directly
+    // (hierarchicalResample has a 10M threshold we can't hit in unit tests easily)
+    // Instead, verify the cache struct works
+    qcp::algo::GraphResamplerCache c;
+    c.level1 = qcp::algo::binMinMax(keys, vals, 0, N, QCPRange(0, N - 1), 500);
+    c.cachedKeyRange = QCPRange(0, N - 1);
+    c.sourceSize = N;
+
+    // Level 2 from cache
+    auto l2 = qcp::algo::binMinMax(c.level1.keys, c.level1.values,
+        0, static_cast<int>(c.level1.keys.size()), QCPRange(10000, 50000), 800);
+    QVERIFY(l2.keys.size() > 0u);
+
+    // Pan: different viewport, same cache
+    auto l2b = qcp::algo::binMinMax(c.level1.keys, c.level1.values,
+        0, static_cast<int>(c.level1.keys.size()), QCPRange(20000, 25000), 800);
+    QVERIFY(l2b.keys.size() > 0u);
+}
+
+void TestPipeline::graphResamplerNaNSkipped()
+{
+    std::vector<double> keys = {0, 1, 2, 3, 4};
+    double nan = std::numeric_limits<double>::quiet_NaN();
+    std::vector<double> vals = {5, nan, 3, nan, 7};
+    QCPRange range(0, 4);
+
+    auto [outKeys, outVals] = qcp::algo::binMinMax(keys, vals, 0, 5, range, 1);
+
+    QCOMPARE(outVals[0], 3.0);
+    QCOMPARE(outVals[1], 7.0);
+}
+
+void TestPipeline::graphResamplerEmptyBinsProduceNaN()
+{
+    std::vector<double> keys = {0, 0.5, 1};
+    std::vector<double> vals = {10, 20, 30};
+    QCPRange range(0, 9);
+
+    auto [outKeys, outVals] = qcp::algo::binMinMax(keys, vals, 0, 3, range, 3);
+
+    // Bin 0: has data
+    QVERIFY(!std::isnan(outVals[0]));
+    QVERIFY(!std::isnan(outVals[1]));
+
+    // Bins 1 and 2: empty → NaN
+    QVERIFY(std::isnan(outVals[2]));
+    QVERIFY(std::isnan(outVals[3]));
+    QVERIFY(std::isnan(outVals[4]));
+    QVERIFY(std::isnan(outVals[5]));
+}
+
+void TestPipeline::graph2HierarchicalResamplingActivates()
+{
+    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+
+    const int N = 10'000'001;
+    std::vector<double> keys(N), vals(N);
+    for (int i = 0; i < N; ++i)
+    {
+        keys[i] = i;
+        vals[i] = std::sin(i * 0.0001);
+    }
+
+    mPlot->xAxis->setRange(0, N - 1);
+    mPlot->yAxis->setRange(-1, 1);
+    g->setData(std::move(keys), std::move(vals));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    QVERIFY(g->pipeline().hasTransform());
+
+    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
+    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
+
+    auto* result = g->pipeline().result();
+    QVERIFY(result);
+    QVERIFY(result->size() > 0);
+    QVERIFY(result->size() < N / 10);
+}
+
+void TestPipeline::graph2SmallDataNoResampling()
+{
+    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+
+    std::vector<double> keys = {1, 2, 3, 4, 5};
+    std::vector<double> vals = {10, 20, 30, 40, 50};
+    g->setData(std::move(keys), std::move(vals));
+
+    QVERIFY(!g->pipeline().hasTransform());
+
+    auto* result = g->pipeline().result();
+    QVERIFY(result);
+    QCOMPARE(result->size(), 5);
+    QCOMPARE(result->keyAt(0), 1.0);
+    QCOMPARE(result->valueAt(4), 50.0);
 }

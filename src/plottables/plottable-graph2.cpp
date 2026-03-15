@@ -1,5 +1,6 @@
 #include "plottable-graph2.h"
 #include "Profiling.hpp"
+#include "../datasource/graph-resampler.h"
 
 #include "../axis/axis.h"
 #include "../core.h"
@@ -34,15 +35,32 @@ QCPGraph2::QCPGraph2(QCPAxis* keyAxis, QCPAxis* valueAxis)
 
 QCPGraph2::~QCPGraph2() = default;
 
+static void ensureResamplingTransform(QCPGraphPipeline& pipeline, int sourceSize)
+{
+    if (sourceSize >= qcp::algo::kResampleThreshold && !pipeline.hasTransform())
+    {
+        pipeline.setTransform(TransformKind::ViewportDependent,
+            [](const QCPAbstractDataSource& src,
+               const ViewportParams& vp,
+               std::any& cache) -> std::shared_ptr<QCPAbstractDataSource> {
+                return qcp::algo::hierarchicalResample(src, vp, cache);
+            });
+    }
+}
+
 void QCPGraph2::setDataSource(std::unique_ptr<QCPAbstractDataSource> source)
 {
     mDataSource = std::move(source);
+    if (mDataSource)
+        ensureResamplingTransform(mPipeline, mDataSource->size());
     mPipeline.setSource(mDataSource);
 }
 
 void QCPGraph2::setDataSource(std::shared_ptr<QCPAbstractDataSource> source)
 {
     mDataSource = std::move(source);
+    if (mDataSource)
+        ensureResamplingTransform(mPipeline, mDataSource->size());
     mPipeline.setSource(mDataSource);
 }
 

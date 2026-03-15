@@ -42,6 +42,15 @@ private slots:
     void pipelineSourceReplacedDuringJob();
     void pipelineRapidFireDeliverResult();
 
+    // Graph resampler
+    void graphResamplerBinMinMax();
+    void graphResamplerLevel1AndLevel2();
+    void graphResamplerCacheReuse();
+    void graphResamplerNaNSkipped();
+    void graphResamplerEmptyBinsProduceNaN();
+    void graph2HierarchicalResamplingActivates();
+    void graph2SmallDataNoResampling();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };
