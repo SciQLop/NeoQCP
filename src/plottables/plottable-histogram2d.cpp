@@ -151,17 +151,47 @@ void QCPHistogram2D::rescaleDataRange(bool recalc)
     if (!mDataSource)
         return;
     auto* data = mPipeline.result();
-    if (data && !recalc)
+    if (!data)
+    {
+        if (recalc)
+            mPipeline.onDataChanged();
+        return;
+    }
+
+    if (mNormalization == nNone)
     {
         QCPRange range = data->dataBounds();
         if (range.lower < range.upper)
             setDataRange(range);
+        return;
     }
-    else
+
+    // Compute bounds over normalized values
+    const int keySz = data->keySize();
+    const int valSz = data->valueSize();
+    if (keySz == 0 || valSz == 0)
+        return;
+
+    QVector<double> colSums(keySz, 0.0);
+    for (int ki = 0; ki < keySz; ++ki)
+        for (int vi = 0; vi < valSz; ++vi)
+            colSums[ki] += data->cell(ki, vi);
+
+    double lo = std::numeric_limits<double>::max();
+    double hi = std::numeric_limits<double>::lowest();
+    for (int ki = 0; ki < keySz; ++ki)
     {
-        // No binned result yet — trigger pipeline
-        mPipeline.onDataChanged();
+        if (colSums[ki] <= 0)
+            continue;
+        for (int vi = 0; vi < valSz; ++vi)
+        {
+            double norm = data->cell(ki, vi) / colSums[ki];
+            if (norm < lo) lo = norm;
+            if (norm > hi) hi = norm;
+        }
     }
+    if (lo < hi)
+        setDataRange(QCPRange(lo, hi));
 }
 
 void QCPHistogram2D::draw(QCPPainter* painter)

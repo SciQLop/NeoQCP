@@ -129,7 +129,7 @@ void QCPColormapRenderer::draw(QCPPainter* painter, QCPAxis* keyAxis, QCPAxis* v
         int sy = static_cast<int>(clipRect.y() * dpr);
         int sw = static_cast<int>(clipRect.width() * dpr);
         int sh = static_cast<int>(clipRect.height() * dpr);
-        if (plot->rhi()->isYUpInNDC())
+        if (auto* rhi = plot->rhi(); rhi && rhi->isYUpInNDC())
             sy = static_cast<int>(plot->height() * dpr) - sy - sh;
         crl->setScissorRect(QRect(sx, sy, sw, sh));
         return;
