@@ -83,6 +83,7 @@
 #include "datasource/algorithms-2d.h"
 #include "datasource/resample.h"
 #include "plottables/plottable-colormap2.h"
+#include "plottables/plottable-histogram2d.h"
 #include "polar/layoutelement-angularaxis.h"
 #include "polar/polargraph.h"
 #include "polar/polargrid.h"
