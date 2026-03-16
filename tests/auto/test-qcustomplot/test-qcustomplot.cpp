@@ -153,13 +153,47 @@ void TestQCustomPlot::rescaleAxes_MultipleFlatGraphs()
   mPlot->addGraph();
   mPlot->graph(0)->setData(QVector<double>()<<1<<2<<3, QVector<double>()<<0<<0<<0);
   mPlot->graph(1)->setData(QVector<double>()<<-1<<0<<1, QVector<double>()<<2<<2<<2);
-  
+
   mPlot->rescaleAxes();
-  
+
   QCOMPARE(mPlot->xAxis->range().lower, -1.0);
   QCOMPARE(mPlot->xAxis->range().upper, 3.0);
   QCOMPARE(mPlot->yAxis->range().lower, 0.0);
   QCOMPARE(mPlot->yAxis->range().upper, 2.0);
+}
+
+void TestQCustomPlot::calculateMargin_staleTickVectors()
+{
+  // Bug: calculateMargin() and draw() iterate mTickVector and access
+  // mTickVectorLabels[i] without bounds checking. The vectors can desync
+  // when setTickLabels(false) clears labels, a replot regenerates ticks
+  // (but skips labels since mTickLabels is false), then setTickLabels(true)
+  // re-enables label access without regenerating them.
+  // Without the bounds check, this crashes with QVector::at() out of bounds.
+  mPlot->setGeometry(50, 50, 500, 500);
+  mPlot->yAxis->setRange(1, 100);
+
+  // Replot populates mTickVector and mTickVectorLabels in sync
+  mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+  // Disable tick labels — this clears mTickVectorLabels (axis.cpp line 852)
+  mPlot->yAxis->setTickLabels(false);
+
+  // Replot regenerates mTickVector via setupTickVectors(), but does NOT
+  // regenerate mTickVectorLabels (nullptr passed to generate() since
+  // mTickLabels is false). Now mTickVector has entries, mTickVectorLabels is empty.
+  mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+  // Re-enable tick labels WITHOUT a replot. mTickLabels is now true,
+  // but mTickVectorLabels is still empty from the clear above.
+  mPlot->yAxis->setTickLabels(true);
+
+  // calculateMargin iterates mTickVector.size() and accesses mTickVectorLabels[i].
+  // Without bounds check: crash. With bounds check: safe.
+  for (auto side : {QCP::msLeft, QCP::msRight, QCP::msTop, QCP::msBottom})
+      mPlot->axisRect()->calculateAutoMargin(side);
+
+  // If we reach here without crashing, the bounds check works
 }
 
 

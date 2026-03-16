@@ -13,7 +13,8 @@ private slots:
   void rescaleAxes_GraphVisibility();
   void rescaleAxes_FlatGraph();
   void rescaleAxes_MultipleFlatGraphs();
-  
+  void calculateMargin_staleTickVectors();
+
 private:
   QCustomPlot *mPlot;
 };

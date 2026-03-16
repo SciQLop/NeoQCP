@@ -486,6 +486,156 @@ void TestDataSource2D::dataBoundsSkipsNaN()
     QCOMPARE(data.dataBounds().upper, 10.0);
 }
 
+void TestDataSource2D::resampleZoomedOutNotBlack()
+{
+    // Bug: the pipeline transform passed the full viewport range to resample()
+    // even when zoomed out far beyond the data extent. This produced a texture
+    // spanning the entire viewport with most bins NaN. Two consequences:
+    // (1) texture could exceed GPU max size (>16384 px), silently failing
+    // (2) within the data region, bins were wider than source fill radius
+    //
+    // Fix: pipeline clamps grid to intersection of viewport and data extent,
+    // so the resampled result covers only the data and has bounded dimensions.
+    mPlot->resize(400, 300);
+    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+
+    std::vector<double> x = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    std::vector<double> y = {0.0, 1.0};
+    std::vector<double> z(20);
+    for (int i = 0; i < 20; ++i)
+        z[i] = static_cast<double>(i + 1);
+    cm->setData(std::move(x), std::move(y), std::move(z));
+    cm->setDataRange(QCPRange(1, 20));
+
+    // Zoom out 10x: viewport [-45, 54], data spans [0, 9]
+    mPlot->xAxis->setRange(-45, 54);
+    mPlot->yAxis->setRange(-5, 6);
+
+    QSignalSpy spy(&cm->pipeline(), &QCPColormapPipeline::finished);
+    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 2000);
+
+    auto* result = cm->pipeline().result();
+    QVERIFY(result != nullptr);
+
+    // The resampled grid should cover approximately the data extent, not the
+    // full viewport. With the bug, keyRange would be [-45, 54] and most bins NaN.
+    QCPRange rk = result->keyRange();
+    QVERIFY2(rk.lower >= -1 && rk.upper <= 10,
+        qPrintable(QString("Resampled key range [%1, %2] should be near data [0, 9], not viewport [-45, 54]")
+            .arg(rk.lower).arg(rk.upper)));
+
+    // Grid dimensions should be bounded by screen pixels, not inflated
+    QVERIFY2(result->keySize() <= 400 * 4,
+        qPrintable(QString("Resampled width %1 should not exceed 4x plot width (1600)")
+            .arg(result->keySize())));
+
+    // Most bins within the result should have data (not NaN)
+    int filled = 0;
+    for (int i = 0; i < result->keySize(); ++i)
+        for (int j = 0; j < result->valueSize(); ++j)
+            if (!std::isnan(result->cell(i, j)))
+                ++filled;
+    int total = result->keySize() * result->valueSize();
+    QVERIFY2(filled > total * 50 / 100,
+        qPrintable(QString("Only %1/%2 bins filled (>50%% expected) — data appears black")
+            .arg(filled).arg(total)));
+}
+
+void TestDataSource2D::resampleLogYResolutionNotCoarse()
+{
+    // Bug: the pipeline computed the Y fraction of screen covered by data
+    // using linear range sizes. For log-Y, data spanning 5 decades (1 to 1e5)
+    // out of a 10-decade viewport (0.01 to 1e8) covers ~50% of screen pixels,
+    // but linearly 99999/1e8 ≈ 0.001, giving pixH ≈ 1. The output grid then
+    // has only a handful of Y bins, producing giant colored blocks.
+    //
+    // Fix: use log-space fraction for log-scaled axes.
+    mPlot->resize(800, 600);
+    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+
+    const int nChannels = 32;
+    std::vector<double> x, y(nChannels), z;
+    for (int j = 0; j < nChannels; ++j)
+        y[j] = std::pow(10.0, 0.0 + j * 5.0 / (nChannels - 1)); // 1 to 1e5
+
+    for (int i = 0; i < 100; ++i)
+    {
+        double t = i * 0.5;
+        x.push_back(t);
+        for (int j = 0; j < nChannels; ++j)
+            z.push_back(std::sin(t * 0.1) * std::cos(j * 0.3));
+    }
+    cm->setData(std::move(x), std::move(y), std::move(z));
+
+    // Log-Y axis, zoomed out: data covers 5 decades, viewport covers 10
+    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setTicker(QSharedPointer<QCPAxisTickerLog>::create());
+    mPlot->xAxis->setRange(0, 50);
+    mPlot->yAxis->setRange(0.01, 1e8);
+
+    QSignalSpy spy(&cm->pipeline(), &QCPColormapPipeline::finished);
+    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 2000);
+
+    auto* result = cm->pipeline().result();
+    QVERIFY(result != nullptr);
+
+    // Data covers ~50% of screen (5/10 decades). With 600px height,
+    // pixH should be ~300. The output grid should have at least pixH bins.
+    // With the bug, pixH was ~1, giving valueSize around 32 (clamped to src.ySize()).
+    QVERIFY2(result->valueSize() >= 100,
+        qPrintable(QString("Output grid has only %1 Y bins — log-Y fraction bug gives coarse blocks")
+            .arg(result->valueSize())));
+}
+
+void TestDataSource2D::resampleVariableYPerColumn()
+{
+    // Bug: Y bin ranges were precomputed from the first visible column only.
+    // When Y values vary per column (yIs2D), subsequent columns used wrong
+    // bin mapping, placing data in incorrect Y bins.
+    //
+    // Column 0 has Y={1, 10}. Column 2 has Y={1000, 10000} — dramatically
+    // different. Without per-column Y bin computation, column 2's data gets
+    // mapped using column 0's bin ranges (y=1..10), landing in the bottom
+    // of the grid instead of the top.
+    std::vector<double> x = {0, 1, 2};
+    // Y is 2D: 3 columns × 2 rows = 6 values
+    std::vector<double> y = {1, 10,   100, 1000,   1000, 10000};
+    std::vector<double> z = {1.0, 2.0,  3.0, 4.0,  5.0, 6.0};
+
+    QCPSoADataSource2D src(std::move(x), std::move(y), std::move(z));
+    QVERIFY(src.yIs2D());
+
+    // Resample with log Y. Output grid: 3 x-bins, 40 y-bins spanning [1, 10000].
+    auto* r = qcp::algo2d::resample(src, 0, 3,
+        QCPRange(0, 2), QCPRange(1, 10000), 3, 40, true, 0);
+    QVERIFY(r);
+
+    // Column 2 (x=2) has Y={1000, 10000}. Its high channel (z=6.0) should
+    // land in the top quarter of the grid (y=10000 is the grid max).
+    // Without the fix, it uses column 0's bin ranges (y=1..10), so data
+    // lands near the bottom instead.
+    int topBin = -1;
+    for (int j = r->valueSize() - 1; j >= 0; --j)
+    {
+        if (!std::isnan(r->cell(2, j)))
+        {
+            topBin = j;
+            break;
+        }
+    }
+
+    QVERIFY2(topBin >= 0, "Column 2 should have data in the output grid");
+
+    // y=10000 is at the top of a [1, 10000] log grid. It should be in the
+    // top quarter (bin >= 30 out of 40). Without the fix, it lands near
+    // bin 2-5 (column 0's y=10 region).
+    QVERIFY2(topBin >= r->valueSize() * 3 / 4,
+        qPrintable(QString("Column 2's top channel (y=10000) at bin %1 should be in top quarter (>=%2)")
+            .arg(topBin).arg(r->valueSize() * 3 / 4)));
+
+    delete r;
+}
+
 void TestDataSource2D::colormap2NanHandling()
 {
     // Bug #2: Default NaN handling was nhNone, causing UB when colorizing

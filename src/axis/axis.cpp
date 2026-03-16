@@ -2002,7 +2002,7 @@ void QCPAxis::draw(QCPPainter* painter)
         for (int i = 0; i < mTickVector.size(); ++i)
         {
             tickPositions.append(coordToPixel(mTickVector.at(i)));
-            if (mTickLabels)
+            if (mTickLabels && i < mTickVectorLabels.size())
                 tickLabels.append(mTickVectorLabels.at(i));
         }
 
@@ -2168,7 +2168,7 @@ int QCPAxis::calculateMargin()
         for (int i = 0; i < mTickVector.size(); ++i)
         {
             tickPositions.append(coordToPixel(mTickVector.at(i)));
-            if (mTickLabels)
+            if (mTickLabels && i < mTickVectorLabels.size())
                 tickLabels.append(mTickVectorLabels.at(i));
         }
     }

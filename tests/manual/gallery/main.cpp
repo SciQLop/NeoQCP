@@ -239,7 +239,64 @@ static QWidget* createColorMapLogTab()
     return wrapPlot(plot);
 }
 
-// ── Tab 5: MultiGraph ────────────────────────────────────────────────────────
+// ── Tab 5: ColorMap2 Variable-Y ──────────────────────────────────────────────
+
+static QWidget* createColorMapVariableYTab()
+{
+    auto* plot = makePlot();
+
+    // Simulate a spectrogram where energy channels drift over time.
+    // Each column has its own Y values (yIs2D), showcasing per-column Y support.
+    const int nCols = 200;
+    const int nChannels = 24;
+
+    std::vector<double> x(nCols), y(nCols * nChannels), z(nCols * nChannels);
+
+    for (int i = 0; i < nCols; ++i)
+    {
+        double t = i * 0.5;
+        x[i] = t;
+
+        // Channel centers drift: base range 1..1e4 with a time-dependent shift
+        double shift = 1.0 + 0.3 * std::sin(t * 0.08);
+        for (int j = 0; j < nChannels; ++j)
+        {
+            double logCenter = shift * (0.0 + j * 4.0 / (nChannels - 1));
+            y[i * nChannels + j] = std::pow(10.0, logCenter);
+
+            double logFreq = logCenter;
+            double peak1 = shift * 1.5;
+            double peak2 = shift * 3.0;
+            z[i * nChannels + j] =
+                std::exp(-(logFreq - peak1) * (logFreq - peak1) / 0.3)
+                + 0.5 * std::exp(-(logFreq - peak2) * (logFreq - peak2) / 0.15)
+                + 0.02 * std::sin(logFreq * t * 0.1);
+        }
+    }
+
+    auto* cm = new QCPColorMap2(plot->xAxis, plot->yAxis);
+    cm->setData(std::move(x), std::move(y), std::move(z));
+
+    plot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    plot->yAxis->setTicker(QSharedPointer<QCPAxisTickerLog>::create());
+    plot->yAxis->setLabel("Energy (eV) — drifting channels");
+    plot->xAxis->setLabel("Time (s)");
+
+    auto* scale = new QCPColorScale(plot);
+    plot->plotLayout()->addElement(0, 1, scale);
+    cm->setColorScale(scale);
+
+    QCPColorGradient gradient(QCPColorGradient::gpJet);
+    gradient.setNanHandling(QCPColorGradient::nhTransparent);
+    cm->setGradient(gradient);
+    cm->rescaleDataRange(true);
+
+    plot->rescaleAxes();
+    plot->replot();
+    return wrapPlot(plot);
+}
+
+// ── Tab 6: MultiGraph ────────────────────────────────────────────────────────
 
 static QWidget* createMultiGraphTab()
 {
@@ -741,8 +798,9 @@ int main(int argc, char* argv[])
     tabs->addTab(createSpansTab(),       "Spans");
     tabs->addTab(createGraphTab(),       "Graph / Curve");
     tabs->addTab(createColorMapTab(),    "ColorMap2");
-    tabs->addTab(createColorMapLogTab(), "ColorMap2 Log/NaN/Gap");
-    tabs->addTab(createMultiGraphTab(),  "MultiGraph");
+    tabs->addTab(createColorMapLogTab(),       "ColorMap2 Log/NaN/Gap");
+    tabs->addTab(createColorMapVariableYTab(), "ColorMap2 Variable-Y");
+    tabs->addTab(createMultiGraphTab(),        "MultiGraph");
     tabs->addTab(createWaterfallTab(),   "Waterfall");
     tabs->addTab(createItemsTab(),       "Items");
     tabs->addTab(createBarsTab(),        "Bars + ErrorBars");

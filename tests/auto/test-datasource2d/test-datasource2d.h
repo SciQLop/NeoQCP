@@ -38,6 +38,9 @@ private slots:
     // Bug fix regression tests
     void resampleLogYNoBinGaps();
     void dataBoundsSkipsNaN();
+    void resampleZoomedOutNotBlack();
+    void resampleLogYResolutionNotCoarse();
+    void resampleVariableYPerColumn();
     void colormap2NanHandling();
     void colormap2DataScaleTypeSync();
 

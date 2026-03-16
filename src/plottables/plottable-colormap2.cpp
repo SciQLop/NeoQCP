@@ -34,21 +34,34 @@ QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
             int xEnd = src.findXEnd(vp.keyRange.upper);
             if (xEnd <= xBegin) return nullptr;
 
-            double visibleFractionX = vp.keyRange.size() / xRange.size();
-            double visibleFractionY = vp.valueRange.size() / yRange.size();
+            // Clamp output grid to intersection of viewport and data extent.
+            // Without this, zooming out creates a grid spanning the full viewport
+            // with bins wider than source spacing, leaving most bins empty (black).
+            QCPRange xOut(std::max(vp.keyRange.lower, xRange.lower),
+                          std::min(vp.keyRange.upper, xRange.upper));
+            QCPRange yOut(std::max(vp.valueRange.lower, yRange.lower),
+                          std::min(vp.valueRange.upper, yRange.upper));
+            if (xOut.lower >= xOut.upper || yOut.lower >= yOut.upper)
+                return nullptr;
+
+            auto logFrac = [](const QCPRange& data, const QCPRange& vp) {
+                if (data.lower <= 0 || vp.lower <= 0) return data.size() / vp.size();
+                return (std::log10(data.upper) - std::log10(data.lower))
+                     / (std::log10(vp.upper) - std::log10(vp.lower));
+            };
+            double xFrac = xOut.size() / vp.keyRange.size();
+            double yFrac = vp.valueLogScale ? logFrac(yOut, vp.valueRange)
+                                            : yOut.size() / vp.valueRange.size();
+            int pixW = std::max(1, static_cast<int>(vp.plotWidthPx * xFrac));
+            int pixH = std::max(1, static_cast<int>(vp.plotHeightPx * yFrac));
+
             int visibleSrcCols = xEnd - xBegin;
-            int w = std::clamp(
-                    static_cast<int>(visibleSrcCols / std::max(0.01, visibleFractionX)),
-                    std::max(visibleSrcCols, vp.plotWidthPx),
-                    std::max(visibleSrcCols, vp.plotWidthPx * 4));
-            int h = std::clamp(
-                    static_cast<int>(src.ySize() / std::max(0.01, visibleFractionY)),
-                    std::max(src.ySize(), vp.plotHeightPx),
-                    std::max(src.ySize(), vp.plotHeightPx * 4));
+            int w = std::clamp(visibleSrcCols, pixW, pixW * 4);
+            int h = std::clamp(src.ySize(), pixH, pixH * 4);
             if (w <= 0 || h <= 0) return nullptr;
 
             auto* raw = qcp::algo2d::resample(src, xBegin, xEnd,
-                vp.keyRange, vp.valueRange, w, h, vp.valueLogScale, gapThreshold.load(std::memory_order_relaxed));
+                xOut, yOut, w, h, vp.valueLogScale, gapThreshold.load(std::memory_order_relaxed));
             return std::shared_ptr<QCPColorMapData>(raw);
         });
 

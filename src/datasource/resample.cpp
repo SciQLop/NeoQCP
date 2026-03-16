@@ -119,41 +119,47 @@ QCPColorMapData* resample(
         }
     }
 
-    // Precompute Y bin ranges: each source Y-row fills bins within half its
-    // local spacing (bounded fill, no bleed beyond data extent).
-    // For log-scaled Y axes, boundaries are geometric means of neighbors
-    // so that channels tile correctly in log space.
+    // Y bin ranges: each source Y-row fills bins within half its local spacing
+    // (bounded fill, no bleed beyond data extent). For log-scaled Y axes,
+    // boundaries are geometric means of neighbors so channels tile correctly.
+    // When Y varies per column (yIs2D), ranges are recomputed per column.
     struct BinRange { int lo, hi; };
-    std::vector<BinRange> yBinRanges(ys);
-    for (int yj = 0; yj < ys; ++yj)
-    {
-        double yVal = src.yAt(xBegin, yj);
-        double yLo, yHi;
-        if (ys == 1)
-        {
-            yLo = yHi = yVal;
-        }
-        else if (yLogScale && yVal > 0)
-        {
-            double prev = (yj > 0) ? src.yAt(xBegin, yj - 1) : 0;
-            double next = (yj < ys - 1) ? src.yAt(xBegin, yj + 1) : 0;
-            yLo = (yj > 0 && prev > 0) ? std::sqrt(prev * yVal) : yVal;
-            yHi = (yj < ys - 1 && next > 0) ? std::sqrt(yVal * next) : yVal;
-        }
-        else
-        {
-            double halfBelow = (yj > 0) ? (yVal - src.yAt(xBegin, yj - 1)) * 0.5 : 0;
-            double halfAbove = (yj < ys - 1) ? (src.yAt(xBegin, yj + 1) - yVal) * 0.5 : 0;
-            if (yj == 0) halfBelow = halfAbove;
-            if (yj == ys - 1) halfAbove = halfBelow;
-            double halfSpacing = std::min(halfBelow, halfAbove);
-            yLo = yVal - halfSpacing;
-            yHi = yVal + halfSpacing;
-        }
+    bool variableY = src.yIs2D();
 
-        yBinRanges[yj].lo = findBin(yLo, yAxis);
-        yBinRanges[yj].hi = findBinFloor(yHi, yAxis);
-    }
+    auto computeYBinRanges = [&](int col, std::vector<BinRange>& ranges) {
+        for (int yj = 0; yj < ys; ++yj)
+        {
+            double yVal = src.yAt(col, yj);
+            double yLo, yHi;
+            if (ys == 1)
+            {
+                yLo = yHi = yVal;
+            }
+            else if (yLogScale && yVal > 0)
+            {
+                double prev = (yj > 0) ? src.yAt(col, yj - 1) : 0;
+                double next = (yj < ys - 1) ? src.yAt(col, yj + 1) : 0;
+                yLo = (yj > 0 && prev > 0) ? std::sqrt(prev * yVal) : yVal;
+                yHi = (yj < ys - 1 && next > 0) ? std::sqrt(yVal * next) : yVal;
+            }
+            else
+            {
+                double halfBelow = (yj > 0) ? (yVal - src.yAt(col, yj - 1)) * 0.5 : 0;
+                double halfAbove = (yj < ys - 1) ? (src.yAt(col, yj + 1) - yVal) * 0.5 : 0;
+                if (yj == 0) halfBelow = halfAbove;
+                if (yj == ys - 1) halfAbove = halfBelow;
+                double halfSpacing = std::min(halfBelow, halfAbove);
+                yLo = yVal - halfSpacing;
+                yHi = yVal + halfSpacing;
+            }
+            ranges[yj].lo = findBin(yLo, yAxis);
+            ranges[yj].hi = findBinFloor(yHi, yAxis);
+        }
+    };
+
+    std::vector<BinRange> yBinRanges(ys);
+    if (!variableY)
+        computeYBinRanges(xBegin, yBinRanges);
 
     for (int si = 0; si < srcCount; ++si)
     {
@@ -184,6 +190,9 @@ QCPColorMapData* resample(
 
         int xBinLo = findBin(xVal - xHalfSpacing, xAxis);
         int xBinHi = findBinFloor(xVal + xHalfSpacing, xAxis);
+
+        if (variableY)
+            computeYBinRanges(xi, yBinRanges);
 
         for (int yj = 0; yj < ys; ++yj)
         {
