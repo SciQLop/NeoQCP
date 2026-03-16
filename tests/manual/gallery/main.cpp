@@ -5,6 +5,7 @@
 #include <QTimer>
 #include <cmath>
 #include <numbers>
+#include <random>
 #include "../../../src/qcp.h"
 
 static QCustomPlot* makePlot(QWidget* parent = nullptr)
@@ -784,6 +785,95 @@ static QWidget* createRealtimeGraphTab()
     return wrapPlot(plot);
 }
 
+// ── Tab: Histogram2D ────────────────────────────────────────────────────────
+
+static QWidget* createHistogram2DTab()
+{
+    auto* plot = makePlot();
+
+    const int nPoints = 100000;
+    std::vector<double> keys(nPoints), vals(nPoints);
+    std::mt19937 rng(42);
+    std::normal_distribution<double> dist(0.0, 1.0);
+    const double rho = 0.6;
+    for (int i = 0; i < nPoints; ++i)
+    {
+        double u = dist(rng);
+        double v = dist(rng);
+        keys[i] = u;
+        vals[i] = rho * u + std::sqrt(1.0 - rho * rho) * v;
+    }
+
+    auto* hist = new QCPHistogram2D(plot->xAxis, plot->yAxis);
+    hist->setData(std::move(keys), std::move(vals));
+    hist->setBins(80, 80);
+    hist->setNormalization(QCPHistogram2D::nColumn);
+
+    auto* scale = new QCPColorScale(plot);
+    plot->plotLayout()->addElement(0, 1, scale);
+    hist->setColorScale(scale);
+
+    QCPColorGradient grad(QCPColorGradient::gpJet);
+    grad.setNanHandling(QCPColorGradient::nhTransparent);
+    hist->setGradient(grad);
+
+    QObject::connect(&hist->pipeline(), &QCPHistogramPipeline::finished,
+        plot, [hist, plot](uint64_t) {
+            hist->rescaleDataRange();
+            plot->rescaleAxes();
+        }, Qt::SingleShotConnection);
+
+    plot->xAxis->setLabel("X");
+    plot->yAxis->setLabel("Y");
+    plot->replot();
+    return wrapPlot(plot);
+}
+
+// ── Tab: Histogram2D (log) ──────────────────────────────────────────────────
+
+static QWidget* createHistogram2DLogTab()
+{
+    auto* plot = makePlot();
+
+    const int nPoints = 50000;
+    std::vector<double> keys(nPoints), vals(nPoints);
+    std::mt19937 rng(123);
+    std::normal_distribution<double> keyDist(5.0, 2.0);
+    std::lognormal_distribution<double> valDist(2.0, 0.8);
+    for (int i = 0; i < nPoints; ++i)
+    {
+        keys[i] = keyDist(rng);
+        vals[i] = valDist(rng);
+    }
+
+    auto* hist = new QCPHistogram2D(plot->xAxis, plot->yAxis);
+    hist->setData(std::move(keys), std::move(vals));
+    hist->setBins(60, 60);
+    hist->setNormalization(QCPHistogram2D::nColumn);
+
+    plot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    plot->yAxis->setTicker(QSharedPointer<QCPAxisTickerLog>::create());
+
+    auto* scale = new QCPColorScale(plot);
+    plot->plotLayout()->addElement(0, 1, scale);
+    hist->setColorScale(scale);
+
+    QCPColorGradient gradient(QCPColorGradient::gpHot);
+    gradient.setNanHandling(QCPColorGradient::nhTransparent);
+    hist->setGradient(gradient);
+
+    QObject::connect(&hist->pipeline(), &QCPHistogramPipeline::finished,
+        plot, [hist, plot](uint64_t) {
+            hist->rescaleDataRange();
+            plot->rescaleAxes();
+        }, Qt::SingleShotConnection);
+
+    plot->xAxis->setLabel("Wind Speed (km/s)");
+    plot->yAxis->setLabel("He Abundance (log)");
+    plot->replot();
+    return wrapPlot(plot);
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 int main(int argc, char* argv[])
@@ -810,6 +900,8 @@ int main(int argc, char* argv[])
     tabs->addTab(createRealtimeColorMapTab(), "Realtime ColorMap2");
     tabs->addTab(createRealtimeGraphTab(),   "Realtime Graph2");
     tabs->addTab(createThemeTab(),       "Dark Theme");
+    tabs->addTab(createHistogram2DTab(),    "Histogram2D");
+    tabs->addTab(createHistogram2DLogTab(), "Histogram2D (log)");
 
     window.setCentralWidget(tabs);
     window.show();
