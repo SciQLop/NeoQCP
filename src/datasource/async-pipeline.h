@@ -116,6 +116,13 @@ public:
 
     bool hasTransform() const { return !!mTransform; }
 
+    void clearTransform()
+    {
+        mTransform = {};
+        mResult.reset();
+        mCache = {};
+    }
+
 protected:
     std::function<void()> makeJob(
         const ViewportParams& vp, std::any cache, uint64_t generation) override

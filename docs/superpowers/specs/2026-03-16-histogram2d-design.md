@@ -77,9 +77,9 @@ public:
     void draw(QCPPainter* painter, QCPAxis* keyAxis, QCPAxis* valueAxis,
               const QCPRange& keyRange, const QCPRange& valueRange);
 
-    // RHI layer management
-    void ensureRhiLayer(QCustomPlot* plot);
-    void releaseRhiLayer(QCustomPlot* plot);
+    // RHI layer management (uses mOwner->parentPlot() internally)
+    QCPColormapRhiLayer* ensureRhiLayer();
+    void releaseRhiLayer();
 
     // Accessors
     const QCPColorGradient& gradient() const;
@@ -102,7 +102,7 @@ private:
 
 The `normalize` callback passed to `updateMapImage` allows QCPHistogram2D to inject column-normalization without the renderer knowing about histogram semantics. QCPColorMap2 passes no callback (or identity).
 
-**Responsibility boundary**: The renderer owns gradient/colorization state, the QImage cache, and RHI layer management. The plottable owns viewport-to-pixel coordinate mapping (via `coordToPixel`) and computes the pixel-space `QRectF` that it passes to `draw()`. The renderer's `draw()` takes fully-resolved axis and range parameters — it does not call `coordToPixel` itself. `ensureRhiLayer`/`releaseRhiLayer` are called by the plottable's `draw()` and destructor respectively.
+**Responsibility boundary**: The renderer owns gradient/colorization state, the QImage cache, and RHI layer management. The renderer's `draw()` takes axis pointers and range parameters, and internally calls `coordToPixel` to compute the pixel-space `QRectF`. `ensureRhiLayer()`/`releaseRhiLayer()` use `mOwner->parentPlot()` to access the QRhi instance. The plottable calls `applyDefaultAntialiasingHint(painter)` before `mRenderer.draw()` (since it's a protected method on QCPAbstractPlottable).
 
 ### QCPHistogram2D Public API
 

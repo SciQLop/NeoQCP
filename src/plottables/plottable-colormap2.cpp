@@ -42,13 +42,19 @@ QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
                 return nullptr;
 
             auto logFrac = [](const QCPRange& data, const QCPRange& vp) {
-                if (data.lower <= 0 || vp.lower <= 0) return data.size() / vp.size();
-                return (std::log10(data.upper) - std::log10(data.lower))
-                     / (std::log10(vp.upper) - std::log10(vp.lower));
+                if (data.lower <= 0 || vp.lower <= 0)
+                {
+                    double vpSz = vp.size();
+                    return vpSz > 0 ? data.size() / vpSz : 1.0;
+                }
+                double denom = std::log10(vp.upper) - std::log10(vp.lower);
+                return denom > 0 ? (std::log10(data.upper) - std::log10(data.lower)) / denom : 1.0;
             };
-            double xFrac = xOut.size() / vp.keyRange.size();
+            double vpKeySz = vp.keyRange.size();
+            double xFrac = vpKeySz > 0 ? xOut.size() / vpKeySz : 1.0;
+            double vpValSz = vp.valueRange.size();
             double yFrac = vp.valueLogScale ? logFrac(yOut, vp.valueRange)
-                                            : yOut.size() / vp.valueRange.size();
+                                            : (vpValSz > 0 ? yOut.size() / vpValSz : 1.0);
             int pixW = std::max(1, static_cast<int>(vp.plotWidthPx * xFrac));
             int pixH = std::max(1, static_cast<int>(vp.plotHeightPx * yFrac));
 

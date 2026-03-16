@@ -349,6 +349,11 @@ void TestPipeline::graph2PipelineTransform()
 {
     auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
 
+    // Set data first, then install transform (setData triggers
+    // ensureResamplingTransform which would clear a manually-installed transform
+    // for small datasets).
+    graph->setData(std::vector<double>{1, 2, 3}, std::vector<double>{4, 5, 6});
+
     graph->pipeline().setTransform(TransformKind::ViewportIndependent,
         [](const QCPAbstractDataSource& src, const ViewportParams&, std::any&)
             -> std::shared_ptr<QCPAbstractDataSource> {
@@ -362,8 +367,7 @@ void TestPipeline::graph2PipelineTransform()
             return std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
                 std::move(keys), std::move(values));
         });
-
-    graph->setData(std::vector<double>{1, 2, 3}, std::vector<double>{4, 5, 6});
+    graph->dataChanged();
 
     QSignalSpy spy(&graph->pipeline(), &QCPGraphPipeline::finished);
     QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 1, 1000);
@@ -417,7 +421,19 @@ void TestPipeline::colormap2PipelineResample()
 void TestPipeline::graph2DataFromExternalThread()
 {
     auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    QSignalSpy spy(&graph->pipeline(), &QCPGraphPipeline::finished);
+
+    auto source = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
+        std::vector<double>{1, 2, 3}, std::vector<double>{4, 5, 6});
+
+    // Install transform after setDataSource (setDataSource clears transforms
+    // for small datasets via ensureResamplingTransform).
+    QThread thread;
+    QObject worker;
+    worker.moveToThread(&thread);
+    thread.start();
+    QMetaObject::invokeMethod(&worker, [&]{
+        graph->setDataSource(source);
+    }, Qt::BlockingQueuedConnection);
 
     graph->pipeline().setTransform(TransformKind::ViewportIndependent,
         [](const QCPAbstractDataSource& src, const ViewportParams&, std::any&)
@@ -428,18 +444,9 @@ void TestPipeline::graph2DataFromExternalThread()
             return std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
                 std::move(k), std::move(v));
         });
+    graph->dataChanged();
 
-    auto source = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
-        std::vector<double>{1, 2, 3}, std::vector<double>{4, 5, 6});
-
-    QThread thread;
-    QObject worker;
-    worker.moveToThread(&thread);
-    thread.start();
-    QMetaObject::invokeMethod(&worker, [&]{
-        graph->setDataSource(source);
-    }, Qt::BlockingQueuedConnection);
-
+    QSignalSpy spy(&graph->pipeline(), &QCPGraphPipeline::finished);
     QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 1, 1000);
     QVERIFY(graph->pipeline().result() != nullptr);
     QCOMPARE(graph->pipeline().result()->size(), 3);
@@ -622,7 +629,7 @@ void TestPipeline::graphResamplerCacheReuse()
     vp.plotWidthPx = 800;
 
     auto result1 = qcp::algo::hierarchicalResample(*src, vp, cache);
-    QVERIFY(!result1); // below 10M threshold
+    QVERIFY(!result1); // below 10M threshold, no cache built
 
     // Exercise binMinMax and GraphResamplerCache directly since
     // hierarchicalResample requires 10M+ points
@@ -674,26 +681,67 @@ void TestPipeline::graphResamplerEmptyBinsProduceNaN()
     QVERIFY(std::isnan(outVals[5]));
 }
 
+// Lightweight data source that computes data on-the-fly without allocating 10M+ arrays.
+class SyntheticLargeSource : public QCPAbstractDataSource
+{
+public:
+    explicit SyntheticLargeSource(int n) : mN(n) {}
+    int size() const override { return mN; }
+    bool empty() const override { return mN == 0; }
+    double keyAt(int i) const override { return static_cast<double>(i); }
+    double valueAt(int i) const override { return std::sin(i * 0.0001); }
+    QCPRange keyRange(bool& found, QCP::SignDomain sd) const override
+    {
+        Q_UNUSED(sd);
+        found = mN > 0;
+        return QCPRange(0, mN - 1);
+    }
+    QCPRange valueRange(bool& found, QCP::SignDomain sd, const QCPRange&) const override
+    {
+        Q_UNUSED(sd);
+        found = mN > 0;
+        return QCPRange(-1, 1);
+    }
+    int findBegin(double sortKey, bool) const override
+    {
+        return std::clamp(static_cast<int>(sortKey), 0, mN);
+    }
+    int findEnd(double sortKey, bool) const override
+    {
+        return std::clamp(static_cast<int>(std::ceil(sortKey)) + 1, 0, mN);
+    }
+    QVector<QPointF> getOptimizedLineData(int begin, int end, int, QCPAxis*, QCPAxis*) const override
+    {
+        return getLines(begin, end, nullptr, nullptr);
+    }
+    QVector<QPointF> getLines(int begin, int end, QCPAxis*, QCPAxis*) const override
+    {
+        QVector<QPointF> result;
+        result.reserve(end - begin);
+        for (int i = begin; i < end; ++i)
+            result.append(QPointF(keyAt(i), valueAt(i)));
+        return result;
+    }
+private:
+    int mN;
+};
+
 void TestPipeline::graph2HierarchicalResamplingActivates()
 {
     auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
 
     const int N = 10'000'001;
-    std::vector<double> keys(N), vals(N);
-    for (int i = 0; i < N; ++i)
-    {
-        keys[i] = i;
-        vals[i] = std::sin(i * 0.0001);
-    }
+    auto source = std::make_shared<SyntheticLargeSource>(N);
+
+    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
 
     mPlot->xAxis->setRange(0, N - 1);
     mPlot->yAxis->setRange(-1, 1);
-    g->setData(std::move(keys), std::move(vals));
+    g->setDataSource(source);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
     QVERIFY(g->pipeline().hasTransform());
 
-    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
     QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
 
     auto* result = g->pipeline().result();
@@ -721,9 +769,9 @@ void TestPipeline::graph2SmallDataNoResampling()
 
 void TestPipeline::graph2LargeToSmallDataFallback()
 {
-    // Bug: when hierarchicalResample returns nullptr (e.g. data below threshold
-    // or log axis), draw() got nullptr and rendered nothing instead of falling
-    // back to the raw data source.
+    // When a graph that previously had a large dataset (with resampling transform)
+    // receives a smaller dataset, the transform should be cleared so the raw
+    // data source is used directly — no nullptr result, no blank rendering.
     auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
 
     // Install the resampling transform (simulates prior large-data assignment)
@@ -733,20 +781,24 @@ void TestPipeline::graph2LargeToSmallDataFallback()
            std::any& cache) -> std::shared_ptr<QCPAbstractDataSource> {
             return qcp::algo::hierarchicalResample(src, vp, cache);
         });
+    QVERIFY(g->pipeline().hasTransform());
 
-    // Assign small data — transform stays but returns nullptr
+    // Assign small data — transform should be cleared
     g->setData(std::vector<double>{1, 2, 3}, std::vector<double>{4, 5, 6});
 
-    // Transform is still installed but result is nullptr (below 10M threshold)
-    QVERIFY(g->pipeline().hasTransform());
-    QVERIFY(!g->pipeline().result());
+    // Transform is removed; pipeline passes through raw data source
+    QVERIFY(!g->pipeline().hasTransform());
 
-    // draw() should fall back to mDataSource and not crash
+    // result() returns the raw source directly (no transform = passthrough)
+    auto* result = g->pipeline().result();
+    QVERIFY(result);
+    QCOMPARE(result->size(), 3);
+
+    // draw() should render normally and not crash
     mPlot->xAxis->setRange(0, 4);
     mPlot->yAxis->setRange(0, 7);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
-    // Verify the data source is accessible for rendering
     QVERIFY(g->dataSource());
     QCOMPARE(g->dataSource()->size(), 3);
 }

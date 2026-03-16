@@ -7,6 +7,7 @@
 #include <layoutelements/layoutelement-axisrect.h>
 #include <layer.h>
 #include <Profiling.hpp>
+#include <vector>
 
 QCPColormapRenderer::QCPColormapRenderer(QCPAbstractPlottable* owner)
     : mOwner(owner)

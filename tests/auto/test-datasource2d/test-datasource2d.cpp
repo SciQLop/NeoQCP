@@ -507,11 +507,12 @@ void TestDataSource2D::resampleZoomedOutNotBlack()
     cm->setData(std::move(x), std::move(y), std::move(z));
     cm->setDataRange(QCPRange(1, 20));
 
+    QSignalSpy spy(&cm->pipeline(), &QCPColormapPipeline::finished);
+
     // Zoom out 10x: viewport [-45, 54], data spans [0, 9]
     mPlot->xAxis->setRange(-45, 54);
     mPlot->yAxis->setRange(-5, 6);
 
-    QSignalSpy spy(&cm->pipeline(), &QCPColormapPipeline::finished);
     QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 2000);
 
     auto* result = cm->pipeline().result();
@@ -567,13 +568,13 @@ void TestDataSource2D::resampleLogYResolutionNotCoarse()
     }
     cm->setData(std::move(x), std::move(y), std::move(z));
 
+    QSignalSpy spy(&cm->pipeline(), &QCPColormapPipeline::finished);
+
     // Log-Y axis, zoomed out: data covers 5 decades, viewport covers 10
     mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
     mPlot->yAxis->setTicker(QSharedPointer<QCPAxisTickerLog>::create());
     mPlot->xAxis->setRange(0, 50);
     mPlot->yAxis->setRange(0.01, 1e8);
-
-    QSignalSpy spy(&cm->pipeline(), &QCPColormapPipeline::finished);
     QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 2000);
 
     auto* result = cm->pipeline().result();

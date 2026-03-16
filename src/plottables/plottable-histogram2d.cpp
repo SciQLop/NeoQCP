@@ -1,6 +1,7 @@
 #include "plottable-histogram2d.h"
 #include "plottable-colormap.h" // for QCPColorMapData
 #include <core.h>
+#include <limits>
 #include <painting/painter.h>
 #include <layoutelements/layoutelement-colorscale.h>
 #include <layoutelements/layoutelement-axisrect.h>
@@ -203,7 +204,7 @@ void QCPHistogram2D::draw(QCPPainter* painter)
     auto* binnedData = mPipeline.result();
     if (!binnedData)
     {
-        if (mDataSource)
+        if (mDataSource && !mPipeline.isBusy())
             mPipeline.onDataChanged();
         return;
     }

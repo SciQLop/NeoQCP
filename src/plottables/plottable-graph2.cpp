@@ -37,14 +37,21 @@ QCPGraph2::~QCPGraph2() = default;
 
 static void ensureResamplingTransform(QCPGraphPipeline& pipeline, int sourceSize)
 {
-    if (sourceSize >= qcp::algo::kResampleThreshold && !pipeline.hasTransform())
+    if (sourceSize >= qcp::algo::kResampleThreshold)
     {
-        pipeline.setTransform(TransformKind::ViewportDependent,
-            [](const QCPAbstractDataSource& src,
-               const ViewportParams& vp,
-               std::any& cache) -> std::shared_ptr<QCPAbstractDataSource> {
-                return qcp::algo::hierarchicalResample(src, vp, cache);
-            });
+        if (!pipeline.hasTransform())
+        {
+            pipeline.setTransform(TransformKind::ViewportDependent,
+                [](const QCPAbstractDataSource& src,
+                   const ViewportParams& vp,
+                   std::any& cache) -> std::shared_ptr<QCPAbstractDataSource> {
+                    return qcp::algo::hierarchicalResample(src, vp, cache);
+                });
+        }
+    }
+    else if (pipeline.hasTransform())
+    {
+        pipeline.clearTransform();
     }
 }
 
