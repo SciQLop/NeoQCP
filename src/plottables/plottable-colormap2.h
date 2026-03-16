@@ -3,14 +3,13 @@
 #include <axis/axis.h>
 #include <datasource/async-pipeline.h>
 #include <datasource/soa-datasource-2d.h>
-#include <colorgradient.h>
+#include <painting/colormap-renderer.h>
 #include <atomic>
 #include <memory>
 #include <span>
 
 class QCPColorScale;
 class QCPColorMapData;
-class QCPColormapRhiLayer;
 
 class QCP_LIB_DECL QCPColorMap2 : public QCPAbstractPlottable
 {
@@ -57,10 +56,10 @@ public:
     void setGapThreshold(double threshold) { mGapThreshold.store(threshold, std::memory_order_relaxed); }
     double gapThreshold() const { return mGapThreshold.load(std::memory_order_relaxed); }
 
-    QCPColorGradient gradient() const { return mGradient; }
-    QCPColorScale* colorScale() const { return mColorScale; }
-    QCPRange dataRange() const { return mDataRange; }
-    QCPAxis::ScaleType dataScaleType() const { return mDataScaleType; }
+    QCPColorGradient gradient() const { return mRenderer.gradient(); }
+    QCPColorScale* colorScale() const { return mRenderer.colorScale(); }
+    QCPRange dataRange() const { return mRenderer.dataRange(); }
+    QCPAxis::ScaleType dataScaleType() const { return mRenderer.dataScaleType(); }
     void setDataScaleType(QCPAxis::ScaleType type);
 
     void setColorScale(QCPColorScale* colorScale);
@@ -92,17 +91,7 @@ private:
     std::shared_ptr<QCPAbstractDataSource2D> mDataSource;
     std::atomic<double> mGapThreshold{1.5}; // before mPipeline: must outlive background jobs
     QCPColormapPipeline mPipeline;
-    QCPColorGradient mGradient;
-    QCPColorScale* mColorScale = nullptr;
-    QCPRange mDataRange;
-    QCPAxis::ScaleType mDataScaleType = QCPAxis::stLinear;
-
-    QImage mMapImage;
-    bool mMapImageInvalidated = true;
+    QCPColormapRenderer mRenderer;
 
     void onViewportChanged();
-    void updateMapImage();
-    QCPColormapRhiLayer* ensureRhiLayer();
-
-    QCPColormapRhiLayer* mRhiLayer = nullptr;
 };

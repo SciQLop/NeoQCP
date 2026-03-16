@@ -2,7 +2,6 @@
 #include "plottable-colormap.h" // for QCPColorMapData
 #include <core.h>
 #include <painting/painter.h>
-#include <painting/colormap-rhi-layer.h>
 #include <layoutelements/layoutelement-colorscale.h>
 #include <layoutelements/layoutelement-axisrect.h>
 #include <axis/axis.h>
@@ -13,10 +12,8 @@
 QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
     : QCPAbstractPlottable(keyAxis, valueAxis)
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
+    , mRenderer(this)
 {
-    mGradient.loadPreset(QCPColorGradient::gpCold);
-    mGradient.setNanHandling(QCPColorGradient::nhTransparent);
-
     mPipeline.setTransform(TransformKind::ViewportDependent,
         [&gapThreshold = mGapThreshold](
             const QCPAbstractDataSource2D& src,
@@ -80,7 +77,7 @@ QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
 
     connect(&mPipeline, &QCPColormapPipeline::finished,
             this, [this](uint64_t) {
-                mMapImageInvalidated = true;
+                mRenderer.invalidateMapImage();
                 if (parentPlot())
                     parentPlot()->replot(QCustomPlot::rpQueuedReplot);
             });
@@ -88,9 +85,7 @@ QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
 
 QCPColorMap2::~QCPColorMap2()
 {
-    if (mRhiLayer && mParentPlot)
-        mParentPlot->unregisterColormapRhiLayer(mRhiLayer);
-    delete mRhiLayer;
+    mRenderer.releaseRhiLayer();
 }
 
 void QCPColorMap2::setDataSource(std::unique_ptr<QCPAbstractDataSource2D> source)
@@ -111,13 +106,10 @@ void QCPColorMap2::dataChanged()
 
 void QCPColorMap2::setGradient(const QCPColorGradient& gradient)
 {
-    if (mGradient != gradient)
+    if (mRenderer.gradient() != gradient)
     {
-        mGradient = gradient;
-        if (mGradient.nanHandling() == QCPColorGradient::nhNone)
-            mGradient.setNanHandling(QCPColorGradient::nhTransparent);
-        mMapImageInvalidated = true;
-        Q_EMIT gradientChanged(mGradient);
+        mRenderer.setGradient(gradient);
+        Q_EMIT gradientChanged(mRenderer.gradient());
         if (mParentPlot)
             mParentPlot->replot(QCustomPlot::rpQueuedReplot);
     }
@@ -125,41 +117,38 @@ void QCPColorMap2::setGradient(const QCPColorGradient& gradient)
 
 void QCPColorMap2::setColorScale(QCPColorScale* colorScale)
 {
-    if (mColorScale)
+    if (mRenderer.colorScale())
     {
-        disconnect(this, &QCPColorMap2::dataRangeChanged, mColorScale, &QCPColorScale::setDataRange);
-        disconnect(this, &QCPColorMap2::gradientChanged, mColorScale, &QCPColorScale::setGradient);
-        disconnect(this, &QCPColorMap2::dataScaleTypeChanged, mColorScale, &QCPColorScale::setDataScaleType);
-        disconnect(mColorScale, &QCPColorScale::dataRangeChanged, this, &QCPColorMap2::setDataRange);
-        disconnect(mColorScale, &QCPColorScale::gradientChanged, this, &QCPColorMap2::setGradient);
-        disconnect(mColorScale, &QCPColorScale::dataScaleTypeChanged, this, &QCPColorMap2::setDataScaleType);
+        disconnect(this, &QCPColorMap2::dataRangeChanged, mRenderer.colorScale(), &QCPColorScale::setDataRange);
+        disconnect(this, &QCPColorMap2::gradientChanged, mRenderer.colorScale(), &QCPColorScale::setGradient);
+        disconnect(this, &QCPColorMap2::dataScaleTypeChanged, mRenderer.colorScale(), &QCPColorScale::setDataScaleType);
+        disconnect(mRenderer.colorScale(), &QCPColorScale::dataRangeChanged, this, &QCPColorMap2::setDataRange);
+        disconnect(mRenderer.colorScale(), &QCPColorScale::gradientChanged, this, &QCPColorMap2::setGradient);
+        disconnect(mRenderer.colorScale(), &QCPColorScale::dataScaleTypeChanged, this, &QCPColorMap2::setDataScaleType);
     }
-    mColorScale = colorScale;
-    if (mColorScale)
+    mRenderer.setColorScale(colorScale);
+    if (colorScale)
     {
-        setGradient(mColorScale->gradient());
-        setDataScaleType(mColorScale->dataScaleType());
-        setDataRange(mColorScale->dataRange());
-        connect(this, &QCPColorMap2::dataRangeChanged, mColorScale, &QCPColorScale::setDataRange);
-        connect(this, &QCPColorMap2::gradientChanged, mColorScale, &QCPColorScale::setGradient);
-        connect(this, &QCPColorMap2::dataScaleTypeChanged, mColorScale, &QCPColorScale::setDataScaleType);
-        connect(mColorScale, &QCPColorScale::dataRangeChanged, this, &QCPColorMap2::setDataRange);
-        connect(mColorScale, &QCPColorScale::gradientChanged, this, &QCPColorMap2::setGradient);
-        connect(mColorScale, &QCPColorScale::dataScaleTypeChanged, this, &QCPColorMap2::setDataScaleType);
+        setGradient(colorScale->gradient());
+        setDataScaleType(colorScale->dataScaleType());
+        setDataRange(colorScale->dataRange());
+        connect(this, &QCPColorMap2::dataRangeChanged, colorScale, &QCPColorScale::setDataRange);
+        connect(this, &QCPColorMap2::gradientChanged, colorScale, &QCPColorScale::setGradient);
+        connect(this, &QCPColorMap2::dataScaleTypeChanged, colorScale, &QCPColorScale::setDataScaleType);
+        connect(colorScale, &QCPColorScale::dataRangeChanged, this, &QCPColorMap2::setDataRange);
+        connect(colorScale, &QCPColorScale::gradientChanged, this, &QCPColorMap2::setGradient);
+        connect(colorScale, &QCPColorScale::dataScaleTypeChanged, this, &QCPColorMap2::setDataScaleType);
     }
 }
 
 void QCPColorMap2::setDataRange(const QCPRange& range)
 {
-    if (!QCPRange::validRange(range))
-        return;
-    QCPRange newRange = (mDataScaleType == QCPAxis::stLogarithmic)
-        ? range.sanitizedForLogScale() : range.sanitizedForLinScale();
-    if (mDataRange.lower != newRange.lower || mDataRange.upper != newRange.upper)
+    QCPRange prev = mRenderer.dataRange();
+    mRenderer.setDataRange(range);
+    QCPRange cur = mRenderer.dataRange();
+    if (prev.lower != cur.lower || prev.upper != cur.upper)
     {
-        mDataRange = newRange;
-        mMapImageInvalidated = true;
-        Q_EMIT dataRangeChanged(mDataRange);
+        Q_EMIT dataRangeChanged(cur);
         if (mParentPlot)
             mParentPlot->replot(QCustomPlot::rpQueuedReplot);
     }
@@ -167,20 +156,14 @@ void QCPColorMap2::setDataRange(const QCPRange& range)
 
 void QCPColorMap2::setDataScaleType(QCPAxis::ScaleType type)
 {
-    if (mDataScaleType != type)
+    if (mRenderer.dataScaleType() != type)
     {
-        mDataScaleType = type;
-        mMapImageInvalidated = true;
-        if (type == QCPAxis::stLogarithmic && QCPRange::validRange(mDataRange))
-        {
-            QCPRange sanitized = mDataRange.sanitizedForLogScale();
-            if (mDataRange.lower != sanitized.lower || mDataRange.upper != sanitized.upper)
-            {
-                mDataRange = sanitized;
-                Q_EMIT dataRangeChanged(mDataRange);
-            }
-        }
-        Q_EMIT dataScaleTypeChanged(mDataScaleType);
+        QCPRange prevRange = mRenderer.dataRange();
+        mRenderer.setDataScaleType(type);
+        QCPRange curRange = mRenderer.dataRange();
+        if (prevRange.lower != curRange.lower || prevRange.upper != curRange.upper)
+            Q_EMIT dataRangeChanged(curRange);
+        Q_EMIT dataScaleTypeChanged(type);
         if (mParentPlot)
             mParentPlot->replot(QCustomPlot::rpQueuedReplot);
     }
@@ -218,44 +201,6 @@ void QCPColorMap2::onViewportChanged()
     mPipeline.onViewportChanged(vp);
 }
 
-void QCPColorMap2::updateMapImage()
-{
-    PROFILE_HERE_N("QCPColorMap2::updateMapImage");
-    auto* data = mPipeline.result();
-    if (!data) return;
-
-    int keySize = data->keySize();
-    int valueSize = data->valueSize();
-    if (keySize == 0 || valueSize == 0)
-        return;
-
-    QImage argbImage(keySize, valueSize, QImage::Format_ARGB32_Premultiplied);
-
-    std::vector<double> rowData(keySize);
-    for (int y = 0; y < valueSize; ++y)
-    {
-        for (int x = 0; x < keySize; ++x)
-            rowData[x] = data->cell(x, y);
-
-        QRgb* pixels = reinterpret_cast<QRgb*>(argbImage.scanLine(valueSize - 1 - y));
-        mGradient.colorize(rowData.data(), mDataRange, pixels, keySize,
-                           1, mDataScaleType == QCPAxis::stLogarithmic);
-    }
-
-    mMapImage = argbImage.convertToFormat(QImage::Format_RGBA8888_Premultiplied);
-    mMapImageInvalidated = false;
-}
-
-QCPColormapRhiLayer* QCPColorMap2::ensureRhiLayer()
-{
-    if (!mRhiLayer && mParentPlot && mParentPlot->rhi())
-    {
-        mRhiLayer = new QCPColormapRhiLayer(mParentPlot->rhi());
-        mParentPlot->registerColormapRhiLayer(mRhiLayer);
-    }
-    return mRhiLayer;
-}
-
 void QCPColorMap2::draw(QCPPainter* painter)
 {
     PROFILE_HERE_N("QCPColorMap2::draw");
@@ -270,49 +215,16 @@ void QCPColorMap2::draw(QCPPainter* painter)
         return;
     }
 
-    if (mMapImageInvalidated)
-        updateMapImage();
+    if (mRenderer.mapImageInvalidated())
+        mRenderer.updateMapImage(resampledData);
 
-    if (mMapImage.isNull())
+    if (mRenderer.mapImage().isNull())
         return;
 
     QCPRange keyRange = resampledData->keyRange();
     QCPRange valueRange = resampledData->valueRange();
-
-    QPointF topLeft = QPointF(mKeyAxis->coordToPixel(keyRange.lower),
-                              mValueAxis->coordToPixel(valueRange.upper));
-    QPointF bottomRight = QPointF(mKeyAxis->coordToPixel(keyRange.upper),
-                                  mValueAxis->coordToPixel(valueRange.lower));
-    QRectF imageRect(topLeft, bottomRight);
-
-    bool mirrorX = mKeyAxis->rangeReversed();
-    bool mirrorY = mValueAxis->rangeReversed();
-    Qt::Orientations flips;
-    if (mirrorX) flips |= Qt::Horizontal;
-    if (mirrorY) flips |= Qt::Vertical;
-
-    if (auto* crl = ensureRhiLayer())
-    {
-        crl->setImage(mMapImage.flipped(flips));
-        crl->setQuadRect(imageRect.normalized());
-        crl->setLayer(layer());
-
-        auto* axisRect = mKeyAxis->axisRect();
-        QRect clipRect = axisRect->rect();
-        double dpr = mParentPlot->bufferDevicePixelRatio();
-        int sx = static_cast<int>(clipRect.x() * dpr);
-        int sy = static_cast<int>(clipRect.y() * dpr);
-        int sw = static_cast<int>(clipRect.width() * dpr);
-        int sh = static_cast<int>(clipRect.height() * dpr);
-        if (mParentPlot->rhi()->isYUpInNDC())
-            sy = static_cast<int>(mParentPlot->height() * dpr) - sy - sh;
-        crl->setScissorRect(QRect(sx, sy, sw, sh));
-        return;
-    }
-
     applyDefaultAntialiasingHint(painter);
-    painter->drawImage(imageRect, mMapImage.convertToFormat(
-        QImage::Format_ARGB32_Premultiplied).flipped(flips));
+    mRenderer.draw(painter, mKeyAxis.data(), mValueAxis.data(), keyRange, valueRange);
 }
 
 void QCPColorMap2::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
