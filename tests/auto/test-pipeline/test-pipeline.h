@@ -55,6 +55,12 @@ private slots:
     void graphResamplerBinMinMaxZeroBins();
     void graphResamplerNonFiniteKeysSkipped();
 
+    // Histogram binner
+    void bin2dBasicCounts();
+    void bin2dNaNSkipped();
+    void bin2dEmptyInput();
+    void bin2dSingleBin();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };

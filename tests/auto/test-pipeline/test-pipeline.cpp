@@ -8,6 +8,7 @@
 #include <plottables/plottable-colormap2.h>
 #include <plottables/plottable-colormap.h>
 #include <datasource/graph-resampler.h>
+#include <datasource/histogram-binner.h>
 #include <QSignalSpy>
 #include <QThread>
 #include <cmath>
@@ -790,4 +791,56 @@ void TestPipeline::graphResamplerNonFiniteKeysSkipped()
     // Only finite keys (0, 2, 4) should contribute → min=10, max=50
     QCOMPARE(outVals[0], 10.0);
     QCOMPARE(outVals[1], 50.0);
+}
+
+// --- Histogram binner tests ---
+
+void TestPipeline::bin2dBasicCounts()
+{
+    std::vector<double> keys = {0.25, 0.25, 0.75, 0.75};
+    std::vector<double> vals = {0.25, 0.75, 0.25, 0.75};
+    auto src = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
+        std::move(keys), std::move(vals));
+    auto* result = qcp::algo::bin2d(*src, 2, 2);
+    QVERIFY(result);
+    QCOMPARE(result->keySize(), 2);
+    QCOMPARE(result->valueSize(), 2);
+    QCOMPARE(result->cell(0, 0), 1.0);
+    QCOMPARE(result->cell(1, 0), 1.0);
+    QCOMPARE(result->cell(0, 1), 1.0);
+    QCOMPARE(result->cell(1, 1), 1.0);
+    delete result;
+}
+
+void TestPipeline::bin2dNaNSkipped()
+{
+    std::vector<double> keys = {0.5, std::nan(""), 0.5};
+    std::vector<double> vals = {0.5, 0.5, std::nan("")};
+    auto src = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
+        std::move(keys), std::move(vals));
+    auto* result = qcp::algo::bin2d(*src, 1, 1);
+    QVERIFY(result);
+    QCOMPARE(result->cell(0, 0), 1.0);
+    delete result;
+}
+
+void TestPipeline::bin2dEmptyInput()
+{
+    std::vector<double> keys, vals;
+    auto src = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
+        std::move(keys), std::move(vals));
+    auto* result = qcp::algo::bin2d(*src, 10, 10);
+    QVERIFY(!result);
+}
+
+void TestPipeline::bin2dSingleBin()
+{
+    std::vector<double> keys = {1.0, 1.0, 1.0};
+    std::vector<double> vals = {2.0, 2.0, 2.0};
+    auto src = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
+        std::move(keys), std::move(vals));
+    auto* result = qcp::algo::bin2d(*src, 1, 1);
+    QVERIFY(result);
+    QCOMPARE(result->cell(0, 0), 3.0);
+    delete result;
 }
