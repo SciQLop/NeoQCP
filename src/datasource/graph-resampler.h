@@ -26,6 +26,9 @@ inline BinResult binMinMax(
     int numBins)
 {
     BinResult out;
+    if (numBins <= 0 || keyRange.size() <= 0)
+        return out;
+
     out.keys.resize(numBins * 2);
     out.values.resize(numBins * 2);
 
@@ -37,7 +40,7 @@ inline BinResult binMinMax(
     {
         double binCenter = keyLo + (b + 0.5) * binWidth;
         out.keys[b * 2 + 0] = binCenter;
-        out.keys[b * 2 + 1] = binCenter + halfWidth * 0.5;
+        out.keys[b * 2 + 1] = binCenter + halfWidth;
         out.values[b * 2 + 0] = std::numeric_limits<double>::quiet_NaN();
         out.values[b * 2 + 1] = std::numeric_limits<double>::quiet_NaN();
     }
@@ -46,7 +49,7 @@ inline BinResult binMinMax(
     {
         double k = srcKeys[i];
         double v = srcValues[i];
-        if (std::isnan(v)) continue;
+        if (std::isnan(v) || !std::isfinite(k)) continue;
 
         int bin = static_cast<int>((k - keyLo) / binWidth);
         bin = std::clamp(bin, 0, numBins - 1);
@@ -79,16 +82,15 @@ inline std::shared_ptr<QCPAbstractDataSource> hierarchicalResample(
     if (srcSize == 0 || srcSize < kResampleThreshold || vp.keyLogScale)
         return nullptr;
 
-    bool foundRange = false;
-    QCPRange fullKeyRange = src.keyRange(foundRange);
-    if (!foundRange || fullKeyRange.size() <= 0)
-        return nullptr;
-
     auto* c = std::any_cast<GraphResamplerCache>(&cache);
-    if (!c || c->sourceSize != srcSize
-           || c->cachedKeyRange.lower != fullKeyRange.lower
-           || c->cachedKeyRange.upper != fullKeyRange.upper)
+    bool cacheValid = c && c->sourceSize == srcSize;
+
+    if (!cacheValid)
     {
+        bool foundRange = false;
+        QCPRange fullKeyRange = src.keyRange(foundRange);
+        if (!foundRange || fullKeyRange.size() <= 0)
+            return nullptr;
         int numBins = std::min(kLevel1TargetBins, srcSize / 2);
 
         std::vector<double> allKeys(srcSize), allVals(srcSize);

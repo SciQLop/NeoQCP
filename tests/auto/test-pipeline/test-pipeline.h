@@ -50,6 +50,10 @@ private slots:
     void graphResamplerEmptyBinsProduceNaN();
     void graph2HierarchicalResamplingActivates();
     void graph2SmallDataNoResampling();
+    void graph2LargeToSmallDataFallback();
+    void graphResamplerBinMinMaxKeyPositions();
+    void graphResamplerBinMinMaxZeroBins();
+    void graphResamplerNonFiniteKeysSkipped();
 
 private:
     QCustomPlot* mPlot = nullptr;

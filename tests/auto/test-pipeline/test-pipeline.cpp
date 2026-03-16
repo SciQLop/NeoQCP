@@ -11,6 +11,7 @@
 #include <QSignalSpy>
 #include <QThread>
 #include <cmath>
+#include <limits>
 
 void TestPipeline::init()
 {
@@ -618,14 +619,11 @@ void TestPipeline::graphResamplerCacheReuse()
     vp.keyRange = QCPRange(0, N - 1);
     vp.plotWidthPx = 800;
 
-    // First call builds Level 1 cache + Level 2 output
     auto result1 = qcp::algo::hierarchicalResample(*src, vp, cache);
-    // Below 10M threshold — returns nullptr (no resampling needed)
-    QVERIFY(!result1);
+    QVERIFY(!result1); // below 10M threshold
 
-    // Test with a source that pretends to be large by calling binMinMax directly
-    // (hierarchicalResample has a 10M threshold we can't hit in unit tests easily)
-    // Instead, verify the cache struct works
+    // Exercise binMinMax and GraphResamplerCache directly since
+    // hierarchicalResample requires 10M+ points
     qcp::algo::GraphResamplerCache c;
     c.level1 = qcp::algo::binMinMax(keys, vals, 0, N, QCPRange(0, N - 1), 500);
     c.cachedKeyRange = QCPRange(0, N - 1);
@@ -717,4 +715,79 @@ void TestPipeline::graph2SmallDataNoResampling()
     QCOMPARE(result->size(), 5);
     QCOMPARE(result->keyAt(0), 1.0);
     QCOMPARE(result->valueAt(4), 50.0);
+}
+
+void TestPipeline::graph2LargeToSmallDataFallback()
+{
+    // Bug: when hierarchicalResample returns nullptr (e.g. data below threshold
+    // or log axis), draw() got nullptr and rendered nothing instead of falling
+    // back to the raw data source.
+    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+
+    // Install the resampling transform (simulates prior large-data assignment)
+    g->pipeline().setTransform(TransformKind::ViewportDependent,
+        [](const QCPAbstractDataSource& src,
+           const ViewportParams& vp,
+           std::any& cache) -> std::shared_ptr<QCPAbstractDataSource> {
+            return qcp::algo::hierarchicalResample(src, vp, cache);
+        });
+
+    // Assign small data — transform stays but returns nullptr
+    g->setData(std::vector<double>{1, 2, 3}, std::vector<double>{4, 5, 6});
+
+    // Transform is still installed but result is nullptr (below 10M threshold)
+    QVERIFY(g->pipeline().hasTransform());
+    QVERIFY(!g->pipeline().result());
+
+    // draw() should fall back to mDataSource and not crash
+    mPlot->xAxis->setRange(0, 4);
+    mPlot->yAxis->setRange(0, 7);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    // Verify the data source is accessible for rendering
+    QVERIFY(g->dataSource());
+    QCOMPARE(g->dataSource()->size(), 3);
+}
+
+void TestPipeline::graphResamplerBinMinMaxKeyPositions()
+{
+    // Bug: comment says output is (binCenter, min), (binCenter+halfWidth, max)
+    // but code writes binCenter + halfWidth * 0.5 (quarter-width offset)
+    std::vector<double> keys = {0, 1, 2, 3};
+    std::vector<double> vals = {10, 20, 30, 40};
+    QCPRange range(0, 4);
+
+    auto [outKeys, outVals] = qcp::algo::binMinMax(keys, vals, 0, 4, range, 1);
+
+    // Single bin: binWidth=4, halfWidth=2, binCenter=2
+    // Expected: (binCenter, min) = (2, 10), (binCenter+halfWidth, max) = (4, 40)
+    QCOMPARE(outKeys[0], 2.0);
+    QCOMPARE(outKeys[1], 4.0);
+}
+
+void TestPipeline::graphResamplerBinMinMaxZeroBins()
+{
+    // Bug: numBins=0 causes division by zero in binWidth = keyRange.size() / numBins
+    std::vector<double> keys = {1, 2, 3};
+    std::vector<double> vals = {4, 5, 6};
+
+    auto result = qcp::algo::binMinMax(keys, vals, 0, 3, QCPRange(1, 3), 0);
+    QCOMPARE(result.keys.size(), 0u);
+    QCOMPARE(result.values.size(), 0u);
+}
+
+void TestPipeline::graphResamplerNonFiniteKeysSkipped()
+{
+    // Bug: non-finite keys (NaN/Inf) produce UB in static_cast<int>((k - keyLo) / binWidth)
+    double nan = std::numeric_limits<double>::quiet_NaN();
+    double inf = std::numeric_limits<double>::infinity();
+    std::vector<double> keys = {0, nan, 2, inf, 4};
+    std::vector<double> vals = {10, 20, 30, 40, 50};
+    QCPRange range(0, 4);
+
+    auto [outKeys, outVals] = qcp::algo::binMinMax(keys, vals, 0, 5, range, 1);
+
+    // Only finite keys (0, 2, 4) should contribute → min=10, max=50
+    QCOMPARE(outVals[0], 10.0);
+    QCOMPARE(outVals[1], 50.0);
 }

@@ -385,7 +385,9 @@ void QCPGraph2::draw(QCPPainter* painter)
 
     const QCPAbstractDataSource* ds = mPipeline.hasTransform()
         ? mPipeline.result()
-        : mDataSource.get();
+        : nullptr;
+    if (!ds)
+        ds = mDataSource.get();
     if (!ds || ds->empty())
         return;
     if (mKeyAxis->range().size() <= 0)
