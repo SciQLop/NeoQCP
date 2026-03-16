@@ -61,6 +61,12 @@ private slots:
     void bin2dEmptyInput();
     void bin2dSingleBin();
 
+    // QCPHistogram2D
+    void histogram2dPipelineBins();
+    void histogram2dNormalizationColumn();
+    void histogram2dNormalizationToggleNoRebind();
+    void histogram2dRenderSmokeTest();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };
