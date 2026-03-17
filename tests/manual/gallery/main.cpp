@@ -785,6 +785,36 @@ static QWidget* createRealtimeGraphTab()
     return wrapPlot(plot);
 }
 
+// ── Tab: Massive Graph2 (500M points) ───────────────────────────────────────
+
+static QWidget* createMassiveGraphTab()
+{
+    auto* plot = makePlot();
+
+    constexpr int N = 500'000'000;
+    std::vector<double> keys(N), vals(N);
+    for (int i = 0; i < N; ++i)
+    {
+        double t = i * 1e-6; // 0 to 500 seconds at 1 MHz
+        keys[i] = t;
+        vals[i] = std::sin(t * 6.28 * 0.5)                // slow drift
+                + 0.3 * std::sin(t * 6.28 * 50.0)         // medium oscillation
+                + 0.1 * std::sin(t * 6.28 * 5000.0);      // fast oscillation (visible when zoomed in)
+    }
+
+    auto* g = new QCPGraph2(plot->xAxis, plot->yAxis);
+    g->setData(std::move(keys), std::move(vals));
+    g->setPen(QPen(QColor(31, 119, 180), 1));
+    g->setName("500M points");
+
+    plot->xAxis->setLabel("Time (s)");
+    plot->yAxis->setLabel("Amplitude");
+    plot->legend->setVisible(true);
+    plot->rescaleAxes();
+    plot->replot();
+    return wrapPlot(plot);
+}
+
 // ── Tab: Histogram2D ────────────────────────────────────────────────────────
 
 static QWidget* createHistogram2DTab()
@@ -900,6 +930,7 @@ int main(int argc, char* argv[])
     tabs->addTab(createRealtimeColorMapTab(), "Realtime ColorMap2");
     tabs->addTab(createRealtimeGraphTab(),   "Realtime Graph2");
     tabs->addTab(createThemeTab(),       "Dark Theme");
+    tabs->addTab(createMassiveGraphTab(), "Graph2 500M pts (~8GB)");
     tabs->addTab(createHistogram2DTab(),    "Histogram2D");
     tabs->addTab(createHistogram2DLogTab(), "Histogram2D (log)");
 

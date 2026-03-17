@@ -1,6 +1,7 @@
 #pragma once
 #include "abstract-datasource.h"
 #include "algorithms.h"
+#include "../Profiling.hpp"
 #include <QtGlobal>
 
 template <IndexableNumericRange KeyContainer, IndexableNumericRange ValueContainer>
@@ -37,12 +38,14 @@ public:
 
     QCPRange keyRange(bool& foundRange, QCP::SignDomain sd = QCP::sdBoth) const override
     {
-        return qcp::algo::keyRange(mKeys, foundRange, sd);
+        PROFILE_HERE_N("SoA::keyRange");
+        return qcp::algo::keyRangeSorted(mKeys, foundRange, sd);
     }
 
     QCPRange valueRange(bool& foundRange, QCP::SignDomain sd = QCP::sdBoth,
                         const QCPRange& inKeyRange = QCPRange()) const override
     {
+        PROFILE_HERE_N("SoA::valueRange");
         return qcp::algo::valueRange(mKeys, mValues, foundRange, sd, inKeyRange);
     }
 

@@ -31,6 +31,7 @@
 #include "../painting/painter.h"
 #include "../plottables/plottable.h"
 #include "../plottables/plottable-graph.h"
+#include "../Profiling.hpp"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPGrid
@@ -1411,6 +1412,7 @@ void QCPAxis::scaleRange(double factor)
 */
 void QCPAxis::scaleRange(double factor, double center)
 {
+    PROFILE_HERE_N("QCPAxis::scaleRange");
     QCPRange oldRange = mRange;
     if (mScaleType == stLinear)
     {

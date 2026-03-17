@@ -1,5 +1,6 @@
 #include "async-pipeline.h"
 #include "pipeline-scheduler.h"
+#include "../Profiling.hpp"
 
 QCPAsyncPipelineBase::QCPAsyncPipelineBase(QCPPipelineScheduler* scheduler,
                                              QObject* parent)
@@ -21,20 +22,22 @@ bool QCPAsyncPipelineBase::isBusy() const
 
 void QCPAsyncPipelineBase::onDataChanged()
 {
+    PROFILE_HERE_N("Pipeline::onDataChanged");
     uint64_t gen = ++mGeneration;
     QMutexLocker lock(&mMutex);
     mCache = std::any{};
 
-    auto job = makeJob(mLastViewport, std::any{}, gen);
-    if (!job) return;
-
     if (mJobRunning)
     {
-        mPending = std::move(job);
+        // Data change supersedes any pending viewport change
+        mPending = makeJob(mLastViewport, std::any{}, gen);
+        mPendingViewport = false;
         mPendingPriority = QCPPipelineScheduler::Heavy;
     }
     else
     {
+        auto job = makeJob(mLastViewport, std::any{}, gen);
+        if (!job) return;
         mJobRunning = true;
         mRunningGeneration = gen;
         lock.unlock();
@@ -44,6 +47,7 @@ void QCPAsyncPipelineBase::onDataChanged()
 
 void QCPAsyncPipelineBase::onViewportChanged(const ViewportParams& vp)
 {
+    PROFILE_HERE_N("Pipeline::onViewportChanged");
     if (mKind == TransformKind::ViewportIndependent)
     {
         QMutexLocker lock(&mMutex);
@@ -55,17 +59,17 @@ void QCPAsyncPipelineBase::onViewportChanged(const ViewportParams& vp)
     QMutexLocker lock(&mMutex);
     mLastViewport = vp;
 
-    auto cache = std::move(mCache);
-    auto job = makeJob(vp, std::move(cache), gen);
-    if (!job) return;
-
     if (mJobRunning)
     {
-        mPending = std::move(job);
+        // Defer job creation — cache will be available when current job finishes
+        mPendingViewport = true;
         mPendingPriority = QCPPipelineScheduler::Fast;
     }
     else
     {
+        auto cache = std::move(mCache);
+        auto job = makeJob(vp, std::move(cache), gen);
+        if (!job) return;
         mJobRunning = true;
         mRunningGeneration = gen;
         lock.unlock();
@@ -75,20 +79,38 @@ void QCPAsyncPipelineBase::onViewportChanged(const ViewportParams& vp)
 
 void QCPAsyncPipelineBase::deliverResult(uint64_t generation, std::any cache, std::any result)
 {
+    PROFILE_HERE_N("Pipeline::deliverResult");
     if (mDestroyed->load())
         return;
 
     QMutexLocker lock(&mMutex);
     mCache = std::move(cache);
 
-    if (mPending)
+    if (mPending || mPendingViewport)
     {
-        auto job = std::move(mPending);
-        mPending = nullptr;
         auto priority = mPendingPriority;
         mRunningGeneration = mGeneration.load();
+
+        std::function<void()> job;
+        if (mPending)
+        {
+            // Data change: pre-baked job (cache was cleared)
+            job = std::move(mPending);
+            mPending = nullptr;
+        }
+        else
+        {
+            // Viewport change: create job now with the restored cache
+            mPendingViewport = false;
+            auto jobCache = std::move(mCache);
+            job = makeJob(mLastViewport, std::move(jobCache), mRunningGeneration);
+        }
+
         lock.unlock();
-        mScheduler->submit(priority, std::move(job));
+        if (job)
+            mScheduler->submit(priority, std::move(job));
+        else
+            mJobRunning = false;
     }
     else
     {

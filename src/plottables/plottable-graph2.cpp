@@ -27,25 +27,23 @@ QCPGraph2::QCPGraph2(QCPAxis* keyAxis, QCPAxis* valueAxis)
     }
 
     connect(&mPipeline, &QCPGraphPipeline::finished,
-            this, [this](uint64_t) {
-                if (parentPlot())
-                    parentPlot()->replot(QCustomPlot::rpQueuedReplot);
-            });
+            this, [this](uint64_t) { onL1Ready(); });
 }
 
 QCPGraph2::~QCPGraph2() = default;
 
-static void ensureResamplingTransform(QCPGraphPipeline& pipeline, int sourceSize)
+static void ensureL1Transform(QCPGraphPipeline& pipeline, int sourceSize)
 {
     if (sourceSize >= qcp::algo::kResampleThreshold)
     {
         if (!pipeline.hasTransform())
         {
-            pipeline.setTransform(TransformKind::ViewportDependent,
+            // Pipeline only builds L1 cache — L2 is done synchronously
+            pipeline.setTransform(TransformKind::ViewportIndependent,
                 [](const QCPAbstractDataSource& src,
                    const ViewportParams& vp,
                    std::any& cache) -> std::shared_ptr<QCPAbstractDataSource> {
-                    return qcp::algo::hierarchicalResample(src, vp, cache);
+                    return qcp::algo::buildL1Cache(src, vp, cache);
                 });
         }
     }
@@ -58,25 +56,76 @@ static void ensureResamplingTransform(QCPGraphPipeline& pipeline, int sourceSize
 void QCPGraph2::setDataSource(std::unique_ptr<QCPAbstractDataSource> source)
 {
     mDataSource = std::move(source);
+    mL1Cache.reset();
+    mL2Result.reset();
+    mNeedsResampling = mDataSource && mDataSource->size() >= qcp::algo::kResampleThreshold;
     if (mDataSource)
-        ensureResamplingTransform(mPipeline, mDataSource->size());
+        ensureL1Transform(mPipeline, mDataSource->size());
     mPipeline.setSource(mDataSource);
 }
 
 void QCPGraph2::setDataSource(std::shared_ptr<QCPAbstractDataSource> source)
 {
     mDataSource = std::move(source);
+    mL1Cache.reset();
+    mL2Result.reset();
+    mNeedsResampling = mDataSource && mDataSource->size() >= qcp::algo::kResampleThreshold;
     if (mDataSource)
-        ensureResamplingTransform(mPipeline, mDataSource->size());
+        ensureL1Transform(mPipeline, mDataSource->size());
     mPipeline.setSource(mDataSource);
 }
 
 void QCPGraph2::dataChanged()
 {
     if (mPipeline.hasTransform())
+    {
+        mL1Cache.reset();
+        mL2Result.reset();
         mPipeline.onDataChanged();
+    }
     else if (mParentPlot)
         mParentPlot->replot();
+}
+
+void QCPGraph2::onL1Ready()
+{
+    PROFILE_HERE_N("QCPGraph2::onL1Ready");
+    // Extract L1 cache from pipeline and store locally
+    auto& pipelineCache = mPipeline.cache();
+    auto* c = std::any_cast<qcp::algo::GraphResamplerCache>(&pipelineCache);
+    if (c && c->sourceSize > 0)
+    {
+        mL1Cache = std::make_shared<qcp::algo::GraphResamplerCache>(std::move(*c));
+        pipelineCache = std::any{}; // clear pipeline copy
+
+        // Immediately do L2 for current viewport
+        if (mKeyAxis && mValueAxis)
+        {
+            auto* axisRect = mKeyAxis->axisRect();
+            if (axisRect)
+            {
+                ViewportParams vp;
+                vp.keyRange = mKeyAxis->range();
+                vp.valueRange = mValueAxis->range();
+                vp.plotWidthPx = axisRect->width();
+                vp.plotHeightPx = axisRect->height();
+                vp.keyLogScale = (mKeyAxis->scaleType() == QCPAxis::stLogarithmic);
+                vp.valueLogScale = (mValueAxis->scaleType() == QCPAxis::stLogarithmic);
+                rebuildL2(vp);
+            }
+        }
+    }
+    if (parentPlot())
+        parentPlot()->replot(QCustomPlot::rpQueuedReplot);
+}
+
+void QCPGraph2::rebuildL2(const ViewportParams& vp)
+{
+    PROFILE_HERE_N("QCPGraph2::rebuildL2");
+    if (!mL1Cache) return;
+    auto result = qcp::algo::resampleL2(*mL1Cache, vp);
+    if (result)
+        mL2Result = std::move(result);
 }
 
 // --- QCPPlottableInterface1D ---
@@ -177,6 +226,9 @@ double QCPGraph2::selectTest(const QPointF& pos, bool onlySelectable, QVariant* 
     if (!mKeyAxis || !mValueAxis)
         return -1;
 
+    // Use resampled data for hit testing when available (O(k) instead of O(n))
+    const QCPAbstractDataSource* ds = mL2Result ? mL2Result.get() : mDataSource.get();
+
     double posKeyMin, posKeyMax, dummy;
     pixelsToCoords(
         pos - QPointF(mParentPlot->selectionTolerance(), mParentPlot->selectionTolerance()),
@@ -187,8 +239,8 @@ double QCPGraph2::selectTest(const QPointF& pos, bool onlySelectable, QVariant* 
     if (posKeyMin > posKeyMax)
         qSwap(posKeyMin, posKeyMax);
 
-    int begin = mDataSource->findBegin(posKeyMin, true);
-    int end = mDataSource->findEnd(posKeyMax, true);
+    int begin = ds->findBegin(posKeyMin, true);
+    int end = ds->findEnd(posKeyMax, true);
     if (begin == end)
         return -1;
 
@@ -199,8 +251,8 @@ double QCPGraph2::selectTest(const QPointF& pos, bool onlySelectable, QVariant* 
 
     for (int i = begin; i < end; ++i)
     {
-        double k = mDataSource->keyAt(i);
-        double v = mDataSource->valueAt(i);
+        double k = ds->keyAt(i);
+        double v = ds->valueAt(i);
         if (keyRange.contains(k) && valueRange.contains(v))
         {
             double distSqr = QCPVector2D(coordsToPixels(k, v) - pos).lengthSquared();
@@ -223,6 +275,7 @@ double QCPGraph2::selectTest(const QPointF& pos, bool onlySelectable, QVariant* 
 
 QCPRange QCPGraph2::getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain) const
 {
+    PROFILE_HERE_N("QCPGraph2::getKeyRange");
     if (!mDataSource || mDataSource->empty())
     {
         foundRange = false;
@@ -234,6 +287,7 @@ QCPRange QCPGraph2::getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain) 
 QCPRange QCPGraph2::getValueRange(bool& foundRange, QCP::SignDomain inSignDomain,
                                    const QCPRange& inKeyRange) const
 {
+    PROFILE_HERE_N("QCPGraph2::getValueRange");
     if (!mDataSource || mDataSource->empty())
     {
         foundRange = false;
@@ -390,13 +444,15 @@ void QCPGraph2::draw(QCPPainter* painter)
     if (!mKeyAxis || !mValueAxis || !mDataSource)
         return;
 
-    const QCPAbstractDataSource* ds = mPipeline.hasTransform()
-        ? mPipeline.result()
-        : nullptr;
-    if (!ds)
-        ds = mDataSource.get();
+    // Use L2 resampled data if available, otherwise raw data (below threshold)
+    const QCPAbstractDataSource* ds = mL2Result ? mL2Result.get()
+                                      : mNeedsResampling ? nullptr
+                                      : mDataSource.get();
     if (!ds || ds->empty())
         return;
+
+    PROFILE_PASS_VALUE(ds->size());
+
     if (mKeyAxis->range().size() <= 0)
         return;
     if (mLineStyle == lsNone && mScatterStyle.isNone())
@@ -504,6 +560,7 @@ void QCPGraph2::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
 
 void QCPGraph2::onViewportChanged()
 {
+    PROFILE_HERE_N("QCPGraph2::onViewportChanged");
     if (!mKeyAxis || !mValueAxis) return;
     auto* axisRect = mKeyAxis->axisRect();
     if (!axisRect) return;
@@ -516,5 +573,7 @@ void QCPGraph2::onViewportChanged()
     vp.keyLogScale = (mKeyAxis->scaleType() == QCPAxis::stLogarithmic);
     vp.valueLogScale = (mValueAxis->scaleType() == QCPAxis::stLogarithmic);
 
-    mPipeline.onViewportChanged(vp);
+    // L2 resampling is synchronous — immediate response to viewport changes
+    if (mL1Cache)
+        rebuildL2(vp);
 }

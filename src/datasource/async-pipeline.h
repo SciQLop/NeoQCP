@@ -54,7 +54,8 @@ protected:
 
     mutable QMutex mMutex;
     std::any mCache;
-    std::function<void()> mPending;
+    std::function<void()> mPending;  // pre-baked job for data changes
+    bool mPendingViewport = false;   // deferred viewport job: created at dispatch with restored cache
     QCPPipelineScheduler::Priority mPendingPriority = QCPPipelineScheduler::Heavy;
     uint64_t mRunningGeneration = 0;
     bool mJobRunning = false;
@@ -63,6 +64,9 @@ protected:
     bool mWasBusy = false;
 
     std::shared_ptr<std::atomic<bool>> mDestroyed;
+
+public:
+    std::any& cache() { return mCache; }
 };
 
 class QCPAbstractDataSource;
@@ -150,7 +154,8 @@ protected:
     void applyResult(uint64_t, std::any result) override
     {
         if (auto* ptr = std::any_cast<std::shared_ptr<Out>>(&result))
-            mResult = std::move(*ptr);
+            if (*ptr) // keep stale result rather than clearing with nullptr
+                mResult = std::move(*ptr);
     }
 
 private:

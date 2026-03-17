@@ -1,6 +1,7 @@
 #pragma once
 #include "abstract-datasource.h"
 #include "axis/axis.h"
+#include "../Profiling.hpp"
 #include <algorithm>
 #include <cmath>
 #include <QtGlobal>
@@ -58,6 +59,47 @@ QCPRange keyRange(const KC& keys, bool& foundRange, QCP::SignDomain sd = QCP::sd
         foundRange = true;
     }
     return foundRange ? QCPRange(lower, upper) : QCPRange();
+}
+
+// O(1) key range for sorted data (sdBoth), O(log n) for sign-domain filtering.
+template <IndexableNumericRange KC>
+QCPRange keyRangeSorted(const KC& keys, bool& foundRange, QCP::SignDomain sd = QCP::sdBoth)
+{
+    foundRange = false;
+    const int sz = static_cast<int>(std::ranges::size(keys));
+    if (sz == 0) return {};
+
+    if (sd == QCP::sdBoth)
+    {
+        foundRange = true;
+        return QCPRange(static_cast<double>(keys[0]),
+                        static_cast<double>(keys[sz - 1]));
+    }
+
+    // For sdPositive/sdNegative, binary search for the boundary
+    if (sd == QCP::sdPositive)
+    {
+        auto it = std::upper_bound(std::ranges::begin(keys), std::ranges::end(keys),
+                                    0.0, [](double val, const auto& elem) {
+                                        return val < static_cast<double>(elem);
+                                    });
+        if (it == std::ranges::end(keys)) return {};
+        foundRange = true;
+        return QCPRange(static_cast<double>(*it),
+                        static_cast<double>(keys[sz - 1]));
+    }
+    else // sdNegative
+    {
+        auto it = std::lower_bound(std::ranges::begin(keys), std::ranges::end(keys),
+                                    0.0, [](const auto& elem, double val) {
+                                        return static_cast<double>(elem) < val;
+                                    });
+        if (it == std::ranges::begin(keys)) return {};
+        --it;
+        foundRange = true;
+        return QCPRange(static_cast<double>(keys[0]),
+                        static_cast<double>(*it));
+    }
 }
 
 template <IndexableNumericRange KC, IndexableNumericRange VC>
@@ -146,6 +188,7 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
                                     int /*pixelWidth*/,
                                     QCPAxis* keyAxis, QCPAxis* valueAxis)
 {
+    PROFILE_HERE_N("optimizedLineData");
     Q_ASSERT(begin >= 0 && end <= static_cast<int>(std::ranges::size(keys)));
     Q_ASSERT(begin >= 0 && end <= static_cast<int>(std::ranges::size(values)));
     const int dataCount = end - begin;

@@ -54,6 +54,7 @@ private slots:
     void graphResamplerBinMinMaxKeyPositions();
     void graphResamplerBinMinMaxZeroBins();
     void graphResamplerNonFiniteKeysSkipped();
+    void graphResamplerParallelMatchesSingleThreaded();
 
     // Histogram binner
     void bin2dBasicCounts();

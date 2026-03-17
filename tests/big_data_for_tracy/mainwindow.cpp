@@ -4,31 +4,31 @@
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
+    auto* plot = new QCustomPlot(this);
+    plot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom
+                          | QCP::iSelectPlottables | QCP::iSelectAxes);
 
-    auto plotBuilder = [this](std::size_t points= 10'000'000){
-        auto plot = new QCustomPlot(this);
+    constexpr int N = 50'000'000;
+    std::vector<double> keys(N), vals(N);
+    for (int i = 0; i < N; ++i)
+    {
+        double t = i * 1e-6;
+        keys[i] = t;
+        vals[i] = std::sin(t * 6.28 * 0.5)
+                + 0.3 * std::sin(t * 6.28 * 50.0)
+                + 0.1 * std::sin(t * 6.28 * 5000.0);
+    }
 
-        plot->addGraph();
+    auto* g = new QCPGraph2(plot->xAxis, plot->yAxis);
+    g->setData(std::move(keys), std::move(vals));
+    g->setPen(QPen(QColor(31, 119, 180), 1));
 
-        // Simulate a large data set
-        for (auto i = 0UL; i < points; ++i) {
-            plot->graph(0)->addData(i, qSin(i * 0.001));
-        }
-        plot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom | QCP::iSelectPlottables | QCP::iSelectAxes | QCP::iSelectLegend);
-        plot->xAxis->rescale();
-        plot->yAxis->rescale();
-        plot->plotLayout()->insertRow(0);
-        plot->plotLayout()->addElement(0,0, new QCPTextElement(plot, "Plot"));
-        plot->replot();
-        return plot;
-    };
-    setCentralWidget(new QWidget(this));
-    mLayout = new QVBoxLayout(centralWidget());
-    mLayout->setContentsMargins(0, 0, 0, 0);
-    mLayout->setSpacing(0);
-    mLayout->addWidget(plotBuilder(10'000'000));
-    mLayout->addWidget(plotBuilder(10'000'000));
+    plot->xAxis->setLabel("Time (s)");
+    plot->yAxis->setLabel("Amplitude");
+    plot->rescaleAxes();
+    plot->replot();
 
+    setCentralWidget(plot);
 }
 
 MainWindow::~MainWindow()

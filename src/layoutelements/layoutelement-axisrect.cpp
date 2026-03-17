@@ -32,6 +32,7 @@
 #include "../painting/painter.h"
 #include "../plottables/plottable.h"
 #include "../plottables/plottable-graph.h"
+#include "../Profiling.hpp"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPAxisRect
@@ -1345,6 +1346,7 @@ void QCPAxisRect::mouseReleaseEvent(QMouseEvent* event, const QPointF& startPos)
 */
 void QCPAxisRect::wheelEvent(QWheelEvent* event)
 {
+    PROFILE_HERE_N("QCPAxisRect::wheelEvent");
     const double delta = event->angleDelta().y();
     const QPointF pos = event->position();
 
