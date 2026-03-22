@@ -96,8 +96,8 @@ void QCPColormapRenderer::updateMapImage(const QCPColorMapData* data, NormalizeF
 
     // Keep native ARGB32 — matches BGRA8 texture format with no per-upload channel swizzle.
     // QRhi handles the fallback swizzle if only RGBA8 is available.
-    mMapImage = std::move(argbImage);
     mFlippedMapImage = {};
+    mMapImage = std::move(argbImage);
     mMapImageInvalidated = false;
 }
 
@@ -116,7 +116,7 @@ void QCPColormapRenderer::draw(QCPPainter* painter, QCPAxis* keyAxis, QCPAxis* v
 
     bool mirrorX = keyAxis->rangeReversed();
     bool mirrorY = valueAxis->rangeReversed();
-    Qt::Orientations flips;
+    Qt::Orientations flips {};
     if (mirrorX) flips |= Qt::Horizontal;
     if (mirrorY) flips |= Qt::Vertical;
 
