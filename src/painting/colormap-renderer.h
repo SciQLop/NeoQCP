@@ -48,11 +48,15 @@ public:
     const QImage& mapImage() const { return mMapImage; }
 
 private:
+    const QImage& flippedMapImage(Qt::Orientations flips);
+
     QCPAbstractPlottable* mOwner;
     QCPColorGradient mGradient;
     QCPRange mDataRange;
     QCPAxis::ScaleType mDataScaleType = QCPAxis::stLinear;
     QImage mMapImage;
+    QImage mFlippedMapImage;
+    Qt::Orientations mLastFlips {};
     bool mMapImageInvalidated = true;
     QCPColorScale* mColorScale = nullptr;
     QCPColormapRhiLayer* mRhiLayer = nullptr;

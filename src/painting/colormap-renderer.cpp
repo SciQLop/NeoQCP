@@ -97,6 +97,7 @@ void QCPColormapRenderer::updateMapImage(const QCPColorMapData* data, NormalizeF
     // Keep native ARGB32 — matches BGRA8 texture format with no per-upload channel swizzle.
     // QRhi handles the fallback swizzle if only RGBA8 is available.
     mMapImage = std::move(argbImage);
+    mFlippedMapImage = {};
     mMapImageInvalidated = false;
 }
 
@@ -124,7 +125,7 @@ void QCPColormapRenderer::draw(QCPPainter* painter, QCPAxis* keyAxis, QCPAxis* v
     {
         if (auto* crl = ensureRhiLayer())
         {
-            crl->setImage(mMapImage.flipped(flips));
+            crl->setImage(flippedMapImage(flips));
             crl->setQuadRect(imageRect.normalized());
             crl->setLayer(mOwner->layer());
 
@@ -143,7 +144,17 @@ void QCPColormapRenderer::draw(QCPPainter* painter, QCPAxis* keyAxis, QCPAxis* v
         }
     }
 
-    painter->drawImage(imageRect, mMapImage.flipped(flips));
+    painter->drawImage(imageRect, flippedMapImage(flips));
+}
+
+const QImage& QCPColormapRenderer::flippedMapImage(Qt::Orientations flips)
+{
+    if (mFlippedMapImage.isNull() || flips != mLastFlips)
+    {
+        mFlippedMapImage = flips ? mMapImage.flipped(flips) : mMapImage;
+        mLastFlips = flips;
+    }
+    return mFlippedMapImage;
 }
 
 QCPColormapRhiLayer* QCPColormapRenderer::ensureRhiLayer()
