@@ -1,7 +1,10 @@
+#include <utility>
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDebug>
 #include <QDoubleSpinBox>
+#include <QFileDialog>
 #include <QGroupBox>
 #include <QLabel>
 #include <QMainWindow>
@@ -30,7 +33,28 @@ static QWidget* wrapPlot(QCustomPlot* plot)
     auto* w = new QWidget;
     auto* lay = new QVBoxLayout(w);
     lay->setContentsMargins(0, 0, 0, 0);
-    lay->addWidget(plot);
+    lay->addWidget(plot, 1);
+
+    auto* btnRow = new QHBoxLayout;
+    btnRow->addStretch();
+    for (auto [label, suffix] : {std::pair{"Export PNG", ".png"}, {"Export PDF", ".pdf"}})
+    {
+        auto* btn = new QPushButton(label, w);
+        QObject::connect(btn, &QPushButton::clicked, plot, [plot, suffix]() {
+            const bool isPdf = (QLatin1String(suffix) == QLatin1String(".pdf"));
+            QString filter = isPdf ? QStringLiteral("PDF (*.pdf)") : QStringLiteral("PNG (*.png)");
+            QString path = QFileDialog::getSaveFileName(plot, QStringLiteral("Export"),
+                                                        QStringLiteral("plot%1").arg(suffix), filter);
+            if (path.isEmpty()) return;
+            if (!path.endsWith(QLatin1String(suffix), Qt::CaseInsensitive))
+                path += QLatin1String(suffix);
+            bool ok = isPdf ? plot->savePdf(path) : plot->savePng(path, 0, 0, 2.0);
+            if (!ok) qDebug() << "Export failed:" << path;
+        });
+        btnRow->addWidget(btn);
+    }
+    lay->addLayout(btnRow);
+
     return w;
 }
 
