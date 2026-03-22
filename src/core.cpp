@@ -426,7 +426,9 @@ QCustomPlot::QCustomPlot(QWidget* parent)
         , mReplotTimeAverage(0)
 {
     setAttribute(Qt::WA_NoMousePropagation);
-    setSampleCount(4); // 4x MSAA for smooth GPU-rendered geometry
+    // Default MSAA off — HiDPI displays already provide sub-pixel smoothness, and 4x
+    // MSAA quadruples memory bandwidth. Users can override via setSampleCount() if needed.
+    setSampleCount(1);
     setFocusPolicy(Qt::ClickFocus);
     setMouseTracking(true);
     QLocale currentLocale = locale();
@@ -2666,10 +2668,7 @@ void QCustomPlot::render(QRhiCommandBuffer* cb)
 
     cb->beginPass(renderTarget(), clearColor, { 1.0f, 0 }, updates);
 
-    cb->setGraphicsPipeline(mCompositePipeline);
-    cb->setViewport({ 0, 0, float(outputSize.width()), float(outputSize.height()) });
     const QRhiCommandBuffer::VertexInput vbufBinding(mQuadVertexBuffer, 0);
-    cb->setVertexInput(0, 1, &vbufBinding, mQuadIndexBuffer, 0, QRhiCommandBuffer::IndexUInt16);
 
     // Iterate over layers (not paint buffers) — mPaintBuffers and mLayers are NOT 1:1.
     // Multiple logical layers share a single paint buffer. Track which buffers we've
@@ -2685,26 +2684,25 @@ void QCustomPlot::render(QRhiCommandBuffer* cb)
             {
                 compositedBuffers.insert(pb.data());
                 auto* rhiBuffer = static_cast<QCPPaintBufferRhi*>(pb.data());
+                if (rhiBuffer->texture())
                 {
-                    if (rhiBuffer->texture())
+                    if (!rhiBuffer->srb() || !rhiBuffer->srbMatchesTexture())
                     {
-                        if (!rhiBuffer->srb() || !rhiBuffer->srbMatchesTexture())
-                        {
-                            auto* srb = mRhi->newShaderResourceBindings();
-                            srb->setBindings({
-                                QRhiShaderResourceBinding::sampledTexture(
-                                    0, QRhiShaderResourceBinding::FragmentStage,
-                                    rhiBuffer->texture(), mSampler)
-                            });
-                            srb->create();
-                            rhiBuffer->setSrb(srb, rhiBuffer->texture());
-                        }
-                        cb->setGraphicsPipeline(mCompositePipeline);
-                        cb->setShaderResources(rhiBuffer->srb());
-                        cb->setVertexInput(0, 1, &vbufBinding, mQuadIndexBuffer, 0,
-                                           QRhiCommandBuffer::IndexUInt16);
-                        cb->drawIndexed(6);
+                        auto* srb = mRhi->newShaderResourceBindings();
+                        srb->setBindings({
+                            QRhiShaderResourceBinding::sampledTexture(
+                                0, QRhiShaderResourceBinding::FragmentStage,
+                                rhiBuffer->texture(), mSampler)
+                        });
+                        srb->create();
+                        rhiBuffer->setSrb(srb, rhiBuffer->texture());
                     }
+                    cb->setGraphicsPipeline(mCompositePipeline);
+                    cb->setViewport({0, 0, float(outputSize.width()), float(outputSize.height())});
+                    cb->setShaderResources(rhiBuffer->srb());
+                    cb->setVertexInput(0, 1, &vbufBinding, mQuadIndexBuffer, 0,
+                                       QRhiCommandBuffer::IndexUInt16);
+                    cb->drawIndexed(6);
                 }
             }
         }
@@ -2713,29 +2711,14 @@ void QCustomPlot::render(QRhiCommandBuffer* cb)
         for (auto* crl : mColormapRhiLayers)
         {
             if (crl->layer() == layer && crl->hasContent())
-            {
                 crl->render(cb, outputSize);
-
-                cb->setGraphicsPipeline(mCompositePipeline);
-                cb->setViewport({0, 0, float(outputSize.width()), float(outputSize.height())});
-                cb->setVertexInput(0, 1, &vbufBinding, mQuadIndexBuffer, 0,
-                                   QRhiCommandBuffer::IndexUInt16);
-            }
         }
 
         // Draw GPU plottable geometry for this layer (after its paint buffer)
         if (auto* prl = mPlottableRhiLayers.value(layer, nullptr))
         {
             if (prl->hasGeometry())
-            {
                 prl->render(cb, outputSize);
-
-                // Restore composite pipeline state for next layer
-                cb->setGraphicsPipeline(mCompositePipeline);
-                cb->setViewport({0, 0, float(outputSize.width()), float(outputSize.height())});
-                cb->setVertexInput(0, 1, &vbufBinding, mQuadIndexBuffer, 0,
-                                   QRhiCommandBuffer::IndexUInt16);
-            }
         }
     }
 

@@ -90,8 +90,9 @@ void QCPPaintBufferRhi::reallocateBuffer()
 
     QSize pixelSize = mSize * mDevicePixelRatio;
 
-    // ARGB32 is QPainter's native format — avoids per-pixel channel swizzle on every draw op.
-    // QRhi converts to RGBA8 once at upload time, which is cheaper than swizzling every paint call.
+    // ARGB32_Premultiplied is QPainter's native format (BGRA byte order on little-endian).
+    // Using a BGRA8 texture avoids the per-upload CPU swizzle that RGBA8 would require.
+    // Especially important on Metal (macOS) where there's no driver-side BGRA→RGBA fast path.
     mStagingImage = QImage(pixelSize, QImage::Format_ARGB32_Premultiplied);
     mStagingImage.setDevicePixelRatio(mDevicePixelRatio);
     mStagingImage.fill(Qt::transparent);
@@ -103,7 +104,10 @@ void QCPPaintBufferRhi::reallocateBuffer()
     mTexture = nullptr;
     if (mRhi)
     {
-        mTexture = mRhi->newTexture(QRhiTexture::RGBA8, pixelSize);
+        const auto fmt = mRhi->isTextureFormatSupported(QRhiTexture::BGRA8)
+            ? QRhiTexture::BGRA8
+            : QRhiTexture::RGBA8;
+        mTexture = mRhi->newTexture(fmt, pixelSize);
         if (!mTexture->create())
         {
             qDebug() << Q_FUNC_INFO << "Failed to create RHI texture";

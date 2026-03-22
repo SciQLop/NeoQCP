@@ -145,8 +145,19 @@ void QCPColormapRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
     if (!mTexture || mTextureSize != imgSize)
     {
         delete mTexture;
-        mTexture = mRhi->newTexture(QRhiTexture::RGBA8, imgSize);
-        mTexture->create();
+        const auto fmt = mRhi->isTextureFormatSupported(QRhiTexture::BGRA8)
+            ? QRhiTexture::BGRA8
+            : QRhiTexture::RGBA8;
+        mTexture = mRhi->newTexture(fmt, imgSize);
+        if (!mTexture->create())
+        {
+            qDebug() << "Failed to create colormap RHI texture";
+            delete mTexture;
+            mTexture = nullptr;
+            delete mSrb;
+            mSrb = nullptr;
+            return;
+        }
         mTextureSize = imgSize;
         mTextureDirty = true;
         textureRecreated = true;

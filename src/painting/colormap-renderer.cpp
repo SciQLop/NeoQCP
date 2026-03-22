@@ -7,6 +7,7 @@
 #include <layoutelements/layoutelement-axisrect.h>
 #include <layer.h>
 #include <Profiling.hpp>
+#include <utility>
 #include <vector>
 
 QCPColormapRenderer::QCPColormapRenderer(QCPAbstractPlottable* owner)
@@ -93,7 +94,9 @@ void QCPColormapRenderer::updateMapImage(const QCPColorMapData* data, NormalizeF
                            1, mDataScaleType == QCPAxis::stLogarithmic);
     }
 
-    mMapImage = argbImage.convertToFormat(QImage::Format_RGBA8888_Premultiplied);
+    // Keep native ARGB32 — matches BGRA8 texture format with no per-upload channel swizzle.
+    // QRhi handles the fallback swizzle if only RGBA8 is available.
+    mMapImage = std::move(argbImage);
     mMapImageInvalidated = false;
 }
 
@@ -140,8 +143,7 @@ void QCPColormapRenderer::draw(QCPPainter* painter, QCPAxis* keyAxis, QCPAxis* v
         }
     }
 
-    painter->drawImage(imageRect, mMapImage.convertToFormat(
-        QImage::Format_ARGB32_Premultiplied).flipped(flips));
+    painter->drawImage(imageRect, mMapImage.flipped(flips));
 }
 
 QCPColormapRhiLayer* QCPColormapRenderer::ensureRhiLayer()
