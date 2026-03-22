@@ -2553,9 +2553,7 @@ int QCPAxisPainterPrivate::size()
     // degrees):
     if (!label.isEmpty())
     {
-        QFontMetrics fontMetrics(labelFont);
-        QRect bounds;
-        bounds = fontMetrics.boundingRect(
+        QRect bounds = fontMetricsFor(labelFont).boundingRect(
             0, 0, 0, 0, Qt::TextDontClip | Qt::AlignHCenter | Qt::AlignVCenter, label);
         result += bounds.height() + labelPadding;
     }
@@ -2783,7 +2781,7 @@ void QCPAxisPainterPrivate::drawTickLabel(QCPPainter* painter, double x, double 
   exponent if necessary (member substituteExponent) and calculates appropriate bounding boxes.
 */
 QCPAxisPainterPrivate::TickLabelData
-QCPAxisPainterPrivate::getTickLabelData(const QFont& font, const QString& text) const
+QCPAxisPainterPrivate::getTickLabelData(const QFont& font, const QString& text)
 {
     TickLabelData result;
 
@@ -2845,13 +2843,13 @@ QCPAxisPainterPrivate::getTickLabelData(const QFont& font, const QString& text) 
         else
             result.expFont.setPixelSize(int(result.expFont.pixelSize() * 0.75));
         // calculate bounding rects of base part(s), exponent part and total one:
-        result.baseBounds = QFontMetrics(result.baseFont)
+        result.baseBounds = fontMetricsFor(result.baseFont)
                                 .boundingRect(0, 0, 0, 0, Qt::TextDontClip, result.basePart);
-        result.expBounds = QFontMetrics(result.expFont)
+        result.expBounds = fontMetricsFor(result.expFont)
                                .boundingRect(0, 0, 0, 0, Qt::TextDontClip, result.expPart);
         if (!result.suffixPart.isEmpty())
             result.suffixBounds
-                = QFontMetrics(result.baseFont)
+                = fontMetricsFor(result.baseFont)
                       .boundingRect(0, 0, 0, 0, Qt::TextDontClip, result.suffixPart);
         result.totalBounds = result.baseBounds.adjusted(
             0, 0, result.expBounds.width() + result.suffixBounds.width() + 2,
@@ -2862,7 +2860,7 @@ QCPAxisPainterPrivate::getTickLabelData(const QFont& font, const QString& text) 
     {
         result.basePart = text;
         result.totalBounds
-            = QFontMetrics(result.baseFont)
+            = fontMetricsFor(result.baseFont)
                   .boundingRect(0, 0, 0, 0, Qt::TextDontClip | Qt::AlignHCenter, result.basePart);
     }
     result.totalBounds.moveTopLeft(
@@ -3024,7 +3022,7 @@ QPointF QCPAxisPainterPrivate::getTickLabelDrawOffset(const TickLabelData& label
   smaller width/height.
 */
 void QCPAxisPainterPrivate::getMaxTickLabelSize(const QFont& font, const QString& text,
-                                                QSize* tickLabelsSize) const
+                                                QSize* tickLabelsSize)
 {
     // note: this function must return the same tick label sizes as the placeTickLabel function.
     QSize finalSize;
@@ -3045,4 +3043,14 @@ void QCPAxisPainterPrivate::getMaxTickLabelSize(const QFont& font, const QString
         tickLabelsSize->setWidth(finalSize.width());
     if (finalSize.height() > tickLabelsSize->height())
         tickLabelsSize->setHeight(finalSize.height());
+}
+
+const QFontMetrics& QCPAxisPainterPrivate::fontMetricsFor(const QFont& font)
+{
+    if (font != mCachedMetricsFont)
+    {
+        mCachedMetricsFont = font;
+        mCachedFontMetrics = QFontMetrics(font);
+    }
+    return mCachedFontMetrics;
 }

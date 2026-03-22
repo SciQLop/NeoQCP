@@ -454,7 +454,7 @@ void QCPLabelPainterPrivate::drawText(QCPPainter* painter, const QPointF& pos,
 */
 QCPLabelPainterPrivate::LabelData
 QCPLabelPainterPrivate::getTickLabelData(const QFont& font, const QColor& color, double rotation,
-                                         AnchorSide side, const QString& text) const
+                                         AnchorSide side, const QString& text)
 {
     LabelData result;
     result.rotation = rotation;
@@ -491,7 +491,7 @@ QCPLabelPainterPrivate::getTickLabelData(const QFont& font, const QColor& color,
             + 0.05); // QFontMetrics.boundingRect has a bug for exact point sizes that make the
                      // results oscillate due to internal rounding
 
-    QFontMetrics baseFontMetrics(result.baseFont);
+    const auto& baseFontMetrics = fontMetricsFor(result.baseFont);
     if (useBeautifulPowers)
     {
         // split text into parts of number/symbol that will be drawn normally and part that will be
@@ -522,11 +522,11 @@ QCPLabelPainterPrivate::getTickLabelData(const QFont& font, const QColor& color,
         // calculate bounding rects of base part(s), exponent part and total one:
         result.baseBounds
             = baseFontMetrics.boundingRect(0, 0, 0, 0, Qt::TextDontClip, result.basePart);
-        result.expBounds = QFontMetrics(result.expFont)
+        result.expBounds = fontMetricsFor(result.expFont)
                                .boundingRect(0, 0, 0, 0, Qt::TextDontClip, result.expPart);
         if (!result.suffixPart.isEmpty())
             result.suffixBounds
-                = QFontMetrics(result.baseFont)
+                = fontMetricsFor(result.baseFont)
                       .boundingRect(0, 0, 0, 0, Qt::TextDontClip, result.suffixPart);
         result.totalBounds = result.baseBounds.adjusted(
             0, 0, result.expBounds.width() + result.suffixBounds.width() + 2,
@@ -735,9 +735,19 @@ QCPLabelPainterPrivate::rotationCorrectedSide(AnchorSide side, double rotation) 
 
 void QCPLabelPainterPrivate::analyzeFontMetrics()
 {
-    const QFontMetrics fm(mFont);
+    const auto& fm = fontMetricsFor(mFont);
     mLetterCapHeight
         = fm.tightBoundingRect(QLatin1String("8"))
               .height(); // this method is slow, that's why we query it only upon font change
     mLetterDescent = fm.descent();
+}
+
+const QFontMetrics& QCPLabelPainterPrivate::fontMetricsFor(const QFont& font)
+{
+    if (font != mCachedMetricsFont)
+    {
+        mCachedMetricsFont = font;
+        mCachedFontMetrics = QFontMetrics(font);
+    }
+    return mCachedFontMetrics;
 }

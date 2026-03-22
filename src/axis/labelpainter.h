@@ -174,6 +174,8 @@ protected:
     QCache<QString, CachedLabel> mLabelCache;
     QRect mAxisSelectionBox, mTickLabelsSelectionBox, mLabelSelectionBox;
     int mLetterCapHeight, mLetterDescent;
+    QFont mCachedMetricsFont;
+    QFontMetrics mCachedFontMetrics {QFont()};
 
     // introduced virtual methods:
     virtual void drawLabelMaybeCached(QCPPainter* painter, const QFont& font, const QColor& color,
@@ -186,7 +188,8 @@ protected:
     QPointF getAnchorPos(const QPointF& tickPos);
     void drawText(QCPPainter* painter, const QPointF& pos, const LabelData& labelData) const;
     LabelData getTickLabelData(const QFont& font, const QColor& color, double rotation,
-                               AnchorSide side, const QString& text) const;
+                               AnchorSide side, const QString& text);
+    const QFontMetrics& fontMetricsFor(const QFont& font);
     void applyAnchorTransform(LabelData& labelData) const;
     // void getMaxTickLabelSize(const QFont &font, const QString &text, QSize *tickLabelsSize)
     // const;

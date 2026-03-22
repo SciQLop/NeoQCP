@@ -544,17 +544,20 @@ protected:
                                     // changed parameters
     QCache<QString, CachedLabel> mLabelCache;
     QRect mAxisSelectionBox, mTickLabelsSelectionBox, mLabelSelectionBox;
+    QFont mCachedMetricsFont;
+    QFontMetrics mCachedFontMetrics {QFont()};
 
     virtual QByteArray generateLabelParameterHash() const;
+    const QFontMetrics& fontMetricsFor(const QFont& font);
 
     virtual void placeTickLabel(QCPPainter* painter, double position, int distanceToAxis,
                                 const QString& text, QSize* tickLabelsSize);
     virtual void drawTickLabel(QCPPainter* painter, double x, double y,
                                const TickLabelData& labelData) const;
-    virtual TickLabelData getTickLabelData(const QFont& font, const QString& text) const;
+    virtual TickLabelData getTickLabelData(const QFont& font, const QString& text);
     virtual QPointF getTickLabelDrawOffset(const TickLabelData& labelData) const;
     virtual void getMaxTickLabelSize(const QFont& font, const QString& text,
-                                     QSize* tickLabelsSize) const;
+                                     QSize* tickLabelsSize);
 };
 
 #endif // QCP_AXIS_H
