@@ -55,8 +55,8 @@ QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
             double vpValSz = vp.valueRange.size();
             double yFrac = vp.valueLogScale ? logFrac(yOut, vp.valueRange)
                                             : (vpValSz > 0 ? yOut.size() / vpValSz : 1.0);
-            int pixW = std::max(1, static_cast<int>(vp.plotWidthPx * xFrac));
-            int pixH = std::max(1, static_cast<int>(vp.plotHeightPx * yFrac));
+            int pixW = std::clamp(static_cast<int>(vp.plotWidthPx * xFrac), 1, 32768);
+            int pixH = std::clamp(static_cast<int>(vp.plotHeightPx * yFrac), 1, 32768);
 
             int visibleSrcCols = xEnd - xBegin;
             int w = std::clamp(visibleSrcCols, pixW, pixW * 4);

@@ -231,8 +231,18 @@ void QCPSpanRhiLayer::rebuildGeometry(float dpr, int outputHeight, bool isYUpInN
 
 void QCPSpanRhiLayer::appendVSpanGeometry(QCPItemVSpan* vspan, QCPAxisRect* ar)
 {
-    float dataX0 = float(vspan->lowerEdge->coords().x());
-    float dataX1 = float(vspan->upperEdge->coords().x());
+    // Use the axis rect's own key axis for coordinate conversion (not the span's
+    // position axis, which may belong to a different axis rect in multi-rect layouts).
+    auto* keyAxis = ar->axis(QCPAxis::atBottom);
+    if (!keyAxis)
+        keyAxis = ar->axis(QCPAxis::atTop);
+    if (!keyAxis)
+        return;
+
+    // Convert data coords to pixels on the CPU in double precision to avoid
+    // float32 catastrophic cancellation with large values (e.g. Unix timestamps).
+    float pixX0 = float(keyAxis->coordToPixel(vspan->lowerEdge->coords().x()));
+    float pixX1 = float(keyAxis->coordToPixel(vspan->upperEdge->coords().x()));
     float pixTop = float(ar->top());
     float pixBot = float(ar->top() + ar->height());
 
@@ -241,9 +251,9 @@ void QCPSpanRhiLayer::appendVSpanGeometry(QCPItemVSpan* vspan, QCPAxisRect* ar)
     if (fillBrush.style() != Qt::NoBrush && fillColor[3] > 0.0f)
     {
         appendQuad(mStagingVertices,
-                   dataX0, pixTop, dataX1, pixTop,
-                   dataX0, pixBot, dataX1, pixBot,
-                   fillColor, 0, 0, 0, 0, 1);
+                   pixX0, pixTop, pixX1, pixTop,
+                   pixX0, pixBot, pixX1, pixBot,
+                   fillColor, 0, 0, 0, 1, 1);
     }
 
     const QPen& borderPen = vspan->selected() ? vspan->selectedBorderPen() : vspan->borderPen();
@@ -253,18 +263,24 @@ void QCPSpanRhiLayer::appendVSpanGeometry(QCPItemVSpan* vspan, QCPAxisRect* ar)
     if (borderPen.style() != Qt::NoPen && halfW > 0.0f)
     {
         appendBorder(mStagingVertices,
-                     dataX0, pixTop, dataX0, pixBot,
-                     borderColor, 1, 0, halfW, 0, 1);
+                     pixX0, pixTop, pixX0, pixBot,
+                     borderColor, 1, 0, halfW, 1, 1);
         appendBorder(mStagingVertices,
-                     dataX1, pixTop, dataX1, pixBot,
-                     borderColor, 1, 0, halfW, 0, 1);
+                     pixX1, pixTop, pixX1, pixBot,
+                     borderColor, 1, 0, halfW, 1, 1);
     }
 }
 
 void QCPSpanRhiLayer::appendHSpanGeometry(QCPItemHSpan* hspan, QCPAxisRect* ar)
 {
-    float dataY0 = float(hspan->lowerEdge->coords().y());
-    float dataY1 = float(hspan->upperEdge->coords().y());
+    auto* valAxis = ar->axis(QCPAxis::atLeft);
+    if (!valAxis)
+        valAxis = ar->axis(QCPAxis::atRight);
+    if (!valAxis)
+        return;
+
+    float pixY0 = float(valAxis->coordToPixel(hspan->lowerEdge->coords().y()));
+    float pixY1 = float(valAxis->coordToPixel(hspan->upperEdge->coords().y()));
     float pixLeft = float(ar->left());
     float pixRight = float(ar->left() + ar->width());
 
@@ -273,9 +289,9 @@ void QCPSpanRhiLayer::appendHSpanGeometry(QCPItemHSpan* hspan, QCPAxisRect* ar)
     if (fillBrush.style() != Qt::NoBrush && fillColor[3] > 0.0f)
     {
         appendQuad(mStagingVertices,
-                   pixLeft, dataY0, pixRight, dataY0,
-                   pixLeft, dataY1, pixRight, dataY1,
-                   fillColor, 0, 0, 0, 1, 0);
+                   pixLeft, pixY0, pixRight, pixY0,
+                   pixLeft, pixY1, pixRight, pixY1,
+                   fillColor, 0, 0, 0, 1, 1);
     }
 
     const QPen& borderPen = hspan->selected() ? hspan->selectedBorderPen() : hspan->borderPen();
@@ -285,29 +301,38 @@ void QCPSpanRhiLayer::appendHSpanGeometry(QCPItemHSpan* hspan, QCPAxisRect* ar)
     if (borderPen.style() != Qt::NoPen && halfW > 0.0f)
     {
         appendBorder(mStagingVertices,
-                     pixLeft, dataY0, pixRight, dataY0,
-                     borderColor, 0, 1, halfW, 1, 0);
+                     pixLeft, pixY0, pixRight, pixY0,
+                     borderColor, 0, 1, halfW, 1, 1);
         appendBorder(mStagingVertices,
-                     pixLeft, dataY1, pixRight, dataY1,
-                     borderColor, 0, 1, halfW, 1, 0);
+                     pixLeft, pixY1, pixRight, pixY1,
+                     borderColor, 0, 1, halfW, 1, 1);
     }
 }
 
 void QCPSpanRhiLayer::appendRSpanGeometry(QCPItemRSpan* rspan, [[maybe_unused]] QCPAxisRect* ar)
 {
-    float dataLeft = float(rspan->leftEdge->coords().x());
-    float dataRight = float(rspan->rightEdge->coords().x());
-    float dataTop = float(rspan->topEdge->coords().y());
-    float dataBot = float(rspan->bottomEdge->coords().y());
+    auto* keyAxis = ar->axis(QCPAxis::atBottom);
+    if (!keyAxis)
+        keyAxis = ar->axis(QCPAxis::atTop);
+    auto* valAxis = ar->axis(QCPAxis::atLeft);
+    if (!valAxis)
+        valAxis = ar->axis(QCPAxis::atRight);
+    if (!keyAxis || !valAxis)
+        return;
+
+    float pixLeft = float(keyAxis->coordToPixel(rspan->leftEdge->coords().x()));
+    float pixRight = float(keyAxis->coordToPixel(rspan->rightEdge->coords().x()));
+    float pixTop = float(valAxis->coordToPixel(rspan->topEdge->coords().y()));
+    float pixBot = float(valAxis->coordToPixel(rspan->bottomEdge->coords().y()));
 
     const QBrush& fillBrush = rspan->selected() ? rspan->selectedBrush() : rspan->brush();
     auto fillColor = qcp::rhi::premultipliedColor(fillBrush.color());
     if (fillBrush.style() != Qt::NoBrush && fillColor[3] > 0.0f)
     {
         appendQuad(mStagingVertices,
-                   dataLeft, dataTop, dataRight, dataTop,
-                   dataLeft, dataBot, dataRight, dataBot,
-                   fillColor, 0, 0, 0, 0, 0);
+                   pixLeft, pixTop, pixRight, pixTop,
+                   pixLeft, pixBot, pixRight, pixBot,
+                   fillColor, 0, 0, 0, 1, 1);
     }
 
     const QPen& borderPen = rspan->selected() ? rspan->selectedBorderPen() : rspan->borderPen();
@@ -317,17 +342,17 @@ void QCPSpanRhiLayer::appendRSpanGeometry(QCPItemRSpan* rspan, [[maybe_unused]] 
     if (borderPen.style() != Qt::NoPen && halfW > 0.0f)
     {
         appendBorder(mStagingVertices,
-                     dataLeft, dataTop, dataLeft, dataBot,
-                     borderColor, 1, 0, halfW, 0, 0);
+                     pixLeft, pixTop, pixLeft, pixBot,
+                     borderColor, 1, 0, halfW, 1, 1);
         appendBorder(mStagingVertices,
-                     dataRight, dataTop, dataRight, dataBot,
-                     borderColor, 1, 0, halfW, 0, 0);
+                     pixRight, pixTop, pixRight, pixBot,
+                     borderColor, 1, 0, halfW, 1, 1);
         appendBorder(mStagingVertices,
-                     dataLeft, dataTop, dataRight, dataTop,
-                     borderColor, 0, 1, halfW, 0, 0);
+                     pixLeft, pixTop, pixRight, pixTop,
+                     borderColor, 0, 1, halfW, 1, 1);
         appendBorder(mStagingVertices,
-                     dataLeft, dataBot, dataRight, dataBot,
-                     borderColor, 0, 1, halfW, 0, 0);
+                     pixLeft, pixBot, pixRight, pixBot,
+                     borderColor, 0, 1, halfW, 1, 1);
     }
 }
 
@@ -337,20 +362,11 @@ void QCPSpanRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
 {
     PROFILE_HERE_N("QCPSpanRhiLayer::uploadResources");
 
-    // Detect layout changes: axis rect pixel bounds may shift due to auto-margins
-    if (!mGeometryDirty)
-    {
-        for (const auto& group : mDrawGroups)
-        {
-            QRect current(group.axisRect->left(), group.axisRect->top(),
-                          group.axisRect->width(), group.axisRect->height());
-            if (mLastAxisRectBounds.value(group.axisRect) != current)
-            {
-                mGeometryDirty = true;
-                break;
-            }
-        }
-    }
+    // Always rebuild geometry: spans use pre-computed pixel coordinates (CPU-side
+    // double→float conversion to avoid float32 precision loss with large values
+    // like Unix timestamps), so geometry must track axis range and layout changes.
+    // Span vertex count is tiny (6-12 per span), so unconditional rebuild is cheap.
+    mGeometryDirty = true;
 
     if (mGeometryDirty)
     {
