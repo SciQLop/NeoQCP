@@ -343,6 +343,14 @@ bool QCPDataLocator::locateColorMap2AtKey(double key, double value)
     if (!src || src->xSize() == 0 || src->ySize() == 0)
         return false;
 
+    bool foundX = false, foundY = false;
+    const QCPRange xr = src->xRange(foundX);
+    const QCPRange yr = src->yRange(foundY);
+    if (foundX && (key < xr.lower || key > xr.upper))
+        return false;
+    if (foundY && (value < yr.lower || value > yr.upper))
+        return false;
+
     int xi = std::clamp(src->findXBegin(key), 0, src->xSize() - 1);
     if (xi + 1 < src->xSize()
         && std::abs(src->xAt(xi + 1) - key) < std::abs(src->xAt(xi) - key))
@@ -356,8 +364,8 @@ bool QCPDataLocator::locateColorMap2AtKey(double key, double value)
         if (dy < bestDy) { bestDy = dy; yj = j; }
     }
 
-    mKey = key;
-    mValue = value;
+    mKey = src->xAt(xi);
+    mValue = src->yAt(xi, yj);
     mData = src->zAt(xi, yj);
     mDataIndex = xi * src->ySize() + yj;
     mHitPlottable = mPlottable;
@@ -372,6 +380,11 @@ bool QCPDataLocator::locateColorMapAtKey(double key, double value)
     if (!mapData || mapData->isEmpty())
         return false;
 
+    const QCPRange kr = mapData->keyRange();
+    const QCPRange vr = mapData->valueRange();
+    if (key < kr.lower || key > kr.upper || value < vr.lower || value > vr.upper)
+        return false;
+
     int keyIndex, valueIndex;
     mapData->coordToCell(key, value, &keyIndex, &valueIndex);
 
@@ -379,8 +392,10 @@ bool QCPDataLocator::locateColorMapAtKey(double key, double value)
         || valueIndex < 0 || valueIndex >= mapData->valueSize())
         return false;
 
-    mKey = key;
-    mValue = value;
+    double cellKey, cellValue;
+    mapData->cellToCoord(keyIndex, valueIndex, &cellKey, &cellValue);
+    mKey = cellKey;
+    mValue = cellValue;
     mData = mapData->cell(keyIndex, valueIndex);
     mDataIndex = keyIndex * mapData->valueSize() + valueIndex;
     mHitPlottable = mPlottable;
@@ -395,6 +410,11 @@ bool QCPDataLocator::locateHistogram2DAtKey(double key, double value)
     if (!mapData || mapData->isEmpty())
         return false;
 
+    const QCPRange kr = mapData->keyRange();
+    const QCPRange vr = mapData->valueRange();
+    if (key < kr.lower || key > kr.upper || value < vr.lower || value > vr.upper)
+        return false;
+
     int keyIndex, valueIndex;
     mapData->coordToCell(key, value, &keyIndex, &valueIndex);
 
@@ -402,8 +422,10 @@ bool QCPDataLocator::locateHistogram2DAtKey(double key, double value)
         || valueIndex < 0 || valueIndex >= mapData->valueSize())
         return false;
 
-    mKey = key;
-    mValue = value;
+    double cellKey, cellValue;
+    mapData->cellToCoord(keyIndex, valueIndex, &cellKey, &cellValue);
+    mKey = cellKey;
+    mValue = cellValue;
     mData = mapData->cell(keyIndex, valueIndex);
     mDataIndex = keyIndex * mapData->valueSize() + valueIndex;
     mHitPlottable = mPlottable;
