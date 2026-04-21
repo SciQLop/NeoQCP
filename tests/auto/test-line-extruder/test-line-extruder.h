@@ -19,6 +19,14 @@ private slots:
     void nanAtEnd();
     void duplicatePoints();
     void zeroWidthPen();
+    void infGap();
+    void infAtStart();
+    void infAtEnd();
+    void mixedNanInf();
+    void bothPointsInf();
+    void negativeInf();
+    void singleInfCoord();
+    void overflowToInf();
     void fillHorizontalBaseline();
     void fillVerticalBaseline();
     void fillTooFewPoints();

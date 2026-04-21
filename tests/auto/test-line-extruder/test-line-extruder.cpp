@@ -146,6 +146,93 @@ void TestLineExtruder::zeroWidthPen()
     QVERIFY(verts.isEmpty());
 }
 
+void TestLineExtruder::infGap()
+{
+    constexpr double inf = std::numeric_limits<double>::infinity();
+    QVector<QPointF> points = {
+        {0.0, 0.0}, {10.0, 0.0},
+        {inf, inf},
+        {20.0, 0.0}, {30.0, 0.0}
+    };
+    auto verts = QCPLineExtruder::extrudePolyline(points, 2.0f, Qt::red);
+    QCOMPARE(verts.size(), 12 * 6);
+}
+
+void TestLineExtruder::infAtStart()
+{
+    constexpr double inf = std::numeric_limits<double>::infinity();
+    QVector<QPointF> points = {{inf, inf}, {0.0, 0.0}, {10.0, 0.0}};
+    auto verts = QCPLineExtruder::extrudePolyline(points, 2.0f, Qt::red);
+    QCOMPARE(verts.size(), 6 * 6);
+}
+
+void TestLineExtruder::infAtEnd()
+{
+    constexpr double inf = std::numeric_limits<double>::infinity();
+    QVector<QPointF> points = {{0.0, 0.0}, {10.0, 0.0}, {inf, inf}};
+    auto verts = QCPLineExtruder::extrudePolyline(points, 2.0f, Qt::red);
+    QCOMPARE(verts.size(), 6 * 6);
+}
+
+void TestLineExtruder::mixedNanInf()
+{
+    constexpr double inf = std::numeric_limits<double>::infinity();
+    QVector<QPointF> points = {
+        {0.0, 0.0}, {10.0, 0.0},
+        {qQNaN(), inf},
+        {20.0, 0.0}, {30.0, 0.0},
+        {inf, qQNaN()},
+        {40.0, 0.0}, {50.0, 0.0}
+    };
+    auto verts = QCPLineExtruder::extrudePolyline(points, 2.0f, Qt::red);
+    QCOMPARE(verts.size(), 18 * 6);
+}
+
+void TestLineExtruder::bothPointsInf()
+{
+    constexpr double inf = std::numeric_limits<double>::infinity();
+    QVector<QPointF> points = {{inf, 0.0}, {inf, 10.0}};
+    auto verts = QCPLineExtruder::extrudePolyline(points, 2.0f, Qt::red);
+    QVERIFY(verts.isEmpty());
+}
+
+void TestLineExtruder::negativeInf()
+{
+    constexpr double inf = std::numeric_limits<double>::infinity();
+    QVector<QPointF> points = {
+        {0.0, 0.0}, {10.0, 0.0},
+        {-inf, -inf},
+        {20.0, 0.0}, {30.0, 0.0}
+    };
+    auto verts = QCPLineExtruder::extrudePolyline(points, 2.0f, Qt::red);
+    QCOMPARE(verts.size(), 12 * 6);
+}
+
+void TestLineExtruder::singleInfCoord()
+{
+    constexpr double inf = std::numeric_limits<double>::infinity();
+    QVector<QPointF> points = {
+        {0.0, 0.0}, {10.0, 0.0},
+        {inf, 5.0},
+        {20.0, 0.0}, {30.0, 0.0}
+    };
+    auto verts = QCPLineExtruder::extrudePolyline(points, 2.0f, Qt::red);
+    QCOMPARE(verts.size(), 12 * 6);
+}
+
+void TestLineExtruder::overflowToInf()
+{
+    constexpr double big = 1e200;
+    QVector<QPointF> points = {
+        {0.0, 0.0}, {10.0, 0.0},
+        {big, big},
+        {20.0, 0.0}, {30.0, 0.0}
+    };
+    auto verts = QCPLineExtruder::extrudePolyline(points, 2.0f, Qt::red);
+    // big*big overflows to Inf in normalized() — must not crash
+    QVERIFY(!verts.isEmpty());
+}
+
 void TestLineExtruder::fillHorizontalBaseline()
 {
     // Polygon: base0(0,10), curve(0,0), curve(5,0), curve(10,0), base1(10,10)

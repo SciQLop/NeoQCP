@@ -207,7 +207,7 @@ bool QCPHistogram2D::canProduceContent() const
 {
     if (!mKeyAxis || !mValueAxis || !mDataSource)
         return false;
-    return mPipeline.result() != nullptr;
+    return mPipeline.result() != nullptr || mPipeline.isBusy();
 }
 
 void QCPHistogram2D::draw(QCPPainter* painter)

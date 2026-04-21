@@ -40,7 +40,7 @@ struct WriteCursor
     }
 };
 
-bool isNan(const QPointF& p) { return qIsNaN(p.x()) || qIsNaN(p.y()); }
+bool isNonFinite(const QPointF& p) { return !qIsFinite(p.x()) || !qIsFinite(p.y()); }
 
 QPointF perp(const QPointF& dir)
 {
@@ -50,7 +50,7 @@ QPointF perp(const QPointF& dir)
 QPointF normalized(const QPointF& p)
 {
     double len = qSqrt(p.x() * p.x() + p.y() * p.y());
-    if (len < 1e-10) return {0, 1};
+    if (!qIsFinite(len) || len < 1e-10) return {0, 1};
     return p / len;
 }
 
@@ -72,13 +72,13 @@ struct SegmentData
     int endIdx;
 };
 
-QVector<SegmentData> splitByNaN(const QVector<QPointF>& points)
+QVector<SegmentData> splitByNonFinite(const QVector<QPointF>& points)
 {
     QVector<SegmentData> segments;
     int start = 0;
     for (int i = 0; i < points.size(); ++i)
     {
-        if (isNan(points[i]))
+        if (isNonFinite(points[i]))
         {
             if (i - start >= 2)
                 segments.append({start, i});
@@ -174,7 +174,7 @@ void extrudePolyline(const QVector<QPointF>& points, float penWidth,
     auto rgba = qcp::rhi::premultipliedColor(color);
     float halfWidth = penWidth / 2.0f;
 
-    auto segments = splitByNaN(points);
+    auto segments = splitByNonFinite(points);
 
     // Pre-allocate worst case — the vector retains capacity across frames
     int maxFloats = maxExtrusionFloats(points.size());
@@ -198,7 +198,7 @@ QVector<float> extrudePolyline(const QVector<QPointF>& points, float penWidth,
     auto rgba = qcp::rhi::premultipliedColor(color);
     float halfWidth = penWidth / 2.0f;
 
-    auto segments = splitByNaN(points);
+    auto segments = splitByNonFinite(points);
 
     int maxFloats = maxExtrusionFloats(points.size());
     QVector<float> out(maxFloats);
