@@ -581,7 +581,7 @@ void QCPCurve::drawScatterPlot(QCPPainter* painter, const QVector<QPointF>& poin
     applyScattersAntialiasingHint(painter);
     style.applyTo(painter, mPen);
     for (const QPointF& point : points)
-        if (!qIsNaN(point.x()) && !qIsNaN(point.y()))
+        if (qIsFinite(point.x()) && qIsFinite(point.y()))
             style.drawShape(painter, point);
 }
 

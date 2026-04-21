@@ -696,7 +696,11 @@ void QCPMultiGraph::draw(QCPPainter* painter)
             comp.scatterStyle.applyTo(painter, comp.pen);
             const int skip = mScatterSkip + 1;
             for (int i = 0; i < dataLines.size(); i += skip)
-                comp.scatterStyle.drawShape(painter, dataLines[i].x(), dataLines[i].y());
+            {
+                const double sx = dataLines[i].x(), sy = dataLines[i].y();
+                if (qIsFinite(sx) && qIsFinite(sy))
+                    comp.scatterStyle.drawShape(painter, sx, sy);
+            }
         }
     }
 }

@@ -875,7 +875,11 @@ void QCPPolarGraph::drawScatterPlot(QCPPainter* painter, const QVector<QPointF>&
     applyScattersAntialiasingHint(painter);
     style.applyTo(painter, mPen);
     for (int i = 0; i < scatters.size(); ++i)
-        style.drawShape(painter, scatters.at(i).x(), scatters.at(i).y());
+    {
+        const double sx = scatters.at(i).x(), sy = scatters.at(i).y();
+        if (qIsFinite(sx) && qIsFinite(sy))
+            style.drawShape(painter, sx, sy);
+    }
 }
 
 void QCPPolarGraph::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const

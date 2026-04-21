@@ -1057,7 +1057,10 @@ void QCPGraph::drawScatterPlot(QCPPainter* painter, const QVector<QPointF>& scat
     applyScattersAntialiasingHint(painter);
     style.applyTo(painter, mPen);
     for (const QPointF& scatter : scatters)
-        style.drawShape(painter, scatter.x(), scatter.y());
+    {
+        if (qIsFinite(scatter.x()) && qIsFinite(scatter.y()))
+            style.drawShape(painter, scatter.x(), scatter.y());
+    }
 }
 
 /*!  \internal

@@ -501,7 +501,11 @@ void QCPGraph2::draw(QCPPainter* painter)
         mScatterStyle.applyTo(painter, drawPen);
         const int skip = mScatterSkip + 1;
         for (int i = 0; i < lines.size(); i += skip)
-            mScatterStyle.drawShape(painter, lines[i].x(), lines[i].y());
+        {
+            const double sx = lines[i].x(), sy = lines[i].y();
+            if (qIsFinite(sx) && qIsFinite(sy))
+                mScatterStyle.drawShape(painter, sx, sy);
+        }
     }
 }
 
