@@ -3,6 +3,7 @@
 #include <axis/axis.h>
 #include <QImage>
 #include <QPointF>
+#include <QVector>
 #include <functional>
 
 class QCPAbstractPlottable;
@@ -47,6 +48,12 @@ public:
     bool mapImageInvalidated() const { return mMapImageInvalidated; }
     void invalidateMapImage() { mMapImageInvalidated = true; }
     const QImage& mapImage() const { return mMapImage; }
+    QImage& mapImage() { return mMapImage; }
+    void invalidateFlippedCache() { mFlippedMapImage = {}; }
+
+    // Contour lines (UV-space vertices)
+    void setContourLines(QVector<float> uvVertices, const QColor& color);
+    void clearContour();
 
 private:
     const QImage& flippedMapImage(Qt::Orientations flips);

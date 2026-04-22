@@ -84,7 +84,6 @@ void QCPColormapRenderer::updateMapImage(const QCPColorMapData* data, NormalizeF
 
     if (normalize)
     {
-        // Slow path: per-cell custom normalization
         std::vector<double> rowData(keySize);
         for (int y = 0; y < valueSize; ++y)
         {
@@ -97,8 +96,6 @@ void QCPColormapRenderer::updateMapImage(const QCPColorMapData* data, NormalizeF
     }
     else
     {
-        // Fast path: colorize directly from the raw data array (stride-1 rows),
-        // avoiding per-cell virtual calls and temporary copies.
         const double* rawData = data->rawData();
         for (int y = 0; y < valueSize; ++y)
         {
@@ -107,8 +104,6 @@ void QCPColormapRenderer::updateMapImage(const QCPColorMapData* data, NormalizeF
         }
     }
 
-    // Keep native ARGB32 — matches BGRA8 texture format with no per-upload channel swizzle.
-    // QRhi handles the fallback swizzle if only RGBA8 is available.
     mFlippedMapImage = {};
     mMapImage = std::move(argbImage);
     mMapImageInvalidated = false;
@@ -133,7 +128,6 @@ void QCPColormapRenderer::draw(QCPPainter* painter, QCPAxis* keyAxis, QCPAxis* v
     if (mirrorX) flips |= Qt::Horizontal;
     if (mirrorY) flips |= Qt::Vertical;
 
-    // Skip GPU path during export — the RHI render pass is not active
     if (!painter->modes().testFlag(QCPPainter::pmNoCaching))
     {
         if (auto* crl = ensureRhiLayer())
@@ -163,6 +157,18 @@ const QImage& QCPColormapRenderer::flippedMapImage(Qt::Orientations flips)
         mLastFlips = flips;
     }
     return mFlippedMapImage;
+}
+
+void QCPColormapRenderer::setContourLines(QVector<float> uvVertices, const QColor& color)
+{
+    if (mRhiLayer)
+        mRhiLayer->setContourLines(std::move(uvVertices), color);
+}
+
+void QCPColormapRenderer::clearContour()
+{
+    if (mRhiLayer)
+        mRhiLayer->clearContourLines();
 }
 
 QCPColormapRhiLayer* QCPColormapRenderer::ensureRhiLayer()

@@ -139,9 +139,19 @@ span_vert_qsb = custom_target('span_vert_qsb',
     output: 'span.vert.qsb',
     command: [qsb, '--qt6', '-o', '@OUTPUT@', '@INPUT@'])
 
+contour_line_vert_qsb = custom_target('contour_line_vert_qsb',
+    input: 'src/painting/shaders/contour_line.vert',
+    output: 'contour_line.vert.qsb',
+    command: [qsb, '--qt6', '-o', '@OUTPUT@', '@INPUT@'])
+
+contour_line_frag_qsb = custom_target('contour_line_frag_qsb',
+    input: 'src/painting/shaders/contour_line.frag',
+    output: 'contour_line.frag.qsb',
+    command: [qsb, '--qt6', '-o', '@OUTPUT@', '@INPUT@'])
+
 python3 = find_program('python3')
 embedded_shaders = custom_target('embedded_shaders',
-    input: [composite_vert_qsb, composite_frag_qsb, plottable_vert_qsb, plottable_frag_qsb, span_vert_qsb],
+    input: [composite_vert_qsb, composite_frag_qsb, plottable_vert_qsb, plottable_frag_qsb, span_vert_qsb, contour_line_vert_qsb, contour_line_frag_qsb],
     output: 'embedded_shaders.h',
     command: [python3, files('src/painting/shaders/embed_shaders.py'),
               '@OUTPUT@',
@@ -149,7 +159,9 @@ embedded_shaders = custom_target('embedded_shaders',
               'composite_frag_qsb_data:@INPUT1@',
               'plottable_vert_qsb_data:@INPUT2@',
               'plottable_frag_qsb_data:@INPUT3@',
-              'span_vert_qsb_data:@INPUT4@'])
+              'span_vert_qsb_data:@INPUT4@',
+              'contour_line_vert_qsb_data:@INPUT5@',
+              'contour_line_frag_qsb_data:@INPUT6@'])
 
 NeoQCP = static_library('NeoQCP',
            'src/colorgradient.cpp',
@@ -169,6 +181,7 @@ NeoQCP = static_library('NeoQCP',
            'src/painting/colormap-rhi-layer.cpp',
            'src/painting/colormap-renderer.cpp',
            'src/painting/line-extruder.cpp',
+           'src/painting/contour-extractor.cpp',
            'src/scatterstyle.cpp',
            'src/selection.cpp',
            'src/selectiondecorator-bracket.cpp',

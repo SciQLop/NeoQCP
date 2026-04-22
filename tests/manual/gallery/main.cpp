@@ -296,6 +296,41 @@ static QWidget* createColorMapTab()
     return wrapPlot(plot);
 }
 
+// ── Tab: Contour Overlay ────────────────────────────────────────────────────
+
+static QWidget* createContourTab()
+{
+    auto* plot = makePlot();
+
+    const int nx = 120, ny = 100;
+    std::vector<double> x(nx), y(ny), z(nx * ny);
+    for (int i = 0; i < nx; ++i)
+        x[i] = -3.0 + i * 6.0 / (nx - 1);
+    for (int j = 0; j < ny; ++j)
+        y[j] = -3.0 + j * 6.0 / (ny - 1);
+
+    for (int i = 0; i < nx; ++i)
+        for (int j = 0; j < ny; ++j)
+            z[i * ny + j] = qSin(x[i]) * qCos(y[j]) + 0.3 * qSin(2 * x[i] + y[j]);
+
+    auto* cm = new QCPColorMap2(plot->xAxis, plot->yAxis);
+    cm->setData(std::vector(x), std::vector(y), std::vector(z));
+
+    auto* scale = new QCPColorScale(plot);
+    plot->plotLayout()->addElement(0, 1, scale);
+    cm->setColorScale(scale);
+    cm->setGradient(QCPColorGradient(QCPColorGradient::gpViridis));
+    cm->rescaleDataRange(true);
+
+    cm->setAutoContourLevels(8);
+    cm->setContourPen(QPen(Qt::white, 1.5));
+    cm->setContourLabelEnabled(true);
+
+    plot->rescaleAxes();
+    plot->replot();
+    return wrapPlot(plot);
+}
+
 // ── Tab 4: ColorMap2 Log-Y + Log-Z + NaN + Gaps ─────────────────────────
 
 static QWidget* createColorMapLogTab()
@@ -1396,6 +1431,7 @@ int main(int argc, char* argv[])
     tabs->addTab(createSpansTab(),       "Spans");
     tabs->addTab(createGraphTab(),       "Graph / Curve");
     tabs->addTab(createColorMapTab(),    "ColorMap2");
+    tabs->addTab(createContourTab(),    "Contour Overlay");
     tabs->addTab(createColorMapLogTab(),       "ColorMap2 Log/NaN/Gap");
     tabs->addTab(createColorMapVariableYTab(), "ColorMap2 Variable-Y");
     tabs->addTab(createMultiGraphTab(),        "MultiGraph");

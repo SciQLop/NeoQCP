@@ -2,6 +2,18 @@
 #include "embedded_shaders.h"
 #include "rhi-utils.h"
 #include "Profiling.hpp"
+#include <cstring>
+
+// ── Contour line UBO (std140, 32 bytes) ────────────────────────────────────
+// Must match contour_line.vert/frag ContourLineParams exactly.
+struct alignas(16) ContourLineUbo {
+    float lineColor[4];   // offset  0: vec4 (premultiplied RGBA)
+    float ndcMin[2];      // offset 16: vec2
+    float ndcMax[2];      // offset 24: vec2
+};                        // total: 32
+static_assert(sizeof(ContourLineUbo) == 32);
+
+// ── Lifecycle ───────────────────────────────────────────────────────────────
 
 QCPColormapRhiLayer::QCPColormapRhiLayer(QRhi* rhi)
     : mRhi(rhi)
@@ -10,6 +22,10 @@ QCPColormapRhiLayer::QCPColormapRhiLayer(QRhi* rhi)
 
 QCPColormapRhiLayer::~QCPColormapRhiLayer()
 {
+    delete mLinePipeline;
+    delete mLineSrb;
+    delete mLineUbo;
+    delete mLineVbo;
     delete mPipeline;
     delete mSrb;
     delete mSampler;
@@ -19,16 +35,20 @@ QCPColormapRhiLayer::~QCPColormapRhiLayer()
 
 void QCPColormapRhiLayer::clear()
 {
-    mStagingImage = QImage();
+    mStagingImage = {};
+    mContourUvVertices.clear();
+    mLineVertexCount = 0;
 }
 
 void QCPColormapRhiLayer::invalidatePipeline()
 {
-    delete mPipeline;
-    mPipeline = nullptr;
-    delete mSrb;
-    mSrb = nullptr;
+    delete mLinePipeline; mLinePipeline = nullptr;
+    delete mLineSrb;      mLineSrb = nullptr;
+    delete mPipeline;     mPipeline = nullptr;
+    delete mSrb;          mSrb = nullptr;
 }
+
+// ── CPU-side setters ────────────────────────────────────────────────────────
 
 void QCPColormapRhiLayer::setImage(const QImage& image)
 {
@@ -40,11 +60,55 @@ void QCPColormapRhiLayer::setQuadRect(const QRectF& pixelRect)
 {
     mQuadPixelRect = pixelRect;
     mGeometryDirty = true;
+    mContourUboDirty = true;
 }
 
 void QCPColormapRhiLayer::setScissorRect(const QRect& scissor)
 {
     mScissorRect = scissor;
+}
+
+void QCPColormapRhiLayer::setContourLines(QVector<float> uvVertices, const QColor& color)
+{
+    mContourUvVertices = std::move(uvVertices);
+    mContourColor = color;
+    mContourLinesDirty = true;
+    mContourUboDirty = true;
+}
+
+void QCPColormapRhiLayer::clearContourLines()
+{
+    mContourUvVertices.clear();
+    mLineVertexCount = 0;
+    mContourLinesDirty = true;
+}
+
+// ── Pipeline creation ───────────────────────────────────────────────────────
+
+static QRhiGraphicsPipeline* buildPipeline(
+    QRhi* rhi, const QRhiShaderStage& vert, const QRhiShaderStage& frag,
+    QRhiShaderResourceBindings* layoutSrb,
+    QRhiRenderPassDescriptor* rpDesc, int sampleCount,
+    QRhiGraphicsPipeline::Topology topology,
+    const QRhiVertexInputLayout& inputLayout)
+{
+    auto* pl = rhi->newGraphicsPipeline();
+
+    pl->setShaderStages({vert, frag});
+    pl->setVertexInputLayout(inputLayout);
+    pl->setTargetBlends({qcp::rhi::premultipliedAlphaBlend()});
+    pl->setFlags(QRhiGraphicsPipeline::UsesScissor);
+    pl->setTopology(topology);
+    pl->setSampleCount(sampleCount);
+    pl->setRenderPassDescriptor(rpDesc);
+    pl->setShaderResourceBindings(layoutSrb);
+
+    if (!pl->create())
+    {
+        delete pl;
+        return nullptr;
+    }
+    return pl;
 }
 
 bool QCPColormapRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc,
@@ -56,133 +120,120 @@ bool QCPColormapRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc,
         return true;
 
     invalidatePipeline();
-
-    // Reuse composite shaders: position(float2) + texcoord(float2).
-    // The shader requires a LayerParams UBO at binding 1 (always zero
-    // translation for colormaps since they pre-compute NDC on the CPU).
-    auto vertShader = qcp::rhi::loadEmbeddedShader(composite_vert_qsb_data, composite_vert_qsb_data_len);
-    auto fragShader = qcp::rhi::loadEmbeddedShader(composite_frag_qsb_data, composite_frag_qsb_data_len);
-
-    if (!vertShader.isValid() || !fragShader.isValid())
-    {
-        qDebug() << "Failed to load composite shaders for colormap";
-        return false;
-    }
+    mLastSampleCount = sampleCount;
 
     if (!mSampler)
     {
         mSampler = mRhi->newSampler(QRhiSampler::Nearest, QRhiSampler::Nearest,
                                      QRhiSampler::None,
                                      QRhiSampler::ClampToEdge, QRhiSampler::ClampToEdge);
-        if (!mSampler->create())
+        if (!mSampler->create()) { delete mSampler; mSampler = nullptr; return false; }
+    }
+
+    auto compositeVert = qcp::rhi::loadEmbeddedShader(composite_vert_qsb_data, composite_vert_qsb_data_len);
+    auto compositeFrag = qcp::rhi::loadEmbeddedShader(composite_frag_qsb_data, composite_frag_qsb_data_len);
+    if (!compositeVert.isValid() || !compositeFrag.isValid())
+        return false;
+
+    // Base colormap pipeline
+    {
+        QRhiVertexInputLayout inputLayout;
+        inputLayout.setBindings({{4 * sizeof(float)}});
+        inputLayout.setAttributes({
+            {0, 0, QRhiVertexInputAttribute::Float2, 0},
+            {0, 1, QRhiVertexInputAttribute::Float2, 2 * sizeof(float)}
+        });
+
+        auto* layoutSrb = mRhi->newShaderResourceBindings();
+        layoutSrb->setBindings({
+            QRhiShaderResourceBinding::sampledTexture(0, QRhiShaderResourceBinding::FragmentStage, nullptr, mSampler),
+            QRhiShaderResourceBinding::uniformBuffer(1, QRhiShaderResourceBinding::VertexStage, compositeUbo)
+        });
+        if (!layoutSrb->create()) { delete layoutSrb; return false; }
+        mPipeline = buildPipeline(mRhi, {QRhiShaderStage::Vertex, compositeVert},
+                                  {QRhiShaderStage::Fragment, compositeFrag},
+                                  layoutSrb, rpDesc, sampleCount,
+                                  QRhiGraphicsPipeline::TriangleStrip, inputLayout);
+        delete layoutSrb;
+        if (!mPipeline) return false;
+    }
+
+    // Contour line pipeline
+    {
+        auto lineVert = qcp::rhi::loadEmbeddedShader(contour_line_vert_qsb_data, contour_line_vert_qsb_data_len);
+        auto lineFrag = qcp::rhi::loadEmbeddedShader(contour_line_frag_qsb_data, contour_line_frag_qsb_data_len);
+        if (!lineVert.isValid() || !lineFrag.isValid())
+            return true;
+
+        if (!mLineUbo)
         {
-            qDebug() << Q_FUNC_INFO << "Failed to create colormap sampler";
-            delete mSampler;
-            mSampler = nullptr;
-            return false;
+            mLineUbo = mRhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
+                                        sizeof(ContourLineUbo));
+            if (!mLineUbo->create()) { delete mLineUbo; mLineUbo = nullptr; return true; }
+            mContourUboDirty = true;
         }
-    }
 
-    // Layout-only SRB for pipeline creation (nullptr texture is valid for layout)
-    // Actual texture binding created in uploadResources() once texture exists
-    auto* layoutSrb = mRhi->newShaderResourceBindings();
-    layoutSrb->setBindings({
-        QRhiShaderResourceBinding::sampledTexture(
-            0, QRhiShaderResourceBinding::FragmentStage,
-            nullptr, mSampler),
-        QRhiShaderResourceBinding::uniformBuffer(
-            1, QRhiShaderResourceBinding::VertexStage,
-            compositeUbo)
-    });
-    if (!layoutSrb->create())
-    {
-        qDebug() << Q_FUNC_INFO << "Failed to create colormap layout SRB";
+        QRhiVertexInputLayout inputLayout;
+        inputLayout.setBindings({{2 * sizeof(float)}});
+        inputLayout.setAttributes({
+            {0, 0, QRhiVertexInputAttribute::Float2, 0}
+        });
+
+        auto* layoutSrb = mRhi->newShaderResourceBindings();
+        layoutSrb->setBindings({
+            QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage, mLineUbo)
+        });
+        if (!layoutSrb->create()) { delete layoutSrb; return true; }
+
+        mLinePipeline = buildPipeline(mRhi, {QRhiShaderStage::Vertex, lineVert},
+                                      {QRhiShaderStage::Fragment, lineFrag},
+                                      layoutSrb, rpDesc, sampleCount,
+                                      QRhiGraphicsPipeline::Lines, inputLayout);
+
+        // Create real SRB for draw calls
+        mLineSrb = mRhi->newShaderResourceBindings();
+        mLineSrb->setBindings({
+            QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage, mLineUbo)
+        });
+        mLineSrb->create();
+
         delete layoutSrb;
-        return false;
     }
 
-    mPipeline = mRhi->newGraphicsPipeline();
-    mPipeline->setShaderStages({
-        {QRhiShaderStage::Vertex, vertShader},
-        {QRhiShaderStage::Fragment, fragShader}
-    });
-
-    // Vertex layout: position(float2) + texcoord(float2) — same as composite
-    QRhiVertexInputLayout inputLayout;
-    inputLayout.setBindings({{4 * sizeof(float)}});
-    inputLayout.setAttributes({
-        {0, 0, QRhiVertexInputAttribute::Float2, 0},
-        {0, 1, QRhiVertexInputAttribute::Float2, 2 * sizeof(float)}
-    });
-    mPipeline->setVertexInputLayout(inputLayout);
-
-    mPipeline->setTargetBlends({qcp::rhi::premultipliedAlphaBlend()});
-
-    mPipeline->setFlags(QRhiGraphicsPipeline::UsesScissor);
-    mPipeline->setTopology(QRhiGraphicsPipeline::TriangleStrip);
-    mPipeline->setSampleCount(sampleCount);
-    mPipeline->setRenderPassDescriptor(rpDesc);
-    mPipeline->setShaderResourceBindings(layoutSrb);
-
-    if (!mPipeline->create())
-    {
-        qDebug() << "Failed to create colormap pipeline";
-        delete mPipeline;
-        mPipeline = nullptr;
-        delete layoutSrb;
-        return false;
-    }
-
-    delete layoutSrb;
-    mLastSampleCount = sampleCount;
     return true;
 }
+
+// ── Texture management ──────────────────────────────────────────────────────
 
 bool QCPColormapRhiLayer::ensureTexture(QRhiBuffer* compositeUbo)
 {
     QSize imgSize = mStagingImage.size();
-    bool textureRecreated = false;
+    bool texRecreated = false;
     if (!mTexture || mTextureSize != imgSize)
     {
         delete mTexture;
-        const auto fmt = qcp::rhi::preferredTextureFormat(mRhi);
-        mTexture = mRhi->newTexture(fmt, imgSize);
-        if (!mTexture->create())
-        {
-            qDebug() << "Failed to create colormap RHI texture";
-            delete mTexture;
-            mTexture = nullptr;
-            delete mSrb;
-            mSrb = nullptr;
-            return false;
-        }
+        mTexture = mRhi->newTexture(qcp::rhi::preferredTextureFormat(mRhi), imgSize);
+        if (!mTexture->create()) { delete mTexture; mTexture = nullptr; return false; }
         mTextureSize = imgSize;
         mTextureDirty = true;
-        textureRecreated = true;
+        texRecreated = true;
     }
 
-    if ((!mSrb || textureRecreated) && mTexture)
+    if ((!mSrb || texRecreated) && mTexture)
     {
         delete mSrb;
         mSrb = mRhi->newShaderResourceBindings();
         mSrb->setBindings({
-            QRhiShaderResourceBinding::sampledTexture(
-                0, QRhiShaderResourceBinding::FragmentStage,
-                mTexture, mSampler),
-            QRhiShaderResourceBinding::uniformBuffer(
-                1, QRhiShaderResourceBinding::VertexStage,
-                compositeUbo)
+            QRhiShaderResourceBinding::sampledTexture(0, QRhiShaderResourceBinding::FragmentStage, mTexture, mSampler),
+            QRhiShaderResourceBinding::uniformBuffer(1, QRhiShaderResourceBinding::VertexStage, compositeUbo)
         });
-        if (!mSrb->create())
-        {
-            qDebug() << Q_FUNC_INFO << "Failed to create colormap SRB";
-            delete mSrb;
-            mSrb = nullptr;
-            return false;
-        }
+        if (!mSrb->create()) { delete mSrb; mSrb = nullptr; return false; }
     }
+
     return true;
 }
+
+// ── Quad geometry ───────────────────────────────────────────────────────────
 
 void QCPColormapRhiLayer::updateQuadGeometry(QRhiResourceUpdateBatch* updates,
                                               const QSize& outputSize, float dpr,
@@ -197,38 +248,36 @@ void QCPColormapRhiLayer::updateQuadGeometry(QRhiResourceUpdateBatch* updates,
     const float yFlip = isYUpInNDC ? -1.0f : 1.0f;
 
     auto toNDC = [&](float px, float py) -> std::pair<float, float> {
-        float ndcX = (px * dpr / w) * 2.0f - 1.0f;
-        float ndcY = yFlip * ((py * dpr / h) * 2.0f - 1.0f);
-        return {ndcX, ndcY};
+        return {(px * dpr / w) * 2.0f - 1.0f,
+                yFlip * ((py * dpr / h) * 2.0f - 1.0f)};
     };
 
     auto [x0, y0] = toNDC(mQuadPixelRect.left(), mQuadPixelRect.top());
     auto [x1, y1] = toNDC(mQuadPixelRect.right(), mQuadPixelRect.bottom());
 
+    // Store NDC bounds for contour line UBO
+    mNdcX0 = x0; mNdcY0 = y0;
+    mNdcX1 = x1; mNdcY1 = y1;
+    mContourUboDirty = true;
+
     const float verts[] = {
-        x0, y0,  0.0f, 0.0f,
-        x1, y0,  1.0f, 0.0f,
-        x0, y1,  0.0f, 1.0f,
-        x1, y1,  1.0f, 1.0f,
+        x0, y0, 0.0f, 0.0f,
+        x1, y0, 1.0f, 0.0f,
+        x0, y1, 0.0f, 1.0f,
+        x1, y1, 1.0f, 1.0f,
     };
 
     if (!mVertexBuffer)
     {
-        mVertexBuffer = mRhi->newBuffer(QRhiBuffer::Dynamic,
-                                         QRhiBuffer::VertexBuffer,
-                                         sizeof(verts));
-        if (!mVertexBuffer->create())
-        {
-            qDebug() << Q_FUNC_INFO << "Failed to create colormap vertex buffer";
-            delete mVertexBuffer;
-            mVertexBuffer = nullptr;
-            return;
-        }
+        mVertexBuffer = mRhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, sizeof(verts));
+        if (!mVertexBuffer->create()) { delete mVertexBuffer; mVertexBuffer = nullptr; return; }
     }
 
     updates->updateDynamicBuffer(mVertexBuffer, 0, sizeof(verts), verts);
     mGeometryDirty = false;
 }
+
+// ── Upload ──────────────────────────────────────────────────────────────────
 
 void QCPColormapRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
                                             const QSize& outputSize, float dpr,
@@ -242,32 +291,83 @@ void QCPColormapRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
     if (!ensureTexture(compositeUbo))
         return;
 
-    if (mTextureDirty)
+    if (mTextureDirty && mTexture)
     {
-        QRhiTextureSubresourceUploadDescription subDesc(mStagingImage);
         updates->uploadTexture(mTexture, QRhiTextureUploadDescription(
-            QRhiTextureUploadEntry(0, 0, subDesc)));
+            QRhiTextureUploadEntry(0, 0, QRhiTextureSubresourceUploadDescription(mStagingImage))));
         mTextureDirty = false;
     }
 
     updateQuadGeometry(updates, outputSize, dpr, isYUpInNDC);
+
+    // Contour line vertex buffer
+    if (mContourLinesDirty && mLinePipeline)
+    {
+        mLineVertexCount = mContourUvVertices.size() / 2;
+        if (mLineVertexCount > 0)
+        {
+            int byteSize = mContourUvVertices.size() * int(sizeof(float));
+            if (!mLineVbo || mLineVboSize < byteSize)
+            {
+                delete mLineVbo;
+                mLineVboSize = byteSize;
+                mLineVbo = mRhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, mLineVboSize);
+                if (!mLineVbo->create()) { delete mLineVbo; mLineVbo = nullptr; mLineVertexCount = 0; return; }
+            }
+            updates->updateDynamicBuffer(mLineVbo, 0, byteSize, mContourUvVertices.constData());
+        }
+        mContourLinesDirty = false;
+    }
+
+    // Contour line UBO (quad NDC bounds + color)
+    if (mContourUboDirty && mLineUbo)
+    {
+        ContourLineUbo ubo{};
+        float a = float(mContourColor.alphaF());
+        ubo.lineColor[0] = float(mContourColor.redF()) * a;
+        ubo.lineColor[1] = float(mContourColor.greenF()) * a;
+        ubo.lineColor[2] = float(mContourColor.blueF()) * a;
+        ubo.lineColor[3] = a;
+        ubo.ndcMin[0] = mNdcX0;
+        ubo.ndcMin[1] = mNdcY0;
+        ubo.ndcMax[0] = mNdcX1;
+        ubo.ndcMax[1] = mNdcY1;
+        updates->updateDynamicBuffer(mLineUbo, 0, sizeof(ubo), &ubo);
+        mContourUboDirty = false;
+    }
 }
+
+// ── Render ──────────────────────────────────────────────────────────────────
 
 void QCPColormapRhiLayer::render(QRhiCommandBuffer* cb, const QSize& outputSize)
 {
     PROFILE_HERE_N("QCPColormapRhiLayer::render");
 
-    if (!mPipeline || !mVertexBuffer || !mSrb || !mTexture)
-        return;
+    // Draw colormap quad
+    if (mPipeline && mVertexBuffer && mSrb && mTexture)
+    {
+        cb->setGraphicsPipeline(mPipeline);
+        cb->setViewport({0, 0, float(outputSize.width()), float(outputSize.height())});
+        cb->setShaderResources(mSrb);
 
-    cb->setGraphicsPipeline(mPipeline);
-    cb->setViewport({0, 0, float(outputSize.width()), float(outputSize.height())});
-    cb->setShaderResources(mSrb);
+        const QRhiCommandBuffer::VertexInput vbufBinding(mVertexBuffer, 0);
+        cb->setVertexInput(0, 1, &vbufBinding);
+        cb->setScissor({mScissorRect.x(), mScissorRect.y(),
+                        mScissorRect.width(), mScissorRect.height()});
+        cb->draw(4);
+    }
 
-    const QRhiCommandBuffer::VertexInput vbufBinding(mVertexBuffer, 0);
-    cb->setVertexInput(0, 1, &vbufBinding);
+    // Draw contour lines on top
+    if (mLinePipeline && mLineVbo && mLineSrb && mLineVertexCount > 0)
+    {
+        cb->setGraphicsPipeline(mLinePipeline);
+        cb->setViewport({0, 0, float(outputSize.width()), float(outputSize.height())});
+        cb->setShaderResources(mLineSrb);
 
-    cb->setScissor({mScissorRect.x(), mScissorRect.y(),
-                    mScissorRect.width(), mScissorRect.height()});
-    cb->draw(4);
+        const QRhiCommandBuffer::VertexInput vbufBinding(mLineVbo, 0);
+        cb->setVertexInput(0, 1, &vbufBinding);
+        cb->setScissor({mScissorRect.x(), mScissorRect.y(),
+                        mScissorRect.width(), mScissorRect.height()});
+        cb->draw(mLineVertexCount);
+    }
 }

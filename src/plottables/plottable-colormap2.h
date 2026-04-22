@@ -7,6 +7,7 @@
 #include <atomic>
 #include <memory>
 #include <span>
+#include <QPen>
 
 class QCPColorScale;
 class QCPColorMapData;
@@ -68,6 +69,19 @@ public:
     QCPColormapPipeline& pipeline() { return mPipeline; }
     const QCPColormapPipeline& pipeline() const { return mPipeline; }
 
+    // Contour overlay
+    void setContourLevels(const QVector<double>& levels);
+    [[nodiscard]] QVector<double> contourLevels() const { return mContourLevels; }
+
+    void setContourPen(const QPen& pen);
+    [[nodiscard]] QPen contourPen() const { return mContourPen; }
+
+    void setContourLabelEnabled(bool enabled);
+    [[nodiscard]] bool contourLabelEnabled() const { return mContourLabelEnabled; }
+
+    void setAutoContourLevels(int count);
+    [[nodiscard]] int autoContourLevelCount() const { return mAutoContourCount; }
+
 public Q_SLOTS:
     void setGradient(const QCPColorGradient& gradient);
     void setDataRange(const QCPRange& range);
@@ -96,5 +110,17 @@ private:
     QCPColormapPipeline mPipeline;
     QCPColormapRenderer mRenderer;
 
+    // Contour overlay
+    QVector<double> mContourLevels;
+    QPen mContourPen{Qt::white, 1.0};
+    bool mContourLabelEnabled = false;
+    int mAutoContourCount = 0;
+
+    uint64_t mContourCacheGen = 0;
+    uint64_t mContourDataGen = 0;
+
+    void invalidateContourCache();
+
     void onViewportChanged();
+    void updateContourGpu(const QCPColorMapData* data);
 };
