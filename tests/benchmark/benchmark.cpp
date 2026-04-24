@@ -34,6 +34,10 @@ private slots:
   void QCPGraph2_RenderFloat();
   void QCPGraph2_RenderManyLines();
 
+  void QCPGraph2_ScatterDisc1M();
+  void QCPGraph2_ScatterSquare1M();
+  void QCPGraph2_ScatterWithLine1M();
+
   void QCPColorMap_Standard();
   void QCPColorMap_ColorizeMap();
 
@@ -621,6 +625,63 @@ void Benchmark::QCPGraph2_RenderManyLines()
   }
   mPlot->rescaleAxes();
   mPlot->xAxis->scaleRange(0.7, mPlot->xAxis->range().center());
+
+  QBENCHMARK {
+    mPlot->replot();
+  }
+}
+
+void Benchmark::QCPGraph2_ScatterDisc1M()
+{
+  auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+  graph->setLineStyle(QCPGraph2::lsNone);
+  graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 4));
+  const int n = 1000000;
+  std::vector<double> keys(n), values(n);
+  for (int i = 0; i < n; ++i) {
+    keys[i] = i / static_cast<double>(n);
+    values[i] = qSin(keys[i] * 10 * M_PI) + 0.1 * (std::rand() / double(RAND_MAX));
+  }
+  graph->setData(std::move(keys), std::move(values));
+  graph->rescaleAxes();
+
+  QBENCHMARK {
+    mPlot->replot();
+  }
+}
+
+void Benchmark::QCPGraph2_ScatterSquare1M()
+{
+  auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+  graph->setLineStyle(QCPGraph2::lsNone);
+  graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssSquare, 4));
+  const int n = 1000000;
+  std::vector<double> keys(n), values(n);
+  for (int i = 0; i < n; ++i) {
+    keys[i] = i / static_cast<double>(n);
+    values[i] = qSin(keys[i] * 10 * M_PI) + 0.1 * (std::rand() / double(RAND_MAX));
+  }
+  graph->setData(std::move(keys), std::move(values));
+  graph->rescaleAxes();
+
+  QBENCHMARK {
+    mPlot->replot();
+  }
+}
+
+void Benchmark::QCPGraph2_ScatterWithLine1M()
+{
+  auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+  graph->setLineStyle(QCPGraph2::lsLine);
+  graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 4));
+  const int n = 1000000;
+  std::vector<double> keys(n), values(n);
+  for (int i = 0; i < n; ++i) {
+    keys[i] = i / static_cast<double>(n);
+    values[i] = qSin(keys[i] * 10 * M_PI);
+  }
+  graph->setData(std::move(keys), std::move(values));
+  graph->rescaleAxes();
 
   QBENCHMARK {
     mPlot->replot();

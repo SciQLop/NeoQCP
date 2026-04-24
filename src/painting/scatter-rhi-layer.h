@@ -1,6 +1,8 @@
 #pragma once
 
+#include <QBrush>
 #include <QImage>
+#include <QPen>
 #include <QRect>
 #include <QVector>
 #include <rhi/qrhi.h>
