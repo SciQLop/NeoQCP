@@ -2169,6 +2169,23 @@ void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
             it.value()->clear();
         }
     }
+    for (auto it = mScatterRhiLayers.begin(); it != mScatterRhiLayers.end(); ++it)
+    {
+        QCPLayer* layer = it.key();
+        auto pb = layer->mPaintBuffer.toStrongRef();
+        if (!pb || !pb->contentDirty())
+            continue;
+        if (layer->canSkipRepaintForTranslation())
+        {
+            QPointF offset = layer->pixelOffset();
+            it.value()->setAllOffsets(static_cast<float>(offset.x()),
+                                      static_cast<float>(offset.y()));
+        }
+        else
+        {
+            it.value()->clear();
+        }
+    }
     for (auto& layer : mLayers)
     {
         if (QSharedPointer<QCPAbstractPaintBuffer> pb = layer->mPaintBuffer.toStrongRef();

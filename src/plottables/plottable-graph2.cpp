@@ -13,6 +13,9 @@
 #include "../painting/scatter-rhi-layer.h"
 #include "../vector2d.h"
 
+#include <array>
+#include <random>
+
 QCPGraph2::QCPGraph2(QCPAxis* keyAxis, QCPAxis* valueAxis)
     : QCPAbstractPlottable(keyAxis, valueAxis)
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
@@ -48,6 +51,19 @@ QCPGraph2::QCPGraph2(QCPAxis* keyAxis, QCPAxis* valueAxis)
 }
 
 QCPGraph2::~QCPGraph2() = default;
+
+void QCPGraph2::setScatterColorGradient(const QCPColorGradient& gradient)
+{
+    constexpr int kColormapWidth = 256;
+    std::array<double, kColormapWidth> t;
+    for (int i = 0; i < kColormapWidth; ++i)
+        t[i] = i / double(kColormapWidth - 1);
+    QImage img(kColormapWidth, 1, QImage::Format_ARGB32_Premultiplied);
+    QCPColorGradient g = gradient;
+    g.colorize(t.data(), QCPRange(0.0, 1.0),
+               reinterpret_cast<QRgb*>(img.scanLine(0)), kColormapWidth);
+    mScatterColorMapImage = img;
+}
 
 static void ensureL1Transform(QCPGraphPipeline& pipeline, int sourceSize)
 {
@@ -366,10 +382,12 @@ void QCPGraph2::draw(QCPPainter* painter)
 
     // Data source priority: L2 (viewport-optimized) > raw
     // When L1 exists but L2 is null (sparse enough to draw directly), use raw source.
+    // Scatter-only (lsNone): always use raw data — min/max binning destroys 2D distributions.
+    const bool scatterOnly = (mLineStyle == lsNone);
     const QCPAbstractDataSource* ds = nullptr;
-    if (mL2Result)
+    if (mL2Result && !scatterOnly)
         ds = mL2Result.get();
-    else if (!mNeedsResampling || mL1Cache
+    else if (scatterOnly || !mNeedsResampling || mL1Cache
              || painter->modes().testFlag(QCPPainter::pmNoCaching)
              || mKeyAxis->scaleType() == QCPAxis::stLogarithmic)
         ds = mDataSource.get();
@@ -387,8 +405,17 @@ void QCPGraph2::draw(QCPPainter* painter)
         return;
 
     const QCPRange keyRange = mKeyAxis->range();
-    int begin = ds->findBegin(keyRange.lower);
-    int end = ds->findEnd(keyRange.upper);
+    int begin, end;
+    if (scatterOnly)
+    {
+        begin = 0;
+        end = ds->size();
+    }
+    else
+    {
+        begin = ds->findBegin(keyRange.lower);
+        end = ds->findEnd(keyRange.upper);
+    }
     if (begin >= end)
         return;
 
@@ -405,15 +432,26 @@ void QCPGraph2::draw(QCPPainter* painter)
         mKeyAxis.data(), mValueAxis.data(), isExportMode);
 
     QVector<QPointF> lines;
+    int linesBeginIndex = 0;
     if (needFreshLines)
     {
-        // Expand data range by 100% on each side so GPU-translated pans
-        // don't expose uncovered edges before the rebuild threshold triggers.
-        const double margin = keyRange.size() * 1.0;
-        int cacheBegin = ds->findBegin(keyRange.lower - margin);
-        int cacheEnd = ds->findEnd(keyRange.upper + margin);
+        int cacheBegin, cacheEnd;
+        if (scatterOnly)
+        {
+            cacheBegin = 0;
+            cacheEnd = ds->size();
+        }
+        else
+        {
+            // Expand data range by 100% on each side so GPU-translated pans
+            // don't expose uncovered edges before the rebuild threshold triggers.
+            const double margin = keyRange.size() * 1.0;
+            cacheBegin = ds->findBegin(keyRange.lower - margin);
+            cacheEnd = ds->findEnd(keyRange.upper + margin);
+        }
 
-        if (mAdaptiveSampling)
+        const bool hasColorAxis = !mScatterColorValues.empty();
+        if (mAdaptiveSampling && !hasColorAxis && !scatterOnly)
         {
             const int pixDim = keyIsVertical
                 ? static_cast<int>(mKeyAxis->axisRect()->height())
@@ -425,10 +463,12 @@ void QCPGraph2::draw(QCPPainter* painter)
         {
             lines = ds->getLines(cacheBegin, cacheEnd, mKeyAxis.data(), mValueAxis.data());
         }
+        linesBeginIndex = cacheBegin;
 
         if (!isExportMode)
         {
             mCachedLines = lines;
+            mCachedLinesBeginIndex = cacheBegin;
             mRenderedRange = {mKeyAxis->range(), mValueAxis->range()};
             mHasRenderedRange = true;
             mLineCacheDirty = false;
@@ -440,6 +480,7 @@ void QCPGraph2::draw(QCPPainter* painter)
     else
     {
         lines = mCachedLines;
+        linesBeginIndex = mCachedLinesBeginIndex;
     }
 
     if (lines.isEmpty())
@@ -448,7 +489,6 @@ void QCPGraph2::draw(QCPPainter* painter)
     const QPen drawPen = selected() && mSelectionDecorator
         ? mSelectionDecorator->pen() : mPen;
 
-    // Draw lines
     if (mLineStyle != lsNone && drawPen.style() != Qt::NoPen && drawPen.color().alpha() != 0)
     {
         auto drawPoly = [&](const QVector<QPointF>& pts) {
@@ -495,7 +535,27 @@ void QCPGraph2::draw(QCPPainter* painter)
         }
     }
 
-    // Draw scatters (step transforms don't modify lines — they return new vectors)
+    static constexpr int kOffsetTableSize = 1024;
+    static const auto kOffsets = [] {
+        std::array<uint16_t, kOffsetTableSize> t;
+        std::mt19937 rng(0x5C477E12);
+        for (auto& v : t)
+            v = static_cast<uint16_t>(rng());
+        return t;
+    }();
+
+    const bool useSubset = scatterOnly && mScatterMaxPoints > 0
+                           && lines.size() > mScatterMaxPoints;
+    if (useSubset)
+    {
+        const int N = lines.size();
+        const int M = mScatterMaxPoints;
+        const int bucketSize = N / M;
+        mScatterSubset.resize(M);
+        for (int i = 0; i < M; ++i)
+            mScatterSubset[i] = i * bucketSize + (kOffsets[i % kOffsetTableSize] % bucketSize);
+    }
+
     if (!mScatterStyle.isNone())
     {
         bool usedGpu = false;
@@ -504,27 +564,50 @@ void QCPGraph2::draw(QCPPainter* painter)
             if (auto* srl = mParentPlot->scatterRhiLayer(mLayer))
             {
                 const int skip = mScatterSkip + 1;
-                std::vector<float> pts;
-                pts.reserve((lines.size() / skip) * 3);
-                for (int i = 0; i < lines.size(); i += skip)
-                {
+                const bool hasColor = !mScatterColorValues.empty();
+                const int colorCount = static_cast<int>(mScatterColorValues.size());
+
+                auto emitPoint = [&](int i) {
                     const double sx = lines[i].x(), sy = lines[i].y();
                     if (qIsFinite(sx) && qIsFinite(sy))
                     {
-                        pts.push_back(static_cast<float>(sx));
-                        pts.push_back(static_cast<float>(sy));
-                        pts.push_back(0.0f);
+                        mScatterPts.push_back(static_cast<float>(sx));
+                        mScatterPts.push_back(static_cast<float>(sy));
+                        if (hasColor)
+                        {
+                            const int dataIdx = linesBeginIndex + i;
+                            mScatterPts.push_back(dataIdx < colorCount ? mScatterColorValues[dataIdx] : 0.0f);
+                        }
+                        else
+                        {
+                            mScatterPts.push_back(0.0f);
+                        }
                     }
+                };
+
+                mScatterPts.clear();
+                if (useSubset)
+                {
+                    mScatterPts.reserve(mScatterMaxPoints * 3);
+                    for (int i : mScatterSubset)
+                        emitPoint(i);
                 }
-                if (!pts.empty())
+                else
+                {
+                    mScatterPts.reserve((lines.size() / (mScatterSkip + 1)) * 3);
+                    for (int i = 0; i < lines.size(); i += skip)
+                        emitPoint(i);
+                }
+                if (!mScatterPts.empty())
                 {
                     srl->addScatter(
-                        std::span<const float>(pts.data(), pts.size()),
+                        std::span<const float>(mScatterPts.data(), mScatterPts.size()),
                         mScatterStyle, clipRect(),
                         mParentPlot->devicePixelRatioF(),
                         mParentPlot->rhiOutputSize().height(),
                         static_cast<float>(gpuOffset.x()),
-                        static_cast<float>(gpuOffset.y()));
+                        static_cast<float>(gpuOffset.y()),
+                        hasColor ? mScatterColorMapImage : QImage{});
                 }
                 usedGpu = true;
             }
@@ -533,12 +616,24 @@ void QCPGraph2::draw(QCPPainter* painter)
         {
             applyScattersAntialiasingHint(painter);
             mScatterStyle.applyTo(painter, drawPen);
-            const int skip = mScatterSkip + 1;
-            for (int i = 0; i < lines.size(); i += skip)
+            if (useSubset)
             {
-                const double sx = lines[i].x(), sy = lines[i].y();
-                if (qIsFinite(sx) && qIsFinite(sy))
-                    mScatterStyle.drawShape(painter, sx, sy);
+                for (int i : mScatterSubset)
+                {
+                    const double sx = lines[i].x(), sy = lines[i].y();
+                    if (qIsFinite(sx) && qIsFinite(sy))
+                        mScatterStyle.drawShape(painter, sx, sy);
+                }
+            }
+            else
+            {
+                const int skip = mScatterSkip + 1;
+                for (int i = 0; i < lines.size(); i += skip)
+                {
+                    const double sx = lines[i].x(), sy = lines[i].y();
+                    if (qIsFinite(sx) && qIsFinite(sy))
+                        mScatterStyle.drawShape(painter, sx, sy);
+                }
             }
         }
     }

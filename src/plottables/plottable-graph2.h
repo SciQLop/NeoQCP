@@ -6,6 +6,7 @@
 #include "datasource/async-pipeline.h"
 #include "datasource/graph-resampler.h"
 #include "plottable-draw-utils.h"
+#include "../colorgradient.h"
 #include <memory>
 #include <span>
 #include <QTimer>
@@ -76,6 +77,15 @@ public:
     [[nodiscard]] int scatterSkip() const { return mScatterSkip; }
     void setScatterSkip(int skip) { mScatterSkip = qMax(0, skip); }
 
+    // Per-point color axis for scatter rendering
+    void setScatterColorValues(std::vector<float> values) { mScatterColorValues = std::move(values); }
+    void setScatterColorGradient(const QCPColorGradient& gradient);
+    void clearScatterColorAxis() { mScatterColorValues.clear(); mScatterColorMapImage = {}; }
+
+    // Scatter resampling: 0 = no limit (draw all points), >0 = random subsample to this count
+    [[nodiscard]] int scatterMaxPoints() const { return mScatterMaxPoints; }
+    void setScatterMaxPoints(int maxPoints) { mScatterMaxPoints = qMax(0, maxPoints); }
+
     // Adaptive sampling control
     [[nodiscard]] bool adaptiveSampling() const { return mAdaptiveSampling; }
     void setAdaptiveSampling(bool enabled)
@@ -132,6 +142,7 @@ private:
 
     // Line cache: reuse across replots when viewport shift is small
     QVector<QPointF> mCachedLines;
+    int mCachedLinesBeginIndex = 0;
     bool mLineCacheDirty = true;
     QSize mCachedPlotSize;
     // Cached extruded GPU vertices — avoids re-extrusion on pan
@@ -147,6 +158,14 @@ private:
     LineStyle mLineStyle = lsLine;
     QCPScatterStyle mScatterStyle;
     int mScatterSkip = 0;
+    int mScatterMaxPoints = 100'000;
     bool mAdaptiveSampling = true;
 
+    // Color axis: normalized [0,1] per-point color values + pre-rendered 1D gradient
+    std::vector<float> mScatterColorValues;
+    QImage mScatterColorMapImage;
+
+    // Reused across draw() calls to avoid per-frame heap allocations
+    std::vector<int> mScatterSubset;
+    std::vector<float> mScatterPts;
 };
