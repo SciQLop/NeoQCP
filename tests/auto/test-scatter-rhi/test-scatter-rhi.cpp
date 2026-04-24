@@ -163,10 +163,141 @@ void TestScatterRhi::exportWithScatterStillWorks()
 
 void TestScatterRhi::clearResetsState()
 {
-    // Verify that QCPScatterRhiLayer::clear() works correctly
     QCPScatterRhiLayer layer(nullptr);
-    // clear on empty layer should not crash
     layer.clear();
     QVERIFY(!layer.hasGeometry());
     QVERIFY(layer.isDirty());
+}
+
+// --- Edge case tests ---
+
+void TestScatterRhi::emptyDataDoesNotCrash()
+{
+    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPGraph2::lsNone);
+    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(true);
+}
+
+void TestScatterRhi::singlePointDoesNotCrash()
+{
+    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPGraph2::lsNone);
+    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
+    graph->setData(std::vector<double>{0.5}, std::vector<double>{0.5});
+    mPlot->rescaleAxes();
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(true);
+}
+
+void TestScatterRhi::allNaNDoesNotCrash()
+{
+    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPGraph2::lsNone);
+    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
+    constexpr double nan = std::numeric_limits<double>::quiet_NaN();
+    graph->setData(std::vector<double>{nan, nan, nan},
+                   std::vector<double>{nan, nan, nan});
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(true);
+}
+
+void TestScatterRhi::mixedNaNDoesNotCrash()
+{
+    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPGraph2::lsNone);
+    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
+    constexpr double nan = std::numeric_limits<double>::quiet_NaN();
+    graph->setData(std::vector<double>{0.1, nan, 0.5, 0.9},
+                   std::vector<double>{0.2, 0.3, nan, 0.8});
+    mPlot->rescaleAxes();
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(true);
+}
+
+void TestScatterRhi::infDataDoesNotCrash()
+{
+    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPGraph2::lsNone);
+    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
+    constexpr double inf = std::numeric_limits<double>::infinity();
+    graph->setData(std::vector<double>{0.1, 0.5, 0.9},
+                   std::vector<double>{inf, -inf, 0.5});
+    mPlot->rescaleAxes();
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(true);
+}
+
+void TestScatterRhi::styleChangeBetweenReplots()
+{
+    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPGraph2::lsNone);
+    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
+    graph->setData(std::vector<double>{0.1, 0.5, 0.9},
+                   std::vector<double>{0.2, 0.8, 0.4});
+    mPlot->rescaleAxes();
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssSquare, Qt::blue, 10));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    QPainterPath path;
+    path.addEllipse(-3, -3, 6, 6);
+    graph->setScatterStyle(QCPScatterStyle(path, QPen(Qt::black), QBrush(Qt::red), 8));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(true);
+}
+
+void TestScatterRhi::scatterSkipRespected()
+{
+    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPGraph2::lsNone);
+    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
+    graph->setScatterSkip(5);
+    std::vector<double> keys(100), values(100);
+    for (int i = 0; i < 100; ++i) {
+        keys[i] = i / 100.0;
+        values[i] = std::sin(keys[i] * M_PI);
+    }
+    graph->setData(std::move(keys), std::move(values));
+    mPlot->rescaleAxes();
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(true);
+}
+
+void TestScatterRhi::scatterPlusLineDoesNotCrash()
+{
+    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPGraph2::lsLine);
+    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, Qt::red, 6));
+    graph->setData(std::vector<double>{0.1, 0.3, 0.5, 0.7, 0.9},
+                   std::vector<double>{0.2, 0.8, 0.4, 0.9, 0.1});
+    mPlot->rescaleAxes();
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(true);
+}
+
+void TestScatterRhi::multiGraphScatterDoesNotCrash()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setLineStyle(QCPMultiGraph::lsNone);
+
+    std::vector<double> keys(100);
+    std::vector<std::vector<float>> valueCols(2, std::vector<float>(100));
+    for (int i = 0; i < 100; ++i) {
+        keys[i] = i / 100.0;
+        valueCols[0][i] = static_cast<float>(std::sin(keys[i] * M_PI));
+        valueCols[1][i] = static_cast<float>(std::cos(keys[i] * M_PI));
+    }
+    mg->setData(std::move(keys), std::move(valueCols));
+    mg->setComponentPens({QPen(Qt::red), QPen(Qt::blue)});
+
+    // Set scatter styles on components
+    mg->component(0).scatterStyle = QCPScatterStyle(QCPScatterStyle::ssDisc, Qt::red, 6);
+    mg->component(1).scatterStyle = QCPScatterStyle(QCPScatterStyle::ssSquare, Qt::blue, 6);
+
+    mPlot->rescaleAxes();
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(true);
 }

@@ -23,6 +23,17 @@ private slots:
     void exportWithScatterStillWorks();
     void clearResetsState();
 
+    // Edge cases
+    void emptyDataDoesNotCrash();
+    void singlePointDoesNotCrash();
+    void allNaNDoesNotCrash();
+    void mixedNaNDoesNotCrash();
+    void infDataDoesNotCrash();
+    void styleChangeBetweenReplots();
+    void scatterSkipRespected();
+    void scatterPlusLineDoesNotCrash();
+    void multiGraphScatterDoesNotCrash();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };
