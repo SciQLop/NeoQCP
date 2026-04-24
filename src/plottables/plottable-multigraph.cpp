@@ -10,6 +10,7 @@
 #include "../layoutelements/layoutelement-legend-group.h"
 #include "../painting/painter.h"
 #include "../painting/viewport-offset.h"
+#include "../painting/scatter-rhi-layer.h"
 #include "../vector2d.h"
 
 static QPen defaultSelectedPen(const QPen& pen)
@@ -692,14 +693,48 @@ void QCPMultiGraph::draw(QCPPainter* painter)
 
         // Draw scatters at original data positions (not step-transformed corners)
         if (!comp.scatterStyle.isNone()) {
-            applyScattersAntialiasingHint(painter);
-            comp.scatterStyle.applyTo(painter, comp.pen);
-            const int skip = mScatterSkip + 1;
-            for (int i = 0; i < dataLines.size(); i += skip)
+            bool usedGpu = false;
+            if (!isExportMode && mParentPlot)
             {
-                const double sx = dataLines[i].x(), sy = dataLines[i].y();
-                if (qIsFinite(sx) && qIsFinite(sy))
-                    comp.scatterStyle.drawShape(painter, sx, sy);
+                if (auto* srl = mParentPlot->scatterRhiLayer(mLayer))
+                {
+                    const int skip = mScatterSkip + 1;
+                    std::vector<float> pts;
+                    pts.reserve((dataLines.size() / skip) * 3);
+                    for (int i = 0; i < dataLines.size(); i += skip)
+                    {
+                        const double sx = dataLines[i].x(), sy = dataLines[i].y();
+                        if (qIsFinite(sx) && qIsFinite(sy))
+                        {
+                            pts.push_back(static_cast<float>(sx));
+                            pts.push_back(static_cast<float>(sy));
+                            pts.push_back(0.0f);
+                        }
+                    }
+                    if (!pts.empty())
+                    {
+                        srl->addScatter(
+                            std::span<const float>(pts.data(), pts.size()),
+                            comp.scatterStyle, clipRect(),
+                            mParentPlot->devicePixelRatioF(),
+                            mParentPlot->rhiOutputSize().height(),
+                            static_cast<float>(gpuOffset.x()),
+                            static_cast<float>(gpuOffset.y()));
+                    }
+                    usedGpu = true;
+                }
+            }
+            if (!usedGpu)
+            {
+                applyScattersAntialiasingHint(painter);
+                comp.scatterStyle.applyTo(painter, comp.pen);
+                const int skip = mScatterSkip + 1;
+                for (int i = 0; i < dataLines.size(); i += skip)
+                {
+                    const double sx = dataLines[i].x(), sy = dataLines[i].y();
+                    if (qIsFinite(sx) && qIsFinite(sy))
+                        comp.scatterStyle.drawShape(painter, sx, sy);
+                }
             }
         }
     }

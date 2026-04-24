@@ -10,6 +10,7 @@
 #include "../layoutelements/layoutelement-axisrect.h"
 #include "../painting/painter.h"
 #include "../painting/viewport-offset.h"
+#include "../painting/scatter-rhi-layer.h"
 #include "../vector2d.h"
 
 QCPGraph2::QCPGraph2(QCPAxis* keyAxis, QCPAxis* valueAxis)
@@ -497,14 +498,48 @@ void QCPGraph2::draw(QCPPainter* painter)
     // Draw scatters (step transforms don't modify lines — they return new vectors)
     if (!mScatterStyle.isNone())
     {
-        applyScattersAntialiasingHint(painter);
-        mScatterStyle.applyTo(painter, drawPen);
-        const int skip = mScatterSkip + 1;
-        for (int i = 0; i < lines.size(); i += skip)
+        bool usedGpu = false;
+        if (!isExportMode && mParentPlot)
         {
-            const double sx = lines[i].x(), sy = lines[i].y();
-            if (qIsFinite(sx) && qIsFinite(sy))
-                mScatterStyle.drawShape(painter, sx, sy);
+            if (auto* srl = mParentPlot->scatterRhiLayer(mLayer))
+            {
+                const int skip = mScatterSkip + 1;
+                std::vector<float> pts;
+                pts.reserve((lines.size() / skip) * 3);
+                for (int i = 0; i < lines.size(); i += skip)
+                {
+                    const double sx = lines[i].x(), sy = lines[i].y();
+                    if (qIsFinite(sx) && qIsFinite(sy))
+                    {
+                        pts.push_back(static_cast<float>(sx));
+                        pts.push_back(static_cast<float>(sy));
+                        pts.push_back(0.0f);
+                    }
+                }
+                if (!pts.empty())
+                {
+                    srl->addScatter(
+                        std::span<const float>(pts.data(), pts.size()),
+                        mScatterStyle, clipRect(),
+                        mParentPlot->devicePixelRatioF(),
+                        mParentPlot->rhiOutputSize().height(),
+                        static_cast<float>(gpuOffset.x()),
+                        static_cast<float>(gpuOffset.y()));
+                }
+                usedGpu = true;
+            }
+        }
+        if (!usedGpu)
+        {
+            applyScattersAntialiasingHint(painter);
+            mScatterStyle.applyTo(painter, drawPen);
+            const int skip = mScatterSkip + 1;
+            for (int i = 0; i < lines.size(); i += skip)
+            {
+                const double sx = lines[i].x(), sy = lines[i].y();
+                if (qIsFinite(sx) && qIsFinite(sy))
+                    mScatterStyle.drawShape(painter, sx, sy);
+            }
         }
     }
 }
