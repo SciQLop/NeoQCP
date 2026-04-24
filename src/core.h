@@ -55,6 +55,7 @@ class QCPPlottableRhiLayer;
 class QCPColormapRhiLayer;
 class QCPSpanRhiLayer;
 class QCPGridRhiLayer;
+class QCPScatterRhiLayer;
 class QCPTheme;
 class QCPPipelineScheduler;
 class QCPOverlay;
@@ -135,6 +136,7 @@ public:
 
     [[nodiscard]] QRhi* rhi() const { return mRhi; }
     [[nodiscard]] QCPPlottableRhiLayer* plottableRhiLayer(QCPLayer* layer);
+    [[nodiscard]] QCPScatterRhiLayer* scatterRhiLayer(QCPLayer* layer);
     void registerColormapRhiLayer(QCPColormapRhiLayer* layer);
     void unregisterColormapRhiLayer(QCPColormapRhiLayer* layer);
     [[nodiscard]] QSize rhiOutputSize() const;
@@ -389,6 +391,7 @@ protected:
     QRhiBuffer* mCompositeUbo = nullptr;
     bool mRhiInitialized = false;
     QMap<QCPLayer*, QCPPlottableRhiLayer*> mPlottableRhiLayers;
+    QMap<QCPLayer*, QCPScatterRhiLayer*> mScatterRhiLayers;
     QSet<QCPColormapRhiLayer*> mColormapRhiLayers;
     QCPSpanRhiLayer* mSpanRhiLayer = nullptr;
     QCPGridRhiLayer* mGridRhiLayer = nullptr;

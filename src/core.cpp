@@ -44,6 +44,7 @@
 #include "painting/colormap-rhi-layer.h"
 #include "painting/span-rhi-layer.h"
 #include "painting/grid-rhi-layer.h"
+#include "painting/scatter-rhi-layer.h"
 #include <QSet>
 #include <rhi/qrhi.h>
 #include "embedded_shaders.h"
@@ -510,6 +511,8 @@ QCustomPlot::~QCustomPlot()
     // Release paint buffer GPU resources before QRhiWidget tears down the RHI
     qDeleteAll(mPlottableRhiLayers);
     mPlottableRhiLayers.clear();
+    qDeleteAll(mScatterRhiLayers);
+    mScatterRhiLayers.clear();
     mPaintBuffers.clear();
 
     clearPlottables();
@@ -1103,6 +1106,18 @@ QCPPlottableRhiLayer* QCustomPlot::plottableRhiLayer(QCPLayer* layer)
         mPlottableRhiLayers[layer] = prl;
     }
     return mPlottableRhiLayers[layer];
+}
+
+QCPScatterRhiLayer* QCustomPlot::scatterRhiLayer(QCPLayer* layer)
+{
+    if (!mRhi)
+        return nullptr;
+    if (!mScatterRhiLayers.contains(layer))
+    {
+        auto* srl = new QCPScatterRhiLayer(mRhi);
+        mScatterRhiLayers[layer] = srl;
+    }
+    return mScatterRhiLayers[layer];
 }
 
 void QCustomPlot::registerColormapRhiLayer(QCPColormapRhiLayer* layer)
@@ -2506,6 +2521,8 @@ void QCustomPlot::initialize(QRhiCommandBuffer* cb)
         }
         for (auto* prl : mPlottableRhiLayers)
             prl->invalidatePipeline();
+        for (auto* srl : mScatterRhiLayers)
+            srl->invalidatePipeline();
         for (auto* crl : mColormapRhiLayers)
             crl->invalidatePipeline();
         if (mSpanRhiLayer)
@@ -2647,6 +2664,13 @@ void QCustomPlot::uploadLayerTextures(QRhiResourceUpdateBatch* updates, const QS
     {
         prl->ensurePipeline(renderTarget()->renderPassDescriptor(), sampleCount());
         prl->uploadResources(updates, outputSize, mBufferDevicePixelRatio,
+                              mRhi->isYUpInNDC());
+    }
+
+    for (auto* srl : mScatterRhiLayers)
+    {
+        srl->ensurePipeline(renderTarget()->renderPassDescriptor(), sampleCount());
+        srl->uploadResources(updates, outputSize, mBufferDevicePixelRatio,
                               mRhi->isYUpInNDC());
     }
 
@@ -2821,6 +2845,13 @@ void QCustomPlot::executeRenderPass(QRhiCommandBuffer* cb, QRhiResourceUpdateBat
                 prl->render(cb, outputSize);
         }
 
+        // Draw GPU scatter geometry for this layer (after lines)
+        if (auto* srl = mScatterRhiLayers.value(layer, nullptr))
+        {
+            if (srl->hasGeometry())
+                srl->render(cb, outputSize);
+        }
+
         // Draw GPU spans on the main layer (after plottables, before axes)
         if (layer == this->layer(QLatin1String("main"))
             && mSpanRhiLayer && mSpanRhiLayer->hasSpans())
@@ -2880,6 +2911,8 @@ void QCustomPlot::releaseResources()
     // Release paint buffer GPU resources while the RHI is still valid
     qDeleteAll(mPlottableRhiLayers);
     mPlottableRhiLayers.clear();
+    qDeleteAll(mScatterRhiLayers);
+    mScatterRhiLayers.clear();
     // Colormap RHI layers are owned by plottable renderers — release them so
     // ensureRhiLayer() recreates with the new QRhi on next draw().
     for (auto* plottable : std::as_const(mPlottables))
