@@ -156,6 +156,7 @@ public:
     void applyTo(QCPPainter* painter, const QPen& defaultPen) const;
     void drawShape(QCPPainter* painter, const QPointF& pos) const;
     void drawShape(QCPPainter* painter, double x, double y) const;
+    [[nodiscard]] QImage renderToImage(int textureSize = 64) const;
 
 protected:
     // property members:

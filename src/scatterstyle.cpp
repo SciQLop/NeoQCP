@@ -478,3 +478,19 @@ void QCPScatterStyle::drawShape(QCPPainter* painter, double x, double y) const
         }
     }
 }
+
+QImage QCPScatterStyle::renderToImage(int textureSize) const
+{
+    QImage img(textureSize, textureSize, QImage::Format_ARGB32_Premultiplied);
+    img.fill(Qt::transparent);
+    QCPPainter painter(&img);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setPen(mPen);
+    painter.setBrush(mBrush);
+    double center = textureSize / 2.0;
+    double scale = (textureSize - 2.0) / mSize;
+    painter.translate(center, center);
+    painter.scale(scale, scale);
+    drawShape(&painter, 0.0, 0.0);
+    return img;
+}
