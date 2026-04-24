@@ -193,6 +193,7 @@ NeoQCP = static_library('NeoQCP',
            'src/painting/span-rhi-layer.cpp',
            'src/painting/grid-rhi-layer.cpp',
            'src/painting/colormap-rhi-layer.cpp',
+           'src/painting/scatter-rhi-layer.cpp',
            'src/painting/colormap-renderer.cpp',
            'src/painting/line-extruder.cpp',
            'src/painting/contour-extractor.cpp',
@@ -260,7 +261,7 @@ NeoQCP = static_library('NeoQCP',
            cpp_args:cpp_args,
            dependencies: [qtdeps] + optional_deps,
            install: true,
-           extra_files: [neoqcp_moc_headers, 'src/Profiling.hpp', 'src/painting/paintbuffer-rhi.h', 'src/painting/plottable-rhi-layer.h', 'src/painting/span-rhi-layer.h', 'src/painting/colormap-rhi-layer.h', 'src/painting/grid-rhi-layer.h']
+           extra_files: [neoqcp_moc_headers, 'src/Profiling.hpp', 'src/painting/paintbuffer-rhi.h', 'src/painting/plottable-rhi-layer.h', 'src/painting/span-rhi-layer.h', 'src/painting/colormap-rhi-layer.h', 'src/painting/grid-rhi-layer.h', 'src/painting/scatter-rhi-layer.h']
            )
 
 
