@@ -26,4 +26,7 @@ public:
     virtual QVector<QPointF> getLines(
         int column, int begin, int end,
         QCPAxis* keyAxis, QCPAxis* valueAxis) const = 0;
+
+    virtual const double* rawKeyData() const { return nullptr; }
+    virtual const double* rawColumnData(int /*column*/) const { return nullptr; }
 };

@@ -62,19 +62,51 @@ public:
                                            QCPAxis* keyAxis, QCPAxis* valueAxis) const override
     {
         Q_ASSERT(column >= 0 && column < columnCount());
+        ensureGapCache(begin, end);
         return qcp::algo::optimizedLineData(mKeys, mValues[column], begin, end, pixelWidth,
-                                             keyAxis, valueAxis);
+                                             keyAxis, valueAxis, &mGapCache.gaps);
     }
 
     QVector<QPointF> getLines(int column, int begin, int end,
                                QCPAxis* keyAxis, QCPAxis* valueAxis) const override
     {
         Q_ASSERT(column >= 0 && column < columnCount());
-        return qcp::algo::linesToPixels(mKeys, mValues[column], begin, end, keyAxis, valueAxis);
+        ensureGapCache(begin, end);
+        return qcp::algo::linesToPixels(mKeys, mValues[column], begin, end, keyAxis, valueAxis,
+                                         qcp::algo::kDefaultGapThreshold, &mGapCache.gaps);
+    }
+
+    const double* rawKeyData() const override
+    {
+        if constexpr (std::is_same_v<K, double> && ContiguousNumericRange<KeyContainer>)
+            return std::ranges::data(mKeys);
+        else
+            return nullptr;
+    }
+
+    const double* rawColumnData(int column) const override
+    {
+        if constexpr (std::is_same_v<V, double> && ContiguousNumericRange<ValueContainer>)
+        {
+            if (column >= 0 && column < columnCount())
+                return std::ranges::data(mValues[column]);
+        }
+        return nullptr;
     }
 
 private:
+    void ensureGapCache(int begin, int end) const
+    {
+        if (mGapCache.begin != begin || mGapCache.end != end)
+        {
+            mGapCache.begin = begin;
+            mGapCache.end = end;
+            mGapCache.gaps = qcp::algo::detectKeyGaps(mKeys, begin, end);
+        }
+    }
+
     KeyContainer mKeys;
     std::vector<ValueContainer> mValues;
     std::shared_ptr<const void> mDataGuard;
+    mutable struct { int begin = -1; int end = -1; std::vector<bool> gaps; } mGapCache;
 };

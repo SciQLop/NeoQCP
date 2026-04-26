@@ -1404,12 +1404,13 @@ void QCPAxisRect::markAffectedLayersDirty()
         }
     };
 
+    const bool gpuGrid = mParentPlot->gridRhiLayer() != nullptr;
     for (const auto& axisList : mAxes)
     {
         for (QCPAxis* ax : axisList)
         {
             markOnce(ax->layer());
-            markOnce(ax->grid()->layer());
+            if (!gpuGrid) markOnce(ax->grid()->layer());
         }
     }
     for (QCPAbstractPlottable* p : mParentPlot->mPlottables)

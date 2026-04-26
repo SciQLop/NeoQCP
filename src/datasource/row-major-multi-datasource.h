@@ -129,8 +129,9 @@ public:
     {
         Q_ASSERT(column >= 0 && column < mColumns);
         qcp::detail::StridedColumnView<V> colView(mValues + column, mRows, mStride);
+        ensureGapCache(begin, end);
         return qcp::algo::optimizedLineData(mKeys, colView, begin, end, pixelWidth,
-                                             keyAxis, valueAxis);
+                                             keyAxis, valueAxis, &mGapCache.gaps);
     }
 
     QVector<QPointF> getLines(int column, int begin, int end,
@@ -138,14 +139,27 @@ public:
     {
         Q_ASSERT(column >= 0 && column < mColumns);
         qcp::detail::StridedColumnView<V> colView(mValues + column, mRows, mStride);
-        return qcp::algo::linesToPixels(mKeys, colView, begin, end, keyAxis, valueAxis);
+        ensureGapCache(begin, end);
+        return qcp::algo::linesToPixels(mKeys, colView, begin, end, keyAxis, valueAxis,
+                                         qcp::algo::kDefaultGapThreshold, &mGapCache.gaps);
     }
 
 private:
+    void ensureGapCache(int begin, int end) const
+    {
+        if (mGapCache.begin != begin || mGapCache.end != end)
+        {
+            mGapCache.begin = begin;
+            mGapCache.end = end;
+            mGapCache.gaps = qcp::algo::detectKeyGaps(mKeys, begin, end);
+        }
+    }
+
     std::span<const K> mKeys;
     const V* mValues;
     int mRows;
     int mColumns;
     int mStride;
     std::shared_ptr<const void> mDataGuard;
+    mutable struct { int begin = -1; int end = -1; std::vector<bool> gaps; } mGapCache;
 };

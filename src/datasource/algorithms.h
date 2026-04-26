@@ -165,7 +165,8 @@ template <IndexableNumericRange KC, IndexableNumericRange VC>
 QVector<QPointF> linesToPixels(const KC& keys, const VC& values,
                                 int begin, int end,
                                 QCPAxis* keyAxis, QCPAxis* valueAxis,
-                                double gapThreshold = kDefaultGapThreshold)
+                                double gapThreshold = kDefaultGapThreshold,
+                                const std::vector<bool>* precomputedGaps = nullptr)
 {
     using V = std::ranges::range_value_t<VC>;
     Q_ASSERT(begin >= 0 && end <= static_cast<int>(std::ranges::size(keys)));
@@ -173,7 +174,10 @@ QVector<QPointF> linesToPixels(const KC& keys, const VC& values,
     const int count = end - begin;
     if (count <= 0) return {};
 
-    auto gaps = detectKeyGaps(keys, begin, end, gapThreshold);
+    std::vector<bool> computedGaps;
+    if (!precomputedGaps)
+        computedGaps = detectKeyGaps(keys, begin, end, gapThreshold);
+    const auto& gaps = precomputedGaps ? *precomputedGaps : computedGaps;
 
     QVector<QPointF> result;
     result.reserve(count + count / 10); // extra room for gap markers
@@ -207,7 +211,8 @@ template <IndexableNumericRange KC, IndexableNumericRange VC>
 QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
                                     int begin, int end,
                                     int /*pixelWidth*/,
-                                    QCPAxis* keyAxis, QCPAxis* valueAxis)
+                                    QCPAxis* keyAxis, QCPAxis* valueAxis,
+                                    const std::vector<bool>* precomputedGaps = nullptr)
 {
     PROFILE_HERE_N("optimizedLineData");
     Q_ASSERT(begin >= 0 && end <= static_cast<int>(std::ranges::size(keys)));
@@ -223,10 +228,14 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
         maxCount = int(2 * keyPixelSpan + 2);
 
     if (dataCount < maxCount)
-        return linesToPixels(keys, values, begin, end, keyAxis, valueAxis);
+        return linesToPixels(keys, values, begin, end, keyAxis, valueAxis,
+                             kDefaultGapThreshold, precomputedGaps);
 
     // Adaptive sampling: consolidate multiple data points per pixel into min/max clusters.
-    auto gaps = detectKeyGaps(keys, begin, end);
+    std::vector<bool> computedGaps;
+    if (!precomputedGaps)
+        computedGaps = detectKeyGaps(keys, begin, end);
+    const auto& gaps = precomputedGaps ? *precomputedGaps : computedGaps;
     const auto nanPt = QPointF(qQNaN(), qQNaN());
 
     QVector<QPointF> result;

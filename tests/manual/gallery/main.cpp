@@ -319,7 +319,7 @@ static QWidget* createContourTab()
     auto* scale = new QCPColorScale(plot);
     plot->plotLayout()->addElement(0, 1, scale);
     cm->setColorScale(scale);
-    cm->setGradient(QCPColorGradient(QCPColorGradient::gpViridis));
+    cm->setGradient(QCPColorGradient(QCPColorGradient::gpJet));
     cm->rescaleDataRange(true);
 
     cm->setAutoContourLevels(8);

@@ -29,6 +29,7 @@
 #include "painter.h"
 #include "rhi-utils.h"
 #include "Profiling.hpp"
+#include <cstring>
 
 QCPPaintBufferRhi::QCPPaintBufferRhi(const QSize& size, double devicePixelRatio,
                                        const QString& layerName, QRhi* rhi)
@@ -81,7 +82,10 @@ void QCPPaintBufferRhi::draw(QCPPainter* painter) const
 void QCPPaintBufferRhi::clear(const QColor& color)
 {
     PROFILE_HERE_N("QCPPaintBufferRhi::clear");
-    mStagingImage.fill(color);
+    if (color == Qt::transparent && mStagingImage.format() == QImage::Format_ARGB32_Premultiplied)
+        memset(mStagingImage.bits(), 0, mStagingImage.sizeInBytes());
+    else
+        mStagingImage.fill(color);
 }
 
 void QCPPaintBufferRhi::reallocateBuffer()

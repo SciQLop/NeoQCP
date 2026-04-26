@@ -3441,12 +3441,14 @@ void QCustomPlot::setupPaintBuffers()
                 // Buffers with no plottables (axes, legend) always clear.
                 bool hasPlottables = false;
                 bool anyCanProduce = false;
+                bool hasAnyChildren = false;
                 for (auto* layer : std::as_const(mLayers))
                 {
                     if (layer->mPaintBuffer.toStrongRef() == buffer)
                     {
                         for (auto* child : layer->children())
                         {
+                            hasAnyChildren = true;
                             if (auto* p = qobject_cast<QCPAbstractPlottable*>(child))
                             {
                                 hasPlottables = true;
@@ -3461,7 +3463,11 @@ void QCustomPlot::setupPaintBuffers()
                             break;
                     }
                 }
-                if (!hasPlottables || anyCanProduce)
+                if (!hasAnyChildren && !buffer->invalidated())
+                {
+                    buffer->setContentDirty(false);
+                }
+                else if (!hasPlottables || anyCanProduce)
                 {
                     buffer->clear(Qt::transparent);
                     buffer->setInvalidated();
@@ -3515,6 +3521,17 @@ bool QCustomPlot::hasInvalidatedPaintBuffers()
 
 void QCustomPlot::ensureAtLeastOneBufferDirty()
 {
+    for (const auto& b : mPaintBuffers)
+    {
+        if (b->contentDirty())
+            return;
+    }
+    // No buffer is dirty — use markAffectedLayersDirty() to precisely dirty
+    // only range-dependent layers (axes, grid, plottables), skipping static
+    // buffers (background, empty overlay) to avoid needless memset clears.
+    for (auto* ar : axisRects())
+        ar->markAffectedLayersDirty();
+    // Fallback if nothing got dirtied (e.g. no axis rects)
     for (const auto& b : mPaintBuffers)
     {
         if (b->contentDirty())

@@ -72,14 +72,14 @@ public:
         int s = mBins.stride();
         const bool keyIsVertical = keyAxis->orientation() == Qt::Vertical;
         const int count = end - begin;
-        auto gaps = qcp::algo::detectKeyGaps(mBins.keys, begin, end);
+        ensureGapCache(begin, end);
         const auto nanPt = QPointF(qQNaN(), qQNaN());
 
         QVector<QPointF> lines;
         lines.reserve(count + count / 10);
         for (int i = begin; i < end; ++i)
         {
-            if (gaps[i - begin])
+            if (mGapCache.gaps[i - begin])
                 lines.append(nanPt);
             double v = mBins.values[column * s + i];
             if (std::isnan(v)) continue;
@@ -90,8 +90,26 @@ public:
         return lines;
     }
 
+    const double* rawKeyData() const override { return mBins.keys.data(); }
+    const double* rawColumnData(int column) const override
+    {
+        if (column < 0 || column >= mBins.numColumns) return nullptr;
+        return mBins.values.data() + column * mBins.stride();
+    }
+
 private:
+    void ensureGapCache(int begin, int end) const
+    {
+        if (mGapCache.begin != begin || mGapCache.end != end)
+        {
+            mGapCache.begin = begin;
+            mGapCache.end = end;
+            mGapCache.gaps = qcp::algo::detectKeyGaps(mBins.keys, begin, end);
+        }
+    }
+
     qcp::algo::MultiColumnBinResult mBins;
+    mutable struct { int begin = -1; int end = -1; std::vector<bool> gaps; } mGapCache;
 };
 
 namespace qcp::algo {

@@ -272,11 +272,12 @@ inline MultiColumnBinResult binMinMaxMulti(
     }
 
     // Pre-compute bin indices for all source points (keys are shared across columns)
+    const double* rawKeys = src.rawKeyData();
     std::vector<int> bins(end - begin);
     int validCount = 0;
     for (int i = begin; i < end; ++i)
     {
-        double k = src.keyAt(i);
+        double k = rawKeys ? rawKeys[i] : src.keyAt(i);
         if (!std::isfinite(k)) { bins[i - begin] = -1; continue; }
         bins[i - begin] = std::clamp(static_cast<int>((k - keyLo) / binWidth), 0, numBins - 1);
         ++validCount;
@@ -287,11 +288,12 @@ inline MultiColumnBinResult binMinMaxMulti(
     for (int c = 0; c < N; ++c)
     {
         double* colOut = out.values.data() + c * s;
+        const double* rawCol = src.rawColumnData(c);
         for (int i = begin; i < end; ++i)
         {
             int bin = bins[i - begin];
             if (bin < 0) continue;
-            double v = src.valueAt(c, i);
+            double v = rawCol ? rawCol[i] : src.valueAt(c, i);
             if (std::isnan(v)) continue;
 
             double& mn = colOut[bin * 2 + 0];
@@ -339,13 +341,18 @@ inline MultiColumnBinResult binMinMaxMultiParallel(
 
     threadCount = std::min(threadCount, numBins);
 
+    const double* rawKeys = src.rawKeyData();
+    std::vector<const double*> rawCols(N);
+    for (int c = 0; c < N; ++c)
+        rawCols[c] = src.rawColumnData(c);
+
     auto worker = [&](int srcBegin, int srcEnd, int binBegin, int binEnd) {
         // Pre-compute bin indices for this chunk
         int count = srcEnd - srcBegin;
         std::vector<int> bins(count);
         for (int i = 0; i < count; ++i)
         {
-            double k = src.keyAt(srcBegin + i);
+            double k = rawKeys ? rawKeys[srcBegin + i] : src.keyAt(srcBegin + i);
             if (!std::isfinite(k)) { bins[i] = -1; continue; }
             bins[i] = std::clamp(static_cast<int>((k - keyLo) / binWidth), binBegin, binEnd - 1);
         }
@@ -353,11 +360,12 @@ inline MultiColumnBinResult binMinMaxMultiParallel(
         for (int c = 0; c < N; ++c)
         {
             double* colOut = out.values.data() + c * s;
+            const double* rawCol = rawCols[c];
             for (int i = 0; i < count; ++i)
             {
                 int bin = bins[i];
                 if (bin < 0) continue;
-                double v = src.valueAt(c, srcBegin + i);
+                double v = rawCol ? rawCol[srcBegin + i] : src.valueAt(c, srcBegin + i);
                 if (std::isnan(v)) continue;
 
                 double& mn = colOut[bin * 2 + 0];

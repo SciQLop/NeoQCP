@@ -65,18 +65,32 @@ public:
     QVector<QPointF> getOptimizedLineData(int begin, int end, int pixelWidth,
                                            QCPAxis* keyAxis, QCPAxis* valueAxis) const override
     {
+        ensureGapCache(begin, end);
         return qcp::algo::optimizedLineData(mKeys, mValues, begin, end, pixelWidth,
-                                             keyAxis, valueAxis);
+                                             keyAxis, valueAxis, &mGapCache.gaps);
     }
 
     QVector<QPointF> getLines(int begin, int end,
                                QCPAxis* keyAxis, QCPAxis* valueAxis) const override
     {
-        return qcp::algo::linesToPixels(mKeys, mValues, begin, end, keyAxis, valueAxis);
+        ensureGapCache(begin, end);
+        return qcp::algo::linesToPixels(mKeys, mValues, begin, end, keyAxis, valueAxis,
+                                         qcp::algo::kDefaultGapThreshold, &mGapCache.gaps);
     }
 
 private:
+    void ensureGapCache(int begin, int end) const
+    {
+        if (mGapCache.begin != begin || mGapCache.end != end)
+        {
+            mGapCache.begin = begin;
+            mGapCache.end = end;
+            mGapCache.gaps = qcp::algo::detectKeyGaps(mKeys, begin, end);
+        }
+    }
+
     KeyContainer mKeys;
     ValueContainer mValues;
     std::shared_ptr<const void> mDataGuard;
+    mutable struct { int begin = -1; int end = -1; std::vector<bool> gaps; } mGapCache;
 };
