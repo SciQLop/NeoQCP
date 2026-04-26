@@ -1,24 +1,33 @@
 #pragma once
 #include "abstract-datasource.h"
 #include "axis/axis.h"
+#include "layoutelements/layoutelement-axisrect.h"
 #include "../Profiling.hpp"
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <QtGlobal>
 
 namespace qcp::algo {
 
 constexpr double kDefaultGapThreshold = 1.5;
 
-// Detect gaps between consecutive sorted keys using local neighbor spacing.
-// Returns a bool vector where gapBefore[i] = true means there's a gap between
-// keys[begin+i-1] and keys[begin+i]. Same algorithm as QCPColorMap2 gap detection.
+struct GapVector {
+    std::vector<uint8_t> data;
+    bool hasAnyGap = false;
+
+    explicit GapVector(int count = 0) : data(count, 0) {}
+    uint8_t operator[](int i) const { return data[i]; }
+    void setGap(int i) { data[i] = 1; hasAnyGap = true; }
+    int size() const { return static_cast<int>(data.size()); }
+};
+
 template <IndexableNumericRange KC>
-std::vector<bool> detectKeyGaps(const KC& keys, int begin, int end,
+GapVector detectKeyGaps(const KC& keys, int begin, int end,
                                  double threshold = kDefaultGapThreshold)
 {
     const int count = end - begin;
-    std::vector<bool> gapBefore(count, false);
+    GapVector gapBefore(count);
     if (count < 3 || threshold <= 0) return gapBefore;
 
     for (int i = 0; i < count - 1; ++i)
@@ -30,7 +39,7 @@ std::vector<bool> detectKeyGaps(const KC& keys, int begin, int end,
         if (i + 2 < count)
             refDx = std::min(refDx, static_cast<double>(keys[begin + i + 2]) - static_cast<double>(keys[begin + i + 1]));
         if (refDx < std::numeric_limits<double>::max() && dx > threshold * refDx)
-            gapBefore[i + 1] = true; // gap before point i+1
+            gapBefore.setGap(i + 1);
     }
     return gapBefore;
 }
@@ -161,12 +170,66 @@ QCPRange valueRange(const KC& keys, const VC& values, bool& foundRange,
     return foundRange ? QCPRange(lower, upper) : QCPRange();
 }
 
+// Pre-computed affine transform for coord<->pixel conversion.
+// For linear axes: pixel = coord * scale + offset
+struct AffineTransform {
+    double scale;
+    double offset;
+    double invScale;
+    double invOffset;
+    bool isLinear;
+
+    static AffineTransform fromAxis(const QCPAxis* axis)
+    {
+        AffineTransform t;
+        t.isLinear = axis->scaleType() == QCPAxis::stLinear;
+        if (!t.isLinear) { t.scale = t.offset = t.invScale = t.invOffset = 0; return t; }
+
+        const auto range = axis->range();
+        const double rangeSize = range.size();
+        if (axis->orientation() == Qt::Horizontal)
+        {
+            double width = axis->axisRect()->width();
+            if (!axis->rangeReversed())
+            {
+                t.scale = width / rangeSize;
+                t.offset = axis->axisRect()->left() - range.lower * t.scale;
+            }
+            else
+            {
+                t.scale = -width / rangeSize;
+                t.offset = axis->axisRect()->left() + range.upper * (-t.scale);
+            }
+        }
+        else
+        {
+            double height = axis->axisRect()->height();
+            if (!axis->rangeReversed())
+            {
+                t.scale = -height / rangeSize;
+                t.offset = axis->axisRect()->bottom() - range.lower * t.scale;
+            }
+            else
+            {
+                t.scale = height / rangeSize;
+                t.offset = axis->axisRect()->bottom() - range.upper * t.scale;
+            }
+        }
+        t.invScale = 1.0 / t.scale;
+        t.invOffset = -t.offset * t.invScale;
+        return t;
+    }
+
+    double toPixel(double coord) const { return coord * scale + offset; }
+    double toCoord(double pixel) const { return pixel * invScale + invOffset; }
+};
+
 template <IndexableNumericRange KC, IndexableNumericRange VC>
 QVector<QPointF> linesToPixels(const KC& keys, const VC& values,
                                 int begin, int end,
                                 QCPAxis* keyAxis, QCPAxis* valueAxis,
                                 double gapThreshold = kDefaultGapThreshold,
-                                const std::vector<bool>* precomputedGaps = nullptr)
+                                const GapVector* precomputedGaps = nullptr)
 {
     using V = std::ranges::range_value_t<VC>;
     Q_ASSERT(begin >= 0 && end <= static_cast<int>(std::ranges::size(keys)));
@@ -174,21 +237,25 @@ QVector<QPointF> linesToPixels(const KC& keys, const VC& values,
     const int count = end - begin;
     if (count <= 0) return {};
 
-    std::vector<bool> computedGaps;
+    GapVector computedGaps;
     if (!precomputedGaps)
         computedGaps = detectKeyGaps(keys, begin, end, gapThreshold);
     const auto& gaps = precomputedGaps ? *precomputedGaps : computedGaps;
 
     QVector<QPointF> result;
-    result.reserve(count + count / 10); // extra room for gap markers
+    result.reserve(count + count / 10);
 
     const bool isVertical = keyAxis->orientation() == Qt::Vertical;
     const auto nanPt = QPointF(qQNaN(), qQNaN());
 
+    const auto keyTf = AffineTransform::fromAxis(keyAxis);
+    const auto valTf = AffineTransform::fromAxis(valueAxis);
+    const bool bothLinear = keyTf.isLinear && valTf.isLinear;
+
     for (int i = begin; i < end; ++i)
     {
         int ri = i - begin;
-        if (gaps[ri])
+        if (gaps.hasAnyGap && gaps[ri])
             result.append(nanPt);
 
         double v = static_cast<double>(values[i]);
@@ -197,12 +264,22 @@ QVector<QPointF> linesToPixels(const KC& keys, const VC& values,
             if (std::isnan(v)) { result.append(nanPt); continue; }
         }
 
-        if (isVertical)
-            result.append(QPointF(valueAxis->coordToPixel(v),
-                                  keyAxis->coordToPixel(static_cast<double>(keys[i]))));
+        double k = static_cast<double>(keys[i]);
+        if (bothLinear)
+        {
+            double kp = keyTf.toPixel(k);
+            double vp = valTf.toPixel(v);
+            result.append(isVertical ? QPointF(vp, kp) : QPointF(kp, vp));
+        }
         else
-            result.append(QPointF(keyAxis->coordToPixel(static_cast<double>(keys[i])),
-                                  valueAxis->coordToPixel(v)));
+        {
+            if (isVertical)
+                result.append(QPointF(valueAxis->coordToPixel(v),
+                                      keyAxis->coordToPixel(k)));
+            else
+                result.append(QPointF(keyAxis->coordToPixel(k),
+                                      valueAxis->coordToPixel(v)));
+        }
     }
     return result;
 }
@@ -212,7 +289,7 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
                                     int begin, int end,
                                     int /*pixelWidth*/,
                                     QCPAxis* keyAxis, QCPAxis* valueAxis,
-                                    const std::vector<bool>* precomputedGaps = nullptr)
+                                    const GapVector* precomputedGaps = nullptr)
 {
     PROFILE_HERE_N("optimizedLineData");
     Q_ASSERT(begin >= 0 && end <= static_cast<int>(std::ranges::size(keys)));
@@ -220,7 +297,6 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
     const int dataCount = end - begin;
     if (dataCount <= 0) return {};
 
-    // Determine if adaptive sampling should kick in
     double keyPixelSpan = qAbs(keyAxis->coordToPixel(static_cast<double>(keys[begin]))
                                 - keyAxis->coordToPixel(static_cast<double>(keys[end - 1])));
     int maxCount = (std::numeric_limits<int>::max)();
@@ -231,8 +307,7 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
         return linesToPixels(keys, values, begin, end, keyAxis, valueAxis,
                              kDefaultGapThreshold, precomputedGaps);
 
-    // Adaptive sampling: consolidate multiple data points per pixel into min/max clusters.
-    std::vector<bool> computedGaps;
+    GapVector computedGaps;
     if (!precomputedGaps)
         computedGaps = detectKeyGaps(keys, begin, end);
     const auto& gaps = precomputedGaps ? *precomputedGaps : computedGaps;
@@ -242,12 +317,21 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
     result.reserve(maxCount);
 
     const bool isVertical = keyAxis->orientation() == Qt::Vertical;
+    const auto keyTf = AffineTransform::fromAxis(keyAxis);
+    const auto valTf = AffineTransform::fromAxis(valueAxis);
+    const bool bothLinear = keyTf.isLinear && valTf.isLinear;
+
     auto toPixel = [&](double k, double v) -> QPointF {
+        if (bothLinear)
+        {
+            double kp = keyTf.toPixel(k);
+            double vp = valTf.toPixel(v);
+            return isVertical ? QPointF(vp, kp) : QPointF(kp, vp);
+        }
         return isVertical ? QPointF(valueAxis->coordToPixel(v), keyAxis->coordToPixel(k))
                           : QPointF(keyAxis->coordToPixel(k), valueAxis->coordToPixel(v));
     };
 
-    // Flush the current interval to result
     auto flushInterval = [&](int intervalFirst, int intervalCount,
                               double intervalStartKey, double lastEndKey,
                               double minVal, double maxVal,
@@ -261,7 +345,6 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
             result.append(toPixel(intervalStartKey + epsilon * 0.75, maxVal));
             if (nextKey > intervalStartKey + epsilon * 2)
             {
-                // Find last valid value before nextKey position
                 int prev = intervalFirst + intervalCount - 1;
                 result.append(toPixel(intervalStartKey + epsilon * 0.8,
                                        static_cast<double>(values[prev])));
@@ -274,7 +357,6 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
         }
     };
 
-    // Skip leading NaN values
     int i = begin;
     using V = std::ranges::range_value_t<VC>;
     if constexpr (!std::is_integral_v<V>)
@@ -289,15 +371,43 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
     int currentIntervalFirst = i;
     int reversedFactor = keyAxis->pixelOrientation();
     int reversedRound = reversedFactor == -1 ? 1 : 0;
-    double currentIntervalStartKey = keyAxis->pixelToCoord(
-        int(keyAxis->coordToPixel(static_cast<double>(keys[i])) + reversedRound));
-    double lastIntervalEndKey = currentIntervalStartKey;
-    double keyEpsilon = qAbs(currentIntervalStartKey
-        - keyAxis->pixelToCoord(keyAxis->coordToPixel(currentIntervalStartKey)
-                                + 1.0 * reversedFactor));
-    bool keyEpsilonVariable = keyAxis->scaleType() == QCPAxis::stLogarithmic;
+
+    // For linear axes, pre-compute the constant key-space epsilon and use inline
+    // affine transform for boundary updates (no function calls). For log axes,
+    // fall back to axis method calls.
+    const bool useInlineTransform = keyTf.isLinear;
+    double currentIntervalStartKey = 0;
+    double lastIntervalEndKey = 0;
+    double keyEpsilon = 0;
+    double nextBoundary = 0;  // currentIntervalStartKey + keyEpsilon, cached
+    bool keyEpsilonVariable = false;
+
+    if (useInlineTransform)
+    {
+        double kp = keyTf.toPixel(static_cast<double>(keys[i]));
+        int pixel = static_cast<int>(kp) + reversedRound;
+        currentIntervalStartKey = keyTf.toCoord(pixel);
+        lastIntervalEndKey = currentIntervalStartKey;
+        keyEpsilon = qAbs(keyTf.invScale);
+        nextBoundary = currentIntervalStartKey + keyEpsilon;
+    }
+    else
+    {
+        currentIntervalStartKey = keyAxis->pixelToCoord(
+            int(keyAxis->coordToPixel(static_cast<double>(keys[i])) + reversedRound));
+        lastIntervalEndKey = currentIntervalStartKey;
+        keyEpsilon = qAbs(currentIntervalStartKey
+            - keyAxis->pixelToCoord(keyAxis->coordToPixel(currentIntervalStartKey)
+                                    + 1.0 * reversedFactor));
+        nextBoundary = currentIntervalStartKey + keyEpsilon;
+        keyEpsilonVariable = keyAxis->scaleType() == QCPAxis::stLogarithmic;
+    }
+
     int intervalDataCount = 1;
     ++i;
+
+    const uint8_t* gapData = gaps.data.data();
+    const bool hasAnyGap = gaps.hasAnyGap;
 
     while (i < end)
     {
@@ -307,8 +417,7 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
             if (std::isnan(v)) { ++i; continue; }
         }
 
-        // Key gap: flush current interval and insert a break
-        if (gaps[i - begin])
+        if (hasAnyGap && gapData[i - begin])
         {
             double k = static_cast<double>(keys[i]);
             flushInterval(currentIntervalFirst, intervalDataCount,
@@ -319,22 +428,31 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
             minValue = v;
             maxValue = v;
             currentIntervalFirst = i;
-            currentIntervalStartKey = keyAxis->pixelToCoord(
-                int(keyAxis->coordToPixel(k) + reversedRound));
-            if (keyEpsilonVariable)
-                keyEpsilon = qAbs(currentIntervalStartKey
-                    - keyAxis->pixelToCoord(keyAxis->coordToPixel(currentIntervalStartKey)
-                                            + 1.0 * reversedFactor));
+            if (useInlineTransform)
+            {
+                int pixel = static_cast<int>(keyTf.toPixel(k)) + reversedRound;
+                currentIntervalStartKey = keyTf.toCoord(pixel);
+            }
+            else
+            {
+                currentIntervalStartKey = keyAxis->pixelToCoord(
+                    int(keyAxis->coordToPixel(k) + reversedRound));
+                if (keyEpsilonVariable)
+                    keyEpsilon = qAbs(currentIntervalStartKey
+                        - keyAxis->pixelToCoord(keyAxis->coordToPixel(currentIntervalStartKey)
+                                                + 1.0 * reversedFactor));
+            }
+            nextBoundary = currentIntervalStartKey + keyEpsilon;
             intervalDataCount = 1;
             ++i;
             continue;
         }
 
         double k = static_cast<double>(keys[i]);
-        if (k < currentIntervalStartKey + keyEpsilon)
+        if (k < nextBoundary)
         {
-            if (v < minValue) minValue = v;
-            else if (v > maxValue) maxValue = v;
+            minValue = std::min(minValue, v);
+            maxValue = std::max(maxValue, v);
             ++intervalDataCount;
         }
         else
@@ -346,23 +464,289 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
             minValue = v;
             maxValue = v;
             currentIntervalFirst = i;
-            currentIntervalStartKey = keyAxis->pixelToCoord(
-                int(keyAxis->coordToPixel(k) + reversedRound));
-            if (keyEpsilonVariable)
-                keyEpsilon = qAbs(currentIntervalStartKey
-                    - keyAxis->pixelToCoord(keyAxis->coordToPixel(currentIntervalStartKey)
-                                            + 1.0 * reversedFactor));
+            if (useInlineTransform)
+            {
+                int pixel = static_cast<int>(keyTf.toPixel(k)) + reversedRound;
+                currentIntervalStartKey = keyTf.toCoord(pixel);
+            }
+            else
+            {
+                currentIntervalStartKey = keyAxis->pixelToCoord(
+                    int(keyAxis->coordToPixel(k) + reversedRound));
+                if (keyEpsilonVariable)
+                    keyEpsilon = qAbs(currentIntervalStartKey
+                        - keyAxis->pixelToCoord(keyAxis->coordToPixel(currentIntervalStartKey)
+                                                + 1.0 * reversedFactor));
+            }
+            nextBoundary = currentIntervalStartKey + keyEpsilon;
             intervalDataCount = 1;
         }
         ++i;
     }
-    // Handle last interval
     flushInterval(currentIntervalFirst, intervalDataCount,
                   currentIntervalStartKey, lastIntervalEndKey,
                   minValue, maxValue, keyEpsilon,
                   currentIntervalStartKey + keyEpsilon * 3);
 
     return result;
+}
+
+// Multi-column optimizedLineData: processes all columns in a single pass over the key array.
+// Reads keys once instead of N times, and shares pixel-boundary decisions across columns.
+template <IndexableNumericRange KC>
+void optimizedLineDataMulti(const KC& keys,
+                             int numColumns,
+                             // valueAt(column, dataIndex) -> double
+                             auto&& valueAt,
+                             int begin, int end,
+                             QCPAxis* keyAxis, QCPAxis* valueAxis,
+                             const GapVector* precomputedGaps,
+                             QVector<QPointF>* results)
+{
+    PROFILE_HERE_N("optimizedLineDataMulti");
+    Q_ASSERT(begin >= 0 && end <= static_cast<int>(std::ranges::size(keys)));
+    const int dataCount = end - begin;
+    if (dataCount <= 0)
+    {
+        for (int c = 0; c < numColumns; ++c) results[c].clear();
+        return;
+    }
+
+    double keyPixelSpan = qAbs(keyAxis->coordToPixel(static_cast<double>(keys[begin]))
+                                - keyAxis->coordToPixel(static_cast<double>(keys[end - 1])));
+    int maxCount = (std::numeric_limits<int>::max)();
+    if (2 * keyPixelSpan + 2 < static_cast<double>((std::numeric_limits<int>::max)()))
+        maxCount = int(2 * keyPixelSpan + 2);
+
+    GapVector computedGaps;
+    if (!precomputedGaps)
+        computedGaps = detectKeyGaps(keys, begin, end);
+    const auto& gaps = precomputedGaps ? *precomputedGaps : computedGaps;
+
+    if (dataCount < maxCount)
+    {
+        const auto nanPt = QPointF(qQNaN(), qQNaN());
+        const bool isVertical = keyAxis->orientation() == Qt::Vertical;
+        const auto keyTf = AffineTransform::fromAxis(keyAxis);
+        const auto valTf = AffineTransform::fromAxis(valueAxis);
+        const bool bothLinear = keyTf.isLinear && valTf.isLinear;
+
+        for (int c = 0; c < numColumns; ++c) { results[c].clear(); results[c].reserve(dataCount + dataCount / 10); }
+
+        for (int i = begin; i < end; ++i)
+        {
+            int ri = i - begin;
+            bool isGap = gaps.hasAnyGap && gaps[ri];
+
+            double k = static_cast<double>(keys[i]);
+            double kp = bothLinear ? keyTf.toPixel(k) : keyAxis->coordToPixel(k);
+
+            for (int c = 0; c < numColumns; ++c)
+            {
+                if (isGap) results[c].append(nanPt);
+
+                double v = valueAt(c, i);
+                if (std::isnan(v)) { results[c].append(nanPt); continue; }
+
+                double vp = bothLinear ? valTf.toPixel(v) : valueAxis->coordToPixel(v);
+                results[c].append(isVertical ? QPointF(vp, kp) : QPointF(kp, vp));
+            }
+        }
+        return;
+    }
+
+    // Adaptive sampling: single pass over keys, per-column min/max tracking
+    const auto nanPt = QPointF(qQNaN(), qQNaN());
+    const bool isVertical = keyAxis->orientation() == Qt::Vertical;
+    const auto keyTf = AffineTransform::fromAxis(keyAxis);
+    const auto valTf = AffineTransform::fromAxis(valueAxis);
+    const bool bothLinear = keyTf.isLinear && valTf.isLinear;
+
+    auto toPixel = [&](double k, double v) -> QPointF {
+        if (bothLinear)
+        {
+            double kp = keyTf.toPixel(k);
+            double vp = valTf.toPixel(v);
+            return isVertical ? QPointF(vp, kp) : QPointF(kp, vp);
+        }
+        return isVertical ? QPointF(valueAxis->coordToPixel(v), keyAxis->coordToPixel(k))
+                          : QPointF(keyAxis->coordToPixel(k), valueAxis->coordToPixel(v));
+    };
+
+    for (int c = 0; c < numColumns; ++c) { results[c].clear(); results[c].reserve(maxCount); }
+
+    // Per-column state
+    struct ColState {
+        double minVal;
+        double maxVal;
+        int intervalFirst;
+        int intervalCount;
+    };
+    std::vector<ColState> cs(numColumns);
+
+    int reversedFactor = keyAxis->pixelOrientation();
+    int reversedRound = reversedFactor == -1 ? 1 : 0;
+
+    const bool useInlineTransform = keyTf.isLinear;
+    double currentIntervalStartKey = 0;
+    double lastIntervalEndKey = 0;
+    double keyEpsilon = 0;
+    double nextBoundary = 0;
+    bool keyEpsilonVariable = false;
+
+    int i = begin;
+    if (i >= end)
+    {
+        for (int c = 0; c < numColumns; ++c) results[c].clear();
+        return;
+    }
+
+    if (useInlineTransform)
+    {
+        double kp = keyTf.toPixel(static_cast<double>(keys[i]));
+        int pixel = static_cast<int>(kp) + reversedRound;
+        currentIntervalStartKey = keyTf.toCoord(pixel);
+        lastIntervalEndKey = currentIntervalStartKey;
+        keyEpsilon = qAbs(keyTf.invScale);
+        nextBoundary = currentIntervalStartKey + keyEpsilon;
+    }
+    else
+    {
+        currentIntervalStartKey = keyAxis->pixelToCoord(
+            int(keyAxis->coordToPixel(static_cast<double>(keys[i])) + reversedRound));
+        lastIntervalEndKey = currentIntervalStartKey;
+        keyEpsilon = qAbs(currentIntervalStartKey
+            - keyAxis->pixelToCoord(keyAxis->coordToPixel(currentIntervalStartKey)
+                                    + 1.0 * reversedFactor));
+        nextBoundary = currentIntervalStartKey + keyEpsilon;
+        keyEpsilonVariable = keyAxis->scaleType() == QCPAxis::stLogarithmic;
+    }
+
+    for (int c = 0; c < numColumns; ++c)
+    {
+        double v = valueAt(c, i);
+        cs[c] = {v, v, i, 1};
+    }
+
+    auto flushColumn = [&](int c, const ColState& s,
+                            double intervalStartKey, double lastEndKey,
+                            double epsilon, double nextKey) {
+        if (s.intervalCount >= 2)
+        {
+            double firstVal = valueAt(c, s.intervalFirst);
+            if (!std::isnan(firstVal))
+            {
+                if (lastEndKey < intervalStartKey - epsilon)
+                    results[c].append(toPixel(intervalStartKey + epsilon * 0.2, firstVal));
+            }
+            if (!std::isnan(s.minVal))
+                results[c].append(toPixel(intervalStartKey + epsilon * 0.25, s.minVal));
+            if (!std::isnan(s.maxVal))
+                results[c].append(toPixel(intervalStartKey + epsilon * 0.75, s.maxVal));
+            if (nextKey > intervalStartKey + epsilon * 2)
+            {
+                int prev = s.intervalFirst + s.intervalCount - 1;
+                double lastVal = valueAt(c, prev);
+                if (!std::isnan(lastVal))
+                    results[c].append(toPixel(intervalStartKey + epsilon * 0.8, lastVal));
+            }
+        }
+        else
+        {
+            double val = valueAt(c, s.intervalFirst);
+            if (!std::isnan(val))
+                results[c].append(toPixel(static_cast<double>(keys[s.intervalFirst]), val));
+            else
+                results[c].append(nanPt);
+        }
+    };
+
+    const uint8_t* gapData = gaps.data.data();
+    const bool hasAnyGap = gaps.hasAnyGap;
+
+    ++i;
+    while (i < end)
+    {
+        if (hasAnyGap && gapData[i - begin])
+        {
+            double k = static_cast<double>(keys[i]);
+            for (int c = 0; c < numColumns; ++c)
+            {
+                flushColumn(c, cs[c], currentIntervalStartKey, lastIntervalEndKey,
+                            keyEpsilon, k);
+                results[c].append(nanPt);
+                double v = valueAt(c, i);
+                cs[c] = {v, v, i, 1};
+            }
+            lastIntervalEndKey = currentIntervalStartKey;
+            if (useInlineTransform)
+            {
+                int pixel = static_cast<int>(keyTf.toPixel(k)) + reversedRound;
+                currentIntervalStartKey = keyTf.toCoord(pixel);
+            }
+            else
+            {
+                currentIntervalStartKey = keyAxis->pixelToCoord(
+                    int(keyAxis->coordToPixel(k) + reversedRound));
+                if (keyEpsilonVariable)
+                    keyEpsilon = qAbs(currentIntervalStartKey
+                        - keyAxis->pixelToCoord(keyAxis->coordToPixel(currentIntervalStartKey)
+                                                + 1.0 * reversedFactor));
+            }
+            nextBoundary = currentIntervalStartKey + keyEpsilon;
+            ++i;
+            continue;
+        }
+
+        double k = static_cast<double>(keys[i]);
+        if (k < nextBoundary)
+        {
+            for (int c = 0; c < numColumns; ++c)
+            {
+                double v = valueAt(c, i);
+                if (!std::isnan(v))
+                {
+                    cs[c].minVal = std::min(cs[c].minVal, v);
+                    cs[c].maxVal = std::max(cs[c].maxVal, v);
+                }
+                ++cs[c].intervalCount;
+            }
+        }
+        else
+        {
+            for (int c = 0; c < numColumns; ++c)
+            {
+                flushColumn(c, cs[c], currentIntervalStartKey, lastIntervalEndKey,
+                            keyEpsilon, k);
+                double v = valueAt(c, i);
+                cs[c] = {v, v, i, 1};
+            }
+            lastIntervalEndKey = static_cast<double>(keys[i - 1]);
+            if (useInlineTransform)
+            {
+                int pixel = static_cast<int>(keyTf.toPixel(k)) + reversedRound;
+                currentIntervalStartKey = keyTf.toCoord(pixel);
+            }
+            else
+            {
+                currentIntervalStartKey = keyAxis->pixelToCoord(
+                    int(keyAxis->coordToPixel(k) + reversedRound));
+                if (keyEpsilonVariable)
+                    keyEpsilon = qAbs(currentIntervalStartKey
+                        - keyAxis->pixelToCoord(keyAxis->coordToPixel(currentIntervalStartKey)
+                                                + 1.0 * reversedFactor));
+            }
+            nextBoundary = currentIntervalStartKey + keyEpsilon;
+        }
+        ++i;
+    }
+
+    double finalNextKey = currentIntervalStartKey + keyEpsilon * 3;
+    for (int c = 0; c < numColumns; ++c)
+    {
+        flushColumn(c, cs[c], currentIntervalStartKey, lastIntervalEndKey,
+                    keyEpsilon, finalNextKey);
+    }
 }
 
 } // namespace qcp::algo

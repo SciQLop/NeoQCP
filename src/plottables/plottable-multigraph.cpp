@@ -623,15 +623,30 @@ void QCPMultiGraph::draw(QCPPainter* painter)
         int cacheBegin = ds->findBegin(keyRange.lower - margin);
         int cacheEnd = ds->findEnd(keyRange.upper + margin);
 
-        linesTarget.resize(mComponents.size());
-        for (int c = 0; c < mComponents.size(); ++c)
+        const int nc = static_cast<int>(mComponents.size());
+        linesTarget.resize(nc);
+
+        bool allVisible = true;
+        for (int c = 0; c < nc; ++c)
+            if (!mComponents[c].visible) { allVisible = false; break; }
+
+        if (allVisible && nc > 1 && !(mAdaptiveSampling && !mL2Result))
         {
-            if (!mComponents[c].visible) { linesTarget[c].clear(); continue; }
-            if (mAdaptiveSampling && !mL2Result)
-                linesTarget[c] = ds->getOptimizedLineData(c, cacheBegin, cacheEnd, pixelWidth,
-                                                           mKeyAxis.data(), mValueAxis.data());
-            else
-                linesTarget[c] = ds->getLines(c, cacheBegin, cacheEnd, mKeyAxis.data(), mValueAxis.data());
+            ds->getLinesAll(cacheBegin, cacheEnd,
+                            mKeyAxis.data(), mValueAxis.data(),
+                            linesTarget.data(), nc);
+        }
+        else
+        {
+            for (int c = 0; c < nc; ++c)
+            {
+                if (!mComponents[c].visible) { linesTarget[c].clear(); continue; }
+                if (mAdaptiveSampling && !mL2Result)
+                    linesTarget[c] = ds->getOptimizedLineData(c, cacheBegin, cacheEnd, pixelWidth,
+                                                               mKeyAxis.data(), mValueAxis.data());
+                else
+                    linesTarget[c] = ds->getLines(c, cacheBegin, cacheEnd, mKeyAxis.data(), mValueAxis.data());
+            }
         }
         if (!isExportMode)
         {

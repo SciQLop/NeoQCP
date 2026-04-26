@@ -144,6 +144,22 @@ public:
                                          qcp::algo::kDefaultGapThreshold, &mGapCache.gaps);
     }
 
+    void getOptimizedLineDataAll(int begin, int end, int /*pixelWidth*/,
+                                  QCPAxis* keyAxis, QCPAxis* valueAxis,
+                                  QVector<QPointF>* results, int numColumns) const override
+    {
+        ensureGapCache(begin, end);
+        const int N = std::min(numColumns, mColumns);
+        const V* vals = mValues;
+        const int stride = mStride;
+        qcp::algo::optimizedLineDataMulti(
+            mKeys, N,
+            [vals, stride](int c, int i) -> double {
+                return static_cast<double>(vals[static_cast<std::ptrdiff_t>(i) * stride + c]);
+            },
+            begin, end, keyAxis, valueAxis, &mGapCache.gaps, results);
+    }
+
 private:
     void ensureGapCache(int begin, int end) const
     {
@@ -161,5 +177,5 @@ private:
     int mColumns;
     int mStride;
     std::shared_ptr<const void> mDataGuard;
-    mutable struct { int begin = -1; int end = -1; std::vector<bool> gaps; } mGapCache;
+    mutable struct { int begin = -1; int end = -1; qcp::algo::GapVector gaps; } mGapCache;
 };

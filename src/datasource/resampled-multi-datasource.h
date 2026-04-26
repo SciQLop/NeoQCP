@@ -59,7 +59,7 @@ public:
         return qcp::algo::findEnd(mBins.keys, sortKey, expandedRange);
     }
 
-    QVector<QPointF> getOptimizedLineData(int column, int begin, int end, int pixelWidth,
+    QVector<QPointF> getOptimizedLineData(int column, int begin, int end, int /*pixelWidth*/,
                                            QCPAxis* keyAxis, QCPAxis* valueAxis) const override
     {
         return getLines(column, begin, end, keyAxis, valueAxis);
@@ -74,20 +74,73 @@ public:
         const int count = end - begin;
         ensureGapCache(begin, end);
         const auto nanPt = QPointF(qQNaN(), qQNaN());
+        const auto keyTf = qcp::algo::AffineTransform::fromAxis(keyAxis);
+        const auto valTf = qcp::algo::AffineTransform::fromAxis(valueAxis);
+        const bool bothLinear = keyTf.isLinear && valTf.isLinear;
 
         QVector<QPointF> lines;
         lines.reserve(count + count / 10);
         for (int i = begin; i < end; ++i)
         {
-            if (mGapCache.gaps[i - begin])
+            if (mGapCache.gaps.hasAnyGap && mGapCache.gaps[i - begin])
                 lines.append(nanPt);
             double v = mBins.values[column * s + i];
             if (std::isnan(v)) continue;
-            double keyPx = keyAxis->coordToPixel(mBins.keys[i]);
-            double valPx = valueAxis->coordToPixel(v);
-            lines.append(keyIsVertical ? QPointF(valPx, keyPx) : QPointF(keyPx, valPx));
+            double k = mBins.keys[i];
+            if (bothLinear)
+            {
+                double kp = keyTf.toPixel(k);
+                double vp = valTf.toPixel(v);
+                lines.append(keyIsVertical ? QPointF(vp, kp) : QPointF(kp, vp));
+            }
+            else
+            {
+                double keyPx = keyAxis->coordToPixel(k);
+                double valPx = valueAxis->coordToPixel(v);
+                lines.append(keyIsVertical ? QPointF(valPx, keyPx) : QPointF(keyPx, valPx));
+            }
         }
         return lines;
+    }
+
+    void getOptimizedLineDataAll(int begin, int end, int /*pixelWidth*/,
+                                  QCPAxis* keyAxis, QCPAxis* valueAxis,
+                                  QVector<QPointF>* results, int numColumns) const override
+    {
+        getLinesAll(begin, end, keyAxis, valueAxis, results, numColumns);
+    }
+
+    void getLinesAll(int begin, int end,
+                     QCPAxis* keyAxis, QCPAxis* valueAxis,
+                     QVector<QPointF>* results, int numColumns) const override
+    {
+        ensureGapCache(begin, end);
+        const int N = std::min(numColumns, mBins.numColumns);
+        const int s = mBins.stride();
+        const bool keyIsVertical = keyAxis->orientation() == Qt::Vertical;
+        const int count = end - begin;
+        const auto nanPt = QPointF(qQNaN(), qQNaN());
+        const auto keyTf = qcp::algo::AffineTransform::fromAxis(keyAxis);
+        const auto valTf = qcp::algo::AffineTransform::fromAxis(valueAxis);
+        const bool bothLinear = keyTf.isLinear && valTf.isLinear;
+
+        for (int c = 0; c < N; ++c) { results[c].clear(); results[c].reserve(count + count / 10); }
+
+        for (int i = begin; i < end; ++i)
+        {
+            bool isGap = mGapCache.gaps.hasAnyGap && mGapCache.gaps[i - begin];
+            double k = mBins.keys[i];
+            double kp = bothLinear ? keyTf.toPixel(k) : keyAxis->coordToPixel(k);
+
+            for (int c = 0; c < N; ++c)
+            {
+                if (isGap) results[c].append(nanPt);
+                double v = mBins.values[c * s + i];
+                if (std::isnan(v)) continue;
+                double vp = bothLinear ? valTf.toPixel(v) : valueAxis->coordToPixel(v);
+                results[c].append(keyIsVertical ? QPointF(vp, kp) : QPointF(kp, vp));
+            }
+        }
     }
 
     const double* rawKeyData() const override { return mBins.keys.data(); }
@@ -109,7 +162,7 @@ private:
     }
 
     qcp::algo::MultiColumnBinResult mBins;
-    mutable struct { int begin = -1; int end = -1; std::vector<bool> gaps; } mGapCache;
+    mutable struct { int begin = -1; int end = -1; qcp::algo::GapVector gaps; } mGapCache;
 };
 
 namespace qcp::algo {

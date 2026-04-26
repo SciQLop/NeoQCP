@@ -92,5 +92,5 @@ private:
     KeyContainer mKeys;
     ValueContainer mValues;
     std::shared_ptr<const void> mDataGuard;
-    mutable struct { int begin = -1; int end = -1; std::vector<bool> gaps; } mGapCache;
+    mutable struct { int begin = -1; int end = -1; qcp::algo::GapVector gaps; } mGapCache;
 };

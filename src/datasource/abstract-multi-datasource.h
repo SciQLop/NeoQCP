@@ -27,6 +27,24 @@ public:
         int column, int begin, int end,
         QCPAxis* keyAxis, QCPAxis* valueAxis) const = 0;
 
+    virtual void getOptimizedLineDataAll(
+        int begin, int end, int pixelWidth,
+        QCPAxis* keyAxis, QCPAxis* valueAxis,
+        QVector<QPointF>* results, int numColumns) const
+    {
+        for (int c = 0; c < numColumns; ++c)
+            results[c] = getOptimizedLineData(c, begin, end, pixelWidth, keyAxis, valueAxis);
+    }
+
+    virtual void getLinesAll(
+        int begin, int end,
+        QCPAxis* keyAxis, QCPAxis* valueAxis,
+        QVector<QPointF>* results, int numColumns) const
+    {
+        for (int c = 0; c < numColumns; ++c)
+            results[c] = getLines(c, begin, end, keyAxis, valueAxis);
+    }
+
     virtual const double* rawKeyData() const { return nullptr; }
     virtual const double* rawColumnData(int /*column*/) const { return nullptr; }
 };

@@ -76,6 +76,18 @@ public:
                                          qcp::algo::kDefaultGapThreshold, &mGapCache.gaps);
     }
 
+    void getOptimizedLineDataAll(int begin, int end, int /*pixelWidth*/,
+                                  QCPAxis* keyAxis, QCPAxis* valueAxis,
+                                  QVector<QPointF>* results, int numColumns) const override
+    {
+        ensureGapCache(begin, end);
+        const int N = std::min(numColumns, columnCount());
+        qcp::algo::optimizedLineDataMulti(
+            mKeys, N,
+            [this](int c, int i) -> double { return static_cast<double>(mValues[c][i]); },
+            begin, end, keyAxis, valueAxis, &mGapCache.gaps, results);
+    }
+
     const double* rawKeyData() const override
     {
         if constexpr (std::is_same_v<K, double> && ContiguousNumericRange<KeyContainer>)
@@ -108,5 +120,5 @@ private:
     KeyContainer mKeys;
     std::vector<ValueContainer> mValues;
     std::shared_ptr<const void> mDataGuard;
-    mutable struct { int begin = -1; int end = -1; std::vector<bool> gaps; } mGapCache;
+    mutable struct { int begin = -1; int end = -1; qcp::algo::GapVector gaps; } mGapCache;
 };

@@ -227,6 +227,47 @@ static void scenarioAdaptive(int iters)
     fprintf(stderr, "  total: %.1f ms, per-iter: %.1f ms\n", ms, ms / iters);
 }
 
+static void scenarioAdaptiveMulti(int iters)
+{
+    auto data = generateMultiData(kDefaultPoints, kDefaultCols);
+
+    std::vector<std::span<const double>> spans;
+    spans.reserve(data.columns.size());
+    for (const auto& col : data.columns)
+        spans.emplace_back(col.data(), col.size());
+
+    auto src = std::make_shared<QCPSoAMultiDataSource<
+        std::span<const double>, std::span<const double>>>(
+        std::span<const double>(data.keys), std::move(spans));
+
+    QCustomPlot plot;
+    plot.resize(1920, 1080);
+    plot.xAxis->setRange(data.keys.front(), data.keys.back());
+    plot.yAxis->setRange(-1.5, 1.5);
+    plot.show();
+    QApplication::processEvents(QEventLoop::AllEvents, 100);
+
+    int begin = 0;
+    int end = src->size();
+    int pixelWidth = 1920;
+
+    fprintf(stderr, "adaptive_multi: %d pts × %d cols, %d px, %d iters\n",
+            kDefaultPoints, kDefaultCols, pixelWidth, iters);
+    waitForProfiler();
+
+    QVector<QVector<QPointF>> results(kDefaultCols);
+    QElapsedTimer timer;
+    timer.start();
+    for (int i = 0; i < iters; ++i) {
+        src->getOptimizedLineDataAll(begin, end, pixelWidth,
+                                      plot.xAxis, plot.yAxis,
+                                      results.data(), kDefaultCols);
+        if (results[0].isEmpty()) abort();
+    }
+    double ms = timer.nsecsElapsed() / 1e6;
+    fprintf(stderr, "  total: %.1f ms, per-iter: %.1f ms\n", ms, ms / iters);
+}
+
 static void scenarioDataSetup(int iters)
 {
     fprintf(stderr, "data_setup: %d pts × %d cols, %d iters\n",
@@ -310,6 +351,7 @@ static const Scenario scenarios[] = {
     {"l1_resampling", scenarioL1Resampling, 5},
     {"l2_resampling", scenarioL2Resampling, 100},
     {"adaptive",      scenarioAdaptive,      5},
+    {"adaptive_multi", scenarioAdaptiveMulti, 5},
     {"data_setup",    scenarioDataSetup,      3},
     {"full_replot",   scenarioFullReplot,     20},
     {"pan_replot",    scenarioPanReplot,      200},
