@@ -21,27 +21,57 @@
 ----------------------------------------------------------------------------*/
 #pragma once
 
+// Macros are guarded with #ifndef so that consumers (e.g. SciQLopPlots) can
+// provide their own definitions without colliding when both headers end up in
+// the same translation unit via transitive includes.
 #ifdef TRACY_ENABLE
 
 #include <tracy/Tracy.hpp>
 
-#define PROFILE_FRAME_MARK FrameMark
-#define PROFILE_HERE ZoneScoped
-#define PROFILE_HERE_N(name) ZoneScopedN(name)
-#define PROFILE_HERE_NC(name, color) ZoneScopedNC(name, color)
-#define PROFILE_PASS_VALUE(value) ZoneValue(value)
-#define PROFILE_PASS_TXT(txt, size) ZoneText(txt, size)
-#define PROFILE_PASS_VALUE_N(name, value) ZoneValue(value)
-
+#ifndef PROFILE_FRAME_MARK
+#  define PROFILE_FRAME_MARK FrameMark
+#endif
+#ifndef PROFILE_HERE
+#  define PROFILE_HERE ZoneScoped
+#endif
+#ifndef PROFILE_HERE_N
+#  define PROFILE_HERE_N(name) ZoneScopedN(name)
+#endif
+#ifndef PROFILE_HERE_NC
+#  define PROFILE_HERE_NC(name, color) ZoneScopedNC(name, color)
+#endif
+#ifndef PROFILE_PASS_VALUE
+#  define PROFILE_PASS_VALUE(value) ZoneValue(value)
+#endif
+#ifndef PROFILE_PASS_TXT
+#  define PROFILE_PASS_TXT(txt, size) ZoneText(txt, size)
+#endif
+#ifndef PROFILE_PASS_VALUE_N
+#  define PROFILE_PASS_VALUE_N(name, value) ZoneValue(value)
+#endif
 
 #else
 
-#define PROFILE_FRAME_MARK
-#define PROFILE_HERE
-#define PROFILE_HERE_N(name)
-#define PROFILE_HERE_NC(name, color)
-#define PROFILE_PASS_VALUE(value)
-#define PROFILE_PASS_VALUE_N(name, value)
-#define PROFILE_PASS_TXT(txt, size)
+#ifndef PROFILE_FRAME_MARK
+#  define PROFILE_FRAME_MARK
+#endif
+#ifndef PROFILE_HERE
+#  define PROFILE_HERE
+#endif
+#ifndef PROFILE_HERE_N
+#  define PROFILE_HERE_N(name)
+#endif
+#ifndef PROFILE_HERE_NC
+#  define PROFILE_HERE_NC(name, color)
+#endif
+#ifndef PROFILE_PASS_VALUE
+#  define PROFILE_PASS_VALUE(value)
+#endif
+#ifndef PROFILE_PASS_VALUE_N
+#  define PROFILE_PASS_VALUE_N(name, value)
+#endif
+#ifndef PROFILE_PASS_TXT
+#  define PROFILE_PASS_TXT(txt, size)
+#endif
 
 #endif
