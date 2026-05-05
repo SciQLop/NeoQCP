@@ -539,7 +539,15 @@ QCPLayerable::~QCPLayerable()
 */
 void QCPLayerable::setVisible(bool on)
 {
+    if (mVisible == on)
+        return;
     mVisible = on;
+    // Dirty the owning layer's paint buffer so the next replot redraws it.
+    // Without this, items toggled invisible→visible after their initial replot
+    // never reach drawToPaintBuffer() — breaking lazy GPU registration paths
+    // (e.g. QCPSpanRhiLayer registers spans only via tryRhiDraw() during draw).
+    if (mLayer)
+        mLayer->markDirty();
 }
 
 /*!

@@ -52,8 +52,8 @@ void TestPaintBuffer::contentDirty_setOnInvalidation()
 
 void TestPaintBuffer::contentDirty_markDirtyLayer()
 {
-    mPlot->addLayer("overlay", mPlot->layer("main"), QCustomPlot::limAbove);
-    QCPLayer* overlay = mPlot->layer("overlay");
+    mPlot->addLayer("vis_test", mPlot->layer("main"), QCustomPlot::limAbove);
+    QCPLayer* overlay = mPlot->layer("vis_test");
     overlay->setMode(QCPLayer::lmBuffered);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
@@ -298,6 +298,62 @@ void TestPaintBuffer::skipRepaint_disabledOnInvalidation()
 
     QCPLayer* mainLayer = mPlot->layer("main");
     QVERIFY(!mainLayer->canSkipRepaintForTranslation());
+}
+
+void TestPaintBuffer::setVisible_dirtiesLayerBuffer()
+{
+    // Regression test (NeoQCP commit 92fbbd4): visibility transitions on a
+    // buffered layer must mark the layer dirty so the next replot redraws it.
+    // Without this, items toggled invisible→visible after their initial replot
+    // never reach drawToPaintBuffer() — breaking GPU-registered items (vspans)
+    // whose registration is lazy in draw().
+    mPlot->addLayer("vis_test", mPlot->layer("main"), QCustomPlot::limAbove);
+    QCPLayer* overlay = mPlot->layer("vis_test");
+    overlay->setMode(QCPLayer::lmBuffered);
+
+    auto* line = new QCPItemLine(mPlot);
+    line->setLayer(overlay);
+    line->start->setCoords(1, 1);
+    line->end->setCoords(3, 3);
+    line->setVisible(false);
+
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    auto buf = overlay->mPaintBuffer.toStrongRef();
+    QVERIFY(buf);
+    QVERIFY(!buf->contentDirty());
+
+    line->setVisible(true);
+    QVERIFY2(buf->contentDirty(),
+             "setVisible(false→true) must dirty the layer buffer");
+
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(!buf->contentDirty());
+
+    line->setVisible(false);
+    QVERIFY2(buf->contentDirty(),
+             "setVisible(true→false) must dirty the layer buffer");
+}
+
+void TestPaintBuffer::setVisible_noOpWhenUnchanged()
+{
+    // Calling setVisible() with the current value must not dirty the buffer —
+    // preserves the perf gains of selective dirty-marking on hot paths.
+    mPlot->addLayer("vis_test", mPlot->layer("main"), QCustomPlot::limAbove);
+    QCPLayer* overlay = mPlot->layer("vis_test");
+    overlay->setMode(QCPLayer::lmBuffered);
+
+    auto* line = new QCPItemLine(mPlot);
+    line->setLayer(overlay);
+    line->start->setCoords(1, 1);
+    line->end->setCoords(3, 3);
+
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    auto buf = overlay->mPaintBuffer.toStrongRef();
+    QVERIFY(buf);
+    QVERIFY(!buf->contentDirty());
+
+    line->setVisible(true); // already true
+    QVERIFY(!buf->contentDirty());
 }
 
 void TestPaintBuffer::skipRepaint_bufferNotReuploadedOnPan()
