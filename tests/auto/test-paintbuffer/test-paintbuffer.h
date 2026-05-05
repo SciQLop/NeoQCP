@@ -27,6 +27,9 @@ private slots:
     void skipRepaint_disabledOnInvalidation();
     void skipRepaint_bufferNotReuploadedOnPan();
 
+    void setVisible_dirtiesLayerBuffer();
+    void setVisible_noOpWhenUnchanged();
+
 private:
     QCustomPlot* mPlot;
 };
