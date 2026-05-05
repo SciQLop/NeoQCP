@@ -16,6 +16,7 @@
 #include <plottables/plottable-waterfall.h>
 #include <QSignalSpy>
 #include <QThread>
+#include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
 #include <cmath>
 #include <limits>
 
@@ -41,6 +42,22 @@ void TestPipeline::init()
     mPlot = new QCustomPlot();
     mPlot->resize(400, 300);
 }
+
+namespace {
+// Show the plot, wait for window exposure to drive QRhiWidget::initialize(),
+// and report whether a usable QRhi instance was acquired. Tests that exercise
+// GPU-backed plottables (Graph2/MultiGraph/ColorMap2 — whose draw() and
+// pipeline are gated on a live RHI context) call this and QSKIP on failure
+// in headless / unsupported-platform environments.
+bool showAndHasRhi(QCustomPlot* plot)
+{
+    plot->show();
+    if (!QTest::qWaitForWindowExposed(plot))
+        return false;
+    QCoreApplication::processEvents();
+    return plot->rhi() != nullptr;
+}
+} // namespace
 
 void TestPipeline::cleanup()
 {
@@ -402,6 +419,8 @@ void TestPipeline::graph2PipelineTransform()
 
 void TestPipeline::colormap2PipelineDefault()
 {
+    if (!showAndHasRhi(mPlot)) QSKIP("No QRhi available — pipeline needs viewport from draw()");
+
     auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
 
     std::vector<double> x = {0, 1, 2};
@@ -419,6 +438,8 @@ void TestPipeline::colormap2PipelineDefault()
 
 void TestPipeline::colormap2PipelineResample()
 {
+    if (!showAndHasRhi(mPlot)) QSKIP("No QRhi available — pipeline needs viewport from draw()");
+
     auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
     mPlot->xAxis->setRange(0, 2);
     mPlot->yAxis->setRange(0, 1);
@@ -1279,15 +1300,18 @@ void TestPipeline::resampledMultiDataSourceInterface()
 
 void TestPipeline::multiGraphL1AndL2()
 {
-    const int N = 100;
+    // resampleL2Multi() returns nullptr (sparse path — render directly from L1)
+    // when visible-L1-points <= l2Bins, where l2Bins = plotWidthPx * 4.
+    // Use enough points to force the L2 binning path.
+    const int N = 5000;
     std::vector<double> keys(N);
     std::vector<std::vector<double>> cols = {
         std::vector<double>(N), std::vector<double>(N)
     };
     for (int i = 0; i < N; ++i) {
         keys[i] = static_cast<double>(i);
-        cols[0][i] = std::sin(i * 0.1);
-        cols[1][i] = std::cos(i * 0.1);
+        cols[0][i] = std::sin(i * 0.01);
+        cols[1][i] = std::cos(i * 0.01);
     }
     auto src = std::make_shared<QCPSoAMultiDataSource<
         std::vector<double>, std::vector<double>>>(keys, cols);
@@ -1300,13 +1324,13 @@ void TestPipeline::multiGraphL1AndL2()
     QVERIFY(c->level1.keys.size() > 0);
 
     ViewportParams vp;
-    vp.keyRange = QCPRange(20, 80);
-    vp.plotWidthPx = 200;
+    vp.keyRange = QCPRange(0, N - 1); // ~5000 visible points
+    vp.plotWidthPx = 200;              // l2Bins = 800; 5000 > 800 ⇒ L2 path
     auto l2 = qcp::algo::resampleL2Multi(*c, vp);
     QVERIFY(l2 != nullptr);
     QCOMPARE(l2->columnCount(), 2);
     QVERIFY(l2->size() > 0);
-    QVERIFY(l2->keyAt(0) >= 19.0);
+    QVERIFY(l2->keyAt(0) >= 0.0);
 }
 
 // --- QCPMultiGraph pipeline integration tests ---
@@ -1741,6 +1765,8 @@ void TestPipeline::multiGraphLineCacheReusedOnSmallPan()
 
 void TestPipeline::graph2FastPanNeverBlank()
 {
+    if (!showAndHasRhi(mPlot)) QSKIP("No QRhi available — hasRenderedRange() requires GPU draw()");
+
     auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
 
     int N = 500'000;
@@ -1763,6 +1789,8 @@ void TestPipeline::graph2FastPanNeverBlank()
 
 void TestPipeline::multiGraphFastPanNeverBlank()
 {
+    if (!showAndHasRhi(mPlot)) QSKIP("No QRhi available — hasRenderedRange() requires GPU draw()");
+
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
 
     int N = 500'000;
