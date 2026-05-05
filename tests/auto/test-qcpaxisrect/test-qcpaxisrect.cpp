@@ -77,12 +77,17 @@ void TestQCPAxisRect::axisRemovalConsequencesToPlottables()
 
   QVERIFY(mPlot->axisRect()->removeAxis(mPlot->xAxis));
   QTest::ignoreMessage(QtDebugMsg, "virtual void QCPGraph::draw(QCPPainter*) invalid key or value axis ");
+  // Force the graph's layer dirty: removeAxis nulls the QPointer<QCPAxis>, so
+  // markAffectedLayersDirty() can no longer reach the plottable's axisRect to
+  // mark it; without an explicit markDirty the buffered layer stays clean and
+  // QCPGraph::draw() never runs to emit the expected debug warning.
+  mPlot->layer("main")->markDirty();
   mPlot->replot();
   mPlot->rescaleAxes();
   QTest::ignoreMessage(QtDebugMsg, "void QCPAbstractPlottable::rescaleKeyAxis(bool) const invalid key axis ");
   QTest::ignoreMessage(QtDebugMsg, "void QCPAbstractPlottable::rescaleValueAxis(bool, bool) const invalid key or value axis ");
   graph->rescaleAxes();
-  
+
   // test replacement of previously removed axis:
   QCPAxis *newAxis = mPlot->axisRect()->addAxis(QCPAxis::atBottom);
   graph->setKeyAxis(newAxis);
@@ -100,12 +105,16 @@ void TestQCPAxisRect::axisRemovalConsequencesToItems()
   QVERIFY(mPlot->axisRect()->removeAxis(mPlot->xAxis));
   QTest::ignoreMessage(QtDebugMsg, "virtual QPointF QCPItemPosition::pixelPosition() const Item position type x is ptPlotCoords, but no axes were defined "); // for start position
   QTest::ignoreMessage(QtDebugMsg, "virtual QPointF QCPItemPosition::pixelPosition() const Item position type x is ptPlotCoords, but no axes were defined "); // for end position
+  // Force the item's layer dirty so the buffered layer is redrawn — see
+  // axisRemovalConsequencesToPlottables for the same rationale.
+  mPlot->layer("main")->markDirty();
   mPlot->replot();
   QVERIFY(mPlot->axisRect()->removeAxis(mPlot->yAxis));
   QTest::ignoreMessage(QtDebugMsg, "virtual QPointF QCPItemPosition::pixelPosition() const Item position type x is ptPlotCoords, but no axes were defined "); // for start position
   QTest::ignoreMessage(QtDebugMsg, "virtual QPointF QCPItemPosition::pixelPosition() const Item position type y is ptPlotCoords, but no axes were defined "); // for start position
   QTest::ignoreMessage(QtDebugMsg, "virtual QPointF QCPItemPosition::pixelPosition() const Item position type x is ptPlotCoords, but no axes were defined "); // for end position
   QTest::ignoreMessage(QtDebugMsg, "virtual QPointF QCPItemPosition::pixelPosition() const Item position type y is ptPlotCoords, but no axes were defined "); // for end position
+  mPlot->layer("main")->markDirty();
   mPlot->replot();
   
   
@@ -140,6 +149,7 @@ void TestQCPAxisRect::axisRectRemovalConsequencesToPlottables()
   mPlot->plotLayout()->simplify();
   QCOMPARE(mPlot->plotLayout()->elementCount(), 0);
   QTest::ignoreMessage(QtDebugMsg, "virtual void QCPGraph::draw(QCPPainter*) invalid key or value axis ");
+  mPlot->layer("main")->markDirty();
   mPlot->replot();
   mPlot->rescaleAxes();
   QTest::ignoreMessage(QtDebugMsg, "void QCPAbstractPlottable::rescaleKeyAxis(bool) const invalid key axis ");
@@ -173,6 +183,7 @@ void TestQCPAxisRect::axisRectRemovalConsequencesToItems()
   QTest::ignoreMessage(QtDebugMsg, "virtual QPointF QCPItemPosition::pixelPosition() const Item position type y is ptAxisRectRatio, but no axis rect was defined "); // for start position
   QTest::ignoreMessage(QtDebugMsg, "virtual QPointF QCPItemPosition::pixelPosition() const Item position type x is ptPlotCoords, but no axes were defined "); // for end position
   QTest::ignoreMessage(QtDebugMsg, "virtual QPointF QCPItemPosition::pixelPosition() const Item position type y is ptPlotCoords, but no axes were defined "); // for end position
+  mPlot->layer("main")->markDirty();
   mPlot->replot();
   
   QTest::ignoreMessage(QtDebugMsg, "void QCPItemPosition::setPixelPosition(const QPointF&) Item position type x is ptAxisRectRatio, but no axis rect was defined ");
