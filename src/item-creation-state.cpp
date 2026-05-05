@@ -36,7 +36,9 @@ bool QCPItemCreationState::handleMousePress(QMouseEvent* event)
             return false;
 
         auto* axisRect = axisRectAt(event->pos());
-        if (!axisRect)
+        // axisRectAt matches the outer rect (including axis-label margins);
+        // creation must only trigger inside the inner data area.
+        if (!axisRect || !axisRect->rect().contains(event->pos()))
             return false;
 
         mKeyAxis = axisRect->axis(QCPAxis::atBottom);
