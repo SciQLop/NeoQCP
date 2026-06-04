@@ -83,6 +83,9 @@ private slots:
     void bin2dNaNSkipped();
     void bin2dEmptyInput();
     void bin2dSingleBin();
+    void bin2dUnsortedKeyRange();
+    void bin2dNaNAtKeyEndpoint();
+    void bin2dAllNaNNoGrid();
 
     // QCPHistogram2D
     void histogram2dPipelineBins();

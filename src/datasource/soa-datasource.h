@@ -52,6 +52,30 @@ public:
         return qcp::algo::valueRange(mKeys, mValues, foundRange, sd, inKeyRange);
     }
 
+    bool finiteKeyValueBounds(QCPRange& keyOut, QCPRange& valueOut) const override
+    {
+        PROFILE_HERE_N("SoA::finiteKeyValueBounds");
+        const int n = static_cast<int>(std::ranges::size(mKeys));
+        double kLo = std::numeric_limits<double>::infinity(), kHi = -kLo;
+        double vLo = kLo, vHi = -kLo;
+        bool any = false;
+        for (int i = 0; i < n; ++i)
+        {
+            const double k = static_cast<double>(mKeys[i]);
+            const double v = static_cast<double>(mValues[i]);
+            if (!std::isfinite(k) || !std::isfinite(v))
+                continue;
+            kLo = std::min(kLo, k); kHi = std::max(kHi, k);
+            vLo = std::min(vLo, v); vHi = std::max(vHi, v);
+            any = true;
+        }
+        if (!any)
+            return false;
+        keyOut = QCPRange(kLo, kHi);
+        valueOut = QCPRange(vLo, vHi);
+        return true;
+    }
+
     int findBegin(double sortKey, bool expandedRange = true) const override
     {
         return qcp::algo::findBegin(mKeys, sortKey, expandedRange);
