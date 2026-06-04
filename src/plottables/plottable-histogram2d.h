@@ -56,6 +56,14 @@ public:
     void setNormalization(Normalization norm);
     Normalization normalization() const { return mNormalization; }
 
+    // Bin spacing per axis. Logarithmic spaces bin edges evenly in log10 and
+    // drops non-positive samples; it is meant to accompany a log-scaled axis
+    // (the renderer's uniform-pixel stretch reproduces log positions there).
+    void setKeyBinScale(QCPAxis::ScaleType type);
+    void setValueBinScale(QCPAxis::ScaleType type);
+    QCPAxis::ScaleType keyBinScale() const { return mKeyBinScale; }
+    QCPAxis::ScaleType valueBinScale() const { return mValueBinScale; }
+
     // Forwarded to QCPColormapRenderer
     QCPColorGradient gradient() const { return mRenderer.gradient(); }
     QCPRange dataRange() const { return mRenderer.dataRange(); }
@@ -94,6 +102,8 @@ private:
     int mKeyBins = 100;
     int mValueBins = 100;
     Normalization mNormalization = nNone;
+    QCPAxis::ScaleType mKeyBinScale = QCPAxis::stLinear;
+    QCPAxis::ScaleType mValueBinScale = QCPAxis::stLinear;
     QCPHistogramPipeline mPipeline;
     QCPColormapRenderer mRenderer;
 
