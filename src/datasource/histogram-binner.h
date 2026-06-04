@@ -17,6 +17,11 @@ struct BinAxis
 
     static BinAxis make(const QCPRange& range, int bins, bool log)
     {
+        // Log bins require a positive range; callers (bin2d via the positive-only
+        // finiteKeyValueBounds + expandIfFlat) must guarantee it. Asserting here
+        // keeps that non-local invariant honest and catches a future regression
+        // before it turns into log10(<=0) -> NaN -> UB in the index cast.
+        Q_ASSERT(!log || (range.lower > 0 && range.upper > 0));
         const double lo = log ? std::log10(range.lower) : range.lower;
         const double hi = log ? std::log10(range.upper) : range.upper;
         const double span = hi - lo;

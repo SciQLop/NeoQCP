@@ -91,6 +91,7 @@ private slots:
     void bin2dLogAllNonPositiveNoGrid();
 
     // QCPHistogram2D
+    void histogram2dKeyRangeUnsorted();
     void histogram2dPipelineBins();
     void histogram2dNormalizationColumn();
     void histogram2dNormalizationToggleNoRebind();

@@ -306,7 +306,13 @@ QCPRange QCPHistogram2D::getKeyRange(bool& foundRange, QCP::SignDomain inSignDom
         foundRange = false;
         return {};
     }
-    return mDataSource->keyRange(foundRange, inSignDomain);
+    // Histogram keys are scattered, not sorted, so keyRange()'s first/last
+    // shortcut would be wrong. Report the true finite min/max (positive-only on
+    // a log axis), matching what bin2d() accumulates.
+    QCPRange kr, vr;
+    foundRange = mDataSource->finiteKeyValueBounds(
+        kr, vr, inSignDomain == QCP::sdPositive, false);
+    return foundRange ? kr : QCPRange();
 }
 
 QCPRange QCPHistogram2D::getValueRange(bool& foundRange, QCP::SignDomain inSignDomain,
@@ -330,11 +336,9 @@ double QCPHistogram2D::selectTest(const QPointF& pos, bool onlySelectable, QVari
     double key = mKeyAxis->pixelToCoord(pos.x());
     double value = mValueAxis->pixelToCoord(pos.y());
 
-    bool foundKey = false, foundValue = false;
-    auto kr = mDataSource->keyRange(foundKey);
-    auto vr = mDataSource->valueRange(foundValue);
-
-    if (foundKey && foundValue && kr.contains(key) && vr.contains(value))
+    // Use the true scattered min/max, not the sorted first/last shortcut.
+    QCPRange kr, vr;
+    if (mDataSource->finiteKeyValueBounds(kr, vr) && kr.contains(key) && vr.contains(value))
         return 0;
     return -1;
 }
