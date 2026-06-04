@@ -1300,6 +1300,22 @@ void TestPipeline::bin2dLogAllNonPositiveNoGrid()
 
 // --- QCPHistogram2D tests ---
 
+// Axis auto-scaling asks the plottable for its key range. Histogram keys are
+// scattered, not sorted, so it must report the true min/max, not first/last.
+void TestPipeline::histogram2dKeyRangeUnsorted()
+{
+    auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
+    std::vector<double> keys = {5.0, 1.0, 9.0, 2.0}; // front=5, back=2; min=1, max=9
+    std::vector<double> vals = {0.0, 0.0, 0.0, 0.0};
+    hist->setData(std::move(keys), std::move(vals));
+
+    bool found = false;
+    QCPRange kr = hist->getKeyRange(found);
+    QVERIFY(found);
+    QCOMPARE(kr.lower, 1.0);
+    QCOMPARE(kr.upper, 9.0);
+}
+
 void TestPipeline::histogram2dPipelineBins()
 {
     auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
