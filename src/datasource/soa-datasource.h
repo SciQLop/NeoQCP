@@ -52,7 +52,9 @@ public:
         return qcp::algo::valueRange(mKeys, mValues, foundRange, sd, inKeyRange);
     }
 
-    bool finiteKeyValueBounds(QCPRange& keyOut, QCPRange& valueOut) const override
+    bool finiteKeyValueBounds(QCPRange& keyOut, QCPRange& valueOut,
+                              bool keyPositiveOnly = false,
+                              bool valuePositiveOnly = false) const override
     {
         PROFILE_HERE_N("SoA::finiteKeyValueBounds");
         const int n = static_cast<int>(std::ranges::size(mKeys));
@@ -64,6 +66,8 @@ public:
             const double k = static_cast<double>(mKeys[i]);
             const double v = static_cast<double>(mValues[i]);
             if (!std::isfinite(k) || !std::isfinite(v))
+                continue;
+            if ((keyPositiveOnly && k <= 0) || (valuePositiveOnly && v <= 0))
                 continue;
             kLo = std::min(kLo, k); kHi = std::max(kHi, k);
             vLo = std::min(vLo, v); vHi = std::max(vHi, v);

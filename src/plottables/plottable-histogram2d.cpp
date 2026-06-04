@@ -35,13 +35,16 @@ void QCPHistogram2D::installTransform()
 {
     int capturedKeyBins = mKeyBins;
     int capturedValueBins = mValueBins;
+    const bool keyLog = mKeyBinScale == QCPAxis::stLogarithmic;
+    const bool valueLog = mValueBinScale == QCPAxis::stLogarithmic;
 
     mPipeline.setTransform(TransformKind::ViewportIndependent,
-        [capturedKeyBins, capturedValueBins](
+        [capturedKeyBins, capturedValueBins, keyLog, valueLog](
             const QCPAbstractDataSource& src,
             const ViewportParams& /*vp*/,
             std::any& /*cache*/) -> std::shared_ptr<QCPColorMapData> {
-            auto* raw = qcp::algo::bin2d(src, capturedKeyBins, capturedValueBins);
+            auto* raw = qcp::algo::bin2d(src, capturedKeyBins, capturedValueBins,
+                                         keyLog, valueLog);
             return std::shared_ptr<QCPColorMapData>(raw);
         });
 }
@@ -70,6 +73,24 @@ void QCPHistogram2D::setBins(int keyBins, int valueBins)
         return;
     mKeyBins = keyBins;
     mValueBins = valueBins;
+    installTransform();
+    mPipeline.onDataChanged();
+}
+
+void QCPHistogram2D::setKeyBinScale(QCPAxis::ScaleType type)
+{
+    if (mKeyBinScale == type)
+        return;
+    mKeyBinScale = type;
+    installTransform();
+    mPipeline.onDataChanged();
+}
+
+void QCPHistogram2D::setValueBinScale(QCPAxis::ScaleType type)
+{
+    if (mValueBinScale == type)
+        return;
+    mValueBinScale = type;
     installTransform();
     mPipeline.onDataChanged();
 }

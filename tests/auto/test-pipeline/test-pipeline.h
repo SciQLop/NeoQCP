@@ -86,12 +86,17 @@ private slots:
     void bin2dUnsortedKeyRange();
     void bin2dNaNAtKeyEndpoint();
     void bin2dAllNaNNoGrid();
+    void bin2dLogKeyBinning();
+    void bin2dLogDropsNonPositive();
+    void bin2dLogAllNonPositiveNoGrid();
 
     // QCPHistogram2D
     void histogram2dPipelineBins();
     void histogram2dNormalizationColumn();
     void histogram2dNormalizationToggleNoRebind();
     void histogram2dRenderSmokeTest();
+    void histogram2dLogKeyBinScaleRebins();
+    void histogram2dBinScaleDefaultsLinear();
 
     // Layer-level GPU translation
     void stallPixelOffsetGraph2Busy();

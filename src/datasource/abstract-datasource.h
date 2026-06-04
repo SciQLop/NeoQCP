@@ -40,10 +40,13 @@ public:
     //
     // Unlike keyRange()/valueRange(), this makes NO sorted-key assumption and a
     // sample contributes only when BOTH coordinates are finite -- so the bounds
-    // match exactly the set of points a histogram will accumulate. Returns false
-    // when no finite pair exists. Default scans via keyAt()/valueAt(); typed
-    // sources override for a non-virtual inner loop.
-    virtual bool finiteKeyValueBounds(QCPRange& keyOut, QCPRange& valueOut) const
+    // match exactly the set of points a histogram will accumulate. With
+    // keyPositiveOnly/valuePositiveOnly set (log binning), that coordinate must
+    // also be > 0. Returns false when no qualifying pair exists. Default scans
+    // via keyAt()/valueAt(); typed sources override for a non-virtual inner loop.
+    virtual bool finiteKeyValueBounds(QCPRange& keyOut, QCPRange& valueOut,
+                                      bool keyPositiveOnly = false,
+                                      bool valuePositiveOnly = false) const
     {
         double kLo = std::numeric_limits<double>::infinity(), kHi = -kLo;
         double vLo = kLo, vHi = -kLo;
@@ -54,6 +57,8 @@ public:
             const double k = keyAt(i);
             const double v = valueAt(i);
             if (!std::isfinite(k) || !std::isfinite(v))
+                continue;
+            if ((keyPositiveOnly && k <= 0) || (valuePositiveOnly && v <= 0))
                 continue;
             kLo = std::min(kLo, k); kHi = std::max(kHi, k);
             vLo = std::min(vLo, v); vHi = std::max(vHi, v);

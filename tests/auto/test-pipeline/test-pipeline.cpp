@@ -1241,6 +1241,63 @@ void TestPipeline::bin2dAllNaNNoGrid()
     QVERIFY(!result);
 }
 
+// Log key binning: bin edges are evenly spaced in log space, so a decade of
+// keys lands one-per-bin instead of all piling into the first linear bin.
+void TestPipeline::bin2dLogKeyBinning()
+{
+    std::vector<double> keys = {1.0, 10.0, 100.0, 1000.0};
+    std::vector<double> vals = {5.0, 5.0, 5.0, 5.0};
+    auto src = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
+        std::move(keys), std::move(vals));
+    // keyLog = true, valueLog = false
+    auto* result = qcp::algo::bin2d(*src, 3, 1, true, false);
+    QVERIFY(result);
+
+    // Grid keeps the linear coordinate extent [1, 1000]; the renderer's
+    // uniform-pixel stretch turns these log-spaced cells into log positions.
+    QCOMPARE(result->keyRange().lower, 1.0);
+    QCOMPARE(result->keyRange().upper, 1000.0);
+
+    // log10 range [0, 3], width/3 per bin: 1->bin0, 10->bin1, 100->bin2,
+    // 1000 (log 3) clamps to bin2.
+    QCOMPARE(result->cell(0, 0), 1.0);
+    QCOMPARE(result->cell(1, 0), 1.0);
+    QCOMPARE(result->cell(2, 0), 2.0);
+    delete result;
+}
+
+// On a log axis, non-positive keys can't be placed and are dropped like NaN;
+// the range derives from the positive keys only.
+void TestPipeline::bin2dLogDropsNonPositive()
+{
+    std::vector<double> keys = {-5.0, 1.0, 10.0, 100.0};
+    std::vector<double> vals = {5.0, 5.0, 5.0, 5.0};
+    auto src = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
+        std::move(keys), std::move(vals));
+    auto* result = qcp::algo::bin2d(*src, 2, 1, true, false);
+    QVERIFY(result);
+
+    // -5 dropped: range is the positive extent [1, 100].
+    QCOMPARE(result->keyRange().lower, 1.0);
+    QCOMPARE(result->keyRange().upper, 100.0);
+
+    // log10 range [0, 2], width/2 per bin: 1->bin0, 10->bin1, 100->clamp bin1.
+    QCOMPARE(result->cell(0, 0), 1.0);
+    QCOMPARE(result->cell(1, 0), 2.0);
+    delete result;
+}
+
+// All keys non-positive on a log axis: nothing to bin, so no grid.
+void TestPipeline::bin2dLogAllNonPositiveNoGrid()
+{
+    std::vector<double> keys = {-1.0, -2.0, 0.0};
+    std::vector<double> vals = {1.0, 2.0, 3.0};
+    auto src = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
+        std::move(keys), std::move(vals));
+    auto* result = qcp::algo::bin2d(*src, 4, 4, true, false);
+    QVERIFY(!result);
+}
+
 // --- QCPHistogram2D tests ---
 
 void TestPipeline::histogram2dPipelineBins()
@@ -1261,6 +1318,35 @@ void TestPipeline::histogram2dPipelineBins()
     QVERIFY(result);
     QCOMPARE(result->keySize(), 10);
     QCOMPARE(result->valueSize(), 20);
+}
+
+void TestPipeline::histogram2dBinScaleDefaultsLinear()
+{
+    auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
+    QCOMPARE(hist->keyBinScale(), QCPAxis::stLinear);
+    QCOMPARE(hist->valueBinScale(), QCPAxis::stLinear);
+}
+
+void TestPipeline::histogram2dLogKeyBinScaleRebins()
+{
+    auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
+    hist->setBins(3, 1);
+    hist->setKeyBinScale(QCPAxis::stLogarithmic);
+    QCOMPARE(hist->keyBinScale(), QCPAxis::stLogarithmic);
+
+    std::vector<double> keys = {1.0, 10.0, 100.0, 1000.0};
+    std::vector<double> vals = {5.0, 5.0, 5.0, 5.0};
+    hist->setData(std::move(keys), std::move(vals));
+
+    QSignalSpy spy(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(spy.wait(2000));
+
+    auto* data = hist->pipeline().result();
+    QVERIFY(data);
+    // Log key bins spread the decade one-per-bin (vs all in bin 0 if linear).
+    QCOMPARE(data->cell(0, 0), 1.0);
+    QCOMPARE(data->cell(1, 0), 1.0);
+    QCOMPARE(data->cell(2, 0), 2.0);
 }
 
 void TestPipeline::histogram2dNormalizationColumn()
