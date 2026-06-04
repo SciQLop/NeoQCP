@@ -3,6 +3,9 @@
 #include "axis/range.h"
 #include <QPointF>
 #include <QVector>
+#include <algorithm>
+#include <cmath>
+#include <limits>
 #include <ranges>
 #include <type_traits>
 
@@ -32,6 +35,36 @@ public:
     virtual QCPRange valueRange(bool& foundRange,
                                 QCP::SignDomain sd = QCP::sdBoth,
                                 const QCPRange& inKeyRange = QCPRange()) const = 0;
+
+    // Finite, pairwise bounds over (key, value) samples, for 2D binning.
+    //
+    // Unlike keyRange()/valueRange(), this makes NO sorted-key assumption and a
+    // sample contributes only when BOTH coordinates are finite -- so the bounds
+    // match exactly the set of points a histogram will accumulate. Returns false
+    // when no finite pair exists. Default scans via keyAt()/valueAt(); typed
+    // sources override for a non-virtual inner loop.
+    virtual bool finiteKeyValueBounds(QCPRange& keyOut, QCPRange& valueOut) const
+    {
+        double kLo = std::numeric_limits<double>::infinity(), kHi = -kLo;
+        double vLo = kLo, vHi = -kLo;
+        bool any = false;
+        const int n = size();
+        for (int i = 0; i < n; ++i)
+        {
+            const double k = keyAt(i);
+            const double v = valueAt(i);
+            if (!std::isfinite(k) || !std::isfinite(v))
+                continue;
+            kLo = std::min(kLo, k); kHi = std::max(kHi, k);
+            vLo = std::min(vLo, v); vHi = std::max(vHi, v);
+            any = true;
+        }
+        if (!any)
+            return false;
+        keyOut = QCPRange(kLo, kHi);
+        valueOut = QCPRange(vLo, vHi);
+        return true;
+    }
 
     // Binary search on sorted keys.
     // expandedRange=true includes one extra point beyond the boundary

@@ -1183,6 +1183,64 @@ void TestPipeline::bin2dSingleBin()
     delete result;
 }
 
+// Histogram input is scattered, NOT sorted by key. The bin range must be the
+// true min/max of the keys, not the first/last sample. Here the min (1.0) and
+// max (9.0) are interior; the endpoints are both 2.0.
+void TestPipeline::bin2dUnsortedKeyRange()
+{
+    std::vector<double> keys = {2.0, 1.0, 9.0, 2.0};
+    std::vector<double> vals = {0.0, 0.0, 0.0, 0.0};
+    auto src = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
+        std::move(keys), std::move(vals));
+    auto* result = qcp::algo::bin2d(*src, 4, 1);
+    QVERIFY(result);
+
+    // The grid must span the real key extent [1, 9], not the endpoints [2, 2].
+    QCOMPARE(result->keyRange().lower, 1.0);
+    QCOMPARE(result->keyRange().upper, 9.0);
+
+    // With binWidth = 8/4 = 2: keys 2,1,2 fall in column 0, key 9 clamps to 3.
+    QCOMPARE(result->cell(0, 0), 3.0);
+    QCOMPARE(result->cell(1, 0), 0.0);
+    QCOMPARE(result->cell(2, 0), 0.0);
+    QCOMPARE(result->cell(3, 0), 1.0);
+    delete result;
+}
+
+// A non-finite sample at the first/last key position must not poison the range.
+// The finite points must still bin against the finite min/max.
+void TestPipeline::bin2dNaNAtKeyEndpoint()
+{
+    const double nan = std::nan("");
+    std::vector<double> keys = {nan, 2.0, 6.0, nan};
+    std::vector<double> vals = {1.0, 0.0, 0.0, 1.0};
+    auto src = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
+        std::move(keys), std::move(vals));
+    auto* result = qcp::algo::bin2d(*src, 2, 1);
+    QVERIFY(result);
+
+    // Range derives only from finite keys: [2, 6].
+    QCOMPARE(result->keyRange().lower, 2.0);
+    QCOMPARE(result->keyRange().upper, 6.0);
+
+    // binWidth = 4/2 = 2: key 2 -> col 0, key 6 -> clamps to col 1. NaN dropped.
+    QCOMPARE(result->cell(0, 0), 1.0);
+    QCOMPARE(result->cell(1, 0), 1.0);
+    delete result;
+}
+
+// All keys non-finite: no finite sample to bin, so no grid.
+void TestPipeline::bin2dAllNaNNoGrid()
+{
+    const double nan = std::nan("");
+    std::vector<double> keys = {nan, nan, nan};
+    std::vector<double> vals = {1.0, 2.0, 3.0};
+    auto src = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
+        std::move(keys), std::move(vals));
+    auto* result = qcp::algo::bin2d(*src, 4, 4);
+    QVERIFY(!result);
+}
+
 // --- QCPHistogram2D tests ---
 
 void TestPipeline::histogram2dPipelineBins()

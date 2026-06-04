@@ -12,10 +12,11 @@ inline QCPColorMapData* bin2d(const QCPAbstractDataSource& src, int keyBins, int
     if (n == 0 || keyBins <= 0 || valueBins <= 0)
         return nullptr;
 
-    bool foundKey = false, foundVal = false;
-    QCPRange keyRange = src.keyRange(foundKey);
-    QCPRange valRange = src.valueRange(foundVal);
-    if (!foundKey || !foundVal)
+    // Histogram input is scattered, not sorted by key, and may contain NaN/Inf.
+    // finiteKeyValueBounds() gives the true min/max over finite (key, value)
+    // pairs -- never the first/last sample. No finite pair => no histogram.
+    QCPRange keyRange, valRange;
+    if (!src.finiteKeyValueBounds(keyRange, valRange))
         return nullptr;
 
     if (keyRange.size() == 0) { keyRange.lower -= 0.5; keyRange.upper += 0.5; }
