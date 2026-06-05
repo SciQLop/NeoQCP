@@ -24,6 +24,19 @@ QCPHistogram2D::QCPHistogram2D(QCPAxis* keyAxis, QCPAxis* valueAxis)
             });
     connect(&mPipeline, &QCPHistogramPipeline::busyChanged,
             this, [this](bool) { updateEffectiveBusy(); });
+
+    // Binning follows the axis scale: re-bin whenever an axis toggles log/linear
+    // so the picture re-distributes (the renderer can't reposition cells itself).
+    if (keyAxis)
+        connect(keyAxis, &QCPAxis::scaleTypeChanged, this, &QCPHistogram2D::refreshBinning);
+    if (valueAxis)
+        connect(valueAxis, &QCPAxis::scaleTypeChanged, this, &QCPHistogram2D::refreshBinning);
+}
+
+void QCPHistogram2D::refreshBinning()
+{
+    installTransform();
+    mPipeline.onDataChanged();
 }
 
 QCPHistogram2D::~QCPHistogram2D()
@@ -35,8 +48,8 @@ void QCPHistogram2D::installTransform()
 {
     int capturedKeyBins = mKeyBins;
     int capturedValueBins = mValueBins;
-    const bool keyLog = mKeyBinScale == QCPAxis::stLogarithmic;
-    const bool valueLog = mValueBinScale == QCPAxis::stLogarithmic;
+    const bool keyLog = mKeyAxis && mKeyAxis->scaleType() == QCPAxis::stLogarithmic;
+    const bool valueLog = mValueAxis && mValueAxis->scaleType() == QCPAxis::stLogarithmic;
 
     mPipeline.setTransform(TransformKind::ViewportIndependent,
         [capturedKeyBins, capturedValueBins, keyLog, valueLog](
@@ -79,20 +92,24 @@ void QCPHistogram2D::setBins(int keyBins, int valueBins)
 
 void QCPHistogram2D::setKeyBinScale(QCPAxis::ScaleType type)
 {
-    if (mKeyBinScale == type)
-        return;
-    mKeyBinScale = type;
-    installTransform();
-    mPipeline.onDataChanged();
+    if (mKeyAxis)
+        mKeyAxis->setScaleType(type); // scaleTypeChanged -> re-bin
 }
 
 void QCPHistogram2D::setValueBinScale(QCPAxis::ScaleType type)
 {
-    if (mValueBinScale == type)
-        return;
-    mValueBinScale = type;
-    installTransform();
-    mPipeline.onDataChanged();
+    if (mValueAxis)
+        mValueAxis->setScaleType(type);
+}
+
+QCPAxis::ScaleType QCPHistogram2D::keyBinScale() const
+{
+    return mKeyAxis ? mKeyAxis->scaleType() : QCPAxis::stLinear;
+}
+
+QCPAxis::ScaleType QCPHistogram2D::valueBinScale() const
+{
+    return mValueAxis ? mValueAxis->scaleType() : QCPAxis::stLinear;
 }
 
 void QCPHistogram2D::setNormalization(Normalization norm)
