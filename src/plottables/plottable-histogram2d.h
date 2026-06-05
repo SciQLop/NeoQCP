@@ -56,13 +56,20 @@ public:
     void setNormalization(Normalization norm);
     Normalization normalization() const { return mNormalization; }
 
-    // Bin spacing per axis. Logarithmic spaces bin edges evenly in log10 and
-    // drops non-positive samples; it is meant to accompany a log-scaled axis
-    // (the renderer's uniform-pixel stretch reproduces log positions there).
+    // Bin spacing follows the key/value axis scale: a logarithmic axis bins in
+    // log10 (dropping non-positive samples), so the histogram re-distributes when
+    // the axis scale is toggled (the renderer only stretches cells uniformly in
+    // pixels, so the bin layout must match the axis to be correct). These setters
+    // are convenience aliases that set the corresponding axis scale type.
     void setKeyBinScale(QCPAxis::ScaleType type);
     void setValueBinScale(QCPAxis::ScaleType type);
-    QCPAxis::ScaleType keyBinScale() const { return mKeyBinScale; }
-    QCPAxis::ScaleType valueBinScale() const { return mValueBinScale; }
+    QCPAxis::ScaleType keyBinScale() const;
+    QCPAxis::ScaleType valueBinScale() const;
+
+    // Re-read the key/value axis scale type and re-bin. Wired to the axes'
+    // scaleTypeChanged, but also callable directly for callers that change the
+    // scale with that signal blocked (e.g. SciQLop's axis wrapper).
+    Q_SLOT void refreshBinning();
 
     // Forwarded to QCPColormapRenderer
     QCPColorGradient gradient() const { return mRenderer.gradient(); }
@@ -102,8 +109,6 @@ private:
     int mKeyBins = 100;
     int mValueBins = 100;
     Normalization mNormalization = nNone;
-    QCPAxis::ScaleType mKeyBinScale = QCPAxis::stLinear;
-    QCPAxis::ScaleType mValueBinScale = QCPAxis::stLinear;
     QCPHistogramPipeline mPipeline;
     QCPColormapRenderer mRenderer;
 

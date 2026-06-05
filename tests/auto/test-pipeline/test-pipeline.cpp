@@ -1365,6 +1365,37 @@ void TestPipeline::histogram2dLogKeyBinScaleRebins()
     QCOMPARE(data->cell(2, 0), 2.0);
 }
 
+// The core of "changing the scale changes the look": toggling the key axis
+// between linear and log after data is set must re-bin, since the renderer can
+// only stretch cells uniformly and cannot redistribute them itself.
+void TestPipeline::histogram2dAxisScaleTogglesRebinning()
+{
+    auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
+    hist->setBins(3, 1);
+    std::vector<double> keys = {1.0, 10.0, 100.0, 1000.0};
+    std::vector<double> vals = {5.0, 5.0, 5.0, 5.0};
+    hist->setData(std::move(keys), std::move(vals));
+
+    QSignalSpy spy(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(spy.wait(2000));
+    auto* lin = hist->pipeline().result();
+    QVERIFY(lin);
+    // Linear range [1, 1000], binWidth 333: 1/10/100 -> bin 0, 1000 -> bin 2.
+    QCOMPARE(lin->cell(0, 0), 3.0);
+    QCOMPARE(lin->cell(2, 0), 1.0);
+
+    // Toggle the key axis to log -> the histogram must re-bin in log space.
+    QSignalSpy spy2(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    QVERIFY(spy2.wait(2000));
+    auto* log = hist->pipeline().result();
+    QVERIFY(log);
+    // log10 range [0, 3]: 1->0, 10->1, 100->2, 1000 clamps to 2.
+    QCOMPARE(log->cell(0, 0), 1.0);
+    QCOMPARE(log->cell(1, 0), 1.0);
+    QCOMPARE(log->cell(2, 0), 2.0);
+}
+
 void TestPipeline::histogram2dNormalizationColumn()
 {
     auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);

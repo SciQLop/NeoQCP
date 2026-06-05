@@ -98,6 +98,7 @@ private slots:
     void histogram2dRenderSmokeTest();
     void histogram2dLogKeyBinScaleRebins();
     void histogram2dBinScaleDefaultsLinear();
+    void histogram2dAxisScaleTogglesRebinning();
 
     // Layer-level GPU translation
     void stallPixelOffsetGraph2Busy();
