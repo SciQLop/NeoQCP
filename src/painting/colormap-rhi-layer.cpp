@@ -2,7 +2,13 @@
 #include "embedded_shaders.h"
 #include "rhi-utils.h"
 #include "Profiling.hpp"
+#include "../layer.h"
 #include <cstring>
+
+bool QCPColormapRhiLayer::ownerVisible() const
+{
+    return !mOwner || mOwner->realVisibility();
+}
 
 // ── Contour line UBO (std140, 32 bytes) ────────────────────────────────────
 // Must match contour_line.vert/frag ContourLineParams exactly.
