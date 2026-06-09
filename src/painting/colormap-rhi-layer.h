@@ -8,6 +8,7 @@
 #include <rhi/qrhi.h>
 
 class QCPLayer;
+class QCPLayerable;
 
 class QCPColormapRhiLayer
 {
@@ -20,6 +21,14 @@ public:
     void setScissorRect(const QRect& scissor);
     void setLayer(QCPLayer* layer) { mLayer = layer; }
     QCPLayer* layer() const { return mLayer; }
+
+    // The colormap plottable this RHI layer renders for. The compositor skips
+    // layers whose owner is not really visible — without this a hidden colormap
+    // keeps compositing its last frame (its draw() stops being called, so the
+    // quad is never updated and it freezes in place during pans).
+    void setOwner(QCPLayerable* owner) { mOwner = owner; }
+    QCPLayerable* owner() const { return mOwner; }
+    bool ownerVisible() const;
 
     void setContourLines(QVector<float> uvVertices, const QColor& color);
     void clearContourLines();
@@ -38,6 +47,7 @@ public:
 private:
     QRhi* mRhi;
     QCPLayer* mLayer = nullptr;
+    QCPLayerable* mOwner = nullptr;
 
     // CPU staging — colormap
     QImage mStagingImage;

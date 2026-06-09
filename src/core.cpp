@@ -2699,6 +2699,8 @@ void QCustomPlot::uploadLayerTextures(QRhiResourceUpdateBatch* updates, const QS
 
     for (auto* crl : mColormapRhiLayers)
     {
+        if (!crl->ownerVisible())
+            continue;
         crl->ensurePipeline(renderTarget()->renderPassDescriptor(), sampleCount(),
                             mCompositeUbo);
         crl->uploadResources(updates, outputSize, mBufferDevicePixelRatio,
@@ -2834,7 +2836,7 @@ void QCustomPlot::executeRenderPass(QRhiCommandBuffer* cb, QRhiResourceUpdateBat
         bool hasColormapsOnLayer = false;
         for (auto* crl : mColormapRhiLayers)
         {
-            if (crl->layer() == layer && crl->hasContent())
+            if (crl->layer() == layer && crl->hasContent() && crl->ownerVisible())
             {
                 if (!hasColormapsOnLayer)
                 {
@@ -3920,6 +3922,8 @@ QList<QCPLayerable*> QCustomPlot::layerableListAt(const QPointF& pos, bool onlyS
         for (int i = layerables.size() - 1; i >= 0; --i)
         {
             if (!layerables.at(i)->realVisibility())
+                continue;
+            if (layerables.at(i)->mouseTransparent())
                 continue;
             QVariant details;
             double dist = layerables.at(i)->selectTest(pos, onlySelectable,

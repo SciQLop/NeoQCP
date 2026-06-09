@@ -177,6 +177,7 @@ QCPColormapRhiLayer* QCPColormapRenderer::ensureRhiLayer()
     if (!mRhiLayer && plot && plot->rhi())
     {
         mRhiLayer = new QCPColormapRhiLayer(plot->rhi());
+        mRhiLayer->setOwner(mOwner);
         plot->registerColormapRhiLayer(mRhiLayer);
     }
     return mRhiLayer;

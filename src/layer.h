@@ -130,6 +130,7 @@ class QCP_LIB_DECL QCPLayerable : public QObject
     Q_PROPERTY(QCPLayerable* parentLayerable READ parentLayerable)
     Q_PROPERTY(QCPLayer* layer READ layer WRITE setLayer NOTIFY layerChanged)
     Q_PROPERTY(bool antialiased READ antialiased WRITE setAntialiased)
+    Q_PROPERTY(bool mouseTransparent READ mouseTransparent WRITE setMouseTransparent)
     /// \endcond
 
 public:
@@ -148,11 +149,18 @@ public:
 
     [[nodiscard]] bool antialiased() const { return mAntialiased; }
 
+    // When true, this layerable is skipped by hit-testing (layerableListAt), so
+    // it never captures mouse clicks/hover nor shadows interactive elements
+    // beneath it. Use for purely decorative overlays (e.g. a crosshair) that
+    // would otherwise steal clicks from the legend/plottables below.
+    [[nodiscard]] bool mouseTransparent() const { return mMouseTransparent; }
+
     // setters:
     void setVisible(bool on);
     Q_SLOT bool setLayer(QCPLayer* layer);
     bool setLayer(const QString& layerName);
     void setAntialiased(bool enabled);
+    void setMouseTransparent(bool transparent) { mMouseTransparent = transparent; }
 
     // introduced virtual methods:
     virtual double selectTest(const QPointF& pos, bool onlySelectable,
@@ -171,6 +179,7 @@ protected:
     QPointer<QCPLayerable> mParentLayerable;
     QCPLayer* mLayer;
     bool mAntialiased;
+    bool mMouseTransparent = false;
 
     // introduced virtual methods:
     virtual void parentPlotInitialized(QCustomPlot* parentPlot);
