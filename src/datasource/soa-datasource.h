@@ -16,7 +16,16 @@ public:
         : mKeys(std::move(keys)), mValues(std::move(values)),
           mDataGuard(std::move(dataGuard))
     {
-        Q_ASSERT(std::ranges::size(mKeys) == std::ranges::size(mValues));
+        // Shape lies from callers must degrade to an empty source, not become
+        // OOB reads (release) or aborts (debug) — this is a public entry point.
+        if (std::ranges::size(mKeys) != std::ranges::size(mValues))
+        {
+            qWarning("QCPSoADataSource: keys/values length mismatch (%zu vs %zu) — dropping data",
+                     static_cast<std::size_t>(std::ranges::size(mKeys)),
+                     static_cast<std::size_t>(std::ranges::size(mValues)));
+            mKeys = {};
+            mValues = {};
+        }
     }
 
     const KeyContainer& keys() const { return mKeys; }

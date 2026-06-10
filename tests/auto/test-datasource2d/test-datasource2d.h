@@ -23,6 +23,7 @@ private slots:
     void soa2dSpanView();
     void soa2dMixedTypes();
     void soa2dRangeQueries();
+    void soa2dInvalidShapesDegradeToEmpty();
 
     // Resample algorithm tests
     void resampleUniformGrid();

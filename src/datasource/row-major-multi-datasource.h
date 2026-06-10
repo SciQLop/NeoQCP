@@ -79,10 +79,23 @@ public:
         : mKeys(keys), mValues(values), mRows(rows), mColumns(columns), mStride(stride),
           mDataGuard(std::move(dataGuard))
     {
-        Q_ASSERT(rows >= 0 && columns >= 0 && stride > 0);
-        Q_ASSERT(static_cast<int>(keys.size()) == rows);
-        Q_ASSERT(stride >= columns);
-        Q_ASSERT(values != nullptr || rows == 0);
+        // Shape lies from callers must degrade to an empty source, not become
+        // OOB reads (release) or aborts (debug) — this is a public entry point.
+        const bool valid = rows > 0 && columns >= 0 && stride > 0 && stride >= columns
+            && static_cast<int>(keys.size()) == rows && values != nullptr;
+        if (!valid)
+        {
+            if (rows != 0)
+                qWarning("QCPRowMajorMultiDataSource: invalid shape (rows=%d, columns=%d, "
+                         "stride=%d, keys=%zu, values=%p) — dropping data",
+                         rows, columns, stride, keys.size(),
+                         static_cast<const void*>(values));
+            mKeys = {};
+            mValues = nullptr;
+            mRows = 0;
+            mColumns = 0;
+            mStride = 1;
+        }
     }
 
     int columnCount() const override { return mColumns; }

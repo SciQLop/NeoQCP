@@ -444,6 +444,50 @@ void TestMultiDataSource::rowMajorGetLines()
     QVERIFY(optLines.size() <= 5);
 }
 
+void TestMultiDataSource::soaMismatchedColumnDegradesToEmpty()
+{
+    // A value column shorter than the keys must not become an OOB read
+    // (release) or abort (debug): the source degrades to empty with a warning.
+    std::vector<double> keys = {1.0, 2.0, 3.0};
+    std::vector<std::vector<double>> columns;
+    columns.push_back({10.0, 20.0, 30.0});
+    columns.push_back({40.0, 50.0}); // short column, wrong on purpose
+    QCPSoAMultiDataSource<std::vector<double>, std::vector<double>> src(
+        std::move(keys), std::move(columns));
+
+    QCOMPARE(src.size(), 0);
+    QCOMPARE(src.columnCount(), 0);
+    bool found = true;
+    src.keyRange(found);
+    QVERIFY(!found);
+}
+
+void TestMultiDataSource::rowMajorInvalidShapeDegradesToEmpty()
+{
+    std::vector<double> keys = {1.0, 2.0, 3.0};
+    std::vector<double> values = {10, 20, 30, 40, 50, 60};
+
+    {
+        // keys shorter than rows
+        QCPRowMajorMultiDataSource<double, double> src(
+            std::span<const double>(keys.data(), 2), values.data(), 3, 2, 2);
+        QCOMPARE(src.size(), 0);
+        QCOMPARE(src.columnCount(), 0);
+    }
+    {
+        // stride narrower than the column count
+        QCPRowMajorMultiDataSource<double, double> src(
+            std::span<const double>(keys), values.data(), 3, 2, 1);
+        QCOMPARE(src.size(), 0);
+    }
+    {
+        // null values with rows > 0
+        QCPRowMajorMultiDataSource<double, double> src(
+            std::span<const double>(keys), nullptr, 3, 2, 2);
+        QCOMPARE(src.size(), 0);
+    }
+}
+
 // Helper: build an L1 cache with uniform keys and per-column values
 static qcp::algo::MultiGraphResamplerCache makeL1Cache(
     const std::vector<double>& keys,
