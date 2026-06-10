@@ -712,6 +712,11 @@ void TestDataSource2D::colormap2ViewData()
     QVERIFY(cm->dataSource() != nullptr);
     QCOMPARE(cm->dataSource()->xSize(), 2);
     QCOMPARE(cm->dataSource()->ySize(), 3);
+
+    // Non-owning views over stack arrays: viewData kicked an async resample
+    // that reads them on the pool — drain the pipeline before this frame dies
+    // (caught by ASan as stack-use-after-return).
+    QTRY_VERIFY_WITH_TIMEOUT(!cm->pipeline().isBusy(), 5000);
 }
 
 void TestDataSource2D::colormap2Render()

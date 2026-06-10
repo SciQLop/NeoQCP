@@ -28,4 +28,5 @@ private:
     std::deque<std::function<void()>> mFastQueue;
     std::deque<std::function<void()>> mHeavyQueue;
     int mRunning = 0;
+    bool mShuttingDown = false;
 };

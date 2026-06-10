@@ -21,13 +21,16 @@ QCPAsyncPipelineBase::QCPAsyncPipelineBase(QCPPipelineScheduler* scheduler,
                                              QObject* parent)
     : QObject(parent)
     , mScheduler(scheduler)
-    , mDestroyed(std::make_shared<std::atomic<bool>>(false))
+    , mDestroyGuard(std::make_shared<DestroyGuard>())
 {
 }
 
 QCPAsyncPipelineBase::~QCPAsyncPipelineBase()
 {
-    mDestroyed->store(true);
+    // Taken under the guard mutex so no job sits between its destroyed-check
+    // and its invokeMethod on this object (see makeJob).
+    QMutexLocker lock(&mDestroyGuard->mutex);
+    mDestroyGuard->destroyed = true;
 }
 
 bool QCPAsyncPipelineBase::isBusy() const
@@ -109,9 +112,8 @@ void QCPAsyncPipelineBase::onViewportChanged(const ViewportParams& vp)
 void QCPAsyncPipelineBase::deliverResult(uint64_t generation, std::any cache, std::any result)
 {
     PROFILE_HERE_N("Pipeline::deliverResult");
-    if (mDestroyed->load())
-        return;
-
+    // No destroyed-check needed: this only runs as a queued metacall on a live
+    // object (Qt purges pending metacalls when the receiver is deleted).
     QMutexLocker lock(&mMutex);
     mCache = std::move(cache);
 

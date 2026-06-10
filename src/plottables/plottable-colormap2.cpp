@@ -15,8 +15,44 @@ QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
     , mRenderer(this)
 {
+    installResampleTransform();
+
+    if (keyAxis)
+    {
+        connect(keyAxis, QOverload<const QCPRange&>::of(&QCPAxis::rangeChanged),
+                this, &QCPColorMap2::onViewportChanged);
+    }
+    if (valueAxis)
+    {
+        connect(valueAxis, QOverload<const QCPRange&>::of(&QCPAxis::rangeChanged),
+                this, &QCPColorMap2::onViewportChanged);
+        connect(valueAxis, &QCPAxis::scaleTypeChanged,
+                this, [this](QCPAxis::ScaleType) { onViewportChanged(); });
+    }
+
+    connect(&mPipeline, &QCPColormapPipeline::finished,
+            this, [this](uint64_t) {
+                ++mContourDataGen;
+                mRenderer.invalidateMapImage();
+                if (parentPlot())
+                    parentPlot()->replot(QCustomPlot::rpQueuedReplot);
+            });
+    connect(&mPipeline, &QCPColormapPipeline::busyChanged,
+            this, [this](bool) { updateEffectiveBusy(); });
+}
+
+QCPColorMap2::~QCPColorMap2()
+{
+    mRenderer.releaseRhiLayer();
+}
+
+// The transform runs on the scheduler's pool, possibly after this plottable is
+// deleted (queued jobs are not joined with destruction) — it must be
+// self-contained: settings are captured BY VALUE and re-baked when they change.
+void QCPColorMap2::installResampleTransform()
+{
     mPipeline.setTransform(TransformKind::ViewportDependent,
-        [&gapThreshold = mGapThreshold](
+        [gapThreshold = mGapThreshold](
             const QCPAbstractDataSource2D& src,
             const ViewportParams& vp,
             std::any& cache) -> std::shared_ptr<QCPColorMapData> {
@@ -68,37 +104,18 @@ QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
                 cache = qcp::algo2d::ResampleCache{};
             auto& rc = std::any_cast<qcp::algo2d::ResampleCache&>(cache);
             auto* raw = qcp::algo2d::resample(src, xBegin, xEnd,
-                xOut, yOut, w, h, vp.valueLogScale, gapThreshold.load(std::memory_order_relaxed), &rc);
+                xOut, yOut, w, h, vp.valueLogScale, gapThreshold, &rc);
             return std::shared_ptr<QCPColorMapData>(raw);
         });
-
-    if (keyAxis)
-    {
-        connect(keyAxis, QOverload<const QCPRange&>::of(&QCPAxis::rangeChanged),
-                this, &QCPColorMap2::onViewportChanged);
-    }
-    if (valueAxis)
-    {
-        connect(valueAxis, QOverload<const QCPRange&>::of(&QCPAxis::rangeChanged),
-                this, &QCPColorMap2::onViewportChanged);
-        connect(valueAxis, &QCPAxis::scaleTypeChanged,
-                this, [this](QCPAxis::ScaleType) { onViewportChanged(); });
-    }
-
-    connect(&mPipeline, &QCPColormapPipeline::finished,
-            this, [this](uint64_t) {
-                ++mContourDataGen;
-                mRenderer.invalidateMapImage();
-                if (parentPlot())
-                    parentPlot()->replot(QCustomPlot::rpQueuedReplot);
-            });
-    connect(&mPipeline, &QCPColormapPipeline::busyChanged,
-            this, [this](bool) { updateEffectiveBusy(); });
 }
 
-QCPColorMap2::~QCPColorMap2()
+void QCPColorMap2::setGapThreshold(double threshold)
 {
-    mRenderer.releaseRhiLayer();
+    if (mGapThreshold == threshold)
+        return;
+    mGapThreshold = threshold;
+    installResampleTransform();
+    mPipeline.onDataChanged(); // re-resample so the new threshold shows now, not on the next pan
 }
 
 void QCPColorMap2::setDataSource(std::unique_ptr<QCPAbstractDataSource2D> source)
