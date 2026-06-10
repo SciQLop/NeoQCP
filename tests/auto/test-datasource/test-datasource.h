@@ -24,6 +24,7 @@ private slots:
     void soaFindBeginEnd();
     void soaRangeQueries();
     void soaIntValues();
+    void soaMismatchedLengthsDegradeToEmpty();
 
     // QCPGraph2 integration tests
     void graph2Creation();

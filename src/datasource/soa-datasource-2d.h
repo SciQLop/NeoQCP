@@ -1,6 +1,7 @@
 #pragma once
 #include "abstract-datasource-2d.h"
 #include "algorithms-2d.h"
+#include <QtGlobal>
 #include <memory>
 #include <ranges>
 #include <span>
@@ -17,13 +18,30 @@ public:
         : mX(std::move(x)), mY(std::move(y)), mZ(std::move(z)),
           mDataGuard(std::move(dataGuard))
     {
-        auto nx = std::ranges::size(mX);
-        auto ny = std::ranges::size(mY);
-        auto nz = std::ranges::size(mZ);
-        Q_ASSERT(nx > 0 && nz > 0 && nz % nx == 0);
-        mYSize = static_cast<int>(nz / nx);
-        mYIs2D = (ny == nz);
-        Q_ASSERT(ny == nz || ny == static_cast<decltype(ny)>(mYSize));
+        const auto nx = std::ranges::size(mX);
+        const auto ny = std::ranges::size(mY);
+        const auto nz = std::ranges::size(mZ);
+        // Shape lies from callers must degrade to an empty source, not become
+        // OOB reads (release) or aborts (debug) — this is a public entry point.
+        const bool valid = nx > 0 && nz > 0 && nz % nx == 0
+            && (ny == nz || ny == nz / nx);
+        if (valid)
+        {
+            mYSize = static_cast<int>(nz / nx);
+            mYIs2D = (ny == nz);
+        }
+        else
+        {
+            if (nx != 0 || ny != 0 || nz != 0)
+                qWarning("QCPSoADataSource2D: inconsistent shapes (nx=%zu, ny=%zu, nz=%zu) — dropping data",
+                         static_cast<std::size_t>(nx), static_cast<std::size_t>(ny),
+                         static_cast<std::size_t>(nz));
+            mX = {};
+            mY = {};
+            mZ = {};
+            mYSize = 0;
+            mYIs2D = false;
+        }
     }
 
     const XC& x() const { return mX; }

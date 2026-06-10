@@ -191,6 +191,24 @@ void TestDataSource::soaIntValues()
     QCOMPARE(src.valueAt(2), 300.0);
 }
 
+void TestDataSource::soaMismatchedLengthsDegradeToEmpty()
+{
+    // Shape lies from callers must not become OOB reads (release) or aborts
+    // (debug): the source degrades to empty with a warning.
+    std::vector<double> keys = {1.0, 2.0, 3.0};
+    std::vector<double> values = {10.0, 20.0};
+    QCPSoADataSource<std::vector<double>, std::vector<double>> src(
+        std::move(keys), std::move(values));
+
+    QCOMPARE(src.size(), 0);
+    QVERIFY(src.empty());
+    bool found = true;
+    src.keyRange(found);
+    QVERIFY(!found);
+    src.valueRange(found);
+    QVERIFY(!found);
+}
+
 // QCPGraph2 integration tests
 void TestDataSource::graph2Creation()
 {

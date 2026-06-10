@@ -16,8 +16,20 @@ public:
         : mKeys(std::move(keys)), mValues(std::move(valueColumns)),
           mDataGuard(std::move(dataGuard))
     {
+        // Shape lies from callers must degrade to an empty source, not become
+        // OOB reads (release) or aborts (debug) — this is a public entry point.
         for (const auto& col : mValues)
-            Q_ASSERT(std::ranges::size(col) == std::ranges::size(mKeys));
+        {
+            if (std::ranges::size(col) != std::ranges::size(mKeys))
+            {
+                qWarning("QCPSoAMultiDataSource: column length mismatch (%zu vs %zu keys) — dropping data",
+                         static_cast<std::size_t>(std::ranges::size(col)),
+                         static_cast<std::size_t>(std::ranges::size(mKeys)));
+                mKeys = {};
+                mValues.clear();
+                break;
+            }
+        }
     }
 
     int columnCount() const override { return static_cast<int>(mValues.size()); }

@@ -173,6 +173,41 @@ void TestDataSource2D::soa2dRangeQueries()
     QCOMPARE(src.findXBegin(2.0), 0);
     QCOMPARE(src.findXEnd(4.0), 3);
 }
+
+void TestDataSource2D::soa2dInvalidShapesDegradeToEmpty()
+{
+    // Shape lies must not become OOB reads (release) or aborts (debug):
+    // the source degrades to empty with a warning.
+    {
+        // nz not a multiple of nx
+        std::vector<double> x = {1.0, 2.0, 3.0};
+        std::vector<double> y = {10.0, 20.0};
+        std::vector<double> z = {1.0, 2.0, 3.0, 4.0, 5.0};
+        QCPSoADataSource2D src(std::move(x), std::move(y), std::move(z));
+        QCOMPARE(src.xSize(), 0);
+        QCOMPARE(src.ySize(), 0);
+        bool found = true;
+        src.xRange(found);
+        QVERIFY(!found);
+    }
+    {
+        // y matches neither nz (2D) nor nz/nx (1D)
+        std::vector<double> x = {1.0, 2.0, 3.0};
+        std::vector<double> y = {10.0, 20.0, 30.0};
+        std::vector<double> z = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0};
+        QCPSoADataSource2D src(std::move(x), std::move(y), std::move(z));
+        QCOMPARE(src.xSize(), 0);
+        QCOMPARE(src.ySize(), 0);
+    }
+    {
+        // genuinely empty input stays empty without warning or crash
+        QCPSoADataSource2D src(std::vector<double>{}, std::vector<double>{},
+                               std::vector<double>{});
+        QCOMPARE(src.xSize(), 0);
+        QCOMPARE(src.ySize(), 0);
+    }
+}
+
 void TestDataSource2D::resampleUniformGrid()
 {
     std::vector<double> x = {0.0, 1.0, 2.0, 3.0, 4.0};

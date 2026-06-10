@@ -38,6 +38,10 @@ private slots:
     void rowMajorWithPadding();
     void rowMajorGetLines();
 
+    // Shape validation (degrade to empty, never UB/abort)
+    void soaMismatchedColumnDegradesToEmpty();
+    void rowMajorInvalidShapeDegradesToEmpty();
+
     // resampleL2Multi correctness
     void l2MultiBasicMinMax();
     void l2MultiNanSkipped();
