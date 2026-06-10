@@ -26,6 +26,11 @@ private slots:
 
     void drawDoesNotCrash();
 
+    // Snapshot semantics (C4/H6): parameters apply without waiting for a draw,
+    // and concurrent data/parameter changes never race in-flight resample jobs.
+    void parameterChangesApplyWithoutDraw();
+    void concurrentParameterAndDataChangesAreSafe();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };
