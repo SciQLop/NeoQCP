@@ -2,16 +2,17 @@
 #include "plottable-multigraph.h"
 #include <memory>
 
+// Immutable snapshot: built whole, never mutated. Async resample jobs hold a
+// shared_ptr to one generation while the graph swaps in the next — like the
+// SoA sources, the adapter co-owns its inner source so an in-flight job can
+// never observe a parameter change, a source swap, or a freed source.
 class QCPWaterfallDataAdapter : public QCPAbstractMultiDataSource {
 public:
-    explicit QCPWaterfallDataAdapter(std::shared_ptr<QCPAbstractMultiDataSource> source);
+    QCPWaterfallDataAdapter(std::shared_ptr<QCPAbstractMultiDataSource> source,
+                            QVector<double> offsets, QVector<double> normFactors,
+                            double gain);
 
-    void setSource(std::shared_ptr<QCPAbstractMultiDataSource> source);
     QCPAbstractMultiDataSource* source() const { return mSource.get(); }
-
-    void setOffsets(const QVector<double>& offsets) { mOffsets = offsets; }
-    void setNormFactors(const QVector<double>& factors) { mNormFactors = factors; }
-    void setGain(double gain) { mGain = gain; }
 
     int columnCount() const override;
     int size() const override;
@@ -29,10 +30,10 @@ public:
                                            QCPAxis* keyAxis, QCPAxis* valueAxis) const override;
 
 private:
-    std::shared_ptr<QCPAbstractMultiDataSource> mSource;
-    QVector<double> mOffsets;
-    QVector<double> mNormFactors;
-    double mGain = 1.0;
+    const std::shared_ptr<QCPAbstractMultiDataSource> mSource;
+    const QVector<double> mOffsets;
+    const QVector<double> mNormFactors;
+    const double mGain;
 
     double transform(int column, double rawValue) const;
 };
@@ -63,7 +64,6 @@ public:
 
 protected:
     void dataChanged() override;
-    void draw(QCPPainter* painter) override;
     QCPRange getValueRange(bool& foundRange,
                            QCP::SignDomain inSignDomain = QCP::sdBoth,
                            const QCPRange& inKeyRange = QCPRange()) const override;
@@ -74,15 +74,19 @@ private:
     QVector<double> mUserOffsets;
     bool mNormalize = true;
     double mGain = 1.0;
-    mutable bool mNormDirty = true;
-    mutable QVector<double> mCachedNormFactors;
+    bool mNormDirty = true;
+    QVector<double> mCachedNormFactors;
 
     std::shared_ptr<QCPAbstractMultiDataSource> mOriginalSource;
     std::shared_ptr<QCPWaterfallDataAdapter> mAdapter;
 
     double effectiveOffset(int component) const;
-    void updateAdapter() const;
-    void recomputeNormFactors() const;
+    // Builds a fresh immutable adapter and pushes it through
+    // QCPMultiGraph::setDataSource — every data/parameter change goes through
+    // here, so line/L1/L2 caches are invalidated and what is drawn always
+    // matches the current parameters.
+    void rebuildAdapter();
+    void recomputeNormFactors();
 
     friend class TestWaterfall;
 };

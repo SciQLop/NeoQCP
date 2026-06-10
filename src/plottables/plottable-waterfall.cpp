@@ -4,14 +4,13 @@
 // --- QCPWaterfallDataAdapter ---
 
 QCPWaterfallDataAdapter::QCPWaterfallDataAdapter(
-    std::shared_ptr<QCPAbstractMultiDataSource> source)
+    std::shared_ptr<QCPAbstractMultiDataSource> source,
+    QVector<double> offsets, QVector<double> normFactors, double gain)
     : mSource(std::move(source))
+    , mOffsets(std::move(offsets))
+    , mNormFactors(std::move(normFactors))
+    , mGain(gain)
 {
-}
-
-void QCPWaterfallDataAdapter::setSource(std::shared_ptr<QCPAbstractMultiDataSource> source)
-{
-    mSource = std::move(source);
 }
 
 int QCPWaterfallDataAdapter::columnCount() const { return mSource ? mSource->columnCount() : 0; }
@@ -86,24 +85,22 @@ QVector<QPointF> QCPWaterfallDataAdapter::getOptimizedLineData(int column, int b
 
 QCPWaterfallGraph::QCPWaterfallGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
     : QCPMultiGraph(keyAxis, valueAxis)
-    , mAdapter(std::make_shared<QCPWaterfallDataAdapter>(nullptr))
 {
 }
 
 void QCPWaterfallGraph::setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> source)
 {
     mOriginalSource = std::move(source);
-    mAdapter->setSource(mOriginalSource);
     mNormDirty = true;
-    QCPMultiGraph::setDataSource(mAdapter);
+    rebuildAdapter();
 }
 
-void QCPWaterfallGraph::setOffsetMode(OffsetMode mode) { mOffsetMode = mode; }
-void QCPWaterfallGraph::setUniformSpacing(double spacing) { mUniformSpacing = spacing; }
-void QCPWaterfallGraph::setOffsets(const QVector<double>& offsets) { mUserOffsets = offsets; }
-void QCPWaterfallGraph::setNormalize(bool enabled) { mNormalize = enabled; mNormDirty = true; }
-void QCPWaterfallGraph::setGain(double gain) { mGain = gain; }
-void QCPWaterfallGraph::invalidateNormalization() { mNormDirty = true; }
+void QCPWaterfallGraph::setOffsetMode(OffsetMode mode) { mOffsetMode = mode; rebuildAdapter(); }
+void QCPWaterfallGraph::setUniformSpacing(double spacing) { mUniformSpacing = spacing; rebuildAdapter(); }
+void QCPWaterfallGraph::setOffsets(const QVector<double>& offsets) { mUserOffsets = offsets; rebuildAdapter(); }
+void QCPWaterfallGraph::setNormalize(bool enabled) { mNormalize = enabled; mNormDirty = true; rebuildAdapter(); }
+void QCPWaterfallGraph::setGain(double gain) { mGain = gain; rebuildAdapter(); }
+void QCPWaterfallGraph::invalidateNormalization() { mNormDirty = true; rebuildAdapter(); }
 
 double QCPWaterfallGraph::effectiveOffset(int component) const
 {
@@ -112,7 +109,7 @@ double QCPWaterfallGraph::effectiveOffset(int component) const
     return component * mUniformSpacing;
 }
 
-void QCPWaterfallGraph::recomputeNormFactors() const
+void QCPWaterfallGraph::recomputeNormFactors()
 {
     if (!mOriginalSource) {
         mCachedNormFactors.clear();
@@ -134,9 +131,10 @@ void QCPWaterfallGraph::recomputeNormFactors() const
     mNormDirty = false;
 }
 
-void QCPWaterfallGraph::updateAdapter() const
+void QCPWaterfallGraph::rebuildAdapter()
 {
-    if (!mOriginalSource) return;
+    if (!mOriginalSource)
+        return;
     if (mNormDirty)
         recomputeNormFactors();
 
@@ -145,21 +143,19 @@ void QCPWaterfallGraph::updateAdapter() const
     for (int c = 0; c < cols; ++c)
         offsets[c] = effectiveOffset(c);
 
-    mAdapter->setOffsets(offsets);
-    mAdapter->setNormFactors(mCachedNormFactors);
-    mAdapter->setGain(mGain);
+    mAdapter = std::make_shared<QCPWaterfallDataAdapter>(
+        mOriginalSource, std::move(offsets), mCachedNormFactors, mGain);
+    QCPMultiGraph::setDataSource(mAdapter);
 }
 
 void QCPWaterfallGraph::dataChanged()
 {
-    invalidateNormalization();
+    // In-place mutation of the inner source: norm factors are stale, snapshot
+    // a fresh adapter (which also invalidates line/L1/L2 caches) before the
+    // base handles the change.
+    mNormDirty = true;
+    rebuildAdapter();
     QCPMultiGraph::dataChanged();
-}
-
-void QCPWaterfallGraph::draw(QCPPainter* painter)
-{
-    updateAdapter();
-    QCPMultiGraph::draw(painter);
 }
 
 QCPRange QCPWaterfallGraph::getValueRange(bool& foundRange,
@@ -171,7 +167,6 @@ QCPRange QCPWaterfallGraph::getValueRange(bool& foundRange,
         return QCPRange();
 
     if (inKeyRange != QCPRange()) {
-        updateAdapter();
         QCPRange merged;
         bool first = true;
         for (int c = 0; c < mOriginalSource->columnCount(); ++c) {

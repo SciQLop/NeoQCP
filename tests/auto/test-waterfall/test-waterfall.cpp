@@ -1,5 +1,7 @@
 #include "test-waterfall.h"
 #include "../../../src/qcp.h"
+#include <QCoreApplication>
+#include <cmath>
 
 void TestWaterfall::init()
 {
@@ -257,4 +259,59 @@ void TestWaterfall::drawDoesNotCrash()
 
     new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
+}
+
+void TestWaterfall::parameterChangesApplyWithoutDraw()
+{
+    // Gain/offset/normalize changes must be visible in the data source
+    // immediately — not only after the next draw() happened to refresh the
+    // shared adapter (stale-draw bug: the line cache redrew old amplitudes
+    // while autoscale already used the new ones).
+    auto* wf = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    wf->setOffsetMode(QCPWaterfallGraph::omUniform);
+    wf->setUniformSpacing(0.0);
+    wf->setNormalize(false);
+    wf->setGain(1.0);
+
+    std::vector<double> keys = {0.0, 1.0};
+    std::vector<std::vector<double>> vals = {{1.0, 2.0}};
+    wf->setData(std::move(keys), std::move(vals));
+
+    QCOMPARE(wf->dataSource()->valueAt(0, 0), 1.0);
+
+    wf->setGain(3.0);
+    QCOMPARE(wf->dataSource()->valueAt(0, 0), 3.0);
+
+    wf->setOffsetMode(QCPWaterfallGraph::omCustom);
+    wf->setOffsets({10.0});
+    QCOMPARE(wf->dataSource()->valueAt(0, 0), 13.0);
+}
+
+void TestWaterfall::concurrentParameterAndDataChangesAreSafe()
+{
+    // Data and parameter changes while L1 resample jobs are in flight must
+    // never mutate state those jobs read (shared adapter members, inner
+    // source swap) — pre-fix this is a data race / UAF caught by ASan.
+    constexpr int n = 80'000; // x2 columns > kResampleThreshold
+    auto* wf = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    wf->setNormalize(true);
+
+    for (int iter = 0; iter < 10; ++iter)
+    {
+        std::vector<double> keys(n);
+        std::vector<std::vector<double>> vals(2, std::vector<double>(n));
+        for (int i = 0; i < n; ++i)
+        {
+            keys[i] = i;
+            vals[0][i] = std::sin(i * 0.001) * (iter + 1);
+            vals[1][i] = std::cos(i * 0.001) * (iter + 1);
+        }
+        wf->setData(std::move(keys), std::move(vals)); // kicks an L1 job
+        wf->setGain(1.0 + iter);                        // raced the job pre-fix
+        wf->setUniformSpacing(2.0 + iter);
+        mPlot->replot(QCustomPlot::rpImmediateRefresh); // draw raced it too
+        QCoreApplication::processEvents();
+    }
+    // drain in-flight jobs before the plot dies
+    QTRY_VERIFY_WITH_TIMEOUT(!wf->pipeline().isBusy(), 10000);
 }
