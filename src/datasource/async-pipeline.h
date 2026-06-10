@@ -70,7 +70,15 @@ protected:
     ViewportParams mLastViewport;
     bool mWasBusy = false;
 
-    std::shared_ptr<std::atomic<bool>> mDestroyed;
+    // Shared between the pipeline and its in-flight jobs. The destructor flips
+    // `destroyed` under the mutex and jobs hold the mutex across their
+    // check-and-invoke, so the pipeline cannot be deleted between a job's
+    // destroyed-check and its QMetaObject::invokeMethod on `this`.
+    struct DestroyGuard {
+        QMutex mutex;
+        bool destroyed = false;
+    };
+    std::shared_ptr<DestroyGuard> mDestroyGuard;
 
 public:
     // Only safe to call from the pipeline's thread when no job is running
@@ -166,13 +174,19 @@ protected:
 
         auto source = mSource; // shared_ptr copy — keeps source alive for the job
         auto transform = mTransform;
-        auto destroyed = mDestroyed;
+        auto guard = mDestroyGuard;
         auto* self = this;
 
         return [source, transform, vp, cache = std::move(cache),
-                generation, destroyed, self]() mutable {
+                generation, guard, self]() mutable {
             auto result = transform(*source, vp, cache);
-            if (destroyed->load()) return;
+
+            // Held across check + invoke: the destructor takes the same mutex
+            // before flipping `destroyed`, so `self` cannot die in between.
+            // Once invokeMethod has posted, Qt purges the pending metacall if
+            // the receiver is deleted before delivery.
+            QMutexLocker lock(&guard->mutex);
+            if (guard->destroyed) return;
 
             QMetaObject::invokeMethod(self, [self, result = std::move(result),
                                               cache = std::move(cache), generation]() mutable {

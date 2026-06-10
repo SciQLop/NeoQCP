@@ -16,6 +16,7 @@
 #include <plottables/plottable-waterfall.h>
 #include <QSignalSpy>
 #include <QThread>
+#include <thread>
 #include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
 #include <cmath>
 #include <limits>
@@ -593,6 +594,60 @@ void TestPipeline::pipelineRapidFireDeliverResult()
     QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 3000);
     QVERIFY(pipeline.result() != nullptr);
     QCOMPARE(pipeline.result()->size(), 3);
+}
+
+void TestPipeline::schedulerDtorDropsQueuedJobs()
+{
+    // Jobs still queued when the scheduler dies belong to plottables that may
+    // already be destroyed — the destructor must drop them, not run them
+    // (waitForDone lets a finishing task's epilogue start queued work).
+    std::atomic<bool> gate{false};
+    std::atomic<bool> started{false};
+    std::atomic<bool> queuedRan{false};
+    std::thread releaser;
+    {
+        QCPPipelineScheduler scheduler(1);
+        scheduler.submit(QCPPipelineScheduler::Heavy, [&] {
+            started.store(true);
+            while (!gate.load()) QThread::msleep(2);
+        });
+        while (!started.load()) QThread::msleep(2);
+        scheduler.submit(QCPPipelineScheduler::Heavy, [&] { queuedRan.store(true); });
+        releaser = std::thread([&] {
+            QThread::msleep(100);
+            gate.store(true);
+        });
+        // ~QCPPipelineScheduler runs here: drop the queued job, join the blocker
+    }
+    releaser.join();
+    QVERIFY(!queuedRan.load());
+}
+
+void TestPipeline::colormap2QueuedJobAfterDeleteDoesNotTouchFreedMemory()
+{
+    // The colormap resample transform used to capture the member mGapThreshold
+    // by reference; a job dequeued after removePlottable() then read freed
+    // memory. Fails under ASan before the fix (silent in a plain build).
+    auto* scheduler = mPlot->pipelineScheduler();
+    const int threads = scheduler->maxThreads();
+    std::atomic<bool> gate{false};
+    std::atomic<int> started{0};
+    for (int i = 0; i < threads; ++i)
+        scheduler->submit(QCPPipelineScheduler::Heavy, [&] {
+            started.fetch_add(1);
+            while (!gate.load()) QThread::msleep(2);
+        });
+    while (started.load() < threads) QThread::msleep(2);
+
+    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    std::vector<double> x = {0, 1, 2};
+    std::vector<double> y = {0, 1};
+    std::vector<double> z = {1, 2, 3, 4, 5, 6};
+    cm->setData(std::move(x), std::move(y), std::move(z)); // job queued behind blockers
+    QVERIFY(mPlot->removePlottable(cm)); // deletes the colormap; its job is still queued
+
+    gate.store(true);
+    QThread::msleep(200); // let the orphaned job run (or be dropped, post-fix)
 }
 
 // --- Graph resampler tests ---

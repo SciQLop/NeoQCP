@@ -86,7 +86,9 @@ static QCPGraph2* addGraph2WithScatter(QCustomPlot* plot,
         keys[i] = i;
         values[i] = std::sin(i * 0.1);
     }
-    graph->setData(std::span<const double>(keys), std::span<const double>(values));
+    // Owning setData: span views over these locals would dangle after return
+    // (caught by ASan as heap-use-after-free in the next draw).
+    graph->setData(std::move(keys), std::move(values));
     plot->xAxis->setRange(0, nPoints);
     plot->yAxis->setRange(-1.5, 1.5);
     return graph;

@@ -13,12 +13,23 @@ QCPPipelineScheduler::QCPPipelineScheduler(int maxThreads, QObject* parent)
 
 QCPPipelineScheduler::~QCPPipelineScheduler()
 {
+    // Queued jobs belong to plottables that may already be deleted by the time
+    // the scheduler dies (~QCustomPlot destroys plottables first): drop them
+    // before joining, otherwise a finishing task's epilogue would start them.
+    {
+        QMutexLocker lock(&mMutex);
+        mShuttingDown = true;
+        mFastQueue.clear();
+        mHeavyQueue.clear();
+    }
     mPool.waitForDone();
 }
 
 void QCPPipelineScheduler::submit(Priority priority, std::function<void()> work)
 {
     QMutexLocker lock(&mMutex);
+    if (mShuttingDown)
+        return;
     if (priority == Fast)
         mFastQueue.push_back(std::move(work));
     else
@@ -31,6 +42,8 @@ void QCPPipelineScheduler::submit(Priority priority, std::function<void()> work)
 void QCPPipelineScheduler::scheduleNext()
 {
     QMutexLocker lock(&mMutex);
+    if (mShuttingDown)
+        return;
     while (mRunning < mPool.maxThreadCount())
     {
         std::function<void()> work;

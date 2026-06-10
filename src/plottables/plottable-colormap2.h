@@ -54,8 +54,8 @@ public:
     }
 
     // Properties
-    void setGapThreshold(double threshold) { mGapThreshold.store(threshold, std::memory_order_relaxed); }
-    [[nodiscard]] double gapThreshold() const { return mGapThreshold.load(std::memory_order_relaxed); }
+    void setGapThreshold(double threshold);
+    [[nodiscard]] double gapThreshold() const { return mGapThreshold; }
 
     [[nodiscard]] QCPColorGradient gradient() const { return mRenderer.gradient(); }
     [[nodiscard]] QCPColorScale* colorScale() const { return mRenderer.colorScale(); }
@@ -105,8 +105,12 @@ protected:
     void releaseGpuResources() override { mRenderer.releaseRhiLayer(); }
 
 private:
+    void installResampleTransform();
+
     std::shared_ptr<QCPAbstractDataSource2D> mDataSource;
-    std::atomic<double> mGapThreshold{1.5}; // before mPipeline: must outlive background jobs
+    // Captured by value in the pipeline transform (re-baked by setGapThreshold)
+    // so background jobs never reference this object's memory.
+    double mGapThreshold = 1.5;
     QCPColormapPipeline mPipeline;
     QCPColormapRenderer mRenderer;
 
