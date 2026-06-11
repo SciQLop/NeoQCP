@@ -150,16 +150,21 @@ QCPRange valueRange(const KC& keys, const VC& values, bool& foundRange,
     const bool hasKeyRestriction = inKeyRange.lower != inKeyRange.upper
                                     || inKeyRange.lower != 0.0;
 
+    // Keys are sorted (data source contract): restrict the scan to the visible
+    // window via binary search instead of testing every key. Callers with
+    // unsorted keys (histogram scatter) must not pass a key restriction here.
+    int i0 = 0;
+    int i1 = sz;
+    if (hasKeyRestriction)
+    {
+        i0 = findBegin(keys, inKeyRange.lower, false);
+        i1 = findEnd(keys, inKeyRange.upper, false);
+    }
+
     double lower = std::numeric_limits<double>::max();
     double upper = std::numeric_limits<double>::lowest();
-    for (int i = 0; i < sz; ++i)
+    for (int i = i0; i < i1; ++i)
     {
-        if (hasKeyRestriction)
-        {
-            double k = static_cast<double>(keys[i]);
-            if (k < inKeyRange.lower || k > inKeyRange.upper)
-                continue;
-        }
         double v = static_cast<double>(values[i]);
         if (sd == QCP::sdPositive && v <= 0) continue;
         if (sd == QCP::sdNegative && v >= 0) continue;

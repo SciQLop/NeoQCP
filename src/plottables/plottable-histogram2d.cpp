@@ -65,6 +65,7 @@ void QCPHistogram2D::installTransform()
 void QCPHistogram2D::setDataSource(std::shared_ptr<QCPAbstractDataSource> source)
 {
     mDataSource = std::move(source);
+    invalidateBoundsCache();
     mPipeline.setSource(mDataSource);
 }
 
@@ -75,7 +76,31 @@ void QCPHistogram2D::setDataSource(std::unique_ptr<QCPAbstractDataSource> source
 
 void QCPHistogram2D::dataChanged()
 {
+    invalidateBoundsCache();
     mPipeline.onDataChanged();
+}
+
+void QCPHistogram2D::invalidateBoundsCache() const
+{
+    for (auto& row : mBoundsCache)
+        for (auto& entry : row)
+            entry.valid = false;
+}
+
+bool QCPHistogram2D::cachedFiniteBounds(QCPRange& keyOut, QCPRange& valueOut,
+                                        bool keyPositiveOnly, bool valuePositiveOnly) const
+{
+    auto& entry = mBoundsCache[keyPositiveOnly ? 1 : 0][valuePositiveOnly ? 1 : 0];
+    if (!entry.valid)
+    {
+        entry.found = mDataSource
+            && mDataSource->finiteKeyValueBounds(entry.key, entry.value,
+                                                 keyPositiveOnly, valuePositiveOnly);
+        entry.valid = true;
+    }
+    keyOut = entry.key;
+    valueOut = entry.value;
+    return entry.found;
 }
 
 void QCPHistogram2D::setBins(int keyBins, int valueBins)
@@ -327,8 +352,7 @@ QCPRange QCPHistogram2D::getKeyRange(bool& foundRange, QCP::SignDomain inSignDom
     // shortcut would be wrong. Report the true finite min/max (positive-only on
     // a log axis), matching what bin2d() accumulates.
     QCPRange kr, vr;
-    foundRange = mDataSource->finiteKeyValueBounds(
-        kr, vr, inSignDomain == QCP::sdPositive, false);
+    foundRange = cachedFiniteBounds(kr, vr, inSignDomain == QCP::sdPositive, false);
     return foundRange ? kr : QCPRange();
 }
 
@@ -340,7 +364,31 @@ QCPRange QCPHistogram2D::getValueRange(bool& foundRange, QCP::SignDomain inSignD
         foundRange = false;
         return {};
     }
-    return mDataSource->valueRange(foundRange, inSignDomain, inKeyRange);
+    const bool hasKeyRestriction = inKeyRange.lower != inKeyRange.upper
+                                    || inKeyRange.lower != 0.0;
+    if (!hasKeyRestriction)
+        return mDataSource->valueRange(foundRange, inSignDomain, inKeyRange);
+
+    // Histogram keys are scattered: the source's key-restricted valueRange
+    // binary-searches sorted keys (graph contract) and would be wrong here —
+    // scan linearly through the virtual accessors instead.
+    foundRange = false;
+    double lo = std::numeric_limits<double>::max();
+    double hi = std::numeric_limits<double>::lowest();
+    const int n = mDataSource->size();
+    for (int i = 0; i < n; ++i)
+    {
+        const double k = mDataSource->keyAt(i);
+        if (k < inKeyRange.lower || k > inKeyRange.upper)
+            continue;
+        const double v = mDataSource->valueAt(i);
+        if (inSignDomain == QCP::sdPositive && v <= 0) continue;
+        if (inSignDomain == QCP::sdNegative && v >= 0) continue;
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+        foundRange = true;
+    }
+    return foundRange ? QCPRange(lo, hi) : QCPRange();
 }
 
 double QCPHistogram2D::selectTest(const QPointF& pos, bool onlySelectable, QVariant*) const
@@ -355,7 +403,7 @@ double QCPHistogram2D::selectTest(const QPointF& pos, bool onlySelectable, QVari
 
     // Use the true scattered min/max, not the sorted first/last shortcut.
     QCPRange kr, vr;
-    if (mDataSource->finiteKeyValueBounds(kr, vr) && kr.contains(key) && vr.contains(value))
+    if (cachedFiniteBounds(kr, vr, false, false) && kr.contains(key) && vr.contains(value))
         return 0;
     return -1;
 }

@@ -95,6 +95,8 @@ private slots:
 
     // QCPHistogram2D
     void histogram2dKeyRangeUnsorted();
+    void histogram2dValueRangeRestrictedUnsortedKeys();
+    void histogram2dSelectTestReflectsNewData();
     void histogram2dPipelineBins();
     void histogram2dNormalizationColumn();
     void histogram2dNormalizationToggleNoRebind();

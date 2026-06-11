@@ -118,7 +118,7 @@ public:
 
     QCPRange keyRange(bool& found, QCP::SignDomain sd = QCP::sdBoth) const override
     {
-        return qcp::algo::keyRange(mKeys, found, sd);
+        return qcp::algo::keyRangeSorted(mKeys, found, sd);
     }
 
     QCPRange valueRange(int column, bool& found, QCP::SignDomain sd = QCP::sdBoth,
