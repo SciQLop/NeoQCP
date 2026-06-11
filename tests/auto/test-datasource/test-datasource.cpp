@@ -111,6 +111,63 @@ void TestDataSource::algoValueRange()
     QCOMPARE(range.upper, 8.0);
 }
 
+void TestDataSource::algoValueRangeRestrictionMatchesBruteForce()
+{
+    // Equivalence guard for the windowed (binary-search) key restriction:
+    // results must match a brute-force linear scan for every window placement,
+    // including boundary-exact keys and windows outside the data.
+    std::vector<double> keys, values;
+    for (int i = 0; i < 1000; ++i)
+    {
+        keys.push_back(i * 0.5);
+        values.push_back(std::sin(i * 0.37) * 50.0);
+    }
+
+    auto brute = [&](QCP::SignDomain sd, const QCPRange& kr, bool& found) {
+        found = false;
+        double lo = std::numeric_limits<double>::max();
+        double hi = std::numeric_limits<double>::lowest();
+        for (size_t i = 0; i < keys.size(); ++i)
+        {
+            if (keys[i] < kr.lower || keys[i] > kr.upper)
+                continue;
+            double v = values[i];
+            if (sd == QCP::sdPositive && v <= 0) continue;
+            if (sd == QCP::sdNegative && v >= 0) continue;
+            if (v < lo) lo = v;
+            if (v > hi) hi = v;
+            found = true;
+        }
+        return found ? QCPRange(lo, hi) : QCPRange();
+    };
+
+    const QCPRange windows[] = {
+        {100.0, 200.0},   // boundary-exact keys on both ends
+        {100.25, 200.75}, // boundaries between keys
+        {0.0, 499.5},     // full range
+        {-50.0, -10.0},   // entirely before the data
+        {600.0, 700.0},   // entirely after the data
+        {499.5, 499.5},   // degenerate window on the last key
+    };
+    const QCP::SignDomain domains[] = {QCP::sdBoth, QCP::sdPositive, QCP::sdNegative};
+
+    for (const auto& w : windows)
+    {
+        for (auto sd : domains)
+        {
+            bool foundRef = false, foundGot = false;
+            QCPRange ref = brute(sd, w, foundRef);
+            QCPRange got = qcp::algo::valueRange(keys, values, foundGot, sd, w);
+            QCOMPARE(foundGot, foundRef);
+            if (foundRef)
+            {
+                QCOMPARE(got.lower, ref.lower);
+                QCOMPARE(got.upper, ref.upper);
+            }
+        }
+    }
+}
+
 void TestDataSource::algoLinesToPixels()
 {
     // Tested in integration with QCPGraph2 (needs axis objects)

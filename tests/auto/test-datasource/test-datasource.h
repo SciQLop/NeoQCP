@@ -15,6 +15,7 @@ private slots:
     void algoFindEnd();
     void algoKeyRange();
     void algoValueRange();
+    void algoValueRangeRestrictionMatchesBruteForce();
     void algoLinesToPixels();
     void algoOptimizedLineData();
 

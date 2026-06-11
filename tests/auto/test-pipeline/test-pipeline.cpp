@@ -1381,6 +1381,45 @@ void TestPipeline::histogram2dKeyRangeUnsorted()
     QCOMPARE(kr.upper, 9.0);
 }
 
+void TestPipeline::histogram2dValueRangeRestrictedUnsortedKeys()
+{
+    // Histogram keys are scattered: a key-restricted value range must NOT use
+    // the sorted-keys binary-search window (that's only valid for graphs).
+    auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
+    std::vector<double> keys = {5.0, 1.0, 9.0, 2.0, 7.0};
+    std::vector<double> vals = {50.0, 10.0, 90.0, 20.0, 70.0};
+    hist->setData(std::move(keys), std::move(vals));
+
+    bool found = false;
+    QCPRange vr = hist->getValueRange(found, QCP::sdBoth, QCPRange(1.5, 6.0));
+    QVERIFY(found);
+    QCOMPARE(vr.lower, 20.0); // keys 5.0 and 2.0 are inside [1.5, 6.0]
+    QCOMPARE(vr.upper, 50.0);
+}
+
+void TestPipeline::histogram2dSelectTestReflectsNewData()
+{
+    // Bounds used by selectTest are memoized per data generation: a data
+    // change must invalidate the cache, not keep answering for the old data.
+    mPlot->xAxis->setRange(0, 100);
+    mPlot->yAxis->setRange(0, 100);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
+    hist->setData(std::vector<double>{10.0, 20.0}, std::vector<double>{10.0, 20.0});
+
+    const QPointF inside_old(mPlot->xAxis->coordToPixel(15.0),
+                             mPlot->yAxis->coordToPixel(15.0));
+    QVERIFY(hist->selectTest(inside_old, false) >= 0);
+    QVERIFY(hist->selectTest(inside_old, false) >= 0); // cached round
+
+    hist->setData(std::vector<double>{60.0, 80.0}, std::vector<double>{60.0, 80.0});
+    const QPointF inside_new(mPlot->xAxis->coordToPixel(70.0),
+                             mPlot->yAxis->coordToPixel(70.0));
+    QVERIFY(hist->selectTest(inside_old, false) < 0);  // stale cache would say yes
+    QVERIFY(hist->selectTest(inside_new, false) >= 0);
+}
+
 void TestPipeline::histogram2dPipelineBins()
 {
     auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);

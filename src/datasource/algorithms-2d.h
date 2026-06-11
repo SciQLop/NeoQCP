@@ -21,7 +21,8 @@ int findXEnd(const XC& x, double sortKey)
 template <IndexableNumericRange XC>
 QCPRange xRange(const XC& x, bool& found, QCP::SignDomain sd = QCP::sdBoth)
 {
-    return qcp::algo::keyRange(x, found, sd);
+    // x columns are sorted (2D source contract) — O(1)/O(log n) range
+    return qcp::algo::keyRangeSorted(x, found, sd);
 }
 
 template <IndexableNumericRange YC>

@@ -112,5 +112,21 @@ private:
     QCPHistogramPipeline mPipeline;
     QCPColormapRenderer mRenderer;
 
+    // finiteKeyValueBounds is an O(N) scan over the raw scatter; selectTest
+    // calls it per mouse event and getKeyRange per rescale. The bounds only
+    // change with the data — memoize per (keyPositiveOnly, valuePositiveOnly),
+    // invalidated by setDataSource/dataChanged.
+    struct BoundsCache
+    {
+        bool valid = false;
+        bool found = false;
+        QCPRange key;
+        QCPRange value;
+    };
+    mutable BoundsCache mBoundsCache[2][2];
+    void invalidateBoundsCache() const;
+    bool cachedFiniteBounds(QCPRange& keyOut, QCPRange& valueOut,
+                            bool keyPositiveOnly, bool valuePositiveOnly) const;
+
     void installTransform();
 };
