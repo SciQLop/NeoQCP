@@ -27,6 +27,7 @@ private slots:
     // NaN gap handling
     void linesToPixelsNanProducesNanNotZero();
     void adaptiveSamplingNanDoesNotPoisonMinMax();
+    void adaptiveSamplingInteriorNaNNoSpuriousBreaks();
 
     // Key-space gap detection
     void linesToPixelsBreaksAtKeyGaps();

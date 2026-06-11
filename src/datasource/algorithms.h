@@ -337,7 +337,11 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
                           : QPointF(keyAxis->coordToPixel(k), valueAxis->coordToPixel(v));
     };
 
-    auto flushInterval = [&](int intervalFirst, int intervalCount,
+    // intervalLast is the index of the last ACCEPTED (non-NaN) sample: NaN
+    // samples are skipped without counting, so deriving the closing point as
+    // intervalFirst + intervalCount - 1 could land on a NaN and inject a
+    // spurious line break into gap-free data.
+    auto flushInterval = [&](int intervalFirst, int intervalLast, int intervalCount,
                               double intervalStartKey, double lastEndKey,
                               double minVal, double maxVal,
                               double epsilon, double nextKey) {
@@ -350,9 +354,8 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
             result.append(toPixel(intervalStartKey + epsilon * 0.75, maxVal));
             if (nextKey > intervalStartKey + epsilon * 2)
             {
-                int prev = intervalFirst + intervalCount - 1;
                 result.append(toPixel(intervalStartKey + epsilon * 0.8,
-                                       static_cast<double>(values[prev])));
+                                       static_cast<double>(values[intervalLast])));
             }
         }
         else
@@ -374,6 +377,7 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
     double minValue = static_cast<double>(values[i]);
     double maxValue = minValue;
     int currentIntervalFirst = i;
+    int currentIntervalLast = i;
     int reversedFactor = keyAxis->pixelOrientation();
     int reversedRound = reversedFactor == -1 ? 1 : 0;
 
@@ -425,7 +429,7 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
         if (hasAnyGap && gapData[i - begin])
         {
             double k = static_cast<double>(keys[i]);
-            flushInterval(currentIntervalFirst, intervalDataCount,
+            flushInterval(currentIntervalFirst, currentIntervalLast, intervalDataCount,
                           currentIntervalStartKey, lastIntervalEndKey,
                           minValue, maxValue, keyEpsilon, k);
             result.append(nanPt);
@@ -433,6 +437,7 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
             minValue = v;
             maxValue = v;
             currentIntervalFirst = i;
+            currentIntervalLast = i;
             if (useInlineTransform)
             {
                 int pixel = static_cast<int>(keyTf.toPixel(k)) + reversedRound;
@@ -459,16 +464,18 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
             minValue = std::min(minValue, v);
             maxValue = std::max(maxValue, v);
             ++intervalDataCount;
+            currentIntervalLast = i;
         }
         else
         {
-            flushInterval(currentIntervalFirst, intervalDataCount,
+            flushInterval(currentIntervalFirst, currentIntervalLast, intervalDataCount,
                           currentIntervalStartKey, lastIntervalEndKey,
                           minValue, maxValue, keyEpsilon, k);
             lastIntervalEndKey = static_cast<double>(keys[i - 1]);
             minValue = v;
             maxValue = v;
             currentIntervalFirst = i;
+            currentIntervalLast = i;
             if (useInlineTransform)
             {
                 int pixel = static_cast<int>(keyTf.toPixel(k)) + reversedRound;
@@ -488,7 +495,7 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
         }
         ++i;
     }
-    flushInterval(currentIntervalFirst, intervalDataCount,
+    flushInterval(currentIntervalFirst, currentIntervalLast, intervalDataCount,
                   currentIntervalStartKey, lastIntervalEndKey,
                   minValue, maxValue, keyEpsilon,
                   currentIntervalStartKey + keyEpsilon * 3);
@@ -658,11 +665,11 @@ void optimizedLineDataMulti(const KC& keys,
         }
         else
         {
+            // NaN values are skipped (not breaks) on the adaptive path — key
+            // gaps are detected separately; matching the single-column variant.
             double val = valueAt(c, s.intervalFirst);
             if (!std::isnan(val))
                 results[c].append(toPixel(static_cast<double>(keys[s.intervalFirst]), val));
-            else
-                results[c].append(nanPt);
         }
     };
 
@@ -711,8 +718,18 @@ void optimizedLineDataMulti(const KC& keys,
                 double v = valueAt(c, i);
                 if (!std::isnan(v))
                 {
-                    cs[c].minVal = std::min(cs[c].minVal, v);
-                    cs[c].maxVal = std::max(cs[c].maxVal, v);
+                    // a NaN-seeded interval (reset on a NaN sample) must
+                    // re-seed here, or std::min/max stay NaN-poisoned
+                    if (std::isnan(cs[c].minVal))
+                    {
+                        cs[c].minVal = v;
+                        cs[c].maxVal = v;
+                    }
+                    else
+                    {
+                        cs[c].minVal = std::min(cs[c].minVal, v);
+                        cs[c].maxVal = std::max(cs[c].maxVal, v);
+                    }
                 }
                 ++cs[c].intervalCount;
             }
