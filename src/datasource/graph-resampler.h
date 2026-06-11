@@ -424,14 +424,17 @@ inline std::shared_ptr<QCPAbstractDataSource> buildL1Cache(
     if (srcSize == 0 || srcSize < kResampleThreshold)
         return nullptr;
 
-    auto* c = std::any_cast<GraphResamplerCache>(&cache);
-    if (c && c->sourceSize == srcSize)
-        return nullptr; // L1 already valid
-
     bool foundRange = false;
     QCPRange fullKeyRange = src.keyRange(foundRange);
     if (!foundRange || fullKeyRange.size() <= 0)
         return nullptr;
+
+    // Same size is not enough: replacing the data with an equally-sized batch
+    // must not reuse a stale L1, so the cached key range participates too
+    // (keyRange is O(1) on sorted sources).
+    auto* c = std::any_cast<GraphResamplerCache>(&cache);
+    if (c && c->sourceSize == srcSize && c->cachedKeyRange == fullKeyRange)
+        return nullptr; // L1 already valid
     int numBins = std::min(kLevel1TargetBins, srcSize / 10);
 
     GraphResamplerCache newCache;
@@ -501,13 +504,14 @@ inline std::shared_ptr<QCPAbstractMultiDataSource> buildL1CacheMulti(
     if (srcSize == 0 || N == 0)
         return nullptr;
 
-    auto* c = std::any_cast<MultiGraphResamplerCache>(&cache);
-    if (c && c->sourceSize == srcSize && c->columnCount == N)
-        return nullptr;
-
     bool foundRange = false;
     QCPRange fullKeyRange = src.keyRange(foundRange);
     if (!foundRange || fullKeyRange.size() <= 0)
+        return nullptr;
+
+    auto* c = std::any_cast<MultiGraphResamplerCache>(&cache);
+    if (c && c->sourceSize == srcSize && c->columnCount == N
+        && c->cachedKeyRange == fullKeyRange)
         return nullptr;
     int numBins = std::min(kLevel1TargetBins, srcSize / 10);
 
