@@ -650,6 +650,16 @@ void TestPipeline::colormap2QueuedJobAfterDeleteDoesNotTouchFreedMemory()
     QThread::msleep(200); // let the orphaned job run (or be dropped, post-fix)
 }
 
+void TestPipeline::colormap2GapThresholdBeforeDataDoesNotStickBusy()
+{
+    // setGapThreshold() triggers a re-resample, but before any data source is
+    // set there is no job to run: onDataChanged() must not bump the pipeline
+    // generation, or isBusy() reports true until some future job delivers.
+    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    cm->setGapThreshold(5.0);
+    QVERIFY(!cm->pipeline().isBusy());
+}
+
 // --- Graph resampler tests ---
 
 void TestPipeline::graphResamplerBinMinMax()

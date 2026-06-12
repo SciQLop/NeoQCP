@@ -43,6 +43,7 @@ private slots:
     void pipelineRapidFireDeliverResult();
     void schedulerDtorDropsQueuedJobs();
     void colormap2QueuedJobAfterDeleteDoesNotTouchFreedMemory();
+    void colormap2GapThresholdBeforeDataDoesNotStickBusy();
 
     // Graph resampler
     void graphResamplerBinMinMax();
