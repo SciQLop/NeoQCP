@@ -486,6 +486,15 @@ void TestMultiDataSource::rowMajorInvalidShapeDegradesToEmpty()
             std::span<const double>(keys), nullptr, 3, 2, 2);
         QCOMPARE(src.size(), 0);
     }
+    {
+        // rows == 0 with non-empty keys is a shape lie, not a genuinely
+        // empty source: it must warn like the other mismatch paths
+        QTest::ignoreMessage(QtWarningMsg,
+            QRegularExpression("QCPRowMajorMultiDataSource: invalid shape"));
+        QCPRowMajorMultiDataSource<double, double> src(
+            std::span<const double>(keys), values.data(), 0, 2, 2);
+        QCOMPARE(src.size(), 0);
+    }
 }
 
 // Helper: build an L1 cache with uniform keys and per-column values
