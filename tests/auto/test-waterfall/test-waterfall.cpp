@@ -315,3 +315,21 @@ void TestWaterfall::concurrentParameterAndDataChangesAreSafe()
     // drain in-flight jobs before the plot dies
     QTRY_VERIFY_WITH_TIMEOUT(!wf->pipeline().isBusy(), 10000);
 }
+
+void TestWaterfall::clearingSourceEmptiesTheGraph()
+{
+    // rebuildAdapter() used to early-return on a null source, leaving the
+    // previous adapter installed in QCPMultiGraph: the graph kept rendering
+    // the old data while getKeyRange() already reported "no data".
+    auto* wf = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    std::vector<double> keys = {0.0, 1.0};
+    std::vector<std::vector<double>> vals = {{1.0, 2.0}};
+    wf->setData(std::move(keys), std::move(vals));
+    QVERIFY(wf->dataSource() != nullptr);
+
+    wf->setDataSource(nullptr);
+    QCOMPARE(wf->dataSource(), nullptr);
+    bool found = true;
+    wf->getKeyRange(found);
+    QVERIFY(!found);
+}

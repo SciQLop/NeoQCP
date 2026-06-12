@@ -30,6 +30,7 @@ private slots:
     // and concurrent data/parameter changes never race in-flight resample jobs.
     void parameterChangesApplyWithoutDraw();
     void concurrentParameterAndDataChangesAreSafe();
+    void clearingSourceEmptiesTheGraph();
 
 private:
     QCustomPlot* mPlot = nullptr;
