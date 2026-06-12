@@ -115,7 +115,11 @@ void QCPColorMap2::setGapThreshold(double threshold)
         return;
     mGapThreshold = threshold;
     installResampleTransform();
-    mPipeline.onDataChanged(); // re-resample so the new threshold shows now, not on the next pan
+    // Re-resample so the new threshold shows now, not on the next pan. Without
+    // a source there is no job to run and onDataChanged() would bump the
+    // pipeline generation for nothing, leaving isBusy() stuck true.
+    if (mDataSource)
+        mPipeline.onDataChanged();
 }
 
 void QCPColorMap2::setDataSource(std::unique_ptr<QCPAbstractDataSource2D> source)
