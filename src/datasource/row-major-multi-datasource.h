@@ -85,7 +85,9 @@ public:
             && static_cast<int>(keys.size()) == rows && values != nullptr;
         if (!valid)
         {
-            if (rows != 0)
+            // Genuinely empty input (rows == 0, no keys) stays silent; any
+            // other combination is a shape lie worth a diagnostic.
+            if (rows != 0 || !keys.empty())
                 qWarning("QCPRowMajorMultiDataSource: invalid shape (rows=%d, columns=%d, "
                          "stride=%d, keys=%zu, values=%p) — dropping data",
                          rows, columns, stride, keys.size(),
