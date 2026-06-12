@@ -134,7 +134,13 @@ void QCPWaterfallGraph::recomputeNormFactors()
 void QCPWaterfallGraph::rebuildAdapter()
 {
     if (!mOriginalSource)
+    {
+        // Clearing the source must uninstall the previous adapter too, or the
+        // graph keeps rendering the old data (base caches stay populated).
+        mAdapter.reset();
+        QCPMultiGraph::setDataSource(std::shared_ptr<QCPAbstractMultiDataSource>{});
         return;
+    }
     if (mNormDirty)
         recomputeNormFactors();
 
