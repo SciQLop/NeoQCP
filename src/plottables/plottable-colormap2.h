@@ -69,6 +69,12 @@ public:
     QCPColormapPipeline& pipeline() { return mPipeline; }
     const QCPColormapPipeline& pipeline() const { return mPipeline; }
 
+    // Pure-pan pixel offset of the last-rendered image vs the current axes, so
+    // the compositor can translate the existing texture during a pan instead of
+    // repainting + re-uploading every frame (skip-on-translate fast path).
+    [[nodiscard]] QPointF stallPixelOffset() const override;
+    [[nodiscard]] bool hasRenderedRange() const { return mHasRenderedRange; }
+
     // Contour overlay
     void setContourLevels(const QVector<double>& levels);
     [[nodiscard]] QVector<double> contourLevels() const { return mContourLevels; }
@@ -113,6 +119,10 @@ private:
     double mGapThreshold = 1.5;
     QCPColormapPipeline mPipeline;
     QCPColormapRenderer mRenderer;
+
+    // Axis ranges at the last full draw — baseline for the pan translation offset.
+    bool mHasRenderedRange = false;
+    QCPRange mRenderedKeyRange, mRenderedValueRange;
 
     // Contour overlay
     QVector<double> mContourLevels;

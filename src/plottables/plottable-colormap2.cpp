@@ -8,6 +8,7 @@
 #include <axis/axis.h>
 #include <layer.h>
 #include <datasource/resample.h>
+#include <painting/viewport-offset.h>
 #include <Profiling.hpp>
 
 QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
@@ -231,6 +232,42 @@ void QCPColorMap2::onViewportChanged()
     if (!axisRect) return;
 
     mPipeline.onViewportChanged(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data()));
+
+    // Dirty the layer on every viewport change so a pan is handled even when it
+    // arrives via set_range (axis sync) rather than the interactive drag path
+    // (which already calls markAffectedLayersDirty). stallPixelOffset() then lets
+    // the compositor translate the existing texture instead of repainting it.
+    if (mLayer)
+        mLayer->markDirty();
+}
+
+QPointF QCPColorMap2::stallPixelOffset() const
+{
+    // Only valid when there is a rendered image to shift and no fresher one is
+    // pending (a finished resample / data / gradient change must redraw, not
+    // translate the stale texture).
+    if (!mHasRenderedRange || !mKeyAxis || !mValueAxis
+        || mRenderer.mapImage().isNull() || mRenderer.mapImageInvalidated())
+        return {};
+
+    // Pure translation only: reject genuine zoom. Scale-aware so a pure pan on a
+    // log axis (which changes the linear range size) is not misread as a zoom.
+    if (qAbs(qcp::axisRangeSizeRatio(mKeyAxis.data(), mRenderedKeyRange) - 1.0) > 1e-4
+        || qAbs(qcp::axisRangeSizeRatio(mValueAxis.data(), mRenderedValueRange) - 1.0) > 1e-4)
+        return {};
+
+    const QPointF offset = qcp::computeViewportOffset(
+        mKeyAxis.data(), mValueAxis.data(), mRenderedKeyRange, mRenderedValueRange);
+
+    // Reject if panned beyond the axis rect (texture no longer covers viewport).
+    const bool keyVert = mKeyAxis->orientation() == Qt::Vertical;
+    const double keyDim = keyVert ? mKeyAxis->axisRect()->height() : mKeyAxis->axisRect()->width();
+    const double valDim = keyVert ? mKeyAxis->axisRect()->width() : mKeyAxis->axisRect()->height();
+    if (qAbs(keyVert ? offset.y() : offset.x()) > keyDim
+        || qAbs(keyVert ? offset.x() : offset.y()) > valDim)
+        return {};
+
+    return offset;
 }
 
 bool QCPColorMap2::canProduceContent() const
@@ -276,6 +313,11 @@ void QCPColorMap2::draw(QCPPainter* painter)
     QCPRange valueRange = resampledData->valueRange();
     applyDefaultAntialiasingHint(painter);
     mRenderer.draw(painter, mKeyAxis.data(), mValueAxis.data(), keyRange, valueRange);
+
+    // Baseline for stallPixelOffset: the axes this image was just drawn against.
+    mRenderedKeyRange = mKeyAxis->range();
+    mRenderedValueRange = mValueAxis->range();
+    mHasRenderedRange = true;
 
     bool contoursActive = !mContourLevels.isEmpty() || mAutoContourCount > 0;
     if (contoursActive && (imageWasInvalidated || mContourCacheGen != mContourDataGen))
