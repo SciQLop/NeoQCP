@@ -1,4 +1,6 @@
 #include "test-paintbuffer.h"
+#include <painting/viewport-offset.h>
+#include <vector>
 
 void TestPaintBuffer::init()
 {
@@ -387,4 +389,111 @@ void TestPaintBuffer::skipRepaint_bufferNotReuploadedOnPan()
     // The skip worked: stallPixelOffset still returns non-null
     // because draw() was NOT called (mRenderedRange not updated)
     QVERIFY(!mainLayer->pixelOffset().isNull());
+}
+
+void TestPaintBuffer::colormap2_panDirtiesLayerBuffer()
+{
+    // A ViewportDependent colormap resamples asynchronously on pan. It must
+    // still dirty its layer on every viewport change so the existing image
+    // redraws repositioned to the current axes — otherwise the spectrogram
+    // freezes in place while the axes scroll until the resample lands.
+    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    mPlot->xAxis->setRange(0, 10);
+    mPlot->yAxis->setRange(0, 100);
+    std::vector<double> x{0, 5, 10}, y{0, 50, 100};
+    std::vector<double> z(x.size() * y.size(), 1.0);
+    cm->setData(std::move(x), std::move(y), std::move(z));
+
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    auto buf = cm->layer()->mPaintBuffer.toStrongRef();
+    QVERIFY(buf);
+    buf->setContentDirty(false);  // clean slate (ignore any queued async redraw)
+
+    mPlot->xAxis->setRange(2, 12);  // pure pan
+    QVERIFY2(buf->contentDirty(),
+             "colormap2 pan did not dirty its layer — spectrogram frozen during drag");
+}
+
+void TestPaintBuffer::colormap2_panDirtiesLayerBufferLogY()
+{
+    // Same, with a logarithmic value axis (energy spectrogram): a pure pan in
+    // log space must still dirty the layer (regression for the reported stuck
+    // log-Y spectrogram).
+    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    mPlot->xAxis->setRange(0, 10);
+    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setRange(1, 1000);
+    std::vector<double> x{0, 5, 10}, y{1, 10, 100, 1000};
+    std::vector<double> z(x.size() * y.size(), 1.0);
+    cm->setData(std::move(x), std::move(y), std::move(z));
+
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    auto buf = cm->layer()->mPaintBuffer.toStrongRef();
+    QVERIFY(buf);
+    buf->setContentDirty(false);
+
+    mPlot->yAxis->setRange(2, 2000);  // pure pan in log space (×2)
+    QVERIFY2(buf->contentDirty(),
+             "colormap2 log-Y pan did not dirty its layer — spectrogram frozen during drag");
+}
+
+void TestPaintBuffer::colormap2_stallOffsetOnPan()
+{
+    // Skip-on-translate: after a pan the colormap reports a pixel offset so the
+    // compositor shifts the existing texture instead of repainting+re-uploading.
+    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    mPlot->xAxis->setRange(0, 10);
+    mPlot->yAxis->setRange(0, 100);
+    std::vector<double> x{0, 5, 10}, y{0, 50, 100};
+    std::vector<double> z(x.size() * y.size(), 1.0);
+    cm->setData(std::move(x), std::move(y), std::move(z));
+    (void)mPlot->toPixmap(400, 300);  // synchronous draw establishes the rendered range
+    QVERIFY(cm->hasRenderedRange());
+    QCOMPARE(cm->stallPixelOffset(), QPointF(0, 0));  // no pan yet
+
+    const QCPRange oldKey(0, 10), oldVal(0, 100);
+    mPlot->xAxis->setRange(2, 12);  // pure pan
+    const QPointF expected =
+        qcp::computeViewportOffset(mPlot->xAxis, mPlot->yAxis, oldKey, oldVal);
+    QVERIFY(!expected.isNull());
+    QCOMPARE(cm->stallPixelOffset(), expected);
+    QCOMPARE(mPlot->layer("main")->pixelOffset(), expected);  // layer aggregates it
+}
+
+void TestPaintBuffer::colormap2_stallOffsetOnLogYPan()
+{
+    // A pure pan on a log Y axis must still translate (regression for the stuck
+    // log-Y energy spectrogram): the zoom check is scale-aware.
+    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    mPlot->xAxis->setRange(0, 10);
+    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setRange(1, 1000);
+    std::vector<double> x{0, 5, 10}, y{1, 10, 100, 1000};
+    std::vector<double> z(x.size() * y.size(), 1.0);
+    cm->setData(std::move(x), std::move(y), std::move(z));
+    (void)mPlot->toPixmap(400, 300);
+    QVERIFY(cm->hasRenderedRange());
+
+    mPlot->yAxis->setRange(2, 2000);  // pure pan in log space (x2)
+    QVERIFY2(!cm->stallPixelOffset().isNull(),
+             "log-Y pan misread as zoom — colormap would repaint+reupload every frame");
+}
+
+void TestPaintBuffer::colormap2_stallOffsetNullOnZoom()
+{
+    // A genuine zoom must NOT translate (texture would be wrongly scaled); fall
+    // back to a real repaint.
+    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    mPlot->xAxis->setRange(0, 10);
+    mPlot->yAxis->setRange(0, 100);
+    std::vector<double> x{0, 5, 10}, y{0, 50, 100};
+    std::vector<double> z(x.size() * y.size(), 1.0);
+    cm->setData(std::move(x), std::move(y), std::move(z));
+    (void)mPlot->toPixmap(400, 300);
+    QVERIFY(cm->hasRenderedRange());
+
+    mPlot->xAxis->setRange(0, 20);  // zoom out 2x
+    QVERIFY(cm->stallPixelOffset().isNull());
 }

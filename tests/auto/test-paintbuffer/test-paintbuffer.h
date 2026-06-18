@@ -30,6 +30,12 @@ private slots:
     void setVisible_dirtiesLayerBuffer();
     void setVisible_noOpWhenUnchanged();
 
+    void colormap2_panDirtiesLayerBuffer();
+    void colormap2_panDirtiesLayerBufferLogY();
+    void colormap2_stallOffsetOnPan();
+    void colormap2_stallOffsetOnLogYPan();
+    void colormap2_stallOffsetNullOnZoom();
+
 private:
     QCustomPlot* mPlot;
 };
