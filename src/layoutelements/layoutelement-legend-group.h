@@ -18,6 +18,9 @@ public:
     QSize minimumOuterSizeHint() const override;
     double selectTest(const QPointF& pos, bool onlySelectable, QVariant* details = nullptr) const override;
 
+    // The title shown for the group (collapsed header / expanded header row).
+    QString headerName() const;
+
 signals:
     void componentClicked(int componentIndex);
 
@@ -27,7 +30,6 @@ protected:
 
 private:
     int rowHeight() const;
-    QString headerName() const;
     QCPMultiGraph* mMultiGraph;
     bool mExpanded = false;
     int mSelectedComponent = -1;

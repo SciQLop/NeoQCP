@@ -343,6 +343,33 @@ void TestMultiGraph::addToLegendCreatesGroupItem()
     QCOMPARE(item->multiGraph(), mg);
 }
 
+void TestMultiGraph::legendHeaderDoesNotLeakClassNameWhenEmpty()
+{
+    // A multigraph with no data (0 components) and no name must not surface its
+    // C++ class name ("QCPMultiGraph") to the user in the legend.
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    QCOMPARE(mg->componentCount(), 0);
+    mg->addToLegend();
+    auto* item = qobject_cast<QCPGroupLegendItem*>(mPlot->legend->item(0));
+    QVERIFY(item != nullptr);
+    QVERIFY(item->headerName()
+            != QString::fromUtf8(mg->metaObject()->className()));
+    QVERIFY(item->headerName().isEmpty());
+}
+
+void TestMultiGraph::legendHeaderShowsNameWhileEmpty()
+{
+    // A named multigraph that has not received data yet keeps showing its name
+    // (the loading cue), never the class name.
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setName("b_gse");
+    QCOMPARE(mg->componentCount(), 0);
+    mg->addToLegend();
+    auto* item = qobject_cast<QCPGroupLegendItem*>(mPlot->legend->item(0));
+    QVERIFY(item != nullptr);
+    QCOMPARE(item->headerName(), QStringLiteral("b_gse"));
+}
+
 void TestMultiGraph::removeFromLegendWorks()
 {
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);

@@ -28,7 +28,10 @@ QString QCPGroupLegendItem::headerName() const
     if (!mMultiGraph) return QString();
     if (!mMultiGraph->name().isEmpty()) return mMultiGraph->name();
     int n = mMultiGraph->componentCount();
-    if (n == 0) return mMultiGraph->metaObject()->className();
+    // No name and no components yet (e.g. async data still loading): show an
+    // empty header rather than the C++ class name, which is meaningless to the
+    // user. The legend item itself (and any busy indicator) still renders.
+    if (n == 0) return QString();
     const QString& first = mMultiGraph->component(0).name;
     if (n == 1) return first;
     return first + QString::fromUtf8(" \u2026 ") + mMultiGraph->component(n - 1).name;

@@ -41,6 +41,8 @@ private slots:
     void removeFromLegendWorks();
     void legendExpandCollapse();
     void legendGroupSelectsAll();
+    void legendHeaderDoesNotLeakClassNameWhenEmpty();
+    void legendHeaderShowsNameWhileEmpty();
 
     // Line cache
     void cacheExtendsBeyondVisibleRange();
