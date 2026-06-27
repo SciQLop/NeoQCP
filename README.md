@@ -44,8 +44,15 @@ This fork aims at modernizing the excellent [QCustomPlot](https://www.qcustomplo
   // Line styles and scatter symbols
   graph->setLineStyle(QCPGraph2::lsStepCenter);
   graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, 8));
-  graph->setScatterSkip(2);  // draw every 3rd scatter point
+  graph->setScatterSkip(2);            // draw every 3rd scatter point
+  graph->setScatterMaxPoints(50000);   // stratified subsampling cap for huge datasets
+
+  // Per-point color axis — color scatters by a third quantity
+  graph->setScatterColorValues(std::move(colorValues));
+  graph->setScatterColorGradient(QCPColorGradient::gpJet);
   ```
+
+  Scatters render on the GPU via instanced SDF sprites (see GPU Plottable Rendering), and large series are decimated with adaptive min/max sampling so panning and zooming stay interactive.
 
   **QCPGraph2 vs QCPGraph:**
 
@@ -61,10 +68,13 @@ This fork aims at modernizing the excellent [QCustomPlot](https://www.qcustomplo
   | Selection decoration | Full (pen + scatter) | Basic |
 
 - **GPU Plottable Rendering**
-  QCPGraph and QCPCurve solid-line strokes and baseline fills rendered via QRhi shaders with polyline extrusion and 4x MSAA antialiasing.
+  QCPGraph and QCPCurve solid-line strokes and baseline fills rendered via QRhi shaders with polyline extrusion and 4x MSAA antialiasing. Scatter symbols are drawn as GPU-instanced SDF sprites, and the grid, tick marks, and span items are emitted directly to the GPU as well — keeping the whole hot path off the CPU.
+
+- **Smooth GPU-Translated Panning**
+  Panning shifts cached pixel-space geometry on the GPU via per-draw offsets instead of re-extruding and re-uploading every frame, and the compositor translates unchanged layer textures rather than repainting them. This makes dragging large datasets fluid without touching the CPU data path.
 
 - **Zero-Copy Colormap (QCPColorMap2)**
-  New colormap plottable with async resampling and zero-copy data sources. Data is resampled on a background thread with request coalescing — only the latest viewport matters, so rapid zooming/panning stays fluid. Supports gap detection and logarithmic Y axes.
+  New colormap plottable with async resampling and zero-copy data sources. Data is resampled on a background thread with request coalescing — only the latest viewport matters, so rapid zooming/panning stays fluid.
 
   ```cpp
   auto* cm = new QCPColorMap2(xAxis, yAxis);
@@ -74,6 +84,50 @@ This fork aims at modernizing the excellent [QCustomPlot](https://www.qcustomplo
 
   // Zero-copy view — plot directly from your buffer
   cm->viewData(xSpan, ySpan, zSpan);
+  ```
+
+  Data gaps (missing acquisition periods) are detected and left blank instead of being interpolated across, logarithmic Y axes are supported, and an optional GPU contour-line overlay can be drawn on top of the colorized cells.
+
+- **Multi-Component Graph (QCPMultiGraph)**
+  Plots many value columns that share a single key axis from one zero-copy SoA source — ideal for multi-channel time series. Each component has its own pen/selection, components can be colored in bulk, and the same two-level async resampling as QCPGraph2 keeps millions of points per column interactive. Accepts column-major, row-major, and `std::span` layouts.
+
+  ```cpp
+  auto* mg = new QCPMultiGraph(xAxis, yAxis);
+  mg->setData(std::move(keys), std::move(valueColumns));   // one vector per component
+  mg->setComponentColors({Qt::red, Qt::green, Qt::blue});
+  ```
+
+- **Waterfall (QCPWaterfall)**
+  Built on QCPMultiGraph, stacks normalized spectra/traces into a waterfall display. Normalization is recomputed automatically as data changes.
+
+- **2D Histogram (QCPHistogram2D)**
+  Bins `(key, value)` point clouds into a colormap on a background thread, with per-axis configurable bin counts and logarithmic bin spacing that follows the axis scale type.
+
+  ```cpp
+  auto* h = new QCPHistogram2D(xAxis, yAxis);
+  h->setBins(256, 256);
+  h->viewData(xSpan, ySpan);
+  ```
+
+- **Span Items (QCPVSpan / QCPHSpan / QCPRSpan)**
+  GPU-rendered shaded regions spanning a key range (vertical), value range (horizontal), or both (rectangular) — useful for highlighting time intervals, catalog events, or thresholds. Coordinates are converted to pixels in double precision on the CPU to avoid float32 cancellation with large timestamps.
+
+  ```cpp
+  auto* span = new QCPVSpan(plot);
+  span->setRange(QCPRange(t0, t1));
+  span->setBrush(QColor(0, 120, 215, 60));
+  ```
+
+- **Interactive Item Creation Mode**
+  Drive click-and-drag item creation from user callbacks instead of bespoke event handling. An `ItemCreator` builds the item on press; an `ItemPositioner` updates its geometry as the mouse drags. Creation only fires inside the axis rect's data area.
+
+  ```cpp
+  plot->setItemCreator([](QCustomPlot* p, QCPAxis* kx, QCPAxis* vx) {
+      return new QCPVSpan(p);
+  });
+  plot->setItemPositioner([](QCPAbstractItem* it, double k0, double, double k1, double) {
+      static_cast<QCPVSpan*>(it)->setRange(QCPRange(k0, k1));
+  });
   ```
 
 - **Theming**
@@ -112,14 +166,23 @@ This fork aims at modernizing the excellent [QCustomPlot](https://www.qcustomplo
 
   This lets you switch plot themes along with your application stylesheet — no C++ theme code needed.
 
-- **Bug Fixes**
-  Patched critical issues from upstream:
-    - Fixed DPI scaling issues on macOS and Windows
+- **Upstream QCustomPlot Bugs Fixed**
+  Latent bugs in QCustomPlot's own code, patched in this fork:
+    - DPI scaling issues on macOS and Windows
+    - Crash on Qt 6.10+ from an out-of-range `tickStep` reaching `qRound` in the datetime axis ticker (`qCheckedFPConversionToInteger` assert)
+    - `QCustomPlot::removeLayer()` use-after-delete — the layer was deleted before being removed from the layer list (latent UB)
+
+- **NeoQCP Rendering-Path Fixes**
+  Hardening of NeoQCP's own new GPU / async / zero-copy machinery:
+    - Data gaps and NaN values break polylines instead of drawing fan lines across them (regression in the zero-copy `QCPGraph2`/`QCPMultiGraph` pixel mapping — upstream `QCPGraph` already handled this)
+    - Non-owning data sources guard against use-after-free when the caller frees the buffer mid-resample (`dataGuard`)
+    - Stale results stay visible during background rebuilds — no blank frames on data changes or pans
+    - Async jobs are safe against plottable destruction and viewport mismatches
+    - macOS/Metal correctness: scissor-rect Y-flip and vertex/SRB binding order
 
 - **Planned Features**
     - Incremental `addData()` for QCPGraph2
     - Fill support for QCPGraph2 (under graph / channel fill)
-    - C++ modernization
 
 ## 📥 Installation
 
