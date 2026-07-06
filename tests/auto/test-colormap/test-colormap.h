@@ -9,7 +9,9 @@ private slots:
   void cleanup();
   
   void QCPColorScale_rescaleDataRange();
-  
+  void QCPColorMapData_fillSetsExactValue();
+  void QCPColorMapData_fillIsSafeOnEmptyMap();
+
 private:
   QCustomPlot *mPlot;
   QCPColorMap *mColorMap;

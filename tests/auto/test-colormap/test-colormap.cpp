@@ -97,6 +97,29 @@ void TestColorMap::QCPColorScale_rescaleDataRange()
   QCOMPARE(scale->dataRange().upper, 3.5);
 }
 
+void TestColorMap::QCPColorMapData_fillSetsExactValue()
+{
+  QCPColorMapData data(2, 2, QCPRange(0, 1), QCPRange(0, 1));
+  data.fill(3.5);
+  QCOMPARE(data.cell(0, 0), 3.5);
+  QCOMPARE(data.cell(1, 0), 3.5);
+  QCOMPARE(data.cell(0, 1), 3.5);
+  QCOMPARE(data.cell(1, 1), 3.5);
+}
+
+void TestColorMap::QCPColorMapData_fillIsSafeOnEmptyMap()
+{
+  // clear()/setSize(0,0) is the one reachable path where mData is null;
+  // this can't force the bad_alloc branch (unsafe/nondeterministic to
+  // simulate a real allocation failure), but it exercises the same
+  // null-guard fill() now needs.
+  QCPColorMapData data(2, 2, QCPRange(0, 1), QCPRange(0, 1));
+  data.clear();
+  QVERIFY(data.isEmpty());
+  data.fill(3.5);
+  QVERIFY(data.isEmpty());
+}
+
 void TestColorMap::cleanup()
 {
   delete mPlot;

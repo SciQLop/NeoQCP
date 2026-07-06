@@ -346,6 +346,11 @@ QCPColorMapData* resample(
 
     auto* data = new QCPColorMapData(nx, ny, {xAxis.front(), xAxis.back()},
                                               {yAxis.front(), yAxis.back()});
+    if (!data->rawData())
+    {
+        delete data;
+        return nullptr;
+    }
 
     int ctxBegin = std::max(0, xBegin - 1);
     int ctxEnd = std::min(src.xSize(), xEnd + 1);

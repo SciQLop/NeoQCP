@@ -24,6 +24,7 @@
 ****************************************************************************/
 
 #include "plottable-colormap.h"
+#include <algorithm>
 #include <cmath>
 
 #include "../axis/axis.h"
@@ -225,8 +226,13 @@ void QCPColorMapData::setSize(int keySize, int valueSize)
             if (mData)
                 fill(0);
             else
+            {
                 qDebug() << Q_FUNC_INFO << "out of memory for data dimensions " << mKeySize << "*"
                          << mValueSize;
+                mKeySize = 0;
+                mValueSize = 0;
+                mIsEmpty = true;
+            }
         }
         else
             mData = nullptr;
@@ -470,7 +476,8 @@ void QCPColorMapData::clearAlpha()
 void QCPColorMapData::fill(double z)
 {
     const int dataCount = mValueSize * mKeySize;
-    memset(mData, z, dataCount * sizeof(*mData));
+    if (mData && dataCount > 0)
+        std::fill_n(mData, dataCount, z);
     mDataBounds = QCPRange(z, z);
     mDataModified = true;
 }
