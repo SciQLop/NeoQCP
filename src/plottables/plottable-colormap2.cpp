@@ -389,11 +389,20 @@ void QCPColorMap2::setContourLevels(const QVector<double>& levels)
     mContourLevels = levels;
     mAutoContourCount = 0;
     invalidateContourCache();
+    if (mLayer)
+        mLayer->markDirty();
+    if (mParentPlot)
+        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
 }
 
 void QCPColorMap2::setContourPen(const QPen& pen)
 {
     mContourPen = pen;
+    invalidateContourCache();
+    if (mLayer)
+        mLayer->markDirty();
+    if (mParentPlot)
+        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
 }
 
 void QCPColorMap2::setContourLabelEnabled(bool enabled)
@@ -406,6 +415,10 @@ void QCPColorMap2::setAutoContourLevels(int count)
     mAutoContourCount = qMax(0, count);
     mContourLevels.clear();
     invalidateContourCache();
+    if (mLayer)
+        mLayer->markDirty();
+    if (mParentPlot)
+        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
 }
 
 void QCPColorMap2::invalidateContourCache()

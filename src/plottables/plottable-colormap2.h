@@ -79,6 +79,9 @@ public:
     void setContourLevels(const QVector<double>& levels);
     [[nodiscard]] QVector<double> contourLevels() const { return mContourLevels; }
 
+    // NOTE: only pen.color() reaches the renderer (baked into the GPU line
+    // geometry) -- pen width is stored but never consumed; contour lines are
+    // always drawn at a fixed hairline width regardless of the pen's width.
     void setContourPen(const QPen& pen);
     [[nodiscard]] QPen contourPen() const { return mContourPen; }
 

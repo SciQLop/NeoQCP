@@ -167,6 +167,44 @@ void TestColorMap::QCPColorMap2_selectTestMissReturnsNegativeOne()
   QCOMPARE(result, -1.0);
 }
 
+void TestColorMap::QCPColorMap2_contourSettersScheduleReplot()
+{
+  // One shared colormap for all three setters below: each spins up a real
+  // background resample job (setData -> onDataChanged submits it regardless
+  // of any synchronous bake), so settling once here -- instead of once per
+  // setter in three separate fixtures -- keeps this test from dumping extra
+  // worker-thread/RHI cold-start load on whatever test class runs next.
+  mPlot->resize(400, 300);
+  mPlot->xAxis->setRange(0, 4);
+  mPlot->yAxis->setRange(0, 4);
+
+  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  std::vector<double> x = {0, 1, 2, 3, 4};
+  std::vector<double> y = {0, 1, 2, 3, 4};
+  std::vector<double> z(25, 1.0);
+  cm->setData(x, y, z);
+  cm->setAutoContourLevels(3);
+  mPlot->replot();
+  QTRY_VERIFY_WITH_TIMEOUT(!cm->pipeline().isBusy(), 2000);
+  QTest::qWait(50); // flush any trailing queued replot from the pipeline settling
+
+  {
+    QSignalSpy spy(mPlot, &QCustomPlot::afterReplot);
+    cm->setContourPen(QPen(Qt::red, 2));
+    QVERIFY2(spy.wait(200), "setContourPen should schedule a queued replot on its own");
+  }
+  {
+    QSignalSpy spy(mPlot, &QCustomPlot::afterReplot);
+    cm->setContourLevels({0.2, 0.5, 0.8});
+    QVERIFY2(spy.wait(200), "setContourLevels should schedule a queued replot on its own");
+  }
+  {
+    QSignalSpy spy(mPlot, &QCustomPlot::afterReplot);
+    cm->setAutoContourLevels(5);
+    QVERIFY2(spy.wait(200), "setAutoContourLevels should schedule a queued replot on its own");
+  }
+}
+
 void TestColorMap::cleanup()
 {
   delete mPlot;

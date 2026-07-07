@@ -13,6 +13,7 @@ private slots:
   void QCPColorMapData_fillIsSafeOnEmptyMap();
   void QCPColorMap2_selectTestHitSetsDetails();
   void QCPColorMap2_selectTestMissReturnsNegativeOne();
+  void QCPColorMap2_contourSettersScheduleReplot();
 
 private:
   QCustomPlot *mPlot;
