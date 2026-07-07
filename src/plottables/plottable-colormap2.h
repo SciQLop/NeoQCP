@@ -82,6 +82,8 @@ public:
     void setContourPen(const QPen& pen);
     [[nodiscard]] QPen contourPen() const { return mContourPen; }
 
+    // NOTE: stores the flag only -- no renderer currently draws contour labels,
+    // so toggling this has no visible effect (known limitation, not yet implemented).
     void setContourLabelEnabled(bool enabled);
     [[nodiscard]] bool contourLabelEnabled() const { return mContourLabelEnabled; }
 
