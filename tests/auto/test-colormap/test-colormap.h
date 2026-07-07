@@ -11,6 +11,8 @@ private slots:
   void QCPColorScale_rescaleDataRange();
   void QCPColorMapData_fillSetsExactValue();
   void QCPColorMapData_fillIsSafeOnEmptyMap();
+  void QCPColorMap2_selectTestHitSetsDetails();
+  void QCPColorMap2_selectTestMissReturnsNegativeOne();
 
 private:
   QCustomPlot *mPlot;

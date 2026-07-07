@@ -120,6 +120,53 @@ void TestColorMap::QCPColorMapData_fillIsSafeOnEmptyMap()
   QVERIFY(data.isEmpty());
 }
 
+void TestColorMap::QCPColorMap2_selectTestHitSetsDetails()
+{
+  mPlot->resize(400, 300);
+  mPlot->xAxis->setRange(0, 4);
+  mPlot->yAxis->setRange(0, 4);
+
+  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  std::vector<double> x = {0, 1, 2, 3, 4};
+  std::vector<double> y = {0, 1, 2, 3, 4};
+  std::vector<double> z(25, 1.0);
+  cm->setData(x, y, z);
+  mPlot->replot();
+
+  const double px = mPlot->xAxis->coordToPixel(2.0);
+  const double py = mPlot->yAxis->coordToPixel(2.0);
+
+  QVariant details;
+  const double result = cm->selectTest(QPointF(px, py), true, &details);
+
+  QVERIFY(result > 0);
+  QCOMPARE(result, mPlot->selectionTolerance() * 0.99);
+  QVERIFY(details.canConvert<QCPDataSelection>());
+  QCOMPARE(details.value<QCPDataSelection>(), QCPDataSelection(QCPDataRange(0, 1)));
+}
+
+void TestColorMap::QCPColorMap2_selectTestMissReturnsNegativeOne()
+{
+  mPlot->resize(400, 300);
+  mPlot->xAxis->setRange(0, 4);
+  mPlot->yAxis->setRange(0, 4);
+
+  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  std::vector<double> x = {0, 1, 2, 3, 4};
+  std::vector<double> y = {0, 1, 2, 3, 4};
+  std::vector<double> z(25, 1.0);
+  cm->setData(x, y, z);
+  mPlot->replot();
+
+  const double px = mPlot->xAxis->coordToPixel(20.0);
+  const double py = mPlot->yAxis->coordToPixel(20.0);
+
+  QVariant details;
+  const double result = cm->selectTest(QPointF(px, py), true, &details);
+
+  QCOMPARE(result, -1.0);
+}
+
 void TestColorMap::cleanup()
 {
   delete mPlot;

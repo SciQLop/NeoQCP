@@ -357,22 +357,30 @@ QCPRange QCPColorMap2::getValueRange(bool& foundRange, QCP::SignDomain inSignDom
     return mDataSource->yRange(foundRange, inSignDomain);
 }
 
-double QCPColorMap2::selectTest(const QPointF& pos, bool onlySelectable, QVariant*) const
+double QCPColorMap2::selectTest(const QPointF& pos, bool onlySelectable, QVariant* details) const
 {
     if (onlySelectable && !mSelectable)
         return -1;
     if (!mKeyAxis || !mValueAxis || !mDataSource)
         return -1;
 
-    double key = mKeyAxis->pixelToCoord(pos.x());
-    double value = mValueAxis->pixelToCoord(pos.y());
+    if (!mKeyAxis.data()->axisRect()->rect().contains(pos.toPoint())
+        && !mParentPlot->interactions().testFlag(QCP::iSelectPlottablesBeyondAxisRect))
+        return -1;
+
+    double key, value;
+    pixelsToCoords(pos, key, value);
 
     bool foundKey = false, foundValue = false;
     auto kr = mDataSource->xRange(foundKey);
     auto vr = mDataSource->yRange(foundValue);
 
     if (foundKey && foundValue && kr.contains(key) && vr.contains(value))
-        return 0;
+    {
+        if (details)
+            details->setValue(QCPDataSelection(QCPDataRange(0, 1)));
+        return mParentPlot->selectionTolerance() * 0.99;
+    }
     return -1;
 }
 
