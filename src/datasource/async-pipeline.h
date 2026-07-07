@@ -66,6 +66,7 @@ protected:
     bool mJobRunning = false;
 
     void emitBusyIfNeeded(QMutexLocker<QMutex>& lock);
+    void settleIdle(QMutexLocker<QMutex>& lock, uint64_t gen);
 
     ViewportParams mLastViewport;
     bool mWasBusy = false;

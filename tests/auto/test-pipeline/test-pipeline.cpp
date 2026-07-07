@@ -596,6 +596,41 @@ void TestPipeline::pipelineRapidFireDeliverResult()
     QCOMPARE(pipeline.result()->size(), 3);
 }
 
+void TestPipeline::pipelineNullSourceWhileJobRunningResyncsGeneration()
+{
+    // A data change that clears the source while a job for the previous data
+    // is still in flight rebuilds an empty pending job (no source to run the
+    // transform against). onDataChanged() already bumped mGeneration for that
+    // change; nothing resynced mDisplayedGeneration once the in-flight job
+    // settled, so isBusy() reported true forever (D-04).
+    QCPPipelineScheduler scheduler;
+    std::atomic<bool> gate{false};
+    std::atomic<bool> started{false};
+
+    auto source = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
+        std::vector<double>{1}, std::vector<double>{1});
+
+    QCPGraphPipeline pipeline(&scheduler);
+
+    pipeline.setTransform(TransformKind::ViewportIndependent,
+        [&gate, &started](const QCPAbstractDataSource&, const ViewportParams&, std::any&)
+            -> std::shared_ptr<QCPAbstractDataSource> {
+            started.store(true);
+            while (!gate.load()) QThread::msleep(5);
+            return std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
+                std::vector<double>{1}, std::vector<double>{1});
+        });
+
+    pipeline.setSource(source);
+    while (!started.load()) QThread::msleep(5);
+    QVERIFY(pipeline.isBusy());
+
+    pipeline.setSource(nullptr); // clears source while the first job is still running
+
+    gate.store(true);
+    QTRY_VERIFY_WITH_TIMEOUT(!pipeline.isBusy(), 2000);
+}
+
 void TestPipeline::schedulerDtorDropsQueuedJobs()
 {
     // Jobs still queued when the scheduler dies belong to plottables that may
@@ -657,6 +692,25 @@ void TestPipeline::colormap2GapThresholdBeforeDataDoesNotStickBusy()
     // generation, or isBusy() reports true until some future job delivers.
     auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
     cm->setGapThreshold(5.0);
+    QVERIFY(!cm->pipeline().isBusy());
+}
+
+void TestPipeline::colormap2SetNullSourceAfterDataDoesNotStickBusy()
+{
+    // SciQLopColorMap::set_data's empty-input path clears an existing source
+    // via setDataSource({}) (Speasy sends a "well-formed empty" spectrogram
+    // for windows with no samples). onDataChanged() bumps mGeneration before
+    // makeJob() can tell there is no data to build a job for; nothing resynced
+    // mDisplayedGeneration for that case, so isBusy() reported true forever.
+    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    std::vector<double> x = {0, 1, 2};
+    std::vector<double> y = {0, 1};
+    std::vector<double> z = {1, 2, 3, 4, 5, 6};
+    cm->setData(x, y, z);
+    QTRY_VERIFY_WITH_TIMEOUT(!cm->pipeline().isBusy(), 2000);
+
+    cm->setDataSource(std::shared_ptr<QCPAbstractDataSource2D>{});
+
     QVERIFY(!cm->pipeline().isBusy());
 }
 

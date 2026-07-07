@@ -41,9 +41,11 @@ private slots:
     // Race condition reproducers
     void pipelineSourceReplacedDuringJob();
     void pipelineRapidFireDeliverResult();
+    void pipelineNullSourceWhileJobRunningResyncsGeneration();
     void schedulerDtorDropsQueuedJobs();
     void colormap2QueuedJobAfterDeleteDoesNotTouchFreedMemory();
     void colormap2GapThresholdBeforeDataDoesNotStickBusy();
+    void colormap2SetNullSourceAfterDataDoesNotStickBusy();
 
     // Graph resampler
     void graphResamplerBinMinMax();

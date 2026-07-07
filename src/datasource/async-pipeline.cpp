@@ -64,7 +64,11 @@ void QCPAsyncPipelineBase::onDataChanged()
     else
     {
         auto job = makeJob(mLastViewport, std::any{}, gen);
-        if (!job) return;
+        if (!job)
+        {
+            settleIdle(lock, gen);
+            return;
+        }
         mJobRunning = true;
         mRunningGeneration = gen;
         emitBusyIfNeeded(lock);
@@ -73,6 +77,20 @@ void QCPAsyncPipelineBase::onDataChanged()
     }
 
     emitBusyIfNeeded(lock);
+}
+
+void QCPAsyncPipelineBase::settleIdle(QMutexLocker<QMutex>& lock, uint64_t gen)
+{
+    // No job is running or pending for `gen` (there was nothing to build one
+    // for, e.g. the source was cleared) — resync mDisplayedGeneration so
+    // isBusy() doesn't stay stuck true forever waiting for a result that will
+    // never arrive.
+    mDisplayedGeneration = gen;
+    const bool shouldEmitIdle = mWasBusy;
+    mWasBusy = false;
+    lock.unlock();
+    if (shouldEmitIdle)
+        Q_EMIT busyChanged(false);
 }
 
 void QCPAsyncPipelineBase::onViewportChanged(const ViewportParams& vp)
@@ -98,7 +116,11 @@ void QCPAsyncPipelineBase::onViewportChanged(const ViewportParams& vp)
     {
         auto cache = std::move(mCache);
         auto job = makeJob(vp, std::move(cache), gen);
-        if (!job) return;
+        if (!job)
+        {
+            settleIdle(lock, gen);
+            return;
+        }
         mJobRunning = true;
         mRunningGeneration = gen;
         emitBusyIfNeeded(lock);
@@ -116,6 +138,8 @@ void QCPAsyncPipelineBase::deliverResult(uint64_t generation, std::any cache, st
     // object (Qt purges pending metacalls when the receiver is deleted).
     QMutexLocker lock(&mMutex);
     mCache = std::move(cache);
+
+    bool idle = false;
 
     if (mPending || mPendingViewport)
     {
@@ -141,6 +165,7 @@ void QCPAsyncPipelineBase::deliverResult(uint64_t generation, std::any cache, st
         {
             mJobRunning = false;
             mPendingViewport = false;
+            idle = true;
             lock.unlock();
         }
         else
@@ -152,6 +177,7 @@ void QCPAsyncPipelineBase::deliverResult(uint64_t generation, std::any cache, st
     else
     {
         mJobRunning = false;
+        idle = true;
         lock.unlock();
     }
 
@@ -160,6 +186,18 @@ void QCPAsyncPipelineBase::deliverResult(uint64_t generation, std::any cache, st
         mDisplayedGeneration = generation;
         applyResult(generation, std::move(result));
         Q_EMIT finished(generation);
+    }
+
+    if (idle)
+    {
+        // Nothing is running or pending: catch mDisplayedGeneration up to the
+        // latest bumped generation. Without this, a data/viewport change that
+        // built an empty pending job (e.g. source cleared while this job was
+        // in flight) leaves its newer generation stranded — isBusy() would
+        // report true forever since no further result will ever arrive for it.
+        const uint64_t latest = mGeneration.load();
+        if (latest > mDisplayedGeneration)
+            mDisplayedGeneration = latest;
     }
 
     bool busy = isBusy();
