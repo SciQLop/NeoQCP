@@ -60,15 +60,6 @@ void QCPColormapRenderer::setColorScale(QCPColorScale* scale)
     mColorScale = scale;
 }
 
-void QCPColormapRenderer::rescaleDataRange(const QCPColorMapData* data, bool /*recalc*/)
-{
-    if (!data)
-        return;
-    QCPRange range = data->dataBounds();
-    if (range.lower < range.upper)
-        setDataRange(range);
-}
-
 void QCPColormapRenderer::updateMapImage(const QCPColorMapData* data, NormalizeFn normalize)
 {
     PROFILE_HERE_N("QCPColormapRenderer::updateMapImage");

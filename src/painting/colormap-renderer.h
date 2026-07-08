@@ -32,8 +32,6 @@ public:
     void setColorScale(QCPColorScale* scale);
     QCPColorScale* colorScale() const { return mColorScale; }
 
-    void rescaleDataRange(const QCPColorMapData* data, bool recalc);
-
     // Rendering
     using NormalizeFn = std::function<double(double value, int col, int row)>;
     void updateMapImage(const QCPColorMapData* data, NormalizeFn normalize = {});
@@ -49,7 +47,6 @@ public:
     void invalidateMapImage() { mMapImageInvalidated = true; }
     const QImage& mapImage() const { return mMapImage; }
     QImage& mapImage() { return mMapImage; }
-    void invalidateFlippedCache() { mFlippedMapImage = {}; }
 
     // Contour lines (UV-space vertices)
     void setContourLines(QVector<float> uvVertices, const QColor& color);
