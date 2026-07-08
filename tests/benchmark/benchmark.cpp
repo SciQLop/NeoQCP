@@ -46,6 +46,9 @@ private slots:
 
   void QCPColorMap2_ResampleDouble();
   void QCPColorMap2_ResampleFloat();
+  void QCPColorMapData_ConstructLarge();
+  void QCPColorMap2_ResamplePanSequence();
+  void QCPColorMap2_ResamplePanSequenceSmall();
 
 
   void QCPAxis_TickLabels();
@@ -797,6 +800,74 @@ void Benchmark::QCPColorMap2_ResampleFloat()
   QBENCHMARK
   {
     delete benchmarkResample<float>(50000, 1024);
+  }
+}
+
+void Benchmark::QCPColorMapData_ConstructLarge()
+{
+  // Isolates the ctor's own cost (setSize's fill(0) + the ctor's redundant
+  // second fill(0)) from any resample work.
+  QBENCHMARK
+  {
+    delete new QCPColorMapData(2000, 2000, QCPRange(0, 1), QCPRange(0, 1));
+  }
+}
+
+void Benchmark::QCPColorMap2_ResamplePanSequence()
+{
+  // Mirrors a pan: repeated resample() calls at the same target size, only
+  // xBegin/xEnd (viewport) moves. Isolates the per-job scratch allocation
+  // (accum/counts/gapBetween) cost from the one-off Y axis generation that
+  // ResampleCache already caches.
+  const int nx = 50000, ys = 256;
+  std::vector<double> x(nx), y(ys);
+  for (int i = 0; i < nx; ++i) x[i] = static_cast<double>(i);
+  for (int j = 0; j < ys; ++j) y[j] = static_cast<double>(j);
+  std::vector<double> z(static_cast<std::size_t>(nx) * ys);
+  for (std::size_t i = 0; i < z.size(); ++i) z[i] = static_cast<double>(i % 997);
+
+  QCPSoADataSource2D<std::span<const double>, std::span<const double>, std::span<const double>>
+      src{std::span<const double>(x), std::span<const double>(y), std::span<const double>(z)};
+
+  QBENCHMARK
+  {
+    qcp::algo2d::ResampleCache cache;
+    for (int step = 0; step < 20; ++step)
+    {
+      int xBegin = step * 100;
+      int xEnd = nx - 20 * 100 + step * 100;
+      delete qcp::algo2d::resample(src, xBegin, xEnd, QCPRange(xBegin, xEnd - 1),
+                                    QCPRange(0, ys - 1), 1500, 800, false, 0.0, &cache);
+    }
+  }
+}
+
+void Benchmark::QCPColorMap2_ResamplePanSequenceSmall()
+{
+  // Same pattern as QCPColorMap2_ResamplePanSequence but with a small,
+  // typical-widget-sized target and a modest windowed source column count —
+  // the regime where per-job scratch-buffer allocation could plausibly be a
+  // larger fraction of the total cost than in the multi-million-cell case.
+  const int nx = 4000, ys = 64;
+  std::vector<double> x(nx), y(ys);
+  for (int i = 0; i < nx; ++i) x[i] = static_cast<double>(i);
+  for (int j = 0; j < ys; ++j) y[j] = static_cast<double>(j);
+  std::vector<double> z(static_cast<std::size_t>(nx) * ys);
+  for (std::size_t i = 0; i < z.size(); ++i) z[i] = static_cast<double>(i % 997);
+
+  QCPSoADataSource2D<std::span<const double>, std::span<const double>, std::span<const double>>
+      src{std::span<const double>(x), std::span<const double>(y), std::span<const double>(z)};
+
+  QBENCHMARK
+  {
+    qcp::algo2d::ResampleCache cache;
+    for (int step = 0; step < 100; ++step)
+    {
+      int xBegin = step;
+      int xEnd = nx - 100 + step;
+      delete qcp::algo2d::resample(src, xBegin, xEnd, QCPRange(xBegin, xEnd - 1),
+                                    QCPRange(0, ys - 1), 800, 400, false, 0.0, &cache);
+    }
   }
 }
 

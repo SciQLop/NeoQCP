@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <vector>
 
 class QCPAbstractDataSource2D;
@@ -14,6 +15,14 @@ struct ResampleCache
     double yLower = 0, yUpper = 0;
     int ny = 0;
     bool yLog = false;
+
+    // Reusable scratch buffers for the accumulation loop. Reused across jobs
+    // via assign() (always resets every element, whatever the previous size
+    // or content) so back-to-back pan/zoom jobs at the same target size
+    // don't reallocate on every call.
+    std::vector<double> accum;
+    std::vector<uint32_t> counts;
+    std::vector<bool> gapBetween;
 };
 
 // Core resampling algorithm.

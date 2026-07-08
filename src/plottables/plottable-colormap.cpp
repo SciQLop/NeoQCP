@@ -96,8 +96,10 @@ QCPColorMapData::QCPColorMapData(int keySize, int valueSize, const QCPRange& key
         , mAlpha(nullptr)
         , mDataModified(true)
 {
+    // setSize() already zero-fills a successfully-allocated plane (and is a
+    // guarded no-op for an empty one), so a second fill(0) here would just
+    // memset the whole plane again.
     setSize(keySize, valueSize);
-    fill(0);
 }
 
 QCPColorMapData::~QCPColorMapData()

@@ -109,6 +109,14 @@ void TestColorMap::QCPColorMapData_fillSetsExactValue()
   QCOMPARE(data.cell(1, 1), 3.5);
 }
 
+void TestColorMap::QCPColorMapData_constructorZeroInitializes()
+{
+  QCPColorMapData data(3, 2, QCPRange(0, 1), QCPRange(0, 1));
+  for (int key = 0; key < 3; ++key)
+    for (int value = 0; value < 2; ++value)
+      QCOMPARE(data.cell(key, value), 0.0);
+}
+
 void TestColorMap::QCPColorMapData_fillIsSafeOnEmptyMap()
 {
   // clear()/setSize(0,0) is the one reachable path where mData is null;

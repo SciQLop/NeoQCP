@@ -357,6 +357,34 @@ void TestDataSource2D::resampleGapBoundaryDataPreserved()
     delete r;
 }
 
+void TestDataSource2D::resampleReusedCacheScratchBuffersDontLeakBetweenJobs()
+{
+    // ResampleCache's scratch buffers (accum/counts/gapBetween) are reused
+    // across jobs to avoid reallocating on every pan/zoom step. A job must
+    // fully overwrite them, not just accumulate into whatever they held
+    // from the previous, unrelated job.
+    qcp::algo2d::ResampleCache cache;
+
+    std::vector<double> x1 = {0, 1, 2, 3, 4};
+    std::vector<double> y1 = {0, 1};
+    std::vector<double> z1(10, 100.0);
+    QCPSoADataSource2D src1(x1, y1, z1);
+    auto* r1 = qcp::algo2d::resample(src1, 0, 5, QCPRange(0, 4), QCPRange(0, 1), 5, 2, false, 0.0, &cache);
+    QVERIFY(r1);
+    delete r1;
+
+    std::vector<double> x2 = {0, 1, 2, 3, 4};
+    std::vector<double> y2 = {0, 1};
+    std::vector<double> z2(10, 7.0);
+    QCPSoADataSource2D src2(x2, y2, z2);
+    auto* r2 = qcp::algo2d::resample(src2, 0, 5, QCPRange(0, 4), QCPRange(0, 1), 5, 2, false, 0.0, &cache);
+    QVERIFY(r2);
+    for (int i = 0; i < 5; ++i)
+        for (int j = 0; j < 2; ++j)
+            QCOMPARE(r2->cell(i, j), 7.0);
+    delete r2;
+}
+
 void TestDataSource2D::resampleLogY()
 {
     std::vector<double> x = {0.0, 1.0};

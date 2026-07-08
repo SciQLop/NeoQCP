@@ -151,12 +151,16 @@ void resampleImpl(
     int nx, int ny, int ys,
     bool yLogScale, bool variableY,
     double gapThreshold,
-    double* outData)
+    double* outData,
+    ResampleCache* cache)
 {
     int ctxCount = ctxEnd - ctxBegin;
 
+    std::vector<bool> localGapBetween;
+    std::vector<bool>& gapBetween = cache ? cache->gapBetween : localGapBetween;
+    gapBetween.assign(ctxCount, false);
+
     // Gap detection
-    std::vector<bool> gapBetween(ctxCount, false);
     if (gapThreshold > 0 && ctxCount > 2)
     {
         for (int i = 0; i < ctxCount - 1; ++i)
@@ -210,8 +214,12 @@ void resampleImpl(
 
     // Accumulation buffers
     int total = nx * ny;
-    std::vector<double> accum(total, 0.0);
-    std::vector<uint32_t> counts(total, 0);
+    std::vector<double> localAccum;
+    std::vector<uint32_t> localCounts;
+    std::vector<double>& accum = cache ? cache->accum : localAccum;
+    std::vector<uint32_t>& counts = cache ? cache->counts : localCounts;
+    accum.assign(total, 0.0);
+    counts.assign(total, 0);
 
     // Bin-driven X iteration
     int srcCursor = xBegin;
@@ -366,14 +374,14 @@ QCPColorMapData* resample(
         RawAccessor acc{rawX, rawY, rawZ, ys, variableY};
         resampleImpl(acc, xBegin, xEnd, ctxBegin, ctxEnd,
                      xAxis, yAxis, xEdges, nx, ny, ys,
-                     yLogScale, variableY, gapThreshold, data->rawData());
+                     yLogScale, variableY, gapThreshold, data->rawData(), cache);
     }
     else
     {
         VirtualAccessor acc{src, ys, variableY};
         resampleImpl(acc, xBegin, xEnd, ctxBegin, ctxEnd,
                      xAxis, yAxis, xEdges, nx, ny, ys,
-                     yLogScale, variableY, gapThreshold, data->rawData());
+                     yLogScale, variableY, gapThreshold, data->rawData(), cache);
     }
 
     data->recalculateDataBounds();
