@@ -142,7 +142,7 @@ This enables multi-level resampling strategies where an expensive first pass is 
 
 ## Destruction Safety
 
-The pipeline uses a `shared_ptr<atomic<bool>> mDestroyed` flag. The destructor sets it to `true`. In-flight jobs check this flag before posting results back to the main thread, preventing use-after-free when a plottable is destroyed while a job is running.
+The pipeline uses a `shared_ptr<DestroyGuard>` (`DestroyGuard` = `{ QMutex mutex; bool destroyed; }`), shared between the pipeline and its in-flight jobs. The destructor takes the mutex and sets `destroyed = true`; a job holds the same mutex across its destroyed-check and its `QMetaObject::invokeMethod` call on `this`, so the pipeline cannot be deleted in the window between the check and the metacall being posted — a plain atomic flag can't close that race, since the destructor could still run (and free `this`) between an atomic load and the `invokeMethod` call that follows it.
 
 ## Key Files
 

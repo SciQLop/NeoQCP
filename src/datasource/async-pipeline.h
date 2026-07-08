@@ -104,7 +104,11 @@ public:
                                QObject* parent = nullptr)
         : QCPAsyncPipelineBase(scheduler, parent) {}
 
-    // Must be called before setSource() — not thread-safe with concurrent jobs.
+    // GUI-thread-only (not safe to call concurrently from another thread).
+    // Calling it again after setSource() is fine — e.g. to re-bake a captured
+    // parameter (QCPColorMap2::setGapThreshold does this) — since makeJob()
+    // reads mTransform to build each job's closure, and that closure keeps
+    // its own copy; already-dispatched jobs are unaffected by a later call.
     void setTransform(TransformKind kind, TransformFn fn)
     {
         mKind = kind;

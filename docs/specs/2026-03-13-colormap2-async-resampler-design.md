@@ -1,7 +1,12 @@
 # QCPColorMap2 and Shared Async Resampler
 
 **Date:** 2026-03-13
-**Status:** Draft
+**Status:** Superseded — the shipped `QCPResamplerScheduler`/receiver-side-discard
+design described below was replaced by `QCPPipelineScheduler` +
+`QCPAsyncPipeline<In,Out>` with a mutex-guarded `DestroyGuard` (see
+[async-pipeline.md](../architecture/async-pipeline.md) for the actual
+architecture). Kept for historical context only; do not use this as a
+reference for the current threading model.
 **Scope:** QCPColorMap2 plottable, 2D data source, shared resampler scheduler
 **Depends on:** Zero-Copy Data Source (2026-03-12)
 
