@@ -15,6 +15,7 @@ private slots:
   void QCPColorMap2_selectTestHitSetsDetails();
   void QCPColorMap2_selectTestMissReturnsNegativeOne();
   void QCPColorMap2_contourSettersScheduleReplot();
+  void QCPColorMapRhiLayer_setImageSkipsRedundantUpload();
 
 private:
   QCustomPlot *mPlot;

@@ -1,5 +1,7 @@
 #include "test-colormap.h"
 #include <QMainWindow>
+#include <painting/colormap-rhi-layer.h>
+#include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
 
 void TestColorMap::init()
 {
@@ -217,6 +219,49 @@ void TestColorMap::QCPColorMap2_contourSettersScheduleReplot()
     cm->setAutoContourLevels(5);
     QVERIFY2(spy.wait(200), "setAutoContourLevels should schedule a queued replot on its own");
   }
+}
+
+void TestColorMap::QCPColorMapRhiLayer_setImageSkipsRedundantUpload()
+{
+  // draw() calls setImage() on every replot, even when the resample result
+  // hasn't changed (e.g. interactive zoom while the pipeline is still
+  // computing). Re-uploading an unchanged staging image wastes a full
+  // texture upload (up to ~4x the axis rect per dimension) every such call.
+  mPlot->show();
+  if (!QTest::qWaitForWindowExposed(mPlot))
+    QSKIP("window not exposed in this environment");
+  QCoreApplication::processEvents();
+  QRhi* rhi = mPlot->rhi();
+  if (!rhi)
+    QSKIP("no QRhi available in this environment");
+
+  auto* ubo = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 32);
+  QVERIFY(ubo->create());
+
+  QCPColormapRhiLayer layer(rhi);
+  QImage img(64, 64, QImage::Format_RGBA8888);
+  img.fill(Qt::red);
+
+  layer.setImage(img);
+  QVERIFY(layer.textureUploadPending());
+
+  auto* batch = rhi->nextResourceUpdateBatch();
+  layer.uploadResources(batch, QSize(400, 300), 1.0f, rhi->isYUpInNDC(), ubo);
+  batch->release();
+  QVERIFY(!layer.textureUploadPending());
+
+  // Re-submitting the exact same (unchanged) staging image must not
+  // schedule another upload.
+  layer.setImage(img);
+  QVERIFY(!layer.textureUploadPending());
+
+  // A genuinely new image must still be uploaded.
+  QImage img2(64, 64, QImage::Format_RGBA8888);
+  img2.fill(Qt::blue);
+  layer.setImage(img2);
+  QVERIFY(layer.textureUploadPending());
+
+  delete ubo;
 }
 
 void TestColorMap::cleanup()

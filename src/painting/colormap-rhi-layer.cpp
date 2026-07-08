@@ -58,6 +58,13 @@ void QCPColormapRhiLayer::invalidatePipeline()
 
 void QCPColormapRhiLayer::setImage(const QImage& image)
 {
+    // draw() calls setImage() every replot regardless of whether the
+    // resampled content actually changed (e.g. interactive zoom while the
+    // pipeline is still busy re-baking). cacheKey() identifies the QImage's
+    // backing data, so an unchanged image (same data, shallow-copied through
+    // flippedMapImage's COW) is detected without a pixel comparison.
+    if (image.cacheKey() == mStagingImage.cacheKey() && image.size() == mStagingImage.size())
+        return;
     mStagingImage = image;
     mTextureDirty = true;
 }

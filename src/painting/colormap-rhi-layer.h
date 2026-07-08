@@ -42,6 +42,9 @@ public:
     void render(QRhiCommandBuffer* cb, const QSize& outputSize);
 
     bool hasContent() const { return !mStagingImage.isNull(); }
+    // Exposed for tests: true when the next uploadResources() call will
+    // actually re-upload the staged image to the GPU texture.
+    bool textureUploadPending() const { return mTextureDirty; }
     void clear();
 
 private:

@@ -1,7 +1,10 @@
 #include <QtTest/QtTest>
 
 #include <qcustomplot.h>
+#include <datasource/soa-datasource-2d.h>
+#include <datasource/resample.h>
 #include <vector>
+#include <span>
 
 class Benchmark : public QObject
 {
@@ -40,6 +43,9 @@ private slots:
 
   void QCPColorMap_Standard();
   void QCPColorMap_ColorizeMap();
+
+  void QCPColorMap2_ResampleDouble();
+  void QCPColorMap2_ResampleFloat();
 
 
   void QCPAxis_TickLabels();
@@ -748,6 +754,49 @@ void Benchmark::QCPColorMap_ColorizeMap()
   {
     map->data()->setCell(0, 0, 0); // to invalidate the currently cached map image
     mPlot->replot();
+  }
+}
+
+namespace {
+// Mirrors a realistic streamed spectrogram: nx columns (time) x ys rows
+// (frequency), resampled to a ~1080p viewport. Y is 1D (one frequency axis
+// shared by all columns) so only X/Z dtype matters for the accessor choice.
+template <typename ZT>
+QCPColorMapData* benchmarkResample(int nx, int ys)
+{
+  std::vector<double> x(nx);
+  for (int i = 0; i < nx; ++i)
+    x[i] = static_cast<double>(i);
+
+  std::vector<double> y(ys);
+  for (int j = 0; j < ys; ++j)
+    y[j] = static_cast<double>(j);
+
+  std::vector<ZT> z(static_cast<std::size_t>(nx) * ys);
+  for (std::size_t i = 0; i < z.size(); ++i)
+    z[i] = static_cast<ZT>(i % 997);
+
+  QCPSoADataSource2D<std::span<const double>, std::span<const double>, std::span<const ZT>>
+      src{std::span<const double>(x), std::span<const double>(y), std::span<const ZT>(z)};
+
+  return qcp::algo2d::resample(src, 0, nx, QCPRange(0, nx - 1), QCPRange(0, ys - 1),
+                                1500, 800, false, 0.0);
+}
+}
+
+void Benchmark::QCPColorMap2_ResampleDouble()
+{
+  QBENCHMARK
+  {
+    delete benchmarkResample<double>(50000, 1024);
+  }
+}
+
+void Benchmark::QCPColorMap2_ResampleFloat()
+{
+  QBENCHMARK
+  {
+    delete benchmarkResample<float>(50000, 1024);
   }
 }
 
