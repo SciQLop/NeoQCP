@@ -11,6 +11,7 @@ private slots:
   void QCPColorScale_rescaleDataRange();
   void QCPColorMapData_fillSetsExactValue();
   void QCPColorMapData_fillIsSafeOnEmptyMap();
+  void QCPColorMapData_cellToCoordHandlesSingleCellDimension();
   void QCPColorMap2_selectTestHitSetsDetails();
   void QCPColorMap2_selectTestMissReturnsNegativeOne();
   void QCPColorMap2_contourSettersScheduleReplot();

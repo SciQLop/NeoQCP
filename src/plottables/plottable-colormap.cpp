@@ -546,12 +546,19 @@ void QCPColorMapData::coordToCell(double key, double value, int* keyIndex, int* 
 */
 void QCPColorMapData::cellToCoord(int keyIndex, int valueIndex, double* key, double* value) const
 {
+    // A size-1 dimension has no spacing to divide by; its single cell spans
+    // the whole range, so its coordinate is the range's midpoint rather
+    // than the NaN that keyIndex/double(size-1) would otherwise produce.
     if (key)
-        *key = keyIndex / double(mKeySize - 1) * (mKeyRange.upper - mKeyRange.lower)
-            + mKeyRange.lower;
+        *key = mKeySize > 1
+            ? keyIndex / double(mKeySize - 1) * (mKeyRange.upper - mKeyRange.lower)
+                + mKeyRange.lower
+            : (mKeyRange.lower + mKeyRange.upper) * 0.5;
     if (value)
-        *value = valueIndex / double(mValueSize - 1) * (mValueRange.upper - mValueRange.lower)
-            + mValueRange.lower;
+        *value = mValueSize > 1
+            ? valueIndex / double(mValueSize - 1) * (mValueRange.upper - mValueRange.lower)
+                + mValueRange.lower
+            : (mValueRange.lower + mValueRange.upper) * 0.5;
 }
 
 /*! \internal

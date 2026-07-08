@@ -120,6 +120,20 @@ void TestColorMap::QCPColorMapData_fillIsSafeOnEmptyMap()
   QVERIFY(data.isEmpty());
 }
 
+void TestColorMap::QCPColorMapData_cellToCoordHandlesSingleCellDimension()
+{
+  // A 1-cell key dimension is reachable (e.g. SciQLopHistogram2D with
+  // x_bins=1): keyIndex/double(mKeySize-1) divides by zero. The value
+  // dimension here has the normal size>1 so this also proves the fix
+  // doesn't disturb the ordinary calculation.
+  QCPColorMapData data(1, 3, QCPRange(0, 10), QCPRange(0, 1));
+  double key = -1, value = -1;
+  data.cellToCoord(0, 1, &key, &value);
+  QVERIFY2(std::isfinite(key), "cellToCoord must not return NaN for a size-1 key dimension");
+  QCOMPARE(key, 5.0);
+  QCOMPARE(value, 0.5);
+}
+
 void TestColorMap::QCPColorMap2_selectTestHitSetsDetails()
 {
   mPlot->resize(400, 300);
