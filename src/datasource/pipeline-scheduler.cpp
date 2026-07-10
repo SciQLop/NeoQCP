@@ -1,4 +1,5 @@
 #include "pipeline-scheduler.h"
+#include "thread-naming.h"
 #include <QThread>
 #include <algorithm>
 
@@ -63,6 +64,7 @@ void QCPPipelineScheduler::scheduleNext()
         ++mRunning;
         auto* self = this;
         mPool.start([self, work = std::move(work)]() mutable {
+            qcp::nameThisPoolThreadOnce("pipeSched");
             try { work(); } catch (...) { }
             {
                 QMutexLocker lock(&self->mMutex);

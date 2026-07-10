@@ -3,6 +3,7 @@
 #include "abstract-multi-datasource.h"
 #include "soa-datasource.h"
 #include "async-pipeline.h"
+#include "thread-naming.h"
 #include "../Profiling.hpp"
 #include <QAtomicInt>
 #include <QSemaphore>
@@ -216,6 +217,7 @@ inline BinResult binMinMaxParallel(
 
         if (t < threadCount - 1)
             innerPool().start([&, srcBegin_, srcEnd_, binBegin, binEnd] {
+                nameThisPoolThreadOnce("binWorker");
                 worker(srcBegin_, srcEnd_, binBegin, binEnd);
                 if (remaining.fetchAndSubRelaxed(1) == 1)
                     done.release();
@@ -399,6 +401,7 @@ inline MultiColumnBinResult binMinMaxMultiParallel(
 
         if (t < threadCount - 1)
             innerPool().start([&, srcBegin_, srcEnd_, binBegin, binEnd] {
+                nameThisPoolThreadOnce("binWorker");
                 worker(srcBegin_, srcEnd_, binBegin, binEnd);
                 if (remaining.fetchAndSubRelaxed(1) == 1)
                     done.release();
