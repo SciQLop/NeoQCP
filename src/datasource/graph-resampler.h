@@ -17,12 +17,24 @@
 
 namespace qcp::algo {
 
+// innerPool() is a single process-wide shared pool (not one instance per
+// caller), so its size directly bounds total concurrent inner-parallel OS
+// threads regardless of how many outer resample jobs are in flight at once
+// -- callers just queue for the shared slots instead of each spawning their
+// own. Scales with hardware (matches the outer pipeline scheduler's own
+// default sizing in pipeline-scheduler.cpp) rather than a fixed ceiling, so
+// worst case is ~outer_pool_size + inner_pool_size concurrent threads, not a
+// product of the two.
+inline int innerThreadCount()
+{
+    return std::max(1, QThread::idealThreadCount() / 2);
+}
+
 inline QThreadPool& innerPool()
 {
     static QThreadPool pool;
     static bool init = [&] {
-        pool.setMaxThreadCount(
-            std::min(4, std::max(1, QThread::idealThreadCount() / 2)));
+        pool.setMaxThreadCount(innerThreadCount());
         pool.setExpiryTimeout(-1);
         return true;
     }();
@@ -144,11 +156,6 @@ inline BinResult binMinMax(
 // Parallel Level 1 binning: splits source into N chunks with bin-aligned
 // boundaries so each thread writes to disjoint output bins (zero synchronization).
 // Falls back to single-threaded binMinMax when threadCount <= 1.
-// Cap inner parallelism — these functions already run inside the pipeline
-// scheduler's thread pool, so spawning hardware_concurrency/2 threads here
-// would produce O(pool_size × inner_threads) total OS threads.
-constexpr int kMaxInnerThreads = 4;
-
 inline BinResult binMinMaxParallel(
     const QCPAbstractDataSource& src,
     int begin, int end,
@@ -156,8 +163,7 @@ inline BinResult binMinMaxParallel(
     int numBins)
 {
     PROFILE_HERE_N("binMinMaxParallel");
-    int threadCount = std::min(kMaxInnerThreads,
-        std::max(1, QThread::idealThreadCount() / 2));
+    int threadCount = innerThreadCount();
     if (threadCount <= 1 || (end - begin) < 1'000'000)
         return binMinMax(src, begin, end, keyRange, numBins);
 
@@ -313,8 +319,7 @@ inline MultiColumnBinResult binMinMaxMultiParallel(
     int numBins)
 {
     PROFILE_HERE_N("binMinMaxMultiParallel");
-    int threadCount = std::min(kMaxInnerThreads,
-        std::max(1, QThread::idealThreadCount() / 2));
+    int threadCount = innerThreadCount();
     if (threadCount <= 1 || (end - begin) < 1'000'000)
         return binMinMaxMulti(src, begin, end, keyRange, numBins);
 

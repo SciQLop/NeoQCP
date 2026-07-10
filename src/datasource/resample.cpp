@@ -1,7 +1,7 @@
 #include "resample.h"
 #include "abstract-datasource-2d.h"
 #include "Profiling.hpp"
-#include "graph-resampler.h" // qcp::algo::innerPool(), kMaxInnerThreads
+#include "graph-resampler.h" // qcp::algo::innerPool(), innerThreadCount()
 #include <axis/range.h>
 #include <plottables/plottable-colormap.h> // for QCPColorMapData
 #include <algorithm>
@@ -332,8 +332,7 @@ void resampleImpl(
     // the thread dispatch cost (cost is ~O(visible source cells) regardless
     // of target size, so gate on that, not on nx).
     long long cellBudget = static_cast<long long>(xEnd - xBegin) * ys;
-    int threadCount = forceSerial ? 1
-        : std::min(qcp::algo::kMaxInnerThreads, std::max(1, QThread::idealThreadCount() / 2));
+    int threadCount = forceSerial ? 1 : qcp::algo::innerThreadCount();
     threadCount = std::min(threadCount, nx);
     // Splits [0, count) into `threadCount` contiguous chunks and runs `body`
     // on each -- threadCount-1 chunks on the pool, the last on the calling
