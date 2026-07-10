@@ -497,3 +497,37 @@ void TestPaintBuffer::colormap2_stallOffsetNullOnZoom()
     mPlot->xAxis->setRange(0, 20);  // zoom out 2x
     QVERIFY(cm->stallPixelOffset().isNull());
 }
+
+void TestPaintBuffer::colormap2_drawSkipsNonOverlappingStaleResample()
+{
+    // If the resample pipeline hasn't caught up with a large pan (e.g. the
+    // user panned an entire screen-width or more while a resample was still
+    // in flight), mPipeline.result() can still hold an old result whose
+    // key/value range no longer overlaps the current viewport at all.
+    // Drawing that image would misposition it off-screen; the colormap
+    // should instead keep showing its last relevant frame.
+    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    mPlot->xAxis->setRange(0, 10);
+    mPlot->yAxis->setRange(0, 100);
+    std::vector<double> x{0, 5, 10}, y{0, 50, 100};
+    std::vector<double> z(x.size() * y.size(), 1.0);
+    cm->setData(std::move(x), std::move(y), std::move(z));
+
+    (void)mPlot->toPixmap(400, 300);  // synchronous draw establishes a rendered baseline for key~[0,10]
+    QVERIFY(cm->hasRenderedRange());
+
+    // Pan far beyond the data's own extent so the (still cached, stale)
+    // resample result no longer overlaps the viewport at all. mPipeline
+    // already holds a non-null result, so this second toPixmap() call draws
+    // straight from that stale cache instead of re-resampling.
+    mPlot->xAxis->setRange(1000, 1010);
+    (void)mPlot->toPixmap(400, 300);
+
+    // A small further pan should be rejected as out-of-bounds by
+    // stallPixelOffset() -- UNLESS the previous draw() wrongly moved the
+    // rendered baseline to match its own (mismatched) axis range, in which
+    // case this tiny pan looks like a small, in-bounds, acceptable offset.
+    mPlot->xAxis->setRange(1001, 1011);
+    QVERIFY2(cm->stallPixelOffset().isNull(),
+             "draw() updated its baseline against a non-overlapping stale resample");
+}

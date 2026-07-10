@@ -302,6 +302,26 @@ void QCPColorMap2::draw(QCPPainter* painter)
         }
     }
 
+    // The pipeline can still be holding a result computed for an older
+    // viewport (e.g. the user panned more than a screen-width while a slow
+    // resample was in flight, and stallPixelOffset() rejected the translate
+    // fast path as out-of-bounds -- see plottable-colormap2.h). Drawing that
+    // stale image would position it via the CURRENT axes using its OLD
+    // key/value range, which can land entirely outside the axis rect (a
+    // blank-looking plot) and would also corrupt the stallPixelOffset()
+    // baseline below. Keep the last relevant frame until a resample for a
+    // viewport that actually overlaps the current one lands.
+    if (mHasRenderedRange)
+    {
+        const QCPRange dataKeyRange = resampledData->keyRange();
+        const QCPRange dataValueRange = resampledData->valueRange();
+        auto overlaps = [](const QCPRange& a, const QCPRange& b)
+        { return a.lower <= b.upper && b.lower <= a.upper; };
+        if (!overlaps(dataKeyRange, mKeyAxis->range())
+            || !overlaps(dataValueRange, mValueAxis->range()))
+            return;
+    }
+
     bool imageWasInvalidated = mRenderer.mapImageInvalidated();
     if (imageWasInvalidated)
         mRenderer.updateMapImage(resampledData);
