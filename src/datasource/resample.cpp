@@ -247,8 +247,17 @@ void resampleRange(
             int xBinLo = findBin(fillLo, xAxis);
             int xBinHi = findBinFloor(fillHi, xAxis);
 
+            // ob ranges over [max(xBinLo,xb), min(xBinHi,xb)], which is a
+            // range of width <=1 by construction (it's intersected with the
+            // single value xb) -- so this cell contributes to bin xb or it
+            // doesn't; there's no need to re-derive that per yj below.
+            if (xb < xBinLo || xb > xBinHi)
+                continue;
+
             if (variableY)
                 computeYBinRanges(xi, yBinRanges);
+
+            int obBase = xb * ny;
 
             for (int yj = 0; yj < ys; ++yj)
             {
@@ -262,13 +271,12 @@ void resampleRange(
                 int yLo = yBinRanges[yj].lo;
                 int yHi = yBinRanges[yj].hi;
 
-                for (int ob = std::max(xBinLo, xb); ob <= std::min(xBinHi, xb); ++ob)
-                    for (int yb = yLo; yb <= yHi; ++yb)
-                    {
-                        int idx = ob * ny + yb;
-                        accum[idx] += zVal;
-                        counts[idx] += 1;
-                    }
+                for (int yb = yLo; yb <= yHi; ++yb)
+                {
+                    int idx = obBase + yb;
+                    accum[idx] += zVal;
+                    counts[idx] += 1;
+                }
             }
         }
 
