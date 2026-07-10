@@ -809,24 +809,17 @@ namespace {
 // LOFAR/e-Callisto-scale dynamic spectrum: a wide, dense pan window (100K
 // visible time samples) x 3000 frequency channels -- the scale that measured
 // ~1.1-1.5s single-threaded (see docs/backlog, colormap perf investigation).
-QCPColorMapData* benchmarkResampleWide(bool forceSerial)
+//
+// Data is built once by the caller and passed in by reference -- building the
+// 300M-cell (2.4GB) dataset *inside* the QBENCHMARK block instead makes the
+// allocation+fill dominate the reported time and masks the actual resample()
+// parallel speedup (measured 1.3x instead of the real ~2.3-2.5x the first
+// time this mistake was made here).
+QCPColorMapData* benchmarkResampleWide(
+    const QCPSoADataSource2D<std::span<const double>, std::span<const double>,
+                              std::span<const double>>& src,
+    int nx, int ys, bool forceSerial)
 {
-  const int nx = 100000, ys = 3000;
-  std::vector<double> x(nx);
-  for (int i = 0; i < nx; ++i)
-    x[i] = static_cast<double>(i);
-
-  std::vector<double> y(ys);
-  for (int j = 0; j < ys; ++j)
-    y[j] = static_cast<double>(j);
-
-  std::vector<double> z(static_cast<std::size_t>(nx) * ys);
-  for (std::size_t i = 0; i < z.size(); ++i)
-    z[i] = static_cast<double>(i % 997);
-
-  QCPSoADataSource2D<std::span<const double>, std::span<const double>, std::span<const double>>
-      src{std::span<const double>(x), std::span<const double>(y), std::span<const double>(z)};
-
   // Target grid matches the un-reduced-Y case (ys stays under the 4x
   // supersampling cap relative to a ~800px-tall viewport, so h == ys; width
   // clamps to 4x a ~1458px-wide viewport) -- the exact regime measured at
@@ -838,17 +831,43 @@ QCPColorMapData* benchmarkResampleWide(bool forceSerial)
 
 void Benchmark::QCPColorMap2_ResampleWideSerial()
 {
+  const int nx = 100000, ys = 3000;
+  std::vector<double> x(nx);
+  for (int i = 0; i < nx; ++i)
+    x[i] = static_cast<double>(i);
+  std::vector<double> y(ys);
+  for (int j = 0; j < ys; ++j)
+    y[j] = static_cast<double>(j);
+  std::vector<double> z(static_cast<std::size_t>(nx) * ys);
+  for (std::size_t i = 0; i < z.size(); ++i)
+    z[i] = static_cast<double>(i % 997);
+  QCPSoADataSource2D<std::span<const double>, std::span<const double>, std::span<const double>>
+      src{std::span<const double>(x), std::span<const double>(y), std::span<const double>(z)};
+
   QBENCHMARK
   {
-    delete benchmarkResampleWide(/*forceSerial=*/true);
+    delete benchmarkResampleWide(src, nx, ys, /*forceSerial=*/true);
   }
 }
 
 void Benchmark::QCPColorMap2_ResampleWideParallel()
 {
+  const int nx = 100000, ys = 3000;
+  std::vector<double> x(nx);
+  for (int i = 0; i < nx; ++i)
+    x[i] = static_cast<double>(i);
+  std::vector<double> y(ys);
+  for (int j = 0; j < ys; ++j)
+    y[j] = static_cast<double>(j);
+  std::vector<double> z(static_cast<std::size_t>(nx) * ys);
+  for (std::size_t i = 0; i < z.size(); ++i)
+    z[i] = static_cast<double>(i % 997);
+  QCPSoADataSource2D<std::span<const double>, std::span<const double>, std::span<const double>>
+      src{std::span<const double>(x), std::span<const double>(y), std::span<const double>(z)};
+
   QBENCHMARK
   {
-    delete benchmarkResampleWide(/*forceSerial=*/false);
+    delete benchmarkResampleWide(src, nx, ys, /*forceSerial=*/false);
   }
 }
 
