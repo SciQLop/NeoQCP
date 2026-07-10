@@ -37,6 +37,8 @@ private slots:
     void resampleGapDetectedWithTwoVisibleColumns();
 
     // Bug fix regression tests
+    void resampleParallelMatchesSerial();
+    void resampleParallelMatchesSerialVariableY();
     void resampleReusedCacheScratchBuffersDontLeakBetweenJobs();
     void resampleLogYNoBinGaps();
     void dataBoundsSkipsNaN();

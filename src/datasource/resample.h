@@ -31,6 +31,13 @@ struct ResampleCache
 // Returns nullptr if input is insufficient (srcCount < 2, zero target size, etc.).
 // If cache is non-null and the Y parameters match, reuses the cached Y axis
 // (avoids expensive pow10 recomputation on X-only pans).
+//
+// The accumulation loop -- O(visible source cells), independent of target
+// grid size -- is split across worker threads by target-bin range once the
+// job is large enough to amortize dispatch cost; each thread's writes land
+// in disjoint output slices, so no locking is needed. forceSerial is a
+// test-only knob to get a single-threaded reference for correctness
+// comparisons; production callers should leave it false.
 QCPColorMapData* resample(
     const QCPAbstractDataSource2D& src,
     int xBegin, int xEnd,
@@ -38,6 +45,7 @@ QCPColorMapData* resample(
     int targetWidth, int targetHeight,
     bool yLogScale,
     double gapThreshold,
-    ResampleCache* cache = nullptr);
+    ResampleCache* cache = nullptr,
+    bool forceSerial = false);
 
 } // namespace qcp::algo2d

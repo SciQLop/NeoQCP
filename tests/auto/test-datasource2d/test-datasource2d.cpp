@@ -357,6 +357,105 @@ void TestDataSource2D::resampleGapBoundaryDataPreserved()
     delete r;
 }
 
+void TestDataSource2D::resampleParallelMatchesSerial()
+{
+    // Above the 1M-cell threshold in resample()'s internal parallel dispatch
+    // (qcp::algo2d::resampleImpl): the target-bin-range partitioning across
+    // worker threads must produce bit-identical output to the single-threaded
+    // path, including NaN placement at the same cells.
+    const int nx = 2000, ys = 600; // 1.2M cells, well above the parallel threshold
+    std::vector<double> x(nx), y(ys), z(static_cast<std::size_t>(nx) * ys);
+    for (int i = 0; i < nx; ++i)
+        x[i] = static_cast<double>(i);
+    for (int j = 0; j < ys; ++j)
+        y[j] = static_cast<double>(j);
+    for (std::size_t i = 0; i < z.size(); ++i)
+        z[i] = std::sin(static_cast<double>(i) * 0.0037) * 100.0;
+    // Sprinkle some NaNs so the skip-on-NaN path is exercised across chunks too
+    for (std::size_t i = 0; i < z.size(); i += 977)
+        z[i] = std::numeric_limits<double>::quiet_NaN();
+
+    QCPSoADataSource2D src(x, y, z);
+    QVERIFY(!src.yIs2D());
+
+    auto* serial = qcp::algo2d::resample(src, 0, nx, QCPRange(0, nx - 1), QCPRange(0, ys - 1),
+                                          500, 300, false, 1.5, nullptr, /*forceSerial=*/true);
+    auto* parallel = qcp::algo2d::resample(src, 0, nx, QCPRange(0, nx - 1), QCPRange(0, ys - 1),
+                                            500, 300, false, 1.5, nullptr, /*forceSerial=*/false);
+    QVERIFY(serial != nullptr);
+    QVERIFY(parallel != nullptr);
+    QCOMPARE(parallel->keySize(), serial->keySize());
+    QCOMPARE(parallel->valueSize(), serial->valueSize());
+
+    for (int i = 0; i < serial->keySize(); ++i)
+    {
+        for (int j = 0; j < serial->valueSize(); ++j)
+        {
+            double s = serial->cell(i, j);
+            double p = parallel->cell(i, j);
+            if (std::isnan(s))
+                QVERIFY2(std::isnan(p), qPrintable(QString("NaN mismatch at (%1,%2)").arg(i).arg(j)));
+            else
+                QCOMPARE(p, s);
+        }
+    }
+
+    delete serial;
+    delete parallel;
+}
+
+void TestDataSource2D::resampleParallelMatchesSerialVariableY()
+{
+    // Same as resampleParallelMatchesSerial but with per-column (2D) Y, which
+    // takes the computeYBinRanges-per-column branch inside the parallel worker.
+    const int nx = 2000, nyBudget = 700; // 1.4M cells, above the parallel threshold
+    std::vector<double> x(nx);
+    for (int i = 0; i < nx; ++i)
+        x[i] = static_cast<double>(i);
+
+    std::vector<double> y(static_cast<std::size_t>(nx) * nyBudget);
+    std::vector<double> z(static_cast<std::size_t>(nx) * nyBudget);
+    for (int i = 0; i < nx; ++i)
+    {
+        for (int j = 0; j < nyBudget; ++j)
+        {
+            std::size_t idx = static_cast<std::size_t>(i) * nyBudget + j;
+            y[idx] = j + (i % 3) * 0.01; // slight per-column jitter -> genuinely variable Y
+            z[idx] = std::cos(static_cast<double>(idx) * 0.0029) * 50.0;
+        }
+    }
+    for (std::size_t i = 0; i < z.size(); i += 977)
+        z[i] = std::numeric_limits<double>::quiet_NaN();
+
+    QCPSoADataSource2D src(x, y, z);
+    QVERIFY(src.yIs2D());
+
+    auto* serial = qcp::algo2d::resample(src, 0, nx, QCPRange(0, nx - 1), QCPRange(0, nyBudget - 1),
+                                          400, 250, false, 1.5, nullptr, /*forceSerial=*/true);
+    auto* parallel = qcp::algo2d::resample(src, 0, nx, QCPRange(0, nx - 1), QCPRange(0, nyBudget - 1),
+                                            400, 250, false, 1.5, nullptr, /*forceSerial=*/false);
+    QVERIFY(serial != nullptr);
+    QVERIFY(parallel != nullptr);
+    QCOMPARE(parallel->keySize(), serial->keySize());
+    QCOMPARE(parallel->valueSize(), serial->valueSize());
+
+    for (int i = 0; i < serial->keySize(); ++i)
+    {
+        for (int j = 0; j < serial->valueSize(); ++j)
+        {
+            double s = serial->cell(i, j);
+            double p = parallel->cell(i, j);
+            if (std::isnan(s))
+                QVERIFY2(std::isnan(p), qPrintable(QString("NaN mismatch at (%1,%2)").arg(i).arg(j)));
+            else
+                QCOMPARE(p, s);
+        }
+    }
+
+    delete serial;
+    delete parallel;
+}
+
 void TestDataSource2D::resampleReusedCacheScratchBuffersDontLeakBetweenJobs()
 {
     // ResampleCache's scratch buffers (accum/counts/gapBetween) are reused

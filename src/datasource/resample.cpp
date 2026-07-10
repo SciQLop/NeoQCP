@@ -1,12 +1,16 @@
 #include "resample.h"
 #include "abstract-datasource-2d.h"
 #include "Profiling.hpp"
+#include "graph-resampler.h" // qcp::algo::innerPool(), kMaxInnerThreads
 #include <axis/range.h>
 #include <plottables/plottable-colormap.h> // for QCPColorMapData
 #include <algorithm>
 #include <cmath>
 #include <limits>
 #include <vector>
+#include <QAtomicInt>
+#include <QSemaphore>
+#include <QThread>
 
 namespace qcp::algo2d {
 
@@ -142,41 +146,25 @@ struct VirtualAccessor
 
 struct BinRange { int lo, hi; };
 
+// Processes target bins [xbBegin, xbEnd) only, writing into the shared
+// accum/counts buffers (sized nx*ny) at indices xb*ny+yb for xb in that
+// range. Disjoint target-bin ranges write disjoint index ranges, so this is
+// safe to call from multiple threads concurrently with no locking, as long
+// as each thread owns a non-overlapping [xbBegin, xbEnd) partition -- each
+// worker seeds its own local srcCursor and yBinRanges rather than sharing
+// the sequential-scan state the single-chunk case relies on.
 template <typename Accessor>
-void resampleImpl(
+void resampleRange(
     const Accessor& acc,
-    int xBegin, int xEnd, int ctxBegin, int ctxEnd,
-    const std::vector<double>& xAxis, const std::vector<double>& yAxis,
-    const std::vector<double>& xEdges,
-    int nx, int ny, int ys,
+    int xbBegin, int xbEnd,
+    int xBegin, int xEnd, int ctxBegin, int ctxCount,
+    const std::vector<double>& xAxis, const std::vector<double>& xEdges,
+    const std::vector<bool>& gapBetween,
+    const std::vector<double>& yAxis,
+    int ny, int ys,
     bool yLogScale, bool variableY,
-    double gapThreshold,
-    double* outData,
-    ResampleCache* cache)
+    double* accum, uint32_t* counts)
 {
-    int ctxCount = ctxEnd - ctxBegin;
-
-    std::vector<bool> localGapBetween;
-    std::vector<bool>& gapBetween = cache ? cache->gapBetween : localGapBetween;
-    gapBetween.assign(ctxCount, false);
-
-    // Gap detection
-    if (gapThreshold > 0 && ctxCount > 2)
-    {
-        for (int i = 0; i < ctxCount - 1; ++i)
-        {
-            double dx = acc.xAt(ctxBegin + i + 1) - acc.xAt(ctxBegin + i);
-            double refDx = std::numeric_limits<double>::max();
-            if (i > 0)
-                refDx = std::min(refDx, acc.xAt(ctxBegin + i) - acc.xAt(ctxBegin + i - 1));
-            if (i + 2 < ctxCount)
-                refDx = std::min(refDx, acc.xAt(ctxBegin + i + 2) - acc.xAt(ctxBegin + i + 1));
-            if (refDx < std::numeric_limits<double>::max() && dx > gapThreshold * refDx)
-                gapBetween[i] = true;
-        }
-    }
-
-    // Y bin ranges
     auto computeYBinRanges = [&](int col, std::vector<BinRange>& ranges) {
         for (int yj = 0; yj < ys; ++yj)
         {
@@ -212,19 +200,13 @@ void resampleImpl(
     if (!variableY)
         computeYBinRanges(xBegin, yBinRanges);
 
-    // Accumulation buffers
-    int total = nx * ny;
-    std::vector<double> localAccum;
-    std::vector<uint32_t> localCounts;
-    std::vector<double>& accum = cache ? cache->accum : localAccum;
-    std::vector<uint32_t>& counts = cache ? cache->counts : localCounts;
-    accum.assign(total, 0.0);
-    counts.assign(total, 0);
+    // Seed this chunk's own cursor: for the first chunk this is xBegin (same
+    // as the single-threaded scan); for any other chunk, a binary search at
+    // the chunk's first bin edge (mirrors qcp::algo::binMinMaxParallel's
+    // per-chunk findBegin seeding).
+    int srcCursor = (xbBegin == 0) ? xBegin : acc.lowerBound(xBegin, xEnd, xEdges[xbBegin]);
 
-    // Bin-driven X iteration
-    int srcCursor = xBegin;
-
-    for (int xb = 0; xb < nx; ++xb)
+    for (int xb = xbBegin; xb < xbEnd; ++xb)
     {
         double binLo = xEdges[xb];
         double binHi = xEdges[xb + 1];
@@ -292,18 +274,117 @@ void resampleImpl(
 
         srcCursor = colBegin;
     }
+}
 
-    // Write directly to output array (layout: valueIndex * keySize + keyIndex)
-    for (int i = 0; i < nx; ++i)
+template <typename Accessor>
+void resampleImpl(
+    const Accessor& acc,
+    int xBegin, int xEnd, int ctxBegin, int ctxEnd,
+    const std::vector<double>& xAxis, const std::vector<double>& yAxis,
+    const std::vector<double>& xEdges,
+    int nx, int ny, int ys,
+    bool yLogScale, bool variableY,
+    double gapThreshold,
+    double* outData,
+    ResampleCache* cache,
+    bool forceSerial)
+{
+    int ctxCount = ctxEnd - ctxBegin;
+
+    std::vector<bool> localGapBetween;
+    std::vector<bool>& gapBetween = cache ? cache->gapBetween : localGapBetween;
+    gapBetween.assign(ctxCount, false);
+
+    // Gap detection
+    if (gapThreshold > 0 && ctxCount > 2)
     {
-        for (int j = 0; j < ny; ++j)
+        for (int i = 0; i < ctxCount - 1; ++i)
         {
-            int srcIdx = i * ny + j;
-            int dstIdx = j * nx + i; // QCPColorMapData layout: mData[valueIndex * mKeySize + keyIndex]
-            outData[dstIdx] = counts[srcIdx] > 0 ? accum[srcIdx] / counts[srcIdx]
-                                                  : std::nan("");
+            double dx = acc.xAt(ctxBegin + i + 1) - acc.xAt(ctxBegin + i);
+            double refDx = std::numeric_limits<double>::max();
+            if (i > 0)
+                refDx = std::min(refDx, acc.xAt(ctxBegin + i) - acc.xAt(ctxBegin + i - 1));
+            if (i + 2 < ctxCount)
+                refDx = std::min(refDx, acc.xAt(ctxBegin + i + 2) - acc.xAt(ctxBegin + i + 1));
+            if (refDx < std::numeric_limits<double>::max() && dx > gapThreshold * refDx)
+                gapBetween[i] = true;
         }
     }
+
+    // Accumulation buffers
+    int total = nx * ny;
+    std::vector<double> localAccum;
+    std::vector<uint32_t> localCounts;
+    std::vector<double>& accum = cache ? cache->accum : localAccum;
+    std::vector<uint32_t>& counts = cache ? cache->counts : localCounts;
+    accum.assign(total, 0.0);
+    counts.assign(total, 0);
+
+    auto worker = [&](int xbBegin, int xbEnd) {
+        resampleRange(acc, xbBegin, xbEnd, xBegin, xEnd, ctxBegin, ctxCount,
+                      xAxis, xEdges, gapBetween, yAxis, ny, ys, yLogScale, variableY,
+                      accum.data(), counts.data());
+    };
+
+    // Parallelize by target-bin range: each thread's writes land in disjoint
+    // xb*ny+yb slices, so no synchronization is needed beyond waiting for all
+    // chunks to finish. Only worth it once there's enough work to amortize
+    // the thread dispatch cost (cost is ~O(visible source cells) regardless
+    // of target size, so gate on that, not on nx).
+    long long cellBudget = static_cast<long long>(xEnd - xBegin) * ys;
+    int threadCount = forceSerial ? 1
+        : std::min(qcp::algo::kMaxInnerThreads, std::max(1, QThread::idealThreadCount() / 2));
+    threadCount = std::min(threadCount, nx);
+    // Splits [0, count) into `threadCount` contiguous chunks and runs `body`
+    // on each -- threadCount-1 chunks on the pool, the last on the calling
+    // thread. Only used once the job is large enough to amortize dispatch.
+    auto dispatchParallel = [](int count, int threadCount, auto&& body) {
+        int perChunk = count / threadCount;
+        QAtomicInt remaining(threadCount - 1);
+        QSemaphore done;
+        for (int t = 0; t < threadCount; ++t)
+        {
+            int begin = t * perChunk;
+            int end = (t == threadCount - 1) ? count : (t + 1) * perChunk;
+            if (t < threadCount - 1)
+                qcp::algo::innerPool().start([&, begin, end] {
+                    body(begin, end);
+                    if (remaining.fetchAndSubRelaxed(1) == 1)
+                        done.release();
+                });
+            else
+                body(begin, end); // current thread does the last chunk
+        }
+        if (remaining.loadRelaxed() > 0)
+            done.acquire();
+    };
+
+    if (threadCount <= 1 || cellBudget < 1'000'000)
+        worker(0, nx);
+    else
+        dispatchParallel(nx, threadCount, worker);
+
+    // Write directly to output array (layout: valueIndex * keySize + keyIndex).
+    // O(nx*ny) -- independent of source size, so gate on the output grid
+    // itself rather than cellBudget; parallelizable the same way since each
+    // thread owns a disjoint range of source columns i (and therefore of
+    // dstIdx = j*nx+i, since i doesn't repeat across chunks).
+    auto writeOutput = [&](int iBegin, int iEnd) {
+        for (int i = iBegin; i < iEnd; ++i)
+        {
+            for (int j = 0; j < ny; ++j)
+            {
+                int srcIdx = i * ny + j;
+                int dstIdx = j * nx + i;
+                outData[dstIdx] = counts[srcIdx] > 0 ? accum[srcIdx] / counts[srcIdx]
+                                                      : std::nan("");
+            }
+        }
+    };
+    if (threadCount <= 1 || static_cast<long long>(nx) * ny < 1'000'000)
+        writeOutput(0, nx);
+    else
+        dispatchParallel(nx, threadCount, writeOutput);
 }
 
 } // anonymous namespace
@@ -315,7 +396,8 @@ QCPColorMapData* resample(
     int targetWidth, int targetHeight,
     bool yLogScale,
     double gapThreshold,
-    ResampleCache* cache)
+    ResampleCache* cache,
+    bool forceSerial)
 {
     PROFILE_HERE_N("resample");
     int srcCount = xEnd - xBegin;
@@ -374,14 +456,14 @@ QCPColorMapData* resample(
         RawAccessor acc{rawX, rawY, rawZ, ys, variableY};
         resampleImpl(acc, xBegin, xEnd, ctxBegin, ctxEnd,
                      xAxis, yAxis, xEdges, nx, ny, ys,
-                     yLogScale, variableY, gapThreshold, data->rawData(), cache);
+                     yLogScale, variableY, gapThreshold, data->rawData(), cache, forceSerial);
     }
     else
     {
         VirtualAccessor acc{src, ys, variableY};
         resampleImpl(acc, xBegin, xEnd, ctxBegin, ctxEnd,
                      xAxis, yAxis, xEdges, nx, ny, ys,
-                     yLogScale, variableY, gapThreshold, data->rawData(), cache);
+                     yLogScale, variableY, gapThreshold, data->rawData(), cache, forceSerial);
     }
 
     data->recalculateDataBounds();
