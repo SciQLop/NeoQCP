@@ -23,6 +23,12 @@ private slots:
     void exportWithScatterStillWorks();
     void clearResetsState();
 
+    // Per-point scatter colour must survive the QPainter fallback, not just RHI
+    void painterFallbackAppliesScatterColorValues();
+    void painterFallbackWithoutColorValuesUsesPen();
+    void painterFallbackTintsBrushOfFilledShapes();
+    void painterFallbackToleratesShortColorValues();
+
     // Edge cases
     void emptyDataDoesNotCrash();
     void singlePointDoesNotCrash();

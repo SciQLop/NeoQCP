@@ -163,6 +163,88 @@ void TestScatterRhi::exportWithScatterStillWorks()
     QCOMPARE(pm.height(), 300);
 }
 
+// --- Per-point scatter colour on the QPainter fallback ---
+//
+// setScatterColorValues used to be honoured only by the RHI scatter layer. Every
+// export (toPixmap/savePng/toPainter) and every headless or software-rendered
+// replot takes the QPainter fallback instead, where the colour data was ignored
+// and all markers came out in the single graph pen.
+
+//! Distinct 10-degree hue buckets among saturated pixels — one bucket means one colour.
+static int hueBuckets(const QPixmap& pm)
+{
+    const QImage img = pm.toImage().convertToFormat(QImage::Format_ARGB32);
+    QSet<int> buckets;
+    for (int y = 0; y < img.height(); ++y)
+        for (int x = 0; x < img.width(); ++x)
+        {
+            const QColor c = img.pixelColor(x, y);
+            if (c.alpha() > 8 && c.saturation() > 100 && c.value() > 60)
+                buckets.insert(c.hue() / 10);
+        }
+    return buckets.size();
+}
+
+static std::vector<float> rampColorValues(int n)
+{
+    std::vector<float> values(n);
+    for (int i = 0; i < n; ++i)
+        values[i] = static_cast<float>(i) / (n - 1);
+    return values;
+}
+
+void TestScatterRhi::painterFallbackAppliesScatterColorValues()
+{
+    constexpr int n = 100;
+    auto* graph = addGraph2WithScatter(mPlot, QCPScatterStyle::ssDisc, n);
+    graph->setLineStyle(QCPGraph2::lsNone);
+    graph->setScatterColorValues(rampColorValues(n));
+    graph->setScatterColorGradient(QCPColorGradient(QCPColorGradient::gpJet));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    QVERIFY2(hueBuckets(mPlot->toPixmap(400, 300)) > 5,
+             "exported scatters are monochrome — the colour axis was ignored");
+}
+
+void TestScatterRhi::painterFallbackWithoutColorValuesUsesPen()
+{
+    auto* graph = addGraph2WithScatter(mPlot, QCPScatterStyle::ssDisc, 100);
+    graph->setLineStyle(QCPGraph2::lsNone);
+    graph->setPen(QPen(QColor(Qt::red)));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    QCOMPARE(hueBuckets(mPlot->toPixmap(400, 300)), 1);
+}
+
+void TestScatterRhi::painterFallbackTintsBrushOfFilledShapes()
+{
+    constexpr int n = 100;
+    auto* graph = addGraph2WithScatter(mPlot, QCPScatterStyle::ssCircle, n);
+    graph->setLineStyle(QCPGraph2::lsNone);
+    // ssCircle with an explicit brush: both outline and fill must follow the data.
+    QCPScatterStyle style(QCPScatterStyle::ssCircle, QPen(Qt::black), QBrush(Qt::black), 9);
+    graph->setScatterStyle(style);
+    graph->setScatterColorValues(rampColorValues(n));
+    graph->setScatterColorGradient(QCPColorGradient(QCPColorGradient::gpJet));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    QVERIFY(hueBuckets(mPlot->toPixmap(400, 300)) > 5);
+}
+
+void TestScatterRhi::painterFallbackToleratesShortColorValues()
+{
+    constexpr int n = 100;
+    auto* graph = addGraph2WithScatter(mPlot, QCPScatterStyle::ssDisc, n);
+    graph->setLineStyle(QCPGraph2::lsNone);
+    graph->setScatterColorValues(rampColorValues(n / 2));  // deliberately too few
+    graph->setScatterColorGradient(QCPColorGradient(QCPColorGradient::gpJet));
+
+    // Must not read past the end; the uncovered points fall back to the ramp's
+    // lowest colour, exactly as the RHI path does.
+    QPixmap pm = mPlot->toPixmap(400, 300);
+    QVERIFY(!pm.isNull());
+}
+
 void TestScatterRhi::clearResetsState()
 {
     QCPScatterRhiLayer layer(nullptr);

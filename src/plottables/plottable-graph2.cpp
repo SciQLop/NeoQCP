@@ -615,25 +615,61 @@ void QCPGraph2::draw(QCPPainter* painter)
         if (!usedGpu)
         {
             applyScattersAntialiasingHint(painter);
-            mScatterStyle.applyTo(painter, drawPen);
+
+            // The colour axis has to be honoured here too, not only on the RHI
+            // layer: every export (toPixmap/savePng/toPainter) and every
+            // software-rendered replot lands on this path.
+            const bool hasColor = !mScatterColorValues.empty()
+                && !mScatterColorMapImage.isNull();
+            const int colorCount = static_cast<int>(mScatterColorValues.size());
+            const int colorMapLast = mScatterColorMapImage.width() - 1;
+
+            QCPScatterStyle style = mScatterStyle;
+            const bool tintBrush = style.brush().style() != Qt::NoBrush;
+            style.applyTo(painter, drawPen);
+
+            int lastColorIndex = -1;
+            const auto drawPoint = [&](int i)
+            {
+                const double sx = lines[i].x(), sy = lines[i].y();
+                if (!qIsFinite(sx) || !qIsFinite(sy))
+                    return;
+                if (hasColor)
+                {
+                    const int dataIdx = linesBeginIndex + i;
+                    const float v = dataIdx < colorCount ? mScatterColorValues[dataIdx] : 0.0f;
+                    const int colorIndex
+                        = qBound(0, static_cast<int>(v * colorMapLast + 0.5f), colorMapLast);
+                    // Re-applying the style is the expensive part, and neighbouring
+                    // points nearly always land on the same colormap texel.
+                    if (colorIndex != lastColorIndex)
+                    {
+                        const QColor c = mScatterColorMapImage.pixelColor(colorIndex, 0);
+                        // Overwrite rather than pass as the default pen: applyTo()
+                        // keeps an explicitly-set marker pen, which would drop the
+                        // colour data on the floor.
+                        QPen pen = style.isPenDefined() ? style.pen() : drawPen;
+                        pen.setColor(c);
+                        style.setPen(pen);
+                        if (tintBrush)
+                            style.setBrush(c);
+                        style.applyTo(painter, pen);
+                        lastColorIndex = colorIndex;
+                    }
+                }
+                style.drawShape(painter, sx, sy);
+            };
+
             if (useSubset)
             {
                 for (int i : mScatterSubset)
-                {
-                    const double sx = lines[i].x(), sy = lines[i].y();
-                    if (qIsFinite(sx) && qIsFinite(sy))
-                        mScatterStyle.drawShape(painter, sx, sy);
-                }
+                    drawPoint(i);
             }
             else
             {
                 const int skip = mScatterSkip + 1;
                 for (int i = 0; i < lines.size(); i += skip)
-                {
-                    const double sx = lines[i].x(), sy = lines[i].y();
-                    if (qIsFinite(sx) && qIsFinite(sy))
-                        mScatterStyle.drawShape(painter, sx, sy);
-                }
+                    drawPoint(i);
             }
         }
     }
