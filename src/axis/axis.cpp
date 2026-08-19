@@ -1186,6 +1186,15 @@ void QCPAxis::setLabel(const QString& str)
     }
 }
 
+void QCPAxis::setLabelRenderer(QCPLabelRenderer* renderer)
+{
+    if (mLabelRenderer != renderer)
+    {
+        mLabelRenderer = renderer;
+        mCachedMarginValid = false;   // a different typesetter means a different size
+    }
+}
+
 /*!
   Sets the distance between the tick labels and the axis label.
 
@@ -1998,6 +2007,7 @@ void QCPAxis::draw(QCPPainter* painter)
     mAxisPainter->labelFont = getLabelFont();
     mAxisPainter->labelColor = getLabelColor();
     mAxisPainter->label = mLabel;
+    mAxisPainter->labelRenderer = mLabelRenderer;
     mAxisPainter->substituteExponent = mNumberBeautifulPowers;
     mAxisPainter->tickPen = getTickPen();
     mAxisPainter->subTickPen = getSubTickPen();
@@ -2157,6 +2167,7 @@ int QCPAxis::calculateMargin()
     mAxisPainter->type = mAxisType;
     mAxisPainter->labelFont = getLabelFont();
     mAxisPainter->label = mLabel;
+    mAxisPainter->labelRenderer = mLabelRenderer;
     mAxisPainter->tickLabelFont = mTickLabelFont;
     mAxisPainter->axisRect = mAxisRect->rect();
     mAxisPainter->viewportRect = mParentPlot->viewport();
@@ -2384,20 +2395,29 @@ void QCPAxisPainterPrivate::draw(QCPPainter* painter)
         painter->setClipRect(oldClipRect);
 
     // axis label:
+    const auto drawLabel = [&](const QRect& rect)
+    {
+        if (labelRenderer)
+            labelRenderer->draw(painter, rect, labelFont, labelColor, label);
+        else
+            painter->drawText(rect, Qt::TextDontClip | Qt::AlignCenter, label);
+    };
     QRect labelBounds;
     if (!label.isEmpty())
     {
         margin += labelPadding;
         painter->setFont(labelFont);
         painter->setPen(QPen(labelColor));
-        labelBounds = painter->fontMetrics().boundingRect(0, 0, 0, 0, Qt::TextDontClip, label);
+        labelBounds
+            = labelRenderer
+                ? QRect(QPoint(0, 0), labelRenderer->measure(labelFont, label))
+                : painter->fontMetrics().boundingRect(0, 0, 0, 0, Qt::TextDontClip, label);
         if (type == QCPAxis::atLeft)
         {
             QTransform oldTransform = painter->transform();
             painter->translate((origin.x() - margin - labelBounds.height()), origin.y());
             painter->rotate(-90);
-            painter->drawText(0, 0, axisRect.height(), labelBounds.height(),
-                              Qt::TextDontClip | Qt::AlignCenter, label);
+            drawLabel(QRect(0, 0, axisRect.height(), labelBounds.height()));
             painter->setTransform(oldTransform);
         }
         else if (type == QCPAxis::atRight)
@@ -2406,17 +2426,15 @@ void QCPAxisPainterPrivate::draw(QCPPainter* painter)
             painter->translate((origin.x() + margin + labelBounds.height()),
                                origin.y() - axisRect.height());
             painter->rotate(90);
-            painter->drawText(0, 0, axisRect.height(), labelBounds.height(),
-                              Qt::TextDontClip | Qt::AlignCenter, label);
+            drawLabel(QRect(0, 0, axisRect.height(), labelBounds.height()));
             painter->setTransform(oldTransform);
         }
         else if (type == QCPAxis::atTop)
-            painter->drawText(origin.x(), origin.y() - margin - labelBounds.height(),
-                              axisRect.width(), labelBounds.height(),
-                              Qt::TextDontClip | Qt::AlignCenter, label);
+            drawLabel(QRect(origin.x(), origin.y() - margin - labelBounds.height(),
+                            axisRect.width(), labelBounds.height()));
         else if (type == QCPAxis::atBottom)
-            painter->drawText(origin.x(), origin.y() + margin, axisRect.width(),
-                              labelBounds.height(), Qt::TextDontClip | Qt::AlignCenter, label);
+            drawLabel(QRect(origin.x(), origin.y() + margin, axisRect.width(),
+                            labelBounds.height()));
     }
 
     // set selection boxes:
@@ -2534,9 +2552,15 @@ int QCPAxisPainterPrivate::size()
     // degrees):
     if (!label.isEmpty())
     {
-        QRect bounds = fontMetricsFor(labelFont).boundingRect(
-            0, 0, 0, 0, Qt::TextDontClip | Qt::AlignHCenter | Qt::AlignVCenter, label);
-        result += bounds.height() + labelPadding;
+        const int labelHeight
+            = labelRenderer ? labelRenderer->measure(labelFont, label).height()
+                            : fontMetricsFor(labelFont)
+                                  .boundingRect(0, 0, 0, 0,
+                                                Qt::TextDontClip | Qt::AlignHCenter
+                                                    | Qt::AlignVCenter,
+                                                label)
+                                  .height();
+        result += labelHeight + labelPadding;
     }
 
     return result;

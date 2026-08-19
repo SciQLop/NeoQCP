@@ -27,6 +27,7 @@
 #define QCP_AXIS_H
 
 #include "../global.h"
+#include "labelrenderer.h"
 Q_MOC_INCLUDE(
     "layoutelements/layoutelement-axisrect.h") // Qt6 needs this if using forward declared types in
                                                // Q_PROPERTY; path is relative to .pro
@@ -276,6 +277,7 @@ public:
     QColor labelColor() const { return mLabelColor; }
 
     QString label() const { return mLabel; }
+    QCPLabelRenderer* labelRenderer() const { return mLabelRenderer; }
 
     int labelPadding() const;
 
@@ -337,6 +339,9 @@ public:
     void setLabelFont(const QFont& font);
     void setLabelColor(const QColor& color);
     void setLabel(const QString& str);
+    /*! Substitute the label typesetter; \a renderer is not owned and must
+        outlive the axis. nullptr restores plain QPainter::drawText. */
+    void setLabelRenderer(QCPLabelRenderer* renderer);
     void setLabelPadding(int padding);
     void setPadding(int padding);
     void setOffset(int offset);
@@ -406,6 +411,7 @@ protected:
     //  axis label:
     // int mLabelPadding; // in QCPAxisPainter
     QString mLabel;
+    QCPLabelRenderer* mLabelRenderer = nullptr;
     QFont mLabelFont, mSelectedLabelFont;
     QColor mLabelColor, mSelectedLabelColor;
     // tick labels:
@@ -507,6 +513,7 @@ public:
     QFont labelFont;
     QColor labelColor;
     QString label;
+    QCPLabelRenderer* labelRenderer = nullptr;
     int tickLabelPadding; // directly accessed by QCPAxis setters/getters
     double tickLabelRotation; // directly accessed by QCPAxis setters/getters
     QCPAxis::LabelSide tickLabelSide; // directly accessed by QCPAxis setters/getters

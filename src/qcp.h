@@ -27,6 +27,7 @@
 #define QCP_H
 
 #include "axis/axis.h"
+#include "axis/labelrenderer.h"
 #include "axis/axisticker.h"
 #include "axis/axistickerdatetime.h"
 #include "axis/axistickerfixed.h"
