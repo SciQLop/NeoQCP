@@ -180,6 +180,24 @@ This fork aims at modernizing the excellent [QCustomPlot](https://www.qcustomplo
     - Async jobs are safe against plottable destruction and viewport mismatches
     - macOS/Metal correctness: scissor-rect Y-flip and vertex/SRB binding order
 
+- **LaTeX in Labels**
+  Axis labels, legend entries, plot titles and text items typeset any `$...$` span, so a plot can be labelled the way the physics is written. Backed by [JKQTMathText](https://github.com/jkriege2/JKQtPlotter) — a pure C++ LaTeX parser, no LaTeX installation and no dependency beyond Qt — and the XITS math fonts are embedded, so rendering is identical on every platform.
+
+  ```cpp
+  plot->yAxis->setLabel("$\\frac{\\partial B_x}{\\partial t}$ [nT$\\cdot$s$^{-1}$]");
+  graph->setName("$f^{-5/3}$ Kolmogorov");
+  plot->plotLayout()->addElement(0, 0, new QCPTextElement(plot, "$P(f) \\propto f^{-5/3}$"));
+
+  auto* note = new QCPItemText(plot);        // no separate item type
+  note->setText("break at $f_0 = 3$ Hz");
+  ```
+
+  Only text carrying a `$...$` span is typeset — everything else takes the plain `drawText` path, so ordinary labels cost nothing and a lone `$` stays a currency sign. Sizes are measured through the same seam, so a stacked fraction widens the axis rect and grows its legend entry instead of being clipped.
+
+  Both halves are replaceable: `QCPAxis::setLabelRenderer()` swaps the typesetter for one axis, `QCPLabelRenderer::setDefaultRenderer()` for everything else, and either takes `nullptr` to get plain text back. Build with `-Dwith_latex=false` to leave it out entirely.
+
+  Tick labels are deliberately not covered — they are overwhelmingly numeric, and that painter already renders scientific-notation exponents itself.
+
 - **Planned Features**
     - Incremental `addData()` for QCPGraph2
     - Fill support for QCPGraph2 (under graph / channel fill)
@@ -201,6 +219,10 @@ cd NeoQCP
 meson setup build --buildtype=release
 meson compile -C build
 ```
+
+Build options: `-Dwith_latex=false` drops LaTeX label support (and its JKQTMathText
+subproject), `-Dwith_examples=true` builds the examples, `-Dwith_tests=false` skips
+the tests, `-Dtracy_enable=true` turns on Tracy profiling.
 
 ### Integration in Your Meson Project
 
@@ -259,6 +281,11 @@ We welcome contributions! Please follow these guidelines:
 ## 📄 License
 
 GNU GPL v3 (same as upstream QCustomPlot)
+
+Bundled when built with `with_latex` (the default):
+[JKQTMathText](https://github.com/jkriege2/JKQtPlotter) under LGPL v2.1-or-later,
+and the [XITS](https://github.com/aliftype/xits) math fonts under the SIL Open
+Font License 1.1. Both are compatible with GPL v3.
 
 ---
 
