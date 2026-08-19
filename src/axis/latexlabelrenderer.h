@@ -27,7 +27,7 @@ public:
 
     QSize measure(const QFont& font, const QString& text) const override;
     void draw(QCPPainter* painter, const QRect& rect, const QFont& font, const QColor& color,
-              const QString& text) const override;
+              const QString& text, int flags) const override;
 
 private:
     QCPLatexLabelRenderer() = default;

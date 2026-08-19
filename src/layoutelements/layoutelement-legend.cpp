@@ -25,6 +25,8 @@
 
 #include "layoutelement-legend.h"
 
+#include "../axis/labelrenderer.h"
+
 #include "../core.h"
 #include "../painting/painter.h"
 #include "../plottables/plottable.h"
@@ -310,12 +312,17 @@ void QCPPlottableLegendItem::draw(QCPPainter* painter)
             displayName = prefix + QStringLiteral(" ") + displayName;
     }
 
-    QRect textRect = painter->fontMetrics().boundingRect(
-        0, 0, 0, iconSize.height(), Qt::TextDontClip, displayName);
+    auto* renderer = QCPLabelRenderer::defaultRenderer();
+    QRect textRect(QPoint(0, 0),
+                   QCPLabelRenderer::measureWith(renderer, painter->font(), displayName));
     QRect iconRect(mRect.topLeft(), iconSize);
     int textHeight = qMax(textRect.height(), iconSize.height());
-    painter->drawText(mRect.x() + iconSize.width() + mParentLegend->iconTextPadding(), mRect.y(),
-                      textRect.width(), textHeight, Qt::TextDontClip, displayName);
+    QCPLabelRenderer::drawWith(
+        renderer, painter,
+        QRect(mRect.x() + iconSize.width() + mParentLegend->iconTextPadding(), mRect.y(),
+              textRect.width(), textHeight),
+        painter->font(), painter->pen().color(), displayName,
+        Qt::TextDontClip | Qt::AlignLeft | Qt::AlignVCenter);
 
     painter->save();
     painter->setClipRect(iconRect, Qt::IntersectClip);
@@ -355,12 +362,11 @@ QSize QCPPlottableLegendItem::minimumOuterSizeHint() const
     }
 
     QSize result(0, 0);
-    QRect textRect;
-    QFontMetrics fontMetrics(getFont());
     QSize iconSize = mParentLegend->iconSize();
-    textRect = fontMetrics.boundingRect(0, 0, 0, iconSize.height(), Qt::TextDontClip, displayName);
-    result.setWidth(iconSize.width() + mParentLegend->iconTextPadding() + textRect.width());
-    result.setHeight(qMax(textRect.height(), iconSize.height()));
+    const QSize textSize = QCPLabelRenderer::measureWith(QCPLabelRenderer::defaultRenderer(),
+                                                         getFont(), displayName);
+    result.setWidth(iconSize.width() + mParentLegend->iconTextPadding() + textSize.width());
+    result.setHeight(qMax(textSize.height(), iconSize.height()));
     result.rwidth() += mMargins.left() + mMargins.right();
     result.rheight() += mMargins.top() + mMargins.bottom();
     return result;

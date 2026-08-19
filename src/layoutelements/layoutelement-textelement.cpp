@@ -25,6 +25,8 @@
 
 #include "layoutelement-textelement.h"
 
+#include "../axis/labelrenderer.h"
+
 #include "../core.h"
 #include "../painting/painter.h"
 
@@ -312,16 +314,25 @@ void QCPTextElement::applyDefaultAntialiasingHint(QCPPainter* painter) const
 /* inherits documentation from base class */
 void QCPTextElement::draw(QCPPainter* painter)
 {
-    painter->setFont(mainFont());
-    painter->setPen(QPen(mainTextColor()));
-    painter->drawText(mRect, mTextFlags, mText, &mTextBoundingRect);
+    auto* renderer = QCPLabelRenderer::defaultRenderer();
+    if (!renderer)
+    {
+        painter->setFont(mainFont());
+        painter->setPen(QPen(mainTextColor()));
+        painter->drawText(mRect, mTextFlags, mText, &mTextBoundingRect);
+        return;
+    }
+    // The out-parameter drawText fills is what selectTest hit-tests against, so
+    // it has to be kept up to date on this path too.
+    mTextBoundingRect = QRect(mRect.topLeft(), renderer->measure(mainFont(), mText));
+    QCPLabelRenderer::drawWith(renderer, painter, mRect, mainFont(), mainTextColor(), mText,
+                               mTextFlags);
 }
 
 /* inherits documentation from base class */
 QSize QCPTextElement::minimumOuterSizeHint() const
 {
-    QFontMetrics metrics(mFont);
-    QSize result(metrics.boundingRect(0, 0, 0, 0, Qt::TextDontClip, mText).size());
+    QSize result(QCPLabelRenderer::measureWith(QCPLabelRenderer::defaultRenderer(), mFont, mText));
     result.rwidth() += mMargins.left() + mMargins.right();
     result.rheight() += mMargins.top() + mMargins.bottom();
     return result;
@@ -330,8 +341,7 @@ QSize QCPTextElement::minimumOuterSizeHint() const
 /* inherits documentation from base class */
 QSize QCPTextElement::maximumOuterSizeHint() const
 {
-    QFontMetrics metrics(mFont);
-    QSize result(metrics.boundingRect(0, 0, 0, 0, Qt::TextDontClip, mText).size());
+    QSize result(QCPLabelRenderer::measureWith(QCPLabelRenderer::defaultRenderer(), mFont, mText));
     result.setWidth(QWIDGETSIZE_MAX);
     result.rheight() += mMargins.top() + mMargins.bottom();
     return result;

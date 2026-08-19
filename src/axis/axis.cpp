@@ -25,9 +25,6 @@
 
 #include "axis.h"
 
-#if NEOQCP_WITH_LATEX
-#  include "latexlabelrenderer.h"
-#endif
 
 #include "../core.h"
 #include "../painting/grid-rhi-layer.h"
@@ -456,11 +453,9 @@ QCPAxis::QCPAxis(QCPAxisRect* parent, AxisType type)
         , mCachedMargin(0)
         , mDragging(false)
 {
-#if NEOQCP_WITH_LATEX
-    // Opt out with setLabelRenderer(nullptr); plain labels are unaffected either
-    // way, since the renderer only diverts text carrying a `$...$` span.
-    mLabelRenderer = QCPLatexLabelRenderer::instance();
-#endif
+    // Opt out with setLabelRenderer(nullptr); plain labels are unaffected
+    // either way, since a renderer only diverts text with a `$...$` span.
+    mLabelRenderer = QCPLabelRenderer::defaultRenderer();
     setParent(parent);
     mGrid->setVisible(false);
     setAntialiased(false);
@@ -2406,10 +2401,8 @@ void QCPAxisPainterPrivate::draw(QCPPainter* painter)
     // axis label:
     const auto drawLabel = [&](const QRect& rect)
     {
-        if (labelRenderer)
-            labelRenderer->draw(painter, rect, labelFont, labelColor, label);
-        else
-            painter->drawText(rect, Qt::TextDontClip | Qt::AlignCenter, label);
+        QCPLabelRenderer::drawWith(labelRenderer, painter, rect, labelFont, labelColor, label,
+                                   Qt::TextDontClip | Qt::AlignCenter);
     };
     QRect labelBounds;
     if (!label.isEmpty())
@@ -2417,10 +2410,8 @@ void QCPAxisPainterPrivate::draw(QCPPainter* painter)
         margin += labelPadding;
         painter->setFont(labelFont);
         painter->setPen(QPen(labelColor));
-        labelBounds
-            = labelRenderer
-                ? QRect(QPoint(0, 0), labelRenderer->measure(labelFont, label))
-                : painter->fontMetrics().boundingRect(0, 0, 0, 0, Qt::TextDontClip, label);
+        labelBounds = QRect(QPoint(0, 0),
+                            QCPLabelRenderer::measureWith(labelRenderer, labelFont, label));
         if (type == QCPAxis::atLeft)
         {
             QTransform oldTransform = painter->transform();
@@ -2561,15 +2552,8 @@ int QCPAxisPainterPrivate::size()
     // degrees):
     if (!label.isEmpty())
     {
-        const int labelHeight
-            = labelRenderer ? labelRenderer->measure(labelFont, label).height()
-                            : fontMetricsFor(labelFont)
-                                  .boundingRect(0, 0, 0, 0,
-                                                Qt::TextDontClip | Qt::AlignHCenter
-                                                    | Qt::AlignVCenter,
-                                                label)
-                                  .height();
-        result += labelHeight + labelPadding;
+        result += QCPLabelRenderer::measureWith(labelRenderer, labelFont, label).height()
+            + labelPadding;
     }
 
     return result;

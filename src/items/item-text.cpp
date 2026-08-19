@@ -25,6 +25,8 @@
 
 #include "item-text.h"
 
+#include "../axis/labelrenderer.h"
+
 #include "../core.h"
 #include "../painting/painter.h"
 
@@ -231,8 +233,8 @@ double QCPItemText::selectTest(const QPointF& pos, bool onlySelectable,
     inputTransform.rotate(-mRotation);
     inputTransform.translate(-positionPixels.x(), -positionPixels.y());
     QPointF rotatedPos = inputTransform.map(pos);
-    QFontMetrics fontMetrics(mFont);
-    QRect textRect = fontMetrics.boundingRect(0, 0, 0, 0, Qt::TextDontClip | mTextAlignment, mText);
+    QRect textRect = QCPLabelRenderer::measureRectWith(
+        QCPLabelRenderer::defaultRenderer(), mFont, mText, Qt::TextDontClip | mTextAlignment);
     QRect textBoxRect
         = textRect.adjusted(-mPadding.left(), -mPadding.top(), mPadding.right(), mPadding.bottom());
     QPointF textPos = getTextDrawPoint(positionPixels, textBoxRect, mPositionAlignment);
@@ -250,8 +252,8 @@ void QCPItemText::draw(QCPPainter* painter)
     if (!qFuzzyIsNull(mRotation))
         transform.rotate(mRotation);
     painter->setFont(mainFont());
-    QRect textRect
-        = painter->fontMetrics().boundingRect(0, 0, 0, 0, Qt::TextDontClip | mTextAlignment, mText);
+    QRect textRect = QCPLabelRenderer::measureRectWith(
+        QCPLabelRenderer::defaultRenderer(), mainFont(), mText, Qt::TextDontClip | mTextAlignment);
     QRect textBoxRect
         = textRect.adjusted(-mPadding.left(), -mPadding.top(), mPadding.right(), mPadding.bottom());
     QPointF textPos
@@ -272,8 +274,9 @@ void QCPItemText::draw(QCPPainter* painter)
             painter->drawRect(textBoxRect);
         }
         painter->setBrush(Qt::NoBrush);
-        painter->setPen(QPen(mainColor()));
-        painter->drawText(textRect, Qt::TextDontClip | mTextAlignment, mText);
+        QCPLabelRenderer::drawWith(QCPLabelRenderer::defaultRenderer(), painter, textRect,
+                                   mainFont(), mainColor(), mText,
+                                   Qt::TextDontClip | mTextAlignment);
     }
 }
 
@@ -286,8 +289,8 @@ QPointF QCPItemText::anchorPixelPosition(int anchorId) const
     transform.translate(pos.x(), pos.y());
     if (!qFuzzyIsNull(mRotation))
         transform.rotate(mRotation);
-    QFontMetrics fontMetrics(mainFont());
-    QRect textRect = fontMetrics.boundingRect(0, 0, 0, 0, Qt::TextDontClip | mTextAlignment, mText);
+    QRect textRect = QCPLabelRenderer::measureRectWith(
+        QCPLabelRenderer::defaultRenderer(), mainFont(), mText, Qt::TextDontClip | mTextAlignment);
     QRectF textBoxRect
         = textRect.adjusted(-mPadding.left(), -mPadding.top(), mPadding.right(), mPadding.bottom());
     QPointF textPos

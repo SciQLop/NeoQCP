@@ -55,22 +55,34 @@ QSize QCPLatexLabelRenderer::measure(const QFont& font, const QString& text) con
 }
 
 void QCPLatexLabelRenderer::draw(QCPPainter* painter, const QRect& rect, const QFont& font,
-                                 const QColor& color, const QString& text) const
+                                 const QColor& color, const QString& text, int flags) const
 {
     if (!containsMath(text))
     {
         painter->setFont(font);
         painter->setPen(QPen(color));
-        painter->drawText(rect, Qt::TextDontClip | Qt::AlignCenter, text);
+        painter->drawText(rect, flags, text);
         return;
     }
 
     auto& parser = parserFor(font, color, text);
-    // JKQTMathText draws from a baseline-left origin and we are handed a box to
-    // centre in; the ascent is what converts between the two.
+    // JKQTMathText draws from a baseline-left origin while we are handed a box
+    // and Qt alignment flags; the ascent is what converts between the two.
     double width = 0., ascent = 0., descent = 0., strikeout = 0.;
     parser.getSizeDetail(*painter, width, ascent, descent, strikeout);
-    const double x = rect.x() + (rect.width() - width) / 2.;
-    const double y = rect.y() + (rect.height() - (ascent + descent)) / 2. + ascent;
+    const double height = ascent + descent;
+
+    double x = rect.x();
+    if (flags & Qt::AlignHCenter)
+        x += (rect.width() - width) / 2.;
+    else if (flags & Qt::AlignRight)
+        x += rect.width() - width;
+
+    double y = rect.y() + ascent;   // Qt::AlignTop, and the default
+    if (flags & Qt::AlignVCenter)
+        y = rect.y() + (rect.height() - height) / 2. + ascent;
+    else if (flags & Qt::AlignBottom)
+        y = rect.y() + rect.height() - descent;
+
     parser.draw(*painter, x, y);
 }

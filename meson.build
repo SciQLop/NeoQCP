@@ -191,6 +191,7 @@ embedded_shaders = custom_target('embedded_shaders',
               'scatter_frag_qsb_data:@INPUT8@'])
 
 NeoQCP = static_library('NeoQCP',
+           'src/axis/labelrenderer.cpp',
            'src/colorgradient.cpp',
            'src/theme.cpp',
            'src/core.cpp',
