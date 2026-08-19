@@ -1419,6 +1419,55 @@ static QWidget* createBusyIndicatorTab()
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 
+// ── Tab: LaTeX labels ────────────────────────────────────────────────────────
+
+static QWidget* createLatexTab()
+{
+    auto* plot = makePlot();
+
+    // Every surface that sets user text goes through QCPLabelRenderer: axis
+    // labels, the legend, the title, and text items. Only `$...$` spans are
+    // typeset, so the plain strings here are drawn exactly as they always were.
+    plot->plotLayout()->insertRow(0);
+    plot->plotLayout()->addElement(
+        0, 0, new QCPTextElement(plot, "Wave power $P(f) \\propto f^{-5/3}$",
+                                 QFont("sans", 13, QFont::Bold)));
+
+    const int n = 400;
+    QVector<double> x(n), y(n), y2(n);
+    for (int i = 0; i < n; ++i)
+    {
+        x[i] = 0.1 + i / double(n) * 4.9;
+        y[i] = qPow(x[i], -5.0 / 3.0);
+        y2[i] = 0.6 * qPow(x[i], -1.0) * (1 + 0.15 * qSin(x[i] * 9));
+    }
+    auto* g1 = plot->addGraph();
+    g1->setData(x, y);
+    g1->setPen(QPen(Qt::blue, 1.5));
+    g1->setName("$f^{-5/3}$ Kolmogorov");
+
+    auto* g2 = plot->addGraph();
+    g2->setData(x, y2);
+    g2->setPen(QPen(QColor(200, 60, 0), 1.5));
+    g2->setName("plain text entry");   // untouched: no math span
+
+    plot->xAxis->setLabel("frequency $f$ [Hz]");
+    plot->yAxis->setLabel("$\\frac{\\partial B_x}{\\partial t}$ [nT$\\cdot$s$^{-1}$]");
+
+    auto* note = new QCPItemText(plot);
+    note->position->setCoords(3.0, 0.55);
+    note->setText("break at $f_0 = 3$ Hz");
+    note->setFont(QFont("sans", 11));
+    note->setPen(QPen(Qt::gray));
+    note->setPadding(QMargins(4, 2, 4, 2));
+
+    plot->legend->setVisible(true);
+    plot->rescaleAxes();
+    plot->replot();
+    return wrapPlot(plot);
+}
+
+
 int main(int argc, char* argv[])
 {
     QApplication app(argc, argv);
@@ -1450,6 +1499,7 @@ int main(int argc, char* argv[])
     tabs->addTab(createOverlayTab(),       "Overlay");
     tabs->addTab(createDualYAxisTab(),      "Dual Y-Axis");
     tabs->addTab(createBusyIndicatorTab(), "Busy Indicator");
+    tabs->addTab(createLatexTab(),         "LaTeX Labels");
 
     window.setCentralWidget(tabs);
     window.show();
