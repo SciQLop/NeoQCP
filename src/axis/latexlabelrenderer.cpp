@@ -11,6 +11,22 @@
 namespace
 {
 /*!
+  A space touching a `$` delimiter is swallowed: LaTeX renders it about 1 pixel
+  wide where an ordinary text-mode space is 6, so `time $t$ [s]` sets as
+  "time<i>t</i> [s]". Making those spaces explicit restores them to 7 -- the
+  width they would have had anywhere else in the string.
+
+  Spaces *inside* a math span may be caught too, where `\ ` is equally valid.
+*/
+QString withExplicitBoundarySpaces(QString text)
+{
+    static const QRegularExpression beforeDelimiter(QStringLiteral(" (?=\\$)"));
+    static const QRegularExpression afterDelimiter(QStringLiteral("(?<=\\$) "));
+    return text.replace(beforeDelimiter, QStringLiteral("\\ "))
+        .replace(afterDelimiter, QStringLiteral("\\ "));
+}
+
+/*!
   JKQTMathText is neither cheap to construct nor reentrant, and a repaint asks
   for the same label over and over. One per thread, reconfigured per call.
 */
@@ -20,7 +36,7 @@ JKQTMathText& parserFor(const QFont& font, const QColor& color, const QString& t
     parser.useXITS();
     parser.setFontSize(font.pointSizeF() > 0 ? font.pointSizeF() : font.pixelSize());
     parser.setFontColor(color);
-    parser.parse(text);
+    parser.parse(withExplicitBoundarySpaces(text));
     return parser;
 }
 }
