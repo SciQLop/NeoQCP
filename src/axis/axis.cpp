@@ -25,6 +25,10 @@
 
 #include "axis.h"
 
+#if NEOQCP_WITH_LATEX
+#  include "latexlabelrenderer.h"
+#endif
+
 #include "../core.h"
 #include "../painting/grid-rhi-layer.h"
 #include "../items/item.h"
@@ -452,6 +456,11 @@ QCPAxis::QCPAxis(QCPAxisRect* parent, AxisType type)
         , mCachedMargin(0)
         , mDragging(false)
 {
+#if NEOQCP_WITH_LATEX
+    // Opt out with setLabelRenderer(nullptr); plain labels are unaffected either
+    // way, since the renderer only diverts text carrying a `$...$` span.
+    mLabelRenderer = QCPLatexLabelRenderer::instance();
+#endif
     setParent(parent);
     mGrid->setVisible(false);
     setAntialiased(false);

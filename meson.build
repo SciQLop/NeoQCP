@@ -20,12 +20,25 @@ if get_option ( 'tracy_enable')
     optional_deps += [ tracy ]
 endif
 
+# Kept out of optional_deps on purpose: jkqtmathtext is link_whole'd into
+# libNeoQCP.a, so propagating it to consumers too would land every archive
+# member twice. Nothing public includes its headers -- latexlabelrenderer.h
+# names only Qt types -- so consumers need nothing from it at all.
+latex_sources = []
+latex_deps = []
+if get_option('with_latex')
+    latex_deps += [dependency('jkqtmathtext',
+                              fallback : ['jkqtmathtext', 'jkqtmathtext_dep'])]
+    latex_sources += ['src/axis/latexlabelrenderer.cpp']
+endif
+
 config_data = configuration_data()
 version = meson.project_version().split('.')
 config_data.set('NEOQCP_VERSION_MAJOR', version[0])
 config_data.set('NEOQCP_VERSION_MINOR', version[1])
 config_data.set('NEOQCP_VERSION_PATCH', version[2])
 config_data.set_quoted('NEOQCP_VERSION', meson.project_version())
+config_data.set10('NEOQCP_WITH_LATEX', get_option('with_latex'))
 
 
 config_h = configure_file(
@@ -255,11 +268,12 @@ NeoQCP = static_library('NeoQCP',
            'src/polar/polargraph.cpp',
            'src/polar/polargrid.cpp',
            'src/polar/radialaxis.cpp',
+           latex_sources,
            embedded_shaders,
            neoqcp_moc_files,
            include_directories: NEOQCP_INCLUDE_DIR,
            cpp_args:cpp_args,
-           dependencies: [qtdeps] + optional_deps,
+           dependencies: [qtdeps] + optional_deps + latex_deps,
            install: true,
            extra_files: [neoqcp_moc_headers, 'src/Profiling.hpp', 'src/painting/paintbuffer-rhi.h', 'src/painting/plottable-rhi-layer.h', 'src/painting/span-rhi-layer.h', 'src/painting/colormap-rhi-layer.h', 'src/painting/grid-rhi-layer.h', 'src/painting/scatter-rhi-layer.h']
            )

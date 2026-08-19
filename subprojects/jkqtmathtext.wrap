@@ -1,0 +1,8 @@
+[wrap-git]
+url = https://github.com/jkriege2/JKQtPlotter.git
+revision = v5.0.0-beta2
+depth = 1
+patch_directory = jkqtmathtext
+
+[provide]
+jkqtmathtext = jkqtmathtext_dep

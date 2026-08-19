@@ -28,6 +28,9 @@
 
 #include "axis/axis.h"
 #include "axis/labelrenderer.h"
+#if NEOQCP_WITH_LATEX
+#  include "axis/latexlabelrenderer.h"
+#endif
 #include "axis/axisticker.h"
 #include "axis/axistickerdatetime.h"
 #include "axis/axistickerfixed.h"
