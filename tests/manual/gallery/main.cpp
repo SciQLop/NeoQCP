@@ -562,6 +562,15 @@ static QWidget* createItemsTab()
     rich->setHtml("<b>Rich</b> <i style='color:red'>HTML</i> Text");
     rich->setFont(QFont("Sans", 12));
 
+    // LaTeX text item -- the third flavour: an ordinary QCPItemText whose `$...$`
+    // span is typeset. No separate item type, and the "Plain Text" above proves
+    // text without a span is still drawn verbatim.
+    auto* latex = new QCPItemText(plot);
+    latex->position->setCoords(4.5, 7.9);
+    latex->setText("LaTeX $\\sqrt{\\frac{\\pi}{2}}\\cdot e^{-x^2}$");
+    latex->setFont(QFont("Sans", 12));
+    latex->setColor(QColor(120, 0, 120));
+
     // line item
     auto* line = new QCPItemLine(plot);
     line->start->setCoords(1, 7);
@@ -623,6 +632,15 @@ static QWidget* createItemsTab()
     tracer->setPen(QPen(Qt::red, 2));
     tracer->setBrush(Qt::red);
     tracer->setSize(8);
+
+    // annotating a curve is where a typeset item actually earns its keep
+    auto* tracerLabel = new QCPItemText(plot);
+    tracerLabel->position->setCoords(3.2, 2.6);
+    tracerLabel->setText("$y = 1 + \\sin(2x)$");
+    tracerLabel->setFont(QFont("Sans", 11));
+    tracerLabel->setColor(Qt::darkRed);
+    tracerLabel->setPen(QPen(Qt::lightGray));
+    tracerLabel->setPadding(QMargins(4, 2, 4, 2));
 
     // Shift+click to draw a line item
     plot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) -> QCPAbstractItem* {
