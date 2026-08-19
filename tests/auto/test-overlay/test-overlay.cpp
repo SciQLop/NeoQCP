@@ -1,4 +1,5 @@
 #include "test-overlay.h"
+#include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
 
 void TestOverlay::init()
 {

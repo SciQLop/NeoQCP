@@ -1,6 +1,7 @@
 #include "test-paintbuffer.h"
 #include <painting/viewport-offset.h>
 #include <vector>
+#include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
 
 void TestPaintBuffer::init()
 {

@@ -1,6 +1,7 @@
 #include "test-pipeline.h"
 #include <qcustomplot.h>
 #include <painting/colormap-rhi-layer.h>
+#include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
 
 namespace {
 bool showAndHasRhiLT(QCustomPlot* plot)
