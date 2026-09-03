@@ -107,6 +107,9 @@ void QCPPaintBufferRhi::reallocateBuffer()
     mSrbBoundTexture = nullptr;
     delete mTexture;
     mTexture = nullptr;
+    // Fresh GPU texture holds uninitialized memory until the staging image is
+    // uploaded (solid magenta on Metal). Force that upload before compositing.
+    mNeedsUpload = true;
     if (mRhi)
     {
         const auto fmt = qcp::rhi::preferredTextureFormat(mRhi);

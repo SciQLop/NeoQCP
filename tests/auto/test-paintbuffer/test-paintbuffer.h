@@ -20,6 +20,7 @@ private slots:
     void contentDirty_incrementalReplotPreservesContent();
     void replotAndExport_smokeTest();
     void replotOnFirstShow_tabWidget();
+    void rhi_reallocatedTextureRequiresUpload();
 
     void skipRepaint_graph2PanOnly();
     void skipRepaint_disabledWithItems();

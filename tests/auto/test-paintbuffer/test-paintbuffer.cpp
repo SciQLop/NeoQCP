@@ -1,5 +1,6 @@
 #include "test-paintbuffer.h"
 #include <painting/viewport-offset.h>
+#include <painting/paintbuffer-rhi.h>
 #include <vector>
 #include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
 
@@ -219,6 +220,24 @@ void TestPaintBuffer::replotOnFirstShow_tabWidget()
         for (int x = 0; x < img.width(); x += 10)
             colors.insert(img.pixel(x, y));
     QVERIFY2(colors.size() > 1, "toPixmap produced a blank/uniform image");
+}
+
+void TestPaintBuffer::rhi_reallocatedTextureRequiresUpload()
+{
+    // Regression test (macOS pink empty plot): reallocateBuffer() deletes the
+    // GPU texture and creates a fresh one whose memory is uninitialized (solid
+    // magenta on Metal, transparent on GL). The buffer must force an upload of
+    // the staging image before that texture is ever composited — even when the
+    // layer is later skipped as "stale" because its plottables exist but
+    // produce no content yet (ranged but empty plot).
+    QCPPaintBufferRhi buf(QSize(100, 100), 1.0, "test", nullptr);
+    QVERIFY(buf.needsUpload());
+    buf.setUploaded(); // first frame uploaded fine
+    QVERIFY(!buf.needsUpload());
+
+    buf.setSize(QSize(200, 200)); // reallocates the GPU texture
+    QVERIFY2(buf.needsUpload(),
+             "reallocated texture must be uploaded before compositing");
 }
 
 void TestPaintBuffer::skipRepaint_graph2PanOnly()
