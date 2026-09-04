@@ -2146,10 +2146,12 @@ void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
     if (mReplotting) // incase signals loop back to replot slot
         return;
 
-    if (mSkipReplotsWhenHidden && !isVisible())
+    if (mSkipReplotsWhenHidden && mWasShown && !isVisible())
     {
         // Defer all painting to the first visible replot (forced by initialize()).
         // Buffer dirty/invalidated flags are intentionally left untouched.
+        // Never-shown widgets fall through: classic behavior, required for
+        // offscreen rendering.
         mReplotQueued = false;
         return;
     }
@@ -3020,6 +3022,19 @@ void QCustomPlot::resizeEvent([[maybe_unused]] QResizeEvent* event)
     if (mGridRhiLayer)
         mGridRhiLayer->markGeometryDirty();
     replot(rpImmediateRefresh);
+}
+
+/*! \internal
+
+  Event handler for when the widget is shown. Records that the widget has been
+  shown at least once (mWasShown), which the skipReplotsWhenHidden guard uses to
+  only skip replots for widgets that are hidden after a real show — never-shown
+  widgets (offscreen rendering, tests) keep classic replot behavior.
+*/
+void QCustomPlot::showEvent(QShowEvent* event)
+{
+    QRhiWidget::showEvent(event);
+    mWasShown = true;
 }
 
 /*! \internal

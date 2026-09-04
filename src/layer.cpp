@@ -269,7 +269,7 @@ void QCPLayer::drawToPaintBuffer()
 */
 void QCPLayer::replot()
 {
-    if (mParentPlot->skipReplotsWhenHidden() && !mParentPlot->isVisible())
+    if (mParentPlot->skipReplotsWhenHidden() && mParentPlot->wasShown() && !mParentPlot->isVisible())
         return; // deferred to the first visible replot; dirty flags preserved
     if (mMode == lmBuffered && !mParentPlot->hasInvalidatedPaintBuffers())
     {

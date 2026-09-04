@@ -22,8 +22,22 @@ void TestHiddenReplot::hiddenReplotRunsByDefault()
     QCOMPARE(spy.count(), 1);
 }
 
+void TestHiddenReplot::neverShownReplotRunsWhenEnabled()
+{
+    // Regression guard: never-shown widgets (offscreen rendering, tests) keep
+    // classic replot behavior even with the flag enabled.
+    QSignalSpy beforeSpy(mPlot, &QCustomPlot::beforeReplot);
+    QSignalSpy afterSpy(mPlot, &QCustomPlot::afterReplot);
+    mPlot->setSkipReplotsWhenHidden(true);
+    mPlot->replot();
+    QCOMPARE(beforeSpy.count(), 1);
+    QCOMPARE(afterSpy.count(), 1);
+}
+
 void TestHiddenReplot::hiddenReplotSkippedWhenEnabled()
 {
+    mPlot->show(); // was-shown, then hidden again: the guard applies
+    mPlot->hide();
     QSignalSpy beforeSpy(mPlot, &QCustomPlot::beforeReplot);
     QSignalSpy afterSpy(mPlot, &QCustomPlot::afterReplot);
     mPlot->setSkipReplotsWhenHidden(true);
@@ -34,6 +48,8 @@ void TestHiddenReplot::hiddenReplotSkippedWhenEnabled()
 
 void TestHiddenReplot::replotResumesAfterDisable()
 {
+    mPlot->show();
+    mPlot->hide();
     mPlot->setSkipReplotsWhenHidden(true);
     mPlot->replot();
     mPlot->setSkipReplotsWhenHidden(false);

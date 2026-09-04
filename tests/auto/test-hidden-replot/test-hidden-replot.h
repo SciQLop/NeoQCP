@@ -10,6 +10,7 @@ private slots:
     void cleanup();
 
     void hiddenReplotRunsByDefault();
+    void neverShownReplotRunsWhenEnabled();
     void hiddenReplotSkippedWhenEnabled();
     void replotResumesAfterDisable();
 
