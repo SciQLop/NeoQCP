@@ -54,6 +54,7 @@ private:
     struct SpanSignature
     {
         float e0 = 0, e1 = 0, e2 = 0, e3 = 0; // edge pixels; meaning depends on span type
+        const QCPAxisRect* clipRect = nullptr;
         quint32 fillRgba = 0;
         quint32 borderRgba = 0;
         float borderWidth = 0;

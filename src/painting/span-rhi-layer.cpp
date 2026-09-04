@@ -75,6 +75,9 @@ QCPSpanRhiLayer::SpanSignature QCPSpanRhiLayer::computeSignature(QCPAbstractItem
     QCPAxisRect* ar = span->clipAxisRect();
     if (!ar)
         return sig;
+    // setClipAxisRect() does not mark RHI dirty, so the pointer itself must be
+    // part of the signature to catch a span moving between identical axis rects.
+    sig.clipRect = ar;
 
     const auto fillStyle = [&sig](const QBrush& brush, const QPen& pen)
     {
