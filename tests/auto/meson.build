@@ -35,6 +35,7 @@ test_srcs = [
     'test-scatter-rhi/test-scatter-rhi.cpp',
     'test-span-rhi/test-span-rhi.cpp',
     'test-item-position/test-item-position.cpp',
+    'test-layer-removal/test-layer-removal.cpp',
 ]
 
 test_headers = [
@@ -69,6 +70,7 @@ test_headers = [
     'test-scatter-rhi/test-scatter-rhi.h',
     'test-span-rhi/test-span-rhi.h',
     'test-item-position/test-item-position.h',
+    'test-layer-removal/test-layer-removal.h',
 ]
 test_moc_files = qtmod.compile_moc(headers : test_headers)
 

@@ -1838,6 +1838,10 @@ bool QCustomPlot::removeLayer(QCPLayer* layer)
         pb->setInvalidated();
 
     // remove layer:
+    // Drop GPU-side layer objects keyed on this layer before deleting it, so later
+    // replots/renders never dereference the stale QCPLayer* key.
+    delete mPlottableRhiLayers.take(layer);
+    delete mScatterRhiLayers.take(layer);
     mLayers.removeOne(layer);
     delete layer;
     updateLayerIndices();

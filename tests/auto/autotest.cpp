@@ -29,6 +29,7 @@
 #include "test-scatter-rhi/test-scatter-rhi.h"
 #include "test-span-rhi/test-span-rhi.h"
 #include "test-item-position/test-item-position.h"
+#include "test-layer-removal/test-layer-removal.h"
 
 #define QCPTEST(t) t t##instance; QTest::qExec(&t##instance)
 
@@ -67,6 +68,7 @@ int main(int argc, char **argv)
   QCPTEST(TestScatterRhi);
   QCPTEST(TestSpanRhi);
   QCPTEST(TestItemPosition);
+  QCPTEST(TestLayerRemoval);
 
   return 0;
 }
