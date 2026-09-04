@@ -1,6 +1,7 @@
 #include "test-pipeline.h"
 #include <qcustomplot.h>
 #include <painting/colormap-rhi-layer.h>
+#include <painting/plottable-rhi-layer.h>
 #include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
 
 namespace {
@@ -314,4 +315,53 @@ void TestPipeline::colormapQuadFollowsPanWhileTranslating()
     QVERIFY(!expected.isNull());
     QCOMPARE(crl->pixelOffset(), expected);
     QCOMPARE(crl->effectiveQuadRect(), before.translated(expected));
+}
+
+void TestPipeline::plottableOffsetsRefreshedAtRenderTime()
+{
+    // The graph's GPU translation offsets must track the freshest axis range at
+    // render time, not only the range at the last (coalesced) replot — otherwise
+    // a range change landing between replot and frame leaves the graph trailing
+    // render-time-updated layers (spans, grid) by up to a frame.
+    if (!showAndHasRhiLT(mPlot))
+        QSKIP("No QRhi available — translation offsets need render frames");
+
+    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    QVector<double> keys(1000), values(1000);
+    for (int i = 0; i < 1000; ++i)
+    {
+        keys[i] = i;
+        values[i] = std::sin(i * 0.01);
+    }
+    graph->setData(std::move(keys), std::move(values));
+
+    mPlot->xAxis->setRange(0, 1000);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!graph->pipeline().isBusy(), 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    QCPLayer* mainLayer = mPlot->layer("main");
+    QVERIFY(mainLayer);
+
+    // Pan A with a replot: translation path engages (replot-time offset set).
+    mPlot->xAxis->setRange(100, 1100);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    if (!mainLayer->canSkipRepaintForTranslation())
+        QSKIP("layer repainted instead of translating — nothing to verify");
+
+    auto* prl = mPlot->plottableRhiLayer(mainLayer);
+    QVERIFY(prl);
+    const QPointF offsetA = mainLayer->pixelOffset();
+    QVERIFY(!offsetA.isNull());
+    QCOMPARE(prl->lastUniformOffset(), offsetA);
+
+    // Pan B WITHOUT a replot: the next frame must refresh the offset from the
+    // new range anyway.
+    mPlot->xAxis->setRange(200, 1200);
+    const QPointF expectedB = mainLayer->pixelOffset();
+    QVERIFY(!expectedB.isNull());
+    QVERIFY(expectedB != offsetA);
+    mPlot->update();
+    QTRY_VERIFY_WITH_TIMEOUT(prl->lastUniformOffset() == expectedB, 2000);
 }

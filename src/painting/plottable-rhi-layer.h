@@ -34,6 +34,7 @@ public:
 
     // Offset-only update (no geometry change, no vertex re-upload)
     void setAllOffsets(float offsetX, float offsetY);
+    QPointF lastUniformOffset() const { return QPointF(mLastOffsetX, mLastOffsetY); }
 
     // GPU resource management
     void invalidatePipeline(); // call on resize (render pass descriptor change)
@@ -75,4 +76,6 @@ private:
     int mUniformBufferSize = 0;
     int mLastSampleCount = 0;
     bool mDirty = false;
+    float mLastOffsetX = 0;
+    float mLastOffsetY = 0;
 };

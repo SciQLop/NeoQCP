@@ -122,6 +122,7 @@ private slots:
     void visibleElementStillBlocksTranslation();
     void colormapQuadOffsetTranslatesRect();
     void colormapQuadFollowsPanWhileTranslating();
+    void plottableOffsetsRefreshedAtRenderTime();
 
     // GPU translation offset
     void viewportOffsetLinearHorizontal();

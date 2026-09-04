@@ -2712,8 +2712,56 @@ void QCustomPlot::ensureCompositePipeline()
     mCompositePipeline->create();
 }
 
+/*! \internal
+
+  Refreshes the GPU translation offsets of layers that are skipping their repaint
+  via translation, using the freshest axis ranges. replot() sets these offsets too,
+  but replots are coalesced (rpQueuedReplot): a range change landing between the
+  last replot and this frame would otherwise leave plottable/scatter/colormap
+  geometry trailing render-time-updated layers (spans, grid) by up to a frame.
+
+  The canSkipRepaintForTranslation() guard makes this a no-op whenever the offset
+  is invalid (zoom, pan beyond one viewport, invalidated buffer) — those frames are
+  owned by the replot's full-repaint path and behave exactly as before.
+*/
+void QCustomPlot::refreshLayerTranslationOffsets()
+{
+    for (auto it = mPlottableRhiLayers.begin(); it != mPlottableRhiLayers.end(); ++it)
+    {
+        if (it.key()->canSkipRepaintForTranslation())
+        {
+            const QPointF offset = it.key()->pixelOffset();
+            it.value()->setAllOffsets(static_cast<float>(offset.x()),
+                                      static_cast<float>(offset.y()));
+        }
+    }
+    for (auto it = mScatterRhiLayers.begin(); it != mScatterRhiLayers.end(); ++it)
+    {
+        if (it.key()->canSkipRepaintForTranslation())
+        {
+            const QPointF offset = it.key()->pixelOffset();
+            it.value()->setAllOffsets(static_cast<float>(offset.x()),
+                                      static_cast<float>(offset.y()));
+        }
+    }
+    for (auto* crl : mColormapRhiLayers)
+    {
+        QCPLayer* layer = crl->layer();
+        if (layer && layer->canSkipRepaintForTranslation())
+        {
+            const QPointF offset = layer->pixelOffset();
+            crl->setPixelOffset(static_cast<float>(offset.x()),
+                                static_cast<float>(offset.y()));
+        }
+    }
+}
+
 void QCustomPlot::uploadLayerTextures(QRhiResourceUpdateBatch* updates, const QSize& outputSize)
 {
+    // Freshen translation offsets first — the PRL/SRL/colormap uploadResources()
+    // calls below upload per-draw uniforms every frame.
+    refreshLayerTranslationOffsets();
+
     for (const auto& buffer : mPaintBuffers)
     {
         auto* rhiBuffer = static_cast<QCPPaintBufferRhi*>(buffer.data());

@@ -57,6 +57,8 @@ void QCPScatterRhiLayer::clear()
 
 void QCPScatterRhiLayer::setAllOffsets(float offsetX, float offsetY)
 {
+    mLastOffsetX = offsetX;
+    mLastOffsetY = offsetY;
     for (auto& entry : mDrawEntries)
     {
         entry.offsetX = offsetX;

@@ -38,6 +38,8 @@ void QCPPlottableRhiLayer::clear()
 
 void QCPPlottableRhiLayer::setAllOffsets(float offsetX, float offsetY)
 {
+    mLastOffsetX = offsetX;
+    mLastOffsetY = offsetY;
     for (auto& entry : mDrawEntries)
     {
         entry.offsetX = offsetX;

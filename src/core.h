@@ -424,6 +424,7 @@ protected:
     void render(QRhiCommandBuffer* cb) override;
     void releaseResources() override;
     void ensureCompositePipeline();
+    void refreshLayerTranslationOffsets();
     void uploadLayerTextures(QRhiResourceUpdateBatch* updates, const QSize& outputSize);
     void executeRenderPass(QRhiCommandBuffer* cb, QRhiResourceUpdateBatch* updates,
                            const QSize& outputSize);

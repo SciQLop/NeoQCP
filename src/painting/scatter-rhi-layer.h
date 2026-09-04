@@ -35,6 +35,7 @@ public:
                     const QImage& colormapImage = {});
 
     void setAllOffsets(float offsetX, float offsetY);
+    QPointF lastUniformOffset() const { return QPointF(mLastOffsetX, mLastOffsetY); }
 
     void invalidatePipeline();
     bool ensurePipeline(QRhiRenderPassDescriptor* rpDesc, int sampleCount);
@@ -94,4 +95,6 @@ private:
     double mCachedSize = -1;
     QPen mCachedPen;
     QBrush mCachedBrush;
+    float mLastOffsetX = 0;
+    float mLastOffsetY = 0;
 };
