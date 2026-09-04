@@ -228,6 +228,9 @@ public:
     QCPSpanRhiLayer* spanRhiLayer();
     // grid GPU layer:
     QCPGridRhiLayer* gridRhiLayer();
+    // Non-lazy accessor: returns the grid RHI layer only if it already exists and
+    // never creates one. Safe to call from destructors (e.g. ~QCPAxis).
+    QCPGridRhiLayer* gridRhiLayerIfExists() const;
     // pipeline:
     [[nodiscard]] QCPPipelineScheduler* pipelineScheduler() const { return mPipelineScheduler; }
     void setMaxPipelineThreads(int count);

@@ -687,6 +687,11 @@ QCPGridRhiLayer* QCustomPlot::gridRhiLayer()
     return mGridRhiLayer;
 }
 
+QCPGridRhiLayer* QCustomPlot::gridRhiLayerIfExists() const
+{
+    return mGridRhiLayer;
+}
+
 /*!
   Sets which elements are forcibly drawn antialiased as an \a or combination of
   QCP::AntialiasedElement.
