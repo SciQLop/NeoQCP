@@ -36,6 +36,7 @@ test_srcs = [
     'test-span-rhi/test-span-rhi.cpp',
     'test-item-position/test-item-position.cpp',
     'test-layer-removal/test-layer-removal.cpp',
+    'test-hidden-replot/test-hidden-replot.cpp',
 ]
 
 test_headers = [
@@ -71,6 +72,7 @@ test_headers = [
     'test-span-rhi/test-span-rhi.h',
     'test-item-position/test-item-position.h',
     'test-layer-removal/test-layer-removal.h',
+    'test-hidden-replot/test-hidden-replot.h',
 ]
 test_moc_files = qtmod.compile_moc(headers : test_headers)
 

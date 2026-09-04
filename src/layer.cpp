@@ -269,6 +269,8 @@ void QCPLayer::drawToPaintBuffer()
 */
 void QCPLayer::replot()
 {
+    if (mParentPlot->skipReplotsWhenHidden() && !mParentPlot->isVisible())
+        return; // deferred to the first visible replot; dirty flags preserved
     if (mMode == lmBuffered && !mParentPlot->hasInvalidatedPaintBuffers())
     {
         if (QSharedPointer<QCPAbstractPaintBuffer> pb = mPaintBuffer.toStrongRef())

@@ -231,6 +231,12 @@ public:
     // Non-lazy accessor: returns the grid RHI layer only if it already exists and
     // never creates one. Safe to call from destructors (e.g. ~QCPAxis).
     QCPGridRhiLayer* gridRhiLayerIfExists() const;
+    // When enabled, replot() does nothing while the widget is hidden, avoiding
+    // wasted CPU painting into invisible paint buffers. Dirty flags are preserved,
+    // so the first visible replot repaints everything. Default: false (classic
+    // QCustomPlot behavior, required for offscreen rendering).
+    void setSkipReplotsWhenHidden(bool skip);
+    bool skipReplotsWhenHidden() const;
     // pipeline:
     [[nodiscard]] QCPPipelineScheduler* pipelineScheduler() const { return mPipelineScheduler; }
     void setMaxPipelineThreads(int count);
@@ -382,6 +388,7 @@ protected:
     QVariant mMouseSignalLayerableDetails;
     bool mReplotting;
     bool mReplotQueued;
+    bool mSkipReplotsWhenHidden = false;
     double mReplotTime, mReplotTimeAverage;
     // RHI compositing resources (mRhi cached from rhi() in initialize(); Qt docs only guarantee
     // rhi() during initialize/render/releaseResources, but the pointer is stable in practice):

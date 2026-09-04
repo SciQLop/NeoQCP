@@ -692,6 +692,16 @@ QCPGridRhiLayer* QCustomPlot::gridRhiLayerIfExists() const
     return mGridRhiLayer;
 }
 
+void QCustomPlot::setSkipReplotsWhenHidden(bool skip)
+{
+    mSkipReplotsWhenHidden = skip;
+}
+
+bool QCustomPlot::skipReplotsWhenHidden() const
+{
+    return mSkipReplotsWhenHidden;
+}
+
 /*!
   Sets which elements are forcibly drawn antialiased as an \a or combination of
   QCP::AntialiasedElement.
@@ -2135,6 +2145,14 @@ void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
 
     if (mReplotting) // incase signals loop back to replot slot
         return;
+
+    if (mSkipReplotsWhenHidden && !isVisible())
+    {
+        // Defer all painting to the first visible replot (forced by initialize()).
+        // Buffer dirty/invalidated flags are intentionally left untouched.
+        mReplotQueued = false;
+        return;
+    }
 
     mReplotting = true;
     mReplotQueued = false;

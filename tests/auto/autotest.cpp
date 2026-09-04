@@ -30,6 +30,7 @@
 #include "test-span-rhi/test-span-rhi.h"
 #include "test-item-position/test-item-position.h"
 #include "test-layer-removal/test-layer-removal.h"
+#include "test-hidden-replot/test-hidden-replot.h"
 
 #define QCPTEST(t) t t##instance; QTest::qExec(&t##instance)
 
@@ -69,6 +70,7 @@ int main(int argc, char **argv)
   QCPTEST(TestSpanRhi);
   QCPTEST(TestItemPosition);
   QCPTEST(TestLayerRemoval);
+  QCPTEST(TestHiddenReplot);
 
   return 0;
 }
