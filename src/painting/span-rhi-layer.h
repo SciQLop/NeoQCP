@@ -65,7 +65,10 @@ private:
 
     SpanSignature computeSignature(QCPAbstractItem* span) const;
 
-    void rebuildGeometry(float dpr, int outputHeight);
+    // Rebuilds staging vertices and draw groups. Returns false when a per-group
+    // UBO/SRB allocation failed and the group was dropped, so the caller can keep
+    // the geometry dirty and retry on the next frame.
+    bool rebuildGeometry(float dpr, int outputHeight);
     void appendVSpanGeometry(QCPItemVSpan* vspan, QCPAxisRect* ar);
     void appendHSpanGeometry(QCPItemHSpan* hspan, QCPAxisRect* ar);
     void appendRSpanGeometry(QCPItemRSpan* rspan, QCPAxisRect* ar);

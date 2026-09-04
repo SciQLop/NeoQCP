@@ -253,11 +253,12 @@ bool QCPSpanRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc, int sampl
     return true;
 }
 
-void QCPSpanRhiLayer::rebuildGeometry(float dpr, int outputHeight)
+bool QCPSpanRhiLayer::rebuildGeometry(float dpr, int outputHeight)
 {
     PROFILE_HERE_N("QCPSpanRhiLayer::rebuildGeometry");
 
     mStagingVertices.clear();
+    bool allocationFailed = false;
 
     // Group spans by axis rect
     QMap<QCPAxisRect*, QVector<QCPAbstractItem*>> groupedSpans;
@@ -327,6 +328,7 @@ void QCPSpanRhiLayer::rebuildGeometry(float dpr, int outputHeight)
                 qDebug() << Q_FUNC_INFO << "Failed to create per-group UBO";
                 delete group.uniformBuffer;
                 group.uniformBuffer = nullptr;
+                allocationFailed = true;
                 continue;
             }
             group.srb = mRhi->newShaderResourceBindings();
@@ -341,6 +343,7 @@ void QCPSpanRhiLayer::rebuildGeometry(float dpr, int outputHeight)
                 delete group.uniformBuffer;
                 group.srb = nullptr;
                 group.uniformBuffer = nullptr;
+                allocationFailed = true;
                 continue;
             }
         }
@@ -354,6 +357,7 @@ void QCPSpanRhiLayer::rebuildGeometry(float dpr, int outputHeight)
         delete old.srb;
     }
     mDrawGroups = reconciled;
+    return !allocationFailed;
 }
 
 void QCPSpanRhiLayer::appendVSpanGeometry(QCPItemVSpan* vspan, QCPAxisRect* ar)
@@ -526,8 +530,9 @@ void QCPSpanRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
     const bool changed = detectGeometryChanges();
     if (mGeometryDirty || changed)
     {
-        rebuildGeometry(dpr, outputSize.height());
-        mGeometryDirty = false;
+        // A failed draw-group allocation keeps the dirty flag set so the next
+        // frame retries instead of dropping the group until an unrelated change.
+        mGeometryDirty = !rebuildGeometry(dpr, outputSize.height());
 
         if (!mStagingVertices.isEmpty())
         {
