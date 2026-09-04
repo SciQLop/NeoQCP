@@ -12,6 +12,8 @@ class QCPAxisRect;
 class QCPItemVSpan;
 class QCPItemHSpan;
 class QCPItemRSpan;
+class QBrush;
+class QPen;
 
 class QCPSpanRhiLayer
 {
@@ -33,6 +35,12 @@ public:
     void unregisterSpan(QCPAbstractItem* span);
     void markGeometryDirty();
 
+    // Recomputes the cheap per-span/per-axis-rect change signature, updates the
+    // internal cache and returns true when anything affecting geometry changed since
+    // the last call. Called by uploadResources() every frame; also used by tests.
+    // Never touches mRhi.
+    bool detectGeometryChanges();
+
     bool hasSpans() const { return !mSpans.isEmpty(); }
 
     void invalidatePipeline();
@@ -43,6 +51,20 @@ public:
     void render(QRhiCommandBuffer* cb, const QSize& outputSize);
 
 private:
+    struct SpanSignature
+    {
+        float e0 = 0, e1 = 0, e2 = 0, e3 = 0; // edge pixels; meaning depends on span type
+        quint32 fillRgba = 0;
+        quint32 borderRgba = 0;
+        float borderWidth = 0;
+        int borderStyle = 0;
+        bool borderCosmetic = false;
+        bool selected = false;
+        bool operator==(const SpanSignature& other) const = default;
+    };
+
+    SpanSignature computeSignature(QCPAbstractItem* span) const;
+
     void rebuildGeometry(float dpr, int outputHeight);
     void appendVSpanGeometry(QCPItemVSpan* vspan, QCPAxisRect* ar);
     void appendHSpanGeometry(QCPItemHSpan* hspan, QCPAxisRect* ar);
@@ -63,4 +85,5 @@ private:
     int mVertexBufferSize = 0;
     int mLastSampleCount = 0;
     QMap<QCPAxisRect*, QRect> mLastAxisRectBounds;
+    QVector<SpanSignature> mSignatureCache;
 };

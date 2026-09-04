@@ -6,6 +6,7 @@
 #include "../items/item-vspan.h"
 #include "../items/item-hspan.h"
 #include "../items/item-rspan.h"
+#include "../items/item.h"
 #include "../layoutelements/layoutelement-axisrect.h"
 #include "../axis/axis.h"
 
@@ -48,6 +49,107 @@ void QCPSpanRhiLayer::unregisterSpan(QCPAbstractItem* span)
 void QCPSpanRhiLayer::markGeometryDirty()
 {
     mGeometryDirty = true;
+}
+
+bool QCPSpanRhiLayer::detectGeometryChanges()
+{
+    QVector<SpanSignature> signatures;
+    signatures.reserve(mSpans.size());
+    QMap<QCPAxisRect*, QRect> bounds;
+    for (auto* span : mSpans)
+    {
+        signatures.append(computeSignature(span));
+        if (auto* ar = span->clipAxisRect())
+            bounds.insert(ar, QRect(ar->left(), ar->top(), ar->width(), ar->height()));
+    }
+
+    const bool changed = (signatures != mSignatureCache) || (bounds != mLastAxisRectBounds);
+    mSignatureCache = signatures;
+    mLastAxisRectBounds = bounds;
+    return changed;
+}
+
+QCPSpanRhiLayer::SpanSignature QCPSpanRhiLayer::computeSignature(QCPAbstractItem* span) const
+{
+    SpanSignature sig;
+    QCPAxisRect* ar = span->clipAxisRect();
+    if (!ar)
+        return sig;
+
+    const auto fillStyle = [&sig](const QBrush& brush, const QPen& pen)
+    {
+        if (brush.style() != Qt::NoBrush)
+            sig.fillRgba = brush.color().rgba();
+        sig.borderStyle = int(pen.style());
+        sig.borderRgba = pen.color().rgba();
+        sig.borderWidth = float(pen.widthF());
+        sig.borderCosmetic = pen.isCosmetic();
+    };
+
+    if (auto* vspan = qobject_cast<QCPItemVSpan*>(span))
+    {
+        auto* keyAxis = ar->axis(QCPAxis::atBottom);
+        if (!keyAxis)
+            keyAxis = ar->axis(QCPAxis::atTop);
+        if (keyAxis)
+        {
+            sig.e0 = float(vspan->lowerEdge->typeX() == QCPItemPosition::ptPlotCoords
+                               ? keyAxis->coordToPixel(vspan->lowerEdge->coords().x())
+                               : vspan->lowerEdge->pixelPosition().x());
+            sig.e1 = float(vspan->upperEdge->typeX() == QCPItemPosition::ptPlotCoords
+                               ? keyAxis->coordToPixel(vspan->upperEdge->coords().x())
+                               : vspan->upperEdge->pixelPosition().x());
+        }
+        fillStyle(vspan->selected() ? vspan->selectedBrush() : vspan->brush(),
+                  vspan->selected() ? vspan->selectedBorderPen() : vspan->borderPen());
+        sig.selected = vspan->selected();
+    }
+    else if (auto* hspan = qobject_cast<QCPItemHSpan*>(span))
+    {
+        auto* valAxis = ar->axis(QCPAxis::atLeft);
+        if (!valAxis)
+            valAxis = ar->axis(QCPAxis::atRight);
+        if (valAxis)
+        {
+            sig.e0 = float(hspan->lowerEdge->typeY() == QCPItemPosition::ptPlotCoords
+                               ? valAxis->coordToPixel(hspan->lowerEdge->coords().y())
+                               : hspan->lowerEdge->pixelPosition().y());
+            sig.e1 = float(hspan->upperEdge->typeY() == QCPItemPosition::ptPlotCoords
+                               ? valAxis->coordToPixel(hspan->upperEdge->coords().y())
+                               : hspan->upperEdge->pixelPosition().y());
+        }
+        fillStyle(hspan->selected() ? hspan->selectedBrush() : hspan->brush(),
+                  hspan->selected() ? hspan->selectedBorderPen() : hspan->borderPen());
+        sig.selected = hspan->selected();
+    }
+    else if (auto* rspan = qobject_cast<QCPItemRSpan*>(span))
+    {
+        auto* keyAxis = ar->axis(QCPAxis::atBottom);
+        if (!keyAxis)
+            keyAxis = ar->axis(QCPAxis::atTop);
+        auto* valAxis = ar->axis(QCPAxis::atLeft);
+        if (!valAxis)
+            valAxis = ar->axis(QCPAxis::atRight);
+        if (keyAxis && valAxis)
+        {
+            sig.e0 = float(rspan->leftEdge->typeX() == QCPItemPosition::ptPlotCoords
+                               ? keyAxis->coordToPixel(rspan->leftEdge->coords().x())
+                               : rspan->leftEdge->pixelPosition().x());
+            sig.e1 = float(rspan->rightEdge->typeX() == QCPItemPosition::ptPlotCoords
+                               ? keyAxis->coordToPixel(rspan->rightEdge->coords().x())
+                               : rspan->rightEdge->pixelPosition().x());
+            sig.e2 = float(rspan->topEdge->typeY() == QCPItemPosition::ptPlotCoords
+                               ? valAxis->coordToPixel(rspan->topEdge->coords().y())
+                               : rspan->topEdge->pixelPosition().y());
+            sig.e3 = float(rspan->bottomEdge->typeY() == QCPItemPosition::ptPlotCoords
+                               ? valAxis->coordToPixel(rspan->bottomEdge->coords().y())
+                               : rspan->bottomEdge->pixelPosition().y());
+        }
+        fillStyle(rspan->selected() ? rspan->selectedBrush() : rspan->brush(),
+                  rspan->selected() ? rspan->selectedBorderPen() : rspan->borderPen());
+        sig.selected = rspan->selected();
+    }
+    return sig;
 }
 
 void QCPSpanRhiLayer::cleanupDrawGroups()
@@ -152,7 +254,6 @@ void QCPSpanRhiLayer::rebuildGeometry(float dpr, int outputHeight)
     PROFILE_HERE_N("QCPSpanRhiLayer::rebuildGeometry");
 
     mStagingVertices.clear();
-    cleanupDrawGroups();
 
     // Group spans by axis rect
     QMap<QCPAxisRect*, QVector<QCPAbstractItem*>> groupedSpans;
@@ -164,6 +265,7 @@ void QCPSpanRhiLayer::rebuildGeometry(float dpr, int outputHeight)
         groupedSpans[ar].append(span);
     }
 
+    QVector<DrawGroup> newGroups;
     for (auto it = groupedSpans.constBegin(); it != groupedSpans.constEnd(); ++it)
     {
         QCPAxisRect* ar = it.key();
@@ -185,49 +287,69 @@ void QCPSpanRhiLayer::rebuildGeometry(float dpr, int outputHeight)
         if (groupVertexCount == 0)
             continue;
 
-        // Compute scissor rect in physical pixels
-        QRect scissor = qcp::rhi::computeScissor(
-            QRect(ar->left(), ar->top(), ar->width(), ar->height()),
-            dpr, outputHeight);
-
-        // Create per-group uniform buffer and SRB
-        auto* ubo = mRhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, kUniformBufferSize);
-        if (!ubo->create())
-        {
-            qDebug() << Q_FUNC_INFO << "Failed to create per-group UBO";
-            delete ubo;
-            continue;
-        }
-
-        auto* srb = mRhi->newShaderResourceBindings();
-        srb->setBindings({
-            QRhiShaderResourceBinding::uniformBuffer(
-                0, QRhiShaderResourceBinding::VertexStage, ubo)
-        });
-        if (!srb->create())
-        {
-            qDebug() << Q_FUNC_INFO << "Failed to create per-group SRB";
-            delete srb;
-            delete ubo;
-            continue;
-        }
-
         DrawGroup group;
         group.axisRect = ar;
         group.vertexOffset = groupVertexStart;
         group.vertexCount = groupVertexCount;
-        group.scissorRect = scissor;
-        group.uniformBuffer = ubo;
-        group.srb = srb;
-        mDrawGroups.append(group);
+        group.scissorRect = qcp::rhi::computeScissor(
+            QRect(ar->left(), ar->top(), ar->width(), ar->height()), dpr, outputHeight);
+        newGroups.append(group);
     }
 
-    // Cache axis rect bounds for layout-change detection (currently unused since
-    // we always rebuild, but kept for potential future optimization).
-    mLastAxisRectBounds.clear();
-    for (const auto& group : mDrawGroups)
-        mLastAxisRectBounds[group.axisRect] = QRect(group.axisRect->left(), group.axisRect->top(),
-                                                     group.axisRect->width(), group.axisRect->height());
+    // Reconcile with existing groups: UBO + SRB are keyed by axis rect and survive
+    // rebuilds. Only new groups allocate; only vanished groups release.
+    QVector<DrawGroup> reconciled;
+    reconciled.reserve(newGroups.size());
+    for (auto& group : newGroups)
+    {
+        for (auto& old : mDrawGroups)
+        {
+            if (old.axisRect == group.axisRect)
+            {
+                group.uniformBuffer = old.uniformBuffer;
+                group.srb = old.srb;
+                old.uniformBuffer = nullptr;
+                old.srb = nullptr;
+                break;
+            }
+        }
+        if (!group.uniformBuffer)
+        {
+            group.uniformBuffer = mRhi->newBuffer(QRhiBuffer::Dynamic,
+                                                  QRhiBuffer::UniformBuffer,
+                                                  kUniformBufferSize);
+            if (!group.uniformBuffer->create())
+            {
+                qDebug() << Q_FUNC_INFO << "Failed to create per-group UBO";
+                delete group.uniformBuffer;
+                group.uniformBuffer = nullptr;
+                continue;
+            }
+            group.srb = mRhi->newShaderResourceBindings();
+            group.srb->setBindings({
+                QRhiShaderResourceBinding::uniformBuffer(
+                    0, QRhiShaderResourceBinding::VertexStage, group.uniformBuffer)
+            });
+            if (!group.srb->create())
+            {
+                qDebug() << Q_FUNC_INFO << "Failed to create per-group SRB";
+                delete group.srb;
+                delete group.uniformBuffer;
+                group.srb = nullptr;
+                group.uniformBuffer = nullptr;
+                continue;
+            }
+        }
+        reconciled.append(group);
+    }
+
+    // Free resources of vanished groups (nullptrs already stolen above are safe).
+    for (auto& old : mDrawGroups)
+    {
+        delete old.uniformBuffer;
+        delete old.srb;
+    }
+    mDrawGroups = reconciled;
 }
 
 void QCPSpanRhiLayer::appendVSpanGeometry(QCPItemVSpan* vspan, QCPAxisRect* ar)
@@ -392,13 +514,13 @@ void QCPSpanRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
 {
     PROFILE_HERE_N("QCPSpanRhiLayer::uploadResources");
 
-    // Always rebuild geometry: spans use pre-computed pixel coordinates (CPU-side
-    // double→float conversion to avoid float32 precision loss with large values
-    // like Unix timestamps), so geometry must track axis range and layout changes.
-    // Span vertex count is tiny (6-12 per span), so unconditional rebuild is cheap.
-    mGeometryDirty = true;
-
-    if (mGeometryDirty)
+    // Spans bake pixel coordinates into vertices on the CPU (double-to-float
+    // conversion to avoid float32 precision loss with large values like Unix
+    // timestamps), so geometry must track axis range and layout changes.
+    // detectGeometryChanges() does a cheap per-frame comparison so the rebuild only
+    // runs when a span or its layout actually changed.
+    const bool changed = detectGeometryChanges();
+    if (mGeometryDirty || changed)
     {
         rebuildGeometry(dpr, outputSize.height());
         mGeometryDirty = false;
