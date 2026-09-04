@@ -171,6 +171,10 @@ void QCPSpanRhiLayer::invalidatePipeline()
     delete mLayoutUbo;
     mLayoutUbo = nullptr;
     cleanupDrawGroups();
+    // Draw groups were just released; force a rebuild on the next uploadResources()
+    // even when no signature/bounds change is detectable (e.g. render-target
+    // recreation or sample-count change at unchanged size).
+    mGeometryDirty = true;
 }
 
 bool QCPSpanRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc, int sampleCount)
