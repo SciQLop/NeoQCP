@@ -396,6 +396,21 @@ inline int getMarginValue(const QMargins& margins, QCP::MarginSide side)
     return 0;
 }
 
+/*! \internal
+
+  Converts the (horizontal, vertical) flip pair of the deprecated QImage::mirrored
+  into the Qt::Orientations that QImage::flipped takes.
+*/
+inline Qt::Orientations flipOrientations(bool horizontal, bool vertical)
+{
+    Qt::Orientations orientations;
+    if (horizontal)
+        orientations |= Qt::Horizontal;
+    if (vertical)
+        orientations |= Qt::Vertical;
+    return orientations;
+}
+
 
 Q_ENUM_NS(ExportPen)
 Q_ENUM_NS(ResolutionUnit)

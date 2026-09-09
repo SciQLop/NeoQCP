@@ -642,7 +642,7 @@ void QCPColorScaleAxisRectPrivate::draw(QCPPainter* painter)
     }
 
     painter->drawImage(rect().adjusted(0, -1, 0, -1),
-                       mGradientImage.mirrored(mirrorHorz, mirrorVert));
+                       mGradientImage.flipped(QCP::flipOrientations(mirrorHorz, mirrorVert)));
     QCPAxisRect::draw(painter);
 }
 

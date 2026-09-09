@@ -215,7 +215,8 @@ void QCPItemPixmap::updateScaledPixmap(QRect finalRect, bool flipHorz, bool flip
                                            mTransformationMode);
             if (flipHorz || flipVert)
                 mScaledPixmap
-                    = QPixmap::fromImage(mScaledPixmap.toImage().mirrored(flipHorz, flipVert));
+                    = QPixmap::fromImage(mScaledPixmap.toImage().flipped(
+                        QCP::flipOrientations(flipHorz, flipVert)));
             mScaledPixmap.setDevicePixelRatio(devicePixelRatio);
         }
     }

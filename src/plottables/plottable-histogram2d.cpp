@@ -303,7 +303,9 @@ void QCPHistogram2D::draw(QCPPainter* painter)
     {
         if (mNormalization == nColumn)
         {
-            const int keySz = binnedData->keySize();
+            // qMax: GCC cannot see that keySize() is non-negative and reports a
+            // bogus -Wstringop-overflow on QVector's fill otherwise.
+            const int keySz = qMax(0, binnedData->keySize());
             const int valSz = binnedData->valueSize();
             QVector<double> colSums(keySz, 0.0);
             for (int ki = 0; ki < keySz; ++ki)

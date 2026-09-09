@@ -26,6 +26,17 @@
 #include "axistickerdatetime.h"
 #include "axisticker-utils.h"
 
+namespace
+{
+// The Qt::TimeSpec-taking QDateTime/QDate overloads are deprecated in favour of
+// QTimeZone. Same mapping they used: OffsetFromUTC without an offset is UTC.
+QTimeZone zoneForSpec(Qt::TimeSpec spec)
+{
+    return (spec == Qt::UTC || spec == Qt::OffsetFromUTC) ? QTimeZone(QTimeZone::UTC)
+                                                         : QTimeZone(QTimeZone::LocalTime);
+}
+} // namespace
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPAxisTickerDateTime
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -301,7 +312,8 @@ QString QCPAxisTickerDateTime::getTickLabel(double tick, const QLocale& locale,
     if (mDateTimeSpec == Qt::TimeZone)
         return locale.toString(keyToDateTime(tick).toTimeZone(mTimeZone), mDateTimeFormat);
     else
-        return locale.toString(keyToDateTime(tick).toTimeSpec(mDateTimeSpec), mDateTimeFormat);
+        return locale.toString(keyToDateTime(tick).toTimeZone(zoneForSpec(mDateTimeSpec)),
+                               mDateTimeFormat);
 }
 
 /*! \internal
@@ -404,5 +416,5 @@ double QCPAxisTickerDateTime::dateTimeToKey(const QDateTime& dateTime)
 */
 double QCPAxisTickerDateTime::dateTimeToKey(const QDate& date, Qt::TimeSpec timeSpec)
 {
-    return date.startOfDay(timeSpec).toMSecsSinceEpoch() / 1000.0;
+    return date.startOfDay(zoneForSpec(timeSpec)).toMSecsSinceEpoch() / 1000.0;
 }

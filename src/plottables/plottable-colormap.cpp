@@ -959,7 +959,7 @@ void QCPColorMap::updateLegendIcon(Qt::TransformationMode transformMode, const Q
                            ->rangeReversed();
         bool mirrorY = (valueAxis()->orientation() == Qt::Vertical ? valueAxis() : keyAxis())
                            ->rangeReversed();
-        mLegendIcon = QPixmap::fromImage(mMapImage.mirrored(mirrorX, mirrorY))
+        mLegendIcon = QPixmap::fromImage(mMapImage.flipped(QCP::flipOrientations(mirrorX, mirrorY)))
                           .scaled(thumbSize, Qt::KeepAspectRatio, transformMode);
     }
 }
@@ -1251,7 +1251,7 @@ void QCPColorMap::draw(QCPPainter* painter)
                   .normalized();
         localPainter->setClipRect(tightClipRect, Qt::IntersectClip);
     }
-    localPainter->drawImage(imageRect, mMapImage.mirrored(mirrorX, mirrorY));
+    localPainter->drawImage(imageRect, mMapImage.flipped(QCP::flipOrientations(mirrorX, mirrorY)));
     if (mTightBoundary)
         localPainter->setClipRegion(clipBackup);
     localPainter->setRenderHint(QPainter::SmoothPixmapTransform, smoothBackup);
