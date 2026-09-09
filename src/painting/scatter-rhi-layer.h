@@ -20,6 +20,7 @@ public:
         int instanceCount = 0;
         float offsetX = 0;
         float offsetY = 0;
+        float alpha = 1;
         QRect scissorRect;
     };
 
@@ -32,7 +33,8 @@ public:
                     const QCPScatterStyle& style,
                     const QRect& clipRect, double dpr, int outputHeight,
                     float offsetX = 0, float offsetY = 0,
-                    const QImage& colormapImage = {});
+                    const QImage& colormapImage = {},
+                    float alpha = 1);
 
     void setAllOffsets(float offsetX, float offsetY);
     QPointF lastUniformOffset() const { return QPointF(mLastOffsetX, mLastOffsetY); }
@@ -45,6 +47,7 @@ public:
 
     bool isDirty() const { return mDirty; }
     bool hasGeometry() const { return !mDrawEntries.isEmpty(); }
+    const QVector<DrawEntry>& drawEntries() const { return mDrawEntries; }
 
 private:
     struct alignas(16) PerDrawUniforms
@@ -53,8 +56,10 @@ private:
         float offsetX, offsetY;
         float halfSize;
         float useColorAxis;
+        float alpha;
+        float _pad[3]; // pad to 48 bytes for std140
     };
-    static_assert(sizeof(PerDrawUniforms) == 32);
+    static_assert(sizeof(PerDrawUniforms) == 48);
 
     int ubufStride() const;
 

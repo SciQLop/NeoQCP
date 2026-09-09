@@ -88,7 +88,8 @@ void QCPScatterRhiLayer::addScatter(std::span<const float> points,
                                      const QRect& clipRect, double dpr,
                                      int outputHeight,
                                      float offsetX, float offsetY,
-                                     const QImage& colormapImage)
+                                     const QImage& colormapImage,
+                                     float alpha)
 {
     PROFILE_HERE_N("QCPScatterRhiLayer::addScatter");
 
@@ -126,6 +127,7 @@ void QCPScatterRhiLayer::addScatter(std::span<const float> points,
     entry.scissorRect = qcp::rhi::computeScissor(clipRect, dpr, outputHeight);
     entry.offsetX = offsetX;
     entry.offsetY = offsetY;
+    entry.alpha = alpha;
     entry.instanceOffset = mStagingSize / 3;
     entry.instanceCount = static_cast<int>(points.size()) / 3;
 
@@ -345,7 +347,8 @@ void QCPScatterRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
             entry.offsetX,
             entry.offsetY,
             mHalfSize,
-            mUseColorAxis ? 1.0f : 0.0f
+            mUseColorAxis ? 1.0f : 0.0f,
+            entry.alpha, {0, 0, 0}
         };
         updates->updateDynamicBuffer(mUniformBuffer, i * stride, sizeof(params), &params);
     }

@@ -1,7 +1,20 @@
 #include "test-busy-indicator.h"
 #include <qcustomplot.h>
+#include <painting/plottable-rhi-layer.h>
+#include <QTest>
 
 #include <cmath>
+
+namespace {
+bool showAndHasRhiBusy(QCustomPlot* plot)
+{
+    plot->show();
+    if (!QTest::qWaitForWindowExposed(plot))
+        return false;
+    QCoreApplication::processEvents();
+    return plot->rhi() != nullptr;
+}
+} // namespace
 
 void TestBusyIndicator::init()
 {
@@ -288,4 +301,46 @@ void TestBusyIndicator::visualBusyToggleForcesLayerRepaint()
     graph->setBusy(false);
     QTRY_VERIFY_WITH_TIMEOUT(!graph->visuallyBusy(), 2000);
     QVERIFY(invalidatedAtToggle);
+}
+
+void TestBusyIndicator::gpuEntriesCarryFadeAlpha()
+{
+    if (!showAndHasRhiBusy(mPlot))
+        QSKIP("No QRhi available — GPU draw entries need a real backend");
+
+    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    QVector<double> keys(1000), values(1000);
+    for (int i = 0; i < 1000; ++i)
+    {
+        keys[i] = i;
+        values[i] = std::sin(i * 0.01);
+    }
+    graph->setData(std::move(keys), std::move(values));
+    graph->setBusyShowDelayMs(0);
+    graph->setBusyHideDelayMs(0);
+    mPlot->xAxis->setRange(0, 1000);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!graph->pipeline().isBusy(), 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    auto* prl = mPlot->plottableRhiLayer(mPlot->layer("main"));
+    QVERIFY(prl);
+    QVERIFY(!prl->drawEntries().isEmpty());
+    for (const auto& e : prl->drawEntries())
+        QCOMPARE(e.alpha, 1.0f);
+
+    graph->setBusy(true);
+    QTRY_VERIFY_WITH_TIMEOUT(graph->visuallyBusy(), 2000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(!prl->drawEntries().isEmpty());
+    const float fade = static_cast<float>(graph->effectiveBusyFadeAlpha());
+    for (const auto& e : prl->drawEntries())
+        QVERIFY(qFuzzyCompare(e.alpha, fade));
+
+    graph->setBusy(false);
+    QTRY_VERIFY_WITH_TIMEOUT(!graph->visuallyBusy(), 2000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    for (const auto& e : prl->drawEntries())
+        QCOMPARE(e.alpha, 1.0f);
 }

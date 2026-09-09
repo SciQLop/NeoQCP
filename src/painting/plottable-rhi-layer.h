@@ -18,6 +18,7 @@ public:
         int strokeVertexCount = 0;
         float offsetX = 0;  // per-draw pixel offset (applied in vertex shader)
         float offsetY = 0;
+        float alpha = 1;    // busy fade, multiplies the premultiplied vertex colour
         QRect scissorRect; // in physical pixels, Y-flipped for Y-up backends
     };
 
@@ -30,7 +31,8 @@ public:
                       std::span<const float> strokeVerts,
                       const QRect& clipRect, double dpr,
                       int outputHeight,
-                      float offsetX = 0, float offsetY = 0);
+                      float offsetX = 0, float offsetY = 0,
+                      float alpha = 1);
 
     // Offset-only update (no geometry change, no vertex re-upload)
     void setAllOffsets(float offsetX, float offsetY);
@@ -45,6 +47,7 @@ public:
 
     bool isDirty() const { return mDirty; }
     bool hasGeometry() const { return !mDrawEntries.isEmpty(); }
+    const QVector<DrawEntry>& drawEntries() const { return mDrawEntries; }
 
 private:
     // Per-draw uniform data, aligned to GPU requirements.
@@ -52,8 +55,8 @@ private:
     struct alignas(16) PerDrawUniforms
     {
         float width, height, yFlip, dpr;
-        float offsetX, offsetY;
-        float _pad[2]; // pad to 32 bytes for std140
+        float offsetX, offsetY, alpha;
+        float _pad; // pad to 32 bytes for std140
     };
     static_assert(sizeof(PerDrawUniforms) == 32);
 

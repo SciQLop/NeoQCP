@@ -607,7 +607,8 @@ void QCPGraph2::draw(QCPPainter* painter)
                         mParentPlot->rhiOutputSize().height(),
                         static_cast<float>(gpuOffset.x()),
                         static_cast<float>(gpuOffset.y()),
-                        hasColor ? mScatterColorMapImage : QImage{});
+                        hasColor ? mScatterColorMapImage : QImage{},
+                        static_cast<float>(painter->opacity()));
                 }
                 usedGpu = true;
             }

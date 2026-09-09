@@ -17,6 +17,7 @@ layout(std140, binding = 0) uniform Params {
     float offsetY;
     float halfSize;
     float useColorAxis;
+    float alpha;
 };
 
 void main()
@@ -31,4 +32,6 @@ void main()
         // Full RGBA from sprite (color baked in)
         fragColor = sprite;
     }
+
+    fragColor *= alpha;
 }

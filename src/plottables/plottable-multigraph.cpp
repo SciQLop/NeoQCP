@@ -734,7 +734,8 @@ void QCPMultiGraph::draw(QCPPainter* painter)
                             mParentPlot->devicePixelRatioF(),
                             mParentPlot->rhiOutputSize().height(),
                             static_cast<float>(gpuOffset.x()),
-                            static_cast<float>(gpuOffset.y()));
+                            static_cast<float>(gpuOffset.y()),
+                            QImage{}, static_cast<float>(painter->opacity()));
                     }
                     usedGpu = true;
                 }

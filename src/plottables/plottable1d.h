@@ -582,7 +582,8 @@ void QCPAbstractPlottable1D<DataType>::drawPolyline(QCPPainter* painter,
                 const double dpr = mParentPlot->bufferDevicePixelRatio();
                 const QSize outputSize = mParentPlot->rhiOutputSize();
                 prl->addPlottable({}, strokeVerts, clipRect(), dpr,
-                                   outputSize.height());
+                                   outputSize.height(), 0.0f, 0.0f,
+                                   static_cast<float>(painter->opacity()));
             }
             return;
         }

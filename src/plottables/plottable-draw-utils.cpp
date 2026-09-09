@@ -57,7 +57,8 @@ void drawPolylineWithGpuFallback(QCPPainter* painter,
                 prl->addPlottable({}, strokeVerts, clipRect, dpr,
                                    outputSize.height(),
                                    static_cast<float>(gpuOffset.x()),
-                                   static_cast<float>(gpuOffset.y()));
+                                   static_cast<float>(gpuOffset.y()),
+                                   static_cast<float>(painter->opacity()));
                 return;
             }
         }
@@ -110,7 +111,8 @@ void drawPolylineCached(QCPPainter* painter,
             prl->addPlottable({}, cache.vertices, clipRect, dpr,
                                outputSize.height(),
                                static_cast<float>(gpuOffset.x()),
-                               static_cast<float>(gpuOffset.y()));
+                               static_cast<float>(gpuOffset.y()),
+                               static_cast<float>(painter->opacity()));
             return;
         }
     }

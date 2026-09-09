@@ -18,6 +18,7 @@ layout(std140, binding = 0) uniform Params {
     float offsetY;
     float halfSize;   // marker half-size in logical pixels
     float useColorAxis; // 0.0 = no, 1.0 = yes
+    float alpha;      // busy fade
 };
 
 void main()

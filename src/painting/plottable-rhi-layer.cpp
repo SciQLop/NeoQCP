@@ -70,13 +70,15 @@ QCPPlottableRhiLayer::addPlottable(std::span<const float> fillVerts,
                                     std::span<const float> strokeVerts,
                                     const QRect& clipRect, double dpr,
                                     int outputHeight,
-                                    float offsetX, float offsetY)
+                                    float offsetX, float offsetY,
+                                    float alpha)
 {
     PROFILE_HERE_N("QCPPlottableRhiLayer::addPlottable");
     DrawEntry entry;
     entry.scissorRect = qcp::rhi::computeScissor(clipRect, dpr, outputHeight);
     entry.offsetX = offsetX;
     entry.offsetY = offsetY;
+    entry.alpha = alpha;
 
     if (!fillVerts.empty())
     {
@@ -215,7 +217,8 @@ void QCPPlottableRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
             dpr,
             entry.offsetX,
             entry.offsetY,
-            {0, 0}
+            entry.alpha,
+            0.0f
         };
         updates->updateDynamicBuffer(mUniformBuffer, i * stride, sizeof(params), &params);
     }

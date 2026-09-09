@@ -25,6 +25,7 @@ private slots:
     void groupLegendShowsBusyPrefix();
     void fullLifecycleExternalBusy();
     void visualBusyToggleForcesLayerRepaint();
+    void gpuEntriesCarryFadeAlpha();
 
 private:
     QCustomPlot* mPlot = nullptr;

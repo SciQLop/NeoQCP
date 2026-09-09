@@ -1016,7 +1016,8 @@ void QCPGraph::drawFill(QCPPainter* painter, QVector<QPointF>* lines) const
                     if (!fillVerts.isEmpty())
                     {
                         prl->addPlottable(fillVerts, {}, clipRect(), dpr,
-                                           outHeight);
+                                           outHeight, 0.0f, 0.0f,
+                                           static_cast<float>(painter->opacity()));
                     }
                 }
                 return;
