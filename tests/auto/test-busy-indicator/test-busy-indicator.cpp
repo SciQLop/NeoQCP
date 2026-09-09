@@ -2,7 +2,7 @@
 #include <qcustomplot.h>
 #include <painting/plottable-rhi-layer.h>
 #include <painting/scatter-rhi-layer.h>
-#include <QTest>
+#include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
 
 #include <cmath>
 

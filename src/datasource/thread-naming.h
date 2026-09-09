@@ -11,7 +11,7 @@ namespace qcp
 // pool worker threads name themselves once, the first time they run any
 // task -- makes them show up as e.g. "binWorker" instead of generic
 // "QThread"/"Thread (pooled)" in /proc, `ps -T`, thread_cpu_top.hot_threads().
-inline void nameThisPoolThreadOnce(const char* name) noexcept
+inline void nameThisPoolThreadOnce([[maybe_unused]] const char* name) noexcept
 {
 #ifdef __linux__
     thread_local bool named = false;
