@@ -386,7 +386,9 @@ void QCPGridRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
                 || cached.subTickLengthIn != float(axis->subTickLengthIn())
                 || cached.subTicksVisible != axis->subTicks()
                 || cached.axisVisible != axis->visible()
-                || cached.ticksVisible != axis->ticks())
+                || cached.ticksVisible != axis->ticks()
+                || cached.scaleType != int(axis->scaleType())
+                || cached.rangeReversed != axis->rangeReversed())
             {
                 mGeometryDirty = true;
                 break;
@@ -493,6 +495,8 @@ void QCPGridRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
             cached.subTicksVisible = axis->subTicks();
             cached.axisVisible = axis->visible();
             cached.ticksVisible = axis->ticks();
+            cached.scaleType = int(axis->scaleType());
+            cached.rangeReversed = axis->rangeReversed();
             cached.lastRange = axis->range();
             mCachedTicks[axis] = cached;
         }
