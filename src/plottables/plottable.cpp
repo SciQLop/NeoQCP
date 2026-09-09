@@ -1091,6 +1091,10 @@ void QCPAbstractPlottable::onDebounceTimeout()
         return;
 
     mVisuallyBusy = mEffectiveBusy;
+    // The GPU entries carry the fade alpha; a translating layer would keep the
+    // stale ones, so force one real repaint of this layer.
+    if (mLayer)
+        mLayer->invalidatePaintBuffer();
     emit visuallyBusyChanged(mVisuallyBusy);
 
     if (mParentPlot)

@@ -24,6 +24,7 @@ private slots:
     void legendSizeHintAccountsForPrefix();
     void groupLegendShowsBusyPrefix();
     void fullLifecycleExternalBusy();
+    void visualBusyToggleForcesLayerRepaint();
 
 private:
     QCustomPlot* mPlot = nullptr;

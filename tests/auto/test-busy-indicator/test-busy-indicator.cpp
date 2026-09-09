@@ -1,6 +1,8 @@
 #include "test-busy-indicator.h"
 #include <qcustomplot.h>
 
+#include <cmath>
+
 void TestBusyIndicator::init()
 {
     mPlot = new QCustomPlot(nullptr);
@@ -237,4 +239,53 @@ void TestBusyIndicator::fullLifecycleExternalBusy()
     QTest::qWait(100);
     QCOMPARE(g->visuallyBusy(), false);
     QCOMPARE(visualSpy.count(), 2);
+}
+
+void TestBusyIndicator::visualBusyToggleForcesLayerRepaint()
+{
+    // A fade toggle must not be swallowed by the translate-instead-of-repaint
+    // path: the layer buffer is invalidated so the next replot rebuilds the
+    // GPU entries with the new alpha.
+    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    QVector<double> keys(1000), values(1000);
+    for (int i = 0; i < 1000; ++i)
+    {
+        keys[i] = i;
+        values[i] = std::sin(i * 0.01);
+    }
+    graph->setData(std::move(keys), std::move(values));
+    mPlot->xAxis->setRange(0, 1000);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!graph->pipeline().isBusy(), 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    QCPLayer* mainLayer = mPlot->layer("main");
+    QVERIFY(mainLayer);
+
+    mPlot->xAxis->setRange(50, 1050);
+    QVERIFY(mainLayer->canSkipRepaintForTranslation());
+
+    // Sampled inside the toggle signal, before the queued replot can run:
+    // the offset is still valid (it is a pan) yet the layer refuses to translate.
+    bool invalidatedAtToggle = false;
+    connect(graph, &QCPAbstractPlottable::visuallyBusyChanged, this, [&](bool) {
+        invalidatedAtToggle = !mainLayer->pixelOffset().isNull()
+            && !mainLayer->canSkipRepaintForTranslation();
+    });
+
+    graph->setBusyShowDelayMs(0);
+    graph->setBusyHideDelayMs(0);
+    graph->setBusy(true);
+    QTRY_VERIFY_WITH_TIMEOUT(graph->visuallyBusy(), 2000);
+    QVERIFY(invalidatedAtToggle);
+
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    mPlot->xAxis->setRange(100, 1100);
+    QVERIFY(mainLayer->canSkipRepaintForTranslation());
+
+    invalidatedAtToggle = false;
+    graph->setBusy(false);
+    QTRY_VERIFY_WITH_TIMEOUT(!graph->visuallyBusy(), 2000);
+    QVERIFY(invalidatedAtToggle);
 }

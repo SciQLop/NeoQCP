@@ -85,6 +85,7 @@ public:
     [[nodiscard]] QPointF pixelOffset() const;
     [[nodiscard]] bool canSkipRepaintForTranslation() const;
     [[nodiscard]] bool canTranslateInsteadOfRepaint() const;
+    void invalidatePaintBuffer();
 
     // setters:
     void setVisible(bool visible);

@@ -3538,7 +3538,7 @@ void QCustomPlot::setupPaintBuffers()
             {
                 if (layer->mPaintBuffer.toStrongRef() == buffer)
                 {
-                    if (!layer->canTranslateInsteadOfRepaint())
+                    if (!layer->canSkipRepaintForTranslation())
                     {
                         allCanTranslate = false;
                         break;

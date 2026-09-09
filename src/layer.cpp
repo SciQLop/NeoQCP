@@ -377,6 +377,16 @@ bool QCPLayer::canSkipRepaintForTranslation() const
     return canTranslateInsteadOfRepaint();
 }
 
+/*!
+  Marks this layer's paint buffer as invalidated so the next replot repaints it
+  instead of translating the old content.
+*/
+void QCPLayer::invalidatePaintBuffer()
+{
+    if (auto pb = mPaintBuffer.toStrongRef())
+        pb->setInvalidated();
+}
+
 bool QCPLayer::canTranslateInsteadOfRepaint() const
 {
     if (pixelOffset().isNull())
