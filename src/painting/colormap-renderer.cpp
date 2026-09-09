@@ -138,6 +138,7 @@ void QCPColormapRenderer::draw(QCPPainter* painter, QCPAxis* keyAxis, QCPAxis* v
     }
 
     painter->drawImage(imageRect, flippedMapImage(flips));
+    drawContourFallback(painter, keyAxis, valueAxis);
 }
 
 const QImage& QCPColormapRenderer::flippedMapImage(Qt::Orientations flips)
@@ -153,11 +154,40 @@ const QImage& QCPColormapRenderer::flippedMapImage(Qt::Orientations flips)
 void QCPColormapRenderer::setContourLines(QVector<float> uvVertices, const QColor& color)
 {
     if (mRhiLayer)
+    {
         mRhiLayer->setContourLines(std::move(uvVertices), color);
+        mContourOnGpu = true;
+    }
+}
+
+void QCPColormapRenderer::setContourFallback(QVector<QLineF> segments, const QPen& pen)
+{
+    mContourFallback = std::move(segments);
+    mContourFallbackPen = pen;
+}
+
+void QCPColormapRenderer::drawContourFallback(QCPPainter* painter, QCPAxis* keyAxis,
+                                              QCPAxis* valueAxis)
+{
+    if (mContourFallback.isEmpty() || !keyAxis || !valueAxis)
+        return;
+    painter->save();
+    if (const QCPAxisRect* axisRect = keyAxis->axisRect())
+        painter->setClipRect(axisRect->rect());
+    painter->setPen(mContourFallbackPen);
+    painter->setBrush(Qt::NoBrush);
+    for (const QLineF& s : mContourFallback)
+    {
+        painter->drawLine(QPointF(keyAxis->coordToPixel(s.x1()), valueAxis->coordToPixel(s.y1())),
+                          QPointF(keyAxis->coordToPixel(s.x2()), valueAxis->coordToPixel(s.y2())));
+    }
+    painter->restore();
 }
 
 void QCPColormapRenderer::clearContour()
 {
+    mContourFallback.clear();
+    mContourOnGpu = false;
     if (mRhiLayer)
         mRhiLayer->clearContourLines();
 }
@@ -182,6 +212,7 @@ QCPColormapRhiLayer* QCPColormapRenderer::ensureRhiLayer()
 
 void QCPColormapRenderer::releaseRhiLayer()
 {
+    mContourOnGpu = false;
     if (!mRhiLayer)
         return;
     QCustomPlot* plot = mOwner ? mOwner->parentPlot() : nullptr;

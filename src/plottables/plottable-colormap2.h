@@ -84,9 +84,10 @@ public:
     void setContourLevels(const QVector<double>& levels);
     [[nodiscard]] QVector<double> contourLevels() const { return mContourLevels; }
 
-    // NOTE: only pen.color() reaches the renderer (baked into the GPU line
-    // geometry) -- pen width is stored but never consumed; contour lines are
-    // always drawn at a fixed hairline width regardless of the pen's width.
+    // NOTE: only pen.color() reaches the GPU line renderer (baked into the
+    // line geometry, always a fixed hairline regardless of pen width). The
+    // full pen -- including width -- applies to the QPainter fallback used
+    // for exports (pmNoCaching) and non-RHI compositing.
     void setContourPen(const QPen& pen);
     [[nodiscard]] QPen contourPen() const { return mContourPen; }
 
@@ -97,6 +98,17 @@ public:
 
     void setAutoContourLevels(int count);
     [[nodiscard]] int autoContourLevelCount() const { return mAutoContourCount; }
+
+    // Exposed for tests: the UV-space vertices built by the last contour
+    // rebuild (after axis-reversal mirroring). Empty when contours are
+    // inactive or the last rebuild was degenerate.
+    [[nodiscard]] const QVector<float>& lastContourUv() const { return mLastContourUv; }
+    // Exposed for tests: the levels the last rebuild marched (explicit
+    // levels filtered to finite values, or resolved auto levels).
+    [[nodiscard]] QVector<double> lastContourLevels() const { return mLastContourLevels; }
+    // Exposed for tests: how many times the QPainter fallback segments were
+    // (re)built. Repeated exports of one frame must not re-march the grid.
+    [[nodiscard]] uint64_t fallbackBuildCount() const { return mFallbackBuildCount; }
 
 public Q_SLOTS:
     void setGradient(const QCPColorGradient& gradient);
@@ -118,7 +130,14 @@ protected:
     void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
     bool canProduceContent() const override;
-    void releaseGpuResources() override { mRenderer.releaseRhiLayer(); }
+    // Releasing the RHI layer drops the uploaded contour lines with it; force
+    // a rebuild on the next draw so the replacement layer gets them, instead
+    // of trusting a cache stamp that predates the loss.
+    void releaseGpuResources() override
+    {
+        mRenderer.releaseRhiLayer();
+        mContourCacheGen = 0;
+    }
 
 private:
     void installResampleTransform();
@@ -142,9 +161,25 @@ private:
 
     uint64_t mContourCacheGen = 0;
     uint64_t mContourDataGen = 0;
+    // Generation the QPainter fallback segments were built for (0 = none).
+    // Reset alongside the contour cache; matched against mContourDataGen so
+    // repeated exports of one frame reuse the cached segments.
+    uint64_t mFallbackGen = 0;
+    uint64_t mFallbackBuildCount = 0;
+    // Reversal state the cached UVs were built against (setRangeReversed
+    // emits no signal, so draw() polls for changes to trigger a rebuild).
+    bool mContourMirrorX = false;
+    bool mContourMirrorY = false;
+    QVector<float> mLastContourUv;
+    QVector<double> mLastContourLevels;
 
     void invalidateContourCache();
 
     void onViewportChanged();
     void updateContourGpu(const QCPColorMapData* data);
+    void updateContours(const QCPColorMapData* data, QCPPainter* painter,
+                        bool imageWasInvalidated);
+    void updateContourFallback(const QCPColorMapData* data);
+    void clearContourState();
+    [[nodiscard]] QVector<double> resolveContourLevels(const QCPRange& bounds) const;
 };

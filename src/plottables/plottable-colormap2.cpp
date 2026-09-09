@@ -10,6 +10,7 @@
 #include <datasource/resample.h>
 #include <painting/viewport-offset.h>
 #include <Profiling.hpp>
+#include <cmath>
 
 QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
     : QCPAbstractPlottable(keyAxis, valueAxis)
@@ -90,6 +91,9 @@ void QCPColorMap2::installResampleTransform()
             };
             double vpKeySz = vp.keyRange.size();
             double xFrac = vpKeySz > 0 ? xOut.size() / vpKeySz : 1.0;
+            // NOTE: the key (X) axis is always sampled linearly here, even
+            // when vp.keyLogScale is set -- a log key axis is unsupported by
+            // this layer (image and contours alike, not just contours).
             double vpValSz = vp.valueRange.size();
             double yFrac = vp.valueLogScale ? logFrac(yOut, vp.valueRange)
                                             : (vpValSz > 0 ? yOut.size() / vpValSz : 1.0);
@@ -348,20 +352,20 @@ void QCPColorMap2::draw(QCPPainter* painter)
         return;
 
     QCPRange keyRange = resampledData->keyRange();
-    QCPRange valueRange = resampledData->valueRange();
+    QCPRange valRange = resampledData->valueRange();
+
+    // Contours are (re)built BEFORE the renderer paints: the QPainter path
+    // (exports, non-RHI compositing) draws the fallback lines inline, so
+    // populating them after mRenderer.draw() would miss this frame.
+    updateContours(resampledData, painter, imageWasInvalidated);
+
     applyDefaultAntialiasingHint(painter);
-    mRenderer.draw(painter, mKeyAxis.data(), mValueAxis.data(), keyRange, valueRange);
+    mRenderer.draw(painter, mKeyAxis.data(), mValueAxis.data(), keyRange, valRange);
 
     // Baseline for stallPixelOffset: the axes this image was just drawn against.
     mRenderedKeyRange = mKeyAxis->range();
     mRenderedValueRange = mValueAxis->range();
     mHasRenderedRange = true;
-
-    bool contoursActive = !mContourLevels.isEmpty() || mAutoContourCount > 0;
-    if (contoursActive && (imageWasInvalidated || mContourCacheGen != mContourDataGen))
-        updateContourGpu(resampledData);
-    else if (!contoursActive)
-        mRenderer.clearContour();
 }
 
 void QCPColorMap2::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
@@ -462,6 +466,7 @@ void QCPColorMap2::setAutoContourLevels(int count)
 void QCPColorMap2::invalidateContourCache()
 {
     mContourCacheGen = 0;
+    mFallbackGen = 0;
     mContourDataGen = std::max(mContourDataGen, uint64_t(1));
 }
 
@@ -471,120 +476,147 @@ void QCPColorMap2::updateContourGpu(const QCPColorMapData* data)
     if (!data)
         return;
 
-    mContourCacheGen = mContourDataGen;
-
     const int kSize = data->keySize();
     const int vSize = data->valueSize();
     if (kSize < 2 || vSize < 2)
+    {
+        clearContourState();
         return;
+    }
 
     QCPRange bounds = data->dataBounds();
-    if (bounds.lower >= bounds.upper)
+    if (!(bounds.lower < bounds.upper) || !std::isfinite(bounds.lower)
+        || !std::isfinite(bounds.upper))
+    {
+        clearContourState();
         return;
-
-    QVector<double> levels;
-    if (!mContourLevels.isEmpty())
-    {
-        levels = mContourLevels;
-    }
-    else if (mAutoContourCount > 0)
-    {
-        double step = (bounds.upper - bounds.lower) / (mAutoContourCount + 1);
-        levels.reserve(mAutoContourCount);
-        for (int i = 1; i <= mAutoContourCount; ++i)
-            levels.append(bounds.lower + i * step);
     }
 
     QCPRange keyRange = data->keyRange();
     QCPRange valRange = data->valueRange();
-    double kSpan = keyRange.upper - keyRange.lower;
-    double vSpan = valRange.upper - valRange.lower;
-    if (kSpan <= 0 || vSpan <= 0)
-        return;
-
-    // Subsample large grids — contour lines don't need more than ~300 cells per axis
-    constexpr int kMaxDim = 300;
-    const double* raw = data->rawData();
-    int sk = 1, sv = 1;
-    int ck = kSize, cv = vSize;
-    if (kSize > kMaxDim) { sk = kSize / kMaxDim; ck = kSize / sk; }
-    if (vSize > kMaxDim) { sv = vSize / kMaxDim; cv = vSize / sv; }
-
-    QVector<float> uvVerts;
-    uvVerts.reserve(ck * cv / 4);
-
-    for (double level : levels)
+    const double kSpan = keyRange.upper - keyRange.lower;
+    const double vSpan = valRange.upper - valRange.lower;
+    if (!(kSpan > 0) || !(vSpan > 0) || !std::isfinite(kSpan) || !std::isfinite(vSpan))
     {
-        for (int ki = 0; ki < ck - 1; ++ki)
-        {
-            int srcK0 = ki * sk;
-            int srcK1 = (ki + 1) * sk;
-            double u0 = double(ki) / (ck - 1);
-            double u1 = double(ki + 1) / (ck - 1);
-
-            for (int vi = 0; vi < cv - 1; ++vi)
-            {
-                int srcV0 = vi * sv;
-                int srcV1 = (vi + 1) * sv;
-
-                double z00 = raw[srcV0 * kSize + srcK0];
-                double z10 = raw[srcV0 * kSize + srcK1];
-                double z11 = raw[srcV1 * kSize + srcK1];
-                double z01 = raw[srcV1 * kSize + srcK0];
-
-                if (!std::isfinite(z00) || !std::isfinite(z10) ||
-                    !std::isfinite(z11) || !std::isfinite(z01))
-                    continue;
-
-                int idx = 0;
-                if (z00 >= level) idx |= 1;
-                if (z10 >= level) idx |= 2;
-                if (z11 >= level) idx |= 4;
-                if (z01 >= level) idx |= 8;
-                if (idx == 0 || idx == 15) continue;
-
-                double v0uv = 1.0 - double(vi) / (cv - 1);
-                double v1uv = 1.0 - double(vi + 1) / (cv - 1);
-
-                auto lerpu = [](double a, double va, double b, double vb, double lv) {
-                    double t = (vb == va) ? 0.5 : (lv - va) / (vb - va);
-                    return a + t * (b - a);
-                };
-
-                // Edge midpoints in UV: bottom(z00→z10), right(z10→z11), top(z01→z11), left(z00→z01)
-                float bu = float(lerpu(u0, z00, u1, z10, level)), bv = float(v0uv);
-                float ru = float(u1), rv = float(lerpu(v0uv, z10, v1uv, z11, level));
-                float tu = float(lerpu(u0, z01, u1, z11, level)), tv = float(v1uv);
-                float lu = float(u0), lv = float(lerpu(v0uv, z00, v1uv, z01, level));
-
-                auto seg = [&](float x1, float y1, float x2, float y2) {
-                    uvVerts.append(x1); uvVerts.append(y1);
-                    uvVerts.append(x2); uvVerts.append(y2);
-                };
-
-                switch (idx) {
-                    case  1: case 14: seg(bu,bv,lu,lv); break;
-                    case  2: case 13: seg(bu,bv,ru,rv); break;
-                    case  3: case 12: seg(lu,lv,ru,rv); break;
-                    case  4: case 11: seg(ru,rv,tu,tv); break;
-                    case  6: case  9: seg(bu,bv,tu,tv); break;
-                    case  7: case  8: seg(lu,lv,tu,tv); break;
-                    case 5: {
-                        double center = (z00+z10+z11+z01)*0.25;
-                        if (center >= level) { seg(bu,bv,ru,rv); seg(lu,lv,tu,tv); }
-                        else                 { seg(bu,bv,lu,lv); seg(ru,rv,tu,tv); }
-                        break;
-                    }
-                    case 10: {
-                        double center = (z00+z10+z11+z01)*0.25;
-                        if (center >= level) { seg(bu,bv,lu,lv); seg(ru,rv,tu,tv); }
-                        else                 { seg(bu,bv,ru,rv); seg(lu,lv,tu,tv); }
-                        break;
-                    }
-                }
-            }
-        }
+        clearContourState();
+        return;
     }
 
+    QVector<double> levels = resolveContourLevels(bounds);
+    mLastContourLevels = levels;
+    QVector<float> uvVerts = QCPContourExtractor::extractUv(data, levels);
+
+    // Mirror the UVs the same way the renderer flips the image when an axis
+    // is range-reversed; otherwise the overlay reflects against the image.
+    const bool mirrorX = mKeyAxis && mKeyAxis->rangeReversed();
+    const bool mirrorY = mValueAxis && mValueAxis->rangeReversed();
+    if (mirrorX)
+        for (qsizetype i = 0; i < uvVerts.size(); i += 2)
+            uvVerts[i] = 1.0f - uvVerts[i];
+    if (mirrorY)
+        for (qsizetype i = 1; i < uvVerts.size(); i += 2)
+            uvVerts[i] = 1.0f - uvVerts[i];
+    mContourMirrorX = mirrorX;
+    mContourMirrorY = mirrorY;
+
+    mLastContourUv = uvVerts;
     mRenderer.setContourLines(std::move(uvVerts), mContourPen.color());
+    // Stamp the cache only once the layer holds the matching content, so a
+    // degenerate rebuild can never leave stale lines behind.
+    mContourCacheGen = mContourDataGen;
+}
+
+void QCPColorMap2::updateContours(const QCPColorMapData* data, QCPPainter* painter,
+                                  bool imageWasInvalidated)
+{
+    const bool contoursActive = !mContourLevels.isEmpty() || mAutoContourCount > 0;
+    if (!contoursActive)
+    {
+        clearContourState();
+        return;
+    }
+    // setRangeReversed() emits no signal, so poll here: a reversal flips the
+    // rendered image (see QCPColormapRenderer::draw) and the cached contour
+    // UVs must be mirrored to match.
+    const bool mirrorX = mKeyAxis && mKeyAxis->rangeReversed();
+    const bool mirrorY = mValueAxis && mValueAxis->rangeReversed();
+    if (imageWasInvalidated || mContourCacheGen != mContourDataGen
+        || mirrorX != mContourMirrorX || mirrorY != mContourMirrorY)
+        updateContourGpu(data);
+    // The QPainter path cannot use GPU lines: it needs data-coordinate
+    // fallback lines whenever it paints -- i.e. when nothing was uploaded
+    // (no RHI layer) or when exporting (pmNoCaching bypasses the RHI layer
+    // even if one holds lines). Generation-tracked so repeated exports of
+    // the same frame reuse the cached segments instead of re-marching the
+    // full grid on every paint pass.
+    const bool exportMode = painter && painter->modes().testFlag(QCPPainter::pmNoCaching);
+    const bool fallbackCurrent = mFallbackGen == mContourDataGen && mFallbackGen != 0;
+    if ((!mRenderer.hasContourOnGpu() || exportMode) && !fallbackCurrent)
+        updateContourFallback(data);
+}
+
+void QCPColorMap2::updateContourFallback(const QCPColorMapData* data)
+{
+    if (!data)
+        return;
+    // Degenerate input cannot yield segments; stamp the generation so
+    // exporters don't re-march it on every paint pass.
+    QCPRange bounds = data->dataBounds();
+    if (!(bounds.lower < bounds.upper) || !std::isfinite(bounds.lower)
+        || !std::isfinite(bounds.upper))
+    {
+        mFallbackGen = mContourDataGen;
+        return;
+    }
+    QVector<double> levels = resolveContourLevels(bounds);
+    QVector<QLineF> segments;
+    for (const auto& line : QCPContourExtractor::extract(data, levels))
+        segments.append(line.segments);
+    mRenderer.setContourFallback(std::move(segments), mContourPen);
+    mFallbackGen = mContourDataGen;
+    ++mFallbackBuildCount;
+}
+
+void QCPColorMap2::clearContourState()
+{
+    mRenderer.clearContour();
+    mLastContourUv.clear();
+    mLastContourLevels.clear();
+    mContourCacheGen = mContourDataGen;
+    mFallbackGen = 0;
+}
+
+QVector<double> QCPColorMap2::resolveContourLevels(const QCPRange& bounds) const
+{
+    QVector<double> levels;
+    if (!mContourLevels.isEmpty())
+    {
+        levels.reserve(mContourLevels.size());
+        for (double level : mContourLevels)
+        {
+            if (std::isfinite(level))
+                levels.append(level);
+        }
+    }
+    else if (mAutoContourCount > 0)
+    {
+        levels.reserve(mAutoContourCount);
+        if (mRenderer.dataScaleType() == QCPAxis::stLogarithmic && bounds.lower > 0
+            && bounds.upper > 0)
+        {
+            // Geometric spacing: equal ratios put one line per decade band
+            // instead of bunching every line at the top decade.
+            const double ratio =
+                std::pow(bounds.upper / bounds.lower, 1.0 / (mAutoContourCount + 1));
+            for (int i = 1; i <= mAutoContourCount; ++i)
+                levels.append(bounds.lower * std::pow(ratio, i));
+        }
+        else
+        {
+            const double step = (bounds.upper - bounds.lower) / (mAutoContourCount + 1);
+            for (int i = 1; i <= mAutoContourCount; ++i)
+                levels.append(bounds.lower + i * step);
+        }
+    }
+    return levels;
 }

@@ -344,10 +344,13 @@ void QCPColorMapData::setData(double key, double value, double z)
     if (keyCell >= 0 && keyCell < mKeySize && valueCell >= 0 && valueCell < mValueSize)
     {
         mData[valueCell * mKeySize + keyCell] = z;
-        if (z < mDataBounds.lower)
-            mDataBounds.lower = z;
-        if (z > mDataBounds.upper)
-            mDataBounds.upper = z;
+        if (std::isfinite(z))
+        {
+            if (z < mDataBounds.lower)
+                mDataBounds.lower = z;
+            if (z > mDataBounds.upper)
+                mDataBounds.upper = z;
+        }
         mDataModified = true;
     }
 }
@@ -368,10 +371,15 @@ void QCPColorMapData::setCell(int keyIndex, int valueIndex, double z)
     if (keyIndex >= 0 && keyIndex < mKeySize && valueIndex >= 0 && valueIndex < mValueSize)
     {
         mData[valueIndex * mKeySize + keyIndex] = z;
-        if (z < mDataBounds.lower)
-            mDataBounds.lower = z;
-        if (z > mDataBounds.upper)
-            mDataBounds.upper = z;
+        // Only finite values may tighten the cached bounds: an infinity here
+        // would poison auto contour levels and the color mapping downstream.
+        if (std::isfinite(z))
+        {
+            if (z < mDataBounds.lower)
+                mDataBounds.lower = z;
+            if (z > mDataBounds.upper)
+                mDataBounds.upper = z;
+        }
         mDataModified = true;
     }
     else
@@ -430,7 +438,7 @@ void QCPColorMapData::recalculateDataBounds()
         for (int i = 0; i < dataCount; ++i)
         {
             const double v = mData[i];
-            if (std::isnan(v))
+            if (!std::isfinite(v))
                 continue;
             if (v > maxHeight)
                 maxHeight = v;
@@ -480,7 +488,10 @@ void QCPColorMapData::fill(double z)
     const int dataCount = mValueSize * mKeySize;
     if (mData && dataCount > 0)
         std::fill_n(mData, dataCount, z);
-    mDataBounds = QCPRange(z, z);
+    // A non-finite fill would poison the cached bounds (auto contours, color
+    // mapping); fall back to the same degenerate range recalculateDataBounds
+    // uses when no finite value exists.
+    mDataBounds = std::isfinite(z) ? QCPRange(z, z) : QCPRange(0, 0);
     mDataModified = true;
 }
 

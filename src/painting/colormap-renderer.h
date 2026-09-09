@@ -2,6 +2,8 @@
 #include <colorgradient.h>
 #include <axis/axis.h>
 #include <QImage>
+#include <QLineF>
+#include <QPen>
 #include <QPointF>
 #include <QVector>
 #include <functional>
@@ -51,6 +53,12 @@ public:
     // Contour lines (UV-space vertices)
     void setContourLines(QVector<float> uvVertices, const QColor& color);
     void clearContour();
+    [[nodiscard]] bool hasContourOnGpu() const { return mContourOnGpu; }
+
+    // QPainter fallback for exports (pmNoCaching) and non-RHI compositing:
+    // data-coordinate segments drawn with coordToPixel, so axis reversal
+    // and log scales map correctly without any UV bookkeeping.
+    void setContourFallback(QVector<QLineF> segments, const QPen& pen);
 
     // Hides whatever this colormap's GPU quad last showed. For when a caller
     // (QCPColorMap2::draw()) decides the rendered content no longer belongs
@@ -60,6 +68,7 @@ public:
 
 private:
     const QImage& flippedMapImage(Qt::Orientations flips);
+    void drawContourFallback(QCPPainter* painter, QCPAxis* keyAxis, QCPAxis* valueAxis);
 
     QCPAbstractPlottable* mOwner;
     QCPColorGradient mGradient;
@@ -71,4 +80,7 @@ private:
     bool mMapImageInvalidated = true;
     QCPColorScale* mColorScale = nullptr;
     QCPColormapRhiLayer* mRhiLayer = nullptr;
+    bool mContourOnGpu = false;
+    QVector<QLineF> mContourFallback;
+    QPen mContourFallbackPen;
 };
