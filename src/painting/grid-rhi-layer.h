@@ -7,6 +7,8 @@
 #include <QMap>
 #include <rhi/qrhi.h>
 
+#include "../axis/range.h"
+
 class QCPAxis;
 class QCPAxisRect;
 
@@ -41,8 +43,14 @@ public:
     void registerAxis(QCPAxis* axis);
     void unregisterAxis(QCPAxis* axis);
 
+    // Test read-back accessors.
+    const QVector<DrawGroup>& drawGroups() const { return mDrawGroups; }
+    const QVector<float>& stagingVertices() const { return mStagingVertices; }
+
 private:
     void rebuildGeometry(float dpr, int outputHeight);
+    void appendTickVertices(QCPAxis* axis, QCPAxisRect* ar, QVector<float>& out) const;
+    QVector<QCPAxis*> orderedAxesForRect(QCPAxisRect* ar) const;
     void renderGroups(QRhiCommandBuffer* cb, const QSize& outputSize, bool gridLines);
     void cleanupDrawGroups();
 
@@ -82,6 +90,10 @@ private:
         float subTickLengthOut = 0;
         float subTickLengthIn = 0;
         bool subTicksVisible = false;
+        // Tick marks are baked to pixels at rebuild time; this is the range that
+        // baking used, so uploadResources() can detect a pan (same ticks, moved
+        // range) and re-bake in place without a full geometry rebuild.
+        QCPRange lastRange;
     };
     QMap<QCPAxis*, CachedAxisTicks> mCachedTicks;
 };

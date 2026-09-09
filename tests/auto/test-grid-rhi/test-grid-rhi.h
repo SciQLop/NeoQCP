@@ -20,6 +20,7 @@ private slots:
     void dirtyDetectionRebuildsOnTickChange();
     void dirtyDetectionRebuildsOnPenChange();
     void exportStillUsesQPainter();
+    void tickMarksFollowPanWithoutRebuild();
 
 private:
     QCustomPlot* mPlot = nullptr;

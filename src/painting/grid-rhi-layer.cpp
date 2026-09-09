@@ -6,6 +6,7 @@
 #include "../axis/axis.h"
 #include "../layoutelements/layoutelement-axisrect.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 
@@ -139,6 +140,74 @@ bool QCPGridRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc, int sampl
     return true;
 }
 
+void QCPGridRhiLayer::appendTickVertices(QCPAxis* axis, QCPAxisRect* ar, QVector<float>& out) const
+{
+    if (!axis->visible() || !axis->ticks())
+        return;
+
+    const bool isHorizontal = (axis->orientation() == Qt::Horizontal);
+    const auto axisType = axis->axisType();
+
+    int tickDir = (axisType == QCPAxis::atBottom || axisType == QCPAxis::atRight) ? -1 : 1;
+
+    float baseline = 0.0f;
+    switch (axisType)
+    {
+        case QCPAxis::atBottom: baseline = float(ar->bottom()); break;
+        case QCPAxis::atTop:    baseline = float(ar->top());    break;
+        case QCPAxis::atLeft:   baseline = float(ar->left());   break;
+        case QCPAxis::atRight:  baseline = float(ar->right());  break;
+    }
+
+    auto emitTickLine = [&](double tickValue, float lengthOut, float lengthIn, const QPen& pen) {
+        auto color = qcp::rhi::premultipliedColor(pen.color());
+        float penW = pen.widthF();
+        float halfW = (penW == 0.0 || pen.isCosmetic()) ? 0.5f : float(penW) / 2.0f;
+        if (pen.style() == Qt::NoPen || halfW <= 0.0f || color[3] <= 0.0f)
+            return;
+        // Convert tick position to pixel space so each axis uses its own transform
+        float tv = float(axis->coordToPixel(tickValue));
+        float pxStart = baseline - lengthOut * tickDir;
+        float pxEnd   = baseline + lengthIn  * tickDir;
+        if (isHorizontal)
+        {
+            appendBorder(out,
+                         tv, pxStart, tv, pxEnd,
+                         color, 1, 0, halfW, 1, 1);
+        }
+        else
+        {
+            appendBorder(out,
+                         pxStart, tv, pxEnd, tv,
+                         color, 0, 1, halfW, 1, 1);
+        }
+    };
+
+    float tickLenOut = float(axis->tickLengthOut());
+    float tickLenIn  = float(axis->tickLengthIn());
+    for (double tickVal : axis->tickVector())
+        emitTickLine(tickVal, tickLenOut, tickLenIn, axis->tickPen());
+
+    if (axis->subTicks())
+    {
+        float subTickLenOut = float(axis->subTickLengthOut());
+        float subTickLenIn  = float(axis->subTickLengthIn());
+        for (double subTickVal : axis->subTickVector())
+            emitTickLine(subTickVal, subTickLenOut, subTickLenIn, axis->subTickPen());
+    }
+}
+
+QVector<QCPAxis*> QCPGridRhiLayer::orderedAxesForRect(QCPAxisRect* ar) const
+{
+    QVector<QCPAxis*> axes;
+    for (auto* axis : mAxes)
+    {
+        if (axis->axisRect() == ar)
+            axes.append(axis);
+    }
+    return axes;
+}
+
 void QCPGridRhiLayer::rebuildGeometry(float dpr, int outputHeight)
 {
     PROFILE_HERE_N("QCPGridRhiLayer::rebuildGeometry");
@@ -146,17 +215,19 @@ void QCPGridRhiLayer::rebuildGeometry(float dpr, int outputHeight)
     mStagingVertices.clear();
     cleanupDrawGroups();
 
-    QMap<QCPAxisRect*, QVector<QCPAxis*>> groupedAxes;
+    QVector<QCPAxisRect*> axisRects;
     for (auto* axis : mAxes)
     {
-        if (auto* ar = axis->axisRect())
-            groupedAxes[ar].append(axis);
+        if (auto* ar = axis->axisRect(); ar && !axisRects.contains(ar))
+            axisRects.append(ar);
     }
+    std::sort(axisRects.begin(), axisRects.end());
 
-    for (auto it = groupedAxes.constBegin(); it != groupedAxes.constEnd(); ++it)
+    for (QCPAxisRect* ar : axisRects)
     {
-        QCPAxisRect* ar = it.key();
-        const auto& axes = it.value();
+        // Same predicate used by uploadResources() to re-derive this order when
+        // re-baking tick pixels in place, so the two paths cannot drift.
+        const QVector<QCPAxis*> axes = orderedAxesForRect(ar);
 
         int groupVertexStart = mStagingVertices.size() / kFloatsPerVertex;
 
@@ -244,61 +315,7 @@ void QCPGridRhiLayer::rebuildGeometry(float dpr, int outputHeight)
         int tickGroupVertexStart = mStagingVertices.size() / kFloatsPerVertex;
 
         for (auto* axis : axes)
-        {
-            if (!axis->visible() || !axis->ticks())
-                continue;
-
-            const bool isHorizontal = (axis->orientation() == Qt::Horizontal);
-            const auto axisType = axis->axisType();
-
-            int tickDir = (axisType == QCPAxis::atBottom || axisType == QCPAxis::atRight) ? -1 : 1;
-
-            float baseline = 0.0f;
-            switch (axisType)
-            {
-                case QCPAxis::atBottom: baseline = float(ar->bottom()); break;
-                case QCPAxis::atTop:    baseline = float(ar->top());    break;
-                case QCPAxis::atLeft:   baseline = float(ar->left());   break;
-                case QCPAxis::atRight:  baseline = float(ar->right());  break;
-            }
-
-            auto emitTickLine = [&](double tickValue, float lengthOut, float lengthIn, const QPen& pen) {
-                auto color = qcp::rhi::premultipliedColor(pen.color());
-                float penW = pen.widthF();
-                float halfW = (penW == 0.0 || pen.isCosmetic()) ? 0.5f : float(penW) / 2.0f;
-                if (pen.style() == Qt::NoPen || halfW <= 0.0f || color[3] <= 0.0f)
-                    return;
-                // Convert tick position to pixel space so each axis uses its own transform
-                float tv = float(axis->coordToPixel(tickValue));
-                float pxStart = baseline - lengthOut * tickDir;
-                float pxEnd   = baseline + lengthIn  * tickDir;
-                if (isHorizontal)
-                {
-                    appendBorder(mStagingVertices,
-                                 tv, pxStart, tv, pxEnd,
-                                 color, 1, 0, halfW, 1, 1);
-                }
-                else
-                {
-                    appendBorder(mStagingVertices,
-                                 pxStart, tv, pxEnd, tv,
-                                 color, 0, 1, halfW, 1, 1);
-                }
-            };
-
-            float tickLenOut = float(axis->tickLengthOut());
-            float tickLenIn  = float(axis->tickLengthIn());
-            for (double tickVal : axis->tickVector())
-                emitTickLine(tickVal, tickLenOut, tickLenIn, axis->tickPen());
-
-            if (axis->subTicks())
-            {
-                float subTickLenOut = float(axis->subTickLengthOut());
-                float subTickLenIn  = float(axis->subTickLengthIn());
-                for (double subTickVal : axis->subTickVector())
-                    emitTickLine(subTickVal, subTickLenOut, subTickLenIn, axis->subTickPen());
-            }
-        }
+            appendTickVertices(axis, ar, mStagingVertices);
 
         int tickGroupVertexCount = mStagingVertices.size() / kFloatsPerVertex - tickGroupVertexStart;
         if (tickGroupVertexCount > 0)
@@ -389,6 +406,61 @@ void QCPGridRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
         }
     }
 
+    // Tick marks are baked to pixels, so a pan that keeps the same tick set (no
+    // rebuild triggered above) would otherwise leave them at stale positions.
+    // Detect it separately and re-bake their pixels in place: rebuilding geometry
+    // here would recreate every group's UBO/SRB, which the pan fast path avoids.
+    bool tickPixelsStale = false;
+    if (!mGeometryDirty)
+    {
+        for (auto* axis : mAxes)
+        {
+            const auto& cached = mCachedTicks.value(axis);
+            if (cached.lastRange != axis->range())
+            {
+                tickPixelsStale = true;
+                break;
+            }
+        }
+    }
+
+    if (!mGeometryDirty && tickPixelsStale)
+    {
+        for (auto& group : mDrawGroups)
+        {
+            if (group.isGridLines)
+                continue;
+
+            QVector<float> scratch;
+            for (auto* axis : orderedAxesForRect(group.axisRect))
+                appendTickVertices(axis, group.axisRect, scratch);
+
+            Q_ASSERT(scratch.size() == group.vertexCount * kFloatsPerVertex);
+            if (scratch.size() != group.vertexCount * kFloatsPerVertex)
+            {
+                // Regenerated tick vertex count no longer matches the existing
+                // group: fall back to a full rebuild this frame instead of
+                // writing a mismatched slice into the vertex buffer.
+                mGeometryDirty = true;
+                break;
+            }
+
+            const int floatOffset = group.vertexOffset * kFloatsPerVertex;
+            std::memcpy(mStagingVertices.data() + floatOffset, scratch.constData(),
+                        scratch.size() * sizeof(float));
+            updates->updateDynamicBuffer(mVertexBuffer,
+                                          floatOffset * int(sizeof(float)),
+                                          scratch.size() * int(sizeof(float)),
+                                          mStagingVertices.constData() + floatOffset);
+        }
+
+        if (!mGeometryDirty)
+        {
+            for (auto* axis : mAxes)
+                mCachedTicks[axis].lastRange = axis->range();
+        }
+    }
+
     if (mGeometryDirty)
     {
         rebuildGeometry(dpr, outputSize.height());
@@ -418,6 +490,7 @@ void QCPGridRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
             cached.subTickLengthOut = float(axis->subTickLengthOut());
             cached.subTickLengthIn = float(axis->subTickLengthIn());
             cached.subTicksVisible = axis->subTicks();
+            cached.lastRange = axis->range();
             mCachedTicks[axis] = cached;
         }
 

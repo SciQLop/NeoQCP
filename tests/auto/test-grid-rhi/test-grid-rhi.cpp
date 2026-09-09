@@ -1,6 +1,18 @@
 #include "test-grid-rhi.h"
 #include "../../../src/qcp.h"
 #include "../../../src/painting/grid-rhi-layer.h"
+#include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
+
+namespace {
+bool showAndHasRhiGrid(QCustomPlot* plot)
+{
+    plot->show();
+    if (!QTest::qWaitForWindowExposed(plot))
+        return false;
+    QCoreApplication::processEvents();
+    return plot->rhi() != nullptr;
+}
+} // namespace
 
 void TestGridRhi::init()
 {
@@ -103,4 +115,71 @@ void TestGridRhi::exportStillUsesQPainter()
     QVERIFY(!pm.isNull());
     QCOMPARE(pm.width(), 200);
     QCOMPARE(pm.height(), 150);
+}
+
+void TestGridRhi::tickMarksFollowPanWithoutRebuild()
+{
+    if (!showAndHasRhiGrid(mPlot))
+        QSKIP("No QRhi available — the grid RHI layer needs a real backend");
+    // Sub-ticks are recomputed from the exact range edges, so even a pan that
+    // keeps the same major ticks shifts the sub-tick set near the boundary and
+    // would trigger the (correct, pre-existing) full-rebuild path. Disable them
+    // so this test isolates the tick-mark-pixel re-bake this fix is about.
+    mPlot->xAxis->setSubTicks(false);
+    // Ranges chosen so a small pan keeps the same major tick set.
+    mPlot->xAxis->setRange(0.5, 10.5);
+    mPlot->yAxis->setRange(0.5, 10.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCoreApplication::processEvents();
+
+    auto* grl = mPlot->gridRhiLayer();
+    QVERIFY(grl);
+    auto upload = [&]() {
+        QRhiResourceUpdateBatch* batch = mPlot->rhi()->nextResourceUpdateBatch();
+        grl->uploadResources(batch, mPlot->rhiOutputSize(), float(mPlot->bufferDevicePixelRatio()),
+                             mPlot->rhi()->isYUpInNDC());
+        batch->release();
+    };
+    upload();
+
+    int tickGroup = -1;
+    for (int i = 0; i < grl->drawGroups().size(); ++i)
+        if (!grl->drawGroups()[i].isGridLines) { tickGroup = i; break; }
+    QVERIFY(tickGroup >= 0);
+    const auto groupsBefore = grl->drawGroups().size();
+    QRhiBuffer* uboBefore = grl->drawGroups()[tickGroup].uniformBuffer;
+    const int groupFloatOffset = grl->drawGroups()[tickGroup].vertexOffset * 11;
+    const int groupVertexCount = grl->drawGroups()[tickGroup].vertexCount;
+    const double firstTick = mPlot->xAxis->tickVector().first();
+
+    // The tick group interleaves both axes' vertices; the internal axis emission
+    // order (which axis comes first within the group) is not part of the public
+    // contract, so locate the x axis's first major-tick vertex by its known pixel
+    // position rather than assuming it is at the group's first vertex.
+    int floatOffset = -1;
+    const float expectedXBefore = float(mPlot->xAxis->coordToPixel(firstTick));
+    for (int v = 0; v < groupVertexCount; ++v)
+    {
+        const int off = groupFloatOffset + v * 11;
+        if (qAbs(grl->stagingVertices()[off] - expectedXBefore) < 1.0f)
+        {
+            floatOffset = off;
+            break;
+        }
+    }
+    QVERIFY(floatOffset >= 0);
+    const float xBefore = grl->stagingVertices()[floatOffset];
+    QVERIFY(qAbs(xBefore - expectedXBefore) < 1.0f);
+
+    const auto ticksBefore = mPlot->xAxis->tickVector();
+    mPlot->xAxis->setRange(0.6, 10.6);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCOMPARE(mPlot->xAxis->tickVector(), ticksBefore); // same ticks: no rebuild expected
+    upload();
+
+    QCOMPARE(grl->drawGroups().size(), groupsBefore);
+    QCOMPARE(grl->drawGroups()[tickGroup].uniformBuffer, uboBefore); // no group churn
+    const float xAfter = grl->stagingVertices()[floatOffset];
+    QVERIFY(xAfter != xBefore);
+    QVERIFY(qAbs(xAfter - float(mPlot->xAxis->coordToPixel(firstTick))) < 1.0f);
 }
