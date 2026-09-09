@@ -40,6 +40,8 @@ public:
     [[nodiscard]] bool hasRenderedRange() const { return mHasRenderedRange; }
     QPointF stallPixelOffset() const override;
     bool canProduceContent() const override;
+    bool hasPendingData() const override { return mPendingSource != nullptr; }
+    void commitPendingData() override;
 
     // Convenience: owning
     template <IndexableNumericRange KC, IndexableNumericRange VC>
@@ -155,12 +157,22 @@ protected:
     // Debounce timer: defers expensive L2 rebuild until panning stops
     QTimer mViewportDebounce;
 
-    void onL1Ready();
+    // Replacement data staged while the displayed source keeps rendering; the
+    // plot commits it through commitPendingData() (see QCustomPlot::requestDataSwap).
+    std::shared_ptr<QCPAbstractMultiDataSource> mPendingSource;
+    std::shared_ptr<qcp::algo::MultiGraphResamplerCache> mPendingL1;
+    bool mPendingReady = false;
+    uint64_t mPendingGeneration = 0;
+
+    void applySourceNow(std::shared_ptr<QCPAbstractMultiDataSource> source);
+    void stagePendingSource(std::shared_ptr<QCPAbstractMultiDataSource> source);
+    void markPendingReady();
+    void onL1Ready(uint64_t generation);
+    void syncComponentCount(int newCount);
     void rebuildL2(const ViewportParams& vp);
     void onViewportChanged();
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
 
-    void syncComponentCount();
     void updateBaseSelection();
 
 };

@@ -14,6 +14,11 @@ private slots:
     void requestsWithinWindowCommitOnce();
     void requestAfterWindowCommitsAgain();
 
+    void multiGraphKeepsTranslationWhileDataPending();
+    void multiGraphCommitsAfterWindow();
+    void multiGraphFirstDataCommitsImmediately();
+    void multiGraphLatestPendingWins();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };

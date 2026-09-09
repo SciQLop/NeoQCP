@@ -55,7 +55,7 @@ QCPMultiGraph::QCPMultiGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
     }
 
     connect(&mPipeline, &QCPMultiGraphPipeline::finished,
-            this, [this](uint64_t) { onL1Ready(); });
+            this, [this](uint64_t gen) { onL1Ready(gen); });
     connect(&mPipeline, &QCPMultiGraphPipeline::busyChanged,
             this, [this](bool) { updateEffectiveBusy(); });
 
@@ -97,28 +97,78 @@ static void ensureL1TransformMulti(QCPMultiGraphPipeline& pipeline, int sourceSi
     }
 }
 
+static bool needsResamplingMulti(const QCPAbstractMultiDataSource& src)
+{
+    return src.columnCount() > 0
+        && static_cast<int64_t>(src.size()) * src.columnCount() >= qcp::algo::kResampleThreshold;
+}
+
 void QCPMultiGraph::setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> source)
 {
+    // Keep the displayed geometry (and its GPU translation) alive while the
+    // replacement is prepared; the plot commits it in one debounced swap.
+    const bool canDefer = source && mDataSource && mHasRenderedRange && mParentPlot;
+    if (canDefer)
+        stagePendingSource(std::move(source));
+    else
+        applySourceNow(std::move(source));
+}
+
+void QCPMultiGraph::applySourceNow(std::shared_ptr<QCPAbstractMultiDataSource> source)
+{
+    mPendingSource.reset();
+    mPendingL1.reset();
+    mPendingReady = false;
     mDataSource = std::move(source);
-    syncComponentCount();
+    syncComponentCount(mDataSource ? mDataSource->columnCount() : 0);
     mL1Cache.reset();
     mL2Result.reset();
     mCachedLines.clear();
     mL2Dirty = false;
     mLineCacheDirty = true;
-
+    mNeedsResampling = mDataSource && needsResamplingMulti(*mDataSource);
     if (mDataSource)
-    {
-        mNeedsResampling = mDataSource->columnCount() > 0
-            && static_cast<int64_t>(mDataSource->size()) * mDataSource->columnCount()
-               >= qcp::algo::kResampleThreshold;
         ensureL1TransformMulti(mPipeline, mDataSource->size(), mDataSource->columnCount());
-    }
-    else
-    {
-        mNeedsResampling = false;
-    }
     mPipeline.setSource(mDataSource);
+    if (!mPipeline.hasTransform() && mParentPlot)
+        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    updateEffectiveBusy();
+}
+
+void QCPMultiGraph::stagePendingSource(std::shared_ptr<QCPAbstractMultiDataSource> source)
+{
+    mPendingSource = std::move(source);
+    mPendingL1.reset();
+    mPendingReady = false;
+    syncComponentCount(mPendingSource->columnCount());
+    ensureL1TransformMulti(mPipeline, mPendingSource->size(), mPendingSource->columnCount());
+    mPipeline.setSource(mPendingSource);
+    mPendingGeneration = mPipeline.currentGeneration();
+    if (!mPipeline.hasTransform())
+        markPendingReady();
+    updateEffectiveBusy();
+}
+
+void QCPMultiGraph::markPendingReady()
+{
+    mPendingReady = true;
+    if (mParentPlot)
+        mParentPlot->requestDataSwap();
+}
+
+void QCPMultiGraph::commitPendingData()
+{
+    if (!mPendingSource || !mPendingReady)
+        return;
+    mDataSource = std::move(mPendingSource);
+    mL1Cache = std::move(mPendingL1);
+    mPendingReady = false;
+    mL2Result.reset();
+    mL2Dirty = mL1Cache != nullptr;
+    mNeedsResampling = needsResamplingMulti(*mDataSource);
+    mCachedLines.clear();
+    mLineCacheDirty = true;
+    updateEffectiveBusy();
 }
 
 void QCPMultiGraph::dataChanged()
@@ -126,9 +176,7 @@ void QCPMultiGraph::dataChanged()
     mLineCacheDirty = true;
     if (mDataSource)
     {
-        mNeedsResampling = mDataSource->columnCount() > 0
-            && static_cast<int64_t>(mDataSource->size()) * mDataSource->columnCount()
-               >= qcp::algo::kResampleThreshold;
+        mNeedsResampling = needsResamplingMulti(*mDataSource);
         ensureL1TransformMulti(mPipeline, mDataSource->size(), mDataSource->columnCount());
     }
 
@@ -141,8 +189,17 @@ void QCPMultiGraph::dataChanged()
         mParentPlot->replot();
 }
 
-void QCPMultiGraph::onL1Ready()
+void QCPMultiGraph::onL1Ready(uint64_t generation)
 {
+    if (mPendingSource)
+    {
+        if (generation < mPendingGeneration)
+            return; // result of a superseded pending source
+        bool l2Dirty = false;
+        qcp::extractL1Cache<qcp::algo::MultiGraphResamplerCache>(mPipeline.cache(), mPendingL1, l2Dirty);
+        markPendingReady();
+        return;
+    }
     qcp::extractL1Cache<qcp::algo::MultiGraphResamplerCache>(mPipeline.cache(), mL1Cache, mL2Dirty);
     mLineCacheDirty = true;
     if (parentPlot())
@@ -169,9 +226,8 @@ void QCPMultiGraph::onViewportChanged()
     }
 }
 
-void QCPMultiGraph::syncComponentCount()
+void QCPMultiGraph::syncComponentCount(int newCount)
 {
-    int newCount = mDataSource ? mDataSource->columnCount() : 0;
     int oldCount = mComponents.size();
     if (newCount > oldCount) {
         mComponents.resize(newCount);
@@ -559,7 +615,7 @@ void QCPMultiGraph::draw(QCPPainter* painter)
     {
         auto vp = ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data());
         mPipeline.runSynchronously(vp);
-        onL1Ready();
+        onL1Ready(mPipeline.currentGeneration());
     }
 
     // Data source priority: L2 (viewport-optimized) > raw

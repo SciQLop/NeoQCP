@@ -127,7 +127,11 @@ void TestWaterfall::invalidateNormalization()
     (*vals0)[0] = 10.0;
     (*vals0)[1] = -10.0;
 
+    // rebuildAdapter() now stages the recomputed adapter as pending data (the
+    // graph has already rendered once): wait for the plot's swap window to
+    // commit it instead of expecting an immediate replace.
     wf->invalidateNormalization();
+    QTRY_VERIFY_WITH_TIMEOUT(!wf->hasPendingData(), 5000);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
     QCOMPARE(wf->dataMainValue(0), 1.0);
