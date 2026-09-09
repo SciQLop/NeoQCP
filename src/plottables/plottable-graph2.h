@@ -66,6 +66,8 @@ public:
     [[nodiscard]] bool hasRenderedRange() const { return mHasRenderedRange; }
     QPointF stallPixelOffset() const override;
     bool canProduceContent() const override;
+    bool hasPendingData() const override { return mPendingSource != nullptr; }
+    void commitPendingData() override;
 
     // Line style
     [[nodiscard]] LineStyle lineStyle() const { return mLineStyle; }
@@ -150,7 +152,17 @@ private:
     // Debounce timer: defers expensive L2 rebuild until panning stops
     QTimer mViewportDebounce;
 
-    void onL1Ready();
+    // Replacement data staged while the displayed source keeps rendering; the
+    // plot commits it through commitPendingData() (see QCustomPlot::requestDataSwap).
+    std::shared_ptr<QCPAbstractDataSource> mPendingSource;
+    std::shared_ptr<qcp::algo::GraphResamplerCache> mPendingL1;
+    bool mPendingReady = false;
+    uint64_t mPendingGeneration = 0;
+
+    void applySourceNow(std::shared_ptr<QCPAbstractDataSource> source);
+    void stagePendingSource(std::shared_ptr<QCPAbstractDataSource> source);
+    void markPendingReady();
+    void onL1Ready(uint64_t generation);
     void rebuildL2(const ViewportParams& vp);
 
     friend class TestPipeline;

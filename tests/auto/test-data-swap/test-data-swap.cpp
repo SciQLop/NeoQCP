@@ -1,6 +1,7 @@
 #include "test-data-swap.h"
 #include "qcustomplot.h"
 #include "plottables/plottable-multigraph.h"
+#include "plottables/plottable-graph2.h"
 #include "layoutelements/layoutelement-axisrect.h"
 #include <cmath>
 #include <span>
@@ -275,4 +276,87 @@ void TestDataSwap::multiGraphPendingWiderSourceDrawsSafely()
 
     QTRY_VERIFY_WITH_TIMEOUT(!mg->hasPendingData(), 5000);
     QCOMPARE(mg->dataSource()->columnCount(), 3);
+}
+
+void TestDataSwap::graph2KeepsTranslationWhileDataPending()
+{
+    constexpr int n = 120'000;
+    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    g->setData(ramp(n), sines(n, 1)[0]);
+    mPlot->xAxis->setRange(0, n);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!g->pipeline().isBusy(), 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(g->hasRenderedRange());
+
+    mPlot->setDataSwapDebounceMs(200);
+    g->setData(ramp(n, 1000.0), sines(n, 1)[0]);
+    QVERIFY(g->hasPendingData());
+    QVERIFY(g->busy());
+
+    mPlot->xAxis->setRange(50, n + 50);
+    QVERIFY(!g->stallPixelOffset().isNull());
+    QVERIFY(mPlot->layer("main")->canSkipRepaintForTranslation());
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(g->hasPendingData());
+}
+
+void TestDataSwap::graph2CommitsAfterWindow()
+{
+    constexpr int n = 120'000;
+    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    g->setData(ramp(n), sines(n, 1)[0]);
+    mPlot->xAxis->setRange(0, n);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!g->pipeline().isBusy(), 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    mPlot->setDataSwapDebounceMs(30);
+    g->setData(ramp(n, 1000.0), sines(n, 1)[0]);
+    QVERIFY(g->hasPendingData());
+    QTRY_VERIFY_WITH_TIMEOUT(!g->hasPendingData(), 5000);
+    QCOMPARE(g->dataSource()->keyAt(0), 1000.0);
+    QTRY_VERIFY_WITH_TIMEOUT(!g->busy(), 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(g->hasRenderedRange());
+}
+
+void TestDataSwap::graph2DataChangedWhilePendingKeepsDisplayedGeometry()
+{
+    // A dataChanged() on the displayed source while an unrelated replacement
+    // is staged must re-stage the displayed source itself (superseding the
+    // stale pending one), not touch the displayed caches directly — the
+    // on-screen geometry (and GPU translation) must stay put throughout.
+    constexpr int n = 120'000;
+    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    g->setData(ramp(n), sines(n, 1)[0]);
+    mPlot->xAxis->setRange(0, n);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!g->pipeline().isBusy(), 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(g->hasRenderedRange());
+
+    auto* displayedSource = g->dataSource();
+
+    mPlot->setDataSwapDebounceMs(200);
+    g->setData(ramp(n, 1000.0), sines(n, 1)[0]);
+    QVERIFY(g->hasPendingData());
+
+    g->dataChanged();
+    QVERIFY(g->hasPendingData());
+
+    // Displayed geometry untouched: a small pan still translates.
+    mPlot->xAxis->setRange(50, n + 50);
+    QVERIFY(!g->stallPixelOffset().isNull());
+    QVERIFY(mPlot->layer("main")->canSkipRepaintForTranslation());
+
+    QTRY_VERIFY_WITH_TIMEOUT(!g->hasPendingData(), 5000);
+    // The displayed source won — the unrelated staged replacement lost out.
+    QCOMPARE(g->dataSource(), displayedSource);
+
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(g->hasRenderedRange());
 }

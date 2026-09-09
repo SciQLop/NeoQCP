@@ -37,7 +37,7 @@ QCPGraph2::QCPGraph2(QCPAxis* keyAxis, QCPAxis* valueAxis)
     }
 
     connect(&mPipeline, &QCPGraphPipeline::finished,
-            this, [this](uint64_t) { onL1Ready(); });
+            this, [this](uint64_t gen) { onL1Ready(gen); });
     connect(&mPipeline, &QCPGraphPipeline::busyChanged,
             this, [this](bool) { updateEffectiveBusy(); });
 
@@ -93,6 +93,20 @@ void QCPGraph2::setDataSource(std::unique_ptr<QCPAbstractDataSource> source)
 
 void QCPGraph2::setDataSource(std::shared_ptr<QCPAbstractDataSource> source)
 {
+    // Keep the displayed geometry (and its GPU translation) alive while the
+    // replacement is prepared; the plot commits it in one debounced swap.
+    const bool canDefer = source && mDataSource && mHasRenderedRange && mParentPlot;
+    if (canDefer)
+        stagePendingSource(std::move(source));
+    else
+        applySourceNow(std::move(source));
+}
+
+void QCPGraph2::applySourceNow(std::shared_ptr<QCPAbstractDataSource> source)
+{
+    mPendingSource.reset();
+    mPendingL1.reset();
+    mPendingReady = false;
     mDataSource = std::move(source);
     mL1Cache.reset();
     mL2Result.reset();
@@ -103,10 +117,56 @@ void QCPGraph2::setDataSource(std::shared_ptr<QCPAbstractDataSource> source)
     if (mDataSource)
         ensureL1Transform(mPipeline, mDataSource->size());
     mPipeline.setSource(mDataSource);
+    if (!mPipeline.hasTransform() && mParentPlot)
+        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    updateEffectiveBusy();
+}
+
+void QCPGraph2::stagePendingSource(std::shared_ptr<QCPAbstractDataSource> source)
+{
+    mPendingSource = std::move(source);
+    mPendingL1.reset();
+    mPendingReady = false;
+    ensureL1Transform(mPipeline, mPendingSource->size());
+    mPipeline.setSource(mPendingSource);
+    mPendingGeneration = mPipeline.currentGeneration();
+    if (!mPipeline.hasTransform())
+        markPendingReady();
+    updateEffectiveBusy();
+}
+
+void QCPGraph2::markPendingReady()
+{
+    mPendingReady = true;
+    if (mParentPlot)
+        mParentPlot->requestDataSwap();
+}
+
+void QCPGraph2::commitPendingData()
+{
+    if (!mPendingSource || !mPendingReady)
+        return;
+    mDataSource = std::move(mPendingSource);
+    mL1Cache = std::move(mPendingL1);
+    mPendingReady = false;
+    mL2Result.reset();
+    mL2Dirty = mL1Cache != nullptr;
+    mNeedsResampling = mDataSource->size() >= qcp::algo::kResampleThreshold;
+    mCachedLines.clear();
+    mLineCacheDirty = true;
+    updateEffectiveBusy();
 }
 
 void QCPGraph2::dataChanged()
 {
+    // A mutated displayed source supersedes whatever replacement was staged:
+    // stage it like any other new data so the on-screen geometry stays put.
+    if (mPendingSource)
+    {
+        stagePendingSource(mDataSource);
+        return;
+    }
+
     mLineCacheDirty = true;
 
     bool wasResampling = mNeedsResampling;
@@ -131,9 +191,18 @@ void QCPGraph2::dataChanged()
         mParentPlot->replot();
 }
 
-void QCPGraph2::onL1Ready()
+void QCPGraph2::onL1Ready(uint64_t generation)
 {
     PROFILE_HERE_N("QCPGraph2::onL1Ready");
+    if (mPendingSource)
+    {
+        if (generation < mPendingGeneration)
+            return; // result of a superseded pending source
+        bool l2Dirty = false;
+        qcp::extractL1Cache<qcp::algo::GraphResamplerCache>(mPipeline.cache(), mPendingL1, l2Dirty);
+        markPendingReady();
+        return;
+    }
     qcp::extractL1Cache<qcp::algo::GraphResamplerCache>(mPipeline.cache(), mL1Cache, mL2Dirty);
     mLineCacheDirty = true;
     if (parentPlot())
@@ -370,7 +439,7 @@ void QCPGraph2::draw(QCPPainter* painter)
     {
         auto vp = ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data());
         mPipeline.runSynchronously(vp);
-        onL1Ready();
+        onL1Ready(mPipeline.currentGeneration());
     }
 
     // Rebuild L2 from L1 cache when dirty (viewport changed since last build)

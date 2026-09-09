@@ -21,6 +21,10 @@ private slots:
     void multiGraphDataChangedWhilePendingKeepsDisplayedGeometry();
     void multiGraphPendingWiderSourceDrawsSafely();
 
+    void graph2KeepsTranslationWhileDataPending();
+    void graph2CommitsAfterWindow();
+    void graph2DataChangedWhilePendingKeepsDisplayedGeometry();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };

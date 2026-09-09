@@ -2206,15 +2206,21 @@ void TestPipeline::graph2LineCacheInvalidatedOnDataChange()
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
     QVERIFY(!graph->mCachedLines.isEmpty());
+    auto cachedBefore = graph->mCachedLines;
 
-    // Replace data — cache must be invalidated
+    // Replace data — the graph is already rendered, so the replacement is staged;
+    // committing it (via the plot's swap window) also triggers the plot's automatic
+    // post-commit replot, which immediately rebuilds the cache from the new source.
+    // So the meaningful assertion is "the cache now reflects the new data", not
+    // "the cache is momentarily empty" (the old immediate-replace behaviour).
     std::vector<double> keys2(N), values2(N);
     for (int i = 0; i < N; ++i) { keys2[i] = i; values2[i] = std::cos(i * 0.01); }
     graph->setDataSource(std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
         std::move(keys2), std::move(values2)));
 
-    QVERIFY(graph->mCachedLines.isEmpty());
-    QVERIFY(graph->mLineCacheDirty);
+    QTRY_VERIFY_WITH_TIMEOUT(!graph->hasPendingData(), 5000);
+    QCOMPARE(graph->dataSource()->valueAt(0), std::cos(0.0));
+    QVERIFY(graph->mCachedLines != cachedBefore);
 }
 
 void TestPipeline::multiGraphLineCacheReusedOnSmallPan()
