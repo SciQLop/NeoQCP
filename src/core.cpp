@@ -2148,9 +2148,11 @@ void QCustomPlot::setDataSwapDebounceMs(int ms)
 
 void QCustomPlot::commitPendingData()
 {
+    bool committed = false;
     for (auto* plottable : std::as_const(mPlottables))
-        plottable->commitPendingData();
-    replot();
+        committed |= plottable->commitPendingData();
+    if (committed)
+        replot(QCustomPlot::rpQueuedReplot);
 }
 
 void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)

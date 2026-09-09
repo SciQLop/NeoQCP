@@ -402,6 +402,10 @@ protected:
     bool mReplotQueued;
     QTimer mDataSwapTimer;
     int mDataSwapDebounceMs = 100;
+    // Runs every plottable's commitPendingData() and replots (queued, robust
+    // against a replot already in progress) only if at least one actually
+    // committed — a window where every pending source was superseded is a
+    // no-op and must not force a replot.
     void commitPendingData();
     bool mSkipReplotsWhenHidden = false;
     bool mWasShown = false;

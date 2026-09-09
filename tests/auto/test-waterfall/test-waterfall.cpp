@@ -143,6 +143,44 @@ void TestWaterfall::invalidateNormalization()
     QCOMPARE(range.upper, 1.0);
 }
 
+void TestWaterfall::dataChangedWhileRenderedKeepsRebuiltAdapter()
+{
+    // Regression: QCPWaterfallGraph::dataChanged() used to call
+    // QCPMultiGraph::dataChanged() right after rebuildAdapter(). Once the graph
+    // has rendered once, rebuildAdapter() stages the fresh adapter as pending;
+    // QCPMultiGraph::dataChanged() then saw mPendingSource set and re-staged the
+    // OLD displayed adapter over it (its "a mutation superseded the pending
+    // replacement" branch), so the eventual commit showed the stale
+    // normalization factor instead of the one just rebuilt.
+    auto* wf = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    wf->setOffsetMode(QCPWaterfallGraph::omCustom);
+    wf->setOffsets({0.0});
+    wf->setNormalize(true);
+    wf->setGain(1.0);
+
+    constexpr int n = 300;
+    auto keys = std::make_shared<std::vector<double>>(n);
+    auto vals0 = std::make_shared<std::vector<double>>(n);
+    for (int i = 0; i < n; ++i) {
+        (*keys)[i] = i;
+        (*vals0)[i] = (i == 0) ? 2.0 : std::sin(i * 0.05);
+    }
+
+    wf->viewData(std::span<const double>(*keys),
+                 std::vector<std::span<const double>>{std::span<const double>(*vals0)});
+
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCOMPARE(wf->dataMainValue(0), 1.0); // maxAbs 2.0 -> norm factor 0.5 -> 2.0*0.5
+
+    (*vals0)[0] = 10.0; // new max: norm factor should become 0.1
+
+    wf->dataChanged();
+    QTRY_VERIFY_WITH_TIMEOUT(!wf->hasPendingData(), 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    QCOMPARE(wf->dataMainValue(0), 1.0); // 10.0 * new norm factor 0.1
+}
+
 void TestWaterfall::adapterValueAt()
 {
     auto* wf = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);

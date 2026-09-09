@@ -41,7 +41,7 @@ public:
     QPointF stallPixelOffset() const override;
     bool canProduceContent() const override;
     bool hasPendingData() const override { return mPendingSource != nullptr; }
-    void commitPendingData() override;
+    bool commitPendingData() override;
 
     // Convenience: owning
     template <IndexableNumericRange KC, IndexableNumericRange VC>

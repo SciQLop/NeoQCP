@@ -31,9 +31,10 @@ public:
     PendingStub(QCPAxis* k, QCPAxis* v) : QCPAbstractPlottable(k, v) {}
     int commits = 0;
     bool pending = true;
+    bool committer = true; // commitPendingData()'s return value
 
     bool hasPendingData() const override { return pending; }
-    void commitPendingData() override { ++commits; }
+    bool commitPendingData() override { ++commits; return committer; }
     void notifyBusy() { updateEffectiveBusy(); }
 
     double selectTest(const QPointF&, bool, QVariant* = nullptr) const override { return -1; }
@@ -276,6 +277,52 @@ void TestDataSwap::multiGraphPendingWiderSourceDrawsSafely()
 
     QTRY_VERIFY_WITH_TIMEOUT(!mg->hasPendingData(), 5000);
     QCOMPARE(mg->dataSource()->columnCount(), 3);
+}
+
+void TestDataSwap::multiGraphSmallPendingIgnoresLateLargeJob()
+{
+    // A small (no-transform) pending source staged right after a large one
+    // must not be clobbered when the large source's resample job finally
+    // finishes: setSource() only bumps the pipeline generation when a
+    // transform is set, so without the generation guard fix the late L1
+    // result for the large source would pass onL1Ready's staleness check
+    // and land in mPendingL1 for the small (already-committed) source.
+    constexpr int n = 120'000;
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(ramp(n), sines(n, 2));
+    mPlot->xAxis->setRange(0, n);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->pipeline().isBusy(), 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(mg->hasRenderedRange());
+
+    mPlot->setDataSwapDebounceMs(300);
+    mg->setData(ramp(n, 1000.0), sines(n, 2)); // large source A: kicks a resample job
+    constexpr int nSmall = 500;
+    mg->setData(ramp(nSmall, 2000.0), sines(nSmall, 2)); // small source B: no transform, ready at once
+
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->hasPendingData(), 5000);
+    QCOMPARE(mg->dataSource()->size(), nSmall);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(mg->hasRenderedRange());
+
+    QTest::qWait(500); // let A's job finish, in case it still races in
+    QCOMPARE(mg->dataSource()->size(), nSmall);
+}
+
+void TestDataSwap::noCommitNoReplot()
+{
+    auto* p = new PendingStub(mPlot->xAxis, mPlot->yAxis);
+    p->committer = false; // commitPendingData() returns false: nothing was committed
+    mPlot->setDataSwapDebounceMs(20);
+    QSignalSpy replots(mPlot, &QCustomPlot::afterReplot);
+
+    mPlot->requestDataSwap();
+    QTest::qWait(120);
+
+    QCOMPARE(p->commits, 1); // commitPendingData() still runs...
+    QCOMPARE(replots.count(), 0); // ...but reported nothing to commit, so no replot
 }
 
 void TestDataSwap::graph2KeepsTranslationWhileDataPending()

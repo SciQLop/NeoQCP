@@ -196,8 +196,11 @@ public:
 
     // Deferred data: a replacement source staged while the displayed one keeps
     // rendering (see QCustomPlot::requestDataSwap). Pending data is busy data.
+    // commitPendingData() returns true only when it actually committed a
+    // replacement, so QCustomPlot::commitPendingData() can skip the replot
+    // when every plottable's pending source was superseded (no-op commit).
     virtual bool hasPendingData() const { return false; }
-    virtual void commitPendingData() {}
+    virtual bool commitPendingData() { return false; }
 
     // per-plottable overrides (std::optional -- nullopt falls through to theme)
     void setBusyIndicatorSymbol(const QString& symbol);

@@ -20,6 +20,9 @@ private slots:
     void multiGraphLatestPendingWins();
     void multiGraphDataChangedWhilePendingKeepsDisplayedGeometry();
     void multiGraphPendingWiderSourceDrawsSafely();
+    void multiGraphSmallPendingIgnoresLateLargeJob();
+
+    void noCommitNoReplot();
 
     void graph2KeepsTranslationWhileDataPending();
     void graph2CommitsAfterWindow();

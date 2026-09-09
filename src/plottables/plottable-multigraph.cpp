@@ -143,7 +143,10 @@ void QCPMultiGraph::stagePendingSource(std::shared_ptr<QCPAbstractMultiDataSourc
     syncComponentCount(mPendingSource->columnCount());
     ensureL1TransformMulti(mPipeline, mPendingSource->size(), mPendingSource->columnCount());
     mPipeline.setSource(mPendingSource);
-    mPendingGeneration = mPipeline.currentGeneration();
+    // Without a transform setSource() does not bump the generation, so a job
+    // still running for the previous source would pass the guard below.
+    mPendingGeneration = mPipeline.hasTransform() ? mPipeline.currentGeneration()
+                                                  : mPipeline.currentGeneration() + 1;
     if (!mPipeline.hasTransform())
         markPendingReady();
     updateEffectiveBusy();
@@ -156,10 +159,10 @@ void QCPMultiGraph::markPendingReady()
         mParentPlot->requestDataSwap();
 }
 
-void QCPMultiGraph::commitPendingData()
+bool QCPMultiGraph::commitPendingData()
 {
     if (!mPendingSource || !mPendingReady)
-        return;
+        return false;
     mDataSource = std::move(mPendingSource);
     mL1Cache = std::move(mPendingL1);
     mPendingReady = false;
@@ -169,6 +172,7 @@ void QCPMultiGraph::commitPendingData()
     mCachedLines.clear();
     mLineCacheDirty = true;
     updateEffectiveBusy();
+    return true;
 }
 
 void QCPMultiGraph::dataChanged()
@@ -203,7 +207,7 @@ void QCPMultiGraph::onL1Ready(uint64_t generation)
     {
         if (generation < mPendingGeneration)
             return; // result of a superseded pending source
-        bool l2Dirty = false;
+        [[maybe_unused]] bool l2Dirty = false; // recomputed from mL1Cache by commitPendingData()
         qcp::extractL1Cache<qcp::algo::MultiGraphResamplerCache>(mPipeline.cache(), mPendingL1, l2Dirty);
         markPendingReady();
         return;

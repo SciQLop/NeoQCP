@@ -1,6 +1,7 @@
 #include "test-busy-indicator.h"
 #include <qcustomplot.h>
 #include <painting/plottable-rhi-layer.h>
+#include <painting/scatter-rhi-layer.h>
 #include <QTest>
 
 #include <cmath>
@@ -316,6 +317,7 @@ void TestBusyIndicator::gpuEntriesCarryFadeAlpha()
         values[i] = std::sin(i * 0.01);
     }
     graph->setData(std::move(keys), std::move(values));
+    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, 4));
     graph->setBusyShowDelayMs(0);
     graph->setBusyHideDelayMs(0);
     mPlot->xAxis->setRange(0, 1000);
@@ -329,6 +331,11 @@ void TestBusyIndicator::gpuEntriesCarryFadeAlpha()
     QVERIFY(!prl->drawEntries().isEmpty());
     for (const auto& e : prl->drawEntries())
         QCOMPARE(e.alpha, 1.0f);
+    auto* srl = mPlot->scatterRhiLayer(mPlot->layer("main"));
+    QVERIFY(srl);
+    QVERIFY(!srl->drawEntries().isEmpty());
+    for (const auto& e : srl->drawEntries())
+        QCOMPARE(e.alpha, 1.0f);
 
     graph->setBusy(true);
     QTRY_VERIFY_WITH_TIMEOUT(graph->visuallyBusy(), 2000);
@@ -337,10 +344,15 @@ void TestBusyIndicator::gpuEntriesCarryFadeAlpha()
     const float fade = static_cast<float>(graph->effectiveBusyFadeAlpha());
     for (const auto& e : prl->drawEntries())
         QVERIFY(qFuzzyCompare(e.alpha, fade));
+    QVERIFY(!srl->drawEntries().isEmpty());
+    for (const auto& e : srl->drawEntries())
+        QVERIFY(qFuzzyCompare(e.alpha, fade));
 
     graph->setBusy(false);
     QTRY_VERIFY_WITH_TIMEOUT(!graph->visuallyBusy(), 2000);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     for (const auto& e : prl->drawEntries())
+        QCOMPARE(e.alpha, 1.0f);
+    for (const auto& e : srl->drawEntries())
         QCOMPARE(e.alpha, 1.0f);
 }

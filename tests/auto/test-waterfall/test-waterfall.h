@@ -16,6 +16,7 @@ private slots:
     void normalizationFactors();
     void normalizationDisabled();
     void invalidateNormalization();
+    void dataChangedWhileRenderedKeepsRebuiltAdapter();
 
     void adapterValueAt();
     void singleComponentValueRange();
