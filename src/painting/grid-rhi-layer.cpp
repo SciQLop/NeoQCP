@@ -384,7 +384,9 @@ void QCPGridRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
                 || cached.tickLengthIn != float(axis->tickLengthIn())
                 || cached.subTickLengthOut != float(axis->subTickLengthOut())
                 || cached.subTickLengthIn != float(axis->subTickLengthIn())
-                || cached.subTicksVisible != axis->subTicks())
+                || cached.subTicksVisible != axis->subTicks()
+                || cached.axisVisible != axis->visible()
+                || cached.ticksVisible != axis->ticks())
             {
                 mGeometryDirty = true;
                 break;
@@ -435,7 +437,6 @@ void QCPGridRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
             for (auto* axis : orderedAxesForRect(group.axisRect))
                 appendTickVertices(axis, group.axisRect, scratch);
 
-            Q_ASSERT(scratch.size() == group.vertexCount * kFloatsPerVertex);
             if (scratch.size() != group.vertexCount * kFloatsPerVertex)
             {
                 // Regenerated tick vertex count no longer matches the existing
@@ -490,6 +491,8 @@ void QCPGridRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
             cached.subTickLengthOut = float(axis->subTickLengthOut());
             cached.subTickLengthIn = float(axis->subTickLengthIn());
             cached.subTicksVisible = axis->subTicks();
+            cached.axisVisible = axis->visible();
+            cached.ticksVisible = axis->ticks();
             cached.lastRange = axis->range();
             mCachedTicks[axis] = cached;
         }

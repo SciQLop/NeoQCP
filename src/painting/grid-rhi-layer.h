@@ -90,6 +90,10 @@ private:
         float subTickLengthOut = 0;
         float subTickLengthIn = 0;
         bool subTicksVisible = false;
+        // Neither setVisible() nor setTicks() marks the geometry dirty, and both
+        // change the tick vertex count, so they must be part of the signature.
+        bool axisVisible = false;
+        bool ticksVisible = false;
         // Tick marks are baked to pixels at rebuild time; this is the range that
         // baking used, so uploadResources() can detect a pan (same ticks, moved
         // range) and re-bake in place without a full geometry rebuild.
