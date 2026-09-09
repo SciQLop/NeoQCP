@@ -32,6 +32,7 @@
 #include "painting/paintbuffer.h"
 #include "plottables/plottable.h"
 
+#include <QElapsedTimer>
 #include <QPointer>
 #include <QRhiWidget>
 #include <QTimer>
@@ -243,10 +244,17 @@ public:
     // Deferred data swap: plottables that staged a replacement data source call
     // requestDataSwap() once it is ready. The first request opens a window of
     // dataSwapDebounceMs; every plottable ready by the end of it is committed and
-    // drawn in a single replot.
+    // drawn in a single replot. Swapping mid-pan costs a full repaint in the
+    // middle of a drag, so the window also acts as a settle timer: if the view
+    // translated (panned) within the last dataSwapDebounceMs, the commit is
+    // deferred by another window — but never later than dataSwapMaxWaitMs after
+    // the original request, so a continuously panning/auto-scrolling plot still
+    // gets its data.
     void requestDataSwap();
     void setDataSwapDebounceMs(int ms);
     [[nodiscard]] int dataSwapDebounceMs() const { return mDataSwapDebounceMs; }
+    void setDataSwapMaxWaitMs(int ms);
+    [[nodiscard]] int dataSwapMaxWaitMs() const { return mDataSwapMaxWaitMs; }
     // Whether the widget has been shown at least once (used by the hidden-replot guard).
     bool wasShown() const { return mWasShown; }
     // pipeline:
@@ -400,8 +408,15 @@ protected:
     QVariant mMouseSignalLayerableDetails;
     bool mReplotting;
     bool mReplotQueued;
+    // Restarted whenever a replot() translates (skips repainting) at least one
+    // layer instead of redrawing it, i.e. the view is being panned.
+    QElapsedTimer mLastTranslation;
     QTimer mDataSwapTimer;
-    int mDataSwapDebounceMs = 100;
+    int mDataSwapDebounceMs = 200;
+    // Started when requestDataSwap() arms mDataSwapTimer (not on ride-along
+    // calls), so commitPendingData() can cap how long it defers for a settling pan.
+    QElapsedTimer mDataSwapRequested;
+    int mDataSwapMaxWaitMs = 1000;
     // Runs every plottable's commitPendingData() and replots (queued, robust
     // against a replot already in progress) only if at least one actually
     // committed — a window where every pending source was superseded is a

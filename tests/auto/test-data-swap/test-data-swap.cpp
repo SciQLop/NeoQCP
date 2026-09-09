@@ -32,10 +32,12 @@ public:
     int commits = 0;
     bool pending = true;
     bool committer = true; // commitPendingData()'s return value
+    QPointF stall; // non-null once set: makes the layer translate on replot
 
     bool hasPendingData() const override { return pending; }
     bool commitPendingData() override { ++commits; return committer; }
     void notifyBusy() { updateEffectiveBusy(); }
+    QPointF stallPixelOffset() const override { return stall; }
 
     double selectTest(const QPointF&, bool, QVariant* = nullptr) const override { return -1; }
     QCPRange getKeyRange(bool& found, QCP::SignDomain = QCP::sdBoth) const override
@@ -105,6 +107,50 @@ void TestDataSwap::requestAfterWindowCommitsAgain()
     QTRY_COMPARE_WITH_TIMEOUT(a->commits, 1, 2000);
     mPlot->requestDataSwap();
     QTRY_COMPARE_WITH_TIMEOUT(a->commits, 2, 2000);
+}
+
+void TestDataSwap::swapWaitsForPanToSettle()
+{
+    auto* a = new PendingStub(mPlot->xAxis, mPlot->yAxis);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    a->stall = QPointF(3, 0);              // from now on replots translate
+    mPlot->setDataSwapDebounceMs(100);
+    mPlot->setDataSwapMaxWaitMs(5000);
+    mPlot->requestDataSwap();
+
+    // Keep "panning": a translating replot every 40 ms for 400 ms.
+    QElapsedTimer clock;
+    clock.start();
+    while (clock.elapsed() < 400)
+    {
+        mPlot->replot(QCustomPlot::rpImmediateRefresh);
+        QTest::qWait(40);
+    }
+    QCOMPARE(a->commits, 0);
+
+    // Stop panning: the swap lands within about one window.
+    a->stall = QPointF();
+    QTRY_COMPARE_WITH_TIMEOUT(a->commits, 1, 2000);
+}
+
+void TestDataSwap::swapCapForcesCommitWhilePanning()
+{
+    auto* a = new PendingStub(mPlot->xAxis, mPlot->yAxis);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    a->stall = QPointF(3, 0);
+    mPlot->setDataSwapDebounceMs(100);
+    mPlot->setDataSwapMaxWaitMs(300);
+    mPlot->requestDataSwap();
+
+    QElapsedTimer clock;
+    clock.start();
+    while (clock.elapsed() < 700 && a->commits == 0)
+    {
+        mPlot->replot(QCustomPlot::rpImmediateRefresh);
+        QTest::qWait(40);
+    }
+    QCOMPARE(a->commits, 1);
+    QVERIFY2(clock.elapsed() >= 250, qPrintable(QString::number(clock.elapsed())));
 }
 
 void TestDataSwap::multiGraphKeepsTranslationWhileDataPending()

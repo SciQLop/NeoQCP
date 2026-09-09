@@ -2138,7 +2138,10 @@ void QCustomPlot::requestDataSwap()
     // Leading-edge window: later requests ride along instead of restarting the
     // timer, so the swap latency is bounded by one window under streaming data.
     if (!mDataSwapTimer.isActive())
+    {
         mDataSwapTimer.start(mDataSwapDebounceMs);
+        mDataSwapRequested.start();
+    }
 }
 
 void QCustomPlot::setDataSwapDebounceMs(int ms)
@@ -2146,8 +2149,25 @@ void QCustomPlot::setDataSwapDebounceMs(int ms)
     mDataSwapDebounceMs = qMax(0, ms);
 }
 
+void QCustomPlot::setDataSwapMaxWaitMs(int ms)
+{
+    mDataSwapMaxWaitMs = qMax(0, ms);
+}
+
 void QCustomPlot::commitPendingData()
 {
+    // Swapping mid-pan costs one full repaint in the middle of a drag; wait for
+    // the view to be still for one window, but never longer than the cap so an
+    // auto-scrolling plot still gets its data.
+    const bool panning = mLastTranslation.isValid()
+        && mLastTranslation.elapsed() < mDataSwapDebounceMs;
+    const bool capped = mDataSwapRequested.elapsed() >= mDataSwapMaxWaitMs;
+    if (panning && !capped)
+    {
+        mDataSwapTimer.start(mDataSwapDebounceMs);
+        return;
+    }
+
     bool committed = false;
     for (auto* plottable : std::as_const(mPlottables))
         committed |= plottable->commitPendingData();
@@ -2261,14 +2281,20 @@ void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
             crl->setPixelOffset(0.0f, 0.0f);
         }
     }
+    bool translated = false;
     for (auto& layer : mLayers)
     {
         if (QSharedPointer<QCPAbstractPaintBuffer> pb = layer->mPaintBuffer.toStrongRef();
-            pb && pb->contentDirty() && !layer->canSkipRepaintForTranslation())
+            pb && pb->contentDirty())
         {
-            layer->drawToPaintBuffer();
+            if (layer->canSkipRepaintForTranslation())
+                translated = true;
+            else
+                layer->drawToPaintBuffer();
         }
     }
+    if (translated)
+        mLastTranslation.start();
     for (auto& buffer : mPaintBuffers)
     {
         buffer->setInvalidated(false);

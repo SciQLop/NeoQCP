@@ -13,6 +13,8 @@ private slots:
     void pendingCountsAsBusy();
     void requestsWithinWindowCommitOnce();
     void requestAfterWindowCommitsAgain();
+    void swapWaitsForPanToSettle();
+    void swapCapForcesCommitWhilePanning();
 
     void multiGraphKeepsTranslationWhileDataPending();
     void multiGraphCommitsAfterWindow();
