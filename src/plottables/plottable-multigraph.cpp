@@ -173,6 +173,14 @@ void QCPMultiGraph::commitPendingData()
 
 void QCPMultiGraph::dataChanged()
 {
+    // A mutated displayed source supersedes whatever replacement was staged:
+    // stage it like any other new data so the on-screen geometry stays put.
+    if (mPendingSource)
+    {
+        stagePendingSource(mDataSource);
+        return;
+    }
+
     mLineCacheDirty = true;
     if (mDataSource)
     {
@@ -288,7 +296,10 @@ void QCPMultiGraph::setComponentPens(const QList<QPen>& pens)
 
 double QCPMultiGraph::componentValueAt(int column, int index) const
 {
-    return mDataSource ? mDataSource->valueAt(column, index) : 0.0;
+    // column comes from componentCount(), which may already reflect a wider
+    // pending source than the one currently displayed.
+    return (mDataSource && column < mDataSource->columnCount())
+        ? mDataSource->valueAt(column, index) : 0.0;
 }
 
 QCPDataSelection QCPMultiGraph::componentSelection(int index) const
@@ -379,7 +390,10 @@ QCPRange QCPMultiGraph::getValueRange(bool& foundRange, QCP::SignDomain inSignDo
 
     double lower = std::numeric_limits<double>::max();
     double upper = std::numeric_limits<double>::lowest();
-    for (int c = 0; c < mComponents.size(); ++c) {
+    // mComponents may be sized for a wider pending source than the one
+    // currently displayed — clamp to avoid reading past its columns.
+    const int nc = qMin(mComponents.size(), mDataSource->columnCount());
+    for (int c = 0; c < nc; ++c) {
         if (!mComponents[c].visible) continue;
         bool colFound = false;
         auto colRange = mDataSource->valueRange(c, colFound, inSignDomain, inKeyRange);
@@ -494,7 +508,10 @@ QCPDataSelection QCPMultiGraph::selectTestRect(const QRectF& rect, bool onlySele
     int end = mDataSource->findEnd(keyRange.upper, false);
 
     mLastRectSelections.resize(mComponents.size());
-    for (int c = 0; c < mComponents.size(); ++c) {
+    // mComponents may be sized for a wider pending source than the one
+    // currently displayed — clamp to avoid reading past its columns.
+    const int nc = qMin(mComponents.size(), mDataSource->columnCount());
+    for (int c = 0; c < nc; ++c) {
         if (!mComponents[c].visible) continue;
         QCPDataSelection colSel;
         int segBegin = -1;
@@ -679,7 +696,10 @@ void QCPMultiGraph::draw(QCPPainter* painter)
         int cacheBegin = ds->findBegin(keyRange.lower - margin);
         int cacheEnd = ds->findEnd(keyRange.upper + margin);
 
-        const int nc = static_cast<int>(mComponents.size());
+        // The pending source may carry more columns than the displayed one
+        // (mComponents was already synced to it) — clamp so a mid-window
+        // replot never reads past the displayed source's columns.
+        const int nc = qMin(mComponents.size(), ds->columnCount());
         linesTarget.resize(nc);
 
         bool allVisible = true;

@@ -1,7 +1,9 @@
 #include "test-data-swap.h"
 #include "qcustomplot.h"
 #include "plottables/plottable-multigraph.h"
+#include "layoutelements/layoutelement-axisrect.h"
 #include <cmath>
+#include <span>
 #include <vector>
 
 namespace {
@@ -184,5 +186,93 @@ void TestDataSwap::multiGraphLatestPendingWins()
 
     QTRY_VERIFY_WITH_TIMEOUT(!mg->hasPendingData(), 5000);
     QCOMPARE(mg->dataSource()->keyAt(0), 2000.0);
+    QCOMPARE(mg->dataSource()->columnCount(), 3);
+}
+
+void TestDataSwap::multiGraphDataChangedWhilePendingKeepsDisplayedGeometry()
+{
+    // A dataChanged() on the displayed source while an unrelated replacement
+    // is staged must re-stage the displayed source itself (superseding the
+    // stale pending one), not touch the displayed caches directly — the
+    // on-screen geometry (and GPU translation) must stay put throughout.
+    constexpr int n = 120'000;
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(ramp(n), sines(n, 2));
+    mPlot->xAxis->setRange(0, n);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->pipeline().isBusy(), 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(mg->hasRenderedRange());
+
+    auto* displayedSource = mg->dataSource();
+
+    mPlot->setDataSwapDebounceMs(200);
+    mg->setData(ramp(n, 1000.0), sines(n, 2));
+    QVERIFY(mg->hasPendingData());
+
+    mg->dataChanged();
+    QVERIFY(mg->hasPendingData());
+
+    // Displayed geometry untouched: a small pan still translates.
+    mPlot->xAxis->setRange(50, n + 50);
+    QVERIFY(!mg->stallPixelOffset().isNull());
+    QVERIFY(mPlot->layer("main")->canSkipRepaintForTranslation());
+
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->hasPendingData(), 5000);
+    // The displayed source won — the unrelated staged replacement lost out.
+    QCOMPARE(mg->dataSource(), displayedSource);
+
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(mg->hasRenderedRange());
+}
+
+void TestDataSwap::multiGraphPendingWiderSourceDrawsSafely()
+{
+    // The displayed source (QCPRowMajorMultiDataSource, 2 columns) has no
+    // clamping of its own — draw()/getValueRange()/selectTest() must clamp
+    // to its columnCount() themselves once mComponents was resized for a
+    // wider pending source, or this reads past the row-major buffer.
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setAdaptiveSampling(false); // force the getLinesAll() path in draw()
+
+    constexpr int n = 500;
+    std::vector<double> keys(n);
+    std::vector<double> rowMajor(n * 2); // 2 tightly-packed columns
+    for (int i = 0; i < n; ++i) {
+        keys[i] = i;
+        rowMajor[i * 2 + 0] = std::sin(i * 0.05);
+        rowMajor[i * 2 + 1] = std::cos(i * 0.05);
+    }
+    mg->viewRowMajorData<double, double>(std::span<const double>(keys), rowMajor.data(), 2, 2);
+    mPlot->xAxis->setRange(0, n);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(mg->hasRenderedRange());
+    QCOMPARE(mg->dataSource()->columnCount(), 2);
+
+    mPlot->setDataSwapDebounceMs(200);
+    mg->setData(ramp(n, 50.0), sines(n, 3)); // stage a wider, 3-column replacement
+    QVERIFY(mg->hasPendingData());
+    QCOMPARE(mg->componentCount(), 3);
+    QCOMPARE(mg->dataSource()->columnCount(), 2);
+
+    // Pan and redraw, and exercise the other component-indexed accessors,
+    // before the commit lands: none of these may read past the displayed
+    // (narrower) source's columns.
+    mPlot->xAxis->setRange(5, n + 5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    bool found = false;
+    mg->getValueRange(found);
+
+    QVariant details;
+    mg->selectTest(mPlot->xAxis->axisRect()->rect().center(), false, &details);
+
+    QVERIFY(mg->hasPendingData());
+    QCOMPARE(mg->componentCount(), 3);
+    QCOMPARE(mg->dataSource()->columnCount(), 2);
+
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->hasPendingData(), 5000);
     QCOMPARE(mg->dataSource()->columnCount(), 3);
 }

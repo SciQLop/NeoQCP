@@ -18,6 +18,8 @@ private slots:
     void multiGraphCommitsAfterWindow();
     void multiGraphFirstDataCommitsImmediately();
     void multiGraphLatestPendingWins();
+    void multiGraphDataChangedWhilePendingKeepsDisplayedGeometry();
+    void multiGraphPendingWiderSourceDrawsSafely();
 
 private:
     QCustomPlot* mPlot = nullptr;
