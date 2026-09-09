@@ -139,7 +139,7 @@ void QCPItemCreationState::commitItem()
 void QCPItemCreationState::cancelItem()
 {
     if (mCurrentItem) {
-        mPlot->removeItem(mCurrentItem);
+        (void)mPlot->removeItem(mCurrentItem);
         mCurrentItem = nullptr;
     }
     mKeyAxis = nullptr;
