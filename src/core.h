@@ -34,6 +34,7 @@
 
 #include <QPointer>
 #include <QRhiWidget>
+#include <QTimer>
 #include <functional>
 
 class QCPPainter;
@@ -239,6 +240,13 @@ public:
     // behavior, required for offscreen rendering).
     void setSkipReplotsWhenHidden(bool skip);
     bool skipReplotsWhenHidden() const;
+    // Deferred data swap: plottables that staged a replacement data source call
+    // requestDataSwap() once it is ready. The first request opens a window of
+    // dataSwapDebounceMs; every plottable ready by the end of it is committed and
+    // drawn in a single replot.
+    void requestDataSwap();
+    void setDataSwapDebounceMs(int ms);
+    [[nodiscard]] int dataSwapDebounceMs() const { return mDataSwapDebounceMs; }
     // Whether the widget has been shown at least once (used by the hidden-replot guard).
     bool wasShown() const { return mWasShown; }
     // pipeline:
@@ -392,6 +400,9 @@ protected:
     QVariant mMouseSignalLayerableDetails;
     bool mReplotting;
     bool mReplotQueued;
+    QTimer mDataSwapTimer;
+    int mDataSwapDebounceMs = 100;
+    void commitPendingData();
     bool mSkipReplotsWhenHidden = false;
     bool mWasShown = false;
     double mReplotTime, mReplotTimeAverage;

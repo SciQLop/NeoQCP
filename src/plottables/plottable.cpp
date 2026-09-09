@@ -1073,7 +1073,7 @@ void QCPAbstractPlottable::setBusy(bool busy)
 
 void QCPAbstractPlottable::updateEffectiveBusy()
 {
-    const bool newBusy = mExternalBusy || pipelineBusy();
+    const bool newBusy = mExternalBusy || pipelineBusy() || hasPendingData();
     if (newBusy == mEffectiveBusy)
         return;
 

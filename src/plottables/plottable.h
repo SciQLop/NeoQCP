@@ -194,6 +194,11 @@ public:
     bool visuallyBusy() const { return mVisuallyBusy; }
     void setBusy(bool busy);
 
+    // Deferred data: a replacement source staged while the displayed one keeps
+    // rendering (see QCustomPlot::requestDataSwap). Pending data is busy data.
+    virtual bool hasPendingData() const { return false; }
+    virtual void commitPendingData() {}
+
     // per-plottable overrides (std::optional -- nullopt falls through to theme)
     void setBusyIndicatorSymbol(const QString& symbol);
     void resetBusyIndicatorSymbol();

@@ -502,6 +502,9 @@ QCustomPlot::QCustomPlot(QWidget* parent)
 
     mPipelineScheduler = new QCPPipelineScheduler(0, this);
 
+    mDataSwapTimer.setSingleShot(true);
+    connect(&mDataSwapTimer, &QTimer::timeout, this, &QCustomPlot::commitPendingData);
+
     // No replot here — initialize() + resizeEvent() will handle the first replot once
     // the RHI backend is ready, avoiding throwaway pixmap buffer creation.
 }
@@ -2130,6 +2133,26 @@ void QCustomPlot::deselectAll()
 
   \see replotTime
 */
+void QCustomPlot::requestDataSwap()
+{
+    // Leading-edge window: later requests ride along instead of restarting the
+    // timer, so the swap latency is bounded by one window under streaming data.
+    if (!mDataSwapTimer.isActive())
+        mDataSwapTimer.start(mDataSwapDebounceMs);
+}
+
+void QCustomPlot::setDataSwapDebounceMs(int ms)
+{
+    mDataSwapDebounceMs = qMax(0, ms);
+}
+
+void QCustomPlot::commitPendingData()
+{
+    for (auto* plottable : std::as_const(mPlottables))
+        plottable->commitPendingData();
+    replot();
+}
+
 void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
 {
     PROFILE_HERE;

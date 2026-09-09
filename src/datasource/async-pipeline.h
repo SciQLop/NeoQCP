@@ -39,6 +39,10 @@ public:
 
     bool isBusy() const;
 
+    // Generation bumped by every data/viewport change; finished(gen) reports
+    // the generation a delivered result belongs to.
+    uint64_t currentGeneration() const { return mGeneration.load(); }
+
     void onDataChanged();
     void onViewportChanged(const ViewportParams& vp);
 
