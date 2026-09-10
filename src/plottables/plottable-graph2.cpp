@@ -202,6 +202,14 @@ void QCPGraph2::dataChanged()
     }
     else if (mParentPlot)
         mParentPlot->replot();
+
+    // A mutation can leave a job in flight for pre-mutation data: if the
+    // transform stayed on, the job just queued behind it supersedes it; if
+    // the transform was just cleared, no further job is coming at all and a
+    // late result would otherwise land in mL1Cache permanently. Same +1
+    // no-bump hazard as applySourceNow()/stagePendingSource().
+    mAcceptedGeneration = mPipeline.hasTransform() ? mPipeline.currentGeneration()
+                                                    : mPipeline.currentGeneration() + 1;
 }
 
 void QCPGraph2::onL1Ready(uint64_t generation)
