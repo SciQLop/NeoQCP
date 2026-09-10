@@ -23,12 +23,14 @@ private slots:
     void multiGraphDataChangedWhilePendingKeepsDisplayedGeometry();
     void multiGraphPendingWiderSourceDrawsSafely();
     void multiGraphSmallPendingIgnoresLateLargeJob();
+    void multiGraphLateLargeJobDoesNotContaminateCommittedSmallSource();
 
     void noCommitNoReplot();
 
     void graph2KeepsTranslationWhileDataPending();
     void graph2CommitsAfterWindow();
     void graph2DataChangedWhilePendingKeepsDisplayedGeometry();
+    void graph2LateLargeJobDoesNotContaminateCommittedSmallSource();
 
 private:
     QCustomPlot* mPlot = nullptr;

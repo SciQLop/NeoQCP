@@ -357,6 +357,47 @@ void TestDataSwap::multiGraphSmallPendingIgnoresLateLargeJob()
     QCOMPARE(mg->dataSource()->size(), nSmall);
 }
 
+void TestDataSwap::multiGraphLateLargeJobDoesNotContaminateCommittedSmallSource()
+{
+    // Deterministic version of the A-large/B-small race (relying on real
+    // background-job timing vs. the debounce window is flaky: a small A can
+    // easily finish resampling before the window elapses). Instead, force B's
+    // commit synchronously — with zero event-loop turns since A was staged,
+    // A's real async job cannot have delivered yet — then let A's job finish
+    // for real and check what it does to the *already-committed* B: a late
+    // finished() for A's superseded resample job must not repopulate the
+    // small (non-resampled) B source's L1/L2 cache — otherwise the graph
+    // would render A's stale data even though dataSource() correctly reports B.
+    constexpr int n = 120'000;
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(ramp(n), sines(n, 2));
+    mPlot->xAxis->setRange(0, n);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->pipeline().isBusy(), 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(mg->hasRenderedRange());
+
+    mg->setData(ramp(n, 1000.0), sines(n, 2)); // large source A: stages + dispatches a resample job
+    QVERIFY(mg->pipeline().isBusy());
+
+    constexpr int nSmall = 500;
+    mg->setData(ramp(nSmall, 2000.0), sines(nSmall, 2)); // small source B: no transform, ready at once
+    QVERIFY(mg->hasPendingData());
+    QVERIFY(mg->commitPendingData()); // force B's commit now, before A's job can have delivered
+    QVERIFY(!mg->hasPendingData());
+    QCOMPARE(mg->dataSource()->size(), nSmall);
+    QVERIFY(!mg->mNeedsResampling);
+    QVERIFY(!mg->mL1Cache);
+
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->pipeline().isBusy(), 5000); // let A's job actually finish
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    QVERIFY2(!mg->mL1Cache,
+             "A's late resample result leaked into B's cache after B had already committed");
+    QCOMPARE(mg->dataSource()->size(), nSmall);
+}
+
 void TestDataSwap::noCommitNoReplot()
 {
     auto* p = new PendingStub(mPlot->xAxis, mPlot->yAxis);
@@ -452,4 +493,38 @@ void TestDataSwap::graph2DataChangedWhilePendingKeepsDisplayedGeometry()
 
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QVERIFY(g->hasRenderedRange());
+}
+
+void TestDataSwap::graph2LateLargeJobDoesNotContaminateCommittedSmallSource()
+{
+    // Deterministic version of the A-large/B-small race — see
+    // multiGraphLateLargeJobDoesNotContaminateCommittedSmallSource for why
+    // this forces the commit synchronously instead of racing real timing.
+    constexpr int n = 120'000;
+    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    g->setData(ramp(n), sines(n, 1)[0]);
+    mPlot->xAxis->setRange(0, n);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!g->pipeline().isBusy(), 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(g->hasRenderedRange());
+
+    g->setData(ramp(n, 1000.0), sines(n, 1)[0]); // large source A: stages + dispatches a resample job
+    QVERIFY(g->pipeline().isBusy());
+
+    constexpr int nSmall = 500;
+    g->setData(ramp(nSmall, 2000.0), sines(nSmall, 1)[0]); // small source B: no transform, ready at once
+    QVERIFY(g->hasPendingData());
+    QVERIFY(g->commitPendingData()); // force B's commit now, before A's job can have delivered
+    QVERIFY(!g->hasPendingData());
+    QCOMPARE(g->dataSource()->size(), nSmall);
+    QVERIFY(!g->mL1Cache);
+
+    QTRY_VERIFY_WITH_TIMEOUT(!g->pipeline().isBusy(), 5000); // let A's job actually finish
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    QVERIFY2(!g->mL1Cache,
+             "A's late resample result leaked into B's cache after B had already committed");
+    QCOMPARE(g->dataSource()->size(), nSmall);
 }

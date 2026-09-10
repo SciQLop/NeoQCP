@@ -130,6 +130,11 @@ void QCPMultiGraph::applySourceNow(std::shared_ptr<QCPAbstractMultiDataSource> s
     if (mDataSource)
         ensureL1TransformMulti(mPipeline, mDataSource->size(), mDataSource->columnCount());
     mPipeline.setSource(mDataSource);
+    // Without a transform setSource() does not bump the generation, so a job
+    // still running for the previous source would otherwise pass onL1Ready's
+    // staleness check below.
+    mAcceptedGeneration = mPipeline.hasTransform() ? mPipeline.currentGeneration()
+                                                    : mPipeline.currentGeneration() + 1;
     if (!mPipeline.hasTransform() && mParentPlot)
         mParentPlot->replot(QCustomPlot::rpQueuedReplot);
     updateEffectiveBusy();
@@ -171,6 +176,10 @@ bool QCPMultiGraph::commitPendingData()
     mNeedsResampling = needsResamplingMulti(*mDataSource);
     mCachedLines.clear();
     mLineCacheDirty = true;
+    // Carry the barrier established while staging forward past the commit:
+    // a job dispatched for the source this replaced must not be able to land
+    // in mL1Cache/mL2Result once this source is the one being displayed.
+    mAcceptedGeneration = mPendingGeneration;
     updateEffectiveBusy();
     return true;
 }
@@ -212,6 +221,8 @@ void QCPMultiGraph::onL1Ready(uint64_t generation)
         markPendingReady();
         return;
     }
+    if (generation < mAcceptedGeneration)
+        return; // result of a source that was superseded before this job finished
     qcp::extractL1Cache<qcp::algo::MultiGraphResamplerCache>(mPipeline.cache(), mL1Cache, mL2Dirty);
     mLineCacheDirty = true;
     if (parentPlot())

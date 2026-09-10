@@ -158,6 +158,11 @@ private:
     std::shared_ptr<qcp::algo::GraphResamplerCache> mPendingL1;
     bool mPendingReady = false;
     uint64_t mPendingGeneration = 0;
+    // Generation floor below which a pipeline result is from a source that's
+    // no longer displayed (superseded and already committed/applied) — set
+    // whenever a source is installed, so a late result can't repopulate
+    // mL1Cache/mL2Result for a source it was never computed for.
+    uint64_t mAcceptedGeneration = 0;
 
     void applySourceNow(std::shared_ptr<QCPAbstractDataSource> source);
     void stagePendingSource(std::shared_ptr<QCPAbstractDataSource> source);
@@ -166,6 +171,7 @@ private:
     void rebuildL2(const ViewportParams& vp);
 
     friend class TestPipeline;
+    friend class TestDataSwap;
 
     LineStyle mLineStyle = lsLine;
     QCPScatterStyle mScatterStyle;
