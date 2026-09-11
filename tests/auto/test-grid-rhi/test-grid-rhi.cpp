@@ -183,3 +183,55 @@ void TestGridRhi::tickMarksFollowPanWithoutRebuild()
     QVERIFY(xAfter != xBefore);
     QVERIFY(qAbs(xAfter - float(mPlot->xAxis->coordToPixel(firstTick))) < 1.0f);
 }
+
+void TestGridRhi::gridLinesStayAlignedWithTicksAtEpochScale()
+{
+    if (!showAndHasRhiGrid(mPlot))
+        QSKIP("No QRhi available — the grid RHI layer needs a real backend");
+
+    // A 2025-epoch-scale range (~1.757e9), as wide as a 40 minute plot: large
+    // enough in magnitude that a naive float32 cast of the raw coordinate
+    // loses ~128s of precision (2^(30-23) ULP at this magnitude) -- a
+    // sizeable fraction of the 2400s span. The offset keeps `lower` off a
+    // "nice" tick value -- otherwise the first tick equals `lower` exactly
+    // and both round to the same float32, masking the bug by coincidence.
+    const double lower = 1757000000.0 + 37.123;
+    const double upper = lower + 2400.0;
+    mPlot->xAxis->setRange(lower, upper);
+    mPlot->xAxis->setSubTicks(false);
+    mPlot->yAxis->grid()->setVisible(false); // isolate the x axis's grid lines
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCoreApplication::processEvents();
+
+    auto* grl = mPlot->gridRhiLayer();
+    QVERIFY(grl);
+    QRhiResourceUpdateBatch* batch = mPlot->rhi()->nextResourceUpdateBatch();
+    grl->uploadResources(batch, mPlot->rhiOutputSize(), float(mPlot->bufferDevicePixelRatio()),
+                         mPlot->rhi()->isYUpInNDC());
+    batch->release();
+
+    QVERIFY(!mPlot->xAxis->tickVector().isEmpty());
+    const double tickValue = mPlot->xAxis->tickVector().first();
+    const float expectedPixel = float(mPlot->xAxis->coordToPixel(tickValue));
+
+    int gridGroup = -1;
+    for (int i = 0; i < grl->drawGroups().size(); ++i)
+        if (grl->drawGroups()[i].isGridLines) { gridGroup = i; break; }
+    QVERIFY(gridGroup >= 0);
+    const auto& group = grl->drawGroups()[gridGroup];
+    QVERIFY(group.vertexCount > 0);
+
+    const auto* params = grl->lastUboParams(group.axisRect);
+    QVERIFY(params);
+
+    // The y grid is hidden and sub-ticks are off, so the group's first vertex
+    // is unambiguously the first major x tick's line.
+    const float vx = grl->stagingVertices()[group.vertexOffset * 11];
+
+    // Reproduce the vertex shader's linear transform in float32: the actual
+    // pixel position the GPU will draw, not the CPU-precise coordToPixel().
+    const float t = (vx - params->keyRangeLower) / (params->keyRangeUpper - params->keyRangeLower);
+    const float shaderPixel = t * params->keyAxisLength + params->keyAxisOffset;
+
+    QVERIFY(qAbs(shaderPixel - expectedPixel) < 1.0f);
+}

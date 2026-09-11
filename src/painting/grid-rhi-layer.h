@@ -26,6 +26,15 @@ public:
         bool isGridLines = true;       // false = tick marks
     };
 
+    // Mirrors the SpanParams UBO layout in span.vert (std140, 16 floats).
+    struct UboParams
+    {
+        float width = 0, height = 0, yFlip = 0, dpr = 0;
+        float keyRangeLower = 0, keyRangeUpper = 0, keyAxisOffset = 0, keyAxisLength = 0, keyLogScale = 0;
+        float valRangeLower = 0, valRangeUpper = 0, valAxisOffset = 0, valAxisLength = 0, valLogScale = 0;
+        float _pad0 = 0, _pad1 = 0;
+    };
+
     explicit QCPGridRhiLayer(QRhi* rhi);
     ~QCPGridRhiLayer();
 
@@ -46,6 +55,11 @@ public:
     // Test read-back accessors.
     const QVector<DrawGroup>& drawGroups() const { return mDrawGroups; }
     const QVector<float>& stagingVertices() const { return mStagingVertices; }
+    const UboParams* lastUboParams(QCPAxisRect* ar) const
+    {
+        auto it = mLastUboParams.constFind(ar);
+        return it == mLastUboParams.constEnd() ? nullptr : &it.value();
+    }
 
 private:
     void rebuildGeometry(float dpr, int outputHeight);
@@ -53,6 +67,12 @@ private:
     QVector<QCPAxis*> orderedAxesForRect(QCPAxisRect* ar) const;
     void renderGroups(QRhiCommandBuffer* cb, const QSize& outputSize, bool gridLines);
     void cleanupDrawGroups();
+    // Reference value subtracted from this axis's tick/range coordinates
+    // before they are narrowed to float32, so the GPU never has to represent
+    // a huge absolute coordinate (e.g. a Unix timestamp) at full precision --
+    // only the small offset from it. Fixed at 0 for log axes, where the
+    // subtraction would have to happen before the log(), not after.
+    double axisOrigin(QCPAxis* axis) const;
 
     QRhi* mRhi;
 
@@ -102,6 +122,11 @@ private:
         // baking used, so uploadResources() can detect a pan (same ticks, moved
         // range) and re-bake in place without a full geometry rebuild.
         QCPRange lastRange;
+        // axisOrigin(axis) at rebuild time -- the grid-line vertices baked in
+        // this cycle are relative to it, so uploadResources() must keep using
+        // it (not a freshly recomputed origin) until the next full rebuild.
+        double originValue = 0.0;
     };
     QMap<QCPAxis*, CachedAxisTicks> mCachedTicks;
+    QMap<QCPAxisRect*, UboParams> mLastUboParams;
 };

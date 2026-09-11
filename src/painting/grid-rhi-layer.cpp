@@ -28,6 +28,11 @@ QCPGridRhiLayer::~QCPGridRhiLayer()
 
 void QCPGridRhiLayer::markGeometryDirty() { mGeometryDirty = true; }
 
+double QCPGridRhiLayer::axisOrigin(QCPAxis* axis) const
+{
+    return axis->scaleType() == QCPAxis::stLinear ? axis->range().lower : 0.0;
+}
+
 void QCPGridRhiLayer::registerAxis(QCPAxis* axis)
 {
     if (!mAxes.contains(axis))
@@ -242,6 +247,7 @@ void QCPGridRhiLayer::rebuildGeometry(float dpr, int outputHeight)
             const float pixRight = float(ar->left() + ar->width());
             const float pixTop = float(ar->top());
             const float pixBot = float(ar->top() + ar->height());
+            const double origin = axisOrigin(axis);
 
             auto emitGridLine = [&](double tickValue, const QPen& pen) {
                 auto color = qcp::rhi::premultipliedColor(pen.color());
@@ -249,7 +255,10 @@ void QCPGridRhiLayer::rebuildGeometry(float dpr, int outputHeight)
                 float halfW = (penW == 0.0 || pen.isCosmetic()) ? 0.5f : float(penW) / 2.0f;
                 if (pen.style() == Qt::NoPen || halfW <= 0.0f || color[3] <= 0.0f)
                     return;
-                float tv = float(tickValue);
+                // Subtract the origin in double before narrowing to float32, so a
+                // huge absolute coordinate (e.g. a Unix timestamp) doesn't quantize
+                // away the sub-range precision the shader needs (see axisOrigin()).
+                float tv = float(tickValue - origin);
                 if (isHorizontal)
                 {
                     appendBorder(mStagingVertices,
@@ -498,6 +507,7 @@ void QCPGridRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
             cached.scaleType = int(axis->scaleType());
             cached.rangeReversed = axis->rangeReversed();
             cached.lastRange = axis->range();
+            cached.originValue = axisOrigin(axis);
             mCachedTicks[axis] = cached;
         }
 
@@ -553,29 +563,32 @@ void QCPGridRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
             valLength = float(ar->height());
         }
 
-        struct {
-            float width, height, yFlip, dpr;
-            float keyRangeLower, keyRangeUpper, keyAxisOffset, keyAxisLength, keyLogScale;
-            float valRangeLower, valRangeUpper, valAxisOffset, valAxisLength, valLogScale;
-            float _pad0, _pad1;
-        } params = {
+        // Same origin the grid-line vertices for this axis were baked against
+        // (cached at the last full rebuild) -- must match, not drift, or the
+        // shader's (coord - lower) would mix values relative to two different
+        // origins. See axisOrigin().
+        const double hOrigin = mCachedTicks.value(hAxis).originValue;
+        const double vOrigin = mCachedTicks.value(vAxis).originValue;
+
+        UboParams params = {
             float(outputSize.width()),
             float(outputSize.height()),
             isYUpInNDC ? -1.0f : 1.0f,
             dpr,
-            float(hAxis->range().lower),
-            float(hAxis->range().upper),
+            float(hAxis->range().lower - hOrigin),
+            float(hAxis->range().upper - hOrigin),
             keyOffset,
             keyLength,
             (hAxis->scaleType() == QCPAxis::stLogarithmic) ? 1.0f : 0.0f,
-            float(vAxis->range().lower),
-            float(vAxis->range().upper),
+            float(vAxis->range().lower - vOrigin),
+            float(vAxis->range().upper - vOrigin),
             valOffset,
             valLength,
             (vAxis->scaleType() == QCPAxis::stLogarithmic) ? 1.0f : 0.0f,
             0.0f, 0.0f
         };
         static_assert(sizeof(params) == kUniformBufferSize);
+        mLastUboParams[ar] = params;
         updates->updateDynamicBuffer(group.uniformBuffer, 0, sizeof(params), &params);
     }
 }

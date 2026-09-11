@@ -21,6 +21,7 @@ private slots:
     void dirtyDetectionRebuildsOnPenChange();
     void exportStillUsesQPainter();
     void tickMarksFollowPanWithoutRebuild();
+    void gridLinesStayAlignedWithTicksAtEpochScale();
 
 private:
     QCustomPlot* mPlot = nullptr;
