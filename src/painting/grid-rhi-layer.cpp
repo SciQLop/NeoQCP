@@ -566,9 +566,14 @@ void QCPGridRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
         // Same origin the grid-line vertices for this axis were baked against
         // (cached at the last full rebuild) -- must match, not drift, or the
         // shader's (coord - lower) would mix values relative to two different
-        // origins. See axisOrigin().
-        const double hOrigin = mCachedTicks.value(hAxis).originValue;
-        const double vOrigin = mCachedTicks.value(vAxis).originValue;
+        // origins. See axisOrigin(). constFind() avoids copying the whole
+        // (QVector-bearing) CachedAxisTicks just to read one double.
+        auto cachedOrigin = [this](QCPAxis* axis) {
+            auto it = mCachedTicks.constFind(axis);
+            return it == mCachedTicks.constEnd() ? 0.0 : it.value().originValue;
+        };
+        const double hOrigin = cachedOrigin(hAxis);
+        const double vOrigin = cachedOrigin(vAxis);
 
         UboParams params = {
             float(outputSize.width()),
