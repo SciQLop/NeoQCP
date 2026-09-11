@@ -57,6 +57,8 @@ private slots:
     void graphResamplerNaNSkipped();
     void graphResamplerEmptyBinsProduceNaN();
     void graph2HierarchicalResamplingActivates();
+    void graph2LineCacheRebuiltOnZoomWithBigData();
+    void graph2LineCacheRebuiltOnQueuedZoomWithBigData();
     void graph2SmallDataNoResampling();
     void graph2LargeToSmallDataFallback();
     void graphResamplerBinMinMaxKeyPositions();
@@ -74,6 +76,8 @@ private slots:
     // QCPMultiGraph pipeline integration
     void multiGraphSmallDataNoResampling();
     void multiGraphLargeDataL1L2();
+    void multiGraphLineCacheRebuiltOnZoom();
+    void multiGraphPendingSourceCommitsAfterZoomTriggeredRefetch();
     void multiGraphThresholdScalesWithColumnCount();
     void multiGraphRapidSetDataSource();
     void multiGraphExportSynchronousFallback();

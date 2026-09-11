@@ -1054,6 +1054,96 @@ void TestPipeline::graph2HierarchicalResamplingActivates()
     QVERIFY(g->mL2Result->size() < N / 10);
 }
 
+void TestPipeline::graph2LineCacheRebuiltOnZoomWithBigData()
+{
+    // Reproducer: user report that zooming (in either direction) on a big
+    // (resampled) dataset leaves the graph's rendered lines "stuck" while
+    // axes/grid keep tracking the new range correctly.
+    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+
+    const int N = 10'000'001;
+    auto source = std::make_shared<SyntheticLargeSource>(N);
+
+    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
+
+    mPlot->xAxis->setRange(0, N - 1);
+    mPlot->yAxis->setRange(-1, 1);
+    g->setDataSource(source);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    // Wait for async L1 build to finish, then let onL1Ready's queued replot
+    // (or an explicit one here) run L2 synchronously for the full range.
+    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(g->mL2Result);
+
+    auto linesFullRange = g->mCachedLines;
+    QVERIFY(!linesFullRange.isEmpty());
+
+    // Zoom IN on the big (resampled) dataset.
+    mPlot->xAxis->setRange(N * 0.25, N * 0.75);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    auto linesZoomedIn = g->mCachedLines;
+    QVERIFY2(linesZoomedIn != linesFullRange, "zoom-in did not rebuild the line cache");
+
+    // Zoom back OUT to the full range.
+    mPlot->xAxis->setRange(0, N - 1);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    auto linesZoomedOut = g->mCachedLines;
+    QVERIFY2(linesZoomedOut != linesZoomedIn, "zoom-out did not rebuild the line cache");
+}
+
+void TestPipeline::graph2LineCacheRebuiltOnQueuedZoomWithBigData()
+{
+    // Same as above, but driven the way real interaction actually drives it:
+    // several range changes fired in quick succession, each via
+    // rpQueuedReplot (what QCPAxisRect::wheelEvent/mouseMoveEvent use), with
+    // only one event-loop pump at the end -- not one synchronous replot per
+    // step. Isolates whether the bug needs the coalesced/queued path.
+    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+
+    const int N = 10'000'001;
+    auto source = std::make_shared<SyntheticLargeSource>(N);
+
+    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
+
+    mPlot->xAxis->setRange(0, N - 1);
+    mPlot->yAxis->setRange(-1, 1);
+    g->setDataSource(source);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(g->mL2Result);
+
+    auto linesFullRange = g->mCachedLines;
+    QVERIFY(!linesFullRange.isEmpty());
+
+    double lo = 0, hi = N - 1;
+    for (int i = 0; i < 6; ++i) {
+        double width = (hi - lo) * 0.5;
+        double center = (hi + lo) / 2.0;
+        lo = center - width / 2.0;
+        hi = center + width / 2.0;
+        mPlot->xAxis->setRange(lo, hi);
+        mPlot->replot(QCustomPlot::rpQueuedReplot);
+    }
+    QCoreApplication::processEvents();
+    QTest::qWait(50);
+    QCoreApplication::processEvents();
+
+    auto linesZoomedIn = g->mCachedLines;
+    QVERIFY2(linesZoomedIn != linesFullRange, "queued zoom-in did not rebuild the line cache");
+
+    mPlot->xAxis->setRange(0, N - 1);
+    mPlot->replot(QCustomPlot::rpQueuedReplot);
+    QCoreApplication::processEvents();
+    QTest::qWait(50);
+    QCoreApplication::processEvents();
+
+    auto linesZoomedOut = g->mCachedLines;
+    QVERIFY2(linesZoomedOut != linesZoomedIn, "queued zoom-out did not rebuild the line cache");
+}
+
 void TestPipeline::graph2SmallDataNoResampling()
 {
     auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
@@ -1904,6 +1994,100 @@ void TestPipeline::multiGraphLargeDataL1L2()
     // Trigger replot to build L2
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QVERIFY(mg->mL2Result);
+}
+
+void TestPipeline::multiGraphLineCacheRebuiltOnZoom()
+{
+    // Same reproducer as graph2LineCacheRebuiltOnZoomWithBigData but for
+    // QCPMultiGraph, which is what SciQLopMultiGraphBase (SciQLop's real
+    // multi-component line graphs) actually uses under the hood.
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+
+    const int N = 10'000'001;
+    auto source = std::make_shared<SyntheticLargeMultiSource>(N, 3);
+    mPlot->xAxis->setRange(0, N - 1);
+    mPlot->yAxis->setRange(-1, 1);
+    mg->setDataSource(source);
+
+    QVERIFY(mg->pipeline().hasTransform());
+
+    QEventLoop loop;
+    QTimer timeout;
+    timeout.setSingleShot(true);
+    timeout.start(30000);
+    connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
+    connect(&mg->pipeline(), &QCPMultiGraphPipeline::finished,
+            &loop, &QEventLoop::quit);
+    loop.exec();
+    QVERIFY(mg->mL1Cache);
+
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(mg->mL2Result);
+
+    auto linesFullRange = mg->mCachedLines;
+    QVERIFY(!linesFullRange.isEmpty());
+
+    // Zoom IN on the big (resampled) dataset.
+    mPlot->xAxis->setRange(N * 0.25, N * 0.75);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    auto linesZoomedIn = mg->mCachedLines;
+    QVERIFY2(linesZoomedIn != linesFullRange, "zoom-in did not rebuild the line cache");
+
+    // Zoom back OUT to the full range.
+    mPlot->xAxis->setRange(0, N - 1);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    auto linesZoomedOut = mg->mCachedLines;
+    QVERIFY2(linesZoomedOut != linesZoomedIn, "zoom-out did not rebuild the line cache");
+}
+
+void TestPipeline::multiGraphPendingSourceCommitsAfterZoomTriggeredRefetch()
+{
+    // Simulates real usage: a zoom triggers a fresh data fetch for the new
+    // visible range (SciQLopMultiGraphBase::set_data -> setDataSource on an
+    // already-rendered graph). Checks the newly fetched/resampled data
+    // actually reaches the display, not just that a job runs.
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+
+    const int N1 = 10'000'001;
+    auto source1 = std::make_shared<SyntheticLargeMultiSource>(N1, 3);
+    mPlot->xAxis->setRange(0, N1 - 1);
+    mPlot->yAxis->setRange(-1, 1);
+    mg->setDataSource(source1);
+
+    {
+        QEventLoop loop;
+        QTimer timeout; timeout.setSingleShot(true); timeout.start(30000);
+        connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
+        connect(&mg->pipeline(), &QCPMultiGraphPipeline::finished, &loop, &QEventLoop::quit);
+        loop.exec();
+    }
+    QVERIFY(mg->mL1Cache);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(mg->mHasRenderedRange);
+
+    // Zoom in and, as a real zoom-triggered refetch would, supply fresh
+    // (still large) data for the new range.
+    mPlot->xAxis->setRange(N1 * 0.25, N1 * 0.75);
+    const int N2 = 5'000'001;
+    auto source2 = std::make_shared<SyntheticLargeMultiSource>(N2, 3);
+    mg->setDataSource(source2);
+
+    // Wait for the pending source's L1 build to finish.
+    {
+        QEventLoop loop;
+        QTimer timeout; timeout.setSingleShot(true); timeout.start(30000);
+        connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
+        connect(&mg->pipeline(), &QCPMultiGraphPipeline::finished, &loop, &QEventLoop::quit);
+        loop.exec();
+    }
+
+    // Give the debounced swap (default 200ms debounce, 1000ms cap) every
+    // chance to fire, pumping the event loop the whole time.
+    QTest::qWait(1500);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    QVERIFY2(mg->dataSource() == source2.get(),
+             "the newly fetched data source never got committed as displayed");
 }
 
 void TestPipeline::multiGraphThresholdScalesWithColumnCount()
