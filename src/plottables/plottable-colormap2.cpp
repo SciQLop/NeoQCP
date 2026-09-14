@@ -248,13 +248,6 @@ void QCPColorMap2::onViewportChanged()
     if (!axisRect) return;
 
     mPipeline.onViewportChanged(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data()));
-
-    // Dirty the layer on every viewport change so a pan is handled even when it
-    // arrives via set_range (axis sync) rather than the interactive drag path
-    // (which already calls markAffectedLayersDirty). stallPixelOffset() then lets
-    // the compositor translate the existing texture instead of repainting it.
-    if (mLayer)
-        mLayer->markDirty();
 }
 
 QPointF QCPColorMap2::stallPixelOffset() const

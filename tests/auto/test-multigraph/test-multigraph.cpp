@@ -572,3 +572,59 @@ void TestMultiGraph::renderAllLineStyles()
         mPlot->replot(); // Should not crash
     }
 }
+
+// Reproducer for SciQLop's "zoom moves everything except the graph" bug.
+// SciQLopPlot's wheel/pinch handlers (and set_range / axis synchronizers) only
+// change the axis range and queue a replot. replot() repaints dirty buffers
+// only, and ensureAtLeastOneBufferDirty() dirties the range-dependent layers
+// only when NO buffer is dirty yet. So an unrelated dirty buffer (an item
+// toggled on the overlay layer, a busy legend entry, a catalog span) makes the
+// replot skip the graph layer entirely: axes, grid and spans follow the new
+// range, the graph stays at the old one until something else dirties it.
+// The drag path never showed it because QCPAxisRect::mouseMoveEvent calls
+// markAffectedLayersDirty() explicitly.
+static QCPMultiGraph* renderedMultiGraph(QCustomPlot* plot)
+{
+    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    std::vector<double> keys(21), vals(21);
+    for (int i = 0; i <= 20; ++i) { keys[i] = i; vals[i] = i * 10.0; }
+    mg->setData(std::move(keys), std::vector<std::vector<double>>{std::move(vals)});
+    plot->xAxis->setRange(0, 20);
+    plot->yAxis->setRange(0, 200);
+    plot->replot(QCustomPlot::rpImmediateRefresh);
+    return mg;
+}
+
+static void dirtyOverlayBuffer(QCustomPlot* plot)
+{
+    auto* text = new QCPItemText(plot);
+    text->setLayer(QLatin1String("overlay"));
+    plot->replot(QCustomPlot::rpImmediateRefresh); // settle the add
+    text->setVisible(false);                        // dirties only the overlay buffer
+}
+
+void TestMultiGraph::renderZoomRepaintsWhenAnotherBufferIsDirty()
+{
+    auto* mg = renderedMultiGraph(mPlot);
+    QVERIFY(mg->mHasRenderedRange);
+    dirtyOverlayBuffer(mPlot);
+
+    mPlot->xAxis->scaleRange(0.5, 10.0); // what SciQLopPlot::wheelEvent/_pinch_zoom do
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    QCOMPARE(mg->mRenderedRange.key.lower, mPlot->xAxis->range().lower);
+    QCOMPARE(mg->mRenderedRange.key.upper, mPlot->xAxis->range().upper);
+}
+
+void TestMultiGraph::renderSetRangeRepaintsWhenAnotherBufferIsDirty()
+{
+    auto* mg = renderedMultiGraph(mPlot);
+    QVERIFY(mg->mHasRenderedRange);
+    dirtyOverlayBuffer(mPlot);
+
+    mPlot->xAxis->setRange(5, 15); // SciQLopPlotAxis::set_range / axis synchronizers
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    QCOMPARE(mg->mRenderedRange.key.lower, 5.0);
+    QCOMPARE(mg->mRenderedRange.key.upper, 15.0);
+}

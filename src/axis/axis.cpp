@@ -600,6 +600,24 @@ void QCPAxis::setScaleType(QCPAxis::ScaleType type)
     }
 }
 
+/*! \internal
+
+  Every range setter ends here. A range change invalidates every layer that
+  depends on this axis (its own, the grid, the plottables attached to it), and
+  QCustomPlot::replot only repaints dirty buffers — so the layers are dirtied
+  here, at the source, rather than by each caller (drag, wheel, pinch, setRange
+  from axis synchronizers). QCustomPlot::ensureAtLeastOneBufferDirty() only
+  covers the case where nothing else is dirty; any unrelated dirty buffer would
+  otherwise leave the graph layer stale while axes and grid move.
+*/
+void QCPAxis::rangeDidChange(const QCPRange& oldRange)
+{
+    if (mAxisRect)
+        mAxisRect->markAffectedLayersDirty();
+    emit rangeChanged(mRange);
+    emit rangeChanged(mRange, oldRange);
+}
+
 /*!
   Sets the range of the axis.
 
@@ -624,8 +642,7 @@ void QCPAxis::setRange(const QCPRange& range)
     {
         mRange = range.sanitizedForLinScale();
     }
-    emit rangeChanged(mRange);
-    emit rangeChanged(mRange, oldRange);
+    rangeDidChange(oldRange);
 }
 
 /*!
@@ -701,8 +718,7 @@ void QCPAxis::setRange(double lower, double upper)
     {
         mRange = mRange.sanitizedForLinScale();
     }
-    emit rangeChanged(mRange);
-    emit rangeChanged(mRange, oldRange);
+    rangeDidChange(oldRange);
 }
 
 /*!
@@ -745,8 +761,7 @@ void QCPAxis::setRangeLower(double lower)
     {
         mRange = mRange.sanitizedForLinScale();
     }
-    emit rangeChanged(mRange);
-    emit rangeChanged(mRange, oldRange);
+    rangeDidChange(oldRange);
 }
 
 /*!
@@ -768,8 +783,7 @@ void QCPAxis::setRangeUpper(double upper)
     {
         mRange = mRange.sanitizedForLinScale();
     }
-    emit rangeChanged(mRange);
-    emit rangeChanged(mRange, oldRange);
+    rangeDidChange(oldRange);
 }
 
 /*!
@@ -1378,8 +1392,7 @@ void QCPAxis::moveRange(double diff)
         mRange.lower *= diff;
         mRange.upper *= diff;
     }
-    emit rangeChanged(mRange);
-    emit rangeChanged(mRange, oldRange);
+    rangeDidChange(oldRange);
 }
 
 /*!
@@ -1434,8 +1447,7 @@ void QCPAxis::scaleRange(double factor, double center)
                         "as range:"
                      << center;
     }
-    emit rangeChanged(mRange);
-    emit rangeChanged(mRange, oldRange);
+    rangeDidChange(oldRange);
 }
 
 /*!

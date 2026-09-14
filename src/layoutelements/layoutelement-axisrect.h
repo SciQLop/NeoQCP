@@ -178,6 +178,8 @@ protected:
 private:
     Q_DISABLE_COPY(QCPAxisRect)
 
+    friend class QCPAxis; // rangeDidChange() -> markAffectedLayersDirty()
+
     friend class QCustomPlot;
     friend class TestPaintBuffer;
 };

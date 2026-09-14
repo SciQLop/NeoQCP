@@ -477,6 +477,7 @@ protected:
 
 private:
     Q_DISABLE_COPY(QCPAxis)
+    void rangeDidChange(const QCPRange& oldRange);
 
     friend class QCustomPlot;
     friend class QCPGrid;

@@ -1310,7 +1310,6 @@ void QCPAxisRect::mouseMoveEvent(QMouseEvent* event, [[maybe_unused]] const QPoi
         {
             if (mParentPlot->noAntialiasingOnDrag())
                 mParentPlot->setNotAntialiasedElements(QCP::aeAll);
-            markAffectedLayersDirty();
             mParentPlot->replot(QCustomPlot::rpQueuedReplot);
         }
     }
@@ -1385,7 +1384,6 @@ void QCPAxisRect::wheelEvent(QWheelEvent* event)
                         axis->scaleRange(factor, axis->pixelToCoord(pos.y()));
                 }
             }
-            markAffectedLayersDirty();
             mParentPlot->replot(QCustomPlot::rpQueuedReplot);
         }
     }
@@ -1415,7 +1413,11 @@ void QCPAxisRect::markAffectedLayersDirty()
     }
     for (QCPAbstractPlottable* p : mParentPlot->mPlottables)
     {
-        if (p->keyAxis()->axisRect() == this || p->valueAxis()->axisRect() == this)
+        // A removed axis leaves the plottable's QPointer null (see
+        // TestQCPAxisRect::axisRemovalConsequencesToPlottables).
+        QCPAxis* key = p->keyAxis();
+        QCPAxis* val = p->valueAxis();
+        if ((key && key->axisRect() == this) || (val && val->axisRect() == this))
             markOnce(p->layer());
     }
 }
