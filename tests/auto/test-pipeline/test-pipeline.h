@@ -78,6 +78,7 @@ private slots:
     void multiGraphLargeDataL1L2();
     void multiGraphLineCacheRebuiltOnZoom();
     void multiGraphPendingSourceCommitsAfterZoomTriggeredRefetch();
+    void multiGraphMultipleRapidLegitimateSupersessionsCommitLast();
     void multiGraphThresholdScalesWithColumnCount();
     void multiGraphRapidSetDataSource();
     void multiGraphExportSynchronousFallback();

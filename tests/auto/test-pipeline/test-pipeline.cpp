@@ -2090,6 +2090,64 @@ void TestPipeline::multiGraphPendingSourceCommitsAfterZoomTriggeredRefetch()
              "the newly fetched data source never got committed as displayed");
 }
 
+void TestPipeline::multiGraphMultipleRapidLegitimateSupersessionsCommitLast()
+{
+    // Per the user: assume the remote side is well-behaved (every request
+    // honoured, responses arrive in order) -- the question is whether
+    // NeoQCP's OWN pending-source generation-guard ("the fast feedback
+    // loop": keep old data shown, swap when the new source commits) holds up
+    // when it is superseded MULTIPLE times in a row before any of the
+    // earlier pending sources ever finish their async L1 build or commit.
+    // multiGraphRapidSetDataSource() (above) only calls setDataSource()
+    // before the graph has ever rendered, so canDefer() is false both times
+    // and neither call actually stages a pending source -- it doesn't
+    // exercise this path at all.
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+
+    const int N = 10'000'001;
+    auto source0 = std::make_shared<SyntheticLargeMultiSource>(N, 3);
+    mPlot->xAxis->setRange(0, N - 1);
+    mPlot->yAxis->setRange(-1, 1);
+    mg->setDataSource(source0);
+    {
+        QEventLoop loop;
+        QTimer timeout; timeout.setSingleShot(true); timeout.start(30000);
+        connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
+        connect(&mg->pipeline(), &QCPMultiGraphPipeline::finished, &loop, &QEventLoop::quit);
+        loop.exec();
+    }
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(mg->mHasRenderedRange); // canDefer() now possible
+
+    // Five legitimate, in-order, back-to-back "remote responses" -- each
+    // superseding the previous PENDING one before it has any chance to
+    // finish its own L1 build or commit.
+    std::vector<std::shared_ptr<SyntheticLargeMultiSource>> sources;
+    for (int i = 1; i <= 5; ++i)
+    {
+        auto s = std::make_shared<SyntheticLargeMultiSource>(N, 3);
+        sources.push_back(s);
+        mg->setDataSource(s);
+    }
+    auto lastSource = sources.back();
+
+    // Now let it all actually settle: any in-flight pipeline job, then past
+    // the debounce + max-wait cap.
+    {
+        QEventLoop loop;
+        QTimer timeout; timeout.setSingleShot(true); timeout.start(30000);
+        connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
+        connect(&mg->pipeline(), &QCPMultiGraphPipeline::finished, &loop, &QEventLoop::quit);
+        loop.exec();
+    }
+    QTest::qWait(1500);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    QVERIFY2(mg->dataSource() == lastSource.get(),
+             "the last of 5 rapid, legitimate, in-order supersessions never "
+             "got committed as displayed");
+}
+
 void TestPipeline::multiGraphThresholdScalesWithColumnCount()
 {
     // 200 points * 2 columns = 400 < 100K threshold → no resampling
