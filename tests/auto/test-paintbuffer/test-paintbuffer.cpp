@@ -551,3 +551,53 @@ void TestPaintBuffer::colormap2_drawSkipsNonOverlappingStaleResample()
     QVERIFY2(cm->stallPixelOffset().isNull(),
              "draw() updated its baseline against a non-overlapping stale resample");
 }
+
+namespace {
+QImage bufferImage(const QSharedPointer<QCPAbstractPaintBuffer>& buf)
+{
+    QPixmap pm(buf->size());
+    pm.fill(Qt::transparent);
+    QCPPainter painter(&pm);
+    buf->draw(&painter);
+    painter.end();
+    return pm.toImage();
+}
+}
+
+void TestPaintBuffer::bufferedLayerAddedLate_leavesNoStaleAxisLabels()
+{
+    mPlot->addLayer("spans", mPlot->layer("main"), QCustomPlot::limAbove);
+    mPlot->layer("spans")->setMode(QCPLayer::lmBuffered);
+    mPlot->addLayer("cmap", mPlot->layer("main"), QCustomPlot::limBelow);
+    mPlot->layer("cmap")->setMode(QCPLayer::lmBuffered);
+    auto* curve = new QCPCurve(mPlot->xAxis, mPlot->yAxis);
+    curve->setName("MMS1 GSE");
+    curve->setData(QVector<double>{0, 1, 2, 3}, QVector<double>{0, 5, 2, 4});
+    mPlot->legend->setVisible(true);
+    mPlot->xAxis->setRange(0, 5);
+    mPlot->yAxis->setRange(0, 5);
+    mPlot->replot(QCustomPlot::rpQueuedReplot);
+    QTest::qWait(50);
+
+    // A buffered layer inserted after content was rendered shifts every later
+    // layer to a different buffer index, orphaning the buffer that held the labels.
+    (void)mPlot->addLayer("markers", mPlot->layer("main"), QCustomPlot::limAbove);
+    mPlot->layer("markers")->setMode(QCPLayer::lmBuffered);
+
+    mPlot->xAxis->setRange(-40, 60);
+    mPlot->yAxis->setRange(-40, 60);
+    mPlot->replot(QCustomPlot::rpQueuedReplot);
+    QTest::qWait(50);
+
+    QList<QImage> incremental;
+    for (const auto& buf : std::as_const(mPlot->mPaintBuffers))
+        incremental << bufferImage(buf);
+
+    for (const auto& buf : std::as_const(mPlot->mPaintBuffers))
+        buf->setInvalidated();
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    for (int i = 0; i < mPlot->mPaintBuffers.size(); ++i)
+        QVERIFY2(incremental[i] == bufferImage(mPlot->mPaintBuffers[i]),
+                 qPrintable(QString("buffer %1 differs from a full repaint").arg(i)));
+}

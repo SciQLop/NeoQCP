@@ -29,6 +29,7 @@ private slots:
     void skipRepaint_bufferNotReuploadedOnPan();
 
     void setVisible_dirtiesLayerBuffer();
+    void bufferedLayerAddedLate_leavesNoStaleAxisLabels();
     void setVisible_noOpWhenUnchanged();
 
     void colormap2_panDirtiesLayerBuffer();

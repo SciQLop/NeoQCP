@@ -1804,6 +1804,11 @@ bool QCustomPlot::addLayer(const QString& name, QCPLayer* otherLayer,
     mLayers.insert(otherLayer->index() + (insertMode == limAbove ? 1 : 0), newLayer);
     updateLayerIndices();
     setupPaintBuffers(); // associates new layer with the appropriate paint buffer
+    // Buffers are matched to layers by index, so inserting a layer shifts later layers onto
+    // buffers that still hold another layer's pixels: repaint them all instead of compositing
+    // stale content.
+    for (auto& buffer : std::as_const(mPaintBuffers))
+        buffer->setInvalidated();
     return true;
 }
 
