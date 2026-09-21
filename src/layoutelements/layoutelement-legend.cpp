@@ -254,6 +254,14 @@ QCPPlottableLegendItem::QCPPlottableLegendItem(QCPLegend* parent, QCPAbstractPlo
         : QCPAbstractLegendItem(parent), mPlottable(plottable)
 {
     setAntialiased(false);
+    repaintWhenBusyChanges(plottable);
+}
+
+void QCPAbstractLegendItem::repaintWhenBusyChanges(QCPAbstractPlottable* plottable)
+{
+    if (plottable)
+        connect(plottable, &QCPAbstractPlottable::visuallyBusyChanged, this,
+                [this](bool) { if (auto* legendLayer = layer()) legendLayer->markDirty(); });
 }
 
 /*! \internal

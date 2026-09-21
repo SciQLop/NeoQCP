@@ -7,6 +7,7 @@ QCPGroupLegendItem::QCPGroupLegendItem(QCPLegend* parent, QCPMultiGraph* multiGr
     , mMultiGraph(multiGraph)
 {
     setAntialiased(false);
+    repaintWhenBusyChanges(multiGraph);
 }
 
 void QCPGroupLegendItem::setExpanded(bool expanded)

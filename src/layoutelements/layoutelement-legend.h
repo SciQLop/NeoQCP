@@ -91,6 +91,12 @@ protected:
     QColor mSelectedTextColor;
     bool mSelectable, mSelected;
 
+    //! The busy symbol is part of this item, but the plottable's own layer is not the
+    //! legend's: repaint the legend layer when the symbol shows or hides. This only marks
+    //! the layer dirty; the replot that paints it (and re-lays out the wider legend) is the
+    //! one QCPAbstractPlottable::onDebounceTimeout queues right after visuallyBusyChanged.
+    void repaintWhenBusyChanges(QCPAbstractPlottable* plottable);
+
     // reimplemented virtual methods:
     virtual QCP::Interaction selectionCategory() const override;
     virtual void applyDefaultAntialiasingHint(QCPPainter* painter) const override;

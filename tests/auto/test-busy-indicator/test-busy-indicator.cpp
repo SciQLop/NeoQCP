@@ -304,6 +304,43 @@ void TestBusyIndicator::visualBusyToggleForcesLayerRepaint()
     QVERIFY(invalidatedAtToggle);
 }
 
+void TestBusyIndicator::visualBusyToggleRepaintsTheLegend()
+{
+    // The busy symbol is drawn by the legend, which lives on another layer than the
+    // plottable. Only the plottable's own layer used to be repainted, so the symbol
+    // stayed on screen after the data arrived until something else dirtied the legend.
+    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    graph->setName("legend busy");
+    graph->setData(std::vector<double>{1.0, 2.0}, std::vector<double>{1.0, 2.0});
+    graph->addToLegend();
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    QCPLayer* legendLayer = mPlot->layer("legend");
+    QVERIFY(legendLayer);
+    const auto legendBuffer = legendLayer->mPaintBuffer.toStrongRef();
+    QVERIFY(legendBuffer);
+    QVERIFY(!legendBuffer->contentDirty());
+
+    // Sampled inside the toggle signal, before the queued replot can run.
+    bool legendDirtyAtToggle = false;
+    connect(graph, &QCPAbstractPlottable::visuallyBusyChanged, this,
+            [&](bool) { legendDirtyAtToggle = legendBuffer->contentDirty(); });
+
+    graph->setBusyShowDelayMs(0);
+    graph->setBusyHideDelayMs(0);
+    graph->setBusy(true);
+    QTRY_VERIFY_WITH_TIMEOUT(graph->visuallyBusy(), 2000);
+    QVERIFY2(legendDirtyAtToggle, "the busy symbol appears only on the next legend repaint");
+
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(!legendBuffer->contentDirty());
+
+    legendDirtyAtToggle = false;
+    graph->setBusy(false);
+    QTRY_VERIFY_WITH_TIMEOUT(!graph->visuallyBusy(), 2000);
+    QVERIFY2(legendDirtyAtToggle, "the busy symbol stays until the next legend repaint");
+}
+
 void TestBusyIndicator::gpuEntriesCarryFadeAlpha()
 {
     if (!showAndHasRhiBusy(mPlot))

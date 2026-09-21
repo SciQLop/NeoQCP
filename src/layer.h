@@ -119,6 +119,7 @@ private:
     friend class QCustomPlot;
     friend class QCPLayerable;
     friend class TestPaintBuffer;
+    friend class TestBusyIndicator;
 };
 Q_DECLARE_METATYPE(QCPLayer::LayerMode)
 
