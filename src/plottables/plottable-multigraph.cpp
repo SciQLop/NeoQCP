@@ -322,8 +322,11 @@ void QCPMultiGraph::setComponentVisible(int index, bool visible)
     if (index < 0 || index >= mComponents.size() || mComponents[index].visible == visible)
         return;
     mComponents[index].visible = visible;
+    // A rebuild while the component was hidden dropped its cached lines: rebuild again.
+    mLineCacheDirty = true;
     if (mLayer)
         mLayer->invalidatePaintBuffer();
+    emit componentVisibilityChanged();
 }
 
 double QCPMultiGraph::componentValueAt(int column, int index) const

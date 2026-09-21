@@ -127,6 +127,10 @@ public:
     bool addToLegend(QCPLegend* legend) override;
     bool removeFromLegend(QCPLegend* legend) const override;
 
+Q_SIGNALS:
+    //! A component was shown or hidden: the legend group row draws one segment per visible one.
+    void componentVisibilityChanged();
+
 protected:
     void draw(QCPPainter* painter) override;
     void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;

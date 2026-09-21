@@ -60,3 +60,44 @@ void TestQCPLegend::addAndRemove()
 
 
 
+
+void TestQCPLegend::itemTextColorRepaintsTheLegend()
+{
+  // Dimming an entry (a hidden graph) only changes its text colour. The legend lives on a
+  // layer of its own, so the setter must dirty it or the entry keeps its old colour until
+  // something else repaints the legend.
+  auto *graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+  graph->setName("dimmed");
+  graph->addToLegend();
+  mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+  const auto buffer = mPlot->layer("legend")->mPaintBuffer.toStrongRef();
+  QVERIFY(buffer);
+  QVERIFY(!buffer->contentDirty());
+
+  QCPPlottableLegendItem *item = mPlot->legend->itemWithPlottable(graph);
+  QVERIFY(item);
+  item->setTextColor(Qt::red);
+  QVERIFY2(buffer->contentDirty(), "a new text colour must repaint the legend");
+
+  mPlot->replot(QCustomPlot::rpImmediateRefresh);
+  QVERIFY(!buffer->contentDirty());
+  item->setTextColor(Qt::red);
+  QVERIFY2(!buffer->contentDirty(), "an unchanged colour must not repaint it");
+}
+
+void TestQCPLegend::groupRowFollowsComponentVisibility()
+{
+  auto *mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+  mg->setData(std::vector<double>{1.0, 2.0, 3.0},
+              std::vector<std::vector<double>>{{10.0, 20.0, 30.0}, {-1.0, -2.0, -3.0}});
+  mg->addToLegend();
+  mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+  const auto buffer = mPlot->layer("legend")->mPaintBuffer.toStrongRef();
+  QVERIFY(buffer);
+  QVERIFY(!buffer->contentDirty());
+
+  mg->setComponentVisible(0, false);
+  QVERIFY2(buffer->contentDirty(), "the group row draws one segment per visible component");
+}

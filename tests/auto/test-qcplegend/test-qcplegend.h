@@ -10,6 +10,8 @@ private slots:
   
   void autoAddPlottables();
   void addAndRemove();
+  void itemTextColorRepaintsTheLegend();
+  void groupRowFollowsComponentVisibility();
   
 private:
   QCustomPlot *mPlot;

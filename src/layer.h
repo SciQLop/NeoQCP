@@ -120,6 +120,7 @@ private:
     friend class QCPLayerable;
     friend class TestPaintBuffer;
     friend class TestBusyIndicator;
+    friend class TestQCPLegend;
 };
 Q_DECLARE_METATYPE(QCPLayer::LayerMode)
 

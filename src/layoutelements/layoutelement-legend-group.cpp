@@ -8,6 +8,9 @@ QCPGroupLegendItem::QCPGroupLegendItem(QCPLegend* parent, QCPMultiGraph* multiGr
 {
     setAntialiased(false);
     repaintWhenBusyChanges(multiGraph);
+    if (multiGraph)
+        connect(multiGraph, &QCPMultiGraph::componentVisibilityChanged, this,
+                [this] { if (auto* legendLayer = layer()) legendLayer->markDirty(); });
 }
 
 void QCPGroupLegendItem::setExpanded(bool expanded)

@@ -663,3 +663,34 @@ void TestMultiGraph::componentVisibilityToggleForcesLayerRepaint()
     mg->setComponentVisible(1, true);
     QVERIFY2(!mainLayer->canSkipRepaintForTranslation(), "showing a component must repaint");
 }
+
+void TestMultiGraph::componentShownAfterARebuildIsDrawnAgain()
+{
+    // A rebuild of the line cache while a component is hidden drops its lines. Showing it
+    // again must rebuild them: the cache is otherwise "clean" and the component stays empty.
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    std::vector<double> keys(1000);
+    std::vector<std::vector<double>> columns(3, std::vector<double>(1000));
+    for (int i = 0; i < 1000; ++i)
+    {
+        keys[i] = i;
+        for (int c = 0; c < 3; ++c)
+            columns[c][i] = std::sin(i * 0.01 + c);
+    }
+    mg->setData(std::move(keys), std::move(columns));
+    mPlot->xAxis->setRange(0, 1000);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->pipeline().isBusy(), 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(!mg->mCachedLines[1].isEmpty());
+
+    mg->setComponentVisible(1, false);
+    mPlot->xAxis->setRange(0, 200);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(mg->mCachedLines[1].isEmpty());
+
+    mg->setComponentVisible(1, true);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY2(!mg->mCachedLines[1].isEmpty(), "the shown component was not rebuilt");
+}

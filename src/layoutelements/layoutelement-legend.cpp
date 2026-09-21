@@ -95,7 +95,11 @@ QCPAbstractLegendItem::QCPAbstractLegendItem(QCPLegend* parent)
 */
 void QCPAbstractLegendItem::setFont(const QFont& font)
 {
+    if (mFont == font)
+        return;
     mFont = font;
+    if (mLayer)
+        mLayer->markDirty();
 }
 
 /*!
@@ -105,7 +109,11 @@ void QCPAbstractLegendItem::setFont(const QFont& font)
 */
 void QCPAbstractLegendItem::setTextColor(const QColor& color)
 {
+    if (mTextColor == color)
+        return;
     mTextColor = color;
+    if (mLayer)
+        mLayer->markDirty();
 }
 
 /*!
@@ -116,7 +124,11 @@ void QCPAbstractLegendItem::setTextColor(const QColor& color)
 */
 void QCPAbstractLegendItem::setSelectedFont(const QFont& font)
 {
+    if (mSelectedFont == font)
+        return;
     mSelectedFont = font;
+    if (mLayer)
+        mLayer->markDirty();
 }
 
 /*!
@@ -127,7 +139,11 @@ void QCPAbstractLegendItem::setSelectedFont(const QFont& font)
 */
 void QCPAbstractLegendItem::setSelectedTextColor(const QColor& color)
 {
+    if (mSelectedTextColor == color)
+        return;
     mSelectedTextColor = color;
+    if (mLayer)
+        mLayer->markDirty();
 }
 
 /*!
