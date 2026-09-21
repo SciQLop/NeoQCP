@@ -365,3 +365,36 @@ void TestPipeline::plottableOffsetsRefreshedAtRenderTime()
     mPlot->update();
     QTRY_VERIFY_WITH_TIMEOUT(prl->lastUniformOffset() == expectedB, 2000);
 }
+
+void TestPipeline::visibilityToggleForcesLayerRepaint()
+{
+    // After a pan the layer may repaint by translating its old GPU entries. Showing a
+    // graph again must not take that shortcut: its entries were not kept while it was
+    // hidden, so a translated layer would stay empty until the next real repaint.
+    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    QVector<double> keys(1000), values(1000);
+    for (int i = 0; i < 1000; ++i)
+    {
+        keys[i] = i;
+        values[i] = std::sin(i * 0.01);
+    }
+    graph->setData(std::move(keys), std::move(values));
+    mPlot->xAxis->setRange(0, 1000);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!graph->pipeline().isBusy(), 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    QCPLayer* mainLayer = mPlot->layer("main");
+    QVERIFY(mainLayer);
+
+    mPlot->xAxis->setRange(50, 1050);
+    QVERIFY(mainLayer->canSkipRepaintForTranslation());
+    graph->setVisible(false);
+    QVERIFY2(!mainLayer->canSkipRepaintForTranslation(), "hiding must repaint, not translate");
+
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    mPlot->xAxis->setRange(100, 1100);
+    graph->setVisible(true);
+    QVERIFY2(!mainLayer->canSkipRepaintForTranslation(), "showing must repaint, not translate");
+}

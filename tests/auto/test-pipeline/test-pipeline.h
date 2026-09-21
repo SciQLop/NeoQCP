@@ -118,6 +118,7 @@ private slots:
     // Layer-level GPU translation
     void stallPixelOffsetGraph2Busy();
     void stallPixelOffsetIdleIsZero();
+    void visibilityToggleForcesLayerRepaint();
     void layerPixelOffsetFromBusyChild();
     void layerPixelOffsetZeroWhenNoAsyncChildren();
     void layerTranslationClippedToAxisRect();

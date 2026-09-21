@@ -75,6 +75,10 @@ public:
     // Components
     [[nodiscard]] int componentCount() const { return mComponents.size(); }
     QCPGraphComponent& component(int index) { return mComponents[index]; }
+    //! Shows or hides one component and repaints the layer. Setting `component(i).visible`
+    //! directly is not observed: a layer that translates after a pan would keep the old
+    //! GPU entries.
+    void setComponentVisible(int index, bool visible);
     const QCPGraphComponent& component(int index) const { return mComponents[index]; }
     void setComponentNames(const QStringList& names);
     void setComponentColors(const QList<QColor>& colors);

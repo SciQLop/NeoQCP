@@ -58,6 +58,7 @@ private slots:
     void renderAllLineStyles();
     void renderZoomRepaintsWhenAnotherBufferIsDirty();
     void renderSetRangeRepaintsWhenAnotherBufferIsDirty();
+    void componentVisibilityToggleForcesLayerRepaint();
 
 private:
     QCustomPlot* mPlot = nullptr;

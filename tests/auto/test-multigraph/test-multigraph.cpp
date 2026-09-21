@@ -628,3 +628,38 @@ void TestMultiGraph::renderSetRangeRepaintsWhenAnotherBufferIsDirty()
     QCOMPARE(mg->mRenderedRange.key.lower, 5.0);
     QCOMPARE(mg->mRenderedRange.key.upper, 15.0);
 }
+
+void TestMultiGraph::componentVisibilityToggleForcesLayerRepaint()
+{
+    // A component is shown or hidden through setComponentVisible(): the
+    // layer must repaint (not translate its old GPU entries after a pan), or a
+    // shown component stays missing until something else forces a repaint.
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    std::vector<double> keys(1000);
+    std::vector<std::vector<double>> columns(3, std::vector<double>(1000));
+    for (int i = 0; i < 1000; ++i)
+    {
+        keys[i] = i;
+        for (int c = 0; c < 3; ++c)
+            columns[c][i] = std::sin(i * 0.01 + c);
+    }
+    mg->setData(std::move(keys), std::move(columns));
+    mPlot->xAxis->setRange(0, 1000);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->pipeline().isBusy(), 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    QCPLayer* mainLayer = mPlot->layer("main");
+    QVERIFY(mainLayer);
+
+    mPlot->xAxis->setRange(50, 1050);
+    QVERIFY(mainLayer->canSkipRepaintForTranslation());
+    mg->setComponentVisible(1, false);
+    QVERIFY2(!mainLayer->canSkipRepaintForTranslation(), "hiding a component must repaint");
+
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    mPlot->xAxis->setRange(100, 1100);
+    mg->setComponentVisible(1, true);
+    QVERIFY2(!mainLayer->canSkipRepaintForTranslation(), "showing a component must repaint");
+}

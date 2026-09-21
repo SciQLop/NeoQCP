@@ -317,6 +317,15 @@ void QCPMultiGraph::setComponentPens(const QList<QPen>& pens)
     }
 }
 
+void QCPMultiGraph::setComponentVisible(int index, bool visible)
+{
+    if (index < 0 || index >= mComponents.size() || mComponents[index].visible == visible)
+        return;
+    mComponents[index].visible = visible;
+    if (mLayer)
+        mLayer->invalidatePaintBuffer();
+}
+
 double QCPMultiGraph::componentValueAt(int column, int index) const
 {
     // column comes from componentCount(), which may already reflect a wider
