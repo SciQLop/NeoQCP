@@ -140,8 +140,14 @@ void QCPColormapRenderer::draw(QCPPainter* painter, QCPAxis* keyAxis, QCPAxis* v
         // QPainter image drawn below (render() is only skipped by hasContent(), not
         // by re-checking the size). Export mode (pmNoCaching) never reaches here, so
         // this cannot clear content a later on-screen frame still needs.
+        //
+        // mContourOnGpu also needs to follow: updateContours() (called before draw(),
+        // see plottable-colormap2.cpp) only builds the CPU contour fallback when this
+        // is false, so leaving it true here would draw an empty or stale contour
+        // overlay on every frame the colormap stays oversized, not just this one.
         if (mRhiLayer)
             mRhiLayer->clear();
+        mContourOnGpu = false;
     }
 
     painter->drawImage(imageRect, flippedMapImage(flips));
