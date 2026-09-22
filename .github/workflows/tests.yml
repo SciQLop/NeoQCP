@@ -101,4 +101,4 @@ jobs:
           meson compile -C build
       - name: Test
         run: |
-          meson test --print-errorlogs --no-rebuild -C build
+          meson test -v --no-rebuild -C build
