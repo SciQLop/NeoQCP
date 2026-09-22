@@ -93,11 +93,18 @@ jobs:
           echo "$GITHUB_WORKSPACE/Qt/${{ env.QT_VERSION }}/${{ matrix.qt_dir }}/bin" >> $GITHUB_PATH
           echo "DYLD_FALLBACK_FRAMEWORK_PATH=$GITHUB_WORKSPACE/Qt/${{ env.QT_VERSION }}/${{ matrix.qt_dir }}/lib" >> $GITHUB_ENV
           echo "MACOSX_DEPLOYMENT_TARGET=12.0" >> $GITHUB_ENV
-          # No offscreen here, unlike Linux/Windows: GitHub's macOS runners carry a real,
-          # logged-in GUI session, and Qt's offscreen platform plugin gets no real Metal
-          # device there (QRhi falls back to unavailable), which made GPU-path tests skip
-          # unpredictably instead of running for real. The default cocoa platform uses
-          # that real session.
+          if [ "${{ matrix.arch }}" = "x86_64" ]; then
+            # Intel macOS runners are virtualized, and Apple's paravirtualized Metal
+            # driver there has crashed a plain QWidget::show() outright (unrelated to
+            # this project: an uncaught NSException inside AppleParavirtGPUMetal).
+            # Keep offscreen here; it gets no real Metal device either, but it does not
+            # abort the whole test binary.
+            echo "QT_QPA_PLATFORM=offscreen" >> $GITHUB_ENV
+          fi
+          # No offscreen on Apple Silicon: it carries a real, logged-in GUI session and
+          # a real (non-virtualized) Metal device, unlike offscreen (no QRhi at all) or
+          # the Intel runner above (virtualized, unreliable). The default cocoa platform
+          # uses that session.
 
       - name: Build
         run: |
