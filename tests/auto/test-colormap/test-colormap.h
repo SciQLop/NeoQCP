@@ -17,6 +17,7 @@ private slots:
   void QCPColorMap2_selectTestMissReturnsNegativeOne();
   void QCPColorMap2_contourSettersScheduleReplot();
   void QCPColorMapRhiLayer_setImageSkipsRedundantUpload();
+  void QCPColorMapRhiLayer_oversizedImageDoesNotAbort();
   void QCPColorMap2_hidesStaleQuadWhenPannedPastData();
   void QCPContourExtractor_extractUvKeepsSourceRegistration();
   void QCPColorMapData_recalculateDataBoundsSkipsInfinite();

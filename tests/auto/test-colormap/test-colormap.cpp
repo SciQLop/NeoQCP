@@ -274,6 +274,45 @@ void TestColorMap::QCPColorMapRhiLayer_setImageSkipsRedundantUpload()
   delete ubo;
 }
 
+void TestColorMap::QCPColorMapRhiLayer_oversizedImageDoesNotAbort()
+{
+  // Production crash (SciQLop, real Metal on macOS): a colormap wide/tall enough
+  // in physical pixels -- the resample clamp in QCPColorMap2::installResampleTransform
+  // allows up to plotWidthPx*4 (itself capped at only 32768, already above Metal's
+  // 16384 max 2D texture dimension) -- produced a staging image whose size exceeded
+  // the RHI backend's max texture size. ensureTexture() handed that QSize straight to
+  // QRhi::newTexture(), and on Metal an invalid descriptor aborts the whole process
+  // inside the platform's own validation layer instead of QRhiTexture::create()
+  // returning false the way the rest of ensureTexture() assumes.
+  mPlot->show();
+  if (!QTest::qWaitForWindowExposed(mPlot))
+    QSKIP("window not exposed in this environment");
+  QCoreApplication::processEvents();
+  QRhi* rhi = mPlot->rhi();
+  if (!rhi)
+    QSKIP("no QRhi available in this environment");
+
+  const int maxSize = rhi->resourceLimit(QRhi::TextureSizeMax);
+  QVERIFY(maxSize > 0);
+
+  auto* ubo = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 32);
+  QVERIFY(ubo->create());
+
+  QCPColormapRhiLayer layer(rhi);
+  QImage img(maxSize + 8, 2, QImage::Format_RGBA8888);
+  img.fill(Qt::red);
+  layer.setImage(img);
+
+  auto* batch = rhi->nextResourceUpdateBatch();
+  layer.uploadResources(batch, QSize(400, 300), 1.0f, rhi->isYUpInNDC(), ubo);
+  batch->release();
+
+  // The whole point: reaching this line without the process aborting IS the pass.
+  QVERIFY(true);
+
+  delete ubo;
+}
+
 void TestColorMap::QCPColorMap2_hidesStaleQuadWhenPannedPastData()
 {
   // Regression: once panning moves the axes far enough that the last

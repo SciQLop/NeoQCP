@@ -79,4 +79,8 @@ test_headers = [
 test_moc_files = qtmod.compile_moc(headers : test_headers)
 
 auto_tests=executable('auto-tests',test_srcs, test_moc_files, dependencies:[NeoQCP_dep, qtdeps, qttest], override_options: ['unity=off'])
-test('test-auto-tests', auto_tests)
+# Every QtTest class in the project runs inside this one executable (the QCPTEST
+# macro chains them serially), so its wall-clock time grows with every test class
+# added, not just the one you're adding. Meson's 30 s default has been getting hit
+# on slow/GPU-less CI runners well before the binary is anywhere near unhealthy.
+test('test-auto-tests', auto_tests, timeout: 300)
