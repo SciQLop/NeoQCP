@@ -121,7 +121,7 @@ void QCPColormapRenderer::draw(QCPPainter* painter, QCPAxis* keyAxis, QCPAxis* v
 
     if (!painter->modes().testFlag(QCPPainter::pmNoCaching))
     {
-        if (auto* crl = ensureRhiLayer())
+        if (auto* crl = ensureRhiLayer(); crl && crl->fitsInTexture(mMapImage.size()))
         {
             crl->setImage(flippedMapImage(flips));
             crl->setQuadRect(imageRect.normalized());
@@ -135,6 +135,13 @@ void QCPColormapRenderer::draw(QCPPainter* painter, QCPAxis* keyAxis, QCPAxis* v
             crl->setScissorRect(qcp::rhi::computeScissor(clipRect, dpr, outH));
             return;
         }
+        // Too big for a GPU texture on this backend: drop any GPU quad left over from
+        // an earlier, smaller frame so it does not keep compositing under the
+        // QPainter image drawn below (render() is only skipped by hasContent(), not
+        // by re-checking the size). Export mode (pmNoCaching) never reaches here, so
+        // this cannot clear content a later on-screen frame still needs.
+        if (mRhiLayer)
+            mRhiLayer->clear();
     }
 
     painter->drawImage(imageRect, flippedMapImage(flips));

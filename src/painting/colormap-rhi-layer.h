@@ -61,6 +61,12 @@ public:
     bool textureUploadPending() const { return mTextureDirty; }
     void clear();
 
+    // A resample can produce an image wider or taller than the RHI backend allows in
+    // a texture (Metal aborts the whole process on an oversized descriptor rather than
+    // failing create() gracefully, see ensureTexture()). Callers deciding whether to
+    // even attempt the GPU path should check this first.
+    bool fitsInTexture(const QSize& imgSize) const;
+
 private:
     QRhi* mRhi;
     QCPLayer* mLayer = nullptr;

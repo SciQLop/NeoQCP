@@ -228,9 +228,25 @@ bool QCPColormapRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc,
 
 // ── Texture management ──────────────────────────────────────────────────────
 
+bool QCPColormapRhiLayer::fitsInTexture(const QSize& imgSize) const
+{
+    const int maxTexSize = mRhi->resourceLimit(QRhi::TextureSizeMax);
+    return imgSize.width() > 0 && imgSize.height() > 0
+        && imgSize.width() <= maxTexSize && imgSize.height() <= maxTexSize;
+}
+
 bool QCPColormapRhiLayer::ensureTexture(QRhiBuffer* compositeUbo)
 {
     QSize imgSize = mStagingImage.size();
+    // QRhiTexture::create() is documented to return false on an invalid descriptor,
+    // but the Metal backend does not: an oversized descriptor aborts inside Metal's
+    // own validation instead. Refuse before ever calling newTexture(), so the one
+    // dimension the resample clamp can push past the backend's limit (a wide/tall
+    // colormap panel, see QCPColorMap2::installResampleTransform) degrades to "no
+    // GPU quad this frame" rather than crashing the process.
+    if (!fitsInTexture(imgSize))
+        return false;
+
     bool texRecreated = false;
     if (!mTexture || mTextureSize != imgSize)
     {
