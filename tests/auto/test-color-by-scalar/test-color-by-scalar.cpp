@@ -885,3 +885,45 @@ void TestColorByScalar::coloredLegendLineShowsTheGradient()
     }
     QCOMPARE(img.pixelColor(50, 10), QColor(Qt::black));   // uncoloured: the component pen
 }
+
+void TestColorByScalar::coloredGraphDrawnFromL2KeepsIndicesConsistent()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    const int n = 200'000;   // above kResampleThreshold: the async L1 pipeline runs
+    std::vector<double> keys(n), values(n), negated(n), scalar(n);
+    for (int i = 0; i < n; ++i)
+    {
+        keys[i] = i;
+        values[i] = std::sin(i * 0.001);
+        negated[i] = -values[i];
+        scalar[i] = i;
+    }
+    mg->setDataSource(makeSource(keys, {values, negated}));
+    mg->setColorValues(scalar);
+    mPlot->xAxis->setRange(0, n);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot();
+    QTRY_VERIFY_WITH_TIMEOUT(mg->mL1Cache && !mg->mL1Cache->level1.origin.empty(), 5000);
+
+    auto checkIndices = [&] {
+        QVERIFY(mg->mL2Result);
+        QVERIFY(mg->mL2HasOrigin);
+        QCOMPARE(mg->mCachedIndices.size(), mg->mCachedLines.size());
+        for (int c = 0; c < mg->mCachedLines.size(); ++c)
+        {
+            QVERIFY(!mg->mCachedLines[c].isEmpty());
+            QCOMPARE(mg->mCachedIndices[c].size(), mg->mCachedLines[c].size());
+            for (int idx : mg->mCachedIndices[c])
+                QVERIFY2(idx == -1 || (idx >= 0 && idx < mg->dataCount()),
+                         qPrintable(QString("component %1: index %2").arg(c).arg(idx)));
+        }
+    };
+
+    mPlot->xAxis->setRange(n * 0.25, n * 0.5);
+    mPlot->replot();
+    checkIndices();
+
+    mPlot->xAxis->setRange(n * 0.26, n * 0.51);   // a small pan
+    mPlot->replot();
+    checkIndices();
+}

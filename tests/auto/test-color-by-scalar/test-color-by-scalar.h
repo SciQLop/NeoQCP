@@ -59,6 +59,8 @@ private slots:
 
     void coloredLegendLineShowsTheGradient();
 
+    void coloredGraphDrawnFromL2KeepsIndicesConsistent();
+
 private:
     QCustomPlot* mPlot = nullptr;
     static std::shared_ptr<QCPAbstractMultiDataSource> makeSource(
