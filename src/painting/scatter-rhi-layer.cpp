@@ -256,10 +256,11 @@ bool QCPScatterRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc,
         return false;
     }
 
-    if (!createColoredPipeline(rpDesc, sampleCount))
-        return false;
-
     mLastSampleCount = sampleCount;
+    // A missing coloured pipeline only drops coloured markers (render() skips them);
+    // failing here would rebuild every scatter pipeline on every frame.
+    if (!createColoredPipeline(rpDesc, sampleCount))
+        qWarning() << "Coloured scatter pipeline unavailable: markers coloured by a scalar are not drawn";
     return true;
 }
 
