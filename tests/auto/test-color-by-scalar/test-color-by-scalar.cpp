@@ -653,3 +653,27 @@ void TestColorByScalar::coloredLineRendersTheGradient()
     QVERIFY2(left.red() > 150 && left.blue() < 100, qPrintable(left.name()));
     QVERIFY2(right.blue() > 150 && right.red() < 100, qPrintable(right.name()));
 }
+
+void TestColorByScalar::coloredRunsMeetWithButtEndsOnExport()
+{
+    // Two runs meet at key 1: red (segment 0->1), then blue (segment 1->2).
+    // A square cap on the blue run would overpaint pen/2 of the red run.
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDataSource(makeSource({0, 1, 2}, {{0, 0, 0}}));
+    mg->setComponentPens({QPen(Qt::black, 20)});
+    mg->setColorGradient(redToBlue());
+    mg->setColorRange(QCPRange(0, 1));
+    mg->setColorValues(std::vector<double>{0, 0, 1});
+    mPlot->xAxis->setRange(0, 2);
+    mPlot->yAxis->setRange(-1, 1);
+    const QImage img = mPlot->toPixmap(400, 300).toImage();
+
+    const int y = qRound(mPlot->yAxis->coordToPixel(0));
+    const double boundary = mPlot->xAxis->coordToPixel(1);
+    for (int dx : {3, 5, 7})
+    {
+        const QColor before = img.pixelColor(qRound(boundary) - dx, y);
+        QVERIFY2(before.red() > 150 && before.blue() < 100,
+                 qPrintable(QString("dx %1: %2").arg(dx).arg(before.name())));
+    }
+}

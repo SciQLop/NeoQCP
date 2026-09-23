@@ -44,6 +44,7 @@ private slots:
     void extrudedRunsCarryTheirColour();
     void coloredReextrusionOnlyOnColorChangeNotPan();
     void coloredLineRendersTheGradient();
+    void coloredRunsMeetWithButtEndsOnExport();
 
 private:
     QCustomPlot* mPlot = nullptr;

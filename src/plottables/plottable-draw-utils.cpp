@@ -147,6 +147,9 @@ void drawColoredPolylineRuns(QCPPainter* painter, const QVector<QPointF>& points
     if (!gpuOffset.isNull())
         painter->translate(gpuOffset);
     QPen runPen = pen;
+    // Butt ends at colour changes, like the GPU extruder: a square/round cap would
+    // overpaint pen/2 of the neighbouring run.
+    runPen.setCapStyle(Qt::FlatCap);
     for (const auto& run : runs)
     {
         runPen.setColor(runColor(mapper, run.bucket));
