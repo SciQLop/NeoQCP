@@ -201,6 +201,10 @@ protected:
     void drawColoredScatters(QCPPainter* painter, const QVector<QPointF>& points,
                              const QVector<int>& indices, const QCPGraphComponent& comp,
                              const QPointF& gpuOffset, bool isExportMode) const;
+    // Draws markers in the component's own style: GPU via addScatter, or QPainter fallback.
+    void drawPlainScatters(QCPPainter* painter, const QVector<QPointF>& dataLines,
+                           const QCPGraphComponent& comp, const QPointF& gpuOffset,
+                           bool isExportMode) const;
     void requestOrigin();
     // Same-size-keeps/other-size-clears colour rule, shared by applySourceNow(),
     // commitPendingData() and dataChanged(): each installs or mutates mDataSource and
