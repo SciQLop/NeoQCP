@@ -138,4 +138,53 @@ inline QVector<QPointF> toImpulseLines(const QVector<QPointF>& lines, bool keyIs
     return result;
 }
 
+// Index maps: the data index behind each point the matching to…Lines transform emits.
+inline QVector<int> stepLeftIndices(const QVector<int>& d)
+{
+    if (d.size() < 2)
+        return d;
+    QVector<int> r(d.size() * 2);
+    int last = d.first();
+    for (int i = 0; i < d.size(); ++i)
+    {
+        r[i * 2 + 0] = last;
+        last = d[i];
+        r[i * 2 + 1] = last;
+    }
+    return r;
+}
+
+inline QVector<int> stepRightIndices(const QVector<int>& d)
+{
+    if (d.size() < 2)
+        return d;
+    QVector<int> r(d.size() * 2);
+    for (int i = 0; i < d.size(); ++i)
+        r[i * 2 + 0] = r[i * 2 + 1] = d[i];
+    return r;
+}
+
+inline QVector<int> stepCenterIndices(const QVector<int>& d)
+{
+    if (d.size() < 2)
+        return d;
+    QVector<int> r(d.size() * 2);
+    r[0] = d[0];
+    for (int i = 1; i < d.size(); ++i)
+    {
+        r[i * 2 - 1] = d[i - 1];
+        r[i * 2 + 0] = d[i];
+    }
+    r[d.size() * 2 - 1] = d.last();
+    return r;
+}
+
+inline QVector<int> impulseIndices(const QVector<int>& d)
+{
+    QVector<int> r(d.size() * 2);
+    for (int i = 0; i < d.size(); ++i)
+        r[i * 2 + 0] = r[i * 2 + 1] = d[i];
+    return r;
+}
+
 } // namespace qcp

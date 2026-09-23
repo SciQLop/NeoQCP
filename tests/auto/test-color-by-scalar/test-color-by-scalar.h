@@ -26,6 +26,8 @@ private slots:
     void l1ParallelOriginEqualsSerial();
     void l2OriginComposesThroughL1AndCompacts();
 
+    void stepIndexMapsFollowTheTransforms();
+
 private:
     QCustomPlot* mPlot = nullptr;
     static std::shared_ptr<QCPAbstractMultiDataSource> makeSource(

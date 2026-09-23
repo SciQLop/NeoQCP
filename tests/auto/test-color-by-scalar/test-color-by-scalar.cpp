@@ -5,6 +5,7 @@
 #include "datasource/row-major-multi-datasource.h"
 #include "datasource/graph-resampler.h"
 #include "datasource/resampled-multi-datasource.h"
+#include "plottables/plottable-linestyle.h"
 #include <any>
 #include <cmath>
 
@@ -317,4 +318,22 @@ void TestColorByScalar::l2OriginComposesThroughL1AndCompacts()
         }
         QVERIFY(gapMarkers >= 1);   // the hole is a key gap in L2
     }
+}
+
+void TestColorByScalar::stepIndexMapsFollowTheTransforms()
+{
+    const QVector<int> d {10, 20, 30};
+    QCOMPARE(qcp::stepLeftIndices(d),   (QVector<int>{10, 10, 10, 20, 20, 30}));
+    QCOMPARE(qcp::stepRightIndices(d),  (QVector<int>{10, 10, 20, 20, 30, 30}));
+    QCOMPARE(qcp::stepCenterIndices(d), (QVector<int>{10, 10, 20, 20, 30, 30}));
+    QCOMPARE(qcp::impulseIndices(d),    (QVector<int>{10, 10, 20, 20, 30, 30}));
+    QCOMPARE(qcp::stepLeftIndices({7}), (QVector<int>{7}));   // < 2 points: returned as is
+
+    // Sizes match the point transforms, gaps (-1) travel with their positions.
+    QVector<QPointF> pts {{0, 0}, {1, 5}, {2, 2}, {3, 7}};
+    const QVector<int> di {0, -1, 2, 3};
+    QCOMPARE(qcp::stepLeftIndices(di).size(),   qcp::toStepLeftLines(pts, false).size());
+    QCOMPARE(qcp::stepRightIndices(di).size(),  qcp::toStepRightLines(pts, false).size());
+    QCOMPARE(qcp::stepCenterIndices(di).size(), qcp::toStepCenterLines(pts, false).size());
+    QCOMPARE(qcp::impulseIndices(di).size(),    qcp::toImpulseLines(pts, false, 0).size());
 }
