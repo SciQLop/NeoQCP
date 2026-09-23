@@ -487,6 +487,30 @@ static QWidget* createMultiGraphTab()
     return wrapPlot(plot);
 }
 
+static QWidget* createColoredMultiGraphTab()
+{
+    auto* plot = new QCustomPlot();
+    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    const int n = 2'000'000;   // large enough for L1 + L2
+    std::vector<double> keys(n), a(n), b(n), scalar(n);
+    for (int i = 0; i < n; ++i)
+    {
+        keys[i] = i * 1e-3;
+        a[i] = std::sin(i * 1e-4) + 0.2 * std::sin(i * 0.37);
+        b[i] = std::cos(i * 1e-4);
+        scalar[i] = (i / 50'000) % 7 == 3 ? std::nan("") : std::sin(i * 3e-5);
+    }
+    mg->setData(std::move(keys), std::vector<std::vector<double>>{std::move(a), std::move(b)});
+    mg->setComponentPens({QPen(Qt::black, 2), QPen(Qt::black, 2)});
+    mg->component(0).scatterStyle = QCPScatterStyle(QCPScatterStyle::ssDisc, 5);
+    mg->setColorGradient(QCPColorGradient(QCPColorGradient::gpJet));
+    mg->setColorRange(QCPRange(-1, 1));
+    mg->setColorValues(std::move(scalar));
+    plot->rescaleAxes();
+    plot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom);
+    return wrapPlot(plot);
+}
+
 // ── Tab 5: Waterfall / Seismograph ───────────────────────────────────────────
 
 static QWidget* createWaterfallTab()
@@ -1502,6 +1526,7 @@ int main(int argc, char* argv[])
     tabs->addTab(createColorMapLogTab(),       "ColorMap2 Log/NaN/Gap");
     tabs->addTab(createColorMapVariableYTab(), "ColorMap2 Variable-Y");
     tabs->addTab(createMultiGraphTab(),        "MultiGraph");
+    tabs->addTab(createColoredMultiGraphTab(), "MultiGraph coloured");
     tabs->addTab(createWaterfallTab(),   "Waterfall");
     tabs->addTab(createItemsTab(),       "Items");
     tabs->addTab(createBarsTab(),        "Bars + ErrorBars");
