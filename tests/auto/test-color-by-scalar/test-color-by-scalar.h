@@ -15,6 +15,12 @@ private slots:
 
     void setLineStyleInvalidatesLineCache();
 
+    void linesToPixelsIndexedMatchesPlainAndMarksGaps();
+    void optimizedLineDataIndexedValuesComeFromTheirIndex();
+    void indexedVerticalKeyAxis();
+    void defaultIndexedImplementationMatchesSoA();
+    void rowMajorIndexedMatchesSoA();
+
 private:
     QCustomPlot* mPlot = nullptr;
     static std::shared_ptr<QCPAbstractMultiDataSource> makeSource(

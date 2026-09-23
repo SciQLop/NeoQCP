@@ -159,6 +159,29 @@ public:
                                          qcp::algo::kDefaultGapThreshold, &mGapCache.gaps);
     }
 
+    QVector<QPointF> getLinesIndexed(int column, int begin, int end,
+                                     QCPAxis* keyAxis, QCPAxis* valueAxis,
+                                     QVector<int>& sourceIndices) const override
+    {
+        Q_ASSERT(column >= 0 && column < mColumns);
+        qcp::detail::StridedColumnView<V> colView(mValues + column, mRows, mStride);
+        ensureGapCache(begin, end);
+        return qcp::algo::linesToPixelsIndexed(mKeys, colView, begin, end, keyAxis, valueAxis,
+                                               sourceIndices, qcp::algo::kDefaultGapThreshold,
+                                               &mGapCache.gaps);
+    }
+
+    QVector<QPointF> getOptimizedLineDataIndexed(int column, int begin, int end, int pixelWidth,
+                                                 QCPAxis* keyAxis, QCPAxis* valueAxis,
+                                                 QVector<int>& sourceIndices) const override
+    {
+        Q_ASSERT(column >= 0 && column < mColumns);
+        qcp::detail::StridedColumnView<V> colView(mValues + column, mRows, mStride);
+        ensureGapCache(begin, end);
+        return qcp::algo::optimizedLineDataIndexed(mKeys, colView, begin, end, pixelWidth,
+                                                   keyAxis, valueAxis, sourceIndices, &mGapCache.gaps);
+    }
+
     void getOptimizedLineDataAll(int begin, int end, int /*pixelWidth*/,
                                   QCPAxis* keyAxis, QCPAxis* valueAxis,
                                   QVector<QPointF>* results, int numColumns) const override

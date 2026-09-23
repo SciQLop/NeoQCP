@@ -1,6 +1,9 @@
 #include "test-color-by-scalar.h"
 #include "qcustomplot.h"
 #include "datasource/soa-multi-datasource.h"
+#include "datasource/algorithms.h"
+#include "datasource/row-major-multi-datasource.h"
+#include <cmath>
 
 using SoA = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
 
@@ -34,4 +37,180 @@ void TestColorByScalar::setLineStyleInvalidatesLineCache()
     mg->setLineStyle(QCPMultiGraph::lsStepLeft);
     QVERIFY(mg->mLineCacheDirty);
     QVERIFY(mg->mCachedLines.isEmpty());
+}
+
+namespace {
+
+// Wraps a source and forwards only the pure virtuals, so the indexed calls
+// hit QCPAbstractMultiDataSource's default implementations.
+class ForwardingSource final : public QCPAbstractMultiDataSource
+{
+public:
+    explicit ForwardingSource(std::shared_ptr<QCPAbstractMultiDataSource> inner)
+        : mInner(std::move(inner)) {}
+    int columnCount() const override { return mInner->columnCount(); }
+    int size() const override { return mInner->size(); }
+    double keyAt(int i) const override { return mInner->keyAt(i); }
+    QCPRange keyRange(bool& f, QCP::SignDomain sd) const override { return mInner->keyRange(f, sd); }
+    int findBegin(double k, bool e) const override { return mInner->findBegin(k, e); }
+    int findEnd(double k, bool e) const override { return mInner->findEnd(k, e); }
+    double valueAt(int c, int i) const override { return mInner->valueAt(c, i); }
+    QCPRange valueRange(int c, bool& f, QCP::SignDomain sd, const QCPRange& r) const override
+    { return mInner->valueRange(c, f, sd, r); }
+    QVector<QPointF> getOptimizedLineData(int c, int b, int e, int w, QCPAxis* k, QCPAxis* v) const override
+    { return mInner->getOptimizedLineData(c, b, e, w, k, v); }
+    QVector<QPointF> getLines(int c, int b, int e, QCPAxis* k, QCPAxis* v) const override
+    { return mInner->getLines(c, b, e, k, v); }
+private:
+    std::shared_ptr<QCPAbstractMultiDataSource> mInner;
+};
+
+// 9000 dense samples on [0, 45], a key gap, then 100 sparse samples on [55, 100];
+// NaN values sprinkled in both parts. Exercises every branch of the adaptive path.
+void mixedData(std::vector<double>& keys, std::vector<double>& values)
+{
+    for (int i = 0; i < 9000; ++i)
+    {
+        keys.push_back(45.0 * i / 8999.0);
+        values.push_back(i % 997 == 0 ? std::nan("") : std::sin(i * 0.01) + 0.1 * std::sin(i * 1.3));
+    }
+    for (int i = 0; i < 100; ++i)
+    {
+        keys.push_back(55.0 + 45.0 * i / 99.0);
+        values.push_back(i % 17 == 0 ? std::nan("") : std::cos(i * 0.2));
+    }
+}
+
+void checkValuesComeFromIndices(const QVector<QPointF>& pts, const QVector<int>& idx,
+                                const std::vector<double>& values, QCPAxis* valueAxis, bool valueIsX)
+{
+    QCOMPARE(idx.size(), pts.size());
+    for (int k = 0; k < pts.size(); ++k)
+    {
+        if (idx[k] < 0)
+        {
+            QVERIFY(std::isnan(pts[k].x()) || std::isnan(pts[k].y()));
+            continue;
+        }
+        const double expected = valueAxis->coordToPixel(values[idx[k]]);
+        const double got = valueIsX ? pts[k].x() : pts[k].y();
+        QVERIFY2(qAbs(got - expected) < 1e-6,
+                 qPrintable(QString("point %1: index %2").arg(k).arg(idx[k])));
+    }
+}
+
+} // namespace
+
+void TestColorByScalar::linesToPixelsIndexedMatchesPlainAndMarksGaps()
+{
+    std::vector<double> keys {0, 1, 2, 3, 4, 10, 11, 12};
+    std::vector<double> values {0, 1, 2, std::nan(""), 4, 5, 6, 7};
+    mPlot->xAxis->setRange(0, 12);
+    mPlot->yAxis->setRange(0, 8);
+    mPlot->replot();
+
+    QVector<int> idx;
+    const auto indexed = qcp::algo::linesToPixelsIndexed(keys, values, 0, 8,
+                                                         mPlot->xAxis, mPlot->yAxis, idx);
+    const auto plain = qcp::algo::linesToPixels(keys, values, 0, 8, mPlot->xAxis, mPlot->yAxis);
+
+    QCOMPARE(indexed.size(), plain.size());
+    for (int k = 0; k < plain.size(); ++k)
+        QVERIFY(indexed[k] == plain[k] || (std::isnan(indexed[k].x()) && std::isnan(plain[k].x())));
+    QCOMPARE(idx, (QVector<int>{0, 1, 2, -1, 4, -1, 5, 6, 7}));
+}
+
+void TestColorByScalar::optimizedLineDataIndexedValuesComeFromTheirIndex()
+{
+    std::vector<double> keys, values;
+    mixedData(keys, values);
+    mPlot->xAxis->setRange(0, 100);
+    mPlot->yAxis->setRange(-2, 2);
+    mPlot->replot();
+    const int n = static_cast<int>(keys.size());
+
+    QVector<int> idx;
+    const auto indexed = qcp::algo::optimizedLineDataIndexed(keys, values, 0, n, 400,
+                                                             mPlot->xAxis, mPlot->yAxis, idx);
+    const auto plain = qcp::algo::optimizedLineData(keys, values, 0, n, 400,
+                                                    mPlot->xAxis, mPlot->yAxis);
+    QCOMPARE(indexed.size(), plain.size());
+    QVERIFY(indexed.size() < n);  // the adaptive path really ran
+    checkValuesComeFromIndices(indexed, idx, values, mPlot->yAxis, false);
+}
+
+void TestColorByScalar::indexedVerticalKeyAxis()
+{
+    std::vector<double> keys, values;
+    mixedData(keys, values);
+    mPlot->yAxis->setRange(0, 100);   // key axis is vertical here
+    mPlot->xAxis->setRange(-2, 2);
+    mPlot->replot();
+    const int n = static_cast<int>(keys.size());
+
+    QVector<int> idx;
+    const auto pts = qcp::algo::optimizedLineDataIndexed(keys, values, 0, n, 300,
+                                                         mPlot->yAxis, mPlot->xAxis, idx);
+    checkValuesComeFromIndices(pts, idx, values, mPlot->xAxis, true);
+
+    QVector<int> idx2;
+    const auto full = qcp::algo::linesToPixelsIndexed(keys, values, 0, n,
+                                                      mPlot->yAxis, mPlot->xAxis, idx2);
+    checkValuesComeFromIndices(full, idx2, values, mPlot->xAxis, true);
+}
+
+void TestColorByScalar::defaultIndexedImplementationMatchesSoA()
+{
+    std::vector<double> keys, values;
+    mixedData(keys, values);
+    auto soa = makeSource(keys, {values});
+    ForwardingSource generic(soa);
+    mPlot->xAxis->setRange(0, 100);
+    mPlot->yAxis->setRange(-2, 2);
+    mPlot->replot();
+    const int n = static_cast<int>(keys.size());
+
+    QVector<int> a, b;
+    const auto gl = generic.getLinesIndexed(0, 0, n, mPlot->xAxis, mPlot->yAxis, a);
+    const auto sl = soa->getLinesIndexed(0, 0, n, mPlot->xAxis, mPlot->yAxis, b);
+    QCOMPARE(gl.size(), sl.size());
+    QCOMPARE(a, b);
+
+    QVector<int> c, d;
+    const auto g = generic.getOptimizedLineDataIndexed(0, 100, 5000, 400, mPlot->xAxis, mPlot->yAxis, c);
+    const auto s = soa->getOptimizedLineDataIndexed(0, 100, 5000, 400, mPlot->xAxis, mPlot->yAxis, d);
+    QCOMPARE(g.size(), s.size());
+    QCOMPARE(c, d);
+}
+
+void TestColorByScalar::rowMajorIndexedMatchesSoA()
+{
+    std::vector<double> keys, values;
+    mixedData(keys, values);
+    const int n = static_cast<int>(keys.size());
+    std::vector<double> interleaved(2 * n);
+    for (int i = 0; i < n; ++i)
+    {
+        interleaved[2 * i] = values[i];
+        interleaved[2 * i + 1] = -values[i];
+    }
+    QCPRowMajorMultiDataSource<double, double> rowMajor(
+        std::span<const double>(keys), interleaved.data(), n, 2, 2);
+    std::vector<double> negated(values.size());
+    std::transform(values.begin(), values.end(), negated.begin(), [](double v) { return -v; });
+    auto soa = makeSource(keys, {values, negated});
+    mPlot->xAxis->setRange(0, 100);
+    mPlot->yAxis->setRange(-2, 2);
+    mPlot->replot();
+
+    for (int col = 0; col < 2; ++col)
+    {
+        QVector<int> a, b;
+        rowMajor.getOptimizedLineDataIndexed(col, 0, n, 400, mPlot->xAxis, mPlot->yAxis, a);
+        soa->getOptimizedLineDataIndexed(col, 0, n, 400, mPlot->xAxis, mPlot->yAxis, b);
+        QCOMPARE(a, b);
+        rowMajor.getLinesIndexed(col, 0, n, mPlot->xAxis, mPlot->yAxis, a);
+        soa->getLinesIndexed(col, 0, n, mPlot->xAxis, mPlot->yAxis, b);
+        QCOMPARE(a, b);
+    }
 }

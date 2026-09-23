@@ -45,6 +45,17 @@ public:
             results[c] = getLines(c, begin, end, keyAxis, valueAxis);
     }
 
+    // Same points as getLines / getOptimizedLineData, plus the data index behind each
+    // point in sourceIndices (-1 for a NaN or gap marker). Generic and slow here;
+    // the built-in sources override them.
+    virtual QVector<QPointF> getLinesIndexed(int column, int begin, int end,
+                                             QCPAxis* keyAxis, QCPAxis* valueAxis,
+                                             QVector<int>& sourceIndices) const;
+    virtual QVector<QPointF> getOptimizedLineDataIndexed(int column, int begin, int end,
+                                                         int pixelWidth,
+                                                         QCPAxis* keyAxis, QCPAxis* valueAxis,
+                                                         QVector<int>& sourceIndices) const;
+
     virtual const double* rawKeyData() const { return nullptr; }
     virtual const double* rawColumnData(int /*column*/) const { return nullptr; }
 };

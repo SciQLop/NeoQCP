@@ -229,16 +229,18 @@ struct AffineTransform {
     double toCoord(double pixel) const { return pixel * invScale + invOffset; }
 };
 
-template <IndexableNumericRange KC, IndexableNumericRange VC>
-QVector<QPointF> linesToPixels(const KC& keys, const VC& values,
-                                int begin, int end,
-                                QCPAxis* keyAxis, QCPAxis* valueAxis,
-                                double gapThreshold = kDefaultGapThreshold,
-                                const GapVector* precomputedGaps = nullptr)
+namespace detail {
+
+template <bool WithIndices, IndexableNumericRange KC, IndexableNumericRange VC>
+QVector<QPointF> linesToPixelsImpl(const KC& keys, const VC& values, int begin, int end,
+                                   QCPAxis* keyAxis, QCPAxis* valueAxis,
+                                   double gapThreshold, const GapVector* precomputedGaps,
+                                   QVector<int>* indices)
 {
     using V = std::ranges::range_value_t<VC>;
     Q_ASSERT(begin >= 0 && end <= static_cast<int>(std::ranges::size(keys)));
     Q_ASSERT(begin >= 0 && end <= static_cast<int>(std::ranges::size(values)));
+    if constexpr (WithIndices) indices->clear();
     const int count = end - begin;
     if (count <= 0) return {};
 
@@ -249,10 +251,10 @@ QVector<QPointF> linesToPixels(const KC& keys, const VC& values,
 
     QVector<QPointF> result;
     result.reserve(count + count / 10);
+    if constexpr (WithIndices) indices->reserve(count + count / 10);
 
     const bool isVertical = keyAxis->orientation() == Qt::Vertical;
     const auto nanPt = QPointF(qQNaN(), qQNaN());
-
     const auto keyTf = AffineTransform::fromAxis(keyAxis);
     const auto valTf = AffineTransform::fromAxis(valueAxis);
     const bool bothLinear = keyTf.isLinear && valTf.isLinear;
@@ -261,12 +263,20 @@ QVector<QPointF> linesToPixels(const KC& keys, const VC& values,
     {
         int ri = i - begin;
         if (gaps.hasAnyGap && gaps[ri])
+        {
             result.append(nanPt);
+            if constexpr (WithIndices) indices->append(-1);
+        }
 
         double v = static_cast<double>(values[i]);
         if constexpr (!std::is_integral_v<V>)
         {
-            if (std::isnan(v)) { result.append(nanPt); continue; }
+            if (std::isnan(v))
+            {
+                result.append(nanPt);
+                if constexpr (WithIndices) indices->append(-1);
+                continue;
+            }
         }
 
         double k = static_cast<double>(keys[i]);
@@ -276,29 +286,51 @@ QVector<QPointF> linesToPixels(const KC& keys, const VC& values,
             double vp = valTf.toPixel(v);
             result.append(isVertical ? QPointF(vp, kp) : QPointF(kp, vp));
         }
+        else if (isVertical)
+            result.append(QPointF(valueAxis->coordToPixel(v), keyAxis->coordToPixel(k)));
         else
-        {
-            if (isVertical)
-                result.append(QPointF(valueAxis->coordToPixel(v),
-                                      keyAxis->coordToPixel(k)));
-            else
-                result.append(QPointF(keyAxis->coordToPixel(k),
-                                      valueAxis->coordToPixel(v)));
-        }
+            result.append(QPointF(keyAxis->coordToPixel(k), valueAxis->coordToPixel(v)));
+        if constexpr (WithIndices) indices->append(i);
     }
     return result;
 }
 
+} // namespace detail
+
 template <IndexableNumericRange KC, IndexableNumericRange VC>
-QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
-                                    int begin, int end,
-                                    int /*pixelWidth*/,
-                                    QCPAxis* keyAxis, QCPAxis* valueAxis,
-                                    const GapVector* precomputedGaps = nullptr)
+QVector<QPointF> linesToPixels(const KC& keys, const VC& values, int begin, int end,
+                               QCPAxis* keyAxis, QCPAxis* valueAxis,
+                               double gapThreshold = kDefaultGapThreshold,
+                               const GapVector* precomputedGaps = nullptr)
+{
+    return detail::linesToPixelsImpl<false>(keys, values, begin, end, keyAxis, valueAxis,
+                                            gapThreshold, precomputedGaps, nullptr);
+}
+
+template <IndexableNumericRange KC, IndexableNumericRange VC>
+QVector<QPointF> linesToPixelsIndexed(const KC& keys, const VC& values, int begin, int end,
+                                      QCPAxis* keyAxis, QCPAxis* valueAxis, QVector<int>& indices,
+                                      double gapThreshold = kDefaultGapThreshold,
+                                      const GapVector* precomputedGaps = nullptr)
+{
+    return detail::linesToPixelsImpl<true>(keys, values, begin, end, keyAxis, valueAxis,
+                                           gapThreshold, precomputedGaps, &indices);
+}
+
+namespace detail {
+
+template <bool WithIndices, IndexableNumericRange KC, IndexableNumericRange VC>
+QVector<QPointF> optimizedLineDataImpl(const KC& keys, const VC& values,
+                                       int begin, int end,
+                                       int /*pixelWidth*/,
+                                       QCPAxis* keyAxis, QCPAxis* valueAxis,
+                                       const GapVector* precomputedGaps,
+                                       QVector<int>* indices)
 {
     PROFILE_HERE_N("optimizedLineData");
     Q_ASSERT(begin >= 0 && end <= static_cast<int>(std::ranges::size(keys)));
     Q_ASSERT(begin >= 0 && end <= static_cast<int>(std::ranges::size(values)));
+    if constexpr (WithIndices) indices->clear();
     const int dataCount = end - begin;
     if (dataCount <= 0) return {};
 
@@ -309,8 +341,8 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
         maxCount = int(2 * keyPixelSpan + 2);
 
     if (dataCount < maxCount)
-        return linesToPixels(keys, values, begin, end, keyAxis, valueAxis,
-                             kDefaultGapThreshold, precomputedGaps);
+        return linesToPixelsImpl<WithIndices>(keys, values, begin, end, keyAxis, valueAxis,
+                                              kDefaultGapThreshold, precomputedGaps, indices);
 
     GapVector computedGaps;
     if (!precomputedGaps)
@@ -320,6 +352,7 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
 
     QVector<QPointF> result;
     result.reserve(maxCount);
+    if constexpr (WithIndices) indices->reserve(maxCount);
 
     const bool isVertical = keyAxis->orientation() == Qt::Vertical;
     const auto keyTf = AffineTransform::fromAxis(keyAxis);
@@ -337,31 +370,34 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
                           : QPointF(keyAxis->coordToPixel(k), valueAxis->coordToPixel(v));
     };
 
+    auto emitPoint = [&](const QPointF& p, int index) {
+        result.append(p);
+        if constexpr (WithIndices) indices->append(index);
+    };
+
     // intervalLast is the index of the last ACCEPTED (non-NaN) sample: NaN
     // samples are skipped without counting, so deriving the closing point as
     // intervalFirst + intervalCount - 1 could land on a NaN and inject a
     // spurious line break into gap-free data.
     auto flushInterval = [&](int intervalFirst, int intervalLast, int intervalCount,
                               double intervalStartKey, double lastEndKey,
-                              double minVal, double maxVal,
+                              double minVal, double maxVal, int minIdx, int maxIdx,
                               double epsilon, double nextKey) {
         if (intervalCount >= 2)
         {
             double firstVal = static_cast<double>(values[intervalFirst]);
             if (lastEndKey < intervalStartKey - epsilon)
-                result.append(toPixel(intervalStartKey + epsilon * 0.2, firstVal));
-            result.append(toPixel(intervalStartKey + epsilon * 0.25, minVal));
-            result.append(toPixel(intervalStartKey + epsilon * 0.75, maxVal));
+                emitPoint(toPixel(intervalStartKey + epsilon * 0.2, firstVal), intervalFirst);
+            emitPoint(toPixel(intervalStartKey + epsilon * 0.25, minVal), minIdx);
+            emitPoint(toPixel(intervalStartKey + epsilon * 0.75, maxVal), maxIdx);
             if (nextKey > intervalStartKey + epsilon * 2)
-            {
-                result.append(toPixel(intervalStartKey + epsilon * 0.8,
-                                       static_cast<double>(values[intervalLast])));
-            }
+                emitPoint(toPixel(intervalStartKey + epsilon * 0.8,
+                             static_cast<double>(values[intervalLast])), intervalLast);
         }
         else
         {
-            result.append(toPixel(static_cast<double>(keys[intervalFirst]),
-                                   static_cast<double>(values[intervalFirst])));
+            emitPoint(toPixel(static_cast<double>(keys[intervalFirst]),
+                         static_cast<double>(values[intervalFirst])), intervalFirst);
         }
     };
 
@@ -376,6 +412,8 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
 
     double minValue = static_cast<double>(values[i]);
     double maxValue = minValue;
+    int minIndex = i;
+    int maxIndex = i;
     int currentIntervalFirst = i;
     int currentIntervalLast = i;
     int reversedFactor = keyAxis->pixelOrientation();
@@ -431,11 +469,13 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
             double k = static_cast<double>(keys[i]);
             flushInterval(currentIntervalFirst, currentIntervalLast, intervalDataCount,
                           currentIntervalStartKey, lastIntervalEndKey,
-                          minValue, maxValue, keyEpsilon, k);
-            result.append(nanPt);
+                          minValue, maxValue, minIndex, maxIndex, keyEpsilon, k);
+            emitPoint(nanPt, -1);
             lastIntervalEndKey = currentIntervalStartKey;
             minValue = v;
             maxValue = v;
+            minIndex = i;
+            maxIndex = i;
             currentIntervalFirst = i;
             currentIntervalLast = i;
             if (useInlineTransform)
@@ -461,8 +501,8 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
         double k = static_cast<double>(keys[i]);
         if (k < nextBoundary)
         {
-            minValue = std::min(minValue, v);
-            maxValue = std::max(maxValue, v);
+            if (v < minValue) { minValue = v; minIndex = i; }
+            if (v > maxValue) { maxValue = v; maxIndex = i; }
             ++intervalDataCount;
             currentIntervalLast = i;
         }
@@ -470,10 +510,12 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
         {
             flushInterval(currentIntervalFirst, currentIntervalLast, intervalDataCount,
                           currentIntervalStartKey, lastIntervalEndKey,
-                          minValue, maxValue, keyEpsilon, k);
+                          minValue, maxValue, minIndex, maxIndex, keyEpsilon, k);
             lastIntervalEndKey = static_cast<double>(keys[i - 1]);
             minValue = v;
             maxValue = v;
+            minIndex = i;
+            maxIndex = i;
             currentIntervalFirst = i;
             currentIntervalLast = i;
             if (useInlineTransform)
@@ -497,10 +539,33 @@ QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
     }
     flushInterval(currentIntervalFirst, currentIntervalLast, intervalDataCount,
                   currentIntervalStartKey, lastIntervalEndKey,
-                  minValue, maxValue, keyEpsilon,
+                  minValue, maxValue, minIndex, maxIndex, keyEpsilon,
                   currentIntervalStartKey + keyEpsilon * 3);
 
     return result;
+}
+
+} // namespace detail
+
+template <IndexableNumericRange KC, IndexableNumericRange VC>
+QVector<QPointF> optimizedLineData(const KC& keys, const VC& values,
+                                   int begin, int end, int pixelWidth,
+                                   QCPAxis* keyAxis, QCPAxis* valueAxis,
+                                   const GapVector* precomputedGaps = nullptr)
+{
+    return detail::optimizedLineDataImpl<false>(keys, values, begin, end, pixelWidth,
+                                                keyAxis, valueAxis, precomputedGaps, nullptr);
+}
+
+template <IndexableNumericRange KC, IndexableNumericRange VC>
+QVector<QPointF> optimizedLineDataIndexed(const KC& keys, const VC& values,
+                                          int begin, int end, int pixelWidth,
+                                          QCPAxis* keyAxis, QCPAxis* valueAxis,
+                                          QVector<int>& indices,
+                                          const GapVector* precomputedGaps = nullptr)
+{
+    return detail::optimizedLineDataImpl<true>(keys, values, begin, end, pixelWidth,
+                                               keyAxis, valueAxis, precomputedGaps, &indices);
 }
 
 // Multi-column optimizedLineData: processes all columns in a single pass over the key array.
