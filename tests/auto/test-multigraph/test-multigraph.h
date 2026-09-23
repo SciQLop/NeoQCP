@@ -48,6 +48,8 @@ private slots:
 
     // Line cache
     void cacheExtendsBeyondVisibleRange();
+    void zoomedOutLinesAreThinnedToThePixelWidth_data();
+    void zoomedOutLinesAreThinnedToThePixelWidth();
 
     // Rendering
     void renderVerticalKeyAxisUsesHeight();

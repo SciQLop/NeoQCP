@@ -1016,7 +1016,7 @@ void QCPMultiGraph::draw(QCPPainter* painter)
                                           mKeyAxis.data(), mValueAxis.data(), indicesTarget[c]);
             }
         }
-        else if (allVisible && nc > 1 && !(mAdaptiveSampling && !mL2Result))
+        else if (allVisible && nc > 1 && !mAdaptiveSampling)
         {
             ds->getLinesAll(cacheBegin, cacheEnd,
                             mKeyAxis.data(), mValueAxis.data(),
@@ -1027,7 +1027,7 @@ void QCPMultiGraph::draw(QCPPainter* painter)
             for (int c = 0; c < nc; ++c)
             {
                 if (!mComponents[c].visible) { linesTarget[c].clear(); continue; }
-                if (mAdaptiveSampling && !mL2Result)
+                if (mAdaptiveSampling)
                     linesTarget[c] = ds->getOptimizedLineData(c, cacheBegin, cacheEnd, pixelWidth,
                                                                mKeyAxis.data(), mValueAxis.data());
                 else

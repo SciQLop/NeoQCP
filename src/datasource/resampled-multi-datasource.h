@@ -5,6 +5,7 @@
 #include "../Profiling.hpp"
 #include <algorithm>
 #include <cmath>
+#include <span>
 
 class QCPResampledMultiDataSource final : public QCPAbstractMultiDataSource {
 public:
@@ -59,10 +60,15 @@ public:
         return qcp::algo::findEnd(mBins.keys, sortKey, expandedRange);
     }
 
-    QVector<QPointF> getOptimizedLineData(int column, int begin, int end, int /*pixelWidth*/,
+    QVector<QPointF> getOptimizedLineData(int column, int begin, int end, int pixelWidth,
                                            QCPAxis* keyAxis, QCPAxis* valueAxis) const override
     {
-        return getLines(column, begin, end, keyAxis, valueAxis);
+        if (column < 0 || column >= mBins.numColumns) return {};
+        ensureGapCache(begin, end);
+        const int s = mBins.stride();
+        return qcp::algo::optimizedLineData(
+            mBins.keys, std::span<const double>(mBins.values.data() + column * s, s),
+            begin, end, pixelWidth, keyAxis, valueAxis, &mGapCache.gaps);
     }
 
     QVector<QPointF> getLines(int column, int begin, int end,

@@ -664,6 +664,45 @@ void TestMultiGraph::componentVisibilityToggleForcesLayerRepaint()
     QVERIFY2(!mainLayer->canSkipRepaintForTranslation(), "showing a component must repaint");
 }
 
+void TestMultiGraph::zoomedOutLinesAreThinnedToThePixelWidth_data()
+{
+    QTest::addColumn<int>("columns");
+    QTest::newRow("one column") << 1;
+    QTest::newRow("two columns") << 2;   // all visible: the batched all-columns path
+}
+
+void TestMultiGraph::zoomedOutLinesAreThinnedToThePixelWidth()
+{
+    // Zoomed out, L2 holds ~4 min/max bins per pixel. Adaptive sampling must thin them to
+    // ~2 points per pixel before extrusion, as QCPGraph2 does; drawing every L2 point made
+    // a full replot about twice as slow.
+    QFETCH(int, columns);
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    const int n = 500'000;
+    std::vector<double> keys(n);
+    std::vector<std::vector<double>> values(columns, std::vector<double>(n));
+    for (int i = 0; i < n; ++i)
+    {
+        keys[i] = i;
+        for (int c = 0; c < columns; ++c)
+            values[c][i] = std::sin(i * 0.37 + c) + std::sin(i * 1e-4);
+    }
+    mg->setData(std::move(keys), std::move(values));
+    mPlot->xAxis->setRange(0, n);
+    mPlot->yAxis->setRange(-2.5, 2.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->pipeline().isBusy(), 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY2(mg->mL2Result, "the test needs the L2 path");
+
+    // ~2 points per pixel plus a few interval endpoints; unthinned L2 is ~8 per pixel.
+    const int budget = 3 * mPlot->xAxis->axisRect()->width();
+    for (int c = 0; c < columns; ++c)
+        QVERIFY2(mg->mCachedLines[c].size() <= budget,
+                 qPrintable(QString("column %1 drew %2 points for a budget of %3")
+                                .arg(c).arg(mg->mCachedLines[c].size()).arg(budget)));
+}
+
 void TestMultiGraph::componentShownAfterARebuildIsDrawnAgain()
 {
     // A rebuild of the line cache while a component is hidden drops its lines. Showing it
