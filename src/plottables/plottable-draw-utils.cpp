@@ -120,4 +120,73 @@ void drawPolylineCached(QCPPainter* painter,
     drawPolylineWithGpuFallback(painter, parentPlot, layer, pts, pen, gpuOffset, clipRect);
 }
 
+void extrudeColorRuns(const QVector<QPointF>& points, const std::vector<ColorRun>& runs,
+                      float penWidth, const ColorScalarMapper& mapper, std::vector<float>& out)
+{
+    out.clear();
+    for (const auto& run : runs)
+    {
+        const auto verts = QCPLineExtruder::extrudePolyline(
+            points.mid(run.first, run.last - run.first + 1), penWidth, runColor(mapper, run.bucket));
+        out.insert(out.end(), verts.cbegin(), verts.cend());
+    }
+}
+
+bool needsColoredReextrusion(const ExtrusionCache& cache, bool freshLines,
+                             float penWidth, quint64 colorGeneration)
+{
+    return freshLines || cache.isEmpty() || cache.penWidth != penWidth
+        || cache.colorGeneration != colorGeneration;
+}
+
+void drawColoredPolylineRuns(QCPPainter* painter, const QVector<QPointF>& points,
+                             const std::vector<ColorRun>& runs, const ColorScalarMapper& mapper,
+                             const QPen& pen, const QPointF& gpuOffset)
+{
+    painter->setBrush(Qt::NoBrush);
+    if (!gpuOffset.isNull())
+        painter->translate(gpuOffset);
+    QPen runPen = pen;
+    for (const auto& run : runs)
+    {
+        runPen.setColor(runColor(mapper, run.bucket));
+        painter->setPen(runPen);
+        painter->drawPolyline(points.constData() + run.first, run.last - run.first + 1);
+    }
+    if (!gpuOffset.isNull())
+        painter->translate(-gpuOffset);
+}
+
+void drawColoredPolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer* layer,
+                               const QVector<QPointF>& points, const QVector<int>& indices,
+                               const ColorScalarMapper& mapper, const QPen& pen,
+                               const QPointF& gpuOffset, const QRect& clipRect,
+                               bool freshLines, ExtrusionCache& cache)
+{
+    auto* prl = (parentPlot && parentPlot->rhi()
+                 && !painter->modes().testFlag(QCPPainter::pmVectorized)
+                 && !painter->modes().testFlag(QCPPainter::pmNoCaching)
+                 && pen.style() == Qt::SolidLine)
+        ? parentPlot->plottableRhiLayer(layer) : nullptr;
+    if (!prl)
+        return drawColoredPolylineRuns(painter, points, colorRuns(points, indices, mapper),
+                                       mapper, pen, gpuOffset);
+
+    const double dpr = parentPlot->bufferDevicePixelRatio();
+    const float penWidth = (pen.isCosmetic() || qFuzzyIsNull(pen.widthF()))
+        ? static_cast<float>(1.0 / dpr)
+        : qMax(1.0f, static_cast<float>(pen.widthF()));
+    if (needsColoredReextrusion(cache, freshLines, penWidth, mapper.generation()))
+    {
+        extrudeColorRuns(points, colorRuns(points, indices, mapper), penWidth, mapper, cache.vertices);
+        cache.penWidth = penWidth;
+        cache.colorGeneration = mapper.generation();
+    }
+    if (cache.isEmpty())
+        return;
+    prl->addPlottable({}, cache.vertices, clipRect, dpr, parentPlot->rhiOutputSize().height(),
+                      static_cast<float>(gpuOffset.x()), static_cast<float>(gpuOffset.y()),
+                      static_cast<float>(painter->opacity()));
+}
+
 } // namespace qcp

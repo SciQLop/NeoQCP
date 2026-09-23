@@ -7,6 +7,9 @@
 #include "datasource/resampled-multi-datasource.h"
 #include "plottables/plottable-linestyle.h"
 #include "plottables/plottable-color-mapper.h"
+#include "plottables/plottable-color-runs.h"
+#include "plottables/plottable-draw-utils.h"
+#include "painting/line-extruder.h"
 #include <any>
 #include <cmath>
 
@@ -557,4 +560,96 @@ void TestColorByScalar::uncolourRoutesDiscardAPendingStash()
         QVERIFY(mg->commitPendingData());
         QVERIFY(!mg->hasColorValues());
     }
+}
+
+namespace {
+
+QCPColorGradient redToBlue()
+{
+    QCPColorGradient g;
+    g.clearColorStops();
+    g.setColorStopAt(0, Qt::red);
+    g.setColorStopAt(1, Qt::blue);
+    return g;
+}
+
+qcp::ColorScalarMapper mapperFor(std::vector<double> values, QCPRange range)
+{
+    qcp::ColorScalarMapper m;
+    m.setGradient(redToBlue());
+    m.setRange(range);
+    m.setValues(std::make_shared<const std::vector<double>>(std::move(values)));
+    return m;
+}
+
+} // namespace
+
+void TestColorByScalar::colorRunsMergeEqualBucketsAndSkipGaps()
+{
+    // values per data index: 0, 0, 1, 1, NaN, 1
+    const auto m = mapperFor({0, 0, 1, 1, std::nan(""), 1}, QCPRange(0, 1));
+    const QVector<QPointF> pts {{0, 0}, {1, 0}, {2, 0}, {3, 0}, {qQNaN(), qQNaN()}, {5, 0}, {6, 0}};
+    const QVector<int> idx     {0,      1,      2,      3,      -1,                  4,      5};
+    const auto runs = qcp::colorRuns(pts, idx, m);
+    // Segment k -> k+1 uses idx[k+1]: 0->1 value 0 (bucket 0); 1->2 and 2->3 value 1
+    // (bucket 255, merged); 3->4 and 4->5 touch the NaN point (skipped); 5->6 value 1.
+    QCOMPARE(static_cast<int>(runs.size()), 3);
+    QCOMPARE(runs[0].first, 0); QCOMPARE(runs[0].last, 1); QCOMPARE(runs[0].bucket, 0);
+    QCOMPARE(runs[1].first, 1); QCOMPARE(runs[1].last, 3); QCOMPARE(runs[1].bucket, 255);
+    QCOMPARE(runs[2].first, 5); QCOMPARE(runs[2].last, 6); QCOMPARE(runs[2].bucket, 255);
+}
+
+void TestColorByScalar::extrudedRunsCarryTheirColour()
+{
+    const auto m = mapperFor({0, 1, 0, 1}, QCPRange(0, 1));
+    const QVector<QPointF> pts {{0, 0}, {10, 0}, {20, 5}, {30, 0}};
+    const QVector<int> idx {0, 1, 2, 3};
+    const auto runs = qcp::colorRuns(pts, idx, m);   // three one-segment runs: blue, red, blue
+    QCOMPARE(static_cast<int>(runs.size()), 3);
+
+    std::vector<float> out;
+    qcp::extrudeColorRuns(pts, runs, 2.0f, m, out);
+    int expected = 0;
+    for (const auto& r : runs)
+        expected += QCPLineExtruder::extrudePolyline(pts.mid(r.first, r.last - r.first + 1), 2.0f,
+                                                     Qt::black).size();
+    QCOMPARE(static_cast<int>(out.size()), expected);
+    // first run is blue (bucket 255): every vertex of it has r == 0, b == 1
+    QCOMPARE(out[2], 0.0f);
+    QCOMPARE(out[4], 1.0f);
+}
+
+void TestColorByScalar::coloredReextrusionOnlyOnColorChangeNotPan()
+{
+    qcp::ExtrusionCache cache;
+    cache.vertices = {1, 2, 3, 4, 5, 6};
+    cache.penWidth = 2.0f;
+    cache.colorGeneration = 7;
+    QVERIFY(!qcp::needsColoredReextrusion(cache, false, 2.0f, 7));   // pan frame
+    QVERIFY(qcp::needsColoredReextrusion(cache, true, 2.0f, 7));     // fresh lines
+    QVERIFY(qcp::needsColoredReextrusion(cache, false, 3.0f, 7));    // pen width
+    QVERIFY(qcp::needsColoredReextrusion(cache, false, 2.0f, 8));    // colour changed
+    cache.clear();
+    QVERIFY(qcp::needsColoredReextrusion(cache, false, 2.0f, 7));    // empty
+}
+
+void TestColorByScalar::coloredLineRendersTheGradient()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    std::vector<double> keys(200), values(200, 0.0), scalar(200);
+    for (int i = 0; i < 200; ++i) { keys[i] = i; scalar[i] = i / 199.0; }
+    mg->setDataSource(makeSource(keys, {values}));
+    mg->setComponentPens({QPen(Qt::black, 6)});
+    mg->setColorGradient(redToBlue());
+    mg->setColorRange(QCPRange(0, 1));
+    mg->setColorValues(scalar);
+    mPlot->xAxis->setRange(0, 199);
+    mPlot->yAxis->setRange(-1, 1);
+    const QImage img = mPlot->toPixmap(400, 300).toImage();
+
+    const int y = qRound(mPlot->yAxis->coordToPixel(0));
+    const QColor left = img.pixelColor(qRound(mPlot->xAxis->coordToPixel(10)), y);
+    const QColor right = img.pixelColor(qRound(mPlot->xAxis->coordToPixel(189)), y);
+    QVERIFY2(left.red() > 150 && left.blue() < 100, qPrintable(left.name()));
+    QVERIFY2(right.blue() > 150 && right.red() < 100, qPrintable(right.name()));
 }

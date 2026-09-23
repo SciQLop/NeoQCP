@@ -373,6 +373,18 @@ void QCPMultiGraph::invalidateLines()
     mCachedIndices.clear();
 }
 
+QVector<int> QCPMultiGraph::lineIndices(const QVector<int>& dataIdx) const
+{
+    switch (mLineStyle)
+    {
+        case lsStepLeft:   return qcp::stepLeftIndices(dataIdx);
+        case lsStepRight:  return qcp::stepRightIndices(dataIdx);
+        case lsStepCenter: return qcp::stepCenterIndices(dataIdx);
+        case lsImpulse:    return qcp::impulseIndices(dataIdx);
+        default:           return dataIdx;
+    }
+}
+
 // One async L1 rebuild, the first time the graph is coloured; later colour changes never touch L1/L2.
 void QCPMultiGraph::requestOrigin()
 {
@@ -837,8 +849,12 @@ void QCPMultiGraph::draw(QCPPainter* painter)
             ds = mDataSource.get();
     }
 
+    const bool coloured = mColor.hasValues() && (ds == mDataSource.get() || mL2HasOrigin);
+
     QVector<QVector<QPointF>> exportLines;
+    QVector<QVector<int>> exportIndices;
     auto& linesTarget = isExportMode ? exportLines : mCachedLines;
+    auto& indicesTarget = isExportMode ? exportIndices : mCachedIndices;
 
     if (needFreshLines)
     {
@@ -858,7 +874,20 @@ void QCPMultiGraph::draw(QCPPainter* painter)
         for (int c = 0; c < nc; ++c)
             if (!mComponents[c].visible) { allVisible = false; break; }
 
-        if (allVisible && nc > 1 && !(mAdaptiveSampling && !mL2Result))
+        indicesTarget.resize(coloured ? nc : 0);
+        if (coloured)
+        {
+            for (int c = 0; c < nc; ++c)
+            {
+                if (!mComponents[c].visible) { linesTarget[c].clear(); indicesTarget[c].clear(); continue; }
+                linesTarget[c] = (mAdaptiveSampling && !mL2Result)
+                    ? ds->getOptimizedLineDataIndexed(c, cacheBegin, cacheEnd, pixelWidth,
+                                                      mKeyAxis.data(), mValueAxis.data(), indicesTarget[c])
+                    : ds->getLinesIndexed(c, cacheBegin, cacheEnd,
+                                          mKeyAxis.data(), mValueAxis.data(), indicesTarget[c]);
+            }
+        }
+        else if (allVisible && nc > 1 && !(mAdaptiveSampling && !mL2Result))
         {
             ds->getLinesAll(cacheBegin, cacheEnd,
                             mKeyAxis.data(), mValueAxis.data(),
@@ -897,11 +926,18 @@ void QCPMultiGraph::draw(QCPPainter* painter)
         if (c >= linesTarget.size()) continue;
         const QVector<QPointF>& dataLines = linesTarget[c];
         if (dataLines.isEmpty()) continue;
+        // A size mismatch (lines cached before colouring, on a pan frame) draws
+        // uncoloured until the next fresh fetch.
+        const QVector<int>* dataIdx = (coloured && c < indicesTarget.size()
+                                       && indicesTarget[c].size() == dataLines.size())
+            ? &indicesTarget[c] : nullptr;
 
         // Only compute step-transform when the extrusion cache needs rebuilding —
         // on cache-hit pan frames, drawPolylineCached ignores pts entirely.
+        // A coloured component may re-extrude for reasons only drawColoredPolylineCached
+        // knows (pen width, colour generation), so it always gets its styled points.
         QVector<QPointF> styledLines;
-        const bool needStyledLines = needFreshLines || mExtrusionCaches[c].isEmpty();
+        const bool needStyledLines = needFreshLines || mExtrusionCaches[c].isEmpty() || dataIdx != nullptr;
         if (needStyledLines && mLineStyle != lsNone && mLineStyle != lsLine) {
             switch (mLineStyle) {
                 case lsStepLeft:   styledLines = qcp::toStepLeftLines(dataLines, keyIsVertical); break;
@@ -921,6 +957,17 @@ void QCPMultiGraph::draw(QCPPainter* painter)
                 impulsePen.setCapStyle(Qt::FlatCap);
                 painter->setPen(impulsePen);
                 painter->drawLines(lines);
+            } else if (dataIdx) {
+                applyDefaultAntialiasingHint(painter);
+                if (!isExportMode)
+                    qcp::drawColoredPolylineCached(painter, mParentPlot, mLayer, lines,
+                                                   lineIndices(*dataIdx), mColor, activePen,
+                                                   gpuOffset, clipRect(), needFreshLines,
+                                                   mExtrusionCaches[c]);
+                else
+                    qcp::drawColoredPolylineRuns(painter, lines,
+                                                 qcp::colorRuns(lines, lineIndices(*dataIdx), mColor),
+                                                 mColor, activePen, gpuOffset);
             } else {
                 applyDefaultAntialiasingHint(painter);
                 if (!isExportMode) {

@@ -187,6 +187,8 @@ protected:
     bool mL2HasOrigin = false;
     QVector<QVector<int>> mCachedIndices;   // per component, aligned with mCachedLines when coloured
     void invalidateLines();
+    // Source indices aligned with the line-style-transformed points of a component.
+    QVector<int> lineIndices(const QVector<int>& dataIdx) const;
     void requestOrigin();
     // Same-size-keeps/other-size-clears colour rule, shared by applySourceNow()
     // and commitPendingData(): both install a new mDataSource and must apply it

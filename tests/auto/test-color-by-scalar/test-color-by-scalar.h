@@ -40,6 +40,11 @@ private slots:
     void wrongLengthOnColouredGraphLeavesItUncoloured();
     void uncolourRoutesDiscardAPendingStash();
 
+    void colorRunsMergeEqualBucketsAndSkipGaps();
+    void extrudedRunsCarryTheirColour();
+    void coloredReextrusionOnlyOnColorChangeNotPan();
+    void coloredLineRendersTheGradient();
+
 private:
     QCustomPlot* mPlot = nullptr;
     static std::shared_ptr<QCPAbstractMultiDataSource> makeSource(

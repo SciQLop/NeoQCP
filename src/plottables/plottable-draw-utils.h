@@ -1,5 +1,6 @@
 #pragma once
 
+#include "plottable-color-runs.h"
 #include <QPointF>
 #include <QPen>
 #include <QRect>
@@ -20,6 +21,7 @@ struct ExtrusionCache {
     std::vector<float> vertices;   // untranslated extruded verts (6 floats per vertex)
     float penWidth = 0;
     QRgb penColor = 0;
+    quint64 colorGeneration = 0;   // coloured lines: the mapper generation the vertices were built with
 
     void clear() { vertices.clear(); }
     [[nodiscard]] bool isEmpty() const { return vertices.empty(); }
@@ -50,5 +52,26 @@ void drawPolylineCached(QCPPainter* painter,
                          const QRect& clipRect,
                          bool freshLines,
                          ExtrusionCache& cache);
+
+/// Extrudes each run in its own colour into one vertex buffer (6 floats per vertex).
+void extrudeColorRuns(const QVector<QPointF>& points, const std::vector<ColorRun>& runs,
+                      float penWidth, const ColorScalarMapper& mapper, std::vector<float>& out);
+
+/// A coloured cache survives pans; it is rebuilt on fresh lines, pen width or colour change.
+bool needsColoredReextrusion(const ExtrusionCache& cache, bool freshLines,
+                             float penWidth, quint64 colorGeneration);
+
+/// Coloured counterpart of drawPolylineCached. Builds the runs itself, only when it
+/// re-extrudes (or has no GPU layer), so any reason to re-extrude gets correct runs.
+void drawColoredPolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer* layer,
+                               const QVector<QPointF>& points, const QVector<int>& indices,
+                               const ColorScalarMapper& mapper, const QPen& pen,
+                               const QPointF& gpuOffset, const QRect& clipRect,
+                               bool freshLines, ExtrusionCache& cache);
+
+/// QPainter path for coloured lines: one polyline per run.
+void drawColoredPolylineRuns(QCPPainter* painter, const QVector<QPointF>& points,
+                             const std::vector<ColorRun>& runs, const ColorScalarMapper& mapper,
+                             const QPen& pen, const QPointF& gpuOffset);
 
 } // namespace qcp
