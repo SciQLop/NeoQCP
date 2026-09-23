@@ -32,6 +32,7 @@ QVector<QPointF> QCPAbstractMultiDataSource::getLinesIndexed(
     int column, int begin, int end, QCPAxis* keyAxis, QCPAxis* valueAxis,
     QVector<int>& sourceIndices) const
 {
+    if (end <= begin) { sourceIndices.clear(); return {}; }
     ColumnWindow w(*this, column, begin, end);
     auto pts = qcp::algo::linesToPixelsIndexed(w.keys, w.values, 0, end - begin,
                                                keyAxis, valueAxis, sourceIndices);
@@ -43,6 +44,7 @@ QVector<QPointF> QCPAbstractMultiDataSource::getOptimizedLineDataIndexed(
     int column, int begin, int end, int pixelWidth, QCPAxis* keyAxis, QCPAxis* valueAxis,
     QVector<int>& sourceIndices) const
 {
+    if (end <= begin) { sourceIndices.clear(); return {}; }
     ColumnWindow w(*this, column, begin, end);
     auto pts = qcp::algo::optimizedLineDataIndexed(w.keys, w.values, 0, end - begin, pixelWidth,
                                                    keyAxis, valueAxis, sourceIndices);

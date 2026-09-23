@@ -194,6 +194,22 @@ void TestColorByScalar::defaultIndexedImplementationMatchesSoA()
     QCOMPARE(c, d);
 }
 
+void TestColorByScalar::defaultIndexedImplementationHandlesAnEmptyWindow()
+{
+    ForwardingSource generic(makeSource({0, 1, 2, 3}, {{0, 1, 0, 1}}));
+    mPlot->xAxis->setRange(0, 3);
+    mPlot->yAxis->setRange(-1, 2);
+    mPlot->replot();
+    for (auto [begin, end] : {std::pair{3, 1}, std::pair{2, 2}})
+    {
+        QVector<int> a{7}, b{7};
+        QVERIFY(generic.getLinesIndexed(0, begin, end, mPlot->xAxis, mPlot->yAxis, a).isEmpty());
+        QVERIFY(generic.getOptimizedLineDataIndexed(0, begin, end, 400, mPlot->xAxis, mPlot->yAxis, b).isEmpty());
+        QVERIFY(a.isEmpty());
+        QVERIFY(b.isEmpty());
+    }
+}
+
 void TestColorByScalar::rowMajorIndexedMatchesSoA()
 {
     std::vector<double> keys, values;

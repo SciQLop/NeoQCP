@@ -19,6 +19,7 @@ private slots:
     void optimizedLineDataIndexedValuesComeFromTheirIndex();
     void indexedVerticalKeyAxis();
     void defaultIndexedImplementationMatchesSoA();
+    void defaultIndexedImplementationHandlesAnEmptyWindow();
     void rowMajorIndexedMatchesSoA();
 
     void l1OriginPointsAtEachBinsExtremes();
