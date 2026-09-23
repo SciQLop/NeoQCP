@@ -12,6 +12,7 @@
 #include "painting/line-extruder.h"
 #include <any>
 #include <cmath>
+#include <numeric>
 
 using SoA = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
 
@@ -676,4 +677,92 @@ void TestColorByScalar::coloredRunsMeetWithButtEndsOnExport()
         QVERIFY2(before.red() > 150 && before.blue() < 100,
                  qPrintable(QString("dx %1: %2").arg(dx).arg(before.name())));
     }
+}
+
+namespace {
+
+QCPMultiGraph* rampGraph(QCustomPlot* plot, std::shared_ptr<QCPAbstractMultiDataSource> src,
+                         std::vector<double> scalar)
+{
+    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    mg->setDataSource(std::move(src));
+    mg->setComponentPens({QPen(Qt::black, 6)});
+    mg->setColorGradient(redToBlue());
+    mg->setColorRange(QCPRange(0, 1));
+    mg->setColorValues(std::move(scalar));
+    plot->xAxis->setRange(0, 199);
+    plot->yAxis->setRange(-1, 1);
+    return mg;
+}
+
+std::vector<double> ramp(int n)
+{
+    std::vector<double> s(n);
+    for (int i = 0; i < n; ++i) s[i] = i / double(n - 1);
+    return s;
+}
+
+QColor pixelAt(QCustomPlot* plot, const QImage& img, double key, double value)
+{
+    return img.pixelColor(qRound(plot->xAxis->coordToPixel(key)),
+                          qRound(plot->yAxis->coordToPixel(value)));
+}
+
+bool isRed(const QColor& c) { return c.red() > 150 && c.blue() < 100; }
+bool isBlue(const QColor& c) { return c.blue() > 150 && c.red() < 100; }
+
+} // namespace
+
+void TestColorByScalar::coloredDashedLineRendersTheGradient()
+{
+    std::vector<double> keys(200), values(200, 0.0);
+    std::iota(keys.begin(), keys.end(), 0.0);
+    auto* mg = rampGraph(mPlot, makeSource(keys, {values}), ramp(200));
+    mg->setComponentPens({QPen(QBrush(Qt::black), 6, Qt::DashLine)});
+    const QImage img = mPlot->toPixmap(400, 300).toImage();
+    // A dash may fall on the probe: look at a few pixels around it.
+    auto anyRed = [&](double key) { for (int d = 0; d < 6; ++d) if (isRed(pixelAt(mPlot, img, key + d, 0))) return true; return false; };
+    auto anyBlue = [&](double key) { for (int d = 0; d < 6; ++d) if (isBlue(pixelAt(mPlot, img, key - d, 0))) return true; return false; };
+    QVERIFY(anyRed(10));
+    QVERIFY(anyBlue(189));
+}
+
+void TestColorByScalar::coloredStepLineRendersTheGradient()
+{
+    std::vector<double> keys(200), values(200, 0.0);
+    std::iota(keys.begin(), keys.end(), 0.0);
+    auto* mg = rampGraph(mPlot, makeSource(keys, {values}), ramp(200));
+    mg->setLineStyle(QCPMultiGraph::lsStepLeft);
+    const QImage img = mPlot->toPixmap(400, 300).toImage();
+    QVERIFY(isRed(pixelAt(mPlot, img, 10, 0)));
+    QVERIFY(isBlue(pixelAt(mPlot, img, 189, 0)));
+}
+
+void TestColorByScalar::coloredImpulsesRenderTheGradient()
+{
+    std::vector<double> keys(20), values(20, 0.8);
+    for (int i = 0; i < 20; ++i) keys[i] = i * 10.0;
+    auto* mg = rampGraph(mPlot, makeSource(keys, {values}), ramp(20));
+    mg->setLineStyle(QCPMultiGraph::lsImpulse);
+    // Key 0 is also the x-axis range's lower bound, so it maps to the pixel column the
+    // y-axis baseline is drawn on (axes paint over the graph: see the "axes"/"main" layer
+    // order in QCustomPlot's constructor). Widen the range so the first impulse renders
+    // clear of the axis line; this doesn't change what's asserted, only where it's sampled.
+    mPlot->xAxis->setRange(-10, 199);
+    const QImage img = mPlot->toPixmap(400, 300).toImage();
+    QVERIFY(isRed(pixelAt(mPlot, img, 0, 0.4)));
+    QVERIFY(isBlue(pixelAt(mPlot, img, 190, 0.4)));
+}
+
+void TestColorByScalar::nanScalarLeavesAGap()
+{
+    std::vector<double> keys(200), values(200, 0.0);
+    std::iota(keys.begin(), keys.end(), 0.0);
+    auto scalar = ramp(200);
+    for (int i = 90; i < 110; ++i) scalar[i] = std::nan("");
+    rampGraph(mPlot, makeSource(keys, {values}), scalar);
+    const QImage img = mPlot->toPixmap(400, 300).toImage();
+    const QColor background = pixelAt(mPlot, img, 100, 0.8);   // nothing is drawn up there
+    QCOMPARE(pixelAt(mPlot, img, 100, 0), background);
+    QVERIFY(isRed(pixelAt(mPlot, img, 10, 0)));
 }

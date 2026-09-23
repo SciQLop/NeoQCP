@@ -46,6 +46,11 @@ private slots:
     void coloredLineRendersTheGradient();
     void coloredRunsMeetWithButtEndsOnExport();
 
+    void coloredDashedLineRendersTheGradient();
+    void coloredStepLineRendersTheGradient();
+    void coloredImpulsesRenderTheGradient();
+    void nanScalarLeavesAGap();
+
 private:
     QCustomPlot* mPlot = nullptr;
     static std::shared_ptr<QCPAbstractMultiDataSource> makeSource(

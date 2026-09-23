@@ -385,6 +385,27 @@ QVector<int> QCPMultiGraph::lineIndices(const QVector<int>& dataIdx) const
     }
 }
 
+// Batches impulse line pairs per colour bucket so each bucket is drawn with one
+// drawLines() call (at most 256, one per bucket) instead of one call per pair.
+void QCPMultiGraph::drawColoredImpulses(QCPPainter* painter, const QVector<QPointF>& pairs,
+                                        const QVector<int>& indices, QPen pen) const
+{
+    std::array<QVector<QLineF>, 256> byBucket;
+    for (int i = 0; i + 1 < pairs.size(); i += 2)
+    {
+        const int b = mColor.bucket(indices[i + 1]);
+        if (b != qcp::ColorScalarMapper::kGap)
+            byBucket[b].append(QLineF(pairs[i], pairs[i + 1]));
+    }
+    for (int b = 0; b < 256; ++b)
+    {
+        if (byBucket[b].isEmpty()) continue;
+        pen.setColor(qcp::runColor(mColor, b));
+        painter->setPen(pen);
+        painter->drawLines(byBucket[b]);
+    }
+}
+
 // One async L1 rebuild, the first time the graph is coloured; later colour changes never touch L1/L2.
 void QCPMultiGraph::requestOrigin()
 {
@@ -955,8 +976,12 @@ void QCPMultiGraph::draw(QCPPainter* painter)
                 applyDefaultAntialiasingHint(painter);
                 QPen impulsePen = activePen;
                 impulsePen.setCapStyle(Qt::FlatCap);
-                painter->setPen(impulsePen);
-                painter->drawLines(lines);
+                if (dataIdx)
+                    drawColoredImpulses(painter, lines, qcp::impulseIndices(*dataIdx), impulsePen);
+                else {
+                    painter->setPen(impulsePen);
+                    painter->drawLines(lines);
+                }
             } else if (dataIdx) {
                 applyDefaultAntialiasingHint(painter);
                 if (!isExportMode)

@@ -8,6 +8,7 @@
 #include "datasource/graph-resampler.h"
 #include "plottable-draw-utils.h"
 #include "plottable-color-mapper.h"
+#include <array>
 #include <atomic>
 #include <memory>
 #include <span>
@@ -189,6 +190,9 @@ protected:
     void invalidateLines();
     // Source indices aligned with the line-style-transformed points of a component.
     QVector<int> lineIndices(const QVector<int>& dataIdx) const;
+    // Draws impulse line pairs coloured per point, batched by colour bucket.
+    void drawColoredImpulses(QCPPainter* painter, const QVector<QPointF>& pairs,
+                             const QVector<int>& indices, QPen pen) const;
     void requestOrigin();
     // Same-size-keeps/other-size-clears colour rule, shared by applySourceNow()
     // and commitPendingData(): both install a new mDataSource and must apply it
