@@ -193,6 +193,11 @@ protected:
     // Draws impulse line pairs coloured per point, batched by colour bucket.
     void drawColoredImpulses(QCPPainter* painter, const QVector<QPointF>& pairs,
                              const QVector<int>& indices, QPen pen) const;
+    // Draws markers coloured per point: GPU via addScatterColored, or QPainter
+    // fallback batched by colour bucket.
+    void drawColoredScatters(QCPPainter* painter, const QVector<QPointF>& points,
+                             const QVector<int>& indices, const QCPGraphComponent& comp,
+                             const QPointF& gpuOffset, bool isExportMode) const;
     void requestOrigin();
     // Same-size-keeps/other-size-clears colour rule, shared by applySourceNow()
     // and commitPendingData(): both install a new mDataSource and must apply it

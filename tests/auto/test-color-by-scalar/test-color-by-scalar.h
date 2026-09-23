@@ -53,6 +53,7 @@ private slots:
 
     void scatterEntriesKeepTheirOwnSizeAndMode();
     void coloredScatterStagesColoursPerMarker();
+    void coloredMarkersTakeTheirPointsColour();
 
 private:
     QCustomPlot* mPlot = nullptr;

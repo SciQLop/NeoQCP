@@ -809,3 +809,19 @@ void TestColorByScalar::coloredScatterStagesColoursPerMarker()
     QCOMPARE(layer.mStagingData[3], 10.0f);                   // x of the first coloured marker
     QCOMPARE(layer.mStagingData[5], 0.0f);                    // its padding colorValue
 }
+
+void TestColorByScalar::coloredMarkersTakeTheirPointsColour()
+{
+    std::vector<double> keys(20), values(20, 0.0);
+    for (int i = 0; i < 20; ++i) keys[i] = i * 10.0;
+    auto* mg = rampGraph(mPlot, makeSource(keys, {values}), ramp(20));
+    mg->setLineStyle(QCPMultiGraph::lsNone);
+    mg->component(0).scatterStyle = QCPScatterStyle(QCPScatterStyle::ssDisc, 12);
+    // Key 0 is also the x-axis range's lower bound, so it sits under the y-axis
+    // spine, which paints over the graph (see coloredImpulsesRenderTheGradient).
+    // Widen the range so the first marker renders clear of it.
+    mPlot->xAxis->setRange(-10, 199);
+    const QImage img = mPlot->toPixmap(400, 300).toImage();
+    QVERIFY(isRed(pixelAt(mPlot, img, 0, 0)));
+    QVERIFY(isBlue(pixelAt(mPlot, img, 190, 0)));
+}

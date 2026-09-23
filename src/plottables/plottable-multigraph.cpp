@@ -406,6 +406,58 @@ void QCPMultiGraph::drawColoredImpulses(QCPPainter* painter, const QVector<QPoin
     }
 }
 
+void QCPMultiGraph::drawColoredScatters(QCPPainter* painter, const QVector<QPointF>& points,
+                                        const QVector<int>& indices, const QCPGraphComponent& comp,
+                                        const QPointF& gpuOffset, bool isExportMode) const
+{
+    const int skip = mScatterSkip + 1;
+    if (auto* srl = (!isExportMode && mParentPlot) ? mParentPlot->scatterRhiLayer(mLayer) : nullptr)
+    {
+        std::vector<float> xy, rgba;
+        xy.reserve((points.size() / skip) * 2);
+        rgba.reserve((points.size() / skip) * 4);
+        for (int i = 0; i < points.size(); i += skip)
+        {
+            const int b = mColor.bucket(indices[i]);
+            if (b == qcp::ColorScalarMapper::kGap || !qIsFinite(points[i].x()) || !qIsFinite(points[i].y()))
+                continue;
+            const QRgb c = mColor.color(b);   // premultiplied
+            xy.insert(xy.end(), {float(points[i].x()), float(points[i].y())});
+            rgba.insert(rgba.end(), {qRed(c) / 255.f, qGreen(c) / 255.f, qBlue(c) / 255.f, qAlpha(c) / 255.f});
+        }
+        if (!xy.empty())
+            srl->addScatterColored(xy, rgba, comp.scatterStyle, clipRect(),
+                                   mParentPlot->devicePixelRatioF(),
+                                   mParentPlot->rhiOutputSize().height(),
+                                   float(gpuOffset.x()), float(gpuOffset.y()),
+                                   static_cast<float>(painter->opacity()));
+        return;
+    }
+    applyScattersAntialiasingHint(painter);
+    if (!gpuOffset.isNull())
+        painter->translate(gpuOffset);
+    std::array<QVector<QPointF>, 256> byBucket;
+    for (int i = 0; i < points.size(); i += skip)
+    {
+        const int b = mColor.bucket(indices[i]);
+        if (b != qcp::ColorScalarMapper::kGap && qIsFinite(points[i].x()) && qIsFinite(points[i].y()))
+            byBucket[b].append(points[i]);
+    }
+    for (int b = 0; b < 256; ++b)
+    {
+        if (byBucket[b].isEmpty()) continue;
+        const QColor color = qcp::runColor(mColor, b);
+        QCPScatterStyle style = comp.scatterStyle;
+        style.setPen(QPen(color));
+        style.setBrush(color);
+        style.applyTo(painter, QPen(color));
+        for (const auto& p : byBucket[b])
+            style.drawShape(painter, p.x(), p.y());
+    }
+    if (!gpuOffset.isNull())
+        painter->translate(-gpuOffset);
+}
+
 // One async L1 rebuild, the first time the graph is coloured; later colour changes never touch L1/L2.
 void QCPMultiGraph::requestOrigin()
 {
@@ -1008,48 +1060,52 @@ void QCPMultiGraph::draw(QCPPainter* painter)
 
         // Draw scatters at original data positions (not step-transformed corners)
         if (!comp.scatterStyle.isNone()) {
-            bool usedGpu = false;
-            if (!isExportMode && mParentPlot)
-            {
-                if (auto* srl = mParentPlot->scatterRhiLayer(mLayer))
+            if (dataIdx) {
+                drawColoredScatters(painter, dataLines, *dataIdx, comp, gpuOffset, isExportMode);
+            } else {
+                bool usedGpu = false;
+                if (!isExportMode && mParentPlot)
                 {
+                    if (auto* srl = mParentPlot->scatterRhiLayer(mLayer))
+                    {
+                        const int skip = mScatterSkip + 1;
+                        std::vector<float> pts;
+                        pts.reserve((dataLines.size() / skip) * 3);
+                        for (int i = 0; i < dataLines.size(); i += skip)
+                        {
+                            const double sx = dataLines[i].x(), sy = dataLines[i].y();
+                            if (qIsFinite(sx) && qIsFinite(sy))
+                            {
+                                pts.push_back(static_cast<float>(sx));
+                                pts.push_back(static_cast<float>(sy));
+                                pts.push_back(0.0f);
+                            }
+                        }
+                        if (!pts.empty())
+                        {
+                            srl->addScatter(
+                                std::span<const float>(pts.data(), pts.size()),
+                                comp.scatterStyle, clipRect(),
+                                mParentPlot->devicePixelRatioF(),
+                                mParentPlot->rhiOutputSize().height(),
+                                static_cast<float>(gpuOffset.x()),
+                                static_cast<float>(gpuOffset.y()),
+                                QImage{}, static_cast<float>(painter->opacity()));
+                        }
+                        usedGpu = true;
+                    }
+                }
+                if (!usedGpu)
+                {
+                    applyScattersAntialiasingHint(painter);
+                    comp.scatterStyle.applyTo(painter, comp.pen);
                     const int skip = mScatterSkip + 1;
-                    std::vector<float> pts;
-                    pts.reserve((dataLines.size() / skip) * 3);
                     for (int i = 0; i < dataLines.size(); i += skip)
                     {
                         const double sx = dataLines[i].x(), sy = dataLines[i].y();
                         if (qIsFinite(sx) && qIsFinite(sy))
-                        {
-                            pts.push_back(static_cast<float>(sx));
-                            pts.push_back(static_cast<float>(sy));
-                            pts.push_back(0.0f);
-                        }
+                            comp.scatterStyle.drawShape(painter, sx, sy);
                     }
-                    if (!pts.empty())
-                    {
-                        srl->addScatter(
-                            std::span<const float>(pts.data(), pts.size()),
-                            comp.scatterStyle, clipRect(),
-                            mParentPlot->devicePixelRatioF(),
-                            mParentPlot->rhiOutputSize().height(),
-                            static_cast<float>(gpuOffset.x()),
-                            static_cast<float>(gpuOffset.y()),
-                            QImage{}, static_cast<float>(painter->opacity()));
-                    }
-                    usedGpu = true;
-                }
-            }
-            if (!usedGpu)
-            {
-                applyScattersAntialiasingHint(painter);
-                comp.scatterStyle.applyTo(painter, comp.pen);
-                const int skip = mScatterSkip + 1;
-                for (int i = 0; i < dataLines.size(); i += skip)
-                {
-                    const double sx = dataLines[i].x(), sy = dataLines[i].y();
-                    if (qIsFinite(sx) && qIsFinite(sy))
-                        comp.scatterStyle.drawShape(painter, sx, sy);
                 }
             }
         }
