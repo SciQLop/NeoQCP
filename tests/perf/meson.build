@@ -4,6 +4,11 @@ if host_machine.system() != 'windows'
     dependencies: [NeoQCP_dep],
     cpp_args: ['-DQT_WIDGETS_LIB', '-DQT_GUI_LIB'],
   )
+  single_column_perf = executable('single_column_perf',
+    'single-column-perf.cpp',
+    dependencies: [NeoQCP_dep],
+    cpp_args: ['-DQT_WIDGETS_LIB', '-DQT_GUI_LIB'],
+  )
 endif
 
 configure_file(
