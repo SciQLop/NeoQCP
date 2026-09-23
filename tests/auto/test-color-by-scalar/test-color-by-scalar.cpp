@@ -10,6 +10,8 @@
 #include "plottables/plottable-color-runs.h"
 #include "plottables/plottable-draw-utils.h"
 #include "painting/line-extruder.h"
+#include "painting/scatter-rhi-layer.h"
+#include "scatterstyle.h"
 #include <any>
 #include <cmath>
 #include <numeric>
@@ -765,4 +767,45 @@ void TestColorByScalar::nanScalarLeavesAGap()
     const QColor background = pixelAt(mPlot, img, 100, 0.8);   // nothing is drawn up there
     QCOMPARE(pixelAt(mPlot, img, 100, 0), background);
     QVERIFY(isRed(pixelAt(mPlot, img, 10, 0)));
+}
+
+void TestColorByScalar::scatterEntriesKeepTheirOwnSizeAndMode()
+{
+    QCPScatterRhiLayer layer(nullptr);
+    const std::vector<float> pts {10, 10, 0, 20, 20, 0};
+    QImage cmap(256, 1, QImage::Format_ARGB32_Premultiplied);
+    cmap.fill(Qt::red);
+    layer.addScatter(pts, QCPScatterStyle(QCPScatterStyle::ssDisc, 10), QRect(0, 0, 400, 300), 1.0, 300);
+    layer.addScatter(pts, QCPScatterStyle(QCPScatterStyle::ssDisc, 20), QRect(0, 0, 400, 300), 1.0, 300,
+                     0, 0, cmap);
+    layer.addScatter(pts, QCPScatterStyle(QCPScatterStyle::ssDisc, 6), QRect(0, 0, 400, 300), 1.0, 300);
+    QCOMPARE(layer.mDrawEntries.size(), 3);
+    QCOMPARE(layer.mDrawEntries[0].halfSize, 5.0f);
+    QCOMPARE(layer.mDrawEntries[1].halfSize, 10.0f);
+    QCOMPARE(layer.mDrawEntries[2].halfSize, 3.0f);
+    QVERIFY(!layer.mDrawEntries[0].useColorAxis);
+    QVERIFY(layer.mDrawEntries[1].useColorAxis);   // a later plain draw no longer switches it off
+    QVERIFY(!layer.mDrawEntries[2].useColorAxis);
+    QCOMPARE(layer.mDrawEntries[0].colorOffset, -1);
+    QVERIFY(layer.mColorStaging.empty());           // no coloured draw: no colour data at all
+}
+
+void TestColorByScalar::coloredScatterStagesColoursPerMarker()
+{
+    QCPScatterRhiLayer layer(nullptr);
+    const std::vector<float> plain {1, 1, 0};
+    const std::vector<float> xy {10, 10, 20, 20};
+    const std::vector<float> rgba {1, 0, 0, 1,  0, 0, 1, 1};
+    layer.addScatter(plain, QCPScatterStyle(QCPScatterStyle::ssDisc, 8), QRect(0, 0, 400, 300), 1.0, 300);
+    layer.addScatterColored(xy, rgba, QCPScatterStyle(QCPScatterStyle::ssDisc, 8),
+                            QRect(0, 0, 400, 300), 1.0, 300);
+    QCOMPARE(layer.mDrawEntries.size(), 2);
+    const auto& e = layer.mDrawEntries[1];
+    QCOMPARE(e.instanceOffset, 1);
+    QCOMPARE(e.instanceCount, 2);
+    QCOMPARE(e.colorOffset, 0);
+    QCOMPARE(layer.mStagingSize, 9);                          // 3 floats per instance, both draws
+    QCOMPARE(layer.mColorStaging, (std::vector<float>{1, 0, 0, 1, 0, 0, 1, 1}));
+    QCOMPARE(layer.mStagingData[3], 10.0f);                   // x of the first coloured marker
+    QCOMPARE(layer.mStagingData[5], 0.0f);                    // its padding colorValue
 }

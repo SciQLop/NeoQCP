@@ -8,6 +8,7 @@
 #include <rhi/qrhi.h>
 #include <span>
 #include <cstdlib>
+#include <vector>
 
 class QCPScatterStyle;
 
@@ -22,6 +23,9 @@ public:
         float offsetY = 0;
         float alpha = 1;
         QRect scissorRect;
+        float halfSize = 0;
+        bool useColorAxis = false;
+        int colorOffset = -1; // first colour of this draw in the colour buffer, -1 = plain
     };
 
     explicit QCPScatterRhiLayer(QRhi* rhi);
@@ -35,6 +39,12 @@ public:
                     float offsetX = 0, float offsetY = 0,
                     const QImage& colormapImage = {},
                     float alpha = 1);
+
+    // xy: 2 floats per marker; rgba: 4 premultiplied floats per marker.
+    void addScatterColored(std::span<const float> xy, std::span<const float> rgba,
+                           const QCPScatterStyle& style, const QRect& clipRect, double dpr,
+                           int outputHeight, float offsetX = 0, float offsetY = 0,
+                           float alpha = 1);
 
     void setAllOffsets(float offsetX, float offsetY);
     QPointF lastUniformOffset() const { return QPointF(mLastOffsetX, mLastOffsetY); }
@@ -50,6 +60,8 @@ public:
     const QVector<DrawEntry>& drawEntries() const { return mDrawEntries; }
 
 private:
+    friend class TestColorByScalar;
+
     struct alignas(16) PerDrawUniforms
     {
         float width, height, yFlip, dpr;
@@ -62,11 +74,17 @@ private:
     static_assert(sizeof(PerDrawUniforms) == 48);
 
     int ubufStride() const;
+    bool createColoredPipeline(QRhiRenderPassDescriptor* rpDesc, int sampleCount);
+    bool uploadColors(QRhiResourceUpdateBatch* updates);
+    void addDraw(std::span<const float> xyz, const QCPScatterStyle& style, const QRect& clipRect,
+                 double dpr, int outputHeight, float offsetX, float offsetY, float alpha,
+                 bool useColorAxis, int colorOffset);
 
     void stagingAppend(const float* src, int count);
     float* mStagingData = nullptr;
     int mStagingSize = 0;
     int mStagingCapacity = 0;
+    std::vector<float> mColorStaging; // 4 floats per coloured instance
 
     QRhi* mRhi;
     QVector<DrawEntry> mDrawEntries;
@@ -75,6 +93,8 @@ private:
     QRhiBuffer* mQuadIndexBuffer = nullptr;
     QRhiBuffer* mInstanceBuffer = nullptr;
     int mInstanceBufferSize = 0;
+    QRhiBuffer* mColorBuffer = nullptr;
+    int mColorBufferSize = 0;
 
     QRhiBuffer* mUniformBuffer = nullptr;
     int mUniformBufferSize = 0;
@@ -85,6 +105,7 @@ private:
 
     QRhiShaderResourceBindings* mSrb = nullptr;
     QRhiGraphicsPipeline* mPipeline = nullptr;
+    QRhiGraphicsPipeline* mColoredPipeline = nullptr;
     int mLastSampleCount = 0;
 
     bool mDirty = false;
@@ -93,8 +114,6 @@ private:
     bool mColormapTextureDirty = false;
     QImage mSpriteImage;
     QImage mColormapImage;
-    float mHalfSize = 0;
-    bool mUseColorAxis = false;
 
     int mCachedShape = -1;
     double mCachedSize = -1;

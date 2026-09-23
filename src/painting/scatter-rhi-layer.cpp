@@ -12,10 +12,12 @@ QCPScatterRhiLayer::QCPScatterRhiLayer(QRhi* rhi)
 
 QCPScatterRhiLayer::~QCPScatterRhiLayer()
 {
+    delete mColoredPipeline;
     delete mPipeline;
     delete mSrb;
     delete mUniformBuffer;
     delete mInstanceBuffer;
+    delete mColorBuffer;
     delete mQuadIndexBuffer;
     delete mQuadVertexBuffer;
     delete mSpriteTexture;
@@ -26,6 +28,8 @@ QCPScatterRhiLayer::~QCPScatterRhiLayer()
 
 void QCPScatterRhiLayer::invalidatePipeline()
 {
+    delete mColoredPipeline;
+    mColoredPipeline = nullptr;
     delete mPipeline;
     mPipeline = nullptr;
     delete mSrb;
@@ -52,6 +56,7 @@ void QCPScatterRhiLayer::clear()
 {
     mStagingSize = 0;
     mDrawEntries.resize(0);
+    mColorStaging.clear();
     mDirty = true;
 }
 
@@ -83,20 +88,11 @@ void QCPScatterRhiLayer::stagingAppend(const float* src, int count)
     mStagingSize += count;
 }
 
-void QCPScatterRhiLayer::addScatter(std::span<const float> points,
-                                     const QCPScatterStyle& style,
-                                     const QRect& clipRect, double dpr,
-                                     int outputHeight,
-                                     float offsetX, float offsetY,
-                                     const QImage& colormapImage,
-                                     float alpha)
+void QCPScatterRhiLayer::addDraw(std::span<const float> xyz, const QCPScatterStyle& style,
+                                 const QRect& clipRect, double dpr, int outputHeight,
+                                 float offsetX, float offsetY, float alpha,
+                                 bool useColorAxis, int colorOffset)
 {
-    PROFILE_HERE_N("QCPScatterRhiLayer::addScatter");
-
-    if (points.empty() || points.size() % 3 != 0)
-        return;
-
-    // Check if sprite needs re-rendering
     const int newShape = static_cast<int>(style.shape());
     const double newSize = style.size();
     if (newShape != mCachedShape || !qFuzzyCompare(newSize, mCachedSize)
@@ -110,30 +106,61 @@ void QCPScatterRhiLayer::addScatter(std::span<const float> points,
         mCachedBrush = style.brush();
     }
 
-    mHalfSize = static_cast<float>(newSize * 0.5);
-
-    if (!colormapImage.isNull())
-    {
-        mColormapImage = colormapImage;
-        mColormapTextureDirty = true;
-        mUseColorAxis = true;
-    }
-    else
-    {
-        mUseColorAxis = false;
-    }
-
     DrawEntry entry;
     entry.scissorRect = qcp::rhi::computeScissor(clipRect, dpr, outputHeight);
     entry.offsetX = offsetX;
     entry.offsetY = offsetY;
     entry.alpha = alpha;
     entry.instanceOffset = mStagingSize / 3;
-    entry.instanceCount = static_cast<int>(points.size()) / 3;
+    entry.instanceCount = static_cast<int>(xyz.size()) / 3;
+    entry.halfSize = static_cast<float>(newSize * 0.5);
+    entry.useColorAxis = useColorAxis;
+    entry.colorOffset = colorOffset;
 
-    stagingAppend(points.data(), static_cast<int>(points.size()));
+    stagingAppend(xyz.data(), static_cast<int>(xyz.size()));
     mDrawEntries.append(entry);
     mDirty = true;
+}
+
+void QCPScatterRhiLayer::addScatter(std::span<const float> points,
+                                     const QCPScatterStyle& style,
+                                     const QRect& clipRect, double dpr,
+                                     int outputHeight,
+                                     float offsetX, float offsetY,
+                                     const QImage& colormapImage,
+                                     float alpha)
+{
+    PROFILE_HERE_N("QCPScatterRhiLayer::addScatter");
+    if (points.empty() || points.size() % 3 != 0)
+        return;
+    if (!colormapImage.isNull())
+    {
+        mColormapImage = colormapImage;
+        mColormapTextureDirty = true;
+    }
+    addDraw(points, style, clipRect, dpr, outputHeight, offsetX, offsetY, alpha,
+            !colormapImage.isNull(), -1);
+}
+
+void QCPScatterRhiLayer::addScatterColored(std::span<const float> xy, std::span<const float> rgba,
+                                           const QCPScatterStyle& style, const QRect& clipRect,
+                                           double dpr, int outputHeight, float offsetX,
+                                           float offsetY, float alpha)
+{
+    PROFILE_HERE_N("QCPScatterRhiLayer::addScatterColored");
+    const size_t n = xy.size() / 2;
+    if (n == 0 || xy.size() % 2 != 0 || rgba.size() != n * 4)
+        return;
+    std::vector<float> xyz(n * 3);
+    for (size_t i = 0; i < n; ++i)
+    {
+        xyz[i * 3 + 0] = xy[i * 2 + 0];
+        xyz[i * 3 + 1] = xy[i * 2 + 1];
+        xyz[i * 3 + 2] = 0.0f;
+    }
+    const int colorOffset = static_cast<int>(mColorStaging.size() / 4);
+    mColorStaging.insert(mColorStaging.end(), rgba.begin(), rgba.end());
+    addDraw(xyz, style, clipRect, dpr, outputHeight, offsetX, offsetY, alpha, false, colorOffset);
 }
 
 bool QCPScatterRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc,
@@ -229,7 +256,53 @@ bool QCPScatterRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc,
         return false;
     }
 
+    if (!createColoredPipeline(rpDesc, sampleCount))
+        return false;
+
     mLastSampleCount = sampleCount;
+    return true;
+}
+
+bool QCPScatterRhiLayer::createColoredPipeline(QRhiRenderPassDescriptor* rpDesc, int sampleCount)
+{
+    auto colVert = qcp::rhi::loadEmbeddedShader(scatter_colored_vert_qsb_data,
+                                                scatter_colored_vert_qsb_data_len);
+    auto colFrag = qcp::rhi::loadEmbeddedShader(scatter_colored_frag_qsb_data,
+                                                scatter_colored_frag_qsb_data_len);
+    if (!colVert.isValid() || !colFrag.isValid())
+    {
+        qDebug() << "Failed to load coloured scatter shaders";
+        return false;
+    }
+    mColoredPipeline = mRhi->newGraphicsPipeline();
+    mColoredPipeline->setShaderStages({{QRhiShaderStage::Vertex, colVert},
+                                       {QRhiShaderStage::Fragment, colFrag}});
+    QRhiVertexInputLayout colLayout;
+    colLayout.setBindings({
+        {2 * static_cast<quint32>(sizeof(float)), QRhiVertexInputBinding::PerVertex},
+        {3 * static_cast<quint32>(sizeof(float)), QRhiVertexInputBinding::PerInstance},
+        {4 * static_cast<quint32>(sizeof(float)), QRhiVertexInputBinding::PerInstance}
+    });
+    colLayout.setAttributes({
+        {0, 0, QRhiVertexInputAttribute::Float2, 0},   // cornerOffset
+        {1, 1, QRhiVertexInputAttribute::Float3, 0},   // instanceData
+        {2, 2, QRhiVertexInputAttribute::Float4, 0}    // instanceColor
+    });
+    mColoredPipeline->setVertexInputLayout(colLayout);
+    mColoredPipeline->setTargetBlends({qcp::rhi::premultipliedAlphaBlend()});
+    mColoredPipeline->setFlags(QRhiGraphicsPipeline::UsesScissor);
+    mColoredPipeline->setTopology(QRhiGraphicsPipeline::Triangles);
+    mColoredPipeline->setSampleCount(sampleCount);
+    mColoredPipeline->setRenderPassDescriptor(rpDesc);
+    // Shares the plain pipeline's SRB: the coloured shaders use bindings 0 and 1 of it.
+    mColoredPipeline->setShaderResourceBindings(mSrb);
+    if (!mColoredPipeline->create())
+    {
+        qDebug() << "Failed to create coloured scatter pipeline";
+        delete mColoredPipeline;
+        mColoredPipeline = nullptr;
+        return false;
+    }
     return true;
 }
 
@@ -346,8 +419,8 @@ void QCPScatterRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
             dpr,
             entry.offsetX,
             entry.offsetY,
-            mHalfSize,
-            mUseColorAxis ? 1.0f : 0.0f,
+            entry.halfSize,
+            entry.useColorAxis ? 1.0f : 0.0f,
             entry.alpha, {0, 0, 0}
         };
         updates->updateDynamicBuffer(mUniformBuffer, i * stride, sizeof(params), &params);
@@ -376,7 +449,31 @@ void QCPScatterRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
     }
 
     updates->updateDynamicBuffer(mInstanceBuffer, 0, requiredSize, mStagingData);
+    if (!uploadColors(updates))
+        return;
     mDirty = false;
+}
+
+bool QCPScatterRhiLayer::uploadColors(QRhiResourceUpdateBatch* updates)
+{
+    if (mColorStaging.empty())
+        return true;
+    const int colorBytes = static_cast<int>(mColorStaging.size() * sizeof(float));
+    if (!mColorBuffer || mColorBufferSize < colorBytes)
+    {
+        delete mColorBuffer;
+        mColorBuffer = mRhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, colorBytes);
+        if (!mColorBuffer->create())
+        {
+            delete mColorBuffer;
+            mColorBuffer = nullptr;
+            mColorBufferSize = 0;
+            return false;
+        }
+        mColorBufferSize = colorBytes;
+    }
+    updates->updateDynamicBuffer(mColorBuffer, 0, colorBytes, mColorStaging.data());
+    return true;
 }
 
 void QCPScatterRhiLayer::render(QRhiCommandBuffer* cb,
@@ -388,29 +485,46 @@ void QCPScatterRhiLayer::render(QRhiCommandBuffer* cb,
         || !mInstanceBuffer || !mSrb || mDrawEntries.isEmpty())
         return;
 
-    cb->setGraphicsPipeline(mPipeline);
-    cb->setViewport({0, 0, float(outputSize.width()), float(outputSize.height())});
-
+    QRhiGraphicsPipeline* current = nullptr;
     const int stride = ubufStride();
     for (int i = 0; i < mDrawEntries.size(); ++i)
     {
         const auto& entry = mDrawEntries[i];
         if (entry.instanceCount <= 0)
             continue;
+        const bool coloured = entry.colorOffset >= 0;
+        if (coloured && (!mColoredPipeline || !mColorBuffer))
+            continue;
+        QRhiGraphicsPipeline* wanted = coloured ? mColoredPipeline : mPipeline;
+        if (wanted != current)
+        {
+            cb->setGraphicsPipeline(wanted);
+            cb->setViewport({0, 0, float(outputSize.width()), float(outputSize.height())});
+            current = wanted;
+        }
 
         const QPair<int, quint32> dynamicOffset(0, quint32(i * stride));
         cb->setShaderResources(mSrb, 1, &dynamicOffset);
 
-        const QRhiCommandBuffer::VertexInput vbufBindings[] = {
+        const QRhiCommandBuffer::VertexInput plainInputs[] = {
             {mQuadVertexBuffer, 0},
             {mInstanceBuffer, quint32(entry.instanceOffset * 3 * sizeof(float))}
         };
-        cb->setVertexInput(0, 2, vbufBindings, mQuadIndexBuffer, 0,
-                           QRhiCommandBuffer::IndexUInt16);
+        const QRhiCommandBuffer::VertexInput colouredInputs[] = {
+            {mQuadVertexBuffer, 0},
+            {mInstanceBuffer, quint32(entry.instanceOffset * 3 * sizeof(float))},
+            {mColorBuffer, quint32(entry.colorOffset * 4 * sizeof(float))}
+        };
+        if (coloured)
+            cb->setVertexInput(0, 3, colouredInputs, mQuadIndexBuffer, 0,
+                               QRhiCommandBuffer::IndexUInt16);
+        else
+            cb->setVertexInput(0, 2, plainInputs, mQuadIndexBuffer, 0,
+                               QRhiCommandBuffer::IndexUInt16);
 
         cb->setScissor({entry.scissorRect.x(), entry.scissorRect.y(),
                         entry.scissorRect.width(), entry.scissorRect.height()});
-
         cb->drawIndexed(6, entry.instanceCount, 0, 0, 0);
     }
 }
+

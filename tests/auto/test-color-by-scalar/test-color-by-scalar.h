@@ -51,6 +51,9 @@ private slots:
     void coloredImpulsesRenderTheGradient();
     void nanScalarLeavesAGap();
 
+    void scatterEntriesKeepTheirOwnSizeAndMode();
+    void coloredScatterStagesColoursPerMarker();
+
 private:
     QCustomPlot* mPlot = nullptr;
     static std::shared_ptr<QCPAbstractMultiDataSource> makeSource(
