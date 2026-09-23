@@ -339,6 +339,96 @@ static void scenarioPanReplot(int iters)
     delete plot;
 }
 
+static void colourAndSettle(QCustomPlot* plot, QCPMultiGraph* mg)
+{
+    std::vector<double> scalar(mg->dataCount());
+    for (size_t i = 0; i < scalar.size(); ++i)
+        scalar[i] = std::sin(i * 1e-5);
+    mg->setColorRange(QCPRange(-1, 1));
+    mg->setColorValues(std::move(scalar));
+    for (int w = 0; w < 100 && mg->pipeline().isBusy(); ++w) {   // the one origin rebuild
+        QThread::msleep(50);
+        QApplication::processEvents();
+    }
+    plot->replot(QCustomPlot::rpImmediateRefresh);
+    QApplication::processEvents();
+}
+
+static void scenarioColouredFullReplot(int iters)
+{
+    auto data = generateMultiData(kDefaultPoints, kDefaultCols);
+    auto [plot, mg] = setupPlotWithRhi(data);
+    colourAndSettle(plot, mg);
+    fprintf(stderr, "coloured_full_replot: %d pts × %d cols, %d iters (rhi=%s)\n",
+            kDefaultPoints, kDefaultCols, iters, plot->rhi() ? "yes" : "no");
+    waitForProfiler();
+    QElapsedTimer timer;
+    timer.start();
+    for (int i = 0; i < iters; ++i) {
+        mg->setAdaptiveSampling(mg->adaptiveSampling());
+        plot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+    double ms = timer.nsecsElapsed() / 1e6;
+    fprintf(stderr, "  total: %.1f ms, per-iter: %.1f ms\n", ms, ms / iters);
+    delete plot;
+}
+
+static void scenarioColouredPanReplot(int iters)
+{
+    auto data = generateMultiData(kDefaultPoints, kDefaultCols);
+    auto [plot, mg] = setupPlotWithRhi(data);
+    colourAndSettle(plot, mg);
+    double panStep = plot->xAxis->range().size() * 0.005;
+    fprintf(stderr, "coloured_pan_replot: %d pts × %d cols, %d iters (rhi=%s)\n",
+            kDefaultPoints, kDefaultCols, iters, plot->rhi() ? "yes" : "no");
+    waitForProfiler();
+    QElapsedTimer timer;
+    timer.start();
+    for (int i = 0; i < iters; ++i) {
+        QCPRange r = plot->xAxis->range();
+        plot->xAxis->setRange(r.lower + panStep, r.upper + panStep);
+        plot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+    double ms = timer.nsecsElapsed() / 1e6;
+    fprintf(stderr, "  total: %.1f ms, per-iter: %.1f ms\n", ms, ms / iters);
+    delete plot;
+}
+
+static void zoomLoop(QCustomPlot* plot, int iters)
+{
+    QElapsedTimer timer;
+    timer.start();
+    for (int i = 0; i < iters; ++i) {
+        const QCPRange r = plot->xAxis->range();
+        const double f = (i % 2) ? 1.0 / 0.98 : 0.98;
+        plot->xAxis->setRange(r.center() - r.size() * f / 2, r.center() + r.size() * f / 2);
+        plot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+    double ms = timer.nsecsElapsed() / 1e6;
+    fprintf(stderr, "  total: %.1f ms, per-iter: %.1f ms\n", ms, ms / iters);
+}
+
+static void scenarioZoomReplot(int iters)
+{
+    auto data = generateMultiData(kDefaultPoints, kDefaultCols);
+    auto [plot, mg] = setupPlotWithRhi(data);
+    fprintf(stderr, "zoom_replot: %d iters (rhi=%s)\n", iters, plot->rhi() ? "yes" : "no");
+    waitForProfiler();
+    zoomLoop(plot, iters);
+    delete plot;
+}
+
+static void scenarioColouredZoomReplot(int iters)
+{
+    auto data = generateMultiData(kDefaultPoints, kDefaultCols);
+    auto [plot, mg] = setupPlotWithRhi(data);
+    colourAndSettle(plot, mg);
+    fprintf(stderr, "coloured_zoom_replot: %d iters (rhi=%s)\n", iters, plot->rhi() ? "yes" : "no");
+    waitForProfiler();
+    zoomLoop(plot, iters);
+    delete plot;
+}
+
 // ── Main ────────────────────────────────────────────────────────
 
 struct Scenario {
@@ -355,6 +445,10 @@ static const Scenario scenarios[] = {
     {"data_setup",    scenarioDataSetup,      3},
     {"full_replot",   scenarioFullReplot,     20},
     {"pan_replot",    scenarioPanReplot,      200},
+    {"coloured_full_replot", scenarioColouredFullReplot, 20},
+    {"coloured_pan_replot",  scenarioColouredPanReplot,  200},
+    {"zoom_replot",          scenarioZoomReplot,          50},
+    {"coloured_zoom_replot", scenarioColouredZoomReplot,  50},
 };
 
 int main(int argc, char* argv[])
