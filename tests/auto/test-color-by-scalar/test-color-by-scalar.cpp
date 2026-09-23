@@ -1008,6 +1008,9 @@ void TestColorByScalar::nanScalarLeavesAGap()
     auto scalar = ramp(200);
     for (int i = 90; i < 110; ++i) scalar[i] = std::nan("");
     rampGraph(mPlot, makeSource(keys, {values}), scalar);
+    // Key 100 and value 0 sit on grid lines, whose dots land on the probe on some platforms.
+    mPlot->xAxis->grid()->setVisible(false);
+    mPlot->yAxis->grid()->setVisible(false);
     const QImage img = mPlot->toPixmap(400, 300).toImage();
     const QColor background = pixelAt(mPlot, img, 100, 0.8);   // nothing is drawn up there
     QCOMPARE(pixelAt(mPlot, img, 100, 0), background);
