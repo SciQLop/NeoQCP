@@ -392,12 +392,12 @@ QVector<QPointF> optimizedLineDataImpl(const KC& keys, const VC& values,
             emitPoint(toPixel(intervalStartKey + epsilon * 0.75, maxVal), maxIdx);
             if (nextKey > intervalStartKey + epsilon * 2)
                 emitPoint(toPixel(intervalStartKey + epsilon * 0.8,
-                             static_cast<double>(values[intervalLast])), intervalLast);
+                                  static_cast<double>(values[intervalLast])), intervalLast);
         }
         else
         {
             emitPoint(toPixel(static_cast<double>(keys[intervalFirst]),
-                         static_cast<double>(values[intervalFirst])), intervalFirst);
+                              static_cast<double>(values[intervalFirst])), intervalFirst);
         }
     };
 
