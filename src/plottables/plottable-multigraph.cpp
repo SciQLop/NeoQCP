@@ -427,6 +427,11 @@ void QCPMultiGraph::setColorValues(std::vector<double> values)
 
 void QCPMultiGraph::clearColorValues()
 {
+    // Every "uncolour" route (wrong length, an empty vector, or an explicit call) must
+    // also drop a stash left by an earlier, valid setColorValues() while a source was
+    // pending — otherwise a graph "coloured" only through that stash survives this call
+    // and commitPendingData() re-colours it from the stale stash.
+    mPendingColorValues.reset();
     if (!mColor.hasValues())
         return;
     mColor.clearValues();

@@ -515,3 +515,46 @@ void TestColorByScalar::wrongLengthOnColouredGraphLeavesItUncoloured()
     mg->setColorValues(std::vector<double>{1, 2, 3});   // wrong length
     QVERIFY(!mg->hasColorValues());
 }
+
+void TestColorByScalar::uncolourRoutesDiscardAPendingStash()
+{
+    // Wrong length while pending: the stash from the earlier, valid call must not
+    // survive to re-colour the graph once the pending source commits.
+    {
+        auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+        mg->setDataSource(makeSource({0, 1, 2, 3}, {{0, 1, 0, 1}}));   // n = 4, displayed
+        mPlot->xAxis->setRange(0, 3);
+        mPlot->yAxis->setRange(-1, 2);
+        mPlot->replot();
+        QVERIFY(mg->hasRenderedRange());
+
+        mg->setDataSource(makeSource({0, 1, 2, 3, 4}, {{0, 1, 0, 1, 0}}));  // m = 5, deferred
+        QVERIFY(mg->hasPendingData());
+
+        mg->setColorValues(std::vector<double>{1, 2, 3, 4, 5});   // sized for the pending: stashed
+        mg->setColorValues(std::vector<double>{1, 2, 3});         // wrong length: must discard the stash too
+
+        QVERIFY(mg->commitPendingData());
+        QVERIFY(!mg->hasColorValues());
+    }
+
+    // Empty vector while pending: same "uncolour" route, through clearColorValues()'s
+    // early-return path (nothing in mColor yet, only a pending stash).
+    {
+        auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+        mg->setDataSource(makeSource({0, 1, 2, 3}, {{0, 1, 0, 1}}));
+        mPlot->xAxis->setRange(0, 3);
+        mPlot->yAxis->setRange(-1, 2);
+        mPlot->replot();
+        QVERIFY(mg->hasRenderedRange());
+
+        mg->setDataSource(makeSource({0, 1, 2, 3, 4}, {{0, 1, 0, 1, 0}}));
+        QVERIFY(mg->hasPendingData());
+
+        mg->setColorValues(std::vector<double>{1, 2, 3, 4, 5});   // stashed
+        mg->setColorValues(std::vector<double>{});                // empty: clearColorValues()
+
+        QVERIFY(mg->commitPendingData());
+        QVERIFY(!mg->hasColorValues());
+    }
+}

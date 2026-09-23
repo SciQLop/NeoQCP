@@ -38,6 +38,7 @@ private slots:
     void deferredCommitAppliesTheColorSizeRule();
     void toBucketClampsHugeAndInfinitePositions();
     void wrongLengthOnColouredGraphLeavesItUncoloured();
+    void uncolourRoutesDiscardAPendingStash();
 
 private:
     QCustomPlot* mPlot = nullptr;
