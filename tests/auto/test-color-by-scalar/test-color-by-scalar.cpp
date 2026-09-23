@@ -6,6 +6,7 @@
 #include "datasource/graph-resampler.h"
 #include "datasource/resampled-multi-datasource.h"
 #include "plottables/plottable-linestyle.h"
+#include "plottables/plottable-color-mapper.h"
 #include <any>
 #include <cmath>
 
@@ -336,4 +337,105 @@ void TestColorByScalar::stepIndexMapsFollowTheTransforms()
     QCOMPARE(qcp::stepRightIndices(di).size(),  qcp::toStepRightLines(pts, false).size());
     QCOMPARE(qcp::stepCenterIndices(di).size(), qcp::toStepCenterLines(pts, false).size());
     QCOMPARE(qcp::impulseIndices(di).size(),    qcp::toImpulseLines(pts, false, 0).size());
+}
+
+void TestColorByScalar::mapperBucketsLinearLogNaNAndGaps()
+{
+    qcp::ColorScalarMapper m;
+    m.setValues(std::make_shared<const std::vector<double>>(
+        std::vector<double>{0.0, 0.5, 1.0, 2.0, -1.0, std::nan(""), 10.0, 100.0}));
+    m.setRange(QCPRange(0, 1));
+    QCOMPARE(m.bucket(0), 0);
+    QCOMPARE(m.bucket(1), 128);
+    QCOMPARE(m.bucket(2), 255);
+    QCOMPARE(m.bucket(3), 255);                        // clamped
+    QCOMPARE(m.bucket(4), 0);                          // clamped
+    QCOMPARE(m.bucket(5), qcp::ColorScalarMapper::kGap);   // NaN
+    QCOMPARE(m.bucket(-1), qcp::ColorScalarMapper::kGap);  // gap marker
+    QCOMPARE(m.bucket(99), qcp::ColorScalarMapper::kGap);  // out of range index
+
+    m.setScaleType(QCPAxis::stLogarithmic);
+    m.setRange(QCPRange(1, 100));
+    QCOMPARE(m.bucket(6), 128);                        // 10 is half way on log [1, 100]
+    QCOMPARE(m.bucket(4), qcp::ColorScalarMapper::kGap);   // non-positive on log
+    QCOMPARE(m.bucket(0), qcp::ColorScalarMapper::kGap);
+
+    m.setScaleType(QCPAxis::stLinear);
+    m.setRange(QCPRange(3, 3));                        // degenerate: every finite value -> 0
+    QCOMPARE(m.bucket(1), 0);
+
+    QCPColorGradient redToBlue;
+    redToBlue.clearColorStops();
+    redToBlue.setColorStopAt(0, Qt::red);
+    redToBlue.setColorStopAt(1, Qt::blue);
+    m.setGradient(redToBlue);
+    QCOMPARE(QColor::fromRgba(m.color(0)), QColor(Qt::red));
+    QCOMPARE(QColor::fromRgba(m.color(255)), QColor(Qt::blue));
+}
+
+void TestColorByScalar::mapperGenerationBumpsOnEverySetter()
+{
+    qcp::ColorScalarMapper m;
+    auto g = m.generation();
+    m.setValues(std::make_shared<const std::vector<double>>(std::vector<double>{1}));
+    QVERIFY(m.generation() > g); g = m.generation();
+    m.setGradient(QCPColorGradient(QCPColorGradient::gpHot));
+    QVERIFY(m.generation() > g); g = m.generation();
+    m.setRange(QCPRange(0, 2));
+    QVERIFY(m.generation() > g); g = m.generation();
+    m.setScaleType(QCPAxis::stLogarithmic);
+    QVERIFY(m.generation() > g); g = m.generation();
+    m.clearValues();
+    QVERIFY(m.generation() > g);
+}
+
+void TestColorByScalar::colorValuesOfTheWrongLengthAreRefused()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setColorValues(std::vector<double>{1, 2, 3});      // no data yet
+    QVERIFY(!mg->hasColorValues());
+    mg->setDataSource(makeSource({0, 1, 2, 3}, {{0, 1, 0, 1}}));
+    mg->setColorValues(std::vector<double>{1, 2, 3});      // 3 != 4
+    QVERIFY(!mg->hasColorValues());
+    mg->setColorValues(std::vector<double>{1, 2, 3, 4});
+    QVERIFY(mg->hasColorValues());
+}
+
+void TestColorByScalar::sameSizeDataRefreshKeepsColorValues()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDataSource(makeSource({0, 1, 2, 3}, {{0, 1, 0, 1}}));
+    mg->setColorValues(std::vector<double>{1, 2, 3, 4});
+    mg->setDataSource(makeSource({0, 1, 2, 3}, {{5, 6, 7, 8}}));
+    QVERIFY(mg->hasColorValues());
+    mg->setDataSource(makeSource({0, 1, 2}, {{5, 6, 7}}));
+    QVERIFY(!mg->hasColorValues());
+}
+
+void TestColorByScalar::firstColoringRebuildsL1OnceWithOrigin()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    const int n = 200'000;   // above kResampleThreshold: the async L1 pipeline runs
+    std::vector<double> keys(n), values(n), scalar(n);
+    for (int i = 0; i < n; ++i) { keys[i] = i; values[i] = std::sin(i * 0.001); scalar[i] = i; }
+    mg->setDataSource(makeSource(keys, {values}));
+    mPlot->xAxis->setRange(0, n);
+    mPlot->replot();
+    QTRY_VERIFY_WITH_TIMEOUT(mg->mL1Cache != nullptr, 5000);
+    QVERIFY(mg->mL1Cache->level1.origin.empty());     // uncoloured: no origin built
+
+    const auto uncolouredL1 = mg->mL1Cache;
+    mg->setColorValues(scalar);
+    mPlot->replot();
+    QTRY_VERIFY_WITH_TIMEOUT(mg->mL1Cache != uncolouredL1, 5000);
+    QVERIFY(!mg->mL1Cache->level1.origin.empty());
+
+    const auto colouredL1 = mg->mL1Cache;
+    mg->setColorGradient(QCPColorGradient(QCPColorGradient::gpHot));
+    mg->setColorRange(QCPRange(0, 10));
+    mg->setColorScaleType(QCPAxis::stLogarithmic);
+    std::vector<double> other(n, 1.0);
+    mg->setColorValues(other);                        // same length: no rebuild either
+    QTest::qWait(200);
+    QCOMPARE(mg->mL1Cache, colouredL1);
 }

@@ -28,6 +28,12 @@ private slots:
 
     void stepIndexMapsFollowTheTransforms();
 
+    void mapperBucketsLinearLogNaNAndGaps();
+    void mapperGenerationBumpsOnEverySetter();
+    void colorValuesOfTheWrongLengthAreRefused();
+    void sameSizeDataRefreshKeepsColorValues();
+    void firstColoringRebuildsL1OnceWithOrigin();
+
 private:
     QCustomPlot* mPlot = nullptr;
     static std::shared_ptr<QCPAbstractMultiDataSource> makeSource(

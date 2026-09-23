@@ -7,6 +7,8 @@
 #include "datasource/async-pipeline.h"
 #include "datasource/graph-resampler.h"
 #include "plottable-draw-utils.h"
+#include "plottable-color-mapper.h"
+#include <atomic>
 #include <memory>
 #include <span>
 #include <QTimer>
@@ -89,18 +91,23 @@ public:
 
     // Shared style
     [[nodiscard]] LineStyle lineStyle() const { return mLineStyle; }
-    void setLineStyle(LineStyle style)
-    {
-        if (mLineStyle == style)
-            return;
-        mLineStyle = style;
-        mLineCacheDirty = true;
-        mCachedLines.clear();
-    }
+    void setLineStyle(LineStyle style);
     [[nodiscard]] bool adaptiveSampling() const { return mAdaptiveSampling; }
-    void setAdaptiveSampling(bool enabled) { if (mAdaptiveSampling != enabled) { mAdaptiveSampling = enabled; mLineCacheDirty = true; mCachedLines.clear(); } }
+    void setAdaptiveSampling(bool enabled);
     [[nodiscard]] int scatterSkip() const { return mScatterSkip; }
     void setScatterSkip(int skip) { mScatterSkip = qMax(0, skip); }
+
+    // Colour by scalar: one value per key, shared by all components.
+    void setColorValues(std::shared_ptr<const std::vector<double>> values);
+    void setColorValues(std::vector<double> values);
+    void clearColorValues();
+    [[nodiscard]] bool hasColorValues() const;
+    void setColorGradient(const QCPColorGradient& gradient);
+    [[nodiscard]] QCPColorGradient colorGradient() const;
+    void setColorRange(const QCPRange& range);
+    [[nodiscard]] QCPRange colorRange() const;
+    void setColorScaleType(QCPAxis::ScaleType type);
+    [[nodiscard]] QCPAxis::ScaleType colorScaleType() const;
 
     // Per-component selection
     [[nodiscard]] QCPDataSelection componentSelection(int index) const;
@@ -173,6 +180,14 @@ protected:
     QVector<qcp::ExtrusionCache> mExtrusionCaches;
     // Debounce timer: defers expensive L2 rebuild until panning stops
     QTimer mViewportDebounce;
+
+    qcp::ColorScalarMapper mColor;
+    // Read by the L1 transform on the pipeline thread: build origin tables only for coloured graphs.
+    std::shared_ptr<std::atomic<bool>> mWantOrigin = std::make_shared<std::atomic<bool>>(false);
+    bool mL2HasOrigin = false;
+    QVector<QVector<int>> mCachedIndices;   // per component, aligned with mCachedLines when coloured
+    void invalidateLines();
+    void requestOrigin();
 
     // Replacement data staged while the displayed source keeps rendering; the
     // plot commits it through commitPendingData() (see QCustomPlot::requestDataSwap).

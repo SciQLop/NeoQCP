@@ -46,12 +46,12 @@ QCPMultiGraph::QCPMultiGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
         connect(keyAxis, QOverload<const QCPRange&>::of(&QCPAxis::rangeChanged),
                 this, &QCPMultiGraph::onViewportChanged);
         connect(keyAxis, &QCPAxis::scaleTypeChanged,
-                this, [this] { mLineCacheDirty = true; mCachedLines.clear(); });
+                this, [this] { invalidateLines(); });
     }
     if (valueAxis)
     {
         connect(valueAxis, &QCPAxis::scaleTypeChanged,
-                this, [this] { mLineCacheDirty = true; mCachedLines.clear(); });
+                this, [this] { invalidateLines(); });
     }
 
     connect(&mPipeline, &QCPMultiGraphPipeline::finished,
@@ -75,7 +75,8 @@ void QCPMultiGraph::setDataSource(std::unique_ptr<QCPAbstractMultiDataSource> so
     setDataSource(std::shared_ptr<QCPAbstractMultiDataSource>(std::move(source)));
 }
 
-static void ensureL1TransformMulti(QCPMultiGraphPipeline& pipeline, int sourceSize, int colCount)
+static void ensureL1TransformMulti(QCPMultiGraphPipeline& pipeline, int sourceSize, int colCount,
+                                   std::shared_ptr<std::atomic<bool>> wantOrigin)
 {
     const bool needsResampling = colCount > 0
         && static_cast<int64_t>(sourceSize) * colCount >= qcp::algo::kResampleThreshold;
@@ -84,10 +85,10 @@ static void ensureL1TransformMulti(QCPMultiGraphPipeline& pipeline, int sourceSi
         if (!pipeline.hasTransform())
         {
             pipeline.setTransform(TransformKind::ViewportIndependent,
-                [](const QCPAbstractMultiDataSource& src,
-                   const ViewportParams& vp,
-                   std::any& cache) -> std::shared_ptr<QCPAbstractMultiDataSource> {
-                    return qcp::algo::buildL1CacheMulti(src, vp, cache);
+                [wantOrigin](const QCPAbstractMultiDataSource& src,
+                             const ViewportParams& vp,
+                             std::any& cache) -> std::shared_ptr<QCPAbstractMultiDataSource> {
+                    return qcp::algo::buildL1CacheMulti(src, vp, cache, wantOrigin->load());
                 });
         }
     }
@@ -120,6 +121,13 @@ void QCPMultiGraph::applySourceNow(std::shared_ptr<QCPAbstractMultiDataSource> s
     mPendingL1.reset();
     mPendingReady = false;
     mDataSource = std::move(source);
+    if (mColor.hasValues() && (!mDataSource || mColor.size() != mDataSource->size()))
+    {
+        mColor.clearValues();
+        mWantOrigin->store(false);
+    }
+    mCachedIndices.clear();
+    mL2HasOrigin = false;
     syncComponentCount(mDataSource ? mDataSource->columnCount() : 0);
     mL1Cache.reset();
     mL2Result.reset();
@@ -128,7 +136,7 @@ void QCPMultiGraph::applySourceNow(std::shared_ptr<QCPAbstractMultiDataSource> s
     mLineCacheDirty = true;
     mNeedsResampling = mDataSource && needsResamplingMulti(*mDataSource);
     if (mDataSource)
-        ensureL1TransformMulti(mPipeline, mDataSource->size(), mDataSource->columnCount());
+        ensureL1TransformMulti(mPipeline, mDataSource->size(), mDataSource->columnCount(), mWantOrigin);
     mPipeline.setSource(mDataSource);
     // Without a transform setSource() does not bump the generation, so a job
     // still running for the previous source would otherwise pass onL1Ready's
@@ -146,7 +154,7 @@ void QCPMultiGraph::stagePendingSource(std::shared_ptr<QCPAbstractMultiDataSourc
     mPendingL1.reset();
     mPendingReady = false;
     syncComponentCount(mPendingSource->columnCount());
-    ensureL1TransformMulti(mPipeline, mPendingSource->size(), mPendingSource->columnCount());
+    ensureL1TransformMulti(mPipeline, mPendingSource->size(), mPendingSource->columnCount(), mWantOrigin);
     mPipeline.setSource(mPendingSource);
     // Without a transform setSource() does not bump the generation, so a job
     // still running for the previous source would pass the guard below.
@@ -198,7 +206,7 @@ void QCPMultiGraph::dataChanged()
     if (mDataSource)
     {
         mNeedsResampling = needsResamplingMulti(*mDataSource);
-        ensureL1TransformMulti(mPipeline, mDataSource->size(), mDataSource->columnCount());
+        ensureL1TransformMulti(mPipeline, mDataSource->size(), mDataSource->columnCount(), mWantOrigin);
     }
 
     mL1Cache.reset();
@@ -241,6 +249,7 @@ void QCPMultiGraph::rebuildL2(const ViewportParams& vp)
 {
     if (!mL1Cache) return;
     mL2Result = qcp::algo::resampleL2Multi(*mL1Cache, vp);
+    mL2HasOrigin = mL2Result && !mL1Cache->level1.origin.empty();
 }
 
 void QCPMultiGraph::onViewportChanged()
@@ -328,6 +337,77 @@ void QCPMultiGraph::setComponentVisible(int index, bool visible)
         mLayer->invalidatePaintBuffer();
     emit componentVisibilityChanged();
 }
+
+void QCPMultiGraph::setLineStyle(LineStyle style)
+{
+    if (mLineStyle == style)
+        return;
+    mLineStyle = style;
+    invalidateLines();
+}
+
+void QCPMultiGraph::setAdaptiveSampling(bool enabled)
+{
+    if (mAdaptiveSampling == enabled)
+        return;
+    mAdaptiveSampling = enabled;
+    invalidateLines();
+}
+
+void QCPMultiGraph::invalidateLines()
+{
+    mLineCacheDirty = true;
+    mCachedLines.clear();
+    mCachedIndices.clear();
+}
+
+// One async L1 rebuild, the first time the graph is coloured; later colour changes never touch L1/L2.
+void QCPMultiGraph::requestOrigin()
+{
+    if (!mWantOrigin->exchange(true) && mPipeline.hasTransform())
+        mPipeline.onDataChanged();
+}
+
+void QCPMultiGraph::setColorValues(std::shared_ptr<const std::vector<double>> values)
+{
+    if (!values || values->empty())
+        return clearColorValues();
+    const int expected = mDataSource ? mDataSource->size() : 0;
+    if (static_cast<int>(values->size()) != expected)
+    {
+        qWarning() << "QCPMultiGraph::setColorValues: expected" << expected
+                   << "values (one per key), got" << values->size();
+        return;
+    }
+    const bool wasColoured = mColor.hasValues();
+    mColor.setValues(std::move(values));
+    if (!wasColoured)
+    {
+        invalidateLines();
+        requestOrigin();
+    }
+}
+
+void QCPMultiGraph::setColorValues(std::vector<double> values)
+{
+    setColorValues(std::make_shared<const std::vector<double>>(std::move(values)));
+}
+
+void QCPMultiGraph::clearColorValues()
+{
+    if (!mColor.hasValues())
+        return;
+    mColor.clearValues();
+    invalidateLines();
+}
+
+bool QCPMultiGraph::hasColorValues() const { return mColor.hasValues(); }
+void QCPMultiGraph::setColorGradient(const QCPColorGradient& gradient) { mColor.setGradient(gradient); }
+QCPColorGradient QCPMultiGraph::colorGradient() const { return mColor.gradient(); }
+void QCPMultiGraph::setColorRange(const QCPRange& range) { mColor.setRange(range); }
+QCPRange QCPMultiGraph::colorRange() const { return mColor.range(); }
+void QCPMultiGraph::setColorScaleType(QCPAxis::ScaleType type) { mColor.setScaleType(type); }
+QCPAxis::ScaleType QCPMultiGraph::colorScaleType() const { return mColor.scaleType(); }
 
 double QCPMultiGraph::componentValueAt(int column, int index) const
 {
