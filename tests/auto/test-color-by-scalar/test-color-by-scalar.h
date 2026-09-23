@@ -51,6 +51,7 @@ private slots:
     void coloredDashedLineRendersTheGradient();
     void coloredStepLineRendersTheGradient();
     void coloredImpulsesRenderTheGradient();
+    void coloredImpulsesFollowThePanOffset();
     void nanScalarLeavesAGap();
 
     void scatterEntriesKeepTheirOwnSizeAndMode();

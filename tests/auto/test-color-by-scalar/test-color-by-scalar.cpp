@@ -10,6 +10,7 @@
 #include "plottables/plottable-color-runs.h"
 #include "plottables/plottable-draw-utils.h"
 #include "painting/line-extruder.h"
+#include "painting/viewport-offset.h"
 #include "painting/scatter-rhi-layer.h"
 #include "scatterstyle.h"
 #include <any>
@@ -790,6 +791,57 @@ void TestColorByScalar::coloredImpulsesRenderTheGradient()
     const QImage img = mPlot->toPixmap(400, 300).toImage();
     QVERIFY(isRed(pixelAt(mPlot, img, 0, 0.4)));
     QVERIFY(isBlue(pixelAt(mPlot, img, 190, 0.4)));
+}
+
+void TestColorByScalar::coloredImpulsesFollowThePanOffset()
+{
+    // Reproducer: on a cache-reuse pan frame (gpuOffset non-null), impulse
+    // lines were drawn straight from the cached pixel-space lines without
+    // being translated by gpuOffset, so they stayed at their pre-pan pixel
+    // position while the rest of the graph moved with the pan.
+    std::vector<double> keys(20), values(20, 0.8);
+    for (int i = 0; i < 20; ++i) keys[i] = i * 10.0;
+    auto* mg = rampGraph(mPlot, makeSource(keys, {values}), ramp(20));
+    mg->setLineStyle(QCPMultiGraph::lsImpulse);
+    mPlot->xAxis->setRange(-10, 199);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(mg->mHasRenderedRange);
+    QVERIFY(!mg->mLineCacheDirty);
+    const auto cachedBefore = mg->mCachedLines;
+    const double staleRedPixel = mPlot->xAxis->coordToPixel(0);   // pre-pan pixel of key 0
+
+    // Pure pan: same-size range shift, comfortably clear of the y-axis spine
+    // on both sides (see the coordToPixel comment in coloredImpulsesRenderTheGradient).
+    mPlot->xAxis->setRange(-20, 189);
+
+    // This is exactly the condition draw() itself computes: confirm the pan
+    // is served by translating the cache (gpuOffset non-null, no rebuild) --
+    // otherwise this frame wouldn't exercise the bug at all.
+    const auto [needFresh, gpuOffset] = qcp::evaluateLineCache(
+        mg->mLineCacheDirty, mg->mCachedLines.isEmpty(),
+        QSize(mPlot->xAxis->axisRect()->width(), mPlot->xAxis->axisRect()->height()),
+        mg->mCachedPlotSize, mg->mHasRenderedRange,
+        mg->mRenderedRange.key, mg->mRenderedRange.value,
+        mPlot->xAxis, mPlot->yAxis, false);
+    QVERIFY(!needFresh);
+    QVERIFY(!gpuOffset.isNull());
+
+    // Draw this pan frame directly (not through toPixmap(), which forces
+    // export mode and always rebuilds fresh lines -- it would never exercise
+    // the cache-translation path this bug lives in).
+    QImage img(400, 300, QImage::Format_ARGB32_Premultiplied);
+    img.fill(Qt::white);
+    QCPPainter painter(&img);
+    mg->draw(&painter);
+    painter.end();
+
+    QCOMPARE(mg->mCachedLines, cachedBefore);   // reused, not rebuilt
+
+    const int y = qRound(mPlot->yAxis->coordToPixel(0.4));
+    QVERIFY2(isRed(img.pixelColor(qRound(mPlot->xAxis->coordToPixel(0)), y)),
+             "impulse for key 0 did not follow the pan offset");
+    QVERIFY2(!isRed(img.pixelColor(qRound(staleRedPixel), y)),
+             "impulse for key 0 is stuck at its pre-pan pixel position");
 }
 
 void TestColorByScalar::nanScalarLeavesAGap()

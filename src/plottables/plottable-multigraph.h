@@ -195,7 +195,8 @@ protected:
     QVector<int> lineIndices(const QVector<int>& dataIdx) const;
     // Draws impulse line pairs coloured per point, batched by colour bucket.
     void drawColoredImpulses(QCPPainter* painter, const QVector<QPointF>& pairs,
-                             const QVector<int>& indices, QPen pen) const;
+                             const QVector<int>& indices, QPen pen,
+                             const QPointF& gpuOffset) const;
     // Draws markers coloured per point: GPU via addScatterColored, or QPainter
     // fallback batched by colour bucket.
     void drawColoredScatters(QCPPainter* painter, const QVector<QPointF>& points,

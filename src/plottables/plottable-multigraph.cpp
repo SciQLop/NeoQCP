@@ -389,7 +389,8 @@ QVector<int> QCPMultiGraph::lineIndices(const QVector<int>& dataIdx) const
 // Batches impulse line pairs per colour bucket so each bucket is drawn with one
 // drawLines() call (at most 256, one per bucket) instead of one call per pair.
 void QCPMultiGraph::drawColoredImpulses(QCPPainter* painter, const QVector<QPointF>& pairs,
-                                        const QVector<int>& indices, QPen pen) const
+                                        const QVector<int>& indices, QPen pen,
+                                        const QPointF& gpuOffset) const
 {
     std::array<QVector<QLineF>, 256> byBucket;
     for (int i = 0; i + 1 < pairs.size(); i += 2)
@@ -398,6 +399,8 @@ void QCPMultiGraph::drawColoredImpulses(QCPPainter* painter, const QVector<QPoin
         if (b != qcp::ColorScalarMapper::kGap)
             byBucket[b].append(QLineF(pairs[i], pairs[i + 1]));
     }
+    if (!gpuOffset.isNull())
+        painter->translate(gpuOffset);
     for (int b = 0; b < 256; ++b)
     {
         if (byBucket[b].isEmpty()) continue;
@@ -405,6 +408,8 @@ void QCPMultiGraph::drawColoredImpulses(QCPPainter* painter, const QVector<QPoin
         painter->setPen(pen);
         painter->drawLines(byBucket[b]);
     }
+    if (!gpuOffset.isNull())
+        painter->translate(-gpuOffset);
 }
 
 void QCPMultiGraph::drawColoredScatters(QCPPainter* painter, const QVector<QPointF>& points,
@@ -1079,10 +1084,14 @@ void QCPMultiGraph::draw(QCPPainter* painter)
                 QPen impulsePen = activePen;
                 impulsePen.setCapStyle(Qt::FlatCap);
                 if (dataIdx)
-                    drawColoredImpulses(painter, lines, qcp::impulseIndices(*dataIdx), impulsePen);
+                    drawColoredImpulses(painter, lines, qcp::impulseIndices(*dataIdx), impulsePen, gpuOffset);
                 else {
                     painter->setPen(impulsePen);
+                    if (!gpuOffset.isNull())
+                        painter->translate(gpuOffset);
                     painter->drawLines(lines);
+                    if (!gpuOffset.isNull())
+                        painter->translate(-gpuOffset);
                 }
             } else if (dataIdx) {
                 applyDefaultAntialiasingHint(painter);
