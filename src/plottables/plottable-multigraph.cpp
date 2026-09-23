@@ -451,7 +451,7 @@ void QCPMultiGraph::drawColoredScatters(QCPPainter* painter, const QVector<QPoin
         QCPScatterStyle style = comp.scatterStyle;
         style.setPen(QPen(color));
         style.setBrush(color);
-        style.applyTo(painter, QPen(color));
+        style.applyTo(painter, style.pen());
         for (const auto& p : byBucket[b])
             style.drawShape(painter, p.x(), p.y());
     }
@@ -1000,8 +1000,7 @@ void QCPMultiGraph::draw(QCPPainter* painter)
         if (c >= linesTarget.size()) continue;
         const QVector<QPointF>& dataLines = linesTarget[c];
         if (dataLines.isEmpty()) continue;
-        // A size mismatch (lines cached before colouring, on a pan frame) draws
-        // uncoloured until the next fresh fetch.
+        // Defensive: indices that do not match the lines are never used.
         const QVector<int>* dataIdx = (coloured && c < indicesTarget.size()
                                        && indicesTarget[c].size() == dataLines.size())
             ? &indicesTarget[c] : nullptr;
