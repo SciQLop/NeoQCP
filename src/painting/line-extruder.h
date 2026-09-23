@@ -4,6 +4,7 @@
 #include <QPointF>
 #include <QPolygonF>
 #include <QVector>
+#include <span>
 #include <vector>
 
 namespace QCPLineExtruder
@@ -17,7 +18,13 @@ QVector<float> extrudePolyline(const QVector<QPointF>& points, float penWidth,
                                 const QColor& color);
 
 // Same, but writes into caller-owned buffer (retains capacity across frames → zero alloc on reuse).
+// Clears out first — see appendPolyline() to build several extrusions into one buffer.
 void extrudePolyline(const QVector<QPointF>& points, float penWidth,
+                     const QColor& color, std::vector<float>& out);
+
+// Same as the out-param extrudePolyline(), but appends to out instead of clearing it first —
+// for building several colour runs into one shared vertex buffer without a per-run temporary.
+void appendPolyline(std::span<const QPointF> points, float penWidth,
                      const QColor& color, std::vector<float>& out);
 
 // Tessellate a baseline fill polygon into a triangle-list vertex buffer.

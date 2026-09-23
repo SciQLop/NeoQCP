@@ -1,6 +1,7 @@
 #include "test-line-extruder.h"
 #include "painting/line-extruder.h"
 #include <QPolygonF>
+#include <span>
 
 void TestLineExtruder::horizontalSegment()
 {
@@ -276,4 +277,50 @@ void TestLineExtruder::fillMinimalTrapezoid()
 
     // 2 curve points → first cap (3) + 1 quad (6) + last cap (3) = 12
     QCOMPARE(verts.size(), 12 * 6);
+}
+
+void TestLineExtruder::appendPolylineAppendsRatherThanClears()
+{
+    QVector<QPointF> pointsA = {{0.0, 5.0}, {10.0, 5.0}};
+    QVector<QPointF> pointsB = {{5.0, 0.0}, {5.0, 10.0}};
+    QColor colorA(255, 0, 0, 255);
+    QColor colorB(0, 255, 0, 255);
+    float penWidth = 2.0f;
+
+    const auto expectedA = QCPLineExtruder::extrudePolyline(pointsA, penWidth, colorA);
+    const auto expectedB = QCPLineExtruder::extrudePolyline(pointsB, penWidth, colorB);
+
+    // Calling appendPolyline twice on the same buffer concatenates the two single extrusions.
+    std::vector<float> out;
+    QCPLineExtruder::appendPolyline(std::span<const QPointF>(pointsA), penWidth, colorA, out);
+    QCPLineExtruder::appendPolyline(std::span<const QPointF>(pointsB), penWidth, colorB, out);
+
+    QCOMPARE(static_cast<int>(out.size()), expectedA.size() + expectedB.size());
+    for (int i = 0; i < expectedA.size(); ++i)
+        QCOMPARE(out[i], expectedA[i]);
+    for (int i = 0; i < expectedB.size(); ++i)
+        QCOMPARE(out[expectedA.size() + i], expectedB[i]);
+
+    // It must not clear pre-existing content: seed out with a sentinel and append on top.
+    std::vector<float> seeded {1.0f, 2.0f, 3.0f};
+    QCPLineExtruder::appendPolyline(std::span<const QPointF>(pointsA), penWidth, colorA, seeded);
+    QCOMPARE(seeded[0], 1.0f);
+    QCOMPARE(seeded[1], 2.0f);
+    QCOMPARE(seeded[2], 3.0f);
+    QCOMPARE(static_cast<int>(seeded.size()), 3 + expectedA.size());
+}
+
+void TestLineExtruder::outParamOverloadStillClears()
+{
+    QVector<QPointF> points = {{0.0, 5.0}, {10.0, 5.0}};
+    QColor color(255, 0, 0, 255);
+    float penWidth = 2.0f;
+
+    std::vector<float> out {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+    QCPLineExtruder::extrudePolyline(points, penWidth, color, out);
+
+    const auto expected = QCPLineExtruder::extrudePolyline(points, penWidth, color);
+    QCOMPARE(static_cast<int>(out.size()), expected.size());
+    for (int i = 0; i < expected.size(); ++i)
+        QCOMPARE(out[i], expected[i]);
 }

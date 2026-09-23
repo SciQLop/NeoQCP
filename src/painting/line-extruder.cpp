@@ -72,11 +72,11 @@ struct SegmentData
     int endIdx;
 };
 
-QVector<SegmentData> splitByNonFinite(const QVector<QPointF>& points)
+QVector<SegmentData> splitByNonFinite(std::span<const QPointF> points)
 {
     QVector<SegmentData> segments;
     int start = 0;
-    for (int i = 0; i < points.size(); ++i)
+    for (int i = 0; i < static_cast<int>(points.size()); ++i)
     {
         if (isNonFinite(points[i]))
         {
@@ -85,12 +85,12 @@ QVector<SegmentData> splitByNonFinite(const QVector<QPointF>& points)
             start = i + 1;
         }
     }
-    if (points.size() - start >= 2)
-        segments.append({start, int(points.size())});
+    if (static_cast<int>(points.size()) - start >= 2)
+        segments.append({start, static_cast<int>(points.size())});
     return segments;
 }
 
-void extrudeSegment(WriteCursor& cur, const QVector<QPointF>& points,
+void extrudeSegment(WriteCursor& cur, std::span<const QPointF> points,
                     int start, int end, float halfWidth, const std::array<float, 4>& rgba)
 {
     int count = end - start;
@@ -162,11 +162,10 @@ int maxExtrusionFloats(int pointCount)
 
 } // anonymous namespace
 
-void extrudePolyline(const QVector<QPointF>& points, float penWidth,
+void appendPolyline(std::span<const QPointF> points, float penWidth,
                      const QColor& color, std::vector<float>& out)
 {
     PROFILE_HERE_N("extrudePolyline");
-    out.clear();
     if (points.size() < 2 || penWidth <= 0.0f)
         return;
     PROFILE_PASS_VALUE(points.size());
@@ -176,15 +175,24 @@ void extrudePolyline(const QVector<QPointF>& points, float penWidth,
 
     auto segments = splitByNonFinite(points);
 
-    // Pre-allocate worst case — the vector retains capacity across frames
-    int maxFloats = maxExtrusionFloats(points.size());
-    out.resize(maxFloats);
+    // Pre-allocate worst case on top of whatever's already in out — the vector
+    // retains capacity across frames/runs, so repeated appends amortize to zero alloc.
+    const size_t base = out.size();
+    int maxFloats = maxExtrusionFloats(static_cast<int>(points.size()));
+    out.resize(base + maxFloats);
 
-    WriteCursor cur{out.data()};
+    WriteCursor cur{out.data() + base};
     for (const auto& seg : segments)
         extrudeSegment(cur, points, seg.startIdx, seg.endIdx, halfWidth, rgba);
 
-    out.resize(cur.pos); // trim to actual size (no realloc — smaller than capacity)
+    out.resize(base + cur.pos); // trim to actual size (no realloc — smaller than capacity)
+}
+
+void extrudePolyline(const QVector<QPointF>& points, float penWidth,
+                     const QColor& color, std::vector<float>& out)
+{
+    out.clear();
+    appendPolyline(points, penWidth, color, out);
 }
 
 QVector<float> extrudePolyline(const QVector<QPointF>& points, float penWidth,

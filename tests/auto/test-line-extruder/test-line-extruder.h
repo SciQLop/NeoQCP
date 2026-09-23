@@ -31,4 +31,6 @@ private slots:
     void fillVerticalBaseline();
     void fillTooFewPoints();
     void fillMinimalTrapezoid();
+    void appendPolylineAppendsRatherThanClears();
+    void outParamOverloadStillClears();
 };

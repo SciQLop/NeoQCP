@@ -6,6 +6,7 @@
 #include "../painting/plottable-rhi-layer.h"
 
 #include <cmath>
+#include <span>
 
 namespace {
 
@@ -126,9 +127,9 @@ void extrudeColorRuns(const QVector<QPointF>& points, const std::vector<ColorRun
     out.clear();
     for (const auto& run : runs)
     {
-        const auto verts = QCPLineExtruder::extrudePolyline(
-            points.mid(run.first, run.last - run.first + 1), penWidth, runColor(mapper, run.bucket));
-        out.insert(out.end(), verts.cbegin(), verts.cend());
+        QCPLineExtruder::appendPolyline(
+            std::span<const QPointF>(points.constData() + run.first, run.last - run.first + 1),
+            penWidth, runColor(mapper, run.bucket), out);
     }
 }
 
