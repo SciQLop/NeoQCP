@@ -59,6 +59,8 @@ class ForwardingSource final : public QCPAbstractMultiDataSource
 public:
     explicit ForwardingSource(std::shared_ptr<QCPAbstractMultiDataSource> inner)
         : mInner(std::move(inner)) {}
+    // Stands in for a source mutated in place (the graph is told via dataChanged()).
+    void setInner(std::shared_ptr<QCPAbstractMultiDataSource> inner) { mInner = std::move(inner); }
     int columnCount() const override { return mInner->columnCount(); }
     int size() const override { return mInner->size(); }
     double keyAt(int i) const override { return mInner->keyAt(i); }
@@ -432,6 +434,24 @@ void TestColorByScalar::sameSizeDataRefreshKeepsColorValues()
     QVERIFY(mg->hasColorValues());
     mg->setDataSource(makeSource({0, 1, 2}, {{5, 6, 7}}));
     QVERIFY(!mg->hasColorValues());
+}
+
+void TestColorByScalar::inPlaceResizeAppliesTheColorSizeRule()
+{
+    auto src = std::make_shared<ForwardingSource>(makeSource({0, 1, 2, 3}, {{0, 1, 0, 1}}));
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDataSource(src);
+    mg->setColorValues(std::vector<double>{1, 2, 3, 4});
+
+    src->setInner(makeSource({0, 1, 2, 3}, {{5, 6, 7, 8}}));
+    mg->dataChanged();
+    QVERIFY(mg->hasColorValues());
+    QVERIFY(mg->mWantOrigin->load());
+
+    src->setInner(makeSource({0, 1, 2, 3, 4}, {{5, 6, 7, 8, 9}}));   // appended in place
+    mg->dataChanged();
+    QVERIFY(!mg->hasColorValues());
+    QVERIFY(!mg->mWantOrigin->load());
 }
 
 void TestColorByScalar::firstColoringRebuildsL1OnceWithOrigin()

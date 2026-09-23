@@ -33,6 +33,7 @@ private slots:
     void mapperGenerationBumpsOnEverySetter();
     void colorValuesOfTheWrongLengthAreRefused();
     void sameSizeDataRefreshKeepsColorValues();
+    void inPlaceResizeAppliesTheColorSizeRule();
     void firstColoringRebuildsL1OnceWithOrigin();
 
     void deferredSetColorValuesUsesThePendingSourceSize();

@@ -217,6 +217,7 @@ void QCPMultiGraph::dataChanged()
     mLineCacheDirty = true;
     if (mDataSource)
     {
+        applyColorSizeRule(mDataSource->size());
         mNeedsResampling = needsResamplingMulti(*mDataSource);
         ensureL1TransformMulti(mPipeline, mDataSource->size(), mDataSource->columnCount(), mWantOrigin);
     }
@@ -466,8 +467,8 @@ void QCPMultiGraph::requestOrigin()
 }
 
 // Same-size-keeps/other-size-clears colour rule, applied whenever a new mDataSource is
-// installed without new colour values to go with it (applySourceNow, and commitPendingData
-// when nothing was stashed for the committed source).
+// installed without new colour values to go with it (applySourceNow, commitPendingData
+// when nothing was stashed for the committed source, and dataChanged on an in-place mutation).
 void QCPMultiGraph::applyColorSizeRule(int newSize)
 {
     if (mColor.hasValues() && mColor.size() != newSize)

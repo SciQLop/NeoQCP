@@ -202,9 +202,9 @@ protected:
                              const QVector<int>& indices, const QCPGraphComponent& comp,
                              const QPointF& gpuOffset, bool isExportMode) const;
     void requestOrigin();
-    // Same-size-keeps/other-size-clears colour rule, shared by applySourceNow()
-    // and commitPendingData(): both install a new mDataSource and must apply it
-    // identically. Resets mWantOrigin when the graph ends up uncoloured.
+    // Same-size-keeps/other-size-clears colour rule, shared by applySourceNow(),
+    // commitPendingData() and dataChanged(): each installs or mutates mDataSource and
+    // must apply it identically. Resets mWantOrigin when the graph ends up uncoloured.
     void applyColorSizeRule(int newSize);
 
     // Replacement data staged while the displayed source keeps rendering; the
