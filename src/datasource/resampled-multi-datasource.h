@@ -143,6 +143,45 @@ public:
         }
     }
 
+    QVector<QPointF> getLinesIndexed(int column, int begin, int end,
+                                     QCPAxis* keyAxis, QCPAxis* valueAxis,
+                                     QVector<int>& sourceIndices) const override
+    {
+        sourceIndices.clear();
+        if (column < 0 || column >= mBins.numColumns) return {};
+        const int s = mBins.stride();
+        const bool keyIsVertical = keyAxis->orientation() == Qt::Vertical;
+        ensureGapCache(begin, end);
+        const auto nanPt = QPointF(qQNaN(), qQNaN());
+        const bool hasOrigin = !mBins.origin.empty();
+
+        QVector<QPointF> lines;
+        lines.reserve(end - begin + (end - begin) / 10);
+        sourceIndices.reserve(lines.capacity());
+        for (int i = begin; i < end; ++i)
+        {
+            if (mGapCache.gaps.hasAnyGap && mGapCache.gaps[i - begin])
+            {
+                lines.append(nanPt);
+                sourceIndices.append(-1);
+            }
+            const double v = mBins.values[column * s + i];
+            if (std::isnan(v)) continue;
+            const double kp = keyAxis->coordToPixel(mBins.keys[i]);
+            const double vp = valueAxis->coordToPixel(v);
+            lines.append(keyIsVertical ? QPointF(vp, kp) : QPointF(kp, vp));
+            sourceIndices.append(hasOrigin ? mBins.origin[column * s + i] : -1);
+        }
+        return lines;
+    }
+
+    QVector<QPointF> getOptimizedLineDataIndexed(int column, int begin, int end, int /*pixelWidth*/,
+                                                 QCPAxis* keyAxis, QCPAxis* valueAxis,
+                                                 QVector<int>& sourceIndices) const override
+    {
+        return getLinesIndexed(column, begin, end, keyAxis, valueAxis, sourceIndices);
+    }
+
     const double* rawKeyData() const override { return mBins.keys.data(); }
     const double* rawColumnData(int column) const override
     {
@@ -167,7 +206,10 @@ private:
 
 namespace qcp::algo {
 
-inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2Multi(
+namespace detail {
+
+template <bool WithOrigin>
+inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2MultiImpl(
     const MultiGraphResamplerCache& l1Cache,
     const ViewportParams& vp)
 {
@@ -203,6 +245,8 @@ inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2Multi(
     int l2Stride = l2Bins * 2;
 
     l2.values.resize(N * l2Stride);
+    [[maybe_unused]] std::vector<int> minRow, maxRow;
+    if constexpr (WithOrigin) { minRow.assign(N * l2Bins, -1); maxRow.assign(N * l2Bins, -1); }
 
     constexpr double posInf = std::numeric_limits<double>::infinity();
     constexpr double negInf = -std::numeric_limits<double>::infinity();
@@ -228,19 +272,22 @@ inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2Multi(
         int slot = bin * 2;
 
         bool anyValid = false;
+        const int row = l1Begin + i;
         for (int c = 0; c < N; ++c)
         {
-            double v = l1.values[c * l1Stride + l1Begin + i];
+            double v = l1.values[c * l1Stride + row];
             if (v != v) continue;  // NaN
 
             double* colOut = l2.values.data() + c * l2Stride;
-            if (v < colOut[slot]) colOut[slot] = v;
-            if (v > colOut[slot + 1]) colOut[slot + 1] = v;
+            if (v < colOut[slot])     { colOut[slot] = v;     if constexpr (WithOrigin) minRow[c * l2Bins + bin] = row; }
+            if (v > colOut[slot + 1]) { colOut[slot + 1] = v; if constexpr (WithOrigin) maxRow[c * l2Bins + bin] = row; }
             anyValid = true;
         }
         if (anyValid)
             binHasData[bin] = true;
     }
+
+    if constexpr (WithOrigin) l2.origin.resize(N * l2Stride);
 
     // Compact: emit only populated bins, guided by the bitset
     int outSize = 0;
@@ -263,6 +310,13 @@ inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2Multi(
             // Convert remaining sentinels to NaN for columns with no data in this bin
             colOut[outSize] = (mn == posInf) ? NaN : mn;
             colOut[outSize + 1] = (mx == negInf) ? NaN : mx;
+            if constexpr (WithOrigin)
+            {
+                const int mnRow = minRow[c * l2Bins + b], mxRow = maxRow[c * l2Bins + b];
+                int* orgOut = l2.origin.data() + c * l2Stride;
+                orgOut[outSize]     = mnRow < 0 ? -1 : l1.origin[c * l1Stride + mnRow];
+                orgOut[outSize + 1] = mxRow < 0 ? -1 : l1.origin[c * l1Stride + mxRow];
+            }
         }
         outSize += 2;
     }
@@ -272,10 +326,24 @@ inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2Multi(
     // Compact column data: shift each column's data to final stride.
     for (int c = 1; c < N; ++c)
         for (int i = 0; i < outSize; ++i)
+        {
             l2.values[c * outSize + i] = l2.values[c * l2Stride + i];
+            if constexpr (WithOrigin) l2.origin[c * outSize + i] = l2.origin[c * l2Stride + i];
+        }
     l2.values.resize(N * outSize);
+    if constexpr (WithOrigin) l2.origin.resize(N * outSize);
 
     return std::make_shared<QCPResampledMultiDataSource>(std::move(l2));
+}
+
+} // namespace detail
+
+inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2Multi(
+    const MultiGraphResamplerCache& l1Cache,
+    const ViewportParams& vp)
+{
+    return l1Cache.level1.origin.empty() ? detail::resampleL2MultiImpl<false>(l1Cache, vp)
+                                         : detail::resampleL2MultiImpl<true>(l1Cache, vp);
 }
 
 } // namespace qcp::algo

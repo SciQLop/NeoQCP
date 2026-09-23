@@ -241,6 +241,7 @@ struct GraphResamplerCache {
 struct MultiColumnBinResult {
     std::vector<double> keys;    // 2 * numBins (shared across columns)
     std::vector<double> values;  // N * 2 * numBins, column-major
+    std::vector<int> origin;     // empty, or same layout as values: source index, -1 for an empty slot
     int numColumns = 0;
     int stride() const { return static_cast<int>(keys.size()); }
 };
@@ -256,6 +257,15 @@ inline MultiColumnBinResult binMinMaxMulti(
     const QCPAbstractMultiDataSource& src,
     int begin, int end,
     const QCPRange& keyRange,
+    int numBins, bool withOrigin = false);
+
+namespace detail {
+
+template <bool WithOrigin>
+inline MultiColumnBinResult binMinMaxMultiImpl(
+    const QCPAbstractMultiDataSource& src,
+    int begin, int end,
+    const QCPRange& keyRange,
     int numBins)
 {
     MultiColumnBinResult out;
@@ -266,6 +276,7 @@ inline MultiColumnBinResult binMinMaxMulti(
     out.numColumns = N;
     out.keys.resize(numBins * 2);
     out.values.resize(N * numBins * 2, std::numeric_limits<double>::quiet_NaN());
+    if constexpr (WithOrigin) out.origin.assign(N * numBins * 2, -1);
 
     const double binWidth = keyRange.size() / numBins;
     const double halfWidth = binWidth * 0.5;
@@ -296,6 +307,7 @@ inline MultiColumnBinResult binMinMaxMulti(
     for (int c = 0; c < N; ++c)
     {
         double* colOut = out.values.data() + c * s;
+        [[maybe_unused]] int* orgOut = WithOrigin ? out.origin.data() + c * s : nullptr;
         const double* rawCol = src.rawColumnData(c);
         for (int i = begin; i < end; ++i)
         {
@@ -306,15 +318,16 @@ inline MultiColumnBinResult binMinMaxMulti(
 
             double& mn = colOut[bin * 2 + 0];
             double& mx = colOut[bin * 2 + 1];
-            if (std::isnan(mn) || v < mn) mn = v;
-            if (std::isnan(mx) || v > mx) mx = v;
+            if (std::isnan(mn) || v < mn) { mn = v; if constexpr (WithOrigin) orgOut[bin * 2 + 0] = i; }
+            if (std::isnan(mx) || v > mx) { mx = v; if constexpr (WithOrigin) orgOut[bin * 2 + 1] = i; }
         }
     }
 
     return out;
 }
 
-inline MultiColumnBinResult binMinMaxMultiParallel(
+template <bool WithOrigin>
+inline MultiColumnBinResult binMinMaxMultiParallelImpl(
     const QCPAbstractMultiDataSource& src,
     int begin, int end,
     const QCPRange& keyRange,
@@ -323,7 +336,7 @@ inline MultiColumnBinResult binMinMaxMultiParallel(
     PROFILE_HERE_N("binMinMaxMultiParallel");
     int threadCount = innerThreadCount();
     if (threadCount <= 1 || (end - begin) < 1'000'000)
-        return binMinMaxMulti(src, begin, end, keyRange, numBins);
+        return binMinMaxMulti(src, begin, end, keyRange, numBins, WithOrigin);
 
     int N = src.columnCount();
     MultiColumnBinResult out;
@@ -333,6 +346,7 @@ inline MultiColumnBinResult binMinMaxMultiParallel(
     out.numColumns = N;
     out.keys.resize(numBins * 2);
     out.values.resize(N * numBins * 2, std::numeric_limits<double>::quiet_NaN());
+    if constexpr (WithOrigin) out.origin.assign(N * numBins * 2, -1);
 
     const double binWidth = keyRange.size() / numBins;
     const double halfWidth = binWidth * 0.5;
@@ -367,6 +381,7 @@ inline MultiColumnBinResult binMinMaxMultiParallel(
         for (int c = 0; c < N; ++c)
         {
             double* colOut = out.values.data() + c * s;
+            [[maybe_unused]] int* orgOut = WithOrigin ? out.origin.data() + c * s : nullptr;
             const double* rawCol = rawCols[c];
             for (int i = 0; i < count; ++i)
             {
@@ -377,8 +392,8 @@ inline MultiColumnBinResult binMinMaxMultiParallel(
 
                 double& mn = colOut[bin * 2 + 0];
                 double& mx = colOut[bin * 2 + 1];
-                if (std::isnan(mn) || v < mn) mn = v;
-                if (std::isnan(mx) || v > mx) mx = v;
+                if (std::isnan(mn) || v < mn) { mn = v; if constexpr (WithOrigin) orgOut[bin * 2 + 0] = srcBegin + i; }
+                if (std::isnan(mx) || v > mx) { mx = v; if constexpr (WithOrigin) orgOut[bin * 2 + 1] = srcBegin + i; }
             }
         }
     };
@@ -414,6 +429,28 @@ inline MultiColumnBinResult binMinMaxMultiParallel(
         done.acquire();
 
     return out;
+}
+
+} // namespace detail
+
+inline MultiColumnBinResult binMinMaxMulti(
+    const QCPAbstractMultiDataSource& src,
+    int begin, int end,
+    const QCPRange& keyRange,
+    int numBins, bool withOrigin)
+{
+    return withOrigin ? detail::binMinMaxMultiImpl<true>(src, begin, end, keyRange, numBins)
+                      : detail::binMinMaxMultiImpl<false>(src, begin, end, keyRange, numBins);
+}
+
+inline MultiColumnBinResult binMinMaxMultiParallel(
+    const QCPAbstractMultiDataSource& src,
+    int begin, int end,
+    const QCPRange& keyRange,
+    int numBins, bool withOrigin = false)
+{
+    return withOrigin ? detail::binMinMaxMultiParallelImpl<true>(src, begin, end, keyRange, numBins)
+                      : detail::binMinMaxMultiParallelImpl<false>(src, begin, end, keyRange, numBins);
 }
 
 constexpr int kLevel1TargetBins = 100'000;
@@ -504,7 +541,7 @@ inline std::shared_ptr<QCPAbstractDataSource> resampleL2(
 inline std::shared_ptr<QCPAbstractMultiDataSource> buildL1CacheMulti(
     const QCPAbstractMultiDataSource& src,
     const ViewportParams& /*vp*/,
-    std::any& cache)
+    std::any& cache, bool withOrigin = false)
 {
     PROFILE_HERE_N("buildL1CacheMulti");
     const int srcSize = src.size();
@@ -517,14 +554,19 @@ inline std::shared_ptr<QCPAbstractMultiDataSource> buildL1CacheMulti(
     if (!foundRange || fullKeyRange.size() <= 0)
         return nullptr;
 
+    // The request itself is not stored in MultiGraphResamplerCache: extractL1Cache moves
+    // the cache out of the pipeline slot after every build, so a flag stored there would
+    // be lost. The graph owns that state instead; this check only keeps a stale
+    // origin-less cache from being reused when origin is wanted.
     auto* c = std::any_cast<MultiGraphResamplerCache>(&cache);
     if (c && c->sourceSize == srcSize && c->columnCount == N
-        && c->cachedKeyRange == fullKeyRange)
+        && c->cachedKeyRange == fullKeyRange
+        && (!withOrigin || !c->level1.origin.empty()))
         return nullptr;
     int numBins = std::min(kLevel1TargetBins, srcSize / 10);
 
     MultiGraphResamplerCache newCache;
-    newCache.level1 = binMinMaxMultiParallel(src, 0, srcSize, fullKeyRange, numBins);
+    newCache.level1 = binMinMaxMultiParallel(src, 0, srcSize, fullKeyRange, numBins, withOrigin);
     newCache.cachedKeyRange = fullKeyRange;
     newCache.sourceSize = srcSize;
     newCache.columnCount = N;

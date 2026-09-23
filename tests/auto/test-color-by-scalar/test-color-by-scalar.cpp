@@ -3,6 +3,9 @@
 #include "datasource/soa-multi-datasource.h"
 #include "datasource/algorithms.h"
 #include "datasource/row-major-multi-datasource.h"
+#include "datasource/graph-resampler.h"
+#include "datasource/resampled-multi-datasource.h"
+#include <any>
 #include <cmath>
 
 using SoA = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
@@ -212,5 +215,106 @@ void TestColorByScalar::rowMajorIndexedMatchesSoA()
         rowMajor.getLinesIndexed(col, 0, n, mPlot->xAxis, mPlot->yAxis, a);
         soa->getLinesIndexed(col, 0, n, mPlot->xAxis, mPlot->yAxis, b);
         QCOMPARE(a, b);
+    }
+}
+
+namespace {
+
+// n samples, two columns, keys 0..n with a hole in [0.3 n, 0.4 n) so some bins stay empty.
+std::shared_ptr<QCPAbstractMultiDataSource> holeySource(int n)
+{
+    std::vector<double> keys, a, b;
+    for (int i = 0; i < n; ++i)
+    {
+        if (i >= 3 * n / 10 && i < 4 * n / 10) continue;
+        keys.push_back(i);
+        a.push_back(std::sin(i * 0.001) + 0.3 * std::sin(i * 0.37));
+        b.push_back(i % 101 == 0 ? std::nan("") : std::cos(i * 0.002));
+    }
+    return std::make_shared<SoA>(std::move(keys),
+                                 std::vector<std::vector<double>>{std::move(a), std::move(b)});
+}
+
+void checkOrigin(const qcp::algo::MultiColumnBinResult& bins, const QCPAbstractMultiDataSource& src)
+{
+    const int s = bins.stride();
+    QCOMPARE(static_cast<int>(bins.origin.size()), static_cast<int>(bins.values.size()));
+    for (int c = 0; c < bins.numColumns; ++c)
+        for (int r = 0; r < s; ++r)
+        {
+            const double v = bins.values[c * s + r];
+            const int o = bins.origin[c * s + r];
+            if (std::isnan(v)) { QCOMPARE(o, -1); continue; }
+            QVERIFY(o >= 0);
+            QCOMPARE(src.valueAt(c, o), v);
+        }
+}
+
+} // namespace
+
+void TestColorByScalar::l1OriginPointsAtEachBinsExtremes()
+{
+    auto src = holeySource(50'000);
+    bool found = false;
+    const auto range = src->keyRange(found);
+    const auto bins = qcp::algo::binMinMaxMulti(*src, 0, src->size(), range, 1000, true);
+    checkOrigin(bins, *src);
+}
+
+void TestColorByScalar::l1WithoutOriginBuildsNone()
+{
+    auto src = holeySource(50'000);
+    bool found = false;
+    const auto bins = qcp::algo::binMinMaxMulti(*src, 0, src->size(), src->keyRange(found), 1000);
+    QVERIFY(bins.origin.empty());
+    std::any cache;
+    qcp::algo::buildL1CacheMulti(*src, ViewportParams{}, cache);
+    QVERIFY(std::any_cast<qcp::algo::MultiGraphResamplerCache>(&cache)->level1.origin.empty());
+}
+
+void TestColorByScalar::l1ParallelOriginEqualsSerial()
+{
+    auto src = holeySource(1'300'000);   // above the 1M parallel threshold
+    bool found = false;
+    const auto range = src->keyRange(found);
+    const auto serial = qcp::algo::binMinMaxMulti(*src, 0, src->size(), range, 20'000, true);
+    const auto parallel = qcp::algo::binMinMaxMultiParallel(*src, 0, src->size(), range, 20'000, true);
+    QCOMPARE(parallel.origin, serial.origin);
+    checkOrigin(parallel, *src);
+}
+
+void TestColorByScalar::l2OriginComposesThroughL1AndCompacts()
+{
+    auto src = holeySource(200'000);
+    std::any cache;
+    qcp::algo::buildL1CacheMulti(*src, ViewportParams{}, cache, true);
+    const auto* l1 = std::any_cast<qcp::algo::MultiGraphResamplerCache>(&cache);
+    QVERIFY(l1 && !l1->level1.origin.empty());
+
+    mPlot->xAxis->setRange(0, 200'000);
+    mPlot->yAxis->setRange(-2, 2);
+    mPlot->replot();
+    ViewportParams vp;
+    vp.keyRange = mPlot->xAxis->range();
+    vp.valueRange = mPlot->yAxis->range();
+    vp.plotWidthPx = 100;   // 400 L2 bins, far fewer than the visible L1 rows
+    const auto l2 = qcp::algo::resampleL2Multi(*l1, vp);
+    QVERIFY(l2);
+    // The hole leaves L1 bins whose values are NaN; L2 skips NaN rows, so the ~40 L2 bins
+    // covering only the hole receive no data and are compacted away (720 rows, not 800).
+    QVERIFY(l2->size() < 800);
+
+    for (int c = 0; c < 2; ++c)
+    {
+        QVector<int> idx;
+        const auto pts = l2->getLinesIndexed(c, 0, l2->size(), mPlot->xAxis, mPlot->yAxis, idx);
+        QCOMPARE(idx.size(), pts.size());
+        int gapMarkers = 0;
+        for (int k = 0; k < pts.size(); ++k)
+        {
+            if (idx[k] < 0) { ++gapMarkers; QVERIFY(std::isnan(pts[k].y())); continue; }
+            QVERIFY(qAbs(pts[k].y() - mPlot->yAxis->coordToPixel(src->valueAt(c, idx[k]))) < 1e-6);
+        }
+        QVERIFY(gapMarkers >= 1);   // the hole is a key gap in L2
     }
 }

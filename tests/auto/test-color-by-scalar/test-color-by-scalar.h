@@ -21,6 +21,11 @@ private slots:
     void defaultIndexedImplementationMatchesSoA();
     void rowMajorIndexedMatchesSoA();
 
+    void l1OriginPointsAtEachBinsExtremes();
+    void l1WithoutOriginBuildsNone();
+    void l1ParallelOriginEqualsSerial();
+    void l2OriginComposesThroughL1AndCompacts();
+
 private:
     QCustomPlot* mPlot = nullptr;
     static std::shared_ptr<QCPAbstractMultiDataSource> makeSource(
