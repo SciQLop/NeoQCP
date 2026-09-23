@@ -34,6 +34,11 @@ private slots:
     void sameSizeDataRefreshKeepsColorValues();
     void firstColoringRebuildsL1OnceWithOrigin();
 
+    void deferredSetColorValuesUsesThePendingSourceSize();
+    void deferredCommitAppliesTheColorSizeRule();
+    void toBucketClampsHugeAndInfinitePositions();
+    void wrongLengthOnColouredGraphLeavesItUncoloured();
+
 private:
     QCustomPlot* mPlot = nullptr;
     static std::shared_ptr<QCPAbstractMultiDataSource> makeSource(

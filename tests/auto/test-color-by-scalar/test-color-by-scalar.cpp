@@ -439,3 +439,79 @@ void TestColorByScalar::firstColoringRebuildsL1OnceWithOrigin()
     QTest::qWait(200);
     QCOMPARE(mg->mL1Cache, colouredL1);
 }
+
+void TestColorByScalar::deferredSetColorValuesUsesThePendingSourceSize()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDataSource(makeSource({0, 1, 2, 3}, {{0, 1, 0, 1}}));   // n = 4, displayed
+    mPlot->xAxis->setRange(0, 3);
+    mPlot->yAxis->setRange(-1, 2);
+    mPlot->replot();
+    QVERIFY(mg->hasRenderedRange());
+
+    mg->setDataSource(makeSource({0, 1, 2, 3, 4}, {{0, 1, 0, 1, 0}}));  // m = 5, deferred
+    QVERIFY(mg->hasPendingData());
+
+    // Sized for the pending (5) source, not the still-displayed (4) one: must be accepted.
+    mg->setColorValues(std::vector<double>{1, 2, 3, 4, 5});
+    QVERIFY(mg->commitPendingData());
+    QVERIFY(!mg->hasPendingData());
+    QVERIFY(mg->hasColorValues());
+    QCOMPARE(mg->mColor.size(), 5);
+}
+
+void TestColorByScalar::deferredCommitAppliesTheColorSizeRule()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDataSource(makeSource({0, 1, 2, 3}, {{0, 1, 0, 1}}));
+    mg->setColorValues(std::vector<double>{1, 2, 3, 4});
+    mPlot->xAxis->setRange(0, 3);
+    mPlot->yAxis->setRange(-1, 2);
+    mPlot->replot();
+    QVERIFY(mg->hasRenderedRange());
+    QVERIFY(mg->hasColorValues());
+
+    // Same size, no new colour values supplied while pending: kept through the commit.
+    mg->setDataSource(makeSource({0, 1, 2, 3}, {{5, 6, 7, 8}}));
+    QVERIFY(mg->hasPendingData());
+    QVERIFY(mg->commitPendingData());
+    QVERIFY(mg->hasColorValues());
+    QVERIFY(mg->mWantOrigin->load());
+
+    mPlot->replot();
+    QVERIFY(mg->hasRenderedRange());
+
+    // Different size, no new colour values supplied: dropped on commit, want-origin reset.
+    mg->setDataSource(makeSource({0, 1, 2}, {{5, 6, 7}}));
+    QVERIFY(mg->hasPendingData());
+    QVERIFY(mg->commitPendingData());
+    QVERIFY(!mg->hasColorValues());
+    QVERIFY(!mg->mWantOrigin->load());
+}
+
+void TestColorByScalar::toBucketClampsHugeAndInfinitePositions()
+{
+    qcp::ColorScalarMapper huge;
+    huge.setRange(QCPRange(0, 1));
+    huge.setValues(std::make_shared<const std::vector<double>>(std::vector<double>{1e20}));
+    QCOMPARE(huge.bucket(0), 255);
+
+    // A finite value over a vanishingly small span overflows the division to +inf;
+    // toBucket must clamp the position before lround(), not clamp the already
+    // out-of-range int that a raw lround(+inf * 255) would produce.
+    qcp::ColorScalarMapper overflow;
+    overflow.setRange(QCPRange(0, 1e-300));
+    overflow.setValues(std::make_shared<const std::vector<double>>(std::vector<double>{1e300}));
+    QCOMPARE(overflow.bucket(0), 255);
+}
+
+void TestColorByScalar::wrongLengthOnColouredGraphLeavesItUncoloured()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDataSource(makeSource({0, 1, 2, 3}, {{0, 1, 0, 1}}));
+    mg->setColorValues(std::vector<double>{1, 2, 3, 4});
+    QVERIFY(mg->hasColorValues());
+
+    mg->setColorValues(std::vector<double>{1, 2, 3});   // wrong length
+    QVERIFY(!mg->hasColorValues());
+}

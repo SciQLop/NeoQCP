@@ -119,21 +119,16 @@ void QCPMultiGraph::applySourceNow(std::shared_ptr<QCPAbstractMultiDataSource> s
 {
     mPendingSource.reset();
     mPendingL1.reset();
+    mPendingColorValues.reset();
     mPendingReady = false;
     mDataSource = std::move(source);
-    if (mColor.hasValues() && (!mDataSource || mColor.size() != mDataSource->size()))
-    {
-        mColor.clearValues();
-        mWantOrigin->store(false);
-    }
-    mCachedIndices.clear();
+    applyColorSizeRule(mDataSource ? mDataSource->size() : 0);
+    invalidateLines();
     mL2HasOrigin = false;
     syncComponentCount(mDataSource ? mDataSource->columnCount() : 0);
     mL1Cache.reset();
     mL2Result.reset();
-    mCachedLines.clear();
     mL2Dirty = false;
-    mLineCacheDirty = true;
     mNeedsResampling = mDataSource && needsResamplingMulti(*mDataSource);
     if (mDataSource)
         ensureL1TransformMulti(mPipeline, mDataSource->size(), mDataSource->columnCount(), mWantOrigin);
@@ -152,6 +147,9 @@ void QCPMultiGraph::stagePendingSource(std::shared_ptr<QCPAbstractMultiDataSourc
 {
     mPendingSource = std::move(source);
     mPendingL1.reset();
+    // A newly-staged source supersedes whatever replacement (and colour values meant
+    // for it) was staged before; setColorValues() re-stashes if called again.
+    mPendingColorValues.reset();
     mPendingReady = false;
     syncComponentCount(mPendingSource->columnCount());
     ensureL1TransformMulti(mPipeline, mPendingSource->size(), mPendingSource->columnCount(), mWantOrigin);
@@ -182,8 +180,22 @@ bool QCPMultiGraph::commitPendingData()
     mL2Result.reset();
     mL2Dirty = mL1Cache != nullptr;
     mNeedsResampling = needsResamplingMulti(*mDataSource);
-    mCachedLines.clear();
-    mLineCacheDirty = true;
+
+    if (mPendingColorValues && static_cast<int>(mPendingColorValues->size()) == mDataSource->size())
+    {
+        const bool wasColoured = mColor.hasValues();
+        mColor.setValues(std::move(mPendingColorValues));
+        if (!wasColoured)
+            requestOrigin();
+    }
+    else
+    {
+        applyColorSizeRule(mDataSource->size());
+    }
+    mPendingColorValues.reset();
+    invalidateLines();
+    mL2HasOrigin = false;
+
     // Carry the barrier established while staging forward past the commit:
     // a job dispatched for the source this replaced must not be able to land
     // in mL1Cache/mL2Result once this source is the one being displayed.
@@ -368,15 +380,35 @@ void QCPMultiGraph::requestOrigin()
         mPipeline.onDataChanged();
 }
 
+// Same-size-keeps/other-size-clears colour rule, applied whenever a new mDataSource is
+// installed without new colour values to go with it (applySourceNow, and commitPendingData
+// when nothing was stashed for the committed source).
+void QCPMultiGraph::applyColorSizeRule(int newSize)
+{
+    if (mColor.hasValues() && mColor.size() != newSize)
+        mColor.clearValues();
+    if (!mColor.hasValues())
+        mWantOrigin->store(false);
+}
+
 void QCPMultiGraph::setColorValues(std::shared_ptr<const std::vector<double>> values)
 {
     if (!values || values->empty())
         return clearColorValues();
-    const int expected = mDataSource ? mDataSource->size() : 0;
+    // A pending source (staged but not yet committed) is what the values will apply to
+    // once the swap lands — validate against its size, not the still-displayed source's.
+    const QCPAbstractMultiDataSource* target = mPendingSource ? mPendingSource.get() : mDataSource.get();
+    const int expected = target ? target->size() : 0;
     if (static_cast<int>(values->size()) != expected)
     {
         qWarning() << "QCPMultiGraph::setColorValues: expected" << expected
                    << "values (one per key), got" << values->size();
+        clearColorValues();   // refused: the graph is drawn uncoloured, not left stale
+        return;
+    }
+    if (mPendingSource)
+    {
+        mPendingColorValues = std::move(values);
         return;
     }
     const bool wasColoured = mColor.hasValues();

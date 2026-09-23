@@ -188,11 +188,18 @@ protected:
     QVector<QVector<int>> mCachedIndices;   // per component, aligned with mCachedLines when coloured
     void invalidateLines();
     void requestOrigin();
+    // Same-size-keeps/other-size-clears colour rule, shared by applySourceNow()
+    // and commitPendingData(): both install a new mDataSource and must apply it
+    // identically. Resets mWantOrigin when the graph ends up uncoloured.
+    void applyColorSizeRule(int newSize);
 
     // Replacement data staged while the displayed source keeps rendering; the
     // plot commits it through commitPendingData() (see QCustomPlot::requestDataSwap).
     std::shared_ptr<QCPAbstractMultiDataSource> mPendingSource;
     std::shared_ptr<qcp::algo::MultiGraphResamplerCache> mPendingL1;
+    // Colour values set while a source is staged: validated against mPendingSource's
+    // size (not the still-displayed mDataSource's), applied by commitPendingData().
+    std::shared_ptr<const std::vector<double>> mPendingColorValues;
     bool mPendingReady = false;
     uint64_t mPendingGeneration = 0;
     // Generation floor below which a pipeline result is from a source that's

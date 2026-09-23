@@ -69,6 +69,11 @@ private:
     }
     static int toBucket(double t)
     {
+        // Clamp the position itself before scaling: for a huge or infinite t (a value far
+        // outside the colour range, or a position that overflowed to +/-inf), t * 255 can
+        // exceed lround()'s representable range, which is undefined behaviour and yields
+        // garbage (observed: bucket 0 instead of the correctly-clamped 255).
+        t = std::clamp(t, 0.0, 1.0);
         return std::clamp(static_cast<int>(std::lround(t * 255.0)), 0, 255);
     }
     void rebuildLut()
