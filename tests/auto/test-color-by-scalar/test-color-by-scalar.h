@@ -1,0 +1,22 @@
+#pragma once
+#include <QtTest/QtTest>
+#include <memory>
+#include <vector>
+
+class QCustomPlot;
+class QCPAbstractMultiDataSource;
+
+class TestColorByScalar : public QObject
+{
+    Q_OBJECT
+private slots:
+    void init();
+    void cleanup();
+
+    void setLineStyleInvalidatesLineCache();
+
+private:
+    QCustomPlot* mPlot = nullptr;
+    static std::shared_ptr<QCPAbstractMultiDataSource> makeSource(
+        std::vector<double> keys, std::vector<std::vector<double>> columns);
+};

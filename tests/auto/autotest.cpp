@@ -32,6 +32,7 @@
 #include "test-item-position/test-item-position.h"
 #include "test-layer-removal/test-layer-removal.h"
 #include "test-hidden-replot/test-hidden-replot.h"
+#include "test-color-by-scalar/test-color-by-scalar.h"
 
 #define QCPTEST(t) t t##instance; QTest::qExec(&t##instance)
 
@@ -73,6 +74,7 @@ int main(int argc, char **argv)
   QCPTEST(TestItemPosition);
   QCPTEST(TestLayerRemoval);
   QCPTEST(TestHiddenReplot);
+  QCPTEST(TestColorByScalar);
 
   return 0;
 }

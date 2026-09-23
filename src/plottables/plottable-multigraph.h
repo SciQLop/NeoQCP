@@ -89,7 +89,14 @@ public:
 
     // Shared style
     [[nodiscard]] LineStyle lineStyle() const { return mLineStyle; }
-    void setLineStyle(LineStyle style) { mLineStyle = style; }
+    void setLineStyle(LineStyle style)
+    {
+        if (mLineStyle == style)
+            return;
+        mLineStyle = style;
+        mLineCacheDirty = true;
+        mCachedLines.clear();
+    }
     [[nodiscard]] bool adaptiveSampling() const { return mAdaptiveSampling; }
     void setAdaptiveSampling(bool enabled) { if (mAdaptiveSampling != enabled) { mAdaptiveSampling = enabled; mLineCacheDirty = true; mCachedLines.clear(); } }
     [[nodiscard]] int scatterSkip() const { return mScatterSkip; }
@@ -142,6 +149,7 @@ protected:
     friend class TestMultiGraph;
     friend class TestPipeline;
     friend class TestDataSwap;
+    friend class TestColorByScalar;
 
 protected:
     std::shared_ptr<QCPAbstractMultiDataSource> mDataSource;

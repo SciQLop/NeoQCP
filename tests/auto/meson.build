@@ -38,6 +38,7 @@ test_srcs = [
     'test-layer-removal/test-layer-removal.cpp',
     'test-hidden-replot/test-hidden-replot.cpp',
     'test-data-swap/test-data-swap.cpp',
+    'test-color-by-scalar/test-color-by-scalar.cpp',
 ]
 
 test_headers = [
@@ -75,6 +76,7 @@ test_headers = [
     'test-layer-removal/test-layer-removal.h',
     'test-hidden-replot/test-hidden-replot.h',
     'test-data-swap/test-data-swap.h',
+    'test-color-by-scalar/test-color-by-scalar.h',
 ]
 test_moc_files = qtmod.compile_moc(headers : test_headers)
 
