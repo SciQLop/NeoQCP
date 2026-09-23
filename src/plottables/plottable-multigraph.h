@@ -141,6 +141,9 @@ public:
     using QCPAbstractPlottable::removeFromLegend;
     bool addToLegend(QCPLegend* legend) override;
     bool removeFromLegend(QCPLegend* legend) const override;
+    //! Draws one component's legend line: its pen, or, when the graph is coloured, the pen
+    //! with a gradient brush along `line` sampled from the colour mapper.
+    void drawComponentLegendLine(QCPPainter* painter, int component, const QLineF& line) const;
 
 Q_SIGNALS:
     //! A component was shown or hidden: the legend group row draws one segment per visible one.

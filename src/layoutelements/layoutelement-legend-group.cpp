@@ -138,10 +138,9 @@ void QCPGroupLegendItem::draw(QCPPainter* painter)
         }
         for (int i = 0; i < n; ++i) {
             if (!mMultiGraph->component(i).visible) continue;
-            painter->setPen(mMultiGraph->component(i).pen);
             double x0 = inRect.left() + padding + i * segWidth;
             double x1 = x0 + segWidth;
-            painter->drawLine(QLineF(x0, y, x1, y));
+            mMultiGraph->drawComponentLegendLine(painter, i, QLineF(x0, y, x1, y));
         }
         if (showBusy)
             painter->restore();
@@ -171,9 +170,8 @@ void QCPGroupLegendItem::draw(QCPPainter* painter)
                 painter->save();
                 painter->setOpacity(mMultiGraph->effectiveBusyFadeAlpha());
             }
-            painter->setPen(comp.pen);
             double lineY = rowY + rh / 2.0;
-            painter->drawLine(QLineF(inRect.left() + padding + indent, lineY,
+            mMultiGraph->drawComponentLegendLine(painter, i, QLineF(inRect.left() + padding + indent, lineY,
                                      inRect.left() + padding + indent + iconWidth, lineY));
             if (showBusy)
                 painter->restore();

@@ -1122,11 +1122,24 @@ void QCPMultiGraph::drawLegendIcon(QCPPainter* painter, const QRectF& rect) cons
     double y = rect.center().y();
     for (int i = 0; i < n; ++i) {
         if (!mComponents[i].visible) continue;
-        painter->setPen(mComponents[i].pen);
         double x0 = rect.left() + i * segWidth;
         double x1 = x0 + segWidth;
-        painter->drawLine(QLineF(x0, y, x1, y));
+        drawComponentLegendLine(painter, i, QLineF(x0, y, x1, y));
     }
+}
+
+void QCPMultiGraph::drawComponentLegendLine(QCPPainter* painter, int component, const QLineF& line) const
+{
+    QPen pen = mComponents[component].pen;
+    if (mColor.hasValues())
+    {
+        QLinearGradient gradient(line.p1(), line.p2());
+        for (int s = 0; s <= 4; ++s)
+            gradient.setColorAt(s / 4.0, qcp::runColor(mColor, s * 255 / 4));
+        pen.setBrush(gradient);
+    }
+    painter->setPen(pen);
+    painter->drawLine(line);
 }
 
 // --- Legend ---

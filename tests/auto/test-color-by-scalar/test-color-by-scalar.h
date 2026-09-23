@@ -55,6 +55,8 @@ private slots:
     void coloredScatterStagesColoursPerMarker();
     void coloredMarkersTakeTheirPointsColour();
 
+    void coloredLegendLineShowsTheGradient();
+
 private:
     QCustomPlot* mPlot = nullptr;
     static std::shared_ptr<QCPAbstractMultiDataSource> makeSource(

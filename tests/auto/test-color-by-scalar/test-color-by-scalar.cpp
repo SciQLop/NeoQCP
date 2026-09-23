@@ -825,3 +825,27 @@ void TestColorByScalar::coloredMarkersTakeTheirPointsColour()
     QVERIFY(isRed(pixelAt(mPlot, img, 0, 0)));
     QVERIFY(isBlue(pixelAt(mPlot, img, 190, 0)));
 }
+
+void TestColorByScalar::coloredLegendLineShowsTheGradient()
+{
+    std::vector<double> keys(20), values(20, 0.0);
+    std::iota(keys.begin(), keys.end(), 0.0);
+    auto* mg = rampGraph(mPlot, makeSource(keys, {values}), ramp(20));
+    mg->setComponentPens({QPen(Qt::black, 8)});
+    QImage img(100, 20, QImage::Format_ARGB32_Premultiplied);
+    img.fill(Qt::white);
+    {
+        QCPPainter painter(&img);
+        mg->drawComponentLegendLine(&painter, 0, QLineF(0, 10, 100, 10));
+    }
+    QVERIFY(isRed(img.pixelColor(3, 10)));
+    QVERIFY(isBlue(img.pixelColor(96, 10)));
+
+    mg->clearColorValues();
+    img.fill(Qt::white);
+    {
+        QCPPainter painter(&img);
+        mg->drawComponentLegendLine(&painter, 0, QLineF(0, 10, 100, 10));
+    }
+    QCOMPARE(img.pixelColor(50, 10), QColor(Qt::black));   // uncoloured: the component pen
+}
