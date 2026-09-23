@@ -52,7 +52,11 @@ private slots:
     void coloredStepLineRendersTheGradient();
     void coloredImpulsesRenderTheGradient();
     void coloredImpulsesFollowThePanOffset();
+    void plainImpulsesFollowThePanOffset();
     void nanScalarLeavesAGap();
+
+    void exportAfterOnscreenPanUsesCurrentPixelsNotStaleOffset();
+    void graph2ExportAfterOnscreenPanUsesCurrentPixelsNotStaleOffset();
 
     void scatterEntriesKeepTheirOwnSizeAndMode();
     void coloredScatterStagesColoursPerMarker();

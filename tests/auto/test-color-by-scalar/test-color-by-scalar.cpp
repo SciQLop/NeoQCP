@@ -844,6 +844,163 @@ void TestColorByScalar::coloredImpulsesFollowThePanOffset()
              "impulse for key 0 is stuck at its pre-pan pixel position");
 }
 
+void TestColorByScalar::plainImpulsesFollowThePanOffset()
+{
+    // Uncoloured counterpart of coloredImpulsesFollowThePanOffset: the plain
+    // (non-per-vertex-coloured) impulse draw path must also translate by
+    // gpuOffset on a cache-reusing pan frame.
+    std::vector<double> keys(20), values(20, 0.8);
+    for (int i = 0; i < 20; ++i) keys[i] = i * 10.0;
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDataSource(makeSource(keys, {values}));
+    mg->setComponentPens({QPen(Qt::black, 6)});
+    mg->setLineStyle(QCPMultiGraph::lsImpulse);
+    mPlot->xAxis->setRange(-10, 199);
+    mPlot->yAxis->setRange(-1, 1);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(mg->mHasRenderedRange);
+    QVERIFY(!mg->mLineCacheDirty);
+    const auto cachedBefore = mg->mCachedLines;
+    const double stalePixel = mPlot->xAxis->coordToPixel(0);   // pre-pan pixel of key 0
+
+    mPlot->xAxis->setRange(-20, 189);   // pure pan, same range size
+
+    const auto [needFresh, gpuOffset] = qcp::evaluateLineCache(
+        mg->mLineCacheDirty, mg->mCachedLines.isEmpty(),
+        QSize(mPlot->xAxis->axisRect()->width(), mPlot->xAxis->axisRect()->height()),
+        mg->mCachedPlotSize, mg->mHasRenderedRange,
+        mg->mRenderedRange.key, mg->mRenderedRange.value,
+        mPlot->xAxis, mPlot->yAxis, false);
+    QVERIFY(!needFresh);
+    QVERIFY(!gpuOffset.isNull());
+
+    QImage img(400, 300, QImage::Format_ARGB32_Premultiplied);
+    img.fill(Qt::white);
+    QCPPainter painter(&img);
+    mg->draw(&painter);
+    painter.end();
+
+    QCOMPARE(mg->mCachedLines, cachedBefore);   // reused, not rebuilt
+
+    const int y = qRound(mPlot->yAxis->coordToPixel(0.4));   // mid-line, clear of the tip's antialiasing
+    QVERIFY2(qGray(img.pixel(qRound(mPlot->xAxis->coordToPixel(0)), y)) < 128,
+             "impulse for key 0 did not follow the pan offset");
+    QVERIFY2(qGray(img.pixel(qRound(stalePixel), y)) > 200,
+             "impulse for key 0 is stuck at its pre-pan pixel position");
+}
+
+void TestColorByScalar::exportAfterOnscreenPanUsesCurrentPixelsNotStaleOffset()
+{
+    // Reproducer: evaluateLineCache computed a non-null gpuOffset for a
+    // cache-reusing pan frame and only zeroed it afterwards for export mode.
+    // An export made right after an on-screen pan -- before the next fresh
+    // redraw -- fetches fresh lines in *current* pixel coordinates and then
+    // translates them by that *stale* pan offset on top, landing the line
+    // off its true position in the exported image.
+    //
+    // The export draw is done directly with an export-mode QCPPainter (like
+    // toPixmap() sets up internally) rather than via toPixmap() itself,
+    // because toPixmap() forces its own viewport size, which would differ
+    // from this (unshown, un-laid-out) widget's actual size and trip the
+    // plot-size check in evaluateLineCache before the offset is even
+    // computed -- masking the bug instead of exercising it.
+    std::vector<double> keys(200), values(200, 0.5);
+    std::iota(keys.begin(), keys.end(), 0.0);
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDataSource(makeSource(keys, {values}));
+    mg->setComponentPens({QPen(Qt::black, 6)});
+    mPlot->xAxis->setRange(0, 199);
+    mPlot->yAxis->setRange(-1, 1);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(mg->mHasRenderedRange);
+    QVERIFY(!mg->mLineCacheDirty);
+    const auto cachedBefore = mg->mCachedLines;
+    const QSize plotSize = mPlot->size();
+
+    // Pure pan: same-size range shift. The next on-screen replot must serve
+    // this from the cache -- possibly even skipping the redraw entirely via
+    // a higher-level paint-buffer translation -- never a rebuild.
+    mPlot->yAxis->setRange(-1.2, 0.8);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCOMPARE(mg->mCachedLines, cachedBefore);   // reused, not rebuilt
+
+    // This is exactly the condition draw() itself computes: confirm the pan
+    // frame is served by translating the cache (gpuOffset non-null, no
+    // rebuild) -- otherwise this test wouldn't exercise the bug at all.
+    const auto [needFresh, gpuOffset] = qcp::evaluateLineCache(
+        mg->mLineCacheDirty, mg->mCachedLines.isEmpty(),
+        QSize(mPlot->xAxis->axisRect()->width(), mPlot->xAxis->axisRect()->height()),
+        mg->mCachedPlotSize, mg->mHasRenderedRange,
+        mg->mRenderedRange.key, mg->mRenderedRange.value,
+        mPlot->xAxis, mPlot->yAxis, false);
+    QVERIFY(!needFresh);
+    QVERIFY(!gpuOffset.isNull());
+
+    // Export right after the pan, with no intervening fresh replot.
+    QImage img(plotSize, QImage::Format_ARGB32_Premultiplied);
+    img.fill(Qt::white);
+    QCPPainter painter(&img);
+    painter.setMode(QCPPainter::pmNoCaching);
+    mg->draw(&painter);
+    painter.end();
+
+    const int x = qRound(mPlot->xAxis->coordToPixel(100));
+    const int correctY = qRound(mPlot->yAxis->coordToPixel(0.5));
+    const int staleY = qRound(correctY + gpuOffset.y());
+
+    QVERIFY2(qGray(img.pixel(x, correctY)) < 128,
+             "line is not drawn at the pixel of its current value after export");
+    QVERIFY2(qGray(img.pixel(x, staleY)) > 200,
+             "line is drawn at the stale pre-export pan offset instead");
+}
+
+void TestColorByScalar::graph2ExportAfterOnscreenPanUsesCurrentPixelsNotStaleOffset()
+{
+    // Same reproducer as exportAfterOnscreenPanUsesCurrentPixelsNotStaleOffset,
+    // pinning the shared evaluateLineCache fix for QCPGraph2's own draw path.
+    std::vector<double> keys(200), values(200, 0.5);
+    std::iota(keys.begin(), keys.end(), 0.0);
+    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    g->setData(keys, values);
+    g->setPen(QPen(Qt::black, 6));
+    mPlot->xAxis->setRange(0, 199);
+    mPlot->yAxis->setRange(-1, 1);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(g->mHasRenderedRange);
+    QVERIFY(!g->mLineCacheDirty);
+    const auto cachedBefore = g->mCachedLines;
+    const QSize plotSize = mPlot->size();
+
+    mPlot->yAxis->setRange(-1.2, 0.8);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCOMPARE(g->mCachedLines, cachedBefore);   // reused, not rebuilt
+
+    const auto [needFresh, gpuOffset] = qcp::evaluateLineCache(
+        g->mLineCacheDirty, g->mCachedLines.isEmpty(),
+        QSize(mPlot->xAxis->axisRect()->width(), mPlot->xAxis->axisRect()->height()),
+        g->mCachedPlotSize, g->mHasRenderedRange,
+        g->mRenderedRange.key, g->mRenderedRange.value,
+        mPlot->xAxis, mPlot->yAxis, false);
+    QVERIFY(!needFresh);
+    QVERIFY(!gpuOffset.isNull());
+
+    QImage img(plotSize, QImage::Format_ARGB32_Premultiplied);
+    img.fill(Qt::white);
+    QCPPainter painter(&img);
+    painter.setMode(QCPPainter::pmNoCaching);
+    g->draw(&painter);
+    painter.end();
+
+    const int x = qRound(mPlot->xAxis->coordToPixel(100));
+    const int correctY = qRound(mPlot->yAxis->coordToPixel(0.5));
+    const int staleY = qRound(correctY + gpuOffset.y());
+
+    QVERIFY2(qGray(img.pixel(x, correctY)) < 128,
+             "line is not drawn at the pixel of its current value after export");
+    QVERIFY2(qGray(img.pixel(x, staleY)) > 200,
+             "line is drawn at the stale pre-export pan offset instead");
+}
+
 void TestColorByScalar::nanScalarLeavesAGap()
 {
     std::vector<double> keys(200), values(200, 0.0);

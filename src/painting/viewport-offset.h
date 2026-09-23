@@ -72,6 +72,15 @@ inline LineCacheResult evaluateLineCache(
             needFresh = true;
     }
 
+    // Export always draws fresh lines in current pixel coordinates, so no
+    // pan offset applies to them -- computing one here would leave it for a
+    // caller to apply on top of those already-correct fresh lines unless
+    // every caller remembers to reset it, which is exactly the bug this
+    // early return closes off (lines/markers landing shifted on export
+    // right after an on-screen pan).
+    if (isExportMode)
+        return {true, {}};
+
     QPointF gpuOffset;
     if (!needFresh && hasRenderedRange)
     {
@@ -89,9 +98,6 @@ inline LineCacheResult evaluateLineCache(
         if (keyOff > keyDim * 1.0 || valOff > valDim * 1.0)
             needFresh = true;
     }
-
-    if (isExportMode)
-        needFresh = true;
 
     return {needFresh, gpuOffset};
 }

@@ -172,6 +172,7 @@ private:
 
     friend class TestPipeline;
     friend class TestDataSwap;
+    friend class TestColorByScalar;
 
     LineStyle mLineStyle = lsLine;
     QCPScatterStyle mScatterStyle;
