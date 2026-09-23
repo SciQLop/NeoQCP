@@ -99,6 +99,9 @@ public:
     void setScatterSkip(int skip) { mScatterSkip = qMax(0, skip); }
 
     // Colour by scalar: one value per key, shared by all components.
+    // QCustomPlot convention: these setters do not replot -- the caller must
+    // call replot() (the first colouring may repaint on its own once the
+    // one-time origin L1 rebuild lands).
     void setColorValues(std::shared_ptr<const std::vector<double>> values);
     void setColorValues(std::vector<double> values);
     void clearColorValues();
