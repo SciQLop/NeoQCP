@@ -290,6 +290,7 @@ void QCPMultiGraph::syncComponentCount(int newCount)
             c.pen = QPen(color, 0);
             c.selectedPen = defaultSelectedPen(c.pen);
             c.name = QString("Component %1").arg(i);
+            c.lineStyle = mLineStyle;
         }
     } else if (newCount < oldCount) {
         mComponents.resize(newCount);
@@ -353,9 +354,17 @@ void QCPMultiGraph::setComponentVisible(int index, bool visible)
 
 void QCPMultiGraph::setLineStyle(LineStyle style)
 {
-    if (mLineStyle == style)
-        return;
     mLineStyle = style;
+    for (auto& c : mComponents)
+        c.lineStyle = style;
+    invalidateLines();
+}
+
+void QCPMultiGraph::setComponentLineStyle(int index, LineStyle style)
+{
+    if (index < 0 || index >= mComponents.size() || mComponents[index].lineStyle == style)
+        return;
+    mComponents[index].lineStyle = style;
     invalidateLines();
 }
 
@@ -374,9 +383,9 @@ void QCPMultiGraph::invalidateLines()
     mCachedIndices.clear();
 }
 
-QVector<int> QCPMultiGraph::lineIndices(const QVector<int>& dataIdx) const
+QVector<int> QCPMultiGraph::lineIndices(LineStyle style, const QVector<int>& dataIdx)
 {
-    switch (mLineStyle)
+    switch (style)
     {
         case lsStepLeft:   return qcp::stepLeftIndices(dataIdx);
         case lsStepRight:  return qcp::stepRightIndices(dataIdx);
@@ -753,9 +762,9 @@ double QCPMultiGraph::selectTest(const QPointF& pos, bool onlySelectable, QVaria
     }
 
     // Also check distance to line segments between lo and hi for each component
-    if (mLineStyle != lsNone && lo < hi) {
+    if (lo < hi) {
         for (int c = 0; c < nComponents; ++c) {
-            if (!mComponents[c].visible) continue;
+            if (!mComponents[c].visible || mComponents[c].lineStyle == lsNone) continue;
             QPointF pLo = coordsToPixels(ds->keyAt(lo), ds->valueAt(c, lo));
             QPointF pHi = coordsToPixels(ds->keyAt(hi), ds->valueAt(c, hi));
             double lineDistSqr = QCPVector2D(pos).distanceSquaredToLine(pLo, pHi);
@@ -1050,7 +1059,7 @@ void QCPMultiGraph::draw(QCPPainter* painter)
     for (int c = 0; c < mComponents.size(); ++c) {
         const auto& comp = mComponents[c];
         if (!comp.visible) continue;
-        if (mLineStyle == lsNone && comp.scatterStyle.isNone()) continue;
+        if (comp.lineStyle == lsNone && comp.scatterStyle.isNone()) continue;
 
         if (c >= linesTarget.size()) continue;
         const QVector<QPointF>& dataLines = linesTarget[c];
@@ -1066,8 +1075,8 @@ void QCPMultiGraph::draw(QCPPainter* painter)
         // knows (pen width, colour generation), so it always gets its styled points.
         QVector<QPointF> styledLines;
         const bool needStyledLines = needFreshLines || mExtrusionCaches[c].isEmpty() || dataIdx != nullptr;
-        if (needStyledLines && mLineStyle != lsNone && mLineStyle != lsLine) {
-            switch (mLineStyle) {
+        if (needStyledLines && comp.lineStyle != lsNone && comp.lineStyle != lsLine) {
+            switch (comp.lineStyle) {
                 case lsStepLeft:   styledLines = qcp::toStepLeftLines(dataLines, keyIsVertical); break;
                 case lsStepRight:  styledLines = qcp::toStepRightLines(dataLines, keyIsVertical); break;
                 case lsStepCenter: styledLines = qcp::toStepCenterLines(dataLines, keyIsVertical); break;
@@ -1077,9 +1086,9 @@ void QCPMultiGraph::draw(QCPPainter* painter)
         }
         const QVector<QPointF>& lines = styledLines.isEmpty() ? dataLines : styledLines;
 
-        if (mLineStyle != lsNone) {
+        if (comp.lineStyle != lsNone) {
             const QPen& activePen = comp.selection.isEmpty() ? comp.pen : comp.selectedPen;
-            if (mLineStyle == lsImpulse) {
+            if (comp.lineStyle == lsImpulse) {
                 applyDefaultAntialiasingHint(painter);
                 QPen impulsePen = activePen;
                 impulsePen.setCapStyle(Qt::FlatCap);
@@ -1097,12 +1106,12 @@ void QCPMultiGraph::draw(QCPPainter* painter)
                 applyDefaultAntialiasingHint(painter);
                 if (!isExportMode)
                     qcp::drawColoredPolylineCached(painter, mParentPlot, mLayer, lines,
-                                                   lineIndices(*dataIdx), mColor, activePen,
+                                                   lineIndices(comp.lineStyle, *dataIdx), mColor, activePen,
                                                    gpuOffset, clipRect(), needFreshLines,
                                                    mExtrusionCaches[c]);
                 else
                     qcp::drawColoredPolylineRuns(painter, lines,
-                                                 qcp::colorRuns(lines, lineIndices(*dataIdx), mColor),
+                                                 qcp::colorRuns(lines, lineIndices(comp.lineStyle, *dataIdx), mColor),
                                                  mColor, activePen, gpuOffset);
             } else {
                 applyDefaultAntialiasingHint(painter);

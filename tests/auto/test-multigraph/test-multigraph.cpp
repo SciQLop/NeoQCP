@@ -733,3 +733,82 @@ void TestMultiGraph::componentShownAfterARebuildIsDrawnAgain()
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QVERIFY2(!mg->mCachedLines[1].isEmpty(), "the shown component was not rebuilt");
 }
+
+namespace {
+QCPMultiGraph* redAndBlueHorizontalLines(QCustomPlot* plot)
+{
+    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    mg->setData(std::vector<double>{0, 1, 2, 3, 4},
+                std::vector<std::vector<double>>{{1, 1, 1, 1, 1}, {2, 2, 2, 2, 2}});
+    mg->setComponentPens({QPen(Qt::red, 5), QPen(Qt::blue, 5)});
+    plot->xAxis->setRange(0, 4);
+    plot->yAxis->setRange(0, 3);
+    return mg;
+}
+
+QColor pixelOnLine(const QImage& image, QCustomPlot* plot, double value)
+{
+    const double dpr = image.devicePixelRatio();
+    return image.pixelColor(qRound(plot->xAxis->coordToPixel(2) * dpr),
+                            qRound(plot->yAxis->coordToPixel(value) * dpr));
+}
+
+bool isRed(const QColor& c) { return c.red() > 200 && c.green() < 60 && c.blue() < 60; }
+bool isBlue(const QColor& c) { return c.blue() > 200 && c.red() < 60 && c.green() < 60; }
+} // namespace
+
+void TestMultiGraph::componentLineStyleOnlyChangesThatComponent()
+{
+    auto* mg = redAndBlueHorizontalLines(mPlot);
+    mPlot->replot();
+    mg->setComponentLineStyle(0, QCPMultiGraph::lsNone);
+
+    QCOMPARE(mg->component(0).lineStyle, QCPMultiGraph::lsNone);
+    QCOMPARE(mg->component(1).lineStyle, QCPMultiGraph::lsLine);
+    const QImage image = mPlot->toPixmap(400, 300).toImage();
+    const QColor hidden = pixelOnLine(image, mPlot, 1);
+    const QColor shown = pixelOnLine(image, mPlot, 2);
+    QVERIFY2(!isRed(hidden), qPrintable(QString("component 0 still drawn: %1").arg(hidden.name())));
+    QVERIFY2(isBlue(shown), qPrintable(QString("component 1 not drawn: %1").arg(shown.name())));
+}
+
+void TestMultiGraph::componentLineStyleChangeIsDrawnOnTheGpu()
+{
+    mPlot->show();
+    if (!QTest::qWaitForWindowExposed(mPlot))
+        QSKIP("window not exposed in this environment");
+    QCoreApplication::processEvents();
+    if (!mPlot->rhi())
+        QSKIP("no QRhi available in this environment");
+    auto* mg = redAndBlueHorizontalLines(mPlot);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(isRed(pixelOnLine(mPlot->grabFramebuffer(), mPlot, 1)));
+
+    mg->setComponentLineStyle(0, QCPMultiGraph::lsNone);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    const QImage frame = mPlot->grabFramebuffer();
+    const QColor hidden = pixelOnLine(frame, mPlot, 1);
+    const QColor shown = pixelOnLine(frame, mPlot, 2);
+    QVERIFY2(!isRed(hidden), qPrintable(QString("component 0 still drawn: %1").arg(hidden.name())));
+    QVERIFY2(isBlue(shown), qPrintable(QString("component 1 not drawn: %1").arg(shown.name())));
+}
+
+void TestMultiGraph::setLineStyleAppliesToEveryComponent()
+{
+    auto* mg = redAndBlueHorizontalLines(mPlot);
+    mg->setComponentLineStyle(0, QCPMultiGraph::lsNone);
+    mg->setLineStyle(QCPMultiGraph::lsStepLeft);
+    QCOMPARE(mg->lineStyle(), QCPMultiGraph::lsStepLeft);
+    QCOMPARE(mg->component(0).lineStyle, QCPMultiGraph::lsStepLeft);
+    QCOMPARE(mg->component(1).lineStyle, QCPMultiGraph::lsStepLeft);
+}
+
+void TestMultiGraph::newComponentsTakeTheGraphLineStyle()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setLineStyle(QCPMultiGraph::lsNone);
+    mg->setData(std::vector<double>{0, 1}, std::vector<std::vector<double>>{{1, 1}, {2, 2}});
+    QCOMPARE(mg->component(0).lineStyle, QCPMultiGraph::lsNone);
+    QCOMPARE(mg->component(1).lineStyle, QCPMultiGraph::lsNone);
+}

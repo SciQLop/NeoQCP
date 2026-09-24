@@ -14,20 +14,22 @@
 #include <span>
 #include <QTimer>
 
-struct QCP_LIB_DECL QCPGraphComponent {
-    QString name;
-    QPen pen;
-    QPen selectedPen;
-    QCPScatterStyle scatterStyle;
-    QCPDataSelection selection;
-    bool visible = true;
-};
-
 class QCP_LIB_DECL QCPMultiGraph : public QCPAbstractPlottable, public QCPPlottableInterface1D {
     Q_OBJECT
 public:
     enum LineStyle { lsNone, lsLine, lsStepLeft, lsStepRight, lsStepCenter, lsImpulse };
     Q_ENUM(LineStyle)
+
+    struct Component {
+        QString name;
+        QPen pen;
+        QPen selectedPen;
+        QCPScatterStyle scatterStyle;
+        QCPDataSelection selection;
+        bool visible = true;
+        //! Set through setComponentLineStyle(): a direct write leaves the cached lines stale.
+        LineStyle lineStyle = lsLine;
+    };
 
     explicit QCPMultiGraph(QCPAxis* keyAxis, QCPAxis* valueAxis);
     ~QCPMultiGraph() override;
@@ -77,12 +79,12 @@ public:
 
     // Components
     [[nodiscard]] int componentCount() const { return mComponents.size(); }
-    QCPGraphComponent& component(int index) { return mComponents[index]; }
+    Component& component(int index) { return mComponents[index]; }
     //! Shows or hides one component and repaints the layer. Setting `component(i).visible`
     //! directly is not observed: a layer that translates after a pan would keep the old
     //! GPU entries.
     void setComponentVisible(int index, bool visible);
-    const QCPGraphComponent& component(int index) const { return mComponents[index]; }
+    const Component& component(int index) const { return mComponents[index]; }
     void setComponentNames(const QStringList& names);
     void setComponentColors(const QList<QColor>& colors);
     void setComponentPens(const QList<QPen>& pens);
@@ -90,9 +92,10 @@ public:
     // Per-component value access (for tracers/tooltips)
     [[nodiscard]] double componentValueAt(int column, int index) const;
 
-    // Shared style
+    //! The style given to new components; setLineStyle() also applies it to every component.
     [[nodiscard]] LineStyle lineStyle() const { return mLineStyle; }
     void setLineStyle(LineStyle style);
+    void setComponentLineStyle(int index, LineStyle style);
     [[nodiscard]] bool adaptiveSampling() const { return mAdaptiveSampling; }
     void setAdaptiveSampling(bool enabled);
     [[nodiscard]] int scatterSkip() const { return mScatterSkip; }
@@ -167,7 +170,7 @@ protected:
 
 protected:
     std::shared_ptr<QCPAbstractMultiDataSource> mDataSource;
-    QVector<QCPGraphComponent> mComponents;
+    QVector<Component> mComponents;
     mutable QVector<QCPDataSelection> mLastRectSelections; // per-component selections from selectTestRect
     LineStyle mLineStyle = lsLine;
     bool mAdaptiveSampling = true;
@@ -195,7 +198,7 @@ protected:
     QVector<QVector<int>> mCachedIndices;   // per component, aligned with mCachedLines when coloured
     void invalidateLines();
     // Source indices aligned with the line-style-transformed points of a component.
-    QVector<int> lineIndices(const QVector<int>& dataIdx) const;
+    static QVector<int> lineIndices(LineStyle style, const QVector<int>& dataIdx);
     // Draws impulse line pairs coloured per point, batched by colour bucket.
     void drawColoredImpulses(QCPPainter* painter, const QVector<QPointF>& pairs,
                              const QVector<int>& indices, QPen pen,
@@ -203,11 +206,11 @@ protected:
     // Draws markers coloured per point: GPU via addScatterColored, or QPainter
     // fallback batched by colour bucket.
     void drawColoredScatters(QCPPainter* painter, const QVector<QPointF>& points,
-                             const QVector<int>& indices, const QCPGraphComponent& comp,
+                             const QVector<int>& indices, const Component& comp,
                              const QPointF& gpuOffset, bool isExportMode) const;
     // Draws markers in the component's own style: GPU via addScatter, or QPainter fallback.
     void drawPlainScatters(QCPPainter* painter, const QVector<QPointF>& dataLines,
-                           const QCPGraphComponent& comp, const QPointF& gpuOffset,
+                           const Component& comp, const QPointF& gpuOffset,
                            bool isExportMode) const;
     void requestOrigin();
     // Same-size-keeps/other-size-clears colour rule, shared by applySourceNow(),
@@ -242,3 +245,5 @@ protected:
     void updateBaseSelection();
 
 };
+
+using QCPGraphComponent = QCPMultiGraph::Component;

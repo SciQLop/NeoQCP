@@ -63,6 +63,12 @@ private slots:
     void componentVisibilityToggleForcesLayerRepaint();
     void componentShownAfterARebuildIsDrawnAgain();
 
+    // Line style is per component, like the marker
+    void componentLineStyleOnlyChangesThatComponent();
+    void componentLineStyleChangeIsDrawnOnTheGpu();
+    void setLineStyleAppliesToEveryComponent();
+    void newComponentsTakeTheGraphLineStyle();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };
