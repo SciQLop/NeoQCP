@@ -3,7 +3,17 @@
 #include "Profiling.hpp"
 #include "embedded_shaders.h"
 #include "../scatterstyle.h"
+#include <algorithm>
 #include <cstring>
+
+namespace {
+bool sameMarker(const QCPScatterStyle& a, const QCPScatterStyle& b)
+{
+    return a.shape() == b.shape() && qFuzzyCompare(a.size(), b.size()) && a.pen() == b.pen()
+        && a.brush() == b.brush() && a.customPath() == b.customPath()
+        && a.pixmap().cacheKey() == b.pixmap().cacheKey();
+}
+} // namespace
 
 QCPScatterRhiLayer::QCPScatterRhiLayer(QRhi* rhi)
     : mRhi(rhi)
@@ -20,8 +30,9 @@ QCPScatterRhiLayer::~QCPScatterRhiLayer()
     delete mColorBuffer;
     delete mQuadIndexBuffer;
     delete mQuadVertexBuffer;
-    delete mSpriteTexture;
-    delete mColormapTexture;
+    for (auto& look : mLooks)
+        releaseLookResources(look);
+    delete mPlaceholderTexture;
     delete mSampler;
     std::free(mStagingData);
 }
@@ -42,18 +53,52 @@ void QCPScatterRhiLayer::invalidatePipeline()
     delete mQuadIndexBuffer;
     mQuadIndexBuffer = nullptr;
     mQuadUploaded = false;
-    delete mSpriteTexture;
-    mSpriteTexture = nullptr;
-    delete mColormapTexture;
-    mColormapTexture = nullptr;
+    for (auto& look : mLooks)
+        releaseLookResources(look);
+    delete mPlaceholderTexture;
+    mPlaceholderTexture = nullptr;
     delete mSampler;
     mSampler = nullptr;
-    mSpriteTextureDirty = true;
-    mColormapTextureDirty = true;
+}
+
+void QCPScatterRhiLayer::releaseLookResources(Look& look)
+{
+    delete look.srb;
+    look.srb = nullptr;
+    delete look.spriteTexture;
+    look.spriteTexture = nullptr;
+    delete look.colormapTexture;
+    look.colormapTexture = nullptr;
+}
+
+int QCPScatterRhiLayer::lookFor(const QCPScatterStyle& style, const QImage& colormapImage)
+{
+    for (int i = 0; i < static_cast<int>(mLooks.size()); ++i)
+    {
+        if (sameMarker(mLooks[i].style, style) && mLooks[i].colormapImage == colormapImage)
+        {
+            mLooks[i].used = true;
+            return i;
+        }
+    }
+    mLooks.push_back(Look { style, colormapImage, style.renderToImage(64) });
+    return static_cast<int>(mLooks.size()) - 1;
+}
+
+// Called from clear(), when no draw entry refers to a look any more, so indices may shift.
+void QCPScatterRhiLayer::dropUnusedLooks()
+{
+    const auto unused = std::stable_partition(mLooks.begin(), mLooks.end(),
+                                              [](const Look& look) { return look.used; });
+    std::for_each(unused, mLooks.end(), releaseLookResources);
+    mLooks.erase(unused, mLooks.end());
+    for (auto& look : mLooks)
+        look.used = false;
 }
 
 void QCPScatterRhiLayer::clear()
 {
+    dropUnusedLooks();
     mStagingSize = 0;
     mDrawEntries.resize(0);
     mColorStaging.clear();
@@ -91,21 +136,8 @@ void QCPScatterRhiLayer::stagingAppend(const float* src, int count)
 void QCPScatterRhiLayer::addDraw(std::span<const float> xyz, const QCPScatterStyle& style,
                                  const QRect& clipRect, double dpr, int outputHeight,
                                  float offsetX, float offsetY, float alpha,
-                                 bool useColorAxis, int colorOffset)
+                                 const QImage& colormapImage, int colorOffset)
 {
-    const int newShape = static_cast<int>(style.shape());
-    const double newSize = style.size();
-    if (newShape != mCachedShape || !qFuzzyCompare(newSize, mCachedSize)
-        || style.pen() != mCachedPen || style.brush() != mCachedBrush)
-    {
-        mSpriteImage = style.renderToImage(64);
-        mSpriteTextureDirty = true;
-        mCachedShape = newShape;
-        mCachedSize = newSize;
-        mCachedPen = style.pen();
-        mCachedBrush = style.brush();
-    }
-
     DrawEntry entry;
     entry.scissorRect = qcp::rhi::computeScissor(clipRect, dpr, outputHeight);
     entry.offsetX = offsetX;
@@ -113,9 +145,10 @@ void QCPScatterRhiLayer::addDraw(std::span<const float> xyz, const QCPScatterSty
     entry.alpha = alpha;
     entry.instanceOffset = mStagingSize / 3;
     entry.instanceCount = static_cast<int>(xyz.size()) / 3;
-    entry.halfSize = static_cast<float>(newSize * 0.5);
-    entry.useColorAxis = useColorAxis;
+    entry.halfSize = static_cast<float>(style.size() * 0.5);
+    entry.useColorAxis = !colormapImage.isNull();
     entry.colorOffset = colorOffset;
+    entry.look = lookFor(style, colormapImage);
 
     stagingAppend(xyz.data(), static_cast<int>(xyz.size()));
     mDrawEntries.append(entry);
@@ -133,13 +166,8 @@ void QCPScatterRhiLayer::addScatter(std::span<const float> points,
     PROFILE_HERE_N("QCPScatterRhiLayer::addScatter");
     if (points.empty() || points.size() % 3 != 0)
         return;
-    if (!colormapImage.isNull())
-    {
-        mColormapImage = colormapImage;
-        mColormapTextureDirty = true;
-    }
-    addDraw(points, style, clipRect, dpr, outputHeight, offsetX, offsetY, alpha,
-            !colormapImage.isNull(), -1);
+    addDraw(points, style, clipRect, dpr, outputHeight, offsetX, offsetY, alpha, colormapImage,
+            -1);
 }
 
 void QCPScatterRhiLayer::addScatterColored(std::span<const float> xy, std::span<const float> rgba,
@@ -160,7 +188,7 @@ void QCPScatterRhiLayer::addScatterColored(std::span<const float> xy, std::span<
     }
     const int colorOffset = static_cast<int>(mColorStaging.size() / 4);
     mColorStaging.insert(mColorStaging.end(), rgba.begin(), rgba.end());
-    addDraw(xyz, style, clipRect, dpr, outputHeight, offsetX, offsetY, alpha, false, colorOffset);
+    addDraw(xyz, style, clipRect, dpr, outputHeight, offsetX, offsetY, alpha, {}, colorOffset);
 }
 
 bool QCPScatterRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc,
@@ -188,18 +216,11 @@ bool QCPScatterRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc,
     if (!mSampler->create())
         return false;
 
-    // Sprite texture (1x1 placeholder until real sprite is uploaded)
-    const auto texFmt = qcp::rhi::preferredTextureFormat(mRhi);
-    mSpriteTexture = mRhi->newTexture(texFmt, QSize(1, 1));
-    if (!mSpriteTexture->create())
+    // Stands in for the sprite and colormap in the template bindings, and for the
+    // colormap of looks that have none (the shader then never samples it).
+    mPlaceholderTexture = mRhi->newTexture(qcp::rhi::preferredTextureFormat(mRhi), QSize(1, 1));
+    if (!mPlaceholderTexture->create())
         return false;
-    mSpriteTextureDirty = true;
-
-    // Colormap texture (256x1 placeholder)
-    mColormapTexture = mRhi->newTexture(texFmt, QSize(256, 1));
-    if (!mColormapTexture->create())
-        return false;
-    mColormapTextureDirty = true;
 
     // UBO
     const int stride = ubufStride();
@@ -209,17 +230,8 @@ bool QCPScatterRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc,
     if (!mUniformBuffer->create())
         return false;
 
-    // SRB: UBO (binding 0, vert+frag), sprite (binding 1, frag), colormap (binding 2, frag)
     mSrb = mRhi->newShaderResourceBindings();
-    mSrb->setBindings({
-        QRhiShaderResourceBinding::uniformBufferWithDynamicOffset(
-            0, QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage,
-            mUniformBuffer, sizeof(PerDrawUniforms)),
-        QRhiShaderResourceBinding::sampledTexture(
-            1, QRhiShaderResourceBinding::FragmentStage, mSpriteTexture, mSampler),
-        QRhiShaderResourceBinding::sampledTexture(
-            2, QRhiShaderResourceBinding::FragmentStage, mColormapTexture, mSampler)
-    });
+    setBindings(mSrb, mPlaceholderTexture, mPlaceholderTexture);
     if (!mSrb->create())
         return false;
 
@@ -261,6 +273,61 @@ bool QCPScatterRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc,
     // failing here would rebuild every scatter pipeline on every frame.
     if (!createColoredPipeline(rpDesc, sampleCount))
         qWarning() << "Coloured scatter pipeline unavailable: markers coloured by a scalar are not drawn";
+    return true;
+}
+
+// UBO (binding 0, vert+frag), sprite (binding 1, frag), colormap (binding 2, frag)
+void QCPScatterRhiLayer::setBindings(QRhiShaderResourceBindings* srb, QRhiTexture* sprite,
+                                     QRhiTexture* colormap) const
+{
+    srb->setBindings({
+        QRhiShaderResourceBinding::uniformBufferWithDynamicOffset(
+            0, QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage,
+            mUniformBuffer, sizeof(PerDrawUniforms)),
+        QRhiShaderResourceBinding::sampledTexture(
+            1, QRhiShaderResourceBinding::FragmentStage, sprite, mSampler),
+        QRhiShaderResourceBinding::sampledTexture(
+            2, QRhiShaderResourceBinding::FragmentStage, colormap, mSampler)
+    });
+}
+
+QRhiTexture* QCPScatterRhiLayer::uploadedTexture(const QImage& image,
+                                                 QRhiResourceUpdateBatch* updates)
+{
+    const auto texFmt = qcp::rhi::preferredTextureFormat(mRhi);
+    const QImage::Format imgFmt = (texFmt == QRhiTexture::BGRA8)
+        ? QImage::Format_ARGB32_Premultiplied
+        : QImage::Format_RGBA8888_Premultiplied;
+    const QImage converted = image.convertedTo(imgFmt);
+    auto* texture = mRhi->newTexture(texFmt, converted.size());
+    if (!texture->create())
+    {
+        delete texture;
+        return nullptr;
+    }
+    updates->uploadTexture(texture, QRhiTextureUploadDescription(
+        QRhiTextureUploadEntry(0, 0, QRhiTextureSubresourceUploadDescription(converted))));
+    return texture;
+}
+
+bool QCPScatterRhiLayer::createLookResources(Look& look, QRhiResourceUpdateBatch* updates)
+{
+    look.spriteTexture = uploadedTexture(look.spriteImage, updates);
+    if (!look.colormapImage.isNull())
+        look.colormapTexture = uploadedTexture(look.colormapImage.scaledToWidth(256), updates);
+    if (!look.spriteTexture || (!look.colormapImage.isNull() && !look.colormapTexture))
+    {
+        releaseLookResources(look);
+        return false;
+    }
+    look.srb = mRhi->newShaderResourceBindings();
+    setBindings(look.srb, look.spriteTexture,
+                look.colormapTexture ? look.colormapTexture : mPlaceholderTexture);
+    if (!look.srb->create())
+    {
+        releaseLookResources(look);
+        return false;
+    }
     return true;
 }
 
@@ -348,51 +415,10 @@ void QCPScatterRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
         mQuadUploaded = true;
     }
 
-    // Upload/resize sprite texture
-    if (mSpriteTextureDirty && !mSpriteImage.isNull())
+    for (auto& look : mLooks)
     {
-        const auto texFmt = qcp::rhi::preferredTextureFormat(mRhi);
-        const QImage::Format imgFmt = (texFmt == QRhiTexture::BGRA8)
-            ? QImage::Format_ARGB32_Premultiplied
-            : QImage::Format_RGBA8888_Premultiplied;
-        QImage converted = mSpriteImage.convertedTo(imgFmt);
-
-        if (mSpriteTexture->pixelSize() != converted.size())
-        {
-            mSpriteTexture->setPixelSize(converted.size());
-            mSpriteTexture->create();
-            // Recreate SRB since texture was resized
-            if (mSrb)
-                mSrb->create();
-        }
-
-        QRhiTextureSubresourceUploadDescription subDesc(converted);
-        updates->uploadTexture(mSpriteTexture, QRhiTextureUploadDescription(
-            QRhiTextureUploadEntry(0, 0, subDesc)));
-        mSpriteTextureDirty = false;
-    }
-
-    // Upload colormap texture
-    if (mColormapTextureDirty && !mColormapImage.isNull())
-    {
-        const auto texFmt = qcp::rhi::preferredTextureFormat(mRhi);
-        const QImage::Format imgFmt = (texFmt == QRhiTexture::BGRA8)
-            ? QImage::Format_ARGB32_Premultiplied
-            : QImage::Format_RGBA8888_Premultiplied;
-        QImage converted = mColormapImage.scaledToWidth(256).convertedTo(imgFmt);
-
-        if (mColormapTexture->pixelSize() != converted.size())
-        {
-            mColormapTexture->setPixelSize(converted.size());
-            mColormapTexture->create();
-            if (mSrb)
-                mSrb->create();
-        }
-
-        QRhiTextureSubresourceUploadDescription subDesc(converted);
-        updates->uploadTexture(mColormapTexture, QRhiTextureUploadDescription(
-            QRhiTextureUploadEntry(0, 0, subDesc)));
-        mColormapTextureDirty = false;
+        if (!look.srb)
+            createLookResources(look, updates);
     }
 
     // Grow UBO if needed
@@ -406,6 +432,11 @@ void QCPScatterRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
             return;
         if (mSrb)
             mSrb->create();
+        for (auto& look : mLooks)
+        {
+            if (look.srb)
+                look.srb->create();
+        }
     }
 
     // Upload per-draw uniforms
@@ -496,6 +527,9 @@ void QCPScatterRhiLayer::render(QRhiCommandBuffer* cb,
         const bool coloured = entry.colorOffset >= 0;
         if (coloured && (!mColoredPipeline || !mColorBuffer))
             continue;
+        auto* srb = mLooks[entry.look].srb;
+        if (!srb)
+            continue;
         QRhiGraphicsPipeline* wanted = coloured ? mColoredPipeline : mPipeline;
         if (wanted != current)
         {
@@ -505,7 +539,7 @@ void QCPScatterRhiLayer::render(QRhiCommandBuffer* cb,
         }
 
         const QPair<int, quint32> dynamicOffset(0, quint32(i * stride));
-        cb->setShaderResources(mSrb, 1, &dynamicOffset);
+        cb->setShaderResources(srb, 1, &dynamicOffset);
 
         const QRhiCommandBuffer::VertexInput plainInputs[] = {
             {mQuadVertexBuffer, 0},

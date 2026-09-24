@@ -385,3 +385,78 @@ void TestScatterRhi::multiGraphScatterDoesNotCrash()
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QVERIFY(true);
 }
+
+namespace {
+bool showAndHasRhi(QCustomPlot* plot)
+{
+    plot->show();
+    if (!QTest::qWaitForWindowExposed(plot))
+        return false;
+    QCoreApplication::processEvents();
+    return plot->rhi() != nullptr;
+}
+
+QCPScatterStyle filledSquare(const QColor& color)
+{
+    return QCPScatterStyle(QCPScatterStyle::ssSquare, color, color, 16);
+}
+
+QColor pixelAt(const QImage& frame, QCustomPlot* plot, double key, double value)
+{
+    const double dpr = frame.devicePixelRatio();
+    const QPointF p(plot->xAxis->coordToPixel(key), plot->yAxis->coordToPixel(value));
+    return frame.pixelColor(qRound(p.x() * dpr), qRound(p.y() * dpr));
+}
+
+bool isRed(const QColor& c) { return c.red() > 200 && c.green() < 60 && c.blue() < 60; }
+bool isBlue(const QColor& c) { return c.blue() > 200 && c.red() < 60 && c.green() < 60; }
+
+void setFixedRanges(QCustomPlot* plot)
+{
+    plot->xAxis->setRange(0, 4);
+    plot->yAxis->setRange(0, 3);
+}
+} // namespace
+
+void TestScatterRhi::scattersOnOneLayerKeepTheirOwnMarker()
+{
+    if (!showAndHasRhi(mPlot))
+        QSKIP("No QRhi available — markers are only instanced on the GPU path");
+    auto* red = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    red->setLineStyle(QCPGraph2::lsNone);
+    red->setScatterStyle(filledSquare(Qt::red));
+    red->setData(std::vector<double>{1, 2, 3}, std::vector<double>{1, 1, 1});
+    auto* blue = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    blue->setLineStyle(QCPGraph2::lsNone);
+    blue->setScatterStyle(filledSquare(Qt::blue));
+    blue->setData(std::vector<double>{1, 2, 3}, std::vector<double>{2, 2, 2});
+    setFixedRanges(mPlot);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    const QImage frame = mPlot->grabFramebuffer();
+    const QColor first = pixelAt(frame, mPlot, 2, 1);
+    const QColor second = pixelAt(frame, mPlot, 2, 2);
+    QVERIFY2(isRed(first), qPrintable(QString("first graph drawn as %1").arg(first.name())));
+    QVERIFY2(isBlue(second), qPrintable(QString("second graph drawn as %1").arg(second.name())));
+}
+
+void TestScatterRhi::multiGraphComponentsKeepTheirOwnMarker()
+{
+    if (!showAndHasRhi(mPlot))
+        QSKIP("No QRhi available — markers are only instanced on the GPU path");
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setLineStyle(QCPMultiGraph::lsNone);
+    mg->setData(std::vector<double>{1, 2, 3},
+                std::vector<std::vector<float>>{{1, 1, 1}, {2, 2, 2}});
+    mg->setComponentPens({QPen(Qt::red), QPen(Qt::blue)});
+    mg->component(0).scatterStyle = filledSquare(Qt::red);
+    mg->component(1).scatterStyle = filledSquare(Qt::blue);
+    setFixedRanges(mPlot);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    const QImage frame = mPlot->grabFramebuffer();
+    const QColor first = pixelAt(frame, mPlot, 2, 1);
+    const QColor second = pixelAt(frame, mPlot, 2, 2);
+    QVERIFY2(isRed(first), qPrintable(QString("component 0 drawn as %1").arg(first.name())));
+    QVERIFY2(isBlue(second), qPrintable(QString("component 1 drawn as %1").arg(second.name())));
+}

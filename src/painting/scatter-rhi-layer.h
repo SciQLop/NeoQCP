@@ -9,8 +9,7 @@
 #include <span>
 #include <cstdlib>
 #include <vector>
-
-class QCPScatterStyle;
+#include "../scatterstyle.h"
 
 class QCPScatterRhiLayer
 {
@@ -26,6 +25,7 @@ public:
         float halfSize = 0;
         bool useColorAxis = false;
         int colorOffset = -1; // first colour of this draw in the colour buffer, -1 = plain
+        int look = 0;         // index into mLooks
     };
 
     explicit QCPScatterRhiLayer(QRhi* rhi);
@@ -78,7 +78,27 @@ private:
     bool uploadColors(QRhiResourceUpdateBatch* updates);
     void addDraw(std::span<const float> xyz, const QCPScatterStyle& style, const QRect& clipRect,
                  double dpr, int outputHeight, float offsetX, float offsetY, float alpha,
-                 bool useColorAxis, int colorOffset);
+                 const QImage& colormapImage, int colorOffset);
+
+    // Draws sharing a layer each keep their own marker sprite and colormap: one
+    // texture pair (and its bindings) per distinct look, not one per layer.
+    struct Look
+    {
+        QCPScatterStyle style;
+        QImage colormapImage;
+        QImage spriteImage;
+        QRhiTexture* spriteTexture = nullptr;
+        QRhiTexture* colormapTexture = nullptr;
+        QRhiShaderResourceBindings* srb = nullptr;
+        bool used = true;
+    };
+    int lookFor(const QCPScatterStyle& style, const QImage& colormapImage);
+    void dropUnusedLooks();
+    bool createLookResources(Look& look, QRhiResourceUpdateBatch* updates);
+    static void releaseLookResources(Look& look);
+    QRhiTexture* uploadedTexture(const QImage& image, QRhiResourceUpdateBatch* updates);
+    void setBindings(QRhiShaderResourceBindings* srb, QRhiTexture* sprite,
+                     QRhiTexture* colormap) const;
 
     void stagingAppend(const float* src, int count);
     float* mStagingData = nullptr;
@@ -99,10 +119,11 @@ private:
     QRhiBuffer* mUniformBuffer = nullptr;
     int mUniformBufferSize = 0;
 
-    QRhiTexture* mSpriteTexture = nullptr;
-    QRhiTexture* mColormapTexture = nullptr;
+    std::vector<Look> mLooks;
+    QRhiTexture* mPlaceholderTexture = nullptr;
     QRhiSampler* mSampler = nullptr;
 
+    // Layout template the pipelines are built against; draws bind their look's srb.
     QRhiShaderResourceBindings* mSrb = nullptr;
     QRhiGraphicsPipeline* mPipeline = nullptr;
     QRhiGraphicsPipeline* mColoredPipeline = nullptr;
@@ -110,15 +131,6 @@ private:
 
     bool mDirty = false;
     bool mQuadUploaded = false;
-    bool mSpriteTextureDirty = false;
-    bool mColormapTextureDirty = false;
-    QImage mSpriteImage;
-    QImage mColormapImage;
-
-    int mCachedShape = -1;
-    double mCachedSize = -1;
-    QPen mCachedPen;
-    QBrush mCachedBrush;
     float mLastOffsetX = 0;
     float mLastOffsetY = 0;
 };

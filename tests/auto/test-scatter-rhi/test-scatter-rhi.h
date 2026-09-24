@@ -40,6 +40,10 @@ private slots:
     void scatterPlusLineDoesNotCrash();
     void multiGraphScatterDoesNotCrash();
 
+    // Several scatters on one layer share one QCPScatterRhiLayer
+    void scattersOnOneLayerKeepTheirOwnMarker();
+    void multiGraphComponentsKeepTheirOwnMarker();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };
