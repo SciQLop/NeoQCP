@@ -33,6 +33,7 @@
 #include "test-layer-removal/test-layer-removal.h"
 #include "test-hidden-replot/test-hidden-replot.h"
 #include "test-color-by-scalar/test-color-by-scalar.h"
+#include "test-gradient-presets/test-gradient-presets.h"
 
 #define QCPTEST(t) t t##instance; QTest::qExec(&t##instance)
 
@@ -75,6 +76,7 @@ int main(int argc, char **argv)
   QCPTEST(TestLayerRemoval);
   QCPTEST(TestHiddenReplot);
   QCPTEST(TestColorByScalar);
+  QCPTEST(TestGradientPresets);
 
   return 0;
 }

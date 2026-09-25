@@ -39,6 +39,7 @@ test_srcs = [
     'test-hidden-replot/test-hidden-replot.cpp',
     'test-data-swap/test-data-swap.cpp',
     'test-color-by-scalar/test-color-by-scalar.cpp',
+    'test-gradient-presets/test-gradient-presets.cpp',
 ]
 
 test_headers = [
@@ -77,6 +78,7 @@ test_headers = [
     'test-hidden-replot/test-hidden-replot.h',
     'test-data-swap/test-data-swap.h',
     'test-color-by-scalar/test-color-by-scalar.h',
+    'test-gradient-presets/test-gradient-presets.h',
 ]
 test_moc_files = qtmod.compile_moc(headers : test_headers)
 

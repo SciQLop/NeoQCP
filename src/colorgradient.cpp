@@ -24,6 +24,7 @@
 ****************************************************************************/
 
 #include "colorgradient.h"
+#include "colorgradient-tables.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPColorGradient
@@ -442,6 +443,19 @@ QRgb QCPColorGradient::color(double position, const QCPRange& range, bool logari
   The available presets are:
   \image html QCPColorGradient.png
 */
+namespace
+{
+template <std::size_t N>
+void load_table(QCPColorGradient& gradient,
+                const std::array<std::array<std::uint8_t, 3>, N>& table)
+{
+    gradient.setColorInterpolation(QCPColorGradient::ciRGB);
+    for (std::size_t i = 0; i < N; ++i)
+        gradient.setColorStopAt(double(i) / double(N - 1),
+                                QColor(table[i][0], table[i][1], table[i][2]));
+}
+}
+
 void QCPColorGradient::loadPreset(GradientPreset preset)
 {
     clearColorStops();
@@ -542,6 +556,27 @@ void QCPColorGradient::loadPreset(GradientPreset preset)
             setColorStopAt(1.0 / 3.0, QColor(0, 0, 255));
             setColorStopAt(2.0 / 3.0, QColor(0, 255, 0));
             setColorStopAt(1, QColor(255, 0, 0));
+            break;
+        case gpViridis:
+            load_table(*this, qcp::gradient_tables::kViridis);
+            break;
+        case gpCividis:
+            load_table(*this, qcp::gradient_tables::kCividis);
+            break;
+        case gpMagma:
+            load_table(*this, qcp::gradient_tables::kMagma);
+            break;
+        case gpInferno:
+            load_table(*this, qcp::gradient_tables::kInferno);
+            break;
+        case gpPlasma:
+            load_table(*this, qcp::gradient_tables::kPlasma);
+            break;
+        case gpTurbo:
+            load_table(*this, qcp::gradient_tables::kTurbo);
+            break;
+        case gpCoolwarm:
+            load_table(*this, qcp::gradient_tables::kCoolwarm);
             break;
     }
 }

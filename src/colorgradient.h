@@ -109,6 +109,20 @@ public:
         ,
         gpHues ///< Full hue cycle, with highest and lowest color red (suitable for periodic data,
                ///< such as angles and phases, see \ref setPeriodic)
+        ,
+        gpViridis ///< Perceptually uniform, dark blue over green to yellow, colour-blind safe
+        ,
+        gpCividis ///< Perceptually uniform, blue to yellow, tuned for colour-vision deficiency
+        ,
+        gpMagma ///< Perceptually uniform, black over purple and orange to pale yellow
+        ,
+        gpInferno ///< Perceptually uniform, black over purple and orange to yellow
+        ,
+        gpPlasma ///< Perceptually uniform, dark blue over magenta to yellow
+        ,
+        gpTurbo ///< Smooth, perceptually improved replacement for gpJet
+        ,
+        gpCoolwarm ///< Diverging, blue over light grey to red (Moreland), colour-blind safe
     };
     Q_ENUMS(GradientPreset)
 
