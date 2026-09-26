@@ -22,6 +22,7 @@ struct ResampleCache
     // don't reallocate on every call.
     std::vector<double> accum;
     std::vector<uint32_t> counts;
+    std::vector<uint8_t> nonPositive; // log-z only: bin saw a z <= 0 sample
     std::vector<bool> gapBetween;
 };
 
@@ -31,6 +32,9 @@ struct ResampleCache
 // Returns nullptr if input is insufficient (srcCount < 2, zero target size, etc.).
 // If cache is non-null and the Y parameters match, reuses the cached Y axis
 // (avoids expensive pow10 recomputation on X-only pans).
+//
+// zLogScale averages log10(z) (geometric mean) so a log colour scale isn't
+// skewed toward the bin's largest sample; z <= 0 is left out of the mean.
 //
 // The accumulation loop -- O(visible source cells), independent of target
 // grid size -- is split across worker threads by target-bin range once the
@@ -44,6 +48,7 @@ QCPColorMapData* resample(
     const QCPRange& xRange, const QCPRange& yRange,
     int targetWidth, int targetHeight,
     bool yLogScale,
+    bool zLogScale,
     double gapThreshold,
     ResampleCache* cache = nullptr,
     bool forceSerial = false);

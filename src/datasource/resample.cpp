@@ -162,8 +162,8 @@ void resampleRange(
     const std::vector<bool>& gapBetween,
     const std::vector<double>& yAxis,
     int ny, int ys,
-    bool yLogScale, bool variableY,
-    double* accum, uint32_t* counts)
+    bool yLogScale, bool variableY, bool zLogScale,
+    double* accum, uint32_t* counts, uint8_t* nonPositive)
 {
     auto computeYBinRanges = [&](int col, std::vector<BinRange>& ranges) {
         for (int yj = 0; yj < ys; ++yj)
@@ -283,10 +283,17 @@ void resampleRange(
                 int yLo = yBinRanges[yj].lo;
                 int yHi = yBinRanges[yj].hi;
 
+                if (zLogScale && zVal <= 0)
+                {
+                    for (int yb = yLo; yb <= yHi; ++yb)
+                        nonPositive[obBase + yb] = 1;
+                    continue;
+                }
+                const double sample = zLogScale ? std::log10(zVal) : zVal;
                 for (int yb = yLo; yb <= yHi; ++yb)
                 {
                     int idx = obBase + yb;
-                    accum[idx] += zVal;
+                    accum[idx] += sample;
                     counts[idx] += 1;
                 }
             }
@@ -303,7 +310,7 @@ void resampleImpl(
     const std::vector<double>& xAxis, const std::vector<double>& yAxis,
     const std::vector<double>& xEdges,
     int nx, int ny, int ys,
-    bool yLogScale, bool variableY,
+    bool yLogScale, bool variableY, bool zLogScale,
     double gapThreshold,
     double* outData,
     ResampleCache* cache,
@@ -339,11 +346,14 @@ void resampleImpl(
     std::vector<uint32_t>& counts = cache ? cache->counts : localCounts;
     accum.assign(total, 0.0);
     counts.assign(total, 0);
+    std::vector<uint8_t> localNonPositive;
+    std::vector<uint8_t>& nonPositive = cache ? cache->nonPositive : localNonPositive;
+    nonPositive.assign(zLogScale ? total : 0, 0);
 
     auto worker = [&](int xbBegin, int xbEnd) {
         resampleRange(acc, xbBegin, xbEnd, xBegin, xEnd, ctxBegin, ctxCount,
                       xAxis, xEdges, gapBetween, yAxis, ny, ys, yLogScale, variableY,
-                      accum.data(), counts.data());
+                      zLogScale, accum.data(), counts.data(), nonPositive.data());
     };
 
     // Parallelize by target-bin range: each thread's writes land in disjoint
@@ -388,6 +398,13 @@ void resampleImpl(
     // itself rather than cellBudget; parallelizable the same way since each
     // thread owns a disjoint range of source columns i (and therefore of
     // dstIdx = j*nx+i, since i doesn't repeat across chunks).
+    // A log bin holding only z <= 0 keeps 0 so it still draws the lowest colour.
+    auto binValue = [&](int idx) {
+        if (counts[idx] == 0)
+            return (zLogScale && nonPositive[idx]) ? 0.0 : std::nan("");
+        const double mean = accum[idx] / counts[idx];
+        return zLogScale ? std::pow(10.0, mean) : mean;
+    };
     auto writeOutput = [&](int iBegin, int iEnd) {
         for (int i = iBegin; i < iEnd; ++i)
         {
@@ -395,8 +412,7 @@ void resampleImpl(
             {
                 int srcIdx = i * ny + j;
                 int dstIdx = j * nx + i;
-                outData[dstIdx] = counts[srcIdx] > 0 ? accum[srcIdx] / counts[srcIdx]
-                                                      : std::nan("");
+                outData[dstIdx] = binValue(srcIdx);
             }
         }
     };
@@ -414,6 +430,7 @@ QCPColorMapData* resample(
     const QCPRange& xRange, const QCPRange& yRange,
     int targetWidth, int targetHeight,
     bool yLogScale,
+    bool zLogScale,
     double gapThreshold,
     ResampleCache* cache,
     bool forceSerial)
@@ -475,14 +492,16 @@ QCPColorMapData* resample(
         RawAccessor acc{rawX, rawY, rawZ, ys, variableY};
         resampleImpl(acc, xBegin, xEnd, ctxBegin, ctxEnd,
                      xAxis, yAxis, xEdges, nx, ny, ys,
-                     yLogScale, variableY, gapThreshold, data->rawData(), cache, forceSerial);
+                     yLogScale, variableY, zLogScale, gapThreshold, data->rawData(), cache,
+                     forceSerial);
     }
     else
     {
         VirtualAccessor acc{src, ys, variableY};
         resampleImpl(acc, xBegin, xEnd, ctxBegin, ctxEnd,
                      xAxis, yAxis, xEdges, nx, ny, ys,
-                     yLogScale, variableY, gapThreshold, data->rawData(), cache, forceSerial);
+                     yLogScale, variableY, zLogScale, gapThreshold, data->rawData(), cache,
+                     forceSerial);
     }
 
     data->recalculateDataBounds();

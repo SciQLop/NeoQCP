@@ -143,7 +143,7 @@ private:
     void installResampleTransform();
 
     std::shared_ptr<QCPAbstractDataSource2D> mDataSource;
-    // Captured by value in the pipeline transform (re-baked by setGapThreshold)
+    // Captured by value in the pipeline transform (re-baked by setGapThreshold / setDataScaleType)
     // so background jobs never reference this object's memory.
     double mGapThreshold = 1.5;
     QCPColormapPipeline mPipeline;

@@ -45,6 +45,9 @@ private slots:
     void resampleZoomedOutNotBlack();
     void resampleLogYResolutionNotCoarse();
     void resampleVariableYPerColumn();
+    void resampleLogZAveragesInLogSpace();
+    void resampleLogZIgnoresNonPositive();
+    void colormap2LogZResamplesInLogSpace();
     void colormap2NanHandling();
     void colormap2DataScaleTypeSync();
 

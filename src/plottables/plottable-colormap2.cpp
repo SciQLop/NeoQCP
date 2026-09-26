@@ -54,7 +54,8 @@ QCPColorMap2::~QCPColorMap2()
 void QCPColorMap2::installResampleTransform()
 {
     mPipeline.setTransform(TransformKind::ViewportDependent,
-        [gapThreshold = mGapThreshold](
+        [gapThreshold = mGapThreshold,
+         zLog = mRenderer.dataScaleType() == QCPAxis::stLogarithmic](
             const QCPAbstractDataSource2D& src,
             const ViewportParams& vp,
             std::any& cache) -> std::shared_ptr<QCPColorMapData> {
@@ -109,7 +110,7 @@ void QCPColorMap2::installResampleTransform()
                 cache = qcp::algo2d::ResampleCache{};
             auto& rc = std::any_cast<qcp::algo2d::ResampleCache&>(cache);
             auto* raw = qcp::algo2d::resample(src, xBegin, xEnd,
-                xOut, yOut, w, h, vp.valueLogScale, gapThreshold, &rc);
+                xOut, yOut, w, h, vp.valueLogScale, zLog, gapThreshold, &rc);
             return std::shared_ptr<QCPColorMapData>(raw);
         });
 }
@@ -215,6 +216,9 @@ void QCPColorMap2::setDataScaleType(QCPAxis::ScaleType type)
     {
         QCPRange prevRange = mRenderer.dataRange();
         mRenderer.setDataScaleType(type);
+        installResampleTransform();
+        if (mDataSource)
+            mPipeline.onDataChanged();
         QCPRange curRange = mRenderer.dataRange();
         if (prevRange.lower != curRange.lower || prevRange.upper != curRange.upper)
             Q_EMIT dataRangeChanged(curRange);
