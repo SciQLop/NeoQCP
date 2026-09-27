@@ -7,6 +7,7 @@
 #include "test-qcplayout/test-qcplayout.h"
 #include "test-qcplegend/test-qcplegend.h"
 #include "test-qcpaxisrect/test-qcpaxisrect.h"
+#include "test-tick-label-cache/test-tick-label-cache.h"
 #include "test-datacontainer/test-datacontainer.h"
 #include "test-line-extruder/test-line-extruder.h"
 #include "test-datasource/test-datasource.h"
@@ -50,6 +51,7 @@ int main(int argc, char **argv)
   QCPTEST(TestQCPLayout);
   QCPTEST(TestQCPLegend);
   QCPTEST(TestQCPAxisRect);
+  QCPTEST(TestTickLabelCache);
   QCPTEST(TestDatacontainer);
   QCPTEST(TestLineExtruder);
   QCPTEST(TestDataSource);

@@ -583,6 +583,7 @@ protected:
     virtual QByteArray generateLabelParameterHash() const;
     const QFontMetrics& fontMetricsFor(const QFont& font);
 
+    QPointF snappedToDevicePixels(const QPointF& point) const;
     virtual void placeTickLabel(QCPPainter* painter, double position, int distanceToAxis,
                                 const QString& text, QSize* tickLabelsSize);
     virtual void drawTickLabel(QCPPainter* painter, double x, double y,

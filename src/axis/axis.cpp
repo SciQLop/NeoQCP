@@ -2247,7 +2247,7 @@ QCPAxisPainterPrivate::QCPAxisPainterPrivate(QCustomPlot* parentPlot)
         , abbreviateDecimalPowers(false)
         , reversedEndings(false)
         , mParentPlot(parentPlot)
-        , mLabelCache(16) // cache at most 16 (tick) labels
+        , mLabelCache(64) // cache at most 64 (tick) labels
 {
 }
 
@@ -2700,14 +2700,12 @@ void QCPAxisPainterPrivate::placeTickLabel(QCPPainter* painter, double position,
             TickLabelData labelData = getTickLabelData(painter->font(), text);
             cachedLabel->offset
                 = getTickLabelDrawOffset(labelData) + labelData.rotatedTotalBounds.topLeft();
-            if (!qFuzzyCompare(1.0, mParentPlot->bufferDevicePixelRatio()))
-            {
-                cachedLabel->pixmap = QPixmap(labelData.rotatedTotalBounds.size()
-                                              * mParentPlot->bufferDevicePixelRatio());
-                cachedLabel->pixmap.setDevicePixelRatio(mParentPlot->devicePixelRatioF());
-            }
-            else
-                cachedLabel->pixmap = QPixmap(labelData.rotatedTotalBounds.size());
+            // The buffer's ratio, not the widget's: they differ while a DPR change is pending
+            // (and NeoQCP once forced the buffer to 1 on macOS), and a pixmap sized for one but
+            // tagged with the other draws at the wrong size.
+            const double dpr = mParentPlot->bufferDevicePixelRatio();
+            cachedLabel->pixmap = QPixmap(labelData.rotatedTotalBounds.size() * dpr);
+            cachedLabel->pixmap.setDevicePixelRatio(dpr);
             cachedLabel->pixmap.fill(Qt::transparent);
             QCPPainter cachePainter(&cachedLabel->pixmap);
             cachePainter.setPen(painter->pen());
@@ -2732,7 +2730,8 @@ void QCPAxisPainterPrivate::placeTickLabel(QCPPainter* painter, double position,
         }
         if (!labelClippedByBorder)
         {
-            painter->drawPixmap(labelAnchor + cachedLabel->offset, cachedLabel->pixmap);
+            painter->drawPixmap(snappedToDevicePixels(labelAnchor + cachedLabel->offset),
+                                cachedLabel->pixmap);
             finalSize = cachedLabel->pixmap.size() / mParentPlot->bufferDevicePixelRatio();
         }
         mLabelCache.insert(
@@ -2774,6 +2773,17 @@ void QCPAxisPainterPrivate::placeTickLabel(QCPPainter* painter, double position,
         tickLabelsSize->setWidth(finalSize.width());
     if (finalSize.height() > tickLabelsSize->height())
         tickLabelsSize->setHeight(finalSize.height());
+}
+
+/*! \internal
+
+  \a point moved to the nearest device pixel. drawText hints glyphs onto the pixel grid; a cached
+  label pixmap drawn at a fractional position is resampled instead, and its text blurs.
+*/
+QPointF QCPAxisPainterPrivate::snappedToDevicePixels(const QPointF& point) const
+{
+    const double dpr = mParentPlot->bufferDevicePixelRatio();
+    return {std::round(point.x() * dpr) / dpr, std::round(point.y() * dpr) / dpr};
 }
 
 /*! \internal
