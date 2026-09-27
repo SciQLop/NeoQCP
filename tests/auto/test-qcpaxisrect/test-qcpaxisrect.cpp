@@ -1,4 +1,26 @@
 #include "test-qcpaxisrect.h"
+#include "axis/labelrenderer.h"
+
+namespace
+{
+// Plain drawText, counting how often the axis asks it to lay the label out.
+struct CountingLabelRenderer final : QCPLabelRenderer
+{
+    mutable int measures = 0;
+    mutable int draws = 0;
+    QSize measure(const QFont& font, const QString& text) const override
+    {
+        ++measures;
+        return QCPLabelRenderer::measureWith(nullptr, font, text);
+    }
+    void draw(QCPPainter* painter, const QRect& rect, const QFont& font, const QColor& color,
+              const QString& text, int flags) const override
+    {
+        ++draws;
+        QCPLabelRenderer::drawWith(nullptr, painter, rect, font, color, text, flags);
+    }
+};
+}
 
 void TestQCPAxisRect::init()
 {
@@ -263,3 +285,103 @@ void TestQCPAxisRect::axisRectRemovalConveniencePointers()
 
 
 
+
+void TestQCPAxisRect::axisLabelLaidOutOncePerChange()
+{
+  // SciQLop#143: a full text layout of the axis label on every replot was ~40 % of
+  // QCPAxis::draw. The label rarely changes, so a pan must reuse it.
+  CountingLabelRenderer renderer;
+  mPlot->yAxis->setLabelRenderer(&renderer);
+  mPlot->yAxis->setLabel("B_gse\n[nT]");
+  mPlot->replot(QCustomPlot::rpImmediateRefresh);
+  QVERIFY(renderer.draws > 0);
+  const int draws = renderer.draws, measures = renderer.measures;
+
+  for (int i = 0; i < 5; ++i)
+  {
+    mPlot->yAxis->setRange(i, i + 10);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+  }
+  QCOMPARE(renderer.draws, draws);
+  QCOMPARE(renderer.measures, measures);
+
+  mPlot->yAxis->setLabel("B_gsm\n[nT]");
+  mPlot->replot(QCustomPlot::rpImmediateRefresh);
+  QVERIFY(renderer.draws > draws);
+  const int afterText = renderer.draws;
+
+  mPlot->yAxis->setLabelColor(Qt::red);
+  mPlot->replot(QCustomPlot::rpImmediateRefresh);
+  QVERIFY(renderer.draws > afterText);
+  mPlot->yAxis->setLabelRenderer(nullptr);
+}
+
+void TestQCPAxisRect::axisLabelRedrawnForExports()
+{
+  // Exports stay vector: a PDF must get the text, not a cached pixmap of it.
+  CountingLabelRenderer renderer;
+  mPlot->xAxis->setLabelRenderer(&renderer);
+  mPlot->xAxis->setLabel("time");
+  mPlot->replot(QCustomPlot::rpImmediateRefresh);
+  const int draws = renderer.draws;
+  mPlot->toPixmap(400, 300);
+  QVERIFY(renderer.draws > draws);
+  mPlot->xAxis->setLabelRenderer(nullptr);
+}
+
+static QRect inkBounds(const QImage& image)
+{
+  QRect bounds;
+  for (int y = 0; y < image.height(); ++y)
+    for (int x = 0; x < image.width(); ++x)
+      if (qGray(image.pixel(x, y)) < 200)
+        bounds |= QRect(x, y, 1, 1);
+  return bounds;
+}
+
+void TestQCPAxisRect::axisLabelPictureMatchesDirectText()
+{
+  // The cached picture must land exactly where drawText would put the text, rotated
+  // sides included, and a label longer than the axis must not be cropped.
+  for (auto type : {QCPAxis::atLeft, QCPAxis::atRight, QCPAxis::atTop, QCPAxis::atBottom})
+  {
+    for (const QString& label : {QStringLiteral("B_gse\n[nT]"),
+                                 QStringLiteral("a label much longer than this short axis is")})
+    {
+      auto render = [&](bool exportMode) {
+        QCPAxisPainterPrivate axis(mPlot);
+        axis.type = type;
+        axis.label = label;
+        axis.labelFont = QFont("sans", 10);
+        axis.labelColor = Qt::black;
+        axis.labelPadding = 5;
+        axis.tickLabelPadding = 5;
+        axis.tickLabelRotation = 0;
+        axis.tickLabelSide = QCPAxis::lsOutside;
+        axis.substituteExponent = false;
+        axis.numberMultiplyCross = false;
+        axis.tickLengthIn = axis.tickLengthOut = axis.subTickLengthIn = axis.subTickLengthOut = 0;
+        axis.offset = 0;
+        axis.abbreviateDecimalPowers = false;
+        axis.reversedEndings = false;
+        axis.viewportRect = QRect(0, 0, 400, 300);
+        axis.axisRect = QRect(150, 120, 100, 60);
+        QImage image(400, 300, QImage::Format_ARGB32_Premultiplied);
+        image.fill(Qt::white);
+        QCPPainter painter(&image);
+        if (exportMode)
+          painter.setMode(QCPPainter::pmNoCaching);
+        axis.draw(&painter);
+        axis.draw(&painter); // second draw goes through the cached picture
+        return image;
+      };
+      // Glyph antialiasing differs (upright text turned as a picture vs text drawn rotated),
+      // so compare where the ink lands, to the pixel an antialiased edge may add or drop.
+      const QRect cached = inkBounds(render(false)), direct = inkBounds(render(true));
+      QVERIFY2(qAbs(cached.left() - direct.left()) <= 1 && qAbs(cached.right() - direct.right()) <= 1
+                   && qAbs(cached.top() - direct.top()) <= 1
+                   && qAbs(cached.bottom() - direct.bottom()) <= 1,
+               qPrintable(QString("side %1, label '%2'").arg(int(type)).arg(label)));
+    }
+  }
+}

@@ -15,6 +15,9 @@ private slots:
   void axisRectRemovalConsequencesToPlottables();
   void axisRectRemovalConsequencesToItems();
   void axisRectRemovalConveniencePointers();
+  void axisLabelLaidOutOncePerChange();
+  void axisLabelRedrawnForExports();
+  void axisLabelPictureMatchesDirectText();
   
 private:
   QCustomPlot *mPlot;

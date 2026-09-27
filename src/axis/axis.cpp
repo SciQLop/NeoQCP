@@ -2414,19 +2414,14 @@ void QCPAxisPainterPrivate::draw(QCPPainter* painter)
         painter->setClipRect(oldClipRect);
 
     // axis label:
-    const auto drawLabel = [&](const QRect& rect)
-    {
-        QCPLabelRenderer::drawWith(labelRenderer, painter, rect, labelFont, labelColor, label,
-                                   Qt::TextDontClip | Qt::AlignCenter);
-    };
+    const auto drawLabel = [&](const QRect& rect) { drawAxisLabel(painter, rect); };
     QRect labelBounds;
     if (!label.isEmpty())
     {
         margin += labelPadding;
         painter->setFont(labelFont);
         painter->setPen(QPen(labelColor));
-        labelBounds = QRect(QPoint(0, 0),
-                            QCPLabelRenderer::measureWith(labelRenderer, labelFont, label));
+        labelBounds = QRect(QPoint(0, 0), axisLabelSize());
         if (type == QCPAxis::atLeft)
         {
             QTransform oldTransform = painter->transform();
@@ -2567,11 +2562,57 @@ int QCPAxisPainterPrivate::size()
     // degrees):
     if (!label.isEmpty())
     {
-        result += QCPLabelRenderer::measureWith(labelRenderer, labelFont, label).height()
-            + labelPadding;
+        result += axisLabelSize().height() + labelPadding;
     }
 
     return result;
+}
+
+/*! \internal
+
+  The axis label's size, measured again only when its text, font, colour or renderer changed.
+*/
+QSize QCPAxisPainterPrivate::axisLabelSize()
+{
+    const AxisLabelKey key {labelRenderer, label, labelFont, labelColor};
+    if (!(mAxisLabel.key == key))
+        mAxisLabel = {key, QCPLabelRenderer::measureWith(labelRenderer, labelFont, label)};
+    return mAxisLabel.size;
+}
+
+/*! \internal
+
+  Draws the axis label centred in \a rect from a cached picture, rendered again only when the
+  label, the rect size or the device pixel ratio changed. Exports (\ref QCPPainter::pmNoCaching)
+  draw the text itself so they stay vector.
+*/
+void QCPAxisPainterPrivate::drawAxisLabel(QCPPainter* painter, const QRect& rect)
+{
+    constexpr int flags = Qt::TextDontClip | Qt::AlignCenter;
+    if (painter->modes().testFlag(QCPPainter::pmNoCaching))
+    {
+        QCPLabelRenderer::drawWith(labelRenderer, painter, rect, labelFont, labelColor, label,
+                                   flags);
+        return;
+    }
+    // TextDontClip: a label longer than a short axis overflows rect, so the picture covers both.
+    const QSize box = rect.size().expandedTo(axisLabelSize() + QSize(4, 4));
+    const QPoint inset((box.width() - rect.width()) / 2, (box.height() - rect.height()) / 2);
+    const double dpr = mParentPlot->bufferDevicePixelRatio();
+    if (mAxisLabel.pixmap.isNull() || mAxisLabel.box != box || mAxisLabel.dpr != dpr)
+    {
+        QPixmap pixmap(box * dpr);
+        pixmap.setDevicePixelRatio(dpr);
+        pixmap.fill(Qt::transparent);
+        QCPPainter cachePainter(&pixmap);
+        QCPLabelRenderer::drawWith(labelRenderer, &cachePainter, QRect(inset, rect.size()),
+                                   labelFont, labelColor, label, flags);
+        cachePainter.end();
+        mAxisLabel.pixmap = std::move(pixmap);
+        mAxisLabel.box = box;
+        mAxisLabel.dpr = dpr;
+    }
+    painter->drawPixmap(rect.topLeft() - inset, mAxisLabel.pixmap);
 }
 
 /*! \internal
@@ -2583,6 +2624,7 @@ int QCPAxisPainterPrivate::size()
 void QCPAxisPainterPrivate::clearCache()
 {
     mLabelCache.clear();
+    mAxisLabel = {};
 }
 
 /*! \internal

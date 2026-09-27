@@ -549,7 +549,28 @@ protected:
         QFont baseFont, expFont;
     };
 
+    // Laying out the axis label is costly (a QTextLayout, or a LaTeX parse) and it rarely
+    // changes, so its size and a picture of it are kept until one of these changes.
+    struct AxisLabelKey
+    {
+        const QCPLabelRenderer* renderer = nullptr;
+        QString text;
+        QFont font;
+        QColor color;
+        bool operator==(const AxisLabelKey&) const = default;
+    };
+
+    struct CachedAxisLabel
+    {
+        AxisLabelKey key;
+        QSize size;
+        QSize box;
+        double dpr = 0.;
+        QPixmap pixmap;
+    };
+
     QCustomPlot* mParentPlot;
+    CachedAxisLabel mAxisLabel;
     QByteArray mLabelParameterHash; // to determine whether mLabelCache needs to be cleared due to
                                     // changed parameters
     QCache<QString, CachedLabel> mLabelCache;
@@ -557,6 +578,8 @@ protected:
     QFont mCachedMetricsFont;
     QFontMetrics mCachedFontMetrics {QFont()};
 
+    QSize axisLabelSize();
+    void drawAxisLabel(QCPPainter* painter, const QRect& rect);
     virtual QByteArray generateLabelParameterHash() const;
     const QFontMetrics& fontMetricsFor(const QFont& font);
 
