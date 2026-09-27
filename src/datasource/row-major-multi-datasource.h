@@ -198,6 +198,21 @@ public:
             begin, end, keyAxis, valueAxis, &mGapCache.gaps, results);
     }
 
+    const double* rawKeyData() const override
+    {
+        if constexpr (std::is_same_v<K, double>)
+            return mKeys.data();
+        else
+            return nullptr;
+    }
+
+    QCPRawColumn rawColumn(int column) const override
+    {
+        if (column < 0 || column >= mColumns)
+            return {};
+        return QCPRawColumn::of(mValues + column, mStride);
+    }
+
 private:
     void ensureGapCache(int begin, int end) const
     {

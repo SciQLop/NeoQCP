@@ -109,18 +109,22 @@ int findBinFloor(double value, const std::vector<double>& axis)
     return std::clamp(idx, 0, static_cast<int>(axis.size()) - 1);
 }
 
-// Accessors that use raw pointers when available, virtual calls otherwise.
+// Accessors that use raw arrays when available, virtual calls otherwise.
+template <typename YValues, typename ZValues>
 struct RawAccessor
 {
     const double* x;
-    const double* y;
-    const double* z;
+    YValues y;
+    ZValues z;
     int ys;
     bool yIs2D;
 
     double xAt(int i) const { return x[i]; }
-    double yAt(int i, int j) const { return yIs2D ? y[i * ys + j] : y[j]; }
-    double zAt(int i, int j) const { return z[i * ys + j]; }
+    double yAt(int i, int j) const
+    {
+        return yIs2D ? y[static_cast<std::ptrdiff_t>(i) * ys + j] : y[j];
+    }
+    double zAt(int i, int j) const { return z[static_cast<std::ptrdiff_t>(i) * ys + j]; }
 
     int lowerBound(int begin, int end, double value) const
     {
@@ -483,26 +487,21 @@ QCPColorMapData* resample(
 
     auto xEdges = generateBinEdges(xAxis);
 
-    const double* rawX = src.rawX();
-    const double* rawY = src.rawY();
-    const double* rawZ = src.rawZ();
-
-    if (rawX && rawY && rawZ)
-    {
-        RawAccessor acc{rawX, rawY, rawZ, ys, variableY};
+    auto run = [&](const auto& acc) {
         resampleImpl(acc, xBegin, xEnd, ctxBegin, ctxEnd,
                      xAxis, yAxis, xEdges, nx, ny, ys,
                      yLogScale, variableY, zLogScale, gapThreshold, data->rawData(), cache,
                      forceSerial);
-    }
-    else
-    {
-        VirtualAccessor acc{src, ys, variableY};
-        resampleImpl(acc, xBegin, xEnd, ctxBegin, ctxEnd,
-                     xAxis, yAxis, xEdges, nx, ny, ys,
-                     yLogScale, variableY, zLogScale, gapThreshold, data->rawData(), cache,
-                     forceSerial);
-    }
+    };
+    bool ranRaw = false;
+    if (const double* rawX = src.rawX())
+        visitRawColumn(src.rawY(), [&](auto y) {
+            ranRaw = visitRawColumn(src.rawZ(), [&](auto z) {
+                run(RawAccessor<decltype(y), decltype(z)>{rawX, y, z, ys, variableY});
+            });
+        });
+    if (!ranRaw)
+        run(VirtualAccessor{src, ys, variableY});
 
     data->recalculateDataBounds();
     return data;

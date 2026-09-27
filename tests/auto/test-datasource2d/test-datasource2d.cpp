@@ -6,6 +6,7 @@
 #include <QtTest/QtTest>
 #include <QTemporaryFile>
 #include <cmath>
+#include <memory>
 #include <span>
 
 void TestDataSource2D::init()
@@ -1090,4 +1091,64 @@ void TestDataSource2D::colormap2ExportToPdf()
     QFileInfo fi(path);
     // A PDF with rendered content should be substantially larger than an empty one
     QVERIFY(fi.size() > 1000);
+}
+
+void TestDataSource2D::soa2dFloatExposesTypedRawYZ()
+{
+    // Speasy spectrograms come as float32 energy tables and values: resample()
+    // needs their raw arrays, not a virtual yAt()/zAt() per cell.
+    std::vector<double> x = {0, 1, 2};
+    std::vector<float> y = {10, 20};
+    std::vector<float> z = {1, 2, 3, 4, 5, 6};
+    QCPSoADataSource2D src(x, y, z);
+
+    QCOMPARE(src.rawX(), static_cast<const double*>(src.x().data()));
+    QVERIFY(src.rawY().type == QCPRawColumn::Type::Float);
+    QVERIFY(src.rawZ().type == QCPRawColumn::Type::Float);
+    QCOMPARE(src.rawZ().data, static_cast<const void*>(src.z().data()));
+
+    std::vector<int> zi = {1, 2, 3, 4, 5, 6};
+    QCPSoADataSource2D ints(x, y, zi);
+    QVERIFY(!ints.rawZ());
+}
+
+void TestDataSource2D::resampleFloatMatchesDouble()
+{
+    const int nx = 2000, ys = 32;
+    std::vector<double> x(nx);
+    std::vector<float> yf(static_cast<std::size_t>(nx) * ys), zf(yf.size());
+    for (int i = 0; i < nx; ++i)
+    {
+        x[i] = static_cast<double>(i);
+        for (int j = 0; j < ys; ++j)
+        {
+            const auto k = static_cast<std::size_t>(i) * ys + j;
+            yf[k] = static_cast<float>(1.0 + j * 1.5 + (i % 7) * 0.01);
+            zf[k] = (k % 211 == 0) ? std::numeric_limits<float>::quiet_NaN()
+                                   : static_cast<float>(1.0 + std::abs(std::sin(k * 0.01)) * 1e4);
+        }
+    }
+    std::vector<double> yd(yf.begin(), yf.end()), zd(zf.begin(), zf.end());
+    QCPSoADataSource2D fast(x, yf, zf);
+    QCPSoADataSource2D reference(x, yd, zd);
+    QVERIFY(fast.yIs2D());
+
+    for (bool log : {false, true})
+    {
+        auto run = [&](const QCPAbstractDataSource2D& src) {
+            return qcp::algo2d::resample(src, 0, nx, QCPRange(0, nx - 1), QCPRange(1, 50),
+                                         400, 100, log, log, 1.5, nullptr, false);
+        };
+        std::unique_ptr<QCPColorMapData> got(run(fast)), want(run(reference));
+        QVERIFY(got && want);
+        for (int i = 0; i < want->keySize(); ++i)
+            for (int j = 0; j < want->valueSize(); ++j)
+            {
+                const double w = want->cell(i, j), g = got->cell(i, j);
+                if (std::isnan(w))
+                    QVERIFY(std::isnan(g));
+                else
+                    QCOMPARE(g, w);
+            }
+    }
 }

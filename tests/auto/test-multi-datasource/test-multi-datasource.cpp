@@ -4,6 +4,7 @@
 #include "datasource/row-major-multi-datasource.h"
 #include "datasource/resampled-multi-datasource.h"
 #include <vector>
+#include <limits>
 #include <span>
 
 void TestMultiDataSource::init()
@@ -675,4 +676,90 @@ void TestMultiDataSource::l2MultiEmptyInput()
     vp.plotWidthPx = 100;
     auto result = qcp::algo::resampleL2Multi(cache, vp);
     QVERIFY(result == nullptr);
+}
+
+void TestMultiDataSource::rowMajorExposesTypedRawColumns()
+{
+    // Speasy hands over (N, k) row-major float32 arrays: the binning kernels need
+    // their raw layout, not a virtual valueAt() per element.
+    std::vector<double> keys = {1.0, 2.0, 3.0};
+    std::vector<float> values = {10, 20, 30, 40, 50, 60};
+    QCPRowMajorMultiDataSource<double, float> src(
+        std::span<const double>(keys), values.data(), 3, 2, 2);
+
+    QCOMPARE(src.rawKeyData(), keys.data());
+    const QCPRawColumn col = src.rawColumn(1);
+    QVERIFY(col.type == QCPRawColumn::Type::Float);
+    QCOMPARE(col.data, static_cast<const void*>(values.data() + 1));
+    QCOMPARE(col.stride, std::ptrdiff_t(2));
+}
+
+void TestMultiDataSource::soaFloatExposesTypedRawColumn()
+{
+    std::vector<double> keys = {1.0, 2.0, 3.0};
+    std::vector<float> col0 = {1, 2, 3};
+    QCPSoAMultiDataSource<std::span<const double>, std::span<const float>> src(
+        std::span<const double>(keys), {std::span<const float>(col0)});
+
+    const QCPRawColumn col = src.rawColumn(0);
+    QVERIFY(col.type == QCPRawColumn::Type::Float);
+    QCOMPARE(col.data, static_cast<const void*>(col0.data()));
+    QCOMPARE(col.stride, std::ptrdiff_t(1));
+    QVERIFY(!src.rawColumn(1));
+}
+
+void TestMultiDataSource::integerColumnHasNoRawColumn()
+{
+    std::vector<double> keys = {1.0, 2.0};
+    std::vector<int> values = {1, 2, 3, 4};
+    QCPRowMajorMultiDataSource<double, int> src(
+        std::span<const double>(keys), values.data(), 2, 2, 2);
+    QVERIFY(!src.rawColumn(0));
+    QCOMPARE(src.valueAt(1, 1), 4.0);
+}
+
+void TestMultiDataSource::rowMajorFloatBinsLikeSoaDouble()
+{
+    // Above the 1M-row threshold so binMinMaxMultiParallel really splits the work.
+    const int n = 1'200'000, cols = 3;
+    std::vector<double> keys(n);
+    std::vector<float> rowMajor(static_cast<std::size_t>(n) * cols);
+    std::vector<std::vector<double>> soa(cols, std::vector<double>(n));
+    for (int i = 0; i < n; ++i)
+    {
+        keys[i] = i * 0.5;
+        for (int c = 0; c < cols; ++c)
+        {
+            float v = (i % 997 == c) ? std::numeric_limits<float>::quiet_NaN()
+                                     : static_cast<float>(std::sin(i * 0.001 + c) * 100.0);
+            rowMajor[static_cast<std::size_t>(i) * cols + c] = v;
+            soa[c][i] = v;
+        }
+    }
+    QCPRowMajorMultiDataSource<double, float> fast(
+        std::span<const double>(keys), rowMajor.data(), n, cols, cols);
+    std::vector<std::span<const double>> columns(soa.begin(), soa.end());
+    QCPSoAMultiDataSource<std::span<const double>, std::span<const double>> reference(
+        std::span<const double>(keys), std::move(columns));
+
+    const QCPRange range(0, keys.back());
+    for (bool parallel : {false, true})
+    {
+        auto bin = [&](const QCPAbstractMultiDataSource& src) {
+            return parallel ? qcp::algo::binMinMaxMultiParallel(src, 0, n, range, 5000, true)
+                            : qcp::algo::binMinMaxMulti(src, 0, n, range, 5000, true);
+        };
+        const auto got = bin(fast);
+        const auto want = bin(reference);
+        QCOMPARE(got.keys, want.keys);
+        QCOMPARE(got.origin, want.origin);
+        QCOMPARE(got.values.size(), want.values.size());
+        for (std::size_t i = 0; i < want.values.size(); ++i)
+        {
+            if (std::isnan(want.values[i]))
+                QVERIFY(std::isnan(got.values[i]));
+            else
+                QCOMPARE(got.values[i], want.values[i]);
+        }
+    }
 }

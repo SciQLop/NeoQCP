@@ -189,10 +189,10 @@ public:
     }
 
     const double* rawKeyData() const override { return mBins.keys.data(); }
-    const double* rawColumnData(int column) const override
+    QCPRawColumn rawColumn(int column) const override
     {
-        if (column < 0 || column >= mBins.numColumns) return nullptr;
-        return mBins.values.data() + column * mBins.stride();
+        if (column < 0 || column >= mBins.numColumns) return {};
+        return QCPRawColumn::of(mBins.values.data() + column * mBins.stride());
     }
 
 private:

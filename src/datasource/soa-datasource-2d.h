@@ -92,26 +92,26 @@ public:
 
     const double* rawX() const override
     {
-        if constexpr (std::is_same_v<X, double>)
+        if constexpr (std::is_same_v<X, double> && ContiguousNumericRange<XC>)
             return std::ranges::data(mX);
         else
             return nullptr;
     }
 
-    const double* rawY() const override
+    QCPRawColumn rawY() const override
     {
-        if constexpr (std::is_same_v<Y, double>)
-            return std::ranges::data(mY);
+        if constexpr (ContiguousNumericRange<YC>)
+            return QCPRawColumn::of(std::ranges::data(mY));
         else
-            return nullptr;
+            return {};
     }
 
-    const double* rawZ() const override
+    QCPRawColumn rawZ() const override
     {
-        if constexpr (std::is_same_v<Z, double>)
-            return std::ranges::data(mZ);
+        if constexpr (ContiguousNumericRange<ZC>)
+            return QCPRawColumn::of(std::ranges::data(mZ));
         else
-            return nullptr;
+            return {};
     }
 
 private:

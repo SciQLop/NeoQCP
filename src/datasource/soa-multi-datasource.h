@@ -129,14 +129,14 @@ public:
             return nullptr;
     }
 
-    const double* rawColumnData(int column) const override
+    QCPRawColumn rawColumn(int column) const override
     {
-        if constexpr (std::is_same_v<V, double> && ContiguousNumericRange<ValueContainer>)
+        if constexpr (ContiguousNumericRange<ValueContainer>)
         {
             if (column >= 0 && column < columnCount())
-                return std::ranges::data(mValues[column]);
+                return QCPRawColumn::of(std::ranges::data(mValues[column]));
         }
-        return nullptr;
+        return {};
     }
 
 private:

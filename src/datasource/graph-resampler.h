@@ -261,6 +261,50 @@ inline MultiColumnBinResult binMinMaxMulti(
 
 namespace detail {
 
+// Min/max of every column into out (column c's 2 * numBins slots start at c * stride), and the
+// source row of each into origin. bins[i] is the output bin of row first + i, -1 to skip it.
+// Rows outer, columns inner: a row-major (N, k) array is then read once instead of k times.
+template <bool WithOrigin>
+inline void binRowsMinMax(const QCPAbstractMultiDataSource& src, int first,
+                          const std::vector<int>& bins, double* out,
+                          [[maybe_unused]] int* origin, int stride)
+{
+    const int N = src.columnCount();
+    auto run = [&](auto valueAt) {
+        const int count = static_cast<int>(bins.size());
+        for (int i = 0; i < count; ++i)
+        {
+            const int bin = bins[i];
+            if (bin < 0) continue;
+            for (int c = 0; c < N; ++c)
+            {
+                const double v = valueAt(c, first + i);
+                if (std::isnan(v)) continue;
+
+                const int slot = c * stride + bin * 2;
+                double& mn = out[slot + 0];
+                double& mx = out[slot + 1];
+                if (std::isnan(mn) || v < mn) { mn = v; if constexpr (WithOrigin) origin[slot + 0] = first + i; }
+                if (std::isnan(mx) || v > mx) { mx = v; if constexpr (WithOrigin) origin[slot + 1] = first + i; }
+            }
+        }
+    };
+    const QCPRawColumn col0 = src.rawColumn(0);
+    std::vector<QCPRawColumn> cols(N);
+    for (int c = 0; c < N; ++c)
+        cols[c] = src.rawColumn(c);
+    const bool oneRawType = std::ranges::all_of(
+        cols, [&](const QCPRawColumn& col) { return col && col.type == col0.type; });
+    const bool ranRaw = oneRawType && visitRawColumn(col0, [&](auto raw0) {
+        std::vector<decltype(raw0)> raw(N);
+        for (int c = 0; c < N; ++c)
+            raw[c] = {static_cast<decltype(raw0.data)>(cols[c].data), cols[c].stride};
+        run([&raw](int c, int i) { return raw[c][i]; });
+    });
+    if (!ranRaw)
+        run([&](int c, int i) { return src.valueAt(c, i); });
+}
+
 template <bool WithOrigin>
 inline MultiColumnBinResult binMinMaxMultiImpl(
     const QCPAbstractMultiDataSource& src,
@@ -303,25 +347,8 @@ inline MultiColumnBinResult binMinMaxMultiImpl(
     }
     if (validCount == 0) return out;
 
-    // Outer loop over columns: each column's output region is contiguous in memory
-    for (int c = 0; c < N; ++c)
-    {
-        double* colOut = out.values.data() + c * s;
-        [[maybe_unused]] int* orgOut = WithOrigin ? out.origin.data() + c * s : nullptr;
-        const double* rawCol = src.rawColumnData(c);
-        for (int i = begin; i < end; ++i)
-        {
-            int bin = bins[i - begin];
-            if (bin < 0) continue;
-            double v = rawCol ? rawCol[i] : src.valueAt(c, i);
-            if (std::isnan(v)) continue;
-
-            double& mn = colOut[bin * 2 + 0];
-            double& mx = colOut[bin * 2 + 1];
-            if (std::isnan(mn) || v < mn) { mn = v; if constexpr (WithOrigin) orgOut[bin * 2 + 0] = i; }
-            if (std::isnan(mx) || v > mx) { mx = v; if constexpr (WithOrigin) orgOut[bin * 2 + 1] = i; }
-        }
-    }
+    binRowsMinMax<WithOrigin>(src, begin, bins, out.values.data(),
+                              WithOrigin ? out.origin.data() : nullptr, s);
 
     return out;
 }
@@ -363,9 +390,6 @@ inline MultiColumnBinResult binMinMaxMultiParallelImpl(
     threadCount = std::min(threadCount, numBins);
 
     const double* rawKeys = src.rawKeyData();
-    std::vector<const double*> rawCols(N);
-    for (int c = 0; c < N; ++c)
-        rawCols[c] = src.rawColumnData(c);
 
     auto worker = [&](int srcBegin, int srcEnd, int binBegin, int binEnd) {
         // Pre-compute bin indices for this chunk
@@ -378,24 +402,8 @@ inline MultiColumnBinResult binMinMaxMultiParallelImpl(
             bins[i] = std::clamp(static_cast<int>((k - keyLo) / binWidth), binBegin, binEnd - 1);
         }
 
-        for (int c = 0; c < N; ++c)
-        {
-            double* colOut = out.values.data() + c * s;
-            [[maybe_unused]] int* orgOut = WithOrigin ? out.origin.data() + c * s : nullptr;
-            const double* rawCol = rawCols[c];
-            for (int i = 0; i < count; ++i)
-            {
-                int bin = bins[i];
-                if (bin < 0) continue;
-                double v = rawCol ? rawCol[srcBegin + i] : src.valueAt(c, srcBegin + i);
-                if (std::isnan(v)) continue;
-
-                double& mn = colOut[bin * 2 + 0];
-                double& mx = colOut[bin * 2 + 1];
-                if (std::isnan(mn) || v < mn) { mn = v; if constexpr (WithOrigin) orgOut[bin * 2 + 0] = srcBegin + i; }
-                if (std::isnan(mx) || v > mx) { mx = v; if constexpr (WithOrigin) orgOut[bin * 2 + 1] = srcBegin + i; }
-            }
-        }
+        binRowsMinMax<WithOrigin>(src, srcBegin, bins, out.values.data(),
+                                  WithOrigin ? out.origin.data() : nullptr, s);
     };
 
     int binsPerChunk = numBins / threadCount;

@@ -57,5 +57,5 @@ public:
                                                          QVector<int>& sourceIndices) const;
 
     virtual const double* rawKeyData() const { return nullptr; }
-    virtual const double* rawColumnData(int /*column*/) const { return nullptr; }
+    virtual QCPRawColumn rawColumn(int /*column*/) const { return {}; }
 };

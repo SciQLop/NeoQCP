@@ -38,6 +38,10 @@ private slots:
     void rowMajorValueAt();
     void rowMajorWithPadding();
     void rowMajorGetLines();
+    void rowMajorExposesTypedRawColumns();
+    void soaFloatExposesTypedRawColumn();
+    void integerColumnHasNoRawColumn();
+    void rowMajorFloatBinsLikeSoaDouble();
 
     // Shape validation (degrade to empty, never UB/abort)
     void soaMismatchedColumnDegradesToEmpty();

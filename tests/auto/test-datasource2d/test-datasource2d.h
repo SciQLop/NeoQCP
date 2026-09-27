@@ -22,6 +22,8 @@ private slots:
     void soa2dVariableY();
     void soa2dSpanView();
     void soa2dMixedTypes();
+    void soa2dFloatExposesTypedRawYZ();
+    void resampleFloatMatchesDouble();
     void soa2dRangeQueries();
     void soa2dInvalidShapesDegradeToEmpty();
 

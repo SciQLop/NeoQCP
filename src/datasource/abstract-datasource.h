@@ -5,6 +5,8 @@
 #include <QVector>
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <ranges>
 #include <type_traits>
@@ -19,6 +21,57 @@ concept IndexableNumericRange = std::ranges::random_access_range<C>
 template <typename C>
 concept ContiguousNumericRange = IndexableNumericRange<C>
     && std::ranges::contiguous_range<C>;
+
+// The array behind a column (element i at data[i * stride]), so hot loops can switch on
+// the element type once instead of calling a virtual per element. Empty when the source
+// has no such array or stores a type the loops are not instantiated for.
+struct QCPRawColumn
+{
+    enum class Type : std::uint8_t { None, Double, Float };
+
+    const void* data = nullptr;
+    Type type = Type::None;
+    std::ptrdiff_t stride = 1;
+
+    template <typename T>
+    static QCPRawColumn of(const T* data, std::ptrdiff_t stride = 1)
+    {
+        if constexpr (std::is_same_v<T, double>)
+            return {data, Type::Double, stride};
+        else if constexpr (std::is_same_v<T, float>)
+            return {data, Type::Float, stride};
+        else
+            return {};
+    }
+
+    explicit operator bool() const { return data != nullptr && type != Type::None; }
+};
+
+template <typename T>
+struct QCPStridedValues
+{
+    const T* data;
+    std::ptrdiff_t stride;
+    double operator[](std::ptrdiff_t i) const { return static_cast<double>(data[i * stride]); }
+};
+
+// Calls f with a QCPStridedValues<double> or <float> over col. False (f not called) when
+// col is empty: the caller falls back to the virtual accessors.
+template <typename F>
+bool visitRawColumn(const QCPRawColumn& col, F&& f)
+{
+    switch (col ? col.type : QCPRawColumn::Type::None)
+    {
+        case QCPRawColumn::Type::Double:
+            f(QCPStridedValues<double> {static_cast<const double*>(col.data), col.stride});
+            return true;
+        case QCPRawColumn::Type::Float:
+            f(QCPStridedValues<float> {static_cast<const float*>(col.data), col.stride});
+            return true;
+        default:
+            return false;
+    }
+}
 
 // Non-templated abstract base class for all data sources.
 // QCPGraph2 holds a pointer to this; virtual dispatch happens once per render.
