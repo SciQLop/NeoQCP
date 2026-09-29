@@ -5,6 +5,12 @@
 #include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
 
 namespace {
+// GPU layers keep offsets as float shader uniforms; the layer computes them in double.
+QPointF asUniform(QPointF offset)
+{
+    return {static_cast<float>(offset.x()), static_cast<float>(offset.y())};
+}
+
 bool showAndHasRhiLT(QCustomPlot* plot)
 {
     plot->show();
@@ -311,7 +317,7 @@ void TestPipeline::colormapQuadFollowsPanWhileTranslating()
     // The repaint was skipped, so the raw quad is stale by construction...
     QCOMPARE(crl->quadRect(), before);
     // ...and the offset must make up the difference.
-    const QPointF expected = layer->pixelOffset();
+    const QPointF expected = asUniform(layer->pixelOffset());
     QVERIFY(!expected.isNull());
     QCOMPARE(crl->pixelOffset(), expected);
     QCOMPARE(crl->effectiveQuadRect(), before.translated(expected));
@@ -354,7 +360,7 @@ void TestPipeline::plottableOffsetsRefreshedAtRenderTime()
     QVERIFY(prl);
     const QPointF offsetA = mainLayer->pixelOffset();
     QVERIFY(!offsetA.isNull());
-    QCOMPARE(prl->lastUniformOffset(), offsetA);
+    QCOMPARE(prl->lastUniformOffset(), asUniform(offsetA));
 
     // Pan B WITHOUT a replot: the next frame must refresh the offset from the
     // new range anyway.
@@ -363,7 +369,7 @@ void TestPipeline::plottableOffsetsRefreshedAtRenderTime()
     QVERIFY(!expectedB.isNull());
     QVERIFY(expectedB != offsetA);
     mPlot->update();
-    QTRY_VERIFY_WITH_TIMEOUT(prl->lastUniformOffset() == expectedB, 2000);
+    QTRY_VERIFY_WITH_TIMEOUT(prl->lastUniformOffset() == asUniform(expectedB), 2000);
 }
 
 void TestPipeline::visibilityToggleForcesLayerRepaint()

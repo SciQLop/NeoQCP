@@ -2508,6 +2508,9 @@ void TestPipeline::graph2FastPanNeverBlank()
 
     mPlot->xAxis->setRange(0, 100000);
     mPlot->yAxis->setRange(-1.5, 1.5);
+    // Nothing is drawn until the first background resample lands: "never blank"
+    // is about the pans that follow the first render.
+    QTRY_VERIFY_WITH_TIMEOUT((mPlot->replot(), graph->hasRenderedRange()), 10000);
 
     for (int p = 0; p < 20; ++p)
     {
@@ -2536,6 +2539,8 @@ void TestPipeline::multiGraphFastPanNeverBlank()
     mg->setData(std::move(keys), std::move(cols));
 
     mPlot->xAxis->setRange(0, 100000);
+    // Same as graph2FastPanNeverBlank: wait for the first render.
+    QTRY_VERIFY_WITH_TIMEOUT((mPlot->replot(), mg->hasRenderedRange()), 10000);
 
     for (int p = 0; p < 20; ++p)
     {

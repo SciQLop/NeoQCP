@@ -248,10 +248,12 @@ void TestBusyIndicator::fullLifecycleExternalBusy()
     g->setData(std::vector<double>{1.0, 2.0, 3.0, 4.0, 5.0}, std::vector<double>{10.0, 20.0, 15.0, 25.0, 30.0});
     g->setBusy(false);
 
-    // 4. Visual should stay busy for hide delay
+    // 4. Visual stays busy until the data is shown. On a plot that has already
+    // drawn, the new data waits for the plot's swap window
+    // (QCustomPlot::requestDataSwap), and pending data counts as busy.
     QCOMPARE(g->visuallyBusy(), true);
-    QTest::qWait(100);
-    QCOMPARE(g->visuallyBusy(), false);
+    QTRY_VERIFY_WITH_TIMEOUT(!g->visuallyBusy(), 2000);
+    QVERIFY(!g->hasPendingData());
     QCOMPARE(visualSpy.count(), 2);
 }
 
