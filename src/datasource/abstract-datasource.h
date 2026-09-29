@@ -73,6 +73,10 @@ bool visitRawColumn(const QCPRawColumn& col, F&& f)
     }
 }
 
+namespace qcp::algo {
+constexpr double kDefaultGapThreshold = 1.5;
+}
+
 // Non-templated abstract base class for all data sources.
 // QCPGraph2 holds a pointer to this; virtual dispatch happens once per render.
 class QCPAbstractDataSource {
@@ -143,4 +147,12 @@ public:
     virtual QVector<QPointF> getLines(
         int begin, int end,
         QCPAxis* keyAxis, QCPAxis* valueAxis) const = 0;
+
+    // A key step larger than gapThreshold() times the smaller neighbouring step
+    // breaks the line. 0 turns gap detection off.
+    void setGapThreshold(double threshold) { mGapThreshold = threshold; }
+    [[nodiscard]] double gapThreshold() const { return mGapThreshold; }
+
+private:
+    double mGapThreshold = qcp::algo::kDefaultGapThreshold;
 };

@@ -77,6 +77,10 @@ private slots:
     void multiGraphSmallDataNoResampling();
     void multiGraphLargeDataL1L2();
     void multiGraphLineCacheRebuiltOnZoom();
+    void graph2GapThresholdZeroDrawsIrregularSteps();
+    void multiGraphGapThresholdZeroDrawsIrregularSteps();
+    void graph2GapThresholdReachesResampledSource();
+    void multiGraphGapThresholdReachesResampledSource();
     void multiGraphPendingSourceCommitsAfterZoomTriggeredRefetch();
     void multiGraphMultipleRapidLegitimateSupersessionsCommitLast();
     void multiGraphThresholdScalesWithColumnCount();

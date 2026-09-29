@@ -178,6 +178,37 @@ void TestDataSource::algoOptimizedLineData()
     // Tested in integration with QCPGraph2 (needs axis objects)
 }
 
+namespace
+{
+std::vector<int> gapIndices(const qcp::algo::GapVector& gaps)
+{
+    std::vector<int> out;
+    for (int i = 0; i < gaps.size(); ++i)
+        if (gaps[i])
+            out.push_back(i);
+    return out;
+}
+
+int nanBreaks(const QVector<QPointF>& lines)
+{
+    return static_cast<int>(std::count_if(lines.begin(), lines.end(), [](const QPointF& p) {
+        return std::isnan(p.x()) || std::isnan(p.y());
+    }));
+}
+}
+
+void TestDataSource::algoGapsIgnoreRepeatedKeys()
+{
+    // Issue SciQLopPlots#118: two samples at the same key (a vertical edge)
+    // made the zero step the reference, so every later step was a gap.
+    std::vector<double> edges = {0, 0, 1, 1, 5, 5};
+    QCOMPARE(gapIndices(qcp::algo::detectKeyGaps(edges, 0, 6)), std::vector<int>{});
+
+    // A real gap next to a repeated key is still found from the other neighbour.
+    std::vector<double> gapAfterEdge = {0, 1, 1, 2, 20, 21};
+    QCOMPARE(gapIndices(qcp::algo::detectKeyGaps(gapAfterEdge, 0, 6)), std::vector<int>{4});
+}
+
 void TestDataSource::soaOwningVector()
 {
     std::vector<double> keys = {1.0, 2.0, 3.0};
@@ -246,6 +277,22 @@ void TestDataSource::soaIntValues()
     QCOMPARE(src.size(), 3);
     QCOMPARE(src.valueAt(0), 100.0);
     QCOMPARE(src.valueAt(2), 300.0);
+}
+
+void TestDataSource::soaGapThresholdZeroDisablesGaps()
+{
+    // Issue SciQLopPlots#118: irregular state changes must be drawable as one line.
+    mPlot = new QCustomPlot();
+    mPlot->xAxis->setRange(0, 12);
+    QCPSoADataSource<std::vector<double>, std::vector<double>> src(
+        std::vector<double>{0, 1, 5, 6, 12}, std::vector<double>{1, 0, 1, 0, 0});
+
+    QVERIFY(nanBreaks(src.getLines(0, 5, mPlot->xAxis, mPlot->yAxis)) > 0);
+
+    src.setGapThreshold(0);
+    QCOMPARE(src.gapThreshold(), 0.0);
+    QCOMPARE(nanBreaks(src.getLines(0, 5, mPlot->xAxis, mPlot->yAxis)), 0);
+    QCOMPARE(nanBreaks(src.getOptimizedLineData(0, 5, 400, mPlot->xAxis, mPlot->yAxis)), 0);
 }
 
 void TestDataSource::soaMismatchedLengthsDegradeToEmpty()

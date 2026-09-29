@@ -18,6 +18,7 @@ private slots:
     void algoValueRangeRestrictionMatchesBruteForce();
     void algoLinesToPixels();
     void algoOptimizedLineData();
+    void algoGapsIgnoreRepeatedKeys();
 
     // SoA data source tests
     void soaOwningVector();
@@ -26,6 +27,7 @@ private slots:
     void soaRangeQueries();
     void soaIntValues();
     void soaMismatchedLengthsDegradeToEmpty();
+    void soaGapThresholdZeroDisablesGaps();
 
     // QCPGraph2 integration tests
     void graph2Creation();

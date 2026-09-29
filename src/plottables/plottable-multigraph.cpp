@@ -376,6 +376,14 @@ void QCPMultiGraph::setAdaptiveSampling(bool enabled)
     invalidateLines();
 }
 
+void QCPMultiGraph::setGapThreshold(double threshold)
+{
+    if (mGapThreshold == threshold)
+        return;
+    mGapThreshold = threshold;
+    invalidateLines();
+}
+
 void QCPMultiGraph::invalidateLines()
 {
     mLineCacheDirty = true;
@@ -940,7 +948,7 @@ void QCPMultiGraph::draw(QCPPainter* painter)
     // Data source priority: L2 (viewport-optimized) > raw
     // When L1 exists but L2 is null (sparse enough to draw directly), use raw source.
     // Note: L2 rebuild is deferred until we know fresh lines are needed (below).
-    const QCPAbstractMultiDataSource* ds = nullptr;
+    QCPAbstractMultiDataSource* ds = nullptr;
     if (mL2Result)
         ds = mL2Result.get();
     else if (!mNeedsResampling || mL1Cache
@@ -986,6 +994,9 @@ void QCPMultiGraph::draw(QCPPainter* painter)
         else if (mL1Cache)
             ds = mDataSource.get();
     }
+
+    // Sources are replaced on every data update: the graph's setting is applied at draw time.
+    ds->setGapThreshold(mGapThreshold);
 
     const bool coloured = mColor.hasValues() && (ds == mDataSource.get() || mL2HasOrigin);
 

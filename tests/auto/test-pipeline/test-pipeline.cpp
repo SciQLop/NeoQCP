@@ -2596,3 +2596,110 @@ void TestPipeline::colormap2ResultSurvivesNullViewport()
     QVERIFY2(pipeline.result() != nullptr,
              "Null transform result must not erase previous valid pipeline result");
 }
+
+namespace {
+// Irregular state changes (SciQLopPlots#118): with the default threshold the
+// steps 1 -> 5 and 6 -> 12 are gaps; with 0 the whole trace is one line.
+const std::vector<double> kIrregularKeys = {0, 1, 5, 6, 12};
+const std::vector<double> kStateValues = {1, 0, 1, 0, 0};
+
+int nanBreaks(const QVector<QPointF>& lines)
+{
+    return static_cast<int>(std::count_if(lines.begin(), lines.end(), [](const QPointF& p) {
+        return std::isnan(p.x()) || std::isnan(p.y());
+    }));
+}
+}
+
+void TestPipeline::graph2GapThresholdZeroDrawsIrregularSteps()
+{
+    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    g->setLineStyle(QCPGraph2::lsStepLeft);
+    g->setData(kIrregularKeys, kStateValues);
+    mPlot->xAxis->setRange(0, 12);
+    mPlot->yAxis->setRange(-1, 2);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(nanBreaks(g->mCachedLines) > 0);
+
+    g->setGapThreshold(0);
+    QCOMPARE(g->gapThreshold(), 0.0);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCOMPARE(nanBreaks(g->mCachedLines), 0);
+}
+
+void TestPipeline::multiGraphGapThresholdZeroDrawsIrregularSteps()
+{
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    g->setLineStyle(QCPMultiGraph::lsStepLeft);
+    g->setDataSource(std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
+        kIrregularKeys, std::vector<std::vector<double>>{kStateValues}));
+    mPlot->xAxis->setRange(0, 12);
+    mPlot->yAxis->setRange(-1, 2);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCOMPARE(g->mCachedLines.size(), 1);
+    QVERIFY(nanBreaks(g->mCachedLines[0]) > 0);
+
+    g->setGapThreshold(0);
+    QCOMPARE(g->gapThreshold(), 0.0);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCOMPARE(nanBreaks(g->mCachedLines[0]), 0);
+}
+
+namespace {
+// Big enough to be drawn from the resampled (L2) source, with a hole as wide as
+// the data in the middle of the keys.
+constexpr int kHoleN = 400'000;
+
+std::vector<double> keysWithHole()
+{
+    std::vector<double> keys(kHoleN);
+    for (int i = 0; i < kHoleN; ++i)
+        keys[i] = i < kHoleN / 2 ? i : i + kHoleN;
+    return keys;
+}
+
+std::vector<double> sineValues()
+{
+    std::vector<double> values(kHoleN);
+    for (int i = 0; i < kHoleN; ++i)
+        values[i] = std::sin(i * 1e-3);
+    return values;
+}
+}
+
+void TestPipeline::graph2GapThresholdReachesResampledSource()
+{
+    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
+    mPlot->xAxis->setRange(0, 2 * kHoleN);
+    mPlot->yAxis->setRange(-1, 1);
+    g->setData(keysWithHole(), sineValues());
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(g->mL2Result);
+    QVERIFY(nanBreaks(g->mCachedLines) > 0);
+
+    g->setGapThreshold(0);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCOMPARE(nanBreaks(g->mCachedLines), 0);
+}
+
+void TestPipeline::multiGraphGapThresholdReachesResampledSource()
+{
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    QSignalSpy spy(&g->pipeline(), &QCPMultiGraphPipeline::finished);
+    mPlot->xAxis->setRange(0, 2 * kHoleN);
+    mPlot->yAxis->setRange(-1, 1);
+    g->setDataSource(std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
+        keysWithHole(), std::vector<std::vector<double>>{sineValues()}));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(g->mL2Result);
+    QVERIFY(nanBreaks(g->mCachedLines[0]) > 0);
+
+    g->setGapThreshold(0);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCOMPARE(nanBreaks(g->mCachedLines[0]), 0);
+}

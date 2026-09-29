@@ -99,6 +99,17 @@ public:
         mCachedLines.clear();
     }
 
+    // Gap detection on the line (see QCPAbstractDataSource::setGapThreshold); 0 turns it off.
+    [[nodiscard]] double gapThreshold() const { return mGapThreshold; }
+    void setGapThreshold(double threshold)
+    {
+        if (mGapThreshold == threshold)
+            return;
+        mGapThreshold = threshold;
+        mLineCacheDirty = true;
+        mCachedLines.clear();
+    }
+
     // QCPPlottableInterface1D
     [[nodiscard]] int dataCount() const override;
     [[nodiscard]] double dataMainKey(int index) const override;
@@ -179,6 +190,7 @@ private:
     int mScatterSkip = 0;
     int mScatterMaxPoints = 100'000;
     bool mAdaptiveSampling = true;
+    double mGapThreshold = qcp::algo::kDefaultGapThreshold;
 
     // Color axis: normalized [0,1] per-point color values + pre-rendered 1D gradient
     std::vector<float> mScatterColorValues;

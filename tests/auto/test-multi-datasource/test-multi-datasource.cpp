@@ -3,6 +3,9 @@
 #include "datasource/soa-multi-datasource.h"
 #include "datasource/row-major-multi-datasource.h"
 #include "datasource/resampled-multi-datasource.h"
+#include "plottables/plottable-waterfall.h"
+#include <algorithm>
+#include <cmath>
 #include <vector>
 #include <limits>
 #include <span>
@@ -762,4 +765,31 @@ void TestMultiDataSource::rowMajorFloatBinsLikeSoaDouble()
                 QCOMPARE(got.values[i], want.values[i]);
         }
     }
+}
+
+void TestMultiDataSource::genericIndexedFallbackHonoursGapThreshold()
+{
+    // The waterfall adapter has no indexed overrides: it runs the base-class
+    // fallbacks, which must honour the threshold too (SciQLopPlots#118).
+    mPlot->xAxis->setRange(0, 12);
+    mPlot->yAxis->setRange(-1, 2);
+    auto irregular = std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
+        std::vector<double>{0, 1, 5, 6, 12}, std::vector<std::vector<double>>{{1, 0, 1, 0, 0}});
+    QCPWaterfallDataAdapter adapter(irregular, {0.0}, {1.0}, 1.0);
+    QVector<int> indices;
+    const auto hasBreak = [](const QVector<QPointF>& pts) {
+        return std::any_of(pts.begin(), pts.end(),
+                           [](const QPointF& p) { return std::isnan(p.x()) || std::isnan(p.y()); });
+    };
+    const auto lines = [&] {
+        return adapter.getLinesIndexed(0, 0, 5, mPlot->xAxis, mPlot->yAxis, indices);
+    };
+    const auto optimized = [&] {
+        return adapter.getOptimizedLineDataIndexed(0, 0, 5, 400, mPlot->xAxis, mPlot->yAxis, indices);
+    };
+    QVERIFY(hasBreak(lines()) && hasBreak(optimized()));
+
+    adapter.setGapThreshold(0);
+    QVERIFY(!hasBreak(lines()));
+    QVERIFY(!hasBreak(optimized()));
 }

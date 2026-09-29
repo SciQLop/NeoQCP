@@ -58,4 +58,12 @@ public:
 
     virtual const double* rawKeyData() const { return nullptr; }
     virtual QCPRawColumn rawColumn(int /*column*/) const { return {}; }
+
+    // A key step larger than gapThreshold() times the smaller neighbouring step
+    // breaks the lines. 0 turns gap detection off.
+    void setGapThreshold(double threshold) { mGapThreshold = threshold; }
+    [[nodiscard]] double gapThreshold() const { return mGapThreshold; }
+
+private:
+    double mGapThreshold = qcp::algo::kDefaultGapThreshold;
 };

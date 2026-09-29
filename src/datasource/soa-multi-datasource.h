@@ -85,7 +85,7 @@ public:
         Q_ASSERT(column >= 0 && column < columnCount());
         ensureGapCache(begin, end);
         return qcp::algo::linesToPixels(mKeys, mValues[column], begin, end, keyAxis, valueAxis,
-                                         qcp::algo::kDefaultGapThreshold, &mGapCache.gaps);
+                                         gapThreshold(), &mGapCache.gaps);
     }
 
     QVector<QPointF> getLinesIndexed(int column, int begin, int end,
@@ -95,7 +95,7 @@ public:
         Q_ASSERT(column >= 0 && column < columnCount());
         ensureGapCache(begin, end);
         return qcp::algo::linesToPixelsIndexed(mKeys, mValues[column], begin, end, keyAxis, valueAxis,
-                                               sourceIndices, qcp::algo::kDefaultGapThreshold,
+                                               sourceIndices, gapThreshold(),
                                                &mGapCache.gaps);
     }
 
@@ -142,16 +142,11 @@ public:
 private:
     void ensureGapCache(int begin, int end) const
     {
-        if (mGapCache.begin != begin || mGapCache.end != end)
-        {
-            mGapCache.begin = begin;
-            mGapCache.end = end;
-            mGapCache.gaps = qcp::algo::detectKeyGaps(mKeys, begin, end);
-        }
+        mGapCache.update(mKeys, begin, end, gapThreshold());
     }
 
     KeyContainer mKeys;
     std::vector<ValueContainer> mValues;
     std::shared_ptr<const void> mDataGuard;
-    mutable struct { int begin = -1; int end = -1; qcp::algo::GapVector gaps; } mGapCache;
+    mutable qcp::algo::GapCache mGapCache;
 };

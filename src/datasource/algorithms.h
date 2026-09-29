@@ -10,8 +10,6 @@
 
 namespace qcp::algo {
 
-constexpr double kDefaultGapThreshold = 1.5;
-
 struct GapVector {
     std::vector<uint8_t> data;
     bool hasAnyGap = false;
@@ -30,19 +28,44 @@ GapVector detectKeyGaps(const KC& keys, int begin, int end,
     GapVector gapBefore(count);
     if (count < 3 || threshold <= 0) return gapBefore;
 
+    constexpr double noReference = std::numeric_limits<double>::max();
+    const auto step = [&](int i) {
+        return static_cast<double>(keys[begin + i + 1]) - static_cast<double>(keys[begin + i]);
+    };
+    // A repeated key (zero step) draws a vertical edge: it says nothing about the sampling.
+    const auto reference = [&](int i) { return step(i) > 0 ? step(i) : noReference; };
+
     for (int i = 0; i < count - 1; ++i)
     {
-        double dx = static_cast<double>(keys[begin + i + 1]) - static_cast<double>(keys[begin + i]);
-        double refDx = std::numeric_limits<double>::max();
+        double refDx = noReference;
         if (i > 0)
-            refDx = std::min(refDx, static_cast<double>(keys[begin + i]) - static_cast<double>(keys[begin + i - 1]));
+            refDx = std::min(refDx, reference(i - 1));
         if (i + 2 < count)
-            refDx = std::min(refDx, static_cast<double>(keys[begin + i + 2]) - static_cast<double>(keys[begin + i + 1]));
-        if (refDx < std::numeric_limits<double>::max() && dx > threshold * refDx)
+            refDx = std::min(refDx, reference(i + 1));
+        if (refDx < noReference && step(i) > threshold * refDx)
             gapBefore.setGap(i + 1);
     }
     return gapBefore;
 }
+
+// The gaps of keys[begin, end), recomputed only when the range or the threshold changes.
+struct GapCache {
+    int begin = -1;
+    int end = -1;
+    double threshold = -1;
+    GapVector gaps;
+
+    template <IndexableNumericRange KC>
+    void update(const KC& keys, int newBegin, int newEnd, double newThreshold)
+    {
+        if (begin == newBegin && end == newEnd && threshold == newThreshold)
+            return;
+        begin = newBegin;
+        end = newEnd;
+        threshold = newThreshold;
+        gaps = detectKeyGaps(keys, begin, end, threshold);
+    }
+};
 
 template <IndexableNumericRange KC>
 int findBegin(const KC& keys, double sortKey, bool expandedRange = true)

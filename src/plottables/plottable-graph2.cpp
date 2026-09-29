@@ -476,7 +476,7 @@ void QCPGraph2::draw(QCPPainter* painter)
     // When L1 exists but L2 is null (sparse enough to draw directly), use raw source.
     // Scatter-only (lsNone): always use raw data — min/max binning destroys 2D distributions.
     const bool scatterOnly = (mLineStyle == lsNone);
-    const QCPAbstractDataSource* ds = nullptr;
+    QCPAbstractDataSource* ds = nullptr;
     if (mL2Result && !scatterOnly)
         ds = mL2Result.get();
     else if (scatterOnly || !mNeedsResampling || mL1Cache
@@ -488,6 +488,8 @@ void QCPGraph2::draw(QCPPainter* painter)
 
     if (!ds || ds->empty())
         return;
+    // Sources are replaced on every data update: the graph's setting is applied at draw time.
+    ds->setGapThreshold(mGapThreshold);
 
     PROFILE_PASS_VALUE(ds->size());
 

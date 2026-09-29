@@ -62,7 +62,8 @@ QVector<QPointF> QCPWaterfallDataAdapter::getLines(int column, int begin, int en
         keys[i - begin] = mSource->keyAt(i);
         vals[i - begin] = transform(column, mSource->valueAt(column, i));
     }
-    return qcp::algo::linesToPixels(keys, vals, 0, end - begin, keyAxis, valueAxis);
+    return qcp::algo::linesToPixels(keys, vals, 0, end - begin, keyAxis, valueAxis,
+                                    gapThreshold());
 }
 
 QVector<QPointF> QCPWaterfallDataAdapter::getOptimizedLineData(int column, int begin, int end,
@@ -77,8 +78,9 @@ QVector<QPointF> QCPWaterfallDataAdapter::getOptimizedLineData(int column, int b
         keys[i - begin] = mSource->keyAt(i);
         vals[i - begin] = transform(column, mSource->valueAt(column, i));
     }
+    const auto gaps = qcp::algo::detectKeyGaps(keys, 0, end - begin, gapThreshold());
     return qcp::algo::optimizedLineData(keys, vals, 0, end - begin, pixelWidth,
-                                         keyAxis, valueAxis);
+                                         keyAxis, valueAxis, &gaps);
 }
 
 // --- QCPWaterfallGraph ---

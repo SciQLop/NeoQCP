@@ -98,6 +98,9 @@ public:
     void setComponentLineStyle(int index, LineStyle style);
     [[nodiscard]] bool adaptiveSampling() const { return mAdaptiveSampling; }
     void setAdaptiveSampling(bool enabled);
+    // Gap detection on the lines (see QCPAbstractMultiDataSource::setGapThreshold); 0 turns it off.
+    [[nodiscard]] double gapThreshold() const { return mGapThreshold; }
+    void setGapThreshold(double threshold);
     [[nodiscard]] int scatterSkip() const { return mScatterSkip; }
     void setScatterSkip(int skip) { mScatterSkip = qMax(0, skip); }
 
@@ -174,6 +177,7 @@ protected:
     mutable QVector<QCPDataSelection> mLastRectSelections; // per-component selections from selectTestRect
     LineStyle mLineStyle = lsLine;
     bool mAdaptiveSampling = true;
+    double mGapThreshold = qcp::algo::kDefaultGapThreshold;
     int mScatterSkip = 0;
     QCPMultiGraphPipeline mPipeline;
     std::shared_ptr<qcp::algo::MultiGraphResamplerCache> mL1Cache;

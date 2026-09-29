@@ -53,6 +53,7 @@ private slots:
     void l2MultiMultiColumnConsistency();
     void l2MultiSparseReturnNull();
     void l2MultiEmptyInput();
+    void genericIndexedFallbackHonoursGapThreshold();
 
 private:
     QCustomPlot* mPlot = nullptr;

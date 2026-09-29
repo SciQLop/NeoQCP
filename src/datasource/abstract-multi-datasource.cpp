@@ -35,7 +35,7 @@ QVector<QPointF> QCPAbstractMultiDataSource::getLinesIndexed(
     if (end <= begin) { sourceIndices.clear(); return {}; }
     ColumnWindow w(*this, column, begin, end);
     auto pts = qcp::algo::linesToPixelsIndexed(w.keys, w.values, 0, end - begin,
-                                               keyAxis, valueAxis, sourceIndices);
+                                               keyAxis, valueAxis, sourceIndices, gapThreshold());
     shiftIndices(sourceIndices, begin);
     return pts;
 }
@@ -46,8 +46,9 @@ QVector<QPointF> QCPAbstractMultiDataSource::getOptimizedLineDataIndexed(
 {
     if (end <= begin) { sourceIndices.clear(); return {}; }
     ColumnWindow w(*this, column, begin, end);
+    const auto gaps = qcp::algo::detectKeyGaps(w.keys, 0, end - begin, gapThreshold());
     auto pts = qcp::algo::optimizedLineDataIndexed(w.keys, w.values, 0, end - begin, pixelWidth,
-                                                   keyAxis, valueAxis, sourceIndices);
+                                                   keyAxis, valueAxis, sourceIndices, &gaps);
     shiftIndices(sourceIndices, begin);
     return pts;
 }

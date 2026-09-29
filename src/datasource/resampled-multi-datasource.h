@@ -198,16 +198,11 @@ public:
 private:
     void ensureGapCache(int begin, int end) const
     {
-        if (mGapCache.begin != begin || mGapCache.end != end)
-        {
-            mGapCache.begin = begin;
-            mGapCache.end = end;
-            mGapCache.gaps = qcp::algo::detectKeyGaps(mBins.keys, begin, end);
-        }
+        mGapCache.update(mBins.keys, begin, end, gapThreshold());
     }
 
     qcp::algo::MultiColumnBinResult mBins;
-    mutable struct { int begin = -1; int end = -1; qcp::algo::GapVector gaps; } mGapCache;
+    mutable qcp::algo::GapCache mGapCache;
 };
 
 namespace qcp::algo {
