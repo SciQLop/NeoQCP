@@ -4,6 +4,7 @@
 #include "layoutelements/layoutelement-legend-group.h"
 #include <vector>
 #include <span>
+#include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
 
 void TestMultiGraph::init()
 {

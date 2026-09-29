@@ -1,6 +1,7 @@
 #include "test-scatter-rhi.h"
 #include "../../../src/qcp.h"
 #include "../../../src/painting/scatter-rhi-layer.h"
+#include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
 
 void TestScatterRhi::init()
 {
