@@ -21,6 +21,12 @@
 ----------------------------------------------------------------------------*/
 #pragma once
 
+// A host can route these zones to its own tracer: its "neoqcp-profiling-hook" meson dependency
+// defines NEOQCP_PROFILING_HOOK as a header that defines the PROFILE_* macros it wants.
+#ifdef NEOQCP_PROFILING_HOOK
+#  include NEOQCP_PROFILING_HOOK
+#endif
+
 // Macros are guarded with #ifndef so that consumers (e.g. SciQLopPlots) can
 // provide their own definitions without colliding when both headers end up in
 // the same translation unit via transitive includes.

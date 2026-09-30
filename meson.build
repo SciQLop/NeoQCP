@@ -203,6 +203,9 @@ embedded_shaders = custom_target('embedded_shaders',
               'scatter_colored_vert_qsb_data:@INPUT9@',
               'scatter_colored_frag_qsb_data:@INPUT10@'])
 
+# Overridden by a host (meson.override_dependency) that wants NeoQCP's zones in its own tracer.
+profiling_hook_dep = dependency('neoqcp-profiling-hook', required: false)
+
 NeoQCP = static_library('NeoQCP',
            'src/axis/labelrenderer.cpp',
            'src/colorgradient.cpp',
@@ -288,7 +291,7 @@ NeoQCP = static_library('NeoQCP',
            neoqcp_moc_files,
            include_directories: NEOQCP_INCLUDE_DIR,
            cpp_args:cpp_args,
-           dependencies: [qtdeps] + optional_deps + latex_deps,
+           dependencies: [qtdeps, profiling_hook_dep] + optional_deps + latex_deps,
            install: true,
            extra_files: [neoqcp_moc_headers, 'src/Profiling.hpp', 'src/painting/paintbuffer-rhi.h', 'src/painting/plottable-rhi-layer.h', 'src/painting/span-rhi-layer.h', 'src/painting/colormap-rhi-layer.h', 'src/painting/grid-rhi-layer.h', 'src/painting/scatter-rhi-layer.h']
            )
@@ -297,7 +300,7 @@ NeoQCP = static_library('NeoQCP',
 
 NeoQCP_dep = declare_dependency(link_with: NeoQCP,
                                 include_directories: NEOQCP_INCLUDE_DIR,
-                                dependencies: [qtdeps] + optional_deps,
+                                dependencies: [qtdeps, profiling_hook_dep] + optional_deps,
                                 compile_args: cpp_args)
 
 if get_option ( 'with_examples')
