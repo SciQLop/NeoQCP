@@ -325,7 +325,7 @@ void TestColorByScalar::l2OriginComposesThroughL1AndCompacts()
     vp.keyRange = mPlot->xAxis->range();
     vp.valueRange = mPlot->yAxis->range();
     vp.plotWidthPx = 100;   // 400 L2 bins, far fewer than the visible L1 rows
-    const auto l2 = qcp::algo::resampleL2Multi(*l1, vp);
+    const auto l2 = qcp::algo::resampleL2Multi(*l1, vp, *src);
     QVERIFY(l2);
     // The hole leaves L1 bins whose values are NaN; L2 skips NaN rows, so the ~40 L2 bins
     // covering only the hole receive no data and are compacted away (720 rows, not 800).

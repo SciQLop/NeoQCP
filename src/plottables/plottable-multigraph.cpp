@@ -261,7 +261,7 @@ void QCPMultiGraph::onL1Ready(uint64_t generation)
 void QCPMultiGraph::rebuildL2(const ViewportParams& vp)
 {
     if (!mL1Cache) return;
-    mL2Result = qcp::algo::resampleL2Multi(*mL1Cache, vp);
+    mL2Result = qcp::algo::resampleL2Multi(*mL1Cache, vp, *mDataSource);
     mL2HasOrigin = mL2Result && !mL1Cache->level1.origin.empty();
 }
 
@@ -1007,11 +1007,9 @@ void QCPMultiGraph::draw(QCPPainter* painter)
 
     if (needFreshLines)
     {
-        // Expand data range by 100% on each side so GPU-translated pans
-        // don't expose uncovered edges before the rebuild threshold triggers.
-        const double margin = keyRange.size() * 1.0;
-        int cacheBegin = ds->findBegin(keyRange.lower - margin);
-        int cacheEnd = ds->findEnd(keyRange.upper + margin);
+        const QCPRange cacheRange = qcp::algo::lineCacheKeyRange(keyRange);
+        int cacheBegin = ds->findBegin(cacheRange.lower);
+        int cacheEnd = ds->findEnd(cacheRange.upper);
 
         // The pending source may carry more columns than the displayed one
         // (mComponents was already synced to it) — clamp so a mid-window

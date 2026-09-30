@@ -465,6 +465,46 @@ constexpr int kLevel1TargetBins = 100'000;
 constexpr int kResampleThreshold = 100'000;
 constexpr int kLevel2PixelMultiplier = 4;
 
+// The keys a graph's line cache covers: one view width on each side, so a GPU-translated pan
+// does not expose uncovered edges before the lines are rebuilt.
+inline QCPRange lineCacheKeyRange(const QCPRange& view)
+{
+    return {view.lower - view.size(), view.upper + view.size()};
+}
+
+inline int l2BinCount(const ViewportParams& vp)
+{
+    const int bins = vp.plotWidthPx * kLevel2PixelMultiplier;
+    return bins > 0 ? bins : 3200;
+}
+
+// Decided from the raw rows the line cache would hold, not from L1 bins: L1 bins are equal-width
+// over the whole data, so with bursty data a single one can hide thousands of raw rows.
+template <typename Source>
+inline bool fewEnoughToDrawRaw(const Source& raw, const ViewportParams& vp)
+{
+    const QCPRange scan = lineCacheKeyRange(vp.keyRange);
+    return raw.findEnd(scan.upper) - raw.findBegin(scan.lower) <= l2BinCount(vp);
+}
+
+// One L1 min/max pair per pixel is all a min/max envelope needs; coarser, L2 must bin raw rows.
+inline bool l1ResolvesViewport(int l1RowsInView, const ViewportParams& vp)
+{
+    const int pixels = l2BinCount(vp) / kLevel2PixelMultiplier;
+    return l1RowsInView >= 2 * pixels;
+}
+
+struct RowRange {
+    int begin;
+    int end;
+};
+
+template <typename Source>
+inline RowRange rawRowsInView(const Source& raw, const QCPRange& keyRange)
+{
+    return {raw.findBegin(keyRange.lower, false), raw.findEnd(keyRange.upper, false)};
+}
+
 // L1 build only — heavy, meant for async pipeline.
 // Returns the L1 cache via the std::any, result is nullptr (L2 is done synchronously).
 inline std::shared_ptr<QCPAbstractDataSource> buildL1Cache(
@@ -498,32 +538,26 @@ inline std::shared_ptr<QCPAbstractDataSource> buildL1Cache(
     return nullptr;
 }
 
-// L2 viewport resampling — fast, runs synchronously on the main thread.
-// Takes a shared L1 cache (read-only) and the current viewport.
+// L2 viewport resampling — runs synchronously on the main thread.
+// Returns nullptr when the raw rows are few enough to draw directly.
+// simplify: when L1 is too coarse for the view, the raw rows in view are binned here on the GUI
+// thread, O(rows in plotWidthPx L1 bins). Upgrade path: build that L2 in the async pipeline.
 inline std::shared_ptr<QCPAbstractDataSource> resampleL2(
     const GraphResamplerCache& l1Cache,
-    const ViewportParams& vp)
+    const ViewportParams& vp,
+    const QCPAbstractDataSource& raw)
 {
     PROFILE_HERE_N("resampleL2");
-    if (vp.keyLogScale)
-        return nullptr;
-
-    int l2Bins = vp.plotWidthPx * kLevel2PixelMultiplier;
-    if (l2Bins <= 0) l2Bins = 3200;
-
     const auto& l1 = l1Cache.level1;
-    int l1Size = static_cast<int>(l1.keys.size());
-    if (l1Size == 0) return nullptr;
-
-    auto [l1Begin, l1End] = l1ViewportBounds(l1.keys, l1Size, vp.keyRange);
-    if (l1End <= l1Begin)
+    if (vp.keyLogScale || l1.keys.empty() || fewEnoughToDrawRaw(raw, vp))
         return nullptr;
 
-    // Skip L2 binning when visible points are sparse enough to draw directly
-    if (l1End - l1Begin <= l2Bins)
-        return nullptr;
-
-    auto l2 = binMinMax(l1.keys, l1.values, l1Begin, l1End, vp.keyRange, l2Bins);
+    const int l2Bins = l2BinCount(vp);
+    const auto [l1Begin, l1End] = l1ViewportBounds(l1.keys, static_cast<int>(l1.keys.size()), vp.keyRange);
+    const auto rows = rawRowsInView(raw, vp.keyRange);
+    auto l2 = l1ResolvesViewport(l1End - l1Begin, vp)
+        ? binMinMax(l1.keys, l1.values, l1Begin, l1End, vp.keyRange, l2Bins)
+        : binMinMaxParallel(raw, rows.begin, rows.end, vp.keyRange, l2Bins);
 
     std::vector<double> outKeys, outVals;
     outKeys.reserve(l2.keys.size());
@@ -537,8 +571,7 @@ inline std::shared_ptr<QCPAbstractDataSource> resampleL2(
         }
     }
 
-    if (outKeys.empty()) return nullptr;
-
+    // Empty, not nullptr, when nothing is in view: nullptr would make the graph draw raw rows.
     return std::make_shared<QCPSoADataSource<
         std::vector<double>, std::vector<double>>>(
         std::move(outKeys), std::move(outVals));

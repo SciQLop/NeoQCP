@@ -179,7 +179,7 @@ static void scenarioL2Resampling(int iters)
     QElapsedTimer timer;
     timer.start();
     for (int i = 0; i < iters; ++i) {
-        auto l2 = qcp::algo::resampleL2Multi(*l1Cache, vp);
+        auto l2 = qcp::algo::resampleL2Multi(*l1Cache, vp, *src);
         if (!l2) abort();
     }
     double ms = timer.nsecsElapsed() / 1e6;

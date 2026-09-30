@@ -53,6 +53,7 @@ private slots:
     // Graph resampler
     void graphResamplerBinMinMax();
     void graphResamplerLevel1AndLevel2();
+    void graphResamplerL2BinsRawPointsInsideBurst();
     void graphResamplerCacheReuse();
     void graphResamplerNaNSkipped();
     void graphResamplerEmptyBinsProduceNaN();

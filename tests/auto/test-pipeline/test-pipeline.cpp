@@ -34,7 +34,7 @@ std::shared_ptr<QCPAbstractDataSource> hierarchicalResample(
     qcp::algo::buildL1Cache(src, vp, cache);
     auto* c = std::any_cast<qcp::algo::GraphResamplerCache>(&cache);
     if (!c) return nullptr;
-    return qcp::algo::resampleL2(*c, vp);
+    return qcp::algo::resampleL2(*c, vp, src);
 }
 } // namespace
 
@@ -904,6 +904,36 @@ void TestPipeline::graphResamplerLevel1AndLevel2()
         QVERIFY2(l2.keys[i] >= viewport.lower - 1 && l2.keys[i] <= viewport.upper + 1,
             qPrintable(QString("L2 key[%1]=%2 outside viewport").arg(i).arg(l2.keys[i])));
     }
+}
+
+void TestPipeline::graphResamplerL2BinsRawPointsInsideBurst()
+{
+    // A sample every 10 s over 48 h plus a 20 s burst of 25 samples per ms: the burst holds
+    // 500k raw points but only ~6 L1 bins, which used to make the graph draw them all raw.
+    std::vector<double> keys;
+    for (double t = 0; t < 48 * 3600.0; t += 10.0)
+        keys.push_back(t);
+    const double burst = 10 * 3600.0;
+    for (int ms = 0; ms < 20'000; ++ms)
+        keys.insert(keys.end(), 25, burst + ms * 1e-3);
+    std::sort(keys.begin(), keys.end());
+    std::vector<double> vals(keys.size());
+    for (std::size_t i = 0; i < keys.size(); ++i)
+        vals[i] = static_cast<double>(i % 1000);
+    QCPSoADataSource<std::vector<double>, std::vector<double>> src(std::move(keys), std::move(vals));
+
+    ViewportParams vp;
+    vp.keyRange = QCPRange(burst, burst + 20.0);
+    vp.plotWidthPx = 1000;
+    std::any cache;
+    const auto l2 = hierarchicalResample(src, vp, cache);
+    QVERIFY(l2 != nullptr);
+    QVERIFY2(l2->size() > 1000, "L2 resolution must come from the raw points, not ~6 L1 bins");
+    bool found = false;
+    const auto range = l2->valueRange(found);
+    QVERIFY(found);
+    QCOMPARE(range.lower, 0.0);
+    QCOMPARE(range.upper, 999.0);
 }
 
 void TestPipeline::graphResamplerCacheReuse()
@@ -1900,7 +1930,7 @@ void TestPipeline::multiGraphL1AndL2()
     ViewportParams vp;
     vp.keyRange = QCPRange(0, N - 1); // ~5000 visible points
     vp.plotWidthPx = 200;              // l2Bins = 800; 5000 > 800 ⇒ L2 path
-    auto l2 = qcp::algo::resampleL2Multi(*c, vp);
+    auto l2 = qcp::algo::resampleL2Multi(*c, vp, *src);
     QVERIFY(l2 != nullptr);
     QCOMPARE(l2->columnCount(), 2);
     QVERIFY(l2->size() > 0);

@@ -55,6 +55,11 @@ private slots:
     void l2MultiEmptyInput();
     void genericIndexedFallbackHonoursGapThreshold();
 
+    // L2 decides from raw points, not L1 bins (bursty data)
+    void l2MultiBinsRawPointsInsideBurst();
+    void l2MultiCountsBurstInLineCacheMargin();
+    void l2MultiFewRawPointsReturnNull();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };

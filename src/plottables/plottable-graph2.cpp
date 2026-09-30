@@ -241,7 +241,7 @@ void QCPGraph2::rebuildL2(const ViewportParams& vp)
         mL2Result.reset(); // L2 not supported for log scale — fall back to raw data
         return;
     }
-    mL2Result = qcp::algo::resampleL2(*mL1Cache, vp);
+    mL2Result = qcp::algo::resampleL2(*mL1Cache, vp, *mDataSource);
 }
 
 // --- QCPPlottableInterface1D ---
@@ -537,11 +537,9 @@ void QCPGraph2::draw(QCPPainter* painter)
         }
         else
         {
-            // Expand data range by 100% on each side so GPU-translated pans
-            // don't expose uncovered edges before the rebuild threshold triggers.
-            const double margin = keyRange.size() * 1.0;
-            cacheBegin = ds->findBegin(keyRange.lower - margin);
-            cacheEnd = ds->findEnd(keyRange.upper + margin);
+            const QCPRange cacheRange = qcp::algo::lineCacheKeyRange(keyRange);
+            cacheBegin = ds->findBegin(cacheRange.lower);
+            cacheEnd = ds->findEnd(cacheRange.upper);
         }
 
         const bool hasColorAxis = !mScatterColorValues.empty();

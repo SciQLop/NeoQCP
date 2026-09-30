@@ -212,27 +212,11 @@ namespace detail {
 template <bool WithOrigin>
 inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2MultiImpl(
     const MultiGraphResamplerCache& l1Cache,
-    const ViewportParams& vp)
+    const ViewportParams& vp,
+    int l1Begin, int l1End)
 {
-    PROFILE_HERE_N("resampleL2Multi");
-    if (vp.keyLogScale)
-        return nullptr;
-
-    int l2Bins = vp.plotWidthPx * kLevel2PixelMultiplier;
-    if (l2Bins <= 0) l2Bins = 3200;
-
+    const int l2Bins = l2BinCount(vp);
     const auto& l1 = l1Cache.level1;
-    int l1Size = static_cast<int>(l1.keys.size());
-    if (l1Size == 0 || l1.numColumns == 0) return nullptr;
-
-    auto [l1Begin, l1End] = l1ViewportBounds(l1.keys, l1Size, vp.keyRange);
-    if (l1End <= l1Begin)
-        return nullptr;
-
-    // Skip L2 binning when visible points are sparse enough to draw directly
-    if (l1End - l1Begin <= l2Bins)
-        return nullptr;
-
     int N = l1.numColumns;
     int l1Stride = l1.stride();
 
@@ -321,7 +305,6 @@ inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2MultiImpl(
         }
         outSize += 2;
     }
-    if (outSize == 0) return nullptr;
 
     l2.keys.resize(outSize);
     // Compact column data: shift each column's data to final stride.
@@ -337,14 +320,71 @@ inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2MultiImpl(
     return std::make_shared<QCPResampledMultiDataSource>(std::move(l2));
 }
 
+// Keeps the bins some column has data in; keys, values and origin stay aligned.
+inline MultiColumnBinResult dropEmptyBins(const MultiColumnBinResult& in)
+{
+    const int s = in.stride();
+    const int N = in.numColumns;
+    auto populated = [&](int slot) {
+        for (int c = 0; c < N; ++c)
+            if (!std::isnan(in.values[c * s + slot]) || !std::isnan(in.values[c * s + slot + 1]))
+                return true;
+        return false;
+    };
+    std::vector<int> kept;
+    for (int slot = 0; slot < s; slot += 2)
+        if (populated(slot))
+            kept.push_back(slot);
+
+    MultiColumnBinResult out;
+    out.numColumns = N;
+    const int k = static_cast<int>(kept.size()) * 2;
+    out.keys.resize(k);
+    out.values.resize(N * k);
+    if (!in.origin.empty()) out.origin.resize(N * k);
+    for (int j = 0; j < k; ++j)
+    {
+        const int from = kept[j / 2] + j % 2;
+        out.keys[j] = in.keys[from];
+        for (int c = 0; c < N; ++c)
+        {
+            out.values[c * k + j] = in.values[c * s + from];
+            if (!in.origin.empty()) out.origin[c * k + j] = in.origin[c * s + from];
+        }
+    }
+    return out;
+}
+
+inline std::shared_ptr<QCPResampledMultiDataSource> binRawViewport(
+    const QCPAbstractMultiDataSource& raw, const ViewportParams& vp, bool withOrigin)
+{
+    const auto rows = rawRowsInView(raw, vp.keyRange);
+    return std::make_shared<QCPResampledMultiDataSource>(dropEmptyBins(binMinMaxMultiParallel(
+        raw, rows.begin, rows.end, vp.keyRange, l2BinCount(vp), withOrigin)));
+}
+
 } // namespace detail
 
+// Returns nullptr when the raw rows are few enough to draw directly, and an empty source (not
+// nullptr, which would make the graph draw raw rows) when nothing is in view.
+// simplify: when L1 is too coarse for the view, the raw rows in view are binned here on the GUI
+// thread, O(rows in plotWidthPx L1 bins). Upgrade path: build that L2 in the async pipeline.
 inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2Multi(
     const MultiGraphResamplerCache& l1Cache,
-    const ViewportParams& vp)
+    const ViewportParams& vp,
+    const QCPAbstractMultiDataSource& raw)
 {
-    return l1Cache.level1.origin.empty() ? detail::resampleL2MultiImpl<false>(l1Cache, vp)
-                                         : detail::resampleL2MultiImpl<true>(l1Cache, vp);
+    PROFILE_HERE_N("resampleL2Multi");
+    const auto& l1 = l1Cache.level1;
+    if (vp.keyLogScale || l1.keys.empty() || l1.numColumns == 0 || fewEnoughToDrawRaw(raw, vp))
+        return nullptr;
+
+    const bool withOrigin = !l1.origin.empty();
+    const auto [l1Begin, l1End] = l1ViewportBounds(l1.keys, l1.stride(), vp.keyRange);
+    if (!l1ResolvesViewport(l1End - l1Begin, vp))
+        return detail::binRawViewport(raw, vp, withOrigin);
+    return withOrigin ? detail::resampleL2MultiImpl<true>(l1Cache, vp, l1Begin, l1End)
+                      : detail::resampleL2MultiImpl<false>(l1Cache, vp, l1Begin, l1End);
 }
 
 } // namespace qcp::algo

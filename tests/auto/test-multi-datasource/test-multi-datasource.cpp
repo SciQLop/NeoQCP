@@ -558,6 +558,13 @@ static qcp::algo::MultiGraphResamplerCache makeL1Cache(
     return cache;
 }
 
+// The raw source behind a hand-built L1 cache: same rows, so L1 and raw agree.
+static QCPSoAMultiDataSource<std::vector<double>, std::vector<double>> sourceOf(
+    const std::vector<double>& keys, const std::vector<std::vector<double>>& columns)
+{
+    return {keys, columns};
+}
+
 void TestMultiDataSource::l2MultiBasicMinMax()
 {
     // 10000 uniform points in [0, 100), 1 column with values = key * 2.
@@ -578,7 +585,7 @@ void TestMultiDataSource::l2MultiBasicMinMax()
     ViewportParams vp;
     vp.keyRange = QCPRange(0, 100);
     vp.plotWidthPx = 10; // l2Bins = 40
-    auto result = qcp::algo::resampleL2Multi(cache, vp);
+    auto result = qcp::algo::resampleL2Multi(cache, vp, sourceOf(keys, {vals}));
     QVERIFY(result != nullptr);
     QCOMPARE(result->columnCount(), 1);
     QVERIFY(result->size() > 0);
@@ -613,7 +620,7 @@ void TestMultiDataSource::l2MultiNanSkipped()
     ViewportParams vp;
     vp.keyRange = QCPRange(0, 100);
     vp.plotWidthPx = 10;
-    auto result = qcp::algo::resampleL2Multi(cache, vp);
+    auto result = qcp::algo::resampleL2Multi(cache, vp, sourceOf(keys, {vals}));
     QVERIFY(result != nullptr);
 
     // All output values should be exactly 5.0 (min and max of non-NaN data)
@@ -642,7 +649,7 @@ void TestMultiDataSource::l2MultiMultiColumnConsistency()
     ViewportParams vp;
     vp.keyRange = QCPRange(0, 100);
     vp.plotWidthPx = 10;
-    auto result = qcp::algo::resampleL2Multi(cache, vp);
+    auto result = qcp::algo::resampleL2Multi(cache, vp, sourceOf(keys, {col0, col1}));
     QVERIFY(result != nullptr);
     QCOMPARE(result->columnCount(), 2);
 
@@ -666,7 +673,7 @@ void TestMultiDataSource::l2MultiSparseReturnNull()
     ViewportParams vp;
     vp.keyRange = QCPRange(0, 4);
     vp.plotWidthPx = 100; // l2Bins = 400 >> 3 points
-    auto result = qcp::algo::resampleL2Multi(cache, vp);
+    auto result = qcp::algo::resampleL2Multi(cache, vp, sourceOf(keys, {vals}));
     QVERIFY(result == nullptr);
 }
 
@@ -677,7 +684,7 @@ void TestMultiDataSource::l2MultiEmptyInput()
     ViewportParams vp;
     vp.keyRange = QCPRange(0, 100);
     vp.plotWidthPx = 100;
-    auto result = qcp::algo::resampleL2Multi(cache, vp);
+    auto result = qcp::algo::resampleL2Multi(cache, vp, sourceOf({}, {}));
     QVERIFY(result == nullptr);
 }
 
@@ -792,4 +799,86 @@ void TestMultiDataSource::genericIndexedFallbackHonoursGapThreshold()
     adapter.setGapThreshold(0);
     QVERIFY(!hasBreak(lines()));
     QVERIFY(!hasBreak(optimized()));
+}
+
+namespace {
+
+using BurstySource = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
+
+constexpr double kBaselineSpan = 48 * 3600.0;
+constexpr double kBurstStart = 10 * 3600.0;
+constexpr double kBurstSeconds = 20.0;
+
+// A sample every 10 s over 48 h, plus a 20 s burst of 25 samples per ms sharing each
+// timestamp: the L1 bins (48 h / ~52k bins = 3.3 s each) hide ~80k raw points apiece there.
+std::shared_ptr<BurstySource> burstySource()
+{
+    std::vector<double> keys;
+    for (double t = 0; t < kBaselineSpan; t += 10.0)
+        keys.push_back(t);
+    for (int ms = 0; ms < kBurstSeconds * 1000; ++ms)
+        keys.insert(keys.end(), 25, kBurstStart + ms * 1e-3);
+    std::sort(keys.begin(), keys.end());
+    std::vector<double> values(keys.size());
+    for (std::size_t i = 0; i < keys.size(); ++i)
+        values[i] = static_cast<double>(i % 1000);
+    return std::make_shared<BurstySource>(std::move(keys), std::vector<std::vector<double>>{std::move(values)});
+}
+
+qcp::algo::MultiGraphResamplerCache l1Of(const QCPAbstractMultiDataSource& src)
+{
+    std::any cache;
+    qcp::algo::buildL1CacheMulti(src, ViewportParams{}, cache);
+    return std::any_cast<qcp::algo::MultiGraphResamplerCache>(cache);
+}
+
+ViewportParams viewport(double lo, double hi)
+{
+    ViewportParams vp;
+    vp.keyRange = QCPRange(lo, hi);
+    vp.plotWidthPx = 1000; // l2Bins = 4000
+    return vp;
+}
+
+} // namespace
+
+void TestMultiDataSource::l2MultiBinsRawPointsInsideBurst()
+{
+    // 500k raw points in view but only ~6 L1 bins: judging sparsity from L1 made the
+    // graph draw every raw point on the GUI thread, each frame.
+    const auto src = burstySource();
+    const auto l1 = l1Of(*src);
+    const auto vp = viewport(kBurstStart, kBurstStart + kBurstSeconds);
+
+    const auto l2 = qcp::algo::resampleL2Multi(l1, vp, *src);
+    QVERIFY(l2 != nullptr);
+    QVERIFY2(l2->size() > 1000, "L2 resolution must come from the raw points, not ~6 L1 bins");
+    QVERIFY(l2->size() <= 2 * 4000);
+    bool found = false;
+    const auto range = l2->valueRange(0, found);
+    QVERIFY(found);
+    QCOMPARE(range.lower, 0.0);
+    QCOMPARE(range.upper, 999.0);
+}
+
+void TestMultiDataSource::l2MultiCountsBurstInLineCacheMargin()
+{
+    // The view holds one raw point, but the line cache also covers one view width on each
+    // side, and the burst sits there: drawing raw would still scan the whole burst.
+    const auto src = burstySource();
+    const auto l1 = l1Of(*src);
+    const auto vp = viewport(kBurstStart - 10.0, kBurstStart);
+
+    QVERIFY(qcp::algo::resampleL2Multi(l1, vp, *src) != nullptr);
+}
+
+void TestMultiDataSource::l2MultiFewRawPointsReturnNull()
+{
+    // 2 h of baseline: ~2200 L1 bins in view (more than l2Bins entries), yet only ~2200 raw
+    // points in the line-cache range, so the raw data is cheaper and exact.
+    const auto src = burstySource();
+    const auto l1 = l1Of(*src);
+    const auto vp = viewport(30 * 3600.0, 32 * 3600.0);
+
+    QVERIFY(qcp::algo::resampleL2Multi(l1, vp, *src) == nullptr);
 }
