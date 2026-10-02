@@ -17,6 +17,14 @@ private slots:
     void renameKeepsTheIndex();
     void laneAtInvertsLaneBand();
 
+    void invalidColumnsAreReported();
+    void groupByLaneSortsEachLane();
+    void visibleRowsIncludesLongBarsStartingBeforeRange();
+    void pixelBarsAreAtLeastOnePixelWide();
+    void overlappingSameCategoryBarsMerge();
+    void quadIsTwoTriangles();
+    void millionIntervalsScanQuickly();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };
