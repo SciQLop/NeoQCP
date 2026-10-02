@@ -33,6 +33,10 @@ private slots:
     void barsRebuildOnlyWhenTheViewChanges();
     void stripPlacementIsTranslucent();
 
+    void labelIsDrawnOnlyWhenItFits();
+    void stripDrawsLaneNamesOnce();
+    void barsAndLabelsShowOnTheGpu();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };

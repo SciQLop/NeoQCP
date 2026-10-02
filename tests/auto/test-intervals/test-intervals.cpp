@@ -4,6 +4,7 @@
 #include "plottables/intervals-algo.h"
 #include "plottables/plottable-intervals.h"
 #include <QElapsedTimer>
+#include <QtWidgets/qtestsupport_widgets.h>
 #include <numeric>
 
 void TestIntervals::init()
@@ -293,4 +294,63 @@ void TestIntervals::stripPlacementIsTranslucent()
     twoBars(mPlot, &layout);
     const QColor c = pixelAt(mPlot->toPixmap(400, 300).toImage(), mPlot, 25, 7);
     QVERIFY2(c.red() > 150 && c.green() > 40, qPrintable(c.name())); // red blended with white
+}
+
+void TestIntervals::labelIsDrawnOnlyWhenItFits()
+{
+    QCPLaneLayout layout;
+    layout.setPlacement(QCPLaneLayout::plLanes);
+    layout.setLaneHeight(20);
+    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto c = columns({ 0, 99.5 }, { 60, 99.6 }, { layout.laneIndex("A"), 0 });
+    c.labels = QStringList { "wide label", "narrow label" };
+    iv->setData(std::move(c));
+    iv->setCategoryColors({ Qt::white });
+    mPlot->xAxis->setRange(0, 100);
+    mPlot->toPixmap(400, 300);
+    QCOMPARE(iv->mLabelRects.size(), std::size_t { 1 });
+    QCOMPARE(iv->mLabelRects[0].second, 0);
+}
+
+void TestIntervals::stripDrawsLaneNamesOnce()
+{
+    QCPLaneLayout layout;
+    auto* first = twoBars(mPlot, &layout);
+    auto* second = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    QVERIFY(first->drawsLaneNames());
+    QVERIFY(!second->drawsLaneNames());
+    layout.setPlacement(QCPLaneLayout::plLanes);
+    QVERIFY(!first->drawsLaneNames());
+}
+
+void TestIntervals::barsAndLabelsShowOnTheGpu()
+{
+    // Widened from the 400px default (used by every other test here): at 400px the bar's
+    // axis-rect width (~367px in this environment's font) is narrower than the 34-char
+    // label's advance (~379px), so the fits-check in appendLabelRect correctly suppresses
+    // it — exactly the rule under test in labelIsDrawnOnlyWhenItFits. This test needs the
+    // label to actually fit so it can prove it renders above the GPU bars.
+    mPlot->resize(500, 300);
+    mPlot->show();
+    if (!QTest::qWaitForWindowExposed(mPlot))
+        QSKIP("window not exposed in this environment");
+    QCoreApplication::processEvents();
+    if (!mPlot->rhi())
+        QSKIP("no QRhi available in this environment");
+    QCPLaneLayout layout;
+    layout.setPlacement(QCPLaneLayout::plLanes);
+    layout.setLaneHeight(24);
+    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto c = columns({ 0 }, { 100 }, { layout.laneIndex("A") });
+    c.labels = QStringList { "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW" };
+    iv->setData(std::move(c));
+    iv->setCategoryColors({ Qt::red });
+    mPlot->xAxis->setRange(0, 100);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const QImage frame = mPlot->grabFramebuffer();
+    QVERIFY(isRedish(pixelAt(frame, mPlot, 5, 12)));
+    int nonRed = 0;
+    for (double key = 20; key < 80; key += 0.5)
+        nonRed += isRedish(pixelAt(frame, mPlot, key, 12)) ? 0 : 1;
+    QVERIFY2(nonRed > 5, "label text is hidden under the GPU bars");
 }

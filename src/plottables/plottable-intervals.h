@@ -45,6 +45,10 @@ protected:
     void rebuildBarsIfNeeded();
     void rebuildBars();
     void appendLaneBars(int lane, const QCPLaneBand& band);
+    void appendLabelRect(const qcp::intervals::PixelBar& bar);
+    void drawLabels(QCPPainter* painter) const;
+    void drawLaneNames(QCPPainter* painter) const;
+    [[nodiscard]] bool drawsLaneNames() const;
     [[nodiscard]] std::array<float, 4> rgba(int category) const;
     [[nodiscard]] double fillOpacity() const;
     bool drawBarsOnGpu(QCPPainter* painter);
@@ -56,10 +60,18 @@ protected:
     QVector<QColor> mCategoryColors;
     std::vector<qcp::intervals::PixelBar> mBars;
     std::vector<float> mVertices;
+    std::vector<std::pair<QRectF, int>> mLabelRects;
     std::optional<BuildKey> mBuiltFor;
     quint64 mDataGeneration = 0;
     quint64 mColorGeneration = 0;
     quint64 mBuildCount = 0;
+
+    // The GPU bar path renders its vertex quads after its own layer's painter
+    // output is composited (see QCustomPlot::render), so text drawn by
+    // QCPIntervals::draw() on the same layer would end up underneath the bars.
+    // This layerable lives one layer above and draws the labels/lane names instead.
+    class LabelLayer;
+    LabelLayer* mLabelLayer = nullptr;
 
     friend class TestIntervals;
 };

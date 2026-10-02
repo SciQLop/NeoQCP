@@ -5,13 +5,65 @@
 #include "../painting/rhi-utils.h"
 #include "../axis/axis.h"
 #include "../layoutelements/layoutelement-axisrect.h"
+#include <QFontMetricsF>
 #include <algorithm>
 #include <stdexcept>
+
+// Draws the owning QCPIntervals' bar labels and lane names. Lives one layer above
+// the plottable's own layer so its painter-drawn text composites after (i.e. on top
+// of) the GPU-rendered bars; see the comment on QCPIntervals::mLabelLayer.
+class QCPIntervals::LabelLayer : public QCPLayerable
+{
+public:
+    LabelLayer(QCustomPlot* plot, QCPIntervals* owner, QCPLayer* layer)
+        : QCPLayerable(plot), mOwner(owner)
+    {
+        setLayer(layer);
+        setParentLayerable(owner);
+        setParent(owner);
+    }
+
+protected:
+    void applyDefaultAntialiasingHint(QCPPainter* painter) const override
+    {
+        painter->setAntialiasing(true);
+    }
+
+    void draw(QCPPainter* painter) override
+    {
+        mOwner->drawLabels(painter);
+        if (mOwner->drawsLaneNames())
+            mOwner->drawLaneNames(painter);
+    }
+
+private:
+    QCPIntervals* mOwner;
+};
+
+namespace {
+QCPLayer* layerAbove(QCustomPlot* plot, QCPLayer* base)
+{
+    const QString name = base->name() + QLatin1String(".intervals-labels");
+    if (auto* existing = plot->layer(name))
+        return existing;
+    if (!plot->addLayer(name, base, QCustomPlot::limAbove))
+        return base;
+    auto* created = plot->layer(name);
+    // Its own paint buffer, not merged with the (logically adjacent) base layer's:
+    // the compositor draws each buffer's texture once, attributed to whichever layer
+    // reaches it first. Sharing with base would make the label text composite at
+    // base's position in the draw order, i.e. before base's GPU bar quads, right
+    // back under them.
+    created->setMode(QCPLayer::lmBuffered);
+    return created;
+}
+} // namespace
 
 QCPIntervals::QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* layout)
         : QCPAbstractPlottable(keyAxis, valueAxis), mLayout(layout)
 {
     connect(layout, &QCPLaneLayout::changed, this, [this] { regroupIfLanesWereAdded(); });
+    mLabelLayer = new LabelLayer(mParentPlot, this, layerAbove(mParentPlot, layer()));
 }
 
 void QCPIntervals::setData(qcp::intervals::Columns columns)
@@ -97,6 +149,7 @@ void QCPIntervals::rebuildBars()
 {
     ++mBuildCount;
     mBars.clear();
+    mLabelRects.clear();
     const QRect rect = mKeyAxis->axisRect()->rect();
     for (int lane = 0; lane < static_cast<int>(mLanes.size()); ++lane)
         if (const auto band = mLayout->laneBand(lane, rect))
@@ -123,12 +176,23 @@ void QCPIntervals::appendLaneBars(int lane, const QCPLaneBand& band)
         const int row = rows.rows[i];
         if (mColumns.stop[row] < range.lower)
             continue;
-        qcp::intervals::appendMerged(
-            mBars, qcp::intervals::toPixelBar(mKeyAxis->coordToPixel(mColumns.start[row]),
-                                              mKeyAxis->coordToPixel(mColumns.stop[row]),
-                                              band.top + 1, band.bottom - 1,
-                                              mColumns.category[row], row));
+        const auto bar = qcp::intervals::toPixelBar(mKeyAxis->coordToPixel(mColumns.start[row]),
+                                                    mKeyAxis->coordToPixel(mColumns.stop[row]),
+                                                    band.top + 1, band.bottom - 1,
+                                                    mColumns.category[row], row);
+        appendLabelRect(bar);
+        qcp::intervals::appendMerged(mBars, bar);
     }
+}
+
+void QCPIntervals::appendLabelRect(const qcp::intervals::PixelBar& bar)
+{
+    if (mColumns.labels.isEmpty() || bar.instant)
+        return;
+    const QString& text = mColumns.labels[bar.row];
+    const QRectF rect(QPointF(bar.x0, bar.y0), QPointF(bar.x1, bar.y1));
+    if (!text.isEmpty() && QFontMetricsF(mParentPlot->font()).horizontalAdvance(text) + 4 <= rect.width())
+        mLabelRects.emplace_back(rect, bar.row);
 }
 
 double QCPIntervals::fillOpacity() const
@@ -156,6 +220,35 @@ bool QCPIntervals::drawBarsOnGpu(QCPPainter* painter)
         layer->addPlottable(mVertices, {}, clipRect(), mParentPlot->bufferDevicePixelRatio(),
                             mParentPlot->rhiOutputSize().height());
     return true;
+}
+
+void QCPIntervals::drawLabels(QCPPainter* painter) const
+{
+    painter->setPen(mKeyAxis->tickLabelColor());
+    for (const auto& [rect, row] : mLabelRects)
+        painter->drawText(rect, Qt::AlignCenter, mColumns.labels[row]);
+}
+
+bool QCPIntervals::drawsLaneNames() const
+{
+    if (!mLayout || mLayout->placement() != QCPLaneLayout::plStrip)
+        return false;
+    for (int i = 0; i < mParentPlot->plottableCount(); ++i)
+        if (auto* other = qobject_cast<QCPIntervals*>(mParentPlot->plottable(i));
+            other && other->laneLayout() == mLayout)
+            return other == this;
+    return false;
+}
+
+void QCPIntervals::drawLaneNames(QCPPainter* painter) const
+{
+    const QRect rect = mKeyAxis->axisRect()->rect();
+    painter->setPen(mKeyAxis->tickLabelColor());
+    const QStringList names = mLayout->laneNames();
+    for (int lane = 0; lane < names.size(); ++lane)
+        if (const auto band = mLayout->laneBand(lane, rect))
+            painter->drawText(QRectF(rect.left() + 3, band->top, rect.width() / 3.0, band->bottom - band->top),
+                              Qt::AlignVCenter | Qt::AlignLeft, names[lane]);
 }
 
 void QCPIntervals::drawBarsWithPainter(QCPPainter* painter) const
