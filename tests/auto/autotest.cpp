@@ -43,11 +43,23 @@ static bool shouldRun(const char* name)
     return only.isEmpty() || only == name;
 }
 
+// QCP_TEST_LOG_DIR also writes each class's results to <dir>/<class>.txt: QtTest output never
+// shows on GitHub's Windows runners, so CI prints these files instead.
+static QStringList testArguments(const char* name)
+{
+    QStringList args { QStringLiteral("auto-tests") };
+    const QString dir = qEnvironmentVariable("QCP_TEST_LOG_DIR");
+    if (!dir.isEmpty())
+        args << QStringLiteral("-o") << QStringLiteral("%1/%2.txt,txt").arg(dir, QLatin1String(name))
+             << QStringLiteral("-o") << QStringLiteral("-,txt");
+    return args;
+}
+
 #define QCPTEST(t)                                                                                 \
     if (shouldRun(#t))                                                                             \
     {                                                                                              \
         t t##instance;                                                                             \
-        failures += QTest::qExec(&t##instance);                                                    \
+        failures += QTest::qExec(&t##instance, testArguments(#t));                                 \
     }
 
 int main(int argc, char **argv)

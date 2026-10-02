@@ -111,5 +111,22 @@ jobs:
           meson setup --buildtype debugoptimized build
           meson compile -C build
       - name: Test
+        shell: bash
+        env:
+          QCP_TEST_LOG_DIR: ${{ github.workspace }}/testlogs
         run: |
+          mkdir -p "$QCP_TEST_LOG_DIR"
           meson test -v --no-rebuild -C build
+      # QtTest output never shows on the Windows runners; print each failing class's log.
+      - name: Show failing test classes
+        if: failure()
+        shell: bash
+        run: |
+          for f in "$GITHUB_WORKSPACE"/testlogs/*.txt; do
+            if grep -q "^FAIL!" "$f"; then
+              echo "::group::$(basename "$f")"
+              cat "$f"
+              echo "::endgroup::"
+            fi
+          done
+          grep -h "^Totals:" "$GITHUB_WORKSPACE"/testlogs/*.txt || true

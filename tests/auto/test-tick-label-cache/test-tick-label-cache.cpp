@@ -49,6 +49,25 @@ void forEachAxis(LivePlot* plot, const std::function<void(QCPAxis*)>& f)
         f(axis);
 }
 
+// Where two pictures differ (device pixels), to tell a stale label from a layout shift.
+QString describeDifference(const QImage& a, const QImage& b)
+{
+    if (a.size() != b.size())
+        return QString("sizes %1x%2 vs %3x%4").arg(a.width()).arg(a.height()).arg(b.width()).arg(b.height());
+    QRect where;
+    int count = 0;
+    for (int y = 0; y < a.height(); ++y)
+        for (int x = 0; x < a.width(); ++x)
+            if (a.pixel(x, y) != b.pixel(x, y))
+            {
+                ++count;
+                where |= QRect(x, y, 1, 1);
+            }
+    return QString("%1 pixels differ in %2,%3 %4x%5 of %6x%7")
+        .arg(count).arg(where.x()).arg(where.y()).arg(where.width()).arg(where.height())
+        .arg(a.width()).arg(a.height());
+}
+
 /*
   A plot whose cache saw the state before \a change and one that never did must show the
   same picture, to the bit: both draw every label from a cached pixmap, so any difference
@@ -69,7 +88,8 @@ void checkNoStaleLabel(const Step& before, const Step& change, const QString& wh
     change(&cold);
     const QImage fromColdCache = cold.live(true);
 
-    QVERIFY2(fromWarmCache == fromColdCache, qPrintable(what + ": stale cached tick label"));
+    QVERIFY2(fromWarmCache == fromColdCache,
+             qPrintable(what + ": stale cached tick label, " + describeDifference(fromWarmCache, fromColdCache)));
 }
 
 struct Ink
