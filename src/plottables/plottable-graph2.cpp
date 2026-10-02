@@ -597,7 +597,8 @@ void QCPGraph2::draw(QCPPainter* painter)
 
         // Only compute step-transform when the extrusion cache needs rebuilding —
         // on cache-hit pan frames, drawPolylineCached ignores pts entirely.
-        const bool needStyledLines = needFreshLines || mExtrusionCache.isEmpty();
+        const bool needStyledLines = qcp::needsReextrusion(
+            mExtrusionCache, needFreshLines, drawPen, mParentPlot->bufferDevicePixelRatio());
         switch (mLineStyle)
         {
             case lsNone:

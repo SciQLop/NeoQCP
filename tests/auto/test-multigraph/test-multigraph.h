@@ -68,6 +68,9 @@ private slots:
     void componentLineStyleChangeIsDrawnOnTheGpu();
     void setLineStyleAppliesToEveryComponent();
     void newComponentsTakeTheGraphLineStyle();
+    void plainReextrusionOnPenChangeNotPan();
+    void selectedStepLineKeepsItsSteps();
+    void selectedStepGraph2KeepsItsSteps();
 
 private:
     QCustomPlot* mPlot = nullptr;

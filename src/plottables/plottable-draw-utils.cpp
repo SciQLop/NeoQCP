@@ -32,6 +32,21 @@ void drawPolylineSplitNaN(QCPPainter* painter, const QVector<QPointF>& pts)
 
 namespace qcp {
 
+float extrusionPenWidth(const QPen& pen, double devicePixelRatio)
+{
+    return (pen.isCosmetic() || qFuzzyIsNull(pen.widthF()))
+        ? static_cast<float>(1.0 / devicePixelRatio)
+        : qMax(1.0f, static_cast<float>(pen.widthF()));
+}
+
+bool needsReextrusion(const ExtrusionCache& cache, bool freshLines,
+                      const QPen& pen, double devicePixelRatio)
+{
+    return freshLines || cache.isEmpty()
+        || cache.penWidth != extrusionPenWidth(pen, devicePixelRatio)
+        || cache.penColor != pen.color().rgba();
+}
+
 void drawPolylineWithGpuFallback(QCPPainter* painter,
                                   QCustomPlot* parentPlot,
                                   QCPLayer* layer,
@@ -48,9 +63,7 @@ void drawPolylineWithGpuFallback(QCPPainter* painter,
         if (auto* prl = parentPlot->plottableRhiLayer(layer))
         {
             const double dpr = parentPlot->bufferDevicePixelRatio();
-            const float penWidth = (pen.isCosmetic() || qFuzzyIsNull(pen.widthF()))
-                ? static_cast<float>(1.0 / dpr)
-                : qMax(1.0f, static_cast<float>(pen.widthF()));
+            const float penWidth = extrusionPenWidth(pen, dpr);
             auto strokeVerts = QCPLineExtruder::extrudePolyline(pts, penWidth, pen.color());
             if (!strokeVerts.isEmpty())
             {
@@ -93,12 +106,9 @@ void drawPolylineCached(QCPPainter* painter,
         if (auto* prl = parentPlot->plottableRhiLayer(layer))
         {
             const double dpr = parentPlot->bufferDevicePixelRatio();
-            const float penWidth = (pen.isCosmetic() || qFuzzyIsNull(pen.widthF()))
-                ? static_cast<float>(1.0 / dpr)
-                : qMax(1.0f, static_cast<float>(pen.widthF()));
+            const float penWidth = extrusionPenWidth(pen, dpr);
 
-            if (freshLines || cache.isEmpty()
-                || cache.penWidth != penWidth || cache.penColor != pen.color().rgba())
+            if (needsReextrusion(cache, freshLines, pen, dpr))
             {
                 QCPLineExtruder::extrudePolyline(pts, penWidth, pen.color(), cache.vertices);
                 cache.penWidth = penWidth;

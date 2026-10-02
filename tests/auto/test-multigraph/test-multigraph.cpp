@@ -2,6 +2,7 @@
 #include "qcustomplot.h"
 #include "datasource/soa-multi-datasource.h"
 #include "layoutelements/layoutelement-legend-group.h"
+#include "plottables/plottable-draw-utils.h"
 #include <vector>
 #include <span>
 #include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
@@ -812,4 +813,78 @@ void TestMultiGraph::newComponentsTakeTheGraphLineStyle()
     mg->setData(std::vector<double>{0, 1}, std::vector<std::vector<double>>{{1, 1}, {2, 2}});
     QCOMPARE(mg->component(0).lineStyle, QCPMultiGraph::lsNone);
     QCOMPARE(mg->component(1).lineStyle, QCPMultiGraph::lsNone);
+}
+
+namespace {
+bool showWithRhi(QCustomPlot* plot)
+{
+    plot->show();
+    if (!QTest::qWaitForWindowExposed(plot))
+        return false;
+    QCoreApplication::processEvents();
+    return plot->rhi() != nullptr;
+}
+
+// A step-left line from (0,0) to (4,2) stays flat at y=0 through x=2;
+// a straight line would cross (2,1). Selected and plain pens are both red here.
+bool crossesTheDiagonal(QCustomPlot* plot)
+{
+    const QImage frame = plot->grabFramebuffer();
+    const double dpr = frame.devicePixelRatio();
+    const QColor c = frame.pixelColor(qRound(plot->xAxis->coordToPixel(2) * dpr),
+                                      qRound(plot->yAxis->coordToPixel(1) * dpr));
+    return c.red() > 150 && c.green() < 100 && c.blue() < 100;
+}
+} // namespace
+
+void TestMultiGraph::plainReextrusionOnPenChangeNotPan()
+{
+    const QPen pen(Qt::red, 2);
+    qcp::ExtrusionCache cache;
+    cache.vertices = {1, 2, 3, 4, 5, 6};
+    cache.penWidth = qcp::extrusionPenWidth(pen, 1.0);
+    cache.penColor = pen.color().rgba();
+    QVERIFY(!qcp::needsReextrusion(cache, false, pen, 1.0));                  // pan frame
+    QVERIFY(qcp::needsReextrusion(cache, true, pen, 1.0));                    // fresh lines
+    QVERIFY(qcp::needsReextrusion(cache, false, QPen(Qt::red, 3.5), 1.0));    // selected: wider
+    QVERIFY(qcp::needsReextrusion(cache, false, QPen(Qt::blue, 2), 1.0));     // selected: colour
+    cache.clear();
+    QVERIFY(qcp::needsReextrusion(cache, false, pen, 1.0));                   // empty
+}
+
+void TestMultiGraph::selectedStepLineKeepsItsSteps()
+{
+    if (!showWithRhi(mPlot))
+        QSKIP("no QRhi available in this environment");
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double>{0, 4}, std::vector<std::vector<double>>{{0, 2}});
+    mg->setComponentPens({QPen(Qt::red, 5)});
+    mg->setLineStyle(QCPMultiGraph::lsStepLeft);
+    mPlot->xAxis->setRange(-1, 5);
+    mPlot->yAxis->setRange(-1, 3);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(!crossesTheDiagonal(mPlot));
+
+    mg->setComponentSelection(0, QCPDataSelection(QCPDataRange(0, 2)));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY2(!crossesTheDiagonal(mPlot), "selected step line drawn as a straight line");
+}
+
+void TestMultiGraph::selectedStepGraph2KeepsItsSteps()
+{
+    if (!showWithRhi(mPlot))
+        QSKIP("no QRhi available in this environment");
+    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    g->setData(std::vector<double>{0, 4}, std::vector<double>{0, 2});
+    g->setPen(QPen(Qt::red, 5));
+    g->selectionDecorator()->setPen(QPen(QColor(220, 0, 0), 7));
+    g->setLineStyle(QCPGraph2::lsStepLeft);
+    mPlot->xAxis->setRange(-1, 5);
+    mPlot->yAxis->setRange(-1, 3);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(!crossesTheDiagonal(mPlot));
+
+    g->setSelection(QCPDataSelection(QCPDataRange(0, 2)));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY2(!crossesTheDiagonal(mPlot), "selected step line drawn as a straight line");
 }

@@ -1082,8 +1082,11 @@ void QCPMultiGraph::draw(QCPPainter* painter)
         // on cache-hit pan frames, drawPolylineCached ignores pts entirely.
         // A coloured component may re-extrude for reasons only drawColoredPolylineCached
         // knows (pen width, colour generation), so it always gets its styled points.
+        const QPen& activePen = comp.selection.isEmpty() ? comp.pen : comp.selectedPen;
         QVector<QPointF> styledLines;
-        const bool needStyledLines = needFreshLines || mExtrusionCaches[c].isEmpty() || dataIdx != nullptr;
+        const bool needStyledLines = dataIdx != nullptr
+            || qcp::needsReextrusion(mExtrusionCaches[c], needFreshLines, activePen,
+                                     mParentPlot->bufferDevicePixelRatio());
         if (needStyledLines && comp.lineStyle != lsNone && comp.lineStyle != lsLine) {
             switch (comp.lineStyle) {
                 case lsStepLeft:   styledLines = qcp::toStepLeftLines(dataLines, keyIsVertical); break;
@@ -1096,7 +1099,6 @@ void QCPMultiGraph::draw(QCPPainter* painter)
         const QVector<QPointF>& lines = styledLines.isEmpty() ? dataLines : styledLines;
 
         if (comp.lineStyle != lsNone) {
-            const QPen& activePen = comp.selection.isEmpty() ? comp.pen : comp.selectedPen;
             if (comp.lineStyle == lsImpulse) {
                 applyDefaultAntialiasingHint(painter);
                 QPen impulsePen = activePen;

@@ -40,6 +40,15 @@ void drawPolylineWithGpuFallback(QCPPainter* painter,
                                   const QPointF& gpuOffset,
                                   const QRect& clipRect);
 
+/// GPU stroke width for @a pen: cosmetic or zero-width pens are one device pixel.
+float extrusionPenWidth(const QPen& pen, double devicePixelRatio);
+
+/// A plain cache survives pans; it is rebuilt on fresh lines or any pen change
+/// (e.g. selection). Callers that pass pre-transformed points (steps) must pass them
+/// whenever this is true, since the cache is then re-extruded from those points.
+bool needsReextrusion(const ExtrusionCache& cache, bool freshLines,
+                      const QPen& pen, double devicePixelRatio);
+
 /// Same as above but with cached extrusion.
 /// When @a freshLines is true, re-extrudes and stores in @a cache.
 /// When false, translates cached vertices by gpuOffset.
