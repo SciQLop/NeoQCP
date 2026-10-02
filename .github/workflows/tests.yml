@@ -48,7 +48,8 @@ jobs:
         with:
           python-version: '3.13'
       - name: Install build tools
-        run: pip install aqtinstall meson ninja
+        # aqtinstall 3.3.0 cannot read the Qt 6.11 repository layout; master can (as in SciQLopPlots).
+        run: pip install "aqtinstall @ git+https://github.com/miurahr/aqtinstall.git@master" meson ninja
 
       - name: Cache Qt
         id: cache-qt
