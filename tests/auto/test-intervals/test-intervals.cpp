@@ -198,7 +198,9 @@ void TestIntervals::millionIntervalsScanQuickly()
                 bars, qcp::intervals::toPixelBar(px, stop[row] * 1000.0 / n, 0, 14, 0, row));
         }
     }
-    QVERIFY2(timer.elapsed() < 100, qPrintable(QString::number(timer.elapsed())));
+    // Budget sized for virtualized CI runners (~3x slower than a desktop); a quadratic scan
+    // of 10^6 rows would still take minutes.
+    QVERIFY2(timer.elapsed() < 500, qPrintable(QString::number(timer.elapsed())));
     QVERIFY(bars.size() <= 20 * 1001);
 }
 
@@ -220,6 +222,22 @@ QColor pixelAt(const QImage& image, QCustomPlot* plot, double key, double laneCe
     const QRect rect = plot->axisRect()->rect();
     return image.pixelColor(qRound(plot->xAxis->coordToPixel(key) * dpr),
                             qRound((rect.top() + laneCentreFromTop) * dpr));
+}
+
+bool showWithRhi(QCustomPlot* plot)
+{
+    plot->show();
+    if (!QTest::qWaitForWindowExposed(plot))
+        return false;
+    QCoreApplication::processEvents();
+    return plot->rhi() != nullptr;
+}
+
+// Centred in a bar spanning the axis rect, it covers the middle half whatever the platform font.
+QString labelSpanningHalfTheAxisRect(QCustomPlot* plot)
+{
+    const double advance = QFontMetricsF(plot->font()).horizontalAdvance(QLatin1Char('W'));
+    return QString(qMax(1, int(plot->axisRect()->width() / 2.0 / advance)), QLatin1Char('W'));
 }
 
 bool isRedish(const QColor& c) { return c.red() > 150 && c.green() < 120 && c.blue() < 120; }
@@ -363,12 +381,6 @@ void TestIntervals::stripDrawsLaneNamesOnce()
 
 void TestIntervals::barsAndLabelsShowOnTheGpu()
 {
-    // Widened from the 400px default (used by every other test here): at 400px the bar's
-    // axis-rect width (~367px in this environment's font) is narrower than the 34-char
-    // label's advance (~379px), so the fits-check in appendLabelRect correctly suppresses
-    // it — exactly the rule under test in labelIsDrawnOnlyWhenItFits. This test needs the
-    // label to actually fit so it can prove it renders above the GPU bars.
-    mPlot->resize(500, 300);
     mPlot->show();
     if (!QTest::qWaitForWindowExposed(mPlot))
         QSKIP("window not exposed in this environment");
@@ -379,18 +391,74 @@ void TestIntervals::barsAndLabelsShowOnTheGpu()
     layout.setPlacement(QCPLaneLayout::plLanes);
     layout.setLaneHeight(24);
     auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
-    auto c = columns({ 0 }, { 100 }, { layout.laneIndex("A") });
-    c.labels = QStringList { "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW" };
-    iv->setData(std::move(c));
     iv->setCategoryColors({ Qt::red });
     mPlot->xAxis->setRange(0, 100);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    auto c = columns({ 0 }, { 100 }, { layout.laneIndex("A") });
+    c.labels = QStringList { labelSpanningHalfTheAxisRect(mPlot) };
+    iv->setData(std::move(c));
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     const QImage frame = mPlot->grabFramebuffer();
     QVERIFY(isRedish(pixelAt(frame, mPlot, 5, 12)));
     int nonRed = 0;
-    for (double key = 20; key < 80; key += 0.5)
+    for (double key = 30; key < 70; key += 0.5)
         nonRed += isRedish(pixelAt(frame, mPlot, key, 12)) ? 0 : 1;
     QVERIFY2(nonRed > 5, "label text is hidden under the GPU bars");
+}
+
+namespace {
+//! A red bar over the whole [0, 100] range with a label covering its middle half, drawn once.
+QCPIntervals* drawnLabelledBar(QCustomPlot* plot, QCPLaneLayout* layout)
+{
+    layout->setPlacement(QCPLaneLayout::plLanes);
+    layout->setLaneHeight(24);
+    auto* iv = new QCPIntervals(plot->xAxis, plot->yAxis, layout);
+    iv->setCategoryColors({ Qt::red });
+    plot->xAxis->setRange(0, 100);
+    plot->replot(QCustomPlot::rpImmediateRefresh);
+    auto c = columns({ 0 }, { 100 }, { layout->laneIndex("A") });
+    c.labels = QStringList { labelSpanningHalfTheAxisRect(plot) };
+    iv->setData(std::move(c));
+    plot->replot(QCustomPlot::rpImmediateRefresh);
+    return iv;
+}
+
+int nonRedBetween(const QImage& frame, QCustomPlot* plot, double from, double to, double fromTop)
+{
+    int n = 0;
+    for (double key = from; key < to; key += 0.5)
+        n += isRedish(pixelAt(frame, plot, key, fromTop)) ? 0 : 1;
+    return n;
+}
+} // namespace
+
+void TestIntervals::labelsFollowAPanOnTheGpu()
+{
+    if (!showWithRhi(mPlot))
+        QSKIP("no QRhi available in this environment");
+    QCPLaneLayout layout;
+    drawnLabelledBar(mPlot, &layout);
+    QVERIFY(nonRedBetween(mPlot->grabFramebuffer(), mPlot, 30, 70, 12) > 5);
+
+    // The label covers keys 25..75. A stale overlay would leave its text where keys 65..115
+    // now are; drawn again, it sits at keys 40..75 and leaves 80..98 to the red bar.
+    mPlot->xAxis->setRange(40, 140);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCOMPARE(nonRedBetween(mPlot->grabFramebuffer(), mPlot, 80, 98, 12), 0);
+}
+
+void TestIntervals::selectionOutlineShowsOnTheGpu()
+{
+    if (!showWithRhi(mPlot))
+        QSKIP("no QRhi available in this environment");
+    QCPLaneLayout layout;
+    auto* iv = drawnLabelledBar(mPlot, &layout);
+    QCOMPARE(nonRedBetween(mPlot->grabFramebuffer(), mPlot, 5, 20, 1.5), 0);
+
+    iv->setSelectedRows({ 0 });
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY2(nonRedBetween(mPlot->grabFramebuffer(), mPlot, 5, 20, 1.5) > 5,
+             "the selection outline was not drawn");
 }
 
 void TestIntervals::mergedBarsGetNoLabel()

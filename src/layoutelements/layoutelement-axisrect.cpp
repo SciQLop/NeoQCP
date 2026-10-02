@@ -1418,6 +1418,10 @@ void QCPAxisRect::markAffectedLayersDirty()
         QCPAxis* key = p->keyAxis();
         QCPAxis* val = p->valueAxis();
         if ((key && key->axisRect() == this) || (val && val->axisRect() == this))
+        {
             markOnce(p->layer());
+            for (QCPLayer* dependent : p->dependentLayers())
+                markOnce(dependent);
+        }
     }
 }

@@ -168,6 +168,9 @@ public:
 
     // Offered each key press by QCustomPlot::keyPressEvent before item handling. Every
     // plottable sees the key; return true to consume it, which stops it reaching items.
+    // Layers whose content follows this plottable (an overlay drawn above it, say). The axis
+    // rect marks them dirty with the plottable's own layer whenever its range changes.
+    [[nodiscard]] virtual QList<QCPLayer*> dependentLayers() const { return {}; }
     virtual bool keyPress(QKeyEvent* event)
     {
         Q_UNUSED(event);

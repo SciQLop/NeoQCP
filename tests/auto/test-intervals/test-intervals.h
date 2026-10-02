@@ -37,6 +37,8 @@ private slots:
     void labelIsDrawnOnlyWhenItFits();
     void stripDrawsLaneNamesOnce();
     void barsAndLabelsShowOnTheGpu();
+    void labelsFollowAPanOnTheGpu();
+    void selectionOutlineShowsOnTheGpu();
     void mergedBarsGetNoLabel();
     void labelLayerFollowsThePlottablesLayer();
 

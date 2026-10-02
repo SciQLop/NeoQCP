@@ -67,7 +67,12 @@ QCPIntervals::QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* 
         : QCPAbstractPlottable(keyAxis, valueAxis), mLayout(layout)
 {
     setSelectable(QCP::stMultipleDataRanges);
-    connect(layout, &QCPLaneLayout::changed, this, [this] { regroupIfLanesWereAdded(); });
+    connect(layout, &QCPLaneLayout::changed, this, [this] {
+        regroupIfLanesWereAdded();
+        markLayersDirty();
+    });
+    connect(this, qOverload<const QCPDataSelection&>(&QCPAbstractPlottable::selectionChanged),
+            this, &QCPIntervals::markLayersDirty);
     mLabelLayer = new LabelLayer(mParentPlot, this, layerAbove(mParentPlot, layer()));
     // Keep the label layerable one layer above wherever this plottable itself moves to.
     connect(this, &QCPLayerable::layerChanged, this, [this](QCPLayer* newLayer) {
@@ -86,6 +91,7 @@ void QCPIntervals::setData(qcp::intervals::Columns columns)
     mColumns = std::move(columns);
     mLanes = qcp::intervals::groupByLane(mColumns, mLayout ? mLayout->laneNames().size() : 0);
     ++mDataGeneration;
+    markLayersDirty();
     setSelectedRows(rowsWithIds(selected));
 }
 
@@ -110,6 +116,7 @@ void QCPIntervals::setCategoryColors(const QVector<QColor>& colors)
 {
     mCategoryColors = colors;
     ++mColorGeneration;
+    markLayersDirty();
 }
 
 QColor QCPIntervals::categoryColor(int category) const
@@ -121,6 +128,28 @@ QColor QCPIntervals::categoryColor(int category) const
 }
 
 QCPLayer* QCPIntervals::labelLayer() const { return mLabelLayer->layer(); }
+
+QList<QCPLayer*> QCPIntervals::dependentLayers() const
+{
+    if (QCPLayer* overlay = labelLayer())
+        return { overlay };
+    return {};
+}
+
+// The overlay is a layer of its own: nothing else marks it dirty when the bars change. Marking
+// it alone would also stop QCustomPlot's fallback from repainting the bars' layer, so both go.
+void QCPIntervals::markLayersDirty()
+{
+    for (QCPLayer* l : { layer(), labelLayer() })
+        if (l)
+            l->markDirty();
+}
+
+void QCPIntervals::requestRepaint()
+{
+    markLayersDirty();
+    mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+}
 
 QRectF QCPIntervals::barRect(int row) const
 {
@@ -320,7 +349,7 @@ void QCPIntervals::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
     if (mRubberBand)
     {
         mRubberBand = QRectF(startPos, event->pos()).normalized();
-        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+        requestRepaint();
     }
     else if (mGesture)
         updateGesture(event->pos());
@@ -332,7 +361,7 @@ void QCPIntervals::mouseReleaseEvent(QMouseEvent* event, const QPointF& startPos
     {
         setSelectedRows(rowsInRect(QRectF(startPos, event->pos()).normalized()));
         mRubberBand.reset();
-        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+        requestRepaint();
     }
     else if (mGesture)
         finishGesture();
@@ -479,14 +508,14 @@ void QCPIntervals::updateGesture(const QPointF& pos)
         g.preview = { { -1, std::min(g.pressKey, g.pressKey + dt), std::max(g.pressKey, g.pressKey + dt), g.pressLane } };
     else
         g.preview = qcp::intervals::applyDrag(g.rows, dragKind(g.kind), dt, laneStepsTo(pos), mLayout->displayLanes());
-    mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    requestRepaint();
 }
 
 void QCPIntervals::finishGesture()
 {
     const Gesture g = std::move(*mGesture);
     mGesture.reset();
-    mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    requestRepaint();
     if (!g.moved || g.preview.empty())
         return;
     if (g.kind != Gesture::Create)
@@ -521,7 +550,7 @@ bool QCPIntervals::keyPress(QKeyEvent* event)
     {
         mGesture.reset();
         mRubberBand.reset();
-        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+        requestRepaint();
         return true;
     }
     if (!mEditable || !selected())

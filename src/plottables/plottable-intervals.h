@@ -30,6 +30,7 @@ public:
     [[nodiscard]] QColor categoryColor(int category) const;
     [[nodiscard]] quint64 buildCount() const { return mBuildCount; }
     [[nodiscard]] QCPLayer* labelLayer() const;
+    [[nodiscard]] QList<QCPLayer*> dependentLayers() const override;
 
     enum HitPart { hpNone, hpEmpty, hpBody, hpLeftEdge, hpRightEdge };
 
@@ -157,6 +158,8 @@ protected:
     [[nodiscard]] double snappedToStep(double key) const;
     [[nodiscard]] int laneStepsTo(const QPointF& pos) const;
     [[nodiscard]] double keysPerPixels(double px) const;
+    void markLayersDirty();
+    void requestRepaint();
     [[nodiscard]] bool changesAnyRow(const std::vector<qcp::intervals::Edit>& edits) const;
     void emitEdits(const std::vector<qcp::intervals::Edit>& edits);
     void drawPreview(QCPPainter* painter) const;
