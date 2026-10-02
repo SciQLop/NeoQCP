@@ -95,7 +95,7 @@ public:
         if (mAdaptiveSampling == enabled)
             return;
         mAdaptiveSampling = enabled;
-        mLineCacheDirty = true;
+        markLinesDirty();
         mCachedLines.clear();
     }
 
@@ -106,7 +106,7 @@ public:
         if (mGapThreshold == threshold)
             return;
         mGapThreshold = threshold;
-        mLineCacheDirty = true;
+        markLinesDirty();
         mCachedLines.clear();
     }
 

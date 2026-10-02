@@ -2835,3 +2835,51 @@ void TestPipeline::densePanIsRedrawnFreshBesideASmallGraph()
     };
     QTRY_VERIFY2_WITH_TIMEOUT(renderedAtView(), "the dense graph was never drawn fresh", 2000);
 }
+
+void TestPipeline::colormapNewDataShowsWhileAnotherLayerIsDirty()
+{
+    if (!showAndHasRhi(mPlot))
+        QSKIP("no QRhi available in this environment");
+    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    cm->setGradient(QCPColorGradient(QCPColorGradient::gpGrayscale));
+    cm->setDataRange(QCPRange(0, 1));
+    const auto fill = [](double value) {
+        std::vector<double> x(50), y(50), z(50 * 50, value);
+        for (int i = 0; i < 50; ++i)
+            x[i] = y[i] = i;
+        return std::tuple { std::move(x), std::move(y), std::move(z) };
+    };
+    auto [x0, y0, z0] = fill(0.0);
+    cm->setData(std::move(x0), std::move(y0), std::move(z0));
+    mPlot->xAxis->setRange(0, 49);
+    mPlot->yAxis->setRange(0, 49);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!cm->pipeline().isBusy(), 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const auto centre = [&] {
+        const QImage frame = mPlot->grabFramebuffer();
+        const QPoint c = mPlot->axisRect()->rect().center() * frame.devicePixelRatio();
+        return frame.pixelColor(c);
+    };
+    QVERIFY2(centre().lightness() < 60, qPrintable(centre().name()));
+
+    // Like a crosshair following the mouse: some other layer is dirty on every replot.
+    connect(mPlot, &QCustomPlot::beforeReplot, mPlot, [this] { mPlot->layer("overlay")->markDirty(); });
+    auto [x1, y1, z1] = fill(1.0);
+    cm->setData(std::move(x1), std::move(y1), std::move(z1));
+    QTRY_VERIFY2_WITH_TIMEOUT(centre().lightness() > 200, "the new colormap data never showed", 3000);
+}
+
+void TestPipeline::graph2SetterRedrawsWhileAnotherLayerIsDirty()
+{
+    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    graph->setData(QVector<double> { 0, 1, 2, 3 }, QVector<double> { 0, 1, 0, 1 });
+    mPlot->xAxis->setRange(0, 3);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(!graph->mLineCacheDirty);
+    // Like a crosshair following the mouse: some other layer is dirty on every replot.
+    connect(mPlot, &QCustomPlot::beforeReplot, mPlot, [this] { mPlot->layer("overlay")->markDirty(); });
+    graph->setGapThreshold(0);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY2(!graph->mLineCacheDirty, "the graph was not drawn after setGapThreshold");
+}

@@ -11,6 +11,15 @@
 #include <utility>
 #include <vector>
 
+// A new image is drawn only if the owner's layer is repainted: a replot repaints dirty layers,
+// and marks the plot's layers dirty itself only when none is.
+void QCPColormapRenderer::invalidateMapImage()
+{
+    mMapImageInvalidated = true;
+    if (mOwner && mOwner->layer())
+        mOwner->layer()->markDirty();
+}
+
 QCPColormapRenderer::QCPColormapRenderer(QCPAbstractPlottable* owner)
     : mOwner(owner)
 {

@@ -46,7 +46,7 @@ public:
 
     // Image cache
     bool mapImageInvalidated() const { return mMapImageInvalidated; }
-    void invalidateMapImage() { mMapImageInvalidated = true; }
+    void invalidateMapImage();
     const QImage& mapImage() const { return mMapImage; }
     QImage& mapImage() { return mMapImage; }
 
