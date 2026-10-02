@@ -188,6 +188,7 @@ protected:
     bool mHasRenderedRange = false;
     // Line cache: per-component cached lines, reused with GPU offset
     QVector<QVector<QPointF>> mCachedLines;
+    void markLinesDirty();
     bool mLineCacheDirty = true;
     QSize mCachedPlotSize;
     // Per-component cached extruded GPU vertices — avoids re-extrusion on pan

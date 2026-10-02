@@ -28,12 +28,12 @@ QCPGraph2::QCPGraph2(QCPAxis* keyAxis, QCPAxis* valueAxis)
         connect(keyAxis, QOverload<const QCPRange&>::of(&QCPAxis::rangeChanged),
                 this, &QCPGraph2::onViewportChanged);
         connect(keyAxis, &QCPAxis::scaleTypeChanged,
-                this, [this] { mLineCacheDirty = true; mCachedLines.clear(); });
+                this, [this] { markLinesDirty(); mCachedLines.clear(); });
     }
     if (valueAxis)
     {
         connect(valueAxis, &QCPAxis::scaleTypeChanged,
-                this, [this] { mLineCacheDirty = true; mCachedLines.clear(); });
+                this, [this] { markLinesDirty(); mCachedLines.clear(); });
     }
 
     connect(&mPipeline, &QCPGraphPipeline::finished,
@@ -44,13 +44,22 @@ QCPGraph2::QCPGraph2(QCPAxis* keyAxis, QCPAxis* valueAxis)
     mViewportDebounce.setSingleShot(true);
     mViewportDebounce.setInterval(150);
     connect(&mViewportDebounce, &QTimer::timeout, this, [this] {
-        mLineCacheDirty = true;
+        markLinesDirty();
         if (mParentPlot)
             mParentPlot->replot(QCustomPlot::rpQueuedReplot);
     });
 }
 
 QCPGraph2::~QCPGraph2() = default;
+
+// Fresh lines are drawn only if the layer is repainted: a replot repaints dirty layers, and
+// falls back to marking the plot's layers dirty only when none is, so mark this one here.
+void QCPGraph2::markLinesDirty()
+{
+    mLineCacheDirty = true;
+    if (mLayer)
+        mLayer->markDirty();
+}
 
 void QCPGraph2::setScatterColorGradient(const QCPColorGradient& gradient)
 {
@@ -111,7 +120,7 @@ void QCPGraph2::applySourceNow(std::shared_ptr<QCPAbstractDataSource> source)
     mL1Cache.reset();
     mL2Result.reset();
     mCachedLines.clear();
-    mLineCacheDirty = true;
+    markLinesDirty();
     mL2Dirty = false;
     mNeedsResampling = mDataSource && mDataSource->size() >= qcp::algo::kResampleThreshold;
     if (mDataSource)
@@ -161,7 +170,7 @@ bool QCPGraph2::commitPendingData()
     mL2Dirty = mL1Cache != nullptr;
     mNeedsResampling = mDataSource->size() >= qcp::algo::kResampleThreshold;
     mCachedLines.clear();
-    mLineCacheDirty = true;
+    markLinesDirty();
     // Carry the barrier established while staging forward past the commit:
     // a job dispatched for the source this replaced must not be able to land
     // in mL1Cache/mL2Result once this source is the one being displayed.
@@ -180,7 +189,7 @@ void QCPGraph2::dataChanged()
         return;
     }
 
-    mLineCacheDirty = true;
+    markLinesDirty();
 
     bool wasResampling = mNeedsResampling;
     mNeedsResampling = mDataSource && mDataSource->size() >= qcp::algo::kResampleThreshold;
@@ -227,7 +236,7 @@ void QCPGraph2::onL1Ready(uint64_t generation)
     if (generation < mAcceptedGeneration)
         return; // result of a source that was superseded before this job finished
     qcp::extractL1Cache<qcp::algo::GraphResamplerCache>(mPipeline.cache(), mL1Cache, mL2Dirty);
-    mLineCacheDirty = true;
+    markLinesDirty();
     if (parentPlot())
         parentPlot()->replot(QCustomPlot::rpQueuedReplot);
 }
@@ -431,7 +440,9 @@ bool QCPGraph2::canProduceContent() const
 
 QPointF QCPGraph2::stallPixelOffset() const
 {
-    if (!mHasRenderedRange || mCachedLines.isEmpty() || !mKeyAxis || !mValueAxis)
+    // Dirty lines (the pan debounce fired, or data changed) must be drawn again: offering a
+    // translation would let the layer shift the stale texture forever, edges left blank.
+    if (!mHasRenderedRange || mCachedLines.isEmpty() || mLineCacheDirty || !mKeyAxis || !mValueAxis)
         return {};
     // Only valid for pure translation (pan) — reject if zoom changed
     double keyRatio = mKeyAxis->range().size() / mRenderedRange.key.size();

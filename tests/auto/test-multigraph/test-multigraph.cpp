@@ -887,3 +887,57 @@ void TestMultiGraph::selectedStepGraph2KeepsItsSteps()
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QVERIFY2(!crossesTheDiagonal(mPlot), "selected step line drawn as a straight line");
 }
+
+namespace {
+//! Dense enough that the view is drawn from a resampled (L2) source covering only the view.
+QCPMultiGraph* denseGraphDrawn(QCustomPlot* plot)
+{
+    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    const int n = 400'000;
+    std::vector<double> keys(n), values(n);
+    for (int i = 0; i < n; ++i)
+    {
+        keys[i] = i;
+        values[i] = std::sin(i * 0.001);
+    }
+    mg->setData(std::move(keys), std::vector<std::vector<double>> { std::move(values) });
+    plot->xAxis->setRange(0, 100'000);
+    plot->yAxis->setRange(-1.5, 1.5);
+    plot->replot(QCustomPlot::rpImmediateRefresh);
+    QTest::qWaitFor([mg] { return !mg->pipeline().isBusy(); }, 5000);
+    plot->replot(QCustomPlot::rpImmediateRefresh);
+    return mg;
+}
+
+} // namespace
+
+void TestMultiGraph::panIsRedrawnFreshAfterTheDebounce()
+{
+    if (!showWithRhi(mPlot))
+        QSKIP("no QRhi available in this environment");
+    auto* mg = denseGraphDrawn(mPlot);
+    QVERIFY(mg->mL2Result); // the cached lines cover only the view
+    mPlot->xAxis->setRange(25'000, 125'000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh); // pan frame: translated, edge uncovered
+    const auto renderedAtView = [&] {
+        return qFuzzyCompare(mg->mRenderedRange.key.lower, mPlot->xAxis->range().lower)
+            && qFuzzyCompare(mg->mRenderedRange.key.upper, mPlot->xAxis->range().upper);
+    };
+    QTRY_VERIFY2_WITH_TIMEOUT(renderedAtView(), "the panned view was never drawn fresh", 2000);
+}
+
+void TestMultiGraph::panIsRedrawnFreshWhileAnotherLayerIsDirty()
+{
+    if (!showWithRhi(mPlot))
+        QSKIP("no QRhi available in this environment");
+    auto* mg = denseGraphDrawn(mPlot);
+    // Like a crosshair following the mouse: some other layer is dirty on every replot.
+    connect(mPlot, &QCustomPlot::beforeReplot, mPlot, [this] { mPlot->layer("overlay")->markDirty(); });
+    mPlot->xAxis->setRange(25'000, 125'000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const auto renderedAtView = [&] {
+        return qFuzzyCompare(mg->mRenderedRange.key.lower, mPlot->xAxis->range().lower)
+            && qFuzzyCompare(mg->mRenderedRange.key.upper, mPlot->xAxis->range().upper);
+    };
+    QTRY_VERIFY2_WITH_TIMEOUT(renderedAtView(), "the panned view was never drawn fresh", 2000);
+}

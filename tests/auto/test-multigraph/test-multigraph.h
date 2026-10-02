@@ -71,6 +71,8 @@ private slots:
     void plainReextrusionOnPenChangeNotPan();
     void selectedStepLineKeepsItsSteps();
     void selectedStepGraph2KeepsItsSteps();
+    void panIsRedrawnFreshAfterTheDebounce();
+    void panIsRedrawnFreshWhileAnotherLayerIsDirty();
 
 private:
     QCustomPlot* mPlot = nullptr;

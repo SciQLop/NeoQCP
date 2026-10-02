@@ -2738,3 +2738,61 @@ void TestPipeline::multiGraphGapThresholdReachesResampledSource()
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QCOMPARE(nanBreaks(g->mCachedLines[0]), 0);
 }
+
+void TestPipeline::graph2PanIsRedrawnFreshAfterTheDebounce()
+{
+    if (!showAndHasRhi(mPlot))
+        QSKIP("no QRhi available in this environment");
+    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    QVector<double> keys(400000), values(400000);
+    for (int i = 0; i < 400000; ++i)
+    {
+        keys[i] = i;
+        values[i] = std::sin(i * 0.001);
+    }
+    graph->setData(std::move(keys), std::move(values));
+    mPlot->xAxis->setRange(0, 100000);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!graph->pipeline().isBusy(), 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(graph->mL2Result); // the cached lines cover only the view
+
+    mPlot->xAxis->setRange(25000, 125000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh); // pan frame: translated, edge uncovered
+    const auto renderedAtView = [&] {
+        return qFuzzyCompare(graph->mRenderedRange.key.lower, mPlot->xAxis->range().lower)
+            && qFuzzyCompare(graph->mRenderedRange.key.upper, mPlot->xAxis->range().upper);
+    };
+    QTRY_VERIFY2_WITH_TIMEOUT(renderedAtView(), "the panned view was never drawn fresh", 2000);
+}
+
+void TestPipeline::graph2PanIsRedrawnFreshWhileAnotherLayerIsDirty()
+{
+    if (!showAndHasRhi(mPlot))
+        QSKIP("no QRhi available in this environment");
+    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    QVector<double> keys(400000), values(400000);
+    for (int i = 0; i < 400000; ++i)
+    {
+        keys[i] = i;
+        values[i] = std::sin(i * 0.001);
+    }
+    graph->setData(std::move(keys), std::move(values));
+    mPlot->xAxis->setRange(0, 100000);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!graph->pipeline().isBusy(), 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(graph->mL2Result); // the cached lines cover only the view
+
+    // Like a crosshair following the mouse: some other layer is dirty on every replot.
+    connect(mPlot, &QCustomPlot::beforeReplot, mPlot, [this] { mPlot->layer("overlay")->markDirty(); });
+    mPlot->xAxis->setRange(25000, 125000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh); // pan frame: translated, edge uncovered
+    const auto renderedAtView = [&] {
+        return qFuzzyCompare(graph->mRenderedRange.key.lower, mPlot->xAxis->range().lower)
+            && qFuzzyCompare(graph->mRenderedRange.key.upper, mPlot->xAxis->range().upper);
+    };
+    QTRY_VERIFY2_WITH_TIMEOUT(renderedAtView(), "the panned view was never drawn fresh", 2000);
+}

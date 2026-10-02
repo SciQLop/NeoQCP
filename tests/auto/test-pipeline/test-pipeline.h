@@ -157,6 +157,8 @@ private slots:
     // GPU translation fast path
     void graph2TranslationOffsetWhenBusy();
     void graph2TranslationResetsOnFreshData();
+    void graph2PanIsRedrawnFreshAfterTheDebounce();
+    void graph2PanIsRedrawnFreshWhileAnotherLayerIsDirty();
     void multiGraphTranslationOffsetWhenBusy();
     void colormap2TranslationOffsetWhenBusy();
     void colormap2ResultSurvivesNullViewport();

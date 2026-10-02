@@ -156,6 +156,7 @@ private:
     // Line cache: reuse across replots when viewport shift is small
     QVector<QPointF> mCachedLines;
     int mCachedLinesBeginIndex = 0;
+    void markLinesDirty();
     bool mLineCacheDirty = true;
     QSize mCachedPlotSize;
     // Cached extruded GPU vertices — avoids re-extrusion on pan

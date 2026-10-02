@@ -62,13 +62,22 @@ QCPMultiGraph::QCPMultiGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
     mViewportDebounce.setSingleShot(true);
     mViewportDebounce.setInterval(150);
     connect(&mViewportDebounce, &QTimer::timeout, this, [this] {
-        mLineCacheDirty = true;
+        markLinesDirty();
         if (mParentPlot)
             mParentPlot->replot(QCustomPlot::rpQueuedReplot);
     });
 }
 
 QCPMultiGraph::~QCPMultiGraph() = default;
+
+// Fresh lines are drawn only if the layer is repainted: a replot repaints dirty layers, and
+// falls back to marking the plot's layers dirty only when none is, so mark this one here.
+void QCPMultiGraph::markLinesDirty()
+{
+    mLineCacheDirty = true;
+    if (mLayer)
+        mLayer->markDirty();
+}
 
 void QCPMultiGraph::setDataSource(std::unique_ptr<QCPAbstractMultiDataSource> source)
 {
@@ -214,7 +223,7 @@ void QCPMultiGraph::dataChanged()
         return;
     }
 
-    mLineCacheDirty = true;
+    markLinesDirty();
     if (mDataSource)
     {
         applyColorSizeRule(mDataSource->size());
@@ -253,7 +262,7 @@ void QCPMultiGraph::onL1Ready(uint64_t generation)
     if (generation < mAcceptedGeneration)
         return; // result of a source that was superseded before this job finished
     qcp::extractL1Cache<qcp::algo::MultiGraphResamplerCache>(mPipeline.cache(), mL1Cache, mL2Dirty);
-    mLineCacheDirty = true;
+    markLinesDirty();
     if (parentPlot())
         parentPlot()->replot(QCustomPlot::rpQueuedReplot);
 }
@@ -346,7 +355,7 @@ void QCPMultiGraph::setComponentVisible(int index, bool visible)
         return;
     mComponents[index].visible = visible;
     // A rebuild while the component was hidden dropped its cached lines: rebuild again.
-    mLineCacheDirty = true;
+    markLinesDirty();
     if (mLayer)
         mLayer->invalidatePaintBuffer();
     emit componentVisibilityChanged();
@@ -386,7 +395,7 @@ void QCPMultiGraph::setGapThreshold(double threshold)
 
 void QCPMultiGraph::invalidateLines()
 {
-    mLineCacheDirty = true;
+    markLinesDirty();
     mCachedLines.clear();
     mCachedIndices.clear();
 }
@@ -910,7 +919,9 @@ bool QCPMultiGraph::canProduceContent() const
 
 QPointF QCPMultiGraph::stallPixelOffset() const
 {
-    if (!mHasRenderedRange || mCachedLines.isEmpty() || !mKeyAxis || !mValueAxis)
+    // Dirty lines (the pan debounce fired, or data changed) must be drawn again: offering a
+    // translation would let the layer shift the stale texture forever, edges left blank.
+    if (!mHasRenderedRange || mCachedLines.isEmpty() || mLineCacheDirty || !mKeyAxis || !mValueAxis)
         return {};
     // Only valid for pure translation (pan) — reject if zoom changed
     double keyRatio = mKeyAxis->range().size() / mRenderedRange.key.size();
