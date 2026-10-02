@@ -25,6 +25,14 @@ private slots:
     void quadIsTwoTriangles();
     void millionIntervalsScanQuickly();
 
+    void setDataRejectsInvalidColumns();
+    void emptyDataDrawsNothing();
+    void barsAreDrawnOnTheirLanes();
+    void keyRangeSpansAllIntervals();
+    void categoryColorFallsBackBeyondTheTable();
+    void barsRebuildOnlyWhenTheViewChanges();
+    void stripPlacementIsTranslucent();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };

@@ -2,6 +2,7 @@
 #include "qcustomplot.h"
 #include "plottables/lane-layout.h"
 #include "plottables/intervals-algo.h"
+#include "plottables/plottable-intervals.h"
 #include <QElapsedTimer>
 #include <numeric>
 
@@ -195,4 +196,101 @@ void TestIntervals::millionIntervalsScanQuickly()
     }
     QVERIFY2(timer.elapsed() < 100, qPrintable(QString::number(timer.elapsed())));
     QVERIFY(bars.size() <= 20 * 1001);
+}
+
+namespace {
+QCPIntervals* twoBars(QCustomPlot* plot, QCPLaneLayout* layout)
+{
+    auto* iv = new QCPIntervals(plot->xAxis, plot->yAxis, layout);
+    auto c = columns({10, 60}, {40, 90}, { layout->laneIndex("A"), layout->laneIndex("B") });
+    c.category = { 0, 1 };
+    iv->setData(std::move(c));
+    iv->setCategoryColors({ Qt::red, Qt::blue });
+    plot->xAxis->setRange(0, 100);
+    return iv;
+}
+
+QColor pixelAt(const QImage& image, QCustomPlot* plot, double key, double laneCentreFromTop)
+{
+    const double dpr = image.devicePixelRatio();
+    const QRect rect = plot->axisRect()->rect();
+    return image.pixelColor(qRound(plot->xAxis->coordToPixel(key) * dpr),
+                            qRound((rect.top() + laneCentreFromTop) * dpr));
+}
+
+bool isRedish(const QColor& c) { return c.red() > 150 && c.green() < 120 && c.blue() < 120; }
+bool isBlueish(const QColor& c) { return c.blue() > 150 && c.red() < 120 && c.green() < 120; }
+} // namespace
+
+void TestIntervals::setDataRejectsInvalidColumns()
+{
+    QCPLaneLayout layout;
+    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    QVERIFY_THROWS_EXCEPTION(std::invalid_argument, iv->setData(columns({2}, {1}, {0})));
+    QCOMPARE(iv->rowCount(), 0);
+}
+
+void TestIntervals::emptyDataDrawsNothing()
+{
+    QCPLaneLayout layout;
+    new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    mPlot->toPixmap(400, 300); // must not crash
+}
+
+void TestIntervals::barsAreDrawnOnTheirLanes()
+{
+    QCPLaneLayout layout;
+    layout.setPlacement(QCPLaneLayout::plLanes);
+    twoBars(mPlot, &layout);
+    const QImage image = mPlot->toPixmap(400, 300).toImage();
+    QVERIFY(isRedish(pixelAt(image, mPlot, 25, 7)));    // lane A, inside bar 0
+    QVERIFY(isBlueish(pixelAt(image, mPlot, 75, 21)));  // lane B, inside bar 1
+    QVERIFY(!isRedish(pixelAt(image, mPlot, 75, 7)));   // lane A, no bar
+}
+
+void TestIntervals::keyRangeSpansAllIntervals()
+{
+    QCPLaneLayout layout;
+    auto* iv = twoBars(mPlot, &layout);
+    bool found = false;
+    const QCPRange r = iv->getKeyRange(found);
+    QVERIFY(found);
+    QCOMPARE(r.lower, 10.0);
+    QCOMPARE(r.upper, 90.0);
+    iv->getValueRange(found);
+    QVERIFY(!found); // never drives the value axis
+}
+
+void TestIntervals::categoryColorFallsBackBeyondTheTable()
+{
+    QCPLaneLayout layout;
+    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    iv->setCategoryColors({ Qt::red });
+    QCOMPARE(iv->categoryColor(0), QColor(Qt::red));
+    QVERIFY(iv->categoryColor(1).isValid());
+    QVERIFY(iv->categoryColor(1) != iv->categoryColor(2));
+}
+
+void TestIntervals::barsRebuildOnlyWhenTheViewChanges()
+{
+    QCPLaneLayout layout;
+    auto* iv = twoBars(mPlot, &layout);
+    mPlot->toPixmap(400, 300);
+    const auto builds = iv->buildCount();
+    mPlot->toPixmap(400, 300);
+    QCOMPARE(iv->buildCount(), builds);
+    mPlot->xAxis->setRange(5, 105);
+    mPlot->toPixmap(400, 300);
+    QCOMPARE(iv->buildCount(), builds + 1);
+    layout.setLaneHeight(20);
+    mPlot->toPixmap(400, 300);
+    QCOMPARE(iv->buildCount(), builds + 2);
+}
+
+void TestIntervals::stripPlacementIsTranslucent()
+{
+    QCPLaneLayout layout; // plStrip by default
+    twoBars(mPlot, &layout);
+    const QColor c = pixelAt(mPlot->toPixmap(400, 300).toImage(), mPlot, 25, 7);
+    QVERIFY2(c.red() > 150 && c.green() > 40, qPrintable(c.name())); // red blended with white
 }

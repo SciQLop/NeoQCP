@@ -81,6 +81,7 @@
 #include "plottables/plottable-graph2.h"
 #include "plottables/plottable-multigraph.h"
 #include "plottables/lane-layout.h"
+#include "plottables/plottable-intervals.h"
 #include "plottables/plottable-waterfall.h"
 #include "plottables/plottable-statisticalbox.h"
 #include "datasource/abstract-datasource-2d.h"
