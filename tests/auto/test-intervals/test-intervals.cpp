@@ -788,3 +788,46 @@ void TestIntervals::setDataSelectionFollowsTheId()
     QCOMPARE(iv->selectedRows(), QVector<int>({ 0 }));
     QCOMPARE(iv->selectedIds(), QVector<qint64>({ 101 }));
 }
+
+namespace {
+//! A second timeline on the same layout with one bar at [60,90] on lane A.
+QCPIntervals* siblingOnLaneA(QCustomPlot* plot, QCPLaneLayout* layout)
+{
+    auto* iv = new QCPIntervals(plot->xAxis, plot->yAxis, layout);
+    iv->setData(columns({ 60 }, { 90 }, { layout->laneIndex("A") }));
+    return iv;
+}
+} // namespace
+
+void TestIntervals::clickReachesABarUnderASiblingsEmptySpace()
+{
+    QCPLaneLayout layout;
+    auto* a = laidOutTwoBars(mPlot, &layout);
+    auto* b = siblingOnLaneA(mPlot, &layout);
+    mPlot->replot();
+    click(mPlot, a->pixelOf(25, 0).toPoint());
+    QCOMPARE(a->selectedRows(), QVector<int>({ 0 }));
+    QVERIFY(b->selectedRows().isEmpty());
+}
+
+void TestIntervals::plottableAtPrefersABarOverASiblingsEmptySpace()
+{
+    QCPLaneLayout layout;
+    auto* b = siblingOnLaneA(mPlot, &layout);
+    auto* a = laidOutTwoBars(mPlot, &layout);
+    QCOMPARE(mPlot->plottableAt(a->pixelOf(25, 0)), a);
+    QCOMPARE(mPlot->plottableAt(a->pixelOf(75, 0)), b);
+}
+
+void TestIntervals::pressOnASiblingsBarStartsNoCreate()
+{
+    QCPLaneLayout layout;
+    auto* a = laidOutTwoBars(mPlot, &layout);
+    auto* b = siblingOnLaneA(mPlot, &layout);
+    b->setEditable(true);
+    b->setEditModes(QCPIntervals::emCreate);
+    mPlot->replot();
+    QSignalSpy spy(b, &QCPIntervals::intervalCreated);
+    drag(mPlot, a->pixelOf(25, 0), a->pixelOf(35, 0));
+    QCOMPARE(spy.count(), 0);
+}

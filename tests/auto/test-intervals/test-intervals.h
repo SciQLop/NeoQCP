@@ -76,6 +76,10 @@ private slots:
     void setDataDropsSelectionOfVanishedIds();
     void setDataSelectionFollowsTheId();
 
+    void clickReachesABarUnderASiblingsEmptySpace();
+    void plottableAtPrefersABarOverASiblingsEmptySpace();
+    void pressOnASiblingsBarStartsNoCreate();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };

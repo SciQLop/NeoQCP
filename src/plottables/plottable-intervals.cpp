@@ -188,12 +188,25 @@ double QCPIntervals::selectTest(const QPointF& pos, bool onlySelectable, QVarian
     if (onlySelectable && !selectable())
         return -1;
     const Hit hit = hitTest(pos);
-    if (hit.part == hpNone)
+    // Empty lane space is not selectable, so a click there reaches a sibling
+    // timeline's bar on the same layout (or deselects through the core).
+    if (hit.part == hpNone || (hit.part == hpEmpty && onlySelectable))
         return -1;
     if (details)
         *details = QVariant::fromValue(hit.row >= 0 ? QCPDataSelection(QCPDataRange(hit.row, hit.row + 1))
                                                     : QCPDataSelection());
-    return 0;
+    // Just inside the tolerance: still a press/hover target, but any bar beats it.
+    return hit.part == hpEmpty ? mParentPlot->selectionTolerance() * 0.99 : 0;
+}
+
+bool QCPIntervals::siblingHasBarAt(const QPointF& pos) const
+{
+    for (int i = 0; i < mParentPlot->plottableCount(); ++i)
+        if (auto* other = qobject_cast<QCPIntervals*>(mParentPlot->plottable(i));
+            other && other != this && other->laneLayout() == mLayout && other->realVisibility()
+            && other->hitTest(pos).row >= 0)
+            return true;
+    return false;
 }
 
 void QCPIntervals::selectEvent(QMouseEvent*, bool additive, const QVariant& details,
@@ -282,7 +295,8 @@ int QCPIntervals::findEnd(double, bool) const { return rowCount(); }
 void QCPIntervals::mousePressEvent(QMouseEvent* event, const QVariant&)
 {
     const Hit hit = hitTest(event->pos());
-    if (event->button() != Qt::LeftButton || hit.part == hpNone)
+    if (event->button() != Qt::LeftButton || hit.part == hpNone
+        || (hit.part == hpEmpty && siblingHasBarAt(event->pos())))
     {
         event->ignore();
         return;

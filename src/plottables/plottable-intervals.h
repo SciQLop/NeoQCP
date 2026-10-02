@@ -130,6 +130,7 @@ protected:
     void mouseReleaseEvent(QMouseEvent* event, const QPointF& startPos) override;
 
     [[nodiscard]] QRectF barRect(int row) const;
+    [[nodiscard]] bool siblingHasBarAt(const QPointF& pos) const;
     [[nodiscard]] QVector<int> rowsInRect(const QRectF& rect) const;
     void drawSelection(QCPPainter* painter) const;
 
