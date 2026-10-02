@@ -466,9 +466,15 @@ constexpr int kResampleThreshold = 100'000;
 constexpr int kLevel2PixelMultiplier = 4;
 
 // The keys a graph's line cache covers: one view width on each side, so a GPU-translated pan
-// does not expose uncovered edges before the lines are rebuilt.
-inline QCPRange lineCacheKeyRange(const QCPRange& view)
+// does not expose uncovered edges before the lines are rebuilt. On a log axis a width is a
+// ratio, so [1, 10] covers [0.1, 100].
+inline QCPRange lineCacheKeyRange(const QCPRange& view, bool logScale)
 {
+    if (logScale && view.lower > 0)
+    {
+        const double ratio = view.upper / view.lower;
+        return {view.lower / ratio, view.upper * ratio};
+    }
     return {view.lower - view.size(), view.upper + view.size()};
 }
 
@@ -483,7 +489,7 @@ inline int l2BinCount(const ViewportParams& vp)
 template <typename Source>
 inline bool fewEnoughToDrawRaw(const Source& raw, const ViewportParams& vp)
 {
-    const QCPRange scan = lineCacheKeyRange(vp.keyRange);
+    const QCPRange scan = lineCacheKeyRange(vp.keyRange, vp.keyLogScale);
     return raw.findEnd(scan.upper) - raw.findBegin(scan.lower) <= l2BinCount(vp);
 }
 

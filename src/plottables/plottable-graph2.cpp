@@ -445,8 +445,9 @@ QPointF QCPGraph2::stallPixelOffset() const
     if (!mHasRenderedRange || mCachedLines.isEmpty() || mLineCacheDirty || !mKeyAxis || !mValueAxis)
         return {};
     // Only valid for pure translation (pan) — reject if zoom changed
-    double keyRatio = mKeyAxis->range().size() / mRenderedRange.key.size();
-    double valRatio = mValueAxis->range().size() / mRenderedRange.value.size();
+    // Scale-aware: a pan on a log axis multiplies both ends, which changes the linear size.
+    const double keyRatio = qcp::axisRangeSizeRatio(mKeyAxis.data(), mRenderedRange.key);
+    const double valRatio = qcp::axisRangeSizeRatio(mValueAxis.data(), mRenderedRange.value);
     if (qAbs(keyRatio - 1.0) > 1e-4 || qAbs(valRatio - 1.0) > 1e-4)
         return {};
     QPointF offset = qcp::computeViewportOffset(mKeyAxis.data(), mValueAxis.data(),
@@ -548,7 +549,8 @@ void QCPGraph2::draw(QCPPainter* painter)
         }
         else
         {
-            const QCPRange cacheRange = qcp::algo::lineCacheKeyRange(keyRange);
+            const QCPRange cacheRange = qcp::algo::lineCacheKeyRange(
+            keyRange, mKeyAxis->scaleType() == QCPAxis::stLogarithmic);
             cacheBegin = ds->findBegin(cacheRange.lower);
             cacheEnd = ds->findEnd(cacheRange.upper);
         }
@@ -812,7 +814,7 @@ void QCPGraph2::onViewportChanged()
         // immediate L2 rebuild because the cached lines are at wrong scale.
         if (mHasRenderedRange && mKeyAxis)
         {
-            double ratio = mKeyAxis->range().size() / mRenderedRange.key.size();
+            const double ratio = qcp::axisRangeSizeRatio(mKeyAxis.data(), mRenderedRange.key);
             if (qAbs(ratio - 1.0) < 1e-4)
                 mViewportDebounce.start();
         }

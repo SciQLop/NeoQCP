@@ -2,6 +2,7 @@
 #include <qcustomplot.h>
 #include <datasource/pipeline-scheduler.h>
 #include <datasource/async-pipeline.h>
+#include <datasource/graph-resampler.h>
 #include <datasource/soa-datasource.h>
 #include <datasource/soa-datasource-2d.h>
 #include <datasource/soa-multi-datasource.h>
@@ -2882,4 +2883,81 @@ void TestPipeline::graph2SetterRedrawsWhileAnotherLayerIsDirty()
     graph->setGapThreshold(0);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QVERIFY2(!graph->mLineCacheDirty, "the graph was not drawn after setGapThreshold");
+}
+
+namespace
+{
+//! Positive values over keys 1..10^4, drawn once on the given axis scales.
+QCPGraph2* drawnPositiveGraph(QCustomPlot* plot, bool logKeys, bool logValues)
+{
+    auto* graph = new QCPGraph2(plot->xAxis, plot->yAxis);
+    QVector<double> keys(2000), values(2000);
+    for (int i = 0; i < 2000; ++i)
+    {
+        keys[i] = std::pow(10.0, 4.0 * i / 1999.0);
+        values[i] = 2.0 + std::sin(i * 0.05);
+    }
+    graph->setData(std::move(keys), std::move(values));
+    if (logKeys)
+        plot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    if (logValues)
+        plot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    plot->xAxis->setRange(10, 100);
+    plot->yAxis->setRange(0.5, 5);
+    plot->replot(QCustomPlot::rpImmediateRefresh);
+    plot->replot(QCustomPlot::rpImmediateRefresh);
+    return graph;
+}
+} // namespace
+
+void TestPipeline::logValueAxisPanTranslates()
+{
+    if (!showAndHasRhi(mPlot))
+        QSKIP("no QRhi available in this environment");
+    // A pan on a log axis multiplies both ends (QCPAxisRect drag, QCPAxis::moveRange): every
+    // point moves by the same number of pixels, so the cached lines can be shifted.
+    auto* graph = drawnPositiveGraph(mPlot, false, true);
+    mPlot->yAxis->moveRange(2.0);
+    QVERIFY(!graph->stallPixelOffset().isNull());
+}
+
+void TestPipeline::logKeyAxisPanStaysCovered()
+{
+    if (!showAndHasRhi(mPlot))
+        QSKIP("no QRhi available in this environment");
+    auto* graph = drawnPositiveGraph(mPlot, true, false);
+    mPlot->xAxis->moveRange(2.0); // [10, 100] -> [20, 200]
+    const QPointF offset = graph->stallPixelOffset();
+    QVERIFY(!offset.isNull());
+    // The lines on screen are the cached ones shifted by the offset: they must still span the
+    // view. A linear cache range would stop at 190 and leave the right edge blank.
+    double left = std::numeric_limits<double>::max(), right = std::numeric_limits<double>::lowest();
+    for (const QPointF& p : graph->mCachedLines)
+    {
+        left = std::min(left, p.x() + offset.x());
+        right = std::max(right, p.x() + offset.x());
+    }
+    const QRect rect = mPlot->axisRect()->rect();
+    QVERIFY2(left <= rect.left() && right >= rect.right(),
+             qPrintable(QString("lines span %1..%2, view %3..%4").arg(left).arg(right).arg(rect.left()).arg(rect.right())));
+}
+
+void TestPipeline::additiveShiftOnLogAxisIsNotATranslation()
+{
+    if (!showAndHasRhi(mPlot))
+        QSKIP("no QRhi available in this environment");
+    // [10, 100] -> [20, 110] squeezes the low end: points move by different amounts.
+    auto* graph = drawnPositiveGraph(mPlot, true, false);
+    mPlot->xAxis->setRange(20, 110);
+    QVERIFY(graph->stallPixelOffset().isNull());
+}
+
+void TestPipeline::lineCacheCoversADecadeEachSideOnLogKeys()
+{
+    const QCPRange log = qcp::algo::lineCacheKeyRange(QCPRange(1, 10), true);
+    QCOMPARE(log.lower, 0.1);
+    QCOMPARE(log.upper, 100.0);
+    const QCPRange lin = qcp::algo::lineCacheKeyRange(QCPRange(1, 10), false);
+    QCOMPARE(lin.lower, -8.0);
+    QCOMPARE(lin.upper, 19.0);
 }

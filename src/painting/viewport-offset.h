@@ -66,8 +66,8 @@ inline LineCacheResult evaluateLineCache(
 
     if (!needFresh && hasRenderedRange)
     {
-        double keyRatio = keyAxis->range().size() / renderedKeyRange.size();
-        double valRatio = valueAxis->range().size() / renderedValueRange.size();
+        const double keyRatio = axisRangeSizeRatio(keyAxis, renderedKeyRange);
+        const double valRatio = axisRangeSizeRatio(valueAxis, renderedValueRange);
         if (qAbs(keyRatio - 1.0) > 1e-4 || qAbs(valRatio - 1.0) > 1e-4)
             needFresh = true;
     }

@@ -162,6 +162,10 @@ private slots:
     void densePanIsRedrawnFreshBesideASmallGraph();
     void colormapNewDataShowsWhileAnotherLayerIsDirty();
     void graph2SetterRedrawsWhileAnotherLayerIsDirty();
+    void logValueAxisPanTranslates();
+    void logKeyAxisPanStaysCovered();
+    void additiveShiftOnLogAxisIsNotATranslation();
+    void lineCacheCoversADecadeEachSideOnLogKeys();
     void multiGraphTranslationOffsetWhenBusy();
     void colormap2TranslationOffsetWhenBusy();
     void colormap2ResultSurvivesNullViewport();

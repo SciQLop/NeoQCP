@@ -281,7 +281,7 @@ void QCPMultiGraph::onViewportChanged()
         mL2Dirty = true;
         if (mHasRenderedRange && mKeyAxis)
         {
-            double ratio = mKeyAxis->range().size() / mRenderedRange.key.size();
+            const double ratio = qcp::axisRangeSizeRatio(mKeyAxis.data(), mRenderedRange.key);
             if (qAbs(ratio - 1.0) < 1e-4)
                 mViewportDebounce.start();
         }
@@ -924,8 +924,9 @@ QPointF QCPMultiGraph::stallPixelOffset() const
     if (!mHasRenderedRange || mCachedLines.isEmpty() || mLineCacheDirty || !mKeyAxis || !mValueAxis)
         return {};
     // Only valid for pure translation (pan) — reject if zoom changed
-    double keyRatio = mKeyAxis->range().size() / mRenderedRange.key.size();
-    double valRatio = mValueAxis->range().size() / mRenderedRange.value.size();
+    // Scale-aware: a pan on a log axis multiplies both ends, which changes the linear size.
+    const double keyRatio = qcp::axisRangeSizeRatio(mKeyAxis.data(), mRenderedRange.key);
+    const double valRatio = qcp::axisRangeSizeRatio(mValueAxis.data(), mRenderedRange.value);
     if (qAbs(keyRatio - 1.0) > 1e-4 || qAbs(valRatio - 1.0) > 1e-4)
         return {};
     QPointF offset = qcp::computeViewportOffset(mKeyAxis.data(), mValueAxis.data(),
@@ -1018,7 +1019,8 @@ void QCPMultiGraph::draw(QCPPainter* painter)
 
     if (needFreshLines)
     {
-        const QCPRange cacheRange = qcp::algo::lineCacheKeyRange(keyRange);
+        const QCPRange cacheRange = qcp::algo::lineCacheKeyRange(
+            keyRange, mKeyAxis->scaleType() == QCPAxis::stLogarithmic);
         int cacheBegin = ds->findBegin(cacheRange.lower);
         int cacheEnd = ds->findEnd(cacheRange.upper);
 
