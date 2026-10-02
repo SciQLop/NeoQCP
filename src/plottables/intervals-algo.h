@@ -3,6 +3,7 @@
 #include <QRectF>
 #include <QStringList>
 #include <array>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <utility>
@@ -41,5 +42,34 @@ void appendMerged(std::vector<PixelBar>& bars, const PixelBar& bar);
 void appendQuad(std::vector<float>& out, const QRectF& rect, const std::array<float, 4>& rgba);
 void appendDiamond(std::vector<float>& out, QPointF center, double halfSize,
                    const std::array<float, 4>& rgba);
+
+struct DraggedRow
+{
+    int row;
+    double start, stop;
+    int lane;
+};
+
+enum class DragKind
+{
+    Move,
+    ResizeLeft,
+    ResizeRight
+};
+
+struct Edit
+{
+    int row;
+    double start, stop;
+    int lane;
+};
+
+int shiftLane(int lane, int steps, const std::vector<int>& displayOrder);
+std::vector<Edit> applyDrag(const std::vector<DraggedRow>& rows, DragKind kind, double dt,
+                            int laneSteps, const std::vector<int>& displayOrder);
+std::vector<double> movingEdges(const DraggedRow& grabbed, DragKind kind);
+double snapToStep(double edge, double dt, double step);
+double snapToEdges(const std::vector<double>& movingEdges, double dt,
+                   const std::vector<double>& sortedCandidates, double tolerance);
 
 } // namespace qcp::intervals

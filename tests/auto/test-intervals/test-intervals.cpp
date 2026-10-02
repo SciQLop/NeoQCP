@@ -497,3 +497,50 @@ void TestIntervals::selectTestRectFindsRows()
     const QCPDataSelection sel = iv->selectTestRect(rect, false);
     QCOMPARE(sel, QCPDataSelection(QCPDataRange(1, 2)));
 }
+
+void TestIntervals::moveShiftsBothEdges()
+{
+    using namespace qcp::intervals;
+    const auto edits = applyDrag({ { 3, 10, 40, 0 } }, DragKind::Move, 5, 0, { 0 });
+    QCOMPARE(edits.size(), std::size_t { 1 });
+    QCOMPARE(edits[0].row, 3);
+    QCOMPARE(edits[0].start, 15.0);
+    QCOMPARE(edits[0].stop, 45.0);
+}
+
+void TestIntervals::resizeNeverCrossesTheOtherEdge()
+{
+    using namespace qcp::intervals;
+    QCOMPARE(applyDrag({ { 0, 10, 40, 0 } }, DragKind::ResizeLeft, 50, 0, { 0 })[0].start, 40.0);
+    QCOMPARE(applyDrag({ { 0, 10, 40, 0 } }, DragKind::ResizeRight, -50, 0, { 0 })[0].stop, 10.0);
+    QCOMPARE(applyDrag({ { 0, 10, 40, 0 } }, DragKind::ResizeRight, 5, 0, { 0 })[0].start, 10.0);
+}
+
+void TestIntervals::laneDeltaClampsAtEdges()
+{
+    using qcp::intervals::shiftLane;
+    QCOMPARE(shiftLane(0, -1, { 0, 1, 2 }), 0);
+    QCOMPARE(shiftLane(2, 5, { 0, 1, 2 }), 2);
+    QCOMPARE(shiftLane(1, 1, { 0, 1, 2 }), 2);
+}
+
+void TestIntervals::laneDeltaSkipsHiddenLanes()
+{
+    using qcp::intervals::shiftLane;
+    QCOMPARE(shiftLane(0, 1, { 0, 2 }), 2);
+    QCOMPARE(shiftLane(1, 1, { 0, 2 }), 1); // hidden lane: stays
+}
+
+void TestIntervals::snapToStepAlignsTheEdge()
+{
+    QCOMPARE(qcp::intervals::snapToStep(12, 5, 10), 8.0);
+    QCOMPARE(qcp::intervals::snapToStep(12, 5, 0), 5.0);
+}
+
+void TestIntervals::snapToEdgesLandsOnTheClosestCandidate()
+{
+    using qcp::intervals::snapToEdges;
+    QCOMPARE(snapToEdges({ 10, 40 }, 4.5, { 45.5, 100 }, 2), 5.5);
+    QCOMPARE(snapToEdges({ 10, 40 }, 4.5, { 50, 100 }, 2), 4.5);
+    QCOMPARE(snapToEdges({ 10 }, 0, {}, 2), 0.0);
+}

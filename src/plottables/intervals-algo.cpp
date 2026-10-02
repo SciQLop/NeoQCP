@@ -105,4 +105,77 @@ void appendDiamond(std::vector<float>& out, QPointF c, double h, const std::arra
         appendVertex(out, p, rgba);
 }
 
+int shiftLane(int lane, int steps, const std::vector<int>& displayOrder)
+{
+    const auto it = std::ranges::find(displayOrder, lane);
+    if (it == displayOrder.end())
+        return lane;
+    const auto position = std::clamp<std::ptrdiff_t>(it - displayOrder.begin() + steps, 0,
+                                                     std::ssize(displayOrder) - 1);
+    return displayOrder[position];
+}
+
+std::vector<Edit> applyDrag(const std::vector<DraggedRow>& rows, DragKind kind, double dt,
+                            int laneSteps, const std::vector<int>& displayOrder)
+{
+    std::vector<Edit> edits;
+    edits.reserve(rows.size());
+    for (const auto& r : rows)
+    {
+        switch (kind)
+        {
+            case DragKind::Move:
+                edits.push_back({ r.row, r.start + dt, r.stop + dt,
+                                  shiftLane(r.lane, laneSteps, displayOrder) });
+                break;
+            case DragKind::ResizeLeft:
+                edits.push_back({ r.row, std::min(r.start + dt, r.stop), r.stop, r.lane });
+                break;
+            case DragKind::ResizeRight:
+                edits.push_back({ r.row, r.start, std::max(r.stop + dt, r.start), r.lane });
+                break;
+        }
+    }
+    return edits;
+}
+
+std::vector<double> movingEdges(const DraggedRow& grabbed, DragKind kind)
+{
+    switch (kind)
+    {
+        case DragKind::ResizeLeft:
+            return { grabbed.start };
+        case DragKind::ResizeRight:
+            return { grabbed.stop };
+        case DragKind::Move:
+            break;
+    }
+    return { grabbed.start, grabbed.stop };
+}
+
+double snapToStep(double edge, double dt, double step)
+{
+    if (step <= 0)
+        return dt;
+    return std::round((edge + dt) / step) * step - edge;
+}
+
+double snapToEdges(const std::vector<double>& movingEdges, double dt,
+                   const std::vector<double>& sortedCandidates, double tolerance)
+{
+    double best = dt, bestDistance = tolerance;
+    for (double edge : movingEdges)
+    {
+        const double target = edge + dt;
+        const auto it = std::ranges::lower_bound(sortedCandidates, target);
+        for (auto c : { it, it == sortedCandidates.begin() ? it : std::prev(it) })
+            if (c != sortedCandidates.end() && std::abs(*c - target) <= bestDistance)
+            {
+                bestDistance = std::abs(*c - target);
+                best = *c - edge;
+            }
+    }
+    return best;
+}
+
 } // namespace qcp::intervals

@@ -27,6 +27,7 @@ public:
     [[nodiscard]] QStringList laneNames() const { return mNames; }
     void setDisplayOrder(const QStringList& names);
     [[nodiscard]] QStringList displayOrder() const;
+    [[nodiscard]] const std::vector<int>& displayLanes() const { return mOrder; }
     bool renameLane(const QString& from, const QString& to);
 
     [[nodiscard]] bool laneVisible(int lane) const { return displayPosition(lane) >= 0; }

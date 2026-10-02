@@ -48,6 +48,13 @@ private slots:
     void shiftDragSelectsRowsInTheRect();
     void selectTestRectFindsRows();
 
+    void moveShiftsBothEdges();
+    void resizeNeverCrossesTheOtherEdge();
+    void laneDeltaClampsAtEdges();
+    void laneDeltaSkipsHiddenLanes();
+    void snapToStepAlignsTheEdge();
+    void snapToEdgesLandsOnTheClosestCandidate();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };
