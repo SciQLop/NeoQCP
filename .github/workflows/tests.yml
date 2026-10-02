@@ -87,6 +87,9 @@ jobs:
         run: |
           echo "$env:GITHUB_WORKSPACE\Qt\$env:QT_VERSION\${{ matrix.qt_dir }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
           echo "QT_QPA_PLATFORM=offscreen" >> $env:GITHUB_ENV
+          # offscreen loads fonts only from QT_QPA_FONTDIR (Qt's own fonts dir by default, absent
+          # here): without it every glyph is a box and text comparisons test nothing.
+          echo "QT_QPA_FONTDIR=C:\Windows\Fonts" >> $env:GITHUB_ENV
       - name: Set up environment (macOS)
         if: runner.os == 'macOS'
         run: |
