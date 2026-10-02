@@ -20,6 +20,7 @@ public:
     void setCategoryColors(const QVector<QColor>& colors);
     [[nodiscard]] QColor categoryColor(int category) const;
     [[nodiscard]] quint64 buildCount() const { return mBuildCount; }
+    [[nodiscard]] QCPLayer* labelLayer() const;
 
     double selectTest(const QPointF& pos, bool onlySelectable,
                       QVariant* details = nullptr) const override;

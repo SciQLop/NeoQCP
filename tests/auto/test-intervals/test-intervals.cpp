@@ -354,3 +354,25 @@ void TestIntervals::barsAndLabelsShowOnTheGpu()
         nonRed += isRedish(pixelAt(frame, mPlot, key, 12)) ? 0 : 1;
     QVERIFY2(nonRed > 5, "label text is hidden under the GPU bars");
 }
+
+void TestIntervals::mergedBarsGetNoLabel()
+{
+    QCPLaneLayout layout;
+    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto c = columns({ 0, 20 }, { 30, 50 }, { layout.laneIndex("A"), layout.laneIndex("A") });
+    c.labels = QStringList { "a", "b" };
+    iv->setData(std::move(c));
+    iv->setCategoryColors({ Qt::red });
+    mPlot->xAxis->setRange(0, 100);
+    mPlot->toPixmap(400, 300);
+    QVERIFY(iv->mLabelRects.empty());
+}
+
+void TestIntervals::labelLayerFollowsThePlottablesLayer()
+{
+    QCPLaneLayout layout;
+    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    QVERIFY(mPlot->addLayer(QStringLiteral("custom")));
+    QVERIFY(iv->setLayer(QStringLiteral("custom")));
+    QCOMPARE(iv->labelLayer(), mPlot->layer(QStringLiteral("custom.intervals-labels")));
+}

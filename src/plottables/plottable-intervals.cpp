@@ -64,6 +64,11 @@ QCPIntervals::QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* 
 {
     connect(layout, &QCPLaneLayout::changed, this, [this] { regroupIfLanesWereAdded(); });
     mLabelLayer = new LabelLayer(mParentPlot, this, layerAbove(mParentPlot, layer()));
+    // Keep the label layerable one layer above wherever this plottable itself moves to.
+    connect(this, &QCPLayerable::layerChanged, this, [this](QCPLayer* newLayer) {
+        if (newLayer)
+            mLabelLayer->setLayer(layerAbove(mParentPlot, newLayer));
+    });
 }
 
 void QCPIntervals::setData(qcp::intervals::Columns columns)
@@ -95,6 +100,8 @@ QColor QCPIntervals::categoryColor(int category) const
     // golden-angle hue steps keep neighbouring categories far apart
     return QColor::fromHsv((std::max(0, category) * 137) % 360, 160, 220);
 }
+
+QCPLayer* QCPIntervals::labelLayer() const { return mLabelLayer->layer(); }
 
 double QCPIntervals::selectTest(const QPointF&, bool, QVariant*) const { return -1; }
 
@@ -157,6 +164,10 @@ void QCPIntervals::rebuildBars()
     mVertices.clear();
     for (const auto& bar : mBars)
     {
+        // Merged bars (row == -1, see appendMerged) never get a label: it's ambiguous
+        // which source row's text a bar spanning several rows would show.
+        if (bar.row != -1)
+            appendLabelRect(bar);
         if (bar.instant)
             qcp::intervals::appendDiamond(mVertices, { (bar.x0 + bar.x1) / 2, (bar.y0 + bar.y1) / 2 },
                                           4, rgba(bar.category));
@@ -176,12 +187,11 @@ void QCPIntervals::appendLaneBars(int lane, const QCPLaneBand& band)
         const int row = rows.rows[i];
         if (mColumns.stop[row] < range.lower)
             continue;
-        const auto bar = qcp::intervals::toPixelBar(mKeyAxis->coordToPixel(mColumns.start[row]),
-                                                    mKeyAxis->coordToPixel(mColumns.stop[row]),
-                                                    band.top + 1, band.bottom - 1,
-                                                    mColumns.category[row], row);
-        appendLabelRect(bar);
-        qcp::intervals::appendMerged(mBars, bar);
+        qcp::intervals::appendMerged(
+            mBars, qcp::intervals::toPixelBar(mKeyAxis->coordToPixel(mColumns.start[row]),
+                                              mKeyAxis->coordToPixel(mColumns.stop[row]),
+                                              band.top + 1, band.bottom - 1,
+                                              mColumns.category[row], row));
     }
 }
 

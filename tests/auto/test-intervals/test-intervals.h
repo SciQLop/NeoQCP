@@ -36,6 +36,8 @@ private slots:
     void labelIsDrawnOnlyWhenItFits();
     void stripDrawsLaneNamesOnce();
     void barsAndLabelsShowOnTheGpu();
+    void mergedBarsGetNoLabel();
+    void labelLayerFollowsThePlottablesLayer();
 
 private:
     QCustomPlot* mPlot = nullptr;
