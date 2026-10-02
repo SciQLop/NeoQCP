@@ -41,6 +41,7 @@ test_srcs = [
     'test-data-swap/test-data-swap.cpp',
     'test-color-by-scalar/test-color-by-scalar.cpp',
     'test-gradient-presets/test-gradient-presets.cpp',
+    'test-intervals/test-intervals.cpp',
 ]
 
 test_headers = [
@@ -81,6 +82,7 @@ test_headers = [
     'test-data-swap/test-data-swap.h',
     'test-color-by-scalar/test-color-by-scalar.h',
     'test-gradient-presets/test-gradient-presets.h',
+    'test-intervals/test-intervals.h',
 ]
 test_moc_files = qtmod.compile_moc(headers : test_headers)
 

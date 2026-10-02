@@ -35,6 +35,7 @@
 #include "test-hidden-replot/test-hidden-replot.h"
 #include "test-color-by-scalar/test-color-by-scalar.h"
 #include "test-gradient-presets/test-gradient-presets.h"
+#include "test-intervals/test-intervals.h"
 
 static bool shouldRun(const char* name)
 {
@@ -91,6 +92,7 @@ int main(int argc, char **argv)
   QCPTEST(TestHiddenReplot);
   QCPTEST(TestColorByScalar);
   QCPTEST(TestGradientPresets);
+  QCPTEST(TestIntervals);
 
   return failures == 0 ? 0 : 1;
 }
