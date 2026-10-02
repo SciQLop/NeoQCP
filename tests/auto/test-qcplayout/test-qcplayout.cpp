@@ -1,4 +1,5 @@
 #include "test-qcplayout.h"
+#include "../expect-debug.h"
 
 void TestQCPLayout::init()
 {
@@ -27,19 +28,19 @@ void TestQCPLayout::layoutGridElementManagement()
   QCPAxisRect *r2 = new QCPAxisRect(mPlot);
   QCPAxisRect *r3 = new QCPAxisRect(mPlot);
   
-  QTest::ignoreMessage(QtDebugMsg, "bool QCPLayoutGrid::addElement(int, int, QCPLayoutElement*) There is already an element in the specified row/column: 0 0 ");
+  expectDebugFrom("QCPLayoutGrid::addElement", "There is already an element in the specified row/column: 0 0");
   QVERIFY(!mainLayout->addElement(0, 0, r1));
   QVERIFY(mainLayout->addElement(0, 1, r1));
   QCOMPARE(mainLayout->columnCount(), 2);
   QCOMPARE(mainLayout->rowCount(), 1);
   
-  QTest::ignoreMessage(QtDebugMsg, "bool QCPLayoutGrid::addElement(int, int, QCPLayoutElement*) There is already an element in the specified row/column: 0 1 ");
+  expectDebugFrom("QCPLayoutGrid::addElement", "There is already an element in the specified row/column: 0 1");
   QVERIFY(!mainLayout->addElement(0, 1, r2));
   QVERIFY(mainLayout->addElement(1, 0, r2));
   QCOMPARE(mainLayout->columnCount(), 2);
   QCOMPARE(mainLayout->rowCount(), 2);
   
-  QTest::ignoreMessage(QtDebugMsg, "bool QCPLayoutGrid::addElement(int, int, QCPLayoutElement*) There is already an element in the specified row/column: 1 0 ");
+  expectDebugFrom("QCPLayoutGrid::addElement", "There is already an element in the specified row/column: 1 0");
   QVERIFY(!mainLayout->addElement(1, 0, r3));
   QVERIFY(mainLayout->addElement(2, 4, r3));
   QCOMPARE(mainLayout->columnCount(), 5);
@@ -60,11 +61,11 @@ void TestQCPLayout::layoutGridElementManagement()
   
   QCOMPARE(mainLayout->columnCount(), 3);
   QCOMPARE(mainLayout->rowCount(), 3);
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 0 Column: 2 ");
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 1 Column: 1 ");
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 1 Column: 2 ");
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 2 Column: 0 ");
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 2 Column: 1 ");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 0 Column: 2");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 1 Column: 1");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 1 Column: 2");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 2 Column: 0");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 2 Column: 1");
   QCOMPARE(mainLayout->element(0, 0), mPlot->axisRect());
   QCOMPARE(mainLayout->element(0, 1), r1);
   QCOMPARE(mainLayout->element(0, 2), (QCPLayoutElement*)0);
@@ -86,14 +87,14 @@ void TestQCPLayout::layoutGridElementManagement()
   */
   QCOMPARE(mainLayout->columnCount(), 2);
   QCOMPARE(mainLayout->rowCount(), 2);
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 1 Column: 1 ");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 1 Column: 1");
   QCOMPARE(mainLayout->element(0, 0), mPlot->axisRect());
   QCOMPARE(mainLayout->element(0, 1), r1);
   QCOMPARE(mainLayout->element(1, 0), r2);
   QCOMPARE(mainLayout->element(1, 1), (QCPLayoutElement*)0);
   // test whether linear index correctly changes for different fill orders:
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 1 Column: 1 ");
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 1 Column: 1 ");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 1 Column: 1");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 1 Column: 1");
   mainLayout->setFillOrder(QCPLayoutGrid::foRowsFirst, false);
   QCOMPARE(mainLayout->elementAt(0), mainLayout->element(0, 0));
   QCOMPARE(mainLayout->elementAt(1), mainLayout->element(1, 0));
@@ -121,8 +122,8 @@ void TestQCPLayout::layoutGridElementManagement()
   QCOMPARE(mainLayout->takeAt(1), r2);
   delete r2;
   delete mainAxisRect;
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 0 Column: 0 ");
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 1 Column: 0 ");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 0 Column: 0");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 1 Column: 0");
   QCOMPARE(mainLayout->element(0, 0), (QCPLayoutElement*)0);
   QCOMPARE(mainLayout->element(1, 0), (QCPLayoutElement*)0);
   // now simplify should collapse to 0x0:
@@ -130,7 +131,7 @@ void TestQCPLayout::layoutGridElementManagement()
   QVERIFY(!mainLayout->hasElement(0, 0));
   QCOMPARE(mainLayout->columnCount(), 0);
   QCOMPARE(mainLayout->rowCount(), 0);
-  QTest::ignoreMessage(QtDebugMsg, "QCPAxisRect* QCustomPlot::axisRect(int) const invalid axis rect index 0 ");
+  expectDebugFrom("QCustomPlot::axisRect", "invalid axis rect index 0");
   QVERIFY(!(bool)mPlot->axisRect());
   // repopulate:
   QCPAxisRect *r4 = new QCPAxisRect(mPlot);
@@ -147,7 +148,7 @@ void TestQCPLayout::layoutGridInsertion()
   mainLayout->setRowStretchFactor(0, 3);
   mainLayout->insertColumn(0);
   QCOMPARE(mainLayout->columnCount(), 2);
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 0 Column: 0 ");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 0 Column: 0");
   QCOMPARE(mainLayout->element(0, 0), (QCPLayoutElement*)0);
   QCOMPARE(mainLayout->element(0, 1), mPlot->axisRect());
   QCOMPARE(mainLayout->columnStretchFactors().at(0), 1.0);
@@ -155,8 +156,8 @@ void TestQCPLayout::layoutGridInsertion()
   
   mainLayout->insertColumn(2);
   QCOMPARE(mainLayout->columnCount(), 3);
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 0 Column: 0 ");
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 0 Column: 2 ");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 0 Column: 0");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 0 Column: 2");
   QCOMPARE(mainLayout->element(0, 0), (QCPLayoutElement*)0);
   QCOMPARE(mainLayout->element(0, 1), mPlot->axisRect());
   QCOMPARE(mainLayout->element(0, 2), (QCPLayoutElement*)0);
@@ -166,11 +167,11 @@ void TestQCPLayout::layoutGridInsertion()
   
   mainLayout->insertRow(0);
   QCOMPARE(mainLayout->rowCount(), 2);
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 0 Column: 0 ");
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 0 Column: 1 ");
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 0 Column: 2 ");
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 1 Column: 0 ");
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 1 Column: 2 ");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 0 Column: 0");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 0 Column: 1");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 0 Column: 2");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 1 Column: 0");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 1 Column: 2");
   QCOMPARE(mainLayout->element(0, 0), (QCPLayoutElement*)0);
   QCOMPARE(mainLayout->element(0, 1), (QCPLayoutElement*)0);
   QCOMPARE(mainLayout->element(0, 2), (QCPLayoutElement*)0);
@@ -182,14 +183,14 @@ void TestQCPLayout::layoutGridInsertion()
   
   mainLayout->insertRow(2);
   QCOMPARE(mainLayout->rowCount(), 3);
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 0 Column: 0 ");
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 0 Column: 1 ");
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 0 Column: 2 ");
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 1 Column: 0 ");
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 1 Column: 2 ");
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 2 Column: 0 ");
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 2 Column: 1 ");
-  QTest::ignoreMessage(QtDebugMsg, "QCPLayoutElement* QCPLayoutGrid::element(int, int) const Requested cell is empty. Row: 2 Column: 2 ");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 0 Column: 0");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 0 Column: 1");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 0 Column: 2");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 1 Column: 0");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 1 Column: 2");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 2 Column: 0");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 2 Column: 1");
+  expectDebugFrom("QCPLayoutGrid::element", "Requested cell is empty. Row: 2 Column: 2");
   QCOMPARE(mainLayout->element(0, 0), (QCPLayoutElement*)0);
   QCOMPARE(mainLayout->element(0, 1), (QCPLayoutElement*)0);
   QCOMPARE(mainLayout->element(0, 2), (QCPLayoutElement*)0);
@@ -386,3 +387,14 @@ void TestQCPLayout::marginGroup()
 
 
 
+
+void TestQCPLayout::debugExpectationIgnoresSignatureSpelling()
+{
+  // clang and MSVC spell Q_FUNC_INFO differently from GCC ("QCPLayoutElement *" vs "QCPLayoutElement*")
+  expectDebugFrom("QCPLayoutGrid::addElement", "There is already an element in the specified row/column: 0 0");
+  qDebug() << "bool QCPLayoutGrid::addElement(int, int, QCPLayoutElement *)" << "There is already an element in the specified row/column:" << 0 << 0;
+  expectDebugFrom("QCPLayoutGrid::addElement", "There is already an element in the specified row/column: 0 0");
+  qDebug() << "bool __cdecl QCPLayoutGrid::addElement(int,int,class QCPLayoutElement *)" << "There is already an element in the specified row/column:" << 0 << 0;
+  expectDebugFrom("QCPLayoutGrid::addElement", "There is already an element in the specified row/column: 0 0");
+  qDebug() << "bool QCPLayoutGrid::addElement(int, int, QCPLayoutElement*)" << "There is already an element in the specified row/column:" << 0 << 0;
+}

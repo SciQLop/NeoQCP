@@ -12,6 +12,7 @@ private slots:
   void layoutGridInsertion();
   void layoutGridLayout();
   void marginGroup();
+  void debugExpectationIgnoresSignatureSpelling();
   
   
 private:
