@@ -30,12 +30,20 @@ class PendingStub : public QCPAbstractPlottable
 public:
     PendingStub(QCPAxis* k, QCPAxis* v) : QCPAbstractPlottable(k, v) {}
     int commits = 0;
+    const QElapsedTimer* clock = nullptr;
+    qint64 committedAt = -1; // clock time of the first commit, if a clock is set
     bool pending = true;
     bool committer = true; // commitPendingData()'s return value
     QPointF stall; // non-null once set: makes the layer translate on replot
 
     bool hasPendingData() const override { return pending; }
-    bool commitPendingData() override { ++commits; return committer; }
+    bool commitPendingData() override
+    {
+        if (clock && committedAt < 0)
+            committedAt = clock->elapsed();
+        ++commits;
+        return committer;
+    }
     void notifyBusy() { updateEffectiveBusy(); }
     QPointF stallPixelOffset() const override { return stall; }
 
@@ -76,25 +84,27 @@ void TestDataSwap::requestsWithinWindowCommitOnce()
 {
     auto* a = new PendingStub(mPlot->xAxis, mPlot->yAxis);
     auto* b = new PendingStub(mPlot->xAxis, mPlot->yAxis);
-    mPlot->setDataSwapDebounceMs(200);
+    mPlot->setDataSwapDebounceMs(400);
     QSignalSpy replots(mPlot, &QCustomPlot::afterReplot);
 
     QElapsedTimer clock;
     clock.start();
+    a->clock = &clock;
     mPlot->requestDataSwap();
-    QTest::qWait(120);
+    QTest::qWait(240);
     mPlot->requestDataSwap();          // rides along, must NOT restart the window
     QCOMPARE(a->commits, 0);
     QCOMPARE(b->commits, 0);
 
-    // Leading edge: the commit lands ~200 ms after the FIRST request. A
-    // restarting timer would land at ~320 ms and miss this deadline.
+    // Leading edge: the commit lands ~400 ms after the FIRST request. A restarting timer
+    // would land at 640 ms or later. The commit time is taken inside the commit itself,
+    // not when QTRY polls it, so only timer jitter sits between the two.
     QTRY_COMPARE_WITH_TIMEOUT(a->commits, 1, 2000);
-    QVERIFY2(clock.elapsed() < 280, qPrintable(QString::number(clock.elapsed())));
+    QVERIFY2(a->committedAt < 560, qPrintable(QString::number(a->committedAt)));
     QCOMPARE(b->commits, 1);
     QVERIFY(replots.count() >= 1);
 
-    QTest::qWait(250);                  // no second firing from the second request
+    QTest::qWait(500);                  // no second firing from the second request
     QCOMPARE(a->commits, 1);
     QCOMPARE(b->commits, 1);
 }
