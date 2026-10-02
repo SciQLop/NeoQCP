@@ -765,3 +765,26 @@ void TestIntervals::keysAreNotConsumedWhenNotEditable()
     QKeyEvent e(QEvent::KeyPress, Qt::Key_Delete, Qt::NoModifier);
     QVERIFY(!iv->keyPress(&e));
 }
+
+void TestIntervals::setDataDropsSelectionOfVanishedIds()
+{
+    QCPLaneLayout layout;
+    auto* iv = laidOutTwoBars(mPlot, &layout);
+    iv->setSelectedRows({ 1 });
+    iv->setData(columns({ 10 }, { 40 }, { 0 }));
+    QVERIFY(iv->selectedRows().isEmpty());
+    QVERIFY(iv->selectedIds().isEmpty());
+    mPlot->replot(); // must not read the vanished row
+}
+
+void TestIntervals::setDataSelectionFollowsTheId()
+{
+    QCPLaneLayout layout;
+    auto* iv = laidOutTwoBars(mPlot, &layout);
+    iv->setSelectedRows({ 1 }); // id 101
+    auto c = columns({ 60, 10 }, { 90, 40 }, { 1, 0 });
+    c.ids = { 101, 100 };
+    iv->setData(std::move(c));
+    QCOMPARE(iv->selectedRows(), QVector<int>({ 0 }));
+    QCOMPARE(iv->selectedIds(), QVector<qint64>({ 101 }));
+}

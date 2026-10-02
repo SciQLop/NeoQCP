@@ -73,6 +73,9 @@ private slots:
     void escapeCancelsTheGesture();
     void keysAreNotConsumedWhenNotEditable();
 
+    void setDataDropsSelectionOfVanishedIds();
+    void setDataSelectionFollowsTheId();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };

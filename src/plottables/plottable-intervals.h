@@ -49,6 +49,7 @@ public:
     [[nodiscard]] QVector<int> selectedRows() const;
     [[nodiscard]] QVector<qint64> selectedIds() const;
     void setSelectedRows(const QVector<int>& rows);
+    [[nodiscard]] QVector<int> rowsWithIds(const QVector<qint64>& ids) const;
     [[nodiscard]] QPointF pixelOf(double key, int lane) const;
 
     void setEditable(bool editable);

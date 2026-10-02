@@ -6,6 +6,7 @@
 #include "../axis/axis.h"
 #include "../layoutelements/layoutelement-axisrect.h"
 #include <QFontMetricsF>
+#include <QSet>
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -81,9 +82,21 @@ void QCPIntervals::setData(qcp::intervals::Columns columns)
         throw std::invalid_argument(*error);
     mGesture.reset();
     mRubberBand.reset();
+    const QVector<qint64> selected = selectedIds();
     mColumns = std::move(columns);
     mLanes = qcp::intervals::groupByLane(mColumns, mLayout ? mLayout->laneNames().size() : 0);
     ++mDataGeneration;
+    setSelectedRows(rowsWithIds(selected));
+}
+
+QVector<int> QCPIntervals::rowsWithIds(const QVector<qint64>& ids) const
+{
+    const QSet<qint64> wanted(ids.begin(), ids.end());
+    QVector<int> rows;
+    for (int row = 0; row < rowCount(); ++row)
+        if (wanted.contains(mColumns.ids[row]))
+            rows.append(row);
+    return rows;
 }
 
 // Rows on a lane the layout did not know yet were dropped by groupByLane.
