@@ -67,6 +67,12 @@ private slots:
     void setDataDuringDragCancelsGesture();
     void cursorFollowsThePart();
 
+    void deleteKeyRequestsTheSelectedIds();
+    void arrowsNudgeBySnapStepOrOnePixel();
+    void upDownChangeLaneWhenAllowed();
+    void escapeCancelsTheGesture();
+    void keysAreNotConsumedWhenNotEditable();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };

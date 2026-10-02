@@ -3417,6 +3417,13 @@ void QCustomPlot::keyPressEvent(QKeyEvent* event)
         return;
     }
 
+    for (int i = 0; i < plottableCount(); ++i)
+        if (plottable(i)->keyPress(event))
+        {
+            event->accept();
+            return;
+        }
+
     if (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace)
     {
         for (auto* item : mItems)

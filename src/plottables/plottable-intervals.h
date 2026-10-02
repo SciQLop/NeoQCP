@@ -3,6 +3,7 @@
 #include "plottable1d.h"
 #include "intervals-algo.h"
 #include "lane-layout.h"
+#include <QKeyEvent>
 #include <QPointer>
 #include <optional>
 
@@ -59,6 +60,8 @@ public:
     [[nodiscard]] double snapStep() const { return mSnapStep; }
     [[nodiscard]] std::optional<Qt::CursorShape> cursorAt(const QPointF& pos) const;
     [[nodiscard]] bool gestureActive() const { return mGesture.has_value(); }
+
+    bool keyPress(QKeyEvent* event) override;
 
     double selectTest(const QPointF& pos, bool onlySelectable,
                       QVariant* details = nullptr) const override;
@@ -153,6 +156,7 @@ protected:
     [[nodiscard]] double keysPerPixels(double px) const;
     void emitEdits(const std::vector<qcp::intervals::Edit>& edits);
     void drawPreview(QCPPainter* painter) const;
+    bool nudge(int keySteps, int laneSteps);
 
     bool mEditable = false;
     EditModes mEditModes = EditModes(emMove | emResize);

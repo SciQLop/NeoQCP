@@ -5,6 +5,7 @@
 #include "plottables/plottable-intervals.h"
 #include <QApplication>
 #include <QElapsedTimer>
+#include <QKeyEvent>
 #include <QMouseEvent>
 #include <QtWidgets/qtestsupport_widgets.h>
 #include <numeric>
@@ -695,4 +696,72 @@ void TestIntervals::cursorFollowsThePart()
     QVERIFY(iv->cursorAt(iv->pixelOf(50, 0)) == Qt::CrossCursor);
     iv->setEditable(false);
     QVERIFY(!iv->cursorAt(iv->pixelOf(25, 0)));
+}
+
+namespace {
+void key(QWidget* w, Qt::Key k)
+{
+    QKeyEvent press(QEvent::KeyPress, k, Qt::NoModifier);
+    QApplication::sendEvent(w, &press);
+}
+} // namespace
+
+void TestIntervals::deleteKeyRequestsTheSelectedIds()
+{
+    qRegisterMetaType<QVector<qint64>>();
+    QCPLaneLayout layout;
+    auto* iv = editableTwoBars(mPlot, &layout, QCPIntervals::emDelete);
+    iv->setSelectedRows({ 1 });
+    QSignalSpy spy(iv, &QCPIntervals::deleteRequested);
+    key(mPlot, Qt::Key_Delete);
+    QCOMPARE(spy.count(), 1);
+    QCOMPARE(spy.at(0).at(0).value<QVector<qint64>>(), QVector<qint64>({ 101 }));
+}
+
+void TestIntervals::arrowsNudgeBySnapStepOrOnePixel()
+{
+    QCPLaneLayout layout;
+    auto* iv = editableTwoBars(mPlot, &layout, QCPIntervals::emMove);
+    iv->setSelectedRows({ 0 });
+    QSignalSpy spy(iv, &QCPIntervals::intervalsEdited);
+    iv->setSnap(QCPIntervals::snStep, 5);
+    key(mPlot, Qt::Key_Right);
+    QCOMPARE(spy.at(0).at(0).value<QVector<QCPIntervalEdit>>()[0].start, 15.0);
+    iv->setSnap(QCPIntervals::snNone);
+    key(mPlot, Qt::Key_Left);
+    const double start = spy.at(1).at(0).value<QVector<QCPIntervalEdit>>()[0].start;
+    QVERIFY(start < 10.0 && start > 9.0);
+}
+
+void TestIntervals::upDownChangeLaneWhenAllowed()
+{
+    QCPLaneLayout layout;
+    auto* iv = editableTwoBars(mPlot, &layout, QCPIntervals::emChangeLane);
+    iv->setSelectedRows({ 0 });
+    QSignalSpy spy(iv, &QCPIntervals::intervalsEdited);
+    key(mPlot, Qt::Key_Down);
+    QCOMPARE(spy.at(0).at(0).value<QVector<QCPIntervalEdit>>()[0].lane, 1);
+    key(mPlot, Qt::Key_Right); // emMove is off
+    QCOMPARE(spy.count(), 1);
+}
+
+void TestIntervals::escapeCancelsTheGesture()
+{
+    QCPLaneLayout layout;
+    auto* iv = editableTwoBars(mPlot, &layout, QCPIntervals::emMove);
+    QSignalSpy spy(iv, &QCPIntervals::intervalsEdited);
+    press(mPlot, iv->pixelOf(25, 0).toPoint());
+    moveTo(mPlot, iv->pixelOf(35, 0).toPoint());
+    key(mPlot, Qt::Key_Escape);
+    release(mPlot, iv->pixelOf(35, 0).toPoint());
+    QCOMPARE(spy.count(), 0);
+}
+
+void TestIntervals::keysAreNotConsumedWhenNotEditable()
+{
+    QCPLaneLayout layout;
+    auto* iv = laidOutTwoBars(mPlot, &layout);
+    iv->setSelectedRows({ 0 });
+    QKeyEvent e(QEvent::KeyPress, Qt::Key_Delete, Qt::NoModifier);
+    QVERIFY(!iv->keyPress(&e));
 }

@@ -470,6 +470,51 @@ void QCPIntervals::emitEdits(const std::vector<qcp::intervals::Edit>& edits)
     emit intervalsEdited(out);
 }
 
+bool QCPIntervals::keyPress(QKeyEvent* event)
+{
+    if (event->key() == Qt::Key_Escape && (mGesture || mRubberBand))
+    {
+        mGesture.reset();
+        mRubberBand.reset();
+        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+        return true;
+    }
+    if (!mEditable || !selected())
+        return false;
+    switch (event->key())
+    {
+        case Qt::Key_Delete:
+        case Qt::Key_Backspace:
+            if (!(mEditModes & emDelete))
+                return false;
+            emit deleteRequested(selectedIds());
+            return true;
+        case Qt::Key_Left:
+            return nudge(-1, 0);
+        case Qt::Key_Right:
+            return nudge(1, 0);
+        case Qt::Key_Up:
+            return nudge(0, -1);
+        case Qt::Key_Down:
+            return nudge(0, 1);
+        default:
+            return false;
+    }
+}
+
+bool QCPIntervals::nudge(int keySteps, int laneSteps)
+{
+    if ((keySteps && !(mEditModes & emMove)) || (laneSteps && !(mEditModes & emChangeLane)))
+        return false;
+    const double step = mSnap == snStep && mSnapStep > 0 ? mSnapStep : keysPerPixels(1);
+    std::vector<qcp::intervals::DraggedRow> rows;
+    for (int row : selectedRows())
+        rows.push_back({ row, mColumns.start[row], mColumns.stop[row], mColumns.lane[row] });
+    emitEdits(qcp::intervals::applyDrag(rows, qcp::intervals::DragKind::Move, keySteps * step,
+                                        laneSteps, mLayout->displayLanes()));
+    return true;
+}
+
 std::optional<Qt::CursorShape> QCPIntervals::cursorAt(const QPointF& pos) const
 {
     if (!mEditable)

@@ -40,6 +40,7 @@
 class QCPPainter;
 class QCPAbstractPlottable;
 class QCPPlottableInterface1D;
+class QKeyEvent;
 class QCPLegend;
 
 class QCP_LIB_DECL QCPSelectionDecorator
@@ -164,6 +165,14 @@ public:
 
     virtual QPointF stallPixelOffset() const { return {}; }
     virtual void releaseGpuResources() {}
+
+    // Offered each key press by QCustomPlot::keyPressEvent before item handling;
+    // return true to consume the key and stop it from reaching other plottables/items.
+    virtual bool keyPress(QKeyEvent* event)
+    {
+        Q_UNUSED(event);
+        return false;
+    }
 
     // Returns false when draw() would bail out early (e.g. async pipeline
     // hasn't delivered data yet).  Used by setupPaintBuffers to preserve
