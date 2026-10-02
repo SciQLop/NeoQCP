@@ -450,6 +450,7 @@ protected:
 
     // introduced virtual methods:
     virtual int calculateMargin();
+    void applyTickLabelFormat();
 
     // reimplemented virtual methods:
     virtual void applyDefaultAntialiasingHint(QCPPainter* painter) const override;

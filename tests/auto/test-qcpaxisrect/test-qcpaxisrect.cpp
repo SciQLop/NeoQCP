@@ -391,3 +391,47 @@ void TestQCPAxisRect::axisLabelPictureMatchesDirectText()
     }
   }
 }
+
+void TestQCPAxisRect::logAxisMarginIsRightOnTheFirstFrame()
+{
+  // The margin is measured before the first draw: it must already see the log axis's
+  // abbreviated powers ("10^8", not "1·10^8"), or the first frame lays out wider than the next.
+  QCustomPlot plot;
+  plot.resize(400, 300);
+  plot.setLocale(QLocale(QLocale::English, QLocale::UnitedStates));
+  plot.yAxis->setScaleType(QCPAxis::stLogarithmic);
+  plot.yAxis->setTicker(QSharedPointer<QCPAxisTickerLog>::create());
+  plot.yAxis->setNumberFormat("eb");
+  plot.yAxis->setNumberPrecision(0);
+  plot.yAxis->setTickLabelFont(QFont("sans", 30)); // makes the "1·" prefix hard to miss
+  plot.yAxis->setRange(1e-3, 1e8);
+  plot.replot();
+  const int firstFrame = plot.axisRect()->left();
+  plot.yAxis->setNumberFormat("ebc"); // measured again, now after a draw
+  plot.yAxis->setNumberFormat("eb");
+  plot.replot();
+  QCOMPARE(firstFrame, plot.axisRect()->left());
+}
+
+void TestQCPAxisRect::beautifulPowersInEveryLocale()
+{
+  // QLocale::exponential() is "E" for most locales, while number formatting writes "1e+08":
+  // beautiful powers must not depend on the case of the exponent character.
+  for (const QLocale& locale : {QLocale::c(), QLocale(QLocale::English, QLocale::UnitedStates),
+                                QLocale(QLocale::French, QLocale::France)})
+  {
+    QCustomPlot plot;
+    plot.setLocale(locale);
+    auto measure = [&](bool beautiful) {
+      QCPAxisPainterPrivate axis(&plot);
+      axis.type = QCPAxis::atLeft;
+      axis.tickLabelFont = QFont("sans", 30);
+      axis.tickLabelSide = QCPAxis::lsOutside;
+      axis.substituteExponent = beautiful;
+      axis.abbreviateDecimalPowers = true;
+      axis.tickLabels = {QStringLiteral("1e+08")};
+      return axis.size();
+    };
+    QVERIFY2(measure(true) < measure(false), qPrintable(locale.name()));
+  }
+}

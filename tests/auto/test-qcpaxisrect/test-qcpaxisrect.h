@@ -18,6 +18,8 @@ private slots:
   void axisLabelLaidOutOncePerChange();
   void axisLabelRedrawnForExports();
   void axisLabelPictureMatchesDirectText();
+  void logAxisMarginIsRightOnTheFirstFrame();
+  void beautifulPowersInEveryLocale();
   
 private:
   QCustomPlot *mPlot;

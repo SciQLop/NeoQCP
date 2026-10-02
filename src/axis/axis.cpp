@@ -2027,14 +2027,13 @@ void QCPAxis::draw(QCPPainter* painter)
     mAxisPainter->labelColor = getLabelColor();
     mAxisPainter->label = mLabel;
     mAxisPainter->labelRenderer = mLabelRenderer;
-    mAxisPainter->substituteExponent = mNumberBeautifulPowers;
+    applyTickLabelFormat();
     mAxisPainter->tickPen = getTickPen();
     mAxisPainter->subTickPen = getSubTickPen();
     mAxisPainter->tickLabelFont = getTickLabelFont();
     mAxisPainter->tickLabelColor = getTickLabelColor();
     mAxisPainter->axisRect = mAxisRect->rect();
     mAxisPainter->viewportRect = mParentPlot->viewport();
-    mAxisPainter->abbreviateDecimalPowers = mScaleType == stLogarithmic;
     mAxisPainter->reversedEndings = mRangeReversed;
     mAxisPainter->tickPositions = tickPositions;
     mAxisPainter->tickLabels = tickLabels;
@@ -2188,6 +2187,7 @@ int QCPAxis::calculateMargin()
     mAxisPainter->label = mLabel;
     mAxisPainter->labelRenderer = mLabelRenderer;
     mAxisPainter->tickLabelFont = mTickLabelFont;
+    applyTickLabelFormat();
     mAxisPainter->axisRect = mAxisRect->rect();
     mAxisPainter->viewportRect = mParentPlot->viewport();
     mAxisPainter->tickPositions = tickPositions;
@@ -2198,6 +2198,18 @@ int QCPAxis::calculateMargin()
     mCachedMargin = margin;
     mCachedMarginValid = true;
     return margin;
+}
+
+/*! \internal
+
+  Hands the axis painter what changes how a tick label reads. Both \ref calculateMargin and
+  \ref draw call it, so the margin is measured for the text that gets drawn, even before the
+  first draw.
+*/
+void QCPAxis::applyTickLabelFormat()
+{
+    mAxisPainter->substituteExponent = mNumberBeautifulPowers;
+    mAxisPainter->abbreviateDecimalPowers = mScaleType == stLogarithmic;
 }
 
 /* inherits documentation from base class */
@@ -2642,6 +2654,7 @@ QByteArray QCPAxisPainterPrivate::generateLabelParameterHash() const
     result.append(QByteArray::number(int(tickLabelSide)));
     result.append(QByteArray::number(int(substituteExponent)));
     result.append(QByteArray::number(int(numberMultiplyCross)));
+    result.append(QByteArray::number(int(abbreviateDecimalPowers)));
     result.append(tickLabelColor.name().toLatin1()
                   + QByteArray::number(tickLabelColor.alpha(), 16));
     result.append(tickLabelFont.toString().toLatin1());
@@ -2851,7 +2864,9 @@ QCPAxisPainterPrivate::getTickLabelData(const QFont& font, const QString& text)
     int eLast = -1; // last index of exponent part, rest of text after this will be suffixPart
     if (substituteExponent)
     {
-        ePos = text.indexOf(QString(mParentPlot->locale().exponential()));
+        // QLocale::exponential() is "E" for most locales, while QLocale::toString(x, 'e') writes
+        // a lowercase "e": the case must not decide whether powers are beautified.
+        ePos = text.indexOf(QString(mParentPlot->locale().exponential()), 0, Qt::CaseInsensitive);
         if (ePos > 0 && text.at(ePos - 1).isDigit())
         {
             eLast = ePos;
