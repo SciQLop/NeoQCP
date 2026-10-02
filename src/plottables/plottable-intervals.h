@@ -6,6 +6,14 @@
 #include <QPointer>
 #include <optional>
 
+struct QCPIntervalEdit
+{
+    qint64 id;
+    double start, stop;
+    int lane;
+};
+Q_DECLARE_METATYPE(QCPIntervalEdit)
+
 class QCP_LIB_DECL QCPIntervals : public QCPAbstractPlottable, public QCPPlottableInterface1D
 {
     Q_OBJECT
@@ -31,11 +39,26 @@ public:
         HitPart part = hpNone;
     };
 
+    enum EditMode { emMove = 0x01, emResize = 0x02, emChangeLane = 0x04, emCreate = 0x08, emDelete = 0x10 };
+    Q_DECLARE_FLAGS(EditModes, EditMode)
+
+    enum SnapMode { snNone, snEdges, snStep };
+
     [[nodiscard]] Hit hitTest(const QPointF& pos) const;
     [[nodiscard]] QVector<int> selectedRows() const;
     [[nodiscard]] QVector<qint64> selectedIds() const;
     void setSelectedRows(const QVector<int>& rows);
     [[nodiscard]] QPointF pixelOf(double key, int lane) const;
+
+    void setEditable(bool editable);
+    [[nodiscard]] bool editable() const { return mEditable; }
+    void setEditModes(EditModes modes);
+    [[nodiscard]] EditModes editModes() const { return mEditModes; }
+    void setSnap(SnapMode mode, double step = 0);
+    [[nodiscard]] SnapMode snapMode() const { return mSnap; }
+    [[nodiscard]] double snapStep() const { return mSnapStep; }
+    [[nodiscard]] std::optional<Qt::CursorShape> cursorAt(const QPointF& pos) const;
+    [[nodiscard]] bool gestureActive() const { return mGesture.has_value(); }
 
     double selectTest(const QPointF& pos, bool onlySelectable,
                       QVariant* details = nullptr) const override;
@@ -63,6 +86,11 @@ public:
     QCPDataSelection selectTestRect(const QRectF& rect, bool onlySelectable) const override;
     [[nodiscard]] int findBegin(double sortKey, bool expandedRange = true) const override;
     [[nodiscard]] int findEnd(double sortKey, bool expandedRange = true) const override;
+
+Q_SIGNALS:
+    void intervalsEdited(const QVector<QCPIntervalEdit>& edits);
+    void intervalCreated(double start, double stop, int lane);
+    void deleteRequested(const QVector<qint64>& ids);
 
 protected:
     struct BuildKey
@@ -101,6 +129,37 @@ protected:
     [[nodiscard]] QVector<int> rowsInRect(const QRectF& rect) const;
     void drawSelection(QCPPainter* painter) const;
 
+    struct Gesture
+    {
+        enum Kind { Move, ResizeLeft, ResizeRight, Create } kind;
+        QPointF pressPos;
+        double pressKey = 0;
+        int pressLane = -1;
+        std::vector<qcp::intervals::DraggedRow> rows; // the grabbed row first
+        std::vector<double> snapCandidates;
+        std::vector<qcp::intervals::Edit> preview;
+        bool moved = false;
+    };
+
+    static qcp::intervals::DragKind dragKind(Gesture::Kind kind);
+    [[nodiscard]] std::optional<Gesture::Kind> gestureKindFor(const Hit& hit) const;
+    bool startGesture(const Hit& hit, const QPointF& pos);
+    void updateGesture(const QPointF& pos);
+    void finishGesture();
+    [[nodiscard]] std::vector<qcp::intervals::DraggedRow> draggedRowsFor(const Hit& hit, Gesture::Kind kind) const;
+    [[nodiscard]] std::vector<double> snapCandidatesExcluding(const std::vector<qcp::intervals::DraggedRow>& rows) const;
+    [[nodiscard]] double snappedDelta(double raw) const;
+    [[nodiscard]] int laneStepsTo(const QPointF& pos) const;
+    [[nodiscard]] double keysPerPixels(double px) const;
+    void emitEdits(const std::vector<qcp::intervals::Edit>& edits);
+    void drawPreview(QCPPainter* painter) const;
+
+    bool mEditable = false;
+    EditModes mEditModes = EditModes(emMove | emResize);
+    SnapMode mSnap = snNone;
+    double mSnapStep = 0;
+    std::optional<Gesture> mGesture;
+
     std::optional<QRectF> mRubberBand;
 
     QPointer<QCPLaneLayout> mLayout;
@@ -124,3 +183,4 @@ protected:
 
     friend class TestIntervals;
 };
+Q_DECLARE_OPERATORS_FOR_FLAGS(QCPIntervals::EditModes)

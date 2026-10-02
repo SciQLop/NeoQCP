@@ -55,6 +55,18 @@ private slots:
     void snapToStepAlignsTheEdge();
     void snapToEdgesLandsOnTheClosestCandidate();
 
+    void dragBodyEmitsOnceOnReleaseAndLeavesDataAlone();
+    void clickWithoutMovingEmitsNothing();
+    void dragRightEdgeResizes();
+    void verticalDragChangesLaneOnlyWhenAllowed();
+    void selectedIntervalsMoveTogether();
+    void dragOnEmptyLaneCreates();
+    void notEditableIgnoresDrags();
+    void snapToEdgesLandsExactly();
+    void snapToStepLandsOnMultiples();
+    void setDataDuringDragCancelsGesture();
+    void cursorFollowsThePart();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };

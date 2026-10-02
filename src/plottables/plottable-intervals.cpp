@@ -7,6 +7,7 @@
 #include "../layoutelements/layoutelement-axisrect.h"
 #include <QFontMetricsF>
 #include <algorithm>
+#include <cmath>
 #include <stdexcept>
 
 // Draws the owning QCPIntervals' bar labels and lane names. Lives one layer above
@@ -35,6 +36,7 @@ protected:
         if (mOwner->drawsLaneNames())
             mOwner->drawLaneNames(painter);
         mOwner->drawSelection(painter);
+        mOwner->drawPreview(painter);
     }
 
 private:
@@ -77,6 +79,8 @@ void QCPIntervals::setData(qcp::intervals::Columns columns)
 {
     if (auto error = qcp::intervals::invalidColumns(columns))
         throw std::invalid_argument(*error);
+    mGesture.reset();
+    mRubberBand.reset();
     mColumns = std::move(columns);
     mLanes = qcp::intervals::groupByLane(mColumns, mLayout ? mLayout->laneNames().size() : 0);
     ++mDataGeneration;
@@ -265,9 +269,19 @@ int QCPIntervals::findEnd(double, bool) const { return rowCount(); }
 void QCPIntervals::mousePressEvent(QMouseEvent* event, const QVariant&)
 {
     const Hit hit = hitTest(event->pos());
-    if (event->button() == Qt::LeftButton && (event->modifiers() & Qt::ShiftModifier) && hit.lane >= 0)
+    if (event->button() != Qt::LeftButton || hit.part == hpNone)
+    {
+        event->ignore();
+        return;
+    }
+    if (event->modifiers() & Qt::ShiftModifier)
     {
         mRubberBand = QRectF(event->pos(), event->pos());
+        event->accept();
+        return;
+    }
+    if (mEditable && startGesture(hit, event->pos()))
+    {
         event->accept();
         return;
     }
@@ -276,19 +290,25 @@ void QCPIntervals::mousePressEvent(QMouseEvent* event, const QVariant&)
 
 void QCPIntervals::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
 {
-    if (!mRubberBand)
-        return;
-    mRubberBand = QRectF(startPos, event->pos()).normalized();
-    mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    if (mRubberBand)
+    {
+        mRubberBand = QRectF(startPos, event->pos()).normalized();
+        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    }
+    else if (mGesture)
+        updateGesture(event->pos());
 }
 
 void QCPIntervals::mouseReleaseEvent(QMouseEvent* event, const QPointF& startPos)
 {
-    if (!mRubberBand)
-        return;
-    setSelectedRows(rowsInRect(QRectF(startPos, event->pos()).normalized()));
-    mRubberBand.reset();
-    mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    if (mRubberBand)
+    {
+        setSelectedRows(rowsInRect(QRectF(startPos, event->pos()).normalized()));
+        mRubberBand.reset();
+        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    }
+    else if (mGesture)
+        finishGesture();
 }
 
 void QCPIntervals::drawSelection(QCPPainter* painter) const
@@ -304,6 +324,204 @@ void QCPIntervals::drawSelection(QCPPainter* painter) const
         painter->setPen(QPen(mKeyAxis->tickLabelColor(), 1, Qt::DashLine));
         painter->drawRect(*mRubberBand);
     }
+}
+
+qcp::intervals::DragKind QCPIntervals::dragKind(Gesture::Kind kind)
+{
+    switch (kind)
+    {
+        case Gesture::ResizeLeft:
+            return qcp::intervals::DragKind::ResizeLeft;
+        case Gesture::ResizeRight:
+            return qcp::intervals::DragKind::ResizeRight;
+        default:
+            return qcp::intervals::DragKind::Move;
+    }
+}
+
+std::optional<QCPIntervals::Gesture::Kind> QCPIntervals::gestureKindFor(const Hit& hit) const
+{
+    const bool canMove = mEditModes & (emMove | emChangeLane);
+    switch (hit.part)
+    {
+        case hpBody:
+            return canMove ? std::optional(Gesture::Move) : std::nullopt;
+        case hpLeftEdge:
+            return (mEditModes & emResize) ? std::optional(Gesture::ResizeLeft)
+                                           : (canMove ? std::optional(Gesture::Move) : std::nullopt);
+        case hpRightEdge:
+            return (mEditModes & emResize) ? std::optional(Gesture::ResizeRight)
+                                           : (canMove ? std::optional(Gesture::Move) : std::nullopt);
+        case hpEmpty:
+            return (mEditModes & emCreate) ? std::optional(Gesture::Create) : std::nullopt;
+        case hpNone:
+            break;
+    }
+    return std::nullopt;
+}
+
+bool QCPIntervals::startGesture(const Hit& hit, const QPointF& pos)
+{
+    const auto kind = gestureKindFor(hit);
+    if (!kind)
+        return false;
+    Gesture g { *kind, pos, mKeyAxis->pixelToCoord(pos.x()), hit.lane };
+    g.rows = draggedRowsFor(hit, *kind);
+    g.snapCandidates = snapCandidatesExcluding(g.rows);
+    mGesture = std::move(g);
+    return true;
+}
+
+std::vector<qcp::intervals::DraggedRow> QCPIntervals::draggedRowsFor(const Hit& hit, Gesture::Kind kind) const
+{
+    if (kind == Gesture::Create)
+        return {};
+    auto dragged = [this](int row) {
+        return qcp::intervals::DraggedRow { row, mColumns.start[row], mColumns.stop[row], mColumns.lane[row] };
+    };
+    std::vector<qcp::intervals::DraggedRow> rows { dragged(hit.row) };
+    const QVector<int> selection = selectedRows();
+    if (kind == Gesture::Move && selection.contains(hit.row))
+        for (int row : selection)
+            if (row != hit.row)
+                rows.push_back(dragged(row));
+    return rows;
+}
+
+std::vector<double> QCPIntervals::snapCandidatesExcluding(const std::vector<qcp::intervals::DraggedRow>& rows) const
+{
+    std::vector<double> edges;
+    const QCPRange range = mKeyAxis->range();
+    auto isDragged = [&](int row) { return std::ranges::any_of(rows, [&](const auto& d) { return d.row == row; }); };
+    for (int lane : mLayout->displayLanes())
+    {
+        if (lane >= static_cast<int>(mLanes.size()))
+            continue;
+        const auto [begin, end] = qcp::intervals::candidateRange(mLanes[lane], range.lower, range.upper);
+        for (int i = begin; i < end; ++i)
+            if (const int row = mLanes[lane].rows[i]; !isDragged(row))
+                edges.insert(edges.end(), { mColumns.start[row], mColumns.stop[row] });
+    }
+    std::ranges::sort(edges);
+    return edges;
+}
+
+double QCPIntervals::keysPerPixels(double px) const
+{
+    return std::abs(mKeyAxis->pixelToCoord(px) - mKeyAxis->pixelToCoord(0));
+}
+
+double QCPIntervals::snappedDelta(double raw) const
+{
+    const auto& g = *mGesture;
+    const std::vector<double> edges = g.kind == Gesture::Create
+        ? std::vector<double> { g.pressKey }
+        : qcp::intervals::movingEdges(g.rows.front(), dragKind(g.kind));
+    switch (mSnap)
+    {
+        case snStep:
+            return qcp::intervals::snapToStep(edges.front(), raw, mSnapStep);
+        case snEdges:
+            return qcp::intervals::snapToEdges(edges, raw, g.snapCandidates, keysPerPixels(8));
+        case snNone:
+            break;
+    }
+    return raw;
+}
+
+int QCPIntervals::laneStepsTo(const QPointF& pos) const
+{
+    if (mGesture->kind != Gesture::Move || !(mEditModes & emChangeLane))
+        return 0;
+    return static_cast<int>(std::lround((pos.y() - mGesture->pressPos.y()) / mLayout->laneHeight()));
+}
+
+void QCPIntervals::updateGesture(const QPointF& pos)
+{
+    auto& g = *mGesture;
+    g.moved = g.moved || (pos - g.pressPos).manhattanLength() > 3;
+    const bool keyMoves = g.kind != Gesture::Move || (mEditModes & emMove);
+    const double dt = keyMoves ? snappedDelta(mKeyAxis->pixelToCoord(pos.x()) - g.pressKey) : 0.0;
+    if (g.kind == Gesture::Create)
+        g.preview = { { -1, std::min(g.pressKey, g.pressKey + dt), std::max(g.pressKey, g.pressKey + dt), g.pressLane } };
+    else
+        g.preview = qcp::intervals::applyDrag(g.rows, dragKind(g.kind), dt, laneStepsTo(pos), mLayout->displayLanes());
+    mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+}
+
+void QCPIntervals::finishGesture()
+{
+    const Gesture g = std::move(*mGesture);
+    mGesture.reset();
+    mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    if (!g.moved || g.preview.empty())
+        return;
+    if (g.kind == Gesture::Create)
+        emit intervalCreated(g.preview[0].start, g.preview[0].stop, g.preview[0].lane);
+    else
+        emitEdits(g.preview);
+}
+
+void QCPIntervals::emitEdits(const std::vector<qcp::intervals::Edit>& edits)
+{
+    QVector<QCPIntervalEdit> out;
+    for (const auto& e : edits)
+        out.append({ mColumns.ids[e.row], e.start, e.stop, e.lane });
+    emit intervalsEdited(out);
+}
+
+std::optional<Qt::CursorShape> QCPIntervals::cursorAt(const QPointF& pos) const
+{
+    if (!mEditable)
+        return std::nullopt;
+    const auto kind = gestureKindFor(hitTest(pos));
+    if (!kind)
+        return std::nullopt;
+    switch (*kind)
+    {
+        case Gesture::Move:
+            return Qt::SizeAllCursor;
+        case Gesture::Create:
+            return Qt::CrossCursor;
+        default:
+            return Qt::SizeHorCursor;
+    }
+}
+
+void QCPIntervals::drawPreview(QCPPainter* painter) const
+{
+    if (!mGesture)
+        return;
+    const QRect rect = mKeyAxis->axisRect()->rect();
+    for (const auto& e : mGesture->preview)
+    {
+        const auto band = mLayout->laneBand(e.lane, rect);
+        if (!band)
+            continue;
+        const auto bar = qcp::intervals::toPixelBar(mKeyAxis->coordToPixel(e.start),
+                                                    mKeyAxis->coordToPixel(e.stop),
+                                                    band->top + 1, band->bottom - 1, 0, e.row);
+        QColor fill = categoryColor(e.row >= 0 ? mColumns.category[e.row] : 0);
+        fill.setAlphaF(0.5);
+        painter->setBrush(fill);
+        painter->setPen(QPen(mKeyAxis->tickLabelColor(), 1, Qt::DashLine));
+        painter->drawRect(QRectF(QPointF(bar.x0, bar.y0), QPointF(bar.x1, bar.y1)));
+    }
+}
+
+void QCPIntervals::setEditable(bool editable)
+{
+    mEditable = editable;
+    if (!editable)
+        mGesture.reset();
+}
+
+void QCPIntervals::setEditModes(EditModes modes) { mEditModes = modes; }
+
+void QCPIntervals::setSnap(SnapMode mode, double step)
+{
+    mSnap = mode;
+    mSnapStep = step;
 }
 
 QCPRange QCPIntervals::getKeyRange(bool& foundRange, QCP::SignDomain) const

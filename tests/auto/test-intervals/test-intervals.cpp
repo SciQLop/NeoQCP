@@ -544,3 +544,155 @@ void TestIntervals::snapToEdgesLandsOnTheClosestCandidate()
     QCOMPARE(snapToEdges({ 10, 40 }, 4.5, { 50, 100 }, 2), 4.5);
     QCOMPARE(snapToEdges({ 10 }, 0, {}, 2), 0.0);
 }
+
+namespace {
+constexpr double keyTolerance = 0.6; // ~2 px at 100 keys over ~350 px
+
+QCPIntervals* editableTwoBars(QCustomPlot* plot, QCPLaneLayout* layout,
+                              QCPIntervals::EditModes modes)
+{
+    auto* iv = laidOutTwoBars(plot, layout);
+    iv->setEditable(true);
+    iv->setEditModes(modes);
+    return iv;
+}
+
+void drag(QCustomPlot* plot, QPointF from, QPointF to)
+{
+    press(plot, from.toPoint());
+    moveTo(plot, to.toPoint());
+    release(plot, to.toPoint());
+}
+} // namespace
+
+void TestIntervals::dragBodyEmitsOnceOnReleaseAndLeavesDataAlone()
+{
+    qRegisterMetaType<QVector<QCPIntervalEdit>>();
+    QCPLaneLayout layout;
+    auto* iv = editableTwoBars(mPlot, &layout, QCPIntervals::emMove);
+    QSignalSpy spy(iv, &QCPIntervals::intervalsEdited);
+    press(mPlot, iv->pixelOf(25, 0).toPoint());
+    moveTo(mPlot, iv->pixelOf(35, 0).toPoint());
+    QCOMPARE(spy.count(), 0);
+    release(mPlot, iv->pixelOf(35, 0).toPoint());
+    QCOMPARE(spy.count(), 1);
+    const auto edits = spy.at(0).at(0).value<QVector<QCPIntervalEdit>>();
+    QCOMPARE(edits.size(), 1);
+    QCOMPARE(edits[0].id, qint64 { 100 });
+    QVERIFY(qAbs(edits[0].start - 20) < keyTolerance);
+    QVERIFY(qAbs(edits[0].stop - 50) < keyTolerance);
+    QCOMPARE(iv->columns().start[0], 10.0);
+}
+
+void TestIntervals::clickWithoutMovingEmitsNothing()
+{
+    QCPLaneLayout layout;
+    auto* iv = editableTwoBars(mPlot, &layout, QCPIntervals::emMove);
+    QSignalSpy spy(iv, &QCPIntervals::intervalsEdited);
+    click(mPlot, iv->pixelOf(25, 0).toPoint());
+    QCOMPARE(spy.count(), 0);
+    QCOMPARE(iv->selectedRows(), QVector<int>({ 0 }));
+}
+
+void TestIntervals::dragRightEdgeResizes()
+{
+    QCPLaneLayout layout;
+    auto* iv = editableTwoBars(mPlot, &layout, QCPIntervals::emResize);
+    QSignalSpy spy(iv, &QCPIntervals::intervalsEdited);
+    drag(mPlot, iv->pixelOf(40, 0) - QPointF(2, 0), iv->pixelOf(50, 0) - QPointF(2, 0));
+    const auto e = spy.at(0).at(0).value<QVector<QCPIntervalEdit>>()[0];
+    QCOMPARE(e.start, 10.0);
+    QVERIFY(qAbs(e.stop - 50) < keyTolerance);
+}
+
+void TestIntervals::verticalDragChangesLaneOnlyWhenAllowed()
+{
+    QCPLaneLayout layout;
+    auto* iv = editableTwoBars(mPlot, &layout, QCPIntervals::emMove);
+    QSignalSpy spy(iv, &QCPIntervals::intervalsEdited);
+    drag(mPlot, iv->pixelOf(25, 0), iv->pixelOf(25, 1));
+    QCOMPARE(spy.count(), 1); // moved (vertically) but lane change is off
+    QCOMPARE(spy.at(0).at(0).value<QVector<QCPIntervalEdit>>()[0].lane, 0);
+    iv->setEditModes(QCPIntervals::emMove | QCPIntervals::emChangeLane);
+    drag(mPlot, iv->pixelOf(25, 0), iv->pixelOf(25, 1));
+    QCOMPARE(spy.at(1).at(0).value<QVector<QCPIntervalEdit>>()[0].lane, 1);
+}
+
+void TestIntervals::selectedIntervalsMoveTogether()
+{
+    QCPLaneLayout layout;
+    auto* iv = editableTwoBars(mPlot, &layout, QCPIntervals::emMove);
+    iv->setSelectedRows({ 0, 1 });
+    QSignalSpy spy(iv, &QCPIntervals::intervalsEdited);
+    drag(mPlot, iv->pixelOf(25, 0), iv->pixelOf(35, 0));
+    const auto edits = spy.at(0).at(0).value<QVector<QCPIntervalEdit>>();
+    QCOMPARE(edits.size(), 2);
+    QVERIFY(qAbs(edits[1].start - 70) < keyTolerance);
+}
+
+void TestIntervals::dragOnEmptyLaneCreates()
+{
+    QCPLaneLayout layout;
+    auto* iv = editableTwoBars(mPlot, &layout, QCPIntervals::emCreate);
+    QSignalSpy spy(iv, &QCPIntervals::intervalCreated);
+    drag(mPlot, iv->pixelOf(55, 0), iv->pixelOf(45, 0));
+    QCOMPARE(spy.count(), 1);
+    QVERIFY(qAbs(spy.at(0).at(0).toDouble() - 45) < keyTolerance);
+    QVERIFY(qAbs(spy.at(0).at(1).toDouble() - 55) < keyTolerance);
+    QCOMPARE(spy.at(0).at(2).toInt(), 0);
+}
+
+void TestIntervals::notEditableIgnoresDrags()
+{
+    QCPLaneLayout layout;
+    auto* iv = laidOutTwoBars(mPlot, &layout);
+    QSignalSpy spy(iv, &QCPIntervals::intervalsEdited);
+    drag(mPlot, iv->pixelOf(25, 0), iv->pixelOf(35, 0));
+    QCOMPARE(spy.count(), 0);
+    QVERIFY(!iv->gestureActive());
+}
+
+void TestIntervals::snapToEdgesLandsExactly()
+{
+    QCPLaneLayout layout;
+    auto* iv = editableTwoBars(mPlot, &layout, QCPIntervals::emMove);
+    iv->setSnap(QCPIntervals::snEdges);
+    QSignalSpy spy(iv, &QCPIntervals::intervalsEdited);
+    drag(mPlot, iv->pixelOf(25, 0), iv->pixelOf(44, 0)); // stop 40 -> ~59, bar 1 starts at 60
+    QCOMPARE(spy.at(0).at(0).value<QVector<QCPIntervalEdit>>()[0].stop, 60.0);
+}
+
+void TestIntervals::snapToStepLandsOnMultiples()
+{
+    QCPLaneLayout layout;
+    auto* iv = editableTwoBars(mPlot, &layout, QCPIntervals::emMove);
+    iv->setSnap(QCPIntervals::snStep, 5);
+    QSignalSpy spy(iv, &QCPIntervals::intervalsEdited);
+    drag(mPlot, iv->pixelOf(25, 0), iv->pixelOf(32.3, 0)); // start 10 -> ~17.3 -> 15
+    QCOMPARE(spy.at(0).at(0).value<QVector<QCPIntervalEdit>>()[0].start, 15.0);
+}
+
+void TestIntervals::setDataDuringDragCancelsGesture()
+{
+    QCPLaneLayout layout;
+    auto* iv = editableTwoBars(mPlot, &layout, QCPIntervals::emMove);
+    QSignalSpy spy(iv, &QCPIntervals::intervalsEdited);
+    press(mPlot, iv->pixelOf(25, 0).toPoint());
+    moveTo(mPlot, iv->pixelOf(35, 0).toPoint());
+    iv->setData(columns({ 0 }, { 1 }, { 0 }));
+    release(mPlot, iv->pixelOf(35, 0).toPoint());
+    QCOMPARE(spy.count(), 0);
+    QVERIFY(!iv->gestureActive());
+}
+
+void TestIntervals::cursorFollowsThePart()
+{
+    QCPLaneLayout layout;
+    auto* iv = editableTwoBars(mPlot, &layout,
+                               QCPIntervals::emMove | QCPIntervals::emResize | QCPIntervals::emCreate);
+    QVERIFY(iv->cursorAt(iv->pixelOf(25, 0)) == Qt::SizeAllCursor);
+    QVERIFY(iv->cursorAt(iv->pixelOf(10, 0) + QPointF(2, 0)) == Qt::SizeHorCursor);
+    QVERIFY(iv->cursorAt(iv->pixelOf(50, 0)) == Qt::CrossCursor);
+    iv->setEditable(false);
+    QVERIFY(!iv->cursorAt(iv->pixelOf(25, 0)));
+}
