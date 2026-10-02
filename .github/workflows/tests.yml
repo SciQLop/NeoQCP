@@ -7,7 +7,7 @@ on:
   pull_request:
 
 env:
-  QT_VERSION: 6.10.2
+  QT_VERSION: 6.11.1
 
 jobs:
   build_and_test:
