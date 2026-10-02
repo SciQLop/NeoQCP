@@ -33,7 +33,7 @@ jobs:
             arch: x86_64
             qt_host: mac
             qt_dir: macos
-          - os: macos-14 # Apple Silicon
+          - os: macos-latest # Apple Silicon; follows GitHub's current macOS, no migration per release
             arch: arm64
             qt_host: mac
             qt_dir: macos
