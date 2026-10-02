@@ -509,6 +509,8 @@ void QCPIntervals::emitEdits(const std::vector<qcp::intervals::Edit>& edits)
 
 bool QCPIntervals::keyPress(QKeyEvent* event)
 {
+    if (!realVisibility())
+        return false;
     if (event->key() == Qt::Key_Escape && (mGesture || mRubberBand))
     {
         mGesture.reset();

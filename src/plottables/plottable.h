@@ -166,8 +166,8 @@ public:
     virtual QPointF stallPixelOffset() const { return {}; }
     virtual void releaseGpuResources() {}
 
-    // Offered each key press by QCustomPlot::keyPressEvent before item handling;
-    // return true to consume the key and stop it from reaching other plottables/items.
+    // Offered each key press by QCustomPlot::keyPressEvent before item handling. Every
+    // plottable sees the key; return true to consume it, which stops it reaching items.
     virtual bool keyPress(QKeyEvent* event)
     {
         Q_UNUSED(event);

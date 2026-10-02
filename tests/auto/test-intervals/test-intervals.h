@@ -84,6 +84,9 @@ private slots:
     void dragBackToTheStartEmitsNothing();
     void nudgeClampedAtTheTopLaneEmitsNothing();
 
+    void deleteReachesEveryEditableTimeline();
+    void hiddenTimelineDoesNotConsumeKeys();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };

@@ -861,3 +861,30 @@ void TestIntervals::nudgeClampedAtTheTopLaneEmitsNothing()
     key(mPlot, Qt::Key_Up);
     QCOMPARE(spy.count(), 0);
 }
+
+void TestIntervals::deleteReachesEveryEditableTimeline()
+{
+    qRegisterMetaType<QVector<qint64>>();
+    QCPLaneLayout layout;
+    auto* a = editableTwoBars(mPlot, &layout, QCPIntervals::emDelete);
+    auto* b = siblingOnLaneA(mPlot, &layout);
+    b->setEditable(true);
+    b->setEditModes(QCPIntervals::emDelete);
+    a->setSelectedRows({ 0 });
+    b->setSelectedRows({ 0 });
+    QSignalSpy spyA(a, &QCPIntervals::deleteRequested);
+    QSignalSpy spyB(b, &QCPIntervals::deleteRequested);
+    key(mPlot, Qt::Key_Delete);
+    QCOMPARE(spyA.count(), 1);
+    QCOMPARE(spyB.count(), 1);
+}
+
+void TestIntervals::hiddenTimelineDoesNotConsumeKeys()
+{
+    QCPLaneLayout layout;
+    auto* iv = editableTwoBars(mPlot, &layout, QCPIntervals::emDelete);
+    iv->setSelectedRows({ 0 });
+    iv->setVisible(false);
+    QKeyEvent e(QEvent::KeyPress, Qt::Key_Delete, Qt::NoModifier);
+    QVERIFY(!iv->keyPress(&e));
+}
