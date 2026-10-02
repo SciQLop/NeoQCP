@@ -2796,3 +2796,42 @@ void TestPipeline::graph2PanIsRedrawnFreshWhileAnotherLayerIsDirty()
     };
     QTRY_VERIFY2_WITH_TIMEOUT(renderedAtView(), "the panned view was never drawn fresh", 2000);
 }
+
+void TestPipeline::densePanIsRedrawnFreshBesideASmallGraph()
+{
+    // Both graphs share the "main" layer. The small one is drawn raw: its lines never go
+    // dirty after a pan, so it keeps offering a translation for the whole layer.
+    if (!showAndHasRhi(mPlot))
+        QSKIP("no QRhi available in this environment");
+    auto* small = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    QVector<double> sk(500), sv(500);
+    for (int i = 0; i < 500; ++i)
+    {
+        sk[i] = i * 800.0;
+        sv[i] = 0.5;
+    }
+    small->setData(std::move(sk), std::move(sv));
+    auto* dense = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    QVector<double> keys(400000), values(400000);
+    for (int i = 0; i < 400000; ++i)
+    {
+        keys[i] = i;
+        values[i] = std::sin(i * 0.001);
+    }
+    dense->setData(std::move(keys), std::move(values));
+    mPlot->xAxis->setRange(0, 100000);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!dense->pipeline().isBusy(), 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(dense->mL2Result);
+    QCOMPARE(small->layer(), dense->layer());
+
+    mPlot->xAxis->setRange(25000, 125000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const auto renderedAtView = [&] {
+        return qFuzzyCompare(dense->mRenderedRange.key.lower, mPlot->xAxis->range().lower)
+            && qFuzzyCompare(dense->mRenderedRange.key.upper, mPlot->xAxis->range().upper);
+    };
+    QTRY_VERIFY2_WITH_TIMEOUT(renderedAtView(), "the dense graph was never drawn fresh", 2000);
+}

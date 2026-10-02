@@ -159,6 +159,7 @@ private slots:
     void graph2TranslationResetsOnFreshData();
     void graph2PanIsRedrawnFreshAfterTheDebounce();
     void graph2PanIsRedrawnFreshWhileAnotherLayerIsDirty();
+    void densePanIsRedrawnFreshBesideASmallGraph();
     void multiGraphTranslationOffsetWhenBusy();
     void colormap2TranslationOffsetWhenBusy();
     void colormap2ResultSurvivesNullViewport();

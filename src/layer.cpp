@@ -23,6 +23,7 @@
 **          Version: 2.1.1                                                **
 ****************************************************************************/
 
+#include <optional>
 #include "Profiling.hpp"
 
 #include "layer.h"
@@ -341,31 +342,35 @@ void QCPLayer::removeChild(QCPLayerable* layerable)
                  << reinterpret_cast<quintptr>(layerable);
 }
 
+namespace
+{
+bool samePixelOffset(QPointF a, QPointF b)
+{
+    return qAbs(a.x() - b.x()) < 0.5 && qAbs(a.y() - b.y()) < 0.5;
+}
+} // namespace
+
+// One texture is shifted for the whole layer, so every plottable drawing on it must agree: one
+// that cannot be translated (dirty lines, a zoom, nothing cached) vetoes the shift, or its
+// pending redraw never happens. Plottables with nothing to draw do not take part.
 QPointF QCPLayer::pixelOffset() const
 {
-    QPointF result;
-    QCPAxisRect* firstAxisRect = nullptr;
+    std::optional<QPointF> result;
+    QCPAxisRect* resultAxisRect = nullptr;
     for (auto* child : mChildren)
     {
-        if (auto* plottable = qobject_cast<QCPAbstractPlottable*>(child))
-        {
-            QPointF offset = plottable->stallPixelOffset();
-            if (!offset.isNull())
-            {
-                auto* ar = plottable->keyAxis() ? plottable->keyAxis()->axisRect() : nullptr;
-                if (!firstAxisRect)
-                {
-                    firstAxisRect = ar;
-                    result = offset;
-                }
-                else if (ar != firstAxisRect)
-                {
-                    return {};
-                }
-            }
-        }
+        auto* plottable = qobject_cast<QCPAbstractPlottable*>(child);
+        if (!plottable || !plottable->realVisibility() || !plottable->canProduceContent())
+            continue;
+        const QPointF offset = plottable->stallPixelOffset();
+        auto* axisRect = plottable->keyAxis() ? plottable->keyAxis()->axisRect() : nullptr;
+        if (offset.isNull()
+            || (result && (axisRect != resultAxisRect || !samePixelOffset(*result, offset))))
+            return {};
+        result = offset;
+        resultAxisRect = axisRect;
     }
-    return result;
+    return result.value_or(QPointF());
 }
 
 bool QCPLayer::canSkipRepaintForTranslation() const
