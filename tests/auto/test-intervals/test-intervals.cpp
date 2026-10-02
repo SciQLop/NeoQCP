@@ -3,7 +3,9 @@
 #include "plottables/lane-layout.h"
 #include "plottables/intervals-algo.h"
 #include "plottables/plottable-intervals.h"
+#include <QApplication>
 #include <QElapsedTimer>
+#include <QMouseEvent>
 #include <QtWidgets/qtestsupport_widgets.h>
 #include <numeric>
 
@@ -221,6 +223,41 @@ QColor pixelAt(const QImage& image, QCustomPlot* plot, double key, double laneCe
 
 bool isRedish(const QColor& c) { return c.red() > 150 && c.green() < 120 && c.blue() < 120; }
 bool isBlueish(const QColor& c) { return c.blue() > 150 && c.red() < 120 && c.green() < 120; }
+
+void press(QWidget* w, QPoint pos, Qt::KeyboardModifiers mods = Qt::NoModifier)
+{
+    QMouseEvent e(QEvent::MouseButtonPress, pos, w->mapToGlobal(pos), Qt::LeftButton,
+                  Qt::LeftButton, mods);
+    QApplication::sendEvent(w, &e);
+}
+
+void moveTo(QWidget* w, QPoint pos, Qt::KeyboardModifiers mods = Qt::NoModifier)
+{
+    QMouseEvent e(QEvent::MouseMove, pos, w->mapToGlobal(pos), Qt::NoButton, Qt::LeftButton, mods);
+    QApplication::sendEvent(w, &e);
+}
+
+void release(QWidget* w, QPoint pos, Qt::KeyboardModifiers mods = Qt::NoModifier)
+{
+    QMouseEvent e(QEvent::MouseButtonRelease, pos, w->mapToGlobal(pos), Qt::LeftButton,
+                  Qt::NoButton, mods);
+    QApplication::sendEvent(w, &e);
+}
+
+void click(QWidget* w, QPoint pos, Qt::KeyboardModifiers mods = Qt::NoModifier)
+{
+    press(w, pos, mods);
+    release(w, pos, mods);
+}
+
+//! Bars [10,40] on lane A and [60,90] on lane B, x range [0,100], laid out.
+QCPIntervals* laidOutTwoBars(QCustomPlot* plot, QCPLaneLayout* layout)
+{
+    auto* iv = twoBars(plot, layout);
+    plot->setInteractions(QCP::iSelectPlottables | QCP::iMultiSelect);
+    plot->replot();
+    return iv;
+}
 } // namespace
 
 void TestIntervals::setDataRejectsInvalidColumns()
@@ -375,4 +412,88 @@ void TestIntervals::labelLayerFollowsThePlottablesLayer()
     QVERIFY(mPlot->addLayer(QStringLiteral("custom")));
     QVERIFY(iv->setLayer(QStringLiteral("custom")));
     QCOMPARE(iv->labelLayer(), mPlot->layer(QStringLiteral("custom.intervals-labels")));
+}
+
+void TestIntervals::hitTestOnEmptyPlottable()
+{
+    QCPLaneLayout layout;
+    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    mPlot->replot();
+    QCOMPARE(iv->hitTest(QPointF(100, 100)).part, QCPIntervals::hpNone);
+}
+
+void TestIntervals::hitTestFindsBodyAndEdges()
+{
+    QCPLaneLayout layout;
+    auto* iv = laidOutTwoBars(mPlot, &layout);
+    const QPointF body = iv->pixelOf(25, 0);
+    QCOMPARE(iv->hitTest(body).part, QCPIntervals::hpBody);
+    QCOMPARE(iv->hitTest(body).row, 0);
+    QCOMPARE(iv->hitTest(iv->pixelOf(10, 0) + QPointF(2, 0)).part, QCPIntervals::hpLeftEdge);
+    QCOMPARE(iv->hitTest(iv->pixelOf(40, 0) - QPointF(2, 0)).part, QCPIntervals::hpRightEdge);
+    QCOMPARE(iv->hitTest(iv->pixelOf(50, 0)).part, QCPIntervals::hpEmpty);
+    QCOMPARE(iv->hitTest(iv->pixelOf(50, 0)).lane, 0);
+}
+
+void TestIntervals::narrowBarHasOnlyBody()
+{
+    QCPLaneLayout layout;
+    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    iv->setData(columns({ 50 }, { 50.5 }, { layout.laneIndex("A") }));
+    mPlot->xAxis->setRange(0, 100);
+    mPlot->replot();
+    QCOMPARE(iv->hitTest(iv->pixelOf(50, 0)).part, QCPIntervals::hpBody);
+}
+
+void TestIntervals::hiddenLaneIsNotHit()
+{
+    QCPLaneLayout layout;
+    auto* iv = laidOutTwoBars(mPlot, &layout);
+    const QPointF onB = iv->pixelOf(75, 1);
+    layout.setDisplayOrder({ "A" });
+    mPlot->replot();
+    QVERIFY(iv->hitTest(onB).row != 1);
+}
+
+void TestIntervals::clickSelectsAndCtrlClickToggles()
+{
+    QCPLaneLayout layout;
+    auto* iv = laidOutTwoBars(mPlot, &layout);
+    click(mPlot, iv->pixelOf(25, 0).toPoint());
+    QCOMPARE(iv->selectedRows(), QVector<int>({ 0 }));
+    click(mPlot, iv->pixelOf(75, 1).toPoint(), Qt::ControlModifier);
+    QCOMPARE(iv->selectedRows(), QVector<int>({ 0, 1 }));
+    click(mPlot, iv->pixelOf(25, 0).toPoint(), Qt::ControlModifier);
+    QCOMPARE(iv->selectedRows(), QVector<int>({ 1 }));
+    QCOMPARE(iv->selectedIds(), QVector<qint64>({ 101 }));
+}
+
+void TestIntervals::clickOnEmptyLaneClearsSelection()
+{
+    QCPLaneLayout layout;
+    auto* iv = laidOutTwoBars(mPlot, &layout);
+    iv->setSelectedRows({ 0, 1 });
+    click(mPlot, iv->pixelOf(50, 0).toPoint());
+    QVERIFY(iv->selectedRows().isEmpty());
+}
+
+void TestIntervals::shiftDragSelectsRowsInTheRect()
+{
+    QCPLaneLayout layout;
+    auto* iv = laidOutTwoBars(mPlot, &layout);
+    const QPoint from = iv->pixelOf(5, 0).toPoint();
+    const QPoint to = iv->pixelOf(95, 1).toPoint();
+    press(mPlot, from, Qt::ShiftModifier);
+    moveTo(mPlot, to, Qt::ShiftModifier);
+    release(mPlot, to, Qt::ShiftModifier);
+    QCOMPARE(iv->selectedRows(), QVector<int>({ 0, 1 }));
+}
+
+void TestIntervals::selectTestRectFindsRows()
+{
+    QCPLaneLayout layout;
+    auto* iv = laidOutTwoBars(mPlot, &layout);
+    const QRectF rect(iv->pixelOf(0, 1) - QPointF(0, 3), iv->pixelOf(100, 1) + QPointF(0, 3));
+    const QCPDataSelection sel = iv->selectTestRect(rect, false);
+    QCOMPARE(sel, QCPDataSelection(QCPDataRange(1, 2)));
 }

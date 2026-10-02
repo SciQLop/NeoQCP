@@ -39,6 +39,15 @@ private slots:
     void mergedBarsGetNoLabel();
     void labelLayerFollowsThePlottablesLayer();
 
+    void hitTestOnEmptyPlottable();
+    void hitTestFindsBodyAndEdges();
+    void narrowBarHasOnlyBody();
+    void hiddenLaneIsNotHit();
+    void clickSelectsAndCtrlClickToggles();
+    void clickOnEmptyLaneClearsSelection();
+    void shiftDragSelectsRowsInTheRect();
+    void selectTestRectFindsRows();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };

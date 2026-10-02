@@ -34,6 +34,7 @@ protected:
         mOwner->drawLabels(painter);
         if (mOwner->drawsLaneNames())
             mOwner->drawLaneNames(painter);
+        mOwner->drawSelection(painter);
     }
 
 private:
@@ -62,6 +63,7 @@ QCPLayer* layerAbove(QCustomPlot* plot, QCPLayer* base)
 QCPIntervals::QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* layout)
         : QCPAbstractPlottable(keyAxis, valueAxis), mLayout(layout)
 {
+    setSelectable(QCP::stMultipleDataRanges);
     connect(layout, &QCPLaneLayout::changed, this, [this] { regroupIfLanesWereAdded(); });
     mLabelLayer = new LabelLayer(mParentPlot, this, layerAbove(mParentPlot, layer()));
     // Keep the label layerable one layer above wherever this plottable itself moves to.
@@ -103,7 +105,206 @@ QColor QCPIntervals::categoryColor(int category) const
 
 QCPLayer* QCPIntervals::labelLayer() const { return mLabelLayer->layer(); }
 
-double QCPIntervals::selectTest(const QPointF&, bool, QVariant*) const { return -1; }
+QRectF QCPIntervals::barRect(int row) const
+{
+    const auto band = mLayout->laneBand(mColumns.lane[row], mKeyAxis->axisRect()->rect());
+    if (!band)
+        return {};
+    const auto bar = qcp::intervals::toPixelBar(mKeyAxis->coordToPixel(mColumns.start[row]),
+                                                mKeyAxis->coordToPixel(mColumns.stop[row]),
+                                                band->top + 1, band->bottom - 1, 0, row);
+    return QRectF(QPointF(bar.x0, bar.y0), QPointF(bar.x1, bar.y1));
+}
+
+QPointF QCPIntervals::pixelOf(double key, int lane) const
+{
+    const auto band = mLayout->laneBand(lane, mKeyAxis->axisRect()->rect());
+    return { mKeyAxis->coordToPixel(key), band ? (band->top + band->bottom) / 2 : -1.0 };
+}
+
+namespace {
+QCPIntervals::HitPart partOf(const QRectF& bar, double x)
+{
+    constexpr double edgeGrab = 4, minEdgeWidth = 10;
+    if (bar.width() >= minEdgeWidth && std::abs(x - bar.left()) <= edgeGrab)
+        return QCPIntervals::hpLeftEdge;
+    if (bar.width() >= minEdgeWidth && std::abs(x - bar.right()) <= edgeGrab)
+        return QCPIntervals::hpRightEdge;
+    return QCPIntervals::hpBody;
+}
+
+double distanceToBar(const QRectF& bar, double x)
+{
+    return x < bar.left() ? bar.left() - x : (x > bar.right() ? x - bar.right() : 0);
+}
+} // namespace
+
+QCPIntervals::Hit QCPIntervals::hitTest(const QPointF& pos) const
+{
+    if (!mLayout || !mKeyAxis)
+        return {};
+    const int lane = mLayout->laneAt(pos.y(), mKeyAxis->axisRect()->rect());
+    if (lane < 0 || lane >= static_cast<int>(mLanes.size()))
+        return lane < 0 ? Hit {} : Hit { -1, lane, hpEmpty };
+    const double grabKeys = std::abs(mKeyAxis->pixelToCoord(pos.x() + 4) - mKeyAxis->pixelToCoord(pos.x()));
+    const double key = mKeyAxis->pixelToCoord(pos.x());
+    const auto& rows = mLanes[lane];
+    const auto [begin, end] = qcp::intervals::candidateRange(rows, key - grabKeys, key + grabKeys);
+    Hit best { -1, lane, hpEmpty };
+    double bestDistance = 4.0 + 1e-9;
+    for (int i = begin; i < end; ++i)
+    {
+        const int row = rows.rows[i];
+        const QRectF bar = barRect(row);
+        // later rows are drawn on top, so they win ties
+        if (const double d = distanceToBar(bar, pos.x()); d <= bestDistance)
+        {
+            bestDistance = d;
+            best = { row, lane, partOf(bar, pos.x()) };
+        }
+    }
+    return best;
+}
+
+double QCPIntervals::selectTest(const QPointF& pos, bool onlySelectable, QVariant* details) const
+{
+    if (onlySelectable && !selectable())
+        return -1;
+    const Hit hit = hitTest(pos);
+    if (hit.part == hpNone)
+        return -1;
+    if (details)
+        *details = QVariant::fromValue(hit.row >= 0 ? QCPDataSelection(QCPDataRange(hit.row, hit.row + 1))
+                                                    : QCPDataSelection());
+    return 0;
+}
+
+void QCPIntervals::selectEvent(QMouseEvent*, bool additive, const QVariant& details,
+                               bool* selectionStateChanged)
+{
+    const QCPDataSelection hit = details.value<QCPDataSelection>();
+    const QCPDataSelection before = mSelection;
+    if (!additive)
+        setSelection(hit);
+    else if (!hit.isEmpty() && mSelection.contains(hit))
+        setSelection(mSelection - hit);
+    else
+        setSelection(mSelection + hit);
+    if (selectionStateChanged)
+        *selectionStateChanged = mSelection != before;
+}
+
+void QCPIntervals::deselectEvent(bool* selectionStateChanged)
+{
+    const bool had = selected();
+    setSelection(QCPDataSelection());
+    if (selectionStateChanged)
+        *selectionStateChanged = had;
+}
+
+QVector<int> QCPIntervals::selectedRows() const
+{
+    QVector<int> rows;
+    for (const QCPDataRange& range : mSelection.dataRanges())
+        for (int row = range.begin(); row < range.end(); ++row)
+            rows.append(row);
+    return rows;
+}
+
+QVector<qint64> QCPIntervals::selectedIds() const
+{
+    QVector<qint64> ids;
+    for (int row : selectedRows())
+        ids.append(mColumns.ids[row]);
+    return ids;
+}
+
+void QCPIntervals::setSelectedRows(const QVector<int>& rows)
+{
+    QCPDataSelection sel;
+    for (int row : rows)
+        if (row >= 0 && row < rowCount())
+            sel.addDataRange(QCPDataRange(row, row + 1), false);
+    sel.simplify();
+    setSelection(sel);
+}
+
+QVector<int> QCPIntervals::rowsInRect(const QRectF& rect) const
+{
+    QVector<int> rows;
+    const double a = mKeyAxis->pixelToCoord(rect.left()), b = mKeyAxis->pixelToCoord(rect.right());
+    for (int lane = 0; lane < static_cast<int>(mLanes.size()); ++lane)
+    {
+        const auto band = mLayout->laneBand(lane, mKeyAxis->axisRect()->rect());
+        if (!band || band->bottom < rect.top() || band->top > rect.bottom())
+            continue;
+        const auto [begin, end] = qcp::intervals::candidateRange(mLanes[lane], std::min(a, b), std::max(a, b));
+        for (int i = begin; i < end; ++i)
+            if (const int row = mLanes[lane].rows[i]; barRect(row).intersects(rect))
+                rows.append(row);
+    }
+    std::ranges::sort(rows);
+    return rows;
+}
+
+QCPDataSelection QCPIntervals::selectTestRect(const QRectF& rect, bool onlySelectable) const
+{
+    QCPDataSelection sel;
+    if (onlySelectable && !selectable())
+        return sel;
+    for (int row : rowsInRect(rect.normalized()))
+        sel.addDataRange(QCPDataRange(row, row + 1), false);
+    sel.simplify();
+    return sel;
+}
+
+int QCPIntervals::findBegin(double, bool) const { return 0; }
+
+int QCPIntervals::findEnd(double, bool) const { return rowCount(); }
+
+void QCPIntervals::mousePressEvent(QMouseEvent* event, const QVariant&)
+{
+    const Hit hit = hitTest(event->pos());
+    if (event->button() == Qt::LeftButton && (event->modifiers() & Qt::ShiftModifier) && hit.lane >= 0)
+    {
+        mRubberBand = QRectF(event->pos(), event->pos());
+        event->accept();
+        return;
+    }
+    event->ignore();
+}
+
+void QCPIntervals::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
+{
+    if (!mRubberBand)
+        return;
+    mRubberBand = QRectF(startPos, event->pos()).normalized();
+    mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+}
+
+void QCPIntervals::mouseReleaseEvent(QMouseEvent* event, const QPointF& startPos)
+{
+    if (!mRubberBand)
+        return;
+    setSelectedRows(rowsInRect(QRectF(startPos, event->pos()).normalized()));
+    mRubberBand.reset();
+    mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+}
+
+void QCPIntervals::drawSelection(QCPPainter* painter) const
+{
+    const QRectF visible = mKeyAxis->axisRect()->rect();
+    painter->setBrush(Qt::NoBrush);
+    painter->setPen(mSelectionDecorator ? mSelectionDecorator->pen() : QPen(Qt::black, 2));
+    for (int row : selectedRows())
+        if (const QRectF bar = barRect(row); !bar.isEmpty() && bar.intersects(visible))
+            painter->drawRect(bar);
+    if (mRubberBand)
+    {
+        painter->setPen(QPen(mKeyAxis->tickLabelColor(), 1, Qt::DashLine));
+        painter->drawRect(*mRubberBand);
+    }
+}
 
 QCPRange QCPIntervals::getKeyRange(bool& foundRange, QCP::SignDomain) const
 {

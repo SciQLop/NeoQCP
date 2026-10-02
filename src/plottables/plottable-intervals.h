@@ -6,7 +6,7 @@
 #include <QPointer>
 #include <optional>
 
-class QCP_LIB_DECL QCPIntervals : public QCPAbstractPlottable
+class QCP_LIB_DECL QCPIntervals : public QCPAbstractPlottable, public QCPPlottableInterface1D
 {
     Q_OBJECT
 public:
@@ -22,12 +22,47 @@ public:
     [[nodiscard]] quint64 buildCount() const { return mBuildCount; }
     [[nodiscard]] QCPLayer* labelLayer() const;
 
+    enum HitPart { hpNone, hpEmpty, hpBody, hpLeftEdge, hpRightEdge };
+
+    struct Hit
+    {
+        int row = -1;
+        int lane = -1;
+        HitPart part = hpNone;
+    };
+
+    [[nodiscard]] Hit hitTest(const QPointF& pos) const;
+    [[nodiscard]] QVector<int> selectedRows() const;
+    [[nodiscard]] QVector<qint64> selectedIds() const;
+    void setSelectedRows(const QVector<int>& rows);
+    [[nodiscard]] QPointF pixelOf(double key, int lane) const;
+
     double selectTest(const QPointF& pos, bool onlySelectable,
                       QVariant* details = nullptr) const override;
     QCPRange getKeyRange(bool& foundRange,
                          QCP::SignDomain inSignDomain = QCP::sdBoth) const override;
     QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth,
                            const QCPRange& inKeyRange = QCPRange()) const override;
+
+    QCPPlottableInterface1D* interface1D() override { return this; }
+
+    // QCPPlottableInterface1D
+    [[nodiscard]] int dataCount() const override { return rowCount(); }
+    [[nodiscard]] double dataMainKey(int index) const override { return mColumns.start[index]; }
+    [[nodiscard]] double dataSortKey(int index) const override { return mColumns.start[index]; }
+    [[nodiscard]] double dataMainValue(int index) const override { return mColumns.lane[index]; }
+    [[nodiscard]] QCPRange dataValueRange(int index) const override
+    {
+        return QCPRange(mColumns.lane[index], mColumns.lane[index]);
+    }
+    [[nodiscard]] QPointF dataPixelPosition(int index) const override
+    {
+        return pixelOf(mColumns.start[index], mColumns.lane[index]);
+    }
+    [[nodiscard]] bool sortKeyIsMainKey() const override { return false; }
+    QCPDataSelection selectTestRect(const QRectF& rect, bool onlySelectable) const override;
+    [[nodiscard]] int findBegin(double sortKey, bool expandedRange = true) const override;
+    [[nodiscard]] int findEnd(double sortKey, bool expandedRange = true) const override;
 
 protected:
     struct BuildKey
@@ -54,6 +89,19 @@ protected:
     [[nodiscard]] double fillOpacity() const;
     bool drawBarsOnGpu(QCPPainter* painter);
     void drawBarsWithPainter(QCPPainter* painter) const;
+
+    void selectEvent(QMouseEvent* event, bool additive, const QVariant& details,
+                     bool* selectionStateChanged) override;
+    void deselectEvent(bool* selectionStateChanged) override;
+    void mousePressEvent(QMouseEvent* event, const QVariant& details) override;
+    void mouseMoveEvent(QMouseEvent* event, const QPointF& startPos) override;
+    void mouseReleaseEvent(QMouseEvent* event, const QPointF& startPos) override;
+
+    [[nodiscard]] QRectF barRect(int row) const;
+    [[nodiscard]] QVector<int> rowsInRect(const QRectF& rect) const;
+    void drawSelection(QCPPainter* painter) const;
+
+    std::optional<QRectF> mRubberBand;
 
     QPointer<QCPLaneLayout> mLayout;
     qcp::intervals::Columns mColumns;
