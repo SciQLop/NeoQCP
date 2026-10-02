@@ -154,6 +154,7 @@ protected:
     [[nodiscard]] std::vector<qcp::intervals::DraggedRow> draggedRowsFor(const Hit& hit, Gesture::Kind kind) const;
     [[nodiscard]] std::vector<double> snapCandidatesExcluding(const std::vector<qcp::intervals::DraggedRow>& rows) const;
     [[nodiscard]] double snappedDelta(double raw) const;
+    [[nodiscard]] double snappedToStep(double key) const;
     [[nodiscard]] int laneStepsTo(const QPointF& pos) const;
     [[nodiscard]] double keysPerPixels(double px) const;
     [[nodiscard]] bool changesAnyRow(const std::vector<qcp::intervals::Edit>& edits) const;

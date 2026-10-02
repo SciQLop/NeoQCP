@@ -392,7 +392,8 @@ bool QCPIntervals::startGesture(const Hit& hit, const QPointF& pos)
     const auto kind = gestureKindFor(hit);
     if (!kind)
         return false;
-    Gesture g { *kind, pos, mKeyAxis->pixelToCoord(pos.x()), hit.lane };
+    const double key = mKeyAxis->pixelToCoord(pos.x());
+    Gesture g { *kind, pos, *kind == Gesture::Create ? snappedToStep(key) : key, hit.lane };
     g.rows = draggedRowsFor(hit, *kind);
     g.snapCandidates = snapCandidatesExcluding(g.rows);
     mGesture = std::move(g);
@@ -431,6 +432,11 @@ std::vector<double> QCPIntervals::snapCandidatesExcluding(const std::vector<qcp:
     }
     std::ranges::sort(edges);
     return edges;
+}
+
+double QCPIntervals::snappedToStep(double key) const
+{
+    return mSnap == snStep ? key + qcp::intervals::snapToStep(key, 0, mSnapStep) : key;
 }
 
 double QCPIntervals::keysPerPixels(double px) const

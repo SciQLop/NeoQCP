@@ -888,3 +888,15 @@ void TestIntervals::hiddenTimelineDoesNotConsumeKeys()
     QKeyEvent e(QEvent::KeyPress, Qt::Key_Delete, Qt::NoModifier);
     QVERIFY(!iv->keyPress(&e));
 }
+
+void TestIntervals::createWithStepSnapsBothEnds()
+{
+    QCPLaneLayout layout;
+    auto* iv = editableTwoBars(mPlot, &layout, QCPIntervals::emCreate);
+    iv->setSnap(QCPIntervals::snStep, 5);
+    QSignalSpy spy(iv, &QCPIntervals::intervalCreated);
+    drag(mPlot, iv->pixelOf(52.3, 0), iv->pixelOf(43.1, 0));
+    QCOMPARE(spy.count(), 1);
+    QCOMPARE(spy.at(0).at(0).toDouble(), 45.0);
+    QCOMPARE(spy.at(0).at(1).toDouble(), 50.0);
+}

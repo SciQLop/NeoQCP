@@ -87,6 +87,8 @@ private slots:
     void deleteReachesEveryEditableTimeline();
     void hiddenTimelineDoesNotConsumeKeys();
 
+    void createWithStepSnapsBothEnds();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };
