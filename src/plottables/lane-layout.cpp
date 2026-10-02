@@ -12,6 +12,19 @@ int QCPLaneLayout::laneIndex(const QString& name)
     return mNames.size() - 1;
 }
 
+QVector<int> QCPLaneLayout::laneIndices(const QStringList& names)
+{
+    const auto before = mNames.size();
+    QSignalBlocker blocker(this);
+    QVector<int> indices;
+    for (const auto& name : names)
+        indices.append(laneIndex(name));
+    blocker.unblock();
+    if (mNames.size() != before)
+        notify();
+    return indices;
+}
+
 void QCPLaneLayout::setDisplayOrder(const QStringList& names)
 {
     QSignalBlocker blocker(this);

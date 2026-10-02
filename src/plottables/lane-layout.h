@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QRect>
 #include <QStringList>
+#include <QVector>
 #include <optional>
 #include <vector>
 
@@ -24,6 +25,8 @@ public:
     explicit QCPLaneLayout(QObject* parent = nullptr) : QObject(parent) {}
 
     int laneIndex(const QString& name);
+    //! laneIndex for each name, with a single \c changed for all the new ones.
+    QVector<int> laneIndices(const QStringList& names);
     [[nodiscard]] QStringList laneNames() const { return mNames; }
     void setDisplayOrder(const QStringList& names);
     [[nodiscard]] QStringList displayOrder() const;

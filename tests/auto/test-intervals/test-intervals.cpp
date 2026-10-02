@@ -910,3 +910,14 @@ void TestIntervals::firstVisibleTimelineDrawsLaneNames()
     QVERIFY(!first->drawsLaneNames());
     QVERIFY(second->drawsLaneNames());
 }
+
+void TestIntervals::laneIndicesNotifiesOnce()
+{
+    QCPLaneLayout layout;
+    layout.laneIndex("B");
+    QSignalSpy spy(&layout, &QCPLaneLayout::changed);
+    QCOMPARE(layout.laneIndices({ "A", "B", "C", "A" }), QVector<int>({ 1, 0, 2, 1 }));
+    QCOMPARE(spy.count(), 1);
+    layout.laneIndices({ "C", "B" });
+    QCOMPARE(spy.count(), 1); // nothing new
+}
