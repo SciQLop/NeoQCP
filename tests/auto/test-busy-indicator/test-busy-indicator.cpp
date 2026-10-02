@@ -20,7 +20,11 @@ bool showAndHasRhiBusy(QCustomPlot* plot)
 void TestBusyIndicator::init()
 {
     mPlot = new QCustomPlot(nullptr);
+    // A real size before show: on macOS and Windows the window only gets one later, and a plot
+    // drawn at zero size caches nothing to translate.
+    mPlot->resize(400, 300);
     mPlot->show();
+    QVERIFY(QTest::qWaitForWindowExposed(mPlot));
 }
 
 void TestBusyIndicator::cleanup()
@@ -277,7 +281,8 @@ void TestBusyIndicator::visualBusyToggleForcesLayerRepaint()
              qPrintable(QString("pixelOffset=(%1,%2) canTranslate=%3 (false with an offset: a child "
                                 "blocks; true: the paint buffer is missing or invalidated)")
                             .arg(mainLayer->pixelOffset().x()).arg(mainLayer->pixelOffset().y())
-                            .arg(mainLayer->canTranslateInsteadOfRepaint())));
+                            .arg(mainLayer->canTranslateInsteadOfRepaint())
+                            + QString(" axisRect=%1x%2").arg(mPlot->axisRect()->width()).arg(mPlot->axisRect()->height())));
 
     // Sampled inside the toggle signal, before the queued replot can run:
     // the offset is still valid (it is a pan) yet the layer refuses to translate.

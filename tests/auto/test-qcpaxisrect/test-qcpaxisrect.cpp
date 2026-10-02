@@ -1,5 +1,6 @@
 #include "test-qcpaxisrect.h"
 #include "../expect-debug.h"
+#include "../keep-images.h"
 #include "axis/labelrenderer.h"
 
 namespace
@@ -378,7 +379,11 @@ void TestQCPAxisRect::axisLabelPictureMatchesDirectText()
       };
       // Glyph antialiasing differs (upright text turned as a picture vs text drawn rotated),
       // so compare where the ink lands, to the pixel an antialiased edge may add or drop.
-      const QRect cached = inkBounds(render(false)), direct = inkBounds(render(true));
+      const QImage cachedImage = render(false), directImage = render(true);
+      const QRect cached = inkBounds(cachedImage), direct = inkBounds(directImage);
+      if (qAbs(cached.left() - direct.left()) > 1 || qAbs(cached.right() - direct.right()) > 1
+          || qAbs(cached.top() - direct.top()) > 1 || qAbs(cached.bottom() - direct.bottom()) > 1)
+        keepImagesForCi(QString("axis-label-side%1-%2").arg(int(type)).arg(label.size()), cachedImage, directImage);
       QVERIFY2(qAbs(cached.left() - direct.left()) <= 1 && qAbs(cached.right() - direct.right()) <= 1
                    && qAbs(cached.top() - direct.top()) <= 1
                    && qAbs(cached.bottom() - direct.bottom()) <= 1,

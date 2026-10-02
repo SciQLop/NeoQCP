@@ -130,3 +130,9 @@ jobs:
             fi
           done
           grep -h "^Totals:" "$GITHUB_WORKSPACE"/testlogs/*.txt || true
+      - name: Keep the test logs and mismatching pictures
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testlogs-${{ matrix.os }}
+          path: testlogs/

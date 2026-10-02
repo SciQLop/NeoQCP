@@ -1,5 +1,6 @@
 #include "test-tick-label-cache.h"
 #include "theme.h"
+#include "../keep-images.h"
 
 #include <functional>
 
@@ -88,6 +89,8 @@ void checkNoStaleLabel(const Step& before, const Step& change, const QString& wh
     change(&cold);
     const QImage fromColdCache = cold.live(true);
 
+    if (fromWarmCache != fromColdCache)
+        keepImagesForCi("stale-" + what, fromWarmCache, fromColdCache);
     QVERIFY2(fromWarmCache == fromColdCache,
              qPrintable(what + ": stale cached tick label, " + describeDifference(fromWarmCache, fromColdCache)));
 }
@@ -137,6 +140,12 @@ void checkCloseToDirect(LivePlot* plot, const QString& what)
     QCOMPARE(cached.size(), direct.size());
     const Ink d = marginInk(direct, plot), c = marginInk(cached, plot);
     const int onePixel = int(std::ceil(plot->bufferDevicePixelRatio()));
+    const bool sameBounds = within(c.bounds.left(), d.bounds.left(), onePixel)
+        && within(c.bounds.right(), d.bounds.right(), onePixel)
+        && within(c.bounds.top(), d.bounds.top(), onePixel)
+        && within(c.bounds.bottom(), d.bounds.bottom(), onePixel);
+    if (!sameBounds || qAbs(c.mass - d.mass) > 0.05 * d.mass)
+        keepImagesForCi("direct-" + what, cached, direct);
     QVERIFY2(within(c.bounds.left(), d.bounds.left(), onePixel)
                  && within(c.bounds.right(), d.bounds.right(), onePixel)
                  && within(c.bounds.top(), d.bounds.top(), onePixel)
