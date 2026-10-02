@@ -36,12 +36,24 @@
 #include "test-color-by-scalar/test-color-by-scalar.h"
 #include "test-gradient-presets/test-gradient-presets.h"
 
-#define QCPTEST(t) t t##instance; QTest::qExec(&t##instance)
+static bool shouldRun(const char* name)
+{
+    const QByteArray only = qgetenv("QCP_TEST_CLASS");
+    return only.isEmpty() || only == name;
+}
+
+#define QCPTEST(t)                                                                                 \
+    if (shouldRun(#t))                                                                             \
+    {                                                                                              \
+        t t##instance;                                                                             \
+        failures += QTest::qExec(&t##instance);                                                    \
+    }
 
 int main(int argc, char **argv)
 {
   QApplication app(argc, argv);
-  
+  int failures = 0;
+
   QCPTEST(TestQCustomPlot);
   QCPTEST(TestQCPGraph);
   QCPTEST(TestQCPCurve);
@@ -80,5 +92,5 @@ int main(int argc, char **argv)
   QCPTEST(TestColorByScalar);
   QCPTEST(TestGradientPresets);
 
-  return 0;
+  return failures == 0 ? 0 : 1;
 }
