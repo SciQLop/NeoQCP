@@ -754,7 +754,7 @@ bool QCPIntervals::drawsLaneNames() const
         return false;
     for (int i = 0; i < mParentPlot->plottableCount(); ++i)
         if (auto* other = qobject_cast<QCPIntervals*>(mParentPlot->plottable(i));
-            other && other->laneLayout() == mLayout)
+            other && other->laneLayout() == mLayout && other->realVisibility())
             return other == this;
     return false;
 }

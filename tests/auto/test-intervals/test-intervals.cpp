@@ -900,3 +900,13 @@ void TestIntervals::createWithStepSnapsBothEnds()
     QCOMPARE(spy.at(0).at(0).toDouble(), 45.0);
     QCOMPARE(spy.at(0).at(1).toDouble(), 50.0);
 }
+
+void TestIntervals::firstVisibleTimelineDrawsLaneNames()
+{
+    QCPLaneLayout layout;
+    auto* first = twoBars(mPlot, &layout);
+    auto* second = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    first->setVisible(false);
+    QVERIFY(!first->drawsLaneNames());
+    QVERIFY(second->drawsLaneNames());
+}

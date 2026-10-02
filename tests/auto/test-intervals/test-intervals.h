@@ -89,6 +89,8 @@ private slots:
 
     void createWithStepSnapsBothEnds();
 
+    void firstVisibleTimelineDrawsLaneNames();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };
