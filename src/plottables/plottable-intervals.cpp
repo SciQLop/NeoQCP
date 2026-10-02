@@ -483,14 +483,24 @@ void QCPIntervals::finishGesture()
     mParentPlot->replot(QCustomPlot::rpQueuedReplot);
     if (!g.moved || g.preview.empty())
         return;
-    if (g.kind == Gesture::Create)
-        emit intervalCreated(g.preview[0].start, g.preview[0].stop, g.preview[0].lane);
-    else
+    if (g.kind != Gesture::Create)
         emitEdits(g.preview);
+    else if (g.preview[0].stop > g.preview[0].start)
+        emit intervalCreated(g.preview[0].start, g.preview[0].stop, g.preview[0].lane);
+}
+
+bool QCPIntervals::changesAnyRow(const std::vector<qcp::intervals::Edit>& edits) const
+{
+    return std::ranges::any_of(edits, [this](const qcp::intervals::Edit& e) {
+        return e.start != mColumns.start[e.row] || e.stop != mColumns.stop[e.row]
+            || e.lane != mColumns.lane[e.row];
+    });
 }
 
 void QCPIntervals::emitEdits(const std::vector<qcp::intervals::Edit>& edits)
 {
+    if (!changesAnyRow(edits))
+        return;
     QVector<QCPIntervalEdit> out;
     for (const auto& e : edits)
         out.append({ mColumns.ids[e.row], e.start, e.stop, e.lane });

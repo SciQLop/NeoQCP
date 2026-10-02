@@ -80,6 +80,10 @@ private slots:
     void plottableAtPrefersABarOverASiblingsEmptySpace();
     void pressOnASiblingsBarStartsNoCreate();
 
+    void verticalOnlyCreateEmitsNothing();
+    void dragBackToTheStartEmitsNothing();
+    void nudgeClampedAtTheTopLaneEmitsNothing();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };

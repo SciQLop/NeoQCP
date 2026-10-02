@@ -612,11 +612,10 @@ void TestIntervals::verticalDragChangesLaneOnlyWhenAllowed()
     auto* iv = editableTwoBars(mPlot, &layout, QCPIntervals::emMove);
     QSignalSpy spy(iv, &QCPIntervals::intervalsEdited);
     drag(mPlot, iv->pixelOf(25, 0), iv->pixelOf(25, 1));
-    QCOMPARE(spy.count(), 1); // moved (vertically) but lane change is off
-    QCOMPARE(spy.at(0).at(0).value<QVector<QCPIntervalEdit>>()[0].lane, 0);
+    QCOMPARE(spy.count(), 0); // moved (vertically) but lane change is off: nothing changed
     iv->setEditModes(QCPIntervals::emMove | QCPIntervals::emChangeLane);
     drag(mPlot, iv->pixelOf(25, 0), iv->pixelOf(25, 1));
-    QCOMPARE(spy.at(1).at(0).value<QVector<QCPIntervalEdit>>()[0].lane, 1);
+    QCOMPARE(spy.at(0).at(0).value<QVector<QCPIntervalEdit>>()[0].lane, 1);
 }
 
 void TestIntervals::selectedIntervalsMoveTogether()
@@ -829,5 +828,36 @@ void TestIntervals::pressOnASiblingsBarStartsNoCreate()
     mPlot->replot();
     QSignalSpy spy(b, &QCPIntervals::intervalCreated);
     drag(mPlot, a->pixelOf(25, 0), a->pixelOf(35, 0));
+    QCOMPARE(spy.count(), 0);
+}
+
+void TestIntervals::verticalOnlyCreateEmitsNothing()
+{
+    QCPLaneLayout layout;
+    auto* iv = editableTwoBars(mPlot, &layout, QCPIntervals::emCreate);
+    QSignalSpy spy(iv, &QCPIntervals::intervalCreated);
+    drag(mPlot, iv->pixelOf(50, 0), iv->pixelOf(50, 1));
+    QCOMPARE(spy.count(), 0);
+}
+
+void TestIntervals::dragBackToTheStartEmitsNothing()
+{
+    QCPLaneLayout layout;
+    auto* iv = editableTwoBars(mPlot, &layout, QCPIntervals::emMove);
+    QSignalSpy spy(iv, &QCPIntervals::intervalsEdited);
+    press(mPlot, iv->pixelOf(25, 0).toPoint());
+    moveTo(mPlot, iv->pixelOf(35, 0).toPoint());
+    moveTo(mPlot, iv->pixelOf(25, 0).toPoint());
+    release(mPlot, iv->pixelOf(25, 0).toPoint());
+    QCOMPARE(spy.count(), 0);
+}
+
+void TestIntervals::nudgeClampedAtTheTopLaneEmitsNothing()
+{
+    QCPLaneLayout layout;
+    auto* iv = editableTwoBars(mPlot, &layout, QCPIntervals::emChangeLane);
+    iv->setSelectedRows({ 0 });
+    QSignalSpy spy(iv, &QCPIntervals::intervalsEdited);
+    key(mPlot, Qt::Key_Up);
     QCOMPARE(spy.count(), 0);
 }

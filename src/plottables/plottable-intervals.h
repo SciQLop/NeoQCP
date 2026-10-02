@@ -156,6 +156,7 @@ protected:
     [[nodiscard]] double snappedDelta(double raw) const;
     [[nodiscard]] int laneStepsTo(const QPointF& pos) const;
     [[nodiscard]] double keysPerPixels(double px) const;
+    [[nodiscard]] bool changesAnyRow(const std::vector<qcp::intervals::Edit>& edits) const;
     void emitEdits(const std::vector<qcp::intervals::Edit>& edits);
     void drawPreview(QCPPainter* painter) const;
     bool nudge(int keySteps, int laneSteps);
