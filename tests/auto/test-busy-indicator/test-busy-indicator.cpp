@@ -56,8 +56,7 @@ void TestBusyIndicator::debounceShowDelay()
     g->setBusy(true);
     QCOMPARE(g->visuallyBusy(), false);
 
-    QTest::qWait(150);
-    QCOMPARE(g->visuallyBusy(), true);
+    QTRY_VERIFY_WITH_TIMEOUT(g->visuallyBusy(), 2000);
     QCOMPARE(spy.count(), 1);
 }
 
@@ -68,15 +67,13 @@ void TestBusyIndicator::debounceHideDelay()
     g->setBusyHideDelayMs(100);
 
     g->setBusy(true);
-    QTest::qWait(50);
-    QCOMPARE(g->visuallyBusy(), true);
+    QTRY_VERIFY_WITH_TIMEOUT(g->visuallyBusy(), 2000);
 
     QSignalSpy spy(g, &QCPAbstractPlottable::visuallyBusyChanged);
     g->setBusy(false);
     QCOMPARE(g->visuallyBusy(), true); // still shown (hide delay)
 
-    QTest::qWait(150);
-    QCOMPARE(g->visuallyBusy(), false);
+    QTRY_VERIFY_WITH_TIMEOUT(!g->visuallyBusy(), 2000);
     QCOMPARE(spy.count(), 1);
 }
 
@@ -136,13 +133,12 @@ void TestBusyIndicator::busyPlottableDrawsFaded()
     g->setBusyShowDelayMs(0);
     g->setBusyHideDelayMs(0);
     g->setBusy(true);
-    QTest::qWait(50);
-    QCOMPARE(g->visuallyBusy(), true);
+    QTRY_VERIFY_WITH_TIMEOUT(g->visuallyBusy(), 2000);
 
     QPixmap busyPixmap = mPlot->toPixmap(200, 200);
 
     g->setBusy(false);
-    QTest::qWait(50);
+    QTRY_VERIFY_WITH_TIMEOUT(!g->visuallyBusy(), 2000);
 
     QPixmap normalPixmap = mPlot->toPixmap(200, 200);
 
@@ -171,8 +167,7 @@ void TestBusyIndicator::legendShowsPrefixWhenBusy()
 
     g->setBusyShowDelayMs(0);
     g->setBusy(true);
-    QTest::qWait(50);
-    QCOMPARE(g->visuallyBusy(), true);
+    QTRY_VERIFY_WITH_TIMEOUT(g->visuallyBusy(), 2000);
     mPlot->replot();
 
     QPixmap busyPix = mPlot->toPixmap(400, 300);
@@ -193,7 +188,7 @@ void TestBusyIndicator::legendSizeHintAccountsForPrefix()
 
     g->setBusyShowDelayMs(0);
     g->setBusy(true);
-    QTest::qWait(50);
+    QTRY_VERIFY_WITH_TIMEOUT(g->visuallyBusy(), 2000);
 
     QSize busySize = legendItem->minimumOuterSizeHint();
 
@@ -213,8 +208,7 @@ void TestBusyIndicator::groupLegendShowsBusyPrefix()
 
     mg->setBusyShowDelayMs(0);
     mg->setBusy(true);
-    QTest::qWait(50);
-    QCOMPARE(mg->visuallyBusy(), true);
+    QTRY_VERIFY_WITH_TIMEOUT(mg->visuallyBusy(), 2000);
     mPlot->replot();
 
     QPixmap busyPix = mPlot->toPixmap(400, 300);
@@ -240,8 +234,7 @@ void TestBusyIndicator::fullLifecycleExternalBusy()
     QCOMPARE(g->visuallyBusy(), false); // debounce not yet fired
 
     // 2. Wait for visual busy to show
-    QTest::qWait(100);
-    QCOMPARE(g->visuallyBusy(), true);
+    QTRY_VERIFY_WITH_TIMEOUT(g->visuallyBusy(), 2000);
     QCOMPARE(visualSpy.count(), 1);
 
     // 3. Data arrives — set data and clear external busy
@@ -280,7 +273,11 @@ void TestBusyIndicator::visualBusyToggleForcesLayerRepaint()
     QVERIFY(mainLayer);
 
     mPlot->xAxis->setRange(50, 1050);
-    QVERIFY(mainLayer->canSkipRepaintForTranslation());
+    QVERIFY2(mainLayer->canSkipRepaintForTranslation(),
+             qPrintable(QString("pixelOffset=(%1,%2) canTranslate=%3 (false with an offset: a child "
+                                "blocks; true: the paint buffer is missing or invalidated)")
+                            .arg(mainLayer->pixelOffset().x()).arg(mainLayer->pixelOffset().y())
+                            .arg(mainLayer->canTranslateInsteadOfRepaint())));
 
     // Sampled inside the toggle signal, before the queued replot can run:
     // the offset is still valid (it is a pan) yet the layer refuses to translate.

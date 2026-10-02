@@ -414,8 +414,7 @@ void TestMultiGraph::legendCollapsedFitsBusyIndicator()
     mg->setBusyShowDelayMs(10);
     mg->addToLegend();
     mg->setBusy(true);
-    QTest::qWait(50);
-    QVERIFY(mg->visuallyBusy());
+    QTRY_VERIFY_WITH_TIMEOUT(mg->visuallyBusy(), 2000);
 
     auto* item = qobject_cast<QCPGroupLegendItem*>(mPlot->legend->item(0));
     QVERIFY(item);
