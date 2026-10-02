@@ -1,5 +1,6 @@
 #include "test-hidden-replot.h"
 #include "../../../src/qcp.h"
+#include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
 
 void TestHiddenReplot::init()
 {
@@ -56,4 +57,21 @@ void TestHiddenReplot::replotResumesAfterDisable()
     QSignalSpy spy(mPlot, &QCustomPlot::afterReplot);
     mPlot->replot();
     QCOMPARE(spy.count(), 1);
+}
+
+void TestHiddenReplot::skippedReplotRunsWhenShownAgain()
+{
+    // A tab switch or a sleep hides the plot without resizing it: whatever changed meanwhile
+    // must be drawn when it shows again.
+    mPlot->setSkipReplotsWhenHidden(true);
+    mPlot->show();
+    QVERIFY(QTest::qWaitForWindowExposed(mPlot));
+    mPlot->replot();
+    mPlot->hide();
+    mPlot->xAxis->setRange(5, 15);
+    QSignalSpy afterSpy(mPlot, &QCustomPlot::afterReplot);
+    mPlot->replot();
+    QCOMPARE(afterSpy.count(), 0); // skipped while hidden
+    mPlot->show();
+    QTRY_VERIFY_WITH_TIMEOUT(afterSpy.count() > 0, 2000);
 }

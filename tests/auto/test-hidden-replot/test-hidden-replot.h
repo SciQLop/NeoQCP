@@ -13,6 +13,7 @@ private slots:
     void neverShownReplotRunsWhenEnabled();
     void hiddenReplotSkippedWhenEnabled();
     void replotResumesAfterDisable();
+    void skippedReplotRunsWhenShownAgain();
 
 private:
     QCustomPlot* mPlot = nullptr;

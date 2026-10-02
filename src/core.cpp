@@ -2198,11 +2198,12 @@ void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
 
     if (mSkipReplotsWhenHidden && mWasShown && !isVisible())
     {
-        // Defer all painting to the first visible replot (forced by initialize()).
-        // Buffer dirty/invalidated flags are intentionally left untouched.
-        // Never-shown widgets fall through: classic behavior, required for
-        // offscreen rendering.
+        // Defer all painting to the next show: showEvent() replots, since a show at the same
+        // size (a tab switch, a sleep) does not run initialize(). Buffer dirty/invalidated
+        // flags are intentionally left untouched. Never-shown widgets fall through: classic
+        // behavior, required for offscreen rendering.
         mReplotQueued = false;
+        mReplotSkippedWhileHidden = true;
         return;
     }
 
@@ -3139,6 +3140,8 @@ void QCustomPlot::showEvent(QShowEvent* event)
 {
     QRhiWidget::showEvent(event);
     mWasShown = true;
+    if (std::exchange(mReplotSkippedWhileHidden, false))
+        replot(rpQueuedReplot);
 }
 
 /*! \internal

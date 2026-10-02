@@ -424,6 +424,7 @@ protected:
     void commitPendingData();
     bool mSkipReplotsWhenHidden = false;
     bool mWasShown = false;
+    bool mReplotSkippedWhileHidden = false; // drawn by the next showEvent
     double mReplotTime, mReplotTimeAverage;
     // RHI compositing resources (mRhi cached from rhi() in initialize(); Qt docs only guarantee
     // rhi() during initialize/render/releaseResources, but the pointer is stable in practice):
