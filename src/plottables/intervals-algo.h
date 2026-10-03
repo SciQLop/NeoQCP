@@ -39,6 +39,9 @@ struct PixelBar
 std::optional<std::string> invalidColumns(const Columns& c);
 std::vector<LaneRows> groupByLane(const Columns& c, int laneCount);
 std::pair<int, int> candidateRange(const LaneRows& lane, double lower, double upper);
+//! Puts each interval of \a lane in the first sub-row free at its start (greedy interval
+//! packing), writing \a subRow[row]; returns the number of sub-rows used.
+int packSubRows(const LaneRows& lane, const Columns& c, std::vector<int>& subRow);
 PixelBar toPixelBar(double xa, double xb, double y0, double y1, int category, int row);
 //! Merges \a bar into the previous one when they overlap with the same category. The merged bar
 //! keeps its row (and so its label) only if \a sameLabel says both rows show the same text.

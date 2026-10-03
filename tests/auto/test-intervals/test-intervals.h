@@ -85,6 +85,13 @@ private slots:
     void forbidClampsASelectionByItsTightestBlock();
     void forbidClampsANudge();
     void drawModeAllowsOverlaps();
+    void packSubRowsUsesTheFirstFreeRow();
+    void laneRowsMakeALaneTaller();
+    void stackPutsOverlapsInSubRows();
+    void stackedLaneHasAnIdleLinePerRow();
+    void legendListsTheUsedCategories();
+    void legendItemHasARowPerCategory();
+    void autoAddedLegendItemIsTheCategoryList();
     void snapToStepLandsOnMultiples();
     void setDataDuringDragCancelsGesture();
     void cursorFollowsThePart();

@@ -20,6 +20,7 @@ class QCP_LIB_DECL QCPIntervals : public QCPAbstractPlottable, public QCPPlottab
     Q_OBJECT
 public:
     QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* layout);
+    ~QCPIntervals() override;
 
     void setData(qcp::intervals::Columns columns);
     [[nodiscard]] const qcp::intervals::Columns& columns() const { return mColumns; }
@@ -27,6 +28,14 @@ public:
     [[nodiscard]] QCPLaneLayout* laneLayout() const { return mLayout; }
 
     void setCategoryColors(const QVector<QColor>& colors);
+    //! Names of the category indices, for the legend.
+    void setCategoryNames(const QStringList& names);
+    //! (name, colour) of each category the data uses, first seen first.
+    [[nodiscard]] std::vector<std::pair<QString, QColor>> legendEntries() const;
+    using QCPAbstractPlottable::addToLegend;
+    using QCPAbstractPlottable::removeFromLegend;
+    bool addToLegend(QCPLegend* legend) override;
+    bool removeFromLegend(QCPLegend* legend) const override;
     [[nodiscard]] QColor categoryColor(int category) const;
     [[nodiscard]] quint64 buildCount() const { return mBuildCount; }
     [[nodiscard]] QCPLayer* labelLayer() const;
@@ -126,6 +135,10 @@ protected:
     void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
 
     void regroupIfLanesWereAdded();
+    void updateSubRows();
+    [[nodiscard]] int subRowOf(int row) const { return mSubRow.empty() ? 0 : mSubRow[row]; }
+    //! The vertical band of sub-row \a subRow of \a lane (the whole lane when not stacking).
+    [[nodiscard]] std::optional<QCPLaneBand> rowBand(int lane, int subRow) const;
     [[nodiscard]] BuildKey currentBuildKey() const;
     void rebuildBarsIfNeeded();
     void rebuildBars();
@@ -207,6 +220,7 @@ protected:
     qcp::intervals::Columns mColumns;
     std::vector<qcp::intervals::LaneRows> mLanes;
     QVector<QColor> mCategoryColors;
+    QStringList mCategoryNames;
     std::vector<qcp::intervals::PixelBar> mBars;
     struct Shape
     {
@@ -224,6 +238,7 @@ protected:
     std::vector<LabelRect> mLabelRects;
     Style mStyle = stBars;
     OverlapMode mOverlap = omDraw;
+    std::vector<int> mSubRow; // per row, when stacking
     std::optional<BuildKey> mBuiltFor;
     quint64 mDataGeneration = 0;
     quint64 mColorGeneration = 0;

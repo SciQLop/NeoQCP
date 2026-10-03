@@ -45,7 +45,17 @@ public:
     [[nodiscard]] double lanePixelHeight(const QRect& axisRect) const;
     [[nodiscard]] std::optional<QCPLaneBand> laneBand(int lane, const QRect& axisRect) const;
     [[nodiscard]] int laneAt(double y, const QRect& axisRect) const;
-    [[nodiscard]] int totalHeight() const { return visibleLaneCount() * mLaneHeight; }
+    [[nodiscard]] int totalHeight() const { return totalRows() * mLaneHeight; }
+
+    //! How many rows each lane needs for \a owner (stacked overlaps); a lane is as tall as the
+    //! most any owner asks, and at least one row.
+    void setLaneRows(const QObject* owner, std::vector<int> rowsPerLane);
+    void removeLaneRows(const QObject* owner);
+    [[nodiscard]] int laneRows(int lane) const;
+    [[nodiscard]] int totalRows() const;
+    //! Row coordinate (0 = top) of the middle of \a lane, for labelling it on an axis.
+    [[nodiscard]] double laneCentreRow(int lane) const;
+    [[nodiscard]] int positionOf(int lane) const { return displayPosition(lane); }
     [[nodiscard]] quint64 generation() const { return mGeneration; }
 
 Q_SIGNALS:
@@ -60,4 +70,7 @@ private:
     int mLaneHeight = 14;
     Placement mPlacement = plStrip;
     quint64 mGeneration = 0;
+    std::vector<std::pair<const QObject*, std::vector<int>>> mLaneRows;
+
+    [[nodiscard]] int rowsBefore(int position) const;
 };

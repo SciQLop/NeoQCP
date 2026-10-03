@@ -42,6 +42,21 @@ std::vector<LaneRows> groupByLane(const Columns& c, int laneCount)
     return lanes;
 }
 
+int packSubRows(const LaneRows& lane, const Columns& c, std::vector<int>& subRow)
+{
+    std::vector<double> rowEnds; // where each sub-row is busy until
+    for (int row : lane.rows)
+    {
+        auto free = std::ranges::find_if(rowEnds, [&](double end) { return end <= c.start[row]; });
+        if (free == rowEnds.end())
+            free = rowEnds.insert(rowEnds.end(), c.stop[row]);
+        else
+            *free = c.stop[row];
+        subRow[row] = static_cast<int>(free - rowEnds.begin());
+    }
+    return static_cast<int>(rowEnds.size());
+}
+
 std::pair<int, int> candidateRange(const LaneRows& lane, double lower, double upper)
 {
     const auto first = std::ranges::lower_bound(lane.starts, lower - lane.maxDuration);

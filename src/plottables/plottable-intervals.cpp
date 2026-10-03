@@ -5,6 +5,7 @@
 #include "../painting/rhi-utils.h"
 #include "../axis/axis.h"
 #include "../layoutelements/layoutelement-axisrect.h"
+#include "../layoutelements/layoutelement-legend-intervals.h"
 #include <QFontMetricsF>
 #include <QSet>
 #include <algorithm>
@@ -67,6 +68,13 @@ QCPIntervals::QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* 
         : QCPAbstractPlottable(keyAxis, valueAxis), mLayout(layout)
 {
     setSelectable(QCP::stMultipleDataRanges);
+    // The base constructor auto-added a plain legend item (our addToLegend override was not
+    // in place yet): swap in the category list.
+    if (mParentPlot && mParentPlot->autoAddPlottableToLegend() && mParentPlot->legend)
+    {
+        QCPAbstractPlottable::removeFromLegend(mParentPlot->legend);
+        addToLegend(mParentPlot->legend);
+    }
     connect(layout, &QCPLaneLayout::changed, this, [this] {
         regroupIfLanesWereAdded();
         markLayersDirty();
@@ -90,6 +98,7 @@ void QCPIntervals::setData(qcp::intervals::Columns columns)
     const QVector<qint64> selected = selectedIds();
     mColumns = std::move(columns);
     mLanes = qcp::intervals::groupByLane(mColumns, mLayout ? mLayout->laneNames().size() : 0);
+    updateSubRows();
     ++mDataGeneration;
     markLayersDirty();
     setSelectedRows(rowsWithIds(selected));
@@ -106,10 +115,85 @@ QVector<int> QCPIntervals::rowsWithIds(const QVector<qint64>& ids) const
 }
 
 // Rows on a lane the layout did not know yet were dropped by groupByLane.
+QCPIntervals::~QCPIntervals()
+{
+    if (mLayout)
+        mLayout->removeLaneRows(this);
+}
+
 void QCPIntervals::regroupIfLanesWereAdded()
 {
-    if (static_cast<int>(mLanes.size()) != mLayout->laneNames().size())
-        mLanes = qcp::intervals::groupByLane(mColumns, mLayout->laneNames().size());
+    if (static_cast<int>(mLanes.size()) == mLayout->laneNames().size())
+        return;
+    mLanes = qcp::intervals::groupByLane(mColumns, mLayout->laneNames().size());
+    updateSubRows();
+}
+
+void QCPIntervals::updateSubRows()
+{
+    if (!mLayout)
+        return;
+    if (mOverlap != omStack)
+    {
+        mSubRow.clear();
+        mLayout->removeLaneRows(this);
+        return;
+    }
+    mSubRow.assign(mColumns.start.size(), 0);
+    std::vector<int> rowsPerLane;
+    for (const auto& lane : mLanes)
+        rowsPerLane.push_back(qcp::intervals::packSubRows(lane, mColumns, mSubRow));
+    mLayout->setLaneRows(this, std::move(rowsPerLane));
+}
+
+std::optional<QCPLaneBand> QCPIntervals::rowBand(int lane, int subRow) const
+{
+    const QRect rect = mKeyAxis->axisRect()->rect();
+    const auto band = mLayout->laneBand(lane, rect);
+    if (!band || mOverlap != omStack)
+        return band;
+    const double row = mLayout->lanePixelHeight(rect);
+    const double top = band->top + subRow * row;
+    return QCPLaneBand { top, top + row };
+}
+
+void QCPIntervals::setCategoryNames(const QStringList& names)
+{
+    mCategoryNames = names;
+}
+
+std::vector<std::pair<QString, QColor>> QCPIntervals::legendEntries() const
+{
+    std::vector<std::pair<QString, QColor>> entries;
+    QSet<int> seen;
+    for (int category : mColumns.category)
+        if (!seen.contains(category))
+        {
+            seen.insert(category);
+            entries.emplace_back(mCategoryNames.value(category, QString::number(category)),
+                                 categoryColor(category));
+        }
+    return entries;
+}
+
+bool QCPIntervals::addToLegend(QCPLegend* legend)
+{
+    if (!legend || legend->parentPlot() != mParentPlot)
+        return false;
+    for (int i = 0; i < legend->itemCount(); ++i)
+        if (auto* item = qobject_cast<QCPIntervalsLegendItem*>(legend->item(i)); item && item->intervals() == this)
+            return false;
+    return legend->addItem(new QCPIntervalsLegendItem(legend, this));
+}
+
+bool QCPIntervals::removeFromLegend(QCPLegend* legend) const
+{
+    if (!legend)
+        return false;
+    for (int i = 0; i < legend->itemCount(); ++i)
+        if (auto* item = qobject_cast<QCPIntervalsLegendItem*>(legend->item(i)); item && item->intervals() == this)
+            return legend->removeItem(item);
+    return false;
 }
 
 void QCPIntervals::setCategoryColors(const QVector<QColor>& colors)
@@ -153,7 +237,7 @@ void QCPIntervals::requestRepaint()
 
 QRectF QCPIntervals::barRect(int row) const
 {
-    const auto band = mLayout->laneBand(mColumns.lane[row], mKeyAxis->axisRect()->rect());
+    const auto band = rowBand(mColumns.lane[row], subRowOf(row));
     if (!band)
         return {};
     const auto bar = qcp::intervals::toPixelBar(mKeyAxis->coordToPixel(mColumns.start[row]),
@@ -208,6 +292,8 @@ QCPIntervals::Hit QCPIntervals::hitTest(const QPointF& pos) const
     {
         const int row = rows.rows[i];
         const QRectF bar = barRect(row);
+        if (mOverlap == omStack && (pos.y() < bar.top() - 1 || pos.y() > bar.bottom() + 1))
+            continue; // another sub-row of this lane
         // later rows are drawn on top, so they win ties
         if (const double d = distanceToBar(bar, pos.x()); d <= bestDistance)
         {
@@ -503,8 +589,13 @@ int QCPIntervals::laneStepsTo(const QPointF& pos) const
 {
     if (mGesture->kind != Gesture::Move || !(mEditModes & emChangeLane))
         return 0;
-    const double laneHeight = mLayout->lanePixelHeight(mKeyAxis->axisRect()->rect());
-    return static_cast<int>(std::lround((pos.y() - mGesture->pressPos.y()) / laneHeight));
+    // Lanes can differ in height (stacked overlaps): count lanes, not pixels.
+    const QRect rect = mKeyAxis->axisRect()->rect();
+    const double y = std::clamp(pos.y(), double(rect.top()), double(rect.bottom()) - 1);
+    const int lane = mLayout->laneAt(y, rect);
+    if (lane < 0)
+        return 0;
+    return mLayout->positionOf(lane) - mLayout->positionOf(mGesture->pressLane);
 }
 
 void QCPIntervals::updateGesture(const QPointF& pos)
@@ -631,7 +722,8 @@ void QCPIntervals::drawPreview(QCPPainter* painter) const
     const QRect rect = mKeyAxis->axisRect()->rect();
     for (const auto& e : mGesture->preview)
     {
-        const auto band = mLayout->laneBand(e.lane, rect);
+        const bool sameLane = e.row >= 0 && e.lane == mColumns.lane[e.row];
+        const auto band = rowBand(e.lane, sameLane ? subRowOf(e.row) : 0);
         if (!band)
             continue;
         const auto bar = qcp::intervals::toPixelBar(mKeyAxis->coordToPixel(e.start),
@@ -665,6 +757,7 @@ void QCPIntervals::setOverlapMode(OverlapMode mode)
     if (mOverlap == mode)
         return;
     mOverlap = mode;
+    updateSubRows();
     markLayersDirty();
 }
 
@@ -838,9 +931,15 @@ void QCPIntervals::appendLaneBackdrops(const QRect& axisRect)
             mShapes.push_back({ rectPolygon(QRectF(axisRect.left(), band->top, axisRect.width(),
                                                    band->bottom - band->top)),
                                 withAlpha(ink, 0.06) });
-        const double mid = std::floor((band->top + band->bottom) / 2);
-        mShapes.push_back({ rectPolygon(QRectF(axisRect.left(), mid, axisRect.width(), 1)),
-                            withAlpha(ink, 0.45) });
+        // One idle line per row: in a stacked lane each sub-row is its own signal.
+        const int rows = mOverlap == omStack ? mLayout->laneRows(lanes[position]) : 1;
+        const double rowHeight = (band->bottom - band->top) / rows;
+        for (int r = 0; r < rows; ++r)
+        {
+            const double mid = std::floor(band->top + (r + 0.5) * rowHeight);
+            mShapes.push_back({ rectPolygon(QRectF(axisRect.left(), mid, axisRect.width(), 1)),
+                                withAlpha(ink, 0.45) });
+        }
     }
 }
 
@@ -875,10 +974,11 @@ void QCPIntervals::appendLaneBars(int lane, const QCPLaneBand& band)
         const int row = rows.rows[i];
         if (mColumns.stop[row] < range.lower)
             continue;
+        const QCPLaneBand rows = mOverlap == omStack ? *rowBand(lane, subRowOf(row)) : band;
         qcp::intervals::appendMerged(
             mBars, qcp::intervals::toPixelBar(mKeyAxis->coordToPixel(mColumns.start[row]),
                                               mKeyAxis->coordToPixel(mColumns.stop[row]),
-                                              band.top + inset, band.bottom - inset,
+                                              rows.top + inset, rows.bottom - inset,
                                               mColumns.category[row], row),
             sameLabelAsLastBar(row));
     }

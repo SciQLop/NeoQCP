@@ -1263,3 +1263,121 @@ void TestIntervals::drawModeAllowsOverlaps()
     QVERIFY(qAbs(firstEdit(spy).stop - 60) < keyTolerance);
 }
 
+void TestIntervals::packSubRowsUsesTheFirstFreeRow()
+{
+    const auto c = columns({ 0, 5, 12, 16, 40 }, { 10, 15, 20, 30, 50 }, { 0, 0, 0, 0, 0 });
+    const auto lanes = qcp::intervals::groupByLane(c, 1);
+    std::vector<int> subRow(c.start.size(), -1);
+    QCOMPARE(qcp::intervals::packSubRows(lanes[0], c, subRow), 2);
+    QCOMPARE(subRow, (std::vector<int> { 0, 1, 0, 1, 0 }));
+}
+
+void TestIntervals::laneRowsMakeALaneTaller()
+{
+    QCPLaneLayout layout;
+    layout.setLaneHeight(10);
+    layout.laneIndices({ "A", "B" });
+    QObject owner;
+    layout.setLaneRows(&owner, { 3, 1 });
+    QCOMPARE(layout.totalRows(), 4);
+    QCOMPARE(layout.totalHeight(), 40);
+    const QRect rect(0, 0, 100, 400);
+    QCOMPARE(layout.laneBand(0, rect)->bottom, 30.0);
+    QCOMPARE(layout.laneBand(1, rect)->top, 30.0);
+    QCOMPARE(layout.laneAt(25, rect), 0);
+    QCOMPARE(layout.laneAt(35, rect), 1);
+    QObject other;
+    layout.setLaneRows(&other, { 1, 2 }); // owners sharing the layout: each lane takes the most
+    QCOMPARE(layout.totalRows(), 5);
+    layout.removeLaneRows(&owner);
+    QCOMPARE(layout.totalRows(), 3);
+}
+
+void TestIntervals::stackPutsOverlapsInSubRows()
+{
+    QCPLaneLayout layout;
+    layout.setPlacement(QCPLaneLayout::plLanes);
+    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    const int a = layout.laneIndex("A"), b = layout.laneIndex("B");
+    iv->setData(columns({ 10, 30, 10 }, { 50, 70, 50 }, { a, a, b }));
+    mPlot->xAxis->setRange(0, 100);
+    iv->setOverlapMode(QCPIntervals::omStack);
+    mPlot->replot();
+    QCOMPARE(layout.totalRows(), 3);
+    const QRectF first = iv->barRect(0), second = iv->barRect(1);
+    QVERIFY2(first.bottom() <= second.top(), "overlapping intervals share a row");
+    QCOMPARE(iv->hitTest(QPointF(iv->pixelOf(40, a).x(), second.center().y())).row, 1);
+    QCOMPARE(iv->hitTest(QPointF(iv->pixelOf(40, a).x(), first.center().y())).row, 0);
+    iv->setOverlapMode(QCPIntervals::omDraw);
+    QCOMPARE(layout.totalRows(), 2);
+}
+
+void TestIntervals::stackedLaneHasAnIdleLinePerRow()
+{
+    QCPLaneLayout layout;
+    layout.setPlacement(QCPLaneLayout::plLanes);
+    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    iv->setStyle(QCPIntervals::stWave);
+    iv->setOverlapMode(QCPIntervals::omStack);
+    iv->setCategoryColors({ Qt::red });
+    iv->setData(columns({ 40, 50 }, { 80, 90 }, { layout.laneIndex("A"), layout.laneIndex("A") }));
+    mPlot->xAxis->setRange(0, 100);
+    const QImage image = mPlot->toPixmap(400, 300).toImage();
+    const double row = layout.lanePixelHeight(mPlot->axisRect()->rect());
+    const QColor background = mPlot->backgroundBrush().color();
+    QVERIFY(pixelAt(image, mPlot, 10, row / 2) != background);      // first row's line
+    QVERIFY(pixelAt(image, mPlot, 10, row * 1.5) != background);    // second row's line
+    QCOMPARE(pixelAt(image, mPlot, 10, row), background);           // nothing between them
+}
+
+void TestIntervals::legendListsTheUsedCategories()
+{
+    QCPLaneLayout layout;
+    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto c = columns({ 0, 10, 20 }, { 5, 15, 25 }, { layout.laneIndex("A"), 0, 0 });
+    c.category = { 2, 0, 2 };
+    iv->setData(std::move(c));
+    iv->setCategoryNames({ "BASE", "HKM", "LM" });
+    iv->setCategoryColors({ Qt::red, Qt::green, Qt::blue });
+    const auto entries = iv->legendEntries();
+    QCOMPARE(entries.size(), std::size_t { 2 }); // first seen first; HKM is not used
+    QCOMPARE(entries[0].first, QString("LM"));
+    QCOMPARE(entries[0].second, QColor(Qt::blue));
+    QCOMPARE(entries[1].first, QString("BASE"));
+}
+
+void TestIntervals::legendItemHasARowPerCategory()
+{
+    QCPLaneLayout layout;
+    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto c = columns({ 0, 10 }, { 5, 15 }, { layout.laneIndex("A"), 0 });
+    c.category = { 0, 1 };
+    iv->setData(std::move(c));
+    iv->setCategoryNames({ "BASE", "HKM" });
+    mPlot->legend->clearItems();
+    QVERIFY(iv->addToLegend(mPlot->legend));
+    QCOMPARE(mPlot->legend->itemCount(), 1);
+    auto* item = qobject_cast<QCPIntervalsLegendItem*>(mPlot->legend->item(0));
+    QVERIFY(item);
+    const int twoRows = item->minimumOuterSizeHint().height();
+    iv->setCategoryNames({ "BASE", "HKM", "LM" });
+    auto more = columns({ 0, 10, 20 }, { 5, 15, 25 }, { 0, 0, 0 });
+    more.category = { 0, 1, 2 };
+    iv->setData(std::move(more));
+    QVERIFY(item->minimumOuterSizeHint().height() > twoRows);
+    QVERIFY(!iv->addToLegend(mPlot->legend)); // only once
+    QVERIFY(iv->removeFromLegend(mPlot->legend));
+    QCOMPARE(mPlot->legend->itemCount(), 0);
+}
+
+// QCustomPlot auto-adds plottables to the legend from the base constructor, where the virtual
+// addToLegend is not ours yet: the constructor must swap in the category list.
+void TestIntervals::autoAddedLegendItemIsTheCategoryList()
+{
+    mPlot->legend->clearItems();
+    QCPLaneLayout layout;
+    new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    QCOMPARE(mPlot->legend->itemCount(), 1);
+    QVERIFY(qobject_cast<QCPIntervalsLegendItem*>(mPlot->legend->item(0)));
+}
+

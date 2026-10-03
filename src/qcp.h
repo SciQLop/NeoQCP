@@ -65,6 +65,7 @@
 #include "layoutelements/layoutelement-colorscale.h"
 #include "layoutelements/layoutelement-legend.h"
 #include "layoutelements/layoutelement-legend-group.h"
+#include "layoutelements/layoutelement-legend-intervals.h"
 #include "layoutelements/layoutelement-textelement.h"
 #include "lineending.h"
 #include "painting/paintbuffer.h"
