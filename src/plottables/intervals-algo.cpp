@@ -64,7 +64,7 @@ PixelBar toPixelBar(double xa, double xb, double y0, double y1, int category, in
     return { x0, x1, y0, y1, category, row, instant };
 }
 
-void appendMerged(std::vector<PixelBar>& bars, const PixelBar& bar)
+void appendMerged(std::vector<PixelBar>& bars, const PixelBar& bar, bool sameLabel)
 {
     if (!bars.empty())
     {
@@ -75,7 +75,8 @@ void appendMerged(std::vector<PixelBar>& bars, const PixelBar& bar)
         {
             last.x0 = std::min(last.x0, bar.x0);
             last.x1 = std::max(last.x1, bar.x1);
-            last.row = -1;
+            if (!sameLabel)
+                last.row = -1;
             return;
         }
     }
@@ -103,6 +104,33 @@ void appendDiamond(std::vector<float>& out, QPointF c, double h, const std::arra
         left(c.x() - h, c.y());
     for (const QPointF p : { top, right, bottom, top, bottom, left })
         appendVertex(out, p, rgba);
+}
+
+void appendFan(std::vector<float>& out, const QPolygonF& polygon, const std::array<float, 4>& rgba)
+{
+    for (qsizetype i = 1; i + 1 < polygon.size(); ++i)
+        for (const QPointF p : { polygon[0], polygon[i], polygon[i + 1] })
+            appendVertex(out, p, rgba);
+}
+
+QPolygonF busShape(const QRectF& rect, double slant)
+{
+    const double s = std::min(slant, rect.width() / 2);
+    const double mid = rect.center().y();
+    return QPolygonF({ { rect.left(), mid }, { rect.left() + s, rect.top() },
+                       { rect.right() - s, rect.top() }, { rect.right(), mid },
+                       { rect.right() - s, rect.bottom() }, { rect.left() + s, rect.bottom() } });
+}
+
+std::optional<QString> fittedLabel(const QFontMetricsF& fm, const QString& text, double width)
+{
+    if (fm.horizontalAdvance(text) <= width)
+        return text;
+    const QString elided = fm.elidedText(text, Qt::ElideRight, width);
+    const qsizetype kept = elided.endsWith(QChar(0x2026)) ? elided.size() - 1 : elided.size();
+    if (kept < std::min<qsizetype>(3, text.size()))
+        return std::nullopt;
+    return elided;
 }
 
 int shiftLane(int lane, int steps, const std::vector<int>& displayOrder)

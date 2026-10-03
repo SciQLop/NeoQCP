@@ -17,6 +17,14 @@ private slots:
     void renameKeepsTheIndex();
     void laneAtInvertsLaneBand();
     void lanesPlacementSplitsTheAxisRect();
+    void busShapeHasAngledEnds();
+    void mergedBarsWithTheSameLabelKeepIt();
+    void fanTriangulatesAConvexPolygon();
+    void labelsElideOrHide();
+    void labelCentresInTheVisiblePart();
+    void waveStyleCutsTheBarCorners();
+    void waveStyleDrawsAnIdleBaseline();
+    void waveStyleShadesEveryOtherLane();
     void laneIndicesNotifiesOnce();
 
     void invalidColumnsAreReported();

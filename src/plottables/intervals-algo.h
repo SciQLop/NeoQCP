@@ -1,5 +1,7 @@
 #pragma once
+#include <QFontMetricsF>
 #include <QPointF>
+#include <QPolygonF>
 #include <QRectF>
 #include <QStringList>
 #include <array>
@@ -38,10 +40,18 @@ std::optional<std::string> invalidColumns(const Columns& c);
 std::vector<LaneRows> groupByLane(const Columns& c, int laneCount);
 std::pair<int, int> candidateRange(const LaneRows& lane, double lower, double upper);
 PixelBar toPixelBar(double xa, double xb, double y0, double y1, int category, int row);
-void appendMerged(std::vector<PixelBar>& bars, const PixelBar& bar);
+//! Merges \a bar into the previous one when they overlap with the same category. The merged bar
+//! keeps its row (and so its label) only if \a sameLabel says both rows show the same text.
+void appendMerged(std::vector<PixelBar>& bars, const PixelBar& bar, bool sameLabel = false);
 void appendQuad(std::vector<float>& out, const QRectF& rect, const std::array<float, 4>& rgba);
 void appendDiamond(std::vector<float>& out, QPointF center, double halfSize,
                    const std::array<float, 4>& rgba);
+//! Triangles of a convex polygon, fanned from its first point.
+void appendFan(std::vector<float>& out, const QPolygonF& polygon, const std::array<float, 4>& rgba);
+//! A bus value as wave viewers draw it: a bar whose ends are angled by \a slant pixels.
+QPolygonF busShape(const QRectF& rect, double slant);
+//! \a text if it fits in \a width, else elided with at least 3 characters kept, else nothing.
+std::optional<QString> fittedLabel(const QFontMetricsF& fm, const QString& text, double width);
 
 struct DraggedRow
 {

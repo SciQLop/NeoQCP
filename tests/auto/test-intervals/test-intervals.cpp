@@ -112,6 +112,34 @@ void TestIntervals::lanesPlacementSplitsTheAxisRect()
     QCOMPARE(layout.lanePixelHeight(QRect(0, 0, 100, 54)), 18.0); // natural height
 }
 
+void TestIntervals::busShapeHasAngledEnds()
+{
+    const QPolygonF hex = qcp::intervals::busShape(QRectF(0, 0, 40, 14), 4);
+    QCOMPARE(hex, QPolygonF({ { 0, 7 }, { 4, 0 }, { 36, 0 }, { 40, 7 }, { 36, 14 }, { 4, 14 } }));
+    // Too narrow for the full slant: the ends meet in the middle, a diamond-like shape.
+    const QPolygonF narrow = qcp::intervals::busShape(QRectF(0, 0, 6, 14), 4);
+    QCOMPARE(narrow[1], QPointF(3, 0));
+    QCOMPARE(narrow[2], QPointF(3, 0));
+}
+
+void TestIntervals::fanTriangulatesAConvexPolygon()
+{
+    std::vector<float> out;
+    qcp::intervals::appendFan(out, qcp::intervals::busShape(QRectF(0, 0, 40, 14), 4), { 1, 0, 0, 1 });
+    QCOMPARE(out.size(), std::size_t { 4 * 3 * 6 }); // 4 triangles, 3 vertices, x y r g b a
+}
+
+void TestIntervals::labelsElideOrHide()
+{
+    const QFontMetricsF fm(QFont{});
+    using qcp::intervals::fittedLabel;
+    QCOMPARE(fittedLabel(fm, "burst mode", fm.horizontalAdvance("burst mode") + 1), QString("burst mode"));
+    const auto elided = fittedLabel(fm, "burst mode", fm.horizontalAdvance(QStringLiteral("burs…")) + 1);
+    QVERIFY(elided && elided->endsWith(QChar(0x2026)) && elided->size() >= 4);
+    QVERIFY(!fittedLabel(fm, "burst mode", fm.horizontalAdvance(QStringLiteral("b…"))));
+    QCOMPARE(fittedLabel(fm, "LM", fm.horizontalAdvance("LM") + 1), QString("LM")); // short text fits whole
+}
+
 namespace {
 qcp::intervals::Columns columns(std::vector<double> start, std::vector<double> stop,
                                 std::vector<int> lane)
@@ -180,6 +208,19 @@ void TestIntervals::overlappingSameCategoryBarsMerge()
     QCOMPARE(bars[0].x1, 20.0);
     QCOMPARE(bars[0].row, -1);
     QCOMPARE(bars[1].category, 2);
+}
+
+// Same text on both sides: the merged bar can still show it.
+void TestIntervals::mergedBarsWithTheSameLabelKeepIt()
+{
+    using namespace qcp::intervals;
+    std::vector<PixelBar> bars;
+    appendMerged(bars, toPixelBar(0, 10, 0, 14, 1, 0));
+    appendMerged(bars, toPixelBar(9, 20, 0, 14, 1, 1), true);
+    QCOMPARE(bars.size(), std::size_t { 1 });
+    QCOMPARE(bars[0].row, 0);
+    appendMerged(bars, toPixelBar(19, 30, 0, 14, 1, 2), false);
+    QCOMPARE(bars[0].row, -1);
 }
 
 void TestIntervals::quadIsTwoTriangles()
@@ -386,7 +427,7 @@ void TestIntervals::labelIsDrawnOnlyWhenItFits()
     mPlot->xAxis->setRange(0, 100);
     mPlot->toPixmap(400, 300);
     QCOMPARE(iv->mLabelRects.size(), std::size_t { 1 });
-    QCOMPARE(iv->mLabelRects[0].second, 0);
+    QCOMPARE(iv->mLabelRects[0].row, 0);
 }
 
 void TestIntervals::stripDrawsLaneNamesOnce()
@@ -464,10 +505,11 @@ void TestIntervals::labelsFollowAPanOnTheGpu()
     QVERIFY(nonRedBetween(mPlot->grabFramebuffer(), mPlot, 30, 70, laneCentre) > 5);
 
     // The label covers keys 25..75. A stale overlay would leave its text where keys 65..115
-    // now are; drawn again, it sits at keys 40..75 and leaves 80..98 to the red bar.
+    // now are; drawn again, it is centred in the bar's visible part (keys 40..100), about
+    // keys 45..95, so text shows up in 46..62 only if the labels were redrawn.
     mPlot->xAxis->setRange(40, 140);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QCOMPARE(nonRedBetween(mPlot->grabFramebuffer(), mPlot, 80, 98, laneCentre), 0);
+    QVERIFY(nonRedBetween(mPlot->grabFramebuffer(), mPlot, 46, 62, laneCentre) > 5);
 }
 
 void TestIntervals::selectionOutlineShowsOnTheGpu()
@@ -1011,4 +1053,69 @@ void TestIntervals::laneIndicesNotifiesOnce()
     QCOMPARE(spy.count(), 1);
     layout.laneIndices({ "C", "B" });
     QCOMPARE(spy.count(), 1); // nothing new
+}
+
+void TestIntervals::labelCentresInTheVisiblePart()
+{
+    QCPLaneLayout layout;
+    layout.setPlacement(QCPLaneLayout::plLanes);
+    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    auto c = columns({ -400 }, { 60 }, { layout.laneIndex("A") });
+    c.labels = QStringList { "long interval" };
+    iv->setData(std::move(c));
+    mPlot->xAxis->setRange(0, 100);
+    mPlot->toPixmap(400, 300);
+    QCOMPARE(iv->mLabelRects.size(), std::size_t { 1 });
+    const QRectF label = iv->mLabelRects[0].rect;
+    const double visibleCentre = (mPlot->axisRect()->rect().left() + mPlot->xAxis->coordToPixel(60)) / 2;
+    QVERIFY2(qAbs(label.center().x() - visibleCentre) < 2, "label is not centred in the visible part");
+}
+
+namespace {
+//! One red bar on lane A (keys 20..80) and an empty lane B, drawn with the painter.
+QImage waveImage(QCustomPlot* plot, QCPLaneLayout* layout, QCPIntervals::Style style)
+{
+    layout->setPlacement(QCPLaneLayout::plLanes);
+    auto* iv = new QCPIntervals(plot->xAxis, plot->yAxis, layout);
+    iv->setStyle(style);
+    iv->setCategoryColors({ Qt::red });
+    iv->setData(columns({ 20 }, { 80 }, { layout->laneIndex("A") }));
+    layout->laneIndex("B");
+    plot->xAxis->setRange(0, 100);
+    return plot->toPixmap(400, 300).toImage();
+}
+
+QColor background(QCustomPlot* plot) { return plot->backgroundBrush().color(); }
+} // namespace
+
+void TestIntervals::waveStyleCutsTheBarCorners()
+{
+    QCPLaneLayout layout;
+    const QImage bars = waveImage(mPlot, &layout, QCPIntervals::stBars);
+    const double lane = layout.lanePixelHeight(mPlot->axisRect()->rect());
+    QVERIFY(isRedish(pixelAt(bars, mPlot, 20.2, 3)));          // square corner
+    delete mPlot->plottable(0);
+    const QImage wave = waveImage(mPlot, &layout, QCPIntervals::stWave);
+    QVERIFY(!isRedish(pixelAt(wave, mPlot, 20.2, 3)));         // cut corner
+    QVERIFY(isRedish(pixelAt(wave, mPlot, 50, lane / 2)));     // body
+}
+
+void TestIntervals::waveStyleDrawsAnIdleBaseline()
+{
+    QCPLaneLayout layout;
+    const QImage wave = waveImage(mPlot, &layout, QCPIntervals::stWave);
+    const double lane = layout.lanePixelHeight(mPlot->axisRect()->rect());
+    QVERIFY(pixelAt(wave, mPlot, 10, lane / 2) != background(mPlot));    // idle line before the bar
+    QCOMPARE(pixelAt(wave, mPlot, 10, lane / 2 - 4), pixelAt(wave, mPlot, 10, 3)); // only a thin line
+    delete mPlot->plottable(0);
+    const QImage bars = waveImage(mPlot, &layout, QCPIntervals::stBars);
+    QCOMPARE(pixelAt(bars, mPlot, 10, lane / 2), pixelAt(bars, mPlot, 10, 3));    // no line with bars
+}
+
+void TestIntervals::waveStyleShadesEveryOtherLane()
+{
+    QCPLaneLayout layout;
+    const QImage wave = waveImage(mPlot, &layout, QCPIntervals::stWave);
+    const double lane = layout.lanePixelHeight(mPlot->axisRect()->rect());
+    QVERIFY(pixelAt(wave, mPlot, 10, 3) != pixelAt(wave, mPlot, 10, lane + 3));
 }

@@ -676,7 +676,7 @@ QCPIntervals::BuildKey QCPIntervals::currentBuildKey() const
 {
     const QCPRange range = mKeyAxis->range();
     return { range.lower, range.upper, mKeyAxis->axisRect()->rect(), mDataGeneration,
-             mLayout->generation(), mColorGeneration };
+             mLayout->generation(), mColorGeneration, mStyle };
 }
 
 void QCPIntervals::rebuildBarsIfNeeded()
@@ -696,30 +696,87 @@ void QCPIntervals::rebuildBars()
     ++mBuildCount;
     mBars.clear();
     mLabelRects.clear();
+    mShapes.clear();
     const QRect rect = mKeyAxis->axisRect()->rect();
+    if (mStyle == stWave)
+        appendLaneBackdrops(rect);
     for (int lane = 0; lane < static_cast<int>(mLanes.size()); ++lane)
         if (const auto band = mLayout->laneBand(lane, rect))
             appendLaneBars(lane, *band);
-    mVertices.clear();
     for (const auto& bar : mBars)
     {
         // Merged bars (row == -1, see appendMerged) never get a label: it's ambiguous
         // which source row's text a bar spanning several rows would show.
         if (bar.row != -1)
             appendLabelRect(bar);
-        if (bar.instant)
-            qcp::intervals::appendDiamond(mVertices, { (bar.x0 + bar.x1) / 2, (bar.y0 + bar.y1) / 2 },
-                                          4, rgba(bar.category));
-        else
-            qcp::intervals::appendQuad(mVertices, QRectF(QPointF(bar.x0, bar.y0), QPointF(bar.x1, bar.y1)),
-                                       rgba(bar.category));
+        mShapes.push_back({ barShape(bar), fillColor(bar.category) });
     }
+    mVertices.clear();
+    for (const auto& shape : mShapes)
+        qcp::intervals::appendFan(mVertices, shape.polygon, qcp::rhi::premultipliedColor(shape.color));
+}
+
+namespace {
+constexpr double kWaveSlant = 4;
+constexpr double kWaveInset = 2;
+
+QColor withAlpha(QColor c, double alpha)
+{
+    c.setAlphaF(alpha);
+    return c;
+}
+
+QPolygonF rectPolygon(const QRectF& r)
+{
+    return QPolygonF({ r.topLeft(), r.topRight(), r.bottomRight(), r.bottomLeft() });
+}
+} // namespace
+
+//! Wave style: every other lane shaded, and a thin idle line through each lane, under the bars.
+void QCPIntervals::appendLaneBackdrops(const QRect& axisRect)
+{
+    const QColor ink = mKeyAxis->tickLabelColor();
+    const auto& lanes = mLayout->displayLanes();
+    for (std::size_t position = 0; position < lanes.size(); ++position)
+    {
+        const auto band = mLayout->laneBand(lanes[position], axisRect);
+        if (!band)
+            continue;
+        if (position % 2 == 1)
+            mShapes.push_back({ rectPolygon(QRectF(axisRect.left(), band->top, axisRect.width(),
+                                                   band->bottom - band->top)),
+                                withAlpha(ink, 0.06) });
+        const double mid = std::floor((band->top + band->bottom) / 2);
+        mShapes.push_back({ rectPolygon(QRectF(axisRect.left(), mid, axisRect.width(), 1)),
+                            withAlpha(ink, 0.45) });
+    }
+}
+
+QPolygonF QCPIntervals::barShape(const qcp::intervals::PixelBar& bar) const
+{
+    const QRectF rect(QPointF(bar.x0, bar.y0), QPointF(bar.x1, bar.y1));
+    if (bar.instant)
+    {
+        const QPointF m = rect.center();
+        return QPolygonF({ m + QPointF(0, -4), m + QPointF(4, 0), m + QPointF(0, 4), m + QPointF(-4, 0) });
+    }
+    if (mStyle == stWave)
+        return qcp::intervals::busShape(rect, std::min(kWaveSlant, rect.height() / 2));
+    return rectPolygon(rect);
+}
+
+bool QCPIntervals::sameLabelAsLastBar(int row) const
+{
+    if (mBars.empty() || mBars.back().row == -1 || mColumns.labels.isEmpty())
+        return false;
+    return mColumns.labels[mBars.back().row] == mColumns.labels[row];
 }
 
 void QCPIntervals::appendLaneBars(int lane, const QCPLaneBand& band)
 {
     const QCPRange range = mKeyAxis->range();
     const auto& rows = mLanes[lane];
+    const double inset = mStyle == stWave ? kWaveInset : 1;
     const auto [begin, end] = qcp::intervals::candidateRange(rows, range.lower, range.upper);
     for (int i = begin; i < end; ++i)
     {
@@ -729,19 +786,29 @@ void QCPIntervals::appendLaneBars(int lane, const QCPLaneBand& band)
         qcp::intervals::appendMerged(
             mBars, qcp::intervals::toPixelBar(mKeyAxis->coordToPixel(mColumns.start[row]),
                                               mKeyAxis->coordToPixel(mColumns.stop[row]),
-                                              band.top + 1, band.bottom - 1,
-                                              mColumns.category[row], row));
+                                              band.top + inset, band.bottom - inset,
+                                              mColumns.category[row], row),
+            sameLabelAsLastBar(row));
     }
 }
 
+//! The label sits in the visible part of its bar, so a long interval keeps its text while
+//! panning; it is elided, or left out when not even a few characters fit.
 void QCPIntervals::appendLabelRect(const qcp::intervals::PixelBar& bar)
 {
     if (mColumns.labels.isEmpty() || bar.instant)
         return;
     const QString& text = mColumns.labels[bar.row];
-    const QRectF rect(QPointF(bar.x0, bar.y0), QPointF(bar.x1, bar.y1));
-    if (!text.isEmpty() && QFontMetricsF(mParentPlot->font()).horizontalAdvance(text) + 4 <= rect.width())
-        mLabelRects.emplace_back(rect, bar.row);
+    if (text.isEmpty())
+        return;
+    const QRect axisRect = mKeyAxis->axisRect()->rect();
+    const double left = std::max(bar.x0, double(axisRect.left()));
+    const double right = std::min(bar.x1, double(axisRect.right()));
+    const double ends = mStyle == stWave ? 2 * kWaveSlant : 0;
+    const auto fitted = qcp::intervals::fittedLabel(QFontMetricsF(mParentPlot->font()), text,
+                                                    right - left - ends - 4);
+    if (fitted)
+        mLabelRects.push_back({ QRectF(QPointF(left, bar.y0), QPointF(right, bar.y1)), bar.row, *fitted });
 }
 
 double QCPIntervals::fillOpacity() const
@@ -749,11 +816,19 @@ double QCPIntervals::fillOpacity() const
     return mLayout->placement() == QCPLaneLayout::plStrip ? 0.7 : 1.0;
 }
 
-std::array<float, 4> QCPIntervals::rgba(int category) const
+QColor QCPIntervals::fillColor(int category) const
 {
     QColor c = categoryColor(category);
     c.setAlphaF(c.alphaF() * fillOpacity());
-    return qcp::rhi::premultipliedColor(c);
+    return c;
+}
+
+void QCPIntervals::setStyle(Style style)
+{
+    if (mStyle == style)
+        return;
+    mStyle = style;
+    markLayersDirty();
 }
 
 bool QCPIntervals::drawBarsOnGpu(QCPPainter* painter)
@@ -774,8 +849,8 @@ bool QCPIntervals::drawBarsOnGpu(QCPPainter* painter)
 void QCPIntervals::drawLabels(QCPPainter* painter) const
 {
     painter->setPen(mKeyAxis->tickLabelColor());
-    for (const auto& [rect, row] : mLabelRects)
-        painter->drawText(rect, Qt::AlignCenter, mColumns.labels[row]);
+    for (const auto& label : mLabelRects)
+        painter->drawText(label.rect, Qt::AlignCenter, label.text);
 }
 
 bool QCPIntervals::drawsLaneNames() const
@@ -796,25 +871,21 @@ void QCPIntervals::drawLaneNames(QCPPainter* painter) const
     const QStringList names = mLayout->laneNames();
     for (int lane = 0; lane < names.size(); ++lane)
         if (const auto band = mLayout->laneBand(lane, rect))
-            painter->drawText(QRectF(rect.left() + 3, band->top, rect.width() / 3.0, band->bottom - band->top),
-                              Qt::AlignVCenter | Qt::AlignLeft, names[lane]);
+        {
+            const QRectF box(rect.left() + 3, band->top, rect.width() / 3.0, band->bottom - band->top);
+            const QRectF text = painter->boundingRect(box, Qt::AlignVCenter | Qt::AlignLeft, names[lane]);
+            painter->fillRect(text.adjusted(-3, 0, 3, 0),
+                              withAlpha(mParentPlot->backgroundBrush().color(), 0.85));
+            painter->drawText(box, Qt::AlignVCenter | Qt::AlignLeft, names[lane]);
+        }
 }
 
 void QCPIntervals::drawBarsWithPainter(QCPPainter* painter) const
 {
     painter->setPen(Qt::NoPen);
-    for (const auto& bar : mBars)
+    for (const auto& shape : mShapes)
     {
-        QColor c = categoryColor(bar.category);
-        c.setAlphaF(c.alphaF() * fillOpacity());
-        painter->setBrush(c);
-        if (bar.instant)
-        {
-            const QPointF m((bar.x0 + bar.x1) / 2, (bar.y0 + bar.y1) / 2);
-            painter->drawPolygon(QPolygonF({ m + QPointF(0, -4), m + QPointF(4, 0),
-                                             m + QPointF(0, 4), m + QPointF(-4, 0) }));
-        }
-        else
-            painter->drawRect(QRectF(QPointF(bar.x0, bar.y0), QPointF(bar.x1, bar.y1)));
+        painter->setBrush(shape.color);
+        painter->drawPolygon(shape.polygon);
     }
 }

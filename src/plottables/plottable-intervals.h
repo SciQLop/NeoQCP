@@ -45,6 +45,12 @@ public:
     Q_DECLARE_FLAGS(EditModes, EditMode)
 
     enum SnapMode { snNone, snEdges, snStep };
+    //! stBars: plain coloured bars. stWave: a logic-analyzer look, with angled bus-value ends,
+    //! an idle line through each lane and every other lane shaded.
+    enum Style { stBars, stWave };
+
+    void setStyle(Style style);
+    [[nodiscard]] Style style() const { return mStyle; }
 
     [[nodiscard]] Hit hitTest(const QPointF& pos) const;
     [[nodiscard]] QVector<int> selectedRows() const;
@@ -103,6 +109,7 @@ protected:
         double lower, upper;
         QRect rect;
         quint64 data, layout, colors;
+        Style style;
         bool operator==(const BuildKey&) const = default;
     };
 
@@ -114,11 +121,14 @@ protected:
     void rebuildBarsIfNeeded();
     void rebuildBars();
     void appendLaneBars(int lane, const QCPLaneBand& band);
+    [[nodiscard]] bool sameLabelAsLastBar(int row) const;
     void appendLabelRect(const qcp::intervals::PixelBar& bar);
+    void appendLaneBackdrops(const QRect& axisRect);
+    [[nodiscard]] QPolygonF barShape(const qcp::intervals::PixelBar& bar) const;
+    [[nodiscard]] QColor fillColor(int category) const;
     void drawLabels(QCPPainter* painter) const;
     void drawLaneNames(QCPPainter* painter) const;
     [[nodiscard]] bool drawsLaneNames() const;
-    [[nodiscard]] std::array<float, 4> rgba(int category) const;
     [[nodiscard]] double fillOpacity() const;
     bool drawBarsOnGpu(QCPPainter* painter);
     void drawBarsWithPainter(QCPPainter* painter) const;
@@ -178,8 +188,21 @@ protected:
     std::vector<qcp::intervals::LaneRows> mLanes;
     QVector<QColor> mCategoryColors;
     std::vector<qcp::intervals::PixelBar> mBars;
+    struct Shape
+    {
+        QPolygonF polygon;
+        QColor color;
+    };
+    struct LabelRect
+    {
+        QRectF rect;
+        int row;
+        QString text;
+    };
+    std::vector<Shape> mShapes; // what both the GPU and the painter path draw, bottom first
     std::vector<float> mVertices;
-    std::vector<std::pair<QRectF, int>> mLabelRects;
+    std::vector<LabelRect> mLabelRects;
+    Style mStyle = stBars;
     std::optional<BuildKey> mBuiltFor;
     quint64 mDataGeneration = 0;
     quint64 mColorGeneration = 0;
