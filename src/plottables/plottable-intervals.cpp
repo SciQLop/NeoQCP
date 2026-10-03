@@ -495,7 +495,8 @@ int QCPIntervals::laneStepsTo(const QPointF& pos) const
 {
     if (mGesture->kind != Gesture::Move || !(mEditModes & emChangeLane))
         return 0;
-    return static_cast<int>(std::lround((pos.y() - mGesture->pressPos.y()) / mLayout->laneHeight()));
+    const double laneHeight = mLayout->lanePixelHeight(mKeyAxis->axisRect()->rect());
+    return static_cast<int>(std::lround((pos.y() - mGesture->pressPos.y()) / laneHeight));
 }
 
 void QCPIntervals::updateGesture(const QPointF& pos)

@@ -66,13 +66,21 @@ void QCPLaneLayout::setPlacement(Placement placement)
     notify();
 }
 
+double QCPLaneLayout::lanePixelHeight(const QRect& axisRect) const
+{
+    if (mPlacement == plLanes && !mOrder.empty() && axisRect.height() > 0)
+        return double(axisRect.height()) / double(mOrder.size());
+    return mLaneHeight;
+}
+
 std::optional<QCPLaneBand> QCPLaneLayout::laneBand(int lane, const QRect& axisRect) const
 {
     const int position = displayPosition(lane);
     if (position < 0)
         return std::nullopt;
-    const double top = axisRect.top() + position * mLaneHeight;
-    return QCPLaneBand { top, top + mLaneHeight };
+    const double height = lanePixelHeight(axisRect);
+    const double top = axisRect.top() + position * height;
+    return QCPLaneBand { top, top + height };
 }
 
 int QCPLaneLayout::laneAt(double y, const QRect& axisRect) const
@@ -80,7 +88,7 @@ int QCPLaneLayout::laneAt(double y, const QRect& axisRect) const
     const double offset = y - axisRect.top();
     if (offset < 0)
         return -1;
-    const auto position = static_cast<std::size_t>(offset / mLaneHeight);
+    const auto position = static_cast<std::size_t>(offset / lanePixelHeight(axisRect));
     return position < mOrder.size() ? mOrder[position] : -1;
 }
 

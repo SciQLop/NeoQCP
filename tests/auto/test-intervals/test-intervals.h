@@ -16,6 +16,7 @@ private slots:
     void displayOrderReordersAndHides();
     void renameKeepsTheIndex();
     void laneAtInvertsLaneBand();
+    void lanesPlacementSplitsTheAxisRect();
     void laneIndicesNotifiesOnce();
 
     void invalidColumnsAreReported();

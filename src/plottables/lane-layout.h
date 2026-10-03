@@ -40,6 +40,9 @@ public:
     [[nodiscard]] Placement placement() const { return mPlacement; }
     void setPlacement(Placement placement);
 
+    //! Pixel height of one lane: \ref laneHeight on a strip, an equal share of the axis rect
+    //! in a lanes plot, whose y axis (and so its lane names) spans the whole rect.
+    [[nodiscard]] double lanePixelHeight(const QRect& axisRect) const;
     [[nodiscard]] std::optional<QCPLaneBand> laneBand(int lane, const QRect& axisRect) const;
     [[nodiscard]] int laneAt(double y, const QRect& axisRect) const;
     [[nodiscard]] int totalHeight() const { return visibleLaneCount() * mLaneHeight; }

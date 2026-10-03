@@ -93,6 +93,25 @@ void TestIntervals::laneAtInvertsLaneBand()
     QCOMPARE(layout.laneAt(40, rect), -1);
 }
 
+// A lanes plot labels its lanes with y-axis ticks, which follow the axis rect. The bands must
+// follow it too, or bars and names drift apart whenever the plot isn't at its natural height.
+void TestIntervals::lanesPlacementSplitsTheAxisRect()
+{
+    QCPLaneLayout layout;
+    layout.setLaneHeight(18);
+    layout.setPlacement(QCPLaneLayout::plLanes);
+    layout.laneIndices({ "A", "B", "C" });
+    const QRect rect(0, 10, 100, 90);
+    const auto b = layout.laneBand(1, rect);
+    QVERIFY(b);
+    QCOMPARE(b->top, 40.0);
+    QCOMPARE(b->bottom, 70.0);
+    QCOMPARE(layout.laneAt(45, rect), 1);
+    QCOMPARE(layout.laneAt(95, rect), 2);
+    QCOMPARE(layout.lanePixelHeight(rect), 30.0);
+    QCOMPARE(layout.lanePixelHeight(QRect(0, 0, 100, 54)), 18.0); // natural height
+}
+
 namespace {
 qcp::intervals::Columns columns(std::vector<double> start, std::vector<double> stop,
                                 std::vector<int> lane)
@@ -300,9 +319,11 @@ void TestIntervals::barsAreDrawnOnTheirLanes()
     layout.setPlacement(QCPLaneLayout::plLanes);
     twoBars(mPlot, &layout);
     const QImage image = mPlot->toPixmap(400, 300).toImage();
-    QVERIFY(isRedish(pixelAt(image, mPlot, 25, 7)));    // lane A, inside bar 0
-    QVERIFY(isBlueish(pixelAt(image, mPlot, 75, 21)));  // lane B, inside bar 1
-    QVERIFY(!isRedish(pixelAt(image, mPlot, 75, 7)));   // lane A, no bar
+    const double laneA = layout.lanePixelHeight(mPlot->axisRect()->rect()) / 2;
+    const double laneB = laneA * 3;
+    QVERIFY(isRedish(pixelAt(image, mPlot, 25, laneA)));    // inside bar 0
+    QVERIFY(isBlueish(pixelAt(image, mPlot, 75, laneB)));   // inside bar 1
+    QVERIFY(!isRedish(pixelAt(image, mPlot, 75, laneA)));   // lane A, no bar
 }
 
 void TestIntervals::keyRangeSpansAllIntervals()
@@ -399,10 +420,11 @@ void TestIntervals::barsAndLabelsShowOnTheGpu()
     iv->setData(std::move(c));
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     const QImage frame = mPlot->grabFramebuffer();
-    QVERIFY(isRedish(pixelAt(frame, mPlot, 5, 12)));
+    const double laneCentre = layout.lanePixelHeight(mPlot->axisRect()->rect()) / 2;
+    QVERIFY(isRedish(pixelAt(frame, mPlot, 5, laneCentre)));
     int nonRed = 0;
     for (double key = 30; key < 70; key += 0.5)
-        nonRed += isRedish(pixelAt(frame, mPlot, key, 12)) ? 0 : 1;
+        nonRed += isRedish(pixelAt(frame, mPlot, key, laneCentre)) ? 0 : 1;
     QVERIFY2(nonRed > 5, "label text is hidden under the GPU bars");
 }
 
@@ -438,13 +460,14 @@ void TestIntervals::labelsFollowAPanOnTheGpu()
         QSKIP("no QRhi available in this environment");
     QCPLaneLayout layout;
     drawnLabelledBar(mPlot, &layout);
-    QVERIFY(nonRedBetween(mPlot->grabFramebuffer(), mPlot, 30, 70, 12) > 5);
+    const double laneCentre = layout.lanePixelHeight(mPlot->axisRect()->rect()) / 2;
+    QVERIFY(nonRedBetween(mPlot->grabFramebuffer(), mPlot, 30, 70, laneCentre) > 5);
 
     // The label covers keys 25..75. A stale overlay would leave its text where keys 65..115
     // now are; drawn again, it sits at keys 40..75 and leaves 80..98 to the red bar.
     mPlot->xAxis->setRange(40, 140);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QCOMPARE(nonRedBetween(mPlot->grabFramebuffer(), mPlot, 80, 98, 12), 0);
+    QCOMPARE(nonRedBetween(mPlot->grabFramebuffer(), mPlot, 80, 98, laneCentre), 0);
 }
 
 void TestIntervals::selectionOutlineShowsOnTheGpu()
