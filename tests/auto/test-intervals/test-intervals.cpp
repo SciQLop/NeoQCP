@@ -569,14 +569,32 @@ void TestIntervals::hitTestFindsBodyAndEdges()
     QCOMPARE(iv->hitTest(iv->pixelOf(50, 0)).lane, 0);
 }
 
-void TestIntervals::narrowBarHasOnlyBody()
+// A bar shrunk to a few pixels has no room for edge zones inside it: they sit just outside its
+// ends, so it can still be resized; a press inside moves it.
+void TestIntervals::narrowBarResizesFromJustOutside()
 {
     QCPLaneLayout layout;
     auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
     iv->setData(columns({ 50 }, { 50.5 }, { layout.laneIndex("A") }));
     mPlot->xAxis->setRange(0, 100);
     mPlot->replot();
-    QCOMPARE(iv->hitTest(iv->pixelOf(50, 0)).part, QCPIntervals::hpBody);
+    const QRectF bar = iv->barRect(0);
+    const double y = bar.center().y();
+    QCOMPARE(iv->hitTest(bar.center()).part, QCPIntervals::hpBody);
+    QCOMPARE(iv->hitTest(QPointF(bar.left() - 2, y)).part, QCPIntervals::hpLeftEdge);
+    QCOMPARE(iv->hitTest(QPointF(bar.right() + 2, y)).part, QCPIntervals::hpRightEdge);
+}
+
+void TestIntervals::instantEventHasOnlyBody()
+{
+    QCPLaneLayout layout;
+    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    iv->setData(columns({ 50 }, { 50 }, { layout.laneIndex("A") }));
+    mPlot->xAxis->setRange(0, 100);
+    mPlot->replot();
+    const QRectF bar = iv->barRect(0);
+    QCOMPARE(iv->hitTest(QPointF(bar.left() - 2, bar.center().y())).part, QCPIntervals::hpBody);
+    QCOMPARE(iv->hitTest(QPointF(bar.right() + 2, bar.center().y())).part, QCPIntervals::hpBody);
 }
 
 void TestIntervals::hiddenLaneIsNotHit()

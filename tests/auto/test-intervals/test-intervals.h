@@ -53,7 +53,8 @@ private slots:
 
     void hitTestOnEmptyPlottable();
     void hitTestFindsBodyAndEdges();
-    void narrowBarHasOnlyBody();
+    void narrowBarResizesFromJustOutside();
+    void instantEventHasOnlyBody();
     void hiddenLaneIsNotHit();
     void clickSelectsAndCtrlClickToggles();
     void clickOnEmptyLaneClearsSelection();

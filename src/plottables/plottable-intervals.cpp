@@ -169,12 +169,18 @@ QPointF QCPIntervals::pixelOf(double key, int lane) const
 }
 
 namespace {
-QCPIntervals::HitPart partOf(const QRectF& bar, double x)
+//! A wide bar has its edge zones on its ends. A narrow one has no room for them inside, so
+//! they sit just outside its ends: a bar shrunk to a few pixels can still be resized, and a
+//! press inside it moves it. An instant event (start == stop) only moves.
+QCPIntervals::HitPart partOf(const QRectF& bar, double x, bool instant)
 {
     constexpr double edgeGrab = 4, minEdgeWidth = 10;
-    if (bar.width() >= minEdgeWidth && std::abs(x - bar.left()) <= edgeGrab)
+    if (instant)
+        return QCPIntervals::hpBody;
+    const bool wide = bar.width() >= minEdgeWidth;
+    if (x < bar.left() || (wide && x - bar.left() <= edgeGrab))
         return QCPIntervals::hpLeftEdge;
-    if (bar.width() >= minEdgeWidth && std::abs(x - bar.right()) <= edgeGrab)
+    if (x > bar.right() || (wide && bar.right() - x <= edgeGrab))
         return QCPIntervals::hpRightEdge;
     return QCPIntervals::hpBody;
 }
@@ -206,7 +212,7 @@ QCPIntervals::Hit QCPIntervals::hitTest(const QPointF& pos) const
         if (const double d = distanceToBar(bar, pos.x()); d <= bestDistance)
         {
             bestDistance = d;
-            best = { row, lane, partOf(bar, pos.x()) };
+            best = { row, lane, partOf(bar, pos.x(), mColumns.start[row] == mColumns.stop[row]) };
         }
     }
     return best;
