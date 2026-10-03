@@ -2162,21 +2162,16 @@ void TestPipeline::multiGraphMultipleRapidLegitimateSupersessionsCommitLast()
     }
     auto lastSource = sources.back();
 
-    // Now let it all actually settle: any in-flight pipeline job, then past
-    // the debounce + max-wait cap.
-    {
-        QEventLoop loop;
-        QTimer timeout; timeout.setSingleShot(true); timeout.start(30000);
-        connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
-        connect(&mg->pipeline(), &QCPMultiGraphPipeline::finished, &loop, &QEventLoop::quit);
-        loop.exec();
-    }
-    QTest::qWait(1500);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-
-    QVERIFY2(mg->dataSource() == lastSource.get(),
-             "the last of 5 rapid, legitimate, in-order supersessions never "
-             "got committed as displayed");
+    // Replot until it settles. Waiting for one `finished` and a fixed delay raced on slow CI
+    // runners: that `finished` could be an earlier, superseded job's.
+    auto lastIsDisplayed = [&] {
+        mPlot->replot(QCustomPlot::rpImmediateRefresh);
+        return mg->dataSource() == lastSource.get();
+    };
+    QTRY_VERIFY2_WITH_TIMEOUT(lastIsDisplayed(),
+                              "the last of 5 rapid, legitimate, in-order supersessions never "
+                              "got committed as displayed",
+                              30000);
 }
 
 void TestPipeline::multiGraphThresholdScalesWithColumnCount()
