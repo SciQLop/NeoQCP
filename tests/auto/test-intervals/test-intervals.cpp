@@ -1166,7 +1166,7 @@ void TestIntervals::freeShiftRangeStaysInTheGap()
 namespace {
 //! Lane A: [10, 30] and [50, 70]. Lane B: [40, 60]. Every edit mode, overlaps forbidden.
 QCPIntervals* forbiddingBars(QCustomPlot* plot, QCPLaneLayout* layout,
-                             QCPIntervals::OverlapMode mode = QCPIntervals::omForbid)
+                             bool forbid = true)
 {
     layout->setPlacement(QCPLaneLayout::plLanes);
     auto* iv = new QCPIntervals(plot->xAxis, plot->yAxis, layout);
@@ -1175,7 +1175,7 @@ QCPIntervals* forbiddingBars(QCustomPlot* plot, QCPLaneLayout* layout,
     iv->setEditable(true);
     iv->setEditModes(QCPIntervals::EditModes(QCPIntervals::emMove | QCPIntervals::emResize
                                              | QCPIntervals::emChangeLane | QCPIntervals::emCreate));
-    iv->setOverlapMode(mode);
+    iv->setForbidOverlap(forbid);
     plot->setInteractions(QCP::iSelectPlottables | QCP::iMultiSelect);
     plot->xAxis->setRange(0, 100);
     plot->replot();
@@ -1257,7 +1257,7 @@ void TestIntervals::forbidClampsANudge()
 void TestIntervals::drawModeAllowsOverlaps()
 {
     QCPLaneLayout layout;
-    auto* iv = forbiddingBars(mPlot, &layout, QCPIntervals::omDraw);
+    auto* iv = forbiddingBars(mPlot, &layout, false);
     QSignalSpy spy(iv, &QCPIntervals::intervalsEdited);
     drag(mPlot, iv->pixelOf(20, 0), iv->pixelOf(50, 0));
     QVERIFY(qAbs(firstEdit(spy).stop - 60) < keyTolerance);
@@ -1301,14 +1301,14 @@ void TestIntervals::stackPutsOverlapsInSubRows()
     const int a = layout.laneIndex("A"), b = layout.laneIndex("B");
     iv->setData(columns({ 10, 30, 10 }, { 50, 70, 50 }, { a, a, b }));
     mPlot->xAxis->setRange(0, 100);
-    iv->setOverlapMode(QCPIntervals::omStack);
+    iv->setStackMode(QCPIntervals::skTime);
     mPlot->replot();
     QCOMPARE(layout.totalRows(), 3);
     const QRectF first = iv->barRect(0), second = iv->barRect(1);
     QVERIFY2(first.bottom() <= second.top(), "overlapping intervals share a row");
     QCOMPARE(iv->hitTest(QPointF(iv->pixelOf(40, a).x(), second.center().y())).row, 1);
     QCOMPARE(iv->hitTest(QPointF(iv->pixelOf(40, a).x(), first.center().y())).row, 0);
-    iv->setOverlapMode(QCPIntervals::omDraw);
+    iv->setStackMode(QCPIntervals::skNone);
     QCOMPARE(layout.totalRows(), 2);
 }
 
@@ -1318,7 +1318,7 @@ void TestIntervals::stackedLaneHasAnIdleLinePerRow()
     layout.setPlacement(QCPLaneLayout::plLanes);
     auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
     iv->setStyle(QCPIntervals::stWave);
-    iv->setOverlapMode(QCPIntervals::omStack);
+    iv->setStackMode(QCPIntervals::skTime);
     iv->setCategoryColors({ Qt::red });
     iv->setData(columns({ 40, 50 }, { 80, 90 }, { layout.laneIndex("A"), layout.laneIndex("A") }));
     mPlot->xAxis->setRange(0, 100);
@@ -1344,6 +1344,8 @@ void TestIntervals::legendListsTheUsedCategories()
     QCOMPARE(entries[0].first, QString("LM"));
     QCOMPARE(entries[0].second, QColor(Qt::blue));
     QCOMPARE(entries[1].first, QString("BASE"));
+    iv->setCategoryOrder({ 0 }); // the legend follows the stacking order
+    QCOMPARE(iv->legendEntries()[0].first, QString("BASE"));
 }
 
 void TestIntervals::legendItemHasARowPerCategory()
@@ -1379,5 +1381,85 @@ void TestIntervals::autoAddedLegendItemIsTheCategoryList()
     new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
     QCOMPARE(mPlot->legend->itemCount(), 1);
     QVERIFY(qobject_cast<QCPIntervalsLegendItem*>(mPlot->legend->item(0)));
+}
+
+void TestIntervals::categoryRanksFollowTheOrderThenFirstSeen()
+{
+    auto c = columns({ 0, 1, 2, 3 }, { 1, 2, 3, 4 }, { 0, 0, 0, 0 });
+    c.category = { 3, 1, 3, 0 };
+    using qcp::intervals::categoryRanks;
+    QCOMPARE(categoryRanks(c, {}), (std::vector<int> { 2, 1, -1, 0 }));     // 3, 1, 0 as first seen
+    QCOMPARE(categoryRanks(c, { 0 }), (std::vector<int> { 0, 2, -1, 1 }));  // 0 first, then 3, 1
+}
+
+void TestIntervals::packByCategoryGivesEachCategoryItsRow()
+{
+    auto c = columns({ 0, 10, 20, 30 }, { 5, 15, 25, 35 }, { 0, 0, 0, 0 });
+    c.category = { 2, 0, 2, 1 };
+    const auto lanes = qcp::intervals::groupByLane(c, 1);
+    std::vector<int> subRow(4, -1);
+    QCOMPARE(qcp::intervals::packByCategory(lanes[0], c, { 0, 1, 2 }, subRow), 3);
+    QCOMPARE(subRow, (std::vector<int> { 2, 0, 2, 1 })); // never overlapping, still one row each
+}
+
+namespace {
+//! Lane A with BASE (0), HKM (1) and LM (2) windows, stacked by category.
+QCPIntervals* modes(QCustomPlot* plot, QCPLaneLayout* layout, std::vector<double> start,
+                    std::vector<double> stop, std::vector<int> category)
+{
+    layout->setPlacement(QCPLaneLayout::plLanes);
+    auto* iv = new QCPIntervals(plot->xAxis, plot->yAxis, layout);
+    const int a = layout->laneIndex("A");
+    auto c = columns(std::move(start), std::move(stop), std::vector<int>(category.size(), a));
+    c.category = std::move(category);
+    iv->setData(std::move(c));
+    iv->setCategoryNames({ "BASE", "HKM", "LM" });
+    iv->setStackMode(QCPIntervals::skCategory);
+    plot->xAxis->setRange(0, 100);
+    plot->replot();
+    return iv;
+}
+} // namespace
+
+void TestIntervals::categoryStackKeepsRowsAcrossData()
+{
+    QCPLaneLayout layout;
+    auto* iv = modes(mPlot, &layout, { 0, 40 }, { 30, 70 }, { 2, 0 }); // LM first seen
+    iv->setCategoryOrder({ 0, 1, 2 });
+    QCOMPARE(layout.totalRows(), 2);           // only the categories the lane uses
+    const double lmRow = iv->barRect(0).top();
+    QVERIFY(lmRow > iv->barRect(1).top());     // BASE above LM, as ordered
+    auto c = columns({ 5, 50, 60 }, { 20, 55, 90 }, { 0, 0, 0 }); // another orbit, same modes
+    c.category = { 0, 2, 2 };
+    iv->setData(std::move(c));
+    mPlot->replot();
+    QCOMPARE(iv->barRect(1).top(), lmRow);     // LM keeps its row
+    QCOMPARE(iv->barRect(2).top(), lmRow);
+}
+
+void TestIntervals::categoryStackForbidsOnlyWithinACategory()
+{
+    QCPLaneLayout layout;
+    auto* iv = modes(mPlot, &layout, { 10, 50, 35 }, { 30, 70, 45 }, { 2, 2, 0 });
+    iv->setEditable(true);
+    iv->setEditModes(QCPIntervals::emMove);
+    iv->setForbidOverlap(true);
+    QSignalSpy spy(iv, &QCPIntervals::intervalsEdited);
+    const QPointF grab(iv->pixelOf(20, 0).x(), iv->barRect(0).center().y());
+    drag(mPlot, grab, grab + QPointF(iv->pixelOf(45, 0).x() - iv->pixelOf(20, 0).x(), 0));
+    // +25 would reach the other LM window [50, 70]: stops at 50, crossing BASE [35, 45] freely.
+    QCOMPARE(spy.at(0).at(0).value<QVector<QCPIntervalEdit>>()[0].stop, 50.0);
+}
+
+void TestIntervals::categoryStackNamesItsRows()
+{
+    QCPLaneLayout layout;
+    auto* iv = modes(mPlot, &layout, { 0, 40 }, { 30, 70 }, { 1, 0 });
+    mPlot->toPixmap(400, 300);
+    const auto names = iv->rowNames();
+    QCOMPARE(names.size(), std::size_t { 2 });
+    QCOMPARE(names[0].second, QString("HKM")); // first seen
+    QCOMPARE(names[1].second, QString("BASE"));
+    QVERIFY(names[0].first.bottom() <= names[1].first.top());
 }
 

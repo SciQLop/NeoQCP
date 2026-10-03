@@ -42,6 +42,13 @@ std::pair<int, int> candidateRange(const LaneRows& lane, double lower, double up
 //! Puts each interval of \a lane in the first sub-row free at its start (greedy interval
 //! packing), writing \a subRow[row]; returns the number of sub-rows used.
 int packSubRows(const LaneRows& lane, const Columns& c, std::vector<int>& subRow);
+//! Rank of each category index (-1 if the data never uses it): those in \a order first, in that
+//! order, then the others in first-seen order.
+std::vector<int> categoryRanks(const Columns& c, const std::vector<int>& order);
+//! One sub-row per category the lane uses, ordered by \a rank; writes \a subRow[row] and
+//! returns the number of sub-rows.
+int packByCategory(const LaneRows& lane, const Columns& c, const std::vector<int>& rank,
+                   std::vector<int>& subRow);
 PixelBar toPixelBar(double xa, double xb, double y0, double y1, int category, int row);
 //! Merges \a bar into the previous one when they overlap with the same category. The merged bar
 //! keeps its row (and so its label) only if \a sameLabel says both rows show the same text.

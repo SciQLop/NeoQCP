@@ -133,7 +133,9 @@ void QCPIntervals::updateSubRows()
 {
     if (!mLayout)
         return;
-    if (mOverlap != omStack)
+    ++mSubRowGeneration;
+    mRowCategories.clear();
+    if (mStack == skNone)
     {
         mSubRow.clear();
         mLayout->removeLaneRows(this);
@@ -141,8 +143,20 @@ void QCPIntervals::updateSubRows()
     }
     mSubRow.assign(mColumns.start.size(), 0);
     std::vector<int> rowsPerLane;
+    const auto ranks = qcp::intervals::categoryRanks(mColumns, mCategoryOrder);
     for (const auto& lane : mLanes)
-        rowsPerLane.push_back(qcp::intervals::packSubRows(lane, mColumns, mSubRow));
+    {
+        if (mStack == skTime)
+        {
+            rowsPerLane.push_back(qcp::intervals::packSubRows(lane, mColumns, mSubRow));
+            continue;
+        }
+        rowsPerLane.push_back(qcp::intervals::packByCategory(lane, mColumns, ranks, mSubRow));
+        std::vector<int> categories(rowsPerLane.back(), -1);
+        for (int row : lane.rows)
+            categories[mSubRow[row]] = mColumns.category[row];
+        mRowCategories.push_back(std::move(categories));
+    }
     mLayout->setLaneRows(this, std::move(rowsPerLane));
 }
 
@@ -150,7 +164,7 @@ std::optional<QCPLaneBand> QCPIntervals::rowBand(int lane, int subRow) const
 {
     const QRect rect = mKeyAxis->axisRect()->rect();
     const auto band = mLayout->laneBand(lane, rect);
-    if (!band || mOverlap != omStack)
+    if (!band || mStack == skNone)
         return band;
     const double row = mLayout->lanePixelHeight(rect);
     const double top = band->top + subRow * row;
@@ -164,15 +178,16 @@ void QCPIntervals::setCategoryNames(const QStringList& names)
 
 std::vector<std::pair<QString, QColor>> QCPIntervals::legendEntries() const
 {
+    const auto ranks = qcp::intervals::categoryRanks(mColumns, mCategoryOrder);
+    std::vector<int> used;
+    for (int category = 0; category < static_cast<int>(ranks.size()); ++category)
+        if (ranks[category] >= 0)
+            used.push_back(category);
+    std::ranges::sort(used, {}, [&](int category) { return ranks[category]; });
     std::vector<std::pair<QString, QColor>> entries;
-    QSet<int> seen;
-    for (int category : mColumns.category)
-        if (!seen.contains(category))
-        {
-            seen.insert(category);
-            entries.emplace_back(mCategoryNames.value(category, QString::number(category)),
-                                 categoryColor(category));
-        }
+    for (int category : used)
+        entries.emplace_back(mCategoryNames.value(category, QString::number(category)),
+                             categoryColor(category));
     return entries;
 }
 
@@ -292,7 +307,7 @@ QCPIntervals::Hit QCPIntervals::hitTest(const QPointF& pos) const
     {
         const int row = rows.rows[i];
         const QRectF bar = barRect(row);
-        if (mOverlap == omStack && (pos.y() < bar.top() - 1 || pos.y() > bar.bottom() + 1))
+        if (mStack != skNone && (pos.y() < bar.top() - 1 || pos.y() > bar.bottom() + 1))
             continue; // another sub-row of this lane
         // later rows are drawn on top, so they win ties
         if (const double d = distanceToBar(bar, pos.x()); d <= bestDistance)
@@ -606,7 +621,8 @@ void QCPIntervals::updateGesture(const QPointF& pos)
     const double wanted = keyMoves ? snappedDelta(mKeyAxis->pixelToCoord(pos.x()) - g.pressKey) : 0.0;
     if (g.kind == Gesture::Create)
     {
-        const double dt = createWithoutOverlaps(g.pressKey, g.pressLane, wanted);
+        const double dt = createWithoutOverlaps(g.pressKey, g.pressLane,
+                                                categoryRowAt(g.pressLane, g.pressPos.y()), wanted);
         g.preview = { { -1, std::min(g.pressKey, g.pressKey + dt), std::max(g.pressKey, g.pressKey + dt), g.pressLane } };
     }
     else
@@ -752,23 +768,49 @@ void QCPIntervals::setSnap(SnapMode mode, double step)
     mSnapStep = step;
 }
 
-void QCPIntervals::setOverlapMode(OverlapMode mode)
+void QCPIntervals::setStackMode(StackMode mode)
 {
-    if (mOverlap == mode)
+    if (mStack == mode)
         return;
-    mOverlap = mode;
+    mStack = mode;
     updateSubRows();
     markLayersDirty();
 }
 
+void QCPIntervals::setCategoryOrder(std::vector<int> order)
+{
+    mCategoryOrder = std::move(order);
+    updateSubRows();
+    markLayersDirty();
+}
+
+std::optional<int> QCPIntervals::rowCategory(int row) const
+{
+    return mStack == skCategory ? std::optional(mColumns.category[row]) : std::nullopt;
+}
+
+//! The category of the sub-row under \a y in \a lane, when stacking by category.
+std::optional<int> QCPIntervals::categoryRowAt(int lane, double y) const
+{
+    if (mStack != skCategory || lane < 0 || lane >= static_cast<int>(mRowCategories.size()))
+        return std::nullopt;
+    const auto& categories = mRowCategories[lane];
+    for (int k = 0; k < static_cast<int>(categories.size()); ++k)
+        if (const auto band = rowBand(lane, k); band && y >= band->top && y < band->bottom)
+            return categories[k];
+    return std::nullopt;
+}
+
 std::vector<qcp::intervals::Span>
-QCPIntervals::obstaclesIn(int lane, const std::vector<qcp::intervals::DraggedRow>& dragged) const
+QCPIntervals::obstaclesIn(int lane, const std::vector<qcp::intervals::DraggedRow>& dragged,
+                          std::optional<int> category) const
 {
     std::vector<qcp::intervals::Span> spans;
     if (lane < 0 || lane >= static_cast<int>(mLanes.size()))
         return spans;
     for (int row : mLanes[lane].rows)
-        if (std::ranges::none_of(dragged, [row](const auto& d) { return d.row == row; }))
+        if ((!category || mColumns.category[row] == *category)
+            && std::ranges::none_of(dragged, [row](const auto& d) { return d.row == row; }))
             spans.push_back({ mColumns.start[row], mColumns.stop[row] });
     return spans;
 }
@@ -779,7 +821,7 @@ QCPIntervals::Shift QCPIntervals::withoutOverlaps(const std::vector<qcp::interva
                                                   qcp::intervals::DragKind kind, Shift wanted) const
 {
     using qcp::intervals::DragKind;
-    if (mOverlap != omForbid || rows.empty())
+    if (!mForbid || rows.empty())
         return wanted;
     const auto& order = mLayout->displayLanes();
     auto targetLane = [&](const auto& r, int steps) {
@@ -788,7 +830,8 @@ QCPIntervals::Shift QCPIntervals::withoutOverlaps(const std::vector<qcp::interva
     auto fitsIn = [&](int steps, double dt) {
         return std::ranges::all_of(rows, [&](const auto& r) {
             return qcp::intervals::freeShiftRange(r.start + dt, r.stop + dt,
-                                                  obstaclesIn(targetLane(r, steps), rows)).has_value();
+                                                  obstaclesIn(targetLane(r, steps), rows, rowCategory(r.row)))
+                .has_value();
         });
     };
     Shift shift = wanted;
@@ -802,7 +845,7 @@ QCPIntervals::Shift QCPIntervals::withoutOverlaps(const std::vector<qcp::interva
         // was dropped into (checked free above).
         const double offset = lane == r.lane ? 0.0 : shift.dt;
         const auto range = qcp::intervals::freeShiftRange(r.start + offset, r.stop + offset,
-                                                          obstaclesIn(lane, rows));
+                                                          obstaclesIn(lane, rows, rowCategory(r.row)));
         if (!range)
             continue; // already overlapping before the edit: nothing to keep
         if (kind != DragKind::ResizeRight)
@@ -814,11 +857,12 @@ QCPIntervals::Shift QCPIntervals::withoutOverlaps(const std::vector<qcp::interva
     return shift;
 }
 
-double QCPIntervals::createWithoutOverlaps(double pressKey, int lane, double dt) const
+double QCPIntervals::createWithoutOverlaps(double pressKey, int lane, std::optional<int> category,
+                                          double dt) const
 {
-    if (mOverlap != omForbid)
+    if (!mForbid)
         return dt;
-    const auto range = qcp::intervals::freeShiftRange(pressKey, pressKey, obstaclesIn(lane, {}));
+    const auto range = qcp::intervals::freeShiftRange(pressKey, pressKey, obstaclesIn(lane, {}, category));
     return range ? std::clamp(dt, range->first, range->second) : dt;
 }
 
@@ -861,7 +905,7 @@ QCPIntervals::BuildKey QCPIntervals::currentBuildKey() const
 {
     const QCPRange range = mKeyAxis->range();
     return { range.lower, range.upper, mKeyAxis->axisRect()->rect(), mDataGeneration,
-             mLayout->generation(), mColorGeneration, mStyle };
+             mLayout->generation(), mColorGeneration, mSubRowGeneration, mStyle };
 }
 
 void QCPIntervals::rebuildBarsIfNeeded()
@@ -888,6 +932,9 @@ void QCPIntervals::rebuildBars()
     for (int lane = 0; lane < static_cast<int>(mLanes.size()); ++lane)
         if (const auto band = mLayout->laneBand(lane, rect))
             appendLaneBars(lane, *band);
+    mRowNames.clear();
+    if (mStack == skCategory)
+        appendRowNames(rect);
     for (const auto& bar : mBars)
     {
         // Merged bars (row == -1, see appendMerged) never get a label: it's ambiguous
@@ -932,7 +979,7 @@ void QCPIntervals::appendLaneBackdrops(const QRect& axisRect)
                                                    band->bottom - band->top)),
                                 withAlpha(ink, 0.06) });
         // One idle line per row: in a stacked lane each sub-row is its own signal.
-        const int rows = mOverlap == omStack ? mLayout->laneRows(lanes[position]) : 1;
+        const int rows = mStack != skNone ? mLayout->laneRows(lanes[position]) : 1;
         const double rowHeight = (band->bottom - band->top) / rows;
         for (int r = 0; r < rows; ++r)
         {
@@ -940,6 +987,24 @@ void QCPIntervals::appendLaneBackdrops(const QRect& axisRect)
             mShapes.push_back({ rectPolygon(QRectF(axisRect.left(), mid, axisRect.width(), 1)),
                                 withAlpha(ink, 0.45) });
         }
+    }
+}
+
+void QCPIntervals::appendRowNames(const QRect& axisRect)
+{
+    const QFontMetricsF fm(mParentPlot->font());
+    for (int lane : mLayout->displayLanes())
+    {
+        if (lane >= static_cast<int>(mRowCategories.size()))
+            continue;
+        for (int k = 0; k < static_cast<int>(mRowCategories[lane].size()); ++k)
+            if (const auto band = rowBand(lane, k))
+            {
+                const QString name = mCategoryNames.value(mRowCategories[lane][k]);
+                mRowNames.emplace_back(QRectF(axisRect.left() + 3, band->top,
+                                              fm.horizontalAdvance(name) + 6, band->bottom - band->top),
+                                       name);
+            }
     }
 }
 
@@ -974,7 +1039,7 @@ void QCPIntervals::appendLaneBars(int lane, const QCPLaneBand& band)
         const int row = rows.rows[i];
         if (mColumns.stop[row] < range.lower)
             continue;
-        const QCPLaneBand rows = mOverlap == omStack ? *rowBand(lane, subRowOf(row)) : band;
+        const QCPLaneBand rows = mStack != skNone ? *rowBand(lane, subRowOf(row)) : band;
         qcp::intervals::appendMerged(
             mBars, qcp::intervals::toPixelBar(mKeyAxis->coordToPixel(mColumns.start[row]),
                                               mKeyAxis->coordToPixel(mColumns.stop[row]),
@@ -1043,6 +1108,11 @@ void QCPIntervals::drawLabels(QCPPainter* painter) const
     painter->setPen(mKeyAxis->tickLabelColor());
     for (const auto& label : mLabelRects)
         painter->drawText(label.rect, Qt::AlignCenter, label.text);
+    for (const auto& [box, name] : mRowNames)
+    {
+        painter->fillRect(box, withAlpha(mParentPlot->backgroundBrush().color(), 0.85));
+        painter->drawText(box, Qt::AlignCenter, name);
+    }
 }
 
 bool QCPIntervals::drawsLaneNames() const

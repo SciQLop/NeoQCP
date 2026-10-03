@@ -57,6 +57,37 @@ int packSubRows(const LaneRows& lane, const Columns& c, std::vector<int>& subRow
     return static_cast<int>(rowEnds.size());
 }
 
+std::vector<int> categoryRanks(const Columns& c, const std::vector<int>& order)
+{
+    const int count = c.category.empty() ? 0 : *std::ranges::max_element(c.category) + 1;
+    std::vector<bool> used(std::max(0, count), false);
+    for (int category : c.category)
+        if (category >= 0)
+            used[category] = true;
+    std::vector<int> rank(used.size(), -1);
+    int next = 0;
+    auto place = [&](int category) {
+        if (category >= 0 && category < count && used[category] && rank[category] < 0)
+            rank[category] = next++;
+    };
+    std::ranges::for_each(order, place);
+    std::ranges::for_each(c.category, place);
+    return rank;
+}
+
+int packByCategory(const LaneRows& lane, const Columns& c, const std::vector<int>& rank,
+                   std::vector<int>& subRow)
+{
+    std::vector<int> categories;
+    for (int row : lane.rows)
+        if (std::ranges::find(categories, c.category[row]) == categories.end())
+            categories.push_back(c.category[row]);
+    std::ranges::sort(categories, {}, [&](int category) { return rank[category]; });
+    for (int row : lane.rows)
+        subRow[row] = static_cast<int>(std::ranges::find(categories, c.category[row]) - categories.begin());
+    return static_cast<int>(categories.size());
+}
+
 std::pair<int, int> candidateRange(const LaneRows& lane, double lower, double upper)
 {
     const auto first = std::ranges::lower_bound(lane.starts, lower - lane.maxDuration);

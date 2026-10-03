@@ -92,6 +92,11 @@ private slots:
     void legendListsTheUsedCategories();
     void legendItemHasARowPerCategory();
     void autoAddedLegendItemIsTheCategoryList();
+    void categoryRanksFollowTheOrderThenFirstSeen();
+    void packByCategoryGivesEachCategoryItsRow();
+    void categoryStackKeepsRowsAcrossData();
+    void categoryStackForbidsOnlyWithinACategory();
+    void categoryStackNamesItsRows();
     void snapToStepLandsOnMultiples();
     void setDataDuringDragCancelsGesture();
     void cursorFollowsThePart();

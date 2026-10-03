@@ -57,12 +57,21 @@ public:
     //! stBars: plain coloured bars. stWave: a logic-analyzer look, with angled bus-value ends,
     //! an idle line through each lane and every other lane shaded.
     enum Style { stBars, stWave };
-    //! omDraw: overlapping intervals are drawn over each other. omForbid: move, resize, create
-    //! and nudges stop at the neighbouring block's edge, so an edit never overlaps one.
-    //! omStack: overlapping intervals of a lane go into sub-rows.
-    enum OverlapMode { omDraw, omStack, omForbid };
-    void setOverlapMode(OverlapMode mode);
-    [[nodiscard]] OverlapMode overlapMode() const { return mOverlap; }
+    //! How a lane's intervals are split into sub-rows. skNone: one row, overlaps drawn over each
+    //! other. skTime: overlapping intervals go into the first free sub-row. skCategory: one
+    //! fixed sub-row per category, ordered by setCategoryOrder() then first seen.
+    enum StackMode { skNone, skTime, skCategory };
+    void setStackMode(StackMode mode);
+    [[nodiscard]] StackMode stackMode() const { return mStack; }
+    //! Category indices to stack first, in this order (skCategory).
+    void setCategoryOrder(std::vector<int> order);
+    [[nodiscard]] const std::vector<int>& categoryOrder() const { return mCategoryOrder; }
+    //! Move, resize, create and nudges stop at the neighbouring block's edge in the same row
+    //! (same lane; same lane and category with skCategory), so an edit never overlaps one.
+    void setForbidOverlap(bool forbid) { mForbid = forbid; }
+    [[nodiscard]] bool forbidOverlap() const { return mForbid; }
+    //! Each sub-row's name and box when stacking by category, for drawing and tests.
+    [[nodiscard]] const std::vector<std::pair<QRectF, QString>>& rowNames() const { return mRowNames; }
 
     void setStyle(Style style);
     [[nodiscard]] Style style() const { return mStyle; }
@@ -126,7 +135,7 @@ protected:
     {
         double lower, upper;
         QRect rect;
-        quint64 data, layout, colors;
+        quint64 data, layout, colors, subRows;
         Style style;
         bool operator==(const BuildKey&) const = default;
     };
@@ -203,9 +212,14 @@ protected:
     };
     [[nodiscard]] Shift withoutOverlaps(const std::vector<qcp::intervals::DraggedRow>& rows,
                                         qcp::intervals::DragKind kind, Shift wanted) const;
-    [[nodiscard]] double createWithoutOverlaps(double pressKey, int lane, double dt) const;
+    [[nodiscard]] double createWithoutOverlaps(double pressKey, int lane, std::optional<int> category,
+                                               double dt) const;
+    [[nodiscard]] std::optional<int> categoryRowAt(int lane, double y) const;
     [[nodiscard]] std::vector<qcp::intervals::Span>
-    obstaclesIn(int lane, const std::vector<qcp::intervals::DraggedRow>& dragged) const;
+    obstaclesIn(int lane, const std::vector<qcp::intervals::DraggedRow>& dragged,
+                std::optional<int> category) const;
+    [[nodiscard]] std::optional<int> rowCategory(int row) const;
+    void appendRowNames(const QRect& axisRect);
 
     bool mEditable = false;
     EditModes mEditModes = EditModes(emMove | emResize);
@@ -237,8 +251,13 @@ protected:
     std::vector<float> mVertices;
     std::vector<LabelRect> mLabelRects;
     Style mStyle = stBars;
-    OverlapMode mOverlap = omDraw;
+    StackMode mStack = skNone;
+    bool mForbid = false;
+    std::vector<int> mCategoryOrder;
     std::vector<int> mSubRow; // per row, when stacking
+    std::vector<std::vector<int>> mRowCategories; // per lane, the category of each sub-row (skCategory)
+    std::vector<std::pair<QRectF, QString>> mRowNames;
+    quint64 mSubRowGeneration = 0;
     std::optional<BuildKey> mBuiltFor;
     quint64 mDataGeneration = 0;
     quint64 mColorGeneration = 0;
