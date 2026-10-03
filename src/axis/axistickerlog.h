@@ -49,11 +49,16 @@ protected:
 
     // non-property members:
     double mLogBaseLnInv;
+    bool mMantissaTicks = false;
+
+    QVector<double> createMantissaTickVector(const QCPRange& range) const;
 
     // reimplemented virtual methods:
     virtual int getSubTickCount(double tickStep) override;
     virtual QVector<double> createTickVector(double tickStep,
                                              const QCPRange& range) override;
+    virtual QVector<double> createSubTickVector(int subTickCount,
+                                                const QVector<double>& ticks) override;
 };
 
 #endif // QCP_AXISTICKERLOG_H

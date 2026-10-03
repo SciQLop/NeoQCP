@@ -26,6 +26,45 @@
 #include "axistickerlog.h"
 #include "axisticker-utils.h"
 
+#include <array>
+#include <vector>
+
+namespace
+{
+// Mantissa sets tried in order when the range is too short for whole powers, as matplotlib's
+// LogLocator and d3 do (https://github.com/d3/d3-scale/blob/main/src/log.js).
+const std::array<std::vector<double>, 3> kMantissaLadders { {
+    { 1, 2, 5 },
+    { 1, 2, 3, 5, 7 },
+    { 1, 2, 3, 4, 5, 6, 7, 8, 9 },
+} };
+
+// Every mantissa x 10^p from the decade at or below lower to the decade at or above upper, so one
+// tick lies outside the range on each side (lower > 0).
+QVector<double> mantissaTicks(const std::vector<double>& mantissas, double lower, double upper)
+{
+    QVector<double> ticks;
+    for (int p = qFloor(std::log10(lower)); p <= qCeil(std::log10(upper)); ++p)
+        for (double m : mantissas)
+            ticks.append(m * qPow(10.0, p));
+    return ticks;
+}
+
+int countInRange(const QVector<double>& ticks, double lower, double upper)
+{
+    return int(std::count_if(ticks.cbegin(), ticks.cend(),
+                             [=](double t) { return t >= lower && t <= upper; }));
+}
+
+QVector<double> mirrored(QVector<double> ticks)
+{
+    std::reverse(ticks.begin(), ticks.end());
+    for (double& t : ticks)
+        t = -t;
+    return ticks;
+}
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPAxisTickerLog
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,8 +90,9 @@
   Note that the nature of logarithmic ticks imply that there exists a smallest possible tick step,
   corresponding to one multiplication by the log base. If the user zooms in further than that, no
   new ticks would appear, leading to very sparse or even no axis ticks on the axis. To prevent this
-  situation, this ticker falls back to regular tick generation if the axis range would be covered
-  by too few logarithmically placed ticks.
+  situation, with log base 10 this ticker first places ticks at round mantissas (1, 2, 5 x 10^n,
+  then denser digit sets), and falls back to regular tick generation only if even every digit
+  would give too few ticks.
 */
 
 /*!
@@ -137,8 +177,16 @@ QVector<double> QCPAxisTickerLog::createTickVector(double tickStep, const QCPRan
 
     const double ratio = positive ? range.upper / range.lower : range.lower / range.upper;
     const double baseTickCount = qLn(ratio) * mLogBaseLnInv;
+    mMantissaTicks = false;
     if (baseTickCount < 1.6)
+    {
+        if (auto ticks = createMantissaTickVector(range); !ticks.isEmpty())
+        {
+            mMantissaTicks = true;
+            return ticks;
+        }
         return QCPAxisTicker::createTickVector(tickStep, range);
+    }
 
     const double exactPowerStep = baseTickCount / double(mTickCount + qcp::kTickCountEpsilon);
     const double newLogBase = qPow(mLogBase, qMax(int(cleanMantissa(exactPowerStep)), 1));
@@ -157,4 +205,54 @@ QVector<double> QCPAxisTickerLog::createTickVector(double tickStep, const QCPRan
         result.append(currentTick);
     }
     return result;
+}
+
+/*! \internal
+
+  Ticks at round mantissas (1, 2, 5 x 10^n, then denser sets) for ranges too short for whole
+  powers. Returns an empty vector when even every digit would give too few ticks, or when the log
+  base is not 10.
+*/
+QVector<double> QCPAxisTickerLog::createMantissaTickVector(const QCPRange& range) const
+{
+    if (mLogBase != 10.0)
+        return {};
+    const bool negative = range.upper < 0;
+    const double lower = negative ? -range.upper : range.lower;
+    const double upper = negative ? -range.lower : range.upper;
+    const int wanted = qMax(2, (mTickCount + 1) / 2);
+    for (const auto& mantissas : kMantissaLadders)
+    {
+        auto ticks = mantissaTicks(mantissas, lower, upper);
+        if (countInRange(ticks, lower, upper) >= wanted)
+            return negative ? mirrored(ticks) : ticks;
+    }
+    return {};
+}
+
+/*! \internal
+
+  With mantissa ticks, the sub ticks are the remaining digits (2, 3, 4 ... x 10^n). Otherwise the
+  base class spaces them linearly.
+
+  \seebaseclassmethod
+*/
+QVector<double> QCPAxisTickerLog::createSubTickVector(int subTickCount,
+                                                       const QVector<double>& ticks)
+{
+    if (!mMantissaTicks)
+        return QCPAxisTicker::createSubTickVector(subTickCount, ticks);
+    const bool negative = ticks.front() < 0;
+    const double lower = negative ? -ticks.back() : ticks.front();
+    const double upper = negative ? -ticks.front() : ticks.back();
+    auto isMajor = [&](double v)
+    {
+        return std::any_of(ticks.cbegin(), ticks.cend(),
+                           [&](double t) { return qFuzzyCompare(qAbs(t), v); });
+    };
+    QVector<double> subTicks;
+    for (double v : mantissaTicks(kMantissaLadders.back(), lower, upper))
+        if (v > lower && v < upper && !isMajor(v))
+            subTicks.append(v);
+    return negative ? mirrored(subTicks) : subTicks;
 }
