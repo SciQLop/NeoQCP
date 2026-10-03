@@ -1112,7 +1112,7 @@ void TestIntervals::waveStyleCutsTheBarCorners()
     const QImage bars = waveImage(mPlot, &layout, QCPIntervals::stBars);
     const double lane = layout.lanePixelHeight(mPlot->axisRect()->rect());
     QVERIFY(isRedish(pixelAt(bars, mPlot, 20.2, 3)));          // square corner
-    delete mPlot->plottable(0);
+    mPlot->removePlottable(mPlot->plottable(0)); // not delete: the plot keeps a pointer to it
     const QImage wave = waveImage(mPlot, &layout, QCPIntervals::stWave);
     QVERIFY(!isRedish(pixelAt(wave, mPlot, 20.2, 3)));         // cut corner
     QVERIFY(isRedish(pixelAt(wave, mPlot, 50, lane / 2)));     // body
@@ -1125,7 +1125,7 @@ void TestIntervals::waveStyleDrawsAnIdleBaseline()
     const double lane = layout.lanePixelHeight(mPlot->axisRect()->rect());
     QVERIFY(pixelAt(wave, mPlot, 10, lane / 2) != background(mPlot));    // idle line before the bar
     QCOMPARE(pixelAt(wave, mPlot, 10, lane / 2 - 4), pixelAt(wave, mPlot, 10, 3)); // only a thin line
-    delete mPlot->plottable(0);
+    mPlot->removePlottable(mPlot->plottable(0)); // not delete: the plot keeps a pointer to it
     const QImage bars = waveImage(mPlot, &layout, QCPIntervals::stBars);
     QCOMPARE(pixelAt(bars, mPlot, 10, lane / 2), pixelAt(bars, mPlot, 10, 3));    // no line with bars
 }
