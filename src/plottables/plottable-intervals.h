@@ -44,10 +44,16 @@ public:
     enum EditMode { emMove = 0x01, emResize = 0x02, emChangeLane = 0x04, emCreate = 0x08, emDelete = 0x10 };
     Q_DECLARE_FLAGS(EditModes, EditMode)
 
-    enum SnapMode { snNone, snEdges, snStep };
+    enum SnapMode { snNone, snEdges, snStep, snTimes };
     //! stBars: plain coloured bars. stWave: a logic-analyzer look, with angled bus-value ends,
     //! an idle line through each lane and every other lane shaded.
     enum Style { stBars, stWave };
+    //! omDraw: overlapping intervals are drawn over each other. omForbid: move, resize, create
+    //! and nudges stop at the neighbouring block's edge, so an edit never overlaps one.
+    //! omStack: overlapping intervals of a lane go into sub-rows.
+    enum OverlapMode { omDraw, omStack, omForbid };
+    void setOverlapMode(OverlapMode mode);
+    [[nodiscard]] OverlapMode overlapMode() const { return mOverlap; }
 
     void setStyle(Style style);
     [[nodiscard]] Style style() const { return mStyle; }
@@ -66,6 +72,9 @@ public:
     void setSnap(SnapMode mode, double step = 0);
     [[nodiscard]] SnapMode snapMode() const { return mSnap; }
     [[nodiscard]] double snapStep() const { return mSnapStep; }
+    //! Snap dragged edges to these keys only (e.g. orbit events); sets the snTimes mode.
+    void setSnapTimes(std::vector<double> times);
+    [[nodiscard]] const std::vector<double>& snapTimes() const { return mSnapTimes; }
     [[nodiscard]] std::optional<Qt::CursorShape> cursorAt(const QPointF& pos) const;
     [[nodiscard]] bool gestureActive() const { return mGesture.has_value(); }
 
@@ -174,11 +183,22 @@ protected:
     void emitEdits(const std::vector<qcp::intervals::Edit>& edits);
     void drawPreview(QCPPainter* painter) const;
     bool nudge(int keySteps, int laneSteps);
+    struct Shift
+    {
+        double dt;
+        int laneSteps;
+    };
+    [[nodiscard]] Shift withoutOverlaps(const std::vector<qcp::intervals::DraggedRow>& rows,
+                                        qcp::intervals::DragKind kind, Shift wanted) const;
+    [[nodiscard]] double createWithoutOverlaps(double pressKey, int lane, double dt) const;
+    [[nodiscard]] std::vector<qcp::intervals::Span>
+    obstaclesIn(int lane, const std::vector<qcp::intervals::DraggedRow>& dragged) const;
 
     bool mEditable = false;
     EditModes mEditModes = EditModes(emMove | emResize);
     SnapMode mSnap = snNone;
     double mSnapStep = 0;
+    std::vector<double> mSnapTimes; // sorted
     std::optional<Gesture> mGesture;
 
     std::optional<QRectF> mRubberBand;
@@ -203,6 +223,7 @@ protected:
     std::vector<float> mVertices;
     std::vector<LabelRect> mLabelRects;
     Style mStyle = stBars;
+    OverlapMode mOverlap = omDraw;
     std::optional<BuildKey> mBuiltFor;
     quint64 mDataGeneration = 0;
     quint64 mColorGeneration = 0;

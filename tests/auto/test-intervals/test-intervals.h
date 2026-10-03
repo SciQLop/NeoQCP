@@ -76,6 +76,15 @@ private slots:
     void dragOnEmptyLaneCreates();
     void notEditableIgnoresDrags();
     void snapToEdgesLandsExactly();
+    void snapToTimesLandsExactly();
+    void freeShiftRangeStaysInTheGap();
+    void forbidStopsAMoveAtTheNeighbour();
+    void forbidStopsAResizeAtTheNeighbour();
+    void forbidStopsACreateAtTheNeighbour();
+    void forbidKeepsTheLaneWhenTheTargetIsTaken();
+    void forbidClampsASelectionByItsTightestBlock();
+    void forbidClampsANudge();
+    void drawModeAllowsOverlaps();
     void snapToStepLandsOnMultiples();
     void setDataDuringDragCancelsGesture();
     void cursorFollowsThePart();

@@ -491,6 +491,8 @@ double QCPIntervals::snappedDelta(double raw) const
             return qcp::intervals::snapToStep(edges.front(), raw, mSnapStep);
         case snEdges:
             return qcp::intervals::snapToEdges(edges, raw, g.snapCandidates, keysPerPixels(8));
+        case snTimes:
+            return qcp::intervals::snapToEdges(edges, raw, mSnapTimes, keysPerPixels(8));
         case snNone:
             break;
     }
@@ -510,11 +512,18 @@ void QCPIntervals::updateGesture(const QPointF& pos)
     auto& g = *mGesture;
     g.moved = g.moved || (pos - g.pressPos).manhattanLength() > 3;
     const bool keyMoves = g.kind != Gesture::Move || (mEditModes & emMove);
-    const double dt = keyMoves ? snappedDelta(mKeyAxis->pixelToCoord(pos.x()) - g.pressKey) : 0.0;
+    const double wanted = keyMoves ? snappedDelta(mKeyAxis->pixelToCoord(pos.x()) - g.pressKey) : 0.0;
     if (g.kind == Gesture::Create)
+    {
+        const double dt = createWithoutOverlaps(g.pressKey, g.pressLane, wanted);
         g.preview = { { -1, std::min(g.pressKey, g.pressKey + dt), std::max(g.pressKey, g.pressKey + dt), g.pressLane } };
+    }
     else
-        g.preview = qcp::intervals::applyDrag(g.rows, dragKind(g.kind), dt, laneStepsTo(pos), mLayout->displayLanes());
+    {
+        const auto shift = withoutOverlaps(g.rows, dragKind(g.kind), { wanted, laneStepsTo(pos) });
+        g.preview = qcp::intervals::applyDrag(g.rows, dragKind(g.kind), shift.dt, shift.laneSteps,
+                                              mLayout->displayLanes());
+    }
     requestRepaint();
 }
 
@@ -591,8 +600,9 @@ bool QCPIntervals::nudge(int keySteps, int laneSteps)
     std::vector<qcp::intervals::DraggedRow> rows;
     for (int row : selectedRows())
         rows.push_back({ row, mColumns.start[row], mColumns.stop[row], mColumns.lane[row] });
-    emitEdits(qcp::intervals::applyDrag(rows, qcp::intervals::DragKind::Move, keySteps * step,
-                                        laneSteps, mLayout->displayLanes()));
+    const auto shift = withoutOverlaps(rows, qcp::intervals::DragKind::Move, { keySteps * step, laneSteps });
+    emitEdits(qcp::intervals::applyDrag(rows, qcp::intervals::DragKind::Move, shift.dt, shift.laneSteps,
+                                        mLayout->displayLanes()));
     return true;
 }
 
@@ -648,6 +658,82 @@ void QCPIntervals::setSnap(SnapMode mode, double step)
 {
     mSnap = mode;
     mSnapStep = step;
+}
+
+void QCPIntervals::setOverlapMode(OverlapMode mode)
+{
+    if (mOverlap == mode)
+        return;
+    mOverlap = mode;
+    markLayersDirty();
+}
+
+std::vector<qcp::intervals::Span>
+QCPIntervals::obstaclesIn(int lane, const std::vector<qcp::intervals::DraggedRow>& dragged) const
+{
+    std::vector<qcp::intervals::Span> spans;
+    if (lane < 0 || lane >= static_cast<int>(mLanes.size()))
+        return spans;
+    for (int row : mLanes[lane].rows)
+        if (std::ranges::none_of(dragged, [row](const auto& d) { return d.row == row; }))
+            spans.push_back({ mColumns.start[row], mColumns.stop[row] });
+    return spans;
+}
+
+// simplify: in forbid mode a block changes lane only if it fits at the drop position; it is not
+// slid along the target lane to the nearest free gap. Add that search if users ask for it.
+QCPIntervals::Shift QCPIntervals::withoutOverlaps(const std::vector<qcp::intervals::DraggedRow>& rows,
+                                                  qcp::intervals::DragKind kind, Shift wanted) const
+{
+    using qcp::intervals::DragKind;
+    if (mOverlap != omForbid || rows.empty())
+        return wanted;
+    const auto& order = mLayout->displayLanes();
+    auto targetLane = [&](const auto& r, int steps) {
+        return kind == DragKind::Move ? qcp::intervals::shiftLane(r.lane, steps, order) : r.lane;
+    };
+    auto fitsIn = [&](int steps, double dt) {
+        return std::ranges::all_of(rows, [&](const auto& r) {
+            return qcp::intervals::freeShiftRange(r.start + dt, r.stop + dt,
+                                                  obstaclesIn(targetLane(r, steps), rows)).has_value();
+        });
+    };
+    Shift shift = wanted;
+    if (shift.laneSteps != 0 && !fitsIn(shift.laneSteps, shift.dt))
+        shift.laneSteps = 0;
+    double lo = -std::numeric_limits<double>::infinity(), hi = std::numeric_limits<double>::infinity();
+    for (const auto& r : rows)
+    {
+        const int lane = targetLane(r, shift.laneSteps);
+        // In its own lane a block stays in the gap it starts in; in another one, in the gap it
+        // was dropped into (checked free above).
+        const double offset = lane == r.lane ? 0.0 : shift.dt;
+        const auto range = qcp::intervals::freeShiftRange(r.start + offset, r.stop + offset,
+                                                          obstaclesIn(lane, rows));
+        if (!range)
+            continue; // already overlapping before the edit: nothing to keep
+        if (kind != DragKind::ResizeRight)
+            lo = std::max(lo, offset + range->first);
+        if (kind != DragKind::ResizeLeft)
+            hi = std::min(hi, offset + range->second);
+    }
+    shift.dt = lo <= hi ? std::clamp(shift.dt, lo, hi) : 0.0;
+    return shift;
+}
+
+double QCPIntervals::createWithoutOverlaps(double pressKey, int lane, double dt) const
+{
+    if (mOverlap != omForbid)
+        return dt;
+    const auto range = qcp::intervals::freeShiftRange(pressKey, pressKey, obstaclesIn(lane, {}));
+    return range ? std::clamp(dt, range->first, range->second) : dt;
+}
+
+void QCPIntervals::setSnapTimes(std::vector<double> times)
+{
+    std::ranges::sort(times);
+    mSnapTimes = std::move(times);
+    mSnap = snTimes;
 }
 
 QCPRange QCPIntervals::getKeyRange(bool& foundRange, QCP::SignDomain) const

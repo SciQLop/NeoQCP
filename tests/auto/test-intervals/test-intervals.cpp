@@ -803,6 +803,18 @@ void TestIntervals::notEditableIgnoresDrags()
     QVERIFY(!iv->gestureActive());
 }
 
+// External times (orbit events) are the only candidates: the neighbour's edge at 60 is ignored.
+void TestIntervals::snapToTimesLandsExactly()
+{
+    QCPLaneLayout layout;
+    auto* iv = editableTwoBars(mPlot, &layout, QCPIntervals::emMove);
+    iv->setSnapTimes({ 62.0, 5.0 });
+    QCOMPARE(iv->snapMode(), QCPIntervals::snTimes);
+    QSignalSpy spy(iv, &QCPIntervals::intervalsEdited);
+    drag(mPlot, iv->pixelOf(25, 0), iv->pixelOf(46, 0)); // stop 40 -> ~61
+    QCOMPARE(spy.at(0).at(0).value<QVector<QCPIntervalEdit>>()[0].stop, 62.0);
+}
+
 void TestIntervals::snapToEdgesLandsExactly()
 {
     QCPLaneLayout layout;
@@ -1137,3 +1149,117 @@ void TestIntervals::waveStyleShadesEveryOtherLane()
     const double lane = layout.lanePixelHeight(mPlot->axisRect()->rect());
     QVERIFY(pixelAt(wave, mPlot, 10, 3) != pixelAt(wave, mPlot, 10, lane + 3));
 }
+
+void TestIntervals::freeShiftRangeStaysInTheGap()
+{
+    using qcp::intervals::freeShiftRange;
+    const std::vector<qcp::intervals::Span> obstacles { { 0, 10 }, { 50, 70 } };
+    const auto range = freeShiftRange(20, 30, obstacles);
+    QVERIFY(range);
+    QCOMPARE(range->first, -10.0);  // start may go back to 10
+    QCOMPARE(range->second, 20.0);  // stop may go up to 50
+    QVERIFY(!freeShiftRange(5, 20, obstacles));  // already overlapping: no constraint
+    const auto open = freeShiftRange(80, 90, obstacles);
+    QVERIFY(open && open->first == -10.0 && std::isinf(open->second));
+}
+
+namespace {
+//! Lane A: [10, 30] and [50, 70]. Lane B: [40, 60]. Every edit mode, overlaps forbidden.
+QCPIntervals* forbiddingBars(QCustomPlot* plot, QCPLaneLayout* layout,
+                             QCPIntervals::OverlapMode mode = QCPIntervals::omForbid)
+{
+    layout->setPlacement(QCPLaneLayout::plLanes);
+    auto* iv = new QCPIntervals(plot->xAxis, plot->yAxis, layout);
+    const int a = layout->laneIndex("A"), b = layout->laneIndex("B");
+    iv->setData(columns({ 10, 50, 40 }, { 30, 70, 60 }, { a, a, b }));
+    iv->setEditable(true);
+    iv->setEditModes(QCPIntervals::EditModes(QCPIntervals::emMove | QCPIntervals::emResize
+                                             | QCPIntervals::emChangeLane | QCPIntervals::emCreate));
+    iv->setOverlapMode(mode);
+    plot->setInteractions(QCP::iSelectPlottables | QCP::iMultiSelect);
+    plot->xAxis->setRange(0, 100);
+    plot->replot();
+    return iv;
+}
+
+QCPIntervalEdit firstEdit(const QSignalSpy& spy)
+{
+    return spy.at(0).at(0).value<QVector<QCPIntervalEdit>>()[0];
+}
+} // namespace
+
+void TestIntervals::forbidStopsAMoveAtTheNeighbour()
+{
+    QCPLaneLayout layout;
+    auto* iv = forbiddingBars(mPlot, &layout);
+    QSignalSpy spy(iv, &QCPIntervals::intervalsEdited);
+    drag(mPlot, iv->pixelOf(20, 0), iv->pixelOf(50, 0)); // +30 would reach [40, 60]
+    QCOMPARE(firstEdit(spy).start, 30.0);
+    QCOMPARE(firstEdit(spy).stop, 50.0);
+}
+
+void TestIntervals::forbidStopsAResizeAtTheNeighbour()
+{
+    QCPLaneLayout layout;
+    auto* iv = forbiddingBars(mPlot, &layout);
+    QSignalSpy spy(iv, &QCPIntervals::intervalsEdited);
+    drag(mPlot, iv->pixelOf(30, 0) - QPointF(2, 0), iv->pixelOf(65, 0));
+    QCOMPARE(firstEdit(spy).stop, 50.0);
+    drag(mPlot, iv->pixelOf(50, 0) + QPointF(2, 0), iv->pixelOf(15, 0));
+    QCOMPARE(spy.at(1).at(0).value<QVector<QCPIntervalEdit>>()[0].start, 30.0);
+}
+
+void TestIntervals::forbidStopsACreateAtTheNeighbour()
+{
+    QCPLaneLayout layout;
+    auto* iv = forbiddingBars(mPlot, &layout);
+    QSignalSpy spy(iv, &QCPIntervals::intervalCreated);
+    drag(mPlot, iv->pixelOf(40, 0), iv->pixelOf(85, 0));
+    QCOMPARE(spy.size(), 1);
+    QVERIFY(qAbs(spy.at(0).at(0).toDouble() - 40) < keyTolerance);
+    QCOMPARE(spy.at(0).at(1).toDouble(), 50.0);
+}
+
+void TestIntervals::forbidKeepsTheLaneWhenTheTargetIsTaken()
+{
+    QCPLaneLayout layout;
+    auto* iv = forbiddingBars(mPlot, &layout);
+    QSignalSpy spy(iv, &QCPIntervals::intervalsEdited);
+    drag(mPlot, iv->pixelOf(20, 0), iv->pixelOf(45, 1)); // [35, 55] in B overlaps [40, 60]
+    QCOMPARE(firstEdit(spy).lane, 0);
+    QCOMPARE(firstEdit(spy).stop, 50.0);
+}
+
+void TestIntervals::forbidClampsASelectionByItsTightestBlock()
+{
+    QCPLaneLayout layout;
+    auto* iv = forbiddingBars(mPlot, &layout);
+    iv->setSelectedRows({ 0, 2 }); // [10, 30] in A, [40, 60] in B: B is free to the right
+    QSignalSpy spy(iv, &QCPIntervals::intervalsEdited);
+    drag(mPlot, iv->pixelOf(20, 0), iv->pixelOf(45, 0)); // +25: A's block hits 50 after +20
+    const auto edits = spy.at(0).at(0).value<QVector<QCPIntervalEdit>>();
+    QCOMPARE(edits.size(), 2);
+    for (const auto& e : edits)
+        QCOMPARE(e.stop - (e.id == 100 ? 30.0 : 60.0), 20.0);
+}
+
+void TestIntervals::forbidClampsANudge()
+{
+    QCPLaneLayout layout;
+    auto* iv = forbiddingBars(mPlot, &layout);
+    iv->setSnap(QCPIntervals::snStep, 50);
+    iv->setSelectedRows({ 0 });
+    QSignalSpy spy(iv, &QCPIntervals::intervalsEdited);
+    QVERIFY(iv->nudge(1, 0)); // +50 would land on [50, 70]
+    QCOMPARE(firstEdit(spy).stop, 50.0);
+}
+
+void TestIntervals::drawModeAllowsOverlaps()
+{
+    QCPLaneLayout layout;
+    auto* iv = forbiddingBars(mPlot, &layout, QCPIntervals::omDraw);
+    QSignalSpy spy(iv, &QCPIntervals::intervalsEdited);
+    drag(mPlot, iv->pixelOf(20, 0), iv->pixelOf(50, 0));
+    QVERIFY(qAbs(firstEdit(spy).stop - 60) < keyTolerance);
+}
+

@@ -78,6 +78,16 @@ int shiftLane(int lane, int steps, const std::vector<int>& displayOrder);
 std::vector<Edit> applyDrag(const std::vector<DraggedRow>& rows, DragKind kind, double dt,
                             int laneSteps, const std::vector<int>& displayOrder);
 std::vector<double> movingEdges(const DraggedRow& grabbed, DragKind kind);
+
+struct Span
+{
+    double start, stop;
+};
+
+//! Shifts [lo, hi] that keep [a, b] in its free gap among \a obstacles (touching is allowed).
+//! Nothing if [a, b] already overlaps one: there is no gap to stay in.
+std::optional<std::pair<double, double>> freeShiftRange(double a, double b,
+                                                        const std::vector<Span>& obstacles);
 double snapToStep(double edge, double dt, double step);
 double snapToEdges(const std::vector<double>& movingEdges, double dt,
                    const std::vector<double>& sortedCandidates, double tolerance);

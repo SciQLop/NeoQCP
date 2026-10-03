@@ -1,4 +1,5 @@
 #include "intervals-algo.h"
+#include <limits>
 #include <algorithm>
 #include <cmath>
 #include <numeric>
@@ -165,6 +166,23 @@ std::vector<Edit> applyDrag(const std::vector<DraggedRow>& rows, DragKind kind, 
         }
     }
     return edits;
+}
+
+std::optional<std::pair<double, double>> freeShiftRange(double a, double b,
+                                                        const std::vector<Span>& obstacles)
+{
+    double gapStart = -std::numeric_limits<double>::infinity();
+    double gapEnd = std::numeric_limits<double>::infinity();
+    for (const auto& o : obstacles)
+    {
+        if (o.start < b && o.stop > a)
+            return std::nullopt;
+        if (o.stop <= a)
+            gapStart = std::max(gapStart, o.stop);
+        if (o.start >= b)
+            gapEnd = std::min(gapEnd, o.start);
+    }
+    return std::pair { gapStart - a, gapEnd - b };
 }
 
 std::vector<double> movingEdges(const DraggedRow& grabbed, DragKind kind)
