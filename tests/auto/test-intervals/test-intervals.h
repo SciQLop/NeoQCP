@@ -97,6 +97,7 @@ private slots:
     void categoryStackKeepsRowsAcrossData();
     void categoryStackForbidsOnlyWithinACategory();
     void categoryStackNamesItsRows();
+    void createdIntervalCarriesItsRowCategory();
     void snapToStepLandsOnMultiples();
     void setDataDuringDragCancelsGesture();
     void cursorFollowsThePart();

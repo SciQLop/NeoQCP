@@ -127,7 +127,8 @@ public:
 
 Q_SIGNALS:
     void intervalsEdited(const QVector<QCPIntervalEdit>& edits);
-    void intervalCreated(double start, double stop, int lane);
+    //! \a category is the category of the row it was drawn in (stacking by category), else -1.
+    void intervalCreated(double start, double stop, int lane, int category);
     void deleteRequested(const QVector<qint64>& ids);
 
 protected:

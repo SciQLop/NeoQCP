@@ -1463,3 +1463,21 @@ void TestIntervals::categoryStackNamesItsRows()
     QVERIFY(names[0].first.bottom() <= names[1].first.top());
 }
 
+// Drawn in the "BASE" row of a category-stacked lane: the new interval is a BASE window.
+void TestIntervals::createdIntervalCarriesItsRowCategory()
+{
+    QCPLaneLayout layout;
+    auto* iv = modes(mPlot, &layout, { 0, 60 }, { 20, 80 }, { 2, 0 }); // rows: LM, BASE
+    iv->setEditable(true);
+    iv->setEditModes(QCPIntervals::emCreate);
+    QSignalSpy spy(iv, &QCPIntervals::intervalCreated);
+    const double baseRow = iv->barRect(1).center().y();
+    drag(mPlot, QPointF(iv->pixelOf(30, 0).x(), baseRow), QPointF(iv->pixelOf(50, 0).x(), baseRow));
+    QCOMPARE(spy.size(), 1);
+    QCOMPARE(spy.at(0).at(3).toInt(), 0);
+    iv->setStackMode(QCPIntervals::skNone); // no category rows: unknown
+    mPlot->replot();
+    drag(mPlot, QPointF(iv->pixelOf(30, 0).x(), baseRow), QPointF(iv->pixelOf(50, 0).x(), baseRow));
+    QCOMPARE(spy.at(1).at(3).toInt(), -1);
+}
+

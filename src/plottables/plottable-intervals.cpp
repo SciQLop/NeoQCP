@@ -644,7 +644,8 @@ void QCPIntervals::finishGesture()
     if (g.kind != Gesture::Create)
         emitEdits(g.preview);
     else if (g.preview[0].stop > g.preview[0].start)
-        emit intervalCreated(g.preview[0].start, g.preview[0].stop, g.preview[0].lane);
+        emit intervalCreated(g.preview[0].start, g.preview[0].stop, g.preview[0].lane,
+                             categoryRowAt(g.pressLane, g.pressPos.y()).value_or(-1));
 }
 
 bool QCPIntervals::changesAnyRow(const std::vector<qcp::intervals::Edit>& edits) const
