@@ -309,7 +309,10 @@ void QCPColorMap2::draw(QCPPainter* painter)
         // A colormap made before its plot was laid out was resampled for a tiny axis rect, and
         // a resize changes no axis range: nothing else would ask for a sharper image.
         if (painter->modes().testFlag(QCPPainter::pmNoCaching))
-            mPipeline.runSynchronously(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data()));
+        {
+            if (mPipeline.runSynchronously(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data())))
+                mRenderer.invalidateMapImage(); // finished() only fires for async results
+        }
         else
             onViewportChanged();
         resampledData = mPipeline.result();
