@@ -405,6 +405,38 @@ void TestMultiDataSource::adaptiveSamplingBreaksAtKeyGaps()
              "Adaptive sampling: no gap break found between key=500 and key=10000");
 }
 
+// Each pixel's min and max used to be emitted min first. On a falling line the polyline then went
+// up and down inside every pixel and looked thicker than a rising one.
+void TestMultiDataSource::adaptiveSamplingFollowsFallingData()
+{
+    const int n = 20000;
+    std::vector<double> keys(n), vals(n);
+    for (int i = 0; i < n; ++i)
+        keys[i] = i, vals[i] = -i;
+    mPlot->setGeometry(50, 50, 500, 500);
+    mPlot->xAxis->setRange(0, n);
+    mPlot->yAxis->setRange(-n, 0);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    // Pixel y grows downwards, so a falling line never goes back up.
+    const auto upTurns = [](const QVector<QPointF>& pts) {
+        int count = 0;
+        for (int i = 1; i < pts.size(); ++i)
+            if (pts[i].y() < pts[i - 1].y())
+                ++count;
+        return count;
+    };
+
+    const auto single = qcp::algo::optimizedLineData(keys, vals, 0, n, 500, mPlot->xAxis, mPlot->yAxis);
+    QVERIFY(single.size() < n);
+    QCOMPARE(upTurns(single), 0);
+
+    QCPSoAMultiDataSource<std::vector<double>, std::vector<double>> src(keys, {vals});
+    QVector<QPointF> multi[1];
+    src.getOptimizedLineDataAll(0, n, 500, mPlot->xAxis, mPlot->yAxis, multi, 1);
+    QVERIFY(multi[0].size() < n);
+    QCOMPARE(upTurns(multi[0]), 0);
+}
+
 void TestMultiDataSource::rowMajorValueAt()
 {
     // 3 rows, 2 columns, packed (stride == columns)

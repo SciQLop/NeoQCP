@@ -937,6 +937,80 @@ void TestPipeline::graphResamplerL2BinsRawPointsInsideBurst()
     QCOMPARE(range.upper, 999.0);
 }
 
+// A min/max bin used to emit (min, max) whatever order its samples came in. A falling line then
+// went up and down inside every bin and looked thicker than a rising one.
+template <typename Source, typename ValueAt>
+static int rises(const Source& s, ValueAt valueAt)
+{
+    int count = 0;
+    for (int i = 1; i < s.size(); ++i)
+        if (valueAt(s, i) > valueAt(s, i - 1))
+            ++count;
+    return count;
+}
+
+void TestPipeline::graphResamplerL2FollowsFallingData()
+{
+    const int N = 1'000'000;
+    std::vector<double> keys(N), vals(N);
+    for (int i = 0; i < N; ++i)
+        keys[i] = i, vals[i] = -i;
+    QCPSoADataSource<std::vector<double>, std::vector<double>> src(std::move(keys), std::move(vals));
+    const auto value = [](const QCPAbstractDataSource& s, int i) { return s.valueAt(i); };
+
+    std::any cache;
+    ViewportParams vp;
+    vp.plotWidthPx = 200;
+    vp.keyRange = QCPRange(0, N - 1); // binned from L1
+    auto l2 = hierarchicalResample(src, vp, cache);
+    QVERIFY(l2 != nullptr);
+    QCOMPARE(rises(*l2, value), 0);
+
+    vp.keyRange = QCPRange(1000, 1500); // too few L1 bins: binned from raw rows
+    l2 = hierarchicalResample(src, vp, cache);
+    QVERIFY(l2 != nullptr);
+    QCOMPARE(rises(*l2, value), 0);
+}
+
+void TestPipeline::multiGraphL2FollowsFallingData()
+{
+    const int N = 1'000'000;
+    std::vector<double> keys(N);
+    std::vector<std::vector<double>> cols = {std::vector<double>(N), std::vector<double>(N)};
+    for (int i = 0; i < N; ++i)
+        keys[i] = i, cols[0][i] = -i, cols[1][i] = i;
+    QCPSoAMultiDataSource<std::vector<double>, std::vector<double>> src(keys, cols);
+    const auto falling = [](const QCPAbstractMultiDataSource& s, int i) { return s.valueAt(0, i); };
+    const auto rising = [](const QCPAbstractMultiDataSource& s, int i) { return -s.valueAt(1, i); };
+
+    for (const bool withOrigin : {false, true})
+    {
+        std::any cache;
+        qcp::algo::buildL1CacheMulti(src, ViewportParams{}, cache, withOrigin);
+        auto* c = std::any_cast<qcp::algo::MultiGraphResamplerCache>(&cache);
+        QVERIFY(c != nullptr);
+        ViewportParams vp;
+        vp.plotWidthPx = 200;
+        for (const auto range : {QCPRange(0, N - 1), QCPRange(1000, 1500)})
+        {
+            vp.keyRange = range;
+            const auto l2 = qcp::algo::resampleL2Multi(*c, vp, src);
+            QVERIFY(l2 != nullptr);
+            QCOMPARE(rises(*l2, falling), 0);
+            QCOMPARE(rises(*l2, rising), 0);
+        }
+    }
+}
+
+void TestPipeline::orderPairsByTrendMovesOriginsWithValues()
+{
+    std::vector<double> values = {5, 6, 3, 4, 1, 2};
+    std::vector<int> origin = {11, 10, 21, 20, 31, 30};
+    qcp::algo::orderPairsByTrend(values, origin);
+    QCOMPARE(values, (std::vector<double>{6, 5, 4, 3, 2, 1}));
+    QCOMPARE(origin, (std::vector<int>{10, 11, 20, 21, 30, 31}));
+}
+
 void TestPipeline::graphResamplerCacheReuse()
 {
     const int N = 10000;

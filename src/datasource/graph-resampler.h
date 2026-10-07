@@ -14,6 +14,7 @@
 #include <cmath>
 #include <limits>
 #include <memory>
+#include <span>
 #include <vector>
 
 namespace qcp::algo {
@@ -62,6 +63,29 @@ inline void initBinKeysAndValues(BinResult& out, int numBins, double keyLo, doub
         out.keys[b * 2 + 1] = binCenter + halfWidth;
         out.values[b * 2 + 0] = std::numeric_limits<double>::quiet_NaN();
         out.values[b * 2 + 1] = std::numeric_limits<double>::quiet_NaN();
+    }
+}
+
+// Min/max bins hold (min, max) whatever order their samples came in. Drawn as a polyline, a
+// falling stretch then goes up and down inside every bin and looks thicker than a rising one.
+// This puts each pair in the direction the line travels; origin, if given, follows its values.
+// simplify: the direction comes from the neighbouring bins, not from the samples' true order.
+// It is exact on monotonic stretches; at a turning point the two orders differ inside one bin.
+inline void orderPairsByTrend(std::span<double> values, std::span<int> origin = {})
+{
+    const int pairs = static_cast<int>(values.size() / 2);
+    const auto level = [&](int p) { return 0.5 * (values[2 * p] + values[2 * p + 1]); };
+    for (int p = 0; p < pairs; ++p)
+    {
+        const double here = level(p);
+        const double before = p > 0 && std::isfinite(level(p - 1)) ? level(p - 1) : here;
+        const double after = p + 1 < pairs && std::isfinite(level(p + 1)) ? level(p + 1) : here;
+        if (before > after)
+        {
+            std::swap(values[2 * p], values[2 * p + 1]);
+            if (!origin.empty())
+                std::swap(origin[2 * p], origin[2 * p + 1]);
+        }
     }
 }
 
@@ -252,6 +276,16 @@ struct MultiGraphResamplerCache {
     int sourceSize = 0;
     int columnCount = 0;
 };
+
+inline MultiColumnBinResult orderColumnsByTrend(MultiColumnBinResult bins)
+{
+    const int s = bins.stride();
+    for (int c = 0; c < bins.numColumns; ++c)
+        orderPairsByTrend(std::span(bins.values).subspan(c * s, s),
+                          bins.origin.empty() ? std::span<int>{}
+                                              : std::span(bins.origin).subspan(c * s, s));
+    return bins;
+}
 
 inline MultiColumnBinResult binMinMaxMulti(
     const QCPAbstractMultiDataSource& src,
@@ -538,6 +572,7 @@ inline std::shared_ptr<QCPAbstractDataSource> buildL1Cache(
 
     GraphResamplerCache newCache;
     newCache.level1 = binMinMaxParallel(src, 0, srcSize, fullKeyRange, numBins);
+    orderPairsByTrend(newCache.level1.values);
     newCache.cachedKeyRange = fullKeyRange;
     newCache.sourceSize = srcSize;
     cache = std::move(newCache);
@@ -564,6 +599,7 @@ inline std::shared_ptr<QCPAbstractDataSource> resampleL2(
     auto l2 = l1ResolvesViewport(l1End - l1Begin, vp)
         ? binMinMax(l1.keys, l1.values, l1Begin, l1End, vp.keyRange, l2Bins)
         : binMinMaxParallel(raw, rows.begin, rows.end, vp.keyRange, l2Bins);
+    orderPairsByTrend(l2.values);
 
     std::vector<double> outKeys, outVals;
     outKeys.reserve(l2.keys.size());
@@ -613,7 +649,8 @@ inline std::shared_ptr<QCPAbstractMultiDataSource> buildL1CacheMulti(
     int numBins = std::min(kLevel1TargetBins, srcSize / 10);
 
     MultiGraphResamplerCache newCache;
-    newCache.level1 = binMinMaxMultiParallel(src, 0, srcSize, fullKeyRange, numBins, withOrigin);
+    newCache.level1 = orderColumnsByTrend(
+        binMinMaxMultiParallel(src, 0, srcSize, fullKeyRange, numBins, withOrigin));
     newCache.cachedKeyRange = fullKeyRange;
     newCache.sourceSize = srcSize;
     newCache.columnCount = N;

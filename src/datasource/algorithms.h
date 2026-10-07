@@ -411,8 +411,12 @@ QVector<QPointF> optimizedLineDataImpl(const KC& keys, const VC& values,
             double firstVal = static_cast<double>(values[intervalFirst]);
             if (lastEndKey < intervalStartKey - epsilon)
                 emitPoint(toPixel(intervalStartKey + epsilon * 0.2, firstVal), intervalFirst);
-            emitPoint(toPixel(intervalStartKey + epsilon * 0.25, minVal), minIdx);
-            emitPoint(toPixel(intervalStartKey + epsilon * 0.75, maxVal), maxIdx);
+            // In time order: min first on a falling line would zigzag inside every pixel.
+            const bool maxFirst = maxIdx < minIdx;
+            emitPoint(toPixel(intervalStartKey + epsilon * 0.25, maxFirst ? maxVal : minVal),
+                      maxFirst ? maxIdx : minIdx);
+            emitPoint(toPixel(intervalStartKey + epsilon * 0.75, maxFirst ? minVal : maxVal),
+                      maxFirst ? minIdx : maxIdx);
             if (nextKey > intervalStartKey + epsilon * 2)
                 emitPoint(toPixel(intervalStartKey + epsilon * 0.8,
                                   static_cast<double>(values[intervalLast])), intervalLast);
@@ -681,6 +685,7 @@ void optimizedLineDataMulti(const KC& keys,
         double maxVal;
         int intervalFirst;
         int intervalCount;
+        bool maxFirst; // the max came before the min: emit them in that order
     };
     std::vector<ColState> cs(numColumns);
 
@@ -725,7 +730,7 @@ void optimizedLineDataMulti(const KC& keys,
     for (int c = 0; c < numColumns; ++c)
     {
         double v = valueAt(c, i);
-        cs[c] = {v, v, i, 1};
+        cs[c] = {v, v, i, 1, false};
     }
 
     auto flushColumn = [&](int c, const ColState& s,
@@ -739,10 +744,12 @@ void optimizedLineDataMulti(const KC& keys,
                 if (lastEndKey < intervalStartKey - epsilon)
                     results[c].append(toPixel(intervalStartKey + epsilon * 0.2, firstVal));
             }
-            if (!std::isnan(s.minVal))
-                results[c].append(toPixel(intervalStartKey + epsilon * 0.25, s.minVal));
-            if (!std::isnan(s.maxVal))
-                results[c].append(toPixel(intervalStartKey + epsilon * 0.75, s.maxVal));
+            const double first = s.maxFirst ? s.maxVal : s.minVal;
+            const double second = s.maxFirst ? s.minVal : s.maxVal;
+            if (!std::isnan(first))
+                results[c].append(toPixel(intervalStartKey + epsilon * 0.25, first));
+            if (!std::isnan(second))
+                results[c].append(toPixel(intervalStartKey + epsilon * 0.75, second));
             if (nextKey > intervalStartKey + epsilon * 2)
             {
                 int prev = s.intervalFirst + s.intervalCount - 1;
@@ -776,7 +783,7 @@ void optimizedLineDataMulti(const KC& keys,
                             keyEpsilon, k);
                 results[c].append(nanPt);
                 double v = valueAt(c, i);
-                cs[c] = {v, v, i, 1};
+                cs[c] = {v, v, i, 1, false};
             }
             lastIntervalEndKey = currentIntervalStartKey;
             if (useInlineTransform)
@@ -815,8 +822,8 @@ void optimizedLineDataMulti(const KC& keys,
                     }
                     else
                     {
-                        cs[c].minVal = std::min(cs[c].minVal, v);
-                        cs[c].maxVal = std::max(cs[c].maxVal, v);
+                        if (v < cs[c].minVal) { cs[c].minVal = v; cs[c].maxFirst = true; }
+                        if (v > cs[c].maxVal) { cs[c].maxVal = v; cs[c].maxFirst = false; }
                     }
                 }
                 ++cs[c].intervalCount;
@@ -829,7 +836,7 @@ void optimizedLineDataMulti(const KC& keys,
                 flushColumn(c, cs[c], currentIntervalStartKey, lastIntervalEndKey,
                             keyEpsilon, k);
                 double v = valueAt(c, i);
-                cs[c] = {v, v, i, 1};
+                cs[c] = {v, v, i, 1, false};
             }
             lastIntervalEndKey = static_cast<double>(keys[i - 1]);
             if (useInlineTransform)

@@ -317,7 +317,7 @@ inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2MultiImpl(
     l2.values.resize(N * outSize);
     if constexpr (WithOrigin) l2.origin.resize(N * outSize);
 
-    return std::make_shared<QCPResampledMultiDataSource>(std::move(l2));
+    return std::make_shared<QCPResampledMultiDataSource>(orderColumnsByTrend(std::move(l2)));
 }
 
 // Keeps the bins some column has data in; keys, values and origin stay aligned.
@@ -359,8 +359,8 @@ inline std::shared_ptr<QCPResampledMultiDataSource> binRawViewport(
     const QCPAbstractMultiDataSource& raw, const ViewportParams& vp, bool withOrigin)
 {
     const auto rows = rawRowsInView(raw, vp.keyRange);
-    return std::make_shared<QCPResampledMultiDataSource>(dropEmptyBins(binMinMaxMultiParallel(
-        raw, rows.begin, rows.end, vp.keyRange, l2BinCount(vp), withOrigin)));
+    return std::make_shared<QCPResampledMultiDataSource>(orderColumnsByTrend(dropEmptyBins(
+        binMinMaxMultiParallel(raw, rows.begin, rows.end, vp.keyRange, l2BinCount(vp), withOrigin))));
 }
 
 } // namespace detail
