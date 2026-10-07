@@ -943,6 +943,7 @@ QPointF QCPMultiGraph::stallPixelOffset() const
 
 void QCPMultiGraph::draw(QCPPainter* painter)
 {
+    PROFILE_HERE_N("QCPMultiGraph::draw");
     if (!mKeyAxis || !mValueAxis || !mDataSource || mDataSource->empty())
         return;
     if (mKeyAxis->range().size() <= 0)
