@@ -155,6 +155,8 @@ public:
     void setPeriodic(bool enabled);
 
     // non-property methods:
+    // The colour stops as a QLinearGradient from \a start to \a finalStop, e.g. for a legend icon.
+    [[nodiscard]] QLinearGradient toLinearGradient(const QPointF& start, const QPointF& finalStop) const;
     void colorize(const double* data, const QCPRange& range, QRgb* scanLine, int n,
                   int dataIndexFactor = 1, bool logarithmic = false);
     void colorize(const double* data, const unsigned char* alpha, const QCPRange& range,

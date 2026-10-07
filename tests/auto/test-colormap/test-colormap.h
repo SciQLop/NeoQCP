@@ -14,6 +14,8 @@ private slots:
   void QCPColorMapData_fillIsSafeOnEmptyMap();
   void QCPColorMapData_cellToCoordHandlesSingleCellDimension();
   void QCPColorMap2_selectTestHitSetsDetails();
+  void QCPColorMap2_legendIconShowsTheGradient();
+  void QCPHistogram2D_legendIconShowsTheGradient();
   void QCPColorMap2_selectTestMissReturnsNegativeOne();
   void QCPColorMap2_contourSettersScheduleReplot();
   void QCPColorMapRhiLayer_setImageSkipsRedundantUpload();

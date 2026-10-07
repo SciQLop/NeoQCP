@@ -387,10 +387,7 @@ void QCPColorMap2::draw(QCPPainter* painter)
 
 void QCPColorMap2::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
 {
-    QLinearGradient lg(rect.topLeft(), rect.topRight());
-    lg.setColorAt(0, Qt::blue);
-    lg.setColorAt(1, Qt::red);
-    painter->setBrush(QBrush(lg));
+    painter->setBrush(QBrush(gradient().toLinearGradient(rect.topLeft(), rect.topRight())));
     painter->setPen(Qt::NoPen);
     painter->drawRect(rect);
 }

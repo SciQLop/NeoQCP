@@ -146,6 +146,41 @@ void TestColorMap::QCPColorMapData_cellToCoordHandlesSingleCellDimension()
   QCOMPARE(value, 0.5);
 }
 
+// The legend icon used to be a fixed blue-to-red ramp, whatever the gradient.
+template <typename Plottable>
+static void checkGrayscaleLegendIcon(QCustomPlot* plot)
+{
+  struct Iconed : Plottable
+  {
+    using Plottable::Plottable;
+    using Plottable::drawLegendIcon;
+  };
+  auto* p = new Iconed(plot->xAxis, plot->yAxis);
+  p->setGradient(QCPColorGradient(QCPColorGradient::gpGrayscale));
+  QImage icon(40, 10, QImage::Format_ARGB32);
+  icon.fill(Qt::transparent);
+  {
+    QCPPainter painter(&icon);
+    p->drawLegendIcon(&painter, QRectF(0, 0, 40, 10));
+  }
+  for (const int x : {1, 20, 38})
+  {
+    const QColor c = icon.pixelColor(x, 5);
+    QVERIFY2(c.red() == c.green() && c.green() == c.blue(), qPrintable(c.name()));
+  }
+  QVERIFY(icon.pixelColor(1, 5).lightness() < icon.pixelColor(38, 5).lightness());
+}
+
+void TestColorMap::QCPColorMap2_legendIconShowsTheGradient()
+{
+  checkGrayscaleLegendIcon<QCPColorMap2>(mPlot);
+}
+
+void TestColorMap::QCPHistogram2D_legendIconShowsTheGradient()
+{
+  checkGrayscaleLegendIcon<QCPHistogram2D>(mPlot);
+}
+
 void TestColorMap::QCPColorMap2_selectTestHitSetsDetails()
 {
   mPlot->resize(400, 300);

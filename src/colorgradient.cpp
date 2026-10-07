@@ -765,3 +765,11 @@ void QCPColorGradient::updateColorBuffer()
     }
     mColorBufferInvalidated = false;
 }
+
+QLinearGradient QCPColorGradient::toLinearGradient(const QPointF& start, const QPointF& finalStop) const
+{
+    QLinearGradient result(start, finalStop);
+    for (auto it = mColorStops.cbegin(); it != mColorStops.cend(); ++it)
+        result.setColorAt(it.key(), it.value());
+    return result;
+}
