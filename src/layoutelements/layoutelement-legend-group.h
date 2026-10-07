@@ -34,6 +34,7 @@ protected:
     void selectEvent(QMouseEvent* event, bool additive, const QVariant& details, bool* selectionStateChanged) override;
 
 private:
+    QFont rowFont() const;
     int rowHeight() const;
     QCPMultiGraph* mMultiGraph;
     bool mExpanded = false;

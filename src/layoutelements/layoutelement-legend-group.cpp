@@ -1,6 +1,24 @@
 #include "layoutelement-legend-group.h"
 #include "../plottables/plottable-multigraph.h"
 #include "../painting/painter.h"
+#include "../axis/labelrenderer.h"
+
+namespace {
+
+// Through the label renderer, like QCPPlottableLegendItem: a name such as $\frac{a}{b}$ is typeset.
+QSize measured(const QFont& font, const QString& text)
+{
+    return QCPLabelRenderer::measureWith(QCPLabelRenderer::defaultRenderer(), font, text);
+}
+
+void drawLabel(QCPPainter* painter, const QRectF& rect, const QString& text)
+{
+    QCPLabelRenderer::drawWith(QCPLabelRenderer::defaultRenderer(), painter, rect.toRect(),
+                               painter->font(), painter->pen().color(), text,
+                               Qt::TextDontClip | Qt::AlignLeft | Qt::AlignVCenter);
+}
+
+} // namespace
 
 QCPGroupLegendItem::QCPGroupLegendItem(QCPLegend* parent, QCPMultiGraph* multiGraph)
     : QCPAbstractLegendItem(parent)
@@ -21,10 +39,20 @@ void QCPGroupLegendItem::setExpanded(bool expanded)
         mParentPlot->replot();
 }
 
+QFont QCPGroupLegendItem::rowFont() const
+{
+    return mFont.pointSize() > 0 ? mFont : (mParentLegend ? mParentLegend->font() : QFont());
+}
+
+// Rows share one height so selectTest can find a row by division; the tallest typeset name sets it.
 int QCPGroupLegendItem::rowHeight() const
 {
-    QFont font = mFont.pointSize() > 0 ? mFont : (mParentLegend ? mParentLegend->font() : QFont());
-    return QFontMetrics(font).height() + 4;
+    const QFont font = rowFont();
+    int height = std::max(QFontMetrics(font).height(), measured(font, headerRowText(true)).height());
+    if (mExpanded && mMultiGraph)
+        for (int i = 0; i < mMultiGraph->componentCount(); ++i)
+            height = std::max(height, measured(font, mMultiGraph->component(i).name).height());
+    return height + 4;
 }
 
 QString QCPGroupLegendItem::headerName() const
@@ -117,13 +145,12 @@ void QCPGroupLegendItem::draw(QCPPainter* painter)
     if (font.pointSize() <= 0 && mParentLegend)
         font = mParentLegend->font();
     QColor textColor = mSelected ? mSelectedTextColor : mTextColor;
-    QFontMetrics fm(font);
     painter->setFont(font);
 
     QRectF inRect = mRect;
     int padding = mMargins.left();
     int iconWidth = 20;
-    int rh = fm.height() + 4;
+    int rh = rowHeight();
     int indent = 16;
 
     if (!mExpanded) {
@@ -148,12 +175,12 @@ void QCPGroupLegendItem::draw(QCPPainter* painter)
         painter->setPen(QPen(textColor));
         QRectF textRect(inRect.left() + padding + iconWidth + 6, inRect.top(),
                         inRect.width() - padding - iconWidth - 6, rh);
-        painter->drawText(textRect, Qt::AlignLeft | Qt::AlignVCenter, headerRowText(showBusy));
+        drawLabel(painter, textRect, headerRowText(showBusy));
     } else {
         painter->setPen(QPen(textColor));
         QRectF headerRect(inRect.left() + padding, inRect.top(),
                           inRect.width() - padding, rh);
-        painter->drawText(headerRect, Qt::AlignLeft | Qt::AlignVCenter, headerRowText(showBusy));
+        drawLabel(painter, headerRect, headerRowText(showBusy));
 
         for (int i = 0; i < mMultiGraph->componentCount(); ++i) {
             const auto& comp = mMultiGraph->component(i);
@@ -179,7 +206,7 @@ void QCPGroupLegendItem::draw(QCPPainter* painter)
             painter->setPen(QPen(textColor));
             QRectF textRect(inRect.left() + padding + indent + iconWidth + 6, rowY,
                             inRect.width() - padding - indent - iconWidth - 6, rh);
-            painter->drawText(textRect, Qt::AlignLeft | Qt::AlignVCenter, comp.name);
+            drawLabel(painter, textRect, comp.name);
         }
     }
 
@@ -194,14 +221,13 @@ QSize QCPGroupLegendItem::minimumOuterSizeHint() const
 {
     if (!mMultiGraph) return QSize(0, 0);
 
-    QFont font = mFont.pointSize() > 0 ? mFont : (mParentLegend ? mParentLegend->font() : QFont());
-    QFontMetrics fm(font);
-    int rh = fm.height() + 4;
+    const QFont font = rowFont();
+    int rh = rowHeight();
     int padding = mMargins.left() + mMargins.right();
     int iconWidth = 20;
     int indent = 16;
 
-    const int headerWidth = fm.horizontalAdvance(headerRowText(true));
+    const int headerWidth = measured(font, headerRowText(true)).width();
 
     if (!mExpanded) {
         return QSize(padding + iconWidth + 6 + headerWidth,
@@ -209,7 +235,7 @@ QSize QCPGroupLegendItem::minimumOuterSizeHint() const
     } else {
         int maxTextWidth = headerWidth;
         for (int i = 0; i < mMultiGraph->componentCount(); ++i) {
-            int w = indent + iconWidth + 6 + fm.horizontalAdvance(mMultiGraph->component(i).name);
+            int w = indent + iconWidth + 6 + measured(font, mMultiGraph->component(i).name).width();
             if (w > maxTextWidth) maxTextWidth = w;
         }
         int totalHeight = rh * (1 + mMultiGraph->componentCount());
