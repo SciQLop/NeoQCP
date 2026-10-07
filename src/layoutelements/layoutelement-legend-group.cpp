@@ -39,6 +39,13 @@ void QCPGroupLegendItem::setExpanded(bool expanded)
         mParentPlot->replot();
 }
 
+// One component has nothing to expand to: its row would repeat the header. It is drawn like a plain
+// legend entry, even when selecting the component asked for expansion.
+bool QCPGroupLegendItem::shownExpanded() const
+{
+    return mExpanded && mMultiGraph && mMultiGraph->componentCount() > 1;
+}
+
 QFont QCPGroupLegendItem::rowFont() const
 {
     return mFont.pointSize() > 0 ? mFont : (mParentLegend ? mParentLegend->font() : QFont());
@@ -49,7 +56,7 @@ int QCPGroupLegendItem::rowHeight() const
 {
     const QFont font = rowFont();
     int height = std::max(QFontMetrics(font).height(), measured(font, headerRowText(true)).height());
-    if (mExpanded && mMultiGraph)
+    if (shownExpanded())
         for (int i = 0; i < mMultiGraph->componentCount(); ++i)
             height = std::max(height, measured(font, mMultiGraph->component(i).name).height());
     return height + 4;
@@ -71,8 +78,10 @@ QString QCPGroupLegendItem::headerName() const
 
 QString QCPGroupLegendItem::headerRowText(bool includeBusySymbol) const
 {
-    // ▾ when expanded (collapse toward the edge), ▸ when collapsed.
-    QString text = QString::fromUtf8(mExpanded ? "▾ " : "▸ ");
+    // ▾ when expanded (collapse toward the edge), ▸ when collapsed, nothing for one component.
+    QString text;
+    if (mMultiGraph && mMultiGraph->componentCount() > 1)
+        text = QString::fromUtf8(shownExpanded() ? "▾ " : "▸ ");
     if (includeBusySymbol && mMultiGraph && mMultiGraph->visuallyBusy())
     {
         const QString symbol = mMultiGraph->effectiveBusyIndicatorSymbol();
@@ -97,7 +106,7 @@ double QCPGroupLegendItem::selectTest(const QPointF& pos, bool onlySelectable, Q
         int hitRow = static_cast<int>(relY / rh);
 
         QVariantMap detailMap;
-        if (!mExpanded || hitRow == 0)
+        if (!shownExpanded() || hitRow == 0)
             detailMap[QStringLiteral("componentIndex")] = -1; // header
         else
             detailMap[QStringLiteral("componentIndex")] = qMin(hitRow - 1, mMultiGraph->componentCount() - 1);
@@ -118,6 +127,9 @@ void QCPGroupLegendItem::selectEvent([[maybe_unused]] QMouseEvent* event,
     int componentIndex = -1;
     if (details.typeId() == QMetaType::QVariantMap)
         componentIndex = details.toMap().value(QStringLiteral("componentIndex"), -1).toInt();
+
+    if (componentIndex < 0 && mMultiGraph && mMultiGraph->componentCount() == 1)
+        componentIndex = 0; // nothing to expand: a click selects the line, like a plain entry
 
     if (componentIndex < 0) {
         // Header click: toggle expand/collapse
@@ -153,7 +165,7 @@ void QCPGroupLegendItem::draw(QCPPainter* painter)
     int rh = rowHeight();
     int indent = 16;
 
-    if (!mExpanded) {
+    if (!shownExpanded()) {
         int n = mMultiGraph->componentCount();
         double segWidth = (n > 0) ? static_cast<double>(iconWidth) / n : iconWidth;
         double y = inRect.top() + rh / 2.0;
@@ -167,7 +179,7 @@ void QCPGroupLegendItem::draw(QCPPainter* painter)
             if (!mMultiGraph->component(i).visible) continue;
             double x0 = inRect.left() + padding + i * segWidth;
             double x1 = x0 + segWidth;
-            mMultiGraph->drawComponentLegendLine(painter, i, QLineF(x0, y, x1, y));
+            mMultiGraph->drawComponentLegendIcon(painter, i, QLineF(x0, y, x1, y));
         }
         if (showBusy)
             painter->restore();
@@ -198,7 +210,7 @@ void QCPGroupLegendItem::draw(QCPPainter* painter)
                 painter->setOpacity(mMultiGraph->effectiveBusyFadeAlpha());
             }
             double lineY = rowY + rh / 2.0;
-            mMultiGraph->drawComponentLegendLine(painter, i, QLineF(inRect.left() + padding + indent, lineY,
+            mMultiGraph->drawComponentLegendIcon(painter, i, QLineF(inRect.left() + padding + indent, lineY,
                                      inRect.left() + padding + indent + iconWidth, lineY));
             if (showBusy)
                 painter->restore();
@@ -210,7 +222,7 @@ void QCPGroupLegendItem::draw(QCPPainter* painter)
         }
     }
 
-    if (mSelected && mSelectedComponent < 0 && mParentLegend) {
+    if (mSelected && (mSelectedComponent < 0 || !shownExpanded()) && mParentLegend) {
         painter->setPen(mParentLegend->selectedIconBorderPen());
         painter->setBrush(Qt::NoBrush);
         painter->drawRect(mRect);
@@ -229,7 +241,7 @@ QSize QCPGroupLegendItem::minimumOuterSizeHint() const
 
     const int headerWidth = measured(font, headerRowText(true)).width();
 
-    if (!mExpanded) {
+    if (!shownExpanded()) {
         return QSize(padding + iconWidth + 6 + headerWidth,
                      rh + mMargins.top() + mMargins.bottom());
     } else {

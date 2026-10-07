@@ -1174,13 +1174,14 @@ void QCPMultiGraph::drawLegendIcon(QCPPainter* painter, const QRectF& rect) cons
         if (!mComponents[i].visible) continue;
         double x0 = rect.left() + i * segWidth;
         double x1 = x0 + segWidth;
-        drawComponentLegendLine(painter, i, QLineF(x0, y, x1, y));
+        drawComponentLegendIcon(painter, i, QLineF(x0, y, x1, y));
     }
 }
 
-void QCPMultiGraph::drawComponentLegendLine(QCPPainter* painter, int component, const QLineF& line) const
+void QCPMultiGraph::drawComponentLegendIcon(QCPPainter* painter, int component, const QLineF& line) const
 {
-    QPen pen = mComponents[component].pen;
+    const Component& comp = mComponents[component];
+    QPen pen = comp.pen;
     if (mColor.hasValues())
     {
         QLinearGradient gradient(line.p1(), line.p2());
@@ -1189,7 +1190,15 @@ void QCPMultiGraph::drawComponentLegendLine(QCPPainter* painter, int component, 
         pen.setBrush(gradient);
     }
     painter->setPen(pen);
-    painter->drawLine(line);
+    if (comp.lineStyle != lsNone)
+        painter->drawLine(line);
+    if (!comp.scatterStyle.isNone())
+    {
+        QCPScatterStyle icon = comp.scatterStyle;
+        icon.setSize(qMin(icon.size(), line.length() * 0.5));
+        icon.applyTo(painter, pen);
+        icon.drawShape(painter, line.center().x(), line.center().y());
+    }
 }
 
 // --- Legend ---

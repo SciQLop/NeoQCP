@@ -388,7 +388,7 @@ void TestMultiGraph::legendCollapsedFitsExpanderMarker()
     // clips (it does not elide): a group named "H_hi" rendered as "▸ H_".
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double> { 1.0, 2.0 },
-                std::vector<std::vector<double>> { { 10.0, 20.0 } });
+                std::vector<std::vector<double>> { { 10.0, 20.0 }, { 1.0, 2.0 } });
     mg->setName("H_hi");
     mg->addToLegend();
     auto* item = qobject_cast<QCPGroupLegendItem*>(mPlot->legend->item(0));
@@ -420,8 +420,8 @@ void TestMultiGraph::legendCollapsedFitsBusyIndicator()
     QVERIFY(item);
 
     const QFontMetrics fm(mPlot->legend->font());
-    const QString drawn = QString::fromUtf8("▸ ") + mg->effectiveBusyIndicatorSymbol()
-        + QStringLiteral(" b_gse");
+    // No expander yet: before its first data the graph has no component to expand to.
+    const QString drawn = mg->effectiveBusyIndicatorSymbol() + QStringLiteral(" b_gse");
     const int needed = collapsedChromeWidth(item) + fm.horizontalAdvance(drawn);
     QVERIFY2(item->minimumOuterSizeHint().width() >= needed,
              qPrintable(QStringLiteral("collapsed busy hint %1 < needed %2")
@@ -438,6 +438,39 @@ void TestMultiGraph::removeFromLegendWorks()
     QCOMPARE(mPlot->legend->itemCount(), 1);
     mg->removeFromLegend();
     QCOMPARE(mPlot->legend->itemCount(), 0);
+}
+
+// A one-column line is a one-component multigraph: an expander would only open a second row
+// with the same name.
+void TestMultiGraph::legendOneComponentHasNoExpander()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double>{1.0, 2.0}, std::vector<std::vector<double>>{{10.0, 20.0}});
+    mg->setName("B");
+    mg->addToLegend();
+    auto* item = qobject_cast<QCPGroupLegendItem*>(mPlot->legend->item(0));
+    QVERIFY(item);
+    QCOMPARE(item->headerRowText(false), QStringLiteral("B"));
+    const QSize collapsed = item->minimumOuterSizeHint();
+    item->setExpanded(true); // what selecting the component does
+    QCOMPARE(item->minimumOuterSizeHint(), collapsed);
+}
+
+// The legend icon of a scatter component (no line) used to be a line.
+void TestMultiGraph::legendIconDrawsScatterMarkers()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double>{1.0, 2.0}, std::vector<std::vector<double>>{{10.0, 20.0}});
+    mg->setComponentLineStyle(0, QCPMultiGraph::lsNone);
+    mg->component(0).scatterStyle = QCPScatterStyle(QCPScatterStyle::ssDisc, Qt::black, Qt::black, 6);
+    QImage icon(40, 20, QImage::Format_ARGB32);
+    icon.fill(Qt::white);
+    {
+        QCPPainter painter(&icon);
+        mg->drawComponentLegendIcon(&painter, 0, QLineF(0, 10, 40, 10));
+    }
+    QCOMPARE(icon.pixelColor(20, 10), QColor(Qt::black)); // the marker
+    QCOMPARE(icon.pixelColor(2, 10), QColor(Qt::white));  // no line
 }
 
 void TestMultiGraph::legendExpandCollapse()

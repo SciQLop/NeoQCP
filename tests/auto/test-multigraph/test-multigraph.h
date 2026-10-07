@@ -44,6 +44,8 @@ private slots:
     void legendHeaderDoesNotLeakClassNameWhenEmpty();
     void legendHeaderShowsNameWhileEmpty();
     void legendCollapsedFitsExpanderMarker();
+    void legendOneComponentHasNoExpander();
+    void legendIconDrawsScatterMarkers();
     void legendCollapsedFitsBusyIndicator();
 
     // Line cache

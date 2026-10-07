@@ -1084,7 +1084,7 @@ void TestColorByScalar::coloredLegendLineShowsTheGradient()
     img.fill(Qt::white);
     {
         QCPPainter painter(&img);
-        mg->drawComponentLegendLine(&painter, 0, QLineF(0, 10, 100, 10));
+        mg->drawComponentLegendIcon(&painter, 0, QLineF(0, 10, 100, 10));
     }
     QVERIFY(isRed(img.pixelColor(3, 10)));
     QVERIFY(isBlue(img.pixelColor(96, 10)));
@@ -1093,7 +1093,7 @@ void TestColorByScalar::coloredLegendLineShowsTheGradient()
     img.fill(Qt::white);
     {
         QCPPainter painter(&img);
-        mg->drawComponentLegendLine(&painter, 0, QLineF(0, 10, 100, 10));
+        mg->drawComponentLegendIcon(&painter, 0, QLineF(0, 10, 100, 10));
     }
     QCOMPARE(img.pixelColor(50, 10), QColor(Qt::black));   // uncoloured: the component pen
 }
