@@ -245,6 +245,13 @@ void QCPColorMap2::rescaleDataRange(bool recalc)
         setDataRange(range);
 }
 
+bool QCPColorMap2::resampledForAnotherSize() const
+{
+    const auto now = ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data());
+    const auto last = mPipeline.lastViewport();
+    return now.plotWidthPx != last.plotWidthPx || now.plotHeightPx != last.plotHeightPx;
+}
+
 void QCPColorMap2::onViewportChanged()
 {
     if (!mKeyAxis || !mValueAxis || !mDataSource) return;
@@ -297,6 +304,16 @@ void QCPColorMap2::draw(QCPPainter* painter)
         return;
 
     auto* resampledData = mPipeline.result();
+    if (resampledData && resampledForAnotherSize())
+    {
+        // A colormap made before its plot was laid out was resampled for a tiny axis rect, and
+        // a resize changes no axis range: nothing else would ask for a sharper image.
+        if (painter->modes().testFlag(QCPPainter::pmNoCaching))
+            mPipeline.runSynchronously(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data()));
+        else
+            onViewportChanged();
+        resampledData = mPipeline.result();
+    }
     if (!resampledData)
     {
         if (!mDataSource) return;

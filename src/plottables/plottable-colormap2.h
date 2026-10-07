@@ -140,6 +140,7 @@ protected:
     }
 
 private:
+    [[nodiscard]] bool resampledForAnotherSize() const;
     void installResampleTransform();
 
     std::shared_ptr<QCPAbstractDataSource2D> mDataSource;

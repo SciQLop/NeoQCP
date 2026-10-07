@@ -666,6 +666,29 @@ void TestPipeline::colormap2DataFromExternalThread()
     thread.wait();
 }
 
+// A colormap made before its plot was laid out is resampled for a tiny axis rect. A resize
+// changes no axis range, so the coarse image used to stay until the next pan.
+void TestPipeline::colormap2ResamplesAgainAfterResize()
+{
+    const int nx = 400, ny = 64;
+    std::vector<double> x(nx), y(ny), z(nx * ny);
+    for (int i = 0; i < nx; ++i) x[i] = i;
+    for (int j = 0; j < ny; ++j) y[j] = j;
+    for (int k = 0; k < nx * ny; ++k) z[k] = k % 7;
+
+    mPlot->xAxis->setRange(0, nx - 1);
+    mPlot->yAxis->setRange(0, ny - 1);
+    auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    cm->setDataSource(std::make_shared<QCPSoADataSource2D<
+        std::vector<double>, std::vector<double>, std::vector<double>>>(x, y, z));
+    QVERIFY(cm->pipeline().runSynchronously(
+        ViewportParams{{0, nx - 1.0}, {0, ny - 1.0}, 2, 2, false, false}));
+    QVERIFY(cm->pipeline().result()->keySize() < nx);
+
+    mPlot->toPixmap(800, 400);
+    QVERIFY(cm->pipeline().result()->keySize() >= nx);
+}
+
 void TestPipeline::pipelineSourceReplacedDuringJob()
 {
     QCPPipelineScheduler scheduler(1);

@@ -46,6 +46,13 @@ public:
     void onDataChanged();
     void onViewportChanged(const ViewportParams& vp);
 
+    // The viewport of the latest job requested, async or synchronous.
+    ViewportParams lastViewport() const
+    {
+        QMutexLocker lock(&mMutex);
+        return mLastViewport;
+    }
+
 Q_SIGNALS:
     void finished(uint64_t generation);
     void busyChanged(bool busy);
@@ -155,6 +162,7 @@ public:
         auto source = mSource;
         auto transform = mTransform;
         auto cache = std::move(mCache);
+        mLastViewport = vp;
         lock.unlock();
 
         auto out = transform(*source, vp, cache);

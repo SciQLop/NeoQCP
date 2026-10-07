@@ -40,6 +40,7 @@ private slots:
     // End-to-end
     void graph2DataFromExternalThread();
     void colormap2DataFromExternalThread();
+    void colormap2ResamplesAgainAfterResize();
 
     // Race condition reproducers
     void pipelineSourceReplacedDuringJob();
