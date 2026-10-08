@@ -156,8 +156,10 @@ void QCPItemLine::draw(QCPPainter* painter)
 QLineF QCPItemLine::getRectClippedLine(const QCPVector2D& start, const QCPVector2D& end,
                                        const QRect& rect) const
 {
-    bool containsStart = rect.contains(qRound(start.x()), qRound(start.y()));
-    bool containsEnd = rect.contains(qRound(end.x()), qRound(end.y()));
+    // No rounding to int: an end far outside the view is beyond int range (SciQLop#151).
+    const QRectF bounds(rect);
+    bool containsStart = bounds.contains(start.toPointF());
+    bool containsEnd = bounds.contains(end.toPointF());
     if (containsStart && containsEnd)
         return { start.toPointF(), end.toPointF() };
 

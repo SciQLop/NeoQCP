@@ -165,8 +165,10 @@ void QCPItemCurve::draw(QCPPainter* painter)
 
     // paint visible segment, if existent:
     const int clipEnlarge = qCeil(mainPen().widthF());
-    QRect clip = clipRect().adjusted(-clipEnlarge, -clipEnlarge, clipEnlarge, clipEnlarge);
-    QRect cubicRect = cubicPath.controlPointRect().toRect();
+    // Floating point: a curve far outside the view is beyond int range (SciQLop#151).
+    const QRectF clip
+        = QRectF(clipRect()).adjusted(-clipEnlarge, -clipEnlarge, clipEnlarge, clipEnlarge);
+    QRectF cubicRect = cubicPath.controlPointRect();
     if (cubicRect.isEmpty()) // may happen when start and end exactly on same x or y position
         cubicRect.adjust(0, 0, 1, 1);
     if (clip.intersects(cubicRect))

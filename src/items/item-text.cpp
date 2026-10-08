@@ -235,10 +235,10 @@ double QCPItemText::selectTest(const QPointF& pos, bool onlySelectable,
     QPointF rotatedPos = inputTransform.map(pos);
     QRect textRect = QCPLabelRenderer::measureRectWith(
         QCPLabelRenderer::defaultRenderer(), mFont, mText, Qt::TextDontClip | mTextAlignment);
-    QRect textBoxRect
-        = textRect.adjusted(-mPadding.left(), -mPadding.top(), mPadding.right(), mPadding.bottom());
-    QPointF textPos = getTextDrawPoint(positionPixels, textBoxRect, mPositionAlignment);
-    textBoxRect.moveTopLeft(textPos.toPoint());
+    // Floating point: an item anchored far outside the view is beyond int range (SciQLop#151).
+    QRectF textBoxRect = QRectF(textRect).adjusted(-mPadding.left(), -mPadding.top(),
+                                                   mPadding.right(), mPadding.bottom());
+    textBoxRect.moveTopLeft(getTextDrawPoint(positionPixels, textBoxRect, mPositionAlignment));
 
     return rectDistance(textBoxRect, rotatedPos, true);
 }

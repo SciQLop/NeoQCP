@@ -14,6 +14,8 @@ private slots:
     void axisRectAbsoluteSetPixelPositionRoundTrips();
     void axisRectAbsoluteRespectsParentAnchor();
     void absoluteRemainsWidgetRelative();
+    void farOffscreenItemsDoNotOverflow_data();
+    void farOffscreenItemsDoNotOverflow();
 
 private:
     QCustomPlot* mPlot = nullptr;

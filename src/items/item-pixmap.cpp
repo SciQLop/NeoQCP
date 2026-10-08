@@ -27,6 +27,7 @@
 
 #include "../core.h"
 #include "../painting/painter.h"
+#include <cmath>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPItemPixmap
@@ -131,16 +132,27 @@ double QCPItemPixmap::selectTest(const QPointF& pos, bool onlySelectable,
     return rectDistance(getFinalRect(), pos, true);
 }
 
+namespace
+{
+// A pixmap larger than this could not be allocated anyway; past it, its int rect would overflow.
+bool fitsInPixels(const QRectF& rect)
+{
+    constexpr double limit = 1 << 24;
+    return QRectF(-limit, -limit, 2 * limit, 2 * limit).contains(rect);
+}
+}
+
 /* inherits documentation from base class */
 void QCPItemPixmap::draw(QCPPainter* painter)
 {
     bool flipHorz = false;
     bool flipVert = false;
-    QRect rect = getFinalRect(&flipHorz, &flipVert);
-    int clipPad = mainPen().style() == Qt::NoPen ? 0 : qCeil(mainPen().widthF());
-    QRect boundingRect = rect.adjusted(-clipPad, -clipPad, clipPad, clipPad);
-    if (boundingRect.intersects(clipRect()))
+    const QRectF finalRect = getFinalRect(&flipHorz, &flipVert);
+    const double clipPad = mainPen().style() == Qt::NoPen ? 0 : qCeil(mainPen().widthF());
+    const QRectF boundingRect = finalRect.adjusted(-clipPad, -clipPad, clipPad, clipPad);
+    if (boundingRect.intersects(clipRect()) && fitsInPixels(finalRect))
     {
+        const QRect rect = finalRect.toRect();
         updateScaledPixmap(rect, flipHorz, flipVert);
         painter->drawPixmap(rect.topLeft(), mScaled ? mScaledPixmap : mPixmap);
         QPen pen = mainPen();
@@ -158,7 +170,7 @@ QPointF QCPItemPixmap::anchorPixelPosition(int anchorId) const
 {
     bool flipHorz = false;
     bool flipVert = false;
-    QRect rect = getFinalRect(&flipHorz, &flipVert);
+    QRectF rect = getFinalRect(&flipHorz, &flipVert);
     // we actually want denormal rects (negative width/height) here, so restore
     // the flipped state:
     if (flipHorz)
@@ -208,7 +220,7 @@ void QCPItemPixmap::updateScaledPixmap(QRect finalRect, bool flipHorz, bool flip
     {
         double devicePixelRatio = mPixmap.devicePixelRatio();
         if (finalRect.isNull())
-            finalRect = getFinalRect(&flipHorz, &flipVert);
+            finalRect = getFinalRect(&flipHorz, &flipVert).toRect();
         if (mScaledPixmapInvalidated || finalRect.size() != mScaledPixmap.size() / devicePixelRatio)
         {
             mScaledPixmap = mPixmap.scaled(finalRect.size() * devicePixelRatio, mAspectRatioMode,
@@ -239,19 +251,22 @@ void QCPItemPixmap::updateScaledPixmap(QRect finalRect, bool flipHorz, bool flip
   If scaling is disabled, returns a rect with size of the original pixmap and the top left corner
   aligned with the item position \a topLeft. The position \a bottomRight is ignored.
 */
-QRect QCPItemPixmap::getFinalRect(bool* flippedHorz, bool* flippedVert) const
+QRectF QCPItemPixmap::getFinalRect(bool* flippedHorz, bool* flippedVert) const
 {
-    QRect result;
+    // Whole pixels, like an integer rect, but in floating point: an item anchored far outside the
+    // view is beyond int range (SciQLop#151).
+    const auto rounded = [](const QPointF& p) { return QPointF(std::round(p.x()), std::round(p.y())); };
+    QRectF result;
     bool flipHorz = false;
     bool flipVert = false;
-    QPoint p1 = topLeft->pixelPosition().toPoint();
-    QPoint p2 = bottomRight->pixelPosition().toPoint();
+    const QPointF p1 = rounded(topLeft->pixelPosition());
+    const QPointF p2 = rounded(bottomRight->pixelPosition());
     if (p1 == p2)
-        return { p1, QSize(0, 0) };
+        return { p1, QSizeF(0, 0) };
     if (mScaled)
     {
-        QSize newSize = QSize(p2.x() - p1.x(), p2.y() - p1.y());
-        QPoint topLeft = p1;
+        QSizeF newSize(p2.x() - p1.x(), p2.y() - p1.y());
+        QPointF topLeft = p1;
         if (newSize.width() < 0)
         {
             flipHorz = true;
@@ -264,14 +279,13 @@ QRect QCPItemPixmap::getFinalRect(bool* flippedHorz, bool* flippedVert) const
             newSize.rheight() *= -1;
             topLeft.setY(p2.y());
         }
-        QSize scaledSize = mPixmap.size();
-        scaledSize /= mPixmap.devicePixelRatio();
+        QSizeF scaledSize = QSizeF(mPixmap.size()) / mPixmap.devicePixelRatio();
         scaledSize.scale(newSize * mPixmap.devicePixelRatio(), mAspectRatioMode);
-        result = QRect(topLeft, scaledSize);
+        result = QRectF(topLeft, QSizeF(std::round(scaledSize.width()), std::round(scaledSize.height())));
     }
     else
     {
-        result = QRect(p1, mPixmap.size() / mPixmap.devicePixelRatio());
+        result = QRectF(p1, QSizeF(mPixmap.size() / mPixmap.devicePixelRatio()));
     }
     if (flippedHorz)
         *flippedHorz = flipHorz;

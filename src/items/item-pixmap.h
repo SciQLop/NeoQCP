@@ -108,7 +108,7 @@ protected:
     // non-virtual methods:
     void updateScaledPixmap(QRect finalRect = QRect(), bool flipHorz = false,
                             bool flipVert = false);
-    QRect getFinalRect(bool* flippedHorz = nullptr, bool* flippedVert = nullptr) const;
+    QRectF getFinalRect(bool* flippedHorz = nullptr, bool* flippedVert = nullptr) const;
     QPen mainPen() const;
 };
 

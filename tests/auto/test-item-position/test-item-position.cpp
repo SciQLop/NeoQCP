@@ -1,5 +1,6 @@
 #include "test-item-position.h"
 #include "qcustomplot.h"
+#include <functional>
 
 namespace
 {
@@ -89,4 +90,52 @@ void TestItemPosition::absoluteRemainsWidgetRelative()
 
     // Guards against a fix that makes every static type axis-rect-relative.
     QCOMPARE(item->position->pixelPosition(), QPointF(10, 20));
+}
+
+// SciQLop#151: an item anchored far outside the view has a pixel position beyond int range (or NaN).
+// QRect arithmetic on it overflowed, which Qt 6.11's checked QRect turns into an abort on mouse move
+// (selectTest) or on draw.
+using ItemFactory = std::function<QCPAbstractItem*(QCustomPlot*)>;
+Q_DECLARE_METATYPE(ItemFactory)
+
+void TestItemPosition::farOffscreenItemsDoNotOverflow_data()
+{
+    QTest::addColumn<ItemFactory>("make");
+    QTest::addColumn<double>("coord");
+    const QList<QPair<const char*, ItemFactory>> items = {
+        {"text", [](QCustomPlot* p) { auto* i = new QCPItemText(p); i->setText("label"); return i; }},
+        {"richtext", [](QCustomPlot* p) { auto* i = new QCPItemRichText(p); i->setHtml("<b>label</b>"); return i; }},
+        {"pixmap", [](QCustomPlot* p) { auto* i = new QCPItemPixmap(p); i->setPixmap(QPixmap(16, 16)); return i; }},
+        {"tracer", [](QCustomPlot* p) { return new QCPItemTracer(p); }},
+        {"rect", [](QCustomPlot* p) { return new QCPItemRect(p); }},
+        {"ellipse", [](QCustomPlot* p) { return new QCPItemEllipse(p); }},
+        {"line", [](QCustomPlot* p) { return new QCPItemLine(p); }},
+        {"curve", [](QCustomPlot* p) { return new QCPItemCurve(p); }},
+        {"bracket", [](QCustomPlot* p) { return new QCPItemBracket(p); }},
+        {"straightline", [](QCustomPlot* p) { return new QCPItemStraightLine(p); }},
+        {"vspan", [](QCustomPlot* p) { return new QCPItemVSpan(p); }},
+        {"hspan", [](QCustomPlot* p) { return new QCPItemHSpan(p); }},
+        {"rspan", [](QCustomPlot* p) { return new QCPItemRSpan(p); }},
+    };
+    for (const auto& [name, make] : items)
+    {
+        QTest::newRow(qPrintable(QString("%1/huge").arg(name))) << make << 1e12;
+        QTest::newRow(qPrintable(QString("%1/nan").arg(name))) << make << qQNaN();
+    }
+}
+
+void TestItemPosition::farOffscreenItemsDoNotOverflow()
+{
+    QFETCH(ItemFactory, make);
+    QFETCH(double, coord);
+    mPlot->xAxis->setRange(0, 10);
+    mPlot->yAxis->setRange(0, 10);
+    mPlot->replot();
+    QCPAbstractItem* item = make(mPlot);
+    const auto positions = item->positions();
+    for (int i = 0; i < positions.size(); ++i)
+        positions[i]->setCoords(coord + i, coord + 2 * i);
+
+    QVERIFY(item->selectTest(QPointF(100, 100), false) != 0);
+    QVERIFY(!mPlot->toPixmap(400, 300).isNull());
 }
