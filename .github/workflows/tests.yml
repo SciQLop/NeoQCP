@@ -46,7 +46,9 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          # 3.14: aqt tries zipfile before py7zr, and older zipfile.is_zipfile() takes some Qt .7z
+          # archives for zips (6.11.2 qttools on linux_arm64), then fails to open them.
+          python-version: '3.14'
       - name: Install build tools
         # aqtinstall 3.3.0 cannot read the Qt 6.11 repository layout; master can (as in SciQLopPlots).
         run: pip install "aqtinstall @ git+https://github.com/miurahr/aqtinstall.git@master" meson ninja
