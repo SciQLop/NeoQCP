@@ -3026,10 +3026,9 @@ void QCustomPlot::executeRenderPass(QRhiCommandBuffer* cb, QRhiResourceUpdateBat
                 srl->render(cb, outputSize);
         }
 
-        // Draw GPU spans on the main layer (after plottables, before axes)
-        if (layer == this->layer(QLatin1String("main"))
-            && mSpanRhiLayer && mSpanRhiLayer->hasSpans())
-            mSpanRhiLayer->render(cb, outputSize);
+        // Draw the GPU spans that are on this layer (after its plottables)
+        if (mSpanRhiLayer && mSpanRhiLayer->hasSpans())
+            mSpanRhiLayer->render(cb, outputSize, layer);
 
         // Draw GPU grid lines on the "grid" layer
         if (layer == this->layer(QLatin1String("grid"))

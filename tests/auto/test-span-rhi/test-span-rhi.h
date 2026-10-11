@@ -19,6 +19,7 @@ private slots:
     void exportedSpanHasNoOutlineTheScreenLacks();
     void dashedSpanBorderIsDashedOnScreen();
     void gradientSpanBrushLooksTheSameOnScreen();
+    void spanOnALowerLayerStaysUnderTheData();
 
 private:
     QCustomPlot* mPlot = nullptr;

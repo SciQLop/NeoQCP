@@ -12,8 +12,10 @@
 
 #include "span-grid-vertex.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
+#include <utility>
 
 using namespace qcp::rhi::span_grid;
 
@@ -78,6 +80,7 @@ QCPSpanRhiLayer::SpanSignature QCPSpanRhiLayer::computeSignature(QCPAbstractItem
     // setClipAxisRect() does not mark RHI dirty, so the pointer itself must be
     // part of the signature to catch a span moving between identical axis rects.
     sig.clipRect = ar;
+    sig.layer = span->layer();
 
     const auto fillStyle = [&sig](const QBrush& brush, const QPen& pen)
     {
@@ -263,20 +266,21 @@ bool QCPSpanRhiLayer::rebuildGeometry(float dpr, int outputHeight)
     mStagingVertices.clear();
     bool allocationFailed = false;
 
-    // Group spans by axis rect
-    QMap<QCPAxisRect*, QVector<QCPAbstractItem*>> groupedSpans;
+    // Group spans by layer (where they are composited) and axis rect (their scissor)
+    QMap<std::pair<QCPLayer*, QCPAxisRect*>, QVector<QCPAbstractItem*>> groupedSpans;
     for (auto* span : mSpans)
     {
         QCPAxisRect* ar = span->clipAxisRect();
         if (!ar)
             continue;
-        groupedSpans[ar].append(span);
+        groupedSpans[{ span->layer(), ar }].append(span);
     }
 
     QVector<DrawGroup> newGroups;
     for (auto it = groupedSpans.constBegin(); it != groupedSpans.constEnd(); ++it)
     {
-        QCPAxisRect* ar = it.key();
+        QCPLayer* layer = it.key().first;
+        QCPAxisRect* ar = it.key().second;
         const auto& spans = it.value();
 
         int groupVertexStart = mStagingVertices.size() / kFloatsPerVertex;
@@ -296,6 +300,7 @@ bool QCPSpanRhiLayer::rebuildGeometry(float dpr, int outputHeight)
             continue;
 
         DrawGroup group;
+        group.layer = layer;
         group.axisRect = ar;
         group.vertexOffset = groupVertexStart;
         group.vertexCount = groupVertexCount;
@@ -304,15 +309,15 @@ bool QCPSpanRhiLayer::rebuildGeometry(float dpr, int outputHeight)
         newGroups.append(group);
     }
 
-    // Reconcile with existing groups: UBO + SRB are keyed by axis rect and survive
-    // rebuilds. Only new groups allocate; only vanished groups release.
+    // Reconcile with existing groups: UBO + SRB are keyed by layer and axis rect and
+    // survive rebuilds. Only new groups allocate; only vanished groups release.
     QVector<DrawGroup> reconciled;
     reconciled.reserve(newGroups.size());
     for (auto& group : newGroups)
     {
         for (auto& old : mDrawGroups)
         {
-            if (old.axisRect == group.axisRect)
+            if (old.layer == group.layer && old.axisRect == group.axisRect)
             {
                 group.uniformBuffer = old.uniformBuffer;
                 group.srb = old.srb;
@@ -621,11 +626,14 @@ void QCPSpanRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
     }
 }
 
-void QCPSpanRhiLayer::render(QRhiCommandBuffer* cb, const QSize& outputSize)
+void QCPSpanRhiLayer::render(QRhiCommandBuffer* cb, const QSize& outputSize,
+                             const QCPLayer* layer)
 {
     PROFILE_HERE_N("QCPSpanRhiLayer::render");
 
-    if (!mPipeline || !mVertexBuffer || mDrawGroups.isEmpty())
+    if (!mPipeline || !mVertexBuffer
+        || std::none_of(mDrawGroups.begin(), mDrawGroups.end(),
+                        [layer](const DrawGroup& g) { return g.layer == layer; }))
         return;
 
     cb->setGraphicsPipeline(mPipeline);
@@ -634,6 +642,8 @@ void QCPSpanRhiLayer::render(QRhiCommandBuffer* cb, const QSize& outputSize)
     const QRhiCommandBuffer::VertexInput vbufBinding(mVertexBuffer, 0);
     for (const auto& group : mDrawGroups)
     {
+        if (group.layer != layer)
+            continue;
         // setShaderResources must precede setVertexInput — on Metal, QRhi offsets
         // vertex buffer indices by the number of SRB buffer bindings.
         cb->setShaderResources(group.srb);

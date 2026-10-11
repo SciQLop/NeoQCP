@@ -175,3 +175,26 @@ void TestSpanRhi::gradientSpanBrushLooksTheSameOnScreen()
     QVERIFY2(qAbs(onScreen.red() - inExport.red()) < 40 && qAbs(onScreen.blue() - inExport.blue()) < 40,
              qPrintable(QString("screen %1, export %2").arg(onScreen.name(), inExport.name())));
 }
+
+// All GPU spans were composited right after the "main" layer, whatever layer they were on: a
+// span put on "background" to sit under the data covered the graphs on screen (not in exports).
+void TestSpanRhi::spanOnALowerLayerStaysUnderTheData()
+{
+    if (!waitForRhi(mPlot))
+        QSKIP("No QRhi available — spans are drawn on the GPU only with a real backend");
+    auto* span = new QCPItemVSpan(mPlot);
+    span->setRange(QCPRange(5, 9));
+    span->setBrush(QColor(0, 0, 255));
+    span->setLayer("background");
+    auto* graph = mPlot->addGraph();
+    graph->setData(QVector<double> { 0, 10 }, QVector<double> { 5, 5 });
+    graph->setPen(QPen(Qt::red, 4));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    const QImage screen = mPlot->grabFramebuffer();
+    const double dpr = screen.devicePixelRatio();
+    const QColor onLine = screen.pixelColor(qRound(mPlot->xAxis->coordToPixel(7) * dpr),
+                                            qRound(mPlot->yAxis->coordToPixel(5) * dpr));
+    QVERIFY2(onLine.red() > 200 && onLine.blue() < 60,
+             qPrintable("the line under a background span is " + onLine.name()));
+}

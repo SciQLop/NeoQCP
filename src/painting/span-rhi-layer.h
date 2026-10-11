@@ -8,6 +8,7 @@
 #include <rhi/qrhi.h>
 
 class QCPAbstractItem;
+class QCPLayer;
 class QCPAxisRect;
 class QCPItemVSpan;
 class QCPItemHSpan;
@@ -20,6 +21,7 @@ class QCPSpanRhiLayer
 public:
     struct DrawGroup
     {
+        QCPLayer* layer = nullptr; // drawn where this layer is composited
         QCPAxisRect* axisRect = nullptr;
         int vertexOffset = 0;
         int vertexCount = 0;
@@ -48,13 +50,15 @@ public:
     void uploadResources(QRhiResourceUpdateBatch* updates,
                           const QSize& outputSize, float dpr,
                           bool isYUpInNDC);
-    void render(QRhiCommandBuffer* cb, const QSize& outputSize);
+    //! Draws the spans on \a layer, in their layer's place among the composited layers.
+    void render(QRhiCommandBuffer* cb, const QSize& outputSize, const QCPLayer* layer);
 
 private:
     struct SpanSignature
     {
         float e0 = 0, e1 = 0, e2 = 0, e3 = 0; // edge pixels; meaning depends on span type
         const QCPAxisRect* clipRect = nullptr;
+        const QCPLayer* layer = nullptr;
         quint32 fillRgba = 0;
         quint32 borderRgba = 0;
         float borderWidth = 0;
