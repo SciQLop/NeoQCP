@@ -825,8 +825,9 @@ void QCPAxis::setTicker(QSharedPointer<QCPAxisTicker> ticker)
 /*!
   Sets whether tick marks are displayed.
 
-  Note that setting \a show to false does not imply that tick labels are invisible, too. To achieve
-  that, see \ref setTickLabels.
+  Setting \a show to false hides the tick labels too, as in QCustomPlot. To keep the labels
+  without the marks, use \ref setTickLength(0, 0) (and \ref setSubTickLength(0, 0)) instead.
+  To hide only the labels, see \ref setTickLabels.
 
   \see setSubTicks
 */
