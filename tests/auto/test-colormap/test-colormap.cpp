@@ -729,7 +729,27 @@ void TestColorMap::QCPColorScale_rescaleDataRangeIncludesColorMap2()
   std::vector<double> z = {5, 6, 7, 8, 9, 10};
   cm->setData(x, y, z);
 
+  bool found = false;
   scale->rescaleDataRange(false);
   QCOMPARE(scale->dataRange().lower, 5.0);
+  QCOMPARE(scale->dataRange().upper, 10.0);
+
+  // All the data, like a classic map: not the bounds of the resampled view, which averaging
+  // narrows and which change with the zoom. A ramp over far more columns than pixels.
+  std::vector<double> manyX(4000), twoY = {0, 1}, ramp(4000 * 2);
+  for (int i = 0; i < 4000; ++i)
+  {
+    manyX[i] = i;
+    ramp[i] = ramp[4000 + i] = 10.0 * i / 3999;
+  }
+  cm->setData(manyX, twoY, ramp);
+  mPlot->xAxis->setRange(0, 4000);
+  mPlot->yAxis->setRange(0, 1);
+  mPlot->replot();
+  QTRY_VERIFY_WITH_TIMEOUT(!cm->busy(), 5000);
+  const QCPRange view = cm->colorDataBounds(found);
+  QVERIFY2(found && view.size() < 10.0, "the resampled view should be narrower than the data");
+  scale->rescaleDataRange(false);
+  QCOMPARE(scale->dataRange().lower, 0.0);
   QCOMPARE(scale->dataRange().upper, 10.0);
 }

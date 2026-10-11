@@ -449,7 +449,7 @@ void QCPColorScale::rescaleDataRange(bool onlyVisibleMaps)
         }
         else if (auto* map2 = qobject_cast<QCPColorMap2*>(plottable);
                  map2 && map2->colorScale() == this)
-            mapRange = map2->colorDataBounds(found);
+            mapRange = map2->colorDataBounds(found, true); // all data, as for classic maps
         else if (auto* hist = qobject_cast<QCPHistogram2D*>(plottable);
                  hist && hist->colorScale() == this)
             mapRange = hist->colorDataBounds(found);
