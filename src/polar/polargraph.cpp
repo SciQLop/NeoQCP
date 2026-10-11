@@ -137,8 +137,8 @@ QFont QCPPolarLegendItem::getFont() const
   \a keyAxis. This QCustomPlot instance takes ownership of the QCPPolarGraph, so do not delete it
   manually but use QCPPolarAxisAngular::removeGraph() instead.
 
-  To directly create a QCPPolarGraph inside a plot, you shoud use the QCPPolarAxisAngular::addGraph
-  method.
+  This constructor is how a polar graph is created: \c new QCPPolarGraph(angularAxis,
+  angularAxis->radialAxis()). (There is no QCPPolarAxisAngular::addGraph.)
 */
 QCPPolarGraph::QCPPolarGraph(QCPPolarAxisAngular* keyAxis, QCPPolarAxisRadial* valueAxis)
         : QCPLayerable(keyAxis->parentPlot(), QString(), keyAxis)

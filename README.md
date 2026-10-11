@@ -52,7 +52,7 @@ This fork aims at modernizing the excellent [QCustomPlot](https://www.qcustomplo
   graph->setScatterColorGradient(QCPColorGradient::gpJet);
   ```
 
-  Scatters render on the GPU via instanced SDF sprites (see GPU Plottable Rendering), and large series are decimated with adaptive min/max sampling so panning and zooming stay interactive.
+  QCPGraph2 and QCPMultiGraph scatters render on the GPU via instanced SDF sprites (see GPU Plottable Rendering), and large series are decimated with adaptive min/max sampling so panning and zooming stay interactive.
 
   **QCPGraph2 vs QCPGraph:**
 
@@ -68,7 +68,7 @@ This fork aims at modernizing the excellent [QCustomPlot](https://www.qcustomplo
   | Selection decoration | Full (pen + scatter) | Basic |
 
 - **GPU Plottable Rendering**
-  QCPGraph and QCPCurve solid-line strokes and baseline fills rendered via QRhi shaders with polyline extrusion and 4x MSAA antialiasing. Scatter symbols are drawn as GPU-instanced SDF sprites, and the grid, tick marks, and span items are emitted directly to the GPU as well — keeping the whole hot path off the CPU.
+  QCPGraph and QCPCurve solid-line strokes and baseline fills rendered via QRhi shaders with polyline extrusion and MSAA antialiasing (4x below a device pixel ratio of 2, none above, where pixels are small enough). QCPGraph2 and QCPMultiGraph scatter symbols are drawn as GPU-instanced SDF sprites, and the grid, tick marks, and span items are emitted directly to the GPU as well — keeping the whole hot path off the CPU.
 
 - **Smooth GPU-Translated Panning**
   Panning shifts cached pixel-space geometry on the GPU via per-draw offsets instead of re-extruding and re-uploading every frame, and the compositor translates unchanged layer textures rather than repainting them. This makes dragging large datasets fluid without touching the CPU data path.
@@ -97,7 +97,7 @@ This fork aims at modernizing the excellent [QCustomPlot](https://www.qcustomplo
   mg->setComponentColors({Qt::red, Qt::green, Qt::blue});
   ```
 
-- **Waterfall (QCPWaterfall)**
+- **Waterfall (QCPWaterfallGraph)**
   Built on QCPMultiGraph, stacks normalized spectra/traces into a waterfall display. Normalization is recomputed automatically as data changes.
 
 - **2D Histogram (QCPHistogram2D)**
@@ -109,32 +109,32 @@ This fork aims at modernizing the excellent [QCustomPlot](https://www.qcustomplo
   h->viewData(xSpan, ySpan);
   ```
 
-- **Span Items (QCPVSpan / QCPHSpan / QCPRSpan)**
+- **Span Items (QCPItemVSpan / QCPItemHSpan / QCPItemRSpan)**
   GPU-rendered shaded regions spanning a key range (vertical), value range (horizontal), or both (rectangular) — useful for highlighting time intervals, catalog events, or thresholds. Coordinates are converted to pixels in double precision on the CPU to avoid float32 cancellation with large timestamps.
 
   ```cpp
-  auto* span = new QCPVSpan(plot);
+  auto* span = new QCPItemVSpan(plot);
   span->setRange(QCPRange(t0, t1));
   span->setBrush(QColor(0, 120, 215, 60));
   ```
 
 - **Interactive Item Creation Mode**
-  Drive click-and-drag item creation from user callbacks instead of bespoke event handling. An `ItemCreator` builds the item on press; an `ItemPositioner` updates its geometry as the mouse drags. Creation only fires inside the axis rect's data area.
+  Drive interactive item creation from user callbacks instead of bespoke event handling: click to start, move, click again to finish (Escape or a right click cancels). An `ItemCreator` builds the item on the first click; an `ItemPositioner` updates its geometry as the mouse moves. Creation only fires inside the axis rect's data area.
 
   ```cpp
   plot->setItemCreator([](QCustomPlot* p, QCPAxis* kx, QCPAxis* vx) {
-      return new QCPVSpan(p);
+      return new QCPItemVSpan(p);
   });
   plot->setItemPositioner([](QCPAbstractItem* it, double k0, double, double k1, double) {
-      static_cast<QCPVSpan*>(it)->setRange(QCPRange(k0, k1));
+      static_cast<QCPItemVSpan*>(it)->setRange(QCPRange(k0, k1));
   });
   ```
 
 - **Theming**
-  `QCPTheme` with named color roles (background, foreground, grid, sub-grid, selection, legend). Ships with `QCPTheme::light()` and `QCPTheme::dark()` factories. A shared theme can be applied to multiple plots and live-updated — all axes, grids, legends, ticks, labels, and items react automatically. Theme colors are exposed as Qt properties for QSS integration.
+  `QCPTheme` with named color roles (background, foreground, grid, sub-grid, selection, legend). Ships with `QCPTheme::light()` and `QCPTheme::dark()` factories. A shared theme can be applied to multiple plots and live-updated — axes, grids, legends, ticks, labels and items follow it; plottables keep their own pens. Theme colors are exposed as Qt properties for QSS integration.
 
   ```cpp
-  auto* theme = QCPTheme::dark();
+  auto* theme = QCPTheme::dark(plot);  // the parent owns it: setTheme() does not
   plot->setTheme(theme);  // applies and connects for live updates
   ```
 
@@ -214,7 +214,7 @@ This fork aims at modernizing the excellent [QCustomPlot](https://www.qcustomplo
 ### Build Steps
 
 ```bash
-git clone https://github.com/jeandet/NeoQCP.git
+git clone https://github.com/SciQLop/NeoQCP.git
 cd NeoQCP
 meson setup build --buildtype=release
 meson compile -C build

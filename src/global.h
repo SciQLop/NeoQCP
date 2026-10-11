@@ -212,10 +212,8 @@ enum PlottingHint
                             ///<                than 1. It is only used for solid line pens.
     ,
     phImmediateRefresh
-    = 0x002 ///< <tt>0x002</tt> causes an immediate repaint() instead of a soft update() when
-            ///< QCustomPlot::replot() is called with parameter \ref QCustomPlot::rpRefreshHint.
-            ///<                This is set by default to prevent the plot from freezing on fast
-            ///<                consecutive replots (e.g. user drags ranges with mouse).
+    = 0x002 ///< <tt>0x002</tt> No effect in NeoQCP: every replot ends in one GPU frame of the
+            ///< QRhiWidget. Kept, and set by default, for compatibility with QCustomPlot.
     ,
     phCacheLabels = 0x004 ///< <tt>0x004</tt> axis (tick) labels will be cached as pixmaps,
                           ///< increasing replot performance.

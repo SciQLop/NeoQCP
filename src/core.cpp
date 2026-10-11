@@ -3494,7 +3494,7 @@ void QCustomPlot::draw(QCPPainter* painter)
 */
 void QCustomPlot::updateLayout()
 {
-    PROFILE_HERE_N("QCustomPlot::updateLayou");
+    PROFILE_HERE_N("QCustomPlot::updateLayout");
     // run through layout phases:
     mPlotLayout->update(QCPLayoutElement::upPreparation);
     mPlotLayout->update(QCPLayoutElement::upMargins);

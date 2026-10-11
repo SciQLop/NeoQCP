@@ -51,7 +51,7 @@ public:
     enum AngleReference
     {
         arAbsolute ///< The axis tilt is given in absolute degrees. The zero is to the right and
-                   ///< positive angles are measured counter-clockwise.
+                   ///< positive angles are measured clockwise (screen y points down).
         ,
         arAngularAxis ///< The axis tilt is measured in the angular coordinate system given by the
                       ///< parent angular axis.

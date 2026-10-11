@@ -92,8 +92,8 @@
   If the layer mode (\ref setMode) is set to \ref lmBuffered, you can replot only this specific
   layer by calling \ref replot. In certain situations this can provide better replot performance,
   compared with a full replot of all layers. Upon creation of a new layer, the layer mode is
-  initialized to \ref lmLogical. The only layer that is set to \ref lmBuffered in a new \ref
-  QCustomPlot instance is the "overlay" layer, containing the selection rect.
+  initialized to \ref lmLogical. In a new \ref QCustomPlot instance, the "main" layer and the
+  "overlay" layer, containing the selection rect, are set to \ref lmBuffered.
 */
 
 /* start documentation of inline functions */
@@ -181,8 +181,8 @@ void QCPLayer::setVisible(bool visible)
   you should carefully choose which layers benefit from having their own paint buffer. A typical
   example would be a layer which contains certain layerables (e.g. items) that need to be changed
   and thus replotted regularly, while all other layerables on other layers stay static. By default,
-  only the topmost layer called "overlay" is in mode \ref lmBuffered, and contains the selection
-  rect.
+  the "main" layer and the topmost layer called "overlay" (containing the selection rect) are in
+  mode \ref lmBuffered.
 
   \see replot
 */
