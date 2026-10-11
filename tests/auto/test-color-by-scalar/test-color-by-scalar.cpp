@@ -1139,3 +1139,30 @@ void TestColorByScalar::coloredGraphDrawnFromL2KeepsIndicesConsistent()
     mPlot->replot();
     checkIndices();
 }
+
+// QCPGraph2 looked a point's colour up at its position in the pixel lines. A key gap or a NaN
+// value inserts a break point there, so every marker after it took its neighbour's colour.
+void TestColorByScalar::graph2ScatterColoursFollowTheirPointAcrossBreaks()
+{
+    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPGraph2::lsNone);
+    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssSquare, Qt::black, Qt::black, 12));
+    graph->setScatterColorGradient(redToBlue());
+    // A key gap after key 3, and a NaN value at key 12.
+    graph->setData(std::vector<double>{1, 2, 3, 10, 11, 12, 13},
+                   std::vector<double>{1, 1, 1, 1, 1, qQNaN(), 1});
+    graph->setScatterColorValues({0.f, 0.f, 0.f, 0.f, 1.f, 1.f, 0.f});
+    mPlot->xAxis->setRange(0, 14);
+    mPlot->yAxis->setRange(0, 2);
+
+    const QImage image = mPlot->toPixmap(400, 300).toImage();
+    const auto colourAt = [&](double key) {
+        return image.pixelColor(qRound(mPlot->xAxis->coordToPixel(key)),
+                                qRound(mPlot->yAxis->coordToPixel(1)));
+    };
+    const auto isRed = [](const QColor& c) { return c.red() > 200 && c.blue() < 60; };
+    const auto isBlue = [](const QColor& c) { return c.blue() > 200 && c.red() < 60; };
+    QVERIFY2(isRed(colourAt(10)), qPrintable("key 10 drawn as " + colourAt(10).name()));
+    QVERIFY2(isBlue(colourAt(11)), qPrintable("key 11 drawn as " + colourAt(11).name()));
+    QVERIFY2(isRed(colourAt(13)), qPrintable("key 13 drawn as " + colourAt(13).name()));
+}

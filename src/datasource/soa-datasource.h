@@ -115,6 +115,14 @@ public:
                                          gapThreshold(), &mGapCache.gaps);
     }
 
+    QVector<QPointF> getLinesIndexed(int begin, int end, QCPAxis* keyAxis, QCPAxis* valueAxis,
+                                     QVector<int>& sourceIndices) const override
+    {
+        ensureGapCache(begin, end);
+        return qcp::algo::linesToPixelsIndexed(mKeys, mValues, begin, end, keyAxis, valueAxis,
+                                               sourceIndices, gapThreshold(), &mGapCache.gaps);
+    }
+
 private:
     void ensureGapCache(int begin, int end) const
     {

@@ -46,6 +46,7 @@ private slots:
     void graph2LineStyleChangeAfterFirstDrawIsShown();
     void graph2ScatterStyleChangeAfterFirstDrawIsShown();
     void graph2ScatterColorValuesChangeAfterFirstDrawIsShown();
+    void graph2FirstColorValuesAfterFirstDrawAreShown();
 
 private:
     QCustomPlot* mPlot = nullptr;

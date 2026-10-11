@@ -148,6 +148,13 @@ public:
         int begin, int end,
         QCPAxis* keyAxis, QCPAxis* valueAxis) const = 0;
 
+    // getLines(), plus the data index of each point in sourceIndices (-1 for the break points
+    // inserted at gaps and NaN values): what per-point attributes such as colours look up.
+    // The default copies the window through keyAt()/valueAt(); sources override it for speed.
+    virtual QVector<QPointF> getLinesIndexed(
+        int begin, int end,
+        QCPAxis* keyAxis, QCPAxis* valueAxis, QVector<int>& sourceIndices) const;
+
     // A key step larger than gapThreshold() times the smaller neighbouring step
     // breaks the line. 0 turns gap detection off.
     void setGapThreshold(double threshold) { mGapThreshold = threshold; }

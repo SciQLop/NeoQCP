@@ -66,6 +66,8 @@ private slots:
 
     void coloredGraphDrawnFromL2KeepsIndicesConsistent();
 
+    void graph2ScatterColoursFollowTheirPointAcrossBreaks();
+
 private:
     QCustomPlot* mPlot = nullptr;
     static std::shared_ptr<QCPAbstractMultiDataSource> makeSource(

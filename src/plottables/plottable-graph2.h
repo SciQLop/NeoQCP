@@ -84,7 +84,11 @@ public:
     void setScatterSkip(int skip) { mScatterSkip = qMax(0, skip); }
 
     // Per-point color axis for scatter rendering
-    void setScatterColorValues(std::vector<float> values) { mScatterColorValues = std::move(values); }
+    void setScatterColorValues(std::vector<float> values)
+    {
+        mScatterColorValues = std::move(values);
+        markLinesDirty(); // coloured lines come from the raw data, with each point's index
+    }
     void setScatterColorGradient(const QCPColorGradient& gradient);
     void clearScatterColorAxis() { mScatterColorValues.clear(); mScatterColorMapImage = {}; }
 
@@ -159,7 +163,7 @@ private:
 
     // Line cache: reuse across replots when viewport shift is small
     QVector<QPointF> mCachedLines;
-    int mCachedLinesBeginIndex = 0;
+    QVector<int> mCachedLineIndices; // data index of each cached point, with colour values
     void markLinesDirty();
     bool mLineCacheDirty = true;
     QSize mCachedPlotSize;

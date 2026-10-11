@@ -523,3 +523,26 @@ void TestScatterRhi::graph2ScatterColorValuesChangeAfterFirstDrawIsShown()
     const QColor marker = pixelAt(mPlot->grabFramebuffer(), mPlot, 2, 1);
     QVERIFY2(isBlue(marker), qPrintable(QString("marker drawn as %1").arg(marker.name())));
 }
+
+// Colour lookups need each point's data index, which only lines built with colours carry.
+void TestScatterRhi::graph2FirstColorValuesAfterFirstDrawAreShown()
+{
+    if (!showAndHasRhi(mPlot))
+        QSKIP("No QRhi available — markers are only instanced on the GPU path");
+    QCPColorGradient redToBlue;
+    redToBlue.clearColorStops();
+    redToBlue.setColorStopAt(0, Qt::red);
+    redToBlue.setColorStopAt(1, Qt::blue);
+    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPGraph2::lsNone);
+    graph->setScatterStyle(filledSquare(Qt::black));
+    graph->setScatterColorGradient(redToBlue);
+    graph->setData(std::vector<double>{1, 2, 3}, std::vector<double>{1, 1, 1});
+    setFixedRanges(mPlot);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    graph->setScatterColorValues({1.f, 1.f, 1.f});
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const QColor marker = pixelAt(mPlot->grabFramebuffer(), mPlot, 2, 1);
+    QVERIFY2(isBlue(marker), qPrintable(QString("marker drawn as %1").arg(marker.name())));
+}

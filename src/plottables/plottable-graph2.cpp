@@ -488,10 +488,12 @@ void QCPGraph2::draw(QCPPainter* painter)
     // When L1 exists but L2 is null (sparse enough to draw directly), use raw source.
     // Scatter-only (lsNone): always use raw data — min/max binning destroys 2D distributions.
     const bool scatterOnly = (mLineStyle == lsNone);
+    // Colour values are per data point: the resampled L2 rows are not data points.
+    const bool hasColorAxis = !mScatterColorValues.empty();
     QCPAbstractDataSource* ds = nullptr;
-    if (mL2Result && !scatterOnly)
+    if (mL2Result && !scatterOnly && !hasColorAxis)
         ds = mL2Result.get();
-    else if (scatterOnly || !mNeedsResampling || mL1Cache
+    else if (scatterOnly || hasColorAxis || !mNeedsResampling || mL1Cache
              || painter->modes().testFlag(QCPPainter::pmNoCaching)
              || mKeyAxis->scaleType() == QCPAxis::stLogarithmic)
         ds = mDataSource.get();
@@ -537,7 +539,8 @@ void QCPGraph2::draw(QCPPainter* painter)
         mKeyAxis.data(), mValueAxis.data(), isExportMode);
 
     QVector<QPointF> lines;
-    int linesBeginIndex = 0;
+    // The data index of each point of lines (-1 at breaks), kept when colours need it.
+    QVector<int> lineIndices;
     if (needFreshLines)
     {
         int cacheBegin, cacheEnd;
@@ -554,8 +557,12 @@ void QCPGraph2::draw(QCPPainter* painter)
             cacheEnd = ds->findEnd(cacheRange.upper);
         }
 
-        const bool hasColorAxis = !mScatterColorValues.empty();
-        if (mAdaptiveSampling && !hasColorAxis && !scatterOnly)
+        if (hasColorAxis)
+        {
+            lines = ds->getLinesIndexed(cacheBegin, cacheEnd, mKeyAxis.data(), mValueAxis.data(),
+                                        lineIndices);
+        }
+        else if (mAdaptiveSampling && !scatterOnly)
         {
             const int pixDim = keyIsVertical
                 ? static_cast<int>(mKeyAxis->axisRect()->height())
@@ -567,12 +574,11 @@ void QCPGraph2::draw(QCPPainter* painter)
         {
             lines = ds->getLines(cacheBegin, cacheEnd, mKeyAxis.data(), mValueAxis.data());
         }
-        linesBeginIndex = cacheBegin;
 
         if (!isExportMode)
         {
             mCachedLines = lines;
-            mCachedLinesBeginIndex = cacheBegin;
+            mCachedLineIndices = lineIndices;
             mRenderedRange = {mKeyAxis->range(), mValueAxis->range()};
             mHasRenderedRange = true;
             mLineCacheDirty = false;
@@ -584,7 +590,7 @@ void QCPGraph2::draw(QCPPainter* painter)
     else
     {
         lines = mCachedLines;
-        linesBeginIndex = mCachedLinesBeginIndex;
+        lineIndices = mCachedLineIndices;
     }
 
     if (lines.isEmpty())
@@ -680,8 +686,9 @@ void QCPGraph2::draw(QCPPainter* painter)
                         mScatterPts.push_back(static_cast<float>(sy));
                         if (hasColor)
                         {
-                            const int dataIdx = linesBeginIndex + i;
-                            mScatterPts.push_back(dataIdx < colorCount ? mScatterColorValues[dataIdx] : 0.0f);
+                            const int dataIdx = i < lineIndices.size() ? lineIndices[i] : -1;
+                            mScatterPts.push_back(dataIdx >= 0 && dataIdx < colorCount
+                                                      ? mScatterColorValues[dataIdx] : 0.0f);
                         }
                         else
                         {
@@ -742,8 +749,9 @@ void QCPGraph2::draw(QCPPainter* painter)
                     return;
                 if (hasColor)
                 {
-                    const int dataIdx = linesBeginIndex + i;
-                    const float v = dataIdx < colorCount ? mScatterColorValues[dataIdx] : 0.0f;
+                    const int dataIdx = i < lineIndices.size() ? lineIndices[i] : -1;
+                    const float v = dataIdx >= 0 && dataIdx < colorCount
+                        ? mScatterColorValues[dataIdx] : 0.0f;
                     const int colorIndex
                         = qBound(0, static_cast<int>(v * colorMapLast + 0.5f), colorMapLast);
                     // Re-applying the style is the expensive part, and neighbouring
