@@ -173,11 +173,18 @@ void QCPSelectionRect::setBrush(const QBrush& brush)
 */
 void QCPSelectionRect::cancel()
 {
-    if (mActive)
-    {
-        mActive = false;
-        emit canceled(mRect, nullptr);
-    }
+    cancelWith(nullptr);
+}
+
+// Ends the interaction without applying it, and erases the band from the screen.
+void QCPSelectionRect::cancelWith(QInputEvent* event)
+{
+    if (!mActive)
+        return;
+    mActive = false;
+    emit canceled(mRect, event);
+    if (QCPLayer* l = layer())
+        l->replot();
 }
 
 /*! \internal
@@ -227,11 +234,8 @@ void QCPSelectionRect::endSelection(QMouseEvent* event)
 */
 void QCPSelectionRect::keyPressEvent(QKeyEvent* event)
 {
-    if (event->key() == Qt::Key_Escape && mActive)
-    {
-        mActive = false;
-        emit canceled(mRect, event);
-    }
+    if (event->key() == Qt::Key_Escape)
+        cancelWith(event);
 }
 
 /* inherits documentation from base class */

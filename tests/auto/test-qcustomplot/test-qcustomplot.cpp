@@ -1,3 +1,4 @@
+#include <QSignalSpy>
 #include "test-qcustomplot.h"
 
 void TestQCustomPlot::init()
@@ -209,16 +210,22 @@ void TestQCustomPlot::dateTimeTicker_extremeZoomOutNoCrash()
     // If we reach here without asserting, the guard works
 }
 
+// QCPSelectionRect cancels on Escape, but QCustomPlot::keyPressEvent never passed the key on, so
+// a rubber band being dragged could not be cancelled.
+void TestQCustomPlot::escapeCancelsTheSelectionRect()
+{
+  mPlot->resize(400, 300);
+  mPlot->setSelectionRectMode(QCP::srmZoom);
+  mPlot->replot();
+  QSignalSpy canceled(mPlot->selectionRect(), &QCPSelectionRect::canceled);
+  const QPoint start = mPlot->axisRect()->rect().center();
+  QMouseEvent press(QEvent::MouseButtonPress, start, mPlot->mapToGlobal(start), Qt::LeftButton,
+                    Qt::LeftButton, Qt::NoModifier);
+  QCoreApplication::sendEvent(mPlot, &press);
+  QVERIFY(mPlot->selectionRect()->isActive());
 
-
-
-
-
-
-
-
-
-
-
-
-
+  QKeyEvent escape(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+  QCoreApplication::sendEvent(mPlot, &escape);
+  QCOMPARE(canceled.count(), 1);
+  QVERIFY(!mPlot->selectionRect()->isActive());
+}

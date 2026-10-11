@@ -15,6 +15,7 @@ private slots:
   void rescaleAxes_MultipleFlatGraphs();
   void calculateMargin_staleTickVectors();
   void dateTimeTicker_extremeZoomOutNoCrash();
+  void escapeCancelsTheSelectionRect();
 
 private:
   QCustomPlot *mPlot;

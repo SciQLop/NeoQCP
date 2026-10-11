@@ -3414,6 +3414,17 @@ void QCustomPlot::wheelEvent(QWheelEvent* event)
 */
 void QCustomPlot::keyPressEvent(QKeyEvent* event)
 {
+    // A rubber band being dragged gets the key first: Escape cancels it.
+    if (mSelectionRect && mSelectionRect->isActive())
+    {
+        mSelectionRect->keyPressEvent(event);
+        if (!mSelectionRect->isActive())
+        {
+            event->accept();
+            return;
+        }
+    }
+
     if (mCreationState && mCreationState->handleKeyPress(event))
     {
         event->accept();

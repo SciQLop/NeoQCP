@@ -77,6 +77,7 @@ protected:
     virtual void moveSelection(QMouseEvent* event);
     virtual void endSelection(QMouseEvent* event);
     virtual void keyPressEvent(QKeyEvent* event);
+    void cancelWith(QInputEvent* event);
 
     // reimplemented virtual methods
     virtual void applyDefaultAntialiasingHint(QCPPainter* painter) const override;
