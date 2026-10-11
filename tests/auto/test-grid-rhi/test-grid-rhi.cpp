@@ -1,4 +1,5 @@
 #include "test-grid-rhi.h"
+#include "../../../src/painting/plottable-rhi-layer.h"
 #include "../../../src/qcp.h"
 #include "../../../src/painting/grid-rhi-layer.h"
 #include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
@@ -142,6 +143,31 @@ void TestGridRhi::rasterExportOfAShownPlotKeepsGpuLinesAndFills()
         }
     QVERIFY2(red > 100, qPrintable(QStringLiteral("line pixels: %1").arg(red)));
     QVERIFY2(blue > 1000, qPrintable(QStringLiteral("fill pixels: %1").arg(blue)));
+}
+
+// QCPLayer::replot() repaints one buffered layer. It cleared the paint buffer but not the
+// layer's GPU geometry, so every partial replot added the plottables' lines once more.
+void TestGridRhi::layerReplotDoesNotStackGpuGeometry()
+{
+    if (!showAndHasRhiGrid(mPlot))
+        QSKIP("No QRhi available — GPU geometry needs a real backend");
+    QVERIFY(mPlot->addLayer("cursor", mPlot->layer("main"), QCustomPlot::limAbove));
+    QCPLayer* layer = mPlot->layer("cursor");
+    layer->setMode(QCPLayer::lmBuffered);
+    auto* graph = mPlot->addGraph();
+    graph->setLayer(layer);
+    graph->setData(QVector<double> { -4, 0, 4 }, QVector<double> { -4, 4, -4 });
+    graph->setPen(QPen(Qt::red, 2));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCoreApplication::processEvents();
+    auto* prl = mPlot->plottableRhiLayer(layer);
+    QVERIFY(prl);
+    const auto entries = prl->drawEntries().size();
+    QVERIFY(entries > 0);
+
+    for (int i = 0; i < 3; ++i)
+        layer->replot();
+    QCOMPARE(prl->drawEntries().size(), entries);
 }
 
 void TestGridRhi::tickMarksFollowPanWithoutRebuild()

@@ -31,6 +31,8 @@
 #include "core.h"
 #include "layout.h"
 #include "painting/painter.h"
+#include "painting/plottable-rhi-layer.h"
+#include "painting/scatter-rhi-layer.h"
 #include "items/item.h"
 #include "plottables/plottable.h"
 
@@ -277,6 +279,12 @@ void QCPLayer::replot()
         if (QSharedPointer<QCPAbstractPaintBuffer> pb = mPaintBuffer.toStrongRef())
         {
             pb->clear(Qt::transparent);
+            // As in QCustomPlot::replot(): the plottables re-add their GPU lines and markers
+            // while drawing, so the old ones go first, or each layer replot stacks a copy.
+            if (auto* prl = mParentPlot->mPlottableRhiLayers.value(this))
+                prl->clear();
+            if (auto* srl = mParentPlot->mScatterRhiLayers.value(this))
+                srl->clear();
             drawToPaintBuffer();
             pb->setInvalidated(false); // since layer is lmBuffered, we know only this layer is on
                                        // buffer and we can reset invalidated flag

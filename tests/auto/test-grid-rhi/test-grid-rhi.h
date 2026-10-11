@@ -11,6 +11,7 @@ private slots:
 
     void gridRhiLayerCreatedLazily();
     void rasterExportOfAShownPlotKeepsGpuLinesAndFills();
+    void layerReplotDoesNotStackGpuGeometry();
     void replotDoesNotCrash();
     void replotWithSubGridDoesNotCrash();
     void replotWithZeroLineDoesNotCrash();
