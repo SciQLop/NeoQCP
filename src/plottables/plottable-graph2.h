@@ -71,7 +71,11 @@ public:
 
     // Line style
     [[nodiscard]] LineStyle lineStyle() const { return mLineStyle; }
-    void setLineStyle(LineStyle style) { mLineStyle = style; }
+    void setLineStyle(LineStyle style)
+    {
+        mLineStyle = style;
+        markLinesDirty(); // the cached pixel lines and GPU geometry follow the style
+    }
 
     // Scatter style
     [[nodiscard]] QCPScatterStyle scatterStyle() const { return mScatterStyle; }

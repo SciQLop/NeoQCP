@@ -43,6 +43,9 @@ private slots:
     // Several scatters on one layer share one QCPScatterRhiLayer
     void scattersOnOneLayerKeepTheirOwnMarker();
     void multiGraphComponentsKeepTheirOwnMarker();
+    void graph2LineStyleChangeAfterFirstDrawIsShown();
+    void graph2ScatterStyleChangeAfterFirstDrawIsShown();
+    void graph2ScatterColorValuesChangeAfterFirstDrawIsShown();
 
 private:
     QCustomPlot* mPlot = nullptr;

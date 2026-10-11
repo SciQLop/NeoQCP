@@ -461,3 +461,65 @@ void TestScatterRhi::multiGraphComponentsKeepTheirOwnMarker()
     QVERIFY2(isRed(first), qPrintable(QString("component 0 drawn as %1").arg(first.name())));
     QVERIFY2(isBlue(second), qPrintable(QString("component 1 drawn as %1").arg(second.name())));
 }
+
+// QCPGraph2 reuses its cached pixel lines and GPU geometry while the view stays put. Its style
+// setters did not mark that cache dirty, so a change made after the first draw never showed.
+void TestScatterRhi::graph2LineStyleChangeAfterFirstDrawIsShown()
+{
+    if (!showAndHasRhi(mPlot))
+        QSKIP("No QRhi available — the cached GPU line needs a real backend");
+    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    graph->setPen(QPen(Qt::red, 4));
+    graph->setData(std::vector<double>{1, 3}, std::vector<double>{1, 2});
+    setFixedRanges(mPlot);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(isRed(pixelAt(mPlot->grabFramebuffer(), mPlot, 2, 1.5)));
+
+    graph->setLineStyle(QCPGraph2::lsStepLeft); // holds 1 until x = 3
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const QImage frame = mPlot->grabFramebuffer();
+    QVERIFY2(isRed(pixelAt(frame, mPlot, 2, 1)), "step line not drawn");
+    QVERIFY2(!isRed(pixelAt(frame, mPlot, 2, 1.5)), "old straight line still drawn");
+}
+
+void TestScatterRhi::graph2ScatterStyleChangeAfterFirstDrawIsShown()
+{
+    if (!showAndHasRhi(mPlot))
+        QSKIP("No QRhi available — markers are only instanced on the GPU path");
+    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPGraph2::lsNone);
+    graph->setScatterStyle(filledSquare(Qt::red));
+    graph->setData(std::vector<double>{1, 2, 3}, std::vector<double>{1, 1, 1});
+    setFixedRanges(mPlot);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(isRed(pixelAt(mPlot->grabFramebuffer(), mPlot, 2, 1)));
+
+    graph->setScatterStyle(filledSquare(Qt::blue));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const QColor marker = pixelAt(mPlot->grabFramebuffer(), mPlot, 2, 1);
+    QVERIFY2(isBlue(marker), qPrintable(QString("marker drawn as %1").arg(marker.name())));
+}
+
+void TestScatterRhi::graph2ScatterColorValuesChangeAfterFirstDrawIsShown()
+{
+    if (!showAndHasRhi(mPlot))
+        QSKIP("No QRhi available — markers are only instanced on the GPU path");
+    QCPColorGradient redToBlue;
+    redToBlue.clearColorStops();
+    redToBlue.setColorStopAt(0, Qt::red);
+    redToBlue.setColorStopAt(1, Qt::blue);
+    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPGraph2::lsNone);
+    graph->setScatterStyle(filledSquare(Qt::black));
+    graph->setScatterColorGradient(redToBlue);
+    graph->setData(std::vector<double>{1, 2, 3}, std::vector<double>{1, 1, 1});
+    graph->setScatterColorValues({0.f, 0.f, 0.f});
+    setFixedRanges(mPlot);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(isRed(pixelAt(mPlot->grabFramebuffer(), mPlot, 2, 1)));
+
+    graph->setScatterColorValues({1.f, 1.f, 1.f});
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const QColor marker = pixelAt(mPlot->grabFramebuffer(), mPlot, 2, 1);
+    QVERIFY2(isBlue(marker), qPrintable(QString("marker drawn as %1").arg(marker.name())));
+}
