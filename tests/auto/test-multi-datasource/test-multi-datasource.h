@@ -34,6 +34,7 @@ private slots:
     void resampledGetLinesBreaksAtKeyGaps();
     void adaptiveSamplingBreaksAtKeyGaps();
     void adaptiveSamplingFollowsFallingData();
+    void adaptiveSamplingBreaksAtNaNRuns();
 
     // Row-major data source
     void rowMajorValueAt();

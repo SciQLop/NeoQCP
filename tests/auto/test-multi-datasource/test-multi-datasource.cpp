@@ -437,6 +437,39 @@ void TestMultiDataSource::adaptiveSamplingFollowsFallingData()
     QCOMPARE(upTurns(multi[0]), 0);
 }
 
+// NaN means "no sample". The sparse path broke the line there, but the dense (zoomed-out)
+// path skipped NaN, so a run of NaN wider than many pixels was bridged by a straight line.
+void TestMultiDataSource::adaptiveSamplingBreaksAtNaNRuns()
+{
+    const int n = 20000;
+    std::vector<double> keys(n), vals(n);
+    for (int i = 0; i < n; ++i)
+        keys[i] = i, vals[i] = (i >= 9000 && i < 11000) ? qQNaN() : 1.0;
+    mPlot->setGeometry(50, 50, 500, 500);
+    mPlot->xAxis->setRange(0, n);
+    mPlot->yAxis->setRange(0, 2);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const auto hasBreak = [](const QVector<QPointF>& pts) {
+        return std::any_of(pts.begin(), pts.end(),
+                           [](const QPointF& p) { return qIsNaN(p.x()) || qIsNaN(p.y()); });
+    };
+
+    const auto single = qcp::algo::optimizedLineData(keys, vals, 0, n, 500, mPlot->xAxis, mPlot->yAxis);
+    QVERIFY(single.size() < n); // the dense path ran
+    QVERIFY2(hasBreak(single), "single column: a NaN run is bridged when zoomed out");
+
+    QCPSoAMultiDataSource<std::vector<double>, std::vector<double>> src(keys, {vals});
+    QVector<QPointF> multi[1];
+    src.getOptimizedLineDataAll(0, n, 500, mPlot->xAxis, mPlot->yAxis, multi, 1);
+    QVERIFY(multi[0].size() < n);
+    QVERIFY2(hasBreak(multi[0]), "multi column: a NaN run is bridged when zoomed out");
+
+    // A hole narrower than a pixel stays invisible: every other sample NaN still draws a line.
+    for (int i = 0; i < n; ++i)
+        vals[i] = (i % 2) ? qQNaN() : 1.0;
+    QVERIFY(!hasBreak(qcp::algo::optimizedLineData(keys, vals, 0, n, 500, mPlot->xAxis, mPlot->yAxis)));
+}
+
 void TestMultiDataSource::rowMajorValueAt()
 {
     // 3 rows, 2 columns, packed (stride == columns)

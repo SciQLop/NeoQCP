@@ -398,10 +398,10 @@ QVector<QPointF> optimizedLineDataImpl(const KC& keys, const VC& values,
         if constexpr (WithIndices) indices->append(index);
     };
 
-    // intervalLast is the index of the last ACCEPTED (non-NaN) sample: NaN
-    // samples are skipped without counting, so deriving the closing point as
-    // intervalFirst + intervalCount - 1 could land on a NaN and inject a
-    // spurious line break into gap-free data.
+    // intervalLast is the index of the last ACCEPTED (non-NaN) sample: NaN samples
+    // are skipped without counting, so deriving the closing point as
+    // intervalFirst + intervalCount - 1 could land on a NaN and inject a spurious
+    // line break into gap-free data.
     auto flushInterval = [&](int intervalFirst, int intervalLast, int intervalCount,
                               double intervalStartKey, double lastEndKey,
                               double minVal, double maxVal, int minIdx, int maxIdx,
@@ -483,49 +483,68 @@ QVector<QPointF> optimizedLineDataImpl(const KC& keys, const VC& values,
     const uint8_t* gapData = gaps.data.data();
     const bool hasAnyGap = gaps.hasAnyGap;
 
+    auto startInterval = [&](int index, double k, double v, double endOfPrevious) {
+        lastIntervalEndKey = endOfPrevious;
+        minValue = v;
+        maxValue = v;
+        minIndex = index;
+        maxIndex = index;
+        currentIntervalFirst = index;
+        currentIntervalLast = index;
+        if (useInlineTransform)
+        {
+            int pixel = static_cast<int>(keyTf.toPixel(k)) + reversedRound;
+            currentIntervalStartKey = keyTf.toCoord(pixel);
+        }
+        else
+        {
+            currentIntervalStartKey = keyAxis->pixelToCoord(
+                int(keyAxis->coordToPixel(k) + reversedRound));
+            if (keyEpsilonVariable)
+                keyEpsilon = qAbs(currentIntervalStartKey
+                    - keyAxis->pixelToCoord(keyAxis->coordToPixel(currentIntervalStartKey)
+                                            + 1.0 * reversedFactor));
+        }
+        nextBoundary = currentIntervalStartKey + keyEpsilon;
+        intervalDataCount = 1;
+    };
+    auto flushCurrent = [&](double nextKey) {
+        flushInterval(currentIntervalFirst, currentIntervalLast, intervalDataCount,
+                      currentIntervalStartKey, lastIntervalEndKey,
+                      minValue, maxValue, minIndex, maxIndex, keyEpsilon, nextKey);
+    };
+
+    // NaN means "no sample". A run of NaN wider than a pixel is a hole you can see,
+    // so it breaks the line like a key gap; skipping it bridged the hole whenever
+    // zoomed out. Narrower runs (e.g. every other sample NaN) are skipped, so the
+    // line still shows at this zoom.
+    bool inNaNRun = false;
     while (i < end)
     {
         double v = static_cast<double>(values[i]);
+        double k = static_cast<double>(keys[i]);
         if constexpr (!std::is_integral_v<V>)
         {
-            if (std::isnan(v)) { ++i; continue; }
+            if (std::isnan(v))
+            {
+                inNaNRun = true;
+                ++i;
+                continue;
+            }
         }
+        const bool visibleNaNHole = inNaNRun
+            && qAbs(k - static_cast<double>(keys[currentIntervalLast])) > keyEpsilon;
+        inNaNRun = false;
 
-        if (hasAnyGap && gapData[i - begin])
+        if (visibleNaNHole || (hasAnyGap && gapData[i - begin]))
         {
-            double k = static_cast<double>(keys[i]);
-            flushInterval(currentIntervalFirst, currentIntervalLast, intervalDataCount,
-                          currentIntervalStartKey, lastIntervalEndKey,
-                          minValue, maxValue, minIndex, maxIndex, keyEpsilon, k);
+            flushCurrent(k);
             emitPoint(nanPt, -1);
-            lastIntervalEndKey = currentIntervalStartKey;
-            minValue = v;
-            maxValue = v;
-            minIndex = i;
-            maxIndex = i;
-            currentIntervalFirst = i;
-            currentIntervalLast = i;
-            if (useInlineTransform)
-            {
-                int pixel = static_cast<int>(keyTf.toPixel(k)) + reversedRound;
-                currentIntervalStartKey = keyTf.toCoord(pixel);
-            }
-            else
-            {
-                currentIntervalStartKey = keyAxis->pixelToCoord(
-                    int(keyAxis->coordToPixel(k) + reversedRound));
-                if (keyEpsilonVariable)
-                    keyEpsilon = qAbs(currentIntervalStartKey
-                        - keyAxis->pixelToCoord(keyAxis->coordToPixel(currentIntervalStartKey)
-                                                + 1.0 * reversedFactor));
-            }
-            nextBoundary = currentIntervalStartKey + keyEpsilon;
-            intervalDataCount = 1;
+            startInterval(i, k, v, currentIntervalStartKey);
             ++i;
             continue;
         }
 
-        double k = static_cast<double>(keys[i]);
         if (k < nextBoundary)
         {
             if (v < minValue) { minValue = v; minIndex = i; }
@@ -535,39 +554,12 @@ QVector<QPointF> optimizedLineDataImpl(const KC& keys, const VC& values,
         }
         else
         {
-            flushInterval(currentIntervalFirst, currentIntervalLast, intervalDataCount,
-                          currentIntervalStartKey, lastIntervalEndKey,
-                          minValue, maxValue, minIndex, maxIndex, keyEpsilon, k);
-            lastIntervalEndKey = static_cast<double>(keys[i - 1]);
-            minValue = v;
-            maxValue = v;
-            minIndex = i;
-            maxIndex = i;
-            currentIntervalFirst = i;
-            currentIntervalLast = i;
-            if (useInlineTransform)
-            {
-                int pixel = static_cast<int>(keyTf.toPixel(k)) + reversedRound;
-                currentIntervalStartKey = keyTf.toCoord(pixel);
-            }
-            else
-            {
-                currentIntervalStartKey = keyAxis->pixelToCoord(
-                    int(keyAxis->coordToPixel(k) + reversedRound));
-                if (keyEpsilonVariable)
-                    keyEpsilon = qAbs(currentIntervalStartKey
-                        - keyAxis->pixelToCoord(keyAxis->coordToPixel(currentIntervalStartKey)
-                                                + 1.0 * reversedFactor));
-            }
-            nextBoundary = currentIntervalStartKey + keyEpsilon;
-            intervalDataCount = 1;
+            flushCurrent(k);
+            startInterval(i, k, v, static_cast<double>(keys[i - 1]));
         }
         ++i;
     }
-    flushInterval(currentIntervalFirst, currentIntervalLast, intervalDataCount,
-                  currentIntervalStartKey, lastIntervalEndKey,
-                  minValue, maxValue, minIndex, maxIndex, keyEpsilon,
-                  currentIntervalStartKey + keyEpsilon * 3);
+    flushCurrent(currentIntervalStartKey + keyEpsilon * 3);
 
     return result;
 }
@@ -683,9 +675,11 @@ void optimizedLineDataMulti(const KC& keys,
     struct ColState {
         double minVal;
         double maxVal;
-        int intervalFirst;
-        int intervalCount;
-        bool maxFirst; // the max came before the min: emit them in that order
+        int intervalFirst; // first accepted (non-NaN) sample of the interval
+        int intervalLast;  // last accepted sample, across intervals; -1 after a break
+        int intervalCount; // accepted samples in the interval
+        bool maxFirst;     // the max came before the min: emit them in that order
+        bool inNaNRun;     // NaN samples since intervalLast
     };
     std::vector<ColState> cs(numColumns);
 
@@ -706,32 +700,32 @@ void optimizedLineDataMulti(const KC& keys,
         return;
     }
 
-    if (useInlineTransform)
-    {
-        double kp = keyTf.toPixel(static_cast<double>(keys[i]));
-        int pixel = static_cast<int>(kp) + reversedRound;
-        currentIntervalStartKey = keyTf.toCoord(pixel);
-        lastIntervalEndKey = currentIntervalStartKey;
-        keyEpsilon = qAbs(keyTf.invScale);
+    auto startIntervalAt = [&](double k) {
+        if (useInlineTransform)
+        {
+            int pixel = static_cast<int>(keyTf.toPixel(k)) + reversedRound;
+            currentIntervalStartKey = keyTf.toCoord(pixel);
+        }
+        else
+        {
+            currentIntervalStartKey = keyAxis->pixelToCoord(
+                int(keyAxis->coordToPixel(k) + reversedRound));
+            if (keyEpsilonVariable)
+                keyEpsilon = qAbs(currentIntervalStartKey
+                    - keyAxis->pixelToCoord(keyAxis->coordToPixel(currentIntervalStartKey)
+                                            + 1.0 * reversedFactor));
+        }
         nextBoundary = currentIntervalStartKey + keyEpsilon;
-    }
-    else
-    {
-        currentIntervalStartKey = keyAxis->pixelToCoord(
-            int(keyAxis->coordToPixel(static_cast<double>(keys[i])) + reversedRound));
-        lastIntervalEndKey = currentIntervalStartKey;
-        keyEpsilon = qAbs(currentIntervalStartKey
-            - keyAxis->pixelToCoord(keyAxis->coordToPixel(currentIntervalStartKey)
-                                    + 1.0 * reversedFactor));
-        nextBoundary = currentIntervalStartKey + keyEpsilon;
-        keyEpsilonVariable = keyAxis->scaleType() == QCPAxis::stLogarithmic;
-    }
+    };
 
-    for (int c = 0; c < numColumns; ++c)
-    {
-        double v = valueAt(c, i);
-        cs[c] = {v, v, i, 1, false};
-    }
+    // Linear axes have one pixel width; otherwise the first interval measures it, and only
+    // a log axis measures it again for every interval.
+    if (useInlineTransform)
+        keyEpsilon = qAbs(keyTf.invScale);
+    keyEpsilonVariable = !useInlineTransform;
+    startIntervalAt(static_cast<double>(keys[i]));
+    keyEpsilonVariable = keyEpsilonVariable && keyAxis->scaleType() == QCPAxis::stLogarithmic;
+    lastIntervalEndKey = currentIntervalStartKey;
 
     auto flushColumn = [&](int c, const ColState& s,
                             double intervalStartKey, double lastEndKey,
@@ -739,34 +733,78 @@ void optimizedLineDataMulti(const KC& keys,
         if (s.intervalCount >= 2)
         {
             double firstVal = valueAt(c, s.intervalFirst);
-            if (!std::isnan(firstVal))
-            {
-                if (lastEndKey < intervalStartKey - epsilon)
-                    results[c].append(toPixel(intervalStartKey + epsilon * 0.2, firstVal));
-            }
+            if (lastEndKey < intervalStartKey - epsilon)
+                results[c].append(toPixel(intervalStartKey + epsilon * 0.2, firstVal));
             const double first = s.maxFirst ? s.maxVal : s.minVal;
             const double second = s.maxFirst ? s.minVal : s.maxVal;
-            if (!std::isnan(first))
-                results[c].append(toPixel(intervalStartKey + epsilon * 0.25, first));
-            if (!std::isnan(second))
-                results[c].append(toPixel(intervalStartKey + epsilon * 0.75, second));
+            results[c].append(toPixel(intervalStartKey + epsilon * 0.25, first));
+            results[c].append(toPixel(intervalStartKey + epsilon * 0.75, second));
             if (nextKey > intervalStartKey + epsilon * 2)
-            {
-                int prev = s.intervalFirst + s.intervalCount - 1;
-                double lastVal = valueAt(c, prev);
-                if (!std::isnan(lastVal))
-                    results[c].append(toPixel(intervalStartKey + epsilon * 0.8, lastVal));
-            }
+                results[c].append(toPixel(intervalStartKey + epsilon * 0.8,
+                                          valueAt(c, s.intervalLast)));
+        }
+        else if (s.intervalCount == 1)
+        {
+            results[c].append(toPixel(static_cast<double>(keys[s.intervalFirst]),
+                                      valueAt(c, s.intervalFirst)));
+        }
+    };
+
+    // NaN means "no sample". A run of NaN wider than a pixel is a hole you can see, so
+    // it breaks the column's line like a key gap; skipping it bridged the hole whenever
+    // zoomed out. Narrower runs (e.g. every other sample NaN) are skipped, so the line
+    // still shows at this zoom.
+    auto accept = [&](int c, int index, double k) {
+        ColState& s = cs[c];
+        const double v = valueAt(c, index);
+        if (std::isnan(v))
+        {
+            s.inNaNRun = true;
+            return;
+        }
+        if (s.inNaNRun && s.intervalLast >= 0
+            && qAbs(k - static_cast<double>(keys[s.intervalLast])) > keyEpsilon)
+        {
+            flushColumn(c, s, currentIntervalStartKey, lastIntervalEndKey, keyEpsilon, k);
+            results[c].append(nanPt);
+            s.intervalCount = 0;
+        }
+        s.inNaNRun = false;
+        if (s.intervalCount == 0)
+        {
+            s.minVal = s.maxVal = v;
+            s.intervalFirst = index;
+            s.maxFirst = false;
         }
         else
         {
-            // NaN values are skipped (not breaks) on the adaptive path — key
-            // gaps are detected separately; matching the single-column variant.
-            double val = valueAt(c, s.intervalFirst);
-            if (!std::isnan(val))
-                results[c].append(toPixel(static_cast<double>(keys[s.intervalFirst]), val));
+            if (v < s.minVal) { s.minVal = v; s.maxFirst = true; }
+            if (v > s.maxVal) { s.maxVal = v; s.maxFirst = false; }
+        }
+        s.intervalLast = index;
+        ++s.intervalCount;
+    };
+    // Closes every column's interval at a pixel boundary; a key gap also breaks the lines.
+    auto closeIntervals = [&](double nextKey, bool gap) {
+        for (int c = 0; c < numColumns; ++c)
+        {
+            if (cs[c].intervalCount > 0)
+                flushColumn(c, cs[c], currentIntervalStartKey, lastIntervalEndKey, keyEpsilon,
+                            nextKey);
+            if (gap)
+            {
+                results[c].append(nanPt);
+                cs[c].intervalLast = -1;
+            }
+            cs[c].intervalCount = 0;
         }
     };
+
+    for (int c = 0; c < numColumns; ++c)
+    {
+        cs[c] = {qQNaN(), qQNaN(), i, -1, 0, false, false};
+        accept(c, i, static_cast<double>(keys[i]));
+    }
 
     const uint8_t* gapData = gaps.data.data();
     const bool hasAnyGap = gaps.hasAnyGap;
@@ -774,87 +812,16 @@ void optimizedLineDataMulti(const KC& keys,
     ++i;
     while (i < end)
     {
-        if (hasAnyGap && gapData[i - begin])
+        const double k = static_cast<double>(keys[i]);
+        const bool gap = hasAnyGap && gapData[i - begin];
+        if (gap || k >= nextBoundary)
         {
-            double k = static_cast<double>(keys[i]);
-            for (int c = 0; c < numColumns; ++c)
-            {
-                flushColumn(c, cs[c], currentIntervalStartKey, lastIntervalEndKey,
-                            keyEpsilon, k);
-                results[c].append(nanPt);
-                double v = valueAt(c, i);
-                cs[c] = {v, v, i, 1, false};
-            }
-            lastIntervalEndKey = currentIntervalStartKey;
-            if (useInlineTransform)
-            {
-                int pixel = static_cast<int>(keyTf.toPixel(k)) + reversedRound;
-                currentIntervalStartKey = keyTf.toCoord(pixel);
-            }
-            else
-            {
-                currentIntervalStartKey = keyAxis->pixelToCoord(
-                    int(keyAxis->coordToPixel(k) + reversedRound));
-                if (keyEpsilonVariable)
-                    keyEpsilon = qAbs(currentIntervalStartKey
-                        - keyAxis->pixelToCoord(keyAxis->coordToPixel(currentIntervalStartKey)
-                                                + 1.0 * reversedFactor));
-            }
-            nextBoundary = currentIntervalStartKey + keyEpsilon;
-            ++i;
-            continue;
+            closeIntervals(k, gap);
+            lastIntervalEndKey = gap ? currentIntervalStartKey : static_cast<double>(keys[i - 1]);
+            startIntervalAt(k);
         }
-
-        double k = static_cast<double>(keys[i]);
-        if (k < nextBoundary)
-        {
-            for (int c = 0; c < numColumns; ++c)
-            {
-                double v = valueAt(c, i);
-                if (!std::isnan(v))
-                {
-                    // a NaN-seeded interval (reset on a NaN sample) must
-                    // re-seed here, or std::min/max stay NaN-poisoned
-                    if (std::isnan(cs[c].minVal))
-                    {
-                        cs[c].minVal = v;
-                        cs[c].maxVal = v;
-                    }
-                    else
-                    {
-                        if (v < cs[c].minVal) { cs[c].minVal = v; cs[c].maxFirst = true; }
-                        if (v > cs[c].maxVal) { cs[c].maxVal = v; cs[c].maxFirst = false; }
-                    }
-                }
-                ++cs[c].intervalCount;
-            }
-        }
-        else
-        {
-            for (int c = 0; c < numColumns; ++c)
-            {
-                flushColumn(c, cs[c], currentIntervalStartKey, lastIntervalEndKey,
-                            keyEpsilon, k);
-                double v = valueAt(c, i);
-                cs[c] = {v, v, i, 1, false};
-            }
-            lastIntervalEndKey = static_cast<double>(keys[i - 1]);
-            if (useInlineTransform)
-            {
-                int pixel = static_cast<int>(keyTf.toPixel(k)) + reversedRound;
-                currentIntervalStartKey = keyTf.toCoord(pixel);
-            }
-            else
-            {
-                currentIntervalStartKey = keyAxis->pixelToCoord(
-                    int(keyAxis->coordToPixel(k) + reversedRound));
-                if (keyEpsilonVariable)
-                    keyEpsilon = qAbs(currentIntervalStartKey
-                        - keyAxis->pixelToCoord(keyAxis->coordToPixel(currentIntervalStartKey)
-                                                + 1.0 * reversedFactor));
-            }
-            nextBoundary = currentIntervalStartKey + keyEpsilon;
-        }
+        for (int c = 0; c < numColumns; ++c)
+            accept(c, i, k);
         ++i;
     }
 
