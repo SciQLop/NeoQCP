@@ -18,6 +18,7 @@ private slots:
     void detectsAxisRectResize();
     void exportedSpanHasNoOutlineTheScreenLacks();
     void dashedSpanBorderIsDashedOnScreen();
+    void gradientSpanBrushLooksTheSameOnScreen();
 
 private:
     QCustomPlot* mPlot = nullptr;

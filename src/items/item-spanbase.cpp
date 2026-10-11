@@ -56,6 +56,13 @@ bool QCPAbstractSpanItem::tryRhiDraw(QCPPainter* painter)
 {
     if (auto* layer = mParentPlot ? mParentPlot->spanRhiLayer() : nullptr)
     {
+        // The GPU fill is one flat colour: a gradient or pattern brush is painted with QPainter.
+        const Qt::BrushStyle fill = mainBrush().style();
+        if (fill != Qt::NoBrush && fill != Qt::SolidPattern)
+        {
+            layer->unregisterSpan(this);
+            return false;
+        }
         layer->registerSpan(this);
         if (!painter->isExporting())
             return true;

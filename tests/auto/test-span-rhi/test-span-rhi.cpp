@@ -152,3 +152,26 @@ void TestSpanRhi::dashedSpanBorderIsDashedOnScreen()
     QVERIFY2(qAbs(onScreen - inExport) < 0.15,
              qPrintable(QString("screen %1, export %2").arg(onScreen).arg(inExport)));
 }
+
+// The GPU span fill is one flat colour (brush().color(): black for a gradient).
+void TestSpanRhi::gradientSpanBrushLooksTheSameOnScreen()
+{
+    if (!waitForRhi(mPlot))
+        QSKIP("No QRhi available — spans are drawn on the GPU only with a real backend");
+    auto* span = new QCPItemVSpan(mPlot);
+    span->setRange(QCPRange(5, 9));
+    QLinearGradient gradient(0, 0, 0, 300);
+    gradient.setColorAt(0, Qt::red);
+    gradient.setColorAt(1, Qt::blue);
+    span->setBrush(gradient);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    const QImage screen = mPlot->grabFramebuffer();
+    const double dpr = screen.devicePixelRatio();
+    const QImage exported = mPlot->toPixmap(mPlot->width(), mPlot->height(), dpr).toImage();
+    const int x = qRound(mPlot->xAxis->coordToPixel(7) * dpr);
+    const int y = qRound(mPlot->yAxis->coordToPixel(5) * dpr);
+    const QColor onScreen = screen.pixelColor(x, y), inExport = exported.pixelColor(x, y);
+    QVERIFY2(qAbs(onScreen.red() - inExport.red()) < 40 && qAbs(onScreen.blue() - inExport.blue()) < 40,
+             qPrintable(QString("screen %1, export %2").arg(onScreen.name(), inExport.name())));
+}
