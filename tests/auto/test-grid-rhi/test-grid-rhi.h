@@ -12,6 +12,7 @@ private slots:
     void gridRhiLayerCreatedLazily();
     void rasterExportOfAShownPlotKeepsGpuLinesAndFills();
     void layerReplotDoesNotStackGpuGeometry();
+    void gradientGraphFillLooksTheSameOnScreenAndInExports();
     void replotDoesNotCrash();
     void replotWithSubGridDoesNotCrash();
     void replotWithZeroLineDoesNotCrash();

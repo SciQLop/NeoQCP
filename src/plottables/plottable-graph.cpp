@@ -999,8 +999,9 @@ void QCPGraph::drawFill(QCPPainter* painter, QVector<QPointF>* lines) const
     const QVector<QCPDataRange> segments = getNonNanSegments(lines, keyAxis()->orientation());
     if (!mChannelFillGraph)
     {
+        // The GPU fill is one flat colour: gradients and patterns are painted with QPainter.
         if (auto* rhi = mParentPlot ? mParentPlot->rhi() : nullptr;
-            rhi && !painter->isExporting())
+            rhi && !painter->isExporting() && painter->brush().style() == Qt::SolidPattern)
         {
             auto* prl = mParentPlot->plottableRhiLayer(mLayer);
             if (prl)

@@ -170,6 +170,33 @@ void TestGridRhi::layerReplotDoesNotStackGpuGeometry()
     QCOMPARE(prl->drawEntries().size(), entries);
 }
 
+// The GPU fill of a QCPGraph took brush().color() only: a gradient became a flat colour (black
+// for a QLinearGradient, whose colour() is black) on screen, while exports painted the gradient.
+void TestGridRhi::gradientGraphFillLooksTheSameOnScreenAndInExports()
+{
+    if (!showAndHasRhiGrid(mPlot))
+        QSKIP("No QRhi available — the GPU fill needs a real backend");
+    mPlot->xAxis->grid()->setVisible(false);
+    mPlot->yAxis->grid()->setVisible(false);
+    auto* graph = mPlot->addGraph();
+    graph->setData(QVector<double> { -5, 5 }, QVector<double> { 4, 4 });
+    graph->setPen(Qt::NoPen);
+    QLinearGradient gradient(0, 0, 0, 300);
+    gradient.setColorAt(0, Qt::red);
+    gradient.setColorAt(1, Qt::blue);
+    graph->setBrush(gradient);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCoreApplication::processEvents();
+
+    const QImage screen = mPlot->grabFramebuffer();
+    const QImage exported = mPlot->toPixmap(400, 300, screen.devicePixelRatio()).toImage();
+    const int x = qRound(mPlot->xAxis->coordToPixel(0) * screen.devicePixelRatio());
+    const int y = qRound(mPlot->yAxis->coordToPixel(2) * screen.devicePixelRatio());
+    const QColor onScreen = screen.pixelColor(x, y), inExport = exported.pixelColor(x, y);
+    QVERIFY2(qAbs(onScreen.red() - inExport.red()) < 40 && qAbs(onScreen.blue() - inExport.blue()) < 40,
+             qPrintable(QString("screen %1, export %2").arg(onScreen.name(), inExport.name())));
+}
+
 void TestGridRhi::tickMarksFollowPanWithoutRebuild()
 {
     if (!showAndHasRhiGrid(mPlot))
