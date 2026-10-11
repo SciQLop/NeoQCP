@@ -218,31 +218,23 @@ void QCPHistogram2D::setDataScaleType(QCPAxis::ScaleType type)
     }
 }
 
-void QCPHistogram2D::rescaleDataRange(bool recalc)
+QCPRange QCPHistogram2D::colorDataBounds(bool& found) const
 {
-    if (!mDataSource)
-        return;
+    found = false;
     auto* data = mPipeline.result();
-    if (!data)
-    {
-        if (recalc)
-            mPipeline.onDataChanged();
-        return;
-    }
-
+    if (!mDataSource || !data)
+        return {};
     if (mNormalization == nNone)
     {
-        QCPRange range = data->dataBounds();
-        if (range.lower < range.upper)
-            setDataRange(range);
-        return;
+        found = true;
+        return data->dataBounds();
     }
 
-    // Compute bounds over normalized values
+    // Bounds of the normalized values
     const int keySz = data->keySize();
     const int valSz = data->valueSize();
     if (keySz == 0 || valSz == 0)
-        return;
+        return {};
 
     QVector<double> colSums(keySz, 0.0);
     for (int ki = 0; ki < keySz; ++ki)
@@ -262,8 +254,24 @@ void QCPHistogram2D::rescaleDataRange(bool recalc)
             if (norm > hi) hi = norm;
         }
     }
-    if (lo < hi)
-        setDataRange(QCPRange(lo, hi));
+    found = lo <= hi;
+    return found ? QCPRange(lo, hi) : QCPRange();
+}
+
+void QCPHistogram2D::rescaleDataRange(bool recalc)
+{
+    if (!mDataSource)
+        return;
+    if (!mPipeline.result())
+    {
+        if (recalc)
+            mPipeline.onDataChanged();
+        return;
+    }
+    bool found = false;
+    const QCPRange range = colorDataBounds(found);
+    if (found && range.lower < range.upper)
+        setDataRange(range);
 }
 
 bool QCPHistogram2D::canProduceContent() const

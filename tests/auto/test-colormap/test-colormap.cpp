@@ -715,3 +715,21 @@ void TestColorMap::cleanup()
 {
   delete mPlot;
 }
+
+// QCPColorScale::rescaleDataRange() only looked at classic QCPColorMaps: with a QCPColorMap2
+// (or a QCPHistogram2D) attached it did nothing.
+void TestColorMap::QCPColorScale_rescaleDataRangeIncludesColorMap2()
+{
+  auto* scale = new QCPColorScale(mPlot);
+  mPlot->plotLayout()->addElement(0, 1, scale);
+  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  cm->setColorScale(scale);
+  std::vector<double> x = {0, 1, 2};
+  std::vector<double> y = {0, 1};
+  std::vector<double> z = {5, 6, 7, 8, 9, 10};
+  cm->setData(x, y, z);
+
+  scale->rescaleDataRange(false);
+  QCOMPARE(scale->dataRange().lower, 5.0);
+  QCOMPARE(scale->dataRange().upper, 10.0);
+}

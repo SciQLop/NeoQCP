@@ -230,18 +230,24 @@ void QCPColorMap2::setDataScaleType(QCPAxis::ScaleType type)
     }
 }
 
+QCPRange QCPColorMap2::colorDataBounds(bool& found, bool recalc) const
+{
+    found = false;
+    if (!mDataSource)
+        return {};
+    if (auto* data = mPipeline.result(); data && !recalc)
+    {
+        found = true;
+        return data->dataBounds();
+    }
+    return mDataSource->zRange(found);
+}
+
 void QCPColorMap2::rescaleDataRange(bool recalc)
 {
-    if (!mDataSource)
-        return;
-    auto* data = mPipeline.result();
     bool found = false;
-    QCPRange range;
-    if (data && !recalc)
-        range = data->dataBounds();
-    else
-        range = mDataSource->zRange(found);
-    if (range.lower < range.upper)
+    const QCPRange range = colorDataBounds(found, recalc);
+    if (found && range.lower < range.upper)
         setDataRange(range);
 }
 

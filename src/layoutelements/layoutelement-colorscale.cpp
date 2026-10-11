@@ -30,6 +30,8 @@
 #include "../painting/painter.h"
 #include "../plottables/plottable.h"
 #include "../plottables/plottable-colormap.h"
+#include "../plottables/plottable-colormap2.h"
+#include "../plottables/plottable-histogram2d.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPColorScale
@@ -405,44 +407,54 @@ QList<QCPColorMap*> QCPColorScale::colorMaps() const
 */
 void QCPColorScale::rescaleDataRange(bool onlyVisibleMaps)
 {
-    QList<QCPColorMap*> maps = colorMaps();
     QCPRange newRange;
     bool haveRange = false;
     QCP::SignDomain sign = QCP::sdBoth;
     if (mDataScaleType == QCPAxis::stLogarithmic)
         sign = (mDataRange.upper < 0 ? QCP::sdNegative : QCP::sdPositive);
-    for (QCPColorMap* map : maps)
-    {
-        if (!map->realVisibility() && onlyVisibleMaps)
-            continue;
-        QCPRange mapRange;
-        if (map->colorScale() == this)
+    auto include = [&](QCPRange mapRange) {
+        if (sign == QCP::sdPositive)
         {
-            bool currentFoundRange = true;
-            mapRange = map->data()->dataBounds();
-            if (sign == QCP::sdPositive)
-            {
-                if (mapRange.lower <= 0 && mapRange.upper > 0)
-                    mapRange.lower = mapRange.upper * 1e-3;
-                else if (mapRange.lower <= 0 && mapRange.upper <= 0)
-                    currentFoundRange = false;
-            }
-            else if (sign == QCP::sdNegative)
-            {
-                if (mapRange.upper >= 0 && mapRange.lower < 0)
-                    mapRange.upper = mapRange.lower * 1e-3;
-                else if (mapRange.upper >= 0 && mapRange.lower >= 0)
-                    currentFoundRange = false;
-            }
-            if (currentFoundRange)
-            {
-                if (!haveRange)
-                    newRange = mapRange;
-                else
-                    newRange.expand(mapRange);
-                haveRange = true;
-            }
+            if (mapRange.lower <= 0 && mapRange.upper > 0)
+                mapRange.lower = mapRange.upper * 1e-3;
+            else if (mapRange.lower <= 0 && mapRange.upper <= 0)
+                return;
         }
+        else if (sign == QCP::sdNegative)
+        {
+            if (mapRange.upper >= 0 && mapRange.lower < 0)
+                mapRange.upper = mapRange.lower * 1e-3;
+            else if (mapRange.upper >= 0 && mapRange.lower >= 0)
+                return;
+        }
+        if (!haveRange)
+            newRange = mapRange;
+        else
+            newRange.expand(mapRange);
+        haveRange = true;
+    };
+    // Every colormap attached to this scale: classic maps, and the zero-copy QCPColorMap2 and
+    // QCPHistogram2D, which this loop used to miss.
+    for (int i = 0; mParentPlot && i < mParentPlot->plottableCount(); ++i)
+    {
+        QCPAbstractPlottable* plottable = mParentPlot->plottable(i);
+        if (!plottable->realVisibility() && onlyVisibleMaps)
+            continue;
+        bool found = false;
+        QCPRange mapRange;
+        if (auto* map = qobject_cast<QCPColorMap*>(plottable); map && map->colorScale() == this)
+        {
+            mapRange = map->data()->dataBounds();
+            found = true;
+        }
+        else if (auto* map2 = qobject_cast<QCPColorMap2*>(plottable);
+                 map2 && map2->colorScale() == this)
+            mapRange = map2->colorDataBounds(found);
+        else if (auto* hist = qobject_cast<QCPHistogram2D*>(plottable);
+                 hist && hist->colorScale() == this)
+            mapRange = hist->colorDataBounds(found);
+        if (found)
+            include(mapRange);
     }
     if (haveRange)
     {

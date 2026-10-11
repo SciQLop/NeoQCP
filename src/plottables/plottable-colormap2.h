@@ -66,6 +66,9 @@ public:
 
     void setColorScale(QCPColorScale* colorScale);
     void rescaleDataRange(bool recalc = false);
+    //! The range of the colour values: of the resampled view, or of all data with \a recalc
+    //! (or before the first resample). \a found is false when there is none.
+    [[nodiscard]] QCPRange colorDataBounds(bool& found, bool recalc = false) const;
 
     QCPColormapPipeline& pipeline() { return mPipeline; }
     const QCPColormapPipeline& pipeline() const { return mPipeline; }

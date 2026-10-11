@@ -77,6 +77,8 @@ public:
     QCPAxis::ScaleType dataScaleType() const { return mRenderer.dataScaleType(); }
     QCPColorScale* colorScale() const { return mRenderer.colorScale(); }
     void rescaleDataRange(bool recalc = false);
+    //! The range of the binned (normalized) counts; \a found is false before the first binning.
+    [[nodiscard]] QCPRange colorDataBounds(bool& found) const;
 
     // Pipeline access
     QCPHistogramPipeline& pipeline() { return mPipeline; }
