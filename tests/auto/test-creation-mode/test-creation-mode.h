@@ -15,6 +15,7 @@ private slots:
 
     // Click-move-click creation
     void vspanCreationClickMoveClick();
+    void itemCreatedInASecondAxisRectIsClippedToIt();
     void hspanCreationClickMoveClick();
     void rspanCreationClickMoveClick();
 

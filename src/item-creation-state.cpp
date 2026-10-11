@@ -172,6 +172,8 @@ void QCPItemCreationState::rebindPositions(QCPAbstractItem* item, QCPAxis* keyAx
             pos->setAxisRect(axisRect);
         }
     }
+    // The item draws in that rect too: spans take their full height or width from the clip rect.
+    item->setClipAxisRect(axisRect);
 }
 
 QCPAxisRect* QCPItemCreationState::axisRectAt(const QPointF& pos) const

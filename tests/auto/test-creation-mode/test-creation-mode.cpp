@@ -391,3 +391,25 @@ void TestCreationMode::multiAxisRectCreation()
     QVERIFY(span);
     QVERIFY(span->range().lower > 10);
 }
+
+// The creation state moved the new item's positions to the axis rect under the mouse, but not its
+// clip rect: a span created in a second axis rect took the first rect's height.
+void TestCreationMode::itemCreatedInASecondAxisRectIsClippedToIt()
+{
+    auto* second = new QCPAxisRect(mPlot);
+    mPlot->plotLayout()->addElement(1, 0, second);
+    second->axis(QCPAxis::atBottom)->setRange(0, 10);
+    mPlot->replot();
+    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return new QCPItemVSpan(p); });
+    mPlot->setItemPositioner(vspanPositioner);
+    mPlot->setCreationModeEnabled(true);
+
+    const QPoint p1(second->axis(QCPAxis::atBottom)->coordToPixel(2), second->center().y());
+    const QPoint p2(second->axis(QCPAxis::atBottom)->coordToPixel(6), second->center().y());
+    sendMouseClick(mPlot, Qt::LeftButton, Qt::NoModifier, p1);
+    sendMouseMove(mPlot, p2);
+    sendMouseClick(mPlot, Qt::LeftButton, Qt::NoModifier, p2);
+
+    QCOMPARE(mPlot->itemCount(), 1);
+    QCOMPARE(mPlot->item(0)->clipAxisRect(), second);
+}
