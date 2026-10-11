@@ -1000,7 +1000,7 @@ void QCPGraph::drawFill(QCPPainter* painter, QVector<QPointF>* lines) const
     if (!mChannelFillGraph)
     {
         if (auto* rhi = mParentPlot ? mParentPlot->rhi() : nullptr;
-            rhi && !painter->modes().testFlag(QCPPainter::pmVectorized))
+            rhi && !painter->isExporting())
         {
             auto* prl = mParentPlot->plottableRhiLayer(mLayer);
             if (prl)

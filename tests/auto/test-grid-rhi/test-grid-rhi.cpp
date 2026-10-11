@@ -117,6 +117,33 @@ void TestGridRhi::exportStillUsesQPainter()
     QCOMPARE(pm.height(), 150);
 }
 
+// A shown plot draws QCPGraph lines and fills on the GPU. toPixmap() and the raster saves
+// paint with pmNoCaching only, and the line/fill code checked pmVectorized alone, so the
+// export sent them to the live GPU layer and the image came out without them.
+void TestGridRhi::rasterExportOfAShownPlotKeepsGpuLinesAndFills()
+{
+    if (!showAndHasRhiGrid(mPlot))
+        QSKIP("No QRhi available — the GPU line path needs a real backend");
+    auto* graph = mPlot->addGraph();
+    graph->setData(QVector<double> { -4, 0, 4 }, QVector<double> { -4, 4, -4 });
+    graph->setPen(QPen(Qt::red, 4));
+    graph->setBrush(QBrush(Qt::blue));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCoreApplication::processEvents();
+
+    const QImage image = mPlot->toPixmap(400, 300).toImage();
+    int red = 0, blue = 0;
+    for (int y = 0; y < image.height(); ++y)
+        for (int x = 0; x < image.width(); ++x)
+        {
+            const QColor c = image.pixelColor(x, y);
+            red += c.red() > 200 && c.green() < 60 && c.blue() < 60;
+            blue += c.blue() > 200 && c.red() < 60 && c.green() < 60;
+        }
+    QVERIFY2(red > 100, qPrintable(QStringLiteral("line pixels: %1").arg(red)));
+    QVERIFY2(blue > 1000, qPrintable(QStringLiteral("fill pixels: %1").arg(blue)));
+}
+
 void TestGridRhi::tickMarksFollowPanWithoutRebuild()
 {
     if (!showAndHasRhiGrid(mPlot))

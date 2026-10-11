@@ -57,8 +57,7 @@ bool QCPAbstractSpanItem::tryRhiDraw(QCPPainter* painter)
     if (auto* layer = mParentPlot ? mParentPlot->spanRhiLayer() : nullptr)
     {
         layer->registerSpan(this);
-        if (!painter->modes().testFlag(QCPPainter::pmVectorized)
-            && !painter->modes().testFlag(QCPPainter::pmNoCaching))
+        if (!painter->isExporting())
             return true;
     }
     return false;

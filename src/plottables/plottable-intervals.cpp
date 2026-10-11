@@ -1092,8 +1092,7 @@ void QCPIntervals::setStyle(Style style)
 bool QCPIntervals::drawBarsOnGpu(QCPPainter* painter)
 {
     auto* rhi = mParentPlot->rhi();
-    if (!rhi || painter->modes().testFlag(QCPPainter::pmVectorized)
-        || painter->modes().testFlag(QCPPainter::pmNoCaching))
+    if (!rhi || painter->isExporting())
         return false;
     auto* layer = mParentPlot->plottableRhiLayer(mLayer);
     if (!layer)

@@ -987,8 +987,7 @@ void QCPMultiGraph::draw(QCPPainter* painter)
 
     // --- Line caching with GPU translation ---
     const QSize currentPlotSize(mKeyAxis->axisRect()->width(), mKeyAxis->axisRect()->height());
-    const bool isExportMode = painter->modes().testFlag(QCPPainter::pmNoCaching)
-                            || painter->modes().testFlag(QCPPainter::pmVectorized);
+    const bool isExportMode = painter->isExporting();
     auto [needFreshLines, gpuOffset] = qcp::evaluateLineCache(
         mLineCacheDirty, mCachedLines.isEmpty(),
         currentPlotSize, mCachedPlotSize,

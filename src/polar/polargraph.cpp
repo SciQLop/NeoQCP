@@ -1024,8 +1024,7 @@ void QCPPolarGraph::drawPolyline(QCPPainter* painter, const QVector<QPointF>& li
     // if drawing solid line and not in PDF, use much faster line drawing instead of polyline:
     if (mParentPlot->plottingHints().testFlag(QCP::phFastPolylines)
         && painter->pen().style() == Qt::SolidLine
-        && !painter->modes().testFlag(QCPPainter::pmVectorized)
-        && !painter->modes().testFlag(QCPPainter::pmNoCaching))
+        && !painter->isExporting())
     {
         int i = 0;
         bool lastIsNan = false;

@@ -56,8 +56,7 @@ void drawPolylineWithGpuFallback(QCPPainter* painter,
                                   const QRect& clipRect)
 {
     if (auto* rhi = parentPlot ? parentPlot->rhi() : nullptr;
-        rhi && !painter->modes().testFlag(QCPPainter::pmVectorized)
-            && !painter->modes().testFlag(QCPPainter::pmNoCaching)
+        rhi && !painter->isExporting()
             && pen.style() == Qt::SolidLine)
     {
         if (auto* prl = parentPlot->plottableRhiLayer(layer))
@@ -99,8 +98,7 @@ void drawPolylineCached(QCPPainter* painter,
                          ExtrusionCache& cache)
 {
     if (auto* rhi = parentPlot ? parentPlot->rhi() : nullptr;
-        rhi && !painter->modes().testFlag(QCPPainter::pmVectorized)
-            && !painter->modes().testFlag(QCPPainter::pmNoCaching)
+        rhi && !painter->isExporting()
             && pen.style() == Qt::SolidLine)
     {
         if (auto* prl = parentPlot->plottableRhiLayer(layer))
@@ -178,8 +176,7 @@ void drawColoredPolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCP
                                bool freshLines, ExtrusionCache& cache)
 {
     auto* prl = (parentPlot && parentPlot->rhi()
-                 && !painter->modes().testFlag(QCPPainter::pmVectorized)
-                 && !painter->modes().testFlag(QCPPainter::pmNoCaching)
+                 && !painter->isExporting()
                  && pen.style() == Qt::SolidLine)
         ? parentPlot->plottableRhiLayer(layer) : nullptr;
     if (!prl)

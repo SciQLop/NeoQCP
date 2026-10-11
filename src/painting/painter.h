@@ -63,6 +63,9 @@ public:
     bool antialiasing() const { return testRenderHint(QPainter::Antialiasing); }
 
     PainterModes modes() const { return mModes; }
+    //! True while exporting (toPixmap, save*, toPainter, PDF): everything is painted here, so
+    //! nothing may go to the live GPU layers of the plot.
+    bool isExporting() const { return mModes.testFlag(pmVectorized) || mModes.testFlag(pmNoCaching); }
 
     // setters:
     void setAntialiasing(bool enabled);

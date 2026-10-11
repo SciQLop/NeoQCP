@@ -175,8 +175,7 @@ void QCPGrid::draw(QCPPainter* painter)
     if (auto* plot = mParentAxis->parentPlot())
     {
         if (plot->gridRhiLayer()
-            && !painter->modes().testFlag(QCPPainter::pmVectorized)
-            && !painter->modes().testFlag(QCPPainter::pmNoCaching))
+            && !painter->isExporting())
             return;
     }
 
@@ -2039,8 +2038,7 @@ void QCPAxis::draw(QCPPainter* painter)
     mAxisPainter->tickLabels = tickLabels;
     mAxisPainter->subTickPositions = subTickPositions;
     mAxisPainter->skipTickDrawing = mParentPlot && mParentPlot->gridRhiLayer()
-        && !painter->modes().testFlag(QCPPainter::pmVectorized)
-        && !painter->modes().testFlag(QCPPainter::pmNoCaching);
+        && !painter->isExporting();
     mAxisPainter->draw(painter);
 }
 

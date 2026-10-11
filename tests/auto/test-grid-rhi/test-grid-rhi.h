@@ -10,6 +10,7 @@ private slots:
     void cleanup();
 
     void gridRhiLayerCreatedLazily();
+    void rasterExportOfAShownPlotKeepsGpuLinesAndFills();
     void replotDoesNotCrash();
     void replotWithSubGridDoesNotCrash();
     void replotWithZeroLineDoesNotCrash();

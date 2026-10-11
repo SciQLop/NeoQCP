@@ -568,7 +568,7 @@ void QCPAbstractPlottable1D<DataType>::drawPolyline(QCPPainter* painter,
 {
     // GPU rendering path: extrude polyline into triangle strip
     if (auto* rhi = mParentPlot ? mParentPlot->rhi() : nullptr;
-        rhi && !painter->modes().testFlag(QCPPainter::pmVectorized)
+        rhi && !painter->isExporting()
             && painter->pen().style() == Qt::SolidLine)
     {
         auto* prl = mParentPlot->plottableRhiLayer(mLayer);
@@ -604,8 +604,7 @@ void QCPAbstractPlottable1D<DataType>::drawPolyline(QCPPainter* painter,
     // if drawing solid line and not in PDF, use much faster line drawing instead of polyline:
     if (mParentPlot->plottingHints().testFlag(QCP::phFastPolylines)
         && painter->pen().style() == Qt::SolidLine
-        && !painter->modes().testFlag(QCPPainter::pmVectorized)
-        && !painter->modes().testFlag(QCPPainter::pmNoCaching))
+        && !painter->isExporting())
     {
         int i = 0;
         bool lastIsNan = false;
