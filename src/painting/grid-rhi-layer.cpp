@@ -8,6 +8,8 @@
 
 #include <algorithm>
 #include <array>
+#include <utility>
+#include <vector>
 #include <cmath>
 
 using namespace qcp::rhi::span_grid;
@@ -213,6 +215,39 @@ QVector<QCPAxis*> QCPGridRhiLayer::orderedAxesForRect(QCPAxisRect* ar) const
     return axes;
 }
 
+namespace
+{
+// The visible pieces of a line from `from` to `to` (logical pixels) drawn with `pen`, laid out as
+// QPainter does: the dash pattern is in units of the pen width (zero width counts as 1), offset
+// by dashOffset(), and square or round caps lengthen each dash by half the width at both ends.
+// Without this every grid line was solid on screen, while exports followed the pen.
+std::vector<std::pair<float, float>> dashSegments(float from, float to, const QPen& pen)
+{
+    const QVector<qreal> pattern = pen.style() == Qt::SolidLine ? QVector<qreal>{} : pen.dashPattern();
+    const float unit = pen.widthF() > 0 ? float(pen.widthF()) : 1.0f;
+    float period = 0;
+    for (qreal step : pattern)
+        period += float(step) * unit;
+    if (pattern.size() < 2 || period <= 0)
+        return { { from, to } };
+    const float cap = pen.capStyle() == Qt::FlatCap ? 0.0f : unit / 2.0f;
+    std::vector<std::pair<float, float>> pieces;
+    float pos = from - std::fmod(float(pen.dashOffset()) * unit, period);
+    for (int i = 0; pos < to; ++i)
+    {
+        const float length = float(pattern[i % pattern.size()]) * unit;
+        if (i % 2 == 0)
+        {
+            const float a = std::max(from, pos - cap), b = std::min(to, pos + length + cap);
+            if (b > a)
+                pieces.emplace_back(a, b);
+        }
+        pos += length;
+    }
+    return pieces;
+}
+} // namespace
+
 void QCPGridRhiLayer::rebuildGeometry(float dpr, int outputHeight)
 {
     PROFILE_HERE_N("QCPGridRhiLayer::rebuildGeometry");
@@ -261,15 +296,13 @@ void QCPGridRhiLayer::rebuildGeometry(float dpr, int outputHeight)
                 float tv = float(tickValue - origin);
                 if (isHorizontal)
                 {
-                    appendBorder(mStagingVertices,
-                                 tv, pixTop, tv, pixBot,
-                                 color, 1, 0, halfW, 0, 1);
+                    for (const auto& [a, b] : dashSegments(pixTop, pixBot, pen))
+                        appendBorder(mStagingVertices, tv, a, tv, b, color, 1, 0, halfW, 0, 1);
                 }
                 else
                 {
-                    appendBorder(mStagingVertices,
-                                 pixLeft, tv, pixRight, tv,
-                                 color, 0, 1, halfW, 1, 0);
+                    for (const auto& [a, b] : dashSegments(pixLeft, pixRight, pen))
+                        appendBorder(mStagingVertices, a, tv, b, tv, color, 0, 1, halfW, 1, 0);
                 }
             };
 

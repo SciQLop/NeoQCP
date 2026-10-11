@@ -197,6 +197,38 @@ void TestGridRhi::gradientGraphFillLooksTheSameOnScreenAndInExports()
              qPrintable(QString("screen %1, export %2").arg(onScreen.name(), inExport.name())));
 }
 
+// The GPU grid drew every line solid: QCustomPlot's default dotted grid was solid on screen and
+// dotted only in exports.
+void TestGridRhi::dashedGridPenIsDashedOnScreen()
+{
+    if (!showAndHasRhiGrid(mPlot))
+        QSKIP("No QRhi available — the GPU grid needs a real backend");
+    mPlot->yAxis->grid()->setVisible(false);
+    mPlot->xAxis->grid()->setPen(QPen(Qt::black, 2, Qt::DashLine));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCoreApplication::processEvents();
+
+    const QImage frame = mPlot->grabFramebuffer();
+    const double dpr = frame.devicePixelRatio();
+    const QImage exported = mPlot->toPixmap(400, 300, dpr).toImage();
+    double tick = 0; // a tick other than 0, which the zero-line pen draws
+    for (double t : mPlot->xAxis->tickVector())
+        if (t != 0 && t > mPlot->xAxis->range().lower && t < mPlot->xAxis->range().upper)
+            tick = t;
+    const int x = qRound(mPlot->xAxis->coordToPixel(tick) * dpr);
+    const QRect r = mPlot->axisRect()->rect();
+    const auto inkFraction = [&](const QImage& image) {
+        int ink = 0, all = 0;
+        for (int y = qRound((r.top() + 5) * dpr); y < qRound((r.bottom() - 5) * dpr); ++y, ++all)
+            ink += image.pixelColor(x, y).lightness() < 128;
+        return double(ink) / all;
+    };
+    const double onScreen = inkFraction(frame), inExport = inkFraction(exported);
+    QVERIFY2(onScreen < 0.95, qPrintable(QString("solid on screen: %1").arg(onScreen)));
+    QVERIFY2(qAbs(onScreen - inExport) < 0.1,
+             qPrintable(QString("screen %1, export %2").arg(onScreen).arg(inExport)));
+}
+
 void TestGridRhi::tickMarksFollowPanWithoutRebuild()
 {
     if (!showAndHasRhiGrid(mPlot))

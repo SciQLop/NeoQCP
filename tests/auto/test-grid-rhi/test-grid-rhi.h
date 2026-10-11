@@ -13,6 +13,7 @@ private slots:
     void rasterExportOfAShownPlotKeepsGpuLinesAndFills();
     void layerReplotDoesNotStackGpuGeometry();
     void gradientGraphFillLooksTheSameOnScreenAndInExports();
+    void dashedGridPenIsDashedOnScreen();
     void replotDoesNotCrash();
     void replotWithSubGridDoesNotCrash();
     void replotWithZeroLineDoesNotCrash();
