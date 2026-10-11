@@ -1,20 +1,17 @@
 #include "mainwindow.h"
-#include "ui_mainwindow.h"
 
-MainWindow::MainWindow(QWidget *parent) :
+MainWindow::MainWindow(const QString &outputDir, QWidget *parent) :
   QMainWindow(parent),
-  ui(new Ui::MainWindow),
   customPlot(0),
   defaultBrush(QColor(80, 215, 10, 70))
 {
-  ui->setupUi(this);
-  
-  dir.setPath(qApp->applicationDirPath());
-  dir.mkdir("images");
-  if (!dir.cd("images"))
-    QMessageBox::critical(this, "Error", tr("Couldn't create and access image directory:\n%1").arg(dir.filePath("images")));
-  else
-    QTimer::singleShot(100, this, SLOT(run()));
+  if (!QDir().mkpath(outputDir) || !dir.cd(QDir(outputDir).absolutePath()))
+  {
+    qCritical() << "Couldn't create and access image directory:" << outputDir;
+    return;
+  }
+  mReady = true;
+  QTimer::singleShot(100, this, SLOT(run()));
 }
 
 void MainWindow::run()
@@ -37,12 +34,12 @@ void MainWindow::run()
         qDebug() << "Failed to invoke doc-image-generator method" << i;
     }
   }
-  QTimer::singleShot(0, qApp, SLOT(quit()));
+  QTimer::singleShot(0, qApp, [this]() { qApp->exit(mFailed ? 1 : 0); });
 }
 
 MainWindow::~MainWindow()
 {
-  delete ui;
+  delete customPlot;
 }
 
 void MainWindow::genScatterStyles()
@@ -77,7 +74,7 @@ void MainWindow::genScatterStyles()
     scatterIt.next();
     customPlot->graph()->setScatterStyle(QCPScatterStyle(scatterIt.key(), 8.5));
     QPixmap pm = customPlot->toPixmap(16, 16);
-    pm.save(dir.filePath(scatterIt.value()+".png"));
+    check(pm.save(dir.filePath(scatterIt.value()+".png")), scatterIt.value());
   }
 }
 
@@ -85,18 +82,18 @@ void MainWindow::genItemPixmap()
 {
   resetPlot();
   QCPItemPixmap *pixmapItem = new QCPItemPixmap(customPlot);
-  pixmapItem->setPixmap(QPixmap("./gnu.png"));
+  pixmapItem->setPixmap(QPixmap(GNU_PNG_PATH));
   pixmapItem->setScaled(true, Qt::IgnoreAspectRatio);
   pixmapItem->topLeft->setCoords(-0.2, 1);
   pixmapItem->bottomRight->setCoords(0.3, 0);
   labelItemAnchors(pixmapItem);
   QCPItemPixmap *pixmapItem2 = new QCPItemPixmap(customPlot);
-  pixmapItem2->setPixmap(QPixmap("./gnu.png"));
+  pixmapItem2->setPixmap(QPixmap(GNU_PNG_PATH));
   pixmapItem2->setScaled(true, Qt::IgnoreAspectRatio);
   pixmapItem2->topLeft->setCoords(1.2, 0);
   pixmapItem2->bottomRight->setCoords(0.7, 1);
   labelItemAnchors(pixmapItem2);
-  customPlot->savePng(dir.filePath("QCPItemPixmap.png"), 460, 160);
+  savePng("QCPItemPixmap.png", 460, 160);
 }
 
 void MainWindow::genItemRect()
@@ -107,7 +104,7 @@ void MainWindow::genItemRect()
   rect->topLeft->setCoords(0, 1);
   rect->bottomRight->setCoords(1, 0);
   labelItemAnchors(rect);
-  customPlot->savePng(dir.filePath("QCPItemRect.png"), 230, 160);
+  savePng("QCPItemRect.png", 230, 160);
 }
 
 void MainWindow::genItemEllipse()
@@ -118,7 +115,7 @@ void MainWindow::genItemEllipse()
   ellipse->topLeft->setCoords(-0.15, 1.1);
   ellipse->bottomRight->setCoords(1.1, 0);
   labelItemAnchors(ellipse);
-  customPlot->savePng(dir.filePath("QCPItemEllipse.png"), 300, 200);
+  savePng("QCPItemEllipse.png", 300, 200);
 }
 
 void MainWindow::genItemLine()
@@ -129,7 +126,7 @@ void MainWindow::genItemLine()
   line->end->setCoords(1.1, 0.2);
   line->setHead(QCPLineEnding::esSpikeArrow);
   labelItemAnchors(line);
-  customPlot->savePng(dir.filePath("QCPItemLine.png"), 230, 160);
+  savePng("QCPItemLine.png", 230, 160);
 }
 
 void MainWindow::genItemStraightLIne()
@@ -139,7 +136,7 @@ void MainWindow::genItemStraightLIne()
   straightLine->point1->setCoords(0, 0.4);
   straightLine->point2->setCoords(1, 0.6);
   labelItemAnchors(straightLine);
-  customPlot->savePng(dir.filePath("QCPItemStraightLine.png"), 230, 160);
+  savePng("QCPItemStraightLine.png", 230, 160);
 }
 
 void MainWindow::genItemCurve()
@@ -153,7 +150,7 @@ void MainWindow::genItemCurve()
   curve->setHead(QCPLineEnding::esSpikeArrow);
   curve->setTail(QCPLineEnding::esLineArrow);
   labelItemAnchors(curve);
-  customPlot->savePng(dir.filePath("QCPItemCurve.png"), 230, 160);
+  savePng("QCPItemCurve.png", 230, 160);
 }
 
 void MainWindow::genItemBracket()
@@ -164,7 +161,7 @@ void MainWindow::genItemBracket()
   bracket->right->setCoords(1.2, 0.65);
   bracket->setLength(12);
   labelItemAnchors(bracket, 8, true, false);
-  customPlot->savePng(dir.filePath("QCPItemBracket.png"), 230, 160);
+  savePng("QCPItemBracket.png", 230, 160);
   customPlot->clearItems();
   
   // generate image of multiple bracket lengths/styles:
@@ -204,7 +201,7 @@ void MainWindow::genItemBracket()
   topLabel2->setText("bsSquare");
   topLabel2->position->setCoords(0.85, 1.1);
   topLabel2->setFont(QFont(font().family(), 10));
-  customPlot->savePng(dir.filePath("QCPItemBracket-length.png"), 450, 200);
+  savePng("QCPItemBracket-length.png", 450, 200);
 }
 
 void MainWindow::genItemText()
@@ -217,7 +214,7 @@ void MainWindow::genItemText()
   text->setRotation(12);
   text->setBrush(defaultBrush);
   labelItemAnchors(text);
-  customPlot->savePng(dir.filePath("QCPItemText.png"), 300, 170);
+  savePng("QCPItemText.png", 300, 170);
 }
 
 void MainWindow::genItemTracer()
@@ -237,7 +234,7 @@ void MainWindow::genItemTracer()
   tracer->setGraph(customPlot->graph());
   tracer->setGraphKey(0.8);
   labelItemAnchors(tracer, 8, true, false);
-  customPlot->savePng(dir.filePath("QCPItemTracer.png"), 230, 160);
+  savePng("QCPItemTracer.png", 230, 160);
 }
 
 void MainWindow::genLineEnding()
@@ -266,7 +263,7 @@ void MainWindow::genLineEnding()
     text->setText(endingName);
   }
 
-  customPlot->savePng(dir.filePath("QCPLineEnding.png"), 500, 100);
+  savePng("QCPLineEnding.png", 500, 100);
 }
 
 void MainWindow::genMarginGroup()
@@ -319,7 +316,7 @@ void MainWindow::genMarginGroup()
   splitter->setClipToAxisRect(false);
   splitter->setPen(QPen(Qt::gray, 0, Qt::DashLine));
   
-  customPlot->savePng(dir.filePath("QCPMarginGroup.png"), 400, 400);
+  savePng("QCPMarginGroup.png", 400, 400);
 }
 
 void MainWindow::genAxisRectSpacingOverview()
@@ -365,7 +362,7 @@ void MainWindow::genAxisRectSpacingOverview()
   axisRectLabel->setText("QCPAxisRect");
   axisRectLabel->setColor(QColor(0, 0, 0, 60));
   
-  customPlot->savePng(dir.filePath("AxisRectSpacingOverview.png"), 400, 400);
+  savePng("AxisRectSpacingOverview.png", 400, 400);
 }
 
 void MainWindow::genAxisNamesOverview()
@@ -394,7 +391,7 @@ void MainWindow::genAxisNamesOverview()
   addArrow(QPointF(382, 145), QPointF(382, 245), "Grid line of\ny axis", Qt::AlignHCenter|Qt::AlignTop);
   addBracket(QPointF(263, 186), QPointF(263, 145), "Tick step", QPointF(8, 0), false, Qt::AlignLeft|Qt::AlignVCenter, QCPItemBracket::bsCurly);
   
-  customPlot->savePng(dir.filePath("AxisNamesOverview.png"), 450, 300);
+  savePng("AxisNamesOverview.png", 450, 300);
 }
 
 void MainWindow::genAxisTickers()
@@ -416,7 +413,7 @@ void MainWindow::genAxisTickers()
   fixedTicker->setScaleStrategy(QCPAxisTickerFixed::ssNone); // and no scaling of the tickstep (like multiples or powers) is allowed
   //! [axistickerfixed-creation]
   customPlot->xAxis->ticker()->setTickCount(9);
-  customPlot->savePng(dir.filePath("axisticker-fixed.png"), 600, 50);
+  savePng("axisticker-fixed.png", 600, 50);
   
   
   // QCPAxisTickerLog:
@@ -429,13 +426,13 @@ void MainWindow::genAxisTickers()
   customPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
   //! [axistickerlog-creation]
   customPlot->xAxis->ticker()->setTickCount(9);
-  customPlot->savePng(dir.filePath("axisticker-log.png"), 600, 50);
+  savePng("axisticker-log.png", 600, 50);
   
   QString formatBefore = customPlot->xAxis->numberFormat();
   int precBefore = customPlot->xAxis->numberPrecision();
   customPlot->xAxis->setNumberFormat("eb");
   customPlot->xAxis->setNumberPrecision(0);
-  customPlot->savePng(dir.filePath("axisticker-log-powers.png"), 600, 50);
+  savePng("axisticker-log-powers.png", 600, 50);
   customPlot->xAxis->setScaleType(QCPAxis::stLinear);
   customPlot->xAxis->setNumberFormat(formatBefore);
   customPlot->xAxis->setNumberPrecision(precBefore);
@@ -451,7 +448,7 @@ void MainWindow::genAxisTickers()
   dateTimeTicker->setDateTimeFormat("d. MMM\nyyyy");
   //! [axistickerdatetime-creation]
   customPlot->xAxis->ticker()->setTickCount(9);
-  customPlot->savePng(dir.filePath("axisticker-datetime.png"), 600, 50);
+  savePng("axisticker-datetime.png", 600, 50);
   
   
   // QCPAxisTickerTime:
@@ -463,14 +460,14 @@ void MainWindow::genAxisTickers()
   timeTicker->setTimeFormat("%m:%s");
   //! [axistickertime-creation]
   customPlot->xAxis->ticker()->setTickCount(7);
-  customPlot->savePng(dir.filePath("axisticker-time.png"), 600, 50);
+  savePng("axisticker-time.png", 600, 50);
   
   customPlot->xAxis->setRange(-3600*12, 3600*24*4);
   //! [axistickertime-creation-2]
   timeTicker->setTimeFormat("day %d\n%h:%m");
   //! [axistickertime-creation-2]
   customPlot->xAxis->ticker()->setTickCount(9);
-  customPlot->savePng(dir.filePath("axisticker-time2.png"), 600, 50);
+  savePng("axisticker-time2.png", 600, 50);
   
   
   // QCPAxisTickerPi:
@@ -480,7 +477,7 @@ void MainWindow::genAxisTickers()
   customPlot->xAxis->setTicker(piTicker);
   //! [axistickerpi-creation]
   customPlot->xAxis->ticker()->setTickCount(7);
-  customPlot->savePng(dir.filePath("axisticker-pi.png"), 600, 50);
+  savePng("axisticker-pi.png", 600, 50);
   
   
   // QCPAxisTickerText:
@@ -497,7 +494,7 @@ void MainWindow::genAxisTickers()
   textTicker->addTick(6.0, "Animals");
   textTicker->addTick(8.0, "Vogons");
   //! [axistickertext-creation]
-  customPlot->savePng(dir.filePath("axisticker-text.png"), 600, 50);
+  savePng("axisticker-text.png", 600, 50);
 }
 
 void MainWindow::genLayoutsystem_AddingPlotTitle()
@@ -514,7 +511,7 @@ void MainWindow::genLayoutsystem_AddingPlotTitle()
   customPlot->plotLayout()->addElement(0, 0, title); // place the title in the empty cell we've just created
   //! [plottitle-example]
   
-  customPlot->savePng(dir.filePath("layoutsystem-addingplottitle.png"), 300, 200);
+  savePng("layoutsystem-addingplottitle.png", 300, 200);
 }
 
 void MainWindow::genLayoutsystem_MultipleAxisRects()
@@ -548,7 +545,7 @@ void MainWindow::genLayoutsystem_MultipleAxisRects()
   }
   //! [layoutsystem-example]
   
-  customPlot->savePng(dir.filePath("layoutsystem-multipleaxisrects.png"), 400, 300);
+  savePng("layoutsystem-multipleaxisrects.png", 400, 300);
 }
 
 void MainWindow::genLayoutsystem_AddingLegendTitle()
@@ -572,7 +569,7 @@ void MainWindow::genLayoutsystem_AddingLegendTitle()
   customPlot->legend->addElement(0, 0, legendTitle); // place the text element into the empty cell
   //! [legendtitle-example]
   
-  customPlot->savePng(dir.filePath("layoutsystem-addinglegendtitle.png"), 300, 200);
+  savePng("layoutsystem-addinglegendtitle.png", 300, 200);
 }
 
 void MainWindow::genLayoutsystem_MovingLegend()
@@ -598,7 +595,7 @@ void MainWindow::genLayoutsystem_MovingLegend()
   customPlot->plotLayout()->setRowStretchFactor(1, 0.001);
   //! [movinglegend-example]
   
-  customPlot->savePng(dir.filePath("layoutsystem-movinglegend.png"), 300, 200);
+  savePng("layoutsystem-movinglegend.png", 300, 200);
 }
 
 void MainWindow::genQCPGraph()
@@ -648,7 +645,7 @@ void MainWindow::genQCPGraph()
   customPlot->xAxis->setRange(-1, 11);
   customPlot->yAxis->setRange(-0.5, 2.4);
   
-  customPlot->savePng(dir.filePath("QCPGraph.png"), 450, 200);
+  savePng("QCPGraph.png", 450, 200);
 }
 
 void MainWindow::genQCPCurve()
@@ -679,7 +676,7 @@ void MainWindow::genQCPCurve()
   customPlot->xAxis->setRange(-5, 5);
   customPlot->yAxis->setRange(-2, 2);
   
-  customPlot->savePng(dir.filePath("QCPCurve.png"), 450, 200);
+  savePng("QCPCurve.png", 450, 200);
 }
 
 void MainWindow::genQCPBars()
@@ -717,7 +714,7 @@ void MainWindow::genQCPBars()
   customPlot->xAxis->setRange(-4, 4);
   customPlot->yAxis->setRange(-1, 2);
   
-  customPlot->savePng(dir.filePath("QCPBars.png"), 450, 200);
+  savePng("QCPBars.png", 450, 200);
 }
 
 void MainWindow::genQCPStatisticalBox()
@@ -747,7 +744,7 @@ void MainWindow::genQCPStatisticalBox()
   customPlot->xAxis->setRange(-3, 3);
   customPlot->yAxis->setRange(-1.5, 1.5);
   
-  customPlot->savePng(dir.filePath("QCPStatisticalBox.png"), 450, 200);
+  savePng("QCPStatisticalBox.png", 450, 200);
 }
 
 void MainWindow::genQCPColorMap()
@@ -787,7 +784,7 @@ void MainWindow::genQCPColorMap()
   customPlot->xAxis->scaleRange(1.25, customPlot->xAxis->range().center());
   customPlot->yAxis->scaleRange(1.25, customPlot->yAxis->range().center());
   
-  customPlot->savePng(dir.filePath("QCPColorMap.png"), 450, 200);
+  savePng("QCPColorMap.png", 450, 200);
 }
 
 void MainWindow::genQCPFinancial()
@@ -810,8 +807,7 @@ void MainWindow::genQCPFinancial()
   // generate two sets of random walk data (one for candlestick and one for ohlc chart):
   int n = 500;
   QVector<double> time(n), value1(n), value2(n);
-  QDateTime start = QDateTime(QDate(2022, 6, 11), QTime());
-  start.setTimeSpec(Qt::UTC);
+  QDateTime start = QDateTime(QDate(2022, 6, 11), QTime(0, 0), QTimeZone::UTC);
   double startTime = start.toMSecsSinceEpoch()/1000.0;
   double binSize = 3600*24;
   time[0] = startTime;
@@ -848,7 +844,7 @@ void MainWindow::genQCPFinancial()
   customPlot->xAxis->scaleRange(1.25, customPlot->xAxis->range().center());
   customPlot->yAxis->scaleRange(1.1, customPlot->yAxis->range().center());
   
-  customPlot->savePng(dir.filePath("QCPFinancial.png"), 450, 250);
+  savePng("QCPFinancial.png", 450, 250);
 }
 
 void MainWindow::genQCPErrorBars()
@@ -916,7 +912,7 @@ void MainWindow::genQCPErrorBars()
   customPlot->xAxis->setRange(-0.5, 5.5);
   customPlot->yAxis->setRange(0, 2.0);
   
-  customPlot->savePng(dir.filePath("QCPErrorBars.png"), 450, 250);
+  savePng("QCPErrorBars.png", 450, 250);
 }
 
 void MainWindow::genQCPColorScale()
@@ -950,7 +946,7 @@ void MainWindow::genQCPColorScale()
   colorScaleH->setMinimumMargins(QMargins());
   colorScaleH->setDataRange(QCPRange(-5, 5));
   
-  customPlot->savePng(dir.filePath("QCPColorScale.png"), 450, 200);
+  savePng("QCPColorScale.png", 450, 200);
 }
 
 void MainWindow::genQCPColorGradient()
@@ -960,6 +956,7 @@ void MainWindow::genQCPColorGradient()
   int subImageHeight = 150;
   int imageColumns = 3;
   QPixmap collage(subImageWidth*imageColumns, subImageHeight*((presetEnum.keyCount()-1)/imageColumns+1));
+  collage.fill(Qt::white); // more presets than upstream: the last row has empty cells
   QPainter collagePainter(&collage);
   for (int i=0; i<presetEnum.keyCount(); ++i)
   {
@@ -1009,7 +1006,7 @@ void MainWindow::genQCPColorGradient()
     text->setText(gradientName);
     collagePainter.drawPixmap(subImageWidth*(i%imageColumns), subImageHeight*(i/imageColumns), customPlot->toPixmap(subImageWidth, subImageHeight));
   }
-  collage.save(dir.filePath("QCPColorGradient.png"));
+  check(collage.save(dir.filePath("QCPColorGradient.png")), "QCPColorGradient.png");
 }
 
 void MainWindow::genQCPBarsGroup()
@@ -1045,7 +1042,7 @@ void MainWindow::genQCPBarsGroup()
   customPlot->yAxis->setRange(0, 0.7);
   //! [qcpbarsgroup-example]
   customPlot->replot(); // call before savePng, works around QPainter bug in Qt 4.7.4
-  customPlot->savePng(dir.filePath("QCPBarsGroup.png"), 450, 200);
+  savePng("QCPBarsGroup.png", 450, 200);
 }
 
 void MainWindow::genQCPSelectionType()
@@ -1088,27 +1085,27 @@ void MainWindow::genQCPSelectionType()
   QApplication::sendEvent(customPlot, &pressEvent);
   QApplication::sendEvent(customPlot, &dragEvent);
   QApplication::sendEvent(customPlot, &releaseEvent);
-  customPlot->savePng(dir.filePath("selectiontype-none.png"), imageWidth, imageHeight);
+  savePng("selectiontype-none.png", imageWidth, imageHeight);
   g->setSelectable(QCP::stWhole);
   QApplication::sendEvent(customPlot, &pressEvent);
   QApplication::sendEvent(customPlot, &dragEvent);
   QApplication::sendEvent(customPlot, &releaseEvent);
-  customPlot->savePng(dir.filePath("selectiontype-whole.png"), imageWidth, imageHeight);
+  savePng("selectiontype-whole.png", imageWidth, imageHeight);
   g->setSelectable(QCP::stSingleData);
   QApplication::sendEvent(customPlot, &pressEvent);
   QApplication::sendEvent(customPlot, &dragEvent);
   QApplication::sendEvent(customPlot, &releaseEvent);
-  customPlot->savePng(dir.filePath("selectiontype-singledata.png"), imageWidth, imageHeight);
+  savePng("selectiontype-singledata.png", imageWidth, imageHeight);
   g->setSelectable(QCP::stDataRange);
   QApplication::sendEvent(customPlot, &pressEvent);
   QApplication::sendEvent(customPlot, &dragEvent);
   QApplication::sendEvent(customPlot, &releaseEvent);
-  customPlot->savePng(dir.filePath("selectiontype-datarange.png"), imageWidth, imageHeight);
+  savePng("selectiontype-datarange.png", imageWidth, imageHeight);
   g->setSelectable(QCP::stMultipleDataRanges);
   QApplication::sendEvent(customPlot, &pressEvent);
   QApplication::sendEvent(customPlot, &dragEvent);
   QApplication::sendEvent(customPlot, &releaseEvent);
-  customPlot->savePng(dir.filePath("selectiontype-multipledataranges.png"), imageWidth, imageHeight);
+  savePng("selectiontype-multipledataranges.png", imageWidth, imageHeight);
 }
 
 void MainWindow::genQCPColorMap_Interpolate()
@@ -1152,13 +1149,13 @@ void MainWindow::genQCPColorMap_Interpolate()
   t2->setPositionAlignment(Qt::AlignHCenter|Qt::AlignBottom);
   t2->setClipToAxisRect(false);
   
-  customPlot->savePng(dir.filePath("QCPColorMap-interpolate.png"), 450, 200);
+  savePng("QCPColorMap-interpolate.png", 450, 200);
 }
 
 void MainWindow::genQCPColorMap_TightBoundary()
 {
   resetPlot(false);
-  customPlot->moveLayer(customPlot->layer("main"), customPlot->layer("grid"), QCustomPlot::limBelow);
+  (void)customPlot->moveLayer(customPlot->layer("main"), customPlot->layer("grid"), QCustomPlot::limBelow);
   QCPAxisRect *ar1 = customPlot->axisRect();
   QCPAxisRect *ar2 = new QCPAxisRect(customPlot);
   foreach (QCPAxis *axis, QList<QCPAxis*>() << ar1->axes() << ar2->axes())
@@ -1207,7 +1204,7 @@ void MainWindow::genQCPColorMap_TightBoundary()
   t2->setPositionAlignment(Qt::AlignHCenter|Qt::AlignBottom);
   t2->setClipToAxisRect(false);
   
-  customPlot->savePng(dir.filePath("QCPColorMap-tightboundary.png"), 450, 200);
+  savePng("QCPColorMap-tightboundary.png", 450, 200);
 }
 
 void MainWindow::genQCPColorGradient_LevelCount()
@@ -1286,7 +1283,7 @@ void MainWindow::genQCPColorGradient_LevelCount()
     axis->setLayer("axes");
     axis->grid()->setLayer("grid");
   }
-  customPlot->savePng(dir.filePath("QCPColorGradient-levelcount.png"), 450, 180);
+  savePng("QCPColorGradient-levelcount.png", 450, 180);
 }
 
 void MainWindow::genQCPColorGradient_Periodic()
@@ -1366,7 +1363,21 @@ void MainWindow::genQCPColorGradient_Periodic()
     axis->setLayer("axes");
     axis->grid()->setLayer("grid");
   }
-  customPlot->savePng(dir.filePath("QCPColorGradient-periodic.png"), 450, 180);
+  savePng("QCPColorGradient-periodic.png", 450, 180);
+}
+
+void MainWindow::savePng(const QString &fileName, int width, int height)
+{
+  check(customPlot->savePng(dir.filePath(fileName), width, height), fileName);
+}
+
+void MainWindow::check(bool saved, const QString &fileName)
+{
+  if (!saved)
+  {
+    qCritical() << "Failed to write" << dir.filePath(fileName);
+    mFailed = true;
+  }
 }
 
 void MainWindow::labelItemAnchors(QCPAbstractItem *item, double fontSize, bool circle, bool labelBelow)

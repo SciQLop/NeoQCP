@@ -2,23 +2,19 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QMessageBox>
 #include <QMetaEnum>
 #include <QTimer>
 #include <QDir>
-#include "../../qcustomplot.h"
-
-namespace Ui {
-class MainWindow;
-}
+#include "qcustomplot.h"
 
 class MainWindow : public QMainWindow
 {
   Q_OBJECT
   
 public:
-  explicit MainWindow(QWidget *parent = 0);
+  explicit MainWindow(const QString &outputDir, QWidget *parent = nullptr);
   ~MainWindow();
+  bool ready() const { return mReady; }
   
 public slots:
   void run();
@@ -69,11 +65,14 @@ private:
   void addArrow(QPointF target, QPointF textPosition, QString text, Qt::Alignment textAlign=Qt::AlignCenter);
   void addGridLayoutOutline(QCPLayoutGrid *layout);
   void resetPlot(bool clearAxes=true, bool show=false);
+  void savePng(const QString &fileName, int width, int height);
+  void check(bool saved, const QString &fileName);
   
-  Ui::MainWindow *ui;
   QCustomPlot *customPlot;
   QDir dir; // target directory for images
   QBrush defaultBrush;
+  bool mReady = false;
+  bool mFailed = false;
 };
 
 #endif // MAINWINDOW_H
