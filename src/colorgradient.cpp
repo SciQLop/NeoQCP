@@ -228,6 +228,19 @@ void QCPColorGradient::setPeriodic(bool enabled)
   The QRgb values that are placed in \a scanLine have their r, g, and b components premultiplied
   with alpha (see QImage::Format_ARGB32_Premultiplied).
 */
+namespace
+{
+// Colour level per unit of data. A range of zero width (a colormap whose data range was never
+// set or rescaled) gives infinity, and casting the resulting position to an integer is undefined:
+// x86 painted the first colour and ARM the last. Every value takes the first colour instead.
+double positionToIndexFactor(int levelCount, const QCPRange& range, bool logarithmic)
+{
+    const double factor = !logarithmic ? (levelCount - 1) / range.size()
+                                       : (levelCount - 1) / qLn(range.upper / range.lower);
+    return qIsFinite(factor) ? factor : 0.0;
+}
+} // namespace
+
 void QCPColorGradient::colorize(const double* data, const QCPRange& range, QRgb* scanLine, int n,
                                 int dataIndexFactor, bool logarithmic)
 {
@@ -247,9 +260,7 @@ void QCPColorGradient::colorize(const double* data, const QCPRange& range, QRgb*
         updateColorBuffer();
 
     const bool skipNanCheck = mNanHandling == nhNone;
-    const double posToIndexFactor = !logarithmic
-        ? (mLevelCount - 1) / range.size()
-        : (mLevelCount - 1) / qLn(range.upper / range.lower);
+    const double posToIndexFactor = positionToIndexFactor(mLevelCount, range, logarithmic);
     for (int i = 0; i < n; ++i)
     {
         const double value = data[dataIndexFactor * i];
@@ -325,9 +336,7 @@ void QCPColorGradient::colorize(const double* data, const unsigned char* alpha,
         updateColorBuffer();
 
     const bool skipNanCheck = mNanHandling == nhNone;
-    const double posToIndexFactor = !logarithmic
-        ? (mLevelCount - 1) / range.size()
-        : (mLevelCount - 1) / qLn(range.upper / range.lower);
+    const double posToIndexFactor = positionToIndexFactor(mLevelCount, range, logarithmic);
     for (int i = 0; i < n; ++i)
     {
         const double value = data[dataIndexFactor * i];
@@ -418,9 +427,7 @@ QRgb QCPColorGradient::color(double position, const QCPRange& range, bool logari
         }
     }
 
-    const double posToIndexFactor = !logarithmic
-        ? (mLevelCount - 1) / range.size()
-        : (mLevelCount - 1) / qLn(range.upper / range.lower);
+    const double posToIndexFactor = positionToIndexFactor(mLevelCount, range, logarithmic);
     int index = int((!logarithmic ? position - range.lower : qLn(position / range.lower))
                     * posToIndexFactor);
     if (!mPeriodic)

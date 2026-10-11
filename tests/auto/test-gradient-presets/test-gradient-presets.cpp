@@ -45,3 +45,18 @@ void TestGradientPresets::existingPresetsKeepTheirValues()
     QCOMPARE(int(QCPColorGradient::gpViridis), 12);
     QCOMPARE(int(QCPColorGradient::gpCoolwarm), 18);
 }
+
+// A colormap whose data range was never set has range (0, 0). The colour position was then
+// infinite and cast to an integer: undefined behaviour (UBSan: "-inf is outside the range of
+// representable values"), the first colour on x86 and the last one on ARM.
+void TestGradientPresets::zeroWidthRangeGivesTheFirstColour()
+{
+    QCPColorGradient gradient(QCPColorGradient::gpJet);
+    const double data[3] = { -1.0, 0.0, 1.0 };
+    QRgb line[3];
+    gradient.colorize(data, QCPRange(0, 0), line, 3);
+    const QRgb first = gradient.color(0, QCPRange(0, 1));
+    for (QRgb c : line)
+        QCOMPARE(c, first);
+    QCOMPARE(gradient.color(5, QCPRange(2, 2)), first);
+}
