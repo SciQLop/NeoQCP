@@ -2601,9 +2601,12 @@ QSize QCPAxisPainterPrivate::axisLabelSize()
 void QCPAxisPainterPrivate::drawAxisLabel(QCPPainter* painter, const QRect& rect)
 {
     constexpr int flags = Qt::TextDontClip | Qt::AlignCenter;
+    // A label longer than its axis ran into the neighbouring plots' labels: shorten it
+    // when its renderer can (math is kept whole).
+    const QString text = QCPLabelRenderer::elideWith(labelRenderer, labelFont, label, rect.width());
     if (painter->modes().testFlag(QCPPainter::pmNoCaching))
     {
-        QCPLabelRenderer::drawWith(labelRenderer, painter, rect, labelFont, labelColor, label,
+        QCPLabelRenderer::drawWith(labelRenderer, painter, rect, labelFont, labelColor, text,
                                    flags);
         return;
     }
@@ -2611,16 +2614,18 @@ void QCPAxisPainterPrivate::drawAxisLabel(QCPPainter* painter, const QRect& rect
     const QSize box = rect.size().expandedTo(axisLabelSize() + QSize(4, 4));
     const QPoint inset((box.width() - rect.width()) / 2, (box.height() - rect.height()) / 2);
     const double dpr = mParentPlot->bufferDevicePixelRatio();
-    if (mAxisLabel.pixmap.isNull() || mAxisLabel.box != box || mAxisLabel.dpr != dpr)
+    if (mAxisLabel.pixmap.isNull() || mAxisLabel.box != box || mAxisLabel.dpr != dpr
+        || mAxisLabel.drawn != text)
     {
         QPixmap pixmap(box * dpr);
         pixmap.setDevicePixelRatio(dpr);
         pixmap.fill(Qt::transparent);
         QCPPainter cachePainter(&pixmap);
         QCPLabelRenderer::drawWith(labelRenderer, &cachePainter, QRect(inset, rect.size()),
-                                   labelFont, labelColor, label, flags);
+                                   labelFont, labelColor, text, flags);
         cachePainter.end();
         mAxisLabel.pixmap = std::move(pixmap);
+        mAxisLabel.drawn = text;
         mAxisLabel.box = box;
         mAxisLabel.dpr = dpr;
     }

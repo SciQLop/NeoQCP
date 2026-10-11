@@ -36,6 +36,20 @@ QSize QCPLabelRenderer::measureWith(const QCPLabelRenderer* renderer, const QFon
     return QFontMetrics(font).boundingRect(0, 0, 0, 0, Qt::TextDontClip, text).size();
 }
 
+QString QCPLabelRenderer::plainElide(const QFont& font, const QString& text, int width)
+{
+    // Middle: a label's start names the quantity and its end holds the unit.
+    return QFontMetrics(font).elidedText(text, Qt::ElideMiddle, width);
+}
+
+QString QCPLabelRenderer::elideWith(const QCPLabelRenderer* renderer, const QFont& font,
+                                    const QString& text, int width)
+{
+    if (renderer)
+        return renderer->elide(font, text, width);
+    return plainElide(font, text, width);
+}
+
 QRect QCPLabelRenderer::measureRectWith(const QCPLabelRenderer* renderer, const QFont& font,
                                         const QString& text, int flags)
 {

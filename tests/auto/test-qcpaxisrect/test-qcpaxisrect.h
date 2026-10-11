@@ -18,6 +18,8 @@ private slots:
   void axisLabelLaidOutOncePerChange();
   void axisLabelRedrawnForExports();
   void axisLabelPictureMatchesDirectText();
+  void longPlainLabelIsElidedToTheAxis();
+  void labelRenderersDecideWhatCanBeElided();
   void logAxisMarginIsRightOnTheFirstFrame();
   void beautifulPowersInEveryLocale();
   

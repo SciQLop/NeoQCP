@@ -567,6 +567,7 @@ protected:
         QSize size;
         QSize box;
         double dpr = 0.;
+        QString drawn; // the text in the picture: the label, or its elided form
         QPixmap pixmap;
     };
 

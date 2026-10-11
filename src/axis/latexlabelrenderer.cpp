@@ -102,3 +102,8 @@ void QCPLatexLabelRenderer::draw(QCPPainter* painter, const QRect& rect, const Q
 
     parser.draw(*painter, x, y);
 }
+
+QString QCPLatexLabelRenderer::elide(const QFont& font, const QString& text, int width) const
+{
+    return containsMath(text) ? text : plainElide(font, text, width);
+}

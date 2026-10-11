@@ -2,6 +2,9 @@
 #include "../expect-debug.h"
 #include "../keep-images.h"
 #include "axis/labelrenderer.h"
+#if NEOQCP_WITH_LATEX
+#include "axis/latexlabelrenderer.h"
+#endif
 
 namespace
 {
@@ -434,4 +437,49 @@ void TestQCPAxisRect::beautifulPowersInEveryLocale()
     };
     QVERIFY2(measure(true) < measure(false), qPrintable(locale.name()));
   }
+}
+
+void TestQCPAxisRect::longPlainLabelIsElidedToTheAxis()
+{
+  // A label longer than its axis used to overflow it at both ends, into the
+  // neighbouring plots of a stack. It is elided to the axis length now.
+  QCPAxisPainterPrivate axis(mPlot);
+  axis.type = QCPAxis::atBottom;
+  axis.label = QStringLiteral("Magnetic field vector in GSE plus Btotal (8 or 16 S/s) [nT (all flags)]");
+  axis.labelFont = QFont("sans", 10);
+  axis.labelColor = Qt::black;
+  axis.labelPadding = 5;
+  axis.tickLabelSide = QCPAxis::lsOutside;
+  axis.tickLengthIn = axis.tickLengthOut = axis.subTickLengthIn = axis.subTickLengthOut = 0;
+  axis.viewportRect = QRect(0, 0, 400, 300);
+  axis.axisRect = QRect(150, 120, 100, 60);
+  QImage image(400, 300, QImage::Format_ARGB32_Premultiplied);
+  image.fill(Qt::white);
+  QCPPainter painter(&image);
+  axis.draw(&painter);
+  painter.end();
+  const QRect ink = inkBounds(image.copy(0, 185, 400, 115)); // below the axis: the label
+  QVERIFY(!ink.isEmpty());
+  QVERIFY2(ink.left() >= 149 && ink.right() <= 251,
+           qPrintable(QStringLiteral("label ink spans %1..%2").arg(ink.left()).arg(ink.right())));
+}
+
+void TestQCPAxisRect::labelRenderersDecideWhatCanBeElided()
+{
+  const QFont font("sans", 10);
+  const QString plain = QStringLiteral("a label much longer than the room it is given");
+  const QString elided = QCPLabelRenderer::elideWith(nullptr, font, plain, 80);
+  QVERIFY(elided != plain);
+  QVERIFY(QFontMetrics(font).horizontalAdvance(elided) <= 80);
+
+  // A custom renderer's markup must not be cut: by default it is kept whole.
+  CountingLabelRenderer custom;
+  QCOMPARE(QCPLabelRenderer::elideWith(&custom, font, plain, 80), plain);
+
+#if NEOQCP_WITH_LATEX
+  auto* latex = QCPLatexLabelRenderer::instance();
+  QCOMPARE(QCPLabelRenderer::elideWith(latex, font, plain, 80), elided);
+  const QString math = QStringLiteral("$B_{gse}$ a label much longer than the room it is given");
+  QCOMPARE(QCPLabelRenderer::elideWith(latex, font, math, 80), math);
+#endif
 }

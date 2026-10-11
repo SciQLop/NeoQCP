@@ -28,6 +28,8 @@ public:
     QSize measure(const QFont& font, const QString& text) const override;
     void draw(QCPPainter* painter, const QRect& rect, const QFont& font, const QColor& color,
               const QString& text, int flags) const override;
+    //! Plain text is elided; text with math is kept whole.
+    QString elide(const QFont& font, const QString& text, int width) const override;
 
 private:
     QCPLatexLabelRenderer() = default;

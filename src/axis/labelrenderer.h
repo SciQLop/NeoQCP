@@ -47,6 +47,17 @@ public:
                       const QColor& color, const QString& text, int flags) const = 0;
 
     /*!
+      \a text shortened to fit \a width, or \a text itself when it cannot be shortened
+      as text -- the default, since markup cut in the middle no longer parses.
+    */
+    virtual QString elide(const QFont& font, const QString& text, int width) const
+    {
+        Q_UNUSED(font);
+        Q_UNUSED(width);
+        return text;
+    }
+
+    /*!
       The renderer text-bearing elements use unless told otherwise. This is the
       LaTeX typesetter when NeoQCP is built with \c with_latex, otherwise null
       -- and null simply means plain text.
@@ -67,10 +78,17 @@ public:
     */
     static QRect measureRectWith(const QCPLabelRenderer* renderer, const QFont& font,
                                  const QString& text, int flags);
+    //! \ref elide through \a renderer, or a plain middle elision when it is null.
+    static QString elideWith(const QCPLabelRenderer* renderer, const QFont& font,
+                             const QString& text, int width);
     //! \ref draw through \a renderer, or plain QPainter::drawText when it is null.
     static void drawWith(const QCPLabelRenderer* renderer, QCPPainter* painter,
                          const QRect& rect, const QFont& font, const QColor& color,
                          const QString& text, int flags);
+
+protected:
+    //! What a plain-text renderer's \ref elide does.
+    static QString plainElide(const QFont& font, const QString& text, int width);
 };
 
 #endif // QCP_AXIS_LABELRENDERER_H
