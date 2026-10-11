@@ -317,6 +317,7 @@ endif
 
 if get_option ( 'with_tests')
     subdir('tests')
+    subdir('docs/snippets')
     subdir('documentation/doc-image-generator')
 endif
 

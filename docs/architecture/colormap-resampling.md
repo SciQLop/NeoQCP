@@ -1,6 +1,6 @@
 # Colormap Resampling (2D Heatmaps)
 
-QCPColorMap2 displays 2D datasets (spectrograms, heatmaps) where the source data can have millions of cells. The resampling algorithm bins source data onto a screen-resolution output grid, running asynchronously on a worker thread.
+<a href="../api/classQCPColorMap2.html">QCPColorMap2</a> displays 2D datasets (spectrograms, heatmaps) where the source data can have millions of cells. The resampling algorithm bins source data onto a screen-resolution output grid, running asynchronously on a worker thread.
 
 ## Overview
 
@@ -11,7 +11,7 @@ flowchart TB
     end
     subgraph "Async Resampling (worker thread)"
         B["Detect gaps"] --> C["Bin source cells<br/>into output grid"]
-        C --> D["Divide accumulated z<br/>by bin counts"]
+        C --> D["Divide accumulated z<br/>by bin counts<br/>(log10 z on a log colour scale)"]
     end
     subgraph "Colorization (main thread)"
         E["QCPColorGradient maps<br/>z values → RGBA pixels"]
@@ -60,14 +60,16 @@ The algorithm lives in `qcp::algo2d::resample()`. It transforms the source grid 
 
 ### Step 1: Generate Output Axes
 
-Two 1D arrays define the output grid coordinates:
+The output grid covers the intersection of the viewport and the data extent, not the whole viewport. A grid spanning empty viewport space would have bins wider than the source spacing there, and most of them would stay empty.
+
+Two 1D arrays define the output grid coordinates over that range:
 
 ```
-xAxis = linspace(xRange.lower, xRange.upper, targetWidth)
-yAxis = linspace(yRange.lower, yRange.upper, targetHeight)   // or logspace if yLogScale
+xAxis = linspace(xOut.lower, xOut.upper, targetWidth)
+yAxis = linspace(yOut.lower, yOut.upper, targetHeight)   // or logspace if yLogScale
 ```
 
-`targetWidth` and `targetHeight` are chosen to be at least as large as the source data count within the viewport, and at most 4× the pixel dimensions. This ensures the output never loses resolution compared to the source.
+`targetWidth` and `targetHeight` follow the source density in view, bounded by 1× and 4× the pixel size of that range (see [Output Resolution Selection](#output-resolution-selection)). The Y axis is cached between jobs and reused while its parameters don't change, which saves the `pow10` calls of a log Y axis on X-only pans.
 
 ### Step 2: Detect Gaps
 
@@ -79,10 +81,14 @@ Each source Y row maps to a range of output bins based on its local spacing. The
 
 ```
 For source Y index j:
-    halfSpacing = min(y[j] - y[j-1], y[j+1] - y[j]) / 2
+    halfSpacing = min(|y[j] - y[j-1]|, |y[j+1] - y[j]|) / 2   // first/last row: the one neighbour
     yBinLo = findBin(y[j] - halfSpacing, yAxis)
-    yBinHi = findBin(y[j] + halfSpacing, yAxis)
+    yBinHi = findBinFloor(y[j] + halfSpacing, yAxis)
 ```
+
+The absolute values keep a descending Y (a frequency axis stored top of band first) from inverting the range. On a log Y axis the boundaries are the geometric means with each neighbour, `sqrt(y[j-1]·y[j])` and `sqrt(y[j]·y[j+1])`, so each row covers its share of the log scale.
+
+With 1D Y the ranges are computed once up front; with 2D Y, once per source column.
 
 ### Step 4: Walk Source Data and Accumulate
 
@@ -100,32 +106,37 @@ flowchart TD
     F --> G["For each source row yj"]
     G --> H["Skip if y or z is NaN"]
     H --> I["For each output bin in<br/>[xBinLo..xBinHi] × [yBinLo..yBinHi]"]
-    I --> J["Accumulate z value<br/>Increment bin counter"]
+    I --> J["Accumulate z (or log10 z)<br/>Increment bin counter"]
 ```
 
 The X fill range uses the same bounded-fill strategy as Y: each source column fills output bins within half the distance to its non-gap neighbors. At gap boundaries, fill is clamped to prevent data bleeding across gaps.
+
+The loop is driven by output columns: for each output column, it visits the source columns whose fill can reach it. That makes the work splittable. Once a job has at least a million visible source cells, the output columns are cut into contiguous chunks processed in parallel, each writing only its own slice of the accumulation buffers, so no locking is needed. The accumulation buffers are kept in the pipeline cache and reused by the next job of the same size.
+
+With a logarithmic colour scale (`setDataScaleType(QCPAxis::stLogarithmic)`), `log10(z)` is accumulated instead of `z`, and `z <= 0` samples are left out; the bin only remembers that it saw one.
 
 ### Step 5: Divide
 
 Each output bin divides its accumulated z sum by the number of source cells that contributed:
 
 ```
-output[i][j] = accumulated[i][j] / count[i][j]
+output[i][j] = accumulated[i][j] / count[i][j]                 // linear colour scale
+output[i][j] = 10 ^ (accumulated[i][j] / count[i][j])          // log colour scale: geometric mean
 ```
 
-Bins with zero contributions are set to NaN (rendered as transparent).
+The geometric mean keeps a log colour scale from being skewed toward the largest sample of a bin. Bins with zero contributions are set to NaN (rendered as transparent). On a log colour scale, a bin that only saw `z <= 0` samples is set to 0, so it still draws the lowest colour.
 
 ### Step 6: Colorize
 
-Back on the main thread, `QCPColorGradient::colorize()` maps z values to RGBA pixels row by row, producing a `QImage` ready for GPU upload.
+Back on the main thread, `QCPColorGradient::colorize()` maps z values to RGBA pixels row by row, producing a `QImage` ready for GPU upload. This happens in `QCPColormapRenderer`, only when the resample, the gradient or the data range changed.
 
 ## Pixel-to-Data Mapping
 
-The output grid maps 1:1 to the viewport:
+The output grid maps 1:1 to the clamped range from step 1:
 
 ```
-Output column i  ↔  xAxis[i]  ↔  data coordinate within keyRange
-Output row j     ↔  yAxis[j]  ↔  data coordinate within valueRange
+Output column i  ↔  xAxis[i]  ↔  data coordinate within xOut
+Output row j     ↔  yAxis[j]  ↔  data coordinate within yOut
 ```
 
 Two bin-finding functions handle the lower and upper bounds of fill ranges:
@@ -156,41 +167,51 @@ int findBinFloor(double value, const vector<double>& axis) {
 When rendering, the output image is positioned in the plot using axis coordinate-to-pixel conversion:
 
 ```
-topLeft     = (keyAxis→coordToPixel(keyRange.lower),  valueAxis→coordToPixel(valueRange.upper))
-bottomRight = (keyAxis→coordToPixel(keyRange.upper),  valueAxis→coordToPixel(valueRange.lower))
+topLeft     = (keyAxis→coordToPixel(xOut.lower),  valueAxis→coordToPixel(yOut.upper))
+bottomRight = (keyAxis→coordToPixel(xOut.upper),  valueAxis→coordToPixel(yOut.lower))
 ```
 
 ## Output Resolution Selection
 
-The target resolution is chosen to balance sharpness and performance:
+The target resolution is chosen to balance sharpness and performance. First, the pixel size of the clamped range:
 
-```cpp
-int w = clamp(
-    visibleSourceColumns / visibleFraction,        // scale to full data density
-    max(visibleSourceColumns, pixelWidth),          // never go below source or screen resolution
-    max(visibleSourceColumns, pixelWidth * 4)       // cap at 4× screen resolution
-);
+```
+pixW = clamp(plotWidthPx  × (xOut.size / viewport key size), 1, 32768)
+pixH = clamp(plotHeightPx × (yOut.size / viewport value size), 1, 32768)   // in log units on a log Y axis
 ```
 
-The `visibleFraction` factor estimates how much of the total data range is visible. When zoomed out, `visibleFraction ≈ 1` and `w ≈ sourceColumns`. When zoomed in, `w` scales up proportionally but is capped at 4× pixel resolution to limit memory use.
+Then the grid size follows the source, within 1× and 4× those pixels:
 
-The lower bound ensures the output grid is always at least screen resolution. Without this, small datasets (e.g., 20 source columns) would produce very coarse output when zoomed in — each output bin covers many screen pixels, and the nearest-neighbor bin assignment causes visible jumps when panning.
+```
+w = clamp(visibleSourceColumns, pixW, 4 × pixW)
+h = clamp(sourceRowsPerColumn,  pixH, 4 × pixH)
+```
+
+The upper bound limits memory and work when the source is much denser than the screen. The lower bound keeps the output grid at least at screen resolution. Without it, small datasets (e.g., 20 source columns) would produce very coarse output when zoomed in — each output bin would cover many screen pixels, and the nearest-neighbor bin assignment would cause visible jumps when panning.
+
+The X axis of the grid is always linear. A logarithmic key axis is not supported by this resampler.
 
 ## Async Integration
 
 QCPColorMap2 uses `QCPColormapPipeline` (an alias for `QCPAsyncPipeline<QCPAbstractDataSource2D, QCPColorMapData>`). See [Async Pipeline](async-pipeline.md) for the threading model.
 
-Resampling is triggered by:
-- **New data** → `setDataSource()` / `dataChanged()`
-- **Pan/zoom** → key or value axis `rangeChanged` signal
-- **Scale type change** → value axis `scaleTypeChanged` signal
+The transform is viewport-dependent. Resampling is triggered by:
+- **New data** → `setDataSource()` / `dataChanged()` → `onDataChanged()` on the pipeline (Heavy priority)
+- **Settings that change the result** → `setGapThreshold()`, `setDataScaleType()` → the transform is re-installed with the new values captured, then `onDataChanged()`
+- **Pan/zoom** → key or value axis `rangeChanged` signal → `onViewportChanged()` (Fast priority)
+- **Scale type change** → value axis `scaleTypeChanged` signal → `onViewportChanged()`
+- **Resize** → a draw that finds the last resample made for another plot size requests a new one
 
-Each trigger calls `onViewportChanged()` on the pipeline, which increments the generation counter and submits a job. The pipeline coalesces rapid requests (e.g., during a drag-pan) so only the latest viewport is resampled.
+Each request increments the generation counter and submits a job. The pipeline coalesces rapid requests (e.g., during a drag-pan) so only the latest viewport is resampled.
+
+While a pan's resample is in flight, the previous image is not redrawn: its GPU quad is shifted by the pan offset, like a graph's cached lines.
 
 When the result arrives on the main thread:
 1. The resampled `QCPColorMapData` is stored
 2. The map image is invalidated (forcing re-colorization)
 3. A queued replot is triggered
+
+Exports don't wait for the worker: a draw in export mode with no usable result runs the transform synchronously.
 
 ## Key Files
 
@@ -198,7 +219,8 @@ When the result arrives on the main thread:
 |---|---|
 | `src/datasource/resample.h/.cpp` | `qcp::algo2d::resample()` — core resampling algorithm |
 | `src/datasource/algorithms-2d.h` | Range queries and binary search for 2D data |
-| `src/plottables/plottable-colormap2.h/.cpp` | QCPColorMap2 plottable |
+| `src/plottables/plottable-colormap2.h/.cpp` | QCPColorMap2 plottable; the resample transform and output size selection |
+| `src/painting/colormap-renderer.h/.cpp` | Colorization and image management, shared with QCPHistogram2D |
 | `src/datasource/abstract-datasource-2d.h` | QCPAbstractDataSource2D interface |
 | `src/datasource/soa-datasource-2d.h` | QCPSoADataSource2D template |
 | `src/datasource/async-pipeline.h` | QCPColormapPipeline type alias |

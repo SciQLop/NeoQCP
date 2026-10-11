@@ -1,0 +1,4 @@
+sphinx>=8,<9
+myst-parser>=4
+sphinx-rtd-theme>=3
+sphinxcontrib-mermaid>=1

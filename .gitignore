@@ -69,3 +69,7 @@ meson.build.user
 /qcustomplot.cpp
 
 tests/perf/results/
+
+# Doxygen output for the Read the Docs API reference (docs/Doxyfile)
+docs/_api/
+docs/_build/

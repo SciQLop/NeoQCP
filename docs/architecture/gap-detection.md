@@ -22,6 +22,8 @@ With gap detection:      ●──●──●──●──●          ●─
 
 For colormaps, the issue is similar: without gap detection, source cells on either side of a gap would bleed their fill into the gap region.
 
+Gap detection is done by <a href="../api/classQCPGraph2.html">QCPGraph2</a>, <a href="../api/classQCPMultiGraph.html">QCPMultiGraph</a> (and so `QCPWaterfallGraph`) and <a href="../api/classQCPColorMap2.html">QCPColorMap2</a>. The classic plottables don't do it: `QCPGraph` breaks its line only at NaN values, as upstream QCustomPlot does.
+
 ## Algorithm: Local Neighbor-Based Detection
 
 NeoQCP uses a **local reference** algorithm. For each pair of consecutive X values, the spacing (`dx`) is compared to the spacing of its immediate neighbors. A gap is declared when `dx` is significantly larger than the local reference.
@@ -72,7 +74,7 @@ The local algorithm only compares to immediate neighbors, so a gap's large dista
 
 In `qcp::algo2d::resample()`, the source range is extended by 1 column on each side as *context* for gap detection and fill spacing. This ensures that when zoomed in at a gap boundary (where only 2 visible columns straddle the gap), there are still neighbors available for the local-reference comparison.
 
-```cpp
+```
 // Extend range for gap detection context
 int ctxBegin = max(0, xBegin - 1);
 int ctxEnd = min(xSize, xEnd + 1);
@@ -135,11 +137,33 @@ At a gap boundary:
 
 ### 1D Graph Gap Detection
 
-Currently, QCPGraph2's adaptive sampling does **not** implement gap detection. NaN values in the data are mapped to (0,0) pixel coordinates, which produces visual glitches. Proper polyline-breaking NaN handling is planned.
+Line graphs use the same local-reference rule, in `qcp::algo::detectKeyGaps()`. It runs over the key range being drawn and marks each point that starts a new segment:
+
+```
+For each consecutive pair (i, i+1) in [begin, end):
+    refDx = min(step(i-1), step(i+1))      // only the neighbours that exist
+    if refDx exists and step(i) > threshold × refDx:
+        gapBefore[i+1] = true
+```
+
+A few details differ from the colormap version:
+
+- A repeated key (a zero step) draws a vertical edge. It says nothing about the sampling, so it is never used as a reference.
+- Fewer than 3 points in range: no gap is detected.
+- The result is kept in a small cache on the data source, keyed by the range and the threshold, so a redraw of the same range does not scan again.
+
+Both pixel conversions honour the marks:
+
+- `linesToPixels()` emits a NaN point before each marked point.
+- `optimizedLineData()` closes the current pixel interval at a marked point, emits a NaN point, and starts a new interval there.
+
+The NaN point breaks the polyline: the line extruder and `QPainter` both start a new segment after it. NaN values in the data are skipped and also break the line.
+
+For large data, the summaries built by [adaptive sampling](adaptive-sampling.md) are data sources too, and gap detection runs on their bin keys. A hole in the data leaves empty bins. They are either dropped, which leaves a large key step that is detected as a gap, or kept as NaN values, which break the line as well.
 
 ## Threshold
 
-The gap threshold is a multiplier. Default: `1.5`.
+The gap threshold is a multiplier, set per plottable with `setGapThreshold()`. Default: `1.5`.
 
 - `gapThreshold = 1.5` → a gap is declared when `dx > 1.5 × refDx`
 - `gapThreshold = 0` → gap detection disabled (no gaps)
@@ -149,8 +173,10 @@ For uniformly spaced data, any value > 1.0 works. For mildly non-uniform data (e
 
 ```cpp
 colorMap->setGapThreshold(2.0);  // more tolerant
-colorMap->setGapThreshold(0.0);  // disable gap detection
+graph->setGapThreshold(0.0);     // disable gap detection
 ```
+
+A graph applies its threshold to whichever source it draws, at draw time, so it survives data replacement. A colormap re-runs its resample when the threshold changes.
 
 ## Visual Effect
 
@@ -176,4 +202,6 @@ Source data with gap (threshold = 1.5):
 | File | Role |
 |---|---|
 | `src/datasource/resample.cpp` | Gap detection in `resample()` function |
+| `src/datasource/algorithms.h` | `detectKeyGaps()`, `GapCache`, and their use in `linesToPixels()` / `optimizedLineData()` |
 | `src/plottables/plottable-colormap2.h` | `setGapThreshold()` / `gapThreshold()` API |
+| `src/plottables/plottable-graph2.h`, `plottable-multigraph.h` | `setGapThreshold()` / `gapThreshold()` API for lines |

@@ -1,0 +1,42 @@
+# API reference for Read the Docs: `doxygen docs/Doxyfile` from the repository root writes
+# docs/_api/api/, which Sphinx copies to <site>/api/ (html_extra_path in conf.py).
+PROJECT_NAME           = NeoQCP
+PROJECT_BRIEF          = "Qt6 plotting widget, a modernised QCustomPlot"
+OUTPUT_DIRECTORY       = docs/_api
+HTML_OUTPUT            = api
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+GENERATE_XML           = NO
+INPUT                  = src
+FILE_PATTERNS          = *.h *.dox *.cpp
+RECURSIVE              = YES
+EXCLUDE_PATTERNS       = */shaders/* *-tables.h */colorgradient-tables.h
+EXCLUDE_SYMBOLS        = *Private* _*
+IMAGE_PATH             = documentation/images
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+HIDE_UNDOC_RELATIONS   = NO
+JAVADOC_AUTOBRIEF      = YES
+QT_AUTOBRIEF           = YES
+SOURCE_BROWSER         = NO
+INLINE_SOURCES         = NO
+GENERATE_TREEVIEW      = YES
+DISABLE_INDEX          = NO
+FULL_SIDEBAR           = NO
+HTML_COLORSTYLE        = TOGGLE
+SEARCHENGINE           = YES
+CLASS_GRAPH            = YES
+HAVE_DOT               = NO
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+EXPAND_ONLY_PREDEF     = YES
+PREDEFINED             = QCP_LIB_DECL= Q_DECL_OVERRIDE=override Q_DECL_DEPRECATED= \
+                         "Q_DECLARE_FLAGS(f,e)=" "Q_DECLARE_TYPEINFO(a,b)=" \
+                         "Q_DECLARE_METATYPE(a)=" "Q_DECLARE_OPERATORS_FOR_FLAGS(f)="
+WARN_IF_UNDOCUMENTED   = NO
+QUIET                  = YES
+ALIASES                = "overload=This is an overloaded function.\n" \
+                         "enumimage{1}=\image html \1 \"\"" \
+                         "seebaseclassmethod=For general information about this virtual method, see the base class implementation."
+EXAMPLE_PATH           = .

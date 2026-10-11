@@ -74,6 +74,19 @@ NeoQCP uses QRhiWidget (Qt 6.7+) for hardware-accelerated rendering:
 - **`manual/`** — Manual/visual test application.
 - **`big_data_for_tracy/`** — Tracy profiling test with large datasets.
 
+### Documentation (Read the Docs)
+
+- `docs/*.md` is the user guide (Sphinx + MyST, `docs/conf.py`), `docs/architecture/` is its
+  "Under the hood" section. `docs/plans`, `docs/specs`, `docs/superpowers` are internal, not published.
+- Every guide example is a `DOC_SNIPPET` in `docs/snippets/<page>.cpp`, included by marker
+  (`// [name]` … `// [/name]`). The `doc-snippets` meson test compiles and runs them all.
+- Images: `build/docs/snippets/doc-shots docs/images [name ...]` redraws the guide figures
+  (offscreen, waits for async plottables); `build/documentation/doc-image-generator/doc-image-generator
+  documentation/images` redraws the API reference images. Both are committed: Read the Docs
+  cannot build NeoQCP.
+- API reference: `doxygen docs/Doxyfile` writes `docs/_api/api/`, published at `<site>/api/`.
+- Local build: `pip install -r docs/requirements.txt`, then `sphinx-build -b html docs docs/_build/html`.
+
 ### CI
 
 GitHub Actions runs on Linux (x86_64 + aarch64), Windows, and macOS (Intel + Apple Silicon) with Qt 6. Build uses `--buildtype debugoptimized`.
