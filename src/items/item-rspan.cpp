@@ -172,7 +172,9 @@ void QCPItemRSpan::draw(QCPPainter* painter)
     if (!spanRect.intersects(axRect))
         return;
 
-    painter->setPen(mainPen());
+    // The band is filled and its edges are the border lines, as on screen (the GPU path): an
+    // outline in the item pen framed every exported span along the axis rect edges.
+    painter->setPen(Qt::NoPen);
     painter->setBrush(mainBrush());
     painter->drawRect(spanRect);
 

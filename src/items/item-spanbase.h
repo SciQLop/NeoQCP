@@ -23,6 +23,8 @@ public:
     QPen selectedBorderPen() const { return mSelectedBorderPen; }
     bool movable() const { return mMovable; }
 
+    // A span is drawn as a band (brush) and its edge lines (border pen). The item pen is kept
+    // for API compatibility and not drawn: use setBorderPen() for the lines.
     void setPen(const QPen& pen);
     void setSelectedPen(const QPen& pen);
     void setBrush(const QBrush& brush);

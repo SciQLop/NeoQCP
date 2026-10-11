@@ -16,6 +16,8 @@ private slots:
     void detectsBrushChange();
     void detectsAxisRangeChange();
     void detectsAxisRectResize();
+    void exportedSpanHasNoOutlineTheScreenLacks();
+    void dashedSpanBorderIsDashedOnScreen();
 
 private:
     QCustomPlot* mPlot = nullptr;

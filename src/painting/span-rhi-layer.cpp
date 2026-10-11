@@ -405,12 +405,12 @@ void QCPSpanRhiLayer::appendVSpanGeometry(QCPItemVSpan* vspan, QCPAxisRect* ar)
     float halfW = (penW == 0.0 || borderPen.isCosmetic()) ? 0.5f : float(penW) / 2.0f;
     if (borderPen.style() != Qt::NoPen && halfW > 0.0f)
     {
-        appendBorder(mStagingVertices,
+        appendDashedBorder(mStagingVertices,
                      pixX0, pixTop, pixX0, pixBot,
-                     borderColor, 1, 0, halfW, 1, 1);
-        appendBorder(mStagingVertices,
+                     borderColor, 1, 0, halfW, 1, 1, borderPen);
+        appendDashedBorder(mStagingVertices,
                      pixX1, pixTop, pixX1, pixBot,
-                     borderColor, 1, 0, halfW, 1, 1);
+                     borderColor, 1, 0, halfW, 1, 1, borderPen);
     }
 }
 
@@ -450,12 +450,12 @@ void QCPSpanRhiLayer::appendHSpanGeometry(QCPItemHSpan* hspan, QCPAxisRect* ar)
     float halfW = (penW == 0.0 || borderPen.isCosmetic()) ? 0.5f : float(penW) / 2.0f;
     if (borderPen.style() != Qt::NoPen && halfW > 0.0f)
     {
-        appendBorder(mStagingVertices,
+        appendDashedBorder(mStagingVertices,
                      pixLeft, pixY0, pixRight, pixY0,
-                     borderColor, 0, 1, halfW, 1, 1);
-        appendBorder(mStagingVertices,
+                     borderColor, 0, 1, halfW, 1, 1, borderPen);
+        appendDashedBorder(mStagingVertices,
                      pixLeft, pixY1, pixRight, pixY1,
-                     borderColor, 0, 1, halfW, 1, 1);
+                     borderColor, 0, 1, halfW, 1, 1, borderPen);
     }
 }
 
@@ -504,18 +504,18 @@ void QCPSpanRhiLayer::appendRSpanGeometry(QCPItemRSpan* rspan, [[maybe_unused]] 
     float halfW = (penW == 0.0 || borderPen.isCosmetic()) ? 0.5f : float(penW) / 2.0f;
     if (borderPen.style() != Qt::NoPen && halfW > 0.0f)
     {
-        appendBorder(mStagingVertices,
+        appendDashedBorder(mStagingVertices,
                      pixLeft, pixTop, pixLeft, pixBot,
-                     borderColor, 1, 0, halfW, 1, 1);
-        appendBorder(mStagingVertices,
+                     borderColor, 1, 0, halfW, 1, 1, borderPen);
+        appendDashedBorder(mStagingVertices,
                      pixRight, pixTop, pixRight, pixBot,
-                     borderColor, 1, 0, halfW, 1, 1);
-        appendBorder(mStagingVertices,
+                     borderColor, 1, 0, halfW, 1, 1, borderPen);
+        appendDashedBorder(mStagingVertices,
                      pixLeft, pixTop, pixRight, pixTop,
-                     borderColor, 0, 1, halfW, 1, 1);
-        appendBorder(mStagingVertices,
+                     borderColor, 0, 1, halfW, 1, 1, borderPen);
+        appendDashedBorder(mStagingVertices,
                      pixLeft, pixBot, pixRight, pixBot,
-                     borderColor, 0, 1, halfW, 1, 1);
+                     borderColor, 0, 1, halfW, 1, 1, borderPen);
     }
 }
 
