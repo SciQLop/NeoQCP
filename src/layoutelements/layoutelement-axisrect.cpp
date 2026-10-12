@@ -1341,11 +1341,76 @@ void QCPAxisRect::mouseReleaseEvent([[maybe_unused]] QMouseEvent* event,
   the range zoom factor. This takes care of the wheel direction automatically, by inverting the
   factor, when the wheel step is negative (f^-1 = 1/f).
 */
+namespace
+{
+// Moves the axis so its data follows a pointer moved by pixels along it, as a drag does.
+void followPointer(QCPAxis* axis, double pixels)
+{
+    const QCPRange range = axis->range();
+    if (axis->scaleType() == QCPAxis::stLogarithmic)
+    {
+        const double ratio = axis->pixelToCoord(0) / axis->pixelToCoord(pixels);
+        axis->setRange(range.lower * ratio, range.upper * ratio);
+    }
+    else
+    {
+        const double diff = axis->pixelToCoord(0) - axis->pixelToCoord(pixels);
+        axis->setRange(range.lower + diff, range.upper + diff);
+    }
+}
+
+// A trackpad reports the swipe in pixels; a mouse wheel only in angle steps.
+QPointF swipePixels(const QWheelEvent* event)
+{
+    constexpr double pixelsPerWheelStep = 50.0;
+    return event->pixelDelta().isNull() ? QPointF(event->angleDelta()) * (pixelsPerWheelStep / 120.0)
+                                        : QPointF(event->pixelDelta());
+}
+}
+
+void QCPAxisRect::panByPixels(const QPointF& delta)
+{
+    if (mRangeDrag.testFlag(Qt::Horizontal))
+        for (const QPointer<QCPAxis>& axis : mRangeDragHorzAxis)
+            if (axis)
+                followPointer(axis, delta.x());
+    if (mRangeDrag.testFlag(Qt::Vertical))
+        for (const QPointer<QCPAxis>& axis : mRangeDragVertAxis)
+            if (axis)
+                followPointer(axis, delta.y());
+}
+
+void QCPAxisRect::zoomAt(const QPointF& pos, double factor)
+{
+    if (mRangeZoom.testFlag(Qt::Horizontal))
+        for (const QPointer<QCPAxis>& axis : mRangeZoomHorzAxis)
+            if (axis)
+                axis->scaleRange(factor, axis->pixelToCoord(pos.x()));
+    if (mRangeZoom.testFlag(Qt::Vertical))
+        for (const QPointer<QCPAxis>& axis : mRangeZoomVertAxis)
+            if (axis)
+                axis->scaleRange(factor, axis->pixelToCoord(pos.y()));
+}
+
 void QCPAxisRect::wheelEvent(QWheelEvent* event)
 {
     PROFILE_HERE_N("QCPAxisRect::wheelEvent");
-    const double delta = event->angleDelta().y();
+    // A browser pinch can come with a pixel delta only.
+    const double delta = event->angleDelta().y() != 0 ? event->angleDelta().y()
+                                                       : event->pixelDelta().y();
     const QPointF pos = event->position();
+
+    // With gestures, a swipe pans; a pinch arrives as Ctrl+wheel and zooms below.
+    if (mParentPlot->interactions().testFlag(QCP::iGestures)
+        && !event->modifiers().testFlag(Qt::ControlModifier))
+    {
+        if (mParentPlot->interactions().testFlag(QCP::iRangeDrag))
+        {
+            panByPixels(swipePixels(event));
+            mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+        }
+        return;
+    }
 
     // Mouse range zooming interaction:
     if (mParentPlot->interactions().testFlag(QCP::iRangeZoom))

@@ -467,6 +467,20 @@ protected:
     virtual void mouseReleaseEvent(QMouseEvent* event) override;
     virtual void wheelEvent(QWheelEvent* event) override;
     virtual void keyPressEvent(QKeyEvent* event) override;
+    virtual bool event(QEvent* event) override;
+
+    // introduced methods:
+    void updateGestureInput();
+    bool touchEvent(QTouchEvent* event);
+    void forwardTouchAsMouse(QEvent::Type type, const QEventPoint& point, const QTouchEvent* touch);
+    void pinchStep(const QEventPoint& a, const QEventPoint& b);
+    QPointF touchPosition(const QEventPoint& point) const;
+    struct TouchState {
+        bool pinching = false;    // two fingers were down: no mouse until all are lifted
+        bool mouseDown = false;   // one finger is acting as the left mouse button
+        QHash<int, QPointF> positions;   // each finger's position after the previous event
+    } mTouch;
+    bool nativeGestureEvent(QNativeGestureEvent* event);
 
     // introduced virtual methods:
     virtual void draw(QCPPainter* painter);

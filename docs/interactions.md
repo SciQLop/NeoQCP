@@ -9,6 +9,7 @@ Pass a combination of `QCP::Interaction` flags to `setInteractions()`:
 
 - `QCP::iRangeDrag`: dragging with the left button pans the axes.
 - `QCP::iRangeZoom`: the mouse wheel zooms around the cursor.
+- `QCP::iGestures`: trackpad and touch gestures, see [below](#trackpad-and-touch-gestures).
 - `QCP::iSelectPlottables`, `QCP::iSelectAxes`, `QCP::iSelectLegend`, `QCP::iSelectItems`, `QCP::iSelectOther`: a click selects that kind of object.
 - `QCP::iMultiSelect`: holding the multi-select modifier adds to the selection instead of replacing it.
 - `QCP::iSelectPlottablesBeyondAxisRect`: plottables can be hit outside their axis rect too.
@@ -31,6 +32,25 @@ The axis rect decides which directions move:
 - Each wheel event is scaled by its real angle, so fast wheels and touchpads zoom smoothly.
 
 Dragging or rolling the wheel over an axis itself moves that axis alone. It still has to be allowed by the axis rect's `rangeDrag()` or `rangeZoom()` orientation.
+
+### Trackpad and touch gestures
+
+With `QCP::iGestures`, the plot follows the fingers, like a map:
+
+- A two-finger swipe on a trackpad pans, in x and y.
+- A pinch zooms around the fingers: on a trackpad, on a touch screen, and as macOS's native pinch.
+- On a touch screen, one finger drags and taps like the mouse. Two fingers pinch, and pan as they move together.
+
+Panning still needs `iRangeDrag`, zooming `iRangeZoom`, and the axis rect's orientations apply.
+
+A browser cannot tell a trackpad swipe from a mouse wheel: both arrive as wheel events. So with gestures on, the wheel pans too, and a mouse zooms with Ctrl+wheel, which is also how a browser reports a trackpad pinch. The flag is off by default for that reason. The [online gallery](https://sciqlop.github.io/NeoQCP/) turns it on.
+
+```{literalinclude} snippets/interactions.cpp
+:start-after: // [interactions_gestures]
+:end-before: // [/interactions_gestures]
+:language: cpp
+:dedent:
+```
 
 ## Choose which axes move
 
@@ -268,5 +288,6 @@ The mouse works like upstream QCustomPlot, with these changes:
 - A plottable can consume key presses by overriding `QCPAbstractPlottable::keyPress()`.
 - Items can be created with the mouse. That mode gets the press before anything else, and a right click cancels it. See {doc}`items`.
 - Plottables can show the busy indicator described above.
+- `QCP::iGestures` adds trackpad and touch gestures (swipe, pinch).
 
 The API reference has the details: <a href="api/classQCustomPlot.html">QCustomPlot</a>, <a href="api/classQCPAxisRect.html">QCPAxisRect</a>, <a href="api/classQCPDataSelection.html">QCPDataSelection</a>, <a href="api/classQCPSelectionDecorator.html">QCPSelectionDecorator</a>, <a href="api/classQCPSelectionRect.html">QCPSelectionRect</a>, <a href="api/classQCPDataLocator.html">QCPDataLocator</a>.

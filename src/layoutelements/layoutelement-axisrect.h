@@ -103,6 +103,10 @@ public:
 
     void zoom(const QRectF& pixelRect);
     void zoom(const QRectF& pixelRect, const QList<QCPAxis*>& affectedAxes);
+    // The data follows a pointer moved by delta pixels, on the range drag axes and orientations.
+    void panByPixels(const QPointF& delta);
+    // Scales the range zoom axes by factor (< 1 zooms in) around the pixel pos.
+    void zoomAt(const QPointF& pos, double factor);
     void setupFullAxesBox(bool connectRanges = false);
     QList<QCPAbstractPlottable*> plottables() const;
     QList<QCPGraph*> graphs() const;

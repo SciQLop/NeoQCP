@@ -69,9 +69,10 @@ private:
             if (name == QLatin1String(snippet.name))
                 snippet.draw(mPlot);
         // The guide only needs pictures, so most snippets set no interactions; here every
-        // plot can be explored. Snippets that set their own keep them.
+        // plot can be explored, with trackpad and touch gestures. Snippets that set their own
+        // keep them.
         mPlot->setInteractions(mPlot->interactions() | QCP::iRangeDrag | QCP::iRangeZoom
-                               | QCP::iSelectPlottables | QCP::iSelectLegend);
+                               | QCP::iGestures | QCP::iSelectPlottables | QCP::iSelectLegend);
         mPlot->replot();
     }
 

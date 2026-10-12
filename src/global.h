@@ -259,6 +259,10 @@ enum Interaction
     iSelectPlottablesBeyondAxisRect
     = 0x100 ///< <tt>0x100</tt> When performing plottable selection/hit tests, this flag extends the
             ///< sensitive area beyond the axis rect
+    ,
+    iGestures = 0x200 ///< <tt>0x200</tt> Trackpad and touch gestures: a two-finger swipe (or the
+                      ///< wheel) pans, a pinch (or Ctrl+wheel) zooms. Panning needs \ref
+                      ///< iRangeDrag, zooming \ref iRangeZoom.
 };
 Q_DECLARE_FLAGS(Interactions, Interaction)
 

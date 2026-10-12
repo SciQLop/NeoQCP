@@ -220,6 +220,15 @@ DOC_SNIPPET(interactions_data_locator, 600, 360)
     // [/interactions_data_locator]
 }
 
+DOC_CODE(interactions_gestures)
+{
+    // [interactions_gestures]
+    customPlot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom | QCP::iGestures);
+    // [/interactions_gestures]
+    if (!customPlot->testAttribute(Qt::WA_AcceptTouchEvents))
+        throw std::runtime_error("iGestures did not turn touch input on");
+}
+
 DOC_CODE(interactions_rect_mode_switch)
 {
     // [interactions_rect_mode_switch]

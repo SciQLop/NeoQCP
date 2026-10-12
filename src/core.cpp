@@ -868,6 +868,7 @@ void QCustomPlot::setAutoAddPlottableToLegend(bool on)
 void QCustomPlot::setInteractions(const QCP::Interactions& interactions)
 {
     mInteractions = interactions;
+    updateGestureInput();
 }
 
 /*!
@@ -883,6 +884,16 @@ void QCustomPlot::setInteraction(const QCP::Interaction& interaction, bool enabl
         mInteractions &= ~interaction;
     else if (enabled && !mInteractions.testFlag(interaction))
         mInteractions |= interaction;
+    updateGestureInput();
+}
+
+/*! \internal
+
+  Touch input is only taken with \ref QCP::iGestures (see touchEvent).
+*/
+void QCustomPlot::updateGestureInput()
+{
+    setAttribute(Qt::WA_AcceptTouchEvents, mInteractions.testFlag(QCP::iGestures));
 }
 
 /*!
@@ -3389,6 +3400,136 @@ void QCustomPlot::mouseReleaseEvent(QMouseEvent* event)
   Event handler for mouse wheel events. First, the \ref mouseWheel signal is emitted. Then
   determines the affected layerable and forwards the event to it.
 */
+bool QCustomPlot::event(QEvent* event)
+{
+    if (mInteractions.testFlag(QCP::iGestures))
+    {
+        switch (event->type())
+        {
+            case QEvent::TouchBegin:
+            case QEvent::TouchUpdate:
+            case QEvent::TouchEnd:
+            case QEvent::TouchCancel:
+                return touchEvent(static_cast<QTouchEvent*>(event));
+            default:
+                break;
+        }
+        if (event->type() == QEvent::NativeGesture
+            && nativeGestureEvent(static_cast<QNativeGestureEvent*>(event)))
+            return true;
+    }
+    return QRhiWidget::event(event);
+}
+
+/*! \internal
+
+  Touch with \ref QCP::iGestures. One finger acts as the mouse: drag, click. Two fingers pinch:
+  the data under their midpoint is scaled by the change of their distance, then follows the
+  midpoint. Each finger's last position is kept here, by id: in the browser every finger moves in
+  its own event, and the other one carries a stale lastPosition(). Qt's QPinchGesture counted
+  those steps twice.
+*/
+bool QCustomPlot::touchEvent(QTouchEvent* event)
+{
+    event->accept();
+    const auto& points = event->points();
+    const bool ending = event->type() == QEvent::TouchEnd || event->type() == QEvent::TouchCancel;
+    if (event->type() == QEvent::TouchBegin && points.size() == 1)
+        mTouch = {};   // a browser sends a second TouchBegin when the second finger lands
+    if (!mTouch.pinching && points.size() >= 2 && !ending)
+    {
+        mTouch.pinching = true;
+        if (mTouch.mouseDown)   // a second finger ends the drag, without a click
+        {
+            mMouseHasMoved = true;
+            forwardTouchAsMouse(QEvent::MouseButtonRelease, points.first(), event);
+        }
+    }
+    if (mTouch.pinching && points.size() >= 2 && !ending)
+        pinchStep(points.at(0), points.at(1));
+    else if (!mTouch.pinching && points.size() == 1)
+    {
+        const QEventPoint& point = points.first();
+        if (point.state() == QEventPoint::Pressed)
+            forwardTouchAsMouse(QEvent::MouseButtonPress, point, event);
+        else if (point.state() == QEventPoint::Released)
+            forwardTouchAsMouse(QEvent::MouseButtonRelease, point, event);
+        else if (mTouch.mouseDown)
+            forwardTouchAsMouse(QEvent::MouseMove, point, event);
+    }
+    for (const QEventPoint& point : points)
+        mTouch.positions[point.id()] = touchPosition(point);
+    if (ending)
+    {
+        if (mTouch.mouseDown)
+            forwardTouchAsMouse(QEvent::MouseButtonRelease, points.first(), event);
+        mTouch = {};
+    }
+    return true;
+}
+
+void QCustomPlot::forwardTouchAsMouse(QEvent::Type type, const QEventPoint& point,
+                                      const QTouchEvent* touch)
+{
+    // On the mouse, not the touch screen: an event shares its point's state with its device, so a
+    // mouse event on touch point 0 would end the touch sequence.
+    const bool release = type == QEvent::MouseButtonRelease;
+    QMouseEvent mouse(type, point.position(), point.scenePosition(), point.globalPosition(),
+                      Qt::LeftButton, release ? Qt::NoButton : Qt::LeftButton, touch->modifiers(),
+                      QPointingDevice::primaryPointingDevice());
+    if (type == QEvent::MouseButtonPress)
+        mousePressEvent(&mouse);
+    else if (release)
+        mouseReleaseEvent(&mouse);
+    else
+        mouseMoveEvent(&mouse);
+    mTouch.mouseDown = !release;
+}
+
+// A finger that did not move is where it was: some platforms report no position for it.
+QPointF QCustomPlot::touchPosition(const QEventPoint& point) const
+{
+    return point.state() == QEventPoint::Stationary
+        ? mTouch.positions.value(point.id(), point.position())
+        : point.position();
+}
+
+void QCustomPlot::pinchStep(const QEventPoint& a, const QEventPoint& b)
+{
+    const QPointF posA = touchPosition(a), posB = touchPosition(b);
+    const QPointF lastA = mTouch.positions.value(a.id(), posA);
+    const QPointF lastB = mTouch.positions.value(b.id(), posB);
+    const QPointF lastMid = (lastA + lastB) / 2;
+    const QPointF mid = (posA + posB) / 2;
+    const double lastSpan = QLineF(lastA, lastB).length();
+    const double span = QLineF(posA, posB).length();
+    QCPAxisRect* rect = axisRectAt(lastMid);
+    if (!rect)
+        return;
+    if (mInteractions.testFlag(QCP::iRangeZoom) && lastSpan > 0 && span > 0)
+        rect->zoomAt(lastMid, lastSpan / span);
+    if (mInteractions.testFlag(QCP::iRangeDrag))
+        rect->panByPixels(mid - lastMid);
+    replot(rpQueuedReplot);
+}
+
+/*! \internal
+
+  A native trackpad pinch (macOS): value() is the change in magnification.
+*/
+bool QCustomPlot::nativeGestureEvent(QNativeGestureEvent* event)
+{
+    if (event->gestureType() != Qt::ZoomNativeGesture)
+        return false;
+    QCPAxisRect* rect = axisRectAt(event->position());
+    if (rect && mInteractions.testFlag(QCP::iRangeZoom) && event->value() > -1)
+    {
+        rect->zoomAt(event->position(), 1.0 / (1.0 + event->value()));
+        replot(rpQueuedReplot);
+    }
+    return true;
+}
+
 void QCustomPlot::wheelEvent(QWheelEvent* event)
 {
     emit mouseWheel(event);
