@@ -66,6 +66,10 @@ private:
         for (const auto& snippet : doc_snippets())
             if (name == QLatin1String(snippet.name))
                 snippet.draw(mPlot);
+        // The guide only needs pictures, so most snippets set no interactions; here every
+        // plot can be explored. Snippets that set their own keep them.
+        mPlot->setInteractions(mPlot->interactions() | QCP::iRangeDrag | QCP::iRangeZoom
+                               | QCP::iSelectPlottables | QCP::iSelectLegend);
         mPlot->replot();
     }
 
