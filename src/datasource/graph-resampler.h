@@ -15,7 +15,6 @@
 #include <limits>
 #include <memory>
 #include <span>
-#include <utility>
 #include <vector>
 
 namespace qcp::algo {
@@ -59,9 +58,7 @@ struct BinResult {
 };
 
 // binRatio[b]: the largest step ratio of the rows of bin b, -1 for a bin without rows.
-// A bin with rows but no value holds a run of NaN: a hole, whatever the threshold.
-// simplify: one NaN-only bin breaks the line, where the raw path waits for a run wider than a
-// pixel (algorithms.h). Upgrade path: carry the run's key width and compare it to a pixel at L2.
+// A bin with rows but no value holds NaN only: +inf, see DroppedBins.
 inline void setGapRatios(BinResult& out, const std::vector<float>& binRatio)
 {
     out.gapRatio.assign(out.keys.size(), 0.f);
@@ -163,10 +160,12 @@ inline BinResult binMinMax(
 
         int bin = static_cast<int>((k - keyLo) / binWidth);
         bin = std::clamp(bin, 0, numBins - 1);
-        // An empty source bin is not a row: only its ratio (+inf for a NaN hole) is passed on.
+        // An empty source bin is not a row, a NaN-only one (+inf) is a NaN row.
         const float ratio = srcGapRatios.empty()
             ? static_cast<float>(keyStepRatio(key, 0, size, i)) : srcGapRatios[i];
-        if (srcGapRatios.empty() || !std::isnan(v) || ratio > 0)
+        if (std::isinf(ratio))
+            binRatio[bin] = std::max(binRatio[bin], 0.f);
+        else if (srcGapRatios.empty() || !std::isnan(v) || ratio > 0)
             binRatio[bin] = std::max(binRatio[bin], ratio);
         if (std::isnan(v)) continue;
 
@@ -402,8 +401,8 @@ inline void foldRowStepRatios(const QCPAbstractMultiDataSource& src, int first,
                                          static_cast<float>(keyStepRatio(key, 0, size, first + i)));
 }
 
-// simplify: a bin breaks the line on a NaN hole only when every column is NaN there; one column
-// NaN while the others have data is bridged. Upgrade path: one gapRatio per column.
+// A bin with rows but no value in any column holds NaN only: +inf, see DroppedBins. One column NaN
+// while others have data stays in the bin's values, and the line drawing breaks on it.
 inline void setGapRatios(MultiColumnBinResult& out, const std::vector<float>& binRatio)
 {
     const int s = out.stride();
@@ -584,6 +583,34 @@ constexpr int kLevel1TargetBins = 100'000;
 constexpr int kResampleThreshold = 100'000;
 constexpr int kLevel2PixelMultiplier = 4;
 
+// The gap ratio of a drawn L2 bin, from the bins dropped just before it for having no value: their
+// largest raw step ratio, or +inf when they held NaN rows over at least a pixel. A narrower NaN run
+// cannot be seen, and is skipped as the raw path skips it (optimizedLineData).
+class DroppedBins {
+public:
+    void drop(float ratio, bool nanRows)
+    {
+        ++mCount;
+        mNaN = mNaN || nanRows;
+        if (std::isfinite(ratio))
+            mRatio = std::max(mRatio, ratio);
+    }
+
+    float keep(float ratio)
+    {
+        const float out = mNaN && mCount >= kLevel2PixelMultiplier
+            ? std::numeric_limits<float>::infinity()
+            : std::max(mRatio, std::isfinite(ratio) ? ratio : 0.f);
+        *this = {};
+        return out;
+    }
+
+private:
+    float mRatio = 0.f;
+    int mCount = 0;
+    bool mNaN = false;
+};
+
 // The keys a graph's line cache covers: one view width on each side, so a GPU-translated pan
 // does not expose uncovered edges before the lines are rebuilt. On a log axis a width is a
 // ratio, so [1, 10] covers [0.1, 100].
@@ -691,17 +718,22 @@ inline std::shared_ptr<QCPAbstractDataSource> resampleL2(
     outKeys.reserve(l2.keys.size());
     outVals.reserve(l2.values.size());
     outRatios.reserve(l2.gapRatio.size());
-    float carried = 0.f;
-    for (size_t i = 0; i < l2.keys.size(); ++i)
+    DroppedBins dropped;
+    for (size_t i = 0; i < l2.keys.size(); i += 2)
     {
-        if (!l2.gapRatio.empty())
-            carried = std::max(carried, l2.gapRatio[i]);
-        if (!std::isnan(l2.values[i]))
+        const float ratio = l2.gapRatio.empty() ? 0.f : l2.gapRatio[i];
+        if (std::isnan(l2.values[i]))
         {
-            outKeys.push_back(l2.keys[i]);
-            outVals.push_back(l2.values[i]);
-            outRatios.push_back(std::exchange(carried, 0.f));
+            dropped.drop(ratio, std::isinf(ratio));
+            continue;
         }
+        for (size_t j = i; j < i + 2; ++j)
+        {
+            outKeys.push_back(l2.keys[j]);
+            outVals.push_back(l2.values[j]);
+        }
+        outRatios.push_back(dropped.keep(ratio));
+        outRatios.push_back(0.f);
     }
 
     // Empty, not nullptr, when nothing is in view: nullptr would make the graph draw raw rows.

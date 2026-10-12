@@ -89,6 +89,8 @@ private slots:
     void graph2UniformDataNeverBreaksAtAnyZoom();
     void multiGraphUniformDataNeverBreaksAtAnyZoom();
     void multiGraphNaNHoleBreaksTheResampledLine();
+    void multiGraphNaNHoleInOneColumnBreaksThatLine();
+    void sporadicNaNNeverBreaksTheResampledLine();
     void multiGraphPendingSourceCommitsAfterZoomTriggeredRefetch();
     void multiGraphMultipleRapidLegitimateSupersessionsCommitLast();
     void multiGraphThresholdScalesWithColumnCount();

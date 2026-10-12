@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <cmath>
 #include <span>
-#include <utility>
 
 class QCPResampledMultiDataSource final : public QCPAbstractMultiDataSource {
 public:
@@ -249,6 +248,7 @@ inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2MultiImpl(
     // Bitset to track which bins received data — avoids scanning all bins during compaction
     std::vector<bool> binHasData(l2Bins, false);
     std::vector<float> binRatio(l2Bins, 0.f);
+    std::vector<bool> binNaNRows(l2Bins, false);
     const bool withGaps = !l1.gapRatio.empty();
 
     // Single pass over L1 points: compute bin index once, scatter into all columns
@@ -273,7 +273,9 @@ inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2MultiImpl(
         }
         if (anyValid)
             binHasData[bin] = true;
-        if (withGaps)
+        if (withGaps && std::isinf(l1.gapRatio[row]))
+            binNaNRows[bin] = true;
+        else if (withGaps)
             binRatio[bin] = std::max(binRatio[bin], l1.gapRatio[row]);
     }
 
@@ -285,12 +287,15 @@ inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2MultiImpl(
     // Allocate keys now — we know at most l2Stride entries
     l2.keys.resize(l2Stride);
     l2.gapRatio.resize(l2Stride);
-    float carried = 0.f;
+    DroppedBins dropped;
     for (int b = 0; b < l2Bins; ++b)
     {
-        carried = std::max(carried, binRatio[b]);
-        if (!binHasData[b]) continue;
-        l2.gapRatio[outSize] = std::exchange(carried, 0.f);
+        if (!binHasData[b])
+        {
+            dropped.drop(binRatio[b], binNaNRows[b]);
+            continue;
+        }
+        l2.gapRatio[outSize] = dropped.keep(binRatio[b]);
         l2.gapRatio[outSize + 1] = 0.f;
 
         double binCenter = keyLo + (b + 0.5) * binWidth;
@@ -331,18 +336,18 @@ inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2MultiImpl(
     return std::make_shared<QCPResampledMultiDataSource>(orderColumnsByTrend(std::move(l2)));
 }
 
-// The gap ratio of each kept bin pair, raised by those of the dropped bins just before it: a
-// hole, or a NaN-only bin, makes the next drawn bin break the line.
+// The gap ratio of each kept bin pair, given the bins dropped just before it (see DroppedBins).
 inline std::vector<float> keptGapRatios(const std::vector<float>& ratios, const std::vector<int>& kept)
 {
     std::vector<float> out(kept.size() * 2, 0.f);
+    DroppedBins dropped;
     int next = 0;
-    float carried = 0.f;
     for (size_t j = 0; j < kept.size(); ++j)
     {
-        for (; next <= kept[j]; next += 2)
-            carried = std::max(carried, ratios[next]);
-        out[j * 2] = std::exchange(carried, 0.f);
+        for (; next < kept[j]; next += 2)
+            dropped.drop(ratios[next], std::isinf(ratios[next]));
+        out[j * 2] = dropped.keep(ratios[next]);
+        next += 2;
     }
     return out;
 }

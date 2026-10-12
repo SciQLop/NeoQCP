@@ -2867,11 +2867,12 @@ const std::vector<double> kSamplesPerPixel = {0.5, 1.0, 1.5, 2.0, 3.4, 5.0, 8.0,
 
 // The zooms at which the graph breaks a line drawn from gap-free data.
 template <typename Lines, typename UsesL2>
-QStringList zoomsThatBreakUniformData(QCustomPlot* plot, Lines lines, UsesL2 usesL2)
+QStringList zoomsThatBreakUniformData(QCustomPlot* plot, Lines lines, UsesL2 usesL2,
+                                     const std::vector<double>& zooms = kSamplesPerPixel)
 {
     QStringList broken;
     const double width = plot->xAxis->axisRect()->width();
-    for (const double perPixel : kSamplesPerPixel)
+    for (const double perPixel : zooms)
     {
         const double start = kUniformN * kUniformStep / 2;
         plot->xAxis->setRange(start, start + perPixel * width * kUniformStep);
@@ -2937,6 +2938,65 @@ void TestPipeline::multiGraphNaNHoleBreaksTheResampledLine()
         QVERIFY(g->mL2Result);
         QVERIFY2(nanBreaks(g->mCachedLines[0]) > 0, qPrintable(QString::number(perPixel)));
     }
+}
+
+void TestPipeline::multiGraphNaNHoleInOneColumnBreaksThatLine()
+{
+    // Column 0 is NaN over 4800 samples (5 min at 16 S/s); column 1 has data everywhere.
+    auto hole = uniformValues();
+    std::fill(hole.begin() + kUniformN / 2, hole.begin() + kUniformN / 2 + 4'800, qQNaN());
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    QSignalSpy spy(&g->pipeline(), &QCPMultiGraphPipeline::finished);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    g->setDataSource(std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
+        uniformKeys(), std::vector<std::vector<double>>{hole, uniformValues()}));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
+
+    const double centre = (kUniformN / 2 + 2'400) * kUniformStep;
+    const double span = 3 * 3600;  // 3 h view: the hole is ~1/36 of the width
+    mPlot->xAxis->setRange(centre - span / 2, centre + span / 2);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(g->mL2Result);
+    const auto& line = g->mCachedLines[0];
+    double widest = 0;
+    for (int i = 1; i < line.size(); ++i)
+        if (!std::isnan(line[i].x()) && !std::isnan(line[i - 1].x()))
+            widest = std::max(widest, line[i].x() - line[i - 1].x());
+    qInfo() << "plot width" << mPlot->xAxis->axisRect()->width() << "px, column 0 breaks"
+            << nanBreaks(line) << ", widest segment" << widest << "px";
+    QVERIFY2(nanBreaks(line) > 0, qPrintable(QString("bridged, widest segment %1 px").arg(widest)));
+}
+
+// A NaN narrower than a pixel cannot be seen: it must not break a resampled line. Narrower means
+// its two neighbours are less than a pixel apart, so more than 2 samples per pixel.
+void TestPipeline::sporadicNaNNeverBreaksTheResampledLine()
+{
+    const std::vector<double> subPixelNaN = {3.4, 5.0, 8.0, 12.0, 20.0, 40.0};
+    auto values = uniformValues();
+    for (int i = 0; i < kUniformN; i += 37)
+        values[i] = qQNaN();
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    QSignalSpy spy(&g->pipeline(), &QCPMultiGraphPipeline::finished);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    g->setDataSource(std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
+        uniformKeys(), std::vector<std::vector<double>>{values, values}));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
+    QStringList broken = zoomsThatBreakUniformData(
+        mPlot, [g] { return g->mCachedLines[0]; }, [g] { return bool(g->mL2Result); }, subPixelNaN);
+
+    auto* g2 = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    QSignalSpy spy2(&g2->pipeline(), &QCPGraphPipeline::finished);
+    g->setVisible(false);
+    g2->setData(uniformKeys(), values);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(spy2.count() >= 1, 30000);
+    for (const auto& b : zoomsThatBreakUniformData(
+             mPlot, [g2] { return g2->mCachedLines; }, [g2] { return bool(g2->mL2Result); },
+             subPixelNaN))
+        broken << "graph2 " + b;
+    QVERIFY2(broken.isEmpty(), qPrintable(broken.join("; ")));
 }
 
 void TestPipeline::graph2PanIsRedrawnFreshAfterTheDebounce()
