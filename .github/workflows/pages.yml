@@ -45,6 +45,10 @@ jobs:
           aqt install-qt -O Qt linux desktop ${{ env.QT_VERSION }} -m qtshadertools
           aqt install-qt -O Qt all_os wasm ${{ env.QT_VERSION }} wasm_multithread
 
+      - name: Install the host Qt tools' system libraries
+        # qsb links QtGui, which needs EGL/GL and xkbcommon even to compile shaders.
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libgl1 libxkbcommon0
+
       - name: Install Emscripten
         run: |
           git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$HOME/emsdk"
