@@ -90,6 +90,14 @@ NeoQCP uses QRhiWidget (Qt 6.7+) for hardware-accelerated rendering:
 - API reference: `doxygen docs/Doxyfile` writes `docs/_api/api/`, published at `<site>/api/`.
 - Local build: `pip install -r docs/requirements.txt`, then `sphinx-build -b html docs docs/_build/html`.
 
+### Browser gallery (WebAssembly)
+
+`examples/wasm-gallery` builds the guide snippets for the browser with meson, cross-compiling
+against Qt for WebAssembly (see the commands at the top of its `meson.build`). A wasm build
+(`host_machine.system() == 'emscripten'`) makes only the library and the gallery.
+`qt_static_link.py` adds what meson does not link for a static Qt: the `.prl` libraries,
+resource objects and plugins. `.github/workflows/pages.yml` publishes it to GitHub Pages.
+
 ### CI
 
 GitHub Actions runs on Linux (x86_64 + aarch64), Windows, and macOS (Intel + Apple Silicon) with Qt 6. Build uses `--buildtype debugoptimized`.

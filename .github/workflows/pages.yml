@@ -31,7 +31,7 @@ jobs:
           python-version: '3.14'
       - name: Install build tools
         # aqtinstall 3.3.0 cannot read the Qt 6.11 repository layout; master can.
-        run: pip install "aqtinstall @ git+https://github.com/miurahr/aqtinstall.git@master" ninja
+        run: pip install "aqtinstall @ git+https://github.com/miurahr/aqtinstall.git@master" meson ninja
 
       - name: Cache Qt
         id: cache-qt
@@ -56,15 +56,15 @@ jobs:
           "$HOME/emsdk/emsdk" activate "$EMSDK_VERSION"
 
       - name: Build the gallery
+        # The wasm Qt's qmake finds the host tools in Qt/<version>/gcc_64 (its target_qt.conf).
         run: |
           source "$HOME/emsdk/emsdk_env.sh"
-          QT="$PWD/Qt/${{ env.QT_VERSION }}"
-          "$QT/wasm_multithread/bin/qt-cmake" -S examples/wasm-gallery -B build-wasm -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release -DQT_HOST_PATH="$QT/gcc_64" -DQSB="$QT/gcc_64/bin/qsb"
-          cmake --build build-wasm
+          printf "[constants]\nqt_wasm = '%s'\n" "$PWD/Qt/${{ env.QT_VERSION }}/wasm_multithread" > qt.ini
+          meson setup build-wasm --cross-file qt.ini --cross-file examples/wasm-gallery/emscripten.ini
+          meson compile -C build-wasm
 
       - name: Assemble site
-        run: examples/wasm-gallery/build_site.sh build-wasm _site
+        run: examples/wasm-gallery/build_site.sh build-wasm/examples/wasm-gallery _site
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

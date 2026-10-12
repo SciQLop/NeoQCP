@@ -7,7 +7,8 @@ project('NeoQCP', 'cpp',
 
 qtmod = import('qt6')
 qtdeps = dependency('qt6', modules : ['Core','Widgets','Gui','Svg','PrintSupport'], private_headers: true)
-qttest = dependency('qt6', modules : ['Test'])
+# A browser build (Qt for WebAssembly, see examples/wasm-gallery) makes the library and the gallery.
+is_wasm = host_machine.system() == 'emscripten'
 
 optional_deps = []
 cpp_args = []
@@ -311,13 +312,18 @@ NeoQCP_dep = declare_dependency(link_with: NeoQCP,
                                 dependencies: [qtdeps, profiling_hook_dep] + optional_deps,
                                 compile_args: cpp_args)
 
-if get_option ( 'with_examples')
-    subdir('examples')
-endif
+subdir('docs/snippets')
 
-if get_option ( 'with_tests')
-    subdir('tests')
-    subdir('docs/snippets')
-    subdir('documentation/doc-image-generator')
+if is_wasm
+    subdir('examples/wasm-gallery')
+else
+    if get_option ( 'with_examples')
+        subdir('examples')
+    endif
+    if get_option ( 'with_tests')
+        qttest = dependency('qt6', modules : ['Test'])
+        subdir('tests')
+        subdir('documentation/doc-image-generator')
+    endif
 endif
 
