@@ -157,9 +157,17 @@ Both pixel conversions honour the marks:
 - `linesToPixels()` emits a NaN point before each marked point.
 - `optimizedLineData()` closes the current pixel interval at a marked point, emits a NaN point, and starts a new interval there.
 
-The NaN point breaks the polyline: the line extruder and `QPainter` both start a new segment after it. NaN values in the data are skipped and also break the line.
+The NaN point breaks the polyline: the line extruder and `QPainter` both start a new segment after it.
 
-For large data, the summaries built by [adaptive sampling](adaptive-sampling.md) are data sources too, and gap detection runs on their bin keys. A hole in the data leaves empty bins. They are either dropped, which leaves a large key step that is detected as a gap, or kept as NaN values, which break the line as well.
+NaN values in the data break the line too, when you could see the hole. `linesToPixels()`, used below 2 samples per pixel, breaks at every NaN. `optimizedLineData()` breaks when a NaN run is wider than a pixel. A narrower run cannot be seen, so the line joins the samples on either side.
+
+### Resampled lines
+
+For large data, lines are drawn from the min/max bins built by [adaptive sampling](adaptive-sampling.md). The bin keys say nothing about gaps. A bin narrower than the sampling step can hold no sample, and empty bins are dropped. On perfectly uniform data that leaves key steps of 3 to 5 times the normal one. Run on the bin keys, the detector broke such lines into dots.
+
+So each bin carries the step ratio of the raw rows it came from: the same `dx / refDx` measure, from `keyStepRatio()`. The ratio follows the data from L1 to L2 (`gapRatio` in `BinResult` and `MultiColumnBinResult`). A dropped bin passes its ratio on to the next bin that is drawn. The line breaks before a bin whose ratio passes the threshold, whatever the bin layout.
+
+A dropped bin that held only NaN rows is marked `+inf`. A run of them breaks the line when it is at least a pixel wide (`DroppedBins`, 4 L2 bins), the NaN rule of `optimizedLineData()`. With the threshold at 0 that NaN rule still applies.
 
 ## Threshold
 
@@ -202,6 +210,7 @@ Source data with gap (threshold = 1.5):
 | File | Role |
 |---|---|
 | `src/datasource/resample.cpp` | Gap detection in `resample()` function |
-| `src/datasource/algorithms.h` | `detectKeyGaps()`, `GapCache`, and their use in `linesToPixels()` / `optimizedLineData()` |
+| `src/datasource/algorithms.h` | `detectKeyGaps()`, `keyStepRatio()`, `gapsFromStepRatios()`, `GapCache`, and their use in `linesToPixels()` / `optimizedLineData()` |
+| `src/datasource/graph-resampler.h`, `resampled-multi-datasource.h` | The gap ratio of each bin, through L1 and L2; `DroppedBins` |
 | `src/plottables/plottable-colormap2.h` | `setGapThreshold()` / `gapThreshold()` API |
 | `src/plottables/plottable-graph2.h`, `plottable-multigraph.h` | `setGapThreshold()` / `gapThreshold()` API for lines |
