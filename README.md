@@ -1,5 +1,10 @@
 # NeoQCP, a QCustomPlot Modernized Fork
 [![Tests](https://github.com/SciQLop/NeoQCP/actions/workflows/tests.yml/badge.svg)](https://github.com/SciQLop/NeoQCP/actions/workflows/tests.yml)
+[![Documentation](https://readthedocs.org/projects/neoqcp/badge/?version=latest)](https://neoqcp.readthedocs.io/en/latest/)
+
+**[▶ Try it in your browser](https://sciqlop.github.io/NeoQCP/)**: the gallery plots, built to WebAssembly. Pan, zoom and select, no install needed.
+
+**[📖 Documentation](https://neoqcp.readthedocs.io/en/latest/)**: user guide, gallery and API reference.
 
 [http://www.qcustomplot.com/images/logo.png](http://www.qcustomplot.com/images/logo.png)
 

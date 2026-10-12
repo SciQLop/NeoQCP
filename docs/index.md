@@ -14,6 +14,15 @@ It adds what interactive scientific plotting needs:
 
 ![A damped sine with a legend](images/first-plot-interactive.png)
 
+```{button-link} https://sciqlop.github.io/NeoQCP/
+:color: primary
+:shadow:
+
+Try it in your browser
+```
+
+Every gallery and guide example also runs online, built with Qt for WebAssembly: pan, zoom and select, no install needed.
+
 See what it can do in the {doc}`gallery`, then start with {doc}`getting-started`. The {doc}`concepts` page explains how the pieces fit together.
 The <a href="api/index.html">API reference</a> documents every class.
 
