@@ -1,4 +1,6 @@
 #include <QtTest/QtTest>
+#include <QtGui/qtestsupport_gui.h>          // QTest::createTouchDevice, not in QtTest on macOS
+#include <QtWidgets/qtestsupport_widgets.h>  // QTest::qWaitForWindowExposed
 #include "qcustomplot.h"
 
 class TestGestures : public QObject
