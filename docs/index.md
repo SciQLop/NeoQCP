@@ -14,7 +14,7 @@ It adds what interactive scientific plotting needs:
 
 ![A damped sine with a legend](images/first-plot-interactive.png)
 
-Start with {doc}`getting-started`. The {doc}`concepts` page explains how the pieces fit together.
+See what it can do in the {doc}`gallery`, then start with {doc}`getting-started`. The {doc}`concepts` page explains how the pieces fit together.
 The <a href="api/index.html">API reference</a> documents every class.
 
 ```{toctree}
@@ -22,6 +22,7 @@ The <a href="api/index.html">API reference</a> documents every class.
 :caption: User guide
 
 getting-started
+gallery
 concepts
 graphs
 plottables

@@ -12,6 +12,7 @@ doc_snippet_srcs = files(
     'interactions.cpp',
     'styling.cpp',
     'export.cpp',
+    'gallery.cpp',
     'migrating.cpp',
     'performance.cpp',
     'polar.cpp',

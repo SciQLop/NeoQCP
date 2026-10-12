@@ -8,7 +8,7 @@ author = "Alexis Jeandet"
 copyright = "SciQLop contributors; QCustomPlot by Emanuel Eichhammer"
 version = release = re.search(r"version\s*:\s*'([^']+)'", (ROOT / "meson.build").read_text()).group(1)
 
-extensions = ["myst_parser", "sphinxcontrib.mermaid"]
+extensions = ["myst_parser", "sphinxcontrib.mermaid", "sphinx_design"]
 source_suffix = {".md": "markdown"}
 myst_heading_anchors = 3
 myst_enable_extensions = ["colon_fence"]

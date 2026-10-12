@@ -187,6 +187,7 @@ Above the cap, the graph draws an even sample of `n` points. The sample is the s
 <a href="api/classQCPMultiGraph.html">QCPMultiGraph</a> draws several value columns against one key array.
 Each column is a *component*, with its own name, pen, scatter style, line style and visibility.
 They share the key array, the resampling work and one legend entry.
+The entry starts collapsed; a click expands it to one row per component, and so does `setExpanded(true)` on its `QCPGroupLegendItem`.
 
 ```{literalinclude} snippets/graphs.cpp
 :start-after: // [graphs_multigraph]
