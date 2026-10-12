@@ -127,7 +127,7 @@ public:
     void setGapRatios(std::vector<float> ratios)
     {
         mGapRatios = std::move(ratios);
-        mGapCache = {};
+        mGapCache = qcp::algo::GapCache();
     }
 
 private:
