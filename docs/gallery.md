@@ -3,6 +3,9 @@
 Complete plots that combine several features.
 Each picture is drawn by the code under it: the code is compiled and run by the test suite, like every example in this guide.
 
+Every plot also runs in your browser, built with Qt for WebAssembly: pan, zoom and select as in a desktop application.
+"Try it online" opens it in the [live gallery](https://sciqlop.github.io/NeoQCP/), which also has every example of this guide.
+
 ::::{grid} 2 2 4 4
 :gutter: 2
 
@@ -68,6 +71,13 @@ The magnetic field jumps and turns turbulent, and the cold ion beam heats into a
 
 ![Magnetic field and ion spectrogram across a shock](images/gallery-space-weather.png)
 
+```{button-link} https://sciqlop.github.io/NeoQCP/?plot=gallery_space_weather
+:color: primary
+:outline:
+
+Try it online
+```
+
 :::{dropdown} Code
 ```{literalinclude} snippets/gallery.cpp
 :start-after: // [gallery_space_weather]
@@ -87,6 +97,13 @@ The overview shows all of them; the lower panel shows the four seconds in the re
 - Each view reduces the data to its own pixel columns, so both stay fluid while panning ({doc}`performance`).
 
 ![Ten million samples, overview and detail](images/gallery-ten-million-points.png)
+
+```{button-link} https://sciqlop.github.io/NeoQCP/?plot=gallery_ten_million_points
+:color: primary
+:outline:
+
+Try it online
+```
 
 :::{dropdown} Code
 ```{literalinclude} snippets/gallery.cpp
@@ -109,6 +126,13 @@ The dots bunch up at apogee, where the spacecraft is slow.
 
 ![An elliptical orbit around the Earth, coloured by speed](images/gallery-orbit.png)
 
+```{button-link} https://sciqlop.github.io/NeoQCP/?plot=gallery_orbit
+:color: primary
+:outline:
+
+Try it online
+```
+
 :::{dropdown} Code
 ```{literalinclude} snippets/gallery.cpp
 :start-after: // [gallery_orbit]
@@ -129,6 +153,13 @@ The dots bunch up at apogee, where the spacecraft is slow.
 
 ![A 2D histogram with marginal histograms](images/gallery-joint-density.png)
 
+```{button-link} https://sciqlop.github.io/NeoQCP/?plot=gallery_joint_density
+:color: primary
+:outline:
+
+Try it online
+```
+
 :::{dropdown} Code
 ```{literalinclude} snippets/gallery.cpp
 :start-after: // [gallery_joint_density]
@@ -148,6 +179,13 @@ The electric potential of two charges and a small dipole, with 16 contour lines.
 
 ![An electric potential with contour lines](images/gallery-contours.png)
 
+```{button-link} https://sciqlop.github.io/NeoQCP/?plot=gallery_contours
+:color: primary
+:outline:
+
+Try it online
+```
+
 :::{dropdown} Code
 ```{literalinclude} snippets/gallery.cpp
 :start-after: // [gallery_contours]
@@ -166,6 +204,13 @@ Four months of hourly prices as daily candles, with a 20-day moving average and 
 - The volume panel is a second axis rect with two `QCPBars`, one per colour, under a shared date axis ({doc}`layout`, {doc}`axes`).
 
 ![Candlesticks, a moving average and volume bars](images/gallery-stock-chart.png)
+
+```{button-link} https://sciqlop.github.io/NeoQCP/?plot=gallery_stock_chart
+:color: primary
+:outline:
+
+Try it online
+```
 
 :::{dropdown} Code
 ```{literalinclude} snippets/gallery.cpp
@@ -187,6 +232,13 @@ A Hann taper widens the main lobe but pushes the side lobes far down.
 
 ![The radiation pattern of an antenna array](images/gallery-antenna-pattern.png)
 
+```{button-link} https://sciqlop.github.io/NeoQCP/?plot=gallery_antenna_pattern
+:color: primary
+:outline:
+
+Try it online
+```
+
 :::{dropdown} Code
 ```{literalinclude} snippets/gallery.cpp
 :start-after: // [gallery_antenna_pattern]
@@ -206,6 +258,13 @@ Measurements of a damped oscillator with their uncertainties, the model, and the
 - The axis labels are LaTeX ({doc}`axes`).
 
 ![Measurements with error bars, a model and residuals](images/gallery-fit-residuals.png)
+
+```{button-link} https://sciqlop.github.io/NeoQCP/?plot=gallery_fit_residuals
+:color: primary
+:outline:
+
+Try it online
+```
 
 :::{dropdown} Code
 ```{literalinclude} snippets/gallery.cpp

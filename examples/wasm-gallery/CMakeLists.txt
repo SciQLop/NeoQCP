@@ -1,11 +1,13 @@
 # The user-guide snippets as a live gallery, built for the browser (Qt for WebAssembly).
 # CMake, not meson: Qt's CMake does the wasm link steps (platform plugin, loader, html).
 #
+# From the repository root:
 #   source ~/emsdk/emsdk_env.sh                      # Emscripten 4.0.7 for Qt 6.11
-#   ~/Qt/6.11.2/wasm_multithread/bin/qt-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-#       -DQT_HOST_PATH=$HOME/Qt/6.11.2/gcc_64 -DQSB=$HOME/Qt/6.11.2/gcc_64/bin/qsb
-#   cmake --build build && cd build && python3 ../serve.py 8765
-#   open http://127.0.0.1:8765/neoqcp_gallery.html
+#   ~/Qt/6.11.2/wasm_multithread/bin/qt-cmake -S examples/wasm-gallery -B build-wasm -G Ninja \
+#       -DCMAKE_BUILD_TYPE=Release -DQT_HOST_PATH=$HOME/Qt/6.11.2/gcc_64 -DQSB=$HOME/Qt/6.11.2/gcc_64/bin/qsb
+#   cmake --build build-wasm && examples/wasm-gallery/build_site.sh build-wasm _site
+#   (cd _site && python3 ../examples/wasm-gallery/serve.py 8765)   # http://127.0.0.1:8765/?plot=gallery_orbit
+# CI (.github/workflows/pages.yml) does the same and publishes _site to GitHub Pages.
 cmake_minimum_required(VERSION 3.21)
 project(neoqcp_gallery LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)

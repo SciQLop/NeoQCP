@@ -4,13 +4,30 @@
 #include <QApplication>
 #include <QHBoxLayout>
 #include <QListWidget>
+#include <QTimer>
+#include <QUrlQuery>
 
 #include <algorithm>
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten/val.h>
+#endif
 
 std::vector<DocSnippet>& doc_snippets()
 {
     static std::vector<DocSnippet> all;
     return all;
+}
+
+// The plot named by ?plot=<name> in the page address, so the docs can link to one plot.
+QString requested_plot()
+{
+#ifdef __EMSCRIPTEN__
+    const auto search = emscripten::val::global("location")["search"].as<std::string>();
+    return QUrlQuery(QString::fromStdString(search).mid(1)).queryItemValue("plot");
+#else
+    return {};
+#endif
 }
 
 class Gallery : public QWidget
@@ -31,7 +48,11 @@ public:
                               [](const QString& name) { return name.startsWith("gallery_"); });
         mList->addItems(names);
         connect(mList, &QListWidget::currentTextChanged, this, &Gallery::show_snippet);
-        mList->setCurrentRow(0);
+        // A plot before the first show, so the window composites through QRhi from the start:
+        // switching it to QRhi later loses the WebGL context. Then the same plot again once
+        // the window has its real size, which some plots (the orbit's 1:1 axes) depend on.
+        mList->setCurrentRow(std::max(0, names.indexOf(requested_plot())));
+        QTimer::singleShot(0, this, [this] { show_snippet(mList->currentItem()->text()); });
     }
 
 private:

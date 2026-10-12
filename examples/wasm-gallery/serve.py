@@ -1,4 +1,4 @@
-# python3 serve.py <port>, from the build directory. Threads need these two headers;
+# python3 serve.py <port>, from the site directory. Threads need these two headers;
 # a plain http.server does not send them.
 import http.server, sys
 class Handler(http.server.SimpleHTTPRequestHandler):

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, height=device-height, user-scalable=0">
+  <title>NeoQCP gallery</title>
+  <!-- GitHub Pages cannot send the COOP/COEP headers that wasm threads need; this
+       service worker adds them and reloads the page once. -->
+  <script src="coi-serviceworker.js"></script>
+  <style>
+    html, body { padding: 0; margin: 0; overflow: hidden; height: 100%; background: #fff;
+                 font-family: sans-serif; }
+    #screen { width: 100%; height: 100%; }
+    #loading { margin-top: 30vh; text-align: center; color: #444; line-height: 1.6; }
+  </style>
+</head>
+<body onload="init()">
+  <div id="loading">
+    <strong>NeoQCP gallery</strong><br>
+    <span id="status">Loading about 4 MB of WebAssembly…</span>
+    <noscript>This gallery needs JavaScript.</noscript>
+  </div>
+  <div id="screen"></div>
+  <script>
+    async function init() {
+      const loading = document.querySelector('#loading');
+      const screen = document.querySelector('#screen');
+      const status = document.querySelector('#status');
+      screen.style.display = 'none';
+      try {
+        await qtLoad({
+          qt: {
+            onLoaded: () => { loading.style.display = 'none'; screen.style.display = 'block'; },
+            onExit: exit => { status.textContent = `The gallery stopped (${exit.text ?? exit.code}).`; },
+            entryFunction: window.neoqcp_gallery_entry,
+            containerElements: [screen],
+          }
+        });
+      } catch (e) {
+        status.textContent = `The gallery could not start: ${e}`;
+        console.error(e);
+      }
+    }
+  </script>
+  <script src="neoqcp_gallery.js"></script>
+  <script src="qtloader.js"></script>
+</body>
+</html>
