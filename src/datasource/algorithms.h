@@ -48,6 +48,36 @@ GapVector detectKeyGaps(const KC& keys, int begin, int end,
     return gapBefore;
 }
 
+// How many times wider the step into key i is than the narrower of its neighbouring steps in
+// [begin, end): the measure detectKeyGaps holds against its threshold. 0 when there is nothing
+// to compare it to.
+template <typename KeyAt>
+double keyStepRatio(KeyAt key, int begin, int end, int i)
+{
+    if (i <= begin || i >= end) return 0;
+    const double step = key(i) - key(i - 1);
+    double ref = std::numeric_limits<double>::max();
+    if (i - 1 > begin && key(i - 1) - key(i - 2) > 0)
+        ref = std::min(ref, key(i - 1) - key(i - 2));
+    if (i + 1 < end && key(i + 1) - key(i) > 0)
+        ref = std::min(ref, key(i + 1) - key(i));
+    return step > 0 && ref < std::numeric_limits<double>::max() ? step / ref : 0;
+}
+
+// Binned points say nothing about gaps through their keys: an empty bin is the binning, not a
+// hole in the data. Each carries the keyStepRatio of the raw rows it came from instead, +inf
+// where the rows were all NaN (a hole whatever the threshold).
+inline GapVector gapsFromStepRatios(const std::vector<float>& ratios, int begin, int end,
+                                    double threshold)
+{
+    GapVector gaps(end - begin);
+    if (ratios.empty()) return gaps;
+    for (int i = begin; i < end; ++i)
+        if (std::isinf(ratios[i]) || (threshold > 0 && ratios[i] > threshold))
+            gaps.setGap(i - begin);
+    return gaps;
+}
+
 // The gaps of keys[begin, end), recomputed only when the range or the threshold changes.
 struct GapCache {
     int begin = -1;
@@ -64,6 +94,17 @@ struct GapCache {
         end = newEnd;
         threshold = newThreshold;
         gaps = detectKeyGaps(keys, begin, end, threshold);
+    }
+
+    void updateFromRatios(const std::vector<float>& ratios, int newBegin, int newEnd,
+                          double newThreshold)
+    {
+        if (begin == newBegin && end == newEnd && threshold == newThreshold)
+            return;
+        begin = newBegin;
+        end = newEnd;
+        threshold = newThreshold;
+        gaps = gapsFromStepRatios(ratios, begin, end, threshold);
     }
 };
 

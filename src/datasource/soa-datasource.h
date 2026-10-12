@@ -123,14 +123,25 @@ public:
                                                sourceIndices, gapThreshold(), &mGapCache.gaps);
     }
 
+    // Binned points: their gaps come from these ratios, not from their keys (see gapsFromStepRatios).
+    void setGapRatios(std::vector<float> ratios)
+    {
+        mGapRatios = std::move(ratios);
+        mGapCache = {};
+    }
+
 private:
     void ensureGapCache(int begin, int end) const
     {
-        mGapCache.update(mKeys, begin, end, gapThreshold());
+        if (mGapRatios.empty())
+            mGapCache.update(mKeys, begin, end, gapThreshold());
+        else
+            mGapCache.updateFromRatios(mGapRatios, begin, end, gapThreshold());
     }
 
     KeyContainer mKeys;
     ValueContainer mValues;
     std::shared_ptr<const void> mDataGuard;
+    std::vector<float> mGapRatios;
     mutable qcp::algo::GapCache mGapCache;
 };

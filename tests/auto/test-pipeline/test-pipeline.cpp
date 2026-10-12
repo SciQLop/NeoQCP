@@ -890,7 +890,7 @@ void TestPipeline::graphResamplerBinMinMax()
     std::vector<double> vals = {5, 3, 8, 1, 7, 2, 9, 4, 6, 0};
     QCPRange keyRange(0, 9);
 
-    auto [outKeys, outVals] = qcp::algo::binMinMax(keys, vals, 0, 10, keyRange, 3);
+    auto [outKeys, outVals, outGapRatio] = qcp::algo::binMinMax(keys, vals, 0, 10, keyRange, 3);
 
     QCOMPARE(outKeys.size(), 6u);
     QCOMPARE(outVals.size(), 6u);
@@ -1088,7 +1088,7 @@ void TestPipeline::graphResamplerNaNSkipped()
     std::vector<double> vals = {5, nan, 3, nan, 7};
     QCPRange range(0, 4);
 
-    auto [outKeys, outVals] = qcp::algo::binMinMax(keys, vals, 0, 5, range, 1);
+    auto [outKeys, outVals, outGapRatio] = qcp::algo::binMinMax(keys, vals, 0, 5, range, 1);
 
     QCOMPARE(outVals[0], 3.0);
     QCOMPARE(outVals[1], 7.0);
@@ -1100,7 +1100,7 @@ void TestPipeline::graphResamplerEmptyBinsProduceNaN()
     std::vector<double> vals = {10, 20, 30};
     QCPRange range(0, 9);
 
-    auto [outKeys, outVals] = qcp::algo::binMinMax(keys, vals, 0, 3, range, 3);
+    auto [outKeys, outVals, outGapRatio] = qcp::algo::binMinMax(keys, vals, 0, 3, range, 3);
 
     // Bin 0: has data
     QVERIFY(!std::isnan(outVals[0]));
@@ -1342,7 +1342,7 @@ void TestPipeline::graphResamplerBinMinMaxKeyPositions()
     std::vector<double> vals = {10, 20, 30, 40};
     QCPRange range(0, 4);
 
-    auto [outKeys, outVals] = qcp::algo::binMinMax(keys, vals, 0, 4, range, 1);
+    auto [outKeys, outVals, outGapRatio] = qcp::algo::binMinMax(keys, vals, 0, 4, range, 1);
 
     // Single bin: binWidth=4, halfWidth=2, binCenter=2
     // Expected: (binCenter, min) = (2, 10), (binCenter+halfWidth, max) = (4, 40)
@@ -1370,7 +1370,7 @@ void TestPipeline::graphResamplerNonFiniteKeysSkipped()
     std::vector<double> vals = {10, 20, 30, 40, 50};
     QCPRange range(0, 4);
 
-    auto [outKeys, outVals] = qcp::algo::binMinMax(keys, vals, 0, 5, range, 1);
+    auto [outKeys, outVals, outGapRatio] = qcp::algo::binMinMax(keys, vals, 0, 5, range, 1);
 
     // Only finite keys (0, 2, 4) should contribute → min=10, max=50
     QCOMPARE(outVals[0], 10.0);
@@ -2839,6 +2839,104 @@ void TestPipeline::multiGraphGapThresholdReachesResampledSource()
     g->setGapThreshold(0);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QCOMPARE(nanBreaks(g->mCachedLines[0]), 0);
+}
+
+namespace {
+// MMS FGM survey: 16 S/s, enough samples to be resampled.
+constexpr int kUniformN = 200'000;
+constexpr double kUniformStep = 0.0625;
+
+std::vector<double> uniformKeys()
+{
+    std::vector<double> keys(kUniformN);
+    for (int i = 0; i < kUniformN; ++i)
+        keys[i] = i * kUniformStep;
+    return keys;
+}
+
+std::vector<double> uniformValues()
+{
+    std::vector<double> values(kUniformN);
+    for (int i = 0; i < kUniformN; ++i)
+        values[i] = std::sin(i * 0.01);
+    return values;
+}
+
+// From raw rows (< 1.3 samples per pixel) through L2 binned from raw rows, to L2 binned from L1.
+const std::vector<double> kSamplesPerPixel = {0.5, 1.0, 1.5, 2.0, 3.4, 5.0, 8.0, 12.0, 20.0, 40.0};
+
+// The zooms at which the graph breaks a line drawn from gap-free data.
+template <typename Lines, typename UsesL2>
+QStringList zoomsThatBreakUniformData(QCustomPlot* plot, Lines lines, UsesL2 usesL2)
+{
+    QStringList broken;
+    const double width = plot->xAxis->axisRect()->width();
+    for (const double perPixel : kSamplesPerPixel)
+    {
+        const double start = kUniformN * kUniformStep / 2;
+        plot->xAxis->setRange(start, start + perPixel * width * kUniformStep);
+        plot->replot(QCustomPlot::rpImmediateRefresh);
+        if (const int breaks = nanBreaks(lines()); breaks > 0)
+            broken << QString("%1 samples/px (%2): %3 breaks")
+                          .arg(perPixel).arg(usesL2() ? "L2" : "raw").arg(breaks);
+    }
+    return broken;
+}
+}
+
+void TestPipeline::graph2UniformDataNeverBreaksAtAnyZoom()
+{
+    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    g->setData(uniformKeys(), uniformValues());
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
+
+    const auto broken = zoomsThatBreakUniformData(
+        mPlot, [g] { return g->mCachedLines; }, [g] { return bool(g->mL2Result); });
+    QVERIFY2(broken.isEmpty(), qPrintable(broken.join("; ")));
+    QVERIFY2(g->mL2Result, "the widest zoom must be drawn from L2, or this test checks nothing");
+}
+
+void TestPipeline::multiGraphUniformDataNeverBreaksAtAnyZoom()
+{
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    QSignalSpy spy(&g->pipeline(), &QCPMultiGraphPipeline::finished);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    g->setDataSource(std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
+        uniformKeys(), std::vector<std::vector<double>>{uniformValues()}));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
+
+    const auto broken = zoomsThatBreakUniformData(
+        mPlot, [g] { return g->mCachedLines[0]; }, [g] { return bool(g->mL2Result); });
+    QVERIFY2(broken.isEmpty(), qPrintable(broken.join("; ")));
+    QVERIFY2(g->mL2Result, "the widest zoom must be drawn from L2, or this test checks nothing");
+}
+
+void TestPipeline::multiGraphNaNHoleBreaksTheResampledLine()
+{
+    auto values = uniformValues();
+    std::fill(values.begin() + kUniformN / 2, values.begin() + kUniformN / 2 + 2'000, qQNaN());
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    QSignalSpy spy(&g->pipeline(), &QCPMultiGraphPipeline::finished);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    g->setDataSource(std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
+        uniformKeys(), std::vector<std::vector<double>>{values}));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
+
+    for (const double perPixel : {3.4, 12.0})
+    {
+        const double centre = (kUniformN / 2 + 1'000) * kUniformStep;
+        const double span = perPixel * mPlot->xAxis->axisRect()->width() * kUniformStep;
+        mPlot->xAxis->setRange(centre - span / 2, centre + span / 2);
+        g->setGapThreshold(0);
+        mPlot->replot(QCustomPlot::rpImmediateRefresh);
+        QVERIFY(g->mL2Result);
+        QVERIFY2(nanBreaks(g->mCachedLines[0]) > 0, qPrintable(QString::number(perPixel)));
+    }
 }
 
 void TestPipeline::graph2PanIsRedrawnFreshAfterTheDebounce()

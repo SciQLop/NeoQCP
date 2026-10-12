@@ -86,6 +86,9 @@ private slots:
     void multiGraphGapThresholdZeroDrawsIrregularSteps();
     void graph2GapThresholdReachesResampledSource();
     void multiGraphGapThresholdReachesResampledSource();
+    void graph2UniformDataNeverBreaksAtAnyZoom();
+    void multiGraphUniformDataNeverBreaksAtAnyZoom();
+    void multiGraphNaNHoleBreaksTheResampledLine();
     void multiGraphPendingSourceCommitsAfterZoomTriggeredRefetch();
     void multiGraphMultipleRapidLegitimateSupersessionsCommitLast();
     void multiGraphThresholdScalesWithColumnCount();

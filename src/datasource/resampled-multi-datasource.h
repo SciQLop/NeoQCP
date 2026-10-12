@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <span>
+#include <utility>
 
 class QCPResampledMultiDataSource final : public QCPAbstractMultiDataSource {
 public:
@@ -198,7 +199,7 @@ public:
 private:
     void ensureGapCache(int begin, int end) const
     {
-        mGapCache.update(mBins.keys, begin, end, gapThreshold());
+        mGapCache.updateFromRatios(mBins.gapRatio, begin, end, gapThreshold());
     }
 
     qcp::algo::MultiColumnBinResult mBins;
@@ -247,6 +248,8 @@ inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2MultiImpl(
 
     // Bitset to track which bins received data — avoids scanning all bins during compaction
     std::vector<bool> binHasData(l2Bins, false);
+    std::vector<float> binRatio(l2Bins, 0.f);
+    const bool withGaps = !l1.gapRatio.empty();
 
     // Single pass over L1 points: compute bin index once, scatter into all columns
     int l1Count = l1End - l1Begin;
@@ -270,6 +273,8 @@ inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2MultiImpl(
         }
         if (anyValid)
             binHasData[bin] = true;
+        if (withGaps)
+            binRatio[bin] = std::max(binRatio[bin], l1.gapRatio[row]);
     }
 
     if constexpr (WithOrigin) l2.origin.resize(N * l2Stride);
@@ -279,9 +284,14 @@ inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2MultiImpl(
     constexpr double NaN = std::numeric_limits<double>::quiet_NaN();
     // Allocate keys now — we know at most l2Stride entries
     l2.keys.resize(l2Stride);
+    l2.gapRatio.resize(l2Stride);
+    float carried = 0.f;
     for (int b = 0; b < l2Bins; ++b)
     {
+        carried = std::max(carried, binRatio[b]);
         if (!binHasData[b]) continue;
+        l2.gapRatio[outSize] = std::exchange(carried, 0.f);
+        l2.gapRatio[outSize + 1] = 0.f;
 
         double binCenter = keyLo + (b + 0.5) * binWidth;
         int srcSlot = b * 2;
@@ -307,6 +317,7 @@ inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2MultiImpl(
     }
 
     l2.keys.resize(outSize);
+    l2.gapRatio.resize(outSize);
     // Compact column data: shift each column's data to final stride.
     for (int c = 1; c < N; ++c)
         for (int i = 0; i < outSize; ++i)
@@ -320,7 +331,23 @@ inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2MultiImpl(
     return std::make_shared<QCPResampledMultiDataSource>(orderColumnsByTrend(std::move(l2)));
 }
 
-// Keeps the bins some column has data in; keys, values and origin stay aligned.
+// The gap ratio of each kept bin pair, raised by those of the dropped bins just before it: a
+// hole, or a NaN-only bin, makes the next drawn bin break the line.
+inline std::vector<float> keptGapRatios(const std::vector<float>& ratios, const std::vector<int>& kept)
+{
+    std::vector<float> out(kept.size() * 2, 0.f);
+    int next = 0;
+    float carried = 0.f;
+    for (size_t j = 0; j < kept.size(); ++j)
+    {
+        for (; next <= kept[j]; next += 2)
+            carried = std::max(carried, ratios[next]);
+        out[j * 2] = std::exchange(carried, 0.f);
+    }
+    return out;
+}
+
+// Keeps the bins some column has data in; keys, values, origin and gap ratios stay aligned.
 inline MultiColumnBinResult dropEmptyBins(const MultiColumnBinResult& in)
 {
     const int s = in.stride();
@@ -340,6 +367,8 @@ inline MultiColumnBinResult dropEmptyBins(const MultiColumnBinResult& in)
     out.numColumns = N;
     const int k = static_cast<int>(kept.size()) * 2;
     out.keys.resize(k);
+    if (!in.gapRatio.empty())
+        out.gapRatio = keptGapRatios(in.gapRatio, kept);
     out.values.resize(N * k);
     if (!in.origin.empty()) out.origin.resize(N * k);
     for (int j = 0; j < k; ++j)

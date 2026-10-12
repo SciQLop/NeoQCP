@@ -15,6 +15,7 @@
 #include <limits>
 #include <memory>
 #include <span>
+#include <utility>
 #include <vector>
 
 namespace qcp::algo {
@@ -54,7 +55,21 @@ inline QThreadPool& innerPool()
 struct BinResult {
     std::vector<double> keys;
     std::vector<double> values;
+    std::vector<float> gapRatio; // same layout as keys, see gapsFromStepRatios (0 on max slots)
 };
+
+// binRatio[b]: the largest step ratio of the rows of bin b, -1 for a bin without rows.
+// A bin with rows but no value holds a run of NaN: a hole, whatever the threshold.
+// simplify: one NaN-only bin breaks the line, where the raw path waits for a run wider than a
+// pixel (algorithms.h). Upgrade path: carry the run's key width and compare it to a pixel at L2.
+inline void setGapRatios(BinResult& out, const std::vector<float>& binRatio)
+{
+    out.gapRatio.assign(out.keys.size(), 0.f);
+    for (int b = 0; b < static_cast<int>(binRatio.size()); ++b)
+        if (binRatio[b] >= 0)
+            out.gapRatio[b * 2] = std::isnan(out.values[b * 2])
+                ? std::numeric_limits<float>::infinity() : binRatio[b];
+}
 
 // Initialize bin keys and values for numBins min/max pairs.
 // keys: (binCenter, binCenter+halfWidth) per bin; values: NaN.
@@ -119,12 +134,15 @@ inline L1ViewportBounds l1ViewportBounds(
 // Bin source[begin..end) into numBins min/max pairs.
 // Output: 2*numBins points — (binCenter, min), (binCenter+halfWidth, max) per bin.
 // NaN values and non-finite keys are skipped. Empty bins produce NaN pairs.
+// srcGapRatios: the gap ratios of the source points when they are bins themselves (L1);
+// empty for raw points, whose ratios come from their keys.
 inline BinResult binMinMax(
     const std::vector<double>& srcKeys,
     const std::vector<double>& srcValues,
     int begin, int end,
     const QCPRange& keyRange,
-    int numBins)
+    int numBins,
+    const std::vector<float>& srcGapRatios = {})
 {
     BinResult out;
     if (numBins <= 0 || keyRange.size() <= 0)
@@ -133,15 +151,24 @@ inline BinResult binMinMax(
     const double binWidth = keyRange.size() / numBins;
     const double keyLo = keyRange.lower;
     initBinKeysAndValues(out, numBins, keyLo, binWidth);
+    std::vector<float> binRatio(numBins, -1.f);
+    const auto key = [&](int i) { return srcKeys[i]; };
+    const int size = static_cast<int>(srcKeys.size());
 
     for (int i = begin; i < end; ++i)
     {
         double k = srcKeys[i];
         double v = srcValues[i];
-        if (std::isnan(v) || !std::isfinite(k)) continue;
+        if (!std::isfinite(k)) continue;
 
         int bin = static_cast<int>((k - keyLo) / binWidth);
         bin = std::clamp(bin, 0, numBins - 1);
+        // An empty source bin is not a row: only its ratio (+inf for a NaN hole) is passed on.
+        const float ratio = srcGapRatios.empty()
+            ? static_cast<float>(keyStepRatio(key, 0, size, i)) : srcGapRatios[i];
+        if (srcGapRatios.empty() || !std::isnan(v) || ratio > 0)
+            binRatio[bin] = std::max(binRatio[bin], ratio);
+        if (std::isnan(v)) continue;
 
         double& mn = out.values[bin * 2 + 0];
         double& mx = out.values[bin * 2 + 1];
@@ -149,6 +176,7 @@ inline BinResult binMinMax(
         if (std::isnan(mx) || v > mx) mx = v;
     }
 
+    setGapRatios(out, binRatio);
     return out;
 }
 
@@ -166,15 +194,20 @@ inline BinResult binMinMax(
     const double binWidth = keyRange.size() / numBins;
     const double keyLo = keyRange.lower;
     initBinKeysAndValues(out, numBins, keyLo, binWidth);
+    std::vector<float> binRatio(numBins, -1.f);
+    const auto key = [&](int i) { return src.keyAt(i); };
+    const int size = src.size();
 
     for (int i = begin; i < end; ++i)
     {
         double k = src.keyAt(i);
         double v = src.valueAt(i);
-        if (std::isnan(v) || !std::isfinite(k)) continue;
+        if (!std::isfinite(k)) continue;
 
         int bin = static_cast<int>((k - keyLo) / binWidth);
         bin = std::clamp(bin, 0, numBins - 1);
+        binRatio[bin] = std::max(binRatio[bin], static_cast<float>(keyStepRatio(key, 0, size, i)));
+        if (std::isnan(v)) continue;
 
         double& mn = out.values[bin * 2 + 0];
         double& mx = out.values[bin * 2 + 1];
@@ -182,6 +215,7 @@ inline BinResult binMinMax(
         if (std::isnan(mx) || v > mx) mx = v;
     }
 
+    setGapRatios(out, binRatio);
     return out;
 }
 
@@ -209,6 +243,9 @@ inline BinResult binMinMaxParallel(
 
     // Clamp thread count to available bins
     threadCount = std::min(threadCount, numBins);
+    std::vector<float> binRatio(numBins, -1.f);
+    const auto key = [&](int i) { return src.keyAt(i); };
+    const int size = src.size();
 
     // Worker: iterate source[srcBegin..srcEnd), update bins[binBegin..binEnd)
     auto worker = [&](int srcBegin, int srcEnd, int binBegin, int binEnd) {
@@ -216,10 +253,13 @@ inline BinResult binMinMaxParallel(
         {
             double k = src.keyAt(i);
             double v = src.valueAt(i);
-            if (std::isnan(v) || !std::isfinite(k)) continue;
+            if (!std::isfinite(k)) continue;
 
             int bin = static_cast<int>((k - keyLo) / binWidth);
             bin = std::clamp(bin, binBegin, binEnd - 1);
+            binRatio[bin] = std::max(binRatio[bin],
+                                     static_cast<float>(keyStepRatio(key, 0, size, i)));
+            if (std::isnan(v)) continue;
 
             double& mn = out.values[bin * 2 + 0];
             double& mx = out.values[bin * 2 + 1];
@@ -260,6 +300,7 @@ inline BinResult binMinMaxParallel(
     if (remaining.loadRelaxed() > 0)
         done.acquire();
 
+    setGapRatios(out, binRatio);
     return out;
 }
 
@@ -273,6 +314,7 @@ struct MultiColumnBinResult {
     std::vector<double> keys;    // 2 * numBins (shared across columns)
     std::vector<double> values;  // N * 2 * numBins, column-major
     std::vector<int> origin;     // empty, or same layout as values: source index, -1 for an empty slot
+    std::vector<float> gapRatio; // same layout as keys, see gapsFromStepRatios (0 on max slots)
     int numColumns = 0;
     int stride() const { return static_cast<int>(keys.size()); }
 };
@@ -346,6 +388,36 @@ inline void binRowsMinMax(const QCPAbstractMultiDataSource& src, int first,
         run([&](int c, int i) { return src.valueAt(c, i); });
 }
 
+// binRatio[b]: the largest keyStepRatio of the rows of bin b (see binRowsMinMax for bins),
+// left at -1 for a bin without rows.
+inline void foldRowStepRatios(const QCPAbstractMultiDataSource& src, int first,
+                              const std::vector<int>& bins, float* binRatio)
+{
+    const double* rawKeys = src.rawKeyData();
+    const auto key = [&](int i) { return rawKeys ? rawKeys[i] : src.keyAt(i); };
+    const int size = src.size();
+    for (int i = 0; i < static_cast<int>(bins.size()); ++i)
+        if (bins[i] >= 0)
+            binRatio[bins[i]] = std::max(binRatio[bins[i]],
+                                         static_cast<float>(keyStepRatio(key, 0, size, first + i)));
+}
+
+// simplify: a bin breaks the line on a NaN hole only when every column is NaN there; one column
+// NaN while the others have data is bridged. Upgrade path: one gapRatio per column.
+inline void setGapRatios(MultiColumnBinResult& out, const std::vector<float>& binRatio)
+{
+    const int s = out.stride();
+    out.gapRatio.assign(s, 0.f);
+    for (int b = 0; b < static_cast<int>(binRatio.size()); ++b)
+    {
+        if (binRatio[b] < 0) continue;
+        bool anyValue = false;
+        for (int c = 0; c < out.numColumns && !anyValue; ++c)
+            anyValue = !std::isnan(out.values[c * s + b * 2]);
+        out.gapRatio[b * 2] = anyValue ? binRatio[b] : std::numeric_limits<float>::infinity();
+    }
+}
+
 template <bool WithOrigin>
 inline MultiColumnBinResult binMinMaxMultiImpl(
     const QCPAbstractMultiDataSource& src,
@@ -388,8 +460,11 @@ inline MultiColumnBinResult binMinMaxMultiImpl(
     }
     if (validCount == 0) return out;
 
+    std::vector<float> binRatio(numBins, -1.f);
+    foldRowStepRatios(src, begin, bins, binRatio.data());
     binRowsMinMax<WithOrigin>(src, begin, bins, out.values.data(),
                               WithOrigin ? out.origin.data() : nullptr, s);
+    setGapRatios(out, binRatio);
 
     return out;
 }
@@ -431,6 +506,7 @@ inline MultiColumnBinResult binMinMaxMultiParallelImpl(
     threadCount = std::min(threadCount, numBins);
 
     const double* rawKeys = src.rawKeyData();
+    std::vector<float> binRatio(numBins, -1.f);
 
     auto worker = [&](int srcBegin, int srcEnd, int binBegin, int binEnd) {
         // Pre-compute bin indices for this chunk
@@ -443,6 +519,7 @@ inline MultiColumnBinResult binMinMaxMultiParallelImpl(
             bins[i] = std::clamp(static_cast<int>((k - keyLo) / binWidth), binBegin, binEnd - 1);
         }
 
+        foldRowStepRatios(src, srcBegin, bins, binRatio.data());
         binRowsMinMax<WithOrigin>(src, srcBegin, bins, out.values.data(),
                                   WithOrigin ? out.origin.data() : nullptr, s);
     };
@@ -477,6 +554,7 @@ inline MultiColumnBinResult binMinMaxMultiParallelImpl(
     if (remaining.loadRelaxed() > 0)
         done.acquire();
 
+    setGapRatios(out, binRatio);
     return out;
 }
 
@@ -604,26 +682,33 @@ inline std::shared_ptr<QCPAbstractDataSource> resampleL2(
     const auto [l1Begin, l1End] = l1ViewportBounds(l1.keys, static_cast<int>(l1.keys.size()), vp.keyRange);
     const auto rows = rawRowsInView(raw, vp.keyRange);
     auto l2 = l1ResolvesViewport(l1End - l1Begin, vp)
-        ? binMinMax(l1.keys, l1.values, l1Begin, l1End, vp.keyRange, l2Bins)
+        ? binMinMax(l1.keys, l1.values, l1Begin, l1End, vp.keyRange, l2Bins, l1.gapRatio)
         : binMinMaxParallel(raw, rows.begin, rows.end, vp.keyRange, l2Bins);
     orderPairsByTrend(l2.values);
 
     std::vector<double> outKeys, outVals;
+    std::vector<float> outRatios;
     outKeys.reserve(l2.keys.size());
     outVals.reserve(l2.values.size());
+    outRatios.reserve(l2.gapRatio.size());
+    float carried = 0.f;
     for (size_t i = 0; i < l2.keys.size(); ++i)
     {
+        if (!l2.gapRatio.empty())
+            carried = std::max(carried, l2.gapRatio[i]);
         if (!std::isnan(l2.values[i]))
         {
             outKeys.push_back(l2.keys[i]);
             outVals.push_back(l2.values[i]);
+            outRatios.push_back(std::exchange(carried, 0.f));
         }
     }
 
     // Empty, not nullptr, when nothing is in view: nullptr would make the graph draw raw rows.
-    return std::make_shared<QCPSoADataSource<
-        std::vector<double>, std::vector<double>>>(
+    auto out = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
         std::move(outKeys), std::move(outVals));
+    out->setGapRatios(std::move(outRatios));
+    return out;
 }
 
 // L1 build for multi-column sources — heavy, meant for async pipeline.

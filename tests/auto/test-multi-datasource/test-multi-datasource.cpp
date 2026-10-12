@@ -334,31 +334,24 @@ void TestMultiDataSource::linesToPixelsBreaksAtKeyGaps()
 
 void TestMultiDataSource::resampledGetLinesBreaksAtKeyGaps()
 {
-    // Same gap detection test but through the L2 resampled path.
-    // Build a MultiColumnBinResult with a gap in the keys.
+    // Bin keys jump at both 3 -> 100 and 102 -> 200, but only the raw rows of the bin at 100
+    // came after a gap in the data (ratio 66): the other jump is bins left empty by binning.
     qcp::algo::MultiColumnBinResult bins;
     bins.numColumns = 1;
-    bins.keys = {1.0, 2.0, 3.0, 100.0, 101.0, 102.0};
-    bins.values = {10.0, 20.0, 30.0, 40.0, 50.0, 60.0};
+    bins.keys = {1.0, 2.0, 3.0, 100.0, 101.0, 102.0, 200.0, 201.0};
+    bins.values = {10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 10.0, 20.0};
+    bins.gapRatio = {0, 0, 0, 66, 0, 0, 1, 0};
 
     QCPResampledMultiDataSource src(std::move(bins));
 
-    mPlot->xAxis->setRange(0, 110);
+    mPlot->xAxis->setRange(0, 210);
     mPlot->yAxis->setRange(0, 70);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
-    auto lines = src.getLines(0, 0, 6, mPlot->xAxis, mPlot->yAxis);
-
-    bool foundNanGap = false;
-    for (const auto& pt : lines)
-    {
-        if (qIsNaN(pt.x()) || qIsNaN(pt.y()))
-        {
-            foundNanGap = true;
-            break;
-        }
-    }
-    QVERIFY2(foundNanGap, "Resampled path: no gap break between key=3 and key=100");
+    const auto lines = src.getLines(0, 0, 8, mPlot->xAxis, mPlot->yAxis);
+    QCOMPARE(lines.size(), 9);
+    QVERIFY2(qIsNaN(lines[3].x()), "no break where the raw data had a gap");
+    QCOMPARE(std::count_if(lines.begin(), lines.end(), [](const QPointF& p) { return qIsNaN(p.x()); }), 1);
 }
 
 void TestMultiDataSource::adaptiveSamplingBreaksAtKeyGaps()
