@@ -29,7 +29,14 @@ namespace qcp::algo {
 // product of the two.
 inline int innerThreadCount()
 {
+#ifdef Q_OS_WASM
+    // A wasm thread only starts once the main thread returns to the browser's event loop.
+    // A job waiting for inner threads, while the main thread waits for that job
+    // (~QCPPipelineScheduler's waitForDone), never wakes up: run the chunks serially.
+    return 1;
+#else
     return std::max(1, QThread::idealThreadCount() / 2);
+#endif
 }
 
 inline QThreadPool& innerPool()
