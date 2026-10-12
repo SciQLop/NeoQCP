@@ -51,6 +51,7 @@ bool render(const DocSnippet& snippet, const QString& output_dir)
 {
     QCustomPlot plot;
     plot.resize(snippet.size);
+    plot.setViewport(plot.rect());   // a hidden widget gets its resize event only when shown
     snippet.draw(&plot);
     plot.replot();
     if (!wait_until_idle(plot))
