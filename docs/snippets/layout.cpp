@@ -176,3 +176,11 @@ DOC_SNIPPET(layout_color_scale, 640, 440)
     customPlot->replot();
     // [/layout_color_scale]
 }
+
+DOC_CODE(layout_fixed_margins)
+{
+    // [layout_fixed_margins]
+    customPlot->axisRect()->setAutoMargins(QCP::msNone);
+    customPlot->axisRect()->setMargins(QMargins(60, 10, 10, 40));
+    // [/layout_fixed_margins]
+}

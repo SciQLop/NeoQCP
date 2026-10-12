@@ -1,7 +1,7 @@
 // doc-shots [output-dir] [name ...]
 //
 // Runs every user-guide snippet on its own offscreen plot. With an output directory, saves
-// each one as <output-dir>/<name>.png (names with '_' become '-'); with names, only those.
+// each DOC_SNIPPET as <output-dir>/<name>.png (names with '_' become '-'); with names, only those.
 // Without arguments it is the doc-snippets test: every snippet must run and draw.
 #include "snippets.h"
 
@@ -59,7 +59,7 @@ bool render(const DocSnippet& snippet, const QString& output_dir)
         return false;
     }
     plot.replot();
-    if (output_dir.isEmpty())
+    if (output_dir.isEmpty() || !snippet.hasImage)
         return true;
     const QString path = QDir(output_dir).filePath(image_name(snippet.name));
     if (!plot.savePng(path, snippet.size.width(), snippet.size.height(), 2.0))

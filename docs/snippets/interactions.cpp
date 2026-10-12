@@ -1,6 +1,10 @@
 #include "snippets.h"
 
+#include <QApplication>
+#include <QStatusBar>
+
 #include <cmath>
+#include <memory>
 
 DOC_SNIPPET(interactions_drag_zoom, 600, 360)
 {
@@ -214,4 +218,72 @@ DOC_SNIPPET(interactions_data_locator, 600, 360)
     }
     customPlot->replot();
     // [/interactions_data_locator]
+}
+
+DOC_CODE(interactions_rect_mode_switch)
+{
+    // [interactions_rect_mode_switch]
+    QObject::connect(customPlot, &QCustomPlot::mousePress, [customPlot](QMouseEvent* event) {
+        customPlot->setSelectionRectMode(event->modifiers() & Qt::ShiftModifier ? QCP::srmZoom
+                                                                                : QCP::srmNone);
+    });
+    // [/interactions_rect_mode_switch]
+    QMouseEvent press(QEvent::MouseButtonPress, QPointF(300, 180), QPointF(300, 180),
+                      Qt::LeftButton, Qt::LeftButton, Qt::ShiftModifier);
+    QApplication::sendEvent(customPlot, &press);
+    if (customPlot->selectionRectMode() != QCP::srmZoom)
+        qFatal("interactions_rect_mode_switch: Shift did not switch to zoom");
+}
+
+DOC_CODE(interactions_signals)
+{
+    customPlot->addGraph()->setData(QVector<double> { 0, 1, 2 }, QVector<double> { 1, 0, 1 });
+    // [interactions_signals]
+    QObject::connect(customPlot->xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged),
+                     [](const QCPRange& range) { qDebug() << "x now spans" << range.lower << range.upper; });
+
+    QObject::connect(customPlot, &QCustomPlot::plottableClick,
+                     [](QCPAbstractPlottable* plottable, int dataIndex, QMouseEvent*) {
+                         qDebug() << plottable->name() << "clicked at point" << dataIndex;
+                     });
+
+    QObject::connect(customPlot, &QCustomPlot::selectionChangedByUser, [customPlot] {
+        for (QCPGraph* graph : customPlot->selectedGraphs())
+            qDebug() << graph->name() << "has" << graph->selection().dataPointCount() << "selected points";
+    });
+    // [/interactions_signals]
+    customPlot->xAxis->setRange(0, 2);
+}
+
+DOC_CODE(interactions_locate_on_move)
+{
+    QCPGraph* graph = customPlot->addGraph();
+    graph->setData(QVector<double> { 0, 1, 2 }, QVector<double> { 0, 1, 0 });
+    customPlot->xAxis->setRange(-1, 3);
+    customPlot->yAxis->setRange(-1, 2);
+    customPlot->replot();
+    auto* statusBar = new QStatusBar(customPlot);
+    // [interactions_locate_on_move]
+    auto locator = std::make_shared<QCPDataLocator>();
+    locator->setPlottable(graph);
+    QObject::connect(customPlot, &QCustomPlot::mouseMove, [=](QMouseEvent* event) {
+        if (locator->locate(event->position()))
+            statusBar->showMessage(QString("t = %1, v = %2").arg(locator->key()).arg(locator->value()));
+    });
+    // [/interactions_locate_on_move]
+    const QPointF pos(customPlot->xAxis->coordToPixel(1), customPlot->yAxis->coordToPixel(1));
+    QMouseEvent move(QEvent::MouseMove, pos, pos, Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+    QApplication::sendEvent(customPlot, &move);
+    if (statusBar->currentMessage() != "t = 1, v = 1")
+        qFatal("interactions_locate_on_move: got \"%s\"", qPrintable(statusBar->currentMessage()));
+}
+
+DOC_CODE(interactions_busy)
+{
+    QCPGraph* graph = customPlot->addGraph();
+    // [interactions_busy]
+    graph->setBusy(true);
+    // ... when the new data is in:
+    graph->setBusy(false);
+    // [/interactions_busy]
 }

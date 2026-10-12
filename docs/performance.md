@@ -51,9 +51,11 @@ A pan in progress should not be interrupted by a full repaint. So `QCPGraph2` an
 
 Both delays are settings of the plot (<a href="api/classQCustomPlot.html">QCustomPlot</a>):
 
-```cpp
-customPlot->setDataSwapDebounceMs(50);  // show new data sooner
-customPlot->setDataSwapMaxWaitMs(500);  // never hold it back more than half a second
+```{literalinclude} snippets/performance.cpp
+:start-after: // [performance_swap_delays]
+:end-before: // [/performance_swap_delays]
+:language: cpp
+:dedent:
 ```
 
 `requestDataSwap()` is public, but you normally do not call it: the graphs do. The first `setData()` on a graph that was never drawn is applied at once.
@@ -95,16 +97,11 @@ Keep in mind what `setData()` has done when it returns.
 
 So do not rescale right after replacing the data of a visible graph. Wait for the graph to stop being busy:
 
-```cpp
-graph->setData(std::move(keys), std::move(values));
-QObject::connect(graph, &QCPAbstractPlottable::busyChanged, customPlot,
-                 [customPlot](bool busy) {
-                     if (!busy)
-                     {
-                         customPlot->rescaleAxes();
-                         customPlot->replot();
-                     }
-                 });
+```{literalinclude} snippets/performance.cpp
+:start-after: // [performance_rescale_when_ready]
+:end-before: // [/performance_rescale_when_ready]
+:language: cpp
+:dedent:
 ```
 
 A one-shot version disconnects itself in the lambda. For `QCPColorMap2`, `pipeline().result()` is the resampled grid; it changes only when the result arrives.
@@ -195,14 +192,11 @@ A pan can only shift a layer as a texture when every visible plottable on it can
 - Put items on another layer. New items go to the current layer, which is `"main"`, like the plottables.
 - An axis rect you add yourself also lands on `"main"`, with its axes and grids. Move them to the layers the default axis rect uses:
 
-```cpp
-auto* rect = new QCPAxisRect(customPlot);
-rect->setLayer("background");
-for (QCPAxis* axis : rect->axes())
-{
-    axis->setLayer("axes");
-    axis->grid()->setLayer("grid");
-}
+```{literalinclude} snippets/performance.cpp
+:start-after: // [performance_axis_rect_layers]
+:end-before: // [/performance_axis_rect_layers]
+:language: cpp
+:dedent:
 ```
 
 ### Buffered layers for things that change often

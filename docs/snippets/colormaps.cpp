@@ -219,3 +219,23 @@ DOC_SNIPPET(colormaps_nan, 600, 360)
     customPlot->replot();
     // [/colormaps_nan]
 }
+
+DOC_CODE(colormaps_preset)
+{
+    auto* map = new QCPColorMap(customPlot->xAxis, customPlot->yAxis);
+    // [colormaps_preset]
+    map->setGradient(QCPColorGradient::gpViridis);
+    // [/colormaps_preset]
+}
+
+DOC_CODE(colormaps_custom_gradient)
+{
+    auto* map = new QCPColorMap(customPlot->xAxis, customPlot->yAxis);
+    // [colormaps_custom_gradient]
+    QCPColorGradient gradient;
+    gradient.setColorStopAt(0.0, QColor(10, 10, 60));
+    gradient.setColorStopAt(0.5, QColor(40, 160, 160));
+    gradient.setColorStopAt(1.0, QColor(250, 250, 200));
+    map->setGradient(gradient);
+    // [/colormaps_custom_gradient]
+}

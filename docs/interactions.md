@@ -160,11 +160,11 @@ With the multi-select modifier held, the new points are added to the old selecti
 While a rectangle mode is set, a drag never reaches the axis rect, so it cannot pan.
 To offer both, switch the mode when the button goes down. `mousePress` is emitted before the plot handles the press:
 
-```cpp
-QObject::connect(customPlot, &QCustomPlot::mousePress, [customPlot](QMouseEvent* event) {
-    customPlot->setSelectionRectMode(event->modifiers() & Qt::ShiftModifier ? QCP::srmZoom
-                                                                            : QCP::srmNone);
-});
+```{literalinclude} snippets/interactions.cpp
+:start-after: // [interactions_rect_mode_switch]
+:end-before: // [/interactions_rect_mode_switch]
+:language: cpp
+:dedent:
 ```
 
 `selectionRect()->setPen()` and `setBrush()` style the rectangle. A {doc}`theme <styling>` sets its pen to the selection colour.
@@ -187,19 +187,11 @@ The objects have their own signals:
 
 Several of these signals are overloaded. Pick one with `qOverload`:
 
-```cpp
-QObject::connect(customPlot->xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged),
-                 [](const QCPRange& range) { qDebug() << "x now spans" << range.lower << range.upper; });
-
-QObject::connect(customPlot, &QCustomPlot::plottableClick,
-                 [](QCPAbstractPlottable* plottable, int dataIndex, QMouseEvent*) {
-                     qDebug() << plottable->name() << "clicked at point" << dataIndex;
-                 });
-
-QObject::connect(customPlot, &QCustomPlot::selectionChangedByUser, [customPlot] {
-    for (QCPGraph* graph : customPlot->selectedGraphs())
-        qDebug() << graph->name() << "has" << graph->selection().dataPointCount() << "selected points";
-});
+```{literalinclude} snippets/interactions.cpp
+:start-after: // [interactions_signals]
+:end-before: // [/interactions_signals]
+:language: cpp
+:dedent:
 ```
 
 ## Find the data point under the mouse
@@ -226,14 +218,14 @@ For colour maps, `data()` is the cell's z value. For a `QCPMultiGraph` found by 
 In an application, call `locate()` from `mouseMove`.
 NeoQCP turns on mouse tracking, so `mouseMove` arrives even with no button pressed:
 
-```cpp
-auto* locator = new QCPDataLocator;   // keep it alive as long as the connection
-locator->setPlottable(graph);
-QObject::connect(customPlot, &QCustomPlot::mouseMove, [=](QMouseEvent* event) {
-    if (locator->locate(event->position()))
-        statusBar->showMessage(QString("t = %1, v = %2").arg(locator->key()).arg(locator->value()));
-});
+```{literalinclude} snippets/interactions.cpp
+:start-after: // [interactions_locate_on_move]
+:end-before: // [/interactions_locate_on_move]
+:language: cpp
+:dedent:
 ```
+
+`QCPDataLocator` is not a `QObject`. The lambda owns it through a shared pointer, so it lives as long as the connection.
 
 To find which plottable is under the cursor in the first place, use `customPlot->plottableAt(pos, onlySelectable, &dataIndex)`.
 
@@ -246,10 +238,11 @@ It comes back when it is no longer busy.
 Plottables that resample on worker threads (`QCPGraph2`, `QCPMultiGraph`, `QCPColorMap2`, `QCPHistogram2D`) are busy on their own while they work.
 You can mark any plottable busy yourself, for example while its data downloads:
 
-```cpp
-graph->setBusy(true);
-// ... when the new data is in:
-graph->setBusy(false);
+```{literalinclude} snippets/interactions.cpp
+:start-after: // [interactions_busy]
+:end-before: // [/interactions_busy]
+:language: cpp
+:dedent:
 ```
 
 `busy()` is the state right now. `visuallyBusy()` is what is drawn.

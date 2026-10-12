@@ -52,7 +52,7 @@ DOC_SNIPPET(export_pdf, 600, 360)
     // [/export_pdf]
 }
 
-DOC_SNIPPET(export_formats, 600, 360)
+DOC_CODE(export_formats)
 {
     // [export_formats]
     QVector<double> x(100), y(100);
@@ -77,7 +77,7 @@ DOC_SNIPPET(export_formats, 600, 360)
     // [/export_formats]
 }
 
-DOC_SNIPPET(export_pixmap, 600, 360)
+DOC_CODE(export_pixmap)
 {
     // [export_pixmap]
     QVector<double> t(300), v(300);
@@ -98,7 +98,7 @@ DOC_SNIPPET(export_pixmap, 600, 360)
     // [/export_pixmap]
 }
 
-DOC_SNIPPET(export_to_painter, 600, 360)
+DOC_CODE(export_to_painter)
 {
     // [export_to_painter]
     QVector<double> t(2000), v(2000);
@@ -123,4 +123,17 @@ DOC_SNIPPET(export_to_painter, 600, 360)
     if (!figure.save(dir.filePath("overview-and-zoom.png")))
         qWarning() << "could not write the figure";
     // [/export_to_painter]
+}
+
+DOC_CODE(export_transparent)
+{
+    customPlot->addGraph()->setData(QVector<double> { 0, 1, 2 }, QVector<double> { 1, 0, 1 });
+    customPlot->rescaleAxes();
+    QTemporaryDir dir;
+    const QString file = dir.filePath("transparent.png");
+    // [export_transparent]
+    customPlot->setBackground(Qt::NoBrush);
+    if (!customPlot->savePng(file, 600, 360, 2.0))
+        qWarning() << "could not write" << file;
+    // [/export_transparent]
 }

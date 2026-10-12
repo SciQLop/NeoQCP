@@ -198,9 +198,11 @@ An axis rect computes each margin from the axes on that side: ticks, tick labels
 
 To give a plot fixed margins, for example to line it up with something outside the widget:
 
-```cpp
-customPlot->axisRect()->setAutoMargins(QCP::msNone);
-customPlot->axisRect()->setMargins(QMargins(60, 10, 10, 40));
+```{literalinclude} snippets/layout.cpp
+:start-after: // [layout_fixed_margins]
+:end-before: // [/layout_fixed_margins]
+:language: cpp
+:dedent:
 ```
 
 ### Minimum and maximum size

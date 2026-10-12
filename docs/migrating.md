@@ -66,10 +66,11 @@ Many functions that return a status or a value are now `[[nodiscard]]`. Among th
 
 Code that ignores the result still compiles, with a warning:
 
-```cpp
-customPlot->removeGraph(0);                  // warning: result ignored
-if (!customPlot->savePng("plot.png"))        // fine
-    qWarning() << "export failed";
+```{literalinclude} snippets/migrating.cpp
+:start-after: // [migrating_nodiscard]
+:end-before: // [/migrating_nodiscard]
+:language: cpp
+:dedent:
 ```
 
 ## Behaviour that changed

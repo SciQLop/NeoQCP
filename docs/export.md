@@ -98,10 +98,11 @@ Here one plot draws two panels of a figure, before and after a zoom:
 
 A PNG gets a transparent background when the plot has none:
 
-```cpp
-customPlot->setBackground(Qt::NoBrush);
-if (!customPlot->savePng(file, 600, 360, 2.0))
-    qWarning() << "could not write" << file;
+```{literalinclude} snippets/export.cpp
+:start-after: // [export_transparent]
+:end-before: // [/export_transparent]
+:language: cpp
+:dedent:
 ```
 
 The axis rect background is already transparent by default. JPEG and BMP have no transparency.
@@ -111,19 +112,8 @@ The axis rect background is already transparent by default. JPEG and BMP have no
 The plot is a `QWidget`, so the program needs a `QApplication`.
 It does not need a screen. The `offscreen` platform plugin is enough, for example on a server or in a test:
 
-```cpp
-#include <QApplication>
-#include <qcustomplot.h>
-
-int main(int argc, char** argv)
-{
-    qputenv("QT_QPA_PLATFORM", "offscreen");   // or set it in the environment
-    QApplication app(argc, argv);
-    QCustomPlot customPlot;
-    customPlot.addGraph()->setData({ 0, 1, 2, 3 }, { 1, 0, 2, 1 });
-    customPlot.rescaleAxes();
-    return customPlot.savePng("plot.png", 600, 360, 2.0) ? 0 : 1;
-}
+```{literalinclude} snippets/programs/offscreen-export.cpp
+:language: cpp
 ```
 
 No `show()` and no `replot()` are needed. Every export lays the plot out at the requested size and draws it right away.

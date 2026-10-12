@@ -80,6 +80,9 @@ NeoQCP uses QRhiWidget (Qt 6.7+) for hardware-accelerated rendering:
   "Under the hood" section. `docs/plans`, `docs/specs`, `docs/superpowers` are internal, not published.
 - Every guide example is a `DOC_SNIPPET` in `docs/snippets/<page>.cpp`, included by marker
   (`// [name]` … `// [/name]`). The `doc-snippets` meson test compiles and runs them all.
+  No inline C++ in the guide pages: an example without a picture is a `DOC_CODE`, and a complete
+  program goes in `docs/snippets/programs/` (built, and run as a test when it does not block).
+  Pseudo-code in `docs/architecture/` is exempt.
 - Images: `build/docs/snippets/doc-shots docs/images [name ...]` redraws the guide figures
   (offscreen, waits for async plottables); `build/documentation/doc-image-generator/doc-image-generator
   documentation/images` redraws the API reference images. Both are committed: Read the Docs

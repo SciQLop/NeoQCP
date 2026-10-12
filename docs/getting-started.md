@@ -78,21 +78,10 @@ It starts with one axis rect, holding a bottom `xAxis` and a left `yAxis`.
 `addGraph()` creates a graph on the default axes. `setData()` copies the points into it.
 Nothing is drawn until `replot()`: change as much as you like, then replot once.
 
-A complete program only adds the window around it:
+A complete program puts the same lines in a window:
 
-```cpp
-#include <QApplication>
-#include <qcustomplot.h>
-
-int main(int argc, char** argv)
-{
-    QApplication app(argc, argv);
-    QCustomPlot customPlot;
-    customPlot.resize(600, 360);
-    // ... the lines above, with customPlot. instead of customPlot->
-    customPlot.show();
-    return app.exec();
-}
+```{literalinclude} snippets/programs/first-window.cpp
+:language: cpp
 ```
 
 ## Interaction, names and a legend

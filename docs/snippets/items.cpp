@@ -264,7 +264,7 @@ DOC_SNIPPET(items_creation, 600, 360)
     // [/items_creation]
 }
 
-DOC_SNIPPET(items_overlay, 600, 300)
+DOC_CODE(items_overlay)
 {
     // [items_overlay]
     customPlot->xAxis->setRange(0, 100);

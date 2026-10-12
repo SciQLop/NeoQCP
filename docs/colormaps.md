@@ -156,8 +156,11 @@ For a `QCPHistogram2D`, call it once the counts exist (after `finished`, see abo
 A <a href="api/classQCPColorGradient.html">QCPColorGradient</a> turns the data range into colours.
 The quickest way is a preset. Every `setGradient()` accepts one directly:
 
-```cpp
-map->setGradient(QCPColorGradient::gpViridis);
+```{literalinclude} snippets/colormaps.cpp
+:start-after: // [colormaps_preset]
+:end-before: // [/colormaps_preset]
+:language: cpp
+:dedent:
 ```
 
 These are all the presets, from the lowest value on the left to the highest on the right:
@@ -180,12 +183,11 @@ Some advice on picking one:
 
 To build your own, start from an empty gradient and add colour stops between 0 and 1:
 
-```cpp
-QCPColorGradient gradient;
-gradient.setColorStopAt(0.0, QColor(10, 10, 60));
-gradient.setColorStopAt(0.5, QColor(40, 160, 160));
-gradient.setColorStopAt(1.0, QColor(250, 250, 200));
-map->setGradient(gradient);
+```{literalinclude} snippets/colormaps.cpp
+:start-after: // [colormaps_custom_gradient]
+:end-before: // [/colormaps_custom_gradient]
+:language: cpp
+:dedent:
 ```
 
 - `setColorInterpolation()` blends between stops in RGB (`ciRGB`) or HSV (`ciHSV`).

@@ -110,3 +110,26 @@ DOC_SNIPPET(concepts_coordinates, 600, 360)
     customPlot->replot();
     // [/concepts_coordinates]
 }
+
+DOC_CODE(concepts_replot_batch)
+{
+    QCPGraph* graph = customPlot->addGraph();
+    const QVector<double> x { 0, 5, 10 }, y { 1, 3, 2 };
+    // [concepts_replot_batch]
+    graph->setData(x, y);
+    customPlot->xAxis->setRange(0, 10);
+    customPlot->yAxis->setLabel("signal");
+    customPlot->replot();   // one redraw for all three changes
+    // [/concepts_replot_batch]
+}
+
+DOC_CODE(concepts_queued_replot)
+{
+    // [concepts_queued_replot]
+    QObject::connect(customPlot->xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged),
+                     customPlot, [customPlot](const QCPRange&) {
+                         customPlot->replot(QCustomPlot::rpQueuedReplot);
+                     });
+    // [/concepts_queued_replot]
+    customPlot->xAxis->setRange(0, 10);
+}

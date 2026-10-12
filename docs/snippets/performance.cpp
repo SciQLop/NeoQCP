@@ -127,3 +127,44 @@ DOC_SNIPPET(performance_cursor_layer, 600, 360)
     customPlot->replot();
     // [/performance_cursor_layer]
 }
+
+DOC_CODE(performance_swap_delays)
+{
+    // [performance_swap_delays]
+    customPlot->setDataSwapDebounceMs(50);  // show new data sooner
+    customPlot->setDataSwapMaxWaitMs(500);  // never hold it back more than half a second
+    // [/performance_swap_delays]
+}
+
+DOC_CODE(performance_rescale_when_ready)
+{
+    auto* graph = new QCPGraph2(customPlot->xAxis, customPlot->yAxis);
+    graph->setData(std::vector<double> { 0, 1 }, std::vector<double> { 0, 1 });
+    customPlot->replot();
+    std::vector<double> keys { 0, 10 }, values { -5, 5 };
+    // [performance_rescale_when_ready]
+    graph->setData(std::move(keys), std::move(values));
+    QObject::connect(graph, &QCPAbstractPlottable::busyChanged, customPlot,
+                     [customPlot](bool busy) {
+                         if (!busy)
+                         {
+                             customPlot->rescaleAxes();
+                             customPlot->replot();
+                         }
+                     });
+    // [/performance_rescale_when_ready]
+}
+
+DOC_CODE(performance_axis_rect_layers)
+{
+    // [performance_axis_rect_layers]
+    auto* rect = new QCPAxisRect(customPlot);
+    rect->setLayer("background");
+    for (QCPAxis* axis : rect->axes())
+    {
+        axis->setLayer("axes");
+        axis->grid()->setLayer("grid");
+    }
+    // [/performance_axis_rect_layers]
+    customPlot->plotLayout()->addElement(1, 0, rect);
+}

@@ -140,11 +140,11 @@ Changing a plot does not redraw it.
 Setting data, ranges or pens only stores the new state.
 `replot()` then lays out the plot, redraws the layers that changed, and asks the widget to repaint.
 
-```cpp
-graph->setData(x, y);
-customPlot->xAxis->setRange(0, 10);
-customPlot->yAxis->setLabel("signal");
-customPlot->replot();   // one redraw for all three changes
+```{literalinclude} snippets/concepts.cpp
+:start-after: // [concepts_replot_batch]
+:end-before: // [/concepts_replot_batch]
+:language: cpp
+:dedent:
 ```
 
 Batch your changes and replot once.
@@ -157,11 +157,11 @@ Each `replot()` redraws every layer that changed, so ten replots cost about ten 
 
 Use `rpQueuedReplot` in code that may run many times per event: slots connected to range changes, data callbacks, timers.
 
-```cpp
-connect(customPlot->xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged),
-        customPlot, [customPlot](const QCPRange&) {
-            customPlot->replot(QCustomPlot::rpQueuedReplot);
-        });
+```{literalinclude} snippets/concepts.cpp
+:start-after: // [concepts_queued_replot]
+:end-before: // [/concepts_queued_replot]
+:language: cpp
+:dedent:
 ```
 
 The plot replots by itself on resize, and when the user drags, zooms or selects.
