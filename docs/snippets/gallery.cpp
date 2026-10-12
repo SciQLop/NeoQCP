@@ -202,13 +202,12 @@ DOC_SNIPPET(gallery_orbit, 640, 560)
         speed.append(std::sqrt(mu * (2 / r - 1 / (a * earthRadius))));
     }
 
-    QCPColorGradient gradient(QCPColorGradient::gpPlasma);
-    const QCPRange speedRange(0, 10);
-    for (int i = 0; i + 1 < x.size(); ++i)   // one short segment per minute, coloured by speed
+    QVector<QCPCurve*> segments;   // one short segment per minute, coloured by speed
+    for (int i = 0; i + 1 < x.size(); ++i)
     {
         auto* segment = new QCPCurve(customPlot->xAxis, customPlot->yAxis);
         segment->setData({ index[i], index[i + 1] }, { x[i], x[i + 1] }, { y[i], y[i + 1] });
-        segment->setPen(QPen(QColor::fromRgba(gradient.color(speed[i], speedRange)), 4));
+        segments.append(segment);
     }
     QVector<double> hourIndex, hourX, hourY;   // a dot every hour
     for (int i = 0; i < x.size(); i += 60)
@@ -228,11 +227,19 @@ DOC_SNIPPET(gallery_orbit, 640, 560)
     earth->setPen(QPen(QColor(31, 119, 180)));
     earth->setBrush(QColor(31, 119, 180));
 
-    auto* scale = new QCPColorScale(customPlot);   // a scale with no colormap: set it by hand
+    auto* scale = new QCPColorScale(customPlot);   // a scale with no colormap: colour by hand
     customPlot->plotLayout()->addElement(0, 1, scale);
-    scale->setGradient(gradient);
-    scale->setDataRange(speedRange);
     scale->setLabel("speed [km/s]");
+    auto recolour = [=] {   // follows the scale when it is dragged, zoomed or restyled
+        for (int i = 0; i < segments.size(); ++i)
+            segments[i]->setPen(QPen(QColor::fromRgba(
+                scale->gradient().color(speed[i], scale->dataRange())), 4));
+        customPlot->replot(QCustomPlot::rpQueuedReplot);
+    };
+    QObject::connect(scale, &QCPColorScale::dataRangeChanged, customPlot, recolour);
+    QObject::connect(scale, &QCPColorScale::gradientChanged, customPlot, recolour);
+    scale->setGradient(QCPColorGradient::gpPlasma);
+    scale->setDataRange(QCPRange(0, 10));
 
     customPlot->xAxis->setLabel("x [Earth radii]");
     customPlot->yAxis->setLabel("y [Earth radii]");
