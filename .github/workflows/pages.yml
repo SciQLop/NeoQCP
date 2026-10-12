@@ -38,12 +38,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: Qt
-          key: qt-${{ env.QT_VERSION }}-wasm-multithread
+          # -abs: the Qt installed with a relative -O wrote qmake wrappers with relative paths.
+          key: qt-${{ env.QT_VERSION }}-wasm-multithread-abs
       - name: Install Qt (host tools + wasm)
         if: steps.cache-qt.outputs.cache-hit != 'true'
         run: |
-          aqt install-qt -O Qt linux desktop ${{ env.QT_VERSION }} -m qtshadertools
-          aqt install-qt -O Qt all_os wasm ${{ env.QT_VERSION }} wasm_multithread
+          aqt install-qt -O "$PWD/Qt" linux desktop ${{ env.QT_VERSION }} -m qtshadertools
+          aqt install-qt -O "$PWD/Qt" all_os wasm ${{ env.QT_VERSION }} wasm_multithread
 
       - name: Install the host Qt tools' system libraries
         # qsb links QtGui, which needs EGL/GL and xkbcommon even to compile shaders.

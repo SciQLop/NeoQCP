@@ -129,6 +129,8 @@ neoqcp_moc_files = qtmod.compile_moc(headers: neoqcp_moc_headers, include_direct
 qmake = find_program('qmake6', 'qmake')
 qt_libexec = run_command(qmake, '-query', 'QT_HOST_LIBEXECS', check: true).stdout().strip()
 qt_bin = run_command(qmake, '-query', 'QT_HOST_BINS', check: true).stdout().strip()
+# Queried here, from the source root: aqt can write qmake wrappers with relative paths.
+qt_prefix = run_command(qmake, '-query', 'QT_INSTALL_PREFIX', check: true).stdout().strip()
 qsb = find_program('qsb', dirs: [qt_libexec, qt_bin])
 
 composite_vert_qsb = custom_target('composite_vert_qsb',

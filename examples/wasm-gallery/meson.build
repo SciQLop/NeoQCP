@@ -8,7 +8,7 @@
 #   (cd _site && python3 ../examples/wasm-gallery/serve.py 8765)   # http://127.0.0.1:8765/?plot=gallery_orbit
 # CI (.github/workflows/pages.yml) does the same and publishes _site to GitHub Pages.
 
-qt_wasm = run_command(qmake, '-query', 'QT_INSTALL_PREFIX', check: true).stdout().strip()
+qt_wasm = qt_prefix
 
 # Qt is static here, and meson links only its module archives: the bundled libraries, the
 # resource objects and the plugins come from Qt's .prl files, as Qt's CMake does.
