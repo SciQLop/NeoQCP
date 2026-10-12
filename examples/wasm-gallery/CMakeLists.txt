@@ -12,12 +12,27 @@ cmake_minimum_required(VERSION 3.21)
 project(neoqcp_gallery LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Svg PrintSupport GuiPrivate WidgetsPrivate)
 
 set(NEOQCP ${CMAKE_CURRENT_SOURCE_DIR}/../..)
 file(GLOB_RECURSE NEOQCP_SOURCES ${NEOQCP}/src/*.cpp ${NEOQCP}/src/*.h)
-list(FILTER NEOQCP_SOURCES EXCLUDE REGEX "latexlabelrenderer")
+
+# LaTeX labels: JKQTMathText at the url and revision meson's wrap pins, built like
+# subprojects/packagefiles/jkqtmathtext/meson.build (its sources, XITS font, no warnings).
+file(STRINGS ${NEOQCP}/subprojects/jkqtmathtext.wrap JKQT_URL REGEX "^url")
+file(STRINGS ${NEOQCP}/subprojects/jkqtmathtext.wrap JKQT_REVISION REGEX "^revision")
+string(REGEX REPLACE "^url *= *" "" JKQT_URL "${JKQT_URL}")
+string(REGEX REPLACE "^revision *= *" "" JKQT_REVISION "${JKQT_REVISION}")
+include(FetchContent)
+FetchContent_Declare(jkqtmathtext GIT_REPOSITORY ${JKQT_URL} GIT_TAG ${JKQT_REVISION}
+                     GIT_SHALLOW TRUE SOURCE_SUBDIR no-upstream-cmake)
+FetchContent_MakeAvailable(jkqtmathtext)
+set(JKQT ${jkqtmathtext_SOURCE_DIR}/lib)
+file(GLOB JKQT_SOURCES ${JKQT}/jkqtmathtext/*.cpp ${JKQT}/jkqtmathtext/nodes/*.cpp
+                       ${JKQT}/jkqtmathtext/parsers/*.cpp ${JKQT}/jkqtcommon/*.cpp)
+set_source_files_properties(${JKQT_SOURCES} PROPERTIES COMPILE_OPTIONS "-w")
 
 set(NEOQCP_VERSION_MAJOR 2)
 set(NEOQCP_VERSION_MINOR 1)
@@ -28,7 +43,7 @@ file(WRITE ${CMAKE_BINARY_DIR}/gen/neoqcp_config.h
 #define NEOQCP_VERSION_MINOR 1
 #define NEOQCP_VERSION_PATCH 1
 #define NEOQCP_VERSION \"2.1.1\"
-#define NEOQCP_WITH_LATEX 0
+#define NEOQCP_WITH_LATEX 1
 ")
 
 set(SHADERS composite.vert composite.frag plottable.vert plottable.frag span.vert
@@ -54,8 +69,10 @@ file(GLOB SNIPPETS ${NEOQCP}/docs/snippets/*.cpp)
 list(FILTER SNIPPETS EXCLUDE REGEX "/main\\.cpp$")
 
 qt_add_executable(neoqcp_gallery gallery.cpp ${SNIPPETS} ${NEOQCP_SOURCES}
-                  ${CMAKE_BINARY_DIR}/gen/embedded_shaders.h)
-target_include_directories(neoqcp_gallery PRIVATE ${NEOQCP}/src ${NEOQCP}
+                  ${CMAKE_BINARY_DIR}/gen/embedded_shaders.h
+                  ${JKQT_SOURCES} ${JKQT}/jkqtmathtext/resources/xits.qrc)
+target_compile_definitions(neoqcp_gallery PRIVATE JKQTMATHTEXT_COMPILED_WITH_XITS)
+target_include_directories(neoqcp_gallery PRIVATE ${NEOQCP}/src ${NEOQCP} ${JKQT}
                            ${NEOQCP}/docs/snippets ${CMAKE_BINARY_DIR}/gen)
 target_link_libraries(neoqcp_gallery PRIVATE Qt6::Core Qt6::Gui Qt6::GuiPrivate Qt6::WidgetsPrivate Qt6::Widgets
                       Qt6::Svg Qt6::PrintSupport)
