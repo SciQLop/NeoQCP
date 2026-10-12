@@ -82,7 +82,9 @@ void QCPPaintBufferRhi::draw(QCPPainter* painter) const
 void QCPPaintBufferRhi::clear(const QColor& color)
 {
     PROFILE_HERE_N("QCPPaintBufferRhi::clear");
-    if (color == Qt::transparent && mStagingImage.format() == QImage::Format_ARGB32_Premultiplied)
+    const auto format = mStagingImage.format();
+    if (color == Qt::transparent && (format == QImage::Format_ARGB32_Premultiplied
+                                     || format == QImage::Format_RGBA8888_Premultiplied))
         memset(mStagingImage.bits(), 0, mStagingImage.sizeInBytes());
     else
         mStagingImage.fill(color);
@@ -98,7 +100,9 @@ void QCPPaintBufferRhi::reallocateBuffer()
     // ARGB32_Premultiplied is QPainter's native format (BGRA byte order on little-endian).
     // Using a BGRA8 texture avoids the per-upload CPU swizzle that RGBA8 would require.
     // Especially important on Metal (macOS) where there's no driver-side BGRA→RGBA fast path.
-    mStagingImage = QImage(pixelSize, QImage::Format_ARGB32_Premultiplied);
+    // Without BGRA8 (WebGL), paint straight into RGBA bytes instead.
+    const auto fmt = mRhi ? qcp::rhi::preferredTextureFormat(mRhi) : QRhiTexture::BGRA8;
+    mStagingImage = QImage(pixelSize, qcp::rhi::imageFormatFor(fmt));
     mStagingImage.setDevicePixelRatio(mDevicePixelRatio);
     mStagingImage.fill(Qt::transparent);
 
@@ -112,7 +116,6 @@ void QCPPaintBufferRhi::reallocateBuffer()
     mNeedsUpload = true;
     if (mRhi)
     {
-        const auto fmt = qcp::rhi::preferredTextureFormat(mRhi);
         mTexture = mRhi->newTexture(fmt, pixelSize);
         if (!mTexture->create())
         {

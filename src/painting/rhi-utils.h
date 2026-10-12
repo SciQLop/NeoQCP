@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QColor>
+#include <QImage>
 #include <array>
 #include <rhi/qrhi.h>
 
@@ -17,6 +18,14 @@ inline QRhiTexture::Format preferredTextureFormat(QRhi* rhi)
     return rhi->isTextureFormatSupported(QRhiTexture::BGRA8)
         ? QRhiTexture::BGRA8
         : QRhiTexture::RGBA8;
+}
+
+// The QImage layout whose bytes a texture of this format reads in the right channel order.
+// WebGL has no BGRA8, so there QPainter's native ARGB32 bytes would come out red/blue swapped.
+inline QImage::Format imageFormatFor(QRhiTexture::Format textureFormat)
+{
+    return textureFormat == QRhiTexture::BGRA8 ? QImage::Format_ARGB32_Premultiplied
+                                               : QImage::Format_RGBA8888_Premultiplied;
 }
 
 inline QShader loadEmbeddedShader(const unsigned char* data, unsigned int length)

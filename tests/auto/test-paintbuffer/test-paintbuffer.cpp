@@ -601,3 +601,18 @@ void TestPaintBuffer::bufferedLayerAddedLate_leavesNoStaleAxisLabels()
         QVERIFY2(incremental[i] == bufferImage(mPlot->mPaintBuffers[i]),
                  qPrintable(QString("buffer %1 differs from a full repaint").arg(i)));
 }
+
+// WebGL has no BGRA8 textures: an image uploaded to an RGBA8 texture must hold R,G,B,A bytes,
+// or red and blue come out swapped (the legend and colormaps of a WebAssembly build).
+void TestPaintBuffer::rhi_imageBytesMatchTextureChannelOrder()
+{
+    QImage painted(1, 1, QImage::Format_ARGB32_Premultiplied);
+    painted.fill(QColor(200, 100, 50));
+    const auto bytes = [&](QRhiTexture::Format format) {
+        const QImage converted = painted.convertedTo(qcp::rhi::imageFormatFor(format));
+        const uchar* p = converted.constBits();
+        return QList<int> { p[0], p[1], p[2], p[3] };
+    };
+    QCOMPARE(bytes(QRhiTexture::RGBA8), (QList<int> { 200, 100, 50, 255 }));
+    QCOMPARE(bytes(QRhiTexture::BGRA8), (QList<int> { 50, 100, 200, 255 }));
+}

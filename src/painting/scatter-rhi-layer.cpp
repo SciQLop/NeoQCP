@@ -295,10 +295,7 @@ QRhiTexture* QCPScatterRhiLayer::uploadedTexture(const QImage& image,
                                                  QRhiResourceUpdateBatch* updates)
 {
     const auto texFmt = qcp::rhi::preferredTextureFormat(mRhi);
-    const QImage::Format imgFmt = (texFmt == QRhiTexture::BGRA8)
-        ? QImage::Format_ARGB32_Premultiplied
-        : QImage::Format_RGBA8888_Premultiplied;
-    const QImage converted = image.convertedTo(imgFmt);
+    const QImage converted = image.convertedTo(qcp::rhi::imageFormatFor(texFmt));
     auto* texture = mRhi->newTexture(texFmt, converted.size());
     if (!texture->create())
     {

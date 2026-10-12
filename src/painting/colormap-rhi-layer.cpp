@@ -334,7 +334,8 @@ void QCPColormapRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
     if (mTextureDirty && mTexture)
     {
         updates->uploadTexture(mTexture, QRhiTextureUploadDescription(
-            QRhiTextureUploadEntry(0, 0, QRhiTextureSubresourceUploadDescription(mStagingImage))));
+            QRhiTextureUploadEntry(0, 0, QRhiTextureSubresourceUploadDescription(
+                mStagingImage.convertedTo(qcp::rhi::imageFormatFor(mTexture->format()))))));
         mTextureDirty = false;
     }
 

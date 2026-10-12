@@ -2,6 +2,7 @@
 #include <QtWidgets/qtestsupport_widgets.h>
 #include "qcustomplot.h"
 #include "painting/paintbuffer-pixmap.h"
+#include "painting/rhi-utils.h"
 
 class TestPaintBuffer : public QObject
 {
@@ -21,6 +22,7 @@ private slots:
     void replotAndExport_smokeTest();
     void replotOnFirstShow_tabWidget();
     void rhi_reallocatedTextureRequiresUpload();
+    void rhi_imageBytesMatchTextureChannelOrder();
 
     void skipRepaint_graph2PanOnly();
     void skipRepaint_disabledWithItems();
