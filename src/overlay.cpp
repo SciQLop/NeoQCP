@@ -19,8 +19,7 @@ void QCPOverlay::showMessage(const QString& text, Level level,
     mPosition = position;
     setVisible(!text.isEmpty());
     emit messageChanged(mText, mLevel);
-    if (mParentPlot)
-        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    redraw();
 }
 
 void QCPOverlay::clearMessage()
@@ -28,8 +27,7 @@ void QCPOverlay::clearMessage()
     mText.clear();
     setVisible(false);
     emit messageChanged(mText, mLevel);
-    if (mParentPlot)
-        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    redraw();
 }
 
 void QCPOverlay::setCollapsible(bool enabled)
@@ -41,8 +39,7 @@ void QCPOverlay::setCollapsible(bool enabled)
         mCollapsed = false;
         emit collapsedChanged(false);
     }
-    if (mParentPlot)
-        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    redraw();
 }
 
 void QCPOverlay::setCollapsed(bool collapsed)
@@ -51,21 +48,29 @@ void QCPOverlay::setCollapsed(bool collapsed)
         return;
     mCollapsed = collapsed;
     emit collapsedChanged(mCollapsed);
-    if (mParentPlot)
-        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    redraw();
 }
 
 void QCPOverlay::setOpacity(qreal opacity)
 {
     mOpacity = qBound(0.0, opacity, 1.0);
-    if (mParentPlot && visible())
-        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    if (visible())
+        redraw();
 }
 
 void QCPOverlay::setFont(const QFont& font)
 {
     mFont = font;
-    if (mParentPlot && visible())
+    if (visible())
+        redraw();
+}
+
+// The notification layer is buffered: a replot alone repaints the old message.
+void QCPOverlay::redraw()
+{
+    if (mLayer)
+        mLayer->invalidatePaintBuffer();
+    if (mParentPlot)
         mParentPlot->replot(QCustomPlot::rpQueuedReplot);
 }
 

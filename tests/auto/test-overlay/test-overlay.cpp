@@ -229,3 +229,38 @@ void TestOverlay::overlayExcludedFromExport()
     QColor errorColor = QColor(178, 34, 34);
     QVERIFY(centerColor != errorColor);
 }
+
+void TestOverlay::updateWhileVisibleRedrawsLayer_data()
+{
+    QTest::addColumn<int>("change");
+    QTest::newRow("showMessage") << 0;
+    QTest::newRow("setOpacity") << 1;
+    QTest::newRow("setFont") << 2;
+    QTest::newRow("setCollapsed") << 3;
+    QTest::newRow("setCollapsible") << 4;
+}
+
+// The notification layer is buffered: a change to a message already on screen must
+// dirty that buffer, or the replot keeps painting the old message (SciQLop tutorial:
+// an Info message followed by a Warning stayed green until cleared).
+void TestOverlay::updateWhileVisibleRedrawsLayer()
+{
+    QFETCH(int, change);
+    auto* ov = mPlot->overlay();
+    ov->setCollapsible(change == 3);
+    ov->showMessage("Info first", QCPOverlay::Info, QCPOverlay::FitContent);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    auto buffer = ov->layer()->mPaintBuffer.toStrongRef();
+    QVERIFY(buffer);
+    QVERIFY(!buffer->contentDirty());
+
+    switch (change)
+    {
+        case 0: ov->showMessage("Data gap detected", QCPOverlay::Warning, QCPOverlay::FitContent); break;
+        case 1: ov->setOpacity(0.5); break;
+        case 2: { QFont f = ov->font(); f.setPointSize(f.pointSize() + 4); ov->setFont(f); break; }
+        case 3: ov->setCollapsed(true); break;
+        case 4: ov->setCollapsible(true); break;
+    }
+    QVERIFY(buffer->contentDirty());
+}

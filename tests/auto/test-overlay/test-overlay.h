@@ -27,6 +27,8 @@ private slots:
     void overlaySurvivesClear();
     void overlayAccessorCreatesLazily();
     void overlayExcludedFromExport();
+    void updateWhileVisibleRedrawsLayer_data();
+    void updateWhileVisibleRedrawsLayer();
 
 private:
     QCustomPlot* mPlot;

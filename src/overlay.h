@@ -65,6 +65,7 @@ private:
 
     QColor levelColor() const;
     QRect computeRect() const;
+    void redraw();
     QRect collapseHandleRect() const;
 
     Q_DISABLE_COPY(QCPOverlay)

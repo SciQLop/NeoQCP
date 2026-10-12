@@ -121,6 +121,7 @@ private:
     friend class TestPaintBuffer;
     friend class TestBusyIndicator;
     friend class TestQCPLegend;
+    friend class TestOverlay;
 };
 Q_DECLARE_METATYPE(QCPLayer::LayerMode)
 
