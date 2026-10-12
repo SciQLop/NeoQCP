@@ -48,11 +48,13 @@ public:
                               [](const QString& name) { return name.startsWith("gallery_"); });
         mList->addItems(names);
         connect(mList, &QListWidget::currentTextChanged, this, &Gallery::show_snippet);
-        // A plot before the first show, so the window composites through QRhi from the start:
-        // switching it to QRhi later loses the WebGL context. Then the same plot again once
-        // the window has its real size, which some plots (the orbit's 1:1 axes) depend on.
-        mList->setCurrentRow(std::max(0, names.indexOf(requested_plot())));
-        QTimer::singleShot(0, this, [this] { show_snippet(mList->currentItem()->text()); });
+        // An empty plot before the first show, so the window composites through QRhi from the
+        // start: switching a shown window to QRhi loses the WebGL context. The real plot comes
+        // once the window has its real size, which some plots (the orbit's 1:1 axes) depend on.
+        mPlot = new QCustomPlot;
+        layout->addWidget(mPlot);
+        const int row = int(std::max<qsizetype>(0, names.indexOf(requested_plot())));
+        QTimer::singleShot(0, this, [this, row] { mList->setCurrentRow(row); });
     }
 
 private:
