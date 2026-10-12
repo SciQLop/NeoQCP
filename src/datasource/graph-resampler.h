@@ -402,7 +402,8 @@ inline void foldRowStepRatios(const QCPAbstractMultiDataSource& src, int first,
 }
 
 // A bin with rows but no value in any column holds NaN only: +inf, see DroppedBins. One column NaN
-// while others have data stays in the bin's values, and the line drawing breaks on it.
+// while others have data stays NaN in the bin's values: adaptive sampling (the default) breaks
+// that column's line on it when wider than a pixel; getLines without it bridges the hole.
 inline void setGapRatios(MultiColumnBinResult& out, const std::vector<float>& binRatio)
 {
     const int s = out.stride();
