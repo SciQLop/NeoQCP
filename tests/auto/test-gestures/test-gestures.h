@@ -1,5 +1,8 @@
+// First: it defines QT_WIDGETS_LIB, which QTest::touchEvent(QWidget*) needs and the macOS build
+// does not set. After <QtTest>, qtesttouch.h would already be read without it.
+#include <QtTest/qtest_widgets.h>
 #include <QtTest/QtTest>
-#include <QtGui/qtestsupport_gui.h>          // QTest::createTouchDevice, not in QtTest on macOS
+#include <QtGui/qtestsupport_gui.h>          // QTest::createTouchDevice
 #include <QtWidgets/qtestsupport_widgets.h>  // QTest::qWaitForWindowExposed
 #include "qcustomplot.h"
 
