@@ -26,6 +26,8 @@
 #ifndef QCP_AXIS_H
 #define QCP_AXIS_H
 
+#include <optional>
+#include <utility>
 #include "../global.h"
 #include "labelrenderer.h"
 Q_MOC_INCLUDE(
@@ -579,8 +581,11 @@ protected:
     QRect mAxisSelectionBox, mTickLabelsSelectionBox, mLabelSelectionBox;
     QFont mCachedMetricsFont;
     QFontMetrics mCachedFontMetrics {QFont()};
+    // Along the axis, where the tick label drawn last spans; empty before the first of a draw.
+    std::optional<std::pair<double, double>> mLastTickLabelSpan;
 
     QSize axisLabelSize();
+    bool overlapsLastTickLabel(double from, double to);
     void drawAxisLabel(QCPPainter* painter, const QRect& rect);
     virtual QByteArray generateLabelParameterHash() const;
     const QFontMetrics& fontMetricsFor(const QFont& font);

@@ -356,6 +356,40 @@ void TestTickLabelCache::manyLabelsMatch()
     checkCloseToDirect(&plot, "40 labels");
 }
 
+// More labels than fit (a narrow plot, a phone): a label that would overlap the one drawn before
+// it is skipped, cached or not, rather than drawn into it.
+void TestTickLabelCache::crowdedLabelsDoNotOverlap()
+{
+    for (bool cache : {false, true})
+    {
+        LivePlot plot;
+        plot.resize(220, 200);
+        plot.setViewport(plot.rect());   // never shown: no resize event sets it
+        auto text = QSharedPointer<QCPAxisTickerText>::create();
+        for (int i = 0; i < 20; ++i)
+            text->addTick(i, QString("label-%1").arg(i, 3, 10, QChar('0')));
+        plot.xAxis->setTicker(text);
+        plot.xAxis->setRange(-0.5, 19.5);
+        const QImage image = plot.live(cache);
+        const int labelWidth = QFontMetrics(plot.xAxis->tickLabelFont()).horizontalAdvance("label-000");
+        const double dpr = image.devicePixelRatio();
+        const int top = int((plot.axisRect()->bottom() + 4) * dpr);
+        int run = 0, widest = 0, blank = 0;
+        for (int x = 0; x < image.width(); ++x)
+        {
+            bool ink = false;
+            for (int y = top; y < image.height() && !ink; ++y)
+                ink = qGray(image.pixel(x, y)) < 128;
+            blank = ink ? 0 : blank + 1;
+            run = ink ? run + 1 + (blank == 0 && run > 0 ? 0 : 0) : (blank >= 3 ? 0 : run);
+            widest = std::max(widest, run);
+        }
+        QVERIFY2(widest / dpr <= labelWidth + 4,
+                 qPrintable(QString("cache %1: %2 px of ink in a row, one label is %3 px")
+                                .arg(cache).arg(widest / dpr).arg(labelWidth)));
+    }
+}
+
 void TestTickLabelCache::pdfExportKeepsVectorText()
 {
     // Exports paint with pmNoCaching: text stays text, no label pixmaps in the PDF.

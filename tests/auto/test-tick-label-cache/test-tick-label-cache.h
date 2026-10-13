@@ -22,6 +22,7 @@ private slots:
     void logAxisBeautifulPowersMatch();
     void linearToLogSwitchRefreshesPowers();
     void manyLabelsMatch();
+    void crowdedLabelsDoNotOverlap();
     void pdfExportKeepsVectorText();
 
 };

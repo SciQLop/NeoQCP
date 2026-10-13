@@ -2414,6 +2414,7 @@ void QCPAxisPainterPrivate::draw(QCPPainter* painter)
         int distanceToAxis = margin;
         if (tickLabelSide == QCPAxis::lsInside)
             distanceToAxis = -(qMax(tickLengthIn, subTickLengthIn) + tickLabelPadding);
+        mLastTickLabelSpan.reset();
         for (int i = 0; i < maxLabelIndex; ++i)
             placeTickLabel(painter, tickPositions.at(i), distanceToAxis, tickLabels.at(i),
                            &tickLabelsSize);
@@ -2745,7 +2746,13 @@ void QCPAxisPainterPrivate::placeTickLabel(QCPPainter* painter, double position,
                         > viewportRect.bottom()
                     || labelAnchor.y() + cachedLabel->offset.y() < viewportRect.top();
         }
-        if (!labelClippedByBorder)
+        const QPointF topLeft = labelAnchor + cachedLabel->offset;
+        const QSizeF size = cachedLabel->pixmap.size() / mParentPlot->bufferDevicePixelRatio();
+        const bool horizontal = QCPAxis::orientation(type) == Qt::Horizontal;
+        if (!labelClippedByBorder
+            && !overlapsLastTickLabel(horizontal ? topLeft.x() : topLeft.y(),
+                                      horizontal ? topLeft.x() + size.width()
+                                                 : topLeft.y() + size.height()))
         {
             painter->drawPixmap(snappedToDevicePixels(labelAnchor + cachedLabel->offset),
                                 cachedLabel->pixmap);
@@ -2778,7 +2785,11 @@ void QCPAxisPainterPrivate::placeTickLabel(QCPPainter* painter, double position,
                         > viewportRect.bottom()
                     || finalPosition.y() + labelData.rotatedTotalBounds.top() < viewportRect.top();
         }
-        if (!labelClippedByBorder)
+        const QRectF bounds = QRectF(labelData.rotatedTotalBounds).translated(finalPosition);
+        const bool horizontal = QCPAxis::orientation(type) == Qt::Horizontal;
+        if (!labelClippedByBorder
+            && !overlapsLastTickLabel(horizontal ? bounds.left() : bounds.top(),
+                                      horizontal ? bounds.right() : bounds.bottom()))
         {
             drawTickLabel(painter, finalPosition.x(), finalPosition.y(), labelData);
             finalSize = labelData.rotatedTotalBounds.size();
@@ -2790,6 +2801,22 @@ void QCPAxisPainterPrivate::placeTickLabel(QCPPainter* painter, double position,
         tickLabelsSize->setWidth(finalSize.width());
     if (finalSize.height() > tickLabelsSize->height())
         tickLabelsSize->setHeight(finalSize.height());
+}
+
+/*! \internal
+
+  Whether a tick label spanning [\a from, \a to] along the axis would touch the one drawn before
+  it in this draw. If not, it becomes the last drawn label. With more ticks than labels fit (a
+  narrow plot), every other label is skipped instead of drawn into its neighbour.
+*/
+bool QCPAxisPainterPrivate::overlapsLastTickLabel(double from, double to)
+{
+    // Strictly overlapping: a label's box holds a full line height, so stacked lane names (a
+    // timeline) touch without their text running together.
+    if (mLastTickLabelSpan && from < mLastTickLabelSpan->second && to > mLastTickLabelSpan->first)
+        return true;
+    mLastTickLabelSpan = std::make_pair(from, to);
+    return false;
 }
 
 /*! \internal
