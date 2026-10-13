@@ -398,3 +398,27 @@ void TestQCPLayout::debugExpectationIgnoresSignatureSpelling()
   expectDebugFrom("QCPLayoutGrid::addElement", "There is already an element in the specified row/column: 0 0");
   qDebug() << "bool QCPLayoutGrid::addElement(int, int, QCPLayoutElement*)" << "There is already an element in the specified row/column:" << 0 << 0;
 }
+
+// A colour scale does not compute its top and bottom margins: it used to report the last
+// value a margin group gave it, so the group could grow but never shrink. A plot whose x
+// tick labels are hidden kept the margin of its first layout under the data area.
+void TestQCPLayout::marginGroupShrinksWithAColorScale()
+{
+  auto* scale = new QCPColorScale(mPlot);
+  mPlot->plotLayout()->addElement(0, 1, scale);
+  auto* group = new QCPMarginGroup(mPlot);
+  mPlot->axisRect()->setMarginGroup(QCP::msTop | QCP::msBottom, group);
+  scale->setMarginGroup(QCP::msTop | QCP::msBottom, group);
+  mPlot->xAxis->setLabel("time");
+  mPlot->replot();
+  const int withLabels = mPlot->axisRect()->margins().bottom();
+
+  mPlot->xAxis->setTickLabels(false);
+  mPlot->xAxis->setLabel("");
+  mPlot->replot();
+  QVERIFY2(mPlot->axisRect()->margins().bottom() < withLabels,
+           qPrintable(QString("bottom margin %1, was %2 with labels")
+                          .arg(mPlot->axisRect()->margins().bottom()).arg(withLabels)));
+  QCOMPARE(scale->margins().bottom(), mPlot->axisRect()->margins().bottom());
+  QCOMPARE(scale->margins().top(), mPlot->axisRect()->margins().top());
+}

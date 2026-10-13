@@ -135,6 +135,7 @@ protected:
 
     // reimplemented virtual methods:
     virtual void applyDefaultAntialiasingHint(QCPPainter* painter) const override;
+    virtual int calculateAutoMargin(QCP::MarginSide side) override;
     // events:
     virtual void mousePressEvent(QMouseEvent* event, const QVariant& details) override;
     virtual void mouseMoveEvent(QMouseEvent* event, const QPointF& startPos) override;

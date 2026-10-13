@@ -481,6 +481,15 @@ void QCPColorScale::rescaleDataRange(bool onlyVisibleMaps)
 }
 
 /* inherits documentation from base class */
+/* inherits documentation from base class */
+int QCPColorScale::calculateAutoMargin(QCP::MarginSide side)
+{
+    // The base returns max(current margin, minimum margin): in a margin group, the margin the
+    // group last set would come back as this element's own, so the group could never shrink.
+    // The scale lays its bar and axis out inside its rect and needs no outer margin itself.
+    return QCP::getMarginValue(mMinimumMargins, side);
+}
+
 void QCPColorScale::update(UpdatePhase phase)
 {
     QCPLayoutElement::update(phase);
