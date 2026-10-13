@@ -317,7 +317,11 @@ NeoQCP_dep = declare_dependency(link_with: NeoQCP,
 subdir('docs/snippets')
 
 if is_wasm
-    subdir('examples/wasm-gallery')
+    # A project using NeoQCP as a subproject builds its own page: the gallery would link
+    # against that project's hooks (e.g. a profiling hook it provides).
+    if not meson.is_subproject()
+        subdir('examples/wasm-gallery')
+    endif
 else
     if get_option ( 'with_examples')
         subdir('examples')
