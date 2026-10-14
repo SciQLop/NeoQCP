@@ -500,7 +500,11 @@ QCustomPlot::QCustomPlot(QWidget* parent)
     mTheme = mOwnedTheme;
     connectThemeSignal();
 
+#ifdef Q_OS_WASM
+    mPipelineScheduler = new QCPPipelineScheduler(QCPPipelineScheduler::browserPool(), 0, this);
+#else
     mPipelineScheduler = new QCPPipelineScheduler(0, this);
+#endif
 
     mDataSwapTimer.setSingleShot(true);
     connect(&mDataSwapTimer, &QTimer::timeout, this, &QCustomPlot::commitPendingData);

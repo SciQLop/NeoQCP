@@ -14,6 +14,8 @@ private slots:
     void schedulerSubmitHeavy();
     void schedulerSubmitFast();
     void schedulerFastPriority();
+    void schedulerOnSharedPoolWaitsForItsOwnJob();
+    void schedulerOnSharedPoolDoesNotWaitForOthers();
 
     // Pipeline base tests
     void pipelinePassthrough();

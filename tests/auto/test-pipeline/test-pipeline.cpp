@@ -18,6 +18,7 @@
 #include <QSignalSpy>
 #include <QThread>
 #include <thread>
+#include <future>
 #include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
 #include <cmath>
 #include <limits>
@@ -127,6 +128,41 @@ void TestPipeline::schedulerFastPriority()
     QVERIFY(order.size() == 2);
     QCOMPARE(order[0], 2); // fast ran first
     QCOMPARE(order[1], 1);
+}
+
+void TestPipeline::schedulerOnSharedPoolWaitsForItsOwnJob()
+{
+    QThreadPool pool;
+    std::atomic<bool> started{false}, finished{false};
+    auto* scheduler = new QCPPipelineScheduler(&pool);
+    scheduler->submit(QCPPipelineScheduler::Heavy, [&]{
+        started.store(true);
+        QThread::msleep(100);
+        finished.store(true);
+    });
+    while (!started.load()) QThread::msleep(1);
+    delete scheduler;
+    QVERIFY(finished.load());
+}
+
+void TestPipeline::schedulerOnSharedPoolDoesNotWaitForOthers()
+{
+    // In the browser all plots share one pool: removing a plot must not wait for the others' jobs.
+    QThreadPool pool;
+    std::atomic<bool> gate{false}, started{false};
+    QCPPipelineScheduler busy(&pool);
+    busy.submit(QCPPipelineScheduler::Heavy, [&]{
+        started.store(true);
+        while (!gate.load()) QThread::msleep(5);
+    });
+    while (!started.load()) QThread::msleep(1);
+    auto destroyed = std::async(std::launch::async, [&]{
+        QCPPipelineScheduler idle(&pool);
+        idle.submit(QCPPipelineScheduler::Fast, []{});
+    });
+    const bool returned = destroyed.wait_for(std::chrono::seconds(2)) == std::future_status::ready;
+    gate.store(true);
+    QVERIFY(returned);
 }
 
 void TestPipeline::pipelinePassthrough()
