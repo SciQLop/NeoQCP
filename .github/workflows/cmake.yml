@@ -1,0 +1,106 @@
+name: CMake
+
+# The CMake build of the library, used the two ways a CMake project would: find_package on an
+# installed NeoQCP, and FetchContent. meson.build stays the reference build (tests.yml).
+on:
+  push:
+  pull_request:
+
+env:
+  QT_VERSION: 6.11.2
+
+jobs:
+  cmake:
+    name: CMake build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            qt_host: linux
+            qt_dir: gcc_64
+          - os: windows-latest
+            qt_host: windows
+            qt_dir: msvc2022_64
+          - os: macos-latest
+            qt_host: mac
+            qt_dir: macos
+    defaults:
+      run:
+        shell: bash
+    env:
+      QT_ROOT: ${{ github.workspace }}/Qt/${{ env.QT_VERSION }}/${{ matrix.qt_dir }}
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+        with:
+          arch: amd64
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'   # see tests.yml: older zipfile misreads some Qt .7z archives
+      - name: The CMake and Meson builds list the same files
+        run: python tests/cmake/check-sources.py
+      - name: Install build tools
+        run: pip install "aqtinstall @ git+https://github.com/miurahr/aqtinstall.git@master" ninja
+
+      # Same key as tests.yml, so the two workflows share the cached Qt.
+      - name: Cache Qt
+        id: cache-qt
+        uses: actions/cache@v4
+        with:
+          path: Qt
+          key: qt-${{ env.QT_VERSION }}-${{ matrix.qt_host }}-${{ matrix.qt_dir }}
+      - name: Install Qt
+        if: steps.cache-qt.outputs.cache-hit != 'true'
+        run: |
+          if [ "${{ matrix.qt_host }}" = "windows" ]; then
+            aqt install-qt -O Qt ${{ matrix.qt_host }} desktop ${{ env.QT_VERSION }} win64_msvc2022_64 -m qtshadertools
+          else
+            aqt install-qt -O Qt ${{ matrix.qt_host }} desktop ${{ env.QT_VERSION }} -m qtshadertools
+          fi
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt update && sudo apt install -y libgl-dev xvfb libatomic1 libglx-dev libegl-dev libxrandr2 libxss1 libxcursor1 libxcomposite1 libasound2-dev libxi6 libxtst6 libglib2.0-bin libdbus-1-3 libxdamage1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libnss3
+      - name: Set up environment
+        run: |
+          echo "$QT_ROOT/bin" >> "$GITHUB_PATH"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            # offscreen reads fonts only from QT_QPA_FONTDIR, which has none by default here.
+            echo "QT_QPA_FONTDIR=C:\Windows\Fonts" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build and install the library
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT" -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/prefix"
+          cmake --build build
+          cmake --install build
+      - name: A project finds the installed NeoQCP with find_package
+        run: |
+          cmake -S tests/cmake/consumer -B build-package -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/prefix;$QT_ROOT"
+          cmake --build build-package
+          ./build-package/consumer package.png
+      - name: A project builds NeoQCP itself with FetchContent
+        run: |
+          cmake -S tests/cmake/consumer -B build-fetch -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT" -DNEOQCP_SOURCE_DIR="${{ github.workspace }}"
+          cmake --build build-fetch
+          ./build-fetch/consumer fetch.png
+      - name: The library builds without LaTeX labels
+        if: runner.os == 'Linux'
+        run: |
+          cmake -S . -B build-nolatex -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT" -DNEOQCP_WITH_LATEX=OFF
+          cmake --build build-nolatex
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cmake-consumer-${{ matrix.os }}
+          path: '*.png'
+          if-no-files-found: ignore
