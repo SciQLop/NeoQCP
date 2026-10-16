@@ -2,9 +2,9 @@
 
 ## What you need
 
-- Qt 6.7 or newer, with the Core, Gui, Widgets, Svg and PrintSupport modules.
+- Qt 6.7 or newer, with the Core, Gui, Widgets, Svg and PrintSupport modules, and Qt Shader Tools (its `qsb` compiles the shaders).
 - A C++20 compiler.
-- [Meson](https://mesonbuild.com/) 1.1 or newer, and Ninja.
+- [Meson](https://mesonbuild.com/) 1.1 or newer and Ninja, or CMake 3.21 or newer.
 
 ## Build NeoQCP
 
@@ -30,6 +30,50 @@ These build options change what is built:
 Pass them to `meson setup`, for example `meson setup build -Dwith_latex=false`.
 
 ## Use it in your project
+
+### With CMake
+
+NeoQCP builds with CMake 3.21 or newer. `FetchContent` builds it as part of your project:
+
+```cmake
+cmake_minimum_required(VERSION 3.21)
+project(my-plot-app LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 20)
+
+find_package(Qt6 REQUIRED COMPONENTS Widgets)
+
+include(FetchContent)
+FetchContent_Declare(NeoQCP
+    GIT_REPOSITORY https://github.com/SciQLop/NeoQCP.git
+    GIT_TAG main)
+FetchContent_MakeAvailable(NeoQCP)
+
+add_executable(myapp main.cpp)
+target_link_libraries(myapp PRIVATE NeoQCP::NeoQCP Qt6::Widgets)
+```
+
+Pin `GIT_TAG` to a commit for reproducible builds. To use an installed NeoQCP instead, build and
+install it once:
+
+```bash
+cmake -S NeoQCP -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/path/to/Qt/6.11.2/gcc_64
+cmake --build build
+cmake --install build --prefix /where/to/install
+```
+
+Then replace the `FetchContent` lines with `find_package(NeoQCP REQUIRED)`, with the install
+prefix in `CMAKE_PREFIX_PATH`. These options change what is built:
+
+| Option | Default | Effect |
+|---|---|---|
+| `NEOQCP_WITH_LATEX` | `ON` | Typeset `$...$` spans in labels. `OFF` leaves out JKQTMathText. |
+| `NEOQCP_TRACY` | `OFF` | Instrument for the [Tracy](https://github.com/wolfpld/tracy) profiler. |
+| `NEOQCP_INSTALL` | `ON` when built on its own | Install the library, its headers and its CMake package files. |
+
+The CMake build makes the library only. The tests, the examples and the WebAssembly gallery build
+with Meson.
+
+### With Meson
 
 The simplest way is a Meson wrap. Create `subprojects/NeoQCP.wrap`:
 

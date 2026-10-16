@@ -36,14 +36,35 @@ space plasma data, and of its plotting library [SciQLopPlots](https://github.com
 - **Items and interactions.** Shaded spans, click-and-drag item creation, trackpad and touch gestures, and a busy indicator.
 - **Styling.** Light and dark themes, also settable from a Qt stylesheet, and LaTeX in axis labels, legends and titles.
 - **In the browser.** The same code builds for WebAssembly.
-- **A modern build.** Qt 6 only, C++20, Meson, CI on Linux, macOS, Windows and WebAssembly, and optional [Tracy](https://github.com/wolfpld/tracy) profiling.
+- **A modern build.** Qt 6 only, C++20, Meson or CMake, CI on Linux, macOS, Windows and WebAssembly, and optional [Tracy](https://github.com/wolfpld/tracy) profiling.
 
 It also fixes bugs in QCustomPlot's own code, such as DPI scaling on macOS and Windows, and a
 crash in the date-time axis on Qt 6.10 and newer.
 
 ## Quick start
 
-Add NeoQCP to a Meson project with a wrap file, `subprojects/NeoQCP.wrap`:
+With CMake, fetch and build it as part of your project:
+
+```cmake
+cmake_minimum_required(VERSION 3.21)
+project(my-plot-app LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 20)
+
+find_package(Qt6 REQUIRED COMPONENTS Widgets)
+
+include(FetchContent)
+FetchContent_Declare(NeoQCP
+    GIT_REPOSITORY https://github.com/SciQLop/NeoQCP.git
+    GIT_TAG main)
+FetchContent_MakeAvailable(NeoQCP)
+
+add_executable(myapp main.cpp)
+target_link_libraries(myapp PRIVATE NeoQCP::NeoQCP Qt6::Widgets)
+```
+
+An installed NeoQCP (`cmake --install`) is found with `find_package(NeoQCP)` instead.
+
+With Meson, add a wrap file, `subprojects/NeoQCP.wrap`:
 
 ```ini
 [wrap-git]
@@ -102,7 +123,8 @@ The [migration guide](https://neoqcp.readthedocs.io/en/latest/migrating.html) li
 
 ## Building and testing
 
-You need Qt 6.7 or newer, a C++20 compiler, Meson 1.1 or newer and Ninja:
+You need Qt 6.7 or newer with Qt Shader Tools, a C++20 compiler, Meson 1.1 or newer and Ninja.
+The tests and examples build with Meson:
 
 ```bash
 git clone https://github.com/SciQLop/NeoQCP.git
