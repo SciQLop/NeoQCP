@@ -10,6 +10,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
 if(NEOQCP_SOURCE_DIR)
+    # A Windows path's backslashes would read as escapes inside FetchContent.
+    file(TO_CMAKE_PATH "${NEOQCP_SOURCE_DIR}" NEOQCP_SOURCE_DIR)
     include(FetchContent)
     FetchContent_Declare(NeoQCP SOURCE_DIR ${NEOQCP_SOURCE_DIR})
     FetchContent_MakeAvailable(NeoQCP)

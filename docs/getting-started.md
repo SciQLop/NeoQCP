@@ -70,6 +70,9 @@ prefix in `CMAKE_PREFIX_PATH`. These options change what is built:
 | `NEOQCP_TRACY` | `OFF` | Instrument for the [Tracy](https://github.com/wolfpld/tracy) profiler. |
 | `NEOQCP_INSTALL` | `ON` when built on its own | Install the library, its headers and its CMake package files. |
 
+On Linux, Qt's CMake package for its private Gui API needs the xkbcommon development headers
+(`libxkbcommon-dev` on Debian and Ubuntu, `libxkbcommon-devel` on Fedora).
+
 The CMake build makes the library only. The tests, the examples and the WebAssembly gallery build
 with Meson.
 
