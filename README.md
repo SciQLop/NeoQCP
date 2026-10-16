@@ -1,297 +1,130 @@
-# NeoQCP, a QCustomPlot Modernized Fork
+# NeoQCP
+
 [![Tests](https://github.com/SciQLop/NeoQCP/actions/workflows/tests.yml/badge.svg)](https://github.com/SciQLop/NeoQCP/actions/workflows/tests.yml)
 [![Documentation](https://readthedocs.org/projects/neoqcp/badge/?version=latest)](https://neoqcp.readthedocs.io/en/latest/)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+![C++20](https://img.shields.io/badge/C++-20-blue.svg)
+![Qt 6.7+](https://img.shields.io/badge/Qt-6.7+-41cd52.svg)
+
+Fast, interactive 2D plotting for Qt 6 applications. NeoQCP is a modernized fork of
+[QCustomPlot](https://www.qcustomplot.com/): the same API, drawn on the GPU, with plottables
+that take millions of points without copying them.
 
 **[▶ Try it in your browser](https://sciqlop.github.io/NeoQCP/)**: the gallery plots, built to WebAssembly. Pan, zoom and select, no install needed.
 
 **[📖 Documentation](https://neoqcp.readthedocs.io/en/latest/)**: user guide, gallery and API reference.
 
-[http://www.qcustomplot.com/images/logo.png](http://www.qcustomplot.com/images/logo.png)
+<table>
+  <tr>
+    <td><a href="https://neoqcp.readthedocs.io/en/latest/gallery.html#space-weather-overview"><img src="docs/images/gallery-space-weather.png" alt="Magnetic field time series above an ion spectrogram, with a highlighted interval"></a></td>
+    <td><a href="https://neoqcp.readthedocs.io/en/latest/gallery.html#ten-million-points"><img src="docs/images/gallery-ten-million-points.png" alt="Ten million samples plotted without a copy, with a zoomed view below"></a></td>
+  </tr>
+  <tr>
+    <td><a href="https://neoqcp.readthedocs.io/en/latest/gallery.html#contour-lines"><img src="docs/images/gallery-contours.png" alt="A colour map of a potential field with contour lines and a colour scale"></a></td>
+    <td><a href="https://neoqcp.readthedocs.io/en/latest/gallery.html#antenna-pattern"><img src="docs/images/gallery-antenna-pattern.png" alt="A polar plot of an antenna array's radiation pattern"></a></td>
+  </tr>
+</table>
 
-This fork aims at modernizing the excellent [QCustomPlot](https://www.qcustomplot.com/) library with:
+NeoQCP draws the plots of [SciQLop](https://github.com/SciQLop/SciQLop), a tool for browsing
+space plasma data, and of its plotting library [SciQLopPlots](https://github.com/SciQLop/SciQLopPlots).
 
-## ✨ Key Improvements
+## What it adds to QCustomPlot
 
-- **Qt6 Exclusive Support**
-  Dropped legacy Qt4/Qt5 support - focused on Qt6 only to reduce complexity and leverage modern Qt features
+- **GPU rendering.** It draws through Qt's QRhi: Metal on macOS, Vulkan on Linux, D3D on Windows and WebGL in the browser. Lines, fills, scatters, grids and spans are drawn by shaders, and panning moves cached geometry instead of redrawing it.
+- **Big data, no copy.** `QCPMultiGraph`, `QCPGraph2` and `QCPColorMap2` plot from your own containers or raw pointers, in any numeric type. Background threads reduce the data to what the pixels can show, so panning and zooming stay fluid with millions of points.
+- **New plottables.** Multi-component graphs, colour maps with gap detection, log axes and contour lines, 2D histograms, waterfalls, and interval timelines (`QCPIntervals`).
+- **Items and interactions.** Shaded spans, click-and-drag item creation, trackpad and touch gestures, and a busy indicator.
+- **Styling.** Light and dark themes, also settable from a Qt stylesheet, and LaTeX in axis labels, legends and titles.
+- **In the browser.** The same code builds for WebAssembly.
+- **A modern build.** Qt 6 only, C++20, Meson, CI on Linux, macOS, Windows and WebAssembly, and optional [Tracy](https://github.com/wolfpld/tracy) profiling.
 
-- **QRhi Rendering Backend**
-  Replaced the QWidget + OpenGL FBO rendering path with QRhiWidget. Qt's Rendering Hardware Interface maps to the native graphics API on each platform (Metal on macOS, Vulkan on Linux, D3D on Windows). Layer textures are composited directly on the GPU with no GPU-to-CPU readback.
+It also fixes bugs in QCustomPlot's own code, such as DPI scaling on macOS and Windows, and a
+crash in the date-time axis on Qt 6.10 and newer.
 
-- **GitHub Actions CI**
-  Integrated GitHub Actions for continuous integration, ensuring code quality and build stability across platforms
+## Quick start
 
-- **Modern Build System**
-  Replaced qmake with [Meson](https://mesonbuild.com/) for faster, more reliable builds
+Add NeoQCP to a Meson project with a wrap file, `subprojects/NeoQCP.wrap`:
 
-- **[Tracy](https://github.com/wolfpld/tracy) Profiler Integration**
-  Integrated Tracy for real-time performance profiling, allowing you to visualize and optimize your plotting code and
-  NeoQCP itself.
+```ini
+[wrap-git]
+url = https://github.com/SciQLop/NeoQCP.git
+revision = main
+depth = 1
 
-- **Zero-Copy Data Source (QCPGraph2)**
-  New plottable that plots directly from user-owned containers without copying or converting data. Supports `std::vector`, `QVector`, `std::span`, and raw pointers with any numeric type (`double`, `float`, `int`). Uses C++20 concepts and SoA layout — algorithms run in the container's native type and only cast to `double` at the final pixel-coordinate step. Supports all line styles from QCPGraph (line, step-left/right/center, impulse), scatter symbols, and scatter skip.
+[provide]
+NeoQCP = NeoQCP_dep
+```
 
-  ```cpp
-  // Owning — move your data in, no copy
-  std::vector<double> keys = /* ... */;
-  std::vector<float> values = /* ... */;
-  graph->setData(std::move(keys), std::move(values));
+Then, in your `meson.build`:
 
-  // Zero-copy view — plot directly from your buffer
-  graph->viewData(keyPtr, valuePtr, count);
+```meson
+project('my-plot-app', 'cpp', default_options: ['cpp_std=c++20'])
 
-  // Shared — multiple graphs, one data source
-  auto src = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<float>>>(
-      std::move(keys), std::move(values));
-  graph1->setDataSource(src);
-  graph2->setDataSource(src);
+qt = dependency('qt6', modules: ['Core', 'Gui', 'Widgets', 'Svg', 'PrintSupport'])
+neoqcp = dependency('NeoQCP')
 
-  // Line styles and scatter symbols
-  graph->setLineStyle(QCPGraph2::lsStepCenter);
-  graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, 8));
-  graph->setScatterSkip(2);            // draw every 3rd scatter point
-  graph->setScatterMaxPoints(50000);   // stratified subsampling cap for huge datasets
+executable('myapp', 'main.cpp', dependencies: [qt, neoqcp], gui_app: true)
+```
 
-  // Per-point color axis — color scatters by a third quantity
-  graph->setScatterColorValues(std::move(colorValues));
-  graph->setScatterColorGradient(QCPColorGradient::gpJet);
-  ```
+`QCustomPlot` is a `QWidget`, as in QCustomPlot:
 
-  QCPGraph2 and QCPMultiGraph scatters render on the GPU via instanced SDF sprites (see GPU Plottable Rendering), and large series are decimated with adaptive min/max sampling so panning and zooming stay interactive.
+```cpp
+#include <qcustomplot.h>
 
-  **QCPGraph2 vs QCPGraph:**
+auto* plot = new QCustomPlot;
+QVector<double> x(101), y(101);
+for (int i = 0; i < 101; ++i)
+{
+    x[i] = i / 50.0 - 1;
+    y[i] = x[i] * x[i];
+}
+plot->addGraph();
+plot->graph(0)->setData(x, y);
+plot->rescaleAxes();
+plot->replot();
+```
 
-  | Feature | QCPGraph | QCPGraph2 |
-  |---------|----------|-----------|
-  | Data source | `QCPDataContainer` (copies data) | Zero-copy pluggable `QCPAbstractDataSource` |
-  | Container types | `double` only | Any numeric type (`float`, `int`, etc.) |
-  | Line styles | All 6 | All 6 |
-  | Scatter symbols | All 17+ shapes | All 17+ shapes |
-  | Fill under graph | Yes | No |
-  | Channel fill | Yes | No |
-  | `addData()` incremental | Yes | Not yet |
-  | Selection decoration | Full (pen + scatter) | Basic |
+For large data, move your vectors into a multi-component graph. Nothing is copied:
 
-- **GPU Plottable Rendering**
-  QCPGraph and QCPCurve solid-line strokes and baseline fills rendered via QRhi shaders with polyline extrusion and MSAA antialiasing (4x below a device pixel ratio of 2, none above, where pixels are small enough). QCPGraph2 and QCPMultiGraph scatter symbols are drawn as GPU-instanced SDF sprites, and the grid, tick marks, and span items are emitted directly to the GPU as well — keeping the whole hot path off the CPU.
+```cpp
+auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+mg->setData(std::move(keys), std::move(valueColumns));   // one vector per component
+mg->setComponentColors({Qt::red, Qt::green, Qt::blue});
+```
 
-- **Smooth GPU-Translated Panning**
-  Panning shifts cached pixel-space geometry on the GPU via per-draw offsets instead of re-extruding and re-uploading every frame, and the compositor translates unchanged layer textures rather than repainting them. This makes dragging large datasets fluid without touching the CPU data path.
+The [getting started guide](https://neoqcp.readthedocs.io/en/latest/getting-started.html) goes further.
 
-- **Zero-Copy Colormap (QCPColorMap2)**
-  New colormap plottable with async resampling and zero-copy data sources. Data is resampled on a background thread with request coalescing — only the latest viewport matters, so rapid zooming/panning stays fluid.
+## Coming from QCustomPlot
 
-  ```cpp
-  auto* cm = new QCPColorMap2(xAxis, yAxis);
+Most code that builds with QCustomPlot 2.1.1 on Qt 6 builds with NeoQCP unchanged. NeoQCP needs
+Qt 6.7 or newer and builds with Meson instead of qmake, and a few defaults and behaviours changed.
+The [migration guide](https://neoqcp.readthedocs.io/en/latest/migrating.html) lists every difference.
 
-  // Owning — move your data in
-  cm->setData(std::move(xVec), std::move(yVec), std::move(zVec));
+## Building and testing
 
-  // Zero-copy view — plot directly from your buffer
-  cm->viewData(xSpan, ySpan, zSpan);
-  ```
-
-  Data gaps (missing acquisition periods) are detected and left blank instead of being interpolated across, logarithmic Y axes are supported, and an optional GPU contour-line overlay can be drawn on top of the colorized cells.
-
-- **Multi-Component Graph (QCPMultiGraph)**
-  Plots many value columns that share a single key axis from one zero-copy SoA source — ideal for multi-channel time series. Each component has its own pen/selection, components can be colored in bulk, and the same two-level async resampling as QCPGraph2 keeps millions of points per column interactive. Accepts column-major, row-major, and `std::span` layouts.
-
-  ```cpp
-  auto* mg = new QCPMultiGraph(xAxis, yAxis);
-  mg->setData(std::move(keys), std::move(valueColumns));   // one vector per component
-  mg->setComponentColors({Qt::red, Qt::green, Qt::blue});
-  ```
-
-- **Waterfall (QCPWaterfallGraph)**
-  Built on QCPMultiGraph, stacks normalized spectra/traces into a waterfall display. Normalization is recomputed automatically as data changes.
-
-- **2D Histogram (QCPHistogram2D)**
-  Bins `(key, value)` point clouds into a colormap on a background thread, with per-axis configurable bin counts and logarithmic bin spacing that follows the axis scale type.
-
-  ```cpp
-  auto* h = new QCPHistogram2D(xAxis, yAxis);
-  h->setBins(256, 256);
-  h->viewData(xSpan, ySpan);
-  ```
-
-- **Span Items (QCPItemVSpan / QCPItemHSpan / QCPItemRSpan)**
-  GPU-rendered shaded regions spanning a key range (vertical), value range (horizontal), or both (rectangular) — useful for highlighting time intervals, catalog events, or thresholds. Coordinates are converted to pixels in double precision on the CPU to avoid float32 cancellation with large timestamps.
-
-  ```cpp
-  auto* span = new QCPItemVSpan(plot);
-  span->setRange(QCPRange(t0, t1));
-  span->setBrush(QColor(0, 120, 215, 60));
-  ```
-
-- **Interactive Item Creation Mode**
-  Drive interactive item creation from user callbacks instead of bespoke event handling: click to start, move, click again to finish (Escape or a right click cancels). An `ItemCreator` builds the item on the first click; an `ItemPositioner` updates its geometry as the mouse moves. Creation only fires inside the axis rect's data area.
-
-  ```cpp
-  plot->setItemCreator([](QCustomPlot* p, QCPAxis* kx, QCPAxis* vx) {
-      return new QCPItemVSpan(p);
-  });
-  plot->setItemPositioner([](QCPAbstractItem* it, double k0, double, double k1, double) {
-      static_cast<QCPItemVSpan*>(it)->setRange(QCPRange(k0, k1));
-  });
-  ```
-
-- **Theming**
-  `QCPTheme` with named color roles (background, foreground, grid, sub-grid, selection, legend). Ships with `QCPTheme::light()` and `QCPTheme::dark()` factories. A shared theme can be applied to multiple plots and live-updated — axes, grids, legends, ticks, labels and items follow it; plottables keep their own pens. Theme colors are exposed as Qt properties for QSS integration.
-
-  ```cpp
-  auto* theme = QCPTheme::dark(plot);  // the parent owns it: setTheme() does not
-  plot->setTheme(theme);  // applies and connects for live updates
-  ```
-
-  Theme colors are exposed as Qt properties on `QCustomPlot`, so you can drive them entirely from QSS:
-
-  ```css
-  /* Dark theme via stylesheet */
-  QCustomPlot {
-      qproperty-themeBackground:       #1e1e1e;
-      qproperty-themeForeground:       #d4d4d4;
-      qproperty-themeGrid:             #3c3c3c;
-      qproperty-themeSubGrid:          #2a2a2a;
-      qproperty-themeSelection:        #264f78;
-      qproperty-themeLegendBackground: #252526;
-      qproperty-themeLegendBorder:     #3c3c3c;
-  }
-
-  /* Light theme via stylesheet */
-  QCustomPlot[objectName="lightPlot"] {
-      qproperty-themeBackground:       #ffffff;
-      qproperty-themeForeground:       #1e1e1e;
-      qproperty-themeGrid:             #d0d0d0;
-      qproperty-themeSubGrid:          #e8e8e8;
-      qproperty-themeSelection:        #0078d4;
-      qproperty-themeLegendBackground: #f5f5f5;
-      qproperty-themeLegendBorder:     #d0d0d0;
-  }
-  ```
-
-  This lets you switch plot themes along with your application stylesheet — no C++ theme code needed.
-
-- **Upstream QCustomPlot Bugs Fixed**
-  Latent bugs in QCustomPlot's own code, patched in this fork:
-    - DPI scaling issues on macOS and Windows
-    - Crash on Qt 6.10+ from an out-of-range `tickStep` reaching `qRound` in the datetime axis ticker (`qCheckedFPConversionToInteger` assert)
-    - `QCustomPlot::removeLayer()` use-after-delete — the layer was deleted before being removed from the layer list (latent UB)
-
-- **NeoQCP Rendering-Path Fixes**
-  Hardening of NeoQCP's own new GPU / async / zero-copy machinery:
-    - Data gaps and NaN values break polylines instead of drawing fan lines across them (regression in the zero-copy `QCPGraph2`/`QCPMultiGraph` pixel mapping — upstream `QCPGraph` already handled this)
-    - Non-owning data sources guard against use-after-free when the caller frees the buffer mid-resample (`dataGuard`)
-    - Stale results stay visible during background rebuilds — no blank frames on data changes or pans
-    - Async jobs are safe against plottable destruction and viewport mismatches
-    - macOS/Metal correctness: scissor-rect Y-flip and vertex/SRB binding order
-
-- **LaTeX in Labels**
-  Axis labels, legend entries, plot titles and text items typeset any `$...$` span, so a plot can be labelled the way the physics is written. Backed by [JKQTMathText](https://github.com/jkriege2/JKQtPlotter) — a pure C++ LaTeX parser, no LaTeX installation and no dependency beyond Qt — and the XITS math fonts are embedded, so rendering is identical on every platform.
-
-  ```cpp
-  plot->yAxis->setLabel("$\\frac{\\partial B_x}{\\partial t}$ [nT$\\cdot$s$^{-1}$]");
-  graph->setName("$f^{-5/3}$ Kolmogorov");
-  plot->plotLayout()->addElement(0, 0, new QCPTextElement(plot, "$P(f) \\propto f^{-5/3}$"));
-
-  auto* note = new QCPItemText(plot);        // no separate item type
-  note->setText("break at $f_0 = 3$ Hz");
-  ```
-
-  Only text carrying a `$...$` span is typeset — everything else takes the plain `drawText` path, so ordinary labels cost nothing and a lone `$` stays a currency sign. Sizes are measured through the same seam, so a stacked fraction widens the axis rect and grows its legend entry instead of being clipped.
-
-  Both halves are replaceable: `QCPAxis::setLabelRenderer()` swaps the typesetter for one axis, `QCPLabelRenderer::setDefaultRenderer()` for everything else, and either takes `nullptr` to get plain text back. Build with `-Dwith_latex=false` to leave it out entirely.
-
-  Tick labels are deliberately not covered — they are overwhelmingly numeric, and that painter already renders scientific-notation exponents itself.
-
-- **Planned Features**
-    - Incremental `addData()` for QCPGraph2
-    - Fill support for QCPGraph2 (under graph / channel fill)
-
-## 📥 Installation
-
-### Prerequisites
-
-- Qt 6.7+ (Core, Gui, Widgets, Svg, PrintSupport modules)
-- Meson 1.1.0+
-- Ninja build system
-- C++20 compatible compiler
-
-### Build Steps
+You need Qt 6.7 or newer, a C++20 compiler, Meson 1.1 or newer and Ninja:
 
 ```bash
 git clone https://github.com/SciQLop/NeoQCP.git
 cd NeoQCP
 meson setup build --buildtype=release
 meson compile -C build
+meson test -C build
 ```
 
-Build options: `-Dwith_latex=false` drops LaTeX label support (and its JKQTMathText
-subproject), `-Dwith_examples=true` builds the examples, `-Dwith_tests=false` skips
-the tests, `-Dtracy_enable=true` turns on Tracy profiling.
+Build options: `-Dwith_latex=false` leaves out LaTeX labels, `-Dwith_examples=true` builds the
+examples, `-Dwith_tests=false` skips the tests, and `-Dtracy_enable=true` turns on Tracy profiling.
 
-### Integration in Your Meson Project
+## Contributing
 
-Create a `subprojects/NeoQCP.wrap` file with the following content:
+Bug reports and pull requests are welcome on [GitHub](https://github.com/SciQLop/NeoQCP/issues).
+A bug fix comes with a test that fails without it.
 
-```meson
-[wrap-git]
-url = https://github.com/SciQLop/NeoQCP.git
-revision = HEAD
-depth = 1
+## License
 
-[provide]
-NeoQCP = NeoQCP_dep
+GNU GPL v3, like QCustomPlot.
 
-```
-
-Then, in your `meson.build` file, add:
-
-```meson
-project('my-plot-app', 'cpp',
-        default_options: ['cpp_std=c++20'])
-
-qtmod = import('qt6')
-qtdeps = dependency('qt6', modules : ['Core','Widgets','Gui','Svg','PrintSupport'], method:'qmake')
-
-neoqcp = dependency('NeoQCP')
-
-executable('myapp',
-           'main.cpp',
-           dependencies: [qtdeps, neoqcp],
-           gui_app: true)
-```
-
-## 🆚 Migration from QCustomPlot
-
-TBD
-
-## 🧪 Testing
-
-Run test suite with:
-
-```bash
-meson setup builddir
-meson test -C builddir
-```
-
-## 🤝 Contributing
-
-We welcome contributions! Please follow these guidelines:
-
-1. Fork the repository
-2. Create a new branch for your feature or bug fix
-3. Write tests for new functionality or bug fixes
-4. Submit pull request with description of changes
-
-## 📄 License
-
-GNU GPL v3 (same as upstream QCustomPlot)
-
-Bundled when built with `with_latex` (the default):
-[JKQTMathText](https://github.com/jkriege2/JKQtPlotter) under LGPL v2.1-or-later,
-and the [XITS](https://github.com/aliftype/xits) math fonts under the SIL Open
-Font License 1.1. Both are compatible with GPL v3.
-
----
-
-**Report Issues**: [GitHub Issues](https://github.com/SciQLop/NeoQCP/issues)
+When built with `with_latex` (the default), NeoQCP bundles
+[JKQTMathText](https://github.com/jkriege2/JKQtPlotter) under LGPL v2.1 or later, and the
+[XITS](https://github.com/aliftype/xits) math fonts under the SIL Open Font License 1.1.
+Both are compatible with GPL v3.
