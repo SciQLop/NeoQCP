@@ -898,7 +898,9 @@ void QCPAbstractPlottable::setWantsLegend(bool wants)
     if (mWantsLegend == wants)
         return;
     mWantsLegend = wants;
-    if (wants)
+    if (mGroup)
+        mRowOnLeave = wants;
+    else if (wants)
         addToLegend();
     else
         removeFromLegend();

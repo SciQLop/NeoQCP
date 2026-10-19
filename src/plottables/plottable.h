@@ -282,6 +282,7 @@ private:
 
     QCPPlottableGroup* mGroup = nullptr; // set and cleared by the group
     bool mWantsLegend = true;
+    bool mRowOnLeave = false; // while grouped: get a legend row back on leaving
     bool mExternalBusy = false;
     bool mVisuallyBusy = false;
     bool mEffectiveBusy = false;

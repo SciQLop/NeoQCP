@@ -24,6 +24,16 @@ bool isShown(const QCPAbstractPlottable* plottable)
             return true;
     return false;
 }
+
+// A multi-graph is shown when visible with visible components (see isShown), so showing or hiding
+// it as a group member sets its components too.
+void setShown(const QPointer<QCPAbstractPlottable>& plottable, bool shown)
+{
+    plottable->setVisible(shown);
+    if (auto* multiGraph = qobject_cast<QCPMultiGraph*>(plottable.data()))
+        for (int i = 0; multiGraph && i < multiGraph->componentCount(); ++i)
+            multiGraph->setComponentVisible(i, shown);
+}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -71,11 +81,14 @@ bool QCPPlottableGroup::addMember(QCPAbstractPlottable* plottable)
         return false;
     if (plottable->mGroup == this)
         return true;
-    if (plottable->mGroup)
-        plottable->mGroup->removeMember(plottable);
-
+    // Taken over before anyone is told: a membersChanged slot may remove the plottable or delete
+    // a group, so every signal waits until the state is consistent, and is guarded.
+    QPointer<QCPPlottableGroup> previous = plottable->mGroup;
+    if (previous)
+        previous->detach(plottable, false); // still out of the legend; its row-on-leave stays
+    else
+        plottable->mRowOnLeave = plottable->removeFromLegend();
     plottable->mGroup = this;
-    plottable->removeFromLegend();
     mMembers.append(plottable);
     connect(plottable, &QCPLayerable::visibleChanged, this, &QCPPlottableGroup::markRowDirty);
     connect(plottable, &QCPAbstractPlottable::visuallyBusyChanged, this,
@@ -84,7 +97,15 @@ bool QCPPlottableGroup::addMember(QCPAbstractPlottable* plottable)
         connect(multiGraph, &QCPMultiGraph::componentVisibilityChanged, this,
                 &QCPPlottableGroup::markRowDirty);
     updateLegendRow();
-    emit membersChanged();
+
+    QPointer<QCPPlottableGroup> self = this;
+    if (previous)
+    {
+        previous->updateLegendRow();
+        emit previous->membersChanged();
+    }
+    if (self)
+        emit membersChanged();
     return true;
 }
 
@@ -105,7 +126,7 @@ void QCPPlottableGroup::detach(QCPAbstractPlottable* plottable, bool restoreRow)
     disconnect(plottable, nullptr, this, nullptr);
     mMembers.removeAll(plottable);
     plottable->mGroup = nullptr;
-    if (restoreRow && plottable->wantsLegend())
+    if (restoreRow && plottable->mRowOnLeave)
         plottable->addToLegend();
 }
 
@@ -117,11 +138,13 @@ bool QCPPlottableGroup::visible() const
 
 void QCPPlottableGroup::setVisible(bool visible)
 {
-    // A member's visibleChanged slot may delete this group.
+    // A member's visibleChanged slot may delete this group or another member: iterate a copy of
+    // the guarded list, never raw pointers.
     QPointer<QCPPlottableGroup> self = this;
-    for (const QPointer<QCPAbstractPlottable>& member : members())
+    const auto snapshot = mMembers;
+    for (const auto& member : snapshot)
         if (member)
-            member->setVisible(visible);
+            setShown(member, visible);
     if (self)
         markRowDirty();
 }

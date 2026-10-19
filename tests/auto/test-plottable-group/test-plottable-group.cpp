@@ -284,3 +284,105 @@ void TestPlottableGroup::membersChangedSlotMayRemoveAgain()
     QCOMPARE(mPlot->plottableCount(), 1);
     QCOMPARE(group->members(), QList<QCPAbstractPlottable*> { b });
 }
+
+void TestPlottableGroup::visibilitySlotMayRemoveALaterMember()
+{
+    auto* a = mPlot->addGraph();
+    auto* b = mPlot->addGraph();
+    auto* group = mPlot->addPlottableGroup("g");
+    group->addMember(a);
+    group->addMember(b);
+    connect(a, &QCPLayerable::visibleChanged, this, [this, b] { (void)mPlot->removePlottable(b); });
+
+    group->setVisible(false); // must not touch the deleted b
+    QCOMPARE(group->members(), QList<QCPAbstractPlottable*> { a });
+}
+
+void TestPlottableGroup::moveSurvivesASlotRemovingTheMember()
+{
+    auto* a = mPlot->addGraph();
+    auto* first = mPlot->addPlottableGroup("first");
+    auto* second = mPlot->addPlottableGroup("second");
+    first->addMember(a);
+    connect(first, &QCPPlottableGroup::membersChanged, this,
+            [this, a] { (void)mPlot->removePlottable(a); });
+
+    QVERIFY(second->addMember(a));
+    QCOMPARE(mPlot->plottableCount(), 0);
+    QVERIFY(first->members().isEmpty());
+    QVERIFY(second->members().isEmpty());
+}
+
+void TestPlottableGroup::leavingDoesNotAddARowNeverThere()
+{
+    mPlot->setAutoAddPlottableToLegend(false);
+    auto* a = mPlot->addGraph();
+    auto* group = mPlot->addPlottableGroup("g");
+    group->addMember(a);
+    QVERIFY(mPlot->removePlottableGroup(group));
+    QCOMPARE(mPlot->legend->itemCount(), 0);
+}
+
+void TestPlottableGroup::wantedWhileGroupedGetsARowOnLeaving()
+{
+    auto* a = mPlot->addGraph();
+    a->setWantsLegend(false);
+    auto* group = mPlot->addPlottableGroup("g");
+    group->addMember(a);
+    a->setWantsLegend(true);
+    QCOMPARE(plottableRows(), 0); // still grouped: the group's row stands for it
+    group->removeMember(a);
+    QCOMPARE(plottableRows(), 1);
+}
+
+void TestPlottableGroup::showingRestoresHiddenComponents()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDataSource(
+        std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
+            std::vector<double> { 1.0, 2.0 },
+            std::vector<std::vector<double>> { { 1.0, 2.0 }, { 3.0, 4.0 } }));
+    auto* group = mPlot->addPlottableGroup("g");
+    group->addMember(mg);
+    mg->setComponentVisible(0, false);
+    mg->setComponentVisible(1, false);
+    QVERIFY(!group->visible());
+
+    group->setVisible(true);
+    QVERIFY(group->visible());
+    QVERIFY(mg->component(0).visible && mg->component(1).visible);
+}
+
+void TestPlottableGroup::intervalsCanBeGrouped()
+{
+    auto* layout = new QCPLaneLayout(mPlot);
+    auto* intervals = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, layout);
+    auto* group = mPlot->addPlottableGroup("g");
+    QVERIFY(group->addMember(intervals));
+    QCOMPARE(mPlot->legend->itemCount(), 1);
+    QVERIFY(groupRow());
+    QVERIFY(!intervals->addToLegend());
+    group->removeMember(intervals);
+    QCOMPARE(mPlot->legend->itemCount(), 1);
+    QVERIFY(!groupRow());
+}
+
+void TestPlottableGroup::clearPlottablesEmptiesGroups()
+{
+    QPointer<QCPPlottableGroup> group = mPlot->addPlottableGroup("g");
+    group->addMember(mPlot->addGraph());
+    group->addMember(mPlot->addGraph());
+    mPlot->clearPlottables();
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(group);
+    QVERIFY(group->members().isEmpty());
+    QCOMPARE(mPlot->legend->itemCount(), 0);
+}
+
+void TestPlottableGroup::foreignGroupIsNotRemoved()
+{
+    QCustomPlot other;
+    QPointer<QCPPlottableGroup> foreign = other.addPlottableGroup("f");
+    QVERIFY(!mPlot->removePlottableGroup(foreign));
+    QVERIFY(foreign);
+}

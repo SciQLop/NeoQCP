@@ -24,6 +24,14 @@ private slots:
     void busyMemberShowsTheBusySymbol();
     void deletingThePlotWithGroupsIsSafe();
     void membersChangedSlotMayRemoveAgain();
+    void visibilitySlotMayRemoveALaterMember();
+    void moveSurvivesASlotRemovingTheMember();
+    void leavingDoesNotAddARowNeverThere();
+    void wantedWhileGroupedGetsARowOnLeaving();
+    void showingRestoresHiddenComponents();
+    void intervalsCanBeGrouped();
+    void clearPlottablesEmptiesGroups();
+    void foreignGroupIsNotRemoved();
 
 private:
     QCPPlottableGroupLegendItem* groupRow() const;
