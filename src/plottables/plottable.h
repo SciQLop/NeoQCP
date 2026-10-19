@@ -39,6 +39,7 @@
 
 class QCPPainter;
 class QCPAbstractPlottable;
+class QCPPlottableGroup;
 class QCPPlottableInterface1D;
 class QKeyEvent;
 class QCPLegend;
@@ -201,6 +202,12 @@ public:
     virtual bool removeFromLegend(QCPLegend* legend) const;
     bool removeFromLegend() const;
 
+    // A grouped plottable has no legend row of its own: its group has one (QCPPlottableGroup).
+    QCPPlottableGroup* group() const { return mGroup; }
+    // False keeps the plottable out of the legend, also after it leaves a group.
+    bool wantsLegend() const { return mWantsLegend; }
+    void setWantsLegend(bool wants);
+
     // busy indicator
     bool busy() const;
     bool visuallyBusy() const { return mVisuallyBusy; }
@@ -266,12 +273,15 @@ protected:
     void updateEffectiveBusy();
 
     // non-virtual methods:
+    bool legendAllowed() const { return mWantsLegend && !mGroup; }
     void applyFillAntialiasingHint(QCPPainter* painter) const;
     void applyScattersAntialiasingHint(QCPPainter* painter) const;
 
 private:
     Q_DISABLE_COPY(QCPAbstractPlottable)
 
+    QCPPlottableGroup* mGroup = nullptr; // set and cleared by the group
+    bool mWantsLegend = true;
     bool mExternalBusy = false;
     bool mVisuallyBusy = false;
     bool mEffectiveBusy = false;
@@ -287,6 +297,8 @@ private:
     friend class QCustomPlot;
     friend class QCPAxis;
     friend class QCPPlottableLegendItem;
+    friend class QCPPlottableGroup;
+    friend class QCPPlottableGroupLegendItem;
 };
 
 

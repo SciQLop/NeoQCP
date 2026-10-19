@@ -44,6 +44,7 @@ test_srcs = [
     'test-gradient-presets/test-gradient-presets.cpp',
     'test-axis-ticker-log/test-axis-ticker-log.cpp',
     'test-intervals/test-intervals.cpp',
+    'test-plottable-group/test-plottable-group.cpp',
 ]
 
 test_headers = [
@@ -87,6 +88,7 @@ test_headers = [
     'test-gradient-presets/test-gradient-presets.h',
     'test-axis-ticker-log/test-axis-ticker-log.h',
     'test-intervals/test-intervals.h',
+    'test-plottable-group/test-plottable-group.h',
 ]
 test_moc_files = qtmod.compile_moc(headers : test_headers)
 

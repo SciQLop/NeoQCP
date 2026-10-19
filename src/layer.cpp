@@ -581,6 +581,7 @@ void QCPLayerable::setVisible(bool on)
     // its old GPU entries, which lack (or still hold) the toggled item.
     if (mLayer)
         mLayer->invalidatePaintBuffer();
+    emit visibleChanged(on);
 }
 
 /*!

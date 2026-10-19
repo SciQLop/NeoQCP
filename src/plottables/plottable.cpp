@@ -866,6 +866,8 @@ void QCPAbstractPlottable::rescaleValueAxis(bool onlyEnlarge, bool inKeyRange) c
 */
 bool QCPAbstractPlottable::addToLegend(QCPLegend* legend)
 {
+    if (!legendAllowed())
+        return false;
     if (!legend)
     {
         qDebug() << Q_FUNC_INFO << "passed legend is null";
@@ -884,6 +886,22 @@ bool QCPAbstractPlottable::addToLegend(QCPLegend* legend)
     }
     else
         return false;
+}
+
+/*!
+  Sets whether this plottable wants a legend row. False removes its row and keeps it out of the
+  legend, also when it leaves a \ref QCPPlottableGroup. True adds the row back, unless the
+  plottable is grouped (its group's row stands for it).
+*/
+void QCPAbstractPlottable::setWantsLegend(bool wants)
+{
+    if (mWantsLegend == wants)
+        return;
+    mWantsLegend = wants;
+    if (wants)
+        addToLegend();
+    else
+        removeFromLegend();
 }
 
 /*! \overload

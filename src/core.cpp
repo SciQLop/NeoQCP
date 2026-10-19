@@ -26,6 +26,7 @@
 /*! \file */
 
 #include "core.h"
+#include "plottables/plottable-group.h"
 #include "item-creation-state.h"
 #include "overlay.h"
 
@@ -522,6 +523,10 @@ QCustomPlot::~QCustomPlot()
     mScatterRhiLayers.clear();
     mPaintBuffers.clear();
 
+    // Before the plottables and the legend: a group's destructor touches both. As QObject
+    // children the groups would otherwise be destroyed after them.
+    while (!mPlottableGroups.isEmpty())
+        delete mPlottableGroups.last();
     clearPlottables();
     clearItems();
 
@@ -1303,6 +1308,12 @@ bool QCustomPlot::removePlottable(QCPAbstractPlottable* plottable)
         return false;
     }
 
+    if (QCPPlottableGroup* group = plottable->group())
+    {
+        group->detach(plottable, false);
+        group->updateLegendRow();
+        emit group->membersChanged();
+    }
     // remove plottable from legend:
     plottable->removeFromLegend();
     // special handling for QCPGraphs to maintain the simple graph interface:
@@ -1337,6 +1348,31 @@ bool QCustomPlot::removePlottable(int index)
 
   \see removePlottable
 */
+/*!
+  Creates an empty \ref QCPPlottableGroup named \a name. The plot owns it.
+
+  \see removePlottableGroup
+*/
+QCPPlottableGroup* QCustomPlot::addPlottableGroup(const QString& name)
+{
+    auto* group = new QCPPlottableGroup(this, name);
+    mPlottableGroups.append(group);
+    return group;
+}
+
+/*!
+  Deletes \a group. Its members stay, and get their own legend rows back.
+
+  Returns false if \a group isn't one of this plot's groups.
+*/
+bool QCustomPlot::removePlottableGroup(QCPPlottableGroup* group)
+{
+    if (!mPlottableGroups.contains(group))
+        return false;
+    delete group;
+    return true;
+}
+
 int QCustomPlot::clearPlottables()
 {
     int c = mPlottables.size();

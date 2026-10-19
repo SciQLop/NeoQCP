@@ -71,6 +71,7 @@ set(NEOQCP_SOURCES
     src/plottables/lane-layout.cpp
     src/plottables/intervals-algo.cpp
     src/plottables/plottable-intervals.cpp
+    src/plottables/plottable-group.cpp
     src/plottables/plottable-waterfall.cpp
     src/datasource/resample.cpp
     src/datasource/pipeline-scheduler.cpp
@@ -144,6 +145,7 @@ set(NEOQCP_MOC_HEADERS
     src/plottables/plottable-multigraph.h
     src/plottables/lane-layout.h
     src/plottables/plottable-intervals.h
+    src/plottables/plottable-group.h
     src/plottables/plottable-waterfall.h
     src/plottables/plottable-statisticalbox.h
     src/datasource/pipeline-scheduler.h

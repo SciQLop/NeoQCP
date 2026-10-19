@@ -193,6 +193,8 @@ std::vector<std::pair<QString, QColor>> QCPIntervals::legendEntries() const
 
 bool QCPIntervals::addToLegend(QCPLegend* legend)
 {
+    if (!legendAllowed())
+        return false;
     if (!legend || legend->parentPlot() != mParentPlot)
         return false;
     for (int i = 0; i < legend->itemCount(); ++i)

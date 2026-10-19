@@ -121,6 +121,7 @@ private:
     friend class TestPaintBuffer;
     friend class TestBusyIndicator;
     friend class TestQCPLegend;
+    friend class TestPlottableGroup;
     friend class TestOverlay;
 };
 Q_DECLARE_METATYPE(QCPLayer::LayerMode)
@@ -175,6 +176,7 @@ public:
 
 signals:
     void layerChanged(QCPLayer* newLayer);
+    void visibleChanged(bool visible);
 
 protected:
     // property members:

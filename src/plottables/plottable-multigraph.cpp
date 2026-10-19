@@ -1204,6 +1204,8 @@ void QCPMultiGraph::drawComponentLegendIcon(QCPPainter* painter, int component, 
 
 bool QCPMultiGraph::addToLegend(QCPLegend* legend)
 {
+    if (!legendAllowed())
+        return false;
     if (!legend) {
         if (mParentPlot)
             legend = mParentPlot->legend;

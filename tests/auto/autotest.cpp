@@ -37,6 +37,7 @@
 #include "test-gradient-presets/test-gradient-presets.h"
 #include "test-axis-ticker-log/test-axis-ticker-log.h"
 #include "test-intervals/test-intervals.h"
+#include "test-plottable-group/test-plottable-group.h"
 #include "test-gestures/test-gestures.h"
 
 static bool shouldRun(const char* name)
@@ -109,6 +110,7 @@ int main(int argc, char **argv)
   QCPTEST(TestGradientPresets);
   QCPTEST(TestAxisTickerLog);
   QCPTEST(TestIntervals);
+  QCPTEST(TestPlottableGroup);
 
   return failures == 0 ? 0 : 1;
 }

@@ -45,6 +45,7 @@ class QCPAxis;
 class QCPGraph;
 class QCPLegend;
 class QCPAbstractLegendItem;
+class QCPPlottableGroup;
 class QCPSelectionRect;
 class QRhi;
 class QRhiCommandBuffer;
@@ -269,6 +270,10 @@ public:
     [[nodiscard]] bool removePlottable(int index);
     int clearPlottables();
     [[nodiscard]] int plottableCount() const;
+    // plottable groups: one legend row for several plottables (QCPPlottableGroup)
+    QCPPlottableGroup* addPlottableGroup(const QString& name);
+    bool removePlottableGroup(QCPPlottableGroup* group);
+    [[nodiscard]] QList<QCPPlottableGroup*> plottableGroups() const { return mPlottableGroups; }
     [[nodiscard]] QList<QCPAbstractPlottable*> selectedPlottables() const;
     template <class PlottableType>
     [[nodiscard]] PlottableType* plottableAt(const QPointF& pos, bool onlySelectable = false,
@@ -377,6 +382,7 @@ protected:
     QCPLayoutGrid* mPlotLayout;
     bool mAutoAddPlottableToLegend;
     QList<QCPAbstractPlottable*> mPlottables;
+    QList<QCPPlottableGroup*> mPlottableGroups;
     QList<QCPGraph*>
         mGraphs; // extra list of plottables also in mPlottables that are of type QCPGraph
     QList<QCPAbstractItem*> mItems;
@@ -507,6 +513,7 @@ protected:
     bool hasInvalidatedPaintBuffers();
     void ensureAtLeastOneBufferDirty();
     friend class QCPLegend;
+    friend class QCPPlottableGroup;
     friend class QCPAxis;
     friend class QCPLayer;
     friend class TestPaintBuffer;
