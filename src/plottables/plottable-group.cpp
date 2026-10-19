@@ -117,9 +117,13 @@ bool QCPPlottableGroup::visible() const
 
 void QCPPlottableGroup::setVisible(bool visible)
 {
-    for (auto* member : members())
-        member->setVisible(visible);
-    markRowDirty();
+    // A member's visibleChanged slot may delete this group.
+    QPointer<QCPPlottableGroup> self = this;
+    for (const QPointer<QCPAbstractPlottable>& member : members())
+        if (member)
+            member->setVisible(visible);
+    if (self)
+        markRowDirty();
 }
 
 void QCPPlottableGroup::updateLegendRow()
@@ -131,7 +135,7 @@ void QCPPlottableGroup::updateLegendRow()
         mLegendRow = new QCPPlottableGroupLegendItem(legend, this);
         legend->addItem(mLegendRow);
     }
-    else if (!wantsRow && mLegendRow)
+    else if (!wantsRow && mLegendRow && legend)
         legend->removeItem(mLegendRow);
     else
         markRowDirty();
@@ -224,7 +228,7 @@ void QCPPlottableGroupLegendItem::draw(QCPPainter* painter)
     if (hidden)
         painter->setOpacity(kHiddenRowAlpha / 255.0);
     else if (showBusy)
-        painter->setOpacity(icon->effectiveBusyFadeAlpha());
+        painter->setOpacity(busyMember()->effectiveBusyFadeAlpha());
     icon->drawLegendIcon(painter, iconRect);
     painter->restore();
 

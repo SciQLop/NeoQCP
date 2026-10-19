@@ -1308,12 +1308,9 @@ bool QCustomPlot::removePlottable(QCPAbstractPlottable* plottable)
         return false;
     }
 
-    if (QCPPlottableGroup* group = plottable->group())
-    {
+    QPointer<QCPPlottableGroup> group = plottable->group();
+    if (group)
         group->detach(plottable, false);
-        group->updateLegendRow();
-        emit group->membersChanged();
-    }
     // remove plottable from legend:
     plottable->removeFromLegend();
     // special handling for QCPGraphs to maintain the simple graph interface:
@@ -1322,6 +1319,12 @@ bool QCustomPlot::removePlottable(QCPAbstractPlottable* plottable)
     // remove plottable:
     mPlottables.removeOne(plottable);
     delete plottable;
+    // Only now: a slot may call removePlottable again, and must find this one gone.
+    if (group)
+    {
+        group->updateLegendRow();
+        emit group->membersChanged();
+    }
     return true;
 }
 

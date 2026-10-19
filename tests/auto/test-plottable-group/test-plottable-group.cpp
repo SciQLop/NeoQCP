@@ -267,3 +267,20 @@ void TestPlottableGroup::deletingThePlotWithGroupsIsSafe()
     plot->replot(QCustomPlot::rpImmediateRefresh);
     delete plot;
 }
+
+void TestPlottableGroup::membersChangedSlotMayRemoveAgain()
+{
+    // removePlottable used to emit membersChanged before deleting: a slot removing the same
+    // plottable (or another one) re-entered it and the plottable was deleted twice.
+    auto* a = mPlot->addGraph();
+    auto* b = mPlot->addGraph();
+    auto* group = mPlot->addPlottableGroup("g");
+    group->addMember(a);
+    group->addMember(b);
+    connect(group, &QCPPlottableGroup::membersChanged, this,
+            [this, a] { (void)mPlot->removePlottable(a); });
+
+    QVERIFY(mPlot->removePlottable(a));
+    QCOMPARE(mPlot->plottableCount(), 1);
+    QCOMPARE(group->members(), QList<QCPAbstractPlottable*> { b });
+}

@@ -23,6 +23,7 @@ private slots:
     void rowRepaintsWhenMembersHide();
     void busyMemberShowsTheBusySymbol();
     void deletingThePlotWithGroupsIsSafe();
+    void membersChangedSlotMayRemoveAgain();
 
 private:
     QCPPlottableGroupLegendItem* groupRow() const;
