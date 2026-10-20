@@ -182,6 +182,25 @@ The legend is a layout element inside the axis rect, in the top right corner by 
 
 To put the legend outside the axis rect, move it to another cell of the plot layout. See {doc}`layout`.
 
+## Group entries
+
+A `QCPPlottableGroup` shows several plottables as one legend row: a model drawn as a median and two dashed bounds, say.
+
+```{literalinclude} snippets/styling.cpp
+:start-after: // [styling_legend_group]
+:end-before: // [/styling_legend_group]
+:language: cpp
+:dedent:
+```
+
+![One legend row for a median and its two bounds](images/styling-legend-group.png)
+
+- Members lose their own row while grouped, and get it back when they leave.
+- The row shows the first visible member's icon, and dims when no member is visible.
+- The group holds its members, it doesn't own them. `removePlottable()` takes a plottable out of its group, and `removePlottableGroup()` deletes the group but keeps its members.
+- A double-click on the row emits `doubleClicked()`. The group doesn't toggle anything by itself.
+- `setWantsLegend(false)` keeps a plottable out of the legend altogether, also after it leaves a group.
+
 ## Backgrounds
 
 There are two backgrounds:

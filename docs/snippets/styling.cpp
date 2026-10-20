@@ -193,6 +193,44 @@ DOC_SNIPPET(styling_legend, 600, 360)
     // [/styling_legend]
 }
 
+DOC_SNIPPET(styling_legend_group, 600, 360)
+{
+    // [styling_legend_group]
+    auto curve = [&](double offset, Qt::PenStyle style, const QString& name)
+    {
+        QVector<double> x(200), y(200);
+        for (int i = 0; i < 200; ++i)
+        {
+            x[i] = i / 20.0;
+            y[i] = std::sin(x[i]) + offset;
+        }
+        QCPGraph* graph = customPlot->addGraph();
+        graph->setData(x, y);
+        graph->setPen(QPen(QColor(31, 119, 180), offset == 0 ? 2.5 : 1.5, style));
+        graph->setName(name);
+        return graph;
+    };
+    QCPPlottableGroup* model = customPlot->addPlottableGroup("model (median, min, max)");
+    model->addMember(curve(0.0, Qt::SolidLine, "median"));
+    model->addMember(curve(-0.3, Qt::DashLine, "min"));
+    model->addMember(curve(0.3, Qt::DashLine, "max"));
+
+    QCPGraph* zero = customPlot->addGraph();
+    zero->setData(QVector<double> { 0, 10 }, QVector<double> { 0, 0 });
+    zero->setPen(QPen(QColor(150, 150, 150), 1, Qt::DotLine));
+    zero->setWantsLegend(false); // context, not data: no row
+
+    // A double-click on the row reports it; here it hides or shows the whole model.
+    QObject::connect(model, &QCPPlottableGroup::doubleClicked, model,
+                     [model] { model->setVisible(!model->visible()); });
+
+    customPlot->legend->setVisible(true);
+    customPlot->rescaleAxes();
+    customPlot->yAxis->setRange(-1.6, 2.1);
+    customPlot->replot();
+    // [/styling_legend_group]
+}
+
 DOC_SNIPPET(styling_background, 600, 360)
 {
     // [styling_background]
