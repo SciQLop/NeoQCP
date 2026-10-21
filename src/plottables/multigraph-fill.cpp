@@ -214,7 +214,7 @@ std::pair<double, double> logZeroSideEdges(const QCPAxis& valueAxis)
 // a GPU pan, near enough to keep float precision; the scissor clips it.
 double baselinePixel(const QCPAxis& valueAxis, double value)
 {
-    if (valueAxis.scaleType() == QCPAxis::stLinear || value > 0)
+    if (valueAxis.scaleType() == QCPAxis::stLinear || value > 0 || std::isnan(value))
         return valueAxis.coordToPixel(value);
     const auto [edge, other] = logZeroSideEdges(valueAxis);
     return edge + 2.0 * (edge - other);

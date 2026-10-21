@@ -1365,15 +1365,16 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::fillRows(const Fill& fill,
 {
     const auto gaps = ds.gapsBefore(begin, end);
     const auto* targetColumn = std::get_if<int>(&fill.target);
-    const double constantPixel =
-        targetColumn ? 0.0 : qcp::fill::baselinePixel(*mValueAxis, std::get<double>(fill.target));
+    const auto edgePixel = [this](double value) {
+        return qcp::fill::baselinePixel(*mValueAxis, value);
+    };
+    const double constantPixel = targetColumn ? 0.0 : edgePixel(std::get<double>(fill.target));
     std::vector<qcp::fill::StripPoint> rows;
     rows.reserve(std::max(0, end - begin));
     for (int i = begin; i < end; ++i)
         rows.push_back({mKeyAxis->coordToPixel(ds.keyAt(i)),
-                        mValueAxis->coordToPixel(ds.valueAt(fill.owner, i)),
-                        targetColumn ? mValueAxis->coordToPixel(ds.valueAt(*targetColumn, i))
-                                     : constantPixel,
+                        edgePixel(ds.valueAt(fill.owner, i)),
+                        targetColumn ? edgePixel(ds.valueAt(*targetColumn, i)) : constantPixel,
                         gaps.size() > i - begin && gaps[i - begin] != 0});
     return rows;
 }

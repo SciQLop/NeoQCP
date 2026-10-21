@@ -66,6 +66,8 @@ private slots:
     void hidingAnEdgeRemovesTheFillAndShowingBringsItBack();
     void fillBreaksAtAKeyGap();
     void fillOnALogAxisClampsAZeroBaseline();
+    void bandEdgeAtZeroOnALogAxisReachesTheEdge();
+    void bandEdgeAtZeroOnALogAxisIsClampedLikeABaseline();
     void fillCacheIsRebuiltOnZoom();
     void defaultFillFollowsTheOwnerColourOnTheGpu();
     void autoScaleIncludesHiddenLineBandEdges();

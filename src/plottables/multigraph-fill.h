@@ -42,7 +42,8 @@ std::vector<StripPoint> stepped(std::span<const StripPoint> rows, Step step);
 //! On a log value axis: the edge pixel on the side of zero, then the opposite edge.
 std::pair<double, double> logZeroSideEdges(const QCPAxis& valueAxis);
 
-//! The pixel of a fill baseline at value; on a log axis a value <= 0 goes past the edge.
+//! The pixel of a fill edge or baseline at value; on a log axis a value <= 0 goes past the edge.
+//! NaN stays NaN, so a missing row still breaks the strip.
 double baselinePixel(const QCPAxis& valueAxis, double value);
 
 } // namespace qcp::fill

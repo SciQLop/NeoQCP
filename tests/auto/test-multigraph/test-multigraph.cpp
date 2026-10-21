@@ -3,6 +3,8 @@
 #include "datasource/soa-multi-datasource.h"
 #include "layoutelements/layoutelement-legend-group.h"
 #include "plottables/plottable-draw-utils.h"
+#include <cmath>
+#include <limits>
 #include <vector>
 #include <span>
 #include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
@@ -1203,6 +1205,43 @@ void TestMultiGraph::fillOnALogAxisClampsAZeroBaseline()
     const QRect r = mPlot->axisRect()->rect();
     QVERIFY(isRedish(img.pixelColor(r.center().x(), r.bottom() - 8))); // above the inward ticks
     QVERIFY(!isRedish(img.pixelColor(r.center().x(), int(mPlot->yAxis->coordToPixel(50)))));
+}
+
+static QCPMultiGraph* bandDownToZeroOnALogAxis(QCustomPlot* plot)
+{
+    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    mg->setData(std::vector<double>{1, 2, 3, 4},
+                std::vector<std::vector<double>>{{0, 0, nan, 0}, {10, 10, 10, 10}});
+    mg->setComponentFillBetween(1, 0, QBrush(Qt::red));
+    plot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    plot->xAxis->setRange(1, 4);
+    plot->yAxis->setRange(0.1, 100);
+    return mg;
+}
+
+void TestMultiGraph::bandEdgeAtZeroOnALogAxisReachesTheEdge()
+{
+    bandDownToZeroOnALogAxis(mPlot);
+    const QImage img = renderOf(mPlot);
+    const QRect r = mPlot->axisRect()->rect();
+    const int x = int(mPlot->xAxis->coordToPixel(1.5));
+    QVERIFY(isRedish(img.pixelColor(x, r.bottom() - 8))); // above the inward ticks
+    QVERIFY(!isRedish(img.pixelColor(x, int(mPlot->yAxis->coordToPixel(50)))));
+}
+
+// Clamped like a constant baseline at 0, two axis lengths out: a GPU pan translates the cached
+// strip, and an edge only 200 px out (coordToPixel's own guess) can come into view.
+void TestMultiGraph::bandEdgeAtZeroOnALogAxisIsClampedLikeABaseline()
+{
+    auto* mg = bandDownToZeroOnALogAxis(mPlot);
+    renderOf(mPlot); // lays the axis rect out
+    const auto rows = mg->fillRows(*mg->componentFill(1), *mg->dataSource(), 0, 4);
+    const double zeroBaseline = qcp::fill::baselinePixel(*mPlot->yAxis, 0.0);
+    QCOMPARE(rows[0].b, zeroBaseline);
+    QCOMPARE(rows[1].b, zeroBaseline);
+    QVERIFY(std::isnan(rows[2].b)); // a NaN row still breaks the strip
+    QCOMPARE(rows[3].b, zeroBaseline);
 }
 
 void TestMultiGraph::fillCacheIsRebuiltOnZoom()
