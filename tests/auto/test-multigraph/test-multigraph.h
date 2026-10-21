@@ -66,6 +66,7 @@ private slots:
     void fillBreaksAtAKeyGap();
     void fillOnALogAxisClampsAZeroBaseline();
     void fillCacheIsRebuiltOnZoom();
+    void defaultFillFollowsTheOwnerColourOnTheGpu();
     void autoScaleIncludesHiddenLineBandEdges();
     void fillFollowsADownsampledLine();
 

@@ -327,6 +327,14 @@ bool QCPMultiGraph::isValidColumn(int column) const
     return column >= 0 && (!source || column < source->columnCount());
 }
 
+// A default-brush fill takes its owner's pen colour, which the GPU vertices have baked in.
+bool QCPMultiGraph::hasDefaultBrushFill(int ownerCount) const
+{
+    return std::any_of(mFills.begin(), mFills.end(), [ownerCount](const FillEntry& e) {
+        return e.spec.owner < ownerCount && e.spec.brush.style() == Qt::NoBrush;
+    });
+}
+
 void QCPMultiGraph::decorationsChanged()
 {
     invalidateLines();
@@ -424,6 +432,8 @@ void QCPMultiGraph::setComponentColors(const QList<QColor>& colors)
         mComponents[i].pen.setColor(colors[i]);
         mComponents[i].selectedPen = defaultSelectedPen(mComponents[i].pen);
     }
+    if (hasDefaultBrushFill(n))
+        decorationsChanged();
 }
 
 void QCPMultiGraph::setComponentPens(const QList<QPen>& pens)
@@ -433,6 +443,8 @@ void QCPMultiGraph::setComponentPens(const QList<QPen>& pens)
         mComponents[i].pen = pens[i];
         mComponents[i].selectedPen = defaultSelectedPen(pens[i]);
     }
+    if (hasDefaultBrushFill(n))
+        decorationsChanged();
 }
 
 void QCPMultiGraph::setComponentInLegend(int index, bool inLegend)
@@ -1375,6 +1387,9 @@ void QCPMultiGraph::drawFillOnGpu(QCPPainter* painter, QCPPlottableRhiLayer* lay
 
 // Built from the current axes on every frame, so unlike the cached GPU vertices it needs no pan
 // offset.
+// simplify: O(rows in the cache window) per frame. Bounded by the binning to 4 rows per pixel, but
+// the rows are still walked: raw sources below the resample threshold, or any source on a log key
+// axis. Upgrade: cache the shaped rows per fill, like the GPU vertices, and translate them.
 void QCPMultiGraph::paintFill(QCPPainter* painter, const QBrush& brush,
                               std::span<const qcp::fill::StripPoint> rows) const
 {

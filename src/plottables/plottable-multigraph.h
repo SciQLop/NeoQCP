@@ -277,6 +277,7 @@ protected:
     bool setFill(Fill fill);
     bool isValidColumn(int column) const;
     void decorationsChanged();
+    [[nodiscard]] bool hasDefaultBrushFill(int ownerCount) const;
     void resizePerColumn(int nc, QVector<QVector<QPointF>>& lines, QVector<QVector<int>>& indices,
                          bool coloured);
     [[nodiscard]] std::pair<int, int> lineCacheWindow(const QCPAbstractMultiDataSource& ds) const;

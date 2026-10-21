@@ -1184,8 +1184,11 @@ void TestMultiGraph::fillBreaksAtAKeyGap()
     mg->setComponentFill(0, 0.0, QBrush(Qt::red));
     mPlot->xAxis->setRange(0, 23);
     mPlot->yAxis->setRange(-1, 6);
-    QVERIFY(!isRedish(renderOf(mPlot).pixelColor(int(mPlot->xAxis->coordToPixel(11)),
-                                                 int(mPlot->yAxis->coordToPixel(2)))));
+    const QImage img = renderOf(mPlot);
+    QVERIFY(isRedish(img.pixelColor(int(mPlot->xAxis->coordToPixel(1)),
+                                    int(mPlot->yAxis->coordToPixel(2)))));
+    QVERIFY(!isRedish(img.pixelColor(int(mPlot->xAxis->coordToPixel(11)),
+                                     int(mPlot->yAxis->coordToPixel(2)))));
 }
 
 void TestMultiGraph::fillOnALogAxisClampsAZeroBaseline()
@@ -1204,17 +1207,53 @@ void TestMultiGraph::fillOnALogAxisClampsAZeroBaseline()
 
 void TestMultiGraph::fillCacheIsRebuiltOnZoom()
 {
+    if (!showWithRhi(mPlot))
+        QSKIP("no exposed window with a QRhi in this environment");
     auto* mg = threeColumnGraph(mPlot);
     mg->setComponentFillBetween(1, 2, QBrush(Qt::red));
+    mPlot->xAxis->setRange(1, 3);
+    mPlot->yAxis->setRange(-1, 5);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    if (!mPlot->rhi())
-        QSKIP("no RHI in this environment");
+    QVERIFY(mPlot->plottableRhiLayer(mg->layer())); // the GPU branch ran, not only the export one
     const auto before = mg->mFills.first().verts;
     QVERIFY(!before.empty());
+
     mPlot->xAxis->setRange(1.5, 2.5);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(mg->mFills.first().verts != before);
-    QVERIFY(mPlot->plottableRhiLayer(mg->layer())); // the GPU branch ran, not only the export one
+    const auto zoomed = mg->mFills.first().verts;
+    QVERIFY(zoomed != before);
+
+    mPlot->xAxis->setRange(1.55, 2.55);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY2(mg->mFills.first().verts == zoomed, "a pan within the cache reuses the vertices");
+    const QImage frame = mPlot->grabFramebuffer();
+    QVERIFY(isRedish(frame.pixelColor(int(mPlot->xAxis->coordToPixel(2)),
+                                      int(mPlot->yAxis->coordToPixel(1.5)))));
+}
+
+void TestMultiGraph::defaultFillFollowsTheOwnerColourOnTheGpu()
+{
+    if (!showWithRhi(mPlot))
+        QSKIP("no exposed window with a QRhi in this environment");
+    auto* mg = threeColumnGraph(mPlot);
+    mg->setComponentColors({Qt::black, Qt::red, Qt::red});
+    mg->setComponentFillBetween(1, 2);
+    mPlot->xAxis->setRange(1, 3);
+    mPlot->yAxis->setRange(-1, 5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const QPoint inside(int(mPlot->xAxis->coordToPixel(2)), int(mPlot->yAxis->coordToPixel(1.5)));
+    const QColor red = mPlot->grabFramebuffer().pixelColor(inside);
+    QVERIFY2(red.red() > red.blue(), qPrintable(red.name()));
+
+    mg->setComponentColors({Qt::black, Qt::blue, Qt::blue});
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const QColor blue = mPlot->grabFramebuffer().pixelColor(inside);
+    QVERIFY2(blue.blue() > blue.red(), qPrintable(blue.name()));
+
+    mg->setComponentPens({QPen(Qt::black), QPen(Qt::red), QPen(Qt::red)});
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const QColor redAgain = mPlot->grabFramebuffer().pixelColor(inside);
+    QVERIFY2(redAgain.red() > redAgain.blue(), qPrintable(redAgain.name()));
 }
 
 void TestMultiGraph::autoScaleIncludesHiddenLineBandEdges()
