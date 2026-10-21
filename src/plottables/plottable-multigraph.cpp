@@ -12,6 +12,7 @@
 #include "../painting/viewport-offset.h"
 #include "../painting/scatter-rhi-layer.h"
 #include "../vector2d.h"
+#include <algorithm>
 
 static QPen defaultSelectedPen(const QPen& pen)
 {
@@ -303,7 +304,87 @@ void QCPMultiGraph::syncComponentCount(int newCount)
         }
     } else if (newCount < oldCount) {
         mComponents.resize(newCount);
+        dropDecorationsBeyond(newCount);
     }
+}
+
+// A decoration pointing at a column that no longer exists is dropped for good: a later, wider
+// source puts unrelated data in that column.
+void QCPMultiGraph::dropDecorationsBeyond(int columnCount)
+{
+    const auto outside = [columnCount](const FillEntry& e) {
+        const auto* col = std::get_if<int>(&e.spec.target);
+        return e.spec.owner >= columnCount || (col && *col >= columnCount);
+    };
+    mFills.erase(std::remove_if(mFills.begin(), mFills.end(), outside), mFills.end());
+}
+
+bool QCPMultiGraph::isValidColumn(int column) const
+{
+    return column >= 0 && (!mDataSource || column < mDataSource->columnCount());
+}
+
+void QCPMultiGraph::decorationsChanged()
+{
+    invalidateLines();
+    if (mLayer)
+        mLayer->invalidatePaintBuffer();
+}
+
+bool QCPMultiGraph::setFill(Fill fill)
+{
+    const auto* col = std::get_if<int>(&fill.target);
+    if (!isValidColumn(fill.owner) || (col && (!isValidColumn(*col) || *col == fill.owner)))
+        return false;
+    clearComponentFill(fill.owner);
+    mFills.append({std::move(fill), {}});
+    decorationsChanged();
+    return true;
+}
+
+bool QCPMultiGraph::setComponentFill(int owner, double value, const QBrush& brush)
+{
+    return setFill({owner, value, brush});
+}
+
+bool QCPMultiGraph::setComponentFillBetween(int owner, int target, const QBrush& brush)
+{
+    return setFill({owner, target, brush});
+}
+
+void QCPMultiGraph::setComponentFillBrush(int owner, const QBrush& brush)
+{
+    for (auto& e : mFills)
+        if (e.spec.owner == owner)
+            e.spec.brush = brush;
+    decorationsChanged();
+}
+
+void QCPMultiGraph::clearComponentFill(int owner)
+{
+    const auto before = mFills.size();
+    mFills.erase(std::remove_if(mFills.begin(), mFills.end(),
+                                [owner](const FillEntry& e) { return e.spec.owner == owner; }),
+                 mFills.end());
+    if (mFills.size() != before)
+        decorationsChanged();
+}
+
+std::optional<QCPMultiGraph::Fill> QCPMultiGraph::componentFill(int owner) const
+{
+    for (const auto& e : mFills)
+        if (e.spec.owner == owner)
+            return e.spec;
+    return std::nullopt;
+}
+
+QBrush QCPMultiGraph::effectiveFillBrush(const Fill& fill) const
+{
+    if (fill.brush.style() != Qt::NoBrush)
+        return fill.brush;
+    const QColor c = fill.owner < mComponents.size() ? mComponents[fill.owner].pen.color()
+                                                     : QColor(Qt::gray);
+    return QBrush(QColor(c.red(), c.green(), c.blue(), 64));
 }
 
 void QCPMultiGraph::updateBaseSelection()

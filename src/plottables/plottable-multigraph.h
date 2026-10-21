@@ -11,7 +11,10 @@
 #include <array>
 #include <atomic>
 #include <memory>
+#include <optional>
 #include <span>
+#include <variant>
+#include <vector>
 #include <QTimer>
 
 class QCP_LIB_DECL QCPMultiGraph : public QCPAbstractPlottable, public QCPPlottableInterface1D {
@@ -93,6 +96,20 @@ public:
     void setComponentNames(const QStringList& names);
     void setComponentColors(const QList<QColor>& colors);
     void setComponentPens(const QList<QPen>& pens);
+
+    struct Fill {
+        int owner = -1;
+        std::variant<double, int> target;   // a constant, or another column
+        QBrush brush;                       // Qt::NoBrush = owner pen colour at alpha 64
+    };
+    //! Fills between a column and a constant. False (nothing changed) for an unknown column.
+    bool setComponentFill(int owner, double value, const QBrush& brush = Qt::NoBrush);
+    //! Fills between two columns. One fill per owner: setting again replaces it.
+    bool setComponentFillBetween(int owner, int target, const QBrush& brush = Qt::NoBrush);
+    void setComponentFillBrush(int owner, const QBrush& brush);
+    void clearComponentFill(int owner);
+    [[nodiscard]] std::optional<Fill> componentFill(int owner) const;
+    [[nodiscard]] QBrush effectiveFillBrush(const Fill& fill) const;
 
     // Per-component value access (for tracers/tooltips)
     [[nodiscard]] double componentValueAt(int column, int index) const;
@@ -179,6 +196,11 @@ protected:
 protected:
     std::shared_ptr<QCPAbstractMultiDataSource> mDataSource;
     QVector<Component> mComponents;
+    struct FillEntry {
+        Fill spec;
+        std::vector<float> verts;   // triangle cache, rebuilt when lines change
+    };
+    QVector<FillEntry> mFills;
     mutable QVector<QCPDataSelection> mLastRectSelections; // per-component selections from selectTestRect
     LineStyle mLineStyle = lsLine;
     bool mAdaptiveSampling = true;
@@ -248,6 +270,10 @@ protected:
     void markPendingReady();
     void onL1Ready(uint64_t generation);
     void syncComponentCount(int newCount);
+    void dropDecorationsBeyond(int columnCount);
+    bool setFill(Fill fill);
+    bool isValidColumn(int column) const;
+    void decorationsChanged();
     void rebuildL2(const ViewportParams& vp);
     void onViewportChanged();
     bool pipelineBusy() const override { return mPipeline.isBusy(); }

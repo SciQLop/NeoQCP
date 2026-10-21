@@ -53,6 +53,13 @@ private slots:
     void legendIconDrawsScatterMarkers();
     void legendCollapsedFitsBusyIndicator();
 
+    // Fills
+    void fillRejectsBadColumns();
+    void fillBeforeDataIsKept();
+    void fillIsDroppedWhenItsColumnDisappears();
+    void fillDefaultBrushIsTheOwnerColourAtQuarterAlpha();
+    void fillReplacesAndClears();
+
     // Line cache
     void cacheExtendsBeyondVisibleRange();
     void zoomedOutLinesAreThinnedToThePixelWidth_data();

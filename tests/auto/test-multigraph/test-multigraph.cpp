@@ -1058,3 +1058,53 @@ void TestMultiGraph::legendSelectTestSurvivesNullMultiGraph()
     QVERIFY(item.selectTest(QPointF(5, 5), false, &details) >= 0);
     QCOMPARE(details.toMap().value("componentIndex").toInt(), -1);
 }
+
+void TestMultiGraph::fillRejectsBadColumns()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    QVERIFY(!mg->setComponentFillBetween(1, 1));
+    QVERIFY(!mg->setComponentFillBetween(0, 3));
+    QVERIFY(!mg->setComponentFillBetween(-1, 0));
+    QVERIFY(mg->setComponentFillBetween(1, 2));
+    QCOMPARE(std::get<int>(mg->componentFill(1)->target), 2);
+}
+
+void TestMultiGraph::fillBeforeDataIsKept()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    QVERIFY(mg->setComponentFillBetween(1, 2));
+    mg->setData(std::vector<double>{1, 2, 3},
+                std::vector<std::vector<double>>{{1, 2, 3}, {0, 1, 2}, {2, 3, 4}});
+    QVERIFY(mg->componentFill(1).has_value());
+}
+
+void TestMultiGraph::fillIsDroppedWhenItsColumnDisappears()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    QVERIFY(mg->setComponentFillBetween(1, 2));
+    mg->setData(std::vector<double>{1, 2}, std::vector<std::vector<double>>{{1, 2}, {0, 1}});
+    QVERIFY(!mg->componentFill(1).has_value());
+    mg->setData(std::vector<double>{1, 2},
+                std::vector<std::vector<double>>{{1, 2}, {0, 1}, {3, 4}});
+    QVERIFY(!mg->componentFill(1).has_value()); // shrinking is lossy
+}
+
+void TestMultiGraph::fillDefaultBrushIsTheOwnerColourAtQuarterAlpha()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    mg->setComponentColors({Qt::red, Qt::green, Qt::blue});
+    mg->setComponentFill(0, 0.0);
+    const QBrush b = mg->effectiveFillBrush(*mg->componentFill(0));
+    QCOMPARE(b.color().rgb(), QColor(Qt::red).rgb());
+    QCOMPARE(b.color().alpha(), 64);
+}
+
+void TestMultiGraph::fillReplacesAndClears()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    mg->setComponentFill(0, 1.0);
+    mg->setComponentFillBetween(0, 2);
+    QCOMPARE(std::get<int>(mg->componentFill(0)->target), 2);
+    mg->clearComponentFill(0);
+    QVERIFY(!mg->componentFill(0).has_value());
+}
