@@ -308,7 +308,7 @@ NeoQCP = static_library('NeoQCP',
            cpp_args:cpp_args,
            dependencies: [qtdeps, profiling_hook_dep] + optional_deps + latex_deps,
            install: true,
-           extra_files: [neoqcp_moc_headers, 'src/plottables/multigraph-fill.h', 'src/plottables/multigraph-errorbars.h', 'src/Profiling.hpp', 'src/painting/paintbuffer-rhi.h', 'src/painting/plottable-rhi-layer.h', 'src/painting/span-rhi-layer.h', 'src/painting/colormap-rhi-layer.h', 'src/painting/grid-rhi-layer.h', 'src/painting/scatter-rhi-layer.h']
+           extra_files: [neoqcp_moc_headers, 'src/plottables/multigraph-fill.h', 'src/datasource/histogram-binner-1d.h', 'src/plottables/multigraph-errorbars.h', 'src/Profiling.hpp', 'src/painting/paintbuffer-rhi.h', 'src/painting/plottable-rhi-layer.h', 'src/painting/span-rhi-layer.h', 'src/painting/colormap-rhi-layer.h', 'src/painting/grid-rhi-layer.h', 'src/painting/scatter-rhi-layer.h']
            )
 
 

@@ -17,6 +17,7 @@
 #include "test-multi-datasource/test-multi-datasource.h"
 #include "test-multigraph/test-multigraph.h"
 #include "test-fill-geometry/test-fill-geometry.h"
+#include "test-histogram1d/test-histogram1d.h"
 #include "test-errorbar-geometry/test-errorbar-geometry.h"
 #include "test-pipeline/test-pipeline.h"
 #include "test-waterfall/test-waterfall.h"
@@ -91,6 +92,7 @@ int main(int argc, char **argv)
   QCPTEST(TestMultiDataSource);
   QCPTEST(TestMultiGraph);
   QCPTEST(TestFillGeometry);
+  QCPTEST(TestHistogram1D);
   QCPTEST(TestErrorBarGeometry);
   QCPTEST(TestDataLocator);
   QCPTEST(TestHSpan);
