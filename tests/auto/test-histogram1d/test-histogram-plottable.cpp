@@ -182,6 +182,15 @@ void TestHistogramPlottable::logValueAxisRangeSkipsZeroHeights()
     QCOMPARE(r.lower, 4.0);
 }
 
+void TestHistogramPlottable::allZeroHeightsHaveNoValueRange()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    h->setBinned({0, 1, 2}, {{0, 0}});
+    bool found = true;
+    h->getValueRange(found);
+    QVERIFY(!found);
+}
+
 void TestHistogramPlottable::nonPositiveFixedRangeIsRejectedOnLogBins()
 {
     mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
@@ -293,6 +302,20 @@ void TestHistogramPlottable::exportBinningEmitsNothing()
     QCOMPARE(moved.count(), 0);
 }
 
+void TestHistogramPlottable::exportWhileBinningShowsTheNewData()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    h->setBins(1);
+    h->setFixedRange(QCPRange(0, 10));
+    h->setDataSource(values({1, 2}));
+    QVERIFY(waitForResult(h));
+    QVERIFY(settle(h));
+    h->setDataSource(values({1, 2, 3, 4, 5}));
+    QVERIFY(h->pipeline().isBusy());
+    mPlot->toPixmap(400, 300);
+    QCOMPARE(h->histogram()->heights[0][0], 5.0);
+}
+
 static bool isRedish(QColor c) { return c.red() > 150 && c.green() < 120 && c.blue() < 120; }
 
 void TestHistogramPlottable::barsAreDrawnUpToTheirHeight()
@@ -342,20 +365,17 @@ void TestHistogramPlottable::emptyBinsOnALogAxisStayOutOfTheOutline()
         QVERIFY(std::isnan(p.x()) || std::isfinite(p.y()));
 }
 
-void TestHistogramPlottable::clickInsideABarHitsAndAboveItMisses()
+// Drawing ignores the selection state, so a click must not select something that looks the same.
+void TestHistogramPlottable::aHistogramIsNotSelectable()
 {
     auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
     h->setBinned({0, 1, 2}, {{3, 6}});
     mPlot->xAxis->setRange(0, 2);
     mPlot->yAxis->setRange(0, 8);
     mPlot->replot();
-    const auto at = [&](double x, double y) {
-        return QPointF(mPlot->xAxis->coordToPixel(x), mPlot->yAxis->coordToPixel(y));
-    };
-    QCOMPARE(h->selectTest(at(0.5, 2), false), 0.0);
-    QCOMPARE(h->selectTest(at(0.5, 4.5), false), -1.0);
-    h->setSelectable(QCP::stNone);
-    QCOMPARE(h->selectTest(at(0.5, 2), true), -1.0);
+    const QPointF insideABar(mPlot->xAxis->coordToPixel(0.5), mPlot->yAxis->coordToPixel(2));
+    QCOMPARE(h->selectTest(insideABar, false), -1.0);
+    QCOMPARE(h->selectTest(insideABar, true), -1.0);
 }
 
 namespace {

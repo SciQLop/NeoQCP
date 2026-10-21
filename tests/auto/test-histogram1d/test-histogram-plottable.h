@@ -18,6 +18,7 @@ private slots:
     void emptyDataAfterDataHasNoRangeAndNoCrash();
     void exportBinsSynchronously();
     void logValueAxisRangeSkipsZeroHeights();
+    void allZeroHeightsHaveNoValueRange();
     void nonPositiveFixedRangeIsRejectedOnLogBins();
     void nonPositiveFixedRangeFallsBackToAutoWhenTheAxisTurnsLog();
     void autoEdgesNeverShrinkWhileJobsOverlap();
@@ -25,11 +26,12 @@ private slots:
     void preBinnedBarsDropAnOlderSourcesResultAndRange();
     void resetEdgesDropsAResultBinnedBeforeTheReset();
     void exportBinningEmitsNothing();
+    void exportWhileBinningShowsTheNewData();
     void barsAreDrawnUpToTheirHeight();
     void outlineRunsDoNotJoinBars();
     void stepOutlineIsTheTopProfile();
     void emptyBinsOnALogAxisStayOutOfTheOutline();
-    void clickInsideABarHitsAndAboveItMisses();
+    void aHistogramIsNotSelectable();
     void barsAreDrawnOnTheGpu();
     void emptyBinOnALinearAxisKeepsTheStepRun();
     void stepWithOneColumnIsTheOutlineOnly();

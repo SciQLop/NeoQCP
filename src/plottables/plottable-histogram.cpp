@@ -273,7 +273,7 @@ void QCPHistogram::draw(QCPPainter* painter)
 {
     PROFILE_HERE_N("QCPHistogram::draw");
     // Export does not pump the event loop, so a background result would never arrive.
-    if (!mResult && painter->modes().testFlag(QCPPainter::pmNoCaching))
+    if ((!mResult || mPipeline.isBusy()) && painter->modes().testFlag(QCPPainter::pmNoCaching))
         binForExport();
     if (!mResult || !mKeyAxis || !mValueAxis)
         return;
@@ -394,6 +394,8 @@ QCPRange QCPHistogram::getValueRange(bool& foundRange, QCP::SignDomain inSignDom
     if (!mResult)
         return {};
     const double upper = largest(mResult->heights);
+    if (!(upper > 0))
+        return {};
     if (inSignDomain != QCP::sdPositive)
     {
         foundRange = true;
@@ -406,14 +408,9 @@ QCPRange QCPHistogram::getValueRange(bool& foundRange, QCP::SignDomain inSignDom
     return QCPRange(*lower, upper);
 }
 
-double QCPHistogram::selectTest(const QPointF& pos, bool onlySelectable, QVariant*) const
+// simplify: not selectable in v1, draw() has no selected look. Hit-test the bar rects of
+// qcp::histogram::contains(columnBars(c), ...) when a selected look is added.
+double QCPHistogram::selectTest(const QPointF&, bool, QVariant*) const
 {
-    if ((onlySelectable && mSelectable == QCP::stNone) || !mResult || !mKeyAxis || !mValueAxis)
-        return -1;
-    if (!mKeyAxis->axisRect()->rect().contains(pos.toPoint()))
-        return -1;
-    for (int c = 0; c < int(mResult->heights.size()); ++c)
-        if (qcp::histogram::contains(columnBars(c), pos, keyIsVertical()))
-            return 0;
     return -1;
 }
