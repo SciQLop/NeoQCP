@@ -129,8 +129,10 @@ void QCPGroupLegendItem::selectEvent([[maybe_unused]] QMouseEvent* event,
     if (details.typeId() == QMetaType::QVariantMap)
         componentIndex = details.toMap().value(QStringLiteral("componentIndex"), -1).toInt();
 
-    if (componentIndex < 0 && mMultiGraph && mMultiGraph->legendComponents().size() == 1)
-        componentIndex = mMultiGraph->legendComponents().first(); // nothing to expand: a click selects the line, like a plain entry
+    const QVector<int> shown = mMultiGraph ? mMultiGraph->legendComponents() : QVector<int>();
+    // Nothing to expand: a click selects the line, like a plain entry
+    if (componentIndex < 0 && shown.size() == 1)
+        componentIndex = shown.first();
 
     if (componentIndex < 0) {
         // Header click: toggle expand/collapse

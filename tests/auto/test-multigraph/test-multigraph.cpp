@@ -1033,3 +1033,19 @@ void TestMultiGraph::legendOneInLegendComponentHasNoExpander()
     QVERIFY(!gi->shownExpanded());
     QVERIFY(!gi->headerRowText(false).startsWith(QString::fromUtf8("▾")));
 }
+
+void TestMultiGraph::legendHeaderClickSelectsTheOnlyInLegendComponent()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    mg->setComponentInLegend(0, false);
+    mg->setComponentInLegend(2, false);
+    mg->addToLegend(mPlot->legend);
+    auto* gi = groupItemOf(mPlot, mg);
+    QSignalSpy clicked(gi, &QCPGroupLegendItem::componentClicked);
+    QVariantMap details;
+    details[QStringLiteral("componentIndex")] = -1;
+    gi->selectEvent(nullptr, false, details, nullptr);
+    QCOMPARE(clicked.count(), 1);
+    QCOMPARE(clicked.first().first().toInt(), 1);
+    QCOMPARE(gi->selectedComponent(), 1);
+}
