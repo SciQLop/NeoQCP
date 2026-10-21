@@ -294,7 +294,7 @@ protected:
     void stagePendingSource(std::shared_ptr<QCPAbstractMultiDataSource> source);
     void markPendingReady();
     void onL1Ready(uint64_t generation);
-    void syncComponentCount(int newCount);
+    void syncComponentCount(const QCPAbstractMultiDataSource* source);
     void dropDecorationsBeyond(int columnCount);
     bool setFill(Fill fill);
     bool isValidColumn(int column) const;

@@ -1394,6 +1394,21 @@ void TestMultiGraph::errorBarsAreDroppedWhenABoundColumnDisappears()
     QVERIFY(!mg->componentErrorBars(0).has_value());
 }
 
+void TestMultiGraph::anEmptySourceKeepsFillsAndErrorBars()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    QVERIFY(mg->setComponentFill(2, 0.0));
+    QVERIFY(mg->setComponentErrorBars(0, 1, 2));
+    mg->setData(std::vector<double>{}, std::vector<std::vector<double>>{{}});
+    mg->setDataSource(std::shared_ptr<QCPAbstractMultiDataSource>());
+    mg->setData(std::vector<double>{1, 2, 3},
+                std::vector<std::vector<double>>{{1, 2, 3}, {0, 1, 2}, {2, 3, 4}});
+    QVERIFY(mg->componentFill(2).has_value());
+    QVERIFY(mg->componentErrorBars(0).has_value());
+    mg->setData(std::vector<double>{1, 2}, std::vector<std::vector<double>>{{1, 2}, {0, 1}});
+    QVERIFY(!mg->componentFill(2).has_value()); // a non-empty narrower source is still lossy
+}
+
 void TestMultiGraph::errorBarsRejectBadColumns()
 {
     auto* mg = threeColumnGraph(mPlot);

@@ -77,6 +77,7 @@ private slots:
     void errorBoundsBelowZeroOnALogAxisReachTheEdge();
     void selectedErrorBarsUseTheSelectedPen();
     void errorBarsAreDroppedWhenABoundColumnDisappears();
+    void anEmptySourceKeepsFillsAndErrorBars();
     void errorBarsRejectBadColumns();
     void capWidthChangeShowsOnTheNextFrame();
     void errorBarsAreCachedOnTheGpu();

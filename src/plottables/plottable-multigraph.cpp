@@ -131,7 +131,7 @@ void QCPMultiGraph::applySourceNow(std::shared_ptr<QCPAbstractMultiDataSource> s
     applyColorSizeRule(mDataSource ? mDataSource->size() : 0);
     invalidateLines();
     mL2HasOrigin = false;
-    syncComponentCount(mDataSource ? mDataSource->columnCount() : 0);
+    syncComponentCount(mDataSource.get());
     mL1Cache.reset();
     mL2Result.reset();
     mL2Dirty = false;
@@ -157,7 +157,7 @@ void QCPMultiGraph::stagePendingSource(std::shared_ptr<QCPAbstractMultiDataSourc
     // for it) was staged before; setColorValues() re-stashes if called again.
     mPendingColorValues.reset();
     mPendingReady = false;
-    syncComponentCount(mPendingSource->columnCount());
+    syncComponentCount(mPendingSource.get());
     ensureL1TransformMulti(mPipeline, mPendingSource->size(), mPendingSource->columnCount(), mWantOrigin);
     mPipeline.setSource(mPendingSource);
     // Without a transform setSource() does not bump the generation, so a job
@@ -285,8 +285,9 @@ void QCPMultiGraph::onViewportChanged()
     }
 }
 
-void QCPMultiGraph::syncComponentCount(int newCount)
+void QCPMultiGraph::syncComponentCount(const QCPAbstractMultiDataSource* source)
 {
+    const int newCount = source ? source->columnCount() : 0;
     int oldCount = mComponents.size();
     if (newCount > oldCount) {
         mComponents.resize(newCount);
@@ -301,7 +302,9 @@ void QCPMultiGraph::syncComponentCount(int newCount)
         }
     } else if (newCount < oldCount) {
         mComponents.resize(newCount);
-        dropDecorationsBeyond(newCount);
+        // An empty fetch window says nothing about the columns: keep what they carry.
+        if (source && source->size() > 0)
+            dropDecorationsBeyond(newCount);
     }
 }
 
