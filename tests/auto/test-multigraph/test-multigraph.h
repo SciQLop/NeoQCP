@@ -60,6 +60,14 @@ private slots:
     void fillDefaultBrushIsTheOwnerColourAtQuarterAlpha();
     void fillReplacesAndClears();
     void fillValidatesAgainstTheStagedSource();
+    void fillToZeroColoursBelowTheCurveOnly();
+    void hiddenEdgeLinesKeepTheirFill();
+    void hidingAnEdgeRemovesTheFillAndShowingBringsItBack();
+    void fillBreaksAtAKeyGap();
+    void fillOnALogAxisClampsAZeroBaseline();
+    void fillCacheIsRebuiltOnZoom();
+    void autoScaleIncludesHiddenLineBandEdges();
+    void fillFollowsADownsampledLine();
 
     // Line cache
     void cacheExtendsBeyondVisibleRange();

@@ -1122,3 +1122,130 @@ void TestMultiGraph::fillValidatesAgainstTheStagedSource()
     stage(mg, 4);
     QVERIFY(mg->setComponentFillBetween(0, 3));
 }
+
+static QImage renderOf(QCustomPlot* plot)
+{
+    return plot->toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+}
+
+static bool isRedish(QColor c) { return c.red() > 150 && c.green() < 120 && c.blue() < 120; }
+
+void TestMultiGraph::fillToZeroColoursBelowTheCurveOnly()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    std::vector<double> x(200), y(200);
+    for (int i = 0; i < 200; ++i) { x[i] = i; y[i] = 5.0; }
+    mg->setData(std::move(x), std::vector<std::vector<double>>{std::move(y)});
+    mg->setComponentColors({Qt::red});
+    mg->setComponentFill(0, 0.0, QBrush(Qt::red));
+    mPlot->xAxis->setRange(0, 199);
+    mPlot->yAxis->setRange(-5, 10);
+    const QImage img = renderOf(mPlot);
+    const QRect r = mPlot->axisRect()->rect();
+    const int xm = r.center().x();
+    QVERIFY(isRedish(img.pixelColor(xm, int(mPlot->yAxis->coordToPixel(2.5)))));
+    QVERIFY(!isRedish(img.pixelColor(xm, int(mPlot->yAxis->coordToPixel(7.5)))));
+    QVERIFY(!isRedish(img.pixelColor(xm, int(mPlot->yAxis->coordToPixel(-2.5)))));
+}
+
+void TestMultiGraph::hiddenEdgeLinesKeepTheirFill()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    mg->setComponentLineStyle(1, QCPMultiGraph::lsNone);
+    mg->setComponentLineStyle(2, QCPMultiGraph::lsNone);
+    mg->setComponentFillBetween(1, 2, QBrush(Qt::red));
+    mPlot->xAxis->setRange(1, 3);
+    mPlot->yAxis->setRange(-1, 5);
+    const QImage img = renderOf(mPlot);
+    // y = 1.5, not 2: the probe must miss column 0's line, which goes through (2, 2).
+    QVERIFY(isRedish(img.pixelColor(int(mPlot->xAxis->coordToPixel(2)),
+                                    int(mPlot->yAxis->coordToPixel(1.5)))));
+}
+
+void TestMultiGraph::hidingAnEdgeRemovesTheFillAndShowingBringsItBack()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    mg->setComponentFillBetween(1, 2, QBrush(Qt::red));
+    mPlot->xAxis->setRange(1, 3);
+    mPlot->yAxis->setRange(-1, 5);
+    renderOf(mPlot); // lays the axis rect out before the probe is placed
+    const QPoint inside(int(mPlot->xAxis->coordToPixel(2)), int(mPlot->yAxis->coordToPixel(1.5)));
+    mg->setComponentVisible(2, false);
+    QVERIFY(!isRedish(renderOf(mPlot).pixelColor(inside)));
+    mg->setComponentVisible(2, true);
+    QVERIFY(isRedish(renderOf(mPlot).pixelColor(inside)));
+}
+
+void TestMultiGraph::fillBreaksAtAKeyGap()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double>{0, 1, 2, 3, 20, 21, 22, 23},
+                std::vector<std::vector<double>>{{5, 5, 5, 5, 5, 5, 5, 5}});
+    mg->setComponentFill(0, 0.0, QBrush(Qt::red));
+    mPlot->xAxis->setRange(0, 23);
+    mPlot->yAxis->setRange(-1, 6);
+    QVERIFY(!isRedish(renderOf(mPlot).pixelColor(int(mPlot->xAxis->coordToPixel(11)),
+                                                 int(mPlot->yAxis->coordToPixel(2)))));
+}
+
+void TestMultiGraph::fillOnALogAxisClampsAZeroBaseline()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double>{1, 2, 3}, std::vector<std::vector<double>>{{10, 10, 10}});
+    mg->setComponentFill(0, 0.0, QBrush(Qt::red));
+    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setRange(1, 3);
+    mPlot->yAxis->setRange(0.1, 100);
+    const QImage img = renderOf(mPlot);
+    const QRect r = mPlot->axisRect()->rect();
+    QVERIFY(isRedish(img.pixelColor(r.center().x(), r.bottom() - 8))); // above the inward ticks
+    QVERIFY(!isRedish(img.pixelColor(r.center().x(), int(mPlot->yAxis->coordToPixel(50)))));
+}
+
+void TestMultiGraph::fillCacheIsRebuiltOnZoom()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    mg->setComponentFillBetween(1, 2, QBrush(Qt::red));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    if (!mPlot->rhi())
+        QSKIP("no RHI in this environment");
+    const auto before = mg->mFills.first().verts;
+    QVERIFY(!before.empty());
+    mPlot->xAxis->setRange(1.5, 2.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(mg->mFills.first().verts != before);
+    QVERIFY(mPlot->plottableRhiLayer(mg->layer())); // the GPU branch ran, not only the export one
+}
+
+void TestMultiGraph::autoScaleIncludesHiddenLineBandEdges()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    mg->setComponentLineStyle(2, QCPMultiGraph::lsNone);
+    bool found = false;
+    QCOMPARE(mg->getValueRange(found).upper, 4.0);
+}
+
+void TestMultiGraph::fillFollowsADownsampledLine()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    const int n = 500'000;
+    const double period = n / 5.0;
+    std::vector<double> keys(n), values(n);
+    for (int i = 0; i < n; ++i)
+    {
+        keys[i] = i;
+        values[i] = std::sin(2 * M_PI * i / period);
+    }
+    mg->setData(std::move(keys), std::vector<std::vector<double>>{std::move(values)});
+    mg->setComponentFill(0, 0.0, QBrush(Qt::red));
+    mPlot->xAxis->setRange(0, n);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->pipeline().isBusy(), 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY2(mg->mL2Result, "the test needs the L2 path");
+    const QImage img = renderOf(mPlot);
+    const int crest = int(mPlot->xAxis->coordToPixel(period / 4));
+    QVERIFY(isRedish(img.pixelColor(crest, int(mPlot->yAxis->coordToPixel(0.5)))));
+    QVERIFY(!isRedish(img.pixelColor(crest, int(mPlot->yAxis->coordToPixel(1.3)))));
+}

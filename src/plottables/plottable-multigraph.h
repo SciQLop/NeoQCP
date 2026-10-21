@@ -8,6 +8,7 @@
 #include "datasource/graph-resampler.h"
 #include "plottable-draw-utils.h"
 #include "plottable-color-mapper.h"
+#include "multigraph-fill.h"
 #include <array>
 #include <atomic>
 #include <memory>
@@ -16,6 +17,8 @@
 #include <variant>
 #include <vector>
 #include <QTimer>
+
+class QCPPlottableRhiLayer;
 
 class QCP_LIB_DECL QCPMultiGraph : public QCPAbstractPlottable, public QCPPlottableInterface1D {
     Q_OBJECT
@@ -274,6 +277,24 @@ protected:
     bool setFill(Fill fill);
     bool isValidColumn(int column) const;
     void decorationsChanged();
+    void resizePerColumn(int nc, QVector<QVector<QPointF>>& lines, QVector<QVector<int>>& indices,
+                         bool coloured);
+    [[nodiscard]] std::pair<int, int> lineCacheWindow(const QCPAbstractMultiDataSource& ds) const;
+    [[nodiscard]] bool fillDrawable(const Fill& fill, int columnCount) const;
+    [[nodiscard]] double fillBaselinePixel(double value) const;
+    [[nodiscard]] static qcp::fill::Step ownerStep(const Component& owner);
+    [[nodiscard]] std::vector<qcp::fill::StripPoint> fillRows(const Fill& fill,
+                                                              const QCPAbstractMultiDataSource& ds,
+                                                              int begin, int end) const;
+    [[nodiscard]] std::vector<qcp::fill::StripPoint> shapedFillRows(
+        const Fill& fill, const QCPAbstractMultiDataSource& ds, int begin, int end) const;
+    void drawFills(QCPPainter* painter, const QCPAbstractMultiDataSource& ds, int begin, int end,
+                   bool fresh, const QPointF& gpuOffset, bool isExportMode);
+    void drawFillOnGpu(QCPPainter* painter, QCPPlottableRhiLayer* layer, FillEntry& entry,
+                       const QBrush& brush, const QCPAbstractMultiDataSource& ds, int begin,
+                       int end, bool fresh, const QPointF& gpuOffset);
+    void paintFill(QCPPainter* painter, const QBrush& brush,
+                   std::span<const qcp::fill::StripPoint> rows) const;
     void rebuildL2(const ViewportParams& vp);
     void onViewportChanged();
     bool pipelineBusy() const override { return mPipeline.isBusy(); }

@@ -11,6 +11,8 @@
 #include "../painting/painter.h"
 #include "../painting/viewport-offset.h"
 #include "../painting/scatter-rhi-layer.h"
+#include "../painting/plottable-rhi-layer.h"
+#include "../painting/rhi-utils.h"
 #include "../vector2d.h"
 #include <algorithm>
 
@@ -1118,24 +1120,19 @@ void QCPMultiGraph::draw(QCPPainter* painter)
     auto& linesTarget = isExportMode ? exportLines : mCachedLines;
     auto& indicesTarget = isExportMode ? exportIndices : mCachedIndices;
 
+    const auto [cacheBegin, cacheEnd] = lineCacheWindow(*ds);
     if (needFreshLines)
     {
-        const QCPRange cacheRange = qcp::algo::lineCacheKeyRange(
-            keyRange, mKeyAxis->scaleType() == QCPAxis::stLogarithmic);
-        int cacheBegin = ds->findBegin(cacheRange.lower);
-        int cacheEnd = ds->findEnd(cacheRange.upper);
-
         // The pending source may carry more columns than the displayed one
         // (mComponents was already synced to it) — clamp so a mid-window
         // replot never reads past the displayed source's columns.
         const int nc = qMin(mComponents.size(), ds->columnCount());
-        linesTarget.resize(nc);
+        resizePerColumn(nc, linesTarget, indicesTarget, coloured);
 
         bool allVisible = true;
         for (int c = 0; c < nc; ++c)
             if (!mComponents[c].visible) { allVisible = false; break; }
 
-        indicesTarget.resize(coloured ? nc : 0);
         if (coloured)
         {
             for (int c = 0; c < nc; ++c)
@@ -1173,18 +1170,19 @@ void QCPMultiGraph::draw(QCPPainter* painter)
             mLineCacheDirty = false;
             mCachedPlotSize = currentPlotSize;
             for (auto& ec : mExtrusionCaches) ec.clear();
+            for (auto& fill : mFills) fill.verts.clear();
             gpuOffset = {};
         }
     }
 
-    mExtrusionCaches.resize(mComponents.size());
+    drawFills(painter, *ds, cacheBegin, cacheEnd, needFreshLines, gpuOffset, isExportMode);
 
     for (int c = 0; c < mComponents.size(); ++c) {
         const auto& comp = mComponents[c];
         if (!comp.visible) continue;
         if (comp.lineStyle == lsNone && comp.scatterStyle.isNone()) continue;
 
-        if (c >= linesTarget.size()) continue;
+        if (c >= linesTarget.size() || c >= mExtrusionCaches.size()) continue;
         const QVector<QPointF>& dataLines = linesTarget[c];
         if (dataLines.isEmpty()) continue;
         // Defensive: indices that do not match the lines are never used.
@@ -1260,6 +1258,133 @@ void QCPMultiGraph::draw(QCPPainter* painter)
             }
         }
     }
+}
+
+void QCPMultiGraph::resizePerColumn(int nc, QVector<QVector<QPointF>>& lines,
+                                    QVector<QVector<int>>& indices, bool coloured)
+{
+    lines.resize(nc);
+    indices.resize(coloured ? nc : 0);
+    mExtrusionCaches.resize(nc);
+}
+
+std::pair<int, int> QCPMultiGraph::lineCacheWindow(const QCPAbstractMultiDataSource& ds) const
+{
+    const QCPRange cacheRange = qcp::algo::lineCacheKeyRange(
+        mKeyAxis->range(), mKeyAxis->scaleType() == QCPAxis::stLogarithmic);
+    return {ds.findBegin(cacheRange.lower), ds.findEnd(cacheRange.upper)};
+}
+
+bool QCPMultiGraph::fillDrawable(const Fill& fill, int columnCount) const
+{
+    const auto shown = [&](int column) {
+        return column >= 0 && column < columnCount && column < mComponents.size()
+            && mComponents[column].visible;
+    };
+    const auto* target = std::get_if<int>(&fill.target);
+    return shown(fill.owner) && mComponents[fill.owner].lineStyle != lsImpulse
+        && (!target || shown(*target));
+}
+
+// A log axis has no pixel for a value <= 0: the baseline goes two axis lengths past the edge on
+// the side of zero, as QCPGraph::getFillBasePoint picks it. Far enough to stay off screen during
+// a GPU pan, near enough to keep float precision; the scissor clips it.
+double QCPMultiGraph::fillBaselinePixel(double value) const
+{
+    if (mValueAxis->scaleType() == QCPAxis::stLinear || value > 0)
+        return mValueAxis->coordToPixel(value);
+    const QCPRange range = mValueAxis->range();
+    const bool positive = range.upper > 0;
+    const double edge = mValueAxis->coordToPixel(positive ? range.lower : range.upper);
+    const double other = mValueAxis->coordToPixel(positive ? range.upper : range.lower);
+    return edge + 2.0 * (edge - other);
+}
+
+qcp::fill::Step QCPMultiGraph::ownerStep(const Component& owner)
+{
+    switch (owner.lineStyle) {
+        case lsStepLeft:   return qcp::fill::Step::Left;
+        case lsStepRight:  return qcp::fill::Step::Right;
+        case lsStepCenter: return qcp::fill::Step::Center;
+        default:           return qcp::fill::Step::None;
+    }
+}
+
+std::vector<qcp::fill::StripPoint> QCPMultiGraph::fillRows(const Fill& fill,
+                                                           const QCPAbstractMultiDataSource& ds,
+                                                           int begin, int end) const
+{
+    const auto gaps = ds.gapsBefore(begin, end);
+    const auto* targetColumn = std::get_if<int>(&fill.target);
+    const double constantPixel = targetColumn ? 0.0 : fillBaselinePixel(std::get<double>(fill.target));
+    std::vector<qcp::fill::StripPoint> rows;
+    rows.reserve(std::max(0, end - begin));
+    for (int i = begin; i < end; ++i)
+        rows.push_back({mKeyAxis->coordToPixel(ds.keyAt(i)),
+                        mValueAxis->coordToPixel(ds.valueAt(fill.owner, i)),
+                        targetColumn ? mValueAxis->coordToPixel(ds.valueAt(*targetColumn, i))
+                                     : constantPixel,
+                        gaps.size() > i - begin && gaps[i - begin] != 0});
+    return rows;
+}
+
+// Binned when the rows outnumber 4 per pixel, the lines' own L2 density (kLevel2PixelMultiplier).
+std::vector<qcp::fill::StripPoint> QCPMultiGraph::shapedFillRows(
+    const Fill& fill, const QCPAbstractMultiDataSource& ds, int begin, int end) const
+{
+    const QRect rect = mKeyAxis->axisRect()->rect();
+    const int pixelLength = mKeyAxis->orientation() == Qt::Vertical ? rect.height() : rect.width();
+    auto rows = fillRows(fill, ds, begin, end);
+    if (end - begin > 4 * pixelLength)
+        rows = qcp::fill::binToSpans(rows, 0.25);
+    return qcp::fill::stepped(rows, ownerStep(mComponents[fill.owner]));
+}
+
+void QCPMultiGraph::drawFills(QCPPainter* painter, const QCPAbstractMultiDataSource& ds, int begin,
+                              int end, bool fresh, const QPointF& gpuOffset, bool isExportMode)
+{
+    auto* gpuLayer = mParentPlot && mParentPlot->rhi() && !isExportMode
+        ? mParentPlot->plottableRhiLayer(mLayer) : nullptr;
+    for (auto& entry : mFills) {
+        if (!fillDrawable(entry.spec, ds.columnCount())) continue;
+        const QBrush brush = effectiveFillBrush(entry.spec);
+        if (brush.style() == Qt::NoBrush || brush.color().alpha() == 0) continue;
+        // The GPU fill is one flat colour: gradients and patterns are painted with QPainter.
+        if (gpuLayer && brush.style() == Qt::SolidPattern)
+            drawFillOnGpu(painter, gpuLayer, entry, brush, ds, begin, end, fresh, gpuOffset);
+        else
+            paintFill(painter, brush, shapedFillRows(entry.spec, ds, begin, end));
+    }
+}
+
+void QCPMultiGraph::drawFillOnGpu(QCPPainter* painter, QCPPlottableRhiLayer* layer,
+                                  FillEntry& entry, const QBrush& brush,
+                                  const QCPAbstractMultiDataSource& ds, int begin, int end,
+                                  bool fresh, const QPointF& gpuOffset)
+{
+    if (fresh)
+        qcp::fill::appendStrip(shapedFillRows(entry.spec, ds, begin, end),
+                               mKeyAxis->orientation() == Qt::Vertical,
+                               qcp::rhi::premultipliedColor(brush.color()), entry.verts);
+    if (entry.verts.empty())
+        return;
+    layer->addPlottable(entry.verts, {}, clipRect(), mParentPlot->bufferDevicePixelRatio(),
+                        mParentPlot->rhiOutputSize().height(), float(gpuOffset.x()),
+                        float(gpuOffset.y()), float(painter->opacity()));
+}
+
+// Built from the current axes on every frame, so unlike the cached GPU vertices it needs no pan
+// offset.
+void QCPMultiGraph::paintFill(QCPPainter* painter, const QBrush& brush,
+                              std::span<const qcp::fill::StripPoint> rows) const
+{
+    painter->save();
+    applyFillAntialiasingHint(painter);
+    painter->setPen(Qt::NoPen);
+    painter->setBrush(brush);
+    for (const QPolygonF& polygon : qcp::fill::stripPolygons(rows, mKeyAxis->orientation() == Qt::Vertical))
+        painter->drawPolygon(polygon);
+    painter->restore();
 }
 
 void QCPMultiGraph::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
