@@ -322,7 +322,7 @@ void TestHistogramPlottable::exportBinningEmitsNothing()
     QSignalSpy ready(h, &QCPHistogram::histogramReady);
     QSignalSpy moved(h, &QCPHistogram::edgesChanged);
     h->setDataSource(values({0, 1, 2, 3}));
-    mPlot->toPixmap(400, 300);
+    QVERIFY(!mPlot->toPixmap(400, 300).isNull());
     QVERIFY(h->histogram());
     QCOMPARE(ready.count(), 0);
     QCOMPARE(moved.count(), 0);
@@ -338,7 +338,7 @@ void TestHistogramPlottable::exportWhileBinningShowsTheNewData()
     QVERIFY(settle(h));
     h->setDataSource(values({1, 2, 3, 4, 5}));
     QVERIFY(h->pipeline().isBusy());
-    mPlot->toPixmap(400, 300);
+    QVERIFY(!mPlot->toPixmap(400, 300).isNull());
     QCOMPARE(h->histogram()->heights[0][0], 5.0);
 }
 
