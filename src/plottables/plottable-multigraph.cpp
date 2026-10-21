@@ -1460,12 +1460,12 @@ QPen QCPMultiGraph::errorBarPen(const ErrorBars& spec) const
     return spec.pen.value_or(mComponents[spec.value].pen);
 }
 
-// A log axis has no pixel for a value <= 0: a bound there stops at the axis edge.
-double QCPMultiGraph::errorPixel(double value) const
+// A log axis has no pixel for a value <= 0: a bar's bound there stops at the axis edge.
+double QCPMultiGraph::errorPixel(const QCPAxis& valueAxis, double value)
 {
-    if (mValueAxis->scaleType() == QCPAxis::stLinear || value > 0 || std::isnan(value))
-        return mValueAxis->coordToPixel(value);
-    return qcp::fill::logZeroSideEdges(*mValueAxis).first;
+    if (valueAxis.scaleType() == QCPAxis::stLinear || value > 0 || std::isnan(value))
+        return valueAxis.coordToPixel(value);
+    return qcp::fill::logZeroSideEdges(valueAxis).first;
 }
 
 static bool bothFinite(double a, double b) { return std::isfinite(a) && std::isfinite(b); }
@@ -1473,16 +1473,17 @@ static double lowerAtMost(double lower, double y) { return bothFinite(lower, y) 
 static double upperAtLeast(double upper, double y) { return bothFinite(upper, y) ? std::max(upper, y) : upper; }
 
 std::vector<qcp::errorbars::Bar> QCPMultiGraph::errorBarRows(
-    const ErrorBars& spec, const QCPAbstractMultiDataSource& ds, int begin, int end) const
+    const ErrorBars& spec, const QCPAbstractMultiDataSource& ds, int begin, int end,
+    BoundPixel boundPixel) const
 {
     std::vector<qcp::errorbars::Bar> bars;
     bars.reserve(std::max(0, end - begin));
     for (int i = begin; i < end; ++i)
     {
         const double y = ds.valueAt(spec.value, i);
-        bars.push_back({mKeyAxis->coordToPixel(ds.keyAt(i)), errorPixel(y),
-                        errorPixel(lowerAtMost(ds.valueAt(spec.lower, i), y)),
-                        errorPixel(upperAtLeast(ds.valueAt(spec.upper, i), y))});
+        bars.push_back({mKeyAxis->coordToPixel(ds.keyAt(i)), boundPixel(*mValueAxis, y),
+                        boundPixel(*mValueAxis, lowerAtMost(ds.valueAt(spec.lower, i), y)),
+                        boundPixel(*mValueAxis, upperAtLeast(ds.valueAt(spec.upper, i), y))});
     }
     return bars;
 }
@@ -1502,9 +1503,9 @@ bool QCPMultiGraph::errorBarsFitInView(std::span<const qcp::errorbars::Bar> bars
 }
 
 std::vector<qcp::fill::StripPoint> QCPMultiGraph::errorBandRows(
-    std::span<const qcp::errorbars::Bar> bars, const QCPAbstractMultiDataSource& ds, int begin,
-    int end) const
+    const ErrorBars& spec, const QCPAbstractMultiDataSource& ds, int begin, int end) const
 {
+    const auto bars = errorBarRows(spec, ds, begin, end, &qcp::fill::baselinePixel);
     const auto gaps = ds.gapsBefore(begin, end);
     std::vector<qcp::fill::StripPoint> rows;
     rows.reserve(bars.size());
@@ -1527,18 +1528,20 @@ void QCPMultiGraph::drawErrorBars(QCPPainter* painter, const QCPAbstractMultiDat
     const bool rebuild = fresh || isExportMode;
     for (auto& entry : mErrorBars) {
         if (!errorBarsDrawable(entry.spec, ds.columnCount())) continue;
-        const bool needRows = rebuild || (entry.asBand && !gpuLayer);
-        const auto bars = needRows ? errorBarRows(entry.spec, ds, begin, end)
+        // A band builds its own rows: its bounds <= 0 on a log axis go past the edge, not to it.
+        const bool checkFit = rebuild && rawRows;
+        const auto bars = checkFit ? errorBarRows(entry.spec, ds, begin, end)
                                    : std::vector<qcp::errorbars::Bar>{};
         const bool asBand = rebuild
-            ? !(rawRows && errorBarsFitInView(bars, 3 * entry.spec.capWidthPx))
+            ? !(checkFit && errorBarsFitInView(bars, 3 * entry.spec.capWidthPx))
             : entry.asBand;
         if (!isExportMode)
             entry.asBand = asBand;
+        const bool needBandRows = rebuild || !gpuLayer;
         if (asBand)
             drawBarsAsBand(painter, gpuLayer, entry,
-                           needRows ? errorBandRows(bars, ds, begin, end)
-                                    : std::vector<qcp::fill::StripPoint>{},
+                           needBandRows ? errorBandRows(entry.spec, ds, begin, end)
+                                        : std::vector<qcp::fill::StripPoint>{},
                            fresh, gpuOffset);
         else
             drawBarsAsPolylines(painter, entry, bars, fresh, gpuOffset, isExportMode);

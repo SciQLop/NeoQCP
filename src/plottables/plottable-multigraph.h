@@ -322,14 +322,15 @@ protected:
                    std::span<const qcp::fill::StripPoint> rows) const;
     [[nodiscard]] bool errorBarsDrawable(const ErrorBars& spec, int columnCount) const;
     [[nodiscard]] QPen errorBarPen(const ErrorBars& spec) const;
-    [[nodiscard]] double errorPixel(double value) const;
+    using BoundPixel = double (*)(const QCPAxis& valueAxis, double value);
+    [[nodiscard]] static double errorPixel(const QCPAxis& valueAxis, double value);
     [[nodiscard]] std::vector<qcp::errorbars::Bar> errorBarRows(
-        const ErrorBars& spec, const QCPAbstractMultiDataSource& ds, int begin, int end) const;
+        const ErrorBars& spec, const QCPAbstractMultiDataSource& ds, int begin, int end,
+        BoundPixel boundPixel = &errorPixel) const;
     [[nodiscard]] bool errorBarsFitInView(std::span<const qcp::errorbars::Bar> bars,
                                           double minSpacingPx) const;
     [[nodiscard]] std::vector<qcp::fill::StripPoint> errorBandRows(
-        std::span<const qcp::errorbars::Bar> bars, const QCPAbstractMultiDataSource& ds,
-        int begin, int end) const;
+        const ErrorBars& spec, const QCPAbstractMultiDataSource& ds, int begin, int end) const;
     void drawErrorBars(QCPPainter* painter, const QCPAbstractMultiDataSource& ds, bool rawRows,
                        int begin, int end, bool fresh, const QPointF& gpuOffset, bool isExportMode);
     void drawBarsAsPolylines(QCPPainter* painter, ErrorBarsEntry& entry,

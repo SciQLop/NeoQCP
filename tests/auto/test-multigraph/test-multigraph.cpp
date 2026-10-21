@@ -1408,6 +1408,24 @@ void TestMultiGraph::errorBoundsBelowZeroOnALogAxisReachTheEdge()
     QCOMPARE(bars[1].lower, mPlot->yAxis->coordToPixel(0.1));
 }
 
+// A band's bound <= 0 goes two axis lengths out, like a fill edge: the GPU pans the cached band,
+// and one stopping at the edge would show its end. Bars keep stopping at the edge.
+void TestMultiGraph::errorBandBoundsBelowZeroOnALogAxisAreClampedLikeABaseline()
+{
+    auto* mg = errorBarGraph(mPlot, 3, 1.0);
+    std::vector<double> x{0, 1, 2}, y{1, 1, 1}, lo{-1, 0, 0.5}, hi{2, 2, 2};
+    mg->setData(std::move(x), std::vector<std::vector<double>>{std::move(y), std::move(lo), std::move(hi)});
+    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setRange(-0.5, 2.5);
+    mPlot->yAxis->setRange(0.1, 10);
+    renderOf(mPlot); // lays the axis rect out
+    const auto rows = mg->errorBandRows(*mg->componentErrorBars(0), *mg->dataSource(), 0, 3);
+    const double zeroBaseline = qcp::fill::baselinePixel(*mPlot->yAxis, 0.0);
+    QCOMPARE(rows[0].a, zeroBaseline);
+    QCOMPARE(rows[1].a, zeroBaseline);
+    QCOMPARE(rows[2].a, mPlot->yAxis->coordToPixel(0.5));
+}
+
 void TestMultiGraph::selectedErrorBarsUseTheSelectedPen()
 {
     auto* mg = errorBarGraph(mPlot, 5, 1.0);

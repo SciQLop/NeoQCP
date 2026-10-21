@@ -77,6 +77,7 @@ private slots:
     void sparseErrorBarsAreDrawnAsBars();
     void denseErrorBarsBecomeABand();
     void errorBoundsBelowZeroOnALogAxisReachTheEdge();
+    void errorBandBoundsBelowZeroOnALogAxisAreClampedLikeABaseline();
     void selectedErrorBarsUseTheSelectedPen();
     void errorBarsAreDroppedWhenABoundColumnDisappears();
     void anEmptySourceKeepsFillsAndErrorBars();
