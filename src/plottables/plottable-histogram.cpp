@@ -156,6 +156,17 @@ void QCPHistogram::setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> sou
 {
     mDataSource = std::move(source);
     mPipeline.setSource(mDataSource);
+    if (!mDataSource)
+        clearResult();
+}
+
+// No job runs for a null source, so nothing would replace the old bars; one still running for
+// the old source must not land either.
+void QCPHistogram::clearResult()
+{
+    mAcceptedGeneration = mPipeline.currentGeneration();
+    takeResult(nullptr);
+    requestReplot();
 }
 
 void QCPHistogram::setBinned(std::vector<double> edges, std::vector<std::vector<double>> heights)

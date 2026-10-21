@@ -82,6 +82,7 @@ private:
     void onPipelineFinished(uint64_t generation);
     bool storeResult(std::shared_ptr<qcp::algo::Histogram1D> result);
     void takeResult(std::shared_ptr<qcp::algo::Histogram1D> result);
+    void clearResult();
     void rememberEdges();
     void requestReplot();
 

@@ -26,7 +26,10 @@ struct Gate
 {
     std::atomic<bool> open { false };
     std::atomic<bool> entered { false };
-    void waitEntered() const { while (!entered.load()) QThread::msleep(1); }
+    [[nodiscard]] bool waitEntered() const
+    {
+        return QTest::qWaitFor([this] { return entered.load(); }, 5000);
+    }
 };
 
 // Blocks every read until the gate opens, so the test controls when a binning job ends.
@@ -224,7 +227,7 @@ void TestHistogramPlottable::autoEdgesNeverShrinkWhileJobsOverlap()
     EdgeLog log(h);
     auto gate = std::make_shared<Gate>();
     h->setDataSource(gated({-5, 8}, gate));
-    gate->waitEntered();
+    QVERIFY(gate->waitEntered());
     h->setDataSource(values({2, 8})); // queued behind the blocked job, with the old edges
     gate->open = true;
     QVERIFY(settle(h));
@@ -244,7 +247,7 @@ void TestHistogramPlottable::rebinningAfterOverlappingJobsShowsTheLastSource()
     auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
     auto gate = std::make_shared<Gate>();
     h->setDataSource(gated({0, 10}, gate));
-    gate->waitEntered();
+    QVERIFY(gate->waitEntered());
     h->setDataSource(values({2, 5, 8})); // queued, binned without the edges of the first
     gate->open = true;
     QVERIFY(settle(h));
@@ -260,7 +263,7 @@ void TestHistogramPlottable::preBinnedBarsDropAnOlderSourcesResultAndRange()
     QVERIFY(waitForResult(h));
     auto gate = std::make_shared<Gate>();
     h->setDataSource(gated({0, 10}, gate));
-    gate->waitEntered();
+    QVERIFY(gate->waitEntered());
     h->setBinned({100, 101, 102}, {{1, 2}});
     h->setDataSource(values({50, 60}));
     EdgeLog log(h);
@@ -279,7 +282,7 @@ void TestHistogramPlottable::resetEdgesDropsAResultBinnedBeforeTheReset()
     QVERIFY(waitForResult(h));
     auto gate = std::make_shared<Gate>();
     h->setDataSource(gated({0, 10}, gate));
-    gate->waitEntered();
+    QVERIFY(gate->waitEntered());
     EdgeLog log(h);
     h->resetEdges();
     gate->open = true;
@@ -288,6 +291,29 @@ void TestHistogramPlottable::resetEdgesDropsAResultBinnedBeforeTheReset()
         QCOMPARE(shown.lower, 0.0);
     QCOMPARE(h->histogram()->edges.front(), 0.0);
     QCOMPARE(h->histogram()->edges.back(), 10.0);
+}
+
+void TestHistogramPlottable::clearingTheSourceClearsTheBars()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    h->setDataSource(values({0, 10}));
+    QVERIFY(waitForResult(h));
+    QSignalSpy ready(h, &QCPHistogram::histogramReady);
+    h->setDataSource(nullptr);
+    QVERIFY(!h->histogram());
+    QCOMPARE(ready.count(), 1);
+}
+
+void TestHistogramPlottable::clearingTheSourceDropsAnInFlightResult()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto gate = std::make_shared<Gate>();
+    h->setDataSource(gated({0, 10}, gate));
+    QVERIFY(gate->waitEntered());
+    h->setDataSource(nullptr);
+    gate->open = true;
+    QVERIFY(settle(h));
+    QVERIFY(!h->histogram());
 }
 
 void TestHistogramPlottable::exportBinningEmitsNothing()

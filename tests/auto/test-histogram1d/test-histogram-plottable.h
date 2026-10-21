@@ -25,6 +25,8 @@ private slots:
     void rebinningAfterOverlappingJobsShowsTheLastSource();
     void preBinnedBarsDropAnOlderSourcesResultAndRange();
     void resetEdgesDropsAResultBinnedBeforeTheReset();
+    void clearingTheSourceClearsTheBars();
+    void clearingTheSourceDropsAnInFlightResult();
     void exportBinningEmitsNothing();
     void exportWhileBinningShowsTheNewData();
     void barsAreDrawnUpToTheirHeight();
