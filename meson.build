@@ -103,7 +103,6 @@ neoqcp_moc_headers = ['src/axis/axis.h',
             'src/plottables/plottable-graph.h',
             'src/plottables/plottable-graph2.h',
             'src/plottables/plottable-multigraph.h',
-            'src/plottables/multigraph-fill.h',
             'src/plottables/lane-layout.h',
             'src/plottables/plottable-intervals.h',
             'src/plottables/plottable-group.h',
@@ -308,7 +307,7 @@ NeoQCP = static_library('NeoQCP',
            cpp_args:cpp_args,
            dependencies: [qtdeps, profiling_hook_dep] + optional_deps + latex_deps,
            install: true,
-           extra_files: [neoqcp_moc_headers, 'src/Profiling.hpp', 'src/painting/paintbuffer-rhi.h', 'src/painting/plottable-rhi-layer.h', 'src/painting/span-rhi-layer.h', 'src/painting/colormap-rhi-layer.h', 'src/painting/grid-rhi-layer.h', 'src/painting/scatter-rhi-layer.h']
+           extra_files: [neoqcp_moc_headers, 'src/plottables/multigraph-fill.h', 'src/Profiling.hpp', 'src/painting/paintbuffer-rhi.h', 'src/painting/plottable-rhi-layer.h', 'src/painting/span-rhi-layer.h', 'src/painting/colormap-rhi-layer.h', 'src/painting/grid-rhi-layer.h', 'src/painting/scatter-rhi-layer.h']
            )
 
 

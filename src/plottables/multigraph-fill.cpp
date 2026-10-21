@@ -1,5 +1,7 @@
 #include "multigraph-fill.h"
+#include <algorithm>
 #include <cmath>
+#include <utility>
 
 namespace qcp::fill {
 namespace {

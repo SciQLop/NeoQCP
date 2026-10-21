@@ -2,6 +2,7 @@
 #include "plottables/multigraph-fill.h"
 #include "plottables/plottable-linestyle.h"
 #include <cmath>
+#include <limits>
 
 using qcp::fill::StripPoint;
 namespace {
