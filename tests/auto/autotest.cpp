@@ -16,6 +16,7 @@
 #include "test-paintbuffer/test-paintbuffer.h"
 #include "test-multi-datasource/test-multi-datasource.h"
 #include "test-multigraph/test-multigraph.h"
+#include "test-fill-geometry/test-fill-geometry.h"
 #include "test-pipeline/test-pipeline.h"
 #include "test-waterfall/test-waterfall.h"
 #include "test-hspan/test-hspan.h"
@@ -88,6 +89,7 @@ int main(int argc, char **argv)
   QCPTEST(TestPaintBuffer);
   QCPTEST(TestMultiDataSource);
   QCPTEST(TestMultiGraph);
+  QCPTEST(TestFillGeometry);
   QCPTEST(TestDataLocator);
   QCPTEST(TestHSpan);
   QCPTEST(TestRSpan);
