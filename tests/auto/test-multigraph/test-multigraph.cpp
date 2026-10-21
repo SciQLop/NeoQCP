@@ -974,3 +974,62 @@ void TestMultiGraph::panIsRedrawnFreshWhileAnotherLayerIsDirty()
     };
     QTRY_VERIFY2_WITH_TIMEOUT(renderedAtView(), "the panned view was never drawn fresh", 2000);
 }
+
+static QCPMultiGraph* threeColumnGraph(QCustomPlot* plot)
+{
+    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    mg->setData(std::vector<double>{1.0, 2.0, 3.0},
+                std::vector<std::vector<double>>{{1, 2, 3}, {0, 1, 2}, {2, 3, 4}});
+    mg->setComponentNames({"y", "low", "high"});
+    return mg;
+}
+
+static QCPGroupLegendItem* groupItemOf(QCustomPlot* plot, QCPMultiGraph* mg)
+{
+    for (int i = 0; i < plot->legend->itemCount(); ++i)
+        if (auto* gi = qobject_cast<QCPGroupLegendItem*>(plot->legend->item(i)))
+            if (gi->multiGraph() == mg)
+                return gi;
+    return nullptr;
+}
+
+void TestMultiGraph::legendSkipsComponentsOutOfTheLegend()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    mg->setComponentInLegend(2, false);
+    QCOMPARE(mg->legendComponents(), (QVector<int>{0, 1}));
+    mg->addToLegend(mPlot->legend);
+    auto* gi = groupItemOf(mPlot, mg);
+    QVERIFY(gi);
+    gi->setExpanded(true);
+    const int rh = gi->rowHeight();
+    QCOMPARE(gi->minimumOuterSizeHint().height(),
+             rh * 3 + gi->margins().top() + gi->margins().bottom());
+}
+
+void TestMultiGraph::legendClickMapsRowsToInLegendComponents()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    mg->setComponentInLegend(1, false);
+    mg->addToLegend(mPlot->legend);
+    auto* gi = groupItemOf(mPlot, mg);
+    gi->setExpanded(true);
+    mPlot->replot();
+    QVariant details;
+    const QRect r = gi->rect();
+    const int rh = gi->rowHeight();
+    QVERIFY(gi->selectTest(QPointF(r.left() + 5, r.top() + 2 * rh + rh / 2), false, &details) >= 0);
+    QCOMPARE(details.toMap().value("componentIndex").toInt(), 2);
+}
+
+void TestMultiGraph::legendOneInLegendComponentHasNoExpander()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    mg->setComponentInLegend(1, false);
+    mg->setComponentInLegend(2, false);
+    mg->addToLegend(mPlot->legend);
+    auto* gi = groupItemOf(mPlot, mg);
+    gi->setExpanded(true);
+    QVERIFY(!gi->shownExpanded());
+    QVERIFY(!gi->headerRowText(false).startsWith(QString::fromUtf8("▾")));
+}

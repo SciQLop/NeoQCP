@@ -349,6 +349,23 @@ void QCPMultiGraph::setComponentPens(const QList<QPen>& pens)
     }
 }
 
+void QCPMultiGraph::setComponentInLegend(int index, bool inLegend)
+{
+    if (index < 0 || index >= mComponents.size() || mComponents[index].inLegend == inLegend)
+        return;
+    mComponents[index].inLegend = inLegend;
+    Q_EMIT componentVisibilityChanged();
+}
+
+QVector<int> QCPMultiGraph::legendComponents() const
+{
+    QVector<int> shown;
+    for (int i = 0; i < mComponents.size(); ++i)
+        if (mComponents[i].inLegend)
+            shown.append(i);
+    return shown;
+}
+
 void QCPMultiGraph::setComponentVisible(int index, bool visible)
 {
     if (index < 0 || index >= mComponents.size() || mComponents[index].visible == visible)
@@ -1164,16 +1181,16 @@ void QCPMultiGraph::draw(QCPPainter* painter)
 void QCPMultiGraph::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
 {
     applyDefaultAntialiasingHint(painter);
-    if (mComponents.isEmpty()) return;
+    const QVector<int> shown = legendComponents();
+    if (shown.isEmpty()) return;
 
-    int n = mComponents.size();
-    double segWidth = rect.width() / n;
+    double segWidth = rect.width() / shown.size();
     double y = rect.center().y();
-    for (int i = 0; i < n; ++i) {
-        if (!mComponents[i].visible) continue;
-        double x0 = rect.left() + i * segWidth;
+    for (int k = 0; k < shown.size(); ++k) {
+        if (!mComponents[shown[k]].visible) continue;
+        double x0 = rect.left() + k * segWidth;
         double x1 = x0 + segWidth;
-        drawComponentLegendIcon(painter, i, QLineF(x0, y, x1, y));
+        drawComponentLegendIcon(painter, shown[k], QLineF(x0, y, x1, y));
     }
 }
 

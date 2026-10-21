@@ -27,6 +27,7 @@ public:
         QCPScatterStyle scatterStyle;
         QCPDataSelection selection;
         bool visible = true;
+        bool inLegend = true;
         //! Set through setComponentLineStyle(): a direct write leaves the cached lines stale.
         LineStyle lineStyle = lsLine;
     };
@@ -84,6 +85,10 @@ public:
     //! directly is not observed: a layer that translates after a pan would keep the old
     //! GPU entries.
     void setComponentVisible(int index, bool visible);
+    //! Keeps a component out of the legend (a band edge, an error bound) while it still draws
+    //! and counts for auto-scale.
+    void setComponentInLegend(int index, bool inLegend);
+    [[nodiscard]] QVector<int> legendComponents() const;
     const Component& component(int index) const { return mComponents[index]; }
     void setComponentNames(const QStringList& names);
     void setComponentColors(const QList<QColor>& colors);

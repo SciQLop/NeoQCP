@@ -43,7 +43,7 @@ void QCPGroupLegendItem::setExpanded(bool expanded)
 // legend entry, even when selecting the component asked for expansion.
 bool QCPGroupLegendItem::shownExpanded() const
 {
-    return mExpanded && mMultiGraph && mMultiGraph->componentCount() > 1;
+    return mExpanded && mMultiGraph && mMultiGraph->legendComponents().size() > 1;
 }
 
 QFont QCPGroupLegendItem::rowFont() const
@@ -57,7 +57,7 @@ int QCPGroupLegendItem::rowHeight() const
     const QFont font = rowFont();
     int height = std::max(QFontMetrics(font).height(), measured(font, headerRowText(true)).height());
     if (shownExpanded())
-        for (int i = 0; i < mMultiGraph->componentCount(); ++i)
+        for (int i : mMultiGraph->legendComponents())
             height = std::max(height, measured(font, mMultiGraph->component(i).name).height());
     return height + 4;
 }
@@ -66,21 +66,21 @@ QString QCPGroupLegendItem::headerName() const
 {
     if (!mMultiGraph) return QString();
     if (!mMultiGraph->name().isEmpty()) return mMultiGraph->name();
-    int n = mMultiGraph->componentCount();
+    const QVector<int> shown = mMultiGraph->legendComponents();
     // No name and no components yet (e.g. async data still loading): show an
     // empty header rather than the C++ class name, which is meaningless to the
     // user. The legend item itself (and any busy indicator) still renders.
-    if (n == 0) return QString();
-    const QString& first = mMultiGraph->component(0).name;
-    if (n == 1) return first;
-    return first + QString::fromUtf8(" \u2026 ") + mMultiGraph->component(n - 1).name;
+    if (shown.isEmpty()) return QString();
+    const QString& first = mMultiGraph->component(shown.first()).name;
+    if (shown.size() == 1) return first;
+    return first + QString::fromUtf8(" \u2026 ") + mMultiGraph->component(shown.last()).name;
 }
 
 QString QCPGroupLegendItem::headerRowText(bool includeBusySymbol) const
 {
     // ▾ when expanded (collapse toward the edge), ▸ when collapsed, nothing for one component.
     QString text;
-    if (mMultiGraph && mMultiGraph->componentCount() > 1)
+    if (mMultiGraph && mMultiGraph->legendComponents().size() > 1)
         text = QString::fromUtf8(shownExpanded() ? "▾ " : "▸ ");
     if (includeBusySymbol && mMultiGraph && mMultiGraph->visuallyBusy())
     {
@@ -106,10 +106,11 @@ double QCPGroupLegendItem::selectTest(const QPointF& pos, bool onlySelectable, Q
         int hitRow = static_cast<int>(relY / rh);
 
         QVariantMap detailMap;
-        if (!shownExpanded() || hitRow == 0)
+        const QVector<int> shown = mMultiGraph->legendComponents();
+        if (!shownExpanded() || hitRow == 0 || shown.isEmpty())
             detailMap[QStringLiteral("componentIndex")] = -1; // header
         else
-            detailMap[QStringLiteral("componentIndex")] = qMin(hitRow - 1, mMultiGraph->componentCount() - 1);
+            detailMap[QStringLiteral("componentIndex")] = shown[qMin(hitRow - 1, shown.size() - 1)];
         *details = detailMap;
     }
 
@@ -128,8 +129,8 @@ void QCPGroupLegendItem::selectEvent([[maybe_unused]] QMouseEvent* event,
     if (details.typeId() == QMetaType::QVariantMap)
         componentIndex = details.toMap().value(QStringLiteral("componentIndex"), -1).toInt();
 
-    if (componentIndex < 0 && mMultiGraph && mMultiGraph->componentCount() == 1)
-        componentIndex = 0; // nothing to expand: a click selects the line, like a plain entry
+    if (componentIndex < 0 && mMultiGraph && mMultiGraph->legendComponents().size() == 1)
+        componentIndex = mMultiGraph->legendComponents().first(); // nothing to expand: a click selects the line, like a plain entry
 
     if (componentIndex < 0) {
         // Header click: toggle expand/collapse
@@ -166,8 +167,8 @@ void QCPGroupLegendItem::draw(QCPPainter* painter)
     int indent = 16;
 
     if (!shownExpanded()) {
-        int n = mMultiGraph->componentCount();
-        double segWidth = (n > 0) ? static_cast<double>(iconWidth) / n : iconWidth;
+        const QVector<int> shown = mMultiGraph->legendComponents();
+        double segWidth = shown.isEmpty() ? iconWidth : static_cast<double>(iconWidth) / shown.size();
         double y = inRect.top() + rh / 2.0;
 
         if (showBusy)
@@ -175,9 +176,10 @@ void QCPGroupLegendItem::draw(QCPPainter* painter)
             painter->save();
             painter->setOpacity(mMultiGraph->effectiveBusyFadeAlpha());
         }
-        for (int i = 0; i < n; ++i) {
+        for (int k = 0; k < shown.size(); ++k) {
+            const int i = shown[k];
             if (!mMultiGraph->component(i).visible) continue;
-            double x0 = inRect.left() + padding + i * segWidth;
+            double x0 = inRect.left() + padding + k * segWidth;
             double x1 = x0 + segWidth;
             mMultiGraph->drawComponentLegendIcon(painter, i, QLineF(x0, y, x1, y));
         }
@@ -194,9 +196,11 @@ void QCPGroupLegendItem::draw(QCPPainter* painter)
                           inRect.width() - padding, rh);
         drawLabel(painter, headerRect, headerRowText(showBusy));
 
-        for (int i = 0; i < mMultiGraph->componentCount(); ++i) {
+        const QVector<int> shown = mMultiGraph->legendComponents();
+        for (int k = 0; k < shown.size(); ++k) {
+            const int i = shown[k];
             const auto& comp = mMultiGraph->component(i);
-            double rowY = inRect.top() + (i + 1) * rh;
+            double rowY = inRect.top() + (k + 1) * rh;
 
             if (mSelected && mSelectedComponent == i && mParentLegend) {
                 painter->setPen(mParentLegend->selectedIconBorderPen());
@@ -246,11 +250,12 @@ QSize QCPGroupLegendItem::minimumOuterSizeHint() const
                      rh + mMargins.top() + mMargins.bottom());
     } else {
         int maxTextWidth = headerWidth;
-        for (int i = 0; i < mMultiGraph->componentCount(); ++i) {
+        const QVector<int> shown = mMultiGraph->legendComponents();
+        for (int i : shown) {
             int w = indent + iconWidth + 6 + measured(font, mMultiGraph->component(i).name).width();
             if (w > maxTextWidth) maxTextWidth = w;
         }
-        int totalHeight = rh * (1 + mMultiGraph->componentCount());
+        int totalHeight = rh * (1 + shown.size());
         return QSize(padding + maxTextWidth, totalHeight + mMargins.top() + mMargins.bottom());
     }
 }

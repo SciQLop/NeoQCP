@@ -39,6 +39,9 @@ private slots:
     // Legend
     void addToLegendCreatesGroupItem();
     void removeFromLegendWorks();
+    void legendSkipsComponentsOutOfTheLegend();
+    void legendClickMapsRowsToInLegendComponents();
+    void legendOneInLegendComponentHasNoExpander();
     void legendExpandCollapse();
     void legendGroupSelectsAll();
     void legendHeaderDoesNotLeakClassNameWhenEmpty();
