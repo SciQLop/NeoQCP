@@ -123,19 +123,29 @@ jobs:
         run: |
           mkdir -p "$QCP_TEST_LOG_DIR"
           meson test -v --no-rebuild -C build
+      # Offscreen has no QRhi, so the run above skips every GPU test: run them on an X server.
+      - name: Test the GPU paths under xvfb (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          QCP_TEST_LOG_DIR: ${{ github.workspace }}/testlogs/xvfb
+        run: |
+          mkdir -p "$QCP_TEST_LOG_DIR"
+          xvfb-run -a -s "-screen 0 1600x1200x24" env QT_QPA_PLATFORM=xcb QCP_TEST_LOG_DIR="$QCP_TEST_LOG_DIR" ./build/tests/auto/auto-tests
       # QtTest output never shows on the Windows runners; print each failing class's log.
       - name: Show failing test classes
         if: failure()
         shell: bash
         run: |
-          for f in "$GITHUB_WORKSPACE"/testlogs/*.txt; do
+          shopt -s nullglob
+          for f in "$GITHUB_WORKSPACE"/testlogs/*.txt "$GITHUB_WORKSPACE"/testlogs/xvfb/*.txt; do
             if grep -q "^FAIL!" "$f"; then
               echo "::group::$(basename "$f")"
               cat "$f"
               echo "::endgroup::"
             fi
           done
-          grep -h "^Totals:" "$GITHUB_WORKSPACE"/testlogs/*.txt || true
+          grep -rh "^Totals:" "$GITHUB_WORKSPACE"/testlogs || true
       - name: Keep the test logs and mismatching pictures
         if: failure()
         uses: actions/upload-artifact@v4
