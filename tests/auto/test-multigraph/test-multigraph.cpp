@@ -1108,3 +1108,17 @@ void TestMultiGraph::fillReplacesAndClears()
     mg->clearComponentFill(0);
     QVERIFY(!mg->componentFill(0).has_value());
 }
+
+void TestMultiGraph::fillValidatesAgainstTheStagedSource()
+{
+    using Source = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
+    const auto stage = [](QCPMultiGraph* g, int columns) {
+        g->stagePendingSource(std::make_shared<Source>(
+            std::vector<double>{1, 2}, std::vector<std::vector<double>>(columns, {1, 2})));
+    };
+    auto* mg = threeColumnGraph(mPlot);
+    stage(mg, 2);
+    QVERIFY(!mg->setComponentFillBetween(0, 2));
+    stage(mg, 4);
+    QVERIFY(mg->setComponentFillBetween(0, 3));
+}

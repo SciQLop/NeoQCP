@@ -321,7 +321,8 @@ void QCPMultiGraph::dropDecorationsBeyond(int columnCount)
 
 bool QCPMultiGraph::isValidColumn(int column) const
 {
-    return column >= 0 && (!mDataSource || column < mDataSource->columnCount());
+    const auto& source = mPendingSource ? mPendingSource : mDataSource;
+    return column >= 0 && (!source || column < source->columnCount());
 }
 
 void QCPMultiGraph::decorationsChanged()
@@ -354,9 +355,11 @@ bool QCPMultiGraph::setComponentFillBetween(int owner, int target, const QBrush&
 
 void QCPMultiGraph::setComponentFillBrush(int owner, const QBrush& brush)
 {
-    for (auto& e : mFills)
-        if (e.spec.owner == owner)
-            e.spec.brush = brush;
+    const auto it = std::find_if(mFills.begin(), mFills.end(),
+                                 [owner](const FillEntry& e) { return e.spec.owner == owner; });
+    if (it == mFills.end())
+        return;
+    it->spec.brush = brush;
     decorationsChanged();
 }
 

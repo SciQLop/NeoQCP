@@ -59,6 +59,7 @@ private slots:
     void fillIsDroppedWhenItsColumnDisappears();
     void fillDefaultBrushIsTheOwnerColourAtQuarterAlpha();
     void fillReplacesAndClears();
+    void fillValidatesAgainstTheStagedSource();
 
     // Line cache
     void cacheExtendsBeyondVisibleRange();
