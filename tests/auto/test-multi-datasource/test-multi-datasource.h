@@ -35,6 +35,9 @@ private slots:
     void adaptiveSamplingBreaksAtKeyGaps();
     void adaptiveSamplingFollowsFallingData();
     void adaptiveSamplingBreaksAtNaNRuns();
+    void gapsBeforeMatchesTheLineBreaks();
+    void gapsBeforeOffByZeroThreshold();
+    void gapsBeforeRowMajor();
 
     // Row-major data source
     void rowMajorValueAt();

@@ -149,6 +149,12 @@ public:
         }
     }
 
+    qcp::algo::GapVector gapsBefore(int begin, int end) const override
+    {
+        ensureGapCache(begin, end);
+        return mGapCache.gaps;
+    }
+
     QVector<QPointF> getLinesIndexed(int column, int begin, int end,
                                      QCPAxis* keyAxis, QCPAxis* valueAxis,
                                      QVector<int>& sourceIndices) const override

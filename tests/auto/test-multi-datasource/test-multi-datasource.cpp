@@ -940,3 +940,38 @@ void TestMultiDataSource::l2MultiFewRawPointsReturnNull()
 
     QVERIFY(qcp::algo::resampleL2Multi(l1, vp, *src) == nullptr);
 }
+
+void TestMultiDataSource::gapsBeforeMatchesTheLineBreaks()
+{
+    QCPSoAMultiDataSource<std::vector<double>, std::vector<double>> src(
+        std::vector<double>{0, 1, 2, 3, 10, 11, 12},
+        std::vector<std::vector<double>>{{0, 1, 2, 3, 4, 5, 6}});
+    src.setGapThreshold(1.5);
+    const auto gaps = src.gapsBefore(0, 7);
+    QCOMPARE(gaps.size(), 7);
+    QVERIFY(gaps.hasAnyGap);
+    for (int i = 0; i < 7; ++i)
+        QCOMPARE(int(gaps[i]), i == 4 ? 1 : 0);
+}
+
+void TestMultiDataSource::gapsBeforeOffByZeroThreshold()
+{
+    QCPSoAMultiDataSource<std::vector<double>, std::vector<double>> src(
+        std::vector<double>{0, 1, 2, 3, 10, 11, 12},
+        std::vector<std::vector<double>>{{0, 1, 2, 3, 4, 5, 6}});
+    src.setGapThreshold(0);
+    QVERIFY(!src.gapsBefore(0, 7).hasAnyGap);
+}
+
+void TestMultiDataSource::gapsBeforeRowMajor()
+{
+    std::vector<double> keys = {0, 1, 2, 3, 10, 11, 12};
+    std::vector<double> values = {0, 1, 2, 3, 4, 5, 6};
+    QCPRowMajorMultiDataSource<double, double> src(
+        std::span<const double>(keys), values.data(), 7, 1, 1);
+    src.setGapThreshold(1.5);
+    const auto gaps = src.gapsBefore(0, 7);
+    QVERIFY(gaps.hasAnyGap);
+    for (int i = 0; i < 7; ++i)
+        QCOMPARE(int(gaps[i]), i == 4 ? 1 : 0);
+}

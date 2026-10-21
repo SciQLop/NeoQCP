@@ -1,5 +1,6 @@
 #pragma once
 #include "abstract-datasource.h"
+#include "algorithms.h"
 
 class QCPAbstractMultiDataSource {
 public:
@@ -55,6 +56,16 @@ public:
                                                          int pixelWidth,
                                                          QCPAxis* keyAxis, QCPAxis* valueAxis,
                                                          QVector<int>& sourceIndices) const;
+
+    // Element i is set when the step into row begin + i is a key gap under
+    // gapThreshold(), exactly what getLines breaks on. Generic and slow here.
+    virtual qcp::algo::GapVector gapsBefore(int begin, int end) const
+    {
+        std::vector<double> keys(std::max(0, end - begin));
+        for (int i = begin; i < end; ++i)
+            keys[i - begin] = keyAt(i);
+        return qcp::algo::detectKeyGaps(keys, 0, static_cast<int>(keys.size()), gapThreshold());
+    }
 
     virtual const double* rawKeyData() const { return nullptr; }
     virtual QCPRawColumn rawColumn(int /*column*/) const { return {}; }
