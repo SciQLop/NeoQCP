@@ -282,6 +282,7 @@ NeoQCP = static_library('NeoQCP',
            'src/plottables/plottable-draw-utils.cpp',
            'src/plottables/plottable-multigraph.cpp',
            'src/plottables/multigraph-fill.cpp',
+           'src/plottables/multigraph-errorbars.cpp',
            'src/plottables/lane-layout.cpp',
            'src/plottables/intervals-algo.cpp',
            'src/plottables/plottable-intervals.cpp',
@@ -307,7 +308,7 @@ NeoQCP = static_library('NeoQCP',
            cpp_args:cpp_args,
            dependencies: [qtdeps, profiling_hook_dep] + optional_deps + latex_deps,
            install: true,
-           extra_files: [neoqcp_moc_headers, 'src/plottables/multigraph-fill.h', 'src/Profiling.hpp', 'src/painting/paintbuffer-rhi.h', 'src/painting/plottable-rhi-layer.h', 'src/painting/span-rhi-layer.h', 'src/painting/colormap-rhi-layer.h', 'src/painting/grid-rhi-layer.h', 'src/painting/scatter-rhi-layer.h']
+           extra_files: [neoqcp_moc_headers, 'src/plottables/multigraph-fill.h', 'src/plottables/multigraph-errorbars.h', 'src/Profiling.hpp', 'src/painting/paintbuffer-rhi.h', 'src/painting/plottable-rhi-layer.h', 'src/painting/span-rhi-layer.h', 'src/painting/colormap-rhi-layer.h', 'src/painting/grid-rhi-layer.h', 'src/painting/scatter-rhi-layer.h']
            )
 
 
