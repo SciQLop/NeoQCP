@@ -71,6 +71,9 @@ private:
     QCPHistogram1DPipeline mPipeline;
     // Results of jobs started before the last binning change or setBinned are dropped.
     uint64_t mAcceptedGeneration = 0;
+    //! The key scale the binning was made for: a new key axis or a blocked scaleTypeChanged
+    //! leaves it behind, and draw() catches up.
+    bool mBinnedKeyLog = false;
 
     [[nodiscard]] bool keyLog() const;
     [[nodiscard]] bool autoEdges() const;

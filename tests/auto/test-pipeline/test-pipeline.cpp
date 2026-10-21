@@ -1952,6 +1952,54 @@ void TestPipeline::histogram2dAxisScaleTogglesRebinning()
     QCOMPARE(log->cell(2, 0), 2.0);
 }
 
+namespace
+{
+// Four samples a decade apart, in 3 bins: linear puts 3 in bin 0, log spreads them.
+QCPHistogram2D* decadeHistogram(QCustomPlot* plot, bool alongKeys)
+{
+    auto* hist = new QCPHistogram2D(plot->xAxis, plot->yAxis);
+    std::vector<double> decades = { 1.0, 10.0, 100.0, 1000.0 };
+    std::vector<double> flat(4, 5.0);
+    hist->setBins(alongKeys ? 3 : 1, alongKeys ? 1 : 3);
+    if (alongKeys)
+        hist->setData(std::move(decades), std::move(flat));
+    else
+        hist->setData(std::move(flat), std::move(decades));
+    return hist;
+}
+
+bool spreadOverDecades(const QCPColorMapData* data, bool alongKeys)
+{
+    const auto cell = [&](int i) { return alongKeys ? data->cell(i, 0) : data->cell(0, i); };
+    return data && cell(0) == 1.0 && cell(1) == 1.0 && cell(2) == 2.0;
+}
+} // namespace
+
+// The constructor's scaleTypeChanged links are to the first axes only: draw() notices the rest.
+void TestPipeline::histogram2dRebinsForTheScaleOfANewKeyAxis()
+{
+    auto* hist = decadeHistogram(mPlot, true);
+    QSignalSpy spy(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(spy.wait(2000));
+    QVERIFY(!spreadOverDecades(hist->pipeline().result(), true));
+    hist->setKeyAxis(mPlot->xAxis2);
+    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->replot();
+    QTRY_VERIFY_WITH_TIMEOUT(spreadOverDecades(hist->pipeline().result(), true), 2000);
+}
+
+void TestPipeline::histogram2dRebinsForTheScaleOfANewValueAxis()
+{
+    auto* hist = decadeHistogram(mPlot, false);
+    QSignalSpy spy(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(spy.wait(2000));
+    QVERIFY(!spreadOverDecades(hist->pipeline().result(), false));
+    hist->setValueAxis(mPlot->yAxis2);
+    mPlot->yAxis2->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->replot();
+    QTRY_VERIFY_WITH_TIMEOUT(spreadOverDecades(hist->pipeline().result(), false), 2000);
+}
+
 void TestPipeline::histogram2dNormalizationColumn()
 {
     auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);

@@ -97,6 +97,7 @@ void QCPHistogram::installTransform()
 {
     const int bins = mBins;
     const bool log = keyLog();
+    mBinnedKeyLog = log;
     const auto normalization = mNormalization;
     const auto fixed = mFixedRange;
     const auto autoRange = mAutoRange;
@@ -283,6 +284,8 @@ bool QCPHistogram::canProduceContent() const
 void QCPHistogram::draw(QCPPainter* painter)
 {
     PROFILE_HERE_N("QCPHistogram::draw");
+    if (keyLog() != mBinnedKeyLog)
+        resetEdges();
     // Export does not pump the event loop, so a background result would never arrive.
     if ((!mResult || mPipeline.isBusy()) && painter->modes().testFlag(QCPPainter::pmNoCaching))
         binForExport();

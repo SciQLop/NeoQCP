@@ -124,6 +124,8 @@ private slots:
     void histogram2dValueRangeRestrictedUnsortedKeys();
     void histogram2dSelectTestReflectsNewData();
     void histogram2dPipelineBins();
+    void histogram2dRebinsForTheScaleOfANewKeyAxis();
+    void histogram2dRebinsForTheScaleOfANewValueAxis();
     void histogram2dNormalizationColumn();
     void histogram2dNormalizationToggleNoRebind();
     void histogram2dRenderSmokeTest();

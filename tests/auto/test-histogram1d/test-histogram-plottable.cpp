@@ -219,6 +219,22 @@ void TestHistogramPlottable::nonPositiveFixedRangeFallsBackToAutoWhenTheAxisTurn
     QCOMPARE(h->histogram()->edges.front(), 1.0);
 }
 
+// The constructor's scaleTypeChanged link is to the first axis only: draw() notices the rest.
+void TestHistogramPlottable::rebinsForTheScaleOfANewKeyAxis()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    h->setBins(3);
+    h->setDataSource(values({1, 10, 100, 1000}));
+    QVERIFY(waitForResult(h));
+    QVERIFY(!h->histogram()->log);
+    h->setKeyAxis(mPlot->xAxis2);
+    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->replot();
+    QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && h->histogram()->log, 5000);
+    QCOMPARE(h->histogram()->edges.front(), 1.0);
+    QCOMPARE(h->histogram()->edges.back(), 1000.0);
+}
+
 void TestHistogramPlottable::autoEdgesNeverShrinkWhileJobsOverlap()
 {
     auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);

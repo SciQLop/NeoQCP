@@ -113,6 +113,10 @@ private:
     Normalization mNormalization = nNone;
     QCPHistogramPipeline mPipeline;
     QCPColormapRenderer mRenderer;
+    //! The axis scales the binning was made for: a new axis or a blocked scaleTypeChanged
+    //! leaves them behind, and draw() catches up.
+    bool mBinnedKeyLog = false;
+    bool mBinnedValueLog = false;
 
     // finiteKeyValueBounds is an O(N) scan over the raw scatter; selectTest
     // calls it per mouse event and getKeyRange per rescale. The bounds only
@@ -131,4 +135,5 @@ private:
                             bool keyPositiveOnly, bool valuePositiveOnly) const;
 
     void installTransform();
+    [[nodiscard]] bool binnedForTheAxisScales() const;
 };

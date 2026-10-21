@@ -48,8 +48,10 @@ void QCPHistogram2D::installTransform()
 {
     int capturedKeyBins = mKeyBins;
     int capturedValueBins = mValueBins;
-    const bool keyLog = mKeyAxis && mKeyAxis->scaleType() == QCPAxis::stLogarithmic;
-    const bool valueLog = mValueAxis && mValueAxis->scaleType() == QCPAxis::stLogarithmic;
+    const bool keyLog = keyBinScale() == QCPAxis::stLogarithmic;
+    const bool valueLog = valueBinScale() == QCPAxis::stLogarithmic;
+    mBinnedKeyLog = keyLog;
+    mBinnedValueLog = valueLog;
 
     mPipeline.setTransform(TransformKind::ViewportIndependent,
         [capturedKeyBins, capturedValueBins, keyLog, valueLog](
@@ -281,11 +283,19 @@ bool QCPHistogram2D::canProduceContent() const
     return mPipeline.result() != nullptr || mPipeline.isBusy();
 }
 
+bool QCPHistogram2D::binnedForTheAxisScales() const
+{
+    return (keyBinScale() == QCPAxis::stLogarithmic) == mBinnedKeyLog
+        && (valueBinScale() == QCPAxis::stLogarithmic) == mBinnedValueLog;
+}
+
 void QCPHistogram2D::draw(QCPPainter* painter)
 {
     PROFILE_HERE_N("QCPHistogram2D::draw");
     if (!mKeyAxis || !mValueAxis)
         return;
+    if (!binnedForTheAxisScales())
+        refreshBinning();
 
     auto* binnedData = mPipeline.result();
     if (!binnedData)
