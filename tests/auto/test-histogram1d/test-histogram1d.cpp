@@ -96,3 +96,21 @@ void TestHistogram1D::edgesOnlyWiden()
     QCOMPARE(widenedRange(QCPRange(0, 10), QCPRange(-5, 8)), QCPRange(-5, 10));
     QCOMPARE(widenedRange(std::nullopt, QCPRange(2, 8)), QCPRange(2, 8));
 }
+
+void TestHistogram1D::noBinsGiveNothing()
+{
+    const auto src = source({{1, 2, 3}});
+    for (int bins : {0, -3})
+    {
+        QVERIFY(binEdges(QCPRange(0, 4), bins, false).empty());
+        const auto h = bin1d(src, QCPRange(0, 4), bins, false);
+        QVERIFY(h.edges.empty());
+        QVERIFY(h.heights.empty());
+    }
+}
+
+void TestHistogram1D::valueAtTheUpperEdgeLandsInTheLastBin()
+{
+    const auto h = bin1d(source({{4}}), QCPRange(0, 4), 4, false);
+    QCOMPARE(h.heights[0], (std::vector<double>{0, 0, 0, 1}));
+}

@@ -46,9 +46,11 @@ inline std::optional<QCPRange> finiteValueBounds(const QCPAbstractMultiDataSourc
     return bounds;
 }
 
-//! bins + 1 edges, evenly spaced in linear or log10 space.
+//! bins + 1 edges, evenly spaced in linear or log10 space; none when bins <= 0.
 inline std::vector<double> binEdges(QCPRange range, int bins, bool log)
 {
+    if (bins <= 0)
+        return {};
     const double lo = log ? std::log10(range.lower) : range.lower;
     const double hi = log ? std::log10(range.upper) : range.upper;
     std::vector<double> edges(bins + 1);
@@ -62,8 +64,11 @@ inline std::vector<double> binEdges(QCPRange range, int bins, bool log)
 
 //! Counts finite values inside [range.lower, range.upper] of every column into shared bins.
 //! Values outside the range are not counted. Log: non-positive values are skipped.
+//! bins <= 0 gives an empty histogram.
 inline Histogram1D bin1d(const QCPAbstractMultiDataSource& src, QCPRange range, int bins, bool log)
 {
+    if (bins <= 0)
+        return { {}, {}, {}, log };
     const BinAxis axis = BinAxis::make(range, bins, log);
     const int columns = src.columnCount();
     Histogram1D h { binEdges(range, bins, log), std::vector(columns, std::vector<double>(bins, 0.0)),

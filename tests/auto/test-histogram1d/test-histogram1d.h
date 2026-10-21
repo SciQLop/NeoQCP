@@ -14,4 +14,6 @@ private slots:
     void densityUsesEachLogBinsOwnWidth();
     void emptyOrAllNanHasNoBounds();
     void edgesOnlyWiden();
+    void noBinsGiveNothing();
+    void valueAtTheUpperEdgeLandsInTheLastBin();
 };

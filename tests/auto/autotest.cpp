@@ -18,6 +18,7 @@
 #include "test-multigraph/test-multigraph.h"
 #include "test-fill-geometry/test-fill-geometry.h"
 #include "test-histogram1d/test-histogram1d.h"
+#include "test-histogram1d/test-histogram-plottable.h"
 #include "test-errorbar-geometry/test-errorbar-geometry.h"
 #include "test-pipeline/test-pipeline.h"
 #include "test-waterfall/test-waterfall.h"
@@ -93,6 +94,7 @@ int main(int argc, char **argv)
   QCPTEST(TestMultiGraph);
   QCPTEST(TestFillGeometry);
   QCPTEST(TestHistogram1D);
+  QCPTEST(TestHistogramPlottable);
   QCPTEST(TestErrorBarGeometry);
   QCPTEST(TestDataLocator);
   QCPTEST(TestHSpan);

@@ -232,3 +232,6 @@ using QCPHistogramPipeline = QCPAsyncPipeline<QCPAbstractDataSource, QCPColorMap
 
 class QCPAbstractMultiDataSource;
 using QCPMultiGraphPipeline = QCPAsyncPipeline<QCPAbstractMultiDataSource, QCPAbstractMultiDataSource>;
+
+namespace qcp::algo { struct Histogram1D; }
+using QCPHistogram1DPipeline = QCPAsyncPipeline<QCPAbstractMultiDataSource, qcp::algo::Histogram1D>;
