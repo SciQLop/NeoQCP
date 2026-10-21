@@ -68,13 +68,7 @@ QCPHistogram::QCPHistogram(QCPAxis* keyAxis, QCPAxis* valueAxis)
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
 {
     installTransform();
-    connect(&mPipeline, &QCPHistogram1DPipeline::finished, this, [this](uint64_t) {
-        // A job still in flight when setBinned dropped the source must not replace the bars.
-        if (!mDataSource)
-            return;
-        takeResult(pipelineResult());
-        requestReplot();
-    });
+    connect(&mPipeline, &QCPHistogram1DPipeline::finished, this, &QCPHistogram::onPipelineFinished);
     connect(&mPipeline, &QCPHistogram1DPipeline::busyChanged,
             this, [this](bool) { updateEffectiveBusy(); });
     // Edges in one scale mean nothing in the other: re-fit them when the key axis toggles.
@@ -120,6 +114,29 @@ void QCPHistogram::refreshBinning()
 {
     installTransform();
     mPipeline.onDataChanged();
+    mAcceptedGeneration = mPipeline.currentGeneration();
+}
+
+// A job queued behind a running one captured the edges from before that job's result,
+// so its result can be narrower than the edges now shown: bin it again, never shrink.
+bool QCPHistogram::coversAutoEdges(const Histogram1D& h) const
+{
+    const auto known = autoEdges() ? usableRange(mAutoRange, keyLog()) : std::nullopt;
+    return !known || (h.edges.front() <= known->lower && h.edges.back() >= known->upper);
+}
+
+void QCPHistogram::onPipelineFinished(uint64_t generation)
+{
+    if (generation < mAcceptedGeneration)
+        return;
+    auto result = pipelineResult();
+    if (result && !coversAutoEdges(*result))
+    {
+        refreshBinning();
+        return;
+    }
+    takeResult(std::move(result));
+    requestReplot();
 }
 
 std::shared_ptr<Histogram1D> QCPHistogram::pipelineResult() const
@@ -144,7 +161,10 @@ void QCPHistogram::setBinned(std::vector<double> edges, std::vector<std::vector<
         return;
     }
     mDataSource.reset();
+    mAutoRange.reset();
+    installTransform();
     mPipeline.setSource(nullptr);
+    mAcceptedGeneration = mPipeline.currentGeneration();
     const std::size_t columns = heights.size();
     takeResult(std::make_shared<Histogram1D>(
         Histogram1D { std::move(edges), std::move(heights), std::vector<int>(columns, 0), keyLog() }));
@@ -196,15 +216,19 @@ void QCPHistogram::resetEdges()
     refreshBinning();
 }
 
-void QCPHistogram::takeResult(std::shared_ptr<Histogram1D> result)
+bool QCPHistogram::storeResult(std::shared_ptr<Histogram1D> result)
 {
     const bool edgesMoved = result && (!mResult || mResult->edges != result->edges);
     mResult = std::move(result);
     if (edgesMoved)
-    {
         rememberEdges();
+    return edgesMoved;
+}
+
+void QCPHistogram::takeResult(std::shared_ptr<Histogram1D> result)
+{
+    if (storeResult(std::move(result)))
         Q_EMIT edgesChanged();
-    }
     Q_EMIT histogramReady();
 }
 
@@ -213,7 +237,8 @@ void QCPHistogram::rememberEdges()
 {
     if (!mDataSource || !autoEdges())
         return;
-    mAutoRange = QCPRange(mResult->edges.front(), mResult->edges.back());
+    mAutoRange = widenedRange(usableRange(mAutoRange, keyLog()),
+                              QCPRange(mResult->edges.front(), mResult->edges.back()));
     installTransform();
 }
 
@@ -229,8 +254,9 @@ void QCPHistogram::binForExport()
 {
     if (!mDataSource || !mKeyAxis || !mValueAxis)
         return;
+    // No signals: their receivers (auto-scale) must not run in the middle of a paint.
     if (mPipeline.runSynchronously(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data())))
-        takeResult(pipelineResult());
+        storeResult(pipelineResult());
 }
 
 bool QCPHistogram::canProduceContent() const

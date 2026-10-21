@@ -20,6 +20,10 @@ private slots:
     void logValueAxisRangeSkipsZeroHeights();
     void nonPositiveFixedRangeIsRejectedOnLogBins();
     void nonPositiveFixedRangeFallsBackToAutoWhenTheAxisTurnsLog();
+    void autoEdgesNeverShrinkWhileJobsOverlap();
+    void preBinnedBarsDropAnOlderSourcesResultAndRange();
+    void resetEdgesDropsAResultBinnedBeforeTheReset();
+    void exportBinningEmitsNothing();
 
 private:
     QCustomPlot* mPlot = nullptr;

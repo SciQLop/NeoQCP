@@ -46,7 +46,8 @@ inline std::optional<QCPRange> finiteValueBounds(const QCPAbstractMultiDataSourc
     return bounds;
 }
 
-//! bins + 1 edges, evenly spaced in linear or log10 space; none when bins <= 0.
+//! bins + 1 edges, evenly spaced in linear or log10 space, the outer two exactly the range;
+//! none when bins <= 0.
 inline std::vector<double> binEdges(QCPRange range, int bins, bool log)
 {
     if (bins <= 0)
@@ -59,6 +60,9 @@ inline std::vector<double> binEdges(QCPRange range, int bins, bool log)
         const double mapped = lo + i * (hi - lo) / bins;
         edges[i] = log ? std::pow(10.0, mapped) : mapped;
     }
+    // Exact outer edges: QCPHistogram compares them with its remembered range.
+    edges.front() = range.lower;
+    edges.back() = range.upper;
     return edges;
 }
 

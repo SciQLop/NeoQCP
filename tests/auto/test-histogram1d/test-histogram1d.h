@@ -16,4 +16,5 @@ private slots:
     void edgesOnlyWiden();
     void noBinsGiveNothing();
     void valueAtTheUpperEdgeLandsInTheLastBin();
+    void outerEdgesAreTheRangeExactly();
 };

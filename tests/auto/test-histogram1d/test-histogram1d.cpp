@@ -114,3 +114,14 @@ void TestHistogram1D::valueAtTheUpperEdgeLandsInTheLastBin()
     const auto h = bin1d(source({{4}}), QCPRange(0, 4), 4, false);
     QCOMPARE(h.heights[0], (std::vector<double>{0, 0, 0, 1}));
 }
+
+void TestHistogram1D::outerEdgesAreTheRangeExactly()
+{
+    const auto lin = binEdges(QCPRange(0.1, 0.7), 3, false);
+    QCOMPARE(lin.front(), 0.1);
+    QCOMPARE(lin.back(), 0.7);
+    const auto log = binEdges(QCPRange(3, 70), 7, true);
+    QVERIFY(log.front() == 3.0); // exact, not fuzzy: auto edges are compared exactly
+    QVERIFY(log.back() == 70.0);
+    QVERIFY(lin.back() == 0.7);
+}

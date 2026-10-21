@@ -65,6 +65,8 @@ private:
     Style mStyle = sBars;
     QList<QColor> mColors;
     QCPHistogram1DPipeline mPipeline;
+    // Results of jobs started before the last binning change or setBinned are dropped.
+    uint64_t mAcceptedGeneration = 0;
 
     [[nodiscard]] bool keyLog() const;
     [[nodiscard]] bool autoEdges() const;
@@ -72,6 +74,9 @@ private:
     void installTransform();
     void refreshBinning();
     void binForExport();
+    [[nodiscard]] bool coversAutoEdges(const qcp::algo::Histogram1D& h) const;
+    void onPipelineFinished(uint64_t generation);
+    bool storeResult(std::shared_ptr<qcp::algo::Histogram1D> result);
     void takeResult(std::shared_ptr<qcp::algo::Histogram1D> result);
     void rememberEdges();
     void requestReplot();

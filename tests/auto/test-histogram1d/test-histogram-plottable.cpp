@@ -2,6 +2,8 @@
 #include "qcustomplot.h"
 #include "plottables/plottable-histogram.h"
 #include "datasource/soa-multi-datasource.h"
+#include <QThread>
+#include <atomic>
 
 namespace {
 using Src = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
@@ -15,6 +17,73 @@ bool waitForResult(QCPHistogram* h)
 {
     QSignalSpy ready(h, &QCPHistogram::histogramReady);
     return ready.count() > 0 || ready.wait(5000);
+}
+
+struct Gate
+{
+    std::atomic<bool> open { false };
+    std::atomic<bool> entered { false };
+    void waitEntered() const { while (!entered.load()) QThread::msleep(1); }
+};
+
+// Blocks every read until the gate opens, so the test controls when a binning job ends.
+class GatedSource final : public QCPAbstractMultiDataSource
+{
+public:
+    GatedSource(std::shared_ptr<Src> inner, std::shared_ptr<Gate> gate)
+        : mInner(std::move(inner)), mGate(std::move(gate)) {}
+    int columnCount() const override { return mInner->columnCount(); }
+    int size() const override { return mInner->size(); }
+    double keyAt(int i) const override { return mInner->keyAt(i); }
+    QCPRange keyRange(bool& found, QCP::SignDomain sd) const override { return mInner->keyRange(found, sd); }
+    int findBegin(double k, bool e) const override { return mInner->findBegin(k, e); }
+    int findEnd(double k, bool e) const override { return mInner->findEnd(k, e); }
+    double valueAt(int column, int i) const override
+    {
+        mGate->entered.store(true);
+        while (!mGate->open.load()) QThread::msleep(1);
+        return mInner->valueAt(column, i);
+    }
+    QCPRange valueRange(int column, bool& found, QCP::SignDomain sd, const QCPRange& r) const override
+    {
+        return mInner->valueRange(column, found, sd, r);
+    }
+    QVector<QPointF> getOptimizedLineData(int c, int b, int e, int px, QCPAxis* k, QCPAxis* v) const override
+    {
+        return mInner->getOptimizedLineData(c, b, e, px, k, v);
+    }
+    QVector<QPointF> getLines(int c, int b, int e, QCPAxis* k, QCPAxis* v) const override
+    {
+        return mInner->getLines(c, b, e, k, v);
+    }
+
+private:
+    std::shared_ptr<Src> mInner;
+    std::shared_ptr<Gate> mGate;
+};
+
+std::shared_ptr<GatedSource> gated(std::vector<double> v, std::shared_ptr<Gate> gate)
+{
+    return std::make_shared<GatedSource>(values(std::move(v)), std::move(gate));
+}
+
+//! (front, back) of every result shown, in order.
+struct EdgeLog
+{
+    QList<QCPRange> shown;
+    explicit EdgeLog(QCPHistogram* h)
+    {
+        QObject::connect(h, &QCPHistogram::histogramReady, h, [this, h] {
+            if (h->histogram())
+                shown.append(QCPRange(h->histogram()->edges.front(), h->histogram()->edges.back()));
+        });
+    }
+};
+
+bool settle(QCPHistogram* h)
+{
+    QTest::qWait(50);
+    return QTest::qWaitFor([h] { return !h->pipeline().isBusy(); }, 5000);
 }
 }
 
@@ -133,4 +202,75 @@ void TestHistogramPlottable::nonPositiveFixedRangeFallsBackToAutoWhenTheAxisTurn
     QVERIFY(ready.wait(5000));
     QVERIFY(h->histogram()->log);
     QCOMPARE(h->histogram()->edges.front(), 1.0);
+}
+
+void TestHistogramPlottable::autoEdgesNeverShrinkWhileJobsOverlap()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    h->setDataSource(values({0, 10}));
+    QVERIFY(waitForResult(h));
+    EdgeLog log(h);
+    auto gate = std::make_shared<Gate>();
+    h->setDataSource(gated({-5, 8}, gate));
+    gate->waitEntered();
+    h->setDataSource(values({2, 8})); // queued behind the blocked job, with the old edges
+    gate->open = true;
+    QVERIFY(settle(h));
+    QVERIFY(!log.shown.isEmpty());
+    for (int i = 1; i < log.shown.size(); ++i)
+    {
+        QVERIFY(log.shown[i].lower <= log.shown[i - 1].lower);
+        QVERIFY(log.shown[i].upper >= log.shown[i - 1].upper);
+    }
+    QCOMPARE(h->histogram()->edges.front(), -5.0);
+    QCOMPARE(h->histogram()->edges.back(), 10.0);
+}
+
+void TestHistogramPlottable::preBinnedBarsDropAnOlderSourcesResultAndRange()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    h->setDataSource(values({-100, -90}));
+    QVERIFY(waitForResult(h));
+    auto gate = std::make_shared<Gate>();
+    h->setDataSource(gated({0, 10}, gate));
+    gate->waitEntered();
+    h->setBinned({100, 101, 102}, {{1, 2}});
+    h->setDataSource(values({50, 60}));
+    EdgeLog log(h);
+    gate->open = true;
+    QVERIFY(settle(h));
+    for (const QCPRange& shown : log.shown)
+        QCOMPARE(shown.lower, 50.0); // neither the stale source nor its range
+    QCOMPARE(h->histogram()->edges.front(), 50.0);
+    QCOMPARE(h->histogram()->edges.back(), 60.0);
+}
+
+void TestHistogramPlottable::resetEdgesDropsAResultBinnedBeforeTheReset()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    h->setDataSource(values({-100, -90}));
+    QVERIFY(waitForResult(h));
+    auto gate = std::make_shared<Gate>();
+    h->setDataSource(gated({0, 10}, gate));
+    gate->waitEntered();
+    EdgeLog log(h);
+    h->resetEdges();
+    gate->open = true;
+    QVERIFY(settle(h));
+    for (const QCPRange& shown : log.shown)
+        QCOMPARE(shown.lower, 0.0);
+    QCOMPARE(h->histogram()->edges.front(), 0.0);
+    QCOMPARE(h->histogram()->edges.back(), 10.0);
+}
+
+void TestHistogramPlottable::exportBinningEmitsNothing()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    QSignalSpy ready(h, &QCPHistogram::histogramReady);
+    QSignalSpy moved(h, &QCPHistogram::edgesChanged);
+    h->setDataSource(values({0, 1, 2, 3}));
+    mPlot->toPixmap(400, 300);
+    QVERIFY(h->histogram());
+    QCOMPARE(ready.count(), 0);
+    QCOMPARE(moved.count(), 0);
 }
