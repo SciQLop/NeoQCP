@@ -195,8 +195,11 @@ void QCPAsyncPipelineBase::deliverResult(uint64_t generation, std::any cache, st
         // built an empty pending job (e.g. source cleared while this job was
         // in flight) leaves its newer generation stranded — isBusy() would
         // report true forever since no further result will ever arrive for it.
+        // A finished() receiver may have started a job meanwhile (QCPHistogram
+        // re-bins a result narrower than its edges): that one is not stranded.
+        QMutexLocker relock(&mMutex);
         const uint64_t latest = mGeneration.load();
-        if (latest > mDisplayedGeneration)
+        if (!mJobRunning && latest > mDisplayedGeneration)
             mDisplayedGeneration = latest;
     }
 

@@ -6,6 +6,7 @@
 #include "datasource/soa-multi-datasource.h"
 #include <QThread>
 #include <atomic>
+#include <numeric>
 
 namespace {
 using Src = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
@@ -226,6 +227,21 @@ void TestHistogramPlottable::autoEdgesNeverShrinkWhileJobsOverlap()
     }
     QCOMPARE(h->histogram()->edges.front(), -5.0);
     QCOMPARE(h->histogram()->edges.back(), 10.0);
+}
+
+// The last result is narrower than the edges and re-bins from finished(): that job must land.
+void TestHistogramPlottable::rebinningAfterOverlappingJobsShowsTheLastSource()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto gate = std::make_shared<Gate>();
+    h->setDataSource(gated({0, 10}, gate));
+    gate->waitEntered();
+    h->setDataSource(values({2, 5, 8})); // queued, binned without the edges of the first
+    gate->open = true;
+    QVERIFY(settle(h));
+    QVERIFY(h->histogram());
+    const auto& heights = h->histogram()->heights.front();
+    QCOMPARE(std::accumulate(heights.begin(), heights.end(), 0.0), 3.0);
 }
 
 void TestHistogramPlottable::preBinnedBarsDropAnOlderSourcesResultAndRange()

@@ -21,6 +21,7 @@ private slots:
     void nonPositiveFixedRangeIsRejectedOnLogBins();
     void nonPositiveFixedRangeFallsBackToAutoWhenTheAxisTurnsLog();
     void autoEdgesNeverShrinkWhileJobsOverlap();
+    void rebinningAfterOverlappingJobsShowsTheLastSource();
     void preBinnedBarsDropAnOlderSourcesResultAndRange();
     void resetEdgesDropsAResultBinnedBeforeTheReset();
     void exportBinningEmitsNothing();
