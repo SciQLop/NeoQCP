@@ -288,7 +288,7 @@ void QCPHistogram::draw(QCPPainter* painter)
         binForExport();
     if (!mResult || !mKeyAxis || !mValueAxis)
         return;
-    auto* layer = gpuLayer(painter);
+    auto* layer = qcp::gpuLayer(mParentPlot, mLayer, painter->isExporting());
     for (int c = 0; c < int(mResult->heights.size()); ++c)
     {
         const auto bars = columnBars(c);
@@ -325,12 +325,6 @@ QVector<QPointF> QCPHistogram::outline(std::span<const qcp::histogram::BarRect> 
 {
     return mStyle == sBars ? qcp::histogram::barOutlines(bars, keyIsVertical())
                            : qcp::histogram::stepOutline(bars, keyIsVertical());
-}
-
-QCPPlottableRhiLayer* QCPHistogram::gpuLayer(const QCPPainter* painter) const
-{
-    return mParentPlot && mParentPlot->rhi() && !painter->isExporting()
-        ? mParentPlot->plottableRhiLayer(mLayer) : nullptr;
 }
 
 // Built from the current axes on every frame: no pan offset.

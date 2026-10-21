@@ -11,11 +11,15 @@
 class QCustomPlot;
 class QCPPainter;
 class QCPLayer;
+class QCPPlottableRhiLayer;
 
 namespace qcp {
 
 /// The colour of the index-th component or column when none is set (cycles after 10).
 QColor defaultPlottableColor(int index);
+
+/// The GPU layer a plottable on @a layer draws into, or nullptr: no QRhi, or exporting.
+QCPPlottableRhiLayer* gpuLayer(QCustomPlot* parentPlot, QCPLayer* layer, bool exporting);
 
 /// QPainter::drawPolyline does not break at NaN: one polyline per NaN-separated run.
 void drawPolylineSplitNaN(QCPPainter* painter, const QVector<QPointF>& pts);

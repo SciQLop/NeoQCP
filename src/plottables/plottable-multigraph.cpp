@@ -1397,16 +1397,10 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::binnedWhenDense(
     return rows;
 }
 
-QCPPlottableRhiLayer* QCPMultiGraph::gpuLayerFor(bool isExportMode) const
-{
-    return mParentPlot && mParentPlot->rhi() && !isExportMode
-        ? mParentPlot->plottableRhiLayer(mLayer) : nullptr;
-}
-
 void QCPMultiGraph::drawFills(QCPPainter* painter, const QCPAbstractMultiDataSource& ds, int begin,
                               int end, bool fresh, const QPointF& gpuOffset, bool isExportMode)
 {
-    auto* gpuLayer = gpuLayerFor(isExportMode);
+    auto* gpuLayer = qcp::gpuLayer(mParentPlot, mLayer, isExportMode);
     for (auto& entry : mFills) {
         if (!fillDrawable(entry.spec, ds.columnCount())) continue;
         const QBrush brush = effectiveFillBrush(entry.spec);
@@ -1529,7 +1523,7 @@ void QCPMultiGraph::drawErrorBars(QCPPainter* painter, const QCPAbstractMultiDat
                                   bool rawRows, int begin, int end, bool fresh,
                                   const QPointF& gpuOffset, bool isExportMode)
 {
-    auto* gpuLayer = gpuLayerFor(isExportMode);
+    auto* gpuLayer = qcp::gpuLayer(mParentPlot, mLayer, isExportMode);
     const bool rebuild = fresh || isExportMode;
     for (auto& entry : mErrorBars) {
         if (!errorBarsDrawable(entry.spec, ds.columnCount())) continue;

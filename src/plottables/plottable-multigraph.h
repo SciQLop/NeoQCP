@@ -318,7 +318,6 @@ protected:
                        bool fresh, const QPointF& gpuOffset);
     [[nodiscard]] std::vector<qcp::fill::StripPoint> binnedWhenDense(
         std::vector<qcp::fill::StripPoint> rows) const;
-    [[nodiscard]] QCPPlottableRhiLayer* gpuLayerFor(bool isExportMode) const;
     void paintFill(QCPPainter* painter, const QBrush& brush,
                    std::span<const qcp::fill::StripPoint> rows) const;
     [[nodiscard]] bool errorBarsDrawable(const ErrorBars& spec, int columnCount) const;

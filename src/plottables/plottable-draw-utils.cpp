@@ -21,6 +21,12 @@ QColor defaultPlottableColor(int index)
     return colors[index % colors.size()];
 }
 
+QCPPlottableRhiLayer* gpuLayer(QCustomPlot* parentPlot, QCPLayer* layer, bool exporting)
+{
+    return parentPlot && parentPlot->rhi() && !exporting ? parentPlot->plottableRhiLayer(layer)
+                                                         : nullptr;
+}
+
 void drawPolylineSplitNaN(QCPPainter* painter, const QVector<QPointF>& pts)
 {
     int segStart = 0;

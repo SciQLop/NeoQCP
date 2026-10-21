@@ -1,21 +1,15 @@
 #include "histogram-geometry.h"
 #include "multigraph-fill.h"
+#include "plottable-geometry-utils.h"
 #include "../axis/axis.h"
 #include "../datasource/histogram-binner-1d.h"
 #include <algorithm>
 #include <cmath>
-#include <limits>
 
 namespace qcp::histogram {
 namespace {
 
-const QPointF kBreak(std::numeric_limits<double>::quiet_NaN(),
-                     std::numeric_limits<double>::quiet_NaN());
-
-QPointF point(double key, double value, bool keyIsVertical)
-{
-    return keyIsVertical ? QPointF(value, key) : QPointF(key, value);
-}
+using qcp::geometry::point;
 
 // A log axis has no position for a count <= 0.
 bool absentHeight(const QCPAxis& valueAxis, double height)
@@ -39,7 +33,7 @@ bool joins(const BarRect& previous, const BarRect& next)
 void startRun(QVector<QPointF>& out)
 {
     if (!out.isEmpty())
-        out.append(kBreak);
+        out.append(qcp::geometry::breakPoint());
 }
 
 } // namespace

@@ -91,7 +91,6 @@ private:
     [[nodiscard]] bool keyIsVertical() const;
     [[nodiscard]] std::vector<qcp::histogram::BarRect> columnBars(int column) const;
     [[nodiscard]] QVector<QPointF> outline(std::span<const qcp::histogram::BarRect> bars) const;
-    [[nodiscard]] QCPPlottableRhiLayer* gpuLayer(const QCPPainter* painter) const;
     void drawColumnOnGpu(QCPPainter* painter, QCPPlottableRhiLayer* layer,
                          std::span<const qcp::histogram::BarRect> bars, const ColumnLook& look);
     void paintColumn(QCPPainter* painter, std::span<const qcp::histogram::BarRect> bars,

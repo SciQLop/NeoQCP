@@ -1,4 +1,5 @@
 #include "multigraph-fill.h"
+#include "plottable-geometry-utils.h"
 #include "../axis/axis.h"
 #include <algorithm>
 #include <cmath>
@@ -67,19 +68,16 @@ std::vector<std::span<const StripPoint>> runs(std::span<const StripPoint> rows)
     return result;
 }
 
-QPointF point(bool keyIsVertical, double key, double value)
-{
-    return keyIsVertical ? QPointF(value, key) : QPointF(key, value);
-}
+using qcp::geometry::point;
 
 QPolygonF closedPolygon(std::span<const StripPoint> run, bool keyIsVertical)
 {
     QPolygonF poly;
     poly.reserve(static_cast<qsizetype>(run.size() * 2));
     for (const auto& r : run)
-        poly << point(keyIsVertical, r.key, r.a);
+        poly << point(r.key, r.a, keyIsVertical);
     for (auto it = run.rbegin(); it != run.rend(); ++it)
-        poly << point(keyIsVertical, it->key, it->b);
+        poly << point(it->key, it->b, keyIsVertical);
     return poly;
 }
 
