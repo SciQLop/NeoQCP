@@ -17,18 +17,23 @@ QPointF point(double key, double value, bool keyIsVertical)
     return keyIsVertical ? QPointF(value, key) : QPointF(key, value);
 }
 
-// A log axis has no position for a count <= 0: such a bar collapses onto its base.
-double topPixel(const QCPAxis& valueAxis, double height, double base)
+// A log axis has no position for a count <= 0.
+bool absentHeight(const QCPAxis& valueAxis, double height)
 {
     const bool log = valueAxis.scaleType() == QCPAxis::stLogarithmic;
-    if (!std::isfinite(height) || (log && height <= 0))
-        return base;
-    return valueAxis.coordToPixel(height);
+    return !std::isfinite(height) || (log && height <= 0);
+}
+
+BarRect bar(double left, double right, double base, const QCPAxis& valueAxis, double height)
+{
+    if (absentHeight(valueAxis, height))
+        return {left, right, base, base, true};
+    return {left, right, base, valueAxis.coordToPixel(height)};
 }
 
 bool joins(const BarRect& previous, const BarRect& next)
 {
-    return !isEmpty(previous) && !isEmpty(next) && previous.right == next.left;
+    return !previous.absent && !next.absent && previous.right == next.left;
 }
 
 void startRun(QVector<QPointF>& out)
@@ -49,8 +54,8 @@ std::vector<BarRect> barRects(const qcp::algo::Histogram1D& h, int column,
     std::vector<BarRect> bars;
     bars.reserve(heights.size());
     for (std::size_t i = 0; i < heights.size() && i + 1 < h.edges.size(); ++i)
-        bars.push_back({keyAxis->coordToPixel(h.edges[i]), keyAxis->coordToPixel(h.edges[i + 1]),
-                        base, topPixel(*valueAxis, heights[i], base)});
+        bars.push_back(bar(keyAxis->coordToPixel(h.edges[i]), keyAxis->coordToPixel(h.edges[i + 1]),
+                           base, *valueAxis, heights[i]));
     return bars;
 }
 
@@ -81,7 +86,7 @@ QVector<QPointF> stepOutline(std::span<const BarRect> bars, bool keyIsVertical)
     for (std::size_t i = 0; i < bars.size(); ++i)
     {
         const BarRect& bar = bars[i];
-        if (isEmpty(bar))
+        if (bar.absent)
             continue;
         if (i == 0 || !joins(bars[i - 1], bar))
         {

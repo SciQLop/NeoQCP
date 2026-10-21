@@ -30,6 +30,10 @@ private slots:
     void emptyBinsOnALogAxisStayOutOfTheOutline();
     void clickInsideABarHitsAndAboveItMisses();
     void barsAreDrawnOnTheGpu();
+    void emptyBinOnALinearAxisKeepsTheStepRun();
+    void stepWithOneColumnIsTheOutlineOnly();
+    void stepWithSeveralColumnsHasALightFill();
+    void barsKeepATranslucentUserColour();
 
 private:
     QCustomPlot* mPlot = nullptr;

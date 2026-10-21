@@ -316,8 +316,10 @@ void TestHistogramPlottable::emptyBinsOnALogAxisStayOutOfTheOutline()
 {
     auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
     h->setBinned({0, 1, 2, 3}, {{4, 0, 4}});
+    mPlot->xAxis->setRange(0, 3);
     mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
     mPlot->yAxis->setRange(1, 10);
+    mPlot->replot();
     const auto bars = qcp::histogram::barRects(*h->histogram(), 0, mPlot->xAxis, mPlot->yAxis);
     QCOMPARE(bars[1].top, bars[1].base);
     for (const QPointF& p : qcp::histogram::stepOutline(bars, false))
@@ -370,4 +372,63 @@ void TestHistogramPlottable::barsAreDrawnOnTheGpu()
     };
     QVERIFY(isRedish(px(1.5, 4.5)));
     QVERIFY(!isRedish(px(0.5, 4.5)));
+}
+
+void TestHistogramPlottable::emptyBinOnALinearAxisKeepsTheStepRun()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    h->setBinned({0, 1, 2, 3}, {{4, 0, 4}});
+    mPlot->xAxis->setRange(0, 3);
+    mPlot->yAxis->setRange(0, 10);
+    mPlot->replot();
+    const auto bars = qcp::histogram::barRects(*h->histogram(), 0, mPlot->xAxis, mPlot->yAxis);
+    const auto run = qcp::histogram::stepOutline(bars, false);
+    for (const QPointF& p : run)
+        QVERIFY(!std::isnan(p.x()));
+    QVERIFY(run.contains(QPointF(bars[1].left, bars[1].base)));
+    QVERIFY(run.contains(QPointF(bars[1].right, bars[1].base)));
+}
+
+namespace {
+QColor exportedPixel(QCustomPlot* plot, double x, double y)
+{
+    const QImage img = plot->toPixmap(400, 300).toImage();
+    return img.pixelColor(int(plot->xAxis->coordToPixel(x)), int(plot->yAxis->coordToPixel(y)));
+}
+bool isLightRed(QColor c) { return c.red() > 200 && c.green() > 150 && c.green() < 235; }
+}
+
+void TestHistogramPlottable::stepWithOneColumnIsTheOutlineOnly()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    h->setColumnColors({Qt::red});
+    h->setStyle(QCPHistogram::sStep);
+    h->setBinned({0, 1, 2}, {{3, 6}});
+    mPlot->xAxis->setRange(0, 2);
+    mPlot->yAxis->setRange(0, 8);
+    const QColor inside = exportedPixel(mPlot, 0.5, 2);
+    QVERIFY2(inside.green() > 240 && inside.blue() > 240, qPrintable(inside.name()));
+}
+
+void TestHistogramPlottable::stepWithSeveralColumnsHasALightFill()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    h->setColumnColors({Qt::red, Qt::blue});
+    h->setStyle(QCPHistogram::sStep);
+    h->setBinned({0, 1, 2}, {{3, 6}, {0, 0}});
+    mPlot->xAxis->setRange(0, 2);
+    mPlot->yAxis->setRange(0, 8);
+    const QColor inside = exportedPixel(mPlot, 0.5, 2);
+    QVERIFY2(isLightRed(inside), qPrintable(inside.name()));
+}
+
+void TestHistogramPlottable::barsKeepATranslucentUserColour()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    h->setColumnColors({QColor(255, 0, 0, 64)});
+    h->setBinned({0, 1, 2}, {{3, 6}});
+    mPlot->xAxis->setRange(0, 2);
+    mPlot->yAxis->setRange(0, 8);
+    const QColor inside = exportedPixel(mPlot, 0.5, 2);
+    QVERIFY2(isLightRed(inside), qPrintable(inside.name()));
 }

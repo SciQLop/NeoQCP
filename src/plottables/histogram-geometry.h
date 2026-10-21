@@ -12,9 +12,9 @@ namespace qcp::algo { struct Histogram1D; }
 
 namespace qcp::histogram {
 
-//! One column's bars as pixel rectangles; zero-height bars on a log value axis have
-//! top == base (they are left out of the outline).
-struct BarRect { double left, right, base, top; };
+//! One column's bars as pixel rectangles. absent: the height has no position on the value axis
+//! (non-finite, or <= 0 on a log axis); top == base and the step outline breaks there.
+struct BarRect { double left, right, base, top; bool absent = false; };
 
 [[nodiscard]] inline bool isEmpty(const BarRect& bar) { return bar.top == bar.base; }
 

@@ -290,16 +290,14 @@ void QCPHistogram::draw(QCPPainter* painter)
 
 QCPHistogram::ColumnLook QCPHistogram::columnLook(int column) const
 {
-    QColor color = column < mColors.size() && mColors[column].isValid()
+    const QColor color = column < mColors.size() && mColors[column].isValid()
         ? mColors[column] : qcp::defaultPlottableColor(column);
     if (mStyle == sBars)
-    {
-        color.setAlpha(255);
         return {color, QPen(color.darker(125), 1)};
-    }
-    QColor light = color;
-    light.setAlpha(64);
-    return {light, QPen(color, 1)};
+    // One step outline reads alone; several overlap, and a light fill tells them apart.
+    QColor fill = color;
+    fill.setAlpha(mResult && mResult->heights.size() > 1 ? 64 : 0);
+    return {fill, QPen(color, 1)};
 }
 
 bool QCPHistogram::keyIsVertical() const
@@ -330,7 +328,9 @@ void QCPHistogram::drawColumnOnGpu(QCPPainter* painter, QCPPlottableRhiLayer* la
                                    const ColumnLook& look)
 {
     std::vector<float> fill;
-    qcp::histogram::appendBarQuads(bars, keyIsVertical(), qcp::rhi::premultipliedColor(look.fill), fill);
+    if (look.fill.alpha() > 0)
+        qcp::histogram::appendBarQuads(bars, keyIsVertical(), qcp::rhi::premultipliedColor(look.fill),
+                                       fill);
     const double dpr = mParentPlot->bufferDevicePixelRatio();
     // simplify: re-extruded per frame; fine for the hundreds of bins histograms use. Cache with
     // qcp::ExtrusionCache (drawPolylineCached) if a 10^5-bin case appears.
@@ -350,7 +350,7 @@ void QCPHistogram::paintColumn(QCPPainter* painter, std::span<const qcp::histogr
     painter->setPen(Qt::NoPen);
     painter->setBrush(look.fill);
     for (const auto& bar : bars)
-        if (!qcp::histogram::isEmpty(bar))
+        if (look.fill.alpha() > 0 && !qcp::histogram::isEmpty(bar))
             painter->drawRect(qcp::histogram::pixelRect(bar, keyIsVertical()));
     painter->setPen(look.outline);
     painter->setBrush(Qt::NoBrush);
