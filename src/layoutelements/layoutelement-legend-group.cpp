@@ -106,7 +106,7 @@ double QCPGroupLegendItem::selectTest(const QPointF& pos, bool onlySelectable, Q
         int hitRow = static_cast<int>(relY / rh);
 
         QVariantMap detailMap;
-        const QVector<int> shown = mMultiGraph->legendComponents();
+        const QVector<int> shown = mMultiGraph ? mMultiGraph->legendComponents() : QVector<int>();
         if (!shownExpanded() || hitRow == 0 || shown.isEmpty())
             detailMap[QStringLiteral("componentIndex")] = -1; // header
         else

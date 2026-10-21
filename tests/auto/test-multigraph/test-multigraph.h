@@ -43,6 +43,7 @@ private slots:
     void legendClickMapsRowsToInLegendComponents();
     void legendOneInLegendComponentHasNoExpander();
     void legendHeaderClickSelectsTheOnlyInLegendComponent();
+    void legendSelectTestSurvivesNullMultiGraph();
     void legendExpandCollapse();
     void legendGroupSelectsAll();
     void legendHeaderDoesNotLeakClassNameWhenEmpty();

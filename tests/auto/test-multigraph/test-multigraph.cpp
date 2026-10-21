@@ -1049,3 +1049,12 @@ void TestMultiGraph::legendHeaderClickSelectsTheOnlyInLegendComponent()
     QCOMPARE(clicked.first().first().toInt(), 1);
     QCOMPARE(gi->selectedComponent(), 1);
 }
+
+void TestMultiGraph::legendSelectTestSurvivesNullMultiGraph()
+{
+    QCPGroupLegendItem item(mPlot->legend, nullptr);
+    item.setOuterRect(QRect(0, 0, 100, 40));
+    QVariant details;
+    QVERIFY(item.selectTest(QPointF(5, 5), false, &details) >= 0);
+    QCOMPARE(details.toMap().value("componentIndex").toInt(), -1);
+}
