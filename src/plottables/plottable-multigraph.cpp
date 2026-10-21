@@ -1418,9 +1418,17 @@ void QCPMultiGraph::drawLegendIcon(QCPPainter* painter, const QRectF& rect) cons
     }
 }
 
+static QRectF legendSwatchRect(const QLineF& line)
+{
+    constexpr double swatchHeight = 12; // ~60 % of a legend row at the default font
+    return QRectF(line.x1(), line.y1() - swatchHeight / 2, line.length(), swatchHeight);
+}
+
 void QCPMultiGraph::drawComponentLegendIcon(QCPPainter* painter, int component, const QLineF& line) const
 {
     const Component& comp = mComponents[component];
+    if (const auto fill = componentFill(component))
+        painter->fillRect(legendSwatchRect(line), effectiveFillBrush(*fill));
     QPen pen = comp.pen;
     if (mColor.hasValues())
     {

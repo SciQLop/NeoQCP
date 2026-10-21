@@ -1288,3 +1288,20 @@ void TestMultiGraph::fillFollowsADownsampledLine()
     QVERIFY(isRedish(img.pixelColor(crest, int(mPlot->yAxis->coordToPixel(0.5)))));
     QVERIFY(!isRedish(img.pixelColor(crest, int(mPlot->yAxis->coordToPixel(1.3)))));
 }
+
+void TestMultiGraph::legendIconOfABandIsAFilledSwatch()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double>{1, 2}, std::vector<std::vector<double>>{{0, 0}, {1, 1}});
+    mg->setComponentLineStyle(0, QCPMultiGraph::lsNone);
+    mg->setComponentLineStyle(1, QCPMultiGraph::lsNone);
+    mg->setComponentInLegend(1, false);
+    mg->setComponentFillBetween(0, 1, QBrush(Qt::red));
+    QImage img(40, 20, QImage::Format_ARGB32);
+    img.fill(Qt::white);
+    QCPPainter p(&img);
+    mg->drawComponentLegendIcon(&p, 0, QLineF(0, 10, 40, 10));
+    p.end();
+    QVERIFY(isRedish(img.pixelColor(20, 6)));
+    QVERIFY(isRedish(img.pixelColor(20, 14)));
+}

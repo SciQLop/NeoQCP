@@ -51,6 +51,7 @@ private slots:
     void legendCollapsedFitsExpanderMarker();
     void legendOneComponentHasNoExpander();
     void legendIconDrawsScatterMarkers();
+    void legendIconOfABandIsAFilledSwatch();
     void legendCollapsedFitsBusyIndicator();
 
     // Fills
