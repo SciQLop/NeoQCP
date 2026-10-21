@@ -1,6 +1,7 @@
 #pragma once
 
 #include "plottable-color-runs.h"
+#include <QColor>
 #include <QPointF>
 #include <QPen>
 #include <QRect>
@@ -12,6 +13,12 @@ class QCPPainter;
 class QCPLayer;
 
 namespace qcp {
+
+/// The colour of the index-th component or column when none is set (cycles after 10).
+QColor defaultPlottableColor(int index);
+
+/// QPainter::drawPolyline does not break at NaN: one polyline per NaN-separated run.
+void drawPolylineSplitNaN(QCPPainter* painter, const QVector<QPointF>& pts);
 
 /// Cached extruded vertices for a single polyline.
 /// Stores the untranslated GPU vertices so they can be reused across frames

@@ -1,6 +1,8 @@
 #include "test-histogram-plottable.h"
 #include "qcustomplot.h"
 #include "plottables/plottable-histogram.h"
+#include "plottables/histogram-geometry.h"
+#include "painting/plottable-rhi-layer.h"
 #include "datasource/soa-multi-datasource.h"
 #include <QThread>
 #include <atomic>
@@ -273,4 +275,99 @@ void TestHistogramPlottable::exportBinningEmitsNothing()
     QVERIFY(h->histogram());
     QCOMPARE(ready.count(), 0);
     QCOMPARE(moved.count(), 0);
+}
+
+static bool isRedish(QColor c) { return c.red() > 150 && c.green() < 120 && c.blue() < 120; }
+
+void TestHistogramPlottable::barsAreDrawnUpToTheirHeight()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    h->setColumnColors({Qt::red});
+    h->setBinned({0, 1, 2}, {{3, 6}});
+    mPlot->xAxis->setRange(0, 2);
+    mPlot->yAxis->setRange(0, 8);
+    const QImage img = mPlot->toPixmap(400, 300).toImage();
+    const auto px = [&](double x, double y) {
+        return img.pixelColor(int(mPlot->xAxis->coordToPixel(x)), int(mPlot->yAxis->coordToPixel(y)));
+    };
+    QVERIFY(isRedish(px(0.5, 2)));
+    QVERIFY(!isRedish(px(0.5, 4.5)));
+    QVERIFY(isRedish(px(1.5, 4.5)));
+}
+
+void TestHistogramPlottable::outlineRunsDoNotJoinBars()
+{
+    const std::vector<qcp::histogram::BarRect> bars { {0, 10, 100, 50}, {10, 20, 100, 20} };
+    const auto runs = qcp::histogram::barOutlines(bars, false);
+    QCOMPARE(runs.size(), 5 + 1 + 5);
+    QVERIFY(std::isnan(runs[5].x()));
+}
+
+void TestHistogramPlottable::stepOutlineIsTheTopProfile()
+{
+    const std::vector<qcp::histogram::BarRect> bars { {0, 10, 100, 50}, {10, 20, 100, 20} };
+    const auto run = qcp::histogram::stepOutline(bars, false);
+    QCOMPARE(run.first(), QPointF(0, 100));
+    QCOMPARE(run.last(), QPointF(20, 100));
+    QVERIFY(run.contains(QPointF(10, 50)) && run.contains(QPointF(10, 20)));
+}
+
+void TestHistogramPlottable::emptyBinsOnALogAxisStayOutOfTheOutline()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    h->setBinned({0, 1, 2, 3}, {{4, 0, 4}});
+    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setRange(1, 10);
+    const auto bars = qcp::histogram::barRects(*h->histogram(), 0, mPlot->xAxis, mPlot->yAxis);
+    QCOMPARE(bars[1].top, bars[1].base);
+    for (const QPointF& p : qcp::histogram::stepOutline(bars, false))
+        QVERIFY(std::isnan(p.x()) || std::isfinite(p.y()));
+}
+
+void TestHistogramPlottable::clickInsideABarHitsAndAboveItMisses()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    h->setBinned({0, 1, 2}, {{3, 6}});
+    mPlot->xAxis->setRange(0, 2);
+    mPlot->yAxis->setRange(0, 8);
+    mPlot->replot();
+    const auto at = [&](double x, double y) {
+        return QPointF(mPlot->xAxis->coordToPixel(x), mPlot->yAxis->coordToPixel(y));
+    };
+    QCOMPARE(h->selectTest(at(0.5, 2), false), 0.0);
+    QCOMPARE(h->selectTest(at(0.5, 4.5), false), -1.0);
+    h->setSelectable(QCP::stNone);
+    QCOMPARE(h->selectTest(at(0.5, 2), true), -1.0);
+}
+
+namespace {
+bool showWithRhi(QCustomPlot* plot)
+{
+    plot->show();
+    if (!QTest::qWaitForWindowExposed(plot))
+        return false;
+    QCoreApplication::processEvents();
+    return plot->rhi() != nullptr;
+}
+}
+
+void TestHistogramPlottable::barsAreDrawnOnTheGpu()
+{
+    if (!showWithRhi(mPlot))
+        QSKIP("no QRhi available in this environment");
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    h->setColumnColors({Qt::red});
+    h->setBinned({0, 1, 2}, {{3, 6}});
+    mPlot->xAxis->setRange(0, 2);
+    mPlot->yAxis->setRange(0, 8);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(!mPlot->plottableRhiLayer(h->layer())->drawEntries().isEmpty());
+    const QImage frame = mPlot->grabFramebuffer();
+    const double dpr = frame.devicePixelRatio();
+    const auto px = [&](double x, double y) {
+        return frame.pixelColor(qRound(mPlot->xAxis->coordToPixel(x) * dpr),
+                                qRound(mPlot->yAxis->coordToPixel(y) * dpr));
+    };
+    QVERIFY(isRedish(px(1.5, 4.5)));
+    QVERIFY(!isRedish(px(0.5, 4.5)));
 }

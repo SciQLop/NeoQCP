@@ -1,12 +1,16 @@
 #pragma once
 #include "plottable.h"
+#include "histogram-geometry.h"
 #include <datasource/async-pipeline.h>
 #include <datasource/histogram-binner-1d.h>
 #include <QColor>
+#include <QPen>
 #include <QList>
 #include <memory>
 #include <optional>
 #include <vector>
+
+class QCPPlottableRhiLayer;
 
 //! A 1-D histogram of every value column of a multi data source, with shared bin edges.
 //! Binning runs in the background; pre-binned data (setBinned) bypasses the pipeline.
@@ -80,4 +84,15 @@ private:
     void takeResult(std::shared_ptr<qcp::algo::Histogram1D> result);
     void rememberEdges();
     void requestReplot();
+
+    struct ColumnLook { QColor fill; QPen outline; };
+    [[nodiscard]] ColumnLook columnLook(int column) const;
+    [[nodiscard]] bool keyIsVertical() const;
+    [[nodiscard]] std::vector<qcp::histogram::BarRect> columnBars(int column) const;
+    [[nodiscard]] QVector<QPointF> outline(std::span<const qcp::histogram::BarRect> bars) const;
+    [[nodiscard]] QCPPlottableRhiLayer* gpuLayer(const QCPPainter* painter) const;
+    void drawColumnOnGpu(QCPPainter* painter, QCPPlottableRhiLayer* layer,
+                         std::span<const qcp::histogram::BarRect> bars, const ColumnLook& look);
+    void paintColumn(QCPPainter* painter, std::span<const qcp::histogram::BarRect> bars,
+                     const ColumnLook& look) const;
 };

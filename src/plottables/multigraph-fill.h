@@ -4,7 +4,10 @@
 #include <QVector>
 #include <array>
 #include <span>
+#include <utility>
 #include <vector>
+
+class QCPAxis;
 
 namespace qcp::fill {
 
@@ -35,5 +38,11 @@ QVector<QPolygonF> stripPolygons(std::span<const StripPoint> rows, bool keyIsVer
 //! Step transforms applied to both edges, matching qcp::toStepLeftLines & co.
 enum class Step { None, Left, Right, Center };
 std::vector<StripPoint> stepped(std::span<const StripPoint> rows, Step step);
+
+//! On a log value axis: the edge pixel on the side of zero, then the opposite edge.
+std::pair<double, double> logZeroSideEdges(const QCPAxis& valueAxis);
+
+//! The pixel of a fill baseline at value; on a log axis a value <= 0 goes past the edge.
+double baselinePixel(const QCPAxis& valueAxis, double value);
 
 } // namespace qcp::fill

@@ -27,13 +27,6 @@ static QPen defaultSelectedPen(const QPen& pen)
     return sel;
 }
 
-static const QList<QColor> sDefaultColors = {
-    QColor(31, 119, 180),  QColor(255, 127, 14), QColor(44, 160, 44),
-    QColor(214, 39, 40),   QColor(148, 103, 189), QColor(140, 86, 75),
-    QColor(227, 119, 194), QColor(127, 127, 127), QColor(188, 189, 34),
-    QColor(23, 190, 207)
-};
-
 QCPMultiGraph::QCPMultiGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
     : QCPAbstractPlottable(keyAxis, valueAxis)
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
@@ -299,7 +292,7 @@ void QCPMultiGraph::syncComponentCount(int newCount)
         mComponents.resize(newCount);
         for (int i = oldCount; i < newCount; ++i) {
             auto& c = mComponents[i];
-            QColor color = sDefaultColors[i % sDefaultColors.size()];
+            QColor color = qcp::defaultPlottableColor(i);
             c.pen = QPen(color, 0);
             c.selectedPen = defaultSelectedPen(c.pen);
             c.name = QString("Component %1").arg(i);
@@ -1353,28 +1346,6 @@ bool QCPMultiGraph::fillDrawable(const Fill& fill, int columnCount) const
         && (!target || shown(*target));
 }
 
-// A log axis has no pixel for a value <= 0: the baseline goes two axis lengths past the edge on
-// the side of zero, as QCPGraph::getFillBasePoint picks it. Far enough to stay off screen during
-// a GPU pan, near enough to keep float precision; the scissor clips it.
-double QCPMultiGraph::fillBaselinePixel(double value) const
-{
-    if (mValueAxis->scaleType() == QCPAxis::stLinear || value > 0)
-        return mValueAxis->coordToPixel(value);
-    const auto [edge, other] = logZeroSideEdges();
-    return edge + 2.0 * (edge - other);
-}
-
-// simplify: a value <= 0 is taken as invalid on every log axis, but on an all-negative range the
-// invalid values are the ones >= 0. Callers then push valid negative values to the edge. Upgrade:
-// test the value's sign against the range's sign in fillBaselinePixel and errorPixel.
-std::pair<double, double> QCPMultiGraph::logZeroSideEdges() const
-{
-    const QCPRange range = mValueAxis->range();
-    const bool positive = range.upper > 0;
-    return {mValueAxis->coordToPixel(positive ? range.lower : range.upper),
-            mValueAxis->coordToPixel(positive ? range.upper : range.lower)};
-}
-
 qcp::fill::Step QCPMultiGraph::ownerStep(const Component& owner)
 {
     switch (owner.lineStyle) {
@@ -1391,7 +1362,8 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::fillRows(const Fill& fill,
 {
     const auto gaps = ds.gapsBefore(begin, end);
     const auto* targetColumn = std::get_if<int>(&fill.target);
-    const double constantPixel = targetColumn ? 0.0 : fillBaselinePixel(std::get<double>(fill.target));
+    const double constantPixel =
+        targetColumn ? 0.0 : qcp::fill::baselinePixel(*mValueAxis, std::get<double>(fill.target));
     std::vector<qcp::fill::StripPoint> rows;
     rows.reserve(std::max(0, end - begin));
     for (int i = begin; i < end; ++i)
@@ -1495,7 +1467,7 @@ double QCPMultiGraph::errorPixel(double value) const
 {
     if (mValueAxis->scaleType() == QCPAxis::stLinear || value > 0 || std::isnan(value))
         return mValueAxis->coordToPixel(value);
-    return logZeroSideEdges().first;
+    return qcp::fill::logZeroSideEdges(*mValueAxis).first;
 }
 
 static bool bothFinite(double a, double b) { return std::isfinite(a) && std::isfinite(b); }

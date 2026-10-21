@@ -8,7 +8,18 @@
 #include <cmath>
 #include <span>
 
-namespace {
+namespace qcp {
+
+QColor defaultPlottableColor(int index)
+{
+    static const QList<QColor> colors = {
+        QColor(31, 119, 180),  QColor(255, 127, 14), QColor(44, 160, 44),
+        QColor(214, 39, 40),   QColor(148, 103, 189), QColor(140, 86, 75),
+        QColor(227, 119, 194), QColor(127, 127, 127), QColor(188, 189, 34),
+        QColor(23, 190, 207)
+    };
+    return colors[index % colors.size()];
+}
 
 void drawPolylineSplitNaN(QCPPainter* painter, const QVector<QPointF>& pts)
 {
@@ -27,10 +38,6 @@ void drawPolylineSplitNaN(QCPPainter* painter, const QVector<QPointF>& pts)
     if (segLen >= 2)
         painter->drawPolyline(pts.constData() + segStart, segLen);
 }
-
-} // anonymous namespace
-
-namespace qcp {
 
 float extrusionPenWidth(const QPen& pen, double devicePixelRatio)
 {

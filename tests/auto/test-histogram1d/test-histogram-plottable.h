@@ -24,6 +24,12 @@ private slots:
     void preBinnedBarsDropAnOlderSourcesResultAndRange();
     void resetEdgesDropsAResultBinnedBeforeTheReset();
     void exportBinningEmitsNothing();
+    void barsAreDrawnUpToTheirHeight();
+    void outlineRunsDoNotJoinBars();
+    void stepOutlineIsTheTopProfile();
+    void emptyBinsOnALogAxisStayOutOfTheOutline();
+    void clickInsideABarHitsAndAboveItMisses();
+    void barsAreDrawnOnTheGpu();
 
 private:
     QCustomPlot* mPlot = nullptr;

@@ -1,4 +1,5 @@
 #include "multigraph-fill.h"
+#include "../axis/axis.h"
 #include <algorithm>
 #include <cmath>
 #include <utility>
@@ -195,6 +196,28 @@ std::vector<StripPoint> stepped(std::span<const StripPoint> rows, Step step)
             default: steppedCenter(rows, i, out); break;
         }
     return out;
+}
+
+// simplify: a value <= 0 is taken as invalid on every log axis, but on an all-negative range the
+// invalid values are the ones >= 0. Callers then push valid negative values to the edge. Upgrade:
+// test the value's sign against the range's sign in baselinePixel and QCPMultiGraph::errorPixel.
+std::pair<double, double> logZeroSideEdges(const QCPAxis& valueAxis)
+{
+    const QCPRange range = valueAxis.range();
+    const bool positive = range.upper > 0;
+    return {valueAxis.coordToPixel(positive ? range.lower : range.upper),
+            valueAxis.coordToPixel(positive ? range.upper : range.lower)};
+}
+
+// A log axis has no pixel for a value <= 0: the baseline goes two axis lengths past the edge on
+// the side of zero, as QCPGraph::getFillBasePoint picks it. Far enough to stay off screen during
+// a GPU pan, near enough to keep float precision; the scissor clips it.
+double baselinePixel(const QCPAxis& valueAxis, double value)
+{
+    if (valueAxis.scaleType() == QCPAxis::stLinear || value > 0)
+        return valueAxis.coordToPixel(value);
+    const auto [edge, other] = logZeroSideEdges(valueAxis);
+    return edge + 2.0 * (edge - other);
 }
 
 } // namespace qcp::fill
