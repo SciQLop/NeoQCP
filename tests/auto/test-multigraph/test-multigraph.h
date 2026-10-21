@@ -71,6 +71,18 @@ private slots:
     void autoScaleIncludesHiddenLineBandEdges();
     void fillFollowsADownsampledLine();
 
+    // Error bars
+    void sparseErrorBarsAreDrawnAsBars();
+    void denseErrorBarsBecomeABand();
+    void errorBoundsBelowZeroOnALogAxisReachTheEdge();
+    void selectedErrorBarsUseTheSelectedPen();
+    void errorBarsAreDroppedWhenABoundColumnDisappears();
+    void errorBarsRejectBadColumns();
+    void capWidthChangeShowsOnTheNextFrame();
+    void errorBarsAreCachedOnTheGpu();
+    void errorBarsHideTheirBoundsFromTheLegend();
+    void legendIconOfErrorBarsHasABarGlyph();
+
     // Line cache
     void cacheExtendsBeyondVisibleRange();
     void zoomedOutLinesAreThinnedToThePixelWidth_data();

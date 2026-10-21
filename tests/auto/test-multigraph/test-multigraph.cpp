@@ -1305,3 +1305,152 @@ void TestMultiGraph::legendIconOfABandIsAFilledSwatch()
     QVERIFY(isRedish(img.pixelColor(20, 6)));
     QVERIFY(isRedish(img.pixelColor(20, 14)));
 }
+
+static QCPMultiGraph* errorBarGraph(QCustomPlot* plot, int n, double spacing)
+{
+    std::vector<double> x(n), y(n), lo(n), hi(n);
+    for (int i = 0; i < n; ++i) { x[i] = i * spacing; y[i] = 5; lo[i] = 3; hi[i] = 7; }
+    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    mg->setData(std::move(x), std::vector<std::vector<double>>{std::move(y), std::move(lo), std::move(hi)});
+    mg->setComponentColors({Qt::red, Qt::red, Qt::red});
+    mg->setComponentLineStyle(0, QCPMultiGraph::lsNone);
+    mg->setComponentLineStyle(1, QCPMultiGraph::lsNone);
+    mg->setComponentLineStyle(2, QCPMultiGraph::lsNone);
+    mg->setComponentErrorBars(0, 1, 2);
+    return mg;
+}
+
+void TestMultiGraph::sparseErrorBarsAreDrawnAsBars()
+{
+    errorBarGraph(mPlot, 5, 1.0);
+    mPlot->xAxis->setRange(-0.5, 4.5);
+    mPlot->yAxis->setRange(0, 10);
+    const QImage img = renderOf(mPlot);
+    const int xBar = int(mPlot->xAxis->coordToPixel(2));
+    const int xBetween = int(mPlot->xAxis->coordToPixel(2.5));
+    const int yInside = int(mPlot->yAxis->coordToPixel(4));
+    QVERIFY(isRedish(img.pixelColor(xBar, yInside)));
+    QVERIFY(!isRedish(img.pixelColor(xBetween, yInside)));
+}
+
+void TestMultiGraph::denseErrorBarsBecomeABand()
+{
+    errorBarGraph(mPlot, 2000, 0.01);
+    mPlot->xAxis->setRange(0, 20);
+    mPlot->yAxis->setRange(0, 10);
+    const QImage img = renderOf(mPlot);
+    const QColor between = img.pixelColor(int(mPlot->xAxis->coordToPixel(10.003)),
+                                          int(mPlot->yAxis->coordToPixel(4)));
+    QVERIFY(between.red() > between.green() + 30); // translucent red band, everywhere
+}
+
+void TestMultiGraph::errorBoundsBelowZeroOnALogAxisReachTheEdge()
+{
+    auto* mg = errorBarGraph(mPlot, 3, 1.0);
+    std::vector<double> x{0, 1, 2}, y{1, 1, 1}, lo{-1, -1, -1}, hi{2, 2, 2};
+    mg->setData(std::move(x), std::vector<std::vector<double>>{std::move(y), std::move(lo), std::move(hi)});
+    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setRange(-0.5, 2.5);
+    mPlot->yAxis->setRange(0.1, 10);
+    mPlot->xAxis->setTicks(false); // the tick at x = 1 would cover the bottom rows
+    const QImage img = renderOf(mPlot);
+    const QRect r = mPlot->axisRect()->rect();
+    const int xStem = int(mPlot->xAxis->coordToPixel(1));
+    bool lit = false;
+    for (int dy = 1; dy <= 3; ++dy)
+        for (int dx = 0; dx <= 1; ++dx) // antialiased: a 1 px stem straddles two columns
+        {
+            const QColor c = img.pixelColor(xStem + dx, r.bottom() - dy);
+            lit = lit || c.red() > c.green() + 60;
+        }
+    QVERIFY(lit); // the stem reaches the bottom edge
+    // ... and stops there: the clipped pixels cannot tell the edge from 200 px past it.
+    const auto bars = mg->errorBarRows(*mg->componentErrorBars(0), *mg->dataSource(), 0, 3);
+    QCOMPARE(bars[1].lower, mPlot->yAxis->coordToPixel(0.1));
+}
+
+void TestMultiGraph::selectedErrorBarsUseTheSelectedPen()
+{
+    auto* mg = errorBarGraph(mPlot, 5, 1.0);
+    auto& comp = mg->component(0);
+    comp.selectedPen = QPen(Qt::blue, 2);
+    mg->setComponentSelection(0, QCPDataSelection(QCPDataRange(0, 5)));
+    mPlot->xAxis->setRange(-0.5, 4.5);
+    mPlot->yAxis->setRange(0, 10);
+    QImage img = renderOf(mPlot);
+    const QPoint bar(int(mPlot->xAxis->coordToPixel(2)), int(mPlot->yAxis->coordToPixel(4)));
+    QVERIFY(img.pixelColor(bar).blue() > 150);
+    mg->setComponentSelection(0, QCPDataSelection());
+    img = renderOf(mPlot);
+    QVERIFY(isRedish(img.pixelColor(bar)));
+}
+
+void TestMultiGraph::errorBarsAreDroppedWhenABoundColumnDisappears()
+{
+    auto* mg = errorBarGraph(mPlot, 3, 1.0);
+    mg->setData(std::vector<double>{0, 1}, std::vector<std::vector<double>>{{1, 1}, {0, 0}});
+    QVERIFY(!mg->componentErrorBars(0).has_value());
+}
+
+void TestMultiGraph::errorBarsRejectBadColumns()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    QVERIFY(!mg->setComponentErrorBars(0, 1, 1));
+    QVERIFY(!mg->setComponentErrorBars(0, 0, 2));
+    QVERIFY(!mg->setComponentErrorBars(0, 1, 5));
+}
+
+void TestMultiGraph::capWidthChangeShowsOnTheNextFrame()
+{
+    auto* mg = errorBarGraph(mPlot, 5, 1.0);
+    mPlot->xAxis->setRange(-0.5, 4.5);
+    mPlot->yAxis->setRange(0, 10);
+    renderOf(mPlot); // lays the axis rect out: pixel coordinates are meaningless before
+    const QPoint capEdge(int(mPlot->xAxis->coordToPixel(2)) + 8, int(mPlot->yAxis->coordToPixel(7)));
+    QVERIFY(!isRedish(renderOf(mPlot).pixelColor(capEdge)));
+    mg->setComponentErrorBars(0, 1, 2, 20);
+    QVERIFY(isRedish(renderOf(mPlot).pixelColor(capEdge)));
+}
+
+void TestMultiGraph::errorBarsAreCachedOnTheGpu()
+{
+    if (!showWithRhi(mPlot))
+        QSKIP("no QRhi available in this environment");
+    auto* sparse = errorBarGraph(mPlot, 5, 1.0);
+    mPlot->xAxis->setRange(-0.5, 4.5);
+    mPlot->yAxis->setRange(0, 10);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(!sparse->mErrorBars.first().bars.isEmpty());
+    QVERIFY(!sparse->mErrorBars.first().asBand);
+
+    mPlot->clearPlottables();
+    auto* dense = errorBarGraph(mPlot, 2000, 0.01);
+    mPlot->xAxis->setRange(0, 20);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!dense->pipeline().isBusy(), 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(dense->mErrorBars.first().asBand);
+    QVERIFY(!dense->mErrorBars.first().band.empty());
+}
+
+void TestMultiGraph::errorBarsHideTheirBoundsFromTheLegend()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    QVERIFY(mg->setComponentErrorBars(0, 1, 2));
+    QCOMPARE(mg->legendComponents(), (QVector<int>{0}));
+}
+
+void TestMultiGraph::legendIconOfErrorBarsHasABarGlyph()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    mg->setComponentColors({Qt::red, Qt::red, Qt::red});
+    mg->setComponentLineStyle(0, QCPMultiGraph::lsNone);
+    mg->setComponentErrorBars(0, 1, 2);
+    QImage img(40, 20, QImage::Format_ARGB32);
+    img.fill(Qt::white);
+    QCPPainter p(&img);
+    mg->drawComponentLegendIcon(&p, 0, QLineF(0, 10, 40, 10));
+    p.end();
+    QVERIFY(isRedish(img.pixelColor(20, 7)));   // the stem
+    QVERIFY(!isRedish(img.pixelColor(5, 7)));   // no line
+}

@@ -9,6 +9,7 @@
 #include "plottable-draw-utils.h"
 #include "plottable-color-mapper.h"
 #include "multigraph-fill.h"
+#include "multigraph-errorbars.h"
 #include <array>
 #include <atomic>
 #include <memory>
@@ -114,6 +115,19 @@ public:
     [[nodiscard]] std::optional<Fill> componentFill(int owner) const;
     [[nodiscard]] QBrush effectiveFillBrush(const Fill& fill) const;
 
+    struct ErrorBars {
+        int value = -1, lower = -1, upper = -1;
+        std::optional<QPen> pen;      // none = the value component's pen
+        double capWidthPx = 6;        // full cap width
+    };
+    //! Bars from `lower` to `upper` at each row of `value`; a band when rows are too dense.
+    //! One per value column: setting again replaces it. Takes the bounds out of the legend.
+    //! False (nothing changed) for an unknown or repeated column.
+    bool setComponentErrorBars(int value, int lower, int upper, double capWidthPx = 6,
+                               std::optional<QPen> pen = std::nullopt);
+    void clearComponentErrorBars(int value);
+    [[nodiscard]] std::optional<ErrorBars> componentErrorBars(int value) const;
+
     // Per-component value access (for tracers/tooltips)
     [[nodiscard]] double componentValueAt(int column, int index) const;
 
@@ -204,6 +218,14 @@ protected:
         std::vector<float> verts;   // triangle cache, rebuilt when lines change
     };
     QVector<FillEntry> mFills;
+    struct ErrorBarsEntry {
+        ErrorBars spec;
+        qcp::ExtrusionCache bars;
+        QVector<QPointF> runs;      // pixel runs at the rendered range, re-extruded on a pen change
+        std::vector<float> band;    // triangle cache of the dense fallback
+        bool asBand = false;        // mode picked on the last fresh frame, kept on pan frames
+    };
+    QVector<ErrorBarsEntry> mErrorBars;
     mutable QVector<QCPDataSelection> mLastRectSelections; // per-component selections from selectTestRect
     LineStyle mLineStyle = lsLine;
     bool mAdaptiveSampling = true;
@@ -277,7 +299,7 @@ protected:
     bool setFill(Fill fill);
     bool isValidColumn(int column) const;
     void decorationsChanged();
-    [[nodiscard]] bool hasDefaultBrushFill(int ownerCount) const;
+    [[nodiscard]] bool hasPenDerivedDecoration(int ownerCount) const;
     void resizePerColumn(int nc, QVector<QVector<QPointF>>& lines, QVector<QVector<int>>& indices,
                          bool coloured);
     [[nodiscard]] std::pair<int, int> lineCacheWindow(const QCPAbstractMultiDataSource& ds) const;
@@ -291,11 +313,32 @@ protected:
         const Fill& fill, const QCPAbstractMultiDataSource& ds, int begin, int end) const;
     void drawFills(QCPPainter* painter, const QCPAbstractMultiDataSource& ds, int begin, int end,
                    bool fresh, const QPointF& gpuOffset, bool isExportMode);
-    void drawFillOnGpu(QCPPainter* painter, QCPPlottableRhiLayer* layer, FillEntry& entry,
-                       const QBrush& brush, const QCPAbstractMultiDataSource& ds, int begin,
-                       int end, bool fresh, const QPointF& gpuOffset);
+    void drawFillOnGpu(QCPPainter* painter, QCPPlottableRhiLayer* layer, std::vector<float>& verts,
+                       const QColor& color, std::span<const qcp::fill::StripPoint> rows,
+                       bool fresh, const QPointF& gpuOffset);
+    [[nodiscard]] std::vector<qcp::fill::StripPoint> binnedWhenDense(
+        std::vector<qcp::fill::StripPoint> rows) const;
+    [[nodiscard]] QCPPlottableRhiLayer* gpuLayerFor(bool isExportMode) const;
     void paintFill(QCPPainter* painter, const QBrush& brush,
                    std::span<const qcp::fill::StripPoint> rows) const;
+    [[nodiscard]] bool errorBarsDrawable(const ErrorBars& spec, int columnCount) const;
+    [[nodiscard]] QPen errorBarPen(const ErrorBars& spec) const;
+    [[nodiscard]] double errorPixel(double value) const;
+    [[nodiscard]] std::vector<qcp::errorbars::Bar> errorBarRows(
+        const ErrorBars& spec, const QCPAbstractMultiDataSource& ds, int begin, int end) const;
+    [[nodiscard]] bool errorBarsFitInView(std::span<const qcp::errorbars::Bar> bars,
+                                          double minSpacingPx) const;
+    [[nodiscard]] std::vector<qcp::fill::StripPoint> errorBandRows(
+        std::span<const qcp::errorbars::Bar> bars, const QCPAbstractMultiDataSource& ds,
+        int begin, int end) const;
+    void drawErrorBars(QCPPainter* painter, const QCPAbstractMultiDataSource& ds, bool rawRows,
+                       int begin, int end, bool fresh, const QPointF& gpuOffset, bool isExportMode);
+    void drawBarsAsPolylines(QCPPainter* painter, ErrorBarsEntry& entry,
+                             std::span<const qcp::errorbars::Bar> bars, bool fresh,
+                             const QPointF& gpuOffset, bool isExportMode);
+    void drawBarsAsBand(QCPPainter* painter, QCPPlottableRhiLayer* gpuLayer, ErrorBarsEntry& entry,
+                        std::span<const qcp::fill::StripPoint> rows, bool fresh,
+                        const QPointF& gpuOffset);
     void rebuildL2(const ViewportParams& vp);
     void onViewportChanged();
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
