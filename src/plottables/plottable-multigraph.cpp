@@ -304,6 +304,7 @@ void QCPMultiGraph::syncComponentCount(int newCount)
             c.selectedPen = defaultSelectedPen(c.pen);
             c.name = QString("Component %1").arg(i);
             c.lineStyle = mLineStyle;
+            c.inLegend = !isErrorBound(i);
         }
     } else if (newCount < oldCount) {
         mComponents.resize(newCount);
@@ -325,6 +326,14 @@ void QCPMultiGraph::dropDecorationsBeyond(int columnCount)
     };
     mErrorBars.erase(std::remove_if(mErrorBars.begin(), mErrorBars.end(), barsOutside),
                      mErrorBars.end());
+}
+
+// Error bars can be set before the data that creates their bound components.
+bool QCPMultiGraph::isErrorBound(int column) const
+{
+    return std::any_of(mErrorBars.begin(), mErrorBars.end(), [column](const ErrorBarsEntry& e) {
+        return e.spec.lower == column || e.spec.upper == column;
+    });
 }
 
 bool QCPMultiGraph::isValidColumn(int column) const
@@ -1351,11 +1360,19 @@ double QCPMultiGraph::fillBaselinePixel(double value) const
 {
     if (mValueAxis->scaleType() == QCPAxis::stLinear || value > 0)
         return mValueAxis->coordToPixel(value);
+    const auto [edge, other] = logZeroSideEdges();
+    return edge + 2.0 * (edge - other);
+}
+
+// simplify: a value <= 0 is taken as invalid on every log axis, but on an all-negative range the
+// invalid values are the ones >= 0. Callers then push valid negative values to the edge. Upgrade:
+// test the value's sign against the range's sign in fillBaselinePixel and errorPixel.
+std::pair<double, double> QCPMultiGraph::logZeroSideEdges() const
+{
     const QCPRange range = mValueAxis->range();
     const bool positive = range.upper > 0;
-    const double edge = mValueAxis->coordToPixel(positive ? range.lower : range.upper);
-    const double other = mValueAxis->coordToPixel(positive ? range.upper : range.lower);
-    return edge + 2.0 * (edge - other);
+    return {mValueAxis->coordToPixel(positive ? range.lower : range.upper),
+            mValueAxis->coordToPixel(positive ? range.upper : range.lower)};
 }
 
 qcp::fill::Step QCPMultiGraph::ownerStep(const Component& owner)
@@ -1478,8 +1495,7 @@ double QCPMultiGraph::errorPixel(double value) const
 {
     if (mValueAxis->scaleType() == QCPAxis::stLinear || value > 0 || std::isnan(value))
         return mValueAxis->coordToPixel(value);
-    const QCPRange range = mValueAxis->range();
-    return mValueAxis->coordToPixel(range.upper > 0 ? range.lower : range.upper);
+    return logZeroSideEdges().first;
 }
 
 static bool bothFinite(double a, double b) { return std::isfinite(a) && std::isfinite(b); }
@@ -1585,6 +1601,7 @@ void QCPMultiGraph::drawBarsAsBand(QCPPainter* painter, QCPPlottableRhiLayer* gp
                                    std::span<const qcp::fill::StripPoint> rows, bool fresh,
                                    const QPointF& gpuOffset)
 {
+    // Not the selected colour: the GPU band bakes its colour in, and selecting would rebuild it.
     QColor color = errorBarPen(entry.spec).color();
     color.setAlpha(64);
     if (gpuLayer)

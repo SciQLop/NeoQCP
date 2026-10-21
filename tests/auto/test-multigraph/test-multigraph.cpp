@@ -1379,7 +1379,9 @@ void TestMultiGraph::selectedErrorBarsUseTheSelectedPen()
     mPlot->yAxis->setRange(0, 10);
     QImage img = renderOf(mPlot);
     const QPoint bar(int(mPlot->xAxis->coordToPixel(2)), int(mPlot->yAxis->coordToPixel(4)));
-    QVERIFY(img.pixelColor(bar).blue() > 150);
+    const QColor selected = img.pixelColor(bar);
+    QVERIFY2(selected.blue() > 150 && selected.red() < 100 && selected.green() < 100,
+             qPrintable(selected.name()));
     mg->setComponentSelection(0, QCPDataSelection());
     img = renderOf(mPlot);
     QVERIFY(isRedish(img.pixelColor(bar)));
@@ -1453,4 +1455,12 @@ void TestMultiGraph::legendIconOfErrorBarsHasABarGlyph()
     p.end();
     QVERIFY(isRedish(img.pixelColor(20, 7)));   // the stem
     QVERIFY(!isRedish(img.pixelColor(5, 7)));   // no line
+}
+
+void TestMultiGraph::errorBoundsSetBeforeDataStayOutOfTheLegend()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    QVERIFY(mg->setComponentErrorBars(0, 1, 2));
+    mg->setData(std::vector<double>{1, 2}, std::vector<std::vector<double>>{{1, 1}, {0, 0}, {2, 2}});
+    QCOMPARE(mg->legendComponents(), (QVector<int>{0}));
 }

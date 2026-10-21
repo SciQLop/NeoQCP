@@ -81,6 +81,7 @@ private slots:
     void capWidthChangeShowsOnTheNextFrame();
     void errorBarsAreCachedOnTheGpu();
     void errorBarsHideTheirBoundsFromTheLegend();
+    void errorBoundsSetBeforeDataStayOutOfTheLegend();
     void legendIconOfErrorBarsHasABarGlyph();
 
     // Line cache

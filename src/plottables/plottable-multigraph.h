@@ -298,6 +298,7 @@ protected:
     void dropDecorationsBeyond(int columnCount);
     bool setFill(Fill fill);
     bool isValidColumn(int column) const;
+    [[nodiscard]] bool isErrorBound(int column) const;
     void decorationsChanged();
     [[nodiscard]] bool hasPenDerivedDecoration(int ownerCount) const;
     void resizePerColumn(int nc, QVector<QVector<QPointF>>& lines, QVector<QVector<int>>& indices,
@@ -305,6 +306,8 @@ protected:
     [[nodiscard]] std::pair<int, int> lineCacheWindow(const QCPAbstractMultiDataSource& ds) const;
     [[nodiscard]] bool fillDrawable(const Fill& fill, int columnCount) const;
     [[nodiscard]] double fillBaselinePixel(double value) const;
+    //! On a log value axis: the edge pixel on the side of zero, then the opposite edge.
+    [[nodiscard]] std::pair<double, double> logZeroSideEdges() const;
     [[nodiscard]] static qcp::fill::Step ownerStep(const Component& owner);
     [[nodiscard]] std::vector<qcp::fill::StripPoint> fillRows(const Fill& fill,
                                                               const QCPAbstractMultiDataSource& ds,
