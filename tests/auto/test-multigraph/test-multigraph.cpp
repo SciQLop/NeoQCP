@@ -1,6 +1,7 @@
 #include "test-multigraph.h"
 #include "qcustomplot.h"
 #include "datasource/soa-multi-datasource.h"
+#include "datasource/row-major-multi-datasource.h"
 #include "layoutelements/layoutelement-legend-group.h"
 #include "plottables/plottable-draw-utils.h"
 #include <cmath>
@@ -1527,6 +1528,30 @@ void TestMultiGraph::anEmptySourceKeepsFillsAndErrorBars()
     QVERIFY(mg->componentErrorBars(0).has_value());
     mg->setData(std::vector<double>{1, 2}, std::vector<std::vector<double>>{{1, 2}, {0, 1}});
     QVERIFY(!mg->componentFill(2).has_value()); // a non-empty narrower source is still lossy
+}
+
+// A (0, 3) row-major window degrades to a 0-column source: it says nothing about the columns.
+void TestMultiGraph::anEmptySourceKeepsTheComponents()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    mg->setComponentColors({Qt::red, Qt::green, Qt::blue});
+    mg->setComponentLineStyle(1, QCPMultiGraph::lsNone);
+    mg->setComponentFillBetween(1, 2, QBrush(Qt::red));
+    mPlot->xAxis->setRange(1, 3);
+    mPlot->yAxis->setRange(-1, 5);
+    renderOf(mPlot);
+    const std::vector<double> none;
+    mg->setDataSource(std::make_shared<QCPRowMajorMultiDataSource<double, double>>(
+        std::span<const double>(none), none.data(), 0, 3, 3));
+    QCOMPARE(mg->componentCount(), 3);
+    mg->setData(std::vector<double>{1, 2, 3},
+                std::vector<std::vector<double>>{{1, 2, 3}, {0, 1, 2}, {2, 3, 4}});
+    QCOMPARE(mg->component(0).name, QStringLiteral("y"));
+    QCOMPARE(mg->component(2).pen.color(), QColor(Qt::blue));
+    QCOMPARE(mg->component(1).lineStyle, QCPMultiGraph::lsNone);
+    const QImage img = renderOf(mPlot);
+    QVERIFY(isRedish(img.pixelColor(int(mPlot->xAxis->coordToPixel(2)),
+                                    int(mPlot->yAxis->coordToPixel(1.5)))));
 }
 
 void TestMultiGraph::errorBarsRejectBadColumns()

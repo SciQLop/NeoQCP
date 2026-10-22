@@ -301,9 +301,11 @@ void QCPMultiGraph::syncComponentCount(const QCPAbstractMultiDataSource* source)
             c.inLegend = !isErrorBound(i);
         }
     } else if (newCount < oldCount) {
+        // An empty fetch window says nothing about the columns: keep them and what they carry.
+        if (source && source->size() == 0)
+            return;
         mComponents.resize(newCount);
-        // An empty fetch window says nothing about the columns: keep what they carry.
-        if (source && source->size() > 0)
+        if (source)
             dropDecorationsBeyond(newCount);
     }
 }
