@@ -72,7 +72,7 @@ jobs:
       - name: Install system dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
-          sudo apt update && sudo apt install -y ccache libgl-dev xvfb libatomic1 libglx-dev libegl-dev libxrandr2 libxss1 libxcursor1 libxcomposite1 libasound2-dev libxi6 libxtst6 libglib2.0-bin libdbus-1-3 libxdamage1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libnss3 libgl1-mesa-dri
+          sudo apt update && sudo apt install -y ccache libgl-dev xvfb libatomic1 libglx-dev libegl-dev libxrandr2 libxss1 libxcursor1 libxcomposite1 libasound2-dev libxi6 libxtst6 libglib2.0-bin libdbus-1-3 libxdamage1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libnss3 libgl1-mesa-dri libxcb-image0 libxcb-render-util0 xauth
 
       - name: Set up ccache
         uses: hendrikmuhs/ccache-action@v1
@@ -126,6 +126,8 @@ jobs:
       # Offscreen has no QRhi, so the run above skips every GPU test: run them on an X server.
       - name: Test the GPU paths under xvfb (Linux)
         if: runner.os == 'Linux'
+        # The binary runs directly, outside meson test's 300 s timeout.
+        timeout-minutes: 15
         shell: bash
         env:
           QCP_TEST_LOG_DIR: ${{ github.workspace }}/testlogs/xvfb
