@@ -266,6 +266,26 @@ void TestHistogramPlottable::exportRightAfterAScaleChangeBinsForTheNewScale()
     QCOMPARE(h->histogram()->edges.back(), 1000.0);
 }
 
+// A reset queued by a stale scale must not land once the scale is fresh again: it would drop
+// auto edges that are still right.
+void TestHistogramPlottable::queuedResetIsDroppedWhenTheScaleIsFreshAgain()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    h->setBins(3);
+    h->setDataSource(values({1, 10, 100, 1000}));
+    QVERIFY(waitForResult(h));
+    QVERIFY(settle(h));
+    const auto edges = h->histogram()->edges;
+    h->setKeyAxis(mPlot->xAxis2);
+    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->replot(); // queues the reset
+    mPlot->xAxis2->setScaleType(QCPAxis::stLinear);
+    QSignalSpy busy(&h->pipeline(), &QCPHistogram1DPipeline::busyChanged);
+    QTest::qWait(100);
+    QCOMPARE(busy.count(), 0);
+    QCOMPARE(h->histogram()->edges, edges);
+}
+
 void TestHistogramPlottable::autoEdgesNeverShrinkWhileJobsOverlap()
 {
     auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);

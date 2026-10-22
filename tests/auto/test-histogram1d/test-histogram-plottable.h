@@ -24,6 +24,7 @@ private slots:
     void rebinsForTheScaleOfANewKeyAxis();
     void rebinForANewScaleEmitsNothingDuringPaint();
     void exportRightAfterAScaleChangeBinsForTheNewScale();
+    void queuedResetIsDroppedWhenTheScaleIsFreshAgain();
     void autoEdgesNeverShrinkWhileJobsOverlap();
     void rebinningAfterOverlappingJobsShowsTheLastSource();
     void preBinnedBarsDropAnOlderSourcesResultAndRange();

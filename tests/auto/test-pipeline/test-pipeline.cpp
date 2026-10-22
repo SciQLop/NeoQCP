@@ -2036,6 +2036,22 @@ void TestPipeline::histogram2dExportRightAfterANewAxisShowsItsScale()
     QVERIFY(spreadOverDecades(hist->pipeline().result(), true));
 }
 
+// The export re-binned for the new scale: the re-bin queued by the paint before it is moot.
+void TestPipeline::histogram2dQueuedRebinIsDroppedAfterAnExportRebinned()
+{
+    auto* hist = decadeHistogram(mPlot, true);
+    QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(finished.wait(2000));
+    hist->setKeyAxis(mPlot->xAxis2);
+    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->replot(); // queues the re-bin
+    QVERIFY(!mPlot->toPixmap(400, 300).isNull());
+    QSignalSpy busy(&hist->pipeline(), &QCPHistogramPipeline::busyChanged);
+    QTest::qWait(100);
+    QCOMPARE(busy.count(), 0);
+    QVERIFY(spreadOverDecades(hist->pipeline().result(), true));
+}
+
 // Nothing finite bins to no cells: draw() must not take that for "not binned yet" and loop.
 void TestPipeline::histogram2dWithNothingFiniteBinsOnce()
 {

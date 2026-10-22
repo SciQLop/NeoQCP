@@ -281,7 +281,9 @@ void QCPHistogram::binForExport()
         storeResult(pipelineResult());
 }
 
-// resetEdges() emits busyChanged at once, and nothing may emit during a paint.
+// resetEdges() emits busyChanged at once, and nothing may emit during a paint. The scale may be
+// fresh again when this runs (set back, or re-binned by an export): a reset would then only drop
+// auto edges that are still right.
 void QCPHistogram::queueResetEdges()
 {
     if (mResetQueued)
@@ -289,7 +291,8 @@ void QCPHistogram::queueResetEdges()
     mResetQueued = true;
     QMetaObject::invokeMethod(this, [this] {
         mResetQueued = false;
-        resetEdges();
+        if (keyLog() != mBinnedKeyLog)
+            resetEdges();
     }, Qt::QueuedConnection);
 }
 

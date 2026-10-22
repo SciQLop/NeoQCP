@@ -299,7 +299,8 @@ bool QCPHistogram2D::binnedForTheAxisScales() const
         && (valueBinScale() == QCPAxis::stLogarithmic) == mBinnedValueLog;
 }
 
-// refreshBinning() emits busyChanged at once, and nothing may emit during a paint.
+// refreshBinning() emits busyChanged at once, and nothing may emit during a paint. The scales
+// may be fresh again when this runs (set back, or re-binned by an export): skip the re-bin then.
 void QCPHistogram2D::queueRefreshBinning()
 {
     if (mRebinQueued)
@@ -307,7 +308,8 @@ void QCPHistogram2D::queueRefreshBinning()
     mRebinQueued = true;
     QMetaObject::invokeMethod(this, [this] {
         mRebinQueued = false;
-        refreshBinning();
+        if (!binnedForTheAxisScales())
+            refreshBinning();
     }, Qt::QueuedConnection);
 }
 

@@ -129,6 +129,7 @@ private slots:
     void histogram2dRebinForANewScaleEmitsNothingDuringPaint();
     void histogram2dExportRightAfterAScaleChangeShowsTheNewBins();
     void histogram2dExportRightAfterANewAxisShowsItsScale();
+    void histogram2dQueuedRebinIsDroppedAfterAnExportRebinned();
     void histogram2dWithNothingFiniteBinsOnce();
     void histogram2dDataWithNothingFiniteClearsTheOldCells();
     void histogram2dNormalizationColumn();
