@@ -14,6 +14,8 @@ class QCPPlottableRhiLayer;
 
 //! A 1-D histogram of every value column of a multi data source, with shared bin edges.
 //! Binning runs in the background; pre-binned data (setBinned) bypasses the pipeline.
+//! Bins follow the key axis scale. A scale change on an axis given later with setKeyAxis is
+//! picked up at the next draw, not at once: only the constructor's axis is listened to.
 class QCP_LIB_DECL QCPHistogram : public QCPAbstractPlottable
 {
     Q_OBJECT

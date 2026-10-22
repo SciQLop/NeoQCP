@@ -10,6 +10,10 @@
 class QCPColorScale;
 class QCPColorMapData;
 
+//! A 2-D density histogram of scattered (key, value) samples, binned in the background.
+//! Bins follow the axis scales. A scale change on an axis given later with setKeyAxis or
+//! setValueAxis is picked up at the next draw, not at once: only the constructor's axes are
+//! listened to.
 class QCP_LIB_DECL QCPHistogram2D : public QCPAbstractPlottable
 {
     Q_OBJECT
