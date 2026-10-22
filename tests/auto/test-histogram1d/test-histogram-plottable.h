@@ -25,6 +25,7 @@ private slots:
     void rebinForANewScaleEmitsNothingDuringPaint();
     void exportRightAfterAScaleChangeBinsForTheNewScale();
     void queuedResetIsDroppedWhenTheScaleIsFreshAgain();
+    void resultOfTheOldScaleIsNotShownUnderTheNewOne();
     void autoEdgesNeverShrinkWhileJobsOverlap();
     void rebinningAfterOverlappingJobsShowsTheLastSource();
     void preBinnedBarsDropAnOlderSourcesResultAndRange();

@@ -88,6 +88,14 @@ bool QCPHistogram::keyLog() const
     return mKeyAxis && mKeyAxis->scaleType() == QCPAxis::stLogarithmic;
 }
 
+// The transform's scale alone is not enough: rememberEdges() reinstalls it for the current axis
+// when an older job's result lands, and that result keeps its own scale.
+bool QCPHistogram::scaleIsStale() const
+{
+    const bool shownStale = mDataSource && mResult && mResult->log != keyLog();
+    return keyLog() != mBinnedKeyLog || shownStale;
+}
+
 bool QCPHistogram::autoEdges() const
 {
     return !usableRange(mFixedRange, keyLog());
@@ -136,6 +144,12 @@ void QCPHistogram::onPipelineFinished(uint64_t generation)
     if (generation < mAcceptedGeneration)
         return;
     auto result = pipelineResult();
+    // A job started before the key scale changed: its bins mean nothing in the new scale.
+    if (result && result->log != keyLog())
+    {
+        resetEdges();
+        return;
+    }
     if (result && !coversAutoEdges(*result))
     {
         refreshBinning();
@@ -271,7 +285,7 @@ void QCPHistogram::binForExport()
 {
     if (!mDataSource || !mKeyAxis || !mValueAxis)
         return;
-    if (keyLog() != mBinnedKeyLog)
+    if (scaleIsStale())
     {
         mAutoRange.reset();
         installTransform();
@@ -291,7 +305,7 @@ void QCPHistogram::queueResetEdges()
     mResetQueued = true;
     QMetaObject::invokeMethod(this, [this] {
         mResetQueued = false;
-        if (keyLog() != mBinnedKeyLog)
+        if (scaleIsStale())
             resetEdges();
     }, Qt::QueuedConnection);
 }
@@ -304,7 +318,7 @@ bool QCPHistogram::canProduceContent() const
 void QCPHistogram::draw(QCPPainter* painter)
 {
     PROFILE_HERE_N("QCPHistogram::draw");
-    const bool staleScale = keyLog() != mBinnedKeyLog;
+    const bool staleScale = scaleIsStale();
     if (staleScale)
         queueResetEdges();
     // Export does not pump the event loop, so a background result would never arrive.

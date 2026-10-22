@@ -80,6 +80,7 @@ private:
 
     [[nodiscard]] bool keyLog() const;
     [[nodiscard]] bool autoEdges() const;
+    [[nodiscard]] bool scaleIsStale() const;
     [[nodiscard]] std::shared_ptr<qcp::algo::Histogram1D> pipelineResult() const;
     void installTransform();
     void refreshBinning();

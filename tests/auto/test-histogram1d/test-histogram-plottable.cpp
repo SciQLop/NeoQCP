@@ -286,6 +286,24 @@ void TestHistogramPlottable::queuedResetIsDroppedWhenTheScaleIsFreshAgain()
     QCOMPARE(h->histogram()->edges, edges);
 }
 
+// A job started before the toggle lands after the reset was queued: its result moves the auto
+// edges, which reinstalls the transform for the new scale. Its own linear bars must not stay.
+void TestHistogramPlottable::resultOfTheOldScaleIsNotShownUnderTheNewOne()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    h->setBins(3);
+    auto gate = std::make_shared<Gate>();
+    h->setDataSource(gated({1, 10, 100, 1000}, gate));
+    QVERIFY(gate->waitEntered());
+    h->setKeyAxis(mPlot->xAxis2);
+    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    gate->open = true;
+    QThread::msleep(100); // the job ends and posts its result, which nothing handles yet
+    mPlot->replot();      // queues the reset behind that result
+    QVERIFY(settle(h));
+    QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && h->histogram()->log, 2000);
+}
+
 void TestHistogramPlottable::autoEdgesNeverShrinkWhileJobsOverlap()
 {
     auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
