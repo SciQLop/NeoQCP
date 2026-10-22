@@ -74,6 +74,7 @@ private:
     //! The key scale the binning was made for: a new key axis or a blocked scaleTypeChanged
     //! leaves it behind, and draw() catches up.
     bool mBinnedKeyLog = false;
+    bool mResetQueued = false;
 
     [[nodiscard]] bool keyLog() const;
     [[nodiscard]] bool autoEdges() const;
@@ -81,6 +82,7 @@ private:
     void installTransform();
     void refreshBinning();
     void binForExport();
+    void queueResetEdges();
     [[nodiscard]] bool coversAutoEdges(const qcp::algo::Histogram1D& h) const;
     void onPipelineFinished(uint64_t generation);
     bool storeResult(std::shared_ptr<qcp::algo::Histogram1D> result);

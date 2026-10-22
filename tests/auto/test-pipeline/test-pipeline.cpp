@@ -2000,6 +2000,42 @@ void TestPipeline::histogram2dRebinsForTheScaleOfANewValueAxis()
     QTRY_VERIFY_WITH_TIMEOUT(spreadOverDecades(hist->pipeline().result(), false), 2000);
 }
 
+// Nothing may emit during a paint: the re-bin draw() asks for runs from the event loop.
+void TestPipeline::histogram2dRebinForANewScaleEmitsNothingDuringPaint()
+{
+    auto* hist = decadeHistogram(mPlot, true);
+    QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(finished.wait(2000));
+    hist->setKeyAxis(mPlot->xAxis2);
+    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    QSignalSpy busy(&hist->pipeline(), &QCPHistogramPipeline::busyChanged);
+    mPlot->replot();
+    QCOMPARE(busy.count(), 0);
+    QTRY_VERIFY_WITH_TIMEOUT(spreadOverDecades(hist->pipeline().result(), true), 2000);
+}
+
+// Export does not pump the event loop: the re-bin started by the scale change cannot land.
+void TestPipeline::histogram2dExportRightAfterAScaleChangeShowsTheNewBins()
+{
+    auto* hist = decadeHistogram(mPlot, true);
+    QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(finished.wait(2000));
+    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    QVERIFY(!mPlot->toPixmap(400, 300).isNull());
+    QVERIFY(spreadOverDecades(hist->pipeline().result(), true));
+}
+
+void TestPipeline::histogram2dExportRightAfterANewAxisShowsItsScale()
+{
+    auto* hist = decadeHistogram(mPlot, true);
+    QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(finished.wait(2000));
+    hist->setKeyAxis(mPlot->xAxis2);
+    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    QVERIFY(!mPlot->toPixmap(400, 300).isNull());
+    QVERIFY(spreadOverDecades(hist->pipeline().result(), true));
+}
+
 void TestPipeline::histogram2dNormalizationColumn()
 {
     auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);

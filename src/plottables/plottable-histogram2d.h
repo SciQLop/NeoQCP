@@ -117,6 +117,7 @@ private:
     //! leaves them behind, and draw() catches up.
     bool mBinnedKeyLog = false;
     bool mBinnedValueLog = false;
+    bool mRebinQueued = false;
 
     // finiteKeyValueBounds is an O(N) scan over the raw scatter; selectTest
     // calls it per mouse event and getKeyRange per rescale. The bounds only
@@ -136,4 +137,6 @@ private:
 
     void installTransform();
     [[nodiscard]] bool binnedForTheAxisScales() const;
+    void queueRefreshBinning();
+    void binForExport();
 };

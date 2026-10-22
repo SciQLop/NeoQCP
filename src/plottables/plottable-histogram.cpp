@@ -271,9 +271,26 @@ void QCPHistogram::binForExport()
 {
     if (!mDataSource || !mKeyAxis || !mValueAxis)
         return;
+    if (keyLog() != mBinnedKeyLog)
+    {
+        mAutoRange.reset();
+        installTransform();
+    }
     // No signals: their receivers (auto-scale) must not run in the middle of a paint.
     if (mPipeline.runSynchronously(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data())))
         storeResult(pipelineResult());
+}
+
+// resetEdges() emits busyChanged at once, and nothing may emit during a paint.
+void QCPHistogram::queueResetEdges()
+{
+    if (mResetQueued)
+        return;
+    mResetQueued = true;
+    QMetaObject::invokeMethod(this, [this] {
+        mResetQueued = false;
+        resetEdges();
+    }, Qt::QueuedConnection);
 }
 
 bool QCPHistogram::canProduceContent() const
@@ -284,10 +301,12 @@ bool QCPHistogram::canProduceContent() const
 void QCPHistogram::draw(QCPPainter* painter)
 {
     PROFILE_HERE_N("QCPHistogram::draw");
-    if (keyLog() != mBinnedKeyLog)
-        resetEdges();
+    const bool staleScale = keyLog() != mBinnedKeyLog;
+    if (staleScale)
+        queueResetEdges();
     // Export does not pump the event loop, so a background result would never arrive.
-    if ((!mResult || mPipeline.isBusy()) && painter->modes().testFlag(QCPPainter::pmNoCaching))
+    if ((staleScale || !mResult || mPipeline.isBusy())
+        && painter->modes().testFlag(QCPPainter::pmNoCaching))
         binForExport();
     if (!mResult || !mKeyAxis || !mValueAxis)
         return;

@@ -235,6 +235,37 @@ void TestHistogramPlottable::rebinsForTheScaleOfANewKeyAxis()
     QCOMPARE(h->histogram()->edges.back(), 1000.0);
 }
 
+// Nothing may emit during a paint: the re-bin draw() asks for runs from the event loop.
+void TestHistogramPlottable::rebinForANewScaleEmitsNothingDuringPaint()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    h->setBins(3);
+    h->setDataSource(values({1, 10, 100, 1000}));
+    QVERIFY(waitForResult(h));
+    QVERIFY(settle(h));
+    h->setKeyAxis(mPlot->xAxis2);
+    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    QSignalSpy busy(&h->pipeline(), &QCPHistogram1DPipeline::busyChanged);
+    mPlot->replot();
+    QCOMPARE(busy.count(), 0);
+    QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && h->histogram()->log, 5000);
+}
+
+void TestHistogramPlottable::exportRightAfterAScaleChangeBinsForTheNewScale()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    h->setBins(3);
+    h->setDataSource(values({1, 10, 100, 1000}));
+    QVERIFY(waitForResult(h));
+    QVERIFY(settle(h));
+    h->setKeyAxis(mPlot->xAxis2);
+    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    QVERIFY(!mPlot->toPixmap(400, 300).isNull());
+    QVERIFY(h->histogram()->log);
+    QCOMPARE(h->histogram()->edges.front(), 1.0);
+    QCOMPARE(h->histogram()->edges.back(), 1000.0);
+}
+
 void TestHistogramPlottable::autoEdgesNeverShrinkWhileJobsOverlap()
 {
     auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);

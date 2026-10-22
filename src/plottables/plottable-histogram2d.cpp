@@ -289,32 +289,47 @@ bool QCPHistogram2D::binnedForTheAxisScales() const
         && (valueBinScale() == QCPAxis::stLogarithmic) == mBinnedValueLog;
 }
 
+// refreshBinning() emits busyChanged at once, and nothing may emit during a paint.
+void QCPHistogram2D::queueRefreshBinning()
+{
+    if (mRebinQueued)
+        return;
+    mRebinQueued = true;
+    QMetaObject::invokeMethod(this, [this] {
+        mRebinQueued = false;
+        refreshBinning();
+    }, Qt::QueuedConnection);
+}
+
+// Export does not pump the event loop, so a background result would never arrive. No signals.
+void QCPHistogram2D::binForExport()
+{
+    if (!mDataSource)
+        return;
+    if (!binnedForTheAxisScales())
+        installTransform();
+    if (mPipeline.runSynchronously(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data())))
+        mRenderer.invalidateMapImage();
+}
+
 void QCPHistogram2D::draw(QCPPainter* painter)
 {
     PROFILE_HERE_N("QCPHistogram2D::draw");
     if (!mKeyAxis || !mValueAxis)
         return;
-    if (!binnedForTheAxisScales())
-        refreshBinning();
+    const bool staleScales = !binnedForTheAxisScales();
+    if (staleScales)
+        queueRefreshBinning();
 
+    const bool exporting = painter->modes().testFlag(QCPPainter::pmNoCaching);
+    if (exporting && (staleScales || !mPipeline.result() || mPipeline.isBusy()))
+        binForExport();
     auto* binnedData = mPipeline.result();
     if (!binnedData)
     {
-        if (!mDataSource) return;
-        if (painter->modes().testFlag(QCPPainter::pmNoCaching))
-        {
-            // Export path: run transform synchronously since event loop is not pumped
-            if (!mPipeline.runSynchronously(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data())))
-                return;
-            binnedData = mPipeline.result();
-            if (!binnedData) return;
-        }
-        else
-        {
-            if (!mPipeline.isBusy())
-                mPipeline.onDataChanged();
-            return;
-        }
+        if (mDataSource && !exporting && !mPipeline.isBusy())
+            queueRefreshBinning();
+        return;
     }
 
     if (mRenderer.mapImageInvalidated())

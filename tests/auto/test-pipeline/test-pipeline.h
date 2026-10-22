@@ -126,6 +126,9 @@ private slots:
     void histogram2dPipelineBins();
     void histogram2dRebinsForTheScaleOfANewKeyAxis();
     void histogram2dRebinsForTheScaleOfANewValueAxis();
+    void histogram2dRebinForANewScaleEmitsNothingDuringPaint();
+    void histogram2dExportRightAfterAScaleChangeShowsTheNewBins();
+    void histogram2dExportRightAfterANewAxisShowsItsScale();
     void histogram2dNormalizationColumn();
     void histogram2dNormalizationToggleNoRebind();
     void histogram2dRenderSmokeTest();
