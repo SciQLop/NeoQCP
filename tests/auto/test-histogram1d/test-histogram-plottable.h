@@ -26,6 +26,7 @@ private slots:
     void exportRightAfterAScaleChangeBinsForTheNewScale();
     void queuedResetIsDroppedWhenTheScaleIsFreshAgain();
     void resultOfTheOldScaleIsNotShownUnderTheNewOne();
+    void staleScaleIsResetOnceUnderAReplotStream();
     void autoEdgesNeverShrinkWhileJobsOverlap();
     void rebinningAfterOverlappingJobsShowsTheLastSource();
     void preBinnedBarsDropAnOlderSourcesResultAndRange();

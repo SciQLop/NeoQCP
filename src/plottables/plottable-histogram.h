@@ -77,6 +77,8 @@ private:
     //! leaves it behind, and draw() catches up.
     bool mBinnedKeyLog = false;
     bool mResetQueued = false;
+    //! The key scale a stale-scale reset is in flight for.
+    std::optional<bool> mResetForLog;
 
     [[nodiscard]] bool keyLog() const;
     [[nodiscard]] bool autoEdges() const;
@@ -86,6 +88,7 @@ private:
     void refreshBinning();
     void binForExport();
     void queueResetEdges();
+    void resetForTheStaleScale();
     [[nodiscard]] bool coversAutoEdges(const qcp::algo::Histogram1D& h) const;
     void onPipelineFinished(uint64_t generation);
     bool storeResult(std::shared_ptr<qcp::algo::Histogram1D> result);

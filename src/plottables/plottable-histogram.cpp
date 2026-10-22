@@ -143,6 +143,7 @@ void QCPHistogram::onPipelineFinished(uint64_t generation)
 {
     if (generation < mAcceptedGeneration)
         return;
+    mResetForLog.reset();
     auto result = pipelineResult();
     // A job started before the key scale changed: its bins mean nothing in the new scale.
     if (result && result->log != keyLog())
@@ -305,9 +306,19 @@ void QCPHistogram::queueResetEdges()
     mResetQueued = true;
     QMetaObject::invokeMethod(this, [this] {
         mResetQueued = false;
-        if (scaleIsStale())
-            resetEdges();
+        resetForTheStaleScale();
     }, Qt::QueuedConnection);
+}
+
+// One reset per scale until its job delivers: every frame showing stale bars asks again, and
+// each new reset would supersede the job before it, so a steady replot stream would keep the
+// stale bars up.
+void QCPHistogram::resetForTheStaleScale()
+{
+    if (!scaleIsStale() || mResetForLog == keyLog())
+        return;
+    mResetForLog = keyLog();
+    resetEdges();
 }
 
 bool QCPHistogram::canProduceContent() const

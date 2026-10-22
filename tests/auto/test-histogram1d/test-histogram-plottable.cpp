@@ -4,6 +4,7 @@
 #include "plottables/histogram-geometry.h"
 #include "painting/plottable-rhi-layer.h"
 #include "datasource/soa-multi-datasource.h"
+#include <QScopeGuard>
 #include <QThread>
 #include <atomic>
 #include <numeric>
@@ -300,6 +301,33 @@ void TestHistogramPlottable::resultOfTheOldScaleIsNotShownUnderTheNewOne()
     gate->open = true;
     QThread::msleep(100); // the job ends and posts its result, which nothing handles yet
     mPlot->replot();      // queues the reset behind that result
+    QVERIFY(settle(h));
+    QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && h->histogram()->log, 2000);
+}
+
+// Every frame showing stale bars asks for a reset; all but the first would supersede the job
+// before it, so under a steady replot stream the new bars would never land.
+void TestHistogramPlottable::staleScaleIsResetOnceUnderAReplotStream()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    h->setBins(3);
+    h->setDataSource(values({1, 10, 100, 1000}));
+    QVERIFY(waitForResult(h));
+    QVERIFY(settle(h));
+    auto gate = std::make_shared<Gate>();
+    const auto release = qScopeGuard([gate] { gate->open = true; }); // a failure must not hang
+    h->setDataSource(gated({1, 10, 100, 1000}, gate));
+    QVERIFY(gate->waitEntered());
+    h->setKeyAxis(mPlot->xAxis2);
+    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    const auto before = h->pipeline().currentGeneration();
+    for (int i = 0; i < 20; ++i)
+    {
+        mPlot->replot();
+        QCoreApplication::processEvents();
+    }
+    QCOMPARE(h->pipeline().currentGeneration() - before, uint64_t(1));
+    gate->open = true;
     QVERIFY(settle(h));
     QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && h->histogram()->log, 2000);
 }
