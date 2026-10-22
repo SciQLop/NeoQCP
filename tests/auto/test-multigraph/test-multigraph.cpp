@@ -905,6 +905,34 @@ void TestMultiGraph::selectedStepLineKeepsItsSteps()
     QVERIFY2(!crossesTheDiagonal(mPlot), "selected step line drawn as a straight line");
 }
 
+static bool onScreenIsRed(QCustomPlot* plot, double key, double value)
+{
+    const QImage frame = plot->grabFramebuffer();
+    const double dpr = frame.devicePixelRatio();
+    const QColor c = frame.pixelColor(qRound(plot->xAxis->coordToPixel(key) * dpr),
+                                      qRound(plot->yAxis->coordToPixel(value) * dpr));
+    return c.red() > 150 && c.green() < 100 && c.blue() < 100;
+}
+
+void TestMultiGraph::committedDataIsDrawnOnScreen()
+{
+    if (!showWithRhi(mPlot))
+        QSKIP("no QRhi available in this environment");
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double>{0, 4}, std::vector<std::vector<double>>{{1, 1}});
+    mg->setComponentPens({QPen(Qt::red, 5)});
+    mPlot->xAxis->setRange(-1, 5);
+    mPlot->yAxis->setRange(0, 4);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(onScreenIsRed(mPlot, 2, 1));
+    mg->setData(std::vector<double>{0, 4}, std::vector<std::vector<double>>{{3, 3}});
+    QVERIFY(mg->hasPendingData());
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->hasPendingData(), 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY2(onScreenIsRed(mPlot, 2, 3), "the committed data is not on screen");
+    QVERIFY2(!onScreenIsRed(mPlot, 2, 1), "the replaced data is still on screen");
+}
+
 void TestMultiGraph::selectedStepGraph2KeepsItsSteps()
 {
     if (!showWithRhi(mPlot))
