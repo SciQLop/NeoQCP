@@ -2052,6 +2052,56 @@ void TestPipeline::histogram2dQueuedRebinIsDroppedAfterAnExportRebinned()
     QVERIFY(spreadOverDecades(hist->pipeline().result(), true));
 }
 
+namespace
+{
+// Four keys a decade apart, all at value 5. Reads off the GUI thread wait for the gate, so a
+// background job can be held while an export bins synchronously.
+class GatedDecadeSource final : public QCPAbstractDataSource
+{
+public:
+    explicit GatedDecadeSource(std::shared_ptr<std::atomic<bool>> open) : mOpen(std::move(open)) {}
+    int size() const override { return 4; }
+    double keyAt(int i) const override
+    {
+        if (QThread::currentThread() != qApp->thread())
+            while (!mOpen->load()) QThread::msleep(1);
+        return std::pow(10.0, i);
+    }
+    double valueAt(int) const override { return 5.0; }
+    QCPRange keyRange(bool& found, QCP::SignDomain) const override { found = true; return {1, 1000}; }
+    QCPRange valueRange(bool& found, QCP::SignDomain, const QCPRange&) const override
+    {
+        found = true;
+        return {5, 5};
+    }
+    int findBegin(double, bool) const override { return 0; }
+    int findEnd(double, bool) const override { return 4; }
+    QVector<QPointF> getOptimizedLineData(int, int, int, QCPAxis*, QCPAxis*) const override { return {}; }
+    QVector<QPointF> getLines(int, int, QCPAxis*, QCPAxis*) const override { return {}; }
+
+private:
+    std::shared_ptr<std::atomic<bool>> mOpen;
+};
+} // namespace
+
+// An export bins for the new scale at once; a job started before it, in the old scale, must not
+// replace that result when it lands.
+void TestPipeline::histogram2dExportResultIsNotReplacedByAnOlderJob()
+{
+    auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
+    hist->setBins(3, 1);
+    auto open = std::make_shared<std::atomic<bool>>(false);
+    QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    hist->setDataSource(std::make_shared<GatedDecadeSource>(open));
+    hist->setKeyAxis(mPlot->xAxis2);
+    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    QVERIFY(!mPlot->toPixmap(400, 300).isNull());
+    QVERIFY(spreadOverDecades(hist->pipeline().result(), true));
+    open->store(true);
+    QTest::qWait(200);
+    QVERIFY(spreadOverDecades(hist->pipeline().result(), true));
+}
+
 // Nothing finite bins to no cells: draw() must not take that for "not binned yet" and loop.
 void TestPipeline::histogram2dWithNothingFiniteBinsOnce()
 {

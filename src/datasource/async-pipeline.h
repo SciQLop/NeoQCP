@@ -45,6 +45,9 @@ public:
 
     void onDataChanged();
     void onViewportChanged(const ViewportParams& vp);
+    //! Drops the results of every job started so far: a result made synchronously from the
+    //! current source and transform is newer than all of them. Emits nothing (safe in a paint).
+    void supersedeEarlierJobs();
 
     // The viewport of the latest job requested, async or synchronous.
     ViewportParams lastViewport() const

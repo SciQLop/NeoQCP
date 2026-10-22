@@ -79,6 +79,12 @@ void QCPAsyncPipelineBase::onDataChanged()
     emitBusyIfNeeded(lock);
 }
 
+void QCPAsyncPipelineBase::supersedeEarlierJobs()
+{
+    QMutexLocker lock(&mMutex);
+    mDisplayedGeneration = ++mGeneration;
+}
+
 void QCPAsyncPipelineBase::settleIdle(QMutexLocker<QMutex>& lock, uint64_t gen)
 {
     // No job is running or pending for `gen` (there was nothing to build one

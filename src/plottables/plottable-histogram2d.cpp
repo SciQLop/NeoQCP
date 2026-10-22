@@ -320,8 +320,11 @@ void QCPHistogram2D::binForExport()
         return;
     if (!binnedForTheAxisScales())
         installTransform();
-    if (mPipeline.runSynchronously(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data())))
-        mRenderer.invalidateMapImage();
+    if (!mPipeline.runSynchronously(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data())))
+        return;
+    // A job still running may have the old scales: it must not replace these cells.
+    mPipeline.supersedeEarlierJobs();
+    mRenderer.invalidateMapImage();
 }
 
 void QCPHistogram2D::draw(QCPPainter* painter)
