@@ -45,8 +45,14 @@ public:
 
     void onDataChanged();
     void onViewportChanged(const ViewportParams& vp);
-    //! Drops the results of every job started so far: a result made synchronously from the
-    //! current source and transform is newer than all of them. Emits nothing (safe in a paint).
+    //! After a synchronous run (export): the results of the jobs already started are dropped
+    //! when they land, so they cannot replace the newer synchronous result. Emits nothing, so
+    //! it is safe inside a paint.
+    //! - Viewport-independent transforms only. A pending viewport replay takes the latest
+    //!   generation, so it would be dropped too, and nothing asks for that viewport again.
+    //! - A dropped job still runs to the end. It still installs its cache, which is harmless
+    //!   only for cache-less transforms such as bin2d.
+    //! - isBusy() turns false at once. busyChanged(false) comes only when the dropped job lands.
     void supersedeEarlierJobs();
 
     // The viewport of the latest job requested, async or synchronous.
