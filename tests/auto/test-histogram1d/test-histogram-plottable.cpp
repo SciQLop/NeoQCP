@@ -232,8 +232,13 @@ void TestHistogramPlottable::rebinsForTheScaleOfANewKeyAxis()
     mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
     mPlot->replot();
     QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && h->histogram()->log, 5000);
-    QCOMPARE(h->histogram()->edges.front(), 1.0);
-    QCOMPARE(h->histogram()->edges.back(), 1000.0);
+    const auto& edges = h->histogram()->edges;
+    QCOMPARE(edges.size(), std::size_t(4));
+    QCOMPARE(edges.front(), 1.0);
+    QCOMPARE(edges[1], 10.0); // log-spaced, not only flagged log
+    QCOMPARE(edges[2], 100.0);
+    QCOMPARE(edges.back(), 1000.0);
+    QCOMPARE(h->histogram()->heights[0], (std::vector<double>{1, 1, 2}));
 }
 
 // Nothing may emit during a paint: the re-bin draw() asks for runs from the event loop.
@@ -515,6 +520,45 @@ void TestHistogramPlottable::aHistogramIsNotSelectable()
     const QPointF insideABar(mPlot->xAxis->coordToPixel(0.5), mPlot->yAxis->coordToPixel(2));
     QCOMPARE(h->selectTest(insideABar, false), -1.0);
     QCOMPARE(h->selectTest(insideABar, true), -1.0);
+}
+
+void TestHistogramPlottable::verticalKeyAxisGrowsBarsAlongX()
+{
+    auto* h = new QCPHistogram(mPlot->yAxis, mPlot->xAxis);
+    h->setColumnColors({Qt::red});
+    h->setBinned({0, 1, 2}, {{6, 2}});
+    mPlot->yAxis->setRange(0, 2);
+    mPlot->xAxis->setRange(0, 8);
+    const QImage img = mPlot->toPixmap(400, 300).toImage();
+    const auto at = [&](double value, double key) {
+        return QPointF(mPlot->xAxis->coordToPixel(value), mPlot->yAxis->coordToPixel(key));
+    };
+
+    const auto bars = qcp::histogram::barRects(*h->histogram(), 0, mPlot->yAxis, mPlot->xAxis);
+    QCOMPARE(bars.size(), std::size_t(2));
+    QCOMPARE(bars[0].left, mPlot->yAxis->coordToPixel(0));
+    QCOMPARE(bars[0].base, mPlot->xAxis->coordToPixel(0));
+    QCOMPARE(bars[0].top, mPlot->xAxis->coordToPixel(6));
+    const QRectF r = qcp::histogram::pixelRect(bars[0], true);
+    QCOMPARE(r.left(), mPlot->xAxis->coordToPixel(0));
+    QCOMPARE(r.right(), mPlot->xAxis->coordToPixel(6));
+    QCOMPARE(r.top(), mPlot->yAxis->coordToPixel(1));
+    QCOMPARE(r.bottom(), mPlot->yAxis->coordToPixel(0));
+    const auto outline = qcp::histogram::barOutlines(bars, true);
+    QCOMPARE(outline[0], at(0, 0));
+    QCOMPARE(outline[1], at(6, 0));
+    QCOMPARE(outline[2], at(6, 1));
+    QVERIFY(qcp::histogram::contains(bars, at(4.5, 0.5), true));
+    QVERIFY(!qcp::histogram::contains(bars, at(4.5, 1.5), true));
+    QVERIFY(qcp::histogram::contains(bars, at(1.5, 1.5), true));
+
+    for (const double key : {0.25, 0.75, 1.25, 1.75})
+        for (const double value : {0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5})
+        {
+            const bool inABar = value < (key < 1 ? 6 : 2);
+            QVERIFY2(isRedish(img.pixelColor(at(value, key).toPoint())) == inABar,
+                     qPrintable(QStringLiteral("value %1, key %2").arg(value).arg(key)));
+        }
 }
 
 namespace {

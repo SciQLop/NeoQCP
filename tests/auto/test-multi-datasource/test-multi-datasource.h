@@ -38,6 +38,8 @@ private slots:
     void gapsBeforeMatchesTheLineBreaks();
     void gapsBeforeOffByZeroThreshold();
     void gapsBeforeRowMajor();
+    void resampledGapsBeforeBreaksAtNaNBinsAndThresholdGaps();
+    void gapsBeforeEqualsTheLineBreaksOfEverySource();
 
     // Row-major data source
     void rowMajorValueAt();

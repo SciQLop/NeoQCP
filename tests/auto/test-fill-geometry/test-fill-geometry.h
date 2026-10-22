@@ -15,4 +15,6 @@ private slots:
     void stripPolygonsOnePerRun();
     void stepLeftHoldsEachValueUntilTheNextKey();
     void stepRightAndCenterMatchTheLineHelpers();
+    void steppedMovesBothEdgesAndKeepsBreaks_data();
+    void steppedMovesBothEdgesAndKeepsBreaks();
 };

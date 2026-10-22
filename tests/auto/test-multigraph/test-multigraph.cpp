@@ -939,7 +939,8 @@ QCPMultiGraph* denseGraphDrawn(QCustomPlot* plot)
     plot->xAxis->setRange(0, 100'000);
     plot->yAxis->setRange(-1.5, 1.5);
     plot->replot(QCustomPlot::rpImmediateRefresh);
-    QTest::qWaitFor([mg] { return !mg->pipeline().isBusy(); }, 5000);
+    if (!QTest::qWaitFor([mg] { return !mg->pipeline().isBusy(); }, 5000))
+        qWarning("denseGraphDrawn: the pipeline is still busy after 5 s");
     plot->replot(QCustomPlot::rpImmediateRefresh);
     return mg;
 }
@@ -1033,7 +1034,7 @@ void TestMultiGraph::legendOneInLegendComponentHasNoExpander()
     auto* gi = groupItemOf(mPlot, mg);
     gi->setExpanded(true);
     QVERIFY(!gi->shownExpanded());
-    QVERIFY(!gi->headerRowText(false).startsWith(QString::fromUtf8("▾")));
+    QCOMPARE(gi->headerRowText(false), QStringLiteral("y"));
 }
 
 void TestMultiGraph::legendHeaderClickSelectsTheOnlyInLegendComponent()
@@ -1270,6 +1271,31 @@ void TestMultiGraph::fillCacheIsRebuiltOnZoom()
                                       int(mPlot->yAxis->coordToPixel(1.5)))));
 }
 
+// The GPU pans the cached strip: an edge stopped at the axis bottom would come into view.
+void TestMultiGraph::bandEdgeAtZeroOnALogAxisStaysPastTheEdgeUnderAGpuPan()
+{
+    if (!showWithRhi(mPlot))
+        QSKIP("no exposed window with a QRhi in this environment");
+    auto* mg = bandDownToZeroOnALogAxis(mPlot);
+    mPlot->axisRect()->setAutoMargins(QCP::msNone); // new tick labels must not resize the rect
+    mPlot->axisRect()->setMargins(QMargins(50, 20, 20, 30));
+    mPlot->xAxis->setTicks(false);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(mPlot->plottableRhiLayer(mg->layer()));
+    const auto before = mg->mFills.first().verts;
+    QVERIFY(!before.empty());
+
+    mPlot->yAxis->setRange(0.05, 50); // the content moves up a tenth of the axis
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY2(mg->mFills.first().verts == before, "the pan must reuse the cached strip");
+    const QImage frame = mPlot->grabFramebuffer();
+    const double dpr = frame.devicePixelRatio();
+    const QRect r = mPlot->axisRect()->rect();
+    const QColor c = frame.pixelColor(qRound(mPlot->xAxis->coordToPixel(1.5) * dpr),
+                                      qRound((r.bottom() - 3) * dpr));
+    QVERIFY2(isRedish(c), qPrintable(c.name()));
+}
+
 void TestMultiGraph::defaultFillFollowsTheOwnerColourOnTheGpu()
 {
     if (!showWithRhi(mPlot))
@@ -1343,6 +1369,43 @@ void TestMultiGraph::legendIconOfABandIsAFilledSwatch()
     p.end();
     QVERIFY(isRedish(img.pixelColor(20, 6)));
     QVERIFY(isRedish(img.pixelColor(20, 14)));
+}
+
+void TestMultiGraph::legendIconDrawsTheLineOverTheSwatch()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double>{1, 2}, std::vector<std::vector<double>>{{1, 1}});
+    mg->setComponentPens({QPen(Qt::blue, 3)});
+    mg->setComponentFill(0, 0.0, QBrush(Qt::red));
+    QImage img(40, 20, QImage::Format_ARGB32);
+    img.fill(Qt::white);
+    QCPPainter p(&img);
+    mg->drawComponentLegendIcon(&p, 0, QLineF(0, 10, 40, 10));
+    p.end();
+    const QColor onTheLine = img.pixelColor(20, 10);
+    QVERIFY2(onTheLine.blue() > 150 && onTheLine.red() < 100, qPrintable(onTheLine.name()));
+    QVERIFY(isRedish(img.pixelColor(20, 6)));
+}
+
+void TestMultiGraph::collapsedLegendRowShowsTheBandSwatch()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double>{1, 2}, std::vector<std::vector<double>>{{0, 0}, {1, 1}});
+    mg->setComponentLineStyle(0, QCPMultiGraph::lsNone);
+    mg->setComponentLineStyle(1, QCPMultiGraph::lsNone);
+    mg->setComponentInLegend(1, false);
+    mg->setComponentFillBetween(0, 1, QBrush(Qt::red));
+    mg->addToLegend(mPlot->legend);
+    mPlot->legend->setVisible(true);
+    mPlot->xAxis->setRange(10, 20); // the band itself stays out of view
+    auto* gi = groupItemOf(mPlot, mg);
+    QVERIFY(gi);
+    QVERIFY(!gi->shownExpanded());
+    const QImage img = renderOf(mPlot);
+    const QRect r = gi->rect();
+    const QColor swatch = img.pixelColor(r.left() + gi->margins().left() + 10,
+                                         r.top() + gi->rowHeight() / 2 - 3);
+    QVERIFY2(isRedish(swatch), qPrintable(swatch.name()));
 }
 
 static QCPMultiGraph* errorBarGraph(QCustomPlot* plot, int n, double spacing)

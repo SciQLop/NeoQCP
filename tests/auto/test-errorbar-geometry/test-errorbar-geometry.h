@@ -13,4 +13,5 @@ private slots:
     void barsFitNeedsTheSpacing();
     void noInfinitiesEverReachTheRuns();
     void barsAreSeparatedByOneNanNotTrailing();
+    void zeroLengthStemStillHasBothCaps();
 };

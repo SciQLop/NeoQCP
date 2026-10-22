@@ -773,7 +773,7 @@ void TestMultiDataSource::soaFloatExposesTypedRawColumn()
     QVERIFY(col.type == QCPRawColumn::Type::Float);
     QCOMPARE(col.data, static_cast<const void*>(col0.data()));
     QCOMPARE(col.stride, std::ptrdiff_t(1));
-    QVERIFY(!src.rawColumn(1));
+    QVERIFY(!src.rawColumn(src.columnCount()));
 }
 
 void TestMultiDataSource::integerColumnHasNoRawColumn()
@@ -952,6 +952,82 @@ void TestMultiDataSource::gapsBeforeMatchesTheLineBreaks()
     QVERIFY(gaps.hasAnyGap);
     for (int i = 0; i < 7; ++i)
         QCOMPARE(int(gaps[i]), i == 4 ? 1 : 0);
+}
+
+namespace {
+// 1 for each row of [0, rows) that getLines starts with a NaN break (values must be NaN-free).
+std::vector<int> lineBreaks(const QVector<QPointF>& lines, int rows)
+{
+    std::vector<int> breaks(rows, 0);
+    int row = 0;
+    for (const QPointF& p : lines)
+    {
+        if (!qIsNaN(p.x()))
+            ++row;
+        else if (row < rows)
+            breaks[row] = 1;
+    }
+    return breaks;
+}
+
+std::vector<int> gapFlags(const qcp::algo::GapVector& gaps, int rows)
+{
+    std::vector<int> flags(rows, 0);
+    for (int i = 0; i < rows; ++i)
+        flags[i] = gaps.hasAnyGap && gaps[i] ? 1 : 0;
+    return flags;
+}
+
+// Bin keys evenly spaced: only the ratios say where the raw data broke. Row 2 holds NaN rows
+// (+inf), row 4 a step 5x its neighbours.
+QCPResampledMultiDataSource resampledWithGaps()
+{
+    qcp::algo::MultiColumnBinResult bins;
+    bins.numColumns = 1;
+    bins.keys = {0, 1, 2, 3, 4, 5, 6, 7};
+    bins.values = {1, 2, 3, 4, 5, 6, 7, 8};
+    bins.gapRatio = {0, 0, std::numeric_limits<float>::infinity(), 0, 5, 0, 1, 0};
+    return QCPResampledMultiDataSource(std::move(bins));
+}
+} // namespace
+
+void TestMultiDataSource::resampledGapsBeforeBreaksAtNaNBinsAndThresholdGaps()
+{
+    auto src = resampledWithGaps();
+    src.setGapThreshold(2);
+    QCOMPARE(gapFlags(src.gapsBefore(0, 8), 8), (std::vector<int>{0, 0, 1, 0, 1, 0, 0, 0}));
+    src.setGapThreshold(0); // gap detection off: NaN rows still break
+    QCOMPARE(gapFlags(src.gapsBefore(0, 8), 8), (std::vector<int>{0, 0, 1, 0, 0, 0, 0, 0}));
+    src.setGapThreshold(2);
+    QCOMPARE(gapFlags(src.gapsBefore(3, 8), 5), (std::vector<int>{0, 1, 0, 0, 0}));
+}
+
+void TestMultiDataSource::gapsBeforeEqualsTheLineBreaksOfEverySource()
+{
+    std::vector<double> keys = {0, 1, 2, 3, 10, 11, 12, 30, 31};
+    std::vector<double> values = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+    QCPSoAMultiDataSource<std::vector<double>, std::vector<double>> soa(
+        std::vector<double>(keys), std::vector<std::vector<double>>{values});
+    QCPRowMajorMultiDataSource<double, double> rowMajor(
+        std::span<const double>(keys), values.data(), 9, 1, 1);
+    auto resampled = resampledWithGaps();
+    mPlot->xAxis->setRange(0, 40);
+    mPlot->yAxis->setRange(0, 10);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    const auto check = [&](QCPAbstractMultiDataSource& src, int begin, int end, const char* name) {
+        src.setGapThreshold(2);
+        const auto lines = src.getLines(0, begin, end, mPlot->xAxis, mPlot->yAxis);
+        const auto expected = lineBreaks(lines, end - begin);
+        QVERIFY2(std::count(expected.begin(), expected.end(), 1) > 0, name);
+        QVERIFY2(gapFlags(src.gapsBefore(begin, end), end - begin) == expected, name);
+    };
+    check(soa, 0, 9, "SoA");
+    check(soa, 2, 9, "SoA, from row 2");
+    check(rowMajor, 0, 9, "row-major");
+    check(rowMajor, 2, 9, "row-major, from row 2");
+    check(resampled, 0, 8, "resampled");
+    check(resampled, 3, 8, "resampled, from row 3");
 }
 
 void TestMultiDataSource::gapsBeforeOffByZeroThreshold()

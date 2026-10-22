@@ -73,3 +73,17 @@ void TestErrorBarGeometry::barsAreSeparatedByOneNanNotTrailing()
     QVERIFY(std::isnan(runs[8].x()));
     QVERIFY(std::isfinite(runs.last().x()));
 }
+
+// Pins the current look: an error of zero still shows its (coinciding) caps.
+void TestErrorBarGeometry::zeroLengthStemStillHasBothCaps()
+{
+    const std::vector<Bar> bars { {10, 50, 50, 50} };
+    const auto runs = qcp::errorbars::barRuns(bars, 3, false);
+    QCOMPARE(runs.size(), 3 * 2 + 2);
+    QCOMPARE(runs[0], QPointF(10, 50));
+    QCOMPARE(runs[1], QPointF(10, 50));
+    QCOMPARE(runs[3], QPointF(7, 50));
+    QCOMPARE(runs[4], QPointF(13, 50));
+    QCOMPARE(runs[6], QPointF(7, 50));
+    QCOMPARE(runs[7], QPointF(13, 50));
+}

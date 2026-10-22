@@ -57,11 +57,15 @@ void TestFillGeometry::crossingEdgesAreSplitNotDoubleBlended()
 
 void TestFillGeometry::verticalKeySwapsCoordinates()
 {
-    const std::vector<StripPoint> rows { {0, 0, 10}, {10, 0, 10} };
+    const std::vector<StripPoint> rows { {100, 0, 10}, {110, 0, 10} };
     std::vector<float> out;
     qcp::fill::appendStrip(rows, true, kRed, out);
+    QVERIFY(!out.empty());
     for (std::size_t v = 0; v < out.size(); v += 6)
+    {
         QVERIFY(out[v] == 0.f || out[v] == 10.f); // x is the value position
+        QVERIFY(out[v + 1] == 100.f || out[v + 1] == 110.f); // y is the key position
+    }
 }
 
 void TestFillGeometry::binToSpansTakesMinAndMaxOfBothEdges()
@@ -121,4 +125,50 @@ void TestFillGeometry::stepRightAndCenterMatchTheLineHelpers()
     compare(qcp::fill::Step::Left, qcp::toStepLeftLines(lines, false), 1);
     compare(qcp::fill::Step::Right, qcp::toStepRightLines(lines, false), 1);
     compare(qcp::fill::Step::Center, qcp::toStepCenterLines(lines, false), 0);
+}
+
+Q_DECLARE_METATYPE(qcp::fill::Step)
+Q_DECLARE_METATYPE(std::vector<StripPoint>)
+
+namespace {
+bool sameValue(double x, double y) { return (std::isnan(x) && std::isnan(y)) || x == y; }
+bool samePoint(const StripPoint& p, const StripPoint& q)
+{
+    return p.key == q.key && sameValue(p.a, q.a) && sameValue(p.b, q.b) && p.breakBefore == q.breakBefore;
+}
+QByteArray describe(const StripPoint& p)
+{
+    return QByteArray("{") + QByteArray::number(p.key) + ", " + QByteArray::number(p.a) + ", "
+        + QByteArray::number(p.b) + (p.breakBefore ? ", break}" : "}");
+}
+// A row with a NaN edge, then a row that starts a new run.
+const std::vector<StripPoint> kSteppedRows { {0, 1, 5}, {10, 3, 6}, {20, kNan, 7}, {30, 2, 8, true}, {40, 4, 9} };
+}
+
+void TestFillGeometry::steppedMovesBothEdgesAndKeepsBreaks_data()
+{
+    using qcp::fill::Step;
+    QTest::addColumn<Step>("step");
+    QTest::addColumn<std::vector<StripPoint>>("expected");
+    QTest::newRow("left") << Step::Left << std::vector<StripPoint> {
+        {0, 1, 5}, {10, 1, 5}, {10, 3, 6}, {20, 3, 6}, {20, kNan, 7},
+        {30, 2, 8, true}, {40, 2, 8}, {40, 4, 9} };
+    QTest::newRow("right") << Step::Right << std::vector<StripPoint> {
+        {0, 1, 5}, {0, 3, 6}, {10, 3, 6}, {10, kNan, 7}, {20, kNan, 7},
+        {30, 2, 8, true}, {30, 4, 9}, {40, 4, 9} };
+    QTest::newRow("center") << Step::Center << std::vector<StripPoint> {
+        {0, 1, 5}, {5, 1, 5}, {5, 3, 6}, {15, 3, 6}, {15, kNan, 7}, {20, kNan, 7},
+        {30, 2, 8, true}, {35, 2, 8}, {35, 4, 9}, {40, 4, 9} };
+}
+
+void TestFillGeometry::steppedMovesBothEdgesAndKeepsBreaks()
+{
+    QFETCH(qcp::fill::Step, step);
+    QFETCH(std::vector<StripPoint>, expected);
+    const auto s = qcp::fill::stepped(kSteppedRows, step);
+    QCOMPARE(s.size(), expected.size());
+    for (std::size_t i = 0; i < s.size(); ++i)
+        QVERIFY2(samePoint(s[i], expected[i]),
+                 (QByteArray::number(qulonglong(i)) + ": " + describe(s[i]) + " != "
+                  + describe(expected[i])).constData());
 }

@@ -52,6 +52,8 @@ private slots:
     void legendOneComponentHasNoExpander();
     void legendIconDrawsScatterMarkers();
     void legendIconOfABandIsAFilledSwatch();
+    void legendIconDrawsTheLineOverTheSwatch();
+    void collapsedLegendRowShowsTheBandSwatch();
     void legendCollapsedFitsBusyIndicator();
 
     // Fills
@@ -69,6 +71,7 @@ private slots:
     void bandEdgeAtZeroOnALogAxisReachesTheEdge();
     void bandEdgeAtZeroOnALogAxisIsClampedLikeABaseline();
     void fillCacheIsRebuiltOnZoom();
+    void bandEdgeAtZeroOnALogAxisStaysPastTheEdgeUnderAGpuPan();
     void defaultFillFollowsTheOwnerColourOnTheGpu();
     void autoScaleIncludesHiddenLineBandEdges();
     void fillFollowsADownsampledLine();
