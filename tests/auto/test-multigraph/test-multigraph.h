@@ -85,6 +85,8 @@ private slots:
     void errorBarsAreDroppedWhenABoundColumnDisappears();
     void anEmptySourceKeepsFillsAndErrorBars();
     void anEmptySourceKeepsTheComponents();
+    void anEmptyWiderSourceDoesNotGrowTheComponents();
+    void keptComponentsStayEditableDuringAnEmptyWindow();
     void errorBarsRejectBadColumns();
     void capWidthChangeShowsOnTheNextFrame();
     void errorBarsAreCachedOnTheGpu();

@@ -287,6 +287,9 @@ void QCPMultiGraph::onViewportChanged()
 
 void QCPMultiGraph::syncComponentCount(const QCPAbstractMultiDataSource* source)
 {
+    // An empty fetch window says nothing about the columns: keep them and what they carry.
+    if (source && source->size() == 0)
+        return;
     const int newCount = source ? source->columnCount() : 0;
     int oldCount = mComponents.size();
     if (newCount > oldCount) {
@@ -301,9 +304,6 @@ void QCPMultiGraph::syncComponentCount(const QCPAbstractMultiDataSource* source)
             c.inLegend = !isErrorBound(i);
         }
     } else if (newCount < oldCount) {
-        // An empty fetch window says nothing about the columns: keep them and what they carry.
-        if (source && source->size() == 0)
-            return;
         mComponents.resize(newCount);
         if (source)
             dropDecorationsBeyond(newCount);
@@ -337,7 +337,12 @@ bool QCPMultiGraph::isErrorBound(int column) const
 bool QCPMultiGraph::isValidColumn(int column) const
 {
     const auto& source = mPendingSource ? mPendingSource : mDataSource;
-    return column >= 0 && (!source || column < source->columnCount());
+    if (!source)
+        return column >= 0;
+    // An empty window keeps the components (syncComponentCount), so they stay editable.
+    const int columns = source->size() == 0 ? qMax(componentCount(), source->columnCount())
+                                            : source->columnCount();
+    return column >= 0 && column < columns;
 }
 
 // A default-brush fill or error band takes its owner's pen colour, which the GPU vertices have

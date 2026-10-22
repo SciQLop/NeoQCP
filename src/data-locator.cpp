@@ -311,7 +311,7 @@ bool QCPDataLocator::locateMultiGraphAtKey(double key)
 {
     auto* mg = qobject_cast<QCPMultiGraph*>(mPlottable);
     auto* src = mg->dataSource();
-    if (!src || src->size() == 0)
+    if (!src || src->size() == 0 || src->columnCount() == 0)
         return false;
 
     int idx = src->findEnd(key, false);

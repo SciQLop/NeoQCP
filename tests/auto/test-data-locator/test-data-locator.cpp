@@ -156,3 +156,14 @@ void TestDataLocator::locateOnMultiGraphSelectsClosestComponent()
     // Must return component 1's value (-30), not component 0's (10)
     QCOMPARE(locator.value(), -30.0);
 }
+
+void TestDataLocator::locateAtKeyOnAMultiGraphWithoutColumns()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double>{1.0, 2.0, 3.0}, std::vector<std::vector<double>>{});
+    QCOMPARE(mg->dataSource()->columnCount(), 0);
+
+    QCPDataLocator locator;
+    QVERIFY(!locator.locateAtKey(mg, 2.0));
+    QVERIFY(!locator.isValid());
+}

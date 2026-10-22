@@ -1134,6 +1134,19 @@ static QImage renderOf(QCustomPlot* plot)
 
 static bool isRedish(QColor c) { return c.red() > 150 && c.green() < 120 && c.blue() < 120; }
 
+// Export renders (toPixmap) never stage a source; a live replot does, and the plot swaps the
+// staged source in on its debounce timer, never on replot().
+static void commitEmptyWindow(QCustomPlot* plot, QCPMultiGraph* mg)
+{
+    plot->replot(QCustomPlot::rpImmediateRefresh);
+    const std::vector<double> none;
+    mg->setDataSource(std::make_shared<QCPRowMajorMultiDataSource<double, double>>(
+        std::span<const double>(none), none.data(), 0, 3, 3));
+    QVERIFY(mg->hasPendingData());
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->hasPendingData(), 5000);
+    QCOMPARE(mg->dataSource()->size(), 0);
+}
+
 void TestMultiGraph::fillToZeroColoursBelowTheCurveOnly()
 {
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
@@ -1521,6 +1534,7 @@ void TestMultiGraph::anEmptySourceKeepsFillsAndErrorBars()
     QVERIFY(mg->setComponentFill(2, 0.0));
     QVERIFY(mg->setComponentErrorBars(0, 1, 2));
     mg->setData(std::vector<double>{}, std::vector<std::vector<double>>{{}});
+    QCOMPARE(mg->componentCount(), 3);
     mg->setDataSource(std::shared_ptr<QCPAbstractMultiDataSource>());
     mg->setData(std::vector<double>{1, 2, 3},
                 std::vector<std::vector<double>>{{1, 2, 3}, {0, 1, 2}, {2, 3, 4}});
@@ -1539,19 +1553,36 @@ void TestMultiGraph::anEmptySourceKeepsTheComponents()
     mg->setComponentFillBetween(1, 2, QBrush(Qt::red));
     mPlot->xAxis->setRange(1, 3);
     mPlot->yAxis->setRange(-1, 5);
-    renderOf(mPlot);
-    const std::vector<double> none;
-    mg->setDataSource(std::make_shared<QCPRowMajorMultiDataSource<double, double>>(
-        std::span<const double>(none), none.data(), 0, 3, 3));
+    QImage img = renderOf(mPlot);
+    const QPoint inBand(int(mPlot->xAxis->coordToPixel(2)), int(mPlot->yAxis->coordToPixel(1.5)));
+    QVERIFY(isRedish(img.pixelColor(inBand)));
+    commitEmptyWindow(mPlot, mg);
     QCOMPARE(mg->componentCount(), 3);
-    mg->setData(std::vector<double>{1, 2, 3},
-                std::vector<std::vector<double>>{{1, 2, 3}, {0, 1, 2}, {2, 3, 4}});
     QCOMPARE(mg->component(0).name, QStringLiteral("y"));
     QCOMPARE(mg->component(2).pen.color(), QColor(Qt::blue));
     QCOMPARE(mg->component(1).lineStyle, QCPMultiGraph::lsNone);
-    const QImage img = renderOf(mPlot);
-    QVERIFY(isRedish(img.pixelColor(int(mPlot->xAxis->coordToPixel(2)),
-                                    int(mPlot->yAxis->coordToPixel(1.5)))));
+    QVERIFY(!isRedish(renderOf(mPlot).pixelColor(inBand)));
+    mg->setData(std::vector<double>{1, 2, 3},
+                std::vector<std::vector<double>>{{1, 2, 3}, {0, 1, 2}, {2, 3, 4}});
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->hasPendingData(), 5000);
+    QVERIFY(isRedish(renderOf(mPlot).pixelColor(inBand)));
+}
+
+void TestMultiGraph::anEmptyWiderSourceDoesNotGrowTheComponents()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    mg->setData(std::vector<double>{}, std::vector<std::vector<double>>(5));
+    QCOMPARE(mg->dataSource()->columnCount(), 5);
+    QCOMPARE(mg->componentCount(), 3);
+}
+
+void TestMultiGraph::keptComponentsStayEditableDuringAnEmptyWindow()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    commitEmptyWindow(mPlot, mg);
+    QVERIFY(mg->setComponentFillBetween(1, 2));
+    QVERIFY(mg->setComponentErrorBars(0, 1, 2));
+    QVERIFY(!mg->setComponentFill(3, 0.0));
 }
 
 void TestMultiGraph::errorBarsRejectBadColumns()
