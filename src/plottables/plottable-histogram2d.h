@@ -141,6 +141,8 @@ private:
 
     void installTransform();
     [[nodiscard]] bool binnedForTheAxisScales() const;
+    //! The binned cells, or nullptr when there are none (yet).
+    [[nodiscard]] const QCPColorMapData* binned() const;
     void queueRefreshBinning();
     void binForExport();
 };

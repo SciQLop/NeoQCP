@@ -2036,6 +2036,39 @@ void TestPipeline::histogram2dExportRightAfterANewAxisShowsItsScale()
     QVERIFY(spreadOverDecades(hist->pipeline().result(), true));
 }
 
+// Nothing finite bins to no cells: draw() must not take that for "not binned yet" and loop.
+void TestPipeline::histogram2dWithNothingFiniteBinsOnce()
+{
+    auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
+    // A layer whose plottables all have nothing to show is not drawn: give it one that has.
+    mPlot->addGraph()->setData(QVector<double>{0, 1}, QVector<double>{0, 1});
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    hist->setData(std::vector<double>(10, nan), std::vector<double>(10, nan));
+    QVERIFY(finished.wait(2000));
+    for (int i = 0; i < 20; ++i)
+    {
+        mPlot->replot();
+        QTest::qWait(10);
+    }
+    QVERIFY2(finished.count() <= 2, qPrintable(QString::number(finished.count())));
+    QVERIFY(hist->pipeline().result()->isEmpty());
+}
+
+// The pipeline keeps its previous result when a job returns none: old cells would stay.
+void TestPipeline::histogram2dDataWithNothingFiniteClearsTheOldCells()
+{
+    auto* hist = decadeHistogram(mPlot, true);
+    QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(finished.wait(2000));
+    QVERIFY(hist->pipeline().result());
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    hist->setData(std::vector<double>(4, nan), std::vector<double>(4, nan));
+    QVERIFY(finished.wait(2000));
+    const auto* result = hist->pipeline().result();
+    QVERIFY(result && result->isEmpty());
+}
+
 void TestPipeline::histogram2dNormalizationColumn()
 {
     auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);

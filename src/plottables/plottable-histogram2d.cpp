@@ -60,6 +60,10 @@ void QCPHistogram2D::installTransform()
             std::any& /*cache*/) -> std::shared_ptr<QCPColorMapData> {
             auto* raw = qcp::algo::bin2d(src, capturedKeyBins, capturedValueBins,
                                          keyLog, valueLog);
+            // Empty, not nullptr: the pipeline keeps its previous result on nullptr, so
+            // "nothing to bin" would leave the old cells.
+            if (!raw)
+                return std::make_shared<QCPColorMapData>(0, 0, QCPRange(), QCPRange());
             return std::shared_ptr<QCPColorMapData>(raw);
         });
 }
@@ -220,10 +224,16 @@ void QCPHistogram2D::setDataScaleType(QCPAxis::ScaleType type)
     }
 }
 
+const QCPColorMapData* QCPHistogram2D::binned() const
+{
+    const auto* data = mPipeline.result();
+    return data && !data->isEmpty() ? data : nullptr;
+}
+
 QCPRange QCPHistogram2D::colorDataBounds(bool& found) const
 {
     found = false;
-    auto* data = mPipeline.result();
+    auto* data = binned();
     if (!mDataSource || !data)
         return {};
     if (mNormalization == nNone)
@@ -324,13 +334,11 @@ void QCPHistogram2D::draw(QCPPainter* painter)
     const bool exporting = painter->modes().testFlag(QCPPainter::pmNoCaching);
     if (exporting && (staleScales || !mPipeline.result() || mPipeline.isBusy()))
         binForExport();
-    auto* binnedData = mPipeline.result();
+    // Not re-binned from here when there is nothing: no result with an idle pipeline means the
+    // data bins to nothing, and a re-bin would loop through finished() -> replot -> draw.
+    auto* binnedData = binned();
     if (!binnedData)
-    {
-        if (mDataSource && !exporting && !mPipeline.isBusy())
-            queueRefreshBinning();
         return;
-    }
 
     if (mRenderer.mapImageInvalidated())
     {
