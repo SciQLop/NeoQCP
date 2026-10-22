@@ -86,6 +86,9 @@ private slots:
     void anEmptySourceKeepsFillsAndErrorBars();
     void anEmptySourceKeepsTheComponents();
     void anEmptyWiderSourceDoesNotGrowTheComponents();
+    void aStagedEmptyWiderSourceDoesNotGrowTheComponents();
+    void aFirstEmptySourceAcceptsItsColumns();
+    void aNarrowerSourceDropsDecorationsSetDuringAnEmptyWindow();
     void keptComponentsStayEditableDuringAnEmptyWindow();
     void errorBarsRejectBadColumns();
     void capWidthChangeShowsOnTheNextFrame();

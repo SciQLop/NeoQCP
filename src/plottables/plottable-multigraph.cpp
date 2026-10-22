@@ -305,9 +305,9 @@ void QCPMultiGraph::syncComponentCount(const QCPAbstractMultiDataSource* source)
         }
     } else if (newCount < oldCount) {
         mComponents.resize(newCount);
-        if (source)
-            dropDecorationsBeyond(newCount);
     }
+    if (source)
+        dropDecorationsBeyond(newCount);
 }
 
 // A decoration pointing at a column that no longer exists is dropped for good: a later, wider

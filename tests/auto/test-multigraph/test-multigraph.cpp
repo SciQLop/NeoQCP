@@ -1164,15 +1164,17 @@ static bool isRedish(QColor c) { return c.red() > 150 && c.green() < 120 && c.bl
 
 // Export renders (toPixmap) never stage a source; a live replot does, and the plot swaps the
 // staged source in on its debounce timer, never on replot().
-static void commitEmptyWindow(QCustomPlot* plot, QCPMultiGraph* mg)
+static bool commitEmptyWindow(QCustomPlot* plot, QCPMultiGraph* mg)
 {
     plot->replot(QCustomPlot::rpImmediateRefresh);
     const std::vector<double> none;
     mg->setDataSource(std::make_shared<QCPRowMajorMultiDataSource<double, double>>(
         std::span<const double>(none), none.data(), 0, 3, 3));
-    QVERIFY(mg->hasPendingData());
-    QTRY_VERIFY_WITH_TIMEOUT(!mg->hasPendingData(), 5000);
-    QCOMPARE(mg->dataSource()->size(), 0);
+    if (!mg->hasPendingData())
+        return false;
+    if (!QTest::qWaitFor([mg] { return !mg->hasPendingData(); }, 5000))
+        return false;
+    return mg->dataSource()->size() == 0 && mg->dataSource()->columnCount() == 0;
 }
 
 void TestMultiGraph::fillToZeroColoursBelowTheCurveOnly()
@@ -1584,7 +1586,7 @@ void TestMultiGraph::anEmptySourceKeepsTheComponents()
     QImage img = renderOf(mPlot);
     const QPoint inBand(int(mPlot->xAxis->coordToPixel(2)), int(mPlot->yAxis->coordToPixel(1.5)));
     QVERIFY(isRedish(img.pixelColor(inBand)));
-    commitEmptyWindow(mPlot, mg);
+    QVERIFY(commitEmptyWindow(mPlot, mg));
     QCOMPARE(mg->componentCount(), 3);
     QCOMPARE(mg->component(0).name, QStringLiteral("y"));
     QCOMPARE(mg->component(2).pen.color(), QColor(Qt::blue));
@@ -1604,10 +1606,44 @@ void TestMultiGraph::anEmptyWiderSourceDoesNotGrowTheComponents()
     QCOMPARE(mg->componentCount(), 3);
 }
 
+void TestMultiGraph::aStagedEmptyWiderSourceDoesNotGrowTheComponents()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    mg->setData(std::vector<double>{}, std::vector<std::vector<double>>(5));
+    QVERIFY(mg->hasPendingData());
+    QCOMPARE(mg->componentCount(), 3);
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->hasPendingData(), 5000);
+    QCOMPARE(mg->dataSource()->columnCount(), 5);
+    QCOMPARE(mg->componentCount(), 3);
+}
+
+void TestMultiGraph::aFirstEmptySourceAcceptsItsColumns()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double>{}, std::vector<std::vector<double>>(5));
+    QCOMPARE(mg->componentCount(), 0);
+    QVERIFY(mg->setComponentFill(4, 0.0));
+    QVERIFY(!mg->setComponentFill(5, 0.0));
+}
+
+// A decoration set during an empty window must not wake on a later, unrelated wider source.
+void TestMultiGraph::aNarrowerSourceDropsDecorationsSetDuringAnEmptyWindow()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double>{}, std::vector<std::vector<double>>(5));
+    QVERIFY(mg->setComponentFill(4, 0.0));
+    QVERIFY(mg->setComponentErrorBars(0, 3, 4));
+    mg->setData(std::vector<double>{1, 2}, std::vector<std::vector<double>>{{1, 2}, {3, 4}});
+    mg->setData(std::vector<double>{1, 2}, std::vector<std::vector<double>>(5, {1, 2}));
+    QVERIFY(!mg->componentFill(4).has_value());
+    QVERIFY(!mg->componentErrorBars(0).has_value());
+}
+
 void TestMultiGraph::keptComponentsStayEditableDuringAnEmptyWindow()
 {
     auto* mg = threeColumnGraph(mPlot);
-    commitEmptyWindow(mPlot, mg);
+    QVERIFY(commitEmptyWindow(mPlot, mg));
     QVERIFY(mg->setComponentFillBetween(1, 2));
     QVERIFY(mg->setComponentErrorBars(0, 1, 2));
     QVERIFY(!mg->setComponentFill(3, 0.0));
