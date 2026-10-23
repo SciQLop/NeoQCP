@@ -289,12 +289,11 @@ void QCPPolarGraph::setSelectable(QCP::SelectionType selectable)
         mSelectable = selectable;
         QCPDataSelection oldSelection = mSelection;
         mSelection.enforceType(mSelectable);
+        const bool selectionTrimmed = mSelection != oldSelection;
+        const QPointer<QCPPolarGraph> alive(this);
         emit selectableChanged(mSelectable);
-        if (mSelection != oldSelection)
-        {
-            emit selectionChanged(selected());
-            emit selectionChanged(mSelection);
-        }
+        if (alive && selectionTrimmed)
+            emitSelectionChanged();
     }
 }
 
@@ -323,9 +322,21 @@ void QCPPolarGraph::setSelection(QCPDataSelection selection)
     if (mSelection != selection)
     {
         mSelection = selection;
-        emit selectionChanged(selected());
-        emit selectionChanged(mSelection);
+        emitSelectionChanged();
     }
+}
+
+/*! \internal
+
+  Emits both \ref selectionChanged signals. A slot may delete this graph: the second signal is only
+  emitted while it is alive.
+*/
+void QCPPolarGraph::emitSelectionChanged()
+{
+    const QPointer<QCPPolarGraph> alive(this);
+    emit selectionChanged(selected());
+    if (alive)
+        emit selectionChanged(mSelection);
 }
 
 /*! \overload
@@ -784,6 +795,7 @@ void QCPPolarGraph::selectEvent([[maybe_unused]] QMouseEvent* event, bool additi
     {
         QCPDataSelection newSelection = details.value<QCPDataSelection>();
         QCPDataSelection selectionBefore = mSelection;
+        const QPointer<QCPPolarGraph> alive(this);
         if (additive)
         {
             if (mSelectable == QCP::stWhole) // in whole selection mode, we toggle to no selection
@@ -806,8 +818,9 @@ void QCPPolarGraph::selectEvent([[maybe_unused]] QMouseEvent* event, bool additi
         }
         else
             setSelection(newSelection);
+        // setSelection only emits on a change, so a graph a slot deleted did change.
         if (selectionStateChanged)
-            *selectionStateChanged = mSelection != selectionBefore;
+            *selectionStateChanged = !alive || mSelection != selectionBefore;
     }
 }
 
@@ -817,9 +830,10 @@ void QCPPolarGraph::deselectEvent(bool* selectionStateChanged)
     if (mSelectable != QCP::stNone)
     {
         QCPDataSelection selectionBefore = mSelection;
+        const QPointer<QCPPolarGraph> alive(this);
         setSelection(QCPDataSelection());
         if (selectionStateChanged)
-            *selectionStateChanged = mSelection != selectionBefore;
+            *selectionStateChanged = !alive || mSelection != selectionBefore;
     }
 }
 

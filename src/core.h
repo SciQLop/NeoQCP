@@ -502,6 +502,7 @@ protected:
     bool registerGraph(QCPGraph* graph);
     bool registerItem(QCPAbstractItem* item);
     void updateLayerIndices() const;
+    bool deselectAllExcept(const QCPLayerable* kept);
     QCPLayerable* layerableAt(const QPointF& pos, bool onlySelectable,
                               QVariant* selectionDetails = nullptr) const;
     QList<QCPLayerable*> layerableListAt(const QPointF& pos, bool onlySelectable,

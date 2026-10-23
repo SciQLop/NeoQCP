@@ -274,6 +274,7 @@ protected:
 
     // non-virtual methods:
     bool legendAllowed() const { return mWantsLegend && !mGroup; }
+    void emitSelectionChanged();
     void applyFillAntialiasingHint(QCPPainter* painter) const;
     void applyScattersAntialiasingHint(QCPPainter* painter) const;
 

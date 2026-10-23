@@ -213,9 +213,10 @@ void QCPAbstractLegendItem::selectEvent([[maybe_unused]] QMouseEvent* event, boo
     if (mSelectable && mParentLegend->selectableParts().testFlag(QCPLegend::spItems))
     {
         bool selBefore = mSelected;
+        const QPointer<QCPAbstractLegendItem> alive(this);
         setSelected(additive ? !mSelected : true);
         if (selectionStateChanged)
-            *selectionStateChanged = mSelected != selBefore;
+            *selectionStateChanged = !alive || mSelected != selBefore;
     }
 }
 
@@ -225,9 +226,10 @@ void QCPAbstractLegendItem::deselectEvent(bool* selectionStateChanged)
     if (mSelectable && mParentLegend->selectableParts().testFlag(QCPLegend::spItems))
     {
         bool selBefore = mSelected;
+        const QPointer<QCPAbstractLegendItem> alive(this);
         setSelected(false);
         if (selectionStateChanged)
-            *selectionStateChanged = mSelected != selBefore;
+            *selectionStateChanged = !alive || mSelected != selBefore;
     }
 }
 
@@ -981,6 +983,7 @@ void QCPLegend::selectEvent([[maybe_unused]] QMouseEvent* event, bool additive,
     if (details.value<SelectablePart>() == spLegendBox && mSelectableParts.testFlag(spLegendBox))
     {
         SelectableParts selBefore = mSelectedParts;
+        const QPointer<QCPLegend> alive(this);
         setSelectedParts(
             additive ? mSelectedParts ^ spLegendBox
                      : mSelectedParts
@@ -988,7 +991,7 @@ void QCPLegend::selectEvent([[maybe_unused]] QMouseEvent* event, bool additive,
                                     // be deselected by QCustomPlot (they're normal QCPLayerables
                                     // with own deselectEvent)
         if (selectionStateChanged)
-            *selectionStateChanged = mSelectedParts != selBefore;
+            *selectionStateChanged = !alive || mSelectedParts != selBefore;
     }
 }
 
@@ -999,9 +1002,10 @@ void QCPLegend::deselectEvent(bool* selectionStateChanged)
     if (mSelectableParts.testFlag(spLegendBox))
     {
         SelectableParts selBefore = mSelectedParts;
+        const QPointer<QCPLegend> alive(this);
         setSelectedParts(selectedParts() & ~spLegendBox);
         if (selectionStateChanged)
-            *selectionStateChanged = mSelectedParts != selBefore;
+            *selectionStateChanged = !alive || mSelectedParts != selBefore;
     }
 }
 

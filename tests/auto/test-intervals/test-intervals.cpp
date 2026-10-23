@@ -1481,3 +1481,32 @@ void TestIntervals::createdIntervalCarriesItsRowCategory()
     QCOMPARE(spy.at(1).at(3).toInt(), -1);
 }
 
+
+namespace {
+void removeOnSelection(QCustomPlot* plot, QCPIntervals* iv)
+{
+    QObject::connect(iv, qOverload<const QCPDataSelection&>(&QCPAbstractPlottable::selectionChanged),
+                     plot, [plot, iv] { QVERIFY(plot->removePlottable(iv)); });
+}
+} // namespace
+
+void TestIntervals::clickSlotDeletingTheTimelineIsSafe()
+{
+    QCPLaneLayout layout;
+    auto* iv = laidOutTwoBars(mPlot, &layout);
+    removeOnSelection(mPlot, iv);
+    click(mPlot, iv->pixelOf(25, 0).toPoint());
+    QCOMPARE(mPlot->plottableCount(), 0);
+}
+
+void TestIntervals::shiftDragSlotDeletingTheTimelineIsSafe()
+{
+    QCPLaneLayout layout;
+    auto* iv = laidOutTwoBars(mPlot, &layout);
+    removeOnSelection(mPlot, iv);
+    const QPoint to = iv->pixelOf(95, 1).toPoint();
+    press(mPlot, iv->pixelOf(25, 0).toPoint(), Qt::ShiftModifier);
+    moveTo(mPlot, to, Qt::ShiftModifier);
+    release(mPlot, to, Qt::ShiftModifier);
+    QCOMPARE(mPlot->plottableCount(), 0);
+}

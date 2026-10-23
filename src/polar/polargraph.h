@@ -197,6 +197,7 @@ protected:
     virtual void draw(QCPPainter* painter);
     virtual QCP::Interaction selectionCategory() const;
     void applyDefaultAntialiasingHint(QCPPainter* painter) const;
+    void emitSelectionChanged();
     // events:
     virtual void selectEvent(QMouseEvent* event, bool additive, const QVariant& details,
                              bool* selectionStateChanged);

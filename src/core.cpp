@@ -60,6 +60,25 @@
 #include <QTimer>
 #include "datasource/pipeline-scheduler.h"
 
+// Selection and input handlers call into layerables whose signals reach user slots, and a slot may
+// delete any layerable: these loops walk guarded snapshots instead of the live lists.
+namespace
+{
+template <typename T>
+QList<QPointer<T>> guarded(const QList<T*>& objects)
+{
+    return QList<QPointer<T>>(objects.cbegin(), objects.cend());
+}
+
+QList<QPointer<QCPLayerable>> guardedLayerables(const QList<QCPLayer*>& layers)
+{
+    QList<QPointer<QCPLayerable>> result;
+    for (auto* layer : layers)
+        result.append(guarded(layer->children()));
+    return result;
+}
+} // namespace
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCustomPlot
@@ -2158,11 +2177,30 @@ QList<QCPLegend*> QCustomPlot::selectedLegends() const
 */
 void QCustomPlot::deselectAll()
 {
-    for (QCPLayer* layer : mLayers)
-    {
-        for (QCPLayerable* layerable : layer->children())
+    for (const auto& layerable : guardedLayerables(mLayers))
+        if (layerable)
             layerable->deselectEvent(nullptr);
+}
+
+/*! \internal
+
+  Sends a deselectEvent to every layerable but \a kept whose selection category is enabled in the
+  interactions. Returns whether any selection changed.
+*/
+bool QCustomPlot::deselectAllExcept(const QCPLayerable* kept)
+{
+    bool changed = false;
+    for (const auto& layerable : guardedLayerables(mLayers))
+    {
+        if (layerable && layerable != kept
+            && mInteractions.testFlag(layerable->selectionCategory()))
+        {
+            bool selChanged = false;
+            layerable->deselectEvent(&selChanged);
+            changed |= selChanged;
+        }
     }
+    return changed;
 }
 
 /*!
@@ -3215,9 +3253,11 @@ void QCustomPlot::mouseDoubleClickEvent(QMouseEvent* event)
     // determine layerable under the cursor (this event is called instead of the second press event
     // in a double-click):
     QList<QVariant> details;
-    QList<QCPLayerable*> candidates = layerableListAt(mMousePressPos, false, &details);
+    const auto candidates = guarded(layerableListAt(mMousePressPos, false, &details));
     for (int i = 0; i < candidates.size(); ++i)
     {
+        if (!candidates.at(i))
+            continue;
         event->accept(); // default impl of QCPLayerable's mouse events ignore the event, in that
                          // case propagate to next candidate in list
         candidates.at(i)->mouseDoubleClickEvent(event, details.at(i));
@@ -3230,7 +3270,7 @@ void QCustomPlot::mouseDoubleClickEvent(QMouseEvent* event)
     }
 
     // emit specialized object double click signals:
-    if (!candidates.isEmpty())
+    if (!candidates.isEmpty() && candidates.first())
     {
         if (QCPAbstractPlottable* ap = qobject_cast<QCPAbstractPlottable*>(candidates.first()))
         {
@@ -3304,7 +3344,7 @@ void QCustomPlot::mousePressEvent(QMouseEvent* event)
         // no selection rect interaction, prepare for click signal emission and forward event to
         // layerable under the cursor:
         QList<QVariant> details;
-        QList<QCPLayerable*> candidates = layerableListAt(mMousePressPos, false, &details);
+        const auto candidates = guarded(layerableListAt(mMousePressPos, false, &details));
         if (!candidates.isEmpty())
         {
             mMouseSignalLayerable
@@ -3315,6 +3355,8 @@ void QCustomPlot::mousePressEvent(QMouseEvent* event)
         // forward event to topmost candidate which accepts the event:
         for (int i = 0; i < candidates.size(); ++i)
         {
+            if (!candidates.at(i))
+                continue;
             event->accept(); // default impl of QCPLayerable's mouse events call ignore() on the
                              // event, in that case propagate to next candidate in list
             candidates.at(i)->mousePressEvent(event, details.at(i));
@@ -3578,8 +3620,10 @@ void QCustomPlot::wheelEvent(QWheelEvent* event)
     emit mouseWheel(event);
 
     // forward event to layerable under cursor:
-    for (auto candidate: layerableListAt(event->position(), false))
+    for (const auto& candidate : guarded(layerableListAt(event->position(), false)))
     {
+        if (!candidate)
+            continue;
         event->accept(); // default impl of QCPLayerable's mouse events ignore the event, in that
                          // case propagate to next candidate in list
         candidate->wheelEvent(event);
@@ -3615,8 +3659,9 @@ void QCustomPlot::keyPressEvent(QKeyEvent* event)
     }
 
     bool consumed = false;
-    for (int i = 0; i < plottableCount(); ++i)
-        consumed = plottable(i)->keyPress(event) || consumed;
+    for (const auto& plottable : guarded(mPlottables))
+        if (plottable)
+            consumed = plottable->keyPress(event) || consumed;
     if (consumed)
     {
         event->accept();
@@ -3625,9 +3670,9 @@ void QCustomPlot::keyPressEvent(QKeyEvent* event)
 
     if (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace)
     {
-        for (auto* item : mItems)
+        for (const auto& item : guarded(mItems))
         {
-            if (item->selected())
+            if (item && item->selected())
                 emit item->deleteRequested();
         }
     }
@@ -3966,7 +4011,7 @@ void QCustomPlot::legendRemoved(QCPLegend* legend)
 */
 void QCustomPlot::processRectSelection(QRect rect, QMouseEvent* event)
 {
-    using SelectionCandidate = QPair<QCPAbstractPlottable*, QCPDataSelection>;
+    using SelectionCandidate = QPair<QPointer<QCPAbstractPlottable>, QCPDataSelection>;
     using SelectionCandidates = QMultiMap<int, SelectionCandidate>; // map key is number of selected data points, so we have selections sorted by size
 
     bool selectionStateChanged = false;
@@ -4003,36 +4048,24 @@ void QCustomPlot::processRectSelection(QRect rect, QMouseEvent* event)
             }
 
             bool additive = event->modifiers().testFlag(mMultiSelectModifier);
-            // deselect all other layerables if not additive selection:
+            // deselect all other layerables if not additive selection, except the plottable
+            // selected afterwards:
             if (!additive)
-            {
-                // emit deselection except to those plottables who will be selected afterwards:
-                for (auto layer : mLayers)
-                {
-                    for (auto layerable : layer->children())
-                    {
-                        if ((potentialSelections.isEmpty()
-                             || potentialSelections.constBegin()->first != layerable)
-                            && mInteractions.testFlag(layerable->selectionCategory()))
-                        {
-                            bool selChanged = false;
-                            layerable->deselectEvent(&selChanged);
-                            selectionStateChanged |= selChanged;
-                        }
-                    }
-                }
-            }
+                selectionStateChanged |= deselectAllExcept(
+                    potentialSelections.isEmpty() ? nullptr
+                                                  : potentialSelections.constBegin()->first.data());
 
             // go through selections in reverse (largest selection first) and emit select events:
             SelectionCandidates::const_iterator it = potentialSelections.constEnd();
             while (it != potentialSelections.constBegin())
             {
                 --it;
-                if (mInteractions.testFlag(it.value().first->selectionCategory()))
+                QCPAbstractPlottable* plottable = it.value().first;
+                if (plottable && mInteractions.testFlag(plottable->selectionCategory()))
                 {
                     bool selChanged = false;
-                    it.value().first->selectEvent(
-                        event, additive, QVariant::fromValue(it.value().second), &selChanged);
+                    plottable->selectEvent(event, additive, QVariant::fromValue(it.value().second),
+                                           &selChanged);
                     selectionStateChanged |= selChanged;
                 }
             }
@@ -4091,27 +4124,13 @@ void QCustomPlot::processRectZoom(QRect rect, [[maybe_unused]] QMouseEvent* even
 void QCustomPlot::processPointSelection(QMouseEvent* event)
 {
     QVariant details;
-    QCPLayerable* clickedLayerable = layerableAt(event->pos(), true, &details);
+    const QPointer<QCPLayerable> clickedLayerable = layerableAt(event->pos(), true, &details);
     bool selectionStateChanged = false;
     bool additive = mInteractions.testFlag(QCP::iMultiSelect)
         && event->modifiers().testFlag(mMultiSelectModifier);
     // deselect all other layerables if not additive selection:
     if (!additive)
-    {
-        for (auto layer : std::as_const(mLayers))
-        {
-            for (auto layerable : layer->children())
-            {
-                if (layerable != clickedLayerable
-                    && mInteractions.testFlag(layerable->selectionCategory()))
-                {
-                    bool selChanged = false;
-                    layerable->deselectEvent(&selChanged);
-                    selectionStateChanged |= selChanged;
-                }
-            }
-        }
-    }
+        selectionStateChanged |= deselectAllExcept(clickedLayerable);
     if (clickedLayerable && mInteractions.testFlag(clickedLayerable->selectionCategory()))
     {
         // a layerable was actually clicked, call its selectEvent:

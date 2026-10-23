@@ -466,8 +466,7 @@ void QCPMultiGraph::updateBaseSelection()
     if (mSelection != combined)
     {
         mSelection = combined;
-        emit selectionChanged(selected());
-        emit selectionChanged(mSelection);
+        emitSelectionChanged();
     }
 }
 

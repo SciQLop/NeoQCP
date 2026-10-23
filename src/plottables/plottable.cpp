@@ -582,9 +582,21 @@ void QCPAbstractPlottable::setSelection(QCPDataSelection selection)
     if (mSelection != selection)
     {
         mSelection = selection;
-        emit selectionChanged(selected());
-        emit selectionChanged(mSelection);
+        emitSelectionChanged();
     }
+}
+
+/*! \internal
+
+  Emits both \ref selectionChanged signals. A slot may delete this plottable: the second signal is
+  only emitted while it is alive.
+*/
+void QCPAbstractPlottable::emitSelectionChanged()
+{
+    const QPointer<QCPAbstractPlottable> alive(this);
+    emit selectionChanged(selected());
+    if (alive)
+        emit selectionChanged(mSelection);
 }
 
 /*!
@@ -630,12 +642,11 @@ void QCPAbstractPlottable::setSelectable(QCP::SelectionType selectable)
         mSelectable = selectable;
         QCPDataSelection oldSelection = mSelection;
         mSelection.enforceType(mSelectable);
+        const bool selectionTrimmed = mSelection != oldSelection;
+        const QPointer<QCPAbstractPlottable> alive(this);
         emit selectableChanged(mSelectable);
-        if (mSelection != oldSelection)
-        {
-            emit selectionChanged(selected());
-            emit selectionChanged(mSelection);
-        }
+        if (alive && selectionTrimmed)
+            emitSelectionChanged();
     }
 }
 
@@ -1034,6 +1045,7 @@ void QCPAbstractPlottable::selectEvent([[maybe_unused]] QMouseEvent* event, bool
     {
         QCPDataSelection newSelection = details.value<QCPDataSelection>();
         QCPDataSelection selectionBefore = mSelection;
+        const QPointer<QCPAbstractPlottable> alive(this);
         if (additive)
         {
             if (mSelectable == QCP::stWhole) // in whole selection mode, we toggle to no selection
@@ -1056,8 +1068,9 @@ void QCPAbstractPlottable::selectEvent([[maybe_unused]] QMouseEvent* event, bool
         }
         else
             setSelection(newSelection);
+        // setSelection only emits on a change, so a plottable a slot deleted did change.
         if (selectionStateChanged)
-            *selectionStateChanged = mSelection != selectionBefore;
+            *selectionStateChanged = !alive || mSelection != selectionBefore;
     }
 }
 
@@ -1067,9 +1080,10 @@ void QCPAbstractPlottable::deselectEvent(bool* selectionStateChanged)
     if (mSelectable != QCP::stNone)
     {
         QCPDataSelection selectionBefore = mSelection;
+        const QPointer<QCPAbstractPlottable> alive(this);
         setSelection(QCPDataSelection());
         if (selectionStateChanged)
-            *selectionStateChanged = mSelection != selectionBefore;
+            *selectionStateChanged = !alive || mSelection != selectionBefore;
     }
 }
 

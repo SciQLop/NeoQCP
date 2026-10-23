@@ -355,9 +355,10 @@ void QCPTextElement::selectEvent([[maybe_unused]] QMouseEvent* event, bool addit
     if (mSelectable)
     {
         bool selBefore = mSelected;
+        const QPointer<QCPTextElement> alive(this);
         setSelected(additive ? !mSelected : true);
         if (selectionStateChanged)
-            *selectionStateChanged = mSelected != selBefore;
+            *selectionStateChanged = !alive || mSelected != selBefore;
     }
 }
 
@@ -367,9 +368,10 @@ void QCPTextElement::deselectEvent(bool* selectionStateChanged)
     if (mSelectable)
     {
         bool selBefore = mSelected;
+        const QPointer<QCPTextElement> alive(this);
         setSelected(false);
         if (selectionStateChanged)
-            *selectionStateChanged = mSelected != selBefore;
+            *selectionStateChanged = !alive || mSelected != selBefore;
     }
 }
 

@@ -1387,9 +1387,10 @@ void QCPAbstractItem::selectEvent([[maybe_unused]] QMouseEvent* event, bool addi
     if (mSelectable)
     {
         bool selBefore = mSelected;
+        const QPointer<QCPAbstractItem> alive(this);
         setSelected(additive ? !mSelected : true);
         if (selectionStateChanged)
-            *selectionStateChanged = mSelected != selBefore;
+            *selectionStateChanged = !alive || mSelected != selBefore;
     }
 }
 
@@ -1399,9 +1400,10 @@ void QCPAbstractItem::deselectEvent(bool* selectionStateChanged)
     if (mSelectable)
     {
         bool selBefore = mSelected;
+        const QPointer<QCPAbstractItem> alive(this);
         setSelected(false);
         if (selectionStateChanged)
-            *selectionStateChanged = mSelected != selBefore;
+            *selectionStateChanged = !alive || mSelected != selBefore;
     }
 }
 

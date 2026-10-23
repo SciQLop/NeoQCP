@@ -229,3 +229,110 @@ void TestQCustomPlot::escapeCancelsTheSelectionRect()
   QCOMPARE(canceled.count(), 1);
   QVERIFY(!mPlot->selectionRect()->isActive());
 }
+
+namespace {
+void sendMouse(QCustomPlot* plot, QEvent::Type type, QPoint pos, Qt::MouseButtons buttons,
+               Qt::KeyboardModifiers mods = Qt::NoModifier)
+{
+  QMouseEvent e(type, pos, plot->mapToGlobal(pos), Qt::LeftButton, buttons, mods);
+  QCoreApplication::sendEvent(plot, &e);
+}
+
+void clickAt(QCustomPlot* plot, QPoint pos)
+{
+  sendMouse(plot, QEvent::MouseButtonPress, pos, Qt::LeftButton);
+  sendMouse(plot, QEvent::MouseButtonRelease, pos, Qt::NoButton);
+}
+
+void dragFromTo(QCustomPlot* plot, QPoint from, QPoint to)
+{
+  sendMouse(plot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+  sendMouse(plot, QEvent::MouseMove, to, Qt::LeftButton);
+  sendMouse(plot, QEvent::MouseButtonRelease, to, Qt::NoButton);
+}
+
+//! A flat graph at value 5 over keys [2, 8], axes [0, 10], laid out.
+QCPGraph* flatGraph(QCustomPlot* plot, double value = 5)
+{
+  auto* g = new QCPGraph(plot->xAxis, plot->yAxis);
+  g->setData(QVector<double>{ 2, 5, 8 }, QVector<double>{ value, value, value });
+  return g;
+}
+
+void layOut(QCustomPlot* plot, QCP::Interactions interactions)
+{
+  plot->resize(400, 300);
+  plot->xAxis->setRange(0, 10);
+  plot->yAxis->setRange(0, 10);
+  plot->setInteractions(interactions);
+  plot->replot();
+}
+
+QPoint pixelOf(QCustomPlot* plot, double key, double value)
+{
+  return QPoint(qRound(plot->xAxis->coordToPixel(key)), qRound(plot->yAxis->coordToPixel(value)));
+}
+} // namespace
+
+// A slot deleting the plottable from its own selection signal: QCP must not touch it afterwards.
+void TestQCustomPlot::clickSlotDeletingTheGraphIsSafe()
+{
+  layOut(mPlot, QCP::iSelectPlottables);
+  auto* g = flatGraph(mPlot);
+  connect(g, qOverload<bool>(&QCPAbstractPlottable::selectionChanged), mPlot,
+          [this, g](bool) { QVERIFY(mPlot->removePlottable(g)); });
+  clickAt(mPlot, pixelOf(mPlot, 5, 5));
+  QCOMPARE(mPlot->plottableCount(), 0);
+}
+
+void TestQCustomPlot::deselectSlotDeletingTheClickedGraphIsSafe()
+{
+  layOut(mPlot, QCP::iSelectPlottables);
+  auto* selected = flatGraph(mPlot, 2);
+  auto* clicked = flatGraph(mPlot, 8);
+  selected->setSelection(QCPDataSelection(QCPDataRange(0, 3)));
+  connect(selected, qOverload<bool>(&QCPAbstractPlottable::selectionChanged), mPlot,
+          [this, clicked](bool) { QVERIFY(mPlot->removePlottable(clicked)); });
+  clickAt(mPlot, pixelOf(mPlot, 5, 8));
+  QCOMPARE(mPlot->plottableCount(), 1);
+  QVERIFY(!selected->selected());
+}
+
+void TestQCustomPlot::rectDeselectSlotDeletingACandidateIsSafe()
+{
+  layOut(mPlot, QCP::iSelectPlottables);
+  mPlot->setSelectionRectMode(QCP::srmSelect);
+  auto* selected = flatGraph(mPlot, 2);
+  auto* candidate = flatGraph(mPlot, 8);
+  selected->setSelection(QCPDataSelection(QCPDataRange(0, 3)));
+  connect(selected, qOverload<bool>(&QCPAbstractPlottable::selectionChanged), mPlot,
+          [this, candidate](bool) { QVERIFY(mPlot->removePlottable(candidate)); });
+  dragFromTo(mPlot, pixelOf(mPlot, 1, 9), pixelOf(mPlot, 9, 7));
+  QCOMPARE(mPlot->plottableCount(), 1);
+}
+
+void TestQCustomPlot::clickSlotDeletingTheItemIsSafe()
+{
+  layOut(mPlot, QCP::iSelectItems);
+  auto* line = new QCPItemLine(mPlot);
+  line->start->setCoords(2, 5);
+  line->end->setCoords(8, 5);
+  connect(line, &QCPAbstractItem::selectionChanged, mPlot,
+          [this, line](bool) { QVERIFY(mPlot->removeItem(line)); });
+  clickAt(mPlot, pixelOf(mPlot, 5, 5));
+  QCOMPARE(mPlot->itemCount(), 0);
+}
+
+void TestQCustomPlot::deleteKeySlotDeletingEveryItemIsSafe()
+{
+  layOut(mPlot, QCP::iSelectItems);
+  for (int i = 0; i < 3; ++i)
+  {
+    auto* line = new QCPItemLine(mPlot);
+    line->setSelected(true);
+    connect(line, &QCPAbstractItem::deleteRequested, mPlot, [this] { mPlot->clearItems(); });
+  }
+  QKeyEvent del(QEvent::KeyPress, Qt::Key_Delete, Qt::NoModifier);
+  QCoreApplication::sendEvent(mPlot, &del);
+  QCOMPARE(mPlot->itemCount(), 0);
+}

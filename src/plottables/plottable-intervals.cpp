@@ -352,14 +352,16 @@ void QCPIntervals::selectEvent(QMouseEvent*, bool additive, const QVariant& deta
 {
     const QCPDataSelection hit = details.value<QCPDataSelection>();
     const QCPDataSelection before = mSelection;
+    const QPointer<QCPIntervals> alive(this);
     if (!additive)
         setSelection(hit);
     else if (!hit.isEmpty() && mSelection.contains(hit))
         setSelection(mSelection - hit);
     else
         setSelection(mSelection + hit);
+    // setSelection only emits on a change, so a timeline a slot deleted did change.
     if (selectionStateChanged)
-        *selectionStateChanged = mSelection != before;
+        *selectionStateChanged = !alive || mSelection != before;
 }
 
 void QCPIntervals::deselectEvent(bool* selectionStateChanged)
@@ -468,9 +470,10 @@ void QCPIntervals::mouseReleaseEvent(QMouseEvent* event, const QPointF& startPos
 {
     if (mRubberBand)
     {
-        setSelectedRows(rowsInRect(QRectF(startPos, event->pos()).normalized()));
+        // Selecting last: a selection slot may delete this timeline.
         mRubberBand.reset();
         requestRepaint();
+        setSelectedRows(rowsInRect(QRectF(startPos, event->pos()).normalized()));
     }
     else if (mGesture)
         finishGesture();

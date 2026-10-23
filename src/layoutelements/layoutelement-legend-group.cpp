@@ -136,16 +136,18 @@ void QCPGroupLegendItem::selectEvent([[maybe_unused]] QMouseEvent* event,
 
     if (componentIndex < 0) {
         // Header click: toggle expand/collapse
-        setExpanded(!mExpanded);
         mSelectedComponent = -1;
+        setExpanded(!mExpanded); // last: it replots, which reaches user slots
     } else {
         // Component click: select that component
         bool selBefore = mSelected;
         mSelectedComponent = componentIndex;
+        const QPointer<QCPGroupLegendItem> alive(this);
         setSelected(true);
         if (selectionStateChanged)
-            *selectionStateChanged = mSelected != selBefore;
-        emit componentClicked(componentIndex);
+            *selectionStateChanged = !alive || mSelected != selBefore;
+        if (alive)
+            emit componentClicked(componentIndex);
     }
 }
 

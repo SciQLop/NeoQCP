@@ -126,6 +126,9 @@ private slots:
 
     void firstVisibleTimelineDrawsLaneNames();
 
+    void clickSlotDeletingTheTimelineIsSafe();
+    void shiftDragSlotDeletingTheTimelineIsSafe();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };

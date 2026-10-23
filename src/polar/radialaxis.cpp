@@ -1222,9 +1222,10 @@ void QCPPolarAxisRadial::selectEvent([[maybe_unused]] QMouseEvent* event, bool a
     if (mSelectableParts.testFlag(part))
     {
         SelectableParts selBefore = mSelectedParts;
+        const QPointer<QCPPolarAxisRadial> alive(this);
         setSelectedParts(additive ? mSelectedParts ^ part : part);
         if (selectionStateChanged)
-            *selectionStateChanged = mSelectedParts != selBefore;
+            *selectionStateChanged = !alive || mSelectedParts != selBefore;
     }
 }
 
@@ -1232,9 +1233,10 @@ void QCPPolarAxisRadial::selectEvent([[maybe_unused]] QMouseEvent* event, bool a
 void QCPPolarAxisRadial::deselectEvent(bool* selectionStateChanged)
 {
     SelectableParts selBefore = mSelectedParts;
+    const QPointer<QCPPolarAxisRadial> alive(this);
     setSelectedParts(mSelectedParts & ~mSelectableParts);
     if (selectionStateChanged)
-        *selectionStateChanged = mSelectedParts != selBefore;
+        *selectionStateChanged = !alive || mSelectedParts != selBefore;
 }
 
 /*! \internal

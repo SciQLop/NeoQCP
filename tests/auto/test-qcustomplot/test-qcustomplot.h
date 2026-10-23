@@ -16,6 +16,11 @@ private slots:
   void calculateMargin_staleTickVectors();
   void dateTimeTicker_extremeZoomOutNoCrash();
   void escapeCancelsTheSelectionRect();
+  void clickSlotDeletingTheGraphIsSafe();
+  void deselectSlotDeletingTheClickedGraphIsSafe();
+  void rectDeselectSlotDeletingACandidateIsSafe();
+  void clickSlotDeletingTheItemIsSafe();
+  void deleteKeySlotDeletingEveryItemIsSafe();
 
 private:
   QCustomPlot *mPlot;
