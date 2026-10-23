@@ -651,3 +651,43 @@ void TestHistogramPlottable::barsKeepATranslucentUserColour()
     const QColor inside = exportedPixel(mPlot, 0.5, 2);
     QVERIFY2(isLightRed(inside), qPrintable(inside.name()));
 }
+
+namespace {
+template <typename Signal>
+void removeOn(QCustomPlot* plot, QCPHistogram* h, Signal signal)
+{
+    QObject::connect(
+        h, signal, plot,
+        [plot, alive = QPointer<QCPHistogram>(h)] {
+            if (alive)
+                plot->removePlottable(alive);
+        },
+        Qt::SingleShotConnection);
+}
+} // namespace
+
+void TestHistogramPlottable::readySlotRemovingTheHistogramIsSafe()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    removeOn(mPlot, h, &QCPHistogram::histogramReady);
+    h->setDataSource(values({0, 1, 2, 3, 4}));
+    QTRY_COMPARE_WITH_TIMEOUT(mPlot->plottableCount(), 0, 5000);
+    QTest::qWait(50);
+}
+
+void TestHistogramPlottable::edgesSlotRemovingTheHistogramIsSafe()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    removeOn(mPlot, h, &QCPHistogram::edgesChanged);
+    h->setDataSource(values({0, 1, 2, 3, 4}));
+    QTRY_COMPARE_WITH_TIMEOUT(mPlot->plottableCount(), 0, 5000);
+    QTest::qWait(50);
+}
+
+void TestHistogramPlottable::preBinnedReadySlotRemovingTheHistogramIsSafe()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    removeOn(mPlot, h, &QCPHistogram::histogramReady);
+    h->setBinned({0, 1, 2}, {{3, 5}});
+    QCOMPARE(mPlot->plottableCount(), 0);
+}

@@ -1,4 +1,5 @@
 #include "plottable-histogram.h"
+#include <QPointer>
 #include "plottable-draw-utils.h"
 #include <axis/axis.h>
 #include <core.h>
@@ -127,8 +128,11 @@ void QCPHistogram::installTransform()
 void QCPHistogram::refreshBinning()
 {
     installTransform();
+    // Its busyChanged slot may delete this histogram.
+    const QPointer<QCPHistogram> alive(this);
     mPipeline.onDataChanged();
-    mAcceptedGeneration = mPipeline.currentGeneration();
+    if (alive)
+        mAcceptedGeneration = mPipeline.currentGeneration();
 }
 
 // A job queued behind a running one captured the edges from before that job's result,
@@ -157,7 +161,6 @@ void QCPHistogram::onPipelineFinished(uint64_t generation)
         return;
     }
     takeResult(std::move(result));
-    requestReplot();
 }
 
 std::shared_ptr<Histogram1D> QCPHistogram::pipelineResult() const
@@ -171,8 +174,9 @@ std::shared_ptr<Histogram1D> QCPHistogram::pipelineResult() const
 void QCPHistogram::setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> source)
 {
     mDataSource = std::move(source);
+    const QPointer<QCPHistogram> alive(this);
     mPipeline.setSource(mDataSource);
-    if (!mDataSource)
+    if (alive && !mDataSource)
         clearResult();
 }
 
@@ -182,7 +186,6 @@ void QCPHistogram::clearResult()
 {
     mAcceptedGeneration = mPipeline.currentGeneration();
     takeResult(nullptr);
-    requestReplot();
 }
 
 void QCPHistogram::setBinned(std::vector<double> edges, std::vector<std::vector<double>> heights)
@@ -195,12 +198,14 @@ void QCPHistogram::setBinned(std::vector<double> edges, std::vector<std::vector<
     mDataSource.reset();
     mAutoRange.reset();
     installTransform();
+    const QPointer<QCPHistogram> alive(this);
     mPipeline.setSource(nullptr);
+    if (!alive)
+        return;
     mAcceptedGeneration = mPipeline.currentGeneration();
     const std::size_t columns = heights.size();
     takeResult(std::make_shared<Histogram1D>(
         Histogram1D { std::move(edges), std::move(heights), std::vector<int>(columns, 0), keyLog() }));
-    requestReplot();
 }
 
 void QCPHistogram::setBins(int bins)
@@ -257,11 +262,16 @@ bool QCPHistogram::storeResult(std::shared_ptr<Histogram1D> result)
     return edgesMoved;
 }
 
+// Repaints before it signals: a slot may delete this histogram.
 void QCPHistogram::takeResult(std::shared_ptr<Histogram1D> result)
 {
-    if (storeResult(std::move(result)))
+    const bool edgesMoved = storeResult(std::move(result));
+    requestReplot();
+    const QPointer<QCPHistogram> alive(this);
+    if (edgesMoved)
         Q_EMIT edgesChanged();
-    Q_EMIT histogramReady();
+    if (alive)
+        Q_EMIT histogramReady();
 }
 
 // setTransform does not restart the pipeline, so reinstalling here cannot loop.

@@ -46,6 +46,9 @@ private slots:
     void stepWithOneColumnIsTheOutlineOnly();
     void stepWithSeveralColumnsHasALightFill();
     void barsKeepATranslucentUserColour();
+    void readySlotRemovingTheHistogramIsSafe();
+    void edgesSlotRemovingTheHistogramIsSafe();
+    void preBinnedReadySlotRemovingTheHistogramIsSafe();
 
 private:
     QCustomPlot* mPlot = nullptr;
