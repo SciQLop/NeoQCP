@@ -201,7 +201,13 @@ bool QCPMultiGraph::commitPendingData()
         const bool wasColoured = mColor.hasValues();
         mColor.setValues(std::move(mPendingColorValues));
         if (!wasColoured)
+        {
+            // The pipeline's busyChanged slot may delete this graph.
+            const QPointer<QCPMultiGraph> alive(this);
             requestOrigin();
+            if (!alive)
+                return true;
+        }
     }
     else
     {
