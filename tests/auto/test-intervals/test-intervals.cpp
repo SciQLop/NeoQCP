@@ -1,6 +1,7 @@
 #include "test-intervals.h"
 #include "qcustomplot.h"
 #include "plottables/lane-layout.h"
+#include <QPointer>
 #include "plottables/intervals-algo.h"
 #include "plottables/plottable-intervals.h"
 #include <QApplication>
@@ -1509,4 +1510,79 @@ void TestIntervals::shiftDragSlotDeletingTheTimelineIsSafe()
     moveTo(mPlot, to, Qt::ShiftModifier);
     release(mPlot, to, Qt::ShiftModifier);
     QCOMPARE(mPlot->plottableCount(), 0);
+}
+
+namespace {
+void removeOnLanesChanged(QCustomPlot* plot, QCPLaneLayout* layout, QCPIntervals* iv)
+{
+    QObject::connect(
+        layout, &QCPLaneLayout::changed, plot,
+        [plot, alive = QPointer<QCPIntervals>(iv)] {
+            if (alive)
+                plot->removePlottable(alive);
+        },
+        Qt::SingleShotConnection);
+}
+
+QCPIntervals* twoOverlapsOnLaneA(QCustomPlot* plot, QCPLaneLayout* layout)
+{
+    auto* iv = new QCPIntervals(plot->xAxis, plot->yAxis, layout);
+    const int a = layout->laneIndex("A");
+    iv->setData(columns({ 10, 30 }, { 50, 70 }, { a, a }));
+    return iv;
+}
+} // namespace
+
+void TestIntervals::lanesChangedSlotDeletingTheTimelineInSetDataIsSafe()
+{
+    QCPLaneLayout layout;
+    auto* iv = twoOverlapsOnLaneA(mPlot, &layout);
+    iv->setStackMode(QCPIntervals::skTime);
+    removeOnLanesChanged(mPlot, &layout, iv);
+    iv->setData(columns({ 10 }, { 50 }, { 0 }));
+    QCOMPARE(mPlot->plottableCount(), 0);
+}
+
+void TestIntervals::lanesChangedSlotDeletingTheTimelineInSetStackModeIsSafe()
+{
+    QCPLaneLayout layout;
+    auto* iv = twoOverlapsOnLaneA(mPlot, &layout);
+    removeOnLanesChanged(mPlot, &layout, iv);
+    iv->setStackMode(QCPIntervals::skTime);
+    QCOMPARE(mPlot->plottableCount(), 0);
+}
+
+// A lane another timeline adds makes this one regroup (and re-pack) from its own changed slot.
+void TestIntervals::lanesChangedSlotDeletingARegroupedTimelineIsSafe()
+{
+    QCPLaneLayout layout;
+    layout.laneIndex("A");
+    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    iv->setStackMode(QCPIntervals::skTime);
+    iv->setData(columns({ 10, 30 }, { 50, 70 }, { 1, 1 })); // lane 1 is not known yet
+    removeOnLanesChanged(mPlot, &layout, iv);
+    layout.laneIndex("B");
+    QCOMPARE(mPlot->plottableCount(), 0);
+}
+
+void TestIntervals::nestedRepacksNotifyOnceAfterTheOuterCall()
+{
+    QCPLaneLayout layout;
+    auto* iv = twoOverlapsOnLaneA(mPlot, &layout);
+    iv->setStackMode(QCPIntervals::skTime);
+    iv->setSelection(QCPDataSelection(QCPDataRange(0, 1)));
+    QObject::connect(
+        iv, qOverload<const QCPDataSelection&>(&QCPAbstractPlottable::selectionChanged), mPlot,
+        [iv] {
+            iv->setStackMode(QCPIntervals::skNone);
+            iv->setCategoryOrder({ 0 });
+        },
+        Qt::SingleShotConnection);
+    QList<int> rowsWhenNotified;
+    QObject::connect(&layout, &QCPLaneLayout::changed, mPlot,
+                     [&] { rowsWhenNotified.append(layout.totalRows()); });
+    auto c = columns({ 10, 20, 30 }, { 50, 60, 70 }, { 0, 0, 0 });
+    std::iota(c.ids.begin(), c.ids.end(), qint64 { 7 }); // the selected id vanishes
+    iv->setData(std::move(c));
+    QCOMPARE(rowsWhenNotified, QList<int>({ 1 }));
 }

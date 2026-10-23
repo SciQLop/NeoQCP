@@ -93,6 +93,7 @@ void QCPIntervals::setData(qcp::intervals::Columns columns)
 {
     if (auto error = qcp::intervals::invalidColumns(columns))
         throw std::invalid_argument(*error);
+    const QCPLaneLayout::Batch lanesChangedLast(mLayout);
     mGesture.reset();
     mRubberBand.reset();
     const QVector<qint64> selected = selectedIds();
@@ -778,6 +779,7 @@ void QCPIntervals::setStackMode(StackMode mode)
 {
     if (mStack == mode)
         return;
+    const QCPLaneLayout::Batch lanesChangedLast(mLayout);
     mStack = mode;
     updateSubRows();
     markLayersDirty();
@@ -785,6 +787,7 @@ void QCPIntervals::setStackMode(StackMode mode)
 
 void QCPIntervals::setCategoryOrder(std::vector<int> order)
 {
+    const QCPLaneLayout::Batch lanesChangedLast(mLayout);
     mCategoryOrder = std::move(order);
     updateSubRows();
     markLayersDirty();

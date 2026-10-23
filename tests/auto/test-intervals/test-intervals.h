@@ -128,6 +128,10 @@ private slots:
 
     void clickSlotDeletingTheTimelineIsSafe();
     void shiftDragSlotDeletingTheTimelineIsSafe();
+    void lanesChangedSlotDeletingTheTimelineInSetDataIsSafe();
+    void lanesChangedSlotDeletingTheTimelineInSetStackModeIsSafe();
+    void lanesChangedSlotDeletingARegroupedTimelineIsSafe();
+    void nestedRepacksNotifyOnceAfterTheOuterCall();
 
 private:
     QCustomPlot* mPlot = nullptr;

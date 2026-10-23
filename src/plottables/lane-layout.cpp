@@ -1,6 +1,6 @@
 #include "lane-layout.h"
-#include <QSignalBlocker>
 #include <algorithm>
+#include <utility>
 
 int QCPLaneLayout::laneIndex(const QString& name)
 {
@@ -14,25 +14,20 @@ int QCPLaneLayout::laneIndex(const QString& name)
 
 QVector<int> QCPLaneLayout::laneIndices(const QStringList& names)
 {
-    const auto before = mNames.size();
-    QSignalBlocker blocker(this);
+    const Batch batch(this);
     QVector<int> indices;
     for (const auto& name : names)
         indices.append(laneIndex(name));
-    blocker.unblock();
-    if (mNames.size() != before)
-        notify();
     return indices;
 }
 
 void QCPLaneLayout::setDisplayOrder(const QStringList& names)
 {
-    QSignalBlocker blocker(this);
+    const Batch batch(this);
     std::vector<int> order;
     for (const auto& name : names)
         order.push_back(laneIndex(name));
     mOrder = std::move(order);
-    blocker.unblock();
     notify();
 }
 
@@ -152,8 +147,33 @@ int QCPLaneLayout::displayPosition(int lane) const
     return it == mOrder.end() ? -1 : static_cast<int>(it - mOrder.begin());
 }
 
+QCPLaneLayout::Batch::Batch(QCPLaneLayout* layout) : mLayout(layout)
+{
+    if (mLayout)
+        ++mLayout->mBatchDepth;
+}
+
+QCPLaneLayout::Batch::~Batch()
+{
+    if (mLayout && --mLayout->mBatchDepth == 0)
+        mLayout->flush();
+}
+
 void QCPLaneLayout::notify()
 {
     ++mGeneration;
+    mPending = true;
+    if (mBatchDepth == 0)
+        flush();
+}
+
+// The emit runs inside a batch: a receiver re-packing its lanes from the slot (or a slot
+// re-packing another timeline) does not emit in the middle of this one, but in the next round,
+// which the batch's end starts.
+void QCPLaneLayout::flush()
+{
+    if (!std::exchange(mPending, false))
+        return;
+    const Batch emitting(this);
     emit changed();
 }

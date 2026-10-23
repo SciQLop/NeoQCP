@@ -1,6 +1,7 @@
 #pragma once
 #include "../global.h"
 #include <QObject>
+#include <QPointer>
 #include <QRect>
 #include <QStringList>
 #include <QVector>
@@ -23,6 +24,21 @@ public:
     Q_ENUM(Placement)
 
     explicit QCPLaneLayout(QObject* parent = nullptr) : QObject(parent) {}
+
+    //! Holds \c changed back until the outermost batch ends, then emits it once. A call that
+    //! re-packs lanes and goes on with its own state opens one, so a slot on \c changed (which
+    //! may delete that caller) only runs once the caller is done.
+    class QCP_LIB_DECL Batch
+    {
+    public:
+        explicit Batch(QCPLaneLayout* layout);
+        ~Batch();
+        Batch(const Batch&) = delete;
+        Batch& operator=(const Batch&) = delete;
+
+    private:
+        QPointer<QCPLaneLayout> mLayout;
+    };
 
     int laneIndex(const QString& name);
     //! laneIndex for each name, with a single \c changed for all the new ones.
@@ -64,12 +80,15 @@ Q_SIGNALS:
 private:
     [[nodiscard]] int displayPosition(int lane) const;
     void notify();
+    void flush();
 
     QStringList mNames;
     std::vector<int> mOrder; // lane indices, top to bottom
     int mLaneHeight = 14;
     Placement mPlacement = plStrip;
     quint64 mGeneration = 0;
+    int mBatchDepth = 0;
+    bool mPending = false;
     std::vector<std::pair<const QObject*, std::vector<int>>> mLaneRows;
 
     [[nodiscard]] int rowsBefore(int position) const;
