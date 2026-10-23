@@ -113,6 +113,9 @@ public:
     void setComponentFillBrush(int owner, const QBrush& brush);
     void clearComponentFill(int owner);
     [[nodiscard]] std::optional<Fill> componentFill(int owner) const;
+    //! Whether a decoration may name \a column: any column >= 0 before the first data, the
+    //! data's columns after.
+    [[nodiscard]] bool isValidColumn(int column) const;
     [[nodiscard]] QBrush effectiveFillBrush(const Fill& fill) const;
 
     struct ErrorBars {
@@ -297,7 +300,6 @@ protected:
     void syncComponentCount(const QCPAbstractMultiDataSource* source);
     void dropDecorationsBeyond(int columnCount);
     bool setFill(Fill fill);
-    bool isValidColumn(int column) const;
     [[nodiscard]] bool isErrorBound(int column) const;
     void decorationsChanged();
     [[nodiscard]] bool hasPenDerivedDecoration(int ownerCount) const;
