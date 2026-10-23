@@ -1,4 +1,5 @@
 #include "plottable-graph2.h"
+#include <QPointer>
 #include "plottable-draw-utils.h"
 #include "plottable-l1-cache.h"
 #include "plottable-linestyle.h"
@@ -125,7 +126,11 @@ void QCPGraph2::applySourceNow(std::shared_ptr<QCPAbstractDataSource> source)
     mNeedsResampling = mDataSource && mDataSource->size() >= qcp::algo::kResampleThreshold;
     if (mDataSource)
         ensureL1Transform(mPipeline, mDataSource->size());
+    // The pipeline's busyChanged slot may delete this graph.
+    const QPointer<QCPGraph2> alive(this);
     mPipeline.setSource(mDataSource);
+    if (!alive)
+        return;
     // Without a transform setSource() does not bump the generation, so a job
     // still running for the previous source would otherwise pass onL1Ready's
     // staleness check below.
@@ -142,7 +147,11 @@ void QCPGraph2::stagePendingSource(std::shared_ptr<QCPAbstractDataSource> source
     mPendingL1.reset();
     mPendingReady = false;
     ensureL1Transform(mPipeline, mPendingSource->size());
+    // The pipeline's busyChanged slot may delete this graph.
+    const QPointer<QCPGraph2> alive(this);
     mPipeline.setSource(mPendingSource);
+    if (!alive)
+        return;
     // Without a transform setSource() does not bump the generation, so a job
     // still running for the previous source would pass the guard below.
     mPendingGeneration = mPipeline.hasTransform() ? mPipeline.currentGeneration()
@@ -207,7 +216,10 @@ void QCPGraph2::dataChanged()
     {
         mL1Cache.reset();
         mL2Dirty = false;
+        const QPointer<QCPGraph2> alive(this);
         mPipeline.onDataChanged();
+        if (!alive)
+            return; // the pipeline's busyChanged slot deleted this graph
     }
     else if (mParentPlot)
         mParentPlot->replot();

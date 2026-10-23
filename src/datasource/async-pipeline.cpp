@@ -2,6 +2,8 @@
 #include "pipeline-scheduler.h"
 #include "../Profiling.hpp"
 #include "../axis/axis.h"
+#include <QPointer>
+#include <utility>
 #include "../layoutelements/layoutelement-axisrect.h"
 
 ViewportParams ViewportParams::fromAxes(const QCPAxis* keyAxis, const QCPAxis* valueAxis)
@@ -48,6 +50,21 @@ void QCPAsyncPipelineBase::emitBusyIfNeeded(QMutexLocker<QMutex>& lock)
         Q_EMIT busyChanged(true);
 }
 
+// A busyChanged slot may delete the plottable that owns this pipeline, so the job is handed to
+// the scheduler first and the signal comes last.
+void QCPAsyncPipelineBase::startJob(QMutexLocker<QMutex>& lock, uint64_t gen,
+                                    QCPPipelineScheduler::Priority priority,
+                                    std::function<void()> job)
+{
+    mJobRunning = true;
+    mRunningGeneration = gen;
+    const bool becameBusy = !std::exchange(mWasBusy, true);
+    lock.unlock();
+    mScheduler->submit(priority, std::move(job));
+    if (becameBusy)
+        Q_EMIT busyChanged(true);
+}
+
 void QCPAsyncPipelineBase::onDataChanged()
 {
     PROFILE_HERE_N("Pipeline::onDataChanged");
@@ -69,10 +86,7 @@ void QCPAsyncPipelineBase::onDataChanged()
             settleIdle(lock, gen);
             return;
         }
-        mJobRunning = true;
-        mRunningGeneration = gen;
-        emitBusyIfNeeded(lock);
-        mScheduler->submit(QCPPipelineScheduler::Heavy, std::move(job));
+        startJob(lock, gen, QCPPipelineScheduler::Heavy, std::move(job));
         return;
     }
 
@@ -127,10 +141,7 @@ void QCPAsyncPipelineBase::onViewportChanged(const ViewportParams& vp)
             settleIdle(lock, gen);
             return;
         }
-        mJobRunning = true;
-        mRunningGeneration = gen;
-        emitBusyIfNeeded(lock);
-        mScheduler->submit(QCPPipelineScheduler::Fast, std::move(job));
+        startJob(lock, gen, QCPPipelineScheduler::Fast, std::move(job));
         return;
     }
 
@@ -191,7 +202,11 @@ void QCPAsyncPipelineBase::deliverResult(uint64_t generation, std::any cache, st
     {
         mDisplayedGeneration = generation;
         applyResult(generation, std::move(result));
+        // A finished() slot may delete the plottable, and this pipeline with it.
+        const QPointer<QCPAsyncPipelineBase> alive(this);
         Q_EMIT finished(generation);
+        if (!alive)
+            return;
     }
 
     if (idle)

@@ -26,6 +26,7 @@ private slots:
     void multiGraphLateLargeJobDoesNotContaminateCommittedSmallSource();
 
     void noCommitNoReplot();
+    void commitRemovingAPlottableStillCommitsTheOthers();
 
     void graph2KeepsTranslationWhileDataPending();
     void graph2CommitsAfterWindow();

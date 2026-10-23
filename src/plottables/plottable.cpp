@@ -1112,11 +1112,11 @@ void QCPAbstractPlottable::updateEffectiveBusy()
         return;
 
     mEffectiveBusy = newBusy;
-    emit busyChanged(mEffectiveBusy);
-
     mBusyDebounceTimer.stop();
     const int delay = mEffectiveBusy ? effectiveBusyShowDelayMs() : effectiveBusyHideDelayMs();
     mBusyDebounceTimer.start(delay);
+    // Last: a slot may delete this plottable.
+    emit busyChanged(mEffectiveBusy);
 }
 
 void QCPAbstractPlottable::onDebounceTimeout()

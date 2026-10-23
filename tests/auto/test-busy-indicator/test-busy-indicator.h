@@ -27,6 +27,8 @@ private slots:
     void visualBusyToggleForcesLayerRepaint();
     void visualBusyToggleRepaintsTheLegend();
     void gpuEntriesCarryFadeAlpha();
+    void busySlotRemovingThePlottableIsSafe();
+    void pipelineBusySlotRemovingThePlottableIsSafe();
 
 private:
     QCustomPlot* mPlot = nullptr;

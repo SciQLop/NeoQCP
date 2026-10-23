@@ -538,3 +538,28 @@ void TestDataSwap::graph2LateLargeJobDoesNotContaminateCommittedSmallSource()
              "A's late resample result leaked into B's cache after B had already committed");
     QCOMPARE(g->dataSource()->size(), nSmall);
 }
+
+// A commit's busyChanged slot may remove its plottable from the plot's list mid-walk.
+void TestDataSwap::commitRemovingAPlottableStillCommitsTheOthers()
+{
+    struct SelfRemoving : PendingStub
+    {
+        using PendingStub::PendingStub;
+        bool commitPendingData() override
+        {
+            parentPlot()->removePlottable(this);
+            return true;
+        }
+    };
+    // Not first: Qt erases the front of a list by moving its start, which hides the bug.
+    auto* b = new PendingStub(mPlot->xAxis, mPlot->yAxis);
+    new SelfRemoving(mPlot->xAxis, mPlot->yAxis);
+    auto* c = new PendingStub(mPlot->xAxis, mPlot->yAxis);
+    auto* d = new PendingStub(mPlot->xAxis, mPlot->yAxis);
+    mPlot->setDataSwapDebounceMs(0);
+    mPlot->requestDataSwap();
+    QTRY_COMPARE_WITH_TIMEOUT(b->commits, 1, 2000);
+    QCOMPARE(c->commits, 1);
+    QCOMPARE(d->commits, 1);
+    QCOMPARE(mPlot->plottableCount(), 3);
+}

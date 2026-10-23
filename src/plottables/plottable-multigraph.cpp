@@ -1,4 +1,5 @@
 #include "plottable-multigraph.h"
+#include <QPointer>
 #include "plottable-draw-utils.h"
 #include "plottable-l1-cache.h"
 #include "plottable-linestyle.h"
@@ -138,7 +139,11 @@ void QCPMultiGraph::applySourceNow(std::shared_ptr<QCPAbstractMultiDataSource> s
     mNeedsResampling = mDataSource && needsResamplingMulti(*mDataSource);
     if (mDataSource)
         ensureL1TransformMulti(mPipeline, mDataSource->size(), mDataSource->columnCount(), mWantOrigin);
+    // The pipeline's busyChanged slot may delete this graph.
+    const QPointer<QCPMultiGraph> alive(this);
     mPipeline.setSource(mDataSource);
+    if (!alive)
+        return;
     // Without a transform setSource() does not bump the generation, so a job
     // still running for the previous source would otherwise pass onL1Ready's
     // staleness check below.
@@ -159,7 +164,11 @@ void QCPMultiGraph::stagePendingSource(std::shared_ptr<QCPAbstractMultiDataSourc
     mPendingReady = false;
     syncComponentCount(mPendingSource.get());
     ensureL1TransformMulti(mPipeline, mPendingSource->size(), mPendingSource->columnCount(), mWantOrigin);
+    // The pipeline's busyChanged slot may delete this graph.
+    const QPointer<QCPMultiGraph> alive(this);
     mPipeline.setSource(mPendingSource);
+    if (!alive)
+        return;
     // Without a transform setSource() does not bump the generation, so a job
     // still running for the previous source would pass the guard below.
     mPendingGeneration = mPipeline.hasTransform() ? mPipeline.currentGeneration()
@@ -231,10 +240,13 @@ void QCPMultiGraph::dataChanged()
     mL1Cache.reset();
     mL2Dirty = false;
 
+    const QPointer<QCPMultiGraph> alive(this);
     if (mPipeline.hasTransform())
         mPipeline.onDataChanged();
     else if (mParentPlot)
         mParentPlot->replot();
+    if (!alive)
+        return; // the pipeline's busyChanged slot deleted this graph
 
     // A mutation can leave a job in flight for pre-mutation data: if the
     // transform stayed on, the job just queued behind it supersedes it; if

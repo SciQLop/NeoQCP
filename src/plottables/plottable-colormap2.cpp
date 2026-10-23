@@ -1,4 +1,5 @@
 #include "plottable-colormap2.h"
+#include <QPointer>
 #include "plottable-colormap.h" // for QCPColorMapData
 #include <core.h>
 #include <painting/painter.h>
@@ -147,8 +148,11 @@ void QCPColorMap2::setDataSource(std::shared_ptr<QCPAbstractDataSource2D> source
     // zero-width default key/value range no longer intersects the data) that
     // nothing ever corrects once the user stops panning. Establish a real,
     // current viewport here, before the pipeline ever resamples this source.
+    // The pipeline's busyChanged slot may delete this colour map.
+    const QPointer<QCPColorMap2> alive(this);
     onViewportChanged();
-    mPipeline.setSource(mDataSource);
+    if (alive)
+        mPipeline.setSource(mDataSource);
 }
 
 void QCPColorMap2::dataChanged()
@@ -217,8 +221,11 @@ void QCPColorMap2::setDataScaleType(QCPAxis::ScaleType type)
         QCPRange prevRange = mRenderer.dataRange();
         mRenderer.setDataScaleType(type);
         installResampleTransform();
+        const QPointer<QCPColorMap2> alive(this);
         if (mDataSource)
             mPipeline.onDataChanged();
+        if (!alive)
+            return; // its busyChanged slot deleted this colour map
         QCPRange curRange = mRenderer.dataRange();
         if (prevRange.lower != curRange.lower || prevRange.upper != curRange.upper)
             Q_EMIT dataRangeChanged(curRange);

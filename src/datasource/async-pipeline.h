@@ -86,6 +86,8 @@ protected:
     bool mJobRunning = false;
 
     void emitBusyIfNeeded(QMutexLocker<QMutex>& lock);
+    void startJob(QMutexLocker<QMutex>& lock, uint64_t gen, QCPPipelineScheduler::Priority priority,
+                  std::function<void()> job);
     void settleIdle(QMutexLocker<QMutex>& lock, uint64_t gen);
 
     ViewportParams mLastViewport;

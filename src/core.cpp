@@ -2265,9 +2265,12 @@ void QCustomPlot::commitPendingData()
         return;
     }
 
+    // A commit's busyChanged slot may remove plottables: walk a snapshot, skip the gone ones.
     bool committed = false;
-    for (auto* plottable : std::as_const(mPlottables))
-        committed |= plottable->commitPendingData();
+    const QList<QPointer<QCPAbstractPlottable>> plottables(mPlottables.cbegin(), mPlottables.cend());
+    for (const auto& plottable : plottables)
+        if (plottable)
+            committed |= plottable->commitPendingData();
     if (committed)
         replot(QCustomPlot::rpQueuedReplot);
 }

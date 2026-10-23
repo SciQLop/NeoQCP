@@ -397,3 +397,38 @@ void TestBusyIndicator::gpuEntriesCarryFadeAlpha()
     for (const auto& e : srl->drawEntries())
         QCOMPARE(e.alpha, 1.0f);
 }
+
+namespace {
+void removeOnBusy(QCustomPlot* plot, QCPAbstractPlottable* p)
+{
+    QObject::connect(
+        p, &QCPAbstractPlottable::busyChanged, plot,
+        [plot, alive = QPointer<QCPAbstractPlottable>(p)] {
+            if (alive)
+                plot->removePlottable(alive);
+        },
+        Qt::SingleShotConnection);
+}
+} // namespace
+
+void TestBusyIndicator::busySlotRemovingThePlottableIsSafe()
+{
+    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    removeOnBusy(mPlot, g);
+    g->setBusy(true);
+    QCOMPARE(mPlot->plottableCount(), 0);
+}
+
+// Big enough to resample: the pipeline goes busy inside setData.
+void TestBusyIndicator::pipelineBusySlotRemovingThePlottableIsSafe()
+{
+    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    removeOnBusy(mPlot, g);
+    const int n = 200'000;
+    std::vector<double> keys(n), values(n);
+    for (int i = 0; i < n; ++i)
+        keys[i] = values[i] = i;
+    g->setData(std::move(keys), std::move(values));
+    QCOMPARE(mPlot->plottableCount(), 0);
+    QTest::qWait(50);
+}
