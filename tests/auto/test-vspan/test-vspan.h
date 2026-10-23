@@ -23,6 +23,8 @@ private slots:
     void multiAxisRectSpans();
     void spanRhiLayerNullWithoutRhi();
     void edgesHonourTheirPositionType();
+    void setRangeSlotDeletingTheSpanIsSafe();
+    void dragSlotDeletingTheSpanIsSafe();
 
 private:
     QCustomPlot* mPlot = nullptr;

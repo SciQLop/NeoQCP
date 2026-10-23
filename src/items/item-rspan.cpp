@@ -54,24 +54,26 @@ void QCPItemRSpan::setKeyRange(const QCPRange& range)
 {
     leftEdge->setCoords(range.lower, leftEdge->coords().y());
     rightEdge->setCoords(range.upper, rightEdge->coords().y());
-    emit keyRangeChanged(range);
+    // Emit last: a slot may delete this span.
     if (mParentPlot)
     {
         markRhiDirty();
         mParentPlot->replot(QCustomPlot::rpQueuedReplot);
     }
+    emit keyRangeChanged(range);
 }
 
 void QCPItemRSpan::setValueRange(const QCPRange& range)
 {
     bottomEdge->setCoords(bottomEdge->coords().x(), range.lower);
     topEdge->setCoords(topEdge->coords().x(), range.upper);
-    emit valueRangeChanged(range);
+    // Emit last: a slot may delete this span.
     if (mParentPlot)
     {
         markRhiDirty();
         mParentPlot->replot(QCustomPlot::rpQueuedReplot);
     }
+    emit valueRangeChanged(range);
 }
 
 double QCPItemRSpan::selectTest(const QPointF& pos, bool onlySelectable, QVariant* details) const
@@ -263,16 +265,24 @@ void QCPItemRSpan::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
             break;
     }
 
-    if (mDragPart == hpLeft || mDragPart == hpRight || mDragPart == hpFill)
-        emit keyRangeChanged(keyRange());
-    if (mDragPart == hpTop || mDragPart == hpBottom || mDragPart == hpFill)
-        emit valueRangeChanged(valueRange());
-
     if (mParentPlot)
     {
         markRhiDirty();
         mParentPlot->replot(QCustomPlot::rpQueuedReplot);
     }
+    emitDraggedRanges();
+}
+
+// A slot may delete this span: emit last, and the value range only while it is alive.
+void QCPItemRSpan::emitDraggedRanges()
+{
+    const bool keyMoved = mDragPart == hpLeft || mDragPart == hpRight || mDragPart == hpFill;
+    const bool valueMoved = mDragPart == hpTop || mDragPart == hpBottom || mDragPart == hpFill;
+    const QPointer<QCPItemRSpan> alive(this);
+    if (keyMoved)
+        emit keyRangeChanged(keyRange());
+    if (alive && valueMoved)
+        emit valueRangeChanged(valueRange());
 }
 
 void QCPItemRSpan::mouseReleaseEvent([[maybe_unused]] QMouseEvent* event,

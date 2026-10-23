@@ -57,6 +57,9 @@ protected:
     virtual void mousePressEvent(QMouseEvent* event, const QVariant& details) override;
     virtual void mouseMoveEvent(QMouseEvent* event, const QPointF& startPos) override;
     virtual void mouseReleaseEvent(QMouseEvent* event, const QPointF& startPos) override;
+
+private:
+    void emitDraggedRanges();
 };
 
 #endif // QCP_ITEM_RSPAN_H

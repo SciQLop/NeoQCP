@@ -173,3 +173,30 @@ void TestRSpan::edgesHonourTheirPositionType()
     QVERIFY(span->selectTest(QPointF(axRect.left() + 150.0, axRect.top() + 100.0), false) >= 0);
     QVERIFY(span->selectTest(QPointF(axRect.left() + 400.0, axRect.top() + 100.0), false) < 0);
 }
+
+namespace {
+void sendMouse(QCustomPlot* plot, QEvent::Type type, QPoint pos, Qt::MouseButtons buttons)
+{
+    QMouseEvent e(type, pos, plot->mapToGlobal(pos), Qt::LeftButton, buttons, Qt::NoModifier);
+    QCoreApplication::sendEvent(plot, &e);
+}
+} // namespace
+
+// A fill drag emits keyRangeChanged then valueRangeChanged: a slot deleting the span on the first
+// must stop the second.
+void TestRSpan::fillDragSlotDeletingTheSpanIsSafe()
+{
+    auto* span = new QCPItemRSpan(mPlot);
+    span->setKeyRange(QCPRange(3, 7));
+    span->setValueRange(QCPRange(3, 7));
+    mPlot->replot();
+    QSignalSpy valueChanges(span, &QCPItemRSpan::valueRangeChanged);
+    connect(span, &QCPItemRSpan::keyRangeChanged, mPlot,
+            [this, span] { QVERIFY(mPlot->removeItem(span)); });
+    const QPoint from(qRound(mPlot->xAxis->coordToPixel(5)), qRound(mPlot->yAxis->coordToPixel(5)));
+    sendMouse(mPlot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseMove, from + QPoint(20, 20), Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseButtonRelease, from + QPoint(20, 20), Qt::NoButton);
+    QCOMPARE(mPlot->itemCount(), 0);
+    QCOMPARE(valueChanges.count(), 0);
+}

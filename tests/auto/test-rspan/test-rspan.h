@@ -17,6 +17,7 @@ private slots:
     void dirtyTrackingReplots();
     void drawOnLogAxis();
     void edgesHonourTheirPositionType();
+    void fillDragSlotDeletingTheSpanIsSafe();
 
 private:
     QCustomPlot* mPlot = nullptr;

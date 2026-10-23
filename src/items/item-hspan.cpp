@@ -39,12 +39,13 @@ void QCPItemHSpan::setRange(const QCPRange& range)
 {
     lowerEdge->setCoords(0, range.lower);
     upperEdge->setCoords(1, range.upper);
-    emit rangeChanged(range);
+    // Emit last: a slot may delete this span.
     if (mParentPlot)
     {
         markRhiDirty();
         mParentPlot->replot(QCustomPlot::rpQueuedReplot);
     }
+    emit rangeChanged(range);
 }
 
 double QCPItemHSpan::selectTest(const QPointF& pos, bool onlySelectable, QVariant* details) const
@@ -169,12 +170,13 @@ void QCPItemHSpan::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
         default:
             break;
     }
-    emit rangeChanged(range());
+    // Emit last: a slot may delete this span.
     if (mParentPlot)
     {
         markRhiDirty();
         mParentPlot->replot(QCustomPlot::rpQueuedReplot);
     }
+    emit rangeChanged(range());
 }
 
 void QCPItemHSpan::mouseReleaseEvent([[maybe_unused]] QMouseEvent* event,
