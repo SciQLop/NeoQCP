@@ -31,6 +31,7 @@ private slots:
   void QCPColorMap2_contourExportCachesFallback();
   void QCPColorMapData_fillNonFiniteKeepsBoundsDegenerate();
   void QCPColorScale_rescaleDataRangeIncludesColorMap2();
+  void QCPColorMap2_drawEmitsNoBusyChange();
 
 private:
   QCustomPlot *mPlot;

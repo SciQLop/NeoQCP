@@ -1,5 +1,6 @@
 #include "plottable-colormap2.h"
 #include <QPointer>
+#include <utility>
 #include "plottable-colormap.h" // for QCPColorMapData
 #include <core.h>
 #include <painting/painter.h>
@@ -274,6 +275,18 @@ void QCPColorMap2::onViewportChanged()
     mPipeline.onViewportChanged(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data()));
 }
 
+// A viewport change turns the pipeline busy at once, and nothing may emit during a paint: a
+// busyChanged slot may delete this colour map.
+void QCPColorMap2::queueViewportChange()
+{
+    if (std::exchange(mViewportChangeQueued, true))
+        return;
+    QMetaObject::invokeMethod(this, [this] {
+        mViewportChangeQueued = false;
+        onViewportChanged();
+    }, Qt::QueuedConnection);
+}
+
 QPointF QCPColorMap2::stallPixelOffset() const
 {
     // Only valid when there is a rendered image to shift and no fresher one is
@@ -327,7 +340,7 @@ void QCPColorMap2::draw(QCPPainter* painter)
                 mRenderer.invalidateMapImage(); // finished() only fires for async results
         }
         else
-            onViewportChanged();
+            queueViewportChange();
         resampledData = mPipeline.result();
     }
     if (!resampledData)
@@ -343,7 +356,7 @@ void QCPColorMap2::draw(QCPPainter* painter)
         }
         else
         {
-            onViewportChanged();
+            queueViewportChange();
             return;
         }
     }

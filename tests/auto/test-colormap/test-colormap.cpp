@@ -753,3 +753,37 @@ void TestColorMap::QCPColorScale_rescaleDataRangeIncludesColorMap2()
   QCOMPARE(scale->dataRange().lower, 0.0);
   QCOMPARE(scale->dataRange().upper, 10.0);
 }
+
+// A resize changes no axis range, so draw() itself asks for a sharper resample. The request turns
+// the pipeline busy, and a busyChanged slot may delete the colour map: it must not run mid-paint.
+void TestColorMap::QCPColorMap2_drawEmitsNoBusyChange()
+{
+  mPlot->show();
+  if (!QTest::qWaitForWindowExposed(mPlot))
+    QSKIP("window not exposed in this environment");
+  QCoreApplication::processEvents();
+  if (!mPlot->rhi())
+    QSKIP("no QRhi available in this environment");
+
+  mPlot->resize(400, 300);
+  mPlot->xAxis->setRange(0, 4);
+  mPlot->yAxis->setRange(0, 4);
+  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  std::vector<double> x = {0, 1, 2, 3, 4}, y = {0, 1, 2, 3, 4}, z(25, 1.0);
+  cm->setData(x, y, z);
+  settleColorMap(mPlot, cm);
+
+  bool replotting = false;
+  connect(mPlot, &QCustomPlot::beforeReplot, this, [&] { replotting = true; });
+  connect(mPlot, &QCustomPlot::afterReplot, this, [&] { replotting = false; });
+  int busyChanges = 0, busyChangesMidReplot = 0;
+  connect(cm, &QCPAbstractPlottable::busyChanged, this, [&](bool) {
+    ++busyChanges;
+    busyChangesMidReplot += replotting;
+  });
+  mPlot->resize(600, 450); // its resize event replots at once
+  QCoreApplication::sendPostedEvents();
+  QTRY_VERIFY_WITH_TIMEOUT(busyChanges > 0, 2000); // sanity: the sharper resample did run
+  QCOMPARE(busyChangesMidReplot, 0);
+  QTRY_VERIFY_WITH_TIMEOUT(!cm->pipeline().isBusy(), 2000);
+}

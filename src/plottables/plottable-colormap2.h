@@ -180,6 +180,8 @@ private:
     void invalidateContourCache();
 
     void onViewportChanged();
+    void queueViewportChange();
+    bool mViewportChangeQueued = false;
     void updateContourGpu(const QCPColorMapData* data);
     void updateContours(const QCPColorMapData* data, QCPPainter* painter,
                         bool imageWasInvalidated);
