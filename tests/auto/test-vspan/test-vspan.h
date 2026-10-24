@@ -25,6 +25,7 @@ private slots:
     void edgesHonourTheirPositionType();
     void setRangeSlotDeletingTheSpanIsSafe();
     void dragSlotDeletingTheSpanIsSafe();
+    void pixelModeDragMovesByPixels();
 
 private:
     QCustomPlot* mPlot = nullptr;

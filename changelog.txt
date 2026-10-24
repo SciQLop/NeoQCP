@@ -11,6 +11,11 @@ Behaviour changes (slots that delete their sender are now safe):
   - An axis rect or polar angular axis deleted in the middle of a drag or wheel zoom restores the
         plot's antialiasing settings.
 
+Bugfixes:
+  - Dragging a QCPItemVSpan, QCPItemHSpan or QCPItemRSpan moves each edge by the mouse delta in pixels,
+        whatever the edge's position type is. Pixels-mode edges (ptAxisRectAbsolute) used to move
+        by the delta converted to data units.
+
 Build:
   - QCPColormapRenderer::colorScale() moved out of line and the renderer, axis rect, polar and
         QCustomPlot headers changed layout: rebuild everything that includes them.

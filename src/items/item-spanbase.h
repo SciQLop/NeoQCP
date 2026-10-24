@@ -45,6 +45,10 @@ protected:
 
     void markRhiDirty();
 
+    // Moves one coordinate of an edge to a pixel position, whatever the edge's position type is;
+    // the other coordinate is left untouched.
+    static void setEdgePixel(QCPItemPosition* edge, Qt::Orientation orientation, double pixel);
+
     // Returns true if draw() should return early (RHI layer handles rendering)
     bool tryRhiDraw(QCPPainter* painter);
 };

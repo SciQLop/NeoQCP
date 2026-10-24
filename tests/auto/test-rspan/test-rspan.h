@@ -18,6 +18,7 @@ private slots:
     void drawOnLogAxis();
     void edgesHonourTheirPositionType();
     void fillDragSlotDeletingTheSpanIsSafe();
+    void pixelModeDragMovesByPixels();
 
 private:
     QCustomPlot* mPlot = nullptr;

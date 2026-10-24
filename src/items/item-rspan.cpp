@@ -219,47 +219,40 @@ void QCPItemRSpan::mousePressEvent(QMouseEvent* event, const QVariant& details)
         return;
     }
     mDragPart = static_cast<HitPart>(details.toInt());
-    mDragStartLeft = leftEdge->coords().x();
-    mDragStartRight = rightEdge->coords().x();
-    mDragStartTop = topEdge->coords().y();
-    mDragStartBottom = bottomEdge->coords().y();
+    mDragStartLeft = leftEdge->pixelPosition().x();
+    mDragStartRight = rightEdge->pixelPosition().x();
+    mDragStartTop = topEdge->pixelPosition().y();
+    mDragStartBottom = bottomEdge->pixelPosition().y();
     event->accept();
 }
 
 void QCPItemRSpan::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
 {
-    auto* keyAxis = leftEdge->keyAxis();
-    auto* valAxis = leftEdge->valueAxis();
-    if (!keyAxis || !valAxis || mDragPart == hpNone)
+    if (mDragPart == hpNone)
         return;
 
-    const double startKeyCoord = keyAxis->pixelToCoord(startPos.x());
-    const double currentKeyCoord = keyAxis->pixelToCoord(event->pos().x());
-    const double keyDelta = currentKeyCoord - startKeyCoord;
-
-    const double startValCoord = valAxis->pixelToCoord(startPos.y());
-    const double currentValCoord = valAxis->pixelToCoord(event->pos().y());
-    const double valDelta = currentValCoord - startValCoord;
+    const double dx = event->pos().x() - startPos.x();
+    const double dy = event->pos().y() - startPos.y();
 
     switch (mDragPart)
     {
         case hpLeft:
-            leftEdge->setCoords(mDragStartLeft + keyDelta, leftEdge->coords().y());
+            setEdgePixel(leftEdge, Qt::Horizontal, mDragStartLeft + dx);
             break;
         case hpRight:
-            rightEdge->setCoords(mDragStartRight + keyDelta, rightEdge->coords().y());
+            setEdgePixel(rightEdge, Qt::Horizontal, mDragStartRight + dx);
             break;
         case hpTop:
-            topEdge->setCoords(topEdge->coords().x(), mDragStartTop + valDelta);
+            setEdgePixel(topEdge, Qt::Vertical, mDragStartTop + dy);
             break;
         case hpBottom:
-            bottomEdge->setCoords(bottomEdge->coords().x(), mDragStartBottom + valDelta);
+            setEdgePixel(bottomEdge, Qt::Vertical, mDragStartBottom + dy);
             break;
         case hpFill:
-            leftEdge->setCoords(mDragStartLeft + keyDelta, leftEdge->coords().y());
-            rightEdge->setCoords(mDragStartRight + keyDelta, rightEdge->coords().y());
-            topEdge->setCoords(topEdge->coords().x(), mDragStartTop + valDelta);
-            bottomEdge->setCoords(bottomEdge->coords().x(), mDragStartBottom + valDelta);
+            setEdgePixel(leftEdge, Qt::Horizontal, mDragStartLeft + dx);
+            setEdgePixel(rightEdge, Qt::Horizontal, mDragStartRight + dx);
+            setEdgePixel(topEdge, Qt::Vertical, mDragStartTop + dy);
+            setEdgePixel(bottomEdge, Qt::Vertical, mDragStartBottom + dy);
             break;
         default:
             break;

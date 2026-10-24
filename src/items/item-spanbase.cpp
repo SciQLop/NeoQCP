@@ -69,3 +69,14 @@ bool QCPAbstractSpanItem::tryRhiDraw(QCPPainter* painter)
     }
     return false;
 }
+
+void QCPAbstractSpanItem::setEdgePixel(QCPItemPosition* edge, Qt::Orientation orientation,
+                                       double pixel)
+{
+    const QPointF otherCoords = edge->coords();
+    QPointF px = edge->pixelPosition();
+    (orientation == Qt::Horizontal ? px.rx() : px.ry()) = pixel;
+    edge->setPixelPosition(px);
+    edge->setCoords(orientation == Qt::Horizontal ? QPointF(edge->coords().x(), otherCoords.y())
+                                                  : QPointF(otherCoords.x(), edge->coords().y()));
+}

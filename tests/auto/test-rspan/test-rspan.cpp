@@ -200,3 +200,27 @@ void TestRSpan::fillDragSlotDeletingTheSpanIsSafe()
     QCOMPARE(mPlot->itemCount(), 0);
     QCOMPARE(valueChanges.count(), 0);
 }
+
+void TestRSpan::pixelModeDragMovesByPixels()
+{
+    mPlot->xAxis->setRange(0, 1000);
+    mPlot->yAxis->setRange(0, 1000);
+    mPlot->replot();
+    auto* span = new QCPItemRSpan(mPlot);
+    for (auto* edge : {span->leftEdge, span->rightEdge, span->topEdge, span->bottomEdge})
+    {
+        edge->setTypeX(QCPItemPosition::ptAxisRectAbsolute);
+        edge->setTypeY(QCPItemPosition::ptAxisRectAbsolute);
+    }
+    span->setKeyRange(QCPRange(100, 200));
+    span->setValueRange(QCPRange(50, 100));
+    const QRect axRect = mPlot->axisRect()->rect();
+    const QPoint from(axRect.left() + 150, axRect.top() + 75);
+    sendMouse(mPlot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseMove, from + QPoint(40, 30), Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseButtonRelease, from + QPoint(40, 30), Qt::NoButton);
+    QCOMPARE(span->keyRange().lower, 140.0);
+    QCOMPARE(span->keyRange().upper, 240.0);
+    QCOMPARE(span->valueRange().lower, 80.0);
+    QCOMPARE(span->valueRange().upper, 130.0);
+}

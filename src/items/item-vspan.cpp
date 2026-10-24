@@ -140,32 +140,29 @@ void QCPItemVSpan::mousePressEvent(QMouseEvent* event, const QVariant& details)
         return;
     }
     mDragPart = static_cast<HitPart>(details.toInt());
-    mDragStartLower = lowerEdge->coords().x();
-    mDragStartUpper = upperEdge->coords().x();
+    mDragStartLower = lowerEdge->pixelPosition().x();
+    mDragStartUpper = upperEdge->pixelPosition().x();
     event->accept();
 }
 
 void QCPItemVSpan::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
 {
-    auto* keyAxis = lowerEdge->keyAxis();
-    if (!keyAxis || mDragPart == hpNone)
+    if (mDragPart == hpNone)
         return;
 
-    const double startCoord = keyAxis->pixelToCoord(startPos.x());
-    const double currentCoord = keyAxis->pixelToCoord(event->pos().x());
-    const double delta = currentCoord - startCoord;
+    const double delta = event->pos().x() - startPos.x();
 
     switch (mDragPart)
     {
         case hpLowerEdge:
-            lowerEdge->setCoords(mDragStartLower + delta, 0);
+            setEdgePixel(lowerEdge, Qt::Horizontal, mDragStartLower + delta);
             break;
         case hpUpperEdge:
-            upperEdge->setCoords(mDragStartUpper + delta, 1);
+            setEdgePixel(upperEdge, Qt::Horizontal, mDragStartUpper + delta);
             break;
         case hpFill:
-            lowerEdge->setCoords(mDragStartLower + delta, 0);
-            upperEdge->setCoords(mDragStartUpper + delta, 1);
+            setEdgePixel(lowerEdge, Qt::Horizontal, mDragStartLower + delta);
+            setEdgePixel(upperEdge, Qt::Horizontal, mDragStartUpper + delta);
             break;
         default:
             break;

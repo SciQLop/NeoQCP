@@ -243,3 +243,21 @@ void TestVSpan::dragSlotDeletingTheSpanIsSafe()
     sendMouse(mPlot, QEvent::MouseButtonRelease, from + QPoint(20, 0), Qt::NoButton);
     QCOMPARE(mPlot->itemCount(), 0);
 }
+
+// Pixels-mode edges are axis-rect pixels: a 40 px drag moves them 40 px, not 40 px of data units.
+void TestVSpan::pixelModeDragMovesByPixels()
+{
+    mPlot->xAxis->setRange(0, 1000);
+    mPlot->replot();
+    auto* span = new QCPItemVSpan(mPlot);
+    span->lowerEdge->setTypeX(QCPItemPosition::ptAxisRectAbsolute);
+    span->upperEdge->setTypeX(QCPItemPosition::ptAxisRectAbsolute);
+    span->setRange(QCPRange(100, 200));
+    const QRect axRect = mPlot->axisRect()->rect();
+    const QPoint from(axRect.left() + 150, axRect.center().y());
+    sendMouse(mPlot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseMove, from + QPoint(40, 0), Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseButtonRelease, from + QPoint(40, 0), Qt::NoButton);
+    QCOMPARE(span->range().lower, 140.0);
+    QCOMPARE(span->range().upper, 240.0);
+}
