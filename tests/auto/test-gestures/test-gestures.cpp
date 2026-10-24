@@ -156,6 +156,17 @@ void TestGestures::nativePinchZooms()
              qPrintable(QString::number(mPlot->xAxis->range().size())));
 }
 
+// Before: QApplication ignores it first; left ignored, it went on to the parent through the plot,
+// which a rangeChanged slot may have deleted.
+void TestGestures::nativePinchIsAccepted()
+{
+    mPlot->setInteraction(QCP::iGestures);
+    QNativeGestureEvent event(Qt::ZoomNativeGesture, QPointingDevice::primaryPointingDevice(), 2,
+                              centre(), centre(), mPlot->mapToGlobal(centre()), 1.0, {});
+    QCoreApplication::sendEvent(mPlot, &event);
+    QVERIFY(event.isAccepted());
+}
+
 void TestGestures::gesturesAcceptTouch()
 {
     QVERIFY(!mPlot->testAttribute(Qt::WA_AcceptTouchEvents));

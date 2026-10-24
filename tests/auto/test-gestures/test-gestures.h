@@ -23,6 +23,7 @@ private slots:
     void touchSequencePinchZoomsByTheFingerSpread();
     void touchPinchOneFingerPerEvent();
     void nativePinchZooms();
+    void nativePinchIsAccepted();
     void gesturesAcceptTouch();
     void gesturesNeedRangeInteractions();
     void dragSlotDeletingTheAxisRectIsSafe();

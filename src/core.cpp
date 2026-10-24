@@ -3651,6 +3651,9 @@ bool QCustomPlot::nativeGestureEvent(QNativeGestureEvent* event)
 {
     if (event->gestureType() != Qt::ZoomNativeGesture)
         return false;
+    // Before the zoom: QApplication ignores the event first, and an ignored one goes on to the
+    // widget's parent through the widget, which a rangeChanged slot may have deleted.
+    event->accept();
     QCPAxisRect* rect = axisRectAt(event->position());
     if (rect && mInteractions.testFlag(QCP::iRangeZoom) && event->value() > -1)
     {
