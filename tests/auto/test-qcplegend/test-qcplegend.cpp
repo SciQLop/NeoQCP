@@ -101,3 +101,37 @@ void TestQCPLegend::groupRowFollowsComponentVisibility()
   mg->setComponentVisible(0, false);
   QVERIFY2(buffer->contentDirty(), "the group row draws one segment per visible component");
 }
+
+namespace {
+void addSelectedItems(QCustomPlot* plot, int count)
+{
+  for (int i = 0; i < count; ++i)
+    plot->addGraph();
+  for (int i = 0; i < count; ++i)
+    plot->legend->item(i)->setSelected(true);
+}
+} // namespace
+
+// setSelectedParts deselects the items one by one: a slot removing the item it was told about
+// must not make the loop skip the next one.
+void TestQCPLegend::deselectSlotRemovingAnItemStillDeselectsTheOthers()
+{
+  addSelectedItems(mPlot, 3);
+  auto* first = mPlot->legend->item(0);
+  connect(first, &QCPAbstractLegendItem::selectionChanged, mPlot,
+          [this, first] { QVERIFY(mPlot->legend->removeItem(first)); }, Qt::SingleShotConnection);
+  mPlot->legend->setSelectedParts(QCPLegend::spNone);
+  QCOMPARE(mPlot->legend->itemCount(), 2);
+  QVERIFY(!mPlot->legend->item(0)->selected());
+  QVERIFY(!mPlot->legend->item(1)->selected());
+  QCOMPARE(mPlot->legend->selectedParts(), QCPLegend::SelectableParts(QCPLegend::spNone));
+}
+
+void TestQCPLegend::deselectSlotDeletingTheLegendIsSafe()
+{
+  addSelectedItems(mPlot, 3);
+  connect(mPlot->legend->item(0), &QCPAbstractLegendItem::selectionChanged, mPlot,
+          [this] { delete mPlot->legend; }, Qt::SingleShotConnection);
+  mPlot->legend->setSelectedParts(QCPLegend::spNone);
+  QCOMPARE(mPlot->legend, nullptr);
+}

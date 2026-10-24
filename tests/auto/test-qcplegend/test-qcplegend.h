@@ -12,6 +12,8 @@ private slots:
   void addAndRemove();
   void itemTextColorRepaintsTheLegend();
   void groupRowFollowsComponentVisibility();
+  void deselectSlotRemovingAnItemStillDeselectsTheOthers();
+  void deselectSlotDeletingTheLegendIsSafe();
   
 private:
   QCustomPlot *mPlot;

@@ -641,6 +641,21 @@ void QCPLegend::setSelectableParts(const SelectableParts& selectable)
   \see SelectablePart, setSelectableParts, selectTest, setSelectedBorderPen,
   setSelectedIconBorderPen, setSelectedBrush, setSelectedFont
 */
+namespace {
+// Each item signals its deselection, and a slot may remove items or delete the legend: walks a
+// guarded snapshot, and returns whether the legend is still there.
+bool deselectItems(QCPLegend* legend)
+{
+    const QPointer<QCPLegend> alive(legend);
+    const auto selected = legend->selectedItems();
+    const QList<QPointer<QCPAbstractLegendItem>> items(selected.cbegin(), selected.cend());
+    for (const auto& item : items)
+        if (item)
+            item->setSelected(false);
+    return alive;
+}
+} // namespace
+
 void QCPLegend::setSelectedParts(const SelectableParts& selected)
 {
     SelectableParts newSelected = selected;
@@ -658,11 +673,8 @@ void QCPLegend::setSelectedParts(const SelectableParts& selected)
         if (mSelectedParts.testFlag(spItems)
             && !newSelected.testFlag(spItems)) // spItems flag was unset, so clear item selection
         {
-            for (int i = 0; i < itemCount(); ++i)
-            {
-                if (item(i))
-                    item(i)->setSelected(false);
-            }
+            if (!deselectItems(this))
+                return;
         }
         mSelectedParts = newSelected;
         emit selectionChanged(mSelectedParts);
