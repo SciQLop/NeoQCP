@@ -27,6 +27,8 @@ void QCPLaneLayout::setDisplayOrder(const QStringList& names)
     std::vector<int> order;
     for (const auto& name : names)
         order.push_back(laneIndex(name));
+    if (order == mOrder)
+        return;
     mOrder = std::move(order);
     notify();
 }
@@ -49,14 +51,21 @@ bool QCPLaneLayout::renameLane(const QString& from, const QString& to)
     return true;
 }
 
+// The setters notify only on a change: a changed slot re-applying the current value would
+// otherwise notify again, and run itself without end.
 void QCPLaneLayout::setLaneHeight(int px)
 {
-    mLaneHeight = std::max(4, px);
+    const int height = std::max(4, px);
+    if (height == mLaneHeight)
+        return;
+    mLaneHeight = height;
     notify();
 }
 
 void QCPLaneLayout::setPlacement(Placement placement)
 {
+    if (placement == mPlacement)
+        return;
     mPlacement = placement;
     notify();
 }

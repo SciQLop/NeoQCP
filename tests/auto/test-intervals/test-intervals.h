@@ -132,6 +132,7 @@ private slots:
     void lanesChangedSlotDeletingTheTimelineInSetStackModeIsSafe();
     void lanesChangedSlotDeletingARegroupedTimelineIsSafe();
     void nestedRepacksNotifyOnceAfterTheOuterCall();
+    void reapplyingAnUnchangedLayoutSettingDoesNotNotify();
 
 private:
     QCustomPlot* mPlot = nullptr;

@@ -1586,3 +1586,29 @@ void TestIntervals::nestedRepacksNotifyOnceAfterTheOuterCall()
     iv->setData(std::move(c));
     QCOMPARE(rowsWhenNotified, QList<int>({ 1 }));
 }
+
+// A changed slot that re-applies the current settings (a view syncing itself back) must not
+// notify again: each notify would re-run the slot without end. The slot gives up after a few
+// rounds, so the old behaviour shows as a count, not a stack overflow.
+void TestIntervals::reapplyingAnUnchangedLayoutSettingDoesNotNotify()
+{
+    QCPLaneLayout layout;
+    layout.setDisplayOrder({ "A", "B" });
+    layout.setLaneHeight(20);
+    layout.setPlacement(QCPLaneLayout::plLanes);
+    int rounds = 0;
+    connect(&layout, &QCPLaneLayout::changed, &layout, [&] {
+        if (++rounds > 5)
+            return;
+        layout.setLaneHeight(layout.laneHeight());
+        layout.setPlacement(layout.placement());
+        layout.setDisplayOrder(layout.displayOrder());
+    });
+    layout.setLaneHeight(2); // clamped to 4: re-applying 4 is no change either
+    QCOMPARE(rounds, 1);
+    rounds = 0;
+    layout.setLaneHeight(layout.laneHeight());
+    layout.setPlacement(layout.placement());
+    layout.setDisplayOrder(layout.displayOrder());
+    QCOMPARE(rounds, 0);
+}
