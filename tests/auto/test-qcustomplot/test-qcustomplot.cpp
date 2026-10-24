@@ -433,3 +433,40 @@ void TestQCustomPlot::replacingADraggedSelectionRectFromItsCancelSlotIsSafe()
   mPlot->setSelectionRect(new QCPSelectionRect(mPlot));
   QCOMPARE(mPlot->selectionRect(), last);
 }
+
+// A rect being destroyed must not signal: a canceled slot would see it as the plot's current rect.
+void TestQCustomPlot::deletingADraggedSelectionRectDoesNotSignal()
+{
+  startRubberBand(mPlot);
+  int canceled = 0;
+  connect(mPlot->selectionRect(), &QCPSelectionRect::canceled, mPlot, [&canceled] { ++canceled; });
+  deleteRectOn(mPlot, &QCPSelectionRect::changed);
+  sendMouse(mPlot, QEvent::MouseMove, pixelOf(mPlot, 8, 8), Qt::LeftButton);
+  QCOMPARE(canceled, 0);
+  QCOMPARE(mPlot->selectionRect(), nullptr);
+  sendMouse(mPlot, QEvent::MouseButtonRelease, pixelOf(mPlot, 8, 8), Qt::NoButton);
+}
+
+// Before: the destructor's canceled slot installed a rect, which deleted the dying one again.
+void TestQCustomPlot::cancelSlotInstallingARectWhileTheDraggedOneIsDeletedIsSafe()
+{
+  startRubberBand(mPlot);
+  replaceRectOn(mPlot, &QCPSelectionRect::canceled);
+  deleteRectOn(mPlot, &QCPSelectionRect::changed);
+  sendMouse(mPlot, QEvent::MouseMove, pixelOf(mPlot, 8, 8), Qt::LeftButton);
+  sendMouse(mPlot, QEvent::MouseButtonRelease, pixelOf(mPlot, 8, 8), Qt::NoButton);
+  QCOMPARE(mPlot->selectionRect(), nullptr);
+}
+
+// Once: the rect was deleted (no zoom), or its accepted signal connected twice (two zooms).
+void TestQCustomPlot::settingTheCurrentSelectionRectKeepsIt()
+{
+  layOut(mPlot, QCP::Interactions());
+  mPlot->setSelectionRectMode(QCP::srmZoom);
+  auto* rect = mPlot->selectionRect();
+  mPlot->setSelectionRect(rect);
+  QCOMPARE(mPlot->selectionRect(), rect);
+  QSignalSpy zooms(mPlot->xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged));
+  dragFromTo(mPlot, pixelOf(mPlot, 2, 2), pixelOf(mPlot, 6, 6));
+  QCOMPARE(zooms.count(), 1);
+}

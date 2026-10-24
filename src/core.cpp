@@ -100,6 +100,9 @@ QList<QPointer<QCPLayerable>> guardedLayerables(const QList<QCPLayer*>& layers)
   Allows access to the currently used QCPSelectionRect instance (or subclass thereof), that is used
   to handle and draw selection rect interactions (see \ref setSelectionRectMode).
 
+  Do not keep the returned pointer across a signal: a slot may delete or replace the rect. Read it
+  again instead; it is null once the rect is gone.
+
   \see setSelectionRect
 */
 
@@ -1051,11 +1054,17 @@ void QCustomPlot::setSelectionRectMode(QCP::SelectionRectMode mode)
   This method is useful if you wish to replace the default QCPSelectionRect instance with an
   instance of a QCPSelectionRect subclass, to introduce custom behaviour of the selection rect.
 
+  If the previous rect is being dragged, it is canceled before it is deleted. A slot connected to
+  its \ref QCPSelectionRect::canceled signal that installs a rect of its own wins: the rect passed
+  here is then deleted. Passing the current rect does nothing.
+
   \see setSelectionRectMode
 */
 void QCustomPlot::setSelectionRect(QCPSelectionRect* selectionRect)
 {
-    QCPSelectionRect* previous = mSelectionRect;
+    if (selectionRect == mSelectionRect)
+        return;
+    const QPointer<QCPSelectionRect> previous = mSelectionRect;
     mSelectionRect = selectionRect;
 
     if (mSelectionRect)
@@ -1066,8 +1075,11 @@ void QCustomPlot::setSelectionRect(QCPSelectionRect* selectionRect)
         else if (mSelectionRectMode == QCP::srmZoom)
             connect(mSelectionRect, &QCPSelectionRect::accepted, this, &QCustomPlot::processRectZoom);
     }
-    // Last: deleting a dragged rect cancels it, and a canceled slot may set another rect.
-    delete previous;
+    // Last: a canceled slot may install another rect, delete this one, or reinstall it.
+    if (previous)
+        previous->cancel();
+    if (previous && previous != mSelectionRect)
+        delete previous.data();
 }
 
 void QCustomPlot::setItemCreator(ItemCreator creator)

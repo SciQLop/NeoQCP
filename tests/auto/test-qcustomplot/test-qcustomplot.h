@@ -27,6 +27,9 @@ private slots:
   void moveSlotDeletingTheSelectionRectIsSafe();
   void escapeSlotDeletingTheSelectionRectIsSafe();
   void replacingADraggedSelectionRectFromItsCancelSlotIsSafe();
+  void deletingADraggedSelectionRectDoesNotSignal();
+  void cancelSlotInstallingARectWhileTheDraggedOneIsDeletedIsSafe();
+  void settingTheCurrentSelectionRectKeepsIt();
 
 private:
   QCustomPlot *mPlot;

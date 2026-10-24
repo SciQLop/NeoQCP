@@ -119,9 +119,14 @@ QCPSelectionRect::QCPSelectionRect(QCustomPlot* parentPlot)
 {
 }
 
+// Silent: a canceled slot would see this half-destroyed rect as the plot's current one.
 QCPSelectionRect::~QCPSelectionRect()
 {
-    cancel();
+    if (!mActive)
+        return;
+    mActive = false;
+    if (QCPLayer* band = layer())
+        band->replot();
 }
 
 /*!
@@ -169,7 +174,8 @@ void QCPSelectionRect::setBrush(const QBrush& brush)
 
 /*!
   If there is currently a selection interaction going on (\ref isActive), the interaction is
-  canceled. The selection rect will emit the \ref canceled signal.
+  canceled. The selection rect will emit the \ref canceled signal. Deleting an active rect
+  cancels it without the signal.
 */
 void QCPSelectionRect::cancel()
 {
