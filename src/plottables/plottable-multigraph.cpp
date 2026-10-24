@@ -252,7 +252,7 @@ void QCPMultiGraph::dataChanged()
     else if (mParentPlot)
         mParentPlot->replot();
     if (!alive)
-        return; // the pipeline's busyChanged slot deleted this graph
+        return; // a busyChanged or replot slot deleted this graph
 
     // A mutation can leave a job in flight for pre-mutation data: if the
     // transform stayed on, the job just queued behind it supersedes it; if

@@ -192,6 +192,7 @@ private slots:
     void histogram2dTranslationOffsetWhenBusy();
     void translatedGeometryClippedToAxisRect();
     void multipleGraph2IndependentOffsets();
+    void graph2DataChangedReplotSlotDeletingTheGraphIsSafe();
 
 private:
     QCustomPlot* mPlot = nullptr;

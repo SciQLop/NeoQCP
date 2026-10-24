@@ -212,17 +212,17 @@ void QCPGraph2::dataChanged()
             mPipeline.clearTransform();
     }
 
+    const QPointer<QCPGraph2> alive(this);
     if (mPipeline.hasTransform())
     {
         mL1Cache.reset();
         mL2Dirty = false;
-        const QPointer<QCPGraph2> alive(this);
         mPipeline.onDataChanged();
-        if (!alive)
-            return; // the pipeline's busyChanged slot deleted this graph
     }
     else if (mParentPlot)
         mParentPlot->replot();
+    if (!alive)
+        return; // a busyChanged or replot slot deleted this graph
 
     // A mutation can leave a job in flight for pre-mutation data: if the
     // transform stayed on, the job just queued behind it supersedes it; if

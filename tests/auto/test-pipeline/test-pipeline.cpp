@@ -3439,3 +3439,16 @@ void TestPipeline::lineCacheCoversADecadeEachSideOnLogKeys()
     QCOMPARE(lin.lower, -8.0);
     QCOMPARE(lin.upper, 19.0);
 }
+
+// Below the resampling threshold dataChanged replots at once, so beforeReplot slots run inside
+// it; one deleting the graph must end dataChanged.
+void TestPipeline::graph2DataChangedReplotSlotDeletingTheGraphIsSafe()
+{
+    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    g->setData(std::vector<double>{ 0, 1, 2 }, std::vector<double>{ 0, 1, 2 });
+    QVERIFY(!g->pipeline().hasTransform());
+    connect(mPlot, &QCustomPlot::beforeReplot, mPlot,
+            [this, g] { QVERIFY(mPlot->removePlottable(g)); }, Qt::SingleShotConnection);
+    g->dataChanged();
+    QCOMPARE(mPlot->plottableCount(), 0);
+}
