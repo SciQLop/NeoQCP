@@ -702,6 +702,33 @@ void TestQCustomPlot::radialWheelSlotDeletingTheAngularAxisIsSafe()
   QVERIFY(!angular);
 }
 
+// Before: the radial loop copied the deleted angular axis's lists after its own range change.
+void TestQCustomPlot::angularDragSlotDeletingTheAngularAxisIsSafe()
+{
+  QList<QCPPolarAxisRadial*> radials;
+  QPointer<QCPPolarAxisAngular> angular = polarPlot(mPlot, radials);
+  angular->setRangeDrag(true);
+  connect(angular, qOverload<const QCPRange&>(&QCPPolarAxisAngular::rangeChanged), mPlot,
+          [this, angular] { mPlot->plotLayout()->remove(angular); }, Qt::SingleShotConnection);
+  const QPoint from = polarPoint(angular, 0.6);
+  const QPoint to = (angular->center() + QPointF(0.6 * angular->radius(), 0)).toPoint();
+  sendMouse(mPlot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+  sendMouse(mPlot, QEvent::MouseMove, to, Qt::LeftButton);
+  sendMouse(mPlot, QEvent::MouseButtonRelease, to, Qt::NoButton);
+  QVERIFY(!angular);
+}
+
+void TestQCustomPlot::angularWheelSlotDeletingTheAngularAxisIsSafe()
+{
+  QList<QCPPolarAxisRadial*> radials;
+  QPointer<QCPPolarAxisAngular> angular = polarPlot(mPlot, radials);
+  angular->setRangeZoom(true);
+  connect(angular, qOverload<const QCPRange&>(&QCPPolarAxisAngular::rangeChanged), mPlot,
+          [this, angular] { mPlot->plotLayout()->remove(angular); }, Qt::SingleShotConnection);
+  wheelOnPolar(mPlot, angular);
+  QVERIFY(!angular);
+}
+
 // Before: only the axis's release handler restored it, so the plot stayed non-antialiased.
 void TestQCustomPlot::radialDragSlotDeletingTheAngularAxisRestoresAntialiasing()
 {

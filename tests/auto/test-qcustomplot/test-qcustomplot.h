@@ -43,6 +43,8 @@ private slots:
   void radialDragSlotDeletingTheAngularAxisIsSafe();
   void radialWheelSlotRemovingARadialAxisZoomsTheOthers();
   void radialWheelSlotDeletingTheAngularAxisIsSafe();
+  void angularDragSlotDeletingTheAngularAxisIsSafe();
+  void angularWheelSlotDeletingTheAngularAxisIsSafe();
   void radialDragSlotDeletingTheAngularAxisRestoresAntialiasing();
 
 private:

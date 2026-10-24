@@ -1663,6 +1663,8 @@ void QCPPolarAxisAngular::mouseMoveEvent(QMouseEvent* event,
             pixelToCoord(event->pos(), angleCoord, radiusCoord);
             double diff = angleCoordStart - angleCoord;
             setRange(mDragAngularStart.lower + diff, mDragAngularStart.upper + diff);
+            if (!alive)
+                return;
         }
 
         const auto dragStart = mDragRadialStart; // a slot may delete this axis and the list
@@ -1751,6 +1753,8 @@ void QCPPolarAxisAngular::wheelEvent(QWheelEvent* event)
             double angleCoord, radiusCoord;
             pixelToCoord(pos, angleCoord, radiusCoord);
             scaleRange(qPow(mRangeZoomFactor, wheelSteps), angleCoord);
+            if (!alive)
+                return;
         }
 
         const QList<QPointer<QCPPolarAxisRadial>> axes(mRadialAxes.begin(), mRadialAxes.end());
