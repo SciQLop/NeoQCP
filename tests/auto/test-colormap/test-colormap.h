@@ -35,6 +35,7 @@ private slots:
   void QCPColorMap2_colourSlotDeletingTheMapIsSafe();
   void QCPHistogram2D_colourSlotDeletingTheMapIsSafe();
   void QCPColorMap_scaleTypeSlotDeletingTheMapIsSafe();
+  void QCPColorScale_rangeSlotDeletingTheScaleIsSafe();
 
 private:
   QCustomPlot *mPlot;

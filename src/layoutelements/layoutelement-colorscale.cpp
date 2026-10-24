@@ -286,11 +286,14 @@ void QCPColorScale::setDataScaleType(QCPAxis::ScaleType scaleType)
     if (mDataScaleType != scaleType)
     {
         mDataScaleType = scaleType;
+        // Both calls may signal a new range, and a dataRangeChanged slot may delete this scale.
+        const QPointer<QCPColorScale> alive(this);
         if (mColorAxis)
             mColorAxis.data()->setScaleType(mDataScaleType);
-        if (mDataScaleType == QCPAxis::stLogarithmic)
+        if (alive && mDataScaleType == QCPAxis::stLogarithmic)
             setDataRange(mDataRange.sanitizedForLogScale());
-        emit dataScaleTypeChanged(mDataScaleType);
+        if (alive)
+            emit dataScaleTypeChanged(mDataScaleType);
     }
 }
 

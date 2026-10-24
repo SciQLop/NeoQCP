@@ -846,3 +846,17 @@ void TestColorMap::QCPColorMap_scaleTypeSlotDeletingTheMapIsSafe()
   QCOMPARE(mPlot->plottableCount(), 0);
 }
 
+// The scale signals its sanitised range, then its scale type.
+void TestColorMap::QCPColorScale_rangeSlotDeletingTheScaleIsSafe()
+{
+  auto* scale = new QCPColorScale(mPlot);
+  scale->setDataRange(QCPRange(-1, 10));
+  const QPointer<QCPColorScale> alive(scale);
+  int scaleTypeSignals = 0;
+  connect(scale, &QCPColorScale::dataScaleTypeChanged, mPlot, [&] { ++scaleTypeSignals; });
+  connect(scale, &QCPColorScale::dataRangeChanged, mPlot, [scale] { delete scale; },
+          Qt::SingleShotConnection);
+  scale->setDataScaleType(QCPAxis::stLogarithmic);
+  QVERIFY(!alive);
+  QCOMPARE(scaleTypeSignals, 0);
+}

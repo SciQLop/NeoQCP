@@ -592,10 +592,12 @@ void QCPAxis::setScaleType(QCPAxis::ScaleType type)
     if (mScaleType != type)
     {
         mScaleType = type;
+        mCachedMarginValid = false;
+        const QPointer<QCPAxis> alive(this); // a rangeChanged slot may delete this axis
         if (mScaleType == stLogarithmic)
             setRange(mRange.sanitizedForLogScale());
-        mCachedMarginValid = false;
-        emit scaleTypeChanged(mScaleType);
+        if (alive)
+            emit scaleTypeChanged(mScaleType);
     }
 }
 
@@ -613,8 +615,10 @@ void QCPAxis::rangeDidChange(const QCPRange& oldRange)
 {
     if (mAxisRect)
         mAxisRect->markAffectedLayersDirty();
+    const QPointer<QCPAxis> alive(this); // a slot may delete this axis
     emit rangeChanged(mRange);
-    emit rangeChanged(mRange, oldRange);
+    if (alive)
+        emit rangeChanged(mRange, oldRange);
 }
 
 /*!
