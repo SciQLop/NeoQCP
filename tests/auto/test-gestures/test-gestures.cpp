@@ -370,6 +370,25 @@ void TestGestures::dragRightAfterAWheelZoomRestoresAntialiasing()
     expectAntialiasing(on, off);
 }
 
+// Before: a wheel zoom during a drag backed up the drag's forced state, and its timer, firing after
+// the release, put that back for good.
+void TestGestures::wheelZoomDuringADragRestoresAntialiasing()
+{
+    mPlot->setAntialiasedElements(QCP::aePlottables);
+    const auto on = mPlot->antialiasedElements(), off = mPlot->notAntialiasedElements();
+    const QPoint c = centre().toPoint();
+    auto send = [this](QEvent::Type type, QPoint pos, Qt::MouseButtons buttons) {
+        QMouseEvent e(type, pos, mPlot->mapToGlobal(pos), Qt::LeftButton, buttons, Qt::NoModifier);
+        QCoreApplication::sendEvent(mPlot, &e);
+    };
+    send(QEvent::MouseButtonPress, c, Qt::LeftButton);
+    send(QEvent::MouseMove, c + QPoint(40, 20), Qt::LeftButton);
+    wheel({0, 40}, {0, 120});
+    send(QEvent::MouseButtonRelease, c + QPoint(40, 20), Qt::NoButton);
+    QTest::qWait(400); // the wheel's restore timer fires after the release
+    expectAntialiasing(on, off);
+}
+
 // Before: the restore timer died with the rect.
 void TestGestures::wheelSlotDeletingTheAxisRectRestoresAntialiasing()
 {

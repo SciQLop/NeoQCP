@@ -1432,8 +1432,11 @@ void QCPAxisRect::wheelEvent(QWheelEvent* event)
                 if (!mWheelZooming)
                 {
                     mWheelZooming = true;
-                    mAAWheelBackup = mParentPlot->antialiasedElements();
-                    mNotAAWheelBackup = mParentPlot->notAntialiasedElements();
+                    // During a drag the plot shows the drag's forced state.
+                    const bool dragForced = mDragging && mParentPlot->noAntialiasingOnDrag();
+                    mAAWheelBackup = dragForced ? mAADragBackup : mParentPlot->antialiasedElements();
+                    mNotAAWheelBackup
+                        = dragForced ? mNotAADragBackup : mParentPlot->notAntialiasedElements();
                 }
                 mParentPlot->setNotAntialiasedElements(QCP::aeAll);
                 mWheelZoomRestoreTimer.start();
