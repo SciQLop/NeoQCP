@@ -471,6 +471,43 @@ void TestQCustomPlot::settingTheCurrentSelectionRectKeepsIt()
   QCOMPARE(zooms.count(), 1);
 }
 
+// Before: the nested setSelectionRect connected the reinstalled rect's accepted signal again.
+void TestQCustomPlot::cancelSlotReinstallingThePreviousRectZoomsOnce()
+{
+  startRubberBand(mPlot);
+  auto* original = mPlot->selectionRect();
+  connect(original, &QCPSelectionRect::canceled, mPlot,
+          [this, original] { mPlot->setSelectionRect(original); }, Qt::SingleShotConnection);
+  mPlot->setSelectionRect(new QCPSelectionRect(mPlot));
+  QCOMPARE(mPlot->selectionRect(), original);
+  sendMouse(mPlot, QEvent::MouseButtonRelease, pixelOf(mPlot, 2, 2), Qt::NoButton);
+  QSignalSpy zooms(mPlot->xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged));
+  dragFromTo(mPlot, pixelOf(mPlot, 2, 2), pixelOf(mPlot, 6, 6));
+  QCOMPARE(zooms.count(), 1);
+}
+
+void TestQCustomPlot::cancelSlotDeletingThePlotWhileSettingARectIsSafe()
+{
+  startRubberBand(mPlot);
+  connect(mPlot->selectionRect(), &QCPSelectionRect::canceled, this, [this] {
+    delete mPlot;
+    mPlot = nullptr;
+  }, Qt::SingleShotConnection);
+  mPlot->setSelectionRect(new QCPSelectionRect(mPlot));
+  QCOMPARE(mPlot, nullptr);
+}
+
+void TestQCustomPlot::cancelSlotDeletingThePlotWhileClearingTheRectModeIsSafe()
+{
+  startRubberBand(mPlot);
+  connect(mPlot->selectionRect(), &QCPSelectionRect::canceled, this, [this] {
+    delete mPlot;
+    mPlot = nullptr;
+  }, Qt::SingleShotConnection);
+  mPlot->setSelectionRectMode(QCP::srmNone);
+  QCOMPARE(mPlot, nullptr);
+}
+
 namespace {
 // Closing a panel from a plot signal deletes the plot while its event handler is on the stack.
 template <typename Sender, typename Signal>

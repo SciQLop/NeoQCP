@@ -1026,9 +1026,12 @@ void QCustomPlot::setMultiSelectModifier(Qt::KeyboardModifier modifier)
 void QCustomPlot::setSelectionRectMode(QCP::SelectionRectMode mode)
 {
     // When switching to none, abort a potentially active selection rect. A canceled slot may
-    // delete or replace it.
+    // delete or replace it, or delete the plot.
+    const QPointer<QCustomPlot> alive(this);
     if (mSelectionRect && mode == QCP::srmNone)
         mSelectionRect->cancel();
+    if (!alive)
+        return;
     if (mSelectionRect)
     {
         // disconnect old connections:
@@ -1068,18 +1071,22 @@ void QCustomPlot::setSelectionRect(QCPSelectionRect* selectionRect)
     const QPointer<QCPSelectionRect> previous = mSelectionRect;
     mSelectionRect = selectionRect;
 
+    // Unique: a canceled slot below may reinstall a rect that is still connected.
     if (mSelectionRect)
     {
-        // establish connections with new selection rect:
         if (mSelectionRectMode == QCP::srmSelect)
-            connect(mSelectionRect, &QCPSelectionRect::accepted, this, &QCustomPlot::processRectSelection);
+            connect(mSelectionRect, &QCPSelectionRect::accepted, this,
+                    &QCustomPlot::processRectSelection, Qt::UniqueConnection);
         else if (mSelectionRectMode == QCP::srmZoom)
-            connect(mSelectionRect, &QCPSelectionRect::accepted, this, &QCustomPlot::processRectZoom);
+            connect(mSelectionRect, &QCPSelectionRect::accepted, this, &QCustomPlot::processRectZoom,
+                    Qt::UniqueConnection);
     }
-    // Last: a canceled slot may install another rect, delete this one, or reinstall it.
+    // Last: a canceled slot may install another rect, delete this one, reinstall it, or delete
+    // the plot.
+    const QPointer<QCustomPlot> alive(this);
     if (previous)
         previous->cancel();
-    if (previous && previous != mSelectionRect)
+    if (alive && previous && previous != mSelectionRect)
         delete previous.data();
 }
 

@@ -30,6 +30,9 @@ private slots:
   void deletingADraggedSelectionRectDoesNotSignal();
   void cancelSlotInstallingARectWhileTheDraggedOneIsDeletedIsSafe();
   void settingTheCurrentSelectionRectKeepsIt();
+  void cancelSlotReinstallingThePreviousRectZoomsOnce();
+  void cancelSlotDeletingThePlotWhileSettingARectIsSafe();
+  void cancelSlotDeletingThePlotWhileClearingTheRectModeIsSafe();
   void clickSelectionSlotDeletingThePlotIsSafe();
   void rectSelectionSlotDeletingThePlotIsSafe();
   void rectZoomSlotDeletingThePlotIsSafe();
