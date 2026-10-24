@@ -33,6 +33,8 @@ private slots:
     void nativePinchSlotDeletingThePlotIsSafe();
     void axisDragSlotDeletingTheAxisIsSafe();
     void axisWheelSlotDeletingTheAxisIsSafe();
+    void dragSlotDeletingTheAxisRectRestoresAntialiasing();
+    void wheelSlotDeletingTheAxisRectRestoresAntialiasing();
 
 private:
     QPointF centre() const;
@@ -42,6 +44,7 @@ private:
     template <typename Slot> void onFirstXRangeChange(Slot slot);
     void deleteAxisRectOnRangeChange();
     void deleteAxisRect();
+    void expectAntialiasing(QCP::AntialiasedElements on, QCP::AntialiasedElements off);
     void deletePlotOnRangeChange();
     void pinch();
 

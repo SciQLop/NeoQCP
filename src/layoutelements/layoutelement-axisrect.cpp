@@ -220,6 +220,21 @@ QCPAxisRect::QCPAxisRect(QCustomPlot* parentPlot, bool setupDefaultAxes)
 
 QCPAxisRect::~QCPAxisRect()
 {
+    // Deleted mid-gesture (by a rangeChanged slot): give the plot its antialiasing back. Without a
+    // layer, the plot itself is being torn down.
+    if (mParentPlot && layer())
+    {
+        if (mWheelZooming)
+        {
+            mParentPlot->setAntialiasedElements(mAAWheelBackup);
+            mParentPlot->setNotAntialiasedElements(mNotAAWheelBackup);
+        }
+        if (mDragging && mParentPlot->noAntialiasingOnDrag())
+        {
+            mParentPlot->setAntialiasedElements(mAADragBackup);
+            mParentPlot->setNotAntialiasedElements(mNotAADragBackup);
+        }
+    }
     delete mInsetLayout;
     mInsetLayout = nullptr;
 

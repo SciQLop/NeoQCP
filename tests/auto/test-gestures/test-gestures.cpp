@@ -304,3 +304,38 @@ void TestGestures::axisWheelSlotDeletingTheAxisIsSafe()
     QVERIFY(mRangeSlotRan);
     QCOMPARE(mPlot->axisRect()->axisCount(QCPAxis::atBottom), 0);
 }
+
+void TestGestures::expectAntialiasing(QCP::AntialiasedElements on, QCP::AntialiasedElements off)
+{
+    QCOMPARE(mPlot->antialiasedElements().toInt(), on.toInt());
+    QCOMPARE(mPlot->notAntialiasedElements().toInt(), off.toInt());
+}
+
+// Before: only the rect's release handler restored it, so the plot stayed non-antialiased.
+void TestGestures::dragSlotDeletingTheAxisRectRestoresAntialiasing()
+{
+    mPlot->setAntialiasedElements(QCP::aePlottables);
+    const auto on = mPlot->antialiasedElements(), off = mPlot->notAntialiasedElements();
+    int changes = 0; // the first move turns antialiasing off, the second deletes the rect
+    connect(mPlot->xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged), this, [this, &changes] {
+        if (++changes != 2)
+            return;
+        mRangeSlotRan = true;
+        deleteAxisRect();
+    });
+    const QPoint c = centre().toPoint();
+    drag(c, c + QPoint(40, 20));
+    QVERIFY(mRangeSlotRan);
+    expectAntialiasing(on, off);
+}
+
+// Before: the restore timer died with the rect.
+void TestGestures::wheelSlotDeletingTheAxisRectRestoresAntialiasing()
+{
+    mPlot->setAntialiasedElements(QCP::aePlottables);
+    const auto on = mPlot->antialiasedElements(), off = mPlot->notAntialiasedElements();
+    deleteAxisRectOnRangeChange();
+    wheel({0, 40}, {0, 120});
+    QVERIFY(mRangeSlotRan);
+    expectAntialiasing(on, off);
+}
