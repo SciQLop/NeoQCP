@@ -133,6 +133,7 @@ private slots:
     void lanesChangedSlotDeletingARegroupedTimelineIsSafe();
     void nestedRepacksNotifyOnceAfterTheOuterCall();
     void reapplyingAnUnchangedLayoutSettingDoesNotNotify();
+    void reapplyingTheCategoryOrderDoesNotRestack();
 
 private:
     QCustomPlot* mPlot = nullptr;

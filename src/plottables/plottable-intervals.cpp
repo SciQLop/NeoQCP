@@ -787,6 +787,8 @@ void QCPIntervals::setStackMode(StackMode mode)
 
 void QCPIntervals::setCategoryOrder(std::vector<int> order)
 {
+    if (mCategoryOrder == order)
+        return;
     const QCPLaneLayout::Batch lanesChangedLast(mLayout);
     mCategoryOrder = std::move(order);
     updateSubRows();

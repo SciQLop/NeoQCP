@@ -1612,3 +1612,14 @@ void TestIntervals::reapplyingAnUnchangedLayoutSettingDoesNotNotify()
     layout.setDisplayOrder(layout.displayOrder());
     QCOMPARE(rounds, 0);
 }
+
+// Like setStackMode: the same order again must not restack the rows (a bar rebuild).
+void TestIntervals::reapplyingTheCategoryOrderDoesNotRestack()
+{
+    QCPLaneLayout layout;
+    auto* iv = modes(mPlot, &layout, { 0, 40 }, { 30, 70 }, { 2, 0 });
+    iv->setCategoryOrder({ 0, 1, 2 });
+    const quint64 generation = iv->mSubRowGeneration;
+    iv->setCategoryOrder({ 0, 1, 2 });
+    QCOMPARE(iv->mSubRowGeneration, generation);
+}
