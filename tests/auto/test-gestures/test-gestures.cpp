@@ -2,6 +2,7 @@
 
 void TestGestures::init()
 {
+    mRangeSlotRan = false;
     mPlot = new QCustomPlot(nullptr);
     mPlot->resize(400, 300);
     mPlot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom);
@@ -206,7 +207,14 @@ void TestGestures::onFirstXRangeChange(Slot slot)
 // The drag, wheel and pinch handlers loop over the axes and use the plot after each range change.
 void TestGestures::deleteAxisRectOnRangeChange()
 {
-    onFirstXRangeChange([this] { QVERIFY(mPlot->plotLayout()->remove(mPlot->axisRect())); });
+    onFirstXRangeChange([this] { deleteAxisRect(); });
+}
+
+void TestGestures::deleteAxisRect()
+{
+    const QPointer<QCPAxisRect> rect = mPlot->axisRect();
+    QVERIFY(mPlot->plotLayout()->remove(rect)); // remove() deletes the element
+    QVERIFY(!rect);
 }
 
 void TestGestures::deletePlotOnRangeChange()

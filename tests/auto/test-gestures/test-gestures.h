@@ -41,6 +41,7 @@ private:
     void drag(QPoint from, QPoint to);
     template <typename Slot> void onFirstXRangeChange(Slot slot);
     void deleteAxisRectOnRangeChange();
+    void deleteAxisRect();
     void deletePlotOnRangeChange();
     void pinch();
 
