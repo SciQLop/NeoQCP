@@ -1021,12 +1021,12 @@ void QCustomPlot::setMultiSelectModifier(Qt::KeyboardModifier modifier)
 */
 void QCustomPlot::setSelectionRectMode(QCP::SelectionRectMode mode)
 {
+    // When switching to none, abort a potentially active selection rect. A canceled slot may
+    // delete or replace it.
+    if (mSelectionRect && mode == QCP::srmNone)
+        mSelectionRect->cancel();
     if (mSelectionRect)
     {
-        if (mode == QCP::srmNone)
-            mSelectionRect->cancel(); // when switching to none, we immediately want to abort a
-                                      // potentially active selection rect
-
         // disconnect old connections:
         if (mSelectionRectMode == QCP::srmSelect)
             disconnect(mSelectionRect, &QCPSelectionRect::accepted, this, &QCustomPlot::processRectSelection);
@@ -1055,8 +1055,7 @@ void QCustomPlot::setSelectionRectMode(QCP::SelectionRectMode mode)
 */
 void QCustomPlot::setSelectionRect(QCPSelectionRect* selectionRect)
 {
-    delete mSelectionRect;
-
+    QCPSelectionRect* previous = mSelectionRect;
     mSelectionRect = selectionRect;
 
     if (mSelectionRect)
@@ -1067,6 +1066,8 @@ void QCustomPlot::setSelectionRect(QCPSelectionRect* selectionRect)
         else if (mSelectionRectMode == QCP::srmZoom)
             connect(mSelectionRect, &QCPSelectionRect::accepted, this, &QCustomPlot::processRectZoom);
     }
+    // Last: deleting a dragged rect cancels it, and a canceled slot may set another rect.
+    delete previous;
 }
 
 void QCustomPlot::setItemCreator(ItemCreator creator)
@@ -3648,7 +3649,7 @@ void QCustomPlot::keyPressEvent(QKeyEvent* event)
     if (mSelectionRect && mSelectionRect->isActive())
     {
         mSelectionRect->keyPressEvent(event);
-        if (!mSelectionRect->isActive())
+        if (!mSelectionRect || !mSelectionRect->isActive())
         {
             event->accept();
             return;
@@ -4080,8 +4081,8 @@ void QCustomPlot::processRectSelection(QRect rect, QMouseEvent* event)
         emit selectionChangedByUser();
         replot(rpQueuedReplot);
     }
-    else if (mSelectionRect)
-        mSelectionRect->layer()->replot();
+    else if (QCPLayer* band = mSelectionRect ? mSelectionRect->layer() : nullptr)
+        band->replot();
 }
 
 /*! \internal

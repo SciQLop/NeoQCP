@@ -31,6 +31,7 @@
 #include "global.h"
 #include "painting/paintbuffer.h"
 #include "plottables/plottable.h"
+#include "selectionrect.h"
 
 #include <QElapsedTimer>
 #include <QPointer>
@@ -46,7 +47,6 @@ class QCPGraph;
 class QCPLegend;
 class QCPAbstractLegendItem;
 class QCPPlottableGroup;
-class QCPSelectionRect;
 class QRhi;
 class QRhiCommandBuffer;
 class QRhiGraphicsPipeline;
@@ -400,7 +400,7 @@ protected:
     QCP::PlottingHints mPlottingHints;
     Qt::KeyboardModifier mMultiSelectModifier;
     QCP::SelectionRectMode mSelectionRectMode;
-    QCPSelectionRect* mSelectionRect;
+    QPointer<QCPSelectionRect> mSelectionRect; // a slot may delete it
     QCPTheme* mOwnedTheme;
     QPointer<QCPTheme> mTheme;
     bool mThemeDirty;

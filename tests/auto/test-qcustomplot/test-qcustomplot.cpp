@@ -358,6 +358,13 @@ void replaceRectOn(QCustomPlot* plot, Signal signal)
                    [plot] { plot->setSelectionRect(new QCPSelectionRect(plot)); },
                    Qt::SingleShotConnection);
 }
+
+template <typename Signal>
+void deleteRectOn(QCustomPlot* plot, Signal signal)
+{
+  QObject::connect(plot->selectionRect(), signal, plot, [plot] { delete plot->selectionRect(); },
+                   Qt::SingleShotConnection);
+}
 } // namespace
 
 // QCustomPlot::setSelectionRect deletes the rect a slot replaces: the rect must not repaint
@@ -395,3 +402,34 @@ void TestQCustomPlot::escapeSlotReplacingTheSelectionRectIsSafe()
   QVERIFY(!mPlot->selectionRect()->isActive());
 }
 
+// Deleting the rect outright leaves the plot without one, not with a dangling pointer.
+void TestQCustomPlot::moveSlotDeletingTheSelectionRectIsSafe()
+{
+  startRubberBand(mPlot);
+  deleteRectOn(mPlot, &QCPSelectionRect::changed);
+  sendMouse(mPlot, QEvent::MouseMove, pixelOf(mPlot, 8, 8), Qt::LeftButton);
+  QCOMPARE(mPlot->selectionRect(), nullptr);
+  sendMouse(mPlot, QEvent::MouseMove, pixelOf(mPlot, 9, 9), Qt::LeftButton);
+  sendMouse(mPlot, QEvent::MouseButtonRelease, pixelOf(mPlot, 9, 9), Qt::NoButton);
+  pressEscape(mPlot);
+}
+
+void TestQCustomPlot::escapeSlotDeletingTheSelectionRectIsSafe()
+{
+  startRubberBand(mPlot);
+  deleteRectOn(mPlot, &QCPSelectionRect::canceled);
+  pressEscape(mPlot);
+  QCOMPARE(mPlot->selectionRect(), nullptr);
+}
+
+// Replacing a rect mid-drag cancels it from its destructor; a canceled slot replacing it again
+// must not delete it a second time.
+void TestQCustomPlot::replacingADraggedSelectionRectFromItsCancelSlotIsSafe()
+{
+  startRubberBand(mPlot);
+  auto* last = new QCPSelectionRect(mPlot);
+  connect(mPlot->selectionRect(), &QCPSelectionRect::canceled, mPlot,
+          [this, last] { mPlot->setSelectionRect(last); }, Qt::SingleShotConnection);
+  mPlot->setSelectionRect(new QCPSelectionRect(mPlot));
+  QCOMPARE(mPlot->selectionRect(), last);
+}
