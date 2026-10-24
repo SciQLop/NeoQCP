@@ -67,6 +67,7 @@ private slots:
     void coloredGraphDrawnFromL2KeepsIndicesConsistent();
 
     void graph2ScatterColoursFollowTheirPointAcrossBreaks();
+    void firstColouredCommitSlotDeletingTheGraphIsSafe();
 
 private:
     QCustomPlot* mPlot = nullptr;

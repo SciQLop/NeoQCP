@@ -1166,3 +1166,29 @@ void TestColorByScalar::graph2ScatterColoursFollowTheirPointAcrossBreaks()
     QVERIFY2(isBlue(colourAt(11)), qPrintable("key 11 drawn as " + colourAt(11).name()));
     QVERIFY2(isRed(colourAt(13)), qPrintable("key 13 drawn as " + colourAt(13).name()));
 }
+
+// The first colour values commit with a pending source, and turn the origin on: the pipeline
+// restarts and goes busy, and a slot on that may delete the graph mid-commit.
+void TestColorByScalar::firstColouredCommitSlotDeletingTheGraphIsSafe()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    const int n = 200'000; // above kResampleThreshold: the async L1 pipeline runs
+    std::vector<double> keys(n), values(n), scalar(n);
+    for (int i = 0; i < n; ++i) { keys[i] = i; values[i] = std::sin(i * 0.001); scalar[i] = i; }
+    mg->setDataSource(makeSource(keys, {values}));
+    mPlot->xAxis->setRange(0, n);
+    mPlot->replot();
+    QTRY_VERIFY_WITH_TIMEOUT(mg->mL1Cache != nullptr && mg->hasRenderedRange(), 5000);
+
+    mPlot->setDataSwapDebounceMs(60'000); // the test commits by hand
+    mg->setDataSource(makeSource(keys, {values}));
+    QVERIFY(mg->hasPendingData());
+    mg->setColorValues(scalar); // stashed for the pending source
+    QTRY_VERIFY_WITH_TIMEOUT(mg->mPendingReady, 5000);
+    QVERIFY(!mg->pipeline().isBusy());
+
+    connect(&mg->pipeline(), &QCPMultiGraphPipeline::busyChanged, mPlot,
+            [this, mg] { QVERIFY(mPlot->removePlottable(mg)); }, Qt::SingleShotConnection);
+    QVERIFY(mg->commitPendingData());
+    QCOMPARE(mPlot->plottableCount(), 0);
+}
