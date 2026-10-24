@@ -604,3 +604,123 @@ void TestQCustomPlot::radialRangeSlotDeletingTheAxisIsSafe()
     QCOMPARE(scaleTypes, 0);
   }
 }
+
+namespace {
+//! A polar plot filling the widget: radial axes spanning [0, 10], [0, 100] and [0, 1000].
+QCPPolarAxisAngular* polarPlot(QCustomPlot* plot, QList<QCPPolarAxisRadial*>& radials)
+{
+  plot->plotLayout()->clear();
+  auto* angular = new QCPPolarAxisAngular(plot);
+  plot->plotLayout()->addElement(0, 0, angular);
+  radials = { angular->radialAxis(), angular->addRadialAxis(), angular->addRadialAxis() };
+  for (int i = 0; i < radials.size(); ++i)
+    radials[i]->setRange(0, std::pow(10.0, i + 1));
+  plot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom);
+  plot->resize(400, 400);
+  plot->replot();
+  return angular;
+}
+
+//! A point straight above the centre, at the fraction of the radius, away from the radial axes.
+QPoint polarPoint(QCPPolarAxisAngular* angular, double fraction)
+{
+  return (angular->center() - QPointF(0, fraction * angular->radius())).toPoint();
+}
+
+void dragRadially(QCustomPlot* plot, QCPPolarAxisAngular* angular)
+{
+  const QPoint from = polarPoint(angular, 0.6), to = polarPoint(angular, 0.3);
+  sendMouse(plot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+  sendMouse(plot, QEvent::MouseMove, to, Qt::LeftButton);
+  sendMouse(plot, QEvent::MouseButtonRelease, to, Qt::NoButton);
+}
+
+void wheelOnPolar(QCustomPlot* plot, QCPPolarAxisAngular* angular)
+{
+  const QPointF pos = polarPoint(angular, 0.5);
+  QWheelEvent event(pos, plot->mapToGlobal(pos), QPoint(), QPoint(0, 120), Qt::NoButton,
+                    Qt::NoModifier, Qt::NoScrollPhase, false);
+  QCoreApplication::sendEvent(plot, &event);
+}
+
+template <typename Slot>
+void onFirstRangeChange(QCPPolarAxisRadial* axis, QObject* context, Slot slot)
+{
+  QObject::connect(axis, qOverload<const QCPRange&>(&QCPPolarAxisRadial::rangeChanged), context,
+                   slot, Qt::SingleShotConnection);
+}
+} // namespace
+
+// Before: the press-time baselines were index-parallel to the shrunken axis list.
+void TestQCustomPlot::radialDragSlotRemovingARadialAxisKeepsTheOthersBaselines()
+{
+  QList<QCPPolarAxisRadial*> radials;
+  auto* angular = polarPlot(mPlot, radials);
+  onFirstRangeChange(radials[0], angular, [angular, first = radials[0]] {
+    angular->removeRadialAxis(first);
+  });
+  dragRadially(mPlot, angular);
+  QCOMPARE(angular->radialAxisCount(), 2);
+  QCOMPARE(radials[1]->range().size(), 100.0);
+  QCOMPARE(radials[2]->range().size(), 1000.0);
+  QVERIFY(radials[1]->range().lower != 0);
+}
+
+void TestQCustomPlot::radialDragSlotDeletingTheAngularAxisIsSafe()
+{
+  QList<QCPPolarAxisRadial*> radials;
+  QPointer<QCPPolarAxisAngular> angular = polarPlot(mPlot, radials);
+  onFirstRangeChange(radials[0], mPlot, [this, angular] {
+    mPlot->plotLayout()->remove(angular);
+  });
+  dragRadially(mPlot, angular);
+  QVERIFY(!angular);
+}
+
+// Before: removing an axis shifted the list under the loop, so the next axis was skipped.
+void TestQCustomPlot::radialWheelSlotRemovingARadialAxisZoomsTheOthers()
+{
+  QList<QCPPolarAxisRadial*> radials;
+  auto* angular = polarPlot(mPlot, radials);
+  onFirstRangeChange(radials[0], angular, [angular, first = radials[0]] {
+    angular->removeRadialAxis(first);
+  });
+  wheelOnPolar(mPlot, angular);
+  QCOMPARE(angular->radialAxisCount(), 2);
+  QVERIFY(radials[1]->range().size() != 100.0);
+  QVERIFY(radials[2]->range().size() != 1000.0);
+}
+
+void TestQCustomPlot::radialWheelSlotDeletingTheAngularAxisIsSafe()
+{
+  QList<QCPPolarAxisRadial*> radials;
+  QPointer<QCPPolarAxisAngular> angular = polarPlot(mPlot, radials);
+  onFirstRangeChange(radials[0], mPlot, [this, angular] {
+    mPlot->plotLayout()->remove(angular);
+  });
+  wheelOnPolar(mPlot, angular);
+  QVERIFY(!angular);
+}
+
+// Before: only the axis's release handler restored it, so the plot stayed non-antialiased.
+void TestQCustomPlot::radialDragSlotDeletingTheAngularAxisRestoresAntialiasing()
+{
+  QList<QCPPolarAxisRadial*> radials;
+  QPointer<QCPPolarAxisAngular> angular = polarPlot(mPlot, radials);
+  mPlot->setAntialiasedElements(QCP::aePlottables);
+  const auto on = mPlot->antialiasedElements(), off = mPlot->notAntialiasedElements();
+  int changes = 0; // the first move turns antialiasing off, the second deletes the axis
+  connect(radials[0], qOverload<const QCPRange&>(&QCPPolarAxisRadial::rangeChanged), mPlot,
+          [this, angular, &changes] {
+            if (++changes == 2)
+              mPlot->plotLayout()->remove(angular);
+          });
+  const QPoint from = polarPoint(angular, 0.6);
+  sendMouse(mPlot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+  sendMouse(mPlot, QEvent::MouseMove, polarPoint(angular, 0.4), Qt::LeftButton);
+  sendMouse(mPlot, QEvent::MouseMove, polarPoint(angular, 0.3), Qt::LeftButton);
+  sendMouse(mPlot, QEvent::MouseButtonRelease, from, Qt::NoButton);
+  QVERIFY(!angular);
+  QCOMPARE(mPlot->antialiasedElements().toInt(), on.toInt());
+  QCOMPARE(mPlot->notAntialiasedElements().toInt(), off.toInt());
+}

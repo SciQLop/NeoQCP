@@ -228,6 +228,13 @@ QCPPolarAxisAngular::QCPPolarAxisAngular(QCustomPlot* parentPlot)
 
 QCPPolarAxisAngular::~QCPPolarAxisAngular()
 {
+    // Deleted mid-drag (by a rangeChanged slot): give the plot its antialiasing back. Without a
+    // layer, the plot itself is being torn down.
+    if (mParentPlot && layer() && mDragging && mParentPlot->noAntialiasingOnDrag())
+    {
+        mParentPlot->setAntialiasedElements(mAADragBackup);
+        mParentPlot->setNotAntialiasedElements(mNotAADragBackup);
+    }
     delete mGrid; // delete grid here instead of via parent ~QObject for better defined deletion
                   // order
     mGrid = 0;
@@ -1624,9 +1631,10 @@ void QCPPolarAxisAngular::mousePressEvent(QMouseEvent* event,
         if (mParentPlot->interactions().testFlag(QCP::iRangeDrag))
         {
             mDragAngularStart = range();
+            // Paired with its axis: a rangeChanged slot may remove an axis mid-drag.
             mDragRadialStart.clear();
-            for (int i = 0; i < mRadialAxes.size(); ++i)
-                mDragRadialStart.append(mRadialAxes.at(i)->range());
+            for (QCPPolarAxisRadial* axis : mRadialAxes)
+                mDragRadialStart.append({ axis, axis->range() });
         }
     }
 }
@@ -1657,10 +1665,12 @@ void QCPPolarAxisAngular::mouseMoveEvent(QMouseEvent* event,
             setRange(mDragAngularStart.lower + diff, mDragAngularStart.upper + diff);
         }
 
-        for (int i = 0; alive && i < mRadialAxes.size(); ++i)
+        const auto dragStart = mDragRadialStart; // a slot may delete this axis and the list
+        for (const auto& [ax, start] : dragStart)
         {
-            QCPPolarAxisRadial* ax = mRadialAxes.at(i);
-            if (!ax->rangeDrag())
+            if (!alive)
+                break;
+            if (!ax || !ax->rangeDrag())
                 continue;
             doReplot = true;
             double angleCoordStart, radiusCoordStart;
@@ -1670,16 +1680,14 @@ void QCPPolarAxisAngular::mouseMoveEvent(QMouseEvent* event,
             if (ax->scaleType() == QCPPolarAxisRadial::stLinear)
             {
                 double diff = radiusCoordStart - radiusCoord;
-                ax->setRange(mDragRadialStart.at(i).lower + diff,
-                             mDragRadialStart.at(i).upper + diff);
+                ax->setRange(start.lower + diff, start.upper + diff);
             }
             else if (ax->scaleType() == QCPPolarAxisRadial::stLogarithmic)
             {
                 if (radiusCoord != 0)
                 {
                     double diff = radiusCoordStart / radiusCoord;
-                    ax->setRange(mDragRadialStart.at(i).lower * diff,
-                                 mDragRadialStart.at(i).upper * diff);
+                    ax->setRange(start.lower * diff, start.upper * diff);
                 }
             }
         }
@@ -1745,10 +1753,12 @@ void QCPPolarAxisAngular::wheelEvent(QWheelEvent* event)
             scaleRange(qPow(mRangeZoomFactor, wheelSteps), angleCoord);
         }
 
-        for (int i = 0; alive && i < mRadialAxes.size(); ++i)
+        const QList<QPointer<QCPPolarAxisRadial>> axes(mRadialAxes.begin(), mRadialAxes.end());
+        for (const QPointer<QCPPolarAxisRadial>& ax : axes) // a slot may remove axes
         {
-            QCPPolarAxisRadial* ax = mRadialAxes.at(i);
-            if (!ax->rangeZoom())
+            if (!alive)
+                break;
+            if (!ax || !ax->rangeZoom())
                 continue;
             doReplot = true;
             double angleCoord, radiusCoord;

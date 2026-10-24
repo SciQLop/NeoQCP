@@ -39,6 +39,11 @@ private slots:
   void releaseSlotDeletingThePlotIsSafe();
   void angularRangeSlotDeletingTheAxisIsSafe();
   void radialRangeSlotDeletingTheAxisIsSafe();
+  void radialDragSlotRemovingARadialAxisKeepsTheOthersBaselines();
+  void radialDragSlotDeletingTheAngularAxisIsSafe();
+  void radialWheelSlotRemovingARadialAxisZoomsTheOthers();
+  void radialWheelSlotDeletingTheAngularAxisIsSafe();
+  void radialDragSlotDeletingTheAngularAxisRestoresAntialiasing();
 
 private:
   QCustomPlot *mPlot;

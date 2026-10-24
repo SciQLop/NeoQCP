@@ -347,7 +347,7 @@ protected:
     QVector<QPointF> mSubTickVectorCosSin;
     bool mDragging;
     QCPRange mDragAngularStart;
-    QList<QCPRange> mDragRadialStart;
+    QList<QPair<QPointer<QCPPolarAxisRadial>, QCPRange>> mDragRadialStart;
     QCP::AntialiasedElements mAADragBackup, mNotAADragBackup;
     QCPLabelPainterPrivate mLabelPainter;
 
