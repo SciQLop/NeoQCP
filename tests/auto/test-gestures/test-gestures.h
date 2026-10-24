@@ -24,6 +24,7 @@ private slots:
     void touchPinchOneFingerPerEvent();
     void nativePinchZooms();
     void nativePinchIsAccepted();
+    void unusedNativePinchIsNotAccepted();
     void gesturesAcceptTouch();
     void gesturesNeedRangeInteractions();
     void dragSlotDeletingTheAxisRectIsSafe();

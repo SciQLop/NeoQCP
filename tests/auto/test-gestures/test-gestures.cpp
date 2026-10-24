@@ -167,6 +167,17 @@ void TestGestures::nativePinchIsAccepted()
     QVERIFY(event.isAccepted());
 }
 
+// A pinch the plot does not zoom on stays ignored, so the parent widget still gets it.
+void TestGestures::unusedNativePinchIsNotAccepted()
+{
+    mPlot->setInteractions(QCP::iGestures);
+    QNativeGestureEvent event(Qt::ZoomNativeGesture, QPointingDevice::primaryPointingDevice(), 2,
+                              centre(), centre(), mPlot->mapToGlobal(centre()), 1.0, {});
+    event.ignore();
+    QCoreApplication::sendEvent(mPlot, &event);
+    QVERIFY(!event.isAccepted());
+}
+
 void TestGestures::gesturesAcceptTouch()
 {
     QVERIFY(!mPlot->testAttribute(Qt::WA_AcceptTouchEvents));

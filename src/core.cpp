@@ -3651,17 +3651,16 @@ bool QCustomPlot::nativeGestureEvent(QNativeGestureEvent* event)
 {
     if (event->gestureType() != Qt::ZoomNativeGesture)
         return false;
+    QCPAxisRect* rect = axisRectAt(event->position());
+    if (!rect || !mInteractions.testFlag(QCP::iRangeZoom) || event->value() <= -1)
+        return false; // left ignored: the parent widget gets the pinch
     // Before the zoom: QApplication ignores the event first, and an ignored one goes on to the
     // widget's parent through the widget, which a rangeChanged slot may have deleted.
     event->accept();
-    QCPAxisRect* rect = axisRectAt(event->position());
-    if (rect && mInteractions.testFlag(QCP::iRangeZoom) && event->value() > -1)
-    {
-        const QPointer<QCustomPlot> alive(this); // a rangeChanged slot may delete the plot
-        rect->zoomAt(event->position(), 1.0 / (1.0 + event->value()));
-        if (alive)
-            replot(rpQueuedReplot);
-    }
+    const QPointer<QCustomPlot> alive(this); // a rangeChanged slot may delete the plot
+    rect->zoomAt(event->position(), 1.0 / (1.0 + event->value()));
+    if (alive)
+        replot(rpQueuedReplot);
     return true;
 }
 
