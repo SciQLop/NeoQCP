@@ -21,6 +21,8 @@ private slots:
     void exportFallbackRendersSpan();
     void dirtyTrackingReplots();
     void edgesHonourTheirPositionType();
+    void setRangeSlotDeletingTheSpanIsSafe();
+    void dragSlotDeletingTheSpanIsSafe();
 
 private:
     QCustomPlot* mPlot = nullptr;

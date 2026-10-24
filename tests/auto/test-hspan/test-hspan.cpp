@@ -177,3 +177,40 @@ void TestHSpan::edgesHonourTheirPositionType()
     QVERIFY(span->selectTest(QPointF(midX, axRect.top() + 150.0), false) >= 0);
     QVERIFY(span->selectTest(QPointF(midX, axRect.top() + 300.0), false) < 0);
 }
+
+namespace {
+void removeOnRangeChange(QCustomPlot* plot, QCPItemHSpan* span)
+{
+    QObject::connect(span, &QCPItemHSpan::rangeChanged, plot,
+                     [plot, span] { QVERIFY(plot->removeItem(span)); });
+}
+
+void sendMouse(QCustomPlot* plot, QEvent::Type type, QPoint pos, Qt::MouseButtons buttons)
+{
+    QMouseEvent e(type, pos, plot->mapToGlobal(pos), Qt::LeftButton, buttons, Qt::NoModifier);
+    QCoreApplication::sendEvent(plot, &e);
+}
+} // namespace
+
+// A slot deleting the span from its own signal: the span must not touch itself afterwards.
+void TestHSpan::setRangeSlotDeletingTheSpanIsSafe()
+{
+    auto* span = new QCPItemHSpan(mPlot);
+    removeOnRangeChange(mPlot, span);
+    span->setRange(QCPRange(3, 7));
+    QCOMPARE(mPlot->itemCount(), 0);
+}
+
+void TestHSpan::dragSlotDeletingTheSpanIsSafe()
+{
+    auto* span = new QCPItemHSpan(mPlot);
+    span->setRange(QCPRange(3, 7));
+    mPlot->replot();
+    removeOnRangeChange(mPlot, span);
+    const int x = mPlot->axisRect()->rect().center().x();
+    const QPoint from(x, qRound(mPlot->yAxis->coordToPixel(5)));
+    sendMouse(mPlot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseMove, from + QPoint(0, 20), Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseButtonRelease, from + QPoint(0, 20), Qt::NoButton);
+    QCOMPARE(mPlot->itemCount(), 0);
+}
