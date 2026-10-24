@@ -6,6 +6,7 @@
 #include <painting/colormap-rhi-layer.h>
 #include <core.h>
 #include <layoutelements/layoutelement-axisrect.h>
+#include <layoutelements/layoutelement-colorscale.h>
 #include <layer.h>
 #include <Profiling.hpp>
 #include <utility>
@@ -67,6 +68,11 @@ void QCPColormapRenderer::setDataScaleType(QCPAxis::ScaleType type)
 void QCPColormapRenderer::setColorScale(QCPColorScale* scale)
 {
     mColorScale = scale;
+}
+
+QCPColorScale* QCPColormapRenderer::colorScale() const
+{
+    return mColorScale;
 }
 
 void QCPColormapRenderer::updateMapImage(const QCPColorMapData* data, NormalizeFn normalize)

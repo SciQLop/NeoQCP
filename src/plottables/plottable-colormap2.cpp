@@ -184,14 +184,15 @@ void QCPColorMap2::setColorScale(QCPColorScale* colorScale)
     mRenderer.setColorScale(colorScale);
     if (colorScale)
     {
-        // Each setter signals, and a slot may delete this colour map.
+        // Each setter signals, and a slot may delete this colour map or the scale.
         const QPointer<QCPColorMap2> alive(this);
+        const QPointer<QCPColorScale> live(colorScale);
         setGradient(colorScale->gradient());
-        if (alive)
-            setDataScaleType(colorScale->dataScaleType());
-        if (alive)
-            setDataRange(colorScale->dataRange());
-        if (!alive)
+        if (alive && live)
+            setDataScaleType(live->dataScaleType());
+        if (alive && live)
+            setDataRange(live->dataRange());
+        if (!alive || !live)
             return;
         connect(this, &QCPColorMap2::dataRangeChanged, colorScale, &QCPColorScale::setDataRange);
         connect(this, &QCPColorMap2::gradientChanged, colorScale, &QCPColorScale::setGradient);
@@ -218,10 +219,10 @@ void QCPColorMap2::setDataScaleType(QCPAxis::ScaleType type)
 {
     if (mRenderer.dataScaleType() == type)
         return;
+    const QPointer<QCPColorMap2> alive(this); // the pipeline's and dataRangeChanged's slots may delete this map
     const QCPRange prevRange = mRenderer.dataRange();
     mRenderer.setDataScaleType(type);
     installResampleTransform();
-    const QPointer<QCPColorMap2> alive(this);
     if (mDataSource)
         mPipeline.onDataChanged();
     if (!alive)

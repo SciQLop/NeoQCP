@@ -4,6 +4,7 @@
 #include <QImage>
 #include <QLineF>
 #include <QPen>
+#include <QPointer>
 #include <QPointF>
 #include <QVector>
 #include <functional>
@@ -32,7 +33,7 @@ public:
     QCPAxis::ScaleType dataScaleType() const { return mDataScaleType; }
 
     void setColorScale(QCPColorScale* scale);
-    QCPColorScale* colorScale() const { return mColorScale; }
+    QCPColorScale* colorScale() const;
 
     // Rendering
     using NormalizeFn = std::function<double(double value, int col, int row)>;
@@ -78,7 +79,7 @@ private:
     QImage mFlippedMapImage;
     Qt::Orientations mLastFlips {};
     bool mMapImageInvalidated = true;
-    QCPColorScale* mColorScale = nullptr;
+    QPointer<QCPColorScale> mColorScale; // the scale may be deleted first
     QCPColormapRhiLayer* mRhiLayer = nullptr;
     bool mContourOnGpu = false;
     QVector<QLineF> mContourFallback;

@@ -176,14 +176,15 @@ void QCPHistogram2D::setColorScale(QCPColorScale* scale)
     mRenderer.setColorScale(scale);
     if (scale)
     {
-        // Each setter signals, and a slot may delete this histogram.
+        // Each setter signals, and a slot may delete this histogram or the scale.
         const QPointer<QCPHistogram2D> alive(this);
+        const QPointer<QCPColorScale> live(scale);
         setGradient(scale->gradient());
-        if (alive)
-            setDataScaleType(scale->dataScaleType());
-        if (alive)
-            setDataRange(scale->dataRange());
-        if (!alive)
+        if (alive && live)
+            setDataScaleType(live->dataScaleType());
+        if (alive && live)
+            setDataRange(live->dataRange());
+        if (!alive || !live)
             return;
         connect(this, &QCPHistogram2D::dataRangeChanged, scale, &QCPColorScale::setDataRange);
         connect(this, &QCPHistogram2D::gradientChanged, scale, &QCPColorScale::setGradient);
@@ -210,11 +211,11 @@ void QCPHistogram2D::setDataScaleType(QCPAxis::ScaleType type)
 {
     if (mRenderer.dataScaleType() == type)
         return;
+    const QPointer<QCPHistogram2D> alive(this); // a dataRangeChanged slot may delete this histogram
     const QCPRange prevRange = mRenderer.dataRange();
     mRenderer.setDataScaleType(type);
     redrawLater();
     const QCPRange curRange = mRenderer.dataRange();
-    const QPointer<QCPHistogram2D> alive(this);
     if (prevRange.lower != curRange.lower || prevRange.upper != curRange.upper)
         Q_EMIT dataRangeChanged(curRange);
     if (alive)

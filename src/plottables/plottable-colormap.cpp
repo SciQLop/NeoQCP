@@ -906,9 +906,15 @@ void QCPColorMap::setColorScale(QCPColorScale* colorScale)
     mColorScale = colorScale;
     if (mColorScale) // connect signals to new color scale
     {
-        setGradient(mColorScale.data()->gradient());
-        setDataRange(mColorScale.data()->dataRange());
-        setDataScaleType(mColorScale.data()->dataScaleType());
+        // Each setter signals, and a slot may delete this colour map or the scale.
+        const QPointer<QCPColorMap> alive(this);
+        setGradient(colorScale->gradient());
+        if (alive && mColorScale)
+            setDataRange(mColorScale->dataRange());
+        if (alive && mColorScale)
+            setDataScaleType(mColorScale->dataScaleType());
+        if (!alive || !mColorScale)
+            return;
         connect(this, &QCPColorMap::dataRangeChanged, mColorScale.data(), &QCPColorScale::setDataRange);
         connect(this, &QCPColorMap::dataScaleTypeChanged, mColorScale.data(), &QCPColorScale::setDataScaleType);
         connect(this, &QCPColorMap::gradientChanged, mColorScale.data(), &QCPColorScale::setGradient);

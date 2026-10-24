@@ -860,3 +860,50 @@ void TestColorMap::QCPColorScale_rangeSlotDeletingTheScaleIsSafe()
   QVERIFY(!alive);
   QCOMPARE(scaleTypeSignals, 0);
 }
+
+namespace {
+// The map kept a raw pointer to its scale: after the scale died, the next setColorScale
+// disconnected from freed memory.
+template <typename Map>
+void forgetsADeletedColorScale(QCustomPlot* plot, Map* map)
+{
+  auto* scale = new QCPColorScale(plot);
+  map->setColorScale(scale);
+  delete scale;
+  QCOMPARE(map->colorScale(), nullptr);
+  map->setColorScale(nullptr);
+  auto* other = new QCPColorScale(plot);
+  map->setColorScale(other);
+  QCOMPARE(map->colorScale(), other);
+  other->setDataRange(QCPRange(1, 2)); // connected
+  QCOMPARE(map->dataRange(), QCPRange(1, 2));
+  delete other;
+}
+} // namespace
+
+void TestColorMap::QCPColorMap2_forgetsADeletedColorScale()
+{
+  forgetsADeletedColorScale(mPlot, new QCPColorMap2(mPlot->xAxis, mPlot->yAxis));
+}
+
+void TestColorMap::QCPHistogram2D_forgetsADeletedColorScale()
+{
+  forgetsADeletedColorScale(mPlot, new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis));
+}
+
+void TestColorMap::QCPColorMap_forgetsADeletedColorScale()
+{
+  forgetsADeletedColorScale(mPlot, mColorMap);
+}
+
+// The classic map applied the scale's gradient, range and type, then connected, unguarded.
+void TestColorMap::QCPColorMap_colorScaleSlotDeletingTheMapIsSafe()
+{
+  auto* scale = new QCPColorScale(mPlot);
+  scale->setGradient(QCPColorGradient(QCPColorGradient::gpHot));
+  scale->setDataScaleType(QCPAxis::stLogarithmic);
+  removeOn(mColorMap, &QCPColorMap::gradientChanged);
+  mColorMap->setColorScale(scale);
+  QCOMPARE(mPlot->plottableCount(), 0);
+  QCOMPARE(scale->dataScaleType(), QCPAxis::stLogarithmic);
+}
