@@ -79,6 +79,7 @@ public:
     QCPColorGradient gradient() const { return mRenderer.gradient(); }
     QCPRange dataRange() const { return mRenderer.dataRange(); }
     QCPAxis::ScaleType dataScaleType() const { return mRenderer.dataScaleType(); }
+    //! Deleting the scale detaches it silently: this turns null, no signal is emitted.
     QCPColorScale* colorScale() const { return mRenderer.colorScale(); }
     void rescaleDataRange(bool recalc = false);
     //! The range of the binned (normalized) counts; \a found is false before the first binning.

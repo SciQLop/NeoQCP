@@ -33,6 +33,7 @@ public:
     QCPAxis::ScaleType dataScaleType() const { return mDataScaleType; }
 
     void setColorScale(QCPColorScale* scale);
+    //! Null once the scale is deleted. Out of line since the QPointer member: rebuild users.
     QCPColorScale* colorScale() const;
 
     // Rendering

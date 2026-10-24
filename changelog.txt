@@ -1,3 +1,20 @@
+#### NeoQCP, unreleased ####
+
+Behaviour changes (slots that delete their sender are now safe):
+  - Deleting a selection rect no longer emits QCPSelectionRect::canceled. Code that cleared its own drag
+        state on canceled must also watch for the rect's destruction (QObject::destroyed).
+  - QCustomPlot::setSelectionRect(current rect) does nothing; it used to delete and reinstall it.
+        Replacing a rect being dragged cancels it before deleting it, so its canceled slot still runs.
+  - QCPLaneLayout setters and QCPIntervals::setCategoryOrder do not notify (and do not restack) when
+        the value is unchanged.
+  - Deleting a QCPColorScale detaches the color maps using it silently: colorScale() returns nullptr.
+  - An axis rect or polar angular axis deleted in the middle of a drag or wheel zoom restores the
+        plot's antialiasing settings.
+
+Build:
+  - QCPColormapRenderer::colorScale() moved out of line and the renderer, axis rect, polar and
+        QCustomPlot headers changed layout: rebuild everything that includes them.
+
 #### Version 2.1.1 released on 06.11.22 ####
 
 Added features:

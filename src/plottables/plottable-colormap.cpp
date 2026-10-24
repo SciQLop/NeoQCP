@@ -891,6 +891,7 @@ void QCPColorMap::setTightBoundary(bool enabled)
   or the color scale, and the setting will be applied to both.
 
   Pass \c nullptr as \a colorScale to disconnect the color scale from this color map again.
+  Deleting the color scale disconnects it too, silently: \ref colorScale then returns \c nullptr.
 */
 void QCPColorMap::setColorScale(QCPColorScale* colorScale)
 {

@@ -133,6 +133,7 @@ public:
 
     [[nodiscard]] QCPColorGradient gradient() const { return mGradient; }
 
+    //! Deleting the scale detaches it silently: this turns null, no signal is emitted.
     [[nodiscard]] QCPColorScale* colorScale() const { return mColorScale.data(); }
 
     // setters:

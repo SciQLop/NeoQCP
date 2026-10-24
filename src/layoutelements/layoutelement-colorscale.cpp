@@ -119,6 +119,9 @@
 
 /*!
   Constructs a new QCPColorScale.
+
+  Deleting a color scale detaches every color map that uses it, without a signal: their
+  colorScale() returns \c nullptr afterwards.
 */
 QCPColorScale::QCPColorScale(QCustomPlot* parentPlot)
         : QCPLayoutElement(parentPlot)

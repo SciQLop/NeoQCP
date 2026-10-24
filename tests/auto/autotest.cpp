@@ -74,6 +74,11 @@ static QStringList testArguments(const char* name)
 int main(int argc, char **argv)
 {
   QApplication app(argc, argv);
+  if (qEnvironmentVariableIsEmpty("QCP_TEST_CLASS") && !qEnvironmentVariableIsEmpty("QCP_TEST_FUNCTION"))
+  {
+    qCritical("QCP_TEST_FUNCTION needs QCP_TEST_CLASS: name the class the function belongs to.");
+    return 2;
+  }
   int failures = 0;
 
   QCPTEST(TestQCustomPlot);

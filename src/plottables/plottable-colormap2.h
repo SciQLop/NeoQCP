@@ -59,6 +59,7 @@ public:
     [[nodiscard]] double gapThreshold() const { return mGapThreshold; }
 
     [[nodiscard]] QCPColorGradient gradient() const { return mRenderer.gradient(); }
+    //! Deleting the scale detaches it silently: this turns null, no signal is emitted.
     [[nodiscard]] QCPColorScale* colorScale() const { return mRenderer.colorScale(); }
     [[nodiscard]] QCPRange dataRange() const { return mRenderer.dataRange(); }
     [[nodiscard]] QCPAxis::ScaleType dataScaleType() const { return mRenderer.dataScaleType(); }

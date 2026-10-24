@@ -119,7 +119,10 @@ QCPSelectionRect::QCPSelectionRect(QCustomPlot* parentPlot)
 {
 }
 
-// Silent: a canceled slot would see this half-destroyed rect as the plot's current one.
+// No canceled signal: a canceled slot would see this half-destroyed rect as the plot's current
+// one. Not silent for the plot: the layer replot may fall back to a full synchronous replot, which
+// runs beforeReplot/afterReplot slots. A null layer means the whole plot is being torn down: the
+// layers detach their children before they are deleted.
 QCPSelectionRect::~QCPSelectionRect()
 {
     if (!mActive)
