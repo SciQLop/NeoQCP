@@ -1129,10 +1129,10 @@ void QCPAbstractPlottable::onDebounceTimeout()
     // stale ones, so force one real repaint of this layer.
     if (mLayer)
         mLayer->invalidatePaintBuffer();
-    emit visuallyBusyChanged(mVisuallyBusy);
-
     if (mParentPlot)
         mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    // Last: a slot may delete this plottable.
+    emit visuallyBusyChanged(mVisuallyBusy);
 }
 
 // per-plottable overrides

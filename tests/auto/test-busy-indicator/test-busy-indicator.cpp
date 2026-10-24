@@ -432,3 +432,14 @@ void TestBusyIndicator::pipelineBusySlotRemovingThePlottableIsSafe()
     QCOMPARE(mPlot->plottableCount(), 0);
     QTest::qWait(50);
 }
+
+// The debounce timer flips the visual busy state, then queued a replot through the plottable.
+void TestBusyIndicator::visuallyBusySlotRemovingThePlottableIsSafe()
+{
+    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    g->setBusyShowDelayMs(0);
+    connect(g, &QCPAbstractPlottable::visuallyBusyChanged, mPlot,
+            [this, g] { QVERIFY(mPlot->removePlottable(g)); }, Qt::SingleShotConnection);
+    g->setBusy(true);
+    QTRY_COMPARE_WITH_TIMEOUT(mPlot->plottableCount(), 0, 2000);
+}

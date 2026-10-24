@@ -29,6 +29,7 @@ private slots:
     void gpuEntriesCarryFadeAlpha();
     void busySlotRemovingThePlottableIsSafe();
     void pipelineBusySlotRemovingThePlottableIsSafe();
+    void visuallyBusySlotRemovingThePlottableIsSafe();
 
 private:
     QCustomPlot* mPlot = nullptr;
