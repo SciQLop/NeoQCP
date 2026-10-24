@@ -451,6 +451,46 @@ bool QCPAxisRect::removeAxis(QCPAxis* axis)
 
   \see QCustomPlot::setSelectionRectMode
 */
+namespace
+{
+// A rangeChanged slot may delete an axis or the axis rect, or edit the rect's axis lists: the
+// loops below walk snapshots, and stop once the rect is gone.
+template <typename Step>
+void forEachAxis(const QPointer<QCPAxisRect>& rect, const QList<QPointer<QCPAxis>> axes, Step step)
+{
+    for (const QPointer<QCPAxis>& axis : axes)
+    {
+        if (!rect)
+            return;
+        if (axis)
+            step(axis.data());
+    }
+}
+
+// Moves the axis from its range at the drag start by the pointer's travel.
+void dragAxis(QCPAxis* axis, const QCPRange& start, double fromPixel, double toPixel)
+{
+    if (axis->scaleType() == QCPAxis::stLinear)
+    {
+        const double diff = axis->pixelToCoord(fromPixel) - axis->pixelToCoord(toPixel);
+        axis->setRange(start.lower + diff, start.upper + diff);
+    }
+    else
+    {
+        const double ratio = axis->pixelToCoord(fromPixel) / axis->pixelToCoord(toPixel);
+        axis->setRange(start.lower * ratio, start.upper * ratio);
+    }
+}
+
+void dragAxes(const QPointer<QCPAxisRect>& rect, const QList<QPointer<QCPAxis>> axes,
+              const QList<QCPRange> starts, double fromPixel, double toPixel)
+{
+    for (qsizetype i = 0; i < std::min(axes.size(), starts.size()) && rect; ++i)
+        if (QCPAxis* axis = axes.at(i))
+            dragAxis(axis, starts.at(i), fromPixel, toPixel);
+}
+}
+
 void QCPAxisRect::zoom(const QRectF& pixelRect)
 {
     zoom(pixelRect, axes());
@@ -466,20 +506,15 @@ void QCPAxisRect::zoom(const QRectF& pixelRect)
 */
 void QCPAxisRect::zoom(const QRectF& pixelRect, const QList<QCPAxis*>& affectedAxes)
 {
-    for (QCPAxis* axis : affectedAxes)
-    {
-        if (!axis)
-        {
-            qDebug() << Q_FUNC_INFO << "a passed axis was zero";
-            continue;
-        }
-        QCPRange pixelRange;
-        if (axis->orientation() == Qt::Horizontal)
-            pixelRange = QCPRange(pixelRect.left(), pixelRect.right());
-        else
-            pixelRange = QCPRange(pixelRect.top(), pixelRect.bottom());
+    if (affectedAxes.contains(nullptr))
+        qDebug() << Q_FUNC_INFO << "a passed axis was zero";
+    const QList<QPointer<QCPAxis>> axes(affectedAxes.begin(), affectedAxes.end());
+    forEachAxis(this, axes, [&pixelRect](QCPAxis* axis) {
+        const QCPRange pixelRange = axis->orientation() == Qt::Horizontal
+            ? QCPRange(pixelRect.left(), pixelRect.right())
+            : QCPRange(pixelRect.top(), pixelRect.bottom());
         axis->setRange(axis->pixelToCoord(pixelRange.lower), axis->pixelToCoord(pixelRange.upper));
-    }
+    });
 }
 
 /*!
@@ -1248,70 +1283,23 @@ void QCPAxisRect::mousePressEvent(QMouseEvent* event, [[maybe_unused]] const QVa
 
   \see mousePressEvent, mouseReleaseEvent
 */
-void QCPAxisRect::mouseMoveEvent(QMouseEvent* event, [[maybe_unused]] const QPointF& startPos)
+void QCPAxisRect::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
 {
     // Mouse range dragging interaction:
-    if (mDragging && mParentPlot->interactions().testFlag(QCP::iRangeDrag))
+    if (!mDragging || !mParentPlot->interactions().testFlag(QCP::iRangeDrag))
+        return;
+    const QPointer<QCPAxisRect> alive(this);
+    const QPointF pos = event->pos();
+    if (mRangeDrag.testFlag(Qt::Horizontal))
+        dragAxes(alive, mRangeDragHorzAxis, mDragStartHorzRange, startPos.x(), pos.x());
+    if (alive && mRangeDrag.testFlag(Qt::Vertical))
+        dragAxes(alive, mRangeDragVertAxis, mDragStartVertRange, startPos.y(), pos.y());
+
+    if (alive && mRangeDrag != 0) // if either vertical or horizontal drag was enabled, do a replot
     {
-
-        if (mRangeDrag.testFlag(Qt::Horizontal))
-        {
-            for (int i = 0; i < mRangeDragHorzAxis.size(); ++i)
-            {
-                QCPAxis* ax = mRangeDragHorzAxis.at(i).data();
-                if (!ax)
-                    continue;
-                if (i >= mDragStartHorzRange.size())
-                    break;
-                if (ax->mScaleType == QCPAxis::stLinear)
-                {
-                    double diff
-                        = ax->pixelToCoord(startPos.x()) - ax->pixelToCoord(event->pos().x());
-                    ax->setRange(mDragStartHorzRange.at(i).lower + diff,
-                                 mDragStartHorzRange.at(i).upper + diff);
-                }
-                else if (ax->mScaleType == QCPAxis::stLogarithmic)
-                {
-                    double diff
-                        = ax->pixelToCoord(startPos.x()) / ax->pixelToCoord(event->pos().x());
-                    ax->setRange(mDragStartHorzRange.at(i).lower * diff,
-                                 mDragStartHorzRange.at(i).upper * diff);
-                }
-            }
-        }
-
-        if (mRangeDrag.testFlag(Qt::Vertical))
-        {
-            for (int i = 0; i < mRangeDragVertAxis.size(); ++i)
-            {
-                QCPAxis* ax = mRangeDragVertAxis.at(i).data();
-                if (!ax)
-                    continue;
-                if (i >= mDragStartVertRange.size())
-                    break;
-                if (ax->mScaleType == QCPAxis::stLinear)
-                {
-                    double diff
-                        = ax->pixelToCoord(startPos.y()) - ax->pixelToCoord(event->pos().y());
-                    ax->setRange(mDragStartVertRange.at(i).lower + diff,
-                                 mDragStartVertRange.at(i).upper + diff);
-                }
-                else if (ax->mScaleType == QCPAxis::stLogarithmic)
-                {
-                    double diff
-                        = ax->pixelToCoord(startPos.y()) / ax->pixelToCoord(event->pos().y());
-                    ax->setRange(mDragStartVertRange.at(i).lower * diff,
-                                 mDragStartVertRange.at(i).upper * diff);
-                }
-            }
-        }
-
-        if (mRangeDrag != 0) // if either vertical or horizontal drag was enabled, do a replot
-        {
-            if (mParentPlot->noAntialiasingOnDrag())
-                mParentPlot->setNotAntialiasedElements(QCP::aeAll);
-            mParentPlot->replot(QCustomPlot::rpQueuedReplot);
-        }
+        if (mParentPlot->noAntialiasingOnDrag())
+            mParentPlot->setNotAntialiasedElements(QCP::aeAll);
+        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
     }
 }
 
@@ -1370,26 +1358,29 @@ QPointF swipePixels(const QWheelEvent* event)
 
 void QCPAxisRect::panByPixels(const QPointF& delta)
 {
+    const QPointer<QCPAxisRect> alive(this);
     if (mRangeDrag.testFlag(Qt::Horizontal))
-        for (const QPointer<QCPAxis>& axis : mRangeDragHorzAxis)
-            if (axis)
-                followPointer(axis, delta.x());
-    if (mRangeDrag.testFlag(Qt::Vertical))
-        for (const QPointer<QCPAxis>& axis : mRangeDragVertAxis)
-            if (axis)
-                followPointer(axis, delta.y());
+        forEachAxis(alive, mRangeDragHorzAxis, [&](QCPAxis* axis) { followPointer(axis, delta.x()); });
+    if (alive && mRangeDrag.testFlag(Qt::Vertical))
+        forEachAxis(alive, mRangeDragVertAxis, [&](QCPAxis* axis) { followPointer(axis, delta.y()); });
 }
 
 void QCPAxisRect::zoomAt(const QPointF& pos, double factor)
 {
+    zoomAxesAt(pos, factor, factor);
+}
+
+void QCPAxisRect::zoomAxesAt(const QPointF& pos, double horizontalFactor, double verticalFactor)
+{
+    const QPointer<QCPAxisRect> alive(this);
     if (mRangeZoom.testFlag(Qt::Horizontal))
-        for (const QPointer<QCPAxis>& axis : mRangeZoomHorzAxis)
-            if (axis)
-                axis->scaleRange(factor, axis->pixelToCoord(pos.x()));
-    if (mRangeZoom.testFlag(Qt::Vertical))
-        for (const QPointer<QCPAxis>& axis : mRangeZoomVertAxis)
-            if (axis)
-                axis->scaleRange(factor, axis->pixelToCoord(pos.y()));
+        forEachAxis(alive, mRangeZoomHorzAxis, [&](QCPAxis* axis) {
+            axis->scaleRange(horizontalFactor, axis->pixelToCoord(pos.x()));
+        });
+    if (alive && mRangeZoom.testFlag(Qt::Vertical))
+        forEachAxis(alive, mRangeZoomVertAxis, [&](QCPAxis* axis) {
+            axis->scaleRange(verticalFactor, axis->pixelToCoord(pos.y()));
+        });
 }
 
 void QCPAxisRect::wheelEvent(QWheelEvent* event)
@@ -1406,8 +1397,10 @@ void QCPAxisRect::wheelEvent(QWheelEvent* event)
     {
         if (mParentPlot->interactions().testFlag(QCP::iRangeDrag))
         {
+            const QPointer<QCPAxisRect> alive(this); // a rangeChanged slot may delete this rect
             panByPixels(swipePixels(event));
-            mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+            if (alive)
+                mParentPlot->replot(QCustomPlot::rpQueuedReplot);
         }
         return;
     }
@@ -1429,27 +1422,12 @@ void QCPAxisRect::wheelEvent(QWheelEvent* event)
                 mWheelZoomRestoreTimer.start();
             }
 
-            double factor;
-            double wheelSteps = delta / 120.0;
-            if (mRangeZoom.testFlag(Qt::Horizontal))
-            {
-                factor = qPow(mRangeZoomFactorHorz, wheelSteps);
-                for (QPointer<QCPAxis> axis : mRangeZoomHorzAxis)
-                {
-                    if (!axis.isNull())
-                        axis->scaleRange(factor, axis->pixelToCoord(pos.x()));
-                }
-            }
-            if (mRangeZoom.testFlag(Qt::Vertical))
-            {
-                factor = qPow(mRangeZoomFactorVert, wheelSteps);
-                for (QPointer<QCPAxis> axis : mRangeZoomVertAxis)
-                {
-                    if (!axis.isNull())
-                        axis->scaleRange(factor, axis->pixelToCoord(pos.y()));
-                }
-            }
-            mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+            const double wheelSteps = delta / 120.0;
+            const QPointer<QCPAxisRect> alive(this); // a rangeChanged slot may delete this rect
+            zoomAxesAt(pos, qPow(mRangeZoomFactorHorz, wheelSteps),
+                       qPow(mRangeZoomFactorVert, wheelSteps));
+            if (alive)
+                mParentPlot->replot(QCustomPlot::rpQueuedReplot);
         }
     }
 }

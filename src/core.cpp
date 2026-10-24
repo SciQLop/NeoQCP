@@ -26,6 +26,7 @@
 /*! \file */
 
 #include "core.h"
+#include <utility>
 #include "plottables/plottable-group.h"
 #include "item-creation-state.h"
 #include "overlay.h"
@@ -3262,7 +3263,10 @@ void QCustomPlot::showEvent(QShowEvent* event)
 */
 void QCustomPlot::mouseDoubleClickEvent(QMouseEvent* event)
 {
+    const QPointer<QCustomPlot> alive(this); // a slot may delete the plot
     emit mouseDoubleClick(event);
+    if (!alive)
+        return;
     mMouseHasMoved = false;
     mMousePressPos = event->pos();
 
@@ -3277,6 +3281,8 @@ void QCustomPlot::mouseDoubleClickEvent(QMouseEvent* event)
         event->accept(); // default impl of QCPLayerable's mouse events ignore the event, in that
                          // case propagate to next candidate in list
         candidates.at(i)->mouseDoubleClickEvent(event, details.at(i));
+        if (!alive)
+            return;
         if (event->isAccepted())
         {
             mMouseEventLayerable = candidates.at(i);
@@ -3321,7 +3327,10 @@ void QCustomPlot::mouseDoubleClickEvent(QMouseEvent* event)
 */
 void QCustomPlot::mousePressEvent(QMouseEvent* event)
 {
+    const QPointer<QCustomPlot> alive(this); // a slot may delete the plot
     emit mousePress(event);
+    if (!alive)
+        return;
     // save some state to tell in releaseEvent whether it was a click:
     mMouseHasMoved = false;
     mMousePressPos = event->pos();
@@ -3376,6 +3385,8 @@ void QCustomPlot::mousePressEvent(QMouseEvent* event)
             event->accept(); // default impl of QCPLayerable's mouse events call ignore() on the
                              // event, in that case propagate to next candidate in list
             candidates.at(i)->mousePressEvent(event, details.at(i));
+            if (!alive)
+                return;
             if (event->isAccepted())
             {
                 mMouseEventLayerable = candidates.at(i);
@@ -3403,7 +3414,10 @@ void QCustomPlot::mousePressEvent(QMouseEvent* event)
 */
 void QCustomPlot::mouseMoveEvent(QMouseEvent* event)
 {
+    const QPointer<QCustomPlot> alive(this); // a slot may delete the plot
     emit mouseMove(event);
+    if (!alive)
+        return;
 
     if (!mMouseHasMoved && (mMousePressPos - event->pos()).manhattanLength() > 3)
         mMouseHasMoved = true; // moved too far from mouse press position, don't handle as click on
@@ -3440,60 +3454,59 @@ void QCustomPlot::mouseMoveEvent(QMouseEvent* event)
 */
 void QCustomPlot::mouseReleaseEvent(QMouseEvent* event)
 {
+    // Every step below can reach a slot that deletes the plot.
+    const QPointer<QCustomPlot> alive(this);
     emit mouseRelease(event);
-
-    if (!mMouseHasMoved) // mouse hasn't moved (much) between press and release, so handle as click
-    {
-        if (mSelectionRect
-            && mSelectionRect->isActive()) // a simple click shouldn't successfully finish a
-                                           // selection rect, so cancel it here
-            mSelectionRect->cancel();
-        if (event->button() == Qt::LeftButton)
-            processPointSelection(event);
-
-        // emit specialized click signals of QCustomPlot instance:
-        if (QCPAbstractPlottable* ap = qobject_cast<QCPAbstractPlottable*>(mMouseSignalLayerable))
-        {
-            int dataIndex = 0;
-            if (!mMouseSignalLayerableDetails.value<QCPDataSelection>().isEmpty())
-                dataIndex
-                    = mMouseSignalLayerableDetails.value<QCPDataSelection>().dataRange().begin();
-            emit plottableClick(ap, dataIndex, event);
-        }
-        else if (QCPAxis* ax = qobject_cast<QCPAxis*>(mMouseSignalLayerable))
-            emit axisClick(ax, mMouseSignalLayerableDetails.value<QCPAxis::SelectablePart>(),
-                           event);
-        else if (QCPAbstractItem* ai = qobject_cast<QCPAbstractItem*>(mMouseSignalLayerable))
-            emit itemClick(ai, event);
-        else if (QCPLegend* lg = qobject_cast<QCPLegend*>(mMouseSignalLayerable))
-            emit legendClick(lg, nullptr, event);
-        else if (QCPAbstractLegendItem* li
-                 = qobject_cast<QCPAbstractLegendItem*>(mMouseSignalLayerable))
-            emit legendClick(li->parentLegend(), li, event);
-        mMouseSignalLayerable = nullptr;
-    }
-
-    if (mSelectionRect && mSelectionRect->isActive()) // Note: if a click was detected above, the
-                                                      // selection rect is canceled there
-    {
-        // finish selection rect, the appropriate action will be taken via signal-slot connection:
-        mSelectionRect->endSelection(event);
-    }
-    else
-    {
-        // call event of affected layerable:
-        if (mMouseEventLayerable)
-        {
-            mMouseEventLayerable->mouseReleaseEvent(event, mMousePressPos);
-            mMouseEventLayerable = nullptr;
-        }
-    }
-
-    if (noAntialiasingOnDrag())
+    if (alive && !mMouseHasMoved) // mouse hasn't moved (much) between press and release
+        releaseAsClick(event);
+    if (alive)
+        releaseDrag(event);
+    if (alive && noAntialiasingOnDrag())
         replot(rpQueuedReplot);
 
     event->accept(); // in case QCPLayerable reimplementation manipulates event accepted state. In
                      // QWidget event system, QCustomPlot wants to accept the event.
+}
+
+// A click: cancels a selection rect, selects, and emits the specialized click signal.
+void QCustomPlot::releaseAsClick(QMouseEvent* event)
+{
+    const QPointer<QCustomPlot> alive(this);
+    // a simple click shouldn't successfully finish a selection rect, so cancel it here
+    if (mSelectionRect && mSelectionRect->isActive())
+        mSelectionRect->cancel();
+    if (alive && event->button() == Qt::LeftButton)
+        processPointSelection(event);
+    if (alive)
+        emitClickSignal(event);
+}
+
+void QCustomPlot::emitClickSignal(QMouseEvent* event)
+{
+    const QPointer<QCPLayerable> clicked = std::exchange(mMouseSignalLayerable, nullptr);
+    const QVariant details = mMouseSignalLayerableDetails;
+    if (QCPAbstractPlottable* ap = qobject_cast<QCPAbstractPlottable*>(clicked))
+    {
+        const auto selection = details.value<QCPDataSelection>();
+        emit plottableClick(ap, selection.isEmpty() ? 0 : selection.dataRange().begin(), event);
+    }
+    else if (QCPAxis* ax = qobject_cast<QCPAxis*>(clicked))
+        emit axisClick(ax, details.value<QCPAxis::SelectablePart>(), event);
+    else if (QCPAbstractItem* ai = qobject_cast<QCPAbstractItem*>(clicked))
+        emit itemClick(ai, event);
+    else if (QCPLegend* lg = qobject_cast<QCPLegend*>(clicked))
+        emit legendClick(lg, nullptr, event);
+    else if (QCPAbstractLegendItem* li = qobject_cast<QCPAbstractLegendItem*>(clicked))
+        emit legendClick(li->parentLegend(), li, event);
+}
+
+// Finishes the selection rect (the action runs from its accepted signal), or the captured drag.
+void QCustomPlot::releaseDrag(QMouseEvent* event)
+{
+    if (mSelectionRect && mSelectionRect->isActive()) // a click above already canceled it
+        mSelectionRect->endSelection(event);
+    else if (const QPointer<QCPLayerable> target = std::exchange(mMouseEventLayerable, nullptr))
+        target->mouseReleaseEvent(event, QPointF(mMousePressPos));
 }
 
 /*! \internal
@@ -3533,6 +3546,7 @@ bool QCustomPlot::event(QEvent* event)
 bool QCustomPlot::touchEvent(QTouchEvent* event)
 {
     event->accept();
+    const QPointer<QCustomPlot> alive(this); // the mouse and range slots may delete the plot
     const auto& points = event->points();
     const bool ending = event->type() == QEvent::TouchEnd || event->type() == QEvent::TouchCancel;
     if (event->type() == QEvent::TouchBegin && points.size() == 1)
@@ -3544,6 +3558,8 @@ bool QCustomPlot::touchEvent(QTouchEvent* event)
         {
             mMouseHasMoved = true;
             forwardTouchAsMouse(QEvent::MouseButtonRelease, points.first(), event);
+            if (!alive)
+                return true;
         }
     }
     if (mTouch.pinching && points.size() >= 2 && !ending)
@@ -3558,13 +3574,16 @@ bool QCustomPlot::touchEvent(QTouchEvent* event)
         else if (mTouch.mouseDown)
             forwardTouchAsMouse(QEvent::MouseMove, point, event);
     }
+    if (!alive)
+        return true;
     for (const QEventPoint& point : points)
         mTouch.positions[point.id()] = touchPosition(point);
     if (ending)
     {
-        if (mTouch.mouseDown)
+        const bool mouseDown = mTouch.mouseDown;
+        mTouch = {}; // first: the release may delete the plot
+        if (mouseDown)
             forwardTouchAsMouse(QEvent::MouseButtonRelease, points.first(), event);
-        mTouch = {};
     }
     return true;
 }
@@ -3578,13 +3597,13 @@ void QCustomPlot::forwardTouchAsMouse(QEvent::Type type, const QEventPoint& poin
     QMouseEvent mouse(type, point.position(), point.scenePosition(), point.globalPosition(),
                       Qt::LeftButton, release ? Qt::NoButton : Qt::LeftButton, touch->modifiers(),
                       QPointingDevice::primaryPointingDevice());
+    mTouch.mouseDown = !release; // first: the mouse handlers may delete the plot
     if (type == QEvent::MouseButtonPress)
         mousePressEvent(&mouse);
     else if (release)
         mouseReleaseEvent(&mouse);
     else
         mouseMoveEvent(&mouse);
-    mTouch.mouseDown = !release;
 }
 
 // A finger that did not move is where it was: some platforms report no position for it.
@@ -3604,14 +3623,17 @@ void QCustomPlot::pinchStep(const QEventPoint& a, const QEventPoint& b)
     const QPointF mid = (posA + posB) / 2;
     const double lastSpan = QLineF(lastA, lastB).length();
     const double span = QLineF(posA, posB).length();
-    QCPAxisRect* rect = axisRectAt(lastMid);
+    // A rangeChanged slot may delete the axis rect, or the plot with it.
+    const QPointer<QCustomPlot> alive(this);
+    const QPointer<QCPAxisRect> rect = axisRectAt(lastMid);
     if (!rect)
         return;
     if (mInteractions.testFlag(QCP::iRangeZoom) && lastSpan > 0 && span > 0)
         rect->zoomAt(lastMid, lastSpan / span);
-    if (mInteractions.testFlag(QCP::iRangeDrag))
+    if (rect && mInteractions.testFlag(QCP::iRangeDrag))
         rect->panByPixels(mid - lastMid);
-    replot(rpQueuedReplot);
+    if (alive)
+        replot(rpQueuedReplot);
 }
 
 /*! \internal
@@ -3625,8 +3647,10 @@ bool QCustomPlot::nativeGestureEvent(QNativeGestureEvent* event)
     QCPAxisRect* rect = axisRectAt(event->position());
     if (rect && mInteractions.testFlag(QCP::iRangeZoom) && event->value() > -1)
     {
+        const QPointer<QCustomPlot> alive(this); // a rangeChanged slot may delete the plot
         rect->zoomAt(event->position(), 1.0 / (1.0 + event->value()));
-        replot(rpQueuedReplot);
+        if (alive)
+            replot(rpQueuedReplot);
     }
     return true;
 }
@@ -4030,6 +4054,7 @@ void QCustomPlot::processRectSelection(QRect rect, QMouseEvent* event)
     using SelectionCandidate = QPair<QPointer<QCPAbstractPlottable>, QCPDataSelection>;
     using SelectionCandidates = QMultiMap<int, SelectionCandidate>; // map key is number of selected data points, so we have selections sorted by size
 
+    const QPointer<QCustomPlot> alive(this); // a (de)selection slot may delete the plot
     bool selectionStateChanged = false;
 
     if (mInteractions.testFlag(QCP::iSelectPlottables))
@@ -4088,11 +4113,10 @@ void QCustomPlot::processRectSelection(QRect rect, QMouseEvent* event)
         }
     }
 
+    if (!alive)
+        return;
     if (selectionStateChanged)
-    {
-        emit selectionChangedByUser();
-        replot(rpQueuedReplot);
-    }
+        announceUserSelection();
     else if (QCPLayer* band = mSelectionRect ? mSelectionRect->layer() : nullptr)
         band->replot();
 }
@@ -4115,7 +4139,10 @@ void QCustomPlot::processRectZoom(QRect rect, [[maybe_unused]] QMouseEvent* even
         QList<QCPAxis*> affectedAxes = QList<QCPAxis*>()
             << axisRect->rangeZoomAxes(Qt::Horizontal) << axisRect->rangeZoomAxes(Qt::Vertical);
         affectedAxes.removeAll(static_cast<QCPAxis*>(nullptr));
+        const QPointer<QCustomPlot> alive(this); // a rangeChanged slot may delete the plot
         axisRect->zoom(QRectF(rect), affectedAxes);
+        if (!alive)
+            return;
     }
     replot(rpQueuedReplot); // always replot to make selection rect disappear
 }
@@ -4139,6 +4166,7 @@ void QCustomPlot::processRectZoom(QRect rect, [[maybe_unused]] QMouseEvent* even
 */
 void QCustomPlot::processPointSelection(QMouseEvent* event)
 {
+    const QPointer<QCustomPlot> alive(this); // a (de)selection slot may delete the plot
     QVariant details;
     const QPointer<QCPLayerable> clickedLayerable = layerableAt(event->pos(), true, &details);
     bool selectionStateChanged = false;
@@ -4154,11 +4182,14 @@ void QCustomPlot::processPointSelection(QMouseEvent* event)
         clickedLayerable->selectEvent(event, additive, details, &selChanged);
         selectionStateChanged |= selChanged;
     }
-    if (selectionStateChanged)
-    {
-        emit selectionChangedByUser();
-        replot(rpQueuedReplot);
-    }
+    if (alive && selectionStateChanged)
+        announceUserSelection();
+}
+
+void QCustomPlot::announceUserSelection()
+{
+    replot(rpQueuedReplot);
+    emit selectionChangedByUser(); // last: a slot may delete the plot
 }
 
 /*! \internal

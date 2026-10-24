@@ -177,6 +177,7 @@ protected:
     // non-property methods:
     void drawBackground(QCPPainter* painter);
     void updateAxesOffset(QCPAxis::AxisType type);
+    void zoomAxesAt(const QPointF& pos, double horizontalFactor, double verticalFactor);
     void markAffectedLayersDirty();
 
 private:

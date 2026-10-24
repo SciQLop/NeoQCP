@@ -479,6 +479,10 @@ protected:
     void updateGestureInput();
     bool touchEvent(QTouchEvent* event);
     void forwardTouchAsMouse(QEvent::Type type, const QEventPoint& point, const QTouchEvent* touch);
+    void releaseAsClick(QMouseEvent* event);
+    void emitClickSignal(QMouseEvent* event);
+    void releaseDrag(QMouseEvent* event);
+    void announceUserSelection();
     void pinchStep(const QEventPoint& a, const QEventPoint& b);
     QPointF touchPosition(const QEventPoint& point) const;
     struct TouchState {

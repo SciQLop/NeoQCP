@@ -172,3 +172,127 @@ void TestGestures::gesturesNeedRangeInteractions()
     wheel({0, 40}, {0, 120}, Qt::ControlModifier);
     QCOMPARE(mPlot->xAxis->range(), QCPRange(0, 100));
 }
+
+void TestGestures::wheelAt(QPointF pos)
+{
+    QWheelEvent event(pos, mPlot->mapToGlobal(pos), QPoint(), QPoint(0, 120), Qt::NoButton,
+                      Qt::NoModifier, Qt::NoScrollPhase, false);
+    QCoreApplication::sendEvent(mPlot, &event);
+}
+
+void TestGestures::drag(QPoint from, QPoint to)
+{
+    auto send = [this](QEvent::Type type, QPoint pos, Qt::MouseButtons buttons) {
+        QMouseEvent e(type, pos, mPlot->mapToGlobal(pos), Qt::LeftButton, buttons, Qt::NoModifier);
+        QCoreApplication::sendEvent(mPlot, &e);
+    };
+    send(QEvent::MouseButtonPress, from, Qt::LeftButton);
+    send(QEvent::MouseMove, (from + to) / 2, Qt::LeftButton);
+    send(QEvent::MouseMove, to, Qt::LeftButton);
+    send(QEvent::MouseButtonRelease, to, Qt::NoButton);
+}
+
+template <typename Slot>
+void TestGestures::onFirstXRangeChange(Slot slot)
+{
+    connect(mPlot->xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged), this,
+            [this, slot] {
+                mRangeSlotRan = true;
+                slot();
+            },
+            Qt::SingleShotConnection);
+}
+
+// The drag, wheel and pinch handlers loop over the axes and use the plot after each range change.
+void TestGestures::deleteAxisRectOnRangeChange()
+{
+    onFirstXRangeChange([this] { QVERIFY(mPlot->plotLayout()->remove(mPlot->axisRect())); });
+}
+
+void TestGestures::deletePlotOnRangeChange()
+{
+    onFirstXRangeChange([this] {
+        delete mPlot;
+        mPlot = nullptr;
+    });
+}
+
+void TestGestures::pinch()
+{
+    const QPoint c = centre().toPoint();
+    QTest::touchEvent(mPlot, mTouchScreen).press(0, c - QPoint(30, 0)).press(1, c + QPoint(30, 0));
+    QTest::touchEvent(mPlot, mTouchScreen).move(0, c - QPoint(40, 0)).move(1, c + QPoint(50, 0));
+    if (mPlot)
+        QTest::touchEvent(mPlot, mTouchScreen).release(0, c - QPoint(40, 0)).release(1, c + QPoint(50, 0));
+}
+
+void TestGestures::dragSlotDeletingTheAxisRectIsSafe()
+{
+    deleteAxisRectOnRangeChange();
+    const QPoint c = centre().toPoint();
+    drag(c, c + QPoint(40, 20));
+    QVERIFY(mRangeSlotRan);
+    QCOMPARE(mPlot->axisRectCount(), 0);
+}
+
+void TestGestures::wheelSlotDeletingTheAxisRectIsSafe()
+{
+    deleteAxisRectOnRangeChange();
+    wheel({0, 40}, {0, 120});
+    QVERIFY(mRangeSlotRan);
+    QCOMPARE(mPlot->axisRectCount(), 0);
+}
+
+void TestGestures::swipeSlotDeletingTheAxisRectIsSafe()
+{
+    mPlot->setInteraction(QCP::iGestures);
+    deleteAxisRectOnRangeChange();
+    wheel({40, 30}, {40, 30});
+    QVERIFY(mRangeSlotRan);
+    QCOMPARE(mPlot->axisRectCount(), 0);
+}
+
+void TestGestures::pinchSlotDeletingTheAxisRectIsSafe()
+{
+    mPlot->setInteraction(QCP::iGestures);
+    deleteAxisRectOnRangeChange();
+    pinch();
+    QVERIFY(mRangeSlotRan);
+    QCOMPARE(mPlot->axisRectCount(), 0);
+}
+
+void TestGestures::pinchSlotDeletingThePlotIsSafe()
+{
+    mPlot->setInteraction(QCP::iGestures);
+    deletePlotOnRangeChange();
+    pinch();
+    QVERIFY(mRangeSlotRan);
+}
+
+void TestGestures::nativePinchSlotDeletingThePlotIsSafe()
+{
+    mPlot->setInteraction(QCP::iGestures);
+    deletePlotOnRangeChange();
+    QNativeGestureEvent event(Qt::ZoomNativeGesture, QPointingDevice::primaryPointingDevice(), 2,
+                              centre(), centre(), mPlot->mapToGlobal(centre()), 1.0, {});
+    QCoreApplication::sendEvent(mPlot, &event);
+    QVERIFY(mRangeSlotRan);
+}
+
+// Dragging or wheeling on the axis itself, not inside the axis rect.
+void TestGestures::axisDragSlotDeletingTheAxisIsSafe()
+{
+    onFirstXRangeChange([this] { QVERIFY(mPlot->axisRect()->removeAxis(mPlot->xAxis)); });
+    const QPoint onAxis(int(centre().x()), mPlot->axisRect()->bottom() + 8);
+    drag(onAxis, onAxis + QPoint(40, 0));
+    QVERIFY(mRangeSlotRan);
+    QCOMPARE(mPlot->axisRect()->axisCount(QCPAxis::atBottom), 0);
+}
+
+void TestGestures::axisWheelSlotDeletingTheAxisIsSafe()
+{
+    onFirstXRangeChange([this] { QVERIFY(mPlot->axisRect()->removeAxis(mPlot->xAxis)); });
+    wheelAt(QPointF(centre().x(), mPlot->axisRect()->bottom() + 8));
+    QVERIFY(mRangeSlotRan);
+    QCOMPARE(mPlot->axisRect()->axisCount(QCPAxis::atBottom), 0);
+}

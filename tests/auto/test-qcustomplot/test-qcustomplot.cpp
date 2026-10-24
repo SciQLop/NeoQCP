@@ -470,3 +470,56 @@ void TestQCustomPlot::settingTheCurrentSelectionRectKeepsIt()
   dragFromTo(mPlot, pixelOf(mPlot, 2, 2), pixelOf(mPlot, 6, 6));
   QCOMPARE(zooms.count(), 1);
 }
+
+namespace {
+// Closing a panel from a plot signal deletes the plot while its event handler is on the stack.
+template <typename Sender, typename Signal>
+void deletePlotOn(QCustomPlot*& plot, Sender* sender, Signal signal, bool* ran)
+{
+  QObject::connect(sender, signal, sender, [&plot, ran] {
+    *ran = true;
+    delete plot;
+    plot = nullptr;
+  }, Qt::SingleShotConnection);
+}
+} // namespace
+
+void TestQCustomPlot::clickSelectionSlotDeletingThePlotIsSafe()
+{
+  layOut(mPlot, QCP::iSelectPlottables);
+  flatGraph(mPlot);
+  bool ran = false;
+  deletePlotOn(mPlot, mPlot, &QCustomPlot::selectionChangedByUser, &ran);
+  clickAt(mPlot, pixelOf(mPlot, 5, 5));
+  QVERIFY(ran);
+}
+
+void TestQCustomPlot::rectSelectionSlotDeletingThePlotIsSafe()
+{
+  layOut(mPlot, QCP::iSelectPlottables);
+  mPlot->setSelectionRectMode(QCP::srmSelect);
+  flatGraph(mPlot);
+  bool ran = false;
+  deletePlotOn(mPlot, mPlot, &QCustomPlot::selectionChangedByUser, &ran);
+  dragFromTo(mPlot, pixelOf(mPlot, 1, 9), pixelOf(mPlot, 9, 1));
+  QVERIFY(ran);
+}
+
+void TestQCustomPlot::rectZoomSlotDeletingThePlotIsSafe()
+{
+  layOut(mPlot, QCP::Interactions());
+  mPlot->setSelectionRectMode(QCP::srmZoom);
+  bool ran = false;
+  deletePlotOn(mPlot, mPlot->xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged), &ran);
+  dragFromTo(mPlot, pixelOf(mPlot, 2, 2), pixelOf(mPlot, 6, 6));
+  QVERIFY(ran);
+}
+
+void TestQCustomPlot::releaseSlotDeletingThePlotIsSafe()
+{
+  layOut(mPlot, QCP::iSelectPlottables);
+  bool ran = false;
+  deletePlotOn(mPlot, mPlot, &QCustomPlot::mouseRelease, &ran);
+  clickAt(mPlot, pixelOf(mPlot, 5, 5));
+  QVERIFY(ran);
+}

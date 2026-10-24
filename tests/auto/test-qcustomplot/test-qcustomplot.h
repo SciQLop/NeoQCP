@@ -30,6 +30,10 @@ private slots:
   void deletingADraggedSelectionRectDoesNotSignal();
   void cancelSlotInstallingARectWhileTheDraggedOneIsDeletedIsSafe();
   void settingTheCurrentSelectionRectKeepsIt();
+  void clickSelectionSlotDeletingThePlotIsSafe();
+  void rectSelectionSlotDeletingThePlotIsSafe();
+  void rectZoomSlotDeletingThePlotIsSafe();
+  void releaseSlotDeletingThePlotIsSafe();
 
 private:
   QCustomPlot *mPlot;

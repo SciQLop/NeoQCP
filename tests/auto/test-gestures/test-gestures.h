@@ -25,10 +25,26 @@ private slots:
     void nativePinchZooms();
     void gesturesAcceptTouch();
     void gesturesNeedRangeInteractions();
+    void dragSlotDeletingTheAxisRectIsSafe();
+    void wheelSlotDeletingTheAxisRectIsSafe();
+    void swipeSlotDeletingTheAxisRectIsSafe();
+    void pinchSlotDeletingTheAxisRectIsSafe();
+    void pinchSlotDeletingThePlotIsSafe();
+    void nativePinchSlotDeletingThePlotIsSafe();
+    void axisDragSlotDeletingTheAxisIsSafe();
+    void axisWheelSlotDeletingTheAxisIsSafe();
 
 private:
     QPointF centre() const;
     void wheel(QPoint pixelDelta, QPoint angleDelta, Qt::KeyboardModifiers modifiers = Qt::NoModifier);
+    void wheelAt(QPointF pos);
+    void drag(QPoint from, QPoint to);
+    template <typename Slot> void onFirstXRangeChange(Slot slot);
+    void deleteAxisRectOnRangeChange();
+    void deletePlotOnRangeChange();
+    void pinch();
+
+    bool mRangeSlotRan = false;
 
     QCustomPlot* mPlot;
     QPointingDevice* mTouchScreen = QTest::createTouchDevice();

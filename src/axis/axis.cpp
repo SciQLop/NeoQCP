@@ -1895,6 +1895,7 @@ void QCPAxis::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
         const double startPixel = orientation() == Qt::Horizontal ? startPos.x() : startPos.y();
         const double currentPixel
             = orientation() == Qt::Horizontal ? event->pos().x() : event->pos().y();
+        const QPointer<QCPAxis> alive(this); // a rangeChanged slot may delete this axis
         if (mScaleType == QCPAxis::stLinear)
         {
             const double diff = pixelToCoord(startPixel) - pixelToCoord(currentPixel);
@@ -1905,6 +1906,8 @@ void QCPAxis::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
             const double diff = pixelToCoord(startPixel) / pixelToCoord(currentPixel);
             setRange(mDragStartRange.lower * diff, mDragStartRange.upper * diff);
         }
+        if (!alive)
+            return;
 
         if (mParentPlot->noAntialiasingOnDrag())
             mParentPlot->setNotAntialiasedElements(QCP::aeAll);
@@ -1966,8 +1969,10 @@ void QCPAxis::wheelEvent(QWheelEvent* event)
 
     const double wheelSteps = delta / 120.0;
     const double factor = qPow(mAxisRect->rangeZoomFactor(orientation()), wheelSteps);
+    const QPointer<QCPAxis> alive(this); // a rangeChanged slot may delete this axis
     scaleRange(factor, pixelToCoord(orientation() == Qt::Horizontal ? pos.x() : pos.y()));
-    mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    if (alive)
+        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
 }
 
 /*! \internal
