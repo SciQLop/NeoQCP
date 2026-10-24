@@ -21,6 +21,9 @@ private slots:
   void rectDeselectSlotDeletingACandidateIsSafe();
   void clickSlotDeletingTheItemIsSafe();
   void deleteKeySlotDeletingEveryItemIsSafe();
+  void moveSlotReplacingTheSelectionRectIsSafe();
+  void cancelSlotReplacingTheSelectionRectIsSafe();
+  void escapeSlotReplacingTheSelectionRectIsSafe();
 
 private:
   QCustomPlot *mPlot;

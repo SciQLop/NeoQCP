@@ -336,3 +336,62 @@ void TestQCustomPlot::deleteKeySlotDeletingEveryItemIsSafe()
   QCoreApplication::sendEvent(mPlot, &del);
   QCOMPARE(mPlot->itemCount(), 0);
 }
+
+namespace {
+void startRubberBand(QCustomPlot* plot)
+{
+  layOut(plot, QCP::Interactions());
+  plot->setSelectionRectMode(QCP::srmZoom);
+  sendMouse(plot, QEvent::MouseButtonPress, pixelOf(plot, 2, 2), Qt::LeftButton);
+}
+
+void pressEscape(QCustomPlot* plot)
+{
+  QKeyEvent escape(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+  QCoreApplication::sendEvent(plot, &escape);
+}
+
+template <typename Signal>
+void replaceRectOn(QCustomPlot* plot, Signal signal)
+{
+  QObject::connect(plot->selectionRect(), signal, plot,
+                   [plot] { plot->setSelectionRect(new QCPSelectionRect(plot)); },
+                   Qt::SingleShotConnection);
+}
+} // namespace
+
+// QCustomPlot::setSelectionRect deletes the rect a slot replaces: the rect must not repaint
+// through itself after its own signal.
+void TestQCustomPlot::moveSlotReplacingTheSelectionRectIsSafe()
+{
+  startRubberBand(mPlot);
+  auto* old = mPlot->selectionRect();
+  replaceRectOn(mPlot, &QCPSelectionRect::changed);
+  sendMouse(mPlot, QEvent::MouseMove, pixelOf(mPlot, 8, 8), Qt::LeftButton);
+  sendMouse(mPlot, QEvent::MouseMove, pixelOf(mPlot, 9, 9), Qt::LeftButton);
+  sendMouse(mPlot, QEvent::MouseButtonRelease, pixelOf(mPlot, 9, 9), Qt::NoButton);
+  QVERIFY(mPlot->selectionRect() != old);
+  QVERIFY(!mPlot->selectionRect()->isActive());
+}
+
+// A click (no drag) cancels the band on release.
+void TestQCustomPlot::cancelSlotReplacingTheSelectionRectIsSafe()
+{
+  startRubberBand(mPlot);
+  auto* old = mPlot->selectionRect();
+  replaceRectOn(mPlot, &QCPSelectionRect::canceled);
+  sendMouse(mPlot, QEvent::MouseButtonRelease, pixelOf(mPlot, 2, 2), Qt::NoButton);
+  QVERIFY(mPlot->selectionRect() != old);
+  QVERIFY(!mPlot->selectionRect()->isActive());
+}
+
+void TestQCustomPlot::escapeSlotReplacingTheSelectionRectIsSafe()
+{
+  startRubberBand(mPlot);
+  auto* old = mPlot->selectionRect();
+  replaceRectOn(mPlot, &QCPSelectionRect::canceled);
+  pressEscape(mPlot);
+  QVERIFY(mPlot->selectionRect() != old);
+  QVERIFY(!mPlot->selectionRect()->isActive());
+}
+
