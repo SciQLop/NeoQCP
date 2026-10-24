@@ -46,6 +46,7 @@ void QCPAsyncPipelineBase::emitBusyIfNeeded(QMutexLocker<QMutex>& lock)
     if (shouldEmitBusy)
         mWasBusy = true;
     lock.unlock();
+    // Last, and callers return at once: a slot may delete the owner and this pipeline.
     if (shouldEmitBusy)
         Q_EMIT busyChanged(true);
 }
@@ -61,6 +62,7 @@ void QCPAsyncPipelineBase::startJob(QMutexLocker<QMutex>& lock, uint64_t gen,
     const bool becameBusy = !std::exchange(mWasBusy, true);
     lock.unlock();
     mScheduler->submit(priority, std::move(job));
+    // Last, and callers return at once: a slot may delete the owner and this pipeline.
     if (becameBusy)
         Q_EMIT busyChanged(true);
 }
@@ -109,6 +111,7 @@ void QCPAsyncPipelineBase::settleIdle(QMutexLocker<QMutex>& lock, uint64_t gen)
     const bool shouldEmitIdle = mWasBusy;
     mWasBusy = false;
     lock.unlock();
+    // Last, and callers return at once: a slot may delete the owner and this pipeline.
     if (shouldEmitIdle)
         Q_EMIT busyChanged(false);
 }
@@ -228,6 +231,7 @@ void QCPAsyncPipelineBase::deliverResult(uint64_t generation, std::any cache, st
     if (busy != mWasBusy)
     {
         mWasBusy = busy;
+        // Last: a slot may delete the owner and this pipeline.
         Q_EMIT busyChanged(busy);
     }
 }
