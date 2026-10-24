@@ -37,6 +37,7 @@ private slots:
     void axisWheelSlotDeletingTheAxisIsSafe();
     void dragSlotDeletingTheAxisRectRestoresAntialiasing();
     void wheelSlotDeletingTheAxisRectRestoresAntialiasing();
+    void dragRightAfterAWheelZoomRestoresAntialiasing();
 
 private:
     QPointF centre() const;

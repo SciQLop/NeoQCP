@@ -1275,8 +1275,10 @@ void QCPAxisRect::mousePressEvent(QMouseEvent* event, [[maybe_unused]] const QVa
         // initialize antialiasing backup in case we start dragging:
         if (mParentPlot->noAntialiasingOnDrag())
         {
-            mAADragBackup = mParentPlot->antialiasedElements();
-            mNotAADragBackup = mParentPlot->notAntialiasedElements();
+            // Inside a wheel zoom's restore window the plot shows the wheel's forced state.
+            mAADragBackup = mWheelZooming ? mAAWheelBackup : mParentPlot->antialiasedElements();
+            mNotAADragBackup
+                = mWheelZooming ? mNotAAWheelBackup : mParentPlot->notAntialiasedElements();
         }
         // Mouse range dragging interaction:
         if (mParentPlot->interactions().testFlag(QCP::iRangeDrag))
