@@ -135,3 +135,49 @@ void TestQCPLegend::deselectSlotDeletingTheLegendIsSafe()
   mPlot->legend->setSelectedParts(QCPLegend::spNone);
   QCOMPARE(mPlot->legend, nullptr);
 }
+
+namespace {
+// A click on nothing deselects everything: QCustomPlot::deselectAllExcept, then each
+// layerable's deselectEvent.
+void clickAway(QCustomPlot* plot)
+{
+  plot->setInteractions(QCP::iSelectLegend | QCP::iSelectPlottables);
+  plot->resize(400, 300);
+  plot->replot();
+  const QPoint empty = plot->axisRect()->rect().bottomLeft() + QPoint(5, -5);
+  QMouseEvent press(QEvent::MouseButtonPress, empty, plot->mapToGlobal(empty), Qt::LeftButton,
+                    Qt::LeftButton, Qt::NoModifier);
+  QCoreApplication::sendEvent(plot, &press);
+  QMouseEvent release(QEvent::MouseButtonRelease, empty, plot->mapToGlobal(empty), Qt::LeftButton,
+                      Qt::NoButton, Qt::NoModifier);
+  QCoreApplication::sendEvent(plot, &release);
+}
+} // namespace
+
+void TestQCPLegend::clickAwayDeletingTheLegendFromItsDeselectionIsSafe()
+{
+  mPlot->addGraph();
+  mPlot->legend->setSelectableParts(QCPLegend::spLegendBox | QCPLegend::spItems);
+  mPlot->legend->setSelectedParts(QCPLegend::spLegendBox);
+  bool ran = false;
+  connect(mPlot->legend, &QCPLegend::selectionChanged, mPlot, [this, &ran] {
+    ran = true;
+    delete mPlot->legend;
+  }, Qt::SingleShotConnection);
+  clickAway(mPlot);
+  QVERIFY(ran);
+  QCOMPARE(mPlot->legend, nullptr);
+}
+
+void TestQCPLegend::clickAwayDeletingTheLegendFromAnItemDeselectionIsSafe()
+{
+  addSelectedItems(mPlot, 3);
+  bool ran = false;
+  connect(mPlot->legend->item(0), &QCPAbstractLegendItem::selectionChanged, mPlot, [this, &ran] {
+    ran = true;
+    delete mPlot->legend;
+  }, Qt::SingleShotConnection);
+  clickAway(mPlot);
+  QVERIFY(ran);
+  QCOMPARE(mPlot->legend, nullptr);
+}

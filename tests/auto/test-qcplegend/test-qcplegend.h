@@ -14,6 +14,8 @@ private slots:
   void groupRowFollowsComponentVisibility();
   void deselectSlotRemovingAnItemStillDeselectsTheOthers();
   void deselectSlotDeletingTheLegendIsSafe();
+  void clickAwayDeletingTheLegendFromItsDeselectionIsSafe();
+  void clickAwayDeletingTheLegendFromAnItemDeselectionIsSafe();
   
 private:
   QCustomPlot *mPlot;
