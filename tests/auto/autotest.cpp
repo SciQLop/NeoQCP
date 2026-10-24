@@ -55,6 +55,8 @@ static bool shouldRun(const char* name)
 static QStringList testArguments(const char* name)
 {
     QStringList args { QStringLiteral("auto-tests") };
+    if (!qEnvironmentVariable("QCP_TEST_FUNCTION").isEmpty())
+        args << qEnvironmentVariable("QCP_TEST_FUNCTION");
     const QString dir = qEnvironmentVariable("QCP_TEST_LOG_DIR");
     if (!dir.isEmpty())
         args << QStringLiteral("-o") << QStringLiteral("%1/%2.txt,txt").arg(dir, QLatin1String(name))
