@@ -523,3 +523,47 @@ void TestQCustomPlot::releaseSlotDeletingThePlotIsSafe()
   clickAt(mPlot, pixelOf(mPlot, 5, 5));
   QVERIFY(ran);
 }
+
+namespace {
+// A slot of the first rangeChanged deletes the axes: the second must not be emitted from them.
+template <typename Axis>
+void expectNoSecondRangeSignal(Axis* axis, QCPPolarAxisAngular* owner, int* second)
+{
+  QObject::connect(axis, qOverload<const QCPRange&, const QCPRange&>(&Axis::rangeChanged), owner,
+                   [second] { ++*second; });
+  QObject::connect(axis, qOverload<const QCPRange&>(&Axis::rangeChanged), owner,
+                   [owner] { delete owner; });
+}
+} // namespace
+
+void TestQCustomPlot::angularRangeSlotDeletingTheAxisIsSafe()
+{
+  auto* angular = new QCPPolarAxisAngular(mPlot);
+  const QPointer<QCPPolarAxisAngular> alive(angular);
+  int second = 0;
+  expectNoSecondRangeSignal(angular, angular, &second);
+  angular->setRange(0, 180);
+  QVERIFY(!alive);
+  QCOMPARE(second, 0);
+}
+
+void TestQCustomPlot::radialRangeSlotDeletingTheAxisIsSafe()
+{
+  for (bool viaScaleType : { false, true })
+  {
+    auto* angular = new QCPPolarAxisAngular(mPlot);
+    auto* radial = angular->radialAxis();
+    radial->setRange(-1, 10);
+    const QPointer<QCPPolarAxisRadial> alive(radial);
+    int second = 0, scaleTypes = 0;
+    connect(radial, &QCPPolarAxisRadial::scaleTypeChanged, angular, [&scaleTypes] { ++scaleTypes; });
+    expectNoSecondRangeSignal(radial, angular, &second);
+    if (viaScaleType)
+      radial->setScaleType(QCPPolarAxisRadial::stLogarithmic); // sanitises the range first
+    else
+      radial->setRange(2, 3);
+    QVERIFY(!alive);
+    QCOMPARE(second, 0);
+    QCOMPARE(scaleTypes, 0);
+  }
+}

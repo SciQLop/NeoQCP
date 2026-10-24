@@ -281,10 +281,11 @@ void QCPPolarAxisRadial::setScaleType(QCPPolarAxisRadial::ScaleType type)
     if (mScaleType != type)
     {
         mScaleType = type;
+        const QPointer<QCPPolarAxisRadial> alive(this); // a rangeChanged slot may delete this axis
         if (mScaleType == stLogarithmic)
             setRange(mRange.sanitizedForLogScale());
-        // mCachedMarginValid = false;
-        emit scaleTypeChanged(mScaleType);
+        if (alive)
+            emit scaleTypeChanged(mScaleType);
     }
 }
 
@@ -312,8 +313,7 @@ void QCPPolarAxisRadial::setRange(const QCPRange& range)
     {
         mRange = range.sanitizedForLinScale();
     }
-    emit rangeChanged(mRange);
-    emit rangeChanged(mRange, oldRange);
+    emitRangeChanged(oldRange);
 }
 
 /*!
@@ -389,8 +389,7 @@ void QCPPolarAxisRadial::setRange(double lower, double upper)
     {
         mRange = mRange.sanitizedForLinScale();
     }
-    emit rangeChanged(mRange);
-    emit rangeChanged(mRange, oldRange);
+    emitRangeChanged(oldRange);
 }
 
 /*!
@@ -433,8 +432,7 @@ void QCPPolarAxisRadial::setRangeLower(double lower)
     {
         mRange = mRange.sanitizedForLinScale();
     }
-    emit rangeChanged(mRange);
-    emit rangeChanged(mRange, oldRange);
+    emitRangeChanged(oldRange);
 }
 
 /*!
@@ -456,8 +454,7 @@ void QCPPolarAxisRadial::setRangeUpper(double upper)
     {
         mRange = mRange.sanitizedForLinScale();
     }
-    emit rangeChanged(mRange);
-    emit rangeChanged(mRange, oldRange);
+    emitRangeChanged(oldRange);
 }
 
 /*!
@@ -988,8 +985,7 @@ void QCPPolarAxisRadial::moveRange(double diff)
         mRange.lower *= diff;
         mRange.upper *= diff;
     }
-    emit rangeChanged(mRange);
-    emit rangeChanged(mRange, oldRange);
+    emitRangeChanged(oldRange);
 }
 
 /*!
@@ -1043,8 +1039,7 @@ void QCPPolarAxisRadial::scaleRange(double factor, double center)
                         "as range:"
                      << center;
     }
-    emit rangeChanged(mRange);
-    emit rangeChanged(mRange, oldRange);
+    emitRangeChanged(oldRange);
 }
 
 /*!
@@ -1558,4 +1553,13 @@ QColor QCPPolarAxisRadial::getLabelColor() const
 QCP::Interaction QCPPolarAxisRadial::selectionCategory() const
 {
     return QCP::iSelectAxes;
+}
+
+// Both range signals: a slot of the first may delete this axis.
+void QCPPolarAxisRadial::emitRangeChanged(const QCPRange& oldRange)
+{
+    const QPointer<QCPPolarAxisRadial> alive(this);
+    emit rangeChanged(mRange);
+    if (alive)
+        emit rangeChanged(mRange, oldRange);
 }

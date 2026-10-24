@@ -396,8 +396,7 @@ void QCPPolarAxisAngular::moveRange(double diff)
     QCPRange oldRange = mRange;
     mRange.lower += diff;
     mRange.upper += diff;
-    emit rangeChanged(mRange);
-    emit rangeChanged(mRange, oldRange);
+    emitRangeChanged(oldRange);
 }
 
 /*!
@@ -431,8 +430,7 @@ void QCPPolarAxisAngular::scaleRange(double factor, double center)
     newRange.upper = (mRange.upper - center) * factor + center;
     if (QCPRange::validRange(newRange))
         mRange = newRange.sanitizedForLinScale();
-    emit rangeChanged(mRange);
-    emit rangeChanged(mRange, oldRange);
+    emitRangeChanged(oldRange);
 }
 
 /*!
@@ -813,8 +811,7 @@ void QCPPolarAxisAngular::setRange(const QCPRange& range)
         return;
     QCPRange oldRange = mRange;
     mRange = range.sanitizedForLinScale();
-    emit rangeChanged(mRange);
-    emit rangeChanged(mRange, oldRange);
+    emitRangeChanged(oldRange);
 }
 
 /*!
@@ -883,8 +880,7 @@ void QCPPolarAxisAngular::setRange(double lower, double upper)
     mRange.lower = lower;
     mRange.upper = upper;
     mRange = mRange.sanitizedForLinScale();
-    emit rangeChanged(mRange);
-    emit rangeChanged(mRange, oldRange);
+    emitRangeChanged(oldRange);
 }
 
 /*!
@@ -920,8 +916,7 @@ void QCPPolarAxisAngular::setRangeLower(double lower)
     QCPRange oldRange = mRange;
     mRange.lower = lower;
     mRange = mRange.sanitizedForLinScale();
-    emit rangeChanged(mRange);
-    emit rangeChanged(mRange, oldRange);
+    emitRangeChanged(oldRange);
 }
 
 /*!
@@ -936,8 +931,7 @@ void QCPPolarAxisAngular::setRangeUpper(double upper)
     QCPRange oldRange = mRange;
     mRange.upper = upper;
     mRange = mRange.sanitizedForLinScale();
-    emit rangeChanged(mRange);
-    emit rangeChanged(mRange, oldRange);
+    emitRangeChanged(oldRange);
 }
 
 /*!
@@ -1648,6 +1642,7 @@ void QCPPolarAxisAngular::mouseMoveEvent(QMouseEvent* event,
                                          [[maybe_unused]] const QPointF& startPos)
 {
     bool doReplot = false;
+    const QPointer<QCPPolarAxisAngular> alive(this); // a rangeChanged slot may delete this axis
     // Mouse range dragging interaction:
     if (mDragging && mParentPlot->interactions().testFlag(QCP::iRangeDrag))
     {
@@ -1662,7 +1657,7 @@ void QCPPolarAxisAngular::mouseMoveEvent(QMouseEvent* event,
             setRange(mDragAngularStart.lower + diff, mDragAngularStart.upper + diff);
         }
 
-        for (int i = 0; i < mRadialAxes.size(); ++i)
+        for (int i = 0; alive && i < mRadialAxes.size(); ++i)
         {
             QCPPolarAxisRadial* ax = mRadialAxes.at(i);
             if (!ax->rangeDrag())
@@ -1689,7 +1684,7 @@ void QCPPolarAxisAngular::mouseMoveEvent(QMouseEvent* event,
             }
         }
 
-        if (doReplot) // if either vertical or horizontal drag was enabled, do a replot
+        if (alive && doReplot) // if either vertical or horizontal drag was enabled, do a replot
         {
             if (mParentPlot->noAntialiasingOnDrag())
                 mParentPlot->setNotAntialiasedElements(QCP::aeAll);
@@ -1727,6 +1722,7 @@ void QCPPolarAxisAngular::mouseReleaseEvent([[maybe_unused]] QMouseEvent* event,
 void QCPPolarAxisAngular::wheelEvent(QWheelEvent* event)
 {
     bool doReplot = false;
+    const QPointer<QCPPolarAxisAngular> alive(this); // a rangeChanged slot may delete this axis
     // Mouse range zooming interaction:
     if (mParentPlot->interactions().testFlag(QCP::iRangeZoom))
     {
@@ -1749,7 +1745,7 @@ void QCPPolarAxisAngular::wheelEvent(QWheelEvent* event)
             scaleRange(qPow(mRangeZoomFactor, wheelSteps), angleCoord);
         }
 
-        for (int i = 0; i < mRadialAxes.size(); ++i)
+        for (int i = 0; alive && i < mRadialAxes.size(); ++i)
         {
             QCPPolarAxisRadial* ax = mRadialAxes.at(i);
             if (!ax->rangeZoom())
@@ -1760,7 +1756,7 @@ void QCPPolarAxisAngular::wheelEvent(QWheelEvent* event)
             ax->scaleRange(qPow(ax->rangeZoomFactor(), wheelSteps), radiusCoord);
         }
     }
-    if (doReplot)
+    if (alive && doReplot)
         mParentPlot->replot(QCustomPlot::rpQueuedReplot);
 }
 
@@ -1786,4 +1782,13 @@ bool QCPPolarAxisAngular::registerPolarGraph(QCPPolarGraph* graph)
                          // (via QCPLayerable constructor)
         graph->setLayer(mParentPlot->currentLayer());
     return true;
+}
+
+// Both range signals: a slot of the first may delete this axis.
+void QCPPolarAxisAngular::emitRangeChanged(const QCPRange& oldRange)
+{
+    const QPointer<QCPPolarAxisAngular> alive(this);
+    emit rangeChanged(mRange);
+    if (alive)
+        emit rangeChanged(mRange, oldRange);
 }

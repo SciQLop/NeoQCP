@@ -375,6 +375,7 @@ protected:
 
 private:
     Q_DISABLE_COPY(QCPPolarAxisAngular)
+    void emitRangeChanged(const QCPRange& oldRange);
 
     friend class QCustomPlot;
     friend class QCPPolarGrid;

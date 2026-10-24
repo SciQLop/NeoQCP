@@ -331,6 +331,7 @@ protected:
 
 private:
     Q_DISABLE_COPY(QCPPolarAxisRadial)
+    void emitRangeChanged(const QCPRange& oldRange);
 
     friend class QCustomPlot;
     friend class QCPPolarAxisAngular;

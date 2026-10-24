@@ -34,6 +34,8 @@ private slots:
   void rectSelectionSlotDeletingThePlotIsSafe();
   void rectZoomSlotDeletingThePlotIsSafe();
   void releaseSlotDeletingThePlotIsSafe();
+  void angularRangeSlotDeletingTheAxisIsSafe();
+  void radialRangeSlotDeletingTheAxisIsSafe();
 
 private:
   QCustomPlot *mPlot;
