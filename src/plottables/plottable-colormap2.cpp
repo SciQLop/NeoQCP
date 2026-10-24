@@ -163,15 +163,11 @@ void QCPColorMap2::dataChanged()
 
 void QCPColorMap2::setGradient(const QCPColorGradient& gradient)
 {
-    if (mRenderer.gradient() != gradient)
-    {
-        mRenderer.setGradient(gradient);
-        Q_EMIT gradientChanged(mRenderer.gradient());
-        if (mLayer)
-            mLayer->markDirty();
-        if (mParentPlot)
-            mParentPlot->replot(QCustomPlot::rpQueuedReplot);
-    }
+    if (mRenderer.gradient() == gradient)
+        return;
+    mRenderer.setGradient(gradient);
+    redrawLater();
+    Q_EMIT gradientChanged(mRenderer.gradient()); // last: a slot may delete this colour map
 }
 
 void QCPColorMap2::setColorScale(QCPColorScale* colorScale)
@@ -188,9 +184,15 @@ void QCPColorMap2::setColorScale(QCPColorScale* colorScale)
     mRenderer.setColorScale(colorScale);
     if (colorScale)
     {
+        // Each setter signals, and a slot may delete this colour map.
+        const QPointer<QCPColorMap2> alive(this);
         setGradient(colorScale->gradient());
-        setDataScaleType(colorScale->dataScaleType());
-        setDataRange(colorScale->dataRange());
+        if (alive)
+            setDataScaleType(colorScale->dataScaleType());
+        if (alive)
+            setDataRange(colorScale->dataRange());
+        if (!alive)
+            return;
         connect(this, &QCPColorMap2::dataRangeChanged, colorScale, &QCPColorScale::setDataRange);
         connect(this, &QCPColorMap2::gradientChanged, colorScale, &QCPColorScale::setGradient);
         connect(this, &QCPColorMap2::dataScaleTypeChanged, colorScale, &QCPColorScale::setDataScaleType);
@@ -207,35 +209,37 @@ void QCPColorMap2::setDataRange(const QCPRange& range)
     QCPRange cur = mRenderer.dataRange();
     if (prev.lower != cur.lower || prev.upper != cur.upper)
     {
-        Q_EMIT dataRangeChanged(cur);
-        if (mLayer)
-            mLayer->markDirty();
-        if (mParentPlot)
-            mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+        redrawLater();
+        Q_EMIT dataRangeChanged(cur); // last: a slot may delete this colour map
     }
 }
 
 void QCPColorMap2::setDataScaleType(QCPAxis::ScaleType type)
 {
-    if (mRenderer.dataScaleType() != type)
-    {
-        QCPRange prevRange = mRenderer.dataRange();
-        mRenderer.setDataScaleType(type);
-        installResampleTransform();
-        const QPointer<QCPColorMap2> alive(this);
-        if (mDataSource)
-            mPipeline.onDataChanged();
-        if (!alive)
-            return; // its busyChanged slot deleted this colour map
-        QCPRange curRange = mRenderer.dataRange();
-        if (prevRange.lower != curRange.lower || prevRange.upper != curRange.upper)
-            Q_EMIT dataRangeChanged(curRange);
+    if (mRenderer.dataScaleType() == type)
+        return;
+    const QCPRange prevRange = mRenderer.dataRange();
+    mRenderer.setDataScaleType(type);
+    installResampleTransform();
+    const QPointer<QCPColorMap2> alive(this);
+    if (mDataSource)
+        mPipeline.onDataChanged();
+    if (!alive)
+        return; // its busyChanged slot deleted this colour map
+    redrawLater();
+    const QCPRange curRange = mRenderer.dataRange();
+    if (prevRange.lower != curRange.lower || prevRange.upper != curRange.upper)
+        Q_EMIT dataRangeChanged(curRange);
+    if (alive)
         Q_EMIT dataScaleTypeChanged(type);
-        if (mLayer)
-            mLayer->markDirty();
-        if (mParentPlot)
-            mParentPlot->replot(QCustomPlot::rpQueuedReplot);
-    }
+}
+
+void QCPColorMap2::redrawLater()
+{
+    if (mLayer)
+        mLayer->markDirty();
+    if (mParentPlot)
+        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
 }
 
 QCPRange QCPColorMap2::colorDataBounds(bool& found, bool recalc) const

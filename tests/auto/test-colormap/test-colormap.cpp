@@ -787,3 +787,62 @@ void TestColorMap::QCPColorMap2_drawEmitsNoBusyChange()
   QCOMPARE(busyChangesMidReplot, 0);
   QTRY_VERIFY_WITH_TIMEOUT(!cm->pipeline().isBusy(), 2000);
 }
+
+namespace {
+template <typename Plottable, typename Signal>
+void removeOn(Plottable* plottable, Signal signal)
+{
+  auto* plot = plottable->parentPlot();
+  QObject::connect(plottable, signal, plot,
+                   [plot, plottable] { QVERIFY(plot->removePlottable(plottable)); },
+                   Qt::SingleShotConnection);
+}
+
+// Each colour setter of a GPU colour map: a slot deleting the map from the signal must end the
+// setter, so the map is neither touched nor made to emit again.
+template <typename Map>
+void colourSettersSurviveADeletingSlot(QCustomPlot* plot)
+{
+  const auto check = [plot](auto signal, auto apply) {
+    auto* map = new Map(plot->xAxis, plot->yAxis);
+    map->setDataRange(QCPRange(-1, 10));
+    removeOn(map, signal);
+    apply(map);
+    QCOMPARE(plot->plottableCount(), 0);
+  };
+  // The log scale sanitises the range, so dataRangeChanged comes first.
+  check(&Map::dataRangeChanged, [](Map* m) { m->setDataScaleType(QCPAxis::stLogarithmic); });
+  check(&Map::dataScaleTypeChanged, [](Map* m) { m->setDataScaleType(QCPAxis::stLogarithmic); });
+  check(&Map::dataRangeChanged, [](Map* m) { m->setDataRange(QCPRange(2, 3)); });
+  check(&Map::gradientChanged,
+        [](Map* m) { m->setGradient(QCPColorGradient(QCPColorGradient::gpHot)); });
+  auto* scale = new QCPColorScale(plot);
+  scale->setGradient(QCPColorGradient(QCPColorGradient::gpHot));
+  scale->setDataScaleType(QCPAxis::stLogarithmic);
+  check(&Map::gradientChanged, [scale](Map* m) { m->setColorScale(scale); });
+  check(&Map::dataScaleTypeChanged, [scale](Map* m) { m->setColorScale(scale); });
+  delete scale;
+}
+} // namespace
+
+void TestColorMap::QCPColorMap2_colourSlotDeletingTheMapIsSafe()
+{
+  QVERIFY(mPlot->removePlottable(mColorMap));
+  colourSettersSurviveADeletingSlot<QCPColorMap2>(mPlot);
+}
+
+void TestColorMap::QCPHistogram2D_colourSlotDeletingTheMapIsSafe()
+{
+  QVERIFY(mPlot->removePlottable(mColorMap));
+  colourSettersSurviveADeletingSlot<QCPHistogram2D>(mPlot);
+}
+
+// The classic map sanitises its range for the log scale after it signals the scale type.
+void TestColorMap::QCPColorMap_scaleTypeSlotDeletingTheMapIsSafe()
+{
+  mColorMap->setDataRange(QCPRange(-1, 10));
+  removeOn(mColorMap, &QCPColorMap::dataScaleTypeChanged);
+  mColorMap->setDataScaleType(QCPAxis::stLogarithmic);
+  QCOMPARE(mPlot->plottableCount(), 0);
+}
+

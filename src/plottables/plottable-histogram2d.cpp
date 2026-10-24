@@ -155,15 +155,11 @@ void QCPHistogram2D::setNormalization(Normalization norm)
 
 void QCPHistogram2D::setGradient(const QCPColorGradient& gradient)
 {
-    if (mRenderer.gradient() != gradient)
-    {
-        mRenderer.setGradient(gradient);
-        Q_EMIT gradientChanged(mRenderer.gradient());
-        if (mLayer)
-            mLayer->markDirty();
-        if (mParentPlot)
-            mParentPlot->replot(QCustomPlot::rpQueuedReplot);
-    }
+    if (mRenderer.gradient() == gradient)
+        return;
+    mRenderer.setGradient(gradient);
+    redrawLater();
+    Q_EMIT gradientChanged(mRenderer.gradient()); // last: a slot may delete this histogram
 }
 
 void QCPHistogram2D::setColorScale(QCPColorScale* scale)
@@ -180,9 +176,15 @@ void QCPHistogram2D::setColorScale(QCPColorScale* scale)
     mRenderer.setColorScale(scale);
     if (scale)
     {
+        // Each setter signals, and a slot may delete this histogram.
+        const QPointer<QCPHistogram2D> alive(this);
         setGradient(scale->gradient());
-        setDataScaleType(scale->dataScaleType());
-        setDataRange(scale->dataRange());
+        if (alive)
+            setDataScaleType(scale->dataScaleType());
+        if (alive)
+            setDataRange(scale->dataRange());
+        if (!alive)
+            return;
         connect(this, &QCPHistogram2D::dataRangeChanged, scale, &QCPColorScale::setDataRange);
         connect(this, &QCPHistogram2D::gradientChanged, scale, &QCPColorScale::setGradient);
         connect(this, &QCPHistogram2D::dataScaleTypeChanged, scale, &QCPColorScale::setDataScaleType);
@@ -199,29 +201,32 @@ void QCPHistogram2D::setDataRange(const QCPRange& range)
     QCPRange cur = mRenderer.dataRange();
     if (prev.lower != cur.lower || prev.upper != cur.upper)
     {
-        Q_EMIT dataRangeChanged(cur);
-        if (mLayer)
-            mLayer->markDirty();
-        if (mParentPlot)
-            mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+        redrawLater();
+        Q_EMIT dataRangeChanged(cur); // last: a slot may delete this histogram
     }
 }
 
 void QCPHistogram2D::setDataScaleType(QCPAxis::ScaleType type)
 {
-    if (mRenderer.dataScaleType() != type)
-    {
-        QCPRange prevRange = mRenderer.dataRange();
-        mRenderer.setDataScaleType(type);
-        QCPRange curRange = mRenderer.dataRange();
-        if (prevRange.lower != curRange.lower || prevRange.upper != curRange.upper)
-            Q_EMIT dataRangeChanged(curRange);
+    if (mRenderer.dataScaleType() == type)
+        return;
+    const QCPRange prevRange = mRenderer.dataRange();
+    mRenderer.setDataScaleType(type);
+    redrawLater();
+    const QCPRange curRange = mRenderer.dataRange();
+    const QPointer<QCPHistogram2D> alive(this);
+    if (prevRange.lower != curRange.lower || prevRange.upper != curRange.upper)
+        Q_EMIT dataRangeChanged(curRange);
+    if (alive)
         Q_EMIT dataScaleTypeChanged(type);
-        if (mLayer)
-            mLayer->markDirty();
-        if (mParentPlot)
-            mParentPlot->replot(QCustomPlot::rpQueuedReplot);
-    }
+}
+
+void QCPHistogram2D::redrawLater()
+{
+    if (mLayer)
+        mLayer->markDirty();
+    if (mParentPlot)
+        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
 }
 
 const QCPColorMapData* QCPHistogram2D::binned() const

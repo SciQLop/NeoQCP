@@ -145,6 +145,7 @@ protected:
 private:
     [[nodiscard]] bool resampledForAnotherSize() const;
     void installResampleTransform();
+    void redrawLater();
 
     std::shared_ptr<QCPAbstractDataSource2D> mDataSource;
     // Captured by value in the pipeline transform (re-baked by setGapThreshold / setDataScaleType)

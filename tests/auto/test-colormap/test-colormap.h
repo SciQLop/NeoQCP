@@ -32,6 +32,9 @@ private slots:
   void QCPColorMapData_fillNonFiniteKeepsBoundsDegenerate();
   void QCPColorScale_rescaleDataRangeIncludesColorMap2();
   void QCPColorMap2_drawEmitsNoBusyChange();
+  void QCPColorMap2_colourSlotDeletingTheMapIsSafe();
+  void QCPHistogram2D_colourSlotDeletingTheMapIsSafe();
+  void QCPColorMap_scaleTypeSlotDeletingTheMapIsSafe();
 
 private:
   QCustomPlot *mPlot;

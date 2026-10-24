@@ -821,8 +821,9 @@ void QCPColorMap::setDataScaleType(QCPAxis::ScaleType scaleType)
     {
         mDataScaleType = scaleType;
         mMapImageInvalidated = true;
+        const QPointer<QCPColorMap> alive(this); // a slot may delete this colour map
         emit dataScaleTypeChanged(mDataScaleType);
-        if (mDataScaleType == QCPAxis::stLogarithmic)
+        if (alive && mDataScaleType == QCPAxis::stLogarithmic)
             setDataRange(mDataRange.sanitizedForLogScale());
     }
 }

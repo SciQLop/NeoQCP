@@ -111,6 +111,8 @@ protected:
     void releaseGpuResources() override { mRenderer.releaseRhiLayer(); }
 
 private:
+    void redrawLater();
+
     std::shared_ptr<QCPAbstractDataSource> mDataSource;
     int mKeyBins = 100;
     int mValueBins = 100;
