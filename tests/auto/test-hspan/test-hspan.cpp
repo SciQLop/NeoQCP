@@ -231,3 +231,57 @@ void TestHSpan::pixelModeDragMovesByPixels()
     QCOMPARE(span->range().lower, 140.0);
     QCOMPARE(span->range().upper, 240.0);
 }
+
+void TestHSpan::dataDragMovesByMouseDelta()
+{
+    auto* span = new QCPItemHSpan(mPlot);
+    span->setRange(QCPRange(3, 7));
+    mPlot->replot();
+    const auto* axis = mPlot->yAxis;
+    const double lower = axis->pixelToCoord(axis->coordToPixel(3) + 40);
+    const double upper = axis->pixelToCoord(axis->coordToPixel(7) + 40);
+    const QPoint from(mPlot->axisRect()->rect().center().x(), qRound(axis->coordToPixel(5)));
+    sendMouse(mPlot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseMove, from + QPoint(0, 40), Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseButtonRelease, from + QPoint(0, 40), Qt::NoButton);
+    QCOMPARE(span->range().lower, lower);
+    QCOMPARE(span->range().upper, upper);
+}
+
+// On a log axis the drag follows the mouse in pixels: the edges move by different data amounts.
+void TestHSpan::logAxisDragFollowsTheMouseInPixels()
+{
+    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setRange(1, 1000);
+    mPlot->replot();
+    auto* span = new QCPItemHSpan(mPlot);
+    span->setRange(QCPRange(10, 100));
+    mPlot->replot();
+    const auto* axis = mPlot->yAxis;
+    const double lower = axis->pixelToCoord(axis->coordToPixel(10) + 40);
+    const double upper = axis->pixelToCoord(axis->coordToPixel(100) + 40);
+    const QPoint from(mPlot->axisRect()->rect().center().x(), qRound(axis->coordToPixel(30)));
+    sendMouse(mPlot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseMove, from + QPoint(0, 40), Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseButtonRelease, from + QPoint(0, 40), Qt::NoButton);
+    QCOMPARE(span->range().lower, lower);
+    QCOMPARE(span->range().upper, upper);
+}
+
+void TestHSpan::mixedEdgesEachMoveInTheirOwnUnit()
+{
+    auto* span = new QCPItemHSpan(mPlot);
+    span->lowerEdge->setTypeY(QCPItemPosition::ptAxisRectAbsolute);
+    span->lowerEdge->setCoords(0, 200);
+    span->upperEdge->setCoords(1, 7);
+    mPlot->replot();
+    const auto* axis = mPlot->yAxis;
+    const QRect axRect = mPlot->axisRect()->rect();
+    const double upper = axis->pixelToCoord(axis->coordToPixel(7) + 40);
+    const QPoint from(axRect.center().x(), axRect.top() + 150);
+    sendMouse(mPlot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseMove, from + QPoint(0, 40), Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseButtonRelease, from + QPoint(0, 40), Qt::NoButton);
+    QCOMPARE(span->lowerEdge->coords().y(), 240.0);
+    QCOMPARE(span->upperEdge->coords().y(), upper);
+}

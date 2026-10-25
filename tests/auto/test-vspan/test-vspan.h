@@ -26,6 +26,9 @@ private slots:
     void setRangeSlotDeletingTheSpanIsSafe();
     void dragSlotDeletingTheSpanIsSafe();
     void pixelModeDragMovesByPixels();
+    void dataDragMovesByMouseDelta();
+    void logAxisDragFollowsTheMouseInPixels();
+    void mixedEdgesEachMoveInTheirOwnUnit();
 
 private:
     QCustomPlot* mPlot = nullptr;

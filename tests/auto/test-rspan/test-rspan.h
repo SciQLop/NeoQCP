@@ -19,6 +19,9 @@ private slots:
     void edgesHonourTheirPositionType();
     void fillDragSlotDeletingTheSpanIsSafe();
     void pixelModeDragMovesByPixels();
+    void dataDragMovesByMouseDelta();
+    void logAxisDragFollowsTheMouseInPixels();
+    void mixedEdgesEachMoveInTheirOwnUnit();
 
 private:
     QCustomPlot* mPlot = nullptr;

@@ -224,3 +224,59 @@ void TestRSpan::pixelModeDragMovesByPixels()
     QCOMPARE(span->valueRange().lower, 80.0);
     QCOMPARE(span->valueRange().upper, 130.0);
 }
+
+void TestRSpan::dataDragMovesByMouseDelta()
+{
+    auto* span = new QCPItemRSpan(mPlot);
+    span->setKeyRange(QCPRange(3, 7));
+    span->setValueRange(QCPRange(2, 6));
+    mPlot->replot();
+    const auto* x = mPlot->xAxis;
+    const auto* y = mPlot->yAxis;
+    const QPoint from(qRound(x->coordToPixel(5)), qRound(y->coordToPixel(4)));
+    sendMouse(mPlot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseMove, from + QPoint(40, 30), Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseButtonRelease, from + QPoint(40, 30), Qt::NoButton);
+    QCOMPARE(span->keyRange().lower, x->pixelToCoord(x->coordToPixel(3) + 40));
+    QCOMPARE(span->keyRange().upper, x->pixelToCoord(x->coordToPixel(7) + 40));
+    QCOMPARE(span->valueRange().lower, y->pixelToCoord(y->coordToPixel(2) + 30));
+    QCOMPARE(span->valueRange().upper, y->pixelToCoord(y->coordToPixel(6) + 30));
+}
+
+void TestRSpan::logAxisDragFollowsTheMouseInPixels()
+{
+    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setRange(1, 1000);
+    mPlot->replot();
+    auto* span = new QCPItemRSpan(mPlot);
+    span->setKeyRange(QCPRange(10, 100));
+    span->setValueRange(QCPRange(2, 6));
+    mPlot->replot();
+    const auto* x = mPlot->xAxis;
+    const auto* y = mPlot->yAxis;
+    const QPoint from(qRound(x->coordToPixel(30)), qRound(y->coordToPixel(4)));
+    sendMouse(mPlot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseMove, from + QPoint(40, 0), Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseButtonRelease, from + QPoint(40, 0), Qt::NoButton);
+    QCOMPARE(span->keyRange().lower, x->pixelToCoord(x->coordToPixel(10) + 40));
+    QCOMPARE(span->keyRange().upper, x->pixelToCoord(x->coordToPixel(100) + 40));
+}
+
+void TestRSpan::mixedEdgesEachMoveInTheirOwnUnit()
+{
+    auto* span = new QCPItemRSpan(mPlot);
+    span->leftEdge->setTypeX(QCPItemPosition::ptAxisRectAbsolute);
+    span->leftEdge->setCoords(100, span->leftEdge->coords().y());
+    span->rightEdge->setCoords(7, span->rightEdge->coords().y());
+    span->setValueRange(QCPRange(2, 6));
+    mPlot->replot();
+    const auto* x = mPlot->xAxis;
+    const auto* y = mPlot->yAxis;
+    const QRect axRect = mPlot->axisRect()->rect();
+    const QPoint from(axRect.left() + 150, qRound(y->coordToPixel(4)));
+    sendMouse(mPlot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseMove, from + QPoint(40, 0), Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseButtonRelease, from + QPoint(40, 0), Qt::NoButton);
+    QCOMPARE(span->leftEdge->coords().x(), 140.0);
+    QCOMPARE(span->rightEdge->coords().x(), x->pixelToCoord(x->coordToPixel(7) + 40));
+}
