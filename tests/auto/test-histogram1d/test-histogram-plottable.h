@@ -1,7 +1,9 @@
 #pragma once
 #include <QtTest/QtTest>
+#include <functional>
 
 class QCustomPlot;
+class QCPHistogram;
 
 class TestHistogramPlottable : public QObject
 {
@@ -53,7 +55,42 @@ private slots:
     void readySlotRemovingTheHistogramIsSafe();
     void edgesSlotRemovingTheHistogramIsSafe();
     void preBinnedReadySlotRemovingTheHistogramIsSafe();
+    void logBinsHonourAFixedRangeStartingAtOne();
+    void fixedRangeStartingAtZeroFallsBackWhenTheAxisTurnsLog();
+    void flatDataGetsAWidenedRange();
+    void aSingleBinCanBePreBinned();
+    void preBinnedCountsNothing();
+    void logValueRangeStartsAtTheSmallestPositiveHeight();
+    void keyAxisScaleChangeRebinsWithoutADraw();
+    void shownResultOfTheOtherScaleIsStaleEvenWhenTheTransformIsFresh();
+    void logAxisFromTheStartIsNotStale();
+    void normalizationIsAppliedToTheBars();
+    void staleScaleIsResetAgainAfterAJobDelivered();
+    void resultOfTheOldScaleIsResetWithoutADraw();
+    void nonPositiveBinCountsAreIgnored();
+    void theSameBinCountDoesNotRebin();
+    void changingTheStyleRequestsARepaint();
+    void changingTheColoursRequestsARepaint();
+    void newBarsRequestARepaint();
+    void exportOfPreBinnedBarsLeavesTheTransformAlone();
+    void exportOfAStaleScaleForgetsTheAutoRange();
+    void emptyHistogramHasNoContent();
+    void withoutBarsThereIsNoKeyRange();
+    void noPositiveEdgeMeansNoPositiveKeyRange();
+    void keyRangeSpansTheEdges();
+    void valueRangeOfSmallHeightsStartsAtZero();
+    void barsHaveADarkerOutlineAroundTheBase();
+    void stepOutlineIsOnePixelThick();
+    void stepOutlineHasNoBase();
+    void fillHasNoBorderWhateverPenThePainterHad();
+    void anAlmostTransparentFillStillPaints();
+    void drawingRestoresThePainter();
+    void gpuBarsHaveFillAndOutline();
+    void gpuBarsAreNotShifted();
+    void gpuStepOfOneColumnHasOnlyTheOutline();
+    void gpuAnAlmostTransparentFillStillDraws();
 
 private:
+    void expectRepaint(QCPHistogram* h, const std::function<void()>& change);
     QCustomPlot* mPlot = nullptr;
 };

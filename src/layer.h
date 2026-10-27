@@ -123,6 +123,7 @@ private:
     friend class TestQCPLegend;
     friend class TestPlottableGroup;
     friend class TestOverlay;
+    friend class TestHistogramPlottable;
 };
 Q_DECLARE_METATYPE(QCPLayer::LayerMode)
 

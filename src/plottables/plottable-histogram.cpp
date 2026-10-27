@@ -411,7 +411,6 @@ void QCPHistogram::paintColumn(QCPPainter* painter, std::span<const qcp::histogr
                                const ColumnLook& look) const
 {
     painter->save();
-    applyDefaultAntialiasingHint(painter);
     painter->setPen(Qt::NoPen);
     painter->setBrush(look.fill);
     for (const auto& bar : bars)
