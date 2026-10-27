@@ -35,6 +35,7 @@ private slots:
     void selectEventAdditive();
     void deselectEventClearsAll();
     void componentSelectionUpdatesBase();
+    void anInLegendIndexPastTheEndIsIgnored();
 
     // Legend
     void addToLegendCreatesGroupItem();
@@ -75,6 +76,15 @@ private slots:
     void defaultFillFollowsTheOwnerColourOnTheGpu();
     void autoScaleIncludesHiddenLineBandEdges();
     void fillFollowsADownsampledLine();
+    void settingAFillRepaintsTheLayer();
+    void clearingAFillRepaintsTheLayer();
+    void aFillWithoutItsComponentYetIsGray();
+    void aRebuiltGpuFillIsNotDrawnTwice();
+    void aFillOnAColumnOnlyTheStagedSourceHasIsNotDrawn();
+    void denseFillRowsAreBinnedAboveFourPerPixel();
+    void paintFillDrawsNoOutline();
+    void paintFillHonoursTheFillAntialiasing();
+    void paintFillRestoresThePainter();
 
     // Error bars
     void sparseErrorBarsAreDrawnAsBars();
@@ -88,6 +98,7 @@ private slots:
     void anEmptyWiderSourceDoesNotGrowTheComponents();
     void aStagedEmptyWiderSourceDoesNotGrowTheComponents();
     void aFirstEmptySourceAcceptsItsColumns();
+    void aNullSourceClearsTheComponents();
     void aNarrowerSourceDropsDecorationsSetDuringAnEmptyWindow();
     void keptComponentsStayEditableDuringAnEmptyWindow();
     void errorBarsRejectBadColumns();
@@ -96,9 +107,30 @@ private slots:
     void errorBarsHideTheirBoundsFromTheLegend();
     void errorBoundsSetBeforeDataStayOutOfTheLegend();
     void legendIconOfErrorBarsHasABarGlyph();
+    void legendIconOfErrorBarsHasACapAtEachEnd();
+    void legendIconOfErrorBarsUsesTheBarsPen();
+    void legendIconHasOneSegmentPerComponent();
+    void legendSwatchIsTwelvePixelsTall();
+    void settingErrorBarsRepaintsTheLayer();
+    void clearingErrorBarsRepaintsTheLayer();
+    void errorBarsOfDifferentColumnsCoexist();
+    void replacingErrorBarsKeepsOnlyTheNewOnes();
+    void errorBoundOfZeroOnALogAxisStopsAtTheEdge();
+    void errorBoundsInsideALogAxisAreNotClamped();
+    void barsCrowdedAtAnEdgeOfTheViewForceABand();
+    void barsOutsideTheViewDoNotForceABand();
+    void aOneSidedErrorBandKeepsItsValueEdge();
+    void errorBarsOnResampledDataAreABand();
+    void denseErrorBandIsTranslucent();
+    void hiddenComponentHidesItsErrorBars();
+    void errorBarsOnAColumnOnlyTheStagedSourceHasAreNotDrawn();
 
     // Line cache
     void cacheExtendsBeyondVisibleRange();
+    void lineCacheWindowFollowsTheKeyScale_data();
+    void lineCacheWindowFollowsTheKeyScale();
+    void aNarrowerThenWiderStagedSourceKeepsTheCachedExtrusionsInRange();
+    void aWiderStagedSourceKeepsTheCachedLinesInRange();
     void zoomedOutLinesAreThinnedToThePixelWidth_data();
     void zoomedOutLinesAreThinnedToThePixelWidth();
 

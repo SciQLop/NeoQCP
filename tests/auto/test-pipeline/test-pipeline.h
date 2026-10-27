@@ -100,6 +100,8 @@ private slots:
     void multiGraphExportSynchronousFallback();
     void multiGraphLogScaleFallback();
     void multiGraphDataChangedInvalidatesL1();
+    void multiGraphDataChangedRejectsAStaleL1();
+    void multiGraphReplacedBySmallSourceRejectsAStaleL1();
     void multiGraphHiddenComponentsStillResampled();
 
     // L2 lazy rebuild (deferred to draw)

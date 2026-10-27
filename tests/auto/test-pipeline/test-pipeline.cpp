@@ -2641,6 +2641,46 @@ void TestPipeline::multiGraphDataChangedInvalidatesL1()
     QVERIFY(mg->mL1Cache);
 }
 
+// Whether the graph kept the first result to land. The `finished` slot added here runs after the
+// graph's own, so the L1 cache already holds the result if the graph accepted it.
+static bool keepsTheFirstL1ToLand(QCPMultiGraph* mg, const std::function<bool()>& hasL1)
+{
+    bool landed = false, kept = false;
+    const auto connection = QObject::connect(
+        &mg->pipeline(), &QCPMultiGraphPipeline::finished, mg, [&](uint64_t) {
+            if (!std::exchange(landed, true))
+                kept = hasL1();
+        });
+    QTest::qWaitFor([&] { return landed; }, 30000);
+    QObject::disconnect(connection);
+    return landed && kept;
+}
+
+// The job running for the old data lands first and must not be taken for the new data's.
+void TestPipeline::multiGraphDataChangedRejectsAStaleL1()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    const int N = 10'000'001;
+    mPlot->xAxis->setRange(0, N - 1);
+    mPlot->yAxis->setRange(-1, 1);
+    mg->setDataSource(std::make_shared<SyntheticLargeMultiSource>(N, 2));
+    mg->dataChanged();
+    QVERIFY(!keepsTheFirstL1ToLand(mg, [mg] { return bool(mg->mL1Cache); }));
+}
+
+// No job is coming for a source too small to resample, so the running one is the only L1 left.
+void TestPipeline::multiGraphReplacedBySmallSourceRejectsAStaleL1()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    const int N = 10'000'001;
+    mPlot->xAxis->setRange(0, N - 1);
+    mPlot->yAxis->setRange(-1, 1);
+    mg->setDataSource(std::make_shared<SyntheticLargeMultiSource>(N, 2));
+    mg->setData(std::vector<double>{1, 2, 3}, std::vector<std::vector<double>>{{1, 2, 3}});
+    QVERIFY(!mg->pipeline().hasTransform());
+    QVERIFY(!keepsTheFirstL1ToLand(mg, [mg] { return bool(mg->mL1Cache); }));
+}
+
 void TestPipeline::multiGraphHiddenComponentsStillResampled()
 {
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);

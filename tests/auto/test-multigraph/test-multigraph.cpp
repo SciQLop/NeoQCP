@@ -331,8 +331,10 @@ void TestMultiGraph::componentSelectionUpdatesBase()
     mg->setData(std::vector<double>{1.0, 2.0, 3.0},
                 std::vector<std::vector<double>>{{10.0, 20.0, 30.0}});
     QVERIFY(!mg->selected());
+    QSignalSpy spy(mg, qOverload<bool>(&QCPAbstractPlottable::selectionChanged));
     mg->setComponentSelection(0, QCPDataSelection(QCPDataRange(0, 2)));
     QVERIFY(mg->selected());
+    QCOMPARE(spy.count(), 1);
 }
 
 void TestMultiGraph::addToLegendCreatesGroupItem()
@@ -1655,6 +1657,8 @@ void TestMultiGraph::errorBarsRejectBadColumns()
     QVERIFY(!mg->setComponentErrorBars(0, 1, 1));
     QVERIFY(!mg->setComponentErrorBars(0, 0, 2));
     QVERIFY(!mg->setComponentErrorBars(0, 1, 5));
+    QVERIFY(!mg->setComponentErrorBars(5, 1, 2));
+    QVERIFY(!mg->setComponentErrorBars(0, 5, 2));
 }
 
 void TestMultiGraph::capWidthChangeShowsOnTheNextFrame()
@@ -1718,4 +1722,453 @@ void TestMultiGraph::errorBoundsSetBeforeDataStayOutOfTheLegend()
     QVERIFY(mg->setComponentErrorBars(0, 1, 2));
     mg->setData(std::vector<double>{1, 2}, std::vector<std::vector<double>>{{1, 1}, {0, 0}, {2, 2}});
     QCOMPARE(mg->legendComponents(), (QVector<int>{0}));
+}
+
+void TestMultiGraph::anInLegendIndexPastTheEndIsIgnored()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    mg->setComponentInLegend(3, false);
+    mg->setComponentInLegend(-1, false);
+    QCOMPARE(mg->legendComponents(), (QVector<int>{0, 1, 2}));
+}
+
+void TestMultiGraph::aNullSourceClearsTheComponents()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    mg->setDataSource(std::shared_ptr<QCPAbstractMultiDataSource>());
+    QCOMPARE(mg->componentCount(), 0);
+}
+
+// --- A decoration change repaints the layer: a pan would otherwise translate the old pixels ---
+
+static QCPMultiGraph* settledThreeColumnGraph(QCustomPlot* plot)
+{
+    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    std::vector<double> keys(1000);
+    std::vector<std::vector<double>> columns(3, std::vector<double>(1000));
+    for (int i = 0; i < 1000; ++i)
+    {
+        keys[i] = i;
+        for (int c = 0; c < 3; ++c)
+            columns[c][i] = std::sin(i * 0.01 + c);
+    }
+    mg->setData(std::move(keys), std::move(columns));
+    plot->xAxis->setRange(0, 1000);
+    plot->yAxis->setRange(-1.5, 1.5);
+    return mg;
+}
+
+static bool layerKeepsItsPixelsAfterAPan(QCustomPlot* plot)
+{
+    plot->replot(QCustomPlot::rpImmediateRefresh);
+    plot->xAxis->moveRange(50);
+    return plot->layer("main")->canSkipRepaintForTranslation();
+}
+
+void TestMultiGraph::settingAFillRepaintsTheLayer()
+{
+    auto* mg = settledThreeColumnGraph(mPlot);
+    QVERIFY(layerKeepsItsPixelsAfterAPan(mPlot));
+    QVERIFY(mg->setComponentFill(0, 0.0));
+    QVERIFY(!mPlot->layer("main")->canSkipRepaintForTranslation());
+}
+
+void TestMultiGraph::clearingAFillRepaintsTheLayer()
+{
+    auto* mg = settledThreeColumnGraph(mPlot);
+    QVERIFY(mg->setComponentFill(0, 0.0));
+    QVERIFY(layerKeepsItsPixelsAfterAPan(mPlot));
+    mg->clearComponentFill(0);
+    QVERIFY(!mPlot->layer("main")->canSkipRepaintForTranslation());
+}
+
+void TestMultiGraph::settingErrorBarsRepaintsTheLayer()
+{
+    auto* mg = settledThreeColumnGraph(mPlot);
+    QVERIFY(layerKeepsItsPixelsAfterAPan(mPlot));
+    QVERIFY(mg->setComponentErrorBars(0, 1, 2));
+    QVERIFY(!mPlot->layer("main")->canSkipRepaintForTranslation());
+}
+
+void TestMultiGraph::clearingErrorBarsRepaintsTheLayer()
+{
+    auto* mg = settledThreeColumnGraph(mPlot);
+    QVERIFY(mg->setComponentErrorBars(0, 1, 2));
+    QVERIFY(layerKeepsItsPixelsAfterAPan(mPlot));
+    mg->clearComponentErrorBars(0);
+    QVERIFY(!mPlot->layer("main")->canSkipRepaintForTranslation());
+}
+
+void TestMultiGraph::errorBarsOfDifferentColumnsCoexist()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double>{1, 2}, std::vector<std::vector<double>>(6, {1, 2}));
+    QVERIFY(mg->setComponentErrorBars(0, 1, 2));
+    QVERIFY(mg->setComponentErrorBars(3, 4, 5));
+    QVERIFY(mg->componentErrorBars(0).has_value());
+    QVERIFY(mg->componentErrorBars(3).has_value());
+    mg->clearComponentErrorBars(0);
+    QVERIFY(!mg->componentErrorBars(0).has_value());
+    QVERIFY(mg->componentErrorBars(3).has_value());
+}
+
+void TestMultiGraph::replacingErrorBarsKeepsOnlyTheNewOnes()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    QVERIFY(mg->setComponentErrorBars(0, 1, 2, 6));
+    QVERIFY(mg->setComponentErrorBars(0, 1, 2, 20));
+    QCOMPARE(mg->componentErrorBars(0)->capWidthPx, 20.0);
+}
+
+void TestMultiGraph::aFillWithoutItsComponentYetIsGray()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double>{}, std::vector<std::vector<double>>(5));
+    QVERIFY(mg->setComponentFill(0, 0.0));
+    const QColor fill = mg->effectiveFillBrush(*mg->componentFill(0)).color();
+    QCOMPARE(fill.rgb(), QColor(Qt::gray).rgb());
+    QCOMPARE(fill.alpha(), 64);
+}
+
+void TestMultiGraph::aRebuiltGpuFillIsNotDrawnTwice()
+{
+    if (!showWithRhi(mPlot))
+        QSKIP("no exposed window with a QRhi in this environment");
+    auto* mg = threeColumnGraph(mPlot);
+    for (int c = 0; c < 3; ++c)
+        mg->setComponentLineStyle(c, QCPMultiGraph::lsNone);
+    const QBrush red(QColor(255, 0, 0, 64));
+    mg->setComponentFillBetween(1, 2, red);
+    mPlot->xAxis->setRange(1, 3);
+    mPlot->yAxis->setRange(-1, 5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const QPoint inside(int(mPlot->xAxis->coordToPixel(2)), int(mPlot->yAxis->coordToPixel(1.5)));
+    const QColor once = mPlot->grabFramebuffer().pixelColor(inside);
+    mg->setComponentFillBrush(1, red); // same look, but the geometry is built again
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCOMPARE(mPlot->grabFramebuffer().pixelColor(inside), once);
+}
+
+using StagedSource = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
+
+// Once the plot has drawn, a new source waits as a staged one until the plot commits it.
+static void stageColumns(QCPMultiGraph* mg, int columns)
+{
+    mg->setDataSource(std::make_shared<StagedSource>(
+        std::vector<double>{1, 2, 3}, std::vector<std::vector<double>>(columns, {1, 2, 3})));
+}
+
+static QPoint pixelOf(QCustomPlot* plot, double key, double value)
+{
+    return {int(plot->xAxis->coordToPixel(key)), int(plot->yAxis->coordToPixel(value))};
+}
+
+// The displayed source keeps its columns while a staged one waits, but the components already
+// follow the staged one.
+static QCPMultiGraph* graphWithAStagedSourceOfColumns(QCustomPlot* plot, int displayed, int staged)
+{
+    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    std::vector<std::vector<double>> columns;
+    for (int c = 0; c < displayed; ++c)
+        columns.push_back({1.0 + c / 2.0, 2.0 + c / 2.0, 3.0 + c / 2.0}); // one line each, apart
+    mg->setData(std::vector<double>{1, 2, 3}, std::move(columns));
+    mg->setComponentPens({QPen(Qt::red, 3)});
+    plot->xAxis->setRange(1, 3);
+    plot->yAxis->setRange(-1, 5);
+    plot->replot(QCustomPlot::rpImmediateRefresh);
+    stageColumns(mg, staged);
+    return mg;
+}
+
+void TestMultiGraph::aFillOnAColumnOnlyTheStagedSourceHasIsNotDrawn()
+{
+    auto* mg = graphWithAStagedSourceOfColumns(mPlot, 3, 5);
+    QVERIFY(mg->setComponentFill(3, 0.0, QBrush(Qt::red)));
+    QVERIFY(!isRedish(renderOf(mPlot).pixelColor(pixelOf(mPlot, 2, 0.5))));
+}
+
+void TestMultiGraph::errorBarsOnAColumnOnlyTheStagedSourceHasAreNotDrawn()
+{
+    auto* mg = graphWithAStagedSourceOfColumns(mPlot, 3, 5);
+    QVERIFY(mg->setComponentErrorBars(0, 1, 3, 6, QPen(Qt::red, 3)));
+    QVERIFY(!isRedish(renderOf(mPlot).pixelColor(pixelOf(mPlot, 2, 1.5))));
+}
+
+void TestMultiGraph::hiddenComponentHidesItsErrorBars()
+{
+    auto* mg = errorBarGraph(mPlot, 5, 1.0);
+    mPlot->xAxis->setRange(-0.5, 4.5);
+    mPlot->yAxis->setRange(0, 10);
+    mg->setComponentVisible(0, false);
+    QVERIFY(!isRedish(renderOf(mPlot).pixelColor(pixelOf(mPlot, 2, 4))));
+}
+
+// Both sets of cached lines follow the displayed source's columns, but an export draw resizes
+// the extrusion caches alone: a component beyond either must be skipped.
+void TestMultiGraph::aNarrowerThenWiderStagedSourceKeepsTheCachedExtrusionsInRange()
+{
+    auto* mg = graphWithAStagedSourceOfColumns(mPlot, 5, 3);
+    renderOf(mPlot);
+    stageColumns(mg, 5);
+    mPlot->layer("main")->invalidatePaintBuffer();
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCOMPARE(mg->componentCount(), 5);
+    QVERIFY(isRedish(renderOf(mPlot).pixelColor(pixelOf(mPlot, 2, 2))));
+}
+
+void TestMultiGraph::aWiderStagedSourceKeepsTheCachedLinesInRange()
+{
+    auto* mg = graphWithAStagedSourceOfColumns(mPlot, 5, 3);
+    mg->markLinesDirty();
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    stageColumns(mg, 5);
+    renderOf(mPlot);
+    mPlot->layer("main")->invalidatePaintBuffer();
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCOMPARE(mg->componentCount(), 5);
+    QVERIFY(isRedish(renderOf(mPlot).pixelColor(pixelOf(mPlot, 2, 2))));
+}
+
+void TestMultiGraph::lineCacheWindowFollowsTheKeyScale_data()
+{
+    QTest::addColumn<bool>("logKeyAxis");
+    QTest::addColumn<double>("viewLower");
+    QTest::addColumn<double>("viewUpper");
+    QTest::newRow("linear: a view's width on each side") << false << 5.0 << 15.0;
+    QTest::newRow("log: a view's ratio on each side") << true << 10.0 << 100.0;
+}
+
+// The cached lines must reach the first and last rows the window holds, or a pan exposes a gap.
+void TestMultiGraph::lineCacheWindowFollowsTheKeyScale()
+{
+    QFETCH(bool, logKeyAxis);
+    QFETCH(double, viewLower);
+    QFETCH(double, viewUpper);
+    std::vector<double> keys;
+    for (int i = 0; i < 25; ++i)
+        keys.push_back(logKeyAxis ? std::pow(10.0, i / 8.0) : double(i));
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double>(keys),
+                std::vector<std::vector<double>>{std::vector<double>(keys.size(), 1.0)});
+    mPlot->xAxis->setScaleType(logKeyAxis ? QCPAxis::stLogarithmic : QCPAxis::stLinear);
+    mPlot->xAxis->setRange(viewLower, viewUpper);
+    mPlot->yAxis->setRange(0, 2);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const auto& cached = mg->mCachedLines[0];
+    QCOMPARE(cached.first().x(), mPlot->xAxis->coordToPixel(keys.front()));
+    QCOMPARE(cached.last().x(), mPlot->xAxis->coordToPixel(keys.back()));
+}
+
+// Binned when the rows outnumber 4 per pixel of the key axis.
+void TestMultiGraph::denseFillRowsAreBinnedAboveFourPerPixel()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    renderOf(mPlot); // lays the axis rect out
+    const std::size_t width = mPlot->axisRect()->rect().width();
+    const auto rowsAtOnePixel = [](std::size_t n) {
+        return std::vector<qcp::fill::StripPoint>(n, {0.0, 0.0, 10.0});
+    };
+    QCOMPARE(mg->binnedWhenDense(rowsAtOnePixel(4 * width)).size(), 4 * width);
+    QCOMPARE(mg->binnedWhenDense(rowsAtOnePixel(4 * width + 1)).size(), std::size_t(1));
+}
+
+static const std::vector<qcp::fill::StripPoint> kSquareRows{{10, 10, 30}, {30, 10, 30}};
+
+void TestMultiGraph::paintFillDrawsNoOutline()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    QImage img(40, 40, QImage::Format_ARGB32);
+    img.fill(Qt::white);
+    QCPPainter p(&img);
+    p.setPen(QPen(Qt::blue, 8));
+    mg->paintFill(&p, QBrush(Qt::red), kSquareRows);
+    p.end();
+    QVERIFY(isRedish(img.pixelColor(11, 20)));
+}
+
+void TestMultiGraph::paintFillHonoursTheFillAntialiasing()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    mg->setAntialiasedFill(false);
+    QImage img(40, 40, QImage::Format_ARGB32);
+    img.fill(Qt::white);
+    QCPPainter p(&img);
+    p.setAntialiasing(true);
+    mg->paintFill(&p, QBrush(Qt::red), kSquareRows);
+    p.end();
+    const int green = img.pixelColor(10, 20).green(); // the edge pixel: half covered if antialiased
+    QVERIFY2(green == 0 || green == 255, qPrintable(QString::number(green)));
+}
+
+void TestMultiGraph::paintFillRestoresThePainter()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    mg->setAntialiasedFill(false);
+    QImage img(40, 40, QImage::Format_ARGB32);
+    QCPPainter p(&img);
+    p.setAntialiasing(true);
+    p.setPen(QPen(Qt::blue, 3));
+    p.setBrush(Qt::green);
+    mg->paintFill(&p, QBrush(Qt::red), kSquareRows);
+    QCOMPARE(p.pen().color(), QColor(Qt::blue));
+    QCOMPARE(p.brush().color(), QColor(Qt::green));
+    QVERIFY(p.testRenderHint(QPainter::Antialiasing));
+}
+
+void TestMultiGraph::errorBoundOfZeroOnALogAxisStopsAtTheEdge()
+{
+    auto* mg = errorBarGraph(mPlot, 3, 1.0);
+    mg->setData(std::vector<double>{0, 1, 2}, std::vector<std::vector<double>>{{1, 1, 1}, {0, 0, 0}, {2, 2, 2}});
+    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setRange(0.1, 10);
+    renderOf(mPlot); // lays the axis rect out
+    const auto bars = mg->errorBarRows(*mg->componentErrorBars(0), *mg->dataSource(), 0, 3);
+    QCOMPARE(bars[1].lower, mPlot->yAxis->coordToPixel(0.1));
+}
+
+void TestMultiGraph::errorBoundsInsideALogAxisAreNotClamped()
+{
+    auto* mg = errorBarGraph(mPlot, 3, 1.0);
+    mg->setData(std::vector<double>{0, 1, 2},
+                std::vector<std::vector<double>>{{0.5, 0.5, 0.5}, {0.25, 0.25, 0.25}, {2, 2, 2}});
+    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setRange(0.1, 10);
+    renderOf(mPlot);
+    const auto bars = mg->errorBarRows(*mg->componentErrorBars(0), *mg->dataSource(), 0, 3);
+    QCOMPARE(bars[1].value, mPlot->yAxis->coordToPixel(0.5));
+    QCOMPARE(bars[1].lower, mPlot->yAxis->coordToPixel(0.25));
+    QCOMPARE(bars[1].upper, mPlot->yAxis->coordToPixel(2));
+}
+
+static std::vector<qcp::errorbars::Bar> barsAt(std::initializer_list<double> keys)
+{
+    std::vector<qcp::errorbars::Bar> bars;
+    for (const double key : keys)
+        bars.push_back({key, 5, 3, 7});
+    return bars;
+}
+
+void TestMultiGraph::barsCrowdedAtAnEdgeOfTheViewForceABand()
+{
+    auto* mg = errorBarGraph(mPlot, 5, 1.0);
+    renderOf(mPlot); // lays the axis rect out
+    const QRect rect = mPlot->axisRect()->rect();
+    QVERIFY(!mg->errorBarsFitInView(barsAt({double(rect.left()), rect.left() + 1.0}), 10));
+    QVERIFY(!mg->errorBarsFitInView(barsAt({rect.right() - 1.0, double(rect.right())}), 10));
+}
+
+void TestMultiGraph::barsOutsideTheViewDoNotForceABand()
+{
+    auto* mg = errorBarGraph(mPlot, 5, 1.0);
+    renderOf(mPlot);
+    const QRect rect = mPlot->axisRect()->rect();
+    QVERIFY(mg->errorBarsFitInView(barsAt({rect.left() - 2.0, rect.left() - 1.0}), 10));
+    QVERIFY(mg->errorBarsFitInView(barsAt({rect.right() + 1.0, rect.right() + 2.0}), 10));
+}
+
+void TestMultiGraph::aOneSidedErrorBandKeepsItsValueEdge()
+{
+    auto* mg = errorBarGraph(mPlot, 3, 1.0);
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    mg->setData(std::vector<double>{0, 1, 2},
+                std::vector<std::vector<double>>{{5, 5, 5}, {nan, nan, nan}, {7, 7, 7}});
+    mPlot->yAxis->setRange(0, 10);
+    renderOf(mPlot);
+    const auto rows = mg->errorBandRows(*mg->componentErrorBars(0), *mg->dataSource(), 0, 3);
+    QCOMPARE(rows[1].a, mPlot->yAxis->coordToPixel(5));
+    QCOMPARE(rows[1].b, mPlot->yAxis->coordToPixel(7));
+}
+
+// Resampled rows are not the data's rows: they can only make a band, however far apart.
+void TestMultiGraph::errorBarsOnResampledDataAreABand()
+{
+    const int n = 40'000; // 3 columns: above kResampleThreshold, the async L1 pipeline runs
+    std::vector<double> x(n), y(n, 5), lo(n, 3), hi(n, 7);
+    for (int i = 0; i < n; ++i)
+        x[i] = i * 0.0005;
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::move(x), std::vector<std::vector<double>>{std::move(y), std::move(lo), std::move(hi)});
+    for (int c = 0; c < 3; ++c)
+        mg->setComponentLineStyle(c, QCPMultiGraph::lsNone);
+    mg->setComponentErrorBars(0, 1, 2, 0.0); // no cap: any spacing would fit as bars
+    mPlot->xAxis->setRange(0, 20);
+    mPlot->yAxis->setRange(0, 10);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->pipeline().isBusy(), 5000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(mg->mL2Result);
+    QVERIFY(mg->mErrorBars.first().asBand);
+}
+
+void TestMultiGraph::denseErrorBandIsTranslucent()
+{
+    errorBarGraph(mPlot, 2000, 0.01);
+    mPlot->xAxis->setRange(0, 20);
+    mPlot->yAxis->setRange(0, 10);
+    const QImage img = renderOf(mPlot);
+    const QColor between = img.pixelColor(pixelOf(mPlot, 9.5, 5)); // off the grid lines
+    QCOMPARE(between.green(), 191); // red at 64/255 over white
+}
+
+void TestMultiGraph::legendIconHasOneSegmentPerComponent()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    mg->setComponentPens({QPen(Qt::red, 3), QPen(Qt::green, 3), QPen(Qt::blue, 3)});
+    QImage img(60, 20, QImage::Format_ARGB32);
+    img.fill(Qt::white);
+    QCPPainter p(&img);
+    mg->drawLegendIcon(&p, QRectF(0, 0, 60, 20));
+    p.end();
+    QCOMPARE(img.pixelColor(10, 10).rgb(), QColor(Qt::red).rgb());
+    QCOMPARE(img.pixelColor(30, 10).rgb(), QColor(Qt::green).rgb());
+    QCOMPARE(img.pixelColor(50, 10).rgb(), QColor(Qt::blue).rgb());
+}
+
+static QImage legendIconOfErrorBars(QCustomPlot* plot, const QPen& barPen)
+{
+    auto* mg = threeColumnGraph(plot);
+    mg->setComponentPens({QPen(Qt::blue), QPen(Qt::blue), QPen(Qt::blue)});
+    mg->setComponentLineStyle(0, QCPMultiGraph::lsNone);
+    mg->setComponentErrorBars(0, 1, 2, 6, barPen);
+    QImage img(40, 20, QImage::Format_ARGB32);
+    img.fill(Qt::white);
+    QCPPainter p(&img);
+    mg->drawComponentLegendIcon(&p, 0, QLineF(0, 10, 40, 10));
+    p.end();
+    return img;
+}
+
+void TestMultiGraph::legendIconOfErrorBarsUsesTheBarsPen()
+{
+    const QImage img = legendIconOfErrorBars(mPlot, QPen(Qt::red, 2));
+    QVERIFY(isRedish(img.pixelColor(20, 10)));
+}
+
+void TestMultiGraph::legendIconOfErrorBarsHasACapAtEachEnd()
+{
+    const QImage img = legendIconOfErrorBars(mPlot, QPen(Qt::red, 2));
+    for (const int x : {18, 22}) // either side of the stem
+    {
+        QVERIFY(isRedish(img.pixelColor(x, 5)));
+        QVERIFY(isRedish(img.pixelColor(x, 15)));
+    }
+}
+
+void TestMultiGraph::legendSwatchIsTwelvePixelsTall()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double>{1, 2}, std::vector<std::vector<double>>{{0, 0}, {1, 1}});
+    mg->setComponentLineStyle(0, QCPMultiGraph::lsNone);
+    mg->setComponentLineStyle(1, QCPMultiGraph::lsNone);
+    mg->setComponentInLegend(1, false);
+    mg->setComponentFillBetween(0, 1, QBrush(Qt::red));
+    QImage img(40, 20, QImage::Format_ARGB32);
+    img.fill(Qt::white);
+    QCPPainter p(&img);
+    mg->drawComponentLegendIcon(&p, 0, QLineF(0, 10, 40, 10));
+    p.end();
+    QCOMPARE(img.pixelColor(20, 3), QColor(Qt::white));
+    QVERIFY(isRedish(img.pixelColor(20, 4)));
+    QVERIFY(isRedish(img.pixelColor(20, 15)));
+    QCOMPARE(img.pixelColor(20, 16), QColor(Qt::white));
 }
