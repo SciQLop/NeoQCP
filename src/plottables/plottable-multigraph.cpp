@@ -377,8 +377,6 @@ bool QCPMultiGraph::hasPenDerivedDecoration(int ownerCount) const
 void QCPMultiGraph::decorationsChanged()
 {
     invalidateLines();
-    if (mLayer)
-        mLayer->invalidatePaintBuffer();
 }
 
 bool QCPMultiGraph::setFill(Fill fill)
@@ -1399,7 +1397,7 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::fillRows(const Fill& fill,
         rows.push_back({mKeyAxis->coordToPixel(ds.keyAt(i)),
                         edgePixel(ds.valueAt(fill.owner, i)),
                         targetColumn ? edgePixel(ds.valueAt(*targetColumn, i)) : constantPixel,
-                        gaps.size() > i - begin && gaps[i - begin] != 0});
+                        gaps[i - begin] != 0});
     return rows;
 }
 
@@ -1428,7 +1426,6 @@ void QCPMultiGraph::drawFills(QCPPainter* painter, const QCPAbstractMultiDataSou
     for (auto& entry : mFills) {
         if (!fillDrawable(entry.spec, ds.columnCount())) continue;
         const QBrush brush = effectiveFillBrush(entry.spec);
-        if (brush.style() == Qt::NoBrush || brush.color().alpha() == 0) continue;
         // The GPU fill is one flat colour: gradients and patterns are painted with QPainter.
         if (gpuLayer && brush.style() == Qt::SolidPattern)
             drawFillOnGpu(painter, gpuLayer, entry.verts, brush.color(),
@@ -1492,10 +1489,6 @@ double QCPMultiGraph::errorPixel(const QCPAxis& valueAxis, double value)
     return qcp::fill::logZeroSideEdges(valueAxis).first;
 }
 
-static bool bothFinite(double a, double b) { return std::isfinite(a) && std::isfinite(b); }
-static double lowerAtMost(double lower, double y) { return bothFinite(lower, y) ? std::min(lower, y) : lower; }
-static double upperAtLeast(double upper, double y) { return bothFinite(upper, y) ? std::max(upper, y) : upper; }
-
 std::vector<qcp::errorbars::Bar> QCPMultiGraph::errorBarRows(
     const ErrorBars& spec, const QCPAbstractMultiDataSource& ds, int begin, int end,
     BoundPixel boundPixel) const
@@ -1505,9 +1498,10 @@ std::vector<qcp::errorbars::Bar> QCPMultiGraph::errorBarRows(
     for (int i = begin; i < end; ++i)
     {
         const double y = ds.valueAt(spec.value, i);
+        // std::min/max return their first argument when either is NaN: a NaN bound stays NaN.
         bars.push_back({mKeyAxis->coordToPixel(ds.keyAt(i)), boundPixel(*mValueAxis, y),
-                        boundPixel(*mValueAxis, lowerAtMost(ds.valueAt(spec.lower, i), y)),
-                        boundPixel(*mValueAxis, upperAtLeast(ds.valueAt(spec.upper, i), y))});
+                        boundPixel(*mValueAxis, std::min(ds.valueAt(spec.lower, i), y)),
+                        boundPixel(*mValueAxis, std::max(ds.valueAt(spec.upper, i), y))});
     }
     return bars;
 }
@@ -1537,7 +1531,7 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::errorBandRows(
     {
         qcp::errorbars::Bar bar = bars[k];
         qcp::errorbars::resolve(bar);
-        rows.push_back({bar.key, bar.lower, bar.upper, gaps.size() > k && gaps[k] != 0});
+        rows.push_back({bar.key, bar.lower, bar.upper, gaps[k] != 0});
     }
     return binnedWhenDense(std::move(rows));
 }
@@ -1580,7 +1574,6 @@ void QCPMultiGraph::drawBarsAsPolylines(QCPPainter* painter, ErrorBarsEntry& ent
     const QPen pen = comp.selection.isEmpty() ? errorBarPen(entry.spec) : comp.selectedPen;
     const bool keyIsVertical = mKeyAxis->orientation() == Qt::Vertical;
     const double capHalfWidth = entry.spec.capWidthPx / 2;
-    applyDefaultAntialiasingHint(painter);
     if (isExportMode) {
         qcp::drawPolylineWithGpuFallback(painter, mParentPlot, mLayer,
                                          qcp::errorbars::barRuns(bars, capHalfWidth, keyIsVertical),
