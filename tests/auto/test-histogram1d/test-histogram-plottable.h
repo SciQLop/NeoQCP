@@ -40,6 +40,10 @@ private slots:
     void stepOutlineIsTheTopProfile();
     void emptyBinsOnALogAxisStayOutOfTheOutline();
     void aHistogramIsNotSelectable();
+    void barRectsRejectBadColumnsAndRaggedEdges();
+    void logAxisMarksOnlyNonPositiveBarsAbsent();
+    void stepOutlineBreaksAtAnAbsentBar();
+    void gpuQuadsOfSeveralBarsDoNotJoin();
     void verticalKeyAxisGrowsBarsAlongX();
     void barsAreDrawnOnTheGpu();
     void emptyBinOnALinearAxisKeepsTheStepRun();

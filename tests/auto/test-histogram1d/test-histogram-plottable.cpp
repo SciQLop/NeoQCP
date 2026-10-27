@@ -522,6 +522,60 @@ void TestHistogramPlottable::aHistogramIsNotSelectable()
     QCOMPARE(h->selectTest(insideABar, true), -1.0);
 }
 
+void TestHistogramPlottable::barRectsRejectBadColumnsAndRaggedEdges()
+{
+    const auto rects = [&](const qcp::algo::Histogram1D& h, int column) {
+        return qcp::histogram::barRects(h, column, mPlot->xAxis, mPlot->yAxis);
+    };
+    const qcp::algo::Histogram1D h { {0, 1, 2}, {{3, 6}}, {9}, false };
+    QCOMPARE(rects(h, 0).size(), std::size_t(2));
+    QVERIFY(rects(h, -1).empty());
+    QVERIFY(rects(h, 1).empty());
+    QVERIFY(rects(h, 7).empty());
+    QVERIFY(rects({ {0}, {{3}}, {3}, false }, 0).empty());
+    QCOMPARE(rects({ {0, 1, 2}, {{3, 6, 5, 4}}, {9}, false }, 0).size(), std::size_t(2));
+    QCOMPARE(rects({ {0, 1, 2, 3, 4}, {{3, 6}}, {9}, false }, 0).size(), std::size_t(2));
+}
+
+void TestHistogramPlottable::logAxisMarksOnlyNonPositiveBarsAbsent()
+{
+    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setRange(1, 10);
+    const qcp::algo::Histogram1D h { {0, 1, 2, 3}, {{1, 0, 4}}, {5}, true };
+    const auto bars = qcp::histogram::barRects(h, 0, mPlot->xAxis, mPlot->yAxis);
+    QVERIFY(!bars[0].absent);
+    QCOMPARE(bars[0].top, mPlot->yAxis->coordToPixel(1));
+    QVERIFY(bars[1].absent);
+    QVERIFY(!bars[2].absent);
+}
+
+void TestHistogramPlottable::stepOutlineBreaksAtAnAbsentBar()
+{
+    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setRange(1, 10);
+    const qcp::algo::Histogram1D h { {0, 1, 2, 3}, {{4, 0, 4}}, {8}, true };
+    const auto bars = qcp::histogram::barRects(h, 0, mPlot->xAxis, mPlot->yAxis);
+    const auto run = qcp::histogram::stepOutline(bars, false);
+    QCOMPARE(run.size(), 4 + 1 + 4);
+    QVERIFY(std::isnan(run[4].x()));
+    QCOMPARE(run[3], QPointF(bars[0].right, bars[0].base));
+    QCOMPARE(run[5], QPointF(bars[2].left, bars[2].base));
+}
+
+void TestHistogramPlottable::gpuQuadsOfSeveralBarsDoNotJoin()
+{
+    const std::array<float, 4> rgba { 1, 0, 0, 1 };
+    const qcp::histogram::BarRect a { 0, 10, 100, 50 };
+    const qcp::histogram::BarRect b { 10, 20, 100, 20 };
+    const auto floats = [&](std::vector<qcp::histogram::BarRect> bars) {
+        std::vector<float> out;
+        qcp::histogram::appendBarQuads(bars, false, rgba, out);
+        return out.size();
+    };
+    QVERIFY(floats({a}) > 0);
+    QCOMPARE(floats({a, b}), floats({a}) + floats({b}));
+}
+
 void TestHistogramPlottable::verticalKeyAxisGrowsBarsAlongX()
 {
     auto* h = new QCPHistogram(mPlot->yAxis, mPlot->xAxis);
