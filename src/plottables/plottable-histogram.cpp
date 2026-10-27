@@ -288,8 +288,7 @@ void QCPHistogram::requestReplot()
 {
     if (mLayer)
         mLayer->markDirty();
-    if (mParentPlot)
-        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    mParentPlot->replot(QCustomPlot::rpQueuedReplot);
 }
 
 void QCPHistogram::binForExport()
@@ -410,7 +409,6 @@ void QCPHistogram::drawColumnOnGpu(QCPPainter* painter, QCPPlottableRhiLayer* la
 void QCPHistogram::paintColumn(QCPPainter* painter, std::span<const qcp::histogram::BarRect> bars,
                                const ColumnLook& look) const
 {
-    painter->save();
     painter->setPen(Qt::NoPen);
     painter->setBrush(look.fill);
     for (const auto& bar : bars)
@@ -419,7 +417,6 @@ void QCPHistogram::paintColumn(QCPPainter* painter, std::span<const qcp::histogr
     painter->setPen(look.outline);
     painter->setBrush(Qt::NoBrush);
     qcp::drawPolylineSplitNaN(painter, outline(bars));
-    painter->restore();
 }
 
 void QCPHistogram::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const

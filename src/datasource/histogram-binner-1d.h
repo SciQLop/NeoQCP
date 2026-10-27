@@ -12,7 +12,7 @@ struct Histogram1D
 {
     std::vector<double> edges;                // bins + 1, increasing
     std::vector<std::vector<double>> heights; // one vector of `bins` per column
-    std::vector<int> counted;                 // values counted per column (for normalization)
+    std::vector<int> counted;                 // values counted per column (for normalization); 0 for pre-binned data, which makes normalize() a no-op
     bool log = false;
 };
 

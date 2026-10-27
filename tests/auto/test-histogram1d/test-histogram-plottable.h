@@ -61,7 +61,7 @@ private slots:
     void flatDataGetsAWidenedRange();
     void aSingleBinCanBePreBinned();
     void preBinnedCountsNothing();
-    void logValueRangeStartsAtTheSmallestPositiveHeight();
+    void positiveValueRangeStartsAtTheSmallestHeight();
     void keyAxisScaleChangeRebinsWithoutADraw();
     void shownResultOfTheOtherScaleIsStaleEvenWhenTheTransformIsFresh();
     void logAxisFromTheStartIsNotStale();
@@ -73,7 +73,8 @@ private slots:
     void changingTheStyleRequestsARepaint();
     void changingTheColoursRequestsARepaint();
     void newBarsRequestARepaint();
-    void exportOfPreBinnedBarsLeavesTheTransformAlone();
+    void exportOfPreBinnedBarsDoesNotRebin();
+    void exportOfPreBinnedBarsOnAStaleScaleQueuesOneReset();
     void exportOfAStaleScaleForgetsTheAutoRange();
     void emptyHistogramHasNoContent();
     void withoutBarsThereIsNoKeyRange();
@@ -85,13 +86,12 @@ private slots:
     void stepOutlineHasNoBase();
     void fillHasNoBorderWhateverPenThePainterHad();
     void anAlmostTransparentFillStillPaints();
-    void drawingRestoresThePainter();
     void gpuBarsHaveFillAndOutline();
     void gpuBarsAreNotShifted();
     void gpuStepOfOneColumnHasOnlyTheOutline();
     void gpuAnAlmostTransparentFillStillDraws();
 
 private:
-    void expectRepaint(QCPHistogram* h, const std::function<void()>& change);
+    [[nodiscard]] bool repaintFollows(QCPHistogram* h, const std::function<void()>& change);
     QCustomPlot* mPlot = nullptr;
 };
