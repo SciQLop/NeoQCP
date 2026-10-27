@@ -495,6 +495,75 @@ void TestHistogramPlottable::stepOutlineIsTheTopProfile()
     QVERIFY(run.contains(QPointF(10, 50)) && run.contains(QPointF(10, 20)));
 }
 
+namespace {
+std::vector<qcp::histogram::BarRect> rectsOf(QCustomPlot* plot, const qcp::algo::Histogram1D& h, int column)
+{
+    return qcp::histogram::barRects(h, column, plot->xAxis, plot->yAxis);
+}
+const qcp::algo::Histogram1D twoBins { .edges = {0, 1, 2}, .heights = {{3, 6}}, .counted = {9} };
+}
+
+void TestHistogramPlottable::barRectsOfAMissingColumnAreEmpty()
+{
+    QCOMPARE(rectsOf(mPlot, twoBins, 0).size(), std::size_t(2));
+    QVERIFY(rectsOf(mPlot, twoBins, -1).empty());
+    QVERIFY(rectsOf(mPlot, twoBins, 1).empty());
+}
+
+void TestHistogramPlottable::barRectsOfRaggedEdgesAreEmpty()
+{
+    const qcp::algo::Histogram1D tooManyHeights { .edges = {0, 1, 2}, .heights = {{3, 6, 5, 4}}, .counted = {9} };
+    const qcp::algo::Histogram1D tooManyEdges { .edges = {0, 1, 2, 3, 4}, .heights = {{3, 6}}, .counted = {9} };
+    const qcp::algo::Histogram1D oneEdge { .edges = {0}, .heights = {{3}}, .counted = {3} };
+    QVERIFY(rectsOf(mPlot, tooManyHeights, 0).empty());
+    QVERIFY(rectsOf(mPlot, tooManyEdges, 0).empty());
+    QVERIFY(rectsOf(mPlot, oneEdge, 0).empty());
+}
+
+void TestHistogramPlottable::logAxisMarksOnlyNonPositiveOrNonFiniteBarsAbsent()
+{
+    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setRange(1, 10);
+    const qcp::algo::Histogram1D h { .edges = {0, 1, 2, 3, 4, 5},
+                                     .heights = {{1, 0, -3, qQNaN(), 4}}, .counted = {5}, .log = true };
+    const auto bars = rectsOf(mPlot, h, 0);
+    QVERIFY(!bars[0].absent);
+    QCOMPARE(bars[0].top, mPlot->yAxis->coordToPixel(1));
+    QVERIFY(bars[1].absent);
+    QVERIFY(bars[2].absent);
+    QVERIFY(bars[3].absent);
+    QVERIFY(!bars[4].absent);
+}
+
+void TestHistogramPlottable::stepOutlineBreaksAtAnAbsentBar()
+{
+    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setRange(1, 10);
+    const qcp::algo::Histogram1D h { .edges = {0, 1, 2, 3}, .heights = {{4, 0, 4}}, .counted = {8}, .log = true };
+    const auto bars = rectsOf(mPlot, h, 0);
+    const auto run = qcp::histogram::stepOutline(bars, false);
+    QCOMPARE(run.size(), 4 + 1 + 4);
+    QVERIFY(std::isnan(run[4].x()));
+    QCOMPARE(run[3], QPointF(bars[0].right, bars[0].base));
+    QCOMPARE(run[5], QPointF(bars[2].left, bars[2].base));
+}
+
+void TestHistogramPlottable::gpuQuadsOfBarsWithAGapStayInsideTheirBar()
+{
+    const std::array<float, 4> rgba { 1, 0, 0, 1 };
+    const std::vector<qcp::histogram::BarRect> bars { {0, 10, 100, 50}, {20, 30, 100, 20} };
+    std::vector<float> out;
+    qcp::histogram::appendBarQuads(bars, false, rgba, out);
+    constexpr std::size_t floatsPerTriangle = 3 * 6;
+    QCOMPARE(out.size(), 2 * 2 * floatsPerTriangle);
+    for (std::size_t t = 0; t < out.size(); t += floatsPerTriangle)
+    {
+        const float x0 = out[t], x1 = out[t + 6], x2 = out[t + 12];
+        const float lo = std::min({x0, x1, x2}), hi = std::max({x0, x1, x2});
+        QVERIFY2((lo >= 0 && hi <= 10) || (lo >= 20 && hi <= 30), qPrintable(QString::number(lo) + " " + QString::number(hi)));
+    }
+}
+
 void TestHistogramPlottable::emptyBinsOnALogAxisStayOutOfTheOutline()
 {
     auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
@@ -520,60 +589,6 @@ void TestHistogramPlottable::aHistogramIsNotSelectable()
     const QPointF insideABar(mPlot->xAxis->coordToPixel(0.5), mPlot->yAxis->coordToPixel(2));
     QCOMPARE(h->selectTest(insideABar, false), -1.0);
     QCOMPARE(h->selectTest(insideABar, true), -1.0);
-}
-
-void TestHistogramPlottable::barRectsRejectBadColumnsAndRaggedEdges()
-{
-    const auto rects = [&](const qcp::algo::Histogram1D& h, int column) {
-        return qcp::histogram::barRects(h, column, mPlot->xAxis, mPlot->yAxis);
-    };
-    const qcp::algo::Histogram1D h { {0, 1, 2}, {{3, 6}}, {9}, false };
-    QCOMPARE(rects(h, 0).size(), std::size_t(2));
-    QVERIFY(rects(h, -1).empty());
-    QVERIFY(rects(h, 1).empty());
-    QVERIFY(rects(h, 7).empty());
-    QVERIFY(rects({ {0}, {{3}}, {3}, false }, 0).empty());
-    QCOMPARE(rects({ {0, 1, 2}, {{3, 6, 5, 4}}, {9}, false }, 0).size(), std::size_t(2));
-    QCOMPARE(rects({ {0, 1, 2, 3, 4}, {{3, 6}}, {9}, false }, 0).size(), std::size_t(2));
-}
-
-void TestHistogramPlottable::logAxisMarksOnlyNonPositiveBarsAbsent()
-{
-    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
-    mPlot->yAxis->setRange(1, 10);
-    const qcp::algo::Histogram1D h { {0, 1, 2, 3}, {{1, 0, 4}}, {5}, true };
-    const auto bars = qcp::histogram::barRects(h, 0, mPlot->xAxis, mPlot->yAxis);
-    QVERIFY(!bars[0].absent);
-    QCOMPARE(bars[0].top, mPlot->yAxis->coordToPixel(1));
-    QVERIFY(bars[1].absent);
-    QVERIFY(!bars[2].absent);
-}
-
-void TestHistogramPlottable::stepOutlineBreaksAtAnAbsentBar()
-{
-    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
-    mPlot->yAxis->setRange(1, 10);
-    const qcp::algo::Histogram1D h { {0, 1, 2, 3}, {{4, 0, 4}}, {8}, true };
-    const auto bars = qcp::histogram::barRects(h, 0, mPlot->xAxis, mPlot->yAxis);
-    const auto run = qcp::histogram::stepOutline(bars, false);
-    QCOMPARE(run.size(), 4 + 1 + 4);
-    QVERIFY(std::isnan(run[4].x()));
-    QCOMPARE(run[3], QPointF(bars[0].right, bars[0].base));
-    QCOMPARE(run[5], QPointF(bars[2].left, bars[2].base));
-}
-
-void TestHistogramPlottable::gpuQuadsOfSeveralBarsDoNotJoin()
-{
-    const std::array<float, 4> rgba { 1, 0, 0, 1 };
-    const qcp::histogram::BarRect a { 0, 10, 100, 50 };
-    const qcp::histogram::BarRect b { 10, 20, 100, 20 };
-    const auto floats = [&](std::vector<qcp::histogram::BarRect> bars) {
-        std::vector<float> out;
-        qcp::histogram::appendBarQuads(bars, false, rgba, out);
-        return out.size();
-    };
-    QVERIFY(floats({a}) > 0);
-    QCOMPARE(floats({a, b}), floats({a}) + floats({b}));
 }
 
 void TestHistogramPlottable::verticalKeyAxisGrowsBarsAlongX()

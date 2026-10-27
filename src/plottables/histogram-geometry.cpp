@@ -41,13 +41,13 @@ void startRun(QVector<QPointF>& out)
 std::vector<BarRect> barRects(const qcp::algo::Histogram1D& h, int column,
                               const QCPAxis* keyAxis, const QCPAxis* valueAxis)
 {
-    if (column < 0 || column >= int(h.heights.size()) || h.edges.size() < 2)
+    if (column < 0 || column >= int(h.heights.size()) || h.edges.size() != h.heights[column].size() + 1)
         return {};
     const double base = qcp::fill::baselinePixel(*valueAxis, 0);
     const auto& heights = h.heights[column];
     std::vector<BarRect> bars;
     bars.reserve(heights.size());
-    for (std::size_t i = 0; i < heights.size() && i + 1 < h.edges.size(); ++i)
+    for (std::size_t i = 0; i < heights.size(); ++i)
         bars.push_back(bar(keyAxis->coordToPixel(h.edges[i]), keyAxis->coordToPixel(h.edges[i + 1]),
                            base, *valueAxis, heights[i]));
     return bars;

@@ -18,6 +18,8 @@ struct BarRect { double left, right, base, top; bool absent = false; };
 
 [[nodiscard]] inline bool isEmpty(const BarRect& bar) { return bar.top == bar.base; }
 
+//! One bar per bin of the column. Empty for a missing column or when edges.size() != bins + 1,
+//! the same input QCPHistogram::setBinned rejects.
 std::vector<BarRect> barRects(const qcp::algo::Histogram1D& h, int column,
                               const QCPAxis* keyAxis, const QCPAxis* valueAxis);
 
