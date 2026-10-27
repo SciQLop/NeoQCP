@@ -1390,6 +1390,7 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::fillRows(const Fill& fill,
     const auto edgePixel = [this](double value) {
         return qcp::fill::baselinePixel(*mValueAxis, value);
     };
+    Q_ASSERT(gaps.size() == std::max(0, end - begin)); // gapsBefore() holds one entry per row
     const double constantPixel = targetColumn ? 0.0 : edgePixel(std::get<double>(fill.target));
     std::vector<qcp::fill::StripPoint> rows;
     rows.reserve(std::max(0, end - begin));
@@ -1426,6 +1427,7 @@ void QCPMultiGraph::drawFills(QCPPainter* painter, const QCPAbstractMultiDataSou
     for (auto& entry : mFills) {
         if (!fillDrawable(entry.spec, ds.columnCount())) continue;
         const QBrush brush = effectiveFillBrush(entry.spec);
+        if (brush.color().alpha() == 0) continue;
         // The GPU fill is one flat colour: gradients and patterns are painted with QPainter.
         if (gpuLayer && brush.style() == Qt::SolidPattern)
             drawFillOnGpu(painter, gpuLayer, entry.verts, brush.color(),
@@ -1498,7 +1500,8 @@ std::vector<qcp::errorbars::Bar> QCPMultiGraph::errorBarRows(
     for (int i = begin; i < end; ++i)
     {
         const double y = ds.valueAt(spec.value, i);
-        // std::min/max return their first argument when either is NaN: a NaN bound stays NaN.
+        // std::min/max return their first argument when either is NaN, so a NaN bound stays NaN.
+        // Unlike the helpers they replace, a -inf lower or +inf upper value now wins over the bound.
         bars.push_back({mKeyAxis->coordToPixel(ds.keyAt(i)), boundPixel(*mValueAxis, y),
                         boundPixel(*mValueAxis, std::min(ds.valueAt(spec.lower, i), y)),
                         boundPixel(*mValueAxis, std::max(ds.valueAt(spec.upper, i), y))});
@@ -1525,6 +1528,7 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::errorBandRows(
 {
     const auto bars = errorBarRows(spec, ds, begin, end, &qcp::fill::baselinePixel);
     const auto gaps = ds.gapsBefore(begin, end);
+    Q_ASSERT(gaps.size() == int(bars.size())); // gapsBefore() holds one entry per row
     std::vector<qcp::fill::StripPoint> rows;
     rows.reserve(bars.size());
     for (int k = 0; k < int(bars.size()); ++k)

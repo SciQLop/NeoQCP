@@ -66,6 +66,7 @@ private slots:
     void fillValidatesAgainstTheStagedSource();
     void fillToZeroColoursBelowTheCurveOnly();
     void hiddenEdgeLinesKeepTheirFill();
+    void anAlmostTransparentFillStillPaints();
     void hidingAnEdgeRemovesTheFillAndShowingBringsItBack();
     void fillBreaksAtAKeyGap();
     void fillOnALogAxisClampsAZeroBaseline();

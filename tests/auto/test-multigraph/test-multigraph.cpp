@@ -2172,3 +2172,16 @@ void TestMultiGraph::legendSwatchIsTwelvePixelsTall()
     QVERIFY(isRedish(img.pixelColor(20, 15)));
     QCOMPARE(img.pixelColor(20, 16), QColor(Qt::white));
 }
+
+void TestMultiGraph::anAlmostTransparentFillStillPaints()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    mg->setComponentLineStyle(1, QCPMultiGraph::lsNone);
+    mg->setComponentLineStyle(2, QCPMultiGraph::lsNone);
+    mg->setComponentFillBetween(1, 2, QBrush(QColor(255, 0, 0, 1)));
+    mPlot->xAxis->setRange(1, 3);
+    mPlot->yAxis->setRange(-1, 5);
+    renderOf(mPlot); // lays the axis rect out
+    const QImage img = renderOf(mPlot);
+    QVERIFY(img.pixelColor(pixelOf(mPlot, 2, 1.5)).green() < 255);
+}
