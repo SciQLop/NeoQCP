@@ -25,6 +25,8 @@ private slots:
     void nonPositiveFixedRangeFallsBackToAutoWhenTheAxisTurnsLog();
     void rebinsForTheScaleOfANewKeyAxis();
     void rebinForANewScaleEmitsNothingDuringPaint();
+    void rebinsForANewKeyAxisScaleWithoutADraw();
+    void theAxisItLeftIsNoLongerListenedTo();
     void exportRightAfterAScaleChangeBinsForTheNewScale();
     void queuedResetIsDroppedWhenTheScaleIsFreshAgain();
     void resultOfTheOldScaleIsNotShownUnderTheNewOne();

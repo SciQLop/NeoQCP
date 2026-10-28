@@ -61,8 +61,11 @@ protected:
     void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
     bool canProduceContent() const override;
+    void axesChanged() override { followKeyAxis(); }
 
 private:
+    void followKeyAxis();
+    QMetaObject::Connection mKeyScaleLink;
     std::shared_ptr<QCPAbstractMultiDataSource> mDataSource;
     std::shared_ptr<qcp::algo::Histogram1D> mResult;
     std::optional<QCPRange> mFixedRange, mAutoRange;
@@ -73,8 +76,8 @@ private:
     QCPHistogram1DPipeline mPipeline;
     // Results of jobs started before the last binning change or setBinned are dropped.
     uint64_t mAcceptedGeneration = 0;
-    //! The key scale the binning was made for: a new key axis or a blocked scaleTypeChanged
-    //! leaves it behind, and draw() catches up.
+    //! The key scale the binning was made for: a new key axis, or a scaleTypeChanged that was
+    //! blocked, leaves it behind, and draw() catches up.
     bool mBinnedKeyLog = false;
     bool mResetQueued = false;
     //! The key scale a stale-scale reset is in flight for.

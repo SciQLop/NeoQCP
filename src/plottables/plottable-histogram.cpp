@@ -77,9 +77,15 @@ QCPHistogram::QCPHistogram(QCPAxis* keyAxis, QCPAxis* valueAxis)
     connect(&mPipeline, &QCPHistogram1DPipeline::finished, this, &QCPHistogram::onPipelineFinished);
     connect(&mPipeline, &QCPHistogram1DPipeline::busyChanged,
             this, [this](bool) { updateEffectiveBusy(); });
-    // Edges in one scale mean nothing in the other: re-fit them when the key axis toggles.
-    if (keyAxis)
-        connect(keyAxis, &QCPAxis::scaleTypeChanged, this, &QCPHistogram::resetEdges);
+    followKeyAxis();
+}
+
+// Edges in one scale mean nothing in the other: re-fit them when the key axis toggles.
+void QCPHistogram::followKeyAxis()
+{
+    disconnect(mKeyScaleLink);
+    if (mKeyAxis)
+        mKeyScaleLink = connect(mKeyAxis.data(), &QCPAxis::scaleTypeChanged, this, &QCPHistogram::resetEdges);
 }
 
 QCPHistogram::~QCPHistogram() = default;
