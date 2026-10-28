@@ -1,6 +1,7 @@
 #include "test-fill-geometry.h"
 #include "plottables/multigraph-fill.h"
 #include "plottables/plottable-linestyle.h"
+#include "qcustomplot.h"
 #include <cmath>
 #include <limits>
 
@@ -18,6 +19,13 @@ double area(const std::vector<float>& v)
         total += std::abs((x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0)) / 2;
     }
     return total;
+}
+QList<QPointF> vertices(const std::vector<float>& v)
+{
+    QList<QPointF> result;
+    for (std::size_t i = 0; i + 1 < v.size(); i += 6)
+        result << QPointF(v[i], v[i + 1]);
+    return result;
 }
 }
 
@@ -68,6 +76,34 @@ void TestFillGeometry::verticalKeySwapsCoordinates()
     }
 }
 
+void TestFillGeometry::crossingEdgesSplitAtTheCrossing()
+{
+    const std::vector<StripPoint> rows { {100, 2, 12}, {110, 12, 2} };
+    std::vector<float> out;
+    qcp::fill::appendStrip(rows, false, kRed, out);
+    const QList<QPointF> expected { {100, 2}, {105, 7}, {100, 12}, {105, 7}, {110, 12}, {110, 2} };
+    QCOMPARE(vertices(out), expected);
+}
+
+void TestFillGeometry::edgesTouchingAtARowAreOneQuad()
+{
+    const std::vector<StripPoint> rows { {0, 5, 5}, {10, 0, 10}, {20, 3, 3} };
+    std::vector<float> out;
+    qcp::fill::appendStrip(rows, false, kRed, out);
+    const QList<QPointF> expected { {0, 5}, {10, 0}, {10, 10}, {0, 5}, {10, 10}, {0, 5},
+                                    {10, 0}, {20, 3}, {20, 3}, {10, 0}, {20, 3}, {10, 10} };
+    QCOMPARE(vertices(out), expected);
+}
+
+void TestFillGeometry::thinStripsAreOneQuad()
+{
+    const std::vector<StripPoint> rows { {0, 0, 0.5}, {10, 0, 0.5} };
+    std::vector<float> out;
+    qcp::fill::appendStrip(rows, false, kRed, out);
+    const QList<QPointF> expected { {0, 0}, {10, 0}, {10, 0.5}, {0, 0}, {10, 0.5}, {0, 0.5} };
+    QCOMPARE(vertices(out), expected);
+}
+
 void TestFillGeometry::binToSpansTakesMinAndMaxOfBothEdges()
 {
     const std::vector<StripPoint> rows { {0.1, 5, 6}, {0.4, 1, 9}, {0.9, 3, 4}, {1.2, 2, 2} };
@@ -93,6 +129,40 @@ void TestFillGeometry::stripPolygonsOnePerRun()
     const auto polys = qcp::fill::stripPolygons(rows, false);
     QCOMPARE(polys.size(), 2);
     QCOMPARE(polys[0].size(), 4); // a forward (2), b back (2)
+}
+
+void TestFillGeometry::aBrokenSecondRowDoesNotJoinTheFirst()
+{
+    const std::vector<StripPoint> rows { {0, 0, 10}, {10, 0, 10, true}, {20, 0, 10}, {30, 0, 10} };
+    const auto polys = qcp::fill::stripPolygons(rows, false);
+    QCOMPARE(polys.size(), 1);
+    QCOMPARE(polys[0].size(), 6);
+}
+
+void TestFillGeometry::aSingleRowRunMakesNoPolygon()
+{
+    const std::vector<StripPoint> rows { {0, 0, 10}, {10, kNan, 10}, {20, 0, 10}, {30, 0, 10} };
+    const auto polys = qcp::fill::stripPolygons(rows, false);
+    QCOMPARE(polys.size(), 1);
+    QCOMPARE(polys[0].size(), 4);
+}
+
+void TestFillGeometry::binToSpansJoinsRowsOfALaterBin()
+{
+    const std::vector<StripPoint> rows { {5.1, 1, 2}, {5.4, 0, 3} };
+    const auto spans = qcp::fill::binToSpans(rows, 1.0);
+    QCOMPARE(spans.size(), std::size_t(1));
+    QCOMPARE(spans[0].a, 0.0);
+    QCOMPARE(spans[0].b, 3.0);
+}
+
+void TestFillGeometry::binToSpansPutsEachSpanAtItsBinCentre()
+{
+    const std::vector<StripPoint> rows { {0.1, 0, 1}, {1.2, 0, 1}, {4.5, 0, 1} };
+    const auto spans = qcp::fill::binToSpans(rows, 2.0);
+    QCOMPARE(spans.size(), std::size_t(2));
+    QCOMPARE(spans[0].key, 1.0);
+    QCOMPARE(spans[1].key, 5.0);
 }
 
 void TestFillGeometry::stepLeftHoldsEachValueUntilTheNextKey()
@@ -171,4 +241,37 @@ void TestFillGeometry::steppedMovesBothEdgesAndKeepsBreaks()
         QVERIFY2(samePoint(s[i], expected[i]),
                  (QByteArray::number(qulonglong(i)) + ": " + describe(s[i]) + " != "
                   + describe(expected[i])).constData());
+}
+
+namespace {
+struct LogAxisPlot
+{
+    QCustomPlot plot;
+    LogAxisPlot(double lower, double upper)
+    {
+        plot.resize(400, 300);
+        plot.yAxis->setScaleType(QCPAxis::stLogarithmic);
+        plot.yAxis->setRange(lower, upper);
+        plot.replot();
+    }
+    QCPAxis& axis() { return *plot.yAxis; }
+};
+double pastTheEdge(const QCPAxis& axis, double lower, double upper)
+{
+    const double edge = axis.coordToPixel(lower), other = axis.coordToPixel(upper);
+    return edge + 2.0 * (edge - other);
+}
+}
+
+void TestFillGeometry::baselinePixelPastTheEdgeOnALogAxis()
+{
+    LogAxisPlot p(0.1, 100);
+    QCOMPARE(qcp::fill::baselinePixel(p.axis(), 0.0), pastTheEdge(p.axis(), 0.1, 100));
+    QCOMPARE(qcp::fill::baselinePixel(p.axis(), 10.0), p.axis().coordToPixel(10.0));
+}
+
+void TestFillGeometry::baselinePixelOnALogAxisBelowOne()
+{
+    LogAxisPlot p(0.001, 0.5);
+    QCOMPARE(qcp::fill::baselinePixel(p.axis(), 0.0), pastTheEdge(p.axis(), 0.001, 0.5));
 }
