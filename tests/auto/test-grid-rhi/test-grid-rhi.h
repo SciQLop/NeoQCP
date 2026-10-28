@@ -24,6 +24,7 @@ private slots:
     void dirtyDetectionRebuildsOnTickChange();
     void dirtyDetectionRebuildsOnPenChange();
     void exportStillUsesQPainter();
+    void noGpuLayerIsOfferedWhileExporting();
     void tickMarksFollowPanWithoutRebuild();
     void gridLinesStayAlignedWithTicksAtEpochScale();
 

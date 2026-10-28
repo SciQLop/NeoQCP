@@ -26,6 +26,9 @@ void TestErrorBarGeometry::nanBoundGivesAOneSidedBar()
     Bar b { 10, 50, kNan, 40 };
     QVERIFY(qcp::errorbars::resolve(b));
     QCOMPARE(b.lower, 50.0);
+    Bar above { 10, 50, 60, kNan };
+    QVERIFY(qcp::errorbars::resolve(above));
+    QCOMPARE(above.upper, 50.0);
 }
 
 void TestErrorBarGeometry::twoNanPointsGiveNoBar()
@@ -56,6 +59,8 @@ void TestErrorBarGeometry::barsFitNeedsTheSpacing()
     const std::vector<Bar> bursty { {0, 1, 2, 0}, {2, 1, 2, 0}, {40, 1, 2, 0} };
     QVERIFY(qcp::errorbars::barsFit(wide, 18));
     QVERIFY(!qcp::errorbars::barsFit(bursty, 18));
+    const std::vector<Bar> exactlyApart { {0, 1, 2, 0}, {18, 1, 2, 0} };
+    QVERIFY(qcp::errorbars::barsFit(exactlyApart, 18));
 }
 
 void TestErrorBarGeometry::noInfinitiesEverReachTheRuns()

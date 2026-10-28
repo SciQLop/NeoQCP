@@ -17,4 +17,8 @@ private slots:
     void noBinsGiveNothing();
     void valueAtTheUpperEdgeLandsInTheLastBin();
     void outerEdgesAreTheRangeExactly();
+    void positiveBoundsSkipZero();
+    void interiorEdgesAreEvenlySpacedFromTheRangeStart();
+    void aSingleValueIsNormalizedToo();
+    void aColumnWithNothingCountedStaysZero();
 };

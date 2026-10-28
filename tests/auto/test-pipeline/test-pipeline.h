@@ -22,6 +22,8 @@ private slots:
     // Pipeline base tests
     void pipelinePassthrough();
     void pipelineTransformRuns();
+    void theFirstJobReportsBusyThenIdleWhenItLands();
+    void aBusySlotMayWaitForAnotherThreadUsingThePipeline();
     void pipelineCoalescing();
     void pipelineViewportIndependentSkipsViewport();
     void pipelineViewportDependentRuns();

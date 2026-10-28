@@ -201,6 +201,59 @@ void TestPipeline::pipelineTransformRuns()
     QCOMPARE(pipeline.result()->valueAt(0), 10.0);
 }
 
+void TestPipeline::theFirstJobReportsBusyThenIdleWhenItLands()
+{
+    QCPPipelineScheduler scheduler;
+    QCPGraphPipeline pipeline(&scheduler);
+    pipeline.setTransform(TransformKind::ViewportIndependent,
+        [](const QCPAbstractDataSource& src, const ViewportParams&, std::any&)
+            -> std::shared_ptr<QCPAbstractDataSource> {
+            return std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
+                std::vector<double>{1, 2, 3}, std::vector<double>{4, 5, 6});
+        });
+    QList<bool> states;
+    connect(&pipeline, &QCPGraphPipeline::busyChanged, this, [&](bool busy) { states << busy; });
+
+    pipeline.setSource(std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
+        std::vector<double>{1, 2, 3}, std::vector<double>{4, 5, 6}));
+
+    QCOMPARE(states, (QList<bool>{true}));
+    QTRY_COMPARE_WITH_TIMEOUT(states, (QList<bool>{true, false}), 1000);
+}
+
+// busyChanged is emitted with the pipeline's mutex released: a slot may wait for another
+// thread that uses the pipeline.
+void TestPipeline::aBusySlotMayWaitForAnotherThreadUsingThePipeline()
+{
+    QCPPipelineScheduler scheduler;
+    QCPGraphPipeline pipeline(&scheduler);
+    pipeline.setTransform(TransformKind::ViewportIndependent,
+        [](const QCPAbstractDataSource&, const ViewportParams&, std::any&)
+            -> std::shared_ptr<QCPAbstractDataSource> {
+            return std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
+                std::vector<double>{1}, std::vector<double>{1});
+        });
+    std::promise<void> reached;
+    auto reachedFuture = reached.get_future();
+    std::thread other;
+    bool otherThreadGotThrough = false;
+    connect(&pipeline, &QCPGraphPipeline::busyChanged, this, [&](bool busy) {
+        if (!busy || other.joinable())
+            return;
+        other = std::thread([&] {
+            pipeline.lastViewport();
+            reached.set_value();
+        });
+        otherThreadGotThrough = reachedFuture.wait_for(std::chrono::seconds(1))
+                                == std::future_status::ready;
+    });
+
+    pipeline.setSource(std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
+        std::vector<double>{1}, std::vector<double>{1}));
+    other.join();
+    QVERIFY(otherThreadGotThrough);
+}
+
 void TestPipeline::pipelineCoalescing()
 {
     QCPPipelineScheduler scheduler(1);

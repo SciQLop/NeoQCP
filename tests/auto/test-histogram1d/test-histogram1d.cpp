@@ -125,3 +125,30 @@ void TestHistogram1D::outerEdgesAreTheRangeExactly()
     QVERIFY(log.back() == 70.0);
     QVERIFY(lin.back() == 0.7);
 }
+
+void TestHistogram1D::positiveBoundsSkipZero()
+{
+    const auto bounds = finiteValueBounds(source({{0, 2, 8}}), true);
+    QVERIFY(bounds.has_value());
+    QCOMPARE(bounds->lower, 2.0);
+    QCOMPARE(bounds->upper, 8.0);
+}
+
+void TestHistogram1D::interiorEdgesAreEvenlySpacedFromTheRangeStart()
+{
+    QCOMPARE(binEdges(QCPRange(10, 20), 4, false), (std::vector<double>{10, 12.5, 15, 17.5, 20}));
+}
+
+void TestHistogram1D::aSingleValueIsNormalizedToo()
+{
+    auto h = bin1d(source({{3}}), QCPRange(0, 8), 4, false); // width 2
+    normalize(h, HistogramNormalization::Density);
+    QCOMPARE(h.heights[0], (std::vector<double>{0, 0.5, 0, 0}));
+}
+
+void TestHistogram1D::aColumnWithNothingCountedStaysZero()
+{
+    auto h = bin1d(source({{kNan, 100}}), QCPRange(0, 8), 4, false);
+    normalize(h, HistogramNormalization::Probability);
+    QCOMPARE(h.heights[0], (std::vector<double>{0, 0, 0, 0}));
+}

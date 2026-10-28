@@ -2,6 +2,7 @@
 #include "../../../src/painting/plottable-rhi-layer.h"
 #include "../../../src/qcp.h"
 #include "../../../src/painting/grid-rhi-layer.h"
+#include "../../../src/plottables/plottable-draw-utils.h"
 #include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
 
 namespace {
@@ -346,4 +347,13 @@ void TestGridRhi::gridLinesStayAlignedWithTicksAtEpochScale()
     const float shaderPixel = t * params->keyAxisLength + params->keyAxisOffset;
 
     QVERIFY(qAbs(shaderPixel - expectedPixel) < 1.0f);
+}
+
+void TestGridRhi::noGpuLayerIsOfferedWhileExporting()
+{
+    if (!showAndHasRhiGrid(mPlot))
+        QSKIP("No QRhi available");
+    QCPLayer* layer = mPlot->layer("main");
+    QVERIFY(qcp::gpuLayer(mPlot, layer, false) != nullptr);
+    QVERIFY(qcp::gpuLayer(mPlot, layer, true) == nullptr);
 }
