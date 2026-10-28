@@ -203,6 +203,7 @@ Q_SIGNALS:
 protected:
     void draw(QCPPainter* painter) override;
     void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
+    void axesChanged() override { followAxes(); }
 
     void selectEvent(QMouseEvent* event, bool additive, const QVariant& details,
                      bool* selectionStateChanged) override;
@@ -343,6 +344,8 @@ protected:
                         const QPointF& gpuOffset);
     void rebuildL2(const ViewportParams& vp);
     void onViewportChanged();
+    void followAxes();
+    QList<QMetaObject::Connection> mAxisLinks;
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
 
     void updateBaseSelection();

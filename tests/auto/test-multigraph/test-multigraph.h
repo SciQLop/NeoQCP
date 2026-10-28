@@ -130,6 +130,8 @@ private slots:
     void cacheExtendsBeyondVisibleRange();
     void lineCacheWindowFollowsTheKeyScale_data();
     void lineCacheWindowFollowsTheKeyScale();
+    void lineCacheFollowsTheScaleOfANewKeyAxis();
+    void lineCacheFollowsTheScaleOfANewValueAxis();
     void aNarrowerThenWiderStagedSourceKeepsTheCachedExtrusionsInRange();
     void aWiderStagedSourceKeepsTheCachedLinesInRange();
     void zoomedOutLinesAreThinnedToThePixelWidth_data();

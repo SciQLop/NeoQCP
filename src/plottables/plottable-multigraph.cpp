@@ -1,5 +1,6 @@
 #include "plottable-multigraph.h"
 #include <QPointer>
+#include <utility>
 #include "plottable-draw-utils.h"
 #include "plottable-l1-cache.h"
 #include "plottable-linestyle.h"
@@ -39,18 +40,7 @@ QCPMultiGraph::QCPMultiGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
         addToLegend();
     }
 
-    if (keyAxis)
-    {
-        connect(keyAxis, QOverload<const QCPRange&>::of(&QCPAxis::rangeChanged),
-                this, &QCPMultiGraph::onViewportChanged);
-        connect(keyAxis, &QCPAxis::scaleTypeChanged,
-                this, [this] { invalidateLines(); });
-    }
-    if (valueAxis)
-    {
-        connect(valueAxis, &QCPAxis::scaleTypeChanged,
-                this, [this] { invalidateLines(); });
-    }
+    followAxes();
 
     connect(&mPipeline, &QCPMultiGraphPipeline::finished,
             this, [this](uint64_t gen) { onL1Ready(gen); });
@@ -70,6 +60,22 @@ QCPMultiGraph::~QCPMultiGraph() = default;
 
 // Fresh lines are drawn only if the layer is repainted: a replot repaints dirty layers, and
 // falls back to marking the plot's layers dirty only when none is, so mark this one here.
+void QCPMultiGraph::followAxes()
+{
+    for (const auto& link : std::exchange(mAxisLinks, {}))
+        disconnect(link);
+    if (mKeyAxis)
+    {
+        mAxisLinks << connect(mKeyAxis.data(), QOverload<const QCPRange&>::of(&QCPAxis::rangeChanged),
+                              this, &QCPMultiGraph::onViewportChanged);
+        mAxisLinks << connect(mKeyAxis.data(), &QCPAxis::scaleTypeChanged,
+                              this, [this] { invalidateLines(); });
+    }
+    if (mValueAxis)
+        mAxisLinks << connect(mValueAxis.data(), &QCPAxis::scaleTypeChanged,
+                              this, [this] { invalidateLines(); });
+}
+
 void QCPMultiGraph::markLinesDirty()
 {
     mLineCacheDirty = true;

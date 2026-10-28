@@ -1959,6 +1959,43 @@ void TestMultiGraph::lineCacheWindowFollowsTheKeyScale()
     QCOMPARE(cached.last().x(), mPlot->xAxis->coordToPixel(keys.back()));
 }
 
+static QCPMultiGraph* decadesOnTheSecondAxes(QCustomPlot* plot, bool newKeyAxis)
+{
+    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    const std::vector<double> decades{1, 10, 100};
+    mg->setData(std::vector<double>(decades), std::vector<std::vector<double>>{decades});
+    if (newKeyAxis)
+        mg->setKeyAxis(plot->xAxis2);
+    else
+        mg->setValueAxis(plot->yAxis2);
+    for (auto* axis : {plot->xAxis, plot->yAxis, plot->xAxis2, plot->yAxis2})
+        axis->setRange(1, 100);
+    plot->replot(QCustomPlot::rpImmediateRefresh);
+    return mg;
+}
+
+static bool anyPoint(const QVector<QPointF>& line, const std::function<bool(QPointF)>& match)
+{
+    return std::any_of(line.cbegin(), line.cend(), match);
+}
+
+// No replot between the toggle and the first look: only the axis signal can drop the cache.
+void TestMultiGraph::lineCacheFollowsTheScaleOfANewKeyAxis()
+{
+    auto* mg = decadesOnTheSecondAxes(mPlot, true);
+    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(anyPoint(mg->mCachedLines[0], [&](QPointF p) { return qFuzzyCompare(p.x(), mPlot->xAxis2->coordToPixel(10)); }));
+}
+
+void TestMultiGraph::lineCacheFollowsTheScaleOfANewValueAxis()
+{
+    auto* mg = decadesOnTheSecondAxes(mPlot, false);
+    mPlot->yAxis2->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(anyPoint(mg->mCachedLines[0], [&](QPointF p) { return qFuzzyCompare(p.y(), mPlot->yAxis2->coordToPixel(10)); }));
+}
+
 // Binned when the rows outnumber 4 per pixel of the key axis.
 void TestMultiGraph::denseFillRowsAreBinnedAboveFourPerPixel()
 {
