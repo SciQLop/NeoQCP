@@ -669,6 +669,35 @@ void TestPipeline::graph2LinesFollowTheScaleOfANewValueAxis()
     QVERIFY(anyPoint(graph->mCachedLines, [&](QPointF p) { return qFuzzyCompare(p.y(), mPlot->yAxis2->coordToPixel(10)); }));
 }
 
+// The log axis is ready before the swap and the range stays 1..100: no signal fires at the swap.
+static QCPGraph2* decadesThenMovedToALogAxis(QCustomPlot* plot, bool keyAxis)
+{
+    for (auto* axis : {plot->xAxis, plot->yAxis, plot->xAxis2, plot->yAxis2})
+        axis->setRange(1, 100);
+    (keyAxis ? plot->xAxis2 : plot->yAxis2)->setScaleType(QCPAxis::stLogarithmic);
+    auto* graph = new QCPGraph2(plot->xAxis, plot->yAxis);
+    graph->setData(QVector<double>{1, 10, 100}, QVector<double>{1, 10, 100});
+    plot->replot(QCustomPlot::rpImmediateRefresh);
+    if (keyAxis)
+        graph->setKeyAxis(plot->xAxis2);
+    else
+        graph->setValueAxis(plot->yAxis2);
+    plot->replot(QCustomPlot::rpImmediateRefresh);
+    return graph;
+}
+
+void TestPipeline::graph2LinesAreRebuiltWhenMovedToALogKeyAxis()
+{
+    auto* graph = decadesThenMovedToALogAxis(mPlot, true);
+    QVERIFY(anyPoint(graph->mCachedLines, [&](QPointF p) { return qFuzzyCompare(p.x(), mPlot->xAxis2->coordToPixel(10)); }));
+}
+
+void TestPipeline::graph2LinesAreRebuiltWhenMovedToALogValueAxis()
+{
+    auto* graph = decadesThenMovedToALogAxis(mPlot, false);
+    QVERIFY(anyPoint(graph->mCachedLines, [&](QPointF p) { return qFuzzyCompare(p.y(), mPlot->yAxis2->coordToPixel(10)); }));
+}
+
 void TestPipeline::graph2DataFromExternalThread()
 {
     auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
@@ -822,6 +851,37 @@ void TestPipeline::colormap2ResamplesForTheRangeOfANewValueAxis()
     cm->setValueAxis(mPlot->yAxis2);
     mPlot->yAxis2->setRange(2, 7);
     QCOMPARE(cm->pipeline().lastViewport().valueRange, QCPRange(2, 7));
+}
+
+// Ranges and scales are set before the swap: no signal fires at the swap itself.
+void TestPipeline::colormap2ResamplesWhenMovedToALogKeyAxis()
+{
+    auto* cm = gridOnTheSecondAxes(mPlot);
+    mPlot->xAxis2->setRange(1, 100);
+    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    cm->setKeyAxis(mPlot->xAxis2);
+    QVERIFY(cm->pipeline().lastViewport().keyLogScale);
+}
+
+void TestPipeline::colormap2ResamplesWhenMovedToALogValueAxis()
+{
+    auto* cm = gridOnTheSecondAxes(mPlot);
+    mPlot->yAxis2->setRange(1, 100);
+    mPlot->yAxis2->setScaleType(QCPAxis::stLogarithmic);
+    cm->setValueAxis(mPlot->yAxis2);
+    QVERIFY(cm->pipeline().lastViewport().valueLogScale);
+}
+
+// One axis in both roles must not connect twice: a range change would resample twice.
+void TestPipeline::colormap2OnOneAxisForBothDirectionsListensOnce()
+{
+    auto* cm = gridOnTheSecondAxes(mPlot);
+    cm->setKeyAxis(mPlot->xAxis2);
+    cm->setValueAxis(mPlot->xAxis2);
+    QSignalSpy busy(&cm->pipeline(), &QCPColormapPipeline::busyChanged);
+    const auto before = cm->pipeline().currentGeneration();
+    mPlot->xAxis2->setRange(2, 7);
+    QCOMPARE(cm->pipeline().currentGeneration() - before, uint64_t(1));
 }
 
 void TestPipeline::pipelineSourceReplacedDuringJob()

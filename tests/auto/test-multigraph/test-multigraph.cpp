@@ -1996,6 +1996,36 @@ void TestMultiGraph::lineCacheFollowsTheScaleOfANewValueAxis()
     QVERIFY(anyPoint(mg->mCachedLines[0], [&](QPointF p) { return qFuzzyCompare(p.y(), mPlot->yAxis2->coordToPixel(10)); }));
 }
 
+// The log axis is ready before the swap and the range stays 1..100: no signal fires at the swap.
+static QCPMultiGraph* decadesThenMovedToALogAxis(QCustomPlot* plot, bool keyAxis)
+{
+    for (auto* axis : {plot->xAxis, plot->yAxis, plot->xAxis2, plot->yAxis2})
+        axis->setRange(1, 100);
+    (keyAxis ? plot->xAxis2 : plot->yAxis2)->setScaleType(QCPAxis::stLogarithmic);
+    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    const std::vector<double> decades{1, 10, 100};
+    mg->setData(std::vector<double>(decades), std::vector<std::vector<double>>{decades});
+    plot->replot(QCustomPlot::rpImmediateRefresh);
+    if (keyAxis)
+        mg->setKeyAxis(plot->xAxis2);
+    else
+        mg->setValueAxis(plot->yAxis2);
+    plot->replot(QCustomPlot::rpImmediateRefresh);
+    return mg;
+}
+
+void TestMultiGraph::lineCacheIsRebuiltWhenMovedToALogKeyAxis()
+{
+    auto* mg = decadesThenMovedToALogAxis(mPlot, true);
+    QVERIFY(anyPoint(mg->mCachedLines[0], [&](QPointF p) { return qFuzzyCompare(p.x(), mPlot->xAxis2->coordToPixel(10)); }));
+}
+
+void TestMultiGraph::lineCacheIsRebuiltWhenMovedToALogValueAxis()
+{
+    auto* mg = decadesThenMovedToALogAxis(mPlot, false);
+    QVERIFY(anyPoint(mg->mCachedLines[0], [&](QPointF p) { return qFuzzyCompare(p.y(), mPlot->yAxis2->coordToPixel(10)); }));
+}
+
 // Binned when the rows outnumber 4 per pixel of the key axis.
 void TestMultiGraph::denseFillRowsAreBinnedAboveFourPerPixel()
 {

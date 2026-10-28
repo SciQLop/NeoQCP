@@ -38,7 +38,8 @@ void QCPColorMap2::followAxes()
 {
     for (const auto& link : std::exchange(mAxisLinks, {}))
         disconnect(link);
-    for (QCPAxis* axis : {mKeyAxis.data(), mValueAxis.data()})
+    const bool oneAxis = mKeyAxis == mValueAxis;
+    for (QCPAxis* axis : {mKeyAxis.data(), oneAxis ? nullptr : mValueAxis.data()})
     {
         if (!axis)
             continue;
@@ -47,6 +48,7 @@ void QCPColorMap2::followAxes()
         mAxisLinks << connect(axis, &QCPAxis::scaleTypeChanged,
                               this, &QCPColorMap2::onViewportChanged);
     }
+    onViewportChanged(); // the resample was made for the old axes
 }
 
 QCPColorMap2::~QCPColorMap2()

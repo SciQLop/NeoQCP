@@ -74,6 +74,7 @@ void QCPMultiGraph::followAxes()
     if (mValueAxis)
         mAxisLinks << connect(mValueAxis.data(), &QCPAxis::scaleTypeChanged,
                               this, [this] { invalidateLines(); });
+    invalidateLines(); // pixels computed for the old axes mean nothing on the new ones
 }
 
 void QCPMultiGraph::markLinesDirty()

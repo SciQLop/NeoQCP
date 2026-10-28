@@ -58,6 +58,7 @@ void QCPGraph2::followAxes()
     }
     if (mValueAxis)
         mAxisLinks << connect(mValueAxis.data(), &QCPAxis::scaleTypeChanged, this, dropLines);
+    dropLines(); // pixels computed for the old axes mean nothing on the new ones
 }
 
 void QCPGraph2::markLinesDirty()

@@ -35,6 +35,8 @@ private slots:
     void graph2PipelineTransform();
     void graph2LinesFollowTheScaleOfANewKeyAxis();
     void graph2LinesFollowTheScaleOfANewValueAxis();
+    void graph2LinesAreRebuiltWhenMovedToALogKeyAxis();
+    void graph2LinesAreRebuiltWhenMovedToALogValueAxis();
 
     // QCPColorMap2 pipeline integration
     void colormap2PipelineDefault();
@@ -52,6 +54,9 @@ private slots:
     void colormap2ResamplesForTheScaleOfANewValueAxis();
     void colormap2ResamplesForTheRangeOfANewKeyAxis();
     void colormap2ResamplesForTheRangeOfANewValueAxis();
+    void colormap2ResamplesWhenMovedToALogKeyAxis();
+    void colormap2ResamplesWhenMovedToALogValueAxis();
+    void colormap2OnOneAxisForBothDirectionsListensOnce();
 
     // Race condition reproducers
     void pipelineSourceReplacedDuringJob();
