@@ -33,6 +33,8 @@ private slots:
     // QCPGraph2 pipeline integration
     void graph2PipelinePassthrough();
     void graph2PipelineTransform();
+    void graph2LinesFollowTheScaleOfANewKeyAxis();
+    void graph2LinesFollowTheScaleOfANewValueAxis();
 
     // QCPColorMap2 pipeline integration
     void colormap2PipelineDefault();

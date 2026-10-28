@@ -633,6 +633,42 @@ void TestPipeline::colormap2DescendingYAxisLogScaleResamplesNonEmpty()
              "descending-y source on a log value axis must still accumulate cells");
 }
 
+static QCPGraph2* decadesOnTheSecondAxes(QCustomPlot* plot, bool newKeyAxis)
+{
+    auto* graph = new QCPGraph2(plot->xAxis, plot->yAxis);
+    graph->setData(QVector<double>{1, 10, 100}, QVector<double>{1, 10, 100});
+    if (newKeyAxis)
+        graph->setKeyAxis(plot->xAxis2);
+    else
+        graph->setValueAxis(plot->yAxis2);
+    for (auto* axis : {plot->xAxis, plot->yAxis, plot->xAxis2, plot->yAxis2})
+        axis->setRange(1, 100);
+    plot->replot(QCustomPlot::rpImmediateRefresh);
+    return graph;
+}
+
+static bool anyPoint(const QVector<QPointF>& line, const std::function<bool(QPointF)>& match)
+{
+    return std::any_of(line.cbegin(), line.cend(), match);
+}
+
+// No replot between the toggle and the first look: only the axis signal can drop the cache.
+void TestPipeline::graph2LinesFollowTheScaleOfANewKeyAxis()
+{
+    auto* graph = decadesOnTheSecondAxes(mPlot, true);
+    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(anyPoint(graph->mCachedLines, [&](QPointF p) { return qFuzzyCompare(p.x(), mPlot->xAxis2->coordToPixel(10)); }));
+}
+
+void TestPipeline::graph2LinesFollowTheScaleOfANewValueAxis()
+{
+    auto* graph = decadesOnTheSecondAxes(mPlot, false);
+    mPlot->yAxis2->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(anyPoint(graph->mCachedLines, [&](QPointF p) { return qFuzzyCompare(p.y(), mPlot->yAxis2->coordToPixel(10)); }));
+}
+
 void TestPipeline::graph2DataFromExternalThread()
 {
     auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);

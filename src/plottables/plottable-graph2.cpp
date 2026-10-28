@@ -1,5 +1,6 @@
 #include "plottable-graph2.h"
 #include <QPointer>
+#include <utility>
 #include "plottable-draw-utils.h"
 #include "plottable-l1-cache.h"
 #include "plottable-linestyle.h"
@@ -24,18 +25,7 @@ QCPGraph2::QCPGraph2(QCPAxis* keyAxis, QCPAxis* valueAxis)
     setPen(QPen(Qt::blue, 0));
     setBrush(Qt::NoBrush);
 
-    if (keyAxis)
-    {
-        connect(keyAxis, QOverload<const QCPRange&>::of(&QCPAxis::rangeChanged),
-                this, &QCPGraph2::onViewportChanged);
-        connect(keyAxis, &QCPAxis::scaleTypeChanged,
-                this, [this] { markLinesDirty(); mCachedLines.clear(); });
-    }
-    if (valueAxis)
-    {
-        connect(valueAxis, &QCPAxis::scaleTypeChanged,
-                this, [this] { markLinesDirty(); mCachedLines.clear(); });
-    }
+    followAxes();
 
     connect(&mPipeline, &QCPGraphPipeline::finished,
             this, [this](uint64_t gen) { onL1Ready(gen); });
@@ -55,6 +45,21 @@ QCPGraph2::~QCPGraph2() = default;
 
 // Fresh lines are drawn only if the layer is repainted: a replot repaints dirty layers, and
 // falls back to marking the plot's layers dirty only when none is, so mark this one here.
+void QCPGraph2::followAxes()
+{
+    const auto dropLines = [this] { markLinesDirty(); mCachedLines.clear(); };
+    for (const auto& link : std::exchange(mAxisLinks, {}))
+        disconnect(link);
+    if (mKeyAxis)
+    {
+        mAxisLinks << connect(mKeyAxis.data(), QOverload<const QCPRange&>::of(&QCPAxis::rangeChanged),
+                              this, &QCPGraph2::onViewportChanged);
+        mAxisLinks << connect(mKeyAxis.data(), &QCPAxis::scaleTypeChanged, this, dropLines);
+    }
+    if (mValueAxis)
+        mAxisLinks << connect(mValueAxis.data(), &QCPAxis::scaleTypeChanged, this, dropLines);
+}
+
 void QCPGraph2::markLinesDirty()
 {
     mLineCacheDirty = true;

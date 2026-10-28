@@ -144,12 +144,15 @@ protected:
     void draw(QCPPainter* painter) override;
     void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
+    void axesChanged() override { followAxes(); }
 
     void onViewportChanged();
 
 private:
     std::shared_ptr<QCPAbstractDataSource> mDataSource;
     QCPGraphPipeline mPipeline;
+    void followAxes();
+    QList<QMetaObject::Connection> mAxisLinks;
 
     // Two-phase resampling: L1 built async, L2 computed lazily at draw time
     std::shared_ptr<qcp::algo::GraphResamplerCache> mL1Cache;
