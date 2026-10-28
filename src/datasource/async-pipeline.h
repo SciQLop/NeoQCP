@@ -9,6 +9,7 @@
 #include <memory>
 #include <any>
 #include <atomic>
+#include <optional>
 #include <type_traits>
 #include "pipeline-scheduler.h"
 
@@ -86,6 +87,8 @@ protected:
     bool mJobRunning = false;
 
     bool claimDisplayedGeneration(uint64_t generation);
+    //! The new busy state if it differs from the last one emitted; call without the lock held.
+    std::optional<bool> claimBusyEdge();
     void emitBusyIfNeeded(QMutexLocker<QMutex>& lock);
     void startJob(QMutexLocker<QMutex>& lock, QCPPipelineScheduler::Priority priority,
                   std::function<void()> job);
@@ -148,6 +151,7 @@ public:
             onDataChanged();
     }
 
+    // The pointer stays valid only until the next delivery: use it within the call, on the GUI thread.
     const Out* result() const
     {
         if (!mTransform)

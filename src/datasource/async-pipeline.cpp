@@ -104,6 +104,16 @@ bool QCPAsyncPipelineBase::claimDisplayedGeneration(uint64_t generation)
     return true;
 }
 
+std::optional<bool> QCPAsyncPipelineBase::claimBusyEdge()
+{
+    QMutexLocker lock(&mMutex);
+    const bool busy = mGeneration.load() > mDisplayedGeneration;
+    if (busy == mWasBusy)
+        return std::nullopt;
+    mWasBusy = busy;
+    return busy;
+}
+
 void QCPAsyncPipelineBase::supersedeEarlierJobs()
 {
     QMutexLocker lock(&mMutex);
@@ -235,11 +245,8 @@ void QCPAsyncPipelineBase::deliverResult(uint64_t generation, std::any cache, st
             mDisplayedGeneration = latest;
     }
 
-    bool busy = isBusy();
-    if (busy != mWasBusy)
-    {
-        mWasBusy = busy;
-        // Last: a slot may delete the owner and this pipeline.
-        Q_EMIT busyChanged(busy);
-    }
+    const auto busyEdge = claimBusyEdge();
+    // Last: a slot may delete the owner and this pipeline.
+    if (busyEdge)
+        Q_EMIT busyChanged(*busyEdge);
 }
