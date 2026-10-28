@@ -250,7 +250,8 @@ void TestPipeline::aBusySlotMayWaitForAnotherThreadUsingThePipeline()
 
     pipeline.setSource(std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
         std::vector<double>{1}, std::vector<double>{1}));
-    other.join();
+    if (other.joinable())
+        other.join();
     QVERIFY(otherThreadGotThrough);
 }
 
