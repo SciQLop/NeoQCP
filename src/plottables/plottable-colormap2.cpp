@@ -21,18 +21,7 @@ QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
 {
     installResampleTransform();
 
-    if (keyAxis)
-    {
-        connect(keyAxis, QOverload<const QCPRange&>::of(&QCPAxis::rangeChanged),
-                this, &QCPColorMap2::onViewportChanged);
-    }
-    if (valueAxis)
-    {
-        connect(valueAxis, QOverload<const QCPRange&>::of(&QCPAxis::rangeChanged),
-                this, &QCPColorMap2::onViewportChanged);
-        connect(valueAxis, &QCPAxis::scaleTypeChanged,
-                this, [this](QCPAxis::ScaleType) { onViewportChanged(); });
-    }
+    followAxes();
 
     connect(&mPipeline, &QCPColormapPipeline::finished,
             this, [this](uint64_t) {
@@ -43,6 +32,21 @@ QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
             });
     connect(&mPipeline, &QCPColormapPipeline::busyChanged,
             this, [this](bool) { updateEffectiveBusy(); });
+}
+
+void QCPColorMap2::followAxes()
+{
+    for (const auto& link : std::exchange(mAxisLinks, {}))
+        disconnect(link);
+    for (QCPAxis* axis : {mKeyAxis.data(), mValueAxis.data()})
+    {
+        if (!axis)
+            continue;
+        mAxisLinks << connect(axis, QOverload<const QCPRange&>::of(&QCPAxis::rangeChanged),
+                              this, &QCPColorMap2::onViewportChanged);
+        mAxisLinks << connect(axis, &QCPAxis::scaleTypeChanged,
+                              this, &QCPColorMap2::onViewportChanged);
+    }
 }
 
 QCPColorMap2::~QCPColorMap2()

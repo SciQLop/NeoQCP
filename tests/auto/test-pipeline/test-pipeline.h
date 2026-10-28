@@ -47,6 +47,11 @@ private slots:
     void graph2DataFromExternalThread();
     void colormap2DataFromExternalThread();
     void colormap2ResamplesAgainAfterResize();
+    void colormap2ResamplesForTheLogScaleOfItsKeyAxis();
+    void colormap2ResamplesForTheScaleOfANewKeyAxis();
+    void colormap2ResamplesForTheScaleOfANewValueAxis();
+    void colormap2ResamplesForTheRangeOfANewKeyAxis();
+    void colormap2ResamplesForTheRangeOfANewValueAxis();
 
     // Race condition reproducers
     void pipelineSourceReplacedDuringJob();

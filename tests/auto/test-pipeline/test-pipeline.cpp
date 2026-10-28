@@ -770,6 +770,60 @@ void TestPipeline::colormap2ResamplesAgainAfterResize()
     QCOMPARE(exported, fresh.toPixmap(800, 400).toImage());
 }
 
+static QCPColorMap2* gridOnTheSecondAxes(QCustomPlot* plot)
+{
+    std::vector<double> x(10), y(10), z(100, 1.0);
+    for (int i = 0; i < 10; ++i)
+        x[i] = y[i] = std::pow(10.0, i / 4.5);
+    auto* cm = new QCPColorMap2(plot->xAxis, plot->yAxis);
+    cm->setDataSource(std::make_shared<QCPSoADataSource2D<
+        std::vector<double>, std::vector<double>, std::vector<double>>>(x, y, z));
+    return cm;
+}
+
+// None of these draws: the axis signal alone must request the new viewport.
+void TestPipeline::colormap2ResamplesForTheLogScaleOfItsKeyAxis()
+{
+    auto* cm = gridOnTheSecondAxes(mPlot);
+    mPlot->xAxis->setRange(1, 100); // a log toggle that leaves the range alone emits no rangeChanged
+    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    QVERIFY(cm->pipeline().lastViewport().keyLogScale);
+}
+
+void TestPipeline::colormap2ResamplesForTheScaleOfANewKeyAxis()
+{
+    auto* cm = gridOnTheSecondAxes(mPlot);
+    cm->setKeyAxis(mPlot->xAxis2);
+    mPlot->xAxis2->setRange(1, 100);
+    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    QVERIFY(cm->pipeline().lastViewport().keyLogScale);
+}
+
+void TestPipeline::colormap2ResamplesForTheScaleOfANewValueAxis()
+{
+    auto* cm = gridOnTheSecondAxes(mPlot);
+    cm->setValueAxis(mPlot->yAxis2);
+    mPlot->yAxis2->setRange(1, 100);
+    mPlot->yAxis2->setScaleType(QCPAxis::stLogarithmic);
+    QVERIFY(cm->pipeline().lastViewport().valueLogScale);
+}
+
+void TestPipeline::colormap2ResamplesForTheRangeOfANewKeyAxis()
+{
+    auto* cm = gridOnTheSecondAxes(mPlot);
+    cm->setKeyAxis(mPlot->xAxis2);
+    mPlot->xAxis2->setRange(2, 7);
+    QCOMPARE(cm->pipeline().lastViewport().keyRange, QCPRange(2, 7));
+}
+
+void TestPipeline::colormap2ResamplesForTheRangeOfANewValueAxis()
+{
+    auto* cm = gridOnTheSecondAxes(mPlot);
+    cm->setValueAxis(mPlot->yAxis2);
+    mPlot->yAxis2->setRange(2, 7);
+    QCOMPARE(cm->pipeline().lastViewport().valueRange, QCPRange(2, 7));
+}
+
 void TestPipeline::pipelineSourceReplacedDuringJob()
 {
     QCPPipelineScheduler scheduler(1);

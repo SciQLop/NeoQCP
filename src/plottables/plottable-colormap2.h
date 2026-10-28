@@ -134,6 +134,7 @@ protected:
     void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
     bool canProduceContent() const override;
+    void axesChanged() override { followAxes(); }
     // Releasing the RHI layer drops the uploaded contour lines with it; force
     // a rebuild on the next draw so the replacement layer gets them, instead
     // of trusting a cache stamp that predates the loss.
@@ -182,6 +183,8 @@ private:
     void invalidateContourCache();
 
     void onViewportChanged();
+    void followAxes();
+    QList<QMetaObject::Connection> mAxisLinks;
     void queueViewportChange();
     bool mViewportChangeQueued = false;
     void updateContourGpu(const QCPColorMapData* data);
