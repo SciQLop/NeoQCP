@@ -1,7 +1,9 @@
 #pragma once
 #include <QtTest/QtTest>
+#include <functional>
 
 class QCustomPlot;
+class QCPHistogram2D;
 
 class TestPipeline : public QObject
 {
@@ -141,6 +143,13 @@ private slots:
     void histogram2dLogKeyBinScaleRebins();
     void histogram2dBinScaleDefaultsLinear();
     void histogram2dAxisScaleTogglesRebinning();
+    void histogram2dLogValueAxisFromTheStartIsNotStale();
+    void histogram2dStaleScaleIsReboundAgainAfterAQueuedRebin();
+    void histogram2dExportDrawsTheNewBins();
+    void histogram2dAdoptsTheRangeOfANewColorScale();
+    void histogram2dChangingTheGradientRequestsARepaint();
+    void histogram2dChangingTheDataRangeRequestsARepaint();
+    void histogram2dChangingTheDataScaleTypeRequestsARepaint();
 
     // Layer-level GPU translation
     void stallPixelOffsetGraph2Busy();
@@ -197,5 +206,6 @@ private slots:
     void graph2DataChangedReplotSlotDeletingTheGraphIsSafe();
 
 private:
+    bool repaintFollows(QCPHistogram2D* hist, const std::function<void()>& change);
     QCustomPlot* mPlot = nullptr;
 };

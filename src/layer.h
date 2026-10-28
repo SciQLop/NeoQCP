@@ -124,6 +124,7 @@ private:
     friend class TestPlottableGroup;
     friend class TestOverlay;
     friend class TestHistogramPlottable;
+    friend class TestPipeline;
 };
 Q_DECLARE_METATYPE(QCPLayer::LayerMode)
 

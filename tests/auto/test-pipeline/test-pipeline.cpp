@@ -2133,6 +2133,115 @@ void TestPipeline::histogram2dDataWithNothingFiniteClearsTheOldCells()
     QVERIFY(finished.wait(2000));
     const auto* result = hist->pipeline().result();
     QVERIFY(result && result->isEmpty());
+    QCOMPARE(result->keySize(), 0);
+    QCOMPARE(result->valueSize(), 0);
+}
+
+// The scale the cells were binned for is remembered at install time: a log axis from the start
+// is fresh, not stale, so draw() must not ask for a re-bin again and again.
+void TestPipeline::histogram2dLogValueAxisFromTheStartIsNotStale()
+{
+    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    auto* hist = decadeHistogram(mPlot, false);
+    QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(finished.wait(2000));
+    QVERIFY(spreadOverDecades(hist->pipeline().result(), false));
+    for (int i = 0; i < 20; ++i)
+    {
+        mPlot->replot();
+        QTest::qWait(10);
+    }
+    QVERIFY2(finished.count() <= 2, qPrintable(QString::number(finished.count())));
+}
+
+// A queued re-bin is done once it ran: the next stale scale needs a new one.
+void TestPipeline::histogram2dStaleScaleIsReboundAgainAfterAQueuedRebin()
+{
+    auto* hist = decadeHistogram(mPlot, true);
+    QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(finished.wait(2000));
+    hist->setKeyAxis(mPlot->xAxis2);
+    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->replot();
+    QTRY_VERIFY_WITH_TIMEOUT(spreadOverDecades(hist->pipeline().result(), true), 2000);
+    mPlot->xAxis2->setScaleType(QCPAxis::stLinear);
+    mPlot->replot();
+    QTRY_VERIFY_WITH_TIMEOUT(!spreadOverDecades(hist->pipeline().result(), true), 2000);
+}
+
+namespace
+{
+QImage exportedLogKeyDecades(QCustomPlot* plot, bool drawnLinearFirst)
+{
+    auto* hist = new QCPHistogram2D(plot->xAxis, plot->yAxis);
+    hist->setBins(3, 1);
+    hist->setDataRange(QCPRange(0, 3));
+    QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    hist->setData(std::vector<double>{1.0, 10.0, 100.0, 1000.0}, std::vector<double>{1.0, 2.0, 3.0, 4.0});
+    finished.wait(2000);
+    plot->xAxis->setRange(1, 1000);
+    plot->yAxis->setRange(0, 5);
+    if (drawnLinearFirst)
+        plot->replot(QCustomPlot::rpImmediateRefresh);
+    plot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    plot->xAxis->setRange(1, 1000);
+    return plot->toPixmap(400, 300).toImage();
+}
+} // namespace
+
+// The export bins for the new scale itself: the picture of the old cells must not be reused.
+// Values span a range: a histogram of one value is a zero-height strip, which paints nothing.
+void TestPipeline::histogram2dExportDrawsTheNewBins()
+{
+    QCustomPlot reference;
+    reference.resize(400, 300);
+    const QImage expected = exportedLogKeyDecades(&reference, false);
+    const QImage exported = exportedLogKeyDecades(mPlot, true);
+    QVERIFY(!expected.isNull());
+    QVERIFY(exported == expected);
+}
+
+void TestPipeline::histogram2dAdoptsTheRangeOfANewColorScale()
+{
+    auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
+    auto* scale = new QCPColorScale(mPlot);
+    scale->setDataRange(QCPRange(5, 6));
+    hist->setColorScale(scale);
+    QCOMPARE(hist->dataRange(), QCPRange(5, 6));
+    delete scale;
+}
+
+bool TestPipeline::repaintFollows(QCPHistogram2D* hist, const std::function<void()>& change)
+{
+    QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    if (!finished.wait(2000))
+        return false;
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTest::qWait(20);
+    const auto buffer = hist->layer()->mPaintBuffer.toStrongRef();
+    if (!buffer || buffer->contentDirty())
+        return false;
+    QSignalSpy replotted(mPlot, &QCustomPlot::afterReplot);
+    change();
+    return buffer->contentDirty() && replotted.wait(2000);
+}
+
+void TestPipeline::histogram2dChangingTheGradientRequestsARepaint()
+{
+    auto* hist = decadeHistogram(mPlot, true);
+    QVERIFY(repaintFollows(hist, [&] { hist->setGradient(QCPColorGradient(QCPColorGradient::gpHot)); }));
+}
+
+void TestPipeline::histogram2dChangingTheDataRangeRequestsARepaint()
+{
+    auto* hist = decadeHistogram(mPlot, true);
+    QVERIFY(repaintFollows(hist, [&] { hist->setDataRange(QCPRange(1, 2)); }));
+}
+
+void TestPipeline::histogram2dChangingTheDataScaleTypeRequestsARepaint()
+{
+    auto* hist = decadeHistogram(mPlot, true);
+    QVERIFY(repaintFollows(hist, [&] { hist->setDataScaleType(QCPAxis::stLogarithmic); }));
 }
 
 void TestPipeline::histogram2dNormalizationColumn()

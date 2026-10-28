@@ -226,8 +226,7 @@ void QCPHistogram2D::redrawLater()
 {
     if (mLayer)
         mLayer->markDirty();
-    if (mParentPlot)
-        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    mParentPlot->replot(QCustomPlot::rpQueuedReplot);
 }
 
 const QCPColorMapData* QCPHistogram2D::binned() const
