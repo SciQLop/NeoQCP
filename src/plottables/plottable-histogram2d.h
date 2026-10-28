@@ -11,9 +11,8 @@ class QCPColorScale;
 class QCPColorMapData;
 
 //! A 2-D density histogram of scattered (key, value) samples, binned in the background.
-//! Bins follow the axis scales. A scale change on an axis given later with setKeyAxis or
-//! setValueAxis is picked up at the next draw, not at once: only the constructor's axes are
-//! listened to.
+//! Bins follow the axis scales, also those of an axis given later with setKeyAxis or
+//! setValueAxis.
 class QCP_LIB_DECL QCPHistogram2D : public QCPAbstractPlottable
 {
     Q_OBJECT
@@ -107,12 +106,14 @@ Q_SIGNALS:
 protected:
     void draw(QCPPainter* painter) override;
     void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
+    void axesChanged() override { followAxisScales(); }
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
     bool canProduceContent() const override;
     void releaseGpuResources() override { mRenderer.releaseRhiLayer(); }
 
 private:
     void redrawLater();
+    void followAxisScales();
 
     std::shared_ptr<QCPAbstractDataSource> mDataSource;
     int mKeyBins = 100;
@@ -125,6 +126,8 @@ private:
     bool mBinnedKeyLog = false;
     bool mBinnedValueLog = false;
     bool mRebinQueued = false;
+    QMetaObject::Connection mKeyScaleLink;
+    QMetaObject::Connection mValueScaleLink;
 
     // finiteKeyValueBounds is an O(N) scan over the raw scatter; selectTest
     // calls it per mouse event and getKeyRange per rescale. The bounds only

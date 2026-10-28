@@ -11,7 +11,7 @@
 
 QCPHistogram2D::QCPHistogram2D(QCPAxis* keyAxis, QCPAxis* valueAxis)
     : QCPAbstractPlottable(keyAxis, valueAxis)
-    , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
+    , mPipeline(parentPlot()->pipelineScheduler(), this)
     , mRenderer(this)
 {
     installTransform();
@@ -19,18 +19,23 @@ QCPHistogram2D::QCPHistogram2D(QCPAxis* keyAxis, QCPAxis* valueAxis)
     connect(&mPipeline, &QCPHistogramPipeline::finished,
             this, [this](uint64_t) {
                 mRenderer.invalidateMapImage();
-                if (parentPlot())
-                    parentPlot()->replot(QCustomPlot::rpQueuedReplot);
+                parentPlot()->replot(QCustomPlot::rpQueuedReplot);
             });
     connect(&mPipeline, &QCPHistogramPipeline::busyChanged,
             this, [this](bool) { updateEffectiveBusy(); });
 
-    // Binning follows the axis scale: re-bin whenever an axis toggles log/linear
-    // so the picture re-distributes (the renderer can't reposition cells itself).
-    if (keyAxis)
-        connect(keyAxis, &QCPAxis::scaleTypeChanged, this, &QCPHistogram2D::refreshBinning);
-    if (valueAxis)
-        connect(valueAxis, &QCPAxis::scaleTypeChanged, this, &QCPHistogram2D::refreshBinning);
+    followAxisScales();
+}
+
+// The renderer can't reposition cells itself: a log/linear toggle needs a re-bin.
+void QCPHistogram2D::followAxisScales()
+{
+    disconnect(mKeyScaleLink);
+    disconnect(mValueScaleLink);
+    if (mKeyAxis)
+        mKeyScaleLink = connect(mKeyAxis.data(), &QCPAxis::scaleTypeChanged, this, &QCPHistogram2D::refreshBinning);
+    if (mValueAxis)
+        mValueScaleLink = connect(mValueAxis.data(), &QCPAxis::scaleTypeChanged, this, &QCPHistogram2D::refreshBinning);
 }
 
 void QCPHistogram2D::refreshBinning()
@@ -149,8 +154,7 @@ void QCPHistogram2D::setNormalization(Normalization norm)
         return;
     mNormalization = norm;
     mRenderer.invalidateMapImage();
-    if (mParentPlot)
-        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    mParentPlot->replot(QCustomPlot::rpQueuedReplot);
 }
 
 void QCPHistogram2D::setGradient(const QCPColorGradient& gradient)

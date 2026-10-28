@@ -539,6 +539,7 @@ void QCPAbstractPlottable::setBrush(const QBrush& brush)
 void QCPAbstractPlottable::setKeyAxis(QCPAxis* axis)
 {
     mKeyAxis = axis;
+    axesChanged();
 }
 
 /*!
@@ -555,6 +556,7 @@ void QCPAbstractPlottable::setKeyAxis(QCPAxis* axis)
 void QCPAbstractPlottable::setValueAxis(QCPAxis* axis)
 {
     mValueAxis = axis;
+    axesChanged();
 }
 
 /*!

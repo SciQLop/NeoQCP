@@ -2000,6 +2000,33 @@ void TestPipeline::histogram2dRebinsForTheScaleOfANewValueAxis()
     QTRY_VERIFY_WITH_TIMEOUT(spreadOverDecades(hist->pipeline().result(), false), 2000);
 }
 
+// No draw is asked for: a scale change that leaves the range alone does not replot.
+void TestPipeline::histogram2dRebinsForANewKeyAxisScaleWithoutADraw()
+{
+    auto* hist = decadeHistogram(mPlot, true);
+    QSignalSpy spy(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(spy.wait(2000));
+    hist->setKeyAxis(mPlot->xAxis2);
+    mPlot->xAxis2->setRange(1, 1000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTest::qWait(50);
+    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    QTRY_VERIFY_WITH_TIMEOUT(spreadOverDecades(hist->pipeline().result(), true), 2000);
+}
+
+void TestPipeline::histogram2dRebinsForANewValueAxisScaleWithoutADraw()
+{
+    auto* hist = decadeHistogram(mPlot, false);
+    QSignalSpy spy(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(spy.wait(2000));
+    hist->setValueAxis(mPlot->yAxis2);
+    mPlot->yAxis2->setRange(1, 1000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTest::qWait(50);
+    mPlot->yAxis2->setScaleType(QCPAxis::stLogarithmic);
+    QTRY_VERIFY_WITH_TIMEOUT(spreadOverDecades(hist->pipeline().result(), false), 2000);
+}
+
 // Nothing may emit during a paint: the re-bin draw() asks for runs from the event loop.
 void TestPipeline::histogram2dRebinForANewScaleEmitsNothingDuringPaint()
 {
@@ -2043,6 +2070,7 @@ void TestPipeline::histogram2dQueuedRebinIsDroppedAfterAnExportRebinned()
     QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
     QVERIFY(finished.wait(2000));
     hist->setKeyAxis(mPlot->xAxis2);
+    const QSignalBlocker noSignal(mPlot->xAxis2); // only the paint notices the new scale
     mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
     mPlot->replot(); // queues the re-bin
     QVERIFY(!mPlot->toPixmap(400, 300).isNull());
@@ -2151,7 +2179,7 @@ void TestPipeline::histogram2dLogValueAxisFromTheStartIsNotStale()
         mPlot->replot();
         QTest::qWait(10);
     }
-    QVERIFY2(finished.count() <= 2, qPrintable(QString::number(finished.count())));
+    QCOMPARE(finished.count(), 1);
 }
 
 // A queued re-bin is done once it ran: the next stale scale needs a new one.
@@ -2215,15 +2243,19 @@ bool TestPipeline::repaintFollows(QCPHistogram2D* hist, const std::function<void
 {
     QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
     if (!finished.wait(2000))
-        return false;
+        return qWarning("no binned result"), false;
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QTest::qWait(20);
     const auto buffer = hist->layer()->mPaintBuffer.toStrongRef();
     if (!buffer || buffer->contentDirty())
-        return false;
+        return qWarning("no clean paint buffer to start from"), false;
     QSignalSpy replotted(mPlot, &QCustomPlot::afterReplot);
     change();
-    return buffer->contentDirty() && replotted.wait(2000);
+    if (!buffer->contentDirty())
+        return qWarning("no dirty flag"), false;
+    if (!replotted.wait(2000))
+        return qWarning("no replot"), false;
+    return true;
 }
 
 void TestPipeline::histogram2dChangingTheGradientRequestsARepaint()

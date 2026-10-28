@@ -245,6 +245,9 @@ signals:
     void visuallyBusyChanged(bool visuallyBusy);
 
 protected:
+    //! Called after setKeyAxis or setValueAxis; not called by the constructor.
+    virtual void axesChanged() {}
+
     // property members:
     QString mName;
     bool mAntialiasedFill, mAntialiasedScatters;
