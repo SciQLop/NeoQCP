@@ -85,6 +85,7 @@ protected:
     uint64_t mRunningGeneration = 0;
     bool mJobRunning = false;
 
+    bool claimDisplayedGeneration(uint64_t generation);
     void emitBusyIfNeeded(QMutexLocker<QMutex>& lock);
     void startJob(QMutexLocker<QMutex>& lock, QCPPipelineScheduler::Priority priority,
                   std::function<void()> job);
@@ -159,6 +160,7 @@ public:
             else
                 return nullptr;
         }
+        QMutexLocker lock(&mMutex);
         return mResult.get();
     }
 
@@ -183,6 +185,7 @@ public:
         lock.unlock();
 
         if (!out) return false;
+        lock.relock();
         mResult = std::move(out);
         return true;
     }
@@ -190,6 +193,7 @@ public:
     void clearTransform()
     {
         mTransform = {};
+        QMutexLocker lock(&mMutex);
         mResult.reset();
         mCache = {};
     }
@@ -228,7 +232,10 @@ protected:
     {
         if (auto* ptr = std::any_cast<std::shared_ptr<Out>>(&result))
             if (*ptr)
+            {
+                QMutexLocker lock(&mMutex);
                 mResult = std::move(*ptr);
+            }
     }
 
 private:

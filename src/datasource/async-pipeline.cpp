@@ -37,6 +37,7 @@ QCPAsyncPipelineBase::~QCPAsyncPipelineBase()
 
 bool QCPAsyncPipelineBase::isBusy() const
 {
+    QMutexLocker lock(&mMutex);
     return mGeneration.load() > mDisplayedGeneration;
 }
 
@@ -92,6 +93,15 @@ void QCPAsyncPipelineBase::onDataChanged()
     }
 
     emitBusyIfNeeded(lock);
+}
+
+bool QCPAsyncPipelineBase::claimDisplayedGeneration(uint64_t generation)
+{
+    QMutexLocker lock(&mMutex);
+    if (generation <= mDisplayedGeneration)
+        return false;
+    mDisplayedGeneration = generation;
+    return true;
 }
 
 void QCPAsyncPipelineBase::supersedeEarlierJobs()
@@ -200,9 +210,8 @@ void QCPAsyncPipelineBase::deliverResult(uint64_t generation, std::any cache, st
         lock.unlock();
     }
 
-    if (generation > mDisplayedGeneration)
+    if (claimDisplayedGeneration(generation))
     {
-        mDisplayedGeneration = generation;
         applyResult(generation, std::move(result));
         // A finished() slot may delete the plottable, and this pipeline with it.
         const QPointer<QCPAsyncPipelineBase> alive(this);
