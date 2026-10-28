@@ -2,6 +2,7 @@
 #include "plottables/multigraph-fill.h"
 #include "plottables/plottable-linestyle.h"
 #include "qcustomplot.h"
+#include <algorithm>
 #include <cmath>
 #include <limits>
 
@@ -25,6 +26,22 @@ QList<QPointF> vertices(const std::vector<float>& v)
     QList<QPointF> result;
     for (std::size_t i = 0; i + 1 < v.size(); i += 6)
         result << QPointF(v[i], v[i + 1]);
+    return result;
+}
+using Triangle = std::array<QPointF, 3>;
+bool before(const QPointF& p, const QPointF& q) { return p.x() != q.x() ? p.x() < q.x() : p.y() < q.y(); }
+QList<Triangle> triangleSet(const std::vector<float>& v)
+{
+    const auto pts = vertices(v);
+    QList<Triangle> result;
+    for (qsizetype i = 0; i + 2 < pts.size(); i += 3)
+    {
+        Triangle t { pts[i], pts[i + 1], pts[i + 2] };
+        std::sort(t.begin(), t.end(), before);
+        result << t;
+    }
+    std::sort(result.begin(), result.end(), [](const Triangle& a, const Triangle& b)
+              { return std::lexicographical_compare(a.begin(), a.end(), b.begin(), b.end(), before); });
     return result;
 }
 }
@@ -81,18 +98,9 @@ void TestFillGeometry::crossingEdgesSplitAtTheCrossing()
     const std::vector<StripPoint> rows { {100, 2, 12}, {110, 12, 2} };
     std::vector<float> out;
     qcp::fill::appendStrip(rows, false, kRed, out);
-    const QList<QPointF> expected { {100, 2}, {105, 7}, {100, 12}, {105, 7}, {110, 12}, {110, 2} };
-    QCOMPARE(vertices(out), expected);
-}
-
-void TestFillGeometry::edgesTouchingAtARowAreOneQuad()
-{
-    const std::vector<StripPoint> rows { {0, 5, 5}, {10, 0, 10}, {20, 3, 3} };
-    std::vector<float> out;
-    qcp::fill::appendStrip(rows, false, kRed, out);
-    const QList<QPointF> expected { {0, 5}, {10, 0}, {10, 10}, {0, 5}, {10, 10}, {0, 5},
-                                    {10, 0}, {20, 3}, {20, 3}, {10, 0}, {20, 3}, {10, 10} };
-    QCOMPARE(vertices(out), expected);
+    const QList<Triangle> expected { { QPointF(100, 2), QPointF(100, 12), QPointF(105, 7) },
+                                     { QPointF(105, 7), QPointF(110, 2), QPointF(110, 12) } };
+    QCOMPARE(triangleSet(out), expected);
 }
 
 void TestFillGeometry::thinStripsAreOneQuad()

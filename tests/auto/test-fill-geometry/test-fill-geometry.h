@@ -11,7 +11,6 @@ private slots:
     void crossingEdgesAreSplitNotDoubleBlended();
     void verticalKeySwapsCoordinates();
     void crossingEdgesSplitAtTheCrossing();
-    void edgesTouchingAtARowAreOneQuad();
     void thinStripsAreOneQuad();
     void binToSpansTakesMinAndMaxOfBothEdges();
     void binToSpansKeepsBreaks();

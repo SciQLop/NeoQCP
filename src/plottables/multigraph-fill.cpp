@@ -146,6 +146,7 @@ void appendStrip(std::span<const StripPoint> rows, bool keyIsVertical,
 
 std::vector<StripPoint> binToSpans(std::span<const StripPoint> rows, double binWidthPx)
 {
+    Q_ASSERT(binWidthPx > 0);
     std::vector<StripPoint> spans;
     long long currentBin = 0;
     bool pendingBreak = false;
