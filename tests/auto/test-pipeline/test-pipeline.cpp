@@ -2160,8 +2160,10 @@ void TestPipeline::histogram2dQueuedRebinIsDroppedAfterAnExportRebinned()
     QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
     QVERIFY(finished.wait(2000));
     hist->setKeyAxis(mPlot->xAxis2);
-    const QSignalBlocker noSignal(mPlot->xAxis2); // only the paint notices the new scale
-    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    {
+        const QSignalBlocker noSignal(mPlot->xAxis2); // only the paint notices the new scale
+        mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    }
     mPlot->replot(); // queues the re-bin
     QVERIFY(!mPlot->toPixmap(400, 300).isNull());
     QSignalSpy busy(&hist->pipeline(), &QCPHistogramPipeline::busyChanged);
@@ -2333,18 +2335,30 @@ bool TestPipeline::repaintFollows(QCPHistogram2D* hist, const std::function<void
 {
     QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
     if (!finished.wait(2000))
-        return qWarning("no binned result"), false;
+    {
+        qWarning("no binned result");
+        return false;
+    }
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QTest::qWait(20);
     const auto buffer = hist->layer()->mPaintBuffer.toStrongRef();
     if (!buffer || buffer->contentDirty())
-        return qWarning("no clean paint buffer to start from"), false;
+    {
+        qWarning("no clean paint buffer to start from");
+        return false;
+    }
     QSignalSpy replotted(mPlot, &QCustomPlot::afterReplot);
     change();
     if (!buffer->contentDirty())
-        return qWarning("no dirty flag"), false;
+    {
+        qWarning("no dirty flag");
+        return false;
+    }
     if (!replotted.wait(2000))
-        return qWarning("no replot"), false;
+    {
+        qWarning("no replot");
+        return false;
+    }
     return true;
 }
 
