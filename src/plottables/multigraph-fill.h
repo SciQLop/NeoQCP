@@ -29,6 +29,7 @@ void appendStrip(std::span<const StripPoint> rows, bool keyIsVertical,
 
 //! Rows binned into spans: per bin of binWidthPx along the key, one row at the bin centre with
 //! a = min and b = max of both edges. Bins never join across a break.
+//! \pre binWidthPx > 0
 std::vector<StripPoint> binToSpans(std::span<const StripPoint> rows, double binWidthPx);
 
 //! The same strip as closed polygons, one per gap-free run (edge a forward, edge b back), for
