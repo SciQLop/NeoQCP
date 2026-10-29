@@ -22,6 +22,7 @@
 #include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
 #include <cmath>
 #include <limits>
+#include <optional>
 
 namespace {
 // Combined L1+L2 helper — used only by tests below.
@@ -253,6 +254,28 @@ void TestPipeline::aBusySlotMayWaitForAnotherThreadUsingThePipeline()
     if (other.joinable())
         other.join();
     QVERIFY(otherThreadGotThrough);
+}
+
+// Nothing newer is on its way when the latest result lands: a finished() slot sees an idle pipeline.
+void TestPipeline::theLatestResultIsNotBusyWhenItLands()
+{
+    QCPPipelineScheduler scheduler;
+    QCPGraphPipeline pipeline(&scheduler);
+    pipeline.setTransform(TransformKind::ViewportIndependent,
+        [](const QCPAbstractDataSource&, const ViewportParams&, std::any&)
+            -> std::shared_ptr<QCPAbstractDataSource> {
+            return std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
+                std::vector<double>{1}, std::vector<double>{1});
+        });
+    std::optional<bool> busyWhenItLanded;
+    connect(&pipeline, &QCPGraphPipeline::finished, this,
+            [&](uint64_t) { busyWhenItLanded = pipeline.isBusy(); });
+
+    pipeline.setSource(std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
+        std::vector<double>{1}, std::vector<double>{1}));
+
+    QTRY_VERIFY_WITH_TIMEOUT(busyWhenItLanded.has_value(), 1000);
+    QCOMPARE(*busyWhenItLanded, false);
 }
 
 void TestPipeline::pipelineCoalescing()
@@ -2179,15 +2202,15 @@ bool spreadOverDecades(const QCPColorMapData* data, bool alongKeys)
 }
 } // namespace
 
-// The constructor's scaleTypeChanged links are to the first axes only: draw() notices the rest.
+// Moving onto an axis that is already log sends no scaleTypeChanged: draw() notices the scale.
 void TestPipeline::histogram2dRebinsForTheScaleOfANewKeyAxis()
 {
     auto* hist = decadeHistogram(mPlot, true);
     QSignalSpy spy(&hist->pipeline(), &QCPHistogramPipeline::finished);
     QVERIFY(spy.wait(2000));
     QVERIFY(!spreadOverDecades(hist->pipeline().result(), true));
-    hist->setKeyAxis(mPlot->xAxis2);
     mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    hist->setKeyAxis(mPlot->xAxis2);
     mPlot->replot();
     QTRY_VERIFY_WITH_TIMEOUT(spreadOverDecades(hist->pipeline().result(), true), 2000);
 }
@@ -2198,8 +2221,8 @@ void TestPipeline::histogram2dRebinsForTheScaleOfANewValueAxis()
     QSignalSpy spy(&hist->pipeline(), &QCPHistogramPipeline::finished);
     QVERIFY(spy.wait(2000));
     QVERIFY(!spreadOverDecades(hist->pipeline().result(), false));
-    hist->setValueAxis(mPlot->yAxis2);
     mPlot->yAxis2->setScaleType(QCPAxis::stLogarithmic);
+    hist->setValueAxis(mPlot->yAxis2);
     mPlot->replot();
     QTRY_VERIFY_WITH_TIMEOUT(spreadOverDecades(hist->pipeline().result(), false), 2000);
 }
@@ -2229,6 +2252,42 @@ void TestPipeline::histogram2dRebinsForANewValueAxisScaleWithoutADraw()
     QTest::qWait(50);
     mPlot->yAxis2->setScaleType(QCPAxis::stLogarithmic);
     QTRY_VERIFY_WITH_TIMEOUT(spreadOverDecades(hist->pipeline().result(), false), 2000);
+}
+
+// The axis the histogram left is someone else's now: toggling its scale must not re-bin.
+void TestPipeline::histogram2dIgnoresTheScaleOfTheKeyAxisItLeft()
+{
+    auto* hist = decadeHistogram(mPlot, true);
+    QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(finished.wait(2000));
+    hist->setKeyAxis(mPlot->xAxis2);
+    QSignalSpy busy(&hist->pipeline(), &QCPHistogramPipeline::busyChanged);
+    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    QCOMPARE(busy.count(), 0);
+}
+
+void TestPipeline::histogram2dIgnoresTheScaleOfTheValueAxisItLeft()
+{
+    auto* hist = decadeHistogram(mPlot, false);
+    QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(finished.wait(2000));
+    hist->setValueAxis(mPlot->yAxis2);
+    QSignalSpy busy(&hist->pipeline(), &QCPHistogramPipeline::busyChanged);
+    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    QCOMPARE(busy.count(), 0);
+}
+
+// Bins land in the background, after the replot that asked for them: they repaint on their own.
+void TestPipeline::histogram2dNewBinsAreRepaintedWhenTheyLand()
+{
+    auto* hist = decadeHistogram(mPlot, true);
+    QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(finished.wait(2000));
+    QTest::qWait(20);
+    QSignalSpy replotted(mPlot, &QCustomPlot::afterReplot);
+    hist->setData(std::vector<double>{1.0, 2.0}, std::vector<double>{5.0, 5.0});
+    QVERIFY(finished.wait(2000));
+    QTRY_VERIFY_WITH_TIMEOUT(replotted.count() > 0, 2000);
 }
 
 // Nothing may emit during a paint: the re-bin draw() asks for runs from the event loop.
@@ -2327,8 +2386,8 @@ void TestPipeline::histogram2dExportResultIsNotReplacedByAnOlderJob()
     auto open = std::make_shared<std::atomic<bool>>(false);
     QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
     hist->setDataSource(std::make_shared<GatedDecadeSource>(open));
+    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic); // already log: no re-bin is queued
     hist->setKeyAxis(mPlot->xAxis2);
-    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
     QVERIFY(!mPlot->toPixmap(400, 300).isNull());
     QVERIFY(spreadOverDecades(hist->pipeline().result(), true));
     open->store(true);
@@ -2369,6 +2428,9 @@ void TestPipeline::histogram2dDataWithNothingFiniteClearsTheOldCells()
     QVERIFY(result && result->isEmpty());
     QCOMPARE(result->keySize(), 0);
     QCOMPARE(result->valueSize(), 0);
+    bool found = true;
+    hist->colorDataBounds(found);
+    QVERIFY(!found);
 }
 
 // The scale the cells were binned for is remembered at install time: a log axis from the start
@@ -2389,16 +2451,17 @@ void TestPipeline::histogram2dLogValueAxisFromTheStartIsNotStale()
 }
 
 // A queued re-bin is done once it ran: the next stale scale needs a new one.
+// The axes swap scales without a signal, so only draw() sees each change.
 void TestPipeline::histogram2dStaleScaleIsReboundAgainAfterAQueuedRebin()
 {
     auto* hist = decadeHistogram(mPlot, true);
     QSignalSpy finished(&hist->pipeline(), &QCPHistogramPipeline::finished);
     QVERIFY(finished.wait(2000));
-    hist->setKeyAxis(mPlot->xAxis2);
     mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    hist->setKeyAxis(mPlot->xAxis2);
     mPlot->replot();
     QTRY_VERIFY_WITH_TIMEOUT(spreadOverDecades(hist->pipeline().result(), true), 2000);
-    mPlot->xAxis2->setScaleType(QCPAxis::stLinear);
+    hist->setKeyAxis(mPlot->xAxis);
     mPlot->replot();
     QTRY_VERIFY_WITH_TIMEOUT(!spreadOverDecades(hist->pipeline().result(), true), 2000);
 }
@@ -2492,6 +2555,12 @@ void TestPipeline::histogram2dChangingTheDataScaleTypeRequestsARepaint()
 {
     auto* hist = decadeHistogram(mPlot, true);
     QVERIFY(repaintFollows(hist, [&] { hist->setDataScaleType(QCPAxis::stLogarithmic); }));
+}
+
+void TestPipeline::histogram2dChangingTheNormalizationRequestsARepaint()
+{
+    auto* hist = decadeHistogram(mPlot, true);
+    QVERIFY(repaintFollows(hist, [&] { hist->setNormalization(QCPHistogram2D::nColumn); }));
 }
 
 void TestPipeline::histogram2dNormalizationColumn()

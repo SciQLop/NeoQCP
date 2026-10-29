@@ -24,6 +24,7 @@ private slots:
     void pipelineTransformRuns();
     void theFirstJobReportsBusyThenIdleWhenItLands();
     void aBusySlotMayWaitForAnotherThreadUsingThePipeline();
+    void theLatestResultIsNotBusyWhenItLands();
     void pipelineCoalescing();
     void pipelineViewportIndependentSkipsViewport();
     void pipelineViewportDependentRuns();
@@ -146,6 +147,9 @@ private slots:
     void histogram2dRebinsForTheScaleOfANewValueAxis();
     void histogram2dRebinsForANewKeyAxisScaleWithoutADraw();
     void histogram2dRebinsForANewValueAxisScaleWithoutADraw();
+    void histogram2dIgnoresTheScaleOfTheKeyAxisItLeft();
+    void histogram2dIgnoresTheScaleOfTheValueAxisItLeft();
+    void histogram2dNewBinsAreRepaintedWhenTheyLand();
     void histogram2dRebinForANewScaleEmitsNothingDuringPaint();
     void histogram2dExportRightAfterAScaleChangeShowsTheNewBins();
     void histogram2dExportRightAfterANewAxisShowsItsScale();
@@ -166,6 +170,7 @@ private slots:
     void histogram2dChangingTheGradientRequestsARepaint();
     void histogram2dChangingTheDataRangeRequestsARepaint();
     void histogram2dChangingTheDataScaleTypeRequestsARepaint();
+    void histogram2dChangingTheNormalizationRequestsARepaint();
 
     // Layer-level GPU translation
     void stallPixelOffsetGraph2Busy();
