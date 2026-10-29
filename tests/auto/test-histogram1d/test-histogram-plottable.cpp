@@ -291,6 +291,7 @@ void TestHistogramPlottable::theAxisItLeftIsNoLongerListenedTo()
     QCOMPARE(busy.count(), 0);
 }
 
+// The new axis is log before the move: no scale signal re-bins, only the export can notice.
 void TestHistogramPlottable::exportRightAfterAScaleChangeBinsForTheNewScale()
 {
     auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
@@ -298,8 +299,8 @@ void TestHistogramPlottable::exportRightAfterAScaleChangeBinsForTheNewScale()
     h->setDataSource(values({1, 10, 100, 1000}));
     QVERIFY(waitForResult(h));
     QVERIFY(settle(h));
-    h->setKeyAxis(mPlot->xAxis2);
     mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    h->setKeyAxis(mPlot->xAxis2);
     QVERIFY(!mPlot->toPixmap(400, 300).isNull());
     QVERIFY(h->histogram()->log);
     QCOMPARE(h->histogram()->edges.front(), 1.0);
@@ -951,6 +952,7 @@ void TestHistogramPlottable::normalizationIsAppliedToTheBars()
 }
 
 // A reset for a scale stays in flight until its job delivers; the next stale scale needs a new one.
+// xAxis2 is log before each move, so both log re-bins go through draw(), not the scale signal.
 void TestHistogramPlottable::staleScaleIsResetAgainAfterAJobDelivered()
 {
     auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
@@ -958,8 +960,8 @@ void TestHistogramPlottable::staleScaleIsResetAgainAfterAJobDelivered()
     h->setDataSource(values({1, 10, 100, 1000}));
     QVERIFY(waitForResult(h));
     QVERIFY(settle(h));
-    h->setKeyAxis(mPlot->xAxis2);
     mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    h->setKeyAxis(mPlot->xAxis2);
     mPlot->replot();
     QTRY_VERIFY_WITH_TIMEOUT(h->histogram() && h->histogram()->log, 5000);
     QVERIFY(settle(h));
@@ -1073,6 +1075,7 @@ void TestHistogramPlottable::exportOfPreBinnedBarsOnAStaleScaleQueuesOneReset()
 }
 
 // The automatic edges of the old scale must not outlive it: they may be wider than the data.
+// The new axis is log before the move, so only the export can notice the scale.
 void TestHistogramPlottable::exportOfAStaleScaleForgetsTheAutoRange()
 {
     auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
@@ -1084,9 +1087,10 @@ void TestHistogramPlottable::exportOfAStaleScaleForgetsTheAutoRange()
     QVERIFY(waitForResult(h));
     QVERIFY(settle(h));
     QCOMPARE(h->histogram()->edges.front(), 1.0);
-    h->setKeyAxis(mPlot->xAxis2);
     mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    h->setKeyAxis(mPlot->xAxis2);
     QVERIFY(!mPlot->toPixmap(400, 300).isNull());
+    QVERIFY(h->histogram()->log);
     QCOMPARE(h->histogram()->edges.front(), 10.0);
     QCOMPARE(h->histogram()->edges.back(), 100.0);
 }
@@ -1114,6 +1118,17 @@ void TestHistogramPlottable::noPositiveEdgeMeansNoPositiveKeyRange()
     bool found = true;
     h->getKeyRange(found, QCP::sdPositive);
     QVERIFY(!found);
+}
+
+void TestHistogramPlottable::positiveKeyRangeStartsAtTheFirstPositiveEdge()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    h->setBinned({-1, 0, 0.5, 2}, {{1, 1, 1}});
+    bool found = false;
+    const QCPRange r = h->getKeyRange(found, QCP::sdPositive);
+    QVERIFY(found);
+    QCOMPARE(r.lower, 0.5);
+    QCOMPARE(r.upper, 2.0);
 }
 
 void TestHistogramPlottable::keyRangeSpansTheEdges()

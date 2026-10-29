@@ -81,6 +81,7 @@ private slots:
     void emptyHistogramHasNoContent();
     void withoutBarsThereIsNoKeyRange();
     void noPositiveEdgeMeansNoPositiveKeyRange();
+    void positiveKeyRangeStartsAtTheFirstPositiveEdge();
     void keyRangeSpansTheEdges();
     void valueRangeOfSmallHeightsStartsAtZero();
     void barsHaveADarkerOutlineAroundTheBase();
