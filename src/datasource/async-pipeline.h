@@ -65,6 +65,8 @@ public:
 
 Q_SIGNALS:
     void finished(uint64_t generation);
+    //! With data changed off the owner thread, a queued busyChanged(true) can land after
+    //! busyChanged(false): slots re-read isBusy() instead of trusting the argument.
     void busyChanged(bool busy);
 
 protected:
