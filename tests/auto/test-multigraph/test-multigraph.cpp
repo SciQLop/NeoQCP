@@ -1240,6 +1240,24 @@ void TestMultiGraph::fillBreaksAtAKeyGap()
                                      int(mPlot->yAxis->coordToPixel(2)))));
 }
 
+// The rows far left of the view keep the drawn window from starting at row 0.
+void TestMultiGraph::fillBreaksAtAKeyGapPastTheFirstRow()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double>{-100, -99, -98, -97, 0, 1, 2, 3, 20, 21, 22, 23},
+                std::vector<std::vector<double>>{std::vector<double>(12, 5.0)});
+    mg->setComponentFill(0, 0.0, QBrush(Qt::red));
+    mPlot->xAxis->setRange(0, 23);
+    mPlot->yAxis->setRange(-1, 6);
+    const QImage img = renderOf(mPlot);
+    QVERIFY(isRedish(img.pixelColor(int(mPlot->xAxis->coordToPixel(1)),
+                                    int(mPlot->yAxis->coordToPixel(2)))));
+    QVERIFY(!isRedish(img.pixelColor(int(mPlot->xAxis->coordToPixel(11)),
+                                     int(mPlot->yAxis->coordToPixel(2)))));
+    QVERIFY(isRedish(img.pixelColor(int(mPlot->xAxis->coordToPixel(21)),
+                                    int(mPlot->yAxis->coordToPixel(2)))));
+}
+
 void TestMultiGraph::fillOnALogAxisClampsAZeroBaseline()
 {
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
@@ -1782,6 +1800,16 @@ void TestMultiGraph::clearingAFillRepaintsTheLayer()
     QVERIFY(!mPlot->layer("main")->canSkipRepaintForTranslation());
 }
 
+void TestMultiGraph::changingAFillBrushRepaintsTheLayerInTheNewBrush()
+{
+    auto* mg = settledThreeColumnGraph(mPlot);
+    QVERIFY(mg->setComponentFill(0, 0.0, QBrush(Qt::red)));
+    QVERIFY(layerKeepsItsPixelsAfterAPan(mPlot));
+    mg->setComponentFillBrush(0, QBrush(Qt::blue));
+    QCOMPARE(mg->componentFill(0)->brush.color(), QColor(Qt::blue));
+    QVERIFY(!mPlot->layer("main")->canSkipRepaintForTranslation());
+}
+
 void TestMultiGraph::settingErrorBarsRepaintsTheLayer()
 {
     auto* mg = settledThreeColumnGraph(mPlot);
@@ -2024,6 +2052,14 @@ void TestMultiGraph::lineCacheIsRebuiltWhenMovedToALogValueAxis()
 {
     auto* mg = decadesThenMovedToALogAxis(mPlot, false);
     QVERIFY(anyPoint(mg->mCachedLines[0], [&](QPointF p) { return qFuzzyCompare(p.y(), mPlot->yAxis2->coordToPixel(10)); }));
+}
+
+// A scale change on the axis the graph left must not drop the lines drawn on its new axis.
+void TestMultiGraph::theKeyAxisItLeftIsNoLongerListenedTo()
+{
+    auto* mg = decadesThenMovedToALogAxis(mPlot, true);
+    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    QVERIFY(!mg->mCachedLines.isEmpty());
 }
 
 // Binned when the rows outnumber 4 per pixel of the key axis.

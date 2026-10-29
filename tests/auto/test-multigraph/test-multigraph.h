@@ -69,6 +69,7 @@ private slots:
     void anAlmostTransparentFillStillPaints();
     void hidingAnEdgeRemovesTheFillAndShowingBringsItBack();
     void fillBreaksAtAKeyGap();
+    void fillBreaksAtAKeyGapPastTheFirstRow();
     void fillOnALogAxisClampsAZeroBaseline();
     void bandEdgeAtZeroOnALogAxisReachesTheEdge();
     void bandEdgeAtZeroOnALogAxisIsClampedLikeABaseline();
@@ -79,6 +80,7 @@ private slots:
     void fillFollowsADownsampledLine();
     void settingAFillRepaintsTheLayer();
     void clearingAFillRepaintsTheLayer();
+    void changingAFillBrushRepaintsTheLayerInTheNewBrush();
     void aFillWithoutItsComponentYetIsGray();
     void aRebuiltGpuFillIsNotDrawnTwice();
     void aFillOnAColumnOnlyTheStagedSourceHasIsNotDrawn();
@@ -134,6 +136,7 @@ private slots:
     void lineCacheFollowsTheScaleOfANewValueAxis();
     void lineCacheIsRebuiltWhenMovedToALogKeyAxis();
     void lineCacheIsRebuiltWhenMovedToALogValueAxis();
+    void theKeyAxisItLeftIsNoLongerListenedTo();
     void aNarrowerThenWiderStagedSourceKeepsTheCachedExtrusionsInRange();
     void aWiderStagedSourceKeepsTheCachedLinesInRange();
     void zoomedOutLinesAreThinnedToThePixelWidth_data();
