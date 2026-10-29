@@ -993,6 +993,19 @@ void TestMultiGraph::panIsRedrawnFreshAfterTheDebounce()
     QTRY_VERIFY2_WITH_TIMEOUT(renderedAtView(), "the panned view was never drawn fresh", 2000);
 }
 
+// The new axis is ranged before the move: only the move itself can mark the resample stale.
+void TestMultiGraph::resampledLinesFollowANewKeyAxis()
+{
+    auto* mg = denseGraphDrawn(mPlot);
+    QVERIFY(mg->mL2Result);
+    mPlot->xAxis2->setRange(200'000, 300'000);
+    mg->setKeyAxis(mPlot->xAxis2);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(mg->mL2Result);
+    QVERIFY2(mg->mL2Result->keyAt(mg->mL2Result->size() - 1) > 250'000,
+             "drawn from the resample of the old axis's range");
+}
+
 void TestMultiGraph::panIsRedrawnFreshWhileAnotherLayerIsDirty()
 {
     if (!showWithRhi(mPlot))
@@ -1846,6 +1859,15 @@ void TestMultiGraph::replacingErrorBarsKeepsOnlyTheNewOnes()
     QVERIFY(mg->setComponentErrorBars(0, 1, 2, 6));
     QVERIFY(mg->setComponentErrorBars(0, 1, 2, 20));
     QCOMPARE(mg->componentErrorBars(0)->capWidthPx, 20.0);
+}
+
+void TestMultiGraph::clearedErrorBoundsComeBackToTheLegend()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    QVERIFY(mg->setComponentErrorBars(0, 1, 2, 6));
+    QCOMPARE(mg->legendComponents(), QVector<int>({0}));
+    mg->clearComponentErrorBars(0);
+    QCOMPARE(mg->legendComponents(), QVector<int>({0, 1, 2}));
 }
 
 void TestMultiGraph::aFillWithoutItsComponentYetIsGray()

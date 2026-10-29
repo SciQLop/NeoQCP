@@ -1508,6 +1508,28 @@ void TestPipeline::graph2HierarchicalResamplingActivates()
     QVERIFY(g->mL2Result->size() < N / 10);
 }
 
+// The new axis is ranged before the move: only the move itself can mark the resample stale.
+void TestPipeline::graph2ResampleFollowsANewKeyAxis()
+{
+    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    const int N = 10'000'001;
+    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
+    mPlot->xAxis->setRange(0, N / 4);
+    mPlot->yAxis->setRange(-1, 1);
+    g->setDataSource(std::make_shared<SyntheticLargeSource>(N));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(g->mL2Result);
+
+    mPlot->xAxis2->setRange(3 * (N / 4), N - 1);
+    g->setKeyAxis(mPlot->xAxis2);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(g->mL2Result);
+    QVERIFY2(g->mL2Result->keyAt(g->mL2Result->size() - 1) > 3 * (N / 4),
+             "drawn from the resample of the old axis's range");
+}
+
 void TestPipeline::graph2LineCacheRebuiltOnZoomWithBigData()
 {
     // Reproducer: user report that zooming (in either direction) on a big

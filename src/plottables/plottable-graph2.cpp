@@ -59,6 +59,7 @@ void QCPGraph2::followAxes()
     if (mValueAxis)
         mAxisLinks << connect(mValueAxis.data(), &QCPAxis::scaleTypeChanged, this, dropLines);
     dropLines(); // pixels computed for the old axes mean nothing on the new ones
+    mL2Dirty = mL1Cache != nullptr; // nor do the bins resampled for the old key range
 }
 
 void QCPGraph2::markLinesDirty()

@@ -118,6 +118,7 @@ private slots:
     void clearingErrorBarsRepaintsTheLayer();
     void errorBarsOfDifferentColumnsCoexist();
     void replacingErrorBarsKeepsOnlyTheNewOnes();
+    void clearedErrorBoundsComeBackToTheLegend();
     void errorBoundOfZeroOnALogAxisStopsAtTheEdge();
     void errorBoundsInsideALogAxisAreNotClamped();
     void barsCrowdedAtAnEdgeOfTheViewForceABand();
@@ -165,6 +166,7 @@ private slots:
     void selectedStepGraph2KeepsItsSteps();
     void panIsRedrawnFreshAfterTheDebounce();
     void panIsRedrawnFreshWhileAnotherLayerIsDirty();
+    void resampledLinesFollowANewKeyAxis();
 
 private:
     QCustomPlot* mPlot = nullptr;

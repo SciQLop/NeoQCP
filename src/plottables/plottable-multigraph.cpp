@@ -75,6 +75,7 @@ void QCPMultiGraph::followAxes()
         mAxisLinks << connect(mValueAxis.data(), &QCPAxis::scaleTypeChanged,
                               this, [this] { invalidateLines(); });
     invalidateLines(); // pixels computed for the old axes mean nothing on the new ones
+    mL2Dirty = mL1Cache != nullptr; // nor do the bins resampled for the old key range
 }
 
 void QCPMultiGraph::markLinesDirty()
@@ -462,12 +463,16 @@ bool QCPMultiGraph::setComponentErrorBars(int value, int lower, int upper, doubl
 
 void QCPMultiGraph::clearComponentErrorBars(int value)
 {
-    const auto before = mErrorBars.size();
+    const auto old = componentErrorBars(value);
+    if (!old)
+        return;
     mErrorBars.erase(std::remove_if(mErrorBars.begin(), mErrorBars.end(),
                                     [value](const ErrorBarsEntry& e) { return e.spec.value == value; }),
                      mErrorBars.end());
-    if (mErrorBars.size() != before)
-        decorationsChanged();
+    for (int bound : {old->lower, old->upper})
+        if (!isErrorBound(bound))
+            setComponentInLegend(bound, true);
+    decorationsChanged();
 }
 
 std::optional<QCPMultiGraph::ErrorBars> QCPMultiGraph::componentErrorBars(int value) const

@@ -124,7 +124,7 @@ public:
         double capWidthPx = 6;        // full cap width
     };
     //! Bars from `lower` to `upper` at each row of `value`; a band when rows are too dense.
-    //! One per value column: setting again replaces it. Takes the bounds out of the legend.
+    //! One per value column: setting again replaces it. Takes the bounds out of the legend; clearing puts back those no other bars use.
     //! False (nothing changed) for an unknown or repeated column.
     bool setComponentErrorBars(int value, int lower, int upper, double capWidthPx = 6,
                                std::optional<QPen> pen = std::nullopt);
