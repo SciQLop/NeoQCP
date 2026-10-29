@@ -70,8 +70,9 @@ void QCPAsyncPipelineBase::startJob(QMutexLocker<QMutex>& lock,
 void QCPAsyncPipelineBase::onDataChanged()
 {
     PROFILE_HERE_N("Pipeline::onDataChanged");
-    uint64_t gen = ++mGeneration;
+    // Bumped under the lock: a result landing in between would count this generation as shown.
     QMutexLocker lock(&mMutex);
+    uint64_t gen = ++mGeneration;
     mCache = std::any{};
 
     if (mJobRunning)
@@ -145,8 +146,8 @@ void QCPAsyncPipelineBase::onViewportChanged(const ViewportParams& vp)
         return;
     }
 
-    uint64_t gen = ++mGeneration;
     QMutexLocker lock(&mMutex);
+    uint64_t gen = ++mGeneration;
     mLastViewport = vp;
 
     if (mJobRunning)

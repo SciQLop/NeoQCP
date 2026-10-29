@@ -256,6 +256,57 @@ void TestPipeline::aBusySlotMayWaitForAnotherThreadUsingThePipeline()
     QVERIFY(otherThreadGotThrough);
 }
 
+namespace {
+struct LockablePipeline : QCPGraphPipeline
+{
+    using QCPGraphPipeline::QCPGraphPipeline;
+    using QCPAsyncPipelineBase::mMutex;
+};
+}
+
+// Another thread's onDataChanged() while the previous result lands. When the generation was
+// bumped before taking the mutex, the landing's idle catch-up counted it as shown before its job
+// started, and its result was then dropped as stale. The test parks the other thread on the
+// mutex, so the landing races it for the lock.
+void TestPipeline::aDataChangeBumpedJustBeforeAResultLandsIsStillShown()
+{
+    // The other thread wins the lock some of the time: several rounds make the race show.
+    for (int round = 0; round < 10; ++round)
+    {
+        QCPPipelineScheduler scheduler;
+        LockablePipeline pipeline(&scheduler);
+        pipeline.setTransform(TransformKind::ViewportIndependent,
+            [](const QCPAbstractDataSource&, const ViewportParams&, std::any&)
+                -> std::shared_ptr<QCPAbstractDataSource> {
+                return std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
+                    std::vector<double>{1}, std::vector<double>{1});
+            });
+        std::thread other;
+        bool otherStarted = false;
+        uint64_t lastShown = 0;
+        connect(&pipeline, &QCPGraphPipeline::finished, this, [&](uint64_t generation) {
+            lastShown = generation;
+            if (std::exchange(otherStarted, true))
+                return;
+            pipeline.mMutex.lock();
+            const uint64_t before = pipeline.currentGeneration();
+            other = std::thread([&] { pipeline.onDataChanged(); });
+            QDeadlineTimer deadline(50);
+            while (pipeline.currentGeneration() == before && !deadline.hasExpired())
+                QThread::yieldCurrentThread();
+            pipeline.mMutex.unlock();
+        });
+
+        pipeline.setSource(std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
+            std::vector<double>{1}, std::vector<double>{1}));
+        QTRY_VERIFY_WITH_TIMEOUT(otherStarted, 1000);
+        other.join();
+        QTRY_VERIFY_WITH_TIMEOUT(!pipeline.isBusy(), 1000);
+        QTest::qWait(20);
+        QCOMPARE(lastShown, pipeline.currentGeneration());
+    }
+}
+
 // Nothing newer is on its way when the latest result lands: a finished() slot sees an idle pipeline.
 void TestPipeline::theLatestResultIsNotBusyWhenItLands()
 {

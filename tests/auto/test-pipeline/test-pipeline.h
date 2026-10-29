@@ -25,6 +25,7 @@ private slots:
     void theFirstJobReportsBusyThenIdleWhenItLands();
     void aBusySlotMayWaitForAnotherThreadUsingThePipeline();
     void theLatestResultIsNotBusyWhenItLands();
+    void aDataChangeBumpedJustBeforeAResultLandsIsStillShown();
     void pipelineCoalescing();
     void pipelineViewportIndependentSkipsViewport();
     void pipelineViewportDependentRuns();
