@@ -35,6 +35,7 @@ public:
         QCPDataSelection selection;
         bool visible = true;
         bool inLegend = true;
+        bool hiddenByErrorBars = false; //!< out of the legend as an error bound, not by the user
         //! Set through setComponentLineStyle(): a direct write leaves the cached lines stale.
         LineStyle lineStyle = lsLine;
     };
@@ -300,6 +301,7 @@ protected:
     void onL1Ready(uint64_t generation);
     void syncComponentCount(const QCPAbstractMultiDataSource* source);
     void dropDecorationsBeyond(int columnCount);
+    void hideErrorBound(int column);
     void releaseErrorBounds(const ErrorBars& removed);
     bool setFill(Fill fill);
     [[nodiscard]] bool isErrorBound(int column) const;

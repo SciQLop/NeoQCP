@@ -120,6 +120,7 @@ private slots:
     void replacingErrorBarsKeepsOnlyTheNewOnes();
     void clearedErrorBoundsComeBackToTheLegend();
     void replacedErrorBoundsComeBackToTheLegend();
+    void aBoundTheUserHidFromTheLegendStaysHidden();
     void errorBoundsOfBarsDroppedByANarrowerSourceComeBackToTheLegend();
     void errorBoundOfZeroOnALogAxisStopsAtTheEdge();
     void errorBoundsInsideALogAxisAreNotClamped();

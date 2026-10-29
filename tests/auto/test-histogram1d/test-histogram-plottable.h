@@ -1,5 +1,6 @@
 #pragma once
 #include <QtTest/QtTest>
+#include <QtWidgets/qtestsupport_widgets.h>  // QTest::qWaitForWindowExposed (macOS)
 #include <functional>
 
 class QCustomPlot;

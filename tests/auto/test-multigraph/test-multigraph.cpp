@@ -1870,6 +1870,15 @@ void TestMultiGraph::clearedErrorBoundsComeBackToTheLegend()
     QCOMPARE(mg->legendComponents(), QVector<int>({0, 1, 2}));
 }
 
+void TestMultiGraph::aBoundTheUserHidFromTheLegendStaysHidden()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    mg->setComponentInLegend(1, false);
+    QVERIFY(mg->setComponentErrorBars(0, 1, 2, 6));
+    mg->clearComponentErrorBars(0);
+    QCOMPARE(mg->legendComponents(), QVector<int>({0, 2}));
+}
+
 void TestMultiGraph::replacedErrorBoundsComeBackToTheLegend()
 {
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);

@@ -328,6 +328,7 @@ void QCPMultiGraph::syncComponentCount(const QCPAbstractMultiDataSource* source)
             c.name = QString("Component %1").arg(i);
             c.lineStyle = mLineStyle;
             c.inLegend = !isErrorBound(i);
+            c.hiddenByErrorBars = !c.inLegend;
         }
     } else if (newCount < oldCount) {
         mComponents.resize(newCount);
@@ -358,11 +359,21 @@ void QCPMultiGraph::dropDecorationsBeyond(int columnCount)
         releaseErrorBounds(spec);
 }
 
-// Bounds of removed bars come back to the legend, unless other bars still use them.
+void QCPMultiGraph::hideErrorBound(int column)
+{
+    if (column < 0 || column >= mComponents.size() || !mComponents[column].inLegend)
+        return; // a bound the user already hid stays the user's
+    setComponentInLegend(column, false);
+    mComponents[column].hiddenByErrorBars = true;
+}
+
+// Bounds of removed bars come back to the legend, unless other bars still use them or the user
+// hid them.
 void QCPMultiGraph::releaseErrorBounds(const ErrorBars& removed)
 {
     for (int bound : {removed.lower, removed.upper})
-        if (!isErrorBound(bound))
+        if (bound >= 0 && bound < mComponents.size() && mComponents[bound].hiddenByErrorBars
+            && !isErrorBound(bound))
             setComponentInLegend(bound, true);
 }
 
@@ -469,8 +480,8 @@ bool QCPMultiGraph::setComponentErrorBars(int value, int lower, int upper, doubl
     ErrorBarsEntry entry;
     entry.spec = {value, lower, upper, std::move(pen), capWidthPx};
     mErrorBars.append(std::move(entry));
-    setComponentInLegend(lower, false);
-    setComponentInLegend(upper, false);
+    hideErrorBound(lower);
+    hideErrorBound(upper);
     decorationsChanged();
     return true;
 }
@@ -543,7 +554,10 @@ void QCPMultiGraph::setComponentPens(const QList<QPen>& pens)
 
 void QCPMultiGraph::setComponentInLegend(int index, bool inLegend)
 {
-    if (index < 0 || index >= mComponents.size() || mComponents[index].inLegend == inLegend)
+    if (index < 0 || index >= mComponents.size())
+        return;
+    mComponents[index].hiddenByErrorBars = false; // from here on, the caller's choice
+    if (mComponents[index].inLegend == inLegend)
         return;
     mComponents[index].inLegend = inLegend;
     Q_EMIT componentVisibilityChanged();
