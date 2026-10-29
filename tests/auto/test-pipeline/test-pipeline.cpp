@@ -257,6 +257,7 @@ void TestPipeline::aBusySlotMayWaitForAnotherThreadUsingThePipeline()
 }
 
 namespace {
+// The pipeline's mutex is the subject of the race test, so the test takes it directly.
 struct LockablePipeline : QCPGraphPipeline
 {
     using QCPGraphPipeline::QCPGraphPipeline;
@@ -291,6 +292,8 @@ void TestPipeline::aDataChangeBumpedJustBeforeAResultLandsIsStillShown()
             pipeline.mMutex.lock();
             const uint64_t before = pipeline.currentGeneration();
             other = std::thread([&] { pipeline.onDataChanged(); });
+            // With the fix the bump waits for this lock, so the spin always runs out: the wait
+            // is what lets the unfixed bump-before-lock happen while the other thread is parked.
             QDeadlineTimer deadline(50);
             while (pipeline.currentGeneration() == before && !deadline.hasExpired())
                 QThread::yieldCurrentThread();
