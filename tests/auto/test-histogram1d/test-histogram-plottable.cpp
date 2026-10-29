@@ -292,6 +292,8 @@ void TestHistogramPlottable::theAxisItLeftIsNoLongerListenedTo()
 }
 
 // The new axis is log before the move: no scale signal re-bins, only the export can notice.
+// A scale change after the move re-bins through the signal instead; an export while that job
+// runs is exportWhileBinningShowsTheNewData, and the late job only re-applies the same bars.
 void TestHistogramPlottable::exportRightAfterAScaleChangeBinsForTheNewScale()
 {
     auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
