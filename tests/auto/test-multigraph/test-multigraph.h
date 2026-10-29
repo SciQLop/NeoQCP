@@ -119,6 +119,8 @@ private slots:
     void errorBarsOfDifferentColumnsCoexist();
     void replacingErrorBarsKeepsOnlyTheNewOnes();
     void clearedErrorBoundsComeBackToTheLegend();
+    void replacedErrorBoundsComeBackToTheLegend();
+    void errorBoundsOfBarsDroppedByANarrowerSourceComeBackToTheLegend();
     void errorBoundOfZeroOnALogAxisStopsAtTheEdge();
     void errorBoundsInsideALogAxisAreNotClamped();
     void barsCrowdedAtAnEdgeOfTheViewForceABand();

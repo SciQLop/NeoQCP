@@ -348,8 +348,22 @@ void QCPMultiGraph::dropDecorationsBeyond(int columnCount)
     const auto barsOutside = [columnCount](const ErrorBarsEntry& e) {
         return std::max({e.spec.value, e.spec.lower, e.spec.upper}) >= columnCount;
     };
+    QVector<ErrorBars> dropped;
+    for (const auto& e : mErrorBars)
+        if (barsOutside(e))
+            dropped.append(e.spec);
     mErrorBars.erase(std::remove_if(mErrorBars.begin(), mErrorBars.end(), barsOutside),
                      mErrorBars.end());
+    for (const auto& spec : dropped)
+        releaseErrorBounds(spec);
+}
+
+// Bounds of removed bars come back to the legend, unless other bars still use them.
+void QCPMultiGraph::releaseErrorBounds(const ErrorBars& removed)
+{
+    for (int bound : {removed.lower, removed.upper})
+        if (!isErrorBound(bound))
+            setComponentInLegend(bound, true);
 }
 
 // Error bars can be set before the data that creates their bound components.
@@ -469,9 +483,7 @@ void QCPMultiGraph::clearComponentErrorBars(int value)
     mErrorBars.erase(std::remove_if(mErrorBars.begin(), mErrorBars.end(),
                                     [value](const ErrorBarsEntry& e) { return e.spec.value == value; }),
                      mErrorBars.end());
-    for (int bound : {old->lower, old->upper})
-        if (!isErrorBound(bound))
-            setComponentInLegend(bound, true);
+    releaseErrorBounds(*old);
     decorationsChanged();
 }
 

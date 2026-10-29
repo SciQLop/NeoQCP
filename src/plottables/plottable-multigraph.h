@@ -300,6 +300,7 @@ protected:
     void onL1Ready(uint64_t generation);
     void syncComponentCount(const QCPAbstractMultiDataSource* source);
     void dropDecorationsBeyond(int columnCount);
+    void releaseErrorBounds(const ErrorBars& removed);
     bool setFill(Fill fill);
     [[nodiscard]] bool isErrorBound(int column) const;
     void decorationsChanged();
