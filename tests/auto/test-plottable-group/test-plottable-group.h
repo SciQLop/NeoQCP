@@ -32,6 +32,7 @@ private slots:
     void intervalsCanBeGrouped();
     void clearPlottablesEmptiesGroups();
     void foreignGroupIsNotRemoved();
+    void iconIsTheFirstVisibleMembers();
 
 private:
     QCPPlottableGroupLegendItem* groupRow() const;

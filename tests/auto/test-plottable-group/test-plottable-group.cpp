@@ -386,3 +386,22 @@ void TestPlottableGroup::foreignGroupIsNotRemoved()
     QVERIFY(!mPlot->removePlottableGroup(foreign));
     QVERIFY(foreign);
 }
+
+void TestPlottableGroup::iconIsTheFirstVisibleMembers()
+{
+    auto* hidden = mPlot->addGraph();
+    hidden->setPen(QPen(Qt::red, 6));
+    auto* shown = mPlot->addGraph();
+    shown->setPen(QPen(Qt::blue, 6));
+    auto* group = mPlot->addPlottableGroup("g");
+    group->addMember(hidden);
+    group->addMember(shown);
+    hidden->setVisible(false);
+
+    mPlot->resize(400, 300);
+    const QImage img = mPlot->toPixmap(400, 300).toImage();
+    const QSize iconSize = mPlot->legend->iconSize();
+    const QPoint iconCentre = groupRow()->rect().topLeft()
+        + QPoint(iconSize.width() / 2, iconSize.height() / 2);
+    QCOMPARE(img.pixelColor(iconCentre), QColor(Qt::blue));
+}
