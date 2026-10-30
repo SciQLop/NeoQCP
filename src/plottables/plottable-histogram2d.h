@@ -4,6 +4,7 @@
 #include <datasource/async-pipeline.h>
 #include <datasource/soa-datasource.h>
 #include <painting/colormap-renderer.h>
+#include <painting/contour-overlay.h>
 #include <memory>
 #include <span>
 
@@ -84,6 +85,23 @@ public:
     //! The range of the binned (normalized) counts; \a found is false before the first binning.
     [[nodiscard]] QCPRange colorDataBounds(bool& found) const;
 
+    // Contours, as on QCPColorMap2, over the values shown: the column fractions with nColumn.
+    void setContourLevels(const QVector<double>& levels);
+    [[nodiscard]] QVector<double> contourLevels() const { return mContours.levels(); }
+    void setAutoContourLevels(int count);
+    [[nodiscard]] int autoContourLevelCount() const { return mContours.autoLevelCount(); }
+    void setContourPen(const QPen& pen);
+    [[nodiscard]] QPen contourPen() const { return mContours.pen(); }
+    void setContourLabelEnabled(bool enabled);
+    [[nodiscard]] bool contourLabelEnabled() const { return mContours.labelsEnabled(); }
+    // Exposed for tests: see QCPColorMap2.
+    [[nodiscard]] const QVector<float>& lastContourUv() const { return mContours.lastUv(); }
+    [[nodiscard]] QVector<double> lastContourLevels() const { return mContours.lastLevels(); }
+    [[nodiscard]] const QVector<QCPContourOverlay::Label>& lastContourLabels() const
+    {
+        return mContours.lastLabels();
+    }
+
     // Pipeline access
     QCPHistogramPipeline& pipeline() { return mPipeline; }
     const QCPHistogramPipeline& pipeline() const { return mPipeline; }
@@ -109,7 +127,11 @@ protected:
     void axesChanged() override { followAxisScales(); }
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
     bool canProduceContent() const override;
-    void releaseGpuResources() override { mRenderer.releaseRhiLayer(); }
+    void releaseGpuResources() override
+    {
+        mRenderer.releaseRhiLayer();
+        mContours.releaseGpu();
+    }
 
 private:
     void redrawLater();
@@ -121,6 +143,17 @@ private:
     Normalization mNormalization = nNone;
     QCPHistogramPipeline mPipeline;
     QCPColormapRenderer mRenderer;
+    QCPContourOverlay mContours { mRenderer };
+    //! The binned counts as shown, column fractions with nColumn, with the colour bounds of the
+    //! non-empty columns. Rebuilt lazily after the bins or the normalization change.
+    struct Shown
+    {
+        std::shared_ptr<QCPColorMapData> normalized;
+        QCPRange bounds;
+        bool found = false;
+        bool stale = true;
+    };
+    mutable Shown mShown;
     //! The axis scales the binning was made for: a new axis or a blocked scaleTypeChanged
     //! leaves them behind, and draw() catches up.
     bool mBinnedKeyLog = false;
@@ -149,6 +182,10 @@ private:
     [[nodiscard]] bool binnedForTheAxisScales() const;
     //! The binned cells, or nullptr when there are none (yet).
     [[nodiscard]] const QCPColorMapData* binned() const;
+    //! The cells as drawn: binned(), or their column fractions with nColumn.
+    [[nodiscard]] const QCPColorMapData* shown() const;
+    void binsChanged();
+    void contoursChanged();
     void queueRefreshBinning();
     void binForExport();
 };

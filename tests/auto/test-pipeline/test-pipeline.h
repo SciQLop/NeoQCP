@@ -169,6 +169,9 @@ private slots:
     void histogram2dStaleScaleIsReboundAgainAfterAQueuedRebin();
     void histogram2dExportDrawsTheNewBins();
     void histogram2dAdoptsTheRangeOfANewColorScale();
+    void histogram2dContoursFollowTheCounts();
+    void histogram2dContoursFollowTheNormalizedCounts();
+    void histogram2dContourLabelsFollowAColourScaleToggle();
     void histogram2dChangingTheGradientRequestsARepaint();
     void histogram2dChangingTheDataRangeRequestsARepaint();
     void histogram2dChangingTheDataScaleTypeRequestsARepaint();

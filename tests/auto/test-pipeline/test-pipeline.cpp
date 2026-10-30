@@ -3996,3 +3996,94 @@ void TestPipeline::graph2DataChangedReplotSlotDeletingTheGraphIsSafe()
     g->dataChanged();
     QCOMPARE(mPlot->plottableCount(), 0);
 }
+
+namespace
+{
+//! One sample in every cell of a 40×40 grid, plus a round bump of up to 10 more in the middle.
+QCPHistogram2D* bumpHistogram(QCustomPlot* plot)
+{
+    auto* hist = new QCPHistogram2D(plot->xAxis, plot->yAxis);
+    std::vector<double> keys, values;
+    for (int i = 0; i < 40; ++i)
+        for (int j = 0; j < 40; ++j)
+        {
+            const int extra = qRound(10 * std::exp(-((i - 20) * (i - 20) + (j - 20) * (j - 20)) / 60.0));
+            for (int n = 0; n <= extra; ++n)
+            {
+                keys.push_back(i + 0.5);
+                values.push_back(j + 0.5);
+            }
+        }
+    hist->setBins(40, 40);
+    hist->setData(std::move(keys), std::move(values));
+    plot->resize(400, 400);
+    plot->xAxis->setRange(0, 40);
+    plot->yAxis->setRange(0, 40);
+    return hist;
+}
+
+int redPixels(const QImage& img)
+{
+    int red = 0;
+    for (int y = 0; y < img.height(); ++y)
+        for (int x = 0; x < img.width(); ++x)
+        {
+            const QColor c = img.pixelColor(x, y);
+            red += c.red() > 200 && c.green() < 60 && c.blue() < 60;
+        }
+    return red;
+}
+} // namespace
+
+void TestPipeline::histogram2dContoursFollowTheCounts()
+{
+    auto* hist = bumpHistogram(mPlot);
+    hist->setGradient(QCPColorGradient(QCPColorGradient::gpGrayscale));
+    hist->rescaleDataRange(true);
+    QSignalSpy spy(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(spy.wait(2000));
+    const QImage without = mPlot->toPixmap().toImage();
+    hist->setContourLevels({ 3.0, 6.0 });
+    hist->setContourPen(QPen(Qt::red, 2));
+    const QImage with = mPlot->toPixmap().toImage();
+    QCOMPARE(hist->lastContourLevels(), (QVector<double> { 3.0, 6.0 }));
+    QVERIFY(!hist->lastContourUv().isEmpty());
+    QVERIFY2(redPixels(without) == 0 && redPixels(with) > 50,
+             qPrintable(QString("red pixels: %1 without, %2 with").arg(redPixels(without)).arg(redPixels(with))));
+}
+
+// With column normalization the image shows fractions of each column: the lines must too.
+void TestPipeline::histogram2dContoursFollowTheNormalizedCounts()
+{
+    auto* hist = bumpHistogram(mPlot);
+    hist->setNormalization(QCPHistogram2D::nColumn);
+    hist->setAutoContourLevels(3);
+    QSignalSpy spy(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(spy.wait(2000));
+    mPlot->toPixmap();
+    const QVector<double> levels = hist->lastContourLevels();
+    QCOMPARE(levels.size(), 3);
+    for (double level : levels)
+        QVERIFY2(level > 0 && level < 1, qPrintable(QString("level %1 is not a column fraction").arg(level)));
+    QVERIFY(!hist->lastContourUv().isEmpty());
+}
+
+// Auto levels change with the colour scale type, which does not re-bin: the labels must follow.
+void TestPipeline::histogram2dContourLabelsFollowAColourScaleToggle()
+{
+    auto* hist = bumpHistogram(mPlot);
+    hist->setAutoContourLevels(3);
+    hist->setContourLabelEnabled(true);
+    QSignalSpy spy(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(spy.wait(2000));
+    mPlot->toPixmap();
+    const QVector<double> linear = hist->lastContourLevels();
+    hist->setDataScaleType(QCPAxis::stLogarithmic);
+    mPlot->toPixmap();
+    const QVector<double> levels = hist->lastContourLevels();
+    QVERIFY2(levels != linear, "sanity: log auto levels differ from linear ones");
+    QVERIFY(!hist->lastContourLabels().isEmpty());
+    for (const auto& label : hist->lastContourLabels())
+        QVERIFY2(levels.contains(label.level),
+                 qPrintable(QString("label level %1 is not a current level").arg(label.level)));
+}

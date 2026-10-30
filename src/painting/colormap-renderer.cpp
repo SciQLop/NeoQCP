@@ -75,7 +75,7 @@ QCPColorScale* QCPColormapRenderer::colorScale() const
     return mColorScale;
 }
 
-void QCPColormapRenderer::updateMapImage(const QCPColorMapData* data, NormalizeFn normalize)
+void QCPColormapRenderer::updateMapImage(const QCPColorMapData* data)
 {
     PROFILE_HERE_N("QCPColormapRenderer::updateMapImage");
     if (!data) return;
@@ -88,26 +88,11 @@ void QCPColormapRenderer::updateMapImage(const QCPColorMapData* data, NormalizeF
     QImage argbImage(keySize, valueSize, QImage::Format_ARGB32_Premultiplied);
     const bool isLog = (mDataScaleType == QCPAxis::stLogarithmic);
 
-    if (normalize)
+    const double* rawData = data->rawData();
+    for (int y = 0; y < valueSize; ++y)
     {
-        std::vector<double> rowData(keySize);
-        for (int y = 0; y < valueSize; ++y)
-        {
-            for (int x = 0; x < keySize; ++x)
-                rowData[x] = normalize(data->cell(x, y), x, y);
-
-            QRgb* pixels = reinterpret_cast<QRgb*>(argbImage.scanLine(valueSize - 1 - y));
-            mGradient.colorize(rowData.data(), mDataRange, pixels, keySize, 1, isLog);
-        }
-    }
-    else
-    {
-        const double* rawData = data->rawData();
-        for (int y = 0; y < valueSize; ++y)
-        {
-            QRgb* pixels = reinterpret_cast<QRgb*>(argbImage.scanLine(valueSize - 1 - y));
-            mGradient.colorize(rawData + y * keySize, mDataRange, pixels, keySize, 1, isLog);
-        }
+        QRgb* pixels = reinterpret_cast<QRgb*>(argbImage.scanLine(valueSize - 1 - y));
+        mGradient.colorize(rawData + y * keySize, mDataRange, pixels, keySize, 1, isLog);
     }
 
     mFlippedMapImage = {};

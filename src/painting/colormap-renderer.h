@@ -7,7 +7,6 @@
 #include <QPointer>
 #include <QPointF>
 #include <QVector>
-#include <functional>
 
 class QCPAbstractPlottable;
 class QCPColorScale;
@@ -37,8 +36,7 @@ public:
     QCPColorScale* colorScale() const;
 
     // Rendering
-    using NormalizeFn = std::function<double(double value, int col, int row)>;
-    void updateMapImage(const QCPColorMapData* data, NormalizeFn normalize = {});
+    void updateMapImage(const QCPColorMapData* data);
     void draw(QCPPainter* painter, QCPAxis* keyAxis, QCPAxis* valueAxis,
               const QCPRange& keyRange, const QCPRange& valueRange);
     //! Where the image of a grid over \a keyRange × \a valueRange is drawn, in pixels, ordered

@@ -18,7 +18,7 @@ QCPHistogram2D::QCPHistogram2D(QCPAxis* keyAxis, QCPAxis* valueAxis)
 
     connect(&mPipeline, &QCPHistogramPipeline::finished,
             this, [this](uint64_t) {
-                mRenderer.invalidateMapImage();
+                binsChanged();
                 parentPlot()->replot(QCustomPlot::rpQueuedReplot);
             });
     connect(&mPipeline, &QCPHistogramPipeline::busyChanged,
@@ -153,7 +153,7 @@ void QCPHistogram2D::setNormalization(Normalization norm)
     if (mNormalization == norm)
         return;
     mNormalization = norm;
-    mRenderer.invalidateMapImage();
+    binsChanged();
     mParentPlot->replot(QCustomPlot::rpQueuedReplot);
 }
 
@@ -239,44 +239,74 @@ const QCPColorMapData* QCPHistogram2D::binned() const
     return data && !data->isEmpty() ? data : nullptr;
 }
 
+namespace
+{
+QCPRange rangeOrNothing(double lo, double hi, bool& found)
+{
+    found = lo <= hi;
+    return found ? QCPRange(lo, hi) : QCPRange();
+}
+}
+
+void QCPHistogram2D::binsChanged()
+{
+    mShown.stale = true;
+    mRenderer.invalidateMapImage();
+    mContours.dataChanged();
+}
+
+const QCPColorMapData* QCPHistogram2D::shown() const
+{
+    const auto* bins = binned();
+    if (!bins || mNormalization == nNone)
+        return bins;
+    if (mShown.stale)
+    {
+        // qMax: GCC cannot see that keySize() is non-negative and reports a
+        // bogus -Wstringop-overflow on QVector's fill otherwise.
+        const int keySz = qMax(0, bins->keySize());
+        const int valSz = bins->valueSize();
+        auto fractions = std::make_shared<QCPColorMapData>(keySz, valSz, bins->keyRange(), bins->valueRange());
+        double lo = std::numeric_limits<double>::max();
+        double hi = std::numeric_limits<double>::lowest();
+        for (int ki = 0; ki < keySz; ++ki)
+        {
+            double sum = 0;
+            for (int vi = 0; vi < valSz; ++vi)
+                sum += bins->cell(ki, vi);
+            for (int vi = 0; vi < valSz; ++vi)
+            {
+                const double fraction = sum > 0 ? bins->cell(ki, vi) / sum : 0.0;
+                fractions->setCell(ki, vi, fraction);
+                // An empty column shows as 0 but does not stretch the colour range.
+                if (sum > 0)
+                {
+                    lo = std::min(lo, fraction);
+                    hi = std::max(hi, fraction);
+                }
+            }
+        }
+        fractions->recalculateDataBounds();
+        mShown.normalized = std::move(fractions);
+        mShown.bounds = rangeOrNothing(lo, hi, mShown.found);
+        mShown.stale = false;
+    }
+    return mShown.normalized.get();
+}
+
 QCPRange QCPHistogram2D::colorDataBounds(bool& found) const
 {
     found = false;
-    auto* data = binned();
-    if (!mDataSource || !data)
+    const auto* cells = shown();
+    if (!mDataSource || !cells)
         return {};
     if (mNormalization == nNone)
     {
         found = true;
-        return data->dataBounds();
+        return cells->dataBounds();
     }
-
-    // Bounds of the normalized values
-    const int keySz = data->keySize();
-    const int valSz = data->valueSize();
-    if (keySz == 0 || valSz == 0)
-        return {};
-
-    QVector<double> colSums(keySz, 0.0);
-    for (int ki = 0; ki < keySz; ++ki)
-        for (int vi = 0; vi < valSz; ++vi)
-            colSums[ki] += data->cell(ki, vi);
-
-    double lo = std::numeric_limits<double>::max();
-    double hi = std::numeric_limits<double>::lowest();
-    for (int ki = 0; ki < keySz; ++ki)
-    {
-        if (colSums[ki] <= 0)
-            continue;
-        for (int vi = 0; vi < valSz; ++vi)
-        {
-            double norm = data->cell(ki, vi) / colSums[ki];
-            if (norm < lo) lo = norm;
-            if (norm > hi) hi = norm;
-        }
-    }
-    found = lo <= hi;
-    return found ? QCPRange(lo, hi) : QCPRange();
+    found = mShown.found;
+    return mShown.bounds;
 }
 
 void QCPHistogram2D::rescaleDataRange(bool recalc)
@@ -333,7 +363,7 @@ void QCPHistogram2D::binForExport()
         return;
     // A job still running may have the old scales: it must not replace these cells.
     mPipeline.supersedeEarlierJobs();
-    mRenderer.invalidateMapImage();
+    binsChanged();
 }
 
 void QCPHistogram2D::draw(QCPPainter* painter)
@@ -350,42 +380,55 @@ void QCPHistogram2D::draw(QCPPainter* painter)
         binForExport();
     // Not re-binned from here when there is nothing: no result with an idle pipeline means the
     // data bins to nothing, and a re-bin would loop through finished() -> replot -> draw.
-    auto* binnedData = binned();
-    if (!binnedData)
+    const auto* cells = shown();
+    if (!cells)
         return;
 
-    if (mRenderer.mapImageInvalidated())
-    {
-        if (mNormalization == nColumn)
-        {
-            // qMax: GCC cannot see that keySize() is non-negative and reports a
-            // bogus -Wstringop-overflow on QVector's fill otherwise.
-            const int keySz = qMax(0, binnedData->keySize());
-            const int valSz = binnedData->valueSize();
-            QVector<double> colSums(keySz, 0.0);
-            for (int ki = 0; ki < keySz; ++ki)
-                for (int vi = 0; vi < valSz; ++vi)
-                    colSums[ki] += binnedData->cell(ki, vi);
-
-            mRenderer.updateMapImage(binnedData,
-                [&colSums](double value, int col, int /*row*/) -> double {
-                    double sum = colSums[col];
-                    return sum > 0 ? value / sum : 0.0;
-                });
-        }
-        else
-        {
-            mRenderer.updateMapImage(binnedData);
-        }
-    }
+    const bool imageWasInvalidated = mRenderer.mapImageInvalidated();
+    if (imageWasInvalidated)
+        mRenderer.updateMapImage(cells);
 
     if (mRenderer.mapImage().isNull())
         return;
 
-    QCPRange keyRange = binnedData->keyRange();
-    QCPRange valueRange = binnedData->valueRange();
+    const QCPRange keyRange = cells->keyRange();
+    const QCPRange valueRange = cells->valueRange();
+    // Before the renderer paints: the painter path draws the contour lines with the image.
+    mContours.update(cells, painter, imageWasInvalidated, mKeyAxis.data(), mValueAxis.data());
     applyDefaultAntialiasingHint(painter);
     mRenderer.draw(painter, mKeyAxis.data(), mValueAxis.data(), keyRange, valueRange);
+    mContours.drawLabels(cells, painter, mKeyAxis.data(), mValueAxis.data());
+}
+
+void QCPHistogram2D::contoursChanged()
+{
+    redrawLater();
+}
+
+void QCPHistogram2D::setContourLevels(const QVector<double>& levels)
+{
+    mContours.setLevels(levels);
+    contoursChanged();
+}
+
+void QCPHistogram2D::setAutoContourLevels(int count)
+{
+    mContours.setAutoLevels(count);
+    contoursChanged();
+}
+
+void QCPHistogram2D::setContourPen(const QPen& pen)
+{
+    mContours.setPen(pen);
+    contoursChanged();
+}
+
+void QCPHistogram2D::setContourLabelEnabled(bool enabled)
+{
+    if (enabled == mContours.labelsEnabled())
+        return;
+    mContours.setLabelsEnabled(enabled);
+    contoursChanged();
 }
 
 void QCPHistogram2D::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
