@@ -41,6 +41,13 @@ public:
     void updateMapImage(const QCPColorMapData* data, NormalizeFn normalize = {});
     void draw(QCPPainter* painter, QCPAxis* keyAxis, QCPAxis* valueAxis,
               const QCPRange& keyRange, const QCPRange& valueRange);
+    //! Where the image of a grid over \a keyRange × \a valueRange is drawn, in pixels, ordered
+    //! (left < right, top < bottom). A reversed axis flips the image inside it instead.
+    static QRectF imageRect(const QCPAxis* keyAxis, const QCPAxis* valueAxis,
+                            const QCPRange& keyRange, const QCPRange& valueRange);
+    //! True when the last on-screen draw put the image on the GPU quad (painted after the
+    //! layer's paint buffer), false when it was painted with the painter.
+    [[nodiscard]] bool imageOnGpu() const { return mImageOnGpu; }
 
     // RHI layer
     QCPColormapRhiLayer* ensureRhiLayer();
@@ -58,9 +65,12 @@ public:
     [[nodiscard]] bool hasContourOnGpu() const { return mContourOnGpu; }
 
     // QPainter fallback for exports (pmNoCaching) and non-RHI compositing:
-    // data-coordinate segments drawn with coordToPixel, so axis reversal
-    // and log scales map correctly without any UV bookkeeping.
-    void setContourFallback(QVector<QLineF> segments, const QPen& pen);
+    // UV segments (already mirrored like the GPU lines), mapped through the image rectangle.
+    void setContourFallback(QVector<QLineF> uvSegments, const QPen& pen);
+
+    //! The contour labels on the GPU, over the image and its lines (see QCPColormapRhiLayer).
+    void setLabelOverlay(const QImage& image, const QRectF& pixelRect);
+    void clearLabelOverlay();
 
     // Hides whatever this colormap's GPU quad last showed. For when a caller
     // (QCPColorMap2::draw()) decides the rendered content no longer belongs
@@ -70,7 +80,7 @@ public:
 
 private:
     const QImage& flippedMapImage(Qt::Orientations flips);
-    void drawContourFallback(QCPPainter* painter, QCPAxis* keyAxis, QCPAxis* valueAxis);
+    void drawContourFallback(QCPPainter* painter, const QRectF& imageRect, const QCPAxis* keyAxis);
 
     QCPAbstractPlottable* mOwner;
     QCPColorGradient mGradient;
@@ -83,6 +93,7 @@ private:
     QPointer<QCPColorScale> mColorScale; // the scale may be deleted first
     QCPColormapRhiLayer* mRhiLayer = nullptr;
     bool mContourOnGpu = false;
+    bool mImageOnGpu = false;
     QVector<QLineF> mContourFallback;
     QPen mContourFallbackPen;
 };

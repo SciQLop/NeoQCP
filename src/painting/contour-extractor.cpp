@@ -117,8 +117,8 @@ void marchCells(const double* raw, int kSize, int vSize, int sk, int sv,
 
 } // anonymous namespace
 
-QVector<ContourLine> extract(const QCPColorMapData* data,
-                             const QVector<double>& levels)
+QVector<ContourLine> extract(const QCPColorMapData* data, const QVector<double>& levels,
+                             int maxDim)
 {
     QVector<ContourLine> result;
     if (!data || levels.isEmpty())
@@ -130,73 +130,38 @@ QVector<ContourLine> extract(const QCPColorMapData* data,
         return result;
 
     const double* raw = data->rawData();
-    const QCPRange keyRange = data->keyRange();
-    const QCPRange valRange = data->valueRange();
-
-    const double kStep = (keyRange.upper - keyRange.lower) / (kSize - 1);
-    const double vStep = (valRange.upper - valRange.lower) / (vSize - 1);
-    auto pos = [&](int sK, int sV) -> Pt {
-        return {keyRange.lower + sK * kStep, valRange.lower + sV * vStep};
-    };
-
-    result.reserve(levels.size());
-
-    for (double level : levels)
-    {
-        ContourLine cl;
-        cl.level = level;
-        cl.segments.reserve(kSize);
-        marchCells(raw, kSize, vSize, 1, 1, level, pos,
-                   [&](const Pt& a, const Pt& b) {
-                       cl.segments.append(QLineF(a.x, a.y, b.x, b.y));
-                   });
-
-        if (!cl.segments.isEmpty())
-            result.append(std::move(cl));
-    }
-
-    return result;
-}
-
-QVector<float> extractUv(const QCPColorMapData* data,
-                         const QVector<double>& levels,
-                         int maxDim)
-{
-    QVector<float> out;
-    if (!data || levels.isEmpty())
-        return out;
-
-    const int kSize = data->keySize();
-    const int vSize = data->valueSize();
-    if (kSize < 2 || vSize < 2)
-        return out;
-
-    const double* raw = data->rawData();
     maxDim = std::max(2, maxDim);
-    int sk = 1, sv = 1;
-    if (kSize > maxDim) sk = kSize / maxDim;
-    if (vSize > maxDim) sv = vSize / maxDim;
-
+    const int sk = kSize > maxDim ? kSize / maxDim : 1;
+    const int sv = vSize > maxDim ? vSize / maxDim : 1;
     auto pos = [&](int sK, int sV) -> Pt {
         return {double(sK) / (kSize - 1), 1.0 - double(sV) / (vSize - 1)};
     };
 
-    const int ck = (kSize - 2) / sk + 2;
-    const int cv = (vSize - 2) / sv + 2;
-    out.reserve(ck * cv);
-
+    result.reserve(levels.size());
     for (double level : levels)
     {
+        ContourLine cl;
+        cl.level = level;
         marchCells(raw, kSize, vSize, sk, sv, level, pos,
-                   [&](const Pt& a, const Pt& b) {
-                       out.append(float(a.x));
-                       out.append(float(a.y));
-                       out.append(float(b.x));
-                       out.append(float(b.y));
-                   });
+                   [&](const Pt& a, const Pt& b) { cl.segments.append(QLineF(a.x, a.y, b.x, b.y)); });
+        if (!cl.segments.isEmpty())
+            result.append(std::move(cl));
     }
+    return result;
+}
 
+QVector<float> flatten(const QVector<ContourLine>& lines)
+{
+    QVector<float> out;
+    for (const auto& line : lines)
+        for (const QLineF& s : line.segments)
+            out << float(s.x1()) << float(s.y1()) << float(s.x2()) << float(s.y2());
     return out;
+}
+
+QVector<float> extractUv(const QCPColorMapData* data, const QVector<double>& levels, int maxDim)
+{
+    return flatten(extract(data, levels, maxDim));
 }
 
 } // namespace QCPContourExtractor

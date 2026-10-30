@@ -4,7 +4,7 @@
 #include <datasource/async-pipeline.h>
 #include <datasource/soa-datasource-2d.h>
 #include <painting/colormap-renderer.h>
-#include <painting/contour-extractor.h>
+#include <painting/contour-overlay.h>
 #include <atomic>
 #include <memory>
 #include <span>
@@ -87,43 +87,38 @@ public:
 
     // Contour overlay
     void setContourLevels(const QVector<double>& levels);
-    [[nodiscard]] QVector<double> contourLevels() const { return mContourLevels; }
+    [[nodiscard]] QVector<double> contourLevels() const { return mContours.levels(); }
 
     // NOTE: only pen.color() reaches the GPU line renderer (baked into the
     // line geometry, always a fixed hairline regardless of pen width). The
     // full pen -- including width -- applies to the QPainter fallback used
     // for exports (pmNoCaching) and non-RHI compositing.
     void setContourPen(const QPen& pen);
-    [[nodiscard]] QPen contourPen() const { return mContourPen; }
+    [[nodiscard]] QPen contourPen() const { return mContours.pen(); }
 
     //! Writes each contour's level on it, along the line, in the contour pen's colour.
     void setContourLabelEnabled(bool enabled);
-    [[nodiscard]] bool contourLabelEnabled() const { return mContourLabelEnabled; }
+    [[nodiscard]] bool contourLabelEnabled() const { return mContours.labelsEnabled(); }
 
     void setAutoContourLevels(int count);
-    [[nodiscard]] int autoContourLevelCount() const { return mAutoContourCount; }
+    [[nodiscard]] int autoContourLevelCount() const { return mContours.autoLevelCount(); }
 
     // Exposed for tests: the UV-space vertices built by the last contour
     // rebuild (after axis-reversal mirroring). Empty when contours are
     // inactive or the last rebuild was degenerate.
-    [[nodiscard]] const QVector<float>& lastContourUv() const { return mLastContourUv; }
+    [[nodiscard]] const QVector<float>& lastContourUv() const { return mContours.lastUv(); }
     // Exposed for tests: the levels the last rebuild marched (explicit
     // levels filtered to finite values, or resolved auto levels).
-    [[nodiscard]] QVector<double> lastContourLevels() const { return mLastContourLevels; }
+    [[nodiscard]] QVector<double> lastContourLevels() const { return mContours.lastLevels(); }
 
-    struct ContourLabel
-    {
-        double level;
-        QPointF position; //!< pixels
-    };
-    //! Pixels between two labels of one level, and between any two labels.
-    static constexpr double kContourLabelSpacing = 120.0;
-    static constexpr double kContourLabelClearance = 30.0;
+    using ContourLabel = QCPContourOverlay::Label;
+    static constexpr double kContourLabelSpacing = QCPContourOverlay::kLabelSpacing;
+    static constexpr double kContourLabelClearance = QCPContourOverlay::kLabelClearance;
     // Exposed for tests: the labels the last draw placed.
-    [[nodiscard]] const QVector<ContourLabel>& lastContourLabels() const { return mLastContourLabels; }
-    // Exposed for tests: how many times the QPainter fallback segments were
-    // (re)built. Repeated exports of one frame must not re-march the grid.
-    [[nodiscard]] uint64_t fallbackBuildCount() const { return mFallbackBuildCount; }
+    [[nodiscard]] const QVector<ContourLabel>& lastContourLabels() const { return mContours.lastLabels(); }
+    // Exposed for tests: how many times the contour lines were marched. Repeated exports of one
+    // frame must not re-march the grid.
+    [[nodiscard]] uint64_t fallbackBuildCount() const { return mContours.extractionCount(); }
 
 public Q_SLOTS:
     void setGradient(const QCPColorGradient& gradient);
@@ -152,7 +147,7 @@ protected:
     void releaseGpuResources() override
     {
         mRenderer.releaseRhiLayer();
-        mContourCacheGen = 0;
+        mContours.releaseGpu();
     }
 
 private:
@@ -171,43 +166,12 @@ private:
     bool mHasRenderedRange = false;
     QCPRange mRenderedKeyRange, mRenderedValueRange;
 
-    // Contour overlay
-    QVector<double> mContourLevels;
-    QPen mContourPen{Qt::white, 1.0};
-    bool mContourLabelEnabled = false;
-    int mAutoContourCount = 0;
-
-    uint64_t mContourCacheGen = 0;
-    uint64_t mContourDataGen = 0;
-    // Generation the QPainter fallback segments were built for (0 = none).
-    // Reset alongside the contour cache; matched against mContourDataGen so
-    // repeated exports of one frame reuse the cached segments.
-    uint64_t mFallbackGen = 0;
-    uint64_t mFallbackBuildCount = 0;
-    // Reversal state the cached UVs were built against (setRangeReversed
-    // emits no signal, so draw() polls for changes to trigger a rebuild).
-    bool mContourMirrorX = false;
-    bool mContourMirrorY = false;
-    QVector<float> mLastContourUv;
-    QVector<double> mLastContourLevels;
-    //! Data-space contour lines for the labels, extracted once per contour data generation.
-    QVector<QCPContourExtractor::ContourLine> mLabelLines;
-    uint64_t mLabelGen = 0;
-    QVector<ContourLabel> mLastContourLabels;
-
-    void invalidateContourCache();
+    QCPContourOverlay mContours { mRenderer };
+    void contoursChanged();
 
     void onViewportChanged();
     void followAxes();
     QList<QMetaObject::Connection> mAxisLinks;
     void queueViewportChange();
     bool mViewportChangeQueued = false;
-    void updateContourGpu(const QCPColorMapData* data);
-    void updateContours(const QCPColorMapData* data, QCPPainter* painter,
-                        bool imageWasInvalidated);
-    void updateContourFallback(const QCPColorMapData* data);
-    void drawContourLabels(QCPPainter* painter, const QCPColorMapData* data);
-    [[nodiscard]] bool labelFits(const QPointF& at, double level) const;
-    void clearContourState();
-    [[nodiscard]] QVector<double> resolveContourLevels(const QCPRange& bounds) const;
 };

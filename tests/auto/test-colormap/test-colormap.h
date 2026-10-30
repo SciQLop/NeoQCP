@@ -26,6 +26,10 @@ private slots:
   void QCPColorMap2_contourMirrorsReversedAxis();
   void QCPColorMap2_contourExportDrawsFallback();
   void QCPColorMap2_contourLabelsDrawSpacedInsideThePlot();
+  void QCPColorMap2_contourLabelsShowOnTheGpuFrame();
+  void QCPColorMap2_contourExportFollowsALogValueAxis();
+  void QCPColorMap2_exportDrawsTheImageOnAReversedAxis();
+  void QCPColorMap2_contourLabelsFollowAColourScaleToggle();
   void QCPColorMap2_contourDegenerateDataClearsLines();
   void QCPColorMap2_autoContourLevelsGeometricInLogScale();
   void QCPColorMap2_contourExportAfterRhiDraw();

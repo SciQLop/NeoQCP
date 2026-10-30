@@ -33,15 +33,22 @@ QCPColormapRhiLayer::~QCPColormapRhiLayer()
     delete mLineUbo;
     delete mLineVbo;
     delete mPipeline;
-    delete mSrb;
     delete mSampler;
-    delete mVertexBuffer;
-    delete mTexture;
+    releaseQuad(mImage);
+    releaseQuad(mOverlay);
+}
+
+void QCPColormapRhiLayer::releaseQuad(Quad& quad)
+{
+    delete quad.srb;          quad.srb = nullptr;
+    delete quad.vertexBuffer; quad.vertexBuffer = nullptr;
+    delete quad.texture;      quad.texture = nullptr;
 }
 
 void QCPColormapRhiLayer::clear()
 {
-    mStagingImage = {};
+    mImage.staging = {};
+    mOverlay.staging = {};
     mContourUvVertices.clear();
     mLineVertexCount = 0;
 }
@@ -51,7 +58,8 @@ void QCPColormapRhiLayer::invalidatePipeline()
     delete mLinePipeline; mLinePipeline = nullptr;
     delete mLineSrb;      mLineSrb = nullptr;
     delete mPipeline;     mPipeline = nullptr;
-    delete mSrb;          mSrb = nullptr;
+    delete mImage.srb;    mImage.srb = nullptr;
+    delete mOverlay.srb;  mOverlay.srb = nullptr;
 }
 
 // ── CPU-side setters ────────────────────────────────────────────────────────
@@ -63,17 +71,30 @@ void QCPColormapRhiLayer::setImage(const QImage& image)
     // pipeline is still busy re-baking). cacheKey() identifies the QImage's
     // backing data, so an unchanged image (same data, shallow-copied through
     // flippedMapImage's COW) is detected without a pixel comparison.
-    if (image.cacheKey() == mStagingImage.cacheKey() && image.size() == mStagingImage.size())
+    if (image.cacheKey() == mImage.staging.cacheKey() && image.size() == mImage.staging.size())
         return;
-    mStagingImage = image;
-    mTextureDirty = true;
+    mImage.staging = image;
+    mImage.textureDirty = true;
 }
 
 void QCPColormapRhiLayer::setQuadRect(const QRectF& pixelRect)
 {
-    mQuadPixelRect = pixelRect;
-    mGeometryDirty = true;
+    mImage.pixelRect = pixelRect;
+    mImage.geometryDirty = true;
     mContourUboDirty = true;
+}
+
+void QCPColormapRhiLayer::setOverlay(const QImage& image, const QRectF& pixelRect)
+{
+    mOverlay.staging = image;
+    mOverlay.textureDirty = true;
+    mOverlay.pixelRect = pixelRect;
+    mOverlay.geometryDirty = true;
+}
+
+void QCPColormapRhiLayer::clearOverlay()
+{
+    mOverlay.staging = {};
 }
 
 void QCPColormapRhiLayer::setPixelOffset(float offsetX, float offsetY)
@@ -82,7 +103,8 @@ void QCPColormapRhiLayer::setPixelOffset(float offsetX, float offsetY)
         return;
     mOffsetX = offsetX;
     mOffsetY = offsetY;
-    mGeometryDirty = true;
+    mImage.geometryDirty = true;
+    mOverlay.geometryDirty = true;
     mContourUboDirty = true;
 }
 
@@ -235,9 +257,9 @@ bool QCPColormapRhiLayer::fitsInTexture(const QSize& imgSize) const
         && imgSize.width() <= maxTexSize && imgSize.height() <= maxTexSize;
 }
 
-bool QCPColormapRhiLayer::ensureTexture(QRhiBuffer* compositeUbo)
+bool QCPColormapRhiLayer::ensureTexture(Quad& quad, QRhiBuffer* compositeUbo)
 {
-    QSize imgSize = mStagingImage.size();
+    const QSize imgSize = quad.staging.size();
     // QRhiTexture::create() is documented to return false on an invalid descriptor,
     // but the Metal backend does not: an oversized descriptor aborts inside Metal's
     // own validation instead. Refuse before ever calling newTexture(), so the one
@@ -248,25 +270,25 @@ bool QCPColormapRhiLayer::ensureTexture(QRhiBuffer* compositeUbo)
         return false;
 
     bool texRecreated = false;
-    if (!mTexture || mTextureSize != imgSize)
+    if (!quad.texture || quad.textureSize != imgSize)
     {
-        delete mTexture;
-        mTexture = mRhi->newTexture(qcp::rhi::preferredTextureFormat(mRhi), imgSize);
-        if (!mTexture->create()) { delete mTexture; mTexture = nullptr; return false; }
-        mTextureSize = imgSize;
-        mTextureDirty = true;
+        delete quad.texture;
+        quad.texture = mRhi->newTexture(qcp::rhi::preferredTextureFormat(mRhi), imgSize);
+        if (!quad.texture->create()) { delete quad.texture; quad.texture = nullptr; return false; }
+        quad.textureSize = imgSize;
+        quad.textureDirty = true;
         texRecreated = true;
     }
 
-    if ((!mSrb || texRecreated) && mTexture)
+    if (!quad.srb || texRecreated)
     {
-        delete mSrb;
-        mSrb = mRhi->newShaderResourceBindings();
-        mSrb->setBindings({
-            QRhiShaderResourceBinding::sampledTexture(0, QRhiShaderResourceBinding::FragmentStage, mTexture, mSampler),
+        delete quad.srb;
+        quad.srb = mRhi->newShaderResourceBindings();
+        quad.srb->setBindings({
+            QRhiShaderResourceBinding::sampledTexture(0, QRhiShaderResourceBinding::FragmentStage, quad.texture, mSampler),
             QRhiShaderResourceBinding::uniformBuffer(1, QRhiShaderResourceBinding::VertexStage, compositeUbo)
         });
-        if (!mSrb->create()) { delete mSrb; mSrb = nullptr; return false; }
+        if (!quad.srb->create()) { delete quad.srb; quad.srb = nullptr; return false; }
     }
 
     return true;
@@ -274,14 +296,14 @@ bool QCPColormapRhiLayer::ensureTexture(QRhiBuffer* compositeUbo)
 
 // ── Quad geometry ───────────────────────────────────────────────────────────
 
-void QCPColormapRhiLayer::updateQuadGeometry(QRhiResourceUpdateBatch* updates,
+void QCPColormapRhiLayer::updateQuadGeometry(Quad& quad, QRhiResourceUpdateBatch* updates,
                                               const QSize& outputSize, float dpr,
                                               bool isYUpInNDC)
 {
-    if (!mGeometryDirty && mVertexBuffer && mLastOutputSize == outputSize)
+    if (!quad.geometryDirty && quad.vertexBuffer && quad.lastOutputSize == outputSize)
         return;
 
-    mLastOutputSize = outputSize;
+    quad.lastOutputSize = outputSize;
     const float w = float(outputSize.width());
     const float h = float(outputSize.height());
     const float yFlip = isYUpInNDC ? -1.0f : 1.0f;
@@ -291,14 +313,11 @@ void QCPColormapRhiLayer::updateQuadGeometry(QRhiResourceUpdateBatch* updates,
                 yFlip * ((py * dpr / h) * 2.0f - 1.0f)};
     };
 
-    const QRectF quad = effectiveQuadRect();
-    auto [x0, y0] = toNDC(quad.left(), quad.top());
-    auto [x1, y1] = toNDC(quad.right(), quad.bottom());
-
-    // Store NDC bounds for contour line UBO
-    mNdcX0 = x0; mNdcY0 = y0;
-    mNdcX1 = x1; mNdcY1 = y1;
-    mContourUboDirty = true;
+    const QRectF rect = quad.pixelRect.translated(mOffsetX, mOffsetY);
+    auto [x0, y0] = toNDC(rect.left(), rect.top());
+    auto [x1, y1] = toNDC(rect.right(), rect.bottom());
+    quad.ndcX0 = x0; quad.ndcY0 = y0;
+    quad.ndcX1 = x1; quad.ndcY1 = y1;
 
     const float verts[] = {
         x0, y0, 0.0f, 0.0f,
@@ -307,14 +326,30 @@ void QCPColormapRhiLayer::updateQuadGeometry(QRhiResourceUpdateBatch* updates,
         x1, y1, 1.0f, 1.0f,
     };
 
-    if (!mVertexBuffer)
+    if (!quad.vertexBuffer)
     {
-        mVertexBuffer = mRhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, sizeof(verts));
-        if (!mVertexBuffer->create()) { delete mVertexBuffer; mVertexBuffer = nullptr; return; }
+        quad.vertexBuffer = mRhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, sizeof(verts));
+        if (!quad.vertexBuffer->create()) { delete quad.vertexBuffer; quad.vertexBuffer = nullptr; return; }
     }
 
-    updates->updateDynamicBuffer(mVertexBuffer, 0, sizeof(verts), verts);
-    mGeometryDirty = false;
+    updates->updateDynamicBuffer(quad.vertexBuffer, 0, sizeof(verts), verts);
+    quad.geometryDirty = false;
+}
+
+void QCPColormapRhiLayer::uploadQuad(Quad& quad, QRhiResourceUpdateBatch* updates,
+                                     const QSize& outputSize, float dpr, bool isYUpInNDC,
+                                     QRhiBuffer* compositeUbo)
+{
+    if (quad.staging.isNull() || !ensureTexture(quad, compositeUbo))
+        return;
+    if (quad.textureDirty)
+    {
+        updates->uploadTexture(quad.texture, QRhiTextureUploadDescription(
+            QRhiTextureUploadEntry(0, 0, QRhiTextureSubresourceUploadDescription(
+                quad.staging.convertedTo(qcp::rhi::imageFormatFor(quad.texture->format()))))));
+        quad.textureDirty = false;
+    }
+    updateQuadGeometry(quad, updates, outputSize, dpr, isYUpInNDC);
 }
 
 // ── Upload ──────────────────────────────────────────────────────────────────
@@ -325,21 +360,16 @@ void QCPColormapRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
                                             QRhiBuffer* compositeUbo)
 {
     PROFILE_HERE_N("QCPColormapRhiLayer::uploadResources");
-    if (mStagingImage.isNull())
+    if (mImage.staging.isNull())
         return;
 
-    if (!ensureTexture(compositeUbo))
+    const float oldNdc[] = { mImage.ndcX0, mImage.ndcY0, mImage.ndcX1, mImage.ndcY1 };
+    uploadQuad(mImage, updates, outputSize, dpr, isYUpInNDC, compositeUbo);
+    if (!mImage.texture)
         return;
-
-    if (mTextureDirty && mTexture)
-    {
-        updates->uploadTexture(mTexture, QRhiTextureUploadDescription(
-            QRhiTextureUploadEntry(0, 0, QRhiTextureSubresourceUploadDescription(
-                mStagingImage.convertedTo(qcp::rhi::imageFormatFor(mTexture->format()))))));
-        mTextureDirty = false;
-    }
-
-    updateQuadGeometry(updates, outputSize, dpr, isYUpInNDC);
+    if (std::memcmp(oldNdc, &mImage.ndcX0, sizeof(oldNdc)) != 0)
+        mContourUboDirty = true;
+    uploadQuad(mOverlay, updates, outputSize, dpr, isYUpInNDC, compositeUbo);
 
     // Contour line vertex buffer
     if (mContourLinesDirty && mLinePipeline)
@@ -369,10 +399,10 @@ void QCPColormapRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
         ubo.lineColor[1] = float(mContourColor.greenF()) * a;
         ubo.lineColor[2] = float(mContourColor.blueF()) * a;
         ubo.lineColor[3] = a;
-        ubo.ndcMin[0] = mNdcX0;
-        ubo.ndcMin[1] = mNdcY0;
-        ubo.ndcMax[0] = mNdcX1;
-        ubo.ndcMax[1] = mNdcY1;
+        ubo.ndcMin[0] = mImage.ndcX0;
+        ubo.ndcMin[1] = mImage.ndcY0;
+        ubo.ndcMax[0] = mImage.ndcX1;
+        ubo.ndcMax[1] = mImage.ndcY1;
         updates->updateDynamicBuffer(mLineUbo, 0, sizeof(ubo), &ubo);
         mContourUboDirty = false;
     }
@@ -380,25 +410,27 @@ void QCPColormapRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
 
 // ── Render ──────────────────────────────────────────────────────────────────
 
+void QCPColormapRhiLayer::drawQuad(const Quad& quad, QRhiCommandBuffer* cb, const QSize& outputSize)
+{
+    if (!mPipeline || !quad.vertexBuffer || !quad.srb || !quad.texture || quad.staging.isNull())
+        return;
+    cb->setGraphicsPipeline(mPipeline);
+    cb->setViewport({0, 0, float(outputSize.width()), float(outputSize.height())});
+    cb->setShaderResources(quad.srb);
+    const QRhiCommandBuffer::VertexInput vbufBinding(quad.vertexBuffer, 0);
+    cb->setVertexInput(0, 1, &vbufBinding);
+    cb->setScissor({mScissorRect.x(), mScissorRect.y(),
+                    mScissorRect.width(), mScissorRect.height()});
+    cb->draw(4);
+}
+
 void QCPColormapRhiLayer::render(QRhiCommandBuffer* cb, const QSize& outputSize)
 {
     PROFILE_HERE_N("QCPColormapRhiLayer::render");
 
-    // Draw colormap quad
-    if (mPipeline && mVertexBuffer && mSrb && mTexture)
-    {
-        cb->setGraphicsPipeline(mPipeline);
-        cb->setViewport({0, 0, float(outputSize.width()), float(outputSize.height())});
-        cb->setShaderResources(mSrb);
+    drawQuad(mImage, cb, outputSize);
 
-        const QRhiCommandBuffer::VertexInput vbufBinding(mVertexBuffer, 0);
-        cb->setVertexInput(0, 1, &vbufBinding);
-        cb->setScissor({mScissorRect.x(), mScissorRect.y(),
-                        mScissorRect.width(), mScissorRect.height()});
-        cb->draw(4);
-    }
-
-    // Draw contour lines on top
+    // Contour lines over the image
     if (mLinePipeline && mLineVbo && mLineSrb && mLineVertexCount > 0)
     {
         cb->setGraphicsPipeline(mLinePipeline);
@@ -411,4 +443,7 @@ void QCPColormapRhiLayer::render(QRhiCommandBuffer* cb, const QSize& outputSize)
                         mScissorRect.width(), mScissorRect.height()});
         cb->draw(mLineVertexCount);
     }
+
+    // Labels over the lines
+    drawQuad(mOverlay, cb, outputSize);
 }

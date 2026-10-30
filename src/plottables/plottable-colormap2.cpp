@@ -30,7 +30,7 @@ QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
 
     connect(&mPipeline, &QCPColormapPipeline::finished,
             this, [this](uint64_t) {
-                ++mContourDataGen;
+                mContours.dataChanged();
                 mRenderer.invalidateMapImage();
                 if (parentPlot())
                     parentPlot()->replot(QCustomPlot::rpQueuedReplot);
@@ -353,7 +353,11 @@ void QCPColorMap2::draw(QCPPainter* painter)
         if (painter->modes().testFlag(QCPPainter::pmNoCaching))
         {
             if (mPipeline.runSynchronously(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data())))
-                mRenderer.invalidateMapImage(); // finished() only fires for async results
+            {
+                // finished() only fires for async results
+                mRenderer.invalidateMapImage();
+                mContours.dataChanged();
+            }
         }
         else
             queueViewportChange();
@@ -367,6 +371,7 @@ void QCPColorMap2::draw(QCPPainter* painter)
             // Export path: run transform synchronously since event loop is not pumped
             if (!mPipeline.runSynchronously(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data())))
                 return;
+            mContours.dataChanged();
             resampledData = mPipeline.result();
             if (!resampledData) return;
         }
@@ -416,11 +421,11 @@ void QCPColorMap2::draw(QCPPainter* painter)
     // Contours are (re)built BEFORE the renderer paints: the QPainter path
     // (exports, non-RHI compositing) draws the fallback lines inline, so
     // populating them after mRenderer.draw() would miss this frame.
-    updateContours(resampledData, painter, imageWasInvalidated);
+    mContours.update(resampledData, painter, imageWasInvalidated, mKeyAxis.data(), mValueAxis.data());
 
     applyDefaultAntialiasingHint(painter);
     mRenderer.draw(painter, mKeyAxis.data(), mValueAxis.data(), keyRange, valRange);
-    drawContourLabels(painter, resampledData);
+    mContours.drawLabels(resampledData, painter, mKeyAxis.data(), mValueAxis.data());
 
     // Baseline for stallPixelOffset: the axes this image was just drawn against.
     mRenderedKeyRange = mKeyAxis->range();
@@ -483,266 +488,36 @@ double QCPColorMap2::selectTest(const QPointF& pos, bool onlySelectable, QVarian
     return -1;
 }
 
-void QCPColorMap2::setContourLevels(const QVector<double>& levels)
+void QCPColorMap2::contoursChanged()
 {
-    mContourLevels = levels;
-    mAutoContourCount = 0;
-    invalidateContourCache();
     if (mLayer)
         mLayer->markDirty();
     if (mParentPlot)
         mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+}
+
+void QCPColorMap2::setContourLevels(const QVector<double>& levels)
+{
+    mContours.setLevels(levels);
+    contoursChanged();
 }
 
 void QCPColorMap2::setContourPen(const QPen& pen)
 {
-    mContourPen = pen;
-    invalidateContourCache();
-    if (mLayer)
-        mLayer->markDirty();
-    if (mParentPlot)
-        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    mContours.setPen(pen);
+    contoursChanged();
 }
 
 void QCPColorMap2::setContourLabelEnabled(bool enabled)
 {
-    if (enabled == mContourLabelEnabled)
+    if (enabled == mContours.labelsEnabled())
         return;
-    mContourLabelEnabled = enabled;
-    if (mLayer)
-        mLayer->markDirty();
-    if (mParentPlot)
-        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
-}
-
-bool QCPColorMap2::labelFits(const QPointF& at, double level) const
-{
-    // simplify: O(labels) per candidate; fine for the few dozen labels a plot can hold.
-    return std::none_of(mLastContourLabels.cbegin(), mLastContourLabels.cend(),
-                        [&](const ContourLabel& placed)
-                        {
-                            const double d = QLineF(placed.position, at).length();
-                            return d < kContourLabelClearance
-                                || (placed.level == level && d < kContourLabelSpacing);
-                        });
-}
-
-void QCPColorMap2::drawContourLabels(QCPPainter* painter, const QCPColorMapData* data)
-{
-    mLastContourLabels.clear();
-    const bool contoursActive = !mContourLevels.isEmpty() || mAutoContourCount > 0;
-    if (!mContourLabelEnabled || !contoursActive || !data || !mKeyAxis->axisRect())
-        return;
-    if (mLabelGen != mContourDataGen || mLabelGen == 0)
-    {
-        mLabelLines = QCPContourExtractor::extract(data, resolveContourLevels(data->dataBounds()));
-        mLabelGen = mContourDataGen;
-    }
-    const QRectF area = mKeyAxis->axisRect()->rect();
-    const QFontMetricsF metrics(painter->font());
-    const QColor color = mContourPen.color();
-    // The line is drawn on the GPU layer, which cannot leave a gap for the text: a halo in the
-    // opposite lightness keeps the label readable over its own line.
-    const QPen halo(color.lightness() > 127 ? QColor(0, 0, 0, 170) : QColor(255, 255, 255, 170), 3.0,
-                    Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-    painter->save();
-    painter->setClipRect(area);
-    painter->setRenderHint(QPainter::Antialiasing);
-    for (const auto& line : mLabelLines)
-    {
-        const QString text = QString::number(line.level, 'g', 4);
-        QPainterPath glyphs;
-        glyphs.addText(-metrics.horizontalAdvance(text) / 2, metrics.ascent() / 2 - metrics.descent() / 2,
-                       painter->font(), text);
-        for (const QLineF& segment : line.segments)
-        {
-            const QPointF a = coordsToPixels(segment.x1(), segment.y1());
-            const QPointF b = coordsToPixels(segment.x2(), segment.y2());
-            const QPointF at = (a + b) / 2;
-            if (a == b || !area.contains(at) || !labelFits(at, line.level))
-                continue;
-            double angle = qRadiansToDegrees(std::atan2(b.y() - a.y(), b.x() - a.x()));
-            if (angle > 90)
-                angle -= 180;
-            else if (angle <= -90)
-                angle += 180;
-            painter->save();
-            painter->translate(at);
-            painter->rotate(angle);
-            painter->strokePath(glyphs, halo);
-            painter->fillPath(glyphs, color);
-            painter->restore();
-            mLastContourLabels.append({ line.level, at });
-        }
-    }
-    painter->restore();
+    mContours.setLabelsEnabled(enabled);
+    contoursChanged();
 }
 
 void QCPColorMap2::setAutoContourLevels(int count)
 {
-    mAutoContourCount = qMax(0, count);
-    mContourLevels.clear();
-    invalidateContourCache();
-    if (mLayer)
-        mLayer->markDirty();
-    if (mParentPlot)
-        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
-}
-
-void QCPColorMap2::invalidateContourCache()
-{
-    mContourCacheGen = 0;
-    mFallbackGen = 0;
-    mContourDataGen = std::max(mContourDataGen, uint64_t(1));
-}
-
-void QCPColorMap2::updateContourGpu(const QCPColorMapData* data)
-{
-    PROFILE_HERE_N("QCPColorMap2::updateContourGpu");
-    if (!data)
-        return;
-
-    const int kSize = data->keySize();
-    const int vSize = data->valueSize();
-    if (kSize < 2 || vSize < 2)
-    {
-        clearContourState();
-        return;
-    }
-
-    QCPRange bounds = data->dataBounds();
-    if (!(bounds.lower < bounds.upper) || !std::isfinite(bounds.lower)
-        || !std::isfinite(bounds.upper))
-    {
-        clearContourState();
-        return;
-    }
-
-    QCPRange keyRange = data->keyRange();
-    QCPRange valRange = data->valueRange();
-    const double kSpan = keyRange.upper - keyRange.lower;
-    const double vSpan = valRange.upper - valRange.lower;
-    if (!(kSpan > 0) || !(vSpan > 0) || !std::isfinite(kSpan) || !std::isfinite(vSpan))
-    {
-        clearContourState();
-        return;
-    }
-
-    QVector<double> levels = resolveContourLevels(bounds);
-    mLastContourLevels = levels;
-    QVector<float> uvVerts = QCPContourExtractor::extractUv(data, levels);
-
-    // Mirror the UVs the same way the renderer flips the image when an axis
-    // is range-reversed; otherwise the overlay reflects against the image.
-    const bool mirrorX = mKeyAxis && mKeyAxis->rangeReversed();
-    const bool mirrorY = mValueAxis && mValueAxis->rangeReversed();
-    if (mirrorX)
-        for (qsizetype i = 0; i < uvVerts.size(); i += 2)
-            uvVerts[i] = 1.0f - uvVerts[i];
-    if (mirrorY)
-        for (qsizetype i = 1; i < uvVerts.size(); i += 2)
-            uvVerts[i] = 1.0f - uvVerts[i];
-    mContourMirrorX = mirrorX;
-    mContourMirrorY = mirrorY;
-
-    mLastContourUv = uvVerts;
-    mRenderer.setContourLines(std::move(uvVerts), mContourPen.color());
-    // Stamp the cache only once the layer holds the matching content, so a
-    // degenerate rebuild can never leave stale lines behind.
-    mContourCacheGen = mContourDataGen;
-}
-
-void QCPColorMap2::updateContours(const QCPColorMapData* data, QCPPainter* painter,
-                                  bool imageWasInvalidated)
-{
-    const bool contoursActive = !mContourLevels.isEmpty() || mAutoContourCount > 0;
-    if (!contoursActive)
-    {
-        clearContourState();
-        return;
-    }
-    // setRangeReversed() emits no signal, so poll here: a reversal flips the
-    // rendered image (see QCPColormapRenderer::draw) and the cached contour
-    // UVs must be mirrored to match.
-    const bool mirrorX = mKeyAxis && mKeyAxis->rangeReversed();
-    const bool mirrorY = mValueAxis && mValueAxis->rangeReversed();
-    if (imageWasInvalidated || mContourCacheGen != mContourDataGen
-        || mirrorX != mContourMirrorX || mirrorY != mContourMirrorY)
-        updateContourGpu(data);
-    // The QPainter path cannot use GPU lines: it needs data-coordinate
-    // fallback lines whenever it paints -- i.e. when nothing was uploaded
-    // (no RHI layer) or when exporting (pmNoCaching bypasses the RHI layer
-    // even if one holds lines). Generation-tracked so repeated exports of
-    // the same frame reuse the cached segments instead of re-marching the
-    // full grid on every paint pass.
-    const bool exportMode = painter && painter->modes().testFlag(QCPPainter::pmNoCaching);
-    const bool fallbackCurrent = mFallbackGen == mContourDataGen && mFallbackGen != 0;
-    if ((!mRenderer.hasContourOnGpu() || exportMode) && !fallbackCurrent)
-        updateContourFallback(data);
-}
-
-void QCPColorMap2::updateContourFallback(const QCPColorMapData* data)
-{
-    if (!data)
-        return;
-    // Degenerate input cannot yield segments; stamp the generation so
-    // exporters don't re-march it on every paint pass.
-    QCPRange bounds = data->dataBounds();
-    if (!(bounds.lower < bounds.upper) || !std::isfinite(bounds.lower)
-        || !std::isfinite(bounds.upper))
-    {
-        mFallbackGen = mContourDataGen;
-        return;
-    }
-    QVector<double> levels = resolveContourLevels(bounds);
-    QVector<QLineF> segments;
-    for (const auto& line : QCPContourExtractor::extract(data, levels))
-        segments.append(line.segments);
-    mRenderer.setContourFallback(std::move(segments), mContourPen);
-    mFallbackGen = mContourDataGen;
-    ++mFallbackBuildCount;
-}
-
-void QCPColorMap2::clearContourState()
-{
-    mRenderer.clearContour();
-    mLastContourUv.clear();
-    mLastContourLevels.clear();
-    mContourCacheGen = mContourDataGen;
-    mFallbackGen = 0;
-}
-
-QVector<double> QCPColorMap2::resolveContourLevels(const QCPRange& bounds) const
-{
-    QVector<double> levels;
-    if (!mContourLevels.isEmpty())
-    {
-        levels.reserve(mContourLevels.size());
-        for (double level : mContourLevels)
-        {
-            if (std::isfinite(level))
-                levels.append(level);
-        }
-    }
-    else if (mAutoContourCount > 0)
-    {
-        levels.reserve(mAutoContourCount);
-        if (mRenderer.dataScaleType() == QCPAxis::stLogarithmic && bounds.lower > 0
-            && bounds.upper > 0)
-        {
-            // Geometric spacing: equal ratios put one line per decade band
-            // instead of bunching every line at the top decade.
-            const double ratio =
-                std::pow(bounds.upper / bounds.lower, 1.0 / (mAutoContourCount + 1));
-            for (int i = 1; i <= mAutoContourCount; ++i)
-                levels.append(bounds.lower * std::pow(ratio, i));
-        }
-        else
-        {
-            const double step = (bounds.upper - bounds.lower) / (mAutoContourCount + 1);
-            for (int i = 1; i <= mAutoContourCount; ++i)
-                levels.append(bounds.lower + i * step);
-        }
-    }
-    return levels;
+    mContours.setAutoLevels(count);
+    contoursChanged();
 }

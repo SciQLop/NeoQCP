@@ -122,11 +122,7 @@ void QCPColormapRenderer::draw(QCPPainter* painter, QCPAxis* keyAxis, QCPAxis* v
     if (!keyAxis || !valueAxis || mMapImage.isNull())
         return;
 
-    QPointF topLeft(keyAxis->coordToPixel(keyRange.lower),
-                    valueAxis->coordToPixel(valueRange.upper));
-    QPointF bottomRight(keyAxis->coordToPixel(keyRange.upper),
-                        valueAxis->coordToPixel(valueRange.lower));
-    QRectF imageRect(topLeft, bottomRight);
+    const QRectF rect = imageRect(keyAxis, valueAxis, keyRange, valueRange);
 
     bool mirrorX = keyAxis->rangeReversed();
     bool mirrorY = valueAxis->rangeReversed();
@@ -139,7 +135,7 @@ void QCPColormapRenderer::draw(QCPPainter* painter, QCPAxis* keyAxis, QCPAxis* v
         if (auto* crl = ensureRhiLayer(); crl && crl->fitsInTexture(mMapImage.size()))
         {
             crl->setImage(flippedMapImage(flips));
-            crl->setQuadRect(imageRect.normalized());
+            crl->setQuadRect(rect);
             crl->setLayer(mOwner->layer());
 
             auto* axisRect = keyAxis->axisRect();
@@ -148,6 +144,7 @@ void QCPColormapRenderer::draw(QCPPainter* painter, QCPAxis* keyAxis, QCPAxis* v
             double dpr = plot->bufferDevicePixelRatio();
             int outH = static_cast<int>(plot->height() * dpr);
             crl->setScissorRect(qcp::rhi::computeScissor(clipRect, dpr, outH));
+            mImageOnGpu = true;
             return;
         }
         // Too big for a GPU texture on this backend: drop any GPU quad left over from
@@ -163,10 +160,19 @@ void QCPColormapRenderer::draw(QCPPainter* painter, QCPAxis* keyAxis, QCPAxis* v
         if (mRhiLayer)
             mRhiLayer->clear();
         mContourOnGpu = false;
+        mImageOnGpu = false;
     }
 
-    painter->drawImage(imageRect, flippedMapImage(flips));
-    drawContourFallback(painter, keyAxis, valueAxis);
+    painter->drawImage(rect, flippedMapImage(flips));
+    drawContourFallback(painter, rect, keyAxis);
+}
+
+QRectF QCPColormapRenderer::imageRect(const QCPAxis* keyAxis, const QCPAxis* valueAxis,
+                                      const QCPRange& keyRange, const QCPRange& valueRange)
+{
+    return QRectF(QPointF(keyAxis->coordToPixel(keyRange.lower), valueAxis->coordToPixel(valueRange.upper)),
+                  QPointF(keyAxis->coordToPixel(keyRange.upper), valueAxis->coordToPixel(valueRange.lower)))
+        .normalized();
 }
 
 const QImage& QCPColormapRenderer::flippedMapImage(Qt::Orientations flips)
@@ -188,27 +194,38 @@ void QCPColormapRenderer::setContourLines(QVector<float> uvVertices, const QColo
     }
 }
 
-void QCPColormapRenderer::setContourFallback(QVector<QLineF> segments, const QPen& pen)
+void QCPColormapRenderer::setContourFallback(QVector<QLineF> uvSegments, const QPen& pen)
 {
-    mContourFallback = std::move(segments);
+    mContourFallback = std::move(uvSegments);
     mContourFallbackPen = pen;
 }
 
-void QCPColormapRenderer::drawContourFallback(QCPPainter* painter, QCPAxis* keyAxis,
-                                              QCPAxis* valueAxis)
+void QCPColormapRenderer::setLabelOverlay(const QImage& image, const QRectF& pixelRect)
 {
-    if (mContourFallback.isEmpty() || !keyAxis || !valueAxis)
+    if (mRhiLayer)
+        mRhiLayer->setOverlay(image, pixelRect);
+}
+
+void QCPColormapRenderer::clearLabelOverlay()
+{
+    if (mRhiLayer)
+        mRhiLayer->clearOverlay();
+}
+
+void QCPColormapRenderer::drawContourFallback(QCPPainter* painter, const QRectF& imageRect,
+                                              const QCPAxis* keyAxis)
+{
+    if (mContourFallback.isEmpty())
         return;
     painter->save();
     if (const QCPAxisRect* axisRect = keyAxis->axisRect())
         painter->setClipRect(axisRect->rect());
     painter->setPen(mContourFallbackPen);
     painter->setBrush(Qt::NoBrush);
+    const auto toPixel = [&](double u, double v)
+    { return QPointF(imageRect.left() + u * imageRect.width(), imageRect.top() + v * imageRect.height()); };
     for (const QLineF& s : mContourFallback)
-    {
-        painter->drawLine(QPointF(keyAxis->coordToPixel(s.x1()), valueAxis->coordToPixel(s.y1())),
-                          QPointF(keyAxis->coordToPixel(s.x2()), valueAxis->coordToPixel(s.y2())));
-    }
+        painter->drawLine(toPixel(s.x1(), s.y1()), toPixel(s.x2(), s.y2()));
     painter->restore();
 }
 

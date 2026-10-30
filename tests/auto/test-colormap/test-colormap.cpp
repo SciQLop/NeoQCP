@@ -1,3 +1,4 @@
+#include <QPainterPath>
 #include "test-colormap.h"
 #include <QMainWindow>
 #include <painting/colormap-rhi-layer.h>
@@ -457,6 +458,13 @@ namespace
 {
 // Settles the colormap pipeline like the existing tests do, then forces one
 // more draw so updateContourGpu has run against the delivered result.
+bool fontDrawsGlyphs()
+{
+  QPainterPath probe;
+  probe.addText(0, 0, QFont(), "123");
+  return !probe.isEmpty();
+}
+
 void settleColorMap(QCustomPlot* plot, QCPColorMap2* cm)
 {
   plot->replot();
@@ -553,6 +561,107 @@ void TestColorMap::QCPColorMap2_contourExportDrawsFallback()
   QVERIFY(!pm.isNull());
   const int red = countRedPixels(pm.toImage());
   QVERIFY2(red > 50, qPrintable(QString("export must draw contour lines, red pixels=%1").arg(red)));
+}
+
+// On a log value axis the grid rows are log-spaced: an export line or a label placed as if they
+// were evenly spaced lands far from where the colour changes.
+void TestColorMap::QCPColorMap2_contourExportFollowsALogValueAxis()
+{
+  mPlot->resize(400, 300);
+  mPlot->xAxis->setRange(0, 4);
+  mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+  mPlot->yAxis->setRange(1, 1000);
+  const int ny = 31;
+  std::vector<double> x = {0, 1, 2, 3, 4}, y(ny), z(5 * ny);
+  for (int vi = 0; vi < ny; ++vi)
+    y[vi] = std::pow(10.0, 3.0 * vi / (ny - 1));
+  for (int ki = 0; ki < 5; ++ki)
+    for (int vi = 0; vi < ny; ++vi)
+      z[ki * ny + vi] = std::log10(y[vi]); // horizontal contours at y = 10^level
+  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  cm->setData(x, y, z);
+  settleColorMap(mPlot, cm);
+  cm->setContourLevels({1.0, 2.0});
+  cm->setContourPen(QPen(Qt::red, 2));
+  cm->setContourLabelEnabled(true);
+  QTRY_VERIFY_WITH_TIMEOUT(!cm->pipeline().isBusy(), 2000);
+
+  const QImage img = mPlot->toPixmap().toImage();
+  const auto isRed = [](QColor c) { return c.red() > 200 && c.green() < 80 && c.blue() < 80; };
+  const int column = qRound(mPlot->xAxis->coordToPixel(0.5)); // clear of the labels at x = 2
+  for (double level : {1.0, 2.0})
+  {
+    const double row = mPlot->yAxis->coordToPixel(std::pow(10.0, level));
+    bool found = false;
+    for (int dy = -5; dy <= 5 && !found; ++dy)
+      found = isRed(img.pixelColor(column, qRound(row) + dy));
+    QVERIFY2(found, qPrintable(QString("no export line at y=10^%1 (pixel row %2)").arg(level).arg(row)));
+  }
+  // The resampled grid is piecewise constant per source row: a line is exact to half a row.
+  const double halfRow = 0.5 * (mPlot->yAxis->coordToPixel(y[0]) - mPlot->yAxis->coordToPixel(y[1])) + 1;
+  QVERIFY(!cm->lastContourLabels().isEmpty());
+  for (const auto& label : cm->lastContourLabels())
+  {
+    const double row = mPlot->yAxis->coordToPixel(std::pow(10.0, label.level));
+    QVERIFY2(qAbs(label.position.y() - row) < halfRow,
+             qPrintable(QString("label %1 at row %2, its line is at %3")
+                            .arg(label.level).arg(label.position.y()).arg(row)));
+  }
+}
+
+// Auto levels change with the colour scale type; the labels must not keep the old ones.
+// A reversed axis flips the image; the export must show each value at its own coordinate,
+// exactly like the GPU quad does.
+void TestColorMap::QCPColorMap2_exportDrawsTheImageOnAReversedAxis()
+{
+  mPlot->resize(400, 300);
+  mPlot->xAxis->setRange(0, 4);
+  mPlot->xAxis->setRangeReversed(true);
+  mPlot->yAxis->setRange(0, 4);
+  std::vector<double> x = {0, 1, 2, 3, 4}, y = {0, 1, 2, 3, 4}, z(25);
+  for (int ki = 0; ki < 5; ++ki)
+    for (int vi = 0; vi < 5; ++vi)
+      z[ki * 5 + vi] = ki; // dark at x = 0, bright at x = 4
+  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  cm->setData(x, y, z);
+  cm->setGradient(QCPColorGradient(QCPColorGradient::gpGrayscale));
+  cm->setDataRange(QCPRange(0, 4));
+  settleColorMap(mPlot, cm);
+
+  const QImage img = mPlot->toPixmap().toImage();
+  const int row = qRound(mPlot->yAxis->coordToPixel(2));
+  const int low = qGray(img.pixel(qRound(mPlot->xAxis->coordToPixel(0.5)), row));
+  const int high = qGray(img.pixel(qRound(mPlot->xAxis->coordToPixel(3.5)), row));
+  QVERIFY2(low < high, qPrintable(QString("x=0.5 is %1, x=3.5 is %2: the image is mirrored").arg(low).arg(high)));
+}
+
+void TestColorMap::QCPColorMap2_contourLabelsFollowAColourScaleToggle()
+{
+  mPlot->resize(400, 300);
+  mPlot->xAxis->setRange(0, 4);
+  mPlot->yAxis->setRange(0, 4);
+  const int n = 41;
+  std::vector<double> x(n), y(n), z(n * n);
+  for (int i = 0; i < n; ++i)
+    x[i] = y[i] = 4.0 * i / (n - 1);
+  for (int ki = 0; ki < n; ++ki)
+    for (int vi = 0; vi < n; ++vi)
+      z[ki * n + vi] = std::pow(10.0, 3.0 * ki / (n - 1)); // 1..1000 along x
+  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  cm->setData(x, y, z);
+  settleColorMap(mPlot, cm);
+  cm->setAutoContourLevels(3);
+  cm->setContourLabelEnabled(true);
+  mPlot->toPixmap();
+  cm->setDataScaleType(QCPAxis::stLogarithmic);
+  settleColorMap(mPlot, cm);
+  mPlot->toPixmap();
+
+  const QVector<double> levels = cm->lastContourLevels();
+  QVERIFY(!cm->lastContourLabels().isEmpty());
+  for (const auto& label : cm->lastContourLabels())
+    QVERIFY2(levels.contains(label.level),
+             qPrintable(QString("label level %1 is not a current level").arg(label.level)));
 }
 
 void TestColorMap::QCPColorMap2_contourDegenerateDataClearsLines()
@@ -692,9 +801,10 @@ void TestColorMap::QCPColorMap2_contourExportCachesFallback()
   }
   QTRY_VERIFY_WITH_TIMEOUT(!cm->pipeline().isBusy(), 2000);
 
-  const uint64_t buildsBefore = cm->fallbackBuildCount();
-  QVERIFY2(buildsBefore >= 1, "sanity: settling must have built the fallback once");
+  QVERIFY2(cm->fallbackBuildCount() >= 1, "sanity: settling must have built the lines once");
+  // The first export marches the grid at full resolution, later ones reuse it.
   const QImage img1 = mPlot->toPixmap().toImage();
+  const uint64_t buildsBefore = cm->fallbackBuildCount();
   const QImage img2 = mPlot->toPixmap().toImage();
   QCOMPARE(cm->fallbackBuildCount(), buildsBefore);
   QVERIFY2(countRedPixels(img1) > 50, "export must draw contour lines");
@@ -913,8 +1023,50 @@ void TestColorMap::QCPColorMap_colorScaleSlotDeletingTheMapIsSafe()
   QCOMPARE(scale->dataScaleType(), QCPAxis::stLogarithmic);
 }
 
+// The colour-map image is a GPU quad composited after the layer's paint buffer: labels painted
+// into that buffer end up under the image.
+void TestColorMap::QCPColorMap2_contourLabelsShowOnTheGpuFrame()
+{
+  if (!fontDrawsGlyphs())
+    QSKIP("no usable font: labels draw no pixels");
+  mPlot->resize(400, 300);
+  mPlot->show();
+  if (!QTest::qWaitForWindowExposed(mPlot) || (QCoreApplication::processEvents(), !mPlot->rhi()))
+    QSKIP("no QRhi available in this environment");
+  mPlot->xAxis->setRange(0, 4);
+  mPlot->yAxis->setRange(0, 4);
+  const int n = 41;
+  std::vector<double> x(n), y(n), z(n * n);
+  for (int i = 0; i < n; ++i)
+    x[i] = y[i] = 4.0 * i / (n - 1);
+  for (int ki = 0; ki < n; ++ki)
+    for (int vi = 0; vi < n; ++vi)
+      z[ki * n + vi] = x[ki];
+  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  cm->setData(x, y, z);
+  cm->setContourLevels({1.0, 2.0, 3.0});
+  cm->setContourPen(QPen(Qt::red, 1));
+  settleColorMap(mPlot, cm);
+  QVERIFY2(cm->rhiLayer() && cm->rhiLayer()->hasContent(), "sanity: the image is on the GPU");
+
+  mPlot->replot(QCustomPlot::rpImmediateRefresh);
+  const QImage without = mPlot->grabFramebuffer();
+  cm->setContourLabelEnabled(true);
+  mPlot->replot(QCustomPlot::rpImmediateRefresh);
+  const QImage with = mPlot->grabFramebuffer();
+  QVERIFY(!cm->lastContourLabels().isEmpty());
+
+  int changed = 0;
+  for (int py = 0; py < with.height(); ++py)
+    for (int px = 0; px < with.width(); ++px)
+      changed += with.pixel(px, py) != without.pixel(px, py);
+  QVERIFY2(changed > 100, qPrintable(QString("labels must show on screen: %1 pixels changed").arg(changed)));
+}
+
 void TestColorMap::QCPColorMap2_contourLabelsDrawSpacedInsideThePlot()
 {
+  if (!fontDrawsGlyphs())
+    QSKIP("no usable font: labels draw no pixels");
   mPlot->resize(400, 300);
   mPlot->xAxis->setRange(0, 4);
   mPlot->yAxis->setRange(0, 4);
