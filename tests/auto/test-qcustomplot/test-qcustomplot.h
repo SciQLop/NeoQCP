@@ -37,6 +37,7 @@ private slots:
   void rectSelectionSlotDeletingThePlotIsSafe();
   void rectZoomSlotDeletingThePlotIsSafe();
   void releaseSlotDeletingThePlotIsSafe();
+  void wheelSlotDeletingThePlotIsSafe();
   void angularRangeSlotDeletingTheAxisIsSafe();
   void radialRangeSlotDeletingTheAxisIsSafe();
   void radialDragSlotRemovingARadialAxisKeepsTheOthersBaselines();

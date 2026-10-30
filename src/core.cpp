@@ -3666,7 +3666,13 @@ bool QCustomPlot::nativeGestureEvent(QNativeGestureEvent* event)
 
 void QCustomPlot::wheelEvent(QWheelEvent* event)
 {
+    const QPointer<QCustomPlot> alive(this); // a mouseWheel slot may delete the plot
     emit mouseWheel(event);
+    if (!alive)
+    {
+        event->accept(); // an ignored event goes on to the parent through the deleted widget
+        return;
+    }
 
     // forward event to layerable under cursor:
     for (const auto& candidate : guarded(layerableListAt(event->position(), false)))

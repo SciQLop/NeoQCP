@@ -561,6 +561,18 @@ void TestQCustomPlot::releaseSlotDeletingThePlotIsSafe()
   QVERIFY(ran);
 }
 
+void TestQCustomPlot::wheelSlotDeletingThePlotIsSafe()
+{
+  layOut(mPlot, QCP::iRangeZoom);
+  bool ran = false;
+  deletePlotOn(mPlot, mPlot, &QCustomPlot::mouseWheel, &ran);
+  const QPointF pos = pixelOf(mPlot, 5, 5);
+  QWheelEvent event(pos, mPlot->mapToGlobal(pos), QPoint(), QPoint(0, 120), Qt::NoButton,
+                    Qt::NoModifier, Qt::NoScrollPhase, false);
+  QCoreApplication::sendEvent(mPlot, &event);
+  QVERIFY(ran);
+}
+
 namespace {
 // A slot of the first rangeChanged deletes the axes: the second must not be emitted from them.
 template <typename Axis>
