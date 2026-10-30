@@ -58,8 +58,6 @@ QCPMultiGraph::QCPMultiGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
 
 QCPMultiGraph::~QCPMultiGraph() = default;
 
-// Fresh lines are drawn only if the layer is repainted: a replot repaints dirty layers, and
-// falls back to marking the plot's layers dirty only when none is, so mark this one here.
 void QCPMultiGraph::followAxes()
 {
     for (const auto& link : std::exchange(mAxisLinks, {}))
@@ -78,6 +76,8 @@ void QCPMultiGraph::followAxes()
     mL2Dirty = mL1Cache != nullptr; // nor do the bins resampled for the old key range
 }
 
+// Fresh lines are drawn only if the layer is repainted: a replot repaints dirty layers, and
+// falls back to marking the plot's layers dirty only when none is, so mark this one here.
 void QCPMultiGraph::markLinesDirty()
 {
     mLineCacheDirty = true;
@@ -1461,6 +1461,8 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::binnedWhenDense(
 void QCPMultiGraph::drawFills(QCPPainter* painter, const QCPAbstractMultiDataSource& ds, int begin,
                               int end, bool fresh, const QPointF& gpuOffset, bool isExportMode)
 {
+    if (mFills.isEmpty())
+        return; // gpuLayer() creates the layer it looks up
     auto* gpuLayer = qcp::gpuLayer(mParentPlot, mLayer, isExportMode);
     for (auto& entry : mFills) {
         if (!fillDrawable(entry.spec, ds.columnCount())) continue;
@@ -1584,6 +1586,8 @@ void QCPMultiGraph::drawErrorBars(QCPPainter* painter, const QCPAbstractMultiDat
                                   bool rawRows, int begin, int end, bool fresh,
                                   const QPointF& gpuOffset, bool isExportMode)
 {
+    if (mErrorBars.isEmpty())
+        return; // gpuLayer() creates the layer it looks up
     auto* gpuLayer = qcp::gpuLayer(mParentPlot, mLayer, isExportMode);
     const bool rebuild = fresh || isExportMode;
     for (auto& entry : mErrorBars) {

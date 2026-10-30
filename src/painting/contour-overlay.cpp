@@ -243,6 +243,9 @@ void QCPContourOverlay::drawLabels(const QCPColorMapData* grid, QCPPainter* pain
     // The image is a GPU quad composited after this layer's paint buffer: labels painted there
     // would end up under it. They go in an overlay quad drawn over the image instead, rebuilt
     // only when it would look different (it is a full axis-rect texture).
+    // simplify: a zoom changes imageRect, so each zoom frame rebuilds and uploads the whole
+    // texture (~1 ms of CPU at 1600x900, 4x that on a 2x screen, plus the upload), only while
+    // labels are on. Upgrade path: one small tile per label in an atlas, drawn as one quad each.
     const double dpr = keyAxis->parentPlot()->bufferDevicePixelRatio();
     const LabelKey labelKey { mLastKey, imageRect, area, dpr, painter->font(), mPen.color() };
     if (labelKey == mLastLabelKey && mRenderer.hasLabelOverlay())

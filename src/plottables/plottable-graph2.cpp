@@ -43,8 +43,6 @@ QCPGraph2::QCPGraph2(QCPAxis* keyAxis, QCPAxis* valueAxis)
 
 QCPGraph2::~QCPGraph2() = default;
 
-// Fresh lines are drawn only if the layer is repainted: a replot repaints dirty layers, and
-// falls back to marking the plot's layers dirty only when none is, so mark this one here.
 void QCPGraph2::followAxes()
 {
     const auto dropLines = [this] { markLinesDirty(); mCachedLines.clear(); };
@@ -62,6 +60,8 @@ void QCPGraph2::followAxes()
     mL2Dirty = mL1Cache != nullptr; // nor do the bins resampled for the old key range
 }
 
+// Fresh lines are drawn only if the layer is repainted: a replot repaints dirty layers, and
+// falls back to marking the plot's layers dirty only when none is, so mark this one here.
 void QCPGraph2::markLinesDirty()
 {
     mLineCacheDirty = true;
