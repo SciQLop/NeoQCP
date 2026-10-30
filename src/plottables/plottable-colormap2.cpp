@@ -1,5 +1,10 @@
 #include "plottable-colormap2.h"
+#include <QFontMetricsF>
+#include <QPainterPath>
 #include <QPointer>
+#include <QtMath>
+#include <algorithm>
+#include <cmath>
 #include <utility>
 #include "plottable-colormap.h" // for QCPColorMapData
 #include <core.h>
@@ -415,6 +420,7 @@ void QCPColorMap2::draw(QCPPainter* painter)
 
     applyDefaultAntialiasingHint(painter);
     mRenderer.draw(painter, mKeyAxis.data(), mValueAxis.data(), keyRange, valRange);
+    drawContourLabels(painter, resampledData);
 
     // Baseline for stallPixelOffset: the axes this image was just drawn against.
     mRenderedKeyRange = mKeyAxis->range();
@@ -500,7 +506,76 @@ void QCPColorMap2::setContourPen(const QPen& pen)
 
 void QCPColorMap2::setContourLabelEnabled(bool enabled)
 {
+    if (enabled == mContourLabelEnabled)
+        return;
     mContourLabelEnabled = enabled;
+    if (mLayer)
+        mLayer->markDirty();
+    if (mParentPlot)
+        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+}
+
+bool QCPColorMap2::labelFits(const QPointF& at, double level) const
+{
+    // simplify: O(labels) per candidate; fine for the few dozen labels a plot can hold.
+    return std::none_of(mLastContourLabels.cbegin(), mLastContourLabels.cend(),
+                        [&](const ContourLabel& placed)
+                        {
+                            const double d = QLineF(placed.position, at).length();
+                            return d < kContourLabelClearance
+                                || (placed.level == level && d < kContourLabelSpacing);
+                        });
+}
+
+void QCPColorMap2::drawContourLabels(QCPPainter* painter, const QCPColorMapData* data)
+{
+    mLastContourLabels.clear();
+    const bool contoursActive = !mContourLevels.isEmpty() || mAutoContourCount > 0;
+    if (!mContourLabelEnabled || !contoursActive || !data || !mKeyAxis->axisRect())
+        return;
+    if (mLabelGen != mContourDataGen || mLabelGen == 0)
+    {
+        mLabelLines = QCPContourExtractor::extract(data, resolveContourLevels(data->dataBounds()));
+        mLabelGen = mContourDataGen;
+    }
+    const QRectF area = mKeyAxis->axisRect()->rect();
+    const QFontMetricsF metrics(painter->font());
+    const QColor color = mContourPen.color();
+    // The line is drawn on the GPU layer, which cannot leave a gap for the text: a halo in the
+    // opposite lightness keeps the label readable over its own line.
+    const QPen halo(color.lightness() > 127 ? QColor(0, 0, 0, 170) : QColor(255, 255, 255, 170), 3.0,
+                    Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+    painter->save();
+    painter->setClipRect(area);
+    painter->setRenderHint(QPainter::Antialiasing);
+    for (const auto& line : mLabelLines)
+    {
+        const QString text = QString::number(line.level, 'g', 4);
+        QPainterPath glyphs;
+        glyphs.addText(-metrics.horizontalAdvance(text) / 2, metrics.ascent() / 2 - metrics.descent() / 2,
+                       painter->font(), text);
+        for (const QLineF& segment : line.segments)
+        {
+            const QPointF a = coordsToPixels(segment.x1(), segment.y1());
+            const QPointF b = coordsToPixels(segment.x2(), segment.y2());
+            const QPointF at = (a + b) / 2;
+            if (a == b || !area.contains(at) || !labelFits(at, line.level))
+                continue;
+            double angle = qRadiansToDegrees(std::atan2(b.y() - a.y(), b.x() - a.x()));
+            if (angle > 90)
+                angle -= 180;
+            else if (angle <= -90)
+                angle += 180;
+            painter->save();
+            painter->translate(at);
+            painter->rotate(angle);
+            painter->strokePath(glyphs, halo);
+            painter->fillPath(glyphs, color);
+            painter->restore();
+            mLastContourLabels.append({ line.level, at });
+        }
+    }
+    painter->restore();
 }
 
 void QCPColorMap2::setAutoContourLevels(int count)

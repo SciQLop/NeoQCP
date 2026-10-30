@@ -264,6 +264,11 @@ void TestColorMap::QCPColorMap2_contourSettersScheduleReplot()
     cm->setAutoContourLevels(5);
     QVERIFY2(spy.wait(200), "setAutoContourLevels should schedule a queued replot on its own");
   }
+  {
+    QSignalSpy spy(mPlot, &QCustomPlot::afterReplot);
+    cm->setContourLabelEnabled(true);
+    QVERIFY2(spy.wait(200), "setContourLabelEnabled should schedule a queued replot on its own");
+  }
 }
 
 void TestColorMap::QCPColorMapRhiLayer_setImageSkipsRedundantUpload()
@@ -906,4 +911,53 @@ void TestColorMap::QCPColorMap_colorScaleSlotDeletingTheMapIsSafe()
   mColorMap->setColorScale(scale);
   QCOMPARE(mPlot->plottableCount(), 0);
   QCOMPARE(scale->dataScaleType(), QCPAxis::stLogarithmic);
+}
+
+void TestColorMap::QCPColorMap2_contourLabelsDrawSpacedInsideThePlot()
+{
+  mPlot->resize(400, 300);
+  mPlot->xAxis->setRange(0, 4);
+  mPlot->yAxis->setRange(0, 4);
+  const int n = 41;
+  std::vector<double> x(n), y(n), z(n * n);
+  for (int i = 0; i < n; ++i)
+    x[i] = y[i] = 4.0 * i / (n - 1);
+  // NOTE: source Z layout is x-outer: z[xIndex * ySize + yIndex].
+  for (int ki = 0; ki < n; ++ki)
+    for (int vi = 0; vi < n; ++vi)
+      z[ki * n + vi] = x[ki]; // z = x -> vertical contours
+  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  cm->setData(x, y, z);
+  settleColorMap(mPlot, cm);
+  cm->setContourLevels({1.0, 2.0, 3.0});
+  cm->setContourPen(QPen(Qt::red, 1));
+  QTRY_VERIFY_WITH_TIMEOUT(!cm->pipeline().isBusy(), 2000);
+
+  const QImage without = mPlot->toPixmap().toImage();
+  QVERIFY(cm->lastContourLabels().isEmpty());
+  cm->setContourLabelEnabled(true);
+  const QImage with = mPlot->toPixmap().toImage();
+  const auto labels = cm->lastContourLabels();
+
+  int changed = 0;
+  for (int py = 0; py < with.height(); ++py)
+    for (int px = 0; px < with.width(); ++px)
+      changed += with.pixel(px, py) != without.pixel(px, py);
+  QVERIFY2(changed > 100, qPrintable(QString("labels must draw: %1 pixels changed").arg(changed)));
+  QSet<double> levels;
+  const QRectF area = mPlot->axisRect()->rect();
+  for (const auto& label : labels)
+  {
+    levels.insert(label.level);
+    QVERIFY(area.contains(label.position));
+  }
+  QCOMPARE(levels, (QSet<double>{1.0, 2.0, 3.0}));
+  for (int i = 0; i < labels.size(); ++i)
+    for (int j = i + 1; j < labels.size(); ++j)
+    {
+      const double d = QLineF(labels[i].position, labels[j].position).length();
+      QVERIFY2(d >= QCPColorMap2::kContourLabelClearance, "labels must not overlap");
+      if (labels[i].level == labels[j].level)
+        QVERIFY2(d >= QCPColorMap2::kContourLabelSpacing, "labels of one level must be spaced");
+    }
 }

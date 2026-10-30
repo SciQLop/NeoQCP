@@ -4,6 +4,7 @@
 #include <datasource/async-pipeline.h>
 #include <datasource/soa-datasource-2d.h>
 #include <painting/colormap-renderer.h>
+#include <painting/contour-extractor.h>
 #include <atomic>
 #include <memory>
 #include <span>
@@ -95,8 +96,7 @@ public:
     void setContourPen(const QPen& pen);
     [[nodiscard]] QPen contourPen() const { return mContourPen; }
 
-    // NOTE: stores the flag only -- no renderer currently draws contour labels,
-    // so toggling this has no visible effect (known limitation, not yet implemented).
+    //! Writes each contour's level on it, along the line, in the contour pen's colour.
     void setContourLabelEnabled(bool enabled);
     [[nodiscard]] bool contourLabelEnabled() const { return mContourLabelEnabled; }
 
@@ -110,6 +110,17 @@ public:
     // Exposed for tests: the levels the last rebuild marched (explicit
     // levels filtered to finite values, or resolved auto levels).
     [[nodiscard]] QVector<double> lastContourLevels() const { return mLastContourLevels; }
+
+    struct ContourLabel
+    {
+        double level;
+        QPointF position; //!< pixels
+    };
+    //! Pixels between two labels of one level, and between any two labels.
+    static constexpr double kContourLabelSpacing = 120.0;
+    static constexpr double kContourLabelClearance = 30.0;
+    // Exposed for tests: the labels the last draw placed.
+    [[nodiscard]] const QVector<ContourLabel>& lastContourLabels() const { return mLastContourLabels; }
     // Exposed for tests: how many times the QPainter fallback segments were
     // (re)built. Repeated exports of one frame must not re-march the grid.
     [[nodiscard]] uint64_t fallbackBuildCount() const { return mFallbackBuildCount; }
@@ -179,6 +190,10 @@ private:
     bool mContourMirrorY = false;
     QVector<float> mLastContourUv;
     QVector<double> mLastContourLevels;
+    //! Data-space contour lines for the labels, extracted once per contour data generation.
+    QVector<QCPContourExtractor::ContourLine> mLabelLines;
+    uint64_t mLabelGen = 0;
+    QVector<ContourLabel> mLastContourLabels;
 
     void invalidateContourCache();
 
@@ -191,6 +206,8 @@ private:
     void updateContours(const QCPColorMapData* data, QCPPainter* painter,
                         bool imageWasInvalidated);
     void updateContourFallback(const QCPColorMapData* data);
+    void drawContourLabels(QCPPainter* painter, const QCPColorMapData* data);
+    [[nodiscard]] bool labelFits(const QPointF& at, double level) const;
     void clearContourState();
     [[nodiscard]] QVector<double> resolveContourLevels(const QCPRange& bounds) const;
 };
