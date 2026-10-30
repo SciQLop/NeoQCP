@@ -111,7 +111,8 @@ void QCPContourOverlay::clear()
 {
     mRenderer.clearContour();
     mRenderer.clearLabelOverlay();
-    mUploaded = {};
+    mLastKey = {};
+    mLastLabelKey = {};
     mDrawn = nullptr;
     mLastUv.clear();
     mLastLevels.clear();
@@ -136,15 +137,20 @@ void QCPContourOverlay::update(const QCPColorMapData* grid, const QCPPainter* pa
     // The image's GPU quad is mirrored for a reversed axis (see QCPColormapRenderer::draw), so
     // the lines are mirrored the same way.
     const Lines& screen = linesFor(grid, key, false);
-    if (imageWasInvalidated || !(mUploaded == key))
+    const bool newLines = !(mLastKey == key);
+    if (newLines)
     {
         mLastUv = QCPContourExtractor::flatten(screen.lines);
         mLastLevels = key.levels;
-        // The layer is made by the renderer's first draw, which comes after this: make it now
-        // so the first frame's lines are not dropped.
+        mLastKey = key;
+    }
+    // Also when the GPU layer lost them: cleared off-view, too big a texture, or released.
+    // The layer is made by the renderer's first draw, which comes after this: make it now so the
+    // first frame's lines are not dropped.
+    if (newLines || imageWasInvalidated || !mRenderer.hasContourOnGpu())
+    {
         mRenderer.ensureRhiLayer();
         mRenderer.setContourLines(mLastUv, mPen.color());
-        mUploaded = key;
     }
     mDrawn = &screen;
     if (exportMode)
@@ -152,10 +158,9 @@ void QCPContourOverlay::update(const QCPColorMapData* grid, const QCPPainter* pa
         key.maxDim = fullDim;
         mDrawn = &linesFor(grid, key, true);
     }
-    // The painter needs its own lines whenever it paints the image: on export (which bypasses
-    // the GPU layer even if one holds lines) or when nothing is on the GPU.
-    if (exportMode || !mRenderer.hasContourOnGpu())
-        mRenderer.setContourFallback(mDrawn->segments, mPen);
+    // Only the renderer knows whether this frame paints the image (export, no GPU, too big a
+    // texture), so it always gets the painter lines; a GPU frame ignores them.
+    mRenderer.setContourFallback(mDrawn->segments, mPen);
 }
 
 bool QCPContourOverlay::labelFits(const QPointF& at, double level) const
@@ -212,12 +217,15 @@ void QCPContourOverlay::paintLabels(QPainter* painter, const QRectF& imageRect, 
 void QCPContourOverlay::drawLabels(const QCPColorMapData* grid, QCPPainter* painter,
                                    const QCPAxis* keyAxis, const QCPAxis* valueAxis)
 {
-    mLastLabels.clear();
     const bool exportMode = exporting(painter);
     if (!mLabelsEnabled || !mDrawn || !grid || !keyAxis || !valueAxis || !keyAxis->axisRect())
     {
+        mLastLabels.clear();
         if (!exportMode)
+        {
             mRenderer.clearLabelOverlay();
+            mLastLabelKey = {};
+        }
         return;
     }
     const QRectF area = keyAxis->axisRect()->rect();
@@ -225,6 +233,7 @@ void QCPContourOverlay::drawLabels(const QCPColorMapData* grid, QCPPainter* pain
         = QCPColormapRenderer::imageRect(keyAxis, valueAxis, grid->keyRange(), grid->valueRange());
     if (exportMode || !mRenderer.imageOnGpu())
     {
+        mLastLabels.clear();
         painter->save();
         painter->setClipRect(area);
         paintLabels(painter, imageRect, area);
@@ -232,8 +241,14 @@ void QCPContourOverlay::drawLabels(const QCPColorMapData* grid, QCPPainter* pain
         return;
     }
     // The image is a GPU quad composited after this layer's paint buffer: labels painted there
-    // would end up under it. They go in an overlay quad drawn over the image instead.
+    // would end up under it. They go in an overlay quad drawn over the image instead, rebuilt
+    // only when it would look different (it is a full axis-rect texture).
     const double dpr = keyAxis->parentPlot()->bufferDevicePixelRatio();
+    const LabelKey labelKey { mLastKey, imageRect, area, dpr, painter->font(), mPen.color() };
+    if (labelKey == mLastLabelKey && mRenderer.hasLabelOverlay())
+        return;
+    mLastLabelKey = labelKey;
+    mLastLabels.clear();
     QImage overlay((area.size() * dpr).toSize(), QImage::Format_ARGB32_Premultiplied);
     overlay.setDevicePixelRatio(dpr);
     overlay.fill(Qt::transparent);

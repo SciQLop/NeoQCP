@@ -27,6 +27,8 @@ private slots:
   void QCPColorMap2_contourExportDrawsFallback();
   void QCPColorMap2_contourLabelsDrawSpacedInsideThePlot();
   void QCPColorMap2_contourLabelsShowOnTheGpuFrame();
+  void QCPColorMap2_contourLinesComeBackAfterAPanAwayAndBack();
+  void QCPColorMap2_unchangedLabelsAreNotUploadedAgain();
   void QCPColorMap2_contourExportFollowsALogValueAxis();
   void QCPColorMap2_exportDrawsTheImageOnAReversedAxis();
   void QCPColorMap2_contourLabelsFollowAColourScaleToggle();

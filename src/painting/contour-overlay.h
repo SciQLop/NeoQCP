@@ -1,6 +1,8 @@
 #pragma once
 #include <painting/contour-extractor.h>
+#include <QFont>
 #include <QPen>
+#include <QRectF>
 #include <QPointF>
 #include <QVector>
 #include <cstdint>
@@ -10,7 +12,6 @@ class QCPColorMapData;
 class QCPColormapRenderer;
 class QCPPainter;
 class QPainter;
-class QRectF;
 
 //! Contour lines and their labels over a grid drawn by a QCPColormapRenderer.
 //!
@@ -46,8 +47,6 @@ public:
 
     //! A new grid replaces the old one.
     void dataChanged() { ++mGeneration; }
-    //! The renderer's GPU layer was released, and the uploaded lines with it.
-    void releaseGpu() { mUploaded = {}; }
 
     //! Before the renderer draws \a grid: uploads the GPU lines, or hands the painter lines to
     //! the renderer for an export or a painter-drawn image.
@@ -79,6 +78,16 @@ private:
         QVector<QCPContourExtractor::ContourLine> lines;
         QVector<QLineF> segments; //!< all levels, for the painter
     };
+    //! What the GPU label overlay looks like.
+    struct LabelKey
+    {
+        Key lines;
+        QRectF imageRect, area;
+        double dpr = 0;
+        QFont font;
+        QColor color;
+        bool operator==(const LabelKey&) const = default;
+    };
 
     [[nodiscard]] QVector<double> resolveLevels(const QCPColorMapData* grid) const;
     const Lines& linesFor(const QCPColorMapData* grid, const Key& key, bool exporting);
@@ -97,7 +106,8 @@ private:
     //! One slot for the screen resolution, one for exports: switching between them re-marches nothing.
     Lines mCache[2];
     const Lines* mDrawn = nullptr;
-    Key mUploaded;
+    Key mLastKey;
+    LabelKey mLastLabelKey;
     QVector<float> mLastUv;
     QVector<double> mLastLevels;
     QVector<Label> mLastLabels;

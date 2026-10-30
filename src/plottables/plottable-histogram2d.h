@@ -127,11 +127,7 @@ protected:
     void axesChanged() override { followAxisScales(); }
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
     bool canProduceContent() const override;
-    void releaseGpuResources() override
-    {
-        mRenderer.releaseRhiLayer();
-        mContours.releaseGpu();
-    }
+    void releaseGpuResources() override { mRenderer.releaseRhiLayer(); }
 
 private:
     void redrawLater();

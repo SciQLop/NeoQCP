@@ -65,6 +65,9 @@ public:
     // Exposed for tests: true when the next uploadResources() call will
     // actually re-upload the staged image to the GPU texture.
     bool textureUploadPending() const { return mImage.textureDirty; }
+    // Exposed for tests: the contour line vertices held, and a pending label overlay upload.
+    [[nodiscard]] qsizetype contourVertexCount() const { return mContourUvVertices.size() / 2; }
+    [[nodiscard]] bool overlayUploadPending() const { return mOverlay.textureDirty; }
     void clear();
 
     // A resample can produce an image wider or taller than the RHI backend allows in

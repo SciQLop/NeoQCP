@@ -191,6 +191,11 @@ void QCPColormapRenderer::setLabelOverlay(const QImage& image, const QRectF& pix
         mRhiLayer->setOverlay(image, pixelRect);
 }
 
+bool QCPColormapRenderer::hasLabelOverlay() const
+{
+    return mRhiLayer && mRhiLayer->hasOverlay();
+}
+
 void QCPColormapRenderer::clearLabelOverlay()
 {
     if (mRhiLayer)
@@ -226,6 +231,7 @@ void QCPColormapRenderer::clearRhiContent()
 {
     if (mRhiLayer)
         mRhiLayer->clear();
+    mContourOnGpu = false;
 }
 
 QCPColormapRhiLayer* QCPColormapRenderer::ensureRhiLayer()
@@ -243,6 +249,7 @@ QCPColormapRhiLayer* QCPColormapRenderer::ensureRhiLayer()
 void QCPColormapRenderer::releaseRhiLayer()
 {
     mContourOnGpu = false;
+    mImageOnGpu = false;
     if (!mRhiLayer)
         return;
     QCustomPlot* plot = mOwner ? mOwner->parentPlot() : nullptr;

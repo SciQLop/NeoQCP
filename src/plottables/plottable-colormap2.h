@@ -141,14 +141,9 @@ protected:
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
     bool canProduceContent() const override;
     void axesChanged() override { followAxes(); }
-    // Releasing the RHI layer drops the uploaded contour lines with it; force
-    // a rebuild on the next draw so the replacement layer gets them, instead
-    // of trusting a cache stamp that predates the loss.
-    void releaseGpuResources() override
-    {
-        mRenderer.releaseRhiLayer();
-        mContours.releaseGpu();
-    }
+    // Releasing the RHI layer drops the uploaded contour lines with it; the
+    // contours see the renderer no longer holds them and upload them again.
+    void releaseGpuResources() override { mRenderer.releaseRhiLayer(); }
 
 private:
     [[nodiscard]] bool resampledForAnotherSize() const;

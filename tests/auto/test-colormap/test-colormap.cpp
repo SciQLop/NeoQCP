@@ -1063,6 +1063,65 @@ void TestColorMap::QCPColorMap2_contourLabelsShowOnTheGpuFrame()
   QVERIFY2(changed > 100, qPrintable(QString("labels must show on screen: %1 pixels changed").arg(changed)));
 }
 
+namespace
+{
+//! A shown plot with a 41×41 colour map (z = x) and vertical contours at 1, 2, 3; null without QRhi.
+QCPColorMap2* contouredGpuMap(QCustomPlot* plot)
+{
+  plot->resize(400, 300);
+  plot->show();
+  if (!QTest::qWaitForWindowExposed(plot) || (QCoreApplication::processEvents(), !plot->rhi()))
+    return nullptr;
+  plot->xAxis->setRange(0, 4);
+  plot->yAxis->setRange(0, 4);
+  const int n = 41;
+  std::vector<double> x(n), y(n), z(n * n);
+  for (int i = 0; i < n; ++i)
+    x[i] = y[i] = 4.0 * i / (n - 1);
+  for (int ki = 0; ki < n; ++ki)
+    for (int vi = 0; vi < n; ++vi)
+      z[ki * n + vi] = x[ki];
+  auto* cm = new QCPColorMap2(plot->xAxis, plot->yAxis);
+  cm->setData(x, y, z);
+  cm->setContourLevels({1.0, 2.0, 3.0});
+  settleColorMap(plot, cm);
+  return cm;
+}
+}
+
+// Panning past the data hides the GPU quad and its lines; panning back before a new resample
+// lands shows the image again, and the lines must come back with it.
+void TestColorMap::QCPColorMap2_contourLinesComeBackAfterAPanAwayAndBack()
+{
+  auto* cm = contouredGpuMap(mPlot);
+  if (!cm)
+    QSKIP("no QRhi available in this environment");
+  QVERIFY2(cm->rhiLayer()->contourVertexCount() > 0, "sanity: the lines are on the GPU");
+  mPlot->xAxis->setRange(1000, 1004);
+  mPlot->replot();
+  QVERIFY2(!cm->rhiLayer()->hasContent(), "sanity: the stale quad is hidden");
+  mPlot->xAxis->setRange(0, 4);
+  mPlot->replot();
+  QVERIFY2(cm->rhiLayer()->hasContent(), "sanity: the image is back");
+  QVERIFY2(cm->rhiLayer()->contourVertexCount() > 0, "the contour lines must be back too");
+}
+
+// The label overlay is a full axis-rect texture: a repaint that changes nothing must not upload it.
+void TestColorMap::QCPColorMap2_unchangedLabelsAreNotUploadedAgain()
+{
+  auto* cm = contouredGpuMap(mPlot);
+  if (!cm)
+    QSKIP("no QRhi available in this environment");
+  cm->setContourLabelEnabled(true);
+  mPlot->replot(QCustomPlot::rpImmediateRefresh);
+  mPlot->grabFramebuffer(); // renders, so the pending upload is done
+  QVERIFY2(cm->rhiLayer()->hasOverlay() && !cm->rhiLayer()->overlayUploadPending(), "sanity");
+  cm->layer()->markDirty();
+  mPlot->replot(QCustomPlot::rpImmediateRefresh);
+  QVERIFY2(!cm->rhiLayer()->overlayUploadPending(), "unchanged labels were uploaded again");
+  QVERIFY(!cm->lastContourLabels().isEmpty());
+}
+
 void TestColorMap::QCPColorMap2_contourLabelsDrawSpacedInsideThePlot()
 {
   if (!fontDrawsGlyphs())

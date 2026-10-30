@@ -69,6 +69,7 @@ public:
     //! The contour labels on the GPU, over the image and its lines (see QCPColormapRhiLayer).
     void setLabelOverlay(const QImage& image, const QRectF& pixelRect);
     void clearLabelOverlay();
+    [[nodiscard]] bool hasLabelOverlay() const;
 
     // Hides whatever this colormap's GPU quad last showed. For when a caller
     // (QCPColorMap2::draw()) decides the rendered content no longer belongs
