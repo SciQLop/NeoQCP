@@ -21,6 +21,7 @@ set(NEOQCP_SOURCES
     src/painting/colormap-renderer.cpp
     src/painting/line-extruder.cpp
     src/painting/contour-extractor.cpp
+    src/painting/contour-overlay.cpp
     src/scatterstyle.cpp
     src/selection.cpp
     src/selectiondecorator-bracket.cpp
@@ -68,6 +69,8 @@ set(NEOQCP_SOURCES
     src/plottables/plottable-graph2.cpp
     src/plottables/plottable-draw-utils.cpp
     src/plottables/plottable-multigraph.cpp
+    src/plottables/multigraph-fill.cpp
+    src/plottables/multigraph-errorbars.cpp
     src/plottables/lane-layout.cpp
     src/plottables/intervals-algo.cpp
     src/plottables/plottable-intervals.cpp
@@ -80,6 +83,8 @@ set(NEOQCP_SOURCES
     src/datasource/abstract-multi-datasource.cpp
     src/plottables/plottable-colormap2.cpp
     src/plottables/plottable-histogram2d.cpp
+    src/plottables/plottable-histogram.cpp
+    src/plottables/histogram-geometry.cpp
     src/plottables/plottable-statisticalbox.cpp
     src/data-locator.cpp
     src/polar/layoutelement-angularaxis.cpp
@@ -152,6 +157,7 @@ set(NEOQCP_MOC_HEADERS
     src/datasource/async-pipeline.h
     src/plottables/plottable-colormap2.h
     src/plottables/plottable-histogram2d.h
+    src/plottables/plottable-histogram.h
     src/qcp.h
     src/scatterstyle.h
     src/selection.h
