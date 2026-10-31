@@ -100,7 +100,15 @@ bool settle(QCPHistogram* h)
 }
 }
 
-void TestHistogramPlottable::init() { mPlot = new QCustomPlot(); mPlot->resize(400, 300); }
+// No grid: the tests sample pixels at round values, where a grid line may pass depending on
+// the tick spacing, and so on the fonts.
+void TestHistogramPlottable::init()
+{
+    mPlot = new QCustomPlot();
+    mPlot->resize(400, 300);
+    mPlot->xAxis->grid()->setVisible(false);
+    mPlot->yAxis->grid()->setVisible(false);
+}
 void TestHistogramPlottable::cleanup() { delete mPlot; mPlot = nullptr; }
 
 void TestHistogramPlottable::binsInTheBackground()

@@ -4,6 +4,7 @@
 #include "datasource/row-major-multi-datasource.h"
 #include "layoutelements/layoutelement-legend-group.h"
 #include "plottables/plottable-draw-utils.h"
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <vector>
@@ -1177,6 +1178,28 @@ static QImage renderOf(QCustomPlot* plot)
 
 static bool isRedish(QColor c) { return c.red() > 150 && c.green() < 120 && c.blue() < 120; }
 
+// A 1 px line lands on a fractional pixel that depends on the axis rect, so on the fonts: it is
+// antialiased over two columns, neither of them pure. Look for the dominant colour within 1 px.
+template <typename Dominates>
+static bool dominantNear(const QImage& img, QPoint p, Dominates dominates)
+{
+    for (int dx = -1; dx <= 1; ++dx)
+        for (int dy = -1; dy <= 1; ++dy)
+            if (dominates(img.pixelColor(p + QPoint(dx, dy))))
+                return true;
+    return false;
+}
+
+static bool redNear(const QImage& img, QPoint p)
+{
+    return dominantNear(img, p, [](QColor c) { return c.red() - std::max(c.green(), c.blue()) > 80; });
+}
+
+static bool blueNear(const QImage& img, QPoint p)
+{
+    return dominantNear(img, p, [](QColor c) { return c.blue() - std::max(c.red(), c.green()) > 80; });
+}
+
 // Export renders (toPixmap) never stage a source; a live replot does, and the plot swaps the
 // staged source in on its debounce timer, never on replot().
 static bool commitEmptyWindow(QCustomPlot* plot, QCPMultiGraph* mg)
@@ -1508,7 +1531,7 @@ void TestMultiGraph::sparseErrorBarsAreDrawnAsBars()
     const int xBar = int(mPlot->xAxis->coordToPixel(2));
     const int xBetween = int(mPlot->xAxis->coordToPixel(2.5));
     const int yInside = int(mPlot->yAxis->coordToPixel(4));
-    QVERIFY(isRedish(img.pixelColor(xBar, yInside)));
+    QVERIFY(redNear(img, QPoint(xBar, yInside)));
     QVERIFY(!isRedish(img.pixelColor(xBetween, yInside)));
 }
 
@@ -1576,12 +1599,10 @@ void TestMultiGraph::selectedErrorBarsUseTheSelectedPen()
     mPlot->yAxis->setRange(0, 10);
     QImage img = renderOf(mPlot);
     const QPoint bar(int(mPlot->xAxis->coordToPixel(2)), int(mPlot->yAxis->coordToPixel(4)));
-    const QColor selected = img.pixelColor(bar);
-    QVERIFY2(selected.blue() > 150 && selected.red() < 100 && selected.green() < 100,
-             qPrintable(selected.name()));
+    QVERIFY2(blueNear(img, bar), qPrintable(img.pixelColor(bar).name()));
     mg->setComponentSelection(0, QCPDataSelection());
     img = renderOf(mPlot);
-    QVERIFY(isRedish(img.pixelColor(bar)));
+    QVERIFY(redNear(img, bar));
 }
 
 void TestMultiGraph::errorBarsAreDroppedWhenABoundColumnDisappears()
@@ -1701,7 +1722,7 @@ void TestMultiGraph::capWidthChangeShowsOnTheNextFrame()
     const QPoint capEdge(int(mPlot->xAxis->coordToPixel(2)) + 8, int(mPlot->yAxis->coordToPixel(7)));
     QVERIFY(!isRedish(renderOf(mPlot).pixelColor(capEdge)));
     mg->setComponentErrorBars(0, 1, 2, 20);
-    QVERIFY(isRedish(renderOf(mPlot).pixelColor(capEdge)));
+    QVERIFY(redNear(renderOf(mPlot), capEdge));
 }
 
 void TestMultiGraph::errorBarsAreCachedOnTheGpu()
