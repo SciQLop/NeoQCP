@@ -86,7 +86,7 @@ public:
         ,
         lsLine ///< data points are connected by a straight line
     };
-    Q_ENUMS(LineStyle)
+    Q_ENUM(LineStyle)
 
     QCPPolarGraph(QCPPolarAxisAngular* keyAxis, QCPPolarAxisRadial* valueAxis);
     virtual ~QCPPolarGraph();

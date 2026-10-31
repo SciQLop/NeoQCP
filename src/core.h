@@ -105,7 +105,7 @@ public:
         ,
         limAbove ///< Layer is inserted above other layer
     };
-    Q_ENUMS(LayerInsertMode)
+    Q_ENUM(LayerInsertMode)
 
     /*!
       Defines with what timing the QCustomPlot surface is refreshed after a replot.
@@ -127,7 +127,7 @@ public:
                            ///< multiple redundant replots can be avoided.
                            ///< (Value 3 preserves ABI; 1–2 were the former rpQueuedRefresh/rpRefreshHint.)
     };
-    Q_ENUMS(RefreshPriority)
+    Q_ENUM(RefreshPriority)
 
     explicit QCustomPlot(QWidget* parent = nullptr);
     virtual ~QCustomPlot() override;

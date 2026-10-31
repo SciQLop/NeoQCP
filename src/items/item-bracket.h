@@ -59,7 +59,7 @@ public:
         ,
         bsCalligraphic ///< A curly brace with varying stroke width giving a calligraphic impression
     };
-    Q_ENUMS(BracketStyle)
+    Q_ENUM(BracketStyle)
 
     explicit QCPItemBracket(QCustomPlot* parentPlot);
     virtual ~QCPItemBracket() override;

@@ -94,7 +94,7 @@ public:
         ,
         upLayout ///< Final phase in which the layout system places the rects of the elements
     };
-    Q_ENUMS(UpdatePhase)
+    Q_ENUM(UpdatePhase)
 
     /*!
       Defines to which rect of a layout element the size constraints that can be set via \ref
@@ -111,7 +111,7 @@ public:
         scrOuterRect ///< Minimum/Maximum size constraints apply to outer rect, thus include layout
                      ///< element margins
     };
-    Q_ENUMS(SizeConstraintRect)
+    Q_ENUM(SizeConstraintRect)
 
     explicit QCPLayoutElement(QCustomPlot* parentPlot = nullptr);
     virtual ~QCPLayoutElement() override;
@@ -268,7 +268,7 @@ public:
         foColumnsFirst ///< Columns are filled first, and a new element is wrapped to the next row
                        ///< if the column count would exceed \ref setWrap.
     };
-    Q_ENUMS(FillOrder)
+    Q_ENUM(FillOrder)
 
     explicit QCPLayoutGrid();
     virtual ~QCPLayoutGrid() override;
@@ -357,7 +357,7 @@ public:
         ipBorderAligned ///< The element is aligned to one of the layout sides, see \ref
                         ///< setInsetAlignment
     };
-    Q_ENUMS(InsetPlacement)
+    Q_ENUM(InsetPlacement)
 
     explicit QCPLayoutInset();
     virtual ~QCPLayoutInset() override;

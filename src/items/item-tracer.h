@@ -67,7 +67,7 @@ public:
         ,
         tsSquare ///< A square
     };
-    Q_ENUMS(TracerStyle)
+    Q_ENUM(TracerStyle)
 
     explicit QCPItemTracer(QCustomPlot* parentPlot);
     virtual ~QCPItemTracer() override;

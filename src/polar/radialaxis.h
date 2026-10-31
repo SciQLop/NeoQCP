@@ -56,7 +56,7 @@ public:
         arAngularAxis ///< The axis tilt is measured in the angular coordinate system given by the
                       ///< parent angular axis.
     };
-    Q_ENUMS(AngleReference)
+    Q_ENUM(AngleReference)
 
     /*!
       Defines the scale of an axis.
@@ -69,7 +69,7 @@ public:
         stLogarithmic ///< Logarithmic scaling with correspondingly transformed axis coordinates
                       ///< (possibly also \ref setTicker to a \ref QCPAxisTickerLog instance).
     };
-    Q_ENUMS(ScaleType)
+    Q_ENUM(ScaleType)
 
     /*!
       Defines the selectable parts of an axis.
@@ -85,9 +85,9 @@ public:
         ,
         spAxisLabel = 0x004 ///< The axis label
     };
-    Q_ENUMS(SelectablePart)
-    Q_FLAGS(SelectableParts)
+    Q_ENUM(SelectablePart)
     Q_DECLARE_FLAGS(SelectableParts, SelectablePart)
+    Q_FLAG(SelectableParts)
 
     enum LabelMode
     {
@@ -95,7 +95,7 @@ public:
         ,
         lmRotated ///<
     };
-    Q_ENUMS(LabelMode)
+    Q_ENUM(LabelMode)
 
     explicit QCPPolarAxisRadial(QCPPolarAxisAngular* parent);
     virtual ~QCPPolarAxisRadial();

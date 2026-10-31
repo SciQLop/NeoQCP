@@ -71,7 +71,7 @@ public:
         ,
         esSkewedBar ///< A bar that is skewed (skew controllable via \ref setLength)
     };
-    Q_ENUMS(EndingStyle)
+    Q_ENUM(EndingStyle)
 
     QCPLineEnding();
     QCPLineEnding(EndingStyle style, double width = 8, double length = 10, bool inverted = false);

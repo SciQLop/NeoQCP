@@ -51,7 +51,7 @@ public:
         ,
         ssPowers ///< An integer power of the specified tick step is allowed.
     };
-    Q_ENUMS(ScaleStrategy)
+    Q_ENUM(ScaleStrategy)
 
     QCPAxisTickerFixed();
 

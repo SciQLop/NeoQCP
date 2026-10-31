@@ -173,9 +173,9 @@ public:
         ,
         spItems = 0x002 ///< <tt>0x002</tt> Legend items individually (see \ref selectedItems)
     };
-    Q_ENUMS(SelectablePart)
-    Q_FLAGS(SelectableParts)
+    Q_ENUM(SelectablePart)
     Q_DECLARE_FLAGS(SelectableParts, SelectablePart)
+    Q_FLAG(SelectableParts)
 
     explicit QCPLegend();
     virtual ~QCPLegend() override;

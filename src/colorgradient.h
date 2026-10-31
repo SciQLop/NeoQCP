@@ -46,7 +46,7 @@ public:
         ciHSV ///< Color channels hue, saturation and value are linearly interpolated (The hue is
               ///< interpolated over the shortest angle distance)
     };
-    Q_ENUMS(ColorInterpolation)
+    Q_ENUM(ColorInterpolation)
 
     /*!
       Defines how NaN data points shall appear in the plot.
@@ -68,7 +68,7 @@ public:
         ,
         nhNanColor ///< NaN data points appear as the color defined with \ref setNanColor
     };
-    Q_ENUMS(NanHandling)
+    Q_ENUM(NanHandling)
 
     /*!
       Defines the available presets that can be loaded with \ref loadPreset. See the documentation
@@ -124,7 +124,7 @@ public:
         ,
         gpCoolwarm ///< Diverging, blue over light grey to red (Moreland), colour-blind safe
     };
-    Q_ENUMS(GradientPreset)
+    Q_ENUM(GradientPreset)
 
     QCPColorGradient();
     QCPColorGradient(GradientPreset preset);

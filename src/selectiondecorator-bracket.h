@@ -54,7 +54,7 @@ public:
         bsUserStyle ///< Start custom bracket styles at this index when subclassing and
                     ///< reimplementing \ref drawBracket.
     };
-    Q_ENUMS(BracketStyle)
+    Q_ENUM(BracketStyle)
 
     QCPSelectionDecoratorBracket();
     virtual ~QCPSelectionDecoratorBracket() override;

@@ -174,9 +174,9 @@ public:
         atBottom
         = 0x08 ///< <tt>0x08</tt> Axis is horizontal and on the bottom side of the axis rect
     };
-    Q_ENUMS(AxisType)
-    Q_FLAGS(AxisTypes)
+    Q_ENUM(AxisType)
     Q_DECLARE_FLAGS(AxisTypes, AxisType)
+    Q_FLAG(AxisTypes)
 
     /*!
       Defines on which side of the axis the tick labels (numbers) shall appear.
@@ -190,7 +190,7 @@ public:
         ,
         lsOutside ///< Tick labels will be displayed outside the axis rect
     };
-    Q_ENUMS(LabelSide)
+    Q_ENUM(LabelSide)
 
     /*!
       Defines the scale of an axis.
@@ -203,7 +203,7 @@ public:
         stLogarithmic ///< Logarithmic scaling with correspondingly transformed axis coordinates
                       ///< (possibly also \ref setTicker to a \ref QCPAxisTickerLog instance).
     };
-    Q_ENUMS(ScaleType)
+    Q_ENUM(ScaleType)
 
     /*!
       Defines the selectable parts of an axis.
@@ -219,9 +219,9 @@ public:
         ,
         spAxisLabel = 0x004 ///< The axis label
     };
-    Q_ENUMS(SelectablePart)
-    Q_FLAGS(SelectableParts)
+    Q_ENUM(SelectablePart)
     Q_DECLARE_FLAGS(SelectableParts, SelectablePart)
+    Q_FLAG(SelectableParts)
 
     explicit QCPAxis(QCPAxisRect* parent, AxisType type);
     virtual ~QCPAxis() override;

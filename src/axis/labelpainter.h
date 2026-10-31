@@ -48,7 +48,7 @@ public:
         ,
         amSkewedRotated ///<
     };
-    Q_ENUMS(AnchorMode)
+    Q_ENUM(AnchorMode)
 
     /*!
       TODO
@@ -59,7 +59,7 @@ public:
         ,
         artTangent ///<
     };
-    Q_ENUMS(AnchorReferenceType)
+    Q_ENUM(AnchorReferenceType)
 
     /*!
       TODO
@@ -79,7 +79,7 @@ public:
         asBottomRight,
         asBottomLeft
     };
-    Q_ENUMS(AnchorSide)
+    Q_ENUM(AnchorSide)
 
     explicit QCPLabelPainterPrivate(QCustomPlot* parentPlot);
     virtual ~QCPLabelPainterPrivate();

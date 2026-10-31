@@ -89,7 +89,7 @@ public:
         etValueError ///< The errors are for the value dimension (bars appear parallel to the value
                      ///< axis)
     };
-    Q_ENUMS(ErrorType)
+    Q_ENUM(ErrorType)
 
     explicit QCPErrorBars(QCPAxis* keyAxis, QCPAxis* valueAxis);
     virtual ~QCPErrorBars() override;

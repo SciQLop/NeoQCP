@@ -52,9 +52,9 @@ public:
         ,
         gtNone = 0x00 ///<
     };
-    Q_ENUMS(GridType)
-    Q_FLAGS(GridTypes)
+    Q_ENUM(GridType)
     Q_DECLARE_FLAGS(GridTypes, GridType)
+    Q_FLAG(GridTypes)
 
     explicit QCPPolarGrid(QCPPolarAxisAngular* parentAxis);
 

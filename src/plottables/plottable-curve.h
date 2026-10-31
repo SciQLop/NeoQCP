@@ -92,7 +92,7 @@ public:
         ,
         lsLine ///< Data points are connected with a straight line
     };
-    Q_ENUMS(LineStyle)
+    Q_ENUM(LineStyle)
 
     explicit QCPCurve(QCPAxis* keyAxis, QCPAxis* valueAxis);
     virtual ~QCPCurve() override;

@@ -48,7 +48,7 @@ public:
         tssMeetTickCount ///< Less readable tick steps are allowed which in turn facilitates getting
                          ///< closer to the requested tick count
     };
-    Q_ENUMS(TickStepStrategy)
+    Q_ENUM(TickStepStrategy)
 
     QCPAxisTicker();
     virtual ~QCPAxisTicker();

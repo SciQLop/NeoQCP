@@ -52,9 +52,9 @@ public:
                              ///< pens. (A cosmetic pen is always drawn with width 1 pixel in the
                              ///< vector image/pdf viewer, independent of zoom.)
     };
-    Q_ENUMS(PainterMode)
-    Q_FLAGS(PainterModes)
+    Q_ENUM(PainterMode)
     Q_DECLARE_FLAGS(PainterModes, PainterMode)
+    Q_FLAG(PainterModes)
 
     QCPPainter();
     explicit QCPPainter(QPaintDevice* device);

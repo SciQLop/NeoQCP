@@ -22,7 +22,7 @@ public:
         lsStepCenter,
         lsImpulse
     };
-    Q_ENUMS(LineStyle)
+    Q_ENUM(LineStyle)
 
     explicit QCPGraph2(QCPAxis* keyAxis, QCPAxis* valueAxis);
     virtual ~QCPGraph2() override;

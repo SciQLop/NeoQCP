@@ -105,7 +105,7 @@ public:
         lsImpulse ///< each data point is represented by a line parallel to the value axis, which
                   ///< reaches from the data point to the zero-value-line
     };
-    Q_ENUMS(LineStyle)
+    Q_ENUM(LineStyle)
 
     explicit QCPGraph(QCPAxis* keyAxis, QCPAxis* valueAxis);
     virtual ~QCPGraph() override;

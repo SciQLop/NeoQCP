@@ -58,7 +58,7 @@ public:
         ,
         stPlotCoords ///< Bar spacing is in key coordinates and thus scales with the key axis range
     };
-    Q_ENUMS(SpacingType)
+    Q_ENUM(SpacingType)
 
     explicit QCPBarsGroup(QCustomPlot* parentPlot);
     virtual ~QCPBarsGroup();
@@ -178,7 +178,7 @@ public:
         ,
         wtPlotCoords ///< Bar width is in key coordinates and thus scales with the key axis range
     };
-    Q_ENUMS(WidthType)
+    Q_ENUM(WidthType)
 
     explicit QCPBars(QCPAxis* keyAxis, QCPAxis* valueAxis);
     virtual ~QCPBars() override;

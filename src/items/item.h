@@ -117,7 +117,7 @@ public:
                            ///< axis/label margins for small coordinates, this keeps the offset
                            ///< relative to the plotting area and follows it across resizes.
     };
-    Q_ENUMS(PositionType)
+    Q_ENUM(PositionType)
 
     QCPItemPosition(QCustomPlot* parentPlot, QCPAbstractItem* parentItem, const QString& name);
     virtual ~QCPItemPosition() override;

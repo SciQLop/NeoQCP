@@ -50,7 +50,7 @@ public:
         ,
         tuDays ///< Days (%%d in \ref setTimeFormat)
     };
-    Q_ENUMS(TimeUnit)
+    Q_ENUM(TimeUnit)
 
     QCPAxisTickerTime();
 

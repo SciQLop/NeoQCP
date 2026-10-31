@@ -61,9 +61,9 @@ public:
         ,
         spAxisLabel = 0x004 ///< The axis label
     };
-    Q_ENUMS(SelectablePart)
-    Q_FLAGS(SelectableParts)
+    Q_ENUM(SelectablePart)
     Q_DECLARE_FLAGS(SelectableParts, SelectablePart)
+    Q_FLAG(SelectableParts)
 
     /*!
       TODO
@@ -74,7 +74,7 @@ public:
         ,
         lmRotated ///<
     };
-    Q_ENUMS(LabelMode)
+    Q_ENUM(LabelMode)
 
     explicit QCPPolarAxisAngular(QCustomPlot* parentPlot);
     virtual ~QCPPolarAxisAngular();

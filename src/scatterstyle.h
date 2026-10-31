@@ -57,9 +57,9 @@ public:
         ,
         spAll = 0xFF ///< <tt>0xFF</tt> All properties
     };
-    Q_ENUMS(ScatterProperty)
-    Q_FLAGS(ScatterProperties)
+    Q_ENUM(ScatterProperty)
     Q_DECLARE_FLAGS(ScatterProperties, ScatterProperty)
+    Q_FLAG(ScatterProperties)
 
     /*!
       Defines the shape used for scatter points.
@@ -114,7 +114,7 @@ public:
         ssCustom ///< custom painter operations are performed per scatter (As QPainterPath, see \ref
                  ///< setCustomPath)
     };
-    Q_ENUMS(ScatterShape)
+    Q_ENUM(ScatterShape)
 
     QCPScatterStyle();
     QCPScatterStyle(ScatterShape shape, double size = 6);

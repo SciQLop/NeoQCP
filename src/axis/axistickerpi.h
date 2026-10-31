@@ -49,7 +49,7 @@ public:
         fsUnicodeFractions ///< Fractions are written using sub- and superscript UTF-8 digits and
                            ///< the fraction symbol.
     };
-    Q_ENUMS(FractionStyle)
+    Q_ENUM(FractionStyle)
 
     QCPAxisTickerPi();
 

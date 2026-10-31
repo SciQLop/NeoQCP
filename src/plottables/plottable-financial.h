@@ -105,7 +105,7 @@ public:
         ,
         wtPlotCoords ///< width is in key coordinates and thus scales with the key axis range
     };
-    Q_ENUMS(WidthType)
+    Q_ENUM(WidthType)
 
     /*!
       Defines the possible representations of OHLC data in the plot.
@@ -118,7 +118,7 @@ public:
         ,
         csCandlestick ///< Candlestick representation
     };
-    Q_ENUMS(ChartStyle)
+    Q_ENUM(ChartStyle)
 
     explicit QCPFinancial(QCPAxis* keyAxis, QCPAxis* valueAxis);
     virtual ~QCPFinancial() override;

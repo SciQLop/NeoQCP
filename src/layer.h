@@ -64,7 +64,7 @@ public:
         lmBuffered ///< Layer has its own paint buffer and may be replotted individually (see \ref
                    ///< replot).
     };
-    Q_ENUMS(LayerMode)
+    Q_ENUM(LayerMode)
 
     QCPLayer(QCustomPlot* parentPlot, const QString& layerName);
     virtual ~QCPLayer();
