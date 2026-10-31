@@ -14,12 +14,13 @@ A frame is made in two steps.
 These parts are drawn by GPU shaders:
 
 - Solid lines of `QCPGraph`, `QCPCurve`, `QCPGraph2` and `QCPMultiGraph`. The polyline is cut into triangles on the CPU; `QCPGraph2` and `QCPMultiGraph` keep those triangles across pans.
-- Fills under a `QCPGraph` (not channel fills between two graphs).
+- Fills under a `QCPGraph` (not channel fills between two graphs), and solid-brush fills, error bars and error bands of a `QCPMultiGraph`.
 - Scatter symbols of `QCPGraph2` and `QCPMultiGraph`, as instanced sprites.
-- `QCPColorMap2` and `QCPHistogram2D` images, and the contour lines of `QCPColorMap2`.
+- `QCPColorMap2` and `QCPHistogram2D` images, their contour lines and contour labels.
+- `QCPHistogram` bars.
 - Grid lines, tick marks, `QCPItemVSpan` / `QCPItemHSpan` / `QCPItemRSpan`, and `QCPIntervals` bars.
 
-Everything else goes through `QPainter`: text and tick labels, dashed or dotted lines, channel fills, scatters of the classic plottables, bars, error bars, the classic `QCPColorMap`, and all other items.
+Everything else goes through `QPainter`: text and tick labels, dashed or dotted lines, channel fills, scatters of the classic plottables, the classic `QCPBars` and `QCPErrorBars`, the classic `QCPColorMap`, and all other items.
 
 Lines on the GPU are antialiased by multisampling. The widget uses 4 samples on a normal screen and 1 on a HiDPI screen (device pixel ratio 2 or more), where pixels are already small. `setSampleCount()` (from `QRhiWidget`) overrides it.
 
@@ -72,6 +73,7 @@ These plottables do their heavy work on worker threads:
 | `QCPMultiGraph` | The same, for all columns at once (from 100 000 rows × columns) | the data changes |
 | `QCPColorMap2` | Resampling onto a grid at screen resolution | the data or the visible range changes |
 | `QCPHistogram2D` | Binning of the points | the data or the bins change |
+| `QCPHistogram` | Binning of the values | the data, the bins or the normalization change |
 
 Requests are coalesced. If a job is running, only the latest request waits behind it; the ones in between are dropped. Each plot owns one scheduler, shared by all its plottables. It uses half the machine's cores by default; `setMaxPipelineThreads()` changes that.
 
@@ -182,8 +184,9 @@ When several parts of your code each want a replot, use `replot(QCustomPlot::rpQ
 | Many lines sharing keys | many `QCPGraph` | `QCPMultiGraph` |
 | A 2-D grid | `QCPColorMap` | `QCPColorMap2` |
 | A point cloud to bin | — | `QCPHistogram2D` |
+| Values to bin into a 1-D histogram | — | `QCPHistogram` |
 
-The classic plottables copy your data into a container of `double`, and do all their work on the GUI thread. They are fine up to some tens of thousands of points. `QCPGraph` still has things `QCPGraph2` lacks: fills, channel fills, `addData()`. {doc}`graphs` compares them.
+The classic plottables copy your data into a container of `double`, and do all their work on the GUI thread. They are fine up to some tens of thousands of points. `QCPGraph` still has things `QCPGraph2` lacks: fills, channel fills, `addData()`. `QCPMultiGraph` has fills and bands too. {doc}`graphs` compares them.
 
 ### Keep the plottable layer clean
 
@@ -250,7 +253,7 @@ What you will see:
 
 - One frame per `QCustomPlot::render()` call.
 - The replot: `QCustomPlot::replot`, the layout pass, each `QCPLayer::drawToPaintBuffer`, and the paint buffer work.
-- The `draw()` of `QCPGraph`, `QCPGraph2`, `QCPMultiGraph`, `QCPColorMap2` and `QCPHistogram2D`. The `QCPGraph2` zone carries the size of the data it drew from.
+- The `draw()` of `QCPGraph`, `QCPGraph2`, `QCPMultiGraph`, `QCPColorMap2`, `QCPHistogram2D` and `QCPHistogram`. The `QCPGraph2` zone carries the size of the data it drew from.
 - The data work: `buildL1Cache`, `resampleL2`, `optimizedLineData`, the parallel binning, the colormap `resample`, line extrusion and fill tessellation.
 - The async pipeline: `Pipeline::onDataChanged`, `Pipeline::onViewportChanged`, `Pipeline::deliverResult`.
 - The GPU side: resource uploads and render calls of the plottable, scatter, colormap, span and grid layers.

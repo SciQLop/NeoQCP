@@ -192,6 +192,7 @@ The mouse:
 
 - Dragging the fill moves the whole span.
 - Dragging an edge moves only that edge.
+- An edge moves by as many pixels as the mouse, whatever the type of its position. If the axis moves during the drag, the edge stays under the pointer.
 - `setMovable(false)` turns both off.
 - A drag only starts within the selection tolerance of an edge, or on a visible fill.
 

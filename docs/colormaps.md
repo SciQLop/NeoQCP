@@ -99,9 +99,23 @@ Also give each log axis a `QCPAxisTickerLog`. Changing the scale type does not c
 ### Contour lines
 
 `QCPColorMap2` can draw contour lines on top of the colours.
-`setContourLevels()` takes explicit levels, `setAutoContourLevels(n)` spreads `n` levels over the data range, and `setContourPen()` sets the colour.
-On screen the lines are always one pixel wide: only the pen colour is used. Exports use the full pen.
-`setContourLabelEnabled()` exists but draws nothing yet.
+
+```{literalinclude} snippets/colormaps.cpp
+:start-after: // [colormaps_contours]
+:end-before: // [/colormaps_contours]
+:language: cpp
+:dedent:
+```
+
+![Contour lines with their levels written on them](images/colormaps-contours.png)
+
+- `setContourLevels()` takes explicit levels. `setAutoContourLevels(n)` spreads `n` levels over the data range instead.
+- `setContourPen()` sets the colour. On screen the lines are always one pixel wide: only the pen colour is used. Exports use the full pen.
+- `setContourLabelEnabled(true)` writes each level on its line, in the pen colour, with a thin halo so the text stays readable over the line.
+- Labels of one level are at least 120 pixels apart, and any two labels at least 30 pixels apart.
+- Lines and labels follow log and reversed axes, like the image.
+
+On screen, the lines are traced on a grid of at most 300 by 300 cells, so they stay fast on large data. Exports trace the full grid.
 
 ## 2D histograms
 
@@ -126,6 +140,20 @@ Binning runs on a worker thread.
 Right after `setData()` there are no counts yet, so `rescaleDataRange()` has nothing to read.
 That is why the example connects it to the pipeline's `finished` signal.
 If you know the range in advance, `setDataRange()` works at any time.
+
+A 2D histogram draws contour lines too, with the same functions as `QCPColorMap2`: `setContourLevels()`, `setAutoContourLevels()`, `setContourPen()` and `setContourLabelEnabled()`.
+The levels apply to the values shown. With `nColumn` those are the column fractions, not the counts.
+
+```{literalinclude} snippets/colormaps.cpp
+:start-after: // [colormaps_histogram2d_contours]
+:end-before: // [/colormaps_histogram2d_contours]
+:language: cpp
+:dedent:
+```
+
+![A column-normalized 2D histogram with contour lines](images/colormaps-histogram2d-contours.png)
+
+With `nColumn`, a column without points shows as zero. It does not count for `rescaleDataRange()`.
 
 ## Colour scales
 

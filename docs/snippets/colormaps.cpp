@@ -109,6 +109,29 @@ DOC_SNIPPET(colormaps_log, 600, 360)
     // [/colormaps_log]
 }
 
+DOC_SNIPPET(colormaps_contours, 600, 360)
+{
+    // [colormaps_contours]
+    const int size = 200;
+    std::vector<double> x(size), y(size), z;
+    for (int i = 0; i < size; ++i)
+        x[i] = y[i] = -2 + 4.0 * i / (size - 1);
+    for (double cx : x)   // z is column after column
+        for (double cy : y)
+            z.push_back(std::exp(-(cx * cx + cy * cy)) - 0.6 * std::exp(-((cx - 1) * (cx - 1) + (cy + 1) * (cy + 1)) * 2));
+
+    auto* map = new QCPColorMap2(customPlot->xAxis, customPlot->yAxis);
+    map->setGradient(QCPColorGradient::gpCoolwarm);
+    map->setData(std::move(x), std::move(y), std::move(z));
+    map->setDataRange(QCPRange(-1, 1));
+    map->setContourLevels({ -0.4, -0.2, 0.2, 0.4, 0.6, 0.8 });
+    map->setContourPen(QPen(Qt::black, 1));
+    map->setContourLabelEnabled(true);   // writes each level on its line
+    customPlot->rescaleAxes();
+    customPlot->replot();
+    // [/colormaps_contours]
+}
+
 DOC_SNIPPET(colormaps_histogram2d, 600, 360)
 {
     // [colormaps_histogram2d]
@@ -134,6 +157,37 @@ DOC_SNIPPET(colormaps_histogram2d, 600, 360)
     customPlot->rescaleAxes();
     customPlot->replot();
     // [/colormaps_histogram2d]
+}
+
+DOC_SNIPPET(colormaps_histogram2d_contours, 600, 360)
+{
+    // [colormaps_histogram2d_contours]
+    std::mt19937 rng(8);
+    std::normal_distribution<double> normal(0.0, 1.0);
+    std::uniform_real_distribution<double> uniform(0.0, 10.0);
+    std::vector<double> x(200000), y(200000);
+    for (std::size_t i = 0; i < x.size(); ++i)
+    {
+        x[i] = uniform(rng);
+        y[i] = std::sin(x[i]) + (0.2 + 0.05 * x[i]) * normal(rng);   // spread grows with x
+    }
+
+    auto* histogram = new QCPHistogram2D(customPlot->xAxis, customPlot->yAxis);
+    histogram->setBins(60, 60);
+    histogram->setNormalization(QCPHistogram2D::nColumn);   // each column sums to one
+    histogram->setGradient(QCPColorGradient::gpViridis);
+    histogram->setContourLevels({ 0.02, 0.05 });   // in column fractions, like the colours
+    histogram->setContourPen(QPen(Qt::white, 1));
+    histogram->setContourLabelEnabled(true);
+    histogram->setData(std::move(x), std::move(y));
+    QObject::connect(&histogram->pipeline(), &QCPHistogramPipeline::finished, histogram,
+                     [histogram] { histogram->rescaleDataRange(); });
+
+    customPlot->xAxis->setLabel("x");
+    customPlot->yAxis->setLabel("y");
+    customPlot->rescaleAxes();
+    customPlot->replot();
+    // [/colormaps_histogram2d_contours]
 }
 
 DOC_SNIPPET(colormaps_gradients, 600, 560)

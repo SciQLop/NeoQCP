@@ -260,6 +260,91 @@ DOC_SNIPPET(graphs_multigraph, 600, 360)
     // [/graphs_multigraph]
 }
 
+DOC_SNIPPET(graphs_multigraph_fill, 600, 300)
+{
+    // [graphs_multigraph_fill]
+    const int n = 400;
+    std::vector<double> time(n);
+    std::vector<std::vector<double>> rates(2, std::vector<double>(n));
+    for (int i = 0; i < n; ++i)
+    {
+        time[i] = i * 0.05;
+        rates[0][i] = 3 + 2 * std::sin(time[i] / 2) + std::sin(time[i] * 3);
+        rates[1][i] = 2 + 1.5 * std::cos(time[i] / 3);
+    }
+    auto* graph = new QCPMultiGraph(customPlot->xAxis, customPlot->yAxis);
+    graph->setData(std::move(time), std::move(rates));
+    graph->setName("count rate");
+    graph->setComponentNames({ "protons", "electrons" });
+    graph->setComponentPens({ QPen(QColor(31, 119, 180), 1.5), QPen(QColor(255, 127, 14), 1.5) });
+    graph->setComponentFill(0, 0.0);   // down to 0, in the pen colour, see-through
+    graph->setComponentFill(1, 0.0, QBrush(QColor(255, 127, 14, 40)));
+    customPlot->rescaleAxes();
+    customPlot->yAxis->setRangeLower(0);
+    customPlot->legend->setVisible(true);
+    customPlot->replot();
+    // [/graphs_multigraph_fill]
+}
+
+DOC_SNIPPET(graphs_multigraph_band, 600, 300)
+{
+    // [graphs_multigraph_band]
+    const int n = 300;
+    std::vector<double> time(n);
+    std::vector<std::vector<double>> columns(3, std::vector<double>(n));   // mean, low, high
+    for (int i = 0; i < n; ++i)
+    {
+        time[i] = i * 0.1;
+        const double spread = 0.4 + 0.3 * std::sin(time[i] / 4);
+        columns[0][i] = std::sin(time[i] / 3);
+        columns[1][i] = columns[0][i] - spread;
+        columns[2][i] = columns[0][i] + spread;
+    }
+    auto* model = new QCPMultiGraph(customPlot->xAxis, customPlot->yAxis);
+    model->setData(std::move(time), std::move(columns));
+    model->setComponentNames({ "model", "low", "high" });
+    const QColor blue(31, 119, 180);
+    model->setComponentPens({ QPen(blue, 2), QPen(blue.lighter(150), 0.5), QPen(blue.lighter(150), 0.5) });
+    model->setComponentFillBetween(1, 2);   // from "low" up to "high"
+    model->setComponentInLegend(1, false);  // the edges still draw, but have no legend row
+    model->setComponentInLegend(2, false);
+    customPlot->rescaleAxes();
+    customPlot->legend->setVisible(true);
+    customPlot->replot();
+    // [/graphs_multigraph_band]
+}
+
+DOC_SNIPPET(graphs_multigraph_error_bars, 600, 300)
+{
+    // [graphs_multigraph_error_bars]
+    const int n = 25;
+    std::vector<double> x(n);
+    std::vector<std::vector<double>> columns(3, std::vector<double>(n));   // value, lower, upper
+    std::mt19937 rng(3);
+    std::normal_distribution<double> noise(0.0, 0.15);
+    for (int i = 0; i < n; ++i)
+    {
+        x[i] = i;
+        const double error = 0.1 + 0.02 * i;
+        columns[0][i] = std::exp(-i / 10.0) + noise(rng);
+        columns[1][i] = columns[0][i] - error;   // the bounds, not the error sizes
+        columns[2][i] = columns[0][i] + error;
+    }
+    auto* measured = new QCPMultiGraph(customPlot->xAxis, customPlot->yAxis);
+    measured->setData(std::move(x), std::move(columns));
+    measured->setComponentNames({ "measured", "lower", "upper" });
+    measured->setComponentLineStyle(0, QCPMultiGraph::lsNone);
+    measured->component(0).scatterStyle = QCPScatterStyle(QCPScatterStyle::ssDisc, 6);
+    measured->setComponentErrorBars(0, 1, 2);   // also takes "lower" and "upper" out of the legend
+    measured->setComponentVisible(1, false);     // draw the bounds as bars only, not as lines
+    measured->setComponentVisible(2, false);
+    customPlot->xAxis->setRange(-1, n);
+    customPlot->yAxis->setRange(-0.6, 1.6);
+    customPlot->legend->setVisible(true);
+    customPlot->replot();
+    // [/graphs_multigraph_error_bars]
+}
+
 DOC_SNIPPET(graphs_gaps, 600, 360)
 {
     // [graphs_gaps]

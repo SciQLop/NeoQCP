@@ -42,6 +42,7 @@ With `QCP::iGestures`, the plot follows the fingers, like a map:
 - On a touch screen, one finger drags and taps like the mouse. Two fingers pinch, and pan as they move together.
 
 Panning still needs `iRangeDrag`, zooming `iRangeZoom`, and the axis rect's orientations apply.
+A native pinch that the plot does not zoom on, because zooming is off or the fingers are outside every axis rect, goes on to the parent widget.
 
 A browser cannot tell a trackpad swipe from a mouse wheel: both arrive as wheel events. So with gestures on, the wheel pans too, and a mouse zooms with Ctrl+wheel, which is also how a browser reports a trackpad pinch. The flag is off by default for that reason. The [online gallery](https://sciqlop.github.io/NeoQCP/) turns it on.
 
@@ -162,6 +163,7 @@ The default one draws a blue pen, 2.5 pixels wide.
 - `QCP::srmCustom`: nothing happens on release. Connect to the signals of `selectionRect()` (`started`, `changed`, `canceled`, `accepted`) and do it yourself.
 
 Escape cancels a rectangle being dragged: nothing is zoomed or selected, and `canceled` is emitted. `selectionRect()->cancel()` does the same from code.
+Replacing the rectangle with `setSelectionRect()` during a drag cancels the drag, and `canceled` is emitted. Deleting the rectangle emits nothing, so code that tracks the drag should also watch its `destroyed` signal.
 
 ```{literalinclude} snippets/interactions.cpp
 :start-after: // [interactions_selection_rect]

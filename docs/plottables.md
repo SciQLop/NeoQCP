@@ -1,7 +1,7 @@
 # Other plottables
 
 Not all data is a line over time. This page covers the other plottables:
-parametric curves, bars, financial charts, error bars, box plots, waterfalls and interval timelines.
+parametric curves, bars, financial charts, error bars, box plots, histograms, waterfalls and interval timelines.
 Each one is created with `new`, on a key axis and a value axis. The plot owns it from then on.
 Colormaps and 2D histograms have their own page: {doc}`colormaps`.
 
@@ -126,6 +126,8 @@ That can be any plottable with one-dimensional data: `QCPGraph`, `QCPGraph2`, `Q
 - `setSymbolGap()` leaves a gap around the data point, 10 pixels by default, so the bar does not cross the marker.
 - `rescaleAxes()` takes the error bars into account.
 
+A `QCPMultiGraph` draws its own error bars from two bound columns, and turns them into a band when the points are dense. See {doc}`graphs`.
+
 Reference: <a href="api/classQCPErrorBars.html">QCPErrorBars</a>.
 
 ## Box plots: QCPStatisticalBox
@@ -150,6 +152,83 @@ You compute these numbers yourself; the plottable only draws them.
 - `setOutlierStyle()` takes a scatter style. The default is a blue circle.
 
 Reference: <a href="api/classQCPStatisticalBox.html">QCPStatisticalBox</a>.
+
+## Histograms: QCPHistogram
+
+`QCPHistogram` counts values into bins and draws one bar per bin.
+It reads a multi-column data source, the same kind a `QCPMultiGraph` uses (see {doc}`graphs`).
+Each column gets its own histogram, and all columns share the same bins.
+The keys of the source are not used: only the values are counted.
+
+```{literalinclude} snippets/plottables.cpp
+:start-after: // [plottables_histogram]
+:end-before: // [/plottables_histogram]
+:language: cpp
+:dedent:
+```
+
+![Two distributions drawn as steps, on shared bins](images/plottables-histogram.png)
+
+The bins lie along the key axis, and the bar heights along the value axis.
+
+- `setBins()` sets the number of bins, 64 by default.
+- By default the bins cover the data, from its smallest to its largest value. They are fixed on the first data. Later data can only widen them, never shrink them, so the bars do not jump around as data streams in. `resetEdges()` forgets them, and the next data sets them again.
+- `setFixedRange(range)` gives the bins a fixed range instead. Values outside it are not counted. `setFixedRange(std::nullopt)` goes back to automatic bins.
+- NaN and infinite values are skipped.
+- `edgesChanged` is emitted when the bins move, and `histogramReady` after every new result.
+
+`setNormalization()` says what a bar's height means:
+
+- `HistogramNormalization::Count`, the default: the number of values in the bin.
+- `Probability`: that number divided by the number of values counted in the column. The bars of a column sum to one.
+- `Density`: the probability divided by the bin width. The area of a column is one, so columns with different numbers of values compare well.
+
+`setStyle()` picks the look:
+
+- `sBars`, the default: filled bars with a darker outline. Columns are drawn over each other, so give them see-through colours when there are several.
+- `sStep`: only the outline of the bars. With several columns, a light fill tells them apart.
+
+`setColumnColors()` gives one colour per column. Columns beyond the list take the default plottable colours.
+
+### Log bins
+
+The bins follow the scale of the key axis.
+On a logarithmic key axis they are evenly spaced in log, and values at or below zero are skipped.
+When the scale type changes, the histogram forgets its bins and bins again.
+
+```{literalinclude} snippets/plottables.cpp
+:start-after: // [plottables_histogram_log]
+:end-before: // [/plottables_histogram_log]
+:language: cpp
+:dedent:
+```
+
+![A log-normal distribution on log bins](images/plottables-histogram-log.png)
+
+A fixed range on a log axis must be positive; otherwise it is ignored with a warning.
+
+### Data you binned yourself
+
+`setBinned(edges, heights)` draws bins you computed yourself, without any binning.
+It takes the bin edges, in increasing order, and one list of heights per column.
+
+```{literalinclude} snippets/plottables.cpp
+:start-after: // [plottables_histogram_binned]
+:end-before: // [/plottables_histogram_binned]
+:language: cpp
+:dedent:
+```
+
+- The bins may have different widths.
+- Every column needs exactly one height fewer than there are edges. If one does not, the call is ignored with a warning.
+- `setBinned()` replaces the data source, and the normalization does not apply to these heights.
+
+Binning runs on a worker thread, like the resampling of the zero-copy plottables ({doc}`performance`).
+Right after `setDataSource()` there are no bars yet. That is why the examples rescale the axes on `histogramReady`.
+`histogram()` returns the bins and heights on screen, or `nullptr` before the first result.
+A histogram cannot be selected with the mouse yet.
+
+Reference: <a href="api/classQCPHistogram.html">QCPHistogram</a>.
 
 ## Waterfalls: QCPWaterfallGraph
 

@@ -153,7 +153,7 @@ Here one series is drawn twice: whole on top, zoomed in below.
 
 `QCPGraph2` has the same six line styles as `QCPGraph`, under `QCPGraph2::lsLine` and so on.
 It has the same scatter styles and `setScatterSkip()`.
-It has no fill and no channel fill: use `QCPGraph` for those.
+It has no fill and no channel fill: use `QCPGraph` or `QCPMultiGraph` for those.
 
 Large series are reduced to what the screen can show before they are drawn.
 Above 100 000 points this runs on a worker thread. {doc}`performance` explains how.
@@ -208,6 +208,79 @@ The entry starts collapsed; a click expands it to one row per component, and so 
 
 A multigraph can also colour its lines by a scalar shared by all components, with `setColorValues()`, `setColorGradient()` and `setColorRange()`.
 
+### Fill under a component
+
+`setComponentFill(column, value)` fills the area between a component and a constant value.
+The brush is optional. Without one, the fill takes the component's pen colour, mostly see-through.
+
+```{literalinclude} snippets/graphs.cpp
+:start-after: // [graphs_multigraph_fill]
+:end-before: // [/graphs_multigraph_fill]
+:language: cpp
+:dedent:
+```
+
+![Two count rates, each filled down to zero](images/graphs-multigraph-fill.png)
+
+- A component has at most one fill. Setting another one replaces it.
+- The fill follows the component's line style: a step line gets a stepped fill. A component drawn as impulses gets no fill.
+- A hidden component draws no fill.
+- On a logarithmic value axis, a fill to a value at or below zero goes to the edge of the axis rect.
+- The fill breaks where the line breaks, at gaps and NaN values.
+- `setComponentFillBrush()` changes the brush of an existing fill. `clearComponentFill()` removes it, and `componentFill()` reads it back.
+- The legend row of a filled component shows a swatch of the fill behind its line.
+
+The setters return `false`, and change nothing, when a column does not exist.
+Before the first data, any column is accepted. A fill on a column that a later data set does not have is dropped.
+
+### Fill between two components
+
+`setComponentFillBetween(column, other)` fills between two components.
+This is how you draw a band around a model: one column for the model, one for each edge.
+
+```{literalinclude} snippets/graphs.cpp
+:start-after: // [graphs_multigraph_band]
+:end-before: // [/graphs_multigraph_band]
+:language: cpp
+:dedent:
+```
+
+![A model inside a band](images/graphs-multigraph-band.png)
+
+- The fill takes the brush, or the pen colour, of the first column.
+- Where the two edges cross, the fill crosses with them.
+- Both components must be visible for the fill to show.
+- `setComponentInLegend(column, false)` keeps the edges out of the legend. They are still drawn, and still count for `rescaleAxes()`. `legendComponents()` lists the components that have a row.
+
+Solid brushes are drawn on the GPU. Gradient and pattern brushes are painted with `QPainter`, which is slower.
+
+### Error bars
+
+`setComponentErrorBars(value, lower, upper)` draws an error bar at each point of the `value` column.
+The bar goes from the `lower` column to the `upper` column.
+These two columns hold the bounds themselves, not the size of the error.
+
+```{literalinclude} snippets/graphs.cpp
+:start-after: // [graphs_multigraph_error_bars]
+:end-before: // [/graphs_multigraph_error_bars]
+:language: cpp
+:dedent:
+```
+
+![Measurements with error bars from two bound columns](images/graphs-multigraph-error-bars.png)
+
+- The bars use the pen of the value component, unless you pass one. The caps are 6 pixels wide by default.
+- The two bound columns leave the legend on their own. They come back when the error bars are cleared, unless you hid them yourself.
+- The bound columns are still drawn as lines. Hide them with `setComponentVisible(column, false)` to show only the bars.
+- A NaN bound gives a one-sided bar. On a logarithmic axis, a bound at or below zero stops at the edge of the axis rect.
+- The legend row of the value component shows a small error bar.
+- `clearComponentErrorBars(value)` removes them, and `componentErrorBars(value)` reads them back.
+
+Bars only make sense when they are apart.
+When the points on screen are closer than three cap widths, the bars become a band from the lower to the upper bound.
+When the graph draws a min/max summary instead of the points (see {doc}`performance`), it is always a band.
+The band is drawn in the pen colour, mostly see-through. Zoom in and the bars come back.
+
 ## Gaps and NaN values
 
 Missing data should show as a hole, not as a straight line across it. There are two ways a hole is found.
@@ -236,10 +309,11 @@ A run of NaN then breaks the line when it is wider than a pixel. A narrower one 
 
 | You have | Use |
 |---|---|
-| A few thousand points, built point by point, or you need a fill or a channel fill | `QCPGraph` |
+| A few thousand points, built point by point | `QCPGraph` |
 | A large array you already hold, or data in `float` or integer types | `QCPGraph2` |
 | Data that you update in place and want plotted without a copy | `QCPGraph2::viewData()` |
 | Several series on the same keys: vector components, channels | `QCPMultiGraph` |
+| A fill, a band or error bars on large data | `QCPMultiGraph`, with the edges or bounds as extra columns |
 | Markers coloured by a third quantity | `QCPGraph2` with scatter colour values |
 | Points where x is not a function of time: a trajectory, a closed shape | `QCPCurve`, see {doc}`plottables` |
 

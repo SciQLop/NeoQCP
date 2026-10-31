@@ -82,6 +82,13 @@ Most changes are confined to the new classes. A few touch existing code.
 - **Log axes.** On a log axis spanning less than 1.6 decades, upstream falls back to linear ticks. NeoQCP puts the ticks on round mantissas (2, 5, ...) instead.
 - **Keyboard.** `QCustomPlot` now handles key presses. Each plottable sees the key first, through the new virtual `QCPAbstractPlottable::keyPress()`. Delete and Backspace make every selected item emit `QCPAbstractItem::deleteRequested()`; nothing is deleted for you.
 - **Fixed upstream bugs.** DPI scaling on macOS and Windows; a crash of the date-time ticker on Qt 6.10 and newer; a use-after-delete in `removeLayer()`.
+- **Slots may delete their sender.** A slot connected to a NeoQCP signal can delete the object that emitted it: a plottable, an item, an axis rect, the legend, a colour scale, even the plot. Upstream this often crashed. To make it safe, a few signals moved or went away:
+  - Deleting a selection rect no longer emits its `canceled` signal. If your code resets its own drag state on `canceled`, also watch the rect's `destroyed` signal.
+  - `setSelectionRect()` with the rect already in use does nothing. It used to delete and reinstall it.
+  - Deleting a `QCPColorScale` detaches the colour maps that use it, without a signal. Their `colorScale()` then returns `nullptr`.
+- **Span dragging.** Dragging a `QCPItemVSpan`, `QCPItemHSpan` or `QCPItemRSpan` moves its edges by the mouse movement in pixels, whatever the type of their positions. An edge placed in pixels used to move by the wrong amount. If the axis moves during the drag, the edge now stays under the pointer.
+- **Native pinch.** A macOS pinch that the plot does not zoom on is left to the parent widget. It used to be swallowed.
+- **New axes are followed.** `QCPGraph2`, `QCPMultiGraph`, `QCPColorMap2`, `QCPHistogram2D` and `QCPHistogram` follow the scale and range of an axis given later with `setKeyAxis()` or `setValueAxis()`, not only the axes they were built with.
 
 The classic plottables (`QCPGraph`, `QCPCurve`, `QCPBars`, `QCPColorMap`, ...) keep their data model and behaviour. Their solid lines and `QCPGraph` fills are drawn by the GPU now; dashed lines, channel fills and scatters still use `QPainter`.
 
@@ -92,7 +99,13 @@ The behaviours below belong to the new plottables only. Code that keeps using th
 - **Deferred data swap.** New data on a `QCPGraph2` or `QCPMultiGraph` that is already on screen is shown after a short window (200 ms by default), not at once. Until then the graph reports the old data.
 - **Busy state.** These plottables report `busy()` and emit `busyChanged()`. A plottable busy for long is drawn faded, with a ⟳ in its legend entry.
 
-{doc}`performance` explains the three last points and what they mean for code that reads results right after `setData()`.
+- **Multigraph legend.** The legend row of a `QCPMultiGraph` shows only the components in `legendComponents()`. The bound columns of error bars leave it on their own; `setComponentInLegend()` changes that.
+- **Empty data on a multigraph.** A data source with no rows keeps the components, with their names and styles. It used to reset their number.
+- **Lane layouts.** `QCPLaneLayout` setters and `QCPIntervals::setCategoryOrder()` emit nothing, and restack nothing, when the value does not change.
+- **First colour map frame.** `QCPColorMap2` resamples one event-loop turn after it is shown or resized, not inside the paint. Exports still resample at once.
+- **Contour segments.** `QCPContourExtractor::extract()` returns segments in the image's [0, 1] coordinates, traced on at most 300 by 300 cells by default. It used to return them in data units, on the full grid.
+
+{doc}`performance` explains the asynchronous points and what they mean for code that reads results right after `setData()`.
 
 ## New classes
 
@@ -101,10 +114,11 @@ These do not exist upstream. You do not need them to migrate, but they are where
 Plottables:
 
 - <a href="api/classQCPGraph2.html">QCPGraph2</a>: a line or scatter graph that plots from your own containers, in their own numeric type, without copying. Resamples large data on a worker thread. See {doc}`graphs`.
-- <a href="api/classQCPMultiGraph.html">QCPMultiGraph</a>: many value columns sharing one key column, from one data source. Each component has its own pen, name and selection. Can colour lines by a scalar.
+- <a href="api/classQCPMultiGraph.html">QCPMultiGraph</a>: many value columns sharing one key column, from one data source. Each component has its own pen, name and selection. Can colour lines by a scalar, fill under a component or between two, and draw error bars.
 - <a href="api/classQCPWaterfallGraph.html">QCPWaterfallGraph</a>: a `QCPMultiGraph` that stacks its traces with offsets, optionally normalised.
-- <a href="api/classQCPColorMap2.html">QCPColorMap2</a>: a colour map over zero-copy data, resampled on a worker thread, with gaps, log axes and GPU contour lines. See {doc}`colormaps`.
-- <a href="api/classQCPHistogram2D.html">QCPHistogram2D</a>: bins a point cloud into a colour map, on a worker thread.
+- <a href="api/classQCPColorMap2.html">QCPColorMap2</a>: a colour map over zero-copy data, resampled on a worker thread, with gaps, log axes and GPU contour lines with labels. See {doc}`colormaps`.
+- <a href="api/classQCPHistogram2D.html">QCPHistogram2D</a>: bins a point cloud into a colour map, on a worker thread, with contour lines.
+- <a href="api/classQCPHistogram.html">QCPHistogram</a>: a 1-D histogram of every column of a data source, on shared bins, binned on a worker thread. See {doc}`plottables`.
 - <a href="api/classQCPIntervals.html">QCPIntervals</a>: a timeline of intervals on lanes, editable with the mouse and the keyboard. See {doc}`plottables`.
 
 Data sources, for the zero-copy plottables: `QCPSoADataSource`, `QCPSoAMultiDataSource`, `QCPRowMajorMultiDataSource`, `QCPSoADataSource2D`, and their abstract bases.

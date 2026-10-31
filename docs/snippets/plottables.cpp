@@ -1,6 +1,7 @@
 #include "snippets.h"
 
 #include <cmath>
+#include <memory>
 #include <numbers>
 #include <random>
 #include <vector>
@@ -211,4 +212,80 @@ DOC_SNIPPET(plottables_intervals, 600, 240)
     customPlot->axisRect()->insetLayout()->setInsetAlignment(0, Qt::AlignBottom | Qt::AlignRight);
     customPlot->replot();
     // [/plottables_intervals]
+}
+
+DOC_SNIPPET(plottables_histogram, 600, 320)
+{
+    // [plottables_histogram]
+    std::mt19937 rng(7);
+    std::normal_distribution<double> quiet(0.0, 1.0), active(1.5, 0.6);
+    const int n = 20000;
+    std::vector<double> index(n);   // a multi source needs keys; the histogram ignores them
+    std::vector<std::vector<double>> samples(2, std::vector<double>(n));
+    for (int i = 0; i < n; ++i)
+    {
+        index[i] = i;
+        samples[0][i] = quiet(rng);
+        samples[1][i] = active(rng);
+    }
+    using Source = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
+    auto source = std::make_shared<Source>(std::move(index), std::move(samples));
+
+    auto* histogram = new QCPHistogram(customPlot->xAxis, customPlot->yAxis);
+    histogram->setName("quiet / active");
+    histogram->setBins(60);
+    histogram->setStyle(QCPHistogram::sStep);
+    histogram->setNormalization(qcp::algo::HistogramNormalization::Density);
+    histogram->setDataSource(source);   // one histogram per column, on shared bins
+    // The bars exist only once the background binning is done.
+    QObject::connect(histogram, &QCPHistogram::histogramReady, customPlot, [customPlot] {
+        customPlot->rescaleAxes();
+        customPlot->replot();
+    });
+    customPlot->xAxis->setLabel("value");
+    customPlot->yAxis->setLabel("density");
+    customPlot->legend->setVisible(true);
+    // [/plottables_histogram]
+}
+
+DOC_SNIPPET(plottables_histogram_log, 600, 320)
+{
+    // [plottables_histogram_log]
+    std::mt19937 rng(11);
+    std::lognormal_distribution<double> energy(3.0, 1.2);
+    const int n = 50000;
+    std::vector<double> index(n);
+    std::vector<std::vector<double>> samples(1, std::vector<double>(n));
+    for (int i = 0; i < n; ++i)
+    {
+        index[i] = i;
+        samples[0][i] = energy(rng);
+    }
+    using Source = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
+
+    customPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);   // the bins follow the key axis
+    customPlot->xAxis->setTicker(QSharedPointer<QCPAxisTickerLog>::create());
+    auto* histogram = new QCPHistogram(customPlot->xAxis, customPlot->yAxis);
+    histogram->setBins(40);
+    histogram->setFixedRange(QCPRange(1, 1e4));   // values outside are not counted
+    histogram->setColumnColors({ QColor(44, 160, 44) });
+    histogram->setDataSource(std::make_shared<Source>(std::move(index), std::move(samples)));
+    QObject::connect(histogram, &QCPHistogram::histogramReady, customPlot, [customPlot] {
+        customPlot->rescaleAxes();
+        customPlot->replot();
+    });
+    customPlot->xAxis->setLabel("energy (eV)");
+    customPlot->yAxis->setLabel("count");
+    // [/plottables_histogram_log]
+}
+
+DOC_CODE(plottables_histogram_binned)
+{
+    // [plottables_histogram_binned]
+    auto* histogram = new QCPHistogram(customPlot->xAxis, customPlot->yAxis);
+    // 4 bins need 5 edges. One list of heights per column.
+    histogram->setBinned({ 0, 1, 2, 4, 8 }, { { 3, 7, 5, 1 }, { 1, 4, 6, 2 } });
+    customPlot->rescaleAxes();
+    customPlot->replot();
+    // [/plottables_histogram_binned]
 }
