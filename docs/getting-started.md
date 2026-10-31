@@ -56,7 +56,7 @@ Pin `GIT_TAG` to a commit for reproducible builds. To use an installed NeoQCP in
 install it once:
 
 ```bash
-cmake -S NeoQCP -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/path/to/Qt/6.11.2/gcc_64
+cmake -S NeoQCP -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/path/to/Qt/6.12.0/gcc_64
 cmake --build build
 cmake --install build --prefix /where/to/install
 ```

@@ -1,8 +1,8 @@
 # The user-guide snippets as a live gallery, built for the browser (Qt for WebAssembly).
 #
 # From the repository root:
-#   source ~/emsdk/emsdk_env.sh                      # Emscripten 4.0.7 for Qt 6.11
-#   printf "[constants]\nqt_wasm = '%s'\n" ~/Qt/6.11.2/wasm_multithread > qt.ini
+#   source ~/emsdk/emsdk_env.sh                      # Emscripten 5.0.5 for Qt 6.12
+#   printf "[constants]\nqt_wasm = '%s'\n" ~/Qt/6.12.0/wasm_multithread > qt.ini
 #   meson setup build-wasm --cross-file qt.ini --cross-file examples/wasm-gallery/emscripten.ini
 #   meson compile -C build-wasm && examples/wasm-gallery/build_site.sh build-wasm/examples/wasm-gallery _site
 #   (cd _site && python3 ../examples/wasm-gallery/serve.py 8765)   # http://127.0.0.1:8765/?plot=gallery_orbit

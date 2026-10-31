@@ -17,8 +17,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  QT_VERSION: '6.11.2'
-  EMSDK_VERSION: '4.0.7'   # the version Qt 6.11's wasm binaries are built with
+  QT_VERSION: '6.12.0'
+  EMSDK_VERSION: '5.0.5'   # the version Qt 6.12's wasm binaries are built with
 
 jobs:
   build:
