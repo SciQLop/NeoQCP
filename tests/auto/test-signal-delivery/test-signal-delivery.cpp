@@ -118,10 +118,9 @@ void TestSignalDelivery::replotSignalsWaitForReplotToFinish()
     QList<bool> replotting;
     const auto record = [&] { replotting << plot->isReplotting(); };
     connect(plot.get(), &QCustomPlot::beforeReplot, plot.get(), record);
-    connect(plot.get(), &QCustomPlot::afterLayout, plot.get(), record);
     connect(plot.get(), &QCustomPlot::afterReplot, plot.get(), record);
     plot->replot();
-    QCOMPARE(replotting, QList<bool>({false, false, false}));
+    QCOMPARE(replotting, QList<bool>({false, false}));
 }
 
 void TestSignalDelivery::slotDeletesAxisDuringRescale()
@@ -237,4 +236,68 @@ void TestSignalDelivery::removeInsideInputScope()
     QCOMPARE(releases.count(), 1);
     QCOMPARE(plot->plottableCount(), 0);
     plot->replot();
+}
+
+void TestSignalDelivery::beforeReplotChangesShowInSameReplot()
+{
+    std::unique_ptr<QCustomPlot> plot(plotWithGraph());
+    plot->replot();
+    connect(plot.get(), &QCustomPlot::beforeReplot, plot.get(),
+            [&plot] { plot->xAxis->setRange(100, 200); }, Qt::SingleShotConnection);
+    plot->replot();
+    const QVector<double> ticks = plot->xAxis->tickVector();
+    QVERIFY(!ticks.isEmpty());
+    QVERIFY2(ticks.first() >= 100, "the replot drew the range from before its beforeReplot slot");
+}
+
+void TestSignalDelivery::afterLayoutSeesExportViewport()
+{
+    std::unique_ptr<QCustomPlot> plot(plotWithGraph());
+    bool exportViewport = false;
+    connect(plot.get(), &QCustomPlot::afterLayout, plot.get(),
+            [&] { exportViewport = plot->viewport().size() == QSize(800, 600); });
+    const QPixmap pixmap = plot->toPixmap(800, 600);
+    QVERIFY(!pixmap.isNull());
+    QVERIFY(exportViewport);
+}
+
+void TestSignalDelivery::addGraphBeforeInputFlush()
+{
+    auto* plot = plotWithGraph();
+    const QPointer<QCustomPlot> alive(plot);
+    plot->replot();
+    connect(plot, &QCustomPlot::plottableClick, plot, [plot] { delete plot; });
+    const QPoint onGraph(qRound(plot->xAxis->coordToPixel(5)),
+                         qRound(plot->yAxis->coordToPixel(5)));
+    QTest::mouseClick(plot, Qt::LeftButton, Qt::NoModifier, onGraph);
+    QVERIFY(plot->addGraph());
+    QVERIFY(alive);
+    QCoreApplication::processEvents();
+    QVERIFY(!alive);
+}
+
+void TestSignalDelivery::deleteLayerWhoseChildSlotDeletesPlot()
+{
+    auto* plot = plotWithGraph();
+    const QPointer<QCustomPlot> alive(plot);
+    QVERIFY(plot->addLayer(QStringLiteral("custom")));
+    QCPGraph* graph = plot->graph(0);
+    QVERIFY(graph->setLayer(QStringLiteral("custom")));
+    connect(graph, &QCPLayerable::layerChanged, plot, [plot] { delete plot; });
+    delete plot->layer(QStringLiteral("custom"));
+    QVERIFY(!alive);
+}
+
+void TestSignalDelivery::deleteAxisRectWhoseSlotDeletesPlot()
+{
+    auto* plot = plotWithGraph();
+    const QPointer<QCustomPlot> alive(plot);
+    auto* rect = new QCPAxisRect(plot);
+    plot->plotLayout()->addElement(1, 0, rect);
+    QCPGraph* graph = plot->graph(0);
+    connect(rect->axis(QCPAxis::atBottom), &QObject::destroyed, plot,
+            [plot, graph] { graph->setLayer(plot->layer(QStringLiteral("axes"))); });
+    connect(graph, &QCPLayerable::layerChanged, plot, [plot] { delete plot; });
+    delete rect;
+    QVERIFY(!alive);
 }

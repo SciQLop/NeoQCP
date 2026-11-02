@@ -185,6 +185,7 @@ private:
 
     // Takes axis out of mAxes and the plot's shortcuts, without deleting it. False if not listed.
     bool unlistAxis(QCPAxis* axis);
+    void detachFromOwners();
 
     friend class QCPAxis; // rangeDidChange() -> markAffectedLayersDirty(), ~QCPAxis -> unlistAxis()
 

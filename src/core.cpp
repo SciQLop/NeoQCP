@@ -266,11 +266,8 @@ QList<QPointer<QCPLayerable>> guardedLayerables(const QList<QCPLayer*>& layers)
 
 /*! \fn void QCustomPlot::beforeReplot()
 
-  This signal is emitted for a replot (caused by a call to the slot \ref replot).
-
-  It is delivered when the outermost NeoQCP call returns, after the plot is drawn, so a slot may
-  delete the plot; what a slot changes shows in the next replot. A \ref replot called from its slot
-  does nothing.
+  This signal is emitted immediately before a replot takes place (caused by a call to the slot \ref
+  replot). A slot may delete the plot; a \ref replot called from it does nothing.
 
   It is safe to mutually connect the replot slot with this signal on two QCustomPlots to make them
   replot synchronously, it won't cause an infinite recursion.
@@ -291,8 +288,7 @@ QList<QPointer<QCPLayerable>> guardedLayerables(const QList<QCPLayer*>& layers)
   signal, you have the opportunity to update certain things in your plot that depend crucially on
   the exact dimensions/positioning of layout elements such as axes and axis rects.
 
-  Like \ref beforeReplot, it is delivered when the outermost NeoQCP call returns (after the
-  drawing), and a \ref replot called from its slot does nothing.
+  A slot may delete the plot; a \ref replot called from it does nothing.
 
   \warning However, changing any parameters of this QCustomPlot instance which would normally
   affect the layouting (e.g. axis range order of magnitudes, tick label sizes, etc.) will not issue
@@ -2355,8 +2351,8 @@ bool QCustomPlot::deselectAllExcept(const QCPLayerable* kept)
   Under a few circumstances, QCustomPlot causes a replot by itself. Those are resize events of the
   QCustomPlot widget and user interactions (object selection and range dragging/zooming).
 
-  The signals \ref beforeReplot, \ref afterLayout and \ref afterReplot are delivered, in that
-  order, once the replot is done (\ref deliver). It is safe to mutually connect the replot slot
+  Before the replot happens, the signal \ref beforeReplot is emitted. After the replot, \ref
+  afterReplot is delivered when the outermost NeoQCP call returns (\ref deliver). It is safe to mutually connect the replot slot
   with any of those signals on two QCustomPlots to make them replot synchronously, it won't cause
   an infinite recursion.
 
@@ -2413,11 +2409,9 @@ void QCustomPlot::commitPendingData()
 
 void QCustomPlot::deliver(QObject* sender, std::function<void()> emission)
 {
-    if (!mEmissions.isOpen() && !mEmissions.hasPending())
+    if (!mEmissions.isOpen())
         return emission();
     mEmissions.push(sender, std::move(emission));
-    if (!mEmissions.isOpen())
-        mEmissions.flush(); // behind an input flush still posted: keeps the order
 }
 
 void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
@@ -2450,8 +2444,10 @@ void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
         return;
     }
 
-    mReplotting = true;
     mReplotQueued = false;
+    if (!emitReplotSignal(&QCustomPlot::beforeReplot))
+        return;
+    mReplotting = true;
 
     if (mOverlay) {
         if (auto* notifLayer = layer(QLatin1String("notification"));
@@ -2462,13 +2458,13 @@ void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
         }
     }
 
-    deliverReplotSignal(&QCustomPlot::beforeReplot);
-
-
     QElapsedTimer replotTimer;
     replotTimer.start();
 
+    const QPointer<QCustomPlot> alive(this);
     updateLayout();
+    if (!alive)
+        return;
     ensureAtLeastOneBufferDirty();
     // draw all layered objects (grid, axes, plottables, items, legend,...) into their buffers:
     setupPaintBuffers();
@@ -2564,19 +2560,20 @@ void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
         mReplotTimeAverage
             = mReplotTime; // no previous replots to average with, so initialize with replot time
 
-    deliverReplotSignal(&QCustomPlot::afterReplot);
+    deliver(this, [this] { emitReplotSignal(&QCustomPlot::afterReplot); });
     mReplotting = false;
 }
 
-void QCustomPlot::deliverReplotSignal(void (QCustomPlot::*signal)())
+// Returns false when a slot deleted the plot.
+bool QCustomPlot::emitReplotSignal(void (QCustomPlot::*signal)())
 {
-    deliver(this, [this, signal] {
-        const QPointer<QCustomPlot> alive(this);
-        const bool outer = std::exchange(mDeliveringReplotSignal, true);
-        (this->*signal)();
-        if (alive)
-            mDeliveringReplotSignal = outer;
-    });
+    const QPointer<QCustomPlot> alive(this);
+    const bool outer = std::exchange(mDeliveringReplotSignal, true);
+    (this->*signal)();
+    if (!alive)
+        return false;
+    mDeliveringReplotSignal = outer;
+    return true;
 }
 
 /*!
@@ -2657,7 +2654,8 @@ bool QCustomPlot::savePdf([[maybe_unused]] const QString& fileName, [[maybe_unus
     qDebug() << Q_FUNC_INFO
              << "Qt was built without printer support (QT_NO_PRINTER). PDF not created.";
 #else
-    const QCPEmissionScope scope(this); // its draw's signals come after the viewport is restored
+    const QCPEmissionScope scope(this);
+    const QPointer<QCustomPlot> alive(this); // an afterLayout slot may delete the plot
     int newWidth, newHeight;
     if (width == 0 || height == 0)
     {
@@ -2701,9 +2699,10 @@ bool QCustomPlot::savePdf([[maybe_unused]] const QString& fileName, [[maybe_unus
             printpainter.fillRect(viewport(), mBackgroundBrush);
         draw(&printpainter);
         printpainter.end();
-        success = true;
+        success = alive;
     }
-    setViewport(oldViewport);
+    if (alive)
+        setViewport(oldViewport);
 #endif // QT_NO_PRINTER
     return success;
 }
@@ -3899,7 +3898,10 @@ void QCustomPlot::draw(QCPPainter* painter)
 {
     PROFILE_HERE_N("QCustomPlot::draw");
     const QCPEmissionScope scope(this);
+    const QPointer<QCustomPlot> alive(this); // an afterLayout slot may delete the plot
     updateLayout();
+    if (!alive)
+        return;
 
     // draw viewport background pixmap:
     drawBackground(painter);
@@ -3939,7 +3941,7 @@ void QCustomPlot::updateLayout()
     layout->update(QCPLayoutElement::upMargins);
     layout->update(QCPLayoutElement::upLayout);
 
-    deliverReplotSignal(&QCustomPlot::afterLayout);
+    emitReplotSignal(&QCustomPlot::afterLayout);
 }
 
 /*! \internal
@@ -4619,7 +4621,8 @@ bool QCustomPlot::saveRastered(const QString& fileName, int width, int height, d
 */
 QPixmap QCustomPlot::toPixmap(int width, int height, double scale)
 {
-    const QCPEmissionScope scope(this); // its draw's signals come after the viewport is restored
+    const QCPEmissionScope scope(this);
+    const QPointer<QCustomPlot> alive(this); // an afterLayout slot may delete the plot
     // Temporarily mutates mViewport for export. Safe because single-threaded and mReplotting
     // prevents recursive replot. Viewport is restored before returning.
     int newWidth, newHeight;
@@ -4660,7 +4663,8 @@ QPixmap QCustomPlot::toPixmap(int width, int height, double scale)
                 != Qt::NoBrush) // solid fills were done a few lines above with QPixmap::fill
             painter.fillRect(mViewport, mBackgroundBrush);
         draw(&painter);
-        setViewport(oldViewport);
+        if (alive)
+            setViewport(oldViewport);
         painter.end();
     }
     else // might happen if pixmap has width or height zero
@@ -4686,7 +4690,8 @@ QPixmap QCustomPlot::toPixmap(int width, int height, double scale)
 */
 void QCustomPlot::toPainter(QCPPainter* painter, int width, int height)
 {
-    const QCPEmissionScope scope(this); // its draw's signals come after the viewport is restored
+    const QCPEmissionScope scope(this);
+    const QPointer<QCustomPlot> alive(this); // an afterLayout slot may delete the plot
     // this method is somewhat similar to toPixmap. Change something here, and a change in toPixmap
     // might be necessary, too.
     int newWidth, newHeight;
@@ -4711,7 +4716,8 @@ void QCustomPlot::toPainter(QCPPainter* painter, int width, int height)
                             // brush style, so we also draw solid fills with fillRect here
             painter->fillRect(mViewport, mBackgroundBrush);
         draw(painter);
-        setViewport(oldViewport);
+        if (alive)
+            setViewport(oldViewport);
     }
     else
         qDebug() << Q_FUNC_INFO << "Passed painter is not active";

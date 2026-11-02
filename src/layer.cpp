@@ -137,6 +137,10 @@ QCPLayer::QCPLayer(QCustomPlot* parentPlot, const QString& layerName)
 
 QCPLayer::~QCPLayer()
 {
+    // Not the plot's child any more: a slot that the scope below runs may delete the plot, which
+    // would delete this layer a second time.
+    if (qobject_cast<QCustomPlot*>(mParentPlot))
+        setParent(nullptr);
     const QCPEmissionScope scope(mParentPlot);
     // A plain delete leaves the plot as removeLayer does. qobject_cast is null when the plot is in
     // ~QObject already, i.e. when it deletes this layer as a QObject child.

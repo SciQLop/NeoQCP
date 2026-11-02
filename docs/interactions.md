@@ -207,7 +207,7 @@ A Qt event filter sees the press first:
 - `plottableClick(plottable, dataIndex, event)` and `plottableDoubleClick`: `dataIndex` is the data point that was hit.
 - `axisClick(axis, part, event)`, `legendClick(legend, item, event)`, `itemClick(item, event)` and their double-click versions.
 - `selectionChangedByUser()`: a click or a selection rect changed what is selected. It is not emitted for changes made from code.
-- `beforeReplot()`, `afterLayout()` and `afterReplot()`: once the replot is done, in that order. A slot may delete the plot; a `replot()` called from one does nothing.
+- `beforeReplot()`, `afterLayout()` and `afterReplot()`: around each replot.
 
 The objects have their own signals:
 

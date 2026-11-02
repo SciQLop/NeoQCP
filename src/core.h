@@ -233,7 +233,8 @@ public:
     [[nodiscard]] bool isBeingDestroyed() const { return mBeingDestroyed; }
     [[nodiscard]] bool isReplotting() const { return mReplotting; }
     // Runs \a emission now if no emission scope of this plot is open, else when the outermost one
-    // closes; skipped if \a sender is deleted by then.
+    // closes; skipped if \a sender is deleted by then. Run now, it overtakes input signals whose
+    // posted delivery has not run yet: those stay on their event-loop turn.
     void deliver(QObject* sender, std::function<void()> emission);
     // overlay:
     QCPOverlay* overlay();
@@ -498,7 +499,7 @@ protected:
     void releaseAsClick(QMouseEvent* event);
     void emitClickSignal(QMouseEvent* event);
     void emitDoubleClickSignal(QCPLayerable* clicked, const QVariant& details, QMouseEvent* event);
-    void deliverReplotSignal(void (QCustomPlot::*signal)());
+    bool emitReplotSignal(void (QCustomPlot::*signal)());
     void releaseDrag(QMouseEvent* event);
     void announceUserSelection();
     void pinchStep(const QEventPoint& a, const QEventPoint& b);

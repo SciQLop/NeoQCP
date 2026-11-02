@@ -20,4 +20,10 @@ private slots:
     void deletePlotFromBeforeReplotWithHandle();
     void deletedChildSkipsQueuedEmission();
     void removeInsideInputScope();
+
+    void beforeReplotChangesShowInSameReplot();
+    void afterLayoutSeesExportViewport();
+    void addGraphBeforeInputFlush();
+    void deleteLayerWhoseChildSlotDeletesPlot();
+    void deleteAxisRectWhoseSlotDeletesPlot();
 };

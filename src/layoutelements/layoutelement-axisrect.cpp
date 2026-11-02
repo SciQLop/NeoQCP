@@ -231,6 +231,10 @@ QCPAxisRect::QCPAxisRect(QCustomPlot* parentPlot, bool setupDefaultAxes)
 
 QCPAxisRect::~QCPAxisRect()
 {
+    // Out of its layout and the plot's children: a slot that the scope below runs may delete the
+    // plot, which would delete this rect a second time.
+    if (qobject_cast<QCustomPlot*>(mParentPlot))
+        detachFromOwners();
     const QCPEmissionScope scope(mParentPlot);
     // Deleted mid-gesture (by a rangeChanged slot): give the plot its antialiasing back. Without a
     // layer, the plot itself is being torn down.
@@ -250,8 +254,16 @@ QCPAxisRect::~QCPAxisRect()
     delete mInsetLayout;
     mInsetLayout = nullptr;
 
-    for (QCPAxis* axis : axes())
-        removeAxis(axis);
+    for (const auto& axis : qcp::guarded(axes()))
+        if (axis)
+            removeAxis(axis);
+}
+
+void QCPAxisRect::detachFromOwners()
+{
+    if (mParentLayout)
+        mParentLayout->take(this);
+    setParent(nullptr);
 }
 
 /*!

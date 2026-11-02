@@ -165,7 +165,7 @@ Use `rpQueuedReplot` in code that may run many times per event: slots connected 
 ```
 
 The plot replots by itself on resize, and when the user drags, zooms or selects.
-It emits `beforeReplot()`, `afterLayout()` and `afterReplot()` once each replot is done.
+It emits `beforeReplot()`, `afterLayout()` and `afterReplot()` around each replot.
 `replotTime()` returns how long the last one took, in milliseconds.
 {doc}`performance` explains what makes a replot cheap or expensive.
 
