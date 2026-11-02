@@ -3,6 +3,13 @@
 #include <memory>
 #include <type_traits>
 
+class TestHandleFwd;
+QCPHandle<TestHandleFwd> forwardDeclaredHandle();
+class TestHandleFwd : public QObject
+{
+};
+QCPHandle<TestHandleFwd> forwardDeclaredHandle() { return {}; }
+
 namespace
 {
 int gMisuses = 0;
@@ -54,6 +61,11 @@ void TestHandle::handleConnects()
 
     QCPHandle<QCPGraph> dead;
     QVERIFY(!qcpConnect(dead, qOverload<bool>(&QCPAbstractPlottable::selectionChanged), &plot, [](bool) {}));
+
+    QCPHandle<QCPGraph> deleted(plot.addGraph());
+    delete deleted.get();
+    QVERIFY(!qcpConnect(deleted, qOverload<bool>(&QCPAbstractPlottable::selectionChanged), &plot,
+                        [](bool) {}));
 }
 
 void TestHandle::handleIsNotARawPointer()
@@ -67,6 +79,8 @@ void TestHandle::handleAsCast()
     QCPHandle<QCPAbstractPlottable> h(plot.addGraph());
     QVERIFY(h.as<QCPGraph>());
     QVERIFY(!h.as<QCPCurve>());
+    QCPHandle<QCPAbstractPlottable> dead;
+    QVERIFY(!dead.as<QCPGraph>());
 }
 
 void TestHandle::handleRemove()

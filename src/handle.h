@@ -6,19 +6,24 @@
 #include <QObject>
 #include <QPointer>
 #include <concepts>
+#include <utility>
 
 class TestHandle;
 
 template <typename T>
-    requires std::derived_from<T, QObject>
 class QCPHandle
 {
 public:
     QCPHandle() = default;
-    explicit QCPHandle(T* object) : mObject(object) {}
+    explicit QCPHandle(T* object) : mObject(object) { requireQObject(); }
 
+    // No implicit conversion to T*: it would bring dangling raw pointers back (T* p = h; delete h;).
     explicit operator bool() const { return !mObject.isNull(); }
-    T* get() const { return mObject.data(); }
+    T* get() const
+    {
+        requireQObject();
+        return mObject.data();
+    }
 
     T* operator->() const
     {
@@ -33,12 +38,19 @@ public:
         return QCPHandle<U>(qobject_cast<U*>(mObject.data()));
     }
 
+    // simplify: plain delete is safe for plottables and items, which unlist themselves. Parts (axes,
+    // layers, axis rects) and deleting the sender from its own signal need owner routing (milestone 2).
     void remove() { delete mObject.data(); }
 
     friend bool operator==(const QCPHandle& a, const QCPHandle& b) { return a.get() == b.get(); }
 
 private:
     friend class ::TestHandle;
+
+    static void requireQObject()
+    {
+        static_assert(std::derived_from<T, QObject>, "QCPHandle<T> needs T derived from QObject");
+    }
 
     bool checkAlive() const
     {
