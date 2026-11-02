@@ -15,4 +15,9 @@ private slots:
     void slotDeletesAxisDuringRescale();
     void slotDeletesPlotOnClick();
     void removeLayerWhileIntervalsAddsLayer();
+
+    void deletePlotFromBeforeReplotWithHandle_data();
+    void deletePlotFromBeforeReplotWithHandle();
+    void deletedChildSkipsQueuedEmission();
+    void removeInsideInputScope();
 };

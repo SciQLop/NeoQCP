@@ -168,7 +168,7 @@ void TestSignalDelivery::removeLayerWhileIntervalsAddsLayer()
 {
     QCustomPlot plot;
     QCPLaneLayout lanes;
-    plot.addLayer(QStringLiteral("custom"));
+    QVERIFY(plot.addLayer(QStringLiteral("custom")));
     plot.setCurrentLayer(QStringLiteral("custom"));
     auto* intervals = new QCPIntervals(plot.xAxis, plot.yAxis, &lanes);
     plot.setCurrentLayer(QStringLiteral("main"));
@@ -183,4 +183,58 @@ void TestSignalDelivery::removeLayerWhileIntervalsAddsLayer()
     for (QCPLayerable* layerable : layerablesOnLayers(plot))
         QCOMPARE(layerable->layer()->parentPlot(), &plot);
     plot.replot();
+}
+
+void TestSignalDelivery::deletePlotFromBeforeReplotWithHandle_data()
+{
+    slotDeletesPlotDuringReplot_data();
+}
+
+void TestSignalDelivery::deletePlotFromBeforeReplotWithHandle()
+{
+    QFETCH(QString, signal);
+    auto* plot = plotWithGraph();
+    const QCPHandle<QCPGraph> graph(plot->graph(0));
+    connect(plot, replotSignal(signal), plot, [plot] { delete plot; });
+    plot->replot();
+    QVERIFY(!graph);
+    QVERIFY(graph.get() == nullptr);
+}
+
+void TestSignalDelivery::deletedChildSkipsQueuedEmission()
+{
+    QCustomPlot plot;
+    QCPGraph* queued = plot.addGraph();
+    QCPGraph* other = plot.addGraph();
+    connect(other, &QObject::destroyed, &plot, [queued] { delete queued; });
+    bool ran = false;
+    {
+        QCPEmissionScope scope(&plot);
+        plot.deliver(queued, [&ran] { ran = true; });
+        delete other;
+    }
+    QVERIFY(!ran);
+    QCOMPARE(plot.graphCount(), 0);
+}
+
+void TestSignalDelivery::removeInsideInputScope()
+{
+    std::unique_ptr<QCustomPlot> plot(plotWithGraph());
+    plot->replot();
+    QCPHandle<QCPGraph> graph(plot->graph(0));
+    QSignalSpy clicks(plot.get(), &QCustomPlot::plottableClick);
+    QSignalSpy releases(plot.get(), &QCustomPlot::mouseRelease);
+    const QPoint onGraph(qRound(plot->xAxis->coordToPixel(5)),
+                         qRound(plot->yAxis->coordToPixel(5)));
+    {
+        QCPInputScope scope(plot.get());
+        QTest::mouseClick(plot.get(), Qt::LeftButton, Qt::NoModifier, onGraph);
+        graph.remove();
+    }
+    QCoreApplication::processEvents();
+    QVERIFY(!graph);
+    QCOMPARE(clicks.count(), 0);
+    QCOMPARE(releases.count(), 1);
+    QCOMPARE(plot->plottableCount(), 0);
+    plot->replot();
 }
