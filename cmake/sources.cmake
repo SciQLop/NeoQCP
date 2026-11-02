@@ -4,6 +4,7 @@ set(NEOQCP_SOURCES
     src/axis/labelrenderer.cpp
     src/colorgradient.cpp
     src/theme.cpp
+    src/misuse.cpp
     src/core.cpp
     src/layer.cpp
     src/overlay.cpp
@@ -107,6 +108,7 @@ set(NEOQCP_MOC_HEADERS
     src/axis/labelpainter.h
     src/colorgradient.h
     src/theme.h
+    src/misuse.h
     src/core.h
     src/datacontainer.h
     src/global.h

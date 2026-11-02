@@ -41,6 +41,7 @@
 #include "axis/range.h"
 #include "colorgradient.h"
 #include "theme.h"
+#include "misuse.h"
 #include "core.h"
 #include "datacontainer.h"
 #include "global.h"
