@@ -6,6 +6,7 @@
 #include <QObject>
 #include <QPointer>
 #include <functional>
+#include <utility>
 #include <vector>
 
 class QCustomPlot;
@@ -21,20 +22,31 @@ QList<QPointer<T>> guarded(const QList<T*>& objects)
 } // namespace qcp
 
 // The emissions a plot holds back while one of its scopes is open. It lives in the plot, so it dies
-// with it: nothing queued for a deleted plot ever runs.
+// with it: nothing queued for a deleted plot ever runs. Two lists, because an input-caused
+// emission must wait for its posted turn: a method scope closing first must not run it.
 class QCP_LIB_DECL QCPEmissionQueue
 {
 public:
-    void open() { ++mDepth; }
+    void open(bool input)
+    {
+        if (mDepth++ == 0)
+            mInputOutermost = input;
+    }
     // True when the outermost scope closed.
     bool close() { return --mDepth == 0; }
     [[nodiscard]] bool isOpen() const { return mDepth > 0; }
-    [[nodiscard]] bool hasPending() const { return !mPending.empty(); }
+    [[nodiscard]] bool hasPendingInput() const { return !mInput.empty(); }
+    // Goes with the outermost scope's kind: method-caused or input-caused.
     void push(QObject* sender, std::function<void()> emission);
-    void discard() { mPending.clear(); }
-    // Runs every pending emission whose sender is alive. May delete the plot holding this queue:
-    // it touches nothing of the queue after the first emission.
-    void flush();
+    void discard()
+    {
+        mMethod.clear();
+        mInput.clear();
+    }
+    // Run every pending emission of one kind whose sender is alive. May delete the plot holding this
+    // queue: they touch nothing of the queue after the first emission.
+    void flushMethod() { run(std::exchange(mMethod, {})); }
+    void flushInput() { run(std::exchange(mInput, {})); }
 
 private:
     struct Pending
@@ -45,7 +57,9 @@ private:
     static void run(std::vector<Pending> pending);
 
     int mDepth = 0;
-    std::vector<Pending> mPending;
+    bool mInputOutermost = false;
+    std::vector<Pending> mMethod;
+    std::vector<Pending> mInput;
 };
 
 // Holds back the plot's deferred signals; the outermost scope delivers them as it closes. Inert on a
@@ -62,7 +76,7 @@ protected:
     QCPEmissionScope(QCustomPlot* plot, bool nextTurn);
 
 private:
-    static QCustomPlot* openOn(QCustomPlot* plot);
+    static QCustomPlot* openOn(QCustomPlot* plot, bool input);
     static void postFlush(QCustomPlot* plot);
 
     QPointer<QCustomPlot> mPlot;

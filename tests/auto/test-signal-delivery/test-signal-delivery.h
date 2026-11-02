@@ -11,7 +11,7 @@ private slots:
     void pendingInputSignalsDieWithThePlot();
     void slotDeletesPlotDuringReplot_data();
     void slotDeletesPlotDuringReplot();
-    void replotSignalsWaitForReplotToFinish();
+    void replotSignalsSeeConsistentPlot();
     void slotDeletesAxisDuringRescale();
     void slotDeletesPlotOnClick();
     void removeLayerWhileIntervalsAddsLayer();
@@ -26,4 +26,8 @@ private slots:
     void addGraphBeforeInputFlush();
     void deleteLayerWhoseChildSlotDeletesPlot();
     void deleteAxisRectWhoseSlotDeletesPlot();
+    void replotBeforeInputFlushKeepsClickQueued_data();
+    void replotBeforeInputFlushKeepsClickQueued();
+    void slotDeletesPlotDuringExport_data();
+    void slotDeletesPlotDuringExport();
 };

@@ -1,4 +1,5 @@
 #include "test-signal-delivery.h"
+#include <QTemporaryDir>
 #include <memory>
 
 namespace
@@ -112,7 +113,7 @@ void TestSignalDelivery::slotDeletesPlotDuringReplot()
     QVERIFY(!alive);
 }
 
-void TestSignalDelivery::replotSignalsWaitForReplotToFinish()
+void TestSignalDelivery::replotSignalsSeeConsistentPlot()
 {
     std::unique_ptr<QCustomPlot> plot(plotWithGraph());
     QList<bool> replotting;
@@ -299,5 +300,68 @@ void TestSignalDelivery::deleteAxisRectWhoseSlotDeletesPlot()
             [plot, graph] { graph->setLayer(plot->layer(QStringLiteral("axes"))); });
     connect(graph, &QCPLayerable::layerChanged, plot, [plot] { delete plot; });
     delete rect;
+    QVERIFY(!alive);
+}
+
+void TestSignalDelivery::replotBeforeInputFlushKeepsClickQueued_data()
+{
+    QTest::addColumn<bool>("byResize");
+    QTest::newRow("replot") << false;
+    QTest::newRow("resizeEvent") << true;
+}
+
+void TestSignalDelivery::replotBeforeInputFlushKeepsClickQueued()
+{
+    QFETCH(bool, byResize);
+    auto* plot = plotWithGraph();
+    const QPointer<QCustomPlot> alive(plot);
+    plot->show();
+    QVERIFY(QTest::qWaitForWindowExposed(plot) || !byResize);
+    plot->replot();
+    bool clicked = false;
+    connect(plot, &QCustomPlot::plottableClick, plot, [&clicked, plot] {
+        clicked = true;
+        delete plot;
+    });
+    const QPoint onGraph(qRound(plot->xAxis->coordToPixel(5)),
+                         qRound(plot->yAxis->coordToPixel(5)));
+    QTest::mouseClick(plot, Qt::LeftButton, Qt::NoModifier, onGraph);
+    if (byResize)
+        plot->resize(500, 400);
+    else
+        plot->replot();
+    QVERIFY(alive);
+    QVERIFY2(!clicked, "the click slot ran inside a later NeoQCP call");
+    QCoreApplication::processEvents();
+    QVERIFY(clicked);
+    QVERIFY(!alive);
+}
+
+void TestSignalDelivery::slotDeletesPlotDuringExport_data()
+{
+    QTest::addColumn<QString>("format");
+    for (const char* name : {"toPixmap", "toPainter", "savePdf"})
+        QTest::newRow(name) << QString::fromLatin1(name);
+}
+
+void TestSignalDelivery::slotDeletesPlotDuringExport()
+{
+    QFETCH(QString, format);
+    auto* plot = plotWithGraph();
+    const QPointer<QCustomPlot> alive(plot);
+    connect(plot, &QCustomPlot::afterLayout, plot, [plot] { delete plot; });
+    if (format == QLatin1String("toPixmap"))
+        (void)plot->toPixmap(400, 300);
+    else if (format == QLatin1String("toPainter"))
+    {
+        QPixmap target(400, 300);
+        QCPPainter painter(&target);
+        plot->toPainter(&painter, 400, 300);
+    }
+    else
+    {
+        QTemporaryDir dir;
+        QVERIFY(!plot->savePdf(dir.filePath(QStringLiteral("plot.pdf")), 400, 300));
+    }
     QVERIFY(!alive);
 }
