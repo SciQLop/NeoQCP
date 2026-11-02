@@ -2,6 +2,7 @@
 // does not set. After <QtTest>, qtesttouch.h would already be read without it.
 #include <QtTest/qtest_widgets.h>
 #include <QtTest/QtTest>
+#include <memory>
 #include <QtGui/qtestsupport_gui.h>          // QTest::createTouchDevice
 #include <QtWidgets/qtestsupport_widgets.h>  // QTest::qWaitForWindowExposed
 #include "qcustomplot.h"
@@ -55,5 +56,5 @@ private:
     bool mRangeSlotRan = false;
 
     QCustomPlot* mPlot;
-    QPointingDevice* mTouchScreen = QTest::createTouchDevice();
+    std::unique_ptr<QPointingDevice> mTouchScreen{QTest::createTouchDevice()};
 };

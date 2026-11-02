@@ -81,10 +81,10 @@ void TestGestures::touchTwoFingersTogetherPan()
     mPlot->setInteraction(QCP::iGestures);
     const double pxPerX = mPlot->axisRect()->width() / 100.0;
     const QPoint c = centre().toPoint(), a = c - QPoint(30, 0), b = c + QPoint(30, 0);
-    QTest::touchEvent(mPlot, mTouchScreen).press(0, a).press(1, b);
+    QTest::touchEvent(mPlot, mTouchScreen.get()).press(0, a).press(1, b);
     for (int step = 1; step <= 4; ++step)
-        QTest::touchEvent(mPlot, mTouchScreen).move(0, a + QPoint(5 * step, 0)).move(1, b + QPoint(5 * step, 0));
-    QTest::touchEvent(mPlot, mTouchScreen).release(0, a + QPoint(20, 0)).release(1, b + QPoint(20, 0));
+        QTest::touchEvent(mPlot, mTouchScreen.get()).move(0, a + QPoint(5 * step, 0)).move(1, b + QPoint(5 * step, 0));
+    QTest::touchEvent(mPlot, mTouchScreen.get()).release(0, a + QPoint(20, 0)).release(1, b + QPoint(20, 0));
     QVERIFY(qAbs(mPlot->xAxis->range().size() - 100) < 1e-6);
     QVERIFY2(qAbs(mPlot->xAxis->range().lower + 20 / pxPerX) < 1e-6,
              qPrintable(QString::number(mPlot->xAxis->range().lower)));
@@ -94,10 +94,10 @@ void TestGestures::oneFingerDragPans()
 {
     mPlot->setInteraction(QCP::iGestures);
     const QPoint c = centre().toPoint();
-    QTest::touchEvent(mPlot, mTouchScreen).press(0, c);
+    QTest::touchEvent(mPlot, mTouchScreen.get()).press(0, c);
     for (int step = 1; step <= 4; ++step)
-        QTest::touchEvent(mPlot, mTouchScreen).move(0, c + QPoint(10 * step, 0));
-    QTest::touchEvent(mPlot, mTouchScreen).release(0, c + QPoint(40, 0));
+        QTest::touchEvent(mPlot, mTouchScreen.get()).move(0, c + QPoint(10 * step, 0));
+    QTest::touchEvent(mPlot, mTouchScreen.get()).release(0, c + QPoint(40, 0));
     QVERIFY(mPlot->xAxis->range().lower < -5);
     QVERIFY(qAbs(mPlot->xAxis->range().size() - 100) < 1e-6);
 }
@@ -107,8 +107,8 @@ void TestGestures::oneFingerTapIsAClick()
     mPlot->setInteraction(QCP::iGestures);
     QSignalSpy clicks(mPlot, &QCustomPlot::mouseRelease);
     const QPoint c = centre().toPoint();
-    QTest::touchEvent(mPlot, mTouchScreen).press(0, c);
-    QTest::touchEvent(mPlot, mTouchScreen).release(0, c);
+    QTest::touchEvent(mPlot, mTouchScreen.get()).press(0, c);
+    QTest::touchEvent(mPlot, mTouchScreen.get()).release(0, c);
     QCoreApplication::processEvents(); // input signals arrive on the next event-loop turn
     QCOMPARE(clicks.count(), 1);
     QCOMPARE(mPlot->xAxis->range(), QCPRange(0, 100));
@@ -119,10 +119,10 @@ void TestGestures::touchSequencePinchZoomsByTheFingerSpread()
 {
     mPlot->setInteraction(QCP::iGestures);
     const QPoint c = centre().toPoint();
-    QTest::touchEvent(mPlot, mTouchScreen).press(0, c - QPoint(30, 0)).press(1, c + QPoint(30, 0));
+    QTest::touchEvent(mPlot, mTouchScreen.get()).press(0, c - QPoint(30, 0)).press(1, c + QPoint(30, 0));
     for (int step = 1; step <= 10; ++step)
-        QTest::touchEvent(mPlot, mTouchScreen).move(0, c - QPoint(30 + 6 * step, 0)).move(1, c + QPoint(30 + 6 * step, 0));
-    QTest::touchEvent(mPlot, mTouchScreen).release(0, c - QPoint(90, 0)).release(1, c + QPoint(90, 0));
+        QTest::touchEvent(mPlot, mTouchScreen.get()).move(0, c - QPoint(30 + 6 * step, 0)).move(1, c + QPoint(30 + 6 * step, 0));
+    QTest::touchEvent(mPlot, mTouchScreen.get()).release(0, c - QPoint(90, 0)).release(1, c + QPoint(90, 0));
     const double size = mPlot->xAxis->range().size();
     QVERIFY2(qAbs(size - 100.0 / 3) < 1e-6, qPrintable(QString::number(size)));
 }
@@ -133,16 +133,16 @@ void TestGestures::touchPinchOneFingerPerEvent()
     mPlot->setInteraction(QCP::iGestures);
     const QPoint c = centre().toPoint();
     QPoint a = c - QPoint(30, 0), b = c + QPoint(30, 0);
-    QTest::touchEvent(mPlot, mTouchScreen).press(0, a);
-    QTest::touchEvent(mPlot, mTouchScreen).stationary(0).press(1, b);
+    QTest::touchEvent(mPlot, mTouchScreen.get()).press(0, a);
+    QTest::touchEvent(mPlot, mTouchScreen.get()).stationary(0).press(1, b);
     for (int step = 0; step < 10; ++step)
     {
         a -= QPoint(6, 0);
-        QTest::touchEvent(mPlot, mTouchScreen).move(0, a).stationary(1);
+        QTest::touchEvent(mPlot, mTouchScreen.get()).move(0, a).stationary(1);
         b += QPoint(6, 0);
-        QTest::touchEvent(mPlot, mTouchScreen).stationary(0).move(1, b);
+        QTest::touchEvent(mPlot, mTouchScreen.get()).stationary(0).move(1, b);
     }
-    QTest::touchEvent(mPlot, mTouchScreen).release(0, a).release(1, b);
+    QTest::touchEvent(mPlot, mTouchScreen.get()).release(0, a).release(1, b);
     const double size = mPlot->xAxis->range().size();
     QVERIFY2(qAbs(size - 100.0 / 3) < 1e-6, qPrintable(QString::number(size)));
 }
@@ -251,10 +251,10 @@ void TestGestures::deletePlotOnRangeChange()
 void TestGestures::pinch()
 {
     const QPoint c = centre().toPoint();
-    QTest::touchEvent(mPlot, mTouchScreen).press(0, c - QPoint(30, 0)).press(1, c + QPoint(30, 0));
-    QTest::touchEvent(mPlot, mTouchScreen).move(0, c - QPoint(40, 0)).move(1, c + QPoint(50, 0));
+    QTest::touchEvent(mPlot, mTouchScreen.get()).press(0, c - QPoint(30, 0)).press(1, c + QPoint(30, 0));
+    QTest::touchEvent(mPlot, mTouchScreen.get()).move(0, c - QPoint(40, 0)).move(1, c + QPoint(50, 0));
     if (mPlot)
-        QTest::touchEvent(mPlot, mTouchScreen).release(0, c - QPoint(40, 0)).release(1, c + QPoint(50, 0));
+        QTest::touchEvent(mPlot, mTouchScreen.get()).release(0, c - QPoint(40, 0)).release(1, c + QPoint(50, 0));
 }
 
 void TestGestures::dragSlotDeletingTheAxisRectIsSafe()
