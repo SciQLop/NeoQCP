@@ -308,7 +308,7 @@ public:
     QCPLineEnding lowerEnding() const;
     QCPLineEnding upperEnding() const;
 
-    QCPGrid* grid() const { return mGrid; }
+    QCPGrid* grid() const;
 
     // setters:
     Q_SLOT void setScaleType(QCPAxis::ScaleType type);
@@ -438,7 +438,7 @@ protected:
     ScaleType mScaleType;
 
     // non-property members:
-    QCPGrid* mGrid;
+    mutable QPointer<QCPGrid> mGrid;
     QCPAxisPainterPrivate* mAxisPainter;
     QSharedPointer<QCPAxisTicker> mTicker;
     QVector<double> mTickVector;

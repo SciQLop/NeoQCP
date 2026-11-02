@@ -38,6 +38,38 @@ QCPLegend* TestOwnership::addSecondLegend()
     return second;
 }
 
+QCPGraph* TestOwnership::addRedGraph()
+{
+    mPlot->legend->setVisible(false); // its icon would be red too
+    mPlot->xAxis->setRange(0, 10);
+    mPlot->yAxis->setRange(0, 10);
+    auto* graph = mPlot->addGraph();
+    graph->setPen(QPen(Qt::red, 6));
+    graph->setData(QVector<double> { 1, 9 }, QVector<double> { 5, 5 });
+    return graph;
+}
+
+bool TestOwnership::drawsRed()
+{
+    const QImage image = mPlot->toPixmap(400, 300).toImage();
+    for (int y = 0; y < image.height(); ++y)
+        for (int x = 0; x < image.width(); ++x)
+        {
+            const QColor c = image.pixelColor(x, y);
+            if (c.red() > 200 && c.green() < 60 && c.blue() < 60)
+                return true;
+        }
+    return false;
+}
+
+// Offscreen gives no QRhi, so the GPU layers stay empty there; under a real display they exist.
+void TestOwnership::showAndExpose()
+{
+    mPlot->show();
+    QVERIFY(QTest::qWaitForWindowExposed(mPlot));
+    QCoreApplication::processEvents();
+}
+
 void TestOwnership::deletePlottableLeavesLists()
 {
     auto* graph = mPlot->addGraph();
@@ -255,4 +287,156 @@ void TestOwnership::spanDestructorCreatesNoGpuLayer()
     delete new QCPItemVSpan(mPlot);
 
     QVERIFY(mPlot->spanRhiLayerIfExists() == nullptr);
+}
+
+void TestOwnership::deleteAxisLeavesRectAndShortcuts()
+{
+    auto* graph = addRedGraph();
+    QVERIFY(drawsRed());
+    QCPAxis* y = mPlot->yAxis;
+
+    delete y;
+
+    QVERIFY(!mPlot->axisRect()->axes().contains(y));
+    QCOMPARE(mPlot->axisRect()->axisCount(QCPAxis::atLeft), 0);
+    QVERIFY(mPlot->yAxis == nullptr);
+    QVERIFY(graph->valueAxis() == nullptr);
+    QCOMPARE(gMisuses, 0);
+    QVERIFY(!drawsRed());
+    QCOMPARE(gMisuses, 1);
+    draw();
+    QCOMPARE(gMisuses, 1);
+}
+
+void TestOwnership::plottablesOfAnotherRectAfterAxisRemoval()
+{
+    mPlot->xAxis->setRange(0, 10);
+    mPlot->yAxis->setRange(0, 10);
+    mPlot->setInteractions(QCP::iSelectPlottables | QCP::iSelectItems);
+    mPlot->setSelectionRectMode(QCP::srmSelect);
+    auto* second = new QCPAxisRect(mPlot);
+    mPlot->plotLayout()->addElement(1, 0, second);
+    auto* graph = new QCPGraph(second->axis(QCPAxis::atBottom), second->axis(QCPAxis::atLeft));
+    graph->setData(QVector<double> { 1, 9 }, QVector<double> { 5, 5 });
+    auto* line = new QCPItemLine(mPlot);
+    line->start->setAxes(second->axis(QCPAxis::atBottom), second->axis(QCPAxis::atLeft));
+    mPlot->replot();
+
+    for (QCPAxis* axis : second->axes())
+        QVERIFY(second->removeAxis(axis));
+
+    QVERIFY(graph->keyAxis() == nullptr);
+    QVERIFY(mPlot->axisRect(0)->plottables().isEmpty());
+    QVERIFY(mPlot->axisRect(0)->graphs().isEmpty());
+    QVERIFY(mPlot->axisRect(0)->items().contains(line)); // its end and clip rect are still there
+    QVERIFY(second->plottables().isEmpty());
+    mPlot->replot();
+    const QRect rect = mPlot->axisRect(0)->rect();
+    const auto mouse = [this](QEvent::Type type, QPoint pos, Qt::MouseButtons buttons) {
+        QMouseEvent e(type, pos, mPlot->mapToGlobal(pos), Qt::LeftButton, buttons, Qt::NoModifier);
+        QCoreApplication::sendEvent(mPlot, &e);
+    };
+    mouse(QEvent::MouseButtonPress, rect.topLeft() + QPoint(2, 2), Qt::LeftButton);
+    mouse(QEvent::MouseMove, rect.bottomRight() - QPoint(2, 2), Qt::LeftButton);
+    mouse(QEvent::MouseButtonRelease, rect.bottomRight() - QPoint(2, 2), Qt::NoButton);
+    QVERIFY(!graph->selected());
+    draw();
+}
+
+void TestOwnership::deleteGridTwiceSafe()
+{
+    QPointer<QCPGrid> old = mPlot->xAxis->grid();
+
+    delete old.data();
+
+    QVERIFY(old.isNull());
+    QCPGrid* fresh = mPlot->xAxis->grid();
+    QVERIFY(fresh != nullptr);
+    QCOMPARE(fresh->parent(), static_cast<QObject*>(mPlot->xAxis));
+    QCOMPARE(mPlot->xAxis->grid(), fresh);
+    draw();
+    delete mPlot; // the ASan run checks the axis does not delete the first grid again
+    mPlot = nullptr;
+}
+
+void TestOwnership::deleteLayerLeavesLists()
+{
+    showAndExpose();
+    QCPLayer* main = mPlot->layer("main");
+    QVERIFY(mPlot->addLayer("extra", main, QCustomPlot::limAbove));
+    QCPLayer* extra = mPlot->layer("extra");
+    auto* graph = addRedGraph();
+    QVERIFY(graph->setLayer(extra));
+    mPlot->replot();
+    QCoreApplication::processEvents();
+    const int count = mPlot->layerCount();
+
+    delete extra;
+
+    QCOMPARE(mPlot->layerCount(), count - 1);
+    QVERIFY(mPlot->layer("extra") == nullptr);
+    QCOMPARE(graph->layer(), main);
+    QVERIFY(main->children().contains(graph));
+    QCOMPARE(mPlot->currentLayer(), main);
+    mPlot->replot();
+    QCoreApplication::processEvents();
+    QVERIFY(drawsRed());
+}
+
+void TestOwnership::deleteCurrentLayer()
+{
+    QCPLayer* current = mPlot->currentLayer();
+    QCPLayer* below = mPlot->layer(current->index() - 1);
+
+    delete current;
+
+    QCOMPARE(mPlot->currentLayer(), below);
+    QCOMPARE(mPlot->addGraph()->layer(), below);
+    draw();
+}
+
+void TestOwnership::deleteRootLayoutAndOverlay()
+{
+    delete mPlot->plotLayout();
+
+    QVERIFY(mPlot->plotLayout() != nullptr);
+    QCOMPARE(mPlot->plotLayout()->elementCount(), 0);
+    QVERIFY(mPlot->xAxis == nullptr);
+    QVERIFY(mPlot->legend == nullptr);
+    draw();
+
+    QPointer<QCPOverlay> overlay = mPlot->overlay();
+    delete overlay.data();
+
+    QVERIFY(overlay.isNull());
+    QVERIFY(mPlot->overlay() != nullptr);
+    mPlot->overlay()->showMessage("back");
+    draw();
+}
+
+void TestOwnership::deleteOwnedTheme()
+{
+    delete mPlot->theme();
+    QVERIFY(mPlot->theme() == nullptr);
+
+    mPlot->setTheme(nullptr);
+
+    QVERIFY(mPlot->theme() != nullptr);
+    mPlot->theme()->setBackground(Qt::darkGray);
+    QCoreApplication::processEvents();
+    draw();
+}
+
+void TestOwnership::removeAxisHidesItsPlottables()
+{
+    auto* graph = addRedGraph();
+    QVERIFY(drawsRed());
+
+    QVERIFY(mPlot->axisRect()->removeAxis(mPlot->axisRect()->axis(QCPAxis::atLeft)));
+
+    QVERIFY(graph->valueAxis() == nullptr);
+    QVERIFY(mPlot->yAxis == nullptr);
+    QVERIFY(!drawsRed());
+    draw();
+    QCOMPARE(gMisuses, 1);
 }

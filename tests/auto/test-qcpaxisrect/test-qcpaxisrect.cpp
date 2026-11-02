@@ -8,6 +8,9 @@
 
 namespace
 {
+int gMisuses = 0;
+void countMisuse(const char*, const char*) { ++gMisuses; }
+
 // Plain drawText, counting how often the axis asks it to lay the label out.
 struct CountingLabelRenderer final : QCPLabelRenderer
 {
@@ -103,13 +106,16 @@ void TestQCPAxisRect::axisRemovalConsequencesToPlottables()
   mPlot->replot();
 
   QVERIFY(mPlot->axisRect()->removeAxis(mPlot->xAxis));
-  expectDebugFrom("QCPGraph::draw", "invalid key or value axis");
   // Force the graph's layer dirty: removeAxis nulls the QPointer<QCPAxis>, so
   // markAffectedLayersDirty() can no longer reach the plottable's axisRect to
   // mark it; without an explicit markDirty the buffered layer stays clean and
-  // QCPGraph::draw() never runs to emit the expected debug warning.
+  // the layer never reaches the graph to skip it.
+  gMisuses = 0;
+  const auto previous = qcp::setMisuseHandler(countMisuse);
   mPlot->layer("main")->markDirty();
   mPlot->replot();
+  qcp::setMisuseHandler(previous);
+  QCOMPARE(gMisuses, 1); // the graph without a key axis is not drawn
   mPlot->rescaleAxes();
   expectDebugFrom("QCPAbstractPlottable::rescaleKeyAxis", "invalid key axis");
   expectDebugFrom("QCPAbstractPlottable::rescaleValueAxis", "invalid key or value axis");
@@ -175,9 +181,12 @@ void TestQCPAxisRect::axisRectRemovalConsequencesToPlottables()
   QVERIFY(mPlot->plotLayout()->removeAt(0));
   mPlot->plotLayout()->simplify();
   QCOMPARE(mPlot->plotLayout()->elementCount(), 0);
-  expectDebugFrom("QCPGraph::draw", "invalid key or value axis");
+  gMisuses = 0;
+  const auto previous = qcp::setMisuseHandler(countMisuse);
   mPlot->layer("main")->markDirty();
   mPlot->replot();
+  qcp::setMisuseHandler(previous);
+  QCOMPARE(gMisuses, 1); // the graph without axes is not drawn
   mPlot->rescaleAxes();
   expectDebugFrom("QCPAbstractPlottable::rescaleKeyAxis", "invalid key axis");
   expectDebugFrom("QCPAbstractPlottable::rescaleValueAxis", "invalid key or value axis");

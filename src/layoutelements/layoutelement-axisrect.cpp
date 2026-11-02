@@ -431,30 +431,33 @@ QList<QCPAxis*> QCPAxisRect::addAxes(QCPAxis::AxisTypes types)
 */
 bool QCPAxisRect::removeAxis(QCPAxis* axis)
 {
-    // don't access axis->axisType() to provide safety when axis is an invalid pointer, rather go
-    // through all axis containers:
-    QHashIterator<QCPAxis::AxisType, QList<QCPAxis*>> it(mAxes);
-    while (it.hasNext())
+    // Unlisted first, so the state is the one a plain delete leaves, and a slot on destroyed()
+    // finds it gone.
+    if (!unlistAxis(axis))
     {
-        it.next();
-        if (it.value().contains(axis))
-        {
-            if (it.value().first() == axis
-                && it.value().size()
-                    > 1) // if removing first axis, transfer axis offset to the new first axis
-                         // (which at this point is the second axis, if it exists)
-                it.value()[1]->setOffset(axis->offset());
-            mAxes[it.key()].removeOne(axis);
-            if (qobject_cast<QCustomPlot*>(
-                    parentPlot())) // make sure this isn't called from QObject dtor when QCustomPlot
-                                   // is already destructed (happens when the axis rect is not in
-                                   // any layout and thus QObject-child of QCustomPlot)
-                parentPlot()->axisRemoved(axis);
-            delete axis;
-            return true;
-        }
+        qDebug() << Q_FUNC_INFO << "Axis isn't in axis rect:" << reinterpret_cast<quintptr>(axis);
+        return false;
     }
-    qDebug() << Q_FUNC_INFO << "Axis isn't in axis rect:" << reinterpret_cast<quintptr>(axis);
+    delete axis;
+    return true;
+}
+
+bool QCPAxisRect::unlistAxis(QCPAxis* axis)
+{
+    // don't access axis->axisType(): axis may be an invalid pointer, so go through all the lists
+    for (auto it = mAxes.begin(); it != mAxes.end(); ++it)
+    {
+        QList<QCPAxis*>& sideAxes = it.value();
+        if (!sideAxes.contains(axis))
+            continue;
+        if (sideAxes.first() == axis && sideAxes.size() > 1) // the next axis inherits the offset
+            sideAxes[1]->setOffset(axis->offset());
+        sideAxes.removeOne(axis);
+        // Not from ~QObject of a plot already destroyed (a rect in no layout is its QObject child).
+        if (qobject_cast<QCustomPlot*>(parentPlot()))
+            parentPlot()->axisRemoved(axis);
+        return true;
+    }
     return false;
 }
 
@@ -606,6 +609,15 @@ void QCPAxisRect::setupFullAxesBox(bool connectRanges)
     }
 }
 
+namespace
+{
+// An axis that is gone (deleted, or removed from its rect) is on no rect.
+bool isOn(const QCPAxis* axis, const QCPAxisRect* rect)
+{
+    return axis && axis->axisRect() == rect;
+}
+} // namespace
+
 /*!
   Returns a list of all the plottables that are associated with this axis rect.
 
@@ -621,7 +633,7 @@ QList<QCPAbstractPlottable*> QCPAxisRect::plottables() const
     QList<QCPAbstractPlottable*> result;
     for (QCPAbstractPlottable* plottable : mParentPlot->mPlottables)
     {
-        if (plottable->keyAxis()->axisRect() == this || plottable->valueAxis()->axisRect() == this)
+        if (isOn(plottable->keyAxis(), this) || isOn(plottable->valueAxis(), this))
             result.append(plottable);
     }
     return result;
@@ -641,7 +653,7 @@ QList<QCPGraph*> QCPAxisRect::graphs() const
     QList<QCPGraph*> result;
     for (QCPGraph* graph : mParentPlot->mGraphs)
     {
-        if (graph->keyAxis()->axisRect() == this || graph->valueAxis()->axisRect() == this)
+        if (isOn(graph->keyAxis(), this) || isOn(graph->valueAxis(), this))
             result.append(graph);
     }
     return result;
@@ -672,8 +684,8 @@ QList<QCPAbstractItem*> QCPAxisRect::items() const
         }
         for (QCPItemPosition* position : item->positions())
         {
-            if (position->axisRect() == this || position->keyAxis()->axisRect() == this
-                || position->valueAxis()->axisRect() == this)
+            if (position->axisRect() == this || isOn(position->keyAxis(), this)
+                || isOn(position->valueAxis(), this))
             {
                 result.append(item);
                 break;

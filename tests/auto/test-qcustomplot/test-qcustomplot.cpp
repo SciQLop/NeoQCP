@@ -547,7 +547,7 @@ void TestQCustomPlot::rectZoomSlotDeletingThePlotIsSafe()
   layOut(mPlot, QCP::Interactions());
   mPlot->setSelectionRectMode(QCP::srmZoom);
   bool ran = false;
-  deletePlotOn(mPlot, mPlot->xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged), &ran);
+  deletePlotOn(mPlot, mPlot->xAxis.data(), qOverload<const QCPRange&>(&QCPAxis::rangeChanged), &ran);
   dragFromTo(mPlot, pixelOf(mPlot, 2, 2), pixelOf(mPlot, 6, 6));
   QVERIFY(ran);
 }

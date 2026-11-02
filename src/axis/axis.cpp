@@ -301,11 +301,6 @@ void QCPGrid::drawSubGridLines(QCPPainter* painter) const
   \see orientation(AxisType type), pixelOrientation
 */
 
-/*! \fn QCPGrid *QCPAxis::grid() const
-
-  Returns the \ref QCPGrid instance belonging to this axis. Access it to set details about the way
-  the grid is displayed.
-*/
 
 /*! \fn static Qt::Orientation QCPAxis::orientation(AxisType type)
 
@@ -488,9 +483,29 @@ QCPAxis::~QCPAxis()
     if (mParentPlot)
         if (auto* grl = mParentPlot->gridRhiLayerIfExists())
             grl->unregisterAxis(this);
+    if (mAxisRect)
+        mAxisRect->unlistAxis(this);
     delete mAxisPainter;
-    delete mGrid; // delete grid here instead of via parent ~QObject for better defined deletion
-                  // order
+    delete mGrid.data(); // here rather than in ~QObject, for a better defined deletion order
+}
+
+/*!
+  Returns the \ref QCPGrid instance belonging to this axis. Access it to set details about the way
+  the grid is displayed.
+
+  It is never \c nullptr: if the grid was deleted, a new hidden one is made on the "grid" layer
+  (the QMainWindow::statusBar() pattern).
+*/
+QCPGrid* QCPAxis::grid() const
+{
+    if (!mGrid)
+    {
+        mGrid = new QCPGrid(const_cast<QCPAxis*>(this));
+        mGrid->setVisible(false);
+        if (mParentPlot && mParentPlot->layer(QLatin1String("grid")))
+            mGrid->setLayer(QLatin1String("grid"));
+    }
+    return mGrid;
 }
 
 /* No documentation as it is a property getter */
@@ -2066,7 +2081,7 @@ void QCPAxis::setupTickVectors()
 {
     if (!mParentPlot)
         return;
-    if ((!mTicks && !mTickLabels && !mGrid->visible()) || mRange.size() <= 0)
+    if ((!mTicks && !mTickLabels && !(mGrid && mGrid->visible())) || mRange.size() <= 0)
         return;
 
     QVector<QString> oldLabels = mTickVectorLabels;

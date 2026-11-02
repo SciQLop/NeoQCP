@@ -151,7 +151,8 @@ public:
 
     [[nodiscard]] Qt::AspectRatioMode backgroundScaledMode() const { return mBackgroundScaledMode; }
 
-    [[nodiscard]] QCPLayoutGrid* plotLayout() const { return mPlotLayout; }
+    // Never nullptr: a deleted root layout is replaced by an empty one.
+    [[nodiscard]] QCPLayoutGrid* plotLayout() const;
 
     [[nodiscard]] QCP::AntialiasedElements antialiasedElements() const { return mAntialiasedElements; }
 
@@ -350,8 +351,9 @@ public:
     Q_SLOT void replot(QCustomPlot::RefreshPriority refreshPriority = QCustomPlot::rpImmediateRefresh);
     [[nodiscard]] double replotTime(bool average = false) const;
 
-    QCPAxis *xAxis, *yAxis, *xAxis2, *yAxis2;
-    QCPLegend* legend;
+    // Become nullptr when the axis or legend is deleted.
+    QPointer<QCPAxis> xAxis, yAxis, xAxis2, yAxis2;
+    QPointer<QCPLegend> legend;
 
 signals:
     void mouseDoubleClick(QMouseEvent* event);
@@ -381,7 +383,7 @@ protected:
     // property members:
     QRect mViewport;
     double mBufferDevicePixelRatio;
-    QCPLayoutGrid* mPlotLayout;
+    QPointer<QCPLayoutGrid> mPlotLayout;
     bool mAutoAddPlottableToLegend;
     QList<QCPAbstractPlottable*> mPlottables;
     QList<QCPPlottableGroup*> mPlottableGroups;
@@ -398,12 +400,12 @@ protected:
     QPixmap mScaledBackgroundPixmap;
     bool mBackgroundScaled;
     Qt::AspectRatioMode mBackgroundScaledMode;
-    QCPLayer* mCurrentLayer;
+    QPointer<QCPLayer> mCurrentLayer;
     QCP::PlottingHints mPlottingHints;
     Qt::KeyboardModifier mMultiSelectModifier;
     QCP::SelectionRectMode mSelectionRectMode;
     QPointer<QCPSelectionRect> mSelectionRect; // a slot may delete it
-    QCPTheme* mOwnedTheme;
+    QPointer<QCPTheme> mOwnedTheme;
     QPointer<QCPTheme> mTheme;
     bool mThemeDirty;
     // non-property members:
@@ -450,7 +452,7 @@ protected:
     QCPSpanRhiLayer* mSpanRhiLayer = nullptr;
     QCPGridRhiLayer* mGridRhiLayer = nullptr;
     QCPPipelineScheduler* mPipelineScheduler = nullptr;
-    QCPOverlay* mOverlay = nullptr;
+    QPointer<QCPOverlay> mOverlay;
     ItemCreator mItemCreator;
     ItemPositioner mItemPositioner;
     bool mCreationModeEnabled = false;
@@ -511,6 +513,11 @@ protected:
     void plottableDestroyed(QCPAbstractPlottable* plottable);
     bool registerItem(QCPAbstractItem* item);
     void itemDestroyed(QCPAbstractItem* item);
+    //! Moves the layer's children to the layer below (above for the bottom one) and drops every
+    //! reference to the layer, without deleting it. Called by removeLayer and ~QCPLayer.
+    void unlistLayer(QCPLayer* layer);
+    void createPlotLayout();
+    QCPTheme* ownedTheme();
     void updateLayerIndices() const;
     bool deselectAllExcept(const QCPLayerable* kept);
     QCPLayerable* layerableAt(const QPointF& pos, bool onlySelectable,

@@ -2066,7 +2066,7 @@ static QCPMultiGraph* decadesOnTheSecondAxes(QCustomPlot* plot, bool newKeyAxis)
         mg->setKeyAxis(plot->xAxis2);
     else
         mg->setValueAxis(plot->yAxis2);
-    for (auto* axis : {plot->xAxis, plot->yAxis, plot->xAxis2, plot->yAxis2})
+    for (QCPAxis* axis : {plot->xAxis, plot->yAxis, plot->xAxis2, plot->yAxis2})
         axis->setRange(1, 100);
     plot->replot(QCustomPlot::rpImmediateRefresh);
     return mg;
@@ -2097,7 +2097,7 @@ void TestMultiGraph::lineCacheFollowsTheScaleOfANewValueAxis()
 // The log axis is ready before the swap and the range stays 1..100: no signal fires at the swap.
 static QCPMultiGraph* decadesThenMovedToALogAxis(QCustomPlot* plot, bool keyAxis)
 {
-    for (auto* axis : {plot->xAxis, plot->yAxis, plot->xAxis2, plot->yAxis2})
+    for (QCPAxis* axis : {plot->xAxis, plot->yAxis, plot->xAxis2, plot->yAxis2})
         axis->setRange(1, 100);
     (keyAxis ? plot->xAxis2 : plot->yAxis2)->setScaleType(QCPAxis::stLogarithmic);
     auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);

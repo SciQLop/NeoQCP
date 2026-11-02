@@ -137,19 +137,15 @@ QCPLayer::QCPLayer(QCustomPlot* parentPlot, const QString& layerName)
 
 QCPLayer::~QCPLayer()
 {
-    // If child layerables are still on this layer, detach them, so they don't try to reach back to
-    // this then invalid layer once they get deleted/moved themselves. This only happens when layers
-    // are deleted directly, like in the QCustomPlot destructor. (The regular layer removal
-    // procedure for the user is to call QCustomPlot::removeLayer, which moves all layerables off
-    // this layer before deleting it.)
+    // A plain delete leaves the plot as removeLayer does. qobject_cast is null when the plot is in
+    // ~QObject already, i.e. when it deletes this layer as a QObject child.
+    if (auto* plot = qobject_cast<QCustomPlot*>(mParentPlot); plot && plot->mLayers.contains(this))
+        plot->unlistLayer(this);
 
+    // Children still here (the last layer, or the plot destructor) are detached, so they don't try
+    // to reach back to this layer once they get deleted or moved themselves.
     while (!mChildren.isEmpty())
         mChildren.last()->setLayer(nullptr); // removes itself from mChildren via removeChild()
-
-    if (mParentPlot->currentLayer() == this)
-        qDebug() << Q_FUNC_INFO
-                 << "The parent plot's mCurrentLayer will be a dangling pointer. Should have been "
-                    "set to a valid layer or nullptr beforehand.";
 }
 
 /*!
@@ -209,17 +205,15 @@ void QCPLayer::draw(QCPPainter* painter)
     {
         if (child->realVisibility())
         {
+            auto* plottable = qobject_cast<QCPAbstractPlottable*>(child);
+            if (plottable && !plottable->drawableAxes())
+                continue;
             painter->save();
             painter->setClipRect(child->clipRect().translated(0, -1));
             // Apply busy fade for plottables (suppress during vector export)
-            if (!painter->modes().testFlag(QCPPainter::pmVectorized))
-            {
-                if (auto* plottable = qobject_cast<QCPAbstractPlottable*>(child))
-                {
-                    if (plottable->visuallyBusy())
-                        painter->setOpacity(plottable->effectiveBusyFadeAlpha());
-                }
-            }
+            if (plottable && plottable->visuallyBusy()
+                && !painter->modes().testFlag(QCPPainter::pmVectorized))
+                painter->setOpacity(plottable->effectiveBusyFadeAlpha());
             child->applyDefaultAntialiasingHint(painter);
             child->draw(painter);
             painter->restore();

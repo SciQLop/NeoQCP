@@ -237,7 +237,7 @@ void TestHSpan::dataDragMovesByMouseDelta()
     auto* span = new QCPItemHSpan(mPlot);
     span->setRange(QCPRange(3, 7));
     mPlot->replot();
-    const auto* axis = mPlot->yAxis;
+    const QCPAxis* axis = mPlot->yAxis;
     const double lower = axis->pixelToCoord(axis->coordToPixel(3) + 40);
     const double upper = axis->pixelToCoord(axis->coordToPixel(7) + 40);
     const QPoint from(mPlot->axisRect()->rect().center().x(), qRound(axis->coordToPixel(5)));
@@ -257,7 +257,7 @@ void TestHSpan::logAxisDragFollowsTheMouseInPixels()
     auto* span = new QCPItemHSpan(mPlot);
     span->setRange(QCPRange(10, 100));
     mPlot->replot();
-    const auto* axis = mPlot->yAxis;
+    const QCPAxis* axis = mPlot->yAxis;
     const double lower = axis->pixelToCoord(axis->coordToPixel(10) + 40);
     const double upper = axis->pixelToCoord(axis->coordToPixel(100) + 40);
     const QPoint from(mPlot->axisRect()->rect().center().x(), qRound(axis->coordToPixel(30)));
@@ -275,7 +275,7 @@ void TestHSpan::mixedEdgesEachMoveInTheirOwnUnit()
     span->lowerEdge->setCoords(0, 200);
     span->upperEdge->setCoords(1, 7);
     mPlot->replot();
-    const auto* axis = mPlot->yAxis;
+    const QCPAxis* axis = mPlot->yAxis;
     const QRect axRect = mPlot->axisRect()->rect();
     const double upper = axis->pixelToCoord(axis->coordToPixel(7) + 40);
     const QPoint from(axRect.center().x(), axRect.top() + 150);

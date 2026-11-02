@@ -107,12 +107,6 @@ QList<QPointer<QCPLayerable>> guardedLayerables(const QList<QCPLayer*>& layers)
   \see setSelectionRect
 */
 
-/*! \fn QCPLayoutGrid *QCustomPlot::plotLayout() const
-
-  Returns the top level layout of this QCustomPlot instance. It is a \ref QCPLayoutGrid, initially
-  containing just one cell with the main QCPAxisRect inside.
-*/
-
 /* end of documentation of inline functions */
 /* start of documentation of signals */
 
@@ -486,12 +480,7 @@ QCustomPlot::QCustomPlot(QWidget* parent)
     layer(QLatin1String("main"))->setMode(QCPLayer::lmBuffered);
 
     // create initial layout, axis rect and legend:
-    mPlotLayout = new QCPLayoutGrid;
-    mPlotLayout->initializeParentPlot(this);
-    mPlotLayout->setParent(
-        this); // important because if parent is QWidget, QCPLayout::sizeConstraintsChanged will
-               // call QWidget::updateGeometry
-    mPlotLayout->setLayer(QLatin1String("main"));
+    createPlotLayout();
     QCPAxisRect* defaultAxisRect = new QCPAxisRect(this, true);
     mPlotLayout->addElement(0, 0, defaultAxisRect);
     xAxis = defaultAxisRect->axis(QCPAxis::atBottom);
@@ -520,8 +509,7 @@ QCustomPlot::QCustomPlot(QWidget* parent)
 
     setViewport(rect()); // needs to be called after mPlotLayout has been created
 
-    mOwnedTheme = new QCPTheme(this);
-    mTheme = mOwnedTheme;
+    mTheme = ownedTheme();
     connectThemeSignal();
 
 #ifdef Q_OS_WASM
@@ -560,9 +548,48 @@ QCustomPlot::~QCustomPlot()
     }
 
     mCurrentLayer = nullptr;
-    qDeleteAll(
-        mLayers); // don't use removeLayer, because it would prevent the last layer to be removed
-    mLayers.clear();
+    // Unlisted first: a layer still listed would move its children to its neighbour as it dies.
+    qDeleteAll(std::exchange(mLayers, {}));
+}
+
+/*! \internal
+
+  Makes an empty root layout: in the constructor, and when the user deleted the previous one.
+*/
+void QCustomPlot::createPlotLayout()
+{
+    mPlotLayout = new QCPLayoutGrid;
+    mPlotLayout->initializeParentPlot(this);
+    mPlotLayout->setParent(
+        this); // important because if parent is QWidget, QCPLayout::sizeConstraintsChanged will
+               // call QWidget::updateGeometry
+    if (layer(QLatin1String("main")))
+        mPlotLayout->setLayer(QLatin1String("main"));
+    mPlotLayout->setOuterRect(mViewport);
+}
+
+/*!
+  Returns the top level layout of this QCustomPlot instance. It is a \ref QCPLayoutGrid, initially
+  containing just one cell with the main QCPAxisRect inside.
+
+  It is never \c nullptr: if the user deleted it, an empty layout takes its place.
+*/
+QCPLayoutGrid* QCustomPlot::plotLayout() const
+{
+    if (!mPlotLayout)
+        const_cast<QCustomPlot*>(this)->createPlotLayout();
+    return mPlotLayout;
+}
+
+/*! \internal
+
+  The plot's own theme, used when no other is set. Made again if the user deleted it.
+*/
+QCPTheme* QCustomPlot::ownedTheme()
+{
+    if (!mOwnedTheme)
+        mOwnedTheme = new QCPTheme(this);
+    return mOwnedTheme;
 }
 
 QCPTheme* QCustomPlot::theme() const
@@ -572,7 +599,7 @@ QCPTheme* QCustomPlot::theme() const
 
 void QCustomPlot::setTheme(QCPTheme* theme)
 {
-    QCPTheme* resolved = theme ? theme : mOwnedTheme;
+    QCPTheme* resolved = theme ? theme : ownedTheme();
     if (mTheme == resolved)
         return;
     if (mTheme)
@@ -1975,35 +2002,40 @@ bool QCustomPlot::removeLayer(QCPLayer* layer)
         return false;
     }
 
-    // append all children of this layer to layer below (if this is lowest layer, prepend to layer
-    // above)
-    int removedIndex = layer->index();
-    bool isFirstLayer = removedIndex == 0;
-    QCPLayer* targetLayer
-        = isFirstLayer ? mLayers.at(removedIndex + 1) : mLayers.at(removedIndex - 1);
-    QList<QCPLayerable*> children = layer->children();
-    if (isFirstLayer) // prepend in reverse order (such that relative order stays the same)
-        std::reverse(children.begin(), children.end());
-    for (QCPLayerable* child : children)
-        child->moveToLayer(targetLayer, isFirstLayer); // prepend if isFirstLayer, otherwise append
+    unlistLayer(layer);
+    delete layer;
+    return true;
+}
 
-    // if removed layer is current layer, change current layer to layer below/above:
+void QCustomPlot::unlistLayer(QCPLayer* layer)
+{
+    // Children go to the layer below (above, for the bottom layer), keeping the total rendering
+    // order. The last layer has no neighbour: ~QCPLayer detaches its children.
+    const int removedIndex = layer->index();
+    const bool isFirstLayer = removedIndex == 0;
+    QCPLayer* targetLayer = mLayers.size() < 2
+        ? nullptr
+        : mLayers.at(isFirstLayer ? removedIndex + 1 : removedIndex - 1);
+    if (targetLayer)
+    {
+        QList<QCPLayerable*> children = layer->children();
+        if (isFirstLayer) // prepend in reverse order (such that relative order stays the same)
+            std::reverse(children.begin(), children.end());
+        for (QCPLayerable* child : children)
+            child->moveToLayer(targetLayer, isFirstLayer);
+    }
+
     if (layer == mCurrentLayer)
-        setCurrentLayer(targetLayer);
+        mCurrentLayer = targetLayer;
 
-    // invalidate the paint buffer that was responsible for this layer:
     if (QSharedPointer<QCPAbstractPaintBuffer> pb = layer->mPaintBuffer.toStrongRef())
         pb->setInvalidated();
 
-    // remove layer:
-    // Drop GPU-side layer objects keyed on this layer before deleting it, so later
-    // replots/renders never dereference the stale QCPLayer* key.
+    // Later replots and renders must never dereference the stale QCPLayer* keys.
     delete mPlottableRhiLayers.take(layer);
     delete mScatterRhiLayers.take(layer);
     mLayers.removeOne(layer);
-    delete layer;
     updateLayerIndices();
-    return true;
 }
 
 /*!
@@ -2762,7 +2794,7 @@ bool QCustomPlot::saveBmp(const QString& fileName, int width, int height, double
 */
 QSize QCustomPlot::minimumSizeHint() const
 {
-    return mPlotLayout->minimumOuterSizeHint();
+    return plotLayout()->minimumOuterSizeHint();
 }
 
 /*! \internal
@@ -2772,7 +2804,7 @@ QSize QCustomPlot::minimumSizeHint() const
 */
 QSize QCustomPlot::sizeHint() const
 {
-    return mPlotLayout->minimumOuterSizeHint();
+    return plotLayout()->minimumOuterSizeHint();
 }
 
 /*! \internal
@@ -3821,9 +3853,10 @@ void QCustomPlot::updateLayout()
 {
     PROFILE_HERE_N("QCustomPlot::updateLayout");
     // run through layout phases:
-    mPlotLayout->update(QCPLayoutElement::upPreparation);
-    mPlotLayout->update(QCPLayoutElement::upMargins);
-    mPlotLayout->update(QCPLayoutElement::upLayout);
+    QCPLayoutGrid* layout = plotLayout();
+    layout->update(QCPLayoutElement::upPreparation);
+    layout->update(QCPLayoutElement::upMargins);
+    layout->update(QCPLayoutElement::upLayout);
 
     emit afterLayout();
 }

@@ -109,7 +109,7 @@ static double run(const char* scenario, int points, int iters)
     plot.replot(QCustomPlot::rpImmediateRefresh);
     QApplication::processEvents();
 
-    auto* x = plot.xAxis;
+    QCPAxis* x = plot.xAxis;
     if (strcmp(scenario, "full_replot") == 0)
         return timeLoop(iters, [&](int) {
             invalidateLines(g);

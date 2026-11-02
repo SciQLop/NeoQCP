@@ -981,6 +981,21 @@ bool QCPAbstractPlottable::removeFromLegend() const
         return removeFromLegend(mParentPlot->legend);
 }
 
+bool QCPAbstractPlottable::drawableAxes()
+{
+    if (mKeyAxis && mValueAxis)
+    {
+        mReportedLostAxis = false;
+        return true;
+    }
+    if (!mReportedLostAxis)
+    {
+        mReportedLostAxis = true;
+        qcp::reportMisuse(Q_FUNC_INFO, "its key or value axis is gone: it is not drawn");
+    }
+    return false;
+}
+
 /* inherits documentation from base class */
 QRect QCPAbstractPlottable::clipRect() const
 {

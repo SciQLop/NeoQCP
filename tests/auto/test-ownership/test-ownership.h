@@ -24,9 +24,21 @@ private slots:
     void deleteParentAnchorItem();
     void spanDestructorCreatesNoGpuLayer();
 
+    void deleteAxisLeavesRectAndShortcuts();
+    void plottablesOfAnotherRectAfterAxisRemoval();
+    void deleteGridTwiceSafe();
+    void deleteLayerLeavesLists();
+    void deleteCurrentLayer();
+    void deleteRootLayoutAndOverlay();
+    void deleteOwnedTheme();
+    void removeAxisHidesItsPlottables();
+
 private:
     void draw();
     QCPLegend* addSecondLegend();
+    QCPGraph* addRedGraph();
+    bool drawsRed();
+    void showAndExpose();
 
     QCustomPlot* mPlot = nullptr;
 };

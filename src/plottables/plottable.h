@@ -291,6 +291,7 @@ private:
     bool mExternalBusy = false;
     bool mVisuallyBusy = false;
     bool mEffectiveBusy = false;
+    bool mReportedLostAxis = false; // one misuse per loss, not one per replot
     QTimer mBusyDebounceTimer;
 
     std::optional<QString> mBusyIndicatorSymbol;
@@ -299,8 +300,11 @@ private:
     std::optional<int> mBusyHideDelayMs;
 
     void onDebounceTimeout();
+    //! False, and one misuse the first time, while the key or value axis is gone.
+    bool drawableAxes();
 
     friend class QCustomPlot;
+    friend class QCPLayer; // draw() skips a plottable without drawableAxes()
     friend class QCPAxis;
     friend class QCPPlottableLegendItem;
     friend class QCPPlottableGroup;

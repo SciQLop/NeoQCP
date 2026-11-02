@@ -183,7 +183,10 @@ protected:
 private:
     Q_DISABLE_COPY(QCPAxisRect)
 
-    friend class QCPAxis; // rangeDidChange() -> markAffectedLayersDirty()
+    // Takes axis out of mAxes and the plot's shortcuts, without deleting it. False if not listed.
+    bool unlistAxis(QCPAxis* axis);
+
+    friend class QCPAxis; // rangeDidChange() -> markAffectedLayersDirty(), ~QCPAxis -> unlistAxis()
 
     friend class QCustomPlot;
     friend class TestPaintBuffer;
