@@ -33,6 +33,12 @@ private slots:
     void deleteOwnedTheme();
     void removeAxisHidesItsPlottables();
 
+    void deleteTracedGraph();
+    void deleteColorScaleOfMap();
+    void deleteBarsInGroup();
+    void polarRemoveGraphUnlistsFirst();
+    void intervalsWithoutLaneLayout();
+
 private:
     void draw();
     QCPLegend* addSecondLegend();

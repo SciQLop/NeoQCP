@@ -168,6 +168,8 @@ QCPPolarGraph::QCPPolarGraph(QCPPolarAxisAngular* keyAxis, QCPPolarAxisRadial* v
 
 QCPPolarGraph::~QCPPolarGraph()
 {
+    if (mKeyAxis) // a plain delete leaves the axis's list, as removeGraph does
+        mKeyAxis->mGraphs.removeOne(this);
     /* TODO
     if (mSelectionDecorator)
     {

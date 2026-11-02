@@ -639,11 +639,10 @@ bool QCPPolarAxisAngular::removeGraph(QCPPolarGraph* graph)
         return false;
     }
 
-    // remove plottable from legend:
-    graph->removeFromLegend();
-    // remove plottable:
-    delete graph;
+    // Unlisted before the delete: a destroyed slot may call removeGraph again.
     mGraphs.removeOne(graph);
+    graph->removeFromLegend();
+    delete graph;
     return true;
 }
 

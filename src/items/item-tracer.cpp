@@ -75,7 +75,6 @@ QCPItemTracer::QCPItemTracer(QCustomPlot* parentPlot)
         , position(createPosition(QLatin1String("position")))
         , mSize(6)
         , mStyle(tsCrosshair)
-        , mGraph(nullptr)
         , mGraphKey(0)
         , mInterpolating(false)
 {
@@ -154,8 +153,9 @@ void QCPItemTracer::setStyle(QCPItemTracer::TracerStyle style)
   QCPItemPosition::ptPlotCoords and the axes will be set to the axes of \a graph.
 
   To free the tracer from any graph, set \a graph to \c nullptr. The tracer \a position can then be
-  placed freely like any other item position. This is the state the tracer will assume when its
-  graph gets deleted while still attached to it.
+  placed freely like any other item position. A tracer whose graph gets deleted while still
+  attached to it is neither drawn nor selectable, and \ref graph returns \c nullptr, until the
+  next call of this function.
 
   \see setGraphKey
 */
@@ -168,6 +168,7 @@ void QCPItemTracer::setGraph(QCPGraph* graph)
             position->setType(QCPItemPosition::ptPlotCoords);
             position->setAxes(graph->keyAxis(), graph->valueAxis());
             mGraph = graph;
+            mFollowsGraph = true;
             updatePosition();
         }
         else
@@ -176,6 +177,7 @@ void QCPItemTracer::setGraph(QCPGraph* graph)
     else
     {
         mGraph = nullptr;
+        mFollowsGraph = false;
     }
 }
 
@@ -213,7 +215,7 @@ void QCPItemTracer::setInterpolating(bool enabled)
 double QCPItemTracer::selectTest(const QPointF& pos, bool onlySelectable,
                                  [[maybe_unused]] QVariant* details) const
 {
-    if (onlySelectable && !mSelectable)
+    if ((onlySelectable && !mSelectable) || lostGraph())
         return -1;
 
     QPointF center(position->pixelPosition());
@@ -278,7 +280,7 @@ double QCPItemTracer::selectTest(const QPointF& pos, bool onlySelectable,
 void QCPItemTracer::draw(QCPPainter* painter)
 {
     updatePosition();
-    if (mStyle == tsNone)
+    if (mStyle == tsNone || lostGraph())
         return;
 
     painter->setPen(mainPen());

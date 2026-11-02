@@ -440,3 +440,204 @@ void TestOwnership::removeAxisHidesItsPlottables()
     draw();
     QCOMPARE(gMisuses, 1);
 }
+
+void TestOwnership::deleteTracedGraph()
+{
+    auto* graph = addRedGraph();
+    graph->setPen(QPen(Qt::blue, 2));
+    auto* tracer = new QCPItemTracer(mPlot);
+    tracer->setStyle(QCPItemTracer::tsCircle);
+    tracer->setPen(QPen(Qt::red, 6));
+    tracer->setSize(20);
+    tracer->setGraph(graph);
+    tracer->setGraphKey(5);
+    QVERIFY(drawsRed());
+
+    delete graph;
+
+    QVERIFY(tracer->graph() == nullptr);
+    QVERIFY(!drawsRed());
+    draw();
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestOwnership::deleteColorScaleOfMap()
+{
+    auto* map = new QCPColorMap(mPlot->xAxis, mPlot->yAxis);
+    map->data()->setSize(4, 4);
+    map->data()->setRange(QCPRange(0, 10), QCPRange(0, 10));
+    for (int x = 0; x < 4; ++x)
+        for (int y = 0; y < 4; ++y)
+            map->data()->setCell(x, y, x + y);
+    auto* scale = new QCPColorScale(mPlot);
+    mPlot->plotLayout()->addElement(0, 1, scale);
+    map->setColorScale(scale);
+    map->rescaleDataRange();
+    draw();
+
+    delete scale;
+
+    QVERIFY(map->colorScale() == nullptr);
+    map->setDataRange(QCPRange(0, 3));
+    map->setGradient(QCPColorGradient(QCPColorGradient::gpHot));
+    map->setDataScaleType(QCPAxis::stLogarithmic);
+    draw();
+}
+
+void TestOwnership::deleteBarsInGroup()
+{
+    const auto barsIn = [this](QCPBarsGroup* group) {
+        auto* bars = new QCPBars(mPlot->xAxis, mPlot->yAxis);
+        bars->setData(QVector<double> { 1, 2 }, QVector<double> { 3, 4 });
+        bars->setBarsGroup(group);
+        return bars;
+    };
+    auto* group = new QCPBarsGroup(mPlot);
+    auto* first = barsIn(group);
+    auto* second = barsIn(group);
+    draw();
+
+    delete first;
+
+    QCOMPARE(group->bars(), QList<QCPBars*> { second });
+    draw();
+    delete group;
+    QVERIFY(second->barsGroup() == nullptr);
+    draw();
+
+    auto* other = new QCPBarsGroup(mPlot);
+    auto* third = barsIn(other);
+    auto* fourth = barsIn(other);
+    delete other;
+    QVERIFY(third->barsGroup() == nullptr);
+    QVERIFY(fourth->barsGroup() == nullptr);
+    draw();
+    delete third;
+    draw();
+}
+
+void TestOwnership::polarRemoveGraphUnlistsFirst()
+{
+    mPlot->plotLayout()->clear();
+    auto* angular = new QCPPolarAxisAngular(mPlot);
+    mPlot->plotLayout()->addElement(0, 0, angular);
+    auto* first = new QCPPolarGraph(angular, angular->radialAxis());
+    auto* second = new QCPPolarGraph(angular, angular->radialAxis());
+    first->setData(QVector<double> { 0, 90 }, QVector<double> { 1, 2 });
+    second->setData(QVector<double> { 0, 90 }, QVector<double> { 2, 1 });
+    const QPointer<QCPPolarGraph> firstAlive(first), secondAlive(second);
+    // Raw captures on purpose: the second slot asks to remove the graph being deleted.
+    connect(first, &QObject::destroyed, angular, [angular, second] { angular->removeGraph(second); });
+    connect(second, &QObject::destroyed, angular, [angular, first] { angular->removeGraph(first); });
+
+    QVERIFY(angular->removeGraph(first));
+
+    QVERIFY(firstAlive.isNull());
+    QVERIFY(secondAlive.isNull());
+    QVERIFY(!angular->removeGraph(second));
+    draw();
+}
+
+namespace
+{
+class OpenIntervals : public QCPIntervals
+{
+public:
+    using QCPIntervals::QCPIntervals;
+    using QCPIntervals::requestRepaint;
+};
+
+qcp::intervals::Columns twoIntervals()
+{
+    qcp::intervals::Columns c;
+    c.start = { 10, 60 };
+    c.stop = { 40, 90 };
+    c.lane = { 0, 1 };
+    c.category = { 0, 1 };
+    c.ids = { 100, 101 };
+    return c;
+}
+
+void sendMouse(QWidget* w, QEvent::Type type, QPoint pos, Qt::MouseButtons buttons)
+{
+    QMouseEvent e(type, pos, w->mapToGlobal(pos), Qt::LeftButton, buttons, Qt::NoModifier);
+    QCoreApplication::sendEvent(w, &e);
+}
+
+//! Every public entry point, and the key and mouse paths that edit.
+void exerciseIntervals(QCPIntervals* iv, QCustomPlot* plot)
+{
+    const QPointF pos = plot->axisRect()->rect().center();
+    iv->setData(twoIntervals());
+    iv->setStackMode(QCPIntervals::skTime);
+    iv->setCategoryOrder({ 1, 0 });
+    iv->setStackMode(QCPIntervals::skCategory);
+    iv->setStyle(QCPIntervals::stWave);
+    iv->setForbidOverlap(true);
+    iv->setEditable(true);
+    iv->setEditModes(QCPIntervals::emMove | QCPIntervals::emResize | QCPIntervals::emChangeLane
+                     | QCPIntervals::emCreate | QCPIntervals::emDelete);
+    iv->setSnap(QCPIntervals::snEdges);
+    iv->setCategoryNames({ "a", "b" });
+    iv->setCategoryColors({ Qt::red, Qt::blue });
+    iv->setSelectedRows({ 0, 1 });
+    (void)iv->legendEntries();
+    (void)iv->hitTest(pos);
+    (void)iv->pixelOf(20, 0);
+    (void)iv->dataPixelPosition(0);
+    (void)iv->selectTest(pos, false);
+    (void)iv->selectTestRect(plot->axisRect()->rect(), false);
+    (void)iv->cursorAt(pos);
+    bool found = false;
+    (void)iv->getKeyRange(found);
+    for (int key : { Qt::Key_Left, Qt::Key_Up, Qt::Key_Delete, Qt::Key_Escape })
+    {
+        QKeyEvent e(QEvent::KeyPress, key, Qt::NoModifier);
+        (void)iv->keyPress(&e);
+    }
+    sendMouse(plot, QEvent::MouseButtonPress, pos.toPoint(), Qt::LeftButton);
+    sendMouse(plot, QEvent::MouseMove, pos.toPoint() + QPoint(30, 20), Qt::LeftButton);
+    sendMouse(plot, QEvent::MouseButtonRelease, pos.toPoint() + QPoint(30, 20), Qt::NoButton);
+    plot->replot();
+    QVERIFY(!plot->toPixmap(400, 300).isNull());
+}
+} // namespace
+
+void TestOwnership::intervalsWithoutLaneLayout()
+{
+    mPlot->xAxis->setRange(0, 100);
+    mPlot->setInteractions(QCP::iSelectPlottables | QCP::iMultiSelect);
+
+    auto* unlaid = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, nullptr);
+    QVERIFY(unlaid->laneLayout() == nullptr);
+    QCOMPARE(gMisuses, 1);
+    exerciseIntervals(unlaid, mPlot);
+    QCOMPARE(gMisuses, 1);
+    QVERIFY(mPlot->removePlottable(unlaid));
+
+    gMisuses = 0;
+    auto* layout = new QCPLaneLayout;
+    layout->laneIndices({ "A", "B" });
+    auto* orphaned = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, layout);
+    orphaned->setData(twoIntervals());
+    orphaned->setEditable(true);
+    mPlot->replot();
+    const QPoint onBar = orphaned->pixelOf(25, 0).toPoint();
+    sendMouse(mPlot, QEvent::MouseButtonPress, onBar, Qt::LeftButton);
+    QVERIFY(orphaned->gestureActive());
+    QCOMPARE(gMisuses, 0);
+
+    delete layout;
+
+    sendMouse(mPlot, QEvent::MouseMove, onBar + QPoint(30, 20), Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseButtonRelease, onBar + QPoint(30, 20), Qt::NoButton);
+    QVERIFY(!orphaned->gestureActive());
+    exerciseIntervals(orphaned, mPlot);
+    QCOMPARE(gMisuses, 1);
+
+    gMisuses = 0;
+    auto* inert = new OpenIntervals(nullptr, nullptr, nullptr);
+    QVERIFY(gMisuses >= 1); // the null axis, and the missing layout
+    inert->requestRepaint();
+    delete inert;
+}

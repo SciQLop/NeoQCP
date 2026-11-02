@@ -6,6 +6,7 @@
 #include "../axis/axis.h"
 #include "../layoutelements/layoutelement-axisrect.h"
 #include "../layoutelements/layoutelement-legend-intervals.h"
+#include "../misuse.h"
 #include <QFontMetricsF>
 #include <QSet>
 #include <algorithm>
@@ -34,6 +35,8 @@ protected:
 
     void draw(QCPPainter* painter) override
     {
+        if (!mOwner->hasLaneLayout()) // its labels were laid out on the lost lanes
+            return;
         mOwner->drawLabels(painter);
         if (mOwner->drawsLaneNames())
             mOwner->drawLaneNames(painter);
@@ -75,10 +78,11 @@ QCPIntervals::QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* 
         QCPAbstractPlottable::removeFromLegend(mParentPlot->legend);
         addToLegend(mParentPlot->legend);
     }
-    connect(layout, &QCPLaneLayout::changed, this, [this] {
-        regroupIfLanesWereAdded();
-        markLayersDirty();
-    });
+    if (hasLaneLayout())
+        connect(layout, &QCPLaneLayout::changed, this, [this] {
+            regroupIfLanesWereAdded();
+            markLayersDirty();
+        });
     connect(this, qOverload<const QCPDataSelection&>(&QCPAbstractPlottable::selectionChanged),
             this, &QCPIntervals::markLayersDirty);
     if (!mParentPlot)
@@ -126,7 +130,7 @@ QCPIntervals::~QCPIntervals()
 
 void QCPIntervals::regroupIfLanesWereAdded()
 {
-    if (static_cast<int>(mLanes.size()) == mLayout->laneNames().size())
+    if (!mLayout || static_cast<int>(mLanes.size()) == mLayout->laneNames().size())
         return;
     mLanes = qcp::intervals::groupByLane(mColumns, mLayout->laneNames().size());
     updateSubRows();
@@ -165,6 +169,8 @@ void QCPIntervals::updateSubRows()
 
 std::optional<QCPLaneBand> QCPIntervals::rowBand(int lane, int subRow) const
 {
+    if (!mLayout)
+        return std::nullopt;
     const QRect rect = mKeyAxis->axisRect()->rect();
     const auto band = mLayout->laneBand(lane, rect);
     if (!band || mStack == skNone)
@@ -252,7 +258,23 @@ void QCPIntervals::markLayersDirty()
 void QCPIntervals::requestRepaint()
 {
     markLayersDirty();
-    mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    if (mParentPlot) // an inert timeline (null axis) has no plot
+        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+}
+
+bool QCPIntervals::hasLaneLayout() const
+{
+    if (mLayout)
+    {
+        mReportedNoLayout = false;
+        return true;
+    }
+    if (!mReportedNoLayout)
+    {
+        mReportedNoLayout = true;
+        qcp::reportMisuse(Q_FUNC_INFO, "it has no lane layout: it draws and edits nothing");
+    }
+    return false;
 }
 
 QRectF QCPIntervals::barRect(int row) const
@@ -268,6 +290,8 @@ QRectF QCPIntervals::barRect(int row) const
 
 QPointF QCPIntervals::pixelOf(double key, int lane) const
 {
+    if (!hasLaneLayout())
+        return { mKeyAxis->coordToPixel(key), -1.0 };
     const auto band = mLayout->laneBand(lane, mKeyAxis->axisRect()->rect());
     return { mKeyAxis->coordToPixel(key), band ? (band->top + band->bottom) / 2 : -1.0 };
 }
@@ -297,7 +321,7 @@ double distanceToBar(const QRectF& bar, double x)
 
 QCPIntervals::Hit QCPIntervals::hitTest(const QPointF& pos) const
 {
-    if (!mLayout || !mKeyAxis)
+    if (!mKeyAxis || !hasLaneLayout())
         return {};
     const int lane = mLayout->laneAt(pos.y(), mKeyAxis->axisRect()->rect());
     if (lane < 0 || lane >= static_cast<int>(mLanes.size()))
@@ -405,6 +429,8 @@ void QCPIntervals::setSelectedRows(const QVector<int>& rows)
 QVector<int> QCPIntervals::rowsInRect(const QRectF& rect) const
 {
     QVector<int> rows;
+    if (!hasLaneLayout())
+        return rows;
     const double a = mKeyAxis->pixelToCoord(rect.left()), b = mKeyAxis->pixelToCoord(rect.right());
     for (int lane = 0; lane < static_cast<int>(mLanes.size()); ++lane)
     {
@@ -563,6 +589,8 @@ std::vector<qcp::intervals::DraggedRow> QCPIntervals::draggedRowsFor(const Hit& 
 std::vector<double> QCPIntervals::snapCandidatesExcluding(const std::vector<qcp::intervals::DraggedRow>& rows) const
 {
     std::vector<double> edges;
+    if (!mLayout)
+        return edges;
     const QCPRange range = mKeyAxis->range();
     auto isDragged = [&](int row) { return std::ranges::any_of(rows, [&](const auto& d) { return d.row == row; }); };
     for (int lane : mLayout->displayLanes())
@@ -610,7 +638,7 @@ double QCPIntervals::snappedDelta(double raw) const
 
 int QCPIntervals::laneStepsTo(const QPointF& pos) const
 {
-    if (mGesture->kind != Gesture::Move || !(mEditModes & emChangeLane))
+    if (mGesture->kind != Gesture::Move || !(mEditModes & emChangeLane) || !mLayout)
         return 0;
     // Lanes can differ in height (stacked overlaps): count lanes, not pixels.
     const QRect rect = mKeyAxis->axisRect()->rect();
@@ -623,6 +651,12 @@ int QCPIntervals::laneStepsTo(const QPointF& pos) const
 
 void QCPIntervals::updateGesture(const QPointF& pos)
 {
+    if (!hasLaneLayout()) // deleted mid-gesture: drop the edit
+    {
+        mGesture.reset();
+        requestRepaint();
+        return;
+    }
     auto& g = *mGesture;
     g.moved = g.moved || (pos - g.pressPos).manhattanLength() > 3;
     const bool keyMoves = g.kind != Gesture::Move || (mEditModes & emMove);
@@ -647,7 +681,7 @@ void QCPIntervals::finishGesture()
     const Gesture g = std::move(*mGesture);
     mGesture.reset();
     requestRepaint();
-    if (!g.moved || g.preview.empty())
+    if (!g.moved || g.preview.empty() || !hasLaneLayout())
         return;
     if (g.kind != Gesture::Create)
         emitEdits(g.preview);
@@ -710,7 +744,8 @@ bool QCPIntervals::keyPress(QKeyEvent* event)
 
 bool QCPIntervals::nudge(int keySteps, int laneSteps)
 {
-    if ((keySteps && !(mEditModes & emMove)) || (laneSteps && !(mEditModes & emChangeLane)))
+    if ((keySteps && !(mEditModes & emMove)) || (laneSteps && !(mEditModes & emChangeLane))
+        || !hasLaneLayout())
         return false;
     const double step = mSnap == snStep && mSnapStep > 0 ? mSnapStep : keysPerPixels(1);
     std::vector<qcp::intervals::DraggedRow> rows;
@@ -834,7 +869,7 @@ QCPIntervals::Shift QCPIntervals::withoutOverlaps(const std::vector<qcp::interva
                                                   qcp::intervals::DragKind kind, Shift wanted) const
 {
     using qcp::intervals::DragKind;
-    if (!mForbid || rows.empty())
+    if (!mForbid || rows.empty() || !mLayout)
         return wanted;
     const auto& order = mLayout->displayLanes();
     auto targetLane = [&](const auto& r, int steps) {
@@ -902,7 +937,7 @@ QCPRange QCPIntervals::getValueRange(bool& foundRange, QCP::SignDomain, const QC
 
 void QCPIntervals::draw(QCPPainter* painter)
 {
-    if (!mLayout)
+    if (!hasLaneLayout())
         return;
     rebuildBarsIfNeeded();
     if (!drawBarsOnGpu(painter))

@@ -85,7 +85,7 @@ public:
 
     TracerStyle style() const { return mStyle; }
 
-    QCPGraph* graph() const { return mGraph; }
+    QCPGraph* graph() const { return mGraph.data(); }
 
     double graphKey() const { return mGraphKey; }
 
@@ -117,12 +117,15 @@ protected:
     QBrush mBrush, mSelectedBrush;
     double mSize;
     TracerStyle mStyle;
-    QCPGraph* mGraph;
+    QPointer<QCPGraph> mGraph;
+    bool mFollowsGraph = false; // set by setGraph, so a graph's death is told from no graph
     double mGraphKey;
     bool mInterpolating;
 
     // reimplemented virtual methods:
     virtual void draw(QCPPainter* painter) override;
+
+    bool lostGraph() const { return mFollowsGraph && !mGraph; }
 
     // non-virtual methods:
     QPen mainPen() const;

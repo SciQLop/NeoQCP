@@ -202,6 +202,9 @@ protected:
     [[nodiscard]] double keysPerPixels(double px) const;
     void markLayersDirty();
     void requestRepaint();
+    //! False, and one misuse the first time, while there is no lane layout (none given, or
+    //! deleted): such a timeline draws and edits nothing.
+    [[nodiscard]] bool hasLaneLayout() const;
     [[nodiscard]] bool changesAnyRow(const std::vector<qcp::intervals::Edit>& edits) const;
     void emitEdits(const std::vector<qcp::intervals::Edit>& edits);
     void drawPreview(QCPPainter* painter) const;
@@ -232,6 +235,7 @@ protected:
     std::optional<QRectF> mRubberBand;
 
     QPointer<QCPLaneLayout> mLayout;
+    mutable bool mReportedNoLayout = false; // one misuse per loss, not one per call
     qcp::intervals::Columns mColumns;
     std::vector<qcp::intervals::LaneRows> mLanes;
     QVector<QColor> mCategoryColors;
