@@ -35,7 +35,7 @@ protected:
 
     void draw(QCPPainter* painter) override
     {
-        if (!mOwner->hasLaneLayout()) // its labels were laid out on the lost lanes
+        if (!mOwner->laidOut()) // its labels were laid out on the lost axis or lanes
             return;
         mOwner->drawLabels(painter);
         if (mOwner->drawsLaneNames())
@@ -169,7 +169,7 @@ void QCPIntervals::updateSubRows()
 
 std::optional<QCPLaneBand> QCPIntervals::rowBand(int lane, int subRow) const
 {
-    if (!mLayout)
+    if (!mLayout || !mKeyAxis)
         return std::nullopt;
     const QRect rect = mKeyAxis->axisRect()->rect();
     const auto band = mLayout->laneBand(lane, rect);
@@ -290,8 +290,8 @@ QRectF QCPIntervals::barRect(int row) const
 
 QPointF QCPIntervals::pixelOf(double key, int lane) const
 {
-    if (!hasLaneLayout())
-        return { mKeyAxis->coordToPixel(key), -1.0 };
+    if (!laidOut())
+        return { mKeyAxis ? mKeyAxis->coordToPixel(key) : 0.0, -1.0 };
     const auto band = mLayout->laneBand(lane, mKeyAxis->axisRect()->rect());
     return { mKeyAxis->coordToPixel(key), band ? (band->top + band->bottom) / 2 : -1.0 };
 }
@@ -321,7 +321,7 @@ double distanceToBar(const QRectF& bar, double x)
 
 QCPIntervals::Hit QCPIntervals::hitTest(const QPointF& pos) const
 {
-    if (!mKeyAxis || !hasLaneLayout())
+    if (!laidOut())
         return {};
     const int lane = mLayout->laneAt(pos.y(), mKeyAxis->axisRect()->rect());
     if (lane < 0 || lane >= static_cast<int>(mLanes.size()))
@@ -429,7 +429,7 @@ void QCPIntervals::setSelectedRows(const QVector<int>& rows)
 QVector<int> QCPIntervals::rowsInRect(const QRectF& rect) const
 {
     QVector<int> rows;
-    if (!hasLaneLayout())
+    if (!laidOut())
         return rows;
     const double a = mKeyAxis->pixelToCoord(rect.left()), b = mKeyAxis->pixelToCoord(rect.right());
     for (int lane = 0; lane < static_cast<int>(mLanes.size()); ++lane)
@@ -589,7 +589,7 @@ std::vector<qcp::intervals::DraggedRow> QCPIntervals::draggedRowsFor(const Hit& 
 std::vector<double> QCPIntervals::snapCandidatesExcluding(const std::vector<qcp::intervals::DraggedRow>& rows) const
 {
     std::vector<double> edges;
-    if (!mLayout)
+    if (!mLayout || !mKeyAxis)
         return edges;
     const QCPRange range = mKeyAxis->range();
     auto isDragged = [&](int row) { return std::ranges::any_of(rows, [&](const auto& d) { return d.row == row; }); };
@@ -638,7 +638,7 @@ double QCPIntervals::snappedDelta(double raw) const
 
 int QCPIntervals::laneStepsTo(const QPointF& pos) const
 {
-    if (mGesture->kind != Gesture::Move || !(mEditModes & emChangeLane) || !mLayout)
+    if (mGesture->kind != Gesture::Move || !(mEditModes & emChangeLane) || !mLayout || !mKeyAxis)
         return 0;
     // Lanes can differ in height (stacked overlaps): count lanes, not pixels.
     const QRect rect = mKeyAxis->axisRect()->rect();
@@ -651,7 +651,7 @@ int QCPIntervals::laneStepsTo(const QPointF& pos) const
 
 void QCPIntervals::updateGesture(const QPointF& pos)
 {
-    if (!hasLaneLayout()) // deleted mid-gesture: drop the edit
+    if (!laidOut()) // the axis or lanes were deleted mid-gesture: drop the edit
     {
         mGesture.reset();
         requestRepaint();
@@ -681,7 +681,7 @@ void QCPIntervals::finishGesture()
     const Gesture g = std::move(*mGesture);
     mGesture.reset();
     requestRepaint();
-    if (!g.moved || g.preview.empty() || !hasLaneLayout())
+    if (!g.moved || g.preview.empty() || !laidOut())
         return;
     if (g.kind != Gesture::Create)
         emitEdits(g.preview);
@@ -745,7 +745,7 @@ bool QCPIntervals::keyPress(QKeyEvent* event)
 bool QCPIntervals::nudge(int keySteps, int laneSteps)
 {
     if ((keySteps && !(mEditModes & emMove)) || (laneSteps && !(mEditModes & emChangeLane))
-        || !hasLaneLayout())
+        || !laidOut())
         return false;
     const double step = mSnap == snStep && mSnapStep > 0 ? mSnapStep : keysPerPixels(1);
     std::vector<qcp::intervals::DraggedRow> rows;
@@ -937,7 +937,7 @@ QCPRange QCPIntervals::getValueRange(bool& foundRange, QCP::SignDomain, const QC
 
 void QCPIntervals::draw(QCPPainter* painter)
 {
-    if (!hasLaneLayout())
+    if (!laidOut())
         return;
     rebuildBarsIfNeeded();
     if (!drawBarsOnGpu(painter))

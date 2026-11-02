@@ -50,11 +50,11 @@ public:
     QCPPolarLegendItem(QCPLegend* parent, QCPPolarGraph* graph);
 
     // getters:
-    QCPPolarGraph* polarGraph() { return mPolarGraph; }
+    QCPPolarGraph* polarGraph();
 
 protected:
     // property members:
-    QCPPolarGraph* mPolarGraph;
+    QPointer<QCPPolarGraph> mPolarGraph;
 
     // reimplemented virtual methods:
     virtual void draw(QCPPainter* painter) override;

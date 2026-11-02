@@ -38,6 +38,8 @@ private slots:
     void deleteBarsInGroup();
     void polarRemoveGraphUnlistsFirst();
     void intervalsWithoutLaneLayout();
+    void deletePolarGraphInLegend();
+    void intervalsWithoutAxes();
 
 private:
     void draw();

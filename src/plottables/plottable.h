@@ -280,6 +280,8 @@ protected:
     void emitSelectionChanged();
     void applyFillAntialiasingHint(QCPPainter* painter) const;
     void applyScattersAntialiasingHint(QCPPainter* painter) const;
+    //! False, and one misuse the first time, while the key or value axis is gone.
+    bool drawableAxes() const;
 
 private:
     Q_DISABLE_COPY(QCPAbstractPlottable)
@@ -291,7 +293,7 @@ private:
     bool mExternalBusy = false;
     bool mVisuallyBusy = false;
     bool mEffectiveBusy = false;
-    bool mReportedLostAxis = false; // one misuse per loss, not one per replot
+    mutable bool mReportedLostAxis = false; // one misuse per loss, not one per replot
     QTimer mBusyDebounceTimer;
 
     std::optional<QString> mBusyIndicatorSymbol;
@@ -300,8 +302,6 @@ private:
     std::optional<int> mBusyHideDelayMs;
 
     void onDebounceTimeout();
-    //! False, and one misuse the first time, while the key or value axis is gone.
-    bool drawableAxes();
 
     friend class QCustomPlot;
     friend class QCPLayer; // draw() skips a plottable without drawableAxes()

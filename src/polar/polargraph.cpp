@@ -42,6 +42,12 @@ QCPPolarLegendItem::QCPPolarLegendItem(QCPLegend* parent, QCPPolarGraph* graph)
         : QCPAbstractLegendItem(parent), mPolarGraph(graph)
 {
     setAntialiased(false);
+    leaveLegendWhenDestroyed(graph);
+}
+
+QCPPolarGraph* QCPPolarLegendItem::polarGraph()
+{
+    return mPolarGraph.data();
 }
 
 void QCPPolarLegendItem::draw(QCPPainter* painter)

@@ -205,6 +205,8 @@ protected:
     //! False, and one misuse the first time, while there is no lane layout (none given, or
     //! deleted): such a timeline draws and edits nothing.
     [[nodiscard]] bool hasLaneLayout() const;
+    //! Both axes and the lane layout, each loss reported once: what drawing and editing need.
+    [[nodiscard]] bool laidOut() const { return drawableAxes() && hasLaneLayout(); }
     [[nodiscard]] bool changesAnyRow(const std::vector<qcp::intervals::Edit>& edits) const;
     void emitEdits(const std::vector<qcp::intervals::Edit>& edits);
     void drawPreview(QCPPainter* painter) const;

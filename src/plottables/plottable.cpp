@@ -456,6 +456,7 @@ QCPAbstractPlottable::QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis)
     connect(&mBusyDebounceTimer, &QTimer::timeout, this, &QCPAbstractPlottable::onDebounceTimeout);
 
     // Without both axes there is no plot to join: the plottable stays inert, never drawn.
+    mReportedLostAxis = !(keyAxis && valueAxis); // this check is the one report of that loss
     QCP_CHECK_OR_RETURN(keyAxis && valueAxis, "a plottable needs a key axis and a value axis");
     if (keyAxis->parentPlot() != valueAxis->parentPlot())
         qDebug() << Q_FUNC_INFO << "Parent plot of keyAxis is not the same as that of valueAxis.";
@@ -981,7 +982,7 @@ bool QCPAbstractPlottable::removeFromLegend() const
         return removeFromLegend(mParentPlot->legend);
 }
 
-bool QCPAbstractPlottable::drawableAxes()
+bool QCPAbstractPlottable::drawableAxes() const
 {
     if (mKeyAxis && mValueAxis)
     {

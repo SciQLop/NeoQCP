@@ -641,3 +641,53 @@ void TestOwnership::intervalsWithoutLaneLayout()
     inert->requestRepaint();
     delete inert;
 }
+
+void TestOwnership::deletePolarGraphInLegend()
+{
+    auto* angular = new QCPPolarAxisAngular(mPlot);
+    mPlot->plotLayout()->addElement(0, 1, angular);
+    const int rows = mPlot->legend->itemCount();
+    auto* graph = new QCPPolarGraph(angular, angular->radialAxis());
+    graph->setName("polar");
+    graph->setData(QVector<double> { 0, 90 }, QVector<double> { 1, 2 });
+    QCOMPARE(mPlot->legend->itemCount(), rows + 1);
+    draw();
+
+    delete graph;
+
+    QCOMPARE(mPlot->legend->itemCount(), rows);
+    draw();
+}
+
+void TestOwnership::intervalsWithoutAxes()
+{
+    QCPLaneLayout layout;
+    layout.laneIndices({ "A", "B" });
+    auto* inert = new QCPIntervals(nullptr, nullptr, &layout);
+    QCOMPARE(gMisuses, 1);
+    exerciseIntervals(inert, mPlot);
+    QCOMPARE(gMisuses, 1);
+    delete inert;
+
+    gMisuses = 0;
+    mPlot->xAxis->setRange(0, 100);
+    mPlot->setInteractions(QCP::iSelectPlottables | QCP::iMultiSelect);
+    auto* bereft = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    bereft->setData(twoIntervals());
+    bereft->setEditable(true);
+    mPlot->replot();
+    const QPoint onBar = bereft->pixelOf(25, 0).toPoint();
+    sendMouse(mPlot, QEvent::MouseButtonPress, onBar, Qt::LeftButton);
+    QVERIFY(bereft->gestureActive());
+    QCOMPARE(gMisuses, 0);
+
+    QCPAxis* keyAxis = mPlot->xAxis;
+    delete keyAxis;
+
+    sendMouse(mPlot, QEvent::MouseMove, onBar + QPoint(30, 20), Qt::LeftButton);
+    sendMouse(mPlot, QEvent::MouseButtonRelease, onBar + QPoint(30, 20), Qt::NoButton);
+    QVERIFY(!bereft->gestureActive());
+    exerciseIntervals(bereft, mPlot);
+    QCOMPARE(gMisuses, 1);
+    QVERIFY(mPlot->removePlottable(bereft)); // before the stack layout goes
+}
