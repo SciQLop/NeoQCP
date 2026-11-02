@@ -11,7 +11,7 @@
 
 QCPHistogram2D::QCPHistogram2D(QCPAxis* keyAxis, QCPAxis* valueAxis)
     : QCPAbstractPlottable(keyAxis, valueAxis)
-    , mPipeline(parentPlot()->pipelineScheduler(), this)
+    , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
     , mRenderer(this)
 {
     installTransform();
@@ -19,7 +19,8 @@ QCPHistogram2D::QCPHistogram2D(QCPAxis* keyAxis, QCPAxis* valueAxis)
     connect(&mPipeline, &QCPHistogramPipeline::finished,
             this, [this](uint64_t) {
                 binsChanged();
-                parentPlot()->replot(QCustomPlot::rpQueuedReplot);
+                if (parentPlot())
+                    parentPlot()->replot(QCustomPlot::rpQueuedReplot);
             });
     connect(&mPipeline, &QCPHistogramPipeline::busyChanged,
             this, [this](bool) { updateEffectiveBusy(); });

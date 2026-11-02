@@ -81,6 +81,8 @@ QCPIntervals::QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* 
     });
     connect(this, qOverload<const QCPDataSelection&>(&QCPAbstractPlottable::selectionChanged),
             this, &QCPIntervals::markLayersDirty);
+    if (!mParentPlot)
+        return; // inert (null axis): no plot to put a label layer in
     mLabelLayer = new LabelLayer(mParentPlot, this, layerAbove(mParentPlot, layer()));
     // Keep the label layerable one layer above wherever this plottable itself moves to.
     connect(this, &QCPLayerable::layerChanged, this, [this](QCPLayer* newLayer) {
@@ -229,7 +231,7 @@ QColor QCPIntervals::categoryColor(int category) const
     return QColor::fromHsv((std::max(0, category) * 137) % 360, 160, 220);
 }
 
-QCPLayer* QCPIntervals::labelLayer() const { return mLabelLayer->layer(); }
+QCPLayer* QCPIntervals::labelLayer() const { return mLabelLayer ? mLabelLayer->layer() : nullptr; }
 
 QList<QCPLayer*> QCPIntervals::dependentLayers() const
 {

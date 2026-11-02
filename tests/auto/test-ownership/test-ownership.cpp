@@ -127,6 +127,14 @@ void TestOwnership::nullAxisPlottableIsRefused()
     auto* graph = new QCPGraph(nullptr, nullptr);
     QCOMPARE(gMisuses, 3);
 
+    auto* histogram = new QCPHistogram2D(nullptr, nullptr);
+    QCOMPARE(gMisuses, 4);
+
+    QCPLaneLayout lanes;
+    auto* intervals = new QCPIntervals(nullptr, nullptr, &lanes);
+    QCOMPARE(gMisuses, 5);
+    QVERIFY(intervals->labelLayer() == nullptr);
+
     QCOMPARE(mPlot->plottableCount(), 0);
     QCOMPARE(mPlot->graphCount(), 0);
     QCOMPARE(mPlot->legend->itemCount(), 0);
@@ -134,6 +142,8 @@ void TestOwnership::nullAxisPlottableIsRefused()
     delete orphan;
     delete halfAxed;
     delete graph;
+    delete histogram;
+    delete intervals;
 }
 
 void TestOwnership::legendItemMovedToSecondLegend()
