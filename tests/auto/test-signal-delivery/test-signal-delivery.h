@@ -30,4 +30,7 @@ private slots:
     void replotBeforeInputFlushKeepsClickQueued();
     void slotDeletesPlotDuringExport_data();
     void slotDeletesPlotDuringExport();
+    void inputSignalSurvivesNestedLoopInMethodScope();
+    void slotDeletesPlotOnResize_data();
+    void slotDeletesPlotOnResize();
 };

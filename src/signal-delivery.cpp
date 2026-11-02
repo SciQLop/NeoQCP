@@ -23,9 +23,8 @@ QCPEmissionScope::~QCPEmissionScope()
 {
     if (!mPlot || !mPlot->mEmissions.close())
         return;
-    if (mNextTurn)
-        postFlush(mPlot);
-    else
+    postFlush(mPlot); // first: the method flush may delete the plot
+    if (!mNextTurn)
         mPlot->mEmissions.flushMethod();
 }
 
@@ -40,8 +39,10 @@ QCustomPlot* QCPEmissionScope::openOn(QCustomPlot* plot, bool input)
     return live;
 }
 
-// The application, not the plot, runs the flush: a slot deleting the plot would otherwise delete
-// the widget inside its own event().
+// Every outermost close posts while input signals wait, so a flush that found a scope open (run
+// from a nested event loop) is retried; only closes post, so nothing spins. The application, not
+// the plot, runs the flush: a slot deleting the plot would otherwise delete the widget inside its
+// own event().
 void QCPEmissionScope::postFlush(QCustomPlot* plot)
 {
     if (!plot->mEmissions.hasPendingInput())
@@ -49,8 +50,6 @@ void QCPEmissionScope::postFlush(QCustomPlot* plot)
     QMetaObject::invokeMethod(
         QCoreApplication::instance(),
         [plot = QPointer<QCustomPlot>(plot)] {
-            // simplify: run from a nested event loop inside a scope, it leaves the input signals for
-            // the next input event's flush. Re-posting would spin for as long as that loop runs.
             if (plot && !plot->mEmissions.isOpen())
                 plot->mEmissions.flushInput();
         },

@@ -2882,6 +2882,7 @@ QSize QCustomPlot::sizeHint() const
 */
 void QCustomPlot::initialize(QRhiCommandBuffer* cb)
 {
+    const QCPInputScope scope(this); // called from paintEvent: replots here deliver next turn
     PROFILE_HERE_N("QCustomPlot::initialize");
 
     // QRhiWidget calls initialize() on resize (when the backing texture is recreated).
@@ -3303,6 +3304,7 @@ void QCustomPlot::executeRenderPass(QRhiCommandBuffer* cb, QRhiResourceUpdateBat
 
 void QCustomPlot::render(QRhiCommandBuffer* cb)
 {
+    const QCPInputScope scope(this); // called from paintEvent: replots here deliver next turn
     PROFILE_FRAME_MARK;
     PROFILE_HERE_N("QCustomPlot::render");
 
@@ -3378,6 +3380,7 @@ void QCustomPlot::releaseCompositeResources()
 */
 void QCustomPlot::resizeEvent([[maybe_unused]] QResizeEvent* event)
 {
+    const QCPInputScope scope(this);
     // resize and repaint the buffer:
     setViewport(rect());
     if (mSpanRhiLayer)
@@ -3396,6 +3399,7 @@ void QCustomPlot::resizeEvent([[maybe_unused]] QResizeEvent* event)
 */
 void QCustomPlot::showEvent(QShowEvent* event)
 {
+    const QCPInputScope scope(this);
     QRhiWidget::showEvent(event);
     mWasShown = true;
     if (std::exchange(mReplotSkippedWhileHidden, false))

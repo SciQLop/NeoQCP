@@ -365,3 +365,53 @@ void TestSignalDelivery::slotDeletesPlotDuringExport()
     }
     QVERIFY(!alive);
 }
+
+void TestSignalDelivery::inputSignalSurvivesNestedLoopInMethodScope()
+{
+    std::unique_ptr<QCustomPlot> plot(plotWithGraph());
+    plot->replot();
+    int clicks = 0;
+    connect(plot.get(), &QCustomPlot::plottableClick, plot.get(), [&clicks] { ++clicks; });
+    const QPoint onGraph(qRound(plot->xAxis->coordToPixel(5)),
+                         qRound(plot->yAxis->coordToPixel(5)));
+    QTest::mouseClick(plot.get(), Qt::LeftButton, Qt::NoModifier, onGraph);
+    plot->graph(0)->setData(QVector<double>{-5, 20}, QVector<double>{-5, 20});
+    connect(plot->xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged), plot.get(),
+            [] { QCoreApplication::processEvents(); }, Qt::SingleShotConnection);
+    plot->rescaleAxes();
+    QCOMPARE(clicks, 0);
+    QCoreApplication::processEvents();
+    QCOMPARE(clicks, 1);
+}
+
+void TestSignalDelivery::slotDeletesPlotOnResize_data()
+{
+    QTest::addColumn<bool>("byShow");
+    QTest::newRow("resize") << false;
+    QTest::newRow("show") << true;
+}
+
+void TestSignalDelivery::slotDeletesPlotOnResize()
+{
+    QFETCH(bool, byShow);
+    auto* plot = plotWithGraph();
+    const QPointer<QCustomPlot> alive(plot);
+    if (!byShow)
+    {
+        plot->show();
+        QVERIFY(QTest::qWaitForWindowExposed(plot));
+        QCoreApplication::processEvents();
+    }
+    bool ran = false;
+    connect(plot, &QCustomPlot::afterReplot, plot, [&ran, plot] {
+        ran = true;
+        delete plot;
+    });
+    if (byShow)
+        plot->show();
+    else
+        plot->resize(500, 400);
+    QVERIFY2(!ran, "an afterReplot slot ran inside the widget's own event");
+    QTRY_VERIFY(ran);
+    QVERIFY(!alive);
+}
