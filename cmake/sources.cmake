@@ -109,6 +109,7 @@ set(NEOQCP_MOC_HEADERS
     src/colorgradient.h
     src/theme.h
     src/misuse.h
+    src/handle.h
     src/core.h
     src/datacontainer.h
     src/global.h

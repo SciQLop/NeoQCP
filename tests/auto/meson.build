@@ -50,6 +50,7 @@ test_srcs = [
     'test-intervals/test-intervals.cpp',
     'test-plottable-group/test-plottable-group.cpp',
     'test-misuse/test-misuse.cpp',
+    'test-handle/test-handle.cpp',
     'test-ownership/test-ownership.cpp',
 ]
 
@@ -100,6 +101,7 @@ test_headers = [
     'test-intervals/test-intervals.h',
     'test-plottable-group/test-plottable-group.h',
     'test-misuse/test-misuse.h',
+    'test-handle/test-handle.h',
     'test-ownership/test-ownership.h',
 ]
 test_moc_files = qtmod.compile_moc(headers : test_headers)
