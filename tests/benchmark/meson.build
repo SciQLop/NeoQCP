@@ -5,4 +5,4 @@ qcp_benchmark=executable('qcp_benchmark', 'benchmark.cpp', qcp_benchmark_moc_fil
                         dependencies:[NeoQCP_dep, qttest],
                         cpp_args: ['-DQT_WIDGETS_LIB', '-DQT_GUI_LIB']
                         )
-benchmark('qcp_benchmark', auto_tests)
+benchmark('qcp_benchmark', qcp_benchmark)

@@ -5,6 +5,7 @@
 #include <datasource/resample.h>
 #include <vector>
 #include <span>
+#include <memory>
 
 class Benchmark : public QObject
 {
@@ -55,7 +56,13 @@ private slots:
 
   void QCPAxis_TickLabels();
   void QCPAxis_TickLabelsCached();
-  
+  void QCPAxis_SetRange10k();
+
+  void QCPItems_AddRemove10k();
+  void QCPItems_Replot10k();
+  void QCPAxisRects_Stack8_Replot();
+  void QCPPlots_Stack8_Replot();
+
 private:
   QCustomPlot *mPlot;
   QWidget mContainerWidget;
@@ -968,5 +975,116 @@ void Benchmark::QCPAxis_TickLabelsCached()
   QBENCHMARK
   {
     mPlot->replot();
+  }
+}
+
+namespace {
+
+QVector<double> sineKeys(int n)
+{
+  QVector<double> x(n);
+  for (int i = 0; i < n; ++i)
+    x[i] = i / static_cast<double>(n);
+  return x;
+}
+
+QVector<double> sineValues(const QVector<double> &x)
+{
+  QVector<double> y(x.size());
+  for (int i = 0; i < x.size(); ++i)
+    y[i] = qSin(x[i] * 10 * M_PI);
+  return y;
+}
+
+void addLineItems(QCustomPlot *plot, int count, double xMax)
+{
+  for (int i = 0; i < count; ++i)
+  {
+    auto *item = new QCPItemLine(plot);
+    const double x = xMax * i / count;
+    item->start->setCoords(x, 0);
+    item->end->setCoords(x + 0.01, 1);
+  }
+}
+
+}
+
+void Benchmark::QCPAxis_SetRange10k()
+{
+  const auto x = sineKeys(10000);
+  mPlot->addGraph()->setData(x, sineValues(x));
+  QBENCHMARK
+  {
+    for (int i = 0; i < 10000; ++i)
+      mPlot->xAxis->setRange(i * 1e-5, 1 + i * 1e-5);
+  }
+}
+
+void Benchmark::QCPItems_AddRemove10k()
+{
+  QBENCHMARK
+  {
+    addLineItems(mPlot, 10000, 100);
+    mPlot->clearItems();
+  }
+}
+
+void Benchmark::QCPItems_Replot10k()
+{
+  addLineItems(mPlot, 10000, 100);
+  mPlot->xAxis->setRange(0, 1);
+  mPlot->yAxis->setRange(0, 1);
+  int step = 0;
+  QBENCHMARK
+  {
+    mPlot->xAxis->setRange(0.001 * ++step, 1 + 0.001 * step);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+  }
+}
+
+void Benchmark::QCPAxisRects_Stack8_Replot()
+{
+  const auto x = sineKeys(100000);
+  const auto y = sineValues(x);
+  QList<QCPAxisRect *> rects;
+  mPlot->plotLayout()->clear();
+  for (int i = 0; i < 8; ++i)
+  {
+    auto *rect = new QCPAxisRect(mPlot);
+    mPlot->plotLayout()->addElement(i, 0, rect);
+    mPlot->addGraph(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft))->setData(x, y);
+    rects.append(rect);
+  }
+  mPlot->replot(QCustomPlot::rpImmediateRefresh);
+  int step = 0;
+  QBENCHMARK
+  {
+    rects[3]->axis(QCPAxis::atBottom)->setRange(0.001 * ++step, 0.7 + 0.001 * step);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+  }
+}
+
+void Benchmark::QCPPlots_Stack8_Replot()
+{
+  const auto x = sineKeys(100000);
+  const auto y = sineValues(x);
+  std::vector<std::unique_ptr<QCustomPlot>> plots;
+  for (int i = 0; i < 8; ++i)
+  {
+    auto plot = std::make_unique<QCustomPlot>(&mContainerWidget);
+    plot->setGeometry(0, 0, 640, 45);
+    plot->addGraph()->setData(x, y);
+    plot->rescaleAxes();
+    plot->show();
+    plots.push_back(std::move(plot));
+  }
+  qApp->processEvents();
+  QCustomPlot *changing = plots[3].get();
+  changing->replot(QCustomPlot::rpImmediateRefresh);
+  int step = 0;
+  QBENCHMARK
+  {
+    changing->xAxis->setRange(0.001 * ++step, 0.7 + 0.001 * step);
+    changing->replot(QCustomPlot::rpImmediateRefresh);
   }
 }
