@@ -79,20 +79,24 @@ is done, and leaves NeoQCP building and green. Only milestone 1 is planned here.
 - Create: `docs/plans/neoqcp-3/baseline.md`
 
 **Interfaces:**
-- Produces: benchmark functions `QCPItems_AddRemove10k`, `QCPItems_Frame10k`, `QCPAxisRects_Stack8_Frame`,
-  `QCPPlots_Stack8_Frame` in class `Benchmark`; the baseline table later tasks compare against.
+- Produces: benchmark functions `QCPItems_AddRemove10k`, `QCPItems_Replot10k`, `QCPAxisRects_Stack8_Replot`,
+  `QCPPlots_Stack8_Replot`, `QCPAxis_SetRange10k` in class `Benchmark`; the baseline table later tasks compare
+  against. These time the CPU side of `replot()` (paint-buffer rasterisation): the GPU upload and composite
+  happen later in `render()`, which an offscreen benchmark does not run. Task 2 measures the full frame.
 
 - [ ] **Step 1:** Change the registration to `benchmark('qcp_benchmark', qcp_benchmark)`. Run
   `meson test -C build-qt612 --benchmark --print-errorlogs`. Expected: the output lists `Benchmark::` functions
-  (today it lists the unit tests).
+  (today it lists the unit tests) and contains `RESULT` lines (Qt Test prints them for every `QBENCHMARK`).
 - [ ] **Step 2:** Add the four benchmarks, each a `QBENCHMARK` block:
   - `QCPItems_AddRemove10k`: create 10 000 `QCPItemLine`s on `mPlot`, then `clearItems()`.
-  - `QCPItems_Frame10k`: with 10 000 `QCPItemLine`s spread over the x range `[0, 100]` and the view at
+  - `QCPItems_Replot10k`: with 10 000 `QCPItemLine`s spread over the x range `[0, 100]` and the view at
     `[0, 1]`, time `mPlot->replot(QCustomPlot::rpImmediateRefresh)`.
-  - `QCPAxisRects_Stack8_Frame`: one plot, 8 axis rects stacked in the root layout, each with one graph of
+  - `QCPAxisRects_Stack8_Replot`: one plot, 8 axis rects stacked in the root layout, each with one graph of
     100 000 points; time a replot after changing one rect's x range.
-  - `QCPPlots_Stack8_Frame`: the same data as 8 separate `QCustomPlot` widgets; time a replot of the one
+  - `QCPPlots_Stack8_Replot`: the same data as 8 separate `QCustomPlot` widgets; time a replot of the one
     whose range changed.
+  - `QCPAxis_SetRange10k`: 10 000 `xAxis->setRange` calls on a plot with one 10 000-point graph (this is
+    the path Task 9's deferred delivery touches).
 - [ ] **Step 3:** Build, run `build-qt612/tests/benchmark/qcp_benchmark -median 5` three times, and write
   `docs/plans/neoqcp-3/baseline.md`: one table, one row per benchmark, the median of the three runs, the
   machine, the Qt version and the commit. Expected: every existing benchmark and the four new ones have a
@@ -107,7 +111,8 @@ is done, and leaves NeoQCP building and green. Only milestone 1 is planned here.
 
 - [ ] **Step 1:** Using the Task 1 benchmarks `QCPAxisRects_Stack8_Frame` and `QCPPlots_Stack8_Frame`, and a
   Tracy capture of each (`meson setup -Dtracy_enable=true --buildtype=debugoptimized build-tracy` once, then
-  the same scenario), find where the stacked-rect frame spends its time compared with the separate plots:
+  the same scenario, on a real display, `QT_QPA_PLATFORM=xcb`, so `render()` runs and the GPU side is in the
+  capture), find where the stacked-rect frame spends its time compared with the separate plots:
   which layers repaint on a one-rect range change, whether every rect's plottables redraw, and whether the
   GPU paths re-upload for the whole widget.
 - [ ] **Step 2:** Write `multi-axisrect-perf.md`: the two numbers, the cause in one paragraph with
@@ -178,7 +183,11 @@ is done, and leaves NeoQCP building and green. Only milestone 1 is planned here.
   the counts (run under `build-asan` to see the use-after-free if the debug build happens to survive).
 - [ ] **Step 3:** In `~QCPAbstractPlottable`, call `mParentPlot->plottableDestroyed(this)` if the plot is
   alive (hold the plot as `QPointer` there). Make `removePlottable` unlist before deleting and rely on the
-  same unregister. Check `keyAxis`/`valueAxis` at the top of the constructor with `QCP_CHECK_OR_RETURN`.
+  same unregister. A null axis: the base constructor dereferences `keyAxis` in its member initializer
+  list (`plottable.cpp:437-438`), so make that initializer null-safe, then `QCP_CHECK` in the body; a
+  plottable with no axes stays inert (never registered, never drawn), which keeps the documented "the
+  construction is not aborted". Check that the derived constructors used in the test (`QCPCurve`) do
+  not dereference the plot or axes when inert.
   Update `mParentLegend` in `QCPLegend::addItem`. A plottable legend item whose plottable dies removes itself
   from its legend.
 - [ ] **Step 4:** Build, run `TestOwnership` (then under `build-asan`). Expected: 6 passed, no ASan report.
@@ -223,7 +232,8 @@ is done, and leaves NeoQCP building and green. Only milestone 1 is planned here.
 **Interfaces:**
 - Produces: `QCPAxis::grid()` always returns a live grid (re-created on demand if deleted, the
   `QMainWindow::statusBar()` pattern). The plot's shortcut members become `QPointer`s; `plotLayout()` and
-  `overlay()` re-create an empty root layout or overlay if theirs was deleted.
+  `overlay()` re-create an empty root layout or overlay if theirs was deleted, except while the plot is
+  being destroyed (Task 7), when they return `nullptr`.
 
 - [ ] **Step 1: Write the failing tests:**
   - `deleteAxisLeavesRectAndShortcuts`: `delete plot->yAxis`; `axisRect()->axes()` no longer contains it,
@@ -239,13 +249,43 @@ is done, and leaves NeoQCP building and green. Only milestone 1 is planned here.
     `plot->overlay()` returns a new live overlay.
   - `deleteOwnedTheme`: `delete plot->theme()` while it is the plot's own theme, then `setTheme(nullptr)`
     and `replot()` run.
+  - `removeAxisHidesItsPlottables`: `axisRect()->removeAxis(axisRect()->axis(QCPAxis::atLeft))` while a
+    graph uses it; the graph is not drawn, one misuse is recorded over two replots.
 - [ ] **Step 2:** Build, run. Expected: each fails or crashes before its fix.
 - [ ] **Step 3:** `~QCPAxis` tells its rect and the plot (reuse `axisRemoved`); the axis-rect scans skip
-  plottables and items with a null axis; `~QCPLayer` unregisters from `mLayers` and the GPU-layer maps and
-  fixes the current layer; the plot's raw shortcuts and parts become `QPointer`s with the re-creation above.
+  plottables and items with a null axis; a plottable whose key or value axis is gone is skipped when
+  drawing and reports one misuse (once per plottable, not once per replot); `QCPAxisRect::removeAxis` gives
+  the same result as a `delete`; `~QCPLayer` unregisters from `mLayers` and the GPU-layer maps and fixes
+  the current layer; the plot's raw shortcuts and parts become `QPointer`s with the re-creation above.
 - [ ] **Step 4:** Build, run `TestOwnership` (and `build-asan`). Expected: all passed, ASan clean.
 - [ ] **Step 5:** Full suite and benchmark. Expected: green, no regression.
 - [ ] **Step 6: Commit** — "fix(ownership): axes, grids, layers and plot parts are safe to delete".
+
+### Task 6b: The remaining dangling relations
+
+**Files:**
+- Modify: `src/items/item-tracer.{h,cpp}` (`mGraph` raw, `item-tracer.h:120`), `src/plottables/plottable-colormap.cpp`,
+  `src/plottables/plottable-bars.cpp`, `src/polar/layoutelement-angularaxis.cpp:634-648`,
+  `src/plottables/plottable-intervals.cpp` (lane-layout dereferences at `:127, 167, 269, 409, 566, 616-619, 837`)
+- Test: `tests/auto/test-ownership/test-ownership.cpp`
+
+- [ ] **Step 1: Write the failing tests:**
+  - `deleteTracedGraph`: a tracer on a graph; `delete` the graph; `tracer->graph() == nullptr`, the tracer
+    is not drawn, `replot()` runs.
+  - `deleteColorScaleOfMap`: `delete` a colour map's scale; `map->colorScale() == nullptr`, `replot()` runs.
+  - `deleteBarsInGroup`: bars in a `QCPBarsGroup`; `delete` one bar and then the group; both directions
+    ASan-clean.
+  - `polarRemoveGraphUnlistsFirst`: a polar graph's `destroyed` slot calls `removeGraph` on another graph
+    of the same angular axis; nothing is deleted twice.
+  - `intervalsWithoutLaneLayout`: a `QCPIntervals` given no lane layout, and one whose layout is deleted:
+    every public method runs (no crash) and reports one misuse.
+- [ ] **Step 2:** Build, run. Expected: each fails or crashes before its fix (some may already pass: then
+  the test stays as a guard and the step notes it).
+- [ ] **Step 3:** `QPointer` for the tracer's graph; polar `removeGraph` unlists before deleting; intervals
+  check the lane layout at each listed site; colour map and bars as the tests require.
+- [ ] **Step 4:** Build, run `TestOwnership` (and `build-asan`). Expected: all passed, ASan clean.
+- [ ] **Step 5:** Full suite and benchmark. Expected: green, no regression.
+- [ ] **Step 6: Commit** — "fix(ownership): tracer, colour scale, bars, polar and intervals relations".
 
 ### Task 7: Safe teardown
 
@@ -265,8 +305,9 @@ is done, and leaves NeoQCP building and green. Only milestone 1 is planned here.
   - `childrenDeletedWhilePlotWhole`: a plottable's `destroyed` slot reads `plot->axisRect()->rect()`; it is
     the same rect as before the deletion started (the plot is still whole).
 - [ ] **Step 2:** Build, run. Expected: the first two crash or record no misuse.
-- [ ] **Step 3:** Set the flag first in the destructor, delete groups, plottables, items and the layout
-  before anything else the plot owns, and guard the mutators.
+- [ ] **Step 3:** Set the flag first in the destructor, then delete groups, plottables and items while the
+  layout is still in place (the layout outlives them, so `childrenDeletedWhilePlotWhole` holds), then the
+  layout, then the rest; guard the mutators.
 - [ ] **Step 4:** Build, run `TestOwnership` (and `build-asan`). Expected: all passed.
 - [ ] **Step 5:** Full suite and benchmark. Expected: green, no regression.
 - [ ] **Step 6: Commit** — "fix(core): a plot tears down whole; mutators refuse while it is destroyed".
@@ -284,7 +325,10 @@ is done, and leaves NeoQCP building and green. Only milestone 1 is planned here.
   - `explicit operator bool() const;` (alive), `T* get() const;` (null when dead)
   - `T* operator->() const;`: alive → the object; dead → `qcp::reportMisuse(...)` then
     `qFatal("NeoQCP: call through a handle whose object was deleted")` (spec answer 2).
-  - `operator T*() const;` (implicit, like `QPointer`, so `QObject::connect(h, &T::signal, …)` compiles).
+  - no implicit conversion to `T*` (it would bring dangling raw pointers back: `T* p = h;`, `delete h;`).
+    Connecting goes through a free helper,
+    `template <typename T, typename Signal, typename... Rest> QMetaObject::Connection qcpConnect(const QCPHandle<T>& h, Signal signal, Rest&&... rest)`,
+    which returns an invalid connection for a dead handle.
   - `template <typename U> QCPHandle<U> as() const;` (`qobject_cast`, empty on mismatch).
   - `void remove();`: deletes the object if alive (later milestones route this through the owner).
   - copyable, comparable (`==` on the object).
@@ -294,8 +338,9 @@ is done, and leaves NeoQCP building and green. Only milestone 1 is planned here.
   - `handleTestsFalseAfterDelete`: `QCPHandle<QCPGraph> h(plot->addGraph());` is true; after `delete
     h.get()`, `h` and a copy made before the delete are both false and `get()` is null.
   - `handleOutlivesPlot`: a handle copied into a lambda, the plot deleted, then the lambda runs: false.
-  - `handleConnects`: `QObject::connect(h, &QCPAbstractPlottable::selectionChanged, …)` fires when the
-    graph's selection changes.
+  - `handleConnects`: `qcpConnect(h, &QCPAbstractPlottable::selectionChanged, …)` fires when the graph's
+    selection changes; on a dead handle it returns an invalid connection.
+  - `handleIsNotARawPointer`: `static_assert(!std::is_convertible_v<QCPHandle<QCPGraph>, QCPGraph*>);`
   - `handleAsCast`: `QCPHandle<QCPAbstractPlottable>` of a graph `.as<QCPGraph>()` is true and
     `.as<QCPCurve>()` is false.
   - `handleRemove`: `h.remove()` deletes; `plottableCount()` drops; a second `remove()` is a no-op.
@@ -305,7 +350,7 @@ is done, and leaves NeoQCP building and green. Only milestone 1 is planned here.
     survive, so the fatal path itself is not tested.)
 - [ ] **Step 2:** Register, build, run. Expected: fails to compile (`handle.h` not found).
 - [ ] **Step 3:** Implement `src/handle.h`.
-- [ ] **Step 4:** Build, run `TestHandle`. Expected: 6 passed.
+- [ ] **Step 4:** Build, run `TestHandle`. Expected: 7 passed.
 - [ ] **Step 5: Commit** — "feat(core): QCPHandle<T>, a typed handle that never dangles".
 
 ### Task 9: Deferred signal delivery at the hazard sites
@@ -339,6 +384,9 @@ is done, and leaves NeoQCP building and green. Only milestone 1 is planned here.
     and has run after `QCoreApplication::processEvents()`.
   - `slotDeletesPlotDuringReplot`: slots on `beforeReplot`, `afterLayout` and `afterReplot` (one test each,
     data-driven) `delete` the plot; `replot()` returns and ASan is clean.
+  - `replotSignalsWaitForReplotToFinish`: a `beforeReplot` slot records `plot->isReplotting()` (add the
+    getter if missing); it records `false`, which fails while the emit is direct, so a direct emit left
+    inside `replot` is caught.
   - `slotDeletesAxisDuringRescale`: a `rangeChanged` slot deletes another axis during `rescaleAxes()`; no crash.
   - `slotDeletesPlotOnClick`: a `plottableClick` slot deletes the plot after a simulated mouse press and
     release (`QTest::mouseClick` on a graph's pixel); no crash, and the slot ran after the event returned.
@@ -351,9 +399,26 @@ is done, and leaves NeoQCP building and green. Only milestone 1 is planned here.
   `QCPLayout::clear`; open a `QCPInputScope` at the top of the mouse, wheel and key handlers; route those
   sites' emits through `deliver`; loops use guarded snapshots.
 - [ ] **Step 4:** Build, run `TestSignalDelivery` (and `build-asan`). Expected: all passed, ASan clean.
-- [ ] **Step 5:** Full suite and benchmark. Expected: green, no regression. Existing tests that assumed a
-  synchronous signal from an input handler are updated to process events once; list each in the commit.
+- [ ] **Step 5:** Full suite and benchmark. Expected: green, no regression (`QCPAxis_SetRange10k` included).
+  Existing tests that assumed a synchronous signal from an input handler are updated to process events once;
+  list each in the commit. This is the one sanctioned exception to the "additive only" constraint: the
+  maintainer chose input-caused signals on the next event-loop turn (spec answer 1).
 - [ ] **Step 6: Commit** — "feat(core): deferred signal delivery at the re-entrancy hazard sites".
+
+### Task 9b: The primitives compose
+
+**Files:**
+- Test: `tests/auto/test-signal-delivery/test-signal-delivery.cpp`
+
+- [ ] **Step 1: Write the tests** (data-driven; each must be ASan-clean):
+  - `deletePlotFromBeforeReplotWithHandle`: a `beforeReplot` slot deletes the plot while a
+    `QCPHandle<QCPGraph>` into it is held; after `replot()` returns the handle is false.
+  - `deletedChildSkipsQueuedEmission`: inside a `QCPEmissionScope`, queue an emission for a graph, then delete
+    the graph from another graph's `destroyed` slot; the emission is skipped at the flush.
+  - `removeInsideInputScope`: `handle.remove()` inside a `QCPInputScope`, then `processEvents()`; no crash,
+    the queued input signals for that object are skipped.
+- [ ] **Step 2:** Build, run. Expected: pass (if one fails, fix the primitive it exposes, test-first, in this task).
+- [ ] **Step 3: Commit** — "test(core): handles, teardown and deferred delivery together".
 
 ### Task 10: Close the milestone
 
@@ -366,5 +431,7 @@ is done, and leaves NeoQCP building and green. Only milestone 1 is planned here.
 - [ ] **Step 3:** Ask opencode for an honest, contradicting review of the milestone's diff
   (`git diff e9daa0c..HEAD -- src tests`); verify each point against the code; fix the real ones test-first.
 - [ ] **Step 4:** Changelog entry under a new "3.0 (in progress)" heading: what is now safe to delete, the new
-  headers, the deferred delivery rule and which sites use it.
+  headers, the deferred delivery rule and which sites use it. Add the `2.x` back-port rule to the changelog
+  header: fixes land on the 3.0 line and are cherry-picked to `2.x` with `git cherry-pick -x`; CI for `2.x`
+  is set up when the branches are first pushed (the maintainer's call).
 - [ ] **Step 5: Commit** — "docs: milestone 1 of the 3.0 object model". Report to the maintainer; no push.
