@@ -715,6 +715,11 @@ QCPSpanRhiLayer* QCustomPlot::spanRhiLayer()
     return mSpanRhiLayer;
 }
 
+QCPSpanRhiLayer* QCustomPlot::spanRhiLayerIfExists() const
+{
+    return mSpanRhiLayer;
+}
+
 QCPGridRhiLayer* QCustomPlot::gridRhiLayer()
 {
     if (!mGridRhiLayer && mRhi)
@@ -1703,8 +1708,10 @@ bool QCustomPlot::removeItem(QCPAbstractItem* item)
 {
     if (mItems.contains(item))
     {
-        delete item;
+        // Unlisted first: a slot on destroyed() that calls removeItem or clearItems must find it gone.
         mItems.removeOne(item);
+        item->mRegisteredPlot = nullptr;
+        delete item;
         return true;
     }
     else
@@ -1738,10 +1745,15 @@ bool QCustomPlot::removeItem(int index)
 */
 int QCustomPlot::clearItems()
 {
-    int c = mItems.size();
-    while (!mItems.isEmpty())
-        (void)removeItem(mItems.last());
-    return c;
+    // All unlisted before the first delete, as in removeItem: a slot on destroyed() finds none of
+    // them. The guarded snapshot skips any that such a slot deletes itself.
+    const auto items = guarded(mItems);
+    for (QCPAbstractItem* item : std::as_const(mItems))
+        item->mRegisteredPlot = nullptr;
+    mItems.clear();
+    for (auto it = items.crbegin(); it != items.crend(); ++it)
+        delete it->data();
+    return items.size();
 }
 
 /*!
@@ -4296,6 +4308,16 @@ bool QCustomPlot::registerGraph(QCPGraph* graph)
 
     mGraphs.append(graph);
     return true;
+}
+
+/*! \internal
+
+  Called by the destructor of \a item: a plain delete (or deleteLater) leaves no dead pointer in
+  the item list.
+*/
+void QCustomPlot::itemDestroyed(QCPAbstractItem* item)
+{
+    mItems.removeOne(item);
 }
 
 /*! \internal

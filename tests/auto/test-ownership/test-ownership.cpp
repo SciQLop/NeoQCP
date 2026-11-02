@@ -1,5 +1,7 @@
 #include "test-ownership.h"
 
+#include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
+
 namespace
 {
 int gMisuses = 0;
@@ -171,4 +173,86 @@ void TestOwnership::plottableDeathLeavesSecondLegend()
 
     QCOMPARE(second->itemCount(), 0);
     draw();
+}
+
+void TestOwnership::deleteItemLeavesList()
+{
+    auto* line = new QCPItemLine(mPlot);
+    new QCPItemText(mPlot);
+    QCOMPARE(mPlot->itemCount(), 2);
+
+    delete line;
+
+    QCOMPARE(mPlot->itemCount(), 1);
+    QVERIFY(!mPlot->hasItem(line));
+    draw();
+}
+
+void TestOwnership::deleteLaterItem()
+{
+    auto* line = new QCPItemLine(mPlot);
+    new QCPItemText(mPlot);
+
+    line->deleteLater();
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+
+    QCOMPARE(mPlot->itemCount(), 1);
+    draw();
+}
+
+void TestOwnership::removeItemFromDestroyedSlot()
+{
+    auto* line = new QCPItemLine(mPlot);
+    new QCPItemText(mPlot);
+    connect(line, &QObject::destroyed, mPlot, [this] { mPlot->clearItems(); });
+
+    QVERIFY(mPlot->removeItem(line));
+
+    QCOMPARE(mPlot->itemCount(), 0);
+    draw();
+}
+
+void TestOwnership::clearItemsWhileASlotDeletesAnother()
+{
+    auto* first = new QCPItemLine(mPlot);
+    auto* second = new QCPItemLine(mPlot);
+    new QCPItemText(mPlot); // cleared first: its slot deletes an item still in the snapshot
+    connect(mPlot->item(), &QObject::destroyed, mPlot, [first] { delete first; });
+    Q_UNUSED(second);
+
+    QCOMPARE(mPlot->clearItems(), 3);
+
+    QCOMPARE(mPlot->itemCount(), 0);
+    draw();
+}
+
+void TestOwnership::deleteParentAnchorItem()
+{
+    auto* tracer = new QCPItemTracer(mPlot);
+    tracer->position->setCoords(1, 2);
+    auto* text = new QCPItemText(mPlot);
+    text->position->setParentAnchor(tracer->position);
+    text->position->setCoords(10, 20); // pixels away from the tracer
+    mPlot->replot();
+    const QPointF before = text->position->pixelPosition();
+
+    delete tracer;
+
+    QVERIFY(text->position->parentAnchor() == nullptr);
+    QCOMPARE(text->position->pixelPosition(), before);
+    draw();
+}
+
+void TestOwnership::spanDestructorCreatesNoGpuLayer()
+{
+    mPlot->show();
+    if (!QTest::qWaitForWindowExposed(mPlot)
+        || (QCoreApplication::processEvents(), !mPlot->rhi()))
+        QSKIP("no QRhi on this platform");
+    mPlot->replot();
+    QVERIFY(mPlot->spanRhiLayerIfExists() == nullptr);
+
+    delete new QCPItemVSpan(mPlot);
+
+    QVERIFY(mPlot->spanRhiLayerIfExists() == nullptr);
 }

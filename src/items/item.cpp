@@ -274,14 +274,12 @@ QCPItemPosition::~QCPItemPosition()
     for (QCPItemPosition* child : mChildrenX.values())
     {
         if (child->parentAnchorX() == this)
-            child->setParentAnchorX(
-                nullptr); // this acts back on this anchor and child removes itself from mChildrenX
+            child->setParentAnchorX(nullptr, true); // the child leaves mChildrenX by itself
     }
     for (QCPItemPosition* child : mChildrenY.values())
     {
         if (child->parentAnchorY() == this)
-            child->setParentAnchorY(
-                nullptr); // this acts back on this anchor and child removes itself from mChildrenY
+            child->setParentAnchorY(nullptr, true); // the child leaves mChildrenY by itself
     }
     // unregister as child in parent:
     if (mParentAnchorX)
@@ -1077,7 +1075,8 @@ void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
 QCPAbstractItem::QCPAbstractItem(QCustomPlot* parentPlot)
         : QCPLayerable(parentPlot), mClipToAxisRect(false), mSelectable(true), mSelected(false)
 {
-    parentPlot->registerItem(this);
+    if (parentPlot->registerItem(this))
+        mRegisteredPlot = parentPlot;
 
     QList<QCPAxisRect*> rects = parentPlot->axisRects();
     if (!rects.isEmpty())
@@ -1089,6 +1088,8 @@ QCPAbstractItem::QCPAbstractItem(QCustomPlot* parentPlot)
 
 QCPAbstractItem::~QCPAbstractItem()
 {
+    if (mRegisteredPlot)
+        mRegisteredPlot->itemDestroyed(this);
     // don't delete mPositions because every position is also an anchor and thus in mAnchors
     qDeleteAll(mAnchors);
 }

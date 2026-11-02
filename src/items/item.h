@@ -254,6 +254,8 @@ protected:
 private:
     Q_DISABLE_COPY(QCPAbstractItem)
 
+    QPointer<QCustomPlot> mRegisteredPlot; // the plot whose item list holds this one
+
     friend class QCustomPlot;
     friend class QCPItemAnchor;
 };

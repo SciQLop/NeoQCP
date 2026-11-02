@@ -229,6 +229,8 @@ public:
     QCPOverlay* overlay();
     // span GPU layer:
     QCPSpanRhiLayer* spanRhiLayer();
+    // Non-lazy accessor: never creates the span RHI layer. Safe from destructors.
+    QCPSpanRhiLayer* spanRhiLayerIfExists() const;
     // grid GPU layer:
     QCPGridRhiLayer* gridRhiLayer();
     // Non-lazy accessor: returns the grid RHI layer only if it already exists and
@@ -508,6 +510,7 @@ protected:
     QPointer<QCPPlottableGroup> unlistPlottable(QCPAbstractPlottable* plottable);
     void plottableDestroyed(QCPAbstractPlottable* plottable);
     bool registerItem(QCPAbstractItem* item);
+    void itemDestroyed(QCPAbstractItem* item);
     void updateLayerIndices() const;
     bool deselectAllExcept(const QCPLayerable* kept);
     QCPLayerable* layerableAt(const QPointF& pos, bool onlySelectable,

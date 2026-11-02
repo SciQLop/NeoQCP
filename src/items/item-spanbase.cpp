@@ -6,14 +6,14 @@
 
 QCPAbstractSpanItem::~QCPAbstractSpanItem()
 {
-    if (mParentPlot && mParentPlot->spanRhiLayer())
-        mParentPlot->spanRhiLayer()->unregisterSpan(this);
+    if (auto* layer = mParentPlot ? mParentPlot->spanRhiLayerIfExists() : nullptr)
+        layer->unregisterSpan(this);
 }
 
 void QCPAbstractSpanItem::markRhiDirty()
 {
-    if (mParentPlot && mParentPlot->spanRhiLayer())
-        mParentPlot->spanRhiLayer()->markGeometryDirty();
+    if (auto* layer = mParentPlot ? mParentPlot->spanRhiLayerIfExists() : nullptr)
+        layer->markGeometryDirty();
 }
 
 void QCPAbstractSpanItem::setPen(const QPen& pen)

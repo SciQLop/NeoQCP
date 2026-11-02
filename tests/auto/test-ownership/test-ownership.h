@@ -17,6 +17,13 @@ private slots:
     void legendItemMovedToSecondLegend();
     void plottableDeathLeavesSecondLegend();
 
+    void deleteItemLeavesList();
+    void deleteLaterItem();
+    void removeItemFromDestroyedSlot();
+    void clearItemsWhileASlotDeletesAnother();
+    void deleteParentAnchorItem();
+    void spanDestructorCreatesNoGpuLayer();
+
 private:
     void draw();
     QCPLegend* addSecondLegend();
