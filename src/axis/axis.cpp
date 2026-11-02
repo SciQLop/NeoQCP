@@ -494,11 +494,11 @@ QCPAxis::~QCPAxis()
   the grid is displayed.
 
   It is never \c nullptr: if the grid was deleted, a new hidden one is made on the "grid" layer
-  (the QMainWindow::statusBar() pattern).
+  (the QMainWindow::statusBar() pattern). The exception is a plot being destroyed: then it may be.
 */
 QCPGrid* QCPAxis::grid() const
 {
-    if (!mGrid)
+    if (!mGrid && !(mParentPlot && mParentPlot->isBeingDestroyed()))
     {
         mGrid = new QCPGrid(const_cast<QCPAxis*>(this));
         mGrid->setVisible(false);

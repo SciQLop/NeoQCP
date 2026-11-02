@@ -238,6 +238,7 @@ private:
     Q_DISABLE_COPY(QCPPolarGraph)
 
     friend class QCPPolarLegendItem;
+    friend class QCPPolarAxisAngular;
 };
 
 #endif // QCP_POLARGRAPH_H

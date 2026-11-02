@@ -40,6 +40,15 @@ private slots:
     void intervalsWithoutLaneLayout();
     void deletePolarGraphInLegend();
     void intervalsWithoutAxes();
+    void deleteAngularAxisWithGraphs();
+
+    void destroyedSlotAddsDuringTeardown();
+    void destroyedSlotConstructsDuringTeardown();
+    void destroyedSlotDeletesSiblingDuringTeardown();
+    void childrenDeletedWhilePlotWhole();
+    void mutatorsRefuseDuringTeardown();
+    void recreatingGettersReturnNullDuringTeardown();
+    void shownPlotTeardownFreesGpuResources();
 
 private:
     void draw();

@@ -261,7 +261,13 @@ void QCPPolarGraph::setPeriodic(bool enabled)
 */
 void QCPPolarGraph::setKeyAxis(QCPPolarAxisAngular* axis)
 {
+    if (mKeyAxis == axis)
+        return;
+    if (mKeyAxis)
+        mKeyAxis->mGraphs.removeOne(this);
     mKeyAxis = axis;
+    if (mKeyAxis)
+        mKeyAxis->registerPolarGraph(this);
 }
 
 /*!

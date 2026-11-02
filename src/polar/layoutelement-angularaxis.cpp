@@ -27,6 +27,7 @@
 #include "polargraph.h"
 #include "polargrid.h"
 #include "radialaxis.h"
+#include <utility>
 
 #include "../axis/axistickerfixed.h"
 #include "../axis/labelpainter.h"
@@ -238,6 +239,10 @@ QCPPolarAxisAngular::~QCPPolarAxisAngular()
     delete mGrid; // delete grid here instead of via parent ~QObject for better defined deletion
                   // order
     mGrid = 0;
+
+    // The graphs outlive their axis: none may reach back into this list once it is gone.
+    for (QCPPolarGraph* graph : std::exchange(mGraphs, {}))
+        graph->mKeyAxis = nullptr;
 
     delete mInsetLayout;
     mInsetLayout = 0;

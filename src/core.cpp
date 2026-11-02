@@ -27,6 +27,7 @@
 
 #include "core.h"
 #include <utility>
+#include "misuse.h"
 #include "plottables/plottable-group.h"
 #include "item-creation-state.h"
 #include "overlay.h"
@@ -527,29 +528,28 @@ QCustomPlot::QCustomPlot(QWidget* parent)
 
 QCustomPlot::~QCustomPlot()
 {
+    mBeingDestroyed = true;
     // Release paint buffer GPU resources before QRhiWidget tears down the RHI
-    qDeleteAll(mPlottableRhiLayers);
-    mPlottableRhiLayers.clear();
-    qDeleteAll(mScatterRhiLayers);
-    mScatterRhiLayers.clear();
+    qDeleteAll(std::exchange(mPlottableRhiLayers, {}));
+    qDeleteAll(std::exchange(mScatterRhiLayers, {}));
     mPaintBuffers.clear();
 
     // Before the plottables and the legend: a group's destructor touches both. As QObject
     // children the groups would otherwise be destroyed after them.
     while (!mPlottableGroups.isEmpty())
         delete mPlottableGroups.last();
-    clearPlottables();
-    clearItems();
+    // While the layout stands: a destroyed() slot of these still sees a whole plot.
+    while (!mPlottables.isEmpty())
+        deletePlottable(mPlottables.last());
+    deleteAllItems();
 
-    if (mPlotLayout)
-    {
-        delete mPlotLayout;
-        mPlotLayout = nullptr;
-    }
+    delete mPlotLayout.data();
 
     mCurrentLayer = nullptr;
     // Unlisted first: a layer still listed would move its children to its neighbour as it dies.
     qDeleteAll(std::exchange(mLayers, {}));
+    // Last: the spans and axes deleted above unregister from the span and grid GPU layers.
+    releaseCompositeResources();
 }
 
 /*! \internal
@@ -572,11 +572,12 @@ void QCustomPlot::createPlotLayout()
   Returns the top level layout of this QCustomPlot instance. It is a \ref QCPLayoutGrid, initially
   containing just one cell with the main QCPAxisRect inside.
 
-  It is never \c nullptr: if the user deleted it, an empty layout takes its place.
+  It is never \c nullptr: if the user deleted it, an empty layout takes its place. The exception
+  is a plot being destroyed (\ref isBeingDestroyed): then nothing is made.
 */
 QCPLayoutGrid* QCustomPlot::plotLayout() const
 {
-    if (!mPlotLayout)
+    if (!mPlotLayout && !mBeingDestroyed)
         const_cast<QCustomPlot*>(this)->createPlotLayout();
     return mPlotLayout;
 }
@@ -587,7 +588,7 @@ QCPLayoutGrid* QCustomPlot::plotLayout() const
 */
 QCPTheme* QCustomPlot::ownedTheme()
 {
-    if (!mOwnedTheme)
+    if (!mOwnedTheme && !mBeingDestroyed)
         mOwnedTheme = new QCPTheme(this);
     return mOwnedTheme;
 }
@@ -599,6 +600,7 @@ QCPTheme* QCustomPlot::theme() const
 
 void QCustomPlot::setTheme(QCPTheme* theme)
 {
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed");
     QCPTheme* resolved = theme ? theme : ownedTheme();
     if (mTheme == resolved)
         return;
@@ -624,7 +626,7 @@ void QCustomPlot::connectThemeSignal()
 
 void QCustomPlot::applyTheme()
 {
-    if (!mTheme)
+    if (!mTheme || mBeingDestroyed)
         return;
 
     auto recoloredPen = [](QPen pen, const QColor& c) { pen.setColor(c); return pen; };
@@ -720,7 +722,7 @@ void QCustomPlot::setMaxPipelineThreads(int count)
 
 QCPOverlay* QCustomPlot::overlay()
 {
-    if (!mOverlay) {
+    if (!mOverlay && !mBeingDestroyed) {
         auto* notifLayer = layer(QLatin1String("notification"));
         if (!notifLayer) {
             (void)addLayer(QLatin1String("notification"));
@@ -737,7 +739,7 @@ QCPOverlay* QCustomPlot::overlay()
 
 QCPSpanRhiLayer* QCustomPlot::spanRhiLayer()
 {
-    if (!mSpanRhiLayer && mRhi)
+    if (!mSpanRhiLayer && mRhi && !mBeingDestroyed)
         mSpanRhiLayer = new QCPSpanRhiLayer(mRhi);
     return mSpanRhiLayer;
 }
@@ -749,7 +751,7 @@ QCPSpanRhiLayer* QCustomPlot::spanRhiLayerIfExists() const
 
 QCPGridRhiLayer* QCustomPlot::gridRhiLayer()
 {
-    if (!mGridRhiLayer && mRhi)
+    if (!mGridRhiLayer && mRhi && !mBeingDestroyed)
         mGridRhiLayer = new QCPGridRhiLayer(mRhi);
     return mGridRhiLayer;
 }
@@ -1208,7 +1210,7 @@ void QCustomPlot::setBufferDevicePixelRatio(double ratio)
 
 QCPPlottableRhiLayer* QCustomPlot::plottableRhiLayer(QCPLayer* layer)
 {
-    if (!mRhi)
+    if (!mRhi || mBeingDestroyed)
         return nullptr;
     if (!mPlottableRhiLayers.contains(layer))
     {
@@ -1220,7 +1222,7 @@ QCPPlottableRhiLayer* QCustomPlot::plottableRhiLayer(QCPLayer* layer)
 
 QCPScatterRhiLayer* QCustomPlot::scatterRhiLayer(QCPLayer* layer)
 {
-    if (!mRhi)
+    if (!mRhi || mBeingDestroyed)
         return nullptr;
     if (!mScatterRhiLayers.contains(layer))
     {
@@ -1373,13 +1375,23 @@ QCPAbstractPlottable* QCustomPlot::plottable()
 */
 bool QCustomPlot::removePlottable(QCPAbstractPlottable* plottable)
 {
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     if (!mPlottables.contains(plottable))
     {
         qDebug() << Q_FUNC_INFO
                  << "plottable not in list:" << reinterpret_cast<quintptr>(plottable);
         return false;
     }
+    deletePlottable(plottable);
+    return true;
+}
 
+/*! \internal
+
+  Unlists and deletes \a plottable, one of this plot's.
+*/
+void QCustomPlot::deletePlottable(QCPAbstractPlottable* plottable)
+{
     // Unlisted while still whole, so a subclass's own legend row goes too; the destructor skips it.
     QPointer<QCPPlottableGroup> group = unlistPlottable(plottable);
     plottable->mRegisteredPlot = nullptr;
@@ -1390,7 +1402,6 @@ bool QCustomPlot::removePlottable(QCPAbstractPlottable* plottable)
         group->updateLegendRow();
         emit group->membersChanged();
     }
-    return true;
 }
 
 /*! \internal
@@ -1435,6 +1446,7 @@ void QCustomPlot::plottableDestroyed(QCPAbstractPlottable* plottable)
 */
 bool QCustomPlot::removePlottable(int index)
 {
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     if (index >= 0 && index < mPlottables.size())
         return removePlottable(mPlottables[index]);
     else
@@ -1459,6 +1471,7 @@ bool QCustomPlot::removePlottable(int index)
 */
 QCPPlottableGroup* QCustomPlot::addPlottableGroup(const QString& name)
 {
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", nullptr);
     auto* group = new QCPPlottableGroup(this, name);
     mPlottableGroups.append(group);
     return group;
@@ -1471,6 +1484,7 @@ QCPPlottableGroup* QCustomPlot::addPlottableGroup(const QString& name)
 */
 bool QCustomPlot::removePlottableGroup(QCPPlottableGroup* group)
 {
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     if (!mPlottableGroups.contains(group))
         return false;
     delete group;
@@ -1479,9 +1493,10 @@ bool QCustomPlot::removePlottableGroup(QCPPlottableGroup* group)
 
 int QCustomPlot::clearPlottables()
 {
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", 0);
     int c = mPlottables.size();
     while (!mPlottables.isEmpty())
-        (void)removePlottable(mPlottables.last());
+        deletePlottable(mPlottables.last());
     return c;
 }
 
@@ -1590,6 +1605,7 @@ QCPGraph* QCustomPlot::graph() const
 */
 QCPGraph* QCustomPlot::addGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
 {
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", nullptr);
     if (!keyAxis)
         keyAxis = xAxis;
     if (!valueAxis)
@@ -1634,6 +1650,7 @@ bool QCustomPlot::removeGraph(QCPGraph* graph)
 */
 bool QCustomPlot::removeGraph(int index)
 {
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     if (index >= 0 && index < mGraphs.size())
         return removeGraph(mGraphs[index]);
     else
@@ -1650,6 +1667,7 @@ bool QCustomPlot::removeGraph(int index)
 */
 int QCustomPlot::clearGraphs()
 {
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", 0);
     int c = mGraphs.size();
     while (!mGraphs.isEmpty())
         (void)removeGraph(mGraphs.last());
@@ -1733,6 +1751,7 @@ QCPAbstractItem* QCustomPlot::item() const
 */
 bool QCustomPlot::removeItem(QCPAbstractItem* item)
 {
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     if (mItems.contains(item))
     {
         // Unlisted first: a slot on destroyed() that calls removeItem or clearItems must find it gone.
@@ -1754,6 +1773,7 @@ bool QCustomPlot::removeItem(QCPAbstractItem* item)
 */
 bool QCustomPlot::removeItem(int index)
 {
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     if (index >= 0 && index < mItems.size())
         return removeItem(mItems[index]);
     else
@@ -1771,6 +1791,12 @@ bool QCustomPlot::removeItem(int index)
   \see removeItem
 */
 int QCustomPlot::clearItems()
+{
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", 0);
+    return deleteAllItems();
+}
+
+int QCustomPlot::deleteAllItems()
 {
     // All unlisted before the first delete, as in removeItem: a slot on destroyed() finds none of
     // them. The guarded snapshot skips any that such a slot deletes itself.
@@ -1890,6 +1916,7 @@ QCPLayer* QCustomPlot::currentLayer() const
 */
 bool QCustomPlot::setCurrentLayer(const QString& name)
 {
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     if (QCPLayer* newCurrentLayer = layer(name))
     {
         return setCurrentLayer(newCurrentLayer);
@@ -1911,6 +1938,7 @@ bool QCustomPlot::setCurrentLayer(const QString& name)
 */
 bool QCustomPlot::setCurrentLayer(QCPLayer* layer)
 {
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     if (!mLayers.contains(layer))
     {
         qDebug() << Q_FUNC_INFO
@@ -1948,6 +1976,7 @@ int QCustomPlot::layerCount() const
 bool QCustomPlot::addLayer(const QString& name, QCPLayer* otherLayer,
                            QCustomPlot::LayerInsertMode insertMode)
 {
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     if (!otherLayer)
         otherLayer = mLayers.last();
     if (!mLayers.contains(otherLayer))
@@ -1990,6 +2019,7 @@ bool QCustomPlot::addLayer(const QString& name, QCPLayer* otherLayer,
 */
 bool QCustomPlot::removeLayer(QCPLayer* layer)
 {
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     if (!mLayers.contains(layer))
     {
         qDebug() << Q_FUNC_INFO
@@ -2050,6 +2080,7 @@ void QCustomPlot::unlistLayer(QCPLayer* layer)
 bool QCustomPlot::moveLayer(QCPLayer* layer, QCPLayer* otherLayer,
                             QCustomPlot::LayerInsertMode insertMode)
 {
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     if (!mLayers.contains(layer))
     {
         qDebug() << Q_FUNC_INFO
@@ -2372,6 +2403,8 @@ void QCustomPlot::commitPendingData()
 void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
 {
     PROFILE_HERE;
+    if (mBeingDestroyed)
+        return;
     if (refreshPriority == QCustomPlot::rpQueuedReplot)
     {
         if (!mReplotQueued)
@@ -2794,7 +2827,8 @@ bool QCustomPlot::saveBmp(const QString& fileName, int width, int height, double
 */
 QSize QCustomPlot::minimumSizeHint() const
 {
-    return plotLayout()->minimumOuterSizeHint();
+    const QCPLayoutGrid* layout = plotLayout();
+    return layout ? layout->minimumOuterSizeHint() : QSize();
 }
 
 /*! \internal
@@ -2804,7 +2838,7 @@ QSize QCustomPlot::minimumSizeHint() const
 */
 QSize QCustomPlot::sizeHint() const
 {
-    return plotLayout()->minimumOuterSizeHint();
+    return minimumSizeHint();
 }
 
 /*! \internal
@@ -3280,25 +3314,27 @@ void QCustomPlot::releaseResources()
     for (auto* plottable : std::as_const(mPlottables))
         plottable->releaseGpuResources();
     mColormapRhiLayers.clear();
-    delete mSpanRhiLayer;
-    mSpanRhiLayer = nullptr;
-    delete mGridRhiLayer;
-    mGridRhiLayer = nullptr;
     mPaintBuffers.clear();
-    delete mCompositePipeline;
-    mCompositePipeline = nullptr;
-    delete mLayoutSrb;
-    mLayoutSrb = nullptr;
-    delete mCompositeUbo;
-    mCompositeUbo = nullptr;
-    delete mSampler;
-    mSampler = nullptr;
-    delete mQuadVertexBuffer;
-    mQuadVertexBuffer = nullptr;
-    delete mQuadIndexBuffer;
-    mQuadIndexBuffer = nullptr;
+    releaseCompositeResources();
     mRhi = nullptr;
     mRhiInitialized = false;
+}
+
+/*! \internal
+
+  Frees the span and grid GPU layers and the compositing resources. Safe to call twice: by
+  releaseResources, then by the destructor.
+*/
+void QCustomPlot::releaseCompositeResources()
+{
+    delete std::exchange(mSpanRhiLayer, nullptr);
+    delete std::exchange(mGridRhiLayer, nullptr);
+    delete std::exchange(mCompositePipeline, nullptr);
+    delete std::exchange(mLayoutSrb, nullptr);
+    delete std::exchange(mCompositeUbo, nullptr);
+    delete std::exchange(mSampler, nullptr);
+    delete std::exchange(mQuadVertexBuffer, nullptr);
+    delete std::exchange(mQuadIndexBuffer, nullptr);
 }
 
 /*! \internal
@@ -3854,6 +3890,8 @@ void QCustomPlot::updateLayout()
     PROFILE_HERE_N("QCustomPlot::updateLayout");
     // run through layout phases:
     QCPLayoutGrid* layout = plotLayout();
+    if (!layout)
+        return;
     layout->update(QCPLayoutElement::upPreparation);
     layout->update(QCPLayoutElement::upMargins);
     layout->update(QCPLayoutElement::upLayout);
@@ -4294,6 +4332,7 @@ void QCustomPlot::announceUserSelection()
 */
 bool QCustomPlot::registerPlottable(QCPAbstractPlottable* plottable)
 {
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     if (mPlottables.contains(plottable))
     {
         qDebug() << Q_FUNC_INFO << "plottable already added to this QCustomPlot:"
@@ -4328,6 +4367,8 @@ bool QCustomPlot::registerPlottable(QCPAbstractPlottable* plottable)
 */
 bool QCustomPlot::registerGraph(QCPGraph* graph)
 {
+    if (mBeingDestroyed) // registerPlottable reported it already
+        return false;
     if (!graph)
     {
         qDebug() << Q_FUNC_INFO << "passed graph is zero";
@@ -4364,6 +4405,7 @@ void QCustomPlot::itemDestroyed(QCPAbstractItem* item)
 */
 bool QCustomPlot::registerItem(QCPAbstractItem* item)
 {
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     if (mItems.contains(item))
     {
         qDebug() << Q_FUNC_INFO

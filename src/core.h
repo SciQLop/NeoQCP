@@ -226,6 +226,8 @@ public:
     void setThemeLegendBackground(const QColor& color);
     [[nodiscard]] QColor themeLegendBorder() const;
     void setThemeLegendBorder(const QColor& color);
+    // True from the first line of the destructor: the mutators refuse, the getters make nothing.
+    [[nodiscard]] bool isBeingDestroyed() const { return mBeingDestroyed; }
     // overlay:
     QCPOverlay* overlay();
     // span GPU layer:
@@ -458,6 +460,7 @@ protected:
     bool mCreationModeEnabled = false;
     Qt::KeyboardModifier mCreationModifier = Qt::ShiftModifier;
     QCPItemCreationState* mCreationState = nullptr;
+    bool mBeingDestroyed = false;
     // reimplemented virtual methods:
     virtual QSize minimumSizeHint() const override;
     virtual QSize sizeHint() const override;
@@ -511,6 +514,9 @@ protected:
     //! Takes \a plottable out of every list, its group and the legend; safe to call twice.
     QPointer<QCPPlottableGroup> unlistPlottable(QCPAbstractPlottable* plottable);
     void plottableDestroyed(QCPAbstractPlottable* plottable);
+    void deletePlottable(QCPAbstractPlottable* plottable);
+    int deleteAllItems();
+    void releaseCompositeResources();
     bool registerItem(QCPAbstractItem* item);
     void itemDestroyed(QCPAbstractItem* item);
     //! Moves the layer's children to the layer below (above for the bottom one) and drops every

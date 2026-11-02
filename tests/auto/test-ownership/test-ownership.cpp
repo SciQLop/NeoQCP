@@ -691,3 +691,186 @@ void TestOwnership::intervalsWithoutAxes()
     QCOMPARE(gMisuses, 1);
     QVERIFY(mPlot->removePlottable(bereft)); // before the stack layout goes
 }
+
+void TestOwnership::deleteAngularAxisWithGraphs()
+{
+    auto* angular = new QCPPolarAxisAngular(mPlot);
+    auto* other = new QCPPolarAxisAngular(mPlot);
+    mPlot->plotLayout()->addElement(0, 1, angular);
+    mPlot->plotLayout()->addElement(0, 2, other);
+    auto* survivor = new QCPPolarGraph(angular, angular->radialAxis());
+    survivor->setData(QVector<double> { 0, 90 }, QVector<double> { 1, 2 });
+    auto* moved = new QCPPolarGraph(angular, angular->radialAxis());
+    moved->setKeyAxis(other);
+    delete moved;
+    angular->rescale(); // walks its graph list: the moved graph left it
+    draw();
+
+    delete angular;
+
+    QVERIFY(survivor->keyAxis() == nullptr);
+    draw();
+    delete survivor;
+    draw();
+
+    auto* plot = new QCustomPlot;
+    auto* held = new QCPPolarAxisAngular(plot);
+    plot->plotLayout()->addElement(0, 1, held);
+    new QCPPolarGraph(held, held->radialAxis());
+    delete plot;
+}
+
+void TestOwnership::destroyedSlotAddsDuringTeardown()
+{
+    auto* plot = new QCustomPlot;
+    auto* graph = plot->addGraph();
+    QCPGraph* added = graph;
+    connect(graph, &QObject::destroyed, [plot, &added] { added = plot->addGraph(); });
+
+    delete plot;
+
+    QVERIFY(added == nullptr);
+    QCOMPARE(gMisuses, 1);
+}
+
+void TestOwnership::destroyedSlotConstructsDuringTeardown()
+{
+    auto* plot = new QCustomPlot;
+    auto* graph = plot->addGraph();
+    connect(graph, &QObject::destroyed, [plot] {
+        new QCPCurve(plot->xAxis, plot->yAxis);
+        new QCPItemText(plot);
+    });
+
+    delete plot;
+
+    QCOMPARE(gMisuses, 2); // one refused registration each
+}
+
+void TestOwnership::destroyedSlotDeletesSiblingDuringTeardown()
+{
+    auto* plot = new QCustomPlot;
+    plot->legend->setVisible(true);
+    auto* group = plot->addPlottableGroup("pair");
+    QPointer<QCPGraph> first = plot->addGraph();
+    auto* second = plot->addGraph();
+    group->addMember(first);
+    group->addMember(second);
+    QPointer<QCPAbstractItem> item = new QCPItemText(plot);
+    auto* last = plot->addGraph();
+    connect(last, &QObject::destroyed, [first] { delete first.data(); });
+    connect(second, &QObject::destroyed, [item] { delete item.data(); });
+
+    delete plot;
+
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestOwnership::childrenDeletedWhilePlotWhole()
+{
+    auto* plot = new QCustomPlot;
+    plot->resize(400, 300);
+    plot->replot();
+    const QRect before = plot->axisRect()->rect();
+    QVERIFY(before.isValid());
+    auto* graph = plot->addGraph();
+    auto* item = new QCPItemText(plot);
+    QRect seenByGraph, seenByItem;
+    auto rectOf = [plot] { return plot->axisRect() ? plot->axisRect()->rect() : QRect(); };
+    connect(graph, &QObject::destroyed, [&] { seenByGraph = rectOf(); });
+    connect(item, &QObject::destroyed, [&] { seenByItem = rectOf(); });
+
+    delete plot;
+
+    QCOMPARE(seenByGraph, before);
+    QCOMPARE(seenByItem, before);
+}
+
+void TestOwnership::mutatorsRefuseDuringTeardown()
+{
+    auto* plot = new QCustomPlot;
+    QPointer<QCPGraph> sibling = plot->addGraph();
+    QPointer<QCPPlottableGroup> group = plot->addPlottableGroup("g");
+    QPointer<QCPAbstractItem> item = new QCPItemText(plot);
+    QVERIFY(plot->addLayer("extra"));
+    auto* watched = plot->addGraph();
+    const int plottables = plot->plottableCount();
+    const int items = plot->itemCount();
+    const int layers = plot->layerCount();
+
+    QPointer<QCPLayer> main = plot->layer("main");
+    QPointer<QCPLayer> extra = plot->layer("extra");
+    const QList<std::pair<const char*, std::function<void()>>> mutators {
+        { "addGraph", [&] { QVERIFY(!plot->addGraph()); } },
+        { "addLayer", [&] { QVERIFY(!plot->addLayer("late")); } },
+        { "removeLayer", [&] { QVERIFY(!plot->removeLayer(extra)); } },
+        { "moveLayer", [&] { QVERIFY(!plot->moveLayer(extra, main)); } },
+        { "setCurrentLayer(name)", [&] { QVERIFY(!plot->setCurrentLayer("extra")); } },
+        { "setCurrentLayer(layer)", [&] { QVERIFY(!plot->setCurrentLayer(extra)); } },
+        { "removePlottable", [&] { QVERIFY(!plot->removePlottable(sibling)); } },
+        { "removePlottable(index)", [&] { QVERIFY(!plot->removePlottable(0)); } },
+        { "removeGraph", [&] { QVERIFY(!plot->removeGraph(sibling)); } },
+        { "removeGraph(index)", [&] { QVERIFY(!plot->removeGraph(0)); } },
+        { "clearPlottables", [&] { QCOMPARE(plot->clearPlottables(), 0); } },
+        { "clearGraphs", [&] { QCOMPARE(plot->clearGraphs(), 0); } },
+        { "addPlottableGroup", [&] { QVERIFY(!plot->addPlottableGroup("late")); } },
+        { "removePlottableGroup", [&] { QVERIFY(!plot->removePlottableGroup(group)); } },
+        { "removeItem", [&] { QVERIFY(!plot->removeItem(item)); } },
+        { "removeItem(index)", [&] { QVERIFY(!plot->removeItem(0)); } },
+        { "clearItems", [&] { QCOMPARE(plot->clearItems(), 0); } },
+        { "setTheme", [&] { plot->setTheme(nullptr); } },
+    };
+    QStringList unrefused;
+    int seenPlottables = -1, seenItems = -1, seenLayers = -1;
+    connect(watched, &QObject::destroyed, [&] {
+        for (const auto& [name, call] : mutators)
+        {
+            const int before = gMisuses;
+            call();
+            if (gMisuses != before + 1)
+                unrefused << name;
+        }
+        seenPlottables = plot->plottableCount();
+        seenItems = plot->itemCount();
+        seenLayers = plot->layerCount();
+    });
+
+    delete plot;
+
+    QCOMPARE(unrefused, QStringList());
+    QCOMPARE(seenPlottables, plottables - 1); // only the watched graph went
+    QCOMPARE(seenItems, items);
+    QCOMPARE(seenLayers, layers);
+}
+
+void TestOwnership::recreatingGettersReturnNullDuringTeardown()
+{
+    auto* plot = new QCustomPlot;
+    QCPAxis* axis = plot->xAxis;
+    bool layoutMade = true, overlayMade = true, gridMade = true;
+    connect(plot->plotLayout(), &QObject::destroyed, [&] {
+        layoutMade = plot->plotLayout() != nullptr;
+        overlayMade = plot->overlay() != nullptr;
+    });
+    connect(axis->grid(), &QObject::destroyed, [&] { gridMade = axis->grid() != nullptr; });
+
+    delete plot;
+
+    QVERIFY(!layoutMade);
+    QVERIFY(!overlayMade);
+    QVERIFY(!gridMade);
+    QCOMPARE(gMisuses, 0); // a getter answers, it does not complain
+}
+
+// Run under xvfb with ASan to see the GPU side: offscreen gives no QRhi.
+void TestOwnership::shownPlotTeardownFreesGpuResources()
+{
+    showAndExpose();
+    auto* span = new QCPItemVSpan(mPlot);
+    span->setRange(QCPRange(2, 4));
+    mPlot->xAxis->grid()->setVisible(true);
+    mPlot->replot();
+    QCoreApplication::processEvents();
+    delete mPlot;
+    mPlot = nullptr;
+}
