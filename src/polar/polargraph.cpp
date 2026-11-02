@@ -613,12 +613,18 @@ bool QCPPolarGraph::addToLegend(QCPLegend* legend)
         return false;
     }
 
-    // if (!legend->hasItemWithPlottable(this)) // TODO
-    //{
+    if (legendItemIn(legend))
+        return false;
     legend->addItem(new QCPPolarLegendItem(legend, this));
     return true;
-    //} else
-    //  return false;
+}
+
+QCPPolarLegendItem* QCPPolarGraph::legendItemIn(const QCPLegend* legend) const
+{
+    for (int i = 0; i < legend->itemCount(); ++i)
+        if (auto* pli = qobject_cast<QCPPolarLegendItem*>(legend->item(i)); pli && pli->polarGraph() == this)
+            return pli;
+    return nullptr;
 }
 
 bool QCPPolarGraph::addToLegend()
@@ -636,22 +642,7 @@ bool QCPPolarGraph::removeFromLegend(QCPLegend* legend) const
         qDebug() << Q_FUNC_INFO << "passed legend is null";
         return false;
     }
-
-
-    QCPPolarLegendItem* removableItem = nullptr;
-    for (int i = 0; i < legend->itemCount();
-         ++i) // TODO: reduce this to code in QCPAbstractPlottable::removeFromLegend once unified
-    {
-        if (QCPPolarLegendItem* pli = qobject_cast<QCPPolarLegendItem*>(legend->item(i)))
-        {
-            if (pli->polarGraph() == this)
-            {
-                removableItem = pli;
-                break;
-            }
-        }
-    }
-
+    QCPPolarLegendItem* removableItem = legendItemIn(legend);
     if (removableItem)
         return legend->removeItem(removableItem);
     else

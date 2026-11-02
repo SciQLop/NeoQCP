@@ -226,7 +226,9 @@ public:
     void setThemeLegendBackground(const QColor& color);
     [[nodiscard]] QColor themeLegendBorder() const;
     void setThemeLegendBorder(const QColor& color);
-    // True from the first line of the destructor: the mutators refuse, the getters make nothing.
+    // True from the first line of ~QCustomPlot's body (a subclass destructor has already run by
+    // then). It is what mutators called from children's destroyed() slots see: they refuse, and
+    // the getters make nothing.
     [[nodiscard]] bool isBeingDestroyed() const { return mBeingDestroyed; }
     // overlay:
     QCPOverlay* overlay();

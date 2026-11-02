@@ -41,6 +41,7 @@ private slots:
     void deletePolarGraphInLegend();
     void intervalsWithoutAxes();
     void deleteAngularAxisWithGraphs();
+    void movePolarGraphKeepsOneLegendRow();
 
     void destroyedSlotAddsDuringTeardown();
     void destroyedSlotConstructsDuringTeardown();

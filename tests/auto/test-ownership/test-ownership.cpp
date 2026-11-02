@@ -720,6 +720,27 @@ void TestOwnership::deleteAngularAxisWithGraphs()
     delete plot;
 }
 
+void TestOwnership::movePolarGraphKeepsOneLegendRow()
+{
+    auto* angular = new QCPPolarAxisAngular(mPlot);
+    auto* other = new QCPPolarAxisAngular(mPlot);
+    mPlot->plotLayout()->addElement(0, 1, angular);
+    mPlot->plotLayout()->addElement(0, 2, other);
+    auto* graph = new QCPPolarGraph(angular, angular->radialAxis());
+    const int rows = mPlot->legend->itemCount();
+
+    graph->setKeyAxis(other);
+    QCOMPARE(mPlot->legend->itemCount(), rows);
+
+    QVERIFY(!graph->addToLegend());
+    QCOMPARE(mPlot->legend->itemCount(), rows);
+    QVERIFY(graph->removeFromLegend());
+    QVERIFY(graph->addToLegend());
+    QVERIFY(!graph->addToLegend());
+    QCOMPARE(mPlot->legend->itemCount(), rows);
+    draw();
+}
+
 void TestOwnership::destroyedSlotAddsDuringTeardown()
 {
     auto* plot = new QCustomPlot;
@@ -866,11 +887,15 @@ void TestOwnership::recreatingGettersReturnNullDuringTeardown()
 void TestOwnership::shownPlotTeardownFreesGpuResources()
 {
     showAndExpose();
+    if (!mPlot->rhi())
+        QSKIP("no QRhi on this platform");
     auto* span = new QCPItemVSpan(mPlot);
     span->setRange(QCPRange(2, 4));
     mPlot->xAxis->grid()->setVisible(true);
     mPlot->replot();
     QCoreApplication::processEvents();
+    QVERIFY(mPlot->spanRhiLayerIfExists() != nullptr);
+    QVERIFY(mPlot->gridRhiLayerIfExists() != nullptr);
     delete mPlot;
     mPlot = nullptr;
 }

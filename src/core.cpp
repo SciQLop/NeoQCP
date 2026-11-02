@@ -2838,7 +2838,7 @@ QSize QCustomPlot::minimumSizeHint() const
 */
 QSize QCustomPlot::sizeHint() const
 {
-    return minimumSizeHint();
+    return QCustomPlot::minimumSizeHint();
 }
 
 /*! \internal

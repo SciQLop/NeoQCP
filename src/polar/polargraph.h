@@ -236,6 +236,7 @@ protected:
 
 private:
     Q_DISABLE_COPY(QCPPolarGraph)
+    QCPPolarLegendItem* legendItemIn(const QCPLegend* legend) const;
 
     friend class QCPPolarLegendItem;
     friend class QCPPolarAxisAngular;

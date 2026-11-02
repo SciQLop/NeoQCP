@@ -160,10 +160,6 @@
 
 /* end documentation of inline functions */
 
-/*!
-  Creates a QCPAxisRect instance and sets default values. An axis is added for each of the four
-  sides, the top and right axes are set invisible initially.
-*/
 namespace
 {
 bool beingDestroyed(const QCustomPlot* plot)
@@ -172,6 +168,10 @@ bool beingDestroyed(const QCustomPlot* plot)
 }
 } // namespace
 
+/*!
+  Creates a QCPAxisRect instance and sets default values. An axis is added for each of the four
+  sides, the top and right axes are set invisible initially.
+*/
 QCPAxisRect::QCPAxisRect(QCustomPlot* parentPlot, bool setupDefaultAxes)
         : QCPLayoutElement(parentPlot)
         , mBackgroundBrush(Qt::NoBrush)
@@ -206,10 +206,9 @@ QCPAxisRect::QCPAxisRect(QCustomPlot* parentPlot, bool setupDefaultAxes)
     mAxes.insert(QCPAxis::atTop, QList<QCPAxis*>());
     mAxes.insert(QCPAxis::atBottom, QList<QCPAxis*>());
 
-    // Built by a slot while the plot is torn down: no axes, the rect stays inert.
-    if (setupDefaultAxes)
-        QCP_CHECK(!beingDestroyed(mParentPlot), "the plot is being destroyed");
-    if (setupDefaultAxes && !beingDestroyed(mParentPlot))
+    if (setupDefaultAxes && beingDestroyed(mParentPlot))
+        qcp::reportMisuse(Q_FUNC_INFO, "the plot is being destroyed");
+    else if (setupDefaultAxes)
     {
         QCPAxis* xAxis = addAxis(QCPAxis::atBottom);
         QCPAxis* yAxis = addAxis(QCPAxis::atLeft);
