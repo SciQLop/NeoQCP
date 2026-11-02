@@ -133,6 +133,11 @@ QCPColorScale::QCPColorScale(QCustomPlot* parentPlot)
         , mBarWidth(20)
         , mAxisRect(new QCPColorScaleAxisRectPrivate(this))
 {
+    if (mAxisRect->axes().isEmpty()) // refused its axes, the plot is being destroyed: stay inert
+    {
+        delete mAxisRect.data();
+        return;
+    }
     setMinimumMargins(
         QMargins(0, 6, 0, 6)); // for default right color scale types, keep some room at bottom and
                                // top (important if no margin group is used)
@@ -618,6 +623,8 @@ QCPColorScaleAxisRectPrivate::QCPColorScaleAxisRectPrivate(QCPColorScale* parent
     setMinimumMargins(QMargins(0, 0, 0, 0));
     const QList<QCPAxis::AxisType> allAxisTypes = QList<QCPAxis::AxisType>()
         << QCPAxis::atBottom << QCPAxis::atTop << QCPAxis::atLeft << QCPAxis::atRight;
+    if (axes().isEmpty()) // refused its axes: the plot is being destroyed
+        return;
     for (QCPAxis::AxisType type : allAxisTypes)
     {
         axis(type)->setVisible(true);

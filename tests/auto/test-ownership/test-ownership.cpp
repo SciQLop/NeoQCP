@@ -874,3 +874,45 @@ void TestOwnership::shownPlotTeardownFreesGpuResources()
     delete mPlot;
     mPlot = nullptr;
 }
+
+void TestOwnership::newAxisRectDuringTeardown()
+{
+    auto* plot = new QCustomPlot;
+    auto* graph = plot->addGraph();
+    int axes = -1;
+    QCPAxis* added = nullptr;
+    connect(graph, &QObject::destroyed, [&] {
+        auto* rect = new QCPAxisRect(plot);
+        added = rect->addAxis(QCPAxis::atLeft);
+        axes = rect->axes().size();
+        rect->setupFullAxesBox(true);
+    });
+
+    delete plot;
+
+    QVERIFY(added == nullptr);
+    QCOMPARE(axes, 0);
+    QCOMPARE(gMisuses, 3); // the default axes, the added one, the axes box
+}
+
+void TestOwnership::newColorScaleDuringTeardown()
+{
+    auto* plot = new QCustomPlot;
+    auto* graph = plot->addGraph();
+    connect(graph, &QObject::destroyed, [plot] {
+        auto* scale = new QCPColorScale(plot);
+        scale->setDataRange(QCPRange(1, 2));
+        scale->setDataScaleType(QCPAxis::stLogarithmic);
+        scale->setGradient(QCPColorGradient(QCPColorGradient::gpHot));
+        scale->setLabel("late");
+        scale->setType(QCPAxis::atBottom);
+        scale->setRangeDrag(true);
+        scale->setRangeZoom(true);
+        scale->rescaleDataRange(false);
+        (void)scale->axis();
+    });
+
+    delete plot;
+
+    QCOMPARE(gMisuses, 1); // its axis rect was refused its axes
+}

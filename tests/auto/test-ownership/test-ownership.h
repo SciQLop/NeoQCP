@@ -49,6 +49,8 @@ private slots:
     void mutatorsRefuseDuringTeardown();
     void recreatingGettersReturnNullDuringTeardown();
     void shownPlotTeardownFreesGpuResources();
+    void newAxisRectDuringTeardown();
+    void newColorScaleDuringTeardown();
 
 private:
     void draw();

@@ -369,7 +369,7 @@ void QCPGridRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
             }
             const auto& cached = it.value();
             QCPGrid* grid = axis->grid();
-            if (cached.majorTicks != axis->tickVector()
+            if (!grid || cached.majorTicks != axis->tickVector()
                 || cached.subTicks != axis->subTickVector()
                 || cached.subGridVisible != grid->subGridVisible()
                 || cached.gridColor != grid->pen().color().rgba()
@@ -476,6 +476,8 @@ void QCPGridRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
         for (auto* axis : mAxes)
         {
             QCPGrid* grid = axis->grid();
+            if (!grid)
+                continue;
             CachedAxisTicks cached;
             cached.majorTicks = axis->tickVector();
             cached.subTicks = axis->subTickVector();

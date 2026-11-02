@@ -28,6 +28,7 @@
 #include "../axis/axis.h"
 #include "../axis/axisticker.h"
 #include "../core.h"
+#include "../misuse.h"
 #include "../items/item.h"
 #include "../painting/painter.h"
 #include "../plottables/plottable.h"
@@ -163,6 +164,14 @@
   Creates a QCPAxisRect instance and sets default values. An axis is added for each of the four
   sides, the top and right axes are set invisible initially.
 */
+namespace
+{
+bool beingDestroyed(const QCustomPlot* plot)
+{
+    return plot && plot->isBeingDestroyed();
+}
+} // namespace
+
 QCPAxisRect::QCPAxisRect(QCustomPlot* parentPlot, bool setupDefaultAxes)
         : QCPLayoutElement(parentPlot)
         , mBackgroundBrush(Qt::NoBrush)
@@ -197,7 +206,10 @@ QCPAxisRect::QCPAxisRect(QCustomPlot* parentPlot, bool setupDefaultAxes)
     mAxes.insert(QCPAxis::atTop, QList<QCPAxis*>());
     mAxes.insert(QCPAxis::atBottom, QList<QCPAxis*>());
 
+    // Built by a slot while the plot is torn down: no axes, the rect stays inert.
     if (setupDefaultAxes)
+        QCP_CHECK(!beingDestroyed(mParentPlot), "the plot is being destroyed");
+    if (setupDefaultAxes && !beingDestroyed(mParentPlot))
     {
         QCPAxis* xAxis = addAxis(QCPAxis::atBottom);
         QCPAxis* yAxis = addAxis(QCPAxis::atLeft);
@@ -331,6 +343,7 @@ QList<QCPAxis*> QCPAxisRect::axes() const
 */
 QCPAxis* QCPAxisRect::addAxis(QCPAxis::AxisType type, QCPAxis* axis)
 {
+    QCP_CHECK_OR_RETURN(!beingDestroyed(mParentPlot), "the plot is being destroyed", nullptr);
     QCPAxis* newAxis = axis;
     if (!newAxis)
     {
@@ -556,6 +569,7 @@ void QCPAxisRect::zoom(const QRectF& pixelRect, const QList<QCPAxis*>& affectedA
 */
 void QCPAxisRect::setupFullAxesBox(bool connectRanges)
 {
+    QCP_CHECK_OR_RETURN(!beingDestroyed(mParentPlot), "the plot is being destroyed");
     QCPAxis *xAxis, *yAxis, *xAxis2, *yAxis2;
     if (axisCount(QCPAxis::atBottom) == 0)
         xAxis = addAxis(QCPAxis::atBottom);
@@ -1483,7 +1497,8 @@ void QCPAxisRect::markAffectedLayersDirty()
         for (QCPAxis* ax : axisList)
         {
             markOnce(ax->layer());
-            if (!gpuGrid) markOnce(ax->grid()->layer());
+            if (QCPGrid* grid = ax->grid(); grid && !gpuGrid)
+                markOnce(grid->layer());
         }
     }
     for (QCPAbstractPlottable* p : mParentPlot->mPlottables)
