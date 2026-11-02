@@ -33,7 +33,7 @@ using Step = std::function<void(LivePlot*)>;
 void showAllAxes(LivePlot* plot)
 {
     plot->resize(400, 300);
-    for (QCPAxis* axis : {plot->xAxis2, plot->yAxis2})
+    for (auto* axis : {plot->xAxis2, plot->yAxis2})
     {
         axis->setVisible(true);
         axis->setTickLabels(true);

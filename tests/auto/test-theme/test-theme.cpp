@@ -59,7 +59,7 @@ void TestTheme::applyThemePropagatesAxisColors()
 {
     auto* theme = QCPTheme::dark();
     mPlot->setTheme(theme);
-    QCPAxis* axis = mPlot->xAxis;
+    auto* axis = mPlot->xAxis;
     QCOMPARE(axis->basePen().color(), QColor("#e0e0e0"));
     QCOMPARE(axis->tickPen().color(), QColor("#e0e0e0"));
     QCOMPARE(axis->subTickPen().color(), QColor("#e0e0e0"));

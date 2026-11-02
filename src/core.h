@@ -351,9 +351,9 @@ public:
     Q_SLOT void replot(QCustomPlot::RefreshPriority refreshPriority = QCustomPlot::rpImmediateRefresh);
     [[nodiscard]] double replotTime(bool average = false) const;
 
-    // Become nullptr when the axis or legend is deleted.
-    QPointer<QCPAxis> xAxis, yAxis, xAxis2, yAxis2;
-    QPointer<QCPLegend> legend;
+    // Cleared by ~QCPAxis (through axisRemoved) and ~QCPLegend (through legendRemoved).
+    QCPAxis *xAxis, *yAxis, *xAxis2, *yAxis2;
+    QCPLegend* legend;
 
 signals:
     void mouseDoubleClick(QMouseEvent* event);

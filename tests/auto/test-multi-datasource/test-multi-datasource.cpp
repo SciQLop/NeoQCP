@@ -143,8 +143,8 @@ void TestMultiDataSource::soaGetLines()
         {-1.0, -2.0, -3.0}
     };
     QCPSoAMultiDataSource src(std::move(keys), std::move(cols));
-    QCPAxis* keyAxis = mPlot->xAxis;
-    QCPAxis* valueAxis = mPlot->yAxis;
+    auto* keyAxis = mPlot->xAxis;
+    auto* valueAxis = mPlot->yAxis;
     keyAxis->setRange(0, 4);
     valueAxis->setRange(-5, 35);
     mPlot->replot();
@@ -160,8 +160,8 @@ void TestMultiDataSource::soaGetOptimizedLineData()
     std::vector<double> keys = {1.0, 2.0, 3.0};
     std::vector<std::vector<double>> cols = {{10.0, 20.0, 30.0}};
     QCPSoAMultiDataSource src(std::move(keys), std::move(cols));
-    QCPAxis* keyAxis = mPlot->xAxis;
-    QCPAxis* valueAxis = mPlot->yAxis;
+    auto* keyAxis = mPlot->xAxis;
+    auto* valueAxis = mPlot->yAxis;
     keyAxis->setRange(0, 4);
     valueAxis->setRange(0, 35);
     mPlot->replot();
