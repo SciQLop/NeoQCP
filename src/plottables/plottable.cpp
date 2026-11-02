@@ -29,6 +29,7 @@
 #include "core.h"
 #include "layoutelements/layoutelement-axisrect.h"
 #include "layoutelements/layoutelement-legend.h"
+#include "misuse.h"
 #include "painting/painter.h"
 #include "theme.h"
 
@@ -429,13 +430,17 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
   and have perpendicular orientations. If either of these restrictions is violated, a corresponding
   message is printed to the debug output (qDebug), the construction is not aborted, though.
 
+  A null \a keyAxis or \a valueAxis is a misuse (see \ref qcp::setMisuseHandler): the plottable is
+  then built but inert, in no plot and never drawn, and deleting it is up to the caller.
+
   Since QCPAbstractPlottable is an abstract class that defines the basic interface to plottables,
   it can't be directly instantiated.
 
   You probably want one of the subclasses like \ref QCPGraph or \ref QCPCurve instead.
 */
 QCPAbstractPlottable::QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPLayerable(keyAxis->parentPlot(), QString(), keyAxis->axisRect())
+        : QCPLayerable(keyAxis && valueAxis ? keyAxis->parentPlot() : nullptr, QString(),
+                       keyAxis && valueAxis ? keyAxis->axisRect() : nullptr)
         , mName()
         , mAntialiasedFill(true)
         , mAntialiasedScatters(true)
@@ -446,20 +451,25 @@ QCPAbstractPlottable::QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis)
         , mSelectable(QCP::stWhole)
         , mSelectionDecorator(nullptr)
 {
+    setSelectionDecorator(new QCPSelectionDecorator);
+    mBusyDebounceTimer.setSingleShot(true);
+    connect(&mBusyDebounceTimer, &QTimer::timeout, this, &QCPAbstractPlottable::onDebounceTimeout);
+
+    // Without both axes there is no plot to join: the plottable stays inert, never drawn.
+    QCP_CHECK_OR_RETURN(keyAxis && valueAxis, "a plottable needs a key axis and a value axis");
     if (keyAxis->parentPlot() != valueAxis->parentPlot())
         qDebug() << Q_FUNC_INFO << "Parent plot of keyAxis is not the same as that of valueAxis.";
     if (keyAxis->orientation() == valueAxis->orientation())
         qDebug() << Q_FUNC_INFO << "keyAxis and valueAxis must be orthogonal to each other.";
 
-    mParentPlot->registerPlottable(this);
-    setSelectionDecorator(new QCPSelectionDecorator);
-
-    mBusyDebounceTimer.setSingleShot(true);
-    connect(&mBusyDebounceTimer, &QTimer::timeout, this, &QCPAbstractPlottable::onDebounceTimeout);
+    if (mParentPlot->registerPlottable(this))
+        mRegisteredPlot = mParentPlot;
 }
 
 QCPAbstractPlottable::~QCPAbstractPlottable()
 {
+    if (mRegisteredPlot)
+        mRegisteredPlot->plottableDestroyed(this);
     if (mSelectionDecorator)
     {
         delete mSelectionDecorator;

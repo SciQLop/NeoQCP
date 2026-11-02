@@ -188,7 +188,8 @@ QCPGraph::QCPGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
         , mAdaptiveSampling {}
 {
     // special handling for QCPGraphs to maintain the simple graph interface:
-    mParentPlot->registerGraph(this);
+    if (mParentPlot)
+        mParentPlot->registerGraph(this);
 
     setPen(QPen(Qt::blue, 0));
     setBrush(Qt::NoBrush);

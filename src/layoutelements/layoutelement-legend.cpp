@@ -273,6 +273,28 @@ QCPPlottableLegendItem::QCPPlottableLegendItem(QCPLegend* parent, QCPAbstractPlo
 {
     setAntialiased(false);
     repaintWhenBusyChanges(plottable);
+    leaveLegendWhenDestroyed(plottable);
+}
+
+QCPLegend* QCPAbstractLegendItem::parentLegend() const
+{
+    return mParentLegend;
+}
+
+void QCPAbstractLegendItem::leaveLegendWhenDestroyed(QObject* subject)
+{
+    if (subject)
+        connect(subject, &QObject::destroyed, this,
+                [this]
+                {
+                    if (mParentLegend)
+                        mParentLegend->removeItem(this);
+                });
+}
+
+QCPAbstractPlottable* QCPPlottableLegendItem::plottable()
+{
+    return mPlottable;
 }
 
 void QCPAbstractLegendItem::repaintWhenBusyChanges(QCPAbstractPlottable* plottable)
@@ -833,7 +855,10 @@ bool QCPLegend::hasItemWithPlottable(const QCPAbstractPlottable* plottable) cons
 */
 bool QCPLegend::addItem(QCPAbstractLegendItem* item)
 {
-    return addElement(item);
+    if (!addElement(item))
+        return false;
+    item->mParentLegend = this;
+    return true;
 }
 
 /*! \overload

@@ -27,6 +27,7 @@
 #define QCP_LAYOUTELEMENT_LEGEND_H
 
 #include "../global.h"
+#include <QPointer>
 #include "../layer.h"
 #include "../layout.h"
 
@@ -52,7 +53,7 @@ public:
     explicit QCPAbstractLegendItem(QCPLegend* parent);
 
     // getters:
-    QCPLegend* parentLegend() const { return mParentLegend; }
+    QCPLegend* parentLegend() const;
 
     QFont font() const { return mFont; }
 
@@ -84,7 +85,7 @@ signals:
 
 protected:
     // property members:
-    QCPLegend* mParentLegend;
+    QPointer<QCPLegend> mParentLegend; // follows the item into QCPLegend::addItem
     QFont mFont;
     QColor mTextColor;
     QFont mSelectedFont;
@@ -96,6 +97,8 @@ protected:
     //! the layer dirty; the replot that paints it (and re-lays out the wider legend) is the
     //! one QCPAbstractPlottable::onDebounceTimeout queues right after visuallyBusyChanged.
     void repaintWhenBusyChanges(QCPAbstractPlottable* plottable);
+    //! A row about \a subject has nothing left to show once it is gone: it leaves its legend.
+    void leaveLegendWhenDestroyed(QObject* subject);
 
     // reimplemented virtual methods:
     virtual QCP::Interaction selectionCategory() const override;
@@ -121,11 +124,11 @@ public:
     QCPPlottableLegendItem(QCPLegend* parent, QCPAbstractPlottable* plottable);
 
     // getters:
-    QCPAbstractPlottable* plottable() { return mPlottable; }
+    QCPAbstractPlottable* plottable();
 
 protected:
     // property members:
-    QCPAbstractPlottable* mPlottable;
+    QPointer<QCPAbstractPlottable> mPlottable;
 
     // reimplemented virtual methods:
     virtual void draw(QCPPainter* painter) override;

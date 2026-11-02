@@ -1348,16 +1348,9 @@ bool QCustomPlot::removePlottable(QCPAbstractPlottable* plottable)
         return false;
     }
 
-    QPointer<QCPPlottableGroup> group = plottable->group();
-    if (group)
-        group->detach(plottable, false);
-    // remove plottable from legend:
-    plottable->removeFromLegend();
-    // special handling for QCPGraphs to maintain the simple graph interface:
-    if (QCPGraph* graph = qobject_cast<QCPGraph*>(plottable))
-        mGraphs.removeOne(graph);
-    // remove plottable:
-    mPlottables.removeOne(plottable);
+    // Unlisted while still whole, so a subclass's own legend row goes too; the destructor skips it.
+    QPointer<QCPPlottableGroup> group = unlistPlottable(plottable);
+    plottable->mRegisteredPlot = nullptr;
     delete plottable;
     // Only now: a slot may call removePlottable again, and must find this one gone.
     if (group)
@@ -1366,6 +1359,42 @@ bool QCustomPlot::removePlottable(QCPAbstractPlottable* plottable)
         emit group->membersChanged();
     }
     return true;
+}
+
+/*! \internal
+
+  Takes \a plottable out of its group, the plot's legend and the plottable and graph lists, and
+  returns the group it left (null if none). Safe to call twice: the second call finds nothing.
+
+  Called from the plottable base destructor too, when the subclass parts are already gone: virtual
+  calls reach the base versions and qobject_cast sees a QCPAbstractPlottable, so neither is relied
+  on here. A subclass's own legend row leaves by itself (QCPAbstractLegendItem::leaveLegendWhenDestroyed).
+*/
+QPointer<QCPPlottableGroup> QCustomPlot::unlistPlottable(QCPAbstractPlottable* plottable)
+{
+    QPointer<QCPPlottableGroup> group = plottable->group();
+    if (group)
+        group->detach(plottable, false);
+    if (legend)
+        plottable->removeFromLegend(legend);
+    mGraphs.removeIf([plottable](const QCPGraph* graph) { return graph == plottable; });
+    mPlottables.removeOne(plottable);
+    return group;
+}
+
+/*! \internal
+
+  Called by the destructor of \a plottable: a plain delete (or deleteLater) leaves no dead pointer
+  in the plot, its group or its legend row.
+*/
+void QCustomPlot::plottableDestroyed(QCPAbstractPlottable* plottable)
+{
+    QPointer<QCPPlottableGroup> group = unlistPlottable(plottable);
+    if (group)
+    {
+        group->updateLegendRow();
+        emit group->membersChanged();
+    }
 }
 
 /*! \overload

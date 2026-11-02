@@ -504,6 +504,9 @@ protected:
     // non-virtual methods:
     bool registerPlottable(QCPAbstractPlottable* plottable);
     bool registerGraph(QCPGraph* graph);
+    //! Takes \a plottable out of every list, its group and the legend; safe to call twice.
+    QPointer<QCPPlottableGroup> unlistPlottable(QCPAbstractPlottable* plottable);
+    void plottableDestroyed(QCPAbstractPlottable* plottable);
     bool registerItem(QCPAbstractItem* item);
     void updateLayerIndices() const;
     bool deselectAllExcept(const QCPLayerable* kept);

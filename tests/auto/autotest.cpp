@@ -43,6 +43,7 @@
 #include "test-intervals/test-intervals.h"
 #include "test-plottable-group/test-plottable-group.h"
 #include "test-misuse/test-misuse.h"
+#include "test-ownership/test-ownership.h"
 #include "test-gestures/test-gestures.h"
 
 static bool shouldRun(const char* name)
@@ -128,6 +129,7 @@ int main(int argc, char **argv)
   QCPTEST(TestIntervals);
   QCPTEST(TestPlottableGroup);
   QCPTEST(TestMisuse);
+  QCPTEST(TestOwnership);
 
   return failures == 0 ? 0 : 1;
 }

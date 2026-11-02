@@ -285,6 +285,7 @@ private:
     Q_DISABLE_COPY(QCPAbstractPlottable)
 
     QCPPlottableGroup* mGroup = nullptr; // set and cleared by the group
+    QPointer<QCustomPlot> mRegisteredPlot; // the plot whose lists hold this one; null when inert
     bool mWantsLegend = true;
     bool mRowOnLeave = false; // while grouped: get a legend row back on leaving
     bool mExternalBusy = false;

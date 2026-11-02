@@ -10,6 +10,7 @@ constexpr int kSwatchWidth = 16, kSwatchGap = 6;
 QCPIntervalsLegendItem::QCPIntervalsLegendItem(QCPLegend* parent, QCPIntervals* intervals)
         : QCPAbstractLegendItem(parent), mIntervals(intervals)
 {
+    leaveLegendWhenDestroyed(intervals);
 }
 
 QFont QCPIntervalsLegendItem::effectiveFont() const
