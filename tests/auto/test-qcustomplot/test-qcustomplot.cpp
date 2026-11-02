@@ -334,6 +334,7 @@ void TestQCustomPlot::deleteKeySlotDeletingEveryItemIsSafe()
   }
   QKeyEvent del(QEvent::KeyPress, Qt::Key_Delete, Qt::NoModifier);
   QCoreApplication::sendEvent(mPlot, &del);
+  QCoreApplication::processEvents(); // input signals arrive on the next event-loop turn
   QCOMPARE(mPlot->itemCount(), 0);
 }
 
@@ -558,6 +559,7 @@ void TestQCustomPlot::releaseSlotDeletingThePlotIsSafe()
   bool ran = false;
   deletePlotOn(mPlot, mPlot, &QCustomPlot::mouseRelease, &ran);
   clickAt(mPlot, pixelOf(mPlot, 5, 5));
+  QCoreApplication::processEvents(); // input signals arrive on the next event-loop turn
   QVERIFY(ran);
 }
 
@@ -570,6 +572,7 @@ void TestQCustomPlot::wheelSlotDeletingThePlotIsSafe()
   QWheelEvent event(pos, mPlot->mapToGlobal(pos), QPoint(), QPoint(0, 120), Qt::NoButton,
                     Qt::NoModifier, Qt::NoScrollPhase, false);
   QCoreApplication::sendEvent(mPlot, &event);
+  QCoreApplication::processEvents(); // input signals arrive on the next event-loop turn
   QVERIFY(ran);
 }
 

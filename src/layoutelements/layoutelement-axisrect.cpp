@@ -231,6 +231,7 @@ QCPAxisRect::QCPAxisRect(QCustomPlot* parentPlot, bool setupDefaultAxes)
 
 QCPAxisRect::~QCPAxisRect()
 {
+    const QCPEmissionScope scope(mParentPlot);
     // Deleted mid-gesture (by a rangeChanged slot): give the plot its antialiasing back. Without a
     // layer, the plot itself is being torn down.
     if (mParentPlot && layer())

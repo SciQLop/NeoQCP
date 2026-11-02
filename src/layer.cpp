@@ -137,6 +137,7 @@ QCPLayer::QCPLayer(QCustomPlot* parentPlot, const QString& layerName)
 
 QCPLayer::~QCPLayer()
 {
+    const QCPEmissionScope scope(mParentPlot);
     // A plain delete leaves the plot as removeLayer does. qobject_cast is null when the plot is in
     // ~QObject already, i.e. when it deletes this layer as a QObject child.
     if (auto* plot = qobject_cast<QCustomPlot*>(mParentPlot); plot && plot->mLayers.contains(this))
@@ -765,8 +766,18 @@ bool QCPLayerable::moveToLayer(QCPLayer* layer, bool prepend)
     if (mLayer)
         mLayer->addChild(this, prepend);
     if (mLayer != oldLayer)
-        emit layerChanged(mLayer);
+        emitLayerChanged();
     return true;
+}
+
+// qobject_cast: null when the plot is down to ~QObject, where nothing of it may be touched.
+void QCPLayerable::emitLayerChanged()
+{
+    const auto emission = [this, layer = QPointer<QCPLayer>(mLayer)] { emit layerChanged(layer); };
+    if (auto* plot = qobject_cast<QCustomPlot*>(mParentPlot))
+        plot->deliver(this, emission);
+    else
+        emission();
 }
 
 /*! \internal

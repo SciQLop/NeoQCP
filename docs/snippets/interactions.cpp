@@ -229,13 +229,28 @@ DOC_CODE(interactions_gestures)
         throw std::runtime_error("iGestures did not turn touch input on");
 }
 
+// [interactions_rect_mode_filter]
+class ShiftDragZooms : public QObject
+{
+public:
+    using QObject::QObject;
+    bool eventFilter(QObject* watched, QEvent* event) override
+    {
+        if (event->type() == QEvent::MouseButtonPress)
+        {
+            const bool shift = static_cast<QMouseEvent*>(event)->modifiers() & Qt::ShiftModifier;
+            static_cast<QCustomPlot*>(watched)->setSelectionRectMode(shift ? QCP::srmZoom
+                                                                          : QCP::srmNone);
+        }
+        return false; // the plot still handles the press
+    }
+};
+// [/interactions_rect_mode_filter]
+
 DOC_CODE(interactions_rect_mode_switch)
 {
     // [interactions_rect_mode_switch]
-    QObject::connect(customPlot, &QCustomPlot::mousePress, [customPlot](QMouseEvent* event) {
-        customPlot->setSelectionRectMode(event->modifiers() & Qt::ShiftModifier ? QCP::srmZoom
-                                                                                : QCP::srmNone);
-    });
+    customPlot->installEventFilter(new ShiftDragZooms(customPlot));
     // [/interactions_rect_mode_switch]
     QMouseEvent press(QEvent::MouseButtonPress, QPointF(300, 180), QPointF(300, 180),
                       Qt::LeftButton, Qt::LeftButton, Qt::ShiftModifier);
@@ -283,6 +298,7 @@ DOC_CODE(interactions_locate_on_move)
     const QPointF pos(customPlot->xAxis->coordToPixel(1), customPlot->yAxis->coordToPixel(1));
     QMouseEvent move(QEvent::MouseMove, pos, pos, Qt::NoButton, Qt::NoButton, Qt::NoModifier);
     QApplication::sendEvent(customPlot, &move);
+    QApplication::processEvents(); // input signals arrive on the next event-loop turn
     if (statusBar->currentMessage() != "t = 1, v = 1")
         qFatal("interactions_locate_on_move: got \"%s\"", qPrintable(statusBar->currentMessage()));
 }

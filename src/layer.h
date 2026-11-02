@@ -210,6 +210,7 @@ protected:
     void initializeParentPlot(QCustomPlot* parentPlot);
     void setParentLayerable(QCPLayerable* parentLayerable);
     bool moveToLayer(QCPLayer* layer, bool prepend);
+    void emitLayerChanged();
     void applyAntialiasingHint(QCPPainter* painter, bool localAntialiased,
                                QCP::AntialiasedElement overrideElement) const;
 

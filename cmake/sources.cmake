@@ -5,6 +5,7 @@ set(NEOQCP_SOURCES
     src/colorgradient.cpp
     src/theme.cpp
     src/misuse.cpp
+    src/signal-delivery.cpp
     src/core.cpp
     src/layer.cpp
     src/overlay.cpp
@@ -110,6 +111,7 @@ set(NEOQCP_MOC_HEADERS
     src/theme.h
     src/misuse.h
     src/handle.h
+    src/signal-delivery.h
     src/core.h
     src/datacontainer.h
     src/global.h

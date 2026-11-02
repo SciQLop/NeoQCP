@@ -32,6 +32,7 @@
 #include "painting/paintbuffer.h"
 #include "plottables/plottable.h"
 #include "selectionrect.h"
+#include "signal-delivery.h"
 
 #include <QElapsedTimer>
 #include <QPointer>
@@ -230,6 +231,10 @@ public:
     // then). It is what mutators called from children's destroyed() slots see: they refuse, and
     // the getters make nothing.
     [[nodiscard]] bool isBeingDestroyed() const { return mBeingDestroyed; }
+    [[nodiscard]] bool isReplotting() const { return mReplotting; }
+    // Runs \a emission now if no emission scope of this plot is open, else when the outermost one
+    // closes; skipped if \a sender is deleted by then.
+    void deliver(QObject* sender, std::function<void()> emission);
     // overlay:
     QCPOverlay* overlay();
     // span GPU layer:
@@ -463,6 +468,8 @@ protected:
     Qt::KeyboardModifier mCreationModifier = Qt::ShiftModifier;
     QCPItemCreationState* mCreationState = nullptr;
     bool mBeingDestroyed = false;
+    QCPEmissionQueue mEmissions;
+    bool mDeliveringReplotSignal = false; // a replot() from its slot is ignored, as in 2.x
     // reimplemented virtual methods:
     virtual QSize minimumSizeHint() const override;
     virtual QSize sizeHint() const override;
@@ -490,6 +497,8 @@ protected:
     void forwardTouchAsMouse(QEvent::Type type, const QEventPoint& point, const QTouchEvent* touch);
     void releaseAsClick(QMouseEvent* event);
     void emitClickSignal(QMouseEvent* event);
+    void emitDoubleClickSignal(QCPLayerable* clicked, const QVariant& details, QMouseEvent* event);
+    void deliverReplotSignal(void (QCustomPlot::*signal)());
     void releaseDrag(QMouseEvent* event);
     void announceUserSelection();
     void pinchStep(const QEventPoint& a, const QEventPoint& b);
@@ -547,6 +556,7 @@ protected:
     friend class QCPAbstractPlottable;
     friend class QCPGraph;
     friend class QCPAbstractItem;
+    friend class QCPEmissionScope;
 };
 Q_DECLARE_METATYPE(QCustomPlot::LayerInsertMode)
 Q_DECLARE_METATYPE(QCustomPlot::RefreshPriority)

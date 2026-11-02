@@ -180,7 +180,15 @@ Without `iMultiSelect`, only the plottable with the most points inside the recta
 With the multi-select modifier held, the new points are added to the old selection.
 
 While a rectangle mode is set, a drag never reaches the axis rect, so it cannot pan.
-To offer both, switch the mode when the button goes down. `mousePress` is emitted before the plot handles the press:
+To offer both, switch the mode when the button goes down, before the plot handles the press.
+`mousePress` cannot do it: like every input signal, it arrives on the next event-loop turn, after the plot has handled the event.
+A Qt event filter sees the press first:
+
+```{literalinclude} snippets/interactions.cpp
+:start-after: // [interactions_rect_mode_filter]
+:end-before: // [/interactions_rect_mode_filter]
+:language: cpp
+```
 
 ```{literalinclude} snippets/interactions.cpp
 :start-after: // [interactions_rect_mode_switch]
@@ -195,11 +203,11 @@ To offer both, switch the mode when the button goes down. `mousePress` is emitte
 
 `QCustomPlot` re-emits the raw mouse events, then more specific ones:
 
-- `mousePress`, `mouseMove`, `mouseRelease`, `mouseDoubleClick`, `mouseWheel`: every event, before the plot handles it.
+- `mousePress`, `mouseMove`, `mouseRelease`, `mouseDoubleClick`, `mouseWheel`: every event, with a copy of it. They arrive on the next event-loop turn, after the plot has handled the event, so a slot may delete the plot. The click signals below arrive the same way.
 - `plottableClick(plottable, dataIndex, event)` and `plottableDoubleClick`: `dataIndex` is the data point that was hit.
 - `axisClick(axis, part, event)`, `legendClick(legend, item, event)`, `itemClick(item, event)` and their double-click versions.
 - `selectionChangedByUser()`: a click or a selection rect changed what is selected. It is not emitted for changes made from code.
-- `beforeReplot()`, `afterLayout()` and `afterReplot()`: around each replot.
+- `beforeReplot()`, `afterLayout()` and `afterReplot()`: once the replot is done, in that order. A slot may delete the plot; a `replot()` called from one does nothing.
 
 The objects have their own signals:
 

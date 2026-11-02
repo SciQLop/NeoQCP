@@ -825,6 +825,7 @@ bool QCPLayout::remove(QCPLayoutElement* element)
 */
 void QCPLayout::clear()
 {
+    const QCPEmissionScope scope(mParentPlot);
     for (int i = elementCount() - 1; i >= 0; --i)
     {
         if (elementAt(i))

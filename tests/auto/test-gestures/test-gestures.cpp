@@ -109,6 +109,7 @@ void TestGestures::oneFingerTapIsAClick()
     const QPoint c = centre().toPoint();
     QTest::touchEvent(mPlot, mTouchScreen).press(0, c);
     QTest::touchEvent(mPlot, mTouchScreen).release(0, c);
+    QCoreApplication::processEvents(); // input signals arrive on the next event-loop turn
     QCOMPARE(clicks.count(), 1);
     QCOMPARE(mPlot->xAxis->range(), QCPRange(0, 100));
 }

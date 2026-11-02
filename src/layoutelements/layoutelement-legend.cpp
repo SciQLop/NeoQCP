@@ -912,6 +912,7 @@ bool QCPLegend::removeItem(QCPAbstractLegendItem* item)
 */
 void QCPLegend::clearItems()
 {
+    const QCPEmissionScope scope(mParentPlot);
     for (int i = elementCount() - 1; i >= 0; --i)
     {
         if (item(i))

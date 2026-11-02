@@ -888,13 +888,10 @@ void TestColorMap::QCPColorMap2_drawEmitsNoBusyChange()
   cm->setData(x, y, z);
   settleColorMap(mPlot, cm);
 
-  bool replotting = false;
-  connect(mPlot, &QCustomPlot::beforeReplot, this, [&] { replotting = true; });
-  connect(mPlot, &QCustomPlot::afterReplot, this, [&] { replotting = false; });
   int busyChanges = 0, busyChangesMidReplot = 0;
   connect(cm, &QCPAbstractPlottable::busyChanged, this, [&](bool) {
     ++busyChanges;
-    busyChangesMidReplot += replotting;
+    busyChangesMidReplot += mPlot->isReplotting();
   });
   mPlot->resize(600, 450); // its resize event replots at once
   QCoreApplication::sendPostedEvents();

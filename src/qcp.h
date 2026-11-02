@@ -43,6 +43,7 @@
 #include "theme.h"
 #include "misuse.h"
 #include "handle.h"
+#include "signal-delivery.h"
 #include "core.h"
 #include "datacontainer.h"
 #include "global.h"
