@@ -1978,9 +1978,12 @@ static QCPMultiGraph* graphWithAStagedSourceOfColumns(QCustomPlot* plot, int dis
     return mg;
 }
 
+void TestMultiGraph::stillPreparing(QCPMultiGraph* mg) { mg->mPendingReady = false; }
+
 void TestMultiGraph::aFillOnAColumnOnlyTheStagedSourceHasIsNotDrawn()
 {
     auto* mg = graphWithAStagedSourceOfColumns(mPlot, 3, 5);
+    stillPreparing(mg);
     QVERIFY(mg->setComponentFill(3, 0.0, QBrush(Qt::red)));
     QVERIFY(!isRedish(renderOf(mPlot).pixelColor(pixelOf(mPlot, 2, 0.5))));
 }
@@ -1988,6 +1991,7 @@ void TestMultiGraph::aFillOnAColumnOnlyTheStagedSourceHasIsNotDrawn()
 void TestMultiGraph::errorBarsOnAColumnOnlyTheStagedSourceHasAreNotDrawn()
 {
     auto* mg = graphWithAStagedSourceOfColumns(mPlot, 3, 5);
+    stillPreparing(mg);
     QVERIFY(mg->setComponentErrorBars(0, 1, 3, 6, QPen(Qt::red, 3)));
     QVERIFY(!isRedish(renderOf(mPlot).pixelColor(pixelOf(mPlot, 2, 1.5))));
 }
@@ -2006,8 +2010,10 @@ void TestMultiGraph::hiddenComponentHidesItsErrorBars()
 void TestMultiGraph::aNarrowerThenWiderStagedSourceKeepsTheCachedExtrusionsInRange()
 {
     auto* mg = graphWithAStagedSourceOfColumns(mPlot, 5, 3);
+    stillPreparing(mg);
     renderOf(mPlot);
     stageColumns(mg, 5);
+    stillPreparing(mg);
     mPlot->layer("main")->invalidatePaintBuffer();
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QCOMPARE(mg->componentCount(), 5);
@@ -2017,9 +2023,11 @@ void TestMultiGraph::aNarrowerThenWiderStagedSourceKeepsTheCachedExtrusionsInRan
 void TestMultiGraph::aWiderStagedSourceKeepsTheCachedLinesInRange()
 {
     auto* mg = graphWithAStagedSourceOfColumns(mPlot, 5, 3);
+    stillPreparing(mg);
     mg->markLinesDirty();
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     stageColumns(mg, 5);
+    stillPreparing(mg);
     renderOf(mPlot);
     mPlot->layer("main")->invalidatePaintBuffer();
     mPlot->replot(QCustomPlot::rpImmediateRefresh);

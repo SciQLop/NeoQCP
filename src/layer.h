@@ -106,8 +106,12 @@ protected:
 
     // non-property members:
     QWeakPointer<QCPAbstractPaintBuffer> mPaintBuffer;
+    quint64 mDirtyGeneration = 0;
+    quint64 mDrawnGeneration = 0;
 
     // non-virtual methods:
+    void noteDirtied();
+    [[nodiscard]] bool dirtiedAfterDraw() const { return mDirtyGeneration > mDrawnGeneration; }
     void draw(QCPPainter* painter);
     void drawToPaintBuffer();
     void addChild(QCPLayerable* layerable, bool prepend);
@@ -175,6 +179,8 @@ public:
 
     // non-property methods:
     [[nodiscard]] bool realVisibility() const;
+    // Schedules a repaint of this layerable's layer; a no-op without a plot or a layer.
+    void markDirty();
 
 signals:
     void layerChanged(QCPLayer* newLayer);

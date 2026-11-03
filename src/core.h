@@ -233,6 +233,13 @@ public:
     // (for example layerChanged(nullptr) as the layers are deleted); a slot should check this first.
     [[nodiscard]] bool isBeingDestroyed() const { return mBeingDestroyed; }
     [[nodiscard]] bool isReplotting() const { return mReplotting; }
+    // Schedules one queued replot for the next event-loop turn; requests and layer marks coalesce
+    // into it. Asked during a replot, it runs in the turn after that replot.
+    void requestRepaint();
+    [[nodiscard]] bool isRepaintQueued() const { return mReplotQueued; }
+    // The export barrier: commits pending data swaps and runs a queued repaint now, so an export
+    // shows the current state. Does not wait for worker-thread pipelines.
+    void settle();
     // overlay:
     QCPOverlay* overlay();
     // span GPU layer:
@@ -439,6 +446,15 @@ protected:
     // committed — a window where every pending source was superseded is a
     // no-op and must not force a replot.
     void commitPendingData();
+    bool commitEveryPendingSource();
+    // Bumped by every layer mark; a replot reaching a layer in its draw loop records the current one.
+    quint64 mPaintGeneration = 0;
+    // An explicit rpQueuedReplot during a replot: the end of that replot schedules it.
+    bool mRepaintAskedDuringReplot = false;
+    quint64 mRepaintTicket = 0;
+    void scheduleRepaint();
+    [[nodiscard]] bool replotDeferredWhileHidden() const;
+    bool remarkLayersDirtiedAfterDraw();
     bool mSkipReplotsWhenHidden = false;
     bool mWasShown = false;
     bool mReplotSkippedWhileHidden = false; // drawn by the next showEvent

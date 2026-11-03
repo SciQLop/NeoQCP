@@ -2397,14 +2397,82 @@ void QCustomPlot::commitPendingData()
         return;
     }
 
+    if (commitEveryPendingSource())
+        replot(QCustomPlot::rpQueuedReplot);
+}
+
+bool QCustomPlot::commitEveryPendingSource()
+{
     // A commit's busyChanged slot may remove plottables: walk a snapshot, skip the gone ones.
     bool committed = false;
     const QList<QPointer<QCPAbstractPlottable>> plottables(mPlottables.cbegin(), mPlottables.cend());
     for (const auto& plottable : plottables)
         if (plottable)
             committed |= plottable->commitPendingData();
-    if (committed)
-        replot(QCustomPlot::rpQueuedReplot);
+    return committed;
+}
+
+void QCustomPlot::requestRepaint()
+{
+    if (mReplotting)
+        mRepaintAskedDuringReplot = true;
+    else
+        scheduleRepaint();
+}
+
+// Refuses during a replot: the end of that replot reschedules what was marked after its draw.
+void QCustomPlot::scheduleRepaint()
+{
+    if (mBeingDestroyed || mReplotting || mReplotQueued)
+        return;
+    if (replotDeferredWhileHidden())
+    {
+        mReplotSkippedWhileHidden = true;
+        return;
+    }
+    mReplotQueued = true;
+    // A synchronous replot() in between already drew it, and a later request posts its own timer:
+    // only the latest request's timer replots.
+    const quint64 ticket = ++mRepaintTicket;
+    QTimer::singleShot(0, this, [this, ticket] {
+        if (mReplotQueued && ticket == mRepaintTicket)
+            replot();
+    });
+}
+
+void QCustomPlot::settle()
+{
+    const QCPEmissionScope scope(this);
+    if (mBeingDestroyed || mReplotting)
+        return;
+    if (mDataSwapTimer.isActive())
+    {
+        mDataSwapTimer.stop();
+        if (commitEveryPendingSource())
+            scheduleRepaint();
+    }
+    if (mReplotQueued)
+        replot();
+}
+
+bool QCustomPlot::replotDeferredWhileHidden() const
+{
+    return mSkipReplotsWhenHidden && mWasShown && !isVisible();
+}
+
+// Flags are cleared at the end of a replot, so a layer marked after it was drawn is marked again.
+bool QCustomPlot::remarkLayersDirtiedAfterDraw()
+{
+    bool any = false;
+    for (auto* layer : std::as_const(mLayers))
+    {
+        if (!layer->dirtiedAfterDraw())
+            continue;
+        if (auto pb = layer->mPaintBuffer.toStrongRef())
+            pb->setInvalidated();
+        any = true;
+    }
+    return any;
 }
 
 void QCustomPlot::deliver(QObject* sender, std::function<void()> emission)
@@ -2421,19 +2489,12 @@ void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
     if (mBeingDestroyed)
         return;
     if (refreshPriority == QCustomPlot::rpQueuedReplot)
-    {
-        if (!mReplotQueued)
-        {
-            mReplotQueued = true;
-            QTimer::singleShot(0, this, [this] { replot(); });
-        }
-        return;
-    }
+        return requestRepaint();
 
     if (mReplotting || mDeliveringReplotSignal) // a replot signal's slot calls replot
         return;
 
-    if (mSkipReplotsWhenHidden && mWasShown && !isVisible())
+    if (replotDeferredWhileHidden())
     {
         // Defer all painting to the next show: showEvent() replots, since a show at the same
         // size (a tab switch, a sleep) does not run initialize(). Buffer dirty/invalidated
@@ -2448,6 +2509,7 @@ void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
     if (!emitReplotSignal(&QCustomPlot::beforeReplot))
         return;
     mReplotting = true;
+    mRepaintAskedDuringReplot = false;
 
     if (mOverlay) {
         if (auto* notifLayer = layer(QLatin1String("notification"));
@@ -2529,6 +2591,8 @@ void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
     bool translated = false;
     for (auto& layer : mLayers)
     {
+        // Drawn, translated or kept as it is: this replot has dealt with every mark made so far.
+        layer->mDrawnGeneration = mPaintGeneration;
         if (QSharedPointer<QCPAbstractPaintBuffer> pb = layer->mPaintBuffer.toStrongRef();
             pb && pb->contentDirty())
         {
@@ -2560,8 +2624,12 @@ void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
         mReplotTimeAverage
             = mReplotTime; // no previous replots to average with, so initialize with replot time
 
+    const bool asked = std::exchange(mRepaintAskedDuringReplot, false);
+    const bool dirtied = remarkLayersDirtiedAfterDraw();
     deliver(this, [this] { emitReplotSignal(&QCustomPlot::afterReplot); });
     mReplotting = false;
+    if (asked || dirtied)
+        scheduleRepaint();
 }
 
 // Returns false when a slot deleted the plot.
@@ -2656,6 +2724,9 @@ bool QCustomPlot::savePdf([[maybe_unused]] const QString& fileName, [[maybe_unus
 #else
     const QCPEmissionScope scope(this);
     const QPointer<QCustomPlot> alive(this); // an afterLayout slot may delete the plot
+    settle();
+    if (!alive)
+        return false;
     int newWidth, newHeight;
     if (width == 0 || height == 0)
     {
@@ -4665,6 +4736,9 @@ QPixmap QCustomPlot::toPixmap(int width, int height, double scale)
 {
     const QCPEmissionScope scope(this);
     const QPointer<QCustomPlot> alive(this); // an afterLayout slot may delete the plot
+    settle();
+    if (!alive)
+        return QPixmap();
     // Temporarily mutates mViewport for export. Safe because single-threaded and mReplotting
     // prevents recursive replot. Viewport is restored before returning.
     int newWidth, newHeight;
@@ -4734,6 +4808,9 @@ void QCustomPlot::toPainter(QCPPainter* painter, int width, int height)
 {
     const QCPEmissionScope scope(this);
     const QPointer<QCustomPlot> alive(this); // an afterLayout slot may delete the plot
+    settle();
+    if (!alive)
+        return;
     // this method is somewhat similar to toPixmap. Change something here, and a change in toPixmap
     // might be necessary, too.
     int newWidth, newHeight;

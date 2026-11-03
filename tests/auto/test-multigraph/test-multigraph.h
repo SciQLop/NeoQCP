@@ -2,6 +2,7 @@
 #include <QtTest/QtTest>
 
 class QCustomPlot;
+class QCPMultiGraph;
 
 class TestMultiGraph : public QObject
 {
@@ -172,5 +173,7 @@ private slots:
     void resampledLinesFollowANewKeyAxis();
 
 private:
+    // The staged source stays staged, as while its pipeline prepares it: exports commit ready ones.
+    static void stillPreparing(QCPMultiGraph* mg);
     QCustomPlot* mPlot = nullptr;
 };

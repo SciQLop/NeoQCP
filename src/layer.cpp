@@ -237,6 +237,7 @@ void QCPLayer::draw(QCPPainter* painter)
 void QCPLayer::drawToPaintBuffer()
 {
     PROFILE_HERE_N("QCPLayer::drawToPaintBuffer");
+    mDrawnGeneration = mParentPlot->mPaintGeneration;
     if (QSharedPointer<QCPAbstractPaintBuffer> pb = mPaintBuffer.toStrongRef())
     {
         if (QCPPainter* painter = pb->startPainting())
@@ -300,6 +301,13 @@ void QCPLayer::markDirty()
 {
     if (QSharedPointer<QCPAbstractPaintBuffer> pb = mPaintBuffer.toStrongRef())
         pb->setContentDirty(true);
+    noteDirtied();
+}
+
+void QCPLayer::noteDirtied()
+{
+    mDirtyGeneration = ++mParentPlot->mPaintGeneration;
+    mParentPlot->scheduleRepaint();
 }
 
 /*! \internal
@@ -397,6 +405,7 @@ void QCPLayer::invalidatePaintBuffer()
 {
     if (auto pb = mPaintBuffer.toStrongRef())
         pb->setInvalidated();
+    noteDirtied();
 }
 
 bool QCPLayer::canTranslateInsteadOfRepaint() const
@@ -560,6 +569,16 @@ QCPLayerable::~QCPLayerable()
         mLayer->removeChild(this);
         mLayer = nullptr;
     }
+}
+
+void QCPLayerable::markDirty()
+{
+    if (!mParentPlot || !mLayer)
+        return;
+    if (mLayer->mode() == QCPLayer::lmBuffered)
+        mLayer->markDirty();
+    else
+        mLayer->invalidatePaintBuffer();
 }
 
 /*!

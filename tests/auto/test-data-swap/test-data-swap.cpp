@@ -413,6 +413,7 @@ void TestDataSwap::noCommitNoReplot()
     auto* p = new PendingStub(mPlot->xAxis, mPlot->yAxis);
     p->committer = false; // commitPendingData() returns false: nothing was committed
     mPlot->setDataSwapDebounceMs(20);
+    mPlot->replot(); // the first draw a new plot queues
     QSignalSpy replots(mPlot, &QCustomPlot::afterReplot);
 
     mPlot->requestDataSwap();
