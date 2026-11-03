@@ -62,6 +62,7 @@ private slots:
   void QCPItems_Replot10k();
   void QCPAxisRects_Stack8_Replot();
   void QCPPlots_Stack8_Replot();
+  void QCPInput_MouseMoveStorm();
 
 private:
   QCustomPlot *mPlot;
@@ -1087,4 +1088,27 @@ void Benchmark::QCPPlots_Stack8_Replot()
     changing->xAxis->setRange(0.001 * ++step, 0.7 + 0.001 * step);
     changing->replot(QCustomPlot::rpImmediateRefresh);
   }
+}
+
+void Benchmark::QCPInput_MouseMoveStorm()
+{
+  mPlot->addGraph()->setData(sineKeys(1000), sineValues(sineKeys(1000)));
+  mPlot->rescaleAxes();
+  mPlot->replot(QCustomPlot::rpImmediateRefresh);
+  int moves = 0;
+  connect(mPlot, &QCustomPlot::mouseMove, mPlot, [&moves] { ++moves; });
+  const int kMoves = 10000;
+  QBENCHMARK
+  {
+    moves = 0;
+    for (int i = 0; i < kMoves; ++i)
+    {
+      const QPointF pos(10 + i % 600, 10 + i % 300);
+      QMouseEvent event(QEvent::MouseMove, pos, mPlot->mapToGlobal(pos), Qt::NoButton,
+                        Qt::NoButton, Qt::NoModifier);
+      QCoreApplication::sendEvent(mPlot, &event);
+    }
+    qApp->processEvents(); // runs the posted input flush
+  }
+  QCOMPARE(moves, kMoves);
 }
