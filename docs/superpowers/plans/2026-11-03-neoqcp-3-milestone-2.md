@@ -45,6 +45,7 @@
   - `bool QCustomPlot::isRepaintQueued() const;`
   - `QCPLayer`: `quint64 mDirtyGeneration, mDrawnGeneration`. `markDirty()` and `invalidatePaintBuffer()` bump the plot-wide generation into `mDirtyGeneration` and call `requestRepaint()`; `drawToPaintBuffer()` records `mDrawnGeneration`. At the end of `replot()`, if any layer has `mDirtyGeneration > mDrawnGeneration` (dirtied during this replot after it was drawn — an `afterReplot` slot or a draw-path setter), schedule one queued replot. That is one per turn: a slot that dirties on every `afterReplot` repaints continuously like an animation, never re-entrantly.
   - `void QCPLayerable::markDirty();` — no-op when `parentPlot()` is null or the layerable has no layer; else marks its layer (or invalidates it when the layer is unbuffered) — which schedules.
+  - `void QCustomPlot::settle();` — the export barrier *(maintainer, 2026-11-03: rightness first)*: commits pending data swaps and runs a queued repaint synchronously, so the plot is in its current state. Called first by `toPixmap`, `toPainter`, `savePdf`, `saveRastered` (and through it `savePng`/`saveJpg`/`saveBmp`), and `grab`-style paths. Does not wait for worker-thread pipelines (that could block the GUI; tools that need it keep their explicit wait). No-op during teardown or while a replot runs.
 
 - [ ] **Step 1: Failing tests** in `TestRepaint` (count `afterReplot`):
   - `markDirtySchedulesOneRepaint`: `graph->markDirty()` ×1000 → `isRepaintQueued()`; `QTRY_COMPARE(count, 1)`; one more `processEvents()` keeps 1.
@@ -53,6 +54,7 @@
   - `hiddenPlotQueuesNoVisibleWork`: hidden plot, `setSkipReplotsWhenHidden(true)`: after `markDirty()` and `processEvents()`, `afterReplot` count 0 and `isRepaintQueued()` false; showing the plot draws the change.
   - `markDirtyWithoutPlotIsNoOp`: a layerable with no parent plot/layer: no crash, no misuse.
   - `syncReplotStillWorks`: `replot()` emits `afterReplot` before it returns.
+  - `exportSettlesFirst`: data-driven over `toPixmap`, `savePng` (to a temp file), `savePdf`, `toPainter`: change a graph's pen (no `replot()`), export at once → the exported pixels show the new colour, and `isRepaintQueued()` is false afterwards; a pending data swap (`requestDataSwap` path) is committed before the export.
 - [ ] **Step 2:** Build, run. Expected: the first three fail.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** `TestRepaint`, `TestSignalDelivery`, full suite (both builds), benchmark.
