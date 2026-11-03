@@ -514,6 +514,10 @@ void TestOwnership::deleteLastLayer()
     QVERIFY(graph->layer() == nullptr); // drawn nowhere until given a layer
     new QCPAxisRect(mPlot);
     draw();
+    QVERIFY(mPlot->overlay() != nullptr);
+    QVERIFY(mPlot->addLayer("again"));
+    QVERIFY(graph->setLayer("again"));
+    draw();
     QCOMPARE(gMisuses, 0);
 }
 

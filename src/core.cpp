@@ -1986,9 +1986,11 @@ bool QCustomPlot::addLayer(const QString& name, QCPLayer* otherLayer,
                            QCustomPlot::LayerInsertMode insertMode)
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
-    if (!otherLayer)
+    // A plain delete can remove every layer (removeLayer keeps one): the new one is then the only one.
+    const bool onlyLayer = mLayers.isEmpty();
+    if (!otherLayer && !onlyLayer)
         otherLayer = mLayers.last();
-    if (!mLayers.contains(otherLayer))
+    if (!onlyLayer && !mLayers.contains(otherLayer))
     {
         qDebug() << Q_FUNC_INFO << "otherLayer not a layer of this QCustomPlot:"
                  << reinterpret_cast<quintptr>(otherLayer);
@@ -2001,7 +2003,7 @@ bool QCustomPlot::addLayer(const QString& name, QCPLayer* otherLayer,
     }
 
     QCPLayer* newLayer = new QCPLayer(this, name);
-    mLayers.insert(otherLayer->index() + (insertMode == limAbove ? 1 : 0), newLayer);
+    mLayers.insert(onlyLayer ? 0 : otherLayer->index() + (insertMode == limAbove ? 1 : 0), newLayer);
     updateLayerIndices();
     setupPaintBuffers(); // associates new layer with the appropriate paint buffer
     // Buffers are matched to layers by index, so inserting a layer shifts later layers onto
