@@ -27,6 +27,7 @@ private slots:
     void noGpuLayerIsOfferedWhileExporting();
     void tickMarksFollowPanWithoutRebuild();
     void gridLinesStayAlignedWithTicksAtEpochScale();
+    void deletedGridKeepsTickCache();
 
 private:
     QCustomPlot* mPlot = nullptr;

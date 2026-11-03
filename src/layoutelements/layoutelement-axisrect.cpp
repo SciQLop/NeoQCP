@@ -1509,7 +1509,7 @@ void QCPAxisRect::markAffectedLayersDirty()
         for (QCPAxis* ax : axisList)
         {
             markOnce(ax->layer());
-            if (QCPGrid* grid = ax->grid(); grid && !gpuGrid)
+            if (QCPGrid* grid = ax->gridIfExists(); grid && !gpuGrid)
                 markOnce(grid->layer());
         }
     }

@@ -309,6 +309,9 @@ public:
     QCPLineEnding upperEnding() const;
 
     QCPGrid* grid() const;
+    // Never creates a grid: null once the user deleted it. For internal draw and dirty-marking
+    // paths, which must not bring back a deleted grid.
+    QCPGrid* gridIfExists() const { return mGrid; }
 
     // setters:
     Q_SLOT void setScaleType(QCPAxis::ScaleType type);

@@ -35,4 +35,6 @@ private slots:
     void slotDeletesPlotOnResize();
     void deleteInsideOwnEventReportsMisuse();
     void inputFlushPostedOnce();
+    void replotFromReplotSignalIsIgnored_data();
+    void replotFromReplotSignalIsIgnored();
 };

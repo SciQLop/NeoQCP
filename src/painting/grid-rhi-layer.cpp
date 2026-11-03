@@ -238,7 +238,7 @@ void QCPGridRhiLayer::rebuildGeometry(float dpr, int outputHeight)
 
         for (auto* axis : axes)
         {
-            QCPGrid* grid = axis->grid();
+            QCPGrid* grid = axis->gridIfExists();
             if (!grid || !grid->visible())
                 continue;
 
@@ -368,17 +368,19 @@ void QCPGridRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
                 break;
             }
             const auto& cached = it.value();
-            QCPGrid* grid = axis->grid();
-            if (!grid || cached.majorTicks != axis->tickVector()
+            QCPGrid* grid = axis->gridIfExists();
+            if (cached.hasGrid != (grid != nullptr)
+                || (grid
+                    && (cached.subGridVisible != grid->subGridVisible()
+                        || cached.gridColor != grid->pen().color().rgba()
+                        || cached.subGridColor != grid->subGridPen().color().rgba()
+                        || cached.zeroLineColor != grid->zeroLinePen().color().rgba()
+                        || cached.gridPenWidth != float(grid->pen().widthF())
+                        || cached.subGridPenWidth != float(grid->subGridPen().widthF())
+                        || cached.zeroLinePenWidth != float(grid->zeroLinePen().widthF())
+                        || cached.zeroLinePenStyle != grid->zeroLinePen().style()))
+                || cached.majorTicks != axis->tickVector()
                 || cached.subTicks != axis->subTickVector()
-                || cached.subGridVisible != grid->subGridVisible()
-                || cached.gridColor != grid->pen().color().rgba()
-                || cached.subGridColor != grid->subGridPen().color().rgba()
-                || cached.zeroLineColor != grid->zeroLinePen().color().rgba()
-                || cached.gridPenWidth != float(grid->pen().widthF())
-                || cached.subGridPenWidth != float(grid->subGridPen().widthF())
-                || cached.zeroLinePenWidth != float(grid->zeroLinePen().widthF())
-                || cached.zeroLinePenStyle != grid->zeroLinePen().style()
                 || cached.tickColor != axis->tickPen().color().rgba()
                 || cached.subTickColor != axis->subTickPen().color().rgba()
                 || cached.tickPenWidth != float(axis->tickPen().widthF())
@@ -475,20 +477,21 @@ void QCPGridRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
         mCachedTicks.clear();
         for (auto* axis : mAxes)
         {
-            QCPGrid* grid = axis->grid();
-            if (!grid)
-                continue;
             CachedAxisTicks cached;
             cached.majorTicks = axis->tickVector();
             cached.subTicks = axis->subTickVector();
-            cached.subGridVisible = grid->subGridVisible();
-            cached.gridColor = grid->pen().color().rgba();
-            cached.subGridColor = grid->subGridPen().color().rgba();
-            cached.zeroLineColor = grid->zeroLinePen().color().rgba();
-            cached.gridPenWidth = float(grid->pen().widthF());
-            cached.subGridPenWidth = float(grid->subGridPen().widthF());
-            cached.zeroLinePenWidth = float(grid->zeroLinePen().widthF());
-            cached.zeroLinePenStyle = grid->zeroLinePen().style();
+            if (QCPGrid* grid = axis->gridIfExists())
+            {
+                cached.hasGrid = true;
+                cached.subGridVisible = grid->subGridVisible();
+                cached.gridColor = grid->pen().color().rgba();
+                cached.subGridColor = grid->subGridPen().color().rgba();
+                cached.zeroLineColor = grid->zeroLinePen().color().rgba();
+                cached.gridPenWidth = float(grid->pen().widthF());
+                cached.subGridPenWidth = float(grid->subGridPen().widthF());
+                cached.zeroLinePenWidth = float(grid->zeroLinePen().widthF());
+                cached.zeroLinePenStyle = grid->zeroLinePen().style();
+            }
             cached.tickColor = axis->tickPen().color().rgba();
             cached.subTickColor = axis->subTickPen().color().rgba();
             cached.tickPenWidth = float(axis->tickPen().widthF());

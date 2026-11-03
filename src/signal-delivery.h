@@ -40,15 +40,21 @@ public:
     {
         if (mDepth++ == 0)
             mOutermost = source;
+        if (source == Source::WidgetEvent)
+            ++mWidgetEventDepth;
     }
     // True when the outermost scope closed.
-    bool close() { return --mDepth == 0; }
+    bool close(Source source)
+    {
+        if (source == Source::WidgetEvent)
+            --mWidgetEventDepth;
+        return --mDepth == 0;
+    }
     [[nodiscard]] bool isOpen() const { return mDepth > 0; }
     [[nodiscard]] bool hasPendingInput() const { return !mInput.empty(); }
-    [[nodiscard]] bool insideWidgetEvent() const
-    {
-        return mDepth > 0 && mOutermost == Source::WidgetEvent;
-    }
+    // At any nesting depth: a widget event can open under a method scope (processEvents() from a
+    // rangeChanged slot).
+    [[nodiscard]] bool insideWidgetEvent() const { return mWidgetEventDepth > 0; }
     // True when no posted input flush is outstanding; it then counts as posted.
     bool claimFlushPost() { return !std::exchange(mFlushPosted, true); }
     void postedFlushStarted() { mFlushPosted = false; }
@@ -73,6 +79,7 @@ private:
     static void run(std::vector<Pending> pending);
 
     int mDepth = 0;
+    int mWidgetEventDepth = 0;
     Source mOutermost = Source::Method;
     bool mFlushPosted = false;
     std::vector<Pending> mMethod;
@@ -100,7 +107,7 @@ private:
     static void postFlush(QCustomPlot* plot);
 
     QPointer<QCustomPlot> mPlot;
-    bool mNextTurn;
+    QCPEmissionQueue::Source mSource;
 };
 
 // For Qt event handlers, where deleting the widget is forbidden: the outermost scope delivers on the

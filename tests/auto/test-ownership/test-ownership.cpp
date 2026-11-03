@@ -359,6 +359,40 @@ void TestOwnership::deleteGridTwiceSafe()
     mPlot = nullptr;
 }
 
+void TestOwnership::deletedGridStaysDeleted()
+{
+    delete mPlot->xAxis->grid();
+
+    mPlot->xAxis->setRange(1, 7); // dirty-marks the axis rect's layers
+    draw();
+    mPlot->replot(QCustomPlot::rpQueuedReplot);
+    QCoreApplication::processEvents();
+
+    QVERIFY(mPlot->xAxis->gridIfExists() == nullptr);
+    QVERIFY(mPlot->xAxis->grid() != nullptr); // an explicit call still makes one
+}
+
+// Run under xvfb: offscreen gives no QRhi, so no GPU grid layer.
+void TestOwnership::deletedGridStaysDeletedOnGpu()
+{
+    showAndExpose();
+    if (!mPlot->rhi())
+        QSKIP("no QRhi on this platform");
+    mPlot->xAxis->grid()->setVisible(true);
+    mPlot->yAxis->grid()->setVisible(true);
+    mPlot->replot();
+    QCoreApplication::processEvents();
+    QVERIFY(mPlot->gridRhiLayerIfExists() != nullptr);
+
+    delete mPlot->xAxis->grid();
+    mPlot->xAxis->setRange(1, 7);
+    mPlot->replot();
+    mPlot->repaint();
+    QCoreApplication::processEvents();
+
+    QVERIFY(mPlot->xAxis->gridIfExists() == nullptr);
+}
+
 void TestOwnership::deleteLayerLeavesLists()
 {
     showAndExpose();
@@ -792,19 +826,30 @@ void TestOwnership::childrenDeletedWhilePlotWhole()
     auto* plot = new QCustomPlot;
     plot->resize(400, 300);
     plot->replot();
-    const QRect before = plot->axisRect()->rect();
+    QCPAxisRect* const rectBefore = plot->axisRect();
+    const QRect before = rectBefore->rect();
     QVERIFY(before.isValid());
     auto* graph = plot->addGraph();
     auto* item = new QCPItemText(plot);
     QRect seenByGraph, seenByItem;
+    QCPAxisRect* rectSeenByGraph = nullptr;
+    QCPAxisRect* rectSeenByItem = nullptr;
     auto rectOf = [plot] { return plot->axisRect() ? plot->axisRect()->rect() : QRect(); };
-    connect(graph, &QObject::destroyed, [&] { seenByGraph = rectOf(); });
-    connect(item, &QObject::destroyed, [&] { seenByItem = rectOf(); });
+    connect(graph, &QObject::destroyed, [&] {
+        seenByGraph = rectOf();
+        rectSeenByGraph = plot->axisRect();
+    });
+    connect(item, &QObject::destroyed, [&] {
+        seenByItem = rectOf();
+        rectSeenByItem = plot->axisRect();
+    });
 
     delete plot;
 
     QCOMPARE(seenByGraph, before);
     QCOMPARE(seenByItem, before);
+    QCOMPARE(rectSeenByGraph, rectBefore);
+    QCOMPARE(rectSeenByItem, rectBefore);
 }
 
 void TestOwnership::mutatorsRefuseDuringTeardown()

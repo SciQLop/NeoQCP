@@ -27,6 +27,8 @@ private slots:
     void deleteAxisLeavesRectAndShortcuts();
     void plottablesOfAnotherRectAfterAxisRemoval();
     void deleteGridTwiceSafe();
+    void deletedGridStaysDeleted();
+    void deletedGridStaysDeletedOnGpu();
     void deleteLayerLeavesLists();
     void deleteCurrentLayer();
     void deleteRootLayoutAndOverlay();

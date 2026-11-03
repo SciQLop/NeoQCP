@@ -15,16 +15,16 @@ void QCPEmissionQueue::run(std::vector<Pending> pending)
 }
 
 QCPEmissionScope::QCPEmissionScope(QCustomPlot* plot, QCPEmissionQueue::Source source)
-        : mPlot(openOn(plot, source)), mNextTurn(source != QCPEmissionQueue::Source::Method)
+        : mPlot(openOn(plot, source)), mSource(source)
 {
 }
 
 QCPEmissionScope::~QCPEmissionScope()
 {
-    if (!mPlot || !mPlot->mEmissions.close())
+    if (!mPlot || !mPlot->mEmissions.close(mSource))
         return;
     postFlush(mPlot); // first: the method flush may delete the plot
-    if (!mNextTurn)
+    if (mSource == QCPEmissionQueue::Source::Method)
         mPlot->mEmissions.flushMethod();
 }
 

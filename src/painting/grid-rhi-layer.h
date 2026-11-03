@@ -93,6 +93,8 @@ private:
     struct CachedAxisTicks {
         QVector<double> majorTicks;
         QVector<double> subTicks;
+        // The ticks of an axis whose grid was deleted are still drawn, so it is cached too.
+        bool hasGrid = false;
         bool subGridVisible = false;
         QRgb gridColor = 0;
         QRgb subGridColor = 0;

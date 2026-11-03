@@ -444,9 +444,26 @@ void TestSignalDelivery::deleteInsideOwnEventReportsMisuse()
     }
     const int insideEvent = gMisuses;
     {
+        // A widget event nested under a method scope: processEvents() from a rangeChanged slot.
         auto* plot = new QCustomPlot;
         const QCPEmissionScope methodScope(plot);
         const QCPWidgetEventScope nested(plot);
+        delete plot;
+    }
+    const int nestedEvent = gMisuses - insideEvent;
+    {
+        // Once the widget event closed, the open method scope alone does not report.
+        auto* plot = new QCustomPlot;
+        const QCPEmissionScope methodScope(plot);
+        {
+            const QCPWidgetEventScope closed(plot);
+        }
+        delete plot;
+    }
+    {
+        auto* plot = new QCustomPlot;
+        const QCPWidgetEventScope event(plot);
+        const QCPInputScope nestedInput(plot);
         delete plot;
     }
     {
@@ -459,7 +476,8 @@ void TestSignalDelivery::deleteInsideOwnEventReportsMisuse()
     delete new QCustomPlot;
     qcp::setMisuseHandler(previous);
     QCOMPARE(insideEvent, 1);
-    QCOMPARE(gMisuses, 1);
+    QCOMPARE(nestedEvent, 1);
+    QCOMPARE(gMisuses, 3);
 }
 
 void TestSignalDelivery::inputFlushPostedOnce()
@@ -481,4 +499,28 @@ void TestSignalDelivery::inputFlushPostedOnce()
     QCoreApplication::instance()->removeEventFilter(&counter);
     QCOMPARE(counter.count, 1);
     QCOMPARE(clicks, 1);
+}
+
+void TestSignalDelivery::replotFromReplotSignalIsIgnored_data()
+{
+    slotDeletesPlotDuringReplot_data();
+}
+
+void TestSignalDelivery::replotFromReplotSignalIsIgnored()
+{
+    QFETCH(QString, signal);
+    std::unique_ptr<QCustomPlot> plot(plotWithGraph());
+    int depth = 0;
+    int deepest = 0;
+    int replots = 0;
+    connect(plot.get(), &QCustomPlot::beforeReplot, plot.get(), [&] {
+        ++replots;
+        deepest = std::max(deepest, ++depth);
+    });
+    connect(plot.get(), &QCustomPlot::afterReplot, plot.get(), [&] { --depth; });
+    connect(plot.get(), replotSignal(signal), plot.get(), [&] { plot->replot(); });
+    plot->replot();
+    QCOMPARE(replots, 1);
+    QCOMPARE(deepest, 1);
+    QCOMPARE(depth, 0);
 }

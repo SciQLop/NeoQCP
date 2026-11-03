@@ -357,3 +357,30 @@ void TestGridRhi::noGpuLayerIsOfferedWhileExporting()
     QVERIFY(qcp::gpuLayer(mPlot, layer, false) != nullptr);
     QVERIFY(qcp::gpuLayer(mPlot, layer, true) == nullptr);
 }
+
+// The ticks of an axis whose grid was deleted are still drawn: an unchanged frame must not rebuild.
+void TestGridRhi::deletedGridKeepsTickCache()
+{
+    if (!showAndHasRhiGrid(mPlot))
+        QSKIP("No QRhi available — the grid RHI layer needs a real backend");
+    delete mPlot->xAxis->grid();
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCoreApplication::processEvents();
+
+    auto* grl = mPlot->gridRhiLayer();
+    QVERIFY(grl);
+    auto upload = [&]() {
+        QRhiResourceUpdateBatch* batch = mPlot->rhi()->nextResourceUpdateBatch();
+        grl->uploadResources(batch, mPlot->rhiOutputSize(), float(mPlot->bufferDevicePixelRatio()),
+                             mPlot->rhi()->isYUpInNDC());
+        batch->release();
+    };
+    upload();
+    QVERIFY(!grl->drawGroups().isEmpty());
+    QRhiBuffer* uboBefore = grl->drawGroups().first().uniformBuffer;
+
+    upload();
+
+    QCOMPARE(grl->drawGroups().first().uniformBuffer, uboBefore);
+    QVERIFY(mPlot->xAxis->gridIfExists() == nullptr);
+}

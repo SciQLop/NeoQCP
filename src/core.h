@@ -232,10 +232,6 @@ public:
     // the getters make nothing.
     [[nodiscard]] bool isBeingDestroyed() const { return mBeingDestroyed; }
     [[nodiscard]] bool isReplotting() const { return mReplotting; }
-    // Runs \a emission now if no emission scope of this plot is open, else when the outermost one
-    // closes; skipped if \a sender is deleted by then. Run now, it overtakes input signals whose
-    // posted delivery has not run yet: those stay on their event-loop turn.
-    void deliver(QObject* sender, std::function<void()> emission);
     // overlay:
     QCPOverlay* overlay();
     // span GPU layer:
@@ -548,6 +544,10 @@ protected:
     QCPAbstractPaintBuffer* createPaintBuffer(const QString& layerName);
     bool hasInvalidatedPaintBuffers();
     void ensureAtLeastOneBufferDirty();
+    // Runs \a emission now if no emission scope of this plot is open, else when the outermost one
+    // closes; skipped if \a sender is deleted by then. Run now, it overtakes input signals whose
+    // posted delivery has not run yet: those stay on their event-loop turn.
+    void deliver(QObject* sender, std::function<void()> emission);
     friend class QCPLegend;
     friend class QCPPlottableGroup;
     friend class QCPAxis;
@@ -557,7 +557,9 @@ protected:
     friend class QCPAbstractPlottable;
     friend class QCPGraph;
     friend class QCPAbstractItem;
+    friend class QCPLayerable;
     friend class QCPEmissionScope;
+    friend class TestSignalDelivery;
 };
 Q_DECLARE_METATYPE(QCustomPlot::LayerInsertMode)
 Q_DECLARE_METATYPE(QCustomPlot::RefreshPriority)
