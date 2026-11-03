@@ -462,3 +462,75 @@ void TestSignalDelivery::replotSignalOfAWidgetEventRunsInsideIt()
     QVERIFY(runs > 0);
     QVERIFY2(runsOutsideWidgetEvent == 0, "deleting the plot from this slot would not be reported");
 }
+
+void TestSignalDelivery::wheelSlotIgnoringAndDeletingThePlotIsSafe()
+{
+    WheelRecorder parent;
+    parent.resize(400, 300);
+    QPointer<QCustomPlot> plot = plotWithGraph();
+    plot->setParent(&parent);
+    plot->show();
+    parent.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&parent));
+    connect(plot, &QCustomPlot::mouseWheel, plot, [&plot](QWheelEvent* event) {
+        event->ignore();
+        delete plot;
+    });
+    const QPointF pos = plot->rect().center();
+    QWheelEvent wheel(pos, plot->mapToGlobal(pos), QPoint(), QPoint(0, 120), Qt::NoButton,
+                      Qt::NoModifier, Qt::NoScrollPhase, false);
+    QSpontaneKeyEvent::setSpontaneous(&wheel);
+    QCoreApplication::instance()->notify(plot, &wheel);
+    QVERIFY(!plot);
+}
+
+void TestSignalDelivery::releaseSlotIgnoringAndDeletingThePlotIsSafe()
+{
+    QPointer<QCustomPlot> plot = plotWithGraph();
+    plot->show();
+    QVERIFY(QTest::qWaitForWindowExposed(plot));
+    connect(plot, &QCustomPlot::mouseRelease, plot, [&plot](QMouseEvent* event) {
+        event->ignore();
+        delete plot;
+    });
+    QTest::mouseClick(plot, Qt::LeftButton, Qt::NoModifier, plot->rect().center());
+    QVERIFY(!plot);
+}
+
+void TestSignalDelivery::nestedEventKeepsOuterEntriesQueued()
+{
+    QCustomPlot plot;
+    bool ranA = false;
+    bool ranB = false;
+    {
+        const QCPEmissionScope outer(&plot);
+        plot.deliver(&plot, [&ranA] { ranA = true; });
+        {
+            const QCPEmissionScope nested(&plot, QCPEmissionScope::Kind::Event);
+            plot.deliver(&plot, [&ranB] { ranB = true; });
+        }
+        QVERIFY(ranB);
+        QVERIFY(!ranA);
+    }
+    QVERIFY(ranA);
+}
+
+void TestSignalDelivery::deleteLaterDeliversTeardownSignalsLikeDelete()
+{
+    const auto layerChangesDuringTeardown = [](bool later) {
+        auto* plot = new QCustomPlot;
+        int changes = 0;
+        connect(plot->selectionRect(), &QCPLayerable::layerChanged, [&changes] { ++changes; });
+        if (later)
+        {
+            plot->deleteLater();
+            QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        }
+        else
+            delete plot;
+        return changes;
+    };
+    const int byDelete = layerChangesDuringTeardown(false);
+    QVERIFY(byDelete > 0);
+    QCOMPARE(layerChangesDuringTeardown(true), byDelete);
+}

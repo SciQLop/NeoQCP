@@ -33,4 +33,8 @@ private slots:
     void nestedEventDeliversWhenItReturns();
     void replotSignalOfAWidgetEventRunsInsideIt_data();
     void replotSignalOfAWidgetEventRunsInsideIt();
+    void wheelSlotIgnoringAndDeletingThePlotIsSafe();
+    void releaseSlotIgnoringAndDeletingThePlotIsSafe();
+    void nestedEventKeepsOuterEntriesQueued();
+    void deleteLaterDeliversTeardownSignalsLikeDelete();
 };

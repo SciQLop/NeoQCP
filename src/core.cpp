@@ -2882,7 +2882,8 @@ QSize QCustomPlot::sizeHint() const
 */
 void QCustomPlot::initialize(QRhiCommandBuffer* cb)
 {
-    // The paint event opened one already; grabFramebuffer() runs this outside any event.
+    // Delivers at its own return, also under a method scope (grabFramebuffer() from an export):
+    // the paint event's scope does not cover that path.
     const QCPEmissionScope scope(this, QCPEmissionScope::Kind::WidgetEvent);
     PROFILE_HERE_N("QCustomPlot::initialize");
 
@@ -3305,7 +3306,8 @@ void QCustomPlot::executeRenderPass(QRhiCommandBuffer* cb, QRhiResourceUpdateBat
 
 void QCustomPlot::render(QRhiCommandBuffer* cb)
 {
-    // The paint event opened one already; grabFramebuffer() runs this outside any event.
+    // Delivers at its own return, also under a method scope (grabFramebuffer() from an export):
+    // the paint event's scope does not cover that path.
     const QCPEmissionScope scope(this, QCPEmissionScope::Kind::WidgetEvent);
     PROFILE_FRAME_MARK;
     PROFILE_HERE_N("QCustomPlot::render");
@@ -3688,9 +3690,23 @@ QCPEmissionScope::Kind scopeKindOf(QEvent::Type type)
 
   The signals the handlers queue are delivered as this returns: after QCustomPlot handled the
   event, before Qt goes on with it. Their slots get the event itself, so \c ignore() in a slot
-  lets the event go on to the parent widget.
+  lets the event go on to the parent widget (once Qt::WA_NoMousePropagation is cleared).
 */
 bool QCustomPlot::event(QEvent* event)
+{
+    // A deleteLater() teardown delivers like a plain delete: no scope to hold its signals back.
+    if (event->type() == QEvent::DeferredDelete)
+        return handleEvent(event);
+    const QPointer<QCustomPlot> alive(this);
+    const bool handled = handleInScope(event);
+    if (alive)
+        return handled;
+    // QApplication passes an ignored mouse or wheel event on through this widget, now deleted.
+    event->accept();
+    return true;
+}
+
+bool QCustomPlot::handleInScope(QEvent* event)
 {
     const QCPEmissionScope scope(this, scopeKindOf(event->type()));
     return handleEvent(event);

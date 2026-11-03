@@ -488,6 +488,7 @@ protected:
     virtual void wheelEvent(QWheelEvent* event) override;
     virtual void keyPressEvent(QKeyEvent* event) override;
     virtual bool event(QEvent* event) override;
+    bool handleInScope(QEvent* event);
     bool handleEvent(QEvent* event);
 
     // introduced methods:

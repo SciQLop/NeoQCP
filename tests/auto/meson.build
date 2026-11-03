@@ -114,4 +114,13 @@ auto_tests=executable('auto-tests',test_srcs, test_moc_files, dependencies:[NeoQ
 # macro chains them serially), so its wall-clock time grows with every test class
 # added, not just the one you're adding. Meson's 30 s default has been getting hit
 # on slow/GPU-less CI runners well before the binary is anywhere near unhealthy.
-test('test-auto-tests', auto_tests, timeout: 300)
+# Under ASan: catch use of a stack event after its handler returned, and fill freed memory so that
+# Qt code (not instrumented) reading a deleted widget crashes instead of reading stale data.
+auto_tests_env = environment()
+if 'address' in get_option('b_sanitize')
+    auto_tests_env.append('ASAN_OPTIONS',
+                          'halt_on_error=1:abort_on_error=1:print_summary=1:'
+                          + 'detect_stack_use_after_return=1:max_free_fill_size=1048576:free_fill_byte=190',
+                          separator: ':')
+endif
+test('test-auto-tests', auto_tests, timeout: 300, env: auto_tests_env)

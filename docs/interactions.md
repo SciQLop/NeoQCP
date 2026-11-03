@@ -203,7 +203,7 @@ A Qt event filter sees the press first:
 
 `QCustomPlot` re-emits the raw mouse events, then more specific ones:
 
-- `mousePress`, `mouseMove`, `mouseRelease`, `mouseDoubleClick`, `mouseWheel`: every event, passed as is. They arrive once the plot has handled the event, before Qt goes on with it, so a slot may delete the plot or call `event->ignore()`. The click signals below arrive the same way.
+- `mousePress`, `mouseMove`, `mouseRelease`, `mouseDoubleClick`, `mouseWheel`: every event, passed as is. They arrive once the plot has handled the event, before Qt goes on with it, so a slot may delete the plot. `event->ignore()` in a slot passes a mouse event or wheel on to the parent widget only if you clear `Qt::WA_NoMousePropagation`, which the plot sets by default, as in 2.x. The click signals below arrive the same way.
 - `plottableClick(plottable, dataIndex, event)` and `plottableDoubleClick`: `dataIndex` is the data point that was hit.
 - `axisClick(axis, part, event)`, `legendClick(legend, item, event)`, `itemClick(item, event)` and their double-click versions.
 - `selectionChangedByUser()`: a click or a selection rect changed what is selected. It is not emitted for changes made from code.

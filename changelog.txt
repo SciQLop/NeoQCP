@@ -37,9 +37,9 @@ Deferred delivery rule (signals that run user code at a moment the plot may be h
   - Emitted while the plot handles a Qt event (mouse, wheel, key, resize, show, paint), including a
         replot() run inside one: delivered at the end of QCustomPlot::event(), after NeoQCP handled
         the event and before Qt goes on with it.
-  - Input signals carry the event itself: accept() or ignore() in a slot decides what Qt does next
-        (a wheel reaches the parent widget once Qt::WA_NoMousePropagation, set by QCustomPlot as in
-        2.x, is cleared).
+  - Input signals carry the event itself: accept() or ignore() in a slot is what Qt sees next. An
+        ignored mouse event or wheel only goes on to the parent widget if the user clears
+        Qt::WA_NoMousePropagation, which QCustomPlot sets by default, as in 2.x.
   - Still direct (milestone 4): selectionChangedByUser, selectionChanged, rangeChanged,
         QCPSelectionRect::accepted and the QCPIntervals edit signals (intervalsEdited,
         intervalCreated, deleteRequested). beforeReplot and afterLayout keep 2.x timing.

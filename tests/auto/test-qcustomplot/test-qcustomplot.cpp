@@ -1,4 +1,5 @@
 #include <QSignalSpy>
+#include <QtTest/qtestspontaneevent.h>
 #include "test-qcustomplot.h"
 
 void TestQCustomPlot::init()
@@ -569,7 +570,36 @@ void TestQCustomPlot::wheelSlotDeletingThePlotIsSafe()
   const QPointF pos = pixelOf(mPlot, 5, 5);
   QWheelEvent event(pos, mPlot->mapToGlobal(pos), QPoint(), QPoint(0, 120), Qt::NoButton,
                     Qt::NoModifier, Qt::NoScrollPhase, false);
-  QCoreApplication::sendEvent(mPlot, &event);
+  // Spontaneous, like a real wheel: sendEvent() would take QApplication's non-propagating path.
+  QSpontaneKeyEvent::setSpontaneous(&event);
+  QCoreApplication::instance()->notify(mPlot, &event);
+  QVERIFY(ran);
+}
+
+// Through the window, as a real click: QWidgetWindow dispatches it and forwards the right button
+// as a context-menu event.
+void TestQCustomPlot::rightPressSlotDeletingThePlotIsSafe()
+{
+  QWidget panel;
+  panel.resize(400, 300);
+  mPlot->setParent(&panel);
+  mPlot->setGeometry(0, 0, 400, 300);
+  panel.show();
+  QVERIFY(QTest::qWaitForWindowExposed(&panel));
+  bool ran = false;
+  deletePlotOn(mPlot, mPlot, &QCustomPlot::mousePress, &ran);
+  QTest::mouseClick(panel.windowHandle(), Qt::RightButton, Qt::NoModifier, QPoint(200, 150));
+  if (mPlot)
+    mPlot->setParent(nullptr); // cleanup() deletes it, not the panel
+  QVERIFY(ran);
+}
+
+void TestQCustomPlot::rightPressSlotDeletingATopLevelPlotIsSafe()
+{
+  QVERIFY(QTest::qWaitForWindowExposed(mPlot));
+  bool ran = false;
+  deletePlotOn(mPlot, mPlot, &QCustomPlot::mousePress, &ran);
+  QTest::mouseClick(mPlot->windowHandle(), Qt::RightButton, Qt::NoModifier, QPoint(20, 20));
   QVERIFY(ran);
 }
 
