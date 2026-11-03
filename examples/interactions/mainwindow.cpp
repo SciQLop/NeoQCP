@@ -35,9 +35,9 @@ MainWindow::MainWindow(QWidget *parent) :
   
   // connect slot that ties some axis selections together (especially opposite axes):
   connect(ui->customPlot, SIGNAL(selectionChangedByUser()), this, SLOT(selectionChanged()));
-  // connect slots that takes care that when an axis is selected, only that direction can be dragged and zoomed:
-  connect(ui->customPlot, SIGNAL(mousePress(QMouseEvent*)), this, SLOT(mousePress()));
-  connect(ui->customPlot, SIGNAL(mouseWheel(QWheelEvent*)), this, SLOT(mouseWheel()));
+  // when an axis is selected, only that direction can be dragged and zoomed. An event filter sees the
+  // press and the wheel before the plot does; the mousePress and mouseWheel signals come after it:
+  ui->customPlot->installEventFilter(this);
   
   // make bottom and left axes transfer their ranges to top and right axes:
   connect(ui->customPlot->xAxis, SIGNAL(rangeChanged(QCPRange)), ui->customPlot->xAxis2, SLOT(setRange(QCPRange)));
@@ -152,7 +152,16 @@ void MainWindow::selectionChanged()
   }
 }
 
-void MainWindow::mousePress()
+bool MainWindow::eventFilter(QObject *watched, QEvent *event)
+{
+  if (event->type() == QEvent::MouseButtonPress)
+    limitDragToSelectedAxis();
+  else if (event->type() == QEvent::Wheel)
+    limitZoomToSelectedAxis();
+  return QMainWindow::eventFilter(watched, event);
+}
+
+void MainWindow::limitDragToSelectedAxis()
 {
   // if an axis is selected, only allow the direction of that axis to be dragged
   // if no axis is selected, both directions may be dragged
@@ -165,7 +174,7 @@ void MainWindow::mousePress()
     ui->customPlot->axisRect()->setRangeDrag(Qt::Horizontal|Qt::Vertical);
 }
 
-void MainWindow::mouseWheel()
+void MainWindow::limitZoomToSelectedAxis()
 {
   // if an axis is selected, only allow the direction of that axis to be zoomed
   // if no axis is selected, both directions may be zoomed

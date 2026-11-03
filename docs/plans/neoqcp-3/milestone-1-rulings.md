@@ -113,3 +113,4 @@ Every decision the executor made on the maintainer's behalf during milestone 1 (
 ## Maintainer answers
 
 - 2026-11-03: dead-handle operator-> keeps qFatal in release (spec answer 2 confirmed).
+- 2026-11-03: input signals are delivered at the end of QCustomPlot::event() (decision on oc#4): every entry point, a method call or a Qt event, delivers its signals when it returns. Supersedes spec answer 1's "next event-loop turn" (the spec marks it revised).

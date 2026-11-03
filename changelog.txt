@@ -26,14 +26,20 @@ New headers (included from qcp.h):
   - signal-delivery.h: deferred signal delivery, see the rule below.
 
 Deferred delivery rule (signals that run user code at a moment the plot may be half-updated):
+  - One rule: every NeoQCP entry point, a method call or a Qt event, delivers its signals when it
+        returns. Nested calls deliver when the outermost one returns; a nested event (a click sent
+        from a rangeChanged slot) delivers when that event returns.
   - Converted so far: mousePress, mouseMove, mouseRelease, mouseDoubleClick, mouseWheel, the *Click
         and *DoubleClick signals, QCPAbstractItem::deleteRequested, afterReplot and
         QCPLayerable::layerChanged.
   - Emitted from a method call (replot(), setLayer(), ...): delivered when the outermost call returns.
         A replot() you call yourself delivers afterReplot before it returns.
-  - Emitted from an input handler (mouse, wheel, key, resize, show, paint), including a replot() run
-        inside one: delivered on the next event-loop turn.
-  - Input signals carry a copy of the event: accept() or ignore() in a slot has no effect.
+  - Emitted while the plot handles a Qt event (mouse, wheel, key, resize, show, paint), including a
+        replot() run inside one: delivered at the end of QCustomPlot::event(), after NeoQCP handled
+        the event and before Qt goes on with it.
+  - Input signals carry the event itself: accept() or ignore() in a slot decides what Qt does next
+        (a wheel reaches the parent widget once Qt::WA_NoMousePropagation, set by QCustomPlot as in
+        2.x, is cleared).
   - Still direct (milestone 4): selectionChangedByUser, selectionChanged, rangeChanged,
         QCPSelectionRect::accepted and the QCPIntervals edit signals (intervalsEdited,
         intervalCreated, deleteRequested). beforeReplot and afterLayout keep 2.x timing.
@@ -52,9 +58,10 @@ Behaviour changes for 2.x users:
   - Items added while clearItems() runs survive it.
   - A tracer whose graph is deleted is hidden; it used to become free.
   - A plot being destroyed refuses to add or remove anything (misuse).
-  - A slot on mousePress or mouseWheel can no longer steer the current event; do it from an event filter.
-  - Input signals, and afterReplot from a replot inside an input handler, arrive one event-loop turn
-        later than before.
+  - A slot on mousePress or mouseWheel runs after the plot handled the event, so it can no longer steer
+        it (setRangeDragAxes from a press slot applies from the next press); do it from an event filter.
+  - Input signals, and afterReplot from a replot inside an event handler, arrive at the end of the
+        plot's event handling instead of in the middle of it.
   - Deleting the plot inside a resize, show or paint event reports misuse; use deleteLater().
 
 #### NeoQCP, unreleased ####

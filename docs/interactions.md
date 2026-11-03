@@ -181,7 +181,7 @@ With the multi-select modifier held, the new points are added to the old selecti
 
 While a rectangle mode is set, a drag never reaches the axis rect, so it cannot pan.
 To offer both, switch the mode when the button goes down, before the plot handles the press.
-`mousePress` cannot do it: like every input signal, it arrives on the next event-loop turn, after the plot has handled the event.
+`mousePress` cannot do it: like every input signal, it arrives once the plot has handled the event.
 A Qt event filter sees the press first:
 
 ```{literalinclude} snippets/interactions.cpp
@@ -203,7 +203,7 @@ A Qt event filter sees the press first:
 
 `QCustomPlot` re-emits the raw mouse events, then more specific ones:
 
-- `mousePress`, `mouseMove`, `mouseRelease`, `mouseDoubleClick`, `mouseWheel`: every event, with a copy of it. They arrive on the next event-loop turn, after the plot has handled the event, so a slot may delete the plot. The click signals below arrive the same way.
+- `mousePress`, `mouseMove`, `mouseRelease`, `mouseDoubleClick`, `mouseWheel`: every event, passed as is. They arrive once the plot has handled the event, before Qt goes on with it, so a slot may delete the plot or call `event->ignore()`. The click signals below arrive the same way.
 - `plottableClick(plottable, dataIndex, event)` and `plottableDoubleClick`: `dataIndex` is the data point that was hit.
 - `axisClick(axis, part, event)`, `legendClick(legend, item, event)`, `itemClick(item, event)` and their double-click versions.
 - `selectionChangedByUser()`: a click or a selection rect changed what is selected. It is not emitted for changes made from code.

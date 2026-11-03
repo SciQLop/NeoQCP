@@ -302,6 +302,8 @@ does today.)
    the widget is forbidden, are delivered just after the event finishes, on the next event-loop turn.
    This replaces the per-method "emit last" rule of decision 5 as the mechanism; the rule stays as the
    guarantee.
+   *Revised 2026-11-03:* input-caused signals are delivered at the end of `QCustomPlot::event()`, after
+   NeoQCP handled the event and before Qt goes on with it, not on the next event-loop turn.
 2. **A dead handle through `h->` in a release build** stops the program with a clear message (`qFatal`),
    never reading freed memory. The handle's own common operations stay safe no-ops (decision 4).
 3. **Creation uses a fluent builder**, not an options struct: `plot.add<QCPGraph>(x, y).name("Bx").pen(p)`.

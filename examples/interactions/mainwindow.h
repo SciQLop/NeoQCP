@@ -16,14 +16,15 @@ class MainWindow : public QMainWindow
 public:
   explicit MainWindow(QWidget *parent = 0);
   ~MainWindow();
-  
+
+protected:
+  bool eventFilter(QObject *watched, QEvent *event) override;
+
 private slots:
   void titleDoubleClick(QMouseEvent *event);
   void axisLabelDoubleClick(QCPAxis* axis, QCPAxis::SelectablePart part);
   void legendDoubleClick(QCPLegend* legend, QCPAbstractLegendItem* item);
   void selectionChanged();
-  void mousePress();
-  void mouseWheel();
   void addRandomGraph();
   void removeSelectedGraph();
   void removeAllGraphs();
@@ -32,6 +33,8 @@ private slots:
   void graphClicked(QCPAbstractPlottable *plottable, int dataIndex);
   
 private:
+  void limitDragToSelectedAxis();
+  void limitZoomToSelectedAxis();
   Ui::MainWindow *ui;
 };
 
