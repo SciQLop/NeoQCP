@@ -571,6 +571,9 @@ QCPLayerable::~QCPLayerable()
 
 // Invalidates rather than dirties: an appearance change must be drawn, never hidden by a pan
 // shifting the layer's old frame (QCPLayer::markDirty, for range changes, allows that).
+//
+// Call it first in a setter: after the equality early return and before storing the value, calling
+// helpers or emitting. Marking only schedules a repaint, so nothing may touch `this` afterwards.
 void QCPLayerable::markDirty()
 {
     if (!mParentPlot || !mLayer)

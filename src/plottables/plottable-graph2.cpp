@@ -34,11 +34,7 @@ QCPGraph2::QCPGraph2(QCPAxis* keyAxis, QCPAxis* valueAxis)
 
     mViewportDebounce.setSingleShot(true);
     mViewportDebounce.setInterval(150);
-    connect(&mViewportDebounce, &QTimer::timeout, this, [this] {
-        markLinesDirty();
-        if (mParentPlot)
-            mParentPlot->replot(QCustomPlot::rpQueuedReplot);
-    });
+    connect(&mViewportDebounce, &QTimer::timeout, this, [this] { markLinesDirty(); });
 }
 
 QCPGraph2::~QCPGraph2() = default;
@@ -71,6 +67,7 @@ void QCPGraph2::markLinesDirty()
 
 void QCPGraph2::setScatterColorGradient(const QCPColorGradient& gradient)
 {
+    markDirty();
     constexpr int kColormapWidth = 256;
     std::array<double, kColormapWidth> t;
     for (int i = 0; i < kColormapWidth; ++i)
@@ -80,7 +77,6 @@ void QCPGraph2::setScatterColorGradient(const QCPColorGradient& gradient)
     g.colorize(t.data(), QCPRange(0.0, 1.0),
                reinterpret_cast<QRgb*>(img.scanLine(0)), kColormapWidth);
     mScatterColorMapImage = img;
-    markDirty();
 }
 
 static void ensureL1Transform(QCPGraphPipeline& pipeline, int sourceSize)
@@ -106,8 +102,8 @@ static void ensureL1Transform(QCPGraphPipeline& pipeline, int sourceSize)
 
 void QCPGraph2::setDataSource(std::unique_ptr<QCPAbstractDataSource> source)
 {
-    setDataSource(std::shared_ptr<QCPAbstractDataSource>(std::move(source)));
     markDirty();
+    setDataSource(std::shared_ptr<QCPAbstractDataSource>(std::move(source)));
 }
 
 void QCPGraph2::setDataSource(std::shared_ptr<QCPAbstractDataSource> source)
@@ -145,8 +141,8 @@ void QCPGraph2::applySourceNow(std::shared_ptr<QCPAbstractDataSource> source)
     // staleness check below.
     mAcceptedGeneration = mPipeline.hasTransform() ? mPipeline.currentGeneration()
                                                     : mPipeline.currentGeneration() + 1;
-    if (!mPipeline.hasTransform() && mParentPlot)
-        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    if (!mPipeline.hasTransform())
+        markDirty();
     updateEffectiveBusy();
 }
 
@@ -229,9 +225,9 @@ void QCPGraph2::dataChanged()
         mPipeline.onDataChanged();
     }
     else if (mParentPlot)
-        mParentPlot->replot();
+        mParentPlot->replot(); // data, not appearance: a mutation is shown at once (2.x behaviour)
     if (!alive)
-        return; // a busyChanged or replot slot deleted this graph
+        return; // a busyChanged slot deleted this graph
 
     // A mutation can leave a job in flight for pre-mutation data: if the
     // transform stayed on, the job just queued behind it supersedes it; if
@@ -258,8 +254,6 @@ void QCPGraph2::onL1Ready(uint64_t generation)
         return; // result of a source that was superseded before this job finished
     qcp::extractL1Cache<qcp::algo::GraphResamplerCache>(mPipeline.cache(), mL1Cache, mL2Dirty);
     markLinesDirty();
-    if (parentPlot())
-        parentPlot()->replot(QCustomPlot::rpQueuedReplot);
 }
 
 void QCPGraph2::rebuildL2(const ViewportParams& vp)

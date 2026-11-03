@@ -64,6 +64,7 @@ void QCPPlottableGroup::setName(const QString& name)
 {
     if (name == mName)
         return;
+    markRowDirty(); // the only surface a group draws: its legend row
     mName = name;
     markRowDirty();
 }
@@ -140,6 +141,7 @@ bool QCPPlottableGroup::visible() const
 
 void QCPPlottableGroup::setVisible(bool visible)
 {
+    markRowDirty();
     // A member's visibleChanged slot may delete this group or another member: iterate a copy of
     // the guarded list, never raw pointers.
     QPointer<QCPPlottableGroup> self = this;

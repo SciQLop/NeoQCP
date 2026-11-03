@@ -97,6 +97,7 @@ QCPIntervals::QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* 
 
 void QCPIntervals::setData(qcp::intervals::Columns columns)
 {
+    markDirty();
     if (auto error = qcp::intervals::invalidColumns(columns))
         throw std::invalid_argument(*error);
     const QCPLaneLayout::Batch lanesChangedLast(mLayout);
@@ -109,7 +110,6 @@ void QCPIntervals::setData(qcp::intervals::Columns columns)
     ++mDataGeneration;
     markLayersDirty();
     setSelectedRows(rowsWithIds(selected));
-    markDirty();
 }
 
 QVector<int> QCPIntervals::rowsWithIds(const QVector<qint64>& ids) const
@@ -185,8 +185,8 @@ void QCPIntervals::setCategoryNames(const QStringList& names)
 {
     if (mCategoryNames == names)
         return;
-    mCategoryNames = names;
     markDirty();
+    mCategoryNames = names;
 }
 
 std::vector<std::pair<QString, QColor>> QCPIntervals::legendEntries() const
@@ -228,10 +228,11 @@ bool QCPIntervals::removeFromLegend(QCPLegend* legend) const
 
 void QCPIntervals::setCategoryColors(const QVector<QColor>& colors)
 {
+    if (colors == mCategoryColors)
+        return;
+    markDirty();
     mCategoryColors = colors;
     ++mColorGeneration;
-    markLayersDirty();
-    markDirty();
 }
 
 QColor QCPIntervals::categoryColor(int category) const
@@ -262,9 +263,7 @@ void QCPIntervals::markLayersDirty()
 
 void QCPIntervals::requestRepaint()
 {
-    markLayersDirty();
-    if (mParentPlot) // an inert timeline (null axis) has no plot
-        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    markLayersDirty(); // marking schedules the repaint
 }
 
 bool QCPIntervals::hasLaneLayout() const
@@ -428,7 +427,7 @@ void QCPIntervals::setSelectedRows(const QVector<int>& rows)
         if (row >= 0 && row < rowCount())
             sel.addDataRange(QCPDataRange(row, row + 1), false);
     sel.simplify();
-    markDirty(); // before setSelection(): its slot may delete this plottable
+    markDirty();
     setSelection(sel);
 }
 
@@ -805,46 +804,50 @@ void QCPIntervals::drawPreview(QCPPainter* painter) const
 
 void QCPIntervals::setEditable(bool editable)
 {
+    if (editable == mEditable)
+        return;
+    markDirty();
     mEditable = editable;
     if (!editable)
         mGesture.reset();
-    markDirty();
 }
 
 void QCPIntervals::setEditModes(EditModes modes) {
     if (mEditModes == modes)
         return;
-    mEditModes = modes;
     markDirty();
+    mEditModes = modes;
 }
 
 void QCPIntervals::setSnap(SnapMode mode, double step)
 {
+    if (mode == mSnap && step == mSnapStep)
+        return;
+    markDirty();
     mSnap = mode;
     mSnapStep = step;
-    markDirty();
 }
 
 void QCPIntervals::setStackMode(StackMode mode)
 {
     if (mStack == mode)
         return;
+    markDirty();
     const QCPLaneLayout::Batch lanesChangedLast(mLayout);
     mStack = mode;
     updateSubRows();
     markLayersDirty();
-    markDirty();
 }
 
 void QCPIntervals::setCategoryOrder(std::vector<int> order)
 {
     if (mCategoryOrder == order)
         return;
+    markDirty();
     const QCPLaneLayout::Batch lanesChangedLast(mLayout);
     mCategoryOrder = std::move(order);
     updateSubRows();
     markLayersDirty();
-    markDirty();
 }
 
 std::optional<int> QCPIntervals::rowCategory(int row) const
@@ -932,9 +935,11 @@ double QCPIntervals::createWithoutOverlaps(double pressKey, int lane, std::optio
 void QCPIntervals::setSnapTimes(std::vector<double> times)
 {
     std::ranges::sort(times);
+    if (times == mSnapTimes && mSnap == snTimes)
+        return;
+    markDirty();
     mSnapTimes = std::move(times);
     mSnap = snTimes;
-    markDirty();
 }
 
 QCPRange QCPIntervals::getKeyRange(bool& foundRange, QCP::SignDomain) const
@@ -1148,9 +1153,9 @@ void QCPIntervals::setStyle(Style style)
 {
     if (mStyle == style)
         return;
+    markDirty();
     mStyle = style;
     markLayersDirty();
-    markDirty();
 }
 
 bool QCPIntervals::drawBarsOnGpu(QCPPainter* painter)

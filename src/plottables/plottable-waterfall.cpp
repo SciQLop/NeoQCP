@@ -92,31 +92,52 @@ QCPWaterfallGraph::QCPWaterfallGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
 
 void QCPWaterfallGraph::setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> source)
 {
+    markDirty();
     mOriginalSource = std::move(source);
     mNormDirty = true;
     rebuildAdapter();
-    markDirty();
 }
 
-void QCPWaterfallGraph::setOffsetMode(OffsetMode mode) { mOffsetMode = mode; rebuildAdapter(); 
+void QCPWaterfallGraph::setOffsetMode(OffsetMode mode)
+{
+    if (mode == mOffsetMode)
+        return;
     markDirty();
+    mOffsetMode = mode;
+    rebuildAdapter();
 }
-void QCPWaterfallGraph::setUniformSpacing(double spacing) { mUniformSpacing = spacing; rebuildAdapter(); 
+void QCPWaterfallGraph::setUniformSpacing(double spacing)
+{
+    if (spacing == mUniformSpacing)
+        return;
     markDirty();
+    mUniformSpacing = spacing;
+    rebuildAdapter();
 }
-void QCPWaterfallGraph::setOffsets(const QVector<double>& offsets) { mUserOffsets = offsets; rebuildAdapter(); 
+void QCPWaterfallGraph::setOffsets(const QVector<double>& offsets)
+{
+    if (offsets == mUserOffsets)
+        return;
     markDirty();
+    mUserOffsets = offsets;
+    rebuildAdapter();
 }
-void QCPWaterfallGraph::setNormalize(bool enabled) { mNormalize = enabled; mNormDirty = true; rebuildAdapter(); 
+void QCPWaterfallGraph::setNormalize(bool enabled)
+{
+    if (enabled == mNormalize)
+        return;
     markDirty();
+    mNormalize = enabled;
+    mNormDirty = true;
+    rebuildAdapter();
 }
 void QCPWaterfallGraph::setGain(double gain)
 {
     if (gain == mGain)
         return;
+    markDirty();
     mGain = gain;
     rebuildAdapter();
-    markDirty();
 }
 void QCPWaterfallGraph::invalidateNormalization() { mNormDirty = true; rebuildAdapter(); }
 

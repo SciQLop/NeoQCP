@@ -32,6 +32,7 @@ private slots:
     void barsGroupSpacingRepaints();
     void plottableGroupVisibilityRepaints();
     void axisMarginChangeDuringPanRepaints();
+    void multiGraphLineStyleResetsComponents();
     void equalValueDoesNotDirty_data();
     void equalValueDoesNotDirty();
 

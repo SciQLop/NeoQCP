@@ -775,6 +775,7 @@ void QCPColorMap::setData(QCPColorMapData* data, bool copy)
                  << reinterpret_cast<quintptr>(data);
         return;
     }
+    markDirty();
     if (copy)
     {
         *mMapData = *data;
@@ -785,7 +786,6 @@ void QCPColorMap::setData(QCPColorMapData* data, bool copy)
         mMapData = data;
     }
     mMapImageInvalidated = true;
-    markDirty();
 }
 
 /*!
@@ -807,7 +807,7 @@ void QCPColorMap::setDataRange(const QCPRange& dataRange)
     else
         mDataRange = dataRange.sanitizedForLinScale();
     mMapImageInvalidated = true;
-    markDirty(); // before the signal: a slot may delete this colour map
+    markDirty();
     emit dataRangeChanged(mDataRange);
 }
 
@@ -822,7 +822,7 @@ void QCPColorMap::setDataScaleType(QCPAxis::ScaleType scaleType)
         return;
     mDataScaleType = scaleType;
     mMapImageInvalidated = true;
-    markDirty(); // before the signal: a slot may delete this colour map
+    markDirty();
     const QPointer<QCPColorMap> alive(this);
     emit dataScaleTypeChanged(mDataScaleType);
     if (alive && mDataScaleType == QCPAxis::stLogarithmic)
@@ -846,7 +846,7 @@ void QCPColorMap::setGradient(const QCPColorGradient& gradient)
         return;
     mGradient = gradient;
     mMapImageInvalidated = true;
-    markDirty(); // before the signal: a slot may delete this colour map
+    markDirty();
     emit gradientChanged(mGradient);
 }
 
@@ -859,9 +859,11 @@ void QCPColorMap::setGradient(const QCPColorGradient& gradient)
 */
 void QCPColorMap::setInterpolate(bool enabled)
 {
+    if (enabled == mInterpolate)
+        return;
+    markDirty();
     mInterpolate = enabled;
     mMapImageInvalidated = true; // because oversampling factors might need to change
-    markDirty();
 }
 
 /*!
@@ -879,8 +881,8 @@ void QCPColorMap::setTightBoundary(bool enabled)
 {
     if (mTightBoundary == enabled)
         return;
-    mTightBoundary = enabled;
     markDirty();
+    mTightBoundary = enabled;
 }
 
 /*!
@@ -900,6 +902,7 @@ void QCPColorMap::setTightBoundary(bool enabled)
 */
 void QCPColorMap::setColorScale(QCPColorScale* colorScale)
 {
+    markDirty();
     if (mColorScale) // unconnect signals from old color scale
     {
         disconnect(this, &QCPColorMap::dataRangeChanged, mColorScale.data(), &QCPColorScale::setDataRange);
@@ -928,7 +931,6 @@ void QCPColorMap::setColorScale(QCPColorScale* colorScale)
         connect(mColorScale.data(), &QCPColorScale::gradientChanged, this, &QCPColorMap::setGradient);
         connect(mColorScale.data(), &QCPColorScale::dataScaleTypeChanged, this, &QCPColorMap::setDataScaleType);
     }
-    markDirty();
 }
 
 /*!

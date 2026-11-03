@@ -227,8 +227,8 @@ void QCPFinancial::setData(QSharedPointer<QCPFinancialDataContainer> data)
 {
     if (mDataContainer == data)
         return;
-    mDataContainer = data;
     markDirty();
+    mDataContainer = data;
 }
 
 /*! \overload
@@ -257,8 +257,8 @@ void QCPFinancial::setChartStyle(QCPFinancial::ChartStyle style)
 {
     if (mChartStyle == style)
         return;
-    mChartStyle = style;
     markDirty();
+    mChartStyle = style;
 }
 
 /*!
@@ -270,8 +270,8 @@ void QCPFinancial::setWidth(double width)
 {
     if (mWidth == width)
         return;
-    mWidth = width;
     markDirty();
+    mWidth = width;
 }
 
 /*!
@@ -286,8 +286,8 @@ void QCPFinancial::setWidthType(QCPFinancial::WidthType widthType)
 {
     if (mWidthType == widthType)
         return;
-    mWidthType = widthType;
     markDirty();
+    mWidthType = widthType;
 }
 
 /*!
@@ -303,8 +303,8 @@ void QCPFinancial::setTwoColored(bool twoColored)
 {
     if (mTwoColored == twoColored)
         return;
-    mTwoColored = twoColored;
     markDirty();
+    mTwoColored = twoColored;
 }
 
 /*!
@@ -320,8 +320,8 @@ void QCPFinancial::setBrushPositive(const QBrush& brush)
 {
     if (mBrushPositive == brush)
         return;
-    mBrushPositive = brush;
     markDirty();
+    mBrushPositive = brush;
 }
 
 /*!
@@ -337,8 +337,8 @@ void QCPFinancial::setBrushNegative(const QBrush& brush)
 {
     if (mBrushNegative == brush)
         return;
-    mBrushNegative = brush;
     markDirty();
+    mBrushNegative = brush;
 }
 
 /*!
@@ -354,8 +354,8 @@ void QCPFinancial::setPenPositive(const QPen& pen)
 {
     if (mPenPositive == pen)
         return;
-    mPenPositive = pen;
     markDirty();
+    mPenPositive = pen;
 }
 
 /*!
@@ -371,8 +371,8 @@ void QCPFinancial::setPenNegative(const QPen& pen)
 {
     if (mPenNegative == pen)
         return;
-    mPenNegative = pen;
     markDirty();
+    mPenNegative = pen;
 }
 
 /*! \overload

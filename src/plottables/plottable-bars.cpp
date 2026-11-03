@@ -122,9 +122,9 @@ void QCPBarsGroup::setSpacingType(SpacingType spacingType)
 {
     if (mSpacingType == spacingType)
         return;
+    for (QCPBars* bar : bars())
+        bar->markDirty();
     mSpacingType = spacingType;
-    if (auto* plot = qobject_cast<QCustomPlot*>(parent()))
-        plot->requestRepaint();
 }
 
 /*!
@@ -137,9 +137,9 @@ void QCPBarsGroup::setSpacing(double spacing)
 {
     if (mSpacing == spacing)
         return;
+    for (QCPBars* bar : bars())
+        bar->markDirty();
     mSpacing = spacing;
-    if (auto* plot = qobject_cast<QCustomPlot*>(parent()))
-        plot->requestRepaint();
 }
 
 /*!
@@ -566,8 +566,8 @@ void QCPBars::setData(QSharedPointer<QCPBarsDataContainer> data)
 {
     if (mDataContainer == data)
         return;
-    mDataContainer = data;
     markDirty();
+    mDataContainer = data;
 }
 
 /*! \overload
@@ -598,8 +598,8 @@ void QCPBars::setWidth(double width)
 {
     if (mWidth == width)
         return;
-    mWidth = width;
     markDirty();
+    mWidth = width;
 }
 
 /*!
@@ -614,8 +614,8 @@ void QCPBars::setWidthType(QCPBars::WidthType widthType)
 {
     if (mWidthType == widthType)
         return;
-    mWidthType = widthType;
     markDirty();
+    mWidthType = widthType;
 }
 
 /*!
@@ -626,6 +626,9 @@ void QCPBars::setWidthType(QCPBars::WidthType widthType)
 */
 void QCPBars::setBarsGroup(QCPBarsGroup* barsGroup)
 {
+    if (barsGroup == mBarsGroup)
+        return;
+    markDirty();
     // deregister at old group:
     if (mBarsGroup)
         mBarsGroup->unregisterBars(this);
@@ -633,7 +636,6 @@ void QCPBars::setBarsGroup(QCPBarsGroup* barsGroup)
     // register at new group:
     if (mBarsGroup)
         mBarsGroup->registerBars(this);
-    markDirty();
 }
 
 /*!
@@ -652,8 +654,8 @@ void QCPBars::setBaseValue(double baseValue)
 {
     if (mBaseValue == baseValue)
         return;
-    mBaseValue = baseValue;
     markDirty();
+    mBaseValue = baseValue;
 }
 
 /*!
@@ -665,8 +667,8 @@ void QCPBars::setStackingGap(double pixels)
 {
     if (mStackingGap == pixels)
         return;
-    mStackingGap = pixels;
     markDirty();
+    mStackingGap = pixels;
 }
 
 /*! \overload
@@ -738,6 +740,7 @@ void QCPBars::moveBelow(QCPBars* bars)
                  << "passed QCPBars* doesn't have same key and value axis as this QCPBars";
         return;
     }
+    markDirty(); // the restacking below changes what is drawn
     // remove from stacking:
     connectBars(mBarBelow.data(),
                 mBarAbove.data()); // Note: also works if one (or both) of them is 0
@@ -774,6 +777,7 @@ void QCPBars::moveAbove(QCPBars* bars)
                  << "passed QCPBars* doesn't have same key and value axis as this QCPBars";
         return;
     }
+    markDirty(); // the restacking below changes what is drawn
     // remove from stacking:
     connectBars(mBarBelow.data(),
                 mBarAbove.data()); // Note: also works if one (or both) of them is 0

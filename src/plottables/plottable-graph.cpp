@@ -221,8 +221,8 @@ void QCPGraph::setData(QSharedPointer<QCPGraphDataContainer> data)
 {
     if (mDataContainer == data)
         return;
-    mDataContainer = data;
     markDirty();
+    mDataContainer = data;
 }
 
 /*! \overload
@@ -253,8 +253,8 @@ void QCPGraph::setLineStyle(LineStyle ls)
 {
     if (mLineStyle == ls)
         return;
-    mLineStyle = ls;
     markDirty();
+    mLineStyle = ls;
 }
 
 /*!
@@ -266,8 +266,8 @@ void QCPGraph::setLineStyle(LineStyle ls)
 */
 void QCPGraph::setScatterStyle(const QCPScatterStyle& style)
 {
-    mScatterStyle = style;
     markDirty();
+    mScatterStyle = style;
 }
 
 /*!
@@ -283,8 +283,11 @@ void QCPGraph::setScatterStyle(const QCPScatterStyle& style)
 */
 void QCPGraph::setScatterSkip(int skip)
 {
-    mScatterSkip = qMax(0, skip);
+    const int wanted = qMax(0, skip);
+    if (wanted == mScatterSkip)
+        return;
     markDirty();
+    mScatterSkip = wanted;
 }
 
 /*!
@@ -298,6 +301,7 @@ void QCPGraph::setScatterSkip(int skip)
 */
 void QCPGraph::setChannelFillGraph(QCPGraph* targetGraph)
 {
+    markDirty();
     // prevent setting channel target to this graph itself:
     if (targetGraph == this)
     {
@@ -314,7 +318,6 @@ void QCPGraph::setChannelFillGraph(QCPGraph* targetGraph)
     }
 
     mChannelFillGraph = targetGraph;
-    markDirty();
 }
 
 /*!
@@ -354,8 +357,8 @@ void QCPGraph::setAdaptiveSampling(bool enabled)
 {
     if (mAdaptiveSampling == enabled)
         return;
-    mAdaptiveSampling = enabled;
     markDirty();
+    mAdaptiveSampling = enabled;
 }
 
 /*! \overload

@@ -255,8 +255,8 @@ void QCPStatisticalBox::setData(QSharedPointer<QCPStatisticalBoxDataContainer> d
 {
     if (mDataContainer == data)
         return;
-    mDataContainer = data;
     markDirty();
+    mDataContainer = data;
 }
 
 /*! \overload
@@ -288,8 +288,8 @@ void QCPStatisticalBox::setWidth(double width)
 {
     if (mWidth == width)
         return;
-    mWidth = width;
     markDirty();
+    mWidth = width;
 }
 
 /*!
@@ -304,8 +304,8 @@ void QCPStatisticalBox::setWhiskerWidth(double width)
 {
     if (mWhiskerWidth == width)
         return;
-    mWhiskerWidth = width;
     markDirty();
+    mWhiskerWidth = width;
 }
 
 /*!
@@ -323,8 +323,8 @@ void QCPStatisticalBox::setWhiskerPen(const QPen& pen)
 {
     if (mWhiskerPen == pen)
         return;
-    mWhiskerPen = pen;
     markDirty();
+    mWhiskerPen = pen;
 }
 
 /*!
@@ -340,8 +340,8 @@ void QCPStatisticalBox::setWhiskerBarPen(const QPen& pen)
 {
     if (mWhiskerBarPen == pen)
         return;
-    mWhiskerBarPen = pen;
     markDirty();
+    mWhiskerBarPen = pen;
 }
 
 /*!
@@ -354,8 +354,8 @@ void QCPStatisticalBox::setWhiskerAntialiased(bool enabled)
 {
     if (mWhiskerAntialiased == enabled)
         return;
-    mWhiskerAntialiased = enabled;
     markDirty();
+    mWhiskerAntialiased = enabled;
 }
 
 /*!
@@ -365,8 +365,8 @@ void QCPStatisticalBox::setMedianPen(const QPen& pen)
 {
     if (mMedianPen == pen)
         return;
-    mMedianPen = pen;
     markDirty();
+    mMedianPen = pen;
 }
 
 /*!
@@ -378,8 +378,8 @@ void QCPStatisticalBox::setMedianPen(const QPen& pen)
 */
 void QCPStatisticalBox::setOutlierStyle(const QCPScatterStyle& style)
 {
-    mOutlierStyle = style;
     markDirty();
+    mOutlierStyle = style;
 }
 
 /*! \overload

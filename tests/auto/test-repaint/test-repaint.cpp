@@ -1,5 +1,7 @@
 #include "test-repaint.h"
 #include "plottables/plottable-multigraph.h"
+#include "datasource/soa-multi-datasource.h"
+#include "plottables/plottable-bars.h"
 #include "plottables/plottable-bars.h"
 #include "plottables/plottable-colormap.h"
 #include "plottables/plottable-colormap2.h"
@@ -707,7 +709,7 @@ const QVector<PlottableAppearanceCase>& plottableAppearanceCases()
         { "colormap.setGradient", [](Plot plot) -> QCPAbstractPlottable* { return new QCPColorMap(plot.xAxis, plot.yAxis); },
           [](QCPAbstractPlottable* p) { static_cast<QCPColorMap*>(p)->setGradient(QCPColorGradient::gpJet); } },
         { "colormap.setInterpolate", [](Plot plot) -> QCPAbstractPlottable* { return new QCPColorMap(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPColorMap*>(p)->setInterpolate(true); } },
+          [](QCPAbstractPlottable* p) { static_cast<QCPColorMap*>(p)->setInterpolate(false); } },
         { "colormap.setTightBoundary", [](Plot plot) -> QCPAbstractPlottable* { return new QCPColorMap(plot.xAxis, plot.yAxis); },
           [](QCPAbstractPlottable* p) { static_cast<QCPColorMap*>(p)->setTightBoundary(true); } },
         { "colormap2.setGapThreshold", [](Plot plot) -> QCPAbstractPlottable* { return new QCPColorMap2(plot.xAxis, plot.yAxis); },
@@ -731,7 +733,7 @@ const QVector<PlottableAppearanceCase>& plottableAppearanceCases()
         { "waterfall.setGain", [](Plot plot) -> QCPAbstractPlottable* { return new QCPWaterfallGraph(plot.xAxis, plot.yAxis); },
           [](QCPAbstractPlottable* p) { static_cast<QCPWaterfallGraph*>(p)->setGain(2.0); } },
         { "waterfall.setNormalize", [](Plot plot) -> QCPAbstractPlottable* { return new QCPWaterfallGraph(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPWaterfallGraph*>(p)->setNormalize(true); } },
+          [](QCPAbstractPlottable* p) { static_cast<QCPWaterfallGraph*>(p)->setNormalize(false); } },
     };
     return cases;
 }
@@ -793,15 +795,6 @@ void TestRepaint::plottableEqualValueDoesNotDirty()
     QVERIFY2(!plot->isRepaintQueued(),
              qPrintable(setter + QStringLiteral(" repainted an equal value")));
 }
-void TestRepaint::barsGroupSpacingRepaints()
-{
-    auto plot = settledPlot();
-    auto* group = new QCPBarsGroup(plot.get());
-    waitUntilSettled(*plot);
-
-    group->setSpacing(3);
-    QVERIFY(plot->isRepaintQueued());
-}
 
 void TestRepaint::plottableGroupVisibilityRepaints()
 {
@@ -817,23 +810,95 @@ void TestRepaint::plottableGroupVisibilityRepaints()
 
 void TestRepaint::axisMarginChangeDuringPanRepaints()
 {
-    // A margin change moves every axis and plottable of the rect. If the layers are only marked
-    // dirty, a pan in progress may still translate the old frame and show the graph at the margin it
-    // had before (the reason markAppearanceDirty invalidates instead of dirtying).
+    // A margin change moves the axis rect, so every layer must be redrawn at the new geometry: a
+    // pan in progress would otherwise translate the old frame and leave the fill at the old edge.
     QCustomPlot plot;
     plot.resize(400, 300);
     auto* fill = new FillStub(plot.xAxis, plot.yAxis);
     fill->setPen(QPen(kBlue));
+    plot.xAxis->setLabel(QStringLiteral("x"));
+    plot.yAxis->setLabel(QStringLiteral("y"));
     plot.replot();
-    const int before = pixelsOfColor(screenOf(&plot), kBlue);
-    QVERIFY(before > 1000);
+    waitUntilSettled(plot);
+    const QRect before = plot.axisRect()->rect();
 
     fill->stall = QPointF(5, 0); // a pan in progress
-    plot.xAxis->setTickLengthIn(40); // a margin change: every layer must be redrawn, not shifted
+    plot.xAxis->setTickLengthOut(60); // outside ticks take margin: the rect moves
     waitUntilSettled(plot);
+    const QRect after = plot.axisRect()->rect();
+    QVERIFY2(after != before, "the margin change must move the axis rect");
 
-    const int after = pixelsOfColor(screenOf(&plot), kBlue);
-    QVERIFY2(after < before, qPrintable(QStringLiteral("%1 -> %2 blue pixels").arg(before).arg(after)));
+    // The fill is drawn over exactly the axis rect, so its bounding box is the rect: anything else
+    // means the layer was shifted by the pending pan.
+    const QImage screen = screenOf(&plot);
+    int minX = screen.width(), minY = screen.height(), maxX = -1, maxY = -1;
+    for (int y = 0; y < screen.height(); ++y)
+    {
+        for (int x = 0; x < screen.width(); ++x)
+        {
+            const QColor c = screen.pixelColor(x, y);
+            if (c.blue() > 200 && c.red() < 80 && c.green() < 80)
+            {
+                minX = qMin(minX, x);
+                minY = qMin(minY, y);
+                maxX = qMax(maxX, x);
+                maxY = qMax(maxY, y);
+            }
+        }
+    }
+    QVERIFY(maxX >= minX);
+    // The fill covers exactly the axis rect; one pixel of slack for the antialiased border. A layer
+    // translated by the pending pan would be off by the stall, not by one pixel.
+    const QRect drawn(QPoint(minX, minY), QPoint(maxX, maxY));
+    QVERIFY2(qAbs(drawn.left() - after.left()) <= 1 && qAbs(drawn.top() - after.top()) <= 1
+                 && qAbs(drawn.right() - after.right()) <= 1
+                 && qAbs(drawn.bottom() - after.bottom()) <= 1,
+             qPrintable(QStringLiteral("drawn %1,%2 %3x%4 vs rect %5,%6 %7x%8")
+                            .arg(drawn.x()).arg(drawn.y()).arg(drawn.width()).arg(drawn.height())
+                            .arg(after.x()).arg(after.y()).arg(after.width()).arg(after.height())));
+}
+
+void TestRepaint::multiGraphLineStyleResetsComponents()
+{
+    // A component may carry its own style; the global setter must still reset it, so comparing the
+    // global member alone is not enough to decide "nothing changed".
+    QCustomPlot plot;
+    auto* mg = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto source = std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
+        std::vector<double>{0.0, 1.0}, std::vector<std::vector<double>>{{0.0, 1.0}});
+    mg->setDataSource(source);
+    QCOMPARE(mg->componentCount(), 1);
+
+    mg->setComponentLineStyle(0, QCPMultiGraph::lsStepLeft);
+    QCOMPARE(mg->component(0).lineStyle, QCPMultiGraph::lsStepLeft);
+
+    mg->setLineStyle(QCPMultiGraph::lsLine);
+    QCOMPARE(mg->component(0).lineStyle, QCPMultiGraph::lsLine);
+}
+
+void TestRepaint::barsGroupSpacingRepaints()
+{
+    // The bars group is a QObject, not a layerable: it has to mark its member bars, a plot-wide
+    // request would dirty no layer and the bars would keep their old spacing.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    auto* group = new QCPBarsGroup(&plot);
+    auto* first = new QCPBars(plot.xAxis, plot.yAxis);
+    auto* second = new QCPBars(plot.xAxis, plot.yAxis);
+    for (auto* bars : {first, second})
+    {
+        bars->setBarsGroup(group);
+        bars->setData({1.0, 2.0, 3.0}, {0.5, 1.0, 0.5});
+    }
+    plot.xAxis->setRange(0.5, 3.5);
+    plot.yAxis->setRange(0, 1.5);
+    plot.replot();
+    waitUntilSettled(plot);
+    const QImage before = screenOf(&plot);
+
+    group->setSpacing(0.3);
+    waitUntilSettled(plot);
+    QVERIFY2(before != screenOf(&plot), "the new spacing never reached the screen");
 }
 
 void TestRepaint::axisUnlistedHandsOffsetToSibling()

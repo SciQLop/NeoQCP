@@ -504,8 +504,8 @@ void QCPAbstractPlottable::setAntialiasedFill(bool enabled)
 {
     if (mAntialiasedFill == enabled)
         return;
-    mAntialiasedFill = enabled;
     markDirty();
+    mAntialiasedFill = enabled;
 }
 
 /*!
@@ -518,8 +518,8 @@ void QCPAbstractPlottable::setAntialiasedScatters(bool enabled)
 {
     if (mAntialiasedScatters == enabled)
         return;
-    mAntialiasedScatters = enabled;
     markDirty();
+    mAntialiasedScatters = enabled;
 }
 
 /*!
@@ -534,8 +534,8 @@ void QCPAbstractPlottable::setPen(const QPen& pen)
 {
     if (mPen == pen)
         return;
-    mPen = pen;
     markDirty();
+    mPen = pen;
 }
 
 /*!
@@ -551,8 +551,8 @@ void QCPAbstractPlottable::setBrush(const QBrush& brush)
 {
     if (mBrush == brush)
         return;
-    mBrush = brush;
     markDirty();
+    mBrush = brush;
 }
 
 /*!
@@ -568,9 +568,9 @@ void QCPAbstractPlottable::setBrush(const QBrush& brush)
 */
 void QCPAbstractPlottable::setKeyAxis(QCPAxis* axis)
 {
+    markDirty();
     mKeyAxis = axis;
     axesChanged();
-    markDirty();
 }
 
 /*!
@@ -586,9 +586,9 @@ void QCPAbstractPlottable::setKeyAxis(QCPAxis* axis)
 */
 void QCPAbstractPlottable::setValueAxis(QCPAxis* axis)
 {
+    markDirty();
     mValueAxis = axis;
     axesChanged();
-    markDirty();
 }
 
 /*!
@@ -942,6 +942,7 @@ void QCPAbstractPlottable::setWantsLegend(bool wants)
 {
     if (mWantsLegend == wants)
         return;
+    markDirty();
     mWantsLegend = wants;
     if (mGroup)
         mRowOnLeave = wants;
@@ -949,7 +950,6 @@ void QCPAbstractPlottable::setWantsLegend(bool wants)
         addToLegend();
     else
         removeFromLegend();
-    markDirty();
 }
 
 /*! \overload
@@ -1178,9 +1178,7 @@ void QCPAbstractPlottable::onDebounceTimeout()
     // The GPU entries carry the fade alpha; a translating layer would keep the
     // stale ones, so force one real repaint of this layer.
     if (mLayer)
-        mLayer->invalidatePaintBuffer();
-    if (mParentPlot)
-        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+        mLayer->invalidatePaintBuffer(); // invalidating schedules the repaint
     // Last: a slot may delete this plottable.
     emit visuallyBusyChanged(mVisuallyBusy);
 }

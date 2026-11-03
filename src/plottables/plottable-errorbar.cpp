@@ -160,8 +160,8 @@ void QCPErrorBars::setData(QSharedPointer<QCPErrorBarsDataContainer> data)
 {
     if (mDataContainer == data)
         return;
-    mDataContainer = data;
     markDirty();
+    mDataContainer = data;
 }
 
 /*! \overload
@@ -226,8 +226,8 @@ void QCPErrorBars::setDataPlottable(QCPAbstractPlottable* plottable)
         return;
     }
 
-    mDataPlottable = plottable;
     markDirty();
+    mDataPlottable = plottable;
 }
 
 /*!
@@ -238,8 +238,8 @@ void QCPErrorBars::setErrorType(ErrorType type)
 {
     if (mErrorType == type)
         return;
-    mErrorType = type;
     markDirty();
+    mErrorType = type;
 }
 
 /*!
@@ -250,8 +250,8 @@ void QCPErrorBars::setWhiskerWidth(double pixels)
 {
     if (mWhiskerWidth == pixels)
         return;
-    mWhiskerWidth = pixels;
     markDirty();
+    mWhiskerWidth = pixels;
 }
 
 /*!
@@ -263,8 +263,8 @@ void QCPErrorBars::setSymbolGap(double pixels)
 {
     if (mSymbolGap == pixels)
         return;
-    mSymbolGap = pixels;
     markDirty();
+    mSymbolGap = pixels;
 }
 
 /*! \overload

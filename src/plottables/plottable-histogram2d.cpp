@@ -19,8 +19,7 @@ QCPHistogram2D::QCPHistogram2D(QCPAxis* keyAxis, QCPAxis* valueAxis)
     connect(&mPipeline, &QCPHistogramPipeline::finished,
             this, [this](uint64_t) {
                 binsChanged();
-                if (parentPlot())
-                    parentPlot()->replot(QCustomPlot::rpQueuedReplot);
+                markDirty(); // marking schedules the repaint
             });
     connect(&mPipeline, &QCPHistogramPipeline::busyChanged,
             this, [this](bool) { updateEffectiveBusy(); });
@@ -76,10 +75,10 @@ void QCPHistogram2D::installTransform()
 
 void QCPHistogram2D::setDataSource(std::shared_ptr<QCPAbstractDataSource> source)
 {
+    markDirty();
     mDataSource = std::move(source);
     invalidateBoundsCache();
     mPipeline.setSource(mDataSource);
-    markDirty();
 }
 
 void QCPHistogram2D::setDataSource(std::unique_ptr<QCPAbstractDataSource> source)
@@ -122,25 +121,29 @@ void QCPHistogram2D::setBins(int keyBins, int valueBins)
         return;
     if (keyBins == mKeyBins && valueBins == mValueBins)
         return;
+    markDirty();
     mKeyBins = keyBins;
     mValueBins = valueBins;
     installTransform();
     mPipeline.onDataChanged();
-    markDirty();
 }
 
 void QCPHistogram2D::setKeyBinScale(QCPAxis::ScaleType type)
 {
+    if (mKeyAxis && mKeyAxis->scaleType() == type)
+        return;
+    markDirty();
     if (mKeyAxis)
         mKeyAxis->setScaleType(type); // scaleTypeChanged -> re-bin
-    markDirty();
 }
 
 void QCPHistogram2D::setValueBinScale(QCPAxis::ScaleType type)
 {
+    if (mValueAxis && mValueAxis->scaleType() == type)
+        return;
+    markDirty();
     if (mValueAxis)
         mValueAxis->setScaleType(type);
-    markDirty();
 }
 
 QCPAxis::ScaleType QCPHistogram2D::keyBinScale() const
@@ -157,23 +160,23 @@ void QCPHistogram2D::setNormalization(Normalization norm)
 {
     if (mNormalization == norm)
         return;
+    markDirty();
     mNormalization = norm;
     binsChanged();
-    mParentPlot->replot(QCustomPlot::rpQueuedReplot);
-    markDirty();
 }
 
 void QCPHistogram2D::setGradient(const QCPColorGradient& gradient)
 {
     if (mRenderer.gradient() == gradient)
         return;
+    markDirty();
     mRenderer.setGradient(gradient);
-    redrawLater();
     Q_EMIT gradientChanged(mRenderer.gradient()); // last: a slot may delete this histogram
 }
 
 void QCPHistogram2D::setColorScale(QCPColorScale* scale)
 {
+    markDirty();
     if (mRenderer.colorScale())
     {
         disconnect(this, &QCPHistogram2D::dataRangeChanged, mRenderer.colorScale(), &QCPColorScale::setDataRange);
@@ -203,7 +206,6 @@ void QCPHistogram2D::setColorScale(QCPColorScale* scale)
         connect(scale, &QCPColorScale::gradientChanged, this, &QCPHistogram2D::setGradient);
         connect(scale, &QCPColorScale::dataScaleTypeChanged, this, &QCPHistogram2D::setDataScaleType);
     }
-    markDirty();
 }
 
 void QCPHistogram2D::setDataRange(const QCPRange& range)
@@ -235,9 +237,7 @@ void QCPHistogram2D::setDataScaleType(QCPAxis::ScaleType type)
 
 void QCPHistogram2D::redrawLater()
 {
-    if (mLayer)
-        mLayer->markDirty();
-    mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    markDirty(); // marking schedules the repaint
 }
 
 const QCPColorMapData* QCPHistogram2D::binned() const
@@ -414,32 +414,32 @@ void QCPHistogram2D::contoursChanged()
 
 void QCPHistogram2D::setContourLevels(const QVector<double>& levels)
 {
+    markDirty();
     mContours.setLevels(levels);
     contoursChanged();
-    markDirty();
 }
 
 void QCPHistogram2D::setAutoContourLevels(int count)
 {
+    markDirty();
     mContours.setAutoLevels(count);
     contoursChanged();
-    markDirty();
 }
 
 void QCPHistogram2D::setContourPen(const QPen& pen)
 {
+    markDirty();
     mContours.setPen(pen);
     contoursChanged();
-    markDirty();
 }
 
 void QCPHistogram2D::setContourLabelEnabled(bool enabled)
 {
     if (enabled == mContours.labelsEnabled())
         return;
+    markDirty();
     mContours.setLabelsEnabled(enabled);
     contoursChanged();
-    markDirty();
 }
 
 void QCPHistogram2D::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const

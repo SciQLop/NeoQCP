@@ -32,8 +32,7 @@ QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
             this, [this](uint64_t) {
                 mContours.dataChanged();
                 mRenderer.invalidateMapImage();
-                if (parentPlot())
-                    parentPlot()->replot(QCustomPlot::rpQueuedReplot);
+                markDirty(); // marking schedules the repaint
             });
     connect(&mPipeline, &QCPColormapPipeline::busyChanged,
             this, [this](bool) { updateEffectiveBusy(); });
@@ -132,6 +131,7 @@ void QCPColorMap2::setGapThreshold(double threshold)
 {
     if (mGapThreshold == threshold)
         return;
+    markDirty();
     mGapThreshold = threshold;
     installResampleTransform();
     // Re-resample so the new threshold shows now, not on the next pan. Without
@@ -139,13 +139,12 @@ void QCPColorMap2::setGapThreshold(double threshold)
     // pipeline generation for nothing, leaving isBusy() stuck true.
     if (mDataSource)
         mPipeline.onDataChanged();
-    markDirty();
 }
 
 void QCPColorMap2::setDataSource(std::unique_ptr<QCPAbstractDataSource2D> source)
 {
-    setDataSource(std::shared_ptr<QCPAbstractDataSource2D>(std::move(source)));
     markDirty();
+    setDataSource(std::shared_ptr<QCPAbstractDataSource2D>(std::move(source)));
 }
 
 void QCPColorMap2::setDataSource(std::shared_ptr<QCPAbstractDataSource2D> source)
@@ -185,6 +184,7 @@ void QCPColorMap2::setGradient(const QCPColorGradient& gradient)
 
 void QCPColorMap2::setColorScale(QCPColorScale* colorScale)
 {
+    markDirty();
     if (mRenderer.colorScale())
     {
         disconnect(this, &QCPColorMap2::dataRangeChanged, mRenderer.colorScale(), &QCPColorScale::setDataRange);
@@ -214,7 +214,6 @@ void QCPColorMap2::setColorScale(QCPColorScale* colorScale)
         connect(colorScale, &QCPColorScale::gradientChanged, this, &QCPColorMap2::setGradient);
         connect(colorScale, &QCPColorScale::dataScaleTypeChanged, this, &QCPColorMap2::setDataScaleType);
     }
-    markDirty();
 }
 
 void QCPColorMap2::setDataRange(const QCPRange& range)
@@ -251,10 +250,7 @@ void QCPColorMap2::setDataScaleType(QCPAxis::ScaleType type)
 
 void QCPColorMap2::redrawLater()
 {
-    if (mLayer)
-        mLayer->markDirty();
-    if (mParentPlot)
-        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    markDirty(); // marking schedules the repaint
 }
 
 QCPRange QCPColorMap2::colorDataBounds(bool& found, bool recalc) const
@@ -493,38 +489,35 @@ double QCPColorMap2::selectTest(const QPointF& pos, bool onlySelectable, QVarian
 
 void QCPColorMap2::contoursChanged()
 {
-    if (mLayer)
-        mLayer->markDirty();
-    if (mParentPlot)
-        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    markDirty();
 }
 
 void QCPColorMap2::setContourLevels(const QVector<double>& levels)
 {
+    markDirty();
     mContours.setLevels(levels);
     contoursChanged();
-    markDirty();
 }
 
 void QCPColorMap2::setContourPen(const QPen& pen)
 {
+    markDirty();
     mContours.setPen(pen);
     contoursChanged();
-    markDirty();
 }
 
 void QCPColorMap2::setContourLabelEnabled(bool enabled)
 {
     if (enabled == mContours.labelsEnabled())
         return;
+    markDirty();
     mContours.setLabelsEnabled(enabled);
     contoursChanged();
-    markDirty();
 }
 
 void QCPColorMap2::setAutoContourLevels(int count)
 {
+    markDirty();
     mContours.setAutoLevels(count);
     contoursChanged();
-    markDirty();
 }

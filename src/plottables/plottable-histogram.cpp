@@ -179,12 +179,12 @@ std::shared_ptr<Histogram1D> QCPHistogram::pipelineResult() const
 
 void QCPHistogram::setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> source)
 {
+    markDirty();
     mDataSource = std::move(source);
     const QPointer<QCPHistogram> alive(this);
     mPipeline.setSource(mDataSource);
     if (alive && !mDataSource)
         clearResult();
-    markDirty();
 }
 
 // No job runs for a null source, so nothing would replace the old bars; one still running for
@@ -220,9 +220,9 @@ void QCPHistogram::setBins(int bins)
 {
     if (bins <= 0 || bins == mBins)
         return;
+    markDirty();
     mBins = bins;
     refreshBinning();
-    markDirty();
 }
 
 void QCPHistogram::setFixedRange(std::optional<QCPRange> range)
@@ -232,18 +232,18 @@ void QCPHistogram::setFixedRange(std::optional<QCPRange> range)
         qWarning() << "QCPHistogram::setFixedRange: log bins need a positive range, ignored";
         return;
     }
+    markDirty();
     mFixedRange = range;
     refreshBinning();
-    markDirty();
 }
 
 void QCPHistogram::setNormalization(HistogramNormalization norm)
 {
     if (norm == mNormalization)
         return;
+    markDirty();
     mNormalization = norm;
     refreshBinning();
-    markDirty();
 }
 
 void QCPHistogram::setStyle(Style style)
@@ -297,9 +297,7 @@ void QCPHistogram::rememberEdges()
 
 void QCPHistogram::requestReplot()
 {
-    if (mLayer)
-        mLayer->markDirty();
-    mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    markDirty(); // marking schedules the repaint
 }
 
 void QCPHistogram::binForExport()
