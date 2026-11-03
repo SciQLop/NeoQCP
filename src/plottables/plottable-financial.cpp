@@ -225,7 +225,10 @@ QCPFinancial::~QCPFinancial() { }
 */
 void QCPFinancial::setData(QSharedPointer<QCPFinancialDataContainer> data)
 {
+    if (mDataContainer == data)
+        return;
     mDataContainer = data;
+    markDirty();
 }
 
 /*! \overload
@@ -252,7 +255,10 @@ void QCPFinancial::setData(const QVector<double>& keys, const QVector<double>& o
 */
 void QCPFinancial::setChartStyle(QCPFinancial::ChartStyle style)
 {
+    if (mChartStyle == style)
+        return;
     mChartStyle = style;
+    markDirty();
 }
 
 /*!
@@ -262,7 +268,10 @@ void QCPFinancial::setChartStyle(QCPFinancial::ChartStyle style)
 */
 void QCPFinancial::setWidth(double width)
 {
+    if (mWidth == width)
+        return;
     mWidth = width;
+    markDirty();
 }
 
 /*!
@@ -275,7 +284,10 @@ void QCPFinancial::setWidth(double width)
 */
 void QCPFinancial::setWidthType(QCPFinancial::WidthType widthType)
 {
+    if (mWidthType == widthType)
+        return;
     mWidthType = widthType;
+    markDirty();
 }
 
 /*!
@@ -289,7 +301,10 @@ void QCPFinancial::setWidthType(QCPFinancial::WidthType widthType)
 */
 void QCPFinancial::setTwoColored(bool twoColored)
 {
+    if (mTwoColored == twoColored)
+        return;
     mTwoColored = twoColored;
+    markDirty();
 }
 
 /*!
@@ -303,7 +318,10 @@ void QCPFinancial::setTwoColored(bool twoColored)
 */
 void QCPFinancial::setBrushPositive(const QBrush& brush)
 {
+    if (mBrushPositive == brush)
+        return;
     mBrushPositive = brush;
+    markDirty();
 }
 
 /*!
@@ -317,7 +335,10 @@ void QCPFinancial::setBrushPositive(const QBrush& brush)
 */
 void QCPFinancial::setBrushNegative(const QBrush& brush)
 {
+    if (mBrushNegative == brush)
+        return;
     mBrushNegative = brush;
+    markDirty();
 }
 
 /*!
@@ -331,7 +352,10 @@ void QCPFinancial::setBrushNegative(const QBrush& brush)
 */
 void QCPFinancial::setPenPositive(const QPen& pen)
 {
+    if (mPenPositive == pen)
+        return;
     mPenPositive = pen;
+    markDirty();
 }
 
 /*!
@@ -345,7 +369,10 @@ void QCPFinancial::setPenPositive(const QPen& pen)
 */
 void QCPFinancial::setPenNegative(const QPen& pen)
 {
+    if (mPenNegative == pen)
+        return;
     mPenNegative = pen;
+    markDirty();
 }
 
 /*! \overload

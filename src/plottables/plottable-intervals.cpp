@@ -109,6 +109,7 @@ void QCPIntervals::setData(qcp::intervals::Columns columns)
     ++mDataGeneration;
     markLayersDirty();
     setSelectedRows(rowsWithIds(selected));
+    markDirty();
 }
 
 QVector<int> QCPIntervals::rowsWithIds(const QVector<qint64>& ids) const
@@ -182,7 +183,10 @@ std::optional<QCPLaneBand> QCPIntervals::rowBand(int lane, int subRow) const
 
 void QCPIntervals::setCategoryNames(const QStringList& names)
 {
+    if (mCategoryNames == names)
+        return;
     mCategoryNames = names;
+    markDirty();
 }
 
 std::vector<std::pair<QString, QColor>> QCPIntervals::legendEntries() const
@@ -227,6 +231,7 @@ void QCPIntervals::setCategoryColors(const QVector<QColor>& colors)
     mCategoryColors = colors;
     ++mColorGeneration;
     markLayersDirty();
+    markDirty();
 }
 
 QColor QCPIntervals::categoryColor(int category) const
@@ -423,6 +428,7 @@ void QCPIntervals::setSelectedRows(const QVector<int>& rows)
         if (row >= 0 && row < rowCount())
             sel.addDataRange(QCPDataRange(row, row + 1), false);
     sel.simplify();
+    markDirty(); // before setSelection(): its slot may delete this plottable
     setSelection(sel);
 }
 
@@ -802,14 +808,21 @@ void QCPIntervals::setEditable(bool editable)
     mEditable = editable;
     if (!editable)
         mGesture.reset();
+    markDirty();
 }
 
-void QCPIntervals::setEditModes(EditModes modes) { mEditModes = modes; }
+void QCPIntervals::setEditModes(EditModes modes) {
+    if (mEditModes == modes)
+        return;
+    mEditModes = modes;
+    markDirty();
+}
 
 void QCPIntervals::setSnap(SnapMode mode, double step)
 {
     mSnap = mode;
     mSnapStep = step;
+    markDirty();
 }
 
 void QCPIntervals::setStackMode(StackMode mode)
@@ -820,6 +833,7 @@ void QCPIntervals::setStackMode(StackMode mode)
     mStack = mode;
     updateSubRows();
     markLayersDirty();
+    markDirty();
 }
 
 void QCPIntervals::setCategoryOrder(std::vector<int> order)
@@ -830,6 +844,7 @@ void QCPIntervals::setCategoryOrder(std::vector<int> order)
     mCategoryOrder = std::move(order);
     updateSubRows();
     markLayersDirty();
+    markDirty();
 }
 
 std::optional<int> QCPIntervals::rowCategory(int row) const
@@ -919,6 +934,7 @@ void QCPIntervals::setSnapTimes(std::vector<double> times)
     std::ranges::sort(times);
     mSnapTimes = std::move(times);
     mSnap = snTimes;
+    markDirty();
 }
 
 QCPRange QCPIntervals::getKeyRange(bool& foundRange, QCP::SignDomain) const
@@ -1134,6 +1150,7 @@ void QCPIntervals::setStyle(Style style)
         return;
     mStyle = style;
     markLayersDirty();
+    markDirty();
 }
 
 bool QCPIntervals::drawBarsOnGpu(QCPPainter* painter)

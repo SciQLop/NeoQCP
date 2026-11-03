@@ -139,11 +139,13 @@ void QCPColorMap2::setGapThreshold(double threshold)
     // pipeline generation for nothing, leaving isBusy() stuck true.
     if (mDataSource)
         mPipeline.onDataChanged();
+    markDirty();
 }
 
 void QCPColorMap2::setDataSource(std::unique_ptr<QCPAbstractDataSource2D> source)
 {
     setDataSource(std::shared_ptr<QCPAbstractDataSource2D>(std::move(source)));
+    markDirty();
 }
 
 void QCPColorMap2::setDataSource(std::shared_ptr<QCPAbstractDataSource2D> source)
@@ -212,6 +214,7 @@ void QCPColorMap2::setColorScale(QCPColorScale* colorScale)
         connect(colorScale, &QCPColorScale::gradientChanged, this, &QCPColorMap2::setGradient);
         connect(colorScale, &QCPColorScale::dataScaleTypeChanged, this, &QCPColorMap2::setDataScaleType);
     }
+    markDirty();
 }
 
 void QCPColorMap2::setDataRange(const QCPRange& range)
@@ -500,12 +503,14 @@ void QCPColorMap2::setContourLevels(const QVector<double>& levels)
 {
     mContours.setLevels(levels);
     contoursChanged();
+    markDirty();
 }
 
 void QCPColorMap2::setContourPen(const QPen& pen)
 {
     mContours.setPen(pen);
     contoursChanged();
+    markDirty();
 }
 
 void QCPColorMap2::setContourLabelEnabled(bool enabled)
@@ -514,10 +519,12 @@ void QCPColorMap2::setContourLabelEnabled(bool enabled)
         return;
     mContours.setLabelsEnabled(enabled);
     contoursChanged();
+    markDirty();
 }
 
 void QCPColorMap2::setAutoContourLevels(int count)
 {
     mContours.setAutoLevels(count);
     contoursChanged();
+    markDirty();
 }

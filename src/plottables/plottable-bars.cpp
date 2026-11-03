@@ -120,7 +120,11 @@ QCPBarsGroup::~QCPBarsGroup()
 */
 void QCPBarsGroup::setSpacingType(SpacingType spacingType)
 {
+    if (mSpacingType == spacingType)
+        return;
     mSpacingType = spacingType;
+    if (auto* plot = qobject_cast<QCustomPlot*>(parent()))
+        plot->requestRepaint();
 }
 
 /*!
@@ -131,7 +135,11 @@ void QCPBarsGroup::setSpacingType(SpacingType spacingType)
 */
 void QCPBarsGroup::setSpacing(double spacing)
 {
+    if (mSpacing == spacing)
+        return;
     mSpacing = spacing;
+    if (auto* plot = qobject_cast<QCustomPlot*>(parent()))
+        plot->requestRepaint();
 }
 
 /*!
@@ -556,7 +564,10 @@ QCPBars::~QCPBars()
 */
 void QCPBars::setData(QSharedPointer<QCPBarsDataContainer> data)
 {
+    if (mDataContainer == data)
+        return;
     mDataContainer = data;
+    markDirty();
 }
 
 /*! \overload
@@ -585,7 +596,10 @@ void QCPBars::setData(const QVector<double>& keys, const QVector<double>& values
 */
 void QCPBars::setWidth(double width)
 {
+    if (mWidth == width)
+        return;
     mWidth = width;
+    markDirty();
 }
 
 /*!
@@ -598,7 +612,10 @@ void QCPBars::setWidth(double width)
 */
 void QCPBars::setWidthType(QCPBars::WidthType widthType)
 {
+    if (mWidthType == widthType)
+        return;
     mWidthType = widthType;
+    markDirty();
 }
 
 /*!
@@ -616,6 +633,7 @@ void QCPBars::setBarsGroup(QCPBarsGroup* barsGroup)
     // register at new group:
     if (mBarsGroup)
         mBarsGroup->registerBars(this);
+    markDirty();
 }
 
 /*!
@@ -632,7 +650,10 @@ void QCPBars::setBarsGroup(QCPBarsGroup* barsGroup)
 */
 void QCPBars::setBaseValue(double baseValue)
 {
+    if (mBaseValue == baseValue)
+        return;
     mBaseValue = baseValue;
+    markDirty();
 }
 
 /*!
@@ -642,7 +663,10 @@ void QCPBars::setBaseValue(double baseValue)
 */
 void QCPBars::setStackingGap(double pixels)
 {
+    if (mStackingGap == pixels)
+        return;
     mStackingGap = pixels;
+    markDirty();
 }
 
 /*! \overload

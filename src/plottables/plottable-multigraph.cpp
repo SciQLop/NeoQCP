@@ -88,6 +88,7 @@ void QCPMultiGraph::markLinesDirty()
 void QCPMultiGraph::setDataSource(std::unique_ptr<QCPAbstractMultiDataSource> source)
 {
     setDataSource(std::shared_ptr<QCPAbstractMultiDataSource>(std::move(source)));
+    markDirty();
 }
 
 static void ensureL1TransformMulti(QCPMultiGraphPipeline& pipeline, int sourceSize, int colCount,
@@ -441,6 +442,7 @@ void QCPMultiGraph::setComponentFillBrush(int owner, const QBrush& brush)
         return;
     it->spec.brush = brush;
     decorationsChanged();
+    markDirty();
 }
 
 void QCPMultiGraph::clearComponentFill(int owner)
@@ -528,6 +530,7 @@ void QCPMultiGraph::setComponentNames(const QStringList& names)
     int n = qMin(names.size(), mComponents.size());
     for (int i = 0; i < n; ++i)
         mComponents[i].name = names[i];
+    markDirty();
 }
 
 void QCPMultiGraph::setComponentColors(const QList<QColor>& colors)
@@ -539,6 +542,7 @@ void QCPMultiGraph::setComponentColors(const QList<QColor>& colors)
     }
     if (hasPenDerivedDecoration(n))
         decorationsChanged();
+    markDirty();
 }
 
 void QCPMultiGraph::setComponentPens(const QList<QPen>& pens)
@@ -550,6 +554,7 @@ void QCPMultiGraph::setComponentPens(const QList<QPen>& pens)
     }
     if (hasPenDerivedDecoration(n))
         decorationsChanged();
+    markDirty();
 }
 
 void QCPMultiGraph::setComponentInLegend(int index, bool inLegend)
@@ -561,6 +566,7 @@ void QCPMultiGraph::setComponentInLegend(int index, bool inLegend)
         return;
     mComponents[index].inLegend = inLegend;
     Q_EMIT componentVisibilityChanged();
+    markDirty();
 }
 
 QVector<int> QCPMultiGraph::legendComponents() const
@@ -586,10 +592,13 @@ void QCPMultiGraph::setComponentVisible(int index, bool visible)
 
 void QCPMultiGraph::setLineStyle(LineStyle style)
 {
+    if (style == mLineStyle)
+        return;
     mLineStyle = style;
     for (auto& c : mComponents)
         c.lineStyle = style;
     invalidateLines();
+    markDirty();
 }
 
 void QCPMultiGraph::setComponentLineStyle(int index, LineStyle style)
@@ -598,6 +607,7 @@ void QCPMultiGraph::setComponentLineStyle(int index, LineStyle style)
         return;
     mComponents[index].lineStyle = style;
     invalidateLines();
+    markDirty();
 }
 
 void QCPMultiGraph::setAdaptiveSampling(bool enabled)
@@ -606,6 +616,7 @@ void QCPMultiGraph::setAdaptiveSampling(bool enabled)
         return;
     mAdaptiveSampling = enabled;
     invalidateLines();
+    markDirty();
 }
 
 void QCPMultiGraph::setGapThreshold(double threshold)
@@ -614,6 +625,7 @@ void QCPMultiGraph::setGapThreshold(double threshold)
         return;
     mGapThreshold = threshold;
     invalidateLines();
+    markDirty();
 }
 
 void QCPMultiGraph::invalidateLines()
@@ -808,6 +820,7 @@ void QCPMultiGraph::setColorValues(std::shared_ptr<const std::vector<double>> va
         invalidateLines();
         requestOrigin();
     }
+    markDirty();
 }
 
 void QCPMultiGraph::setColorValues(std::vector<double> values)
@@ -829,11 +842,17 @@ void QCPMultiGraph::clearColorValues()
 }
 
 bool QCPMultiGraph::hasColorValues() const { return mColor.hasValues(); }
-void QCPMultiGraph::setColorGradient(const QCPColorGradient& gradient) { mColor.setGradient(gradient); }
+void QCPMultiGraph::setColorGradient(const QCPColorGradient& gradient) { mColor.setGradient(gradient); 
+    markDirty();
+}
 QCPColorGradient QCPMultiGraph::colorGradient() const { return mColor.gradient(); }
-void QCPMultiGraph::setColorRange(const QCPRange& range) { mColor.setRange(range); }
+void QCPMultiGraph::setColorRange(const QCPRange& range) { mColor.setRange(range); 
+    markDirty();
+}
 QCPRange QCPMultiGraph::colorRange() const { return mColor.range(); }
-void QCPMultiGraph::setColorScaleType(QCPAxis::ScaleType type) { mColor.setScaleType(type); }
+void QCPMultiGraph::setColorScaleType(QCPAxis::ScaleType type) { mColor.setScaleType(type); 
+    markDirty();
+}
 QCPAxis::ScaleType QCPMultiGraph::colorScaleType() const { return mColor.scaleType(); }
 
 double QCPMultiGraph::componentValueAt(int column, int index) const
@@ -855,7 +874,8 @@ void QCPMultiGraph::setComponentSelection(int index, const QCPDataSelection& sel
         mComponents[index].selection = sel;
         updateBaseSelection();
     }
-}
+        markDirty();
+    }
 
 // --- QCPPlottableInterface1D ---
 

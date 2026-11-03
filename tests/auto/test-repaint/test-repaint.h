@@ -25,6 +25,13 @@ private slots:
     void axisSettersScheduleRepaint_data();
     void axisSettersScheduleRepaint();
     void axisUnlistedHandsOffsetToSibling();
+    void plottableSettersScheduleRepaint_data();
+    void plottableSettersScheduleRepaint();
+    void plottableEqualValueDoesNotDirty_data();
+    void plottableEqualValueDoesNotDirty();
+    void barsGroupSpacingRepaints();
+    void plottableGroupVisibilityRepaints();
+    void axisMarginChangeDuringPanRepaints();
     void equalValueDoesNotDirty_data();
     void equalValueDoesNotDirty();
 

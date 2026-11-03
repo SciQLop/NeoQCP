@@ -484,6 +484,8 @@ QCPAbstractPlottable::~QCPAbstractPlottable()
 */
 void QCPAbstractPlottable::setName(const QString& name)
 {
+    if (name == mName)
+        return;
     mName = name;
     // simplify: only the default legend's row is marked; a plottable in another legend shows its
     // new name on that legend's next repaint. Mark every legend when multi-legend plots matter.
@@ -500,7 +502,10 @@ void QCPAbstractPlottable::setName(const QString& name)
 */
 void QCPAbstractPlottable::setAntialiasedFill(bool enabled)
 {
+    if (mAntialiasedFill == enabled)
+        return;
     mAntialiasedFill = enabled;
+    markDirty();
 }
 
 /*!
@@ -511,7 +516,10 @@ void QCPAbstractPlottable::setAntialiasedFill(bool enabled)
 */
 void QCPAbstractPlottable::setAntialiasedScatters(bool enabled)
 {
+    if (mAntialiasedScatters == enabled)
+        return;
     mAntialiasedScatters = enabled;
+    markDirty();
 }
 
 /*!
@@ -524,7 +532,10 @@ void QCPAbstractPlottable::setAntialiasedScatters(bool enabled)
 */
 void QCPAbstractPlottable::setPen(const QPen& pen)
 {
+    if (mPen == pen)
+        return;
     mPen = pen;
+    markDirty();
 }
 
 /*!
@@ -538,7 +549,10 @@ void QCPAbstractPlottable::setPen(const QPen& pen)
 */
 void QCPAbstractPlottable::setBrush(const QBrush& brush)
 {
+    if (mBrush == brush)
+        return;
     mBrush = brush;
+    markDirty();
 }
 
 /*!
@@ -556,6 +570,7 @@ void QCPAbstractPlottable::setKeyAxis(QCPAxis* axis)
 {
     mKeyAxis = axis;
     axesChanged();
+    markDirty();
 }
 
 /*!
@@ -573,6 +588,7 @@ void QCPAbstractPlottable::setValueAxis(QCPAxis* axis)
 {
     mValueAxis = axis;
     axesChanged();
+    markDirty();
 }
 
 /*!
@@ -933,6 +949,7 @@ void QCPAbstractPlottable::setWantsLegend(bool wants)
         addToLegend();
     else
         removeFromLegend();
+    markDirty();
 }
 
 /*! \overload

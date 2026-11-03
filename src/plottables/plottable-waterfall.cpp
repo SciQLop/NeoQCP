@@ -95,13 +95,29 @@ void QCPWaterfallGraph::setDataSource(std::shared_ptr<QCPAbstractMultiDataSource
     mOriginalSource = std::move(source);
     mNormDirty = true;
     rebuildAdapter();
+    markDirty();
 }
 
-void QCPWaterfallGraph::setOffsetMode(OffsetMode mode) { mOffsetMode = mode; rebuildAdapter(); }
-void QCPWaterfallGraph::setUniformSpacing(double spacing) { mUniformSpacing = spacing; rebuildAdapter(); }
-void QCPWaterfallGraph::setOffsets(const QVector<double>& offsets) { mUserOffsets = offsets; rebuildAdapter(); }
-void QCPWaterfallGraph::setNormalize(bool enabled) { mNormalize = enabled; mNormDirty = true; rebuildAdapter(); }
-void QCPWaterfallGraph::setGain(double gain) { mGain = gain; rebuildAdapter(); }
+void QCPWaterfallGraph::setOffsetMode(OffsetMode mode) { mOffsetMode = mode; rebuildAdapter(); 
+    markDirty();
+}
+void QCPWaterfallGraph::setUniformSpacing(double spacing) { mUniformSpacing = spacing; rebuildAdapter(); 
+    markDirty();
+}
+void QCPWaterfallGraph::setOffsets(const QVector<double>& offsets) { mUserOffsets = offsets; rebuildAdapter(); 
+    markDirty();
+}
+void QCPWaterfallGraph::setNormalize(bool enabled) { mNormalize = enabled; mNormDirty = true; rebuildAdapter(); 
+    markDirty();
+}
+void QCPWaterfallGraph::setGain(double gain)
+{
+    if (gain == mGain)
+        return;
+    mGain = gain;
+    rebuildAdapter();
+    markDirty();
+}
 void QCPWaterfallGraph::invalidateNormalization() { mNormDirty = true; rebuildAdapter(); }
 
 double QCPWaterfallGraph::effectiveOffset(int component) const

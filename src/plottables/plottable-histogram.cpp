@@ -184,6 +184,7 @@ void QCPHistogram::setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> sou
     mPipeline.setSource(mDataSource);
     if (alive && !mDataSource)
         clearResult();
+    markDirty();
 }
 
 // No job runs for a null source, so nothing would replace the old bars; one still running for
@@ -204,6 +205,7 @@ void QCPHistogram::setBinned(std::vector<double> edges, std::vector<std::vector<
     mDataSource.reset();
     mAutoRange.reset();
     installTransform();
+    markDirty(); // before the pipeline signals below: a slot may delete this histogram
     const QPointer<QCPHistogram> alive(this);
     mPipeline.setSource(nullptr);
     if (!alive)
@@ -220,6 +222,7 @@ void QCPHistogram::setBins(int bins)
         return;
     mBins = bins;
     refreshBinning();
+    markDirty();
 }
 
 void QCPHistogram::setFixedRange(std::optional<QCPRange> range)
@@ -231,6 +234,7 @@ void QCPHistogram::setFixedRange(std::optional<QCPRange> range)
     }
     mFixedRange = range;
     refreshBinning();
+    markDirty();
 }
 
 void QCPHistogram::setNormalization(HistogramNormalization norm)
@@ -239,6 +243,7 @@ void QCPHistogram::setNormalization(HistogramNormalization norm)
         return;
     mNormalization = norm;
     refreshBinning();
+    markDirty();
 }
 
 void QCPHistogram::setStyle(Style style)

@@ -122,3 +122,164 @@ therefore **not** dirtied — call `plot.requestRepaint()` after changing a shar
 
 The axis rect's margin setters live in `src/layout.cpp` (`QCPLayoutGrid`), not in the rect: they are
 handled with the layout family in Task 5.
+
+## plottables
+
+| class | setter | file:line | changes the drawing? | dirties |
+| --- | --- | --- | --- | --- |
+| QCPBarsGroup | setSpacingType | src/plottables/plottable-bars.cpp:121 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPBarsGroup | setSpacing | src/plottables/plottable-bars.cpp:136 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPBars | setData | src/plottables/plottable-bars.cpp:557 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPBars | setData | src/plottables/plottable-bars.cpp:573 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPBars | setWidth | src/plottables/plottable-bars.cpp:597 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPBars | setWidthType | src/plottables/plottable-bars.cpp:613 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPBars | setBarsGroup | src/plottables/plottable-bars.cpp:627 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPBars | setBaseValue | src/plottables/plottable-bars.cpp:651 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPBars | setStackingGap | src/plottables/plottable-bars.cpp:664 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPColorMapData | setSize | src/plottables/plottable-colormap.cpp:205 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPColorMapData | setKeySize | src/plottables/plottable-colormap.cpp:259 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPColorMapData | setValueSize | src/plottables/plottable-colormap.cpp:274 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPColorMapData | setRange | src/plottables/plottable-colormap.cpp:289 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPColorMapData | setKeyRange | src/plottables/plottable-colormap.cpp:305 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPColorMapData | setValueRange | src/plottables/plottable-colormap.cpp:320 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPColorMapData | setData | src/plottables/plottable-colormap.cpp:337 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPColorMapData | setCell | src/plottables/plottable-colormap.cpp:369 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPColorMapData | setAlpha | src/plottables/plottable-colormap.cpp:404 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPColorMap | setData | src/plottables/plottable-colormap.cpp:770 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPColorMap | setDataRange | src/plottables/plottable-colormap.cpp:799 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPColorMap | setDataScaleType | src/plottables/plottable-colormap.cpp:819 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPColorMap | setGradient | src/plottables/plottable-colormap.cpp:843 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPColorMap | setInterpolate | src/plottables/plottable-colormap.cpp:860 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPColorMap | setTightBoundary | src/plottables/plottable-colormap.cpp:878 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPColorMap | setColorScale | src/plottables/plottable-colormap.cpp:901 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPColorMap2 | setGapThreshold | src/plottables/plottable-colormap2.cpp:131 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPColorMap2 | setDataSource | src/plottables/plottable-colormap2.cpp:144 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPColorMap2 | setDataSource | src/plottables/plottable-colormap2.cpp:149 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPColorMap2 | setGradient | src/plottables/plottable-colormap2.cpp:177 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPColorMap2 | setColorScale | src/plottables/plottable-colormap2.cpp:186 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPColorMap2 | setDataRange | src/plottables/plottable-colormap2.cpp:220 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPColorMap2 | setDataScaleType | src/plottables/plottable-colormap2.cpp:232 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPColorMap2 | setContourLevels | src/plottables/plottable-colormap2.cpp:502 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPColorMap2 | setContourPen | src/plottables/plottable-colormap2.cpp:509 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPColorMap2 | setContourLabelEnabled | src/plottables/plottable-colormap2.cpp:516 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPColorMap2 | setAutoContourLevels | src/plottables/plottable-colormap2.cpp:525 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPCurve | setData | src/plottables/plottable-curve.cpp:207 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPCurve | setData | src/plottables/plottable-curve.cpp:223 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPCurve | setData | src/plottables/plottable-curve.cpp:241 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPCurve | setScatterStyle | src/plottables/plottable-curve.cpp:257 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPCurve | setScatterSkip | src/plottables/plottable-curve.cpp:274 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPCurve | setLineStyle | src/plottables/plottable-curve.cpp:287 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPErrorBars | setData | src/plottables/plottable-errorbar.cpp:159 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPErrorBars | setData | src/plottables/plottable-errorbar.cpp:173 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPErrorBars | setData | src/plottables/plottable-errorbar.cpp:189 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPErrorBars | setDataPlottable | src/plottables/plottable-errorbar.cpp:212 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPErrorBars | setErrorType | src/plottables/plottable-errorbar.cpp:237 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPErrorBars | setWhiskerWidth | src/plottables/plottable-errorbar.cpp:249 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPErrorBars | setSymbolGap | src/plottables/plottable-errorbar.cpp:262 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPFinancial | setData | src/plottables/plottable-financial.cpp:226 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPFinancial | setData | src/plottables/plottable-financial.cpp:242 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPFinancial | setChartStyle | src/plottables/plottable-financial.cpp:256 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPFinancial | setWidth | src/plottables/plottable-financial.cpp:269 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPFinancial | setWidthType | src/plottables/plottable-financial.cpp:285 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPFinancial | setTwoColored | src/plottables/plottable-financial.cpp:302 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPFinancial | setBrushPositive | src/plottables/plottable-financial.cpp:319 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPFinancial | setBrushNegative | src/plottables/plottable-financial.cpp:336 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPFinancial | setPenPositive | src/plottables/plottable-financial.cpp:353 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPFinancial | setPenNegative | src/plottables/plottable-financial.cpp:370 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPGraph | setData | src/plottables/plottable-graph.cpp:220 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPGraph | setData | src/plottables/plottable-graph.cpp:236 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPGraph | setLineStyle | src/plottables/plottable-graph.cpp:252 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPGraph | setScatterStyle | src/plottables/plottable-graph.cpp:267 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPGraph | setScatterSkip | src/plottables/plottable-graph.cpp:284 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPGraph | setChannelFillGraph | src/plottables/plottable-graph.cpp:299 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPGraph | setAdaptiveSampling | src/plottables/plottable-graph.cpp:353 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPGraph2 | setScatterColorGradient | src/plottables/plottable-graph2.cpp:72 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPGraph2 | setDataSource | src/plottables/plottable-graph2.cpp:106 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPGraph2 | setDataSource | src/plottables/plottable-graph2.cpp:111 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPPlottableGroup | setName | src/plottables/plottable-group.cpp:63 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPPlottableGroup | setVisible | src/plottables/plottable-group.cpp:141 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPHistogram | setDataSource | src/plottables/plottable-histogram.cpp:180 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPHistogram | setBinned | src/plottables/plottable-histogram.cpp:198 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPHistogram | setBins | src/plottables/plottable-histogram.cpp:219 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPHistogram | setFixedRange | src/plottables/plottable-histogram.cpp:228 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPHistogram | setNormalization | src/plottables/plottable-histogram.cpp:240 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPHistogram | setStyle | src/plottables/plottable-histogram.cpp:249 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPHistogram | setColumnColors | src/plottables/plottable-histogram.cpp:255 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPHistogram2D | setDataSource | src/plottables/plottable-histogram2d.cpp:77 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPHistogram2D | setDataSource | src/plottables/plottable-histogram2d.cpp:84 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPHistogram2D | setBins | src/plottables/plottable-histogram2d.cpp:119 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPHistogram2D | setKeyBinScale | src/plottables/plottable-histogram2d.cpp:132 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPHistogram2D | setValueBinScale | src/plottables/plottable-histogram2d.cpp:139 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPHistogram2D | setNormalization | src/plottables/plottable-histogram2d.cpp:156 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPHistogram2D | setGradient | src/plottables/plottable-histogram2d.cpp:166 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPHistogram2D | setColorScale | src/plottables/plottable-histogram2d.cpp:175 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPHistogram2D | setDataRange | src/plottables/plottable-histogram2d.cpp:209 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPHistogram2D | setDataScaleType | src/plottables/plottable-histogram2d.cpp:221 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPHistogram2D | setContourLevels | src/plottables/plottable-histogram2d.cpp:415 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPHistogram2D | setAutoContourLevels | src/plottables/plottable-histogram2d.cpp:422 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPHistogram2D | setContourPen | src/plottables/plottable-histogram2d.cpp:429 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPHistogram2D | setContourLabelEnabled | src/plottables/plottable-histogram2d.cpp:436 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPIntervals | setData | src/plottables/plottable-intervals.cpp:98 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPIntervals | setCategoryNames | src/plottables/plottable-intervals.cpp:184 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPIntervals | setCategoryColors | src/plottables/plottable-intervals.cpp:229 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPIntervals | setSelectedRows | src/plottables/plottable-intervals.cpp:424 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPIntervals | setEditable | src/plottables/plottable-intervals.cpp:806 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPIntervals | setEditModes | src/plottables/plottable-intervals.cpp:814 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPIntervals | setSnap | src/plottables/plottable-intervals.cpp:821 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPIntervals | setStackMode | src/plottables/plottable-intervals.cpp:828 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPIntervals | setCategoryOrder | src/plottables/plottable-intervals.cpp:839 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPIntervals | setSnapTimes | src/plottables/plottable-intervals.cpp:932 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPIntervals | setStyle | src/plottables/plottable-intervals.cpp:1147 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPMultiGraph | setDataSource | src/plottables/plottable-multigraph.cpp:88 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPMultiGraph | setDataSource | src/plottables/plottable-multigraph.cpp:122 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPMultiGraph | setComponentFillBrush | src/plottables/plottable-multigraph.cpp:437 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPMultiGraph | setComponentNames | src/plottables/plottable-multigraph.cpp:528 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPMultiGraph | setComponentColors | src/plottables/plottable-multigraph.cpp:536 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPMultiGraph | setComponentPens | src/plottables/plottable-multigraph.cpp:548 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPMultiGraph | setComponentInLegend | src/plottables/plottable-multigraph.cpp:560 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPMultiGraph | setComponentVisible | src/plottables/plottable-multigraph.cpp:581 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPMultiGraph | setLineStyle | src/plottables/plottable-multigraph.cpp:593 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPMultiGraph | setComponentLineStyle | src/plottables/plottable-multigraph.cpp:604 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPMultiGraph | setAdaptiveSampling | src/plottables/plottable-multigraph.cpp:613 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPMultiGraph | setGapThreshold | src/plottables/plottable-multigraph.cpp:622 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPMultiGraph | setColorValues | src/plottables/plottable-multigraph.cpp:784 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPMultiGraph | setColorValues | src/plottables/plottable-multigraph.cpp:813 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPMultiGraph | setColorGradient | src/plottables/plottable-multigraph.cpp:845 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPMultiGraph | setColorRange | src/plottables/plottable-multigraph.cpp:849 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPMultiGraph | setColorScaleType | src/plottables/plottable-multigraph.cpp:853 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPMultiGraph | setComponentSelection | src/plottables/plottable-multigraph.cpp:871 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPStatisticalBox | setData | src/plottables/plottable-statisticalbox.cpp:254 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPStatisticalBox | setData | src/plottables/plottable-statisticalbox.cpp:270 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPStatisticalBox | setWidth | src/plottables/plottable-statisticalbox.cpp:287 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPStatisticalBox | setWhiskerWidth | src/plottables/plottable-statisticalbox.cpp:303 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPStatisticalBox | setWhiskerPen | src/plottables/plottable-statisticalbox.cpp:322 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPStatisticalBox | setWhiskerBarPen | src/plottables/plottable-statisticalbox.cpp:339 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPStatisticalBox | setWhiskerAntialiased | src/plottables/plottable-statisticalbox.cpp:353 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPStatisticalBox | setMedianPen | src/plottables/plottable-statisticalbox.cpp:364 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPStatisticalBox | setOutlierStyle | src/plottables/plottable-statisticalbox.cpp:379 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPWaterfallGraph | setDataSource | src/plottables/plottable-waterfall.cpp:93 | data | `markDirty()` after the data is in place (the container has no signal) |
+| QCPWaterfallGraph | setOffsetMode | src/plottables/plottable-waterfall.cpp:101 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPWaterfallGraph | setUniformSpacing | src/plottables/plottable-waterfall.cpp:104 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPWaterfallGraph | setOffsets | src/plottables/plottable-waterfall.cpp:107 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPWaterfallGraph | setNormalize | src/plottables/plottable-waterfall.cpp:110 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPWaterfallGraph | setGain | src/plottables/plottable-waterfall.cpp:113 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPSelectionDecorator | setPen | src/plottables/plottable.cpp:82 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPSelectionDecorator | setBrush | src/plottables/plottable.cpp:90 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPSelectionDecorator | setScatterStyle | src/plottables/plottable.cpp:102 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPSelectionDecorator | setUsedScatterProperties | src/plottables/plottable.cpp:116 | no | — (state only) |
+| QCPAbstractPlottable | setName | src/plottables/plottable.cpp:485 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPAbstractPlottable | setAntialiasedFill | src/plottables/plottable.cpp:503 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPAbstractPlottable | setAntialiasedScatters | src/plottables/plottable.cpp:517 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPAbstractPlottable | setPen | src/plottables/plottable.cpp:533 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPAbstractPlottable | setBrush | src/plottables/plottable.cpp:550 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPAbstractPlottable | setKeyAxis | src/plottables/plottable.cpp:569 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPAbstractPlottable | setValueAxis | src/plottables/plottable.cpp:587 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPAbstractPlottable | setSelection | src/plottables/plottable.cpp:613 | no | — (state only) |
+| QCPAbstractPlottable | setSelectionDecorator | src/plottables/plottable.cpp:645 | no | — (state only) |
+| QCPAbstractPlottable | setSelectable | src/plottables/plottable.cpp:672 | no | — (state only) |
+| QCPAbstractPlottable | setWantsLegend | src/plottables/plottable.cpp:941 | yes | `QCPLayerable::markDirty()` — its own layer |
+| QCPAbstractPlottable | setBusy | src/plottables/plottable.cpp:1149 | no | already invalidates (busy gate) |
+| QCPAbstractPlottable | setBusyIndicatorSymbol | src/plottables/plottable.cpp:1190 | no | — (state only) |
+| QCPAbstractPlottable | setBusyFadeAlpha | src/plottables/plottable.cpp:1200 | no | — (state only) |
+| QCPAbstractPlottable | setBusyShowDelayMs | src/plottables/plottable.cpp:1210 | no | — (state only) |
+| QCPAbstractPlottable | setBusyHideDelayMs | src/plottables/plottable.cpp:1220 | no | — (state only) |

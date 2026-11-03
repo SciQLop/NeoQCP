@@ -62,6 +62,8 @@ QCPPlottableGroup::~QCPPlottableGroup()
 
 void QCPPlottableGroup::setName(const QString& name)
 {
+    if (name == mName)
+        return;
     mName = name;
     markRowDirty();
 }

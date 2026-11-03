@@ -80,6 +80,7 @@ void QCPGraph2::setScatterColorGradient(const QCPColorGradient& gradient)
     g.colorize(t.data(), QCPRange(0.0, 1.0),
                reinterpret_cast<QRgb*>(img.scanLine(0)), kColormapWidth);
     mScatterColorMapImage = img;
+    markDirty();
 }
 
 static void ensureL1Transform(QCPGraphPipeline& pipeline, int sourceSize)
@@ -106,6 +107,7 @@ static void ensureL1Transform(QCPGraphPipeline& pipeline, int sourceSize)
 void QCPGraph2::setDataSource(std::unique_ptr<QCPAbstractDataSource> source)
 {
     setDataSource(std::shared_ptr<QCPAbstractDataSource>(std::move(source)));
+    markDirty();
 }
 
 void QCPGraph2::setDataSource(std::shared_ptr<QCPAbstractDataSource> source)

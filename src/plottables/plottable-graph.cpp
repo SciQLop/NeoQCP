@@ -219,7 +219,10 @@ QCPGraph::~QCPGraph() { }
 */
 void QCPGraph::setData(QSharedPointer<QCPGraphDataContainer> data)
 {
+    if (mDataContainer == data)
+        return;
     mDataContainer = data;
+    markDirty();
 }
 
 /*! \overload
@@ -248,7 +251,10 @@ void QCPGraph::setData(const QVector<double>& keys, const QVector<double>& value
 */
 void QCPGraph::setLineStyle(LineStyle ls)
 {
+    if (mLineStyle == ls)
+        return;
     mLineStyle = ls;
+    markDirty();
 }
 
 /*!
@@ -261,6 +267,7 @@ void QCPGraph::setLineStyle(LineStyle ls)
 void QCPGraph::setScatterStyle(const QCPScatterStyle& style)
 {
     mScatterStyle = style;
+    markDirty();
 }
 
 /*!
@@ -277,6 +284,7 @@ void QCPGraph::setScatterStyle(const QCPScatterStyle& style)
 void QCPGraph::setScatterSkip(int skip)
 {
     mScatterSkip = qMax(0, skip);
+    markDirty();
 }
 
 /*!
@@ -306,6 +314,7 @@ void QCPGraph::setChannelFillGraph(QCPGraph* targetGraph)
     }
 
     mChannelFillGraph = targetGraph;
+    markDirty();
 }
 
 /*!
@@ -343,7 +352,10 @@ void QCPGraph::setChannelFillGraph(QCPGraph* targetGraph)
 */
 void QCPGraph::setAdaptiveSampling(bool enabled)
 {
+    if (mAdaptiveSampling == enabled)
+        return;
     mAdaptiveSampling = enabled;
+    markDirty();
 }
 
 /*! \overload

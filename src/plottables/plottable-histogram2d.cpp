@@ -79,6 +79,7 @@ void QCPHistogram2D::setDataSource(std::shared_ptr<QCPAbstractDataSource> source
     mDataSource = std::move(source);
     invalidateBoundsCache();
     mPipeline.setSource(mDataSource);
+    markDirty();
 }
 
 void QCPHistogram2D::setDataSource(std::unique_ptr<QCPAbstractDataSource> source)
@@ -125,18 +126,21 @@ void QCPHistogram2D::setBins(int keyBins, int valueBins)
     mValueBins = valueBins;
     installTransform();
     mPipeline.onDataChanged();
+    markDirty();
 }
 
 void QCPHistogram2D::setKeyBinScale(QCPAxis::ScaleType type)
 {
     if (mKeyAxis)
         mKeyAxis->setScaleType(type); // scaleTypeChanged -> re-bin
+    markDirty();
 }
 
 void QCPHistogram2D::setValueBinScale(QCPAxis::ScaleType type)
 {
     if (mValueAxis)
         mValueAxis->setScaleType(type);
+    markDirty();
 }
 
 QCPAxis::ScaleType QCPHistogram2D::keyBinScale() const
@@ -156,6 +160,7 @@ void QCPHistogram2D::setNormalization(Normalization norm)
     mNormalization = norm;
     binsChanged();
     mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    markDirty();
 }
 
 void QCPHistogram2D::setGradient(const QCPColorGradient& gradient)
@@ -198,6 +203,7 @@ void QCPHistogram2D::setColorScale(QCPColorScale* scale)
         connect(scale, &QCPColorScale::gradientChanged, this, &QCPHistogram2D::setGradient);
         connect(scale, &QCPColorScale::dataScaleTypeChanged, this, &QCPHistogram2D::setDataScaleType);
     }
+    markDirty();
 }
 
 void QCPHistogram2D::setDataRange(const QCPRange& range)
@@ -410,18 +416,21 @@ void QCPHistogram2D::setContourLevels(const QVector<double>& levels)
 {
     mContours.setLevels(levels);
     contoursChanged();
+    markDirty();
 }
 
 void QCPHistogram2D::setAutoContourLevels(int count)
 {
     mContours.setAutoLevels(count);
     contoursChanged();
+    markDirty();
 }
 
 void QCPHistogram2D::setContourPen(const QPen& pen)
 {
     mContours.setPen(pen);
     contoursChanged();
+    markDirty();
 }
 
 void QCPHistogram2D::setContourLabelEnabled(bool enabled)
@@ -430,6 +439,7 @@ void QCPHistogram2D::setContourLabelEnabled(bool enabled)
         return;
     mContours.setLabelsEnabled(enabled);
     contoursChanged();
+    markDirty();
 }
 
 void QCPHistogram2D::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const

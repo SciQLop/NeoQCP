@@ -785,6 +785,7 @@ void QCPColorMap::setData(QCPColorMapData* data, bool copy)
         mMapData = data;
     }
     mMapImageInvalidated = true;
+    markDirty();
 }
 
 /*!
@@ -799,15 +800,15 @@ void QCPColorMap::setDataRange(const QCPRange& dataRange)
 {
     if (!QCPRange::validRange(dataRange))
         return;
-    if (mDataRange.lower != dataRange.lower || mDataRange.upper != dataRange.upper)
-    {
-        if (mDataScaleType == QCPAxis::stLogarithmic)
-            mDataRange = dataRange.sanitizedForLogScale();
-        else
-            mDataRange = dataRange.sanitizedForLinScale();
-        mMapImageInvalidated = true;
-        emit dataRangeChanged(mDataRange);
-    }
+    if (mDataRange.lower == dataRange.lower && mDataRange.upper == dataRange.upper)
+        return;
+    if (mDataScaleType == QCPAxis::stLogarithmic)
+        mDataRange = dataRange.sanitizedForLogScale();
+    else
+        mDataRange = dataRange.sanitizedForLinScale();
+    mMapImageInvalidated = true;
+    markDirty(); // before the signal: a slot may delete this colour map
+    emit dataRangeChanged(mDataRange);
 }
 
 /*!
@@ -817,15 +818,15 @@ void QCPColorMap::setDataRange(const QCPRange& dataRange)
 */
 void QCPColorMap::setDataScaleType(QCPAxis::ScaleType scaleType)
 {
-    if (mDataScaleType != scaleType)
-    {
-        mDataScaleType = scaleType;
-        mMapImageInvalidated = true;
-        const QPointer<QCPColorMap> alive(this); // a slot may delete this colour map
-        emit dataScaleTypeChanged(mDataScaleType);
-        if (alive && mDataScaleType == QCPAxis::stLogarithmic)
-            setDataRange(mDataRange.sanitizedForLogScale());
-    }
+    if (mDataScaleType == scaleType)
+        return;
+    mDataScaleType = scaleType;
+    mMapImageInvalidated = true;
+    markDirty(); // before the signal: a slot may delete this colour map
+    const QPointer<QCPColorMap> alive(this);
+    emit dataScaleTypeChanged(mDataScaleType);
+    if (alive && mDataScaleType == QCPAxis::stLogarithmic)
+        setDataRange(mDataRange.sanitizedForLogScale());
 }
 
 /*!
@@ -841,12 +842,12 @@ void QCPColorMap::setDataScaleType(QCPAxis::ScaleType scaleType)
 */
 void QCPColorMap::setGradient(const QCPColorGradient& gradient)
 {
-    if (mGradient != gradient)
-    {
-        mGradient = gradient;
-        mMapImageInvalidated = true;
-        emit gradientChanged(mGradient);
-    }
+    if (mGradient == gradient)
+        return;
+    mGradient = gradient;
+    mMapImageInvalidated = true;
+    markDirty(); // before the signal: a slot may delete this colour map
+    emit gradientChanged(mGradient);
 }
 
 /*!
@@ -860,6 +861,7 @@ void QCPColorMap::setInterpolate(bool enabled)
 {
     mInterpolate = enabled;
     mMapImageInvalidated = true; // because oversampling factors might need to change
+    markDirty();
 }
 
 /*!
@@ -875,7 +877,10 @@ void QCPColorMap::setInterpolate(bool enabled)
 */
 void QCPColorMap::setTightBoundary(bool enabled)
 {
+    if (mTightBoundary == enabled)
+        return;
     mTightBoundary = enabled;
+    markDirty();
 }
 
 /*!
@@ -923,6 +928,7 @@ void QCPColorMap::setColorScale(QCPColorScale* colorScale)
         connect(mColorScale.data(), &QCPColorScale::gradientChanged, this, &QCPColorMap::setGradient);
         connect(mColorScale.data(), &QCPColorScale::dataScaleTypeChanged, this, &QCPColorMap::setDataScaleType);
     }
+    markDirty();
 }
 
 /*!

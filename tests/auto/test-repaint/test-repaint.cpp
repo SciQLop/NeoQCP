@@ -1,5 +1,17 @@
 #include "test-repaint.h"
 #include "plottables/plottable-multigraph.h"
+#include "plottables/plottable-bars.h"
+#include "plottables/plottable-colormap.h"
+#include "plottables/plottable-colormap2.h"
+#include "plottables/plottable-curve.h"
+#include "plottables/plottable-errorbar.h"
+#include "plottables/plottable-financial.h"
+#include "plottables/plottable-graph2.h"
+#include "plottables/plottable-group.h"
+#include "plottables/plottable-histogram.h"
+#include "plottables/plottable-histogram2d.h"
+#include "plottables/plottable-statisticalbox.h"
+#include "plottables/plottable-waterfall.h"
 #include <QTemporaryDir>
 #include <QtWidgets/qtestsupport_widgets.h>
 #include <algorithm>
@@ -629,6 +641,199 @@ void TestRepaint::axisSettersScheduleRepaint()
     it->change(*plot);
 
     QVERIFY2(plot->isRepaintQueued(), qPrintable(setter + QStringLiteral(" scheduled no repaint")));
+}
+
+namespace
+{
+struct PlottableAppearanceCase
+{
+    const char* name;
+    // Creates the plottable; the test settles afterwards so only the setter's own dirty counts.
+    std::function<QCPAbstractPlottable*(QCustomPlot&)> prepare;
+    std::function<void(QCPAbstractPlottable*)> change;
+};
+
+const QVector<PlottableAppearanceCase>& plottableAppearanceCases()
+{
+    using Plot = QCustomPlot&;
+    static const QVector<PlottableAppearanceCase> cases{
+        { "graph.setLineStyle", [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPGraph*>(p)->setLineStyle(QCPGraph::lsStepLeft); } },
+        { "graph.setScatterSkip", [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPGraph*>(p)->setScatterSkip(2); } },
+        { "graph.setAdaptiveSampling", [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPGraph*>(p)->setAdaptiveSampling(false); } },
+        { "graph.setPen", [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
+          [](QCPAbstractPlottable* p) { p->setPen(QPen(Qt::darkGreen, 3)); } },
+        { "graph.setBrush", [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
+          [](QCPAbstractPlottable* p) { p->setBrush(QBrush(Qt::yellow)); } },
+        { "graph.setName", [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
+          [](QCPAbstractPlottable* p) { p->setName(QStringLiteral("renamed")); } },
+        { "curve.setPen", [](Plot plot) -> QCPAbstractPlottable* { return new QCPCurve(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { p->setPen(QPen(Qt::darkCyan, 3)); } },
+        { "curve.setBrush", [](Plot plot) -> QCPAbstractPlottable* { return new QCPCurve(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { p->setBrush(QBrush(Qt::cyan)); } },
+        { "curve.setScatterStyle", [](Plot plot) -> QCPAbstractPlottable* { return new QCPCurve(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p)
+          { static_cast<QCPCurve*>(p)->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, 6)); } },
+        { "bars.setWidth", [](Plot plot) -> QCPAbstractPlottable* { return new QCPBars(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPBars*>(p)->setWidth(0.5); } },
+        { "bars.setWidthType", [](Plot plot) -> QCPAbstractPlottable* { return new QCPBars(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPBars*>(p)->setWidthType(QCPBars::wtAbsolute); } },
+        { "bars.setBaseValue", [](Plot plot) -> QCPAbstractPlottable* { return new QCPBars(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPBars*>(p)->setBaseValue(0.5); } },
+        { "bars.setStackingGap", [](Plot plot) -> QCPAbstractPlottable* { return new QCPBars(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPBars*>(p)->setStackingGap(2); } },
+        { "financial.setWidth", [](Plot plot) -> QCPAbstractPlottable* { return new QCPFinancial(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPFinancial*>(p)->setWidth(0.3); } },
+        { "financial.setChartStyle", [](Plot plot) -> QCPAbstractPlottable* { return new QCPFinancial(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPFinancial*>(p)->setChartStyle(QCPFinancial::csOhlc); } },
+        { "financial.setPenNegative", [](Plot plot) -> QCPAbstractPlottable* { return new QCPFinancial(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPFinancial*>(p)->setPenNegative(QPen(Qt::magenta, 2)); } },
+        { "statisticalbox.setWidth", [](Plot plot) -> QCPAbstractPlottable* { return new QCPStatisticalBox(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPStatisticalBox*>(p)->setWidth(0.6); } },
+        { "statisticalbox.setWhiskerPen", [](Plot plot) -> QCPAbstractPlottable* { return new QCPStatisticalBox(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPStatisticalBox*>(p)->setWhiskerPen(QPen(Qt::magenta, 2)); } },
+        { "statisticalbox.setMedianPen", [](Plot plot) -> QCPAbstractPlottable* { return new QCPStatisticalBox(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPStatisticalBox*>(p)->setMedianPen(QPen(Qt::darkGreen, 3)); } },
+        { "errorbars.setWhiskerWidth", [](Plot plot) -> QCPAbstractPlottable* { return new QCPErrorBars(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPErrorBars*>(p)->setWhiskerWidth(10); } },
+        { "errorbars.setErrorType", [](Plot plot) -> QCPAbstractPlottable* { return new QCPErrorBars(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPErrorBars*>(p)->setErrorType(QCPErrorBars::etKeyError); } },
+        { "colormap.setDataRange", [](Plot plot) -> QCPAbstractPlottable* { return new QCPColorMap(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPColorMap*>(p)->setDataRange(QCPRange(0, 5)); } },
+        { "colormap.setDataScaleType", [](Plot plot) -> QCPAbstractPlottable* { return new QCPColorMap(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPColorMap*>(p)->setDataScaleType(QCPAxis::stLogarithmic); } },
+        { "colormap.setGradient", [](Plot plot) -> QCPAbstractPlottable* { return new QCPColorMap(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPColorMap*>(p)->setGradient(QCPColorGradient::gpJet); } },
+        { "colormap.setInterpolate", [](Plot plot) -> QCPAbstractPlottable* { return new QCPColorMap(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPColorMap*>(p)->setInterpolate(true); } },
+        { "colormap.setTightBoundary", [](Plot plot) -> QCPAbstractPlottable* { return new QCPColorMap(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPColorMap*>(p)->setTightBoundary(true); } },
+        { "colormap2.setGapThreshold", [](Plot plot) -> QCPAbstractPlottable* { return new QCPColorMap2(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPColorMap2*>(p)->setGapThreshold(0.5); } },
+        { "colormap2.setContourPen", [](Plot plot) -> QCPAbstractPlottable* { return new QCPColorMap2(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPColorMap2*>(p)->setContourPen(QPen(Qt::magenta, 2)); } },
+        { "colormap2.setAutoContourLevels", [](Plot plot) -> QCPAbstractPlottable* { return new QCPColorMap2(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPColorMap2*>(p)->setAutoContourLevels(8); } },
+        { "histogram.setBins", [](Plot plot) -> QCPAbstractPlottable* { return new QCPHistogram(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPHistogram*>(p)->setBins(12); } },
+        { "histogram.setStyle", [](Plot plot) -> QCPAbstractPlottable* { return new QCPHistogram(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPHistogram*>(p)->setStyle(QCPHistogram::sStep); } },
+        { "histogram2d.setContourPen", [](Plot plot) -> QCPAbstractPlottable* { return new QCPHistogram2D(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPHistogram2D*>(p)->setContourPen(QPen(Qt::magenta, 2)); } },
+        { "multigraph.setLineStyle", [](Plot plot) -> QCPAbstractPlottable* { return new QCPMultiGraph(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPMultiGraph*>(p)->setLineStyle(QCPMultiGraph::lsNone); } },
+        { "multigraph.setAdaptiveSampling", [](Plot plot) -> QCPAbstractPlottable* { return new QCPMultiGraph(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPMultiGraph*>(p)->setAdaptiveSampling(false); } },
+        { "waterfall.setOffsetMode", [](Plot plot) -> QCPAbstractPlottable* { return new QCPWaterfallGraph(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPWaterfallGraph*>(p)->setOffsetMode(QCPWaterfallGraph::omCustom); } },
+        { "waterfall.setGain", [](Plot plot) -> QCPAbstractPlottable* { return new QCPWaterfallGraph(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPWaterfallGraph*>(p)->setGain(2.0); } },
+        { "waterfall.setNormalize", [](Plot plot) -> QCPAbstractPlottable* { return new QCPWaterfallGraph(plot.xAxis, plot.yAxis); },
+          [](QCPAbstractPlottable* p) { static_cast<QCPWaterfallGraph*>(p)->setNormalize(true); } },
+    };
+    return cases;
+}
+} // namespace
+
+void TestRepaint::plottableSettersScheduleRepaint_data()
+{
+    QTest::addColumn<QString>("setter");
+    for (const PlottableAppearanceCase& c : plottableAppearanceCases())
+        QTest::newRow(c.name) << QString::fromLatin1(c.name);
+}
+
+void TestRepaint::plottableSettersScheduleRepaint()
+{
+    QFETCH(QString, setter);
+    const auto& cases = plottableAppearanceCases();
+    auto it = std::find_if(cases.cbegin(), cases.cend(), [&setter](const PlottableAppearanceCase& c)
+                           { return setter == QLatin1String(c.name); });
+    QVERIFY(it != cases.cend());
+
+    auto plot = settledPlot();
+    QCPAbstractPlottable* plottable = it->prepare(*plot);
+    QVERIFY(plottable);
+    waitUntilSettled(*plot);
+    QVERIFY(!plot->isRepaintQueued());
+
+    it->change(plottable);
+    QVERIFY2(plot->isRepaintQueued(), qPrintable(setter + QStringLiteral(" scheduled no repaint")));
+}
+
+void TestRepaint::plottableEqualValueDoesNotDirty_data()
+{
+    QTest::addColumn<QString>("setter");
+    static const char* const names[] = {"graph.setPen",  "graph.setName",  "curve.setPen",
+                                        "bars.setWidth", "colormap.setGradient",
+                                        "multigraph.setLineStyle", "waterfall.setGain"};
+    for (const char* name : names)
+        QTest::newRow(name) << QString::fromLatin1(name);
+}
+
+void TestRepaint::plottableEqualValueDoesNotDirty()
+{
+    QFETCH(QString, setter);
+    const auto& cases = plottableAppearanceCases();
+    auto it = std::find_if(cases.cbegin(), cases.cend(), [&setter](const PlottableAppearanceCase& c)
+                           { return setter == QLatin1String(c.name); });
+    QVERIFY(it != cases.cend());
+
+    auto plot = settledPlot();
+    QCPAbstractPlottable* plottable = it->prepare(*plot);
+    QVERIFY(plottable);
+    waitUntilSettled(*plot);
+
+    it->change(plottable);
+    QVERIFY2(plot->isRepaintQueued(), qPrintable(setter + QStringLiteral(" changed nothing")));
+    waitUntilSettled(*plot);
+
+    it->change(plottable); // same value: there is nothing new to draw
+    QVERIFY2(!plot->isRepaintQueued(),
+             qPrintable(setter + QStringLiteral(" repainted an equal value")));
+}
+void TestRepaint::barsGroupSpacingRepaints()
+{
+    auto plot = settledPlot();
+    auto* group = new QCPBarsGroup(plot.get());
+    waitUntilSettled(*plot);
+
+    group->setSpacing(3);
+    QVERIFY(plot->isRepaintQueued());
+}
+
+void TestRepaint::plottableGroupVisibilityRepaints()
+{
+    auto plot = settledPlot();
+    QCPPlottableGroup* group = plot->addPlottableGroup(QStringLiteral("g"));
+    QVERIFY(group);
+    QVERIFY(group->addMember(plot->graph(0)));
+    waitUntilSettled(*plot);
+
+    group->setVisible(false);
+    QVERIFY(plot->isRepaintQueued());
+}
+
+void TestRepaint::axisMarginChangeDuringPanRepaints()
+{
+    // A margin change moves every axis and plottable of the rect. If the layers are only marked
+    // dirty, a pan in progress may still translate the old frame and show the graph at the margin it
+    // had before (the reason markAppearanceDirty invalidates instead of dirtying).
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    auto* fill = new FillStub(plot.xAxis, plot.yAxis);
+    fill->setPen(QPen(kBlue));
+    plot.replot();
+    const int before = pixelsOfColor(screenOf(&plot), kBlue);
+    QVERIFY(before > 1000);
+
+    fill->stall = QPointF(5, 0); // a pan in progress
+    plot.xAxis->setTickLengthIn(40); // a margin change: every layer must be redrawn, not shifted
+    waitUntilSettled(plot);
+
+    const int after = pixelsOfColor(screenOf(&plot), kBlue);
+    QVERIFY2(after < before, qPrintable(QStringLiteral("%1 -> %2 blue pixels").arg(before).arg(after)));
 }
 
 void TestRepaint::axisUnlistedHandsOffsetToSibling()

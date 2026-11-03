@@ -206,7 +206,10 @@ QCPCurve::~QCPCurve() { }
 */
 void QCPCurve::setData(QSharedPointer<QCPCurveDataContainer> data)
 {
+    if (mDataContainer == data)
+        return;
     mDataContainer = data;
+    markDirty();
 }
 
 /*! \overload
@@ -254,6 +257,7 @@ void QCPCurve::setData(const QVector<double>& keys, const QVector<double>& value
 void QCPCurve::setScatterStyle(const QCPScatterStyle& style)
 {
     mScatterStyle = style;
+    markDirty();
 }
 
 /*!
@@ -270,6 +274,7 @@ void QCPCurve::setScatterStyle(const QCPScatterStyle& style)
 void QCPCurve::setScatterSkip(int skip)
 {
     mScatterSkip = qMax(0, skip);
+    markDirty();
 }
 
 /*!
@@ -281,7 +286,10 @@ void QCPCurve::setScatterSkip(int skip)
 */
 void QCPCurve::setLineStyle(QCPCurve::LineStyle style)
 {
+    if (mLineStyle == style)
+        return;
     mLineStyle = style;
+    markDirty();
 }
 
 /*! \overload
