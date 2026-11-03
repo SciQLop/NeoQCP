@@ -229,7 +229,8 @@ public:
     void setThemeLegendBorder(const QColor& color);
     // True from the first line of ~QCustomPlot's body (a subclass destructor has already run by
     // then). It is what mutators called from children's destroyed() slots see: they refuse, and
-    // the getters make nothing.
+    // the getters make nothing. Children's own signals can still reach user slots during teardown
+    // (for example layerChanged(nullptr) as the layers are deleted); a slot should check this first.
     [[nodiscard]] bool isBeingDestroyed() const { return mBeingDestroyed; }
     [[nodiscard]] bool isReplotting() const { return mReplotting; }
     // overlay:

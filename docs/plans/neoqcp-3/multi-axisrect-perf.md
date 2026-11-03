@@ -140,3 +140,5 @@ already handle.
   absolute numbers and the stacked-vs-separate ratio for the synced case only roughly right. A check on a
   real GPU (macOS Metal, Linux Vulkan or GL) should come before decision 13 is closed, mostly for the
   all-rows-change case.
+- The Task 2 measuring program was not kept: the numbers come from a throwaway program on llvmpipe, and
+  decision 13 waits for that real-GPU re-check.

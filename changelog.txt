@@ -20,16 +20,32 @@ Refused, inert or reported as misuse (debug builds abort, release builds warn an
 
 New headers (included from qcp.h):
   - misuse.h: qcp::reportMisuse and QCP_CHECK, the one way invalid use is reported.
+        qcp::setMisuseHandler replaces the default (abort in debug, warn in release).
   - handle.h: QCPHandle<T>, a typed handle that never dangles (null when the target is deleted;
         qcpConnect connects through it). Not used by the getters yet.
   - signal-delivery.h: deferred signal delivery, see the rule below.
 
 Deferred delivery rule (signals that run user code at a moment the plot may be half-updated):
-  - afterReplot, and signals caused by input (mouse, wheel, key, resize, show, paint), are delivered on
-        the next event-loop turn after the event.
-  - Signals caused by a method call are delivered when the outermost call returns.
-  - beforeReplot and afterLayout are emitted directly, with 2.x timing.
-  - rangeChanged stays direct.
+  - Converted so far: mousePress, mouseMove, mouseRelease, mouseDoubleClick, mouseWheel, the *Click
+        and *DoubleClick signals, QCPAbstractItem::deleteRequested, afterReplot and
+        QCPLayerable::layerChanged.
+  - Emitted from a method call (replot(), setLayer(), ...): delivered when the outermost call returns.
+        A replot() you call yourself delivers afterReplot before it returns.
+  - Emitted from an input handler (mouse, wheel, key, resize, show, paint), including a replot() run
+        inside one: delivered on the next event-loop turn.
+  - Input signals carry a copy of the event: accept() or ignore() in a slot has no effect.
+  - Still direct (milestone 4): selectionChangedByUser, selectionChanged, rangeChanged,
+        QCPSelectionRect::accepted and the QCPIntervals edit signals (intervalsEdited,
+        intervalCreated, deleteRequested). beforeReplot and afterLayout keep 2.x timing.
+
+Parts the plot re-creates, and getters that never create:
+  - QCPAxis::grid() (a new hidden grid), plotLayout() and overlay() make a new part when the old one
+        was deleted; setTheme(nullptr) makes a new owned theme. While the plot is being destroyed they
+        make nothing and may return null.
+  - gridIfExists(), spanRhiLayerIfExists(), gridRhiLayerIfExists() return what exists, or null.
+  - isBeingDestroyed() and isReplotting() tell a slot what state the plot is in.
+  - Deleting every layer is allowed: new plottables and items then have no layer and are not drawn
+        until given one; addLayer() starts a new list (removeLayer() still keeps the last layer).
 
 Behaviour changes for 2.x users:
   - Debug builds abort at the next draw when a plottable's axis was removed; 2.x printed a debug message.
@@ -37,7 +53,8 @@ Behaviour changes for 2.x users:
   - A tracer whose graph is deleted is hidden; it used to become free.
   - A plot being destroyed refuses to add or remove anything (misuse).
   - A slot on mousePress or mouseWheel can no longer steer the current event; do it from an event filter.
-  - afterReplot and input signals arrive one event-loop turn later than before.
+  - Input signals, and afterReplot from a replot inside an input handler, arrive one event-loop turn
+        later than before.
   - Deleting the plot inside a resize, show or paint event reports misuse; use deleteLater().
 
 #### NeoQCP, unreleased ####
