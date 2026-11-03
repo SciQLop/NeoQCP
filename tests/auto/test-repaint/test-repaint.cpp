@@ -12,7 +12,7 @@ std::unique_ptr<QCustomPlot> settledPlot()
 {
     auto plot = std::make_unique<QCustomPlot>();
     plot->resize(400, 300);
-    plot->addGraph()->setData(QVector<double> { 0, 10 }, QVector<double> { 0, 10 });
+    plot->addGraph()->setData(QVector<double>{0, 10}, QVector<double>{0, 10});
     plot->graph(0)->setPen(QPen(Qt::red, 4));
     plot->xAxis->setRange(0, 10);
     plot->yAxis->setRange(0, 10);
@@ -30,7 +30,6 @@ public:
 
 protected:
     void applyDefaultAntialiasingHint(QCPPainter*) const override { }
-
     void draw(QCPPainter*) override
     {
         if (onDraw)
@@ -43,34 +42,27 @@ class PendingStub : public QCPAbstractPlottable
 {
 public:
     PendingStub(QCPAxis* k, QCPAxis* v) : QCPAbstractPlottable(k, v) { }
-
     int commits = 0;
 
     bool hasPendingData() const override { return commits == 0; }
-
     bool commitPendingData() override
     {
         ++commits;
         return true;
     }
-
     double selectTest(const QPointF&, bool, QVariant* = nullptr) const override { return -1; }
-
     QCPRange getKeyRange(bool& found, QCP::SignDomain = QCP::sdBoth) const override
     {
         found = false;
-        return { };
+        return {};
     }
-
     QCPRange getValueRange(bool& found, QCP::SignDomain = QCP::sdBoth,
                            const QCPRange& = QCPRange()) const override
     {
         found = false;
-        return { };
+        return {};
     }
-
     void draw(QCPPainter*) override { }
-
     void drawLegendIcon(QCPPainter*, const QRectF&) const override { }
 };
 
@@ -79,7 +71,6 @@ class NoContentStub : public PendingStub
 {
 public:
     using PendingStub::PendingStub;
-
     bool canProduceContent() const override { return false; }
 };
 
@@ -89,11 +80,8 @@ class FillStub : public PendingStub
 public:
     using PendingStub::PendingStub;
     QPointF stall;
-
     bool hasPendingData() const override { return false; }
-
     QPointF stallPixelOffset() const override { return stall; }
-
     void draw(QCPPainter* painter) override
     {
         painter->fillRect(mKeyAxis->axisRect()->rect(), pen().color());
@@ -142,15 +130,11 @@ QImage exportWith(QCustomPlot& plot, const QString& how, const QString& dir)
         return pixmap.toImage();
     }
     [[maybe_unused]] const bool saved = plot.savePdf(dir + QStringLiteral("/plot.pdf"), 400, 300);
-    return { }; // the caller checks the file
+    return {}; // the caller checks the file
 }
 
 int gMisuses = 0;
-
-void countMisuse(const char*, const char*)
-{
-    ++gMisuses;
-}
+void countMisuse(const char*, const char*) { ++gMisuses; }
 } // namespace
 
 void TestRepaint::markDirtySchedulesOneRepaint()
@@ -415,20 +399,21 @@ void TestRepaint::exportSettlesFirst()
     }
 }
 
+
 void TestRepaint::exportShowsReadyStagedData()
 {
     QCustomPlot plot;
     plot.resize(400, 300);
     auto* mg = new QCPMultiGraph(plot.xAxis, plot.yAxis);
-    mg->setData(std::vector<double> { 0, 10 }, std::vector<std::vector<double>> { { 2, 2 } });
-    mg->setComponentPens({ QPen(Qt::red, 4) });
+    mg->setData(std::vector<double>{0, 10}, std::vector<std::vector<double>>{{2, 2}});
+    mg->setComponentPens({QPen(Qt::red, 4)});
     plot.xAxis->setRange(0, 10);
     plot.yAxis->setRange(0, 10);
     plot.replot();
     plot.setDataSwapDebounceMs(10000);
     using Source = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
-    mg->setDataSource(std::make_shared<Source>(std::vector<double> { 0, 10 },
-                                               std::vector<std::vector<double>> { { 8, 8 } }));
+    mg->setDataSource(std::make_shared<Source>(std::vector<double>{0, 10},
+                                               std::vector<std::vector<double>>{{8, 8}}));
     QVERIFY(mg->hasPendingData());
 
     const QImage image = plot.toPixmap(400, 300).toImage();
@@ -448,8 +433,7 @@ void TestRepaint::exportShowsReadyStagedData()
     QCOMPARE(redNear(2), 0);
 }
 
-// The legend is on its own buffer ("axes" and "legend"): marking the graph's layer does not redraw
-// it.
+// The legend is on its own buffer ("axes" and "legend"): marking the graph's layer does not redraw it.
 void TestRepaint::legendShowsAddedGraphAndItsName()
 {
     QCustomPlot plot;
@@ -461,7 +445,7 @@ void TestRepaint::legendShowsAddedGraphAndItsName()
     waitUntilSettled(plot);
     const QImage empty = screenOf(&plot);
 
-    auto g = plot.add<QCPGraph>(QVector<double> { 0, 1 }, QVector<double> { 0, 1 }).setName("Bx");
+    auto g = plot.add<QCPGraph>(QVector<double>{0, 1}, QVector<double>{0, 1}).setName("Bx");
     waitUntilSettled(plot);
     const QImage oneRow = screenOf(&plot);
     const QRect rowArea = plot.legend->outerRect();
@@ -580,15 +564,15 @@ const QVector<AxisAppearanceCase>& axisAppearanceCases()
               plot.xAxis->setSelectedLabelFont(font);
           } },
         { "axis.setSelectedTickLabelColor",
-          [](QCustomPlot& plot) { plot.xAxis->setSelectedTickLabelColor(Qt::blue); } },
+          [](QCustomPlot& plot) { plot.xAxis->setSelectedTickLabelColor(Qt::magenta); } },
         { "axis.setSelectedLabelColor",
-          [](QCustomPlot& plot) { plot.xAxis->setSelectedLabelColor(Qt::blue); } },
+          [](QCustomPlot& plot) { plot.xAxis->setSelectedLabelColor(Qt::magenta); } },
         { "axis.setSelectedBasePen",
-          [](QCustomPlot& plot) { plot.xAxis->setSelectedBasePen(QPen(Qt::blue, 2)); } },
+          [](QCustomPlot& plot) { plot.xAxis->setSelectedBasePen(QPen(Qt::magenta, 3)); } },
         { "axis.setSelectedTickPen",
-          [](QCustomPlot& plot) { plot.xAxis->setSelectedTickPen(QPen(Qt::blue, 2)); } },
+          [](QCustomPlot& plot) { plot.xAxis->setSelectedTickPen(QPen(Qt::magenta, 3)); } },
         { "axis.setSelectedSubTickPen",
-          [](QCustomPlot& plot) { plot.xAxis->setSelectedSubTickPen(QPen(Qt::blue, 2)); } },
+          [](QCustomPlot& plot) { plot.xAxis->setSelectedSubTickPen(QPen(Qt::magenta, 3)); } },
         { "axis.setLowerEnding",
           [](QCustomPlot& plot) { plot.xAxis->setLowerEnding(QCPLineEnding::esSpikeArrow); } },
         { "axis.setUpperEnding",
@@ -600,9 +584,26 @@ const QVector<AxisAppearanceCase>& axisAppearanceCases()
         { "axisRect.setBackground(pixmap, scaled, mode)", [](QCustomPlot& plot)
           { plot.axisRect(0)->setBackground(QPixmap(8, 8), true, Qt::KeepAspectRatio); } },
         { "axisRect.setBackgroundScaled",
-          [](QCustomPlot& plot) { plot.axisRect(0)->setBackgroundScaled(true); } },
+          [](QCustomPlot& plot) { plot.axisRect(0)->setBackgroundScaled(false); } },
         { "axisRect.setBackgroundScaledMode", [](QCustomPlot& plot)
           { plot.axisRect(0)->setBackgroundScaledMode(Qt::KeepAspectRatio); } },
+        { "axis.setRangeReversed", [](QCustomPlot& plot) { plot.xAxis->setRangeReversed(true); } },
+        { "axis.setLabelRenderer", [](QCustomPlot& plot) { plot.xAxis->setLabelRenderer(nullptr); } },
+    };
+    return cases;
+}
+
+const QVector<AxisAppearanceCase>& equalValueCases()
+{
+    static const QVector<AxisAppearanceCase> cases{
+        { "axis.setLabel", [](QCustomPlot& plot) { plot.xAxis->setLabel(QStringLiteral("x")); } },
+        { "axis.setTickLengthIn", [](QCustomPlot& plot) { plot.xAxis->setTickLengthIn(7); } },
+        { "axis.setTickLabelColor",
+          [](QCustomPlot& plot) { plot.xAxis->setTickLabelColor(Qt::blue); } },
+        { "axis.setPadding", [](QCustomPlot& plot) { plot.xAxis->setPadding(6); } },
+        { "grid.setPen", [](QCustomPlot& plot) { plot.xAxis->grid()->setPen(QPen(Qt::red, 2)); } },
+        { "axisRect.setBackgroundScaled",
+          [](QCustomPlot& plot) { plot.axisRect(0)->setBackgroundScaled(false); } },
     };
     return cases;
 }
@@ -628,6 +629,54 @@ void TestRepaint::axisSettersScheduleRepaint()
     it->change(*plot);
 
     QVERIFY2(plot->isRepaintQueued(), qPrintable(setter + QStringLiteral(" scheduled no repaint")));
+}
+
+void TestRepaint::axisUnlistedHandsOffsetToSibling()
+{
+    // Removing the innermost axis of a side hands its offset to the next one, which now dirties
+    // layers: that must not happen while the plot is being torn down (~QCPAxis -> unlistAxis).
+    auto plot = settledPlot();
+    QCPAxisRect* rect = plot->axisRect();
+    QCPAxis* inner = rect->addAxis(QCPAxis::atRight);
+    QCPAxis* outer = rect->addAxis(QCPAxis::atRight);
+    inner->setOffset(30);
+    waitUntilSettled(*plot);
+
+    rect->removeAxis(inner); // outer inherits the offset, and the changed margins repaint
+    QVERIFY(plot->isRepaintQueued());
+
+    waitUntilSettled(*plot);
+    delete outer; // the rect takes the axis out of its lists on the way out
+    waitUntilSettled(*plot);
+    plot->replot();
+    QVERIFY(!plot->isRepaintQueued());
+}
+
+void TestRepaint::equalValueDoesNotDirty_data()
+{
+    QTest::addColumn<QString>("setter");
+    for (const AxisAppearanceCase& c : equalValueCases())
+        QTest::newRow(c.name) << QString::fromLatin1(c.name);
+}
+
+void TestRepaint::equalValueDoesNotDirty()
+{
+    QFETCH(QString, setter);
+    const auto& cases = equalValueCases();
+    auto it = std::find_if(cases.cbegin(), cases.cend(), [&setter](const AxisAppearanceCase& c)
+                           { return setter == QLatin1String(c.name); });
+    QVERIFY(it != cases.cend());
+
+    auto plot = settledPlot();
+    waitUntilSettled(*plot);
+
+    it->change(*plot);
+    QVERIFY2(plot->isRepaintQueued(), qPrintable(setter + QStringLiteral(" changed nothing")));
+    waitUntilSettled(*plot);
+
+    it->change(*plot); // same value: there is nothing new to draw
+    QVERIFY2(!plot->isRepaintQueued(),
+             qPrintable(setter + QStringLiteral(" repainted an equal value")));
 }
 
 QImage TestRepaint::screenOf(QCustomPlot* plot)

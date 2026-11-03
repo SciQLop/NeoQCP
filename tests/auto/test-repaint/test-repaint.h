@@ -24,6 +24,9 @@ private slots:
     void setLayerRepaintsTheLayerLeft();
     void axisSettersScheduleRepaint_data();
     void axisSettersScheduleRepaint();
+    void axisUnlistedHandsOffsetToSibling();
+    void equalValueDoesNotDirty_data();
+    void equalValueDoesNotDirty();
 
 private:
     // What the plot shows: its paint buffers composed, or the framebuffer under RHI.

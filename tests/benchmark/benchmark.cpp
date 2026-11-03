@@ -57,6 +57,7 @@ private slots:
   void QCPAxis_TickLabels();
   void QCPAxis_TickLabelsCached();
   void QCPAxis_SetRange10k();
+  void QCPAxis_SetTickLength10kItems();
 
   void QCPItems_AddRemove10k();
   void QCPItems_Replot10k();
@@ -1018,6 +1019,17 @@ void Benchmark::QCPAxis_SetRange10k()
   {
     for (int i = 0; i < 10000; ++i)
       mPlot->xAxis->setRange(i * 1e-5, 1 + i * 1e-5);
+  }
+}
+
+void Benchmark::QCPAxis_SetTickLength10kItems()
+{
+  addLineItems(mPlot, 10000, 100);
+  int step = 0;
+  QBENCHMARK
+  {
+    for (int i = 0; i < 100; ++i)
+      mPlot->xAxis->setTickLengthIn(step++ % 2 ? 8 : 10);
   }
 }
 

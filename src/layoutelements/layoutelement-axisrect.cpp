@@ -470,21 +470,24 @@ bool QCPAxisRect::removeAxis(QCPAxis* axis)
 
 bool QCPAxisRect::unlistAxis(QCPAxis* axis)
 {
+    // Not from ~QObject of a plot already destroyed (a rect in no layout is its QObject child).
+    // Nothing may be dirtied or re-laid out once the plot is going away.
+    QCustomPlot* plot = qobject_cast<QCustomPlot*>(parentPlot());
+    const bool alive = plot && !plot->isBeingDestroyed();
     // don't access axis->axisType(): axis may be an invalid pointer, so go through all the lists
     for (auto it = mAxes.begin(); it != mAxes.end(); ++it)
     {
         QList<QCPAxis*>& sideAxes = it.value();
         if (!sideAxes.contains(axis))
             continue;
-        if (sideAxes.first() == axis && sideAxes.size() > 1) // the next axis inherits the offset
+        if (alive && sideAxes.first() == axis && sideAxes.size() > 1) // the next axis inherits the offset
             sideAxes[1]->setOffset(axis->offset());
         sideAxes.removeOne(axis);
-        // Not from ~QObject of a plot already destroyed (a rect in no layout is its QObject child).
-        if (qobject_cast<QCustomPlot*>(parentPlot()))
+        if (plot)
         {
-            if (!parentPlot()->isBeingDestroyed())
+            if (alive)
                 markLayersUsingAxisDirty(axis);
-            parentPlot()->axisRemoved(axis);
+            plot->axisRemoved(axis);
         }
         return true;
     }
@@ -502,6 +505,11 @@ void QCPAxisRect::markLayersUsingAxisDirty(const QCPAxis* axis)
         for (QCPLayer* dependent : p->dependentLayers())
             dependent->markDirty();
     }
+    markItemsUsingAxisDirty(axis);
+}
+
+void QCPAxisRect::markItemsUsingAxisDirty(const QCPAxis* axis)
+{
     for (QCPAbstractItem* item : mParentPlot->mItems)
     {
         const auto positions = item->positions();
@@ -826,6 +834,8 @@ void QCPAxisRect::draw(QCPPainter* painter)
 */
 void QCPAxisRect::setBackground(const QPixmap& pm)
 {
+    if (pm.cacheKey() == mBackgroundPixmap.cacheKey())
+        return;
     mBackgroundPixmap = pm;
     mScaledBackgroundPixmap = QPixmap();
     markDirty();
@@ -846,6 +856,8 @@ void QCPAxisRect::setBackground(const QPixmap& pm)
 */
 void QCPAxisRect::setBackground(const QBrush& brush)
 {
+    if (brush == mBackgroundBrush)
+        return;
     mBackgroundBrush = brush;
     markDirty();
 }
@@ -859,6 +871,9 @@ void QCPAxisRect::setBackground(const QBrush& brush)
 */
 void QCPAxisRect::setBackground(const QPixmap& pm, bool scaled, Qt::AspectRatioMode mode)
 {
+    if (pm.cacheKey() == mBackgroundPixmap.cacheKey() && scaled == mBackgroundScaled
+        && mode == mBackgroundScaledMode)
+        return;
     mBackgroundPixmap = pm;
     mScaledBackgroundPixmap = QPixmap();
     mBackgroundScaled = scaled;
@@ -878,6 +893,8 @@ void QCPAxisRect::setBackground(const QPixmap& pm, bool scaled, Qt::AspectRatioM
 */
 void QCPAxisRect::setBackgroundScaled(bool scaled)
 {
+    if (scaled == mBackgroundScaled)
+        return;
     mBackgroundScaled = scaled;
     markDirty();
 }
@@ -890,6 +907,8 @@ void QCPAxisRect::setBackgroundScaled(bool scaled)
 */
 void QCPAxisRect::setBackgroundScaledMode(Qt::AspectRatioMode mode)
 {
+    if (mode == mBackgroundScaledMode)
+        return;
     mBackgroundScaledMode = mode;
     markDirty();
 }
@@ -1522,7 +1541,7 @@ void QCPAxisRect::wheelEvent(QWheelEvent* event)
     }
 }
 
-void QCPAxisRect::markAffectedLayersDirty()
+void QCPAxisRect::markAffectedLayersDirty(bool invalidate)
 {
     // Collect unique layers from axes, grids, and plottables in this rect.
     // Typically <=4 unique layers, so linear scan is fine.
@@ -1531,7 +1550,10 @@ void QCPAxisRect::markAffectedLayersDirty()
         if (l && !seen.contains(l))
         {
             seen.append(l);
-            l->markDirty();
+            if (invalidate)
+                l->invalidatePaintBuffer();
+            else
+                l->markDirty();
         }
     };
 

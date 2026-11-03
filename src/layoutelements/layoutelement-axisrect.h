@@ -178,7 +178,7 @@ protected:
     void drawBackground(QCPPainter* painter);
     void updateAxesOffset(QCPAxis::AxisType type);
     void zoomAxesAt(const QPointF& pos, double horizontalFactor, double verticalFactor);
-    void markAffectedLayersDirty();
+    void markAffectedLayersDirty(bool invalidate = false);
 
 private:
     Q_DISABLE_COPY(QCPAxisRect)
@@ -187,6 +187,8 @@ private:
     bool unlistAxis(QCPAxis* axis);
     // Afterwards the plottables' and items' axis pointers are null and nothing can find them.
     void markLayersUsingAxisDirty(const QCPAxis* axis);
+    // Only the item layers: markAffectedLayersDirty() already covers plottables.
+    void markItemsUsingAxisDirty(const QCPAxis* axis);
     void detachFromOwners();
 
     friend class QCPAxis; // rangeDidChange() -> markAffectedLayersDirty(), ~QCPAxis -> unlistAxis()

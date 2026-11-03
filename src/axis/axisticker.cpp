@@ -37,6 +37,9 @@
   QCPAxis::setTicker. Since that method takes a <tt>QSharedPointer<QCPAxisTicker></tt>, multiple
   axes can share the same ticker instance.
 
+  A ticker is a shared value: editing it in place changes nothing the axes can observe, so call
+  \ref QCustomPlot::requestRepaint after such an edit.
+
   This base class generates normal tick coordinates and numeric labels for linear axes. It picks a
   reasonable tick step (the separation between ticks) which results in readable tick labels. The
   number of ticks that should be approximately generated can be set via \ref setTickCount.
