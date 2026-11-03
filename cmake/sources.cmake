@@ -111,7 +111,6 @@ set(NEOQCP_MOC_HEADERS
     src/theme.h
     src/misuse.h
     src/handle.h
-    src/handle-ops.h
     src/signal-delivery.h
     src/core.h
     src/datacontainer.h

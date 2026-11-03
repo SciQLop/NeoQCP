@@ -18,4 +18,9 @@ private slots:
     void setAxisRectAndLayerAreChecked();
     void addUserSubclass();
     void addRefusedDuringTeardown();
+    void addRefusedWithoutAxisRect();
+    void addPutsOneLegendRow();
+    void addGraphWithContainer();
+    void withReachesAnySetter();
+    void setterSlotDeletesInsideTheSetter();
 };

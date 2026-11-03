@@ -346,13 +346,18 @@ QCP_LIB_DECL void setAxisRect(QCPAbstractPlottable& plottable, QCPAxisRect* rect
     \endcode
     Without one, add<T>() returns T::OpsFor<T>, the handle of the nearest base family. A subclass
     meant to be subclassed again writes its setters once as a template taking (T, Self) and
-    declares \c OpsFor, like QCPGraphOps and QCPGraph do.
+    declares \c OpsFor, like QCPGraphOps and QCPGraph do;
+  - Self is the complete, most-derived handle type (checked at compile time), and a Handle is
+    default-constructible: add<T>() builds it so;
+  - a plottable setter exposed through ops emits its signals as its last statement. apply()
+    re-checks the object after the setter returns, but cannot protect the setter's own body from
+    a slot that deletes the object.
 */
 template <typename T, typename Self>
 class QCPPlottableOps : public QCPHandle<T>
 {
 public:
-    using Ret = QCPOpsRet<Self, QCPPlottableOps>;
+    using Ret = qcp::OpsRet<Self, QCPPlottableOps>;
     using QCPHandle<T>::QCPHandle;
 
     Ret setName(const QString& name)
@@ -390,11 +395,19 @@ public:
     {
         return apply([&](T& p) { qcp::ops::setAxes(p, keyAxis, valueAxis); });
     }
+    // Any setter without a handle form: change(T&) runs only while the object lives.
+    template <typename Change>
+    Ret with(Change&& change)
+    {
+        return apply(std::forward<Change>(change));
+    }
 
 protected:
     template <typename Change>
     Ret apply(Change&& change)
     {
+        static_assert(std::is_base_of_v<QCPPlottableOps, Ret>,
+                      "Self must be the complete handle type deriving from these ops (CRTP)");
         if (T* object = this->get())
         {
             change(*object);

@@ -29,6 +29,7 @@
 #include "axis/axis.h"
 #include "axis/range.h"
 #include "global.h"
+#include "handle-ops.h"
 #include "painting/paintbuffer.h"
 #include "plottables/plottable.h"
 #include "selectionrect.h"
@@ -304,11 +305,12 @@ public:
     [[nodiscard]] bool hasPlottable(QCPAbstractPlottable* plottable) const;
 
     // Creates a T on the default axis rect's bottom and left axes and the current layer, passes
-    // args to the handle's setData, and returns T's fluent handle (QCPHandleFor<T>, see
-    // QCPPlottableOps). Refused, with an empty handle, while the plot is being destroyed or when it
-    // has no axis rect with those axes.
+    // args to the handle's setData, and returns T's fluent handle (qcp::HandleFor<T>, see
+    // QCPPlottableOps). Refused while the plot is being destroyed or when it has no axis rect with
+    // those axes. The two creation APIs fail differently: addGraph() logs with qDebug and returns
+    // nullptr; add<T>() reports misuse (qcp::reportMisuse) and returns an empty handle.
     template <typename T, typename... Args>
-    QCPHandleFor<T> add(Args&&... args);
+    qcp::HandleFor<T> add(Args&&... args);
 
     // specialized interface for QCPGraph:
     [[nodiscard]] QCPGraph* graph(int index) const;
@@ -603,16 +605,16 @@ Q_DECLARE_METATYPE(QCustomPlot::RefreshPriority)
 // implementation of template functions:
 
 template <typename T, typename... Args>
-QCPHandleFor<T> QCustomPlot::add(Args&&... args)
+qcp::HandleFor<T> QCustomPlot::add(Args&&... args)
 {
-    using Handle = QCPHandleFor<T>;
+    using Handle = qcp::HandleFor<T>;
     if constexpr (sizeof...(Args) > 0)
         static_assert(requires(Handle h) { h.setData(std::declval<Args>()...); },
                       "add<T>(args...): T's handle has no setData taking these arguments");
     const auto [keyAxis, valueAxis] = axesForAdd();
     if (!keyAxis)
         return Handle{};
-    Handle handle = qcpMakeHandle<Handle>(new T(keyAxis, valueAxis));
+    Handle handle = qcp::makeHandle<Handle>(new T(keyAxis, valueAxis));
     handle.get()->markDirty();
     if constexpr (sizeof...(Args) > 0)
         handle.setData(std::forward<Args>(args)...);

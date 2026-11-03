@@ -43,7 +43,7 @@ public:
     int tag = 0;
 
     template <typename T, typename Self = void>
-    class Ops : public QCPGraphOps<T, QCPOpsRet<Self, Ops<T>>>
+    class Ops : public QCPGraphOps<T, qcp::OpsRet<Self, Ops<T>>>
     {
     public:
         auto setTag(int t)
@@ -278,4 +278,62 @@ void TestBuilder::addRefusedDuringTeardown()
 
     QVERIFY(refused);
     QCOMPARE(gMisuses, 1);
+}
+
+void TestBuilder::addRefusedWithoutAxisRect()
+{
+    QCustomPlot plot;
+    plot.plotLayout()->clear();
+    QVERIFY(!plot.add<QCPGraph>());
+    QCOMPARE(gMisuses, 1);
+    QCOMPARE(plot.graphCount(), 0);
+}
+
+void TestBuilder::addPutsOneLegendRow()
+{
+    QCustomPlot plot;
+    const int rows = plot.legend->itemCount();
+    auto g = plot.add<QCPGraph>(kKeys, kValues).setName("Bx");
+    QCOMPARE(plot.legend->itemCount(), rows + 1);
+    QVERIFY(plot.legend->itemWithPlottable(g.get()));
+}
+
+void TestBuilder::addGraphWithContainer()
+{
+    QCustomPlot plot;
+    auto data = QSharedPointer<QCPGraphDataContainer>::create();
+    data->add(QCPGraphData(1, 2));
+    auto g = plot.add<QCPGraph>(data);
+    QCOMPARE(g->dataCount(), 1);
+    QCOMPARE(g->data(), data);
+}
+
+void TestBuilder::withReachesAnySetter()
+{
+    QCustomPlot plot;
+    auto g = plot.add<QCPGraph>().with([](QCPGraph& graph) { graph.setScatterSkip(3); }).setName("w");
+    static_assert(std::is_same_v<decltype(g), QCPGraphOps<QCPGraph>>);
+    QCOMPARE(g->scatterSkip(), 3);
+    QCOMPARE(g->name(), QString("w"));
+
+    int calls = 0;
+    g.remove();
+    g.with([&calls](QCPGraph&) { ++calls; });
+    QCOMPARE(calls, 0);
+    QCOMPARE(gMisuses, 0);
+}
+
+// The setter's own body must survive its signal's slot deleting the object (it emits last).
+void TestBuilder::setterSlotDeletesInsideTheSetter()
+{
+    QCustomPlot plot;
+    auto g = plot.add<QCPGraph>(kKeys, kValues);
+    connect(g.get(), qOverload<bool>(&QCPAbstractPlottable::selectionChanged), &plot,
+            [g](bool) mutable { g.remove(); });
+    auto after = g.with([](QCPGraph& graph) { graph.setSelection(QCPDataSelection(QCPDataRange(0, 1))); })
+                     .setName("gone");
+    QVERIFY(!g);
+    QVERIFY(!after);
+    QCOMPARE(plot.graphCount(), 0);
+    QCOMPARE(gMisuses, 0);
 }

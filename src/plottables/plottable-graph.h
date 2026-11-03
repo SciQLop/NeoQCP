@@ -216,9 +216,9 @@ Q_DECLARE_METATYPE(QCPGraph::LineStyle)
 
 // The fluent handle of a graph; see QCPPlottableOps for the subclass contract.
 template <typename T, typename Self>
-class QCPGraphOps : public QCPPlottableOps<T, QCPOpsRet<Self, QCPGraphOps<T>>>
+class QCPGraphOps : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPGraphOps<T>>>
 {
-    using Base = QCPPlottableOps<T, QCPOpsRet<Self, QCPGraphOps<T>>>;
+    using Base = QCPPlottableOps<T, qcp::OpsRet<Self, QCPGraphOps<T>>>;
 
 public:
     using typename Base::Ret;
@@ -231,6 +231,10 @@ public:
     Ret setScatterStyle(const QCPScatterStyle& style)
     {
         return this->apply([&](T& g) { g.setScatterStyle(style); });
+    }
+    Ret setData(QSharedPointer<QCPGraphDataContainer> data)
+    {
+        return this->apply([&](T& g) { g.setData(std::move(data)); });
     }
     Ret setData(const QVector<double>& keys, const QVector<double>& values,
                 bool alreadySorted = false)
