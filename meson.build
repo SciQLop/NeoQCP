@@ -13,6 +13,12 @@ is_wasm = host_machine.system() == 'emscripten'
 optional_deps = []
 cpp_args = []
 
+# Qt's CMake defines QT_NO_DEBUG for non-debug builds; Meson's Qt dependency does not.
+# Misuse reporting (src/misuse.cpp) keys on it: warn in release, abort in debug.
+if not get_option('debug')
+    cpp_args += ['-DQT_NO_DEBUG']
+endif
+
 if get_option ( 'tracy_enable')
     if get_option ( 'buildtype') != 'debugoptimized'
         warning ( 'Profiling builds should set -- buildtype = debugoptimized')
