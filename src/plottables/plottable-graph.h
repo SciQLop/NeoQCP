@@ -34,6 +34,8 @@
 
 class QCPPainter;
 class QCPAxis;
+template <typename T, typename Self = void>
+class QCPGraphOps;
 
 class QCP_LIB_DECL QCPGraphData
 {
@@ -106,6 +108,9 @@ public:
                   ///< reaches from the data point to the zero-value-line
     };
     Q_ENUM(LineStyle)
+
+    template <typename T>
+    using OpsFor = QCPGraphOps<T>;
 
     explicit QCPGraph(QCPAxis* keyAxis, QCPAxis* valueAxis);
     virtual ~QCPGraph() override;
@@ -208,5 +213,30 @@ protected:
     friend class QCPLegend;
 };
 Q_DECLARE_METATYPE(QCPGraph::LineStyle)
+
+// The fluent handle of a graph; see QCPPlottableOps for the subclass contract.
+template <typename T, typename Self>
+class QCPGraphOps : public QCPPlottableOps<T, QCPOpsRet<Self, QCPGraphOps<T>>>
+{
+    using Base = QCPPlottableOps<T, QCPOpsRet<Self, QCPGraphOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setLineStyle(QCPGraph::LineStyle style)
+    {
+        return this->apply([&](T& g) { g.setLineStyle(style); });
+    }
+    Ret setScatterStyle(const QCPScatterStyle& style)
+    {
+        return this->apply([&](T& g) { g.setScatterStyle(style); });
+    }
+    Ret setData(const QVector<double>& keys, const QVector<double>& values,
+                bool alreadySorted = false)
+    {
+        return this->apply([&](T& g) { g.setData(keys, values, alreadySorted); });
+    }
+};
 
 #endif // QCP_PLOTTABLE_GRAPH_H

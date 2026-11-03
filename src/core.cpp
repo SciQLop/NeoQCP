@@ -1607,6 +1607,18 @@ QCPGraph* QCustomPlot::graph() const
 
   \see graph, graphCount, removeGraph, clearGraphs
 */
+std::pair<QCPAxis*, QCPAxis*> QCustomPlot::axesForAdd() const
+{
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", {});
+    const QList<QCPAxisRect*> rects = axisRects();
+    QCP_CHECK_OR_RETURN(!rects.isEmpty(), "the plot has no axis rect", {});
+    const QList<QCPAxis*> keyAxes = rects.first()->axes(QCPAxis::atBottom);
+    const QList<QCPAxis*> valueAxes = rects.first()->axes(QCPAxis::atLeft);
+    QCP_CHECK_OR_RETURN(!keyAxes.isEmpty() && !valueAxes.isEmpty(),
+                        "the default axis rect has no bottom or left axis", {});
+    return {keyAxes.first(), valueAxes.first()};
+}
+
 QCPGraph* QCustomPlot::addGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", nullptr);

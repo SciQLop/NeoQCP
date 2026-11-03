@@ -1242,3 +1242,59 @@ int QCPAbstractPlottable::effectiveBusyHideDelayMs() const
         return mParentPlot->theme()->busyHideDelayMs();
     return 500;
 }
+
+namespace qcp::ops
+{
+void setLayer(QCPLayerable& layerable, const QString& layerName)
+{
+    QCustomPlot* plot = layerable.parentPlot();
+    QCP_CHECK_OR_RETURN(plot && plot->layer(layerName), "no layer of that name in the plot");
+    layerable.setLayer(layerName);
+}
+
+void setAxes(QCPAbstractPlottable& plottable, QCPAxis* keyAxis, QCPAxis* valueAxis)
+{
+    QCP_CHECK_OR_RETURN(keyAxis && valueAxis, "a plottable needs a key axis and a value axis");
+    QCP_CHECK_OR_RETURN(keyAxis->parentPlot() == plottable.parentPlot()
+                            && valueAxis->parentPlot() == plottable.parentPlot(),
+                        "the axes belong to another plot");
+    QCP_CHECK_OR_RETURN(keyAxis->orientation() != valueAxis->orientation(),
+                        "the key and value axes must be orthogonal");
+    plottable.setKeyAxis(keyAxis);
+    plottable.setValueAxis(valueAxis);
+}
+
+namespace
+{
+// axis(type) would log on a missing type; a refusal here is already reported as misuse.
+QCPAxis* firstAxis(const QCPAxisRect* rect, QCPAxis::AxisType type)
+{
+    const QList<QCPAxis*> axes = rect->axes(type);
+    return axes.isEmpty() ? nullptr : axes.first();
+}
+
+void setAxesOfRect(QCPAbstractPlottable& plottable, QCPAxisRect* rect, QCPAxis::AxisType keyType,
+                   QCPAxis::AxisType valueType)
+{
+    QCPAxis* keyAxis = firstAxis(rect, keyType);
+    QCPAxis* valueAxis = firstAxis(rect, valueType);
+    QCP_CHECK_OR_RETURN(keyAxis && valueAxis, "the axis rect has no axis of that type");
+    setAxes(plottable, keyAxis, valueAxis);
+}
+} // namespace
+
+void setAxes(QCPAbstractPlottable& plottable, QCPAxis::AxisType keyType,
+             QCPAxis::AxisType valueType)
+{
+    QCPAxis* current = plottable.keyAxis();
+    QCP_CHECK_OR_RETURN(current, "the plottable has lost its key axis, so it has no axis rect");
+    setAxesOfRect(plottable, current->axisRect(), keyType, valueType);
+}
+
+void setAxisRect(QCPAbstractPlottable& plottable, QCPAxisRect* rect)
+{
+    QCP_CHECK_OR_RETURN(rect && rect->parentPlot() == plottable.parentPlot(),
+                        "the axis rect belongs to another plot");
+    setAxesOfRect(plottable, rect, QCPAxis::atBottom, QCPAxis::atLeft);
+}
+} // namespace qcp::ops

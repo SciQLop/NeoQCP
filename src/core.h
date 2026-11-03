@@ -39,6 +39,7 @@
 #include <QRhiWidget>
 #include <QTimer>
 #include <functional>
+#include <utility>
 
 class QCPPainter;
 class QCPLayer;
@@ -302,6 +303,13 @@ public:
                                       int* dataIndex = nullptr) const;
     [[nodiscard]] bool hasPlottable(QCPAbstractPlottable* plottable) const;
 
+    // Creates a T on the default axis rect's bottom and left axes and the current layer, passes
+    // args to the handle's setData, and returns T's fluent handle (QCPHandleFor<T>, see
+    // QCPPlottableOps). Refused, with an empty handle, while the plot is being destroyed or when it
+    // has no axis rect with those axes.
+    template <typename T, typename... Args>
+    QCPHandleFor<T> add(Args&&... args);
+
     // specialized interface for QCPGraph:
     [[nodiscard]] QCPGraph* graph(int index) const;
     [[nodiscard]] QCPGraph* graph() const;
@@ -395,6 +403,10 @@ signals:
 
     void itemCreated(QCPAbstractItem* item);
     void itemCanceled();
+
+private:
+    // The axes add<T>() puts a new plottable on; both null (one misuse) when it must refuse.
+    [[nodiscard]] std::pair<QCPAxis*, QCPAxis*> axesForAdd() const;
 
 protected:
     // property members:
@@ -589,6 +601,23 @@ Q_DECLARE_METATYPE(QCustomPlot::LayerInsertMode)
 Q_DECLARE_METATYPE(QCustomPlot::RefreshPriority)
 
 // implementation of template functions:
+
+template <typename T, typename... Args>
+QCPHandleFor<T> QCustomPlot::add(Args&&... args)
+{
+    using Handle = QCPHandleFor<T>;
+    if constexpr (sizeof...(Args) > 0)
+        static_assert(requires(Handle h) { h.setData(std::declval<Args>()...); },
+                      "add<T>(args...): T's handle has no setData taking these arguments");
+    const auto [keyAxis, valueAxis] = axesForAdd();
+    if (!keyAxis)
+        return Handle{};
+    Handle handle = qcpMakeHandle<Handle>(new T(keyAxis, valueAxis));
+    handle.get()->markDirty();
+    if constexpr (sizeof...(Args) > 0)
+        handle.setData(std::forward<Args>(args)...);
+    return handle;
+}
 
 /*!
   Returns the plottable at the pixel position \a pos. The plottable type (a QCPAbstractPlottable

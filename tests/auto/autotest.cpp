@@ -47,6 +47,7 @@
 #include "test-ownership/test-ownership.h"
 #include "test-signal-delivery/test-signal-delivery.h"
 #include "test-repaint/test-repaint.h"
+#include "test-builder/test-builder.h"
 #include "test-gestures/test-gestures.h"
 
 static bool shouldRun(const char* name)
@@ -136,6 +137,7 @@ int main(int argc, char **argv)
   QCPTEST(TestOwnership);
   QCPTEST(TestSignalDelivery);
   QCPTEST(TestRepaint);
+  QCPTEST(TestBuilder);
 
   return failures == 0 ? 0 : 1;
 }

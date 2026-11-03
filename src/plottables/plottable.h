@@ -32,6 +32,7 @@
 #include "axis/axis.h"
 #include "axis/range.h"
 #include "global.h"
+#include "handle-ops.h"
 #include "layer.h"
 #include "scatterstyle.h"
 #include "selection.h"
@@ -43,6 +44,9 @@ class QCPPlottableGroup;
 class QCPPlottableInterface1D;
 class QKeyEvent;
 class QCPLegend;
+class QCPAxisRect;
+template <typename T, typename Self = void>
+class QCPPlottableOps;
 
 class QCP_LIB_DECL QCPSelectionDecorator
 {
@@ -118,6 +122,10 @@ class QCP_LIB_DECL QCPAbstractPlottable : public QCPLayerable
     /// \endcond
 
 public:
+    // The handle QCustomPlot::add<T>() returns for a T that declares no Handle (see QCPPlottableOps).
+    template <typename T>
+    using OpsFor = QCPPlottableOps<T>;
+
     QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis);
     virtual ~QCPAbstractPlottable() override;
 
@@ -311,5 +319,90 @@ private:
     friend class QCPPlottableGroupLegendItem;
 };
 
+namespace qcp::ops
+{
+// Checked setters behind the handles: each refuses a bad value with one misuse and keeps the old.
+QCP_LIB_DECL void setLayer(QCPLayerable& layerable, const QString& layerName);
+QCP_LIB_DECL void setAxes(QCPAbstractPlottable& plottable, QCPAxis* keyAxis, QCPAxis* valueAxis);
+QCP_LIB_DECL void setAxes(QCPAbstractPlottable& plottable, QCPAxis::AxisType keyType,
+                          QCPAxis::AxisType valueType);
+QCP_LIB_DECL void setAxisRect(QCPAbstractPlottable& plottable, QCPAxisRect* rect);
+} // namespace qcp::ops
+
+/*!
+  The fluent handle of a plottable: what QCustomPlot::add<T>() returns. Each setter is a no-op on
+  a dead handle, marks the plottable dirty (one repaint per event-loop turn, however long the
+  chain) and returns the handle by value, so a chain never holds a reference to a temporary.
+
+  Contract for a plottable subclass T:
+  - keep the T(QCPAxis* keyAxis, QCPAxis* valueAxis) constructor: add<T>() calls it;
+  - declare a nested \c Handle only to add setters:
+    \code
+    class Handle : public QCPGraphOps<MyGraph, Handle>
+    {
+    public:
+        Handle setTag(int t) { return apply([t](MyGraph& g) { g.setTag(t); }); }
+    };
+    \endcode
+    Without one, add<T>() returns T::OpsFor<T>, the handle of the nearest base family. A subclass
+    meant to be subclassed again writes its setters once as a template taking (T, Self) and
+    declares \c OpsFor, like QCPGraphOps and QCPGraph do.
+*/
+template <typename T, typename Self>
+class QCPPlottableOps : public QCPHandle<T>
+{
+public:
+    using Ret = QCPOpsRet<Self, QCPPlottableOps>;
+    using QCPHandle<T>::QCPHandle;
+
+    Ret setName(const QString& name)
+    {
+        return apply([&](T& p) { p.setName(name); });
+    }
+    Ret setPen(const QPen& pen)
+    {
+        return apply([&](T& p) { p.setPen(pen); });
+    }
+    Ret setBrush(const QBrush& brush)
+    {
+        return apply([&](T& p) { p.setBrush(brush); });
+    }
+    Ret setVisible(bool visible)
+    {
+        return apply([&](T& p) { p.setVisible(visible); });
+    }
+    Ret setLayer(const QString& layerName)
+    {
+        return apply([&](T& p) { qcp::ops::setLayer(p, layerName); });
+    }
+    // By role, on the plottable's current axis rect: survives the axes being replaced.
+    Ret setAxes(QCPAxis::AxisType keyType, QCPAxis::AxisType valueType)
+    {
+        return apply([&](T& p) { qcp::ops::setAxes(p, keyType, valueType); });
+    }
+    // Moves to the rect's bottom and left axes.
+    Ret setAxisRect(QCPAxisRect* rect)
+    {
+        return apply([&](T& p) { qcp::ops::setAxisRect(p, rect); });
+    }
+    // Escape hatch while raw axis getters exist; goes away with them.
+    Ret setAxes(QCPAxis* keyAxis, QCPAxis* valueAxis)
+    {
+        return apply([&](T& p) { qcp::ops::setAxes(p, keyAxis, valueAxis); });
+    }
+
+protected:
+    template <typename Change>
+    Ret apply(Change&& change)
+    {
+        if (T* object = this->get())
+        {
+            change(*object);
+            if (T* alive = this->get()) // a slot of the change may have deleted it
+                alive->markDirty();
+        }
+        return static_cast<const Ret&>(*this);
+    }
+};
 
 #endif // QCP_PLOTTABLE_H

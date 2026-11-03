@@ -55,6 +55,7 @@ test_srcs = [
     'test-ownership/test-ownership.cpp',
     'test-signal-delivery/test-signal-delivery.cpp',
     'test-repaint/test-repaint.cpp',
+    'test-builder/test-builder.cpp',
 ]
 
 test_headers = [
@@ -108,6 +109,7 @@ test_headers = [
     'test-ownership/test-ownership.h',
     'test-signal-delivery/test-signal-delivery.h',
     'test-repaint/test-repaint.h',
+    'test-builder/test-builder.h',
 ]
 test_moc_files = qtmod.compile_moc(headers : test_headers)
 
