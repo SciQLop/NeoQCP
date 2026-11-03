@@ -1,3 +1,45 @@
+#### NeoQCP 3.0 (in progress) ####
+
+Maintenance branches: fixes land on the 3.0 line and are cherry-picked to 2.x with
+`git cherry-pick -x`. CI for 2.x is set up when the branches are first pushed (the maintainer's call).
+
+Milestone 1 (foundations). Additive, except for the behaviour changes listed below.
+
+Safe to delete from user code (plot, axes and the objects below stay consistent):
+  - Plottables (also from a slot of their own signals), items, axes, grids, layers and the plot's own
+        parts (axis rects, legend, colour scales): they leave the plot, their group and the legend.
+  - A tracer whose graph is deleted hides itself. A colour map whose scale is deleted drops it. Polar
+        graphs, legend rows, bars groups and intervals follow the same rule; histograms and intervals
+        stay inert on a null axis.
+  - The plot itself, from the slot of a mouse, wheel or key signal (use deleteLater() from resize, show
+        and paint, see below).
+Refused, inert or reported as misuse (debug builds abort, release builds warn and refuse):
+  - Adding or removing anything while the plot is being destroyed (for example from a child's destroyed()
+        slot). Objects built during teardown are inert.
+  - Using a plottable whose axis was removed. Deleting the plot inside a resize, show or paint event.
+
+New headers (included from qcp.h):
+  - misuse.h: qcp::reportMisuse and QCP_CHECK, the one way invalid use is reported.
+  - handle.h: QCPHandle<T>, a typed handle that never dangles (null when the target is deleted;
+        qcpConnect connects through it). Not used by the getters yet.
+  - signal-delivery.h: deferred signal delivery, see the rule below.
+
+Deferred delivery rule (signals that run user code at a moment the plot may be half-updated):
+  - afterReplot, and signals caused by input (mouse, wheel, key, resize, show, paint), are delivered on
+        the next event-loop turn after the event.
+  - Signals caused by a method call are delivered when the outermost call returns.
+  - beforeReplot and afterLayout are emitted directly, with 2.x timing.
+  - rangeChanged stays direct.
+
+Behaviour changes for 2.x users:
+  - Debug builds abort at the next draw when a plottable's axis was removed; 2.x printed a debug message.
+  - Items added while clearItems() runs survive it.
+  - A tracer whose graph is deleted is hidden; it used to become free.
+  - A plot being destroyed refuses to add or remove anything (misuse).
+  - A slot on mousePress or mouseWheel can no longer steer the current event; do it from an event filter.
+  - afterReplot and input signals arrive one event-loop turn later than before.
+  - Deleting the plot inside a resize, show or paint event reports misuse; use deleteLater().
+
 #### NeoQCP, unreleased ####
 
 Behaviour changes (slots that delete their sender are now safe):
