@@ -1,0 +1,3 @@
+# LeakSanitizer suppressions for leaks outside NeoQCP.
+# Qt's CUPS print plugin (libcupsprintersupport.so) leaks strdup'ed strings inside libcups.
+leak:libcups

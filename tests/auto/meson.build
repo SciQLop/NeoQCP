@@ -1,3 +1,4 @@
+# ASan build: run with LSAN_OPTIONS=suppressions=<repo>/tests/lsan.supp to ignore Qt's CUPS print plugin leak.
 
 test_srcs = [
     'autotest.cpp',
