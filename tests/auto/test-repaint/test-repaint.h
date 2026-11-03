@@ -20,6 +20,8 @@ private slots:
     void exportSettlesFirst_data();
     void exportSettlesFirst();
     void exportShowsReadyStagedData();
+    void legendShowsAddedGraphAndItsName();
+    void setLayerRepaintsTheLayerLeft();
 
 private:
     // What the plot shows: its paint buffers composed, or the framebuffer under RHI.

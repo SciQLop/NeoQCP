@@ -485,6 +485,11 @@ QCPAbstractPlottable::~QCPAbstractPlottable()
 void QCPAbstractPlottable::setName(const QString& name)
 {
     mName = name;
+    // simplify: only the default legend's row is marked; a plottable in another legend shows its
+    // new name on that legend's next repaint. Mark every legend when multi-legend plots matter.
+    if (mParentPlot && mParentPlot->legend)
+        if (QCPPlottableLegendItem* row = mParentPlot->legend->itemWithPlottable(this))
+            row->markDirty();
 }
 
 /*!

@@ -330,8 +330,7 @@ void QCPLayer::addChild(QCPLayerable* layerable, bool prepend)
             mChildren.prepend(layerable);
         else
             mChildren.append(layerable);
-        if (QSharedPointer<QCPAbstractPaintBuffer> pb = mPaintBuffer.toStrongRef())
-            pb->setInvalidated();
+        invalidatePaintBuffer();
     }
     else
         qDebug() << Q_FUNC_INFO << "layerable is already child of this layer"
@@ -350,10 +349,7 @@ void QCPLayer::addChild(QCPLayerable* layerable, bool prepend)
 void QCPLayer::removeChild(QCPLayerable* layerable)
 {
     if (mChildren.removeOne(layerable))
-    {
-        if (QSharedPointer<QCPAbstractPaintBuffer> pb = mPaintBuffer.toStrongRef())
-            pb->setInvalidated();
-    }
+        invalidatePaintBuffer();
     else
         qDebug() << Q_FUNC_INFO << "layerable is not child of this layer"
                  << reinterpret_cast<quintptr>(layerable);

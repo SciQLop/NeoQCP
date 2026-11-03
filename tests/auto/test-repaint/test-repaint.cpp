@@ -321,6 +321,7 @@ void TestRepaint::markDirtyWithoutPlotIsNoOp()
     auto plot = settledPlot();
     auto* layerless = new DrawHook(plot.get());
     layerless->setLayer(static_cast<QCPLayer*>(nullptr));
+    waitUntilSettled(*plot); // joining and leaving a layer repaints it
     layerless->markDirty();
     QVERIFY(!plot->isRepaintQueued());
     QCOMPARE(gMisuses, 0);
@@ -429,6 +430,44 @@ void TestRepaint::exportShowsReadyStagedData()
     };
     QVERIFY(redNear(8) > 0);
     QCOMPARE(redNear(2), 0);
+}
+
+// The legend is on its own buffer ("axes" and "legend"): marking the graph's layer does not redraw it.
+void TestRepaint::legendShowsAddedGraphAndItsName()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.legend->setVisible(true);
+    plot.xAxis->setRange(0, 10);
+    plot.yAxis->setRange(0, 10);
+    plot.replot();
+    waitUntilSettled(plot);
+    const QImage empty = screenOf(&plot);
+
+    auto g = plot.add<QCPGraph>(QVector<double>{0, 1}, QVector<double>{0, 1}).setName("Bx");
+    waitUntilSettled(plot);
+    const QImage oneRow = screenOf(&plot);
+    const QRect rowArea = plot.legend->outerRect();
+    QVERIFY(oneRow.copy(rowArea) != empty.copy(rowArea));
+
+    g.setName("Bx2, a longer name");
+    waitUntilSettled(plot);
+    const QRect renamedArea = plot.legend->outerRect();
+    QVERIFY(screenOf(&plot).copy(renamedArea) != oneRow.copy(renamedArea));
+}
+
+void TestRepaint::setLayerRepaintsTheLayerLeft()
+{
+    auto plot = settledPlot();
+    plot->layer(QStringLiteral("overlay"))->setVisible(false);
+    plot->replot();
+    waitUntilSettled(*plot);
+    QVERIFY(pixelsOfColor(screenOf(plot.get()), Qt::red) > 50);
+
+    QVERIFY(plot->graph(0)->setLayer(QStringLiteral("overlay")));
+    QVERIFY(plot->isRepaintQueued());
+    waitUntilSettled(*plot);
+    QCOMPARE(pixelsOfColor(screenOf(plot.get()), Qt::red), 0);
 }
 
 QImage TestRepaint::screenOf(QCustomPlot* plot)

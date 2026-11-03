@@ -858,6 +858,7 @@ bool QCPLegend::addItem(QCPAbstractLegendItem* item)
     if (!addElement(item))
         return false;
     item->mParentLegend = this;
+    markDirty(); // an item made earlier joins the layout: its layer was not marked by this
     return true;
 }
 
