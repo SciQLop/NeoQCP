@@ -106,13 +106,8 @@ void TestQCPAxisRect::axisRemovalConsequencesToPlottables()
   mPlot->replot();
 
   QVERIFY(mPlot->axisRect()->removeAxis(mPlot->xAxis));
-  // Force the graph's layer dirty: removeAxis nulls the QPointer<QCPAxis>, so
-  // markAffectedLayersDirty() can no longer reach the plottable's axisRect to
-  // mark it; without an explicit markDirty the buffered layer stays clean and
-  // the layer never reaches the graph to skip it.
   gMisuses = 0;
   const auto previous = qcp::setMisuseHandler(countMisuse);
-  mPlot->layer("main")->markDirty();
   mPlot->replot();
   qcp::setMisuseHandler(previous);
   QCOMPARE(gMisuses, 1); // the graph without a key axis is not drawn
@@ -138,16 +133,12 @@ void TestQCPAxisRect::axisRemovalConsequencesToItems()
   QVERIFY(mPlot->axisRect()->removeAxis(mPlot->xAxis));
   expectDebugFrom("QCPItemPosition::pixelPosition", "Item position type x is ptPlotCoords, but no axes were defined"); // for start position
   expectDebugFrom("QCPItemPosition::pixelPosition", "Item position type x is ptPlotCoords, but no axes were defined"); // for end position
-  // Force the item's layer dirty so the buffered layer is redrawn — see
-  // axisRemovalConsequencesToPlottables for the same rationale.
-  mPlot->layer("main")->markDirty();
   mPlot->replot();
   QVERIFY(mPlot->axisRect()->removeAxis(mPlot->yAxis));
   expectDebugFrom("QCPItemPosition::pixelPosition", "Item position type x is ptPlotCoords, but no axes were defined"); // for start position
   expectDebugFrom("QCPItemPosition::pixelPosition", "Item position type y is ptPlotCoords, but no axes were defined"); // for start position
   expectDebugFrom("QCPItemPosition::pixelPosition", "Item position type x is ptPlotCoords, but no axes were defined"); // for end position
   expectDebugFrom("QCPItemPosition::pixelPosition", "Item position type y is ptPlotCoords, but no axes were defined"); // for end position
-  mPlot->layer("main")->markDirty();
   mPlot->replot();
   
   

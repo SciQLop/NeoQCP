@@ -33,6 +33,8 @@ private slots:
     void setVisible_dirtiesLayerBuffer();
     void bufferedLayerAddedLate_leavesNoStaleAxisLabels();
     void setVisible_noOpWhenUnchanged();
+    void axisDelete_dirtiesPlottableLayer();
+    void axisDelete_dirtiesItemLayer();
 
     void colormap2_panDirtiesLayerBuffer();
     void colormap2_panDirtiesLayerBufferLogY();

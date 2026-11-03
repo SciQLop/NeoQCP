@@ -79,6 +79,48 @@ void TestPaintBuffer::contentDirty_markDirtyLayer()
     QCOMPARE(dirtyCount, 1);
 }
 
+namespace
+{
+QCPLayer* ownBufferedLayer(QCustomPlot* plot, const QString& name)
+{
+    plot->addLayer(name, plot->layer("main"), QCustomPlot::limAbove);
+    QCPLayer* layer = plot->layer(name);
+    layer->setMode(QCPLayer::lmBuffered);
+    return layer;
+}
+} // namespace
+
+void TestPaintBuffer::axisDelete_dirtiesPlottableLayer()
+{
+    QCPLayer* layer = ownBufferedLayer(mPlot, "graph_layer");
+    QCPGraph* graph = mPlot->addGraph();
+    graph->setLayer(layer);
+    graph->setData(QVector<double>{0, 1, 2}, QVector<double>{0, 1, 0});
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    auto buf = layer->mPaintBuffer.toStrongRef();
+    QVERIFY(buf);
+    QVERIFY(!buf->contentDirty());
+
+    delete mPlot->yAxis;
+
+    QVERIFY(buf->contentDirty());
+}
+
+void TestPaintBuffer::axisDelete_dirtiesItemLayer()
+{
+    QCPLayer* layer = ownBufferedLayer(mPlot, "item_layer");
+    auto* item = new QCPItemLine(mPlot);
+    item->setLayer(layer);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    auto buf = layer->mPaintBuffer.toStrongRef();
+    QVERIFY(buf);
+    QVERIFY(!buf->contentDirty());
+
+    delete mPlot->xAxis;
+
+    QVERIFY(buf->contentDirty());
+}
+
 void TestPaintBuffer::contentDirty_fallbackMarksAllDirty()
 {
     mPlot->replot(QCustomPlot::rpImmediateRefresh);

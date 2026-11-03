@@ -34,6 +34,7 @@
 #include "../plottables/plottable.h"
 #include "../plottables/plottable-graph.h"
 #include "../Profiling.hpp"
+#include <algorithm>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPAxisRect
@@ -480,10 +481,36 @@ bool QCPAxisRect::unlistAxis(QCPAxis* axis)
         sideAxes.removeOne(axis);
         // Not from ~QObject of a plot already destroyed (a rect in no layout is its QObject child).
         if (qobject_cast<QCustomPlot*>(parentPlot()))
+        {
+            if (!parentPlot()->isBeingDestroyed())
+                markLayersUsingAxisDirty(axis);
             parentPlot()->axisRemoved(axis);
+        }
         return true;
     }
     return false;
+}
+
+void QCPAxisRect::markLayersUsingAxisDirty(const QCPAxis* axis)
+{
+    for (QCPAbstractPlottable* p : mParentPlot->mPlottables)
+    {
+        if (p->keyAxis() != axis && p->valueAxis() != axis)
+            continue;
+        if (p->layer())
+            p->layer()->markDirty();
+        for (QCPLayer* dependent : p->dependentLayers())
+            dependent->markDirty();
+    }
+    for (QCPAbstractItem* item : mParentPlot->mItems)
+    {
+        const auto positions = item->positions();
+        const bool usesAxis = std::any_of(positions.begin(), positions.end(), [axis](auto* pos) {
+            return pos->keyAxis() == axis || pos->valueAxis() == axis;
+        });
+        if (usesAxis && item->layer())
+            item->layer()->markDirty();
+    }
 }
 
 /*!
