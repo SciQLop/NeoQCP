@@ -34,6 +34,7 @@ private slots:
     void deletedGridStaysDeletedOnGpu();
     void deleteLayerLeavesLists();
     void deleteCurrentLayer();
+    void deleteLastLayer();
     void deleteRootLayoutAndOverlay();
     void deleteOwnedTheme();
     void removeAxisHidesItsPlottables();

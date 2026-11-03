@@ -501,6 +501,22 @@ void TestOwnership::deleteCurrentLayer()
     draw();
 }
 
+// A plain delete bypasses removeLayer's "keep one layer" rule.
+void TestOwnership::deleteLastLayer()
+{
+    while (mPlot->layerCount() > 0)
+        delete mPlot->layer(0);
+
+    QVERIFY(mPlot->currentLayer() == nullptr);
+    auto* graph = mPlot->addGraph();
+    QVERIFY(graph);
+    graph->setData(QVector<double> { 1, 2 }, QVector<double> { 1, 2 });
+    QVERIFY(graph->layer() == nullptr); // drawn nowhere until given a layer
+    new QCPAxisRect(mPlot);
+    draw();
+    QCOMPARE(gMisuses, 0);
+}
+
 void TestOwnership::deleteRootLayoutAndOverlay()
 {
     delete mPlot->plotLayout();
