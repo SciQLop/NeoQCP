@@ -87,6 +87,7 @@ void QCPGrid::setSubGridVisible(bool visible)
     if (auto* plot = mParentAxis ? mParentAxis->parentPlot() : nullptr)
         if (auto* grl = plot->gridRhiLayer())
             grl->markGeometryDirty();
+    markDirty();
 }
 
 /*!
@@ -95,6 +96,7 @@ void QCPGrid::setSubGridVisible(bool visible)
 void QCPGrid::setAntialiasedSubGrid(bool enabled)
 {
     mAntialiasedSubGrid = enabled;
+    markDirty();
 }
 
 /*!
@@ -103,6 +105,7 @@ void QCPGrid::setAntialiasedSubGrid(bool enabled)
 void QCPGrid::setAntialiasedZeroLine(bool enabled)
 {
     mAntialiasedZeroLine = enabled;
+    markDirty();
 }
 
 /*!
@@ -114,6 +117,7 @@ void QCPGrid::setPen(const QPen& pen)
     if (auto* plot = mParentAxis ? mParentAxis->parentPlot() : nullptr)
         if (auto* grl = plot->gridRhiLayer())
             grl->markGeometryDirty();
+    markDirty();
 }
 
 /*!
@@ -125,6 +129,7 @@ void QCPGrid::setSubGridPen(const QPen& pen)
     if (auto* plot = mParentAxis ? mParentAxis->parentPlot() : nullptr)
         if (auto* grl = plot->gridRhiLayer())
             grl->markGeometryDirty();
+    markDirty();
 }
 
 /*!
@@ -139,6 +144,7 @@ void QCPGrid::setZeroLinePen(const QPen& pen)
     if (auto* plot = mParentAxis ? mParentAxis->parentPlot() : nullptr)
         if (auto* grl = plot->gridRhiLayer())
             grl->markGeometryDirty();
+    markDirty();
 }
 
 /*! \internal
@@ -612,7 +618,10 @@ void QCPAxis::setScaleType(QCPAxis::ScaleType type)
         if (mScaleType == stLogarithmic)
             setRange(mRange.sanitizedForLogScale());
         if (alive)
+        {
             emit scaleTypeChanged(mScaleType);
+            markAppearanceDirty();
+        }
     }
 }
 
@@ -634,6 +643,21 @@ void QCPAxis::rangeDidChange(const QCPRange& oldRange)
     emit rangeChanged(mRange);
     if (alive)
         emit rangeChanged(mRange, oldRange);
+}
+
+/*! \internal
+
+  Dirties every layer a change of look moves. A different font, tick length or label padding changes
+  the axis margin, and the margin sets the rect every axis, grid and plottable in it is laid out in;
+  QCPAxisRect::markAffectedLayersDirty() walks those, the items on the axis are what
+  markLayersUsingAxisDirty() adds. No-op until the axis is in a rect.
+*/
+void QCPAxis::markAppearanceDirty()
+{
+    if (!mAxisRect)
+        return;
+    mAxisRect->markAffectedLayersDirty();
+    mAxisRect->markLayersUsingAxisDirty(this);
 }
 
 /*!
@@ -707,6 +731,7 @@ void QCPAxis::setSelectedParts(const SelectableParts& selected)
         mSelectedParts = selected;
         emit selectionChanged(mSelectedParts);
     }
+    markAppearanceDirty();
 }
 
 /*!
@@ -833,12 +858,15 @@ void QCPAxis::setRangeReversed(bool reversed)
 */
 void QCPAxis::setTicker(QSharedPointer<QCPAxisTicker> ticker)
 {
-    if (ticker)
-        mTicker = ticker;
-    else
+    if (!ticker)
+    {
         qDebug() << Q_FUNC_INFO << "can not set nullptr as axis ticker";
+        return;
+    }
+    mTicker = ticker;
     // no need to invalidate margin cache here because produced tick labels are checked for changes
     // in setupTickVector
+    markAppearanceDirty();
 }
 
 /*!
@@ -857,6 +885,7 @@ void QCPAxis::setTicks(bool show)
         mTicks = show;
         mCachedMarginValid = false;
     }
+    markAppearanceDirty();
 }
 
 /*!
@@ -871,6 +900,7 @@ void QCPAxis::setTickLabels(bool show)
         if (!mTickLabels)
             mTickVectorLabels.clear();
     }
+    markAppearanceDirty();
 }
 
 /*!
@@ -884,6 +914,7 @@ void QCPAxis::setTickLabelPadding(int padding)
         mAxisPainter->tickLabelPadding = padding;
         mCachedMarginValid = false;
     }
+    markAppearanceDirty();
 }
 
 /*!
@@ -898,6 +929,7 @@ void QCPAxis::setTickLabelFont(const QFont& font)
         mTickLabelFont = font;
         mCachedMarginValid = false;
     }
+    markAppearanceDirty();
 }
 
 /*!
@@ -908,6 +940,7 @@ void QCPAxis::setTickLabelFont(const QFont& font)
 void QCPAxis::setTickLabelColor(const QColor& color)
 {
     mTickLabelColor = color;
+    markAppearanceDirty();
 }
 
 /*!
@@ -926,6 +959,7 @@ void QCPAxis::setTickLabelRotation(double degrees)
         mAxisPainter->tickLabelRotation = qBound(-90.0, degrees, 90.0);
         mCachedMarginValid = false;
     }
+    markAppearanceDirty();
 }
 
 /*!
@@ -939,6 +973,7 @@ void QCPAxis::setTickLabelSide(LabelSide side)
 {
     mAxisPainter->tickLabelSide = side;
     mCachedMarginValid = false;
+    markAppearanceDirty();
 }
 
 /*!
@@ -983,62 +1018,53 @@ void QCPAxis::setNumberFormat(const QString& formatCode)
         qDebug() << Q_FUNC_INFO << "Passed formatCode is empty";
         return;
     }
-    mCachedMarginValid = false;
 
     // interpret first char as number format char:
     QString allowedFormatChars(QLatin1String("eEfgG"));
-    if (allowedFormatChars.contains(formatCode.at(0)))
-    {
-        mNumberFormatChar = QLatin1Char(formatCode.at(0).toLatin1());
-    }
-    else
+    if (!allowedFormatChars.contains(formatCode.at(0)))
     {
         qDebug() << Q_FUNC_INFO
                  << "Invalid number format code (first char not in 'eEfgG'):" << formatCode;
         return;
     }
-    if (formatCode.length() < 2)
+    const char formatChar = formatCode.at(0).toLatin1();
+    bool beautifulPowers = false;
+    bool multiplyCross = false;
+    if (formatCode.length() > 1)
     {
-        mNumberBeautifulPowers = false;
-        mAxisPainter->numberMultiplyCross = false;
-        return;
+        // interpret second char as indicator for beautiful decimal powers:
+        if (formatCode.at(1) == QLatin1Char('b') && (formatChar == 'e' || formatChar == 'g'))
+        {
+            beautifulPowers = true;
+        }
+        else
+        {
+            qDebug() << Q_FUNC_INFO
+                     << "Invalid number format code (second char not 'b' or first char neither "
+                        "'e' nor 'g'):"
+                     << formatCode;
+            return;
+        }
+        // interpret third char as indicator for dot or cross multiplication symbol:
+        if (formatCode.length() > 2)
+        {
+            if (formatCode.at(2) == QLatin1Char('c'))
+                multiplyCross = true;
+            else if (formatCode.at(2) != QLatin1Char('d'))
+            {
+                qDebug() << Q_FUNC_INFO
+                         << "Invalid number format code (third char neither 'c' nor 'd'):"
+                         << formatCode;
+                return;
+            }
+        }
     }
 
-    // interpret second char as indicator for beautiful decimal powers:
-    if (formatCode.at(1) == QLatin1Char('b')
-        && (mNumberFormatChar == QLatin1Char('e') || mNumberFormatChar == QLatin1Char('g')))
-    {
-        mNumberBeautifulPowers = true;
-    }
-    else
-    {
-        qDebug()
-            << Q_FUNC_INFO
-            << "Invalid number format code (second char not 'b' or first char neither 'e' nor 'g'):"
-            << formatCode;
-        return;
-    }
-    if (formatCode.length() < 3)
-    {
-        mAxisPainter->numberMultiplyCross = false;
-        return;
-    }
-
-    // interpret third char as indicator for dot or cross multiplication symbol:
-    if (formatCode.at(2) == QLatin1Char('c'))
-    {
-        mAxisPainter->numberMultiplyCross = true;
-    }
-    else if (formatCode.at(2) == QLatin1Char('d'))
-    {
-        mAxisPainter->numberMultiplyCross = false;
-    }
-    else
-    {
-        qDebug() << Q_FUNC_INFO
-                 << "Invalid number format code (third char neither 'c' nor 'd'):" << formatCode;
-        return;
-    }
+    mCachedMarginValid = false;
+    mNumberFormatChar = QLatin1Char(formatChar);
+    mNumberBeautifulPowers = beautifulPowers;
+    mAxisPainter->numberMultiplyCross = multiplyCross;
+    markAppearanceDirty();
 }
 
 /*!
@@ -1053,6 +1079,7 @@ void QCPAxis::setNumberPrecision(int precision)
         mNumberPrecision = precision;
         mCachedMarginValid = false;
     }
+    markAppearanceDirty();
 }
 
 /*!
@@ -1067,6 +1094,7 @@ void QCPAxis::setTickLength(int inside, int outside)
 {
     setTickLengthIn(inside);
     setTickLengthOut(outside);
+    markAppearanceDirty();
 }
 
 /*!
@@ -1081,6 +1109,7 @@ void QCPAxis::setTickLengthIn(int inside)
     {
         mAxisPainter->tickLengthIn = inside;
     }
+    markAppearanceDirty();
 }
 
 /*!
@@ -1097,6 +1126,7 @@ void QCPAxis::setTickLengthOut(int outside)
         mAxisPainter->tickLengthOut = outside;
         mCachedMarginValid = false; // only outside tick length can change margin
     }
+    markAppearanceDirty();
 }
 
 /*!
@@ -1113,6 +1143,7 @@ void QCPAxis::setSubTicks(bool show)
         mSubTicks = show;
         mCachedMarginValid = false;
     }
+    markAppearanceDirty();
 }
 
 /*!
@@ -1127,6 +1158,7 @@ void QCPAxis::setSubTickLength(int inside, int outside)
 {
     setSubTickLengthIn(inside);
     setSubTickLengthOut(outside);
+    markAppearanceDirty();
 }
 
 /*!
@@ -1141,6 +1173,7 @@ void QCPAxis::setSubTickLengthIn(int inside)
     {
         mAxisPainter->subTickLengthIn = inside;
     }
+    markAppearanceDirty();
 }
 
 /*!
@@ -1157,6 +1190,7 @@ void QCPAxis::setSubTickLengthOut(int outside)
         mAxisPainter->subTickLengthOut = outside;
         mCachedMarginValid = false; // only outside tick length can change margin
     }
+    markAppearanceDirty();
 }
 
 /*!
@@ -1167,6 +1201,7 @@ void QCPAxis::setSubTickLengthOut(int outside)
 void QCPAxis::setBasePen(const QPen& pen)
 {
     mBasePen = pen;
+    markAppearanceDirty();
 }
 
 /*!
@@ -1177,6 +1212,7 @@ void QCPAxis::setBasePen(const QPen& pen)
 void QCPAxis::setTickPen(const QPen& pen)
 {
     mTickPen = pen;
+    markAppearanceDirty();
 }
 
 /*!
@@ -1187,6 +1223,7 @@ void QCPAxis::setTickPen(const QPen& pen)
 void QCPAxis::setSubTickPen(const QPen& pen)
 {
     mSubTickPen = pen;
+    markAppearanceDirty();
 }
 
 /*!
@@ -1201,6 +1238,7 @@ void QCPAxis::setLabelFont(const QFont& font)
         mLabelFont = font;
         mCachedMarginValid = false;
     }
+    markAppearanceDirty();
 }
 
 /*!
@@ -1211,6 +1249,7 @@ void QCPAxis::setLabelFont(const QFont& font)
 void QCPAxis::setLabelColor(const QColor& color)
 {
     mLabelColor = color;
+    markAppearanceDirty();
 }
 
 /*!
@@ -1224,6 +1263,7 @@ void QCPAxis::setLabel(const QString& str)
         mLabel = str;
         mCachedMarginValid = false;
     }
+    markAppearanceDirty();
 }
 
 void QCPAxis::setLabelRenderer(QCPLabelRenderer* renderer)
@@ -1233,6 +1273,7 @@ void QCPAxis::setLabelRenderer(QCPLabelRenderer* renderer)
         mLabelRenderer = renderer;
         mCachedMarginValid = false;   // a different typesetter means a different size
     }
+    markAppearanceDirty();
 }
 
 /*!
@@ -1247,6 +1288,7 @@ void QCPAxis::setLabelPadding(int padding)
         mAxisPainter->labelPadding = padding;
         mCachedMarginValid = false;
     }
+    markAppearanceDirty();
 }
 
 /*!
@@ -1266,6 +1308,7 @@ void QCPAxis::setPadding(int padding)
         mPadding = padding;
         mCachedMarginValid = false;
     }
+    markAppearanceDirty();
 }
 
 /*!
@@ -1279,6 +1322,7 @@ void QCPAxis::setPadding(int padding)
 void QCPAxis::setOffset(int offset)
 {
     mAxisPainter->offset = offset;
+    markAppearanceDirty();
 }
 
 /*!
@@ -1294,6 +1338,7 @@ void QCPAxis::setSelectedTickLabelFont(const QFont& font)
         // don't set mCachedMarginValid to false here because margin calculation is always done with
         // non-selected fonts
     }
+    markAppearanceDirty();
 }
 
 /*!
@@ -1306,6 +1351,7 @@ void QCPAxis::setSelectedLabelFont(const QFont& font)
     mSelectedLabelFont = font;
     // don't set mCachedMarginValid to false here because margin calculation is always done with
     // non-selected fonts
+    markAppearanceDirty();
 }
 
 /*!
@@ -1319,6 +1365,7 @@ void QCPAxis::setSelectedTickLabelColor(const QColor& color)
     {
         mSelectedTickLabelColor = color;
     }
+    markAppearanceDirty();
 }
 
 /*!
@@ -1329,6 +1376,7 @@ void QCPAxis::setSelectedTickLabelColor(const QColor& color)
 void QCPAxis::setSelectedLabelColor(const QColor& color)
 {
     mSelectedLabelColor = color;
+    markAppearanceDirty();
 }
 
 /*!
@@ -1339,6 +1387,7 @@ void QCPAxis::setSelectedLabelColor(const QColor& color)
 void QCPAxis::setSelectedBasePen(const QPen& pen)
 {
     mSelectedBasePen = pen;
+    markAppearanceDirty();
 }
 
 /*!
@@ -1349,6 +1398,7 @@ void QCPAxis::setSelectedBasePen(const QPen& pen)
 void QCPAxis::setSelectedTickPen(const QPen& pen)
 {
     mSelectedTickPen = pen;
+    markAppearanceDirty();
 }
 
 /*!
@@ -1359,6 +1409,7 @@ void QCPAxis::setSelectedTickPen(const QPen& pen)
 void QCPAxis::setSelectedSubTickPen(const QPen& pen)
 {
     mSelectedSubTickPen = pen;
+    markAppearanceDirty();
 }
 
 /*!
@@ -1374,6 +1425,7 @@ void QCPAxis::setSelectedSubTickPen(const QPen& pen)
 void QCPAxis::setLowerEnding(const QCPLineEnding& ending)
 {
     mAxisPainter->lowerEnding = ending;
+    markAppearanceDirty();
 }
 
 /*!
@@ -1389,6 +1441,7 @@ void QCPAxis::setLowerEnding(const QCPLineEnding& ending)
 void QCPAxis::setUpperEnding(const QCPLineEnding& ending)
 {
     mAxisPainter->upperEnding = ending;
+    markAppearanceDirty();
 }
 
 /*!

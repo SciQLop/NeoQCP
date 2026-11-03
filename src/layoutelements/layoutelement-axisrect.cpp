@@ -828,6 +828,7 @@ void QCPAxisRect::setBackground(const QPixmap& pm)
 {
     mBackgroundPixmap = pm;
     mScaledBackgroundPixmap = QPixmap();
+    markDirty();
 }
 
 /*! \overload
@@ -846,6 +847,7 @@ void QCPAxisRect::setBackground(const QPixmap& pm)
 void QCPAxisRect::setBackground(const QBrush& brush)
 {
     mBackgroundBrush = brush;
+    markDirty();
 }
 
 /*! \overload
@@ -861,6 +863,7 @@ void QCPAxisRect::setBackground(const QPixmap& pm, bool scaled, Qt::AspectRatioM
     mScaledBackgroundPixmap = QPixmap();
     mBackgroundScaled = scaled;
     mBackgroundScaledMode = mode;
+    markDirty();
 }
 
 /*!
@@ -876,6 +879,7 @@ void QCPAxisRect::setBackground(const QPixmap& pm, bool scaled, Qt::AspectRatioM
 void QCPAxisRect::setBackgroundScaled(bool scaled)
 {
     mBackgroundScaled = scaled;
+    markDirty();
 }
 
 /*!
@@ -887,6 +891,7 @@ void QCPAxisRect::setBackgroundScaled(bool scaled)
 void QCPAxisRect::setBackgroundScaledMode(Qt::AspectRatioMode mode)
 {
     mBackgroundScaledMode = mode;
+    markDirty();
 }
 
 /*!

@@ -2,6 +2,7 @@
 #include "plottables/plottable-multigraph.h"
 #include <QTemporaryDir>
 #include <QtWidgets/qtestsupport_widgets.h>
+#include <algorithm>
 #include <functional>
 #include <memory>
 
@@ -11,7 +12,7 @@ std::unique_ptr<QCustomPlot> settledPlot()
 {
     auto plot = std::make_unique<QCustomPlot>();
     plot->resize(400, 300);
-    plot->addGraph()->setData(QVector<double>{0, 10}, QVector<double>{0, 10});
+    plot->addGraph()->setData(QVector<double> { 0, 10 }, QVector<double> { 0, 10 });
     plot->graph(0)->setPen(QPen(Qt::red, 4));
     plot->xAxis->setRange(0, 10);
     plot->yAxis->setRange(0, 10);
@@ -29,6 +30,7 @@ public:
 
 protected:
     void applyDefaultAntialiasingHint(QCPPainter*) const override { }
+
     void draw(QCPPainter*) override
     {
         if (onDraw)
@@ -41,27 +43,34 @@ class PendingStub : public QCPAbstractPlottable
 {
 public:
     PendingStub(QCPAxis* k, QCPAxis* v) : QCPAbstractPlottable(k, v) { }
+
     int commits = 0;
 
     bool hasPendingData() const override { return commits == 0; }
+
     bool commitPendingData() override
     {
         ++commits;
         return true;
     }
+
     double selectTest(const QPointF&, bool, QVariant* = nullptr) const override { return -1; }
+
     QCPRange getKeyRange(bool& found, QCP::SignDomain = QCP::sdBoth) const override
     {
         found = false;
-        return {};
+        return { };
     }
+
     QCPRange getValueRange(bool& found, QCP::SignDomain = QCP::sdBoth,
                            const QCPRange& = QCPRange()) const override
     {
         found = false;
-        return {};
+        return { };
     }
+
     void draw(QCPPainter*) override { }
+
     void drawLegendIcon(QCPPainter*, const QRectF&) const override { }
 };
 
@@ -70,6 +79,7 @@ class NoContentStub : public PendingStub
 {
 public:
     using PendingStub::PendingStub;
+
     bool canProduceContent() const override { return false; }
 };
 
@@ -79,8 +89,11 @@ class FillStub : public PendingStub
 public:
     using PendingStub::PendingStub;
     QPointF stall;
+
     bool hasPendingData() const override { return false; }
+
     QPointF stallPixelOffset() const override { return stall; }
+
     void draw(QCPPainter* painter) override
     {
         painter->fillRect(mKeyAxis->axisRect()->rect(), pen().color());
@@ -129,11 +142,15 @@ QImage exportWith(QCustomPlot& plot, const QString& how, const QString& dir)
         return pixmap.toImage();
     }
     [[maybe_unused]] const bool saved = plot.savePdf(dir + QStringLiteral("/plot.pdf"), 400, 300);
-    return {}; // the caller checks the file
+    return { }; // the caller checks the file
 }
 
 int gMisuses = 0;
-void countMisuse(const char*, const char*) { ++gMisuses; }
+
+void countMisuse(const char*, const char*)
+{
+    ++gMisuses;
+}
 } // namespace
 
 void TestRepaint::markDirtySchedulesOneRepaint()
@@ -398,21 +415,20 @@ void TestRepaint::exportSettlesFirst()
     }
 }
 
-
 void TestRepaint::exportShowsReadyStagedData()
 {
     QCustomPlot plot;
     plot.resize(400, 300);
     auto* mg = new QCPMultiGraph(plot.xAxis, plot.yAxis);
-    mg->setData(std::vector<double>{0, 10}, std::vector<std::vector<double>>{{2, 2}});
-    mg->setComponentPens({QPen(Qt::red, 4)});
+    mg->setData(std::vector<double> { 0, 10 }, std::vector<std::vector<double>> { { 2, 2 } });
+    mg->setComponentPens({ QPen(Qt::red, 4) });
     plot.xAxis->setRange(0, 10);
     plot.yAxis->setRange(0, 10);
     plot.replot();
     plot.setDataSwapDebounceMs(10000);
     using Source = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
-    mg->setDataSource(std::make_shared<Source>(std::vector<double>{0, 10},
-                                               std::vector<std::vector<double>>{{8, 8}}));
+    mg->setDataSource(std::make_shared<Source>(std::vector<double> { 0, 10 },
+                                               std::vector<std::vector<double>> { { 8, 8 } }));
     QVERIFY(mg->hasPendingData());
 
     const QImage image = plot.toPixmap(400, 300).toImage();
@@ -432,7 +448,8 @@ void TestRepaint::exportShowsReadyStagedData()
     QCOMPARE(redNear(2), 0);
 }
 
-// The legend is on its own buffer ("axes" and "legend"): marking the graph's layer does not redraw it.
+// The legend is on its own buffer ("axes" and "legend"): marking the graph's layer does not redraw
+// it.
 void TestRepaint::legendShowsAddedGraphAndItsName()
 {
     QCustomPlot plot;
@@ -444,7 +461,7 @@ void TestRepaint::legendShowsAddedGraphAndItsName()
     waitUntilSettled(plot);
     const QImage empty = screenOf(&plot);
 
-    auto g = plot.add<QCPGraph>(QVector<double>{0, 1}, QVector<double>{0, 1}).setName("Bx");
+    auto g = plot.add<QCPGraph>(QVector<double> { 0, 1 }, QVector<double> { 0, 1 }).setName("Bx");
     waitUntilSettled(plot);
     const QImage oneRow = screenOf(&plot);
     const QRect rowArea = plot.legend->outerRect();
@@ -468,6 +485,149 @@ void TestRepaint::setLayerRepaintsTheLayerLeft()
     QVERIFY(plot->isRepaintQueued());
     waitUntilSettled(*plot);
     QCOMPARE(pixelsOfColor(screenOf(plot.get()), Qt::red), 0);
+}
+
+namespace
+{
+struct AxisAppearanceCase
+{
+    const char* name;
+    std::function<void(QCustomPlot&)> change;
+};
+
+// One entry per "yes" row of docs/plans/neoqcp-3/milestone-2-setters.md, section "axes".
+const QVector<AxisAppearanceCase>& axisAppearanceCases()
+{
+    static const QVector<AxisAppearanceCase> cases = {
+        { "grid.setSubGridVisible",
+          [](QCustomPlot& plot) { plot.xAxis->grid()->setSubGridVisible(true); } },
+        { "grid.setAntialiasedSubGrid",
+          [](QCustomPlot& plot) { plot.xAxis->grid()->setAntialiasedSubGrid(true); } },
+        { "grid.setAntialiasedZeroLine",
+          [](QCustomPlot& plot) { plot.xAxis->grid()->setAntialiasedZeroLine(true); } },
+        { "grid.setPen",
+          [](QCustomPlot& plot) { plot.xAxis->grid()->setPen(QPen(Qt::darkGreen)); } },
+        { "grid.setSubGridPen",
+          [](QCustomPlot& plot) { plot.xAxis->grid()->setSubGridPen(QPen(Qt::darkCyan)); } },
+        { "grid.setZeroLinePen",
+          [](QCustomPlot& plot) { plot.xAxis->grid()->setZeroLinePen(QPen(Qt::darkMagenta)); } },
+        { "axis.setScaleType",
+          [](QCustomPlot& plot) { plot.xAxis->setScaleType(QCPAxis::stLogarithmic); } },
+        { "axis.setSelectedParts",
+          [](QCustomPlot& plot) { plot.xAxis->setSelectedParts(QCPAxis::spAxis); } },
+        { "axis.setTicker", [](QCustomPlot& plot)
+          { plot.xAxis->setTicker(QSharedPointer<QCPAxisTickerFixed>::create()); } },
+        { "axis.setTicks", [](QCustomPlot& plot) { plot.xAxis->setTicks(false); } },
+        { "axis.setTickLabels", [](QCustomPlot& plot) { plot.xAxis->setTickLabels(false); } },
+        { "axis.setTickLabelPadding", [](QCustomPlot& plot)
+          { plot.xAxis->setTickLabelPadding(plot.xAxis->tickLabelPadding() + 3); } },
+        { "axis.setTickLabelFont",
+          [](QCustomPlot& plot)
+          {
+              QFont font = plot.xAxis->tickLabelFont();
+              font.setPointSizeF(font.pointSizeF() + 2);
+              plot.xAxis->setTickLabelFont(font);
+          } },
+        { "axis.setTickLabelColor",
+          [](QCustomPlot& plot) { plot.xAxis->setTickLabelColor(Qt::blue); } },
+        { "axis.setTickLabelRotation",
+          [](QCustomPlot& plot) { plot.xAxis->setTickLabelRotation(35); } },
+        { "axis.setTickLabelSide",
+          [](QCustomPlot& plot) { plot.xAxis->setTickLabelSide(QCPAxis::lsInside); } },
+        { "axis.setNumberFormat",
+          [](QCustomPlot& plot) { plot.xAxis->setNumberFormat(QStringLiteral("e")); } },
+        { "axis.setNumberPrecision", [](QCustomPlot& plot)
+          { plot.xAxis->setNumberPrecision(plot.xAxis->numberPrecision() + 2); } },
+        { "axis.setTickLength", [](QCustomPlot& plot) { plot.xAxis->setTickLength(9); } },
+        { "axis.setTickLengthIn", [](QCustomPlot& plot) { plot.xAxis->setTickLengthIn(7); } },
+        { "axis.setTickLengthOut", [](QCustomPlot& plot) { plot.xAxis->setTickLengthOut(5); } },
+        { "axis.setSubTicks", [](QCustomPlot& plot) { plot.xAxis->setSubTicks(false); } },
+        { "axis.setSubTickLength", [](QCustomPlot& plot) { plot.xAxis->setSubTickLength(6); } },
+        { "axis.setSubTickLengthIn", [](QCustomPlot& plot) { plot.xAxis->setSubTickLengthIn(5); } },
+        { "axis.setSubTickLengthOut",
+          [](QCustomPlot& plot) { plot.xAxis->setSubTickLengthOut(4); } },
+        { "axis.setBasePen", [](QCustomPlot& plot) { plot.xAxis->setBasePen(QPen(Qt::red, 2)); } },
+        { "axis.setTickPen", [](QCustomPlot& plot) { plot.xAxis->setTickPen(QPen(Qt::red, 2)); } },
+        { "axis.setSubTickPen",
+          [](QCustomPlot& plot) { plot.xAxis->setSubTickPen(QPen(Qt::red, 2)); } },
+        { "axis.setLabelFont",
+          [](QCustomPlot& plot)
+          {
+              QFont font = plot.xAxis->labelFont();
+              font.setPointSizeF(font.pointSizeF() + 2);
+              plot.xAxis->setLabelFont(font);
+          } },
+        { "axis.setLabelColor", [](QCustomPlot& plot) { plot.xAxis->setLabelColor(Qt::blue); } },
+        { "axis.setLabel", [](QCustomPlot& plot) { plot.xAxis->setLabel(QStringLiteral("X")); } },
+        { "axis.setLabelPadding",
+          [](QCustomPlot& plot) { plot.xAxis->setLabelPadding(plot.xAxis->labelPadding() + 3); } },
+        { "axis.setPadding",
+          [](QCustomPlot& plot) { plot.xAxis->setPadding(plot.xAxis->padding() + 3); } },
+        { "axis.setOffset",
+          [](QCustomPlot& plot) { plot.xAxis->setOffset(plot.xAxis->offset() + 3); } },
+        { "axis.setSelectedTickLabelFont",
+          [](QCustomPlot& plot)
+          {
+              QFont font = plot.xAxis->tickLabelFont();
+              font.setPointSizeF(font.pointSizeF() + 2);
+              plot.xAxis->setSelectedTickLabelFont(font);
+          } },
+        { "axis.setSelectedLabelFont",
+          [](QCustomPlot& plot)
+          {
+              QFont font = plot.xAxis->labelFont();
+              font.setPointSizeF(font.pointSizeF() + 2);
+              plot.xAxis->setSelectedLabelFont(font);
+          } },
+        { "axis.setSelectedTickLabelColor",
+          [](QCustomPlot& plot) { plot.xAxis->setSelectedTickLabelColor(Qt::blue); } },
+        { "axis.setSelectedLabelColor",
+          [](QCustomPlot& plot) { plot.xAxis->setSelectedLabelColor(Qt::blue); } },
+        { "axis.setSelectedBasePen",
+          [](QCustomPlot& plot) { plot.xAxis->setSelectedBasePen(QPen(Qt::blue, 2)); } },
+        { "axis.setSelectedTickPen",
+          [](QCustomPlot& plot) { plot.xAxis->setSelectedTickPen(QPen(Qt::blue, 2)); } },
+        { "axis.setSelectedSubTickPen",
+          [](QCustomPlot& plot) { plot.xAxis->setSelectedSubTickPen(QPen(Qt::blue, 2)); } },
+        { "axis.setLowerEnding",
+          [](QCustomPlot& plot) { plot.xAxis->setLowerEnding(QCPLineEnding::esSpikeArrow); } },
+        { "axis.setUpperEnding",
+          [](QCustomPlot& plot) { plot.xAxis->setUpperEnding(QCPLineEnding::esSpikeArrow); } },
+        { "axisRect.setBackground(brush)",
+          [](QCustomPlot& plot) { plot.axisRect(0)->setBackground(QBrush(Qt::yellow)); } },
+        { "axisRect.setBackground(pixmap)",
+          [](QCustomPlot& plot) { plot.axisRect(0)->setBackground(QPixmap(8, 8)); } },
+        { "axisRect.setBackground(pixmap, scaled, mode)", [](QCustomPlot& plot)
+          { plot.axisRect(0)->setBackground(QPixmap(8, 8), true, Qt::KeepAspectRatio); } },
+        { "axisRect.setBackgroundScaled",
+          [](QCustomPlot& plot) { plot.axisRect(0)->setBackgroundScaled(true); } },
+        { "axisRect.setBackgroundScaledMode", [](QCustomPlot& plot)
+          { plot.axisRect(0)->setBackgroundScaledMode(Qt::KeepAspectRatio); } },
+    };
+    return cases;
+}
+} // namespace
+
+void TestRepaint::axisSettersScheduleRepaint_data()
+{
+    QTest::addColumn<QString>("setter");
+    for (const AxisAppearanceCase& c : axisAppearanceCases())
+        QTest::newRow(c.name) << QString::fromLatin1(c.name);
+}
+
+void TestRepaint::axisSettersScheduleRepaint()
+{
+    QFETCH(QString, setter);
+    auto plot = settledPlot();
+    QVERIFY(!plot->isRepaintQueued());
+
+    const auto& cases = axisAppearanceCases();
+    auto it = std::find_if(cases.cbegin(), cases.cend(), [&setter](const AxisAppearanceCase& c)
+                           { return setter == QLatin1String(c.name); });
+    QVERIFY(it != cases.cend());
+    it->change(*plot);
+
+    QVERIFY2(plot->isRepaintQueued(), qPrintable(setter + QStringLiteral(" scheduled no repaint")));
 }
 
 QImage TestRepaint::screenOf(QCustomPlot* plot)

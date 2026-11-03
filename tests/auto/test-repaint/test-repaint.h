@@ -22,6 +22,8 @@ private slots:
     void exportShowsReadyStagedData();
     void legendShowsAddedGraphAndItsName();
     void setLayerRepaintsTheLayerLeft();
+    void axisSettersScheduleRepaint_data();
+    void axisSettersScheduleRepaint();
 
 private:
     // What the plot shows: its paint buffers composed, or the framebuffer under RHI.

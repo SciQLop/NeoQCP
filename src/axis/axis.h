@@ -484,6 +484,8 @@ protected:
 private:
     Q_DISABLE_COPY(QCPAxis)
     void rangeDidChange(const QCPRange& oldRange);
+    // Dirties the layers a change of look moves; call it at the end of the setter.
+    void markAppearanceDirty();
 
     friend class QCustomPlot;
     friend class QCPGrid;
