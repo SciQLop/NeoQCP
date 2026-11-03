@@ -109,3 +109,7 @@ Every decision the executor made on the maintainer's behalf during milestone 1 (
 - Task 9: minor (deferred): Qt CUPS print plugin 80 B LSan leak via QPrinter in the savePdf test row — Qt code; consider an LSan suppression file
 - Task 10: minor (deferred, FINAL REVIEW: triage): axis-rect dirty marking calls the creating GPU grid-layer accessor (pre-existing)
 - Task 10: minor (deferred): plan doc still lists deliver as public
+
+## Maintainer answers
+
+- 2026-11-03: dead-handle operator-> keeps qFatal in release (spec answer 2 confirmed).
