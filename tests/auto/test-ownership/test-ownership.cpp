@@ -111,6 +111,78 @@ void TestOwnership::deleteMultiGraphLeavesItsRow()
     draw();
 }
 
+namespace
+{
+template <typename Row>
+Row* findRow(QCPLegend* legend)
+{
+    for (int i = 0; i < legend->itemCount(); ++i)
+        if (auto* row = qobject_cast<Row*>(legend->item(i)))
+            return row;
+    return nullptr;
+}
+
+QCPIntervals* intervalsInLegend(QCustomPlot* plot, QCPLaneLayout* layout)
+{
+    layout->laneIndices({ "A" });
+    auto* intervals = new QCPIntervals(plot->xAxis, plot->yAxis, layout);
+    (void)intervals->addToLegend(plot->legend);
+    return intervals;
+}
+} // namespace
+
+void TestOwnership::deleteMultiGraphLeavesSecondLegend()
+{
+    auto* multiGraph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* second = addSecondLegend();
+    QVERIFY(second->addItem(findRow<QCPGroupLegendItem>(mPlot->legend)));
+    second->setVisible(true);
+
+    delete multiGraph;
+
+    QCOMPARE(second->itemCount(), 0);
+    draw();
+}
+
+void TestOwnership::deleteIntervalsLeavesItsRows()
+{
+    QCPLaneLayout layout;
+    auto* intervals = intervalsInLegend(mPlot, &layout);
+    QVERIFY(findRow<QCPIntervalsLegendItem>(mPlot->legend));
+    auto* second = addSecondLegend();
+    QVERIFY(intervals->addToLegend(second));
+    draw();
+
+    delete intervals;
+
+    QVERIFY(!findRow<QCPIntervalsLegendItem>(mPlot->legend));
+    QCOMPARE(second->itemCount(), 0);
+    draw();
+}
+
+// A row taken out of every legend is in none when its plottable dies: nothing removes it, and it
+// must not keep a dangling pointer for when it is added back.
+void TestOwnership::detachedRowsOutliveTheirPlottables()
+{
+    QCPLaneLayout layout;
+    auto* multiGraph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* intervals = intervalsInLegend(mPlot, &layout);
+    auto* groupRow = findRow<QCPGroupLegendItem>(mPlot->legend);
+    auto* intervalsRow = findRow<QCPIntervalsLegendItem>(mPlot->legend);
+    QVERIFY(groupRow && intervalsRow);
+    QVERIFY(mPlot->legend->take(groupRow));
+    QVERIFY(mPlot->legend->take(intervalsRow));
+
+    delete multiGraph;
+    delete intervals;
+
+    QVERIFY(groupRow->multiGraph() == nullptr);
+    QVERIFY(intervalsRow->intervals() == nullptr);
+    QVERIFY(mPlot->legend->addItem(groupRow));
+    QVERIFY(mPlot->legend->addItem(intervalsRow));
+    draw();
+}
+
 void TestOwnership::deletePlottableInGroup()
 {
     auto* first = mPlot->addGraph();

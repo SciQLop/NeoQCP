@@ -11,6 +11,9 @@ private slots:
     void deletePlottableLeavesLists();
     void deleteLaterPlottable();
     void deleteMultiGraphLeavesItsRow();
+    void deleteMultiGraphLeavesSecondLegend();
+    void deleteIntervalsLeavesItsRows();
+    void detachedRowsOutliveTheirPlottables();
     void deletePlottableInGroup();
     void removePlottableStillDeletes();
     void nullAxisPlottableIsRefused();

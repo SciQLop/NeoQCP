@@ -5,12 +5,23 @@
 namespace
 {
 constexpr int kSwatchWidth = 16, kSwatchGap = 6;
+
+// A row taken out of its legend outlives its plottable: nothing removes it then.
+std::vector<std::pair<QString, QColor>> entriesOf(const QCPIntervals* intervals)
+{
+    return intervals ? intervals->legendEntries() : std::vector<std::pair<QString, QColor>> {};
+}
 }
 
 QCPIntervalsLegendItem::QCPIntervalsLegendItem(QCPLegend* parent, QCPIntervals* intervals)
         : QCPAbstractLegendItem(parent), mIntervals(intervals)
 {
     leaveLegendWhenDestroyed(intervals);
+}
+
+QCPIntervals* QCPIntervalsLegendItem::intervals() const
+{
+    return mIntervals.data();
 }
 
 QFont QCPIntervalsLegendItem::effectiveFont() const
@@ -22,7 +33,7 @@ QFont QCPIntervalsLegendItem::effectiveFont() const
 QSize QCPIntervalsLegendItem::minimumOuterSizeHint() const
 {
     const QFontMetrics fm(effectiveFont());
-    const auto entries = mIntervals->legendEntries();
+    const auto entries = entriesOf(mIntervals);
     int textWidth = 0;
     for (const auto& [name, color] : entries)
         textWidth = std::max(textWidth, fm.horizontalAdvance(name));
@@ -38,7 +49,7 @@ void QCPIntervalsLegendItem::draw(QCPPainter* painter)
     const int rowHeight = fm.height() + 4;
     painter->setFont(font);
     double top = mRect.top();
-    for (const auto& [name, color] : mIntervals->legendEntries())
+    for (const auto& [name, color] : entriesOf(mIntervals))
     {
         const QRectF swatch(mRect.left() + mMargins.left(), top + rowHeight / 4.0, kSwatchWidth,
                             rowHeight / 2.0);

@@ -32,6 +32,11 @@ QCPGroupLegendItem::QCPGroupLegendItem(QCPLegend* parent, QCPMultiGraph* multiGr
                 [this] { if (auto* legendLayer = layer()) legendLayer->markDirty(); });
 }
 
+QCPMultiGraph* QCPGroupLegendItem::multiGraph() const
+{
+    return mMultiGraph.data();
+}
+
 void QCPGroupLegendItem::setExpanded(bool expanded)
 {
     if (mExpanded == expanded) return;

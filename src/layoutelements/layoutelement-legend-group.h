@@ -1,5 +1,6 @@
 #pragma once
 #include "layoutelement-legend.h"
+#include <QPointer>
 
 class QCPMultiGraph;
 
@@ -9,7 +10,7 @@ class QCP_LIB_DECL QCPGroupLegendItem : public QCPAbstractLegendItem
 public:
     QCPGroupLegendItem(QCPLegend* parent, QCPMultiGraph* multiGraph);
 
-    QCPMultiGraph* multiGraph() const { return mMultiGraph; }
+    QCPMultiGraph* multiGraph() const;
     bool expanded() const { return mExpanded; }
     void setExpanded(bool expanded);
     int selectedComponent() const { return mSelectedComponent; }
@@ -38,7 +39,7 @@ private:
     bool shownExpanded() const;
     QFont rowFont() const;
     int rowHeight() const;
-    QCPMultiGraph* mMultiGraph;
+    QPointer<QCPMultiGraph> mMultiGraph;
     bool mExpanded = false;
     int mSelectedComponent = -1;
 };
