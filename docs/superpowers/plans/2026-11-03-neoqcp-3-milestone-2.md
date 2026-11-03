@@ -155,4 +155,4 @@ Same shape for `src/items/*.cpp` (span `setRange`/`setKeyRange`/`setValueRange` 
 
 ### Moved out of this milestone
 
-Item scaling (constant-time removal, view culling; spec decision 2) becomes its own small milestone: its target must be set from the end-of-milestone-1 number (61 ms, `baseline.md`), after explaining why that row got 24 % faster.
+Item scaling (constant-time removal, view culling; spec decision 2) becomes its own small milestone: its target must be set from the end-of-milestone-1 number (61 ms, `baseline.md`), after explaining why that row got 24 % faster. Profiled 2026-11-03 (milestone 2 Task 2): 65 % of the row is four O(n²) list scans (the duplicate checks in `registerItem` and in the layer's `addChild`, Qt's children scan on delete, and the layer's `removeChild` searching from the front while items are deleted from the back); the row moves 61–80 ms with memory layout. Cheap first fixes: search from the back, skip the two duplicate checks for new objects.
