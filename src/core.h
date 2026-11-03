@@ -488,6 +488,7 @@ protected:
     virtual void wheelEvent(QWheelEvent* event) override;
     virtual void keyPressEvent(QKeyEvent* event) override;
     virtual bool event(QEvent* event) override;
+    bool handleEvent(QEvent* event);
 
     // introduced methods:
     void updateGestureInput();
@@ -546,8 +547,8 @@ protected:
     bool hasInvalidatedPaintBuffers();
     void ensureAtLeastOneBufferDirty();
     // Runs \a emission now if no emission scope of this plot is open, else when the outermost one
-    // closes; skipped if \a sender is deleted by then. Run now, it overtakes input signals whose
-    // posted delivery has not run yet: those stay on their event-loop turn.
+    // closes (or the innermost event scope, see QCPEmissionScope::Kind); skipped if \a sender is
+    // deleted by then.
     void deliver(QObject* sender, std::function<void()> emission);
     friend class QCPLegend;
     friend class QCPPlottableGroup;

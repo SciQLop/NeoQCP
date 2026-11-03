@@ -167,7 +167,6 @@ void TestTheme::qssProxyProperties()
 
 void TestTheme::coalescing()
 {
-    QCoreApplication::processEvents(); // the show's afterReplot arrives on the next event-loop turn
     int replotCount = 0;
     connect(mPlot, &QCustomPlot::afterReplot, [&replotCount]() { ++replotCount; });
 

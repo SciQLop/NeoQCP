@@ -1108,7 +1108,6 @@ void Benchmark::QCPInput_MouseMoveStorm()
                         Qt::NoButton, Qt::NoModifier);
       QCoreApplication::sendEvent(mPlot, &event);
     }
-    qApp->processEvents(); // runs the posted input flush
   }
   QCOMPARE(moves, kMoves);
 }

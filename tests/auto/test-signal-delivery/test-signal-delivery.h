@@ -7,34 +7,30 @@ class TestSignalDelivery : public QObject
 private slots:
     void nestedScopeDeliversAtOutermost();
     void deadSenderSkipped();
-    void inputScopeDeliversNextTurn();
-    void pendingInputSignalsDieWithThePlot();
     void slotDeletesPlotDuringReplot_data();
     void slotDeletesPlotDuringReplot();
     void replotSignalsSeeConsistentPlot();
     void slotDeletesAxisDuringRescale();
-    void slotDeletesPlotOnClick();
     void removeLayerWhileIntervalsAddsLayer();
 
     void deletePlotFromBeforeReplotWithHandle_data();
     void deletePlotFromBeforeReplotWithHandle();
     void deletedChildSkipsQueuedEmission();
-    void removeInsideInputScope();
 
     void beforeReplotChangesShowInSameReplot();
     void afterLayoutSeesExportViewport();
-    void addGraphBeforeInputFlush();
     void deleteLayerWhoseChildSlotDeletesPlot();
     void deleteAxisRectWhoseSlotDeletesPlot();
-    void replotBeforeInputFlushKeepsClickQueued_data();
-    void replotBeforeInputFlushKeepsClickQueued();
     void slotDeletesPlotDuringExport_data();
     void slotDeletesPlotDuringExport();
-    void inputSignalSurvivesNestedLoopInMethodScope();
-    void slotDeletesPlotOnResize_data();
-    void slotDeletesPlotOnResize();
     void deleteInsideOwnEventReportsMisuse();
-    void inputFlushPostedOnce();
     void replotFromReplotSignalIsIgnored_data();
     void replotFromReplotSignalIsIgnored();
+    void pendingSignalsDieWithThePlot();
+    void slotDeletesPlotOnClick();
+    void slotsRunBeforeEventReturns();
+    void wheelIgnoredInSlotReachesParent();
+    void nestedEventDeliversWhenItReturns();
+    void replotSignalOfAWidgetEventRunsInsideIt_data();
+    void replotSignalOfAWidgetEventRunsInsideIt();
 };

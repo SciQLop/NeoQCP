@@ -21,6 +21,7 @@ private slots:
     void touchTwoFingersTogetherPan();
     void oneFingerDragPans();
     void oneFingerTapIsAClick();
+    void tapSlotReadsItsMouseEvent();
     void touchSequencePinchZoomsByTheFingerSpread();
     void touchPinchOneFingerPerEvent();
     void nativePinchZooms();

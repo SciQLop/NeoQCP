@@ -1,5 +1,6 @@
 #include "test-signal-delivery.h"
 #include <QTemporaryDir>
+#include <QtTest/qtestspontaneevent.h>
 #include <memory>
 
 namespace
@@ -32,22 +33,27 @@ QList<QCPLayerable*> layerablesOnLayers(const QCustomPlot& plot)
     return result;
 }
 
+QPoint pixelOf(const QCustomPlot& plot, double key, double value)
+{
+    return {qRound(plot.xAxis->coordToPixel(key)), qRound(plot.yAxis->coordToPixel(value))};
+}
+
+class WheelRecorder : public QWidget
+{
+public:
+    int wheels = 0;
+
+protected:
+    void wheelEvent(QWheelEvent* event) override
+    {
+        ++wheels;
+        event->accept();
+    }
+};
+
 int gMisuses = 0;
 void countMisuse(const char*, const char*) { ++gMisuses; }
 
-class MetaCallCounter : public QObject
-{
-public:
-    int count = 0;
-
-protected:
-    bool eventFilter(QObject* watched, QEvent* event) override
-    {
-        if (watched == QCoreApplication::instance() && event->type() == QEvent::MetaCall)
-            ++count;
-        return false;
-    }
-};
 } // namespace
 
 void TestSignalDelivery::nestedScopeDeliversAtOutermost()
@@ -82,34 +88,6 @@ void TestSignalDelivery::deadSenderSkipped()
         plot.deliver(sender, [&] { ran = true; });
         delete sender;
     }
-    QVERIFY(!ran);
-}
-
-void TestSignalDelivery::inputScopeDeliversNextTurn()
-{
-    QCustomPlot plot;
-    bool ran = false;
-    {
-        QCPInputScope scope(&plot);
-        plot.deliver(&plot, [&] { ran = true; });
-    }
-    QVERIFY(!ran);
-    QCoreApplication::processEvents();
-    QVERIFY(ran);
-}
-
-void TestSignalDelivery::pendingInputSignalsDieWithThePlot()
-{
-    auto* plot = plotWithGraph();
-    QObject outlivesThePlot;
-    bool ran = false;
-    {
-        QCPInputScope scope(plot);
-        plot->deliver(&outlivesThePlot, [&ran] { ran = true; });
-    }
-    delete plot;
-    QVERIFY2(!ran, "a queued emission ran during the plot's teardown");
-    QCoreApplication::processEvents();
     QVERIFY(!ran);
 }
 
@@ -160,25 +138,6 @@ void TestSignalDelivery::slotDeletesAxisDuringRescale()
     plot->rescaleAxes();
     QVERIFY(removed);
     QCOMPARE(rect->axes().size(), 3);
-}
-
-void TestSignalDelivery::slotDeletesPlotOnClick()
-{
-    auto* plot = plotWithGraph();
-    const QPointer<QCustomPlot> alive(plot);
-    plot->replot();
-    bool clicked = false;
-    connect(plot, &QCustomPlot::plottableClick, plot, [&clicked, plot] {
-        clicked = true;
-        delete plot;
-    });
-    const QPoint onGraph(qRound(plot->xAxis->coordToPixel(5)),
-                         qRound(plot->yAxis->coordToPixel(5)));
-    QTest::mouseClick(plot, Qt::LeftButton, Qt::NoModifier, onGraph);
-    QVERIFY2(!clicked, "the click slot ran inside the mouse event");
-    QCoreApplication::processEvents();
-    QVERIFY(clicked);
-    QVERIFY(!alive);
 }
 
 void TestSignalDelivery::removeLayerWhileIntervalsAddsLayer()
@@ -234,28 +193,6 @@ void TestSignalDelivery::deletedChildSkipsQueuedEmission()
     QCOMPARE(plot.graphCount(), 0);
 }
 
-void TestSignalDelivery::removeInsideInputScope()
-{
-    std::unique_ptr<QCustomPlot> plot(plotWithGraph());
-    plot->replot();
-    QCPHandle<QCPGraph> graph(plot->graph(0));
-    QSignalSpy clicks(plot.get(), &QCustomPlot::plottableClick);
-    QSignalSpy releases(plot.get(), &QCustomPlot::mouseRelease);
-    const QPoint onGraph(qRound(plot->xAxis->coordToPixel(5)),
-                         qRound(plot->yAxis->coordToPixel(5)));
-    {
-        QCPInputScope scope(plot.get());
-        QTest::mouseClick(plot.get(), Qt::LeftButton, Qt::NoModifier, onGraph);
-        graph.remove();
-    }
-    QCoreApplication::processEvents();
-    QVERIFY(!graph);
-    QCOMPARE(clicks.count(), 0);
-    QCOMPARE(releases.count(), 1);
-    QCOMPARE(plot->plottableCount(), 0);
-    plot->replot();
-}
-
 void TestSignalDelivery::beforeReplotChangesShowInSameReplot()
 {
     std::unique_ptr<QCustomPlot> plot(plotWithGraph());
@@ -277,21 +214,6 @@ void TestSignalDelivery::afterLayoutSeesExportViewport()
     const QPixmap pixmap = plot->toPixmap(800, 600);
     QVERIFY(!pixmap.isNull());
     QVERIFY(exportViewport);
-}
-
-void TestSignalDelivery::addGraphBeforeInputFlush()
-{
-    auto* plot = plotWithGraph();
-    const QPointer<QCustomPlot> alive(plot);
-    plot->replot();
-    connect(plot, &QCustomPlot::plottableClick, plot, [plot] { delete plot; });
-    const QPoint onGraph(qRound(plot->xAxis->coordToPixel(5)),
-                         qRound(plot->yAxis->coordToPixel(5)));
-    QTest::mouseClick(plot, Qt::LeftButton, Qt::NoModifier, onGraph);
-    QVERIFY(plot->addGraph());
-    QVERIFY(alive);
-    QCoreApplication::processEvents();
-    QVERIFY(!alive);
 }
 
 void TestSignalDelivery::deleteLayerWhoseChildSlotDeletesPlot()
@@ -317,40 +239,6 @@ void TestSignalDelivery::deleteAxisRectWhoseSlotDeletesPlot()
             [plot, graph] { graph->setLayer(plot->layer(QStringLiteral("axes"))); });
     connect(graph, &QCPLayerable::layerChanged, plot, [plot] { delete plot; });
     delete rect;
-    QVERIFY(!alive);
-}
-
-void TestSignalDelivery::replotBeforeInputFlushKeepsClickQueued_data()
-{
-    QTest::addColumn<bool>("byResize");
-    QTest::newRow("replot") << false;
-    QTest::newRow("resizeEvent") << true;
-}
-
-void TestSignalDelivery::replotBeforeInputFlushKeepsClickQueued()
-{
-    QFETCH(bool, byResize);
-    auto* plot = plotWithGraph();
-    const QPointer<QCustomPlot> alive(plot);
-    plot->show();
-    QVERIFY(QTest::qWaitForWindowExposed(plot) || !byResize);
-    plot->replot();
-    bool clicked = false;
-    connect(plot, &QCustomPlot::plottableClick, plot, [&clicked, plot] {
-        clicked = true;
-        delete plot;
-    });
-    const QPoint onGraph(qRound(plot->xAxis->coordToPixel(5)),
-                         qRound(plot->yAxis->coordToPixel(5)));
-    QTest::mouseClick(plot, Qt::LeftButton, Qt::NoModifier, onGraph);
-    if (byResize)
-        plot->resize(500, 400);
-    else
-        plot->replot();
-    QVERIFY(alive);
-    QVERIFY2(!clicked, "the click slot ran inside a later NeoQCP call");
-    QCoreApplication::processEvents();
-    QVERIFY(clicked);
     QVERIFY(!alive);
 }
 
@@ -383,63 +271,14 @@ void TestSignalDelivery::slotDeletesPlotDuringExport()
     QVERIFY(!alive);
 }
 
-void TestSignalDelivery::inputSignalSurvivesNestedLoopInMethodScope()
-{
-    std::unique_ptr<QCustomPlot> plot(plotWithGraph());
-    plot->replot();
-    int clicks = 0;
-    connect(plot.get(), &QCustomPlot::plottableClick, plot.get(), [&clicks] { ++clicks; });
-    const QPoint onGraph(qRound(plot->xAxis->coordToPixel(5)),
-                         qRound(plot->yAxis->coordToPixel(5)));
-    QTest::mouseClick(plot.get(), Qt::LeftButton, Qt::NoModifier, onGraph);
-    plot->graph(0)->setData(QVector<double>{-5, 20}, QVector<double>{-5, 20});
-    connect(plot->xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged), plot.get(),
-            [] { QCoreApplication::processEvents(); }, Qt::SingleShotConnection);
-    plot->rescaleAxes();
-    QCOMPARE(clicks, 0);
-    QCoreApplication::processEvents();
-    QCOMPARE(clicks, 1);
-}
-
-void TestSignalDelivery::slotDeletesPlotOnResize_data()
-{
-    QTest::addColumn<bool>("byShow");
-    QTest::newRow("resize") << false;
-    QTest::newRow("show") << true;
-}
-
-void TestSignalDelivery::slotDeletesPlotOnResize()
-{
-    QFETCH(bool, byShow);
-    auto* plot = plotWithGraph();
-    const QPointer<QCustomPlot> alive(plot);
-    if (!byShow)
-    {
-        plot->show();
-        QVERIFY(QTest::qWaitForWindowExposed(plot));
-        QCoreApplication::processEvents();
-    }
-    bool ran = false;
-    connect(plot, &QCustomPlot::afterReplot, plot, [&ran, plot] {
-        ran = true;
-        delete plot;
-    });
-    if (byShow)
-        plot->show();
-    else
-        plot->resize(500, 400);
-    QVERIFY2(!ran, "an afterReplot slot ran inside the widget's own event");
-    QTRY_VERIFY(ran);
-    QVERIFY(!alive);
-}
-
 void TestSignalDelivery::deleteInsideOwnEventReportsMisuse()
 {
+    using Kind = QCPEmissionScope::Kind;
     gMisuses = 0;
     const auto previous = qcp::setMisuseHandler(countMisuse);
     {
         auto* plot = new QCustomPlot;
-        const QCPWidgetEventScope scope(plot);
+        const QCPEmissionScope scope(plot, Kind::WidgetEvent);
         delete plot;
     }
     const int insideEvent = gMisuses;
@@ -447,7 +286,7 @@ void TestSignalDelivery::deleteInsideOwnEventReportsMisuse()
         // A widget event nested under a method scope: processEvents() from a rangeChanged slot.
         auto* plot = new QCustomPlot;
         const QCPEmissionScope methodScope(plot);
-        const QCPWidgetEventScope nested(plot);
+        const QCPEmissionScope nested(plot, Kind::WidgetEvent);
         delete plot;
     }
     const int nestedEvent = gMisuses - insideEvent;
@@ -456,21 +295,21 @@ void TestSignalDelivery::deleteInsideOwnEventReportsMisuse()
         auto* plot = new QCustomPlot;
         const QCPEmissionScope methodScope(plot);
         {
-            const QCPWidgetEventScope closed(plot);
+            const QCPEmissionScope closed(plot, Kind::WidgetEvent);
         }
         delete plot;
     }
     {
         auto* plot = new QCustomPlot;
-        const QCPWidgetEventScope event(plot);
-        const QCPInputScope nestedInput(plot);
+        const QCPEmissionScope event(plot, Kind::WidgetEvent);
+        const QCPEmissionScope nestedInput(plot, Kind::Event);
         delete plot;
     }
     {
         // Closing a panel from a click slot stays allowed: Qt does not touch the widget after a
         // mouse handler returns.
         auto* plot = new QCustomPlot;
-        const QCPInputScope mouseScope(plot);
+        const QCPEmissionScope mouseScope(plot, Kind::Event);
         delete plot;
     }
     delete new QCustomPlot;
@@ -478,27 +317,6 @@ void TestSignalDelivery::deleteInsideOwnEventReportsMisuse()
     QCOMPARE(insideEvent, 1);
     QCOMPARE(nestedEvent, 1);
     QCOMPARE(gMisuses, 3);
-}
-
-void TestSignalDelivery::inputFlushPostedOnce()
-{
-    std::unique_ptr<QCustomPlot> plot(plotWithGraph());
-    plot->replot();
-    QCoreApplication::processEvents();
-    int clicks = 0;
-    connect(plot.get(), &QCustomPlot::plottableClick, plot.get(), [&clicks] { ++clicks; });
-    const QPoint onGraph(qRound(plot->xAxis->coordToPixel(5)),
-                         qRound(plot->yAxis->coordToPixel(5)));
-    MetaCallCounter counter;
-    QCoreApplication::instance()->installEventFilter(&counter);
-    QTest::mouseClick(plot.get(), Qt::LeftButton, Qt::NoModifier, onGraph);
-    for (int i = 0; i < 10; ++i)
-        plot->replot();
-    QCOMPARE(clicks, 0);
-    QCoreApplication::processEvents();
-    QCoreApplication::instance()->removeEventFilter(&counter);
-    QCOMPARE(counter.count, 1);
-    QCOMPARE(clicks, 1);
 }
 
 void TestSignalDelivery::replotFromReplotSignalIsIgnored_data()
@@ -523,4 +341,124 @@ void TestSignalDelivery::replotFromReplotSignalIsIgnored()
     QCOMPARE(replots, 1);
     QCOMPARE(deepest, 1);
     QCOMPARE(depth, 0);
+}
+
+void TestSignalDelivery::pendingSignalsDieWithThePlot()
+{
+    auto* plot = plotWithGraph();
+    QObject outlivesThePlot;
+    bool ran = false;
+    {
+        QCPEmissionScope scope(plot);
+        plot->deliver(&outlivesThePlot, [&ran] { ran = true; });
+        delete plot;
+    }
+    QVERIFY(!ran);
+}
+
+void TestSignalDelivery::slotDeletesPlotOnClick()
+{
+    auto* plot = plotWithGraph();
+    const QPointer<QCustomPlot> alive(plot);
+    plot->replot();
+    bool clicked = false;
+    connect(plot, &QCustomPlot::plottableClick, plot, [&clicked, plot] {
+        clicked = true;
+        delete plot;
+    });
+    QTest::mouseClick(plot, Qt::LeftButton, Qt::NoModifier, pixelOf(*plot, 5, 5));
+    QVERIFY(clicked);
+    QVERIFY(!alive);
+}
+
+void TestSignalDelivery::slotsRunBeforeEventReturns()
+{
+    std::unique_ptr<QCustomPlot> plot(plotWithGraph());
+    plot->setInteraction(QCP::iRangeDrag);
+    plot->replot();
+    bool ran = false;
+    QCPLayerable* handledBy = nullptr;
+    connect(plot.get(), &QCustomPlot::mousePress, plot.get(), [&] {
+        ran = true;
+        handledBy = plot->mMouseEventLayerable;
+    });
+    const QPoint offTheGraph = pixelOf(*plot, 8, 2);
+    QTest::mousePress(plot.get(), Qt::LeftButton, Qt::NoModifier, offTheGraph);
+    QVERIFY(ran);
+    QCOMPARE(handledBy, plot->axisRect());
+    QTest::mouseRelease(plot.get(), Qt::LeftButton, Qt::NoModifier, offTheGraph);
+}
+
+void TestSignalDelivery::wheelIgnoredInSlotReachesParent()
+{
+    WheelRecorder parent;
+    parent.resize(400, 300);
+    auto* plot = plotWithGraph();
+    plot->setParent(&parent);
+    // QCustomPlot sets it, as 2.x did; a plot in a scroll area clears it to pass wheels on.
+    plot->setAttribute(Qt::WA_NoMousePropagation, false);
+    plot->show();
+    parent.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&parent));
+    connect(plot, &QCustomPlot::mouseWheel, plot, [](QWheelEvent* event) { event->ignore(); });
+    const QPointF pos = plot->rect().center();
+    QWheelEvent wheel(pos, plot->mapToGlobal(pos), QPoint(), QPoint(0, 120), Qt::NoButton,
+                      Qt::NoModifier, Qt::NoScrollPhase, false);
+    QSpontaneKeyEvent::setSpontaneous(&wheel); // QApplication propagates spontaneous wheels only
+    QCoreApplication::instance()->notify(plot, &wheel);
+    QCOMPARE(parent.wheels, 1);
+}
+
+void TestSignalDelivery::nestedEventDeliversWhenItReturns()
+{
+    std::unique_ptr<QCustomPlot> plot(plotWithGraph());
+    plot->replot();
+    int clicks = 0;
+    QPoint clickedAt;
+    connect(plot.get(), &QCustomPlot::plottableClick, plot.get(),
+            [&](QCPAbstractPlottable*, int, QMouseEvent* event) {
+                ++clicks;
+                clickedAt = event->pos();
+            });
+    plot->graph(0)->setData(QVector<double>{-5, 20}, QVector<double>{-5, 20});
+    int clicksWhenTheEventReturned = -1;
+    QPoint onGraph;
+    connect(plot->xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged), plot.get(),
+            [&] {
+                onGraph = pixelOf(*plot, 5, 5);
+                QTest::mouseClick(plot.get(), Qt::LeftButton, Qt::NoModifier, onGraph);
+                clicksWhenTheEventReturned = clicks;
+            },
+            Qt::SingleShotConnection);
+    plot->rescaleAxes();
+    QCOMPARE(clicksWhenTheEventReturned, 1);
+    QCOMPARE(clickedAt, onGraph);
+}
+
+void TestSignalDelivery::replotSignalOfAWidgetEventRunsInsideIt_data()
+{
+    QTest::addColumn<bool>("byShow");
+    QTest::newRow("resize") << false;
+    QTest::newRow("show") << true;
+}
+
+void TestSignalDelivery::replotSignalOfAWidgetEventRunsInsideIt()
+{
+    QFETCH(bool, byShow);
+    std::unique_ptr<QCustomPlot> plot(plotWithGraph());
+    int runs = 0;
+    int runsOutsideWidgetEvent = 0;
+    connect(plot.get(), &QCustomPlot::afterReplot, plot.get(), [&] {
+        ++runs;
+        runsOutsideWidgetEvent += !plot->mEmissions.insideWidgetEvent();
+    });
+    if (byShow)
+        plot->show();
+    else
+    {
+        QResizeEvent resize(QSize(500, 400), plot->size());
+        QCoreApplication::sendEvent(plot.get(), &resize);
+    }
+    QVERIFY(runs > 0);
+    QVERIFY2(runsOutsideWidgetEvent == 0, "deleting the plot from this slot would not be reported");
 }

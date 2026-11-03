@@ -69,12 +69,6 @@ namespace
 {
 using qcp::guarded;
 
-template <typename Event>
-std::shared_ptr<Event> copyOf(const Event* event)
-{
-    return std::shared_ptr<Event>(event->clone());
-}
-
 QList<QPointer<QCPLayerable>> guardedLayerables(const QList<QCPLayer*>& layers)
 {
     QList<QPointer<QCPLayerable>> result;
@@ -118,43 +112,44 @@ QList<QPointer<QCPLayerable>> guardedLayerables(const QList<QCPLayer*>& layers)
 
   This signal is emitted when the QCustomPlot receives a mouse double click event.
 
-  Like every input signal, it is delivered on the next event-loop turn, after QCustomPlot has
-  handled the event (so a slot may delete the plot); \a event is a copy of the event.
+  Like every input signal, it is delivered when QCustomPlot has handled the event, before Qt goes on
+  with it, so a slot may delete the plot; \a event is the event itself.
 */
 
 /*! \fn void QCustomPlot::mousePress(QMouseEvent *event)
 
   This signal is emitted when the QCustomPlot receives a mouse press event.
 
-  Like every input signal, it is delivered on the next event-loop turn, after QCustomPlot has
-  handled the event (so a slot may delete the plot); \a event is a copy of the event. Unlike in
-  2.x, a slot can no longer change how this press drags (\ref QCPAxisRect::setRangeDragAxes
-  applies from the next press).
+  Like every input signal, it is delivered when QCustomPlot has handled the event, before Qt goes on
+  with it, so a slot may delete the plot; \a event is the event itself. Unlike in 2.x, a slot can
+  no longer change how this press drags (\ref QCPAxisRect::setRangeDragAxes applies from the next
+  press); an event filter on the plot sees the press first.
 */
 
 /*! \fn void QCustomPlot::mouseMove(QMouseEvent *event)
 
   This signal is emitted when the QCustomPlot receives a mouse move event.
 
-  Like every input signal, it is delivered on the next event-loop turn, after QCustomPlot has
-  handled the event (so a slot may delete the plot); \a event is a copy of the event.
+  Like every input signal, it is delivered when QCustomPlot has handled the event, before Qt goes on
+  with it, so a slot may delete the plot; \a event is the event itself.
 */
 
 /*! \fn void QCustomPlot::mouseRelease(QMouseEvent *event)
 
   This signal is emitted when the QCustomPlot receives a mouse release event.
 
-  Like every input signal, it is delivered on the next event-loop turn, after QCustomPlot has
-  handled the event (so a slot may delete the plot); \a event is a copy of the event.
+  Like every input signal, it is delivered when QCustomPlot has handled the event, before Qt goes on
+  with it, so a slot may delete the plot; \a event is the event itself.
 */
 
 /*! \fn void QCustomPlot::mouseWheel(QMouseEvent *event)
 
   This signal is emitted when the QCustomPlot receives a mouse wheel event.
 
-  Like every input signal, it is delivered on the next event-loop turn, after QCustomPlot has
-  handled the event (so a slot may delete the plot); \a event is a copy of the event. Unlike in
-  2.x, a slot can no longer change how this wheel step zooms.
+  Like every input signal, it is delivered when QCustomPlot has handled the event, before Qt goes on
+  with it, so a slot may delete the plot; \a event is the event itself. Unlike in 2.x, a slot can
+  no longer change how this wheel step zooms, but \c event->ignore() now passes the wheel on to
+  the parent widget (once Qt::WA_NoMousePropagation, which QCustomPlot sets, is cleared).
 */
 
 /*! \fn void QCustomPlot::plottableClick(QCPAbstractPlottable *plottable, int dataIndex, QMouseEvent
@@ -535,8 +530,8 @@ QCustomPlot::~QCustomPlot()
 {
     mBeingDestroyed = true;
     if (mEmissions.insideWidgetEvent())
-        qcp::reportMisuse(Q_FUNC_INFO, "QCustomPlot deleted inside its own event handler (a "
-                                       "beforeReplot/afterLayout slot?): use deleteLater()");
+        qcp::reportMisuse(Q_FUNC_INFO, "QCustomPlot deleted inside its own resize, show or "
+                                       "paint event (a replot signal's slot?): use deleteLater()");
     mEmissions.discard(); // a plot being destroyed delivers nothing it held back
     // Release paint buffer GPU resources before QRhiWidget tears down the RHI
     qDeleteAll(std::exchange(mPlottableRhiLayers, {}));
@@ -2887,7 +2882,8 @@ QSize QCustomPlot::sizeHint() const
 */
 void QCustomPlot::initialize(QRhiCommandBuffer* cb)
 {
-    const QCPWidgetEventScope scope(this); // called from paintEvent: replots here deliver next turn
+    // The paint event opened one already; grabFramebuffer() runs this outside any event.
+    const QCPEmissionScope scope(this, QCPEmissionScope::Kind::WidgetEvent);
     PROFILE_HERE_N("QCustomPlot::initialize");
 
     // QRhiWidget calls initialize() on resize (when the backing texture is recreated).
@@ -3309,7 +3305,8 @@ void QCustomPlot::executeRenderPass(QRhiCommandBuffer* cb, QRhiResourceUpdateBat
 
 void QCustomPlot::render(QRhiCommandBuffer* cb)
 {
-    const QCPWidgetEventScope scope(this); // called from paintEvent: replots here deliver next turn
+    // The paint event opened one already; grabFramebuffer() runs this outside any event.
+    const QCPEmissionScope scope(this, QCPEmissionScope::Kind::WidgetEvent);
     PROFILE_FRAME_MARK;
     PROFILE_HERE_N("QCustomPlot::render");
 
@@ -3385,7 +3382,6 @@ void QCustomPlot::releaseCompositeResources()
 */
 void QCustomPlot::resizeEvent([[maybe_unused]] QResizeEvent* event)
 {
-    const QCPWidgetEventScope scope(this);
     // resize and repaint the buffer:
     setViewport(rect());
     if (mSpanRhiLayer)
@@ -3404,7 +3400,6 @@ void QCustomPlot::resizeEvent([[maybe_unused]] QResizeEvent* event)
 */
 void QCustomPlot::showEvent(QShowEvent* event)
 {
-    const QCPWidgetEventScope scope(this);
     QRhiWidget::showEvent(event);
     mWasShown = true;
     if (std::exchange(mReplotSkippedWhileHidden, false))
@@ -3422,9 +3417,8 @@ void QCustomPlot::showEvent(QShowEvent* event)
 */
 void QCustomPlot::mouseDoubleClickEvent(QMouseEvent* event)
 {
-    const QCPInputScope scope(this);
     const QPointer<QCustomPlot> alive(this); // a layerable's slot may delete the plot
-    deliver(this, [this, e = copyOf(event)] { emit mouseDoubleClick(e.get()); });
+    deliver(this, [this, event] { emit mouseDoubleClick(event); });
     mMouseHasMoved = false;
     mMousePressPos = event->pos();
 
@@ -3467,9 +3461,8 @@ void QCustomPlot::mouseDoubleClickEvent(QMouseEvent* event)
 */
 void QCustomPlot::mousePressEvent(QMouseEvent* event)
 {
-    const QCPInputScope scope(this);
     const QPointer<QCustomPlot> alive(this); // a layerable's slot may delete the plot
-    deliver(this, [this, e = copyOf(event)] { emit mousePress(e.get()); });
+    deliver(this, [this, event] { emit mousePress(event); });
     // save some state to tell in releaseEvent whether it was a click:
     mMouseHasMoved = false;
     mMousePressPos = event->pos();
@@ -3553,8 +3546,7 @@ void QCustomPlot::mousePressEvent(QMouseEvent* event)
 */
 void QCustomPlot::mouseMoveEvent(QMouseEvent* event)
 {
-    const QCPInputScope scope(this);
-    deliver(this, [this, e = copyOf(event)] { emit mouseMove(e.get()); });
+    deliver(this, [this, event] { emit mouseMove(event); });
 
     if (!mMouseHasMoved && (mMousePressPos - event->pos()).manhattanLength() > 3)
         mMouseHasMoved = true; // moved too far from mouse press position, don't handle as click on
@@ -3591,10 +3583,9 @@ void QCustomPlot::mouseMoveEvent(QMouseEvent* event)
 */
 void QCustomPlot::mouseReleaseEvent(QMouseEvent* event)
 {
-    const QCPInputScope scope(this);
     // Every step below can reach a slot that deletes the plot.
     const QPointer<QCustomPlot> alive(this);
-    deliver(this, [this, e = copyOf(event)] { emit mouseRelease(e.get()); });
+    deliver(this, [this, event] { emit mouseRelease(event); });
     if (alive && !mMouseHasMoved) // mouse hasn't moved (much) between press and release
         releaseAsClick(event);
     if (alive)
@@ -3633,41 +3624,39 @@ void QCustomPlot::emitClickSignal(QMouseEvent* event)
 {
     QCPLayerable* clicked = std::exchange(mMouseSignalLayerable, nullptr);
     const QVariant details = mMouseSignalLayerableDetails;
-    const auto e = copyOf(event);
     if (auto* ap = qobject_cast<QCPAbstractPlottable*>(clicked))
-        deliver(ap, [this, ap, i = clickedDataIndex(details), e] {
-            emit plottableClick(ap, i, e.get());
+        deliver(ap, [this, ap, i = clickedDataIndex(details), event] {
+            emit plottableClick(ap, i, event);
         });
     else if (auto* ax = qobject_cast<QCPAxis*>(clicked))
-        deliver(ax, [this, ax, part = details.value<QCPAxis::SelectablePart>(), e] {
-            emit axisClick(ax, part, e.get());
+        deliver(ax, [this, ax, part = details.value<QCPAxis::SelectablePart>(), event] {
+            emit axisClick(ax, part, event);
         });
     else if (auto* ai = qobject_cast<QCPAbstractItem*>(clicked))
-        deliver(ai, [this, ai, e] { emit itemClick(ai, e.get()); });
+        deliver(ai, [this, ai, event] { emit itemClick(ai, event); });
     else if (auto* lg = qobject_cast<QCPLegend*>(clicked))
-        deliver(lg, [this, lg, e] { emit legendClick(lg, nullptr, e.get()); });
+        deliver(lg, [this, lg, event] { emit legendClick(lg, nullptr, event); });
     else if (auto* li = qobject_cast<QCPAbstractLegendItem*>(clicked))
-        deliver(li, [this, li, e] { emit legendClick(li->parentLegend(), li, e.get()); });
+        deliver(li, [this, li, event] { emit legendClick(li->parentLegend(), li, event); });
 }
 
 void QCustomPlot::emitDoubleClickSignal(QCPLayerable* clicked, const QVariant& details,
                                         QMouseEvent* event)
 {
-    const auto e = copyOf(event);
     if (auto* ap = qobject_cast<QCPAbstractPlottable*>(clicked))
-        deliver(ap, [this, ap, i = clickedDataIndex(details), e] {
-            emit plottableDoubleClick(ap, i, e.get());
+        deliver(ap, [this, ap, i = clickedDataIndex(details), event] {
+            emit plottableDoubleClick(ap, i, event);
         });
     else if (auto* ax = qobject_cast<QCPAxis*>(clicked))
-        deliver(ax, [this, ax, part = details.value<QCPAxis::SelectablePart>(), e] {
-            emit axisDoubleClick(ax, part, e.get());
+        deliver(ax, [this, ax, part = details.value<QCPAxis::SelectablePart>(), event] {
+            emit axisDoubleClick(ax, part, event);
         });
     else if (auto* ai = qobject_cast<QCPAbstractItem*>(clicked))
-        deliver(ai, [this, ai, e] { emit itemDoubleClick(ai, e.get()); });
+        deliver(ai, [this, ai, event] { emit itemDoubleClick(ai, event); });
     else if (auto* lg = qobject_cast<QCPLegend*>(clicked))
-        deliver(lg, [this, lg, e] { emit legendDoubleClick(lg, nullptr, e.get()); });
+        deliver(lg, [this, lg, event] { emit legendDoubleClick(lg, nullptr, event); });
     else if (auto* li = qobject_cast<QCPAbstractLegendItem*>(clicked))
-        deliver(li, [this, li, e] { emit legendDoubleClick(li->parentLegend(), li, e.get()); });
+        deliver(li, [this, li, event] { emit legendDoubleClick(li->parentLegend(), li, event); });
 }
 
 // Finishes the selection rect (the action runs from its accepted signal), or the captured drag.
@@ -3679,12 +3668,35 @@ void QCustomPlot::releaseDrag(QMouseEvent* event)
         target->mouseReleaseEvent(event, QPointF(mMousePressPos));
 }
 
+namespace
+{
+QCPEmissionScope::Kind scopeKindOf(QEvent::Type type)
+{
+    switch (type)
+    {
+        case QEvent::Resize:
+        case QEvent::Show:
+        case QEvent::Paint:
+            return QCPEmissionScope::Kind::WidgetEvent;
+        default:
+            return QCPEmissionScope::Kind::Event;
+    }
+}
+} // namespace
+
 /*! \internal
 
-  Event handler for mouse wheel events. First, the \ref mouseWheel signal is emitted. Then
-  determines the affected layerable and forwards the event to it.
+  The signals the handlers queue are delivered as this returns: after QCustomPlot handled the
+  event, before Qt goes on with it. Their slots get the event itself, so \c ignore() in a slot
+  lets the event go on to the parent widget.
 */
 bool QCustomPlot::event(QEvent* event)
+{
+    const QCPEmissionScope scope(this, scopeKindOf(event->type()));
+    return handleEvent(event);
+}
+
+bool QCustomPlot::handleEvent(QEvent* event)
 {
     if (mInteractions.testFlag(QCP::iGestures))
     {
@@ -3768,6 +3780,8 @@ void QCustomPlot::forwardTouchAsMouse(QEvent::Type type, const QEventPoint& poin
                       Qt::LeftButton, release ? Qt::NoButton : Qt::LeftButton, touch->modifiers(),
                       QPointingDevice::primaryPointingDevice());
     mTouch.mouseDown = !release; // first: the mouse handlers may delete the plot
+    // Delivers before the event on this stack dies.
+    const QCPEmissionScope scope(this, QCPEmissionScope::Kind::Event);
     if (type == QEvent::MouseButtonPress)
         mousePressEvent(&mouse);
     else if (release)
@@ -3827,10 +3841,14 @@ bool QCustomPlot::nativeGestureEvent(QNativeGestureEvent* event)
     return true;
 }
 
+/*! \internal
+
+  Event handler for mouse wheel events. First, the \ref mouseWheel signal is emitted. Then
+  determines the affected layerable and forwards the event to it.
+*/
 void QCustomPlot::wheelEvent(QWheelEvent* event)
 {
-    const QCPInputScope scope(this);
-    deliver(this, [this, e = copyOf(event)] { emit mouseWheel(e.get()); });
+    deliver(this, [this, event] { emit mouseWheel(event); });
 
     // forward event to layerable under cursor:
     for (const auto& candidate : guarded(layerableListAt(event->position(), false)))
@@ -3854,7 +3872,6 @@ void QCustomPlot::wheelEvent(QWheelEvent* event)
 */
 void QCustomPlot::keyPressEvent(QKeyEvent* event)
 {
-    const QCPInputScope scope(this);
     // A rubber band being dragged gets the key first: Escape cancels it.
     if (mSelectionRect && mSelectionRect->isActive())
     {

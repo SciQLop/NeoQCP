@@ -109,9 +109,21 @@ void TestGestures::oneFingerTapIsAClick()
     const QPoint c = centre().toPoint();
     QTest::touchEvent(mPlot, mTouchScreen.get()).press(0, c);
     QTest::touchEvent(mPlot, mTouchScreen.get()).release(0, c);
-    QCoreApplication::processEvents(); // input signals arrive on the next event-loop turn
     QCOMPARE(clicks.count(), 1);
     QCOMPARE(mPlot->xAxis->range(), QCPRange(0, 100));
+}
+
+// The mouse event a touch is forwarded as lives on the stack of the touch handler.
+void TestGestures::tapSlotReadsItsMouseEvent()
+{
+    mPlot->setInteraction(QCP::iGestures);
+    QPointF releasedAt;
+    connect(mPlot, &QCustomPlot::mouseRelease, mPlot,
+            [&releasedAt](QMouseEvent* event) { releasedAt = event->position(); });
+    const QPoint c = centre().toPoint();
+    QTest::touchEvent(mPlot, mTouchScreen.get()).press(0, c);
+    QTest::touchEvent(mPlot, mTouchScreen.get()).release(0, c);
+    QCOMPARE(releasedAt, QPointF(c));
 }
 
 // Spreading two fingers from 60 to 180 px apart zooms in 3x, whatever the number of touch events.

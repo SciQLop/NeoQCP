@@ -298,7 +298,6 @@ DOC_CODE(interactions_locate_on_move)
     const QPointF pos(customPlot->xAxis->coordToPixel(1), customPlot->yAxis->coordToPixel(1));
     QMouseEvent move(QEvent::MouseMove, pos, pos, Qt::NoButton, Qt::NoButton, Qt::NoModifier);
     QApplication::sendEvent(customPlot, &move);
-    QApplication::processEvents(); // input signals arrive on the next event-loop turn
     if (statusBar->currentMessage() != "t = 1, v = 1")
         qFatal("interactions_locate_on_move: got \"%s\"", qPrintable(statusBar->currentMessage()));
 }
