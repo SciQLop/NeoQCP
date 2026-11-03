@@ -1,4 +1,5 @@
 #include "test-repaint.h"
+#include "plottables/plottable-multigraph.h"
 #include <QTemporaryDir>
 #include <QtWidgets/qtestsupport_widgets.h>
 #include <functional>
@@ -11,6 +12,7 @@ std::unique_ptr<QCustomPlot> settledPlot()
     auto plot = std::make_unique<QCustomPlot>();
     plot->resize(400, 300);
     plot->addGraph()->setData(QVector<double>{0, 10}, QVector<double>{0, 10});
+    plot->graph(0)->setPen(QPen(Qt::red, 4));
     plot->xAxis->setRange(0, 10);
     plot->yAxis->setRange(0, 10);
     plot->replot();
@@ -70,6 +72,28 @@ public:
     using PendingStub::PendingStub;
     bool canProduceContent() const override { return false; }
 };
+
+// Fills its axis rect with its pen colour. A non-null stall makes its layer translate on replot.
+class FillStub : public PendingStub
+{
+public:
+    using PendingStub::PendingStub;
+    QPointF stall;
+    bool hasPendingData() const override { return false; }
+    QPointF stallPixelOffset() const override { return stall; }
+    void draw(QCPPainter* painter) override
+    {
+        painter->fillRect(mKeyAxis->axisRect()->rect(), pen().color());
+    }
+};
+
+const QColor kBlue(0, 0, 255);
+
+void waitUntilSettled(QCustomPlot& plot)
+{
+    QTRY_VERIFY(!plot.isRepaintQueued());
+    QCoreApplication::processEvents();
+}
 
 int pixelsOfColor(const QImage& image, const QColor& color)
 {
@@ -136,7 +160,10 @@ void TestRepaint::dirtyAfterDrawRepaintsNextTurn()
             {
                 replottingAtEntry << plot->isReplotting();
                 if (++count == 1)
+                {
+                    plot->graph(0)->setPen(QPen(kBlue, 4));
                     plot->graph(0)->markDirty();
+                }
             });
     plot->replot();
     QCOMPARE(count, 1);
@@ -146,6 +173,9 @@ void TestRepaint::dirtyAfterDrawRepaintsNextTurn()
         QCoreApplication::processEvents();
     QCOMPARE(count, 2);
     QCOMPARE(replottingAtEntry, (QList<bool>{false, false}));
+    const QImage screen = screenOf(plot.get());
+    QVERIFY(pixelsOfColor(screen, kBlue) > 50);
+    QCOMPARE(pixelsOfColor(screen, Qt::red), 0);
 }
 
 void TestRepaint::markDuringDrawRepaintsNextTurn()
@@ -155,8 +185,10 @@ void TestRepaint::markDuringDrawRepaintsNextTurn()
     int draws = 0;
     hook->onDraw = [&]
     {
-        if (++draws == 1)
-            plot->graph(0)->markDirty(); // "main" is drawn before "overlay"
+        if (++draws > 1)
+            return;
+        plot->graph(0)->setPen(QPen(kBlue, 4));
+        plot->graph(0)->markDirty(); // "main" is drawn before "overlay"
     };
     QSignalSpy after(plot.get(), &QCustomPlot::afterReplot);
     plot->replot();
@@ -166,6 +198,51 @@ void TestRepaint::markDuringDrawRepaintsNextTurn()
     for (int i = 0; i < 3; ++i)
         QCoreApplication::processEvents();
     QCOMPARE(after.count(), 2);
+    const QImage screen = screenOf(plot.get());
+    QVERIFY(pixelsOfColor(screen, kBlue) > 50);
+    QCOMPARE(pixelsOfColor(screen, Qt::red), 0);
+}
+
+void TestRepaint::markAfterDrawSurvivesAnotherDirtyBuffer()
+{
+    auto plot = settledPlot();
+    auto* hook = new DrawHook(plot.get(), QStringLiteral("overlay"));
+    int draws = 0;
+    hook->onDraw = [&]
+    {
+        if (++draws > 1)
+            return;
+        plot->graph(0)->setPen(QPen(kBlue, 4));
+        plot->graph(0)->markDirty();
+    };
+    int replots = 0;
+    connect(plot.get(), &QCustomPlot::afterReplot, plot.get(),
+            [&]
+            {
+                if (++replots == 1)
+                    hook->markDirty();
+            });
+    plot->replot();
+    waitUntilSettled(*plot);
+    const QImage screen = screenOf(plot.get());
+    QVERIFY(pixelsOfColor(screen, kBlue) > 50);
+    QCOMPARE(pixelsOfColor(screen, Qt::red), 0);
+}
+
+void TestRepaint::appearanceChangeIsNotHiddenByTranslation()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    auto* fill = new FillStub(plot.xAxis, plot.yAxis);
+    fill->setPen(QPen(Qt::red));
+    plot.replot();
+    fill->stall = QPointF(5, 0); // a pan in progress: the layer would shift its old frame
+    fill->setPen(QPen(kBlue));
+    fill->markDirty();
+    waitUntilSettled(plot);
+    const QImage screen = screenOf(&plot);
+    QVERIFY(pixelsOfColor(screen, kBlue) > 1000);
+    QCOMPARE(pixelsOfColor(screen, Qt::red), 0);
 }
 
 void TestRepaint::requestDuringReplotRunsNextTurn()
@@ -222,12 +299,17 @@ void TestRepaint::hiddenPlotQueuesNoVisibleWork()
     for (int i = 0; i < 10 && plot->isRepaintQueued(); ++i)
         QCoreApplication::processEvents();
     QSignalSpy after(plot.get(), &QCustomPlot::afterReplot);
+    plot->graph(0)->setPen(QPen(kBlue, 4));
     plot->graph(0)->markDirty();
     QCoreApplication::processEvents();
     QCOMPARE(after.count(), 0);
     QVERIFY(!plot->isRepaintQueued());
     plot->show();
     QTRY_VERIFY(after.count() > 0);
+    waitUntilSettled(*plot);
+    const QImage screen = screenOf(plot.get());
+    QVERIFY(pixelsOfColor(screen, kBlue) > 50);
+    QCOMPARE(pixelsOfColor(screen, Qt::red), 0);
 }
 
 void TestRepaint::markDirtyWithoutPlotIsNoOp()
@@ -294,8 +376,6 @@ void TestRepaint::exportSettlesFirst()
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
     auto plot = settledPlot();
-    plot->graph(0)->setPen(QPen(Qt::red, 4));
-    plot->replot();
     auto* pending = new PendingStub(plot->xAxis, plot->yAxis);
     plot->setDataSwapDebounceMs(10000);
     plot->requestDataSwap();
@@ -306,7 +386,7 @@ void TestRepaint::exportSettlesFirst()
     const QImage image = exportWith(*plot, how, dir.path());
 
     QCOMPARE(pending->commits, 1);
-    QVERIFY(!plot->isRepaintQueued());
+    QVERIFY(plot->isRepaintQueued()); // the screen catches up next turn
     if (how == QLatin1String("savePdf"))
         QVERIFY(QFileInfo(dir.path() + QStringLiteral("/plot.pdf")).size() > 0);
     else
@@ -317,3 +397,49 @@ void TestRepaint::exportSettlesFirst()
     }
 }
 
+
+void TestRepaint::exportShowsReadyStagedData()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    auto* mg = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    mg->setData(std::vector<double>{0, 10}, std::vector<std::vector<double>>{{2, 2}});
+    mg->setComponentPens({QPen(Qt::red, 4)});
+    plot.xAxis->setRange(0, 10);
+    plot.yAxis->setRange(0, 10);
+    plot.replot();
+    plot.setDataSwapDebounceMs(10000);
+    using Source = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
+    mg->setDataSource(std::make_shared<Source>(std::vector<double>{0, 10},
+                                               std::vector<std::vector<double>>{{8, 8}}));
+    QVERIFY(mg->hasPendingData());
+
+    const QImage image = plot.toPixmap(400, 300).toImage();
+
+    QVERIFY(!mg->hasPendingData());
+    QVERIFY(plot.isRepaintQueued());
+    const int x = qRound(plot.xAxis->coordToPixel(5));
+    const auto redNear = [&](double value)
+    {
+        const int y = qRound(plot.yAxis->coordToPixel(value));
+        int red = 0;
+        for (int dy = -2; dy <= 2; ++dy)
+            red += pixelsOfColor(image.copy(x, y + dy, 1, 1), Qt::red);
+        return red;
+    };
+    QVERIFY(redNear(8) > 0);
+    QCOMPARE(redNear(2), 0);
+}
+
+QImage TestRepaint::screenOf(QCustomPlot* plot)
+{
+    if (plot->mRhi)
+        return plot->grabFramebuffer();
+    QImage image(plot->viewport().size(), QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::white);
+    QCPPainter painter(&image);
+    for (const auto& buffer : plot->mPaintBuffers)
+        buffer->draw(&painter);
+    painter.end();
+    return image;
+}

@@ -93,6 +93,8 @@ public:
 
     // non-virtual methods:
     void replot();
+    // Marks the layer for the next turn's repaint; a pan may still shift its old frame. GUI thread
+    // only.
     void markDirty();
 
 protected:
@@ -179,7 +181,8 @@ public:
 
     // non-property methods:
     [[nodiscard]] bool realVisibility() const;
-    // Schedules a repaint of this layerable's layer; a no-op without a plot or a layer.
+    // Schedules a full repaint of this layerable's layer next turn; a no-op without a plot or a
+    // layer. GUI thread only.
     void markDirty();
 
 signals:

@@ -2414,6 +2414,8 @@ bool QCustomPlot::commitEveryPendingSource()
 
 void QCustomPlot::requestRepaint()
 {
+    if (mBeingDestroyed)
+        return;
     if (mReplotting)
         mRepaintAskedDuringReplot = true;
     else
@@ -2440,19 +2442,33 @@ void QCustomPlot::scheduleRepaint()
     });
 }
 
+// Exports draw the model directly (draw() lays out first), so the screen's queued repaint is not
+// needed: it would draw a second time, at the widget's size. The screen catches up next turn.
 void QCustomPlot::settle()
 {
     const QCPEmissionScope scope(this);
     if (mBeingDestroyed || mReplotting)
         return;
+    keepNotificationLayerOnTop();
     if (mDataSwapTimer.isActive())
     {
         mDataSwapTimer.stop();
         if (commitEveryPendingSource())
             scheduleRepaint();
     }
-    if (mReplotQueued)
-        replot();
+}
+
+void QCustomPlot::keepNotificationLayerOnTop()
+{
+    if (!mOverlay)
+        return;
+    if (auto* notifLayer = layer(QLatin1String("notification"));
+        notifLayer && notifLayer != mLayers.last())
+    {
+        mLayers.removeOne(notifLayer);
+        mLayers.append(notifLayer);
+        updateLayerIndices();
+    }
 }
 
 bool QCustomPlot::replotDeferredWhileHidden() const
@@ -2510,15 +2526,7 @@ void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
         return;
     mReplotting = true;
     mRepaintAskedDuringReplot = false;
-
-    if (mOverlay) {
-        if (auto* notifLayer = layer(QLatin1String("notification"));
-            notifLayer && notifLayer != mLayers.last()) {
-            mLayers.removeOne(notifLayer);
-            mLayers.append(notifLayer);
-            updateLayerIndices();
-        }
-    }
+    keepNotificationLayerOnTop();
 
     QElapsedTimer replotTimer;
     replotTimer.start();

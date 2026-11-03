@@ -306,6 +306,8 @@ void QCPLayer::markDirty()
 
 void QCPLayer::noteDirtied()
 {
+    if (!mParentPlot)
+        return;
     mDirtyGeneration = ++mParentPlot->mPaintGeneration;
     mParentPlot->scheduleRepaint();
 }
@@ -571,14 +573,13 @@ QCPLayerable::~QCPLayerable()
     }
 }
 
+// Invalidates rather than dirties: an appearance change must be drawn, never hidden by a pan
+// shifting the layer's old frame (QCPLayer::markDirty, for range changes, allows that).
 void QCPLayerable::markDirty()
 {
     if (!mParentPlot || !mLayer)
         return;
-    if (mLayer->mode() == QCPLayer::lmBuffered)
-        mLayer->markDirty();
-    else
-        mLayer->invalidatePaintBuffer();
+    mLayer->invalidatePaintBuffer();
 }
 
 /*!

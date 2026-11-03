@@ -104,3 +104,10 @@ composite happen in `render()`, which an offscreen benchmark does not run).
 | QCPItems_Replot10k | 0.13 | 0.13 | 0.13 / 0.13 / 0.13 | 1.00 |
 | QCPAxisRects_Stack8_Replot | 1.8 | 1.8 | 1.8 / 1.8 / 1.8 | 1.00 |
 | QCPPlots_Stack8_Replot | 0.26 | 0.26 | 0.26 / 0.26 / 0.26 | 1.00 |
+
+## Milestone 2 Task 1 re-measure (2026-11-03)
+
+- QCPGraph_AddDataMixedUnsorted, after the Task 1 fix round, three sequential runs of `-median 5`
+  for this row only: 29 / 29 / 29 ms. Load average at each start: 1.60, 1.56, 1.56 (1 min). That
+  matches the baseline (29) and the end of milestone 1 (29). The 33 ms seen once in the Task 1
+  report came from a loaded machine (load about 3.8).

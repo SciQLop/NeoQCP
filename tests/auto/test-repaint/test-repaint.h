@@ -8,6 +8,8 @@ private slots:
     void markDirtySchedulesOneRepaint();
     void dirtyAfterDrawRepaintsNextTurn();
     void markDuringDrawRepaintsNextTurn();
+    void markAfterDrawSurvivesAnotherDirtyBuffer();
+    void appearanceChangeIsNotHiddenByTranslation();
     void requestDuringReplotRunsNextTurn();
     void afterReplotSlotDirtyingEveryTimeDoesNotStarve();
     void hiddenPlotQueuesNoVisibleWork();
@@ -17,4 +19,9 @@ private slots:
     void syncReplotCancelsTheQueuedOne();
     void exportSettlesFirst_data();
     void exportSettlesFirst();
+    void exportShowsReadyStagedData();
+
+private:
+    // What the plot shows: its paint buffers composed, or the framebuffer under RHI.
+    static QImage screenOf(QCustomPlot* plot);
 };

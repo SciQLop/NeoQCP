@@ -234,11 +234,14 @@ public:
     [[nodiscard]] bool isBeingDestroyed() const { return mBeingDestroyed; }
     [[nodiscard]] bool isReplotting() const { return mReplotting; }
     // Schedules one queued replot for the next event-loop turn; requests and layer marks coalesce
-    // into it. Asked during a replot, it runs in the turn after that replot.
+    // into it. Asked during a replot, it runs in the turn after that replot. GUI thread only.
     void requestRepaint();
+    // False also while a hidden plot owes a change: it is drawn when the plot shows again, and
+    // nothing is queued meanwhile (setSkipReplotsWhenHidden).
     [[nodiscard]] bool isRepaintQueued() const { return mReplotQueued; }
-    // The export barrier: commits pending data swaps and runs a queued repaint now, so an export
-    // shows the current state. Does not wait for worker-thread pipelines.
+    // The export barrier, run first by every export: commits pending data swaps that are ready, so
+    // the export shows the newest data. Does not wait for worker-thread pipelines, and does not
+    // repaint the screen (that follows next turn).
     void settle();
     // overlay:
     QCPOverlay* overlay();
@@ -453,6 +456,7 @@ protected:
     bool mRepaintAskedDuringReplot = false;
     quint64 mRepaintTicket = 0;
     void scheduleRepaint();
+    void keepNotificationLayerOnTop();
     [[nodiscard]] bool replotDeferredWhileHidden() const;
     bool remarkLayersDirtiedAfterDraw();
     bool mSkipReplotsWhenHidden = false;
@@ -579,6 +583,7 @@ protected:
     friend class QCPLayerable;
     friend class QCPEmissionScope;
     friend class TestSignalDelivery;
+    friend class TestRepaint;
 };
 Q_DECLARE_METATYPE(QCustomPlot::LayerInsertMode)
 Q_DECLARE_METATYPE(QCustomPlot::RefreshPriority)

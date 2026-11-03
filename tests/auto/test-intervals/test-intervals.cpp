@@ -395,9 +395,6 @@ void TestIntervals::barsRebuildOnlyWhenTheViewChanges()
 {
     QCPLaneLayout layout;
     auto* iv = twoBars(mPlot, &layout);
-    // An export first draws the queued on-screen repaint: give the never-shown widget the export's
-    // size, or that repaint and the export build for two different axis rects.
-    mPlot->setViewport(QRect(0, 0, 400, 300));
     mPlot->toPixmap(400, 300);
     const auto builds = iv->buildCount();
     mPlot->toPixmap(400, 300);
