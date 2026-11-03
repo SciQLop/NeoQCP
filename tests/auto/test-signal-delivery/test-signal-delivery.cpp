@@ -31,6 +31,23 @@ QList<QCPLayerable*> layerablesOnLayers(const QCustomPlot& plot)
         result += plot.layer(i)->children();
     return result;
 }
+
+int gMisuses = 0;
+void countMisuse(const char*, const char*) { ++gMisuses; }
+
+class MetaCallCounter : public QObject
+{
+public:
+    int count = 0;
+
+protected:
+    bool eventFilter(QObject* watched, QEvent* event) override
+    {
+        if (watched == QCoreApplication::instance() && event->type() == QEvent::MetaCall)
+            ++count;
+        return false;
+    }
+};
 } // namespace
 
 void TestSignalDelivery::nestedScopeDeliversAtOutermost()
@@ -414,4 +431,54 @@ void TestSignalDelivery::slotDeletesPlotOnResize()
     QVERIFY2(!ran, "an afterReplot slot ran inside the widget's own event");
     QTRY_VERIFY(ran);
     QVERIFY(!alive);
+}
+
+void TestSignalDelivery::deleteInsideOwnEventReportsMisuse()
+{
+    gMisuses = 0;
+    const auto previous = qcp::setMisuseHandler(countMisuse);
+    {
+        auto* plot = new QCustomPlot;
+        const QCPWidgetEventScope scope(plot);
+        delete plot;
+    }
+    const int insideEvent = gMisuses;
+    {
+        auto* plot = new QCustomPlot;
+        const QCPEmissionScope methodScope(plot);
+        const QCPWidgetEventScope nested(plot);
+        delete plot;
+    }
+    {
+        // Closing a panel from a click slot stays allowed: Qt does not touch the widget after a
+        // mouse handler returns.
+        auto* plot = new QCustomPlot;
+        const QCPInputScope mouseScope(plot);
+        delete plot;
+    }
+    delete new QCustomPlot;
+    qcp::setMisuseHandler(previous);
+    QCOMPARE(insideEvent, 1);
+    QCOMPARE(gMisuses, 1);
+}
+
+void TestSignalDelivery::inputFlushPostedOnce()
+{
+    std::unique_ptr<QCustomPlot> plot(plotWithGraph());
+    plot->replot();
+    QCoreApplication::processEvents();
+    int clicks = 0;
+    connect(plot.get(), &QCustomPlot::plottableClick, plot.get(), [&clicks] { ++clicks; });
+    const QPoint onGraph(qRound(plot->xAxis->coordToPixel(5)),
+                         qRound(plot->yAxis->coordToPixel(5)));
+    MetaCallCounter counter;
+    QCoreApplication::instance()->installEventFilter(&counter);
+    QTest::mouseClick(plot.get(), Qt::LeftButton, Qt::NoModifier, onGraph);
+    for (int i = 0; i < 10; ++i)
+        plot->replot();
+    QCOMPARE(clicks, 0);
+    QCoreApplication::processEvents();
+    QCoreApplication::instance()->removeEventFilter(&counter);
+    QCOMPARE(counter.count, 1);
+    QCOMPARE(clicks, 1);
 }

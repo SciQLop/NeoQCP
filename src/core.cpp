@@ -534,6 +534,9 @@ QCustomPlot::QCustomPlot(QWidget* parent)
 QCustomPlot::~QCustomPlot()
 {
     mBeingDestroyed = true;
+    if (mEmissions.insideWidgetEvent())
+        qcp::reportMisuse(Q_FUNC_INFO, "QCustomPlot deleted inside its own event handler (a "
+                                       "beforeReplot/afterLayout slot?): use deleteLater()");
     mEmissions.discard(); // a plot being destroyed delivers nothing it held back
     // Release paint buffer GPU resources before QRhiWidget tears down the RHI
     qDeleteAll(std::exchange(mPlottableRhiLayers, {}));
@@ -2882,7 +2885,7 @@ QSize QCustomPlot::sizeHint() const
 */
 void QCustomPlot::initialize(QRhiCommandBuffer* cb)
 {
-    const QCPInputScope scope(this); // called from paintEvent: replots here deliver next turn
+    const QCPWidgetEventScope scope(this); // called from paintEvent: replots here deliver next turn
     PROFILE_HERE_N("QCustomPlot::initialize");
 
     // QRhiWidget calls initialize() on resize (when the backing texture is recreated).
@@ -3304,7 +3307,7 @@ void QCustomPlot::executeRenderPass(QRhiCommandBuffer* cb, QRhiResourceUpdateBat
 
 void QCustomPlot::render(QRhiCommandBuffer* cb)
 {
-    const QCPInputScope scope(this); // called from paintEvent: replots here deliver next turn
+    const QCPWidgetEventScope scope(this); // called from paintEvent: replots here deliver next turn
     PROFILE_FRAME_MARK;
     PROFILE_HERE_N("QCustomPlot::render");
 
@@ -3380,7 +3383,7 @@ void QCustomPlot::releaseCompositeResources()
 */
 void QCustomPlot::resizeEvent([[maybe_unused]] QResizeEvent* event)
 {
-    const QCPInputScope scope(this);
+    const QCPWidgetEventScope scope(this);
     // resize and repaint the buffer:
     setViewport(rect());
     if (mSpanRhiLayer)
@@ -3399,7 +3402,7 @@ void QCustomPlot::resizeEvent([[maybe_unused]] QResizeEvent* event)
 */
 void QCustomPlot::showEvent(QShowEvent* event)
 {
-    const QCPInputScope scope(this);
+    const QCPWidgetEventScope scope(this);
     QRhiWidget::showEvent(event);
     mWasShown = true;
     if (std::exchange(mReplotSkippedWhileHidden, false))

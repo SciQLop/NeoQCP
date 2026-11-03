@@ -27,15 +27,31 @@ QList<QPointer<T>> guarded(const QList<T*>& objects)
 class QCP_LIB_DECL QCPEmissionQueue
 {
 public:
-    void open(bool input)
+    // What opened a scope: a plot method, a Qt input event, or a widget event (resize, show, paint)
+    // that Qt keeps using after the handler returns.
+    enum class Source
+    {
+        Method,
+        Input,
+        WidgetEvent
+    };
+
+    void open(Source source)
     {
         if (mDepth++ == 0)
-            mInputOutermost = input;
+            mOutermost = source;
     }
     // True when the outermost scope closed.
     bool close() { return --mDepth == 0; }
     [[nodiscard]] bool isOpen() const { return mDepth > 0; }
     [[nodiscard]] bool hasPendingInput() const { return !mInput.empty(); }
+    [[nodiscard]] bool insideWidgetEvent() const
+    {
+        return mDepth > 0 && mOutermost == Source::WidgetEvent;
+    }
+    // True when no posted input flush is outstanding; it then counts as posted.
+    bool claimFlushPost() { return !std::exchange(mFlushPosted, true); }
+    void postedFlushStarted() { mFlushPosted = false; }
     // Goes with the outermost scope's kind: method-caused or input-caused.
     void push(QObject* sender, std::function<void()> emission);
     void discard()
@@ -57,7 +73,8 @@ private:
     static void run(std::vector<Pending> pending);
 
     int mDepth = 0;
-    bool mInputOutermost = false;
+    Source mOutermost = Source::Method;
+    bool mFlushPosted = false;
     std::vector<Pending> mMethod;
     std::vector<Pending> mInput;
 };
@@ -67,16 +84,19 @@ private:
 class QCP_LIB_DECL QCPEmissionScope
 {
 public:
-    explicit QCPEmissionScope(QCustomPlot* plot) : QCPEmissionScope(plot, false) { }
+    explicit QCPEmissionScope(QCustomPlot* plot)
+            : QCPEmissionScope(plot, QCPEmissionQueue::Source::Method)
+    {
+    }
     ~QCPEmissionScope();
     QCPEmissionScope(const QCPEmissionScope&) = delete;
     QCPEmissionScope& operator=(const QCPEmissionScope&) = delete;
 
 protected:
-    QCPEmissionScope(QCustomPlot* plot, bool nextTurn);
+    QCPEmissionScope(QCustomPlot* plot, QCPEmissionQueue::Source source);
 
 private:
-    static QCustomPlot* openOn(QCustomPlot* plot, bool input);
+    static QCustomPlot* openOn(QCustomPlot* plot, QCPEmissionQueue::Source source);
     static void postFlush(QCustomPlot* plot);
 
     QPointer<QCustomPlot> mPlot;
@@ -88,7 +108,21 @@ private:
 class QCP_LIB_DECL QCPInputScope : public QCPEmissionScope
 {
 public:
-    explicit QCPInputScope(QCustomPlot* plot) : QCPEmissionScope(plot, true) { }
+    explicit QCPInputScope(QCustomPlot* plot)
+            : QCPEmissionScope(plot, QCPEmissionQueue::Source::Input)
+    {
+    }
+};
+
+// An input scope for resize, show and paint handlers. Qt touches the widget after these return, so
+// deleting the plot inside one is reported as misuse.
+class QCP_LIB_DECL QCPWidgetEventScope : public QCPEmissionScope
+{
+public:
+    explicit QCPWidgetEventScope(QCustomPlot* plot)
+            : QCPEmissionScope(plot, QCPEmissionQueue::Source::WidgetEvent)
+    {
+    }
 };
 
 #endif // QCP_SIGNAL_DELIVERY_H

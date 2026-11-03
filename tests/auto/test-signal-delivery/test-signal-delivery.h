@@ -33,4 +33,6 @@ private slots:
     void inputSignalSurvivesNestedLoopInMethodScope();
     void slotDeletesPlotOnResize_data();
     void slotDeletesPlotOnResize();
+    void deleteInsideOwnEventReportsMisuse();
+    void inputFlushPostedOnce();
 };
