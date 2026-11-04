@@ -62,6 +62,16 @@ private slots:
 
   void QCPItems_AddRemove10k();
   void QCPItems_Replot10k();
+  void QCPItems_Add10k();
+  void QCPItems_Clear10k();
+  void QCPItems_DeleteEach10k();
+  void QCPItems_RemoveEach10k();
+  void QObject_DeleteEachChild10k();
+  void QCPItems_DeletePlot10k();
+  void QCPItems_Zoom10k();
+  void QCPItems_Zoom100();
+  void QCPItems_MouseMove10k();
+  void QCPItems_MouseMove100();
   void QCPAxisRects_Stack8_Replot();
   void QCPPlots_Stack8_Replot();
   void QCPInput_MouseMoveStorm();
@@ -1069,6 +1079,157 @@ void Benchmark::QCPItems_Replot10k()
     mPlot->xAxis->setRange(0.001 * ++step, 1 + 0.001 * step);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
   }
+}
+
+namespace
+{
+// A shuffled order, so neither "delete the newest first" nor "delete the oldest first" can hide in
+// an index pattern. Seeded, so two runs measure the same sequence.
+QVector<int> shuffledIndices(int count)
+{
+  QVector<int> indices(count);
+  std::iota(indices.begin(), indices.end(), 0);
+  std::shuffle(indices.begin(), indices.end(), std::mt19937 { 42 });
+  return indices;
+}
+} // namespace
+
+void Benchmark::QCPItems_Add10k()
+{
+  // The clear happens in cleanup() with the plot, outside the measurement.
+  QBENCHMARK_ONCE { addLineItems(mPlot, 10000, 100); }
+}
+
+void Benchmark::QCPItems_Clear10k()
+{
+  addLineItems(mPlot, 10000, 100);
+  QBENCHMARK_ONCE { mPlot->clearItems(); }
+}
+
+void Benchmark::QCPItems_DeleteEach10k()
+{
+  addLineItems(mPlot, 10000, 100);
+  QVector<QCPAbstractItem *> items;
+  items.reserve(mPlot->itemCount());
+  for (int i = 0; i < mPlot->itemCount(); ++i)
+    items.append(mPlot->item(i));
+  QVector<QCPAbstractItem *> order;
+  order.reserve(items.size());
+  for (int index : shuffledIndices(items.size()))
+    order.append(items[index]);
+  QBENCHMARK_ONCE
+  {
+    for (QCPAbstractItem *item : order)
+      mPlot->removeItem(item);
+  }
+}
+
+void Benchmark::QCPItems_RemoveEach10k()
+{
+  addLineItems(mPlot, 10000, 100);
+  const QVector<int> order = shuffledIndices(mPlot->itemCount());
+  QBENCHMARK_ONCE
+  {
+    // Remove by position, always from the current list: the order is the shuffled one, mapped
+    // through the items that are still there.
+    QVector<QCPAbstractItem *> items;
+    for (int i = 0; i < mPlot->itemCount(); ++i)
+      items.append(mPlot->item(i));
+    for (int index : order)
+      if (items[index])
+        mPlot->removeItem(items[index]);
+  }
+}
+
+void Benchmark::QObject_DeleteEachChild10k()
+{
+  // The control row: Qt's own children bookkeeping, without any QCP list.
+  auto *root = new QObject;
+  QList<QObject *> children;
+  for (int i = 0; i < 10000; ++i)
+    children.append(new QObject(root));
+  QBENCHMARK_ONCE
+  {
+    for (QObject *child : children)
+      delete child;
+  }
+  delete root;
+}
+
+void Benchmark::QCPItems_DeletePlot10k()
+{
+  QBENCHMARK_ONCE
+  {
+    auto *plot = new QCustomPlot;
+    addLineItems(plot, 10000, 100);
+    delete plot;
+  }
+}
+
+void Benchmark::QCPItems_Zoom10k()
+{
+  addLineItems(mPlot, 10000, 1);
+  mPlot->xAxis->setRange(0, 1);
+  mPlot->yAxis->setRange(0, 1);
+  mPlot->replot();
+  // 100 of the 10 000 items are inside the x range at any time.
+  double lower = 0.4;
+  QBENCHMARK
+  {
+    lower = lower > 0.5 ? 0.4 : lower + 0.01;
+    mPlot->xAxis->setRange(lower, lower + 0.1);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+  }
+}
+
+void Benchmark::QCPItems_Zoom100()
+{
+  addLineItems(mPlot, 100, 1);
+  mPlot->xAxis->setRange(0, 1);
+  mPlot->yAxis->setRange(0, 1);
+  mPlot->replot();
+  double lower = 0.4;
+  QBENCHMARK
+  {
+    lower = lower > 0.5 ? 0.4 : lower + 0.01;
+    mPlot->xAxis->setRange(lower, lower + 0.1);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+  }
+}
+
+namespace
+{
+// The same storm as QCPInput_MouseMoveStorm, for a plot whose items are selectable.
+void itemMouseMoveStorm(QCustomPlot *plot)
+{
+  plot->setInteractions(QCP::iSelectItems);
+  int moves = 0;
+  QObject::connect(plot, &QCustomPlot::mouseMove, plot, [&moves](QMouseEvent *) { ++moves; });
+  const int kMoves = 10000;
+  QBENCHMARK_ONCE
+  {
+    for (int i = 0; i < kMoves; ++i)
+    {
+      const QPointF pos(10 + (i * 37) % 600, 10 + (i * 53) % 330);
+      QMouseEvent event(QEvent::MouseMove, pos, plot->mapToGlobal(pos), Qt::NoButton,
+                        Qt::NoButton, Qt::NoModifier);
+      QCoreApplication::sendEvent(plot, &event);
+    }
+  }
+  QCOMPARE(moves, kMoves);
+}
+} // namespace
+
+void Benchmark::QCPItems_MouseMove10k()
+{
+  addLineItems(mPlot, 10000, 100);
+  itemMouseMoveStorm(mPlot);
+}
+
+void Benchmark::QCPItems_MouseMove100()
+{
+  addLineItems(mPlot, 100, 100);
+  itemMouseMoveStorm(mPlot);
 }
 
 void Benchmark::QCPAxisRects_Stack8_Replot()
