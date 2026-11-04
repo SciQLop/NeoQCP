@@ -72,6 +72,30 @@ public:
     };
 };
 
+int pixelsOfColor(QCustomPlot& plot, const QColor& color)
+{
+    const QImage image = plot.toPixmap(400, 300).toImage();
+    int count = 0;
+    for (int y = 0; y < image.height(); ++y)
+        for (int x = 0; x < image.width(); ++x)
+            count += image.pixelColor(x, y) == color;
+    return count;
+}
+
+void showRedLine(QCustomPlot& plot, QCPGraph& graph)
+{
+    graph.setPen(QPen(Qt::red, 3));
+    plot.xAxis->setRange(0, 4);
+    plot.yAxis->setRange(0, 7);
+    settle(plot);
+}
+
+class UserGraph : public QCPGraph
+{
+public:
+    using QCPGraph::QCPGraph;
+};
+
 class PlainSub : public QCPGraph
 {
 public:
@@ -529,3 +553,182 @@ void TestBuilder::barsHandleGroupsAndStacks()
     QCOMPARE(gMisuses, 1);
 }
 
+void TestBuilder::takeAndReAdd()
+{
+    QCustomPlot a;
+    QCustomPlot b;
+    auto g = a.add<QCPGraph>(kKeys, kValues).setName("moved");
+    auto group = a.add<QCPPlottableGroup>("pair").addMember(g);
+    showRedLine(a, *g.get());
+    QVERIFY(pixelsOfColor(a, Qt::red) > 20);
+
+    std::unique_ptr<QCPGraph> taken = a.take(g);
+    QVERIFY(taken);
+    QVERIFY(!g || g.get() == taken.get());
+    QCOMPARE(a.graphCount(), 0);
+    QCOMPARE(a.plottableCount(), 0);
+    QVERIFY(!a.legend->hasItemWithPlottable(taken.get()));
+    QCOMPARE(group->members().size(), 0);
+    QCOMPARE(taken->parent(), static_cast<QObject*>(nullptr));
+    QCOMPARE(taken->keyAxis(), static_cast<QCPAxis*>(nullptr));
+    QCOMPARE(taken->layer(), static_cast<QCPLayer*>(nullptr));
+    settle(a);
+    QCOMPARE(pixelsOfColor(a, Qt::red), 0);
+
+    auto moved = b.add(std::move(taken));
+    QCOMPARE(b.graphCount(), 1);
+    QCOMPARE(moved->keyAxis(), b.xAxis);
+    QCOMPARE(moved->layer(), b.currentLayer());
+    QVERIFY(b.legend->hasItemWithPlottable(moved.get()));
+    b.xAxis->setRange(0, 4);
+    b.yAxis->setRange(0, 7);
+    settle(b);
+    QVERIFY(pixelsOfColor(b, Qt::red) > 20);
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestBuilder::takeAndReAddItem()
+{
+    QCustomPlot a;
+    QCustomPlot b;
+    auto line = a.add<QCPItemLine>().setPositionType(QCPItemPosition::ptPlotCoords).setStart(1, 1).setEnd(2, 2);
+    auto taken = a.take(line);
+    QVERIFY(taken);
+    QCOMPARE(a.itemCount(), 0);
+    QCOMPARE(taken->parentPlot(), static_cast<QCustomPlot*>(nullptr));
+    QCOMPARE(taken->start->keyAxis(), static_cast<QCPAxis*>(nullptr));
+    settle(a);
+
+    auto moved = b.add(std::move(taken));
+    QCOMPARE(b.itemCount(), 1);
+    QCOMPARE(moved->parentPlot(), &b);
+    QCOMPARE(moved->start->keyAxis(), b.xAxis);
+    QCOMPARE(moved->end->coords(), QPointF(2, 2));
+    settle(b);
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestBuilder::takeColorMapLeavesScale()
+{
+    QCustomPlot plot;
+    auto scale = plot.add<QCPColorScale>(1, 0);
+    auto map = plot.add<QCPColorMap>().setColorScale(scale);
+    QCOMPARE(map->colorScale(), scale.get());
+    QCOMPARE(scale->colorMaps().size(), 1);
+
+    auto taken = plot.take(map);
+    QVERIFY(taken);
+    QCOMPARE(taken->colorScale(), static_cast<QCPColorScale*>(nullptr));
+    QCOMPARE(scale->colorMaps().size(), 0);
+    scale->setDataRange(QCPRange(5, 9));
+    QVERIFY(taken->dataRange().lower != 5);
+    taken.reset();
+    settle(plot);
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestBuilder::takeBarsLeavesGroupAndStack()
+{
+    QCustomPlot plot;
+    auto group = plot.add<QCPBarsGroup>();
+    auto lower = plot.add<QCPBars>(kKeys, kValues).setBarsGroup(group);
+    auto upper = plot.add<QCPBars>(kKeys, kValues).setBarsGroup(group);
+    upper->moveAbove(lower.get());
+    QCOMPARE(upper->barBelow(), lower.get());
+
+    auto taken = plot.take(lower);
+    QVERIFY(taken);
+    QCOMPARE(taken->barsGroup(), static_cast<QCPBarsGroup*>(nullptr));
+    QCOMPARE(group->bars().size(), 1);
+    QCOMPARE(upper->barBelow(), static_cast<QCPBars*>(nullptr));
+    taken.reset();
+    settle(plot);
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestBuilder::takeDeadHandle()
+{
+    QCustomPlot plot;
+    auto g = plot.add<QCPGraph>(kKeys, kValues);
+    g.remove();
+    QVERIFY(!plot.take(g));
+    QCOMPARE(gMisuses, 1);
+}
+
+void TestBuilder::takeForeignObject()
+{
+    QCustomPlot owner;
+    QCustomPlot other;
+    auto g = owner.add<QCPGraph>(kKeys, kValues);
+    QVERIFY(!other.take(g));
+    QCOMPARE(gMisuses, 1);
+    QCOMPARE(owner.graphCount(), 1);
+    QVERIFY(g);
+}
+
+void TestBuilder::takeDuringTeardown()
+{
+    auto* plot = new QCustomPlot;
+    auto first = plot->add<QCPGraph>(kKeys, kValues);
+    auto second = plot->add<QCPGraph>(kKeys, kValues);
+    bool refused = false;
+    connect(first.get(), &QObject::destroyed,
+            [plot, second, &refused] { refused = plot->take(second) == nullptr; });
+    delete plot;
+    QVERIFY(refused);
+    QCOMPARE(gMisuses, 1);
+}
+
+void TestBuilder::addUserBuilt()
+{
+    QCustomPlot plot;
+    // the constructor reports a plottable built without axes; add() is how it gets them
+    auto built = std::make_unique<UserGraph>(nullptr, nullptr);
+    QCOMPARE(gMisuses, 1);
+    auto handle = plot.add(std::move(built));
+    static_assert(std::is_base_of_v<QCPHandle<UserGraph>, decltype(handle)>);
+    QVERIFY(handle);
+    QCOMPARE(handle->keyAxis(), plot.xAxis);
+    QCOMPARE(handle->valueAxis(), plot.yAxis);
+    QCOMPARE(handle->layer(), plot.currentLayer());
+    QCOMPARE(plot.graphCount(), 1);
+    QVERIFY(plot.legend->hasItemWithPlottable(handle.get()));
+    handle.setName("user").setPen(QPen(Qt::red));
+    QCOMPARE(handle->name(), QString("user"));
+    QCOMPARE(gMisuses, 1);
+}
+
+void TestBuilder::addRefusesObjectOfAPlot()
+{
+    QCustomPlot plot;
+    QCustomPlot other;
+    auto handle = plot.add(std::make_unique<QCPGraph>(other.xAxis, other.yAxis));
+    QVERIFY(!handle);
+    QCOMPARE(gMisuses, 1);
+    QCOMPARE(plot.graphCount(), 0);
+    QCOMPARE(other.graphCount(), 0);
+    QVERIFY(!plot.add(std::unique_ptr<QCPGraph>()));
+    QCOMPARE(gMisuses, 2);
+}
+
+void TestBuilder::takenPointerDeletedIsClean()
+{
+    QCustomPlot plot;
+    auto g = plot.add<QCPGraph>(kKeys, kValues);
+    auto line = plot.add<QCPItemLine>();
+    auto bars = plot.add<QCPBars>(kKeys, kValues);
+    auto map = plot.add<QCPColorMap>();
+    auto takenGraph = plot.take(g);
+    auto takenLine = plot.take(line);
+    auto takenBars = plot.take(bars);
+    auto takenMap = plot.take(map);
+    takenGraph.reset();
+    takenLine.reset();
+    takenBars.reset();
+    takenMap.reset();
+    QVERIFY(!g);
+    QCOMPARE(plot.plottableCount(), 0);
+    QCOMPARE(plot.itemCount(), 0);
+    settle(plot);
+    QCOMPARE(gMisuses, 0);
+}

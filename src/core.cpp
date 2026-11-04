@@ -1402,6 +1402,133 @@ bool QCustomPlot::removePlottable(QCPAbstractPlottable* plottable)
     return true;
 }
 
+namespace
+{
+// What still points at a plottable that leaves without being destroyed: the colour scale it follows,
+// its bars group and its stack. Destruction undoes these by itself.
+void leaveSiblings(QCPAbstractPlottable* plottable)
+{
+    if (auto* map = qobject_cast<QCPColorMap*>(plottable))
+        map->setColorScale(nullptr);
+    else if (auto* map2 = qobject_cast<QCPColorMap2*>(plottable))
+        map2->setColorScale(nullptr);
+    else if (auto* histogram = qobject_cast<QCPHistogram2D*>(plottable))
+        histogram->setColorScale(nullptr);
+    else if (auto* bars = qobject_cast<QCPBars*>(plottable))
+    {
+        bars->setBarsGroup(nullptr);
+        bars->moveBelow(nullptr);
+    }
+}
+} // namespace
+
+/*! \internal
+
+  QCustomPlot::take for a plottable: everything the plot and its parts hold of it is let go, and the
+  object is left whole, in the state of a plottable built without axes (inert, no parent).
+*/
+bool QCustomPlot::detach(QCPAbstractPlottable* plottable)
+{
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
+    QCP_CHECK_OR_RETURN(mPlottables.contains(plottable), "the object is not in this plot", false);
+    leaveSiblings(plottable);
+    for (QCPLegend* legend : findChildren<QCPLegend*>())
+        plottable->removeFromLegend(legend);
+    const QPointer<QCPPlottableGroup> group = unlistPlottable(plottable);
+    plottable->moveToLayer(nullptr, false);
+    plottable->setParentLayerable(nullptr);
+    plottable->mKeyAxis = nullptr;
+    plottable->mValueAxis = nullptr;
+    plottable->mReportedLostAxis = true;
+    plottable->mRegisteredPlot = nullptr;
+    plottable->mParentPlot = nullptr;
+    plottable->setParent(nullptr);
+    if (group)
+    {
+        group->updateLegendRow();
+        emit group->membersChanged();
+    }
+    return true;
+}
+
+/*! \internal
+
+  QCustomPlot::add(std::unique_ptr) for a plottable: the inverse of detach, onto the default axes.
+*/
+bool QCustomPlot::adopt(QCPAbstractPlottable* plottable)
+{
+    const auto [keyAxis, valueAxis] = axesForAdd();
+    if (!keyAxis)
+        return false;
+    QCP_CHECK_OR_RETURN(!plottable->parentPlot(), "the object already belongs to a plot: take it first",
+                        false);
+    plottable->setParent(this);
+    plottable->initializeParentPlot(this);
+    plottable->mKeyAxis = keyAxis;
+    plottable->mValueAxis = valueAxis;
+    plottable->mReportedLostAxis = false;
+    plottable->setParentLayerable(keyAxis->axisRect());
+    if (!registerPlottable(plottable))
+        return false;
+    plottable->mRegisteredPlot = this;
+    if (auto* graph = qobject_cast<QCPGraph*>(plottable))
+        registerGraph(graph);
+    return true;
+}
+
+/*! \internal
+
+  QCustomPlot::take for an item. Its positions forget their axes and axis rect, and the anchors the
+  plot, so nothing of the old plot is reachable from it. Parent anchors between items are kept.
+*/
+bool QCustomPlot::detach(QCPAbstractItem* item)
+{
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
+    QCP_CHECK_OR_RETURN(mItems.contains(item), "the object is not in this plot", false);
+    mItems.removeOne(item);
+    item->mRegisteredPlot = nullptr;
+    item->setClipAxisRect(nullptr);
+    item->moveToLayer(nullptr, false);
+    item->setParentLayerable(nullptr);
+    for (QCPItemPosition* position : item->mPositions)
+    {
+        position->setAxes(nullptr, nullptr);
+        position->setAxisRect(nullptr);
+    }
+    for (QCPItemAnchor* anchor : item->mAnchors)
+        anchor->mParentPlot = nullptr;
+    item->mParentPlot = nullptr;
+    item->setParent(nullptr);
+    return true;
+}
+
+/*! \internal
+
+  QCustomPlot::add(std::unique_ptr) for an item: positions get the plot's default axes and axis rect
+  as in the item constructor.
+*/
+bool QCustomPlot::adopt(QCPAbstractItem* item)
+{
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
+    QCP_CHECK_OR_RETURN(!item->parentPlot(), "the object already belongs to a plot: take it first",
+                        false);
+    item->setParent(this);
+    item->initializeParentPlot(this);
+    for (QCPItemAnchor* anchor : item->mAnchors)
+        anchor->mParentPlot = this;
+    for (QCPItemPosition* position : item->mPositions)
+    {
+        position->setAxes(xAxis, yAxis);
+        position->setAxisRect(axisRect());
+    }
+    if (!registerItem(item))
+        return false;
+    item->mRegisteredPlot = this;
+    if (QCPAxisRect* rect = axisRect())
+        item->setClipAxisRect(rect);
+    return true;
+}
+
 /*! \internal
 
   Unlists and deletes \a plottable, one of this plot's.

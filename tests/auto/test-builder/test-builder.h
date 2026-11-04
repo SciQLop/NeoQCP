@@ -34,4 +34,14 @@ private slots:
     void groupsOwnedByPlot();
     void groupHandlesSetAndAddMembers();
     void barsHandleGroupsAndStacks();
+    void takeAndReAdd();
+    void takeAndReAddItem();
+    void takeColorMapLeavesScale();
+    void takeBarsLeavesGroupAndStack();
+    void takeDeadHandle();
+    void takeForeignObject();
+    void takeDuringTeardown();
+    void addUserBuilt();
+    void addRefusesObjectOfAPlot();
+    void takenPointerDeletedIsClean();
 };
