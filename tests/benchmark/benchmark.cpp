@@ -48,6 +48,7 @@ private slots:
   void QCPColorMap2_ResampleDouble();
   void QCPColorMap2_ResampleFloat();
   void QCPColorMapData_ConstructLarge();
+  void QCPColorMap_SetCell1M();
   void QCPColorMap2_ResamplePanSequence();
   void QCPColorMap2_ResamplePanSequenceSmall();
   void QCPColorMap2_ResampleWideSerial();
@@ -887,6 +888,21 @@ void Benchmark::QCPColorMapData_ConstructLarge()
   QBENCHMARK
   {
     delete new QCPColorMapData(2000, 2000, QCPRange(0, 1), QCPRange(0, 1));
+  }
+}
+
+// Filling a map cell by cell on a live plot: every setCell reaches the map's repaint mark.
+void Benchmark::QCPColorMap_SetCell1M()
+{
+  QCPColorMap *map = new QCPColorMap(mPlot->xAxis, mPlot->yAxis);
+  const int n = 1000;
+  map->data()->setSize(n, n);
+  mPlot->replot();
+  QBENCHMARK
+  {
+    for (int x=0; x<n; ++x)
+      for (int y=0; y<n; ++y)
+        map->data()->setCell(x, y, x+y);
   }
 }
 

@@ -23,6 +23,7 @@
 **          Version: 2.1.1                                                **
 ****************************************************************************/
 
+#include <utility>
 #include "plottable-colormap.h"
 #include <algorithm>
 #include <cmath>
@@ -765,11 +766,13 @@ QCPColorMap::~QCPColorMap()
 }
 
 // The data has no layer of its own; the map that draws it is the only thing that can schedule
-// the repaint, and its draw() re-renders the image as soon as mDataModified is set.
+// the repaint, and its draw() re-renders the image as soon as mDataModified is set. Only the first
+// change after a draw marks: while the flag is set a repaint is already pending (joining a layer,
+// setData and this function all mark), so a cell-by-cell fill costs one mark, not one per cell.
 void QCPColorMapData::dataChanged()
 {
-    mDataModified = true;
-    if (mOwner)
+    const bool repaintPending = std::exchange(mDataModified, true);
+    if (mOwner && !repaintPending)
         mOwner->markDirty();
 }
 
