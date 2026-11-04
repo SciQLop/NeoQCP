@@ -15,6 +15,8 @@ set(NEOQCP_SOURCES
     src/lineending.cpp
     src/painting/paintbuffer.cpp
     src/painting/painter.cpp
+    src/painting/draw-context.cpp
+    src/painting/command-replay-painter.cpp
     src/painting/paintbuffer-pixmap.cpp
     src/painting/paintbuffer-rhi.cpp
     src/painting/plottable-rhi-layer.cpp

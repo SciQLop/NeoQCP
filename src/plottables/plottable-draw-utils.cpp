@@ -27,22 +27,27 @@ QCPPlottableRhiLayer* gpuLayer(QCustomPlot* parentPlot, QCPLayer* layer, bool ex
                                                          : nullptr;
 }
 
-void drawPolylineSplitNaN(QCPPainter* painter, const QVector<QPointF>& pts)
+void drawPolylineSplitNaN(QCPPainter* painter, std::span<const QPointF> pts)
 {
     int segStart = 0;
-    for (int i = 0; i < pts.size(); ++i)
+    for (int i = 0; i < int(pts.size()); ++i)
     {
         if (std::isnan(pts[i].x()) || std::isnan(pts[i].y()))
         {
             int segLen = i - segStart;
             if (segLen >= 2)
-                painter->drawPolyline(pts.constData() + segStart, segLen);
+                painter->drawPolyline(pts.data() + segStart, segLen);
             segStart = i + 1;
         }
     }
-    int segLen = pts.size() - segStart;
+    int segLen = int(pts.size()) - segStart;
     if (segLen >= 2)
-        painter->drawPolyline(pts.constData() + segStart, segLen);
+        painter->drawPolyline(pts.data() + segStart, segLen);
+}
+
+void drawPolylineSplitNaN(QCPPainter* painter, const QVector<QPointF>& pts)
+{
+    drawPolylineSplitNaN(painter, std::span<const QPointF>(pts.constData(), pts.size()));
 }
 
 float extrusionPenWidth(const QPen& pen, double devicePixelRatio)

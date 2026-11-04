@@ -6,6 +6,7 @@
 #include <QPen>
 #include <QRect>
 #include <QVector>
+#include <span>
 #include <vector>
 
 class QCustomPlot;
@@ -23,6 +24,9 @@ QCPPlottableRhiLayer* gpuLayer(QCustomPlot* parentPlot, QCPLayer* layer, bool ex
 
 /// QPainter::drawPolyline does not break at NaN: one polyline per NaN-separated run.
 void drawPolylineSplitNaN(QCPPainter* painter, const QVector<QPointF>& pts);
+
+/// Same, for points the caller already owns as a span (no QVector copy).
+void drawPolylineSplitNaN(QCPPainter* painter, std::span<const QPointF> pts);
 
 /// Cached extruded vertices for a single polyline.
 /// Stores the untranslated GPU vertices so they can be reused across frames

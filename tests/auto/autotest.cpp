@@ -51,6 +51,7 @@
 #include "test-spatial-index/test-spatial-index.h"
 #include "test-item-index/test-item-index.h"
 #include "test-coords/test-coords.h"
+#include "test-draw-context/test-draw-context.h"
 #include "test-gestures/test-gestures.h"
 
 static bool shouldRun(const char* name)
@@ -144,6 +145,7 @@ int main(int argc, char **argv)
   QCPTEST(TestSpatialIndex);
   QCPTEST(TestItemIndex);
   QCPTEST(TestCoords);
+  QCPTEST(TestDrawContext);
 
   return failures == 0 ? 0 : 1;
 }
