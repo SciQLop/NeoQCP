@@ -163,6 +163,9 @@ QCPLayer::~QCPLayer()
 */
 void QCPLayer::setVisible(bool visible)
 {
+    if (visible == mVisible)
+        return;
+    markDirty();
     mVisible = visible;
 }
 

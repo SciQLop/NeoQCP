@@ -2,6 +2,17 @@
 #include "plottables/plottable-multigraph.h"
 #include "datasource/soa-multi-datasource.h"
 #include "plottables/plottable-bars.h"
+#include "items/item-ellipse.h"
+#include "items/item-line.h"
+#include "items/item-pixmap.h"
+#include "items/item-rect.h"
+#include "items/item-text.h"
+#include "items/item-tracer.h"
+#include "layoutelements/layoutelement-colorscale.h"
+#include "layoutelements/layoutelement-legend.h"
+#include "layoutelements/layoutelement-textelement.h"
+#include "polar/layoutelement-angularaxis.h"
+#include "polar/polargrid.h"
 #include "plottables/plottable-bars.h"
 #include "plottables/plottable-colormap.h"
 #include "plottables/plottable-colormap2.h"
@@ -947,6 +958,204 @@ void TestRepaint::equalValueDoesNotDirty()
     it->change(*plot); // same value: there is nothing new to draw
     QVERIFY2(!plot->isRepaintQueued(),
              qPrintable(setter + QStringLiteral(" repainted an equal value")));
+}
+
+namespace
+{
+struct RemainingCase
+{
+    const char* name;
+    std::function<QObject*(QCustomPlot&)> prepare;
+    std::function<void(QObject*)> change;
+};
+
+const QVector<RemainingCase>& remainingCases()
+{
+    static const QVector<RemainingCase> cases{
+        { "text.setColor",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* item = new QCPItemText(&plot);
+              item->position->setCoords(1, 1);
+              return item;
+          },
+          [](QObject* o) { static_cast<QCPItemText*>(o)->setColor(Qt::green); } },
+        { "text.setRotation",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* item = new QCPItemText(&plot);
+              item->position->setCoords(1, 1);
+              return item;
+          },
+          [](QObject* o) { static_cast<QCPItemText*>(o)->setRotation(15); } },
+        { "line.setPen",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* item = new QCPItemLine(&plot);
+              item->start->setCoords(0, 0);
+              item->end->setCoords(1, 1);
+              return item;
+          },
+          [](QObject* o) { static_cast<QCPItemLine*>(o)->setPen(QPen(Qt::darkGreen, 3)); } },
+        { "ellipse.setBrush",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* item = new QCPItemEllipse(&plot);
+              item->topLeft->setCoords(1, 1);
+              item->bottomRight->setCoords(3, 3);
+              return item;
+          },
+          [](QObject* o) { static_cast<QCPItemEllipse*>(o)->setBrush(QBrush(Qt::cyan)); } },
+        { "rect.setPen",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* item = new QCPItemRect(&plot);
+              item->topLeft->setCoords(1, 1);
+              item->bottomRight->setCoords(3, 3);
+              return item;
+          },
+          [](QObject* o) { static_cast<QCPItemRect*>(o)->setPen(QPen(Qt::magenta, 3)); } },
+        { "pixmap.setScaled",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* item = new QCPItemPixmap(&plot);
+              item->setPixmap(QPixmap(4, 4));
+              item->topLeft->setCoords(1, 1);
+              item->bottomRight->setCoords(3, 3);
+              return item;
+          },
+          [](QObject* o) { static_cast<QCPItemPixmap*>(o)->setScaled(false); } },
+        { "textElement.setText",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* el = new QCPTextElement(&plot, QStringLiteral("title"));
+              plot.plotLayout()->insertRow(0);
+              plot.plotLayout()->addElement(0, 0, el);
+              return el;
+          },
+          [](QObject* o) { static_cast<QCPTextElement*>(o)->setText(QStringLiteral("changed")); } },
+        { "textElement.setTextColor",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* el = new QCPTextElement(&plot, QStringLiteral("title"));
+              plot.plotLayout()->insertRow(0);
+              plot.plotLayout()->addElement(0, 0, el);
+              return el;
+          },
+          [](QObject* o) { static_cast<QCPTextElement*>(o)->setTextColor(Qt::darkRed); } },
+        { "colorScale.setBarWidth",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* scale = new QCPColorScale(&plot);
+              plot.plotLayout()->addElement(1, 1, scale);
+              return scale;
+          },
+          [](QObject* o) { static_cast<QCPColorScale*>(o)->setBarWidth(30); } },
+        { "colorScale.setLabel",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* scale = new QCPColorScale(&plot);
+              plot.plotLayout()->addElement(1, 1, scale);
+              return scale;
+          },
+          [](QObject* o) { static_cast<QCPColorScale*>(o)->setLabel(QStringLiteral("z")); } },
+        { "legend.setBorderPen",
+          [](QCustomPlot& plot) -> QObject* { return plot.legend; },
+          [](QObject* o) { static_cast<QCPLegend*>(o)->setBorderPen(QPen(Qt::darkBlue, 2)); } },
+        { "polarAxis.setTickLabelColor",
+          [](QCustomPlot& plot) -> QObject* { return new QCPPolarAxisAngular(&plot); },
+          [](QObject* o)
+          { static_cast<QCPPolarAxisAngular*>(o)->setTickLabelColor(Qt::darkBlue); } },
+        { "polarAxis.setBasePen",
+          [](QCustomPlot& plot) -> QObject* { return new QCPPolarAxisAngular(&plot); },
+          [](QObject* o) { static_cast<QCPPolarAxisAngular*>(o)->setBasePen(QPen(Qt::darkBlue, 3)); } },
+        { "polarGrid.setAngularPen",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* polar = new QCPPolarAxisAngular(&plot);
+              auto* grid = new QCPPolarGrid(polar);
+              return grid;
+          },
+          [](QObject* o) { static_cast<QCPPolarGrid*>(o)->setAngularPen(QPen(Qt::darkGreen, 3)); } },
+        { "layer.setVisible",
+          [](QCustomPlot& plot) -> QObject* { return plot.layer(QStringLiteral("overlay")); },
+          [](QObject* o) { static_cast<QCPLayer*>(o)->setVisible(false); } },
+    };
+    return cases;
+}
+} // namespace
+
+void TestRepaint::remainingSettersScheduleRepaint_data()
+{
+    QTest::addColumn<QString>("setter");
+    for (const RemainingCase& c : remainingCases())
+        QTest::newRow(c.name) << QString::fromLatin1(c.name);
+}
+
+void TestRepaint::remainingSettersScheduleRepaint()
+{
+    QFETCH(QString, setter);
+    const auto& cases = remainingCases();
+    auto it = std::find_if(cases.cbegin(), cases.cend(), [&setter](const RemainingCase& c)
+                           { return setter == QLatin1String(c.name); });
+    QVERIFY(it != cases.cend());
+
+    auto plot = settledPlot();
+    QObject* object = it->prepare(*plot);
+    waitUntilSettled(*plot);
+    waitUntilSettled(*plot); // a prepare may queue twice
+    QVERIFY(!plot->isRepaintQueued());
+
+    it->change(object);
+    QVERIFY2(plot->isRepaintQueued(), qPrintable(setter + QStringLiteral(" scheduled no repaint")));
+}
+
+void TestRepaint::secondLegendRowFollowsRename()
+{
+    auto plot = settledPlot();
+    auto* legend = new QCPLegend();
+    plot->plotLayout()->addElement(0, 1, legend);
+    plot->graph(0)->addToLegend(legend);
+    waitUntilSettled(*plot);
+
+    plot->graph(0)->setName(QStringLiteral("renamed"));
+    QVERIFY(plot->isRepaintQueued());
+}
+
+void TestRepaint::exportSettlesPendingTheme()
+{
+    auto plot = settledPlot();
+    QCPTheme dark;
+    dark.setBackground(Qt::black);
+    plot->setTheme(&dark);
+    // Mutating the theme only queues a 0 ms timer; the export must not show the old colours.
+    dark.setBackground(Qt::darkMagenta);
+    const QImage image = plot->toPixmap(200, 150).toImage();
+    const QColor corner = image.pixelColor(1, 1);
+    QVERIFY2(qAbs(corner.hue() - QColor(Qt::darkMagenta).hue()) < 20,
+             qPrintable(corner.name()));
+}
+
+
+void TestRepaint::steadyPanKeepsTranslating()
+{
+    // The layout calls these on every replot with the values it just computed. A setter that marks
+    // an unchanged value would dirty a layer on every frame, and nothing could ever translate.
+    auto plot = settledPlot();
+    waitUntilSettled(*plot);
+
+    auto* rect = plot->axisRect();
+    rect->setMargins(rect->margins());
+    rect->setMinimumMargins(rect->minimumMargins());
+    rect->setMinimumSize(rect->minimumSize());
+    rect->setMaximumSize(rect->maximumSize());
+    rect->setAutoMargins(rect->autoMargins());
+    auto* grid = qobject_cast<QCPLayoutGrid*>(plot->plotLayout());
+    QVERIFY(grid);
+    grid->setRowSpacing(grid->rowSpacing());
+    grid->setColumnSpacing(grid->columnSpacing());
+
+    QVERIFY(!plot->isRepaintQueued());
 }
 
 QImage TestRepaint::screenOf(QCustomPlot* plot)

@@ -71,16 +71,25 @@ QCPPolarGrid::QCPPolarGrid(QCPPolarAxisAngular* parentAxis)
 
 void QCPPolarGrid::setRadialAxis(QCPPolarAxisRadial* axis)
 {
+    if (axis == mRadialAxis)
+        return;
+    markDirty();
     mRadialAxis = axis;
 }
 
 void QCPPolarGrid::setType(GridTypes type)
 {
+    if (type == mType)
+        return;
+    markDirty();
     mType = type;
 }
 
 void QCPPolarGrid::setSubGridType(GridTypes type)
 {
+    if (type == mSubGridType)
+        return;
+    markDirty();
     mSubGridType = type;
 }
 
@@ -89,6 +98,9 @@ void QCPPolarGrid::setSubGridType(GridTypes type)
 */
 void QCPPolarGrid::setAntialiasedSubGrid(bool enabled)
 {
+    if (enabled == mAntialiasedSubGrid)
+        return;
+    markDirty();
     mAntialiasedSubGrid = enabled;
 }
 
@@ -97,6 +109,9 @@ void QCPPolarGrid::setAntialiasedSubGrid(bool enabled)
 */
 void QCPPolarGrid::setAntialiasedZeroLine(bool enabled)
 {
+    if (enabled == mAntialiasedZeroLine)
+        return;
+    markDirty();
     mAntialiasedZeroLine = enabled;
 }
 
@@ -105,6 +120,9 @@ void QCPPolarGrid::setAntialiasedZeroLine(bool enabled)
 */
 void QCPPolarGrid::setAngularPen(const QPen& pen)
 {
+    if (pen == mAngularPen)
+        return;
+    markDirty();
     mAngularPen = pen;
 }
 
@@ -113,16 +131,25 @@ void QCPPolarGrid::setAngularPen(const QPen& pen)
 */
 void QCPPolarGrid::setAngularSubGridPen(const QPen& pen)
 {
+    if (pen == mAngularSubGridPen)
+        return;
+    markDirty();
     mAngularSubGridPen = pen;
 }
 
 void QCPPolarGrid::setRadialPen(const QPen& pen)
 {
+    if (pen == mRadialPen)
+        return;
+    markDirty();
     mRadialPen = pen;
 }
 
 void QCPPolarGrid::setRadialSubGridPen(const QPen& pen)
 {
+    if (pen == mRadialSubGridPen)
+        return;
+    markDirty();
     mRadialSubGridPen = pen;
 }
 

@@ -322,6 +322,8 @@ QCPAxisRect* QCPItemPosition::axisRect() const
 */
 void QCPItemPosition::setType(QCPItemPosition::PositionType type)
 {
+    if (mParentItem)
+        mParentItem->markDirty();
     setTypeX(type);
     setTypeY(type);
 }
@@ -335,6 +337,8 @@ void QCPItemPosition::setType(QCPItemPosition::PositionType type)
 */
 void QCPItemPosition::setTypeX(QCPItemPosition::PositionType type)
 {
+    if (mParentItem)
+        mParentItem->markDirty();
     if (mPositionTypeX != type)
     {
         // if switching from or to coordinate type that isn't valid (e.g. because axes or axis rect
@@ -368,6 +372,8 @@ void QCPItemPosition::setTypeX(QCPItemPosition::PositionType type)
 */
 void QCPItemPosition::setTypeY(QCPItemPosition::PositionType type)
 {
+    if (mParentItem)
+        mParentItem->markDirty();
     if (mPositionTypeY != type)
     {
         // if switching from or to coordinate type that isn't valid (e.g. because axes or axis rect
@@ -412,6 +418,8 @@ void QCPItemPosition::setTypeY(QCPItemPosition::PositionType type)
 */
 bool QCPItemPosition::setParentAnchor(QCPItemAnchor* parentAnchor, bool keepPixelPosition)
 {
+    if (mParentItem)
+        mParentItem->markDirty();
     bool successX = setParentAnchorX(parentAnchor, keepPixelPosition);
     bool successY = setParentAnchorY(parentAnchor, keepPixelPosition);
     return successX && successY;
@@ -436,6 +444,8 @@ bool QCPItemPosition::setParentAnchorX(QCPItemAnchor* parentAnchor, bool keepPix
     }
     // make sure no recursive parent-child-relationships are created:
     QCPItemAnchor* currentParent = parentAnchor;
+    if (mParentItem)
+        mParentItem->markDirty();
     while (currentParent)
     {
         if (QCPItemPosition* currentParentPos = currentParent->toQCPItemPosition())
@@ -507,6 +517,8 @@ bool QCPItemPosition::setParentAnchorY(QCPItemAnchor* parentAnchor, bool keepPix
     }
     // make sure no recursive parent-child-relationships are created:
     QCPItemAnchor* currentParent = parentAnchor;
+    if (mParentItem)
+        mParentItem->markDirty();
     while (currentParent)
     {
         if (QCPItemPosition* currentParentPos = currentParent->toQCPItemPosition())
@@ -578,6 +590,8 @@ bool QCPItemPosition::setParentAnchorY(QCPItemAnchor* parentAnchor, bool keepPix
 */
 void QCPItemPosition::setCoords(double key, double value)
 {
+    if (mParentItem)
+        mParentItem->markDirty();
     mKey = key;
     mValue = value;
 }
@@ -589,6 +603,8 @@ void QCPItemPosition::setCoords(double key, double value)
 */
 void QCPItemPosition::setCoords(const QPointF& pos)
 {
+    if (mParentItem)
+        mParentItem->markDirty();
     setCoords(pos.x(), pos.y());
 }
 
@@ -744,6 +760,8 @@ QPointF QCPItemPosition::pixelPosition() const
 */
 void QCPItemPosition::setAxes(QCPAxis* keyAxis, QCPAxis* valueAxis)
 {
+    if (mParentItem)
+        mParentItem->markDirty();
     mKeyAxis = keyAxis;
     mValueAxis = valueAxis;
 }
@@ -755,6 +773,10 @@ void QCPItemPosition::setAxes(QCPAxis* keyAxis, QCPAxis* valueAxis)
 */
 void QCPItemPosition::setAxisRect(QCPAxisRect* axisRect)
 {
+    if (axisRect == mAxisRect)
+        return;
+    if (mParentItem)
+        mParentItem->markDirty();
     mAxisRect = axisRect;
 }
 
@@ -770,6 +792,8 @@ void QCPItemPosition::setAxisRect(QCPAxisRect* axisRect)
 */
 void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
 {
+    if (mParentItem)
+        mParentItem->markDirty();
     double x = pixelPosition.x();
     double y = pixelPosition.y();
 
@@ -1109,6 +1133,7 @@ QCPAxisRect* QCPAbstractItem::clipAxisRect() const
 */
 void QCPAbstractItem::setClipToAxisRect(bool clip)
 {
+    markDirty();
     mClipToAxisRect = clip;
     if (mClipToAxisRect)
         setParentLayerable(mClipAxisRect.data());
@@ -1122,6 +1147,7 @@ void QCPAbstractItem::setClipToAxisRect(bool clip)
 */
 void QCPAbstractItem::setClipAxisRect(QCPAxisRect* rect)
 {
+    markDirty();
     mClipAxisRect = rect;
     if (mClipToAxisRect)
         setParentLayerable(mClipAxisRect.data());
@@ -1162,6 +1188,7 @@ void QCPAbstractItem::setSelectable(bool selectable)
 */
 void QCPAbstractItem::setSelected(bool selected)
 {
+    markDirty();
     if (mSelected != selected)
     {
         mSelected = selected;

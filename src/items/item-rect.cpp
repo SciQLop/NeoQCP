@@ -76,6 +76,9 @@ QCPItemRect::~QCPItemRect() { }
 */
 void QCPItemRect::setPen(const QPen& pen)
 {
+    if (pen == mPen)
+        return;
+    markDirty();
     mPen = pen;
 }
 
@@ -86,6 +89,9 @@ void QCPItemRect::setPen(const QPen& pen)
 */
 void QCPItemRect::setSelectedPen(const QPen& pen)
 {
+    if (pen == mSelectedPen)
+        return;
+    markDirty();
     mSelectedPen = pen;
 }
 
@@ -97,6 +103,9 @@ void QCPItemRect::setSelectedPen(const QPen& pen)
 */
 void QCPItemRect::setBrush(const QBrush& brush)
 {
+    if (brush == mBrush)
+        return;
+    markDirty();
     mBrush = brush;
 }
 
@@ -108,6 +117,9 @@ void QCPItemRect::setBrush(const QBrush& brush)
 */
 void QCPItemRect::setSelectedBrush(const QBrush& brush)
 {
+    if (brush == mSelectedBrush)
+        return;
+    markDirty();
     mSelectedBrush = brush;
 }
 

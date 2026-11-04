@@ -14,6 +14,7 @@ QCPItemRichText::~QCPItemRichText() { }
 
 void QCPItemRichText::setHtml(const QString& html)
 {
+    markDirty();
     mHtml = html;
     mDoc.setDefaultFont(mainFont());
     mDoc.setHtml(html);

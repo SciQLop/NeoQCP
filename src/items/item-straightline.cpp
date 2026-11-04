@@ -68,6 +68,9 @@ QCPItemStraightLine::~QCPItemStraightLine() { }
 */
 void QCPItemStraightLine::setPen(const QPen& pen)
 {
+    if (pen == mPen)
+        return;
+    markDirty();
     mPen = pen;
 }
 
@@ -78,6 +81,9 @@ void QCPItemStraightLine::setPen(const QPen& pen)
 */
 void QCPItemStraightLine::setSelectedPen(const QPen& pen)
 {
+    if (pen == mSelectedPen)
+        return;
+    markDirty();
     mSelectedPen = pen;
 }
 

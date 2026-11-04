@@ -80,6 +80,9 @@ QCPItemEllipse::~QCPItemEllipse() { }
 */
 void QCPItemEllipse::setPen(const QPen& pen)
 {
+    if (pen == mPen)
+        return;
+    markDirty();
     mPen = pen;
 }
 
@@ -90,6 +93,9 @@ void QCPItemEllipse::setPen(const QPen& pen)
 */
 void QCPItemEllipse::setSelectedPen(const QPen& pen)
 {
+    if (pen == mSelectedPen)
+        return;
+    markDirty();
     mSelectedPen = pen;
 }
 
@@ -101,6 +107,9 @@ void QCPItemEllipse::setSelectedPen(const QPen& pen)
 */
 void QCPItemEllipse::setBrush(const QBrush& brush)
 {
+    if (brush == mBrush)
+        return;
+    markDirty();
     mBrush = brush;
 }
 
@@ -112,6 +121,9 @@ void QCPItemEllipse::setBrush(const QBrush& brush)
 */
 void QCPItemEllipse::setSelectedBrush(const QBrush& brush)
 {
+    if (brush == mSelectedBrush)
+        return;
+    markDirty();
     mSelectedBrush = brush;
 }
 

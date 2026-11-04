@@ -191,6 +191,9 @@ QCPPolarGraph::~QCPPolarGraph()
 */
 void QCPPolarGraph::setName(const QString& name)
 {
+    if (name == mName)
+        return;
+    markDirty();
     mName = name;
 }
 
@@ -202,6 +205,9 @@ void QCPPolarGraph::setName(const QString& name)
 */
 void QCPPolarGraph::setAntialiasedFill(bool enabled)
 {
+    if (enabled == mAntialiasedFill)
+        return;
+    markDirty();
     mAntialiasedFill = enabled;
 }
 
@@ -213,6 +219,9 @@ void QCPPolarGraph::setAntialiasedFill(bool enabled)
 */
 void QCPPolarGraph::setAntialiasedScatters(bool enabled)
 {
+    if (enabled == mAntialiasedScatters)
+        return;
+    markDirty();
     mAntialiasedScatters = enabled;
 }
 
@@ -226,6 +235,9 @@ void QCPPolarGraph::setAntialiasedScatters(bool enabled)
 */
 void QCPPolarGraph::setPen(const QPen& pen)
 {
+    if (pen == mPen)
+        return;
+    markDirty();
     mPen = pen;
 }
 
@@ -240,11 +252,17 @@ void QCPPolarGraph::setPen(const QPen& pen)
 */
 void QCPPolarGraph::setBrush(const QBrush& brush)
 {
+    if (brush == mBrush)
+        return;
+    markDirty();
     mBrush = brush;
 }
 
 void QCPPolarGraph::setPeriodic(bool enabled)
 {
+    if (enabled == mPeriodic)
+        return;
+    markDirty();
     mPeriodic = enabled;
 }
 
@@ -265,6 +283,7 @@ void QCPPolarGraph::setKeyAxis(QCPPolarAxisAngular* axis)
         return;
     if (mKeyAxis)
         mKeyAxis->mGraphs.removeOne(this);
+    markDirty();
     mKeyAxis = axis;
     if (mKeyAxis)
         mKeyAxis->registerPolarGraph(this);
@@ -283,6 +302,9 @@ void QCPPolarGraph::setKeyAxis(QCPPolarAxisAngular* axis)
 */
 void QCPPolarGraph::setValueAxis(QCPPolarAxisRadial* axis)
 {
+    if (axis == mValueAxis)
+        return;
+    markDirty();
     mValueAxis = axis;
 }
 
@@ -332,6 +354,7 @@ void QCPPolarGraph::setSelectable(QCP::SelectionType selectable)
 */
 void QCPPolarGraph::setSelection(QCPDataSelection selection)
 {
+    markDirty();
     selection.enforceType(mSelectable);
     if (mSelection != selection)
     {
@@ -370,6 +393,9 @@ void QCPPolarGraph::emitSelectionChanged()
 */
 void QCPPolarGraph::setData(QSharedPointer<QCPGraphDataContainer> data)
 {
+    if (data == mDataContainer)
+        return;
+    markDirty();
     mDataContainer = data;
 }
 
@@ -387,6 +413,7 @@ void QCPPolarGraph::setData(QSharedPointer<QCPGraphDataContainer> data)
 void QCPPolarGraph::setData(const QVector<double>& keys, const QVector<double>& values,
                             bool alreadySorted)
 {
+    markDirty();
     mDataContainer->clear();
     addData(keys, values, alreadySorted);
 }
@@ -399,6 +426,9 @@ void QCPPolarGraph::setData(const QVector<double>& keys, const QVector<double>& 
 */
 void QCPPolarGraph::setLineStyle(LineStyle ls)
 {
+    if (ls == mLineStyle)
+        return;
+    markDirty();
     mLineStyle = ls;
 }
 
@@ -411,6 +441,7 @@ void QCPPolarGraph::setLineStyle(LineStyle ls)
 */
 void QCPPolarGraph::setScatterStyle(const QCPScatterStyle& style)
 {
+    markDirty();
     mScatterStyle = style;
 }
 

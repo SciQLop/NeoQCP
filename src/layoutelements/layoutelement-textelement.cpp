@@ -205,6 +205,9 @@ QCPTextElement::QCPTextElement(QCustomPlot* parentPlot, const QString& text, con
 */
 void QCPTextElement::setText(const QString& text)
 {
+    if (text == mText)
+        return;
+    markDirty();
     mText = text;
 }
 
@@ -230,6 +233,9 @@ void QCPTextElement::setText(const QString& text)
 */
 void QCPTextElement::setTextFlags(int flags)
 {
+    if (flags == mTextFlags)
+        return;
+    markDirty();
     mTextFlags = flags;
 }
 
@@ -240,6 +246,9 @@ void QCPTextElement::setTextFlags(int flags)
 */
 void QCPTextElement::setFont(const QFont& font)
 {
+    if (font == mFont)
+        return;
+    markDirty();
     mFont = font;
 }
 
@@ -250,6 +259,9 @@ void QCPTextElement::setFont(const QFont& font)
 */
 void QCPTextElement::setTextColor(const QColor& color)
 {
+    if (color == mTextColor)
+        return;
+    markDirty();
     mTextColor = color;
 }
 
@@ -260,6 +272,9 @@ void QCPTextElement::setTextColor(const QColor& color)
 */
 void QCPTextElement::setSelectedFont(const QFont& font)
 {
+    if (font == mSelectedFont)
+        return;
+    markDirty();
     mSelectedFont = font;
 }
 
@@ -271,6 +286,9 @@ void QCPTextElement::setSelectedFont(const QFont& font)
 */
 void QCPTextElement::setSelectedTextColor(const QColor& color)
 {
+    if (color == mSelectedTextColor)
+        return;
+    markDirty();
     mSelectedTextColor = color;
 }
 
@@ -298,11 +316,11 @@ void QCPTextElement::setSelectable(bool selectable)
 */
 void QCPTextElement::setSelected(bool selected)
 {
-    if (mSelected != selected)
-    {
-        mSelected = selected;
-        emit selectionChanged(mSelected);
-    }
+    if (mSelected == selected)
+        return;
+    markDirty();
+    mSelected = selected;
+    emit selectionChanged(mSelected);
 }
 
 /* inherits documentation from base class */

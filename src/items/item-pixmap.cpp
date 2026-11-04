@@ -83,6 +83,7 @@ QCPItemPixmap::~QCPItemPixmap() { }
 */
 void QCPItemPixmap::setPixmap(const QPixmap& pixmap)
 {
+    markDirty();
     mPixmap = pixmap;
     mScaledPixmapInvalidated = true;
     if (mPixmap.isNull())
@@ -96,6 +97,7 @@ void QCPItemPixmap::setPixmap(const QPixmap& pixmap)
 void QCPItemPixmap::setScaled(bool scaled, Qt::AspectRatioMode aspectRatioMode,
                               Qt::TransformationMode transformationMode)
 {
+    markDirty();
     mScaled = scaled;
     mAspectRatioMode = aspectRatioMode;
     mTransformationMode = transformationMode;
@@ -109,6 +111,9 @@ void QCPItemPixmap::setScaled(bool scaled, Qt::AspectRatioMode aspectRatioMode,
 */
 void QCPItemPixmap::setPen(const QPen& pen)
 {
+    if (pen == mPen)
+        return;
+    markDirty();
     mPen = pen;
 }
 
@@ -119,6 +124,9 @@ void QCPItemPixmap::setPen(const QPen& pen)
 */
 void QCPItemPixmap::setSelectedPen(const QPen& pen)
 {
+    if (pen == mSelectedPen)
+        return;
+    markDirty();
     mSelectedPen = pen;
 }
 

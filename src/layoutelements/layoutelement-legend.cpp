@@ -97,9 +97,9 @@ void QCPAbstractLegendItem::setFont(const QFont& font)
 {
     if (mFont == font)
         return;
-    mFont = font;
     if (mLayer)
         mLayer->markDirty();
+    mFont = font;
 }
 
 /*!
@@ -111,9 +111,9 @@ void QCPAbstractLegendItem::setTextColor(const QColor& color)
 {
     if (mTextColor == color)
         return;
-    mTextColor = color;
     if (mLayer)
         mLayer->markDirty();
+    mTextColor = color;
 }
 
 /*!
@@ -126,9 +126,9 @@ void QCPAbstractLegendItem::setSelectedFont(const QFont& font)
 {
     if (mSelectedFont == font)
         return;
-    mSelectedFont = font;
     if (mLayer)
         mLayer->markDirty();
+    mSelectedFont = font;
 }
 
 /*!
@@ -141,9 +141,9 @@ void QCPAbstractLegendItem::setSelectedTextColor(const QColor& color)
 {
     if (mSelectedTextColor == color)
         return;
-    mSelectedTextColor = color;
     if (mLayer)
         mLayer->markDirty();
+    mSelectedTextColor = color;
 }
 
 /*!
@@ -170,11 +170,11 @@ void QCPAbstractLegendItem::setSelectable(bool selectable)
 */
 void QCPAbstractLegendItem::setSelected(bool selected)
 {
-    if (mSelected != selected)
-    {
-        mSelected = selected;
-        emit selectionChanged(mSelected);
-    }
+    if (mSelected == selected)
+        return;
+    markDirty();
+    mSelected = selected;
+    emit selectionChanged(mSelected);
 }
 
 /* inherits documentation from base class */
@@ -535,6 +535,9 @@ QCPLegend::SelectableParts QCPLegend::selectedParts() const
 */
 void QCPLegend::setBorderPen(const QPen& pen)
 {
+    if (pen == mBorderPen)
+        return;
+    markDirty();
     mBorderPen = pen;
 }
 
@@ -543,6 +546,9 @@ void QCPLegend::setBorderPen(const QPen& pen)
 */
 void QCPLegend::setBrush(const QBrush& brush)
 {
+    if (brush == mBrush)
+        return;
+    markDirty();
     mBrush = brush;
 }
 
@@ -557,6 +563,7 @@ void QCPLegend::setBrush(const QBrush& brush)
 */
 void QCPLegend::setFont(const QFont& font)
 {
+    markDirty();
     mFont = font;
     for (int i = 0; i < itemCount(); ++i)
     {
@@ -576,6 +583,7 @@ void QCPLegend::setFont(const QFont& font)
 */
 void QCPLegend::setTextColor(const QColor& color)
 {
+    markDirty();
     mTextColor = color;
     for (int i = 0; i < itemCount(); ++i)
     {
@@ -590,6 +598,9 @@ void QCPLegend::setTextColor(const QColor& color)
 */
 void QCPLegend::setIconSize(const QSize& size)
 {
+    if (size == mIconSize)
+        return;
+    markDirty();
     mIconSize = size;
 }
 
@@ -597,6 +608,7 @@ void QCPLegend::setIconSize(const QSize& size)
  */
 void QCPLegend::setIconSize(int width, int height)
 {
+    markDirty();
     mIconSize.setWidth(width);
     mIconSize.setHeight(height);
 }
@@ -608,6 +620,9 @@ void QCPLegend::setIconSize(int width, int height)
 */
 void QCPLegend::setIconTextPadding(int padding)
 {
+    if (padding == mIconTextPadding)
+        return;
+    markDirty();
     mIconTextPadding = padding;
 }
 
@@ -619,6 +634,9 @@ void QCPLegend::setIconTextPadding(int padding)
 */
 void QCPLegend::setIconBorderPen(const QPen& pen)
 {
+    if (pen == mIconBorderPen)
+        return;
+    markDirty();
     mIconBorderPen = pen;
 }
 
@@ -685,6 +703,7 @@ void QCPLegend::setSelectedParts(const SelectableParts& selected)
 
     if (mSelectedParts != newSelected)
     {
+        markDirty();
         if (!mSelectedParts.testFlag(spItems)
             && newSelected.testFlag(spItems)) // attempt to set spItems flag (can't do that)
         {
@@ -711,6 +730,9 @@ void QCPLegend::setSelectedParts(const SelectableParts& selected)
 */
 void QCPLegend::setSelectedBorderPen(const QPen& pen)
 {
+    if (pen == mSelectedBorderPen)
+        return;
+    markDirty();
     mSelectedBorderPen = pen;
 }
 
@@ -721,6 +743,9 @@ void QCPLegend::setSelectedBorderPen(const QPen& pen)
 */
 void QCPLegend::setSelectedIconBorderPen(const QPen& pen)
 {
+    if (pen == mSelectedIconBorderPen)
+        return;
+    markDirty();
     mSelectedIconBorderPen = pen;
 }
 
@@ -732,6 +757,9 @@ void QCPLegend::setSelectedIconBorderPen(const QPen& pen)
 */
 void QCPLegend::setSelectedBrush(const QBrush& brush)
 {
+    if (brush == mSelectedBrush)
+        return;
+    markDirty();
     mSelectedBrush = brush;
 }
 
@@ -744,6 +772,7 @@ void QCPLegend::setSelectedBrush(const QBrush& brush)
 */
 void QCPLegend::setSelectedFont(const QFont& font)
 {
+    markDirty();
     mSelectedFont = font;
     for (int i = 0; i < itemCount(); ++i)
     {
@@ -761,6 +790,7 @@ void QCPLegend::setSelectedFont(const QFont& font)
 */
 void QCPLegend::setSelectedTextColor(const QColor& color)
 {
+    markDirty();
     mSelectedTextColor = color;
     for (int i = 0; i < itemCount(); ++i)
     {

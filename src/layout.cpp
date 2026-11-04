@@ -302,6 +302,7 @@ void QCPLayoutElement::setMargins(const QMargins& margins)
 {
     if (mMargins != margins)
     {
+        markLayoutAppearanceDirty();
         mMargins = margins;
         mRect = mOuterRect.adjusted(mMargins.left(), mMargins.top(), -mMargins.right(),
                                     -mMargins.bottom());
@@ -321,6 +322,7 @@ void QCPLayoutElement::setMinimumMargins(const QMargins& margins)
 {
     if (mMinimumMargins != margins)
     {
+        markLayoutAppearanceDirty();
         mMinimumMargins = margins;
     }
 }
@@ -337,6 +339,9 @@ void QCPLayoutElement::setMinimumMargins(const QMargins& margins)
 */
 void QCPLayoutElement::setAutoMargins(QCP::MarginSides sides)
 {
+    if (sides == mAutoMargins)
+        return;
+    markLayoutAppearanceDirty();
     mAutoMargins = sides;
 }
 
@@ -356,6 +361,7 @@ void QCPLayoutElement::setMinimumSize(const QSize& size)
 {
     if (mMinimumSize != size)
     {
+        markLayoutAppearanceDirty();
         mMinimumSize = size;
         if (mParentLayout)
             mParentLayout->sizeConstraintsChanged();
@@ -371,7 +377,7 @@ void QCPLayoutElement::setMinimumSize(const QSize& size)
 */
 void QCPLayoutElement::setMinimumSize(int width, int height)
 {
-    setMinimumSize(QSize(width, height));
+    setMinimumSize(QSize(width, height)); // the QSize overload marks only when the size changes
 }
 
 /*!
@@ -385,6 +391,7 @@ void QCPLayoutElement::setMaximumSize(const QSize& size)
 {
     if (mMaximumSize != size)
     {
+        markLayoutAppearanceDirty();
         mMaximumSize = size;
         if (mParentLayout)
             mParentLayout->sizeConstraintsChanged();
@@ -400,7 +407,7 @@ void QCPLayoutElement::setMaximumSize(const QSize& size)
 */
 void QCPLayoutElement::setMaximumSize(int width, int height)
 {
-    setMaximumSize(QSize(width, height));
+    setMaximumSize(QSize(width, height)); // the QSize overload marks only when the size changes
 }
 
 /*!
@@ -412,10 +419,24 @@ void QCPLayoutElement::setMaximumSize(int width, int height)
 
   \see setMinimumSize, setMaximumSize
 */
+void QCPLayoutElement::markLayoutAppearanceDirty()
+{
+    markDirty();
+}
+
+void QCPLayout::markLayoutAppearanceDirty()
+{
+    markDirty();
+    for (int i = 0; i < elementCount(); ++i)
+        if (QCPLayoutElement* element = elementAt(i))
+            element->markLayoutAppearanceDirty();
+}
+
 void QCPLayoutElement::setSizeConstraintRect(SizeConstraintRect constraintRect)
 {
     if (mSizeConstraintRect != constraintRect)
     {
+        markLayoutAppearanceDirty();
         mSizeConstraintRect = constraintRect;
         if (mParentLayout)
             mParentLayout->sizeConstraintsChanged();
@@ -1323,7 +1344,12 @@ void QCPLayoutGrid::setColumnStretchFactor(int column, double factor)
     if (column >= 0 && column < columnCount())
     {
         if (factor > 0)
+        {
+            if (factor == mColumnStretchFactors.at(column))
+                return;
+            markLayoutAppearanceDirty();
             mColumnStretchFactors[column] = factor;
+        }
         else
             qDebug() << Q_FUNC_INFO << "Invalid stretch factor, must be positive:" << factor;
     }
@@ -1347,6 +1373,9 @@ void QCPLayoutGrid::setColumnStretchFactors(const QList<double>& factors)
 {
     if (factors.size() == mColumnStretchFactors.size())
     {
+        if (factors == mColumnStretchFactors)
+            return;
+        markLayoutAppearanceDirty();
         mColumnStretchFactors = factors;
         for (int i = 0; i < mColumnStretchFactors.size(); ++i)
         {
@@ -1380,7 +1409,12 @@ void QCPLayoutGrid::setRowStretchFactor(int row, double factor)
     if (row >= 0 && row < rowCount())
     {
         if (factor > 0)
+        {
+            if (factor == mRowStretchFactors.at(row))
+                return;
+            markLayoutAppearanceDirty();
             mRowStretchFactors[row] = factor;
+        }
         else
             qDebug() << Q_FUNC_INFO << "Invalid stretch factor, must be positive:" << factor;
     }
@@ -1404,6 +1438,9 @@ void QCPLayoutGrid::setRowStretchFactors(const QList<double>& factors)
 {
     if (factors.size() == mRowStretchFactors.size())
     {
+        if (factors == mRowStretchFactors)
+            return;
+        markLayoutAppearanceDirty();
         mRowStretchFactors = factors;
         for (int i = 0; i < mRowStretchFactors.size(); ++i)
         {
@@ -1426,6 +1463,9 @@ void QCPLayoutGrid::setRowStretchFactors(const QList<double>& factors)
 */
 void QCPLayoutGrid::setColumnSpacing(int pixels)
 {
+    if (pixels == mColumnSpacing)
+        return;
+    markLayoutAppearanceDirty();
     mColumnSpacing = pixels;
 }
 
@@ -1436,6 +1476,9 @@ void QCPLayoutGrid::setColumnSpacing(int pixels)
 */
 void QCPLayoutGrid::setRowSpacing(int pixels)
 {
+    if (pixels == mRowSpacing)
+        return;
+    markLayoutAppearanceDirty();
     mRowSpacing = pixels;
 }
 
@@ -1458,6 +1501,9 @@ void QCPLayoutGrid::setRowSpacing(int pixels)
 */
 void QCPLayoutGrid::setWrap(int count)
 {
+    if (qMax(0, count) == mWrap)
+        return;
+    markLayoutAppearanceDirty();
     mWrap = qMax(0, count);
 }
 
@@ -1488,6 +1534,9 @@ void QCPLayoutGrid::setWrap(int count)
 */
 void QCPLayoutGrid::setFillOrder(FillOrder order, bool rearrange)
 {
+    if (order == mFillOrder && !rearrange)
+        return;
+    markLayoutAppearanceDirty();
     // if rearranging, take all elements via linear index of old fill order:
     const int elCount = elementCount();
     QVector<QCPLayoutElement*> tempElements;
@@ -2045,10 +2094,15 @@ QRectF QCPLayoutInset::insetRect(int index) const
 */
 void QCPLayoutInset::setInsetPlacement(int index, QCPLayoutInset::InsetPlacement placement)
 {
-    if (elementAt(index))
-        mInsetPlacement[index] = placement;
-    else
+    if (!elementAt(index))
+    {
         qDebug() << Q_FUNC_INFO << "Invalid element index:" << index;
+        return;
+    }
+    if (placement == mInsetPlacement.at(index))
+        return;
+    markLayoutAppearanceDirty();
+    mInsetPlacement[index] = placement;
 }
 
 /*!
@@ -2061,10 +2115,15 @@ void QCPLayoutInset::setInsetPlacement(int index, QCPLayoutInset::InsetPlacement
 */
 void QCPLayoutInset::setInsetAlignment(int index, Qt::Alignment alignment)
 {
-    if (elementAt(index))
-        mInsetAlignment[index] = alignment;
-    else
+    if (!elementAt(index))
+    {
         qDebug() << Q_FUNC_INFO << "Invalid element index:" << index;
+        return;
+    }
+    if (alignment == mInsetAlignment.at(index))
+        return;
+    markLayoutAppearanceDirty();
+    mInsetAlignment[index] = alignment;
 }
 
 /*!
@@ -2080,10 +2139,15 @@ void QCPLayoutInset::setInsetAlignment(int index, Qt::Alignment alignment)
 */
 void QCPLayoutInset::setInsetRect(int index, const QRectF& rect)
 {
-    if (elementAt(index))
-        mInsetRect[index] = rect;
-    else
+    if (!elementAt(index))
+    {
         qDebug() << Q_FUNC_INFO << "Invalid element index:" << index;
+        return;
+    }
+    if (rect == mInsetRect.at(index))
+        return;
+    markLayoutAppearanceDirty();
+    mInsetRect[index] = rect;
 }
 
 /* inherits documentation from base class */

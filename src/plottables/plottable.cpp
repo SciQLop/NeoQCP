@@ -487,9 +487,21 @@ void QCPAbstractPlottable::setName(const QString& name)
     if (name == mName)
         return;
     mName = name;
-    // simplify: only the default legend's row is marked; a plottable in another legend shows its
-    // new name on that legend's next repaint. Mark every legend when multi-legend plots matter.
-    if (mParentPlot && mParentPlot->legend)
+    if (!mParentPlot)
+        return;
+    // Every legend with a row for this plottable, not just the default one.
+    std::function<void(QCPLayoutElement*)> markRows = [&](QCPLayoutElement* el) {
+        if (!el)
+            return;
+        if (auto* legend = qobject_cast<QCPLegend*>(el))
+            if (QCPPlottableLegendItem* row = legend->itemWithPlottable(this))
+                row->markDirty();
+        if (auto* layout = qobject_cast<QCPLayout*>(el))
+            for (int i = 0; i < layout->elementCount(); ++i)
+                markRows(layout->elementAt(i));
+    };
+    markRows(mParentPlot->plotLayout());
+    if (mParentPlot->legend)
         if (QCPPlottableLegendItem* row = mParentPlot->legend->itemWithPlottable(this))
             row->markDirty();
 }

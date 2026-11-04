@@ -87,6 +87,9 @@ QCPItemBracket::~QCPItemBracket() { }
 */
 void QCPItemBracket::setPen(const QPen& pen)
 {
+    if (pen == mPen)
+        return;
+    markDirty();
     mPen = pen;
 }
 
@@ -97,6 +100,9 @@ void QCPItemBracket::setPen(const QPen& pen)
 */
 void QCPItemBracket::setSelectedPen(const QPen& pen)
 {
+    if (pen == mSelectedPen)
+        return;
+    markDirty();
     mSelectedPen = pen;
 }
 
@@ -110,6 +116,9 @@ void QCPItemBracket::setSelectedPen(const QPen& pen)
 */
 void QCPItemBracket::setLength(double length)
 {
+    if (length == mLength)
+        return;
+    markDirty();
     mLength = length;
 }
 
@@ -120,6 +129,9 @@ void QCPItemBracket::setLength(double length)
 */
 void QCPItemBracket::setStyle(QCPItemBracket::BracketStyle style)
 {
+    if (style == mStyle)
+        return;
+    markDirty();
     mStyle = style;
 }
 

@@ -52,14 +52,12 @@ QCPRange QCPItemRSpan::valueRange() const
 
 void QCPItemRSpan::setKeyRange(const QCPRange& range)
 {
+    markDirty();
     leftEdge->setCoords(range.lower, leftEdge->coords().y());
     rightEdge->setCoords(range.upper, rightEdge->coords().y());
     // Emit last: a slot may delete this span.
     if (mParentPlot)
-    {
         markRhiDirty();
-        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
-    }
     emit keyRangeChanged(range);
 }
 
@@ -70,9 +68,10 @@ void QCPItemRSpan::setValueRange(const QCPRange& range)
     // Emit last: a slot may delete this span.
     if (mParentPlot)
     {
+    markDirty();
         markRhiDirty();
-        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
-    }
+    
+}
     emit valueRangeChanged(range);
 }
 

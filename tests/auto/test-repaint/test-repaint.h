@@ -25,6 +25,11 @@ private slots:
     void axisSettersScheduleRepaint_data();
     void axisSettersScheduleRepaint();
     void axisUnlistedHandsOffsetToSibling();
+    void steadyPanKeepsTranslating();
+    void remainingSettersScheduleRepaint_data();
+    void remainingSettersScheduleRepaint();
+    void secondLegendRowFollowsRename();
+    void exportSettlesPendingTheme();
     void plottableSettersScheduleRepaint_data();
     void plottableSettersScheduleRepaint();
     void plottableEqualValueDoesNotDirty_data();

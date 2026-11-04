@@ -37,14 +37,12 @@ QCPRange QCPItemVSpan::range() const
 
 void QCPItemVSpan::setRange(const QCPRange& range)
 {
+    markDirty();
     lowerEdge->setCoords(range.lower, 0);
     upperEdge->setCoords(range.upper, 1);
     // Emit last: a slot may delete this span.
     if (mParentPlot)
-    {
         markRhiDirty();
-        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
-    }
     emit rangeChanged(range);
 }
 

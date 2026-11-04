@@ -88,6 +88,9 @@ QCPItemText::~QCPItemText() { }
 */
 void QCPItemText::setColor(const QColor& color)
 {
+    if (color == mColor)
+        return;
+    markDirty();
     mColor = color;
 }
 
@@ -96,6 +99,9 @@ void QCPItemText::setColor(const QColor& color)
 */
 void QCPItemText::setSelectedColor(const QColor& color)
 {
+    if (color == mSelectedColor)
+        return;
+    markDirty();
     mSelectedColor = color;
 }
 
@@ -107,6 +113,9 @@ void QCPItemText::setSelectedColor(const QColor& color)
 */
 void QCPItemText::setPen(const QPen& pen)
 {
+    if (pen == mPen)
+        return;
+    markDirty();
     mPen = pen;
 }
 
@@ -118,6 +127,9 @@ void QCPItemText::setPen(const QPen& pen)
 */
 void QCPItemText::setSelectedPen(const QPen& pen)
 {
+    if (pen == mSelectedPen)
+        return;
+    markDirty();
     mSelectedPen = pen;
 }
 
@@ -129,6 +141,9 @@ void QCPItemText::setSelectedPen(const QPen& pen)
 */
 void QCPItemText::setBrush(const QBrush& brush)
 {
+    if (brush == mBrush)
+        return;
+    markDirty();
     mBrush = brush;
 }
 
@@ -140,6 +155,9 @@ void QCPItemText::setBrush(const QBrush& brush)
 */
 void QCPItemText::setSelectedBrush(const QBrush& brush)
 {
+    if (brush == mSelectedBrush)
+        return;
+    markDirty();
     mSelectedBrush = brush;
 }
 
@@ -150,6 +168,9 @@ void QCPItemText::setSelectedBrush(const QBrush& brush)
 */
 void QCPItemText::setFont(const QFont& font)
 {
+    if (font == mFont)
+        return;
+    markDirty();
     mFont = font;
 }
 
@@ -160,6 +181,9 @@ void QCPItemText::setFont(const QFont& font)
 */
 void QCPItemText::setSelectedFont(const QFont& font)
 {
+    if (font == mSelectedFont)
+        return;
+    markDirty();
     mSelectedFont = font;
 }
 
@@ -171,6 +195,9 @@ void QCPItemText::setSelectedFont(const QFont& font)
 */
 void QCPItemText::setText(const QString& text)
 {
+    if (text == mText)
+        return;
+    markDirty();
     mText = text;
 }
 
@@ -188,6 +215,9 @@ void QCPItemText::setText(const QString& text)
 */
 void QCPItemText::setPositionAlignment(Qt::Alignment alignment)
 {
+    if (alignment == mPositionAlignment)
+        return;
+    markDirty();
     mPositionAlignment = alignment;
 }
 
@@ -197,6 +227,9 @@ void QCPItemText::setPositionAlignment(Qt::Alignment alignment)
 */
 void QCPItemText::setTextAlignment(Qt::Alignment alignment)
 {
+    if (alignment == mTextAlignment)
+        return;
+    markDirty();
     mTextAlignment = alignment;
 }
 
@@ -206,6 +239,9 @@ void QCPItemText::setTextAlignment(Qt::Alignment alignment)
 */
 void QCPItemText::setRotation(double degrees)
 {
+    if (degrees == mRotation)
+        return;
+    markDirty();
     mRotation = degrees;
 }
 
@@ -215,6 +251,9 @@ void QCPItemText::setRotation(double degrees)
 */
 void QCPItemText::setPadding(const QMargins& padding)
 {
+    if (padding == mPadding)
+        return;
+    markDirty();
     mPadding = padding;
 }
 

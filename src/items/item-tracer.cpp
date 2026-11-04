@@ -95,6 +95,9 @@ QCPItemTracer::~QCPItemTracer() { }
 */
 void QCPItemTracer::setPen(const QPen& pen)
 {
+    if (pen == mPen)
+        return;
+    markDirty();
     mPen = pen;
 }
 
@@ -105,6 +108,9 @@ void QCPItemTracer::setPen(const QPen& pen)
 */
 void QCPItemTracer::setSelectedPen(const QPen& pen)
 {
+    if (pen == mSelectedPen)
+        return;
+    markDirty();
     mSelectedPen = pen;
 }
 
@@ -115,6 +121,9 @@ void QCPItemTracer::setSelectedPen(const QPen& pen)
 */
 void QCPItemTracer::setBrush(const QBrush& brush)
 {
+    if (brush == mBrush)
+        return;
+    markDirty();
     mBrush = brush;
 }
 
@@ -125,6 +134,9 @@ void QCPItemTracer::setBrush(const QBrush& brush)
 */
 void QCPItemTracer::setSelectedBrush(const QBrush& brush)
 {
+    if (brush == mSelectedBrush)
+        return;
+    markDirty();
     mSelectedBrush = brush;
 }
 
@@ -134,6 +146,9 @@ void QCPItemTracer::setSelectedBrush(const QBrush& brush)
 */
 void QCPItemTracer::setSize(double size)
 {
+    if (size == mSize)
+        return;
+    markDirty();
     mSize = size;
 }
 
@@ -161,6 +176,7 @@ void QCPItemTracer::setStyle(QCPItemTracer::TracerStyle style)
 */
 void QCPItemTracer::setGraph(QCPGraph* graph)
 {
+    markDirty();
     if (graph)
     {
         if (graph->parentPlot() == mParentPlot)
@@ -192,6 +208,9 @@ void QCPItemTracer::setGraph(QCPGraph* graph)
 */
 void QCPItemTracer::setGraphKey(double key)
 {
+    if (key == mGraphKey)
+        return;
+    markDirty();
     mGraphKey = key;
 }
 
@@ -208,6 +227,9 @@ void QCPItemTracer::setGraphKey(double key)
 */
 void QCPItemTracer::setInterpolating(bool enabled)
 {
+    if (enabled == mInterpolating)
+        return;
+    markDirty();
     mInterpolating = enabled;
 }
 

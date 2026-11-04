@@ -18,36 +18,42 @@ void QCPAbstractSpanItem::markRhiDirty()
 
 void QCPAbstractSpanItem::setPen(const QPen& pen)
 {
+    markDirty();
     mPen = pen;
     markRhiDirty();
 }
 
 void QCPAbstractSpanItem::setSelectedPen(const QPen& pen)
 {
+    markDirty();
     mSelectedPen = pen;
     markRhiDirty();
 }
 
 void QCPAbstractSpanItem::setBrush(const QBrush& brush)
 {
+    markDirty();
     mBrush = brush;
     markRhiDirty();
 }
 
 void QCPAbstractSpanItem::setSelectedBrush(const QBrush& brush)
 {
+    markDirty();
     mSelectedBrush = brush;
     markRhiDirty();
 }
 
 void QCPAbstractSpanItem::setBorderPen(const QPen& pen)
 {
+    markDirty();
     mBorderPen = pen;
     markRhiDirty();
 }
 
 void QCPAbstractSpanItem::setSelectedBorderPen(const QPen& pen)
 {
+    markDirty();
     mSelectedBorderPen = pen;
     markRhiDirty();
 }
@@ -73,6 +79,7 @@ bool QCPAbstractSpanItem::tryRhiDraw(QCPPainter* painter)
 void QCPAbstractSpanItem::setEdgePixel(QCPItemPosition* edge, Qt::Orientation orientation,
                                        double pixel)
 {
+    // the edge position marks its item, so no extra dirty call here
     const QPointF otherCoords = edge->coords();
     QPointF px = edge->pixelPosition();
     (orientation == Qt::Horizontal ? px.rx() : px.ry()) = pixel;

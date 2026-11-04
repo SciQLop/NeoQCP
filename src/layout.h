@@ -156,6 +156,9 @@ public:
 
     // introduced virtual methods:
     virtual void update(UpdatePhase phase);
+    // A layout setter (margins, spacing, stretch, insets) must call this first: it invalidates what
+    // this element draws and, for a layout, everything it arranges.
+    virtual void markLayoutAppearanceDirty();
     virtual QSize minimumOuterSizeHint() const;
     virtual QSize maximumOuterSizeHint() const;
     virtual QList<QCPLayoutElement*> elements(bool recursive) const;
@@ -221,6 +224,7 @@ public:
 
 protected:
     // introduced virtual methods:
+    void markLayoutAppearanceDirty() override;
     virtual void updateLayout();
 
     // non-virtual methods:

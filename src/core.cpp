@@ -695,7 +695,11 @@ void QCustomPlot::applyTheme()
     if (mSelectionRect)
         mSelectionRect->setPen(recoloredPen(mSelectionRect->pen(), sel));
 
-    replot(QCustomPlot::rpQueuedReplot);
+    // The setters above marked what they touch; the background brush is drawn outside every layer,
+    // so invalidate them all and let the queued repaint do the work.
+    for (QCPLayer* layer : mLayers)
+        layer->invalidatePaintBuffer();
+    requestRepaint();
 }
 
 QColor QCustomPlot::themeBackground() const { return mTheme ? mTheme->background() : QColor(); }
@@ -2461,6 +2465,11 @@ void QCustomPlot::settle()
     const QCPEmissionScope scope(this);
     if (mBeingDestroyed || mReplotting)
         return;
+    if (mThemeDirty) // a theme change waits for the event loop; settling means the new picture
+    {
+        mThemeDirty = false;
+        applyTheme();
+    }
     keepNotificationLayerOnTop();
     if (mDataSwapTimer.isActive())
     {

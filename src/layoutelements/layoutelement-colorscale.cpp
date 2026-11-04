@@ -208,6 +208,7 @@ void QCPColorScale::setType(QCPAxis::AxisType type)
     }
     if (mType != type)
     {
+        markDirty();
         mType = type;
         QCPRange rangeTransfer(0, 6);
         QString labelTransfer;
@@ -293,6 +294,7 @@ void QCPColorScale::setDataScaleType(QCPAxis::ScaleType scaleType)
 {
     if (mDataScaleType != scaleType)
     {
+        markDirty();
         mDataScaleType = scaleType;
         // Both calls may signal a new range, and a dataRangeChanged slot may delete this scale.
         const QPointer<QCPColorScale> alive(this);
@@ -316,6 +318,7 @@ void QCPColorScale::setGradient(const QCPColorGradient& gradient)
 {
     if (mGradient != gradient)
     {
+        markDirty();
         mGradient = gradient;
         if (mAxisRect)
             mAxisRect.data()->mGradientImageInvalidated = true;
@@ -335,6 +338,9 @@ void QCPColorScale::setLabel(const QString& str)
         return;
     }
 
+    if (mColorAxis.data()->label() == str)
+        return;
+    markDirty();
     mColorAxis.data()->setLabel(str);
 }
 
@@ -344,6 +350,9 @@ void QCPColorScale::setLabel(const QString& str)
 */
 void QCPColorScale::setBarWidth(int width)
 {
+    if (width == mBarWidth)
+        return;
+    markDirty();
     mBarWidth = width;
 }
 
@@ -516,23 +525,20 @@ void QCPColorScale::update(UpdatePhase phase)
     {
         case upMargins:
         {
+            // Recomputed on every update pass: the setters mark only when the size really changes.
             if (mType == QCPAxis::atBottom || mType == QCPAxis::atTop)
             {
-                setMaximumSize(QWIDGETSIZE_MAX,
-                               mBarWidth + mAxisRect.data()->margins().top()
-                                   + mAxisRect.data()->margins().bottom());
-                setMinimumSize(0,
-                               mBarWidth + mAxisRect.data()->margins().top()
-                                   + mAxisRect.data()->margins().bottom());
+                const int height = mBarWidth + mAxisRect.data()->margins().top()
+                    + mAxisRect.data()->margins().bottom();
+                setMaximumSize(QWIDGETSIZE_MAX, height);
+                setMinimumSize(0, height);
             }
             else
             {
-                setMaximumSize(mBarWidth + mAxisRect.data()->margins().left()
-                                   + mAxisRect.data()->margins().right(),
-                               QWIDGETSIZE_MAX);
-                setMinimumSize(mBarWidth + mAxisRect.data()->margins().left()
-                                   + mAxisRect.data()->margins().right(),
-                               0);
+                const int width = mBarWidth + mAxisRect.data()->margins().left()
+                    + mAxisRect.data()->margins().right();
+                setMaximumSize(width, QWIDGETSIZE_MAX);
+                setMinimumSize(width, 0);
             }
             break;
         }
