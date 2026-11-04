@@ -72,6 +72,7 @@ private slots:
   void QObject_DeleteEachChild10k();
   void QCPItems_DeletePlot10k();
   void QCPItems_Zoom10k();
+  void QCPItems_Pan10k();
   void QCPItems_Zoom100();
   void QCPItems_ZoomEmpty();
   void QCPItems_Click10k();
@@ -1452,4 +1453,20 @@ void Benchmark::QCPItems_RestyleAll10k()
         mPlot->replot(QCustomPlot::rpImmediateRefresh);
     }
     mPlot->clearItems();
+}
+
+void Benchmark::QCPItems_Pan10k()
+{
+  // Same layout as Zoom10k: 10 000 items every 0.01 over 0..100, 100 of them in view.
+  addLineItems(mPlot, 10000, 100);
+  mPlot->xAxis->setRange(50, 51);
+  mPlot->yAxis->setRange(0, 1);
+  mPlot->replot();
+  double left = 50;
+  QBENCHMARK
+  {
+    left += 0.01; // a pan step: the width never changes, only the window slides
+    mPlot->xAxis->setRange(left, left + 1);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+  }
 }

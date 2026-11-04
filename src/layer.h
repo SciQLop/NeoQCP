@@ -159,8 +159,20 @@ private:
     void invalidateItemIndex();
     void noteItemExtentChanged(QCPAbstractItem* item);
 
+    // The axes the item children of this layer follow: a range change on one of them marks this
+    // layer without walking every item of the plot. Rebuilt lazily from the child list; a moved item
+    // unions its own axes in, and a superset only costs a repaint.
+    void invalidateItemAxes();
+    void rebuildItemAxes() const;
+    void noteItemAxes(QCPAbstractItem* item);
+    void collectItemAxes(QCPAbstractItem* item, std::vector<QPointer<QCPAxis>>& axes) const;
+    [[nodiscard]] bool itemsUseAxis(const QCPAxis* axis) const;
+    mutable std::vector<QPointer<QCPAxis>> mItemAxes;
+    mutable bool mItemAxesDirty = true;
+
     friend class QCPAbstractItem;
-    friend class QCPAxis; // a scale type change invalidates the item index
+    friend class QCPAxis;     // a scale type change invalidates the item index
+    friend class QCPAxisRect; // a range change asks which layers follow the axis
     friend class TestItemIndex;
 
     Q_DISABLE_COPY(QCPLayer)

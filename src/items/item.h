@@ -43,6 +43,7 @@ class QCPItemOps;
 class QCP_LIB_DECL QCPItemAnchor
 {
     Q_GADGET
+    friend class QCPLayer; // reads mParentItem to follow an anchor chain for repaint marking
 
 public:
     QCPItemAnchor(QCustomPlot* parentPlot, QCPAbstractItem* parentItem, const QString& name,

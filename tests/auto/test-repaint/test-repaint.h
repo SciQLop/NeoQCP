@@ -44,6 +44,10 @@ private slots:
     void plottableGroupVisibilityRepaints();
     void axisMarginChangeDuringPanRepaints();
     void itemOnOwnLayerFollowsRangeChange();
+    void anchoredChildOnOtherLayerFollowsRange();
+    void rangeChangeMarksOnlyLayersUsingTheAxis();
+    void setAxesMovesTheLayerToTheNewAxis();
+    void itemTakenAndAddedKeepsAxes();
     void multiGraphLineStyleResetsComponents();
     void colorMapDataSettersRepaint_data();
     void colorMapDataSettersRepaint();

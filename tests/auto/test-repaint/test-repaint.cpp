@@ -1556,6 +1556,136 @@ void TestRepaint::itemOnOwnLayerFollowsRangeChange()
                             .arg(blueColumn(screenOf(&plot))).arg(plot.xAxis->coordToPixel(5))));
 }
 
+void TestRepaint::anchoredChildOnOtherLayerFollowsRange()
+{
+    // A position that follows an anchor of another item moves when that item's axis moves, so the
+    // follower's layer has to be marked too, or it keeps last frame's pixels.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.addLayer(QStringLiteral("labels"));
+    plot.xAxis->setRange(0, 10);
+    plot.yAxis->setRange(0, 10);
+    plot.xAxis2->setRange(100, 200);
+    plot.yAxis2->setRange(0, 10);
+    auto* parent = new QCPItemLine(&plot);
+    parent->start->setAxes(plot.xAxis2, plot.yAxis2);
+    parent->end->setAxes(plot.xAxis2, plot.yAxis2);
+    parent->start->setCoords(120, 2);
+    parent->end->setCoords(120, 8);
+    auto* child = new QCPItemText(&plot);
+    QVERIFY(child->setLayer(QStringLiteral("labels")));
+    child->position->setParentAnchor(parent->end);
+    child->setText(QStringLiteral("follower"));
+    plot.replot();
+    waitUntilSettled(plot);
+    waitUntilSettled(plot);
+    auto* labels = plot.layer(QStringLiteral("labels"));
+    auto* main = plot.layer(QStringLiteral("main"));
+    QVERIFY(labels && main);
+    QVERIFY2(!labels->dirtiedAfterDraw(), "a settled labels layer must not be dirty");
+    QVERIFY2(!main->dirtiedAfterDraw(), "a settled main layer must not be dirty");
+
+    plot.xAxis2->setRange(150, 250); // moves the parent, and with it the follower
+    QVERIFY2(main->dirtiedAfterDraw(), "the parent's layer was not marked");
+    QVERIFY2(labels->dirtiedAfterDraw(), "the layer of the anchored follower was not marked");
+}
+
+void TestRepaint::rangeChangeMarksOnlyLayersUsingTheAxis()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.addLayer(QStringLiteral("a"));
+    plot.addLayer(QStringLiteral("b"));
+    for (QCPAxis* axis : {plot.xAxis, plot.yAxis, plot.xAxis2, plot.yAxis2})
+        axis->setRange(0, 10);
+    auto* onFirst = new QCPItemLine(&plot);
+    QVERIFY(onFirst->setLayer(QStringLiteral("a")));
+    onFirst->start->setCoords(1, 1);
+    onFirst->end->setCoords(2, 2);
+    auto* onSecond = new QCPItemLine(&plot);
+    QVERIFY(onSecond->setLayer(QStringLiteral("b")));
+    onSecond->start->setAxes(plot.xAxis2, plot.yAxis2);
+    onSecond->end->setAxes(plot.xAxis2, plot.yAxis2);
+    onSecond->start->setCoords(1, 1);
+    onSecond->end->setCoords(2, 2);
+    plot.replot();
+    waitUntilSettled(plot);
+    waitUntilSettled(plot);
+    auto* a = plot.layer(QStringLiteral("a"));
+    auto* b = plot.layer(QStringLiteral("b"));
+    QVERIFY(a && b);
+    QVERIFY2(!a->dirtiedAfterDraw() && !b->dirtiedAfterDraw(), "both item layers are settled");
+
+    plot.xAxis2->setRange(2, 12);
+    QVERIFY2(b->dirtiedAfterDraw(), "the layer whose item uses xAxis2 was not marked");
+    QVERIFY2(!a->dirtiedAfterDraw(), "the layer on the untouched axis was marked");
+}
+
+void TestRepaint::setAxesMovesTheLayerToTheNewAxis()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.addLayer(QStringLiteral("b"));
+    for (QCPAxis* axis : {plot.xAxis, plot.yAxis, plot.xAxis2, plot.yAxis2})
+        axis->setRange(0, 10);
+    auto* line = new QCPItemLine(&plot);
+    QVERIFY(line->setLayer(QStringLiteral("b")));
+    line->start->setCoords(1, 1);
+    line->end->setCoords(2, 2);
+    plot.replot();
+    waitUntilSettled(plot);
+    waitUntilSettled(plot);
+    auto* b = plot.layer(QStringLiteral("b"));
+    QVERIFY(b);
+    QVERIFY2(!b->dirtiedAfterDraw(), "a settled item layer must not be dirty");
+
+    line->start->setAxes(plot.xAxis2, plot.yAxis2);
+    line->end->setAxes(plot.xAxis2, plot.yAxis2);
+    waitUntilSettled(plot);
+    waitUntilSettled(plot);
+
+    plot.xAxis2->setRange(3, 13);
+    QVERIFY2(b->dirtiedAfterDraw(), "the layer did not follow its item onto xAxis2");
+}
+
+void TestRepaint::itemTakenAndAddedKeepsAxes()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.addLayer(QStringLiteral("b"));
+    for (QCPAxis* axis : {plot.xAxis, plot.yAxis, plot.xAxis2, plot.yAxis2})
+        axis->setRange(0, 10);
+    auto* line = new QCPItemLine(&plot);
+    line->start->setAxes(plot.xAxis2, plot.yAxis2);
+    line->end->setAxes(plot.xAxis2, plot.yAxis2);
+    line->start->setCoords(1, 1);
+    line->end->setCoords(2, 2);
+    plot.replot();
+    waitUntilSettled(plot);
+    waitUntilSettled(plot);
+
+    QCPAbstractItem* item = line;
+    auto handle = qcp::makeHandle<QCPHandle<QCPAbstractItem>>(item);
+    auto taken = plot.take(handle);
+    QVERIFY(taken);
+    auto added = plot.add(std::move(taken));
+    QVERIFY(added);
+    QVERIFY(added.get()->setLayer(QStringLiteral("b")));
+    // adopt() puts a re-added item back on the plot's default axes, as for a new item.
+    auto* readded = qobject_cast<QCPItemLine*>(added.get());
+    QVERIFY(readded);
+    readded->start->setAxes(plot.xAxis2, plot.yAxis2);
+    readded->end->setAxes(plot.xAxis2, plot.yAxis2);
+    plot.replot();
+    waitUntilSettled(plot);
+    waitUntilSettled(plot);
+    auto* b = plot.layer(QStringLiteral("b"));
+    QVERIFY(b);
+    QVERIFY2(!b->dirtiedAfterDraw(), "a settled item layer must not be dirty");
+
+    plot.xAxis2->setRange(4, 14);
+    QVERIFY2(b->dirtiedAfterDraw(), "a taken and re-added item left its layer without axes");
+}
 namespace
 {
 class CountingLine : public QCPItemLine

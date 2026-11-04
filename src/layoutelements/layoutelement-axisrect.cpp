@@ -510,15 +510,13 @@ void QCPAxisRect::markLayersUsingAxisDirty(const QCPAxis* axis)
 
 void QCPAxisRect::markItemsUsingAxisDirty(const QCPAxis* axis)
 {
-    for (QCPAbstractItem* item : mParentPlot->mItems)
-    {
-        const auto positions = item->positions();
-        const bool usesAxis = std::any_of(positions.begin(), positions.end(), [axis](auto* pos) {
-            return pos->keyAxis() == axis || pos->valueAxis() == axis;
-        });
-        if (usesAxis && item->layer())
-            item->layer()->markDirty();
-    }
+    if (!mParentPlot || !axis)
+        return;
+    // Each layer knows which axes its items follow (and the axes of the items their anchors follow):
+    // a range change marks those layers, not every item of the plot.
+    for (QCPLayer* layer : std::as_const(mParentPlot->mLayers))
+        if (layer->itemsUseAxis(axis))
+            layer->markDirty();
 }
 
 /*!

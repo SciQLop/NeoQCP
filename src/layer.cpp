@@ -1109,11 +1109,76 @@ std::optional<QCPDataBox> dataBoxOfRect(QCPAxis* keyAxis, QCPAxis* valueAxis, co
 void QCPLayer::invalidateItemIndex()
 {
     mItemIndexDirty = true;
+    mItemAxesDirty = true; // the child list decides which axes this layer's items follow
+}
+
+namespace
+{
+void addAxis(std::vector<QPointer<QCPAxis>>& axes, QCPAxis* axis)
+{
+    if (!axis)
+        return;
+    const auto known = [axis](const QPointer<QCPAxis>& candidate) { return candidate.data() == axis; };
+    if (std::none_of(axes.cbegin(), axes.cend(), known))
+        axes.push_back(axis);
+}
+} // namespace
+
+void QCPLayer::collectItemAxes(QCPAbstractItem* item, std::vector<QPointer<QCPAxis>>& axes) const
+{
+    // A position can follow an anchor of another item, and that item's pixels move when its own axes
+    // do, so the chain is walked. `seen` ends a cycle (two items anchoring on each other).
+    std::vector<QCPAbstractItem*> pending{item};
+    std::vector<QCPAbstractItem*> seen;
+    while (!pending.empty())
+    {
+        QCPAbstractItem* current = pending.back();
+        pending.pop_back();
+        if (!current || std::find(seen.cbegin(), seen.cend(), current) != seen.cend())
+            continue;
+        seen.push_back(current);
+        for (QCPItemPosition* position : current->positions())
+        {
+            addAxis(axes, position->keyAxis());
+            addAxis(axes, position->valueAxis());
+            if (QCPItemAnchor* anchor = position->parentAnchorX(); anchor && anchor->mParentItem)
+                pending.push_back(anchor->mParentItem);
+            if (QCPItemAnchor* anchor = position->parentAnchorY(); anchor && anchor->mParentItem)
+                pending.push_back(anchor->mParentItem);
+        }
+    }
+}
+
+void QCPLayer::rebuildItemAxes() const
+{
+    mItemAxes.clear();
+    for (QCPLayerable* child : mChildren)
+        if (auto* item = qobject_cast<QCPAbstractItem*>(child))
+            collectItemAxes(item, mItemAxes);
+    mItemAxesDirty = false;
+}
+
+bool QCPLayer::itemsUseAxis(const QCPAxis* axis) const
+{
+    if (mItemAxesDirty)
+        rebuildItemAxes();
+    return std::any_of(mItemAxes.cbegin(), mItemAxes.cend(),
+                       [axis](const QPointer<QCPAxis>& candidate) { return candidate.data() == axis; });
+}
+
+void QCPLayer::noteItemAxes(QCPAbstractItem* item)
+{
+    if (mItemAxesDirty || !item)
+        return; // the next rebuild collects the new axes anyway
+    collectItemAxes(item, mItemAxes);
 }
 
 void QCPLayer::noteItemExtentChanged(QCPAbstractItem* item)
 {
-    if (mItemIndexDirty || !item)
+    if (!item)
+        return;
+    noteItemAxes(item); // even while the index is being rebuilt
+    if (mItemIndexDirty)
         return;
     // The cached slot is valid while the index is clean, which is the only way to get here; the
     // guard covers a child list changed behind our back without invalidating (indexOf fallback).
