@@ -73,6 +73,7 @@ private slots:
   void QCPItems_Zoom100();
   void QCPItems_ZoomEmpty();
   void QCPItems_Click10k();
+  void QCPItems_ClickEmpty10k();
   void QCPItems_Click100();
   void QCPAxisRects_Stack8_Replot();
   void QCPPlots_Stack8_Replot();
@@ -1242,6 +1243,19 @@ void clickStorm(QCustomPlot *plot, const QPointF &onItem, const QPointF &empty)
   }
 }
 } // namespace
+
+void Benchmark::QCPItems_ClickEmpty10k()
+{
+  // Clicks that hit nothing and change no selection: the picture stays current, so the bounds
+  // cached by the last draw answer for the 9 900 items outside the view.
+  addLineItems(mPlot, 10000, 100);
+  // The items span y 0..1; y = 1.5 is in view and hits none of them.
+  mPlot->xAxis->setRange(50, 51);
+  mPlot->yAxis->setRange(0, 2);
+  mPlot->replot();
+  const QPointF empty(mPlot->xAxis->coordToPixel(50.5), mPlot->yAxis->coordToPixel(1.5));
+  clickStorm(mPlot, empty, empty);
+}
 
 void Benchmark::QCPItems_Click10k()
 {

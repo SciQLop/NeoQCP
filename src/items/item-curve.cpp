@@ -25,6 +25,9 @@
 
 #include "item-curve.h"
 
+#include <algorithm>
+#include <array>
+
 #include "../core.h"
 #include "../painting/painter.h"
 
@@ -207,11 +210,13 @@ QPen QCPItemCurve::mainPen() const
 
 std::optional<QRectF> QCPItemCurve::pixelBounds() const
 {
-    QPainterPath path;
-    path.moveTo(start->pixelPosition());
-    path.cubicTo(startDir->pixelPosition(), endDir->pixelPosition(), end->pixelPosition());
+    // A cubic Bezier lies inside the box of its four control points (no path allocation per frame).
+    const std::array<QPointF, 4> points {start->pixelPosition(), startDir->pixelPosition(),
+                                         endDir->pixelPosition(), end->pixelPosition()};
+    const auto [minX, maxX] = std::minmax({points[0].x(), points[1].x(), points[2].x(), points[3].x()});
+    const auto [minY, maxY] = std::minmax({points[0].y(), points[1].y(), points[2].y(), points[3].y()});
     const double pad = qMax(qMax(mHead.boundingDistance(), mTail.boundingDistance()),
                             qMax(mPen.widthF(), mSelectedPen.widthF()))
                        + 2.0;
-    return path.controlPointRect().adjusted(-pad, -pad, pad, pad);
+    return QRectF(QPointF(minX, minY), QPointF(maxX, maxY)).adjusted(-pad, -pad, pad, pad);
 }

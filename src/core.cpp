@@ -4930,25 +4930,25 @@ QList<QCPLayerable*> QCustomPlot::layerableListAt(const QPointF& pos, bool onlyS
                                                   QList<QVariant>* selectionDetails) const
 {
     QList<QCPLayerable*> result;
+    const double tol = selectionTolerance();
+    const QRect currentViewport = viewport();
     for (int layerIndex = mLayers.size() - 1; layerIndex >= 0; --layerIndex)
     {
         const QList<QCPLayerable*> layerables = mLayers.at(layerIndex)->children();
         for (int i = layerables.size() - 1; i >= 0; --i)
         {
-            if (!layerables.at(i)->realVisibility())
-                continue;
-            if (layerables.at(i)->mouseTransparent())
-                continue;
             const QCPLayerable* layerable = layerables.at(i);
             // The bounds cached by the last screen draw save the selectTest() of everything outside
-            // the click position. They are only used while they describe the current picture.
+            // the click position. They are only used while they describe the current picture, and
+            // tested first: they are cheaper than realVisibility()'s walk up the parents.
             if (layerable->mPixelBounds && layerable->mPixelBoundsStamp == mPaintGeneration
-                && layerable->mPixelBoundsViewport == viewport())
-            {
-                const double tol = selectionTolerance();
-                if (!layerable->mPixelBounds->adjusted(-tol, -tol, tol, tol).contains(pos))
-                    continue;
-            }
+                && layerable->mPixelBoundsViewport == currentViewport
+                && !layerable->mPixelBounds->adjusted(-tol, -tol, tol, tol).contains(pos))
+                continue;
+            if (!layerable->realVisibility())
+                continue;
+            if (layerable->mouseTransparent())
+                continue;
             QVariant details;
             double dist = layerables.at(i)->selectTest(pos, onlySelectable,
                                                        selectionDetails ? &details : nullptr);
