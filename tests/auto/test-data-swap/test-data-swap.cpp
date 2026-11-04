@@ -102,7 +102,7 @@ void TestDataSwap::requestsWithinWindowCommitOnce()
     QTRY_COMPARE_WITH_TIMEOUT(a->commits, 1, 2000);
     QVERIFY2(a->committedAt < 560, qPrintable(QString::number(a->committedAt)));
     QCOMPARE(b->commits, 1);
-    QVERIFY(replots.count() >= 1);
+    QTRY_VERIFY_WITH_TIMEOUT(replots.count() >= 1, 2000); // the repaint is queued
 
     QTest::qWait(500);                  // no second firing from the second request
     QCOMPARE(a->commits, 1);
@@ -209,7 +209,8 @@ void TestDataSwap::multiGraphCommitsAfterWindow()
 
     QTRY_VERIFY_WITH_TIMEOUT(!mg->hasPendingData(), 5000);
     QCOMPARE(mg->dataSource()->keyAt(0), 1000.0);
-    QVERIFY(replots.count() >= 1);
+    // The commit queues its repaint for a later event-loop turn: wait for it, do not assume it ran.
+    QTRY_VERIFY_WITH_TIMEOUT(replots.count() >= 1, 5000);
     QTRY_VERIFY_WITH_TIMEOUT(!mg->busy(), 5000);
     // The committed source draws from its own resampled cache: the next replot
     // must not fall back to the "pipeline active, no L1" early return.
