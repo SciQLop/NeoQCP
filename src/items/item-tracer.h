@@ -33,6 +33,9 @@
 class QCPPainter;
 class QCustomPlot;
 
+template <typename T, typename Self = void>
+class QCPItemTracerOps;
+
 class QCP_LIB_DECL QCPItemTracer : public QCPAbstractItem
 {
     Q_OBJECT
@@ -49,6 +52,9 @@ class QCP_LIB_DECL QCPItemTracer : public QCPAbstractItem
     /// \endcond
 
 public:
+    template <typename T>
+    using OpsFor = QCPItemTracerOps<T>;
+
     /*!
       The different visual appearances a tracer item can have. Some styles size may be controlled
       with \ref setSize.
@@ -132,5 +138,61 @@ protected:
     QBrush mainBrush() const;
 };
 Q_DECLARE_METATYPE(QCPItemTracer::TracerStyle)
+
+// The fluent handle of a QCPItemTracer; see QCPItemOps for the subclass contract.
+template <typename T, typename Self>
+class QCPItemTracerOps : public QCPItemOps<T, qcp::OpsRet<Self, QCPItemTracerOps<T>>>
+{
+    using Base = QCPItemOps<T, qcp::OpsRet<Self, QCPItemTracerOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setPosition(double key, double value)
+    {
+        return this->apply([&](T& i) { i.position->setCoords(key, value); });
+    }
+
+    Ret setPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setPen(pen); });
+    }
+
+    Ret setSelectedPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setSelectedPen(pen); });
+    }
+
+    Ret setBrush(const QBrush& brush)
+    {
+        return this->apply([&](T& o) { o.setBrush(brush); });
+    }
+
+    Ret setSelectedBrush(const QBrush& brush)
+    {
+        return this->apply([&](T& o) { o.setSelectedBrush(brush); });
+    }
+
+    Ret setSize(double size)
+    {
+        return this->apply([&](T& o) { o.setSize(size); });
+    }
+
+    Ret setStyle(QCPItemTracer::TracerStyle style)
+    {
+        return this->apply([&](T& o) { o.setStyle(style); });
+    }
+
+    Ret setGraphKey(double key)
+    {
+        return this->apply([&](T& o) { o.setGraphKey(key); });
+    }
+
+    Ret setInterpolating(bool enabled)
+    {
+        return this->apply([&](T& o) { o.setInterpolating(enabled); });
+    }
+};
 
 #endif // QCP_ITEM_TRACER_H

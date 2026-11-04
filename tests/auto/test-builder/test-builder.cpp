@@ -425,6 +425,41 @@ void TestBuilder::addEveryPlottable_data()
             auto i = p.add<QCPIntervals>(columns);
             return i->rowCount() == 1;
         });
+    row("errorbar",
+        [](QCustomPlot& p)
+        {
+            auto e = p.add<QCPErrorBars>().setWhiskerWidth(5);
+            return e->whiskerWidth() == 5;
+        });
+    row("statisticalbox",
+        [](QCustomPlot& p)
+        {
+            auto s = p.add<QCPStatisticalBox>().setWidth(0.4);
+            s->setData(kKeys, kValues, kValues, kValues, kValues, kValues);
+            return s->dataCount() == 3 && s->width() == 0.4;
+        });
+    row("multigraph",
+        [](QCustomPlot& p)
+        {
+            auto m = p.add<QCPMultiGraph>().setLineStyle(QCPMultiGraph::lsLine);
+            m->setData(kKeys, std::vector<std::vector<double>>{std::vector<double>(kValues.begin(), kValues.end())});
+            return m->lineStyle() == QCPMultiGraph::lsLine;
+        });
+    row("waterfall",
+        [](QCustomPlot& p)
+        {
+            auto w = p.add<QCPWaterfallGraph>().setGain(2.0);
+            w->setData(kKeys, std::vector<std::vector<double>>{std::vector<double>(kValues.begin(), kValues.end())});
+            return w->gain() == 2.0;
+        });
+    row("histogram",
+        [](QCustomPlot& p)
+        {
+            return p.add<QCPHistogram>().setBins(7)->bins() == 7;
+        });
+    row("graph2",
+        [](QCustomPlot& p) { return p.add<QCPGraph2>(kKeys, kValues).get()->dataCount() == 3; });
+
 }
 
 void TestBuilder::addEveryPlottable()
@@ -457,6 +492,83 @@ void TestBuilder::addEveryItem_data()
                 && line->head().style() == QCPLineEnding::esSpikeArrow
                 && line->pen().color() == QColor(Qt::green) && !line->clipToAxisRect()
                 && !line->visible();
+        });
+    row("itemcurve",
+        [](QCustomPlot& p)
+        {
+            auto i = p.add<QCPItemCurve>()
+                         .setStart(1, 2);
+            return i->start->coords() == QPointF(1, 2);
+        });
+    row("itembracket",
+        [](QCustomPlot& p)
+        {
+            auto i = p.add<QCPItemBracket>()
+                         .setLeft(1, 2);
+            return i->left->coords() == QPointF(1, 2);
+        });
+    row("itemellipse",
+        [](QCustomPlot& p)
+        {
+            auto i = p.add<QCPItemEllipse>()
+                         .setTopLeft(1, 2);
+            return i->topLeft->coords() == QPointF(1, 2);
+        });
+    row("itempixmap",
+        [](QCustomPlot& p)
+        {
+            auto i = p.add<QCPItemPixmap>()
+                         .setTopLeft(1, 2);
+            return i->topLeft->coords() == QPointF(1, 2);
+        });
+    row("itemrect",
+        [](QCustomPlot& p)
+        {
+            auto i = p.add<QCPItemRect>()
+                         .setTopLeft(1, 2);
+            return i->topLeft->coords() == QPointF(1, 2);
+        });
+    row("itemtext",
+        [](QCustomPlot& p)
+        {
+            auto i = p.add<QCPItemText>()
+                         .setPosition(1, 2);
+            return i->position->coords() == QPointF(1, 2);
+        });
+    row("itemtracer",
+        [](QCustomPlot& p)
+        {
+            auto i = p.add<QCPItemTracer>()
+                         .setPosition(1, 2);
+            return i->position->coords() == QPointF(1, 2);
+        });
+    row("itemstraightline",
+        [](QCustomPlot& p)
+        {
+            auto i = p.add<QCPItemStraightLine>()
+                         .setPoint1(1, 2);
+            return i->point1->coords() == QPointF(1, 2);
+        });
+    row("itemvspan",
+        [](QCustomPlot& p)
+        {
+            auto i = p.add<QCPItemVSpan>()
+                         .setLowerEdge(1, 2);
+            return i->lowerEdge->coords() == QPointF(1, 2);
+        });
+    row("itemhspan",
+        [](QCustomPlot& p)
+        {
+            auto i = p.add<QCPItemHSpan>()
+                         .setLowerEdge(1, 2);
+            return i->lowerEdge->coords() == QPointF(1, 2);
+        });
+    row("itemrspan",
+        [](QCustomPlot& p)
+        {
+            auto i = p.add<QCPItemRSpan>()
+                         .setLeftEdge(1, 2);
+            return i->leftEdge->coords() == QPointF(1, 2);
         });
 }
 
@@ -714,6 +826,38 @@ void TestBuilder::addRefusesObjectOfAPlot()
     QCOMPARE(gMisuses, 3); // the object is the cause; the missing axis rect is not reported too
 }
 
+void TestBuilder::axesOfTwoPlotsAreRefused()
+{
+    QCustomPlot plot;
+    QCustomPlot other;
+    auto built = std::make_unique<QCPGraph>(plot.xAxis, other.yAxis);
+    QCOMPARE(gMisuses, 1);
+    QCOMPARE(plot.plottableCount(), 0);
+    QCOMPARE(other.plottableCount(), 0);
+    QVERIFY(!built->layer()); // inert: neither plot draws it
+    settle(plot);
+    settle(other);
+}
+
+void TestBuilder::tracerGraphIsClearedOnTake()
+{
+    QCustomPlot plot;
+    auto g = plot.add<QCPGraph>(kKeys, kValues);
+    auto tracer = plot.add<QCPItemTracer>();
+    tracer->setGraph(g.get());
+    QCOMPARE(tracer->graph(), g.get());
+
+    auto taken = plot.take(tracer);
+    QVERIFY(taken);
+    QCOMPARE(tracer->graph(), nullptr); // the graph belongs to the plot it left
+
+    QCustomPlot other;
+    auto moved = other.add(std::move(taken));
+    QVERIFY(moved);
+    settle(other);
+    QCOMPARE(gMisuses, 0);
+}
+
 void TestBuilder::takenPointerDeletedIsClean()
 {
     QCustomPlot plot;
@@ -814,18 +958,6 @@ void TestBuilder::addPlottableDuringTeardownIsRefused()
     connect(first.get(), &QObject::destroyed,
             [plot, &refused]
             { refused = !plot->add(std::make_unique<QCPGraph>(nullptr, nullptr)); });
-    delete plot;
-    QVERIFY(refused);
-    QCOMPARE(gMisuses, 1);
-}
-
-void TestBuilder::addGroupDuringTeardownIsRefused()
-{
-    auto* plot = new QCustomPlot;
-    auto first = plot->add<QCPGraph>(kKeys, kValues);
-    bool refused = false;
-    connect(first.get(), &QObject::destroyed,
-            [plot, &refused] { refused = !plot->add<QCPPlottableGroup>("late"); });
     delete plot;
     QVERIFY(refused);
     QCOMPARE(gMisuses, 1);

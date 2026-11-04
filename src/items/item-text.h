@@ -32,6 +32,9 @@
 class QCPPainter;
 class QCustomPlot;
 
+template <typename T, typename Self = void>
+class QCPItemTextOps;
+
 class QCP_LIB_DECL QCPItemText : public QCPAbstractItem
 {
     Q_OBJECT
@@ -52,6 +55,9 @@ class QCP_LIB_DECL QCPItemText : public QCPAbstractItem
     /// \endcond
 
 public:
+    template <typename T>
+    using OpsFor = QCPItemTextOps<T>;
+
     explicit QCPItemText(QCustomPlot* parentPlot);
     virtual ~QCPItemText() override;
 
@@ -146,6 +152,87 @@ protected:
     QColor mainColor() const;
     QPen mainPen() const;
     QBrush mainBrush() const;
+};
+
+// The fluent handle of a QCPItemText; see QCPItemOps for the subclass contract.
+template <typename T, typename Self>
+class QCPItemTextOps : public QCPItemOps<T, qcp::OpsRet<Self, QCPItemTextOps<T>>>
+{
+    using Base = QCPItemOps<T, qcp::OpsRet<Self, QCPItemTextOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setPosition(double key, double value)
+    {
+        return this->apply([&](T& i) { i.position->setCoords(key, value); });
+    }
+
+    Ret setColor(const QColor& color)
+    {
+        return this->apply([&](T& o) { o.setColor(color); });
+    }
+
+    Ret setSelectedColor(const QColor& color)
+    {
+        return this->apply([&](T& o) { o.setSelectedColor(color); });
+    }
+
+    Ret setPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setPen(pen); });
+    }
+
+    Ret setSelectedPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setSelectedPen(pen); });
+    }
+
+    Ret setBrush(const QBrush& brush)
+    {
+        return this->apply([&](T& o) { o.setBrush(brush); });
+    }
+
+    Ret setSelectedBrush(const QBrush& brush)
+    {
+        return this->apply([&](T& o) { o.setSelectedBrush(brush); });
+    }
+
+    Ret setFont(const QFont& font)
+    {
+        return this->apply([&](T& o) { o.setFont(font); });
+    }
+
+    Ret setSelectedFont(const QFont& font)
+    {
+        return this->apply([&](T& o) { o.setSelectedFont(font); });
+    }
+
+    Ret setText(const QString& text)
+    {
+        return this->apply([&](T& o) { o.setText(text); });
+    }
+
+    Ret setPositionAlignment(Qt::Alignment alignment)
+    {
+        return this->apply([&](T& o) { o.setPositionAlignment(alignment); });
+    }
+
+    Ret setTextAlignment(Qt::Alignment alignment)
+    {
+        return this->apply([&](T& o) { o.setTextAlignment(alignment); });
+    }
+
+    Ret setRotation(double degrees)
+    {
+        return this->apply([&](T& o) { o.setRotation(degrees); });
+    }
+    Ret setPadding(const QMargins& padding)
+    {
+        return this->apply([&](T& i) { i.setPadding(padding); });
+    }
+
 };
 
 #endif // QCP_ITEM_TEXT_H

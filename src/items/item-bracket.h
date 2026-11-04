@@ -32,6 +32,9 @@
 class QCPPainter;
 class QCustomPlot;
 
+template <typename T, typename Self = void>
+class QCPItemBracketOps;
+
 class QCP_LIB_DECL QCPItemBracket : public QCPAbstractItem
 {
     Q_OBJECT
@@ -43,6 +46,9 @@ class QCP_LIB_DECL QCPItemBracket : public QCPAbstractItem
     /// \endcond
 
 public:
+    template <typename T>
+    using OpsFor = QCPItemBracketOps<T>;
+
     /*!
       Defines the various visual shapes of the bracket item. The appearance can be further modified
       by \ref setLength and \ref setPen.
@@ -106,5 +112,46 @@ protected:
     QPen mainPen() const;
 };
 Q_DECLARE_METATYPE(QCPItemBracket::BracketStyle)
+
+// The fluent handle of a QCPItemBracket; see QCPItemOps for the subclass contract.
+template <typename T, typename Self>
+class QCPItemBracketOps : public QCPItemOps<T, qcp::OpsRet<Self, QCPItemBracketOps<T>>>
+{
+    using Base = QCPItemOps<T, qcp::OpsRet<Self, QCPItemBracketOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setLeft(double key, double value)
+    {
+        return this->apply([&](T& i) { i.left->setCoords(key, value); });
+    }
+
+    Ret setRight(double key, double value)
+    {
+        return this->apply([&](T& i) { i.right->setCoords(key, value); });
+    }
+
+    Ret setPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setPen(pen); });
+    }
+
+    Ret setSelectedPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setSelectedPen(pen); });
+    }
+
+    Ret setLength(double length)
+    {
+        return this->apply([&](T& o) { o.setLength(length); });
+    }
+
+    Ret setStyle(QCPItemBracket::BracketStyle style)
+    {
+        return this->apply([&](T& o) { o.setStyle(style); });
+    }
+};
 
 #endif // QCP_ITEM_BRACKET_H

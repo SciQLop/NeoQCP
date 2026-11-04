@@ -6,6 +6,9 @@
 class QCPPainter;
 class QCustomPlot;
 
+template <typename T, typename Self = void>
+class QCPItemHSpanOps;
+
 class QCP_LIB_DECL QCPItemHSpan : public QCPAbstractSpanItem
 {
     Q_OBJECT
@@ -18,6 +21,9 @@ class QCP_LIB_DECL QCPItemHSpan : public QCPAbstractSpanItem
     Q_PROPERTY(bool movable READ movable WRITE setMovable)
 
 public:
+    template <typename T>
+    using OpsFor = QCPItemHSpanOps<T>;
+
     explicit QCPItemHSpan(QCustomPlot* parentPlot);
 
     QCPRange range() const;
@@ -47,6 +53,32 @@ protected:
     virtual void mousePressEvent(QMouseEvent* event, const QVariant& details) override;
     virtual void mouseMoveEvent(QMouseEvent* event, const QPointF& startPos) override;
     virtual void mouseReleaseEvent(QMouseEvent* event, const QPointF& startPos) override;
+};
+
+// The fluent handle of a QCPItemHSpan; see QCPItemOps for the subclass contract.
+template <typename T, typename Self>
+class QCPItemHSpanOps : public QCPItemOps<T, qcp::OpsRet<Self, QCPItemHSpanOps<T>>>
+{
+    using Base = QCPItemOps<T, qcp::OpsRet<Self, QCPItemHSpanOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setLowerEdge(double key, double value)
+    {
+        return this->apply([&](T& i) { i.lowerEdge->setCoords(key, value); });
+    }
+
+    Ret setUpperEdge(double key, double value)
+    {
+        return this->apply([&](T& i) { i.upperEdge->setCoords(key, value); });
+    }
+
+    Ret setRange(const QCPRange& range)
+    {
+        return this->apply([&](T& o) { o.setRange(range); });
+    }
 };
 
 #endif // QCP_ITEM_HSPAN_H

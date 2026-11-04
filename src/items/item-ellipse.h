@@ -32,6 +32,9 @@
 class QCPPainter;
 class QCustomPlot;
 
+template <typename T, typename Self = void>
+class QCPItemEllipseOps;
+
 class QCP_LIB_DECL QCPItemEllipse : public QCPAbstractItem
 {
     Q_OBJECT
@@ -43,6 +46,9 @@ class QCP_LIB_DECL QCPItemEllipse : public QCPAbstractItem
     /// \endcond
 
 public:
+    template <typename T>
+    using OpsFor = QCPItemEllipseOps<T>;
+
     explicit QCPItemEllipse(QCustomPlot* parentPlot);
     virtual ~QCPItemEllipse() override;
 
@@ -102,6 +108,47 @@ protected:
     // non-virtual methods:
     QPen mainPen() const;
     QBrush mainBrush() const;
+};
+
+// The fluent handle of a QCPItemEllipse; see QCPItemOps for the subclass contract.
+template <typename T, typename Self>
+class QCPItemEllipseOps : public QCPItemOps<T, qcp::OpsRet<Self, QCPItemEllipseOps<T>>>
+{
+    using Base = QCPItemOps<T, qcp::OpsRet<Self, QCPItemEllipseOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setTopLeft(double key, double value)
+    {
+        return this->apply([&](T& i) { i.topLeft->setCoords(key, value); });
+    }
+
+    Ret setBottomRight(double key, double value)
+    {
+        return this->apply([&](T& i) { i.bottomRight->setCoords(key, value); });
+    }
+
+    Ret setPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setPen(pen); });
+    }
+
+    Ret setSelectedPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setSelectedPen(pen); });
+    }
+
+    Ret setBrush(const QBrush& brush)
+    {
+        return this->apply([&](T& o) { o.setBrush(brush); });
+    }
+
+    Ret setSelectedBrush(const QBrush& brush)
+    {
+        return this->apply([&](T& o) { o.setSelectedBrush(brush); });
+    }
 };
 
 #endif // QCP_ITEM_ELLIPSE_H

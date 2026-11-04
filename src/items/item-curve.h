@@ -33,6 +33,9 @@
 class QCPPainter;
 class QCustomPlot;
 
+template <typename T, typename Self = void>
+class QCPItemCurveOps;
+
 class QCP_LIB_DECL QCPItemCurve : public QCPAbstractItem
 {
     Q_OBJECT
@@ -44,6 +47,9 @@ class QCP_LIB_DECL QCPItemCurve : public QCPAbstractItem
     /// \endcond
 
 public:
+    template <typename T>
+    using OpsFor = QCPItemCurveOps<T>;
+
     explicit QCPItemCurve(QCustomPlot* parentPlot);
     virtual ~QCPItemCurve() override;
 
@@ -81,6 +87,57 @@ protected:
 
     // non-virtual methods:
     QPen mainPen() const;
+};
+
+// The fluent handle of a QCPItemCurve; see QCPItemOps for the subclass contract.
+template <typename T, typename Self>
+class QCPItemCurveOps : public QCPItemOps<T, qcp::OpsRet<Self, QCPItemCurveOps<T>>>
+{
+    using Base = QCPItemOps<T, qcp::OpsRet<Self, QCPItemCurveOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setStart(double key, double value)
+    {
+        return this->apply([&](T& i) { i.start->setCoords(key, value); });
+    }
+
+    Ret setStartDir(double key, double value)
+    {
+        return this->apply([&](T& i) { i.startDir->setCoords(key, value); });
+    }
+
+    Ret setEndDir(double key, double value)
+    {
+        return this->apply([&](T& i) { i.endDir->setCoords(key, value); });
+    }
+
+    Ret setEnd(double key, double value)
+    {
+        return this->apply([&](T& i) { i.end->setCoords(key, value); });
+    }
+
+    Ret setPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setPen(pen); });
+    }
+
+    Ret setSelectedPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setSelectedPen(pen); });
+    }
+
+    Ret setHead(const QCPLineEnding& head)
+    {
+        return this->apply([&](T& o) { o.setHead(head); });
+    }
+
+    Ret setTail(const QCPLineEnding& tail)
+    {
+        return this->apply([&](T& o) { o.setTail(tail); });
+    }
 };
 
 #endif // QCP_ITEM_CURVE_H

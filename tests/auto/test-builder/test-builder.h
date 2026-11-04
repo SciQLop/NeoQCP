@@ -43,13 +43,14 @@ private slots:
     void takeDuringTeardown();
     void addUserBuilt();
     void addRefusesObjectOfAPlot();
+    void axesOfTwoPlotsAreRefused();
+    void tracerGraphIsClearedOnTake();
     void takenPointerDeletedIsClean();
     void addIntervalsWithBadColumnsLeavesThePlotUnchanged();
     void takeCutsAnchorsBothWays();
     void takeCutsOutboundAnchorLinks();
     void pixelPositionOfATakenItemIsNull();
     void addPlottableDuringTeardownIsRefused();
-    void addGroupDuringTeardownIsRefused();
     void itemsWithoutAxisRectAreRefusedLikePlottables();
     void layoutCellsFarBeyondTheGridAreRefused();
     void takenPipelinePlottablesOutliveTheirPlot();

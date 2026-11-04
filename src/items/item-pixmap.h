@@ -32,6 +32,9 @@
 class QCPPainter;
 class QCustomPlot;
 
+template <typename T, typename Self = void>
+class QCPItemPixmapOps;
+
 class QCP_LIB_DECL QCPItemPixmap : public QCPAbstractItem
 {
     Q_OBJECT
@@ -45,6 +48,9 @@ class QCP_LIB_DECL QCPItemPixmap : public QCPAbstractItem
     /// \endcond
 
 public:
+    template <typename T>
+    using OpsFor = QCPItemPixmapOps<T>;
+
     explicit QCPItemPixmap(QCustomPlot* parentPlot);
     virtual ~QCPItemPixmap() override;
 
@@ -110,6 +116,49 @@ protected:
                             bool flipVert = false);
     QRectF getFinalRect(bool* flippedHorz = nullptr, bool* flippedVert = nullptr) const;
     QPen mainPen() const;
+};
+
+// The fluent handle of a QCPItemPixmap; see QCPItemOps for the subclass contract.
+template <typename T, typename Self>
+class QCPItemPixmapOps : public QCPItemOps<T, qcp::OpsRet<Self, QCPItemPixmapOps<T>>>
+{
+    using Base = QCPItemOps<T, qcp::OpsRet<Self, QCPItemPixmapOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setTopLeft(double key, double value)
+    {
+        return this->apply([&](T& i) { i.topLeft->setCoords(key, value); });
+    }
+
+    Ret setBottomRight(double key, double value)
+    {
+        return this->apply([&](T& i) { i.bottomRight->setCoords(key, value); });
+    }
+
+    Ret setPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setPen(pen); });
+    }
+
+    Ret setSelectedPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setSelectedPen(pen); });
+    }
+    Ret setPixmap(const QPixmap& pixmap)
+    {
+        return this->apply([&](T& i) { i.setPixmap(pixmap); });
+    }
+
+    Ret setScaled(bool scaled, Qt::AspectRatioMode aspectRatioMode = Qt::KeepAspectRatio,
+                  Qt::TransformationMode transformationMode = Qt::SmoothTransformation)
+    {
+        return this->apply(
+            [&](T& i) { i.setScaled(scaled, aspectRatioMode, transformationMode); });
+    }
+
 };
 
 #endif // QCP_ITEM_PIXMAP_H

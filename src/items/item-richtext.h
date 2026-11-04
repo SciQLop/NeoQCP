@@ -6,12 +6,18 @@
 
 class QCPPainter;
 
+template <typename T, typename Self = void>
+class QCPItemRichTextOps;
+
 class QCP_LIB_DECL QCPItemRichText : public QCPItemText
 {
     Q_OBJECT
     Q_PROPERTY(QString html READ html WRITE setHtml)
 
 public:
+    template <typename T>
+    using OpsFor = QCPItemRichTextOps<T>;
+
     explicit QCPItemRichText(QCustomPlot* parentPlot);
     virtual ~QCPItemRichText() override;
 
@@ -39,6 +45,23 @@ private:
     double mCornerRadius = 0;
 
     QRectF computeDrawRect(const QPointF& pos) const;
+};
+
+// The fluent handle of a QCPItemRichText; see QCPItemOps for the subclass contract.
+template <typename T, typename Self>
+class QCPItemRichTextOps : public QCPItemTextOps<T, qcp::OpsRet<Self, QCPItemRichTextOps<T>>>
+{
+    // A rich text item is a text item: it keeps the text setters and the position.
+    using Base = QCPItemTextOps<T, qcp::OpsRet<Self, QCPItemRichTextOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setHtml(const QString& html)
+    {
+        return this->apply([&](T& o) { o.setHtml(html); });
+    }
 };
 
 #endif // QCP_ITEM_RICHTEXT_H

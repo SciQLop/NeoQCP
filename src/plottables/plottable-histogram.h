@@ -16,10 +16,16 @@ class QCPPlottableRhiLayer;
 //! Binning runs in the background; pre-binned data (setBinned) bypasses the pipeline.
 //! Bins follow the key axis scale, also on an axis given later with setKeyAxis: a scale
 //! change forgets the edges and bins again.
+template <typename T, typename Self = void>
+class QCPHistogramOps;
+
 class QCP_LIB_DECL QCPHistogram : public QCPAbstractPlottable
 {
     Q_OBJECT
 public:
+    template <typename T>
+    using OpsFor = QCPHistogramOps<T>;
+
     enum Style { sBars, sStep };
     Q_ENUM(Style)
 
@@ -110,4 +116,42 @@ private:
                          std::span<const qcp::histogram::BarRect> bars, const ColumnLook& look);
     void paintColumn(QCPPainter* painter, std::span<const qcp::histogram::BarRect> bars,
                      const ColumnLook& look) const;
+};// The fluent handle of a QCPHistogram; see QCPPlottableOps for the subclass contract.
+template <typename T, typename Self>
+class QCPHistogramOps : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPHistogramOps<T>>>
+{
+    using Base = QCPPlottableOps<T, qcp::OpsRet<Self, QCPHistogramOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setBins(int bins)
+    {
+        return this->apply([&](T& o) { o.setBins(bins); });
+    }
+
+    Ret setStyle(QCPHistogram::Style style)
+    {
+        return this->apply([&](T& o) { o.setStyle(style); });
+    }
+    Ret setBinned(std::vector<double> edges, std::vector<std::vector<double>> heights)
+    {
+        return this->apply([&](T& p) { p.setBinned(std::move(edges), std::move(heights)); });
+    }
+    Ret setFixedRange(std::optional<QCPRange> range)
+    {
+        return this->apply([&](T& p) { p.setFixedRange(std::move(range)); });
+    }
+    Ret setNormalization(qcp::algo::HistogramNormalization norm)
+    {
+        return this->apply([&](T& p) { p.setNormalization(norm); });
+    }
+    Ret setColumnColors(const QList<QColor>& colors)
+    {
+        return this->apply([&](T& p) { p.setColumnColors(colors); });
+    }
+
 };
+
+

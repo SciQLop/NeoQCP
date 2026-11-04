@@ -64,6 +64,9 @@ Q_DECLARE_TYPEINFO(QCPErrorBarsData, Q_PRIMITIVE_TYPE);
 */
 using QCPErrorBarsDataContainer = QVector<QCPErrorBarsData>;
 
+template <typename T, typename Self = void>
+class QCPErrorBarsOps;
+
 class QCP_LIB_DECL QCPErrorBars : public QCPAbstractPlottable, public QCPPlottableInterface1D
 {
     Q_OBJECT
@@ -76,6 +79,9 @@ class QCP_LIB_DECL QCPErrorBars : public QCPAbstractPlottable, public QCPPlottab
     /// \endcond
 
 public:
+    template <typename T>
+    using OpsFor = QCPErrorBarsOps<T>;
+
     /*!
       Defines in which orientation the error bars shall appear. If your data needs both error
       dimensions, create two \ref QCPErrorBars with different \ref ErrorType.
@@ -171,6 +177,32 @@ protected:
 
     friend class QCustomPlot;
     friend class QCPLegend;
+};
+
+// The fluent handle of a QCPErrorBars; see QCPPlottableOps for the subclass contract.
+template <typename T, typename Self>
+class QCPErrorBarsOps : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPErrorBarsOps<T>>>
+{
+    using Base = QCPPlottableOps<T, qcp::OpsRet<Self, QCPErrorBarsOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setErrorType(QCPErrorBars::ErrorType type)
+    {
+        return this->apply([&](T& o) { o.setErrorType(type); });
+    }
+
+    Ret setWhiskerWidth(double pixels)
+    {
+        return this->apply([&](T& o) { o.setWhiskerWidth(pixels); });
+    }
+
+    Ret setSymbolGap(double pixels)
+    {
+        return this->apply([&](T& o) { o.setSymbolGap(pixels); });
+    }
 };
 
 #endif // QCP_PLOTTABLE_ERRORBAR_H

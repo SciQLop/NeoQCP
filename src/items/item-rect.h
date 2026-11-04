@@ -32,6 +32,9 @@
 class QCPPainter;
 class QCustomPlot;
 
+template <typename T, typename Self = void>
+class QCPItemRectOps;
+
 class QCP_LIB_DECL QCPItemRect : public QCPAbstractItem
 {
     Q_OBJECT
@@ -43,6 +46,9 @@ class QCP_LIB_DECL QCPItemRect : public QCPAbstractItem
     /// \endcond
 
 public:
+    template <typename T>
+    using OpsFor = QCPItemRectOps<T>;
+
     explicit QCPItemRect(QCustomPlot* parentPlot);
     virtual ~QCPItemRect() override;
 
@@ -96,6 +102,47 @@ protected:
     // non-virtual methods:
     QPen mainPen() const;
     QBrush mainBrush() const;
+};
+
+// The fluent handle of a QCPItemRect; see QCPItemOps for the subclass contract.
+template <typename T, typename Self>
+class QCPItemRectOps : public QCPItemOps<T, qcp::OpsRet<Self, QCPItemRectOps<T>>>
+{
+    using Base = QCPItemOps<T, qcp::OpsRet<Self, QCPItemRectOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setTopLeft(double key, double value)
+    {
+        return this->apply([&](T& i) { i.topLeft->setCoords(key, value); });
+    }
+
+    Ret setBottomRight(double key, double value)
+    {
+        return this->apply([&](T& i) { i.bottomRight->setCoords(key, value); });
+    }
+
+    Ret setPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setPen(pen); });
+    }
+
+    Ret setSelectedPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setSelectedPen(pen); });
+    }
+
+    Ret setBrush(const QBrush& brush)
+    {
+        return this->apply([&](T& o) { o.setBrush(brush); });
+    }
+
+    Ret setSelectedBrush(const QBrush& brush)
+    {
+        return this->apply([&](T& o) { o.setSelectedBrush(brush); });
+    }
 };
 
 #endif // QCP_ITEM_RECT_H

@@ -11,9 +11,16 @@
 #include <span>
 #include <QTimer>
 
+template <typename T, typename Self = void>
+class QCPGraph2Ops;
+
 class QCP_LIB_DECL QCPGraph2 : public QCPAbstractPlottable, public QCPPlottableInterface1D {
     Q_OBJECT
 public:
+    template <typename T>
+    using OpsFor = QCPGraph2Ops<T>;
+
+
     enum LineStyle {
         lsNone,
         lsLine,
@@ -212,4 +219,28 @@ private:
     // Reused across draw() calls to avoid per-frame heap allocations
     std::vector<int> mScatterSubset;
     std::vector<float> mScatterPts;
+};// The fluent handle of a QCPGraph2; see QCPPlottableOps for the subclass contract.
+template <typename T, typename Self>
+class QCPGraph2Ops : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPGraph2Ops<T>>>
+{
+    using Base = QCPPlottableOps<T, qcp::OpsRet<Self, QCPGraph2Ops<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setData(const QVector<double>& keys, const QVector<double>& values)
+    {
+        return this->apply([&](T& p) { p.setData(keys, values); });
+    }
+    Ret setScatterSkip(int skip)
+    {
+        return this->apply([&](T& p) { p.setScatterSkip(skip); });
+    }
+    Ret setAdaptiveSampling(bool enabled)
+    {
+        return this->apply([&](T& p) { p.setAdaptiveSampling(enabled); });
+    }
 };
+
+

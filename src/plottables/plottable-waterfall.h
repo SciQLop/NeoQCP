@@ -38,9 +38,15 @@ private:
     double transform(int column, double rawValue) const;
 };
 
+template <typename T, typename Self = void>
+class QCPWaterfallGraphOps;
+
 class QCP_LIB_DECL QCPWaterfallGraph : public QCPMultiGraph {
     Q_OBJECT
 public:
+    template <typename T>
+    using OpsFor = QCPWaterfallGraphOps<T>;
+
     enum OffsetMode { omUniform, omCustom };
     Q_ENUM(OffsetMode)
 
@@ -89,4 +95,40 @@ private:
     void recomputeNormFactors();
 
     friend class TestWaterfall;
+};// The fluent handle of a QCPWaterfallGraph; see QCPPlottableOps for the subclass contract.
+template <typename T, typename Self>
+class QCPWaterfallGraphOps : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPWaterfallGraphOps<T>>>
+{
+    using Base = QCPPlottableOps<T, qcp::OpsRet<Self, QCPWaterfallGraphOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setOffsetMode(QCPWaterfallGraph::OffsetMode mode)
+    {
+        return this->apply([&](T& o) { o.setOffsetMode(mode); });
+    }
+
+    Ret setUniformSpacing(double spacing)
+    {
+        return this->apply([&](T& o) { o.setUniformSpacing(spacing); });
+    }
+
+    Ret setNormalize(bool enabled)
+    {
+        return this->apply([&](T& o) { o.setNormalize(enabled); });
+    }
+
+    Ret setGain(double gain)
+    {
+        return this->apply([&](T& o) { o.setGain(gain); });
+    }
+    Ret setOffsets(const QVector<double>& offsets)
+    {
+        return this->apply([&](T& p) { p.setOffsets(offsets); });
+    }
+
 };
+
+

@@ -562,3 +562,29 @@ handled with the layout family in Task 5.
 | QCPColorScale | setRangeDrag | src/layoutelements/layoutelement-colorscale.cpp:369 | no | — (interaction or state only) |
 | QCPColorScale | setRangeZoom | src/layoutelements/layoutelement-colorscale.cpp:393 | no | — (interaction or state only) |
 
+
+## item handles
+
+Every item gets a `QCPItem<Name>Ops` handle with one `set<Position>(key, value)` per public
+position member, plus one `apply` per item setter. Anchors stay read-only (they are inputs to
+`setParentAnchor` on another position, not setters).
+
+| item | handle | positions exposed |
+| --- | --- | --- |
+| QCPItemLine | QCPItemLineOps | setStart, setEnd |
+| QCPItemCurve | QCPItemCurveOps | setStart, setStartDir, setEndDir, setEnd |
+| QCPItemBracket | QCPItemBracketOps | setLeft, setRight |
+| QCPItemEllipse | QCPItemEllipseOps | setTopLeft, setBottomRight |
+| QCPItemPixmap | QCPItemPixmapOps | setTopLeft, setBottomRight |
+| QCPItemRect | QCPItemRectOps | setTopLeft, setBottomRight |
+| QCPItemText | QCPItemTextOps | setPosition |
+| QCPItemRichText | QCPItemRichTextOps | — (inherits its parent's positions) |
+| QCPItemTracer | QCPItemTracerOps | setPosition |
+| QCPItemStraightLine | QCPItemStraightLineOps | setPoint1, setPoint2 |
+| QCPItemVSpan | QCPItemVSpanOps | setLowerEdge, setUpperEdge |
+| QCPItemHSpan | QCPItemHSpanOps | setLowerEdge, setUpperEdge |
+| QCPItemRSpan | QCPItemRSpanOps | setLeftEdge, setRightEdge, setTopEdge, setBottomEdge |
+
+`QCPItemRichTextOps` derives from `QCPItemTextOps` (a rich text item is a text item): it keeps
+`setPosition` and the text setters and adds its own.
+

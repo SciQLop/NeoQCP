@@ -32,6 +32,9 @@
 class QCPPainter;
 class QCustomPlot;
 
+template <typename T, typename Self = void>
+class QCPItemStraightLineOps;
+
 class QCP_LIB_DECL QCPItemStraightLine : public QCPAbstractItem
 {
     Q_OBJECT
@@ -41,6 +44,9 @@ class QCP_LIB_DECL QCPItemStraightLine : public QCPAbstractItem
     /// \endcond
 
 public:
+    template <typename T>
+    using OpsFor = QCPItemStraightLineOps<T>;
+
     explicit QCPItemStraightLine(QCustomPlot* parentPlot);
     virtual ~QCPItemStraightLine() override;
 
@@ -71,6 +77,37 @@ protected:
     QLineF getRectClippedStraightLine(const QCPVector2D& base, const QCPVector2D& vec,
                                       const QRect& rect) const;
     QPen mainPen() const;
+};
+
+// The fluent handle of a QCPItemStraightLine; see QCPItemOps for the subclass contract.
+template <typename T, typename Self>
+class QCPItemStraightLineOps : public QCPItemOps<T, qcp::OpsRet<Self, QCPItemStraightLineOps<T>>>
+{
+    using Base = QCPItemOps<T, qcp::OpsRet<Self, QCPItemStraightLineOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setPoint1(double key, double value)
+    {
+        return this->apply([&](T& i) { i.point1->setCoords(key, value); });
+    }
+
+    Ret setPoint2(double key, double value)
+    {
+        return this->apply([&](T& i) { i.point2->setCoords(key, value); });
+    }
+
+    Ret setPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setPen(pen); });
+    }
+
+    Ret setSelectedPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setSelectedPen(pen); });
+    }
 };
 
 #endif // QCP_ITEM_STRAIGHTLINE_H

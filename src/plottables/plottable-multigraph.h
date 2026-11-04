@@ -21,9 +21,15 @@
 
 class QCPPlottableRhiLayer;
 
+template <typename T, typename Self = void>
+class QCPMultiGraphOps;
+
 class QCP_LIB_DECL QCPMultiGraph : public QCPAbstractPlottable, public QCPPlottableInterface1D {
     Q_OBJECT
 public:
+    template <typename T>
+    using OpsFor = QCPMultiGraphOps<T>;
+
     enum LineStyle { lsNone, lsLine, lsStepLeft, lsStepRight, lsStepCenter, lsImpulse };
     Q_ENUM(LineStyle)
 
@@ -356,4 +362,50 @@ protected:
 
 };
 
-using QCPGraphComponent = QCPMultiGraph::Component;
+using QCPGraphComponent = QCPMultiGraph::Component;// The fluent handle of a QCPMultiGraph; see QCPPlottableOps for the subclass contract.
+template <typename T, typename Self>
+class QCPMultiGraphOps : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPMultiGraphOps<T>>>
+{
+    using Base = QCPPlottableOps<T, qcp::OpsRet<Self, QCPMultiGraphOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setComponentVisible(int index, bool visible)
+    {
+        return this->apply([&](T& o) { o.setComponentVisible(index, visible); });
+    }
+
+    Ret setComponentFillBrush(int owner, const QBrush& brush)
+    {
+        return this->apply([&](T& o) { o.setComponentFillBrush(owner, brush); });
+    }
+
+    Ret setLineStyle(QCPMultiGraph::LineStyle style)
+    {
+        return this->apply([&](T& o) { o.setLineStyle(style); });
+    }
+
+    Ret setComponentLineStyle(int index, QCPMultiGraph::LineStyle style)
+    {
+        return this->apply([&](T& o) { o.setComponentLineStyle(index, style); });
+    }
+
+    Ret setAdaptiveSampling(bool enabled)
+    {
+        return this->apply([&](T& o) { o.setAdaptiveSampling(enabled); });
+    }
+
+    Ret setGapThreshold(double threshold)
+    {
+        return this->apply([&](T& o) { o.setGapThreshold(threshold); });
+    }
+
+    Ret setColorRange(const QCPRange& range)
+    {
+        return this->apply([&](T& o) { o.setColorRange(range); });
+    }
+};
+
+

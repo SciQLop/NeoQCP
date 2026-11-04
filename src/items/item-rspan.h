@@ -6,6 +6,9 @@
 class QCPPainter;
 class QCustomPlot;
 
+template <typename T, typename Self = void>
+class QCPItemRSpanOps;
+
 class QCP_LIB_DECL QCPItemRSpan : public QCPAbstractSpanItem
 {
     Q_OBJECT
@@ -18,6 +21,9 @@ class QCP_LIB_DECL QCPItemRSpan : public QCPAbstractSpanItem
     Q_PROPERTY(bool movable READ movable WRITE setMovable)
 
 public:
+    template <typename T>
+    using OpsFor = QCPItemRSpanOps<T>;
+
     explicit QCPItemRSpan(QCustomPlot* parentPlot);
 
     QCPRange keyRange() const;
@@ -60,6 +66,47 @@ protected:
 
 private:
     void emitDraggedRanges();
+};
+
+// The fluent handle of a QCPItemRSpan; see QCPItemOps for the subclass contract.
+template <typename T, typename Self>
+class QCPItemRSpanOps : public QCPItemOps<T, qcp::OpsRet<Self, QCPItemRSpanOps<T>>>
+{
+    using Base = QCPItemOps<T, qcp::OpsRet<Self, QCPItemRSpanOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setLeftEdge(double key, double value)
+    {
+        return this->apply([&](T& i) { i.leftEdge->setCoords(key, value); });
+    }
+
+    Ret setRightEdge(double key, double value)
+    {
+        return this->apply([&](T& i) { i.rightEdge->setCoords(key, value); });
+    }
+
+    Ret setTopEdge(double key, double value)
+    {
+        return this->apply([&](T& i) { i.topEdge->setCoords(key, value); });
+    }
+
+    Ret setBottomEdge(double key, double value)
+    {
+        return this->apply([&](T& i) { i.bottomEdge->setCoords(key, value); });
+    }
+
+    Ret setKeyRange(const QCPRange& range)
+    {
+        return this->apply([&](T& o) { o.setKeyRange(range); });
+    }
+
+    Ret setValueRange(const QCPRange& range)
+    {
+        return this->apply([&](T& o) { o.setValueRange(range); });
+    }
 };
 
 #endif // QCP_ITEM_RSPAN_H

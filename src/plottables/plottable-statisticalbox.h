@@ -83,6 +83,9 @@ Q_DECLARE_TYPEINFO(QCPStatisticalBoxData, Q_MOVABLE_TYPE);
 */
 using QCPStatisticalBoxDataContainer = QCPDataContainer<QCPStatisticalBoxData>;
 
+template <typename T, typename Self = void>
+class QCPStatisticalBoxOps;
+
 class QCP_LIB_DECL QCPStatisticalBox : public QCPAbstractPlottable1D<QCPStatisticalBoxData>
 {
     Q_OBJECT
@@ -97,6 +100,9 @@ class QCP_LIB_DECL QCPStatisticalBox : public QCPAbstractPlottable1D<QCPStatisti
     /// \endcond
 
 public:
+    template <typename T>
+    using OpsFor = QCPStatisticalBoxOps<T>;
+
     explicit QCPStatisticalBox(QCPAxis* keyAxis, QCPAxis* valueAxis);
 
     // getters:
@@ -177,6 +183,52 @@ protected:
 
     friend class QCustomPlot;
     friend class QCPLegend;
+};
+
+// The fluent handle of a QCPStatisticalBox; see QCPPlottableOps for the subclass contract.
+template <typename T, typename Self>
+class QCPStatisticalBoxOps : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPStatisticalBoxOps<T>>>
+{
+    using Base = QCPPlottableOps<T, qcp::OpsRet<Self, QCPStatisticalBoxOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setWidth(double width)
+    {
+        return this->apply([&](T& o) { o.setWidth(width); });
+    }
+
+    Ret setWhiskerWidth(double width)
+    {
+        return this->apply([&](T& o) { o.setWhiskerWidth(width); });
+    }
+
+    Ret setWhiskerPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setWhiskerPen(pen); });
+    }
+
+    Ret setWhiskerBarPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setWhiskerBarPen(pen); });
+    }
+
+    Ret setWhiskerAntialiased(bool enabled)
+    {
+        return this->apply([&](T& o) { o.setWhiskerAntialiased(enabled); });
+    }
+
+    Ret setMedianPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setMedianPen(pen); });
+    }
+
+    Ret setOutlierStyle(const QCPScatterStyle& style)
+    {
+        return this->apply([&](T& o) { o.setOutlierStyle(style); });
+    }
 };
 
 #endif // QCP_PLOTTABLE_STATISTICALBOX_H
