@@ -1989,10 +1989,12 @@ QCPAbstractItem* QCustomPlot::item() const
 bool QCustomPlot::removeItem(QCPAbstractItem* item)
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
-    if (mItems.contains(item))
+    // One search, not contains() then removeOne(); it stays a search (not item->mRegisteredPlot)
+    // because the caller's pointer may already be dangling.
+    if (const qsizetype index = mItems.indexOf(item); index >= 0)
     {
         // Unlisted first: a slot on destroyed() that calls removeItem or clearItems must find it gone.
-        mItems.removeOne(item);
+        mItems.removeAt(index);
         item->mRegisteredPlot = nullptr;
         delete item;
         return true;
@@ -4818,6 +4820,9 @@ bool QCustomPlot::registerGraph(QCPGraph* graph)
 */
 void QCustomPlot::itemDestroyed(QCPAbstractItem* item)
 {
+    // simplify: one linear search per deleted item (~1 us at 10k items, the order of Qt's own
+    // children search). item(index) needs the order; an index stored on the item or tombstones
+    // would make it O(1) if one-by-one deletes of very large sets ever matter.
     mItems.removeOne(item);
 }
 
