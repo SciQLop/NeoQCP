@@ -145,7 +145,7 @@ QCPColorMapData& QCPColorMapData::operator=(const QCPColorMapData& other)
                 memcpy(mAlpha, other.mAlpha, sizeof(mAlpha[0]) * size_t(keySize * valueSize));
         }
         mDataBounds = other.mDataBounds;
-        mDataModified = true;
+        dataChanged();
     }
     return *this;
 }
@@ -242,7 +242,7 @@ void QCPColorMapData::setSize(int keySize, int valueSize)
         if (mAlpha) // if we had an alpha map, recreate it with new size
             createAlpha();
 
-        mDataModified = true;
+        dataChanged();
     }
 }
 
@@ -305,6 +305,7 @@ void QCPColorMapData::setRange(const QCPRange& keyRange, const QCPRange& valueRa
 void QCPColorMapData::setKeyRange(const QCPRange& keyRange)
 {
     mKeyRange = keyRange;
+    dataChanged();
 }
 
 /*!
@@ -320,6 +321,7 @@ void QCPColorMapData::setKeyRange(const QCPRange& keyRange)
 void QCPColorMapData::setValueRange(const QCPRange& valueRange)
 {
     mValueRange = valueRange;
+    dataChanged();
 }
 
 /*!
@@ -351,7 +353,7 @@ void QCPColorMapData::setData(double key, double value, double z)
             if (z > mDataBounds.upper)
                 mDataBounds.upper = z;
         }
-        mDataModified = true;
+        dataChanged();
     }
 }
 
@@ -380,7 +382,7 @@ void QCPColorMapData::setCell(int keyIndex, int valueIndex, double z)
             if (z > mDataBounds.upper)
                 mDataBounds.upper = z;
         }
-        mDataModified = true;
+        dataChanged();
     }
     else
         qDebug() << Q_FUNC_INFO << "index out of bounds:" << keyIndex << valueIndex;
@@ -408,7 +410,7 @@ void QCPColorMapData::setAlpha(int keyIndex, int valueIndex, unsigned char alpha
         if (mAlpha || createAlpha())
         {
             mAlpha[valueIndex * mKeySize + keyIndex] = alpha;
-            mDataModified = true;
+            dataChanged();
         }
     }
     else
@@ -476,7 +478,7 @@ void QCPColorMapData::clearAlpha()
     {
         delete[] mAlpha;
         mAlpha = nullptr;
-        mDataModified = true;
+        dataChanged();
     }
 }
 
@@ -492,7 +494,7 @@ void QCPColorMapData::fill(double z)
     // mapping); fall back to the same degenerate range recalculateDataBounds
     // uses when no finite value exists.
     mDataBounds = std::isfinite(z) ? QCPRange(z, z) : QCPRange(0, 0);
-    mDataModified = true;
+    dataChanged();
 }
 
 /*!
@@ -510,7 +512,7 @@ void QCPColorMapData::fillAlpha(unsigned char alpha)
     {
         const int dataCount = mValueSize * mKeySize;
         memset(mAlpha, alpha, dataCount * sizeof(*mAlpha));
-        mDataModified = true;
+        dataChanged();
     }
 }
 
@@ -753,11 +755,22 @@ QCPColorMap::QCPColorMap(QCPAxis* keyAxis, QCPAxis* valueAxis)
         , mTightBoundary(false)
         , mMapImageInvalidated(true)
 {
+    mMapData->mOwner = this;
 }
 
 QCPColorMap::~QCPColorMap()
 {
+    mMapData->mOwner = nullptr;
     delete mMapData;
+}
+
+// The data has no layer of its own; the map that draws it is the only thing that can schedule
+// the repaint, and its draw() re-renders the image as soon as mDataModified is set.
+void QCPColorMapData::dataChanged()
+{
+    mDataModified = true;
+    if (mOwner)
+        mOwner->markDirty();
 }
 
 /*!
@@ -779,11 +792,14 @@ void QCPColorMap::setData(QCPColorMapData* data, bool copy)
     if (copy)
     {
         *mMapData = *data;
+        mMapData->mOwner = this;
     }
     else
     {
+        mMapData->mOwner = nullptr;
         delete mMapData;
         mMapData = data;
+        mMapData->mOwner = this;
     }
     mMapImageInvalidated = true;
 }

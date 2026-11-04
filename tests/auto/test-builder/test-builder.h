@@ -65,4 +65,5 @@ private slots:
     void takePolarGraphRefusals();
     void takenPolarGraphOutlivesItsPlot();
     void orphanedPolarGraphCanBeTaken();
+    void takeGraphClearsTracers();
 };

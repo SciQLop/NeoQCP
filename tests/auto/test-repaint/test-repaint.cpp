@@ -1437,3 +1437,68 @@ QImage TestRepaint::screenOf(QCustomPlot* plot)
     painter.end();
     return image;
 }
+
+namespace
+{
+struct ColorMapDataCase
+{
+    const char* name;
+    std::function<void(QCPColorMapData&)> change;
+};
+
+const QVector<ColorMapDataCase>& colorMapDataCases()
+{
+    static const QVector<ColorMapDataCase> cases {
+        { "setCell", [](QCPColorMapData& data) { data.setCell(5, 4, 1.0); } },
+        { "setSize", [](QCPColorMapData& data) { data.setSize(12, 9); } },
+        { "setRange", [](QCPColorMapData& data) { data.setRange(QCPRange(1, 3), QCPRange(2, 4)); } },
+        { "fill", [](QCPColorMapData& data) { data.fill(0.5); } },
+    };
+    return cases;
+}
+} // namespace
+
+void TestRepaint::colorMapDataSettersRepaint_data()
+{
+    QTest::addColumn<QString>("setter");
+    for (const auto& colorMapCase : colorMapDataCases())
+        QTest::newRow(colorMapCase.name) << QString::fromLatin1(colorMapCase.name);
+}
+
+void TestRepaint::colorMapDataSettersRepaint()
+{
+    QFETCH(QString, setter);
+    auto plot = settledPlot();
+    auto map = plot->add<QCPColorMap>();
+    map->data()->setSize(10, 8);
+    map->data()->setRange(QCPRange(0, 10), QCPRange(0, 10));
+    map->setDataRange(QCPRange(0, 1));
+    waitUntilSettled(*plot);
+    QVERIFY(!plot->isRepaintQueued());
+
+    const auto found = std::find_if(colorMapDataCases().cbegin(), colorMapDataCases().cend(),
+                                    [&](const ColorMapDataCase& colorMapCase) {
+                                        return setter == QLatin1String(colorMapCase.name);
+                                    });
+    QVERIFY(found != colorMapDataCases().cend());
+    found->change(*map->data());
+    QVERIFY2(plot->isRepaintQueued(), qPrintable(setter + " scheduled no repaint"));
+}
+
+void TestRepaint::colorMapDataPixelFollowsSetCell()
+{
+    auto plot = settledPlot();
+    auto map = plot->add<QCPColorMap>();
+    map->data()->setSize(10, 8);
+    map->data()->setRange(QCPRange(0, 10), QCPRange(0, 10));
+    map->setDataRange(QCPRange(0, 1));
+    for (int key = 0; key < 10; ++key)
+        for (int value = 0; value < 8; ++value)
+            map->data()->setCell(key, value, 0.0);
+    waitUntilSettled(*plot);
+    const QImage before = screenOf(plot.get());
+
+    map->data()->setCell(5, 4, 1.0);
+    waitUntilSettled(*plot);
+    QVERIFY(before != screenOf(plot.get()));
+}

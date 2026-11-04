@@ -139,6 +139,7 @@ Each buffered layer costs one more texture, so do not make every layer buffered.
 Changing a plot does not redraw it.
 Setting data, ranges or pens only stores the new state.
 `replot()` then lays out the plot, redraws the layers that changed, and asks the widget to repaint.
+Calls like `setData()` or `setRange()` ask for that redraw themselves, so a program rarely calls `replot()`. Use `requestRepaint()` for the changes the plot cannot see: a ticker modified in place, a selection decorator's pen.
 
 ```{literalinclude} snippets/concepts.cpp
 :start-after: // [concepts_replot_batch]

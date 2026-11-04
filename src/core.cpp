@@ -1440,6 +1440,11 @@ bool QCustomPlot::detach(QCPAbstractPlottable* plottable)
     plottable->setPipelineScheduler(nullptr);
     for (QCPLegend* legend : findChildren<QCPLegend*>())
         plottable->removeFromLegend(legend);
+    // A tracer keeps the graph it follows as a QPointer: the taken graph outlives the take, so the
+    // pointer would stay valid while the graph is no longer in this plot.
+    for (QCPAbstractItem* item : std::as_const(mItems))
+        if (auto* tracer = qobject_cast<QCPItemTracer*>(item); tracer && tracer->graph() == plottable)
+            tracer->setGraph(nullptr);
     const QPointer<QCPPlottableGroup> group = unlistPlottable(plottable);
     plottable->moveToLayer(nullptr, false);
     plottable->setParentLayerable(nullptr);

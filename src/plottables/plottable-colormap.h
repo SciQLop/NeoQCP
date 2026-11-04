@@ -98,7 +98,10 @@ protected:
     QCPRange mDataBounds;
     bool mDataModified;
 
+    void dataChanged();
     bool createAlpha(bool initializeOpaque = true);
+
+    QPointer<QCPColorMap> mOwner; // the map that draws this data, null when none does
 
     friend class QCPColorMap;
 };
@@ -193,6 +196,7 @@ protected:
 
     friend class QCustomPlot;
     friend class QCPLegend;
+    friend class QCPColorMapData;
 };
 
 // The fluent handle of a colour map; see QCPPlottableOps for the subclass contract.

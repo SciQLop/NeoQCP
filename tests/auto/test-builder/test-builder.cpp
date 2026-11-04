@@ -1283,3 +1283,38 @@ void TestBuilder::addPolarGraphWithoutRadialAxisIsRefused()
     QVERIFY(!graph);
     QCOMPARE(gMisuses, 1);
 }
+
+namespace
+{
+QStringList gLoggedMessages;
+} // namespace
+
+void TestBuilder::takeGraphClearsTracers()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    auto graph = plot.add<QCPGraph>(QVector<double> { 0, 1, 2 }, QVector<double> { 0, 1, 0 });
+    auto tracer = plot.add<QCPItemTracer>();
+    tracer->setGraph(graph.get());
+    tracer->setGraphKey(1.0);
+    plot.xAxis->setRange(0, 2);
+    plot.yAxis->setRange(-1, 2);
+    plot.replot();
+
+    auto taken = plot.take(graph);
+    QVERIFY(taken);
+    QVERIFY2(!tracer->graph(), "the tracer still points at the taken graph");
+
+    gLoggedMessages.clear();
+    const QtMessageHandler previous = qInstallMessageHandler(
+        [](QtMsgType, const QMessageLogContext&, const QString& message) {
+            gLoggedMessages << message;
+        });
+    plot.replot();
+    plot.replot();
+    qInstallMessageHandler(previous);
+
+    for (const QString& message : std::as_const(gLoggedMessages))
+        QVERIFY2(!message.contains(QLatin1String("not contained")), qPrintable(message));
+    QCOMPARE(gMisuses, 0);
+}

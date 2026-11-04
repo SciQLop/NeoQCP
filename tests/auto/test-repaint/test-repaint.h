@@ -44,6 +44,9 @@ private slots:
     void plottableGroupVisibilityRepaints();
     void axisMarginChangeDuringPanRepaints();
     void multiGraphLineStyleResetsComponents();
+    void colorMapDataSettersRepaint_data();
+    void colorMapDataSettersRepaint();
+    void colorMapDataPixelFollowsSetCell();
     void equalValueDoesNotDirty_data();
     void equalValueDoesNotDirty();
 

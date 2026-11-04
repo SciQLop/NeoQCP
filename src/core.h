@@ -340,7 +340,9 @@ public:
     // ownership. It leaves the lists, its legend rows, its plottable group, bars group and stack,
     // its colour scale, its layer and its axes (set to null); it is unparented. A dead handle, an
     // object of another plot or a plot being destroyed: one misuse and an empty pointer.
-    // Plottables and items only (not yet axis rects, text elements, legends or groups). The plot has
+    // Plottables, items and polar graphs. Axes, layers and layout parts (axis rects, legends, text
+    // elements, colour scales) have no take: they leave only through remove(), which deletes them.
+    // The plot has
     // no item-removed signal, so taking an item emits none (plottables leave their group with
     // membersChanged, as when deleted).
     template <typename T>

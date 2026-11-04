@@ -125,6 +125,8 @@ It starts with one axis rect, holding a bottom `xAxis` and a left `yAxis`.
 `add<QCPGraph>()` creates a graph on the default axes. `setData()` copies the points into it.
 Setters schedule one repaint, so the graph appears without a call to `replot()`: change as much as you like, the plot draws once the event loop runs.
 
+A few changes are invisible to the plot: a ticker modified in place (`xAxis->ticker()->setTickCount()`), a selection decorator's pen. Call `plot->requestRepaint()` after one of those; it asks for the same single repaint the setters do.
+
 A complete program puts the same lines in a window:
 
 ```{literalinclude} snippets/programs/first-window.cpp
