@@ -71,15 +71,17 @@ an export, whatever the pen style.
 ### 2. The object contract
 
 `QCPDrawable` replaces the old drawing virtuals (`draw(QCPPainter*)`, `drawLegendIcon`, `selectTest`)
-for the classes ported to it. Classes not yet ported stay on the old base until milestone 4; the old
+for the classes ported to it. In milestones 3 and 4 it is the adapter `QCPDrawn<Base>`: a ported class
+keeps its old base (data, groups, legend, selection) and the adapter implements the old virtuals from
+the new ones; milestone 4 folds it into the bases. Classes not yet ported stay on the old base until milestone 4; the old
 base is removed before 3.0 ships (milestone 5), so a release never has two ways.
 
 ```cpp
 class QCPDrawable : public QCPLayerable {
 protected:
     virtual void draw(QCPDrawContext& context) const = 0;
-    virtual std::optional<QCPDataBox2D> dataRange() const;       // default: from the recording
-    virtual QCPHit hitTest(QCP::Pixels at, QCPHitQuery query) const; // default: from the recording
+    virtual std::optional<QCPDataBox> dataRange() const;          // default: from the recording
+    virtual std::optional<double> hitTest(QCP::Pixels at, QVariant* details) const; // default: recording
     virtual void drawLegendIcon(QCPDrawContext& icon) const;     // default: the recording, fitted
     void contentChanged();
 };
@@ -105,7 +107,8 @@ protected:
 - The command list is private. Users see the helpers only, so the command set can grow without an ABI
   break.
 - Each command kind has one screen backend, chosen by kind, never by style: GPU for polylines (dashes
-  included), fills, markers and images; QPainter for text and paths. A style the GPU cannot draw (a
+  included), fills, rects, ellipses, error bars and markers; QPainter for text, paths and images
+  (images move to the GPU once the colour-map texture layer is generic, milestone 4). A style the GPU cannot draw (a
   texture brush) is rasterised on the CPU into an image covering the command's bounds, then drawn as a
   GPU image command at the same place in the order.
 - Each command also paints itself with QPainter. That is the export path, written once per command
