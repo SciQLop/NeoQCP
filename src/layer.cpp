@@ -1210,6 +1210,8 @@ void QCPLayer::noteItemExtentChanged(QCPAbstractItem* item)
     mItemKind[position] = 2;
     mItemSide.push_back(position);
     // Bentley-Saxe: keep the small part small, rebuild when it grows past a sixteenth of the layer.
+    // A layer with fewer than 64 items keeps its moved items on the side list until its child list
+    // changes: they are drawn and tested one by one, which is fine at that size.
     if (int(mItemSide.size()) > std::max(64, int(mChildren.size()) / 16))
         mItemIndexDirty = true;
 }
@@ -1272,7 +1274,11 @@ const std::vector<std::uint8_t>& QCPLayer::itemCandidates(const QRectF& pixelAre
     if (mItemIndexDirty)
         rebuildItemIndex();
     mItemCandidates.assign(static_cast<std::size_t>(mChildren.size()), 1);
-    for (std::size_t i = 0; i < mItemKind.size(); ++i)
+    // Equal after a rebuild; the clamp keeps a child list changed behind the index's back from
+    // turning a stale entry into a write past the array.
+    const std::size_t indexed
+        = std::min(mItemKind.size(), mItemCandidates.size());
+    for (std::size_t i = 0; i < indexed; ++i)
         if (mItemKind[i] == 1)
             mItemCandidates[i] = 0;
     for (std::size_t groupIndex = 0; groupIndex < mItemGroups.size(); ++groupIndex)
