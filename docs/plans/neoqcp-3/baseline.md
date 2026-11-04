@@ -167,3 +167,77 @@ composite happen in `render()`, which an offscreen benchmark does not run).
 | QCPAxisRects_Stack8_Replot | 1.8 | 1.8 | 1.8 / 1.8 / 1.8 | 1.00 |
 | QCPPlots_Stack8_Replot | 0.26 | 0.26 | 0.26 / 0.26 / 0.26 | 1.00 |
 | QCPInput_MouseMoveStorm | - | 3.7 | 3.7 / 3.9 / 3.7 | new |
+
+## End of item scaling
+
+- Commit: 49bc340 (neoqcp-3.0), same command and machine, three sequential runs
+- Load average (1/5/15 min) at the start of each run: run 1: 1.85 / 3.35 / 3.31, run 2: 1.75 / 2.98 / 3.18, run 3: 1.60 / 2.68 / 3.06
+- Ratio = end-of-item-scaling median / end-of-milestone-2 median.
+- The whole binary, 56 rows, `QT_QPA_PLATFORM=offscreen qcp_benchmark -median 5`, nothing else running.
+- Single-shot rows (QCPGraph_RemoveData*, QCPColorMapData_ConstructLarge, the delete rows that run once per pass) are noisy, as in the earlier sections.
+- Rows outside the +-15% band (four):
+  - QCPItems_AddRemove10k 72 -> 28 ms (0.39): the point of this milestone. `registerItem`'s duplicate test is a pointer comparison, `clearItems` takes the items out of their layers in one pass and deletes them oldest first so Qt finds each at the front, and the item constructor no longer walks the layout for the whole axis-rect list (Tasks 2, docs/plans/neoqcp-3/item-scaling-profile.md).
+  - QCPItems_Replot10k 0.13 -> 1.2 ms (9.23): not a regression in work done, but in work priced. Before 770b1eb an item-only layer was never redrawn on a range change, so the row timed an empty draw; items are now really redrawn, and Task 4's view culling brings the honest number to 1.2 ms (was 4.5 ms right after the fix).
+  - QCPColorMap_ColorizeMap 0.27 -> 0.16 ms (0.59): not investigated. The row builds its colour map outside the measurement and times `setCell` + a synchronous `replot()`; the improvement is consistent across the three runs (0.16 / 0.16 / 0.16) but I did not bisect it.
+  - QCPGraph_RemoveDataBetween 0.089 -> 0.11 ms (1.24): not investigated beyond noise: it is a single-shot row (0.076 / 0.14 / 0.076 in the three passes) with no code from this milestone on its path.
+- New rows: the item-scaling benchmark set (QCPItems_Add10k, Clear10k, DeleteEach10k, RemoveEach10k, AddRemove20k, DeletePlot10k, Zoom10k, Zoom100, ZoomEmpty, Click10k, Click100, ClickEmpty10k, QObject_DeleteEachChild10k) and QCPColorMap_SetCell1M, which was added after the milestone-2 runs.
+- Guard rows: QCPAxis_SetRange10k, QCPItems_AddRemove10k's neighbours, the Replot rows and the setter rows show no regression from the appearance-marking work; QCPAxis_SetTickLength10kItems is unchanged at 15 ms.
+
+| Benchmark | milestone 2 msecs | end msecs | run 1 / 2 / 3 | ratio |
+|---|---|---|---|---|
+| QCPAxisRects_Stack8_Replot | 1.8 | 1.8 | 1.8 / 1.8 / 1.8 | 1.00 |
+| QCPAxis_SetRange10k | 1.3 | 1.4 | 1.5 / 1.4 / 1.4 | 1.08 |
+| QCPAxis_SetTickLength10kItems | 15 | 15 | 16 / 15 / 15 | 1.00 |
+| QCPAxis_TickLabels | 0.24 | 0.24 | 0.25 / 0.24 / 0.24 | 1.00 |
+| QCPAxis_TickLabelsCached | 0.089 | 0.089 | 0.088 / 0.09 / 0.089 | 1.00 |
+| QCPColorMap2_ResampleDouble | 234 | 221 | 215 / 221 / 226 | 0.94 |
+| QCPColorMap2_ResampleFloat | 132 | 131 | 128 / 137 / 131 | 0.99 |
+| QCPColorMap2_ResamplePanSequence | 167 | 177 | 207 / 158 / 177 | 1.06 |
+| QCPColorMap2_ResamplePanSequenceSmall | 210 | 205 | 205 / 205 / 206 | 0.98 |
+| QCPColorMap2_ResampleWideParallel | 264 | 256 | 256 / 255 / 265 | 0.97 |
+| QCPColorMap2_ResampleWideSerial | 772 | 757 | 754 / 769 / 757 | 0.98 |
+| QCPColorMapData_ConstructLarge | 1.1 | 1.2 | 1.1 / 1.3 / 1.2 | 1.09 |
+| QCPColorMap_ColorizeMap | 0.27 | 0.16 | 0.16 / 0.16 / 0.16 | 0.59 |
+| QCPColorMap_SetCell1M | - | 3.2 | 3.2 / 3.2 / 3.2 | new |
+| QCPColorMap_Standard | 0.22 | 0.22 | 0.22 / 0.22 / 0.22 | 1.00 |
+| QCPGraph2_RenderDouble | 0.14 | 0.14 | 0.14 / 0.14 / 0.14 | 1.00 |
+| QCPGraph2_RenderFloat | 0.14 | 0.14 | 0.14 / 0.14 / 0.14 | 1.00 |
+| QCPGraph2_RenderManyLines | 0.44 | 0.44 | 0.44 / 0.45 / 0.44 | 1.00 |
+| QCPGraph2_ScatterDisc1M | 0.12 | 0.12 | 0.12 / 0.12 / 0.12 | 1.00 |
+| QCPGraph2_ScatterSquare1M | 0.12 | 0.12 | 0.12 / 0.12 / 0.12 | 1.00 |
+| QCPGraph2_ScatterWithLine1M | 0.12 | 0.13 | 0.13 / 0.12 / 0.13 | 1.08 |
+| QCPGraph2_SetDataDouble | 9.5 | 9.5 | 9.5 / 9.7 / 9.3 | 1.00 |
+| QCPGraph2_SetDataFloat | 8.1 | 8.2 | 8.4 / 8.2 / 8.1 | 1.01 |
+| QCPGraph_AddDataAtBeginSorted | 5.5 | 5.5 | 5.2 / 5.5 / 5.7 | 1.00 |
+| QCPGraph_AddDataAtBeginUnsorted | 28 | 28 | 28 / 27 / 28 | 1.00 |
+| QCPGraph_AddDataAtEndSorted | 5.4 | 4.9 | 4.9 / 4.8 / 5.2 | 0.91 |
+| QCPGraph_AddDataAtEndUnsorted | 23 | 22 | 22 / 22 / 23 | 0.96 |
+| QCPGraph_AddDataMixedSorted | 10 | 10 | 10 / 10 / 11 | 1.00 |
+| QCPGraph_AddDataMixedUnsorted | 29 | 29 | 29 / 28 / 29 | 1.00 |
+| QCPGraph_AddDataSingleAtBegin | 0.045 | 0.045 | 0.045 / 0.048 / 0.045 | 1.00 |
+| QCPGraph_AddDataSingleAtEnd | 0.024 | 0.024 | 0.024 / 0.024 / 0.024 | 1.00 |
+| QCPGraph_AddDataSingleRandom | 5 | 5 | 5 / 5 / 5 | 1.00 |
+| QCPGraph_ManyLines | 1.3 | 1.3 | 1.3 / 1.3 / 1.2 | 1.00 |
+| QCPGraph_ManyOffScreenLines | 0.15 | 0.15 | 0.15 / 0.15 / 0.15 | 1.00 |
+| QCPGraph_ManyPoints | 2.6 | 2.6 | 2.6 / 2.6 / 2.6 | 1.00 |
+| QCPGraph_RemoveDataAfter | 0.00072 | 0.00068 | 0.001 / 0.00068 / 0.00064 | 0.94 |
+| QCPGraph_RemoveDataBefore | 0.19 | 0.17 | 0.24 / 0.17 / 0.16 | 0.89 |
+| QCPGraph_RemoveDataBetween | 0.089 | 0.11 | 0.14 / 0.11 / 0.076 | 1.24 |
+| QCPGraph_Standard | 0.67 | 0.71 | 0.71 / 0.72 / 0.66 | 1.06 |
+| QCPInput_MouseMoveStorm | 3.7 | 3.8 | 3.8 / 3.9 / 3.7 | 1.03 |
+| QCPItems_Add10k | - | 18 | 18 / 18 / 19 | new |
+| QCPItems_AddRemove10k | 72 | 28 | 27 / 28 / 28 | 0.39 |
+| QCPItems_AddRemove20k | - | 64 | 65 / 62 / 64 | new |
+| QCPItems_Clear10k | - | 8.3 | 8.6 / 8.3 / 8.3 | new |
+| QCPItems_Click100 | - | 0.014 | 0.013 / 0.014 / 0.014 | new |
+| QCPItems_Click10k | - | 1.2 | 1.2 / 1.2 / 1.2 | new |
+| QCPItems_ClickEmpty10k | - | 0.29 | 0.29 / 0.29 / 0.29 | new |
+| QCPItems_DeleteEach10k | - | 24 | 27 / 24 / 24 | new |
+| QCPItems_DeletePlot10k | - | 25 | 27 / 25 / 25 | new |
+| QCPItems_RemoveEach10k | - | 25 | 32 / 25 / 25 | new |
+| QCPItems_Replot10k | 0.13 | 1.2 | 1.2 / 1.2 / 1.2 | 9.23 |
+| QCPItems_Zoom100 | - | 0.41 | 0.41 / 0.41 / 0.4 | new |
+| QCPItems_Zoom10k | - | 1.2 | 1.2 / 1.2 / 1.2 | new |
+| QCPItems_ZoomEmpty | - | 0.14 | 0.14 / 0.15 / 0.14 | new |
+| QCPPlots_Stack8_Replot | 0.26 | 0.26 | 0.26 / 0.26 / 0.26 | 1.00 |
+| QObject_DeleteEachChild10k | - | 7.8 | 8.3 / 7.8 / 7.7 | new |
