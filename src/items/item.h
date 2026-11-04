@@ -223,6 +223,7 @@ public:
     [[nodiscard]] bool selectable() const { return mSelectable; }
 
     [[nodiscard]] bool selected() const { return mSelected; }
+    [[nodiscard]] bool mayBeSelected() const override { return mSelected; }
 
     // setters:
     void setClipToAxisRect(bool clip);

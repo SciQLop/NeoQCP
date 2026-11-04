@@ -229,6 +229,9 @@ public:
 
     // non-property methods:
     [[nodiscard]] bool realVisibility() const;
+    // False only when deselectEvent() would change nothing, so a deselect pass may skip this
+    // layerable. The default answers "maybe"; items know exactly.
+    [[nodiscard]] virtual bool mayBeSelected() const { return true; }
     // Schedules a full repaint of this layerable's layer next turn; a no-op without a plot or a
     // layer. GUI thread only. Virtual so an item can tell its layer that its extent may have
     // changed: an item that moves leaves the index and is tested one by one until the next rebuild.

@@ -89,6 +89,20 @@ public:
     mutable int mSelectCalls = 0;
 };
 
+class DeselectCountingLine : public QCPItemLine
+{
+public:
+    explicit DeselectCountingLine(QCustomPlot* plot) : QCPItemLine(plot) {}
+    int mDeselectCalls = 0;
+
+protected:
+    void deselectEvent(bool* selectionStateChanged) override
+    {
+        ++mDeselectCalls;
+        QCPItemLine::deselectEvent(selectionStateChanged);
+    }
+};
+
 bool sameList(const QList<QCPLayerable*>& a, const QList<QCPLayerable*>& b)
 {
     return a == b;
@@ -364,4 +378,43 @@ void TestItemIndex::scaleTypeChangeRebuildsTheIndex()
     QCoreApplication::processEvents();
 
     QCOMPARE(plot.toPixmap().toImage(), fresh.toPixmap().toImage());
+}
+
+void TestItemIndex::emptyClickVisitsOnlySelectedItems()
+{
+    // A click deselects everything else; with thousands of items, visiting the ones that are not
+    // selected was most of the click.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.xAxis->setRange(0, 100);
+    plot.yAxis->setRange(0, 100);
+    plot.setInteractions(QCP::iSelectItems);
+    std::vector<DeselectCountingLine*> lines;
+    for (int i = 0; i < 50; ++i)
+    {
+        auto* line = new DeselectCountingLine(&plot);
+        line->start->setCoords(i, 10);
+        line->end->setCoords(i + 0.5, 20);
+        line->setSelected(i % 10 == 0);
+        lines.push_back(line);
+    }
+    plot.replot();
+    const QPointF empty(plot.xAxis->coordToPixel(50), plot.yAxis->coordToPixel(80));
+    const QPointF global = plot.mapToGlobal(empty);
+    QMouseEvent press(QEvent::MouseButtonPress, empty, global, Qt::LeftButton, Qt::LeftButton,
+                      Qt::NoModifier);
+    QCoreApplication::sendEvent(&plot, &press);
+    QMouseEvent release(QEvent::MouseButtonRelease, empty, global, Qt::LeftButton, Qt::NoButton,
+                        Qt::NoModifier);
+    QCoreApplication::sendEvent(&plot, &release);
+
+    for (std::size_t i = 0; i < lines.size(); ++i)
+    {
+        QVERIFY(!lines[i]->selected());
+        QCOMPARE(lines[i]->mDeselectCalls, i % 10 == 0 ? 1 : 0);
+    }
+
+    plot.deselectAll(); // nothing is selected any more: nobody is visited
+    for (std::size_t i = 0; i < lines.size(); ++i)
+        QCOMPARE(lines[i]->mDeselectCalls, i % 10 == 0 ? 1 : 0);
 }

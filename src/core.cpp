@@ -77,11 +77,17 @@ namespace
 {
 using qcp::guarded;
 
-QList<QPointer<QCPLayerable>> guardedLayerables(const QList<QCPLayer*>& layers)
+// The layerables a deselect pass must visit, guarded because a selectionChanged slot may delete
+// any of them. Only those that may be selected: guarding all of them was most of a click with
+// thousands of items.
+QList<QPointer<QCPLayerable>> guardedSelectedLayerables(const QList<QCPLayer*>& layers,
+                                                       const QCPLayerable* kept = nullptr)
 {
     QList<QPointer<QCPLayerable>> result;
     for (auto* layer : layers)
-        result.append(guarded(layer->children()));
+        for (QCPLayerable* layerable : layer->children())
+            if (layerable != kept && layerable->mayBeSelected())
+                result.append(layerable);
     return result;
 }
 } // namespace
@@ -2577,7 +2583,7 @@ QList<QCPLegend*> QCustomPlot::selectedLegends() const
 */
 void QCustomPlot::deselectAll()
 {
-    for (const auto& layerable : guardedLayerables(mLayers))
+    for (const auto& layerable : guardedSelectedLayerables(mLayers))
         if (layerable)
             layerable->deselectEvent(nullptr);
 }
@@ -2590,9 +2596,9 @@ void QCustomPlot::deselectAll()
 bool QCustomPlot::deselectAllExcept(const QCPLayerable* kept)
 {
     bool changed = false;
-    for (const auto& layerable : guardedLayerables(mLayers))
+    for (const auto& layerable : guardedSelectedLayerables(mLayers, kept))
     {
-        if (layerable && layerable != kept
+        if (layerable
             && mInteractions.testFlag(layerable->selectionCategory()))
         {
             bool selChanged = false;

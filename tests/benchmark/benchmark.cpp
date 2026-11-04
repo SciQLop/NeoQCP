@@ -1254,8 +1254,8 @@ void clickStorm(QCustomPlot *plot, const QPointF &onItem, const QPointF &empty)
 
 void Benchmark::QCPItems_ClickEmpty10k()
 {
-  // Clicks that hit nothing and change no selection: the picture stays current, so the bounds
-  // cached by the last draw answer for the 9 900 items outside the view.
+  // Clicks that hit nothing and change no selection: the index answers for the items away from the
+  // click, and the deselect pass visits only selected items.
   addLineItems(mPlot, 10000, 100);
   // The items span y 0..1; y = 1.5 is in view and hits none of them.
   mPlot->xAxis->setRange(50, 51);

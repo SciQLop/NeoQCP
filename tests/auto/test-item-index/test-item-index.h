@@ -9,4 +9,5 @@ private slots:
     void dragOneItemKeepsTheTree();
     void clickTestsOnlyItemsNearTheClick();
     void scaleTypeChangeRebuildsTheIndex();
+    void emptyClickVisitsOnlySelectedItems();
 };
