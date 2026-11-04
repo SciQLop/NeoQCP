@@ -222,6 +222,13 @@ embedded_shaders = custom_target('embedded_shaders',
               'scatter_colored_frag_qsb_data:@INPUT10@'])
 
 # Overridden by a host (meson.override_dependency) that wants NeoQCP's zones in its own tracer.
+if get_option('zone_stats')
+  zone_stats_hook = meson.current_source_dir() / 'tools/zone-stats/zone-stats-hook.h'
+  meson.override_dependency('neoqcp-profiling-hook',
+    declare_dependency(
+      compile_args: ['-DNEOQCP_PROFILING_HOOK="@0@"'.format(zone_stats_hook)],
+      include_directories: include_directories('tools/zone-stats')))
+endif
 profiling_hook_dep = dependency('neoqcp-profiling-hook', required: false)
 
 NeoQCP = static_library('NeoQCP',

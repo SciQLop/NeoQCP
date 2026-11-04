@@ -2,3 +2,4 @@ option('tracy_enable', type : 'boolean', value : false , description : 'Enable p
 option('with_examples', type : 'boolean', value : false , description : 'Enable examples')
 option('with_tests', type : 'boolean', value : true , description : 'Enable tests')
 option('with_latex', type : 'boolean', value : true , description : 'Typeset $...$ spans in axis labels via JKQTMathText')
+option('zone_stats', type : 'boolean', value : false, description : 'Per-zone time and call counts, dumped at exit to $NEOQCP_ZONE_STATS (development)')

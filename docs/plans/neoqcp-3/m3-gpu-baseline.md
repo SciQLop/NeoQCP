@@ -80,6 +80,32 @@ Offscreen rows — `QT_QPA_PLATFORM=offscreen build-qt612/tests/benchmark/qcp_be
 - `QCPItemText_Zoom1k` measures the same in both groups (2.5 ms) — the text path is QPainter either way,
   and the GPU window is larger, so the surfaces are not directly comparable across groups.
 
+## How to profile
+
+`src/Profiling.hpp` already has 75 zone sites; the `zone_stats` build option routes them to a
+header-only time collector (`tools/zone-stats/zone-stats-hook.h`) that writes a table when the
+process exits. It is a development option: a default build is byte-for-byte unaffected (no extra
+compile arguments, no extra code).
+
+    meson setup build-prof --buildtype=debugoptimized -Dzone_stats=true
+    ninja -C build-prof -j 4 tests/benchmark/qcp_benchmark
+
+    # a CPU row
+    NEOQCP_ZONE_STATS=$PWD/build-qt612/oc-scratch/zones-graph.txt QT_QPA_PLATFORM=offscreen \
+      build-prof/tests/benchmark/qcp_benchmark -median 5 QCPGraph_Standard
+
+    # a GPU row (frames are counted at the render pass, so they only appear on this path)
+    xvfb-run -a -s "-screen 0 1600x1200x24" env \
+      NEOQCP_ZONE_STATS=$PWD/build-qt612/oc-scratch/zones-gpu.txt QT_QPA_PLATFORM=xcb \
+      build-prof/tests/benchmark/qcp_benchmark -median 5 QCPGpu_LineSolid100k
+
+The file is tab-separated: `zone`, `calls`, `total_ms`, `mean_us`, `share` (this zone's total over the
+sum of the outermost zones, so nested rows add up to more than 100 % — that is the point), then a
+`frames` line. The cost is two `steady_clock::now()` calls per zone (about 40 ns); measured end to end
+it moved `QCPGraph_Standard` 0.67 -> 0.69 ms and `QCPItems_Zoom10k` 0.42 -> 0.43 ms, i.e. at the noise
+floor. The two tables from the first run are in
+`.superpowers/sdd/2026-11-04-neoqcp-3-milestone-3/task-1b-report.md`.
+
 ## How to reproduce
 
     export PATH="/home/jeandet/Qt/6.12.0/gcc_64/bin:/home/jeandet/Documents/prog/SciQLopPlots/.venv/bin:$PATH"
