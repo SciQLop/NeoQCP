@@ -155,6 +155,9 @@ void QCPPolarGrid::setRadialSubGridPen(const QPen& pen)
 
 void QCPPolarGrid::setRadialZeroLinePen(const QPen& pen)
 {
+    if (pen == mRadialZeroLinePen)
+        return;
+    markDirty();
     mRadialZeroLinePen = pen;
 }
 

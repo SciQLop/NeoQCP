@@ -1541,6 +1541,14 @@ void QCPAxisRect::wheelEvent(QWheelEvent* event)
     }
 }
 
+void QCPAxisRect::markLayoutAppearanceDirty()
+{
+    // Not just the rect's own layer: a pending pan translation would keep the axes, grids and
+    // plottables of this rect at their old pixels.
+    markAffectedLayersDirty(true);
+    QCPLayoutElement::markLayoutAppearanceDirty();
+}
+
 void QCPAxisRect::markAffectedLayersDirty(bool invalidate)
 {
     // Collect unique layers from axes, grids, and plottables in this rect.

@@ -613,15 +613,12 @@ void QCPPolarAxisRadial::setTickLabelRotation(double degrees)
 
 void QCPPolarAxisRadial::setTickLabelMode(LabelMode mode)
 {
-    switch (mode)
-    {
-        case lmUpright:
-            mLabelPainter.setAnchorMode(QCPLabelPainterPrivate::amSkewedUpright);
-            break;
-        case lmRotated:
-            mLabelPainter.setAnchorMode(QCPLabelPainterPrivate::amSkewedRotated);
-            break;
-    }
+    const auto anchor = mode == lmUpright ? QCPLabelPainterPrivate::amSkewedUpright
+                                          : QCPLabelPainterPrivate::amSkewedRotated;
+    if (mLabelPainter.anchorMode() == anchor)
+        return;
+    markDirty();
+    mLabelPainter.setAnchorMode(anchor);
 }
 
 /*!
@@ -834,11 +831,10 @@ void QCPPolarAxisRadial::setSubTickLengthIn(int inside)
 */
 void QCPPolarAxisRadial::setSubTickLengthOut(int outside)
 {
-    if (mSubTickLengthOut != outside)
-    {
-        markDirty();
+    if (mSubTickLengthOut == outside)
+        return;
+    markDirty();
     mSubTickLengthOut = outside;
-}
 }
 
 /*!
@@ -887,11 +883,10 @@ void QCPPolarAxisRadial::setSubTickPen(const QPen& pen)
 */
 void QCPPolarAxisRadial::setLabelFont(const QFont& font)
 {
-    if (mLabelFont != font)
-    {
-        markDirty();
+    if (mLabelFont == font)
+        return;
+    markDirty();
     mLabelFont = font;
-}
 }
 
 /*!
@@ -1540,7 +1535,6 @@ void QCPPolarAxisRadial::setupTickVectors()
     if ((!mTicks && !mTickLabels) || mRange.size() <= 0)
         return;
 
-    markDirty();
     mTicker->generate(mRange, mParentPlot->locale(), mNumberFormatChar, mNumberPrecision,
                       mTickVector, mSubTicks ? &mSubTickVector : 0,
                       mTickLabels ? &mTickVectorLabels : 0);

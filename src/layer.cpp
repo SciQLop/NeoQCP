@@ -165,7 +165,7 @@ void QCPLayer::setVisible(bool visible)
 {
     if (visible == mVisible)
         return;
-    markDirty();
+    invalidatePaintBuffer(); // a hidden layer's translation is not a valid stand-in
     mVisible = visible;
 }
 
@@ -650,6 +650,9 @@ bool QCPLayerable::setLayer(const QString& layerName)
 */
 void QCPLayerable::setAntialiased(bool enabled)
 {
+    if (enabled == mAntialiased)
+        return;
+    markDirty();
     mAntialiased = enabled;
 }
 

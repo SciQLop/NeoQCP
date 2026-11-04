@@ -98,7 +98,7 @@ void QCPAbstractLegendItem::setFont(const QFont& font)
     if (mFont == font)
         return;
     if (mLayer)
-        mLayer->markDirty();
+        mLayer->invalidatePaintBuffer(); // a font change invalidates the old glyphs
     mFont = font;
 }
 
@@ -112,7 +112,7 @@ void QCPAbstractLegendItem::setTextColor(const QColor& color)
     if (mTextColor == color)
         return;
     if (mLayer)
-        mLayer->markDirty();
+        mLayer->invalidatePaintBuffer(); // a font change invalidates the old glyphs
     mTextColor = color;
 }
 
@@ -127,7 +127,7 @@ void QCPAbstractLegendItem::setSelectedFont(const QFont& font)
     if (mSelectedFont == font)
         return;
     if (mLayer)
-        mLayer->markDirty();
+        mLayer->invalidatePaintBuffer(); // a font change invalidates the old glyphs
     mSelectedFont = font;
 }
 
@@ -142,7 +142,7 @@ void QCPAbstractLegendItem::setSelectedTextColor(const QColor& color)
     if (mSelectedTextColor == color)
         return;
     if (mLayer)
-        mLayer->markDirty();
+        mLayer->invalidatePaintBuffer(); // a font change invalidates the old glyphs
     mSelectedTextColor = color;
 }
 
@@ -563,6 +563,8 @@ void QCPLegend::setBrush(const QBrush& brush)
 */
 void QCPLegend::setFont(const QFont& font)
 {
+    if (font == mFont)
+        return;
     markDirty();
     mFont = font;
     for (int i = 0; i < itemCount(); ++i)
@@ -583,6 +585,8 @@ void QCPLegend::setFont(const QFont& font)
 */
 void QCPLegend::setTextColor(const QColor& color)
 {
+    if (color == mTextColor)
+        return;
     markDirty();
     mTextColor = color;
     for (int i = 0; i < itemCount(); ++i)
@@ -608,6 +612,8 @@ void QCPLegend::setIconSize(const QSize& size)
  */
 void QCPLegend::setIconSize(int width, int height)
 {
+    if (QSize(width, height) == mIconSize)
+        return;
     markDirty();
     mIconSize.setWidth(width);
     mIconSize.setHeight(height);
@@ -772,6 +778,8 @@ void QCPLegend::setSelectedBrush(const QBrush& brush)
 */
 void QCPLegend::setSelectedFont(const QFont& font)
 {
+    if (font == mSelectedFont)
+        return;
     markDirty();
     mSelectedFont = font;
     for (int i = 0; i < itemCount(); ++i)
@@ -790,6 +798,8 @@ void QCPLegend::setSelectedFont(const QFont& font)
 */
 void QCPLegend::setSelectedTextColor(const QColor& color)
 {
+    if (color == mSelectedTextColor)
+        return;
     markDirty();
     mSelectedTextColor = color;
     for (int i = 0; i < itemCount(); ++i)

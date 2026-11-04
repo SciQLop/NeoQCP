@@ -354,13 +354,12 @@ void QCPPolarGraph::setSelectable(QCP::SelectionType selectable)
 */
 void QCPPolarGraph::setSelection(QCPDataSelection selection)
 {
-    markDirty();
     selection.enforceType(mSelectable);
-    if (mSelection != selection)
-    {
-        mSelection = selection;
-        emitSelectionChanged();
-    }
+    if (mSelection == selection)
+        return;
+    markDirty();
+    mSelection = selection;
+    emitSelectionChanged();
 }
 
 /*! \internal

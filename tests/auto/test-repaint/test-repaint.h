@@ -27,9 +27,13 @@ private slots:
     void axisUnlistedHandsOffsetToSibling();
     void layoutSettersIgnoreEqualValues();
     void graphTracerSettles();
+    void remainingEqualValueDoesNotDirty_data();
+    void remainingEqualValueDoesNotDirty();
     void remainingSettersScheduleRepaint_data();
     void remainingSettersScheduleRepaint();
     void secondLegendRowFollowsRename();
+    void axisRectMarginsMoveTheContent();
+    void polarPlotSettles();
     void exportSettlesPendingTheme();
     void plottableSettersScheduleRepaint_data();
     void plottableSettersScheduleRepaint();

@@ -39,10 +39,10 @@ QCPMultiGraph* QCPGroupLegendItem::multiGraph() const
 
 void QCPGroupLegendItem::setExpanded(bool expanded)
 {
-    if (mExpanded == expanded) return;
+    if (mExpanded == expanded)
+        return;
+    markDirty();
     mExpanded = expanded;
-    if (mParentPlot)
-        mParentPlot->replot();
 }
 
 // One component has nothing to expand to: its row would repeat the header. It is drawn like a plain

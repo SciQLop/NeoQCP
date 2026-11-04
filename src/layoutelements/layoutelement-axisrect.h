@@ -179,6 +179,9 @@ protected:
     void updateAxesOffset(QCPAxis::AxisType type);
     void zoomAxesAt(const QPointF& pos, double horizontalFactor, double verticalFactor);
     void markAffectedLayersDirty(bool invalidate = false);
+    // A margin or size change moves the inner rect, so every axis, grid and plottable in it draws
+    // at new pixels.
+    void markLayoutAppearanceDirty() override;
 
 private:
     Q_DISABLE_COPY(QCPAxisRect)

@@ -1100,15 +1100,12 @@ void QCPPolarAxisAngular::setTickLabelRotation(double degrees)
 
 void QCPPolarAxisAngular::setTickLabelMode(LabelMode mode)
 {
-    switch (mode)
-    {
-        case lmUpright:
-            mLabelPainter.setAnchorMode(QCPLabelPainterPrivate::amSkewedUpright);
-            break;
-        case lmRotated:
-            mLabelPainter.setAnchorMode(QCPLabelPainterPrivate::amSkewedRotated);
-            break;
-    }
+    const auto anchor = mode == lmUpright ? QCPLabelPainterPrivate::amSkewedUpright
+                                          : QCPLabelPainterPrivate::amSkewedRotated;
+    if (mLabelPainter.anchorMode() == anchor)
+        return;
+    markDirty();
+    mLabelPainter.setAnchorMode(anchor);
 }
 
 /*!
@@ -1210,11 +1207,10 @@ void QCPPolarAxisAngular::setNumberFormat(const QString& formatCode)
 */
 void QCPPolarAxisAngular::setNumberPrecision(int precision)
 {
-    if (mNumberPrecision != precision)
-    {
-        markDirty();
+    if (mNumberPrecision == precision)
+        return;
+    markDirty();
     mNumberPrecision = precision;
-}
 }
 
 /*!
@@ -1227,7 +1223,6 @@ void QCPPolarAxisAngular::setNumberPrecision(int precision)
 */
 void QCPPolarAxisAngular::setTickLength(int inside, int outside)
 {
-    markDirty();
     setTickLengthIn(inside);
     setTickLengthOut(outside);
 }
@@ -1320,11 +1315,10 @@ void QCPPolarAxisAngular::setSubTickLengthIn(int inside)
 */
 void QCPPolarAxisAngular::setSubTickLengthOut(int outside)
 {
-    if (mSubTickLengthOut != outside)
-    {
-        markDirty();
+    if (mSubTickLengthOut == outside)
+        return;
+    markDirty();
     mSubTickLengthOut = outside;
-}
 }
 
 /*!
@@ -1512,6 +1506,9 @@ void QCPPolarAxisAngular::setSelectedTickPen(const QPen& pen)
 */
 void QCPPolarAxisAngular::setSelectedSubTickPen(const QPen& pen)
 {
+    if (pen == mSelectedSubTickPen)
+        return;
+    markDirty();
     mSelectedSubTickPen = pen;
 }
 
@@ -1564,11 +1561,9 @@ void QCPPolarAxisAngular::drawBackground(QCPPainter* painter, const QPointF& cen
         }
         else
         {
-    markDirty();
             painter->drawPixmap(mRect.topLeft() + QPoint(0, -1), mBackgroundPixmap,
                                 QRect(0, 0, mRect.width(), mRect.height()));
-        
-}
+        }
         painter->setClipRegion(originalClip);
     }
 }
@@ -1588,7 +1583,6 @@ void QCPPolarAxisAngular::setupTickVectors()
     if ((!mTicks && !mTickLabels && !mGrid->visible()) || mRange.size() <= 0)
         return;
 
-    markDirty();
     mSubTickVector.clear(); // since we might not pass it to mTicker->generate(), and we don't want
                             // old data in there
     mTicker->generate(mRange, mParentPlot->locale(), mNumberFormatChar, mNumberPrecision,

@@ -621,6 +621,8 @@ void QCustomPlot::connectThemeSignal()
         if (!mThemeDirty) {
             mThemeDirty = true;
             QTimer::singleShot(0, this, [this]() {
+                if (!mThemeDirty) // settle() already applied it
+                    return;
                 mThemeDirty = false;
                 applyTheme();
             });
@@ -697,6 +699,8 @@ void QCustomPlot::applyTheme()
 
     // The setters above marked what they touch; the background brush is drawn outside every layer,
     // so invalidate them all and let the queued repaint do the work.
+    // simplify: invalidates every layer even for a theme change that touches nothing, because
+    // working out which layer a theme field reaches costs more than one repaint.
     for (QCPLayer* layer : mLayers)
         layer->invalidatePaintBuffer();
     requestRepaint();

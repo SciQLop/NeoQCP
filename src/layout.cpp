@@ -410,15 +410,6 @@ void QCPLayoutElement::setMaximumSize(int width, int height)
     setMaximumSize(QSize(width, height)); // the QSize overload marks only when the size changes
 }
 
-/*!
-  Sets to which rect of a layout element the size constraints apply. Size constraints can be set
-  via \ref setMinimumSize and \ref setMaximumSize.
-
-  The outer rect (\ref outerRect) includes the margins (e.g. in the case of a QCPAxisRect the axis
-  labels), whereas the inner rect (\ref rect) does not.
-
-  \see setMinimumSize, setMaximumSize
-*/
 void QCPLayoutElement::markLayoutAppearanceDirty()
 {
     markDirty();
@@ -432,6 +423,15 @@ void QCPLayout::markLayoutAppearanceDirty()
             element->markLayoutAppearanceDirty();
 }
 
+/*!
+  Sets to which rect of a layout element the size constraints apply. Size constraints can be set
+  via \ref setMinimumSize and \ref setMaximumSize.
+
+  The outer rect (\ref outerRect) includes the margins (e.g. in the case of a QCPAxisRect the axis
+  labels), whereas the inner rect (\ref rect) does not.
+
+  \see setMinimumSize, setMaximumSize
+*/
 void QCPLayoutElement::setSizeConstraintRect(SizeConstraintRect constraintRect)
 {
     if (mSizeConstraintRect != constraintRect)
@@ -462,12 +462,14 @@ void QCPLayoutElement::setMarginGroup(QCP::MarginSides sides, QCPMarginGroup* gr
         QCP::msLeft, QCP::msRight, QCP::msTop, QCP::msBottom
     };
 
+    bool changed = false;
     for (auto side : kAllSides)
     {
         if (!sides.testFlag(side))
             continue;
         if (marginGroup(side) != group)
         {
+            changed = true;
             QCPMarginGroup* oldGroup = marginGroup(side);
             if (oldGroup) // unregister at old group
                 oldGroup->removeChild(side, this);
@@ -484,6 +486,8 @@ void QCPLayoutElement::setMarginGroup(QCP::MarginSides sides, QCPMarginGroup* gr
             }
         }
     }
+    if (changed) // the margins it synchronises move this element
+        markLayoutAppearanceDirty();
 }
 
 /*!

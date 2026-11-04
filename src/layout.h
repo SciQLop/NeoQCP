@@ -222,9 +222,10 @@ public:
     bool remove(QCPLayoutElement* element);
     void clear();
 
-protected:
     // introduced virtual methods:
     void markLayoutAppearanceDirty() override;
+
+protected:
     virtual void updateLayout();
 
     // non-virtual methods:

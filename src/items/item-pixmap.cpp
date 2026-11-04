@@ -83,6 +83,8 @@ QCPItemPixmap::~QCPItemPixmap() { }
 */
 void QCPItemPixmap::setPixmap(const QPixmap& pixmap)
 {
+    if (pixmap.cacheKey() == mPixmap.cacheKey())
+        return;
     markDirty();
     mPixmap = pixmap;
     mScaledPixmapInvalidated = true;
@@ -97,6 +99,9 @@ void QCPItemPixmap::setPixmap(const QPixmap& pixmap)
 void QCPItemPixmap::setScaled(bool scaled, Qt::AspectRatioMode aspectRatioMode,
                               Qt::TransformationMode transformationMode)
 {
+    if (scaled == mScaled && aspectRatioMode == mAspectRatioMode
+        && transformationMode == mTransformationMode)
+        return;
     markDirty();
     mScaled = scaled;
     mAspectRatioMode = aspectRatioMode;

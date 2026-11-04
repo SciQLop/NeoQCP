@@ -37,6 +37,8 @@ QCPRange QCPItemHSpan::range() const
 
 void QCPItemHSpan::setRange(const QCPRange& range)
 {
+    if (range == this->range())
+        return;
     markDirty();
     lowerEdge->setCoords(0, range.lower);
     upperEdge->setCoords(1, range.upper);

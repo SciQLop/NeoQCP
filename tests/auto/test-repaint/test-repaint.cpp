@@ -1015,6 +1015,75 @@ const QVector<RemainingCase>& remainingCases()
               return item;
           },
           [](QObject* o) { static_cast<QCPItemRect*>(o)->setPen(QPen(Qt::magenta, 3)); } },
+        { "span.setRange",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* span = new QCPItemHSpan(&plot);
+              return span;
+          },
+          [](QObject* o) { static_cast<QCPItemHSpan*>(o)->setRange(QCPRange(2.5, 7.5)); } },
+        { "legend.setFont",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              return plot.legend;
+          },
+          [](QObject* o) { static_cast<QCPLegend*>(o)->setFont(QFont(QStringLiteral("Helvetica"), 17)); } },
+        { "legend.setIconSize",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              return plot.legend;
+          },
+          [](QObject* o) { static_cast<QCPLegend*>(o)->setIconSize(37, 37); } },
+        { "groupLegend.setExpanded",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* legend = new QCPLegend();
+              plot.plotLayout()->addElement(1, 0, legend);
+              auto* multi = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+              auto* group = new QCPGroupLegendItem(legend, multi);
+              legend->addItem(group);
+              return group;
+          },
+          [](QObject* o) { static_cast<QCPGroupLegendItem*>(o)->setExpanded(true); } },
+        { "tracer.setStyle",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* tracer = new QCPItemTracer(&plot);
+              tracer->setGraph(plot.graph(0));
+              return tracer;
+          },
+          [](QObject* o) { static_cast<QCPItemTracer*>(o)->setStyle(QCPItemTracer::tsSquare); } },
+        { "polarAxis.setTickLabelMode",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* polar = new QCPPolarAxisAngular(&plot);
+              plot.plotLayout()->addElement(1, 0, polar);
+              return polar;
+          },
+          [](QObject* o)
+          { static_cast<QCPPolarAxisAngular*>(o)->setTickLabelMode(QCPPolarAxisAngular::lmRotated); } },
+        { "polarAxis.setSelectedSubTickPen",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* polar = new QCPPolarAxisAngular(&plot);
+              plot.plotLayout()->addElement(1, 0, polar);
+              return polar;
+          },
+          [](QObject* o)
+          { static_cast<QCPPolarAxisAngular*>(o)->setSelectedSubTickPen(QPen(Qt::magenta, 3)); } },
+        { "polarGrid.setRadialZeroLinePen",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* polar = new QCPPolarAxisAngular(&plot);
+              return polar->grid();
+          },
+          [](QObject* o) { static_cast<QCPPolarGrid*>(o)->setRadialZeroLinePen(QPen(Qt::magenta, 2)); } },
+        { "layerable.setAntialiased",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              return plot.graph(0);
+          },
+          [](QObject* o) { static_cast<QCPLayerable*>(o)->setAntialiased(false); } },
         { "pixmap.setScaled",
           [](QCustomPlot& plot) -> QObject*
           {
@@ -1024,7 +1093,7 @@ const QVector<RemainingCase>& remainingCases()
               item->bottomRight->setCoords(3, 3);
               return item;
           },
-          [](QObject* o) { static_cast<QCPItemPixmap*>(o)->setScaled(false); } },
+          [](QObject* o) { static_cast<QCPItemPixmap*>(o)->setScaled(true); } },
         { "tracer.setSize",
           [](QCustomPlot& plot) -> QObject*
           {
@@ -1103,6 +1172,35 @@ const QVector<RemainingCase>& remainingCases()
 }
 } // namespace
 
+void TestRepaint::remainingEqualValueDoesNotDirty_data()
+{
+    QTest::addColumn<QString>("setter");
+    for (const RemainingCase& c : remainingCases())
+        QTest::newRow(c.name) << QString::fromLatin1(c.name);
+}
+
+void TestRepaint::remainingEqualValueDoesNotDirty()
+{
+    QFETCH(QString, setter);
+    const auto& cases = remainingCases();
+    auto it = std::find_if(cases.cbegin(), cases.cend(), [&setter](const RemainingCase& c)
+                           { return setter == QLatin1String(c.name); });
+    QVERIFY(it != cases.cend());
+
+    auto plot = settledPlot();
+    QObject* object = it->prepare(*plot);
+    waitUntilSettled(*plot);
+    waitUntilSettled(*plot);
+
+    it->change(object);
+    QVERIFY2(plot->isRepaintQueued(), qPrintable(setter + QStringLiteral(" changed nothing")));
+    waitUntilSettled(*plot);
+
+    it->change(object); // same value: nothing new to draw
+    QVERIFY2(!plot->isRepaintQueued(),
+             qPrintable(setter + QStringLiteral(" repainted an equal value")));
+}
+
 void TestRepaint::remainingSettersScheduleRepaint_data()
 {
     QTest::addColumn<QString>("setter");
@@ -1128,6 +1226,71 @@ void TestRepaint::remainingSettersScheduleRepaint()
     QVERIFY2(plot->isRepaintQueued(), qPrintable(setter + QStringLiteral(" scheduled no repaint")));
 }
 
+
+void TestRepaint::axisRectMarginsMoveTheContent()
+{
+    // A margin change on the axis rect moves the inner rect, so the axes, grid and plottables must
+    // be redrawn there: a pending pan translation must not keep them at the old pixels.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    auto* fill = new FillStub(plot.xAxis, plot.yAxis);
+    fill->setPen(QPen(kBlue));
+    plot.replot();
+    waitUntilSettled(plot);
+    const QRect before = plot.axisRect()->rect();
+
+    fill->stall = QPointF(5, 0); // a pan in progress
+    plot.axisRect()->setMinimumMargins(QMargins(40, 30, 10, 10));
+    waitUntilSettled(plot);
+    const QRect after = plot.axisRect()->rect();
+    QVERIFY2(after != before, "the margin change must move the axis rect");
+
+    const QImage screen = screenOf(&plot);
+    int minX = screen.width(), minY = screen.height(), maxX = -1, maxY = -1;
+    for (int y = 0; y < screen.height(); ++y)
+        for (int x = 0; x < screen.width(); ++x)
+        {
+            const QColor c = screen.pixelColor(x, y);
+            if (c.blue() > 200 && c.red() < 80 && c.green() < 80)
+            {
+                minX = qMin(minX, x);
+                minY = qMin(minY, y);
+                maxX = qMax(maxX, x);
+                maxY = qMax(maxY, y);
+            }
+        }
+    QVERIFY(maxX >= minX);
+    const QRect drawn(QPoint(minX, minY), QPoint(maxX, maxY));
+    QVERIFY2(qAbs(drawn.left() - after.left()) <= 1 && qAbs(drawn.top() - after.top()) <= 1
+                 && qAbs(drawn.right() - after.right()) <= 1
+                 && qAbs(drawn.bottom() - after.bottom()) <= 1,
+             qPrintable(QStringLiteral("drawn %1,%2 %3x%4 vs rect %5,%6 %7x%8")
+                            .arg(drawn.x()).arg(drawn.y()).arg(drawn.width()).arg(drawn.height())
+                            .arg(after.x()).arg(after.y()).arg(after.width()).arg(after.height())));
+}
+
+void TestRepaint::polarPlotSettles()
+{
+    // An unscaled background pixmap used to mark dirty from inside drawBackground(), so every draw
+    // queued another repaint.
+    auto plot = settledPlot();
+    auto* polar = new QCPPolarAxisAngular(plot.get());
+    plot->plotLayout()->addElement(1, 0, polar);
+    polar->setBackground(QPixmap(8, 8));
+    polar->setBackgroundScaled(false);
+    polar->setRange(0, 360);
+    if (auto* radial = polar->radialAxis())
+        radial->setRange(0, 1);
+    plot->replot();
+    waitUntilSettled(*plot);
+    waitUntilSettled(*plot);
+
+    int replots = 0;
+    QObject::connect(plot.get(), &QCustomPlot::afterReplot, [&replots] { ++replots; });
+    QTest::qWait(200);
+    QCOMPARE(replots, 0);
+    QVERIFY(!plot->isRepaintQueued());
+}
 
 void TestRepaint::exportSettlesPendingTheme()
 {
@@ -1184,19 +1347,28 @@ void TestRepaint::graphTracerSettles()
 
 void TestRepaint::secondLegendRowFollowsRename()
 {
+    // The default legend lives in an axis rect's inset layout: the rename walk has to descend
+    // through axis rects, not just through QCPLayout children.
     auto plot = settledPlot();
     plot->addLayer(QStringLiteral("legend2"));
     auto* legend = new QCPLegend();
-    legend->setLayer(QStringLiteral("legend2"));
-    plot->plotLayout()->addElement(0, 1, legend);
+    plot->axisRect()->insetLayout()->addElement(legend, Qt::AlignTop | Qt::AlignRight);
+    // Only now does the legend know its plot, which setLayer() needs.
+    QVERIFY(legend->setLayer(QStringLiteral("legend2")));
     plot->graph(0)->addToLegend(legend);
+    waitUntilSettled(*plot);
     waitUntilSettled(*plot);
     auto* row = legend->itemWithPlottable(plot->graph(0));
     QVERIFY(row);
+    QVERIFY(!legend->outerRect().isEmpty());
+
+    auto* layer = plot->layer(QStringLiteral("legend2"));
+    QVERIFY(layer);
+    QVERIFY2(!layer->dirtiedAfterDraw(), "a settled legend layer must not be dirty");
 
     plot->graph(0)->setName(QStringLiteral("renamed"));
-    QCOMPARE(row->plottable()->name(), QStringLiteral("renamed")); // the row follows the plottable
-    QVERIFY(plot->isRepaintQueued()); // and the rename reaches a repaint
+    QCOMPARE(row->plottable()->name(), QStringLiteral("renamed"));
+    QVERIFY2(layer->dirtiedAfterDraw(), "the rename did not mark the legend row");
 }
 
 QImage TestRepaint::screenOf(QCustomPlot* plot)
