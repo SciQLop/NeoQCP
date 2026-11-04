@@ -223,6 +223,7 @@ void QCPLayer::draw(QCPPainter* painter)
                 if (mCachingBounds)
                 {
                     child->mPixelBounds = bounds;
+                    child->mPixelBoundsPlot = mParentPlot;
                     child->mPixelBoundsStamp = mParentPlot->mPaintGeneration;
                     child->mPixelBoundsViewport = mParentPlot->viewport();
                 }

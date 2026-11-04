@@ -55,6 +55,7 @@ private slots:
     void itemScrolledIntoViewIsDrawn();
     void culledItemIsNotHitTested();
     void staleBoundsFallBack();
+    void takenItemUsesNoBoundsOfItsOldPlot();
     void exportDoesNotPoisonBounds();
     void userItemWithoutBoundsIsNeverCulled();
 

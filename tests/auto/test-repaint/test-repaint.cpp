@@ -1739,11 +1739,11 @@ void TestRepaint::itemScrolledIntoViewIsDrawn()
     line->start->setCoords(100, 2);
     line->end->setCoords(100, 8);
     waitUntilSettled(*plot);
-    const QImage before = screenOf(plot.get());
+    QCOMPARE(pixelsOfColor(screenOf(plot.get()), Qt::darkGreen), 0);
     plot->xAxis->setRange(95, 105);
     waitUntilSettled(*plot);
-    const QImage after = screenOf(plot.get());
-    QVERIFY2(before != after, "the item stayed culled after the range brought it into view");
+    QVERIFY2(pixelsOfColor(screenOf(plot.get()), Qt::darkGreen) > 0,
+             "the item stayed culled after the range brought it into view");
 }
 
 void TestRepaint::culledItemIsNotHitTested()
@@ -1761,6 +1761,36 @@ void TestRepaint::culledItemIsNotHitTested()
     const QList<QCPLayerable*> hits = plot->layerableListAt(pos, true);
     QVERIFY(hits.contains(near));
     QCOMPARE(far->mSelectCalls, 0);
+}
+
+void TestRepaint::takenItemUsesNoBoundsOfItsOldPlot()
+{
+    // Each plot counts its paint generations from zero, so the stamp an item got in one plot can
+    // equal another plot's generation. Every offset is tried: the first draw in the new plot must
+    // not be needed for the hit test to use the item's new place.
+    for (int offset = 0; offset < 60; ++offset)
+    {
+        auto from = settledPlot();
+        auto to = settledPlot();
+        to->xAxis->setRange(0, 100);
+        waitUntilSettled(*to);
+        auto line = from->add<QCPItemLine>();
+        line->start->setCoords(5, 4);
+        line->end->setCoords(5, 6);
+        for (int i = 0; i < 30; ++i) // the old stamp ends above the new plot's generation
+            from->layer(QStringLiteral("main"))->markDirty();
+        waitUntilSettled(*from); // cached bounds: the middle of the old plot
+        std::unique_ptr<QCPItemLine> taken = from->take(line);
+        QVERIFY(taken);
+        for (int i = 0; i < offset; ++i)
+            to->layer(QStringLiteral("main"))->markDirty();
+        auto* moved = to->add(std::move(taken)).get();
+        moved->start->setCoords(5, 4);
+        moved->end->setCoords(5, 6);
+        const QPointF pos(to->xAxis->coordToPixel(5), to->yAxis->coordToPixel(5));
+        QVERIFY2(to->layerableListAt(pos, true).contains(moved),
+                 qPrintable(QStringLiteral("offset %1: culled by its old plot's bounds").arg(offset)));
+    }
 }
 
 void TestRepaint::staleBoundsFallBack()

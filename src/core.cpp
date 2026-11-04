@@ -4941,7 +4941,8 @@ QList<QCPLayerable*> QCustomPlot::layerableListAt(const QPointF& pos, bool onlyS
             // The bounds cached by the last screen draw save the selectTest() of everything outside
             // the click position. They are only used while they describe the current picture, and
             // tested first: they are cheaper than realVisibility()'s walk up the parents.
-            if (layerable->mPixelBounds && layerable->mPixelBoundsStamp == mPaintGeneration
+            if (layerable->mPixelBounds && layerable->mPixelBoundsPlot == this
+                && layerable->mPixelBoundsStamp == mPaintGeneration
                 && layerable->mPixelBoundsViewport == currentViewport
                 && !layerable->mPixelBounds->adjusted(-tol, -tol, tol, tol).contains(pos))
                 continue;

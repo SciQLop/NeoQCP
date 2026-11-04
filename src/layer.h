@@ -221,6 +221,9 @@ protected:
     // selectTest() only when the bounds are from the current picture (same paint generation, same
     // viewport).
     std::optional<QRectF> mPixelBounds;
+    // The plot that drew it: each plot counts generations from zero, so a stamp alone could match
+    // the generation of the plot a taken object was added to. Compared, never dereferenced.
+    const QCustomPlot* mPixelBoundsPlot = nullptr;
     quint64 mPixelBoundsStamp = 0;
     QRect mPixelBoundsViewport;
 
