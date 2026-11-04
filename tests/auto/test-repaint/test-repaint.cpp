@@ -1025,6 +1025,24 @@ const QVector<RemainingCase>& remainingCases()
               return item;
           },
           [](QObject* o) { static_cast<QCPItemPixmap*>(o)->setScaled(false); } },
+        { "tracer.setSize",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* item = new QCPItemTracer(&plot);
+              item->setGraph(plot.graph(0));
+              item->setGraphKey(5);
+              return item;
+          },
+          [](QObject* o) { static_cast<QCPItemTracer*>(o)->setSize(12); } },
+        { "tracer.setStyle",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* item = new QCPItemTracer(&plot);
+              item->setGraph(plot.graph(0));
+              item->setGraphKey(5);
+              return item;
+          },
+          [](QObject* o) { static_cast<QCPItemTracer*>(o)->setStyle(QCPItemTracer::tsSquare); } },
         { "textElement.setText",
           [](QCustomPlot& plot) -> QObject*
           {
@@ -1110,17 +1128,6 @@ void TestRepaint::remainingSettersScheduleRepaint()
     QVERIFY2(plot->isRepaintQueued(), qPrintable(setter + QStringLiteral(" scheduled no repaint")));
 }
 
-void TestRepaint::secondLegendRowFollowsRename()
-{
-    auto plot = settledPlot();
-    auto* legend = new QCPLegend();
-    plot->plotLayout()->addElement(0, 1, legend);
-    plot->graph(0)->addToLegend(legend);
-    waitUntilSettled(*plot);
-
-    plot->graph(0)->setName(QStringLiteral("renamed"));
-    QVERIFY(plot->isRepaintQueued());
-}
 
 void TestRepaint::exportSettlesPendingTheme()
 {
@@ -1137,7 +1144,7 @@ void TestRepaint::exportSettlesPendingTheme()
 }
 
 
-void TestRepaint::steadyPanKeepsTranslating()
+void TestRepaint::layoutSettersIgnoreEqualValues()
 {
     // The layout calls these on every replot with the values it just computed. A setter that marks
     // an unchanged value would dirty a layer on every frame, and nothing could ever translate.
@@ -1156,6 +1163,40 @@ void TestRepaint::steadyPanKeepsTranslating()
     grid->setColumnSpacing(grid->columnSpacing());
 
     QVERIFY(!plot->isRepaintQueued());
+}
+
+void TestRepaint::graphTracerSettles()
+{
+    // The tracer recomputes its position inside draw(); that must not dirty the layer again, or
+    // every replot schedules the next one forever.
+    auto plot = settledPlot();
+    auto* tracer = new QCPItemTracer(plot.get());
+    tracer->setGraph(plot->graph(0));
+    tracer->setGraphKey(5);
+    waitUntilSettled(*plot);
+
+    int replots = 0;
+    QObject::connect(plot.get(), &QCustomPlot::afterReplot, [&replots]() { ++replots; });
+    QTest::qWait(200);
+    QCOMPARE(replots, 0);
+    QVERIFY(!plot->isRepaintQueued());
+}
+
+void TestRepaint::secondLegendRowFollowsRename()
+{
+    auto plot = settledPlot();
+    plot->addLayer(QStringLiteral("legend2"));
+    auto* legend = new QCPLegend();
+    legend->setLayer(QStringLiteral("legend2"));
+    plot->plotLayout()->addElement(0, 1, legend);
+    plot->graph(0)->addToLegend(legend);
+    waitUntilSettled(*plot);
+    auto* row = legend->itemWithPlottable(plot->graph(0));
+    QVERIFY(row);
+
+    plot->graph(0)->setName(QStringLiteral("renamed"));
+    QCOMPARE(row->plottable()->name(), QStringLiteral("renamed")); // the row follows the plottable
+    QVERIFY(plot->isRepaintQueued()); // and the rename reaches a repaint
 }
 
 QImage TestRepaint::screenOf(QCustomPlot* plot)

@@ -78,7 +78,7 @@ QCPItemTracer::QCPItemTracer(QCustomPlot* parentPlot)
         , mGraphKey(0)
         , mInterpolating(false)
 {
-    position->setCoords(0, 0);
+    position->assignCoords(0, 0);
 
     setBrush(Qt::NoBrush);
     setSelectedBrush(Qt::NoBrush);
@@ -160,6 +160,9 @@ void QCPItemTracer::setSize(double size)
 */
 void QCPItemTracer::setStyle(QCPItemTracer::TracerStyle style)
 {
+    if (mStyle == style)
+        return;
+    markDirty();
     mStyle = style;
 }
 
@@ -176,6 +179,8 @@ void QCPItemTracer::setStyle(QCPItemTracer::TracerStyle style)
 */
 void QCPItemTracer::setGraph(QCPGraph* graph)
 {
+    if (graph == mGraph && !graph)
+        return;
     markDirty();
     if (graph)
     {
@@ -369,9 +374,9 @@ void QCPItemTracer::updatePosition()
                 QCPGraphDataContainer::const_iterator first = mGraph->data()->constBegin();
                 QCPGraphDataContainer::const_iterator last = mGraph->data()->constEnd() - 1;
                 if (mGraphKey <= first->key)
-                    position->setCoords(first->key, first->value);
+                    position->assignCoords(first->key, first->value);
                 else if (mGraphKey >= last->key)
-                    position->setCoords(last->key, last->value);
+                    position->assignCoords(last->key, last->value);
                 else
                 {
                     QCPGraphDataContainer::const_iterator it = mGraph->data()->findBegin(mGraphKey);
@@ -388,27 +393,27 @@ void QCPItemTracer::updatePosition()
                             double slope = 0;
                             if (!qFuzzyCompare(double(it->key), double(prevIt->key)))
                                 slope = (it->value - prevIt->value) / (it->key - prevIt->key);
-                            position->setCoords(mGraphKey,
+                            position->assignCoords(mGraphKey,
                                                 (mGraphKey - prevIt->key) * slope + prevIt->value);
                         }
                         else
                         {
                             // find iterator with key closest to mGraphKey:
                             if (mGraphKey < (prevIt->key + it->key) * 0.5)
-                                position->setCoords(prevIt->key, prevIt->value);
+                                position->assignCoords(prevIt->key, prevIt->value);
                             else
-                                position->setCoords(it->key, it->value);
+                                position->assignCoords(it->key, it->value);
                         }
                     }
                     else // mGraphKey is exactly on last iterator (should actually be caught when
                          // comparing first/last keys, but this is a failsafe for fp uncertainty)
-                        position->setCoords(it->key, it->value);
+                        position->assignCoords(it->key, it->value);
                 }
             }
             else if (mGraph->data()->size() == 1)
             {
                 QCPGraphDataContainer::const_iterator it = mGraph->data()->constBegin();
-                position->setCoords(it->key, it->value);
+                position->assignCoords(it->key, it->value);
             }
             else
                 qDebug() << Q_FUNC_INFO << "graph has no data";

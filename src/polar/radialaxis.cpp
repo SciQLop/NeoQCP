@@ -837,9 +837,6 @@ void QCPPolarAxisRadial::setSubTickLengthOut(int outside)
     if (mSubTickLengthOut != outside)
     {
         markDirty();
-    if (outside == mSubTickLengthOut)
-        return;
-    markDirty();
     mSubTickLengthOut = outside;
 }
 }
@@ -893,9 +890,6 @@ void QCPPolarAxisRadial::setLabelFont(const QFont& font)
     if (mLabelFont != font)
     {
         markDirty();
-    if (font == mLabelFont)
-        return;
-    markDirty();
     mLabelFont = font;
 }
 }

@@ -494,8 +494,13 @@ void QCPAbstractPlottable::setName(const QString& name)
         if (!el)
             return;
         if (auto* legend = qobject_cast<QCPLegend*>(el))
+        {
             if (QCPPlottableLegendItem* row = legend->itemWithPlottable(this))
+            {
                 row->markDirty();
+                legend->markDirty(); // the row may not carry the legend's layer yet
+            }
+        }
         if (auto* layout = qobject_cast<QCPLayout*>(el))
             for (int i = 0; i < layout->elementCount(); ++i)
                 markRows(layout->elementAt(i));

@@ -25,7 +25,8 @@ private slots:
     void axisSettersScheduleRepaint_data();
     void axisSettersScheduleRepaint();
     void axisUnlistedHandsOffsetToSibling();
-    void steadyPanKeepsTranslating();
+    void layoutSettersIgnoreEqualValues();
+    void graphTracerSettles();
     void remainingSettersScheduleRepaint_data();
     void remainingSettersScheduleRepaint();
     void secondLegendRowFollowsRename();

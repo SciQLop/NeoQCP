@@ -174,6 +174,11 @@ protected:
 
 private:
     Q_DISABLE_COPY(QCPItemPosition)
+    friend class QCPItemTracer;
+
+    // The tracer derives this position from its graph on every draw: storing must not mark, or the
+    // draw itself would dirty the layer and the plot would never settle.
+    void assignCoords(double key, double value);
 };
 Q_DECLARE_METATYPE(QCPItemPosition::PositionType)
 

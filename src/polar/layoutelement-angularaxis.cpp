@@ -1213,9 +1213,6 @@ void QCPPolarAxisAngular::setNumberPrecision(int precision)
     if (mNumberPrecision != precision)
     {
         markDirty();
-    if (precision == mNumberPrecision)
-        return;
-    markDirty();
     mNumberPrecision = precision;
 }
 }
@@ -1326,9 +1323,6 @@ void QCPPolarAxisAngular::setSubTickLengthOut(int outside)
     if (mSubTickLengthOut != outside)
     {
         markDirty();
-    if (outside == mSubTickLengthOut)
-        return;
-    markDirty();
     mSubTickLengthOut = outside;
 }
 }
