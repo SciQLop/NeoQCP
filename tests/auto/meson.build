@@ -58,6 +58,7 @@ test_srcs = [
     'test-repaint/test-repaint.cpp',
     'test-builder/test-builder.cpp',
     'test-spatial-index/test-spatial-index.cpp',
+    'test-coords/test-coords.cpp',
 ]
 
 test_headers = [
@@ -114,6 +115,7 @@ test_headers = [
     'test-repaint/test-repaint.h',
     'test-builder/test-builder.h',
     'test-spatial-index/test-spatial-index.h',
+    'test-coords/test-coords.h',
 ]
 test_moc_files = qtmod.compile_moc(headers : test_headers)
 

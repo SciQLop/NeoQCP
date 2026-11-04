@@ -9,6 +9,7 @@ set(NEOQCP_SOURCES
     src/core.cpp
     src/layer.cpp
     src/spatial-index.cpp
+    src/coords.cpp
     src/overlay.cpp
     src/layout.cpp
     src/lineending.cpp
@@ -135,6 +136,7 @@ set(NEOQCP_MOC_HEADERS
     src/items/item-vspan.h
     src/layer.h
     src/spatial-index.h
+    src/coords.h
     src/layout.h
     src/layoutelements/layoutelement-axisrect.h
     src/layoutelements/layoutelement-colorscale.h

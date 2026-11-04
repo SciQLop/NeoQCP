@@ -2,6 +2,7 @@
 
 #include <qcustomplot.h>
 #include <spatial-index.h>
+#include <coords.h>
 #include <datasource/soa-datasource-2d.h>
 #include <datasource/resample.h>
 #include <vector>
@@ -95,6 +96,9 @@ private slots:
   void QCPGpu_Bars10k();
   void QCPGpu_Text1k();
   void QCPGpu_MixedLayer();
+
+  void QCPCoords_CoordToPixel1M();
+  void QCPTransform_Map1M();
 
   void QCPBars_Zoom10k();
   void QCPBars_Pan10k();
@@ -1733,4 +1737,53 @@ void Benchmark::QCPItemText_Zoom1k()
   mPlot->replot();
   int step = 0;
   QBENCHMARK { zoomInPlace(mPlot, 50.5, 1.0, step); }
+}
+
+namespace
+{
+// One million points over 0..1000 / -1..1, the same data for the scalar and the batch row.
+void millionPoints(std::vector<double> &keys, std::vector<double> &values)
+{
+  const int n = 1000000;
+  keys.resize(n);
+  values.resize(n);
+  for (int i = 0; i < n; ++i)
+  {
+    keys[i] = 1000.0 * i / n;
+    values[i] = qSin(6 * M_PI * i / n);
+  }
+}
+} // namespace
+
+void Benchmark::QCPCoords_CoordToPixel1M()
+{
+  // The baseline the batch has to beat: two virtual calls per point, through the axis painter.
+  std::vector<double> keys, values;
+  millionPoints(keys, values);
+  mPlot->xAxis->setRange(0, 1000);
+  mPlot->yAxis->setRange(-1, 1);
+  mPlot->replot();
+  std::vector<QPointF> out(keys.size());
+  QBENCHMARK
+  {
+    const QCPAxis *key = mPlot->xAxis;
+    const QCPAxis *value = mPlot->yAxis;
+    for (std::size_t i = 0; i < keys.size(); ++i)
+      out[i] = QPointF(key->coordToPixel(keys[i]), value->coordToPixel(values[i]));
+  }
+  QCOMPARE(int(out.size()), 1000000);
+}
+
+void Benchmark::QCPTransform_Map1M()
+{
+  std::vector<double> keys, values;
+  millionPoints(keys, values);
+  mPlot->xAxis->setRange(0, 1000);
+  mPlot->yAxis->setRange(-1, 1);
+  mPlot->replot();
+  const QCPTransform transform(mPlot->xAxis, mPlot->yAxis);
+  QVERIFY(transform.valid());
+  std::vector<QPointF> out(keys.size());
+  QBENCHMARK { transform.map(keys, values, out); }
+  QCOMPARE(int(out.size()), 1000000);
 }

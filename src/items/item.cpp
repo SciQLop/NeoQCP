@@ -36,6 +36,17 @@
 #include "layoutelements/layoutelement-axisrect.h"
 #include "painting/painter.h"
 
+namespace
+{
+// setParentAnchor(nullptr, false) also turns a ptPlotCoords type into ptAbsolute, so only call it when
+// an anchor is actually attached.
+void detachFromParent(QCPItemPosition* position)
+{
+  if (position->parentAnchorX() || position->parentAnchorY())
+    position->setParentAnchor(nullptr, false);
+}
+} // namespace
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPItemAnchor
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -923,6 +934,90 @@ void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
     }
 
     setCoords(x, y);
+}
+
+/*! \internal
+
+  Writes the position in one of the typed spaces of coords.h. Each branch is an ordering of the 2.x
+  setters, because leaving a parent anchor or a plot-coord type behind would silently combine with the
+  new numbers. An AnchorOffset whose anchor refuses the link (a cycle) leaves the position untouched.
+*/
+void QCPItemPosition::set(const QCP::Position& position)
+{
+  if (const auto* data = std::get_if<QCP::Data>(&position))
+  {
+    detachFromParent(this);
+    setType(ptPlotCoords);
+    setCoords(data->x, data->y);
+  }
+  else if (const auto* pixels = std::get_if<QCP::Pixels>(&position))
+  {
+    detachFromParent(this);
+    setType(ptAbsolute);
+    setCoords(pixels->x, pixels->y);
+  }
+  else if (const auto* ratio = std::get_if<QCP::AxisRatio>(&position))
+  {
+    detachFromParent(this);
+    setType(ptAxisRectRatio);
+    setCoords(ratio->x, ratio->y);
+  }
+  else if (const auto* anchored = std::get_if<QCP::AnchorOffset>(&position))
+  {
+    setType(ptAbsolute);
+    if (!anchored->anchor)
+    {
+      detachFromParent(this);
+      setCoords(anchored->offset.dx, anchored->offset.dy);
+      return;
+    }
+    if (!setParentAnchor(anchored->anchor, false))
+      return; // refused: a cycle or this position itself
+    setCoords(anchored->offset.dx, anchored->offset.dy);
+  }
+  else if (const auto* mixed = std::get_if<QCP::MixedX>(&position))
+  {
+    detachFromParent(this);
+    setTypeX(ptPlotCoords);
+    setTypeY(ptAxisRectRatio);
+    setCoords(mixed->dataX, mixed->ratioY);
+  }
+  else if (const auto* mixed = std::get_if<QCP::MixedY>(&position))
+  {
+    detachFromParent(this);
+    setTypeX(ptAxisRectRatio);
+    setTypeY(ptPlotCoords);
+    setCoords(mixed->ratioX, mixed->dataY);
+  }
+}
+
+/*! \internal
+
+  Reads the position back in the space it was written in. The variant models data, pixels, an axis-rect
+  fraction, an anchor offset and the two half-data/half-ratio spaces; the remaining 2.x combinations
+  (ptViewportRatio, ptAxisRectAbsolute, an anchor on one axis only) come back as the pixels the
+  position has now, so a caller that only needs the value is never stuck.
+*/
+QCP::Position QCPItemPosition::asPosition() const
+{
+  const bool anchored = mParentAnchorX != nullptr || mParentAnchorY != nullptr;
+  if (mPositionTypeX == ptPlotCoords && mPositionTypeY == ptPlotCoords)
+    return QCP::Data { mKey, mValue };
+  if (mPositionTypeX == ptAxisRectRatio && mPositionTypeY == ptAxisRectRatio)
+    return QCP::AxisRatio { mKey, mValue };
+  if (mPositionTypeX == ptPlotCoords && mPositionTypeY == ptAxisRectRatio)
+    return QCP::MixedX { mKey, mValue };
+  if (mPositionTypeX == ptAxisRectRatio && mPositionTypeY == ptPlotCoords)
+    return QCP::MixedY { mKey, mValue };
+  if (mPositionTypeX == ptAbsolute && mPositionTypeY == ptAbsolute
+      && mParentAnchorX == mParentAnchorY)
+  {
+    if (anchored)
+      return QCP::AnchorOffset { mParentAnchorX, QCP::PixelOffset { mKey, mValue } };
+    return QCP::Pixels { mKey, mValue };
+  }
+  const QPointF pixels = pixelPosition();
+  return QCP::Pixels { pixels.x(), pixels.y() };
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

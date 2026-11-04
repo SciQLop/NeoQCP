@@ -27,6 +27,7 @@
 #define QCP_ITEM_H
 
 #include "axis/axis.h"
+#include "coords.h"
 #include "global.h"
 #include "layer.h"
 #include "spatial-index.h"
@@ -167,6 +168,11 @@ public:
     void setAxes(QCPAxis* keyAxis, QCPAxis* valueAxis);
     void setAxisRect(QCPAxisRect* axisRect);
     void setPixelPosition(const QPointF& pixelPosition);
+    //! Writes the position in a typed space (see coords.h), on top of the 2.x setters.
+    void set(const QCP::Position& position);
+    //! Reads the position back; a 2.x combination the variant does not model comes back as pixels.
+    //! Named asPosition() because value() already returns the value coordinate.
+    [[nodiscard]] QCP::Position asPosition() const;
 
 protected:
     // property members:
