@@ -64,6 +64,54 @@ Behaviour changes for 2.x users:
         plot's event handling instead of in the middle of it.
   - Deleting the plot inside a resize, show or paint event reports misuse; use deleteLater().
 
+Milestone 2 (creation and automatic repaint). Additive, except for the behaviour changes listed below.
+
+Creating objects: QCustomPlot::add<T>(args...) returns a fluent handle (setters chain and return it):
+  - Plottables on the default axes, with their data: plot.add<QCPGraph>(x, y).setName("a").setPen(pen).
+  - Items (plot.add<QCPItemLine>().setStart(...)), layout parts at a cell (add<QCPTextElement>(row,
+        column, text), add<QCPAxisRect>, add<QCPColorScale>), groups (add<QCPBarsGroup>(),
+        add<QCPPlottableGroup>(name)), axes (rect.add<QCPAxis>(QCPAxis::atRight)) and polar graphs
+        (angular.add<QCPPolarGraph>(keys, values)).
+  - Refused, with one misuse and an empty handle: while the plot is being destroyed, without an axis
+        rect, at a layout cell that is taken or more than one past the grid. A setData that throws
+        leaves the plot unchanged.
+  - A subclass gets the same chains: declare OpsFor (or a default-constructible Handle) next to the
+        class; a class meant to be subclassed again writes its ops as a template Ops<T, Self>.
+  - Getters still return raw pointers (handles from getters: milestone 5).
+Moving objects between plots:
+  - take(handle) returns a std::unique_ptr: the object leaves the plot, its legend rows, its groups,
+        its colour-scale link, its layer and its axes; anchor links with the rest of the plot are cut
+        (pixel positions kept); a pipeline plottable stops using the plot's job scheduler.
+  - add(std::unique_ptr<T>) attaches a taken object (or a plottable built with both axes null) to the
+        default axes and the current layer, with its legend row. A refused add destroys the object.
+  - A detached pipeline plottable runs its jobs on the calling thread until it is added again.
+Removing: handle.remove() asks the owner: an axis through its rect, a layer through the plot (the
+        last layer stays), a layout element leaves its layout first; plottables, items and groups are
+        deleted. The plot widget has no remove() (close the window or call deleteLater()).
+Automatic repaint:
+  - Every appearance and data setter schedules one repaint for the next event-loop turn; no replot()
+        is needed to see a change. requestRepaint() schedules one by hand (after changing a shared
+        ticker in place, for example); isRepaintQueued() tells whether one is pending.
+  - replot() stays synchronous, for tests and for code that reads pixels or layout right after a
+        change. settle() applies everything pending (a theme change, ready staged data) without
+        drawing the screen; every export (savePng, toPixmap, ...) settles first.
+  - A colour map's data (map->data()->setCell(...), setSize, fill, ...) repaints its map; a cell-by-cell
+        fill costs one mark. Not seen by the plot: a ticker changed in place and a selection
+        decorator's pen; call requestRepaint() after changing them.
+  - A layer marked after it was drawn in a replot gets one more repaint on the next turn.
+  - The setter rule (for subclass authors, see QCPLayerable::markDirty()): return early on an equal
+        value, mark, then store and emit. A call that changes nothing never marks, and nothing marks
+        from inside a replot's layout or draw: either would repaint forever or lose pan translation.
+
+Behaviour changes for 2.x users:
+  - A plottable built with axes of two different plots is refused (misuse); with both axes null it is
+        a valid detached object, with one null axis it is a misuse.
+  - removeLayer() refuses the last layer, or a layer of another plot, as a misuse (2.x printed a debug
+        message).
+  - QCPGroupLegendItem::setExpanded and the span setters no longer replot synchronously or queue a
+        replot themselves: they schedule the repaint like every other setter.
+  - QCPLineEnding has operator==.
+
 #### NeoQCP, unreleased ####
 
 Behaviour changes (slots that delete their sender are now safe):
