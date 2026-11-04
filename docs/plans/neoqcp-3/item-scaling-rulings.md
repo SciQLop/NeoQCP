@@ -5,15 +5,16 @@ or hit-tested. Branch `neoqcp-3.0`, commits `3970d59..` (local, not pushed). Pla
 `docs/superpowers/plans/2026-11-04-neoqcp-3-item-scaling.md`. Measurements:
 `item-scaling-profile.md`. Benchmark: `baseline.md`, "End of item scaling".
 
-## Question for the maintainer
+## Maintainer decision (2026-11-04): exports restore the screen layout
 
-- After an export at another size (`savePng(file, 800, 600)`, `toPixmap(w, h)`, `toPainter`), the
-  layout keeps the export's geometry until the next screen replot: `coordToPixel`, axis rects and hit
-  tests describe the export, not the screen (pre-existing). This breaks the spec's "layout-dependent
-  queries are always current". Re-running the layout after the export restores the viewport fixes it,
-  but 45 tests read `coordToPixel` after an export to find pixels in the exported image, an idiom user
-  code may share. Reverted; your call: fix it (and port those tests to the export's own geometry), or
-  document it.
+- After an export at another size, the layout kept the export's geometry until the next screen
+  replot. Decided: fix it fully ("option 3"); the export lays the plot out again for the screen when
+  it returns. Commit 51e7459.
+- The 45 tests that broke were not relying on the bug, mostly. A plot resized while hidden never got
+  its resize event (Qt holds it until show), so it laid out at 640x480 while exporting at 400x300.
+  The export bug hid that: it left the 400x300 layout behind. Fixing the hidden resize made 43 of
+  the 45 pass unchanged. Two were tuned to the stale width (adjusted); afterLayout now fires for the
+  export and again for the screen.
 
 ## Rulings (what was decided, why, cost if wrong)
 
@@ -51,8 +52,6 @@ or hit-tested. Branch `neoqcp-3.0`, commits `3970d59..` (local, not pushed). Pla
 
 - `markItemsUsingAxisDirty` marks once per item (one mark per layer would do) and copies each item's
   position list; measured flat (`QCPAxis_SetTickLength10kItems` 15 ms).
-- `exportDoesNotPoisonBounds` replots before its clicks, so it pins "a frame after an export restores
-  hit testing", not the cache itself; tightening it waits for the export-layout decision.
 - `QCPItemBracket::dataExtent` pads by 1.5 x its length, an envelope checked against the bundled styles.
 
 # Item index (plan `docs/superpowers/plans/2026-11-04-neoqcp-3-item-index.md`, commits `fcad1ae..`)

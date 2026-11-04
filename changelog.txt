@@ -143,6 +143,12 @@ Item scaling. Thousands of items add, remove, draw and take clicks without a qua
         them like a direct cycle.
   - Fix (also in 2.x): parallel colour map and graph resampling could return before its worker tasks
         finished, and a task wrote into freed memory (a rare crash while panning a large colour map).
+  - Fix (also in 2.x): an export at another size (toPixmap, savePng, toPainter, savePdf) left the
+        layout at the export's size until the next replot, so coordToPixel() and hit tests described
+        the image. The plot is laid out for the screen again when the export returns; afterLayout
+        fires for the export and for the screen.
+  - Fix (also in 2.x): a plot resized while hidden kept laying out at its old size until it was
+        shown (Qt holds back a hidden widget's resize event). replot() and exports pick up the size.
   - Adding an item and clearItems() are linear; clearItems() and deleting the plot delete the items
         oldest first, after taking them out of their layers in one pass.
   - Behaviour change: clearItems() deletes oldest first (2.x: newest first). A destroyed() slot that
