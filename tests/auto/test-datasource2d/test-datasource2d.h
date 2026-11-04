@@ -41,6 +41,7 @@ private slots:
     // Bug fix regression tests
     void resampleParallelMatchesSerial();
     void resampleParallelMatchesSerialVariableY();
+    void parallelResampleMatchesSerial();
     void resampleReusedCacheScratchBuffersDontLeakBetweenJobs();
     void resampleLogYNoBinGaps();
     void dataBoundsSkipsNaN();

@@ -8,8 +8,6 @@
 #include <cmath>
 #include <limits>
 #include <vector>
-#include <QAtomicInt>
-#include <QSemaphore>
 #include <QThread>
 
 namespace qcp::algo2d {
@@ -373,23 +371,17 @@ void resampleImpl(
     // thread. Only used once the job is large enough to amortize dispatch.
     auto dispatchParallel = [](int count, int threadCount, auto&& body) {
         int perChunk = count / threadCount;
-        QAtomicInt remaining(threadCount - 1);
-        QSemaphore done;
+        qcp::algo::QCPPoolJoin join;
         for (int t = 0; t < threadCount; ++t)
         {
             int begin = t * perChunk;
             int end = (t == threadCount - 1) ? count : (t + 1) * perChunk;
             if (t < threadCount - 1)
-                qcp::algo::innerPool().start([&, begin, end] {
-                    body(begin, end);
-                    if (remaining.fetchAndSubRelaxed(1) == 1)
-                        done.release();
-                });
+                join.start([&, begin, end] { body(begin, end); });
             else
                 body(begin, end); // current thread does the last chunk
         }
-        if (remaining.loadRelaxed() > 0)
-            done.acquire();
+        join.wait();
     };
 
     if (threadCount <= 1 || cellBudget < 1'000'000)

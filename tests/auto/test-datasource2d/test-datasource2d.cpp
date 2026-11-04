@@ -457,6 +457,53 @@ void TestDataSource2D::resampleParallelMatchesSerialVariableY()
     delete parallel;
 }
 
+void TestDataSource2D::parallelResampleMatchesSerial()
+{
+    // A parallel pass must wait for exactly the tasks it started. The caller used to read a counter
+    // after the last task decremented it but before it released the semaphore, skip the wait, and let
+    // the next pass reuse the same stack address: a late release then belonged to the wrong pass and
+    // the caller returned while its workers were still writing the output. 200 jobs on one cache is
+    // the slow, steady version of that window.
+    const int nx = 2000, ys = 600; // 1.2M visible cells: well above the parallel threshold
+    std::vector<double> x(nx), y(ys), z(static_cast<std::size_t>(nx) * ys);
+    for (int i = 0; i < nx; ++i)
+        x[i] = static_cast<double>(i);
+    for (int j = 0; j < ys; ++j)
+        y[j] = static_cast<double>(j);
+    for (std::size_t i = 0; i < z.size(); ++i)
+        z[i] = std::sin(static_cast<double>(i) * 0.0037) * 100.0;
+
+    QCPSoADataSource2D src(x, y, z);
+    qcp::algo2d::ResampleCache cache;
+
+    auto* serial = qcp::algo2d::resample(src, 0, nx, QCPRange(0, nx - 1), QCPRange(0, ys - 1), 200,
+                                          150, false, false, 1.5, nullptr, /*forceSerial=*/true);
+    QVERIFY(serial != nullptr);
+
+    for (int job = 0; job < 200; ++job)
+    {
+        auto* parallel
+            = qcp::algo2d::resample(src, 0, nx, QCPRange(0, nx - 1), QCPRange(0, ys - 1), 200, 150,
+                                    false, false, 1.5, &cache, /*forceSerial=*/false);
+        QVERIFY2(parallel, qPrintable(QString("job %1 returned no output").arg(job)));
+        QCOMPARE(parallel->keySize(), serial->keySize());
+        QCOMPARE(parallel->valueSize(), serial->valueSize());
+        int mismatches = 0;
+        for (int i = 0; i < serial->keySize(); ++i)
+            for (int j = 0; j < serial->valueSize(); ++j)
+            {
+                const double expected = serial->cell(i, j);
+                const double actual = parallel->cell(i, j);
+                const bool same = (std::isnan(expected) && std::isnan(actual))
+                    || actual == expected;
+                mismatches += same ? 0 : 1;
+            }
+        delete parallel;
+        QVERIFY2(mismatches == 0, qPrintable(QString("job %1: %2 cells differ").arg(job).arg(mismatches)));
+    }
+    delete serial;
+}
+
 void TestDataSource2D::resampleReusedCacheScratchBuffersDontLeakBetweenJobs()
 {
     // ResampleCache's scratch buffers (accum/counts/gapBetween) are reused

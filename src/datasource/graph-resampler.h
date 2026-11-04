@@ -5,7 +5,6 @@
 #include "async-pipeline.h"
 #include "thread-naming.h"
 #include "../Profiling.hpp"
-#include <QAtomicInt>
 #include <QSemaphore>
 #include <QThread>
 #include <QThreadPool>
@@ -50,6 +49,33 @@ inline QThreadPool& innerPool()
     (void)init;
     return pool;
 }
+
+// Waits for the tasks one parallel pass started on innerPool(). Each task holds the semaphore
+// through a shared_ptr, so a task still inside release() never releases a semaphore the caller has
+// already destroyed: the caller waits for exactly the tasks it started, however late they finish.
+class QCPPoolJoin
+{
+public:
+    template <typename F>
+    void start(F&& task)
+    {
+        ++mStarted;
+        innerPool().start([task = std::forward<F>(task), done = mDone]() mutable {
+            task();
+            done->release();
+        });
+    }
+
+    void wait()
+    {
+        if (mStarted > 0)
+            mDone->acquire(mStarted);
+    }
+
+private:
+    std::shared_ptr<QSemaphore> mDone = std::make_shared<QSemaphore>();
+    int mStarted = 0;
+};
 
 struct BinResult {
     std::vector<double> keys;
@@ -269,8 +295,7 @@ inline BinResult binMinMaxParallel(
 
     // Partition bins evenly across threads, binary-search source for chunk boundaries
     int binsPerChunk = numBins / threadCount;
-    QAtomicInt remaining(threadCount - 1);
-    QSemaphore done;
+    QCPPoolJoin join;
 
     for (int t = 0; t < threadCount; ++t)
     {
@@ -286,18 +311,14 @@ inline BinResult binMinMaxParallel(
         srcEnd_ = std::clamp(srcEnd_, begin, end);
 
         if (t < threadCount - 1)
-            innerPool().start([&, srcBegin_, srcEnd_, binBegin, binEnd] {
+            join.start([&, srcBegin_, srcEnd_, binBegin, binEnd] {
                 nameThisPoolThreadOnce("binWorker");
                 worker(srcBegin_, srcEnd_, binBegin, binEnd);
-                if (remaining.fetchAndSubRelaxed(1) == 1)
-                    done.release();
             });
         else
             worker(srcBegin_, srcEnd_, binBegin, binEnd); // current thread does last chunk
     }
-
-    if (remaining.loadRelaxed() > 0)
-        done.acquire();
+    join.wait();
 
     setGapRatios(out, binRatio);
     return out;
@@ -525,8 +546,7 @@ inline MultiColumnBinResult binMinMaxMultiParallelImpl(
     };
 
     int binsPerChunk = numBins / threadCount;
-    QAtomicInt remaining(threadCount - 1);
-    QSemaphore done;
+    QCPPoolJoin join;
 
     for (int t = 0; t < threadCount; ++t)
     {
@@ -541,18 +561,14 @@ inline MultiColumnBinResult binMinMaxMultiParallelImpl(
         srcEnd_ = std::clamp(srcEnd_, begin, end);
 
         if (t < threadCount - 1)
-            innerPool().start([&, srcBegin_, srcEnd_, binBegin, binEnd] {
+            join.start([&, srcBegin_, srcEnd_, binBegin, binEnd] {
                 nameThisPoolThreadOnce("binWorker");
                 worker(srcBegin_, srcEnd_, binBegin, binEnd);
-                if (remaining.fetchAndSubRelaxed(1) == 1)
-                    done.release();
             });
         else
             worker(srcBegin_, srcEnd_, binBegin, binEnd);
     }
-
-    if (remaining.loadRelaxed() > 0)
-        done.acquire();
+    join.wait();
 
     setGapRatios(out, binRatio);
     return out;
