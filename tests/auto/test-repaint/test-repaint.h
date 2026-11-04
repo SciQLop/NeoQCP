@@ -45,6 +45,8 @@ private slots:
     void axisMarginChangeDuringPanRepaints();
     void itemOnOwnLayerFollowsRangeChange();
     void anchoredChildOnOtherLayerFollowsRange();
+    void movedParentRepaintsAnchoredChild();
+    void parentOnNewAxesStillMovesAnchoredChild();
     void rangeChangeMarksOnlyLayersUsingTheAxis();
     void setAxesMovesTheLayerToTheNewAxis();
     void itemTakenAndAddedKeepsAxes();

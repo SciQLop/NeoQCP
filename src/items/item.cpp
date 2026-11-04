@@ -1392,6 +1392,21 @@ void QCPAbstractItem::markDirty()
     // leaves the tree and is tested one by one until the layer rebuilds it.
     if (mLayer)
         mLayer->noteItemExtentChanged(this);
+    markFollowersDirty();
+}
+
+void QCPAbstractItem::markFollowersDirty()
+{
+    // A position that follows one of this item's anchors moves with it, whatever layer it is on.
+    // setParentAnchorX/Y refuse anchor cycles, so the recursion ends.
+    for (const QCPItemAnchor* anchor : std::as_const(mAnchors))
+    {
+        for (QCPItemPosition* follower : anchor->mChildrenX)
+            follower->mParentItem->markDirty();
+        for (QCPItemPosition* follower : anchor->mChildrenY)
+            if (!anchor->mChildrenX.contains(follower))
+                follower->mParentItem->markDirty();
+    }
 }
 
 std::optional<QCPItemExtent>

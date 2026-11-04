@@ -1590,6 +1590,69 @@ void TestRepaint::anchoredChildOnOtherLayerFollowsRange()
     QVERIFY2(labels->dirtiedAfterDraw(), "the layer of the anchored follower was not marked");
 }
 
+namespace
+{
+// A line on the main layer and a text on "labels" whose position follows the line's end.
+struct AnchoredPair
+{
+    QCPItemLine* parent;
+    QCPLayer* labels;
+};
+
+AnchoredPair makeAnchoredPair(QCustomPlot& plot)
+{
+    plot.resize(400, 300);
+    plot.addLayer(QStringLiteral("labels"));
+    plot.xAxis->setRange(0, 10);
+    plot.yAxis->setRange(0, 10);
+    plot.xAxis2->setRange(100, 200);
+    plot.yAxis2->setRange(0, 10);
+    auto* parent = new QCPItemLine(&plot);
+    parent->start->setCoords(2, 2);
+    parent->end->setCoords(2, 8);
+    auto* child = new QCPItemText(&plot);
+    child->setLayer(QStringLiteral("labels"));
+    child->position->setParentAnchor(parent->end);
+    child->setText(QStringLiteral("follower"));
+    return { parent, plot.layer(QStringLiteral("labels")) };
+}
+} // namespace
+
+void TestRepaint::movedParentRepaintsAnchoredChild()
+{
+    QCustomPlot plot;
+    const AnchoredPair pair = makeAnchoredPair(plot);
+    plot.replot();
+    waitUntilSettled(plot);
+    waitUntilSettled(plot);
+    QVERIFY2(!pair.labels->dirtiedAfterDraw(), "a settled labels layer must not be dirty");
+
+    pair.parent->end->setCoords(5, 8); // the follower moves with it
+    QVERIFY2(pair.labels->dirtiedAfterDraw(), "the layer of the anchored follower was not marked");
+}
+
+void TestRepaint::parentOnNewAxesStillMovesAnchoredChild()
+{
+    QCustomPlot plot;
+    const AnchoredPair pair = makeAnchoredPair(plot);
+    plot.replot();
+    waitUntilSettled(plot);
+    plot.yAxis->setRange(0, 11); // the labels layer now knows the axes its follower uses
+    plot.replot();
+    waitUntilSettled(plot);
+
+    pair.parent->start->setAxes(plot.xAxis2, plot.yAxis2);
+    pair.parent->end->setAxes(plot.xAxis2, plot.yAxis2);
+    plot.replot();
+    waitUntilSettled(plot);
+    waitUntilSettled(plot);
+    QVERIFY2(!pair.labels->dirtiedAfterDraw(), "a settled labels layer must not be dirty");
+
+    plot.xAxis2->setRange(150, 250); // moves the parent, and with it the follower
+    QVERIFY2(pair.labels->dirtiedAfterDraw(),
+             "the follower's layer missed the axes its parent moved to");
+}
+
 void TestRepaint::rangeChangeMarksOnlyLayersUsingTheAxis()
 {
     QCustomPlot plot;

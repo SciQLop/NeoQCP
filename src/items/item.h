@@ -81,6 +81,7 @@ private:
 
     friend class QCPItemPosition;
     friend class QCustomPlot; // take()/add() move an item between plots
+    friend class QCPAbstractItem; // marks the items that follow its anchors
 };
 
 class QCP_LIB_DECL QCPItemPosition : public QCPItemAnchor
@@ -286,6 +287,7 @@ protected:
     virtual QRect clipRect() const override;
     virtual void applyDefaultAntialiasingHint(QCPPainter* painter) const override;
     virtual void draw(QCPPainter* painter) override = 0;
+    void markFollowersDirty();
     // The extent of these positions, or nullopt when they do not share one axis pair or when both
     // axes are unusable. \a pixelPad is the room the drawing needs around the positions.
     [[nodiscard]] std::optional<QCPItemExtent>
