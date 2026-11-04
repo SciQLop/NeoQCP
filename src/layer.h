@@ -156,19 +156,27 @@ private:
     mutable bool mItemIndexDirty = true;
     mutable int mItemIndexBuilds = 0;
 
+    // Every cache derived from the child list (index, axes, plottables) is stale after it changes.
+    void childrenChanged();
     void invalidateItemIndex();
     void noteItemExtentChanged(QCPAbstractItem* item);
 
     // The axes the item children of this layer follow: a range change on one of them marks this
     // layer without walking every item of the plot. Rebuilt lazily from the child list; a moved item
     // unions its own axes in, and a superset only costs a repaint.
-    void invalidateItemAxes();
     void rebuildItemAxes() const;
     void noteItemAxes(QCPAbstractItem* item);
     void collectItemAxes(QCPAbstractItem* item, std::vector<QPointer<QCPAxis>>& axes) const;
     [[nodiscard]] bool itemsUseAxis(const QCPAxis* axis) const;
     mutable std::vector<QPointer<QCPAxis>> mItemAxes;
     mutable bool mItemAxesDirty = true;
+
+    // The plottable children, in child order. Frame code asks for them on every replot; a cast per
+    // child was a sixth of a frame on a layer of 10 000 items. Rebuilt lazily: a layerable joins its
+    // layer from the base constructor, before it is a plottable.
+    [[nodiscard]] const QList<QCPAbstractPlottable*>& plottableChildren() const;
+    mutable QList<QCPAbstractPlottable*> mPlottableChildren;
+    mutable bool mPlottableChildrenDirty = true;
 
     friend class QCPAbstractItem;
     friend class QCPAxis;     // a scale type change invalidates the item index

@@ -344,7 +344,7 @@ void QCPLayer::addChild(QCPLayerable* layerable, bool prepend)
         mChildren.prepend(layerable);
     else
         mChildren.append(layerable);
-    invalidateItemIndex();
+    childrenChanged();
     invalidatePaintBuffer();
 }
 
@@ -364,7 +364,7 @@ void QCPLayer::removeChildren(const QSet<QCPLayerable*>& dying)
     if (any)
     {
         // The payload is a child position: the ones behind a removed child just shifted.
-        invalidateItemIndex();
+        childrenChanged();
         invalidatePaintBuffer();
     }
 }
@@ -382,7 +382,7 @@ void QCPLayer::removeChild(QCPLayerable* layerable)
 {
     if (mChildren.removeOne(layerable))
     {
-        invalidateItemIndex();
+        childrenChanged();
         invalidatePaintBuffer();
     }
     else
@@ -405,10 +405,9 @@ QPointF QCPLayer::pixelOffset() const
 {
     std::optional<QPointF> result;
     QCPAxisRect* resultAxisRect = nullptr;
-    for (auto* child : mChildren)
+    for (QCPAbstractPlottable* plottable : plottableChildren())
     {
-        auto* plottable = qobject_cast<QCPAbstractPlottable*>(child);
-        if (!plottable || !plottable->realVisibility() || !plottable->canProduceContent())
+        if (!plottable->realVisibility() || !plottable->canProduceContent())
             continue;
         const QPointF offset = plottable->stallPixelOffset();
         auto* axisRect = plottable->keyAxis() ? plottable->keyAxis()->axisRect() : nullptr;
@@ -1106,10 +1105,29 @@ std::optional<QCPDataBox> dataBoxOfRect(QCPAxis* keyAxis, QCPAxis* valueAxis, co
 }
 } // namespace
 
+void QCPLayer::childrenChanged()
+{
+    mItemIndexDirty = true;
+    mItemAxesDirty = true;
+    mPlottableChildrenDirty = true;
+}
+
 void QCPLayer::invalidateItemIndex()
 {
     mItemIndexDirty = true;
-    mItemAxesDirty = true; // the child list decides which axes this layer's items follow
+}
+
+const QList<QCPAbstractPlottable*>& QCPLayer::plottableChildren() const
+{
+    if (mPlottableChildrenDirty)
+    {
+        mPlottableChildren.clear();
+        for (QCPLayerable* child : mChildren)
+            if (auto* plottable = qobject_cast<QCPAbstractPlottable*>(child))
+                mPlottableChildren.append(plottable);
+        mPlottableChildrenDirty = false;
+    }
+    return mPlottableChildren;
 }
 
 namespace

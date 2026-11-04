@@ -80,6 +80,8 @@ using qcp::guarded;
 // The layerables a deselect pass must visit, guarded because a selectionChanged slot may delete
 // any of them. Only those that may be selected: guarding all of them was most of a click with
 // thousands of items.
+// simplify: still one virtual call per child, ~15 us per click at 10 000 items; a plot-wide set of
+// selected layerables is the upgrade if clicks over 100 000 items matter.
 QList<QPointer<QCPLayerable>> guardedSelectedLayerables(const QList<QCPLayer*>& layers,
                                                        const QCPLayerable* kept = nullptr)
 {
@@ -3570,12 +3572,9 @@ void QCustomPlot::executeRenderPass(QRhiCommandBuffer* cb, QRhiResourceUpdateBat
                     if (needsScissor)
                     {
                         QRect clipRect;
-                        for (auto* child : layer->children())
-                        {
-                            if (auto* plottable = qobject_cast<QCPAbstractPlottable*>(child))
-                                clipRect = clipRect.isNull() ? plottable->clipRect()
-                                                             : clipRect.united(plottable->clipRect());
-                        }
+                        for (QCPAbstractPlottable* plottable : layer->plottableChildren())
+                            clipRect = clipRect.isNull() ? plottable->clipRect()
+                                                         : clipRect.united(plottable->clipRect());
                         if (!clipRect.isNull())
                         {
                             double dpr = bufferDevicePixelRatio();
@@ -4478,17 +4477,14 @@ void QCustomPlot::setupPaintBuffers()
                 {
                     if (layer->mPaintBuffer.toStrongRef() == buffer)
                     {
-                        for (auto* child : layer->children())
+                        hasAnyChildren |= !layer->mChildren.isEmpty();
+                        for (QCPAbstractPlottable* p : layer->plottableChildren())
                         {
-                            hasAnyChildren = true;
-                            if (auto* p = qobject_cast<QCPAbstractPlottable*>(child))
+                            hasPlottables = true;
+                            if (p->canProduceContent())
                             {
-                                hasPlottables = true;
-                                if (p->canProduceContent())
-                                {
-                                    anyCanProduce = true;
-                                    break;
-                                }
+                                anyCanProduce = true;
+                                break;
                             }
                         }
                         if (anyCanProduce)
