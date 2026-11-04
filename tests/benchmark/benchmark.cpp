@@ -88,6 +88,18 @@ private slots:
   void QCPSpatialIndex_Build10k();
   void QCPSpatialIndex_Query10k();
 
+  void QCPGpu_LineSolid100k();
+  void QCPGpu_LineDashed100k();
+  void QCPGpu_Pan100k();
+  void QCPGpu_Graph2Render1M();
+  void QCPGpu_Bars10k();
+  void QCPGpu_Text1k();
+  void QCPGpu_MixedLayer();
+
+  void QCPBars_Zoom10k();
+  void QCPBars_Pan10k();
+  void QCPItemText_Zoom1k();
+
 private:
   QCustomPlot *mPlot;
   QWidget mContainerWidget;
@@ -1469,4 +1481,256 @@ void Benchmark::QCPItems_Pan10k()
     mPlot->xAxis->setRange(left, left + 1);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
   }
+}
+
+namespace
+{
+// A GPU row builds its own shown window: mPlot lives in a container an earlier row may have kept
+// unexposed, and only a shown widget creates a QRhi. Returns false when the platform has none
+// (qoffscreen), which the row turns into QSKIP.
+bool makeGpuPlot(QWidget &host, QCustomPlot *&plot)
+{
+  host.resize(1000, 600);
+  plot = new QCustomPlot(&host);
+  plot->setGeometry(0, 0, 1000, 600);
+  host.show();
+  if (!QTest::qWaitForWindowExposed(&host))
+    return false;
+  // QRhiWidget creates its QRhi on the first render: pump the loop until that has happened.
+  QElapsedTimer waited;
+  waited.start();
+  while (!plot->rhi() && waited.elapsed() < 5000)
+  {
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+    QTest::qWait(10);
+  }
+  return plot->rhi() != nullptr;
+}
+} // namespace
+namespace
+{
+void fillSine(QVector<double> &keys, QVector<double> &values, double span)
+{
+  const int n = int(keys.size());
+  for (int i = 0; i < n; ++i)
+  {
+    keys[i] = span * i / n;
+    values[i] = qSin(6 * M_PI * i / n);
+  }
+}
+} // namespace
+namespace
+{
+// A freshly shown plot has to paint once before the loop so texture/pipeline setup stays out of
+// the measurement.
+void settleGpuPlot(QCustomPlot *plot)
+{
+  plot->replot();
+  QCoreApplication::processEvents();
+}
+} // namespace
+
+void Benchmark::QCPGpu_LineSolid100k()
+{
+  QWidget host;
+  QCustomPlot *plot = nullptr;
+  if (!makeGpuPlot(host, plot))
+    QSKIP("no QRhi on this platform (qoffscreen)");
+  auto *graph = plot->addGraph();
+  graph->setPen(QPen(Qt::black, 1, Qt::SolidLine));
+  QVector<double> keys(100000), values(100000);
+  fillSine(keys, values, 1.0);
+  graph->setData(keys, values);
+  plot->xAxis->setRange(0, 1);
+  plot->yAxis->setRange(-1.2, 1.2);
+  settleGpuPlot(plot);
+  int step = 0;
+  QBENCHMARK { zoomInPlace(plot, 0.5, 1.0, step); }
+}
+
+void Benchmark::QCPGpu_LineDashed100k()
+{
+  QWidget host;
+  QCustomPlot *plot = nullptr;
+  if (!makeGpuPlot(host, plot))
+    QSKIP("no QRhi on this platform (qoffscreen)");
+  auto *graph = plot->addGraph();
+  graph->setPen(QPen(Qt::black, 1, Qt::DashLine)); // the QPainter branch, on a GPU surface
+  QVector<double> keys(100000), values(100000);
+  fillSine(keys, values, 1.0);
+  graph->setData(keys, values);
+  plot->xAxis->setRange(0, 1);
+  plot->yAxis->setRange(-1.2, 1.2);
+  settleGpuPlot(plot);
+  int step = 0;
+  QBENCHMARK { zoomInPlace(plot, 0.5, 1.0, step); }
+}
+
+void Benchmark::QCPGpu_Pan100k()
+{
+  QWidget host;
+  QCustomPlot *plot = nullptr;
+  if (!makeGpuPlot(host, plot))
+    QSKIP("no QRhi on this platform (qoffscreen)");
+  auto *graph = plot->addGraph();
+  graph->setPen(QPen(Qt::black, 1, Qt::SolidLine));
+  QVector<double> keys(100000), values(100000);
+  fillSine(keys, values, 100.0);
+  graph->setData(keys, values);
+  plot->xAxis->setRange(50, 51);
+  plot->yAxis->setRange(-1.2, 1.2);
+  settleGpuPlot(plot);
+  double left = 50;
+  QBENCHMARK
+  {
+    left += 0.01; // 1 % of the window, the pan-fast-path candidate
+    plot->xAxis->setRange(left, left + 1);
+    plot->replot(QCustomPlot::rpImmediateRefresh);
+  }
+}
+
+void Benchmark::QCPGpu_Graph2Render1M()
+{
+  QWidget host;
+  QCustomPlot *plot = nullptr;
+  if (!makeGpuPlot(host, plot))
+    QSKIP("no QRhi on this platform (qoffscreen)");
+  auto *graph = new QCPGraph2(plot->xAxis, plot->yAxis);
+  const int n = 1000000;
+  std::vector<double> keys(n), values(n);
+  for (int i = 0; i < n; ++i)
+  {
+    keys[i] = i / static_cast<double>(n);
+    values[i] = qSin(keys[i] * 10 * M_PI);
+  }
+  graph->setData(std::move(keys), std::move(values));
+  plot->xAxis->setRange(0, 1);
+  plot->yAxis->setRange(-1.2, 1.2);
+  settleGpuPlot(plot);
+  int step = 0;
+  QBENCHMARK { zoomInPlace(plot, 0.5, 1.0, step); }
+}
+
+void Benchmark::QCPGpu_Bars10k()
+{
+  QWidget host;
+  QCustomPlot *plot = nullptr;
+  if (!makeGpuPlot(host, plot))
+    QSKIP("no QRhi on this platform (qoffscreen)");
+  auto *bars = new QCPBars(plot->xAxis, plot->yAxis);
+  QVector<double> keys(10000), values(10000);
+  for (int i = 0; i < 10000; ++i)
+  {
+    keys[i] = 100.0 * i / 10000;
+    values[i] = 0.5 + 0.5 * qSin(i * 0.01);
+  }
+  bars->setData(keys, values);
+  plot->xAxis->setRange(50, 51);
+  plot->yAxis->setRange(0, 1);
+  settleGpuPlot(plot);
+  int step = 0;
+  QBENCHMARK { zoomInPlace(plot, 50.5, 1.0, step); }
+}
+
+void Benchmark::QCPGpu_Text1k()
+{
+  QWidget host;
+  QCustomPlot *plot = nullptr;
+  if (!makeGpuPlot(host, plot))
+    QSKIP("no QRhi on this platform (qoffscreen)");
+  for (int i = 0; i < 1000; ++i)
+  {
+    auto *text = new QCPItemText(plot);
+    text->setText(QString::number(i));
+    text->position->setCoords(100.0 * i / 1000, 0.5);
+  }
+  plot->xAxis->setRange(50, 51);
+  plot->yAxis->setRange(0, 1);
+  settleGpuPlot(plot);
+  int step = 0;
+  QBENCHMARK { zoomInPlace(plot, 50.5, 1.0, step); }
+}
+
+void Benchmark::QCPGpu_MixedLayer()
+{
+  QWidget host;
+  QCustomPlot *plot = nullptr;
+  if (!makeGpuPlot(host, plot))
+    QSKIP("no QRhi on this platform (qoffscreen)");
+  // The stacking question of the drawing API: GPU-drawn graphs and QPainter text interleaved in one
+  // layer, which is what a default plot does today.
+  for (int i = 0; i < 100; ++i)
+  {
+    auto *graph = plot->addGraph();
+    graph->setPen(QPen(QColor::fromHsv((i * 7) % 360, 200, 160), 1, Qt::SolidLine));
+    QVector<double> keys(1000), values(1000);
+    for (int j = 0; j < 1000; ++j)
+    {
+      keys[j] = j / 999.0;
+      values[j] = 0.9 * qSin(6 * M_PI * keys[j] + i * 0.1);
+    }
+    graph->setData(keys, values);
+    auto *text = new QCPItemText(plot);
+    text->setText(QStringLiteral("g%1").arg(i));
+    text->position->setCoords(0.01 * i, 0.9);
+  }
+  plot->xAxis->setRange(0, 1);
+  plot->yAxis->setRange(-1.1, 1.1);
+  settleGpuPlot(plot);
+  int step = 0;
+  QBENCHMARK { zoomInPlace(plot, 0.5, 1.0, step); }
+}
+
+void Benchmark::QCPBars_Zoom10k()
+{
+  auto *bars = new QCPBars(mPlot->xAxis, mPlot->yAxis);
+  QVector<double> keys(10000), values(10000);
+  for (int i = 0; i < 10000; ++i)
+  {
+    keys[i] = 100.0 * i / 10000;
+    values[i] = 0.5 + 0.5 * qSin(i * 0.01);
+  }
+  bars->setData(keys, values);
+  mPlot->xAxis->setRange(50, 51);
+  mPlot->yAxis->setRange(0, 1);
+  mPlot->replot();
+  int step = 0;
+  QBENCHMARK { zoomInPlace(mPlot, 50.5, 1.0, step); }
+}
+
+void Benchmark::QCPBars_Pan10k()
+{
+  auto *bars = new QCPBars(mPlot->xAxis, mPlot->yAxis);
+  QVector<double> keys(10000), values(10000);
+  for (int i = 0; i < 10000; ++i)
+  {
+    keys[i] = 100.0 * i / 10000;
+    values[i] = 0.5 + 0.5 * qSin(i * 0.01);
+  }
+  bars->setData(keys, values);
+  mPlot->xAxis->setRange(50, 51);
+  mPlot->yAxis->setRange(0, 1);
+  mPlot->replot();
+  double left = 50;
+  QBENCHMARK
+  {
+    left += 0.01;
+    mPlot->xAxis->setRange(left, left + 1);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+  }
+}
+
+void Benchmark::QCPItemText_Zoom1k()
+{
+  for (int i = 0; i < 1000; ++i)
+  {
+    auto *text = new QCPItemText(mPlot);
+    text->setText(QString::number(i));
+    text->position->setCoords(100.0 * i / 1000, 0.5);
+  }
+  mPlot->xAxis->setRange(50, 51);
+  mPlot->yAxis->setRange(0, 1);
+  mPlot->replot();
+  int step = 0;
+  QBENCHMARK { zoomInPlace(mPlot, 50.5, 1.0, step); }
 }
