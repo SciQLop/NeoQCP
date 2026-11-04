@@ -241,3 +241,80 @@ composite happen in `render()`, which an offscreen benchmark does not run).
 | QCPItems_ZoomEmpty | - | 0.14 | 0.14 / 0.15 / 0.14 | new |
 | QCPPlots_Stack8_Replot | 0.26 | 0.26 | 0.26 / 0.26 / 0.26 | 1.00 |
 | QObject_DeleteEachChild10k | - | 7.8 | 8.3 / 7.8 / 7.7 | new |
+
+## End of item index
+
+- Commit: 1ac1ce5 (neoqcp-3.0), same command and machine, three sequential runs.
+- Load average (1/5/15 min) at the start of each run: run 1: 2.99 / 3.64 / 3.48, run 2: 2.95 / 3.53 / 3.46, run 3: 1.66 / 2.97 / 3.26.
+- Ratio = end-of-item-index median / end-of-item-scaling median.
+- Plan targets: Zoom10k 0.42 <= 1.3 x Zoom100 (0.52), met. Click10k 0.052 and ClickEmpty10k 0.049 against 0.05, met within noise. DragOne10k 0.54 <= 1.5 x Zoom100 (0.60), met. FirstFrame10k - Add10k - Clear10k = 28 - 19 - 8.8, about 0 (target 2 ms), met: the row also clears its items.
+- Rows outside the +-15% band:
+  - QCPItems_Zoom10k 1.2 -> 0.42, Replot10k 1.2 -> 0.41, Click10k 1.2 -> 0.052, ClickEmpty10k 0.29 -> 0.049, Click100 0.014 -> 0.0036, QCPAxis_SetTickLength10kItems 15 -> 0.012: the point of this plan (index, click query, deselect pass, per-layer axes, per-layer plottable list).
+  - QCPItems_RemoveEach10k 25 -> 32 (1.28): same work, slower placement. Bisected to 67ab0e1, which only edits code this row never runs. The time is in `QList::indexOf` over the item list (source and instructions unchanged); `perf stat` gives the same instruction count (1.774e9 vs 1.773e9), the same cache and branch misses, and 10% more cycles. A code-alignment effect; not chased.
+  - QCPGraph_RemoveDataAfter 0.00068 -> 0.00091: a sub-microsecond single-shot row (0.00091 / 0.0012 / 0.00088), no code from this plan on its path.
+- New rows: QCPSpatialIndex_Build10k, QCPSpatialIndex_Query10k, QCPItems_FirstFrame10k, DragOne10k, Pan10k, RestyleAll10k.
+
+| Benchmark | item scaling msecs | end msecs | run 1 / 2 / 3 | ratio |
+|---|---|---|---|---|
+| QCPAxisRects_Stack8_Replot | 1.8 | 1.8 | 1.8 / 1.8 / 1.8 | 1.00 |
+| QCPAxis_SetRange10k | 1.4 | 1.4 | 1.4 / 1.4 / 1.4 | 1.00 |
+| QCPAxis_SetTickLength10kItems | 15 | 0.012 | 0.012 / 0.012 / 0.011 | 0.00 |
+| QCPAxis_TickLabels | 0.24 | 0.24 | 0.24 / 0.24 / 0.24 | 1.00 |
+| QCPAxis_TickLabelsCached | 0.089 | 0.088 | 0.092 / 0.088 / 0.087 | 0.99 |
+| QCPColorMap2_ResampleDouble | 221 | 222 | 229 / 222 / 219 | 1.00 |
+| QCPColorMap2_ResampleFloat | 131 | 133 | 129 / 135 / 133 | 1.02 |
+| QCPColorMap2_ResamplePanSequence | 177 | 188 | 188 / 216 / 179 | 1.06 |
+| QCPColorMap2_ResamplePanSequenceSmall | 205 | 207 | 207 / 203 / 207 | 1.01 |
+| QCPColorMap2_ResampleWideParallel | 256 | 269 | 269 / 259 / 275 | 1.05 |
+| QCPColorMap2_ResampleWideSerial | 757 | 766 | 768 / 766 / 766 | 1.01 |
+| QCPColorMapData_ConstructLarge | 1.2 | 1.1 | 1.1 / 1.1 / 1.1 | 0.92 |
+| QCPColorMap_ColorizeMap | 0.16 | 0.16 | 0.16 / 0.16 / 0.16 | 1.00 |
+| QCPColorMap_SetCell1M | 3.2 | 3 | 3 / 3 / 3.1 | 0.94 |
+| QCPColorMap_Standard | 0.22 | 0.21 | 0.21 / 0.21 / 0.22 | 0.95 |
+| QCPGraph2_RenderDouble | 0.14 | 0.14 | 0.14 / 0.14 / 0.14 | 1.00 |
+| QCPGraph2_RenderFloat | 0.14 | 0.14 | 0.14 / 0.14 / 0.14 | 1.00 |
+| QCPGraph2_RenderManyLines | 0.44 | 0.44 | 0.44 / 0.44 / 0.44 | 1.00 |
+| QCPGraph2_ScatterDisc1M | 0.12 | 0.12 | 0.12 / 0.12 / 0.12 | 1.00 |
+| QCPGraph2_ScatterSquare1M | 0.12 | 0.12 | 0.12 / 0.12 / 0.12 | 1.00 |
+| QCPGraph2_ScatterWithLine1M | 0.13 | 0.12 | 0.12 / 0.12 / 0.13 | 0.92 |
+| QCPGraph2_SetDataDouble | 9.5 | 9.4 | 9.4 / 9.4 / 9.5 | 0.99 |
+| QCPGraph2_SetDataFloat | 8.2 | 8.5 | 8.5 / 8.1 / 8.6 | 1.04 |
+| QCPGraph_AddDataAtBeginSorted | 5.5 | 5.3 | 5.2 / 6 / 5.3 | 0.96 |
+| QCPGraph_AddDataAtBeginUnsorted | 28 | 28 | 28 / 28 / 28 | 1.00 |
+| QCPGraph_AddDataAtEndSorted | 4.9 | 5 | 5 / 5.3 / 5 | 1.02 |
+| QCPGraph_AddDataAtEndUnsorted | 22 | 23 | 24 / 23 / 23 | 1.05 |
+| QCPGraph_AddDataMixedSorted | 10 | 10 | 10 / 11 / 10 | 1.00 |
+| QCPGraph_AddDataMixedUnsorted | 29 | 29 | 29 / 29 / 29 | 1.00 |
+| QCPGraph_AddDataSingleAtBegin | 0.045 | 0.045 | 0.045 / 0.045 / 0.045 | 1.00 |
+| QCPGraph_AddDataSingleAtEnd | 0.024 | 0.024 | 0.024 / 0.024 / 0.024 | 1.00 |
+| QCPGraph_AddDataSingleRandom | 5 | 5.2 | 5.2 / 5.1 / 5.2 | 1.04 |
+| QCPGraph_ManyLines | 1.3 | 1.3 | 1.3 / 1.3 / 1.3 | 1.00 |
+| QCPGraph_ManyOffScreenLines | 0.15 | 0.15 | 0.15 / 0.15 / 0.15 | 1.00 |
+| QCPGraph_ManyPoints | 2.6 | 2.6 | 2.6 / 2.6 / 2.6 | 1.00 |
+| QCPGraph_RemoveDataAfter | 0.00068 | 0.00091 | 0.00091 / 0.0012 / 0.00088 | 1.34 |
+| QCPGraph_RemoveDataBefore | 0.17 | 0.16 | 0.16 / 0.3 / 0.16 | 0.94 |
+| QCPGraph_RemoveDataBetween | 0.11 | 0.1 | 0.081 / 0.13 / 0.1 | 0.91 |
+| QCPGraph_Standard | 0.71 | 0.67 | 0.66 / 0.67 / 0.69 | 0.94 |
+| QCPInput_MouseMoveStorm | 3.8 | 4.1 | 4.1 / 4.1 / 3.7 | 1.08 |
+| QCPItems_Add10k | 18 | 19 | 19 / 18 / 19 | 1.06 |
+| QCPItems_AddRemove10k | 28 | 27 | 27 / 27 / 28 | 0.96 |
+| QCPItems_AddRemove20k | 64 | 64 | 64 / 64 / 66 | 1.00 |
+| QCPItems_Clear10k | 8.3 | 8.8 | 8.8 / 8.2 / 9.5 | 1.06 |
+| QCPItems_Click100 | 0.014 | 0.0036 | 0.0036 / 0.0037 / 0.0036 | 0.26 |
+| QCPItems_Click10k | 1.2 | 0.052 | 0.052 / 0.052 / 0.051 | 0.04 |
+| QCPItems_ClickEmpty10k | 0.29 | 0.049 | 0.049 / 0.05 / 0.049 | 0.17 |
+| QCPItems_DeleteEach10k | 24 | 25 | 27 / 25 / 25 | 1.04 |
+| QCPItems_DeletePlot10k | 25 | 27 | 27 / 27 / 26 | 1.08 |
+| QCPItems_DragOne10k | - | 0.54 | 0.56 / 0.54 / 0.54 | new |
+| QCPItems_FirstFrame10k | - | 28 | 29 / 28 / 28 | new |
+| QCPItems_Pan10k | - | 0.41 | 0.42 / 0.41 / 0.41 | new |
+| QCPItems_RemoveEach10k | 25 | 32 | 32 / 31 / 32 | 1.28 |
+| QCPItems_Replot10k | 1.2 | 0.41 | 0.43 / 0.41 / 0.41 | 0.34 |
+| QCPItems_RestyleAll10k | - | 1.5 | 1.6 / 1.4 / 1.5 | new |
+| QCPItems_Zoom100 | 0.41 | 0.4 | 0.4 / 0.4 / 0.4 | 0.98 |
+| QCPItems_Zoom10k | 1.2 | 0.42 | 0.43 / 0.42 / 0.42 | 0.35 |
+| QCPItems_ZoomEmpty | 0.14 | 0.14 | 0.14 / 0.14 / 0.14 | 1.00 |
+| QCPPlots_Stack8_Replot | 0.26 | 0.26 | 0.26 / 0.26 / 0.26 | 1.00 |
+| QCPSpatialIndex_Build10k | - | 0.88 | 0.89 / 0.88 / 0.88 | new |
+| QCPSpatialIndex_Query10k | - | 0.00036 | 0.00036 / 0.00037 / 0.00036 | new |
+| QObject_DeleteEachChild10k | 7.8 | 7.8 | 8 / 7.8 / 7.8 | 1.00 |

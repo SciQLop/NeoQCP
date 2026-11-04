@@ -112,26 +112,39 @@ Behaviour changes for 2.x users:
         replot themselves: they schedule the repaint like every other setter.
   - QCPLineEnding has operator==.
 
-Item scaling. Thousands of items add, remove and draw without a quadratic step (10 000 items:
-        add + clear 25 ms, was 63; zoom 1.2 ms, was 4.7 once items were really drawn; a click on
-        empty space 0.28 ms, was 1.2).
-  - Fix (also in 2.x): an item on a layer with no plottable of its axis rect stayed at its old pixels
-        after a zoom or a pan; a range change now repaints the items on that axis.
-  - Adding an item and clearItems() are linear; clearItems() and deleting the plot delete the items
-        oldest first, after taking them out of their layers in one pass.
+Item scaling. Thousands of items add, remove, draw and take clicks without a quadratic step. With
+        10 000 items and 100 in view: add + clear 27 ms (was 63); a zoom or a pan 0.42 ms, the same
+        as with only the 100 items (was 4.7 once items were really drawn); a click 0.05 ms (was 1.2);
+        an axis style change 0.012 ms (was 15).
   - Item spatial index: every layer keeps a packed R-tree (sort-tile-recursive bulk load) of its
-        items' extents in data coordinates, rebuilt when the layer's children change and never on a
-        zoom or a pan (the axis transforms are monotone). A frame and a click convert their rectangle
-        once per axis pair and skip the items the tree does not report, still in child order.
+        items' boxes in data coordinates. It is rebuilt when the layer's children change, never on a
+        zoom or a pan (axis transforms are monotone). A frame queries the view, a click queries the
+        click point plus the selection tolerance; skipped items keep their child order.
   - QCPAbstractItem::dataExtent() (virtual, default: none): an item whose drawing and hit area fit a
-        data box returns it with a pixel padding; a coordinate counts only when its position is a plot
-        coordinate with no parent anchor, otherwise that side is unbounded and the item is always
-        drawn and tested. Line, rect, ellipse, curve and bracket items return it; text, pixmap, rich
-        text, straight line and tracer items, plottables and user classes are never culled.
-  - An item whose extent changed (a move, a new pen) leaves the tree for a side list that is tested
-        item by item, and the tree is rebuilt once that list passes max(64, n/16) items.
+        data box returns it with a pixel padding. An axis side is boxed only when every position is
+        a plot coordinate with no parent anchor on that axis; otherwise that side is unbounded. On a
+        log axis a box reaching zero or below is not indexed. Line, rect, ellipse, curve and bracket
+        items return it; text, pixmap, rich text, straight line and tracer items, plottables and
+        user classes are never culled.
+  - A moved item leaves the tree for a side list tested item by item; the tree is rebuilt once that
+        list passes max(64, n/16) items. A scale type change rebuilds every tree.
   - QCustomPlot::setItemIndexing(bool) turns the index off (default on); it is the oracle the
         randomized test compares against.
+  - Each layer knows the axes its items follow, through anchor chains too: a range change or an axis
+        style change marks those layers instead of walking every item.
+  - A deselect pass (a click, deselectAll()) visits only what may be selected. New virtual
+        QCPLayerable::mayBeSelected(), default true; items answer from selected().
+  - Fix (also in 2.x): an item on a layer with no plottable of its axis rect stayed at its old pixels
+        after a zoom or a pan.
+  - Fix: an item following another item's anchor from another layer kept its old pixels when that
+        item moved, changed axes, or had its axis moved.
+  - Fix (also in 2.x): anchor cycles through another item's plain anchor, or through the other axis,
+        were accepted and overflowed the stack on the next pixelPosition(). setParentAnchorX/Y refuse
+        them like a direct cycle.
+  - Fix (also in 2.x): parallel colour map and graph resampling could return before its worker tasks
+        finished, and a task wrote into freed memory (a rare crash while panning a large colour map).
+  - Adding an item and clearItems() are linear; clearItems() and deleting the plot delete the items
+        oldest first, after taking them out of their layers in one pass.
   - Behaviour change: clearItems() deletes oldest first (2.x: newest first). A destroyed() slot that
         deletes another item through a raw pointer may now meet a deleted one; hold a QPointer.
 

@@ -28,13 +28,8 @@ or hit-tested. Branch `neoqcp-3.0`, commits `3970d59..` (local, not pushed). Pla
 - `clearItems()` deletes oldest first (Qt erases a first element by moving the begin pointer). A
   `destroyed()` slot deleting a raw sibling pointer is unsafe in either order; one test now holds a
   `QPointer`. Cost: such user code may crash in a different order than in 2.x (changelog).
-- Culling is a cheap per-item rectangle test, still O(n) per frame, no spatial index (maintainer: "we
-  don't usually put thousands, but it should scale"). Zoom over 10 000 items: 1.2 ms against a 1.0 ms
-  target; the rest is computing 10 000 bounds. Cost: about 0.8 ms per frame at 10 000 items.
-- Hit-test bounds are cached by the screen draw and trusted only while the plot that drew them still
-  has the same paint generation and viewport: any dirty mark anywhere invalidates every cached bound.
-  Cost: fewer cache hits, never a wrong hit. `QCPItems_Click10k` (a click that toggles a selection with
-  no repaint between clicks) stays 1.2 ms; a click on a settled plot is 0.28 ms.
+- (Replaced by the item index, below.) Culling was a per-item rectangle test, and hit testing used
+  bounds cached by the last screen draw. Both are gone.
 - Only line, rect, ellipse, curve and bracket opt in. The tracer moves inside its own draw, text and
   pixmap sizes need font metrics, the straight line is infinite.
 - Adding 20 000 items costs 2.36x adding 10 000 (target 2.3x): linear within noise.
@@ -58,4 +53,53 @@ or hit-tested. Branch `neoqcp-3.0`, commits `3970d59..` (local, not pushed). Pla
   position list; measured flat (`QCPAxis_SetTickLength10kItems` 15 ms).
 - `exportDoesNotPoisonBounds` replots before its clicks, so it pins "a frame after an export restores
   hit testing", not the cache itself; tightening it waits for the export-layout decision.
-- `QCPItemBracket::pixelBounds` pads by 1.5 x its length, an envelope checked against the bundled styles.
+- `QCPItemBracket::dataExtent` pads by 1.5 x its length, an envelope checked against the bundled styles.
+
+# Item index (plan `docs/superpowers/plans/2026-11-04-neoqcp-3-item-index.md`, commits `fcad1ae..`)
+
+Each layer keeps a packed R-tree of its items' boxes in data coordinates. Maintainer, 2026-11-04: "if
+we could use smart and modern algorithms [...] a kd-tree or any smart data structure/algorithm here is
+welcome". Benchmark: `baseline.md`, "End of item index". All four plan targets are met.
+
+## Rulings
+
+- A packed STR R-tree (Skia `SkRTree`, Chromium `cc/base/rtree.h`), not a kd-tree or a dynamic AABB
+  tree: items are boxes, and they move rarely compared with how often frames are drawn. Moved items
+  go to a side list tested one by one (Bentley and Saxe); the tree is rebuilt when that list passes
+  max(64, n/16). Cost if wrong: a plot that drags hundreds of items at once rebuilds often.
+- Boxes are in data coordinates, so zooms, pans and reversals never rebuild. A scale type change
+  rebuilds every tree, because a log axis has no pixel for values at or below zero.
+- Every "this item may have moved" event goes through the item's repaint mark: the setter rule of
+  milestone 2 already makes every setter call it.
+- A layer with fewer than 64 items keeps moved items on the side list until its child list changes.
+  Cost: up to 63 items tested one by one.
+- Clicks cost 0.05 ms at 10 000 items. The rest is three plain passes over the layer's children; a
+  plot-wide set of selected layerables is the upgrade (`simplify:` comment in core.cpp).
+- A selectionChanged slot that selects a not-yet-visited item during a deselect pass leaves it
+  selected: the visit list is taken first. 2.x already depended on visit order.
+- `scaleTypeChangeRebuildsTheIndex` checks the rebuild counter, not pixels: a stale box on a log axis
+  maps to the fixed off-screen pixel and did not show in the probes tried.
+- `add()` of a taken item resets its positions to the default axes, even when it goes back to the
+  same plot (milestone-2 adopt rule). Kept.
+- `QCPItems_RemoveEach10k` 25 -> 32 ms is a code-placement effect (same instruction count, 10% more
+  cycles, bisected to a commit that edits only code the row never runs). Not chased.
+
+## Bugs found and fixed
+
+- An item with one point in data coordinates and another pinned to the axis rect got a box covering
+  only the first point, so it could be culled while on screen (found by the randomized test).
+- A click queried the whole view instead of the click point.
+- A label anchored to an item on another layer kept its old pixels when that item moved, changed
+  axes, or had its axis moved.
+- Anchor cycles through another item's plain anchor, or through the other axis, were accepted (also
+  in 2.x) and overflowed the stack. One walk in setParentAnchorX/Y now refuses them.
+- Marking an item whose position follows its own other position recursed forever (found by the final
+  review, introduced by the follower fix).
+- Parallel resampling could return before its tasks finished (also in 2.x): a late task released the
+  next pass's semaphore, and a task wrote into freed memory. One join helper replaces three copies.
+
+## Review findings ruled false
+
+- "The remaining zoom cost is the cast in the draw loop": the draw loop skips culled items first; the
+  casts were three replot steps scanning every child for plottables (each layer keeps that list now).
+- "The click still costs 0.24 ms because of the per-child loop": it queried the whole view.
