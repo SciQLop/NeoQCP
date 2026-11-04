@@ -470,6 +470,7 @@ private:
 protected:
     // property members:
     QRect mViewport;
+    QSize mViewportWidgetSize; // the widget size the viewport was last taken from
     double mBufferDevicePixelRatio;
     QPointer<QCPLayoutGrid> mPlotLayout;
     bool mAutoAddPlottableToLegend;
@@ -605,6 +606,9 @@ protected:
     // introduced virtual methods:
     virtual void draw(QCPPainter* painter);
     virtual void updateLayout();
+    void restoreViewportAfterExport(const QRect& screenViewport);
+    void adoptWidgetViewport();
+    void syncViewportToWidgetSize();
     virtual void axisRemoved(QCPAxis* axis);
     virtual void legendRemoved(QCPLegend* legend);
     Q_SLOT virtual void processRectSelection(QRect rect, QMouseEvent* event);

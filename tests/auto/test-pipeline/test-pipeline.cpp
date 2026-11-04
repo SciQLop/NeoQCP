@@ -3681,8 +3681,11 @@ void TestPipeline::multiGraphUniformDataNeverBreaksAtAnyZoom()
 
 void TestPipeline::multiGraphNaNHoleBreaksTheResampledLine()
 {
+    // The hole must be narrower than the view at both zooms, so the line has data on both sides of
+    // it: at 3.4 samples per pixel a 360-pixel axis rect shows about 1 200 samples.
+    constexpr int hole = 300;
     auto values = uniformValues();
-    std::fill(values.begin() + kUniformN / 2, values.begin() + kUniformN / 2 + 2'000, qQNaN());
+    std::fill(values.begin() + kUniformN / 2, values.begin() + kUniformN / 2 + hole, qQNaN());
     auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     QSignalSpy spy(&g->pipeline(), &QCPMultiGraphPipeline::finished);
     mPlot->yAxis->setRange(-1.5, 1.5);
@@ -3693,7 +3696,7 @@ void TestPipeline::multiGraphNaNHoleBreaksTheResampledLine()
 
     for (const double perPixel : {3.4, 12.0})
     {
-        const double centre = (kUniformN / 2 + 1'000) * kUniformStep;
+        const double centre = (kUniformN / 2 + hole / 2) * kUniformStep;
         const double span = perPixel * mPlot->xAxis->axisRect()->width() * kUniformStep;
         mPlot->xAxis->setRange(centre - span / 2, centre + span / 2);
         g->setGapThreshold(0);

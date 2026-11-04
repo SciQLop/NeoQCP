@@ -524,7 +524,7 @@ QCustomPlot::QCustomPlot(QWidget* parent)
     mSelectionRect = new QCPSelectionRect(this);
     mSelectionRect->setLayer(QLatin1String("overlay"));
 
-    setViewport(rect()); // needs to be called after mPlotLayout has been created
+    adoptWidgetViewport(); // needs to be called after mPlotLayout has been created
 
     mTheme = ownedTheme();
     connectThemeSignal();
@@ -1216,6 +1216,21 @@ void QCustomPlot::setItemPositioner(ItemPositioner positioner)
   This function is used to allow arbitrary size exports with \ref toPixmap, \ref savePng, \ref
   savePdf, etc. by temporarily changing the viewport size.
 */
+void QCustomPlot::adoptWidgetViewport()
+{
+    mViewportWidgetSize = size();
+    setViewport(rect());
+}
+
+// Qt holds back a hidden widget's resize event until it is shown, so a plot resized while hidden
+// would keep laying out at its old size: coordToPixel(), hit tests and the screen layout would all
+// disagree with width() and height(). A size change no resize event reported is applied here.
+void QCustomPlot::syncViewportToWidgetSize()
+{
+    if (size() != mViewportWidgetSize)
+        adoptWidgetViewport();
+}
+
 void QCustomPlot::setViewport(const QRect& rect)
 {
     mViewport = rect;
@@ -2803,6 +2818,7 @@ void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
     }
 
     mReplotQueued = false;
+    syncViewportToWidgetSize();
     if (!emitReplotSignal(&QCustomPlot::beforeReplot))
         return;
     mReplotting = true;
@@ -3034,6 +3050,7 @@ bool QCustomPlot::savePdf([[maybe_unused]] const QString& fileName, [[maybe_unus
     printer.setColorMode(QPrinter::Color);
     printer.printEngine()->setProperty(QPrintEngine::PPK_Creator, pdfCreator);
     printer.printEngine()->setProperty(QPrintEngine::PPK_DocumentName, pdfTitle);
+    syncViewportToWidgetSize();
     QRect oldViewport = viewport();
     setViewport(QRect(0, 0, newWidth, newHeight));
 
@@ -3062,7 +3079,7 @@ bool QCustomPlot::savePdf([[maybe_unused]] const QString& fileName, [[maybe_unus
         success = alive;
     }
     if (alive)
-        setViewport(oldViewport);
+        restoreViewportAfterExport(oldViewport);
 #endif // QT_NO_PRINTER
     return success;
 }
@@ -3275,7 +3292,7 @@ void QCustomPlot::initialize(QRhiCommandBuffer* cb)
             mGridRhiLayer->invalidatePipeline();
         // QRhiWidget calls initialize() on resize BEFORE resizeEvent() fires.
         // Regenerate geometry now so render() has fresh data for the new size.
-        setViewport(rect());
+        adoptWidgetViewport();
         replot(rpImmediateRefresh);
         return;
     }
@@ -3331,7 +3348,7 @@ void QCustomPlot::initialize(QRhiCommandBuffer* cb)
 
     // Draw content into the fresh buffers so the first frame is not blank.
     // This handles widgets that are initially hidden (e.g. in a QTabWidget).
-    setViewport(rect());
+    adoptWidgetViewport();
     replot(rpImmediateRefresh);
 }
 
@@ -3742,7 +3759,7 @@ void QCustomPlot::releaseCompositeResources()
 void QCustomPlot::resizeEvent([[maybe_unused]] QResizeEvent* event)
 {
     // resize and repaint the buffer:
-    setViewport(rect());
+    adoptWidgetViewport();
     if (mSpanRhiLayer)
         mSpanRhiLayer->markGeometryDirty();
     if (mGridRhiLayer)
@@ -4329,6 +4346,14 @@ void QCustomPlot::draw(QCPPainter* painter)
   Here, the layout elements calculate their positions and margins, and prepare for the following
   draw call.
 */
+// An export lays the plot out at its own size. Laying it out again for the screen keeps
+// coordToPixel(), axis rects and hit tests describing the widget once the export returns.
+void QCustomPlot::restoreViewportAfterExport(const QRect& screenViewport)
+{
+    setViewport(screenViewport);
+    updateLayout();
+}
+
 void QCustomPlot::updateLayout()
 {
     PROFILE_HERE_N("QCustomPlot::updateLayout");
@@ -5064,6 +5089,7 @@ QPixmap QCustomPlot::toPixmap(int width, int height, double scale)
     painter.begin(&result);
     if (painter.isActive())
     {
+        syncViewportToWidgetSize();
         QRect oldViewport = viewport();
         setViewport(QRect(0, 0, newWidth, newHeight));
         painter.setMode(QCPPainter::pmNoCaching);
@@ -5080,7 +5106,7 @@ QPixmap QCustomPlot::toPixmap(int width, int height, double scale)
             painter.fillRect(mViewport, mBackgroundBrush);
         draw(&painter);
         if (alive)
-            setViewport(oldViewport);
+            restoreViewportAfterExport(oldViewport);
         painter.end();
     }
     else // might happen if pixmap has width or height zero
@@ -5127,6 +5153,7 @@ void QCustomPlot::toPainter(QCPPainter* painter, int width, int height)
 
     if (painter->isActive())
     {
+        syncViewportToWidgetSize();
         QRect oldViewport = viewport();
         setViewport(QRect(0, 0, newWidth, newHeight));
         painter->setMode(QCPPainter::pmNoCaching);
@@ -5136,7 +5163,7 @@ void QCustomPlot::toPainter(QCPPainter* painter, int width, int height)
             painter->fillRect(mViewport, mBackgroundBrush);
         draw(painter);
         if (alive)
-            setViewport(oldViewport);
+            restoreViewportAfterExport(oldViewport);
     }
     else
         qDebug() << Q_FUNC_INFO << "Passed painter is not active";

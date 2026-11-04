@@ -2111,3 +2111,40 @@ void TestRepaint::crossAxisAnchorCycleIsRefused()
     QVERIFY2(!accepted, "a cycle through the other axis was accepted");
     plot.replot();
 }
+
+void TestRepaint::layoutDescribesTheScreenAfterAnExport()
+{
+    // An export at another size lays the plot out at that size. Once it returns, coordinates, axis
+    // rects and hit tests must describe the widget again, not the image.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.xAxis->setRange(0, 10);
+    plot.yAxis->setRange(0, 10);
+    plot.replot();
+    const QRect screenRect = plot.axisRect()->rect();
+    const double screenX = plot.xAxis->coordToPixel(5);
+
+    const QPixmap image = plot.toPixmap(800, 600);
+    QCOMPARE(image.size(), QSize(800, 600));
+    QCOMPARE(plot.axisRect()->rect(), screenRect);
+    QCOMPARE(plot.xAxis->coordToPixel(5), screenX);
+
+    QCPPainter painter;
+    QPixmap target(900, 700);
+    painter.begin(&target);
+    plot.toPainter(&painter, 900, 700);
+    painter.end();
+    QCOMPARE(plot.axisRect()->rect(), screenRect);
+}
+
+void TestRepaint::hiddenPlotLaysOutAtItsSize()
+{
+    // Qt sends a hidden widget no resize event until it is shown. The plot must still lay out at
+    // the size it was given, or coordToPixel() disagrees with width() and with its own exports.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.replot();
+    QCOMPARE(plot.viewport(), QRect(0, 0, 400, 300));
+    QVERIFY(plot.axisRect()->outerRect().right() < 400);
+    QVERIFY(plot.axisRect()->outerRect().bottom() < 300);
+}

@@ -208,12 +208,15 @@ void TestSignalDelivery::beforeReplotChangesShowInSameReplot()
 void TestSignalDelivery::afterLayoutSeesExportViewport()
 {
     std::unique_ptr<QCustomPlot> plot(plotWithGraph());
-    bool exportViewport = false;
+    // The export lays out at its size, then once more for the screen when it returns.
+    const QSize screen = plot->size();
+    QList<QSize> seen;
     connect(plot.get(), &QCustomPlot::afterLayout, plot.get(),
-            [&] { exportViewport = plot->viewport().size() == QSize(800, 600); });
+            [&] { seen.append(plot->viewport().size()); });
     const QPixmap pixmap = plot->toPixmap(800, 600);
     QVERIFY(!pixmap.isNull());
-    QVERIFY(exportViewport);
+    QVERIFY(seen.contains(QSize(800, 600)));
+    QCOMPARE(seen.last(), screen);
 }
 
 void TestSignalDelivery::deleteLayerWhoseChildSlotDeletesPlot()

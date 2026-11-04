@@ -67,6 +67,8 @@ private slots:
     void positionFollowingItsOwnItemDoesNotRecurse();
     void crossItemAnchorCycleIsRefused();
     void crossAxisAnchorCycleIsRefused();
+    void layoutDescribesTheScreenAfterAnExport();
+    void hiddenPlotLaysOutAtItsSize();
 
 private:
     // What the plot shows: its paint buffers composed, or the framebuffer under RHI.
