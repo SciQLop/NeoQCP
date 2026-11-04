@@ -103,6 +103,9 @@ protected:
     friend class QCPColorMap;
 };
 
+template <typename T, typename Self = void>
+class QCPColorMapOps;
+
 class QCP_LIB_DECL QCPColorMap : public QCPAbstractPlottable
 {
     Q_OBJECT
@@ -117,6 +120,9 @@ class QCP_LIB_DECL QCPColorMap : public QCPAbstractPlottable
     /// \endcond
 
 public:
+    template <typename T>
+    using OpsFor = QCPColorMapOps<T>;
+
     explicit QCPColorMap(QCPAxis* keyAxis, QCPAxis* valueAxis);
     virtual ~QCPColorMap() override;
 
@@ -187,6 +193,55 @@ protected:
 
     friend class QCustomPlot;
     friend class QCPLegend;
+};
+
+// The fluent handle of a colour map; see QCPPlottableOps for the subclass contract.
+template <typename T, typename Self>
+class QCPColorMapOps : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPColorMapOps<T>>>
+{
+    using Base = QCPPlottableOps<T, qcp::OpsRet<Self, QCPColorMapOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    // The map takes the data over (it frees it, as setData(data, false) does).
+    Ret setData(std::unique_ptr<QCPColorMapData> data)
+    {
+        return this->apply([&](T& p) { p.setData(data.release(), false); });
+    }
+
+    // The map keeps its own copy.
+    Ret setData(const QCPColorMapData& data)
+    {
+        return this->apply([&](T& p) { p.setData(const_cast<QCPColorMapData*>(&data), true); });
+    }
+    Ret setInterpolate(bool enabled)
+    {
+        return this->apply([&](T& p) { p.setInterpolate(enabled); });
+    }
+    Ret setTightBoundary(bool enabled)
+    {
+        return this->apply([&](T& p) { p.setTightBoundary(enabled); });
+    }
+    Ret setGradient(const QCPColorGradient& gradient)
+    {
+        return this->apply([&](T& p) { p.setGradient(gradient); });
+    }
+    Ret setDataRange(const QCPRange& range)
+    {
+        return this->apply([&](T& p) { p.setDataRange(range); });
+    }
+    Ret setDataScaleType(QCPAxis::ScaleType type)
+    {
+        return this->apply([&](T& p) { p.setDataScaleType(type); });
+    }
+
+    // The scale the map follows; an empty or dead handle detaches it.
+    Ret setColorScale(const QCPHandle<QCPColorScale>& scale)
+    {
+        return this->apply([&](T& p) { p.setColorScale(scale.get()); });
+    }
 };
 
 #endif // QCP_PLOTTABLE_COLORMAP_H

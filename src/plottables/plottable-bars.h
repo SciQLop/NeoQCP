@@ -35,6 +35,9 @@ class QCPPainter;
 class QCPAxis;
 class QCPBars;
 
+template <typename T, typename Self = void>
+class QCPBarsGroupOps;
+
 class QCP_LIB_DECL QCPBarsGroup : public QObject
 {
     Q_OBJECT
@@ -44,6 +47,9 @@ class QCP_LIB_DECL QCPBarsGroup : public QObject
     /// \endcond
 
 public:
+    template <typename T>
+    using OpsFor = QCPBarsGroupOps<T>;
+
     /*!
       Defines the ways the spacing between bars in the group can be specified. Thus it defines what
       the number passed to \ref setSpacing actually means.
@@ -150,6 +156,9 @@ Q_DECLARE_TYPEINFO(QCPBarsData, Q_PRIMITIVE_TYPE);
 */
 using QCPBarsDataContainer = QCPDataContainer<QCPBarsData>;
 
+template <typename T, typename Self = void>
+class QCPBarsOps;
+
 class QCP_LIB_DECL QCPBars : public QCPAbstractPlottable1D<QCPBarsData>
 {
     Q_OBJECT
@@ -164,6 +173,9 @@ class QCP_LIB_DECL QCPBars : public QCPAbstractPlottable1D<QCPBarsData>
     /// \endcond
 
 public:
+    template <typename T>
+    using OpsFor = QCPBarsOps<T>;
+
     /*!
       Defines the ways the width of the bar can be specified. Thus it defines what the number passed
       to \ref setWidth actually means.
@@ -254,5 +266,72 @@ protected:
     friend class QCPBarsGroup;
 };
 Q_DECLARE_METATYPE(QCPBars::WidthType)
+
+// The fluent handle of a bar plottable; see QCPPlottableOps for the subclass contract.
+template <typename T, typename Self>
+class QCPBarsOps : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPBarsOps<T>>>
+{
+    using Base = QCPPlottableOps<T, qcp::OpsRet<Self, QCPBarsOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setData(QSharedPointer<QCPBarsDataContainer> data)
+    {
+        return this->apply([&](T& p) { p.setData(std::move(data)); });
+    }
+    Ret setData(const QVector<double>& keys, const QVector<double>& values, bool alreadySorted = false)
+    {
+        return this->apply([&](T& p) { p.setData(keys, values, alreadySorted); });
+    }
+    Ret setWidth(double width)
+    {
+        return this->apply([&](T& p) { p.setWidth(width); });
+    }
+    Ret setWidthType(QCPBars::WidthType type)
+    {
+        return this->apply([&](T& p) { p.setWidthType(type); });
+    }
+    Ret setBaseValue(double baseValue)
+    {
+        return this->apply([&](T& p) { p.setBaseValue(baseValue); });
+    }
+    Ret setStackingGap(double pixels)
+    {
+        return this->apply([&](T& p) { p.setStackingGap(pixels); });
+    }
+
+    // A dead group handle is refused with one misuse; use with() and a null group to ungroup.
+    Ret setBarsGroup(const QCPHandle<QCPBarsGroup>& group)
+    {
+        return this->apply(
+            [&](T& p)
+            {
+                QCP_CHECK_OR_RETURN(group, "the bars group handle is dead");
+                p.setBarsGroup(group.get());
+            });
+    }
+};
+
+// The handle of a bars group: created by QCustomPlot::add<QCPBarsGroup>(), owned by the plot.
+template <typename T, typename Self>
+class QCPBarsGroupOps : public QCPObjectOps<T, qcp::OpsRet<Self, QCPBarsGroupOps<T>>>
+{
+    using Base = QCPObjectOps<T, qcp::OpsRet<Self, QCPBarsGroupOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setSpacingType(QCPBarsGroup::SpacingType type)
+    {
+        return this->apply([&](T& p) { p.setSpacingType(type); });
+    }
+    Ret setSpacing(double spacing)
+    {
+        return this->apply([&](T& p) { p.setSpacing(spacing); });
+    }
+};
 
 #endif // QCP_PLOTTABLE_BARS_H

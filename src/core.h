@@ -40,6 +40,7 @@
 #include <QRhiWidget>
 #include <QTimer>
 #include <functional>
+#include <memory>
 #include <utility>
 
 class QCPPainter;
@@ -70,6 +71,13 @@ class QCustomPlot;
 
 using ItemCreator = std::function<QCPAbstractItem*(QCustomPlot* plot, QCPAxis* keyAxis, QCPAxis* valueAxis)>;
 using ItemPositioner = std::function<void(QCPAbstractItem* item, double anchorKey, double anchorValue, double currentKey, double currentValue)>;
+
+namespace qcp
+{
+// The construction rules of one family, see construct.h: what add<T>(args...) means for T.
+template <typename T>
+struct Construct;
+} // namespace qcp
 
 class QCP_LIB_DECL QCustomPlot : public QRhiWidget
 {
@@ -304,13 +312,22 @@ public:
                                       int* dataIndex = nullptr) const;
     [[nodiscard]] bool hasPlottable(QCPAbstractPlottable* plottable) const;
 
-    // Creates a T on the default axis rect's bottom and left axes and the current layer, passes
-    // args to the handle's setData, and returns T's fluent handle (qcp::HandleFor<T>, see
-    // QCPPlottableOps). Refused while the plot is being destroyed or when it has no axis rect with
-    // those axes. The two creation APIs fail differently: addGraph() logs with qDebug and returns
-    // nullptr; add<T>() reports misuse (qcp::reportMisuse) and returns an empty handle.
+    // Creates a T the plot owns and returns its fluent handle (qcp::HandleFor<T>). What args mean
+    // depends on T's family (qcp::Construct<T>, construct.h):
+    //  - plottable: add<QCPGraph>(keys, values): created on the default axis rect's bottom and left
+    //    axes and the current layer; args go to the handle's setData;
+    //  - item: add<QCPItemLine>(): no args;
+    //  - layout part: add<QCPTextElement>(row, column, text): inserted in the plot layout; the
+    //    arguments after the cell go to the constructor after the plot;
+    //  - group: add<QCPBarsGroup>(), add<QCPPlottableGroup>(name);
+    //  - axis: axisRect->add<QCPAxis>(type).
+    // A refusal (plot being destroyed, no default axes, a taken cell, ...) reports misuse
+    // (qcp::reportMisuse) and returns an empty handle; addGraph() logs with qDebug and returns nullptr.
     template <typename T, typename... Args>
     qcp::HandleFor<T> add(Args&&... args);
+
+    // The axes add<T>() puts a new plottable on; both null (one misuse) when it must refuse.
+    [[nodiscard]] std::pair<QCPAxis*, QCPAxis*> axesForAdd() const;
 
     // specialized interface for QCPGraph:
     [[nodiscard]] QCPGraph* graph(int index) const;
@@ -405,10 +422,6 @@ signals:
 
     void itemCreated(QCPAbstractItem* item);
     void itemCanceled();
-
-private:
-    // The axes add<T>() puts a new plottable on; both null (one misuse) when it must refuse.
-    [[nodiscard]] std::pair<QCPAxis*, QCPAxis*> axesForAdd() const;
 
 protected:
     // property members:
@@ -607,18 +620,7 @@ Q_DECLARE_METATYPE(QCustomPlot::RefreshPriority)
 template <typename T, typename... Args>
 qcp::HandleFor<T> QCustomPlot::add(Args&&... args)
 {
-    using Handle = qcp::HandleFor<T>;
-    if constexpr (sizeof...(Args) > 0)
-        static_assert(requires(Handle h) { h.setData(std::declval<Args>()...); },
-                      "add<T>(args...): T's handle has no setData taking these arguments");
-    const auto [keyAxis, valueAxis] = axesForAdd();
-    if (!keyAxis)
-        return Handle{};
-    Handle handle = qcp::makeHandle<Handle>(new T(keyAxis, valueAxis));
-    handle.get()->markDirty();
-    if constexpr (sizeof...(Args) > 0)
-        handle.setData(std::forward<Args>(args)...);
-    return handle;
+    return qcp::Construct<T>::make(*this, std::forward<Args>(args)...);
 }
 
 /*!

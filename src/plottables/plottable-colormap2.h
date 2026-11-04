@@ -14,11 +14,17 @@ class QCPColorScale;
 class QCPColorMapData;
 class QCPColormapRhiLayer;
 
+template <typename T, typename Self = void>
+class QCPColorMap2Ops;
+
 class QCP_LIB_DECL QCPColorMap2 : public QCPAbstractPlottable
 {
     Q_OBJECT
 
 public:
+    template <typename T>
+    using OpsFor = QCPColorMap2Ops<T>;
+
     explicit QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis);
     ~QCPColorMap2() override;
 
@@ -47,7 +53,6 @@ public:
             std::span<const Y>{y, static_cast<size_t>(ny)},
             std::span<const Z>{z, static_cast<size_t>(nz)}));
     }
-
     template <typename X, typename Y, typename Z>
     void viewData(std::span<const X> x, std::span<const Y> y, std::span<const Z> z)
     {
@@ -169,4 +174,69 @@ private:
     QList<QMetaObject::Connection> mAxisLinks;
     void queueViewportChange();
     bool mViewportChangeQueued = false;
+};
+
+// The fluent handle of a 2D colour map; see QCPPlottableOps for the subclass contract.
+template <typename T, typename Self>
+class QCPColorMap2Ops : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPColorMap2Ops<T>>>
+{
+    using Base = QCPPlottableOps<T, qcp::OpsRet<Self, QCPColorMap2Ops<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    // Same arguments as QCPColorMap2::setData: x and y axes ranges and z, three numeric ranges.
+    template <IndexableNumericRange XC, IndexableNumericRange YC, IndexableNumericRange ZC>
+    Ret setData(XC&& x, YC&& y, ZC&& z)
+    {
+        return this->apply(
+            [&](T& p) { p.setData(std::forward<XC>(x), std::forward<YC>(y), std::forward<ZC>(z)); });
+    }
+    Ret setDataSource(std::unique_ptr<QCPAbstractDataSource2D> source)
+    {
+        return this->apply([&](T& p) { p.setDataSource(std::move(source)); });
+    }
+    Ret setDataSource(std::shared_ptr<QCPAbstractDataSource2D> source)
+    {
+        return this->apply([&](T& p) { p.setDataSource(std::move(source)); });
+    }
+    Ret setGapThreshold(double threshold)
+    {
+        return this->apply([&](T& p) { p.setGapThreshold(threshold); });
+    }
+    Ret setContourLevels(const QVector<double>& levels)
+    {
+        return this->apply([&](T& p) { p.setContourLevels(levels); });
+    }
+    Ret setAutoContourLevels(int count)
+    {
+        return this->apply([&](T& p) { p.setAutoContourLevels(count); });
+    }
+    Ret setContourPen(const QPen& pen)
+    {
+        return this->apply([&](T& p) { p.setContourPen(pen); });
+    }
+    Ret setContourLabelEnabled(bool enabled)
+    {
+        return this->apply([&](T& p) { p.setContourLabelEnabled(enabled); });
+    }
+    Ret setGradient(const QCPColorGradient& gradient)
+    {
+        return this->apply([&](T& p) { p.setGradient(gradient); });
+    }
+    Ret setDataRange(const QCPRange& range)
+    {
+        return this->apply([&](T& p) { p.setDataRange(range); });
+    }
+    Ret setDataScaleType(QCPAxis::ScaleType type)
+    {
+        return this->apply([&](T& p) { p.setDataScaleType(type); });
+    }
+
+    // The scale the map follows; an empty or dead handle detaches it.
+    Ret setColorScale(const QCPHandle<QCPColorScale>& scale)
+    {
+        return this->apply([&](T& p) { p.setColorScale(scale.get()); });
+    }
 };

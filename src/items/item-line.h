@@ -32,6 +32,8 @@
 
 class QCPPainter;
 class QCustomPlot;
+template <typename T, typename Self = void>
+class QCPItemLineOps;
 
 class QCP_LIB_DECL QCPItemLine : public QCPAbstractItem
 {
@@ -44,6 +46,9 @@ class QCP_LIB_DECL QCPItemLine : public QCPAbstractItem
     /// \endcond
 
 public:
+    template <typename T>
+    using OpsFor = QCPItemLineOps<T>;
+
     explicit QCPItemLine(QCustomPlot* parentPlot);
     virtual ~QCPItemLine() override;
 
@@ -81,6 +86,34 @@ protected:
     QLineF getRectClippedLine(const QCPVector2D& start, const QCPVector2D& end,
                               const QRect& rect) const;
     QPen mainPen() const;
+};
+
+// Positions: start, end (coordinates in the position's current type, see QCPItemOps).
+template <typename T, typename Self>
+class QCPItemLineOps : public QCPItemOps<T, qcp::OpsRet<Self, QCPItemLineOps<T>>>
+{
+    using Base = QCPItemOps<T, qcp::OpsRet<Self, QCPItemLineOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setStart(double key, double value)
+    {
+        return this->apply([&](T& i) { i.start->setCoords(key, value); });
+    }
+    Ret setEnd(double key, double value)
+    {
+        return this->apply([&](T& i) { i.end->setCoords(key, value); });
+    }
+    Ret setHead(const QCPLineEnding& head)
+    {
+        return this->apply([&](T& i) { i.setHead(head); });
+    }
+    Ret setTail(const QCPLineEnding& tail)
+    {
+        return this->apply([&](T& i) { i.setTail(tail); });
+    }
 };
 
 #endif // QCP_ITEM_LINE_H

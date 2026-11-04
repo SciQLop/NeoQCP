@@ -27,6 +27,7 @@
 #define QCP_LAYER_H
 
 #include "global.h"
+#include "handle-ops.h"
 Q_MOC_INCLUDE("core.h") // Qt6 needs this if using forward declared types in Q_PROPERTY
 #include "painting/paintbuffer.h"
 
@@ -148,6 +149,10 @@ class QCP_LIB_DECL QCPLayerable : public QObject
     /// \endcond
 
 public:
+    // The handle of a layerable that declares neither Handle nor its own OpsFor (see QCPObjectOps).
+    template <typename T>
+    using OpsFor = QCPLayerableOps<T>;
+
     QCPLayerable(QCustomPlot* plot, QString targetLayer = QString(),
                  QCPLayerable* parentLayerable = nullptr);
     virtual ~QCPLayerable();

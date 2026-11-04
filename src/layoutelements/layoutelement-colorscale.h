@@ -62,6 +62,9 @@ protected:
     friend class QCPColorScale;
 };
 
+template <typename T, typename Self = void>
+class QCPColorScaleOps;
+
 class QCP_LIB_DECL QCPColorScale : public QCPLayoutElement
 {
     Q_OBJECT
@@ -78,6 +81,9 @@ class QCP_LIB_DECL QCPColorScale : public QCPLayoutElement
     /// \endcond
 
 public:
+    template <typename T>
+    using OpsFor = QCPColorScaleOps<T>;
+
     explicit QCPColorScale(QCustomPlot* parentPlot);
     virtual ~QCPColorScale() override;
 
@@ -148,5 +154,41 @@ private:
     friend class QCPColorScaleAxisRectPrivate;
 };
 
+
+// The handle of a colour scale: created in the layout by QCustomPlot::add<QCPColorScale>(row, column).
+template <typename T, typename Self>
+class QCPColorScaleOps : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPColorScaleOps<T>>>
+{
+    using Base = QCPLayerableOps<T, qcp::OpsRet<Self, QCPColorScaleOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setType(QCPAxis::AxisType type)
+    {
+        return this->apply([&](T& p) { p.setType(type); });
+    }
+    Ret setLabel(const QString& label)
+    {
+        return this->apply([&](T& p) { p.setLabel(label); });
+    }
+    Ret setBarWidth(int width)
+    {
+        return this->apply([&](T& p) { p.setBarWidth(width); });
+    }
+    Ret setGradient(const QCPColorGradient& gradient)
+    {
+        return this->apply([&](T& p) { p.setGradient(gradient); });
+    }
+    Ret setDataRange(const QCPRange& range)
+    {
+        return this->apply([&](T& p) { p.setDataRange(range); });
+    }
+    Ret setDataScaleType(QCPAxis::ScaleType type)
+    {
+        return this->apply([&](T& p) { p.setDataScaleType(type); });
+    }
+};
 
 #endif // QCP_LAYOUTELEMENT_COLORSCALE_H

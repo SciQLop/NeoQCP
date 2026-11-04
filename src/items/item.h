@@ -36,6 +36,8 @@ class QCustomPlot;
 class QCPItemPosition;
 class QCPAbstractItem;
 class QCPAxisRect;
+template <typename T, typename Self = void>
+class QCPItemOps;
 
 class QCP_LIB_DECL QCPItemAnchor
 {
@@ -76,6 +78,7 @@ private:
     Q_DISABLE_COPY(QCPItemAnchor)
 
     friend class QCPItemPosition;
+    friend class QCustomPlot; // take()/add() move an item between plots
 };
 
 class QCP_LIB_DECL QCPItemPosition : public QCPItemAnchor
@@ -193,6 +196,9 @@ class QCP_LIB_DECL QCPAbstractItem : public QCPLayerable
     /// \endcond
 
 public:
+    template <typename T>
+    using OpsFor = QCPItemOps<T>;
+
     explicit QCPAbstractItem(QCustomPlot* parentPlot);
     virtual ~QCPAbstractItem() override;
 
@@ -263,6 +269,43 @@ private:
 
     friend class QCustomPlot;
     friend class QCPItemAnchor;
+};
+
+/*!
+  The fluent handle of an item: what QCustomPlot::add<T>() returns. An item's constructor takes the
+  plot only, so add<T>() needs no arguments. Subclass contract as in QCPObjectOps; the position
+  setters of a concrete item (setStart/setEnd, ...) take coordinates in the position's current type,
+  pixels from the widget's top left until setPositionType says otherwise.
+*/
+template <typename T, typename Self>
+class QCPItemOps : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPItemOps<T>>>
+{
+    using Base = QCPLayerableOps<T, qcp::OpsRet<Self, QCPItemOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setClipToAxisRect(bool clip)
+    {
+        return this->apply([&](T& i) { i.setClipToAxisRect(clip); });
+    }
+    Ret setPen(const QPen& pen)
+    {
+        return this->apply([&](T& i) { i.setPen(pen); });
+    }
+    // For every position of the item at once; ptPlotCoords uses the plot's default axes.
+    Ret setPositionType(QCPItemPosition::PositionType type)
+    {
+        return this->apply([&](T& i) { setTypeOf(i.positions(), type); });
+    }
+
+private:
+    static void setTypeOf(const QList<QCPItemPosition*>& positions, QCPItemPosition::PositionType type)
+    {
+        for (QCPItemPosition* position : positions)
+            position->setType(type);
+    }
 };
 
 #endif // QCP_ITEM_H

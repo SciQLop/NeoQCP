@@ -37,6 +37,9 @@ class QCPAbstractPlottable;
 class QCPGraph;
 class QCPAbstractItem;
 
+template <typename T, typename Self = void>
+class QCPAxisRectOps;
+
 class QCP_LIB_DECL QCPAxisRect : public QCPLayoutElement
 {
     Q_OBJECT
@@ -50,6 +53,9 @@ class QCP_LIB_DECL QCPAxisRect : public QCPLayoutElement
     /// \endcond
 
 public:
+    template <typename T>
+    using OpsFor = QCPAxisRectOps<T>;
+
     explicit QCPAxisRect(QCustomPlot* parentPlot, bool setupDefaultAxes = true);
     virtual ~QCPAxisRect() override;
 
@@ -95,6 +101,14 @@ public:
     QCPAxis* axis(QCPAxis::AxisType type, int index = 0) const;
     QList<QCPAxis*> axes(QCPAxis::AxisTypes types) const;
     QList<QCPAxis*> axes() const;
+    // The handle form of addAxis(type): the rect owns the new axis.
+    template <std::same_as<QCPAxis> T>
+    qcp::HandleFor<T> add(QCPAxis::AxisType type)
+    {
+        using Handle = qcp::HandleFor<T>;
+        QCPAxis* axis = addAxis(type);
+        return axis ? qcp::makeHandle<Handle>(axis) : Handle{};
+    }
     QCPAxis* addAxis(QCPAxis::AxisType type, QCPAxis* axis = nullptr);
     QList<QCPAxis*> addAxes(QCPAxis::AxisTypes types);
     bool removeAxis(QCPAxis* axis);
@@ -200,5 +214,37 @@ private:
     friend class TestPaintBuffer;
 };
 
+
+// The handle of an axis rect: created in the layout by QCustomPlot::add<QCPAxisRect>(row, column).
+template <typename T, typename Self>
+class QCPAxisRectOps : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPAxisRectOps<T>>>
+{
+    using Base = QCPLayerableOps<T, qcp::OpsRet<Self, QCPAxisRectOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setBackground(const QBrush& brush)
+    {
+        return this->apply([&](T& p) { p.setBackground(brush); });
+    }
+    Ret setBackground(const QPixmap& pixmap)
+    {
+        return this->apply([&](T& p) { p.setBackground(pixmap); });
+    }
+    Ret setRangeDrag(Qt::Orientations orientations)
+    {
+        return this->apply([&](T& p) { p.setRangeDrag(orientations); });
+    }
+    Ret setRangeZoom(Qt::Orientations orientations)
+    {
+        return this->apply([&](T& p) { p.setRangeZoom(orientations); });
+    }
+    Ret setRangeZoomFactor(double factor)
+    {
+        return this->apply([&](T& p) { p.setRangeZoomFactor(factor); });
+    }
+};
 
 #endif // QCP_LAYOUTELEMENT_AXISRECT_H

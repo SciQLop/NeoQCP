@@ -322,7 +322,6 @@ private:
 namespace qcp::ops
 {
 // Checked setters behind the handles: each refuses a bad value with one misuse and keeps the old.
-QCP_LIB_DECL void setLayer(QCPLayerable& layerable, const QString& layerName);
 QCP_LIB_DECL void setAxes(QCPAbstractPlottable& plottable, QCPAxis* keyAxis, QCPAxis* valueAxis);
 QCP_LIB_DECL void setAxes(QCPAbstractPlottable& plottable, QCPAxis::AxisType keyType,
                           QCPAxis::AxisType valueType);
@@ -354,67 +353,40 @@ QCP_LIB_DECL void setAxisRect(QCPAbstractPlottable& plottable, QCPAxisRect* rect
     a slot that deletes the object.
 */
 template <typename T, typename Self>
-class QCPPlottableOps : public QCPHandle<T>
+class QCPPlottableOps : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPPlottableOps<T>>>
 {
+    using Base = QCPLayerableOps<T, qcp::OpsRet<Self, QCPPlottableOps<T>>>;
+
 public:
-    using Ret = qcp::OpsRet<Self, QCPPlottableOps>;
-    using QCPHandle<T>::QCPHandle;
+    using typename Base::Ret;
+    using Base::Base;
 
     Ret setName(const QString& name)
     {
-        return apply([&](T& p) { p.setName(name); });
+        return this->apply([&](T& p) { p.setName(name); });
     }
     Ret setPen(const QPen& pen)
     {
-        return apply([&](T& p) { p.setPen(pen); });
+        return this->apply([&](T& p) { p.setPen(pen); });
     }
     Ret setBrush(const QBrush& brush)
     {
-        return apply([&](T& p) { p.setBrush(brush); });
-    }
-    Ret setVisible(bool visible)
-    {
-        return apply([&](T& p) { p.setVisible(visible); });
-    }
-    Ret setLayer(const QString& layerName)
-    {
-        return apply([&](T& p) { qcp::ops::setLayer(p, layerName); });
+        return this->apply([&](T& p) { p.setBrush(brush); });
     }
     // By role, on the plottable's current axis rect: survives the axes being replaced.
     Ret setAxes(QCPAxis::AxisType keyType, QCPAxis::AxisType valueType)
     {
-        return apply([&](T& p) { qcp::ops::setAxes(p, keyType, valueType); });
+        return this->apply([&](T& p) { qcp::ops::setAxes(p, keyType, valueType); });
     }
     // Moves to the rect's bottom and left axes.
     Ret setAxisRect(QCPAxisRect* rect)
     {
-        return apply([&](T& p) { qcp::ops::setAxisRect(p, rect); });
+        return this->apply([&](T& p) { qcp::ops::setAxisRect(p, rect); });
     }
     // Escape hatch while raw axis getters exist; goes away with them.
     Ret setAxes(QCPAxis* keyAxis, QCPAxis* valueAxis)
     {
-        return apply([&](T& p) { qcp::ops::setAxes(p, keyAxis, valueAxis); });
-    }
-    // Any setter without a handle form: change(T&) runs only while the object lives.
-    template <typename Change>
-    Ret with(Change&& change)
-    {
-        return apply(std::forward<Change>(change));
-    }
-
-protected:
-    template <typename Change>
-    Ret apply(Change&& change)
-    {
-        static_assert(std::is_base_of_v<QCPPlottableOps, Ret>,
-                      "Self must be the complete handle type deriving from these ops (CRTP)");
-        if (T* object = this->get())
-        {
-            change(*object);
-            if (T* alive = this->get()) // a slot of the change may have deleted it
-                alive->markDirty();
-        }
-        return static_cast<const Ret&>(*this);
+        return this->apply([&](T& p) { qcp::ops::setAxes(p, keyAxis, valueAxis); });
     }
 };
 

@@ -76,6 +76,9 @@ Q_DECLARE_TYPEINFO(QCPFinancialData, Q_PRIMITIVE_TYPE);
 */
 using QCPFinancialDataContainer = QCPDataContainer<QCPFinancialData>;
 
+template <typename T, typename Self = void>
+class QCPFinancialOps;
+
 class QCP_LIB_DECL QCPFinancial : public QCPAbstractPlottable1D<QCPFinancialData>
 {
     Q_OBJECT
@@ -91,6 +94,9 @@ class QCP_LIB_DECL QCPFinancial : public QCPAbstractPlottable1D<QCPFinancialData
     /// \endcond
 
 public:
+    template <typename T>
+    using OpsFor = QCPFinancialOps<T>;
+
     /*!
       Defines the ways the width of the financial bar can be specified. Thus it defines what the
       number passed to \ref setWidth actually means.
@@ -213,5 +219,58 @@ protected:
     friend class QCPLegend;
 };
 Q_DECLARE_METATYPE(QCPFinancial::ChartStyle)
+
+// The fluent handle of a financial plottable; see QCPPlottableOps for the subclass contract.
+template <typename T, typename Self>
+class QCPFinancialOps : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPFinancialOps<T>>>
+{
+    using Base = QCPPlottableOps<T, qcp::OpsRet<Self, QCPFinancialOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setData(QSharedPointer<QCPFinancialDataContainer> data)
+    {
+        return this->apply([&](T& p) { p.setData(std::move(data)); });
+    }
+    Ret setData(const QVector<double>& keys, const QVector<double>& open, const QVector<double>& high,
+            const QVector<double>& low, const QVector<double>& close, bool alreadySorted = false)
+    {
+        return this->apply([&](T& p) { p.setData(keys, open, high, low, close, alreadySorted); });
+    }
+    Ret setChartStyle(QCPFinancial::ChartStyle style)
+    {
+        return this->apply([&](T& p) { p.setChartStyle(style); });
+    }
+    Ret setWidth(double width)
+    {
+        return this->apply([&](T& p) { p.setWidth(width); });
+    }
+    Ret setWidthType(QCPFinancial::WidthType type)
+    {
+        return this->apply([&](T& p) { p.setWidthType(type); });
+    }
+    Ret setTwoColored(bool twoColored)
+    {
+        return this->apply([&](T& p) { p.setTwoColored(twoColored); });
+    }
+    Ret setBrushPositive(const QBrush& brush)
+    {
+        return this->apply([&](T& p) { p.setBrushPositive(brush); });
+    }
+    Ret setBrushNegative(const QBrush& brush)
+    {
+        return this->apply([&](T& p) { p.setBrushNegative(brush); });
+    }
+    Ret setPenPositive(const QPen& pen)
+    {
+        return this->apply([&](T& p) { p.setPenPositive(pen); });
+    }
+    Ret setPenNegative(const QPen& pen)
+    {
+        return this->apply([&](T& p) { p.setPenNegative(pen); });
+    }
+};
 
 #endif // QCP_PLOTTABLE_FINANCIAL_H

@@ -23,4 +23,15 @@ private slots:
     void addGraphWithContainer();
     void withReachesAnySetter();
     void setterSlotDeletesInsideTheSetter();
+
+    void addEveryPlottable_data();
+    void addEveryPlottable();
+    void addEveryItem_data();
+    void addEveryItem();
+    void addAxisToRect();
+    void addLayoutParts();
+    void addToTakenCellIsRefused();
+    void groupsOwnedByPlot();
+    void groupHandlesSetAndAddMembers();
+    void barsHandleGroupsAndStacks();
 };

@@ -33,6 +33,9 @@
 class QCPPainter;
 class QCustomPlot;
 
+template <typename T, typename Self = void>
+class QCPTextElementOps;
+
 class QCP_LIB_DECL QCPTextElement : public QCPLayoutElement
 {
     Q_OBJECT
@@ -47,6 +50,9 @@ class QCP_LIB_DECL QCPTextElement : public QCPLayoutElement
     /// \endcond
 
 public:
+    template <typename T>
+    using OpsFor = QCPTextElementOps<T>;
+
     explicit QCPTextElement(QCustomPlot* parentPlot);
     QCPTextElement(QCustomPlot* parentPlot, const QString& text);
     QCPTextElement(QCustomPlot* parentPlot, const QString& text, double pointSize);
@@ -123,5 +129,33 @@ private:
     Q_DISABLE_COPY(QCPTextElement)
 };
 
+
+// The handle of a text element: created in the layout by QCustomPlot::add<QCPTextElement>(row, column, text).
+template <typename T, typename Self>
+class QCPTextElementOps : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPTextElementOps<T>>>
+{
+    using Base = QCPLayerableOps<T, qcp::OpsRet<Self, QCPTextElementOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setText(const QString& text)
+    {
+        return this->apply([&](T& p) { p.setText(text); });
+    }
+    Ret setTextFlags(int flags)
+    {
+        return this->apply([&](T& p) { p.setTextFlags(flags); });
+    }
+    Ret setFont(const QFont& font)
+    {
+        return this->apply([&](T& p) { p.setFont(font); });
+    }
+    Ret setTextColor(const QColor& color)
+    {
+        return this->apply([&](T& p) { p.setTextColor(color); });
+    }
+};
 
 #endif // QCP_LAYOUTELEMENT_TEXTELEMENT_H

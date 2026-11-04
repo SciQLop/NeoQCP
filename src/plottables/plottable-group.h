@@ -19,11 +19,17 @@ class QCPPlottableGroupLegendItem;
   A double-click on the row emits \ref doubleClicked; the group doesn't change visibility by itself,
   so its owner decides what a double-click means.
 */
+template <typename T, typename Self = void>
+class QCPPlottableGroupOps;
+
 class QCP_LIB_DECL QCPPlottableGroup : public QObject
 {
     Q_OBJECT
 
 public:
+    template <typename T>
+    using OpsFor = QCPPlottableGroupOps<T>;
+
     ~QCPPlottableGroup() override;
 
     QCustomPlot* parentPlot() const { return mParentPlot; }
@@ -83,4 +89,46 @@ private:
     QCPAbstractPlottable* busyMember() const;
 
     QPointer<QCPPlottableGroup> mGroup;
+};
+
+// The handle of a plottable group: created and owned by QCustomPlot::add<QCPPlottableGroup>(name).
+template <typename T, typename Self>
+class QCPPlottableGroupOps : public QCPObjectOps<T, qcp::OpsRet<Self, QCPPlottableGroupOps<T>>>
+{
+    using Base = QCPObjectOps<T, qcp::OpsRet<Self, QCPPlottableGroupOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setName(const QString& name)
+    {
+        return this->apply([&](T& p) { p.setName(name); });
+    }
+    Ret setVisible(bool visible)
+    {
+        return this->apply([&](T& p) { p.setVisible(visible); });
+    }
+
+    // The group holds its members without owning them; a dead handle is refused with one misuse.
+    template <typename P>
+    Ret addMember(const QCPHandle<P>& member)
+    {
+        return this->apply(
+            [&](T& g)
+            {
+                QCP_CHECK_OR_RETURN(member, "the member handle is dead");
+                g.addMember(member.get());
+            });
+    }
+    template <typename P>
+    Ret removeMember(const QCPHandle<P>& member)
+    {
+        return this->apply(
+            [&](T& g)
+            {
+                QCP_CHECK_OR_RETURN(member, "the member handle is dead");
+                g.removeMember(member.get());
+            });
+    }
 };

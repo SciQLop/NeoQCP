@@ -71,6 +71,9 @@ Q_DECLARE_TYPEINFO(QCPCurveData, Q_PRIMITIVE_TYPE);
 */
 using QCPCurveDataContainer = QCPDataContainer<QCPCurveData>;
 
+template <typename T, typename Self = void>
+class QCPCurveOps;
+
 class QCP_LIB_DECL QCPCurve : public QCPAbstractPlottable1D<QCPCurveData>
 {
     Q_OBJECT
@@ -81,6 +84,9 @@ class QCP_LIB_DECL QCPCurve : public QCPAbstractPlottable1D<QCPCurveData>
     /// \endcond
 
 public:
+    template <typename T>
+    using OpsFor = QCPCurveOps<T>;
+
     /*!
       Defines how the curve's line is represented visually in the plot. The line is drawn with the
       current pen of the curve (\ref setPen).
@@ -173,5 +179,42 @@ protected:
     friend class QCPLegend;
 };
 Q_DECLARE_METATYPE(QCPCurve::LineStyle)
+
+// The fluent handle of a curve; see QCPPlottableOps for the subclass contract.
+template <typename T, typename Self>
+class QCPCurveOps : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPCurveOps<T>>>
+{
+    using Base = QCPPlottableOps<T, qcp::OpsRet<Self, QCPCurveOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setData(QSharedPointer<QCPCurveDataContainer> data)
+    {
+        return this->apply([&](T& p) { p.setData(std::move(data)); });
+    }
+    Ret setData(const QVector<double>& t, const QVector<double>& keys, const QVector<double>& values,
+            bool alreadySorted = false)
+    {
+        return this->apply([&](T& p) { p.setData(t, keys, values, alreadySorted); });
+    }
+    Ret setData(const QVector<double>& keys, const QVector<double>& values)
+    {
+        return this->apply([&](T& p) { p.setData(keys, values); });
+    }
+    Ret setScatterStyle(const QCPScatterStyle& style)
+    {
+        return this->apply([&](T& p) { p.setScatterStyle(style); });
+    }
+    Ret setScatterSkip(int skip)
+    {
+        return this->apply([&](T& p) { p.setScatterSkip(skip); });
+    }
+    Ret setLineStyle(QCPCurve::LineStyle style)
+    {
+        return this->apply([&](T& p) { p.setLineStyle(style); });
+    }
+};
 
 #endif // QCP_PLOTTABLE_CURVE_H

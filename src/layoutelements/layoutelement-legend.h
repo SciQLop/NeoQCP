@@ -140,6 +140,9 @@ protected:
     QFont getFont() const;
 };
 
+template <typename T, typename Self = void>
+class QCPLegendOps;
+
 class QCP_LIB_DECL QCPLegend : public QCPLayoutGrid
 {
     Q_OBJECT
@@ -163,6 +166,9 @@ class QCP_LIB_DECL QCPLegend : public QCPLayoutGrid
     /// \endcond
 
 public:
+    template <typename T>
+    using OpsFor = QCPLegendOps<T>;
+
     /*!
       Defines the selectable parts of a legend
 
@@ -285,5 +291,41 @@ private:
 };
 Q_DECLARE_OPERATORS_FOR_FLAGS(QCPLegend::SelectableParts)
 Q_DECLARE_METATYPE(QCPLegend::SelectablePart)
+
+// The handle of a legend; the plot's default one is wrapped with qcp::makeHandle<QCPLegendOps<QCPLegend>>(plot.legend).
+template <typename T, typename Self>
+class QCPLegendOps : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPLegendOps<T>>>
+{
+    using Base = QCPLayerableOps<T, qcp::OpsRet<Self, QCPLegendOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setBorderPen(const QPen& pen)
+    {
+        return this->apply([&](T& p) { p.setBorderPen(pen); });
+    }
+    Ret setBrush(const QBrush& brush)
+    {
+        return this->apply([&](T& p) { p.setBrush(brush); });
+    }
+    Ret setFont(const QFont& font)
+    {
+        return this->apply([&](T& p) { p.setFont(font); });
+    }
+    Ret setTextColor(const QColor& color)
+    {
+        return this->apply([&](T& p) { p.setTextColor(color); });
+    }
+    Ret setIconSize(const QSize& size)
+    {
+        return this->apply([&](T& p) { p.setIconSize(size); });
+    }
+    Ret setIconTextPadding(int padding)
+    {
+        return this->apply([&](T& p) { p.setIconTextPadding(padding); });
+    }
+};
 
 #endif // QCP_LAYOUTELEMENT_LEGEND_H

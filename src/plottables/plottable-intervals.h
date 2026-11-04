@@ -15,10 +15,16 @@ struct QCPIntervalEdit
 };
 Q_DECLARE_METATYPE(QCPIntervalEdit)
 
+template <typename T, typename Self = void>
+class QCPIntervalsOps;
+
 class QCP_LIB_DECL QCPIntervals : public QCPAbstractPlottable, public QCPPlottableInterface1D
 {
     Q_OBJECT
 public:
+    template <typename T>
+    using OpsFor = QCPIntervalsOps<T>;
+
     QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* layout);
     ~QCPIntervals() override;
 
@@ -280,3 +286,20 @@ protected:
     friend class TestIntervals;
 };
 Q_DECLARE_OPERATORS_FOR_FLAGS(QCPIntervals::EditModes)
+
+// The fluent handle of an interval plottable; see QCPPlottableOps for the subclass contract.
+template <typename T, typename Self>
+class QCPIntervalsOps : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPIntervalsOps<T>>>
+{
+    using Base = QCPPlottableOps<T, qcp::OpsRet<Self, QCPIntervalsOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    // Moves the columns in. Invalid columns throw std::invalid_argument, as QCPIntervals::setData does.
+    Ret setData(qcp::intervals::Columns columns)
+    {
+        return this->apply([&](T& p) { p.setData(std::move(columns)); });
+    }
+};

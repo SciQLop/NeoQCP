@@ -14,10 +14,16 @@ class QCPColorMapData;
 //! A 2-D density histogram of scattered (key, value) samples, binned in the background.
 //! Bins follow the axis scales, also those of an axis given later with setKeyAxis or
 //! setValueAxis.
+template <typename T, typename Self = void>
+class QCPHistogram2DOps;
+
 class QCP_LIB_DECL QCPHistogram2D : public QCPAbstractPlottable
 {
     Q_OBJECT
 public:
+    template <typename T>
+    using OpsFor = QCPHistogram2DOps<T>;
+
     enum Normalization { nNone, nColumn };
 
     explicit QCPHistogram2D(QCPAxis* keyAxis, QCPAxis* valueAxis);
@@ -31,14 +37,12 @@ public:
             std::decay_t<KC>, std::decay_t<VC>>>(
             std::forward<KC>(keys), std::forward<VC>(values)));
     }
-
     template <typename K, typename V>
     void viewData(const K* keys, const V* values, int count)
     {
         setDataSource(std::make_shared<QCPSoADataSource<std::span<const K>, std::span<const V>>>(
             std::span<const K>(keys, count), std::span<const V>(values, count)));
     }
-
     template <typename K, typename V>
     void viewData(std::span<const K> keys, std::span<const V> values)
     {
@@ -184,4 +188,80 @@ private:
     void contoursChanged();
     void queueRefreshBinning();
     void binForExport();
+};
+
+// The fluent handle of a 2D histogram; see QCPPlottableOps for the subclass contract.
+template <typename T, typename Self>
+class QCPHistogram2DOps : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPHistogram2DOps<T>>>
+{
+    using Base = QCPPlottableOps<T, qcp::OpsRet<Self, QCPHistogram2DOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    // Same arguments as QCPHistogram2D::setData: two numeric ranges (keys, values), one point per index.
+    template <IndexableNumericRange KC, IndexableNumericRange VC>
+    Ret setData(KC&& keys, VC&& values)
+    {
+        return this->apply([&](T& p) { p.setData(std::forward<KC>(keys), std::forward<VC>(values)); });
+    }
+    Ret setDataSource(std::shared_ptr<QCPAbstractDataSource> source)
+    {
+        return this->apply([&](T& p) { p.setDataSource(std::move(source)); });
+    }
+    Ret setDataSource(std::unique_ptr<QCPAbstractDataSource> source)
+    {
+        return this->apply([&](T& p) { p.setDataSource(std::move(source)); });
+    }
+    Ret setBins(int keyBins, int valueBins)
+    {
+        return this->apply([&](T& p) { p.setBins(keyBins, valueBins); });
+    }
+    Ret setNormalization(QCPHistogram2D::Normalization norm)
+    {
+        return this->apply([&](T& p) { p.setNormalization(norm); });
+    }
+    Ret setKeyBinScale(QCPAxis::ScaleType type)
+    {
+        return this->apply([&](T& p) { p.setKeyBinScale(type); });
+    }
+    Ret setValueBinScale(QCPAxis::ScaleType type)
+    {
+        return this->apply([&](T& p) { p.setValueBinScale(type); });
+    }
+    Ret setContourLevels(const QVector<double>& levels)
+    {
+        return this->apply([&](T& p) { p.setContourLevels(levels); });
+    }
+    Ret setAutoContourLevels(int count)
+    {
+        return this->apply([&](T& p) { p.setAutoContourLevels(count); });
+    }
+    Ret setContourPen(const QPen& pen)
+    {
+        return this->apply([&](T& p) { p.setContourPen(pen); });
+    }
+    Ret setContourLabelEnabled(bool enabled)
+    {
+        return this->apply([&](T& p) { p.setContourLabelEnabled(enabled); });
+    }
+    Ret setGradient(const QCPColorGradient& gradient)
+    {
+        return this->apply([&](T& p) { p.setGradient(gradient); });
+    }
+    Ret setDataRange(const QCPRange& range)
+    {
+        return this->apply([&](T& p) { p.setDataRange(range); });
+    }
+    Ret setDataScaleType(QCPAxis::ScaleType type)
+    {
+        return this->apply([&](T& p) { p.setDataScaleType(type); });
+    }
+
+    // The scale the map follows; an empty or dead handle detaches it.
+    Ret setColorScale(const QCPHandle<QCPColorScale>& scale)
+    {
+        return this->apply([&](T& p) { p.setColorScale(scale.get()); });
+    }
 };

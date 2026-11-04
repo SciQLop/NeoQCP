@@ -1,4 +1,5 @@
 #include "test-builder.h"
+#include <functional>
 #include <memory>
 #include <type_traits>
 
@@ -337,3 +338,194 @@ void TestBuilder::setterSlotDeletesInsideTheSetter()
     QCOMPARE(plot.graphCount(), 0);
     QCOMPARE(gMisuses, 0);
 }
+
+using Check = std::function<bool(QCustomPlot&)>;
+Q_DECLARE_METATYPE(Check)
+
+void TestBuilder::addEveryPlottable_data()
+{
+    QTest::addColumn<Check>("add");
+    const auto row = [](const char* name, Check check) { QTest::newRow(name) << check; };
+    row("graph", [](QCustomPlot& p) { return p.add<QCPGraph>(kKeys, kValues).get()->dataCount() == 3; });
+    row("curve",
+        [](QCustomPlot& p)
+        {
+            auto c = p.add<QCPCurve>(kKeys, kValues).setLineStyle(QCPCurve::lsNone).setScatterSkip(2);
+            return c->dataCount() == 3 && c->lineStyle() == QCPCurve::lsNone && c->scatterSkip() == 2;
+        });
+    row("curveWithParameter",
+        [](QCustomPlot& p) { return p.add<QCPCurve>(kKeys, kKeys, kValues).get()->dataCount() == 3; });
+    row("bars",
+        [](QCustomPlot& p)
+        {
+            auto b = p.add<QCPBars>(kKeys, kValues).setWidth(0.5).setBaseValue(1);
+            return b->dataCount() == 3 && b->width() == 0.5 && b->baseValue() == 1;
+        });
+    row("financial",
+        [](QCustomPlot& p)
+        {
+            auto f = p.add<QCPFinancial>(kKeys, kValues, kValues, kValues, kValues).setTwoColored(true);
+            return f->data()->size() == 3 && f->twoColored();
+        });
+    row("histogram2d",
+        [](QCustomPlot& p)
+        {
+            auto h = p.add<QCPHistogram2D>(std::vector<double>{1, 2, 3}, std::vector<double>{4, 5, 6})
+                         .setBins(10, 20);
+            return h->keyBins() == 10 && h->valueBins() == 20 && h->dataSource();
+        });
+    row("colormap",
+        [](QCustomPlot& p)
+        {
+            auto data = std::make_unique<QCPColorMapData>(2, 2, QCPRange(0, 1), QCPRange(0, 1));
+            auto m = p.add<QCPColorMap>().setData(std::move(data)).setInterpolate(false);
+            return m->data() && m->data()->keySize() == 2 && !m->interpolate();
+        });
+    row("colormap2",
+        [](QCustomPlot& p)
+        {
+            auto m = p.add<QCPColorMap2>(std::vector<double>{1, 2}, std::vector<double>{1, 2},
+                                         std::vector<double>{1, 2, 3, 4})
+                         .setGapThreshold(0.5);
+            return m->dataSource() && m->gapThreshold() == 0.5;
+        });
+    row("intervals",
+        [](QCustomPlot& p)
+        {
+            qcp::intervals::Columns columns;
+            columns.start = {0.0};
+            columns.stop = {1.0};
+            columns.lane = {0};
+            columns.category = {0};
+            columns.ids = {1};
+            auto i = p.add<QCPIntervals>(columns);
+            return i->rowCount() == 1;
+        });
+}
+
+void TestBuilder::addEveryPlottable()
+{
+    QFETCH(Check, add);
+    QCustomPlot plot;
+    QVERIFY(add(plot));
+    QCOMPARE(plot.plottableCount(), 1);
+    QCOMPARE(plot.plottable()->keyAxis(), plot.xAxis);
+    QCOMPARE(plot.plottable()->layer(), plot.currentLayer());
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestBuilder::addEveryItem_data()
+{
+    QTest::addColumn<Check>("add");
+    const auto row = [](const char* name, Check check) { QTest::newRow(name) << check; };
+    row("line",
+        [](QCustomPlot& p)
+        {
+            auto line = p.add<QCPItemLine>()
+                            .setPositionType(QCPItemPosition::ptPlotCoords)
+                            .setStart(1, 2)
+                            .setEnd(3, 4)
+                            .setHead(QCPLineEnding(QCPLineEnding::esSpikeArrow))
+                            .setPen(QPen(Qt::green))
+                            .setClipToAxisRect(false)
+                            .setVisible(false);
+            return line->start->coords() == QPointF(1, 2) && line->end->coords() == QPointF(3, 4)
+                && line->start->type() == QCPItemPosition::ptPlotCoords
+                && line->head().style() == QCPLineEnding::esSpikeArrow
+                && line->pen().color() == QColor(Qt::green) && !line->clipToAxisRect()
+                && !line->visible();
+        });
+}
+
+void TestBuilder::addEveryItem()
+{
+    QFETCH(Check, add);
+    QCustomPlot plot;
+    QVERIFY(add(plot));
+    QCOMPARE(plot.itemCount(), 1);
+    QCOMPARE(plot.item()->layer(), plot.currentLayer());
+    QCOMPARE(plot.item()->parentPlot(), &plot);
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestBuilder::addAxisToRect()
+{
+    QCustomPlot plot;
+    QCPAxisRect* rect = plot.axisRect();
+    QCOMPARE(rect->axisCount(QCPAxis::atRight), 1);
+    auto axis = rect->add<QCPAxis>(QCPAxis::atRight).setVisible(false);
+    QCOMPARE(rect->axisCount(QCPAxis::atRight), 2);
+    QVERIFY(axis);
+    QCOMPARE(axis->axisType(), QCPAxis::atRight);
+    QVERIFY(!axis->visible());
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestBuilder::addLayoutParts()
+{
+    QCustomPlot plot;
+    auto title = plot.add<QCPTextElement>(1, 0, "Title").setText("Heading").setVisible(true);
+    auto rect = plot.add<QCPAxisRect>(2, 0).setRangeZoomFactor(1.5);
+    auto scale = plot.add<QCPColorScale>(2, 1).setLabel("B").setBarWidth(12);
+    QCOMPARE(plot.plotLayout()->element(1, 0), title.get());
+    QCOMPARE(plot.plotLayout()->element(2, 0), rect.get());
+    QCOMPARE(plot.plotLayout()->element(2, 1), scale.get());
+    QCOMPARE(title->text(), QString("Heading"));
+    QCOMPARE(scale->label(), QString("B"));
+    QCOMPARE(scale->barWidth(), 12);
+    QCOMPARE(rect->parentPlot(), &plot);
+    QCOMPARE(gMisuses, 0);
+    settle(plot);
+}
+
+void TestBuilder::addToTakenCellIsRefused()
+{
+    QCustomPlot plot;
+    QVERIFY(!plot.add<QCPTextElement>(0, 0, "on the axis rect"));
+    QCOMPARE(gMisuses, 1);
+    QCOMPARE(plot.plotLayout()->element(0, 0), plot.axisRect());
+}
+
+void TestBuilder::groupsOwnedByPlot()
+{
+    auto* plot = new QCustomPlot;
+    auto bars = plot->add<QCPBarsGroup>();
+    auto group = plot->add<QCPPlottableGroup>("g");
+    QVERIFY(bars);
+    QVERIFY(group);
+    QCOMPARE(plot->plottableGroups().size(), 1);
+    QCOMPARE(group->name(), QString("g"));
+    delete plot;
+    QVERIFY(!bars);
+    QVERIFY(!group);
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestBuilder::groupHandlesSetAndAddMembers()
+{
+    QCustomPlot plot;
+    auto a = plot.add<QCPGraph>(kKeys, kValues);
+    auto b = plot.add<QCPGraph>(kKeys, kValues);
+    auto group = plot.add<QCPPlottableGroup>("g").setName("renamed").addMember(a).addMember(b);
+    QCOMPARE(group->name(), QString("renamed"));
+    QCOMPARE(group->members().size(), 2);
+    group.removeMember(a).setVisible(false);
+    QCOMPARE(group->members().size(), 1);
+    QVERIFY(!b->visible() || !group->visible());
+    a.remove();
+    group.addMember(a);
+    QCOMPARE(gMisuses, 1);
+}
+
+void TestBuilder::barsHandleGroupsAndStacks()
+{
+    QCustomPlot plot;
+    auto bars = plot.add<QCPBarsGroup>().setSpacing(7);
+    QCOMPARE(bars->spacing(), 7.0);
+    auto bar = plot.add<QCPBars>(kKeys, kValues).setBarsGroup(bars);
+    QCOMPARE(bar->barsGroup(), bars.get());
+    bars.remove();
+    bar.setBarsGroup(bars);
+    QCOMPARE(gMisuses, 1);
+}
+

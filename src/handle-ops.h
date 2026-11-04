@@ -2,8 +2,17 @@
 #define QCP_HANDLE_OPS_H
 
 #include "handle.h"
+#include <QString>
 #include <concepts>
 #include <type_traits>
+
+class QCPLayerable;
+
+namespace qcp::ops
+{
+// Refuses (one misuse) a layer the plot doesn't have; the handle setters call it.
+QCP_LIB_DECL void setLayer(QCPLayerable& layerable, const QString& layerName);
+} // namespace qcp::ops
 
 namespace qcp
 {
@@ -25,7 +34,7 @@ concept DeclaresOwnHandle
 template <typename T>
 struct HandleFor
 {
-    static_assert(HasOps<T>, "add<T> needs a plottable (T::OpsFor)");
+    static_assert(HasOps<T>, "add<T> needs T::OpsFor<T> (every layerable and group declares one) or T::Handle");
     using type = typename T::template OpsFor<T>;
 };
 
@@ -51,5 +60,67 @@ H makeHandle(T* object)
     return handle;
 }
 } // namespace qcp
+
+/*!
+  The fluent handle of any QObject the plot owns: what QCustomPlot::add<T>() returns for a group.
+  Every setter is a no-op on a dead handle and returns the handle by value, so a chain never holds
+  a reference to a temporary. Subclass contract (one shape for every family): write the setters in
+  a class template taking (T, Self) that derives from the parent family's ops with
+  \c qcp::OpsRet<Self, ThisOps<T>> as its Self, and declare
+  \code template <typename T> using OpsFor = ThisOps<T>; \endcode in T. Self is the complete,
+  most-derived handle type; \c Self = void means "this class itself".
+*/
+template <typename T, typename Self = void>
+class QCPObjectOps : public QCPHandle<T>
+{
+public:
+    using Ret = qcp::OpsRet<Self, QCPObjectOps>;
+    using QCPHandle<T>::QCPHandle;
+
+    // Any setter without a handle form: change(T&) runs only while the object lives.
+    template <typename Change>
+    Ret with(Change&& change)
+    {
+        return apply(std::forward<Change>(change));
+    }
+
+protected:
+    // Runs the change, then marks a layerable dirty (one repaint per event-loop turn, however long
+    // the chain). The object is re-checked after the change: a slot of it may have deleted it.
+    template <typename Change>
+    Ret apply(Change&& change)
+    {
+        static_assert(std::is_base_of_v<QCPObjectOps, Ret>,
+                      "Self must be the complete handle type deriving from these ops (CRTP)");
+        if (T* object = this->get())
+        {
+            change(*object);
+            if constexpr (std::derived_from<T, QCPLayerable>)
+                if (T* alive = this->get())
+                    alive->markDirty();
+        }
+        return static_cast<const Ret&>(*this);
+    }
+};
+
+// The handle of a layerable (axis, axis rect, text element, colour scale, legend, ...).
+template <typename T, typename Self = void>
+class QCPLayerableOps : public QCPObjectOps<T, qcp::OpsRet<Self, QCPLayerableOps<T>>>
+{
+    using Base = QCPObjectOps<T, qcp::OpsRet<Self, QCPLayerableOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setVisible(bool visible)
+    {
+        return this->apply([&](T& l) { l.setVisible(visible); });
+    }
+    Ret setLayer(const QString& layerName)
+    {
+        return this->apply([&](T& l) { qcp::ops::setLayer(l, layerName); });
+    }
+};
 
 #endif // QCP_HANDLE_OPS_H
