@@ -64,6 +64,8 @@ private slots:
     void takenItemUsesNoBoundsOfItsOldPlot();
     void exportUsesTheIndex();
     void userItemWithoutBoundsIsNeverCulled();
+    void positionFollowingItsOwnItemDoesNotRecurse();
+    void crossItemAnchorCycleIsRefused();
 
 private:
     // What the plot shows: its paint buffers composed, or the framebuffer under RHI.

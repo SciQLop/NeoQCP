@@ -25,7 +25,11 @@
 
 #include "item.h"
 
+#include <algorithm>
 #include <limits>
+#include <vector>
+
+#include <QScopedValueRollback>
 
 #include "axis/axis.h"
 #include "core.h"
@@ -398,6 +402,34 @@ void QCPItemPosition::setTypeY(QCPItemPosition::PositionType type)
     }
 }
 
+bool QCPItemPosition::parentChainReachesThis(QCPItemAnchor* parent, bool xAxis) const
+{
+    // Pixel dependency graph: a position's coordinate comes from its own parent anchor on this axis,
+    // a plain anchor's from the positions of its item. Walking it here is what keeps pixelPosition()
+    // from recursing: two items whose positions follow each other's plain anchors would otherwise
+    // depend on themselves.
+    std::vector<QCPItemAnchor*> pending { parent };
+    std::vector<QCPItemAnchor*> visited;
+    while (!pending.empty())
+    {
+        QCPItemAnchor* anchor = pending.back();
+        pending.pop_back();
+        if (!anchor)
+            continue;
+        if (anchor == this)
+            return true;
+        if (std::find(visited.cbegin(), visited.cend(), anchor) != visited.cend())
+            continue;
+        visited.push_back(anchor);
+        if (QCPItemPosition* position = anchor->toQCPItemPosition())
+            pending.push_back(xAxis ? position->parentAnchorX() : position->parentAnchorY());
+        else if (QCPAbstractItem* item = anchor->mParentItem)
+            for (QCPItemPosition* position : item->positions())
+                pending.push_back(position);
+    }
+    return false;
+}
+
 /*!
   Sets the parent of this QCPItemPosition to \a parentAnchor. This means the position will now
   follow any position changes of the anchor. The local coordinate system of positions with a parent
@@ -441,34 +473,11 @@ bool QCPItemPosition::setParentAnchorX(QCPItemAnchor* parentAnchor, bool keepPix
         return false;
     }
     // make sure no recursive parent-child-relationships are created:
-    QCPItemAnchor* currentParent = parentAnchor;
-    while (currentParent)
+    if (parentChainReachesThis(parentAnchor, true))
     {
-        if (QCPItemPosition* currentParentPos = currentParent->toQCPItemPosition())
-        {
-            // is a QCPItemPosition, might have further parent, so keep iterating
-            if (currentParentPos == this)
-            {
-                qDebug() << Q_FUNC_INFO << "can't create recursive parent-child-relationship"
-                         << reinterpret_cast<quintptr>(parentAnchor);
-                return false;
-            }
-            currentParent = currentParentPos->parentAnchorX();
-        }
-        else
-        {
-            // is a QCPItemAnchor, can't have further parent. Now make sure the parent items aren't
-            // the same, to prevent a position being child of an anchor which itself depends on the
-            // position, because they're both on the same item:
-            if (currentParent->mParentItem == mParentItem)
-            {
-                qDebug() << Q_FUNC_INFO
-                         << "can't set parent to be an anchor which itself depends on this position"
-                         << reinterpret_cast<quintptr>(parentAnchor);
-                return false;
-            }
-            break;
-        }
+        qDebug() << Q_FUNC_INFO << "can't create recursive parent-child-relationship"
+                 << reinterpret_cast<quintptr>(parentAnchor);
+        return false;
     }
 
     // if previously no parent set and PosType is still ptPlotCoords, set to ptAbsolute:
@@ -516,34 +525,11 @@ bool QCPItemPosition::setParentAnchorY(QCPItemAnchor* parentAnchor, bool keepPix
         return false;
     }
     // make sure no recursive parent-child-relationships are created:
-    QCPItemAnchor* currentParent = parentAnchor;
-    while (currentParent)
+    if (parentChainReachesThis(parentAnchor, false))
     {
-        if (QCPItemPosition* currentParentPos = currentParent->toQCPItemPosition())
-        {
-            // is a QCPItemPosition, might have further parent, so keep iterating
-            if (currentParentPos == this)
-            {
-                qDebug() << Q_FUNC_INFO << "can't create recursive parent-child-relationship"
-                         << reinterpret_cast<quintptr>(parentAnchor);
-                return false;
-            }
-            currentParent = currentParentPos->parentAnchorY();
-        }
-        else
-        {
-            // is a QCPItemAnchor, can't have further parent. Now make sure the parent items aren't
-            // the same, to prevent a position being child of an anchor which itself depends on the
-            // position, because they're both on the same item:
-            if (currentParent->mParentItem == mParentItem)
-            {
-                qDebug() << Q_FUNC_INFO
-                         << "can't set parent to be an anchor which itself depends on this position"
-                         << reinterpret_cast<quintptr>(parentAnchor);
-                return false;
-            }
-            break;
-        }
+        qDebug() << Q_FUNC_INFO << "can't create recursive parent-child-relationship"
+                 << reinterpret_cast<quintptr>(parentAnchor);
+        return false;
     }
 
     // if previously no parent set and PosType is still ptPlotCoords, set to ptAbsolute:
@@ -1387,6 +1373,12 @@ QPointF QCPAbstractItem::anchorPixelPosition(int anchorId) const
 */
 void QCPAbstractItem::markDirty()
 {
+    // A position may follow an anchor of its own item (a line's end pinned to its start), so the
+    // follower walk below can come straight back here. Returning at once while marking stops that
+    // recursion, and any longer marking cycle with it.
+    if (mMarking)
+        return;
+    QScopedValueRollback<bool> marking(mMarking, true);
     QCPLayerable::markDirty();
     // The index is in data coordinates and survives range changes, but not a moved item: the item
     // leaves the tree and is tested one by one until the layer rebuilds it.
@@ -1398,7 +1390,8 @@ void QCPAbstractItem::markDirty()
 void QCPAbstractItem::markFollowersDirty()
 {
     // A position that follows one of this item's anchors moves with it, whatever layer it is on.
-    // setParentAnchorX/Y refuse anchor cycles, so the recursion ends.
+    // A follower may belong to this very item: markDirty() returns at once when it is already
+    // marking, which is what ends the walk.
     for (const QCPItemAnchor* anchor : std::as_const(mAnchors))
     {
         for (QCPItemPosition* follower : anchor->mChildrenX)

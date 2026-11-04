@@ -183,6 +183,10 @@ private:
     Q_DISABLE_COPY(QCPItemPosition)
     friend class QCPItemTracer;
 
+    // True when the pixel dependency graph above  parent comes back here: a position depends on its
+    // own parent anchor on the same axis, a plain anchor on every position of its item.
+    [[nodiscard]] bool parentChainReachesThis(QCPItemAnchor* parent, bool xAxis) const;
+
     // The tracer derives this position from its graph on every draw: storing must not mark, or the
     // draw itself would dirty the layer and the plot would never settle.
     void assignCoords(double key, double value);
@@ -288,6 +292,7 @@ protected:
     virtual void applyDefaultAntialiasingHint(QCPPainter* painter) const override;
     virtual void draw(QCPPainter* painter) override = 0;
     void markFollowersDirty();
+    bool mMarking = false;
     // The extent of these positions, or nullopt when they do not share one axis pair or when both
     // axes are unusable. \a pixelPad is the room the drawing needs around the positions.
     [[nodiscard]] std::optional<QCPItemExtent>

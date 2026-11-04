@@ -2049,6 +2049,40 @@ void TestRepaint::exportUsesTheIndex()
     QVERIFY(!plot->layerableListAt(elsewhere, true).contains(line.get()));
 }
 
+void TestRepaint::positionFollowingItsOwnItemDoesNotRecurse()
+{
+    auto plot = settledPlot();
+    auto* line = new QCPItemLine(plot.get());
+    line->start->setCoords(1, 2);
+    line->end->setCoords(3, 4);
+    // A position may follow another position of its own item: the marking walk has to terminate.
+    QVERIFY(line->end->setParentAnchor(line->start));
+    line->start->setCoords(5, 6);
+    plot->replot();
+    waitUntilSettled(*plot);
+    QCOMPARE(line->end->pixelPosition(), line->start->pixelPosition());
+}
+
+void TestRepaint::crossItemAnchorCycleIsRefused()
+{
+    auto plot = settledPlot();
+    auto* first = new QCPItemRect(plot.get());
+    auto* second = new QCPItemRect(plot.get());
+    first->topLeft->setCoords(1, 2);
+    first->bottomRight->setCoords(3, 4);
+    second->topLeft->setCoords(5, 6);
+    second->bottomRight->setCoords(7, 8);
+    QVERIFY(first->topLeft->setParentAnchor(second->bottom));
+    // second's bottom anchor is computed from second's positions, first's bottom from first's: each
+    // following the other is a cycle, and pixelPosition() would recurse until the stack runs out.
+    const bool accepted = second->topLeft->setParentAnchor(first->bottom);
+    if (accepted)
+        (void)first->topLeft->pixelPosition(); // only terminates when the cycle was refused
+    QVERIFY(!accepted);
+    plot->replot();
+    waitUntilSettled(*plot);
+}
+
 void TestRepaint::userItemWithoutBoundsIsNeverCulled()
 {
     auto plot = settledPlot();
