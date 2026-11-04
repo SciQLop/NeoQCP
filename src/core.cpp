@@ -1458,18 +1458,17 @@ bool QCustomPlot::detach(QCPAbstractPlottable* plottable)
 
 /*! \internal
 
-  QCustomPlot::add(std::unique_ptr) for a plottable: the inverse of detach, onto the default axes.
+  Take for a polar graph: it leaves every legend and its angular axis, and the caller owns it.
 */
 bool QCustomPlot::detach(QCPPolarGraph* graph)
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     QCP_CHECK_OR_RETURN(graph, "the pointer is empty", false);
-    auto* angular = graph->keyAxis();
-    QCP_CHECK_OR_RETURN(angular && angular->parentPlot() == this, "the graph belongs to another plot",
-                        false);
+    // An orphan (its angular axis was deleted) is still ours: it has no axis to leave.
+    QCP_CHECK_OR_RETURN(graph->parentPlot() == this, "the graph belongs to another plot", false);
     for (QCPLegend* legend : findChildren<QCPLegend*>())
         graph->removeFromLegend(legend);
-    // Unlists the graph from the angular axis (and nulls its radial axis).
+    // Unlists the graph from the angular axis (and nulls its radial axis); a no-op for an orphan.
     graph->setKeyAxis(nullptr);
     graph->setValueAxis(nullptr);
     graph->moveToLayer(nullptr, false);
@@ -1479,16 +1478,23 @@ bool QCustomPlot::detach(QCPPolarGraph* graph)
     return true;
 }
 
-bool QCustomPlot::adopt(QCPPolarGraph* graph)
+/*! \internal
+
+  The inverse of detach for a polar graph: its axes are polar, so only an angular axis can adopt it.
+*/
+bool QCustomPlot::adopt(QCPPolarGraph*)
 {
-    (void)graph;
-    // Its axes are polar, so only an angular axis can adopt it: the plot cannot pick one.
+    // The plot cannot pick an angular axis for a polar graph, so this always refuses.
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     qcp::reportMisuse(Q_FUNC_INFO,
                       "a polar graph is added through its angular axis, not through the plot");
     return false;
 }
 
+/*! \internal
+
+  QCustomPlot::add(std::unique_ptr) for a plottable: the inverse of detach, onto the default axes.
+*/
 bool QCustomPlot::adopt(QCPAbstractPlottable* plottable)
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);

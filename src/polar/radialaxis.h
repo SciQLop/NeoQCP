@@ -407,6 +407,18 @@ public:
     {
         return this->apply([&](T& o) { o.setTickLabelColor(color); });
     }
+    Ret setTickLabelRotation(double degrees)
+    {
+        return this->apply([&](T& o) { o.setTickLabelRotation(degrees); });
+    }
+    Ret setRangeZoom(bool enabled)
+    {
+        return this->apply([&](T& o) { o.setRangeZoom(enabled); });
+    }
+    Ret setRangeZoomFactor(double factor)
+    {
+        return this->apply([&](T& o) { o.setRangeZoomFactor(factor); });
+    }
     Ret setNumberFormat(const QString& formatCode)
     {
         return this->apply([&](T& o) { o.setNumberFormat(formatCode); });
@@ -415,7 +427,7 @@ public:
     {
         return this->apply([&](T& o) { o.setNumberPrecision(precision); });
     }
-    Ret setTickLength(int inside, int outside)
+    Ret setTickLength(int inside, int outside = 0)
     {
         return this->apply([&](T& o) { o.setTickLength(inside, outside); });
     }
@@ -423,7 +435,7 @@ public:
     {
         return this->apply([&](T& o) { o.setSubTicks(show); });
     }
-    Ret setSubTickLength(int inside, int outside)
+    Ret setSubTickLength(int inside, int outside = 0)
     {
         return this->apply([&](T& o) { o.setSubTickLength(inside, outside); });
     }

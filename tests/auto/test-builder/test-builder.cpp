@@ -1140,15 +1140,25 @@ void TestBuilder::takePolarGraph()
     settle(plot);
     auto angular = plot.add<QCPPolarAxisAngular>(1, 0);
     QVERIFY(angular);
+    angular.setRange(0, 360);
+    angular->radialAxis(0)->setRange(0, 10);
+    settle(plot);
+    const QImage withoutGraph = plot.toPixmap(400, 300).toImage();
+
     auto graph = angular.add<QCPPolarGraph>(kKeys, kValues);
     QVERIFY(graph);
     QCOMPARE(plot.legend->itemCount(), 1);
+    settle(plot);
+    QVERIFY(plot.toPixmap(400, 300).toImage() != withoutGraph);
 
     auto taken = plot.take(graph);
     QVERIFY(taken);
     QCOMPARE(taken.get(), graph.get()); // same object, now owned by the caller
     QCOMPARE(plot.legend->itemCount(), 0);
     QCOMPARE(taken->keyAxis(), nullptr);
+    // Nothing of the graph is left on the axis: the plot draws what it drew before it.
+    settle(plot);
+    QCOMPARE(plot.toPixmap(400, 300).toImage(), withoutGraph);
     QCOMPARE(gMisuses, 0);
 
     // A polar graph is owned by an angular axis, so the plot cannot take one back: the refused add
@@ -1156,6 +1166,107 @@ void TestBuilder::takePolarGraph()
     QVERIFY(!plot.add(std::move(taken)));
     QCOMPARE(gMisuses, 1);
     QVERIFY(!graph);
+}
+
+void TestBuilder::deletedPolarGraphLeavesNoLegendRow()
+{
+    QCustomPlot plot;
+    settle(plot);
+    auto angular = plot.add<QCPPolarAxisAngular>(1, 0);
+    QVERIFY(angular);
+    QCPLegend second;
+    plot.plotLayout()->addElement(0, 1, &second);
+
+    auto graph = angular.add<QCPPolarGraph>(kKeys, kValues);
+    QVERIFY(graph);
+    graph->addToLegend(&second);
+    QCOMPARE(plot.legend->itemCount(), 1);
+    QCOMPARE(second.itemCount(), 1);
+
+    graph.remove(); // a plain delete, as a handle's remove() does
+    QCOMPARE(plot.legend->itemCount(), 0);
+    QCOMPARE(second.itemCount(), 0);
+
+    auto other = angular.add<QCPPolarGraph>(kKeys, kValues);
+    QVERIFY(other);
+    QCOMPARE(plot.legend->itemCount(), 1);
+    auto taken = plot.take(other);
+    QVERIFY(taken);
+    QCOMPARE(plot.legend->itemCount(), 0);
+    taken.reset();
+    QCOMPARE(plot.legend->itemCount(), 0);
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestBuilder::takePolarGraphRefusals()
+{
+    QCustomPlot plot;
+    QCustomPlot other;
+    settle(plot);
+    auto angular = plot.add<QCPPolarAxisAngular>(1, 0);
+    QVERIFY(angular);
+    auto graph = angular.add<QCPPolarGraph>(kKeys, kValues);
+    QVERIFY(graph);
+
+    // the graph of another plot
+    auto foreignAxis = other.add<QCPPolarAxisAngular>(1, 0);
+    QVERIFY(foreignAxis);
+    auto foreign = foreignAxis.add<QCPPolarGraph>(kKeys, kValues);
+    QVERIFY(foreign);
+    QVERIFY(!plot.take(foreign));
+    QCOMPARE(gMisuses, 1);
+    QVERIFY(foreign);
+
+    // the same handle twice
+    auto taken = plot.take(graph);
+    QVERIFY(taken);
+    QVERIFY(!plot.take(graph));
+    QCOMPARE(gMisuses, 2);
+
+    // a dead handle: the caller deleted the object it was given
+    auto dead = angular.add<QCPPolarGraph>(kKeys, kValues);
+    QVERIFY(dead);
+    std::unique_ptr<QCPPolarGraph> owned = plot.take(dead);
+    QVERIFY(owned);
+    owned.reset();
+    QVERIFY(!plot.take(dead));
+    QCOMPARE(gMisuses, 3);
+    QVERIFY(taken);
+}
+
+void TestBuilder::takenPolarGraphOutlivesItsPlot()
+{
+    auto* plot = new QCustomPlot;
+    auto angular = plot->add<QCPPolarAxisAngular>(1, 0);
+    QVERIFY(angular);
+    auto graph = angular.add<QCPPolarGraph>(kKeys, kValues);
+    QVERIFY(graph);
+    auto taken = plot->take(graph);
+    QVERIFY(taken);
+    delete plot;
+    QVERIFY(taken);
+    QCOMPARE(taken->keyAxis(), nullptr);
+    QCOMPARE(taken->parentPlot(), nullptr);
+    taken.reset();
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestBuilder::orphanedPolarGraphCanBeTaken()
+{
+    QCustomPlot plot;
+    settle(plot);
+    auto angular = plot.add<QCPPolarAxisAngular>(1, 0);
+    QVERIFY(angular);
+    auto graph = angular.add<QCPPolarGraph>(kKeys, kValues);
+    QVERIFY(graph);
+
+    delete angular.get(); // the axis outlives its graphs by contract: it nulls their key axis
+    QCOMPARE(graph->keyAxis(), nullptr);
+    auto taken = plot.take(graph);
+    QVERIFY(taken);
+    QCOMPARE(taken.get(), graph.get());
+    QCOMPARE(plot.legend->itemCount(), 0);
+    QCOMPARE(gMisuses, 0);
 }
 
 void TestBuilder::addPolarGraphWithoutRadialAxisIsRefused()

@@ -61,4 +61,8 @@ private slots:
     void addPolar();
     void takePolarGraph();
     void addPolarGraphWithoutRadialAxisIsRefused();
+    void deletedPolarGraphLeavesNoLegendRow();
+    void takePolarGraphRefusals();
+    void takenPolarGraphOutlivesItsPlot();
+    void orphanedPolarGraphCanBeTaken();
 };

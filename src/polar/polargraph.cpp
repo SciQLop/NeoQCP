@@ -26,6 +26,7 @@
 #include "polargraph.h"
 
 #include "../core.h"
+#include "../misuse.h"
 #include "../painting/painter.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -279,6 +280,7 @@ void QCPPolarGraph::setPeriodic(bool enabled)
 */
 void QCPPolarGraph::setKeyAxis(QCPPolarAxisAngular* axis)
 {
+    QCP_CHECK_OR_RETURN(mParentPlot, "a graph that is not in a plot has no axes", );
     if (mKeyAxis == axis)
         return;
     if (mKeyAxis)
