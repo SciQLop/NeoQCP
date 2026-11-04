@@ -152,6 +152,11 @@ void TestHandle::removeLayerThroughHandle()
     QVERIFY(lastHandle);
     QCOMPARE(plot.layerCount(), 1);
     QVERIFY(plot.layer(0) == last);
+
+    // the plot API refuses it the same way: the rule lives in removeLayer, not in the handle
+    QVERIFY(!plot.removeLayer(last));
+    QCOMPARE(gMisuses, 2);
+    QCOMPARE(plot.layerCount(), 1);
     plot.replot();
 }
 

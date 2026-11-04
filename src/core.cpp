@@ -2255,17 +2255,8 @@ bool QCustomPlot::removeLayer(QCPLayer* layer)
 {
     const QCPEmissionScope scope(this);
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
-    if (!mLayers.contains(layer))
-    {
-        qDebug() << Q_FUNC_INFO
-                 << "layer not a layer of this QCustomPlot:" << reinterpret_cast<quintptr>(layer);
-        return false;
-    }
-    if (mLayers.size() < 2)
-    {
-        qDebug() << Q_FUNC_INFO << "can't remove last layer";
-        return false;
-    }
+    QCP_CHECK_OR_RETURN(mLayers.contains(layer), "the layer is not a layer of this plot", false);
+    QCP_CHECK_OR_RETURN(mLayers.size() >= 2, "can't remove the plot's last layer", false);
 
     unlistLayer(layer);
     delete layer;
@@ -5102,13 +5093,10 @@ void removeObject(QCPAxis& axis)
 
 void removeObject(QCPLayer& layer)
 {
-    QCustomPlot* plot = layer.parentPlot();
-    if (!plot || plot->layerCount() < 2)
-    {
-        qcp::reportMisuse(Q_FUNC_INFO, "can't remove the plot's last layer");
-        return;
-    }
-    plot->removeLayer(&layer);
+    if (QCustomPlot* plot = layer.parentPlot())
+        plot->removeLayer(&layer);
+    else
+        delete &layer;
 }
 
 void removeObject(QCPLayoutElement& element)
