@@ -16,7 +16,7 @@ private slots:
     void detachedRowsOutliveTheirPlottables();
     void deletePlottableInGroup();
     void removePlottableStillDeletes();
-    void nullAxisPlottableIsRefused();
+    void nullAxisPlottableIsDetachedHalfAxedIsRefused();
     void legendItemMovedToSecondLegend();
     void plottableDeathLeavesSecondLegend();
 

@@ -52,6 +52,39 @@ inline bool plotIsUsable(const QCustomPlot& plot)
     QCP_CHECK_OR_RETURN(!plot.isBeingDestroyed(), "the plot is being destroyed", false);
     return true;
 }
+
+inline bool plotHasAxisRect(const QCustomPlot& plot)
+{
+    if (!plotIsUsable(plot))
+        return false;
+    QCP_CHECK_OR_RETURN(plot.axisRect(), "the plot has no axis rect", false);
+    return true;
+}
+
+// A cell at most one row and one column past the grid: the grid grows by that much, no more.
+inline bool cellIsNearTheGrid(const QCPLayoutGrid& layout, int row, int column)
+{
+    QCP_CHECK_OR_RETURN(row >= 0 && row <= layout.rowCount() && column >= 0
+                            && column <= layout.columnCount(),
+                        "that cell is not within one row or column of the plot layout", false);
+    return true;
+}
+
+// A throwing setData (bad columns, ...) leaves the plot as it was: the new plottable is taken out
+// again and destroyed, and the exception goes on.
+template <typename Handle, typename... Args>
+void setDataOrUndo(QCustomPlot& plot, Handle& handle, Args&&... args)
+{
+    try
+    {
+        handle.setData(std::forward<Args>(args)...);
+    }
+    catch (...)
+    {
+        (void)plot.take(handle);
+        throw;
+    }
+}
 } // namespace detail
 
 // add<T>(setDataArgs...): on the default axes and the current layer, args go to the handle's setData.
@@ -71,7 +104,7 @@ struct Construct<T>
         Handle handle = makeHandle<Handle>(detail::newPlottable<T>(plot, keyAxis, valueAxis));
         handle.get()->markDirty();
         if constexpr (sizeof...(Args) > 0)
-            handle.setData(std::forward<Args>(args)...);
+            detail::setDataOrUndo(plot, handle, std::forward<Args>(args)...);
         return handle;
     }
 };
@@ -83,7 +116,7 @@ struct Construct<T>
     static HandleFor<T> make(QCustomPlot& plot)
     {
         using Handle = HandleFor<T>;
-        if (!detail::plotIsUsable(plot))
+        if (!detail::plotHasAxisRect(plot))
             return Handle{};
         Handle handle = makeHandle<Handle>(new T(&plot));
         handle.get()->markDirty();
@@ -91,7 +124,7 @@ struct Construct<T>
     }
 };
 
-// add<T>(row, column, ctorArgs...): inserted in the plot layout; ctorArgs follow the plot in T's
+// add<T>(row, column, ctorArgs...): inserted in the plot layout, at most one row or column past it; ctorArgs follow the plot in T's
 // constructor. A taken cell refuses, and the element is deleted.
 template <detail::LayoutPart T>
 struct Construct<T>
@@ -103,7 +136,7 @@ struct Construct<T>
         static_assert(std::constructible_from<T, QCustomPlot*, Args...>,
                       "add<T>(row, column, args...) needs a T(QCustomPlot*, args...) constructor "
                       "(a legend is created by the plot)");
-        if (!detail::plotIsUsable(plot))
+        if (!detail::plotIsUsable(plot) || !detail::cellIsNearTheGrid(*plot.plotLayout(), row, column))
             return Handle{};
         auto element = std::make_unique<T>(&plot, std::forward<Args>(ctorArgs)...);
         QCP_CHECK_OR_RETURN(plot.plotLayout()->addElement(row, column, element.get()),
@@ -131,7 +164,10 @@ struct Construct<QCPPlottableGroup>
 {
     static HandleFor<QCPPlottableGroup> make(QCustomPlot& plot, const QString& name)
     {
-        return makeHandle<HandleFor<QCPPlottableGroup>>(plot.addPlottableGroup(name));
+        using Handle = HandleFor<QCPPlottableGroup>;
+        if (!detail::plotIsUsable(plot))
+            return Handle{};
+        return makeHandle<Handle>(plot.addPlottableGroup(name));
     }
 };
 } // namespace qcp

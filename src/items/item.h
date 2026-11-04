@@ -149,6 +149,7 @@ public:
     [[nodiscard]] QCPAxis* valueAxis() const { return mValueAxis.data(); }
 
     [[nodiscard]] QCPAxisRect* axisRect() const;
+    //! (0, 0) for an item outside a plot (taken, see QCustomPlot::take).
     [[nodiscard]] virtual QPointF pixelPosition() const override;
 
     // setters:
@@ -275,7 +276,7 @@ private:
   The fluent handle of an item: what QCustomPlot::add<T>() returns. An item's constructor takes the
   plot only, so add<T>() needs no arguments. Subclass contract as in QCPObjectOps; the position
   setters of a concrete item (setStart/setEnd, ...) take coordinates in the position's current type,
-  pixels from the widget's top left until setPositionType says otherwise.
+  which is ptPlotCoords on the plot's default axes for a new item (QCPAbstractItem::createPosition).
 */
 template <typename T, typename Self>
 class QCPItemOps : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPItemOps<T>>>
@@ -293,18 +294,6 @@ public:
     Ret setPen(const QPen& pen)
     {
         return this->apply([&](T& i) { i.setPen(pen); });
-    }
-    // For every position of the item at once; ptPlotCoords uses the plot's default axes.
-    Ret setPositionType(QCPItemPosition::PositionType type)
-    {
-        return this->apply([&](T& i) { setTypeOf(i.positions(), type); });
-    }
-
-private:
-    static void setTypeOf(const QList<QCPItemPosition*>& positions, QCPItemPosition::PositionType type)
-    {
-        for (QCPItemPosition* position : positions)
-            position->setType(type);
     }
 };
 

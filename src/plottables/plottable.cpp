@@ -457,8 +457,11 @@ QCPAbstractPlottable::QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis)
     mBusyDebounceTimer.setSingleShot(true);
     connect(&mBusyDebounceTimer, &QTimer::timeout, this, &QCPAbstractPlottable::onDebounceTimeout);
 
-    // Without both axes there is no plot to join: the plottable stays inert, never drawn.
+    // Without both axes there is no plot to join: the plottable stays inert, never drawn. Neither
+    // axis is a valid detached object (QCustomPlot::add(std::unique_ptr) attaches it); one axis is not.
     mReportedLostAxis = !(keyAxis && valueAxis); // this check is the one report of that loss
+    if (!keyAxis && !valueAxis)
+        return;
     QCP_CHECK_OR_RETURN(keyAxis && valueAxis, "a plottable needs a key axis and a value axis");
     if (keyAxis->parentPlot() != valueAxis->parentPlot())
         qDebug() << Q_FUNC_INFO << "Parent plot of keyAxis is not the same as that of valueAxis.";

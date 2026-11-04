@@ -220,25 +220,23 @@ void TestOwnership::removePlottableStillDeletes()
     QVERIFY(!mPlot->removePlottable(graph.data()));
 }
 
-void TestOwnership::nullAxisPlottableIsRefused()
+void TestOwnership::nullAxisPlottableIsDetachedHalfAxedIsRefused()
 {
     auto* orphan = new QCPCurve(nullptr, nullptr);
-    QCOMPARE(gMisuses, 1);
+    QCOMPARE(gMisuses, 0);
     QVERIFY(orphan->parentPlot() == nullptr);
 
     auto* halfAxed = new QCPCurve(mPlot->xAxis, nullptr);
-    QCOMPARE(gMisuses, 2);
+    QCOMPARE(gMisuses, 1);
     QVERIFY(halfAxed->parentPlot() == nullptr);
 
     auto* graph = new QCPGraph(nullptr, nullptr);
-    QCOMPARE(gMisuses, 3);
-
     auto* histogram = new QCPHistogram2D(nullptr, nullptr);
-    QCOMPARE(gMisuses, 4);
+    QCOMPARE(gMisuses, 1);
 
     QCPLaneLayout lanes;
     auto* intervals = new QCPIntervals(nullptr, nullptr, &lanes);
-    QCOMPARE(gMisuses, 5);
+    QCOMPARE(gMisuses, 1);
     QVERIFY(intervals->labelLayer() == nullptr);
 
     QCOMPARE(mPlot->plottableCount(), 0);
@@ -790,9 +788,9 @@ void TestOwnership::intervalsWithoutAxes()
     QCPLaneLayout layout;
     layout.laneIndices({ "A", "B" });
     auto* inert = new QCPIntervals(nullptr, nullptr, &layout);
-    QCOMPARE(gMisuses, 1);
+    QCOMPARE(gMisuses, 0);
     exerciseIntervals(inert, mPlot);
-    QCOMPARE(gMisuses, 1);
+    QCOMPARE(gMisuses, 0);
     delete inert;
 
     gMisuses = 0;

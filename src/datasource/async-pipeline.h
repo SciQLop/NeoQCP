@@ -40,6 +40,10 @@ public:
 
     bool isBusy() const;
 
+    //! The scheduler the jobs run on. With none (a plottable outside a plot) a job runs on the
+    //! calling thread, and its result is delivered by the event loop as usual.
+    void setScheduler(QCPPipelineScheduler* scheduler) { mScheduler = scheduler; }
+
     // Generation bumped by every data/viewport change; finished(gen) reports
     // the generation a delivered result belongs to.
     uint64_t currentGeneration() const { return mGeneration.load(); }
@@ -88,6 +92,7 @@ protected:
     uint64_t mRunningGeneration = 0;
     bool mJobRunning = false;
 
+    void submit(QCPPipelineScheduler::Priority priority, std::function<void()> job);
     bool claimDisplayedGeneration(uint64_t generation);
     //! The new busy state if it differs from the last one emitted; call without the lock held.
     std::optional<bool> claimBusyEdge();

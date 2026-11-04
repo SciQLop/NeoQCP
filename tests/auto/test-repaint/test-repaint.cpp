@@ -1274,13 +1274,11 @@ void TestRepaint::remainingSettersScheduleRepaint()
 
 void TestRepaint::orphanPlottableKeepsName()
 {
-    // A plottable with null axes is a supported inert state: it has no legend to mark, but its name
+    // A plottable with null axes is a valid detached object: it has no legend to mark, but its name
     // is still its own.
-    const auto previous = qcp::setMisuseHandler(countMisuse); // null axes are a reported misuse
     QCPGraph graph(nullptr, nullptr);
     graph.setName(QStringLiteral("orphan"));
     QCOMPARE(graph.name(), QStringLiteral("orphan"));
-    qcp::setMisuseHandler(previous);
 }
 
 void TestRepaint::axisRectMarginsMoveTheContent()

@@ -45,6 +45,7 @@ class QCPPlottableInterface1D;
 class QKeyEvent;
 class QCPLegend;
 class QCPAxisRect;
+class QCPPipelineScheduler;
 template <typename T, typename Self = void>
 class QCPPlottableOps;
 
@@ -174,6 +175,9 @@ public:
 
     virtual QPointF stallPixelOffset() const { return {}; }
     virtual void releaseGpuResources() {}
+    //! The plot's scheduler for a plottable that runs a pipeline: null while it is outside a plot
+    //! (QCustomPlot::take binds it, QCustomPlot::add(std::unique_ptr) rebinds it).
+    virtual void setPipelineScheduler(QCPPipelineScheduler*) {}
 
     // Offered each key press by QCustomPlot::keyPressEvent before item handling. Every
     // plottable sees the key; return true to consume it, which stops it reaching items.

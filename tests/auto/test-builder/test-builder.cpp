@@ -388,8 +388,8 @@ void TestBuilder::addEveryPlottable_data()
     row("financial",
         [](QCustomPlot& p)
         {
-            auto f = p.add<QCPFinancial>(kKeys, kValues, kValues, kValues, kValues).setTwoColored(true);
-            return f->data()->size() == 3 && f->twoColored();
+            auto f = p.add<QCPFinancial>(kKeys, kValues, kValues, kValues, kValues).setTwoColored(false);
+            return f->data()->size() == 3 && !f->twoColored();
         });
     row("histogram2d",
         [](QCustomPlot& p)
@@ -446,7 +446,6 @@ void TestBuilder::addEveryItem_data()
         [](QCustomPlot& p)
         {
             auto line = p.add<QCPItemLine>()
-                            .setPositionType(QCPItemPosition::ptPlotCoords)
                             .setStart(1, 2)
                             .setEnd(3, 4)
                             .setHead(QCPLineEnding(QCPLineEnding::esSpikeArrow))
@@ -535,7 +534,8 @@ void TestBuilder::groupHandlesSetAndAddMembers()
     QCOMPARE(group->members().size(), 2);
     group.removeMember(a).setVisible(false);
     QCOMPARE(group->members().size(), 1);
-    QVERIFY(!b->visible() || !group->visible());
+    QVERIFY(!group->visible());
+    QVERIFY(!b->visible());
     a.remove();
     group.addMember(a);
     QCOMPARE(gMisuses, 1);
@@ -591,7 +591,7 @@ void TestBuilder::takeAndReAddItem()
 {
     QCustomPlot a;
     QCustomPlot b;
-    auto line = a.add<QCPItemLine>().setPositionType(QCPItemPosition::ptPlotCoords).setStart(1, 1).setEnd(2, 2);
+    auto line = a.add<QCPItemLine>().setStart(1, 1).setEnd(2, 2);
     auto taken = a.take(line);
     QVERIFY(taken);
     QCOMPARE(a.itemCount(), 0);
@@ -682,9 +682,8 @@ void TestBuilder::takeDuringTeardown()
 void TestBuilder::addUserBuilt()
 {
     QCustomPlot plot;
-    // the constructor reports a plottable built without axes; add() is how it gets them
-    auto built = std::make_unique<UserGraph>(nullptr, nullptr);
-    QCOMPARE(gMisuses, 1);
+    auto built = std::make_unique<UserGraph>(nullptr, nullptr); // detached: valid, no misuse
+    QCOMPARE(gMisuses, 0);
     auto handle = plot.add(std::move(built));
     static_assert(std::is_base_of_v<QCPHandle<UserGraph>, decltype(handle)>);
     QVERIFY(handle);
@@ -695,7 +694,7 @@ void TestBuilder::addUserBuilt()
     QVERIFY(plot.legend->hasItemWithPlottable(handle.get()));
     handle.setName("user").setPen(QPen(Qt::red));
     QCOMPARE(handle->name(), QString("user"));
-    QCOMPARE(gMisuses, 1);
+    QCOMPARE(gMisuses, 0);
 }
 
 void TestBuilder::addRefusesObjectOfAPlot()
@@ -709,6 +708,10 @@ void TestBuilder::addRefusesObjectOfAPlot()
     QCOMPARE(other.graphCount(), 0);
     QVERIFY(!plot.add(std::unique_ptr<QCPGraph>()));
     QCOMPARE(gMisuses, 2);
+
+    plot.plotLayout()->clear();
+    QVERIFY(!plot.add(std::make_unique<QCPGraph>(other.xAxis, other.yAxis)));
+    QCOMPARE(gMisuses, 3); // the object is the cause; the missing axis rect is not reported too
 }
 
 void TestBuilder::takenPointerDeletedIsClean()
@@ -730,5 +733,177 @@ void TestBuilder::takenPointerDeletedIsClean()
     QCOMPARE(plot.plottableCount(), 0);
     QCOMPARE(plot.itemCount(), 0);
     settle(plot);
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestBuilder::addIntervalsWithBadColumnsLeavesThePlotUnchanged()
+{
+    QCustomPlot plot;
+    const int rows = plot.legend->itemCount();
+    qcp::intervals::Columns bad;
+    bad.start = {0.0, 1.0};
+    bad.stop = {1.0};
+    QVERIFY_EXCEPTION_THROWN(plot.add<QCPIntervals>(bad), std::invalid_argument);
+    QCOMPARE(plot.plottableCount(), 0);
+    QCOMPARE(plot.legend->itemCount(), rows);
+    QCOMPARE(gMisuses, 0);
+    settle(plot);
+}
+
+void TestBuilder::takeCutsAnchorsBothWays()
+{
+    QCustomPlot plot;
+    settle(plot);
+    auto rect = plot.add<QCPItemRect>();
+    rect->topLeft->setCoords(1, 1);
+    rect->bottomRight->setCoords(2, 2);
+    auto follower = plot.add<QCPItemLine>();
+    QVERIFY(follower->start->setParentAnchor(rect->topLeft));
+    const QPointF before = follower->start->pixelPosition();
+
+    auto taken = plot.take(rect);
+    QVERIFY(taken);
+    QCOMPARE(follower->start->parentAnchor(), static_cast<QCPItemAnchor*>(nullptr));
+    QCOMPARE(follower->start->pixelPosition(), before);
+    taken.reset();
+    settle(plot);
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestBuilder::takeCutsOutboundAnchorLinks()
+{
+    QCustomPlot a;
+    QCustomPlot b;
+    for (QCustomPlot* p : {&a, &b})
+    {
+        p->xAxis->setRange(0, 4);
+        p->yAxis->setRange(0, 4);
+        settle(*p);
+    }
+    auto base = a.add<QCPItemRect>();
+    base->topLeft->setCoords(1, 1);
+    base->bottomRight->setCoords(2, 2);
+    auto line = a.add<QCPItemLine>().setStart(0, 0).setEnd(0, 0);
+    QVERIFY(line->end->setParentAnchor(base->bottomRight));
+    const QPointF pixel = line->end->pixelPosition();
+
+    auto taken = a.take(line);
+    QCOMPARE(taken->end->parentAnchor(), static_cast<QCPItemAnchor*>(nullptr));
+    QCOMPARE(base->bottomRight->pixelPosition().isNull(), false);
+    auto moved = b.add(std::move(taken));
+    QCOMPARE(moved->end->pixelPosition(), pixel);
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestBuilder::pixelPositionOfATakenItemIsNull()
+{
+    QCustomPlot plot;
+    auto line = plot.add<QCPItemLine>();
+    line->start->setType(QCPItemPosition::ptViewportRatio);
+    line->start->setCoords(0.5, 0.5);
+    auto taken = plot.take(line);
+    QCOMPARE(taken->start->pixelPosition(), QPointF());
+    QCOMPARE(taken->end->pixelPosition(), QPointF());
+}
+
+void TestBuilder::addPlottableDuringTeardownIsRefused()
+{
+    auto* plot = new QCustomPlot;
+    auto first = plot->add<QCPGraph>(kKeys, kValues);
+    bool refused = false;
+    connect(first.get(), &QObject::destroyed,
+            [plot, &refused]
+            { refused = !plot->add(std::make_unique<QCPGraph>(nullptr, nullptr)); });
+    delete plot;
+    QVERIFY(refused);
+    QCOMPARE(gMisuses, 1);
+}
+
+void TestBuilder::addGroupDuringTeardownIsRefused()
+{
+    auto* plot = new QCustomPlot;
+    auto first = plot->add<QCPGraph>(kKeys, kValues);
+    bool refused = false;
+    connect(first.get(), &QObject::destroyed,
+            [plot, &refused] { refused = !plot->add<QCPPlottableGroup>("late"); });
+    delete plot;
+    QVERIFY(refused);
+    QCOMPARE(gMisuses, 1);
+}
+
+void TestBuilder::itemsWithoutAxisRectAreRefusedLikePlottables()
+{
+    QCustomPlot plot;
+    QCustomPlot source;
+    auto taken = source.take(source.add<QCPItemLine>());
+    plot.plotLayout()->clear();
+    QVERIFY(!plot.add<QCPItemLine>());
+    QCOMPARE(gMisuses, 1);
+    QCOMPARE(plot.itemCount(), 0);
+    QVERIFY(!plot.add(std::move(taken)));
+    QCOMPARE(gMisuses, 2);
+    QCOMPARE(plot.itemCount(), 0);
+}
+
+void TestBuilder::layoutCellsFarBeyondTheGridAreRefused()
+{
+    QCustomPlot plot;
+    QVERIFY(!plot.add<QCPTextElement>(1 << 30, 0, "far"));
+    QVERIFY(!plot.add<QCPTextElement>(0, 5, "far"));
+    QVERIFY(!plot.add<QCPTextElement>(-1, 0, "negative"));
+    QCOMPARE(gMisuses, 3);
+    QVERIFY(plot.add<QCPTextElement>(1, 0, "next row"));
+    QVERIFY(plot.add<QCPTextElement>(0, 1, "next column"));
+    QCOMPARE(gMisuses, 3);
+}
+
+namespace
+{
+using Src = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
+
+// Data in, in flight, source plot gone, data in again on the detached object, then onto plot B.
+template <typename T, typename Feed>
+void roundTripThroughADeadPlot(Feed feed)
+{
+    QCustomPlot b;
+    settle(b);
+    const QImage empty = b.toPixmap(400, 300).toImage();
+
+    auto* a = new QCustomPlot;
+    auto handle = a->add<T>();
+    handle.with(feed);
+    std::unique_ptr<T> taken = a->take(handle);
+    QVERIFY(taken);
+    delete a;
+    feed(*taken);
+    for (int i = 0; i < 20; ++i)
+        QCoreApplication::processEvents();
+
+    auto moved = b.add(std::move(taken));
+    QVERIFY(moved);
+    QTRY_VERIFY_WITH_TIMEOUT(!moved->busy(), 5000);
+    b.rescaleAxes();
+    settle(b);
+    QVERIFY(b.toPixmap(400, 300).toImage() != empty);
+}
+} // namespace
+
+void TestBuilder::takenPipelinePlottablesOutliveTheirPlot()
+{
+    const std::vector<double> x{0, 1, 2, 3}, y{1, 3, 2, 4};
+    roundTripThroughADeadPlot<QCPGraph2>([&](QCPGraph2& p) { p.setData(x, y); });
+    roundTripThroughADeadPlot<QCPMultiGraph>(
+        [&](QCPMultiGraph& p) { p.setData(x, std::vector<std::vector<double>>{y, x}); });
+    roundTripThroughADeadPlot<QCPWaterfallGraph>(
+        [&](QCPWaterfallGraph& p) { p.setData(x, std::vector<std::vector<double>>{y, x}); });
+    roundTripThroughADeadPlot<QCPHistogram>(
+        [&](QCPHistogram& p)
+        {
+            p.setDataSource(std::make_shared<Src>(x, std::vector<std::vector<double>>{y}));
+        });
+    roundTripThroughADeadPlot<QCPHistogram2D>([&](QCPHistogram2D& p) { p.setData(x, y); });
+    roundTripThroughADeadPlot<QCPColorMap2>(
+        [&](QCPColorMap2& p)
+        { p.setData(std::vector<double>{0, 1}, std::vector<double>{0, 1}, std::vector<double>{1, 2, 3, 4}); });
     QCOMPARE(gMisuses, 0);
 }

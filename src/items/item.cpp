@@ -622,6 +622,8 @@ void QCPItemPosition::setCoords(const QPointF& pos)
 */
 QPointF QCPItemPosition::pixelPosition() const
 {
+    if (!mParentPlot) // an item taken out of its plot has no pixels to be at
+        return QPointF();
     QPointF result;
 
     // determine X:

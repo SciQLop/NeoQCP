@@ -54,6 +54,15 @@ void QCPAsyncPipelineBase::emitBusyIfNeeded(QMutexLocker<QMutex>& lock)
 
 // A busyChanged slot may delete the plottable that owns this pipeline, so the job is handed to
 // the scheduler first and the signal comes last.
+void QCPAsyncPipelineBase::submit(QCPPipelineScheduler::Priority priority,
+                                  std::function<void()> job)
+{
+    if (mScheduler)
+        mScheduler->submit(priority, std::move(job));
+    else
+        job();
+}
+
 void QCPAsyncPipelineBase::startJob(QMutexLocker<QMutex>& lock,
                                     QCPPipelineScheduler::Priority priority,
                                     std::function<void()> job)
@@ -61,7 +70,7 @@ void QCPAsyncPipelineBase::startJob(QMutexLocker<QMutex>& lock,
     mJobRunning = true;
     const bool becameBusy = !std::exchange(mWasBusy, true);
     lock.unlock();
-    mScheduler->submit(priority, std::move(job));
+    submit(priority, std::move(job));
     // Last, and callers return at once: a slot may delete the owner and this pipeline.
     if (becameBusy)
         Q_EMIT busyChanged(true);
@@ -211,7 +220,7 @@ void QCPAsyncPipelineBase::deliverResult(uint64_t generation, std::any cache, st
         else
         {
             lock.unlock();
-            mScheduler->submit(priority, std::move(job));
+            submit(priority, std::move(job));
         }
     }
     else

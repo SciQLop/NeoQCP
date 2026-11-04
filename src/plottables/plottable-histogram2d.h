@@ -130,6 +130,7 @@ protected:
     void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
     void axesChanged() override { followAxisScales(); }
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
+    void setPipelineScheduler(QCPPipelineScheduler* scheduler) override { mPipeline.setScheduler(scheduler); }
     bool canProduceContent() const override;
     void releaseGpuResources() override { mRenderer.releaseRhiLayer(); }
 

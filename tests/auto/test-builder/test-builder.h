@@ -44,4 +44,13 @@ private slots:
     void addUserBuilt();
     void addRefusesObjectOfAPlot();
     void takenPointerDeletedIsClean();
+    void addIntervalsWithBadColumnsLeavesThePlotUnchanged();
+    void takeCutsAnchorsBothWays();
+    void takeCutsOutboundAnchorLinks();
+    void pixelPositionOfATakenItemIsNull();
+    void addPlottableDuringTeardownIsRefused();
+    void addGroupDuringTeardownIsRefused();
+    void itemsWithoutAxisRectAreRefusedLikePlottables();
+    void layoutCellsFarBeyondTheGridAreRefused();
+    void takenPipelinePlottablesOutliveTheirPlot();
 };

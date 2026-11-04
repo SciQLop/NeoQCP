@@ -1432,6 +1432,8 @@ bool QCustomPlot::detach(QCPAbstractPlottable* plottable)
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     QCP_CHECK_OR_RETURN(mPlottables.contains(plottable), "the object is not in this plot", false);
     leaveSiblings(plottable);
+    plottable->releaseGpuResources();
+    plottable->setPipelineScheduler(nullptr);
     for (QCPLegend* legend : findChildren<QCPLegend*>())
         plottable->removeFromLegend(legend);
     const QPointer<QCPPlottableGroup> group = unlistPlottable(plottable);
@@ -1457,16 +1459,18 @@ bool QCustomPlot::detach(QCPAbstractPlottable* plottable)
 */
 bool QCustomPlot::adopt(QCPAbstractPlottable* plottable)
 {
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
+    QCP_CHECK_OR_RETURN(!plottable->parentPlot(), "the object already belongs to a plot: take it first",
+                        false);
     const auto [keyAxis, valueAxis] = axesForAdd();
     if (!keyAxis)
         return false;
-    QCP_CHECK_OR_RETURN(!plottable->parentPlot(), "the object already belongs to a plot: take it first",
-                        false);
     plottable->setParent(this);
     plottable->initializeParentPlot(this);
     plottable->mKeyAxis = keyAxis;
     plottable->mValueAxis = valueAxis;
     plottable->mReportedLostAxis = false;
+    plottable->setPipelineScheduler(mPipelineScheduler);
     plottable->setParentLayerable(keyAxis->axisRect());
     if (!registerPlottable(plottable))
         return false;
@@ -1478,6 +1482,33 @@ bool QCustomPlot::adopt(QCPAbstractPlottable* plottable)
 
 /*! \internal
 
+  Unlinks every parent anchor between \a item and the rest of the plot, both directions, keeping the
+  pixel positions (the plot is still there to compute them).
+*/
+void QCustomPlot::cutAnchorLinks(QCPAbstractItem* item)
+{
+    const auto elsewhere = [item](const QCPItemAnchor* anchor)
+    { return anchor && anchor->mParentItem != item; };
+    for (QCPItemPosition* position : item->positions())
+    {
+        if (elsewhere(position->parentAnchorX()))
+            position->setParentAnchorX(nullptr, true);
+        if (elsewhere(position->parentAnchorY()))
+            position->setParentAnchorY(nullptr, true);
+    }
+    for (QCPItemAnchor* anchor : item->anchors())
+    {
+        for (QCPItemPosition* child : anchor->mChildrenX.values())
+            if (elsewhere(child))
+                child->setParentAnchorX(nullptr, true);
+        for (QCPItemPosition* child : anchor->mChildrenY.values())
+            if (elsewhere(child))
+                child->setParentAnchorY(nullptr, true);
+    }
+}
+
+/*! \internal
+
   QCustomPlot::take for an item. Its positions forget their axes and axis rect, and the anchors the
   plot, so nothing of the old plot is reachable from it. Parent anchors between items are kept.
 */
@@ -1485,6 +1516,7 @@ bool QCustomPlot::detach(QCPAbstractItem* item)
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     QCP_CHECK_OR_RETURN(mItems.contains(item), "the object is not in this plot", false);
+    cutAnchorLinks(item);
     mItems.removeOne(item);
     item->mRegisteredPlot = nullptr;
     item->setClipAxisRect(nullptr);
@@ -1512,6 +1544,7 @@ bool QCustomPlot::adopt(QCPAbstractItem* item)
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     QCP_CHECK_OR_RETURN(!item->parentPlot(), "the object already belongs to a plot: take it first",
                         false);
+    QCP_CHECK_OR_RETURN(axisRect(), "the plot has no axis rect", false);
     item->setParent(this);
     item->initializeParentPlot(this);
     for (QCPItemAnchor* anchor : item->mAnchors)

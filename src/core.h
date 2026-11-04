@@ -329,8 +329,9 @@ public:
     // Hands over an object built outside the plot (or taken from one) with the ownership of the
     // plot: reparents it, attaches it to the default axes and the current layer (re-target with the
     // returned handle's setters) and adds the legend row as addGraph() does. Plottables and items.
-    // An empty pointer, an object that already belongs to a plot, or a plot being destroyed: one
-    // misuse and an empty handle; the object is freed.
+    // An empty pointer, an object that already belongs to a plot, a plot being destroyed or one
+    // without axes: one misuse and an empty handle. A refused add DESTROYS the object (it was moved
+    // in): keep no raw pointer to it.
     template <typename T>
     qcp::HandleFor<T> add(std::unique_ptr<T> object);
 
@@ -338,12 +339,11 @@ public:
     // ownership. It leaves the lists, its legend rows, its plottable group, bars group and stack,
     // its colour scale, its layer and its axes (set to null); it is unparented. A dead handle, an
     // object of another plot or a plot being destroyed: one misuse and an empty pointer.
-    // Plottables and items only (not yet axis rects, text elements, legends or groups).
+    // Plottables and items only (not yet axis rects, text elements, legends or groups). The plot has
+    // no item-removed signal, so taking an item emits none (plottables leave their group with
+    // membersChanged, as when deleted).
     template <typename T>
     [[nodiscard]] std::unique_ptr<T> take(QCPHandle<T> handle);
-
-    // The axes add<T>() puts a new plottable on; both null (one misuse) when it must refuse.
-    [[nodiscard]] std::pair<QCPAxis*, QCPAxis*> axesForAdd() const;
 
     // specialized interface for QCPGraph:
     [[nodiscard]] QCPGraph* graph(int index) const;
@@ -440,10 +440,15 @@ signals:
     void itemCanceled();
 
 private:
+    template <typename T>
+    friend struct qcp::Construct;
+    // The axes add<T>() puts a new plottable on; both null (one misuse) when it must refuse.
+    [[nodiscard]] std::pair<QCPAxis*, QCPAxis*> axesForAdd() const;
     bool detach(QCPAbstractPlottable* plottable);
     bool detach(QCPAbstractItem* item);
     bool adopt(QCPAbstractPlottable* plottable);
     bool adopt(QCPAbstractItem* item);
+    void cutAnchorLinks(QCPAbstractItem* item);
 
 protected:
     // property members:
