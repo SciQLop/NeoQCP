@@ -70,8 +70,9 @@ private slots:
   void QCPItems_DeletePlot10k();
   void QCPItems_Zoom10k();
   void QCPItems_Zoom100();
-  void QCPItems_MouseMove10k();
-  void QCPItems_MouseMove100();
+  void QCPItems_ZoomEmpty();
+  void QCPItems_Click10k();
+  void QCPItems_Click100();
   void QCPAxisRects_Stack8_Replot();
   void QCPPlots_Stack8_Replot();
   void QCPInput_MouseMoveStorm();
@@ -1085,6 +1086,15 @@ namespace
 {
 // A shuffled order, so neither "delete the newest first" nor "delete the oldest first" can hide in
 // an index pattern. Seeded, so two runs measure the same sequence.
+QVector<QCPAbstractItem *> itemsInOrder(QCustomPlot *plot)
+{
+  QVector<QCPAbstractItem *> items;
+  items.reserve(plot->itemCount());
+  for (int i = 0; i < plot->itemCount(); ++i)
+    items.append(plot->item(i));
+  return items;
+}
+
 QVector<int> shuffledIndices(int count)
 {
   QVector<int> indices(count);
@@ -1108,36 +1118,27 @@ void Benchmark::QCPItems_Clear10k()
 
 void Benchmark::QCPItems_DeleteEach10k()
 {
+  // The user path: `delete item`, or a handle's remove(), in a shuffled order.
   addLineItems(mPlot, 10000, 100);
-  QVector<QCPAbstractItem *> items;
-  items.reserve(mPlot->itemCount());
-  for (int i = 0; i < mPlot->itemCount(); ++i)
-    items.append(mPlot->item(i));
-  QVector<QCPAbstractItem *> order;
-  order.reserve(items.size());
-  for (int index : shuffledIndices(items.size()))
-    order.append(items[index]);
+  QVector<QCPAbstractItem *> items = itemsInOrder(mPlot);
+  const QVector<int> order = shuffledIndices(items.size());
   QBENCHMARK_ONCE
   {
-    for (QCPAbstractItem *item : order)
-      mPlot->removeItem(item);
+    for (int index : order)
+      delete items[index];
   }
 }
 
 void Benchmark::QCPItems_RemoveEach10k()
 {
+  // The same shuffled order through the plot API, which looks the item up before deleting it.
   addLineItems(mPlot, 10000, 100);
-  const QVector<int> order = shuffledIndices(mPlot->itemCount());
+  QVector<QCPAbstractItem *> items = itemsInOrder(mPlot);
+  const QVector<int> order = shuffledIndices(items.size());
   QBENCHMARK_ONCE
   {
-    // Remove by position, always from the current list: the order is the shuffled one, mapped
-    // through the items that are still there.
-    QVector<QCPAbstractItem *> items;
-    for (int i = 0; i < mPlot->itemCount(); ++i)
-      items.append(mPlot->item(i));
     for (int index : order)
-      if (items[index])
-        mPlot->removeItem(items[index]);
+      mPlot->removeItem(items[index]);
   }
 }
 
@@ -1148,10 +1149,11 @@ void Benchmark::QObject_DeleteEachChild10k()
   QList<QObject *> children;
   for (int i = 0; i < 10000; ++i)
     children.append(new QObject(root));
+  const QVector<int> order = shuffledIndices(children.size());
   QBENCHMARK_ONCE
   {
-    for (QObject *child : children)
-      delete child;
+    for (int index : order)
+      delete children[index];
   }
   delete root;
 }
@@ -1166,20 +1168,27 @@ void Benchmark::QCPItems_DeletePlot10k()
   }
 }
 
+namespace
+{
+// A zoom around a fixed centre: the range width changes, so the layer cannot be translated and
+// every visible item is drawn again on each replot.
+void zoomInPlace(QCustomPlot *plot, double centre, double width, int &step)
+{
+  const double w = (step++ % 2) ? width : width * 0.98;
+  plot->xAxis->setRange(centre - w / 2, centre + w / 2);
+  plot->replot(QCustomPlot::rpImmediateRefresh);
+}
+} // namespace
+
 void Benchmark::QCPItems_Zoom10k()
 {
-  addLineItems(mPlot, 10000, 1);
-  mPlot->xAxis->setRange(0, 1);
+  // Items every 0.01 over 0..100; a width of 1 keeps 100 of them in view, as in Zoom100.
+  addLineItems(mPlot, 10000, 100);
+  mPlot->xAxis->setRange(50, 51);
   mPlot->yAxis->setRange(0, 1);
   mPlot->replot();
-  // 100 of the 10 000 items are inside the x range at any time.
-  double lower = 0.4;
-  QBENCHMARK
-  {
-    lower = lower > 0.5 ? 0.4 : lower + 0.01;
-    mPlot->xAxis->setRange(lower, lower + 0.1);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-  }
+  int step = 0;
+  QBENCHMARK { zoomInPlace(mPlot, 50.5, 1.0, step); }
 }
 
 void Benchmark::QCPItems_Zoom100()
@@ -1188,48 +1197,63 @@ void Benchmark::QCPItems_Zoom100()
   mPlot->xAxis->setRange(0, 1);
   mPlot->yAxis->setRange(0, 1);
   mPlot->replot();
-  double lower = 0.4;
-  QBENCHMARK
-  {
-    lower = lower > 0.5 ? 0.4 : lower + 0.01;
-    mPlot->xAxis->setRange(lower, lower + 0.1);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-  }
+  int step = 0;
+  QBENCHMARK { zoomInPlace(mPlot, 0.5, 1.0, step); }
+}
+
+void Benchmark::QCPItems_ZoomEmpty()
+{
+  // The floor: the same ranges as Zoom100 with no item at all.
+  mPlot->xAxis->setRange(0, 1);
+  mPlot->yAxis->setRange(0, 1);
+  mPlot->replot();
+  int step = 0;
+  QBENCHMARK { zoomInPlace(mPlot, 0.5, 1.0, step); }
 }
 
 namespace
 {
-// The same storm as QCPInput_MouseMoveStorm, for a plot whose items are selectable.
-void itemMouseMoveStorm(QCustomPlot *plot)
+// A click is the only pointer event that hit-tests the items: press selects, release resolves the
+// click. Alternating between a point on an item and an empty point keeps both directions measured.
+void clickStorm(QCustomPlot *plot, const QPointF &onItem, const QPointF &empty)
 {
   plot->setInteractions(QCP::iSelectItems);
-  int moves = 0;
-  QObject::connect(plot, &QCustomPlot::mouseMove, plot, [&moves](QMouseEvent *) { ++moves; });
-  const int kMoves = 10000;
-  QBENCHMARK_ONCE
+  int step = 0;
+  QBENCHMARK
   {
-    for (int i = 0; i < kMoves; ++i)
-    {
-      const QPointF pos(10 + (i * 37) % 600, 10 + (i * 53) % 330);
-      QMouseEvent event(QEvent::MouseMove, pos, plot->mapToGlobal(pos), Qt::NoButton,
-                        Qt::NoButton, Qt::NoModifier);
-      QCoreApplication::sendEvent(plot, &event);
-    }
+    const QPointF pos = (step++ % 2) ? onItem : empty;
+    const QPointF global = plot->mapToGlobal(pos);
+    QMouseEvent press(QEvent::MouseButtonPress, pos, global, Qt::LeftButton, Qt::LeftButton,
+                      Qt::NoModifier);
+    QCoreApplication::sendEvent(plot, &press);
+    QMouseEvent release(QEvent::MouseButtonRelease, pos, global, Qt::LeftButton, Qt::NoButton,
+                        Qt::NoModifier);
+    QCoreApplication::sendEvent(plot, &release);
   }
-  QCOMPARE(moves, kMoves);
 }
 } // namespace
 
-void Benchmark::QCPItems_MouseMove10k()
+void Benchmark::QCPItems_Click10k()
 {
+  // The same layout as Zoom10k: 100 of the 10 000 items are in view.
   addLineItems(mPlot, 10000, 100);
-  itemMouseMoveStorm(mPlot);
+  mPlot->xAxis->setRange(50, 51);
+  mPlot->yAxis->setRange(0, 1);
+  mPlot->replot();
+  const QPointF onItem(mPlot->xAxis->coordToPixel(50.5), mPlot->yAxis->coordToPixel(0.5));
+  const QPointF empty(mPlot->xAxis->coordToPixel(50.9), mPlot->yAxis->coordToPixel(0.5));
+  clickStorm(mPlot, onItem, empty);
 }
 
-void Benchmark::QCPItems_MouseMove100()
+void Benchmark::QCPItems_Click100()
 {
-  addLineItems(mPlot, 100, 100);
-  itemMouseMoveStorm(mPlot);
+  addLineItems(mPlot, 100, 1);
+  mPlot->xAxis->setRange(0, 1);
+  mPlot->yAxis->setRange(0, 1);
+  mPlot->replot();
+  const QPointF onItem(mPlot->xAxis->coordToPixel(0.5), mPlot->yAxis->coordToPixel(0.5));
+  const QPointF empty(mPlot->xAxis->coordToPixel(0.9), mPlot->yAxis->coordToPixel(0.5));
+  clickStorm(mPlot, onItem, empty);
 }
 
 void Benchmark::QCPAxisRects_Stack8_Replot()
