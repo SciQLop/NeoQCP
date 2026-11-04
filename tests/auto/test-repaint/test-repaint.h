@@ -66,6 +66,7 @@ private slots:
     void userItemWithoutBoundsIsNeverCulled();
     void positionFollowingItsOwnItemDoesNotRecurse();
     void crossItemAnchorCycleIsRefused();
+    void crossAxisAnchorCycleIsRefused();
 
 private:
     // What the plot shows: its paint buffers composed, or the framebuffer under RHI.

@@ -185,7 +185,7 @@ private:
 
     // True when the pixel dependency graph above  parent comes back here: a position depends on its
     // own parent anchor on the same axis, a plain anchor on every position of its item.
-    [[nodiscard]] bool parentChainReachesThis(QCPItemAnchor* parent, bool xAxis) const;
+    [[nodiscard]] bool parentChainReachesThis(QCPItemAnchor* parent) const;
 
     // The tracer derives this position from its graph on every draw: storing must not mark, or the
     // draw itself would dirty the layer and the plot would never settle.

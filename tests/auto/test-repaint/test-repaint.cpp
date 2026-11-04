@@ -2095,3 +2095,19 @@ void TestRepaint::userItemWithoutBoundsIsNeverCulled()
     plot->layerableListAt(plain->mCentre, true);
     QVERIFY2(plain->mSelectCalls > 0, "an item without a data extent was culled from hit testing");
 }
+
+void TestRepaint::crossAxisAnchorCycleIsRefused()
+{
+    // pixelPosition() asks a parent for its whole position, so a cycle may switch axes on the way:
+    // a's x follows b, and b's y would follow a.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    auto* a = new QCPItemLine(&plot);
+    auto* b = new QCPItemLine(&plot);
+    QVERIFY(a->start->setParentAnchorX(b->start));
+    const bool accepted = b->start->setParentAnchorY(a->start);
+    if (accepted)
+        (void)a->start->pixelPosition(); // where the cycle bites
+    QVERIFY2(!accepted, "a cycle through the other axis was accepted");
+    plot.replot();
+}

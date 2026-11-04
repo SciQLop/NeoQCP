@@ -402,12 +402,12 @@ void QCPItemPosition::setTypeY(QCPItemPosition::PositionType type)
     }
 }
 
-bool QCPItemPosition::parentChainReachesThis(QCPItemAnchor* parent, bool xAxis) const
+bool QCPItemPosition::parentChainReachesThis(QCPItemAnchor* parent) const
 {
-    // Pixel dependency graph: a position's coordinate comes from its own parent anchor on this axis,
-    // a plain anchor's from the positions of its item. Walking it here is what keeps pixelPosition()
-    // from recursing: two items whose positions follow each other's plain anchors would otherwise
-    // depend on themselves.
+    // Pixel dependency graph: a position's pixel comes from its parent anchors, a plain anchor's from
+    // the positions of its item. Walking it here is what keeps pixelPosition() from recursing. Both
+    // parents count after the first step: pixelPosition() asks a parent for its whole position, so
+    // a cycle may switch axes on the way.
     std::vector<QCPItemAnchor*> pending { parent };
     std::vector<QCPItemAnchor*> visited;
     while (!pending.empty())
@@ -422,7 +422,10 @@ bool QCPItemPosition::parentChainReachesThis(QCPItemAnchor* parent, bool xAxis) 
             continue;
         visited.push_back(anchor);
         if (QCPItemPosition* position = anchor->toQCPItemPosition())
-            pending.push_back(xAxis ? position->parentAnchorX() : position->parentAnchorY());
+        {
+            pending.push_back(position->parentAnchorX());
+            pending.push_back(position->parentAnchorY());
+        }
         else if (QCPAbstractItem* item = anchor->mParentItem)
             for (QCPItemPosition* position : item->positions())
                 pending.push_back(position);
@@ -473,7 +476,7 @@ bool QCPItemPosition::setParentAnchorX(QCPItemAnchor* parentAnchor, bool keepPix
         return false;
     }
     // make sure no recursive parent-child-relationships are created:
-    if (parentChainReachesThis(parentAnchor, true))
+    if (parentChainReachesThis(parentAnchor))
     {
         qDebug() << Q_FUNC_INFO << "can't create recursive parent-child-relationship"
                  << reinterpret_cast<quintptr>(parentAnchor);
@@ -525,7 +528,7 @@ bool QCPItemPosition::setParentAnchorY(QCPItemAnchor* parentAnchor, bool keepPix
         return false;
     }
     // make sure no recursive parent-child-relationships are created:
-    if (parentChainReachesThis(parentAnchor, false))
+    if (parentChainReachesThis(parentAnchor))
     {
         qDebug() << Q_FUNC_INFO << "can't create recursive parent-child-relationship"
                  << reinterpret_cast<quintptr>(parentAnchor);
