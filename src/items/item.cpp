@@ -964,30 +964,32 @@ void QCPItemPosition::set(const QCP::Position& position)
   }
   else if (const auto* anchored = std::get_if<QCP::AnchorOffset>(&position))
   {
-    setType(ptAbsolute);
     if (!anchored->anchor)
     {
+      setType(ptAbsolute);
       detachFromParent(this);
       setCoords(anchored->offset.dx, anchored->offset.dy);
       return;
     }
+    // setParentAnchor switches ptPlotCoords to ptAbsolute itself, and only once the anchor is
+    // accepted: a refused anchor (a cycle, this position) must leave the position untouched.
     if (!setParentAnchor(anchored->anchor, false))
-      return; // refused: a cycle or this position itself
+      return;
     setCoords(anchored->offset.dx, anchored->offset.dy);
   }
-  else if (const auto* mixed = std::get_if<QCP::MixedX>(&position))
+  else if (const auto* mixed = std::get_if<QCP::DataXRatioY>(&position))
   {
     detachFromParent(this);
     setTypeX(ptPlotCoords);
     setTypeY(ptAxisRectRatio);
-    setCoords(mixed->dataX, mixed->ratioY);
+    setCoords(mixed->x, mixed->y);
   }
-  else if (const auto* mixed = std::get_if<QCP::MixedY>(&position))
+  else if (const auto* mixed = std::get_if<QCP::RatioXDataY>(&position))
   {
     detachFromParent(this);
     setTypeX(ptAxisRectRatio);
     setTypeY(ptPlotCoords);
-    setCoords(mixed->ratioX, mixed->dataY);
+    setCoords(mixed->x, mixed->y);
   }
 }
 
@@ -1006,9 +1008,9 @@ QCP::Position QCPItemPosition::asPosition() const
   if (mPositionTypeX == ptAxisRectRatio && mPositionTypeY == ptAxisRectRatio)
     return QCP::AxisRatio { mKey, mValue };
   if (mPositionTypeX == ptPlotCoords && mPositionTypeY == ptAxisRectRatio)
-    return QCP::MixedX { mKey, mValue };
+    return QCP::DataXRatioY { mKey, mValue };
   if (mPositionTypeX == ptAxisRectRatio && mPositionTypeY == ptPlotCoords)
-    return QCP::MixedY { mKey, mValue };
+    return QCP::RatioXDataY { mKey, mValue };
   if (mPositionTypeX == ptAbsolute && mPositionTypeY == ptAbsolute
       && mParentAnchorX == mParentAnchorY)
   {

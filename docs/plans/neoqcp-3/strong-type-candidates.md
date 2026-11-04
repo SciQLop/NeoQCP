@@ -13,7 +13,7 @@ the same arguments to the same functions, so a type fixes both at once; the entr
 | signature | file:line | mix-up allowed today | type that stops it | status |
 | --- | --- | --- | --- | --- |
 | `QCPItemPosition::setCoords(double key, double value)` | src/items/item.h:166 | key/value swapped; the type flags are separate, so nothing checks that `x` is the key | `QCP::Data` / `QCP::Pixels` / `QCP::AxisRatio` via `set(QCP::Position)` | **m3 done** |
-| `QCPItemPosition::setTypeX/setTypeY(PositionType)` | src/items/item.h:161 | one axis in data and the other in ratio — the `MixedX` shape only exists by convention | `QCP::MixedX` / `QCP::MixedY` | **m3 done** |
+| `QCPItemPosition::setTypeX/setTypeY(PositionType)` | src/items/item.h:161 | one axis in data and the other in ratio — the `DataXRatioY` shape only exists by convention | `QCP::DataXRatioY` / `QCP::RatioXDataY` | **m3 done** |
 | `QCPAxis::coordToPixel(double)` / `pixelToCoord(double)` | src/axis/axis.h:383 / :382 | a pixel value passed where a coordinate is expected (and back) | `QCP::Data` ↔ `QCP::Pixels` through `QCPTransform` | **m3 done** |
 | `QCPAxis::setRange(double lower, double upper)` | src/axis/axis.h:319 | lower > upper (silently "valid" until a range check), or a pixel value | `QCP::Interval` (constructor refuses inverted) | m4 |
 | `QCPAxis::moveRange(double diff)` | src/axis/axis.h:377 | a pixel delta instead of a data delta | `QCP::DataDelta` vs `QCP::PixelOffset` | m4 |
