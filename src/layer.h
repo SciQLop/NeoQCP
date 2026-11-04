@@ -27,6 +27,7 @@
 #define QCP_LAYER_H
 
 #include <QSet>
+#include <optional>
 
 #include "global.h"
 #include "handle-ops.h"
@@ -111,6 +112,10 @@ protected:
 
     // non-property members:
     QWeakPointer<QCPAbstractPaintBuffer> mPaintBuffer;
+    // True while this layer draws into its paint buffer (the screen picture): the per-layerable
+    // pixel bounds are then fresh and worth caching for hit testing. An export draws through
+    // QCustomPlot::draw() at another size, so it must not overwrite them.
+    bool mCachingBounds = false;
     quint64 mDirtyGeneration = 0;
     quint64 mDrawnGeneration = 0;
 
@@ -188,6 +193,11 @@ public:
     virtual double selectTest(const QPointF& pos, bool onlySelectable,
                               QVariant* details = nullptr) const;
 
+    // Bounds, in plot pixel coordinates, of everything draw() paints and every point selectTest()
+    // can hit (its tolerance included is not required). nullopt means "unknown": the layerable is
+    // never culled. Only subclasses whose drawing fits a rectangle should override it.
+    [[nodiscard]] virtual std::optional<QRectF> pixelBounds() const { return std::nullopt; }
+
     // non-property methods:
     [[nodiscard]] bool realVisibility() const;
     // Schedules a full repaint of this layerable's layer next turn; a no-op without a plot or a
@@ -206,6 +216,13 @@ protected:
     QCPLayer* mLayer;
     bool mAntialiased;
     bool mMouseTransparent = false;
+
+    // Cache of pixelBounds(), written while the screen draws this layerable: hit testing skips a
+    // selectTest() only when the bounds are from the current picture (same paint generation, same
+    // viewport).
+    std::optional<QRectF> mPixelBounds;
+    quint64 mPixelBoundsStamp = 0;
+    QRect mPixelBoundsViewport;
 
     // introduced virtual methods:
     virtual void parentPlotInitialized(QCustomPlot* parentPlot);

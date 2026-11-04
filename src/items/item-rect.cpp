@@ -197,3 +197,11 @@ QBrush QCPItemRect::mainBrush() const
 {
     return mSelected ? mSelectedBrush : mBrush;
 }
+
+std::optional<QRectF> QCPItemRect::pixelBounds() const
+{
+    const double pad = qMax(mPen.widthF(), mSelectedPen.widthF()) + 2.0;
+    return QRectF(topLeft->pixelPosition(), bottomRight->pixelPosition())
+        .normalized()
+        .adjusted(-pad, -pad, pad, pad);
+}

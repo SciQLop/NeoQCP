@@ -272,3 +272,13 @@ QPen QCPItemLine::mainPen() const
 {
     return mSelected ? mSelectedPen : mPen;
 }
+
+std::optional<QRectF> QCPItemLine::pixelBounds() const
+{
+    const QPointF a = start->pixelPosition();
+    const QPointF b = end->pixelPosition();
+    const double pad = qMax(qMax(mHead.boundingDistance(), mTail.boundingDistance()),
+                            qMax(mPen.widthF(), mSelectedPen.widthF()))
+                       + 2.0;
+    return QRectF(a, b).normalized().adjusted(-pad, -pad, pad, pad);
+}

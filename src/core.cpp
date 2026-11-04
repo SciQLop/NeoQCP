@@ -4939,6 +4939,16 @@ QList<QCPLayerable*> QCustomPlot::layerableListAt(const QPointF& pos, bool onlyS
                 continue;
             if (layerables.at(i)->mouseTransparent())
                 continue;
+            const QCPLayerable* layerable = layerables.at(i);
+            // The bounds cached by the last screen draw save the selectTest() of everything outside
+            // the click position. They are only used while they describe the current picture.
+            if (layerable->mPixelBounds && layerable->mPixelBoundsStamp == mPaintGeneration
+                && layerable->mPixelBoundsViewport == viewport())
+            {
+                const double tol = selectionTolerance();
+                if (!layerable->mPixelBounds->adjusted(-tol, -tol, tol, tol).contains(pos))
+                    continue;
+            }
             QVariant details;
             double dist = layerables.at(i)->selectTest(pos, onlySelectable,
                                                        selectionDetails ? &details : nullptr);

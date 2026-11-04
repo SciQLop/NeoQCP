@@ -216,6 +216,22 @@ void QCPLayer::draw(QCPPainter* painter)
             auto* plottable = qobject_cast<QCPAbstractPlottable*>(child);
             if (plottable && !plottable->drawableAxes())
                 continue;
+            // simplify: this is one cheap rectangle test per child, so a frame is still O(items) —
+            // fine at 10k; a spatial index is the upgrade if the count grows another order.
+            if (const std::optional<QRectF> bounds = child->pixelBounds())
+            {
+                if (mCachingBounds)
+                {
+                    child->mPixelBounds = bounds;
+                    child->mPixelBoundsStamp = mParentPlot->mPaintGeneration;
+                    child->mPixelBoundsViewport = mParentPlot->viewport();
+                }
+                // Off screen: nothing to paint, and no point in saving/restoring the painter.
+                if (!bounds->intersects(child->clipRect()))
+                    continue;
+            }
+            else if (mCachingBounds)
+                child->mPixelBounds.reset();
             painter->save();
             painter->setClipRect(child->clipRect().translated(0, -1));
             // Apply busy fade for plottables (suppress during vector export)
@@ -246,7 +262,11 @@ void QCPLayer::drawToPaintBuffer()
         if (QCPPainter* painter = pb->startPainting())
         {
             if (painter->isActive())
+            {
+                mCachingBounds = true;
                 draw(painter);
+                mCachingBounds = false;
+            }
             else
                 qDebug() << Q_FUNC_INFO << "paint buffer returned inactive painter";
             delete painter;

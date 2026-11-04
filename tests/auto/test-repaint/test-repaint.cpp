@@ -2,6 +2,8 @@
 #include "plottables/plottable-multigraph.h"
 #include "datasource/soa-multi-datasource.h"
 #include "plottables/plottable-bars.h"
+#include "items/item-bracket.h"
+#include "items/item-curve.h"
 #include "items/item-ellipse.h"
 #include "items/item-line.h"
 #include "items/item-richtext.h"
@@ -1552,4 +1554,274 @@ void TestRepaint::itemOnOwnLayerFollowsRangeChange()
     QVERIFY2(qAbs(blueColumn(screenOf(&plot)) - plot.xAxis->coordToPixel(5)) <= 2,
              qPrintable(QStringLiteral("pan: drawn at %1, expected %2")
                             .arg(blueColumn(screenOf(&plot))).arg(plot.xAxis->coordToPixel(5))));
+}
+
+namespace
+{
+class CountingLine : public QCPItemLine
+{
+public:
+    explicit CountingLine(QCustomPlot* plot) : QCPItemLine(plot) {}
+
+    double selectTest(const QPointF& pos, bool onlySelectable,
+                      QVariant* details = nullptr) const override
+    {
+        ++mSelectCalls;
+        return QCPItemLine::selectTest(pos, onlySelectable, details);
+    }
+
+    mutable int mSelectCalls = 0;
+};
+
+// An item that deliberately does not override pixelBounds(): it must never be culled.
+class PlainItem : public QCPAbstractItem
+{
+public:
+    explicit PlainItem(QCustomPlot* plot) : QCPAbstractItem(plot) {}
+
+    void draw(QCPPainter* painter) override
+    {
+        ++mDrawCalls;
+        painter->setPen(QPen(Qt::darkMagenta, 2));
+        painter->drawLine(mCentre + QPointF(-4, 0), mCentre + QPointF(4, 0));
+        painter->drawLine(mCentre + QPointF(0, -4), mCentre + QPointF(0, 4));
+    }
+
+    double selectTest(const QPointF& pos, bool onlySelectable, QVariant*) const override
+    {
+        ++mSelectCalls;
+        Q_UNUSED(onlySelectable)
+        return QCPVector2D(pos - mCentre).length();
+    }
+
+    QPointF mCentre;
+    mutable int mDrawCalls = 0;
+    mutable int mSelectCalls = 0;
+};
+
+QCPAbstractItem* makeBoundedItem(const QString& kind, QCustomPlot* plot)
+{
+    if (kind == QLatin1String("line"))
+    {
+        auto item = plot->add<QCPItemLine>();
+        item->setPen(QPen(Qt::darkRed, 6));
+        item->setHead(QCPLineEnding(QCPLineEnding::esSpikeArrow, 14, 9));
+        item->setTail(QCPLineEnding(QCPLineEnding::esDisc, 12));
+        item->start->setCoords(2, 2);
+        item->end->setCoords(8, 7);
+        return item.get();
+    }
+    if (kind == QLatin1String("rect"))
+    {
+        auto item = plot->add<QCPItemRect>();
+        item->setPen(QPen(Qt::darkRed, 6));
+        item->topLeft->setCoords(2, 2);
+        item->bottomRight->setCoords(8, 7);
+        return item.get();
+    }
+    if (kind == QLatin1String("ellipse"))
+    {
+        auto item = plot->add<QCPItemEllipse>();
+        item->setPen(QPen(Qt::darkRed, 6));
+        item->topLeft->setCoords(2, 2);
+        item->bottomRight->setCoords(8, 7);
+        return item.get();
+    }
+    if (kind == QLatin1String("curve"))
+    {
+        auto item = plot->add<QCPItemCurve>();
+        item->setPen(QPen(Qt::darkRed, 5));
+        item->setHead(QCPLineEnding(QCPLineEnding::esSpikeArrow, 14, 9));
+        item->start->setCoords(2, 2);
+        item->startDir->setCoords(7, 9);
+        item->endDir->setCoords(3, 9);
+        item->end->setCoords(8, 3);
+        return item.get();
+    }
+    if (kind == QLatin1String("bracket"))
+    {
+        auto item = plot->add<QCPItemBracket>();
+        item->setPen(QPen(Qt::darkRed, 5));
+        item->setLength(90);
+        item->left->setCoords(2, 5);
+        item->right->setCoords(8, 5);
+        return item.get();
+    }
+    return nullptr;
+}
+} // namespace
+
+void TestRepaint::itemBoundsContainDrawing_data()
+{
+    QTest::addColumn<QString>("item");
+    QTest::newRow("line") << QStringLiteral("line");
+    QTest::newRow("rect") << QStringLiteral("rect");
+    QTest::newRow("ellipse") << QStringLiteral("ellipse");
+    QTest::newRow("curve") << QStringLiteral("curve");
+    QTest::newRow("bracket") << QStringLiteral("bracket");
+}
+
+void TestRepaint::itemBoundsContainDrawing()
+{
+    QFETCH(QString, item);
+    auto plot = settledPlot();
+    QCPAbstractItem* subject = makeBoundedItem(item, plot.get());
+    QVERIFY(subject);
+
+    // Returns the number of painted pixels, or -1 with a message when one is outside the bounds.
+    int paintedPixels = 0;
+    QString mistake;
+    const auto paintedOutside = [&](const QImage& drawn, const QImage& hidden, const QRectF& bounds) {
+        paintedPixels = 0;
+        for (int y = 0; y < drawn.height(); ++y)
+        {
+            for (int x = 0; x < drawn.width(); ++x)
+            {
+                if (drawn.pixel(x, y) == hidden.pixel(x, y))
+                    continue;
+                ++paintedPixels;
+                if (!bounds.contains(QPointF(x + 0.5, y + 0.5)))
+                    mistake = QStringLiteral("%1: pixel %2,%3 is painted outside %4,%5 %6x%7")
+                                  .arg(item)
+                                  .arg(x)
+                                  .arg(y)
+                                  .arg(bounds.x())
+                                  .arg(bounds.y())
+                                  .arg(bounds.width())
+                                  .arg(bounds.height());
+            }
+        }
+        return paintedPixels;
+    };
+
+    waitUntilSettled(*plot);
+    const std::optional<QRectF> bounds = subject->pixelBounds();
+    QVERIFY2(bounds.has_value(), "the item reports no pixel bounds");
+    const QImage painted = screenOf(plot.get());
+    subject->setVisible(false);
+    waitUntilSettled(*plot);
+    const QImage hidden = screenOf(plot.get());
+    QVERIFY2(paintedOutside(painted, hidden, *bounds) > 0, "the item painted nothing");
+    QVERIFY2(mistake.isEmpty(), qPrintable(mistake));
+
+    // A selected item draws with its selected pen, which may be much wider.
+    const QPen wideSelected(Qt::darkBlue, 13);
+    if (auto* line = qobject_cast<QCPItemLine*>(subject))
+        line->setSelectedPen(wideSelected);
+    else if (auto* rect = qobject_cast<QCPItemRect*>(subject))
+        rect->setSelectedPen(wideSelected);
+    else if (auto* ellipse = qobject_cast<QCPItemEllipse*>(subject))
+        ellipse->setSelectedPen(wideSelected);
+    else if (auto* curve = qobject_cast<QCPItemCurve*>(subject))
+        curve->setSelectedPen(wideSelected);
+    else if (auto* bracket = qobject_cast<QCPItemBracket*>(subject))
+        bracket->setSelectedPen(wideSelected);
+    subject->setVisible(true);
+    subject->setSelected(true);
+    waitUntilSettled(*plot);
+    const std::optional<QRectF> selectedBounds = subject->pixelBounds();
+    QVERIFY2(selectedBounds.has_value(), "the selected item reports no pixel bounds");
+    const QImage selected = screenOf(plot.get());
+    subject->setVisible(false);
+    waitUntilSettled(*plot);
+    const QImage selectedHidden = screenOf(plot.get());
+    mistake.clear();
+    QVERIFY2(paintedOutside(selected, selectedHidden, *selectedBounds) > 0,
+             "the selected item painted nothing");
+    QVERIFY2(mistake.isEmpty(), qPrintable(mistake));
+}
+
+void TestRepaint::itemScrolledIntoViewIsDrawn()
+{
+    auto plot = settledPlot();
+    auto line = plot->add<QCPItemLine>();
+    line->setPen(QPen(Qt::darkGreen, 5));
+    line->start->setCoords(100, 2);
+    line->end->setCoords(100, 8);
+    waitUntilSettled(*plot);
+    const QImage before = screenOf(plot.get());
+    plot->xAxis->setRange(95, 105);
+    waitUntilSettled(*plot);
+    const QImage after = screenOf(plot.get());
+    QVERIFY2(before != after, "the item stayed culled after the range brought it into view");
+}
+
+void TestRepaint::culledItemIsNotHitTested()
+{
+    auto plot = settledPlot();
+    auto* near = new CountingLine(plot.get());
+    near->start->setCoords(4, 4);
+    near->end->setCoords(6, 6);
+    auto* far = new CountingLine(plot.get());
+    far->start->setCoords(1000, 4);
+    far->end->setCoords(1000, 6);
+    waitUntilSettled(*plot);
+
+    const QPointF pos(plot->xAxis->coordToPixel(5), plot->yAxis->coordToPixel(5));
+    const QList<QCPLayerable*> hits = plot->layerableListAt(pos, true);
+    QVERIFY(hits.contains(near));
+    QCOMPARE(far->mSelectCalls, 0);
+}
+
+void TestRepaint::staleBoundsFallBack()
+{
+    auto plot = settledPlot();
+    auto* far = new CountingLine(plot.get());
+    far->start->setCoords(1000, 4);
+    far->end->setCoords(1000, 6);
+    waitUntilSettled(*plot); // its cached bounds now say "far outside"
+
+    const QPointF pos(plot->xAxis->coordToPixel(5), plot->yAxis->coordToPixel(5));
+    far->start->setCoords(4, 4); // moved under the cursor, no replot in between
+    far->end->setCoords(6, 6);
+    QVERIFY2(plot->layerableListAt(pos, true).contains(far),
+             "a moved item was culled by bounds from before the move");
+
+    // Same through a range change: the item enters the view without a replot.
+    auto plot2 = settledPlot();
+    auto* line = new CountingLine(plot2.get());
+    line->start->setCoords(100, 4);
+    line->end->setCoords(100, 6);
+    waitUntilSettled(*plot2);
+    plot2->xAxis->setRange(95, 105);
+    QVERIFY2(plot2->layerableListAt(pos, true).contains(line),
+             "an item scrolled into view was culled by bounds from before the range change");
+}
+
+void TestRepaint::exportDoesNotPoisonBounds()
+{
+    auto plot = settledPlot();
+    auto line = plot->add<QCPItemLine>();
+    line->setPen(QPen(Qt::darkRed, 5));
+    line->start->setCoords(3, 5);
+    line->end->setCoords(7, 5);
+    waitUntilSettled(*plot);
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    QVERIFY(plot->savePng(dir.filePath(QStringLiteral("export.png")), 800, 600, 2.0));
+
+    // The export leaves its own layout in place until the next screen frame (pre-existing), so the
+    // screen redraws once before the user can click: the export must not have poisoned the cache.
+    plot->replot();
+    waitUntilSettled(*plot);
+    const QPointF onItem(plot->xAxis->coordToPixel(5), plot->yAxis->coordToPixel(5));
+    const QPointF elsewhere(plot->xAxis->coordToPixel(9), plot->yAxis->coordToPixel(9));
+
+    QVERIFY2(plot->layerableListAt(onItem, true).contains(line.get()),
+             "an export at another size culled the item on the screen");
+    QVERIFY(!plot->layerableListAt(elsewhere, true).contains(line.get()));
+}
+
+void TestRepaint::userItemWithoutBoundsIsNeverCulled()
+{
+    auto plot = settledPlot();
+    auto* plain = new PlainItem(plot.get());
+    plain->mCentre = QPointF(plot->xAxis->coordToPixel(4), plot->yAxis->coordToPixel(4));
+    waitUntilSettled(*plot);
+    QVERIFY2(plain->mDrawCalls > 0, "the item was never drawn");
+    QVERIFY(!plain->pixelBounds().has_value());
+
+    plot->layerableListAt(plain->mCentre, true);
+    QVERIFY2(plain->mSelectCalls > 0, "an item without pixel bounds was culled from hit testing");
 }

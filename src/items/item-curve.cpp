@@ -204,3 +204,14 @@ QPen QCPItemCurve::mainPen() const
 {
     return mSelected ? mSelectedPen : mPen;
 }
+
+std::optional<QRectF> QCPItemCurve::pixelBounds() const
+{
+    QPainterPath path;
+    path.moveTo(start->pixelPosition());
+    path.cubicTo(startDir->pixelPosition(), endDir->pixelPosition(), end->pixelPosition());
+    const double pad = qMax(qMax(mHead.boundingDistance(), mTail.boundingDistance()),
+                            qMax(mPen.widthF(), mSelectedPen.widthF()))
+                       + 2.0;
+    return path.controlPointRect().adjusted(-pad, -pad, pad, pad);
+}

@@ -50,6 +50,13 @@ private slots:
     void colorMapDataPixelFollowsSetCell();
     void equalValueDoesNotDirty_data();
     void equalValueDoesNotDirty();
+    void itemBoundsContainDrawing_data();
+    void itemBoundsContainDrawing();
+    void itemScrolledIntoViewIsDrawn();
+    void culledItemIsNotHitTested();
+    void staleBoundsFallBack();
+    void exportDoesNotPoisonBounds();
+    void userItemWithoutBoundsIsNeverCulled();
 
 private:
     // What the plot shows: its paint buffers composed, or the framebuffer under RHI.
