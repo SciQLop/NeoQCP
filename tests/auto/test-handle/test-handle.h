@@ -15,4 +15,11 @@ private slots:
     void handleAsCast();
     void handleRemove();
     void deadHandleReportsMisuse();
+
+    void removeAxisThroughHandle();
+    void removeLayerThroughHandle();
+    void removeAxisRectThroughHandle();
+    void noRemoveOnWidgets();
+    void removeLooseLayoutElement();
+    void removeLastAxisRectThenAddIsRefused();
 };

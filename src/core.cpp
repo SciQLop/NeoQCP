@@ -29,6 +29,7 @@
 #include <memory>
 #include <utility>
 #include "misuse.h"
+#include "plottables/plottable-bars.h"
 #include "plottables/plottable-group.h"
 #include "item-creation-state.h"
 #include "overlay.h"
@@ -5081,3 +5082,39 @@ void QCustomPlot::toPainter(QCPPainter* painter, int width, int height)
     else
         qDebug() << Q_FUNC_INFO << "Passed painter is not active";
 }
+
+// The owner of each family removes its member (see qcp::detail::removeObject in handle.h).
+namespace qcp::detail
+{
+void removeObject(QCPAbstractPlottable& plottable) { delete &plottable; }
+void removeObject(QCPAbstractItem& item) { delete &item; }
+void removeObject(QCPPolarGraph& graph) { delete &graph; }
+void removeObject(QCPBarsGroup& group) { delete &group; }
+void removeObject(QCPPlottableGroup& group) { delete &group; }
+
+void removeObject(QCPAxis& axis)
+{
+    if (QCPAxisRect* rect = axis.axisRect())
+        rect->removeAxis(&axis);
+    else
+        delete &axis;
+}
+
+void removeObject(QCPLayer& layer)
+{
+    QCustomPlot* plot = layer.parentPlot();
+    if (!plot || plot->layerCount() < 2)
+    {
+        qcp::reportMisuse(Q_FUNC_INFO, "can't remove the plot's last layer");
+        return;
+    }
+    plot->removeLayer(&layer);
+}
+
+void removeObject(QCPLayoutElement& element)
+{
+    if (QCPLayout* layout = element.layout())
+        layout->take(&element);
+    delete &element;
+}
+} // namespace qcp::detail
