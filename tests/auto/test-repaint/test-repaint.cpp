@@ -1502,3 +1502,54 @@ void TestRepaint::colorMapDataPixelFollowsSetCell()
     waitUntilSettled(*plot);
     QVERIFY(before != screenOf(plot.get()));
 }
+
+namespace
+{
+// The mean x of the blue pixels: where a vertical blue line was drawn, or -1 if none was.
+double blueColumn(const QImage& image)
+{
+    double sum = 0;
+    int count = 0;
+    for (int y = 0; y < image.height(); ++y)
+        for (int x = 0; x < image.width(); ++x)
+        {
+            const QColor c = image.pixelColor(x, y);
+            if (c.blue() > 200 && c.red() < 80 && c.green() < 80)
+            {
+                sum += x;
+                ++count;
+            }
+        }
+    return count ? sum / count : -1;
+}
+} // namespace
+
+void TestRepaint::itemOnOwnLayerFollowsRangeChange()
+{
+    // An item on a layer that holds no plottable: a zoom and a pan must redraw it at its new pixels.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.addLayer("items");
+    auto* line = new QCPItemLine(&plot);
+    line->setLayer("items");
+    line->setPen(QPen(kBlue, 3));
+    line->start->setCoords(5, 0);
+    line->end->setCoords(5, 10);
+    plot.xAxis->setRange(0, 10);
+    plot.yAxis->setRange(0, 10);
+    plot.replot();
+    waitUntilSettled(plot);
+    QVERIFY(qAbs(blueColumn(screenOf(&plot)) - plot.xAxis->coordToPixel(5)) <= 2);
+
+    plot.xAxis->setRange(0, 20); // a zoom
+    waitUntilSettled(plot);
+    QVERIFY2(qAbs(blueColumn(screenOf(&plot)) - plot.xAxis->coordToPixel(5)) <= 2,
+             qPrintable(QStringLiteral("zoom: drawn at %1, expected %2")
+                            .arg(blueColumn(screenOf(&plot))).arg(plot.xAxis->coordToPixel(5))));
+
+    plot.xAxis->setRange(2, 22); // a pan
+    waitUntilSettled(plot);
+    QVERIFY2(qAbs(blueColumn(screenOf(&plot)) - plot.xAxis->coordToPixel(5)) <= 2,
+             qPrintable(QStringLiteral("pan: drawn at %1, expected %2")
+                            .arg(blueColumn(screenOf(&plot))).arg(plot.xAxis->coordToPixel(5))));
+}

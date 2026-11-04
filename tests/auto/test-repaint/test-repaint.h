@@ -43,6 +43,7 @@ private slots:
     void barsGroupSpacingRepaints();
     void plottableGroupVisibilityRepaints();
     void axisMarginChangeDuringPanRepaints();
+    void itemOnOwnLayerFollowsRangeChange();
     void multiGraphLineStyleResetsComponents();
     void colorMapDataSettersRepaint_data();
     void colorMapDataSettersRepaint();

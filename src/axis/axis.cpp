@@ -640,7 +640,7 @@ void QCPAxis::setScaleType(QCPAxis::ScaleType type)
 /*! \internal
 
   Every range setter ends here. A range change invalidates every layer that
-  depends on this axis (its own, the grid, the plottables attached to it), and
+  depends on this axis (its own, the grid, the plottables and items attached to it), and
   QCustomPlot::replot only repaints dirty buffers — so the layers are dirtied
   here, at the source, rather than by each caller (drag, wheel, pinch, setRange
   from axis synchronizers). QCustomPlot::ensureAtLeastOneBufferDirty() only
@@ -650,7 +650,10 @@ void QCPAxis::setScaleType(QCPAxis::ScaleType type)
 void QCPAxis::rangeDidChange(const QCPRange& oldRange)
 {
     if (mAxisRect)
+    {
         mAxisRect->markAffectedLayersDirty();
+        mAxisRect->markItemsUsingAxisDirty(this);
+    }
     const QPointer<QCPAxis> alive(this); // a slot may delete this axis
     emit rangeChanged(mRange);
     if (alive)
