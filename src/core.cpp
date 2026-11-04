@@ -38,6 +38,8 @@
 #include "items/item.h"
 #include "items/item-text.h"
 #include "items/item-tracer.h"
+#include "polar/layoutelement-angularaxis.h"
+#include "polar/polargraph.h"
 #include "layer.h"
 #include "layoutelements/layoutelement-axisrect.h"
 #include "layoutelements/layoutelement-legend.h"
@@ -1458,6 +1460,35 @@ bool QCustomPlot::detach(QCPAbstractPlottable* plottable)
 
   QCustomPlot::add(std::unique_ptr) for a plottable: the inverse of detach, onto the default axes.
 */
+bool QCustomPlot::detach(QCPPolarGraph* graph)
+{
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
+    QCP_CHECK_OR_RETURN(graph, "the pointer is empty", false);
+    auto* angular = graph->keyAxis();
+    QCP_CHECK_OR_RETURN(angular && angular->parentPlot() == this, "the graph belongs to another plot",
+                        false);
+    for (QCPLegend* legend : findChildren<QCPLegend*>())
+        graph->removeFromLegend(legend);
+    // Unlists the graph from the angular axis (and nulls its radial axis).
+    graph->setKeyAxis(nullptr);
+    graph->setValueAxis(nullptr);
+    graph->moveToLayer(nullptr, false);
+    graph->setParentLayerable(nullptr);
+    graph->mParentPlot = nullptr;
+    graph->setParent(nullptr);
+    return true;
+}
+
+bool QCustomPlot::adopt(QCPPolarGraph* graph)
+{
+    (void)graph;
+    // Its axes are polar, so only an angular axis can adopt it: the plot cannot pick one.
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
+    qcp::reportMisuse(Q_FUNC_INFO,
+                      "a polar graph is added through its angular axis, not through the plot");
+    return false;
+}
+
 bool QCustomPlot::adopt(QCPAbstractPlottable* plottable)
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);

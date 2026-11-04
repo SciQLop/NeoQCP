@@ -28,6 +28,7 @@
 
 #include "../axis/range.h"
 #include "../global.h"
+#include "../handle-ops.h"
 #include "../layer.h"
 #include "../layoutelements/layoutelement-legend.h"
 #include "../plottables/plottable-graph.h"
@@ -66,6 +67,9 @@ protected:
     QFont getFont() const;
 };
 
+template <typename T, typename Self = void>
+class QCPPolarGraphOps;
+
 class QCP_LIB_DECL QCPPolarGraph : public QCPLayerable
 {
     Q_OBJECT
@@ -87,6 +91,9 @@ public:
         lsLine ///< data points are connected by a straight line
     };
     Q_ENUM(LineStyle)
+
+    template <typename T>
+    using OpsFor = QCPPolarGraphOps<T>;
 
     QCPPolarGraph(QCPPolarAxisAngular* keyAxis, QCPPolarAxisRadial* valueAxis);
     virtual ~QCPPolarGraph();
@@ -240,6 +247,186 @@ private:
 
     friend class QCPPolarLegendItem;
     friend class QCPPolarAxisAngular;
+};
+
+// The handle of QCPPolarGraph: what add<T>() returns for it.
+template <typename T, typename Self>
+class QCPPolarGraphOps : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPPolarGraphOps<T>>>
+{
+    using Base = QCPLayerableOps<T, qcp::OpsRet<Self, QCPPolarGraphOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setName(const QString& name)
+    {
+        return this->apply([&](T& o) { o.setName(name); });
+    }
+    Ret setPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setPen(pen); });
+    }
+    Ret setBrush(const QBrush& brush)
+    {
+        return this->apply([&](T& o) { o.setBrush(brush); });
+    }
+    Ret setPeriodic(bool enabled)
+    {
+        return this->apply([&](T& o) { o.setPeriodic(enabled); });
+    }
+    Ret setLineStyle(QCPPolarGraph::LineStyle style)
+    {
+        return this->apply([&](T& o) { o.setLineStyle(style); });
+    }
+    Ret setScatterStyle(const QCPScatterStyle& style)
+    {
+        return this->apply([&](T& o) { o.setScatterStyle(style); });
+    }
+    Ret setAntialiasedFill(bool enabled)
+    {
+        return this->apply([&](T& o) { o.setAntialiasedFill(enabled); });
+    }
+    Ret setAntialiasedScatters(bool enabled)
+    {
+        return this->apply([&](T& o) { o.setAntialiasedScatters(enabled); });
+    }
+    Ret setData(const QVector<double>& keys, const QVector<double>& values,
+                 bool alreadySorted = false)
+    {
+        return this->apply([&](T& o) { o.setData(keys, values, alreadySorted); });
+    }
+};
+
+// The handle of QCPPolarAxisAngular: what add<T>() returns for it.
+template <typename T, typename Self>
+class QCPPolarAxisAngularOps : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPPolarAxisAngularOps<T>>>
+{
+    using Base = QCPLayerableOps<T, qcp::OpsRet<Self, QCPPolarAxisAngularOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setBackground(const QBrush& brush)
+    {
+        return this->apply([&](T& o) { o.setBackground(brush); });
+    }
+    Ret setBackground(const QPixmap& pixmap)
+    {
+        return this->apply([&](T& o) { o.setBackground(pixmap); });
+    }
+    Ret setRange(double lower, double upper)
+    {
+        return this->apply([&](T& o) { o.setRange(lower, upper); });
+    }
+    Ret setRangeLower(double lower)
+    {
+        return this->apply([&](T& o) { o.setRangeLower(lower); });
+    }
+    Ret setRangeUpper(double upper)
+    {
+        return this->apply([&](T& o) { o.setRangeUpper(upper); });
+    }
+    Ret setRangeReversed(bool reversed)
+    {
+        return this->apply([&](T& o) { o.setRangeReversed(reversed); });
+    }
+    Ret setAngle(double degrees)
+    {
+        return this->apply([&](T& o) { o.setAngle(degrees); });
+    }
+    Ret setTicks(bool show)
+    {
+        return this->apply([&](T& o) { o.setTicks(show); });
+    }
+    Ret setTickLabels(bool show)
+    {
+        return this->apply([&](T& o) { o.setTickLabels(show); });
+    }
+    Ret setTickLabelPadding(int padding)
+    {
+        return this->apply([&](T& o) { o.setTickLabelPadding(padding); });
+    }
+    Ret setTickLabelFont(const QFont& font)
+    {
+        return this->apply([&](T& o) { o.setTickLabelFont(font); });
+    }
+    Ret setTickLabelColor(const QColor& color)
+    {
+        return this->apply([&](T& o) { o.setTickLabelColor(color); });
+    }
+    Ret setTickLabelRotation(double degrees)
+    {
+        return this->apply([&](T& o) { o.setTickLabelRotation(degrees); });
+    }
+    Ret setNumberFormat(const QString& formatCode)
+    {
+        return this->apply([&](T& o) { o.setNumberFormat(formatCode); });
+    }
+    Ret setNumberPrecision(int precision)
+    {
+        return this->apply([&](T& o) { o.setNumberPrecision(precision); });
+    }
+    Ret setTickLength(int inside, int outside)
+    {
+        return this->apply([&](T& o) { o.setTickLength(inside, outside); });
+    }
+    Ret setSubTicks(bool show)
+    {
+        return this->apply([&](T& o) { o.setSubTicks(show); });
+    }
+    Ret setSubTickLength(int inside, int outside)
+    {
+        return this->apply([&](T& o) { o.setSubTickLength(inside, outside); });
+    }
+    Ret setBasePen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setBasePen(pen); });
+    }
+    Ret setTickPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setTickPen(pen); });
+    }
+    Ret setSubTickPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setSubTickPen(pen); });
+    }
+    Ret setLabelFont(const QFont& font)
+    {
+        return this->apply([&](T& o) { o.setLabelFont(font); });
+    }
+    Ret setLabelColor(const QColor& color)
+    {
+        return this->apply([&](T& o) { o.setLabelColor(color); });
+    }
+    Ret setLabel(const QString& str)
+    {
+        return this->apply([&](T& o) { o.setLabel(str); });
+    }
+    Ret setLabelPadding(int padding)
+    {
+        return this->apply([&](T& o) { o.setLabelPadding(padding); });
+    }
+    Ret setRangeZoom(bool enabled)
+    {
+        return this->apply([&](T& o) { o.setRangeZoom(enabled); });
+    }
+    Ret setRangeZoomFactor(double factor)
+    {
+        return this->apply([&](T& o) { o.setRangeZoomFactor(factor); });
+    }
+
+    // The handle form of addGraph(): the polar graph belongs to this axis and draws on its first
+    // radial axis. args go to the graph handle's setData.
+    template <std::same_as<QCPPolarGraph> Graph, typename... Args>
+    qcp::HandleFor<Graph> add(Args&&... args)
+    {
+        auto* axis = this->get();
+        if (!axis)
+            return {};
+        return axis->template add<Graph>(std::forward<Args>(args)...);
+    }
 };
 
 #endif // QCP_POLARGRAPH_H

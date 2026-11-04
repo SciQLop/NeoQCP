@@ -58,4 +58,7 @@ private slots:
     void tracerTakesItsGraphByHandle();
     void richTextHandleKeepsTheTextSetters();
     void graph2ScatterColoursChangeTheDrawing();
+    void addPolar();
+    void takePolarGraph();
+    void addPolarGraphWithoutRadialAxisIsRefused();
 };

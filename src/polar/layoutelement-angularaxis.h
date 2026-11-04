@@ -30,6 +30,7 @@
 #include "../axis/labelpainter.h"
 #include "../axis/range.h"
 #include "../global.h"
+#include "../handle-ops.h"
 #include "../layout.h"
 
 class QCPPainter;
@@ -38,6 +39,9 @@ class QCPPolarAxisRadial;
 class QCPPolarAxisAngular;
 class QCPPolarGrid;
 class QCPPolarGraph;
+
+template <typename T, typename Self = void>
+class QCPPolarAxisAngularOps;
 
 class QCP_LIB_DECL QCPPolarAxisAngular : public QCPLayoutElement
 {
@@ -75,6 +79,9 @@ public:
         lmRotated ///<
     };
     Q_ENUM(LabelMode)
+
+    template <typename T>
+    using OpsFor = QCPPolarAxisAngularOps<T>;
 
     explicit QCPPolarAxisAngular(QCustomPlot* parentPlot);
     virtual ~QCPPolarAxisAngular();
@@ -235,6 +242,30 @@ public:
     bool removeRadialAxis(QCPPolarAxisRadial* axis);
 
     QCPLayoutInset* insetLayout() const { return mInsetLayout; }
+
+    // The handle form of the graph constructor: the polar graph belongs to this axis and draws on
+    // its first radial axis. args go to the handle's setData.
+    template <std::same_as<QCPPolarGraph> T, typename... Args>
+    qcp::HandleFor<T> add(Args&&... args)
+    {
+        using Handle = qcp::HandleFor<T>;
+        static_assert(requires(Handle h) { h.setData(std::declval<Args>()...); },
+                      "add<T>(args...): the graph's handle has no setData taking these arguments");
+        QCP_CHECK_OR_RETURN(radialAxis(0), "the angular axis has no radial axis", Handle{});
+        Handle handle = qcp::makeHandle<Handle>(new T(this, radialAxis(0)));
+        handle.get()->markDirty();
+        try
+        {
+            handle.setData(std::forward<Args>(args)...);
+        }
+        catch (...)
+        {
+            handle.remove(); // the graph unregisters itself from this axis
+            throw;
+        }
+        return handle;
+    }
+
 
     QRegion exactClipRegion() const;
 

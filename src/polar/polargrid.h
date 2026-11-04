@@ -27,9 +27,13 @@
 #define QCP_POLARGRID_H
 
 #include "../global.h"
+#include "../handle-ops.h"
 #include "radialaxis.h"
 
 class QCPPolarAxisAngular;
+
+template <typename T, typename Self = void>
+class QCPPolarGridOps;
 
 class QCP_LIB_DECL QCPPolarGrid : public QCPLayerable
 {
@@ -55,6 +59,9 @@ public:
     Q_ENUM(GridType)
     Q_DECLARE_FLAGS(GridTypes, GridType)
     Q_FLAG(GridTypes)
+
+    template <typename T>
+    using OpsFor = QCPPolarGridOps<T>;
 
     explicit QCPPolarGrid(QCPPolarAxisAngular* parentAxis);
 
@@ -120,5 +127,53 @@ private:
 Q_DECLARE_OPERATORS_FOR_FLAGS(QCPPolarGrid::GridTypes)
 Q_DECLARE_METATYPE(QCPPolarGrid::GridType)
 
+
+// The handle of QCPPolarGrid: what add<T>() returns for it.
+template <typename T, typename Self>
+class QCPPolarGridOps : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPPolarGridOps<T>>>
+{
+    using Base = QCPLayerableOps<T, qcp::OpsRet<Self, QCPPolarGridOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setType(QCPPolarGrid::GridTypes type)
+    {
+        return this->apply([&](T& o) { o.setType(type); });
+    }
+    Ret setSubGridType(QCPPolarGrid::GridTypes type)
+    {
+        return this->apply([&](T& o) { o.setSubGridType(type); });
+    }
+    Ret setAntialiasedSubGrid(bool enabled)
+    {
+        return this->apply([&](T& o) { o.setAntialiasedSubGrid(enabled); });
+    }
+    Ret setAntialiasedZeroLine(bool enabled)
+    {
+        return this->apply([&](T& o) { o.setAntialiasedZeroLine(enabled); });
+    }
+    Ret setAngularPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setAngularPen(pen); });
+    }
+    Ret setAngularSubGridPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setAngularSubGridPen(pen); });
+    }
+    Ret setRadialPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setRadialPen(pen); });
+    }
+    Ret setRadialSubGridPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setRadialSubGridPen(pen); });
+    }
+    Ret setRadialZeroLinePen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setRadialZeroLinePen(pen); });
+    }
+};
 
 #endif // QCP_POLARGRID_H

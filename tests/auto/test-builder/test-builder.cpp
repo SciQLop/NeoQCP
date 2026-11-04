@@ -1,4 +1,7 @@
 #include "test-builder.h"
+#include "polar/layoutelement-angularaxis.h"
+#include "polar/polargraph.h"
+#include "polar/radialaxis.h"
 #include <functional>
 #include <memory>
 #include <type_traits>
@@ -1107,4 +1110,65 @@ void TestBuilder::graph2ScatterColoursChangeTheDrawing()
     settle(plot);
     QVERIFY(plot.toPixmap(400, 300).toImage() != plain);
     QCOMPARE(gMisuses, 0);
+}
+
+void TestBuilder::addPolar()
+{
+    QCustomPlot plot;
+    auto angular = plot.add<QCPPolarAxisAngular>(1, 0);
+    QVERIFY(angular);
+    QCOMPARE(plot.plotLayout()->element(1, 0), angular.get());
+    QCOMPARE(plot.legend->itemCount(), 0);
+    angular.setRange(0, 360);
+    angular->radialAxis(0)->setRange(0, 10);
+    settle(plot);
+    const QImage withoutGraph = plot.toPixmap(400, 300).toImage();
+
+    auto graph = angular.add<QCPPolarGraph>(kKeys, kValues).setName("p");
+    QVERIFY(graph);
+    QCOMPARE(graph->name(), QString("p"));
+    QCOMPARE(graph->data()->size(), 3);
+    QCOMPARE(plot.legend->itemCount(), 1);
+    settle(plot);
+    QVERIFY(plot.toPixmap(400, 300).toImage() != withoutGraph);
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestBuilder::takePolarGraph()
+{
+    QCustomPlot plot;
+    settle(plot);
+    auto angular = plot.add<QCPPolarAxisAngular>(1, 0);
+    QVERIFY(angular);
+    auto graph = angular.add<QCPPolarGraph>(kKeys, kValues);
+    QVERIFY(graph);
+    QCOMPARE(plot.legend->itemCount(), 1);
+
+    auto taken = plot.take(graph);
+    QVERIFY(taken);
+    QCOMPARE(taken.get(), graph.get()); // same object, now owned by the caller
+    QCOMPARE(plot.legend->itemCount(), 0);
+    QCOMPARE(taken->keyAxis(), nullptr);
+    QCOMPARE(gMisuses, 0);
+
+    // A polar graph is owned by an angular axis, so the plot cannot take one back: the refused add
+    // destroys the pointer it was given.
+    QVERIFY(!plot.add(std::move(taken)));
+    QCOMPARE(gMisuses, 1);
+    QVERIFY(!graph);
+}
+
+void TestBuilder::addPolarGraphWithoutRadialAxisIsRefused()
+{
+    QCustomPlot plot;
+    settle(plot);
+    auto angular = plot.add<QCPPolarAxisAngular>(1, 0);
+    QVERIFY(angular);
+    while (angular->radialAxisCount() > 0)
+        angular->removeRadialAxis(angular->radialAxis(0));
+    QCOMPARE(angular->radialAxisCount(), 0);
+
+    auto graph = angular.add<QCPPolarGraph>(kKeys, kValues);
+    QVERIFY(!graph);
+    QCOMPARE(gMisuses, 1);
 }

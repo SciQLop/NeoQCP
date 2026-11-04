@@ -30,12 +30,16 @@
 #include "../axis/labelpainter.h"
 #include "../axis/range.h"
 #include "../global.h"
+#include "../handle-ops.h"
 #include "../layout.h"
 
 class QCPPainter;
 class QCustomPlot;
 class QCPPolarAxisRadial;
 class QCPPolarAxisAngular;
+
+template <typename T, typename Self = void>
+class QCPPolarAxisRadialOps;
 
 class QCP_LIB_DECL QCPPolarAxisRadial : public QCPLayerable
 {
@@ -96,6 +100,9 @@ public:
         lmRotated ///<
     };
     Q_ENUM(LabelMode)
+
+    template <typename T>
+    using OpsFor = QCPPolarAxisRadialOps<T>;
 
     explicit QCPPolarAxisRadial(QCPPolarAxisAngular* parent);
     virtual ~QCPPolarAxisRadial();
@@ -341,5 +348,113 @@ Q_DECLARE_METATYPE(QCPPolarAxisRadial::AngleReference)
 Q_DECLARE_METATYPE(QCPPolarAxisRadial::ScaleType)
 Q_DECLARE_METATYPE(QCPPolarAxisRadial::SelectablePart)
 
+
+// The handle of QCPPolarAxisRadial: what add<T>() returns for it.
+template <typename T, typename Self>
+class QCPPolarAxisRadialOps : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPPolarAxisRadialOps<T>>>
+{
+    using Base = QCPLayerableOps<T, qcp::OpsRet<Self, QCPPolarAxisRadialOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setScaleType(QCPPolarAxisRadial::ScaleType type)
+    {
+        return this->apply([&](T& o) { o.setScaleType(type); });
+    }
+    Ret setAngleReference(QCPPolarAxisRadial::AngleReference reference)
+    {
+        return this->apply([&](T& o) { o.setAngleReference(reference); });
+    }
+    Ret setRange(double lower, double upper)
+    {
+        return this->apply([&](T& o) { o.setRange(lower, upper); });
+    }
+    Ret setRangeLower(double lower)
+    {
+        return this->apply([&](T& o) { o.setRangeLower(lower); });
+    }
+    Ret setRangeUpper(double upper)
+    {
+        return this->apply([&](T& o) { o.setRangeUpper(upper); });
+    }
+    Ret setRangeReversed(bool reversed)
+    {
+        return this->apply([&](T& o) { o.setRangeReversed(reversed); });
+    }
+    Ret setAngle(double degrees)
+    {
+        return this->apply([&](T& o) { o.setAngle(degrees); });
+    }
+    Ret setTicks(bool show)
+    {
+        return this->apply([&](T& o) { o.setTicks(show); });
+    }
+    Ret setTickLabels(bool show)
+    {
+        return this->apply([&](T& o) { o.setTickLabels(show); });
+    }
+    Ret setTickLabelPadding(int padding)
+    {
+        return this->apply([&](T& o) { o.setTickLabelPadding(padding); });
+    }
+    Ret setTickLabelFont(const QFont& font)
+    {
+        return this->apply([&](T& o) { o.setTickLabelFont(font); });
+    }
+    Ret setTickLabelColor(const QColor& color)
+    {
+        return this->apply([&](T& o) { o.setTickLabelColor(color); });
+    }
+    Ret setNumberFormat(const QString& formatCode)
+    {
+        return this->apply([&](T& o) { o.setNumberFormat(formatCode); });
+    }
+    Ret setNumberPrecision(int precision)
+    {
+        return this->apply([&](T& o) { o.setNumberPrecision(precision); });
+    }
+    Ret setTickLength(int inside, int outside)
+    {
+        return this->apply([&](T& o) { o.setTickLength(inside, outside); });
+    }
+    Ret setSubTicks(bool show)
+    {
+        return this->apply([&](T& o) { o.setSubTicks(show); });
+    }
+    Ret setSubTickLength(int inside, int outside)
+    {
+        return this->apply([&](T& o) { o.setSubTickLength(inside, outside); });
+    }
+    Ret setBasePen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setBasePen(pen); });
+    }
+    Ret setTickPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setTickPen(pen); });
+    }
+    Ret setSubTickPen(const QPen& pen)
+    {
+        return this->apply([&](T& o) { o.setSubTickPen(pen); });
+    }
+    Ret setLabelFont(const QFont& font)
+    {
+        return this->apply([&](T& o) { o.setLabelFont(font); });
+    }
+    Ret setLabelColor(const QColor& color)
+    {
+        return this->apply([&](T& o) { o.setLabelColor(color); });
+    }
+    Ret setLabel(const QString& str)
+    {
+        return this->apply([&](T& o) { o.setLabel(str); });
+    }
+    Ret setLabelPadding(int padding)
+    {
+        return this->apply([&](T& o) { o.setLabelPadding(padding); });
+    }
+};
 
 #endif // QCP_RADIALAXIS_H
