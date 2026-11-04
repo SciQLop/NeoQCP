@@ -112,6 +112,21 @@ Behaviour changes for 2.x users:
         replot themselves: they schedule the repaint like every other setter.
   - QCPLineEnding has operator==.
 
+Item scaling. Thousands of items add, remove and draw without a quadratic step (10 000 items:
+        add + clear 25 ms, was 63; zoom 1.2 ms, was 4.7 once items were really drawn; a click on
+        empty space 0.28 ms, was 1.2).
+  - Fix (also in 2.x): an item on a layer with no plottable of its axis rect stayed at its old pixels
+        after a zoom or a pan; a range change now repaints the items on that axis.
+  - Adding an item and clearItems() are linear; clearItems() and deleting the plot delete the items
+        oldest first, after taking them out of their layers in one pass.
+  - QCPLayerable::pixelBounds() (virtual, default: unknown): a layerable whose drawing and hit area fit
+        a rectangle returns it, in plot pixels; it is then not drawn outside its clip rect and not
+        hit-tested away from the cursor (bounds cached by the last screen draw, used only while the
+        picture is current). Line, rect, ellipse, curve and bracket items return it; text, pixmap, rich
+        text, straight line and tracer items, plottables and user classes are never culled.
+  - Behaviour change: clearItems() deletes oldest first (2.x: newest first). A destroyed() slot that
+        deletes another item through a raw pointer may now meet a deleted one; hold a QPointer.
+
 #### NeoQCP, unreleased ####
 
 Behaviour changes (slots that delete their sender are now safe):
