@@ -327,17 +327,30 @@ void QCPLayer::noteDirtied()
 */
 void QCPLayer::addChild(QCPLayerable* layerable, bool prepend)
 {
-    if (!mChildren.contains(layerable))
-    {
-        if (prepend)
-            mChildren.prepend(layerable);
-        else
-            mChildren.append(layerable);
-        invalidatePaintBuffer();
-    }
+    // Only setLayer()/moveToLayer() call this, right after the layerable left its old layer, so the
+    // child cannot already be here.
+    if (prepend)
+        mChildren.prepend(layerable);
     else
-        qDebug() << Q_FUNC_INFO << "layerable is already child of this layer"
-                 << reinterpret_cast<quintptr>(layerable);
+        mChildren.append(layerable);
+    invalidatePaintBuffer();
+}
+
+/*! \internal
+
+  Removes every child in \a dying in one pass and clears its layer, so the destructor that follows
+  does not call removeChild() again. One repaint request for the whole batch.
+*/
+void QCPLayer::removeChildren(const QSet<QCPLayerable*>& dying)
+{
+    const bool any = mChildren.removeIf([&dying](QCPLayerable* child) {
+        if (!dying.contains(child))
+            return false;
+        child->mLayer = nullptr;
+        return true;
+    }) > 0;
+    if (any)
+        invalidatePaintBuffer();
 }
 
 /*! \internal

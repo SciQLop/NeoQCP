@@ -24,6 +24,10 @@ private slots:
     void deleteLaterItem();
     void removeItemFromDestroyedSlot();
     void clearItemsWhileASlotDeletesAnother();
+    void clearItemsKeepsOtherLayersOrder();
+    void clearItemsSlotDeletesAnother();
+    void itemOrderAfterRemove();
+    void layerOrderAfterMoves();
     void deleteParentAnchorItem();
     void spanDestructorCreatesNoGpuLayer();
 

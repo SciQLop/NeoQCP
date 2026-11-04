@@ -316,15 +316,102 @@ void TestOwnership::removeItemFromDestroyedSlot()
 
 void TestOwnership::clearItemsWhileASlotDeletesAnother()
 {
-    auto* first = new QCPItemLine(mPlot);
     auto* second = new QCPItemLine(mPlot);
-    new QCPItemText(mPlot); // cleared first: its slot deletes an item still in the snapshot
-    connect(mPlot->item(), &QObject::destroyed, mPlot, [first] { delete first; });
+    QPointer<QCPItemLine> first = new QCPItemLine(mPlot);
+    new QCPItemText(mPlot); // cleared last: its slot deletes an item of the snapshot
+    // clearItems deletes oldest first, so `first` may already be gone by the time this runs: the
+    // guarantee is that neither the slot nor the clear crashes, not that a sibling outlives it.
+    connect(mPlot->item(), &QObject::destroyed, mPlot, [first] { delete first.data(); });
     Q_UNUSED(second);
 
     QCOMPARE(mPlot->clearItems(), 3);
 
     QCOMPARE(mPlot->itemCount(), 0);
+    draw();
+}
+
+void TestOwnership::clearItemsKeepsOtherLayersOrder()
+{
+    auto graph = mPlot->add<QCPGraph>();
+    QVERIFY(mPlot->addLayer(QStringLiteral("upper")));
+    auto* upper = mPlot->layer(QStringLiteral("upper"));
+    auto* a = new QCPItemLine(mPlot);
+    auto* b = new QCPItemLine(mPlot);
+    auto* c = new QCPItemLine(mPlot);
+    auto* d = new QCPItemLine(mPlot);
+    c->setLayer(upper);
+    d->setLayer(upper);
+    Q_UNUSED(a);
+    Q_UNUSED(b);
+    mPlot->replot();
+
+    QCOMPARE(mPlot->clearItems(), 4);
+
+    QCOMPARE(mPlot->itemCount(), 0);
+    {
+        const auto kids = mPlot->layer("main")->children();
+        QVERIFY(kids.contains(graph.get())); // the layer keeps its non-item content
+        for (auto* kid : kids)
+            QVERIFY2(!qobject_cast<QCPAbstractItem*>(kid), "an item is still in the layer");
+    }
+    QVERIFY(upper->children().isEmpty());
+    QVERIFY(mPlot->isRepaintQueued());
+    draw();
+}
+
+void TestOwnership::clearItemsSlotDeletesAnother()
+{
+    auto* victim = new QCPItemLine(mPlot);
+    QVERIFY(mPlot->addLayer(QStringLiteral("upper")));
+    auto* upper = mPlot->layer(QStringLiteral("upper"));
+    auto* other = new QCPItemLine(mPlot);
+    other->setLayer(upper);
+    connect(victim, &QObject::destroyed, mPlot, [other] { delete other; });
+
+    QCOMPARE(mPlot->clearItems(), 2);
+
+    QCOMPARE(mPlot->itemCount(), 0);
+    QVERIFY(upper->children().isEmpty());
+    draw();
+}
+
+void TestOwnership::itemOrderAfterRemove()
+{
+    auto* a = new QCPItemLine(mPlot);
+    auto* b = new QCPItemLine(mPlot);
+    auto* c = new QCPItemLine(mPlot);
+    QCOMPARE(mPlot->item(0), a);
+    QCOMPARE(mPlot->item(1), b);
+    QCOMPARE(mPlot->item(2), c);
+
+    mPlot->removeItem(b);
+
+    QCOMPARE(mPlot->itemCount(), 2);
+    QCOMPARE(mPlot->item(0), a);
+    QCOMPARE(mPlot->item(1), c);
+    QVERIFY(mPlot->item(2) == nullptr);
+    draw();
+}
+
+void TestOwnership::layerOrderAfterMoves()
+{
+    QVERIFY(mPlot->addLayer(QStringLiteral("upper")));
+    auto* upper = mPlot->layer(QStringLiteral("upper"));
+    QVERIFY(mPlot->addLayer(QStringLiteral("third")));
+    auto* third = mPlot->layer(QStringLiteral("third"));
+    auto first = mPlot->add<QCPGraph>();
+    auto second = mPlot->add<QCPGraph>();
+    first->setLayer(upper);
+    second->setLayer(upper);
+    QVERIFY(upper->children() == (QList<QCPLayerable*> { first.get(), second.get() }));
+
+    first->setLayer(third);
+    QVERIFY(third->children() == QList<QCPLayerable*> { first.get() });
+    QVERIFY(upper->children() == QList<QCPLayerable*> { second.get() });
+
+    first->setLayer(upper); // coming back appends: drawing order is the layer list order
+    QVERIFY(upper->children() == (QList<QCPLayerable*> { second.get(), first.get() }));
+    QVERIFY(third->children().isEmpty());
     draw();
 }
 

@@ -61,6 +61,7 @@ private slots:
   void QCPAxis_SetTickLength10kItems();
 
   void QCPItems_AddRemove10k();
+  void QCPItems_AddRemove20k();
   void QCPItems_Replot10k();
   void QCPItems_Add10k();
   void QCPItems_Clear10k();
@@ -1065,6 +1066,15 @@ void Benchmark::QCPItems_AddRemove10k()
   QBENCHMARK
   {
     addLineItems(mPlot, 10000, 100);
+    mPlot->clearItems();
+  }
+}
+
+void Benchmark::QCPItems_AddRemove20k()
+{
+  QBENCHMARK
+  {
+    addLineItems(mPlot, 20000, 100);
     mPlot->clearItems();
   }
 }

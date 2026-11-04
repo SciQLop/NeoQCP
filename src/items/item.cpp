@@ -1116,11 +1116,13 @@ QCPAbstractItem::QCPAbstractItem(QCustomPlot* parentPlot)
     if (parentPlot->registerItem(this))
         mRegisteredPlot = parentPlot;
 
-    QList<QCPAxisRect*> rects = parentPlot->axisRects();
-    if (!rects.isEmpty())
+    // A new item has nothing drawn yet, so the clipping setters' dirty marks are pure waste; and
+    // walking the layout for the whole rect list cost more than the item itself.
+    if (QCPAxisRect* rect = parentPlot->firstAxisRect())
     {
-        setClipToAxisRect(true);
-        setClipAxisRect(rects.first());
+        mClipToAxisRect = true;
+        mClipAxisRect = rect;
+        setParentLayerable(rect);
     }
 }
 

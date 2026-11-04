@@ -26,6 +26,8 @@
 #ifndef QCP_LAYER_H
 #define QCP_LAYER_H
 
+#include <QSet>
+
 #include "global.h"
 #include "handle-ops.h"
 Q_MOC_INCLUDE("core.h") // Qt6 needs this if using forward declared types in Q_PROPERTY
@@ -119,6 +121,7 @@ protected:
     void drawToPaintBuffer();
     void addChild(QCPLayerable* layerable, bool prepend);
     void removeChild(QCPLayerable* layerable);
+    void removeChildren(const QSet<QCPLayerable*>& dying);
 
 private:
     Q_DISABLE_COPY(QCPLayer)

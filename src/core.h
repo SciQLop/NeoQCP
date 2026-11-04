@@ -387,6 +387,8 @@ public:
     [[nodiscard]] int axisRectCount() const;
     [[nodiscard]] QCPAxisRect* axisRect(int index = 0) const;
     [[nodiscard]] QList<QCPAxisRect*> axisRects() const;
+    // The first of axisRects() in layout order, without building the list (it is called per item).
+    [[nodiscard]] QCPAxisRect* firstAxisRect() const;
     [[nodiscard]] QCPLayoutElement* layoutElementAt(const QPointF& pos) const;
     [[nodiscard]] QCPAxisRect* axisRectAt(const QPointF& pos) const;
     Q_SLOT void rescaleAxes(bool onlyVisiblePlottables = false);

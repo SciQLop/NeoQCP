@@ -2040,9 +2040,18 @@ int QCustomPlot::deleteAllItems()
     const auto items = guarded(mItems);
     for (QCPAbstractItem* item : std::as_const(mItems))
         item->mRegisteredPlot = nullptr;
+    QSet<QCPLayerable*> dying;
+    for (const auto& item : items)
+        if (item)
+            dying.insert(item.data());
     mItems.clear();
-    for (auto it = items.crbegin(); it != items.crend(); ++it)
-        delete it->data();
+    // One pass per layer instead of one removeChild() per item, and mLayer is cleared so the
+    // destructors do not search the layer again.
+    for (QCPLayer* layer : std::as_const(mLayers))
+        layer->removeChildren(dying);
+    // Oldest first: Qt's children indexOf finds each at the front, where erase is a pointer bump.
+    for (const auto& item : items)
+        delete item.data();
     return items.size();
 }
 
@@ -2373,6 +2382,29 @@ int QCustomPlot::axisRectCount() const
 
   \see axisRectCount, axisRects, QCPLayoutGrid::setFillOrder
 */
+QCPAxisRect* QCustomPlot::firstAxisRect() const
+{
+    // Same depth-first order as axisRects(), stopping at the first rect: allocating the full list
+    // per item dominated the add benchmark.
+    QVarLengthArray<QCPLayoutElement*, 16> stack;
+    if (mPlotLayout)
+        stack.append(mPlotLayout);
+    while (!stack.isEmpty())
+    {
+        QCPLayoutElement* element = stack.back();
+        stack.pop_back();
+        for (QCPLayoutElement* child : element->elements(false))
+        {
+            if (!child)
+                continue;
+            if (auto* rect = qobject_cast<QCPAxisRect*>(child))
+                return rect;
+            stack.append(child);
+        }
+    }
+    return nullptr;
+}
+
 QCPAxisRect* QCustomPlot::axisRect(int index) const
 {
     const QList<QCPAxisRect*> rectList = axisRects();
@@ -4801,7 +4833,9 @@ void QCustomPlot::itemDestroyed(QCPAbstractItem* item)
 bool QCustomPlot::registerItem(QCPAbstractItem* item)
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
-    if (mItems.contains(item))
+    // A live item knows the plot that lists it (registerItem sets it below, detach clears it), so
+    // the duplicate test needs no scan.
+    if (item->mRegisteredPlot == this)
     {
         qDebug() << Q_FUNC_INFO
                  << "item already added to this QCustomPlot:" << reinterpret_cast<quintptr>(item);
