@@ -100,6 +100,8 @@ void QCPItemLine::setSelectedPen(const QPen& pen)
 */
 void QCPItemLine::setHead(const QCPLineEnding& head)
 {
+    if (mHead == head)
+        return;
     markDirty();
     mHead = head;
 }
@@ -114,6 +116,8 @@ void QCPItemLine::setHead(const QCPLineEnding& head)
 */
 void QCPItemLine::setTail(const QCPLineEnding& tail)
 {
+    if (mTail == tail)
+        return;
     markDirty();
     mTail = tail;
 }

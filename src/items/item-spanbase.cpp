@@ -18,6 +18,8 @@ void QCPAbstractSpanItem::markRhiDirty()
 
 void QCPAbstractSpanItem::setPen(const QPen& pen)
 {
+    if (pen == mPen)
+        return;
     markDirty();
     mPen = pen;
     markRhiDirty();
@@ -25,6 +27,8 @@ void QCPAbstractSpanItem::setPen(const QPen& pen)
 
 void QCPAbstractSpanItem::setSelectedPen(const QPen& pen)
 {
+    if (pen == mSelectedPen)
+        return;
     markDirty();
     mSelectedPen = pen;
     markRhiDirty();
@@ -32,6 +36,8 @@ void QCPAbstractSpanItem::setSelectedPen(const QPen& pen)
 
 void QCPAbstractSpanItem::setBrush(const QBrush& brush)
 {
+    if (brush == mBrush)
+        return;
     markDirty();
     mBrush = brush;
     markRhiDirty();
@@ -39,6 +45,8 @@ void QCPAbstractSpanItem::setBrush(const QBrush& brush)
 
 void QCPAbstractSpanItem::setSelectedBrush(const QBrush& brush)
 {
+    if (brush == mSelectedBrush)
+        return;
     markDirty();
     mSelectedBrush = brush;
     markRhiDirty();
@@ -46,6 +54,8 @@ void QCPAbstractSpanItem::setSelectedBrush(const QBrush& brush)
 
 void QCPAbstractSpanItem::setBorderPen(const QPen& pen)
 {
+    if (pen == mBorderPen)
+        return;
     markDirty();
     mBorderPen = pen;
     markRhiDirty();
@@ -53,6 +63,8 @@ void QCPAbstractSpanItem::setBorderPen(const QPen& pen)
 
 void QCPAbstractSpanItem::setSelectedBorderPen(const QPen& pen)
 {
+    if (pen == mSelectedBorderPen)
+        return;
     markDirty();
     mSelectedBorderPen = pen;
     markRhiDirty();

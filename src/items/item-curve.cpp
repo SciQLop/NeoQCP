@@ -110,6 +110,8 @@ void QCPItemCurve::setSelectedPen(const QPen& pen)
 */
 void QCPItemCurve::setHead(const QCPLineEnding& head)
 {
+    if (mHead == head)
+        return;
     markDirty();
     mHead = head;
 }
@@ -124,6 +126,8 @@ void QCPItemCurve::setHead(const QCPLineEnding& head)
 */
 void QCPItemCurve::setTail(const QCPLineEnding& tail)
 {
+    if (mTail == tail)
+        return;
     markDirty();
     mTail = tail;
 }

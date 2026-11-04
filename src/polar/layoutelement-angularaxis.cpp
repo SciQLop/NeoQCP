@@ -727,6 +727,8 @@ QCP::Interaction QCPPolarAxisAngular::selectionCategory() const
 */
 void QCPPolarAxisAngular::setBackground(const QPixmap& pm)
 {
+    if (pm.cacheKey() == mBackgroundPixmap.cacheKey())
+        return;
     markDirty();
     mBackgroundPixmap = pm;
     mScaledBackgroundPixmap = QPixmap();
@@ -762,6 +764,9 @@ void QCPPolarAxisAngular::setBackground(const QBrush& brush)
 */
 void QCPPolarAxisAngular::setBackground(const QPixmap& pm, bool scaled, Qt::AspectRatioMode mode)
 {
+    if (pm.cacheKey() == mBackgroundPixmap.cacheKey() && scaled == mBackgroundScaled
+        && mode == mBackgroundScaledMode)
+        return;
     markDirty();
     mBackgroundPixmap = pm;
     mScaledBackgroundPixmap = QPixmap();
@@ -981,6 +986,8 @@ void QCPPolarAxisAngular::setRangeReversed(bool reversed)
 
 void QCPPolarAxisAngular::setAngle(double degrees)
 {
+    if (degrees == mAngle)
+        return;
     markDirty();
     mAngle = degrees;
     mAngleRad = mAngle / 180.0 * M_PI;
@@ -1053,6 +1060,8 @@ void QCPPolarAxisAngular::setTickLabels(bool show)
 */
 void QCPPolarAxisAngular::setTickLabelPadding(int padding)
 {
+    if (mLabelPainter.padding() == padding)
+        return;
     markDirty();
     mLabelPainter.setPadding(padding);
 }
@@ -1094,6 +1103,8 @@ void QCPPolarAxisAngular::setTickLabelColor(const QColor& color)
 */
 void QCPPolarAxisAngular::setTickLabelRotation(double degrees)
 {
+    if (mLabelPainter.rotation() == degrees)
+        return;
     markDirty();
     mLabelPainter.setRotation(degrees);
 }
@@ -1140,6 +1151,9 @@ void QCPPolarAxisAngular::setTickLabelMode(LabelMode mode)
 */
 void QCPPolarAxisAngular::setNumberFormat(const QString& formatCode)
 {
+    const QChar previousChar = mNumberFormatChar;
+    const bool previousBeautiful = mNumberBeautifulPowers;
+    const bool previousCross = mNumberMultiplyCross;
     if (formatCode.isEmpty())
     {
         qDebug() << Q_FUNC_INFO << "Passed formatCode is empty";
@@ -1148,7 +1162,6 @@ void QCPPolarAxisAngular::setNumberFormat(const QString& formatCode)
     // mCachedMarginValid = false;
 
     // interpret first char as number format char:
-    markDirty();
     QString allowedFormatChars(QLatin1String("eEfgG"));
     if (allowedFormatChars.contains(formatCode.at(0)))
     {
@@ -1195,6 +1208,10 @@ void QCPPolarAxisAngular::setNumberFormat(const QString& formatCode)
                          << formatCode;
         }
     }
+    if (mNumberFormatChar == previousChar && mNumberBeautifulPowers == previousBeautiful
+        && mNumberMultiplyCross == previousCross)
+        return;
+    markDirty();
     mLabelPainter.setSubstituteExponent(mNumberBeautifulPowers);
     mLabelPainter.setMultiplicationSymbol(mNumberMultiplyCross ? QCPLabelPainterPrivate::SymbolCross
                                                                : QCPLabelPainterPrivate::SymbolDot);
@@ -1286,7 +1303,6 @@ void QCPPolarAxisAngular::setSubTicks(bool show)
 */
 void QCPPolarAxisAngular::setSubTickLength(int inside, int outside)
 {
-    markDirty();
     setSubTickLengthIn(inside);
     setSubTickLengthOut(outside);
 }

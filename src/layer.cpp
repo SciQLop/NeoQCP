@@ -763,7 +763,13 @@ void QCPLayerable::initializeParentPlot(QCustomPlot* parentPlot)
 */
 void QCPLayerable::setParentLayerable(QCPLayerable* parentLayerable)
 {
+    if (parentLayerable == mParentLayerable)
+        return;
+    QCPLayer* previous = layer();
     mParentLayerable = parentLayerable;
+    if (previous)
+        previous->invalidatePaintBuffer(); // the old layer still holds its drawing
+    markDirty(); // and this one takes it
 }
 
 /*! \internal

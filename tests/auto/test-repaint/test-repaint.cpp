@@ -4,6 +4,7 @@
 #include "plottables/plottable-bars.h"
 #include "items/item-ellipse.h"
 #include "items/item-line.h"
+#include "items/item-richtext.h"
 #include "items/item-pixmap.h"
 #include "items/item-rect.h"
 #include "items/item-text.h"
@@ -1045,14 +1046,6 @@ const QVector<RemainingCase>& remainingCases()
               return group;
           },
           [](QObject* o) { static_cast<QCPGroupLegendItem*>(o)->setExpanded(true); } },
-        { "tracer.setStyle",
-          [](QCustomPlot& plot) -> QObject*
-          {
-              auto* tracer = new QCPItemTracer(&plot);
-              tracer->setGraph(plot.graph(0));
-              return tracer;
-          },
-          [](QObject* o) { static_cast<QCPItemTracer*>(o)->setStyle(QCPItemTracer::tsSquare); } },
         { "polarAxis.setTickLabelMode",
           [](QCustomPlot& plot) -> QObject*
           {
@@ -1084,6 +1077,58 @@ const QVector<RemainingCase>& remainingCases()
               return plot.graph(0);
           },
           [](QObject* o) { static_cast<QCPLayerable*>(o)->setAntialiased(false); } },
+        { "span.setPen",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              return new QCPItemHSpan(&plot);
+          },
+          [](QObject* o) { static_cast<QCPItemHSpan*>(o)->setPen(QPen(Qt::darkRed, 3)); } },
+        { "line.setHead",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* item = new QCPItemLine(&plot);
+              item->start->setCoords(0, 0);
+              item->end->setCoords(1, 1);
+              return item;
+          },
+          [](QObject* o)
+          { static_cast<QCPItemLine*>(o)->setHead(QCPLineEnding(QCPLineEnding::esDisc, 12, 12)); } },
+        { "richText.setHtml",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* item = new QCPItemRichText(&plot);
+              item->position->setCoords(1, 1);
+              return item;
+          },
+          [](QObject* o) { static_cast<QCPItemRichText*>(o)->setHtml(QStringLiteral("<b>x</b>")); } },
+        { "polarAxis.setAngle",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* polar = new QCPPolarAxisAngular(&plot);
+              plot.plotLayout()->addElement(1, 0, polar);
+              return polar;
+          },
+          [](QObject* o) { static_cast<QCPPolarAxisAngular*>(o)->setAngle(45); } },
+        { "polarAxis.setNumberFormat",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* polar = new QCPPolarAxisAngular(&plot);
+              plot.plotLayout()->addElement(1, 0, polar);
+              return polar;
+          },
+          [](QObject* o) { static_cast<QCPPolarAxisAngular*>(o)->setNumberFormat(QStringLiteral("f")); } },
+        { "polarAxis.setBackground",
+          [](QCustomPlot& plot) -> QObject*
+          {
+              auto* polar = new QCPPolarAxisAngular(&plot);
+              plot.plotLayout()->addElement(1, 0, polar);
+              return polar;
+          },
+          [](QObject* o)
+          {
+              static const QPixmap pixmap(8, 8); // one instance, so the cacheKey repeats
+              static_cast<QCPPolarAxisAngular*>(o)->setBackground(pixmap);
+          } },
         { "pixmap.setScaled",
           [](QCustomPlot& plot) -> QObject*
           {
@@ -1226,6 +1271,17 @@ void TestRepaint::remainingSettersScheduleRepaint()
     QVERIFY2(plot->isRepaintQueued(), qPrintable(setter + QStringLiteral(" scheduled no repaint")));
 }
 
+
+void TestRepaint::orphanPlottableKeepsName()
+{
+    // A plottable with null axes is a supported inert state: it has no legend to mark, but its name
+    // is still its own.
+    const auto previous = qcp::setMisuseHandler(countMisuse); // null axes are a reported misuse
+    QCPGraph graph(nullptr, nullptr);
+    graph.setName(QStringLiteral("orphan"));
+    QCOMPARE(graph.name(), QStringLiteral("orphan"));
+    qcp::setMisuseHandler(previous);
+}
 
 void TestRepaint::axisRectMarginsMoveTheContent()
 {

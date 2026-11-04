@@ -32,6 +32,7 @@ private slots:
     void remainingSettersScheduleRepaint_data();
     void remainingSettersScheduleRepaint();
     void secondLegendRowFollowsRename();
+    void orphanPlottableKeepsName();
     void axisRectMarginsMoveTheContent();
     void polarPlotSettles();
     void exportSettlesPendingTheme();

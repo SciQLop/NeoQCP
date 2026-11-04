@@ -484,46 +484,44 @@ QCPAbstractPlottable::~QCPAbstractPlottable()
    The name is the textual representation of this plottable as it is displayed in the legend
    (\ref QCPLegend). It may contain any UTF-8 characters, including newlines.
 */
+namespace
+{
+// Marks the legend rows that show \a plottable, in every legend the layout contains: the default
+// legend sits in an axis rect's inset layout, so rects are descended too.
+void markLegendRows(QCPLayoutElement* element, QCPAbstractPlottable* plottable)
+{
+    if (!element)
+        return;
+    if (auto* legend = qobject_cast<QCPLegend*>(element))
+    {
+        for (int i = 0; i < legend->itemCount(); ++i)
+        {
+            QCPAbstractLegendItem* item = legend->item(i);
+            auto* row = qobject_cast<QCPPlottableLegendItem*>(item);
+            auto* group = qobject_cast<QCPGroupLegendItem*>(item);
+            const bool shows = row ? row->plottable() == plottable
+                                   : group && group->multiGraph() == plottable;
+            if (!shows)
+                continue;
+            item->markDirty();
+            legend->markDirty(); // the row may not carry the legend's layer yet
+        }
+    }
+    if (auto* rect = qobject_cast<QCPAxisRect*>(element))
+        markLegendRows(rect->insetLayout(), plottable);
+    if (auto* layout = qobject_cast<QCPLayout*>(element))
+        for (int i = 0; i < layout->elementCount(); ++i)
+            markLegendRows(layout->elementAt(i), plottable);
+}
+} // namespace
+
 void QCPAbstractPlottable::setName(const QString& name)
 {
     if (name == mName)
         return;
-    if (!mParentPlot)
-        return;
-    // Every legend row that shows this name, wherever its legend lives: the default legend sits in
-    // an axis rect's inset layout, so the walk descends through rects.
-    std::function<void(QCPLayoutElement*)> markRows = [&](QCPLayoutElement* el) {
-        if (!el)
-            return;
-        if (auto* legend = qobject_cast<QCPLegend*>(el))
-        {
-            for (int i = 0; i < legend->itemCount(); ++i)
-            {
-                QCPAbstractLegendItem* item = legend->item(i);
-                if (auto* row = qobject_cast<QCPPlottableLegendItem*>(item))
-                {
-                    if (row->plottable() != this)
-                        continue;
-                }
-                else if (auto* group = qobject_cast<QCPGroupLegendItem*>(item))
-                {
-                    if (group->multiGraph() != this)
-                        continue;
-                }
-                else
-                    continue;
-                item->markDirty();
-                legend->markDirty(); // the row may not carry the legend's layer yet
-            }
-        }
-        if (auto* rect = qobject_cast<QCPAxisRect*>(el))
-            markRows(rect->insetLayout());
-        if (auto* layout = qobject_cast<QCPLayout*>(el))
-            for (int i = 0; i < layout->elementCount(); ++i)
-                markRows(layout->elementAt(i));
-    };
-    markRows(mParentPlot->plotLayout());
-    mName = name; // nothing emits, so the mark above is enough
+    if (mParentPlot) // an orphan plottable has no legend to mark, but still has a name
+        markLegendRows(mParentPlot->plotLayout(), this);
+    mName = name;
 }
 
 /*!

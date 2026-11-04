@@ -564,6 +564,8 @@ void QCPPolarAxisRadial::setTickLabels(bool show)
 */
 void QCPPolarAxisRadial::setTickLabelPadding(int padding)
 {
+    if (mLabelPainter.padding() == padding)
+        return;
     markDirty();
     mLabelPainter.setPadding(padding);
 }
@@ -607,6 +609,8 @@ void QCPPolarAxisRadial::setTickLabelColor(const QColor& color)
 */
 void QCPPolarAxisRadial::setTickLabelRotation(double degrees)
 {
+    if (mLabelPainter.rotation() == degrees)
+        return;
     markDirty();
     mLabelPainter.setRotation(degrees);
 }
@@ -653,6 +657,9 @@ void QCPPolarAxisRadial::setTickLabelMode(LabelMode mode)
 */
 void QCPPolarAxisRadial::setNumberFormat(const QString& formatCode)
 {
+    const QChar previousChar = mNumberFormatChar;
+    const bool previousBeautiful = mNumberBeautifulPowers;
+    const bool previousCross = mNumberMultiplyCross;
     if (formatCode.isEmpty())
     {
         qDebug() << Q_FUNC_INFO << "Passed formatCode is empty";
@@ -661,7 +668,6 @@ void QCPPolarAxisRadial::setNumberFormat(const QString& formatCode)
     // mCachedMarginValid = false;
 
     // interpret first char as number format char:
-    markDirty();
     QString allowedFormatChars(QLatin1String("eEfgG"));
     if (allowedFormatChars.contains(formatCode.at(0)))
     {
@@ -708,6 +714,10 @@ void QCPPolarAxisRadial::setNumberFormat(const QString& formatCode)
                          << formatCode;
         }
     }
+    if (mNumberFormatChar == previousChar && mNumberBeautifulPowers == previousBeautiful
+        && mNumberMultiplyCross == previousCross)
+        return;
+    markDirty();
     mLabelPainter.setSubstituteExponent(mNumberBeautifulPowers);
     mLabelPainter.setMultiplicationSymbol(mNumberMultiplyCross ? QCPLabelPainterPrivate::SymbolCross
                                                                : QCPLabelPainterPrivate::SymbolDot);
@@ -738,7 +748,6 @@ void QCPPolarAxisRadial::setNumberPrecision(int precision)
 */
 void QCPPolarAxisRadial::setTickLength(int inside, int outside)
 {
-    markDirty();
     setTickLengthIn(inside);
     setTickLengthOut(outside);
 }
@@ -802,7 +811,6 @@ void QCPPolarAxisRadial::setSubTicks(bool show)
 */
 void QCPPolarAxisRadial::setSubTickLength(int inside, int outside)
 {
-    markDirty();
     setSubTickLengthIn(inside);
     setSubTickLengthOut(outside);
 }

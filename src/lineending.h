@@ -92,6 +92,7 @@ public:
     void setInverted(bool inverted);
 
     // non-property methods:
+    bool operator==(const QCPLineEnding&) const = default;
     double boundingDistance() const;
     double realLength() const;
     void draw(QCPPainter* painter, const QCPVector2D& pos, const QCPVector2D& dir) const;

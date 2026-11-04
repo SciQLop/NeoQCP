@@ -269,22 +269,22 @@ handled with the layout family in Task 5.
 | QCPSelectionDecorator | setBrush | src/plottables/plottable.cpp:92 | yes | not dirtied: a decorator has no layer; the plottable that owns it marks its own layer when it restyles itself |
 | QCPSelectionDecorator | setScatterStyle | src/plottables/plottable.cpp:104 | yes | not dirtied: a decorator has no layer; the plottable that owns it marks its own layer when it restyles itself |
 | QCPSelectionDecorator | setUsedScatterProperties | src/plottables/plottable.cpp:118 | no | not dirtied: a decorator has no layer; the plottable that owns it marks its own layer when it restyles itself |
-| QCPAbstractPlottable | setName | src/plottables/plottable.cpp:487 | yes |`QCPLayerable::markDirty()` — its own layer|
-| QCPAbstractPlottable | setAntialiasedFill | src/plottables/plottable.cpp:535 | yes |`QCPLayerable::markDirty()` — its own layer|
-| QCPAbstractPlottable | setAntialiasedScatters | src/plottables/plottable.cpp:549 | yes |`QCPLayerable::markDirty()` — its own layer|
-| QCPAbstractPlottable | setPen | src/plottables/plottable.cpp:565 | yes |`QCPLayerable::markDirty()` — its own layer|
-| QCPAbstractPlottable | setBrush | src/plottables/plottable.cpp:582 | yes |`QCPLayerable::markDirty()` — its own layer|
-| QCPAbstractPlottable | setKeyAxis | src/plottables/plottable.cpp:601 | yes |`QCPLayerable::markDirty()` — its own layer|
-| QCPAbstractPlottable | setValueAxis | src/plottables/plottable.cpp:619 | yes |`QCPLayerable::markDirty()` — its own layer|
-| QCPAbstractPlottable | setSelection | src/plottables/plottable.cpp:645 | no |— (state only)|
-| QCPAbstractPlottable | setSelectionDecorator | src/plottables/plottable.cpp:677 | no |— (state only)|
-| QCPAbstractPlottable | setSelectable | src/plottables/plottable.cpp:704 | no |— (state only)|
-| QCPAbstractPlottable | setWantsLegend | src/plottables/plottable.cpp:973 | yes |`QCPLayerable::markDirty()` — its own layer|
-| QCPAbstractPlottable | setBusy | src/plottables/plottable.cpp:1181 | no |already invalidates (busy gate)|
-| QCPAbstractPlottable | setBusyIndicatorSymbol | src/plottables/plottable.cpp:1220 | no |— (state only)|
-| QCPAbstractPlottable | setBusyFadeAlpha | src/plottables/plottable.cpp:1230 | no |— (state only)|
-| QCPAbstractPlottable | setBusyShowDelayMs | src/plottables/plottable.cpp:1240 | no |— (state only)|
-| QCPAbstractPlottable | setBusyHideDelayMs | src/plottables/plottable.cpp:1250 | no |— (state only)|
+| QCPAbstractPlottable | setName | src/plottables/plottable.cpp:518 | yes |`QCPLayerable::markDirty()` — its own layer|
+| QCPAbstractPlottable | setAntialiasedFill | src/plottables/plottable.cpp:533 | yes |`QCPLayerable::markDirty()` — its own layer|
+| QCPAbstractPlottable | setAntialiasedScatters | src/plottables/plottable.cpp:547 | yes |`QCPLayerable::markDirty()` — its own layer|
+| QCPAbstractPlottable | setPen | src/plottables/plottable.cpp:563 | yes |`QCPLayerable::markDirty()` — its own layer|
+| QCPAbstractPlottable | setBrush | src/plottables/plottable.cpp:580 | yes |`QCPLayerable::markDirty()` — its own layer|
+| QCPAbstractPlottable | setKeyAxis | src/plottables/plottable.cpp:599 | yes |`QCPLayerable::markDirty()` — its own layer|
+| QCPAbstractPlottable | setValueAxis | src/plottables/plottable.cpp:617 | yes |`QCPLayerable::markDirty()` — its own layer|
+| QCPAbstractPlottable | setSelection | src/plottables/plottable.cpp:643 | no |— (state only)|
+| QCPAbstractPlottable | setSelectionDecorator | src/plottables/plottable.cpp:675 | no |— (state only)|
+| QCPAbstractPlottable | setSelectable | src/plottables/plottable.cpp:702 | no |— (state only)|
+| QCPAbstractPlottable | setWantsLegend | src/plottables/plottable.cpp:971 | yes |`QCPLayerable::markDirty()` — its own layer|
+| QCPAbstractPlottable | setBusy | src/plottables/plottable.cpp:1179 | no |already invalidates (busy gate)|
+| QCPAbstractPlottable | setBusyIndicatorSymbol | src/plottables/plottable.cpp:1218 | no |— (state only)|
+| QCPAbstractPlottable | setBusyFadeAlpha | src/plottables/plottable.cpp:1228 | no |— (state only)|
+| QCPAbstractPlottable | setBusyShowDelayMs | src/plottables/plottable.cpp:1238 | no |— (state only)|
+| QCPAbstractPlottable | setBusyHideDelayMs | src/plottables/plottable.cpp:1248 | no |— (state only)|
 
 ## items
 
@@ -297,7 +297,7 @@ handled with the layout family in Task 5.
 | QCPItemCurve | setPen | src/items/item-curve.cpp:82 | yes | `markDirty()` (invalidates its layer) |
 | QCPItemCurve | setSelectedPen | src/items/item-curve.cpp:95 | yes | `markDirty()` (invalidates its layer) |
 | QCPItemCurve | setHead | src/items/item-curve.cpp:111 | yes | `markDirty()` (invalidates its layer) |
-| QCPItemCurve | setTail | src/items/item-curve.cpp:125 | yes | `markDirty()` (invalidates its layer) |
+| QCPItemCurve | setTail | src/items/item-curve.cpp:127 | yes | `markDirty()` (invalidates its layer) |
 | QCPItemEllipse | setPen | src/items/item-ellipse.cpp:81 | yes | `markDirty()` (invalidates its layer) |
 | QCPItemEllipse | setSelectedPen | src/items/item-ellipse.cpp:94 | yes | `markDirty()` (invalidates its layer) |
 | QCPItemEllipse | setBrush | src/items/item-ellipse.cpp:108 | yes | `markDirty()` (invalidates its layer) |
@@ -306,7 +306,7 @@ handled with the layout family in Task 5.
 | QCPItemLine | setPen | src/items/item-line.cpp:72 | yes | `markDirty()` (invalidates its layer) |
 | QCPItemLine | setSelectedPen | src/items/item-line.cpp:85 | yes | `markDirty()` (invalidates its layer) |
 | QCPItemLine | setHead | src/items/item-line.cpp:101 | yes | `markDirty()` (invalidates its layer) |
-| QCPItemLine | setTail | src/items/item-line.cpp:115 | yes | `markDirty()` (invalidates its layer) |
+| QCPItemLine | setTail | src/items/item-line.cpp:117 | yes | `markDirty()` (invalidates its layer) |
 | QCPItemPixmap | setPixmap | src/items/item-pixmap.cpp:84 | yes | `markDirty()` (invalidates its layer) |
 | QCPItemPixmap | setScaled | src/items/item-pixmap.cpp:99 | yes | `markDirty()` (invalidates its layer) |
 | QCPItemPixmap | setPen | src/items/item-pixmap.cpp:117 | yes | `markDirty()` (invalidates its layer) |
@@ -319,13 +319,13 @@ handled with the layout family in Task 5.
 | QCPItemRSpan | setKeyRange | src/items/item-rspan.cpp:53 | yes | `markDirty()` (invalidates its layer) |
 | QCPItemRSpan | setValueRange | src/items/item-rspan.cpp:66 | yes | `markDirty()` (invalidates its layer) |
 | QCPAbstractSpanItem | setPen | src/items/item-spanbase.cpp:19 | yes | `markDirty()` (invalidates its layer) |
-| QCPAbstractSpanItem | setSelectedPen | src/items/item-spanbase.cpp:26 | yes | `markDirty()` (invalidates its layer) |
-| QCPAbstractSpanItem | setBrush | src/items/item-spanbase.cpp:33 | yes | `markDirty()` (invalidates its layer) |
-| QCPAbstractSpanItem | setSelectedBrush | src/items/item-spanbase.cpp:40 | yes | `markDirty()` (invalidates its layer) |
-| QCPAbstractSpanItem | setBorderPen | src/items/item-spanbase.cpp:47 | yes | `markDirty()` (invalidates its layer) |
-| QCPAbstractSpanItem | setSelectedBorderPen | src/items/item-spanbase.cpp:54 | yes | `markDirty()` (invalidates its layer) |
+| QCPAbstractSpanItem | setSelectedPen | src/items/item-spanbase.cpp:28 | yes | `markDirty()` (invalidates its layer) |
+| QCPAbstractSpanItem | setBrush | src/items/item-spanbase.cpp:37 | yes | `markDirty()` (invalidates its layer) |
+| QCPAbstractSpanItem | setSelectedBrush | src/items/item-spanbase.cpp:46 | yes | `markDirty()` (invalidates its layer) |
+| QCPAbstractSpanItem | setBorderPen | src/items/item-spanbase.cpp:55 | yes | `markDirty()` (invalidates its layer) |
+| QCPAbstractSpanItem | setSelectedBorderPen | src/items/item-spanbase.cpp:64 | yes | `markDirty()` (invalidates its layer) |
 | QCPGroupLegendItem | setExpanded | src/layoutelements/layoutelement-legend-group.cpp:40 | yes | `markDirty()` — the row's own layer |
-| QCPAbstractSpanItem | setEdgePixel | src/items/item-spanbase.cpp:79 | yes | `markDirty()` |
+| QCPAbstractSpanItem | setEdgePixel | src/items/item-spanbase.cpp:91 | no | — the edge position setters mark; this only records the pixel |
 | QCPItemStraightLine | setPen | src/items/item-straightline.cpp:69 | yes | `markDirty()` (invalidates its layer) |
 | QCPItemStraightLine | setSelectedPen | src/items/item-straightline.cpp:82 | yes | `markDirty()` (invalidates its layer) |
 | QCPItemText | setColor | src/items/item-text.cpp:89 | yes | `markDirty()` (invalidates its layer) |
@@ -351,21 +351,21 @@ handled with the layout family in Task 5.
 | QCPItemTracer | setGraphKey | src/items/item-tracer.cpp:214 | yes | `markDirty()` (invalidates its layer) |
 | QCPItemTracer | setInterpolating | src/items/item-tracer.cpp:233 | yes | `markDirty()` (invalidates its layer) |
 | QCPItemVSpan | setRange | src/items/item-vspan.cpp:38 | yes | `markDirty()` (invalidates its layer) |
-| QCPItemPosition | setType | src/items/item.cpp:323 | yes | `markDirty()` (invalidates its layer) |
-| QCPItemPosition | setTypeX | src/items/item.cpp:336 | yes | `markDirty()` (invalidates its layer) |
-| QCPItemPosition | setTypeY | src/items/item.cpp:371 | yes | `markDirty()` (invalidates its layer) |
+| QCPItemPosition | setType | setType | src/items/item.cpp:323 | `setTypeX()` and `setTypeY()` mark their item |
+| QCPItemPosition | setType | setType | src/items/item.cpp:336 | `setTypeX()` and `setTypeY()` mark their item |
+| QCPItemPosition | setType | setType | src/items/item.cpp:371 | `setTypeX()` and `setTypeY()` mark their item |
 | QCPItemPosition | setParentAnchor | src/items/item.cpp:419 | yes | `markDirty()` (invalidates its layer) |
 | QCPItemPosition | setParentAnchorX | src/items/item.cpp:436 | yes | `markDirty()` (invalidates its layer) |
 | QCPItemPosition | setParentAnchorY | src/items/item.cpp:509 | yes | `markDirty()` (invalidates its layer) |
 | QCPItemPosition | setCoords | src/items/item.cpp:591 | yes | `markDirty()` (invalidates its layer) |
 | QCPItemPosition | setCoords | src/items/item.cpp:604 | yes | `markDirty()` (invalidates its layer) |
-| QCPItemPosition | setAxes | src/items/item.cpp:763 | yes | `markDirty()` (invalidates its layer) |
-| QCPItemPosition | setAxisRect | src/items/item.cpp:778 | yes | `markDirty()` (invalidates its layer) |
-| QCPItemPosition | setPixelPosition | src/items/item.cpp:797 | yes | `markDirty()` (invalidates its layer) |
-| QCPAbstractItem | setClipToAxisRect | src/items/item.cpp:1142 | yes | `markDirty()` (invalidates its layer) |
-| QCPAbstractItem | setClipAxisRect | src/items/item.cpp:1158 | yes | `markDirty()` (invalidates its layer) |
-| QCPAbstractItem | setSelectable | src/items/item.cpp:1177 | no | — (interaction or state only) |
-| QCPAbstractItem | setSelected | src/items/item.cpp:1201 | yes | `markDirty()` (invalidates its layer) |
+| QCPItemPosition | setAxes | src/items/item.cpp:767 | yes | `markDirty()` (invalidates its layer) |
+| QCPItemPosition | setAxisRect | src/items/item.cpp:782 | yes | `markDirty()` (invalidates its layer) |
+| QCPItemPosition | setPixelPosition | src/items/item.cpp:801 | yes | `markDirty()` (invalidates its layer) |
+| QCPAbstractItem | setClipToAxisRect | src/items/item.cpp:1146 | yes | `markDirty()` (invalidates its layer) |
+| QCPAbstractItem | setClipAxisRect | src/items/item.cpp:1162 | yes | `markDirty()` (invalidates its layer) |
+| QCPAbstractItem | setSelectable | src/items/item.cpp:1181 | no | — (interaction or state only) |
+| QCPAbstractItem | setSelected | src/items/item.cpp:1205 | yes | `markDirty()` (invalidates its layer) |
 
 
 ## polar
@@ -375,52 +375,51 @@ handled with the layout family in Task 5.
 | QCPPolarAxisAngular | setBackground | src/polar/layoutelement-angularaxis.cpp:728 | yes | `markDirty()` (invalidates its layer) |
 | QCPPolarAxisAngular | setBackground | src/polar/layoutelement-angularaxis.cpp:748 | yes | `markDirty()` (invalidates its layer) |
 | QCPPolarAxisAngular | setBackground | src/polar/layoutelement-angularaxis.cpp:763 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setBackgroundScaled | src/polar/layoutelement-angularaxis.cpp:782 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setBackgroundScaledMode | src/polar/layoutelement-angularaxis.cpp:796 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setRangeDrag | src/polar/layoutelement-angularaxis.cpp:804 | no | — (interaction or state only) |
-| QCPPolarAxisAngular | setRangeZoom | src/polar/layoutelement-angularaxis.cpp:809 | no | — (interaction or state only) |
-| QCPPolarAxisAngular | setRangeZoomFactor | src/polar/layoutelement-angularaxis.cpp:814 | no | — (interaction or state only) |
+| QCPPolarAxisAngular | setBackgroundScaled | src/polar/layoutelement-angularaxis.cpp:787 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setBackgroundScaledMode | src/polar/layoutelement-angularaxis.cpp:801 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setRangeDrag | src/polar/layoutelement-angularaxis.cpp:809 | no | — (interaction or state only) |
+| QCPPolarAxisAngular | setRangeZoom | src/polar/layoutelement-angularaxis.cpp:814 | no | — (interaction or state only) |
+| QCPPolarAxisAngular | setRangeZoomFactor | src/polar/layoutelement-angularaxis.cpp:819 | no | — (interaction or state only) |
 | QCPPolarAxisAngular | setRange | src/polar/layoutelement-angularaxis.cpp:827 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setSelectableParts | src/polar/layoutelement-angularaxis.cpp:850 | no | — (interaction or state only) |
-| QCPPolarAxisAngular | setSelectedParts | src/polar/layoutelement-angularaxis.cpp:877 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setSelectableParts | src/polar/layoutelement-angularaxis.cpp:855 | no | — (interaction or state only) |
+| QCPPolarAxisAngular | setSelectedParts | src/polar/layoutelement-angularaxis.cpp:882 | yes | `markDirty()` (invalidates its layer) |
 | QCPPolarAxisAngular | setRange | src/polar/layoutelement-angularaxis.cpp:896 | yes | `markDirty()` (invalidates its layer) |
 | QCPPolarAxisAngular | setRange | src/polar/layoutelement-angularaxis.cpp:922 | yes | `markDirty()` |
-| QCPPolarAxisAngular | setRangeLower | src/polar/layoutelement-angularaxis.cpp:937 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setRangeUpper | src/polar/layoutelement-angularaxis.cpp:953 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setRangeReversed | src/polar/layoutelement-angularaxis.cpp:974 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setAngle | src/polar/layoutelement-angularaxis.cpp:982 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setTicker | src/polar/layoutelement-angularaxis.cpp:1002 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setTicks | src/polar/layoutelement-angularaxis.cpp:1025 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setTickLabels | src/polar/layoutelement-angularaxis.cpp:1038 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setTickLabelPadding | src/polar/layoutelement-angularaxis.cpp:1054 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setTickLabelFont | src/polar/layoutelement-angularaxis.cpp:1065 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setTickLabelColor | src/polar/layoutelement-angularaxis.cpp:1078 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setTickLabelRotation | src/polar/layoutelement-angularaxis.cpp:1095 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setTickLabelMode | src/polar/layoutelement-angularaxis.cpp:1101 | yes | `markDirty()` |
-| QCPPolarAxisAngular | setNumberFormat | src/polar/layoutelement-angularaxis.cpp:1141 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setNumberPrecision | src/polar/layoutelement-angularaxis.cpp:1208 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setTickLength | src/polar/layoutelement-angularaxis.cpp:1224 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setTickLengthIn | src/polar/layoutelement-angularaxis.cpp:1236 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setTickLengthOut | src/polar/layoutelement-angularaxis.cpp:1252 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setSubTicks | src/polar/layoutelement-angularaxis.cpp:1269 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setSubTickLength | src/polar/layoutelement-angularaxis.cpp:1287 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setSubTickLengthIn | src/polar/layoutelement-angularaxis.cpp:1300 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setSubTickLengthOut | src/polar/layoutelement-angularaxis.cpp:1316 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setBasePen | src/polar/layoutelement-angularaxis.cpp:1329 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setTickPen | src/polar/layoutelement-angularaxis.cpp:1342 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setSubTickPen | src/polar/layoutelement-angularaxis.cpp:1355 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setLabelFont | src/polar/layoutelement-angularaxis.cpp:1368 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setLabelColor | src/polar/layoutelement-angularaxis.cpp:1383 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setLabel | src/polar/layoutelement-angularaxis.cpp:1395 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setLabelPadding | src/polar/layoutelement-angularaxis.cpp:1410 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setSelectedTickLabelFont | src/polar/layoutelement-angularaxis.cpp:1425 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setSelectedLabelFont | src/polar/layoutelement-angularaxis.cpp:1441 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setSelectedTickLabelColor | src/polar/layoutelement-angularaxis.cpp:1454 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setSelectedLabelColor | src/polar/layoutelement-angularaxis.cpp:1468 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setSelectedBasePen | src/polar/layoutelement-angularaxis.cpp:1481 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setSelectedTickPen | src/polar/layoutelement-angularaxis.cpp:1494 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisAngular | setSelectedSubTickPen | src/polar/layoutelement-angularaxis.cpp:1507 | yes | `markDirty()` |
-| QCPPolarAxisAngular | setupTickVectors | src/polar/layoutelement-angularaxis.cpp:1579 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setRangeLower | src/polar/layoutelement-angularaxis.cpp:942 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setRangeUpper | src/polar/layoutelement-angularaxis.cpp:958 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setRangeReversed | src/polar/layoutelement-angularaxis.cpp:979 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setAngle | src/polar/layoutelement-angularaxis.cpp:987 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setTicker | src/polar/layoutelement-angularaxis.cpp:1009 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setTicks | src/polar/layoutelement-angularaxis.cpp:1032 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setTickLabels | src/polar/layoutelement-angularaxis.cpp:1045 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setTickLabelPadding | src/polar/layoutelement-angularaxis.cpp:1061 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setTickLabelFont | src/polar/layoutelement-angularaxis.cpp:1074 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setTickLabelColor | src/polar/layoutelement-angularaxis.cpp:1087 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setTickLabelRotation | src/polar/layoutelement-angularaxis.cpp:1104 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setTickLabelMode | src/polar/layoutelement-angularaxis.cpp:1112 | yes | `markDirty()` |
+| QCPPolarAxisAngular | setNumberFormat | src/polar/layoutelement-angularaxis.cpp:1152 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setNumberPrecision | src/polar/layoutelement-angularaxis.cpp:1225 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setTickLength(int, int) | src/polar/layoutelement-angularaxis.cpp:1241 | yes | forwards to `setTickLengthIn()`/`setTickLengthOut()`, which mark |
+| QCPPolarAxisAngular | setTickLength(int, int) | src/polar/layoutelement-angularaxis.cpp:1241 | yes | forwards to `setTickLengthIn()`/`setTickLengthOut()`, which mark |
+| QCPPolarAxisAngular | setTickLength(int, int) | src/polar/layoutelement-angularaxis.cpp:1241 | yes | forwards to `setTickLengthIn()`/`setTickLengthOut()`, which mark |
+| QCPPolarAxisAngular | setSubTicks | src/polar/layoutelement-angularaxis.cpp:1286 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setSubTickLength(int, int) | src/polar/layoutelement-angularaxis.cpp:1304 | yes | forwards to `setSubTickLengthIn()`/`setSubTickLengthOut()`, which mark |
+| QCPPolarAxisAngular | setSubTickLength(int, int) | src/polar/layoutelement-angularaxis.cpp:1304 | yes | forwards to `setSubTickLengthIn()`/`setSubTickLengthOut()`, which mark |
+| QCPPolarAxisAngular | setSubTickLength(int, int) | src/polar/layoutelement-angularaxis.cpp:1304 | yes | forwards to `setSubTickLengthIn()`/`setSubTickLengthOut()`, which mark |
+| QCPPolarAxisAngular | setBasePen | src/polar/layoutelement-angularaxis.cpp:1345 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setTickPen | src/polar/layoutelement-angularaxis.cpp:1358 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setSubTickPen | src/polar/layoutelement-angularaxis.cpp:1371 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setLabelFont | src/polar/layoutelement-angularaxis.cpp:1384 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setLabelColor | src/polar/layoutelement-angularaxis.cpp:1399 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setLabel | src/polar/layoutelement-angularaxis.cpp:1411 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setLabelPadding | src/polar/layoutelement-angularaxis.cpp:1426 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setSelectedTickLabelFont | src/polar/layoutelement-angularaxis.cpp:1441 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setSelectedLabelFont | src/polar/layoutelement-angularaxis.cpp:1457 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setSelectedTickLabelColor | src/polar/layoutelement-angularaxis.cpp:1470 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setSelectedLabelColor | src/polar/layoutelement-angularaxis.cpp:1484 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setSelectedBasePen | src/polar/layoutelement-angularaxis.cpp:1497 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setSelectedTickPen | src/polar/layoutelement-angularaxis.cpp:1510 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisAngular | setSelectedSubTickPen | src/polar/layoutelement-angularaxis.cpp:1523 | yes | `markDirty()` |
 | QCPPolarGraph | setName | src/polar/polargraph.cpp:192 | yes | `markDirty()` (invalidates its layer) |
 | QCPPolarGraph | setAntialiasedFill | src/polar/polargraph.cpp:206 | yes | `markDirty()` (invalidates its layer) |
 | QCPPolarGraph | setAntialiasedScatters | src/polar/polargraph.cpp:220 | yes | `markDirty()` (invalidates its layer) |
@@ -464,34 +463,33 @@ handled with the layout family in Task 5.
 | QCPPolarAxisRadial | setTicks | src/polar/radialaxis.cpp:536 | yes | `markDirty()` (invalidates its layer) |
 | QCPPolarAxisRadial | setTickLabels | src/polar/radialaxis.cpp:549 | yes | `markDirty()` (invalidates its layer) |
 | QCPPolarAxisRadial | setTickLabelPadding | src/polar/radialaxis.cpp:565 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setTickLabelFont | src/polar/radialaxis.cpp:576 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setTickLabelColor | src/polar/radialaxis.cpp:591 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setTickLabelRotation | src/polar/radialaxis.cpp:608 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setTickLabelMode | src/polar/radialaxis.cpp:614 | yes | `markDirty()` |
-| QCPPolarAxisRadial | setNumberFormat | src/polar/radialaxis.cpp:654 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setNumberPrecision | src/polar/radialaxis.cpp:721 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setTickLength | src/polar/radialaxis.cpp:739 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setTickLengthIn | src/polar/radialaxis.cpp:752 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setTickLengthOut | src/polar/radialaxis.cpp:768 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setSubTicks | src/polar/radialaxis.cpp:785 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setSubTickLength | src/polar/radialaxis.cpp:803 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setSubTickLengthIn | src/polar/radialaxis.cpp:816 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setSubTickLengthOut | src/polar/radialaxis.cpp:832 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setBasePen | src/polar/radialaxis.cpp:845 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setTickPen | src/polar/radialaxis.cpp:858 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setSubTickPen | src/polar/radialaxis.cpp:871 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setLabelFont | src/polar/radialaxis.cpp:884 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setLabelColor | src/polar/radialaxis.cpp:897 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setLabel | src/polar/radialaxis.cpp:909 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setLabelPadding | src/polar/radialaxis.cpp:924 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setSelectedTickLabelFont | src/polar/radialaxis.cpp:939 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setSelectedLabelFont | src/polar/radialaxis.cpp:955 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setSelectedTickLabelColor | src/polar/radialaxis.cpp:968 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setSelectedLabelColor | src/polar/radialaxis.cpp:982 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setSelectedBasePen | src/polar/radialaxis.cpp:995 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setSelectedTickPen | src/polar/radialaxis.cpp:1008 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setSelectedSubTickPen | src/polar/radialaxis.cpp:1021 | yes | `markDirty()` (invalidates its layer) |
-| QCPPolarAxisRadial | setupTickVectors | src/polar/radialaxis.cpp:1531 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisRadial | setTickLabelFont | src/polar/radialaxis.cpp:578 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisRadial | setTickLabelColor | src/polar/radialaxis.cpp:593 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisRadial | setTickLabelRotation | src/polar/radialaxis.cpp:610 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisRadial | setTickLabelMode | src/polar/radialaxis.cpp:618 | yes | `markDirty()` |
+| QCPPolarAxisRadial | setNumberFormat | src/polar/radialaxis.cpp:658 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisRadial | setNumberPrecision | src/polar/radialaxis.cpp:731 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisRadial | setTickLength(int, int) | src/polar/radialaxis.cpp:749 | yes | forwards to `setTickLengthIn()`/`setTickLengthOut()`, which mark |
+| QCPPolarAxisRadial | setTickLength(int, int) | src/polar/radialaxis.cpp:749 | yes | forwards to `setTickLengthIn()`/`setTickLengthOut()`, which mark |
+| QCPPolarAxisRadial | setTickLength(int, int) | src/polar/radialaxis.cpp:749 | yes | forwards to `setTickLengthIn()`/`setTickLengthOut()`, which mark |
+| QCPPolarAxisRadial | setSubTicks | src/polar/radialaxis.cpp:794 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisRadial | setSubTickLength(int, int) | src/polar/radialaxis.cpp:812 | yes | forwards to `setSubTickLengthIn()`/`setSubTickLengthOut()`, which mark |
+| QCPPolarAxisRadial | setSubTickLength(int, int) | src/polar/radialaxis.cpp:812 | yes | forwards to `setSubTickLengthIn()`/`setSubTickLengthOut()`, which mark |
+| QCPPolarAxisRadial | setSubTickLength(int, int) | src/polar/radialaxis.cpp:812 | yes | forwards to `setSubTickLengthIn()`/`setSubTickLengthOut()`, which mark |
+| QCPPolarAxisRadial | setBasePen | src/polar/radialaxis.cpp:853 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisRadial | setTickPen | src/polar/radialaxis.cpp:866 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisRadial | setSubTickPen | src/polar/radialaxis.cpp:879 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisRadial | setLabelFont | src/polar/radialaxis.cpp:892 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisRadial | setLabelColor | src/polar/radialaxis.cpp:905 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisRadial | setLabel | src/polar/radialaxis.cpp:917 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisRadial | setLabelPadding | src/polar/radialaxis.cpp:932 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisRadial | setSelectedTickLabelFont | src/polar/radialaxis.cpp:947 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisRadial | setSelectedLabelFont | src/polar/radialaxis.cpp:963 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisRadial | setSelectedTickLabelColor | src/polar/radialaxis.cpp:976 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisRadial | setSelectedLabelColor | src/polar/radialaxis.cpp:990 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisRadial | setSelectedBasePen | src/polar/radialaxis.cpp:1003 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisRadial | setSelectedTickPen | src/polar/radialaxis.cpp:1016 | yes | `markDirty()` (invalidates its layer) |
+| QCPPolarAxisRadial | setSelectedSubTickPen | src/polar/radialaxis.cpp:1029 | yes | `markDirty()` (invalidates its layer) |
 
 
 ## layout
@@ -502,10 +500,10 @@ handled with the layout family in Task 5.
 | QCPLayoutElement | setMargins | src/layout.cpp:301 | yes | `markLayoutAppearanceDirty()` — the element, and for a layout every child |
 | QCPLayoutElement | setMinimumMargins | src/layout.cpp:321 | yes | `markLayoutAppearanceDirty()` — the element, and for a layout every child |
 | QCPLayoutElement | setAutoMargins | src/layout.cpp:340 | yes | `markLayoutAppearanceDirty()` — the element, and for a layout every child |
-| QCPLayoutElement | setMinimumSize | src/layout.cpp:360 | yes | `markLayoutAppearanceDirty()` — the element, and for a layout every child |
-| QCPLayoutElement | setMinimumSize | src/layout.cpp:378 | yes | `markDirty()` |
-| QCPLayoutElement | setMaximumSize | src/layout.cpp:390 | yes | `markLayoutAppearanceDirty()` — the element, and for a layout every child |
-| QCPLayoutElement | setMaximumSize | src/layout.cpp:408 | yes | `markDirty()` |
+| QCPLayoutElement | setMinimumSize(const QSize&) | src/layout.cpp:360 | yes | `markLayoutAppearanceDirty()` — the element, and for a layout every child |
+| QCPLayoutElement | setMinimumSize(int, int) | src/layout.cpp:378 | no | forwards to the QSize overload |
+| QCPLayoutElement | setMaximumSize(const QSize&) | src/layout.cpp:390 | yes | `markLayoutAppearanceDirty()` — the element, and for a layout every child |
+| QCPLayoutElement | setMaximumSize(int, int) | src/layout.cpp:408 | no | forwards to the QSize overload |
 | QCPLayoutElement | setSizeConstraintRect | src/layout.cpp:435 | yes | `markLayoutAppearanceDirty()` — the element, and for a layout every child |
 | QCPLayoutElement | setMarginGroup | src/layout.cpp:459 | yes | `markLayoutAppearanceDirty()` |
 | QCPLayoutGrid | setColumnStretchFactor | src/layout.cpp:1346 | yes | `markLayoutAppearanceDirty()` — the element, and for a layout every child |
@@ -519,13 +517,13 @@ handled with the layout family in Task 5.
 | QCPLayoutInset | setInsetPlacement | src/layout.cpp:2099 | yes | `markLayoutAppearanceDirty()` — the element, and for a layout every child |
 | QCPLayoutInset | setInsetAlignment | src/layout.cpp:2120 | yes | `markLayoutAppearanceDirty()` — the element, and for a layout every child |
 | QCPLayoutInset | setInsetRect | src/layout.cpp:2144 | yes | `markLayoutAppearanceDirty()` — the element, and for a layout every child |
-| QCPLayer | setVisible | src/layer.cpp:164 | yes | `markDirty()` (invalidates its layer) |
+| QCPLayer | setVisible | src/layer.cpp:164 | yes | `invalidatePaintBuffer()` — a stale translation must not survive a hidden layer |
 | QCPLayer | setMode | src/layer.cpp:193 | no | — (interaction or state only) |
 | QCPLayerable | setVisible | src/layer.cpp:592 | yes | `markDirty()` |
 | QCPLayerable | setLayer | src/layer.cpp:617 | yes | `markDirty()` |
 | QCPLayerable | setLayer | src/layer.cpp:627 | yes | `markDirty()` |
 | QCPLayerable | setAntialiased | src/layer.cpp:651 | yes | `markDirty()` |
-| QCPLayerable | setParentLayerable | src/layer.cpp:764 | yes | `markDirty()` |
+| QCPLayerable | setParentLayerable | src/layer.cpp:764 | yes | `invalidatePaintBuffer()` on the old and the new layer |
 | QCPAbstractLegendItem | setFont | src/layoutelements/layoutelement-legend.cpp:96 | yes | `markDirty()` (invalidates its layer) |
 | QCPAbstractLegendItem | setTextColor | src/layoutelements/layoutelement-legend.cpp:110 | yes | `markDirty()` (invalidates its layer) |
 | QCPAbstractLegendItem | setSelectedFont | src/layoutelements/layoutelement-legend.cpp:125 | yes | `markDirty()` (invalidates its layer) |

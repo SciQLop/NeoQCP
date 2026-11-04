@@ -1543,6 +1543,8 @@ void QCPAxisRect::wheelEvent(QWheelEvent* event)
 
 void QCPAxisRect::markLayoutAppearanceDirty()
 {
+    if (!mParentPlot) // the constructor sets sizes before there is a plot to mark
+        return QCPLayoutElement::markLayoutAppearanceDirty();
     // Not just the rect's own layer: a pending pan translation would keep the axes, grids and
     // plottables of this rect at their old pixels.
     markAffectedLayersDirty(true);

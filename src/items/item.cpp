@@ -477,6 +477,8 @@ bool QCPItemPosition::setParentAnchorX(QCPItemAnchor* parentAnchor, bool keepPix
     QPointF pixelP;
     if (keepPixelPosition)
         pixelP = pixelPosition();
+    if (mParentAnchorX == parentAnchor)
+        return false;
     // unregister at current parent anchor:
     if (mParentAnchorX)
         mParentAnchorX->removeChildX(this);
@@ -550,6 +552,8 @@ bool QCPItemPosition::setParentAnchorY(QCPItemAnchor* parentAnchor, bool keepPix
     QPointF pixelP;
     if (keepPixelPosition)
         pixelP = pixelPosition();
+    if (mParentAnchorY == parentAnchor)
+        return false;
     // unregister at current parent anchor:
     if (mParentAnchorY)
         mParentAnchorY->removeChildY(this);
