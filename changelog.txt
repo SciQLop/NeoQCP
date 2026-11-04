@@ -119,11 +119,19 @@ Item scaling. Thousands of items add, remove and draw without a quadratic step (
         after a zoom or a pan; a range change now repaints the items on that axis.
   - Adding an item and clearItems() are linear; clearItems() and deleting the plot delete the items
         oldest first, after taking them out of their layers in one pass.
-  - QCPLayerable::pixelBounds() (virtual, default: unknown): a layerable whose drawing and hit area fit
-        a rectangle returns it, in plot pixels; it is then not drawn outside its clip rect and not
-        hit-tested away from the cursor (bounds cached by the last screen draw, used only while the
-        picture is current). Line, rect, ellipse, curve and bracket items return it; text, pixmap, rich
+  - Item spatial index: every layer keeps a packed R-tree (sort-tile-recursive bulk load) of its
+        items' extents in data coordinates, rebuilt when the layer's children change and never on a
+        zoom or a pan (the axis transforms are monotone). A frame and a click convert their rectangle
+        once per axis pair and skip the items the tree does not report, still in child order.
+  - QCPAbstractItem::dataExtent() (virtual, default: none): an item whose drawing and hit area fit a
+        data box returns it with a pixel padding; a coordinate counts only when its position is a plot
+        coordinate with no parent anchor, otherwise that side is unbounded and the item is always
+        drawn and tested. Line, rect, ellipse, curve and bracket items return it; text, pixmap, rich
         text, straight line and tracer items, plottables and user classes are never culled.
+  - An item whose extent changed (a move, a new pen) leaves the tree for a side list that is tested
+        item by item, and the tree is rebuilt once that list passes max(64, n/16) items.
+  - QCustomPlot::setItemIndexing(bool) turns the index off (default on); it is the oracle the
+        randomized test compares against.
   - Behaviour change: clearItems() deletes oldest first (2.x: newest first). A destroyed() slot that
         deletes another item through a raw pointer may now meet a deleted one; hold a QPointer.
 

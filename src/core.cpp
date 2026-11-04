@@ -791,6 +791,16 @@ bool QCustomPlot::skipReplotsWhenHidden() const
     return mSkipReplotsWhenHidden;
 }
 
+void QCustomPlot::setItemIndexing(bool on)
+{
+    if (mItemIndexing == on)
+        return;
+    mItemIndexing = on;
+    for (QCPLayer* layer : std::as_const(mLayers))
+        layer->invalidateItemIndex();
+    requestRepaint();
+}
+
 /*!
   Sets which elements are forcibly drawn antialiased as an \a or combination of
   QCP::AntialiasedElement.
@@ -4934,17 +4944,18 @@ QList<QCPLayerable*> QCustomPlot::layerableListAt(const QPointF& pos, bool onlyS
     const QRect currentViewport = viewport();
     for (int layerIndex = mLayers.size() - 1; layerIndex >= 0; --layerIndex)
     {
-        const QList<QCPLayerable*> layerables = mLayers.at(layerIndex)->children();
+        const QCPLayer* layer = mLayers.at(layerIndex);
+        const QList<QCPLayerable*> layerables = layer->children();
+        // One tree lookup per layer: an indexed item whose box misses the click position (inflated
+        // by the selection tolerance) cannot be hit, so its selectTest() is not called.
+        const std::vector<std::uint8_t>* candidates = nullptr;
+        if (mItemIndexing && !layerables.isEmpty())
+            candidates = &layer->itemCandidates(
+                QRectF(currentViewport).adjusted(-tol, -tol, tol, tol));
         for (int i = layerables.size() - 1; i >= 0; --i)
         {
             const QCPLayerable* layerable = layerables.at(i);
-            // The bounds cached by the last screen draw save the selectTest() of everything outside
-            // the click position. They are only used while they describe the current picture, and
-            // tested first: they are cheaper than realVisibility()'s walk up the parents.
-            if (layerable->mPixelBounds && layerable->mPixelBoundsPlot == this
-                && layerable->mPixelBoundsStamp == mPaintGeneration
-                && layerable->mPixelBoundsViewport == currentViewport
-                && !layerable->mPixelBounds->adjusted(-tol, -tol, tol, tol).contains(pos))
+            if (candidates && !(*candidates)[static_cast<std::size_t>(i)])
                 continue;
             if (!layerable->realVisibility())
                 continue;

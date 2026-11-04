@@ -298,18 +298,9 @@ QPen QCPItemBracket::mainPen() const
     return mSelected ? mSelectedPen : mPen;
 }
 
-std::optional<QRectF> QCPItemBracket::pixelBounds() const
+std::optional<QCPItemExtent> QCPItemBracket::dataExtent() const
 {
-    const QPointF leftPos = left->pixelPosition();
-    const QPointF rightPos = right->pixelPosition();
-    const QCPVector2D leftVec(leftPos);
-    const QCPVector2D rightVec(rightPos);
-    const QCPVector2D lengthVec =
-        ((rightVec - leftVec) * 0.5).perpendicular().normalized() * mLength;
-    QRectF bounds(leftPos, rightPos);
-    bounds = bounds.united(QRectF((rightVec - lengthVec).toPointF(),
-                                  (leftVec - lengthVec).toPointF()));
-    // the curly and calligraphic paths bend up to 1.2 lengthVec away from the four corners
+    // the curly and calligraphic paths bend away from the corner polygon
     const double pad = qMax(1.5 * mLength, qMax(mPen.widthF(), mSelectedPen.widthF())) + 2.0;
-    return bounds.normalized().adjusted(-pad, -pad, pad, pad);
+    return positionsExtent(pad, positions());
 }

@@ -50,13 +50,13 @@ private slots:
     void colorMapDataPixelFollowsSetCell();
     void equalValueDoesNotDirty_data();
     void equalValueDoesNotDirty();
-    void itemBoundsContainDrawing_data();
-    void itemBoundsContainDrawing();
+    void itemExtentContainsDrawing_data();
+    void itemExtentContainsDrawing();
     void itemScrolledIntoViewIsDrawn();
     void culledItemIsNotHitTested();
     void staleBoundsFallBack();
     void takenItemUsesNoBoundsOfItsOldPlot();
-    void exportDoesNotPoisonBounds();
+    void exportUsesTheIndex();
     void userItemWithoutBoundsIsNeverCulled();
 
 private:

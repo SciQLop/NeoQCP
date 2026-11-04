@@ -208,15 +208,11 @@ QPen QCPItemCurve::mainPen() const
     return mSelected ? mSelectedPen : mPen;
 }
 
-std::optional<QRectF> QCPItemCurve::pixelBounds() const
+std::optional<QCPItemExtent> QCPItemCurve::dataExtent() const
 {
-    // A cubic Bezier lies inside the box of its four control points (no path allocation per frame).
-    const std::array<QPointF, 4> points {start->pixelPosition(), startDir->pixelPosition(),
-                                         endDir->pixelPosition(), end->pixelPosition()};
-    const auto [minX, maxX] = std::minmax({points[0].x(), points[1].x(), points[2].x(), points[3].x()});
-    const auto [minY, maxY] = std::minmax({points[0].y(), points[1].y(), points[2].y(), points[3].y()});
-    const double pad = qMax(qMax(mHead.boundingDistance(), mTail.boundingDistance()),
-                            qMax(mPen.widthF(), mSelectedPen.widthF()))
-                       + 2.0;
-    return QRectF(QPointF(minX, minY), QPointF(maxX, maxY)).adjusted(-pad, -pad, pad, pad);
+    const double pad =
+        qMax(qMax(mHead.boundingDistance(), mTail.boundingDistance()),
+             qMax(mPen.widthF(), mSelectedPen.widthF()))
+        + 2.0;
+    return positionsExtent(pad, positions());
 }

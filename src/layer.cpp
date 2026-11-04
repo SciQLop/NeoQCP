@@ -209,30 +209,21 @@ void QCPLayer::setMode(QCPLayer::LayerMode mode)
 void QCPLayer::draw(QCPPainter* painter)
 {
     PROFILE_HERE_N("QCPLayer::draw");
-    for (QCPLayerable* child : mChildren)
+    // One tree lookup per axis pair for the whole frame; the answer says which indexed children
+    // can be on screen at all. Items outside it are skipped before the painter is touched.
+    const bool useIndex = mParentPlot && mParentPlot->itemIndexing() && !mChildren.isEmpty();
+    if (useIndex)
+        itemCandidates(QRectF(mParentPlot->viewport()));
+    for (int childIndex = 0; childIndex < mChildren.size(); ++childIndex)
     {
+        QCPLayerable* child = mChildren.at(childIndex);
         if (child->realVisibility())
         {
             auto* plottable = qobject_cast<QCPAbstractPlottable*>(child);
             if (plottable && !plottable->drawableAxes())
                 continue;
-            // simplify: this is one cheap rectangle test per child, so a frame is still O(items) —
-            // fine at 10k; a spatial index is the upgrade if the count grows another order.
-            if (const std::optional<QRectF> bounds = child->pixelBounds())
-            {
-                if (mCachingBounds)
-                {
-                    child->mPixelBounds = bounds;
-                    child->mPixelBoundsPlot = mParentPlot;
-                    child->mPixelBoundsStamp = mParentPlot->mPaintGeneration;
-                    child->mPixelBoundsViewport = mParentPlot->viewport();
-                }
-                // Off screen: nothing to paint, and no point in saving/restoring the painter.
-                if (!bounds->intersects(child->clipRect()))
-                    continue;
-            }
-            else if (mCachingBounds)
-                child->mPixelBounds.reset();
+            if (useIndex && !mItemCandidates[static_cast<std::size_t>(childIndex)])
+                continue;
             painter->save();
             painter->setClipRect(child->clipRect().translated(0, -1));
             // Apply busy fade for plottables (suppress during vector export)
@@ -264,9 +255,7 @@ void QCPLayer::drawToPaintBuffer()
         {
             if (painter->isActive())
             {
-                mCachingBounds = true;
                 draw(painter);
-                mCachingBounds = false;
             }
             else
                 qDebug() << Q_FUNC_INFO << "paint buffer returned inactive painter";
@@ -354,6 +343,7 @@ void QCPLayer::addChild(QCPLayerable* layerable, bool prepend)
         mChildren.prepend(layerable);
     else
         mChildren.append(layerable);
+    invalidateItemIndex();
     invalidatePaintBuffer();
 }
 
@@ -371,7 +361,11 @@ void QCPLayer::removeChildren(const QSet<QCPLayerable*>& dying)
         return true;
     }) > 0;
     if (any)
+    {
+        // The payload is a child position: the ones behind a removed child just shifted.
+        invalidateItemIndex();
         invalidatePaintBuffer();
+    }
 }
 
 /*! \internal
@@ -386,7 +380,10 @@ void QCPLayer::removeChildren(const QSet<QCPLayerable*>& dying)
 void QCPLayer::removeChild(QCPLayerable* layerable)
 {
     if (mChildren.removeOne(layerable))
+    {
+        invalidateItemIndex();
         invalidatePaintBuffer();
+    }
     else
         qDebug() << Q_FUNC_INFO << "layerable is not child of this layer"
                  << reinterpret_cast<quintptr>(layerable);
@@ -1085,4 +1082,128 @@ void QCPLayerable::mouseDoubleClickEvent(QMouseEvent* event, [[maybe_unused]] co
 void QCPLayerable::wheelEvent(QWheelEvent* event)
 {
     event->ignore();
+}
+
+namespace
+{
+// The data box of a pixel rectangle on one (key axis, value axis) pair. Log and reversed axes need
+// no special case: pixelToCoord maps the two edges and the result is ordered afterwards.
+std::optional<QCPDataBox> dataBoxOfRect(QCPAxis* keyAxis, QCPAxis* valueAxis, const QRectF& area)
+{
+    if (!keyAxis || !valueAxis)
+        return std::nullopt;
+    const bool keyHorizontal = keyAxis->orientation() == Qt::Horizontal;
+    const bool valueHorizontal = valueAxis->orientation() == Qt::Horizontal;
+    if (keyHorizontal == valueHorizontal)
+        return std::nullopt; // both on the same edge: not an axis pair we can index
+    const double key0 = keyAxis->pixelToCoord(keyHorizontal ? area.left() : area.top());
+    const double key1 = keyAxis->pixelToCoord(keyHorizontal ? area.right() : area.bottom());
+    const double value0 = valueAxis->pixelToCoord(valueHorizontal ? area.left() : area.top());
+    const double value1 = valueAxis->pixelToCoord(valueHorizontal ? area.right() : area.bottom());
+    return QCPDataBox { std::min(key0, key1), std::max(key0, key1), std::min(value0, value1),
+                        std::max(value0, value1) };
+}
+} // namespace
+
+void QCPLayer::invalidateItemIndex()
+{
+    mItemIndexDirty = true;
+}
+
+void QCPLayer::noteItemExtentChanged(QCPAbstractItem* item)
+{
+    if (mItemIndexDirty || !item)
+        return;
+    const int position = mChildren.indexOf(item);
+    if (position < 0 || position >= int(mItemKind.size()))
+        return;
+    if (mItemKind[position] != 1)
+        return; // unindexed, or already on the side list
+    mItemKind[position] = 2;
+    mItemSide.push_back(position);
+    // Bentley-Saxe: keep the small part small, rebuild when it grows past a sixteenth of the layer.
+    if (int(mItemSide.size()) > std::max(64, int(mChildren.size()) / 16))
+        mItemIndexDirty = true;
+}
+
+void QCPLayer::rebuildItemIndex() const
+{
+    mItemIndexDirty = false;
+    ++mItemIndexBuilds;
+    mItemKind.assign(static_cast<std::size_t>(mChildren.size()), 0);
+    mItemGroup.assign(static_cast<std::size_t>(mChildren.size()), -1);
+    mItemGroups.clear();
+    mItemSide.clear();
+    std::vector<std::pair<int, QCPItemExtent>> extents;
+    for (int i = 0; i < mChildren.size(); ++i)
+    {
+        auto* item = qobject_cast<QCPAbstractItem*>(mChildren.at(i));
+        if (!item)
+            continue;
+        const std::optional<QCPItemExtent> extent = item->dataExtent();
+        if (!extent)
+            continue;
+        // A NaN side describes nothing drawable: such an item stays unindexed and is tested as before.
+        if (std::isnan(extent->box.keyLower) || std::isnan(extent->box.keyUpper)
+            || std::isnan(extent->box.valueLower) || std::isnan(extent->box.valueUpper))
+            continue;
+        int group = -1;
+        for (int g = 0; g < int(mItemGroups.size()); ++g)
+            if (mItemGroups[g].keyAxis == extent->keyAxis
+                && mItemGroups[g].valueAxis == extent->valueAxis)
+            {
+                group = g;
+                break;
+            }
+        if (group < 0)
+        {
+            mItemGroups.push_back(ItemIndexGroup { extent->keyAxis, extent->valueAxis, {},
+                                                   extent->pixelPad });
+            group = int(mItemGroups.size()) - 1;
+        }
+        ItemIndexGroup& groupIndex = mItemGroups[group];
+        groupIndex.maxPad = std::max(groupIndex.maxPad, extent->pixelPad);
+        mItemKind[i] = 1;
+        mItemGroup[i] = group;
+        extents.emplace_back(i, *extent);
+    }
+    for (int g = 0; g < int(mItemGroups.size()); ++g)
+    {
+        std::vector<std::pair<QCPDataBox, int>> entries;
+        for (const auto& [child, extent] : extents)
+            if (mItemGroup[child] == g)
+                entries.emplace_back(extent.box, child);
+        mItemGroups[g].index.build(std::move(entries));
+    }
+}
+
+const std::vector<std::uint8_t>& QCPLayer::itemCandidates(const QRectF& pixelArea) const
+{
+    if (mItemIndexDirty)
+        rebuildItemIndex();
+    mItemCandidates.assign(static_cast<std::size_t>(mChildren.size()), 1);
+    for (std::size_t i = 0; i < mItemKind.size(); ++i)
+        if (mItemKind[i] == 1)
+            mItemCandidates[i] = 0;
+    for (std::size_t groupIndex = 0; groupIndex < mItemGroups.size(); ++groupIndex)
+    {
+        const ItemIndexGroup& group = mItemGroups[groupIndex];
+        const double pad = group.maxPad;
+        const std::optional<QCPDataBox> query =
+            dataBoxOfRect(group.keyAxis.data(), group.valueAxis.data(),
+                          pixelArea.adjusted(-pad, -pad, pad, pad));
+        if (!query)
+        {
+            // No usable axis pair (an axis was removed): nothing of this group is culled.
+            for (std::size_t i = 0; i < mItemGroup.size(); ++i)
+                if (mItemGroup[i] == static_cast<int>(groupIndex))
+                    mItemCandidates[i] = 1;
+            continue;
+        }
+        group.index.query(*query, [this](int payload) {
+            if (payload >= 0 && payload < int(mItemCandidates.size()))
+                mItemCandidates[static_cast<std::size_t>(payload)] = 1;
+        });
+    }
+    return mItemCandidates;
 }

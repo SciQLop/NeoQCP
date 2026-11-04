@@ -77,6 +77,8 @@ private slots:
   void QCPItems_Click10k();
   void QCPItems_ClickEmpty10k();
   void QCPItems_Click100();
+  void QCPItems_FirstFrame10k();
+  void QCPItems_DragOne10k();
   void QCPAxisRects_Stack8_Replot();
   void QCPPlots_Stack8_Replot();
   void QCPInput_MouseMoveStorm();
@@ -1393,4 +1395,31 @@ void Benchmark::QCPSpatialIndex_Query10k()
     index.query(query, [&hits](int) { ++hits; });
   }
   QVERIFY(hits > 50 && hits < 200);
+}
+
+void Benchmark::QCPItems_FirstFrame10k()
+{
+  QBENCHMARK
+  {
+    addLineItems(mPlot, 10000, 100);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    mPlot->clearItems();
+  }
+}
+
+void Benchmark::QCPItems_DragOne10k()
+{
+  addLineItems(mPlot, 10000, 100);
+  mPlot->replot(QCustomPlot::rpImmediateRefresh);
+  auto* dragged = qobject_cast<QCPItemLine*>(mPlot->item(5000));
+  QVERIFY(dragged);
+  double x = 50.0;
+  QBENCHMARK
+  {
+    x += 0.01;
+    dragged->start->setCoords(x, 0.2);
+    dragged->end->setCoords(x + 0.01, 0.8);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+  }
+  mPlot->clearItems();
 }

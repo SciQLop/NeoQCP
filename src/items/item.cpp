@@ -25,6 +25,8 @@
 
 #include "item.h"
 
+#include <limits>
+
 #include "axis/axis.h"
 #include "core.h"
 #include "layoutelements/layoutelement-axisrect.h"
@@ -1383,6 +1385,69 @@ QPointF QCPAbstractItem::anchorPixelPosition(int anchorId) const
 
   \see createAnchor
 */
+void QCPAbstractItem::markDirty()
+{
+    QCPLayerable::markDirty();
+    // The index is in data coordinates and survives range changes, but not a moved item: the item
+    // leaves the tree and is tested one by one until the layer rebuilds it.
+    if (mLayer)
+        mLayer->noteItemExtentChanged(this);
+}
+
+std::optional<QCPItemExtent>
+QCPAbstractItem::positionsExtent(double pixelPad, const QList<QCPItemPosition*>& positions) const
+{
+    if (positions.isEmpty())
+        return std::nullopt;
+    QCPAxis* keyAxis = positions.first()->keyAxis();
+    QCPAxis* valueAxis = positions.first()->valueAxis();
+    if (!keyAxis || !valueAxis)
+        return std::nullopt;
+    for (const QCPItemPosition* position : positions)
+        if (position->keyAxis() != keyAxis || position->valueAxis() != valueAxis)
+            return std::nullopt;
+    const double infinity = std::numeric_limits<double>::infinity();
+    QCPDataBox box { infinity, -infinity, infinity, -infinity };
+    bool keyBounded = false;
+    bool valueBounded = false;
+    for (const QCPItemPosition* position : positions)
+    {
+        // A coordinate counts only as a plain plot coordinate: an anchored position follows another
+        // anchor, a ratio or pixel position is not a data value. That side becomes infinite.
+        if (position->typeX() == QCPItemPosition::ptPlotCoords && !position->parentAnchorX())
+        {
+            box.keyLower = std::min(box.keyLower, position->key());
+            box.keyUpper = std::max(box.keyUpper, position->key());
+            keyBounded = true;
+        }
+        if (position->typeY() == QCPItemPosition::ptPlotCoords && !position->parentAnchorY())
+        {
+            box.valueLower = std::min(box.valueLower, position->value());
+            box.valueUpper = std::max(box.valueUpper, position->value());
+            valueBounded = true;
+        }
+    }
+    // A logarithmic axis has no pixel for a coordinate at or below zero, yet draw() still runs: such
+    // an item is left unindexed instead of being culled by a box the axis cannot map.
+    if (keyBounded && keyAxis->scaleType() == QCPAxis::stLogarithmic && !(box.keyLower > 0))
+        keyBounded = false;
+    if (valueBounded && valueAxis->scaleType() == QCPAxis::stLogarithmic && !(box.valueLower > 0))
+        valueBounded = false;
+    if (!keyBounded && !valueBounded)
+        return std::nullopt;
+    if (!keyBounded)
+    {
+        box.keyLower = -infinity;
+        box.keyUpper = infinity;
+    }
+    if (!valueBounded)
+    {
+        box.valueLower = -infinity;
+        box.valueUpper = infinity;
+    }
+    return QCPItemExtent { keyAxis, valueAxis, box, pixelPad };
+}
+
 QCPItemPosition* QCPAbstractItem::createPosition(const QString& name)
 {
     if (hasAnchor(name))

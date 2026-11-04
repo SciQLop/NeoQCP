@@ -236,10 +236,8 @@ QBrush QCPItemEllipse::mainBrush() const
     return mSelected ? mSelectedBrush : mBrush;
 }
 
-std::optional<QRectF> QCPItemEllipse::pixelBounds() const
+std::optional<QCPItemExtent> QCPItemEllipse::dataExtent() const
 {
     const double pad = qMax(mPen.widthF(), mSelectedPen.widthF()) + 2.0;
-    return QRectF(topLeft->pixelPosition(), bottomRight->pixelPosition())
-        .normalized()
-        .adjusted(-pad, -pad, pad, pad);
+    return positionsExtent(pad, positions());
 }

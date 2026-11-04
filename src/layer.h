@@ -27,7 +27,12 @@
 #define QCP_LAYER_H
 
 #include <QSet>
+#include "spatial-index.h"
+
+#include <cstdint>
 #include <optional>
+#include <vector>
+#include <QPointer>
 
 #include "global.h"
 #include "handle-ops.h"
@@ -82,6 +87,11 @@ public:
 
     [[nodiscard]] QList<QCPLayerable*> children() const { return mChildren; }
 
+    // One flag per child: 0 means the child is indexed and lies outside \a pixelArea on screen, so
+    // it need not be drawn or hit tested; 1 means "look at it" (unindexed, on the side list, or a
+    // hit). Const because a lookup may rebuild the index.
+    const std::vector<std::uint8_t>& itemCandidates(const QRectF& pixelArea) const;
+
     [[nodiscard]] bool visible() const { return mVisible; }
 
     [[nodiscard]] LayerMode mode() const { return mMode; }
@@ -112,10 +122,6 @@ protected:
 
     // non-property members:
     QWeakPointer<QCPAbstractPaintBuffer> mPaintBuffer;
-    // True while this layer draws into its paint buffer (the screen picture): the per-layerable
-    // pixel bounds are then fresh and worth caching for hit testing. An export draws through
-    // QCustomPlot::draw() at another size, so it must not overwrite them.
-    bool mCachingBounds = false;
     quint64 mDirtyGeneration = 0;
     quint64 mDrawnGeneration = 0;
 
@@ -129,6 +135,33 @@ protected:
     void removeChildren(const QSet<QCPLayerable*>& dying);
 
 private:
+    // The per-child item index: one packed R-tree per (key axis, value axis) pair, in data
+    // coordinates so that it survives range changes. Kinds are 0 unindexed, 1 indexed, 2 side
+    // (extent changed since the build: tested one by one).
+    void rebuildItemIndex() const;
+    mutable std::vector<std::uint8_t> mItemKind;
+    mutable std::vector<int> mItemGroup;
+    mutable std::vector<std::uint8_t> mItemCandidates;
+    struct ItemIndexGroup
+    {
+        // QPointers: removeAxis() deletes an axis and this group outlives it until the next rebuild.
+        // A dead axis makes the group unusable, and its items are then simply not culled.
+        QPointer<QCPAxis> keyAxis;
+        QPointer<QCPAxis> valueAxis;
+        QCPSpatialIndex index;
+        double maxPad = 0.0;
+    };
+    mutable std::vector<ItemIndexGroup> mItemGroups;
+    mutable std::vector<int> mItemSide;
+    mutable bool mItemIndexDirty = true;
+    mutable int mItemIndexBuilds = 0;
+
+    void invalidateItemIndex();
+    void noteItemExtentChanged(QCPAbstractItem* item);
+
+    friend class QCPAbstractItem;
+    friend class TestItemIndex;
+
     Q_DISABLE_COPY(QCPLayer)
 
     friend class QCustomPlot;
@@ -193,16 +226,12 @@ public:
     virtual double selectTest(const QPointF& pos, bool onlySelectable,
                               QVariant* details = nullptr) const;
 
-    // Bounds, in plot pixel coordinates, of everything draw() paints and every point selectTest()
-    // can hit (its tolerance included is not required). nullopt means "unknown": the layerable is
-    // never culled. Only subclasses whose drawing fits a rectangle should override it.
-    [[nodiscard]] virtual std::optional<QRectF> pixelBounds() const { return std::nullopt; }
-
     // non-property methods:
     [[nodiscard]] bool realVisibility() const;
     // Schedules a full repaint of this layerable's layer next turn; a no-op without a plot or a
-    // layer. GUI thread only.
-    void markDirty();
+    // layer. GUI thread only. Virtual so an item can tell its layer that its extent may have
+    // changed: an item that moves leaves the index and is tested one by one until the next rebuild.
+    virtual void markDirty();
 
 signals:
     void layerChanged(QCPLayer* newLayer);
@@ -216,16 +245,6 @@ protected:
     QCPLayer* mLayer;
     bool mAntialiased;
     bool mMouseTransparent = false;
-
-    // Cache of pixelBounds(), written while the screen draws this layerable: hit testing skips a
-    // selectTest() only when the bounds are from the current picture (same paint generation, same
-    // viewport).
-    std::optional<QRectF> mPixelBounds;
-    // The plot that drew it: each plot counts generations from zero, so a stamp alone could match
-    // the generation of the plot a taken object was added to. Compared, never dereferenced.
-    const QCustomPlot* mPixelBoundsPlot = nullptr;
-    quint64 mPixelBoundsStamp = 0;
-    QRect mPixelBoundsViewport;
 
     // introduced virtual methods:
     virtual void parentPlotInitialized(QCustomPlot* parentPlot);

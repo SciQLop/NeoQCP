@@ -49,6 +49,7 @@
 #include "test-repaint/test-repaint.h"
 #include "test-builder/test-builder.h"
 #include "test-spatial-index/test-spatial-index.h"
+#include "test-item-index/test-item-index.h"
 #include "test-gestures/test-gestures.h"
 
 static bool shouldRun(const char* name)
@@ -140,6 +141,7 @@ int main(int argc, char **argv)
   QCPTEST(TestRepaint);
   QCPTEST(TestBuilder);
   QCPTEST(TestSpatialIndex);
+  QCPTEST(TestItemIndex);
 
   return failures == 0 ? 0 : 1;
 }

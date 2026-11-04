@@ -1599,6 +1599,17 @@ public:
     mutable int mSelectCalls = 0;
 };
 
+// The item's data extent mapped to pixels: exactly what the old pixelBounds() returned.
+QRectF extentPixelRect(const QCPItemExtent& extent)
+{
+    const QPointF a(extent.keyAxis->coordToPixel(extent.box.keyLower),
+                    extent.valueAxis->coordToPixel(extent.box.valueLower));
+    const QPointF b(extent.keyAxis->coordToPixel(extent.box.keyUpper),
+                    extent.valueAxis->coordToPixel(extent.box.valueUpper));
+    const double pad = extent.pixelPad;
+    return QRectF(a, b).normalized().adjusted(-pad, -pad, pad, pad);
+}
+
 QCPAbstractItem* makeBoundedItem(const QString& kind, QCustomPlot* plot)
 {
     if (kind == QLatin1String("line"))
@@ -1651,7 +1662,7 @@ QCPAbstractItem* makeBoundedItem(const QString& kind, QCustomPlot* plot)
 }
 } // namespace
 
-void TestRepaint::itemBoundsContainDrawing_data()
+void TestRepaint::itemExtentContainsDrawing_data()
 {
     QTest::addColumn<QString>("item");
     QTest::newRow("line") << QStringLiteral("line");
@@ -1661,7 +1672,7 @@ void TestRepaint::itemBoundsContainDrawing_data()
     QTest::newRow("bracket") << QStringLiteral("bracket");
 }
 
-void TestRepaint::itemBoundsContainDrawing()
+void TestRepaint::itemExtentContainsDrawing()
 {
     QFETCH(QString, item);
     auto plot = settledPlot();
@@ -1695,13 +1706,14 @@ void TestRepaint::itemBoundsContainDrawing()
     };
 
     waitUntilSettled(*plot);
-    const std::optional<QRectF> bounds = subject->pixelBounds();
-    QVERIFY2(bounds.has_value(), "the item reports no pixel bounds");
+    const std::optional<QCPItemExtent> extent = subject->dataExtent();
+    QVERIFY2(extent.has_value(), "the item reports no data extent");
+    const QRectF bounds = extentPixelRect(*extent);
     const QImage painted = screenOf(plot.get());
     subject->setVisible(false);
     waitUntilSettled(*plot);
     const QImage hidden = screenOf(plot.get());
-    QVERIFY2(paintedOutside(painted, hidden, *bounds) > 0, "the item painted nothing");
+    QVERIFY2(paintedOutside(painted, hidden, bounds) > 0, "the item painted nothing");
     QVERIFY2(mistake.isEmpty(), qPrintable(mistake));
 
     // A selected item draws with its selected pen, which may be much wider.
@@ -1719,14 +1731,15 @@ void TestRepaint::itemBoundsContainDrawing()
     subject->setVisible(true);
     subject->setSelected(true);
     waitUntilSettled(*plot);
-    const std::optional<QRectF> selectedBounds = subject->pixelBounds();
-    QVERIFY2(selectedBounds.has_value(), "the selected item reports no pixel bounds");
+    const std::optional<QCPItemExtent> selectedExtent = subject->dataExtent();
+    QVERIFY2(selectedExtent.has_value(), "the selected item reports no data extent");
+    const QRectF selectedBounds = extentPixelRect(*selectedExtent);
     const QImage selected = screenOf(plot.get());
     subject->setVisible(false);
     waitUntilSettled(*plot);
     const QImage selectedHidden = screenOf(plot.get());
     mistake.clear();
-    QVERIFY2(paintedOutside(selected, selectedHidden, *selectedBounds) > 0,
+    QVERIFY2(paintedOutside(selected, selectedHidden, selectedBounds) > 0,
              "the selected item painted nothing");
     QVERIFY2(mistake.isEmpty(), qPrintable(mistake));
 }
@@ -1818,7 +1831,7 @@ void TestRepaint::staleBoundsFallBack()
              "an item scrolled into view was culled by bounds from before the range change");
 }
 
-void TestRepaint::exportDoesNotPoisonBounds()
+void TestRepaint::exportUsesTheIndex()
 {
     auto plot = settledPlot();
     auto line = plot->add<QCPItemLine>();
@@ -1850,8 +1863,8 @@ void TestRepaint::userItemWithoutBoundsIsNeverCulled()
     plain->mCentre = QPointF(plot->xAxis->coordToPixel(4), plot->yAxis->coordToPixel(4));
     waitUntilSettled(*plot);
     QVERIFY2(plain->mDrawCalls > 0, "the item was never drawn");
-    QVERIFY(!plain->pixelBounds().has_value());
+    QVERIFY(!plain->dataExtent().has_value());
 
     plot->layerableListAt(plain->mCentre, true);
-    QVERIFY2(plain->mSelectCalls > 0, "an item without pixel bounds was culled from hit testing");
+    QVERIFY2(plain->mSelectCalls > 0, "an item without a data extent was culled from hit testing");
 }

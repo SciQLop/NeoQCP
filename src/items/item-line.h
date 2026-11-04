@@ -71,8 +71,8 @@ public:
     virtual double selectTest(const QPointF& pos, bool onlySelectable,
                               QVariant* details = nullptr) const override;
 
-    // bounds for culling; see QCPLayerable::pixelBounds()
-    [[nodiscard]] std::optional<QRectF> pixelBounds() const override;
+    // what the layer's index needs; see QCPAbstractItem::dataExtent()
+    [[nodiscard]] std::optional<QCPItemExtent> dataExtent() const override;
 
     QCPItemPosition* const start;
     QCPItemPosition* const end;

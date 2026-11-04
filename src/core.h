@@ -273,6 +273,18 @@ public:
     // behavior, required for offscreen rendering).
     void setSkipReplotsWhenHidden(bool skip);
     bool skipReplotsWhenHidden() const;
+    // Whether a layer culls its items through its spatial index (default true). Off: every item is
+    // drawn and hit tested, which is what the randomized tests compare against. Items opt out
+    // themselves by returning no data extent.
+    /*! Sets whether layers use the item index (see QCPAbstractItem::dataExtent()).
+
+  On (the default) each layer keeps a packed R-tree of its items' data boxes and skips the ones whose
+  extents miss the queried pixel area, for drawing and for hit testing. Off, every item is drawn and
+  tested, which is what the randomized tests use as the oracle. Toggling invalidates the indices and
+  asks for one repaint.
+  */
+  void setItemIndexing(bool on);
+    [[nodiscard]] bool itemIndexing() const { return mItemIndexing; }
     // Deferred data swap: plottables that staged a replacement data source call
     // requestDataSwap() once it is ready. The first request opens a window of
     // dataSwapDebounceMs; every plottable ready by the end of it is committed and
@@ -519,6 +531,7 @@ protected:
     [[nodiscard]] bool replotDeferredWhileHidden() const;
     bool remarkLayersDirtiedAfterDraw();
     bool mSkipReplotsWhenHidden = false;
+    bool mItemIndexing = true;
     bool mWasShown = false;
     bool mReplotSkippedWhileHidden = false; // drawn by the next showEvent
     double mReplotTime, mReplotTimeAverage;
@@ -645,6 +658,7 @@ protected:
     friend class QCPEmissionScope;
     friend class TestSignalDelivery;
     friend class TestRepaint;
+    friend class TestItemIndex;
 };
 Q_DECLARE_METATYPE(QCustomPlot::LayerInsertMode)
 Q_DECLARE_METATYPE(QCustomPlot::RefreshPriority)
