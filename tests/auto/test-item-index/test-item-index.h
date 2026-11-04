@@ -7,4 +7,6 @@ class TestItemIndex : public QObject
 private slots:
     void randomItemsMatchUnindexed();
     void dragOneItemKeepsTheTree();
+    void clickTestsOnlyItemsNearTheClick();
+    void scaleTypeChangeRebuildsTheIndex();
 };

@@ -626,6 +626,11 @@ void QCPAxis::setScaleType(QCPAxis::ScaleType type)
     {
         mScaleType = type;
         mCachedMarginValid = false;
+        // An item's extent depends on the scale type (a non-positive coordinate has no pixel on a
+        // log axis), so every tree built for the old type is stale.
+        if (mParentPlot)
+            for (int layerIndex = 0; layerIndex < mParentPlot->layerCount(); ++layerIndex)
+                mParentPlot->layer(layerIndex)->invalidateItemIndex();
         const QPointer<QCPAxis> alive(this); // a rangeChanged slot may delete this axis
         if (mScaleType == stLogarithmic)
             setRange(mRange.sanitizedForLogScale());

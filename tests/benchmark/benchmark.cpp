@@ -79,6 +79,7 @@ private slots:
   void QCPItems_Click100();
   void QCPItems_FirstFrame10k();
   void QCPItems_DragOne10k();
+  void QCPItems_RestyleAll10k();
   void QCPAxisRects_Stack8_Replot();
   void QCPPlots_Stack8_Replot();
   void QCPInput_MouseMoveStorm();
@@ -1422,4 +1423,33 @@ void Benchmark::QCPItems_DragOne10k()
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
   }
   mPlot->clearItems();
+}
+
+namespace
+{
+std::vector<QCPItemLine*> linesOf(const QCustomPlot& plot)
+{
+    std::vector<QCPItemLine*> lines;
+    for (int i = 0; i < plot.itemCount(); ++i)
+        if (auto* line = qobject_cast<QCPItemLine*>(plot.item(i)))
+            lines.push_back(line);
+    return lines;
+}
+} // namespace
+
+void Benchmark::QCPItems_RestyleAll10k()
+{
+    addLineItems(mPlot, 10000, 100);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const std::vector<QCPItemLine*> lines = linesOf(*mPlot);
+    QCOMPARE(int(lines.size()), 10000);
+    int round = 0;
+    QBENCHMARK_ONCE
+    {
+        const QPen pen(QColor(30 * (round++ % 8), 120, 200), 1 + round % 4);
+        for (QCPItemLine* line : lines)
+            line->setPen(pen);
+        mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+    mPlot->clearItems();
 }

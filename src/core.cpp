@@ -4946,12 +4946,12 @@ QList<QCPLayerable*> QCustomPlot::layerableListAt(const QPointF& pos, bool onlyS
     {
         const QCPLayer* layer = mLayers.at(layerIndex);
         const QList<QCPLayerable*> layerables = layer->children();
-        // One tree lookup per layer: an indexed item whose box misses the click position (inflated
-        // by the selection tolerance) cannot be hit, so its selectTest() is not called.
+        // One tree lookup per layer, for the click point inflated by the selection tolerance: an
+        // indexed item whose box misses it cannot be hit, so its selectTest() is not called.
         const std::vector<std::uint8_t>* candidates = nullptr;
         if (mItemIndexing && !layerables.isEmpty())
             candidates = &layer->itemCandidates(
-                QRectF(currentViewport).adjusted(-tol, -tol, tol, tol));
+                QRectF(pos, QSizeF(0, 0)).adjusted(-tol, -tol, tol, tol));
         for (int i = layerables.size() - 1; i >= 0; --i)
         {
             const QCPLayerable* layerable = layerables.at(i);

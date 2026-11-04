@@ -160,6 +160,7 @@ private:
     void noteItemExtentChanged(QCPAbstractItem* item);
 
     friend class QCPAbstractItem;
+    friend class QCPAxis; // a scale type change invalidates the item index
     friend class TestItemIndex;
 
     Q_DISABLE_COPY(QCPLayer)

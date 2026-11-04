@@ -217,12 +217,13 @@ void QCPLayer::draw(QCPPainter* painter)
     for (int childIndex = 0; childIndex < mChildren.size(); ++childIndex)
     {
         QCPLayerable* child = mChildren.at(childIndex);
+        // The candidate bit is one array read; visibility and the cast are a walk up the parents.
+        if (useIndex && !mItemCandidates[static_cast<std::size_t>(childIndex)])
+            continue;
         if (child->realVisibility())
         {
             auto* plottable = qobject_cast<QCPAbstractPlottable*>(child);
             if (plottable && !plottable->drawableAxes())
-                continue;
-            if (useIndex && !mItemCandidates[static_cast<std::size_t>(childIndex)])
                 continue;
             painter->save();
             painter->setClipRect(child->clipRect().translated(0, -1));
@@ -1114,7 +1115,11 @@ void QCPLayer::noteItemExtentChanged(QCPAbstractItem* item)
 {
     if (mItemIndexDirty || !item)
         return;
-    const int position = mChildren.indexOf(item);
+    // The cached slot is valid while the index is clean, which is the only way to get here; the
+    // guard covers a child list changed behind our back without invalidating (indexOf fallback).
+    int position = item->mItemSlot;
+    if (position < 0 || position >= int(mChildren.size()) || mChildren.at(position) != item)
+        position = mChildren.indexOf(item);
     if (position < 0 || position >= int(mItemKind.size()))
         return;
     if (mItemKind[position] != 1)
@@ -1140,6 +1145,8 @@ void QCPLayer::rebuildItemIndex() const
         auto* item = qobject_cast<QCPAbstractItem*>(mChildren.at(i));
         if (!item)
             continue;
+        // Cached child slot: a move is O(1) instead of an indexOf over the whole layer.
+        item->mItemSlot = i;
         const std::optional<QCPItemExtent> extent = item->dataExtent();
         if (!extent)
             continue;

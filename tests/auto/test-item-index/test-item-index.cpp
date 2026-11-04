@@ -51,7 +51,7 @@ void placeRandomly(QCPAbstractItem* item, std::mt19937& rng, QCPAxis* keyAxis, Q
     const auto pixels = [&] { return std::uniform_real_distribution<double>(-50.0, 450.0)(rng); };
     for (QCPItemPosition* position : item->positions())
     {
-        switch (std::uniform_int_distribution<int>(0, 2)(rng))
+        switch (std::uniform_int_distribution<int>(0, 3)(rng))
         {
             case 0: // data coordinates, possibly on the secondary axes
                 position->setType(QCPItemPosition::ptPlotCoords);
@@ -66,14 +66,28 @@ void placeRandomly(QCPAbstractItem* item, std::mt19937& rng, QCPAxis* keyAxis, Q
                 position->setType(QCPItemPosition::ptAbsolute);
                 position->setCoords(pixels(), pixels());
                 break;
-            default: // data coordinates on the default axes
+            default: // data coordinates on the plot's default axes
                 position->setType(QCPItemPosition::ptPlotCoords);
-                position->setAxes(nullptr, nullptr);
+                position->setAxes(item->parentPlot()->xAxis, item->parentPlot()->yAxis);
                 position->setCoords(key(), value());
                 break;
         }
     }
 }
+
+// Counts how often the index lets a hit test through to the item.
+class CountingLine : public QCPItemLine
+{
+public:
+    explicit CountingLine(QCustomPlot* plot) : QCPItemLine(plot) {}
+    double selectTest(const QPointF& pos, bool onlySelectable, QVariant* details = nullptr)
+        const override
+    {
+        ++mSelectCalls;
+        return QCPItemLine::selectTest(pos, onlySelectable, details);
+    }
+    mutable int mSelectCalls = 0;
+};
 
 bool sameList(const QList<QCPLayerable*>& a, const QList<QCPLayerable*>& b)
 {
@@ -108,11 +122,9 @@ void TestItemIndex::randomItemsMatchUnindexed()
         plot.xAxis2->setVisible(true);
         plot.yAxis2->setVisible(true);
 
+        QVERIFY(plot.addLayer(QStringLiteral("items2")));
         if (round % 4 == 2)
-        {
-            QVERIFY(plot.addLayer(QStringLiteral("items2")));
             plot.setCurrentLayer(QStringLiteral("items2"));
-        }
 
         const int count = 120 + round * 20;
         std::vector<QCPAbstractItem*> items;
@@ -129,18 +141,72 @@ void TestItemIndex::randomItemsMatchUnindexed()
                 item->setSelected(true);
             items.push_back(item);
         }
-        if (round % 4 == 2)
-            plot.setCurrentLayer(QStringLiteral("main"));
+        plot.setCurrentLayer(QStringLiteral("main"));
 
         plot.replot();
         QCoreApplication::processEvents();
 
-        // Random mutations through the public API, each followed by a frame.
-        std::uniform_int_distribution<int> pick(0, count - 1);
-        for (int step = 0; step < 40; ++step)
+        // Random mutations through the public API, each followed by a frame: moves, pen changes
+        // (they grow the pad), a bracket length, a line ending, a layer move, a delete, a take and
+        // re-add, and a scale type flip every few steps.
+        for (int step = 0; step < 60; ++step)
         {
-            QCPAbstractItem* item = items[std::size_t(pick(rng))];
-            placeRandomly(item, rng, plot.xAxis, plot.yAxis);
+            if (step % 10 == 5)
+            {
+                if (plot.xAxis->scaleType() == QCPAxis::stLinear)
+                {
+                    plot.xAxis->setRange(1, 100);
+                    plot.xAxis->setScaleType(QCPAxis::stLogarithmic);
+                }
+                else
+                {
+                    plot.xAxis->setScaleType(QCPAxis::stLinear);
+                }
+            }
+            if (items.empty())
+                break;
+            std::uniform_int_distribution<int> pick(0, int(items.size()) - 1);
+            const auto index = std::size_t(pick(rng));
+            QCPAbstractItem* item = items[index];
+            const int kind = std::uniform_int_distribution<int>(0, 5)(rng);
+            switch (kind)
+            {
+                case 0:
+                    placeRandomly(item, rng, plot.xAxis, plot.yAxis);
+                    break;
+                case 1:
+                    setPen(item, QPen(QColor(20 * (step % 12), 90, 160),
+                                     1 + std::uniform_int_distribution<int>(0, 12)(rng)));
+                    break;
+                case 2:
+                    if (auto* bracket = qobject_cast<QCPItemBracket*>(item))
+                        bracket->setLength(
+                            std::uniform_real_distribution<double>(10.0, 400.0)(rng));
+                    if (auto* line = qobject_cast<QCPItemLine*>(item))
+                    {
+                        line->setHead(
+                            QCPLineEnding(QCPLineEnding::esSpikeArrow, 20.0, 10.0));
+                        line->setTail(QCPLineEnding(QCPLineEnding::esDisc, 30.0, 10.0));
+                    }
+                    break;
+                case 3:
+                    item->setLayer(plot.layer(step % 2 ? QStringLiteral("items2")
+                                                      : QStringLiteral("main")));
+                    break;
+                case 4: // plain delete: the item unregisters itself (removeItem would delete it)
+                    delete item;
+                    items.erase(items.begin() + std::ptrdiff_t(index));
+                    break;
+                default: { // take through the owner and hand it back
+                    auto handle = qcp::makeHandle<QCPHandle<QCPAbstractItem>>(item);
+                    std::unique_ptr<QCPAbstractItem> taken = plot.take(handle);
+                    QVERIFY(taken);
+                    auto back = plot.add(std::move(taken));
+                    QVERIFY(back);
+                    QCOMPARE(back.get(), item);
+                    break;
+                }
+            }
             if (step % 5 == 0)
             {
                 plot.replot();
@@ -215,4 +281,87 @@ void TestItemIndex::dragOneItemKeepsTheTree()
         plot.replot(QCustomPlot::rpImmediateRefresh);
     }
     QCOMPARE(layer->mItemIndexBuilds, builds);
+}
+
+void TestItemIndex::clickTestsOnlyItemsNearTheClick()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.xAxis->setRange(0, 10);
+    plot.yAxis->setRange(0, 10);
+    auto* nearItem = new CountingLine(&plot);
+    nearItem->setPen(QPen(Qt::black, 4));
+    nearItem->start->setCoords(2.0, 5.0);
+    nearItem->end->setCoords(2.4, 5.0);
+    auto* farItem = new CountingLine(&plot);
+    farItem->setPen(QPen(Qt::black, 4));
+    farItem->start->setCoords(8.0, 5.0);
+    farItem->end->setCoords(8.4, 5.0);
+    plot.replot();
+    QCoreApplication::processEvents();
+
+    const QPointF click(plot.xAxis->coordToPixel(2.2), plot.yAxis->coordToPixel(5.0));
+    const QList<QCPLayerable*> hits = plot.layerableListAt(click, true);
+    QVERIFY(hits.contains(nearItem));
+    QVERIFY2(farItem->mSelectCalls == 0,
+             qPrintable(QStringLiteral("an item 6 units away was hit-tested %1 times")
+                            .arg(farItem->mSelectCalls)));
+}
+
+void TestItemIndex::scaleTypeChangeRebuildsTheIndex()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.xAxis->setRange(1, 100);
+    plot.yAxis->setRange(0, 100);
+
+    // A bracket left of a linear view whose 300 px arms reach into it. On a log axis the same
+    // coordinate is drawn 200 px left of the axis rect, so its extent changes meaning: a tree
+    // built for the linear axis must not answer after the switch.
+    auto* bracket = new QCPItemBracket(&plot);
+    bracket->setPen(QPen(Qt::darkGreen, 3));
+    bracket->setLength(300);
+    bracket->left->setCoords(-1, 20);
+    bracket->right->setCoords(-1, 80);
+    auto* inside = new QCPItemLine(&plot);
+    inside->setPen(QPen(Qt::black, 3));
+    inside->start->setCoords(10, 10);
+    inside->end->setCoords(90, 90);
+
+    plot.replot();
+    QCoreApplication::processEvents();
+    QCPLayer* layer = plot.layer(QStringLiteral("main"));
+    QVERIFY(layer);
+    const int builds = layer->mItemIndexBuilds;
+    QVERIFY(builds >= 1);
+
+    plot.xAxis->setScaleType(QCPAxis::stLogarithmic);
+    plot.xAxis->setRange(1, 100);
+    plot.replot();
+    QCoreApplication::processEvents();
+
+    // The extent of an item depends on the scale type (a non-positive coordinate is unbounded on a
+    // log axis), so the tree has to be rebuilt, not reused.
+    QVERIFY2(layer->mItemIndexBuilds > builds,
+             "the index built for the linear axis survived the switch to log");
+
+    // And the frame must be the one a plot built on a log axis from the start draws.
+    QCustomPlot fresh;
+    fresh.resize(400, 300);
+    fresh.xAxis->setScaleType(QCPAxis::stLogarithmic);
+    fresh.xAxis->setRange(1, 100);
+    fresh.yAxis->setRange(0, 100);
+    auto* freshBracket = new QCPItemBracket(&fresh);
+    freshBracket->setPen(QPen(Qt::darkGreen, 3));
+    freshBracket->setLength(300);
+    freshBracket->left->setCoords(-1, 20);
+    freshBracket->right->setCoords(-1, 80);
+    auto* freshInside = new QCPItemLine(&fresh);
+    freshInside->setPen(QPen(Qt::black, 3));
+    freshInside->start->setCoords(10, 10);
+    freshInside->end->setCoords(90, 90);
+    fresh.replot();
+    QCoreApplication::processEvents();
+
+    QCOMPARE(plot.toPixmap().toImage(), fresh.toPixmap().toImage());
 }

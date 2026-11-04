@@ -254,6 +254,9 @@ public:
         return std::nullopt;
     }
 
+    // Child slot in the owning layer, written when that layer rebuilds its index (QCPLayer).
+    mutable int mItemSlot = -1;
+
     // non-virtual methods:
     [[nodiscard]] QList<QCPItemPosition*> positions() const { return mPositions; }
 
@@ -306,6 +309,7 @@ private:
 
     friend class QCustomPlot;
     friend class QCPItemAnchor;
+    friend class QCPLayer; // writes mItemSlot at rebuild, so a move costs no search
 };
 
 /*!
