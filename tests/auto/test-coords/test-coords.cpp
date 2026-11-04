@@ -404,3 +404,23 @@ void TestCoords::mixingSpacesDoesNotCompile()
     static_assert(Addable<QCPItemAnchor*, QCP::PixelOffset>);
     QVERIFY(true);
 }
+
+void TestCoords::anchorOffsetIsPixelsWhateverTheOldType()
+{
+    // The offset of an anchored position is in pixels, even when the position used to be a ratio
+    // of the axis rect: otherwise (5, 6) would mean five axis-rect widths.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.replot();
+    auto* anchorItem = new QCPItemLine(&plot);
+    anchorItem->start->setCoords(2, 3);
+    auto* item = new QCPItemLine(&plot);
+    item->start->setType(QCPItemPosition::ptAxisRectRatio);
+    item->start->setCoords(0.5, 0.5);
+
+    item->start->set(QCP::AnchorOffset { anchorItem->start, { 5, 6 } });
+    const QPointF expected = anchorItem->start->pixelPosition() + QPointF(5, 6);
+    QCOMPARE(item->start->pixelPosition(), expected);
+    QCOMPARE(item->start->typeX(), QCPItemPosition::ptAbsolute);
+    QCOMPARE(item->start->typeY(), QCPItemPosition::ptAbsolute);
+}

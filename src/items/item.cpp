@@ -971,10 +971,11 @@ void QCPItemPosition::set(const QCP::Position& position)
       setCoords(anchored->offset.dx, anchored->offset.dy);
       return;
     }
-    // setParentAnchor switches ptPlotCoords to ptAbsolute itself, and only once the anchor is
-    // accepted: a refused anchor (a cycle, this position) must leave the position untouched.
+    // Attach first: a refused anchor (a cycle, this position) must leave the position untouched.
+    // Then the offset is pixels, whatever the old type (a ratio type would scale it by the rect).
     if (!setParentAnchor(anchored->anchor, false))
       return;
+    setType(ptAbsolute);
     setCoords(anchored->offset.dx, anchored->offset.dy);
   }
   else if (const auto* mixed = std::get_if<QCP::DataXRatioY>(&position))

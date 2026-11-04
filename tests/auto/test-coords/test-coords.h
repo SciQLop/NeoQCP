@@ -13,6 +13,7 @@ private slots:
     void translationDetected();
     void positionSetMatchesSetters();
     void refusedAnchorLeavesPositionUntouched();
+    void anchorOffsetIsPixelsWhateverTheOldType();
     void ratioTransformMatchesPixels();
     void mixingSpacesDoesNotCompile();
 };
