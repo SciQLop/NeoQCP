@@ -37,6 +37,7 @@
 #include "axis/axis.h"
 #include "items/item.h"
 #include "items/item-text.h"
+#include "items/item-tracer.h"
 #include "layer.h"
 #include "layoutelements/layoutelement-axisrect.h"
 #include "layoutelements/layoutelement-legend.h"
@@ -1485,6 +1486,8 @@ bool QCustomPlot::adopt(QCPAbstractPlottable* plottable)
   Unlinks every parent anchor between \a item and the rest of the plot, both directions, keeping the
   pixel positions (the plot is still there to compute them).
 */
+// A position keeps the pixel it had when its anchor is cut, which is what a user expects for a
+// chain; a self-anchor only keeps the relative offset, so the item collapses onto (0, 0).
 void QCustomPlot::cutAnchorLinks(QCPAbstractItem* item)
 {
     const auto elsewhere = [item](const QCPItemAnchor* anchor)
@@ -1529,6 +1532,9 @@ bool QCustomPlot::detach(QCPAbstractItem* item)
     }
     for (QCPItemAnchor* anchor : item->mAnchors)
         anchor->mParentPlot = nullptr;
+    // The tracer caches the graph it follows: that graph belongs to the plot it is leaving.
+    if (auto* tracer = qobject_cast<QCPItemTracer*>(item))
+        tracer->setGraph(nullptr);
     item->mParentPlot = nullptr;
     item->setParent(nullptr);
     return true;

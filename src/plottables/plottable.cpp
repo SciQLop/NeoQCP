@@ -464,7 +464,13 @@ QCPAbstractPlottable::QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis)
         return;
     QCP_CHECK_OR_RETURN(keyAxis && valueAxis, "a plottable needs a key axis and a value axis");
     if (keyAxis->parentPlot() != valueAxis->parentPlot())
-        qDebug() << Q_FUNC_INFO << "Parent plot of keyAxis is not the same as that of valueAxis.";
+    {
+        // Neither plot may end up drawing it: report once and leave the object inert, like the
+        // both-null case.
+        QCP_CHECK(false, "a plottable needs both axes on the same plot");
+        moveToLayer(nullptr, false);
+        return;
+    }
     if (keyAxis->orientation() == valueAxis->orientation())
         qDebug() << Q_FUNC_INFO << "keyAxis and valueAxis must be orthogonal to each other.";
 

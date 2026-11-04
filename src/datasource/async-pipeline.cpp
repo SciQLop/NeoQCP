@@ -60,7 +60,8 @@ void QCPAsyncPipelineBase::submit(QCPPipelineScheduler::Priority priority,
     if (mScheduler)
         mScheduler->submit(priority, std::move(job));
     else
-        job();
+        job(); // no scheduler (a taken plottable): the caller blocks for the whole transform,
+               // and jobs are not coalesced the way the scheduler does it
 }
 
 void QCPAsyncPipelineBase::startJob(QMutexLocker<QMutex>& lock,

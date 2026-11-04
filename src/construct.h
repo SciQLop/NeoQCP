@@ -81,7 +81,8 @@ void setDataOrUndo(QCustomPlot& plot, Handle& handle, Args&&... args)
     }
     catch (...)
     {
-        (void)plot.take(handle);
+        if (handle)
+            (void)plot.take(handle);
         throw;
     }
 }
