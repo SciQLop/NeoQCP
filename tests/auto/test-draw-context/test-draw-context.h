@@ -17,8 +17,10 @@ private slots:
     void errorBarsMatchesHandPainting();
     void textMatchesHandPainting();
     void pathMatchesHandPainting();
+    void pathDoesNotShiftLaterCommands();
     void imageMatchesHandPainting();
     void painterMatchesHandPainting();
+    void painterCallbackStateDoesNotLeak();
     void boundsCoverEveryCommand();
     void sharedDataIsNotCopied();
     void drawListIsCompact();

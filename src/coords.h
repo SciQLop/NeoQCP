@@ -131,6 +131,8 @@ public:
     //! Maps keys and values in bulk into \a out; stops at the shortest of the three spans.
     void map(std::span<const double> keys, std::span<const double> values,
              std::span<QPointF> out) const;
+    //! Maps interleaved data (x = key, y = value) into \a out; stops at the shortest span.
+    void map(std::span<const QPointF> data, std::span<QPointF> out) const;
     //! True when the two transforms differ by a pixel offset only (a pan, not a zoom); \a delta
     //! gets it.
     [[nodiscard]] bool isTranslationOf(const QCPTransform& other, QPointF* delta = nullptr) const;
@@ -165,9 +167,10 @@ private:
         [[nodiscard]] double toValue(double pixel) const;
     };
 
-    template <bool KeyLog, bool ValueLog>
-    void mapRange(std::span<const double> keys, std::span<const double> values,
-                  std::span<QPointF> out) const;
+    template <bool KeyLog, bool ValueLog, typename KeyAt, typename ValueAt>
+    void mapRange(std::size_t count, KeyAt keyAt, ValueAt valueAt, std::span<QPointF> out) const;
+    template <typename KeyAt, typename ValueAt>
+    void mapAny(std::size_t count, KeyAt keyAt, ValueAt valueAt, std::span<QPointF> out) const;
 
     Axis mKey;
     Axis mValue;

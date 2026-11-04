@@ -205,6 +205,42 @@ void TestCoords::batchMatchesScalar()
     }
 }
 
+void TestCoords::interleavedBatchMatchesScalar()
+{
+    std::mt19937 rng(13);
+    // Every scale case, so the interleaved batch shares the same four log/linear instantiations.
+    for (const ScaleCase& testCase : kCases)
+    {
+        auto plot = layoutPlot();
+        QCPAxis* keyAxis = plot->xAxis;
+        QCPAxis* valueAxis = plot->yAxis;
+        if (testCase.verticalKey)
+        {
+            keyAxis = plot->axisRect()->addAxis(QCPAxis::atLeft);
+            valueAxis = plot->axisRect()->addAxis(QCPAxis::atBottom);
+        }
+        configureLogAxes(keyAxis, valueAxis, testCase);
+        plot->replot();
+
+        const QCPTransform transform(keyAxis, valueAxis);
+        std::vector<QPointF> data(10000);
+        std::uniform_real_distribution<double> inside(1.0, 1000.0);
+        for (QPointF& point : data)
+            point = QPointF(inside(rng), inside(rng));
+        std::vector<QPointF> batch(data.size());
+        transform.map(std::span<const QPointF>(data), std::span<QPointF>(batch));
+
+        for (std::size_t i = 0; i < data.size(); ++i)
+        {
+            const QPointF one = pixelsOf(transform, data[i].x(), data[i].y());
+            QVERIFY2(nearlyEqual(batch[i].x(), one.x()),
+                     qPrintable(QStringLiteral("%1: x at %2").arg(testCase.name).arg(i)));
+            QVERIFY2(nearlyEqual(batch[i].y(), one.y()),
+                     qPrintable(QStringLiteral("%1: y at %2").arg(testCase.name).arg(i)));
+        }
+    }
+}
+
 void TestCoords::translationDetected()
 {
     auto plot = layoutPlot();

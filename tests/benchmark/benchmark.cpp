@@ -3,6 +3,8 @@
 #include <qcustomplot.h>
 #include <spatial-index.h>
 #include <coords.h>
+#include <painting/draw-commands.h>
+#include <painting/draw-context.h>
 #include <datasource/soa-datasource-2d.h>
 #include <datasource/resample.h>
 #include <vector>
@@ -99,6 +101,8 @@ private slots:
 
   void QCPCoords_CoordToPixel1M();
   void QCPTransform_Map1M();
+  void QCPDrawContext_ReplayData1M();
+  void QCPDrawContext_ReplayMarkers100k();
 
   void QCPBars_Zoom10k();
   void QCPBars_Pan10k();
@@ -1786,4 +1790,66 @@ void Benchmark::QCPTransform_Map1M()
   std::vector<QPointF> out(keys.size());
   QBENCHMARK { transform.map(keys, values, out); }
   QCOMPARE(int(out.size()), 1000000);
+}
+
+namespace
+{
+// One shared 1M-point set for the replay rows: data space, so the replay maps every point.
+std::shared_ptr<const std::vector<QPointF>> sharedMillionPoints()
+{
+  static const std::shared_ptr<const std::vector<QPointF>> points = []
+  {
+    auto made = std::make_shared<std::vector<QPointF>>(1000000);
+    for (std::size_t i = 0; i < made->size(); ++i)
+      (*made)[i] = QPointF(1000.0 * i / made->size(), qSin(6 * M_PI * i / made->size()));
+    return std::shared_ptr<const std::vector<QPointF>>(made);
+  }();
+  return points;
+}
+
+std::shared_ptr<const std::vector<QPointF>> sharedPoints(int count)
+{
+  auto made = std::make_shared<std::vector<QPointF>>(count);
+  for (int i = 0; i < count; ++i)
+    (*made)[i] = QPointF(1000.0 * i / count, qSin(6 * M_PI * i / count));
+  return std::shared_ptr<const std::vector<QPointF>>(made);
+}
+} // namespace
+
+void Benchmark::QCPDrawContext_ReplayData1M()
+{
+  mPlot->xAxis->setRange(0, 1000);
+  mPlot->yAxis->setRange(-1, 1);
+  mPlot->replot();
+  QCPDrawContext context(mPlot->xAxis, mPlot->yAxis, mPlot->axisRect(), nullptr);
+  // NoPen: the timed part is the mapping and the NaN split, not the rasterisation.
+  context.polyline(sharedMillionPoints(), QPen(Qt::NoPen));
+  const QCPDrawFrame frame = context.frame();
+  const QCPDrawList &list = context.drawList();
+  QImage image(1000, 600, QImage::Format_ARGB32_Premultiplied);
+  image.fill(Qt::white);
+  QBENCHMARK
+  {
+    QCPPainter painter(&image);
+    qcpReplayWithPainter(list, painter, frame);
+  }
+}
+
+void Benchmark::QCPDrawContext_ReplayMarkers100k()
+{
+  mPlot->xAxis->setRange(0, 1000);
+  mPlot->yAxis->setRange(-1, 1);
+  mPlot->replot();
+  QCPDrawContext context(mPlot->xAxis, mPlot->yAxis, mPlot->axisRect(), nullptr);
+  QCPScatterStyle style(QCPScatterStyle::ssDot, QPen(Qt::black), QBrush(Qt::black), 1.0);
+  context.markers(sharedPoints(100000), style);
+  const QCPDrawFrame frame = context.frame();
+  const QCPDrawList &list = context.drawList();
+  QImage image(1000, 600, QImage::Format_ARGB32_Premultiplied);
+  image.fill(Qt::white);
+  QBENCHMARK
+  {
+    QCPPainter painter(&image);
+    qcpReplayWithPainter(list, painter, frame);
+  }
 }

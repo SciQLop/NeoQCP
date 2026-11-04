@@ -10,6 +10,7 @@ private slots:
     void mapMatchesCoordToPixel();
     void inverseRoundTrips();
     void batchMatchesScalar();
+    void interleavedBatchMatchesScalar();
     void translationDetected();
     void positionSetMatchesSetters();
     void refusedAnchorLeavesPositionUntouched();

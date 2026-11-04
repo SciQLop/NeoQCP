@@ -379,6 +379,64 @@ void TestDrawContext::imageMatchesHandPainting()
     QCOMPARE(replay, hand);
 }
 
+void TestDrawContext::pathDoesNotShiftLaterCommands()
+{
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    QPainterPath path;
+    path.moveTo(0, 0);
+    path.lineTo(40, -25);
+    path.lineTo(80, 10);
+    context.path(QCP::Data { 20, 110 }, path, kPen, kBrush);
+    context.rect(QCP::Data { 120, 20 }, QCP::Data { 180, 60 }, kPen, kBrush);
+
+    const QImage replay = replayOf(context);
+    const QImage hand = painted(
+        [&path](QCPPainter& painter, const QCPTransform& transform) {
+            painter.save();
+            painter.translate(pixelOf(transform, 20, 110));
+            painter.setPen(kPen);
+            painter.setBrush(kBrush);
+            painter.drawPath(path);
+            painter.restore();
+            painter.setPen(kPen);
+            painter.setBrush(kBrush);
+            painter.drawRect(QRectF(pixelOf(transform, 120, 20), pixelOf(transform, 180, 60))
+                                 .normalized());
+        },
+        context.transform());
+    QCOMPARE(replay, hand);
+}
+
+void TestDrawContext::painterCallbackStateDoesNotLeak()
+{
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    const auto callback = [](QCPPainter& painter, const QCPTransform& transform) {
+        painter.setPen(QPen(Qt::red, 1.0));
+        painter.translate(50, 0);
+        painter.drawLine(pixelOf(transform, 0, 0), pixelOf(transform, 10, 10));
+    };
+    context.painter(callback);
+    context.rect(QCP::Data { 120, 20 }, QCP::Data { 180, 60 }, kPen, kBrush);
+
+    const QImage replay = replayOf(context);
+    const QImage hand = painted(
+        [&callback](QCPPainter& painter, const QCPTransform& transform) {
+            painter.save();
+            callback(painter, transform);
+            painter.restore();
+            painter.setPen(kPen);
+            painter.setBrush(kBrush);
+            painter.drawRect(QRectF(pixelOf(transform, 120, 20), pixelOf(transform, 180, 60))
+                                 .normalized());
+        },
+        context.transform());
+    QCOMPARE(replay, hand);
+}
+
 void TestDrawContext::painterMatchesHandPainting()
 {
     Fixture fixture;

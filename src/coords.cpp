@@ -129,11 +129,10 @@ QCP::Data QCPTransform::inverse(QCP::Pixels pixels) const
     return QCP::Data { mKey.toValue(keyPixel), mValue.toValue(valuePixel) };
 }
 
-template <bool KeyLog, bool ValueLog>
-void QCPTransform::mapRange(std::span<const double> keys, std::span<const double> values,
+template <bool KeyLog, bool ValueLog, typename KeyAt, typename ValueAt>
+void QCPTransform::mapRange(std::size_t count, KeyAt keyAt, ValueAt valueAt,
                             std::span<QPointF> out) const
 {
-    const std::size_t count = std::min({ keys.size(), values.size(), out.size() });
     const Axis& keyAxis = mKey;
     const Axis& valueAxis = mValue;
     const double keySlope = keyAxis.slope;
@@ -149,48 +148,69 @@ void QCPTransform::mapRange(std::span<const double> keys, std::span<const double
     const bool keyIsX = !keyAxis.vertical;
     for (std::size_t i = 0; i < count; ++i)
     {
+        const double key = keyAt(i);
+        const double value = valueAt(i);
         double keyPixel;
         double valuePixel;
         if constexpr (KeyLog)
-            keyPixel = (keys[i] > 0.0) == keyPositive
-                ? keyLogSlope * std::log(std::abs(keys[i])) + keyLogIntercept
-                : keyAxis.toPixel(keys[i]); // the sign QCPAxis draws 200 px outside the rect
+            keyPixel = (key > 0.0) == keyPositive
+                ? keyLogSlope * std::log(std::abs(key)) + keyLogIntercept
+                : keyAxis.toPixel(key); // the sign QCPAxis draws 200 px outside the rect
         else
-            keyPixel = keySlope * keys[i] + keyIntercept;
+            keyPixel = keySlope * key + keyIntercept;
         if constexpr (ValueLog)
-            valuePixel = (values[i] > 0.0) == valuePositive
-                ? valueLogSlope * std::log(std::abs(values[i])) + valueLogIntercept
-                : valueAxis.toPixel(values[i]);
+            valuePixel = (value > 0.0) == valuePositive
+                ? valueLogSlope * std::log(std::abs(value)) + valueLogIntercept
+                : valueAxis.toPixel(value);
         else
-            valuePixel = valueSlope * values[i] + valueIntercept;
+            valuePixel = valueSlope * value + valueIntercept;
         out[i] = keyIsX ? QPointF(keyPixel, valuePixel) : QPointF(valuePixel, keyPixel);
+    }
+}
+
+// One dispatch for every batch flavour: the four log/linear instantiations are written once.
+template <typename KeyAt, typename ValueAt>
+void QCPTransform::mapAny(std::size_t count, KeyAt keyAt, ValueAt valueAt,
+                          std::span<QPointF> out) const
+{
+    if (!mKey.usable || !mValue.usable)
+    {
+        const QPointF none(std::numeric_limits<double>::quiet_NaN(),
+                           std::numeric_limits<double>::quiet_NaN());
+        std::fill_n(out.begin(), count, none);
+        return;
+    }
+    if (mKey.logarithmic)
+    {
+        if (mValue.logarithmic)
+            mapRange<true, true>(count, keyAt, valueAt, out);
+        else
+            mapRange<true, false>(count, keyAt, valueAt, out);
+    }
+    else
+    {
+        if (mValue.logarithmic)
+            mapRange<false, true>(count, keyAt, valueAt, out);
+        else
+            mapRange<false, false>(count, keyAt, valueAt, out);
     }
 }
 
 void QCPTransform::map(std::span<const double> keys, std::span<const double> values,
                        std::span<QPointF> out) const
 {
-    if (!mKey.usable || !mValue.usable)
-    {
-        const QPointF none(std::numeric_limits<double>::quiet_NaN(),
-                           std::numeric_limits<double>::quiet_NaN());
-        std::fill_n(out.begin(), std::min({ keys.size(), values.size(), out.size() }), none);
-        return;
-    }
-    if (mKey.logarithmic)
-    {
-        if (mValue.logarithmic)
-            mapRange<true, true>(keys, values, out);
-        else
-            mapRange<true, false>(keys, values, out);
-    }
-    else
-    {
-        if (mValue.logarithmic)
-            mapRange<false, true>(keys, values, out);
-        else
-            mapRange<false, false>(keys, values, out);
-    }
+    mapAny(std::min({ keys.size(), values.size(), out.size() }),
+           [&keys](std::size_t i) { return keys[i]; },
+           [&values](std::size_t i) { return values[i]; }, out);
+}
+
+void QCPTransform::map(std::span<const QPointF> data, std::span<QPointF> out) const
+{
+    // data[i].x() is the key, data[i].y() the value; a caller may map a span onto itself, the
+    // loop reads element i before it writes element i.
+    mapAny(std::min(data.size(), out.size()),
+           [&data](std::size_t i) { return data[i].x(); },
+           [&data](std::size_t i) { return data[i].y(); }, out);
 }
 
 bool QCPTransform::isTranslationOf(const QCPTransform& other, QPointF* delta) const

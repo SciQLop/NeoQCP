@@ -8,11 +8,26 @@
 
 #include <QPolygonF>
 
+#include <algorithm>
 #include <cmath>
 #include <type_traits>
 
 namespace
 {
+// Reused across replays on this thread: a steady-state replay allocates nothing.
+struct Scratch
+{
+    std::vector<QPointF> data;   // data-space points of one command, before the batch map
+    std::vector<QPointF> pixels; // the same points in pixels, or the resolved positions
+    QPolygonF polygon;
+};
+
+Scratch& scratch()
+{
+    thread_local Scratch local;
+    return local;
+}
+
 QPointF dataPixel(const QCPDrawFrame& frame, const QPointF& point)
 {
     const QCP::Pixels pixels = frame.transform.map(QCP::Data { point.x(), point.y() });
@@ -22,18 +37,16 @@ QPointF dataPixel(const QCPDrawFrame& frame, const QPointF& point)
 void resolveInto(const QCPDrawFrame& frame, const std::vector<QCP::Position>& positions,
                  std::vector<QPointF>& pixels)
 {
-    pixels.clear();
-    pixels.reserve(positions.size());
-    for (const QCP::Position& position : positions)
-        pixels.push_back(qcpResolvePosition(frame, position));
+    pixels.resize(positions.size());
+    for (std::size_t i = 0; i < positions.size(); ++i)
+        pixels[i] = qcpResolvePosition(frame, positions[i]);
 }
 
-QPolygonF polygonOf(const std::vector<QPointF>& pixels)
+QPolygonF& polygonOf(const std::vector<QPointF>& pixels)
 {
-    QPolygonF polygon;
-    polygon.reserve(int(pixels.size()));
-    for (const QPointF& pixel : pixels)
-        polygon.append(pixel);
+    QPolygonF& polygon = scratch().polygon;
+    polygon.resize(int(pixels.size()));
+    std::copy(pixels.begin(), pixels.end(), polygon.begin());
     return polygon;
 }
 
@@ -56,18 +69,30 @@ void replayText(const qcp::TextCmd& cmd, QCPPainter& painter, const QCPDrawFrame
     painter.restore();
 }
 
+// The four corners of each bar in one batch: the centre plus and minus the span on each axis.
 void replayErrorBars(const qcp::ErrorBarsCmd& cmd, QCPPainter& painter, const QCPDrawFrame& frame)
 {
     const std::size_t count = std::min(cmd.centres->size(), cmd.spans->size());
-    painter.setPen(cmd.pen);
+    Scratch& local = scratch();
+    local.data.resize(4 * count);
     for (std::size_t i = 0; i < count; ++i)
     {
         const QPointF centre = cmd.centres->at(i);
         const QPointF span = cmd.spans->at(i);
-        const QPointF above = dataPixel(frame, QPointF(centre.x(), centre.y() + span.y()));
-        const QPointF below = dataPixel(frame, QPointF(centre.x(), centre.y() - span.y()));
-        const QPointF left = dataPixel(frame, QPointF(centre.x() - span.x(), centre.y()));
-        const QPointF right = dataPixel(frame, QPointF(centre.x() + span.x(), centre.y()));
+        local.data[4 * i + 0] = QPointF(centre.x(), centre.y() + span.y());
+        local.data[4 * i + 1] = QPointF(centre.x(), centre.y() - span.y());
+        local.data[4 * i + 2] = QPointF(centre.x() - span.x(), centre.y());
+        local.data[4 * i + 3] = QPointF(centre.x() + span.x(), centre.y());
+    }
+    local.pixels.resize(local.data.size());
+    frame.transform.map(std::span<const QPointF>(local.data), std::span<QPointF>(local.pixels));
+    painter.setPen(cmd.pen);
+    for (std::size_t i = 0; i < count; ++i)
+    {
+        const QPointF& above = local.pixels[4 * i + 0];
+        const QPointF& below = local.pixels[4 * i + 1];
+        const QPointF& left = local.pixels[4 * i + 2];
+        const QPointF& right = local.pixels[4 * i + 3];
         painter.drawLine(above, below);
         painter.drawLine(QPointF(left.x(), above.y()), QPointF(right.x(), above.y()));
         painter.drawLine(QPointF(left.x(), below.y()), QPointF(right.x(), below.y()));
@@ -80,7 +105,7 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
     painter.save();
     if (!frame.clip.isEmpty())
         painter.setClipRect(frame.clip);
-    std::vector<QPointF> pixels;
+    Scratch& local = scratch();
     for (const qcp::QCPDrawCommand& command : list.commands)
     {
         std::visit(
@@ -88,37 +113,39 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
                 using Command = std::decay_t<decltype(cmd)>;
                 if constexpr (std::is_same_v<Command, qcp::PolylineDataCmd>)
                 {
-                    pixels.clear();
-                    pixels.reserve(cmd.points->size());
-                    for (const QPointF& point : *cmd.points)
-                        pixels.push_back(dataPixel(frame, point));
+                    const std::span<const QPointF> data(*cmd.points);
+                    local.pixels.resize(data.size());
+                    frame.transform.map(data, std::span<QPointF>(local.pixels));
                     painter.setPen(cmd.pen);
-                    qcp::drawPolylineSplitNaN(&painter, std::span<const QPointF>(pixels));
+                    qcp::drawPolylineSplitNaN(&painter, std::span<const QPointF>(local.pixels));
                 }
                 else if constexpr (std::is_same_v<Command, qcp::PolylinePositionsCmd>)
                 {
-                    resolveInto(frame, cmd.points, pixels);
+                    resolveInto(frame, cmd.points, local.pixels);
                     painter.setPen(cmd.pen);
-                    qcp::drawPolylineSplitNaN(&painter, std::span<const QPointF>(pixels));
+                    qcp::drawPolylineSplitNaN(&painter, std::span<const QPointF>(local.pixels));
                 }
                 else if constexpr (std::is_same_v<Command, qcp::PolygonCmd>)
                 {
-                    resolveInto(frame, cmd.points, pixels);
+                    resolveInto(frame, cmd.points, local.pixels);
                     painter.setPen(cmd.pen);
                     painter.setBrush(cmd.brush);
-                    painter.drawPolygon(polygonOf(pixels));
+                    painter.drawPolygon(polygonOf(local.pixels));
                 }
                 else if constexpr (std::is_same_v<Command, qcp::FillBetweenCmd>)
                 {
-                    QPolygonF polygon;
-                    polygon.reserve(int(cmd.upper->size() + cmd.lower->size()));
-                    for (const QPointF& point : *cmd.upper)
-                        polygon.append(dataPixel(frame, point));
-                    for (auto it = cmd.lower->crbegin(); it != cmd.lower->crend(); ++it)
-                        polygon.append(dataPixel(frame, *it));
+                    const std::size_t upper = cmd.upper->size();
+                    const std::size_t lower = cmd.lower->size();
+                    local.data.resize(upper + lower);
+                    std::copy(cmd.upper->cbegin(), cmd.upper->cend(), local.data.begin());
+                    std::reverse_copy(cmd.lower->cbegin(), cmd.lower->cend(),
+                                      local.data.begin() + std::ptrdiff_t(upper));
+                    local.pixels.resize(local.data.size());
+                    frame.transform.map(std::span<const QPointF>(local.data),
+                                        std::span<QPointF>(local.pixels));
                     painter.setPen(Qt::NoPen);
                     painter.setBrush(cmd.brush);
-                    painter.drawPolygon(polygon);
+                    painter.drawPolygon(polygonOf(local.pixels));
                 }
                 else if constexpr (std::is_same_v<Command, qcp::RectCmd>)
                 {
@@ -140,9 +167,12 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
                 }
                 else if constexpr (std::is_same_v<Command, qcp::MarkersCmd>)
                 {
+                    const std::span<const QPointF> data(*cmd.points);
+                    local.pixels.resize(data.size());
+                    frame.transform.map(data, std::span<QPointF>(local.pixels));
                     cmd.style.applyTo(&painter, QPen(Qt::black));
-                    for (const QPointF& point : *cmd.points)
-                        cmd.style.drawShape(&painter, dataPixel(frame, point));
+                    for (const QPointF& point : local.pixels)
+                        cmd.style.drawShape(&painter, point);
                 }
                 else if constexpr (std::is_same_v<Command, qcp::ErrorBarsCmd>)
                 {
@@ -154,10 +184,12 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
                 }
                 else if constexpr (std::is_same_v<Command, qcp::PathCmd>)
                 {
+                    painter.save(); // the origin translation is this command's own
                     painter.translate(qcpResolvePosition(frame, cmd.origin));
                     painter.setPen(cmd.pen);
                     painter.setBrush(cmd.brush);
                     painter.drawPath(cmd.path);
+                    painter.restore();
                 }
                 else if constexpr (std::is_same_v<Command, qcp::ImageCmd>)
                 {
@@ -168,7 +200,9 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
                 }
                 else if constexpr (std::is_same_v<Command, qcp::PainterCmd>)
                 {
+                    painter.save(); // a callback may leave any state changed
                     cmd.callback(painter, frame.transform);
+                    painter.restore();
                 }
             },
             command);
