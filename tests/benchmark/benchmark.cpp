@@ -1,11 +1,13 @@
 #include <QtTest/QtTest>
 
 #include <qcustomplot.h>
+#include <spatial-index.h>
 #include <datasource/soa-datasource-2d.h>
 #include <datasource/resample.h>
 #include <vector>
 #include <span>
 #include <memory>
+#include <random>
 
 class Benchmark : public QObject
 {
@@ -78,6 +80,9 @@ private slots:
   void QCPAxisRects_Stack8_Replot();
   void QCPPlots_Stack8_Replot();
   void QCPInput_MouseMoveStorm();
+
+  void QCPSpatialIndex_Build10k();
+  void QCPSpatialIndex_Query10k();
 
 private:
   QCustomPlot *mPlot;
@@ -1347,4 +1352,45 @@ void Benchmark::QCPInput_MouseMoveStorm()
     }
   }
   QCOMPARE(moves, kMoves);
+}
+
+namespace
+{
+std::vector<std::pair<QCPDataBox, int>> spatialIndexEntries10k()
+{
+  std::mt19937 rng(7);
+  std::uniform_real_distribution<double> position(0.0, 1000.0);
+  std::vector<std::pair<QCPDataBox, int>> entries;
+  entries.reserve(10000);
+  for (int i = 0; i < 10000; ++i)
+  {
+    const double key = position(rng);
+    const double value = position(rng);
+    entries.push_back({{key, key + 1.0, value, value + 1.0}, i});
+  }
+  return entries;
+}
+} // namespace
+
+void Benchmark::QCPSpatialIndex_Build10k()
+{
+  const std::vector<std::pair<QCPDataBox, int>> entries = spatialIndexEntries10k();
+  QCPSpatialIndex index;
+  QBENCHMARK { index.build(entries); }
+  QCOMPARE(index.size(), 10000);
+}
+
+void Benchmark::QCPSpatialIndex_Query10k()
+{
+  QCPSpatialIndex index;
+  index.build(spatialIndexEntries10k());
+  // 10 000 items of one unit square over 1000x1000: a 100x100 window hits about a hundred.
+  const QCPDataBox query{450.0, 550.0, 450.0, 550.0};
+  int hits = 0;
+  QBENCHMARK
+  {
+    hits = 0;
+    index.query(query, [&hits](int) { ++hits; });
+  }
+  QVERIFY(hits > 50 && hits < 200);
 }
