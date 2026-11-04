@@ -17,14 +17,18 @@ Previous milestone: `docs/plans/neoqcp-3/milestone-2-rulings.md`.
 
 ## Why the numbers move today
 
-Profiled in milestone 2 Task 2: 65 % of `QCPItems_AddRemove10k` is four O(n²) list scans.
+Measured in Task 1 (`docs/plans/neoqcp-3/item-scaling-profile.md`): about half of adding and deleting
+10 000 items is NeoQCP's own linear list scans, each run once per item.
 1. `QCustomPlot::registerItem` checks `mItems.contains(item)` on every new item.
 2. `QCPLayer::addChild` checks `mChildren.contains(layerable)` on every add.
-3. `deleteAllItems` deletes newest first, so Qt's own `children.indexOf` scans the whole parent list.
-4. `QCPLayer::removeChild` (`removeOne`) searches from the front while items die from the back.
+3. `itemDestroyed` and `removeItem` search `mItems` (`removeItem` twice: `contains`, then `removeOne`).
+4. `QCPLayer::removeChild` (`removeOne`) searches the layer list; `deleteAllItems` deletes newest first,
+   so that search and Qt's own `children.indexOf` walk the whole list each time. (Qt 6 erases a first
+   element by moving the begin pointer: deleting oldest first makes both O(1).)
 
-The row moves between 61 and 80 ms with memory layout. That explains its "24 % faster" at the end of
-milestone 1 and its 72 ms at the end of milestone 2: it is cache noise on top of quadratic scans.
+Task 1 also found that a range change never redrew a layer holding only items (fixed in 770b1eb). With
+items really drawn, a zoom over 10 000 items with 100 in view costs 4.7 ms against 0.53 ms for 100
+items, and a click 1.2 ms against 0.013 ms: drawing and hit testing are linear in all items.
 
 ## Global Constraints
 
@@ -97,14 +101,15 @@ dispatching Task 2.
   - `registerItem`: the duplicate check becomes `item->mRegisteredPlot == this` (O(1); it always holds a
     live, new object). `hasItem`, `removeItem` and `detach` keep their list search: they take a user
     pointer that may dangle, and the search answers that safely without dereferencing it.
-  - `QCPLayer::addChild`: the `contains` check becomes a `Q_ASSERT(!mChildren.contains(…))` (debug
-    only); only `setLayer`/`moveToLayer` call it, right after leaving the old layer.
+  - `QCPLayer::addChild`: drop the `contains` check (not a `Q_ASSERT`: asserts are live in
+    `build-qt612`); only `moveToLayer` calls it, right after leaving the old layer, so a duplicate cannot
+    happen. Keep `removeChild`'s "not a child" message: `~QCPLayer` must keep working.
   - `deleteAllItems`: first take all items out of their layers in one pass per layer (`removeIf` against
     a `QSet` of the items; one `invalidatePaintBuffer` per touched layer), then delete them oldest first
     so Qt's `indexOf` finds each at the front. Keep "all unlisted before the first delete".
   - The plot destructor path: apply the same if Task 1 shows `DeletePlot10k` quadratic.
-- [ ] **Step 3:** the four tests, TestOwnership, the full suite in both builds; the Task 1 rows. Target:
-  the ledger's Task 2 line.
+- [ ] **Step 3:** add the row `QCPItems_AddRemove20k` (as `AddRemove10k` with 20 000). Run the four tests,
+  TestOwnership, the full suite in both builds, and the item rows. Target: the ledger's Task 2 line.
 - [ ] **Step 4:** commit "perf(items): adding and clearing items is linear".
 
 ### Task 3: Removing one item costs about what Qt costs
@@ -114,7 +119,8 @@ dispatching Task 2.
 Target: `QCPItems_DeleteEach10k` and `RemoveEach10k` within the ledger's factor of
 `QObject_DeleteEachChild10k` (Qt's own `indexOf` is the floor while items stay plot children).
 
-- [ ] **Step 1:** if the profile shows `mItems.removeOne` or the layer's `removeOne` above Qt's share,
+- [ ] **Step 1:** `removeItem` does one search, not two (`indexOf` + `removeAt`, the list search stays for
+  dangling user pointers). Then, if the profile shows `mItems.removeOne` or the layer's `removeOne` above Qt's share,
   replace the linear search by the cheapest structure that keeps the order rules of the Global
   Constraints (for example `lastIndexOf`, or an index kept on the item). Decide from the profile; a
   `simplify:` comment names the ceiling that remains.
@@ -126,8 +132,8 @@ nothing.
 
 ### Task 4: Items outside the view cost nothing to draw or hit-test
 
-Only if Task 1 shows `Zoom10k` or `MouseMove10k` above the ledger's factor of their `100` rows. The
-controller writes this task's design into the ledger from the profile (what is cheap to test per item,
+Task 1 shows both linear (`Zoom10k` 4.7 ms vs `Zoom100` 0.53 ms; `Click10k` 1.2 ms vs `Click100`
+0.013 ms). The controller writes this task's design into the ledger from the profile (what is cheap to test per item,
 where the test lives, how anchors and pixel positions are handled) before dispatching it. Tests first:
 an item scrolled into view is drawn (pixel check), an item outside is not hit-tested (its `selectTest`
 is not called — count it in a test subclass), an item with pixel-positioned or anchored points is never

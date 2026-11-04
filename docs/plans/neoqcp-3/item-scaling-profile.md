@@ -34,8 +34,8 @@ Qt's real cost. With the shuffle, `QObject_DeleteEachChild10k` costs 7.8 ms inst
 | `QCPItems_RemoveEach10k` | 31 | 31 | 31 | **31 ms** |
 | `QObject_DeleteEachChild10k` | 7.9 | 7.8 | 7.8 | **7.8 ms** |
 | `QCPItems_DeletePlot10k` | 62 | 62 | 62 | **62 ms** |
-| `QCPItems_Zoom10k` | 0.14 | 0.14 | 0.14 | **0.14 ms** |
-| `QCPItems_Zoom100` | 0.14 | 0.14 | 0.14 | **0.14 ms** |
+| `QCPItems_Zoom10k` | 4.7 | | | **4.7 ms** (after 770b1eb; 0.14 before, nothing was drawn) |
+| `QCPItems_Zoom100` | 0.53 | | | **0.53 ms** (after 770b1eb) |
 | `QCPItems_ZoomEmpty` | 0.14 | 0.14 | 0.14 | **0.14 ms** |
 | `QCPItems_Click10k` | 1.2 | 1.2 | 1.2 | **1.2 ms** |
 | `QCPItems_Click100` | 0.013 | 0.013 | 0.013 | **0.013 ms** |
@@ -54,10 +54,12 @@ Qt's own child bookkeeping for the same shape costs 0.78 µs per object.
    shuffled deletes, no QCP lists) is 7.8 ms; deleting the same number of items costs 25 ms, so about
    17 ms of the 25 is ours: the layer's `removeChild` erase and `invalidatePaintBuffer`, plus the item
    destructor's `itemDestroyed` → `mItems.removeOne`.
-3. **Drawing does not scale with the number of items.** `Zoom10k` == `Zoom100` == `ZoomEmpty` == 0.14 ms:
-   100 items in view cost the same as none, and 9 900 items outside the view cost nothing. A true zoom
-   (the width changes, so the layer is redrawn, not translated) still shows no per-item cost at this
-   size. Any culling proposal has to justify itself on something other than "drawing is slow".
+3. **Drawing scales with every item, in view or not.** The first measurement (0.14 ms for 0, 100 and
+   10 000 items) was a bug: a range change never redrew a layer that holds only items, so no item was
+   drawn at all (gdb: 200 `QCPItemLine::draw` calls for 100 items over 12 replots). Fixed in 770b1eb
+   (`itemOnOwnLayerFollowsRangeChange`). Since then `Zoom10k` is 4.7 ms against 0.53 ms for
+   `Zoom100`: the 9 900 items outside the view cost ~0.42 us each per frame. `QCPItems_Replot10k` (a pan)
+   went from 0.13 to 4.5 ms for the same reason. Culling (Task 4) has a measured basis.
 4. **Hit testing does scale, linearly.** `Click10k` is 1.2 ms against 0.013 ms for `Click100`: 92× the
    time for 100× the items, i.e. ~120 ns per item per click. Every press and every release walks the
    item list and calls `selectTest` on each item. This is the one place where the item count is felt
@@ -83,7 +85,7 @@ Buckets: **item list** = `mItems` scans (`indexOf<QCPAbstractItem*>`,
 | `Add10k` (setup only) | 17.8 % | 28.9 % | 18.2 % | 4.6 % | 30.5 % (item constructors, `axisRects()`, allocator) |
 | `Clear10k` | 17.3 % | 29.1 % | 18.3 % | 4.6 % | 30.8 % |
 | `DeleteEach10k` | 22.8 % | 23.5 % | 9.7 % | 4.4 % | 39.6 % |
-| `Zoom10k` | 3.7 % | 6.7 % | 4.1 % | 6.3 % | 79.1 % (Qt's rasterizer and text engine, inside our draw) |
+| `Zoom10k` (before 770b1eb, items not drawn) | 3.7 % | 6.7 % | 4.1 % | 6.3 % | 79.1 % (Qt's rasterizer and text engine, inside our draw) |
 | `Click10k` | 0.6 % | 1.7 % | 6.1 % | 79.0 % | 12.6 % |
 
 Top self-time frames:
@@ -115,10 +117,7 @@ Attack, in this order: the `mItems` scans (`registerItem`'s `contains`, `itemDes
 Those are 40-50 % of the add and delete rows and are what makes 10 000 items cost 10 000 × O(n).
 
 Not worth attacking: `setParent_helper` (Qt's own child bookkeeping, 0.78 µs per object measured by the
-control row), the drawing path (0.14 ms with 0 or 10 000 items), and the item constructors' fixed cost
+control row), and the item constructors' fixed cost
 (two `QCPItemPosition` allocations and two appearance setters each).
 
-A separate question, outside this plan's O(n²) theme but measured here: hit testing is linear in the
-item count (finding 4). If clicking must stay cheap with thousands of items, it needs a spatial index
-or a per-layer bounding box — a different task with a different benchmark row (`QCPItems_Click10k`),
-not a culling flag in the draw path.
+Task 4 (culling) covers both measured linear costs: drawing (finding 3) and hit testing (finding 4).
