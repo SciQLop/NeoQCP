@@ -189,6 +189,18 @@ public:
     using typename Base::Ret;
     using Base::Base;
 
+    // The plottable whose points the bars belong to; a dead handle is refused with one misuse.
+    template <typename P>
+    Ret setDataPlottable(const QCPHandle<P>& plottable)
+    {
+        return this->apply(
+            [&](T& o)
+            {
+                QCP_CHECK_OR_RETURN(plottable, "the data plottable handle is dead");
+                o.setDataPlottable(plottable.get());
+            });
+    }
+
     Ret setErrorType(QCPErrorBars::ErrorType type)
     {
         return this->apply([&](T& o) { o.setErrorType(type); });

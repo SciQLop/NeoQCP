@@ -219,7 +219,9 @@ private:
     // Reused across draw() calls to avoid per-frame heap allocations
     std::vector<int> mScatterSubset;
     std::vector<float> mScatterPts;
-};// The fluent handle of a QCPGraph2; see QCPPlottableOps for the subclass contract.
+};
+
+// The fluent handle of a QCPGraph2; see QCPPlottableOps for the subclass contract.
 template <typename T, typename Self>
 class QCPGraph2Ops : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPGraph2Ops<T>>>
 {
@@ -229,9 +231,35 @@ public:
     using typename Base::Ret;
     using Base::Base;
 
-    Ret setData(const QVector<double>& keys, const QVector<double>& values)
+    // Same arguments as QCPGraph2::setData: two numeric ranges, one point per index.
+    template <IndexableNumericRange KC, IndexableNumericRange VC>
+    Ret setData(KC&& keys, VC&& values)
     {
-        return this->apply([&](T& p) { p.setData(keys, values); });
+        return this->apply([&](T& p) { p.setData(std::forward<KC>(keys), std::forward<VC>(values)); });
+    }
+    Ret setDataSource(std::shared_ptr<QCPAbstractDataSource> source)
+    {
+        return this->apply([&](T& p) { p.setDataSource(std::move(source)); });
+    }
+    Ret setDataSource(std::unique_ptr<QCPAbstractDataSource> source)
+    {
+        return this->apply([&](T& p) { p.setDataSource(std::move(source)); });
+    }
+    Ret setLineStyle(QCPGraph2::LineStyle style)
+    {
+        return this->apply([&](T& p) { p.setLineStyle(style); });
+    }
+    Ret setScatterStyle(const QCPScatterStyle& style)
+    {
+        return this->apply([&](T& p) { p.setScatterStyle(style); });
+    }
+    Ret setScatterMaxPoints(int maxPoints)
+    {
+        return this->apply([&](T& p) { p.setScatterMaxPoints(maxPoints); });
+    }
+    Ret setGapThreshold(double threshold)
+    {
+        return this->apply([&](T& p) { p.setGapThreshold(threshold); });
     }
     Ret setScatterSkip(int skip)
     {
@@ -240,6 +268,14 @@ public:
     Ret setAdaptiveSampling(bool enabled)
     {
         return this->apply([&](T& p) { p.setAdaptiveSampling(enabled); });
+    }
+    Ret setScatterColorValues(std::vector<float> values)
+    {
+        return this->apply([&](T& p) { p.setScatterColorValues(std::move(values)); });
+    }
+    Ret setScatterColorGradient(const QCPColorGradient& gradient)
+    {
+        return this->apply([&](T& p) { p.setScatterColorGradient(gradient); });
     }
 };
 

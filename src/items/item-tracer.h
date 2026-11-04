@@ -174,6 +174,17 @@ public:
         return this->apply([&](T& o) { o.setSelectedBrush(brush); });
     }
 
+    // The graph to follow; a dead handle is refused with one misuse (use with() and nullptr to detach).
+    Ret setGraph(const QCPHandle<QCPGraph>& graph)
+    {
+        return this->apply(
+            [&](T& o)
+            {
+                QCP_CHECK_OR_RETURN(graph, "the graph handle is dead");
+                o.setGraph(graph.get());
+            });
+    }
+
     Ret setSize(double size)
     {
         return this->apply([&](T& o) { o.setSize(size); });

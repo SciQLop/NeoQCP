@@ -362,7 +362,9 @@ protected:
 
 };
 
-using QCPGraphComponent = QCPMultiGraph::Component;// The fluent handle of a QCPMultiGraph; see QCPPlottableOps for the subclass contract.
+using QCPGraphComponent = QCPMultiGraph::Component;
+
+// The fluent handle of a QCPMultiGraph; see QCPPlottableOps for the subclass contract.
 template <typename T, typename Self>
 class QCPMultiGraphOps : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPMultiGraphOps<T>>>
 {
@@ -371,6 +373,69 @@ class QCPMultiGraphOps : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPMultiGra
 public:
     using typename Base::Ret;
     using Base::Base;
+
+    // Same arguments as QCPMultiGraph::setData: the keys and one value column per component.
+    template <IndexableNumericRange KC, IndexableNumericRange VC>
+    Ret setData(KC&& keys, std::vector<VC>&& valueColumns)
+    {
+        return this->apply([&](T& o)
+                           { o.setData(std::forward<KC>(keys), std::forward<std::vector<VC>>(valueColumns)); });
+    }
+
+    Ret setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> source)
+    {
+        return this->apply([&](T& o) { o.setDataSource(std::move(source)); });
+    }
+
+    Ret setDataSource(std::unique_ptr<QCPAbstractMultiDataSource> source)
+    {
+        return this->apply([&](T& o) { o.setDataSource(std::move(source)); });
+    }
+
+    Ret setComponentNames(const QStringList& names)
+    {
+        return this->apply([&](T& o) { o.setComponentNames(names); });
+    }
+
+    Ret setComponentColors(const QList<QColor>& colors)
+    {
+        return this->apply([&](T& o) { o.setComponentColors(colors); });
+    }
+
+    Ret setComponentPens(const QList<QPen>& pens)
+    {
+        return this->apply([&](T& o) { o.setComponentPens(pens); });
+    }
+
+    Ret setComponentInLegend(int index, bool inLegend)
+    {
+        return this->apply([&](T& o) { o.setComponentInLegend(index, inLegend); });
+    }
+
+    Ret setColorValues(std::vector<double> values)
+    {
+        return this->apply([&](T& o) { o.setColorValues(std::move(values)); });
+    }
+
+    Ret setColorValues(std::shared_ptr<const std::vector<double>> values)
+    {
+        return this->apply([&](T& o) { o.setColorValues(std::move(values)); });
+    }
+
+    Ret setColorGradient(const QCPColorGradient& gradient)
+    {
+        return this->apply([&](T& o) { o.setColorGradient(gradient); });
+    }
+
+    Ret setColorScaleType(QCPAxis::ScaleType type)
+    {
+        return this->apply([&](T& o) { o.setColorScaleType(type); });
+    }
+
+    Ret setScatterSkip(int skip)
+    {
+        return this->apply([&](T& o) { o.setScatterSkip(skip); });
+    }
 
     Ret setComponentVisible(int index, bool visible)
     {

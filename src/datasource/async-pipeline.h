@@ -43,6 +43,7 @@ public:
     //! The scheduler the jobs run on. With none (a plottable outside a plot) a job runs on the
     //! calling thread, and its result is delivered by the event loop as usual.
     void setScheduler(QCPPipelineScheduler* scheduler) { mScheduler = scheduler; }
+    [[nodiscard]] QCPPipelineScheduler* scheduler() const { return mScheduler; }
 
     // Generation bumped by every data/viewport change; finished(gen) reports
     // the generation a delivered result belongs to.

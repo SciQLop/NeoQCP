@@ -54,4 +54,8 @@ private slots:
     void itemsWithoutAxisRectAreRefusedLikePlottables();
     void layoutCellsFarBeyondTheGridAreRefused();
     void takenPipelinePlottablesOutliveTheirPlot();
+    void errorBarsTakeTheirPlottableByHandle();
+    void tracerTakesItsGraphByHandle();
+    void richTextHandleKeepsTheTextSetters();
+    void graph2ScatterColoursChangeTheDrawing();
 };

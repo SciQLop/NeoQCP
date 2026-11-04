@@ -441,16 +441,26 @@ void TestBuilder::addEveryPlottable_data()
     row("multigraph",
         [](QCustomPlot& p)
         {
-            auto m = p.add<QCPMultiGraph>().setLineStyle(QCPMultiGraph::lsLine);
-            m->setData(kKeys, std::vector<std::vector<double>>{std::vector<double>(kValues.begin(), kValues.end())});
-            return m->lineStyle() == QCPMultiGraph::lsLine;
+            auto m = p.add<QCPMultiGraph>(std::vector<double>{1, 2, 3},
+                                          std::vector<std::vector<double>>{{4, 5, 6}})
+                         .setComponentNames({"a"})
+                         .setColorValues(std::vector<double>{1, 2, 3})
+                         .setColorGradient(QCPColorGradient(QCPColorGradient::gpJet))
+                         .setColorScaleType(QCPAxis::stLogarithmic)
+                         .setScatterSkip(3)
+                         .setLineStyle(QCPMultiGraph::lsLine);
+            return m->dataSource() && m->hasColorValues() && m->scatterSkip() == 3
+                && m->colorScaleType() == QCPAxis::stLogarithmic
+                && m->colorGradient() == QCPColorGradient(QCPColorGradient::gpJet);
         });
     row("waterfall",
         [](QCustomPlot& p)
         {
-            auto w = p.add<QCPWaterfallGraph>().setGain(2.0);
-            w->setData(kKeys, std::vector<std::vector<double>>{std::vector<double>(kValues.begin(), kValues.end())});
-            return w->gain() == 2.0;
+            auto w = p.add<QCPWaterfallGraph>(std::vector<double>{1, 2, 3},
+                                              std::vector<std::vector<double>>{{4, 5, 6}})
+                         .setGain(2.0)
+                         .setScatterSkip(2);
+            return w->dataSource() && w->gain() == 2.0 && w->scatterSkip() == 2;
         });
     row("histogram",
         [](QCustomPlot& p)
@@ -1006,6 +1016,7 @@ void roundTripThroughADeadPlot(Feed feed)
     handle.with(feed);
     std::unique_ptr<T> taken = a->take(handle);
     QVERIFY(taken);
+    QVERIFY(taken->pipeline().scheduler() == nullptr);
     delete a;
     feed(*taken);
     for (int i = 0; i < 20; ++i)
@@ -1013,6 +1024,7 @@ void roundTripThroughADeadPlot(Feed feed)
 
     auto moved = b.add(std::move(taken));
     QVERIFY(moved);
+    QVERIFY(moved->pipeline().scheduler() == b.pipelineScheduler());
     QTRY_VERIFY_WITH_TIMEOUT(!moved->busy(), 5000);
     b.rescaleAxes();
     settle(b);
@@ -1037,5 +1049,62 @@ void TestBuilder::takenPipelinePlottablesOutliveTheirPlot()
     roundTripThroughADeadPlot<QCPColorMap2>(
         [&](QCPColorMap2& p)
         { p.setData(std::vector<double>{0, 1}, std::vector<double>{0, 1}, std::vector<double>{1, 2, 3, 4}); });
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestBuilder::errorBarsTakeTheirPlottableByHandle()
+{
+    QCustomPlot plot;
+    auto graph = plot.add<QCPGraph>(kKeys, kValues);
+    auto bars = plot.add<QCPErrorBars>().setDataPlottable(graph).setWhiskerWidth(5);
+    QCOMPARE(bars->dataPlottable(), graph.get());
+    QCOMPARE(gMisuses, 0);
+
+    graph.remove();
+    bars.setDataPlottable(graph);
+    QCOMPARE(gMisuses, 1);
+}
+
+void TestBuilder::tracerTakesItsGraphByHandle()
+{
+    QCustomPlot plot;
+    auto graph = plot.add<QCPGraph>(kKeys, kValues);
+    auto tracer = plot.add<QCPItemTracer>().setGraph(graph).setGraphKey(2);
+    QCOMPARE(tracer->graph(), graph.get());
+    QCOMPARE(gMisuses, 0);
+
+    graph.remove();
+    tracer.setGraph(graph);
+    QCOMPARE(gMisuses, 1);
+}
+
+void TestBuilder::richTextHandleKeepsTheTextSetters()
+{
+    QCustomPlot plot;
+    auto text = plot.add<QCPItemRichText>();
+    auto chained = text.setPosition(1, 2).setColor(Qt::red).setHtml("<b>bold</b>").setVisible(false);
+    static_assert(std::is_same_v<decltype(chained), QCPItemRichTextOps<QCPItemRichText>>);
+    QCOMPARE(text->position->coords(), QPointF(1, 2));
+    QCOMPARE(text->color(), QColor(Qt::red));
+    QCOMPARE(text->html(), QString("<b>bold</b>"));
+    QVERIFY(!text->visible());
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestBuilder::graph2ScatterColoursChangeTheDrawing()
+{
+    QCustomPlot plot;
+    plot.xAxis->setRange(0, 4);
+    plot.yAxis->setRange(0, 7);
+    auto g = plot.add<QCPGraph2>(kKeys, kValues)
+                 .setLineStyle(QCPGraph2::lsNone)
+                 .setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 9));
+    QTRY_VERIFY_WITH_TIMEOUT(!g->busy(), 5000);
+    settle(plot);
+    const QImage plain = plot.toPixmap(400, 300).toImage();
+    g.setScatterColorGradient(QCPColorGradient(QCPColorGradient::gpHot))
+        .setScatterColorValues(std::vector<float>{0, 5, 10});
+    settle(plot);
+    QVERIFY(plot.toPixmap(400, 300).toImage() != plain);
     QCOMPARE(gMisuses, 0);
 }

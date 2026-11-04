@@ -95,11 +95,13 @@ private:
     void recomputeNormFactors();
 
     friend class TestWaterfall;
-};// The fluent handle of a QCPWaterfallGraph; see QCPPlottableOps for the subclass contract.
+};
+
+// The fluent handle of a QCPWaterfallGraph; see QCPPlottableOps for the subclass contract.
 template <typename T, typename Self>
-class QCPWaterfallGraphOps : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPWaterfallGraphOps<T>>>
+class QCPWaterfallGraphOps : public QCPMultiGraphOps<T, qcp::OpsRet<Self, QCPWaterfallGraphOps<T>>>
 {
-    using Base = QCPPlottableOps<T, qcp::OpsRet<Self, QCPWaterfallGraphOps<T>>>;
+    using Base = QCPMultiGraphOps<T, qcp::OpsRet<Self, QCPWaterfallGraphOps<T>>>;
 
 public:
     using typename Base::Ret;

@@ -116,7 +116,9 @@ private:
                          std::span<const qcp::histogram::BarRect> bars, const ColumnLook& look);
     void paintColumn(QCPPainter* painter, std::span<const qcp::histogram::BarRect> bars,
                      const ColumnLook& look) const;
-};// The fluent handle of a QCPHistogram; see QCPPlottableOps for the subclass contract.
+};
+
+// The fluent handle of a QCPHistogram; see QCPPlottableOps for the subclass contract.
 template <typename T, typename Self>
 class QCPHistogramOps : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPHistogramOps<T>>>
 {
@@ -125,6 +127,11 @@ class QCPHistogramOps : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPHistogram
 public:
     using typename Base::Ret;
     using Base::Base;
+
+    Ret setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> source)
+    {
+        return this->apply([&](T& o) { o.setDataSource(std::move(source)); });
+    }
 
     Ret setBins(int bins)
     {
