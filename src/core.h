@@ -387,8 +387,6 @@ public:
     [[nodiscard]] int axisRectCount() const;
     [[nodiscard]] QCPAxisRect* axisRect(int index = 0) const;
     [[nodiscard]] QList<QCPAxisRect*> axisRects() const;
-    // The first of axisRects() in layout order, without building the list (it is called per item).
-    [[nodiscard]] QCPAxisRect* firstAxisRect() const;
     [[nodiscard]] QCPLayoutElement* layoutElementAt(const QPointF& pos) const;
     [[nodiscard]] QCPAxisRect* axisRectAt(const QPointF& pos) const;
     Q_SLOT void rescaleAxes(bool onlyVisiblePlottables = false);
@@ -610,6 +608,8 @@ protected:
     int deleteAllItems();
     void releaseCompositeResources();
     bool registerItem(QCPAbstractItem* item);
+    // The first of axisRects() in layout order, without building the list (it is called per item).
+    [[nodiscard]] QCPAxisRect* firstAxisRect() const;
     void itemDestroyed(QCPAbstractItem* item);
     //! Moves the layer's children to the layer below (above for the bottom one) and drops every
     //! reference to the layer, without deleting it. Called by removeLayer and ~QCPLayer.
