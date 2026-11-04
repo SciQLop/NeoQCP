@@ -38,8 +38,7 @@ DOC_SNIPPET(gallery_space_weather, 800, 560)
         }
         b[3][i] = static_cast<float>(std::sqrt(magnitude));
     }
-    auto* field = new QCPMultiGraph(customPlot->xAxis, customPlot->yAxis);
-    field->setData(std::move(time), std::move(b));
+    auto field = customPlot->add<QCPMultiGraph>().setData(std::move(time), std::move(b));
     field->setComponentNames({ "Bx", "By", "Bz", "|B|" });
     field->setComponentPens({ QPen(QColor(77, 166, 255), 1), QPen(QColor(102, 204, 102), 1),
                               QPen(QColor(255, 107, 107), 1), QPen(QColor(230, 230, 230), 1.5) });
@@ -101,7 +100,7 @@ DOC_SNIPPET(gallery_space_weather, 800, 560)
     // The shock, marked on both panels.
     for (QCPAxisRect* rect : { customPlot->axisRect(), spectraRect })
     {
-        auto* span = new QCPItemVSpan(customPlot);
+        auto span = customPlot->add<QCPItemVSpan>();
         span->setClipAxisRect(rect);
         for (QCPItemPosition* edge : { span->lowerEdge, span->upperEdge })
             edge->setAxes(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
@@ -121,7 +120,6 @@ DOC_SNIPPET(gallery_space_weather, 800, 560)
     customPlot->setTheme(QCPTheme::dark(customPlot));
     customPlot->rescaleAxes();
     customPlot->yAxis->setRange(-25, 40);
-    customPlot->replot();
     // [/gallery_space_weather]
 }
 
@@ -145,7 +143,7 @@ DOC_SNIPPET(gallery_ten_million_points, 800, 520)
     auto source = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<float>>>(
         std::move(t), std::move(v));
 
-    auto* overview = new QCPGraph2(customPlot->xAxis, customPlot->yAxis);
+    auto overview = customPlot->add<QCPGraph2>();
     overview->setDataSource(source);
     overview->setPen(QPen(QColor(31, 119, 180), 1));
     customPlot->xAxis->setRange(0, 10000);
@@ -166,7 +164,7 @@ DOC_SNIPPET(gallery_ten_million_points, 800, 520)
     marker->bottomRight->setCoords(window.upper + 40, -1.8);
     marker->setPen(QPen(QColor(214, 39, 40), 1.5));
 
-    auto* note = new QCPItemText(customPlot);
+    auto note = customPlot->add<QCPItemText>();
     note->position->setType(QCPItemPosition::ptAxisRectRatio);
     note->position->setCoords(0.01, 0.03);
     note->setPositionAlignment(Qt::AlignLeft | Qt::AlignTop);
@@ -175,7 +173,6 @@ DOC_SNIPPET(gallery_ten_million_points, 800, 520)
     auto* margins = new QCPMarginGroup(customPlot);
     customPlot->axisRect()->setMarginGroup(QCP::msLeft | QCP::msRight, margins);
     detailRect->setMarginGroup(QCP::msLeft | QCP::msRight, margins);
-    customPlot->replot();
     // [/gallery_ten_million_points]
 }
 
@@ -205,9 +202,8 @@ DOC_SNIPPET(gallery_orbit, 640, 560)
     QVector<QCPCurve*> segments;   // one short segment per minute, coloured by speed
     for (int i = 0; i + 1 < x.size(); ++i)
     {
-        auto* segment = new QCPCurve(customPlot->xAxis, customPlot->yAxis);
-        segment->setData({ index[i], index[i + 1] }, { x[i], x[i + 1] }, { y[i], y[i + 1] });
-        segments.append(segment);
+        auto segment = customPlot->add<QCPCurve>().setData({ index[i], index[i + 1] }, { x[i], x[i + 1] }, { y[i], y[i + 1] });
+        segments.append(segment.get());
     }
     QVector<double> hourIndex, hourX, hourY;   // a dot every hour
     for (int i = 0; i < x.size(); i += 60)
@@ -216,12 +212,12 @@ DOC_SNIPPET(gallery_orbit, 640, 560)
         hourX.append(x[i]);
         hourY.append(y[i]);
     }
-    auto* hours = new QCPCurve(customPlot->xAxis, customPlot->yAxis);
-    hours->setData(hourIndex, hourX, hourY);
-    hours->setLineStyle(QCPCurve::lsNone);
-    hours->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, Qt::black, 6));
+    auto hours = customPlot->add<QCPCurve>()
+        .setData(hourIndex, hourX, hourY)
+        .setLineStyle(QCPCurve::lsNone)
+        .setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, Qt::black, 6));
 
-    auto* earth = new QCPItemEllipse(customPlot);
+    auto earth = customPlot->add<QCPItemEllipse>();
     earth->topLeft->setCoords(-1, 1);
     earth->bottomRight->setCoords(1, -1);
     earth->setPen(QPen(QColor(31, 119, 180)));
@@ -247,7 +243,6 @@ DOC_SNIPPET(gallery_orbit, 640, 560)
     customPlot->yAxis->setRange(-6, 6);
     customPlot->replot();   // lays out the axis rect, so the ratio below uses its real size
     customPlot->yAxis->setScaleRatio(customPlot->xAxis, 1.0);
-    customPlot->replot();
     // [/gallery_orbit]
 }
 
@@ -288,11 +283,11 @@ DOC_SNIPPET(gallery_joint_density, 640, 640)
     const auto [xRange, xCentres, xCounts] = marginal(x);
     const auto [yRange, yCentres, yCounts] = marginal(y);
 
-    auto* density = new QCPHistogram2D(customPlot->xAxis, customPlot->yAxis);
+    auto density = customPlot->add<QCPHistogram2D>();
     density->setBins(bins, bins);
     density->setGradient(QCPColorGradient::gpInferno);
     density->setData(std::move(x), std::move(y));
-    QObject::connect(&density->pipeline(), &QCPHistogramPipeline::finished, density,
+    QObject::connect(&density->pipeline(), &QCPHistogramPipeline::finished, density.get(),
                      [density] { density->rescaleDataRange(); });
     customPlot->xAxis->setRange(xRange);
     customPlot->yAxis->setRange(yRange);
@@ -338,7 +333,6 @@ DOC_SNIPPET(gallery_joint_density, 640, 640)
 
     customPlot->xAxis->setLabel("x");
     customPlot->yAxis->setLabel("y");
-    customPlot->replot();
     // [/gallery_joint_density]
 }
 
@@ -361,8 +355,7 @@ DOC_SNIPPET(gallery_contours, 640, 500)
             potential.push_back(v);
         }
 
-    auto* map = new QCPColorMap2(customPlot->xAxis, customPlot->yAxis);
-    map->setData(std::move(x), std::move(y), std::move(potential));
+    auto map = customPlot->add<QCPColorMap2>().setData(std::move(x), std::move(y), std::move(potential));
     map->setAutoContourLevels(16);
     map->setContourPen(QPen(QColor(255, 255, 255, 170), 1));
 
@@ -379,7 +372,6 @@ DOC_SNIPPET(gallery_contours, 640, 500)
     customPlot->xAxis->setLabel("x");
     customPlot->yAxis->setLabel("y");
     customPlot->rescaleAxes();
-    customPlot->replot();
     // [/gallery_contours]
 }
 
@@ -398,7 +390,7 @@ DOC_SNIPPET(gallery_stock_chart, 800, 520)
         time.append(start + h * 3600);
         price.append(p);
     }
-    auto* candles = new QCPFinancial(customPlot->xAxis, customPlot->yAxis);
+    auto candles = customPlot->add<QCPFinancial>();
     candles->data()->set(QCPFinancial::timeSeriesToOhlc(time, price, day, start));
     candles->setChartStyle(QCPFinancial::csCandlestick);
     candles->setWidth(0.7 * day);
@@ -427,10 +419,10 @@ DOC_SNIPPET(gallery_stock_chart, 800, 520)
         (it->close >= it->open ? upDays : downDays).append(it->key);
         (it->close >= it->open ? volumeUp : volumeDown).append(traded);
     }
-    QCPGraph* trend = customPlot->addGraph();
-    trend->setData(days, average);
-    trend->setPen(QPen(QColor(255, 152, 0), 2));
-    trend->setName("20-day average");
+    auto trend = customPlot->add<QCPGraph>()
+        .setData(days, average)
+        .setPen(QPen(QColor(255, 152, 0), 2))
+        .setName("20-day average");
 
     auto* volumeRect = new QCPAxisRect(customPlot);
     customPlot->plotLayout()->addElement(1, 0, volumeRect);
@@ -465,7 +457,6 @@ DOC_SNIPPET(gallery_stock_chart, 800, 520)
     customPlot->axisRect()->insetLayout()->setInsetAlignment(0, Qt::AlignTop | Qt::AlignLeft);
     customPlot->rescaleAxes();
     customPlot->xAxis->scaleRange(1.03);
-    customPlot->replot();
     // [/gallery_stock_chart]
 }
 
@@ -516,7 +507,6 @@ DOC_SNIPPET(gallery_antenna_pattern, 600, 600)
     customPlot->plotLayout()->insertRow(0);
     customPlot->plotLayout()->addElement(0, 0, new QCPTextElement(
         customPlot, "16-element array: uniform (blue), Hann taper (red)", QFont("sans", 11)));
-    customPlot->replot();
     // [/gallery_antenna_pattern]
 }
 
@@ -542,17 +532,17 @@ DOC_SNIPPET(gallery_fit_residuals, 680, 560)
         fineX.append(model(fineT.last()));
     }
 
-    QCPGraph* curve = customPlot->addGraph();
-    curve->setData(fineT, fineX);
-    curve->setPen(QPen(QColor(214, 39, 40), 2));
-    curve->setName("model");
-    QCPGraph* points = customPlot->addGraph();
-    points->setData(t, x);
-    points->setLineStyle(QCPGraph::lsNone);
-    points->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, QColor(31, 119, 180), 6));
-    points->setName("measurements");
-    auto* errors = new QCPErrorBars(customPlot->xAxis, customPlot->yAxis);
-    errors->setDataPlottable(points);
+    auto curve = customPlot->add<QCPGraph>()
+        .setData(fineT, fineX)
+        .setPen(QPen(QColor(214, 39, 40), 2))
+        .setName("model");
+    auto points = customPlot->add<QCPGraph>()
+        .setData(t, x)
+        .setLineStyle(QCPGraph::lsNone)
+        .setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, QColor(31, 119, 180), 6))
+        .setName("measurements");
+    auto errors = customPlot->add<QCPErrorBars>();
+    errors->setDataPlottable(points.get());
     errors->setData(sigma);
     errors->setPen(QPen(QColor(31, 119, 180)));
     errors->removeFromLegend();
@@ -571,11 +561,11 @@ DOC_SNIPPET(gallery_fit_residuals, 680, 560)
     band->setBrush(QColor(127, 127, 127, 45));
     band->setBorderPen(Qt::NoPen);
     band->setMovable(false);
-    QCPGraph* residuals = customPlot->addGraph(residualT, residualAxis);
-    residuals->setData(t, pull);
-    residuals->setLineStyle(QCPGraph::lsImpulse);
-    residuals->setPen(QPen(QColor(31, 119, 180)));
-    residuals->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, QColor(31, 119, 180), 5));
+    auto residuals = customPlot->add<QCPGraph>().setAxes(residualT, residualAxis)
+        .setData(t, pull)
+        .setLineStyle(QCPGraph::lsImpulse)
+        .setPen(QPen(QColor(31, 119, 180)))
+        .setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, QColor(31, 119, 180), 5));
     residuals->removeFromLegend();
 
     customPlot->xAxis->setTickLabels(false);
@@ -590,6 +580,5 @@ DOC_SNIPPET(gallery_fit_residuals, 680, 560)
     customPlot->axisRect()->setMarginGroup(QCP::msLeft | QCP::msRight, margins);
     residualRect->setMarginGroup(QCP::msLeft | QCP::msRight, margins);
     customPlot->legend->setVisible(true);
-    customPlot->replot();
     // [/gallery_fit_residuals]
 }

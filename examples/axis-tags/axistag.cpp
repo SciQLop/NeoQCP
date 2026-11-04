@@ -31,7 +31,7 @@ AxisTag::AxisTag(QCPAxis *parentAxis) :
 {
   // The dummy tracer serves here as an invisible anchor which always sticks to the right side of
   // the axis rect
-  mDummyTracer = new QCPItemTracer(mAxis->parentPlot());
+  mDummyTracer = mAxis->parentPlot()->add<QCPItemTracer>().get();
   mDummyTracer->setVisible(false);
   mDummyTracer->position->setTypeX(QCPItemPosition::ptAxisRectRatio);
   mDummyTracer->position->setTypeY(QCPItemPosition::ptPlotCoords);
@@ -44,7 +44,7 @@ AxisTag::AxisTag(QCPAxis *parentAxis) :
   // offset for the tag of the second y axis is achieved. This horizontal offset gets dynamically
   // updated in AxisTag::updatePosition. the arrow "start" is simply set to have the "end" as parent
   // anchor. It is given a horizontal offset to the right, which results in a 15 pixel long arrow.
-  mArrow = new QCPItemLine(mAxis->parentPlot());
+  mArrow = mAxis->parentPlot()->add<QCPItemLine>().get();
   mArrow->setLayer("overlay");
   mArrow->setClipToAxisRect(false);
   mArrow->setHead(QCPLineEnding::esSpikeArrow);
@@ -54,7 +54,7 @@ AxisTag::AxisTag(QCPAxis *parentAxis) :
   
   // The text label is anchored at the arrow start (tail) and has its "position" aligned at the
   // left, and vertically centered to the text label box.
-  mLabel = new QCPItemText(mAxis->parentPlot());
+  mLabel = mAxis->parentPlot()->add<QCPItemText>().get();
   mLabel->setLayer("overlay");
   mLabel->setClipToAxisRect(false);
   mLabel->setPadding(QMargins(3, 0, 3, 0));

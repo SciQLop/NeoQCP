@@ -104,7 +104,7 @@ Create a <a href="api/classQCPAxisRect.html">QCPAxisRect</a> and add it to a cel
 - A grid cell holds one element. Cells do not span. To get one wide rect over two narrow ones, nest a grid in a cell, as here.
 - A new axis rect comes with four axes, the top and right ones hidden. `QCPAxisRect(customPlot, false)` creates one with no axes; add them with `addAxis()`.
 - `customPlot->xAxis` and friends only point into the first axis rect. For the others, ask the rect: `rect->axis(QCPAxis::atBottom)`.
-- Pass those axes to `addGraph()` or to a plottable constructor to draw in that rect.
+- Pass those axes to the handle (`plot->add<QCPGraph>().setAxes(rect->axis(QCPAxis::atLeft), rect->axis(QCPAxis::atBottom))`) to draw in that rect.
 
 Stretch factors share space between rows and columns:
 

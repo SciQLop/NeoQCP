@@ -28,7 +28,7 @@ It replaces it: clear the plot layout, then add the angular axis in its place.
 ![Three microphone pickup patterns](images/polar-basic.png)
 
 - `plotLayout()->clear()` deletes the default axis rect, with its four axes and the legend. `xAxis`, `yAxis` and `legend` become null.
-- `new QCPPolarGraph(angularAxis, radialAxis)` creates a graph and registers it with the axes. The plot owns it.
+- `angular->add<QCPPolarGraph>()` creates a graph on the angular axis's first radial axis and registers it. The plot owns it.
 - `setData(angles, radii)` copies the points. The angles are in the angular axis' coordinates: degrees here.
 - `setPen()`, `setBrush()` and `setScatterStyle()` work as on a `QCPGraph`. A brush fills the closed curve.
 - `setLineStyle(QCPPolarGraph::lsNone)` shows the points only. Give them a scatter style, or nothing is drawn.

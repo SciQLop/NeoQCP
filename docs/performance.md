@@ -170,7 +170,7 @@ A data source can feed several graphs. The samples are stored once. Here an over
 
 ### Batch changes, replot once
 
-`replot()` repaints every layer that changed. Change everything first, then call it once.
+Setters schedule one repaint, so a burst of changes costs one redraw. `replot()` forces that redraw now, when a synchronous frame is needed.
 
 When several parts of your code each want a replot, use `replot(QCustomPlot::rpQueuedReplot)`. The replot runs on the next event-loop pass, and all the queued requests in between become one.
 

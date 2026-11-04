@@ -9,8 +9,8 @@ static void populatePlot(QCustomPlot* plot)
                           | QCP::iSelectAxes | QCP::iSelectLegend | QCP::iSelectItems
                           | QCP::iMultiSelect);
 
-    auto* graph1 = plot->addGraph();
-    auto* graph2 = plot->addGraph();
+    auto graph1 = plot->add<QCPGraph>();
+    auto graph2 = plot->add<QCPGraph>();
     graph1->setPen(QPen(QColor("#e74c3c"), 2));
     graph2->setPen(QPen(QColor("#3498db"), 2));
     graph1->setSelectable(QCP::stWhole);
@@ -40,7 +40,7 @@ static void populatePlot(QCustomPlot* plot)
     plot->plotLayout()->insertRow(0);
     plot->plotLayout()->addElement(0, 0, title);
 
-    auto* textItem = new QCPItemText(plot);
+    auto textItem = plot->add<QCPItemText>();
     textItem->position->setCoords(0, 0.5);
     textItem->setText("Selectable\nAnnotation");
     textItem->setSelectable(true);

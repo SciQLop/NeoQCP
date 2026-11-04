@@ -12,7 +12,7 @@ A new `QCustomPlot` has one axis rect with four axes, one on each side:
 - `xAxis2` at the top and `yAxis2` on the right. They are hidden, and their grids too.
 
 They are plain pointers into the default axis rect, kept for convenience.
-`addGraph()` and the other factories use `xAxis` and `yAxis` unless told otherwise.
+`add<T>()` uses `xAxis` and `yAxis` unless told otherwise.
 Show the other two with `setVisible(true)`.
 `axisRect()->setupFullAxesBox(true)` shows all four at once and links the top and right axes to the bottom and left ones.
 
@@ -149,7 +149,7 @@ An axis rect can hold any number of axes on each side.
 
 ![Three quantities against one time axis](images/axes-extra-axis.png)
 
-- Pass the axes to `addGraph(keyAxis, valueAxis)`, or to the constructor of any other plottable.
+- Pass the axes to the handle: `plot->add<QCPGraph>().setAxes(keyAxis, valueAxis)`.
 - An added axis shows its grid. With several value axes, keep only one grid, as above.
 - Colour each axis like its graph, so the reader knows which goes with which.
 - `axisRect()->axis(QCPAxis::atLeft, 1)` finds an axis again by side and index. `removeAxis()` deletes one.

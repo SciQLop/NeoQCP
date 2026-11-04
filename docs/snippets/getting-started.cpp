@@ -11,13 +11,12 @@ DOC_SNIPPET(first_plot, 600, 360)
         x[i] = i / 50.0 - 1;   // -1 to 1
         y[i] = x[i] * x[i];
     }
-    customPlot->addGraph();
+    customPlot->add<QCPGraph>();
     customPlot->graph(0)->setData(x, y);
     customPlot->xAxis->setLabel("x");
     customPlot->yAxis->setLabel("y");
     customPlot->xAxis->setRange(-1, 1);
     customPlot->yAxis->setRange(0, 1);
-    customPlot->replot();
     // [/first_plot]
 }
 
@@ -30,14 +29,13 @@ DOC_SNIPPET(first_plot_interactive, 600, 360)
         t[i] = i / 50.0;
         signal[i] = std::sin(t[i]) * std::exp(-t[i] / 5);
     }
-    QCPGraph* graph = customPlot->addGraph();
-    graph->setData(t, signal);
-    graph->setName("damped sine");
-    graph->setPen(QPen(QColor(31, 119, 180), 2));
+    auto graph = customPlot->add<QCPGraph>()
+        .setData(t, signal)
+        .setName("damped sine")
+        .setPen(QPen(QColor(31, 119, 180), 2));
     customPlot->rescaleAxes();
     customPlot->legend->setVisible(true);
     // Drag to pan, wheel to zoom, click to select.
     customPlot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom | QCP::iSelectPlottables);
-    customPlot->replot();
     // [/first_plot_interactive]
 }

@@ -122,8 +122,8 @@ It starts with one axis rect, holding a bottom `xAxis` and a left `yAxis`.
 
 ![A parabola](images/first-plot.png)
 
-`addGraph()` creates a graph on the default axes. `setData()` copies the points into it.
-Nothing is drawn until `replot()`: change as much as you like, then replot once.
+`add<QCPGraph>()` creates a graph on the default axes. `setData()` copies the points into it.
+Setters schedule one repaint, so the graph appears without a call to `replot()`: change as much as you like, the plot draws once the event loop runs.
 
 A complete program puts the same lines in a window:
 

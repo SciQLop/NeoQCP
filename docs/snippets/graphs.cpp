@@ -28,17 +28,16 @@ DOC_SNIPPET(graphs_line_styles, 600, 400)
         QVector<double> shifted = y;
         for (double& v : shifted)
             v += 3 * s;   // stack the graphs; impulses (s = 0) start from value 0
-        QCPGraph* graph = customPlot->addGraph();
-        graph->setData(x, shifted);
-        graph->setLineStyle(styles[s].first);
-        graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, 5));
-        graph->setPen(QPen(colors[s], 1.5));
-        graph->setName(styles[s].second);
+        auto graph = customPlot->add<QCPGraph>()
+            .setData(x, shifted)
+            .setLineStyle(styles[s].first)
+            .setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, 5))
+            .setPen(QPen(colors[s], 1.5))
+            .setName(styles[s].second);
     }
     customPlot->xAxis->setRange(-0.5, 20);
     customPlot->yAxis->setRange(-1.5, 14);
     customPlot->legend->setVisible(true);
-    customPlot->replot();
     // [/graphs_line_styles]
 }
 
@@ -58,19 +57,18 @@ DOC_SNIPPET(graphs_scatter, 600, 360)
         modelX[i] = i / 30.0;
         model[i] = std::exp(-modelX[i] / 4) * std::cos(modelX[i]);
     }
-    QCPGraph* points = customPlot->addGraph();
-    points->setData(x, measured);
-    points->setLineStyle(QCPGraph::lsNone);
+    auto points = customPlot->add<QCPGraph>()
+        .setData(x, measured)
+        .setLineStyle(QCPGraph::lsNone);
     points->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, QColor(31, 119, 180),
                                             QColor(31, 119, 180, 60), 7));
     points->setName("measurement");
-    QCPGraph* fit = customPlot->addGraph();
-    fit->setData(modelX, model);
-    fit->setPen(QPen(QColor(214, 39, 40), 2));
-    fit->setName("model");
+    auto fit = customPlot->add<QCPGraph>()
+        .setData(modelX, model)
+        .setPen(QPen(QColor(214, 39, 40), 2))
+        .setName("model");
     customPlot->rescaleAxes();
     customPlot->legend->setVisible(true);
-    customPlot->replot();
     // [/graphs_scatter]
 }
 
@@ -84,15 +82,14 @@ DOC_SNIPPET(graphs_fill_under, 600, 360)
         power[i] = std::exp(-std::pow((f[i] - 30) / 6, 2))
                    + 0.5 * std::exp(-std::pow((f[i] - 65) / 10, 2));
     }
-    QCPGraph* spectrum = customPlot->addGraph();
-    spectrum->setData(f, power);
-    spectrum->setPen(QPen(QColor(31, 119, 180), 1.5));
+    auto spectrum = customPlot->add<QCPGraph>()
+        .setData(f, power)
+        .setPen(QPen(QColor(31, 119, 180), 1.5));
     spectrum->setBrush(QColor(31, 119, 180, 70));   // a brush fills down to value 0
     customPlot->xAxis->setLabel("frequency (Hz)");
     customPlot->yAxis->setLabel("power");
     customPlot->xAxis->setRange(0, 100);
     customPlot->yAxis->setRange(0, 1.2);
-    customPlot->replot();
     // [/graphs_fill_under]
 }
 
@@ -108,23 +105,22 @@ DOC_SNIPPET(graphs_channel_fill, 600, 360)
         upper[i] = mean[i] + spread;
         lower[i] = mean[i] - spread;
     }
-    QCPGraph* low = customPlot->addGraph();
-    low->setData(t, lower);
-    low->setPen(Qt::NoPen);
+    auto low = customPlot->add<QCPGraph>()
+        .setData(t, lower)
+        .setPen(Qt::NoPen);
     low->removeFromLegend();
-    QCPGraph* high = customPlot->addGraph();
-    high->setData(t, upper);
-    high->setPen(Qt::NoPen);
-    high->setBrush(QColor(255, 127, 14, 70));
-    high->setChannelFillGraph(low);   // fill between high and low, with high's brush
+    auto high = customPlot->add<QCPGraph>()
+        .setData(t, upper)
+        .setPen(Qt::NoPen)
+        .setBrush(QColor(255, 127, 14, 70));
+    high->setChannelFillGraph(low.get());   // fill between high and low, with high's brush
     high->setName("±1σ");
-    QCPGraph* centre = customPlot->addGraph();
-    centre->setData(t, mean);
-    centre->setPen(QPen(QColor(255, 127, 14), 2));
-    centre->setName("mean");
+    auto centre = customPlot->add<QCPGraph>()
+        .setData(t, mean)
+        .setPen(QPen(QColor(255, 127, 14), 2))
+        .setName("mean");
     customPlot->rescaleAxes();
     customPlot->legend->setVisible(true);
-    customPlot->replot();
     // [/graphs_channel_fill]
 }
 
@@ -143,13 +139,12 @@ DOC_SNIPPET(graphs_graph2_owning, 600, 360)
                               * std::exp(-time[i]);
         counts[i] = static_cast<std::int16_t>(signal + noise(rng));
     }
-    auto* graph = new QCPGraph2(customPlot->xAxis, customPlot->yAxis);
+    auto graph = customPlot->add<QCPGraph2>();
     graph->setData(std::move(time), std::move(counts));   // moved in, not copied
     graph->setPen(QPen(QColor(31, 119, 180), 1));
     customPlot->xAxis->setLabel("time (s)");
     customPlot->yAxis->setLabel("counts");
     customPlot->rescaleAxes();
-    customPlot->replot();
     // [/graphs_graph2_owning]
 }
 
@@ -164,7 +159,7 @@ DOC_SNIPPET(graphs_graph2_view, 600, 360)
         time[i] = i * 0.01;
         level[i] = std::tanh(std::sin(time[i]) * 3);
     }
-    auto* graph = new QCPGraph2(customPlot->xAxis, customPlot->yAxis);
+    auto graph = customPlot->add<QCPGraph2>();
     graph->viewData(time.data(), level.data(), static_cast<int>(time.size()));
     graph->setPen(QPen(QColor(44, 160, 44), 2));
 
@@ -174,7 +169,6 @@ DOC_SNIPPET(graphs_graph2_view, 600, 360)
     graph->dataChanged();
 
     customPlot->rescaleAxes();
-    customPlot->replot();
     // [/graphs_graph2_view]
 }
 
@@ -190,7 +184,7 @@ DOC_SNIPPET(graphs_graph2_shared, 600, 420)
     auto source = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
         std::move(t), std::move(b));
 
-    auto* overview = new QCPGraph2(customPlot->xAxis, customPlot->yAxis);
+    auto overview = customPlot->add<QCPGraph2>();
     overview->setDataSource(source);
 
     auto* detailRect = new QCPAxisRect(customPlot);
@@ -204,7 +198,6 @@ DOC_SNIPPET(graphs_graph2_shared, 600, 420)
     customPlot->rescaleAxes();
     detailX->setRange(40, 45);
     detail->rescaleValueAxis(false, true);
-    customPlot->replot();
     // [/graphs_graph2_shared]
 }
 
@@ -223,14 +216,13 @@ DOC_SNIPPET(graphs_graph2_scatter_color, 600, 360)
         v[i] = std::sin(t[i]) * 3 + residual;
         color[i] = static_cast<float>(std::min(1.0, std::abs(residual) / 2.5));   // 0..1
     }
-    auto* graph = new QCPGraph2(customPlot->xAxis, customPlot->yAxis);
-    graph->setData(std::move(t), std::move(v));
-    graph->setLineStyle(QCPGraph2::lsNone);
-    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 5));
+    auto graph = customPlot->add<QCPGraph2>()
+        .setData(std::move(t), std::move(v))
+        .setLineStyle(QCPGraph2::lsNone)
+        .setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 5));
     graph->setScatterColorValues(std::move(color));
     graph->setScatterColorGradient(QCPColorGradient::gpViridis);
     customPlot->rescaleAxes();
-    customPlot->replot();
     // [/graphs_graph2_scatter_color]
 }
 
@@ -247,7 +239,7 @@ DOC_SNIPPET(graphs_multigraph, 600, 360)
         field[1][i] = static_cast<float>(4 * std::cos(time[i] / 3));
         field[2][i] = static_cast<float>(1.5 * std::sin(time[i] * 2));
     }
-    auto* b = new QCPMultiGraph(customPlot->xAxis, customPlot->yAxis);
+    auto b = customPlot->add<QCPMultiGraph>();
     b->setData(std::move(time), std::move(field));   // one column per component
     b->setName("B (nT)");
     b->setComponentNames({ "Bx", "By", "Bz" });
@@ -256,7 +248,6 @@ DOC_SNIPPET(graphs_multigraph, 600, 360)
     customPlot->xAxis->setLabel("time (s)");
     customPlot->rescaleAxes();
     customPlot->legend->setVisible(true);
-    customPlot->replot();
     // [/graphs_multigraph]
 }
 
@@ -272,9 +263,9 @@ DOC_SNIPPET(graphs_multigraph_fill, 600, 300)
         rates[0][i] = 3 + 2 * std::sin(time[i] / 2) + std::sin(time[i] * 3);
         rates[1][i] = 2 + 1.5 * std::cos(time[i] / 3);
     }
-    auto* graph = new QCPMultiGraph(customPlot->xAxis, customPlot->yAxis);
-    graph->setData(std::move(time), std::move(rates));
-    graph->setName("count rate");
+    auto graph = customPlot->add<QCPMultiGraph>()
+        .setData(std::move(time), std::move(rates))
+        .setName("count rate");
     graph->setComponentNames({ "protons", "electrons" });
     graph->setComponentPens({ QPen(QColor(31, 119, 180), 1.5), QPen(QColor(255, 127, 14), 1.5) });
     graph->setComponentFill(0, 0.0);   // down to 0, in the pen colour, see-through
@@ -282,7 +273,6 @@ DOC_SNIPPET(graphs_multigraph_fill, 600, 300)
     customPlot->rescaleAxes();
     customPlot->yAxis->setRangeLower(0);
     customPlot->legend->setVisible(true);
-    customPlot->replot();
     // [/graphs_multigraph_fill]
 }
 
@@ -300,8 +290,7 @@ DOC_SNIPPET(graphs_multigraph_band, 600, 300)
         columns[1][i] = columns[0][i] - spread;
         columns[2][i] = columns[0][i] + spread;
     }
-    auto* model = new QCPMultiGraph(customPlot->xAxis, customPlot->yAxis);
-    model->setData(std::move(time), std::move(columns));
+    auto model = customPlot->add<QCPMultiGraph>().setData(std::move(time), std::move(columns));
     model->setComponentNames({ "model", "low", "high" });
     const QColor blue(31, 119, 180);
     model->setComponentPens({ QPen(blue, 2), QPen(blue.lighter(150), 0.5), QPen(blue.lighter(150), 0.5) });
@@ -310,7 +299,6 @@ DOC_SNIPPET(graphs_multigraph_band, 600, 300)
     model->setComponentInLegend(2, false);
     customPlot->rescaleAxes();
     customPlot->legend->setVisible(true);
-    customPlot->replot();
     // [/graphs_multigraph_band]
 }
 
@@ -330,8 +318,7 @@ DOC_SNIPPET(graphs_multigraph_error_bars, 600, 300)
         columns[1][i] = columns[0][i] - error;   // the bounds, not the error sizes
         columns[2][i] = columns[0][i] + error;
     }
-    auto* measured = new QCPMultiGraph(customPlot->xAxis, customPlot->yAxis);
-    measured->setData(std::move(x), std::move(columns));
+    auto measured = customPlot->add<QCPMultiGraph>().setData(std::move(x), std::move(columns));
     measured->setComponentNames({ "measured", "lower", "upper" });
     measured->setComponentLineStyle(0, QCPMultiGraph::lsNone);
     measured->component(0).scatterStyle = QCPScatterStyle(QCPScatterStyle::ssDisc, 6);
@@ -341,7 +328,6 @@ DOC_SNIPPET(graphs_multigraph_error_bars, 600, 300)
     customPlot->xAxis->setRange(-1, n);
     customPlot->yAxis->setRange(-0.6, 1.6);
     customPlot->legend->setVisible(true);
-    customPlot->replot();
     // [/graphs_multigraph_error_bars]
 }
 
@@ -361,17 +347,16 @@ DOC_SNIPPET(graphs_gaps, 600, 360)
             values.push_back(std::sin(x) + 2.5);
         }
     }
-    QCPGraph* classic = customPlot->addGraph();
-    classic->setData(t, withNan);
-    classic->setPen(QPen(QColor(31, 119, 180), 2));
-    classic->setName("QCPGraph, NaN values");
-    auto* zeroCopy = new QCPGraph2(customPlot->xAxis, customPlot->yAxis);
-    zeroCopy->setData(std::move(keys), std::move(values));
-    zeroCopy->setPen(QPen(QColor(214, 39, 40), 2));
-    zeroCopy->setName("QCPGraph2, missing keys");
+    auto classic = customPlot->add<QCPGraph>()
+        .setData(t, withNan)
+        .setPen(QPen(QColor(31, 119, 180), 2))
+        .setName("QCPGraph, NaN values");
+    auto zeroCopy = customPlot->add<QCPGraph2>()
+        .setData(std::move(keys), std::move(values))
+        .setPen(QPen(QColor(214, 39, 40), 2))
+        .setName("QCPGraph2, missing keys");
     customPlot->xAxis->setRange(0, 10);
     customPlot->yAxis->setRange(-1.5, 5);
     customPlot->legend->setVisible(true);
-    customPlot->replot();
     // [/graphs_gaps]
 }

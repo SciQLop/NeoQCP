@@ -8,7 +8,7 @@ This page shows each one, then how missing data is drawn, and ends with a short 
 
 ## Draw a line with QCPGraph
 
-`addGraph()` creates a `QCPGraph` on the default axes. `setData()` takes two `QVector<double>`, keys and values.
+`add<QCPGraph>()` creates a `QCPGraph` on the default axes. `setData()` takes two `QVector<double>`, keys and values.
 
 - `setData()` copies the points and replaces what was there.
 - The points are sorted by key, unless you pass `alreadySorted = true`.
@@ -84,7 +84,7 @@ Both graphs must have their keys on axes of the same orientation.
 
 <a href="api/classQCPGraph2.html">QCPGraph2</a> does not copy into a container of `QCPGraphData`.
 It reads keys and values from two arrays, through a data source.
-You create it with `new QCPGraph2(keyAxis, valueAxis)`; the plot takes ownership, like for any plottable.
+You create it with `plot->add<QCPGraph2>().setAxes(keyAxis, valueAxis)`; the plot owns it, like any plottable.
 
 The arrays can hold any arithmetic type: `double`, `float`, `int16_t`, `int64_t`...
 Keys and values can have different types. Values are converted to `double` one at a time, when they are drawn.

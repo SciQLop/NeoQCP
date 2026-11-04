@@ -17,12 +17,11 @@ DOC_SNIPPET(plottables_curve, 480, 420)
         x[i] = std::sin(3 * t[i]);
         y[i] = std::sin(4 * t[i]);
     }
-    auto* lissajous = new QCPCurve(customPlot->xAxis, customPlot->yAxis);
+    auto lissajous = customPlot->add<QCPCurve>();
     lissajous->setData(t, x, y);   // drawn in the order of t, not of x
     lissajous->setPen(QPen(QColor(148, 103, 189), 2));
     customPlot->xAxis->setRange(-1.2, 1.2);
     customPlot->yAxis->setRange(-1.2, 1.2);
-    customPlot->replot();
     // [/plottables_curve]
 }
 
@@ -38,8 +37,7 @@ DOC_SNIPPET(plottables_bars_grouped, 600, 360)
     auto* group = new QCPBarsGroup(customPlot);
     for (int s = 0; s < values.size(); ++s)
     {
-        auto* bars = new QCPBars(customPlot->xAxis, customPlot->yAxis);
-        bars->setData(keys, values[s]);
+        auto bars = customPlot->add<QCPBars>().setData(keys, values[s]);
         bars->setWidth(0.25);   // in key units: three bars fill 0.75 of each slot
         bars->setBarsGroup(group);
         bars->setPen(Qt::NoPen);
@@ -52,7 +50,6 @@ DOC_SNIPPET(plottables_bars_grouped, 600, 360)
     customPlot->xAxis->setRange(0.4, 5.6);
     customPlot->yAxis->setRange(0, 17);
     customPlot->legend->setVisible(true);
-    customPlot->replot();
     // [/plottables_bars_grouped]
 }
 
@@ -60,27 +57,26 @@ DOC_SNIPPET(plottables_bars_stacked, 600, 360)
 {
     // [plottables_bars_stacked]
     const QVector<double> years { 2019, 2020, 2021, 2022, 2023, 2024 };
-    auto* fossil = new QCPBars(customPlot->xAxis, customPlot->yAxis);
-    fossil->setData(years, { 62, 58, 57, 54, 50, 46 });
-    fossil->setBrush(QColor(127, 127, 127));
-    fossil->setName("fossil");
-    auto* nuclear = new QCPBars(customPlot->xAxis, customPlot->yAxis);
-    nuclear->setData(years, { 18, 19, 18, 17, 18, 18 });
-    nuclear->setBrush(QColor(255, 127, 14));
-    nuclear->setName("nuclear");
-    nuclear->moveAbove(fossil);
-    auto* renewable = new QCPBars(customPlot->xAxis, customPlot->yAxis);
-    renewable->setData(years, { 20, 23, 25, 29, 32, 36 });
-    renewable->setBrush(QColor(44, 160, 44));
-    renewable->setName("renewable");
-    renewable->moveAbove(nuclear);
-    for (QCPBars* bars : { fossil, nuclear, renewable })
+    auto fossil = customPlot->add<QCPBars>()
+        .setData(years, { 62, 58, 57, 54, 50, 46 })
+        .setBrush(QColor(127, 127, 127))
+        .setName("fossil");
+    auto nuclear = customPlot->add<QCPBars>()
+        .setData(years, { 18, 19, 18, 17, 18, 18 })
+        .setBrush(QColor(255, 127, 14))
+        .setName("nuclear");
+    nuclear->moveAbove(fossil.get());
+    auto renewable = customPlot->add<QCPBars>()
+        .setData(years, { 20, 23, 25, 29, 32, 36 })
+        .setBrush(QColor(44, 160, 44))
+        .setName("renewable");
+    renewable->moveAbove(nuclear.get());
+    for (QCPBars* bars : { fossil.get(), nuclear.get(), renewable.get() })
         bars->setPen(Qt::NoPen);
     customPlot->xAxis->setRange(2018.4, 2024.6);
     customPlot->yAxis->setRange(0, 135);   // headroom for the legend
     customPlot->yAxis->setLabel("share (%)");
     customPlot->legend->setVisible(true);
-    customPlot->replot();
     // [/plottables_bars_stacked]
 }
 
@@ -97,14 +93,13 @@ DOC_SNIPPET(plottables_financial, 600, 360)
         p += step(rng);
         price[i] = p;
     }
-    auto* candles = new QCPFinancial(customPlot->xAxis, customPlot->yAxis);
+    auto candles = customPlot->add<QCPFinancial>();
     candles->data()->set(QCPFinancial::timeSeriesToOhlc(time, price, 1.0));   // one bin per day
     candles->setChartStyle(QCPFinancial::csCandlestick);
     candles->setWidth(0.6);
     customPlot->xAxis->setLabel("day");
     customPlot->rescaleAxes();
     customPlot->xAxis->scaleRange(1.05);
-    customPlot->replot();
     // [/plottables_financial]
 }
 
@@ -120,26 +115,24 @@ DOC_SNIPPET(plottables_error_bars, 600, 360)
         error[i] = 0.3 + 0.08 * i;
         y[i] = 0.5 * x[i] + noise(rng) * error[i];
     }
-    QCPGraph* points = customPlot->addGraph();
-    points->setData(x, y);
-    points->setLineStyle(QCPGraph::lsNone);
-    points->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, QColor(31, 119, 180), 7));
-    auto* errors = new QCPErrorBars(customPlot->xAxis, customPlot->yAxis);
+    auto points = customPlot->add<QCPGraph>()
+        .setData(x, y)
+        .setLineStyle(QCPGraph::lsNone)
+        .setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, QColor(31, 119, 180), 7));
+    auto errors = customPlot->add<QCPErrorBars>();
     errors->removeFromLegend();
-    errors->setDataPlottable(points);
+    errors->setDataPlottable(points.get());
     errors->setData(error);   // error[i] belongs to point i, the same above and below
     errors->setPen(QPen(QColor(31, 119, 180)));
     customPlot->rescaleAxes();   // includes the error bars
     customPlot->xAxis->setRange(0, 13);
-    customPlot->replot();
     // [/plottables_error_bars]
 }
 
 DOC_SNIPPET(plottables_statistical_box, 600, 360)
 {
     // [plottables_statistical_box]
-    auto* boxes = new QCPStatisticalBox(customPlot->xAxis, customPlot->yAxis);
-    boxes->setBrush(QColor(31, 119, 180, 70));
+    auto boxes = customPlot->add<QCPStatisticalBox>().setBrush(QColor(31, 119, 180, 70));
     //             key  min  Q1   median  Q3   max  outliers
     boxes->addData(1, 1.1, 1.9, 2.25, 2.7, 3.4);
     boxes->addData(2, 0.8, 1.5, 1.9, 2.3, 3.0, { 4.1, 4.4 });
@@ -150,7 +143,6 @@ DOC_SNIPPET(plottables_statistical_box, 600, 360)
     customPlot->xAxis->setRange(0.4, 3.6);
     customPlot->yAxis->setRange(0, 5);
     customPlot->yAxis->setLabel("response time (ms)");
-    customPlot->replot();
     // [/plottables_statistical_box]
 }
 
@@ -170,8 +162,7 @@ DOC_SNIPPET(plottables_waterfall, 600, 420)
                             + 0.3 * std::exp(-std::pow((frequency[i] - 75) / 6, 2));
         }
     }
-    auto* waterfall = new QCPWaterfallGraph(customPlot->xAxis, customPlot->yAxis);
-    waterfall->setData(std::move(frequency), std::move(spectra));
+    auto waterfall = customPlot->add<QCPWaterfallGraph>().setData(std::move(frequency), std::move(spectra));
     waterfall->setUniformSpacing(1.0);   // trace k sits at value k
     waterfall->setGain(0.8);             // each normalised trace spans 0.8 of a step
     QList<QColor> colors;
@@ -181,7 +172,6 @@ DOC_SNIPPET(plottables_waterfall, 600, 420)
     customPlot->xAxis->setLabel("frequency (Hz)");
     customPlot->yAxis->setLabel("trace");
     customPlot->rescaleAxes();
-    customPlot->replot();
     // [/plottables_waterfall]
 }
 
@@ -210,7 +200,6 @@ DOC_SNIPPET(plottables_intervals, 600, 240)
     customPlot->xAxis->setLabel("time (h)");
     customPlot->legend->setVisible(true);
     customPlot->axisRect()->insetLayout()->setInsetAlignment(0, Qt::AlignBottom | Qt::AlignRight);
-    customPlot->replot();
     // [/plottables_intervals]
 }
 
@@ -231,16 +220,14 @@ DOC_SNIPPET(plottables_histogram, 600, 320)
     using Source = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
     auto source = std::make_shared<Source>(std::move(index), std::move(samples));
 
-    auto* histogram = new QCPHistogram(customPlot->xAxis, customPlot->yAxis);
-    histogram->setName("quiet / active");
+    auto histogram = customPlot->add<QCPHistogram>().setName("quiet / active");
     histogram->setBins(60);
     histogram->setStyle(QCPHistogram::sStep);
     histogram->setNormalization(qcp::algo::HistogramNormalization::Density);
     histogram->setDataSource(source);   // one histogram per column, on shared bins
     // The bars exist only once the background binning is done.
-    QObject::connect(histogram, &QCPHistogram::histogramReady, customPlot, [customPlot] {
+    QObject::connect(histogram.get(), &QCPHistogram::histogramReady, customPlot, [customPlot] {
         customPlot->rescaleAxes();
-        customPlot->replot();
     });
     customPlot->xAxis->setLabel("value");
     customPlot->yAxis->setLabel("density");
@@ -265,14 +252,13 @@ DOC_SNIPPET(plottables_histogram_log, 600, 320)
 
     customPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);   // the bins follow the key axis
     customPlot->xAxis->setTicker(QSharedPointer<QCPAxisTickerLog>::create());
-    auto* histogram = new QCPHistogram(customPlot->xAxis, customPlot->yAxis);
+    auto histogram = customPlot->add<QCPHistogram>();
     histogram->setBins(40);
     histogram->setFixedRange(QCPRange(1, 1e4));   // values outside are not counted
     histogram->setColumnColors({ QColor(44, 160, 44) });
     histogram->setDataSource(std::make_shared<Source>(std::move(index), std::move(samples)));
-    QObject::connect(histogram, &QCPHistogram::histogramReady, customPlot, [customPlot] {
+    QObject::connect(histogram.get(), &QCPHistogram::histogramReady, customPlot, [customPlot] {
         customPlot->rescaleAxes();
-        customPlot->replot();
     });
     customPlot->xAxis->setLabel("energy (eV)");
     customPlot->yAxis->setLabel("count");
@@ -282,10 +268,9 @@ DOC_SNIPPET(plottables_histogram_log, 600, 320)
 DOC_CODE(plottables_histogram_binned)
 {
     // [plottables_histogram_binned]
-    auto* histogram = new QCPHistogram(customPlot->xAxis, customPlot->yAxis);
+    auto histogram = customPlot->add<QCPHistogram>();
     // 4 bins need 5 edges. One list of heights per column.
     histogram->setBinned({ 0, 1, 2, 4, 8 }, { { 3, 7, 5, 1 }, { 1, 4, 6, 2 } });
     customPlot->rescaleAxes();
-    customPlot->replot();
     // [/plottables_histogram_binned]
 }

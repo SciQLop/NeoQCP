@@ -9,7 +9,7 @@
 DOC_SNIPPET(colormaps_classic, 600, 360)
 {
     // [colormaps_classic]
-    auto* map = new QCPColorMap(customPlot->xAxis, customPlot->yAxis);
+    auto map = customPlot->add<QCPColorMap>();
     map->data()->setSize(200, 150);                             // 200 x 150 cells
     map->data()->setRange(QCPRange(-4, 4), QCPRange(-3, 3));    // centres of the corner cells
     for (int xIndex = 0; xIndex < 200; ++xIndex)
@@ -34,7 +34,6 @@ DOC_SNIPPET(colormaps_classic, 600, 360)
     scale->setMarginGroup(QCP::msTop | QCP::msBottom, margins);
 
     customPlot->rescaleAxes();
-    customPlot->replot();
     // [/colormaps_classic]
 }
 
@@ -58,15 +57,13 @@ DOC_SNIPPET(colormaps_colormap2, 600, 360)
     addColumns(0, 80);      // 0 to 39.5 s
     addColumns(120, 200);   // 60 to 99.5 s: nothing was recorded in between
 
-    auto* map = new QCPColorMap2(customPlot->xAxis, customPlot->yAxis);
-    map->setData(std::move(time), std::move(frequency), std::move(power));
+    auto map = customPlot->add<QCPColorMap2>().setData(std::move(time), std::move(frequency), std::move(power));
     map->setGradient(QCPColorGradient::gpTurbo);
     map->rescaleDataRange(true);
 
     customPlot->xAxis->setLabel("time [s]");
     customPlot->yAxis->setLabel("frequency [Hz]");
     customPlot->rescaleAxes();
-    customPlot->replot();
     // [/colormaps_colormap2]
 }
 
@@ -96,7 +93,7 @@ DOC_SNIPPET(colormaps_log, 600, 360)
     scale->axis()->setNumberPrecision(0);
     scale->setLabel("flux");
 
-    auto* map = new QCPColorMap2(customPlot->xAxis, customPlot->yAxis);
+    auto map = customPlot->add<QCPColorMap2>();
     map->setColorScale(scale);   // the map takes the scale's log z
     map->setGradient(QCPColorGradient::gpInferno);
     map->setData(std::move(time), std::move(energy), std::move(flux));
@@ -105,7 +102,6 @@ DOC_SNIPPET(colormaps_log, 600, 360)
     customPlot->xAxis->setLabel("time [s]");
     customPlot->yAxis->setLabel("energy [eV]");
     customPlot->rescaleAxes();
-    customPlot->replot();
     // [/colormaps_log]
 }
 
@@ -120,7 +116,7 @@ DOC_SNIPPET(colormaps_contours, 600, 360)
         for (double cy : y)
             z.push_back(std::exp(-(cx * cx + cy * cy)) - 0.6 * std::exp(-((cx - 1) * (cx - 1) + (cy + 1) * (cy + 1)) * 2));
 
-    auto* map = new QCPColorMap2(customPlot->xAxis, customPlot->yAxis);
+    auto map = customPlot->add<QCPColorMap2>();
     map->setGradient(QCPColorGradient::gpCoolwarm);
     map->setData(std::move(x), std::move(y), std::move(z));
     map->setDataRange(QCPRange(-1, 1));
@@ -128,7 +124,6 @@ DOC_SNIPPET(colormaps_contours, 600, 360)
     map->setContourPen(QPen(Qt::black, 1));
     map->setContourLabelEnabled(true);   // writes each level on its line
     customPlot->rescaleAxes();
-    customPlot->replot();
     // [/colormaps_contours]
 }
 
@@ -144,18 +139,17 @@ DOC_SNIPPET(colormaps_histogram2d, 600, 360)
         y[i] = 0.6 * x[i] + 0.8 * normal(rng);   // correlated with x
     }
 
-    auto* histogram = new QCPHistogram2D(customPlot->xAxis, customPlot->yAxis);
+    auto histogram = customPlot->add<QCPHistogram2D>();
     histogram->setBins(120, 80);
     histogram->setGradient(QCPColorGradient::gpInferno);
     histogram->setData(std::move(x), std::move(y));
     // Counts exist only once the background binning is done.
-    QObject::connect(&histogram->pipeline(), &QCPHistogramPipeline::finished, histogram,
+    QObject::connect(&histogram->pipeline(), &QCPHistogramPipeline::finished, histogram.get(),
                      [histogram] { histogram->rescaleDataRange(); });
 
     customPlot->xAxis->setLabel("x");
     customPlot->yAxis->setLabel("y");
     customPlot->rescaleAxes();
-    customPlot->replot();
     // [/colormaps_histogram2d]
 }
 
@@ -172,7 +166,7 @@ DOC_SNIPPET(colormaps_histogram2d_contours, 600, 360)
         y[i] = std::sin(x[i]) + (0.2 + 0.05 * x[i]) * normal(rng);   // spread grows with x
     }
 
-    auto* histogram = new QCPHistogram2D(customPlot->xAxis, customPlot->yAxis);
+    auto histogram = customPlot->add<QCPHistogram2D>();
     histogram->setBins(60, 60);
     histogram->setNormalization(QCPHistogram2D::nColumn);   // each column sums to one
     histogram->setGradient(QCPColorGradient::gpViridis);
@@ -180,13 +174,12 @@ DOC_SNIPPET(colormaps_histogram2d_contours, 600, 360)
     histogram->setContourPen(QPen(Qt::white, 1));
     histogram->setContourLabelEnabled(true);
     histogram->setData(std::move(x), std::move(y));
-    QObject::connect(&histogram->pipeline(), &QCPHistogramPipeline::finished, histogram,
+    QObject::connect(&histogram->pipeline(), &QCPHistogramPipeline::finished, histogram.get(),
                      [histogram] { histogram->rescaleDataRange(); });
 
     customPlot->xAxis->setLabel("x");
     customPlot->yAxis->setLabel("y");
     customPlot->rescaleAxes();
-    customPlot->replot();
     // [/colormaps_histogram2d_contours]
 }
 
@@ -198,7 +191,7 @@ DOC_SNIPPET(colormaps_gradients, 600, 560)
     auto names = QSharedPointer<QCPAxisTickerText>::create();
     for (int i = 0; i < presets.keyCount(); ++i)
     {
-        auto* stripe = new QCPColorMap(customPlot->xAxis, customPlot->yAxis);
+        auto stripe = customPlot->add<QCPColorMap>();
         stripe->data()->setSize(256, 2);
         stripe->data()->setRange(QCPRange(0, 1), QCPRange(i - 0.2, i + 0.2));
         for (int k = 0; k < 256; ++k)
@@ -219,7 +212,6 @@ DOC_SNIPPET(colormaps_gradients, 600, 560)
     customPlot->xAxis->setVisible(false);
     customPlot->xAxis->grid()->setVisible(false);
     customPlot->xAxis->setRange(-0.01, 1.01);
-    customPlot->replot();
     // [/colormaps_gradients]
 }
 
@@ -244,14 +236,13 @@ DOC_SNIPPET(colormaps_interpolation, 600, 300)
         map->rescaleAxes();
         xAxis->setLabel(r == 1 ? "setInterpolate(true)" : "setInterpolate(false)");
     }
-    customPlot->replot();
     // [/colormaps_interpolation]
 }
 
 DOC_SNIPPET(colormaps_nan, 600, 360)
 {
     // [colormaps_nan]
-    auto* map = new QCPColorMap(customPlot->xAxis, customPlot->yAxis);
+    auto map = customPlot->add<QCPColorMap>();
     map->data()->setSize(120, 90);
     map->data()->setRange(QCPRange(0, 12), QCPRange(0, 9));
     for (int xIndex = 0; xIndex < 120; ++xIndex)
@@ -270,13 +261,12 @@ DOC_SNIPPET(colormaps_nan, 600, 360)
     map->setGradient(gradient);
     map->rescaleDataRange(true);
     customPlot->rescaleAxes();
-    customPlot->replot();
     // [/colormaps_nan]
 }
 
 DOC_CODE(colormaps_preset)
 {
-    auto* map = new QCPColorMap(customPlot->xAxis, customPlot->yAxis);
+    auto map = customPlot->add<QCPColorMap>();
     // [colormaps_preset]
     map->setGradient(QCPColorGradient::gpViridis);
     // [/colormaps_preset]
@@ -284,7 +274,7 @@ DOC_CODE(colormaps_preset)
 
 DOC_CODE(colormaps_custom_gradient)
 {
-    auto* map = new QCPColorMap(customPlot->xAxis, customPlot->yAxis);
+    auto map = customPlot->add<QCPColorMap>();
     // [colormaps_custom_gradient]
     QCPColorGradient gradient;
     gradient.setColorStopAt(0.0, QColor(10, 10, 60));

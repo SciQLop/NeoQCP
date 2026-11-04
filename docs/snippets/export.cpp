@@ -13,9 +13,9 @@ DOC_SNIPPET(export_png, 600, 360)
         x[i] = (i - 200) / 10.0;
         y[i] = x[i] == 0 ? 1 : std::sin(x[i]) / x[i];
     }
-    QCPGraph* graph = customPlot->addGraph();
-    graph->setData(x, y);
-    graph->setPen(QPen(QColor(31, 119, 180), 2));
+    auto graph = customPlot->add<QCPGraph>()
+        .setData(x, y)
+        .setPen(QPen(QColor(31, 119, 180), 2));
     customPlot->xAxis->setLabel("x");
     customPlot->yAxis->setLabel("sin(x) / x");
     customPlot->rescaleAxes();
@@ -61,10 +61,10 @@ DOC_CODE(export_formats)
         x[i] = i;
         y[i] = std::sqrt(i) * std::sin(i / 8.0);
     }
-    QCPGraph* graph = customPlot->addGraph();
-    graph->setData(x, y);
-    graph->setLineStyle(QCPGraph::lsStepCenter);
-    graph->setBrush(QColor(31, 119, 180, 50));
+    auto graph = customPlot->add<QCPGraph>()
+        .setData(x, y)
+        .setLineStyle(QCPGraph::lsStepCenter)
+        .setBrush(QColor(31, 119, 180, 50));
     customPlot->rescaleAxes();
 
     QTemporaryDir dir;

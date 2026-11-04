@@ -12,15 +12,14 @@ DOC_SNIPPET(layout_title, 600, 380)
         x[i] = i / 20.0;
         y[i] = std::exp(-0.3 * x[i]) * std::cos(2 * x[i]);
     }
-    QCPGraph* graph = customPlot->addGraph();
-    graph->setData(x, y);
-    graph->setPen(QPen(QColor(31, 119, 180), 2));
+    auto graph = customPlot->add<QCPGraph>()
+        .setData(x, y)
+        .setPen(QPen(QColor(31, 119, 180), 2));
     customPlot->rescaleAxes();
 
     customPlot->plotLayout()->insertRow(0); // the axis rect moves down to row 1
     auto* title = new QCPTextElement(customPlot, "Damped oscillation", QFont("sans", 12, QFont::Bold));
     customPlot->plotLayout()->addElement(0, 0, title);
-    customPlot->replot();
     // [/layout_title]
 }
 
@@ -50,7 +49,6 @@ DOC_SNIPPET(layout_legend_inside, 600, 360)
     auto* legendTitle = new QCPTextElement(customPlot, "Signals", QFont("sans", 9, QFont::Bold));
     legendTitle->setLayer(customPlot->legend->layer()); // else the legend background hides it
     customPlot->legend->addElement(0, 0, legendTitle);
-    customPlot->replot();
     // [/layout_legend_inside]
 }
 
@@ -66,10 +64,10 @@ DOC_SNIPPET(layout_legend_outside, 600, 400)
             x[i] = i / 20.0;
             y[i] = std::sin(x[i] + g) * std::exp(-x[i] / (4 + 3 * g));
         }
-        QCPGraph* graph = customPlot->addGraph();
-        graph->setData(x, y);
-        graph->setName(QString("channel %1").arg(g + 1));
-        graph->setPen(QPen(colors[g], 2));
+        auto graph = customPlot->add<QCPGraph>()
+            .setData(x, y)
+            .setName(QString("channel %1").arg(g + 1))
+            .setPen(QPen(colors[g], 2));
     }
     customPlot->rescaleAxes();
     customPlot->legend->setVisible(true);
@@ -80,7 +78,6 @@ DOC_SNIPPET(layout_legend_outside, 600, 400)
     legendRow->addElement(0, 0, customPlot->legend); // takes it out of the axis rect
     customPlot->legend->setFillOrder(QCPLegend::foColumnsFirst);
     customPlot->plotLayout()->setRowStretchFactor(1, 0.001);
-    customPlot->replot();
     // [/layout_legend_outside]
 }
 
@@ -114,7 +111,6 @@ DOC_SNIPPET(layout_axis_rects, 720, 520)
     plotIn(top, 1, QColor(31, 119, 180));
     plotIn(bottomLeft, 3, QColor(255, 127, 14));
     plotIn(bottomRight, 6, QColor(44, 160, 44));
-    customPlot->replot();
     // [/layout_axis_rects]
 }
 
@@ -144,14 +140,13 @@ DOC_SNIPPET(layout_margin_group, 600, 460)
 
     QObject::connect(customPlot->xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged),
                      lower->axis(QCPAxis::atBottom), qOverload<const QCPRange&>(&QCPAxis::setRange));
-    customPlot->replot();
     // [/layout_margin_group]
 }
 
 DOC_SNIPPET(layout_color_scale, 640, 440)
 {
     // [layout_color_scale]
-    auto* colorMap = new QCPColorMap(customPlot->xAxis, customPlot->yAxis);
+    auto colorMap = customPlot->add<QCPColorMap>();
     colorMap->data()->setSize(200, 200);
     colorMap->data()->setRange(QCPRange(-4, 4), QCPRange(-4, 4));
     for (int ix = 0; ix < 200; ++ix)
@@ -173,7 +168,6 @@ DOC_SNIPPET(layout_color_scale, 640, 440)
     auto* group = new QCPMarginGroup(customPlot);
     customPlot->axisRect()->setMarginGroup(QCP::msTop | QCP::msBottom, group);
     colorScale->setMarginGroup(QCP::msTop | QCP::msBottom, group);
-    customPlot->replot();
     // [/layout_color_scale]
 }
 

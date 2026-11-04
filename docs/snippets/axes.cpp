@@ -15,9 +15,9 @@ DOC_SNIPPET(axes_basics, 600, 360)
         depth[i] = 10.0 * i;                                            // 0 to 590 m
         temperature[i] = 4 + 18 / (1 + std::exp((depth[i] - 150) / 40));
     }
-    QCPGraph* profile = customPlot->addGraph();
-    profile->setData(temperature, depth);
-    profile->setPen(QPen(QColor(31, 119, 180), 2));
+    auto profile = customPlot->add<QCPGraph>()
+        .setData(temperature, depth)
+        .setPen(QPen(QColor(31, 119, 180), 2));
 
     customPlot->xAxis->setLabel("temperature [°C]");
     customPlot->xAxis->setRange(0, 25);
@@ -25,7 +25,6 @@ DOC_SNIPPET(axes_basics, 600, 360)
     customPlot->yAxis->setRange(0, 600);
     customPlot->yAxis->setRangeReversed(true);   // depth grows downward
     customPlot->yAxis->setPadding(15);           // extra blank space left of the label
-    customPlot->replot();
     // [/axes_basics]
 }
 
@@ -38,9 +37,9 @@ DOC_SNIPPET(axes_log, 600, 360)
         frequency[i] = std::pow(10.0, -1 + 4.0 * i / 199);              // 0.1 Hz to 1 kHz
         power[i] = 1e3 / (1 + std::pow(frequency[i] / 2, 5.0 / 3.0));
     }
-    QCPGraph* spectrum = customPlot->addGraph();
-    spectrum->setData(frequency, power);
-    spectrum->setPen(QPen(QColor(214, 39, 40), 2));
+    auto spectrum = customPlot->add<QCPGraph>()
+        .setData(frequency, power)
+        .setPen(QPen(QColor(214, 39, 40), 2));
 
     for (QCPAxis* axis : { customPlot->xAxis, customPlot->yAxis })
     {
@@ -53,7 +52,6 @@ DOC_SNIPPET(axes_log, 600, 360)
     customPlot->xAxis->setLabel("frequency [Hz]");
     customPlot->yAxis->setLabel("power [nT²/Hz]");
     customPlot->rescaleAxes();
-    customPlot->replot();
     // [/axes_log]
 }
 
@@ -81,16 +79,15 @@ DOC_SNIPPET(axes_extra_axis, 600, 360)
     };
     for (const auto& [axis, values, color, label] : series)
     {
-        QCPGraph* graph = customPlot->addGraph(customPlot->xAxis, axis);
-        graph->setData(hour, values);
-        graph->setPen(QPen(color, 2));
+        auto graph = customPlot->add<QCPGraph>().setAxes(customPlot->xAxis, axis)
+            .setData(hour, values)
+            .setPen(QPen(color, 2));
         axis->setLabel(label);
         axis->setLabelColor(color);
         axis->setTickLabelColor(color);
     }
     customPlot->xAxis->setLabel("hour");
     customPlot->rescaleAxes();
-    customPlot->replot();
     // [/axes_extra_axis]
 }
 
@@ -133,7 +130,6 @@ DOC_SNIPPET(axes_tickers, 600, 640)
     addRow(fixed, "QCPAxisTickerFixed (step 15)", 0, 90);
 
     addRow(QSharedPointer<QCPAxisTickerPi>::create(), "QCPAxisTickerPi", 0, 2 * std::numbers::pi);
-    customPlot->replot();
     // [/axes_tickers]
 }
 
@@ -152,7 +148,6 @@ DOC_SNIPPET(axes_latex, 600, 360)
     customPlot->xAxis->setLabel("frequency $f$ [Hz]");
     customPlot->yAxis->setLabel(R"($\frac{\partial B_x}{\partial t}$ [nT$\cdot$s$^{-1}$])");
     customPlot->rescaleAxes();
-    customPlot->replot();
     // [/axes_latex]
 }
 
@@ -170,7 +165,6 @@ DOC_SNIPPET(axes_long_label, 600, 300)
         "magnetic field magnitude, fluxgate magnetometer, GSE frame, burst mode [nT]");
     customPlot->xAxis->setLabel("time [s]");
     customPlot->rescaleAxes();
-    customPlot->replot();
     // [/axes_long_label]
 }
 
@@ -209,6 +203,5 @@ DOC_SNIPPET(axes_linked, 600, 400)
     lowerX->setLabel("time [s]");
 
     upperX->setRange(0, 10);   // the lower x axis follows
-    customPlot->replot();
     // [/axes_linked]
 }

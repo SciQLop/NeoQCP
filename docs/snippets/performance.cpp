@@ -21,13 +21,12 @@ DOC_SNIPPET(performance_million_points, 600, 360)
         const double spike = (i % 1'000'000 == 500'000) ? 3.0 : 0.0; // one sample each
         signal[i] = float(wave + 0.4 * jitter + spike);
     }
-    auto* graph = new QCPGraph2(customPlot->xAxis, customPlot->yAxis);
+    auto graph = customPlot->add<QCPGraph2>();
     graph->setData(std::move(t), std::move(signal)); // moved in, never copied
     graph->setPen(QPen(QColor(31, 119, 180)));
     customPlot->xAxis->setLabel("time (s)");
     customPlot->xAxis->setRange(0, 5000);
     customPlot->yAxis->setRange(-1.5, 4);
-    customPlot->replot();
     // [/performance_million_points]
 }
 
@@ -45,7 +44,7 @@ DOC_SNIPPET(performance_multigraph, 600, 360)
         b[1][i] = float(10 * std::sin(phase) + std::sin(0.53 * t[i]));
         b[2][i] = float(3 * std::sin(5 * phase) + std::sin(0.71 * t[i]));
     }
-    auto* field = new QCPMultiGraph(customPlot->xAxis, customPlot->yAxis);
+    auto field = customPlot->add<QCPMultiGraph>();
     field->setData(std::move(t), std::move(b)); // one key column, three value columns
     field->setComponentNames({ "Bx", "By", "Bz" });
     field->setComponentColors({ QColor(31, 119, 180), QColor(255, 127, 14), QColor(44, 160, 44) });
@@ -53,7 +52,6 @@ DOC_SNIPPET(performance_multigraph, 600, 360)
     customPlot->yAxis->setLabel("B (nT)");
     customPlot->legend->setVisible(true);
     customPlot->rescaleAxes();
-    customPlot->replot();
     // [/performance_multigraph]
 }
 
@@ -71,7 +69,7 @@ DOC_SNIPPET(performance_shared_source, 600, 420)
     auto source = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<float>>>(
         std::move(t), std::move(v));
 
-    auto* overview = new QCPGraph2(customPlot->xAxis, customPlot->yAxis);
+    auto overview = customPlot->add<QCPGraph2>();
     overview->setDataSource(source);
 
     auto* detailRect = new QCPAxisRect(customPlot);
@@ -92,7 +90,6 @@ DOC_SNIPPET(performance_shared_source, 600, 420)
     customPlot->yAxis->setRange(-1.3, 1.3);
     detailRect->axis(QCPAxis::atBottom)->setRange(300, 320);
     detailRect->axis(QCPAxis::atLeft)->setRange(-1.3, 1.3);
-    customPlot->replot();
     // [/performance_shared_source]
 }
 
@@ -111,20 +108,19 @@ DOC_SNIPPET(performance_cursor_layer, 600, 360)
     if (customPlot->addLayer("cursor"))
         customPlot->layer("cursor")->setMode(QCPLayer::lmBuffered);
 
-    auto* cursor = new QCPItemStraightLine(customPlot);
+    auto cursor = customPlot->add<QCPItemStraightLine>();
     cursor->setLayer("cursor");
     cursor->setPen(QPen(QColor(214, 39, 40), 1, Qt::DashLine));
     cursor->point1->setCoords(7.5, 0);
     cursor->point2->setCoords(7.5, 1);
 
-    QObject::connect(customPlot, &QCustomPlot::mouseMove, cursor,
+    QObject::connect(customPlot, &QCustomPlot::mouseMove, cursor.get(),
                      [customPlot, cursor](QMouseEvent* event) {
                          const double key = customPlot->xAxis->pixelToCoord(event->position().x());
                          cursor->point1->setCoords(key, 0);
                          cursor->point2->setCoords(key, 1);
                          customPlot->layer("cursor")->replot(); // only this layer is redrawn
                      });
-    customPlot->replot();
     // [/performance_cursor_layer]
 }
 
@@ -138,18 +134,16 @@ DOC_CODE(performance_swap_delays)
 
 DOC_CODE(performance_rescale_when_ready)
 {
-    auto* graph = new QCPGraph2(customPlot->xAxis, customPlot->yAxis);
-    graph->setData(std::vector<double> { 0, 1 }, std::vector<double> { 0, 1 });
+    auto graph = customPlot->add<QCPGraph2>().setData(std::vector<double> { 0, 1 }, std::vector<double> { 0, 1 });
     customPlot->replot();
     std::vector<double> keys { 0, 10 }, values { -5, 5 };
     // [performance_rescale_when_ready]
     graph->setData(std::move(keys), std::move(values));
-    QObject::connect(graph, &QCPAbstractPlottable::busyChanged, customPlot,
+    QObject::connect(graph.get(), &QCPAbstractPlottable::busyChanged, customPlot,
                      [customPlot](bool busy) {
                          if (!busy)
                          {
                              customPlot->rescaleAxes();
-                             customPlot->replot();
                          }
                      });
     // [/performance_rescale_when_ready]

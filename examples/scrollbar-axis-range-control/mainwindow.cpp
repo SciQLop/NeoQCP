@@ -60,10 +60,10 @@ MainWindow::~MainWindow()
 void MainWindow::setupPlot()
 {
   // The following plot setup is mostly taken from the plot demos:
-  ui->plot->addGraph();
+  ui->plot->add<QCPGraph>();
   ui->plot->graph()->setPen(QPen(Qt::blue));
   ui->plot->graph()->setBrush(QBrush(QColor(0, 0, 255, 20)));
-  ui->plot->addGraph();
+  ui->plot->add<QCPGraph>();
   ui->plot->graph()->setPen(QPen(Qt::red));
   QVector<double> x(500), y0(500), y1(500);
   for (int i=0; i<500; ++i)

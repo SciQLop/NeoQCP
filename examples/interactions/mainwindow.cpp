@@ -205,7 +205,7 @@ void MainWindow::addRandomGraph()
     y[i] = (qSin(x[i]*r1*5)*qSin(qCos(x[i]*r2)*r4*3)+r3*qCos(qSin(x[i])*r4*2))*yScale + yOffset;
   }
   
-  ui->customPlot->addGraph();
+  ui->customPlot->add<QCPGraph>();
   ui->customPlot->graph()->setName(QString("New graph %1").arg(ui->customPlot->graphCount()-1));
   ui->customPlot->graph()->setData(x, y);
   ui->customPlot->graph()->setLineStyle((QCPGraph::LineStyle)(std::rand()%5+1));

@@ -46,8 +46,8 @@ A new plot has one axis rect with four axes. The widget keeps a shortcut pointer
 Call `setVisible(true)` on `xAxis2` or `yAxis2` to show them.
 `axisRect()->setupFullAxesBox(true)` shows all four at once, hides the top and right tick labels, and makes the top and right axes follow the bottom and left ones.
 
-`addGraph()` with no arguments uses `xAxis` and `yAxis`.
-Pass other axes to plot against them, for example `addGraph(customPlot->xAxis, customPlot->yAxis2)` for a second y scale on the right.
+`add<T>()` uses `xAxis` and `yAxis`.
+Pass other axes to plot against them, for example `customPlot->add<QCPGraph>().setAxes(customPlot->xAxis, customPlot->yAxis2)` for a second y scale on the right.
 {doc}`axes` covers ranges, tickers and log scales.
 
 These shortcuts only point into the first axis rect.

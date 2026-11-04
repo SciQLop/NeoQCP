@@ -30,7 +30,6 @@ DOC_SNIPPET(polar_basic, 600, 420)
         graph->setData(angle, gain);
         graph->setPen(QPen(color, 2));
     }
-    customPlot->replot();
     // [/polar_basic]
 }
 
@@ -59,6 +58,5 @@ DOC_SNIPPET(polar_radians, 600, 420)
     rose->setData(theta, r);
     rose->setPen(QPen(QColor(148, 103, 189), 2));
     rose->setBrush(QColor(148, 103, 189, 60));
-    customPlot->replot();
     // [/polar_radians]
 }

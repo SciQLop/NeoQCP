@@ -12,21 +12,20 @@ DOC_SNIPPET(styling_dark_theme, 600, 360)
         a[i] = std::sin(t[i]) * std::exp(-t[i] / 8);
         b[i] = std::cos(t[i]) * std::exp(-t[i] / 8);
     }
-    QCPGraph* sine = customPlot->addGraph();
-    sine->setData(t, a);
-    sine->setName("sine");
-    sine->setPen(QPen(QColor(77, 166, 255), 2));
-    QCPGraph* cosine = customPlot->addGraph();
-    cosine->setData(t, b);
-    cosine->setName("cosine");
-    cosine->setPen(QPen(QColor(255, 159, 67), 2));
+    auto sine = customPlot->add<QCPGraph>()
+        .setData(t, a)
+        .setName("sine")
+        .setPen(QPen(QColor(77, 166, 255), 2));
+    auto cosine = customPlot->add<QCPGraph>()
+        .setData(t, b)
+        .setName("cosine")
+        .setPen(QPen(QColor(255, 159, 67), 2));
     customPlot->xAxis->setLabel("time (s)");
     customPlot->yAxis->setLabel("amplitude");
     customPlot->rescaleAxes();
     customPlot->legend->setVisible(true);
 
     customPlot->setTheme(QCPTheme::dark(customPlot)); // the plot owns the theme
-    customPlot->replot();
     // [/styling_dark_theme]
 }
 
@@ -39,10 +38,10 @@ DOC_SNIPPET(styling_custom_theme, 600, 360)
         x[i] = i / 20.0;
         y[i] = std::sin(x[i]) + 0.5 * std::sin(3 * x[i]);
     }
-    QCPGraph* graph = customPlot->addGraph();
-    graph->setData(x, y);
-    graph->setName("signal");
-    graph->setPen(QPen(QColor("#268bd2"), 2));
+    auto graph = customPlot->add<QCPGraph>()
+        .setData(x, y)
+        .setName("signal")
+        .setPen(QPen(QColor("#268bd2"), 2));
     customPlot->rescaleAxes();
     customPlot->legend->setVisible(true);
 
@@ -55,7 +54,6 @@ DOC_SNIPPET(styling_custom_theme, 600, 360)
     theme->setLegendBackground(QColor("#eee8d5"));
     theme->setLegendBorder(QColor("#93a1a1"));
     customPlot->setTheme(theme);
-    customPlot->replot();
     // [/styling_custom_theme]
 }
 
@@ -70,22 +68,21 @@ DOC_SNIPPET(styling_pens_brushes, 600, 360)
         upper[i] = mid[i] + 0.4;
         lower[i] = mid[i] - 0.4;
     }
-    QCPGraph* low = customPlot->addGraph();
-    low->setData(x, lower);
-    low->setPen(Qt::NoPen);
-    QCPGraph* high = customPlot->addGraph();
-    high->setData(x, upper);
-    high->setPen(Qt::NoPen);
-    high->setBrush(QColor(31, 119, 180, 60));
-    high->setChannelFillGraph(low); // fill between high and low
-    QCPGraph* centre = customPlot->addGraph();
-    centre->setData(x, mid);
-    centre->setPen(QPen(QColor(31, 119, 180), 2));
-    QCPGraph* threshold = customPlot->addGraph();
-    threshold->setData(x, limit);
-    threshold->setPen(QPen(QColor(214, 39, 40), 1.5, Qt::DashLine));
+    auto low = customPlot->add<QCPGraph>()
+        .setData(x, lower)
+        .setPen(Qt::NoPen);
+    auto high = customPlot->add<QCPGraph>()
+        .setData(x, upper)
+        .setPen(Qt::NoPen)
+        .setBrush(QColor(31, 119, 180, 60));
+    high->setChannelFillGraph(low.get()); // fill between high and low
+    auto centre = customPlot->add<QCPGraph>()
+        .setData(x, mid)
+        .setPen(QPen(QColor(31, 119, 180), 2));
+    auto threshold = customPlot->add<QCPGraph>()
+        .setData(x, limit)
+        .setPen(QPen(QColor(214, 39, 40), 1.5, Qt::DashLine));
     customPlot->rescaleAxes();
-    customPlot->replot();
     // [/styling_pens_brushes]
 }
 
@@ -113,16 +110,15 @@ DOC_SNIPPET(styling_scatter_gallery, 600, 360)
     {
         const double x = i % 5 + 0.5;
         const double y = 2.6 - i / 5;
-        QCPGraph* graph = customPlot->addGraph();
-        graph->setData({ x }, { y });
-        graph->setLineStyle(QCPGraph::lsNone);
+        auto graph = customPlot->add<QCPGraph>()
+            .setData({ x }, { y })
+            .setLineStyle(QCPGraph::lsNone);
         graph->setScatterStyle(QCPScatterStyle(shapes[i], QPen(QColor(31, 119, 180), 1.5),
                                                QBrush(QColor(31, 119, 180, 70)), 18));
-        auto* label = new QCPItemText(customPlot);
+        auto label = customPlot->add<QCPItemText>();
         label->position->setCoords(x, y - 0.3);
         label->setText(names[i]);
     }
-    customPlot->replot();
     // [/styling_scatter_gallery]
 }
 
@@ -147,17 +143,16 @@ DOC_SNIPPET(styling_line_endings, 600, 360)
     for (int i = 0; i < styles.size(); ++i)
     {
         const double y = styles.size() - 1 - i;
-        auto* line = new QCPItemLine(customPlot);
+        auto line = customPlot->add<QCPItemLine>();
         line->start->setCoords(1.5, y);
         line->end->setCoords(6, y);
         line->setPen(QPen(QColor(60, 60, 60), 1.5));
         line->setHead(QCPLineEnding(styles[i], 12, 14));
-        auto* label = new QCPItemText(customPlot);
+        auto label = customPlot->add<QCPItemText>();
         label->position->setCoords(6.5, y);
         label->setPositionAlignment(Qt::AlignLeft | Qt::AlignVCenter);
         label->setText(names[i]);
     }
-    customPlot->replot();
     // [/styling_line_endings]
 }
 
@@ -173,10 +168,10 @@ DOC_SNIPPET(styling_legend, 600, 360)
             x[i] = i / 20.0;
             y[i] = std::sin(x[i] + k * 2.1);
         }
-        QCPGraph* graph = customPlot->addGraph();
-        graph->setData(x, y);
-        graph->setPen(QPen(colors[k], 2));
-        graph->setName(QString("phase %1").arg(k));
+        auto graph = customPlot->add<QCPGraph>()
+            .setData(x, y)
+            .setPen(QPen(colors[k], 2))
+            .setName(QString("phase %1").arg(k));
     }
     customPlot->rescaleAxes();
     customPlot->yAxis->setRange(-1.6, 1.2);
@@ -189,7 +184,6 @@ DOC_SNIPPET(styling_legend, 600, 360)
     legend->setFont(QFont(customPlot->font().family(), 9));
     legend->setIconSize(24, 10);
     customPlot->axisRect()->insetLayout()->setInsetAlignment(0, Qt::AlignBottom | Qt::AlignHCenter);
-    customPlot->replot();
     // [/styling_legend]
 }
 
@@ -204,20 +198,20 @@ DOC_SNIPPET(styling_legend_group, 600, 360)
             x[i] = i / 20.0;
             y[i] = std::sin(x[i]) + offset;
         }
-        QCPGraph* graph = customPlot->addGraph();
-        graph->setData(x, y);
-        graph->setPen(QPen(QColor(31, 119, 180), offset == 0 ? 2.5 : 1.5, style));
-        graph->setName(name);
-        return graph;
+        auto graph = customPlot->add<QCPGraph>()
+            .setData(x, y)
+            .setPen(QPen(QColor(31, 119, 180), offset == 0 ? 2.5 : 1.5, style))
+            .setName(name);
+        return graph.get();
     };
     QCPPlottableGroup* model = customPlot->addPlottableGroup("model (median, min, max)");
     model->addMember(curve(0.0, Qt::SolidLine, "median"));
     model->addMember(curve(-0.3, Qt::DashLine, "min"));
     model->addMember(curve(0.3, Qt::DashLine, "max"));
 
-    QCPGraph* zero = customPlot->addGraph();
-    zero->setData(QVector<double> { 0, 10 }, QVector<double> { 0, 0 });
-    zero->setPen(QPen(QColor(150, 150, 150), 1, Qt::DotLine));
+    auto zero = customPlot->add<QCPGraph>()
+        .setData(QVector<double> { 0, 10 }, QVector<double> { 0, 0 })
+        .setPen(QPen(QColor(150, 150, 150), 1, Qt::DotLine));
     zero->setWantsLegend(false); // context, not data: no row
 
     // A double-click on the row reports it; here it hides or shows the whole model.
@@ -227,7 +221,6 @@ DOC_SNIPPET(styling_legend_group, 600, 360)
     customPlot->legend->setVisible(true);
     customPlot->rescaleAxes();
     customPlot->yAxis->setRange(-1.6, 2.1);
-    customPlot->replot();
     // [/styling_legend_group]
 }
 
@@ -240,9 +233,9 @@ DOC_SNIPPET(styling_background, 600, 360)
         x[i] = i / 20.0;
         y[i] = std::exp(-x[i] / 4) * std::cos(2 * x[i]);
     }
-    QCPGraph* graph = customPlot->addGraph();
-    graph->setData(x, y);
-    graph->setPen(QPen(QColor(20, 60, 110), 2));
+    auto graph = customPlot->add<QCPGraph>()
+        .setData(x, y)
+        .setPen(QPen(QColor(20, 60, 110), 2));
     customPlot->rescaleAxes();
 
     QLinearGradient gradient(0, 0, 0, 360);
@@ -250,7 +243,6 @@ DOC_SNIPPET(styling_background, 600, 360)
     gradient.setColorAt(1, QColor(205, 222, 240));
     customPlot->setBackground(QBrush(QColor(245, 245, 245)));
     customPlot->axisRect()->setBackground(QBrush(gradient));
-    customPlot->replot();
     // [/styling_background]
 }
 
@@ -284,6 +276,5 @@ DOC_SNIPPET(styling_axes_grid, 600, 360)
         axis->grid()->setSubGridPen(QPen(QColor(232, 232, 232), 1, Qt::DotLine));
         axis->grid()->setZeroLinePen(QPen(QColor(120, 120, 120), 1));
     }
-    customPlot->replot();
     // [/styling_axes_grid]
 }
