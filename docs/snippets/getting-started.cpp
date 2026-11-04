@@ -11,8 +11,7 @@ DOC_SNIPPET(first_plot, 600, 360)
         x[i] = i / 50.0 - 1;   // -1 to 1
         y[i] = x[i] * x[i];
     }
-    customPlot->add<QCPGraph>();
-    customPlot->graph(0)->setData(x, y);
+    customPlot->add<QCPGraph>(x, y);
     customPlot->xAxis->setLabel("x");
     customPlot->yAxis->setLabel("y");
     customPlot->xAxis->setRange(-1, 1);
