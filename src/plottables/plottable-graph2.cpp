@@ -370,10 +370,6 @@ double QCPGraph2::selectTest(const QPointF& pos, bool onlySelectable, QVariant* 
     if (!axisRect || !axisRect->rect().contains(pos.toPoint()))
         return -1;
 
-    // Fast path: when details aren't needed (e.g. wheel events), skip per-point work.
-    if (!details)
-        return mParentPlot->selectionTolerance() * 0.99;
-
     // Keys are sorted — binary search for the nearest key, then check
     // at most 2 neighbors.  O(log N) instead of O(M).
     const QCPAbstractDataSource* ds = mDataSource.get();
@@ -415,7 +411,8 @@ double QCPGraph2::selectTest(const QPointF& pos, bool onlySelectable, QVariant* 
     if (minDistIndex >= 0)
         selectionResult.addDataRange(QCPDataRange(minDistIndex, minDistIndex + 1), false);
     selectionResult.simplify();
-    details->setValue(selectionResult);
+    if (details)
+        details->setValue(selectionResult);
     return minDistIndex >= 0 ? qSqrt(minDistSqr) : -1;
 }
 

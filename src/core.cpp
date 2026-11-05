@@ -4925,9 +4925,60 @@ void QCustomPlot::updateLayerIndices() const
 
 /*! \internal
 
+  Returns every layerable hit at pixel position \a pos, topmost first: the one rule behind the
+  press, the double-click, the wheel and the selection.
+
+  \a action says what the hit is for: Select skips the layerables that cannot be selected (a
+  layerable says so by returning -1 from selectTest() when only selectable ones are asked for),
+  Press and Wheel take any layerable that is hit. A layerable is hit when its selectTest() distance
+  is below the selection tolerance, whatever the action: there is no "anywhere in my rectangle"
+  shortcut any more.
+
+  Precedence is the mouse grabber (mMouseEventLayerable, which the event handlers consult before
+  this list), then this list. The axis rect lies under the drawables, so it comes last: its own
+  drag and its wheel zoom win whenever no drawable above it accepts the event.
+
+  \see layerableAt, layerableListAt
+*/
+QList<QCPHit> QCustomPlot::hitsAt(const QPointF& pos, QCPHitAction action) const
+{
+    const bool onlySelectable = action == QCPHitAction::Select;
+    const double tol = selectionTolerance();
+    QList<QCPHit> result;
+    for (int layerIndex = mLayers.size() - 1; layerIndex >= 0; --layerIndex)
+    {
+        const QCPLayer* layer = mLayers.at(layerIndex);
+        const QList<QCPLayerable*> layerables = layer->children();
+        // One tree lookup per layer, for the click point inflated by the selection tolerance: an
+        // indexed item whose box misses it cannot be hit, so its selectTest() is not called.
+        const std::vector<std::uint8_t>* candidates = nullptr;
+        if (mItemIndexing && !layerables.isEmpty())
+            candidates = &layer->itemCandidates(
+                QRectF(pos, QSizeF(0, 0)).adjusted(-tol, -tol, tol, tol));
+        for (int i = layerables.size() - 1; i >= 0; --i)
+        {
+            QCPLayerable* layerable = layerables.at(i);
+            if (candidates && !(*candidates)[static_cast<std::size_t>(i)])
+                continue;
+            if (!layerable->realVisibility())
+                continue;
+            if (layerable->mouseTransparent())
+                continue;
+            QVariant details;
+            const double dist = layerable->selectTest(pos, onlySelectable, &details);
+            if (dist >= 0 && dist < tol)
+                result.append({ layerable, details });
+        }
+    }
+    return result;
+}
+
+/*! \internal
+
   Returns the top-most layerable at pixel position \a pos. If \a onlySelectable is set to true,
   only those layerables that are selectable will be considered. (Layerable subclasses communicate
-  their selectability via the QCPLayerable::selectTest method, by returning -1.)
+  their selectability via the QCPLayerable::selectTest method, by returning -1.) This is the first
+  entry of \ref hitsAt, with action Select when \a onlySelectable is set and Press otherwise.
 
   \a selectionDetails is an output parameter that contains selection specifics of the affected
   layerable. This is useful if the respective layerable shall be given a subsequent
@@ -4941,15 +4992,13 @@ void QCustomPlot::updateLayerIndices() const
 QCPLayerable* QCustomPlot::layerableAt(const QPointF& pos, bool onlySelectable,
                                        QVariant* selectionDetails) const
 {
-    QList<QVariant> details;
-    QList<QCPLayerable*> candidates
-        = layerableListAt(pos, onlySelectable, selectionDetails ? &details : nullptr);
-    if (selectionDetails && !details.isEmpty())
-        *selectionDetails = details.first();
-    if (!candidates.isEmpty())
-        return candidates.first();
-    else
+    const QList<QCPHit> hits
+        = hitsAt(pos, onlySelectable ? QCPHitAction::Select : QCPHitAction::Press);
+    if (hits.isEmpty())
         return nullptr;
+    if (selectionDetails)
+        *selectionDetails = hits.first().details;
+    return hits.first().layerable;
 }
 
 /*! \internal
@@ -4960,7 +5009,8 @@ QCPLayerable* QCustomPlot::layerableAt(const QPointF& pos, bool onlySelectable,
 
   The returned list is sorted by the layerable/drawing order such that the layerable that appears
   on top in the plot is at index 0 of the returned list. If you only need to know the top
-  layerable, rather use \ref layerableAt.
+  layerable, rather use \ref layerableAt. This is \ref hitsAt with action Select when \a
+  onlySelectable is set and Press otherwise.
 
   \a selectionDetails is an output parameter that contains selection specifics of the affected
   layerable. This is useful if the respective layerable shall be given a subsequent
@@ -4975,37 +5025,12 @@ QList<QCPLayerable*> QCustomPlot::layerableListAt(const QPointF& pos, bool onlyS
                                                   QList<QVariant>* selectionDetails) const
 {
     QList<QCPLayerable*> result;
-    const double tol = selectionTolerance();
-    const QRect currentViewport = viewport();
-    for (int layerIndex = mLayers.size() - 1; layerIndex >= 0; --layerIndex)
+    for (const QCPHit& hit :
+         hitsAt(pos, onlySelectable ? QCPHitAction::Select : QCPHitAction::Press))
     {
-        const QCPLayer* layer = mLayers.at(layerIndex);
-        const QList<QCPLayerable*> layerables = layer->children();
-        // One tree lookup per layer, for the click point inflated by the selection tolerance: an
-        // indexed item whose box misses it cannot be hit, so its selectTest() is not called.
-        const std::vector<std::uint8_t>* candidates = nullptr;
-        if (mItemIndexing && !layerables.isEmpty())
-            candidates = &layer->itemCandidates(
-                QRectF(pos, QSizeF(0, 0)).adjusted(-tol, -tol, tol, tol));
-        for (int i = layerables.size() - 1; i >= 0; --i)
-        {
-            const QCPLayerable* layerable = layerables.at(i);
-            if (candidates && !(*candidates)[static_cast<std::size_t>(i)])
-                continue;
-            if (!layerable->realVisibility())
-                continue;
-            if (layerable->mouseTransparent())
-                continue;
-            QVariant details;
-            double dist = layerables.at(i)->selectTest(pos, onlySelectable,
-                                                       selectionDetails ? &details : nullptr);
-            if (dist >= 0 && dist < selectionTolerance())
-            {
-                result.append(layerables.at(i));
-                if (selectionDetails)
-                    selectionDetails->append(details);
-            }
-        }
+        result.append(hit.layerable);
+        if (selectionDetails)
+            selectionDetails->append(hit.details);
     }
     return result;
 }

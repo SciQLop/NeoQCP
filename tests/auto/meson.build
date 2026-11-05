@@ -61,6 +61,7 @@ test_srcs = [
     'test-coords/test-coords.cpp',
     'test-draw-context/test-draw-context.cpp',
     'test-drawable/test-drawable.cpp',
+    'test-hit-rule/test-hit-rule.cpp',
 ]
 
 test_headers = [
@@ -120,6 +121,7 @@ test_headers = [
     'test-coords/test-coords.h',
     'test-draw-context/test-draw-context.h',
     'test-drawable/test-drawable.h',
+    'test-hit-rule/test-hit-rule.h',
 ]
 test_moc_files = qtmod.compile_moc(headers : test_headers)
 

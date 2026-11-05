@@ -53,6 +53,7 @@
 #include "test-coords/test-coords.h"
 #include "test-draw-context/test-draw-context.h"
 #include "test-drawable/test-drawable.h"
+#include "test-hit-rule/test-hit-rule.h"
 #include "test-gestures/test-gestures.h"
 
 static bool shouldRun(const char* name)
@@ -148,6 +149,7 @@ int main(int argc, char **argv)
   QCPTEST(TestCoords);
   QCPTEST(TestDrawContext);
   QCPTEST(TestDrawable);
+  QCPTEST(TestHitRule);
 
   return failures == 0 ? 0 : 1;
 }

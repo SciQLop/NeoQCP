@@ -1005,10 +1005,6 @@ double QCPMultiGraph::selectTest(const QPointF& pos, bool onlySelectable, QVaria
     if (!axisRect || !axisRect->rect().contains(pos.toPoint()))
         return -1;
 
-    // Fast path: when details aren't needed (e.g. wheel events), skip per-point work.
-    if (!details)
-        return mParentPlot->selectionTolerance() * 0.99;
-
     // Keys are sorted — binary search for the nearest key, then check
     // each component at that index.  O(log N + C) instead of O(C × M).
     const QCPAbstractMultiDataSource* ds = mDataSource.get();
@@ -1068,7 +1064,8 @@ double QCPMultiGraph::selectTest(const QPointF& pos, bool onlySelectable, QVaria
         map["dataIndex"] = minDistIndex;
         map["key"] = minKey;
         map["value"] = minValue;
-        details->setValue(map);
+        if (details)
+            details->setValue(map);
     }
     return minDistIndex >= 0 ? qSqrt(minDistSqr) : -1;
 }

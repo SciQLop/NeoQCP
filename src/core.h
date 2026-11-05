@@ -80,6 +80,22 @@ template <typename T>
 struct Construct;
 } // namespace qcp
 
+//! What a hit test is for. A press and a wheel take any layerable that is hit, a selection only
+//! those that can be selected (see QCustomPlot::hitsAt).
+enum class QCPHitAction
+{
+    Press,
+    Select,
+    Wheel
+};
+
+//! One hit of QCustomPlot::hitsAt: the layerable and the selection details of the hit.
+struct QCPHit
+{
+    QCPLayerable* layerable = nullptr;
+    QVariant details;
+};
+
 class QCP_LIB_DECL QCustomPlot : public QRhiWidget
 {
     Q_OBJECT
@@ -659,6 +675,7 @@ protected:
                               QVariant* selectionDetails = nullptr) const;
     QList<QCPLayerable*> layerableListAt(const QPointF& pos, bool onlySelectable,
                                          QList<QVariant>* selectionDetails = nullptr) const;
+    QList<QCPHit> hitsAt(const QPointF& pos, QCPHitAction action) const;
     void drawBackground(QCPPainter* painter);
     void connectThemeSignal();
     void setupPaintBuffers();
@@ -683,6 +700,7 @@ protected:
     friend class TestSignalDelivery;
     friend class TestRepaint;
     friend class TestItemIndex;
+    friend class TestHitRule;
 };
 Q_DECLARE_METATYPE(QCustomPlot::LayerInsertMode)
 Q_DECLARE_METATYPE(QCustomPlot::RefreshPriority)
