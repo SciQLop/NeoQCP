@@ -70,46 +70,45 @@ private:
 
   One per recording. A replay that starts on the list this cache was built for, at the same device
   pixel ratio, clip and output size, and with a transform the kept one only translates, hands every
-  run back to the layer with one delta: no extrusion, no tessellation, no mapping. Anything else (a
-  zoom, a re-record, a new device pixel ratio) rebuilds everything and keeps the result. A command
-  the GPU draws as an image is kept as a run of its own: the image comes from the raster cache,
-  which shifts it by the same delta, so it never invalidates the triangles beside it. A recording
-  whose geometry moves in more than one way (a ratio, an anchor, a rect with one data and one pixel
-  corner) is rebuilt, because a kept run can only be shifted by one delta or not at all.
+  run back to the layer with one delta: no extrusion, no tessellation, no mapping. The runs are
+  replayed in the recording's order, so a build frame and a pan frame stack identically. Anything
+  else (a zoom, a re-record, a new device pixel ratio) rebuilds everything and keeps the result. A
+  command the GPU draws as an image is kept as a run of its own: the image comes from the raster
+  cache, which shifts it by the same delta, so it never invalidates the triangles beside it. A
+  recording whose geometry moves in more than one way (a ratio, an anchor, a rect with one data and
+  one pixel corner) is rebuilt, because a kept run can only be shifted by one delta or not at all.
 */
 class QCPRecordingCache
 {
 public:
-    //! Solid vertices as one submission built them: the fill triangles come first, then the stroke.
-    struct SolidRun
+    //! What a kept submission is: a solid run, a dashed one, or a rasterised command.
+    enum class RunKind
     {
-        int first = 0; //!< first vertex in \ref solidVertices
+        Solid,
+        Dashed,
+        Raster
+    };
+
+    /*!
+      One kept submission, in the recording's order.
+
+      A pan frame re-submits the runs in this order, so a style never moves up or down the layer
+      between the frame that built it and one that only shifts it. Neighbouring runs of the same
+      kind and state merge (see the keep* calls); a raster run never merges, it is one image.
+    */
+    struct Run
+    {
+        RunKind kind = RunKind::Solid;
+        int first = 0; //!< first vertex in \ref solidVertices() or \ref dashedVertices()
         int vertexCount = 0;
-        int fillVertexCount = 0; //!< the fill prefix; the rest is stroke (and later fills)
+        int fillVertexCount = 0; //!< solid: the fill prefix; the rest is stroke (and later fills)
         bool movesWithData
             = false; //!< false: a pixel, ratio or anchor position must not be shifted
-    };
-
-    //! A dashed stroke: its dash phase lives in the arc lengths of its vertices. Never merges into
-    //! a solid run, whatever the pane.
-    struct DashedRun
-    {
-        int first = 0; //!< first vertex in \ref dashedVertices
-        int vertexCount = 0;
-        bool movesWithData = false;
-        float dashOffset = 0; //!< pixels
-        float pattern[8] = { };
+        float dashOffset = 0; //!< dashed: pixels
+        float pattern[8] = { }; //!< dashed: the dash pattern
         int patternCount = 0;
-    };
-
-    //! A rasterised command kept as a run of its own: an image is not vertex geometry, so a pan
-    //! re-submits it from the raster cache shifted by the delta, and the rest of the recording
-    //! keeps its triangles.
-    struct RasterRun
-    {
-        int index = 0; //!< the command's place in the recording
-        QRectF bounds; //!< the clipped pixel rect the image covers
-        bool movesWithData = false;
+        int index = 0; //!< raster: the command's place in the recording
+        QRectF bounds; //!< raster: the clipped pixel rect the image covers
     };
 
     /*!
@@ -146,28 +145,17 @@ public:
 
     [[nodiscard]] std::span<const float> solidVertices() const { return mSolid; }
 
-    [[nodiscard]] std::span<const SolidRun> solidRuns() const { return mSolidRuns; }
-
     [[nodiscard]] std::span<const float> dashedVertices() const { return mDashed; }
 
-    [[nodiscard]] std::span<const DashedRun> dashedRuns() const { return mDashedRuns; }
-
-    [[nodiscard]] std::span<const RasterRun> rasterRuns() const { return mRasterRuns; }
-
-    //! Test hook: how many runs the kept geometry holds.
-    [[nodiscard]] int runCount() const
-    {
-        return int(mSolidRuns.size() + mDashedRuns.size() + mRasterRuns.size());
-    }
+    //! The kept submissions, in the recording's order: a reuse frame replays exactly this.
+    [[nodiscard]] std::span<const Run> runs() const { return mRuns; }
 
     void clear();
 
 private:
     std::vector<float> mSolid; //!< six floats per vertex, in record order
-    std::vector<SolidRun> mSolidRuns;
     std::vector<float> mDashed; //!< seven floats per vertex (the seventh is the arc length)
-    std::vector<DashedRun> mDashedRuns;
-    std::vector<RasterRun> mRasterRuns;
+    std::vector<Run> mRuns;
     QCPTransform mTransform;
     QRect mClip;
     quint64 mList = 0;

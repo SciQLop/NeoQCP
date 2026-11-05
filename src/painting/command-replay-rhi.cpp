@@ -281,12 +281,9 @@ bool rasterOverflows(const QCPDrawList& list, const QCPPlottableRhiLayer& layer)
     // the brush); a layer without a dashed pipeline adds the dashes it cannot stroke.
     int needed = list.rasterCommands;
     if (!layer.dashedAvailable())
-        needed += int(std::count_if(list.commands.begin(), list.commands.end(),
-                                    [](const qcp::QCPDrawCommand& command)
-                                    {
-                                        return qcp::strokeIsDashed(command)
-                                            && !qcp::strokeNeedsRaster(command);
-                                    }));
+        needed += int(std::count_if(
+            list.commands.begin(), list.commands.end(), [](const qcp::QCPDrawCommand& command)
+            { return qcp::strokeIsDashed(command) && !qcp::strokeNeedsRaster(command); }));
     if (needed == 0)
         return false;
     if (!layer.canAddImage())
@@ -321,46 +318,53 @@ void addMarkers(const QCPDrawList& list, QCPScatterRhiLayer& scatter, QCPResolve
             addMarker(scatter, *markers, cache, frame, generation, clip, dpr, height);
 }
 
-//! Hands a kept recording back to the layer: one submission per run, shifted by the pan delta when
-//! the run moves with the data, and by nothing otherwise. A rasterised command is re-submitted from
-//! the raster cache, its texture untouched.
+//! Hands a kept recording back to the layer: one submission per run, in the recording's order,
+//! shifted by the pan delta when the run moves with the data, and by nothing otherwise. A
+//! rasterised command is re-submitted from the raster cache, its texture untouched.
 void replayKept(const QCPDrawList& list, const QCPRecordingCache& kept, QCPPlottableRhiLayer& layer,
                 qcp::QCPRasterFallback& fallback, const QCPDrawFrame& frame, quint64 generation,
                 const QRect& clip, double dpr, int height, const QPointF& delta, float alpha)
 {
     const std::span<const float> solid = kept.solidVertices();
-    for (const QCPRecordingCache::SolidRun& run : kept.solidRuns())
-    {
-        const QPointF offset = run.movesWithData ? delta : QPointF();
-        const std::span<const float> vertices
-            = solid.subspan(std::size_t(run.first) * 6, std::size_t(run.vertexCount) * 6);
-        const auto fill = std::size_t(run.fillVertexCount) * 6;
-        layer.addPlottable(vertices.first(fill), vertices.subspan(fill), clip, dpr, height,
-                           static_cast<float>(offset.x()), static_cast<float>(offset.y()), alpha);
-    }
     const std::span<const float> dashed = kept.dashedVertices();
-    for (const QCPRecordingCache::DashedRun& run : kept.dashedRuns())
+    for (const QCPRecordingCache::Run& run : kept.runs())
     {
         const QPointF offset = run.movesWithData ? delta : QPointF();
-        const std::span<const float> vertices
-            = dashed.subspan(std::size_t(run.first) * 7, std::size_t(run.vertexCount) * 7);
-        layer.addDashedPlottable(vertices,
-                                 std::span<const float>(run.pattern, std::size_t(run.patternCount)),
-                                 run.dashOffset, clip, dpr, height, static_cast<float>(offset.x()),
-                                 static_cast<float>(offset.y()), alpha);
-    }
-    for (const QCPRecordingCache::RasterRun& run : kept.rasterRuns())
-    {
-        const qcp::QCPDrawCommand& command = list.commands[std::size_t(run.index)];
-        const qcp::PanBehaviour behaviour
-            = run.movesWithData ? qcp::PanBehaviour::Moves : qcp::PanBehaviour::Stays;
-        const QImage& image = fallback.image(list.id, quint64(run.index), command, frame,
-                                             run.bounds, dpr, generation, behaviour);
-        const QRectF device(run.bounds.left() * dpr, run.bounds.top() * dpr, image.width(),
-                            image.height());
-        const QPointF offset = run.movesWithData ? delta : QPointF();
-        layer.addImage(image, device, clip, dpr, height, static_cast<float>(offset.x()),
-                       static_cast<float>(offset.y()), alpha);
+        const auto offsetX = static_cast<float>(offset.x());
+        const auto offsetY = static_cast<float>(offset.y());
+        switch (run.kind)
+        {
+            case QCPRecordingCache::RunKind::Solid:
+            {
+                const std::span<const float> vertices
+                    = solid.subspan(std::size_t(run.first) * 6, std::size_t(run.vertexCount) * 6);
+                const auto fill = std::size_t(run.fillVertexCount) * 6;
+                layer.addPlottable(vertices.first(fill), vertices.subspan(fill), clip, dpr, height,
+                                   offsetX, offsetY, alpha);
+                break;
+            }
+            case QCPRecordingCache::RunKind::Dashed:
+            {
+                const std::span<const float> vertices
+                    = dashed.subspan(std::size_t(run.first) * 7, std::size_t(run.vertexCount) * 7);
+                layer.addDashedPlottable(
+                    vertices, std::span<const float>(run.pattern, std::size_t(run.patternCount)),
+                    run.dashOffset, clip, dpr, height, offsetX, offsetY, alpha);
+                break;
+            }
+            case QCPRecordingCache::RunKind::Raster:
+            {
+                const qcp::QCPDrawCommand& command = list.commands[std::size_t(run.index)];
+                const qcp::PanBehaviour behaviour
+                    = run.movesWithData ? qcp::PanBehaviour::Moves : qcp::PanBehaviour::Stays;
+                const QImage& image = fallback.image(list.id, quint64(run.index), command, frame,
+                                                     run.bounds, dpr, generation, behaviour);
+                const QRectF device(run.bounds.left() * dpr, run.bounds.top() * dpr, image.width(),
+                                    image.height());
+                layer.addImage(image, device, clip, dpr, height, offsetX, offsetY, alpha);
+                break;
+            }
+        }
     }
 }
 
@@ -433,10 +437,8 @@ void QCPRecordingCache::beginBuild(const QCPDrawList& list, const QCPTransform& 
                                    double dpr, int outputHeight, const QRect& clip)
 {
     mSolid.clear();
-    mSolidRuns.clear();
     mDashed.clear();
-    mDashedRuns.clear();
-    mRasterRuns.clear();
+    mRuns.clear();
     mReusable = mayReuseGeometry(list); // once, at build time: not on every pan frame
     mList = list.id;
     mTransform = transform;
@@ -456,18 +458,20 @@ void QCPRecordingCache::keepSolid(std::span<const float> vertices, int fillVerte
     mSolid.insert(mSolid.end(), vertices.begin(), vertices.end());
     // A run only ends where its pixels would: same transform sensitivity. The fill prefix of the
     // run stays the first submission's, since the layers draw a run as one range.
-    if (!mSolidRuns.empty() && mSolidRuns.back().movesWithData == movesWithData
-        && mSolidRuns.back().first + mSolidRuns.back().vertexCount == first)
+    if (!mRuns.empty() && mRuns.back().kind == RunKind::Solid
+        && mRuns.back().movesWithData == movesWithData
+        && mRuns.back().first + mRuns.back().vertexCount == first)
     {
-        mSolidRuns.back().vertexCount += int(vertices.size()) / 6;
+        mRuns.back().vertexCount += int(vertices.size()) / 6;
         return;
     }
-    SolidRun run;
+    Run run;
+    run.kind = RunKind::Solid;
     run.first = first;
     run.vertexCount = int(vertices.size()) / 6;
     run.fillVertexCount = fillVertexCount;
     run.movesWithData = movesWithData;
-    mSolidRuns.push_back(run);
+    mRuns.push_back(run);
 }
 
 void QCPRecordingCache::keepDashed(std::span<const float> vertices, std::span<const float> pattern,
@@ -478,32 +482,35 @@ void QCPRecordingCache::keepDashed(std::span<const float> vertices, std::span<co
     const auto first = int(mDashed.size() / 7);
     mDashed.insert(mDashed.end(), vertices.begin(), vertices.end());
     // Same pattern and phase: the dashes continue across the commands, so one run draws them.
-    if (!mDashedRuns.empty() && mDashedRuns.back().movesWithData == movesWithData
-        && mDashedRuns.back().first + mDashedRuns.back().vertexCount == first
-        && qFuzzyCompare(mDashedRuns.back().dashOffset, dashOffset)
-        && mDashedRuns.back().patternCount == int(std::min<std::size_t>(pattern.size(), 8))
-        && std::equal(pattern.begin(), pattern.end(), mDashedRuns.back().pattern))
+    if (!mRuns.empty() && mRuns.back().kind == RunKind::Dashed
+        && mRuns.back().movesWithData == movesWithData
+        && mRuns.back().first + mRuns.back().vertexCount == first
+        && qFuzzyCompare(mRuns.back().dashOffset, dashOffset)
+        && mRuns.back().patternCount == int(std::min<std::size_t>(pattern.size(), 8))
+        && std::equal(pattern.begin(), pattern.end(), mRuns.back().pattern))
     {
-        mDashedRuns.back().vertexCount += int(vertices.size()) / 7;
+        mRuns.back().vertexCount += int(vertices.size()) / 7;
         return;
     }
-    DashedRun run;
+    Run run;
+    run.kind = RunKind::Dashed;
     run.first = first;
     run.vertexCount = int(vertices.size()) / 7;
     run.movesWithData = movesWithData;
     run.dashOffset = dashOffset;
     run.patternCount = int(std::min<std::size_t>(pattern.size(), 8));
     std::copy_n(pattern.begin(), run.patternCount, run.pattern);
-    mDashedRuns.push_back(run);
+    mRuns.push_back(run);
 }
 
 void QCPRecordingCache::keepRaster(int index, const QRectF& bounds, bool movesWithData)
 {
-    RasterRun run;
+    Run run;
+    run.kind = RunKind::Raster;
     run.index = index;
     run.bounds = bounds;
     run.movesWithData = movesWithData;
-    mRasterRuns.push_back(run);
+    mRuns.push_back(run);
 }
 
 void QCPRecordingCache::commit()
@@ -512,10 +519,8 @@ void QCPRecordingCache::commit()
     if (mSpoiled)
     {
         mSolid.clear();
-        mSolidRuns.clear();
         mDashed.clear();
-        mDashedRuns.clear();
-        mRasterRuns.clear();
+        mRuns.clear();
     }
     mSpoiled = false;
 }
@@ -528,10 +533,8 @@ void QCPRecordingCache::invalidate()
 void QCPRecordingCache::clear()
 {
     mSolid.clear();
-    mSolidRuns.clear();
     mDashed.clear();
-    mDashedRuns.clear();
-    mRasterRuns.clear();
+    mRuns.clear();
     mValid = false;
     mSpoiled = false;
 }

@@ -76,6 +76,8 @@ public:
         MixedRect,
         FromAnchor,
         Dashed, //!< one dashed stroke: the GPU needs its dashed pipeline for it
+        DashedUnderRect, //!< a dashed line an opaque rect covers: the record order must survive
+        RasterUnderRect, //!< a rasterised fill an opaque rect covers: the same
         ErrorBars, //!< three error bars in a pen no vertex colour can carry
         Raster //!< a texture-brush rect beside a long polyline: two kept runs of different kinds
     };
@@ -193,6 +195,20 @@ public:
             context.polyline(mLine, QPen(Qt::black, 2, Qt::DashLine));
             return;
         }
+        if (mode == DashedUnderRect) // a thick dashed line, then an opaque rect over its middle
+        {
+            context.polyline(mLine, QPen(Qt::blue, 6, Qt::DashLine));
+            context.rect(QCP::Data { 2, 2 }, QCP::Data { 8, 8 }, QPen(Qt::NoPen),
+                         QBrush(Qt::green));
+            return;
+        }
+        if (mode == RasterUnderRect) // a gradient fill the GPU rasterises, then an opaque rect
+        {
+            context.rect(QCP::Data { 2, 2 }, QCP::Data { 7, 7 }, QPen(Qt::NoPen), gradientBrush());
+            context.rect(QCP::Data { 3, 3 }, QCP::Data { 6, 6 }, QPen(Qt::NoPen),
+                         QBrush(Qt::green));
+            return;
+        }
         if (mode == ErrorBars) // a gradient pen: the stroke has to be rasterised, not lost
         {
             auto centres = std::make_shared<const std::vector<QPointF>>(
@@ -204,8 +220,7 @@ public:
         }
         if (mode == Raster) // a texture-brush rect and a long polyline, kept differently
         {
-            context.rect(QCP::Data { 2, 2 }, QCP::Data { 7, 7 }, QPen(Qt::NoPen),
-                         gradientBrush());
+            context.rect(QCP::Data { 2, 2 }, QCP::Data { 7, 7 }, QPen(Qt::NoPen), gradientBrush());
             context.polyline(mLine, QPen(Qt::black, 2));
             return;
         }
@@ -305,7 +320,6 @@ public:
         selectEvent(nullptr, false, details, &changed);
     }
 
-
     mutable int drawCalls = 0;
     mutable int iconCalls = 0;
     bool readsTheme = false;
@@ -402,6 +416,34 @@ void hideAxes(QCustomPlot* plot)
 bool isBlue(const QColor& c)
 {
     return c.blue() > 200 && c.red() < 60 && c.green() < 60;
+}
+
+bool isGreenInk(const QColor& c)
+{
+    return c.green() > 150 && c.red() < 100;
+}
+
+//! How many pixels of \a frame inside \a box \a matches accepts.
+int countPixels(const QImage& frame, QRect box, bool (*matches)(const QColor&))
+{
+    int count = 0;
+    const QRect area = box.intersected(frame.rect());
+    for (int y = area.top(); y <= area.bottom(); ++y)
+        for (int x = area.left(); x <= area.right(); ++x)
+            if (matches(frame.pixelColor(x, y)))
+                ++count;
+    return count;
+}
+
+//! \a a to \a b in data coordinates, as a device-pixel rect.
+QRect deviceRect(QCustomPlot* plot, const QImage& frame, const QPointF& a, const QPointF& b)
+{
+    const QRectF pixels
+        = QRectF(QPointF(plot->xAxis->coordToPixel(a.x()), plot->yAxis->coordToPixel(a.y())),
+                 QPointF(plot->xAxis->coordToPixel(b.x()), plot->yAxis->coordToPixel(b.y())))
+              .normalized();
+    const double dpr = frame.devicePixelRatio();
+    return QRectF(pixels.topLeft() * dpr, pixels.size() * dpr).toAlignedRect();
 }
 } // namespace
 
@@ -757,7 +799,8 @@ void TestDrawable::recordedErrorBarsAreDrawn()
         const QColor c = pixelAt(frame, f.plot.get(), 5.0, 3.2 + 3.6 * i / 80.0);
         ink += c.red() + c.green() + c.blue() < 720 ? 1 : 0;
     }
-    QVERIFY2(ink > 10, qPrintable(QStringLiteral("the error bars left no ink: %1 pixels").arg(ink)));
+    QVERIFY2(ink > 10,
+             qPrintable(QStringLiteral("the error bars left no ink: %1 pixels").arg(ink)));
 }
 
 void TestDrawable::brokenDashedPipelineStillDraws()
@@ -767,8 +810,8 @@ void TestDrawable::brokenDashedPipelineStillDraws()
         QSKIP("No QRhi available - the dashed pipeline is a GPU path");
     auto* shape = new TestShape(f.plot.get());
     shape->mode = TestShape::Dashed;
-    shape->mLine = std::make_shared<const std::vector<QPointF>>(
-        std::vector<QPointF> { { 1, 5 }, { 9, 5 } });
+    shape->mLine
+        = std::make_shared<const std::vector<QPointF>>(std::vector<QPointF> { { 1, 5 }, { 9, 5 } });
     auto* layer = f.plot->plottableRhiLayer(shape->layer());
     QVERIFY(layer);
     layer->breakDashedPipelineForTest();
@@ -866,10 +909,10 @@ void TestDrawable::gradientBarsStackAsOne()
     for (int i = 0; i < 10; ++i)
     {
         const QColor colour = pixelAt(frame, f.plot.get(), 1.0 + 8.0 * (i + 0.5) / 10.0, 2);
-        QVERIFY2(colour.red() > 200 && colour.green() < 60 && colour.blue() < 60,
-                 qPrintable(QStringLiteral("bar %1 is not under the graph: %2")
-                                .arg(i)
-                                .arg(colour.name())));
+        QVERIFY2(
+            colour.red() > 200 && colour.green() < 60 && colour.blue() < 60,
+            qPrintable(
+                QStringLiteral("bar %1 is not under the graph: %2").arg(i).arg(colour.name())));
     }
 }
 
@@ -1294,8 +1337,8 @@ void TestDrawable::anchoredShapeFollowsItsParent()
     host->start->setCoords(6, 6);
     f.plot->replot(QCustomPlot::rpImmediateRefresh);
     // The recording is kept - the anchor moved, nothing the object knows changed - and its vertices
-    // are rebuilt because a recording of positions is neither data-only nor static, so it may not be
-    // re-emitted from the kept geometry of another frame.
+    // are rebuilt because a recording of positions is neither data-only nor static, so it may not
+    // be re-emitted from the kept geometry of another frame.
     QCOMPARE(shape->recordings(), records);
     QVERIFY2(QCPLineExtruder::extruderCallCount() > strokes,
              "the anchored geometry was not resolved again");
@@ -1336,6 +1379,59 @@ void TestDrawable::verticalSpanFollowsAnXPan()
                             .arg(moved)));
     QVERIFY2(qAbs(after.top() - before.top()) <= 1, "the ratio side moved");
     QVERIFY2(qAbs(after.bottom() - before.bottom()) <= 1, "the ratio side moved");
+}
+
+void TestDrawable::dashedUnderOpaqueRectKeepsTheOrderOnAPan()
+{
+    // A pan frame re-submits the kept runs. While it walked one kind at a time (all solids, then
+    // all dashes, then all rasters) a dashed line recorded under an opaque rect came back on top
+    // of it: the record order has to survive the reuse.
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - the kept triangles are a GPU path only");
+    hideAxes(f.plot.get());
+    auto* shape = new TestShape(f.plot.get());
+    shape->mode = TestShape::DashedUnderRect; // blue dashes, then a green rect from (2,2) to (8,8)
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+    QImage frame = f.plot->grabFramebuffer();
+    int covered
+        = countPixels(frame, deviceRect(f.plot.get(), frame, { 2.5, 2.5 }, { 7.5, 7.5 }), isBlue);
+    QVERIFY2(covered == 0,
+             qPrintable(QStringLiteral("the dashes show through the rect on the "
+                                       "first frame: %1 pixels")
+                            .arg(covered)));
+
+    f.plot->xAxis->setRange(1, 11); // a pan: the kept runs are re-submitted
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+    frame = f.plot->grabFramebuffer();
+    covered
+        = countPixels(frame, deviceRect(f.plot.get(), frame, { 2.5, 2.5 }, { 7.5, 7.5 }), isBlue);
+    QVERIFY2(covered == 0,
+             qPrintable(QStringLiteral("the dashes were drawn over the rect on the "
+                                       "pan frame: %1 pixels")
+                            .arg(covered)));
+}
+
+void TestDrawable::rasterUnderOpaqueRectKeepsTheOrderOnAPan()
+{
+    // The same for a rasterised command: the gradient fill goes to an image, the opaque rect over
+    // it is a solid run, and the image must stay under it on a reuse frame too.
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - the kept triangles are a GPU path only");
+    hideAxes(f.plot.get());
+    auto* shape = new TestShape(f.plot.get());
+    shape->mode = TestShape::RasterUnderRect; // a gradient from (2,2) to (7,7), green over 3..6
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY2(isGreenInk(pixelAt(f.plot->grabFramebuffer(), f.plot.get(), 4.5, 4.5)),
+             "the opaque rect is not over the raster on the first frame");
+
+    f.plot->xAxis->setRange(1, 11); // a pan: the kept runs are re-submitted
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+    const QColor centre = pixelAt(f.plot->grabFramebuffer(), f.plot.get(), 4.5, 4.5);
+    QVERIFY2(isGreenInk(centre),
+             qPrintable(QStringLiteral("the raster was drawn over the rect on the pan frame: %1")
+                            .arg(centre.name())));
 }
 
 void TestDrawable::pannedTimeAxisKeepsTheShapeOnAxis()
@@ -1494,7 +1590,8 @@ void TestDrawable::rangeBandLegendIconIsInked()
         for (int x = 0; x < frame.width(); ++x)
             if (frame.pixelColor(x, y) == fill)
                 ++inked;
-    QVERIFY2(inked > 20, qPrintable(QStringLiteral("%1 fill pixels, the icon is blank").arg(inked)));
+    QVERIFY2(inked > 20,
+             qPrintable(QStringLiteral("%1 fill pixels, the icon is blank").arg(inked)));
 }
 
 void TestDrawable::exportStacksLikeTheScreen()
@@ -1524,10 +1621,10 @@ void TestDrawable::exportStacksLikeTheScreen()
     text->setPositionAlignment(Qt::AlignCenter);
     text->position->setCoords(5, 4);
 
-    const QRect glyphBox(QPoint(qRound(f.plot->xAxis->coordToPixel(5)),
-                                qRound(f.plot->yAxis->coordToPixel(4)))
-                             - QPoint(10, 10),
-                         QSize(20, 20));
+    const QRect glyphBox(
+        QPoint(qRound(f.plot->xAxis->coordToPixel(5)), qRound(f.plot->yAxis->coordToPixel(4)))
+            - QPoint(10, 10),
+        QSize(20, 20));
     const auto inkIn = [](const QImage& image, QRect box)
     {
         const double dpr = image.devicePixelRatio();

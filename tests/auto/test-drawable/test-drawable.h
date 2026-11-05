@@ -49,6 +49,8 @@ private slots:
     void mixedCornerRectFollowsAPan();
     void anchoredShapeFollowsItsParent();
     void verticalSpanFollowsAnXPan();
+    void dashedUnderOpaqueRectKeepsTheOrderOnAPan();
+    void rasterUnderOpaqueRectKeepsTheOrderOnAPan();
     void setPenReRecordsOnce();
     void setCoordsMovesTheItem();
     void selectionChangeReRecords();
