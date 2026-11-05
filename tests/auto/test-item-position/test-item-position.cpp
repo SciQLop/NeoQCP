@@ -270,6 +270,28 @@ void TestItemPosition::parentDeletedBeforeAnyFrameKeepsPlace()
 using ItemFactory = std::function<QCPAbstractItem*(QCustomPlot*)>;
 Q_DECLARE_METATYPE(ItemFactory)
 
+void TestItemPosition::setRefusedAnchorIsReported()
+{
+    mPlot->replot();
+    auto* parent = new QCPItemText(mPlot);
+    parent->position->setCoords(100, 100);
+    auto* child = new QCPItemText(mPlot);
+    child->position->setCoords(200, 200);
+
+    // The child follows the parent: an anchor the plot can resolve.
+    child->position->set(QCP::AnchorOffset { parent->position, QCP::PixelOffset { 5, 6 } });
+    QCOMPARE(child->position->parentAnchor(), parent->position);
+
+    // The reverse link closes a cycle: set() must leave the position alone and say why.
+    QTest::ignoreMessage(QtDebugMsg,
+                         QRegularExpression(QStringLiteral("recursive parent-child")));
+    QTest::ignoreMessage(QtDebugMsg, QRegularExpression(QStringLiteral("the anchor was refused")));
+    const QPointF before = parent->position->pixelPosition();
+    parent->position->set(QCP::AnchorOffset { child->position, QCP::PixelOffset { 5, 6 } });
+    QVERIFY2(!parent->position->parentAnchor(), "a refused anchor was attached");
+    QCOMPARE(parent->position->pixelPosition(), before);
+}
+
 void TestItemPosition::farOffscreenItemsDoNotOverflow_data()
 {
     QTest::addColumn<ItemFactory>("make");

@@ -968,7 +968,8 @@ void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
 
   Writes the position in one of the typed spaces of coords.h. Each branch is an ordering of the 2.x
   setters, because leaving a parent anchor or a plot-coord type behind would silently combine with the
-  new numbers. An AnchorOffset whose anchor refuses the link (a cycle) leaves the position untouched.
+  new numbers. An AnchorOffset whose anchor refuses the link (a cycle) leaves the position untouched
+  and says so: setParentAnchorX/Y report the refusal, and this says what was done with it.
 */
 void QCPItemPosition::set(const QCP::Position& position)
 {
@@ -1002,7 +1003,11 @@ void QCPItemPosition::set(const QCP::Position& position)
     // Attach first: a refused anchor (a cycle, this position) must leave the position untouched.
     // Then the offset is pixels, whatever the old type (a ratio type would scale it by the rect).
     if (!setParentAnchor(anchored->anchor, false))
+    {
+      qDebug() << Q_FUNC_INFO
+               << "the anchor was refused, so the position is left as it was";
       return;
+    }
     setType(ptAbsolute);
     setCoords(anchored->offset.dx, anchored->offset.dy);
   }

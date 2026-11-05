@@ -22,6 +22,7 @@ private slots:
     void parentDeletedBeforeAnyFrameKeepsPlace();
     void farOffscreenItemsDoNotOverflow_data();
     void farOffscreenItemsDoNotOverflow();
+    void setRefusedAnchorIsReported();
 
 private:
     QCustomPlot* mPlot = nullptr;
