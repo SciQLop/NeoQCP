@@ -154,6 +154,80 @@ Item scaling. Thousands of items add, remove, draw and take clicks without a qua
   - Behaviour change: clearItems() deletes oldest first (2.x: newest first). A destroyed() slot that
         deletes another item through a raw pointer may now meet a deleted one; hold a QPointer.
 
+Milestone 3 (drawing and extension API). Additive, except for the behaviour changes listed below.
+
+Writing a plot type: derive from QCPDrawn<Base> (QCPAbstractPlottable, a QCPAbstractPlottable1D<T>
+        or QCPAbstractItem), override draw(QCPDrawContext&), append commands with the context's
+        helpers, and mark a change from a setter with contentChanged(). The base's old drawing
+        virtuals are answered from the recording. examples/custom-drawable (RangeBand: a fill and a
+        label in 60 lines) is a complete one.
+  - A recording is transform independent; a replay is not. The plot records once and replays the
+        commands until the object changed or the view epoch did (viewport size, device pixel ratio,
+        theme: QCustomPlot::viewEpoch()). A pan and a zoom change neither key, so both replay.
+  - Positions keep the space they were written in: QCP::Data, QCP::Pixels, QCP::AxisRatio,
+        QCP::AnchorOffset (an anchor plus a QCP::PixelOffset) and the per-axis mixes QCP::DataXRatioY
+        and QCP::RatioXDataY. QCP::PixelOffset and QCP::PixelLength keep a data value from being
+        passed where pixels are expected (Data + Pixels does not compile). QCPTransform and
+        QCPRatioTransform map, invert, recognise a pure translation (QCPTransform::isTranslationOf)
+        and map a whole batch without a per-point branch.
+  - Drawing that is genuinely pixels reads QCPDrawContext::transform(); the recording is then marked
+        transform dependent and is remade on a zoom, a log change or a resize, while a pan keeps it
+        (QCPBars with a width in pixels does this; a width in plot coordinates never reads it).
+  - The defaults save the boilerplate: dataRange() is the recording's data box (an axis side counts
+        only when every position on it is data with no anchor; a log axis drops a box reaching zero
+        or below), hitTest() is the distance to the geometry minus half the pen, 0 inside a visible
+        fill, the box for text and images, and drawLegendIcon() replays the recording fitted into the
+        icon rect. QCPBars overrides both (bar widths for the range, bar rects for the hit test).
+The draw context: one helper per command kind, each taking typed positions and a style: polyline,
+        polygon, fillBetween, rect, ellipse, markers, errorBars, text, path, image. Point data is
+        shared with the recording (std::shared_ptr<const std::vector<QPointF>>), never copied. The
+        command list itself is private, so it can grow without an ABI break.
+  - QCPTextStyle says how a text command is drawn: font, colour, the box's pen and brush, alignment,
+        text flags, rotation, QMarginsF padding, and mathText to measure and draw through the label
+        renderer as QCPItemText always did.
+  - Escapes: painter(callback) runs raw QPainter code in pixels with the frame's transform, and
+        recordEveryFrame() marks a command position that only exists in pixels.
+Plottables and items on the drawing API: QCPBars records one polygon per bar (selected bars last, as
+        before) and QCPItemText records one text command; QCPItemRichText follows and keeps its text
+        document as a painter callback. QCPItemPosition::set(const QCP::Position&) and
+        QCPItemText::setPosition(const QCP::Position&) place an object with a typed position, without
+        a setter sequence or a type flag.
+  - An item whose visible geometry is not its recording (a bar) answers selectTest through its own
+        hitTest(). QCPBars keeps its getKeyRange/getValueRange overrides.
+Drawing on the GPU and in an export:
+  - A command's backend depends on its kind, never on its style: the GPU draws polylines (dashes
+        included), fills, rects, ellipses, error bars and markers; QPainter draws text, paths and
+        images. So a pen or brush style never changes stacking any more.
+  - Dashes are a GPU pipeline of their own (a 7-float vertex with the arc length, a fragment shader
+        that discards by pattern and phase), so a dashed graph costs what a solid one costs and
+        stacks in the same place.
+  - A style the GPU cannot draw (a texture brush, a gradient fill other than the solid one) is
+        rasterised once into an image covering the command, and drawn as a GPU image command at the
+        same place in the order. A layer keeps at most 4 such images; a 5th style is painted with
+        QPainter under the layer's GPU content, with one warning per plot.
+  - The layer's replay keeps the built geometry per recording and translates it on a pan, and merges
+        neighbouring solid runs: 10 000 bars go from 20 000 draw calls to 1.
+  - The painter replay (exports, and the screen without a GPU) skips a command that provably misses
+        the clip. Every command kind paints itself with QPainter, written once per kind instead of
+        once per class, so an export stacks like the screen.
+Hit testing: one rule for press, selection and wheel. The hits are delivered topmost first
+        (QCustomPlot::hitsAt, QCPHitAction) and the first that can take the action wins; a selection
+        skips what cannot be selected while a press still lands on it. The "no details asked means
+        anywhere in the axis rect" path is gone, so a wheel over a graph2 needs its distance like a
+        press does. The layer's item index is asked first; hitTest() runs only for candidates.
+
+Behaviour changes for 2.x users:
+  - Items now default to a new `annotations` layer above `main` (behaviour change: 2.x programs that
+        stacked items on `main` call setLayer).
+  - A dashed pen no longer moves a graph to QPainter: it is drawn on the GPU with its own dashes and
+        keeps its place in the layer order, so a pen style never changes what is drawn over what.
+  - The wheel needs the pointer within the selection tolerance of a plottable, as a press does; it
+        used to zoom the plottable whose axis rect it was in.
+  - An export stacks like the screen: QPainter content first, then the GPU commands' QPainter forms,
+        per buffer. 2.x exports drew everything with QPainter, so a dashed graph could export under
+        an item it screens over. Screen and export are compared on layout, colours and order, not
+        byte for byte (MSAA versus QPainter antialiasing).
+
 #### NeoQCP, unreleased ####
 
 Behaviour changes (slots that delete their sender are now safe):
@@ -170,8 +244,6 @@ Behaviour changes (slots that delete their sender are now safe):
         the parent widget gets it; it used to be accepted always.
 
 Other behaviour changes:
-  - Items now default to a new `annotations` layer above `main` (behaviour change: 2.x programs that
-        stacked items on `main` call setLayer).
   - QCPContourExtractor::extract() returns segments in the image's UV [0,1] space, subsampled to at
         most 300x300 cells by default; it used to return full-resolution segments in data units.
   - QCPColorMap2::draw queues its viewport change: the first resample after a show or resize comes one
