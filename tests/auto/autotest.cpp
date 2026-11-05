@@ -52,6 +52,7 @@
 #include "test-item-index/test-item-index.h"
 #include "test-coords/test-coords.h"
 #include "test-draw-context/test-draw-context.h"
+#include "test-drawable/test-drawable.h"
 #include "test-gestures/test-gestures.h"
 
 static bool shouldRun(const char* name)
@@ -146,6 +147,7 @@ int main(int argc, char **argv)
   QCPTEST(TestItemIndex);
   QCPTEST(TestCoords);
   QCPTEST(TestDrawContext);
+  QCPTEST(TestDrawable);
 
   return failures == 0 ? 0 : 1;
 }

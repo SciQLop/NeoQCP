@@ -198,9 +198,18 @@ QPointF qcpResolvePosition(const QCPDrawFrame& frame, const QCP::Position& posit
     return QPointF(ratioPixels.x, valuePixels.y);
 }
 
+QCPDrawFrame qcpMakeFrame(const QCPAxis* keyAxis, const QCPAxis* valueAxis,
+                          const QCPAxisRect* axisRect, const QRectF& clip)
+{
+    return QCPDrawFrame { QCPTransform(keyAxis, valueAxis), QCPRatioTransform(axisRect), clip };
+}
+
 QCPDrawContext::QCPDrawContext(const QCPAxis* keyAxis, const QCPAxis* valueAxis,
                                const QCPAxisRect* axisRect, const QCPTheme* theme)
-        : mList(std::make_unique<QCPDrawList>())
+        : mKeyAxis(keyAxis)
+        , mValueAxis(valueAxis)
+        , mAxisRect(axisRect)
+        , mList(std::make_unique<QCPDrawList>())
         , mTransform(keyAxis, valueAxis)
         , mRatio(axisRect)
         , mClip(axisRect ? QRectF(axisRect->rect()) : QRectF())

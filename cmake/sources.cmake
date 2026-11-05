@@ -10,6 +10,7 @@ set(NEOQCP_SOURCES
     src/layer.cpp
     src/spatial-index.cpp
     src/coords.cpp
+    src/drawable.cpp
     src/overlay.cpp
     src/layout.cpp
     src/lineending.cpp

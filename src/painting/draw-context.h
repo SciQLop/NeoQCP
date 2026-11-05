@@ -56,6 +56,17 @@ struct QCP_LIB_DECL QCPDrawFrame
 };
 
 /*!
+  \brief The frame of one axis pair and one clip rect, built without recording anything.
+
+  A recording does not depend on the transform, only its replay does, so a cached recording can be
+  replayed into a fresh frame without the object drawing itself again.
+*/
+[[nodiscard]] QCP_LIB_DECL QCPDrawFrame qcpMakeFrame(const QCPAxis* keyAxis,
+                                                     const QCPAxis* valueAxis,
+                                                     const QCPAxisRect* axisRect,
+                                                     const QRectF& clip);
+
+/*!
   \brief The recorder a drawing object receives: typed helpers that append to a \ref QCPDrawList.
 
   Every helper takes its geometry in the space that fits it -- data coordinates for series, \ref
@@ -75,8 +86,10 @@ public:
 
     //! The axes the object draws on; positions in \ref QCP::Data go through it.
     [[nodiscard]] const QCPTransform& transform() const { return mTransform; }
+
     //! The pixels the object may draw in; an empty rect means unclipped.
     [[nodiscard]] QRectF clip() const { return mClip; }
+
     //! The colours the plot is themed with, so a recorder can pick its default pen and brush.
     [[nodiscard]] const QCPTheme& theme() const;
 
@@ -109,8 +122,12 @@ public:
 
     //! The commands recorded so far, in draw order, with their data box.
     [[nodiscard]] const QCPDrawList& drawList() const;
+
     //! What a replay needs; build it once per frame.
-    [[nodiscard]] QCPDrawFrame frame() const { return QCPDrawFrame { mTransform, mRatio, mClip }; }
+    [[nodiscard]] QCPDrawFrame frame() const
+    {
+        return qcpMakeFrame(mKeyAxis, mValueAxis, mAxisRect, mClip);
+    }
 
 private:
     QCPDrawContext(const QCPAxis* keyAxis, const QCPAxis* valueAxis, const QCPAxisRect* axisRect,
@@ -118,7 +135,11 @@ private:
     friend class TestDrawContext;
     friend class TestRepaint; //!< the GPU replay tests record through the same door
     friend class Benchmark; //!< records through the same door to time the replay
+    friend class QCPDrawnCore; //!< the adapter records an object's draw() into its cache
 
+    const QCPAxis* mKeyAxis = nullptr;
+    const QCPAxis* mValueAxis = nullptr;
+    const QCPAxisRect* mAxisRect = nullptr;
     std::unique_ptr<QCPDrawList> mList;
     QCPTransform mTransform;
     QCPRatioTransform mRatio;

@@ -26,50 +26,50 @@
 /*! \file */
 
 #include "core.h"
-#include <memory>
-#include <utility>
+#include "item-creation-state.h"
 #include "misuse.h"
+#include "overlay.h"
 #include "plottables/plottable-bars.h"
 #include "plottables/plottable-group.h"
-#include "item-creation-state.h"
-#include "overlay.h"
+#include <memory>
+#include <utility>
 
 #include "Profiling.hpp"
 #include "axis/axis.h"
-#include "items/item.h"
+#include "embedded_shaders.h"
 #include "items/item-text.h"
 #include "items/item-tracer.h"
-#include "polar/layoutelement-angularaxis.h"
-#include "polar/polargraph.h"
+#include "items/item.h"
 #include "layer.h"
 #include "layoutelements/layoutelement-axisrect.h"
+#include "layoutelements/layoutelement-colorscale.h"
 #include "layoutelements/layoutelement-legend.h"
-#include "painting/painter.h"
-#include "painting/paintbuffer.h"
+#include "layoutelements/layoutelement-textelement.h"
+#include "painting/colormap-rhi-layer.h"
+#include "painting/grid-rhi-layer.h"
 #include "painting/paintbuffer-pixmap.h"
 #include "painting/paintbuffer-rhi.h"
+#include "painting/paintbuffer.h"
+#include "painting/painter.h"
 #include "painting/plottable-rhi-layer.h"
-#include "painting/colormap-rhi-layer.h"
-#include "painting/span-rhi-layer.h"
-#include "painting/grid-rhi-layer.h"
-#include "painting/scatter-rhi-layer.h"
-#include <QSet>
-#include <rhi/qrhi.h>
-#include "embedded_shaders.h"
 #include "painting/rhi-utils.h"
-#include "plottables/plottable.h"
+#include "painting/scatter-rhi-layer.h"
+#include "painting/span-rhi-layer.h"
 #include "plottables/plottable-bars.h"
 #include "plottables/plottable-colormap.h"
 #include "plottables/plottable-colormap2.h"
 #include "plottables/plottable-graph.h"
 #include "plottables/plottable-histogram2d.h"
+#include "plottables/plottable.h"
+#include "polar/layoutelement-angularaxis.h"
+#include "polar/polargraph.h"
 #include "selectionrect.h"
 #include "theme.h"
-#include "layoutelements/layoutelement-textelement.h"
-#include "layoutelements/layoutelement-colorscale.h"
+#include <QSet>
+#include <rhi/qrhi.h>
 
-#include <QTimer>
 #include "datasource/pipeline-scheduler.h"
+#include <QTimer>
 
 // Selection and input handlers call into layerables whose signals reach user slots, and a slot may
 // delete any layerable: these loops walk guarded snapshots instead of the live lists.
@@ -83,7 +83,7 @@ using qcp::guarded;
 // simplify: still one virtual call per child, ~15 us per click at 10 000 items; a plot-wide set of
 // selected layerables is the upgrade if clicks over 100 000 items matter.
 QList<QPointer<QCPLayerable>> guardedSelectedLayerables(const QList<QCPLayer*>& layers,
-                                                       const QCPLayerable* kept = nullptr)
+                                                        const QCPLayerable* kept = nullptr)
 {
     QList<QPointer<QCPLayerable>> result;
     for (auto* layer : layers)
@@ -93,7 +93,6 @@ QList<QPointer<QCPLayerable>> guardedSelectedLayerables(const QList<QCPLayer*>& 
     return result;
 }
 } // namespace
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCustomPlot
@@ -466,12 +465,18 @@ QCustomPlot::QCustomPlot(QWidget* parent)
     setAttribute(Qt::WA_NoMousePropagation);
     // Allow forcing a specific RHI backend via environment variable.
     // NEOQCP_RHI_BACKEND=opengl|metal|vulkan|d3d11|d3d12
-    if (const QByteArray backend = qgetenv("NEOQCP_RHI_BACKEND").toLower(); !backend.isEmpty()) {
-        if (backend == "opengl")       setApi(Api::OpenGL);
-        else if (backend == "vulkan")  setApi(Api::Vulkan);
-        else if (backend == "metal")   setApi(Api::Metal);
-        else if (backend == "d3d11")   setApi(Api::Direct3D11);
-        else if (backend == "d3d12")   setApi(Api::Direct3D12);
+    if (const QByteArray backend = qgetenv("NEOQCP_RHI_BACKEND").toLower(); !backend.isEmpty())
+    {
+        if (backend == "opengl")
+            setApi(Api::OpenGL);
+        else if (backend == "vulkan")
+            setApi(Api::Vulkan);
+        else if (backend == "metal")
+            setApi(Api::Metal);
+        else if (backend == "d3d11")
+            setApi(Api::Direct3D11);
+        else if (backend == "d3d12")
+            setApi(Api::Direct3D12);
     }
     // HiDPI displays (DPR >= 2) already provide sub-pixel smoothness, so MSAA=1 saves
     // bandwidth. Non-HiDPI gets 4x MSAA for proper antialiasing of GPU-rendered lines.
@@ -546,12 +551,13 @@ QCustomPlot::~QCustomPlot()
 {
     mBeingDestroyed = true;
     if (mEmissions.insideWidgetEvent())
-        qcp::reportMisuse(Q_FUNC_INFO, "QCustomPlot deleted inside its own resize, show or "
-                                       "paint event (a replot signal's slot?): use deleteLater()");
+        qcp::reportMisuse(Q_FUNC_INFO,
+                          "QCustomPlot deleted inside its own resize, show or "
+                          "paint event (a replot signal's slot?): use deleteLater()");
     mEmissions.discard(); // a plot being destroyed delivers nothing it held back
     // Release paint buffer GPU resources before QRhiWidget tears down the RHI
-    qDeleteAll(std::exchange(mPlottableRhiLayers, {}));
-    qDeleteAll(std::exchange(mScatterRhiLayers, {}));
+    qDeleteAll(std::exchange(mPlottableRhiLayers, { }));
+    qDeleteAll(std::exchange(mScatterRhiLayers, { }));
     mPaintBuffers.clear();
 
     // Before the plottables and the legend: a group's destructor touches both. As QObject
@@ -567,7 +573,7 @@ QCustomPlot::~QCustomPlot()
 
     mCurrentLayer = nullptr;
     // Unlisted first: a layer still listed would move its children to its neighbour as it dies.
-    qDeleteAll(std::exchange(mLayers, {}));
+    qDeleteAll(std::exchange(mLayers, { }));
     // Last: the spans and axes deleted above unregister from the span and grid GPU layers.
     releaseCompositeResources();
 }
@@ -633,17 +639,22 @@ void QCustomPlot::setTheme(QCPTheme* theme)
 
 void QCustomPlot::connectThemeSignal()
 {
-    connect(mTheme, &QCPTheme::changed, this, [this]() {
-        if (!mThemeDirty) {
-            mThemeDirty = true;
-            QTimer::singleShot(0, this, [this]() {
-                if (!mThemeDirty) // settle() already applied it
-                    return;
-                mThemeDirty = false;
-                applyTheme();
+    connect(mTheme, &QCPTheme::changed, this,
+            [this]()
+            {
+                if (!mThemeDirty)
+                {
+                    mThemeDirty = true;
+                    QTimer::singleShot(0, this,
+                                       [this]()
+                                       {
+                                           if (!mThemeDirty) // settle() already applied it
+                                               return;
+                                           mThemeDirty = false;
+                                           applyTheme();
+                                       });
+                }
             });
-        }
-    });
 }
 
 void QCustomPlot::applyTheme()
@@ -651,14 +662,21 @@ void QCustomPlot::applyTheme()
     if (!mTheme || mBeingDestroyed)
         return;
 
-    auto recoloredPen = [](QPen pen, const QColor& c) { pen.setColor(c); return pen; };
+    ++mViewEpoch;
+
+    auto recoloredPen = [](QPen pen, const QColor& c)
+    {
+        pen.setColor(c);
+        return pen;
+    };
 
     mBackgroundBrush.setColor(mTheme->background());
 
     const QColor fg = mTheme->foreground();
     const QColor sel = mTheme->selection();
 
-    auto applyThemeToAxis = [&](QCPAxis* axis) {
+    auto applyThemeToAxis = [&](QCPAxis* axis)
+    {
         axis->setBasePen(recoloredPen(axis->basePen(), fg));
         axis->setTickPen(recoloredPen(axis->tickPen(), fg));
         axis->setSubTickPen(recoloredPen(axis->subTickPen(), fg));
@@ -681,7 +699,8 @@ void QCustomPlot::applyTheme()
         for (auto* axis : rect->axes())
             applyThemeToAxis(axis);
 
-    if (legend) {
+    if (legend)
+    {
         legend->setBrush(QBrush(mTheme->legendBackground()));
         legend->setBorderPen(recoloredPen(legend->borderPen(), mTheme->legendBorder()));
         legend->setTextColor(fg);
@@ -689,9 +708,12 @@ void QCustomPlot::applyTheme()
         legend->setSelectedBorderPen(recoloredPen(legend->selectedBorderPen(), sel));
     }
 
-    std::function<void(QCPLayoutElement*)> walkLayout = [&](QCPLayoutElement* el) {
-        if (!el) return;
-        if (auto* te = qobject_cast<QCPTextElement*>(el)) {
+    std::function<void(QCPLayoutElement*)> walkLayout = [&](QCPLayoutElement* el)
+    {
+        if (!el)
+            return;
+        if (auto* te = qobject_cast<QCPTextElement*>(el))
+        {
             te->setTextColor(fg);
             te->setSelectedTextColor(sel);
         }
@@ -703,8 +725,10 @@ void QCustomPlot::applyTheme()
     };
     walkLayout(plotLayout());
 
-    for (auto* item : mItems) {
-        if (auto* textItem = qobject_cast<QCPItemText*>(item)) {
+    for (auto* item : mItems)
+    {
+        if (auto* textItem = qobject_cast<QCPItemText*>(item))
+        {
             textItem->setColor(fg);
             textItem->setSelectedColor(sel);
         }
@@ -722,26 +746,82 @@ void QCustomPlot::applyTheme()
     requestRepaint();
 }
 
-QColor QCustomPlot::themeBackground() const { return mTheme ? mTheme->background() : QColor(); }
-void QCustomPlot::setThemeBackground(const QColor& c) { if (mTheme) mTheme->setBackground(c); }
+QColor QCustomPlot::themeBackground() const
+{
+    return mTheme ? mTheme->background() : QColor();
+}
 
-QColor QCustomPlot::themeForeground() const { return mTheme ? mTheme->foreground() : QColor(); }
-void QCustomPlot::setThemeForeground(const QColor& c) { if (mTheme) mTheme->setForeground(c); }
+void QCustomPlot::setThemeBackground(const QColor& c)
+{
+    if (mTheme)
+        mTheme->setBackground(c);
+}
 
-QColor QCustomPlot::themeGrid() const { return mTheme ? mTheme->grid() : QColor(); }
-void QCustomPlot::setThemeGrid(const QColor& c) { if (mTheme) mTheme->setGrid(c); }
+QColor QCustomPlot::themeForeground() const
+{
+    return mTheme ? mTheme->foreground() : QColor();
+}
 
-QColor QCustomPlot::themeSubGrid() const { return mTheme ? mTheme->subGrid() : QColor(); }
-void QCustomPlot::setThemeSubGrid(const QColor& c) { if (mTheme) mTheme->setSubGrid(c); }
+void QCustomPlot::setThemeForeground(const QColor& c)
+{
+    if (mTheme)
+        mTheme->setForeground(c);
+}
 
-QColor QCustomPlot::themeSelection() const { return mTheme ? mTheme->selection() : QColor(); }
-void QCustomPlot::setThemeSelection(const QColor& c) { if (mTheme) mTheme->setSelection(c); }
+QColor QCustomPlot::themeGrid() const
+{
+    return mTheme ? mTheme->grid() : QColor();
+}
 
-QColor QCustomPlot::themeLegendBackground() const { return mTheme ? mTheme->legendBackground() : QColor(); }
-void QCustomPlot::setThemeLegendBackground(const QColor& c) { if (mTheme) mTheme->setLegendBackground(c); }
+void QCustomPlot::setThemeGrid(const QColor& c)
+{
+    if (mTheme)
+        mTheme->setGrid(c);
+}
 
-QColor QCustomPlot::themeLegendBorder() const { return mTheme ? mTheme->legendBorder() : QColor(); }
-void QCustomPlot::setThemeLegendBorder(const QColor& c) { if (mTheme) mTheme->setLegendBorder(c); }
+QColor QCustomPlot::themeSubGrid() const
+{
+    return mTheme ? mTheme->subGrid() : QColor();
+}
+
+void QCustomPlot::setThemeSubGrid(const QColor& c)
+{
+    if (mTheme)
+        mTheme->setSubGrid(c);
+}
+
+QColor QCustomPlot::themeSelection() const
+{
+    return mTheme ? mTheme->selection() : QColor();
+}
+
+void QCustomPlot::setThemeSelection(const QColor& c)
+{
+    if (mTheme)
+        mTheme->setSelection(c);
+}
+
+QColor QCustomPlot::themeLegendBackground() const
+{
+    return mTheme ? mTheme->legendBackground() : QColor();
+}
+
+void QCustomPlot::setThemeLegendBackground(const QColor& c)
+{
+    if (mTheme)
+        mTheme->setLegendBackground(c);
+}
+
+QColor QCustomPlot::themeLegendBorder() const
+{
+    return mTheme ? mTheme->legendBorder() : QColor();
+}
+
+void QCustomPlot::setThemeLegendBorder(const QColor& c)
+{
+    if (mTheme)
+        mTheme->setLegendBorder(c);
+}
 
 void QCustomPlot::setMaxPipelineThreads(int count)
 {
@@ -750,9 +830,11 @@ void QCustomPlot::setMaxPipelineThreads(int count)
 
 QCPOverlay* QCustomPlot::overlay()
 {
-    if (!mOverlay && !mBeingDestroyed) {
+    if (!mOverlay && !mBeingDestroyed)
+    {
         auto* notifLayer = layer(QLatin1String("notification"));
-        if (!notifLayer) {
+        if (!notifLayer)
+        {
             (void)addLayer(QLatin1String("notification"));
             notifLayer = layer(QLatin1String("notification"));
         }
@@ -1108,15 +1190,19 @@ void QCustomPlot::setSelectionRectMode(QCP::SelectionRectMode mode)
     {
         // disconnect old connections:
         if (mSelectionRectMode == QCP::srmSelect)
-            disconnect(mSelectionRect, &QCPSelectionRect::accepted, this, &QCustomPlot::processRectSelection);
+            disconnect(mSelectionRect, &QCPSelectionRect::accepted, this,
+                       &QCustomPlot::processRectSelection);
         else if (mSelectionRectMode == QCP::srmZoom)
-            disconnect(mSelectionRect, &QCPSelectionRect::accepted, this, &QCustomPlot::processRectZoom);
+            disconnect(mSelectionRect, &QCPSelectionRect::accepted, this,
+                       &QCustomPlot::processRectZoom);
 
         // establish new ones:
         if (mode == QCP::srmSelect)
-            connect(mSelectionRect, &QCPSelectionRect::accepted, this, &QCustomPlot::processRectSelection);
+            connect(mSelectionRect, &QCPSelectionRect::accepted, this,
+                    &QCustomPlot::processRectSelection);
         else if (mode == QCP::srmZoom)
-            connect(mSelectionRect, &QCPSelectionRect::accepted, this, &QCustomPlot::processRectZoom);
+            connect(mSelectionRect, &QCPSelectionRect::accepted, this,
+                    &QCustomPlot::processRectZoom);
     }
 
     mSelectionRectMode = mode;
@@ -1150,8 +1236,8 @@ void QCustomPlot::setSelectionRect(QCPSelectionRect* selectionRect)
             connect(mSelectionRect, &QCPSelectionRect::accepted, this,
                     &QCustomPlot::processRectSelection, Qt::UniqueConnection);
         else if (mSelectionRectMode == QCP::srmZoom)
-            connect(mSelectionRect, &QCPSelectionRect::accepted, this, &QCustomPlot::processRectZoom,
-                    Qt::UniqueConnection);
+            connect(mSelectionRect, &QCPSelectionRect::accepted, this,
+                    &QCustomPlot::processRectZoom, Qt::UniqueConnection);
     }
     // Last: a canceled slot may install another rect, delete this one, reinstall it, or delete
     // the plot.
@@ -1164,12 +1250,13 @@ void QCustomPlot::setSelectionRect(QCPSelectionRect* selectionRect)
 
 void QCustomPlot::setItemCreator(ItemCreator creator)
 {
-    if (!mCreationState) {
+    if (!mCreationState)
+    {
         mCreationState = new QCPItemCreationState(this);
-        connect(mCreationState, &QCPItemCreationState::itemCreated,
-                this, &QCustomPlot::itemCreated);
-        connect(mCreationState, &QCPItemCreationState::itemCanceled,
-                this, &QCustomPlot::itemCanceled);
+        connect(mCreationState, &QCPItemCreationState::itemCreated, this,
+                &QCustomPlot::itemCreated);
+        connect(mCreationState, &QCPItemCreationState::itemCanceled, this,
+                &QCustomPlot::itemCanceled);
     }
     mItemCreator = std::move(creator);
     if (!mItemCreator && mCreationState->state() == QCPItemCreationState::Drawing)
@@ -1178,11 +1265,13 @@ void QCustomPlot::setItemCreator(ItemCreator creator)
 
 void QCustomPlot::setCreationModeEnabled(bool enabled)
 {
-    if (mCreationModeEnabled == enabled) return;
+    if (mCreationModeEnabled == enabled)
+        return;
     mCreationModeEnabled = enabled;
     if (enabled)
         setCursor(Qt::CrossCursor);
-    else {
+    else
+    {
         setCursor(Qt::ArrowCursor);
         if (mCreationState)
             mCreationState->cancel();
@@ -1233,6 +1322,7 @@ void QCustomPlot::syncViewportToWidgetSize()
 
 void QCustomPlot::setViewport(const QRect& rect)
 {
+    ++mViewEpoch;
     mViewport = rect;
     if (mPlotLayout)
         mPlotLayout->setOuterRect(mViewport);
@@ -1254,6 +1344,7 @@ void QCustomPlot::setBufferDevicePixelRatio(double ratio)
     if (!qFuzzyCompare(ratio, mBufferDevicePixelRatio))
     {
         mBufferDevicePixelRatio = ratio;
+        ++mViewEpoch;
         for (auto& buffer : mPaintBuffers)
         {
             buffer->setDevicePixelRatio(mBufferDevicePixelRatio);
@@ -1441,8 +1532,8 @@ bool QCustomPlot::removePlottable(QCPAbstractPlottable* plottable)
 
 namespace
 {
-// What still points at a plottable that leaves without being destroyed: the colour scale it follows,
-// its bars group and its stack. Destruction undoes these by itself.
+// What still points at a plottable that leaves without being destroyed: the colour scale it
+// follows, its bars group and its stack. Destruction undoes these by itself.
 void leaveSiblings(QCPAbstractPlottable* plottable)
 {
     if (auto* map = qobject_cast<QCPColorMap*>(plottable))
@@ -1476,7 +1567,8 @@ bool QCustomPlot::detach(QCPAbstractPlottable* plottable)
     // A tracer keeps the graph it follows as a QPointer: the taken graph outlives the take, so the
     // pointer would stay valid while the graph is no longer in this plot.
     for (QCPAbstractItem* item : std::as_const(mItems))
-        if (auto* tracer = qobject_cast<QCPItemTracer*>(item); tracer && tracer->graph() == plottable)
+        if (auto* tracer = qobject_cast<QCPItemTracer*>(item);
+            tracer && tracer->graph() == plottable)
             tracer->setGraph(nullptr);
     const QPointer<QCPPlottableGroup> group = unlistPlottable(plottable);
     plottable->moveToLayer(nullptr, false);
@@ -1537,8 +1629,8 @@ bool QCustomPlot::adopt(QCPPolarGraph*)
 bool QCustomPlot::adopt(QCPAbstractPlottable* plottable)
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
-    QCP_CHECK_OR_RETURN(!plottable->parentPlot(), "the object already belongs to a plot: take it first",
-                        false);
+    QCP_CHECK_OR_RETURN(!plottable->parentPlot(),
+                        "the object already belongs to a plot: take it first", false);
     const auto [keyAxis, valueAxis] = axesForAdd();
     if (!keyAxis)
         return false;
@@ -1566,8 +1658,8 @@ bool QCustomPlot::adopt(QCPAbstractPlottable* plottable)
 // chain; a self-anchor only keeps the relative offset, so the item collapses onto (0, 0).
 void QCustomPlot::cutAnchorLinks(QCPAbstractItem* item)
 {
-    const auto elsewhere = [item](const QCPItemAnchor* anchor)
-    { return anchor && anchor->mParentItem != item; };
+    const auto elsewhere
+        = [item](const QCPItemAnchor* anchor) { return anchor && anchor->mParentItem != item; };
     for (QCPItemPosition* position : item->positions())
     {
         if (elsewhere(position->parentAnchorX()))
@@ -1669,7 +1761,8 @@ void QCustomPlot::deletePlottable(QCPAbstractPlottable* plottable)
 
   Called from the plottable base destructor too, when the subclass parts are already gone: virtual
   calls reach the base versions and qobject_cast sees a QCPAbstractPlottable, so neither is relied
-  on here. A subclass's own legend row leaves by itself (QCPAbstractLegendItem::leaveLegendWhenDestroyed).
+  on here. A subclass's own legend row leaves by itself
+  (QCPAbstractLegendItem::leaveLegendWhenDestroyed).
 */
 QPointer<QCPPlottableGroup> QCustomPlot::unlistPlottable(QCPAbstractPlottable* plottable)
 {
@@ -1863,14 +1956,14 @@ QCPGraph* QCustomPlot::graph() const
 */
 std::pair<QCPAxis*, QCPAxis*> QCustomPlot::axesForAdd() const
 {
-    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", {});
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", { });
     const QList<QCPAxisRect*> rects = axisRects();
-    QCP_CHECK_OR_RETURN(!rects.isEmpty(), "the plot has no axis rect", {});
+    QCP_CHECK_OR_RETURN(!rects.isEmpty(), "the plot has no axis rect", { });
     const QList<QCPAxis*> keyAxes = rects.first()->axes(QCPAxis::atBottom);
     const QList<QCPAxis*> valueAxes = rects.first()->axes(QCPAxis::atLeft);
     QCP_CHECK_OR_RETURN(!keyAxes.isEmpty() && !valueAxes.isEmpty(),
-                        "the default axis rect has no bottom or left axis", {});
-    return {keyAxes.first(), valueAxes.first()};
+                        "the default axis rect has no bottom or left axis", { });
+    return { keyAxes.first(), valueAxes.first() };
 }
 
 QCPGraph* QCustomPlot::addGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
@@ -2026,7 +2119,8 @@ bool QCustomPlot::removeItem(QCPAbstractItem* item)
     // because the caller's pointer may already be dangling.
     if (const qsizetype index = mItems.indexOf(item); index >= 0)
     {
-        // Unlisted first: a slot on destroyed() that calls removeItem or clearItems must find it gone.
+        // Unlisted first: a slot on destroyed() that calls removeItem or clearItems must find it
+        // gone.
         mItems.removeAt(index);
         item->mRegisteredPlot = nullptr;
         delete item;
@@ -2258,7 +2352,8 @@ bool QCustomPlot::addLayer(const QString& name, QCPLayer* otherLayer,
                            QCustomPlot::LayerInsertMode insertMode)
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
-    // A plain delete can remove every layer (removeLayer keeps one): the new one is then the only one.
+    // A plain delete can remove every layer (removeLayer keeps one): the new one is then the only
+    // one.
     const bool onlyLayer = mLayers.isEmpty();
     if (!otherLayer && !onlyLayer)
         otherLayer = mLayers.last();
@@ -2275,7 +2370,8 @@ bool QCustomPlot::addLayer(const QString& name, QCPLayer* otherLayer,
     }
 
     QCPLayer* newLayer = new QCPLayer(this, name);
-    mLayers.insert(onlyLayer ? 0 : otherLayer->index() + (insertMode == limAbove ? 1 : 0), newLayer);
+    mLayers.insert(onlyLayer ? 0 : otherLayer->index() + (insertMode == limAbove ? 1 : 0),
+                   newLayer);
     updateLayerIndices();
     setupPaintBuffers(); // associates new layer with the appropriate paint buffer
     // Buffers are matched to layers by index, so inserting a layer shifts later layers onto
@@ -2615,8 +2711,7 @@ bool QCustomPlot::deselectAllExcept(const QCPLayerable* kept)
     bool changed = false;
     for (const auto& layerable : guardedSelectedLayerables(mLayers, kept))
     {
-        if (layerable
-            && mInteractions.testFlag(layerable->selectionCategory()))
+        if (layerable && mInteractions.testFlag(layerable->selectionCategory()))
         {
             bool selChanged = false;
             layerable->deselectEvent(&selChanged);
@@ -2643,9 +2738,9 @@ bool QCustomPlot::deselectAllExcept(const QCPLayerable* kept)
   QCustomPlot widget and user interactions (object selection and range dragging/zooming).
 
   Before the replot happens, the signal \ref beforeReplot is emitted. After the replot, \ref
-  afterReplot is delivered when the outermost NeoQCP call returns (\ref deliver). It is safe to mutually connect the replot slot
-  with any of those signals on two QCustomPlots to make them replot synchronously, it won't cause
-  an infinite recursion.
+  afterReplot is delivered when the outermost NeoQCP call returns (\ref deliver). It is safe to
+  mutually connect the replot slot with any of those signals on two QCustomPlots to make them replot
+  synchronously, it won't cause an infinite recursion.
 
   If a layer is in mode \ref QCPLayer::lmBuffered (\ref QCPLayer::setMode), it is also possible to
   replot only that specific layer via \ref QCPLayer::replot. See the documentation there for
@@ -2679,8 +2774,8 @@ void QCustomPlot::commitPendingData()
     // Swapping mid-pan costs one full repaint in the middle of a drag; wait for
     // the view to be still for one window, but never longer than the cap so an
     // auto-scrolling plot still gets its data.
-    const bool panning = mLastTranslation.isValid()
-        && mLastTranslation.elapsed() < mDataSwapDebounceMs;
+    const bool panning
+        = mLastTranslation.isValid() && mLastTranslation.elapsed() < mDataSwapDebounceMs;
     const bool capped = mDataSwapRequested.elapsed() >= mDataSwapMaxWaitMs;
     if (panning && !capped)
     {
@@ -2696,7 +2791,8 @@ bool QCustomPlot::commitEveryPendingSource()
 {
     // A commit's busyChanged slot may remove plottables: walk a snapshot, skip the gone ones.
     bool committed = false;
-    const QList<QPointer<QCPAbstractPlottable>> plottables(mPlottables.cbegin(), mPlottables.cend());
+    const QList<QPointer<QCPAbstractPlottable>> plottables(mPlottables.cbegin(),
+                                                           mPlottables.cend());
     for (const auto& plottable : plottables)
         if (plottable)
             committed |= plottable->commitPendingData();
@@ -2727,10 +2823,12 @@ void QCustomPlot::scheduleRepaint()
     // A synchronous replot() in between already drew it, and a later request posts its own timer:
     // only the latest request's timer replots.
     const quint64 ticket = ++mRepaintTicket;
-    QTimer::singleShot(0, this, [this, ticket] {
-        if (mReplotQueued && ticket == mRepaintTicket)
-            replot();
-    });
+    QTimer::singleShot(0, this,
+                       [this, ticket]
+                       {
+                           if (mReplotQueued && ticket == mRepaintTicket)
+                               replot();
+                       });
 }
 
 // Exports draw the model directly (draw() lays out first), so the screen's queued repaint is not
@@ -2885,8 +2983,7 @@ void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
         if (layer->canSkipRepaintForTranslation())
         {
             const QPointF offset = layer->pixelOffset();
-            crl->setPixelOffset(static_cast<float>(offset.x()),
-                                static_cast<float>(offset.y()));
+            crl->setPixelOffset(static_cast<float>(offset.x()), static_cast<float>(offset.y()));
         }
         else
         {
@@ -3305,9 +3402,8 @@ void QCustomPlot::initialize(QRhiCommandBuffer* cb)
     }
 
     // Create sampler for texture compositing
-    mSampler = mRhi->newSampler(QRhiSampler::Linear, QRhiSampler::Linear,
-                                 QRhiSampler::None,
-                                 QRhiSampler::ClampToEdge, QRhiSampler::ClampToEdge);
+    mSampler = mRhi->newSampler(QRhiSampler::Linear, QRhiSampler::Linear, QRhiSampler::None,
+                                QRhiSampler::ClampToEdge, QRhiSampler::ClampToEdge);
     mSampler->create();
 
     // Fullscreen quad: position (x,y) + texcoord (u,v)
@@ -3316,18 +3412,15 @@ void QCustomPlot::initialize(QRhiCommandBuffer* cb)
     const float v0 = mRhi->isYUpInNDC() ? 1.0f : 0.0f; // V at NDC bottom
     const float v1 = mRhi->isYUpInNDC() ? 0.0f : 1.0f; // V at NDC top
     const float quadVertices[] = {
-        -1.0f, -1.0f,  0.0f, v0,
-         1.0f, -1.0f,  1.0f, v0,
-         1.0f,  1.0f,  1.0f, v1,
-        -1.0f,  1.0f,  0.0f, v1,
+        -1.0f, -1.0f, 0.0f, v0, 1.0f, -1.0f, 1.0f, v0, 1.0f, 1.0f, 1.0f, v1, -1.0f, 1.0f, 0.0f, v1,
     };
-    mQuadVertexBuffer = mRhi->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::VertexBuffer,
-                                         sizeof(quadVertices));
+    mQuadVertexBuffer
+        = mRhi->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::VertexBuffer, sizeof(quadVertices));
     mQuadVertexBuffer->create();
 
     static const quint16 quadIndices[] = { 0, 1, 2, 0, 2, 3 };
-    mQuadIndexBuffer = mRhi->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::IndexBuffer,
-                                        sizeof(quadIndices));
+    mQuadIndexBuffer
+        = mRhi->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::IndexBuffer, sizeof(quadIndices));
     mQuadIndexBuffer->create();
 
     // Upload vertex/index data
@@ -3362,8 +3455,10 @@ void QCustomPlot::ensureCompositePipeline()
     if (mCompositePipeline)
         return;
 
-    auto vertShader = qcp::rhi::loadEmbeddedShader(composite_vert_qsb_data, composite_vert_qsb_data_len);
-    auto fragShader = qcp::rhi::loadEmbeddedShader(composite_frag_qsb_data, composite_frag_qsb_data_len);
+    auto vertShader
+        = qcp::rhi::loadEmbeddedShader(composite_vert_qsb_data, composite_vert_qsb_data_len);
+    auto fragShader
+        = qcp::rhi::loadEmbeddedShader(composite_frag_qsb_data, composite_frag_qsb_data_len);
 
     if (!vertShader.isValid() || !fragShader.isValid())
     {
@@ -3372,37 +3467,28 @@ void QCustomPlot::ensureCompositePipeline()
     }
 
     mCompositePipeline = mRhi->newGraphicsPipeline();
-    mCompositePipeline->setShaderStages({
-        { QRhiShaderStage::Vertex, vertShader },
-        { QRhiShaderStage::Fragment, fragShader }
-    });
+    mCompositePipeline->setShaderStages(
+        { { QRhiShaderStage::Vertex, vertShader }, { QRhiShaderStage::Fragment, fragShader } });
 
     QRhiVertexInputLayout inputLayout;
     inputLayout.setBindings({ { 4 * sizeof(float) } });
-    inputLayout.setAttributes({
-        { 0, 0, QRhiVertexInputAttribute::Float2, 0 },
-        { 0, 1, QRhiVertexInputAttribute::Float2, 2 * sizeof(float) }
-    });
+    inputLayout.setAttributes({ { 0, 0, QRhiVertexInputAttribute::Float2, 0 },
+                                { 0, 1, QRhiVertexInputAttribute::Float2, 2 * sizeof(float) } });
     mCompositePipeline->setVertexInputLayout(inputLayout);
 
-    mCompositePipeline->setTargetBlends({qcp::rhi::premultipliedAlphaBlend()});
+    mCompositePipeline->setTargetBlends({ qcp::rhi::premultipliedAlphaBlend() });
 
     mCompositePipeline->setRenderPassDescriptor(renderTarget()->renderPassDescriptor());
     delete mLayoutSrb;
     mLayoutSrb = mRhi->newShaderResourceBindings();
-    mLayoutSrb->setBindings({
-        QRhiShaderResourceBinding::sampledTexture(
-            0, QRhiShaderResourceBinding::FragmentStage,
-            nullptr, mSampler),
-        QRhiShaderResourceBinding::uniformBuffer(
-            1, QRhiShaderResourceBinding::VertexStage,
-            mCompositeUbo)
-    });
+    mLayoutSrb->setBindings({ QRhiShaderResourceBinding::sampledTexture(
+                                  0, QRhiShaderResourceBinding::FragmentStage, nullptr, mSampler),
+                              QRhiShaderResourceBinding::uniformBuffer(
+                                  1, QRhiShaderResourceBinding::VertexStage, mCompositeUbo) });
     mLayoutSrb->create();
     mCompositePipeline->setShaderResourceBindings(mLayoutSrb);
     mCompositePipeline->setSampleCount(sampleCount());
-    mCompositePipeline->setFlags(mCompositePipeline->flags()
-                                 | QRhiGraphicsPipeline::UsesScissor);
+    mCompositePipeline->setFlags(mCompositePipeline->flags() | QRhiGraphicsPipeline::UsesScissor);
     mCompositePipeline->create();
 }
 
@@ -3444,8 +3530,7 @@ void QCustomPlot::refreshLayerTranslationOffsets()
         if (layer && layer->canSkipRepaintForTranslation())
         {
             const QPointF offset = layer->pixelOffset();
-            crl->setPixelOffset(static_cast<float>(offset.x()),
-                                static_cast<float>(offset.y()));
+            crl->setPixelOffset(static_cast<float>(offset.x()), static_cast<float>(offset.y()));
         }
     }
 }
@@ -3462,8 +3547,7 @@ void QCustomPlot::uploadLayerTextures(QRhiResourceUpdateBatch* updates, const QS
         if (rhiBuffer->texture() && rhiBuffer->needsUpload())
         {
             QRhiTextureSubresourceUploadDescription subDesc(rhiBuffer->stagingImage());
-            QRhiTextureUploadDescription uploadDesc(
-                QRhiTextureUploadEntry(0, 0, subDesc));
+            QRhiTextureUploadDescription uploadDesc(QRhiTextureUploadEntry(0, 0, subDesc));
             updates->uploadTexture(rhiBuffer->texture(), uploadDesc);
             rhiBuffer->setUploaded();
         }
@@ -3472,15 +3556,13 @@ void QCustomPlot::uploadLayerTextures(QRhiResourceUpdateBatch* updates, const QS
     for (auto* prl : mPlottableRhiLayers)
     {
         prl->ensurePipeline(renderTarget()->renderPassDescriptor(), sampleCount());
-        prl->uploadResources(updates, outputSize, mBufferDevicePixelRatio,
-                              mRhi->isYUpInNDC());
+        prl->uploadResources(updates, outputSize, mBufferDevicePixelRatio, mRhi->isYUpInNDC());
     }
 
     for (auto* srl : mScatterRhiLayers)
     {
         srl->ensurePipeline(renderTarget()->renderPassDescriptor(), sampleCount());
-        srl->uploadResources(updates, outputSize, mBufferDevicePixelRatio,
-                              mRhi->isYUpInNDC());
+        srl->uploadResources(updates, outputSize, mBufferDevicePixelRatio, mRhi->isYUpInNDC());
     }
 
     if (!mCompositeUbo)
@@ -3493,17 +3575,16 @@ void QCustomPlot::uploadLayerTextures(QRhiResourceUpdateBatch* updates, const QS
     {
         if (!crl->ownerVisible())
             continue;
-        crl->ensurePipeline(renderTarget()->renderPassDescriptor(), sampleCount(),
-                            mCompositeUbo);
-        crl->uploadResources(updates, outputSize, mBufferDevicePixelRatio,
-                              mRhi->isYUpInNDC(), mCompositeUbo);
+        crl->ensurePipeline(renderTarget()->renderPassDescriptor(), sampleCount(), mCompositeUbo);
+        crl->uploadResources(updates, outputSize, mBufferDevicePixelRatio, mRhi->isYUpInNDC(),
+                             mCompositeUbo);
     }
 
     if (mSpanRhiLayer && mSpanRhiLayer->hasSpans())
     {
         mSpanRhiLayer->ensurePipeline(renderTarget()->renderPassDescriptor(), sampleCount());
         mSpanRhiLayer->uploadResources(updates, outputSize, mBufferDevicePixelRatio,
-                                        mRhi->isYUpInNDC());
+                                       mRhi->isYUpInNDC());
     }
 
     // Register all axes with the grid RHI layer
@@ -3526,15 +3607,15 @@ void QCustomPlot::uploadLayerTextures(QRhiResourceUpdateBatch* updates, const QS
     {
         mGridRhiLayer->ensurePipeline(renderTarget()->renderPassDescriptor(), sampleCount());
         mGridRhiLayer->uploadResources(updates, outputSize, mBufferDevicePixelRatio,
-                                        mRhi->isYUpInNDC());
+                                       mRhi->isYUpInNDC());
     }
 }
 
 void QCustomPlot::executeRenderPass(QRhiCommandBuffer* cb, QRhiResourceUpdateBatch* updates,
-                                     const QSize& outputSize)
+                                    const QSize& outputSize)
 {
-    QColor clearColor = (mBackgroundBrush.style() == Qt::SolidPattern)
-        ? mBackgroundBrush.color() : Qt::white;
+    QColor clearColor
+        = (mBackgroundBrush.style() == Qt::SolidPattern) ? mBackgroundBrush.color() : Qt::white;
 
     cb->beginPass(renderTarget(), clearColor, { 1.0f, 0 }, updates);
 
@@ -3559,30 +3640,28 @@ void QCustomPlot::executeRenderPass(QRhiCommandBuffer* cb, QRhiResourceUpdateBat
                     if (!rhiBuffer->srb() || !rhiBuffer->srbMatchesTexture())
                     {
                         auto* srb = mRhi->newShaderResourceBindings();
-                        srb->setBindings({
-                            QRhiShaderResourceBinding::sampledTexture(
-                                0, QRhiShaderResourceBinding::FragmentStage,
-                                rhiBuffer->texture(), mSampler),
-                            QRhiShaderResourceBinding::uniformBuffer(
-                                1, QRhiShaderResourceBinding::VertexStage,
-                                mCompositeUbo)
-                        });
+                        srb->setBindings(
+                            { QRhiShaderResourceBinding::sampledTexture(
+                                  0, QRhiShaderResourceBinding::FragmentStage, rhiBuffer->texture(),
+                                  mSampler),
+                              QRhiShaderResourceBinding::uniformBuffer(
+                                  1, QRhiShaderResourceBinding::VertexStage, mCompositeUbo) });
                         srb->create();
                         rhiBuffer->setSrb(srb, rhiBuffer->texture());
                     }
-                    QPointF layerOffset = layer->canTranslateInsteadOfRepaint()
-                        ? layer->pixelOffset() : QPointF();
-                    struct {
+                    QPointF layerOffset
+                        = layer->canTranslateInsteadOfRepaint() ? layer->pixelOffset() : QPointF();
+
+                    struct
+                    {
                         float translateX, translateY, viewportW, viewportH, yFlip;
-                    } compositeParams = {
-                        float(layerOffset.x()),
-                        float(layerOffset.y()),
-                        float(outputSize.width()),
-                        float(outputSize.height()),
-                        mRhi->isYUpInNDC() ? -1.0f : 1.0f
-                    };
+                    } compositeParams = { float(layerOffset.x()), float(layerOffset.y()),
+                                          float(outputSize.width()), float(outputSize.height()),
+                                          mRhi->isYUpInNDC() ? -1.0f : 1.0f };
+
                     QRhiResourceUpdateBatch* uboUpdates = mRhi->nextResourceUpdateBatch();
-                    uboUpdates->updateDynamicBuffer(mCompositeUbo, 0, sizeof(compositeParams), &compositeParams);
+                    uboUpdates->updateDynamicBuffer(mCompositeUbo, 0, sizeof(compositeParams),
+                                                    &compositeParams);
                     cb->resourceUpdate(uboUpdates);
 
                     bool needsScissor = !layerOffset.isNull();
@@ -3601,7 +3680,7 @@ void QCustomPlot::executeRenderPass(QRhiCommandBuffer* cb, QRhiResourceUpdateBat
                             int sh = static_cast<int>(clipRect.height() * dpr);
                             if (mRhi->isYUpInFramebuffer())
                                 sy = outputSize.height() - sy - sh;
-                            cb->setScissor({sx, sy, sw, sh});
+                            cb->setScissor({ sx, sy, sw, sh });
                         }
                         else
                         {
@@ -3610,9 +3689,10 @@ void QCustomPlot::executeRenderPass(QRhiCommandBuffer* cb, QRhiResourceUpdateBat
                     }
 
                     cb->setGraphicsPipeline(mCompositePipeline);
-                    cb->setViewport({0, 0, float(outputSize.width()), float(outputSize.height())});
+                    cb->setViewport(
+                        { 0, 0, float(outputSize.width()), float(outputSize.height()) });
                     if (!needsScissor)
-                        cb->setScissor({0, 0, outputSize.width(), outputSize.height()});
+                        cb->setScissor({ 0, 0, outputSize.width(), outputSize.height() });
                     cb->setShaderResources(rhiBuffer->srb());
                     cb->setVertexInput(0, 1, &vbufBinding, mQuadIndexBuffer, 0,
                                        QRhiCommandBuffer::IndexUInt16);
@@ -3630,16 +3710,17 @@ void QCustomPlot::executeRenderPass(QRhiCommandBuffer* cb, QRhiResourceUpdateBat
                 if (!hasColormapsOnLayer)
                 {
                     hasColormapsOnLayer = true;
-                    struct {
+
+                    struct
+                    {
                         float translateX, translateY, viewportW, viewportH, yFlip;
-                    } zeroParams = {
-                        0.0f, 0.0f,
-                        float(outputSize.width()),
-                        float(outputSize.height()),
-                        mRhi->isYUpInNDC() ? -1.0f : 1.0f
-                    };
+                    } zeroParams
+                        = { 0.0f, 0.0f, float(outputSize.width()), float(outputSize.height()),
+                            mRhi->isYUpInNDC() ? -1.0f : 1.0f };
+
                     QRhiResourceUpdateBatch* cmapUboUpdate = mRhi->nextResourceUpdateBatch();
-                    cmapUboUpdate->updateDynamicBuffer(mCompositeUbo, 0, sizeof(zeroParams), &zeroParams);
+                    cmapUboUpdate->updateDynamicBuffer(mCompositeUbo, 0, sizeof(zeroParams),
+                                                       &zeroParams);
                     cb->resourceUpdate(cmapUboUpdate);
                 }
                 crl->render(cb, outputSize);
@@ -3665,13 +3746,13 @@ void QCustomPlot::executeRenderPass(QRhiCommandBuffer* cb, QRhiResourceUpdateBat
             mSpanRhiLayer->render(cb, outputSize, layer);
 
         // Draw GPU grid lines on the "grid" layer
-        if (layer == this->layer(QLatin1String("grid"))
-            && mGridRhiLayer && mGridRhiLayer->hasContent())
+        if (layer == this->layer(QLatin1String("grid")) && mGridRhiLayer
+            && mGridRhiLayer->hasContent())
             mGridRhiLayer->renderGridLines(cb, outputSize);
 
         // Draw GPU tick marks on the "axes" layer
-        if (layer == this->layer(QLatin1String("axes"))
-            && mGridRhiLayer && mGridRhiLayer->hasContent())
+        if (layer == this->layer(QLatin1String("axes")) && mGridRhiLayer
+            && mGridRhiLayer->hasContent())
             mGridRhiLayer->renderTickMarks(cb, outputSize);
     }
 
@@ -4001,13 +4082,11 @@ void QCustomPlot::emitClickSignal(QMouseEvent* event)
     QCPLayerable* clicked = std::exchange(mMouseSignalLayerable, nullptr);
     const QVariant details = mMouseSignalLayerableDetails;
     if (auto* ap = qobject_cast<QCPAbstractPlottable*>(clicked))
-        deliver(ap, [this, ap, i = clickedDataIndex(details), event] {
-            emit plottableClick(ap, i, event);
-        });
+        deliver(ap, [this, ap, i = clickedDataIndex(details), event]
+                { emit plottableClick(ap, i, event); });
     else if (auto* ax = qobject_cast<QCPAxis*>(clicked))
-        deliver(ax, [this, ax, part = details.value<QCPAxis::SelectablePart>(), event] {
-            emit axisClick(ax, part, event);
-        });
+        deliver(ax, [this, ax, part = details.value<QCPAxis::SelectablePart>(), event]
+                { emit axisClick(ax, part, event); });
     else if (auto* ai = qobject_cast<QCPAbstractItem*>(clicked))
         deliver(ai, [this, ai, event] { emit itemClick(ai, event); });
     else if (auto* lg = qobject_cast<QCPLegend*>(clicked))
@@ -4020,13 +4099,11 @@ void QCustomPlot::emitDoubleClickSignal(QCPLayerable* clicked, const QVariant& d
                                         QMouseEvent* event)
 {
     if (auto* ap = qobject_cast<QCPAbstractPlottable*>(clicked))
-        deliver(ap, [this, ap, i = clickedDataIndex(details), event] {
-            emit plottableDoubleClick(ap, i, event);
-        });
+        deliver(ap, [this, ap, i = clickedDataIndex(details), event]
+                { emit plottableDoubleClick(ap, i, event); });
     else if (auto* ax = qobject_cast<QCPAxis*>(clicked))
-        deliver(ax, [this, ax, part = details.value<QCPAxis::SelectablePart>(), event] {
-            emit axisDoubleClick(ax, part, event);
-        });
+        deliver(ax, [this, ax, part = details.value<QCPAxis::SelectablePart>(), event]
+                { emit axisDoubleClick(ax, part, event); });
     else if (auto* ai = qobject_cast<QCPAbstractItem*>(clicked))
         deliver(ai, [this, ai, event] { emit itemDoubleClick(ai, event); });
     else if (auto* lg = qobject_cast<QCPLegend*>(clicked))
@@ -4122,11 +4199,11 @@ bool QCustomPlot::touchEvent(QTouchEvent* event)
     const auto& points = event->points();
     const bool ending = event->type() == QEvent::TouchEnd || event->type() == QEvent::TouchCancel;
     if (event->type() == QEvent::TouchBegin && points.size() == 1)
-        mTouch = {};   // a browser sends a second TouchBegin when the second finger lands
+        mTouch = { }; // a browser sends a second TouchBegin when the second finger lands
     if (!mTouch.pinching && points.size() >= 2 && !ending)
     {
         mTouch.pinching = true;
-        if (mTouch.mouseDown)   // a second finger ends the drag, without a click
+        if (mTouch.mouseDown) // a second finger ends the drag, without a click
         {
             mMouseHasMoved = true;
             forwardTouchAsMouse(QEvent::MouseButtonRelease, points.first(), event);
@@ -4153,7 +4230,7 @@ bool QCustomPlot::touchEvent(QTouchEvent* event)
     if (ending)
     {
         const bool mouseDown = mTouch.mouseDown;
-        mTouch = {}; // first: the release may delete the plot
+        mTouch = { }; // first: the release may delete the plot
         if (mouseDown)
             forwardTouchAsMouse(QEvent::MouseButtonRelease, points.first(), event);
     }
@@ -4645,7 +4722,9 @@ void QCustomPlot::legendRemoved(QCPLegend* legend)
 void QCustomPlot::processRectSelection(QRect rect, QMouseEvent* event)
 {
     using SelectionCandidate = QPair<QPointer<QCPAbstractPlottable>, QCPDataSelection>;
-    using SelectionCandidates = QMultiMap<int, SelectionCandidate>; // map key is number of selected data points, so we have selections sorted by size
+    using SelectionCandidates
+        = QMultiMap<int, SelectionCandidate>; // map key is number of selected data points, so we
+                                              // have selections sorted by size
 
     const QPointer<QCustomPlot> alive(this); // a (de)selection slot may delete the plot
     bool selectionStateChanged = false;
@@ -4894,8 +4973,10 @@ bool QCustomPlot::registerItem(QCPAbstractItem* item)
     if (!item->layer()) // usually the layer is already set in the constructor of the item (via
                         // QCPLayerable constructor)
         item->setLayer(currentLayer());
-    if (mTheme) {
-        if (auto* textItem = qobject_cast<QCPItemText*>(item)) {
+    if (mTheme)
+    {
+        if (auto* textItem = qobject_cast<QCPItemText*>(item))
+        {
             textItem->setColor(mTheme->foreground());
             textItem->setSelectedColor(mTheme->selection());
         }
@@ -4977,8 +5058,8 @@ QList<QCPLayerable*> QCustomPlot::layerableListAt(const QPointF& pos, bool onlyS
         // indexed item whose box misses it cannot be hit, so its selectTest() is not called.
         const std::vector<std::uint8_t>* candidates = nullptr;
         if (mItemIndexing && !layerables.isEmpty())
-            candidates = &layer->itemCandidates(
-                QRectF(pos, QSizeF(0, 0)).adjusted(-tol, -tol, tol, tol));
+            candidates
+                = &layer->itemCandidates(QRectF(pos, QSizeF(0, 0)).adjusted(-tol, -tol, tol, tol));
         for (int i = layerables.size() - 1; i >= 0; --i)
         {
             const QCPLayerable* layerable = layerables.at(i);
@@ -5172,11 +5253,30 @@ void QCustomPlot::toPainter(QCPPainter* painter, int width, int height)
 // The owner of each family removes its member (see qcp::detail::removeObject in handle.h).
 namespace qcp::detail
 {
-void removeObject(QCPAbstractPlottable& plottable) { delete &plottable; }
-void removeObject(QCPAbstractItem& item) { delete &item; }
-void removeObject(QCPPolarGraph& graph) { delete &graph; }
-void removeObject(QCPBarsGroup& group) { delete &group; }
-void removeObject(QCPPlottableGroup& group) { delete &group; }
+void removeObject(QCPAbstractPlottable& plottable)
+{
+    delete &plottable;
+}
+
+void removeObject(QCPAbstractItem& item)
+{
+    delete &item;
+}
+
+void removeObject(QCPPolarGraph& graph)
+{
+    delete &graph;
+}
+
+void removeObject(QCPBarsGroup& group)
+{
+    delete &group;
+}
+
+void removeObject(QCPPlottableGroup& group)
+{
+    delete &group;
+}
 
 void removeObject(QCPAxis& axis)
 {

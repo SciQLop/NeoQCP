@@ -60,6 +60,7 @@ test_srcs = [
     'test-spatial-index/test-spatial-index.cpp',
     'test-coords/test-coords.cpp',
     'test-draw-context/test-draw-context.cpp',
+    'test-drawable/test-drawable.cpp',
 ]
 
 test_headers = [
@@ -118,6 +119,7 @@ test_headers = [
     'test-spatial-index/test-spatial-index.h',
     'test-coords/test-coords.h',
     'test-draw-context/test-draw-context.h',
+    'test-drawable/test-drawable.h',
 ]
 test_moc_files = qtmod.compile_moc(headers : test_headers)
 
