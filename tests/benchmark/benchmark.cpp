@@ -3,6 +3,7 @@
 #include <qcustomplot.h>
 #include <spatial-index.h>
 #include <coords.h>
+#include <drawable.h>
 #include <painting/draw-commands.h>
 #include <painting/draw-context.h>
 #include <datasource/soa-datasource-2d.h>
@@ -107,6 +108,9 @@ private slots:
   void QCPBars_Zoom10k();
   void QCPBars_Pan10k();
   void QCPItemText_Zoom1k();
+
+  void QCPDrawn_Zoom10k();
+  void QCPDrawn_Pan10k();
 
 private:
   QCustomPlot *mPlot;
@@ -1852,4 +1856,74 @@ void Benchmark::QCPDrawContext_ReplayMarkers100k()
     QCPPainter painter(&image);
     qcpReplayWithPainter(list, painter, frame);
   }
+}
+
+namespace
+{
+//! A drawn item the benchmarks own: one bar, recorded through the new contract only.
+class BenchDrawnBar : public QCPDrawn<QCPAbstractItem>
+{
+public:
+    BenchDrawnBar(QCustomPlot* plot, double key, double width)
+            : QCPDrawn<QCPAbstractItem>(plot)
+    {
+        mAnchor = createPosition(QStringLiteral("anchor")); // the axes the replay maps through
+        mAnchor->setCoords(key, 0);
+        setClipAxisRect(plot->axisRect());
+        mA = QCP::Data { key, 0.0 };
+        mB = QCP::Data { key + width, 1.0 };
+    }
+
+    using QCPDrawn<QCPAbstractItem>::draw;
+
+    void draw(QCPDrawContext& context) const override
+    {
+        context.rect(mA, mB, mPen, QBrush(Qt::NoBrush));
+    }
+
+    QCPItemPosition* mAnchor = nullptr;
+    QCP::Data mA;
+    QCP::Data mB;
+    QPen mPen = QPen(Qt::black);
+};
+
+//! The layout of addLineItems(), expressed only with the drawing contract.
+void addDrawnBars(QCustomPlot* plot, int count, double xMax)
+{
+    for (int i = 0; i < count; ++i)
+        new BenchDrawnBar(plot, xMax * i / count, 0.01);
+}
+} // namespace
+
+void Benchmark::QCPDrawn_Zoom10k()
+{
+    QWidget host;
+    QCustomPlot* plot = nullptr;
+    if (!makeGpuPlot(host, plot))
+        QSKIP("no QRhi on this platform (qoffscreen)");
+    addDrawnBars(plot, 10000, 100);
+    plot->xAxis->setRange(50, 51);
+    plot->yAxis->setRange(0, 1);
+    settleGpuPlot(plot);
+    int step = 0;
+    QBENCHMARK { zoomInPlace(plot, 50.5, 1.0, step); }
+}
+
+void Benchmark::QCPDrawn_Pan10k()
+{
+    QWidget host;
+    QCustomPlot* plot = nullptr;
+    if (!makeGpuPlot(host, plot))
+        QSKIP("no QRhi on this platform (qoffscreen)");
+    addDrawnBars(plot, 10000, 100);
+    plot->xAxis->setRange(50, 51);
+    plot->yAxis->setRange(0, 1);
+    settleGpuPlot(plot);
+    double left = 50;
+    QBENCHMARK
+    {
+        left += 0.01; // a pan step: the kept triangles only need the delta
+        plot->xAxis->setRange(left, left + 1);
+        plot->replot(QCustomPlot::rpImmediateRefresh);
+    }
 }
