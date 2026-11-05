@@ -35,22 +35,61 @@ QPointF dataPixel(const QCPDrawFrame& frame, const QPointF& point)
     return QPointF(pixels.x, pixels.y);
 }
 
+//! Where a box of \a size sits relative to the anchor: QCPItemText::getTextDrawPoint.
+QPoint boxTopLeft(const QSize& size, Qt::Alignment alignment)
+{
+    QPoint topLeft;
+    if (alignment & Qt::AlignHCenter)
+        topLeft.setX(-size.width() / 2);
+    else if (alignment & Qt::AlignRight)
+        topLeft.setX(-size.width());
+    if (alignment & Qt::AlignVCenter)
+        topLeft.setY(-size.height() / 2);
+    else if (alignment & Qt::AlignBottom)
+        topLeft.setY(-size.height());
+    return topLeft;
+}
+
+const QCPLabelRenderer* textRenderer(const QCPTextStyle& style)
+{
+    return style.mathText ? QCPLabelRenderer::defaultRenderer() : nullptr;
+}
+} // namespace
+
+qcp::QCPTextLayout qcpTextLayout(const QCPTextStyle& style, const QString& text)
+{
+    QRect glyphs
+        = QCPLabelRenderer::measureRectWith(textRenderer(style), style.font, text, style.textFlags);
+    const int left = int(std::ceil(style.padding.left()));
+    const int top = int(std::ceil(style.padding.top()));
+    QRect box = glyphs.adjusted(-left, -top, int(std::ceil(style.padding.right())),
+                                int(std::ceil(style.padding.bottom())));
+    const QPoint topLeft = boxTopLeft(box.size(), style.alignment);
+    glyphs.moveTopLeft(topLeft + QPoint(left, top));
+    box.moveTopLeft(topLeft);
+    return { box, glyphs };
+}
+
+namespace
+{
+//! The box and glyphs, exactly as QCPItemText lays them out relative to the anchor.
 void replayText(const qcp::TextCmd& cmd, QCPPainter& painter, const QCPDrawFrame& frame)
 {
     const QCPTextStyle& style = *cmd.style;
-    const QPointF anchor = qcpResolvePosition(frame, cmd.at);
-    const int flags = int(style.alignment);
     painter.save();
-    painter.translate(anchor);
+    painter.translate(qcpResolvePosition(frame, cmd.at));
     if (style.rotationDegrees != 0.0)
         painter.rotate(style.rotationDegrees);
-    QRect rect = QCPLabelRenderer::measureRectWith(nullptr, style.font, cmd.text, flags);
-    if (style.padding > 0.0)
+    const qcp::QCPTextLayout layout = qcpTextLayout(style, cmd.text);
+    if (style.brush.style() != Qt::NoBrush || style.pen.style() != Qt::NoPen)
     {
-        const int pad = int(std::ceil(style.padding));
-        rect = rect.adjusted(-pad, -pad, pad, pad);
+        painter.setPen(style.pen);
+        painter.setBrush(style.brush);
+        painter.drawRect(layout.box);
+        painter.setBrush(Qt::NoBrush);
     }
-    QCPLabelRenderer::drawWith(nullptr, &painter, rect, style.font, style.color, cmd.text, flags);
+    QCPLabelRenderer::drawWith(textRenderer(style), &painter, layout.glyphs, style.font,
+                               style.color, cmd.text, style.textFlags);
     painter.restore();
 }
 

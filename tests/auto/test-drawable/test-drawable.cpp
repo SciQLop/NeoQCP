@@ -77,6 +77,13 @@ public:
             const_cast<TestShape*>(this)->contentChanged();
         if (readsTheme)
             (void)context.theme();
+        if (readsTransform)
+        {
+            const QCP::Pixels corner = context.transform().map(QCP::Data { 6, 6 });
+            context.rect(QCP::Data { 2, 2 }, QCP::Pixels { corner.x, corner.y }, QPen(Qt::black),
+                         QBrush(fill));
+            return;
+        }
         if (bars > 0)
         {
             for (int i = 0; i < bars; ++i)
@@ -182,6 +189,7 @@ public:
     bool withPolyline = false;
     bool escapeHatch = false;
     bool readsTheme = false;
+    bool readsTransform = false;
     bool contentChangeInsideDraw = false;
     mutable int drawCalls = 0;
     mutable int dirtyCalls = 0;
@@ -406,6 +414,24 @@ void TestDrawable::themeReaderReRecordsOnThemeChange()
     f.plot->replot();
     QCOMPARE(plain->drawCalls, 1); // a polygon that never read the theme stays cached
     QCOMPARE(reader->drawCalls, 2);
+}
+
+void TestDrawable::transformReaderReRecordsOnZoomOnly()
+{
+    Fixture f;
+    auto* shape = new TestShape(f.plot.get());
+    shape->readsTransform = true;
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 1);
+
+    f.plot->xAxis->setRange(2, 12); // a pan only moved the pixels the recording baked
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 1);
+
+    f.plot->xAxis->setRange(4, 6); // a zoom changed their scale: the recording is stale
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 2);
+    QCOMPARE(shape->dirtyCalls, 0); // a view change is not a content change
 }
 
 void TestDrawable::contentChangedInsideDrawIsAMisuse()

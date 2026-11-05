@@ -14,6 +14,7 @@
 #include <QPen>
 #include <QPointF>
 #include <QPolygonF>
+#include <QRect>
 #include <QString>
 #include <algorithm>
 #include <atomic>
@@ -100,6 +101,14 @@ struct TextCmd
     std::shared_ptr<const QCPTextStyle> style;
 };
 
+//! A text command's two rects, relative to its anchor: the box (glyphs grown by the padding and
+//! placed by the style's position alignment) and the glyphs inside it.
+struct QCPTextLayout
+{
+    QRect box;
+    QRect glyphs;
+};
+
 //! A painter path whose origin is a position; the path is in pixels from there.
 struct PathCmd
 {
@@ -128,6 +137,13 @@ using QCPDrawCommand
     = std::variant<PolylineDataCmd, PolylinePositionsCmd, PolygonCmd, FillBetweenCmd, RectCmd,
                    EllipseCmd, MarkersCmd, ErrorBarsCmd, TextCmd, PathCmd, ImageCmd, PainterCmd>;
 } // namespace qcp
+
+/*!
+  The layout of \a text in \a style, as QCPItemText has always drawn it: one place computes it, so
+  the painter replay, the hit test and an item's anchors cannot disagree.
+*/
+[[nodiscard]] QCP_LIB_DECL qcp::QCPTextLayout qcpTextLayout(const QCPTextStyle& style,
+                                                            const QString& text);
 
 //! A new identity per recording; copies and re-records take a fresh one.
 inline quint64 qcpNextDrawListId()
@@ -165,6 +181,7 @@ struct QCP_LIB_DECL QCPDrawList
         hasSamples = other.hasSamples;
         viewDependent = other.viewDependent;
         anchorDependent = other.anchorDependent;
+        transformDependent = other.transformDependent;
         id = qcpNextDrawListId();
         return *this;
     }
@@ -184,6 +201,9 @@ struct QCP_LIB_DECL QCPDrawList
     //! A command holds a QCP::AnchorOffset: an item owns that anchor, and removing the item
     //! invalidates this recording even though its generation did not move.
     bool anchorDependent = false;
+    //! A command read the frame's transform and baked a pixel out of it (a bar width in pixels):
+    //! the recording is still good after a pan, but not after a zoom or a resize.
+    bool transformDependent = false;
     quint64 id = qcpNextDrawListId(); //!< unique: with a command's index it is a cache key
 };
 

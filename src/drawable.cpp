@@ -1,6 +1,5 @@
 #include "drawable.h"
 
-#include "axis/labelrenderer.h"
 #include "core.h"
 #include "layoutelements/layoutelement-axisrect.h"
 #include "misuse.h"
@@ -14,6 +13,7 @@
 
 #include <QDebug>
 #include <QPainter>
+#include <QTransform>
 #include <cmath>
 #include <limits>
 
@@ -123,19 +123,14 @@ std::vector<QPointF> resolve(const std::vector<QPointF>& data, const QCPDrawFram
     return pixels;
 }
 
-//! The text's box, placed the way the painter replay places it.
-QRectF textRect(const qcp::TextCmd& cmd, const QCPDrawFrame& frame)
+//! The distance from \a at to the text's box, in pixels: the box turns with the text.
+double textDistance(const qcp::TextCmd& cmd, const QCPDrawFrame& frame, const QPointF& at)
 {
     const QCPTextStyle& style = *cmd.style;
-    QRect rect
-        = QCPLabelRenderer::measureRectWith(nullptr, style.font, cmd.text, int(style.alignment));
-    if (style.padding > 0.0)
-    {
-        const int pad = int(std::ceil(style.padding));
-        rect = rect.adjusted(-pad, -pad, pad, pad);
-    }
-    const QPointF anchor = qcpResolvePosition(frame, cmd.at);
-    return QRectF(rect).translated(anchor);
+    QPointF local = at - qcpResolvePosition(frame, cmd.at);
+    if (style.rotationDegrees != 0.0)
+        local = QTransform().rotate(-style.rotationDegrees).map(local);
+    return distanceTo(QRectF(qcpTextLayout(style, cmd.text).box), local);
 }
 
 //! The distance from \a at to one command's geometry, in pixels.
@@ -219,9 +214,7 @@ double distanceTo(const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame,
                 return distanceTo(pixels, at, false) - halfPen(cmd.pen);
             }
             else if constexpr (std::is_same_v<Command, qcp::TextCmd>)
-            {
-                return distanceTo(textRect(cmd, frame), at);
-            }
+                return textDistance(cmd, frame, at);
             else if constexpr (std::is_same_v<Command, qcp::PathCmd>)
             {
                 QPainterPath path = cmd.path;
@@ -262,11 +255,13 @@ struct QCPDrawnCore::State
     quint64 recordedGeneration = 0;
     quint64 recordedEpoch = 0;
     quint64 recordedItemsEpoch = 0;
+    QCPTransform recordedTransform;
     quint64 iconGeneration = 0;
     int recordings = 0;
     bool recorded = false;
     bool viewDependent = false;
     bool anchorDependent = false;
+    bool transformDependent = false;
     bool iconRecorded = false;
     bool insideDraw = false;
     bool reportedMissingAxis = false;
@@ -411,9 +406,11 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
     mState->reportedMissingAxis = false;
     const quint64 epoch = view.plot ? view.plot->viewEpoch() : 0;
     const quint64 itemsEpoch = view.plot ? view.plot->itemsEpoch() : 0;
+    const QCPTransform transform(view.keyAxis, view.valueAxis);
     const bool stale = !mState->recorded || mState->recordedGeneration != mState->generation
         || (mState->viewDependent && mState->recordedEpoch != epoch)
-        || (mState->anchorDependent && mState->recordedItemsEpoch != itemsEpoch);
+        || (mState->anchorDependent && mState->recordedItemsEpoch != itemsEpoch)
+        || (mState->transformDependent && !transform.isTranslationOf(mState->recordedTransform));
     if (!stale)
         return true;
     QCPDrawContext context(view.keyAxis, view.valueAxis, view.axisRect, view.theme);
@@ -422,9 +419,11 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
     mState->recording = context.drawList();
     mState->viewDependent = usesTheView(mState->recording);
     mState->anchorDependent = mState->recording.anchorDependent;
+    mState->transformDependent = mState->recording.transformDependent;
     mState->recordedGeneration = mState->generation;
     mState->recordedEpoch = epoch;
     mState->recordedItemsEpoch = itemsEpoch;
+    mState->recordedTransform = transform;
     mState->recorded = true;
     ++mState->recordings;
     return true;

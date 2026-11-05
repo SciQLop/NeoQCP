@@ -273,6 +273,14 @@ QCPDrawContext::QCPDrawContext(const QCPAxis* keyAxis, const QCPAxis* valueAxis,
 
 QCPDrawContext::~QCPDrawContext() = default;
 
+const QCPTransform& QCPDrawContext::transform() const
+{
+    // A recorder that reads the transform bakes pixels out of it: the recording is only good while
+    // the transform keeps translating (a pan), not across a zoom or a resize.
+    mList->transformDependent = true;
+    return mTransform;
+}
+
 const QCPTheme& QCPDrawContext::theme() const
 {
     // Theme colours are a view fact: the commands that read them must not be reused across a

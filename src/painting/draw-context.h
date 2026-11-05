@@ -7,6 +7,7 @@
 #include <QColor>
 #include <QFont>
 #include <QImage>
+#include <QMargins>
 #include <QPainterPath>
 #include <QPen>
 #include <QRectF>
@@ -27,18 +28,28 @@ class QCPScatterStyle;
 /*!
   \brief How a piece of text is drawn by \ref QCPDrawContext::text.
 
-  The four things a text command carries besides its position and its string: the font, the colour
-  (the pen its renderer draws with), the alignment that places the text relative to the anchor, and
-  the rotation around that anchor in degrees. \a padding grows the measured rectangle on every side,
-  which only matters for alignment and for a background drawn by a renderer.
+  What a text command carries besides its position and its string: the font, the colour (the pen its
+  renderer draws with), the border pen and the background brush of its box, the alignment that
+  places the box relative to the anchor, the flags the glyphs are measured and drawn with, and the
+  rotation around the anchor in degrees. \a padding grows the box on every side; the glyphs keep
+  their own rect inside it, as QCPItemText places them.
+
+  \a mathText measures and draws through \ref QCPLabelRenderer::defaultRenderer, which is what
+  QCPItemText does (the LaTeX typesetter when the library is built with it). It is off by default
+  because the renderer measures a plain string one pixel wider and taller than plain font metrics,
+  so a recording that never promised math keeps the plain look.
 */
 struct QCP_LIB_DECL QCPTextStyle
 {
     QFont font;
     QColor color = Qt::black;
+    QPen pen = Qt::NoPen; //!< the box's border
+    QBrush brush = Qt::NoBrush; //!< the box's background
     Qt::Alignment alignment = Qt::AlignLeft | Qt::AlignTop;
+    int textFlags = Qt::AlignLeft; //!< how the glyphs are measured and drawn inside the box
     double rotationDegrees = 0.0;
-    double padding = 0.0;
+    QMarginsF padding;
+    bool mathText = false;
 };
 
 /*!
@@ -58,8 +69,9 @@ struct QCP_LIB_DECL QCPDrawFrame
 /*!
   \brief The frame of one axis pair and one clip rect, built without recording anything.
 
-  A recording does not depend on the transform, only its replay does, so a cached recording can be
-  replayed into a fresh frame without the object drawing itself again.
+  A recording usually does not depend on the transform, only its replay does, so a cached recording
+  can be replayed into a fresh frame without the object drawing itself again. A recording that did
+  read the transform is remade when the new one is not a translation of it.
 */
 [[nodiscard]] QCP_LIB_DECL QCPDrawFrame qcpMakeFrame(const QCPAxis* keyAxis,
                                                      const QCPAxis* valueAxis,
@@ -96,16 +108,22 @@ public:
       pixel-dependent decision (a line width in pixels, a label placed at a pixel coordinate, a
       decision based on the current range) into the commands. Record what moves with the data as a
       position; ask \ref painter() for anything that needs this frame's pixels.
+
+      Reading the transform is allowed for geometry that is genuinely pixels: the recording then
+      carries \ref QCPDrawList::transformDependent and is remade on every zoom or resize (a pan
+      keeps it, since the pixels only moved). It is not free, so a recording that can be expressed
+      in data must not read it: QCPBars with a width in plot coordinates never does, and keeps its
+      recording across a zoom.
     */
-    [[nodiscard]] const QCPTransform& transform() const { return mTransform; }
+    [[nodiscard]] const QCPTransform& transform() const;
 
     /*!
       The pixels the object may draw in; an empty rect means unclipped.
 
       This is the clip of the frame in which draw() ran, not necessarily the frame replaying the
-      recording (the axis rect can move without re-recording). Like \ref transform(), it is a hint
-      for what to record, never a fact to bake into a command: an object whose commands depend on
-      where its clip is must record them through \ref painter().
+      recording (the axis rect can move without re-recording). Unlike \ref transform(), reading it
+      is not tracked: a recording whose commands depend on where its clip is must record them
+      through \ref painter().
     */
     [[nodiscard]] QRectF clip() const { return mClip; }
 
