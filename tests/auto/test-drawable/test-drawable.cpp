@@ -421,7 +421,7 @@ void TestDrawable::themeReaderReRecordsOnThemeChange()
     QCOMPARE(reader->drawCalls, 2);
 }
 
-void TestDrawable::transformReaderReRecordsOnZoomOnly()
+void TestDrawable::transformReaderReRecordsOnEveryPan()
 {
     Fixture f;
     auto* shape = new TestShape(f.plot.get());
@@ -429,13 +429,13 @@ void TestDrawable::transformReaderReRecordsOnZoomOnly()
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 1);
 
-    f.plot->xAxis->setRange(2, 12); // a pan only moved the pixels the recording baked
-    f.plot->replot();
-    QCOMPARE(shape->drawCalls, 1);
-
-    f.plot->xAxis->setRange(4, 6); // a zoom changed their scale: the recording is stale
+    f.plot->xAxis->setRange(2, 12); // a pan moved the pixels the recording baked
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 2);
+
+    f.plot->xAxis->setRange(4, 6); // a zoom changed their scale as well
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 3);
     QCOMPARE(shape->dirtyCalls, 0); // a view change is not a content change
 }
 

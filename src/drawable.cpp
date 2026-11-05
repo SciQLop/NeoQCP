@@ -400,7 +400,11 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
         || mState->recordedDependency != dependency
         || (mState->viewDependent && mState->recordedEpoch != epoch)
         || (mState->anchorDependent && mState->recordedItemsEpoch != itemsEpoch)
-        || (mState->transformDependent && !transform.isTranslationOf(mState->recordedTransform));
+        || (mState->transformDependent && !(transform == mState->recordedTransform));
+    // simplify: a translation still remakes a transform-dependent recording, so a pan of stacked,
+    // grouped or pixel-width bars re-records every frame. A data-plus-pixel-offset position type
+    // would keep them; it is on the deferred list.
+
     if (!stale)
         return true;
     QCPDrawContext context(view.keyAxis, view.valueAxis, view.axisRect, view.theme);

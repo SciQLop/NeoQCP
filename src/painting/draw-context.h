@@ -110,10 +110,11 @@ public:
       position; ask \ref painter() for anything that needs this frame's pixels.
 
       Reading the transform is allowed for geometry that is genuinely pixels: the recording then
-      carries \ref QCPDrawList::transformDependent and is remade on every zoom or resize (a pan
-      keeps it, since the pixels only moved). It is not free, so a recording that can be expressed
-      in data must not read it: QCPBars with a width in plot coordinates never does, and keeps its
-      recording across a zoom.
+      carries \ref QCPDrawList::transformDependent and is remade on every change of the transform,
+      a pan included, since every baked pixel moved. That is the price QCPBars pays for a width or
+      a stacking offset in pixels. It is not free, so a recording that can be expressed in data
+      must not read it: QCPBars with a width in plot coordinates never does, and keeps its
+      recording across a pan and a zoom.
     */
     [[nodiscard]] const QCPTransform& transform() const;
 
@@ -121,11 +122,12 @@ public:
       The pixels the object may draw in; an empty rect means unclipped.
 
       This is the clip of the frame in which draw() ran, not necessarily the frame replaying the
-      recording (the axis rect can move without re-recording). Unlike \ref transform(), reading it
-      is not tracked: a recording whose commands depend on where its clip is must record them
-      through \ref painter().
+      recording: the axis rect can move without the data moving. Reading it therefore counts as
+      reading the transform, and the recording carries \ref QCPDrawList::transformDependent: it is
+      remade on every change of the transform, so its commands and the clip they were cut for
+      always come from the same frame.
     */
-    [[nodiscard]] QRectF clip() const { return mClip; }
+    [[nodiscard]] QRectF clip() const;
 
     //! The colours the plot is themed with, so a recorder can pick its default pen and brush.
     [[nodiscard]] const QCPTheme& theme() const;

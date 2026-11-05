@@ -15,8 +15,12 @@ private slots:
   void addDataShowsTheNewBar();
   void containerEditRedraws();
 
+  void groupedBarsFollowAPan();
+  void stackedBarsFollowAPan();
+  void groupedBarsFollowAPanOnGpu();
+  void stackedBarsFollowAPanOnGpu();
   void plotWidthBarsNeverReRecord();
-  void pixelWidthBarsReRecordOnZoomOnly();
+  void pixelWidthBarsReRecordOnEveryPan();
   void barsSelectionReRecordsAndUsesTheDecorator();
   void barsPanDoesNotReRecord();
   

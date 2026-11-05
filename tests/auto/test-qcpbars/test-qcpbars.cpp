@@ -3,6 +3,7 @@
 #include <QElapsedTimer>
 #include <QMainWindow>
 #include <QtWidgets/qtestsupport_widgets.h>
+#include <functional>
 
 namespace
 {
@@ -62,6 +63,56 @@ QColor pixelAt(const QImage& frame, QCustomPlot* plot, double key, double value)
     const double dpr = frame.devicePixelRatio();
     return frame.pixelColor(qRound(plot->xAxis->coordToPixel(key) * dpr),
                             qRound(plot->yAxis->coordToPixel(value) * dpr));
+}
+
+//! The left-most inked column inside \a plot's axis rect, on the row of \a value, in device pixels.
+int barLeftEdge(const QImage& frame, QCustomPlot* plot, double value)
+{
+    const double dpr = frame.devicePixelRatio();
+    const QRect rect = plot->axisRect()->rect();
+    const int row = qRound(plot->yAxis->coordToPixel(value) * dpr);
+    for (int x = qRound(rect.left() * dpr) + 4; x <= qRound(rect.right() * dpr) - 4; ++x)
+        if (frame.pixelColor(x, row) != QColor(Qt::white))
+            return x;
+    return -1;
+}
+
+//! Pans the key axis by \a keys and reports by how much more than that the bar's left edge moved.
+//! -1 when an edge was not found.
+int leftEdgeShift(QCustomPlot* plot, const std::function<QImage()>& frame, double rowValue,
+                  double keys)
+{
+    const QImage before = frame();
+    const int left = barLeftEdge(before, plot, rowValue);
+    const double moved
+        = (plot->xAxis->coordToPixel(0) - plot->xAxis->coordToPixel(keys)) * before.devicePixelRatio();
+    const QCPRange range = plot->xAxis->range();
+    plot->xAxis->setRange(range.lower + keys, range.upper + keys);
+    plot->replot();
+    for (int i = 0; i < 100 && plot->isRepaintQueued(); ++i)
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+    const int movedLeft = barLeftEdge(frame(), plot, rowValue);
+    if (left < 0 || movedLeft < 0)
+        return -1;
+    return qRound((movedLeft - left) - moved);
+}
+
+//! Two bars side by side in one group, both with a width in plot coordinates.
+void groupedPair(QCustomPlot* plot, QCPBars*& first, QCPBars*& second)
+{
+    first = new QCPBars(plot->xAxis, plot->yAxis);
+    second = new QCPBars(plot->xAxis, plot->yAxis);
+    auto* group = new QCPBarsGroup(plot); // default: an absolute spacing in pixels
+    group->append(first);
+    group->append(second);
+}
+
+//! Two bars on one key range, the second stacked on the first.
+void stackedPair(QCustomPlot* plot, QCPBars*& below, QCPBars*& above)
+{
+    below = new QCPBars(plot->xAxis, plot->yAxis);
+    above = new QCPBars(plot->xAxis, plot->yAxis);
+    above->moveAbove(below);
 }
 } // namespace
 
@@ -252,6 +303,104 @@ void TestQCPBars::containerEditRedraws()
              qPrintable(QStringLiteral("the container edit is painted as %1").arg(edited.name())));
 }
 
+void TestQCPBars::groupedBarsFollowAPan()
+{
+    // A grouped bar's position is in pixels: a pan moves it, so the recording must be remade.
+    QCPBars* first = nullptr;
+    QCPBars* second = nullptr;
+    groupedPair(mPlot, first, second);
+    for (QCPBars* bars : { first, second })
+    {
+        bars->setWidth(0.6);
+        bars->setData(QVector<double> { 2, 3 }, QVector<double> { 1, 1 });
+    }
+    mPlot->xAxis->setRange(0, 4);
+    mPlot->yAxis->setRange(0, 4);
+    mPlot->replot();
+    QVERIFY2(barLeftEdge(frameOf(mPlot), mPlot, 0.5) > 0, "the grouped bar must be painted");
+
+    const int shift = leftEdgeShift(mPlot, [this] { return frameOf(mPlot); }, 0.5, 1.0);
+    QVERIFY2(qAbs(shift) <= 1,
+             qPrintable(QStringLiteral("the grouped bar moved %1 px off the axis").arg(shift)));
+}
+
+void TestQCPBars::stackedBarsFollowAPan()
+{
+    // A stacked bar's own rect is in pixels too (stacking gap, outline): a pan moves it.
+    QCPBars* below = nullptr;
+    QCPBars* above = nullptr;
+    stackedPair(mPlot, below, above);
+    for (QCPBars* bars : { below, above })
+    {
+        bars->setWidth(0.6);
+        bars->setData(QVector<double> { 2, 3 }, QVector<double> { 1, 1 });
+    }
+    mPlot->xAxis->setRange(0, 4);
+    mPlot->yAxis->setRange(0, 4);
+    mPlot->replot();
+    QVERIFY2(barLeftEdge(frameOf(mPlot), mPlot, 1.5) > 0, "the stacked bar must be painted");
+
+    const int shift = leftEdgeShift(mPlot, [this] { return frameOf(mPlot); }, 1.5, 1.0);
+    QVERIFY2(qAbs(shift) <= 1,
+             qPrintable(QStringLiteral("the stacked bar moved %1 px off the axis").arg(shift)));
+}
+
+void TestQCPBars::groupedBarsFollowAPanOnGpu()
+{
+    QWidget host;
+    QCustomPlot* plot = shownPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    QCPBars* first = nullptr;
+    QCPBars* second = nullptr;
+    groupedPair(plot, first, second);
+    for (QCPBars* bars : { first, second })
+    {
+        bars->setWidth(0.6);
+        bars->setData(QVector<double> { 2, 3 }, QVector<double> { 1, 1 });
+    }
+    plot->xAxis->grid()->setVisible(false);
+    plot->yAxis->grid()->setVisible(false);
+    plot->xAxis->setRange(0, 4);
+    plot->yAxis->setRange(0, 4);
+    plot->replot();
+    QTRY_VERIFY(!plot->isRepaintQueued());
+    const QImage before = plot->grabFramebuffer();
+    QVERIFY2(barLeftEdge(before, plot, 0.5) > 0, "the grouped bar must be painted");
+
+    const int shift = leftEdgeShift(plot, [plot] { return plot->grabFramebuffer(); }, 0.5, 1.0);
+    QVERIFY2(qAbs(shift) <= 1,
+             qPrintable(QStringLiteral("the grouped bar moved %1 px off the axis").arg(shift)));
+}
+
+void TestQCPBars::stackedBarsFollowAPanOnGpu()
+{
+    QWidget host;
+    QCustomPlot* plot = shownPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    QCPBars* below = nullptr;
+    QCPBars* above = nullptr;
+    stackedPair(plot, below, above);
+    for (QCPBars* bars : { below, above })
+    {
+        bars->setWidth(0.6);
+        bars->setData(QVector<double> { 2, 3 }, QVector<double> { 1, 1 });
+    }
+    plot->xAxis->grid()->setVisible(false);
+    plot->yAxis->grid()->setVisible(false);
+    plot->xAxis->setRange(0, 4);
+    plot->yAxis->setRange(0, 4);
+    plot->replot();
+    QTRY_VERIFY(!plot->isRepaintQueued());
+    const QImage before = plot->grabFramebuffer();
+    QVERIFY2(barLeftEdge(before, plot, 1.5) > 0, "the stacked bar must be painted");
+
+    const int shift = leftEdgeShift(plot, [plot] { return plot->grabFramebuffer(); }, 1.5, 1.0);
+    QVERIFY2(qAbs(shift) <= 1,
+             qPrintable(QStringLiteral("the stacked bar moved %1 px off the axis").arg(shift)));
+}
+
 void TestQCPBars::plotWidthBarsNeverReRecord()
 {
     // A width in plot coordinates is a data position: a pan and a zoom both reuse the recording.
@@ -273,9 +422,10 @@ void TestQCPBars::plotWidthBarsNeverReRecord()
     QCOMPARE(bars->recordings(), recorded);
 }
 
-void TestQCPBars::pixelWidthBarsReRecordOnZoomOnly()
+void TestQCPBars::pixelWidthBarsReRecordOnEveryPan()
 {
-    // A width in pixels is baked out of the transform: a pan keeps it, a zoom does not.
+    // A width in pixels is baked out of the transform: any new transform remakes the recording,
+    // a pan included (the pixels it baked all moved).
     auto* bars = new CountingBars(mPlot->xAxis, mPlot->yAxis);
     bars->setData(QVector<double> { 1, 2, 3 }, QVector<double> { 1, 2, 3 });
     bars->setWidth(8);
@@ -287,13 +437,13 @@ void TestQCPBars::pixelWidthBarsReRecordOnZoomOnly()
     const int recorded = bars->recordings();
     QVERIFY2(recorded > 0, "the first frame must record");
 
-    mPlot->xAxis->setRange(1, 5); // a pan: the bar is still 8 pixels wide
-    mPlot->replot();
-    QCOMPARE(bars->recordings(), recorded);
-
-    mPlot->xAxis->setRange(0.5, 1.5); // a zoom: the recording would put the bar where it no longer is
+    mPlot->xAxis->setRange(1, 5); // a pan: same width, but every baked pixel moved
     mPlot->replot();
     QCOMPARE(bars->recordings(), recorded + 1);
+
+    mPlot->xAxis->setRange(0.5, 1.5); // a zoom: a new scale as well
+    mPlot->replot();
+    QCOMPARE(bars->recordings(), recorded + 2);
 }
 
 void TestQCPBars::barsSelectionReRecordsAndUsesTheDecorator()

@@ -265,6 +265,12 @@ const QCPTransform& QCPDrawContext::transform() const
     return mTransform;
 }
 
+QRectF QCPDrawContext::clip() const
+{
+    mList->transformDependent = true; // the clip is this frame's: see the doc in the header
+    return mClip;
+}
+
 const QCPTheme& QCPDrawContext::theme() const
 {
     // Theme colours are a view fact: the commands that read them must not be reused across a
