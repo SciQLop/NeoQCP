@@ -96,6 +96,7 @@ private slots:
     void errorBoundsBelowZeroOnALogAxisReachTheEdge();
     void errorBandBoundsBelowZeroOnALogAxisAreClampedLikeABaseline();
     void selectedErrorBarsUseTheSelectedPen();
+    void dashedErrorBarsAreDrawn();
     void errorBarsAreDroppedWhenABoundColumnDisappears();
     void anEmptySourceKeepsFillsAndErrorBars();
     void anEmptySourceKeepsTheComponents();

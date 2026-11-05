@@ -67,7 +67,7 @@ bool needsReextrusion(const ExtrusionCache& cache, bool freshLines, const QPen& 
 
 bool canStrokeOnGpu(const QPen& pen)
 {
-    return pen.style() != Qt::NoPen;
+    return pen.style() != Qt::NoPen && gpuCanFill(pen.brush());
 }
 
 bool gpuCanFill(const QBrush& brush)

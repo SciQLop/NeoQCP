@@ -24,8 +24,10 @@ QColor defaultPlottableColor(int index);
 /// The GPU layer a plottable on @a layer draws into, or nullptr: no QRhi, or exporting.
 QCPPlottableRhiLayer* gpuLayer(QCustomPlot* parentPlot, QCPLayer* layer, bool exporting);
 
-/// True when the GPU can stroke \a pen: every style except NoPen. A non-solid style takes the
-/// dashed pipeline, so the pen's style never changes where the line stacks.
+/// True when the GPU can stroke \a pen: a visible style whose brush is one solid colour. A
+/// non-solid style takes the dashed pipeline, so the pen's style never changes where the line
+/// stacks; a brush the GPU cannot fill (a gradient, a texture) cannot be a vertex colour, so that
+/// stroke goes through the painter instead of vanishing.
 bool canStrokeOnGpu(const QPen& pen);
 
 /// True when \a brush's colour alone can stand in for it: a solid pattern with a visible colour.

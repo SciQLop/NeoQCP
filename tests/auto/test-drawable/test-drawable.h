@@ -25,6 +25,7 @@ private slots:
     void panBuildsNoFillEither();
     void panMovesAllDataEntriesByOneDelta();
     void rasterPanKeepsImage();
+    void recordedErrorBarsAreDrawn();
     void zoomRebuildsOnce();
     void tenThousandBarsAreOneDraw();
     void gradientBarsStackAsOne();

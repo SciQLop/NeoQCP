@@ -1605,6 +1605,58 @@ void TestMultiGraph::selectedErrorBarsUseTheSelectedPen()
     QVERIFY(redNear(img, bar));
 }
 
+// The bars are a polyline like any other: a dashed pen takes the GPU dash pipeline, and a pen the
+// GPU cannot fill is rasterised. Neither may leave a gap where the bars should be.
+void TestMultiGraph::dashedErrorBarsAreDrawn()
+{
+    if (!showWithRhi(mPlot))
+        QSKIP("no exposed window with a QRhi in this environment");
+    auto* mg = errorBarGraph(mPlot, 5, 1.0);
+    mPlot->xAxis->setRange(-0.5, 4.5);
+    mPlot->yAxis->setRange(0, 10);
+    const QPen bars[] = { QPen(Qt::red, 2, Qt::DashLine), QPen(Qt::red, 2) };
+    mg->setComponentPens({ bars[0], bars[1], bars[1] });
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(mPlot->plottableRhiLayer(mg->layer())); // the GPU branch ran, not only the export one
+
+    // How many pixels of the bar over key 2, between the values 3 and 7, are inked at all: a dash
+    // pattern leaves gaps down the column, so the count is what says the bar is drawn.
+    const auto barInk = [&](const QImage& frame)
+    {
+        const double dpr = frame.devicePixelRatio();
+        const int x = qRound(mPlot->xAxis->coordToPixel(2) * dpr);
+        const int top = qRound(mPlot->yAxis->coordToPixel(7) * dpr);
+        const int bottom = qRound(mPlot->yAxis->coordToPixel(3) * dpr);
+        int ink = 0;
+        for (int y = top; y <= bottom; ++y)
+        {
+            bool hit = false;
+            for (int dx = -1; dx <= 1 && !hit; ++dx)
+            {
+                const QColor c = frame.pixelColor(QPoint(x + dx, y));
+                hit = c.red() > 150 && c.green() < 120 && c.blue() < 120;
+            }
+            ink += hit ? 1 : 0;
+        }
+        return ink;
+    };
+    const int dashed = barInk(mPlot->grabFramebuffer());
+    QVERIFY2(dashed > 5, qPrintable(QStringLiteral("a dashed error bar is not drawn: %1 pixels")
+                                        .arg(dashed)));
+
+    QLinearGradient gradient(0, 0, 0, 1);
+    gradient.setCoordinateMode(QGradient::ObjectBoundingMode);
+    gradient.setColorAt(0.0, Qt::red);
+    gradient.setColorAt(1.0, Qt::red);
+    const QPen textured(QBrush(gradient), 2);
+    mg->setComponentPens({ textured, textured, textured });
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const int filled = barInk(mPlot->grabFramebuffer());
+    QVERIFY2(filled > 5,
+             qPrintable(QStringLiteral("a pen the GPU cannot fill lost the bars: %1 pixels")
+                            .arg(filled)));
+}
+
 void TestMultiGraph::errorBarsAreDroppedWhenABoundColumnDisappears()
 {
     auto* mg = errorBarGraph(mPlot, 3, 1.0);

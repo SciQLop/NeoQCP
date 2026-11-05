@@ -665,6 +665,7 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                     // place.
                     qcpErrorBarPixels(frame, std::span<const QPointF>(*cmd.centres),
                                       std::span<const QPointF>(*cmd.spans), pixels);
+                    raster();
                     stroke(pixels, cmd.pen);
                 }
                 else if constexpr (std::is_same_v<T, qcp::MarkersCmd>)

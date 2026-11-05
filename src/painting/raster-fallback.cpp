@@ -41,6 +41,17 @@ namespace
         return double(qcp::extrusionPenWidth(pen, dpr)) / 2.0 + 1.0;
     }
 
+    //! The bounds of finite pixels in \a pixels: the NaNs between error bar runs carry nothing.
+    QRectF pixelBounds(std::span<const QPointF> pixels)
+    {
+        QRectF box;
+        for (const QPointF& pixel : pixels)
+            if (std::isfinite(pixel.x()) && std::isfinite(pixel.y()))
+                box = box.isNull() ? QRectF(pixel, QSizeF(0, 0))
+                                   : box.united(QRectF(pixel, QSizeF(0, 0)));
+        return box;
+    }
+
     //! A brush that paints nothing: no brush at all, or a solid one whose colour is transparent.
     bool brushPaintsNothing(const QBrush& brush)
     {
@@ -137,6 +148,14 @@ QRectF fallbackPixelBounds(const QCPDrawCommand& command, const QCPDrawFrame& fr
                 box = polygonOf(*cmd.points, frame).boundingRect();
                 pen = cmd.pen;
             }
+            else if constexpr (std::is_same_v<T, ErrorBarsCmd>)
+            {
+                std::vector<QPointF> pixels;
+                qcpErrorBarPixels(frame, std::span<const QPointF>(*cmd.centres),
+                                  std::span<const QPointF>(*cmd.spans), pixels);
+                box = pixelBounds(pixels);
+                pen = cmd.pen;
+            }
         },
         command);
     if (box.isEmpty())
@@ -196,6 +215,15 @@ void paintFallback(QCPPainter& painter, const QCPDrawCommand& command, const QCP
             {
                 std::vector<QPointF> pixels;
                 qcpMapDataInto(*cmd.points, frame.transform, pixels);
+                painter.setBrush(Qt::NoBrush);
+                painter.setPen(cmd.pen);
+                drawPolylineSplitNaN(&painter, pixels);
+            }
+            else if constexpr (std::is_same_v<T, ErrorBarsCmd>)
+            {
+                std::vector<QPointF> pixels;
+                qcpErrorBarPixels(frame, std::span<const QPointF>(*cmd.centres),
+                                  std::span<const QPointF>(*cmd.spans), pixels);
                 painter.setBrush(Qt::NoBrush);
                 painter.setPen(cmd.pen);
                 drawPolylineSplitNaN(&painter, pixels);

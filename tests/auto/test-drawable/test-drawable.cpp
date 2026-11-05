@@ -75,6 +75,7 @@ public:
         PixelCorner,
         MixedRect,
         FromAnchor,
+        ErrorBars, //!< three error bars in a pen no vertex colour can carry
         Raster //!< a texture-brush rect beside a long polyline: two kept runs of different kinds
     };
 
@@ -176,6 +177,15 @@ public:
                 = { QCP::DataXRatioY { 2, 0.2 }, QCP::DataXRatioY { 6, 0.2 },
                     QCP::DataXRatioY { 6, 0.8 }, QCP::DataXRatioY { 2, 0.8 } };
             context.polygon(span, QPen(Qt::black, 2), QBrush(Qt::NoBrush));
+            return;
+        }
+        if (mode == ErrorBars) // a gradient pen: the stroke has to be rasterised, not lost
+        {
+            auto centres = std::make_shared<const std::vector<QPointF>>(
+                std::vector<QPointF> { { 3, 5 }, { 5, 5 }, { 7, 5 } });
+            auto spans = std::make_shared<const std::vector<QPointF>>(
+                std::vector<QPointF> { { 0.4, 2 }, { 0.4, 2 }, { 0.4, 2 } });
+            context.errorBars(std::move(centres), std::move(spans), QPen(gradientBrush(), 2));
             return;
         }
         if (mode == Raster) // a texture-brush rect and a long polyline, kept differently
@@ -630,6 +640,26 @@ void TestDrawable::rasterPanKeepsImage()
     f.plot->replot();
     QCOMPARE(shape->rasterCount(), 1);
     QCOMPARE(QCPLineExtruder::extruderCallCount(), strokes);
+}
+
+void TestDrawable::recordedErrorBarsAreDrawn()
+{
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - the raster fallback is a GPU path");
+    auto* shape = new TestShape(f.plot.get());
+    shape->mode = TestShape::ErrorBars;
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+    const QImage frame = f.plot->grabFramebuffer();
+    // The bar over key 5 spans values 3 to 7: a gradient pen cannot be a vertex colour, so the
+    // stroke is an image. Count its ink down the bar's column.
+    int ink = 0;
+    for (int i = 0; i <= 80; ++i)
+    {
+        const QColor c = pixelAt(frame, f.plot.get(), 5.0, 3.2 + 3.6 * i / 80.0);
+        ink += c.red() + c.green() + c.blue() < 720 ? 1 : 0;
+    }
+    QVERIFY2(ink > 10, qPrintable(QStringLiteral("the error bars left no ink: %1 pixels").arg(ink)));
 }
 
 void TestDrawable::zoomRebuildsOnce()
