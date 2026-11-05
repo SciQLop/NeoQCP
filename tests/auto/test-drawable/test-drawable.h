@@ -32,4 +32,5 @@ private slots:
     void setPenReRecordsOnce();
     void setCoordsMovesTheItem();
     void selectionChangeReRecords();
+    void clickSelectsADrawnPlottable();
 };

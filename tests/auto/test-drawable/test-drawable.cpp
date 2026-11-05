@@ -201,6 +201,16 @@ public:
     //! The adapter's old virtual, which the legend calls.
     void paintIcon(QCPPainter* painter, const QRectF& rect) const { drawLegendIcon(painter, rect); }
 
+    //! The click path QCustomPlot uses: selectTest fills the details, selectEvent applies them.
+    void clickSelect(const QPointF& pos)
+    {
+        QVariant details;
+        if (selectTest(pos, true, &details) < 0)
+            return;
+        bool changed = false;
+        selectEvent(nullptr, false, details, &changed);
+    }
+
     mutable int drawCalls = 0;
     std::shared_ptr<const std::vector<QPointF>> mLine
         = std::make_shared<const std::vector<QPointF>>(
@@ -652,6 +662,21 @@ void TestDrawable::selectionChangeReRecords()
     shape->setSelected(true); // QCPAbstractItem::setSelected marks the layer, not the recording
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 2);
+}
+
+void TestDrawable::clickSelectsADrawnPlottable()
+{
+    Fixture f;
+    auto* line = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    line->setSelectable(QCP::stWhole);
+    f.plot->replot();
+    QVERIFY(!line->selected());
+
+    // A click right on the recorded line: the adapter must hand selectEvent a data selection,
+    // or it sets an empty one and the plottable stays unselected.
+    line->clickSelect(QPointF(f.plot->xAxis->coordToPixel(5), f.plot->yAxis->coordToPixel(5)));
+    QVERIFY(line->selected());
+    QCOMPARE(line->selection().dataRangeCount(), 1);
 }
 
 void TestDrawable::panKeepsPixelAndRatioCornersInPlace()

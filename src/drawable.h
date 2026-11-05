@@ -196,7 +196,7 @@ protected:
     void draw(QCPPainter* painter) final { mCore.paint(*this, *painter, view()); }
 
     double selectTest(const QPointF& pos, bool onlySelectable,
-                      QVariant* details = nullptr) const final
+                      QVariant* details = nullptr) const override
     {
         return mCore.selectTest(*this, pos, onlySelectable, details, view());
     }
@@ -217,6 +217,25 @@ public:
 
 protected:
     using QCPDrawnAdapter::drawLegendIcon; // the contract's icon stays reachable
+
+    //! A hit hands selectEvent a selection covering the whole recording.
+    //!
+    //! The recording has no per-point index to hand out: selectEvent only needs a non-empty
+    //! QCPDataSelection, and without one it sets an empty selection and the click selects nothing.
+    double selectTest(const QPointF& pos, bool onlySelectable,
+                      QVariant* details = nullptr) const override
+    {
+        const double hit = QCPDrawnBase<Base>::selectTest(pos, onlySelectable, details);
+        if (hit < 0 || !details)
+            return hit;
+        if (details->isValid() && !details->value<QCPDataSelection>().isEmpty())
+            return hit;
+        int count = 1;
+        if constexpr (requires { this->dataCount(); })
+            count = this->dataCount();
+        *details = QVariant::fromValue(QCPDataSelection(QCPDataRange(0, count)));
+        return hit;
+    }
 
     QCPRange getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain) const override
     {

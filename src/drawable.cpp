@@ -507,7 +507,10 @@ std::optional<double> QCPDrawnCore::hitTest(const QCPDrawable& object, QCP::Pixe
         best = std::min(best, distanceTo(command, frame, point));
     if (!(best <= tolerance))
         return std::nullopt;
-    return best;
+    // A distance is never negative: distanceTo() subtracts the stroke's half width, so a click
+    // inside the stroke came out below zero, and the callers (the layerable selectTest contract)
+    // reject a negative distance as a miss.
+    return std::max(0.0, best);
 }
 
 double QCPDrawnCore::selectTest(const QCPDrawable& object, const QPointF& pos, bool onlySelectable,
