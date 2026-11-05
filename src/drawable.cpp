@@ -260,10 +260,12 @@ struct QCPDrawnCore::State
     quint64 generation = 0;
     quint64 recordedGeneration = 0;
     quint64 recordedEpoch = 0;
+    quint64 recordedItemsEpoch = 0;
     quint64 iconGeneration = 0;
     int recordings = 0;
     bool recorded = false;
     bool viewDependent = false;
+    bool anchorDependent = false;
     bool iconRecorded = false;
     bool insideDraw = false;
     bool reportedMissingAxis = false;
@@ -397,8 +399,10 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
     }
     mState->reportedMissingAxis = false;
     const quint64 epoch = view.plot ? view.plot->viewEpoch() : 0;
+    const quint64 itemsEpoch = view.plot ? view.plot->itemsEpoch() : 0;
     const bool stale = !mState->recorded || mState->recordedGeneration != mState->generation
-        || (mState->viewDependent && mState->recordedEpoch != epoch);
+        || (mState->viewDependent && mState->recordedEpoch != epoch)
+        || (mState->anchorDependent && mState->recordedItemsEpoch != itemsEpoch);
     if (!stale)
         return true;
     QCPDrawContext context(view.keyAxis, view.valueAxis, view.axisRect, view.theme);
@@ -406,8 +410,10 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
     object.draw(context);
     mState->recording = context.drawList();
     mState->viewDependent = usesTheView(mState->recording);
+    mState->anchorDependent = mState->recording.anchorDependent;
     mState->recordedGeneration = mState->generation;
     mState->recordedEpoch = epoch;
+    mState->recordedItemsEpoch = itemsEpoch;
     mState->recorded = true;
     ++mState->recordings;
     return true;

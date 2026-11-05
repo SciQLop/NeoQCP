@@ -10,6 +10,8 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <type_traits>
+#include <variant>
 
 namespace
 {
@@ -131,9 +133,46 @@ QCPDataBox boxOf(const Extent& extent)
                         extent.valueBounded ? extent.valueUpper : Limit::infinity() };
 }
 
+bool holdsAnchor(const QCP::Position& position)
+{
+    return std::holds_alternative<QCP::AnchorOffset>(position);
+}
+
+bool anyAnchor(std::span<const QCP::Position> positions)
+{
+    return std::any_of(positions.begin(), positions.end(),
+                       [](const QCP::Position& position) { return holdsAnchor(position); });
+}
+
+//! True when a command names a QCP::AnchorOffset, which an item owns and may take away.
+bool holdsAnchor(const qcp::QCPDrawCommand& command)
+{
+    return std::visit(
+        [](const auto& value) -> bool
+        {
+            using Command = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<Command, qcp::PolylinePositionsCmd>
+                          || std::is_same_v<Command, qcp::PolygonCmd>)
+                return anyAnchor(value.points);
+            else if constexpr (std::is_same_v<Command, qcp::RectCmd>
+                               || std::is_same_v<Command, qcp::EllipseCmd>
+                               || std::is_same_v<Command, qcp::ImageCmd>)
+                return holdsAnchor(value.a) || holdsAnchor(value.b);
+            else if constexpr (std::is_same_v<Command, qcp::TextCmd>)
+                return holdsAnchor(value.at);
+            else if constexpr (std::is_same_v<Command, qcp::PathCmd>)
+                return holdsAnchor(value.origin);
+            else
+                return false;
+        },
+        command);
+}
+
 //! A side is bounded only while every command so far is: one pixel or ratio command ends it.
 void record(QCPDrawList& list, qcp::QCPDrawCommand command, const Extent& extent)
 {
+    if (holdsAnchor(command))
+        list.anchorDependent = true;
     if (list.commands.empty())
         list.id = qcpNextDrawListId(); // a re-recorded list is a new recording
     if (!extent.empty)

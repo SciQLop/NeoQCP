@@ -113,9 +113,10 @@ public:
         }
         if (mode == Anchored)
         {
+            QCPItemPosition* anchor = externalAnchor ? externalAnchor : mAnchor;
             const QCP::Position corners[]
-                = { QCP::AnchorOffset { mAnchor, QCP::PixelOffset { } },
-                    QCP::AnchorOffset { mAnchor, QCP::PixelOffset { 20, 20 } } };
+                = { QCP::AnchorOffset { anchor, QCP::PixelOffset { } },
+                    QCP::AnchorOffset { anchor, QCP::PixelOffset { 20, 20 } } };
             context.polygon(corners, QPen(Qt::black), QBrush(fill));
             return;
         }
@@ -169,6 +170,8 @@ public:
     [[nodiscard]] std::optional<QCPItemExtent> extent() const { return dataExtent(); }
 
     QCPItemPosition* mAnchor = nullptr;
+    //! An anchor owned by another item, for the lifetime test.
+    QCPItemPosition* externalAnchor = nullptr;
     std::shared_ptr<const std::vector<QPointF>> mLine
         = std::make_shared<const std::vector<QPointF>>(
             std::initializer_list<QPointF> { { 1, 1 }, { 3, 5 }, { 5, 2 }, { 7, 6 }, { 9, 1 } });
@@ -779,4 +782,23 @@ void TestDrawable::panKeepsPixelAndRatioCornersInPlace()
         QVERIFY2(
             qFuzzyIsNull(entry.offsetX) && qFuzzyIsNull(entry.offsetY),
             qPrintable(QStringLiteral("entry offset %1,%2").arg(entry.offsetX).arg(entry.offsetY)));
+}
+
+void TestDrawable::removedAnchorItemDoesNotDangle()
+{
+    Fixture f;
+    auto* host = new QCPItemLine(f.plot.get());
+    host->start->setCoords(3, 3);
+    auto* shape = new TestShape(f.plot.get());
+    shape->mode = TestShape::Anchored;
+    shape->externalAnchor = host->start;
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 1);
+
+    // The recording keeps a raw anchor pointer. Removing the item that owns it must invalidate
+    // the recording: before the fix the next replay resolved a freed position (ASan UAF).
+    f.plot->removeItem(host);
+    shape->externalAnchor = shape->mAnchor; // the next recording names a live anchor
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 2);
 }

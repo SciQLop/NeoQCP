@@ -37,4 +37,5 @@ private slots:
     void selectionChangeReRecords();
     void clickSelectsADrawnPlottable();
     void clickOutsideTheAxisRectMisses();
+    void removedAnchorItemDoesNotDangle();
 };

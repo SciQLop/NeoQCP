@@ -164,6 +164,7 @@ struct QCP_LIB_DECL QCPDrawList
         valueBounded = other.valueBounded;
         hasSamples = other.hasSamples;
         viewDependent = other.viewDependent;
+        anchorDependent = other.anchorDependent;
         id = qcpNextDrawListId();
         return *this;
     }
@@ -180,6 +181,9 @@ struct QCP_LIB_DECL QCPDrawList
     //! A command read the theme (or another view fact the commands do not carry): re-record when
     //! the view epoch moves, even if the command list itself looks view-independent.
     bool viewDependent = false;
+    //! A command holds a QCP::AnchorOffset: an item owns that anchor, and removing the item
+    //! invalidates this recording even though its generation did not move.
+    bool anchorDependent = false;
     quint64 id = qcpNextDrawListId(); //!< unique: with a command's index it is a cache key
 };
 
