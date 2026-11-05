@@ -45,6 +45,67 @@ inline QRhiGraphicsPipeline::TargetBlend premultipliedAlphaBlend()
     return blend;
 }
 
+// One graphics pipeline. Every layer builds the same object and only picks its shaders, vertex
+// layout, topology and bindings, so the flags and blend live here.
+inline QRhiGraphicsPipeline* createPipeline(QRhi* rhi, QRhiRenderPassDescriptor* rpDesc,
+                                            int sampleCount, const QShader& vert,
+                                            const QShader& frag,
+                                            const QRhiVertexInputLayout& layout,
+                                            QRhiShaderResourceBindings* srb,
+                                            QRhiGraphicsPipeline::Topology topology
+                                                = QRhiGraphicsPipeline::Triangles)
+{
+    if (!vert.isValid() || !frag.isValid())
+        return nullptr;
+
+    QRhiGraphicsPipeline* pipeline = rhi->newGraphicsPipeline();
+    pipeline->setShaderStages({ { QRhiShaderStage::Vertex, vert },
+                                { QRhiShaderStage::Fragment, frag } });
+    pipeline->setVertexInputLayout(layout);
+    pipeline->setTargetBlends({ premultipliedAlphaBlend() });
+    pipeline->setFlags(QRhiGraphicsPipeline::UsesScissor);
+    pipeline->setTopology(topology);
+    pipeline->setSampleCount(sampleCount);
+    pipeline->setRenderPassDescriptor(rpDesc);
+    pipeline->setShaderResourceBindings(srb);
+    if (!pipeline->create())
+    {
+        delete pipeline;
+        return nullptr;
+    }
+    return pipeline;
+}
+
+inline QRhiGraphicsPipeline* createPipeline(QRhi* rhi, QRhiRenderPassDescriptor* rpDesc,
+                                            int sampleCount, const unsigned char* vertData,
+                                            unsigned int vertLength, const unsigned char* fragData,
+                                            unsigned int fragLength,
+                                            const QRhiVertexInputLayout& layout,
+                                            QRhiShaderResourceBindings* srb,
+                                            QRhiGraphicsPipeline::Topology topology
+                                                = QRhiGraphicsPipeline::Triangles)
+{
+    return createPipeline(rhi, rpDesc, sampleCount, loadEmbeddedShader(vertData, vertLength),
+                          loadEmbeddedShader(fragData, fragLength), layout, srb, topology);
+}
+
+// The vertex format of every extruded line: dataCoord, colour, extrudeDir, extrudeWidth, isPixel.
+inline constexpr int kStrokeFloatsPerVertex = 11;
+
+inline QRhiVertexInputLayout strokeVertexLayout()
+{
+    QRhiVertexInputLayout layout;
+    layout.setBindings({ { quint32(kStrokeFloatsPerVertex) * quint32(sizeof(float)) } });
+    layout.setAttributes({
+        {0, 0, QRhiVertexInputAttribute::Float2, 0},
+        {0, 1, QRhiVertexInputAttribute::Float4, 2 * sizeof(float)},
+        {0, 2, QRhiVertexInputAttribute::Float2, 6 * sizeof(float)},
+        {0, 3, QRhiVertexInputAttribute::Float, 8 * sizeof(float)},
+        {0, 4, QRhiVertexInputAttribute::Float2, 9 * sizeof(float)},
+    });
+    return layout;
+}
+
 // QRhiScissor always uses bottom-left origin (OpenGL convention).
 // D3D11/Vulkan/Metal backends convert to top-left internally.
 inline QRect computeScissor(const QRect& clip, double dpr, int outputHeight)

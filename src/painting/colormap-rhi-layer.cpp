@@ -130,32 +130,6 @@ void QCPColormapRhiLayer::clearContourLines()
 
 // ── Pipeline creation ───────────────────────────────────────────────────────
 
-static QRhiGraphicsPipeline* buildPipeline(
-    QRhi* rhi, const QRhiShaderStage& vert, const QRhiShaderStage& frag,
-    QRhiShaderResourceBindings* layoutSrb,
-    QRhiRenderPassDescriptor* rpDesc, int sampleCount,
-    QRhiGraphicsPipeline::Topology topology,
-    const QRhiVertexInputLayout& inputLayout)
-{
-    auto* pl = rhi->newGraphicsPipeline();
-
-    pl->setShaderStages({vert, frag});
-    pl->setVertexInputLayout(inputLayout);
-    pl->setTargetBlends({qcp::rhi::premultipliedAlphaBlend()});
-    pl->setFlags(QRhiGraphicsPipeline::UsesScissor);
-    pl->setTopology(topology);
-    pl->setSampleCount(sampleCount);
-    pl->setRenderPassDescriptor(rpDesc);
-    pl->setShaderResourceBindings(layoutSrb);
-
-    if (!pl->create())
-    {
-        delete pl;
-        return nullptr;
-    }
-    return pl;
-}
-
 bool QCPColormapRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc,
                                           int sampleCount,
                                           QRhiBuffer* compositeUbo)
@@ -195,10 +169,9 @@ bool QCPColormapRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc,
             QRhiShaderResourceBinding::uniformBuffer(1, QRhiShaderResourceBinding::VertexStage, compositeUbo)
         });
         if (!layoutSrb->create()) { delete layoutSrb; return false; }
-        mPipeline = buildPipeline(mRhi, {QRhiShaderStage::Vertex, compositeVert},
-                                  {QRhiShaderStage::Fragment, compositeFrag},
-                                  layoutSrb, rpDesc, sampleCount,
-                                  QRhiGraphicsPipeline::TriangleStrip, inputLayout);
+        mPipeline = qcp::rhi::createPipeline(mRhi, rpDesc, sampleCount, compositeVert,
+                                       compositeFrag, inputLayout, layoutSrb,
+                                       QRhiGraphicsPipeline::TriangleStrip);
         delete layoutSrb;
         if (!mPipeline) return false;
     }
@@ -230,10 +203,8 @@ bool QCPColormapRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc,
         });
         if (!layoutSrb->create()) { delete layoutSrb; return true; }
 
-        mLinePipeline = buildPipeline(mRhi, {QRhiShaderStage::Vertex, lineVert},
-                                      {QRhiShaderStage::Fragment, lineFrag},
-                                      layoutSrb, rpDesc, sampleCount,
-                                      QRhiGraphicsPipeline::Lines, inputLayout);
+        mLinePipeline = qcp::rhi::createPipeline(mRhi, rpDesc, sampleCount, lineVert, lineFrag,
+                                           inputLayout, layoutSrb, QRhiGraphicsPipeline::Lines);
 
         // Create real SRB for draw calls
         mLineSrb = mRhi->newShaderResourceBindings();

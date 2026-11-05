@@ -16,42 +16,6 @@ QRhiVertexInputLayout vertexLayoutOf(int strideFloats,
     return layout;
 }
 
-// All three pipelines differ only in their shaders, vertex layout, topology and SRB.
-QRhiGraphicsPipeline* createGraphicsPipeline(QRhi* rhi, QRhiRenderPassDescriptor* rpDesc,
-                                             int sampleCount, const unsigned char* vertData,
-                                             unsigned int vertLength, const unsigned char* fragData,
-                                             unsigned int fragLength,
-                                             const QRhiVertexInputLayout& layout,
-                                             QRhiGraphicsPipeline::Topology topology,
-                                             QRhiShaderResourceBindings* srb, const char* name)
-{
-    const QShader vertShader = qcp::rhi::loadEmbeddedShader(vertData, vertLength);
-    const QShader fragShader = qcp::rhi::loadEmbeddedShader(fragData, fragLength);
-    if (!vertShader.isValid() || !fragShader.isValid())
-    {
-        qDebug() << "Failed to load" << name << "shaders";
-        return nullptr;
-    }
-
-    QRhiGraphicsPipeline* pipeline = rhi->newGraphicsPipeline();
-    pipeline->setShaderStages(
-        { { QRhiShaderStage::Vertex, vertShader }, { QRhiShaderStage::Fragment, fragShader } });
-    pipeline->setVertexInputLayout(layout);
-    pipeline->setTargetBlends({ qcp::rhi::premultipliedAlphaBlend() });
-    pipeline->setFlags(QRhiGraphicsPipeline::UsesScissor);
-    pipeline->setTopology(topology);
-    pipeline->setSampleCount(sampleCount);
-    pipeline->setRenderPassDescriptor(rpDesc);
-    pipeline->setShaderResourceBindings(srb);
-    if (!pipeline->create())
-    {
-        qDebug() << "Failed to create" << name << "pipeline";
-        delete pipeline;
-        return nullptr;
-    }
-    return pipeline;
-}
-
 QRhiBuffer* createUniformBuffer(QRhi* rhi, int size, const char* failure)
 {
     QRhiBuffer* buffer = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, size);
@@ -392,13 +356,13 @@ bool QCPPlottableRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc, int 
     }
 
     // Vertex layout: (x, y) float2 + (r, g, b, a) float4
-    mPipeline = createGraphicsPipeline(
+    mPipeline = qcp::rhi::createPipeline(
         mRhi, rpDesc, sampleCount, plottable_vert_qsb_data, plottable_vert_qsb_data_len,
         plottable_frag_qsb_data, plottable_frag_qsb_data_len,
         vertexLayoutOf(6,
                        { { 0, 0, QRhiVertexInputAttribute::Float2, 0 },
                          { 0, 1, QRhiVertexInputAttribute::Float4, 2 * sizeof(float) } }),
-        QRhiGraphicsPipeline::Triangles, mSrb, "plottable");
+        mSrb);
     if (!mPipeline)
         return false;
 
@@ -467,13 +431,13 @@ void QCPPlottableRhiLayer::createImagePipeline(QRhiRenderPassDescriptor* rpDesc,
     }
 
     // Vertex layout: (x, y) float2 position + (u, v) float2 texcoord
-    mImagePipeline = createGraphicsPipeline(
+    mImagePipeline = qcp::rhi::createPipeline(
         mRhi, rpDesc, sampleCount, plottable_image_vert_qsb_data, plottable_image_vert_qsb_data_len,
         plottable_image_frag_qsb_data, plottable_image_frag_qsb_data_len,
         vertexLayoutOf(4,
                        { { 0, 0, QRhiVertexInputAttribute::Float2, 0 },
                          { 0, 1, QRhiVertexInputAttribute::Float2, 2 * sizeof(float) } }),
-        QRhiGraphicsPipeline::TriangleStrip, layoutSrb, "image plottable");
+        layoutSrb, QRhiGraphicsPipeline::TriangleStrip);
     delete layoutSrb;
     if (!mImagePipeline)
         return;
@@ -552,7 +516,7 @@ void QCPPlottableRhiLayer::createDashedPipeline(QRhiRenderPassDescriptor* rpDesc
     }
 
     // Vertex layout: (x, y) float2 + (r, g, b, a) float4 + distance float
-    mDashPipeline = createGraphicsPipeline(
+    mDashPipeline = qcp::rhi::createPipeline(
         mRhi, rpDesc, sampleCount, plottable_dashed_vert_qsb_data,
         plottable_dashed_vert_qsb_data_len, plottable_dashed_frag_qsb_data,
         plottable_dashed_frag_qsb_data_len,
@@ -560,7 +524,7 @@ void QCPPlottableRhiLayer::createDashedPipeline(QRhiRenderPassDescriptor* rpDesc
                        { { 0, 0, QRhiVertexInputAttribute::Float2, 0 },
                          { 0, 1, QRhiVertexInputAttribute::Float4, 2 * sizeof(float) },
                          { 0, 2, QRhiVertexInputAttribute::Float, 6 * sizeof(float) } }),
-        QRhiGraphicsPipeline::Triangles, mDashSrb, "dashed plottable");
+        mDashSrb);
     if (!mDashPipeline)
         return;
     mDashBroken = false;

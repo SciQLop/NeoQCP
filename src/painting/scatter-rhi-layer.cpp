@@ -235,12 +235,6 @@ bool QCPScatterRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc,
     if (!mSrb->create())
         return false;
 
-    mPipeline = mRhi->newGraphicsPipeline();
-    mPipeline->setShaderStages({
-        {QRhiShaderStage::Vertex, vertShader},
-        {QRhiShaderStage::Fragment, fragShader}
-    });
-
     // Vertex layout: binding 0 = quad corners (PerVertex), binding 1 = instance data (PerInstance)
     QRhiVertexInputLayout inputLayout;
     inputLayout.setBindings({
@@ -251,20 +245,12 @@ bool QCPScatterRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc,
         {0, 0, QRhiVertexInputAttribute::Float2, 0},   // cornerOffset
         {1, 1, QRhiVertexInputAttribute::Float3, 0}    // instanceData
     });
-    mPipeline->setVertexInputLayout(inputLayout);
 
-    mPipeline->setTargetBlends({qcp::rhi::premultipliedAlphaBlend()});
-    mPipeline->setFlags(QRhiGraphicsPipeline::UsesScissor);
-    mPipeline->setTopology(QRhiGraphicsPipeline::Triangles);
-    mPipeline->setSampleCount(sampleCount);
-    mPipeline->setRenderPassDescriptor(rpDesc);
-    mPipeline->setShaderResourceBindings(mSrb);
-
-    if (!mPipeline->create())
+    mPipeline = qcp::rhi::createPipeline(mRhi, rpDesc, sampleCount, vertShader, fragShader,
+                                         inputLayout, mSrb);
+    if (!mPipeline)
     {
         qDebug() << "Failed to create scatter pipeline";
-        delete mPipeline;
-        mPipeline = nullptr;
         return false;
     }
 
@@ -330,18 +316,6 @@ bool QCPScatterRhiLayer::createLookResources(Look& look, QRhiResourceUpdateBatch
 
 bool QCPScatterRhiLayer::createColoredPipeline(QRhiRenderPassDescriptor* rpDesc, int sampleCount)
 {
-    auto colVert = qcp::rhi::loadEmbeddedShader(scatter_colored_vert_qsb_data,
-                                                scatter_colored_vert_qsb_data_len);
-    auto colFrag = qcp::rhi::loadEmbeddedShader(scatter_colored_frag_qsb_data,
-                                                scatter_colored_frag_qsb_data_len);
-    if (!colVert.isValid() || !colFrag.isValid())
-    {
-        qDebug() << "Failed to load coloured scatter shaders";
-        return false;
-    }
-    mColoredPipeline = mRhi->newGraphicsPipeline();
-    mColoredPipeline->setShaderStages({{QRhiShaderStage::Vertex, colVert},
-                                       {QRhiShaderStage::Fragment, colFrag}});
     QRhiVertexInputLayout colLayout;
     colLayout.setBindings({
         {2 * static_cast<quint32>(sizeof(float)), QRhiVertexInputBinding::PerVertex},
@@ -353,19 +327,14 @@ bool QCPScatterRhiLayer::createColoredPipeline(QRhiRenderPassDescriptor* rpDesc,
         {1, 1, QRhiVertexInputAttribute::Float3, 0},   // instanceData
         {2, 2, QRhiVertexInputAttribute::Float4, 0}    // instanceColor
     });
-    mColoredPipeline->setVertexInputLayout(colLayout);
-    mColoredPipeline->setTargetBlends({qcp::rhi::premultipliedAlphaBlend()});
-    mColoredPipeline->setFlags(QRhiGraphicsPipeline::UsesScissor);
-    mColoredPipeline->setTopology(QRhiGraphicsPipeline::Triangles);
-    mColoredPipeline->setSampleCount(sampleCount);
-    mColoredPipeline->setRenderPassDescriptor(rpDesc);
+
     // Shares the plain pipeline's SRB: the coloured shaders use bindings 0 and 1 of it.
-    mColoredPipeline->setShaderResourceBindings(mSrb);
-    if (!mColoredPipeline->create())
+    mColoredPipeline = qcp::rhi::createPipeline(
+        mRhi, rpDesc, sampleCount, scatter_colored_vert_qsb_data, scatter_colored_vert_qsb_data_len,
+        scatter_colored_frag_qsb_data, scatter_colored_frag_qsb_data_len, colLayout, mSrb);
+    if (!mColoredPipeline)
     {
         qDebug() << "Failed to create coloured scatter pipeline";
-        delete mColoredPipeline;
-        mColoredPipeline = nullptr;
         return false;
     }
     return true;

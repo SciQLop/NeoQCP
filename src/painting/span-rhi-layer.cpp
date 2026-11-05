@@ -192,15 +192,6 @@ bool QCPSpanRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc, int sampl
 
     invalidatePipeline();
 
-    auto vertShader = qcp::rhi::loadEmbeddedShader(span_vert_qsb_data, span_vert_qsb_data_len);
-    auto fragShader = qcp::rhi::loadEmbeddedShader(plottable_frag_qsb_data, plottable_frag_qsb_data_len);
-
-    if (!vertShader.isValid() || !fragShader.isValid())
-    {
-        qDebug() << "Failed to load span shaders";
-        return false;
-    }
-
     // Layout-only UBO + SRB: the SRB defines the binding layout for the pipeline.
     // Per-group SRBs with real data are used at draw time.
     mLayoutUbo = mRhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, kUniformBufferSize);
@@ -221,37 +212,13 @@ bool QCPSpanRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc, int sampl
         return false;
     }
 
-    mPipeline = mRhi->newGraphicsPipeline();
-    mPipeline->setShaderStages({
-        {QRhiShaderStage::Vertex, vertShader},
-        {QRhiShaderStage::Fragment, fragShader}
-    });
-
-    // Vertex layout: stride = 11 * sizeof(float) = 44 bytes
-    QRhiVertexInputLayout inputLayout;
-    inputLayout.setBindings({{kFloatsPerVertex * sizeof(float)}});
-    inputLayout.setAttributes({
-        {0, 0, QRhiVertexInputAttribute::Float2, 0},                        // dataCoord
-        {0, 1, QRhiVertexInputAttribute::Float4, 2 * sizeof(float)},        // color
-        {0, 2, QRhiVertexInputAttribute::Float2, 6 * sizeof(float)},        // extrudeDir
-        {0, 3, QRhiVertexInputAttribute::Float,  8 * sizeof(float)},        // extrudeWidth
-        {0, 4, QRhiVertexInputAttribute::Float2, 9 * sizeof(float)},        // isPixel
-    });
-    mPipeline->setVertexInputLayout(inputLayout);
-
-    mPipeline->setTargetBlends({qcp::rhi::premultipliedAlphaBlend()});
-
-    mPipeline->setFlags(QRhiGraphicsPipeline::UsesScissor);
-    mPipeline->setTopology(QRhiGraphicsPipeline::Triangles);
-    mPipeline->setSampleCount(sampleCount);
-    mPipeline->setRenderPassDescriptor(rpDesc);
-    mPipeline->setShaderResourceBindings(mLayoutSrb);
-
-    if (!mPipeline->create())
+    mPipeline = qcp::rhi::createPipeline(mRhi, rpDesc, sampleCount, span_vert_qsb_data,
+                                         span_vert_qsb_data_len, plottable_frag_qsb_data,
+                                         plottable_frag_qsb_data_len,
+                                         qcp::rhi::strokeVertexLayout(), mLayoutSrb);
+    if (!mPipeline)
     {
         qDebug() << "Failed to create span pipeline";
-        delete mPipeline;
-        mPipeline = nullptr;
         return false;
     }
 
