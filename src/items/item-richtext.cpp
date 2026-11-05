@@ -30,71 +30,75 @@ void QCPItemRichText::clearHtml()
     mUseHtml = false;
 }
 
-double QCPItemRichText::selectTest(const QPointF& pos, bool onlySelectable,
-                                    [[maybe_unused]] QVariant* details) const
+std::optional<double> QCPItemRichText::hitTest(QCP::Pixels at, QVariant* details) const
 {
     if (!mUseHtml)
-        return QCPItemText::selectTest(pos, onlySelectable, details);
+        return QCPItemText::hitTest(at, details);
 
-    if (onlySelectable && !mSelectable)
-        return -1;
-
-    QPointF positionPixels(position->pixelPosition());
+    const QPointF positionPixels(position->pixelPosition());
     QTransform inputTransform;
     inputTransform.translate(positionPixels.x(), positionPixels.y());
     inputTransform.rotate(-mRotation);
     inputTransform.translate(-positionPixels.x(), -positionPixels.y());
-    QPointF rotatedPos = inputTransform.map(pos);
-
-    QRectF drawRect = computeDrawRect(positionPixels);
-    return rectDistance(drawRect, rotatedPos, true);
+    const QPointF rotatedPos = inputTransform.map(QPointF(at.x, at.y));
+    return rectDistance(computeDrawRect(positionPixels), rotatedPos, true);
 }
 
-void QCPItemRichText::draw(QCPPainter* painter)
+void QCPItemRichText::draw(QCPDrawContext& context) const
 {
     if (!mUseHtml)
     {
-        QCPItemText::draw(painter);
+        QCPItemText::draw(context);
         return;
     }
 
-    QFont currentFont = mainFont();
+    const QFont currentFont = mainFont();
     if (mDoc.defaultFont() != currentFont)
     {
         mDoc.setDefaultFont(currentFont);
         mBoundingRect = QRectF(QPointF(0, 0), mDoc.size());
     }
+    // A text document is not a draw command: it goes through the painter escape hatch, which reads
+    // its position when it runs, so a pan needs no new recording.
+    context.painter([this](QCPPainter& painter, const QCPTransform&) { drawHtml(painter); });
+}
 
-    QPointF pos(position->pixelPosition());
-    QTransform transform = painter->transform();
+/*! \internal
+
+  Draws the html document: its box, then the document's contents, turned around the position.
+*/
+void QCPItemRichText::drawHtml(QCPPainter& painter) const
+{
+    const QPointF pos(position->pixelPosition());
+    QTransform transform = painter.transform();
     transform.translate(pos.x(), pos.y());
     if (!qFuzzyIsNull(mRotation))
         transform.rotate(mRotation);
 
     QRectF textBoxRect = mBoundingRect.adjusted(-mPadding.left(), -mPadding.top(),
-                                                 mPadding.right(), mPadding.bottom());
-    QPointF drawPos = getTextDrawPoint(QPointF(0, 0), textBoxRect, mPositionAlignment);
+                                               mPadding.right(), mPadding.bottom());
+    const QPointF drawPos = getTextDrawPoint(QPointF(0, 0), textBoxRect, mPositionAlignment);
     textBoxRect.moveTopLeft(drawPos);
 
-    int clipPad = qCeil(mainPen().widthF());
-    QRectF boundingRect = textBoxRect.adjusted(-clipPad, -clipPad, clipPad, clipPad);
-    if (transform.mapRect(boundingRect).intersects(painter->transform().mapRect(clipRect())))
-    {
-        painter->setTransform(transform);
-        if ((mainBrush().style() != Qt::NoBrush && mainBrush().color().alpha() != 0)
-            || (mainPen().style() != Qt::NoPen && mainPen().color().alpha() != 0))
-        {
-            painter->setPen(mainPen());
-            painter->setBrush(mainBrush());
-            if (mCornerRadius > 0)
-                painter->drawRoundedRect(textBoxRect, mCornerRadius, mCornerRadius);
-            else
-                painter->drawRect(textBoxRect);
-        }
+    const int clipPad = qCeil(mainPen().widthF());
+    const QRectF boundingRect = textBoxRect.adjusted(-clipPad, -clipPad, clipPad, clipPad);
+    if (!transform.mapRect(boundingRect).intersects(painter.transform().mapRect(clipRect())))
+        return;
 
-        painter->translate(drawPos + QPointF(mPadding.left(), mPadding.top()));
-        mDoc.drawContents(painter);
+    painter.setTransform(transform);
+    if ((mainBrush().style() != Qt::NoBrush && mainBrush().color().alpha() != 0)
+        || (mainPen().style() != Qt::NoPen && mainPen().color().alpha() != 0))
+    {
+        painter.setPen(mainPen());
+        painter.setBrush(mainBrush());
+        if (mCornerRadius > 0)
+            painter.drawRoundedRect(textBoxRect, mCornerRadius, mCornerRadius);
+        else
+            painter.drawRect(textBoxRect);
     }
+
+    painter.translate(drawPos + QPointF(mPadding.left(), mPadding.top()));
+    mDoc.drawContents(&painter);
 }
 
 QPointF QCPItemRichText::anchorPixelPosition(int anchorId) const

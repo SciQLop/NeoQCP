@@ -99,18 +99,33 @@ QCPItemAnchor::QCPItemAnchor(QCustomPlot* parentPlot, QCPAbstractItem* parentIte
 
 QCPItemAnchor::~QCPItemAnchor()
 {
-    // unregister as parent at children:
-    for (QCPItemPosition* child : mChildrenX.values())
+    detachChildren(true);
+}
+
+/*! \internal
+
+  Detaches every position that is anchored here, so a child never keeps a dangling parent. With
+  \a keepPixelPosition the child stays where it is on screen; without it, it moves to pixel 0.
+  Detaching is done by the item that owns the anchors, before it deletes any of them, because
+  resolving the pixels a child keeps reads this item's positions.
+*/
+void QCPItemAnchor::detachChildren(bool keepPixelPosition)
+{
+    const QSet<QCPItemPosition*> childrenX = mChildrenX;
+    for (QCPItemPosition* child : childrenX)
     {
         if (child->parentAnchorX() == this)
             child->setParentAnchorX(
-                nullptr); // this acts back on this anchor and child removes itself from mChildrenX
+                nullptr, keepPixelPosition); // this acts back on this anchor and the child removes
+                                             // itself from mChildrenX
     }
-    for (QCPItemPosition* child : mChildrenY.values())
+    const QSet<QCPItemPosition*> childrenY = mChildrenY;
+    for (QCPItemPosition* child : childrenY)
     {
         if (child->parentAnchorY() == this)
             child->setParentAnchorY(
-                nullptr); // this acts back on this anchor and child removes itself from mChildrenY
+                nullptr, keepPixelPosition); // this acts back on this anchor and the child removes
+                                             // itself from mChildrenY
     }
 }
 
@@ -126,7 +141,10 @@ QPointF QCPItemAnchor::pixelPosition() const
     {
         if (mAnchorId > -1)
         {
-            return mParentItem->anchorPixelPosition(mAnchorId);
+            if (mParentItem->mDetachingAnchors) // the item is going away, and so are its virtuals
+                return mLastPixel;
+            mLastPixel = mParentItem->anchorPixelPosition(mAnchorId);
+            return mLastPixel;
         }
         else
         {
@@ -1220,6 +1238,11 @@ QCPAbstractItem::QCPAbstractItem(QCustomPlot* parentPlot)
 
 QCPAbstractItem::~QCPAbstractItem()
 {
+    // Before any of them goes away: resolving the pixels a child keeps reads our positions, which
+    // only this class's anchorPixelPosition can still do - the item's own is gone by now.
+    mDetachingAnchors = true;
+    for (QCPItemAnchor* anchor : mAnchors)
+        anchor->detachChildren(true);
     if (mRegisteredPlot)
         mRegisteredPlot->itemDestroyed(this);
     // don't delete mPositions because every position is also an anchor and thus in mAnchors

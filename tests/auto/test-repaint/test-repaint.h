@@ -89,6 +89,8 @@ private slots:
     void unusedFallbackTexturesAreReleased();
     void itemsDefaultToAnnotations();
     void textAboveGraphLine();
+    void barsStackWithTextAbove();
+    void textBorderAndBackgroundMatchTheOldLook();
     void setLayerStillWins();
 
 private:

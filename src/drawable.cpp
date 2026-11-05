@@ -130,7 +130,7 @@ double textDistance(const qcp::TextCmd& cmd, const QCPDrawFrame& frame, const QP
     QPointF local = at - qcpResolvePosition(frame, cmd.at);
     if (style.rotationDegrees != 0.0)
         local = QTransform().rotate(-style.rotationDegrees).map(local);
-    return distanceTo(QRectF(qcpTextLayout(style, cmd.text).box), local);
+    return distanceTo(QRectF(qcpTextLayout(*cmd.style, cmd.glyphSize).box), local);
 }
 
 //! The distance from \a at to one command's geometry, in pixels.
@@ -416,7 +416,7 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
     QCPDrawContext context(view.keyAxis, view.valueAxis, view.axisRect, view.theme);
     const InsideDraw drawing(mState->insideDraw);
     object.draw(context);
-    mState->recording = context.drawList();
+    mState->recording = context.takeDrawList();
     mState->viewDependent = usesTheView(mState->recording);
     mState->anchorDependent = mState->recording.anchorDependent;
     mState->transformDependent = mState->recording.transformDependent;
@@ -539,7 +539,9 @@ double QCPDrawnCore::selectTest(const QCPDrawable& object, const QPointF& pos, b
 {
     if (onlySelectable && !view.selectable)
         return -1.0;
-    return hitTest(object, QCP::Pixels { pos.x(), pos.y() }, details, view).value_or(-1.0);
+    // The object's own hit test: by default the recording's geometry, and its own rects where the
+    // recording is not what the user sees (a bar is hit inside its rect, not within a tolerance).
+    return object.hitTest(QCP::Pixels { pos.x(), pos.y() }, details).value_or(-1.0);
 }
 
 void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const QCPDrawnView& view)

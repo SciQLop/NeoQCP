@@ -199,14 +199,15 @@ public:
 
     using QCPDrawable::draw; // keep draw(QCPDrawContext&) reachable from this class
 
-protected:
-    void draw(QCPPainter* painter) final { mCore.paint(*this, *painter, view()); }
-
+    //! The base's public virtual, answered from the object's own hit test.
     double selectTest(const QPointF& pos, bool onlySelectable,
                       QVariant* details = nullptr) const override
     {
         return mCore.selectTest(*this, pos, onlySelectable, details, view());
     }
+
+protected:
+    void draw(QCPPainter* painter) final { mCore.paint(*this, *painter, view()); }
 
     //! This frame's view: the clip comes from here, since the bases keep clipRect() protected.
     [[nodiscard]] QCPDrawnView view() const override

@@ -10,6 +10,11 @@ private slots:
   
   void dataManipulation();
   void dataSharing();
+
+  void plotWidthBarsNeverReRecord();
+  void pixelWidthBarsReRecordOnZoomOnly();
+  void barsSelectionReRecordsAndUsesTheDecorator();
+  void barsPanDoesNotReRecord();
   
 private:
   QCustomPlot *mPlot;

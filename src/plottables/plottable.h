@@ -316,6 +316,7 @@ private:
     void onDebounceTimeout();
 
     friend class QCustomPlot;
+    friend class QCPSelectionDecorator; // its pen and brush are part of what a plottable draws
     friend class QCPLayer; // draw() skips a plottable without drawableAxes()
     friend class QCPAxis;
     friend class QCPPlottableLegendItem;

@@ -1,4 +1,5 @@
 #include "test-repaint.h"
+#include "axis/labelrenderer.h"
 #include "datasource/soa-multi-datasource.h"
 #include "items/item-bracket.h"
 #include "items/item-curve.h"
@@ -2323,6 +2324,119 @@ void TestRepaint::textAboveGraphLine()
                  && qAbs(atCrossing.green() - background.green()) < 40
                  && qAbs(atCrossing.blue() - background.blue()) < 40,
              qPrintable("the line is over the text: " + atCrossing.name()));
+}
+
+void TestRepaint::barsStackWithTextAbove()
+{
+    // A filled bar on the GPU pass, an item above it: the text's opaque background is what the
+    // crossing pixel shows, and the bar is still drawn beside it.
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    plot->xAxis->setRange(0, 2);
+    plot->yAxis->setRange(0, 2);
+    const QColor barColor(30, 90, 200);
+    auto* bars = new QCPBars(plot->xAxis, plot->yAxis);
+    bars->setData(QVector<double> { 1.0 }, QVector<double> { 1.6 });
+    bars->setWidth(0.8);
+    bars->setPen(Qt::NoPen);
+    bars->setBrush(barColor);
+    const QColor background(240, 200, 60);
+    auto text = plot->add<QCPItemText>();
+    text->position->setCoords(1.0, 1.0);
+    text->setText(QString());
+    text->setPositionAlignment(Qt::AlignCenter);
+    text->setBrush(background);
+    text->setPadding(QMargins(8, 8, 8, 8));
+    plot->replot();
+    waitUntilSettled(*plot);
+
+    const QImage image = screenOf(plot);
+    const double dpr = plot->bufferDevicePixelRatio();
+    const auto pixelAt = [&](double key, double value)
+    {
+        return image.pixelColor(qRound(plot->xAxis->coordToPixel(key) * dpr),
+                                qRound(plot->yAxis->coordToPixel(value) * dpr));
+    };
+    const auto near = [](const QColor& a, const QColor& b)
+    {
+        return qAbs(a.red() - b.red()) < 40 && qAbs(a.green() - b.green()) < 40
+            && qAbs(a.blue() - b.blue()) < 40;
+    };
+    QVERIFY2(near(pixelAt(1.0, 1.0), background),
+             qPrintable("the bar is over the text: " + pixelAt(1.0, 1.0).name()));
+    QVERIFY2(near(pixelAt(0.72, 1.0), barColor),
+             qPrintable("the bar is not drawn beside the text: " + pixelAt(0.72, 1.0).name()));
+}
+
+void TestRepaint::textBorderAndBackgroundMatchTheOldLook()
+{
+    // The item records one text command now; the picture must be the one its QPainter draw made:
+    // measured through the label renderer, padded, rotated about the position, border, background,
+    // glyphs on top. Drawn here by hand on the same layer, so the same painter state, and compared.
+    auto plot = std::make_unique<QCustomPlot>();
+    plot->resize(300, 200);
+    plot->xAxis->setRange(0, 1);
+    plot->yAxis->setRange(0, 1);
+    const QColor border(200, 40, 40);
+    const QColor background(240, 220, 90);
+    const QMargins padding(7, 5, 7, 5);
+    const QString words = QStringLiteral("Rotated");
+    const Qt::Alignment textAlignment = Qt::AlignTop | Qt::AlignHCenter;
+    auto item = plot->add<QCPItemText>();
+    item->position->setCoords(0.4, 0.5);
+    item->setText(words);
+    item->setPositionAlignment(Qt::AlignCenter);
+    item->setTextAlignment(textAlignment);
+    item->setPen(QPen(border, 3));
+    item->setBrush(background);
+    item->setPadding(padding);
+    item->setRotation(30);
+    plot->replot();
+    const QImage painted = plot->toPixmap(300, 200).toImage();
+
+    const QPointF position = item->position->pixelPosition();
+    const QFont font = item->font();
+    item->setVisible(false);
+    auto* hook = new DrawHook(plot.get(), QStringLiteral("annotations"));
+    hook->onPaint = [&](QCPPainter* painter)
+    {
+        painter->setAntialiasing(true);
+        painter->translate(position);
+        painter->rotate(30);
+        const QRect glyphs = QCPLabelRenderer::measureRectWith(QCPLabelRenderer::defaultRenderer(),
+                                                               font, words,
+                                                               int(Qt::TextDontClip | textAlignment));
+        QRectF box = QRectF(glyphs).adjusted(-padding.left(), -padding.top(), padding.right(),
+                                             padding.bottom());
+        const QPointF drawPoint(-box.width() / 2.0, -box.height() / 2.0); // Qt::AlignCenter
+        QRect glyphRect(glyphs);
+        glyphRect.moveTopLeft(drawPoint.toPoint() + QPoint(padding.left(), padding.top()));
+        box.moveTopLeft(drawPoint.toPoint());
+        painter->setPen(QPen(border, 3));
+        painter->setBrush(background);
+        painter->drawRect(box);
+        painter->setBrush(Qt::NoBrush);
+        QCPLabelRenderer::drawWith(QCPLabelRenderer::defaultRenderer(), painter, glyphRect, font,
+                                   Qt::black, words, int(Qt::TextDontClip | textAlignment));
+    };
+    plot->replot();
+    const QImage expected = plot->toPixmap(300, 200).toImage();
+
+    const auto near = [](const QColor& a, const QColor& b)
+    {
+        return qAbs(a.red() - b.red()) <= 16 && qAbs(a.green() - b.green()) <= 16
+            && qAbs(a.blue() - b.blue()) <= 16;
+    };
+    QVERIFY2(pixelsOfColor(expected, background) > 1000, "the reference picture has no background");
+    QVERIFY2(pixelsOfColor(expected, border) > 50, "the reference picture has no border");
+    int differing = 0;
+    for (int y = 0; y < painted.height(); ++y)
+        for (int x = 0; x < painted.width(); ++x)
+            if (!near(painted.pixelColor(x, y), expected.pixelColor(x, y)))
+                ++differing;
+    QVERIFY2(differing == 0, qPrintable(QStringLiteral("%1 pixels differ").arg(differing)));
 }
 
 void TestRepaint::dashedLineStacksLikeSolid()

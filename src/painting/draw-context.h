@@ -160,6 +160,9 @@ public:
     //! The commands recorded so far, in draw order, with their data box.
     [[nodiscard]] const QCPDrawList& drawList() const;
 
+    //! The same list, moved out: a recorder that keeps it pays no copy for a whole bar chart.
+    [[nodiscard]] QCPDrawList takeDrawList();
+
     //! What a replay needs; build it once per frame.
     [[nodiscard]] QCPDrawFrame frame() const
     {

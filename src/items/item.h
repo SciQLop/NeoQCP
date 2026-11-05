@@ -65,11 +65,15 @@ protected:
     QCPAbstractItem* mParentItem;
     int mAnchorId;
     QSet<QCPItemPosition*> mChildrenX, mChildrenY;
+    //! The pixel position last reported, kept because a dying item can no longer compute one.
+    mutable QPointF mLastPixel;
 
     // introduced virtual methods:
     virtual QCPItemPosition* toQCPItemPosition() { return nullptr; }
 
     // non-virtual methods:
+    //! Detaches every position anchored here; \a keepPixelPosition leaves them where they are.
+    void detachChildren(bool keepPixelPosition);
     void addChildX(QCPItemPosition* pos); // called from pos when this anchor is set as parent
     void removeChildX(
         QCPItemPosition* pos); // called from pos when its parent anchor is reset or pos deleted
@@ -321,6 +325,8 @@ private:
     Q_DISABLE_COPY(QCPAbstractItem)
 
     QPointer<QCustomPlot> mRegisteredPlot; // the plot whose item list holds this one
+    //! True while the destructor detaches the anchors: their item has lost its virtuals.
+    bool mDetachingAnchors = false;
 
     friend class QCustomPlot;
     friend class QCPItemAnchor;

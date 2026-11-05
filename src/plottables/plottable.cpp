@@ -84,6 +84,8 @@ QCPSelectionDecorator::~QCPSelectionDecorator() { }
 void QCPSelectionDecorator::setPen(const QPen& pen)
 {
     mPen = pen;
+    if (mPlottable)
+        mPlottable->markDirty(); // the decorator paints through the plottable, which records its look
 }
 
 /*!
@@ -92,6 +94,8 @@ void QCPSelectionDecorator::setPen(const QPen& pen)
 void QCPSelectionDecorator::setBrush(const QBrush& brush)
 {
     mBrush = brush;
+    if (mPlottable)
+        mPlottable->markDirty();
 }
 
 /*!
@@ -655,6 +659,7 @@ void QCPAbstractPlottable::setSelection(QCPDataSelection selection)
     if (mSelection != selection)
     {
         mSelection = selection;
+        markDirty(); // the selection decides what a plottable draws: the next frame must not reuse the last one
         emitSelectionChanged();
     }
 }

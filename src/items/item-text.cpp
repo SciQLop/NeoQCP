@@ -25,10 +25,8 @@
 
 #include "item-text.h"
 
-#include "../axis/labelrenderer.h"
-
 #include "../core.h"
-#include "../painting/painter.h"
+#include "../painting/draw-commands.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPItemText
@@ -56,7 +54,7 @@
   ownership of the item, so do not delete it manually but use QCustomPlot::removeItem() instead.
 */
 QCPItemText::QCPItemText(QCustomPlot* parentPlot)
-        : QCPAbstractItem(parentPlot)
+        : QCPDrawn<QCPAbstractItem>(parentPlot)
         , position(createPosition(QLatin1String("position")))
         , topLeft(createAnchor(QLatin1String("topLeft"), aiTopLeft))
         , top(createAnchor(QLatin1String("top"), aiTop))
@@ -258,85 +256,80 @@ void QCPItemText::setPadding(const QMargins& padding)
 }
 
 /* inherits documentation from base class */
-double QCPItemText::selectTest(const QPointF& pos, bool onlySelectable,
-                               [[maybe_unused]] QVariant* details) const
+/* inherits documentation from base class */
+void QCPItemText::setPosition(const QCP::Position& position)
 {
-    if (onlySelectable && !mSelectable)
-        return -1;
+    this->position->set(position);
+}
 
-    // The rect may be rotated, so we transform the actual clicked pos to the rotated
-    // coordinate system, so we can use the normal rectDistance function for non-rotated rects:
-    QPointF positionPixels(position->pixelPosition());
-    QTransform inputTransform;
-    inputTransform.translate(positionPixels.x(), positionPixels.y());
-    inputTransform.rotate(-mRotation);
-    inputTransform.translate(-positionPixels.x(), -positionPixels.y());
-    QPointF rotatedPos = inputTransform.map(pos);
-    QRect textRect = QCPLabelRenderer::measureRectWith(
-        QCPLabelRenderer::defaultRenderer(), mFont, mText, Qt::TextDontClip | mTextAlignment);
-    // Floating point: an item anchored far outside the view is beyond int range (SciQLop#151).
-    QRectF textBoxRect = QRectF(textRect).adjusted(-mPadding.left(), -mPadding.top(),
-                                                   mPadding.right(), mPadding.bottom());
-    textBoxRect.moveTopLeft(getTextDrawPoint(positionPixels, textBoxRect, mPositionAlignment));
+/*! \internal
 
-    return rectDistance(textBoxRect, rotatedPos, true);
+  What the item draws, what its hit test measures and where its anchors sit: one style, so the
+  three cannot disagree. The selected variants win while the item is selected.
+*/
+QCPTextStyle QCPItemText::textStyle() const
+{
+    QCPTextStyle style;
+    style.font = mainFont();
+    style.color = mainColor();
+    style.pen = mainPen();
+    style.brush = mainBrush();
+    style.alignment = mPositionAlignment;
+    style.textFlags = int(Qt::TextDontClip | mTextAlignment);
+    style.rotationDegrees = mRotation;
+    style.padding = QMarginsF(mPadding);
+    style.mathText = true; // measured and drawn through the label renderer, as it always was
+    return style;
+}
+
+/*! \internal
+
+  The text box before rotation, placed as if the position were the origin: the layout puts it around
+  that point according to the position alignment, and the caller translates and rotates it.
+*/
+QRectF QCPItemText::textBoxAtOrigin() const
+{
+    return QRectF(qcpTextLayout(textStyle(), mText).box);
 }
 
 /* inherits documentation from base class */
-void QCPItemText::draw(QCPPainter* painter)
+void QCPItemText::draw(QCPDrawContext& context) const
 {
-    QPointF pos(position->pixelPosition());
-    QTransform transform = painter->transform();
-    transform.translate(pos.x(), pos.y());
-    if (!qFuzzyIsNull(mRotation))
-        transform.rotate(mRotation);
-    painter->setFont(mainFont());
-    QRect textRect = QCPLabelRenderer::measureRectWith(
-        QCPLabelRenderer::defaultRenderer(), mainFont(), mText, Qt::TextDontClip | mTextAlignment);
-    QRect textBoxRect
-        = textRect.adjusted(-mPadding.left(), -mPadding.top(), mPadding.right(), mPadding.bottom());
-    QPointF textPos
-        = getTextDrawPoint(QPointF(0, 0), textBoxRect,
-                           mPositionAlignment); // 0, 0 because the transform does the translation
-    textRect.moveTopLeft(textPos.toPoint() + QPoint(mPadding.left(), mPadding.top()));
-    textBoxRect.moveTopLeft(textPos.toPoint());
-    int clipPad = qCeil(mainPen().widthF());
-    QRect boundingRect = textBoxRect.adjusted(-clipPad, -clipPad, clipPad, clipPad);
-    if (transform.mapRect(boundingRect).intersects(painter->transform().mapRect(clipRect())))
-    {
-        painter->setTransform(transform);
-        if ((mainBrush().style() != Qt::NoBrush && mainBrush().color().alpha() != 0)
-            || (mainPen().style() != Qt::NoPen && mainPen().color().alpha() != 0))
-        {
-            painter->setPen(mainPen());
-            painter->setBrush(mainBrush());
-            painter->drawRect(textBoxRect);
-        }
-        painter->setBrush(Qt::NoBrush);
-        QCPLabelRenderer::drawWith(QCPLabelRenderer::defaultRenderer(), painter, textRect,
-                                   mainFont(), mainColor(), mText,
-                                   Qt::TextDontClip | mTextAlignment);
-    }
+    context.text(position->asPosition(), mText, textStyle());
 }
+
+/* inherits documentation from base class */
+std::optional<double> QCPItemText::hitTest(QCP::Pixels at, [[maybe_unused]] QVariant* details) const
+{
+    // The rect may be rotated, so the query point goes into the unrotated frame, where the plain
+    // rectDistance applies. An item reports its distance past the selection tolerance too: the
+    // plot decides whether it is a hit.
+    const QPointF pixels(position->pixelPosition());
+    QPointF local(at.x, at.y);
+    if (!qFuzzyIsNull(mRotation))
+    {
+        QTransform inputTransform;
+        inputTransform.translate(pixels.x(), pixels.y());
+        inputTransform.rotate(-mRotation);
+        inputTransform.translate(-pixels.x(), -pixels.y());
+        local = inputTransform.map(local);
+    }
+    QRectF box = textBoxAtOrigin();
+    box.moveTopLeft(box.topLeft() + pixels);
+    return rectDistance(box, local, true);
+}
+
 
 /* inherits documentation from base class */
 QPointF QCPItemText::anchorPixelPosition(int anchorId) const
 {
-    // get actual rect points (pretty much copied from draw function):
-    QPointF pos(position->pixelPosition());
+    // The same box the recording carries, turned around the position the same way:
+    const QPointF pos(position->pixelPosition());
     QTransform transform;
     transform.translate(pos.x(), pos.y());
     if (!qFuzzyIsNull(mRotation))
         transform.rotate(mRotation);
-    QRect textRect = QCPLabelRenderer::measureRectWith(
-        QCPLabelRenderer::defaultRenderer(), mainFont(), mText, Qt::TextDontClip | mTextAlignment);
-    QRectF textBoxRect
-        = textRect.adjusted(-mPadding.left(), -mPadding.top(), mPadding.right(), mPadding.bottom());
-    QPointF textPos
-        = getTextDrawPoint(QPointF(0, 0), textBoxRect,
-                           mPositionAlignment); // 0, 0 because the transform does the translation
-    textBoxRect.moveTopLeft(textPos.toPoint());
-    QPolygonF rectPoly = transform.map(QPolygonF(textBoxRect));
+    const QPolygonF rectPoly = transform.map(QPolygonF(textBoxAtOrigin()));
 
     switch (anchorId)
     {
@@ -368,9 +361,11 @@ QPointF QCPItemText::anchorPixelPosition(int anchorId) const
   left point of the text rect), according to the position \a pos, the text bounding box \a rect and
   the requested \a positionAlignment.
 
-  For example, if \a positionAlignment is <tt>Qt::AlignLeft | Qt::AlignBottom</tt> the returned
-  point will be shifted upward by the height of \a rect, starting from \a pos. So if the text is
-  finally drawn at that point, the lower left corner of the resulting text rect is at \a pos.
+
+/*! \internal
+
+  Returns the point the text is drawn at, given the position \a pos, the box \a rect and the
+  requested \a positionAlignment: the box's top left corner lands there.
 */
 QPointF QCPItemText::getTextDrawPoint(const QPointF& pos, const QRectF& rect,
                                       Qt::Alignment positionAlignment) const

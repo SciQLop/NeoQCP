@@ -26,7 +26,9 @@
 #ifndef QCP_ITEM_TEXT_H
 #define QCP_ITEM_TEXT_H
 
+#include "../drawable.h"
 #include "../global.h"
+#include "../painting/draw-context.h"
 #include "item.h"
 
 class QCPPainter;
@@ -35,7 +37,7 @@ class QCustomPlot;
 template <typename T, typename Self = void>
 class QCPItemTextOps;
 
-class QCP_LIB_DECL QCPItemText : public QCPAbstractItem
+class QCP_LIB_DECL QCPItemText : public QCPDrawn<QCPAbstractItem>
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
@@ -103,9 +105,8 @@ public:
     void setRotation(double degrees);
     void setPadding(const QMargins& padding);
 
-    // reimplemented virtual methods:
-    virtual double selectTest(const QPointF& pos, bool onlySelectable,
-                              QVariant* details = nullptr) const override;
+    //! Places the item, the way QCPItemPosition::set does: a QCP::Data position follows a pan.
+    void setPosition(const QCP::Position& position);
 
     QCPItemPosition* const position;
     QCPItemAnchor* const topLeft;
@@ -142,10 +143,15 @@ protected:
     QMargins mPadding;
 
     // reimplemented virtual methods:
-    virtual void draw(QCPPainter* painter) override;
+    void draw(QCPDrawContext& context) const override;
+    std::optional<double> hitTest(QCP::Pixels at, QVariant* details) const override;
     virtual QPointF anchorPixelPosition(int anchorId) const override;
 
     // non-virtual methods:
+    //! What the item draws, hit-tests and anchors with: the selected variants when selected.
+    QCPTextStyle textStyle() const;
+    //! The box around the text before rotation, placed as if the position were the origin.
+    QRectF textBoxAtOrigin() const;
     QPointF getTextDrawPoint(const QPointF& pos, const QRectF& rect,
                              Qt::Alignment positionAlignment) const;
     QFont mainFont() const;

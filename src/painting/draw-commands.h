@@ -94,19 +94,22 @@ struct ErrorBarsCmd
 
 //! Text anchored at a position. The style is shared: it carries a QFont and a QColor, which would
 //! push the command past a cache line and a half, and text commands are never hot.
-struct TextCmd
-{
-    QCP::Position at;
-    QString text;
-    std::shared_ptr<const QCPTextStyle> style;
-};
-
 //! A text command's two rects, relative to its anchor: the box (glyphs grown by the padding and
 //! placed by the style's position alignment) and the glyphs inside it.
 struct QCPTextLayout
 {
     QRect box;
     QRect glyphs;
+};
+
+struct TextCmd
+{
+    QCP::Position at;
+    QString text;
+    std::shared_ptr<const QCPTextStyle> style;
+    //! Measured once, when the command is recorded: measuring is the expensive half of a text, and
+    //! the recording outlives the frame. The layout follows from it (see qcpTextLayout).
+    QSize glyphSize;
 };
 
 //! A painter path whose origin is a position; the path is in pixels from there.
@@ -138,10 +141,17 @@ using QCPDrawCommand
                    EllipseCmd, MarkersCmd, ErrorBarsCmd, TextCmd, PathCmd, ImageCmd, PainterCmd>;
 } // namespace qcp
 
+//! The size \a text needs in \a style: the measurement a text command keeps.
+[[nodiscard]] QCP_LIB_DECL QSize qcpMeasureText(const QCPTextStyle& style, const QString& text);
+
 /*!
-  The layout of \a text in \a style, as QCPItemText has always drawn it: one place computes it, so
-  the painter replay, the hit test and an item's anchors cannot disagree.
+  The layout of glyphs of \a glyphSize in \a style, as QCPItemText has always drawn it: one place
+  computes it, so the painter replay, the hit test and an item's anchors cannot disagree.
 */
+[[nodiscard]] QCP_LIB_DECL qcp::QCPTextLayout qcpTextLayout(const QCPTextStyle& style,
+                                                            const QSize& glyphSize);
+
+//! The layout of \a text in \a style: measure, then lay out.
 [[nodiscard]] QCP_LIB_DECL qcp::QCPTextLayout qcpTextLayout(const QCPTextStyle& style,
                                                             const QString& text);
 

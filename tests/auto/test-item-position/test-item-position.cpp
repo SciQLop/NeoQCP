@@ -92,6 +92,62 @@ void TestItemPosition::absoluteRemainsWidgetRelative()
     QCOMPARE(item->position->pixelPosition(), QPointF(10, 20));
 }
 
+void TestItemPosition::textRotatedHitTest()
+{
+    // The hit test is the rotated box, not the box the text was measured in.
+    QCPItemText* item = laidOutTextItem(mPlot);
+    item->setText(QStringLiteral("abcdefgh")); // wide, so a rotation moves the corners far
+    item->position->setType(QCPItemPosition::ptAxisRectRatio);
+    item->position->setCoords(0.5, 0.5);
+    item->setPositionAlignment(Qt::AlignCenter);
+    mPlot->replot();
+
+    const QPointF centre = item->position->pixelPosition();
+    const QPointF flatCorner = item->topRight->pixelPosition();
+
+    item->setRotation(45);
+    mPlot->replot();
+    const QPointF rotatedCorner = item->topRight->pixelPosition();
+    QVERIFY2(QLineF(flatCorner, rotatedCorner).length() > 10,
+             "the rotation did not move the corner: the case proves nothing");
+
+    const auto hits = [item](const QPointF& at)
+    {
+        const double distance = item->selectTest(at, false);
+        return distance >= 0 && distance <= item->parentPlot()->selectionTolerance();
+    };
+    QVERIFY2(hits(centre + 0.9 * (rotatedCorner - centre)),
+             "a point inside the rotated box is not hit");
+    QVERIFY2(!hits(centre + 0.95 * (flatCorner - centre)),
+             "a point outside the rotated box is hit");
+}
+
+void TestItemPosition::textAnchorParentDeletedKeepsPlace()
+{
+    // The child is anchored to the parent's corner: deleting the parent must not move the child,
+    // least of all to pixel zero.
+    auto* parent = laidOutTextItem(mPlot);
+    parent->position->setType(QCPItemPosition::ptAbsolute);
+    parent->position->setCoords(120, 90);
+    parent->setText(QStringLiteral("parent"));
+
+    auto* child = new QCPItemText(mPlot);
+    child->position->setType(QCPItemPosition::ptAbsolute);
+    child->position->setParentAnchor(parent->bottomRight);
+    child->position->setCoords(5, 7); // an offset from the anchor, in pixels
+    mPlot->replot();
+    const QPointF before = child->position->pixelPosition();
+    QVERIFY2(before.x() > 100 && before.y() > 100, "the child is not where the anchor is");
+
+    mPlot->removeItem(parent); // deletes it
+    mPlot->replot();
+    const QPointF after = child->position->pixelPosition();
+    QVERIFY2(qAbs(after.x() - before.x()) <= 1.0,
+             qPrintable(QStringLiteral("x moved from %1 to %2").arg(before.x()).arg(after.x())));
+    QVERIFY2(qAbs(after.y() - before.y()) <= 1.0,
+             qPrintable(QStringLiteral("y moved from %1 to %2").arg(before.y()).arg(after.y())));
+}
+
 // SciQLop#151: an item anchored far outside the view has a pixel position beyond int range (or NaN).
 // QRect arithmetic on it overflowed, which Qt 6.11's checked QRect turns into an abort on mouse move
 // (selectTest) or on draw.

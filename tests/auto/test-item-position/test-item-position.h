@@ -14,6 +14,8 @@ private slots:
     void axisRectAbsoluteSetPixelPositionRoundTrips();
     void axisRectAbsoluteRespectsParentAnchor();
     void absoluteRemainsWidgetRelative();
+    void textRotatedHitTest();
+    void textAnchorParentDeletedKeepsPlace();
     void farOffscreenItemsDoNotOverflow_data();
     void farOffscreenItemsDoNotOverflow();
 

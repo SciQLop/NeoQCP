@@ -35,19 +35,20 @@ QPointF dataPixel(const QCPDrawFrame& frame, const QPointF& point)
     return QPointF(pixels.x, pixels.y);
 }
 
-//! Where a box of \a size sits relative to the anchor: QCPItemText::getTextDrawPoint.
+//! Where a box of \a size sits relative to the anchor: QCPItemText::getTextDrawPoint, which halves
+//! a double and rounds the point - an odd size does not truncate the same way.
 QPoint boxTopLeft(const QSize& size, Qt::Alignment alignment)
 {
-    QPoint topLeft;
+    QPointF topLeft;
     if (alignment & Qt::AlignHCenter)
-        topLeft.setX(-size.width() / 2);
+        topLeft.rx() = -size.width() / 2.0;
     else if (alignment & Qt::AlignRight)
-        topLeft.setX(-size.width());
+        topLeft.rx() = -size.width();
     if (alignment & Qt::AlignVCenter)
-        topLeft.setY(-size.height() / 2);
+        topLeft.ry() = -size.height() / 2.0;
     else if (alignment & Qt::AlignBottom)
-        topLeft.setY(-size.height());
-    return topLeft;
+        topLeft.ry() = -size.height();
+    return topLeft.toPoint();
 }
 
 const QCPLabelRenderer* textRenderer(const QCPTextStyle& style)
@@ -56,10 +57,15 @@ const QCPLabelRenderer* textRenderer(const QCPTextStyle& style)
 }
 } // namespace
 
-qcp::QCPTextLayout qcpTextLayout(const QCPTextStyle& style, const QString& text)
+QSize qcpMeasureText(const QCPTextStyle& style, const QString& text)
 {
-    QRect glyphs
-        = QCPLabelRenderer::measureRectWith(textRenderer(style), style.font, text, style.textFlags);
+    return QCPLabelRenderer::measureRectWith(textRenderer(style), style.font, text, style.textFlags)
+        .size();
+}
+
+qcp::QCPTextLayout qcpTextLayout(const QCPTextStyle& style, const QSize& glyphSize)
+{
+    QRect glyphs(QPoint(0, 0), glyphSize);
     const int left = int(std::ceil(style.padding.left()));
     const int top = int(std::ceil(style.padding.top()));
     QRect box = glyphs.adjusted(-left, -top, int(std::ceil(style.padding.right())),
@@ -68,6 +74,11 @@ qcp::QCPTextLayout qcpTextLayout(const QCPTextStyle& style, const QString& text)
     glyphs.moveTopLeft(topLeft + QPoint(left, top));
     box.moveTopLeft(topLeft);
     return { box, glyphs };
+}
+
+qcp::QCPTextLayout qcpTextLayout(const QCPTextStyle& style, const QString& text)
+{
+    return qcpTextLayout(style, qcpMeasureText(style, text));
 }
 
 namespace
@@ -80,7 +91,7 @@ void replayText(const qcp::TextCmd& cmd, QCPPainter& painter, const QCPDrawFrame
     painter.translate(qcpResolvePosition(frame, cmd.at));
     if (style.rotationDegrees != 0.0)
         painter.rotate(style.rotationDegrees);
-    const qcp::QCPTextLayout layout = qcpTextLayout(style, cmd.text);
+    const qcp::QCPTextLayout layout = qcpTextLayout(style, cmd.glyphSize);
     if (style.brush.style() != Qt::NoBrush || style.pen.style() != Qt::NoPen)
     {
         painter.setPen(style.pen);
@@ -137,6 +148,84 @@ bool isGpuKind(const qcp::QCPDrawCommand& command)
 }
 } // namespace
 
+namespace
+{
+//! How far a command's stroke reaches beyond the geometry it is given.
+double strokePad(const QPen& pen)
+{
+    return pen.style() == Qt::NoPen ? 1.0 : std::max(1.0, pen.widthF()) + 1.0;
+}
+
+//! True only when the command is provably outside \a clip: a recording may cover far more than the
+//! frame shows (a bar chart records every bar), and drawing what nobody sees costs the most.
+bool outsideClip(const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame)
+{
+    if (frame.clip.isEmpty())
+        return false;
+    return std::visit(
+        [&](const auto& cmd)
+        {
+            using Command = std::decay_t<decltype(cmd)>;
+            if constexpr (std::is_same_v<Command, qcp::RectCmd>
+                          || std::is_same_v<Command, qcp::EllipseCmd>
+                          || std::is_same_v<Command, qcp::ImageCmd>)
+            {
+                double pad = 1.0;
+                if constexpr (!std::is_same_v<Command, qcp::ImageCmd>)
+                    pad = strokePad(cmd.pen);
+                const QPointF a = qcpResolvePosition(frame, cmd.a);
+                const QPointF b = qcpResolvePosition(frame, cmd.b);
+                return !QRectF(a, b)
+                            .normalized()
+                            .adjusted(-pad, -pad, pad, pad)
+                            .intersects(frame.clip);
+            }
+            else if constexpr (std::is_same_v<Command, qcp::PolygonCmd>
+                               || std::is_same_v<Command, qcp::PolylinePositionsCmd>)
+            {
+                if (cmd.points.empty())
+                    return true;
+                QRectF box;
+                for (const QCP::Position& position : cmd.points)
+                {
+                    const QPointF point = qcpResolvePosition(frame, position);
+                    box |= QRectF(point.x(), point.y(), 0.0, 0.0);
+                }
+                const double pad = strokePad(cmd.pen);
+                return !box.normalized().adjusted(-pad, -pad, pad, pad).intersects(frame.clip);
+            }
+            else if constexpr (std::is_same_v<Command, qcp::TextCmd>)
+            {
+                QTransform transform;
+                const QPointF at = qcpResolvePosition(frame, cmd.at);
+                transform.translate(at.x(), at.y());
+                transform.rotate(cmd.style->rotationDegrees);
+                return !transform.mapRect(QRectF(qcpTextLayout(*cmd.style, cmd.glyphSize).box))
+                    .intersects(frame.clip);
+            }
+            else if constexpr (std::is_same_v<Command, qcp::MarkersCmd>)
+            {
+                if (cmd.points->empty())
+                    return true;
+                QRectF box;
+                for (const QPointF& point : *cmd.points)
+                {
+                    const QCP::Pixels pixel
+                        = frame.transform.map(QCP::Data { point.x(), point.y() });
+                    box |= QRectF(pixel.x, pixel.y, 0.0, 0.0);
+                }
+                const double pad = cmd.style.size() + 1.0;
+                return !box.normalized().adjusted(-pad, -pad, pad, pad).intersects(frame.clip);
+            }
+            else
+            {
+                return false; // a data polyline: mapping its points costs what drawing it costs
+            }
+        },
+        command);
+}
+} // namespace
+
 void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QCPDrawFrame& frame,
                           QCPReplayKinds kinds, const qcp::QCPRasterFallback* fallback)
 {
@@ -157,6 +246,8 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
                 qcp::paintFallback(painter, command, frame, qcp::strokeNeedsRaster(command));
             continue;
         }
+        if (outsideClip(command, frame))
+            continue;
         std::visit(
             [&](const auto& cmd)
             {

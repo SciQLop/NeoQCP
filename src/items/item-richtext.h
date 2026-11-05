@@ -30,21 +30,20 @@ public:
 
     QSizeF contentSize() const { return mBoundingRect.size().grownBy(mPadding); }
 
-    virtual double selectTest(const QPointF& pos, bool onlySelectable,
-                              QVariant* details = nullptr) const override;
-
 protected:
-    virtual void draw(QCPPainter* painter) override;
+    void draw(QCPDrawContext& context) const override;
+    std::optional<double> hitTest(QCP::Pixels at, QVariant* details) const override;
     virtual QPointF anchorPixelPosition(int anchorId) const override;
 
 private:
+    void drawHtml(QCPPainter& painter) const;
+    QRectF computeDrawRect(const QPointF& pos) const;
+
     QString mHtml;
-    QTextDocument mDoc;
-    QRectF mBoundingRect;
+    mutable QTextDocument mDoc;
+    mutable QRectF mBoundingRect;
     bool mUseHtml = false;
     double mCornerRadius = 0;
-
-    QRectF computeDrawRect(const QPointF& pos) const;
 };
 
 // The fluent handle of a QCPItemRichText; see QCPItemOps for the subclass contract.

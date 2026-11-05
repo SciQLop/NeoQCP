@@ -28,6 +28,7 @@
 
 #include "../axis/range.h"
 #include "../datacontainer.h"
+#include "../drawable.h"
 #include "../global.h"
 #include "../plottables/plottable1d.h"
 
@@ -159,7 +160,7 @@ using QCPBarsDataContainer = QCPDataContainer<QCPBarsData>;
 template <typename T, typename Self = void>
 class QCPBarsOps;
 
-class QCP_LIB_DECL QCPBars : public QCPAbstractPlottable1D<QCPBarsData>
+class QCP_LIB_DECL QCPBars : public QCPDrawn<QCPAbstractPlottable1D<QCPBarsData>>
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
@@ -232,8 +233,6 @@ public:
     // reimplemented virtual methods:
     virtual QCPDataSelection selectTestRect(const QRectF& rect,
                                             bool onlySelectable) const override;
-    virtual double selectTest(const QPointF& pos, bool onlySelectable,
-                              QVariant* details = nullptr) const override;
     virtual QCPRange getKeyRange(bool& foundRange,
                                  QCP::SignDomain inSignDomain = QCP::sdBoth) const override;
     virtual QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth,
@@ -250,10 +249,19 @@ protected:
     QPointer<QCPBars> mBarBelow, mBarAbove;
 
     // reimplemented virtual methods:
-    virtual void draw(QCPPainter* painter) override;
-    virtual void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
+    void draw(QCPDrawContext& context) const override;
+    void drawLegendIcon(QCPDrawContext& icon) const override;
+    std::optional<double> hitTest(QCP::Pixels at, QVariant* details) const override;
 
     // non-virtual methods:
+    void recordSegments(QCPDrawContext& context, const QList<QCPDataRange>& segments,
+                        bool selected) const;
+    void recordBar(QCPDrawContext& context, double key, double value, const QPen& pen,
+                   const QBrush& brush) const;
+    //! Whether this bar's geometry is only expressible in pixels, and so reads the transform.
+    bool hasPixelGeometry() const;
+    //! The key coordinate a bars group moves this bar by, 0 without a group.
+    double keyCoordOffset(double key) const;
     void getVisibleDataBounds(QCPBarsDataContainer::const_iterator& begin,
                               QCPBarsDataContainer::const_iterator& end) const;
     QRectF getBarRect(double key, double value) const;

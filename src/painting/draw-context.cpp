@@ -290,6 +290,11 @@ const QCPTheme& QCPDrawContext::theme() const
     return mTheme ? *mTheme : fallback;
 }
 
+QCPDrawList QCPDrawContext::takeDrawList()
+{
+    return std::move(*mList);
+}
+
 const QCPDrawList& QCPDrawContext::drawList() const
 {
     return *mList;
@@ -373,7 +378,9 @@ void QCPDrawContext::text(QCP::Position at, const QString& text, const QCPTextSt
 {
     // The glyphs extend beyond the anchor by an amount only the painter knows, so no data box can
     // describe this command: it leaves the recording unbounded.
-    record(*mList, qcp::TextCmd { at, text, std::make_shared<const QCPTextStyle>(style) },
+    record(*mList,
+           qcp::TextCmd { at, text, std::make_shared<const QCPTextStyle>(style),
+                          qcpMeasureText(style, text) },
            unboundedExtent());
 }
 

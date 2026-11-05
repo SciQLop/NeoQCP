@@ -28,7 +28,10 @@
 #include "../axis/axis.h"
 #include "../core.h"
 #include "../layoutelements/layoutelement-axisrect.h"
+#include "../painting/draw-context.h"
 #include "../painting/painter.h"
+
+#include <typeinfo>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPBarsGroup
@@ -525,7 +528,7 @@ QCPBarsData::QCPBarsData(double key, double value) : key(key), value(value) { }
   but use QCustomPlot::removePlottable() instead.
 */
 QCPBars::QCPBars(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPAbstractPlottable1D<QCPBarsData>(keyAxis, valueAxis)
+        : QCPDrawn<QCPAbstractPlottable1D<QCPBarsData>>(keyAxis, valueAxis)
         , mWidth(0.75)
         , mWidthType(wtPlotCoords)
         , mBarsGroup(nullptr)
@@ -823,34 +826,28 @@ QCPDataSelection QCPBars::selectTestRect(const QRectF& rect, bool onlySelectable
 
   \seebaseclassmethod \ref QCPAbstractPlottable::selectTest
 */
-double QCPBars::selectTest(const QPointF& pos, bool onlySelectable,
-                           [[maybe_unused]] QVariant* details) const
+std::optional<double> QCPBars::hitTest(QCP::Pixels at, QVariant* details) const
 {
-    if ((onlySelectable && mSelectable == QCP::stNone) || mDataContainer->isEmpty())
-        return -1;
-    if (!mKeyAxis || !mValueAxis)
-        return -1;
-
-    if (mKeyAxis.data()->axisRect()->rect().contains(pos.toPoint())
-        || mParentPlot->interactions().testFlag(QCP::iSelectPlottablesBeyondAxisRect))
+    if (mDataContainer->isEmpty() || !mKeyAxis || !mValueAxis)
+        return std::nullopt;
+    // A bar is hit inside its rect and nowhere else: its rect is what the user sees, and the
+    // selection tolerance does not grow it. The axis rect check is the adapter's.
+    const QPointF pos(at.x, at.y);
+    QCPBarsDataContainer::const_iterator visibleBegin, visibleEnd;
+    getVisibleDataBounds(visibleBegin, visibleEnd);
+    for (QCPBarsDataContainer::const_iterator it = visibleBegin; it != visibleEnd; ++it)
     {
-        // get visible data range:
-        QCPBarsDataContainer::const_iterator visibleBegin, visibleEnd;
-        getVisibleDataBounds(visibleBegin, visibleEnd);
-        for (QCPBarsDataContainer::const_iterator it = visibleBegin; it != visibleEnd; ++it)
+        if (getBarRect(it->key, it->value).contains(pos))
         {
-            if (getBarRect(it->key, it->value).contains(pos))
+            if (details)
             {
-                if (details)
-                {
-                    int pointIndex = int(it - mDataContainer->constBegin());
-                    details->setValue(QCPDataSelection(QCPDataRange(pointIndex, pointIndex + 1)));
-                }
-                return mParentPlot->selectionTolerance() * 0.99;
+                const int pointIndex = int(it - mDataContainer->constBegin());
+                details->setValue(QCPDataSelection(QCPDataRange(pointIndex, pointIndex + 1)));
             }
+            return mParentPlot->selectionTolerance() * 0.99;
         }
     }
-    return -1;
+    return std::nullopt;
 }
 
 /* inherits documentation from base class */
@@ -967,71 +964,119 @@ QPointF QCPBars::dataPixelPosition(int index) const
 }
 
 /* inherits documentation from base class */
-void QCPBars::draw(QCPPainter* painter)
+void QCPBars::draw(QCPDrawContext& context) const
 {
     if (!mKeyAxis || !mValueAxis)
     {
-        qDebug() << Q_FUNC_INFO << "invalid key or value axis";
+        qDebug() << Q_FUNC_INFO << "both key and value axis pointer must be set";
         return;
     }
     if (mDataContainer->isEmpty())
         return;
 
-    QCPBarsDataContainer::const_iterator visibleBegin, visibleEnd;
-    getVisibleDataBounds(visibleBegin, visibleEnd);
-
-    // loop over and draw segments of unselected/selected data:
-    QList<QCPDataRange> selectedSegments, unselectedSegments, allSegments;
+    // Every bar is recorded, visible or not: the recording outlives the visible range, and a
+    // selection change only adds the decorator's look to the bars it covers. Selected bars go last,
+    // as they always did.
+    QList<QCPDataRange> selectedSegments, unselectedSegments;
     getDataSegments(selectedSegments, unselectedSegments);
-    allSegments << unselectedSegments << selectedSegments;
-    for (int i = 0; i < allSegments.size(); ++i)
+    recordSegments(context, unselectedSegments, false);
+    recordSegments(context, selectedSegments, true);
+
+    // Only a decorator subclass draws a decoration of its own: the base class's is empty, and
+    // recording a painter callback for it would make every selection change a view change.
+    if (mSelectionDecorator && !selection().isEmpty()
+        && typeid(*mSelectionDecorator) != typeid(QCPSelectionDecorator))
     {
-        bool isSelectedSegment = i >= unselectedSegments.size();
-        QCPBarsDataContainer::const_iterator begin = visibleBegin;
-        QCPBarsDataContainer::const_iterator end = visibleEnd;
-        mDataContainer->limitIteratorsToDataRange(begin, end, allSegments.at(i));
-        if (begin == end)
-            continue;
-
-        for (QCPBarsDataContainer::const_iterator it = begin; it != end; ++it)
-        {
-            // check data validity if flag set:
-#ifdef QCUSTOMPLOT_CHECK_DATA
-            if (QCP::isInvalidData(it->key, it->value))
-                qDebug() << Q_FUNC_INFO << "Data point at" << it->key << "of drawn range invalid."
-                         << "Plottable name:" << name();
-#endif
-            // draw bar:
-            if (isSelectedSegment && mSelectionDecorator)
-            {
-                mSelectionDecorator->applyBrush(painter);
-                mSelectionDecorator->applyPen(painter);
-            }
-            else
-            {
-                painter->setBrush(mBrush);
-                painter->setPen(mPen);
-            }
-            applyDefaultAntialiasingHint(painter);
-            painter->drawPolygon(getBarRect(it->key, it->value));
-        }
+        context.painter([this](QCPPainter& painter, const QCPTransform&) {
+            mSelectionDecorator->drawDecoration(&painter, selection());
+        });
     }
+}
 
-    // draw other selection decoration that isn't just line/scatter pens and brushes:
-    if (mSelectionDecorator)
-        mSelectionDecorator->drawDecoration(painter, selection());
+/*! \internal
+
+  Records \a segments of the data container in order, each bar with the pen and brush its segment
+  draws with: the selection decorator's for a selected one.
+*/
+void QCPBars::recordSegments(QCPDrawContext& context, const QList<QCPDataRange>& segments,
+                             bool selected) const
+{
+    const QPen pen = selected && mSelectionDecorator ? mSelectionDecorator->pen() : mPen;
+    const QBrush brush = selected && mSelectionDecorator ? mSelectionDecorator->brush() : mBrush;
+    for (const QCPDataRange& segment : segments)
+    {
+        auto it = mDataContainer->constBegin() + segment.begin();
+        const auto end = it + segment.size();
+        for (; it != end; ++it)
+            recordBar(context, it->key, it->value, pen, brush);
+    }
+}
+
+/*! \internal
+
+  Records one bar: a rect between two positions when those can express its geometry, and the pixel
+  rect getBarRect gives otherwise. A bar that is not a number draws nothing and is not recorded: it
+  would only widen the box the hit test rejects points with.
+*/
+void QCPBars::recordBar(QCPDrawContext& context, double key, double value, const QPen& pen,
+                        const QBrush& brush) const
+{
+    const double base = getStackedBaseValue(key, value >= 0);
+    if (!qIsFinite(key) || !qIsFinite(value) || !qIsFinite(base))
+        return;
+    if (!hasPixelGeometry())
+    {
+        const double half = mWidth * 0.5;
+        const double centre = key + keyCoordOffset(key);
+        context.rect(QCP::Data { centre - half, base }, QCP::Data { centre + half, base + value },
+                     pen, brush);
+        return;
+    }
+    const QRectF bar = getBarRect(key, value);
+    (void)context.transform(); // the geometry is in pixels: only a pan keeps this recording good
+    context.rect(QCP::Pixels { bar.left(), bar.top() }, QCP::Pixels { bar.right(), bar.bottom() },
+                 pen, brush);
+}
+
+/*! \internal
+
+  Whether this bar's geometry can be expressed as two positions. A width, a group spacing or a
+  stacking gap given in pixels cannot, and such a bar reads the transform, so its recording is
+  remade on a zoom. A group spacing in plot coordinates is a coordinate offset on a linear axis,
+  and only there: on a log axis the same pixel offset is not a coordinate offset.
+*/
+bool QCPBars::hasPixelGeometry() const
+{
+    if (mWidthType != wtPlotCoords)
+        return true;
+    if (mBarsGroup
+        && (mBarsGroup->spacingType() != QCPBarsGroup::stPlotCoords
+            || mKeyAxis->scaleType() != QCPAxis::stLinear))
+        return true;
+    return mBarBelow && (mStackingGap != 0 || mPen != Qt::NoPen);
+}
+
+/*! \internal
+
+  The key coordinate a bars group moves this bar by, 0 without a group: the group's pixel offset
+  turned back into coordinates, which is the same offset for every key on a linear axis.
+*/
+double QCPBars::keyCoordOffset(double key) const
+{
+    if (!mBarsGroup || !mKeyAxis)
+        return 0.0;
+    const double keyPixel = mKeyAxis->coordToPixel(key);
+    return mKeyAxis->pixelToCoord(keyPixel + mBarsGroup->keyPixelOffset(this, key)) - key;
 }
 
 /* inherits documentation from base class */
-void QCPBars::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
+void QCPBars::drawLegendIcon(QCPDrawContext& icon) const
 {
-    // draw filled rect:
-    applyDefaultAntialiasingHint(painter);
-    painter->setBrush(mBrush);
-    painter->setPen(mPen);
-    QRectF r = QRectF(0, 0, rect.width() * 0.67, rect.height() * 0.67);
-    r.moveCenter(rect.center());
-    painter->drawRect(r);
+    // The icon has no data of its own, so the bar is recorded in plot coordinates and an invisible
+    // rect gives the box the replay is fitted to: the bar then covers the middle 67% of the icon,
+    // as it always did.
+    icon.rect(QCP::Data { 0.0, 0.0 }, QCP::Data { 1.0, 1.0 }, QPen(Qt::NoPen), QBrush(Qt::NoBrush));
+    icon.rect(QCP::Data { 0.165, 0.165 }, QCP::Data { 0.835, 0.835 }, mPen, mBrush);
 }
 
 /*!  \internal
