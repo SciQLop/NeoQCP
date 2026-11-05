@@ -75,8 +75,9 @@ private slots:
     void solidLinesKeepTheirVertexFormat();
     void panDoesNotMarkTheLayerDirty();
     void gpuRectFillsBeforeStroking();
-    void mergeKeepsPaintersOrder();
+    void mergeStopsAtAnUnlikeNeighbour();
     void dashesMergeOnlyWithEqualPhase();
+    void overlappingMergedBarsKeepPaintersOrder();
     void dashedUnderSolidStaysUnder();
     void textureBrushStacksLikeSolid();
     void freePolygonFillKeepsItsPlace();

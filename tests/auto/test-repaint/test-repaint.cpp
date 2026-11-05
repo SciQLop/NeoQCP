@@ -35,6 +35,7 @@
 #include <QTemporaryDir>
 #include <QtWidgets/qtestsupport_widgets.h>
 #include <algorithm>
+#include <drawable.h>
 #include <functional>
 #include <memory>
 
@@ -2614,7 +2615,7 @@ void TestRepaint::solidLinesKeepTheirVertexFormat()
 
 // A pen style must not move a plottable up or down its layer: the GPU pass has to draw the
 // submissions in the order they were added, whatever pipelines they need.
-void TestRepaint::mergeKeepsPaintersOrder()
+void TestRepaint::mergeStopsAtAnUnlikeNeighbour()
 {
     QWidget host;
     QCustomPlot* plot = shownGpuPlot(host);
@@ -2947,6 +2948,101 @@ void TestRepaint::freePolygonFillKeepsItsPlace()
     const QColor concavity = sampleAt(plot, image, 150, 175);
     QVERIFY2(concavity.red() > 200 && concavity.green() > 200 && concavity.blue() > 200,
              qPrintable(QStringLiteral("the concavity was filled: %1").arg(concavity.name())));
+}
+
+namespace
+{
+// Three overlapping "bars" as one recording: their fills and outlines are six commands, so the
+// merge has to keep the order the painter would have used.
+class OverlappingBars : public QCPDrawn<QCPAbstractItem>
+{
+public:
+    explicit OverlappingBars(QCustomPlot* plot) : QCPDrawn<QCPAbstractItem>(plot)
+    {
+        setClipAxisRect(plot->axisRect());
+        // An item with no position reports no extent, and the index then never asks it to draw.
+        createPosition(QStringLiteral("anchor"))->setCoords(45, 100);
+    }
+
+    using QCPDrawn<QCPAbstractItem>::draw;
+
+    void draw(QCPDrawContext& context) const override
+    {
+        const QColor fills[] = { QColor(210, 40, 40), QColor(40, 170, 70), QColor(210, 40, 40) };
+        for (int i = 0; i < 3; ++i)
+        {
+            const double left = 45.0 + 100.0 * i;
+            context.rect(QCP::Data { left, 100.0 }, QCP::Data { left + 150.0, 250.0 },
+                         QPen(QColor(20, 20, 20), 6), QBrush(fills[i]));
+        }
+    }
+};
+} // namespace
+
+// Three overlapping bars merge into one vertex range: the range still keeps the painter's order, so
+// a later bar's fill covers the earlier bar's outline and its own outline paints over that fill.
+void TestRepaint::overlappingMergedBarsKeepPaintersOrder()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    usePixelRanges(plot); // data units are widget pixels, so the samples below name their pixel
+
+    const QColor firstFill(210, 40, 40);
+    const QColor secondFill(40, 170, 70);
+    const QColor outline(20, 20, 20);
+    auto* bars = new OverlappingBars(plot); // widget x 45..195, 145..295, 245..395
+    plot->replot();
+    waitUntilSettled(*plot);
+
+    auto* layer = plot->plottableRhiLayer(bars->layer());
+    QVERIFY(layer);
+    // Six solid commands with the same clip, offset and alpha, their vertices one after the other:
+    // the whole stack is one submission, which is what makes its vertex order decide the pixels.
+    QCOMPARE(int(layer->drawEntries().size()), 1);
+    QVERIFY(layer->dashedDrawEntries().isEmpty());
+
+    const QImage screen = screenOf(plot);
+    const QImage exported = plot->toPixmap(400, 300).toImage();
+    const auto near = [](const QColor& a, const QColor& b)
+    {
+        return qAbs(a.red() - b.red()) <= 40 && qAbs(a.green() - b.green()) <= 40
+            && qAbs(a.blue() - b.blue()) <= 40;
+    };
+    const auto disagreement = [&](int x, int y, const QColor& expected)
+    {
+        const QColor onScreen = pixelAt(plot, screen, x, y);
+        const QColor painted = pixelAt(plot, exported, x, y);
+        if (!near(onScreen, expected) || !near(onScreen, painted))
+            return QStringLiteral("screen %1, export %2, expected %3")
+                .arg(onScreen.name(), painted.name(), expected.name());
+        return QString();
+    };
+
+    const struct
+    {
+        int x;
+        int y;
+        QColor colour;
+        const char* what;
+    } samples[] = {
+        { 195, 175, secondFill, "the second bar's fill over the first bar's outline" },
+        { 295, 175, firstFill, "the third bar's fill over the second bar's outline" },
+        { 145, 175, outline, "the second bar's outline over the first bar's fill" },
+        { 245, 175, outline, "the third bar's outline over the second bar's fill" },
+    };
+
+    for (const auto& sample : samples)
+    {
+        const QString failure = disagreement(sample.x, sample.y, sample.colour);
+        QVERIFY2(failure.isEmpty(),
+                 qPrintable(QStringLiteral("%1 at %2,%3: %4")
+                                .arg(QLatin1String(sample.what))
+                                .arg(sample.x)
+                                .arg(sample.y)
+                                .arg(failure)));
+    }
 }
 
 namespace
