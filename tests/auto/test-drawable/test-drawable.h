@@ -37,7 +37,9 @@ private slots:
     void defaultLegendIconIsTheRecordingFitted();
     void flatLineHasALegendIcon();
     void logAxisRescaleKeepsThePositivePart();
-    void panKeepsPixelAndRatioCornersInPlace();
+    void mixedCornerRectFollowsAPan();
+    void anchoredShapeFollowsItsParent();
+    void verticalSpanFollowsAnXPan();
     void setPenReRecordsOnce();
     void setCoordsMovesTheItem();
     void selectionChangeReRecords();

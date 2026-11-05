@@ -72,7 +72,9 @@ private:
   run back to the layer with one delta: no extrusion, no tessellation, no mapping. Anything else (a
   zoom, a re-record, a new device pixel ratio) rebuilds everything and keeps the result. A command
   the GPU draws as an image spoils the build: an image is not vertex geometry, so pans of that
-  recording rebuild.
+  recording rebuild. So does a recording whose geometry moves in more than one way (a ratio, an
+  anchor, a rect with one data and one pixel corner): a kept run can only be shifted by one delta
+  or not at all.
 */
 class QCPRecordingCache
 {
@@ -151,6 +153,7 @@ private:
     quint64 mList = 0;
     double mDpr = 0;
     int mHeight = 0;
+    bool mReusable = false; //!< every kept command moves alike: see beginBuild()
     bool mValid = false;
     bool mSpoiled = false;
 };

@@ -84,6 +84,67 @@ bool isDataOnlyCommand(const qcp::QCPDrawCommand& command)
         command);
 }
 
+//! True when every position of \a command is a Pixels one: it stays where it is, whatever the
+//! transform does.
+bool isStaticCommand(const qcp::QCPDrawCommand& command)
+{
+    const auto allPixels = [](const std::vector<QCP::Position>& positions)
+    {
+        return std::all_of(positions.begin(), positions.end(), [](const QCP::Position& p)
+                           { return std::holds_alternative<QCP::Pixels>(p); });
+    };
+    return std::visit(
+        [&allPixels](const auto& cmd)
+        {
+            using T = std::decay_t<decltype(cmd)>;
+            if constexpr (std::is_same_v<T, qcp::PolylinePositionsCmd>
+                          || std::is_same_v<T, qcp::PolygonCmd>)
+                return allPixels(cmd.points);
+            else if constexpr (std::is_same_v<T, qcp::RectCmd>
+                               || std::is_same_v<T, qcp::EllipseCmd>)
+                return std::holds_alternative<QCP::Pixels>(cmd.a)
+                    && std::holds_alternative<QCP::Pixels>(cmd.b);
+            else
+                return false;
+        },
+        command);
+}
+
+//! True when the GPU replay keeps no geometry for \a command: the painter draws it every frame.
+bool isPainterOnlyCommand(const qcp::QCPDrawCommand& command)
+{
+    return std::visit(
+        [](const auto& cmd)
+        {
+            using T = std::decay_t<decltype(cmd)>;
+            return std::is_same_v<T, qcp::TextCmd> || std::is_same_v<T, qcp::PathCmd>
+                || std::is_same_v<T, qcp::ImageCmd> || std::is_same_v<T, qcp::PainterCmd>;
+        },
+        command);
+}
+
+//! Whether the kept geometry of \a list may be re-emitted on a translated frame.
+//!
+//! Every command the GPU keeps must move the same way: all data (one delta shifts them all), or all
+//! pixels in a recording that never read the transform. A ratio, an anchor, or a rect with one data
+//! and one pixel corner is neither, so the whole recording is rebuilt from its commands instead of
+//! being shifted: resolved against this frame's transform it is right, shifted it is not.
+bool mayReuseGeometry(const QCPDrawList& list)
+{
+    bool allMove = true;
+    bool allStay = true;
+    bool kept = false;
+    for (const qcp::QCPDrawCommand& command : list.commands)
+    {
+        if (isPainterOnlyCommand(command))
+            continue;
+        kept = true;
+        allMove = allMove && isDataOnlyCommand(command);
+        allStay = allStay && isStaticCommand(command);
+    }
+    return !kept || allMove || (allStay && !list.transformDependent);
+}
+
 //! Strokes \a points on the layer, and keeps the triangles when the replay may re-emit them.
 void addPolyline(QCPPlottableRhiLayer& layer, std::span<const QPointF> points, const QPen& pen,
                  const QRect& clip, double dpr, int height, float alpha, bool movesWithData,
@@ -312,7 +373,7 @@ void QCPResolveCache::clear()
 bool QCPRecordingCache::reuse(const QCPDrawList& list, const QCPTransform& transform, double dpr,
                               int outputHeight, const QRect& clip, QPointF* delta)
 {
-    const bool same = mValid && list.id == mList && qFuzzyCompare(dpr, mDpr)
+    const bool same = mReusable && mValid && list.id == mList && qFuzzyCompare(dpr, mDpr)
         && outputHeight == mHeight && clip == mClip && transform.isTranslationOf(mTransform, delta);
     if (!same)
         mValid = false;
@@ -326,6 +387,7 @@ void QCPRecordingCache::beginBuild(const QCPDrawList& list, const QCPTransform& 
     mSolidRuns.clear();
     mDashed.clear();
     mDashedRuns.clear();
+    mReusable = mayReuseGeometry(list); // once, at build time: not on every pan frame
     mList = list.id;
     mTransform = transform;
     mDpr = dpr;

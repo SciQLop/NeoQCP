@@ -63,6 +63,7 @@ public:
         Image,
         Ratio,
         PixelCorner,
+        MixedRect,
         FromAnchor
     };
 
@@ -126,8 +127,10 @@ public:
             QCPItemPosition* anchor = externalAnchor ? externalAnchor : mAnchor;
             const QCP::Position corners[]
                 = { QCP::AnchorOffset { anchor, QCP::PixelOffset { } },
-                    QCP::AnchorOffset { anchor, QCP::PixelOffset { 20, 20 } } };
-            context.polygon(corners, QPen(Qt::black), QBrush(fill));
+                    QCP::AnchorOffset { anchor, QCP::PixelOffset { 20, 0 } },
+                    QCP::AnchorOffset { anchor, QCP::PixelOffset { 20, 20 } },
+                    QCP::AnchorOffset { anchor, QCP::PixelOffset { 0, 20 } } };
+            context.polygon(corners, QPen(Qt::black, 4), QBrush(fill));
             return;
         }
         if (mode == Ratio) // data keys, axis-ratio values: the value side cannot be indexed
@@ -144,6 +147,12 @@ public:
             const QCP::Position corners[]
                 = { QCP::Data { at.x(), at.y() }, QCP::Data { at.x() + 1, at.y() + 1 } };
             context.polygon(corners, QPen(Qt::black), QBrush(fill));
+            return;
+        }
+        if (mode == MixedRect) // one data corner, one pixel corner, nothing beside it
+        {
+            context.rect(QCP::Data { 2, 2 }, QCP::Pixels { 50, 50 }, QPen(Qt::black, 2),
+                         QBrush(Qt::NoBrush));
             return;
         }
         if (mode == PixelCorner) // one data corner, one pixel corner; a ratio span beside it
@@ -312,6 +321,15 @@ QRect inkedBounds(const QImage& frame)
             if (frame.pixelColor(x, y) != QColor(Qt::white))
                 box = box.isNull() ? QRect(x, y, 1, 1) : box.united(QRect(x, y, 1, 1));
     return box;
+}
+
+//! Hides everything but the drawn objects, so the ink measured is theirs.
+void hideAxes(QCustomPlot* plot)
+{
+    plot->xAxis->setVisible(false);
+    plot->yAxis->setVisible(false);
+    plot->xAxis->grid()->setVisible(false);
+    plot->yAxis->grid()->setVisible(false);
 }
 
 bool isBlue(const QColor& c)
@@ -935,27 +953,91 @@ void TestDrawable::clickOutsideTheAxisRectMisses()
     QVERIFY(line->selectTestAt(outside) >= 0);
 }
 
-void TestDrawable::panKeepsPixelAndRatioCornersInPlace()
+void TestDrawable::mixedCornerRectFollowsAPan()
 {
+    // A rect with one data corner and one pixel corner cannot be re-emitted with one delta. This
+    // replaces the offset assertion the old test made (every entry at offset zero) with the pixels
+    // the user sees: the data corner follows the axis, the pixel corner stays where it is.
     Fixture f;
     if (!f.hasRhi())
         QSKIP("No QRhi available - the kept triangles are a GPU path only");
+    hideAxes(f.plot.get());
     auto* shape = new TestShape(f.plot.get());
-    shape->mode = TestShape::PixelCorner;
-    f.plot->replot();
+    shape->mode = TestShape::MixedRect; // data (2, 2) to pixel (50, 50)
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+    const QRect before = inkedBounds(f.plot->grabFramebuffer());
+    const double corner = f.plot->yAxis->coordToPixel(2.0);
+    QVERIFY2(!before.isNull(), "the rect must be painted");
 
-    // A pan moves only data-space positions. The pixel corner and the ratio span stay put, so
-    // their triangles cannot be kept and shifted: they must be extruded again at offset zero.
-    f.plot->yAxis->setRange(2, 12);
-    f.plot->replot();
+    f.plot->yAxis->setRange(2, 12); // a pan: only the data corner's pixels move
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+    const QRect after = inkedBounds(f.plot->grabFramebuffer());
+    const double moved = f.plot->yAxis->coordToPixel(2.0) - corner;
+    QVERIFY2(qAbs((after.bottom() - before.bottom()) - moved) <= 2,
+             qPrintable(QStringLiteral("the data corner moved %1 px, the axis %2 px")
+                            .arg(after.bottom() - before.bottom())
+                            .arg(moved)));
+    QVERIFY2(qAbs(after.top() - before.top()) <= 1,
+             qPrintable(QStringLiteral("the pixel corner moved %1 px").arg(after.top() - before.top())));
+}
 
-    auto* layer = f.plot->plottableRhiLayer(shape->layer());
-    QVERIFY(layer);
-    QVERIFY(!layer->drawEntries().isEmpty());
-    for (const auto& entry : layer->drawEntries())
-        QVERIFY2(
-            qFuzzyIsNull(entry.offsetX) && qFuzzyIsNull(entry.offsetY),
-            qPrintable(QStringLiteral("entry offset %1,%2").arg(entry.offsetX).arg(entry.offsetY)));
+void TestDrawable::anchoredShapeFollowsItsParent()
+{
+    // An anchored position is resolved from the item it hangs on: moving that item must move the
+    // shape, with no pan and no re-record to help.
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - the kept triangles are a GPU path only");
+    hideAxes(f.plot.get());
+    auto* host = new QCPItemLine(f.plot.get());
+    host->setPen(QPen(Qt::NoPen)); // the anchor's item must not be part of the ink
+    host->start->setCoords(3, 3);
+    auto* shape = new TestShape(f.plot.get());
+    shape->mode = TestShape::Anchored; // a quad at the anchor, 20 px across
+    shape->externalAnchor = host->start;
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+    const QRect before = inkedBounds(f.plot->grabFramebuffer());
+    QVERIFY2(!before.isNull(), "the anchored shape must be painted");
+
+    host->start->setCoords(6, 6);
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+    const QRect after = inkedBounds(f.plot->grabFramebuffer());
+    const QPointF moved(f.plot->xAxis->coordToPixel(6) - f.plot->xAxis->coordToPixel(3),
+                        f.plot->yAxis->coordToPixel(6) - f.plot->yAxis->coordToPixel(3));
+    QVERIFY2(qAbs((after.left() - before.left()) - moved.x()) <= 2,
+             qPrintable(QStringLiteral("the shape moved %1 px, the anchor %2 px")
+                            .arg(after.left() - before.left())
+                            .arg(moved.x())));
+    QVERIFY2(qAbs((after.top() - before.top()) - moved.y()) <= 2,
+             qPrintable(QStringLiteral("the shape moved %1 px, the anchor %2 px")
+                            .arg(after.top() - before.top())
+                            .arg(moved.y())));
+}
+
+void TestDrawable::verticalSpanFollowsAnXPan()
+{
+    // A span with data keys and ratio values: an x pan moves its sides, not its top or bottom.
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - the kept triangles are a GPU path only");
+    hideAxes(f.plot.get());
+    auto* shape = new TestShape(f.plot.get());
+    shape->mode = TestShape::Ratio; // keys 2 to 6, values 0.2 to 0.8 of the axis rect
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+    const QRect before = inkedBounds(f.plot->grabFramebuffer());
+    const double edge = f.plot->xAxis->coordToPixel(2.0);
+    QVERIFY2(!before.isNull(), "the span must be painted");
+
+    f.plot->xAxis->setRange(1, 11); // a pan
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+    const QRect after = inkedBounds(f.plot->grabFramebuffer());
+    const double moved = f.plot->xAxis->coordToPixel(2.0) - edge;
+    QVERIFY2(qAbs((after.left() - before.left()) - moved) <= 2,
+             qPrintable(QStringLiteral("the span's side moved %1 px, the axis %2 px")
+                            .arg(after.left() - before.left())
+                            .arg(moved)));
+    QVERIFY2(qAbs(after.top() - before.top()) <= 1, "the ratio side moved");
+    QVERIFY2(qAbs(after.bottom() - before.bottom()) <= 1, "the ratio side moved");
 }
 
 void TestDrawable::pannedTimeAxisKeepsTheShapeOnAxis()
@@ -963,10 +1045,7 @@ void TestDrawable::pannedTimeAxisKeepsTheShapeOnAxis()
     Fixture f;
     if (!f.hasRhi())
         QSKIP("No QRhi available - the kept triangles are a GPU path only");
-    f.plot->xAxis->setVisible(false); // only the shape's ink is measured
-    f.plot->yAxis->setVisible(false);
-    f.plot->xAxis->grid()->setVisible(false);
-    f.plot->yAxis->grid()->setVisible(false);
+    hideAxes(f.plot.get()); // only the shape's ink is measured
     const double start = 1.7e9;
     const double span = 99.9;
     f.plot->xAxis->setRange(start, start + span);
