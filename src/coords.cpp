@@ -295,10 +295,6 @@ bool QCPTransform::isTranslationOf(const QCPTransform& other, QPointF* delta) co
     // two slopes to differ by a thousandth of a pixel across the visible span, which at a 1.7e9
     // epoch is tens of pixels of drift at the origin. At the range's lower corner the delta is the
     // one the visible pixels moved by.
-    // Measure the delta where the recording is, not at data (0, 0): the tolerance above allows the
-    // two slopes to differ by a thousandth of a pixel across the visible span, which at a 1.7e9
-    // epoch is tens of pixels of drift at the origin. At the range's lower corner the delta is the
-    // one the visible pixels moved by.
     const QCP::Data corner { mKey.lower, mValue.lower };
     const QCP::Pixels here = map(corner);
     const QCP::Pixels there = other.map(corner);
