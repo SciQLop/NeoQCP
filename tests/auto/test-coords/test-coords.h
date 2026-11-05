@@ -12,6 +12,7 @@ private slots:
     void batchMatchesScalar();
     void interleavedBatchMatchesScalar();
     void translationDetected();
+    void dragPanOnATimeRangeIsATranslation();
     void positionSetMatchesSetters();
     void refusedAnchorLeavesPositionUntouched();
     void anchorOffsetIsPixelsWhateverTheOldType();

@@ -43,8 +43,8 @@ QCPTransform QCPTransform::fitted(const QCPDataBox& box, const QRectF& rect)
     QCPTransform transform;
     if (!(box.keyLower < box.keyUpper) || !(box.valueLower < box.valueUpper) || rect.isEmpty())
         return transform;
-    const auto fit = [](QCPTransform::Axis& axis, double lower, double upper, const QRectF& r,
-                        bool vertical)
+    const auto fit
+        = [](QCPTransform::Axis& axis, double lower, double upper, const QRectF& r, bool vertical)
     {
         axis.vertical = vertical;
         axis.reversed = false;
@@ -239,16 +239,18 @@ void QCPTransform::map(std::span<const double> keys, std::span<const double> val
     // compiler keeps the loop free of reloads (capturing the spans by reference cost 13 %).
     const double* __restrict k = keys.data();
     const double* __restrict v = values.data();
-    mapAny(std::min({ keys.size(), values.size(), out.size() }),
-           [k](std::size_t i) { return k[i]; }, [v](std::size_t i) { return v[i]; }, out);
+    mapAny(
+        std::min({ keys.size(), values.size(), out.size() }), [k](std::size_t i) { return k[i]; },
+        [v](std::size_t i) { return v[i]; }, out);
 }
 
 void QCPTransform::map(std::span<const QPointF> data, std::span<QPointF> out) const
 {
     // data[i].x() is the key, data[i].y() the value. out must not overlap data (restrict).
     const QPointF* __restrict d = data.data();
-    mapAny(std::min(data.size(), out.size()), [d](std::size_t i) { return d[i].x(); },
-           [d](std::size_t i) { return d[i].y(); }, out);
+    mapAny(
+        std::min(data.size(), out.size()), [d](std::size_t i) { return d[i].x(); },
+        [d](std::size_t i) { return d[i].y(); }, out);
 }
 
 bool QCPTransform::isTranslationOf(const QCPTransform& other, QPointF* delta) const
@@ -261,7 +263,13 @@ bool QCPTransform::isTranslationOf(const QCPTransform& other, QPointF* delta) co
     if (mKey.logarithmic || mValue.logarithmic || other.mKey.logarithmic
         || other.mValue.logarithmic)
         return false;
-    if (mKey.slope != other.mKey.slope || mValue.slope != other.mValue.slope)
+    // The two mappings are translations only when they have the same scale. A drag adds the same
+    // diff to both range ends, but the addition rounds, so the two spans can differ by an ulp:
+    // allow the scale to move by less than a thousandth of a pixel across the visible span
+    // (|delta slope| times the span is exactly that drift).
+    const auto sameScale = [](const Axis& a, const Axis& b)
+    { return std::abs(a.slope - b.slope) * std::abs(a.upper - a.lower) < 1e-3; };
+    if (!sameScale(mKey, other.mKey) || !sameScale(mValue, other.mValue))
         return false; // a zoom: the data-to-pixel scale changed
     const QCP::Pixels here = map(QCP::Data { 0.0, 0.0 });
     const QCP::Pixels there = other.map(QCP::Data { 0.0, 0.0 });

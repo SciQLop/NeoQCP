@@ -278,6 +278,37 @@ void TestCoords::translationDetected()
     QVERIFY(!before.isTranslationOf(QCPTransform(plot->xAxis, plot->yAxis), &delta));
 }
 
+void TestCoords::dragPanOnATimeRangeIsATranslation()
+{
+    auto plot = layoutPlot();
+    plot->yAxis->setRange(0, 10);
+
+    // A one-hour window at a 1.7e9 epoch, dragged by a tenth of its span.
+    plot->xAxis->setRange(1.7e9, 1.7e9 + 3600.0);
+    plot->replot();
+    const QCPTransform hour(plot->xAxis, plot->yAxis);
+    const double hourDiff = 0.1 * (1.7e9 + 3600.0 - 1.7e9);
+    plot->xAxis->setRange(1.7e9 + hourDiff, 1.7e9 + 3600.0 + hourDiff);
+    plot->replot();
+    QPointF delta;
+    QVERIFY2(hour.isTranslationOf(QCPTransform(plot->xAxis, plot->yAxis), &delta),
+             "a dragged hour is a translation");
+
+    // A drag adds the same diff to both ends, but the addition rounds: with a span that is not a
+    // multiple of the double grid at this epoch, the two spans differ by an ulp. The cached
+    // triangles still move by less than a thousandth of a pixel, so this is a translation too.
+    const double start = 1.7e9;
+    const double span = 1.234567890123;
+    plot->xAxis->setRange(start, start + span);
+    plot->replot();
+    const QCPTransform before(plot->xAxis, plot->yAxis);
+    const double diff = -558.2751146554947; // rounds the two spans one ulp apart
+    plot->xAxis->setRange(start + diff, start + span + diff);
+    plot->replot();
+    QVERIFY2(before.isTranslationOf(QCPTransform(plot->xAxis, plot->yAxis), &delta),
+             "a dragged time window stays a translation when its span moves by one ulp");
+}
+
 void TestCoords::positionSetMatchesSetters()
 {
     auto plot = layoutPlot();
