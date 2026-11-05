@@ -1,24 +1,20 @@
 #include "test-repaint.h"
-#include "painting/command-replay-rhi.h"
-#include "painting/draw-context.h"
-#include "painting/plottable-rhi-layer.h"
-#include "plottables/plottable-multigraph.h"
 #include "datasource/soa-multi-datasource.h"
-#include "plottables/plottable-bars.h"
 #include "items/item-bracket.h"
 #include "items/item-curve.h"
 #include "items/item-ellipse.h"
 #include "items/item-line.h"
-#include "items/item-richtext.h"
 #include "items/item-pixmap.h"
 #include "items/item-rect.h"
+#include "items/item-richtext.h"
 #include "items/item-text.h"
 #include "items/item-tracer.h"
 #include "layoutelements/layoutelement-colorscale.h"
 #include "layoutelements/layoutelement-legend.h"
 #include "layoutelements/layoutelement-textelement.h"
-#include "polar/layoutelement-angularaxis.h"
-#include "polar/polargrid.h"
+#include "painting/command-replay-rhi.h"
+#include "painting/draw-context.h"
+#include "painting/plottable-rhi-layer.h"
 #include "plottables/plottable-bars.h"
 #include "plottables/plottable-colormap.h"
 #include "plottables/plottable-colormap2.h"
@@ -28,8 +24,11 @@
 #include "plottables/plottable-graph2.h"
 #include "plottables/plottable-group.h"
 #include "plottables/plottable-histogram2d.h"
+#include "plottables/plottable-multigraph.h"
 #include "plottables/plottable-statisticalbox.h"
 #include "plottables/plottable-waterfall.h"
+#include "polar/layoutelement-angularaxis.h"
+#include "polar/polargrid.h"
 #include <QTemporaryDir>
 #include <QtWidgets/qtestsupport_widgets.h>
 #include <algorithm>
@@ -42,7 +41,7 @@ std::unique_ptr<QCustomPlot> settledPlot()
 {
     auto plot = std::make_unique<QCustomPlot>();
     plot->resize(400, 300);
-    plot->addGraph()->setData(QVector<double>{0, 10}, QVector<double>{0, 10});
+    plot->addGraph()->setData(QVector<double> { 0, 10 }, QVector<double> { 0, 10 });
     plot->graph(0)->setPen(QPen(Qt::red, 4));
     plot->xAxis->setRange(0, 10);
     plot->yAxis->setRange(0, 10);
@@ -60,6 +59,7 @@ public:
 
 protected:
     void applyDefaultAntialiasingHint(QCPPainter*) const override { }
+
     void draw(QCPPainter*) override
     {
         if (onDraw)
@@ -72,27 +72,34 @@ class PendingStub : public QCPAbstractPlottable
 {
 public:
     PendingStub(QCPAxis* k, QCPAxis* v) : QCPAbstractPlottable(k, v) { }
+
     int commits = 0;
 
     bool hasPendingData() const override { return commits == 0; }
+
     bool commitPendingData() override
     {
         ++commits;
         return true;
     }
+
     double selectTest(const QPointF&, bool, QVariant* = nullptr) const override { return -1; }
+
     QCPRange getKeyRange(bool& found, QCP::SignDomain = QCP::sdBoth) const override
     {
         found = false;
-        return {};
+        return { };
     }
+
     QCPRange getValueRange(bool& found, QCP::SignDomain = QCP::sdBoth,
                            const QCPRange& = QCPRange()) const override
     {
         found = false;
-        return {};
+        return { };
     }
+
     void draw(QCPPainter*) override { }
+
     void drawLegendIcon(QCPPainter*, const QRectF&) const override { }
 };
 
@@ -101,6 +108,7 @@ class NoContentStub : public PendingStub
 {
 public:
     using PendingStub::PendingStub;
+
     bool canProduceContent() const override { return false; }
 };
 
@@ -110,8 +118,11 @@ class FillStub : public PendingStub
 public:
     using PendingStub::PendingStub;
     QPointF stall;
+
     bool hasPendingData() const override { return false; }
+
     QPointF stallPixelOffset() const override { return stall; }
+
     void draw(QCPPainter* painter) override
     {
         painter->fillRect(mKeyAxis->axisRect()->rect(), pen().color());
@@ -160,11 +171,15 @@ QImage exportWith(QCustomPlot& plot, const QString& how, const QString& dir)
         return pixmap.toImage();
     }
     [[maybe_unused]] const bool saved = plot.savePdf(dir + QStringLiteral("/plot.pdf"), 400, 300);
-    return {}; // the caller checks the file
+    return { }; // the caller checks the file
 }
 
 int gMisuses = 0;
-void countMisuse(const char*, const char*) { ++gMisuses; }
+
+void countMisuse(const char*, const char*)
+{
+    ++gMisuses;
+}
 } // namespace
 
 void TestRepaint::markDirtySchedulesOneRepaint()
@@ -203,7 +218,7 @@ void TestRepaint::dirtyAfterDrawRepaintsNextTurn()
     for (int i = 0; i < 3; ++i)
         QCoreApplication::processEvents();
     QCOMPARE(count, 2);
-    QCOMPARE(replottingAtEntry, (QList<bool>{false, false}));
+    QCOMPARE(replottingAtEntry, (QList<bool> { false, false }));
     const QImage screen = screenOf(plot.get());
     QVERIFY(pixelsOfColor(screen, kBlue) > 50);
     QCOMPARE(pixelsOfColor(screen, Qt::red), 0);
@@ -429,21 +444,20 @@ void TestRepaint::exportSettlesFirst()
     }
 }
 
-
 void TestRepaint::exportShowsReadyStagedData()
 {
     QCustomPlot plot;
     plot.resize(400, 300);
     auto* mg = new QCPMultiGraph(plot.xAxis, plot.yAxis);
-    mg->setData(std::vector<double>{0, 10}, std::vector<std::vector<double>>{{2, 2}});
-    mg->setComponentPens({QPen(Qt::red, 4)});
+    mg->setData(std::vector<double> { 0, 10 }, std::vector<std::vector<double>> { { 2, 2 } });
+    mg->setComponentPens({ QPen(Qt::red, 4) });
     plot.xAxis->setRange(0, 10);
     plot.yAxis->setRange(0, 10);
     plot.replot();
     plot.setDataSwapDebounceMs(10000);
     using Source = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
-    mg->setDataSource(std::make_shared<Source>(std::vector<double>{0, 10},
-                                               std::vector<std::vector<double>>{{8, 8}}));
+    mg->setDataSource(std::make_shared<Source>(std::vector<double> { 0, 10 },
+                                               std::vector<std::vector<double>> { { 8, 8 } }));
     QVERIFY(mg->hasPendingData());
 
     const QImage image = plot.toPixmap(400, 300).toImage();
@@ -463,7 +477,8 @@ void TestRepaint::exportShowsReadyStagedData()
     QCOMPARE(redNear(2), 0);
 }
 
-// The legend is on its own buffer ("axes" and "legend"): marking the graph's layer does not redraw it.
+// The legend is on its own buffer ("axes" and "legend"): marking the graph's layer does not redraw
+// it.
 void TestRepaint::legendShowsAddedGraphAndItsName()
 {
     QCustomPlot plot;
@@ -475,7 +490,7 @@ void TestRepaint::legendShowsAddedGraphAndItsName()
     waitUntilSettled(plot);
     const QImage empty = screenOf(&plot);
 
-    auto g = plot.add<QCPGraph>(QVector<double>{0, 1}, QVector<double>{0, 1}).setName("Bx");
+    auto g = plot.add<QCPGraph>(QVector<double> { 0, 1 }, QVector<double> { 0, 1 }).setName("Bx");
     waitUntilSettled(plot);
     const QImage oneRow = screenOf(&plot);
     const QRect rowArea = plot.legend->outerRect();
@@ -618,14 +633,15 @@ const QVector<AxisAppearanceCase>& axisAppearanceCases()
         { "axisRect.setBackgroundScaledMode", [](QCustomPlot& plot)
           { plot.axisRect(0)->setBackgroundScaledMode(Qt::KeepAspectRatio); } },
         { "axis.setRangeReversed", [](QCustomPlot& plot) { plot.xAxis->setRangeReversed(true); } },
-        { "axis.setLabelRenderer", [](QCustomPlot& plot) { plot.xAxis->setLabelRenderer(nullptr); } },
+        { "axis.setLabelRenderer",
+          [](QCustomPlot& plot) { plot.xAxis->setLabelRenderer(nullptr); } },
     };
     return cases;
 }
 
 const QVector<AxisAppearanceCase>& equalValueCases()
 {
-    static const QVector<AxisAppearanceCase> cases{
+    static const QVector<AxisAppearanceCase> cases {
         { "axis.setLabel", [](QCustomPlot& plot) { plot.xAxis->setLabel(QStringLiteral("x")); } },
         { "axis.setTickLengthIn", [](QCustomPlot& plot) { plot.xAxis->setTickLengthIn(7); } },
         { "axis.setTickLabelColor",
@@ -674,12 +690,14 @@ struct PlottableAppearanceCase
 const QVector<PlottableAppearanceCase>& plottableAppearanceCases()
 {
     using Plot = QCustomPlot&;
-    static const QVector<PlottableAppearanceCase> cases{
+    static const QVector<PlottableAppearanceCase> cases {
         { "graph.setLineStyle", [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPGraph*>(p)->setLineStyle(QCPGraph::lsStepLeft); } },
+          [](QCPAbstractPlottable* p)
+          { static_cast<QCPGraph*>(p)->setLineStyle(QCPGraph::lsStepLeft); } },
         { "graph.setScatterSkip", [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
           [](QCPAbstractPlottable* p) { static_cast<QCPGraph*>(p)->setScatterSkip(2); } },
-        { "graph.setAdaptiveSampling", [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
+        { "graph.setAdaptiveSampling",
+          [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
           [](QCPAbstractPlottable* p) { static_cast<QCPGraph*>(p)->setAdaptiveSampling(false); } },
         { "graph.setPen", [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
           [](QCPAbstractPlottable* p) { p->setPen(QPen(Qt::darkGreen, 3)); } },
@@ -687,69 +705,103 @@ const QVector<PlottableAppearanceCase>& plottableAppearanceCases()
           [](QCPAbstractPlottable* p) { p->setBrush(QBrush(Qt::yellow)); } },
         { "graph.setName", [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
           [](QCPAbstractPlottable* p) { p->setName(QStringLiteral("renamed")); } },
-        { "curve.setPen", [](Plot plot) -> QCPAbstractPlottable* { return new QCPCurve(plot.xAxis, plot.yAxis); },
+        { "curve.setPen",
+          [](Plot plot) -> QCPAbstractPlottable* { return new QCPCurve(plot.xAxis, plot.yAxis); },
           [](QCPAbstractPlottable* p) { p->setPen(QPen(Qt::darkCyan, 3)); } },
-        { "curve.setBrush", [](Plot plot) -> QCPAbstractPlottable* { return new QCPCurve(plot.xAxis, plot.yAxis); },
+        { "curve.setBrush",
+          [](Plot plot) -> QCPAbstractPlottable* { return new QCPCurve(plot.xAxis, plot.yAxis); },
           [](QCPAbstractPlottable* p) { p->setBrush(QBrush(Qt::cyan)); } },
-        { "curve.setScatterStyle", [](Plot plot) -> QCPAbstractPlottable* { return new QCPCurve(plot.xAxis, plot.yAxis); },
+        { "curve.setScatterStyle",
+          [](Plot plot) -> QCPAbstractPlottable* { return new QCPCurve(plot.xAxis, plot.yAxis); },
           [](QCPAbstractPlottable* p)
-          { static_cast<QCPCurve*>(p)->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, 6)); } },
-        { "bars.setWidth", [](Plot plot) -> QCPAbstractPlottable* { return new QCPBars(plot.xAxis, plot.yAxis); },
+          {
+              static_cast<QCPCurve*>(p)->setScatterStyle(
+                  QCPScatterStyle(QCPScatterStyle::ssCircle, 6));
+          } },
+        { "bars.setWidth",
+          [](Plot plot) -> QCPAbstractPlottable* { return new QCPBars(plot.xAxis, plot.yAxis); },
           [](QCPAbstractPlottable* p) { static_cast<QCPBars*>(p)->setWidth(0.5); } },
-        { "bars.setWidthType", [](Plot plot) -> QCPAbstractPlottable* { return new QCPBars(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPBars*>(p)->setWidthType(QCPBars::wtAbsolute); } },
-        { "bars.setBaseValue", [](Plot plot) -> QCPAbstractPlottable* { return new QCPBars(plot.xAxis, plot.yAxis); },
+        { "bars.setWidthType", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPBars(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          { static_cast<QCPBars*>(p)->setWidthType(QCPBars::wtAbsolute); } },
+        { "bars.setBaseValue",
+          [](Plot plot) -> QCPAbstractPlottable* { return new QCPBars(plot.xAxis, plot.yAxis); },
           [](QCPAbstractPlottable* p) { static_cast<QCPBars*>(p)->setBaseValue(0.5); } },
-        { "bars.setStackingGap", [](Plot plot) -> QCPAbstractPlottable* { return new QCPBars(plot.xAxis, plot.yAxis); },
+        { "bars.setStackingGap",
+          [](Plot plot) -> QCPAbstractPlottable* { return new QCPBars(plot.xAxis, plot.yAxis); },
           [](QCPAbstractPlottable* p) { static_cast<QCPBars*>(p)->setStackingGap(2); } },
-        { "financial.setWidth", [](Plot plot) -> QCPAbstractPlottable* { return new QCPFinancial(plot.xAxis, plot.yAxis); },
+        { "financial.setWidth", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPFinancial(plot.xAxis, plot.yAxis); },
           [](QCPAbstractPlottable* p) { static_cast<QCPFinancial*>(p)->setWidth(0.3); } },
-        { "financial.setChartStyle", [](Plot plot) -> QCPAbstractPlottable* { return new QCPFinancial(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPFinancial*>(p)->setChartStyle(QCPFinancial::csOhlc); } },
-        { "financial.setPenNegative", [](Plot plot) -> QCPAbstractPlottable* { return new QCPFinancial(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPFinancial*>(p)->setPenNegative(QPen(Qt::magenta, 2)); } },
-        { "statisticalbox.setWidth", [](Plot plot) -> QCPAbstractPlottable* { return new QCPStatisticalBox(plot.xAxis, plot.yAxis); },
+        { "financial.setChartStyle", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPFinancial(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          { static_cast<QCPFinancial*>(p)->setChartStyle(QCPFinancial::csOhlc); } },
+        { "financial.setPenNegative", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPFinancial(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          { static_cast<QCPFinancial*>(p)->setPenNegative(QPen(Qt::magenta, 2)); } },
+        { "statisticalbox.setWidth", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPStatisticalBox(plot.xAxis, plot.yAxis); },
           [](QCPAbstractPlottable* p) { static_cast<QCPStatisticalBox*>(p)->setWidth(0.6); } },
-        { "statisticalbox.setWhiskerPen", [](Plot plot) -> QCPAbstractPlottable* { return new QCPStatisticalBox(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPStatisticalBox*>(p)->setWhiskerPen(QPen(Qt::magenta, 2)); } },
-        { "statisticalbox.setMedianPen", [](Plot plot) -> QCPAbstractPlottable* { return new QCPStatisticalBox(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPStatisticalBox*>(p)->setMedianPen(QPen(Qt::darkGreen, 3)); } },
-        { "errorbars.setWhiskerWidth", [](Plot plot) -> QCPAbstractPlottable* { return new QCPErrorBars(plot.xAxis, plot.yAxis); },
+        { "statisticalbox.setWhiskerPen", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPStatisticalBox(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          { static_cast<QCPStatisticalBox*>(p)->setWhiskerPen(QPen(Qt::magenta, 2)); } },
+        { "statisticalbox.setMedianPen", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPStatisticalBox(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          { static_cast<QCPStatisticalBox*>(p)->setMedianPen(QPen(Qt::darkGreen, 3)); } },
+        { "errorbars.setWhiskerWidth", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPErrorBars(plot.xAxis, plot.yAxis); },
           [](QCPAbstractPlottable* p) { static_cast<QCPErrorBars*>(p)->setWhiskerWidth(10); } },
-        { "errorbars.setErrorType", [](Plot plot) -> QCPAbstractPlottable* { return new QCPErrorBars(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPErrorBars*>(p)->setErrorType(QCPErrorBars::etKeyError); } },
-        { "colormap.setDataRange", [](Plot plot) -> QCPAbstractPlottable* { return new QCPColorMap(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPColorMap*>(p)->setDataRange(QCPRange(0, 5)); } },
-        { "colormap.setDataScaleType", [](Plot plot) -> QCPAbstractPlottable* { return new QCPColorMap(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPColorMap*>(p)->setDataScaleType(QCPAxis::stLogarithmic); } },
-        { "colormap.setGradient", [](Plot plot) -> QCPAbstractPlottable* { return new QCPColorMap(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPColorMap*>(p)->setGradient(QCPColorGradient::gpJet); } },
-        { "colormap.setInterpolate", [](Plot plot) -> QCPAbstractPlottable* { return new QCPColorMap(plot.xAxis, plot.yAxis); },
+        { "errorbars.setErrorType", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPErrorBars(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          { static_cast<QCPErrorBars*>(p)->setErrorType(QCPErrorBars::etKeyError); } },
+        { "colormap.setDataRange", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPColorMap(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          { static_cast<QCPColorMap*>(p)->setDataRange(QCPRange(0, 5)); } },
+        { "colormap.setDataScaleType", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPColorMap(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          { static_cast<QCPColorMap*>(p)->setDataScaleType(QCPAxis::stLogarithmic); } },
+        { "colormap.setGradient", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPColorMap(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          { static_cast<QCPColorMap*>(p)->setGradient(QCPColorGradient::gpJet); } },
+        { "colormap.setInterpolate", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPColorMap(plot.xAxis, plot.yAxis); },
           [](QCPAbstractPlottable* p) { static_cast<QCPColorMap*>(p)->setInterpolate(false); } },
-        { "colormap.setTightBoundary", [](Plot plot) -> QCPAbstractPlottable* { return new QCPColorMap(plot.xAxis, plot.yAxis); },
+        { "colormap.setTightBoundary", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPColorMap(plot.xAxis, plot.yAxis); },
           [](QCPAbstractPlottable* p) { static_cast<QCPColorMap*>(p)->setTightBoundary(true); } },
-        { "colormap2.setGapThreshold", [](Plot plot) -> QCPAbstractPlottable* { return new QCPColorMap2(plot.xAxis, plot.yAxis); },
+        { "colormap2.setGapThreshold", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPColorMap2(plot.xAxis, plot.yAxis); },
           [](QCPAbstractPlottable* p) { static_cast<QCPColorMap2*>(p)->setGapThreshold(0.5); } },
-        { "colormap2.setContourPen", [](Plot plot) -> QCPAbstractPlottable* { return new QCPColorMap2(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPColorMap2*>(p)->setContourPen(QPen(Qt::magenta, 2)); } },
-        { "colormap2.setAutoContourLevels", [](Plot plot) -> QCPAbstractPlottable* { return new QCPColorMap2(plot.xAxis, plot.yAxis); },
+        { "colormap2.setContourPen", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPColorMap2(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          { static_cast<QCPColorMap2*>(p)->setContourPen(QPen(Qt::magenta, 2)); } },
+        { "colormap2.setAutoContourLevels", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPColorMap2(plot.xAxis, plot.yAxis); },
           [](QCPAbstractPlottable* p) { static_cast<QCPColorMap2*>(p)->setAutoContourLevels(8); } },
-        { "histogram.setBins", [](Plot plot) -> QCPAbstractPlottable* { return new QCPHistogram(plot.xAxis, plot.yAxis); },
+        { "histogram.setBins", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPHistogram(plot.xAxis, plot.yAxis); },
           [](QCPAbstractPlottable* p) { static_cast<QCPHistogram*>(p)->setBins(12); } },
-        { "histogram.setStyle", [](Plot plot) -> QCPAbstractPlottable* { return new QCPHistogram(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPHistogram*>(p)->setStyle(QCPHistogram::sStep); } },
-        { "histogram2d.setContourPen", [](Plot plot) -> QCPAbstractPlottable* { return new QCPHistogram2D(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPHistogram2D*>(p)->setContourPen(QPen(Qt::magenta, 2)); } },
-        { "multigraph.setLineStyle", [](Plot plot) -> QCPAbstractPlottable* { return new QCPMultiGraph(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPMultiGraph*>(p)->setLineStyle(QCPMultiGraph::lsNone); } },
-        { "multigraph.setAdaptiveSampling", [](Plot plot) -> QCPAbstractPlottable* { return new QCPMultiGraph(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPMultiGraph*>(p)->setAdaptiveSampling(false); } },
-        { "waterfall.setOffsetMode", [](Plot plot) -> QCPAbstractPlottable* { return new QCPWaterfallGraph(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPWaterfallGraph*>(p)->setOffsetMode(QCPWaterfallGraph::omCustom); } },
-        { "waterfall.setGain", [](Plot plot) -> QCPAbstractPlottable* { return new QCPWaterfallGraph(plot.xAxis, plot.yAxis); },
+        { "histogram.setStyle", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPHistogram(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          { static_cast<QCPHistogram*>(p)->setStyle(QCPHistogram::sStep); } },
+        { "histogram2d.setContourPen", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPHistogram2D(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          { static_cast<QCPHistogram2D*>(p)->setContourPen(QPen(Qt::magenta, 2)); } },
+        { "multigraph.setLineStyle", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPMultiGraph(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          { static_cast<QCPMultiGraph*>(p)->setLineStyle(QCPMultiGraph::lsNone); } },
+        { "multigraph.setAdaptiveSampling", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPMultiGraph(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          { static_cast<QCPMultiGraph*>(p)->setAdaptiveSampling(false); } },
+        { "waterfall.setOffsetMode", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPWaterfallGraph(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          { static_cast<QCPWaterfallGraph*>(p)->setOffsetMode(QCPWaterfallGraph::omCustom); } },
+        { "waterfall.setGain", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPWaterfallGraph(plot.xAxis, plot.yAxis); },
           [](QCPAbstractPlottable* p) { static_cast<QCPWaterfallGraph*>(p)->setGain(2.0); } },
-        { "waterfall.setNormalize", [](Plot plot) -> QCPAbstractPlottable* { return new QCPWaterfallGraph(plot.xAxis, plot.yAxis); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPWaterfallGraph*>(p)->setNormalize(false); } },
+        { "waterfall.setNormalize", [](Plot plot) -> QCPAbstractPlottable*
+          { return new QCPWaterfallGraph(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          { static_cast<QCPWaterfallGraph*>(p)->setNormalize(false); } },
     };
     return cases;
 }
@@ -783,9 +835,9 @@ void TestRepaint::plottableSettersScheduleRepaint()
 void TestRepaint::plottableEqualValueDoesNotDirty_data()
 {
     QTest::addColumn<QString>("setter");
-    static const char* const names[] = {"graph.setPen",  "graph.setName",  "curve.setPen",
-                                        "bars.setWidth", "colormap.setGradient",
-                                        "multigraph.setLineStyle", "waterfall.setGain"};
+    static const char* const names[]
+        = { "graph.setPen",         "graph.setName",           "curve.setPen",     "bars.setWidth",
+            "colormap.setGradient", "multigraph.setLineStyle", "waterfall.setGain" };
     for (const char* name : names)
         QTest::newRow(name) << QString::fromLatin1(name);
 }
@@ -870,8 +922,14 @@ void TestRepaint::axisMarginChangeDuringPanRepaints()
                  && qAbs(drawn.right() - after.right()) <= 1
                  && qAbs(drawn.bottom() - after.bottom()) <= 1,
              qPrintable(QStringLiteral("drawn %1,%2 %3x%4 vs rect %5,%6 %7x%8")
-                            .arg(drawn.x()).arg(drawn.y()).arg(drawn.width()).arg(drawn.height())
-                            .arg(after.x()).arg(after.y()).arg(after.width()).arg(after.height())));
+                            .arg(drawn.x())
+                            .arg(drawn.y())
+                            .arg(drawn.width())
+                            .arg(drawn.height())
+                            .arg(after.x())
+                            .arg(after.y())
+                            .arg(after.width())
+                            .arg(after.height())));
 }
 
 void TestRepaint::multiGraphLineStyleResetsComponents()
@@ -881,7 +939,7 @@ void TestRepaint::multiGraphLineStyleResetsComponents()
     QCustomPlot plot;
     auto* mg = new QCPMultiGraph(plot.xAxis, plot.yAxis);
     auto source = std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
-        std::vector<double>{0.0, 1.0}, std::vector<std::vector<double>>{{0.0, 1.0}});
+        std::vector<double> { 0.0, 1.0 }, std::vector<std::vector<double>> { { 0.0, 1.0 } });
     mg->setDataSource(source);
     QCOMPARE(mg->componentCount(), 1);
 
@@ -901,10 +959,10 @@ void TestRepaint::barsGroupSpacingRepaints()
     auto* group = new QCPBarsGroup(&plot);
     auto* first = new QCPBars(plot.xAxis, plot.yAxis);
     auto* second = new QCPBars(plot.xAxis, plot.yAxis);
-    for (auto* bars : {first, second})
+    for (auto* bars : { first, second })
     {
         bars->setBarsGroup(group);
-        bars->setData({1.0, 2.0, 3.0}, {0.5, 1.0, 0.5});
+        bars->setData({ 1.0, 2.0, 3.0 }, { 0.5, 1.0, 0.5 });
     }
     plot.xAxis->setRange(0.5, 3.5);
     plot.yAxis->setRange(0, 1.5);
@@ -976,7 +1034,7 @@ struct RemainingCase
 
 const QVector<RemainingCase>& remainingCases()
 {
-    static const QVector<RemainingCase> cases{
+    static const QVector<RemainingCase> cases {
         { "text.setColor",
           [](QCustomPlot& plot) -> QObject*
           {
@@ -1027,17 +1085,10 @@ const QVector<RemainingCase>& remainingCases()
               return span;
           },
           [](QObject* o) { static_cast<QCPItemHSpan*>(o)->setRange(QCPRange(2.5, 7.5)); } },
-        { "legend.setFont",
-          [](QCustomPlot& plot) -> QObject*
-          {
-              return plot.legend;
-          },
-          [](QObject* o) { static_cast<QCPLegend*>(o)->setFont(QFont(QStringLiteral("Helvetica"), 17)); } },
-        { "legend.setIconSize",
-          [](QCustomPlot& plot) -> QObject*
-          {
-              return plot.legend;
-          },
+        { "legend.setFont", [](QCustomPlot& plot) -> QObject* { return plot.legend; },
+          [](QObject* o)
+          { static_cast<QCPLegend*>(o)->setFont(QFont(QStringLiteral("Helvetica"), 17)); } },
+        { "legend.setIconSize", [](QCustomPlot& plot) -> QObject* { return plot.legend; },
           [](QObject* o) { static_cast<QCPLegend*>(o)->setIconSize(37, 37); } },
         { "groupLegend.setExpanded",
           [](QCustomPlot& plot) -> QObject*
@@ -1058,7 +1109,10 @@ const QVector<RemainingCase>& remainingCases()
               return polar;
           },
           [](QObject* o)
-          { static_cast<QCPPolarAxisAngular*>(o)->setTickLabelMode(QCPPolarAxisAngular::lmRotated); } },
+          {
+              static_cast<QCPPolarAxisAngular*>(o)->setTickLabelMode(
+                  QCPPolarAxisAngular::lmRotated);
+          } },
         { "polarAxis.setSelectedSubTickPen",
           [](QCustomPlot& plot) -> QObject*
           {
@@ -1074,18 +1128,11 @@ const QVector<RemainingCase>& remainingCases()
               auto* polar = new QCPPolarAxisAngular(&plot);
               return polar->grid();
           },
-          [](QObject* o) { static_cast<QCPPolarGrid*>(o)->setRadialZeroLinePen(QPen(Qt::magenta, 2)); } },
-        { "layerable.setAntialiased",
-          [](QCustomPlot& plot) -> QObject*
-          {
-              return plot.graph(0);
-          },
+          [](QObject* o)
+          { static_cast<QCPPolarGrid*>(o)->setRadialZeroLinePen(QPen(Qt::magenta, 2)); } },
+        { "layerable.setAntialiased", [](QCustomPlot& plot) -> QObject* { return plot.graph(0); },
           [](QObject* o) { static_cast<QCPLayerable*>(o)->setAntialiased(false); } },
-        { "span.setPen",
-          [](QCustomPlot& plot) -> QObject*
-          {
-              return new QCPItemHSpan(&plot);
-          },
+        { "span.setPen", [](QCustomPlot& plot) -> QObject* { return new QCPItemHSpan(&plot); },
           [](QObject* o) { static_cast<QCPItemHSpan*>(o)->setPen(QPen(Qt::darkRed, 3)); } },
         { "line.setHead",
           [](QCustomPlot& plot) -> QObject*
@@ -1096,7 +1143,9 @@ const QVector<RemainingCase>& remainingCases()
               return item;
           },
           [](QObject* o)
-          { static_cast<QCPItemLine*>(o)->setHead(QCPLineEnding(QCPLineEnding::esDisc, 12, 12)); } },
+          {
+              static_cast<QCPItemLine*>(o)->setHead(QCPLineEnding(QCPLineEnding::esDisc, 12, 12));
+          } },
         { "richText.setHtml",
           [](QCustomPlot& plot) -> QObject*
           {
@@ -1104,7 +1153,8 @@ const QVector<RemainingCase>& remainingCases()
               item->position->setCoords(1, 1);
               return item;
           },
-          [](QObject* o) { static_cast<QCPItemRichText*>(o)->setHtml(QStringLiteral("<b>x</b>")); } },
+          [](QObject* o)
+          { static_cast<QCPItemRichText*>(o)->setHtml(QStringLiteral("<b>x</b>")); } },
         { "polarAxis.setAngle",
           [](QCustomPlot& plot) -> QObject*
           {
@@ -1120,7 +1170,8 @@ const QVector<RemainingCase>& remainingCases()
               plot.plotLayout()->addElement(1, 0, polar);
               return polar;
           },
-          [](QObject* o) { static_cast<QCPPolarAxisAngular*>(o)->setNumberFormat(QStringLiteral("f")); } },
+          [](QObject* o)
+          { static_cast<QCPPolarAxisAngular*>(o)->setNumberFormat(QStringLiteral("f")); } },
         { "polarAxis.setBackground",
           [](QCustomPlot& plot) -> QObject*
           {
@@ -1195,16 +1246,14 @@ const QVector<RemainingCase>& remainingCases()
               return scale;
           },
           [](QObject* o) { static_cast<QCPColorScale*>(o)->setLabel(QStringLiteral("z")); } },
-        { "legend.setBorderPen",
-          [](QCustomPlot& plot) -> QObject* { return plot.legend; },
+        { "legend.setBorderPen", [](QCustomPlot& plot) -> QObject* { return plot.legend; },
           [](QObject* o) { static_cast<QCPLegend*>(o)->setBorderPen(QPen(Qt::darkBlue, 2)); } },
-        { "polarAxis.setTickLabelColor",
-          [](QCustomPlot& plot) -> QObject* { return new QCPPolarAxisAngular(&plot); },
-          [](QObject* o)
+        { "polarAxis.setTickLabelColor", [](QCustomPlot& plot) -> QObject*
+          { return new QCPPolarAxisAngular(&plot); }, [](QObject* o)
           { static_cast<QCPPolarAxisAngular*>(o)->setTickLabelColor(Qt::darkBlue); } },
-        { "polarAxis.setBasePen",
-          [](QCustomPlot& plot) -> QObject* { return new QCPPolarAxisAngular(&plot); },
-          [](QObject* o) { static_cast<QCPPolarAxisAngular*>(o)->setBasePen(QPen(Qt::darkBlue, 3)); } },
+        { "polarAxis.setBasePen", [](QCustomPlot& plot) -> QObject*
+          { return new QCPPolarAxisAngular(&plot); }, [](QObject* o)
+          { static_cast<QCPPolarAxisAngular*>(o)->setBasePen(QPen(Qt::darkBlue, 3)); } },
         { "polarGrid.setAngularPen",
           [](QCustomPlot& plot) -> QObject*
           {
@@ -1212,7 +1261,8 @@ const QVector<RemainingCase>& remainingCases()
               auto* grid = new QCPPolarGrid(polar);
               return grid;
           },
-          [](QObject* o) { static_cast<QCPPolarGrid*>(o)->setAngularPen(QPen(Qt::darkGreen, 3)); } },
+          [](QObject* o)
+          { static_cast<QCPPolarGrid*>(o)->setAngularPen(QPen(Qt::darkGreen, 3)); } },
         { "layer.setVisible",
           [](QCustomPlot& plot) -> QObject* { return plot.layer(QStringLiteral("overlay")); },
           [](QObject* o) { static_cast<QCPLayer*>(o)->setVisible(false); } },
@@ -1275,7 +1325,6 @@ void TestRepaint::remainingSettersScheduleRepaint()
     QVERIFY2(plot->isRepaintQueued(), qPrintable(setter + QStringLiteral(" scheduled no repaint")));
 }
 
-
 void TestRepaint::orphanPlottableKeepsName()
 {
     // A plottable with null axes is a valid detached object: it has no legend to mark, but its name
@@ -1323,8 +1372,14 @@ void TestRepaint::axisRectMarginsMoveTheContent()
                  && qAbs(drawn.right() - after.right()) <= 1
                  && qAbs(drawn.bottom() - after.bottom()) <= 1,
              qPrintable(QStringLiteral("drawn %1,%2 %3x%4 vs rect %5,%6 %7x%8")
-                            .arg(drawn.x()).arg(drawn.y()).arg(drawn.width()).arg(drawn.height())
-                            .arg(after.x()).arg(after.y()).arg(after.width()).arg(after.height())));
+                            .arg(drawn.x())
+                            .arg(drawn.y())
+                            .arg(drawn.width())
+                            .arg(drawn.height())
+                            .arg(after.x())
+                            .arg(after.y())
+                            .arg(after.width())
+                            .arg(after.height())));
 }
 
 void TestRepaint::polarPlotSettles()
@@ -1360,10 +1415,8 @@ void TestRepaint::exportSettlesPendingTheme()
     dark.setBackground(Qt::darkMagenta);
     const QImage image = plot->toPixmap(200, 150).toImage();
     const QColor corner = image.pixelColor(1, 1);
-    QVERIFY2(qAbs(corner.hue() - QColor(Qt::darkMagenta).hue()) < 20,
-             qPrintable(corner.name()));
+    QVERIFY2(qAbs(corner.hue() - QColor(Qt::darkMagenta).hue()) < 20, qPrintable(corner.name()));
 }
-
 
 void TestRepaint::layoutSettersIgnoreEqualValues()
 {
@@ -1455,7 +1508,8 @@ const QVector<ColorMapDataCase>& colorMapDataCases()
     static const QVector<ColorMapDataCase> cases {
         { "setCell", [](QCPColorMapData& data) { data.setCell(5, 4, 1.0); } },
         { "setSize", [](QCPColorMapData& data) { data.setSize(12, 9); } },
-        { "setRange", [](QCPColorMapData& data) { data.setRange(QCPRange(1, 3), QCPRange(2, 4)); } },
+        { "setRange",
+          [](QCPColorMapData& data) { data.setRange(QCPRange(1, 3), QCPRange(2, 4)); } },
         { "fill", [](QCPColorMapData& data) { data.fill(0.5); } },
     };
     return cases;
@@ -1481,9 +1535,8 @@ void TestRepaint::colorMapDataSettersRepaint()
     QVERIFY(!plot->isRepaintQueued());
 
     const auto found = std::find_if(colorMapDataCases().cbegin(), colorMapDataCases().cend(),
-                                    [&](const ColorMapDataCase& colorMapCase) {
-                                        return setter == QLatin1String(colorMapCase.name);
-                                    });
+                                    [&](const ColorMapDataCase& colorMapCase)
+                                    { return setter == QLatin1String(colorMapCase.name); });
     QVERIFY(found != colorMapDataCases().cend());
     found->change(*map->data());
     QVERIFY2(plot->isRepaintQueued(), qPrintable(setter + " scheduled no repaint"));
@@ -1530,7 +1583,8 @@ double blueColumn(const QImage& image)
 
 void TestRepaint::itemOnOwnLayerFollowsRangeChange()
 {
-    // An item on a layer that holds no plottable: a zoom and a pan must redraw it at its new pixels.
+    // An item on a layer that holds no plottable: a zoom and a pan must redraw it at its new
+    // pixels.
     QCustomPlot plot;
     plot.resize(400, 300);
     plot.addLayer("items");
@@ -1549,13 +1603,15 @@ void TestRepaint::itemOnOwnLayerFollowsRangeChange()
     waitUntilSettled(plot);
     QVERIFY2(qAbs(blueColumn(screenOf(&plot)) - plot.xAxis->coordToPixel(5)) <= 2,
              qPrintable(QStringLiteral("zoom: drawn at %1, expected %2")
-                            .arg(blueColumn(screenOf(&plot))).arg(plot.xAxis->coordToPixel(5))));
+                            .arg(blueColumn(screenOf(&plot)))
+                            .arg(plot.xAxis->coordToPixel(5))));
 
     plot.xAxis->setRange(2, 22); // a pan
     waitUntilSettled(plot);
     QVERIFY2(qAbs(blueColumn(screenOf(&plot)) - plot.xAxis->coordToPixel(5)) <= 2,
              qPrintable(QStringLiteral("pan: drawn at %1, expected %2")
-                            .arg(blueColumn(screenOf(&plot))).arg(plot.xAxis->coordToPixel(5))));
+                            .arg(blueColumn(screenOf(&plot)))
+                            .arg(plot.xAxis->coordToPixel(5))));
 }
 
 void TestRepaint::anchoredChildOnOtherLayerFollowsRange()
@@ -1661,7 +1717,7 @@ void TestRepaint::rangeChangeMarksOnlyLayersUsingTheAxis()
     plot.resize(400, 300);
     plot.addLayer(QStringLiteral("a"));
     plot.addLayer(QStringLiteral("b"));
-    for (QCPAxis* axis : {plot.xAxis, plot.yAxis, plot.xAxis2, plot.yAxis2})
+    for (QCPAxis* axis : { plot.xAxis, plot.yAxis, plot.xAxis2, plot.yAxis2 })
         axis->setRange(0, 10);
     auto* onFirst = new QCPItemLine(&plot);
     QVERIFY(onFirst->setLayer(QStringLiteral("a")));
@@ -1691,7 +1747,7 @@ void TestRepaint::setAxesMovesTheLayerToTheNewAxis()
     QCustomPlot plot;
     plot.resize(400, 300);
     plot.addLayer(QStringLiteral("b"));
-    for (QCPAxis* axis : {plot.xAxis, plot.yAxis, plot.xAxis2, plot.yAxis2})
+    for (QCPAxis* axis : { plot.xAxis, plot.yAxis, plot.xAxis2, plot.yAxis2 })
         axis->setRange(0, 10);
     auto* line = new QCPItemLine(&plot);
     QVERIFY(line->setLayer(QStringLiteral("b")));
@@ -1718,7 +1774,7 @@ void TestRepaint::itemTakenAndAddedKeepsAxes()
     QCustomPlot plot;
     plot.resize(400, 300);
     plot.addLayer(QStringLiteral("b"));
-    for (QCPAxis* axis : {plot.xAxis, plot.yAxis, plot.xAxis2, plot.yAxis2})
+    for (QCPAxis* axis : { plot.xAxis, plot.yAxis, plot.xAxis2, plot.yAxis2 })
         axis->setRange(0, 10);
     auto* line = new QCPItemLine(&plot);
     line->start->setAxes(plot.xAxis2, plot.yAxis2);
@@ -1751,12 +1807,13 @@ void TestRepaint::itemTakenAndAddedKeepsAxes()
     plot.xAxis2->setRange(4, 14);
     QVERIFY2(b->dirtiedAfterDraw(), "a taken and re-added item left its layer without axes");
 }
+
 namespace
 {
 class CountingLine : public QCPItemLine
 {
 public:
-    explicit CountingLine(QCustomPlot* plot) : QCPItemLine(plot) {}
+    explicit CountingLine(QCustomPlot* plot) : QCPItemLine(plot) { }
 
     double selectTest(const QPointF& pos, bool onlySelectable,
                       QVariant* details = nullptr) const override
@@ -1772,7 +1829,7 @@ public:
 class PlainItem : public QCPAbstractItem
 {
 public:
-    explicit PlainItem(QCustomPlot* plot) : QCPAbstractItem(plot) {}
+    explicit PlainItem(QCustomPlot* plot) : QCPAbstractItem(plot) { }
 
     void draw(QCPPainter* painter) override
     {
@@ -1877,7 +1934,8 @@ void TestRepaint::itemExtentContainsDrawing()
     // Returns the number of painted pixels, or -1 with a message when one is outside the bounds.
     int paintedPixels = 0;
     QString mistake;
-    const auto paintedOutside = [&](const QImage& drawn, const QImage& hidden, const QRectF& bounds) {
+    const auto paintedOutside = [&](const QImage& drawn, const QImage& hidden, const QRectF& bounds)
+    {
         paintedPixels = 0;
         for (int y = 0; y < drawn.height(); ++y)
         {
@@ -1996,8 +2054,9 @@ void TestRepaint::takenItemUsesNoBoundsOfItsOldPlot()
         moved->start->setCoords(5, 4);
         moved->end->setCoords(5, 6);
         const QPointF pos(to->xAxis->coordToPixel(5), to->yAxis->coordToPixel(5));
-        QVERIFY2(to->layerableListAt(pos, true).contains(moved),
-                 qPrintable(QStringLiteral("offset %1: culled by its old plot's bounds").arg(offset)));
+        QVERIFY2(
+            to->layerableListAt(pos, true).contains(moved),
+            qPrintable(QStringLiteral("offset %1: culled by its old plot's bounds").arg(offset)));
     }
 }
 
@@ -2192,7 +2251,8 @@ void TestRepaint::dashedLineStacksLikeSolid()
 {
     // A pen style must not decide stacking: both cases have the graph on the GPU pass, above the
     // rect item that was created after it.
-    const auto darkPixelsOverTheRect = [](Qt::PenStyle style) {
+    const auto darkPixelsOverTheRect = [](Qt::PenStyle style)
+    {
         QWidget host;
         QCustomPlot* plot = shownGpuPlot(host);
         if (!plot)
@@ -2270,7 +2330,8 @@ void TestRepaint::dashPhaseSurvivesPan()
     plot->replot();
     waitUntilSettled(*plot);
 
-    const auto runs = [](const QVector<int>& columns) {
+    const auto runs = [](const QVector<int>& columns)
+    {
         int count = 0;
         for (int i = 1; i < columns.size(); ++i)
             if (columns[i] != columns[i - 1] + 1)
@@ -2312,7 +2373,8 @@ void TestRepaint::dashedLineMatchesExportDashes()
     plot->replot();
     waitUntilSettled(*plot);
 
-    const auto runs = [](const QVector<int>& columns) {
+    const auto runs = [](const QVector<int>& columns)
+    {
         int count = 0;
         for (int i = 1; i < columns.size(); ++i)
             if (columns[i] != columns[i - 1] + 1)
@@ -2324,10 +2386,9 @@ void TestRepaint::dashedLineMatchesExportDashes()
     const int exportRuns = runs(inkedColumns(plot, exported));
     QVERIFY(screenRuns > 3);
     // The GPU pattern and the QPainter one start at the same place; allow one dash of slack.
-    QVERIFY2(qAbs(screenRuns - exportRuns) <= 1,
-             qPrintable(QStringLiteral("screen %1 dashes, export %2")
-                            .arg(screenRuns)
-                            .arg(exportRuns)));
+    QVERIFY2(
+        qAbs(screenRuns - exportRuns) <= 1,
+        qPrintable(QStringLiteral("screen %1 dashes, export %2").arg(screenRuns).arg(exportRuns)));
 }
 
 void TestRepaint::solidLinesKeepTheirVertexFormat()
@@ -2362,7 +2423,7 @@ void TestRepaint::solidLinesKeepTheirVertexFormat()
 void TestRepaint::dashedUnderSolidStaysUnder()
 {
     QWidget host;
-    QCustomPlot *plot = shownGpuPlot(host);
+    QCustomPlot* plot = shownGpuPlot(host);
     if (!plot)
         QSKIP("no QRhi on this platform (qoffscreen)");
     plot->resize(400, 300);
@@ -2370,17 +2431,16 @@ void TestRepaint::dashedUnderSolidStaysUnder()
     plot->yAxis->setRange(0, 1);
 
     // Dashed first, solid second: the solid line crosses the dashed one and must be on top.
-    auto *dashed = plot->addGraph();
+    auto* dashed = plot->addGraph();
     QPen alwaysOnDash(Qt::red, 6, Qt::CustomDashLine);
     alwaysOnDash.setDashPattern({ 1000.0, 1.0 }); // on for 6000 px: the crossing is mid-dash
     dashed->setPen(alwaysOnDash);
     dashed->setData(QVector<double> { 0, 1 }, QVector<double> { 0.5, 0.5 });
-    auto *solid = plot->addGraph();
+    auto* solid = plot->addGraph();
     solid->setPen(QPen(Qt::blue, 6, Qt::SolidLine));
     solid->setData(QVector<double> { 0.5, 0.5 }, QVector<double> { 0, 1 });
     waitUntilSettled(*plot);
-    const QPoint centre(int(plot->xAxis->coordToPixel(0.5)),
-                        int(plot->yAxis->coordToPixel(0.5)));
+    const QPoint centre(int(plot->xAxis->coordToPixel(0.5)), int(plot->yAxis->coordToPixel(0.5)));
     const QColor crossing = screenOf(plot).pixelColor(centre);
     QVERIFY2(crossing.blue() > 120 && crossing.red() < 90,
              "a solid line added after a dashed one must stay above it");
@@ -2388,16 +2448,16 @@ void TestRepaint::dashedUnderSolidStaysUnder()
     // The other way round: a dash that is on at the crossing stays above the solid line, so the
     // fix is submission order, not "dashed always below solid".
     QWidget host2;
-    QCustomPlot *plot2 = shownGpuPlot(host2);
+    QCustomPlot* plot2 = shownGpuPlot(host2);
     if (!plot2)
         QSKIP("no QRhi on this platform (qoffscreen)");
     plot2->resize(400, 300);
     plot2->xAxis->setRange(0, 1);
     plot2->yAxis->setRange(0, 1);
-    auto *solid2 = plot2->addGraph();
+    auto* solid2 = plot2->addGraph();
     solid2->setPen(QPen(Qt::blue, 6, Qt::SolidLine));
     solid2->setData(QVector<double> { 0.5, 0.5 }, QVector<double> { 0, 1 });
-    auto *dashed2 = plot2->addGraph();
+    auto* dashed2 = plot2->addGraph();
     QPen longDash(Qt::red, 6, Qt::CustomDashLine);
     longDash.setDashPattern({ 1000.0, 1.0 }); // on for 6000 px: the crossing is mid-dash
     dashed2->setPen(longDash);
@@ -2490,3 +2550,129 @@ void TestRepaint::unequalFillBetweenStaysOnThePainter()
     QVERIFY2(layer->drawEntries().isEmpty(), "a mismatched ribbon was filled on the GPU");
 }
 
+namespace
+{
+// Data units are widget pixels and the axis rect is the whole widget, so a test can name the pixel
+// it samples.
+void usePixelRanges(QCustomPlot* plot)
+{
+    plot->xAxis->setVisible(false);
+    plot->xAxis2->setVisible(false);
+    plot->yAxis->setVisible(false);
+    plot->yAxis2->setVisible(false);
+    plot->axisRect()->setAutoMargins(QCP::msNone);
+    plot->axisRect()->setMargins(QMargins(0, 0, 0, 0));
+    plot->xAxis->setRange(0, 400);
+    plot->yAxis->setRange(0, 300);
+    plot->replot();
+    waitUntilSettled(*plot);
+}
+
+// The colour at data \a point in \a image.
+QColor sampleAt(QCustomPlot* plot, const QImage& image, double x, double y)
+{
+    const double dpr = plot->bufferDevicePixelRatio();
+    return image.pixelColor(int(plot->xAxis->coordToPixel(x) * dpr),
+                            int(plot->yAxis->coordToPixel(y) * dpr));
+}
+
+QImage flatTexture(const QColor& colour)
+{
+    QImage texture(4, 4, QImage::Format_ARGB32_Premultiplied);
+    texture.fill(colour);
+    return texture;
+}
+} // namespace
+
+// A brush style must not decide stacking: a texture rect and a polyline keep their submission
+// order, exactly as two solid commands do.
+void TestRepaint::textureBrushStacksLikeSolid()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    usePixelRanges(plot);
+    auto* layer = plot->plottableRhiLayer(plot->currentLayer());
+    QVERIFY(layer);
+    const QImage texture = flatTexture(QColor(240, 140, 20));
+    const auto crossingColour = [&](bool rectLast)
+    {
+        QCPDrawContext context(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+        const auto line = std::make_shared<const std::vector<QPointF>>(
+            std::vector<QPointF> { { 60, 150 }, { 340, 150 } });
+        const auto addRect = [&context, &texture]
+        {
+            context.rect(QCP::Data { 60, 60 }, QCP::Data { 340, 240 }, QPen(Qt::NoPen),
+                         QBrush(texture));
+        };
+        if (rectLast)
+        {
+            context.polyline(line, QPen(Qt::blue, 8));
+            addRect();
+        }
+        else
+        {
+            addRect();
+            context.polyline(line, QPen(Qt::blue, 8));
+        }
+        layer->clear();
+        QCPResolveCache cache;
+        qcpReplayWithRhi(context.drawList(), *layer, *plot->scatterRhiLayer(plot->currentLayer()),
+                         context.frame(), cache, plot->bufferDevicePixelRatio(),
+                         plot->rhiOutputSize().height());
+        return sampleAt(plot, screenOf(plot), 200, 150);
+    };
+
+    const QColor lineOnTop = crossingColour(false);
+    QVERIFY2(
+        lineOnTop.blue() > 120 && lineOnTop.red() < 90,
+        qPrintable(
+            QStringLiteral("the polyline lost to the texture rect: %1").arg(lineOnTop.name())));
+    const QColor rectOnTop = crossingColour(true);
+    QVERIFY2(rectOnTop.red() > 180 && rectOnTop.green() > 90 && rectOnTop.blue() < 70,
+             qPrintable(QStringLiteral("a rect added last did not cover the polyline: %1")
+                            .arg(rectOnTop.name())));
+}
+
+// A free-form fill has no fan centre, so the GPU used to leave it to the painter pass, which put it
+// under everything. It keeps its place now, and its stroke still paints over it.
+void TestRepaint::freePolygonFillKeepsItsPlace()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    usePixelRanges(plot);
+    QCPDrawContext context(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+    const std::vector<QCP::Position> points { QCP::Data { 50, 50 },   QCP::Data { 250, 50 },
+                                              QCP::Data { 250, 250 }, QCP::Data { 200, 250 },
+                                              QCP::Data { 200, 100 }, QCP::Data { 100, 100 },
+                                              QCP::Data { 100, 250 }, QCP::Data { 50, 250 } };
+    context.polygon(points, QPen(Qt::NoPen), QBrush(QColor(20, 160, 80)));
+    const auto line = std::make_shared<const std::vector<QPointF>>(
+        std::vector<QPointF> { { 30, 175 }, { 110, 175 } });
+    context.polyline(line, QPen(Qt::blue, 8));
+
+    auto* layer = plot->plottableRhiLayer(plot->currentLayer());
+    QVERIFY(layer);
+    layer->clear();
+    QCPResolveCache cache;
+    qcpReplayWithRhi(context.drawList(), *layer, *plot->scatterRhiLayer(plot->currentLayer()),
+                     context.frame(), cache, plot->bufferDevicePixelRatio(),
+                     plot->rhiOutputSize().height());
+    const QImage image = screenOf(plot);
+
+    const QColor inside = sampleAt(plot, image, 75, 120);
+    QVERIFY2(inside.green() > 120 && inside.red() < 90,
+             qPrintable(
+                 QStringLiteral("the fill is missing inside the polygon: %1").arg(inside.name())));
+    const QColor crossing = sampleAt(plot, image, 75, 175);
+    QVERIFY2(
+        crossing.blue() > 120 && crossing.red() < 90,
+        qPrintable(
+            QStringLiteral("the stroke did not paint over the fill: %1").arg(crossing.name())));
+    const QColor concavity = sampleAt(plot, image, 150, 175);
+    QVERIFY2(concavity.red() > 200 && concavity.green() > 200 && concavity.blue() > 200,
+             qPrintable(QStringLiteral("the concavity was filled: %1").arg(concavity.name())));
+}

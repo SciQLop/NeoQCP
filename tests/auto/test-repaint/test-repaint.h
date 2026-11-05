@@ -1,5 +1,5 @@
-#include <QtTest/QtTest>
 #include "qcustomplot.h"
+#include <QtTest/QtTest>
 
 class TestRepaint : public QObject
 {
@@ -77,6 +77,8 @@ private slots:
     void gpuRectFillsBeforeStroking();
     void unequalFillBetweenStaysOnThePainter();
     void dashedUnderSolidStaysUnder();
+    void textureBrushStacksLikeSolid();
+    void freePolygonFillKeepsItsPlace();
 
 private:
     // What the plot shows: its paint buffers composed, or the framebuffer under RHI.

@@ -18,6 +18,7 @@ set(NEOQCP_SOURCES
     src/painting/draw-context.cpp
     src/painting/command-replay-painter.cpp
     src/painting/command-replay-rhi.cpp
+    src/painting/raster-fallback.cpp
     src/painting/paintbuffer-pixmap.cpp
     src/painting/paintbuffer-rhi.cpp
     src/painting/plottable-rhi-layer.cpp
@@ -189,6 +190,8 @@ set(NEOQCP_SHADERS
     src/painting/shaders/plottable.frag
     src/painting/shaders/plottable_dashed.vert
     src/painting/shaders/plottable_dashed.frag
+    src/painting/shaders/plottable_image.vert
+    src/painting/shaders/plottable_image.frag
     src/painting/shaders/span.vert
     src/painting/shaders/contour_line.vert
     src/painting/shaders/contour_line.frag

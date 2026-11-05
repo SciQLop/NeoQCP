@@ -179,6 +179,16 @@ plottable_dashed_frag_qsb = custom_target('plottable_dashed_frag_qsb',
     output: 'plottable_dashed.frag.qsb',
     command: [qsb, '--qt6', '-o', '@OUTPUT@', '@INPUT@'])
 
+plottable_image_vert_qsb = custom_target('plottable_image_vert_qsb',
+    input: 'src/painting/shaders/plottable_image.vert',
+    output: 'plottable_image.vert.qsb',
+    command: [qsb, '--qt6', '-o', '@OUTPUT@', '@INPUT@'])
+
+plottable_image_frag_qsb = custom_target('plottable_image_frag_qsb',
+    input: 'src/painting/shaders/plottable_image.frag',
+    output: 'plottable_image.frag.qsb',
+    command: [qsb, '--qt6', '-o', '@OUTPUT@', '@INPUT@'])
+
 span_vert_qsb = custom_target('span_vert_qsb',
     input: 'src/painting/shaders/span.vert',
     output: 'span.vert.qsb',
@@ -220,7 +230,8 @@ embedded_shaders = custom_target('embedded_shaders',
             span_vert_qsb, contour_line_vert_qsb, contour_line_frag_qsb,
             scatter_vert_qsb, scatter_frag_qsb,
             scatter_colored_vert_qsb, scatter_colored_frag_qsb,
-            plottable_dashed_vert_qsb, plottable_dashed_frag_qsb],
+            plottable_dashed_vert_qsb, plottable_dashed_frag_qsb,
+            plottable_image_vert_qsb, plottable_image_frag_qsb],
     output: 'embedded_shaders.h',
     command: [python3, files('src/painting/shaders/embed_shaders.py'),
               '@OUTPUT@',
@@ -236,7 +247,9 @@ embedded_shaders = custom_target('embedded_shaders',
               'scatter_colored_vert_qsb_data:@INPUT9@',
               'scatter_colored_frag_qsb_data:@INPUT10@',
               'plottable_dashed_vert_qsb_data:@INPUT11@',
-              'plottable_dashed_frag_qsb_data:@INPUT12@'])
+              'plottable_dashed_frag_qsb_data:@INPUT12@',
+              'plottable_image_vert_qsb_data:@INPUT13@',
+              'plottable_image_frag_qsb_data:@INPUT14@'])
 
 # Overridden by a host (meson.override_dependency) that wants NeoQCP's zones in its own tracer.
 if get_option('zone_stats')
@@ -266,6 +279,7 @@ NeoQCP = static_library('NeoQCP',
            'src/painting/draw-context.cpp',
            'src/painting/command-replay-painter.cpp',
            'src/painting/command-replay-rhi.cpp',
+           'src/painting/raster-fallback.cpp',
            'src/painting/paintbuffer-pixmap.cpp',
            'src/painting/paintbuffer-rhi.cpp',
            'src/painting/plottable-rhi-layer.cpp',
@@ -353,7 +367,7 @@ NeoQCP = static_library('NeoQCP',
            cpp_args:cpp_args,
            dependencies: [qtdeps, profiling_hook_dep] + optional_deps + latex_deps,
            install: true,
-           extra_files: [neoqcp_moc_headers, 'src/handle-ops.h', 'src/construct.h', 'src/plottables/multigraph-fill.h', 'src/plottables/histogram-geometry.h', 'src/datasource/histogram-binner-1d.h', 'src/plottables/multigraph-errorbars.h', 'src/plottables/plottable-geometry-utils.h', 'src/Profiling.hpp', 'src/painting/paintbuffer-rhi.h', 'src/painting/plottable-rhi-layer.h', 'src/painting/span-rhi-layer.h', 'src/painting/colormap-rhi-layer.h', 'src/painting/grid-rhi-layer.h', 'src/painting/scatter-rhi-layer.h']
+           extra_files: [neoqcp_moc_headers, 'src/handle-ops.h', 'src/construct.h', 'src/plottables/multigraph-fill.h', 'src/plottables/histogram-geometry.h', 'src/datasource/histogram-binner-1d.h', 'src/plottables/multigraph-errorbars.h', 'src/plottables/plottable-geometry-utils.h', 'src/Profiling.hpp', 'src/painting/paintbuffer-rhi.h', 'src/painting/plottable-rhi-layer.h', 'src/painting/raster-fallback.h', 'src/painting/span-rhi-layer.h', 'src/painting/colormap-rhi-layer.h', 'src/painting/grid-rhi-layer.h', 'src/painting/scatter-rhi-layer.h']
            )
 
 
