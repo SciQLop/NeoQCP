@@ -267,6 +267,27 @@ struct QCPDrawnCore::State
     bool reportedMissingAxis = false;
 };
 
+namespace
+{
+/*!
+  Marks the object as drawing for the guard's lifetime: a contentChanged() from inside a recording
+  is a misuse, since it would re-record on every frame.
+*/
+class InsideDraw
+{
+public:
+    explicit InsideDraw(bool& flag) : mFlag(flag) { mFlag = true; }
+
+    ~InsideDraw() { mFlag = false; }
+
+    InsideDraw(const InsideDraw&) = delete;
+    InsideDraw& operator=(const InsideDraw&) = delete;
+
+private:
+    bool& mFlag;
+};
+} // namespace
+
 QCPRange qcpDrawnRange(double lower, double upper, bool& foundRange, QCP::SignDomain inSignDomain)
 {
     foundRange = std::isfinite(lower) && std::isfinite(upper) && lower <= upper;
@@ -293,7 +314,7 @@ bool QCPDrawnCore::contentChanged()
     if (mState->insideDraw)
     {
         qcp::reportMisuse(Q_FUNC_INFO,
-                          "contentChanged() from inside draw(): ignored, it would "
+                          "contentChanged() from inside a drawing: ignored, it would "
                           "re-record on every frame");
         return false;
     }
@@ -329,9 +350,8 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
     if (!stale)
         return true;
     QCPDrawContext context(view.keyAxis, view.valueAxis, view.axisRect, view.theme);
-    mState->insideDraw = true;
+    const InsideDraw drawing(mState->insideDraw);
     object.draw(context);
-    mState->insideDraw = false;
     mState->recording = context.drawList();
     mState->viewDependent = usesTheView(mState->recording);
     mState->recordedGeneration = mState->generation;
@@ -461,6 +481,7 @@ void QCPDrawnCore::paintIcon(const QCPDrawable& object, QCPPainter& painter, con
         // An icon records through the same door, into a list of its own: the axes only feed the
         // context's unused frame, so an object outside a plot still gets its icon.
         QCPDrawContext context(view.keyAxis, view.valueAxis, view.axisRect, view.theme);
+        const InsideDraw drawing(mState->insideDraw);
         object.drawLegendIcon(context);
         mState->icon = context.drawList();
         mState->iconGeneration = mState->generation;

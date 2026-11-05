@@ -175,6 +175,41 @@ public:
             std::initializer_list<QPointF> { { 1, 1 }, { 9, 9 } });
 };
 
+//! A drawn plottable whose legend icon calls a setter: a misuse, like contentChanged() in draw().
+class TestIconSetter : public QCPDrawn<QCPAbstractPlottable>
+{
+public:
+    TestIconSetter(QCPAxis* keyAxis, QCPAxis* valueAxis)
+            : QCPDrawn<QCPAbstractPlottable>(keyAxis, valueAxis)
+    {
+    }
+
+    using QCPDrawn<QCPAbstractPlottable>::draw;
+    using QCPDrawn<QCPAbstractPlottable>::drawLegendIcon; // the painter overload stays reachable
+
+    void draw(QCPDrawContext& context) const override
+    {
+        ++drawCalls;
+        context.polyline(mLine, QPen(Qt::black, 2));
+    }
+
+    void drawLegendIcon(QCPDrawContext& context) const override
+    {
+        ++iconCalls;
+        context.polyline(mLine, QPen(Qt::black, 2));
+        const_cast<TestIconSetter*>(this)->contentChanged();
+    }
+
+    //! The adapter's old virtual, which the core's icon path hangs off.
+    void paintIcon(QCPPainter* painter, const QRectF& rect) const { drawLegendIcon(painter, rect); }
+
+    mutable int drawCalls = 0;
+    mutable int iconCalls = 0;
+    std::shared_ptr<const std::vector<QPointF>> mLine
+        = std::make_shared<const std::vector<QPointF>>(
+            std::initializer_list<QPointF> { { 1, 1 }, { 9, 9 } });
+};
+
 struct Fixture
 {
     Fixture()
@@ -313,6 +348,24 @@ void TestDrawable::contentChangedInsideDrawIsAMisuse()
     f.plot->replot();
     QCOMPARE(gMisuseCount, 1);
     QCOMPARE(shape->drawCalls, 1); // no generation bump: nothing re-recorded
+}
+
+void TestDrawable::contentChangedInsideLegendIconIsAMisuse()
+{
+    Fixture f;
+    auto* line = new TestIconSetter(f.plot->xAxis, f.plot->yAxis);
+    QImage image(100, 50, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::white);
+    QCPPainter painter(&image);
+    line->paintIcon(&painter, QRectF(0, 0, 100, 50));
+    line->paintIcon(&painter, QRectF(0, 0, 100, 50)); // the icon is already recorded
+    painter.end();
+
+    QCOMPARE(line->iconCalls, 1);
+    QCOMPARE(gMisuseCount, 1); // once, not once per icon paint
+
+    f.plot->replot(); // a bumped generation would re-record the screen list too
+    QCOMPARE(line->drawCalls, 1);
 }
 
 void TestDrawable::missingAxisHidesWithAMessage()

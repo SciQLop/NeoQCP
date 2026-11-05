@@ -16,6 +16,7 @@ private slots:
     void unrelatedMarkDoesNotReRecord();
     void viewEpochReRecordsEscapeHatch();
     void contentChangedInsideDrawIsAMisuse();
+    void contentChangedInsideLegendIconIsAMisuse();
     void missingAxisHidesWithAMessage();
 
     void panReusesResolvedGeometry();
