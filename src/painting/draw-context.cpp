@@ -177,38 +177,22 @@ void record(QCPDrawList& list, qcp::QCPDrawCommand command, const Extent& extent
         list.id = qcpNextDrawListId(); // a re-recorded list is a new recording
     if (!extent.empty)
     {
-        if (!list.hasSamples)
-        {
-            list.keyBounded = extent.keyBounded;
-            list.valueBounded = extent.valueBounded;
-            list.bounds = boxOf(extent);
-            list.hasSamples = true;
-        }
+        // An unbounded side of this command says nothing about the box: boxOf() leaves it at ±inf,
+        // so merging keeps the recording's side unbounded too.
+        const QCPDataBox box = boxOf(extent);
+        const bool first = !list.hasSamples;
+        if (first)
+            list.bounds = box;
         else
         {
-            list.keyBounded = list.keyBounded && extent.keyBounded;
-            list.valueBounded = list.valueBounded && extent.valueBounded;
-            if (list.keyBounded)
-            {
-                list.bounds.keyLower = std::min(list.bounds.keyLower, extent.keyLower);
-                list.bounds.keyUpper = std::max(list.bounds.keyUpper, extent.keyUpper);
-            }
-            if (list.valueBounded)
-            {
-                list.bounds.valueLower = std::min(list.bounds.valueLower, extent.valueLower);
-                list.bounds.valueUpper = std::max(list.bounds.valueUpper, extent.valueUpper);
-            }
+            list.bounds.keyLower = std::min(list.bounds.keyLower, box.keyLower);
+            list.bounds.keyUpper = std::max(list.bounds.keyUpper, box.keyUpper);
+            list.bounds.valueLower = std::min(list.bounds.valueLower, box.valueLower);
+            list.bounds.valueUpper = std::max(list.bounds.valueUpper, box.valueUpper);
         }
-    }
-    if (!list.keyBounded)
-    {
-        list.bounds.keyLower = -Limit::infinity();
-        list.bounds.keyUpper = Limit::infinity();
-    }
-    if (!list.valueBounded)
-    {
-        list.bounds.valueLower = -Limit::infinity();
-        list.bounds.valueUpper = Limit::infinity();
+        list.keyBounded = first ? extent.keyBounded : list.keyBounded && extent.keyBounded;
+        list.valueBounded = first ? extent.valueBounded : list.valueBounded && extent.valueBounded;
+        list.hasSamples = true;
     }
     list.commands.push_back(std::move(command));
 }

@@ -113,8 +113,6 @@ public:
     //! Test hook: how many times the vertex buffers were uploaded (a pan must not add one).
     int solidVertexUploads() const { return mSolidVertexUploads; }
 
-    int dashedVertexUploads() const { return mDashVertexUploads; }
-
     bool hasGeometry() const
     {
         return !mDrawEntries.isEmpty() || !mDashEntries.isEmpty() || !mImageEntries.isEmpty();
@@ -234,7 +232,6 @@ private:
     int mLastDashSampleCount = 0; //!< the sample count the dashed pipeline was attempted for
     bool mDashBroken = false; //!< the dashed pipeline failed to build for that sample count
     int mSolidVertexUploads = 0; //!< instrumentation for the pan test
-    int mDashVertexUploads = 0;
 
     QVector<ImageEntry> mImageEntries;
     QHash<qint64, ImageTexture*> mImageTextures; //!< keyed by QImage::cacheKey()

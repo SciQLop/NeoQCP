@@ -718,9 +718,8 @@ void QCPPlottableRhiLayer::uploadDashed(QRhiResourceUpdateBatch* updates, const 
     if (mDashStagingSize == 0 || !mDirty)
         return; // as above: nothing moved but the offsets
 
-    if (uploadVertices(mRhi, updates, mDashVertexBuffer, mDashVertexBufferSize, mDashStagingData,
-                       mDashStagingSize, "Failed to create dashed plottable vertex buffer"))
-        ++mDashVertexUploads;
+    uploadVertices(mRhi, updates, mDashVertexBuffer, mDashVertexBufferSize, mDashStagingData,
+                   mDashStagingSize, "Failed to create dashed plottable vertex buffer");
 }
 
 void QCPPlottableRhiLayer::render(QRhiCommandBuffer* cb, const QSize& outputSize)
