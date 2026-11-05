@@ -303,6 +303,17 @@ QColor pixelAt(const QImage& frame, QCustomPlot* plot, double key, double value)
     return frame.pixelColor(qRound(p.x() * dpr), qRound(p.y() * dpr));
 }
 
+//! The box the inked pixels of \a frame occupy, in device pixels.
+QRect inkedBounds(const QImage& frame)
+{
+    QRect box;
+    for (int y = 0; y < frame.height(); ++y)
+        for (int x = 0; x < frame.width(); ++x)
+            if (frame.pixelColor(x, y) != QColor(Qt::white))
+                box = box.isNull() ? QRect(x, y, 1, 1) : box.united(QRect(x, y, 1, 1));
+    return box;
+}
+
 bool isBlue(const QColor& c)
 {
     return c.blue() > 200 && c.red() < 60 && c.green() < 60;
@@ -945,6 +956,39 @@ void TestDrawable::panKeepsPixelAndRatioCornersInPlace()
         QVERIFY2(
             qFuzzyIsNull(entry.offsetX) && qFuzzyIsNull(entry.offsetY),
             qPrintable(QStringLiteral("entry offset %1,%2").arg(entry.offsetX).arg(entry.offsetY)));
+}
+
+void TestDrawable::pannedTimeAxisKeepsTheShapeOnAxis()
+{
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - the kept triangles are a GPU path only");
+    f.plot->xAxis->setVisible(false); // only the shape's ink is measured
+    f.plot->yAxis->setVisible(false);
+    f.plot->xAxis->grid()->setVisible(false);
+    f.plot->yAxis->grid()->setVisible(false);
+    const double start = 1.7e9;
+    const double span = 99.9;
+    f.plot->xAxis->setRange(start, start + span);
+    auto* line = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    line->mLine = std::make_shared<const std::vector<QPointF>>(
+        std::initializer_list<QPointF> { { start + 10.0, 2.0 }, { start + 90.0, 8.0 } });
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+    const int before = inkedBounds(f.plot->grabFramebuffer()).left();
+    const double lineStart = f.plot->xAxis->coordToPixel(start + 10.0);
+    QVERIFY2(before > 0, "the line must be painted");
+
+    // A drag that leaves the two spans an ulp apart: the kept triangles move by one delta, and it
+    // must be the delta of the visible pixels, not the one measured at data 0.
+    const double draggedSpan = span * (1.0 + 4e-9);
+    f.plot->xAxis->setRange(start + 1.0, start + 1.0 + draggedSpan);
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+    const int after = inkedBounds(f.plot->grabFramebuffer()).left();
+    const double moved = f.plot->xAxis->coordToPixel(start + 10.0) - lineStart;
+    QVERIFY2(qAbs((after - before) - moved) <= 1.0,
+             qPrintable(QStringLiteral("the shape moved %1 px, the axis %2 px")
+                            .arg(after - before)
+                            .arg(moved)));
 }
 
 void TestDrawable::removedAnchorItemDoesNotDangle()

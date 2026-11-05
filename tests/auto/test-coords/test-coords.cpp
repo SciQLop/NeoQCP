@@ -309,6 +309,41 @@ void TestCoords::dragPanOnATimeRangeIsATranslation()
              "a dragged time window stays a translation when its span moves by one ulp");
 }
 
+void TestCoords::panDeltaIsMeasuredInsideTheRange()
+{
+    // A drag can move the two ends by one ulp apart (see dragPanOnATimeRangeIsATranslation): the
+    // slopes then differ by a thousandth of a pixel across the window, but by tens of pixels at
+    // data 0, 1.7e9 keys away. The delta must be the one the visible pixels moved by.
+    auto plot = layoutPlot();
+    plot->yAxis->setRange(0, 10);
+    const double start = 1.7e9;
+    const double span = 99.9;
+    plot->xAxis->setRange(start, start + span);
+    plot->replot();
+    const QCPTransform before(plot->xAxis, plot->yAxis);
+
+    const double draggedSpan = span * (1.0 + 4e-9); // one ulp of the epoch, as a drag can leave it
+    plot->xAxis->setRange(start + 1.0, start + 1.0 + draggedSpan);
+    plot->replot();
+    const QCPTransform after(plot->xAxis, plot->yAxis);
+
+    QPointF delta;
+    QVERIFY2(before.isTranslationOf(after, &delta), "the two slopes are a thousandth of a pixel apart");
+    for (const double key : { start, start + span * 0.5, start + span })
+    {
+        const QPointF moved = pixelsOf(before, key, 5.0) - pixelsOf(after, key, 5.0);
+        QVERIFY2(qAbs(moved.x() - delta.x()) <= 1e-3,
+                 qPrintable(QStringLiteral("at %1 the axis moved %2 px, the delta says %3")
+                                .arg(key)
+                                .arg(moved.x())
+                                .arg(delta.x())));
+        QVERIFY2(qAbs(moved.y() - delta.y()) <= 1e-3,
+                 qPrintable(QStringLiteral("value moved %1 px, the delta says %2")
+                                .arg(moved.y())
+                                .arg(delta.y())));
+    }
+}
+
 void TestCoords::positionSetMatchesSetters()
 {
     auto plot = layoutPlot();

@@ -291,8 +291,17 @@ bool QCPTransform::isTranslationOf(const QCPTransform& other, QPointF* delta) co
     { return std::abs(a.slope - b.slope) * std::abs(a.upper - a.lower) < 1e-3; };
     if (!sameScale(mKey, other.mKey) || !sameScale(mValue, other.mValue))
         return false; // a zoom: the data-to-pixel scale changed
-    const QCP::Pixels here = map(QCP::Data { 0.0, 0.0 });
-    const QCP::Pixels there = other.map(QCP::Data { 0.0, 0.0 });
+    // Measure the delta where the recording is, not at data (0, 0): the tolerance above allows the
+    // two slopes to differ by a thousandth of a pixel across the visible span, which at a 1.7e9
+    // epoch is tens of pixels of drift at the origin. At the range's lower corner the delta is the
+    // one the visible pixels moved by.
+    // Measure the delta where the recording is, not at data (0, 0): the tolerance above allows the
+    // two slopes to differ by a thousandth of a pixel across the visible span, which at a 1.7e9
+    // epoch is tens of pixels of drift at the origin. At the range's lower corner the delta is the
+    // one the visible pixels moved by.
+    const QCP::Data corner { mKey.lower, mValue.lower };
+    const QCP::Pixels here = map(corner);
+    const QCP::Pixels there = other.map(corner);
     if (delta)
         *delta = QPointF(here.x - there.x, here.y - there.y);
     return true;
