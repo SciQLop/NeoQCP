@@ -70,11 +70,8 @@ class QCPOverlay;
 class QCPItemCreationState;
 class QCustomPlot;
 
-using ItemCreator
-    = std::function<QCPAbstractItem*(QCustomPlot* plot, QCPAxis* keyAxis, QCPAxis* valueAxis)>;
-using ItemPositioner
-    = std::function<void(QCPAbstractItem* item, double anchorKey, double anchorValue,
-                         double currentKey, double currentValue)>;
+using ItemCreator = std::function<QCPAbstractItem*(QCustomPlot* plot, QCPAxis* keyAxis, QCPAxis* valueAxis)>;
+using ItemPositioner = std::function<void(QCPAbstractItem* item, double anchorKey, double anchorValue, double currentKey, double currentValue)>;
 
 namespace qcp
 {
@@ -104,8 +101,7 @@ class QCP_LIB_DECL QCustomPlot : public QRhiWidget
     Q_PROPERTY(QColor themeGrid READ themeGrid WRITE setThemeGrid)
     Q_PROPERTY(QColor themeSubGrid READ themeSubGrid WRITE setThemeSubGrid)
     Q_PROPERTY(QColor themeSelection READ themeSelection WRITE setThemeSelection)
-    Q_PROPERTY(
-        QColor themeLegendBackground READ themeLegendBackground WRITE setThemeLegendBackground)
+    Q_PROPERTY(QColor themeLegendBackground READ themeLegendBackground WRITE setThemeLegendBackground)
     Q_PROPERTY(QColor themeLegendBorder READ themeLegendBorder WRITE setThemeLegendBorder)
     /// \endcond
 
@@ -134,15 +130,14 @@ public:
                            ///< widget repaint is always queued via update().
         ,
         rpQueuedRefresh [[deprecated("Use rpImmediateRefresh — identical under QRhiWidget")]]
-        = rpImmediateRefresh ///< Deprecated. Identical to rpImmediateRefresh.
+            = rpImmediateRefresh ///< Deprecated. Identical to rpImmediateRefresh.
         ,
         rpRefreshHint [[deprecated("Use rpImmediateRefresh — identical under QRhiWidget")]]
-        = rpImmediateRefresh ///< Deprecated. Identical to rpImmediateRefresh.
+            = rpImmediateRefresh ///< Deprecated. Identical to rpImmediateRefresh.
         ,
-        rpQueuedReplot
-        = 3 ///< Queues the entire replot for the next event loop iteration. This way
-            ///< multiple redundant replots can be avoided.
-            ///< (Value 3 preserves ABI; 1–2 were the former rpQueuedRefresh/rpRefreshHint.)
+        rpQueuedReplot = 3 ///< Queues the entire replot for the next event loop iteration. This way
+                           ///< multiple redundant replots can be avoided.
+                           ///< (Value 3 preserves ABI; 1–2 were the former rpQueuedRefresh/rpRefreshHint.)
     };
     Q_ENUM(RefreshPriority)
 
@@ -158,8 +153,8 @@ public:
       Bumped whenever the viewport size, the device pixel ratio or the theme changes.
 
       A recording that contains view-dependent commands (text, images, painter paths, raw painter
-      code) is keyed on this on top of the object's own generation, so a resize re-records it while
-      a pan or a zoom, which changes neither, does not.
+      code) is keyed on this on top of the object's own generation, so a resize re-records it while a
+      pan or a zoom, which changes neither, does not.
     */
     [[nodiscard]] quint64 viewEpoch() const { return mViewEpoch; }
 
@@ -173,7 +168,6 @@ public:
     [[nodiscard]] quint64 itemsEpoch() const { return mItemsEpoch; }
 
     [[nodiscard]] QRhi* rhi() const { return mRhi; }
-
     [[nodiscard]] QCPPlottableRhiLayer* plottableRhiLayer(QCPLayer* layer);
     [[nodiscard]] QCPScatterRhiLayer* scatterRhiLayer(QCPLayer* layer);
     void registerColormapRhiLayer(QCPColormapRhiLayer* layer);
@@ -181,7 +175,6 @@ public:
     [[nodiscard]] QSize rhiOutputSize() const;
 
     [[nodiscard]] QPixmap background() const { return mBackgroundPixmap; }
-
     [[nodiscard]] QBrush backgroundBrush() const { return mBackgroundBrush; }
 
     [[nodiscard]] bool backgroundScaled() const { return mBackgroundScaled; }
@@ -191,15 +184,9 @@ public:
     // Never nullptr: a deleted root layout is replaced by an empty one.
     [[nodiscard]] QCPLayoutGrid* plotLayout() const;
 
-    [[nodiscard]] QCP::AntialiasedElements antialiasedElements() const
-    {
-        return mAntialiasedElements;
-    }
+    [[nodiscard]] QCP::AntialiasedElements antialiasedElements() const { return mAntialiasedElements; }
 
-    [[nodiscard]] QCP::AntialiasedElements notAntialiasedElements() const
-    {
-        return mNotAntialiasedElements;
-    }
+    [[nodiscard]] QCP::AntialiasedElements notAntialiasedElements() const { return mNotAntialiasedElements; }
 
     [[nodiscard]] bool autoAddPlottableToLegend() const { return mAutoAddPlottableToLegend; }
 
@@ -219,19 +206,12 @@ public:
 
     // Item creation mode
     void setItemCreator(ItemCreator creator);
-
     [[nodiscard]] const ItemCreator& itemCreator() const { return mItemCreator; }
-
     void setItemPositioner(ItemPositioner positioner);
-
     [[nodiscard]] const ItemPositioner& itemPositioner() const { return mItemPositioner; }
-
     void setCreationModeEnabled(bool enabled);
-
     [[nodiscard]] bool creationModeEnabled() const { return mCreationModeEnabled; }
-
     void setCreationModifier(Qt::KeyboardModifier mod);
-
     [[nodiscard]] Qt::KeyboardModifier creationModifier() const { return mCreationModifier; }
 
     // setters:
@@ -276,24 +256,18 @@ public:
     void setThemeLegendBackground(const QColor& color);
     [[nodiscard]] QColor themeLegendBorder() const;
     void setThemeLegendBorder(const QColor& color);
-
     // True from the first line of ~QCustomPlot's body (a subclass destructor has already run by
     // then). It is what mutators called from children's destroyed() slots see: they refuse, and
     // the getters make nothing. Children's own signals can still reach user slots during teardown
-    // (for example layerChanged(nullptr) as the layers are deleted); a slot should check this
-    // first.
+    // (for example layerChanged(nullptr) as the layers are deleted); a slot should check this first.
     [[nodiscard]] bool isBeingDestroyed() const { return mBeingDestroyed; }
-
     [[nodiscard]] bool isReplotting() const { return mReplotting; }
-
     // Schedules one queued replot for the next event-loop turn; requests and layer marks coalesce
     // into it. Asked during a replot, it runs in the turn after that replot. GUI thread only.
     void requestRepaint();
-
     // False also while a hidden plot owes a change: it is drawn when the plot shows again, and
     // nothing is queued meanwhile (setSkipReplotsWhenHidden).
     [[nodiscard]] bool isRepaintQueued() const { return mReplotQueued; }
-
     // The export barrier, run first by every export: commits pending data swaps that are ready, so
     // the export shows the newest data. Does not wait for worker-thread pipelines, and does not
     // repaint the screen (that follows next turn).
@@ -322,15 +296,13 @@ public:
     // themselves by returning no data extent.
     /*! Sets whether layers use the item index (see QCPAbstractItem::dataExtent()).
 
-  On (the default) each layer keeps a packed R-tree of its items' data boxes and skips the ones
-  whose extents miss the queried pixel area, for drawing and for hit testing. Off, every item is
-  drawn and tested, which is what the randomized tests use as the oracle. Toggling invalidates the
-  indices and asks for one repaint.
+  On (the default) each layer keeps a packed R-tree of its items' data boxes and skips the ones whose
+  extents miss the queried pixel area, for drawing and for hit testing. Off, every item is drawn and
+  tested, which is what the randomized tests use as the oracle. Toggling invalidates the indices and
+  asks for one repaint.
   */
-    void setItemIndexing(bool on);
-
+  void setItemIndexing(bool on);
     [[nodiscard]] bool itemIndexing() const { return mItemIndexing; }
-
     // Deferred data swap: plottables that staged a replacement data source call
     // requestDataSwap() once it is ready. The first request opens a window of
     // dataSwapDebounceMs; every plottable ready by the end of it is committed and
@@ -342,19 +314,13 @@ public:
     // gets its data.
     void requestDataSwap();
     void setDataSwapDebounceMs(int ms);
-
     [[nodiscard]] int dataSwapDebounceMs() const { return mDataSwapDebounceMs; }
-
     void setDataSwapMaxWaitMs(int ms);
-
     [[nodiscard]] int dataSwapMaxWaitMs() const { return mDataSwapMaxWaitMs; }
-
     // Whether the widget has been shown at least once (used by the hidden-replot guard).
     bool wasShown() const { return mWasShown; }
-
     // pipeline:
     [[nodiscard]] QCPPipelineScheduler* pipelineScheduler() const { return mPipelineScheduler; }
-
     void setMaxPipelineThreads(int count);
 
     // non-property methods:
@@ -368,15 +334,13 @@ public:
     // plottable groups: one legend row for several plottables (QCPPlottableGroup)
     QCPPlottableGroup* addPlottableGroup(const QString& name);
     bool removePlottableGroup(QCPPlottableGroup* group);
-
     [[nodiscard]] QList<QCPPlottableGroup*> plottableGroups() const { return mPlottableGroups; }
-
     [[nodiscard]] QList<QCPAbstractPlottable*> selectedPlottables() const;
     template <class PlottableType>
     [[nodiscard]] PlottableType* plottableAt(const QPointF& pos, bool onlySelectable = false,
-                                             int* dataIndex = nullptr) const;
+                               int* dataIndex = nullptr) const;
     [[nodiscard]] QCPAbstractPlottable* plottableAt(const QPointF& pos, bool onlySelectable = false,
-                                                    int* dataIndex = nullptr) const;
+                                      int* dataIndex = nullptr) const;
     [[nodiscard]] bool hasPlottable(QCPAbstractPlottable* plottable) const;
 
     // Creates a T the plot owns and returns its fluent handle (qcp::HandleFor<T>). What args mean
@@ -389,8 +353,7 @@ public:
     //  - group: add<QCPBarsGroup>(), add<QCPPlottableGroup>(name);
     //  - axis: axisRect->add<QCPAxis>(type).
     // A refusal (plot being destroyed, no default axes, a taken cell, ...) reports misuse
-    // (qcp::reportMisuse) and returns an empty handle; addGraph() logs with qDebug and returns
-    // nullptr.
+    // (qcp::reportMisuse) and returns an empty handle; addGraph() logs with qDebug and returns nullptr.
     template <typename T, typename... Args>
     qcp::HandleFor<T> add(Args&&... args);
 
@@ -446,10 +409,9 @@ public:
     bool setCurrentLayer(QCPLayer* layer);
     [[nodiscard]] int layerCount() const;
     [[nodiscard]] bool addLayer(const QString& name, QCPLayer* otherLayer = nullptr,
-                                LayerInsertMode insertMode = limAbove);
+                  LayerInsertMode insertMode = limAbove);
     [[nodiscard]] bool removeLayer(QCPLayer* layer);
-    [[nodiscard]] bool moveLayer(QCPLayer* layer, QCPLayer* otherLayer,
-                                 LayerInsertMode insertMode = limAbove);
+    [[nodiscard]] bool moveLayer(QCPLayer* layer, QCPLayer* otherLayer, LayerInsertMode insertMode = limAbove);
 
     // axis rect/layout interface:
     [[nodiscard]] int axisRectCount() const;
@@ -464,25 +426,22 @@ public:
     Q_SLOT void deselectAll();
 
     [[nodiscard]] bool savePdf(const QString& fileName, int width = 0, int height = 0,
-                               QCP::ExportPen exportPen = QCP::epAllowCosmetic,
-                               const QString& pdfCreator = QString(),
-                               const QString& pdfTitle = QString());
-    [[nodiscard]] bool savePng(const QString& fileName, int width = 0, int height = 0,
-                               double scale = 1.0, int quality = -1, int resolution = 96,
-                               QCP::ResolutionUnit resolutionUnit = QCP::ruDotsPerInch);
-    [[nodiscard]] bool saveJpg(const QString& fileName, int width = 0, int height = 0,
-                               double scale = 1.0, int quality = -1, int resolution = 96,
-                               QCP::ResolutionUnit resolutionUnit = QCP::ruDotsPerInch);
-    [[nodiscard]] bool saveBmp(const QString& fileName, int width = 0, int height = 0,
-                               double scale = 1.0, int resolution = 96,
-                               QCP::ResolutionUnit resolutionUnit = QCP::ruDotsPerInch);
+                 QCP::ExportPen exportPen = QCP::epAllowCosmetic,
+                 const QString& pdfCreator = QString(), const QString& pdfTitle = QString());
+    [[nodiscard]] bool savePng(const QString& fileName, int width = 0, int height = 0, double scale = 1.0,
+                 int quality = -1, int resolution = 96,
+                 QCP::ResolutionUnit resolutionUnit = QCP::ruDotsPerInch);
+    [[nodiscard]] bool saveJpg(const QString& fileName, int width = 0, int height = 0, double scale = 1.0,
+                 int quality = -1, int resolution = 96,
+                 QCP::ResolutionUnit resolutionUnit = QCP::ruDotsPerInch);
+    [[nodiscard]] bool saveBmp(const QString& fileName, int width = 0, int height = 0, double scale = 1.0,
+                 int resolution = 96, QCP::ResolutionUnit resolutionUnit = QCP::ruDotsPerInch);
     [[nodiscard]] bool saveRastered(const QString& fileName, int width, int height, double scale,
-                                    const char* format, int quality = -1, int resolution = 96,
-                                    QCP::ResolutionUnit resolutionUnit = QCP::ruDotsPerInch);
+                      const char* format, int quality = -1, int resolution = 96,
+                      QCP::ResolutionUnit resolutionUnit = QCP::ruDotsPerInch);
     [[nodiscard]] QPixmap toPixmap(int width = 0, int height = 0, double scale = 1.0);
     void toPainter(QCPPainter* painter, int width = 0, int height = 0);
-    Q_SLOT void replot(QCustomPlot::RefreshPriority refreshPriority
-                       = QCustomPlot::rpImmediateRefresh);
+    Q_SLOT void replot(QCustomPlot::RefreshPriority refreshPriority = QCustomPlot::rpImmediateRefresh);
     [[nodiscard]] double replotTime(bool average = false) const;
 
     // Cleared by ~QCPAxis (through axisRemoved) and ~QCPLegend (through legendRemoved).
@@ -583,8 +542,7 @@ protected:
     // no-op and must not force a replot.
     void commitPendingData();
     bool commitEveryPendingSource();
-    // Bumped by every layer mark; a replot reaching a layer in its draw loop records the current
-    // one.
+    // Bumped by every layer mark; a replot reaching a layer in its draw loop records the current one.
     quint64 mPaintGeneration = 0;
     // An explicit rpQueuedReplot during a replot: the end of that replot schedules it.
     bool mRepaintAskedDuringReplot = false;
@@ -658,14 +616,11 @@ protected:
     void announceUserSelection();
     void pinchStep(const QEventPoint& a, const QEventPoint& b);
     QPointF touchPosition(const QEventPoint& point) const;
-
-    struct TouchState
-    {
-        bool pinching = false; // two fingers were down: no mouse until all are lifted
-        bool mouseDown = false; // one finger is acting as the left mouse button
-        QHash<int, QPointF> positions; // each finger's position after the previous event
+    struct TouchState {
+        bool pinching = false;    // two fingers were down: no mouse until all are lifted
+        bool mouseDown = false;   // one finger is acting as the left mouse button
+        QHash<int, QPointF> positions;   // each finger's position after the previous event
     } mTouch;
-
     bool nativeGestureEvent(QNativeGestureEvent* event);
 
     // introduced virtual methods:
@@ -743,13 +698,13 @@ qcp::HandleFor<T> QCustomPlot::add(Args&&... args)
 template <typename T>
 qcp::HandleFor<T> QCustomPlot::add(std::unique_ptr<T> object)
 {
-    static_assert(std::derived_from<T, QCPAbstractPlottable>
-                      || std::derived_from<T, QCPAbstractItem> || std::is_same_v<T, QCPPolarGraph>,
+    static_assert(std::derived_from<T, QCPAbstractPlottable> || std::derived_from<T, QCPAbstractItem>
+                      || std::is_same_v<T, QCPPolarGraph>,
                   "add(std::unique_ptr<T>) takes plottables, items and polar graphs");
     using Handle = qcp::HandleFor<T>;
-    QCP_CHECK_OR_RETURN(object, "the pointer is empty", Handle { });
+    QCP_CHECK_OR_RETURN(object, "the pointer is empty", Handle{});
     if (!adopt(object.get()))
-        return Handle { };
+        return Handle{};
     Handle handle = qcp::makeHandle<Handle>(object.release());
     handle.get()->markDirty();
     return handle;
@@ -758,8 +713,8 @@ qcp::HandleFor<T> QCustomPlot::add(std::unique_ptr<T> object)
 template <typename T>
 std::unique_ptr<T> QCustomPlot::take(QCPHandle<T> handle)
 {
-    static_assert(std::derived_from<T, QCPAbstractPlottable>
-                      || std::derived_from<T, QCPAbstractItem> || std::is_same_v<T, QCPPolarGraph>,
+    static_assert(std::derived_from<T, QCPAbstractPlottable> || std::derived_from<T, QCPAbstractItem>
+                      || std::is_same_v<T, QCPPolarGraph>,
                   "take(handle) works on plottables, items and polar graphs");
     QCP_CHECK_OR_RETURN(handle, "the handle is dead", nullptr);
     T* object = handle.get();
