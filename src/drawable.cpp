@@ -2,8 +2,12 @@
 
 #include "core.h"
 #include "misuse.h"
+#include "painting/command-replay-rhi.h"
 #include "painting/draw-commands.h"
 #include "painting/draw-context.h"
+#include "painting/painter.h"
+#include "painting/raster-fallback.h"
+#include "plottables/plottable-draw-utils.h"
 
 #include <QDebug>
 #include <QPainter>
@@ -29,6 +33,9 @@ bool usesTheView(const QCPDrawList& list)
 struct QCPDrawnCore::State
 {
     QCPDrawList recording;
+    QCPResolveCache resolve;
+    qcp::QCPRasterFallback raster;
+    QCPExtrusionCache extrusion;
     quint64 generation = 0;
     quint64 recordedGeneration = 0;
     quint64 recordedEpoch = 0;
@@ -59,6 +66,11 @@ bool QCPDrawnCore::contentChanged()
 int QCPDrawnCore::recordingCount() const
 {
     return mState->recordings;
+}
+
+quint64 QCPDrawnCore::resolveRemapCount() const
+{
+    return mState->resolve.remapCount();
 }
 
 bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView& view)
@@ -97,7 +109,21 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
         return;
     const QCPDrawFrame frame
         = qcpMakeFrame(view.keyAxis, view.valueAxis, view.axisRect, QRectF(view.clip));
-    qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::All);
+    QCPPlottableRhiLayer* plottables
+        = painter.isExporting() ? nullptr : qcp::gpuLayer(view.plot, view.layer, false);
+    QCPScatterRhiLayer* scatter = plottables ? view.plot->scatterRhiLayer(view.layer) : nullptr;
+    if (!plottables || !scatter)
+    {
+        // An export has no GPU pass, and so has a screen without a backend: the painter draws it
+        // all, and never touches the caches a screen frame resolves into.
+        qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::All);
+        return;
+    }
+    qcpReplayWithRhi(mState->recording, *plottables, *scatter, frame, mState->resolve,
+                     mState->raster, view.plot->bufferDevicePixelRatio(),
+                     view.plot->rhiOutputSize(), mState->recordedGeneration, &mState->extrusion);
+    qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::PainterOnly,
+                         &mState->raster);
 }
 
 std::optional<double> QCPDrawnCore::hitTest(const QCPDrawable& object, QCP::Pixels, QVariant*,

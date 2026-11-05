@@ -17,4 +17,8 @@ private slots:
     void viewEpochReRecordsEscapeHatch();
     void contentChangedInsideDrawIsAMisuse();
     void missingAxisHidesWithAMessage();
+
+    void panReusesResolvedGeometry();
+    void exportDoesNotPoisonTheResolveCache();
+    void drawnPolygonStacksAboveAnEarlierGpuGraph();
 };

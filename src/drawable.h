@@ -92,6 +92,9 @@ public:
     //! Test hook: how many times the object was asked to record.
     [[nodiscard]] int recordingCount() const;
 
+    //! Test hook: how many times the resolve cache mapped a recording again.
+    [[nodiscard]] quint64 resolveRemapCount() const;
+
 private:
     bool ensureRecording(const QCPDrawable& object, const QCPDrawnView& view);
 

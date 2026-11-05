@@ -3,6 +3,7 @@
 #include "Profiling.hpp"
 #include <QtMath>
 #include <array>
+#include <atomic>
 #include <cstring>
 
 namespace QCPLineExtruder
@@ -10,6 +11,8 @@ namespace QCPLineExtruder
 
 namespace
 {
+//! Test hook: the extrusions since the process started (see extruderCallCount()).
+std::atomic<quint64> gExtrusions { 0 };
 
 constexpr float MITER_LIMIT = 4.0f;
 
@@ -211,6 +214,7 @@ float appendPolylineImpl(std::span<const QPointF> points, float penWidth, const 
     PROFILE_HERE_N("extrudePolyline");
     if (points.size() < 2 || penWidth <= 0.0f)
         return startDistance;
+    gExtrusions.fetch_add(1, std::memory_order_relaxed);
     PROFILE_PASS_VALUE(points.size());
 
     auto rgba = qcp::rhi::premultipliedColor(color);
@@ -241,6 +245,11 @@ float appendPolylineImpl(std::span<const QPointF> points, float penWidth, const 
 }
 
 } // anonymous namespace
+
+quint64 extruderCallCount()
+{
+    return gExtrusions.load(std::memory_order_relaxed);
+}
 
 void appendPolyline(std::span<const QPointF> points, float penWidth,
                      const QColor& color, std::vector<float>& out, bool closed)

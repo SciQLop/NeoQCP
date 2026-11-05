@@ -55,15 +55,33 @@ std::vector<float>& markerScratch()
     return points;
 }
 
-void addPolyline(QCPPlottableRhiLayer& layer, std::span<const QPointF> points, const QPen& pen,
-                 const QRect& clip, double dpr, int height, bool closed = false)
+//! Strokes \a points on the layer, through \a cache when the command's triangles may be kept.
+void addPolyline(const QCPDrawList& list, const qcp::QCPDrawCommand& command,
+                 QCPPlottableRhiLayer& layer, std::span<const QPointF> points, const QPen& pen,
+                 const QCPTransform& transform, const QRect& clip, double dpr, int height,
+                 QCPExtrusionCache* cache, bool closed = false)
 {
     if (!qcp::canStrokeOnGpu(pen) || points.size() < 2)
         return;
     const float width = qcp::extrusionPenWidth(pen, dpr);
     std::vector<float>& verts = strokeScratch();
+    if (!cache)
+    {
+        qcp::extrudeStroke(points, pen, width, verts, closed);
+        qcp::addGpuStroke(layer, verts, pen, width, clip, dpr, height);
+        return;
+    }
+    const quint64 key = qcpCommandIndex(list, command);
+    QPointF delta;
+    const std::span<const float> kept = cache->translated(key, transform, &delta);
+    if (!kept.empty())
+    {
+        qcp::addGpuStroke(layer, kept, pen, width, clip, dpr, height, delta);
+        return;
+    }
     qcp::extrudeStroke(points, pen, width, verts, closed);
     qcp::addGpuStroke(layer, verts, pen, width, clip, dpr, height);
+    cache->keep(key, transform, verts);
 }
 
 // Triangle strip between two pixel-space curves of the same length.
@@ -221,6 +239,7 @@ QCPResolveCache::pixels(const std::shared_ptr<const std::vector<QPointF>>& recor
             transform.map(data, std::span<QPointF>(entry.pixels));
             entry.generation = generation;
             entry.transform = transform;
+            ++mRemaps;
         }
         return std::span<const QPointF>(entry.pixels);
     }
@@ -233,6 +252,7 @@ QCPResolveCache::pixels(const std::shared_ptr<const std::vector<QPointF>>& recor
     const std::span<const QPointF> data(*recording);
     entry.pixels.resize(data.size());
     transform.map(data, std::span<QPointF>(entry.pixels));
+    ++mRemaps;
     return std::span<const QPointF>(entry.pixels);
 }
 
@@ -241,14 +261,81 @@ void QCPResolveCache::clear()
     mEntries.clear();
 }
 
+void QCPExtrusionCache::beginReplay(quint64 list)
+{
+    // A re-recorded list (or another recording) shares no command index with the kept geometry.
+    if (!mStarted || list != mList)
+    {
+        mEntries.clear();
+        mList = list;
+        mStarted = true;
+        return;
+    }
+    for (auto it = mEntries.begin(); it != mEntries.end();)
+    {
+        if (!it->used)
+            it = mEntries.erase(it);
+        else
+        {
+            it->used = false;
+            ++it;
+        }
+    }
+}
+
+std::span<const float> QCPExtrusionCache::translated(quint64 key, const QCPTransform& transform,
+                                                     QPointF* delta)
+{
+    for (Entry& entry : mEntries)
+    {
+        if (entry.key != key)
+            continue;
+        entry.used = true;
+        if (entry.vertices.empty() || !transform.isTranslationOf(entry.transform, delta))
+            return { };
+        return std::span<const float>(entry.vertices);
+    }
+    Entry& entry = mEntries.emplace_back();
+    entry.key = key;
+    entry.used = true;
+    return { };
+}
+
+void QCPExtrusionCache::keep(quint64 key, const QCPTransform& transform,
+                             std::span<const float> vertices)
+{
+    for (Entry& entry : mEntries)
+    {
+        if (entry.key != key)
+            continue;
+        entry.vertices.assign(vertices.begin(), vertices.end());
+        entry.transform = transform;
+        entry.used = true;
+        return;
+    }
+    Entry& entry = mEntries.emplace_back();
+    entry.key = key;
+    entry.vertices.assign(vertices.begin(), vertices.end());
+    entry.transform = transform;
+    entry.used = true;
+}
+
+void QCPExtrusionCache::clear()
+{
+    mEntries.clear();
+    mStarted = false;
+}
+
 void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                       QCPScatterRhiLayer& scatter, const QCPDrawFrame& frame,
                       QCPResolveCache& cache, qcp::QCPRasterFallback& fallback, double dpr,
-                      const QSize& outputSize, quint64 generation)
+                      const QSize& outputSize, quint64 generation, QCPExtrusionCache* extrusion)
 {
     PROFILE_HERE_N("qcpReplayWithRhi");
     cache.beginReplay();
     fallback.beginReplay();
+    if (extrusion)
+        extrusion->beginReplay(list.id);
     const int outputHeight = outputSize.height();
     const QRect clip = frame.clip.isEmpty() ? QRect() : frame.clip.toAlignedRect();
     std::vector<QPointF>& pixels = pixelScratch();
@@ -266,7 +353,8 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                     addRasterCommand(list, plottables, command, frame, fallback, clip, dpr,
                                      outputSize, generation);
                     if (!qcp::strokeNeedsRaster(command))
-                        addPolyline(plottables, resolved, cmd.pen, clip, dpr, outputHeight);
+                        addPolyline(list, command, plottables, resolved, cmd.pen, frame.transform,
+                                    clip, dpr, outputHeight, extrusion);
                 }
                 else if constexpr (std::is_same_v<T, qcp::PolylinePositionsCmd>)
                 {
@@ -274,7 +362,8 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                     addRasterCommand(list, plottables, command, frame, fallback, clip, dpr,
                                      outputSize, generation);
                     if (!qcp::strokeNeedsRaster(command))
-                        addPolyline(plottables, pixels, cmd.pen, clip, dpr, outputHeight);
+                        addPolyline(list, command, plottables, pixels, cmd.pen, frame.transform,
+                                    clip, dpr, outputHeight, extrusion);
                 }
                 else if constexpr (std::is_same_v<T, qcp::PolygonCmd>)
                 {
@@ -284,8 +373,8 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                                      outputSize, generation);
                     qcpResolveInto(cmd.points, frame, pixels);
                     if (!qcp::strokeNeedsRaster(command))
-                        addPolyline(plottables, qcpRingOf(pixels), cmd.pen, clip, dpr, outputHeight,
-                                    true);
+                        addPolyline(list, command, plottables, qcpRingOf(pixels), cmd.pen,
+                                    frame.transform, clip, dpr, outputHeight, extrusion, true);
                 }
                 else if constexpr (std::is_same_v<T, qcp::FillBetweenCmd>)
                 {
@@ -322,7 +411,8 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                     {
                         pixels.assign({ box.topLeft(), box.topRight(), box.bottomRight(),
                                         box.bottomLeft(), box.topLeft() });
-                        addPolyline(plottables, pixels, cmd.pen, clip, dpr, outputHeight, true);
+                        addPolyline(list, command, plottables, pixels, cmd.pen, frame.transform,
+                                    clip, dpr, outputHeight, extrusion, true);
                     }
                 }
                 else if constexpr (std::is_same_v<T, qcp::EllipseCmd>)
@@ -341,7 +431,8 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                     addRasterCommand(list, plottables, command, frame, fallback, clip, dpr,
                                      outputSize, generation);
                     if (!qcp::strokeNeedsRaster(command))
-                        addPolyline(plottables, pixels, cmd.pen, clip, dpr, outputHeight, true);
+                        addPolyline(list, command, plottables, pixels, cmd.pen, frame.transform,
+                                    clip, dpr, outputHeight, extrusion, true);
                 }
                 else if constexpr (std::is_same_v<T, qcp::ErrorBarsCmd>)
                 {
@@ -350,7 +441,8 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                     // place.
                     qcpErrorBarPixels(frame, std::span<const QPointF>(*cmd.centres),
                                       std::span<const QPointF>(*cmd.spans), pixels);
-                    addPolyline(plottables, pixels, cmd.pen, clip, dpr, outputHeight);
+                    addPolyline(list, command, plottables, pixels, cmd.pen, frame.transform, clip,
+                                dpr, outputHeight, extrusion);
                 }
                 else if constexpr (std::is_same_v<T, qcp::MarkersCmd>)
                 {

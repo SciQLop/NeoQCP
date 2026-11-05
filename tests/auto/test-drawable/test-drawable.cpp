@@ -3,9 +3,12 @@
 #include <drawable.h>
 #include <misuse.h>
 #include <painting/draw-context.h>
+#include <painting/line-extruder.h>
 #include <qcustomplot.h>
 
+#include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
 #include <memory>
+#include <vector>
 
 namespace
 {
@@ -50,6 +53,18 @@ public:
         ++drawCalls;
         if (contentChangeInsideDraw)
             const_cast<TestShape*>(this)->contentChanged();
+        if (bars > 0)
+        {
+            for (int i = 0; i < bars; ++i)
+            {
+                const double key = 1.0 + 8.0 * i / bars;
+                context.rect(QCP::Data { key, 1.0 }, QCP::Data { key + 8.0 / bars, 3.0 },
+                             QPen(Qt::black), QBrush(Qt::NoBrush));
+            }
+            return;
+        }
+        if (withPolyline)
+            context.polyline(mLine, QPen(Qt::black, 2));
         if (escapeHatch)
         {
             context.painter(
@@ -62,15 +77,24 @@ public:
         }
         const QCP::Position corners[]
             = { QCP::Data { 2, 2 }, QCP::Data { 6, 2 }, QCP::Data { 6, 6 }, QCP::Data { 2, 6 } };
-        context.polygon(corners, QPen(Qt::black), QBrush(Qt::darkRed));
+        context.polygon(corners, QPen(Qt::black), QBrush(fill));
         if (withText)
             context.text(QCP::Data { 4, 4 }, QStringLiteral("x"), QCPTextStyle { });
     }
 
     void touch() { contentChanged(); }
 
+    //! Test hook: how many times the resolve cache mapped a recording again.
+    [[nodiscard]] quint64 remaps() const { return mCore.resolveRemapCount(); }
+
     QCPItemPosition* mAnchor = nullptr;
+    std::shared_ptr<const std::vector<QPointF>> mLine
+        = std::make_shared<const std::vector<QPointF>>(
+            std::initializer_list<QPointF> { { 1, 1 }, { 3, 5 }, { 5, 2 }, { 7, 6 }, { 9, 1 } });
+    QColor fill = QColor(Qt::darkRed);
+    int bars = 0;
     bool withText = false;
+    bool withPolyline = false;
     bool escapeHatch = false;
     bool contentChangeInsideDraw = false;
     mutable int drawCalls = 0;
@@ -86,8 +110,30 @@ struct Fixture
         plot->yAxis->setRange(0, 10);
     }
 
+    //! Shows the plot and reports whether a real QRhi came up (the GPU path needs one).
+    bool hasRhi()
+    {
+        plot->show();
+        if (!QTest::qWaitForWindowExposed(plot.get()))
+            return false;
+        QCoreApplication::processEvents();
+        return plot->rhi() != nullptr;
+    }
+
     std::unique_ptr<QCustomPlot> plot;
 };
+
+QColor pixelAt(const QImage& frame, QCustomPlot* plot, double key, double value)
+{
+    const double dpr = frame.devicePixelRatio();
+    const QPointF p(plot->xAxis->coordToPixel(key), plot->yAxis->coordToPixel(value));
+    return frame.pixelColor(qRound(p.x() * dpr), qRound(p.y() * dpr));
+}
+
+bool isBlue(const QColor& c)
+{
+    return c.blue() > 200 && c.red() < 60 && c.green() < 60;
+}
 } // namespace
 
 void TestDrawable::init()
@@ -203,4 +249,58 @@ void TestDrawable::missingAxisHidesWithAMessage()
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 0);
     QCOMPARE(gAxisMessages, 1); // once per object, not once per frame
+}
+
+void TestDrawable::panReusesResolvedGeometry()
+{
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - the extruded vertices are a GPU path only");
+    auto* shape = new TestShape(f.plot.get());
+    shape->bars = 10000;
+    f.plot->replot();
+    const quint64 before = QCPLineExtruder::extruderCallCount();
+    QVERIFY2(before > 0, "the first frame must extrude the bars");
+
+    f.plot->xAxis->setRange(1, 11); // a pan: same span, one pixel offset
+    f.plot->replot();
+    QCOMPARE(QCPLineExtruder::extruderCallCount(), before);
+
+    f.plot->xAxis->setRange(4, 6); // a zoom: a new scale, so nothing can be shifted
+    f.plot->replot();
+    QVERIFY(QCPLineExtruder::extruderCallCount() > before);
+}
+
+void TestDrawable::exportDoesNotPoisonTheResolveCache()
+{
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - the resolve cache is a GPU path only");
+    auto* shape = new TestShape(f.plot.get());
+    shape->withPolyline = true;
+    f.plot->replot();
+    const quint64 remaps = shape->remaps();
+    QVERIFY2(remaps > 0, "the first frame must resolve the line");
+
+    f.plot->toPixmap(800, 600); // an export: its own transform, its own pixels
+    QCOMPARE(shape->remaps(), remaps);
+
+    f.plot->replot(); // the screen frame still resolves with the screen transform
+    QCOMPARE(shape->remaps(), remaps);
+}
+
+void TestDrawable::drawnPolygonStacksAboveAnEarlierGpuGraph()
+{
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - this checks the order of two GPU submissions");
+    auto* graph = f.plot->addGraph();
+    graph->setData(QVector<double> { 1, 9 }, QVector<double> { 4, 4 });
+    graph->setPen(QPen(Qt::red, 24));
+    auto* shape = new TestShape(f.plot.get()); // created after the graph: it must land above it
+    shape->fill = QColor(Qt::blue);
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+
+    const QColor colour = pixelAt(f.plot->grabFramebuffer(), f.plot.get(), 4, 4);
+    QVERIFY2(isBlue(colour), qPrintable(QString("the item drew as %1").arg(colour.name())));
 }

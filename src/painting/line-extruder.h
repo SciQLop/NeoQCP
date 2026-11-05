@@ -10,6 +10,10 @@
 namespace QCPLineExtruder
 {
 
+//! Test hook: how many polylines have been extruded since the process started. A replay that
+//! re-uses the vertices it kept for a pan adds none.
+[[nodiscard]] quint64 extruderCallCount();
+
 // Extrude a polyline into a triangle-list vertex buffer.
 // Each vertex: (x, y, r, g, b, a) — 6 floats.
 // NaN points in the input create gaps.
