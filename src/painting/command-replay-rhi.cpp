@@ -261,69 +261,42 @@ void QCPResolveCache::clear()
     mEntries.clear();
 }
 
-void QCPExtrusionCache::beginReplay(quint64 list)
+void QCPExtrusionCache::beginReplay(quint64 list, std::size_t commands)
 {
     // A re-recorded list (or another recording) shares no command index with the kept geometry.
-    if (!mStarted || list != mList)
+    if (list != mList)
     {
         mEntries.clear();
         mList = list;
-        mStarted = true;
-        return;
     }
-    for (auto it = mEntries.begin(); it != mEntries.end();)
-    {
-        if (!it->used)
-            it = mEntries.erase(it);
-        else
-        {
-            it->used = false;
-            ++it;
-        }
-    }
+    mEntries.resize(commands);
 }
 
 std::span<const float> QCPExtrusionCache::translated(quint64 key, const QCPTransform& transform,
                                                      QPointF* delta)
 {
-    for (Entry& entry : mEntries)
-    {
-        if (entry.key != key)
-            continue;
-        entry.used = true;
-        if (entry.vertices.empty() || !transform.isTranslationOf(entry.transform, delta))
-            return { };
-        return std::span<const float>(entry.vertices);
-    }
-    Entry& entry = mEntries.emplace_back();
-    entry.key = key;
-    entry.used = true;
-    return { };
+    if (key >= mEntries.size())
+        return { };
+    const Entry& entry = mEntries[key];
+    if (entry.vertices.empty() || !transform.isTranslationOf(entry.transform, delta))
+        return { };
+    return std::span<const float>(entry.vertices);
 }
 
 void QCPExtrusionCache::keep(quint64 key, const QCPTransform& transform,
                              std::span<const float> vertices)
 {
-    for (Entry& entry : mEntries)
-    {
-        if (entry.key != key)
-            continue;
-        entry.vertices.assign(vertices.begin(), vertices.end());
-        entry.transform = transform;
-        entry.used = true;
-        return;
-    }
-    Entry& entry = mEntries.emplace_back();
-    entry.key = key;
+    if (key >= mEntries.size())
+        mEntries.resize(key + 1);
+    Entry& entry = mEntries[key];
     entry.vertices.assign(vertices.begin(), vertices.end());
     entry.transform = transform;
-    entry.used = true;
 }
 
 void QCPExtrusionCache::clear()
 {
     mEntries.clear();
-    mStarted = false;
+    mList = 0;
 }
 
 void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
@@ -335,7 +308,7 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
     cache.beginReplay();
     fallback.beginReplay();
     if (extrusion)
-        extrusion->beginReplay(list.id);
+        extrusion->beginReplay(list.id, list.commands.size());
     const int outputHeight = outputSize.height();
     const QRect clip = frame.clip.isEmpty() ? QRect() : frame.clip.toAlignedRect();
     std::vector<QPointF>& pixels = pixelScratch();
