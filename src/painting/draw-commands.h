@@ -310,20 +310,6 @@ inline void qcpMapDataInto(std::span<const QPointF> points, const QCPTransform& 
     transform.map(points, std::span<QPointF>(out));
 }
 
-//! \a command's pen, or one that draws nothing: the kinds that have no stroke.
-inline QPen qcpCommandPen(const qcp::QCPDrawCommand& command)
-{
-    return std::visit(
-        [](const auto& cmd)
-        {
-            if constexpr (requires { cmd.pen; })
-                return cmd.pen;
-            else
-                return QPen(Qt::NoPen);
-        },
-        command);
-}
-
 //! The pixel polyline of error bars from their four mapped corners: bar plus two caps, with a gap
 //! between two bars so a replay never joins them.
 inline void qcpErrorBarPolyline(std::span<const QPointF> corners, std::vector<QPointF>& out)

@@ -54,33 +54,52 @@ bool strokeNeedsRaster(const QPen& pen)
     return pen.style() != Qt::NoPen && !gpuCanFill(pen.brush());
 }
 
+namespace
+{
+    //! Which halves of a command the raster has to paint: its fill, its stroke, or both.
+    struct RasterNeeds
+    {
+        bool fill = false;
+        bool stroke = false;
+    };
+
+    //! One dispatch answers both questions: every caller asks about both.
+    RasterNeeds rasterNeedsOf(const QCPDrawCommand& command)
+    {
+        return std::visit(
+            [](const auto& cmd)
+            {
+                using T = std::decay_t<decltype(cmd)>;
+                RasterNeeds needs;
+                if constexpr (requires { cmd.pen; })
+                    needs.stroke = strokeNeedsRaster(cmd.pen);
+                if constexpr (std::is_same_v<T, PolygonCmd>)
+                    needs.fill = !brushPaintsNothing(cmd.brush);
+                else if constexpr (std::is_same_v<T, FillBetweenCmd>)
+                    needs.fill = !brushPaintsNothing(cmd.brush)
+                        && (!gpuCanFill(cmd.brush) || cmd.upper->size() != cmd.lower->size());
+                else if constexpr (std::is_same_v<T, RectCmd> || std::is_same_v<T, EllipseCmd>)
+                    needs.fill = !brushPaintsNothing(cmd.brush) && !gpuCanFill(cmd.brush);
+                return needs;
+            },
+            command);
+    }
+} // namespace
+
 bool strokeNeedsRaster(const QCPDrawCommand& command)
 {
-    return strokeNeedsRaster(qcpCommandPen(command));
+    return rasterNeedsOf(command).stroke;
 }
 
 bool fillNeedsRaster(const QCPDrawCommand& command)
 {
-    return std::visit(
-        [](const auto& cmd)
-        {
-            using T = std::decay_t<decltype(cmd)>;
-            if constexpr (std::is_same_v<T, PolygonCmd>)
-                return !brushPaintsNothing(cmd.brush);
-            else if constexpr (std::is_same_v<T, FillBetweenCmd>)
-                return !brushPaintsNothing(cmd.brush)
-                    && (!gpuCanFill(cmd.brush) || cmd.upper->size() != cmd.lower->size());
-            else if constexpr (std::is_same_v<T, RectCmd> || std::is_same_v<T, EllipseCmd>)
-                return !brushPaintsNothing(cmd.brush) && !gpuCanFill(cmd.brush);
-            else
-                return false;
-        },
-        command);
+    return rasterNeedsOf(command).fill;
 }
 
 bool needsRaster(const QCPDrawCommand& command)
 {
-    return fillNeedsRaster(command) || strokeNeedsRaster(command);
+    const RasterNeeds needs = rasterNeedsOf(command);
+    return needs.fill || needs.stroke;
 }
 
 QRectF fallbackPixelBounds(const QCPDrawCommand& command, const QCPDrawFrame& frame, double dpr,
