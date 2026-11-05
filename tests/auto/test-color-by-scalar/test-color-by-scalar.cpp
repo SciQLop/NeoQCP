@@ -645,12 +645,12 @@ void TestColorByScalar::coloredReextrusionOnlyOnColorChangeNotPan()
     cache.vertices = {1, 2, 3, 4, 5, 6};
     cache.penWidth = 2.0f;
     cache.colorGeneration = 7;
-    QVERIFY(!qcp::needsColoredReextrusion(cache, false, 2.0f, 7));   // pan frame
-    QVERIFY(qcp::needsColoredReextrusion(cache, true, 2.0f, 7));     // fresh lines
-    QVERIFY(qcp::needsColoredReextrusion(cache, false, 3.0f, 7));    // pen width
-    QVERIFY(qcp::needsColoredReextrusion(cache, false, 2.0f, 8));    // colour changed
+    QVERIFY(!qcp::needsColoredReextrusion(cache, false, 2.0f, 7, false));   // pan frame
+    QVERIFY(qcp::needsColoredReextrusion(cache, true, 2.0f, 7, false));     // fresh lines
+    QVERIFY(qcp::needsColoredReextrusion(cache, false, 3.0f, 7, false));    // pen width
+    QVERIFY(qcp::needsColoredReextrusion(cache, false, 2.0f, 8, false));    // colour changed
     cache.clear();
-    QVERIFY(qcp::needsColoredReextrusion(cache, false, 2.0f, 7));    // empty
+    QVERIFY(qcp::needsColoredReextrusion(cache, false, 2.0f, 7, false));    // empty
 }
 
 void TestColorByScalar::coloredLineRendersTheGradient()

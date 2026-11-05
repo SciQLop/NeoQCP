@@ -24,6 +24,13 @@ private slots:
     void boundsCoverEveryCommand();
     void sharedDataIsNotCopied();
     void drawListIsCompact();
+    void resolveCacheSurvivesNewEntries();
+    void resolveCacheIgnoresAReusedAddress();
+    void resolveCacheEvictsUnusedEntries();
+    void dashLengthsIncludeTheCaps();
+    void emptyCustomDashIsSolid();
+    void closedRingJoinsTheSeam();
+    void nonSolidBrushIsNotFlattened();
     void errorBarsMapTheirSpansAsExtents();
     void ellipseFanFillCoversTheDisc();
     void mixedRecordingSplitsByKind();

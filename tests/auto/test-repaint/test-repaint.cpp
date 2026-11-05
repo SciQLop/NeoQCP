@@ -1,4 +1,6 @@
 #include "test-repaint.h"
+#include "painting/command-replay-rhi.h"
+#include "painting/draw-context.h"
 #include "painting/plottable-rhi-layer.h"
 #include "plottables/plottable-multigraph.h"
 #include "datasource/soa-multi-datasource.h"
@@ -25,7 +27,6 @@
 #include "plottables/plottable-financial.h"
 #include "plottables/plottable-graph2.h"
 #include "plottables/plottable-group.h"
-#include "plottables/plottable-histogram.h"
 #include "plottables/plottable-histogram2d.h"
 #include "plottables/plottable-statisticalbox.h"
 #include "plottables/plottable-waterfall.h"
@@ -2408,3 +2409,84 @@ void TestRepaint::dashedUnderSolidStaysUnder()
     QVERIFY2(crossing2.red() > 120 && crossing2.blue() < 90,
              "a dash that is on must stay above a solid line added before it");
 }
+
+void TestRepaint::panDoesNotMarkTheLayerDirty()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    auto* graph = plot->addGraph();
+    QVector<double> keys, values;
+    for (int i = 0; i <= 100; ++i)
+    {
+        keys << i / 100.0;
+        values << qSin(i / 12.0);
+    }
+    graph->setData(keys, values);
+    plot->rescaleAxes();
+    plot->replot();
+    QTRY_VERIFY_WITH_TIMEOUT(!plot->isRepaintQueued(), 5000);
+    auto* layer = plot->plottableRhiLayer(graph->layer());
+    QVERIFY(layer);
+    // The upload happens in the compositor's frame, not in replot(): wait for it.
+    QTRY_VERIFY_WITH_TIMEOUT(layer->solidVertexUploads() > 0, 5000);
+
+    // A pan moves the per-draw offsets only: the vertices are already on the GPU, and
+    // uploadResources re-uploads them exactly when isDirty() is set.
+    QVERIFY(!layer->isDirty());
+    const int uploads = layer->solidVertexUploads();
+    QVERIFY(uploads > 0);
+    layer->setAllOffsets(7.0f, 0.0f);
+    QVERIFY(!layer->isDirty());
+}
+
+void TestRepaint::gpuRectFillsBeforeStroking()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    QCPDrawContext context(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+    const QBrush brush(QColor(40, 160, 90));
+    context.rect(QCP::Data { 10, 10 }, QCP::Data { 80, 60 }, QPen(Qt::black, 2.0), brush);
+
+    auto* layer = plot->plottableRhiLayer(plot->currentLayer());
+    QVERIFY(layer);
+    layer->clear();
+    QCPResolveCache cache;
+    qcpReplayWithRhi(context.drawList(), *layer, *plot->scatterRhiLayer(plot->currentLayer()),
+                     context.frame(), cache, plot->bufferDevicePixelRatio(),
+                     plot->rhiOutputSize().height());
+    const auto& entries = layer->drawEntries();
+    QCOMPARE(int(entries.size()), 2);
+    QVERIFY2(entries.first().fillVertexCount > 0, "the fill must be submitted first");
+    QCOMPARE(entries.first().strokeVertexCount, 0);
+    QCOMPARE(entries.last().fillVertexCount, 0);
+    QVERIFY(entries.last().strokeVertexCount > 0);
+}
+
+void TestRepaint::unequalFillBetweenStaysOnThePainter()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    QCPDrawContext context(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+    const auto upper = std::make_shared<const std::vector<QPointF>>(
+        std::vector<QPointF> { { 0, 10 }, { 10, 12 }, { 20, 14 } });
+    const auto lower = std::make_shared<const std::vector<QPointF>>(
+        std::vector<QPointF> { { 0, 0 }, { 10, 1 } });
+    context.fillBetween(upper, lower, QBrush(QColor(60, 60, 200)));
+
+    auto* layer = plot->plottableRhiLayer(plot->currentLayer());
+    QVERIFY(layer);
+    layer->clear();
+    QCPResolveCache cache;
+    qcpReplayWithRhi(context.drawList(), *layer, *plot->scatterRhiLayer(plot->currentLayer()),
+                     context.frame(), cache, plot->bufferDevicePixelRatio(),
+                     plot->rhiOutputSize().height());
+    // Pairing two series of different lengths is not a ribbon: the painter pass fills it.
+    QVERIFY2(layer->drawEntries().isEmpty(), "a mismatched ribbon was filled on the GPU");
+}
+

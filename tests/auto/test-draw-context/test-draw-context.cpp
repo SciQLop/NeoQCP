@@ -662,3 +662,136 @@ void TestDrawContext::extruderContinuesArcLengthAcrossRuns()
                                                     Qt::black, verts);
     QVERIFY2(std::abs(afterGap - 10.0f) < 1e-4f, "a NaN gap restarts the arc length at zero");
 }
+
+void TestDrawContext::resolveCacheSurvivesNewEntries()
+{
+    // A span handed out before another recording was cached must still point at its own pixels.
+    Fixture fixture;
+    const QCPTransform transform(fixture.plot->xAxis, fixture.plot->yAxis);
+    const auto first = sharedPoints({{1, 2}, {3, 4}});
+    const auto second = sharedPoints({{5, 6}, {7, 8}, {9, 10}});
+    QCPResolveCache cache;
+    const std::span<const QPointF> a = cache.pixels(first, 1, transform);
+    QCOMPARE(int(a.size()), 2);
+    const std::span<const QPointF> b = cache.pixels(second, 1, transform);
+    QCOMPARE(int(b.size()), 3);
+    // Reading the first span after the second entry was added: ASan sees a dangling pointer here
+    // when the storage is a plain vector.
+    QCOMPARE(int(a.size()), 2);
+    const QPointF expected = pixelOf(transform, 1, 2);
+    QCOMPARE(a[0], expected);
+}
+
+void TestDrawContext::resolveCacheIgnoresAReusedAddress()
+{
+    Fixture fixture;
+    const QCPTransform transform(fixture.plot->xAxis, fixture.plot->yAxis);
+    const auto first = sharedPoints({{1, 2}, {3, 4}});
+    QCPResolveCache cache;
+    const std::span<const QPointF> a = cache.pixels(first, 1, transform);
+    QCOMPARE(int(a.size()), 2);
+    const auto* address = first.get();
+    // Freed, and a different recording of another size takes its place.
+    auto* replaced = new std::vector<QPointF>{{9, 9}, {9, 9}, {9, 9}, {9, 9}};
+    auto second = std::shared_ptr<const std::vector<QPointF>>(replaced);
+    cache.beginReplay();
+    const std::span<const QPointF> b = cache.pixels(second, 1, transform);
+    QCOMPARE(int(b.size()), 4);
+    QCOMPARE(b[0], pixelOf(transform, 9, 9));
+    Q_UNUSED(address);
+}
+
+void TestDrawContext::resolveCacheEvictsUnusedEntries()
+{
+    Fixture fixture;
+    const QCPTransform transform(fixture.plot->xAxis, fixture.plot->yAxis);
+    QCPResolveCache cache;
+    for (int i = 0; i < 100; ++i)
+    {
+        cache.beginReplay();
+        const auto recording = sharedPoints({{double(i), 1}, {2, 3}});
+        QCOMPARE(int(cache.pixels(recording, 1, transform).size()), 2);
+        QVERIFY(cache.entryCount() <= 1);
+    }
+}
+
+void TestDrawContext::dashLengthsIncludeTheCaps()
+{
+    // QPen's default SquareCap extends every dash by half the width at each end: QPainter draws
+    // 5w on / 1w off for DashLine, not 4/2.
+    const float width = 2.0f;
+    const qcp::DashPattern dash = qcp::dashPatternOf(QPen(Qt::black, width, Qt::DashLine), width);
+    QCOMPARE(dash.count, 2);
+    QCOMPARE(dash.lengths[0], 5.0f * width);
+    QCOMPARE(dash.lengths[1], 1.0f * width);
+
+    const qcp::DashPattern dot = qcp::dashPatternOf(QPen(Qt::black, width, Qt::DotLine), width);
+    QCOMPARE(dot.lengths[0], 2.0f * width);
+    QCOMPARE(dot.lengths[1], 1.0f * width);
+
+    QPen flat(Qt::black, width, Qt::DashLine);
+    flat.setCapStyle(Qt::FlatCap);
+    const qcp::DashPattern unchanged = qcp::dashPatternOf(flat, width);
+    QCOMPARE(unchanged.lengths[0], 4.0f * width);
+    QCOMPARE(unchanged.lengths[1], 2.0f * width);
+}
+
+void TestDrawContext::emptyCustomDashIsSolid()
+{
+    QPen pen(Qt::black, 2.0, Qt::CustomDashLine);
+    pen.setDashPattern({0, 0});
+    QVERIFY(!qcp::isDashed(pen));
+    std::vector<float> verts;
+    qcp::extrudeStroke(std::span<const QPointF>(std::array<QPointF, 3> { QPointF(0, 0),
+                                                                        QPointF(10, 0),
+                                                                        QPointF(20, 0) }),
+                       pen, 2.0f, verts);
+    QVERIFY(!verts.empty());
+    QCOMPARE(verts.size() % 6, std::size_t(0)); // 6 floats: the solid format
+}
+
+void TestDrawContext::closedRingJoinsTheSeam()
+{
+    const std::array<QPointF, 5> ring { QPointF(0, 0), QPointF(10, 0), QPointF(10, 10),
+                                        QPointF(0, 10), QPointF(0, 0) };
+    std::vector<float> closed;
+    qcp::extrudeStroke(std::span<const QPointF>(ring), QPen(Qt::black, 2.0), 2.0f, closed, true);
+    // The miter at the seam reaches halfWidth * sqrt(2) outside the corner; a butt end does not.
+    bool hasMiter = false;
+    for (std::size_t i = 0; i < closed.size(); i += 6)
+    {
+        const float x = std::abs(closed[i]);
+        const float y = std::abs(closed[i + 1]);
+        // halfWidth is 1: a miter lands on the diagonal corner (1.0, 1.0); a butt end has one
+        // coordinate at 1 and the other at 0.
+        if (x > 0.9f && x < 1.1f && y > 0.9f && y < 1.1f)
+            hasMiter = true;
+    }
+    QVERIFY2(hasMiter, "the ring's closing corner has no join");
+}
+
+void TestDrawContext::nonSolidBrushIsNotFlattened()
+{
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    QLinearGradient gradient(0, 0, 1, 0);
+    gradient.setColorAt(0, Qt::red);
+    gradient.setColorAt(1, Qt::blue);
+    context.rect(QCP::Data { 20, 20 }, QCP::Data { 120, 100 }, QPen(Qt::NoPen), QBrush(gradient));
+
+    QImage image(kWidth, kHeight, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::white);
+    {
+        QCPPainter painter(&image);
+        painter.setAntialiasing(true);
+        // The GPU cannot fill a gradient: the painter pass keeps it, fill only.
+        qcpReplayWithPainter(context.drawList(), painter, context.frame(), QCPReplayKinds::PainterOnly);
+    }
+    int painted = 0;
+    for (int y = 25; y < 95; y += 5)
+        for (int x = 25; x < 115; x += 5)
+            if (image.pixelColor(x, y) != QColor(Qt::white))
+                ++painted;
+    QVERIFY2(painted > 50, "the gradient fill disappeared");
+}

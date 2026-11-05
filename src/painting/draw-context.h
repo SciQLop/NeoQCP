@@ -116,6 +116,7 @@ private:
     QCPDrawContext(const QCPAxis* keyAxis, const QCPAxis* valueAxis, const QCPAxisRect* axisRect,
                    const QCPTheme* theme);
     friend class TestDrawContext;
+    friend class TestRepaint; //!< the GPU replay tests record through the same door
     friend class Benchmark; //!< records through the same door to time the replay
 
     std::unique_ptr<QCPDrawList> mList;

@@ -24,15 +24,16 @@ void extrudePolyline(const QVector<QPointF>& points, float penWidth,
 
 // Same as the out-param extrudePolyline(), but appends to out instead of clearing it first —
 // for building several colour runs into one shared vertex buffer without a per-run temporary.
+// \a closed joins the last segment to the first (a ring whose last point repeats the first).
 void appendPolyline(std::span<const QPointF> points, float penWidth,
-                     const QColor& color, std::vector<float>& out);
+                     const QColor& color, std::vector<float>& out, bool closed = false);
 
 // Same with 7 floats per vertex: (x, y, r, g, b, a, arc length in pixels). The arc length starts
 // at \a startDistance and the value at the end of the last segment is returned, so colour runs that
 // share a point continue one dash pattern. Each NaN-separated segment restarts at 0.
 float appendPolylineWithDistance(std::span<const QPointF> points, float penWidth,
                                  const QColor& color, std::vector<float>& out,
-                                 float startDistance = 0.0f);
+                                 float startDistance = 0.0f, bool closed = false);
 
 // Tessellate a baseline fill polygon into a triangle-list vertex buffer.
 // The polygon structure is: basePoint0, curvePoint0..N, basePoint1.

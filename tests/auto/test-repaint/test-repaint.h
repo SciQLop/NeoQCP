@@ -73,6 +73,9 @@ private slots:
     void dashPhaseSurvivesPan();
     void dashedLineMatchesExportDashes();
     void solidLinesKeepTheirVertexFormat();
+    void panDoesNotMarkTheLayerDirty();
+    void gpuRectFillsBeforeStroking();
+    void unequalFillBetweenStaysOnThePainter();
     void dashedUnderSolidStaysUnder();
 
 private:

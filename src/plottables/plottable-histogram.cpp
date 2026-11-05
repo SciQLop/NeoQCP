@@ -407,12 +407,29 @@ void QCPHistogram::drawColumnOnGpu(QCPPainter* painter, QCPPlottableRhiLayer* la
     const double dpr = mParentPlot->bufferDevicePixelRatio();
     // simplify: re-extruded per frame; fine for the hundreds of bins histograms use. Cache with
     // qcp::ExtrusionCache (drawPolylineCached) if a 10^5-bin case appears.
-    const QVector<float> stroke = QCPLineExtruder::extrudePolyline(
-        outline(bars), qcp::extrusionPenWidth(look.outline, dpr), look.outline.color());
-    if (fill.empty() && stroke.isEmpty())
+    const QVector<QPointF> outlinePoints = outline(bars);
+    std::vector<float> stroke;
+    const float penWidth = qcp::extrusionPenWidth(look.outline, dpr);
+    if (qcp::canStrokeOnGpu(look.outline))
+        qcp::extrudeStroke(std::span<const QPointF>(outlinePoints.constData(), outlinePoints.size()),
+                           look.outline, penWidth, stroke);
+    if (fill.empty() && stroke.empty())
         return;
-    layer->addPlottable(fill, stroke, clipRect(), dpr, mParentPlot->rhiOutputSize().height(), 0, 0,
-                        float(painter->opacity()));
+    const int height = mParentPlot->rhiOutputSize().height();
+    const float alpha = float(painter->opacity());
+    const QRect clip = clipRect();
+    // A solid outline stays in the same draw record as the fill (fill first: the outline's inner
+    // half must stay visible over it). A dashed one needs the dashed pipeline, so it is its own
+    // record, submitted after the fill.
+    if (!qcp::isDashed(look.outline))
+        layer->addPlottable(fill, stroke, clip, dpr, height, 0, 0, alpha);
+    else
+    {
+        if (!fill.empty())
+            layer->addPlottable(fill, {}, clip, dpr, height, 0, 0, alpha);
+        qcp::addGpuStroke(*layer, stroke, look.outline, penWidth, clip, dpr, height, QPointF(),
+                          alpha);
+    }
 }
 
 void QCPHistogram::paintColumn(QCPPainter* painter, std::span<const qcp::histogram::BarRect> bars,

@@ -61,7 +61,7 @@ bool needsReextrusion(const ExtrusionCache& cache, bool freshLines,
                       const QPen& pen, double devicePixelRatio)
 {
     return freshLines || cache.isEmpty()
-        || cache.withDistance != (pen.style() != Qt::SolidLine)
+        || cache.withDistance != isDashed(pen)
         || cache.penWidth != extrusionPenWidth(pen, devicePixelRatio)
         || cache.penColor != pen.color().rgba();
 }
@@ -106,11 +106,26 @@ DashPattern dashPatternOf(const QPen& pen, float penWidth)
         break;
     }
     }
+    // QPen's Square and Round caps extend every dash by half the width at both ends, so QPainter
+    // draws an "on" of L + width and an "off" of max(0, L - width): DashLine is 5w on / 1w off.
+    const bool capsExtend = pen.capStyle() != Qt::FlatCap;
+    // A pattern that draws nothing is not a dash: QPainter treats an empty or all-zero custom
+    // pattern as solid, and the cap rule below would otherwise turn 0/0 into 1/0.
+    float rawTotal = 0;
+    for (int i = 0; i < count; ++i)
+        rawTotal += static_cast<float>(units[i]);
+    if (rawTotal <= 0)
+        return {};
     float total = 0;
     for (int i = 0; i < count; ++i)
     {
-        result.lengths[i] = static_cast<float>(units[i]) * penWidth;
-        total += result.lengths[i];
+        float length = static_cast<float>(units[i]) * penWidth;
+        if (capsExtend)
+            length += (i % 2) == 0 ? penWidth : -penWidth;
+        if (length < 0)
+            length = 0;
+        result.lengths[i] = length;
+        total += length;
     }
     if (total <= 0)
         return {};
@@ -118,6 +133,11 @@ DashPattern dashPatternOf(const QPen& pen, float penWidth)
     result.total = total;
     result.offset = static_cast<float>(pen.dashOffset()) * penWidth;
     return result;
+}
+
+bool isDashed(const QPen& pen)
+{
+    return dashPatternOf(pen, 1.0f).count > 0;
 }
 
 namespace
@@ -133,30 +153,37 @@ std::vector<float>& strokeScratch()
 } // namespace
 
 void extrudeStroke(std::span<const QPointF> pts, const QPen& pen, float penWidth,
-                   std::vector<float>& out)
+                   std::vector<float>& out, bool closed)
 {
     out.clear();
-    if (pen.style() == Qt::SolidLine)
-        QCPLineExtruder::appendPolyline(pts, penWidth, pen.color(), out);
+    if (!isDashed(pen))
+        QCPLineExtruder::appendPolyline(pts, penWidth, pen.color(), out, closed);
     else
-        QCPLineExtruder::appendPolylineWithDistance(pts, penWidth, pen.color(), out);
+        QCPLineExtruder::appendPolylineWithDistance(pts, penWidth, pen.color(), out, 0.0f, closed);
 }
 
-void addGpuStroke(QCPPlottableRhiLayer& layer, std::span<const float> verts, const QPen& pen,
+bool addGpuStroke(QCPPlottableRhiLayer& layer, std::span<const float> verts, const QPen& pen,
                   float penWidth, const QRect& clipRect, double dpr, int outputHeight,
                   const QPointF& offset, float alpha)
 {
     if (verts.empty())
-        return;
-    const DashPattern pattern = dashPatternOf(pen, penWidth);
-    if (pattern.count > 0)
+        return false;
+    if (isDashed(pen))
+    {
+        // No dashed pipeline (it failed to build): the caller paints this stroke itself, rather
+        // than adding 7-float vertices to the 6-float buffer.
+        if (!layer.dashedAvailable())
+            return false;
+        const DashPattern pattern = dashPatternOf(pen, penWidth);
         layer.addDashedPlottable(verts, std::span<const float>(pattern.lengths.data(), pattern.count),
                                  pattern.offset, clipRect, dpr, outputHeight,
                                  static_cast<float>(offset.x()), static_cast<float>(offset.y()),
                                  alpha);
+    }
     else
         layer.addPlottable({}, verts, clipRect, dpr, outputHeight,
                            static_cast<float>(offset.x()), static_cast<float>(offset.y()), alpha);
+    return true;
 }
 
 bool strokePolylineOnGpu(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer* layer,
@@ -173,9 +200,9 @@ bool strokePolylineOnGpu(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer*
     extrudeStroke(pts, pen, penWidth, verts);
     if (verts.empty())
         return false;
-    addGpuStroke(*prl, verts, pen, penWidth, clipRect, dpr, parentPlot->rhiOutputSize().height(),
-                 gpuOffset, static_cast<float>(painter->opacity()));
-    return true;
+    return addGpuStroke(*prl, verts, pen, penWidth, clipRect, dpr,
+                        parentPlot->rhiOutputSize().height(), gpuOffset,
+                        static_cast<float>(painter->opacity()));
 }
 
 bool strokePolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer* layer,
@@ -191,16 +218,15 @@ bool strokePolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer
     if (needsReextrusion(cache, freshLines, pen, dpr))
     {
         extrudeStroke(pts, pen, penWidth, cache.vertices);
-        cache.withDistance = pen.style() != Qt::SolidLine;
+        cache.withDistance = isDashed(pen);
         cache.penWidth = penWidth;
         cache.penColor = pen.color().rgba();
     }
     if (cache.isEmpty())
         return false;
-    addGpuStroke(*prl, cache.vertices, pen, penWidth, clipRect, dpr,
-                 parentPlot->rhiOutputSize().height(), gpuOffset,
-                 static_cast<float>(painter->opacity()));
-    return true;
+    return addGpuStroke(*prl, cache.vertices, pen, penWidth, clipRect, dpr,
+                        parentPlot->rhiOutputSize().height(), gpuOffset,
+                        static_cast<float>(painter->opacity()));
 }
 
 void drawPolylineWithGpuFallback(QCPPainter* painter,
@@ -287,7 +313,7 @@ void drawColoredPolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCP
     const float penWidth = (pen.isCosmetic() || qFuzzyIsNull(pen.widthF()))
         ? static_cast<float>(1.0 / dpr)
         : qMax(1.0f, static_cast<float>(pen.widthF()));
-    const bool dashed = pen.style() != Qt::SolidLine;
+    const bool dashed = isDashed(pen);
     if (needsColoredReextrusion(cache, freshLines, penWidth, mapper.generation(), dashed))
     {
         const std::vector<ColorRun> runs = colorRuns(points, indices, mapper);

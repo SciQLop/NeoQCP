@@ -5,6 +5,8 @@
 
 #include <QColor>
 #include <QPointF>
+#include <deque>
+#include <memory>
 #include <span>
 #include <vector>
 
@@ -21,22 +23,33 @@ class QCPScatterRhiLayer;
 class QCPResolveCache
 {
 public:
-    //! The pixels of \\a data for this \\a key; \\a data is mapped only when the entry is stale.
-    [[nodiscard]] const std::vector<QPointF>& pixels(const void* key, quint64 generation,
-                                                     const QCPTransform& transform,
-                                                     std::span<const QPointF> data);
+    //! Marks the entries unused and sweeps those the previous replay did not touch.
+    void beginReplay();
+
+    /*!
+      The pixels of \a recording through \a transform, remapped only when the generation or the
+      transform changed. Keyed on the recording itself (a weak reference): a freed recording can
+      never be matched by a new vector that happens to live at the same address.
+    */
+    [[nodiscard]] std::span<const QPointF> pixels(
+        const std::shared_ptr<const std::vector<QPointF>>& recording, quint64 generation,
+        const QCPTransform& transform);
+
     void clear();
+    //! Test hook: how many recordings the cache holds.
+    [[nodiscard]] int entryCount() const { return int(mEntries.size()); }
 
 private:
     struct Entry
     {
-        const void* key = nullptr;
+        std::weak_ptr<const std::vector<QPointF>> recording;
         quint64 generation = 0;
         QCPTransform transform;
-        bool valid = false;
         std::vector<QPointF> pixels;
+        bool used = false;
     };
-    std::vector<Entry> mEntries;
+    // A deque keeps every entry (and the span handed out from it) at a stable address.
+    std::deque<Entry> mEntries;
 };
 
 /*!

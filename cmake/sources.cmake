@@ -187,6 +187,8 @@ set(NEOQCP_SHADERS
     src/painting/shaders/composite.frag
     src/painting/shaders/plottable.vert
     src/painting/shaders/plottable.frag
+    src/painting/shaders/plottable_dashed.vert
+    src/painting/shaders/plottable_dashed.frag
     src/painting/shaders/span.vert
     src/painting/shaders/contour_line.vert
     src/painting/shaders/contour_line.frag

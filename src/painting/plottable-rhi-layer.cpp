@@ -132,7 +132,7 @@ QCPPlottableRhiLayer::addPlottable(std::span<const float> fillVerts,
     }
 
     mDrawEntries.append(entry);
-    mDrawOrder.append({false, mDrawEntries.size() - 1});
+    mDrawOrder.append({false, int(mDrawEntries.size()) - 1});
     mDirty = true;
 }
 
@@ -166,7 +166,7 @@ void QCPPlottableRhiLayer::addDashedPlottable(std::span<const float> strokeVerts
     entry.vertexCount = int(strokeVerts.size()) / 7;
     dashStagingAppend(strokeVerts.data(), int(strokeVerts.size()));
     mDashEntries.append(entry);
-    mDrawOrder.append({true, mDashEntries.size() - 1});
+    mDrawOrder.append({true, int(mDashEntries.size()) - 1});
     mDirty = true;
 }
 
@@ -174,8 +174,11 @@ bool QCPPlottableRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc,
                                            int sampleCount)
 {
     PROFILE_HERE_N("QCPPlottableRhiLayer::ensurePipeline");
-    if (mPipeline && mDashPipeline && mLastSampleCount == sampleCount)
-        return true;
+    // A dashed pipeline that failed for this sample count is remembered: rebuilding it every frame
+    // would rebuild the solid one too, and the dashed lines would never appear again.
+    if (mPipeline && mLastSampleCount == sampleCount
+        && (mDashPipeline || (mDashBroken && mLastDashSampleCount == sampleCount)))
+        return mPipeline != nullptr;
 
     // Rebuild pipeline if sample count changed or first creation
     invalidatePipeline();
@@ -255,6 +258,10 @@ bool QCPPlottableRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc,
 void QCPPlottableRhiLayer::createDashedPipeline(QRhiRenderPassDescriptor* rpDesc,
                                                  int sampleCount)
 {
+    // Remembered even when this fails, so ensurePipeline does not rebuild both pipelines every
+    // frame; dashed strokes then fall back to QPainter through dashedAvailable().
+    mLastDashSampleCount = sampleCount;
+    mDashBroken = true;
     auto vertShader = qcp::rhi::loadEmbeddedShader(plottable_dashed_vert_qsb_data,
                                                    plottable_dashed_vert_qsb_data_len);
     auto fragShader = qcp::rhi::loadEmbeddedShader(plottable_dashed_frag_qsb_data,
@@ -316,7 +323,7 @@ void QCPPlottableRhiLayer::createDashedPipeline(QRhiRenderPassDescriptor* rpDesc
         mDashPipeline = nullptr;
         return;
     }
-    mLastDashSampleCount = sampleCount;
+    mDashBroken = false;
 }
 
 void QCPPlottableRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
@@ -371,8 +378,8 @@ void QCPPlottableRhiLayer::uploadSolid(QRhiResourceUpdateBatch* updates, const Q
         updates->updateDynamicBuffer(mUniformBuffer, i * stride, sizeof(params), &params);
     }
 
-    if (mStagingSize == 0)
-        return;
+    if (mStagingSize == 0 || !mDirty)
+        return; // a pan only moves the uniforms; the vertices are already on the GPU
 
     const int requiredSize = mStagingSize * static_cast<int>(sizeof(float));
     if (!mVertexBuffer || mVertexBufferSize < requiredSize)
@@ -391,6 +398,7 @@ void QCPPlottableRhiLayer::uploadSolid(QRhiResourceUpdateBatch* updates, const Q
         mVertexBufferSize = requiredSize;
     }
     updates->updateDynamicBuffer(mVertexBuffer, 0, requiredSize, mStagingData);
+    ++mSolidVertexUploads;
 }
 
 void QCPPlottableRhiLayer::uploadDashed(QRhiResourceUpdateBatch* updates, const QSize& outputSize,
@@ -433,8 +441,8 @@ void QCPPlottableRhiLayer::uploadDashed(QRhiResourceUpdateBatch* updates, const 
         updates->updateDynamicBuffer(mDashUniformBuffer, i * stride, sizeof(params), &params);
     }
 
-    if (mDashStagingSize == 0)
-        return;
+    if (mDashStagingSize == 0 || !mDirty)
+        return; // as above: nothing moved but the offsets
 
     const int requiredSize = mDashStagingSize * static_cast<int>(sizeof(float));
     if (!mDashVertexBuffer || mDashVertexBufferSize < requiredSize)
@@ -453,6 +461,7 @@ void QCPPlottableRhiLayer::uploadDashed(QRhiResourceUpdateBatch* updates, const 
         mDashVertexBufferSize = requiredSize;
     }
     updates->updateDynamicBuffer(mDashVertexBuffer, 0, requiredSize, mDashStagingData);
+    ++mDashVertexUploads;
 }
 
 void QCPPlottableRhiLayer::render(QRhiCommandBuffer* cb,
@@ -463,7 +472,7 @@ void QCPPlottableRhiLayer::render(QRhiCommandBuffer* cb,
     if (mDrawOrder.isEmpty())
         return;
 
-    cb->setViewport({0, 0, float(outputSize.width()), float(outputSize.height())});
+    const QRhiViewport viewport(0, 0, float(outputSize.width()), float(outputSize.height()));
 
     // Walk the submissions in order and rebind only when the pipeline actually changes: a solid
     // and a dashed plottable keep their relative stacking whatever their pens look like.
@@ -479,6 +488,7 @@ void QCPPlottableRhiLayer::render(QRhiCommandBuffer* cb,
             if (bound != Bound::Dashed)
             {
                 cb->setGraphicsPipeline(mDashPipeline);
+                cb->setViewport(viewport); // QRhi: the viewport belongs to the pipeline binding
                 bound = Bound::Dashed;
             }
             const auto& entry = mDashEntries[record.index];
@@ -496,6 +506,7 @@ void QCPPlottableRhiLayer::render(QRhiCommandBuffer* cb,
         if (bound != Bound::Solid)
         {
             cb->setGraphicsPipeline(mPipeline);
+            cb->setViewport(viewport);
             bound = Bound::Solid;
         }
         const auto& entry = mDrawEntries[record.index];

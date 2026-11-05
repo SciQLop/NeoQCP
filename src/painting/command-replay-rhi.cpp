@@ -52,25 +52,21 @@ std::vector<float>& markerScratch()
     return points;
 }
 
-bool isFillable(const QBrush& brush)
-{
-    return brush.style() != Qt::NoBrush && brush.color().alpha() != 0;
-}
 
 void addPolyline(QCPPlottableRhiLayer& layer, std::span<const QPointF> points, const QPen& pen,
-                 const QRect& clip, double dpr, int height)
+                 const QRect& clip, double dpr, int height, bool closed = false)
 {
     if (!qcp::canStrokeOnGpu(pen) || points.size() < 2)
         return;
     const float width = qcp::extrusionPenWidth(pen, dpr);
     std::vector<float>& verts = strokeScratch();
-    qcp::extrudeStroke(points, pen, width, verts);
+    qcp::extrudeStroke(points, pen, width, verts, closed);
     qcp::addGpuStroke(layer, verts, pen, width, clip, dpr, height);
 }
 
 // Triangle strip between two pixel-space curves of the same length.
-void addRibbonFill(QCPPlottableRhiLayer& layer, const std::vector<QPointF>& upper,
-                   const std::vector<QPointF>& lower, const QColor& color, const QRect& clip,
+void addRibbonFill(QCPPlottableRhiLayer& layer, std::span<const QPointF> upper,
+                   std::span<const QPointF> lower, const QColor& color, const QRect& clip,
                    double dpr, int height)
 {
     const std::size_t count = std::min(upper.size(), lower.size());
@@ -169,28 +165,50 @@ QPolygonF ellipseRing(QPointF a, QPointF b, int segments = 96)
 
 } // namespace
 
-const std::vector<QPointF>& QCPResolveCache::pixels(const void* key, quint64 generation,
-                                                    const QCPTransform& transform,
-                                                    std::span<const QPointF> data)
+void QCPResolveCache::beginReplay()
+{
+    // Sweep what the previous replay did not touch: a recording that is gone or no longer drawn.
+    for (auto it = mEntries.begin(); it != mEntries.end();)
+    {
+        if (!it->used || it->recording.expired())
+            it = mEntries.erase(it);
+        else
+        {
+            it->used = false;
+            ++it;
+        }
+    }
+}
+
+std::span<const QPointF> QCPResolveCache::pixels(
+    const std::shared_ptr<const std::vector<QPointF>>& recording, quint64 generation,
+    const QCPTransform& transform)
 {
     for (Entry& entry : mEntries)
     {
-        if (entry.key != key)
+        if (entry.recording.lock() != recording)
             continue;
-        if (entry.generation == generation && entry.transform == transform)
-            return entry.pixels;
-        entry.generation = generation;
-        entry.transform = transform;
-        entry.valid = true;
-        entry.pixels.resize(data.size());
-        transform.map(data, std::span<QPointF>(entry.pixels));
-        return entry.pixels;
+        entry.used = true;
+        if (entry.generation != generation || !(entry.transform == transform))
+        {
+            const std::span<const QPointF> data(*recording);
+            entry.pixels.resize(data.size());
+            transform.map(data, std::span<QPointF>(entry.pixels));
+            entry.generation = generation;
+            entry.transform = transform;
+        }
+        return std::span<const QPointF>(entry.pixels);
     }
-    mEntries.push_back(Entry { key, generation, transform, true, {} });
-    Entry& entry = mEntries.back();
+
+    Entry& entry = mEntries.emplace_back();
+    entry.recording = recording;
+    entry.generation = generation;
+    entry.transform = transform;
+    entry.used = true;
+    const std::span<const QPointF> data(*recording);
     entry.pixels.resize(data.size());
     transform.map(data, std::span<QPointF>(entry.pixels));
-    return entry.pixels;
+    return std::span<const QPointF>(entry.pixels);
 }
 
 void QCPResolveCache::clear()
@@ -203,6 +221,7 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                       QCPResolveCache& cache, double dpr, int outputHeight, quint64 generation)
 {
     PROFILE_HERE_N("qcpReplayWithRhi");
+    cache.beginReplay();
     const QRect clip = frame.clip.isEmpty() ? QRect() : frame.clip.toAlignedRect();
     std::vector<QPointF>& pixels = pixelScratch();
 
@@ -213,9 +232,8 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                 using T = std::decay_t<decltype(cmd)>;
                 if constexpr (std::is_same_v<T, qcp::PolylineDataCmd>)
                 {
-                    const std::vector<QPointF>& resolved =
-                        cache.pixels(cmd.points.get(), generation, frame.transform,
-                                     std::span<const QPointF>(*cmd.points));
+                    const std::span<const QPointF> resolved =
+                        cache.pixels(cmd.points, generation, frame.transform);
                     addPolyline(plottables, resolved, cmd.pen, clip, dpr, outputHeight);
                 }
                 else if constexpr (std::is_same_v<T, qcp::PolylinePositionsCmd>)
@@ -226,19 +244,19 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                 else if constexpr (std::is_same_v<T, qcp::PolygonCmd>)
                 {
                     resolveInto(cmd.points, frame, pixels);
-                    addPolyline(plottables, ringOf(pixels), cmd.pen, clip, dpr, outputHeight);
+                    addPolyline(plottables, ringOf(pixels), cmd.pen, clip, dpr, outputHeight, true);
                     // simplify: a free-form outline has no fan centre, so its fill is left to the
                     // PainterOnly pass; Task 5 rasterises it to a CPU image and keeps the GPU slot.
                 }
                 else if constexpr (std::is_same_v<T, qcp::FillBetweenCmd>)
                 {
-                    const std::vector<QPointF>& upper =
-                        cache.pixels(cmd.upper.get(), generation, frame.transform,
-                                     std::span<const QPointF>(*cmd.upper));
-                    const std::vector<QPointF>& lower =
-                        cache.pixels(cmd.lower.get(), generation, frame.transform,
-                                     std::span<const QPointF>(*cmd.lower));
-                    if (isFillable(cmd.brush))
+                    const std::span<const QPointF> upper =
+                        cache.pixels(cmd.upper, generation, frame.transform);
+                    const std::span<const QPointF> lower =
+                        cache.pixels(cmd.lower, generation, frame.transform);
+                    // Pairing upper[i] with lower[i] is only a ribbon when the two series line up;
+                    // otherwise the fill is the painter pass's (Task 5 rasterises it).
+                    if (qcpGpuFillsBrush(cmd.brush) && upper.size() == lower.size())
                         addRibbonFill(plottables, upper, lower, cmd.brush.color(), clip, dpr,
                                       outputHeight);
                 }
@@ -247,10 +265,8 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                     const QRectF box =
                         QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
                             .normalized();
-                    pixels.assign({ box.topLeft(), box.topRight(), box.bottomRight(),
-                                    box.bottomLeft(), box.topLeft() });
-                    addPolyline(plottables, pixels, cmd.pen, clip, dpr, outputHeight);
-                    if (isFillable(cmd.brush))
+                    // The fill is submitted first: the stroke's inner half must stay visible.
+                    if (qcpGpuFillsBrush(cmd.brush))
                     {
                         const std::array<QPointF, 4> corners {
                             box.topLeft(), box.topRight(), box.bottomRight(), box.bottomLeft()
@@ -258,19 +274,24 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                         fanFill(plottables, box.center(), corners, cmd.brush.color(), clip, dpr,
                                 outputHeight);
                     }
+                    pixels.assign({ box.topLeft(), box.topRight(), box.bottomRight(),
+                                    box.bottomLeft(), box.topLeft() });
+                    addPolyline(plottables, pixels, cmd.pen, clip, dpr, outputHeight, true);
                 }
                 else if constexpr (std::is_same_v<T, qcp::EllipseCmd>)
                 {
-                    const QPolygonF ring = ellipseRing(qcpResolvePosition(frame, cmd.a),
-                                                       qcpResolvePosition(frame, cmd.b));
+                    const QPointF a = qcpResolvePosition(frame, cmd.a);
+                    const QPointF b = qcpResolvePosition(frame, cmd.b);
+                    const QPointF centre = QRectF(a, b).normalized().center();
+                    const QPolygonF ring = ellipseRing(a, b);
                     pixels.assign(std::size_t(ring.size()), QPointF());
                     for (int i = 0; i < ring.size(); ++i)
                         pixels[std::size_t(i)] = ring.at(i);
-                    addPolyline(plottables, pixels, cmd.pen, clip, dpr, outputHeight);
-                    if (isFillable(cmd.brush))
-                        fanFill(plottables, QRectF(ring.first(), ring.last()).center(),
+                    if (qcpGpuFillsBrush(cmd.brush))
+                        fanFill(plottables, centre,
                                 std::span<const QPointF>(pixels.data(), pixels.size() - 1),
                                 cmd.brush.color(), clip, dpr, outputHeight);
+                    addPolyline(plottables, pixels, cmd.pen, clip, dpr, outputHeight, true);
                 }
                 else if constexpr (std::is_same_v<T, qcp::ErrorBarsCmd>)
                 {
@@ -282,9 +303,8 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                 }
                 else if constexpr (std::is_same_v<T, qcp::MarkersCmd>)
                 {
-                    const std::vector<QPointF>& resolved =
-                        cache.pixels(cmd.points.get(), generation, frame.transform,
-                                     std::span<const QPointF>(*cmd.points));
+                    const std::span<const QPointF> resolved =
+                        cache.pixels(cmd.points, generation, frame.transform);
                     std::vector<float>& xy = markerScratch();
                     xy.resize(resolved.size() * 2);
                     for (std::size_t i = 0; i < resolved.size(); ++i)

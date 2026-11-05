@@ -150,6 +150,13 @@ struct QCP_LIB_DECL QCPDrawList
     bool valueBounded = false;
 };
 
+//! True when the GPU can fill \a brush exactly: a solid pattern with opaque-enough colour. Anything
+//! else (gradient, texture, hatch) is flattened by a vertex colour, so the painter pass keeps it.
+inline bool qcpGpuFillsBrush(const QBrush& brush)
+{
+    return brush.style() == Qt::SolidPattern && brush.color().alpha() != 0;
+}
+
 //! The one place a QCP::Position becomes pixels: every command and every caller goes through it.
 [[nodiscard]] QPointF qcpResolvePosition(const QCPDrawFrame& frame, const QCP::Position& position);
 

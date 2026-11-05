@@ -76,6 +76,11 @@ public:
     void render(QRhiCommandBuffer* cb, const QSize& outputSize);
 
     bool isDirty() const { return mDirty; }
+    //! False once the dashed pipeline failed to build: a dashed stroke must then be painted instead.
+    bool dashedAvailable() const { return !mDashBroken; }
+    //! Test hook: how many times the vertex buffers were uploaded (a pan must not add one).
+    int solidVertexUploads() const { return mSolidVertexUploads; }
+    int dashedVertexUploads() const { return mDashVertexUploads; }
     bool hasGeometry() const { return !mDrawEntries.isEmpty() || !mDashEntries.isEmpty(); }
     const QVector<DrawEntry>& drawEntries() const { return mDrawEntries; }
     const QVector<DashedEntry>& dashedDrawEntries() const { return mDashEntries; }
@@ -131,7 +136,10 @@ private:
     QRhiGraphicsPipeline* mDashPipeline = nullptr;
     int mDashVertexBufferSize = 0;
     int mDashUniformBufferSize = 0;
-    int mLastDashSampleCount = 0;
+    int mLastDashSampleCount = 0; //!< the sample count the dashed pipeline was attempted for
+    bool mDashBroken = false;     //!< the dashed pipeline failed to build for that sample count
+    int mSolidVertexUploads = 0;  //!< instrumentation for the pan test
+    int mDashVertexUploads = 0;
 
     QRhiBuffer* mVertexBuffer = nullptr;
     QRhiBuffer* mUniformBuffer = nullptr;

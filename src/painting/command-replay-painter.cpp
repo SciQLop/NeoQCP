@@ -113,6 +113,57 @@ bool isGpuKind(const qcp::QCPDrawCommand& command)
 }
 } // namespace
 
+namespace
+{
+// The fills a GPU frame leaves to this pass: a free-form polygon (no GPU tessellator) and any
+// brush the GPU would flatten. Fill only, no outline: the GPU drew the stroke.
+void paintSkippedFill(QCPPainter& painter, const QCPDrawFrame& frame,
+                      const qcp::QCPDrawCommand& command)
+{
+    Scratch& local = scratch();
+    painter.setPen(Qt::NoPen);
+    std::visit(
+        [&](const auto& cmd) {
+            using Command = std::decay_t<decltype(cmd)>;
+            if constexpr (std::is_same_v<Command, qcp::PolygonCmd>)
+            {
+                painter.setBrush(cmd.brush);
+                resolveInto(frame, cmd.points, local.pixels);
+                painter.drawPolygon(polygonOf(local.pixels));
+            }
+            else if constexpr (std::is_same_v<Command, qcp::FillBetweenCmd>)
+            {
+                if (qcpGpuFillsBrush(cmd.brush))
+                    return;
+                painter.setBrush(cmd.brush);
+                const std::size_t count = std::min(cmd.upper->size(), cmd.lower->size());
+                local.data.resize(2 * count);
+                for (std::size_t i = 0; i < count; ++i)
+                {
+                    local.data[i] = (*cmd.upper)[i];
+                    local.data[2 * count - 1 - i] = (*cmd.lower)[i];
+                }
+                frame.transform.map(std::span<const QPointF>(local.data),
+                                    std::span<QPointF>(local.pixels));
+                painter.drawPolygon(polygonOf(local.pixels));
+            }
+            else if constexpr (std::is_same_v<Command, qcp::RectCmd>
+                               || std::is_same_v<Command, qcp::EllipseCmd>)
+            {
+                if (qcpGpuFillsBrush(cmd.brush))
+                    return;
+                painter.setBrush(cmd.brush);
+                const QRectF box(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b));
+                if constexpr (std::is_same_v<Command, qcp::RectCmd>)
+                    painter.drawRect(box.normalized());
+                else
+                    painter.drawEllipse(box.normalized());
+            }
+        },
+        command);
+}
+} // namespace
+
 void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QCPDrawFrame& frame,
                           QCPReplayKinds kinds)
 {
@@ -123,7 +174,10 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
     for (const qcp::QCPDrawCommand& command : list.commands)
     {
         if (kinds == QCPReplayKinds::PainterOnly && isGpuKind(command))
+        {
+            paintSkippedFill(painter, frame, command);
             continue;
+        }
         std::visit(
             [&](const auto& cmd) {
                 using Command = std::decay_t<decltype(cmd)>;

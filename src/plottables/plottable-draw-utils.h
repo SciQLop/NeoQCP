@@ -37,10 +37,14 @@ struct DashPattern
 };
 DashPattern dashPatternOf(const QPen& pen, float penWidth);
 
+/// One definition of "this pen is dashed": the pattern the GPU can draw has at least one entry.
+/// A CustomDashLine with an empty or all-zero pattern is solid (QPainter agrees).
+bool isDashed(const QPen& pen);
+
 /// Extrudes \a pts in the format \a pen needs: 6 floats, or 7 with the arc length when dashed.
 /// The one place that chooses the extruder for a stroke.
 void extrudeStroke(std::span<const QPointF> pts, const QPen& pen, float penWidth,
-                   std::vector<float>& out);
+                   std::vector<float>& out, bool closed = false);
 
 /// Strokes \a pts on the GPU, solid or dashed. False means the caller must paint them itself
 /// (no QRhi, exporting, no layer, or nothing to stroke).
@@ -77,7 +81,8 @@ bool strokePolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer
 
 /// Adds already-extruded stroke vertices to \a layer: the dashed pipeline when \a pen is not
 /// solid, the solid one otherwise. Shared by the plottable paths and the command replay.
-void addGpuStroke(QCPPlottableRhiLayer& layer, std::span<const float> verts, const QPen& pen,
+/// False when a dashed pen has no dashed pipeline (it failed to build): the caller paints it.
+bool addGpuStroke(QCPPlottableRhiLayer& layer, std::span<const float> verts, const QPen& pen,
                   float penWidth, const QRect& clipRect, double dpr, int outputHeight,
                   const QPointF& offset = QPointF(), float alpha = 1);
 
@@ -118,7 +123,7 @@ void drawPolylineCached(QCPPainter* painter,
 
 /// A coloured cache survives pans; it is rebuilt on fresh lines, pen width or colour change.
 bool needsColoredReextrusion(const ExtrusionCache& cache, bool freshLines,
-                             float penWidth, quint64 colorGeneration, bool dashed = false);
+                             float penWidth, quint64 colorGeneration, bool dashed);
 
 /// Coloured counterpart of drawPolylineCached. Builds the runs itself, only when it
 /// re-extrudes (or has no GPU layer), so any reason to re-extrude gets correct runs.

@@ -112,15 +112,25 @@ QVector<SegmentData> splitByNonFinite(std::span<const QPointF> points)
 //! pattern, and the caller resets it between NaN-separated segments.
 template <bool WithDistance>
 void extrudeSegment(WriteCursor<WithDistance>& cur, std::span<const QPointF> points, int start,
-                    int end, float halfWidth, const std::array<float, 4>& rgba, double& walked)
+                    int end, float halfWidth, const std::array<float, 4>& rgba, double& walked,
+                    bool closed)
 {
     int count = end - start;
     if (count < 2) return;
 
     // Sliding window: only previous and current normal/left/right needed.
     QPointF prevNormal = perp(normalized(points[start + 1] - points[start]));
-    QPointF prevLeft = points[start] + prevNormal * halfWidth;
-    QPointF prevRight = points[start] - prevNormal * halfWidth;
+    // A closed ring (its last point repeats the first) joins there too, or the seam shows a notch.
+    QPointF seam = prevNormal * halfWidth;
+    if (closed)
+    {
+        const QPointF lastNormal =
+            perp(normalized(points[start] - points[start + count - 2]));
+        const QPointF joined = miterOffset(lastNormal, prevNormal, halfWidth);
+        seam = joined.isNull() ? prevNormal * halfWidth : joined;
+    }
+    QPointF prevLeft = points[start] + seam;
+    QPointF prevRight = points[start] - seam;
 
     for (int i = 1; i < count - 1; ++i)
     {
@@ -172,11 +182,14 @@ void extrudeSegment(WriteCursor<WithDistance>& cur, std::span<const QPointF> poi
         prevNormal = curNormal;
     }
 
-    const double lastStep = distance(points[start + count - 2], points[start + count - 1]);
+    double lastStep = 0.0;
     if constexpr (WithDistance)
+    {
+        lastStep = distance(points[start + count - 2], points[start + count - 1]);
         walked += lastStep;
-    QPointF lastLeft = points[start + count - 1] + prevNormal * halfWidth;
-    QPointF lastRight = points[start + count - 1] - prevNormal * halfWidth;
+    }
+    QPointF lastLeft = points[start + count - 1] + (closed ? seam : prevNormal * halfWidth);
+    QPointF lastRight = points[start + count - 1] - (closed ? seam : prevNormal * halfWidth);
     cur.quad(prevLeft, lastLeft, lastRight, prevRight, rgba, float(walked - lastStep),
              float(walked));
 }
@@ -193,7 +206,7 @@ int maxExtrusionFloats(int pointCount, bool withDistance)
 //! the arc length at the end of the last segment. Each NaN-separated segment restarts the pattern.
 template <bool WithDistance>
 float appendPolylineImpl(std::span<const QPointF> points, float penWidth, const QColor& color,
-                         std::vector<float>& out, float startDistance)
+                         std::vector<float>& out, float startDistance, bool closed)
 {
     PROFILE_HERE_N("extrudePolyline");
     if (points.size() < 2 || penWidth <= 0.0f)
@@ -219,7 +232,7 @@ float appendPolylineImpl(std::span<const QPointF> points, float penWidth, const 
         if (!firstSegment)
             walked = 0.0; // a NaN gap restarts the dash pattern
         extrudeSegment<WithDistance>(cur, points, seg.startIdx, seg.endIdx, halfWidth, rgba,
-                                     walked);
+                                     walked, closed);
         firstSegment = false;
     }
 
@@ -230,16 +243,16 @@ float appendPolylineImpl(std::span<const QPointF> points, float penWidth, const 
 } // anonymous namespace
 
 void appendPolyline(std::span<const QPointF> points, float penWidth,
-                     const QColor& color, std::vector<float>& out)
+                     const QColor& color, std::vector<float>& out, bool closed)
 {
-    appendPolylineImpl<false>(points, penWidth, color, out, 0.0f);
+    appendPolylineImpl<false>(points, penWidth, color, out, 0.0f, closed);
 }
 
 float appendPolylineWithDistance(std::span<const QPointF> points, float penWidth,
                                  const QColor& color, std::vector<float>& out,
-                                 float startDistance)
+                                 float startDistance, bool closed)
 {
-    return appendPolylineImpl<true>(points, penWidth, color, out, startDistance);
+    return appendPolylineImpl<true>(points, penWidth, color, out, startDistance, closed);
 }
 
 void extrudePolyline(const QVector<QPointF>& points, float penWidth,
@@ -268,7 +281,8 @@ QVector<float> extrudePolyline(const QVector<QPointF>& points, float penWidth,
     WriteCursor<false> cur{out.data()};
     double walked = 0.0;
     for (const auto& seg : segments)
-        extrudeSegment<false>(cur, points, seg.startIdx, seg.endIdx, halfWidth, rgba, walked);
+        extrudeSegment<false>(cur, points, seg.startIdx, seg.endIdx, halfWidth, rgba, walked,
+                              false);
 
     out.resize(cur.pos);
     return out;
