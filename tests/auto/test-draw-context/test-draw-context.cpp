@@ -528,6 +528,18 @@ void TestDrawContext::boundsCoverEveryCommand()
         QCOMPARE(bounds.valueUpper, 60.0);
     }
     {
+        // Two disjoint commands: the box holds both, it is their union and not their overlap.
+        QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                               nullptr);
+        context.polyline(sharedPoints({ { 1, 1 }, { 2, 2 } }), pen);
+        context.polyline(sharedPoints({ { 8, 8 }, { 9, 9 } }), pen);
+        const QCPDataBox& bounds = context.drawList().bounds;
+        QCOMPARE(bounds.keyLower, 1.0);
+        QCOMPARE(bounds.keyUpper, 9.0);
+        QCOMPARE(bounds.valueLower, 1.0);
+        QCOMPARE(bounds.valueUpper, 9.0);
+    }
+    {
         // An empty recording is unbounded, not a box at the origin.
         QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
                                nullptr);

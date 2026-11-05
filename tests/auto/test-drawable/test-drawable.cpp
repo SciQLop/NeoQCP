@@ -48,6 +48,15 @@ public:
     // draw() does not hide it (-Woverloaded-virtual).
     using QCPDrawn<QCPAbstractItem>::draw;
 
+    enum Mode
+    {
+        Polygon,
+        Mixed,
+        Anchored,
+        ZeroValue,
+        Disjoint
+    };
+
     void draw(QCPDrawContext& context) const override
     {
         ++drawCalls;
@@ -75,8 +84,29 @@ public:
                 });
             return;
         }
-        const QCP::Position corners[]
-            = { QCP::Data { 2, 2 }, QCP::Data { 6, 2 }, QCP::Data { 6, 6 }, QCP::Data { 2, 6 } };
+        if (mode == Mixed)
+        {
+            const QCP::Position corners[] = { QCP::Data { 2, 2 }, QCP::DataXRatioY { 6, 0.5 } };
+            context.polygon(corners, QPen(Qt::black), QBrush(fill));
+            return;
+        }
+        if (mode == Disjoint)
+        {
+            context.rect(QCP::Data { 1, 1 }, QCP::Data { 2, 2 }, QPen(Qt::black), QBrush(fill));
+            context.rect(QCP::Data { 8, 8 }, QCP::Data { 9, 9 }, QPen(Qt::black), QBrush(fill));
+            return;
+        }
+        if (mode == Anchored)
+        {
+            const QCP::Position corners[] = { QCP::AnchorOffset { mAnchor, QCP::PixelOffset { } },
+                                              QCP::AnchorOffset { mAnchor,
+                                                                  QCP::PixelOffset { 20, 20 } } };
+            context.polygon(corners, QPen(Qt::black), QBrush(fill));
+            return;
+        }
+        const double valueTop = mode == ZeroValue ? 0.0 : 2.0;
+        const QCP::Position corners[] = { QCP::Data { 2, valueTop }, QCP::Data { 6, valueTop },
+                                          QCP::Data { 6, 6 }, QCP::Data { 2, 6 } };
         context.polygon(corners, QPen(Qt::black), QBrush(fill));
         if (withText)
             context.text(QCP::Data { 4, 4 }, QStringLiteral("x"), QCPTextStyle { });
@@ -87,17 +117,48 @@ public:
     //! Test hook: how many times the resolve cache mapped a recording again.
     [[nodiscard]] quint64 remaps() const { return mCore.resolveRemapCount(); }
 
+    //! The adapter's dataExtent(), which the layer index reads.
+    [[nodiscard]] std::optional<QCPItemExtent> extent() const { return dataExtent(); }
+
     QCPItemPosition* mAnchor = nullptr;
     std::shared_ptr<const std::vector<QPointF>> mLine
         = std::make_shared<const std::vector<QPointF>>(
             std::initializer_list<QPointF> { { 1, 1 }, { 3, 5 }, { 5, 2 }, { 7, 6 }, { 9, 1 } });
     QColor fill = QColor(Qt::darkRed);
+    Mode mode = Polygon;
     int bars = 0;
     bool withText = false;
     bool withPolyline = false;
     bool escapeHatch = false;
     bool contentChangeInsideDraw = false;
     mutable int drawCalls = 0;
+};
+
+//! A drawn plottable: one data-space line, so the default icon has something to fit.
+class TestLine : public QCPDrawn<QCPAbstractPlottable>
+{
+public:
+    TestLine(QCPAxis* keyAxis, QCPAxis* valueAxis)
+            : QCPDrawn<QCPAbstractPlottable>(keyAxis, valueAxis)
+    {
+    }
+
+    using QCPDrawn<QCPAbstractPlottable>::draw;
+
+    void draw(QCPDrawContext& context) const override
+    {
+        context.polyline(mLine, QPen(Qt::black, 2));
+    }
+
+    //! The adapter's old virtual, which the legend calls.
+    void paintIcon(QCPPainter* painter, const QRectF& rect) const
+    {
+        drawLegendIcon(painter, rect);
+    }
+
+    std::shared_ptr<const std::vector<QPointF>> mLine
+        = std::make_shared<const std::vector<QPointF>>(
+            std::initializer_list<QPointF> { { 1, 1 }, { 9, 9 } });
 };
 
 struct Fixture
@@ -282,7 +343,8 @@ void TestDrawable::exportDoesNotPoisonTheResolveCache()
     const quint64 remaps = shape->remaps();
     QVERIFY2(remaps > 0, "the first frame must resolve the line");
 
-    f.plot->toPixmap(800, 600); // an export: its own transform, its own pixels
+    const QPixmap exported = f.plot->toPixmap(800, 600); // its own transform, its own pixels
+    QVERIFY(!exported.isNull());
     QCOMPARE(shape->remaps(), remaps);
 
     f.plot->replot(); // the screen frame still resolves with the screen transform
@@ -303,4 +365,99 @@ void TestDrawable::drawnPolygonStacksAboveAnEarlierGpuGraph()
 
     const QColor colour = pixelAt(f.plot->grabFramebuffer(), f.plot.get(), 4, 4);
     QVERIFY2(isBlue(colour), qPrintable(QString("the item drew as %1").arg(colour.name())));
+}
+
+void TestDrawable::defaultHitTestMatchesGeometry()
+{
+    Fixture f;
+    auto* shape = new TestShape(f.plot.get()); // filled polygon over data (2,2)-(6,6)
+    f.plot->replot();
+    const auto at = [&](double key, double value)
+    {
+        return QCP::Pixels { f.plot->xAxis->coordToPixel(key),
+                             f.plot->yAxis->coordToPixel(value) };
+    };
+
+    const std::optional<double> inside = shape->hitTest(at(4, 4), nullptr);
+    QVERIFY(inside.has_value());
+    QCOMPARE(*inside, 0.0); // inside a visible fill
+
+    const double edge = f.plot->xAxis->coordToPixel(2);
+    const std::optional<double> near = shape->hitTest(QCP::Pixels { edge - 3, at(0, 4).y },
+                                                      nullptr);
+    QVERIFY2(near.has_value(), "3 px from the outline is inside the selection tolerance");
+    QVERIFY2(*near > 1.0 && *near < 4.0, qPrintable(QString("distance %1").arg(*near)));
+
+    QVERIFY(!shape->hitTest(QCP::Pixels { edge - 60, at(0, 4).y }, nullptr).has_value());
+}
+
+void TestDrawable::defaultDataRangeFollowsTheExtentRules()
+{
+    Fixture f;
+    auto* shape = new TestShape(f.plot.get());
+    f.plot->replot();
+
+    const std::optional<QCPDataBox> polygon = shape->dataRange();
+    QVERIFY(polygon);
+    QCOMPARE(polygon->keyLower, 2.0);
+    QCOMPARE(polygon->keyUpper, 6.0);
+    QCOMPARE(polygon->valueLower, 2.0);
+    QCOMPARE(polygon->valueUpper, 6.0);
+    const std::optional<QCPItemExtent> extent = shape->extent();
+    QVERIFY(extent);
+    QCOMPARE(extent->box.keyLower, polygon->keyLower);
+    QCOMPARE(extent->box.valueUpper, polygon->valueUpper);
+
+    shape->mode = TestShape::Disjoint; // two commands far apart: the box holds both, not their gap
+    shape->touch();
+    f.plot->replot();
+    const std::optional<QCPDataBox> disjoint = shape->dataRange();
+    QVERIFY(disjoint);
+    QCOMPARE(disjoint->keyLower, 1.0);
+    QCOMPARE(disjoint->keyUpper, 9.0);
+    QCOMPARE(disjoint->valueLower, 1.0);
+    QCOMPARE(disjoint->valueUpper, 9.0);
+
+    shape->mode = TestShape::Mixed; // a ratio on the value axis: that side is unbounded
+    shape->touch();
+    f.plot->replot();
+    const std::optional<QCPDataBox> mixed = shape->dataRange();
+    QVERIFY(mixed);
+    QCOMPARE(mixed->keyLower, 2.0);
+    QVERIFY(std::isinf(mixed->valueLower) && mixed->valueLower < 0);
+
+    shape->mode = TestShape::Anchored; // an anchored position: both sides unbounded
+    shape->touch();
+    f.plot->replot();
+    QVERIFY(!shape->dataRange().has_value());
+    QVERIFY(!shape->extent().has_value());
+
+    shape->mode = TestShape::ZeroValue; // a box reaching zero cannot be indexed on a log axis
+    shape->touch();
+    f.plot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    f.plot->yAxis->setRange(0.1, 100);
+    f.plot->replot();
+    const std::optional<QCPDataBox> logarithmic = shape->dataRange();
+    QVERIFY(logarithmic);
+    QCOMPARE(logarithmic->keyLower, 2.0);
+    QVERIFY(std::isinf(logarithmic->valueLower) && logarithmic->valueLower < 0);
+    QVERIFY(!(shape->extent()->box.valueLower > 0.0));
+}
+
+void TestDrawable::defaultLegendIconIsTheRecordingFitted()
+{
+    Fixture f;
+    auto* line = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    const QRectF icon(0, 0, 100, 50);
+    QImage image(100, 50, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::white);
+    QCPPainter painter(&image);
+    line->paintIcon(&painter, icon);
+    painter.end();
+
+    // The recording is data (1,1) to (9,9), fitted to the rect: the line runs bottom-left to
+    // top-right, so the centre is ink and the top-left corner is empty.
+    QVERIFY2(image.pixelColor(50, 25).lightness() < 200,
+             qPrintable(QString("centre is %1").arg(image.pixelColor(50, 25).name())));
+    QVERIFY(image.pixelColor(4, 4).lightness() > 240);
 }

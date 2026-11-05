@@ -14,8 +14,11 @@
 
 #include "global.h"
 
+#include "spatial-index.h"
+
 #include <QPointF>
 #include <QPointer>
+#include <QRectF>
 #include <span>
 #include <variant>
 
@@ -123,6 +126,9 @@ public:
     QCPTransform() = default;
     QCPTransform(const QCPAxis* keyAxis, const QCPAxis* valueAxis);
 
+    //! A transform that fits \a box into \a rect: what a legend icon replays a recording through.
+    [[nodiscard]] static QCPTransform fitted(const QCPDataBox& box, const QRectF& rect);
+
     //! Maps one data point to pixels.
     [[nodiscard]] QCP::Pixels map(QCP::Data data) const;
     //! Maps one pixel point back to data coordinates (the inverse of map, not clamped to the
@@ -196,6 +202,9 @@ class QCP_LIB_DECL QCPRatioTransform
 public:
     QCPRatioTransform() = default;
     explicit QCPRatioTransform(const QCPAxisRect* axisRect);
+
+    //! A ratio transform over \a rect: 0,0 is its top left, 1,1 its bottom right (the icon case).
+    [[nodiscard]] static QCPRatioTransform fitted(const QRectF& rect);
 
     //! Maps a fraction of the axis rect to pixels.
     [[nodiscard]] QCP::Pixels map(QCP::AxisRatio ratio) const;

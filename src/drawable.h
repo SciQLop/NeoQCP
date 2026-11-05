@@ -82,12 +82,22 @@ public:
     //! A new generation. False, and one misuse report, when called from inside draw().
     bool contentChanged();
 
-    //! Draws \a object's recording through \a painter: an export, or a screen without a GPU layer.
-    void paint(const QCPDrawable& object, QCPPainter& painter, const QCPDrawnView& view);
+    //! What the object occupies, from the recording: QCPAbstractItem::dataExtent's two rules.
+    std::optional<QCPDataBox> dataRange(const QCPDrawable& object, const QCPDrawnView& view);
+
+    //! The pixels the recording's widest stroke reaches around its geometry.
+    [[nodiscard]] double pixelPad() const;
 
     //! The pixel distance from \a at to the recording, or none when it missed.
     std::optional<double> hitTest(const QCPDrawable& object, QCP::Pixels at, QVariant* details,
                                   const QCPDrawnView& view);
+
+    //! Draws \a object's recording through \a painter: an export, or a screen without a GPU layer.
+    void paint(const QCPDrawable& object, QCPPainter& painter, const QCPDrawnView& view);
+
+    //! Draws \a object's recording into \a rect, fitted to its data box: the default legend icon.
+    void paintIcon(const QCPDrawable& object, QCPPainter& painter, const QRectF& rect,
+                   const QCPDrawnView& view);
 
     //! Test hook: how many times the object was asked to record.
     [[nodiscard]] int recordingCount() const;
@@ -101,6 +111,10 @@ private:
     struct State;
     std::unique_ptr<State> mState;
 };
+
+//! A box side as a QCPRange, keeping only the requested sign domain.
+[[nodiscard]] QCP_LIB_DECL QCPRange qcpDrawnRange(double lower, double upper, bool& foundRange,
+                                                  QCP::SignDomain inSignDomain);
 
 /*!
   \brief The common part of an adapter: the contract, the recording cache and the old virtuals both
@@ -119,11 +133,17 @@ public:
             Base::markDirty();
     }
 
-    std::optional<QCPDataBox> dataRange() const override { return std::nullopt; }
+    using QCPDrawable::draw; // keep draw(QCPDrawContext&) reachable from the icon default
 
-    std::optional<double> hitTest(QCP::Pixels, QVariant*) const override { return std::nullopt; }
+    std::optional<QCPDataBox> dataRange() const override { return mCore.dataRange(*this, view()); }
 
-    void drawLegendIcon(QCPDrawContext&) const override { }
+    std::optional<double> hitTest(QCP::Pixels at, QVariant* details) const override
+    {
+        return mCore.hitTest(*this, at, details, view());
+    }
+
+    //! The default icon is the object's own drawing; an override records a summary instead.
+    void drawLegendIcon(QCPDrawContext& icon) const override { draw(icon); }
 
 protected:
     void draw(QCPPainter* painter) final { mCore.paint(*this, *painter, view()); }
@@ -190,20 +210,36 @@ public:
     using QCPDrawnBase<Base>::QCPDrawnBase;
 
 protected:
-    QCPRange getKeyRange(bool& foundRange, QCP::SignDomain) const override
+    using QCPDrawnBase<Base>::drawLegendIcon; // the contract's icon stays reachable
+
+    QCPRange getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain) const override
     {
-        foundRange = false;
-        return { };
+        const std::optional<QCPDataBox> box = this->dataRange();
+        if (!box)
+        {
+            foundRange = false;
+            return { };
+        }
+        return qcpDrawnRange(box->keyLower, box->keyUpper, foundRange, inSignDomain);
     }
 
-    QCPRange getValueRange(bool& foundRange, QCP::SignDomain,
-                           const QCPRange& = QCPRange()) const override
+    QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain,
+                           const QCPRange& inKeyRange = QCPRange()) const override
     {
-        foundRange = false;
-        return { };
+        Q_UNUSED(inKeyRange) // simplify: a box keeps no per-key values, so it cannot be narrowed
+        const std::optional<QCPDataBox> box = this->dataRange();
+        if (!box)
+        {
+            foundRange = false;
+            return { };
+        }
+        return qcpDrawnRange(box->valueLower, box->valueUpper, foundRange, inSignDomain);
     }
 
-    void drawLegendIcon(QCPPainter*, const QRectF&) const override { }
+    void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override
+    {
+        this->mCore.paintIcon(*this, *painter, rect, this->view());
+    }
 };
 
 //! A drawn item: the recording answers its extent.
@@ -214,7 +250,16 @@ public:
     using QCPDrawnBase<Base>::QCPDrawnBase;
 
 protected:
-    std::optional<QCPItemExtent> dataExtent() const override { return std::nullopt; }
+    std::optional<QCPItemExtent> dataExtent() const override
+    {
+        const std::optional<QCPDataBox> box = this->dataRange();
+        if (!box)
+            return std::nullopt;
+        const QCPDrawnView drawn = this->view();
+        return QCPItemExtent { const_cast<QCPAxis*>(drawn.keyAxis),
+                               const_cast<QCPAxis*>(drawn.valueAxis), *box,
+                               this->mCore.pixelPad() };
+    }
 };
 
 /*!

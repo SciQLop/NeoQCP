@@ -1,5 +1,6 @@
 #include "drawable.h"
 
+#include "axis/labelrenderer.h"
 #include "core.h"
 #include "misuse.h"
 #include "painting/command-replay-rhi.h"
@@ -8,12 +9,17 @@
 #include "painting/painter.h"
 #include "painting/raster-fallback.h"
 #include "plottables/plottable-draw-utils.h"
+#include "vector2d.h"
 
 #include <QDebug>
 #include <QPainter>
+#include <cmath>
+#include <limits>
 
 namespace
 {
+constexpr double kInfinity = std::numeric_limits<double>::infinity();
+
 //! True when a replay of \a list depends on the view, not only on the transform: the commands that
 //! measure or rasterise in pixels.
 bool usesTheView(const QCPDrawList& list)
@@ -28,23 +34,247 @@ bool usesTheView(const QCPDrawList& list)
     }
     return false;
 }
+
+//! Half the pen's stroke: how far a stroke reaches from its baseline.
+double halfPen(const QPen& pen)
+{
+    return pen.style() == Qt::NoPen ? 0.0 : std::max(1.0, pen.widthF()) / 2.0;
+}
+
+//! True when a fill is painted at all.
+bool visibleBrush(const QBrush& brush)
+{
+    return brush.style() != Qt::NoBrush && brush.color().alpha() > 0;
+}
+
+bool finite(const QPointF& point)
+{
+    return std::isfinite(point.x()) && std::isfinite(point.y());
+}
+
+//! The distance from \a at to the polyline \a points, in pixels; infinite for an empty polyline.
+double distanceTo(std::span<const QPointF> points, const QPointF& at, bool closed)
+{
+    if (points.empty())
+        return kInfinity;
+    if (points.size() == 1)
+        return QCPVector2D(at - points.front()).length();
+    const QCPVector2D point(at);
+    double best = kInfinity;
+    const auto segment = [&](const QPointF& from, const QPointF& to)
+    {
+        if (!finite(from) || !finite(to))
+            return;
+        best = std::min(best, point.distanceSquaredToLine(QCPVector2D(from), QCPVector2D(to)));
+    };
+    for (std::size_t i = 0; i + 1 < points.size(); ++i)
+        segment(points[i], points[i + 1]);
+    if (closed && points.size() > 2)
+        segment(points.back(), points.front());
+    return std::sqrt(best);
+}
+
+//! The distance from \a at to \a rect, 0 inside.
+double distanceTo(const QRectF& rect, const QPointF& at)
+{
+    if (rect.contains(at))
+        return 0.0;
+    return std::hypot(rect.left() - at.x(), rect.top() - at.y());
+}
+
+//! The outline of an ellipse inscribed in \a box, closed: the hit test samples what the GPU fills.
+std::vector<QPointF> ellipseRing(const QRectF& box, int segments = 96)
+{
+    const QPointF centre = box.center();
+    const double rx = box.width() / 2.0;
+    const double ry = box.height() / 2.0;
+    std::vector<QPointF> ring;
+    ring.reserve(std::size_t(segments));
+    for (int i = 0; i < segments; ++i)
+    {
+        const double angle = 2.0 * M_PI * i / segments;
+        ring.emplace_back(centre.x() + rx * std::cos(angle), centre.y() + ry * std::sin(angle));
+    }
+    return ring;
+}
+
+std::vector<QPointF> resolve(std::span<const QCP::Position> positions, const QCPDrawFrame& frame)
+{
+    std::vector<QPointF> pixels(positions.size());
+    qcpResolveInto(positions, frame, pixels);
+    return pixels;
+}
+
+std::vector<QPointF> resolve(const std::vector<QPointF>& data, const QCPDrawFrame& frame)
+{
+    std::vector<QPointF> pixels(data.size());
+    frame.transform.map(std::span<const QPointF>(data), std::span<QPointF>(pixels));
+    return pixels;
+}
+
+//! The text's box, placed the way the painter replay places it.
+QRectF textRect(const qcp::TextCmd& cmd, const QCPDrawFrame& frame)
+{
+    const QCPTextStyle& style = *cmd.style;
+    QRect rect
+        = QCPLabelRenderer::measureRectWith(nullptr, style.font, cmd.text, int(style.alignment));
+    if (style.padding > 0.0)
+    {
+        const int pad = int(std::ceil(style.padding));
+        rect = rect.adjusted(-pad, -pad, pad, pad);
+    }
+    const QPointF anchor = qcpResolvePosition(frame, cmd.at);
+    return QRectF(rect).translated(anchor);
+}
+
+//! The distance from \a at to one command's geometry, in pixels.
+double distanceTo(const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame, const QPointF& at)
+{
+    return std::visit(
+        [&](const auto& cmd) -> double
+        {
+            using Command = std::decay_t<decltype(cmd)>;
+            if constexpr (std::is_same_v<Command, qcp::PolylineDataCmd>)
+            {
+                const std::vector<QPointF> pixels = resolve(*cmd.points, frame);
+                return distanceTo(pixels, at, false) - halfPen(cmd.pen);
+            }
+            else if constexpr (std::is_same_v<Command, qcp::PolylinePositionsCmd>)
+            {
+                const std::vector<QPointF> pixels = resolve(cmd.points, frame);
+                return distanceTo(pixels, at, false) - halfPen(cmd.pen);
+            }
+            else if constexpr (std::is_same_v<Command, qcp::PolygonCmd>)
+            {
+                const std::vector<QPointF> pixels = resolve(cmd.points, frame);
+                if (visibleBrush(cmd.brush)
+                    && QPolygonF(QVector<QPointF>(pixels.begin(), pixels.end()))
+                           .containsPoint(at, Qt::OddEvenFill))
+                    return 0.0;
+                return distanceTo(pixels, at, true) - halfPen(cmd.pen);
+            }
+            else if constexpr (std::is_same_v<Command, qcp::FillBetweenCmd>)
+            {
+                const std::vector<QPointF> upper = resolve(*cmd.upper, frame);
+                const std::vector<QPointF> lower = resolve(*cmd.lower, frame);
+                double best = std::min(distanceTo(upper, at, false), distanceTo(lower, at, false));
+                if (visibleBrush(cmd.brush) && !upper.empty() && !lower.empty())
+                {
+                    QPolygonF ribbon;
+                    for (const QPointF& point : upper)
+                        ribbon << point;
+                    for (auto it = lower.rbegin(); it != lower.rend(); ++it)
+                        ribbon << *it;
+                    if (ribbon.containsPoint(at, Qt::OddEvenFill))
+                        return 0.0;
+                }
+                return best;
+            }
+            else if constexpr (std::is_same_v<Command, qcp::RectCmd>)
+            {
+                const QRectF box
+                    = QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
+                          .normalized();
+                if (visibleBrush(cmd.brush) && box.contains(at))
+                    return 0.0;
+                const std::array<QPointF, 4> corners { box.topLeft(), box.topRight(),
+                                                       box.bottomRight(), box.bottomLeft() };
+                return distanceTo(corners, at, true) - halfPen(cmd.pen);
+            }
+            else if constexpr (std::is_same_v<Command, qcp::EllipseCmd>)
+            {
+                const QRectF box
+                    = QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
+                          .normalized();
+                if (visibleBrush(cmd.brush) && box.contains(at))
+                {
+                    const double nx = 2.0 * (at.x() - box.center().x()) / box.width();
+                    const double ny = 2.0 * (at.y() - box.center().y()) / box.height();
+                    if (nx * nx + ny * ny <= 1.0)
+                        return 0.0;
+                }
+                return distanceTo(ellipseRing(box), at, true) - halfPen(cmd.pen);
+            }
+            else if constexpr (std::is_same_v<Command, qcp::MarkersCmd>)
+            {
+                const std::vector<QPointF> pixels = resolve(*cmd.points, frame);
+                return distanceTo(pixels, at, false) - cmd.style.size() / 2.0;
+            }
+            else if constexpr (std::is_same_v<Command, qcp::ErrorBarsCmd>)
+            {
+                std::vector<QPointF> pixels;
+                qcpErrorBarPixels(frame, std::span<const QPointF>(*cmd.centres),
+                                  std::span<const QPointF>(*cmd.spans), pixels);
+                return distanceTo(pixels, at, false) - halfPen(cmd.pen);
+            }
+            else if constexpr (std::is_same_v<Command, qcp::TextCmd>)
+            {
+                return distanceTo(textRect(cmd, frame), at);
+            }
+            else if constexpr (std::is_same_v<Command, qcp::PathCmd>)
+            {
+                QPainterPath path = cmd.path;
+                path.translate(qcpResolvePosition(frame, cmd.origin));
+                if (visibleBrush(cmd.brush) && path.contains(at))
+                    return 0.0;
+                double best = kInfinity;
+                for (const QPolygonF& subpath : path.toSubpathPolygons())
+                {
+                    const std::span<const QPointF> points(subpath.constData(),
+                                                          std::size_t(subpath.size()));
+                    best = std::min(best, distanceTo(points, at, false));
+                }
+                return best - halfPen(cmd.pen);
+            }
+            else if constexpr (std::is_same_v<Command, qcp::ImageCmd>)
+            {
+                const QRectF box
+                    = QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
+                          .normalized();
+                return distanceTo(box, at);
+            }
+            else // painter(): opaque to the default hit test
+                return kInfinity;
+        },
+        command);
+}
 } // namespace
 
 struct QCPDrawnCore::State
 {
     QCPDrawList recording;
+    QCPDrawList icon;
     QCPResolveCache resolve;
     qcp::QCPRasterFallback raster;
     QCPExtrusionCache extrusion;
     quint64 generation = 0;
     quint64 recordedGeneration = 0;
     quint64 recordedEpoch = 0;
+    quint64 iconGeneration = 0;
     int recordings = 0;
     bool recorded = false;
     bool viewDependent = false;
+    bool iconRecorded = false;
     bool insideDraw = false;
     bool reportedMissingAxis = false;
 };
+
+QCPRange qcpDrawnRange(double lower, double upper, bool& foundRange, QCP::SignDomain inSignDomain)
+{
+    foundRange = std::isfinite(lower) && std::isfinite(upper) && lower <= upper;
+    if (!foundRange)
+        return { };
+    if (inSignDomain == QCP::sdPositive)
+        lower = std::max(lower, 0.0);
+    else if (inSignDomain == QCP::sdNegative)
+        upper = std::min(upper, 0.0);
+    if (!(lower <= upper))
+    {
+        foundRange = false;
+        return { };
+    }
+    return QCPRange(lower, upper);
+}
 
 QCPDrawnCore::QCPDrawnCore() : mState(std::make_unique<State>()) { }
 
@@ -103,6 +333,91 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
     return true;
 }
 
+std::optional<QCPDataBox> QCPDrawnCore::dataRange(const QCPDrawable& object,
+                                                  const QCPDrawnView& view)
+{
+    if (!ensureRecording(object, view))
+        return std::nullopt;
+    const QCPDrawList& list = mState->recording;
+    // The recording already knows which sides every command was data on; a log axis cannot index a
+    // box that reaches zero or below, exactly as QCPAbstractItem::positionsExtent decides it.
+    bool keyBounded = list.keyBounded;
+    bool valueBounded = list.valueBounded;
+    const bool keyLog = view.keyAxis->scaleType() == QCPAxis::stLogarithmic;
+    const bool valueLog = view.valueAxis->scaleType() == QCPAxis::stLogarithmic;
+    if (keyBounded && keyLog && !(list.bounds.keyLower > 0))
+        keyBounded = false;
+    if (valueBounded && valueLog && !(list.bounds.valueLower > 0))
+        valueBounded = false;
+    if (!keyBounded && !valueBounded)
+        return std::nullopt;
+    QCPDataBox box = list.bounds;
+    if (!keyBounded)
+    {
+        box.keyLower = -kInfinity;
+        box.keyUpper = kInfinity;
+    }
+    if (!valueBounded)
+    {
+        box.valueLower = -kInfinity;
+        box.valueUpper = kInfinity;
+    }
+    return box;
+}
+
+double QCPDrawnCore::pixelPad() const
+{
+    double pad = 0.0;
+    for (const qcp::QCPDrawCommand& command : mState->recording.commands)
+        pad = std::max(pad,
+                       std::visit(
+                           [](const auto& cmd) -> double
+                           {
+                               using Command = std::decay_t<decltype(cmd)>;
+                               if constexpr (std::is_same_v<Command, qcp::MarkersCmd>)
+                                   return cmd.style.size() / 2.0;
+                               else if constexpr (std::is_same_v<Command, qcp::TextCmd>
+                                                  || std::is_same_v<Command, qcp::ImageCmd>
+                                                  || std::is_same_v<Command, qcp::FillBetweenCmd>
+                                                  || std::is_same_v<Command, qcp::PainterCmd>)
+                                   return 0.0;
+                               else
+                                   return halfPen(cmd.pen);
+                           },
+                           command));
+    return pad + 1.0; // antialiasing
+}
+
+std::optional<double> QCPDrawnCore::hitTest(const QCPDrawable& object, QCP::Pixels at, QVariant*,
+                                            const QCPDrawnView& view)
+{
+    if (!ensureRecording(object, view))
+        return std::nullopt;
+    const double tolerance = view.plot ? double(view.plot->selectionTolerance()) : 5.0;
+    const QPointF point(at.x, at.y);
+    const std::optional<QCPDataBox> box = dataRange(object, view);
+    const QCPDrawFrame frame
+        = qcpMakeFrame(view.keyAxis, view.valueAxis, view.axisRect, QRectF(view.clip));
+    const double pad = pixelPad();
+    if (box)
+    {
+        // Bounds first: the whole recording's box, mapped and grown by the widest stroke.
+        const QPointF first
+            = qcpResolvePosition(frame, QCP::Data { box->keyLower, box->valueLower });
+        const QPointF second
+            = qcpResolvePosition(frame, QCP::Data { box->keyUpper, box->valueUpper });
+        const double grow = pad + tolerance;
+        if (!QRectF(first, second).normalized().adjusted(-grow, -grow, grow, grow).contains(point))
+            return std::nullopt;
+    }
+    double best = kInfinity;
+    for (const qcp::QCPDrawCommand& command : mState->recording.commands)
+        best = std::min(best, distanceTo(command, frame, point));
+    if (!(best <= tolerance))
+        return std::nullopt;
+    return best;
+}
+
 void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const QCPDrawnView& view)
 {
     if (!ensureRecording(object, view))
@@ -126,10 +441,21 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
                          &mState->raster);
 }
 
-std::optional<double> QCPDrawnCore::hitTest(const QCPDrawable& object, QCP::Pixels, QVariant*,
-                                            const QCPDrawnView& view)
+void QCPDrawnCore::paintIcon(const QCPDrawable& object, QCPPainter& painter, const QRectF& rect,
+                             const QCPDrawnView& view)
 {
-    if (!ensureRecording(object, view))
-        return std::nullopt;
-    return std::nullopt;
+    if (mState->iconGeneration != mState->generation || !mState->iconRecorded)
+    {
+        // An icon records through the same door, into a list of its own: the axes only feed the
+        // context's unused frame, so an object outside a plot still gets its icon.
+        QCPDrawContext context(view.keyAxis, view.valueAxis, view.axisRect, view.theme);
+        object.drawLegendIcon(context);
+        mState->icon = context.drawList();
+        mState->iconGeneration = mState->generation;
+        mState->iconRecorded = true;
+    }
+    if (!mState->icon.keyBounded || !mState->icon.valueBounded)
+        return; // nothing to fit the recording into the rect with
+    const QCPDrawFrame frame = qcpMakeFittedFrame(mState->icon.bounds, rect);
+    qcpReplayWithPainter(mState->icon, painter, frame, QCPReplayKinds::All);
 }

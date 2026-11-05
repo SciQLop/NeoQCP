@@ -21,4 +21,8 @@ private slots:
     void panReusesResolvedGeometry();
     void exportDoesNotPoisonTheResolveCache();
     void drawnPolygonStacksAboveAnEarlierGpuGraph();
+
+    void defaultHitTestMatchesGeometry();
+    void defaultDataRangeFollowsTheExtentRules();
+    void defaultLegendIconIsTheRecordingFitted();
 };

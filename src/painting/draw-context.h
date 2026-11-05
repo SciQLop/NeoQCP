@@ -66,6 +66,10 @@ struct QCP_LIB_DECL QCPDrawFrame
                                                      const QCPAxisRect* axisRect,
                                                      const QRectF& clip);
 
+//! A frame that fits \a box into \a rect: a replay without axes, as a legend icon does.
+[[nodiscard]] QCP_LIB_DECL QCPDrawFrame qcpMakeFittedFrame(const QCPDataBox& box,
+                                                           const QRectF& rect);
+
 /*!
   \brief The recorder a drawing object receives: typed helpers that append to a \ref QCPDrawList.
 

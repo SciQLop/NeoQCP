@@ -142,13 +142,13 @@ void record(QCPDrawList& list, qcp::QCPDrawCommand command, const Extent& extent
         list.valueBounded = list.valueBounded && extent.valueBounded;
         if (list.keyBounded)
         {
-            list.bounds.keyLower = std::max(list.bounds.keyLower, extent.keyLower);
-            list.bounds.keyUpper = std::min(list.bounds.keyUpper, extent.keyUpper);
+            list.bounds.keyLower = std::min(list.bounds.keyLower, extent.keyLower);
+            list.bounds.keyUpper = std::max(list.bounds.keyUpper, extent.keyUpper);
         }
         if (list.valueBounded)
         {
-            list.bounds.valueLower = std::max(list.bounds.valueLower, extent.valueLower);
-            list.bounds.valueUpper = std::min(list.bounds.valueUpper, extent.valueUpper);
+            list.bounds.valueLower = std::min(list.bounds.valueLower, extent.valueLower);
+            list.bounds.valueUpper = std::max(list.bounds.valueUpper, extent.valueUpper);
         }
     }
     if (!list.keyBounded)
@@ -202,6 +202,11 @@ QCPDrawFrame qcpMakeFrame(const QCPAxis* keyAxis, const QCPAxis* valueAxis,
                           const QCPAxisRect* axisRect, const QRectF& clip)
 {
     return QCPDrawFrame { QCPTransform(keyAxis, valueAxis), QCPRatioTransform(axisRect), clip };
+}
+
+QCPDrawFrame qcpMakeFittedFrame(const QCPDataBox& box, const QRectF& rect)
+{
+    return QCPDrawFrame { QCPTransform::fitted(box, rect), QCPRatioTransform::fitted(rect), rect };
 }
 
 QCPDrawContext::QCPDrawContext(const QCPAxis* keyAxis, const QCPAxis* valueAxis,

@@ -38,6 +38,41 @@ QCPTransform::QCPTransform(const QCPAxis* keyAxis, const QCPAxis* valueAxis)
     mValue.prepare();
 }
 
+QCPTransform QCPTransform::fitted(const QCPDataBox& box, const QRectF& rect)
+{
+    QCPTransform transform;
+    if (!(box.keyLower < box.keyUpper) || !(box.valueLower < box.valueUpper) || rect.isEmpty())
+        return transform;
+    const auto fit = [](QCPTransform::Axis& axis, double lower, double upper, const QRectF& r,
+                        bool vertical)
+    {
+        axis.vertical = vertical;
+        axis.reversed = false;
+        axis.lower = lower;
+        axis.upper = upper;
+        axis.left = r.left();
+        axis.top = r.top();
+        axis.right = r.right();
+        axis.bottom = r.bottom();
+        axis.origin = vertical ? r.bottom() : r.left();
+        axis.length = vertical ? r.height() : r.width();
+        axis.prepare();
+    };
+    fit(transform.mKey, box.keyLower, box.keyUpper, rect, false);
+    fit(transform.mValue, box.valueLower, box.valueUpper, rect, true);
+    return transform;
+}
+
+QCPRatioTransform QCPRatioTransform::fitted(const QRectF& rect)
+{
+    QCPRatioTransform transform;
+    transform.mLeft = rect.left();
+    transform.mTop = rect.top();
+    transform.mWidth = rect.width();
+    transform.mHeight = rect.height();
+    return transform;
+}
+
 void QCPTransform::Axis::snapshot(const QCPAxis* axis)
 {
     vertical = axis->orientation() == Qt::Vertical;
