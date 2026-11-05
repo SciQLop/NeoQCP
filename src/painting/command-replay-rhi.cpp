@@ -19,18 +19,6 @@ namespace
 {
 
 // Per-replay buffers: a frame allocates nothing once they have grown.
-std::vector<QPointF>& dataScratch()
-{
-    static thread_local std::vector<QPointF> buffer;
-    return buffer;
-}
-
-std::vector<QPointF>& cornerScratch()
-{
-    static thread_local std::vector<QPointF> buffer;
-    return buffer;
-}
-
 std::vector<QPointF>& pixelScratch()
 {
     static thread_local std::vector<QPointF> points;
@@ -205,38 +193,10 @@ void addRasterCommand(const QCPDrawList& list, QCPPlottableRhiLayer& layer,
         fallback.painterHandles(listId, index);
         return;
     }
-    bool fresh = false;
-    const QImage& image
-        = fallback.image(listId, index, command, frame, bounds, dpr, generation, fresh);
+    const QImage& image = fallback.image(listId, index, command, frame, bounds, dpr, generation);
     const QRectF device(bounds.left() * dpr, bounds.top() * dpr, image.width(), image.height());
     if (!layer.addImage(image, device, clip, dpr, viewport.height()))
         fallback.painterHandles(listId, index);
-}
-
-// Pixel-space error bars from the four mapped corners of each bar: bar plus two caps, with gaps.
-void errorBarPolyline(const std::vector<QPointF>& corners, std::vector<QPointF>& out)
-{
-    const QPointF gap(std::numeric_limits<double>::quiet_NaN(),
-                      std::numeric_limits<double>::quiet_NaN());
-    out.clear();
-    const std::size_t count = corners.size() / 4;
-    out.reserve(count * 9);
-    for (std::size_t i = 0; i < count; ++i)
-    {
-        const QPointF& above = corners[4 * i + 0];
-        const QPointF& below = corners[4 * i + 1];
-        const QPointF& left = corners[4 * i + 2];
-        const QPointF& right = corners[4 * i + 3];
-        out.push_back(above);
-        out.push_back(below);
-        out.push_back(gap);
-        out.push_back(QPointF(left.x(), above.y()));
-        out.push_back(QPointF(right.x(), above.y()));
-        out.push_back(gap);
-        out.push_back(QPointF(left.x(), below.y()));
-        out.push_back(QPointF(right.x(), below.y()));
-        out.push_back(gap);
-    }
 }
 
 // One markers command on the scatter layer. Its own layer is rebuilt every frame, so the points are
@@ -292,23 +252,6 @@ void replayKept(const QCPRecordingCache& kept, QCPPlottableRhiLayer& layer, cons
                                  run.dashOffset, clip, dpr, height, static_cast<float>(offset.x()),
                                  static_cast<float>(offset.y()), alpha);
     }
-}
-
-QPolygonF ellipseRing(QPointF a, QPointF b, int segments = 96)
-{
-    const QRectF box = QRectF(a, b).normalized();
-    const QPointF centre = box.center();
-    const double rx = box.width() / 2.0;
-    const double ry = box.height() / 2.0;
-    QPolygonF ring;
-    ring.reserve(segments + 1);
-    for (int i = 0; i < segments; ++i)
-    {
-        const double angle = 2.0 * M_PI * i / segments;
-        ring << QPointF(centre.x() + rx * std::cos(angle), centre.y() + ry * std::sin(angle));
-    }
-    ring << ring.first();
-    return ring;
 }
 
 } // namespace
@@ -575,21 +518,16 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                 {
                     const QPointF a = qcpResolvePosition(frame, cmd.a);
                     const QPointF b = qcpResolvePosition(frame, cmd.b);
-                    const QPointF centre = QRectF(a, b).normalized().center();
-                    const QPolygonF ring = ellipseRing(a, b);
-                    pixels.assign(std::size_t(ring.size()), QPointF());
-                    for (int i = 0; i < ring.size(); ++i)
-                        pixels[std::size_t(i)] = ring.at(i);
+                    const QRectF box = QRectF(a, b).normalized();
+                    const std::vector<QPointF> ring = qcpEllipseRing(box);
                     if (qcp::gpuCanFill(cmd.brush) && !qcp::needsRaster(command))
-                        fanFill(plottables, centre,
-                                std::span<const QPointF>(pixels.data(), pixels.size() - 1),
-                                cmd.brush.color(), clip, dpr, outputHeight, alpha,
-                                isDataOnlyCommand(command), geometry);
+                        fanFill(plottables, box.center(), ring, cmd.brush.color(), clip, dpr,
+                                outputHeight, alpha, isDataOnlyCommand(command), geometry);
                     addRasterCommand(list, plottables, command, frame, fallback, clip, dpr,
                                      outputSize, generation, geometry);
                     if (!qcp::strokeNeedsRaster(command))
-                        addPolyline(plottables, pixels, cmd.pen, clip, dpr, outputHeight, alpha,
-                                    isDataOnlyCommand(command), geometry, true);
+                        addPolyline(plottables, qcpRingOf(ring), cmd.pen, clip, dpr, outputHeight,
+                                    alpha, isDataOnlyCommand(command), geometry, true);
                 }
                 else if constexpr (std::is_same_v<T, qcp::ErrorBarsCmd>)
                 {
@@ -638,16 +576,4 @@ std::vector<float> qcpFanFillVertices(const QPointF& centre, std::span<const QPo
         push(ring[(i + 1) % ring.size()]);
     }
     return verts;
-}
-
-void qcpErrorBarPixels(const QCPDrawFrame& frame, std::span<const QPointF> centres,
-                       std::span<const QPointF> spans, std::vector<QPointF>& out)
-{
-    std::vector<QPointF>& data = dataScratch();
-    qcpErrorBarCorners(centres, spans, data);
-    // Not pixelScratch(): the caller may hand its own pixel buffer as \a out.
-    std::vector<QPointF>& corners = cornerScratch();
-    corners.resize(data.size());
-    frame.transform.map(std::span<const QPointF>(data), std::span<QPointF>(corners));
-    errorBarPolyline(corners, out);
 }

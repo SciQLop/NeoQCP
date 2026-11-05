@@ -179,7 +179,3 @@ quint64 qcpFillBuildCount();
 //! Triangles of a fan fill from \a centre over an open \a ring: six floats per vertex.
 std::vector<float> qcpFanFillVertices(const QPointF& centre, std::span<const QPointF> ring,
                                       const QColor& color);
-
-//! The pixel polyline of a recording's error bars: the bar and its two caps, NaN gaps between bars.
-void qcpErrorBarPixels(const QCPDrawFrame& frame, std::span<const QPointF> centres,
-                       std::span<const QPointF> spans, std::vector<QPointF>& out);

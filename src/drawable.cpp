@@ -93,33 +93,17 @@ double distanceTo(const QRectF& rect, const QPointF& at)
     return std::hypot(dx, dy);
 }
 
-//! The outline of an ellipse inscribed in \a box, closed: the hit test samples what the GPU fills.
-std::vector<QPointF> ellipseRing(const QRectF& box, int segments = 96)
-{
-    const QPointF centre = box.center();
-    const double rx = box.width() / 2.0;
-    const double ry = box.height() / 2.0;
-    std::vector<QPointF> ring;
-    ring.reserve(std::size_t(segments));
-    for (int i = 0; i < segments; ++i)
-    {
-        const double angle = 2.0 * M_PI * i / segments;
-        ring.emplace_back(centre.x() + rx * std::cos(angle), centre.y() + ry * std::sin(angle));
-    }
-    return ring;
-}
-
 std::vector<QPointF> resolve(std::span<const QCP::Position> positions, const QCPDrawFrame& frame)
 {
-    std::vector<QPointF> pixels(positions.size());
+    std::vector<QPointF> pixels;
     qcpResolveInto(positions, frame, pixels);
     return pixels;
 }
 
 std::vector<QPointF> resolve(const std::vector<QPointF>& data, const QCPDrawFrame& frame)
 {
-    std::vector<QPointF> pixels(data.size());
-    frame.transform.map(std::span<const QPointF>(data), std::span<QPointF>(pixels));
+    std::vector<QPointF> pixels;
+    qcpMapDataInto(data, frame.transform, pixels);
     return pixels;
 }
 
@@ -199,7 +183,7 @@ double distanceTo(const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame,
                     if (nx * nx + ny * ny <= 1.0)
                         return 0.0;
                 }
-                return distanceTo(ellipseRing(box), at, true) - halfPen(cmd.pen);
+                return distanceTo(qcpRingOf(qcpEllipseRing(box)), at, true) - halfPen(cmd.pen);
             }
             else if constexpr (std::is_same_v<Command, qcp::MarkersCmd>)
             {

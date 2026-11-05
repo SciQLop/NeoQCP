@@ -15,9 +15,11 @@
 #include <QPointF>
 #include <QPolygonF>
 #include <QRect>
+#include <QRectF>
 #include <QString>
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 
 #include <functional>
 #include <limits>
@@ -281,6 +283,84 @@ inline void qcpErrorBarCorners(std::span<const QPointF> centres, std::span<const
         out[4 * i + 2] = QPointF(centre.x() - span.x(), centre.y());
         out[4 * i + 3] = QPointF(centre.x() + span.x(), centre.y());
     }
+}
+
+//! An ellipse inscribed in \a box: \a segments points on the outline, open (close it with
+//! qcpRingOf).
+inline std::vector<QPointF> qcpEllipseRing(const QRectF& box, int segments = 96)
+{
+    const QPointF centre = box.center();
+    const double rx = box.width() / 2.0;
+    const double ry = box.height() / 2.0;
+    std::vector<QPointF> ring;
+    ring.reserve(std::size_t(segments));
+    for (int i = 0; i < segments; ++i)
+    {
+        const double angle = 2.0 * M_PI * i / segments;
+        ring.emplace_back(centre.x() + rx * std::cos(angle), centre.y() + ry * std::sin(angle));
+    }
+    return ring;
+}
+
+//! Data-space \a points through \a transform into \a out: a series is positions like any other.
+inline void qcpMapDataInto(std::span<const QPointF> points, const QCPTransform& transform,
+                           std::vector<QPointF>& out)
+{
+    out.resize(points.size());
+    transform.map(points, std::span<QPointF>(out));
+}
+
+//! \a command's pen, or one that draws nothing: the kinds that have no stroke.
+inline QPen qcpCommandPen(const qcp::QCPDrawCommand& command)
+{
+    return std::visit(
+        [](const auto& cmd)
+        {
+            if constexpr (requires { cmd.pen; })
+                return cmd.pen;
+            else
+                return QPen(Qt::NoPen);
+        },
+        command);
+}
+
+//! The pixel polyline of error bars from their four mapped corners: bar plus two caps, with a gap
+//! between two bars so a replay never joins them.
+inline void qcpErrorBarPolyline(std::span<const QPointF> corners, std::vector<QPointF>& out)
+{
+    const QPointF gap(std::numeric_limits<double>::quiet_NaN(),
+                      std::numeric_limits<double>::quiet_NaN());
+    const std::size_t count = corners.size() / 4;
+    out.clear();
+    out.reserve(count * 9);
+    for (std::size_t i = 0; i < count; ++i)
+    {
+        const QPointF& above = corners[4 * i + 0];
+        const QPointF& below = corners[4 * i + 1];
+        const QPointF& left = corners[4 * i + 2];
+        const QPointF& right = corners[4 * i + 3];
+        out.push_back(above);
+        out.push_back(below);
+        out.push_back(gap);
+        out.push_back(QPointF(left.x(), above.y()));
+        out.push_back(QPointF(right.x(), above.y()));
+        out.push_back(gap);
+        out.push_back(QPointF(left.x(), below.y()));
+        out.push_back(QPointF(right.x(), below.y()));
+        out.push_back(gap);
+    }
+}
+
+//! The pixel polyline of \a spans around \a centres, through \a frame: what both replays stroke.
+inline void qcpErrorBarPixels(const QCPDrawFrame& frame, std::span<const QPointF> centres,
+                              std::span<const QPointF> spans, std::vector<QPointF>& out)
+{
+    static thread_local std::vector<QPointF> data;
+    static thread_local std::vector<QPointF> corners;
+    qcpErrorBarCorners(centres, spans, data);
+    corners.resize(data.size());
+    frame.transform.map(std::span<const QPointF>(data), std::span<QPointF>(corners));
+    qcpErrorBarPolyline(corners, out);
 }
 
 namespace qcp

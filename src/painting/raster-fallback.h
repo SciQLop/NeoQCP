@@ -56,14 +56,13 @@ public:
     void beginReplay();
 
     /*!
-      The raster of command \a index of recording \a list, over \a bounds, at \a dpr; \a fresh is
-      set when it was painted now. The key is the command's place in its recording, the generation,
-      the frame's transform and the clipped bounds: a zoom or a moved view repaints, a pan with the
-      same transform hits.
+      The raster of command \a index of recording \a list, over \a bounds, at \a dpr. The key is the
+      command's place in its recording, the generation, the frame's transform and the clipped
+      bounds: a zoom or a moved view repaints, a pan with the same transform hits.
     */
     const QImage& image(quint64 list, quint64 index, const QCPDrawCommand& command,
                         const QCPDrawFrame& frame, const QRectF& bounds, double dpr,
-                        quint64 generation, bool& fresh);
+                        quint64 generation);
 
     //! The layer is full: the painter pass draws command \a index of \a list instead.
     void painterHandles(quint64 list, quint64 index);

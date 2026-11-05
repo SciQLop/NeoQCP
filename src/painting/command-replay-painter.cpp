@@ -29,12 +29,6 @@ Scratch& scratch()
     return local;
 }
 
-QPointF dataPixel(const QCPDrawFrame& frame, const QPointF& point)
-{
-    const QCP::Pixels pixels = frame.transform.map(QCP::Data { point.x(), point.y() });
-    return QPointF(pixels.x, pixels.y);
-}
-
 //! Where a box of \a size sits relative to the anchor: QCPItemText::getTextDrawPoint, which halves
 //! a double and rounds the point - an odd size does not truncate the same way.
 QPoint boxTopLeft(const QSize& size, Qt::Alignment alignment)
@@ -102,28 +96,6 @@ void replayText(const qcp::TextCmd& cmd, QCPPainter& painter, const QCPDrawFrame
     QCPLabelRenderer::drawWith(textRenderer(style), &painter, layout.glyphs, style.font,
                                style.color, cmd.text, style.textFlags);
     painter.restore();
-}
-
-// The four corners of each bar in one batch: the centre plus and minus the span on each axis.
-void replayErrorBars(const qcp::ErrorBarsCmd& cmd, QCPPainter& painter, const QCPDrawFrame& frame)
-{
-    const std::size_t count = std::min(cmd.centres->size(), cmd.spans->size());
-    Scratch& local = scratch();
-    qcpErrorBarCorners(std::span<const QPointF>(*cmd.centres), std::span<const QPointF>(*cmd.spans),
-                       local.data);
-    local.pixels.resize(local.data.size());
-    frame.transform.map(std::span<const QPointF>(local.data), std::span<QPointF>(local.pixels));
-    painter.setPen(cmd.pen);
-    for (std::size_t i = 0; i < count; ++i)
-    {
-        const QPointF& above = local.pixels[4 * i + 0];
-        const QPointF& below = local.pixels[4 * i + 1];
-        const QPointF& left = local.pixels[4 * i + 2];
-        const QPointF& right = local.pixels[4 * i + 3];
-        painter.drawLine(above, below);
-        painter.drawLine(QPointF(left.x(), above.y()), QPointF(right.x(), above.y()));
-        painter.drawLine(QPointF(left.x(), below.y()), QPointF(right.x(), below.y()));
-    }
 }
 } // namespace
 
@@ -201,7 +173,7 @@ bool outsideClip(const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame)
                 transform.translate(at.x(), at.y());
                 transform.rotate(cmd.style->rotationDegrees);
                 return !transform.mapRect(QRectF(qcpTextLayout(*cmd.style, cmd.glyphSize).box))
-                    .intersects(frame.clip);
+                            .intersects(frame.clip);
             }
             else if constexpr (std::is_same_v<Command, qcp::MarkersCmd>)
             {
@@ -319,7 +291,10 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
                 }
                 else if constexpr (std::is_same_v<Command, qcp::ErrorBarsCmd>)
                 {
-                    replayErrorBars(cmd, painter, frame);
+                    qcpErrorBarPixels(frame, std::span<const QPointF>(*cmd.centres),
+                                      std::span<const QPointF>(*cmd.spans), local.data);
+                    painter.setPen(cmd.pen);
+                    qcp::drawPolylineSplitNaN(&painter, std::span<const QPointF>(local.data));
                 }
                 else if constexpr (std::is_same_v<Command, qcp::TextCmd>)
                 {
