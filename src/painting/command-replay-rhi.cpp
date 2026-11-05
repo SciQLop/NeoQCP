@@ -277,11 +277,16 @@ void addRasterCommand(const QCPDrawList& list, QCPPlottableRhiLayer& layer,
 //! content and half under it.
 bool rasterOverflows(const QCPDrawList& list, const QCPPlottableRhiLayer& layer)
 {
-    int needed = 0;
-    for (const qcp::QCPDrawCommand& command : list.commands)
-        if (qcp::needsRaster(command)
-            || (!layer.dashedAvailable() && qcp::strokeIsDashed(command)))
-            ++needed;
+    // The recording counted its rasterised commands once (they depend on nothing but the pen and
+    // the brush); a layer without a dashed pipeline adds the dashes it cannot stroke.
+    int needed = list.rasterCommands;
+    if (!layer.dashedAvailable())
+        needed += int(std::count_if(list.commands.begin(), list.commands.end(),
+                                    [](const qcp::QCPDrawCommand& command)
+                                    {
+                                        return qcp::strokeIsDashed(command)
+                                            && !qcp::strokeNeedsRaster(command);
+                                    }));
     if (needed == 0)
         return false;
     if (!layer.canAddImage())

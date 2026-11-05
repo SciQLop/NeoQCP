@@ -1,6 +1,7 @@
 #include "draw-context.h"
 
 #include "draw-commands.h"
+#include "raster-fallback.h"
 
 #include "../axis/axis.h"
 #include "../items/item.h"
@@ -210,6 +211,8 @@ void record(QCPDrawList& list, qcp::QCPDrawCommand command, const Extent& data,
         list.id = qcpNextDrawListId(); // a re-recorded list is a new recording
     mergeExtent(list.data, data);
     mergeExtent(list.index, index);
+    if (qcp::needsRaster(command))
+        ++list.rasterCommands;
     list.commands.push_back(std::move(command));
 }
 

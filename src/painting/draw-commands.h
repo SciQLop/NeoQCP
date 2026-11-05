@@ -229,6 +229,7 @@ struct QCP_LIB_DECL QCPDrawList
         anchorDependent = other.anchorDependent;
         transformDependent = other.transformDependent;
         everyFrame = other.everyFrame;
+        rasterCommands = other.rasterCommands;
         id = qcpNextDrawListId();
         return *this;
     }
@@ -252,6 +253,9 @@ struct QCP_LIB_DECL QCPDrawList
     //! QCPItemPosition::asPosition): a snapshot, which goes stale without the object's generation
     //! moving. Such a recording is remade every frame.
     bool everyFrame = false;
+    //! How many commands the replay has to rasterise (see needsRaster): a raster image is a
+    //! scarce resource, and counting here keeps the query off every frame's replay.
+    int rasterCommands = 0;
     quint64 id = qcpNextDrawListId(); //!< unique: with a command's index it is a cache key
 };
 
