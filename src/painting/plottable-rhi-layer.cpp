@@ -2,6 +2,7 @@
 #include "Profiling.hpp"
 #include "embedded_shaders.h"
 #include "rhi-utils.h"
+#include <algorithm>
 #include <cstring>
 
 QCPPlottableRhiLayer::QCPPlottableRhiLayer(QRhi* rhi) : mRhi(rhi) { }
@@ -108,6 +109,8 @@ int QCPPlottableRhiLayer::dashUbufStride() const
 
 void QCPPlottableRhiLayer::dashStagingAppend(const float* src, int count)
 {
+    if (count <= 0)
+        return;
     if (mDashStagingSize + count > mDashStagingCapacity)
     {
         mDashStagingCapacity = std::max(mDashStagingCapacity * 2, mDashStagingSize + count);
@@ -120,6 +123,8 @@ void QCPPlottableRhiLayer::dashStagingAppend(const float* src, int count)
 
 void QCPPlottableRhiLayer::stagingAppend(const float* src, int count)
 {
+    if (count <= 0)
+        return;
     if (mStagingSize + count > mStagingCapacity)
     {
         mStagingCapacity = std::max(mStagingCapacity * 2, mStagingSize + count);
@@ -135,30 +140,40 @@ void QCPPlottableRhiLayer::addPlottable(std::span<const float> fillVerts,
                                         double dpr, int outputHeight, float offsetX, float offsetY,
                                         float alpha)
 {
+    if (fillVerts.empty() && strokeVerts.empty())
+        return;
     PROFILE_HERE_N("QCPPlottableRhiLayer::addPlottable");
     DrawEntry entry;
     entry.scissorRect = qcp::rhi::computeScissor(clipRect, dpr, outputHeight);
     entry.offsetX = offsetX;
     entry.offsetY = offsetY;
     entry.alpha = alpha;
+    entry.vertexOffset = mStagingSize / 6;
+    entry.fillVertexCount = static_cast<int>(fillVerts.size()) / 6;
 
-    if (!fillVerts.empty())
-    {
-        entry.fillOffset = mStagingSize / 6;
-        entry.fillVertexCount = static_cast<int>(fillVerts.size()) / 6;
-        stagingAppend(fillVerts.data(), static_cast<int>(fillVerts.size()));
-    }
+    stagingAppend(fillVerts.data(), static_cast<int>(fillVerts.size()));
+    stagingAppend(strokeVerts.data(), static_cast<int>(strokeVerts.size()));
+    entry.vertexCount = mStagingSize / 6 - entry.vertexOffset;
 
-    if (!strokeVerts.empty())
-    {
-        entry.strokeOffset = mStagingSize / 6;
-        entry.strokeVertexCount = static_cast<int>(strokeVerts.size()) / 6;
-        stagingAppend(strokeVerts.data(), static_cast<int>(strokeVerts.size()));
-    }
-
+    mDirty = true;
+    if (extendLastSolid(entry))
+        return;
     mDrawEntries.append(entry);
     mDrawOrder.append({ DrawKind::Solid, int(mDrawEntries.size()) - 1 });
-    mDirty = true;
+}
+
+bool QCPPlottableRhiLayer::extendLastSolid(const DrawEntry& entry)
+{
+    if (mDrawOrder.isEmpty() || mDrawOrder.last().kind != DrawKind::Solid)
+        return false;
+    DrawEntry& last = mDrawEntries[mDrawOrder.last().index];
+    if (last.scissorRect != entry.scissorRect || last.offsetX != entry.offsetX
+        || last.offsetY != entry.offsetY || last.alpha != entry.alpha
+        || last.vertexOffset + last.vertexCount != entry.vertexOffset)
+        return false;
+    last.vertexCount += entry.vertexCount;
+    last.fillVertexCount += entry.fillVertexCount;
+    return true;
 }
 
 void QCPPlottableRhiLayer::addDashedPlottable(std::span<const float> strokeVerts,
@@ -189,9 +204,29 @@ void QCPPlottableRhiLayer::addDashedPlottable(std::span<const float> strokeVerts
     entry.vertexOffset = mDashStagingSize / 7;
     entry.vertexCount = int(strokeVerts.size()) / 7;
     dashStagingAppend(strokeVerts.data(), int(strokeVerts.size()));
+    mDirty = true;
+    if (extendLastDashed(entry))
+        return;
     mDashEntries.append(entry);
     mDrawOrder.append({ DrawKind::Dashed, int(mDashEntries.size()) - 1 });
-    mDirty = true;
+}
+
+bool QCPPlottableRhiLayer::extendLastDashed(const DashedEntry& entry)
+{
+    if (mDrawOrder.isEmpty() || mDrawOrder.last().kind != DrawKind::Dashed)
+        return false;
+    DashedEntry& last = mDashEntries[mDrawOrder.last().index];
+    // A different pattern or phase inks different pixels, so only an identical one can continue
+    // the run; the dashes themselves are triangles, so the ranges join without a connecting line.
+    if (last.scissorRect != entry.scissorRect || last.offsetX != entry.offsetX
+        || last.offsetY != entry.offsetY || last.alpha != entry.alpha
+        || last.dashOffset != entry.dashOffset || last.patternLength != entry.patternLength
+        || last.patternCount != entry.patternCount
+        || !std::equal(std::begin(last.pattern), std::end(last.pattern), std::begin(entry.pattern))
+        || last.vertexOffset + last.vertexCount != entry.vertexOffset)
+        return false;
+    last.vertexCount += entry.vertexCount;
+    return true;
 }
 
 bool QCPPlottableRhiLayer::addImage(const QImage& image, const QRectF& pixelRect,
@@ -797,6 +832,8 @@ void QCPPlottableRhiLayer::render(QRhiCommandBuffer* cb, const QSize& outputSize
             bound = Bound::Solid;
         }
         const auto& entry = mDrawEntries[record.index];
+        if (entry.vertexCount == 0)
+            continue;
         // Bind per-draw uniform slot via dynamic offset.
         // setShaderResources must precede setVertexInput — on Metal, QRhi offsets
         // vertex buffer indices by the number of SRB buffer bindings.
@@ -805,9 +842,8 @@ void QCPPlottableRhiLayer::render(QRhiCommandBuffer* cb, const QSize& outputSize
         cb->setVertexInput(0, 1, &solidBinding);
         cb->setScissor({ entry.scissorRect.x(), entry.scissorRect.y(), entry.scissorRect.width(),
                          entry.scissorRect.height() });
-        if (entry.fillVertexCount > 0)
-            cb->draw(entry.fillVertexCount, 1, entry.fillOffset, 0);
-        if (entry.strokeVertexCount > 0)
-            cb->draw(entry.strokeVertexCount, 1, entry.strokeOffset, 0);
+        // Fill and stroke are one contiguous range: the triangles do not care which is which, so
+        // one draw covers both.
+        cb->draw(entry.vertexCount, 1, entry.vertexOffset, 0);
     }
 }

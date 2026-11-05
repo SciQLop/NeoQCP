@@ -584,6 +584,55 @@ void TestDrawable::zoomRebuildsOnce()
     QCOMPARE(QCPLineExtruder::extruderCallCount(), strokesAfterZoom);
 }
 
+void TestDrawable::tenThousandBarsAreOneDraw()
+{
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - the merged entries are a GPU path only");
+    auto* shape = new TestShape(f.plot.get());
+    shape->bars = 10000;
+    shape->filledBars = true;
+    f.plot->replot();
+
+    auto* layer = f.plot->plottableRhiLayer(shape->layer());
+    QVERIFY(layer);
+    // Every bar shares the clip, the offset and the alpha of the one before it and its vertices
+    // start where theirs end: the whole recording is one draw, not one per rect side.
+    QCOMPARE(int(layer->drawEntries().size()), 1);
+    const auto& entry = layer->drawEntries().first();
+    QVERIFY(entry.fillVertexCount > 0);
+    QVERIFY(entry.vertexCount > entry.fillVertexCount);
+}
+
+void TestDrawable::fadeSplitsTheRun()
+{
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - the merged entries are a GPU path only");
+    auto* first = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    first->setPen(QPen(Qt::black, 2));
+    auto* second = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    second->mLine = std::make_shared<const std::vector<QPointF>>(
+        std::initializer_list<QPointF> { { 1, 8 }, { 9, 8 } });
+    second->setPen(QPen(Qt::black, 2));
+    f.plot->replot();
+
+    auto* layer = f.plot->plottableRhiLayer(first->layer());
+    QVERIFY(layer);
+    QCOMPARE(second->layer(), first->layer());
+    // Two objects on one layer, nothing to tell their strokes apart: one run.
+    QCOMPARE(int(layer->drawEntries().size()), 1);
+
+    // The second one fades: its alpha no longer matches, so it must keep its own run instead of
+    // being folded into the first object's and drawn at the wrong opacity.
+    second->setBusyShowDelayMs(0);
+    second->setBusy(true);
+    QTRY_VERIFY_WITH_TIMEOUT(second->visuallyBusy(), 5000);
+    f.plot->replot();
+    QCOMPARE(int(layer->drawEntries().size()), 2);
+    QVERIFY(layer->drawEntries().last().alpha < 0.99f);
+}
+
 void TestDrawable::exportDoesNotPoisonTheResolveCache()
 {
     Fixture f;

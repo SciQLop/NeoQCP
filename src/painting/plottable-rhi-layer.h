@@ -15,10 +15,9 @@ class QCPPlottableRhiLayer
 public:
     struct DrawEntry
     {
-        int fillOffset = 0;
-        int fillVertexCount = 0;
-        int strokeOffset = 0;
-        int strokeVertexCount = 0;
+        int vertexOffset = 0; //!< first vertex of the run, in submission order
+        int vertexCount = 0; //!< the whole run: fill vertices first, then the stroke
+        int fillVertexCount = 0; //!< how many of \a vertexCount are fill (0 for a stroke only)
         float offsetX = 0; // per-draw pixel offset (applied in vertex shader)
         float offsetY = 0;
         float alpha = 1; // busy fade, multiplies the premultiplied vertex colour
@@ -206,6 +205,11 @@ private:
     int dashUbufStride() const;
     int imageUbufStride() const;
     void dashStagingAppend(const float* src, int count);
+
+    //! Extends the last submission when \a entry continues it with the same draw state, so a
+    //! hundred thousand consecutive shapes are one draw. False when it has to be its own entry.
+    bool extendLastSolid(const DrawEntry& entry);
+    bool extendLastDashed(const DashedEntry& entry);
 
     // Raw staging buffer — avoids QVector::resize zero-initialization overhead
     void stagingAppend(const float* src, int count);

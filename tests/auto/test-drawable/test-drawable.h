@@ -25,6 +25,8 @@ private slots:
     void panBuildsNoFillEither();
     void panMovesAllDataEntriesByOneDelta();
     void zoomRebuildsOnce();
+    void tenThousandBarsAreOneDraw();
+    void fadeSplitsTheRun();
     void exportDoesNotPoisonTheResolveCache();
     void drawnPolygonStacksAboveAnEarlierGpuGraph();
 

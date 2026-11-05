@@ -1266,7 +1266,7 @@ void TestHistogramPlottable::gpuBarsHaveFillAndOutline()
     const auto drawn = gpuEntries(mPlot, gpuHistogram(mPlot, QCPHistogram::sBars, Qt::red));
     QCOMPARE(drawn.size(), 1);
     QVERIFY(drawn[0].fillVertexCount > 0);
-    QVERIFY(drawn[0].strokeVertexCount > 0);
+    QVERIFY(drawn[0].vertexCount > drawn[0].fillVertexCount);
 }
 
 void TestHistogramPlottable::gpuBarsAreNotShifted()
@@ -1286,7 +1286,7 @@ void TestHistogramPlottable::gpuStepOfOneColumnHasOnlyTheOutline()
     const auto drawn = gpuEntries(mPlot, gpuHistogram(mPlot, QCPHistogram::sStep, Qt::red));
     QCOMPARE(drawn.size(), 1);
     QCOMPARE(drawn[0].fillVertexCount, 0);
-    QVERIFY(drawn[0].strokeVertexCount > 0);
+    QVERIFY(drawn[0].vertexCount > 0);
 }
 
 void TestHistogramPlottable::gpuAnAlmostTransparentFillStillDraws()

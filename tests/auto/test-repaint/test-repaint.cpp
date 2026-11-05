@@ -2608,11 +2608,77 @@ void TestRepaint::solidLinesKeepTheirVertexFormat()
     QVERIFY(layer->dashedDrawEntries().isEmpty());
 
     QVERIFY(!layer->drawEntries().isEmpty());
-    QVERIFY(layer->drawEntries().first().strokeVertexCount > 0);
+    QCOMPARE(layer->drawEntries().first().fillVertexCount, 0); // a line has no fill
+    QVERIFY(layer->drawEntries().first().vertexCount > 0);
 }
 
 // A pen style must not move a plottable up or down its layer: the GPU pass has to draw the
 // submissions in the order they were added, whatever pipelines they need.
+void TestRepaint::mergeKeepsPaintersOrder()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    plot->xAxis->setRange(0, 100);
+    plot->yAxis->setRange(0, 50);
+    QCPDrawContext context(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+    const QBrush brush(QColor(40, 160, 90));
+    context.rect(QCP::Data { 10, 10 }, QCP::Data { 40, 40 }, QPen(Qt::black, 2.0), brush);
+    context.rect(QCP::Data { 45, 10 }, QCP::Data { 70, 40 }, QPen(Qt::black, 2.0, Qt::DashLine),
+                 QBrush(Qt::NoBrush));
+    context.rect(QCP::Data { 75, 10 }, QCP::Data { 100, 40 }, QPen(Qt::black, 2.0), brush);
+
+    auto* layer = plot->plottableRhiLayer(plot->currentLayer());
+    QVERIFY(layer);
+    layer->clear();
+    QCPResolveCache cache;
+    qcp::QCPRasterFallback fallback;
+    qcpReplayWithRhi(context.drawList(), *layer, *plot->scatterRhiLayer(plot->currentLayer()),
+                     context.frame(), cache, fallback, plot->bufferDevicePixelRatio(),
+                     plot->rhiOutputSize());
+    // The dashed submission sits between the two solid ones. Folding the second solid rect into
+    // the first would draw it below that dash, so the merge must stop at an unlike neighbour.
+    QCOMPARE(int(layer->drawEntries().size()), 2);
+    QCOMPARE(int(layer->dashedDrawEntries().size()), 1);
+}
+
+void TestRepaint::dashesMergeOnlyWithEqualPhase()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    plot->xAxis->setRange(0, 10);
+    plot->yAxis->setRange(0, 10);
+    QCPDrawContext context(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+    const auto first = std::make_shared<const std::vector<QPointF>>(
+        std::initializer_list<QPointF> { { 1, 1 }, { 2, 2 }, { 3, 1 } });
+    const auto second = std::make_shared<const std::vector<QPointF>>(
+        std::initializer_list<QPointF> { { 1, 3 }, { 2, 4 }, { 3, 3 } });
+    const auto third = std::make_shared<const std::vector<QPointF>>(
+        std::initializer_list<QPointF> { { 1, 5 }, { 2, 6 }, { 3, 5 } });
+    const QPen dash(Qt::black, 2.0, Qt::DashLine);
+    context.polyline(first, dash);
+    context.polyline(second, dash);
+    QPen shifted = dash;
+    shifted.setDashOffset(3.0);
+    context.polyline(third, shifted);
+
+    auto* layer = plot->plottableRhiLayer(plot->currentLayer());
+    QVERIFY(layer);
+    layer->clear();
+    QCPResolveCache cache;
+    qcp::QCPRasterFallback fallback;
+    qcpReplayWithRhi(context.drawList(), *layer, *plot->scatterRhiLayer(plot->currentLayer()),
+                     context.frame(), cache, fallback, plot->bufferDevicePixelRatio(),
+                     plot->rhiOutputSize());
+    // The first two dashes share pattern, width and phase: one run. The shifted one restarts the
+    // pattern elsewhere, so it cannot join them without changing which pixels are inked.
+    QCOMPARE(int(layer->dashedDrawEntries().size()), 2);
+    QVERIFY(layer->drawEntries().isEmpty());
+}
+
 void TestRepaint::dashedUnderSolidStaysUnder()
 {
     QWidget host;
@@ -2713,11 +2779,11 @@ void TestRepaint::gpuRectFillsBeforeStroking()
                      context.frame(), cache, fallback, plot->bufferDevicePixelRatio(),
                      plot->rhiOutputSize());
     const auto& entries = layer->drawEntries();
-    QCOMPARE(int(entries.size()), 2);
+    // One rect is one entry: its fill vertices, then its outline, are one contiguous range that
+    // the GPU draws with a single call.
+    QCOMPARE(int(entries.size()), 1);
     QVERIFY2(entries.first().fillVertexCount > 0, "the fill must be submitted first");
-    QCOMPARE(entries.first().strokeVertexCount, 0);
-    QCOMPARE(entries.last().fillVertexCount, 0);
-    QVERIFY(entries.last().strokeVertexCount > 0);
+    QVERIFY(entries.first().vertexCount > entries.first().fillVertexCount);
 }
 
 void TestRepaint::unequalFillBetweenBecomesAnImage()
