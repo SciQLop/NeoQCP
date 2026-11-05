@@ -239,6 +239,8 @@ struct QCPDrawnCore::State
     quint64 recordedGeneration = 0;
     quint64 recordedEpoch = 0;
     quint64 recordedItemsEpoch = 0;
+    quint64 recordedDependency = 0;
+    const void* recordedSource = nullptr;
     QCPTransform recordedTransform;
     quint64 iconGeneration = 0;
     int recordings = 0;
@@ -391,8 +393,11 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
     const quint64 epoch = view.plot ? view.plot->viewEpoch() : 0;
     const quint64 itemsEpoch = view.plot ? view.plot->itemsEpoch() : 0;
     const QCPTransform transform(view.keyAxis, view.valueAxis);
+    const void* source = object.dataSource();
+    const quint64 dependency = object.dependencyRevision();
     const bool stale = !mState->recorded || mState->recording.everyFrame
-        || mState->recordedGeneration != mState->generation
+        || mState->recordedGeneration != mState->generation || mState->recordedSource != source
+        || mState->recordedDependency != dependency
         || (mState->viewDependent && mState->recordedEpoch != epoch)
         || (mState->anchorDependent && mState->recordedItemsEpoch != itemsEpoch)
         || (mState->transformDependent && !transform.isTranslationOf(mState->recordedTransform));
@@ -408,6 +413,8 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
     mState->recordedGeneration = mState->generation;
     mState->recordedEpoch = epoch;
     mState->recordedItemsEpoch = itemsEpoch;
+    mState->recordedSource = source;
+    mState->recordedDependency = dependency;
     mState->recordedTransform = transform;
     mState->recorded = true;
     ++mState->recordings;

@@ -11,6 +11,10 @@ private slots:
   void dataManipulation();
   void dataSharing();
 
+  void setDataTwiceRedrawsTheNewBars();
+  void addDataShowsTheNewBar();
+  void containerEditRedraws();
+
   void plotWidthBarsNeverReRecord();
   void pixelWidthBarsReRecordOnZoomOnly();
   void barsSelectionReRecordsAndUsesTheDecorator();

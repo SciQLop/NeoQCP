@@ -63,6 +63,15 @@ public:
     virtual std::optional<double> hitTest(QCP::Pixels at, QVariant* details) const = 0;
     //! Draws the object into a legend icon's rect; the adapter replays the recording, fitted.
     virtual void drawLegendIcon(QCPDrawContext& icon) const = 0;
+
+    //! The data the recording was made from, nullptr for none: a new pointer is a stale recording.
+    [[nodiscard]] virtual const void* dataSource() const { return nullptr; }
+
+    /*!
+      Everything else the recording depends on that the generation does not cover: other data (a
+      bar's stack, its group), a counter that only ever grows. A change makes the recording stale.
+    */
+    [[nodiscard]] virtual quint64 dependencyRevision() const { return 0; }
 };
 
 /*!
@@ -222,6 +231,24 @@ class QCPDrawnPlottable : public QCPDrawnBase<Base>
 {
 public:
     using QCPDrawnBase<Base>::QCPDrawnBase;
+
+    //! The data container the recording read, when the base has one.
+    [[nodiscard]] const void* dataSource() const override
+    {
+        if constexpr (requires { this->mDataContainer.get(); })
+            return this->mDataContainer.get();
+        else
+            return nullptr;
+    }
+
+    //! The container's revision: a setter that only fills the container still makes a stale record.
+    [[nodiscard]] quint64 dependencyRevision() const override
+    {
+        if constexpr (requires { this->mDataContainer->revision(); })
+            return this->mDataContainer->revision();
+        else
+            return 0;
+    }
 
 protected:
     using QCPDrawnAdapter::drawLegendIcon; // the contract's icon stays reachable

@@ -57,6 +57,12 @@ public:
 
     [[nodiscard]] bool autoSqueeze() const { return mAutoSqueeze; }
 
+    /*!
+      Bumped by every change to the data, including the ones made through a mutable iterator: a
+      reader that baked these data into what it drew compares this counter to notice it is stale.
+    */
+    [[nodiscard]] quint64 revision() const { return mRevision; }
+
     // setters:
     void setAutoSqueeze(bool enabled);
 
@@ -78,9 +84,17 @@ public:
 
     [[nodiscard]] const_iterator constEnd() const { return mData.constEnd(); }
 
-    iterator begin() { return mData.begin() + mPreallocSize; }
+    iterator begin()
+    {
+        ++mRevision; // a mutable iterator may change the data: assume it did
+        return mData.begin() + mPreallocSize;
+    }
 
-    iterator end() { return mData.end(); }
+    iterator end()
+    {
+        ++mRevision;
+        return mData.end();
+    }
 
     const_iterator findBegin(double sortKey, bool expandedRange = true) const;
     const_iterator findEnd(double sortKey, bool expandedRange = true) const;
@@ -104,6 +118,7 @@ protected:
     QVector<DataType> mData;
     int mPreallocSize;
     int mPreallocIteration;
+    quint64 mRevision = 0; //!< bumped by every mutation, see revision()
 
     // non-virtual methods:
     void preallocateGrow(int minimumPreallocSize);
@@ -294,6 +309,7 @@ void QCPDataContainer<DataType>::set(const QCPDataContainer<DataType>& data)
 template <class DataType>
 void QCPDataContainer<DataType>::set(const QVector<DataType>& data, bool alreadySorted)
 {
+    ++mRevision;
     mData = data;
     mPreallocSize = 0;
     mPreallocIteration = 0;
@@ -310,6 +326,7 @@ void QCPDataContainer<DataType>::set(const QVector<DataType>& data, bool already
 template <class DataType>
 void QCPDataContainer<DataType>::add(const QCPDataContainer<DataType>& data)
 {
+    ++mRevision;
     if (data.isEmpty())
         return;
 
@@ -351,6 +368,7 @@ void QCPDataContainer<DataType>::add(const QCPDataContainer<DataType>& data)
 template <class DataType>
 void QCPDataContainer<DataType>::add(const QVector<DataType>& data, bool alreadySorted)
 {
+    ++mRevision;
     if (data.isEmpty())
         return;
     if (isEmpty())
@@ -396,6 +414,7 @@ void QCPDataContainer<DataType>::add(const QVector<DataType>& data, bool already
 template <class DataType>
 void QCPDataContainer<DataType>::add(const DataType& data)
 {
+    ++mRevision;
     if (isEmpty()
         || !qcpLessThanSortKey<DataType>(
             data,
@@ -428,6 +447,7 @@ void QCPDataContainer<DataType>::add(const DataType& data)
 template <class DataType>
 void QCPDataContainer<DataType>::removeBefore(double sortKey)
 {
+    ++mRevision;
     QCPDataContainer<DataType>::iterator it = begin();
     QCPDataContainer<DataType>::iterator itEnd = std::lower_bound(
         begin(), end(), DataType::fromSortKey(sortKey), qcpLessThanSortKey<DataType>);
@@ -445,6 +465,7 @@ void QCPDataContainer<DataType>::removeBefore(double sortKey)
 template <class DataType>
 void QCPDataContainer<DataType>::removeAfter(double sortKey)
 {
+    ++mRevision;
     QCPDataContainer<DataType>::iterator it = std::upper_bound(
         begin(), end(), DataType::fromSortKey(sortKey), qcpLessThanSortKey<DataType>);
     QCPDataContainer<DataType>::iterator itEnd = end();
@@ -463,6 +484,7 @@ void QCPDataContainer<DataType>::removeAfter(double sortKey)
 template <class DataType>
 void QCPDataContainer<DataType>::remove(double sortKeyFrom, double sortKeyTo)
 {
+    ++mRevision;
     if (sortKeyFrom >= sortKeyTo || isEmpty())
         return;
 
@@ -487,6 +509,7 @@ void QCPDataContainer<DataType>::remove(double sortKeyFrom, double sortKeyTo)
 template <class DataType>
 void QCPDataContainer<DataType>::remove(double sortKey)
 {
+    ++mRevision;
     QCPDataContainer::iterator it = std::lower_bound(begin(), end(), DataType::fromSortKey(sortKey),
                                                      qcpLessThanSortKey<DataType>);
     if (it != end() && it->sortKey() == sortKey)
@@ -509,6 +532,7 @@ void QCPDataContainer<DataType>::remove(double sortKey)
 template <class DataType>
 void QCPDataContainer<DataType>::clear()
 {
+    ++mRevision;
     mData.clear();
     mPreallocIteration = 0;
     mPreallocSize = 0;
@@ -528,6 +552,7 @@ void QCPDataContainer<DataType>::clear()
 template <class DataType>
 void QCPDataContainer<DataType>::sort()
 {
+    ++mRevision;
     std::sort(begin(), end(), qcpLessThanSortKey<DataType>);
 }
 
@@ -544,6 +569,7 @@ void QCPDataContainer<DataType>::sort()
 template <class DataType>
 void QCPDataContainer<DataType>::squeeze(bool preAllocation, bool postAllocation)
 {
+    ++mRevision;
     if (preAllocation)
     {
         if (mPreallocSize > 0)

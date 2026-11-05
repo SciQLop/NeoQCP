@@ -47,6 +47,22 @@ QVector<double> spreadKeys(int count)
         keys << 10.0 * i / count;
     return keys;
 }
+
+//! The plot as the user sees it, without the grid lines a probe pixel could land on.
+QImage frameOf(QCustomPlot* plot)
+{
+    plot->xAxis->grid()->setVisible(false);
+    plot->yAxis->grid()->setVisible(false);
+    plot->resize(300, 200);
+    return plot->toPixmap(300, 200).toImage();
+}
+
+QColor pixelAt(const QImage& frame, QCustomPlot* plot, double key, double value)
+{
+    const double dpr = frame.devicePixelRatio();
+    return frame.pixelColor(qRound(plot->xAxis->coordToPixel(key) * dpr),
+                            qRound(plot->yAxis->coordToPixel(value) * dpr));
+}
 } // namespace
 
 void TestQCPBars::init()
@@ -183,6 +199,57 @@ void TestQCPBars::dataSharing()
   bars2->addData(4, 5);
   QCOMPARE(mBars->data()->size(), 1);
   QCOMPARE(bars2->data()->size(), 6);
+}
+
+void TestQCPBars::setDataTwiceRedrawsTheNewBars()
+{
+    // setData(keys, values) rewrites the container without marking the bar dirty itself: the
+    // screen must still show the new heights after the next replot.
+    mBars->setWidth(0.6);
+    mPlot->xAxis->setRange(0, 4);
+    mPlot->yAxis->setRange(0, 4);
+    mBars->setData(QVector<double> { 1, 2, 3 }, QVector<double> { 0.5, 0.5, 0.5 });
+    mPlot->replot();
+    QCOMPARE(pixelAt(frameOf(mPlot), mPlot, 2.0, 2.0), QColor(Qt::white));
+
+    mBars->setData(QVector<double> { 1, 2, 3 }, QVector<double> { 3, 3, 3 });
+    mPlot->replot();
+    const QColor raised = pixelAt(frameOf(mPlot), mPlot, 2.0, 2.0);
+    QVERIFY2(raised != QColor(Qt::white),
+             qPrintable(QStringLiteral("the raised bar is still painted as %1").arg(raised.name())));
+}
+
+void TestQCPBars::addDataShowsTheNewBar()
+{
+    mBars->setWidth(0.6);
+    mPlot->xAxis->setRange(0, 5);
+    mPlot->yAxis->setRange(0, 4);
+    mBars->setData(QVector<double> { 1, 2 }, QVector<double> { 1, 1 });
+    mPlot->replot();
+    QCOMPARE(pixelAt(frameOf(mPlot), mPlot, 4.0, 1.5), QColor(Qt::white));
+
+    mBars->addData(4, 3);
+    mPlot->replot();
+    const QColor added = pixelAt(frameOf(mPlot), mPlot, 4.0, 1.5);
+    QVERIFY2(added != QColor(Qt::white),
+             qPrintable(QStringLiteral("the added bar is painted as %1").arg(added.name())));
+}
+
+void TestQCPBars::containerEditRedraws()
+{
+    // The container API is public: bars->data()->add() changes the data behind the recording.
+    mBars->setWidth(0.6);
+    mPlot->xAxis->setRange(0, 5);
+    mPlot->yAxis->setRange(0, 4);
+    mBars->setData(QVector<double> { 1 }, QVector<double> { 1 });
+    mPlot->replot();
+    QCOMPARE(pixelAt(frameOf(mPlot), mPlot, 3.0, 1.5), QColor(Qt::white));
+
+    mBars->data()->add(QCPBarsData(3, 3));
+    mPlot->replot();
+    const QColor edited = pixelAt(frameOf(mPlot), mPlot, 3.0, 1.5);
+    QVERIFY2(edited != QColor(Qt::white),
+             qPrintable(QStringLiteral("the container edit is painted as %1").arg(edited.name())));
 }
 
 void TestQCPBars::plotWidthBarsNeverReRecord()
