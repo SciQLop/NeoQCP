@@ -75,6 +75,7 @@ public:
         PixelCorner,
         MixedRect,
         FromAnchor,
+        Dashed, //!< one dashed stroke: the GPU needs its dashed pipeline for it
         ErrorBars, //!< three error bars in a pen no vertex colour can carry
         Raster //!< a texture-brush rect beside a long polyline: two kept runs of different kinds
     };
@@ -177,6 +178,11 @@ public:
                 = { QCP::DataXRatioY { 2, 0.2 }, QCP::DataXRatioY { 6, 0.2 },
                     QCP::DataXRatioY { 6, 0.8 }, QCP::DataXRatioY { 2, 0.8 } };
             context.polygon(span, QPen(Qt::black, 2), QBrush(Qt::NoBrush));
+            return;
+        }
+        if (mode == Dashed)
+        {
+            context.polyline(mLine, QPen(Qt::black, 2, Qt::DashLine));
             return;
         }
         if (mode == ErrorBars) // a gradient pen: the stroke has to be rasterised, not lost
@@ -660,6 +666,40 @@ void TestDrawable::recordedErrorBarsAreDrawn()
         ink += c.red() + c.green() + c.blue() < 720 ? 1 : 0;
     }
     QVERIFY2(ink > 10, qPrintable(QStringLiteral("the error bars left no ink: %1 pixels").arg(ink)));
+}
+
+void TestDrawable::brokenDashedPipelineStillDraws()
+{
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - the dashed pipeline is a GPU path");
+    auto* shape = new TestShape(f.plot.get());
+    shape->mode = TestShape::Dashed;
+    shape->mLine = std::make_shared<const std::vector<QPointF>>(
+        std::vector<QPointF> { { 1, 5 }, { 9, 5 } });
+    auto* layer = f.plot->plottableRhiLayer(shape->layer());
+    QVERIFY(layer);
+    layer->breakDashedPipelineForTest();
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+
+    // Dashes leave gaps, so the count down the line, not one pixel, says the stroke is there.
+    const auto ink = [&](const QImage& frame)
+    {
+        int count = 0;
+        for (int i = 0; i <= 60; ++i)
+        {
+            const QColor c = pixelAt(frame, f.plot.get(), 1.2 + 7.6 * i / 60.0, 5.0);
+            count += c.red() + c.green() + c.blue() < 720 ? 1 : 0;
+        }
+        return count;
+    };
+    QVERIFY2(ink(f.plot->grabFramebuffer()) > 10,
+             "a dashed stroke was lost when the dashed pipeline could not be built");
+
+    // The stroke became an image, and an image is kept: the pan only shifts it.
+    f.plot->xAxis->setRange(0, 11);
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY2(ink(f.plot->grabFramebuffer()) > 10, "the pan lost the rasterised dash");
 }
 
 void TestDrawable::zoomRebuildsOnce()

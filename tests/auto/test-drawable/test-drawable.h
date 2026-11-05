@@ -26,6 +26,7 @@ private slots:
     void panMovesAllDataEntriesByOneDelta();
     void rasterPanKeepsImage();
     void recordedErrorBarsAreDrawn();
+    void brokenDashedPipelineStillDraws();
     void zoomRebuildsOnce();
     void tenThousandBarsAreOneDraw();
     void gradientBarsStackAsOne();

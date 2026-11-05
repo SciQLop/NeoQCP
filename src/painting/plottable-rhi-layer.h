@@ -143,6 +143,9 @@ public:
     //! Test hook: pretend the image pipeline failed to build.
     void breakImagePipelineForTest() { mImageBroken = true; }
 
+    //! Test hook: pretend the dashed pipeline failed to build.
+    void breakDashedPipelineForTest() { mDashBroken = true; }
+
     const QVector<ImageEntry>& imageDrawEntries() const { return mImageEntries; }
 
 private:

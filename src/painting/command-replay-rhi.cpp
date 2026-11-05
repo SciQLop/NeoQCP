@@ -227,9 +227,10 @@ void fanFill(QCPPlottableRhiLayer& layer, const QPointF& centre, std::span<const
 void addRasterCommand(const QCPDrawList& list, QCPPlottableRhiLayer& layer,
                       const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame,
                       qcp::QCPRasterFallback& fallback, const QRect& clip, double dpr,
-                      const QSize& viewport, quint64 generation, QCPRecordingCache* cache)
+                      const QSize& viewport, quint64 generation, QCPRecordingCache* cache,
+                      bool needed, bool withStroke)
 {
-    if (!qcp::needsRaster(command))
+    if (!needed)
         return;
     const quint64 listId = list.id;
     const quint64 index = qcpCommandIndex(list, command);
@@ -248,7 +249,6 @@ void addRasterCommand(const QCPDrawList& list, QCPPlottableRhiLayer& layer,
                           " by QPainter, under this layer's GPU content";
         return;
     }
-    const bool withStroke = qcp::strokeNeedsRaster(command);
     QRectF bounds = qcp::fallbackPixelBounds(command, frame, dpr, withStroke);
     bounds = bounds.intersected(QRectF(QPointF(0, 0), QSizeF(viewport) / dpr));
     if (!clip.isEmpty())
@@ -279,7 +279,8 @@ bool rasterOverflows(const QCPDrawList& list, const QCPPlottableRhiLayer& layer)
 {
     int needed = 0;
     for (const qcp::QCPDrawCommand& command : list.commands)
-        if (qcp::needsRaster(command))
+        if (qcp::needsRaster(command)
+            || (!layer.dashedAvailable() && qcp::strokeIsDashed(command)))
             ++needed;
     if (needed == 0)
         return false;
@@ -574,12 +575,16 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
     for (const qcp::QCPDrawCommand& command : list.commands)
     {
         // Both answers are the same in every branch: ask once per command, not once per path.
-        const bool strokeRaster = qcp::strokeNeedsRaster(command);
+        // The dashed pipeline is built with the layer, so a layer that failed to build it can only
+        // rasterise a dashed stroke; the painter copy would land under the layer's GPU content.
+        const bool strokeRaster = qcp::strokeNeedsRaster(command)
+            || (!plottables.dashedAvailable() && qcp::strokeIsDashed(command));
+        const bool fillRaster = qcp::fillNeedsRaster(command);
         const bool dataOnly = isDataOnlyCommand(command);
         const auto raster = [&]
         {
             addRasterCommand(list, plottables, command, frame, fallback, clip, dpr, outputSize,
-                             generation, geometry);
+                             generation, geometry, fillRaster || strokeRaster, strokeRaster);
         };
         const auto stroke
             = [&](std::span<const QPointF> points, const QPen& pen, bool closed = false)
@@ -633,7 +638,7 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                         = QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
                               .normalized();
                     // The fill is submitted first: the stroke's inner half must stay visible.
-                    if (qcp::gpuCanFill(cmd.brush) && !qcp::needsRaster(command))
+                    if (qcp::gpuCanFill(cmd.brush) && !fillRaster && !strokeRaster)
                     {
                         const std::array<QPointF, 4> corners { box.topLeft(), box.topRight(),
                                                                box.bottomRight(),
@@ -652,7 +657,7 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                     const QPointF b = qcpResolvePosition(frame, cmd.b);
                     const QRectF box = QRectF(a, b).normalized();
                     const std::vector<QPointF> ring = qcpEllipseRing(box);
-                    if (qcp::gpuCanFill(cmd.brush) && !qcp::needsRaster(command))
+                    if (qcp::gpuCanFill(cmd.brush) && !fillRaster && !strokeRaster)
                         fanFill(plottables, box.center(), ring, cmd.brush.color(), clip, dpr,
                                 outputHeight, alpha, dataOnly, geometry);
                     raster();

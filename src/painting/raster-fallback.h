@@ -20,6 +20,10 @@ namespace qcp
 //! has to be part of the command's image.
 bool strokeNeedsRaster(const QPen& pen);
 
+/// True when \a command's stroke is a dash pattern: the GPU can only draw it through its dashed
+/// pipeline, so a layer without one has to rasterise it.
+bool strokeIsDashed(const QCPDrawCommand& command);
+
 //! Same for \a command's pen (false for the kinds that have none).
 bool strokeNeedsRaster(const QCPDrawCommand& command);
 

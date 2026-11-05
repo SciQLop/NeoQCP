@@ -65,6 +65,19 @@ bool strokeNeedsRaster(const QPen& pen)
     return pen.style() != Qt::NoPen && !gpuCanFill(pen.brush());
 }
 
+bool strokeIsDashed(const QCPDrawCommand& command)
+{
+    return std::visit(
+        [](const auto& cmd)
+        {
+            if constexpr (requires { cmd.pen; })
+                return isDashed(cmd.pen);
+            else
+                return false;
+        },
+        command);
+}
+
 namespace
 {
     //! Which halves of a command the raster has to paint: its fill, its stroke, or both.
