@@ -75,6 +75,8 @@ public:
         ++drawCalls;
         if (contentChangeInsideDraw)
             const_cast<TestShape*>(this)->contentChanged();
+        if (readsTheme)
+            (void)context.theme();
         if (bars > 0)
         {
             for (int i = 0; i < bars; ++i)
@@ -176,6 +178,7 @@ public:
     bool withText = false;
     bool withPolyline = false;
     bool escapeHatch = false;
+    bool readsTheme = false;
     bool contentChangeInsideDraw = false;
     mutable int drawCalls = 0;
     mutable int dirtyCalls = 0;
@@ -381,6 +384,25 @@ void TestDrawable::viewEpochReRecordsEscapeHatch()
     f.plot->replot();
     QCOMPARE(plain->drawCalls, 1);
     QCOMPARE(hatch->drawCalls, 2);
+}
+
+void TestDrawable::themeReaderReRecordsOnThemeChange()
+{
+    Fixture f;
+    auto* plain = new TestShape(f.plot.get());
+    auto* reader = new TestShape(f.plot.get());
+    reader->readsTheme = true;
+    f.plot->replot();
+    QCOMPARE(plain->drawCalls, 1);
+    QCOMPARE(reader->drawCalls, 1);
+
+    // Theme facts come from the view: a recording that read them cannot outlive a new theme.
+    const quint64 epoch = f.plot->viewEpoch();
+    f.plot->applyTheme();
+    QVERIFY2(f.plot->viewEpoch() != epoch, "a theme change must bump the view epoch");
+    f.plot->replot();
+    QCOMPARE(plain->drawCalls, 1); // a polygon that never read the theme stays cached
+    QCOMPARE(reader->drawCalls, 2);
 }
 
 void TestDrawable::contentChangedInsideDrawIsAMisuse()

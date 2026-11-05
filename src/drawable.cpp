@@ -24,6 +24,8 @@ constexpr double kInfinity = std::numeric_limits<double>::infinity();
 //! measure or rasterise in pixels.
 bool usesTheView(const QCPDrawList& list)
 {
+    if (list.viewDependent)
+        return true;
     for (const qcp::QCPDrawCommand& command : list.commands)
     {
         if (std::holds_alternative<qcp::TextCmd>(command)

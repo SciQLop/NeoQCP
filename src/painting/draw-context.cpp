@@ -226,6 +226,9 @@ QCPDrawContext::~QCPDrawContext() = default;
 
 const QCPTheme& QCPDrawContext::theme() const
 {
+    // Theme colours are a view fact: the commands that read them must not be reused across a
+    // theme change (the epoch rule picks this flag up).
+    mList->viewDependent = true;
     static const QCPTheme fallback;
     return mTheme ? *mTheme : fallback;
 }

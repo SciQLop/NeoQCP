@@ -161,6 +161,7 @@ struct QCP_LIB_DECL QCPDrawList
         bounds = other.bounds;
         keyBounded = other.keyBounded;
         valueBounded = other.valueBounded;
+        viewDependent = other.viewDependent;
         id = qcpNextDrawListId();
         return *this;
     }
@@ -172,6 +173,9 @@ struct QCP_LIB_DECL QCPDrawList
                         std::numeric_limits<double>::infinity() };
     bool keyBounded = false;
     bool valueBounded = false;
+    //! A command read the theme (or another view fact the commands do not carry): re-record when
+    //! the view epoch moves, even if the command list itself looks view-independent.
+    bool viewDependent = false;
     quint64 id = qcpNextDrawListId(); //!< unique: with a command's index it is a cache key
 };
 

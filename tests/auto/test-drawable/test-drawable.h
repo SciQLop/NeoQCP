@@ -15,6 +15,7 @@ private slots:
     void setterReRecordsOnce();
     void unrelatedMarkDoesNotReRecord();
     void viewEpochReRecordsEscapeHatch();
+    void themeReaderReRecordsOnThemeChange();
     void contentChangedInsideDrawIsAMisuse();
     void contentChangedInsideLegendIconIsAMisuse();
     void missingAxisHidesWithAMessage();
