@@ -39,4 +39,5 @@ private slots:
     void clickSelectsADrawnPlottable();
     void clickOutsideTheAxisRectMisses();
     void removedAnchorItemDoesNotDangle();
+    void rangeBandExampleDraws();
 };

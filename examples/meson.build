@@ -1,4 +1,5 @@
 subdir('axis-tags')
+subdir('custom-drawable')
 subdir('interactions')
 subdir('plots')
 subdir('scrollbar-axis-range-control')

@@ -1,6 +1,7 @@
 #include "test-drawable.h"
 
 #include <drawable.h>
+#include <examples/custom-drawable/rangeband.h>
 #include <misuse.h>
 #include <painting/draw-context.h>
 #include <painting/line-extruder.h>
@@ -827,4 +828,33 @@ void TestDrawable::removedAnchorItemDoesNotDangle()
     shape->externalAnchor = shape->mAnchor; // the next recording names a live anchor
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 2);
+}
+
+void TestDrawable::rangeBandExampleDraws()
+{
+    // The example in examples/custom-drawable, drawn through the same replay as everything else: its
+    // fill is where it says, and its label is inked.
+    Fixture f;
+    const QColor fill(120, 180, 240);
+    auto* band = new RangeBand(f.plot->xAxis, f.plot->yAxis);
+    band->setBrush(fill);
+    band->setLabel(QStringLiteral("band"));
+    band->setData(QVector<double> { 1, 2, 3, 4, 5, 6, 7, 8, 9 },
+                  QVector<double>(9, 3.0), QVector<double>(9, 5.0));
+    f.plot->replot();
+    const QImage frame = f.plot->toPixmap(300, 200).toImage();
+
+    QCOMPARE(pixelAt(frame, f.plot.get(), 2.0, 4.0), fill);
+    QCOMPARE(pixelAt(frame, f.plot.get(), 8.0, 3.5), fill);
+    QCOMPARE(pixelAt(frame, f.plot.get(), 5.0, 2.0), QColor(Qt::white)); // outside the band
+
+    const double dpr = frame.devicePixelRatio();
+    const QRect aboveLabel(qRound(f.plot->xAxis->coordToPixel(5.0) * dpr) - 40,
+                           qRound(f.plot->yAxis->coordToPixel(5.0) * dpr) - 24, 80, 24);
+    int inked = 0;
+    for (int y = aboveLabel.top(); y <= aboveLabel.bottom(); ++y)
+        for (int x = aboveLabel.left(); x <= aboveLabel.right(); ++x)
+            if (qGray(frame.pixel(x, y)) < 100)
+                ++inked;
+    QVERIFY2(inked > 10, qPrintable(QStringLiteral("%1 dark pixels, no label").arg(inked)));
 }
