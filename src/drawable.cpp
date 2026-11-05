@@ -288,8 +288,15 @@ private:
 };
 } // namespace
 
-QCPRange qcpDrawnRange(double lower, double upper, bool& foundRange, QCP::SignDomain inSignDomain)
+QCPRange qcpDrawnRange(const std::optional<QCPDataBox>& box, QCPDrawnSide side, bool& foundRange,
+                       QCP::SignDomain inSignDomain)
 {
+    foundRange = false;
+    if (!box)
+        return { };
+    const bool key = side == QCPDrawnSide::Key;
+    double lower = key ? box->keyLower : box->valueLower;
+    double upper = key ? box->keyUpper : box->valueUpper;
     foundRange = std::isfinite(lower) && std::isfinite(upper) && lower <= upper;
     if (!foundRange)
         return { };
@@ -303,6 +310,49 @@ QCPRange qcpDrawnRange(double lower, double upper, bool& foundRange, QCP::SignDo
         return { };
     }
     return QCPRange(lower, upper);
+}
+
+namespace
+{
+//! The part of a view every object has: its plot, layer and theme.
+QCPDrawnView qcpLayerableView(const QCPLayerable& object)
+{
+    QCPDrawnView view;
+    view.plot = object.parentPlot();
+    view.layer = object.layer();
+    view.theme = view.plot ? view.plot->theme() : nullptr;
+    return view;
+}
+} // namespace
+
+QCPDrawnView qcpDrawnViewOf(const QCPAbstractItem& item, QRect clip)
+{
+    QCPDrawnView view = qcpLayerableView(item);
+    view.selectable = item.selectable();
+    view.clip = clip;
+    // simplify: an item mixing axis pairs across its positions is drawn through the first pair;
+    // per-position frames when an item needs them.
+    const QList<QCPItemPosition*> positions = item.positions();
+    if (!positions.isEmpty())
+    {
+        view.keyAxis = positions.first()->keyAxis();
+        view.valueAxis = positions.first()->valueAxis();
+    }
+    view.axisRect = item.clipAxisRect();
+    if (!view.axisRect && view.keyAxis)
+        view.axisRect = view.keyAxis->axisRect();
+    return view;
+}
+
+QCPDrawnView qcpDrawnViewOf(const QCPAbstractPlottable& plottable, QRect clip)
+{
+    QCPDrawnView view = qcpLayerableView(plottable);
+    view.selectable = plottable.selectable() != QCP::stNone;
+    view.clip = clip;
+    view.keyAxis = plottable.keyAxis();
+    view.valueAxis = plottable.valueAxis();
+    view.axisRect = view.keyAxis ? view.keyAxis->axisRect() : nullptr;
+    return view;
 }
 
 QCPDrawnCore::QCPDrawnCore() : mState(std::make_unique<State>()) { }
@@ -393,6 +443,16 @@ std::optional<QCPDataBox> QCPDrawnCore::dataRange(const QCPDrawable& object,
     return box;
 }
 
+std::optional<QCPItemExtent> QCPDrawnCore::dataExtent(const QCPDrawable& object,
+                                                      const QCPDrawnView& view)
+{
+    const std::optional<QCPDataBox> box = dataRange(object, view);
+    if (!box)
+        return std::nullopt;
+    return QCPItemExtent { const_cast<QCPAxis*>(view.keyAxis), const_cast<QCPAxis*>(view.valueAxis),
+                           *box, pixelPad() };
+}
+
 double QCPDrawnCore::pixelPad() const
 {
     double pad = 0.0;
@@ -448,6 +508,14 @@ std::optional<double> QCPDrawnCore::hitTest(const QCPDrawable& object, QCP::Pixe
     if (!(best <= tolerance))
         return std::nullopt;
     return best;
+}
+
+double QCPDrawnCore::selectTest(const QCPDrawable& object, const QPointF& pos, bool onlySelectable,
+                                QVariant* details, const QCPDrawnView& view)
+{
+    if (onlySelectable && !view.selectable)
+        return -1.0;
+    return hitTest(object, QCP::Pixels { pos.x(), pos.y() }, details, view).value_or(-1.0);
 }
 
 void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const QCPDrawnView& view)

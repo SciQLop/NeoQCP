@@ -40,6 +40,7 @@ struct QCP_LIB_DECL QCPDrawnView
     QCustomPlot* plot = nullptr;
     QCPLayer* layer = nullptr;
     QRect clip; //!< what the layer clips this object with
+    bool selectable = false; //!< whether the base lets the object be selected at all
 };
 
 /*!
@@ -88,9 +89,16 @@ public:
     //! The pixels the recording's widest stroke reaches around its geometry.
     [[nodiscard]] double pixelPad() const;
 
+    //! The recording's box as an item extent: QCPAbstractItem::dataExtent's two rules.
+    std::optional<QCPItemExtent> dataExtent(const QCPDrawable& object, const QCPDrawnView& view);
+
     //! The pixel distance from \a at to the recording, or none when it missed.
     std::optional<double> hitTest(const QCPDrawable& object, QCP::Pixels at, QVariant* details,
                                   const QCPDrawnView& view);
+
+    //! hitTest() as the bases' selectTest wants it: -1 when \a onlySelectable and not selectable.
+    double selectTest(const QCPDrawable& object, const QPointF& pos, bool onlySelectable,
+                      QVariant* details, const QCPDrawnView& view);
 
     //! Draws \a object's recording through \a painter: an export, or a screen without a GPU layer.
     void paint(const QCPDrawable& object, QCPPainter& painter, const QCPDrawnView& view);
@@ -112,29 +120,35 @@ private:
     std::unique_ptr<State> mState;
 };
 
-//! A box side as a QCPRange, keeping only the requested sign domain.
-[[nodiscard]] QCP_LIB_DECL QCPRange qcpDrawnRange(double lower, double upper, bool& foundRange,
+//! A box side, for the one range helper both plottable ranges answer through.
+enum class QCPDrawnSide
+{
+    Key,
+    Value
+};
+
+/*!
+  The view \a item or \a plottable is drawn through; \a clip is what its layer clips it with (the
+  bases keep clipRect() protected, so the object hands it over).
+*/
+[[nodiscard]] QCP_LIB_DECL QCPDrawnView qcpDrawnViewOf(const QCPAbstractItem& item, QRect clip);
+[[nodiscard]] QCP_LIB_DECL QCPDrawnView qcpDrawnViewOf(const QCPAbstractPlottable& plottable,
+                                                       QRect clip);
+
+//! \a box's \a side as a QCPRange, keeping only the requested sign domain.
+[[nodiscard]] QCP_LIB_DECL QCPRange qcpDrawnRange(const std::optional<QCPDataBox>& box,
+                                                  QCPDrawnSide side, bool& foundRange,
                                                   QCP::SignDomain inSignDomain);
 
 /*!
-  \brief The common part of an adapter: the contract, the recording cache and the old virtuals both
-  bases have (draw(QCPPainter*) and selectTest).
+  \brief The non-template half of an adapter: the contract's methods, answered from the recording.
+
+  Only \a view() waits for the base, because only the base knows where its axes, its clip and its
+  selection rule are.
 */
-template <typename Base>
-class QCPDrawnBase : public Base, public QCPDrawable
+class QCP_LIB_DECL QCPDrawnAdapter : public QCPDrawable
 {
 public:
-    using Base::Base;
-
-    //! The setter rule: a new generation, then the layer mark the base needs.
-    void contentChanged()
-    {
-        if (mCore.contentChanged())
-            Base::markDirty();
-    }
-
-    using QCPDrawable::draw; // keep draw(QCPDrawContext&) reachable from the icon default
-
     std::optional<QCPDataBox> dataRange() const override { return mCore.dataRange(*this, view()); }
 
     std::optional<double> hitTest(QCP::Pixels at, QVariant* details) const override
@@ -146,60 +160,45 @@ public:
     void drawLegendIcon(QCPDrawContext& icon) const override { draw(icon); }
 
 protected:
+    //! What the core reads from the object this frame.
+    [[nodiscard]] virtual QCPDrawnView view() const = 0;
+
+    mutable QCPDrawnCore mCore;
+};
+
+/*!
+  \brief The common part of an adapter: what needs \a Base, which is the old virtuals and the
+  setter.
+*/
+template <typename Base>
+class QCPDrawnBase : public Base, public QCPDrawnAdapter
+{
+public:
+    using Base::Base;
+
+    //! The setter rule: a new generation, then the layer mark the base needs.
+    void contentChanged()
+    {
+        if (mCore.contentChanged())
+            Base::markDirty();
+    }
+
+    using QCPDrawable::draw; // keep draw(QCPDrawContext&) reachable from this class
+
+protected:
     void draw(QCPPainter* painter) final { mCore.paint(*this, *painter, view()); }
 
     double selectTest(const QPointF& pos, bool onlySelectable,
                       QVariant* details = nullptr) const final
     {
-        if (onlySelectable && !choosable())
-            return -1.0;
-        const std::optional<double> distance
-            = mCore.hitTest(*this, QCP::Pixels { pos.x(), pos.y() }, details, view());
-        return distance.value_or(-1.0);
+        return mCore.selectTest(*this, pos, onlySelectable, details, view());
     }
 
-    //! What the core needs from the object this frame.
-    [[nodiscard]] QCPDrawnView view() const
+    //! This frame's view: the clip comes from here, since the bases keep clipRect() protected.
+    [[nodiscard]] QCPDrawnView view() const override
     {
-        QCPDrawnView result;
-        result.plot = this->parentPlot();
-        result.layer = this->layer();
-        result.theme = result.plot ? result.plot->theme() : nullptr;
-        result.clip = this->clipRect();
-        if constexpr (std::is_base_of_v<QCPAbstractItem, Base>)
-        {
-            // simplify: an item mixing axis pairs across its positions is drawn through the first
-            // pair; per-position frames when an item needs them.
-            const QList<QCPItemPosition*> positions
-                = static_cast<const QCPAbstractItem&>(*this).positions();
-            if (!positions.isEmpty())
-            {
-                result.keyAxis = positions.first()->keyAxis();
-                result.valueAxis = positions.first()->valueAxis();
-            }
-            result.axisRect = static_cast<const QCPAbstractItem&>(*this).clipAxisRect();
-            if (!result.axisRect && result.keyAxis)
-                result.axisRect = result.keyAxis->axisRect();
-        }
-        else
-        {
-            result.keyAxis = this->keyAxis();
-            result.valueAxis = this->valueAxis();
-            result.axisRect = result.keyAxis ? result.keyAxis->axisRect() : nullptr;
-        }
-        return result;
+        return qcpDrawnViewOf(*this, this->clipRect());
     }
-
-    //! Whether the base lets this object be selected at all, in the spelling each base uses.
-    [[nodiscard]] bool choosable() const
-    {
-        if constexpr (std::is_base_of_v<QCPAbstractItem, Base>)
-            return this->selectable();
-        else
-            return this->selectable() != QCP::stNone;
-    }
-
-    mutable QCPDrawnCore mCore;
 };
 
 //! A drawn plottable: the recording answers its two ranges and its legend icon.
@@ -210,30 +209,18 @@ public:
     using QCPDrawnBase<Base>::QCPDrawnBase;
 
 protected:
-    using QCPDrawnBase<Base>::drawLegendIcon; // the contract's icon stays reachable
+    using QCPDrawnAdapter::drawLegendIcon; // the contract's icon stays reachable
 
     QCPRange getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain) const override
     {
-        const std::optional<QCPDataBox> box = this->dataRange();
-        if (!box)
-        {
-            foundRange = false;
-            return { };
-        }
-        return qcpDrawnRange(box->keyLower, box->keyUpper, foundRange, inSignDomain);
+        return qcpDrawnRange(this->dataRange(), QCPDrawnSide::Key, foundRange, inSignDomain);
     }
 
     QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain,
                            const QCPRange& inKeyRange = QCPRange()) const override
     {
         Q_UNUSED(inKeyRange) // simplify: a box keeps no per-key values, so it cannot be narrowed
-        const std::optional<QCPDataBox> box = this->dataRange();
-        if (!box)
-        {
-            foundRange = false;
-            return { };
-        }
-        return qcpDrawnRange(box->valueLower, box->valueUpper, foundRange, inSignDomain);
+        return qcpDrawnRange(this->dataRange(), QCPDrawnSide::Value, foundRange, inSignDomain);
     }
 
     void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override
@@ -252,13 +239,7 @@ public:
 protected:
     std::optional<QCPItemExtent> dataExtent() const override
     {
-        const std::optional<QCPDataBox> box = this->dataRange();
-        if (!box)
-            return std::nullopt;
-        const QCPDrawnView drawn = this->view();
-        return QCPItemExtent { const_cast<QCPAxis*>(drawn.keyAxis),
-                               const_cast<QCPAxis*>(drawn.valueAxis), *box,
-                               this->mCore.pixelPad() };
+        return this->mCore.dataExtent(*this, this->view());
     }
 };
 
