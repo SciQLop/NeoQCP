@@ -232,6 +232,9 @@ public:
     //! Test hook: how many rasterised images the replay keeps for this object.
     [[nodiscard]] int rasterCount() const { return mCore.rasterCount(); }
 
+    //! Test hook: how many recordings the object has built.
+    [[nodiscard]] int recordings() const { return mCore.recordingCount(); }
+
     //! The adapter's dataExtent(), which the layer index reads.
     [[nodiscard]] std::optional<QCPItemExtent> extent() const { return dataExtent(); }
 
@@ -1285,9 +1288,17 @@ void TestDrawable::anchoredShapeFollowsItsParent()
     f.plot->replot(QCustomPlot::rpImmediateRefresh);
     const QRect before = inkedBounds(f.plot->grabFramebuffer());
     QVERIFY2(!before.isNull(), "the anchored shape must be painted");
+    const int records = shape->recordings();
+    const quint64 strokes = QCPLineExtruder::extruderCallCount();
 
     host->start->setCoords(6, 6);
     f.plot->replot(QCustomPlot::rpImmediateRefresh);
+    // The recording is kept - the anchor moved, nothing the object knows changed - and its vertices
+    // are rebuilt because a recording of positions is neither data-only nor static, so it may not be
+    // re-emitted from the kept geometry of another frame.
+    QCOMPARE(shape->recordings(), records);
+    QVERIFY2(QCPLineExtruder::extruderCallCount() > strokes,
+             "the anchored geometry was not resolved again");
     const QRect after = inkedBounds(f.plot->grabFramebuffer());
     const QPointF moved(f.plot->xAxis->coordToPixel(6) - f.plot->xAxis->coordToPixel(3),
                         f.plot->yAxis->coordToPixel(6) - f.plot->yAxis->coordToPixel(3));
