@@ -158,8 +158,8 @@ protected:
     QCPTextStyle textStyle() const;
     //! The box around the text before rotation, placed as if the position were the origin.
     QRectF textBoxAtOrigin() const;
-    //! The size of the text in its current font, measured once per text and font.
-    QSize glyphSize() const;
+    //! The size of the text in \a style, measured once per text and font.
+    QSize glyphSize(const QCPTextStyle& style) const;
     QPointF getTextDrawPoint(const QPointF& pos, const QRectF& rect,
                              Qt::Alignment positionAlignment) const;
     QFont mainFont() const;
