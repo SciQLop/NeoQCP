@@ -88,10 +88,25 @@ public:
     QCPDrawContext& operator=(const QCPDrawContext&) = delete;
     ~QCPDrawContext();
 
-    //! The axes the object draws on; positions in \ref QCP::Data go through it.
+    /*!
+      The axes the object draws on; positions in \ref QCP::Data go through it.
+
+      A recording is reused across pans and zooms: draw() runs once and the replay maps the same
+      data positions through this frame's transform. Draw code must therefore not bake any
+      pixel-dependent decision (a line width in pixels, a label placed at a pixel coordinate, a
+      decision based on the current range) into the commands. Record what moves with the data as a
+      position; ask \ref painter() for anything that needs this frame's pixels.
+    */
     [[nodiscard]] const QCPTransform& transform() const { return mTransform; }
 
-    //! The pixels the object may draw in; an empty rect means unclipped.
+    /*!
+      The pixels the object may draw in; an empty rect means unclipped.
+
+      This is the clip of the frame in which draw() ran, not necessarily the frame replaying the
+      recording (the axis rect can move without re-recording). Like \ref transform(), it is a hint
+      for what to record, never a fact to bake into a command: an object whose commands depend on
+      where its clip is must record them through \ref painter().
+    */
     [[nodiscard]] QRectF clip() const { return mClip; }
 
     //! The colours the plot is themed with, so a recorder can pick its default pen and brush.
