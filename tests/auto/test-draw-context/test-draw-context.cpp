@@ -734,7 +734,7 @@ void TestDrawContext::extrusionCacheDropsOnADprChange()
     QCPScatterRhiLayer scatter(nullptr);
     QCPResolveCache resolve;
     qcp::QCPRasterFallback fallback;
-    QCPExtrusionCache extrusion;
+    QCPRecordingCache geometry;
     QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
                            nullptr);
     QPen pen(Qt::black);
@@ -747,18 +747,18 @@ void TestDrawContext::extrusionCacheDropsOnADprChange()
     const quint64 before = QCPLineExtruder::extruderCallCount();
     plottables.clear();
     qcpReplayWithRhi(list, plottables, scatter, frame, resolve, fallback, 1.0, outputSize, 0,
-                     &extrusion);
+                     &geometry);
     const quint64 afterDpr1 = QCPLineExtruder::extruderCallCount();
     QVERIFY2(afterDpr1 > before, "the first replay extrudes");
 
     plottables.clear();
     qcpReplayWithRhi(list, plottables, scatter, frame, resolve, fallback, 1.0, outputSize, 0,
-                     &extrusion);
+                     &geometry);
     QCOMPARE(QCPLineExtruder::extruderCallCount(), afterDpr1);
 
     plottables.clear();
     qcpReplayWithRhi(list, plottables, scatter, frame, resolve, fallback, 2.0, outputSize, 0,
-                     &extrusion);
+                     &geometry);
     QVERIFY2(QCPLineExtruder::extruderCallCount() > afterDpr1,
              "a new device pixel ratio rebuilds the cosmetic pen's triangles");
 }

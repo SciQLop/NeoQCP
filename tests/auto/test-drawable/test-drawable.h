@@ -22,6 +22,9 @@ private slots:
     void missingAxisHidesWithAMessage();
 
     void panReusesResolvedGeometry();
+    void panBuildsNoFillEither();
+    void panMovesAllDataEntriesByOneDelta();
+    void zoomRebuildsOnce();
     void exportDoesNotPoisonTheResolveCache();
     void drawnPolygonStacksAboveAnEarlierGpuGraph();
 

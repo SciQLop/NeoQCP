@@ -3,12 +3,14 @@
 #include <drawable.h>
 #include <examples/custom-drawable/rangeband.h>
 #include <misuse.h>
+#include <painting/command-replay-rhi.h>
 #include <painting/draw-context.h>
 #include <painting/line-extruder.h>
 #include <painting/plottable-rhi-layer.h>
 #include <qcustomplot.h>
 
 #include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
+#include <cmath>
 #include <memory>
 #include <vector>
 
@@ -91,7 +93,7 @@ public:
             {
                 const double key = 1.0 + 8.0 * i / bars;
                 context.rect(QCP::Data { key, 1.0 }, QCP::Data { key + 8.0 / bars, 3.0 },
-                             QPen(Qt::black), QBrush(Qt::NoBrush));
+                             QPen(Qt::black), QBrush(filledBars ? fill : QColor(Qt::NoBrush)));
             }
             return;
         }
@@ -186,6 +188,8 @@ public:
     QColor fill = QColor(Qt::darkRed);
     Mode mode = Polygon;
     int bars = 0;
+    //! Fill the bar rects too, so a replay builds fills and strokes.
+    bool filledBars = false;
     bool withText = false;
     bool withPolyline = false;
     bool escapeHatch = false;
@@ -495,6 +499,89 @@ void TestDrawable::panReusesResolvedGeometry()
     f.plot->xAxis->setRange(4, 6); // a zoom: a new scale, so nothing can be shifted
     f.plot->replot();
     QVERIFY(QCPLineExtruder::extruderCallCount() > before);
+}
+
+void TestDrawable::panBuildsNoFillEither()
+{
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - the built geometry is a GPU path only");
+    auto* shape = new TestShape(f.plot.get());
+    shape->bars = 10000;
+    shape->filledBars = true;
+    f.plot->replot();
+    const quint64 fills = qcpFillBuildCount();
+    const quint64 strokes = QCPLineExtruder::extruderCallCount();
+    QVERIFY2(fills > 0, "the first frame must tessellate the fills");
+    QVERIFY2(strokes > 0, "the first frame must extrude the outlines");
+
+    // A pan moves the whole recording by one delta: neither the fills nor the strokes are built
+    // again, they are the kept triangles handed back with an offset.
+    f.plot->xAxis->setRange(1, 11);
+    f.plot->replot();
+    QCOMPARE(qcpFillBuildCount(), fills);
+    QCOMPARE(QCPLineExtruder::extruderCallCount(), strokes);
+}
+
+void TestDrawable::panMovesAllDataEntriesByOneDelta()
+{
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - the kept geometry is a GPU path only");
+    auto* shape = new TestShape(f.plot.get());
+    shape->bars = 10;
+    shape->filledBars = true;
+    f.plot->replot();
+
+    f.plot->xAxis->setRange(1, 11); // a pan: same span, one pixel offset
+    f.plot->replot();
+
+    auto* layer = f.plot->plottableRhiLayer(shape->layer());
+    QVERIFY(layer);
+    const auto& entries = layer->drawEntries();
+    QVERIFY(!entries.isEmpty());
+    const float offsetX = entries.first().offsetX;
+    const float offsetY = entries.first().offsetY;
+    QVERIFY2(
+        std::abs(offsetX) > 0.5f,
+        qPrintable(QStringLiteral("the pan must offset the kept geometry, got %1").arg(offsetX)));
+    QVERIFY2(qFuzzyIsNull(offsetY), "the pan is horizontal");
+    // Every entry moves with the data, including the fills: a rebuild would leave their offset at
+    // zero and the entry list at two per bar.
+    for (const auto& entry : entries)
+    {
+        QCOMPARE(entry.offsetX, offsetX);
+        QCOMPARE(entry.offsetY, offsetY);
+    }
+}
+
+void TestDrawable::zoomRebuildsOnce()
+{
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - the kept geometry is a GPU path only");
+    auto* shape = new TestShape(f.plot.get());
+    shape->bars = 100;
+    shape->filledBars = true;
+    // Another object on the same layer, re-recorded before the last frame: it clears the layer, so
+    // the replay really runs on a frame where the shape itself changed nothing.
+    auto* ticker = new TestShape(f.plot.get());
+    ticker->escapeHatch = true;
+    f.plot->replot();
+    const quint64 fills = qcpFillBuildCount();
+    const quint64 strokes = QCPLineExtruder::extruderCallCount();
+
+    f.plot->xAxis->setRange(4, 6); // a zoom: a new scale, so the geometry is built once
+    f.plot->replot();
+    const quint64 afterZoom = qcpFillBuildCount();
+    const quint64 strokesAfterZoom = QCPLineExtruder::extruderCallCount();
+    QVERIFY2(afterZoom > fills, "the zoom must build the fills again");
+    QVERIFY2(strokesAfterZoom > strokes, "the zoom must extrude the outlines again");
+
+    ticker->touch();
+    f.plot->replot(); // same transform, same recording: the kept geometry is re-emitted as is
+    QCOMPARE(qcpFillBuildCount(), afterZoom);
+    QCOMPARE(QCPLineExtruder::extruderCallCount(), strokesAfterZoom);
 }
 
 void TestDrawable::exportDoesNotPoisonTheResolveCache()
@@ -832,15 +919,15 @@ void TestDrawable::removedAnchorItemDoesNotDangle()
 
 void TestDrawable::rangeBandExampleDraws()
 {
-    // The example in examples/custom-drawable, drawn through the same replay as everything else: its
-    // fill is where it says, and its label is inked.
+    // The example in examples/custom-drawable, drawn through the same replay as everything else:
+    // its fill is where it says, and its label is inked.
     Fixture f;
     const QColor fill(120, 180, 240);
     auto* band = new RangeBand(f.plot->xAxis, f.plot->yAxis);
     band->setBrush(fill);
     band->setLabel(QStringLiteral("band"));
-    band->setData(QVector<double> { 1, 2, 3, 4, 5, 6, 7, 8, 9 },
-                  QVector<double>(9, 3.0), QVector<double>(9, 5.0));
+    band->setData(QVector<double> { 1, 2, 3, 4, 5, 6, 7, 8, 9 }, QVector<double>(9, 3.0),
+                  QVector<double>(9, 5.0));
     f.plot->replot();
     const QImage frame = f.plot->toPixmap(300, 200).toImage();
 

@@ -250,7 +250,7 @@ struct QCPDrawnCore::State
     QCPDrawList icon;
     QCPResolveCache resolve;
     qcp::QCPRasterFallback raster;
-    QCPExtrusionCache extrusion;
+    QCPRecordingCache geometry;
     quint64 generation = 0;
     quint64 recordedGeneration = 0;
     quint64 recordedEpoch = 0;
@@ -563,7 +563,8 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
     }
     qcpReplayWithRhi(mState->recording, *plottables, *scatter, frame, mState->resolve,
                      mState->raster, view.plot->bufferDevicePixelRatio(),
-                     view.plot->rhiOutputSize(), mState->recordedGeneration, &mState->extrusion);
+                     view.plot->rhiOutputSize(), mState->recordedGeneration, &mState->geometry,
+                     static_cast<float>(painter.opacity()));
     qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::PainterOnly,
                          &mState->raster);
 }

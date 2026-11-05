@@ -55,6 +55,13 @@ std::vector<float>& markerScratch()
     return points;
 }
 
+// Every fill the replay tessellates: the two builders below are the only places that make one.
+quint64& fillBuilds()
+{
+    static quint64 count = 0;
+    return count;
+}
+
 //! True when every position the command was recorded from is QCP::Data.
 //!
 //! Only then do the resolved pixels move by one delta when the transform pans: a pixel or ratio
@@ -89,43 +96,42 @@ bool isDataOnlyCommand(const qcp::QCPDrawCommand& command)
         command);
 }
 
-//! Strokes \a points on the layer, through \a cache when the command's triangles may be kept.
-void addPolyline(const QCPDrawList& list, const qcp::QCPDrawCommand& command,
-                 QCPPlottableRhiLayer& layer, std::span<const QPointF> points, const QPen& pen,
-                 const QCPTransform& transform, const QRect& clip, double dpr, int height,
-                 QCPExtrusionCache* cache, bool closed = false)
+//! Strokes \a points on the layer, and keeps the triangles when the replay may re-emit them.
+void addPolyline(QCPPlottableRhiLayer& layer, std::span<const QPointF> points, const QPen& pen,
+                 const QRect& clip, double dpr, int height, float alpha, bool movesWithData,
+                 QCPRecordingCache* cache, bool closed = false)
 {
     if (!qcp::canStrokeOnGpu(pen) || points.size() < 2)
         return;
     const float width = qcp::extrusionPenWidth(pen, dpr);
     std::vector<float>& verts = strokeScratch();
-    if (!cache || !isDataOnlyCommand(command))
-    {
-        qcp::extrudeStroke(points, pen, width, verts, closed);
-        qcp::addGpuStroke(layer, verts, pen, width, clip, dpr, height);
-        return;
-    }
-    const quint64 key = qcpCommandIndex(list, command);
-    QPointF delta;
-    const std::span<const float> kept = cache->translated(key, transform, width, &delta);
-    if (!kept.empty())
-    {
-        qcp::addGpuStroke(layer, kept, pen, width, clip, dpr, height, delta);
-        return;
-    }
     qcp::extrudeStroke(points, pen, width, verts, closed);
-    qcp::addGpuStroke(layer, verts, pen, width, clip, dpr, height);
-    cache->keep(key, transform, width, verts);
+    const QPointF none;
+    if (!qcp::addGpuStroke(layer, verts, pen, width, clip, dpr, height, none, alpha))
+        return; // no dashed pipeline: nothing was drawn, so nothing is kept
+    if (!cache)
+        return;
+    if (qcp::isDashed(pen))
+    {
+        const qcp::DashPattern pattern = qcp::dashPatternOf(pen, width);
+        cache->keepDashed(
+            verts, std::span<const float>(pattern.lengths.data(), std::size_t(pattern.count)),
+            pattern.offset, movesWithData);
+    }
+    else
+        cache->keepSolid(verts, 0, movesWithData);
 }
 
 // Triangle strip between two pixel-space curves of the same length.
 void addRibbonFill(QCPPlottableRhiLayer& layer, std::span<const QPointF> upper,
                    std::span<const QPointF> lower, const QColor& color, const QRect& clip,
-                   double dpr, int height)
+                   double dpr, int height, float alpha, bool movesWithData,
+                   QCPRecordingCache* cache)
 {
     const std::size_t count = std::min(upper.size(), lower.size());
     if (count < 2 || color.alpha() == 0)
         return;
+    ++fillBuilds();
     const std::array<float, 4> rgba = qcp::rhi::premultipliedColor(color);
     std::vector<float>& verts = fillScratch();
     verts.clear();
@@ -145,17 +151,24 @@ void addRibbonFill(QCPPlottableRhiLayer& layer, std::span<const QPointF> upper,
         push(lower[i + 1]);
         push(lower[i]);
     }
-    layer.addPlottable(verts, { }, clip, dpr, height);
+    layer.addPlottable(verts, { }, clip, dpr, height, 0, 0, alpha);
+    if (cache)
+        cache->keepSolid(verts, int(verts.size()) / 6, movesWithData);
 }
 
 // A triangle fan from \a centre over the (open) \a ring: correct for any convex outline, which is
 // what a rect and an ellipse are, and cheaper than clipping a baseline tessellator to its shape.
 void fanFill(QCPPlottableRhiLayer& layer, const QPointF& centre, std::span<const QPointF> ring,
-             const QColor& color, const QRect& clip, double dpr, int height)
+             const QColor& color, const QRect& clip, double dpr, int height, float alpha,
+             bool movesWithData, QCPRecordingCache* cache)
 {
     const std::vector<float> verts = qcpFanFillVertices(centre, ring, color);
-    if (!verts.empty())
-        layer.addPlottable(verts, { }, clip, dpr, height);
+    if (verts.empty())
+        return;
+    ++fillBuilds();
+    layer.addPlottable(verts, { }, clip, dpr, height, 0, 0, alpha);
+    if (cache)
+        cache->keepSolid(verts, int(verts.size()) / 6, movesWithData);
 }
 
 // A fill or stroke the GPU cannot express (a texture, a gradient, a hatch, a free-form outline) is
@@ -164,10 +177,13 @@ void fanFill(QCPPlottableRhiLayer& layer, const QPointF& centre, std::span<const
 void addRasterCommand(const QCPDrawList& list, QCPPlottableRhiLayer& layer,
                       const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame,
                       qcp::QCPRasterFallback& fallback, const QRect& clip, double dpr,
-                      const QSize& viewport, quint64 generation)
+                      const QSize& viewport, quint64 generation, QCPRecordingCache* cache)
 {
     if (!qcp::needsRaster(command))
         return;
+    // An image is not vertex geometry: the kept runs cannot place it on a pan frame.
+    if (cache)
+        cache->invalidate();
     const quint64 listId = list.id;
     const quint64 index = qcpCommandIndex(list, command);
     if (!layer.canAddImage())
@@ -220,6 +236,61 @@ void errorBarPolyline(const std::vector<QPointF>& corners, std::vector<QPointF>&
         out.push_back(QPointF(left.x(), below.y()));
         out.push_back(QPointF(right.x(), below.y()));
         out.push_back(gap);
+    }
+}
+
+// One markers command on the scatter layer. Its own layer is rebuilt every frame, so the points are
+// mapped again from the resolve cache even when the plottable geometry is re-emitted.
+void addMarker(QCPScatterRhiLayer& scatter, const qcp::MarkersCmd& markers, QCPResolveCache& cache,
+               const QCPDrawFrame& frame, quint64 generation, const QRect& clip, double dpr,
+               int height)
+{
+    const std::span<const QPointF> resolved
+        = cache.pixels(markers.points, generation, frame.transform);
+    std::vector<float>& xy = markerScratch();
+    xy.resize(resolved.size() * 2);
+    for (std::size_t i = 0; i < resolved.size(); ++i)
+    {
+        xy[2 * i] = static_cast<float>(resolved[i].x());
+        xy[2 * i + 1] = static_cast<float>(resolved[i].y());
+    }
+    scatter.addScatter(xy, markers.style, clip, dpr, height);
+}
+
+void addMarkers(const QCPDrawList& list, QCPScatterRhiLayer& scatter, QCPResolveCache& cache,
+                const QCPDrawFrame& frame, quint64 generation, const QRect& clip, double dpr,
+                int height)
+{
+    for (const qcp::QCPDrawCommand& command : list.commands)
+        if (const auto* markers = std::get_if<qcp::MarkersCmd>(&command))
+            addMarker(scatter, *markers, cache, frame, generation, clip, dpr, height);
+}
+
+//! Hands a kept recording back to the layer: one submission per run, shifted by the pan delta when
+//! the run moves with the data, and by nothing otherwise.
+void replayKept(const QCPRecordingCache& kept, QCPPlottableRhiLayer& layer, const QRect& clip,
+                double dpr, int height, const QPointF& delta, float alpha)
+{
+    const std::span<const float> solid = kept.solidVertices();
+    for (const QCPRecordingCache::SolidRun& run : kept.solidRuns())
+    {
+        const QPointF offset = run.movesWithData ? delta : QPointF();
+        const std::span<const float> vertices
+            = solid.subspan(std::size_t(run.first) * 6, std::size_t(run.vertexCount) * 6);
+        const auto fill = std::size_t(run.fillVertexCount) * 6;
+        layer.addPlottable(vertices.first(fill), vertices.subspan(fill), clip, dpr, height,
+                           static_cast<float>(offset.x()), static_cast<float>(offset.y()), alpha);
+    }
+    const std::span<const float> dashed = kept.dashedVertices();
+    for (const QCPRecordingCache::DashedRun& run : kept.dashedRuns())
+    {
+        const QPointF offset = run.movesWithData ? delta : QPointF();
+        const std::span<const float> vertices
+            = dashed.subspan(std::size_t(run.first) * 7, std::size_t(run.vertexCount) * 7);
+        layer.addDashedPlottable(vertices,
+                                 std::span<const float>(run.pattern, std::size_t(run.patternCount)),
+                                 run.dashOffset, clip, dpr, height, static_cast<float>(offset.x()),
+                                 static_cast<float>(offset.y()), alpha);
     }
 }
 
@@ -295,58 +366,134 @@ void QCPResolveCache::clear()
     mEntries.clear();
 }
 
-void QCPExtrusionCache::beginReplay(quint64 list, std::size_t commands)
+bool QCPRecordingCache::reuse(const QCPDrawList& list, const QCPTransform& transform, double dpr,
+                              int outputHeight, const QRect& clip, QPointF* delta)
 {
-    // A re-recorded list (or another recording) shares no command index with the kept geometry.
-    if (list != mList)
+    const bool same = mValid && list.id == mList && qFuzzyCompare(dpr, mDpr)
+        && outputHeight == mHeight && clip == mClip && transform.isTranslationOf(mTransform, delta);
+    if (!same)
+        mValid = false;
+    return same;
+}
+
+void QCPRecordingCache::beginBuild(const QCPDrawList& list, const QCPTransform& transform,
+                                   double dpr, int outputHeight, const QRect& clip)
+{
+    mSolid.clear();
+    mSolidRuns.clear();
+    mDashed.clear();
+    mDashedRuns.clear();
+    mList = list.id;
+    mTransform = transform;
+    mDpr = dpr;
+    mHeight = outputHeight;
+    mClip = clip;
+    mValid = false;
+    mSpoiled = false;
+}
+
+void QCPRecordingCache::keepSolid(std::span<const float> vertices, int fillVertexCount,
+                                  bool movesWithData)
+{
+    if (vertices.empty())
+        return;
+    const auto first = int(mSolid.size() / 6);
+    mSolid.insert(mSolid.end(), vertices.begin(), vertices.end());
+    // A run only ends where its pixels would: same transform sensitivity. The fill prefix of the
+    // run stays the first submission's, since the layers draw a run as one range.
+    if (!mSolidRuns.empty() && mSolidRuns.back().movesWithData == movesWithData
+        && mSolidRuns.back().first + mSolidRuns.back().vertexCount == first)
     {
-        mEntries.clear();
-        mList = list;
+        mSolidRuns.back().vertexCount += int(vertices.size()) / 6;
+        return;
     }
-    mEntries.resize(commands);
+    SolidRun run;
+    run.first = first;
+    run.vertexCount = int(vertices.size()) / 6;
+    run.fillVertexCount = fillVertexCount;
+    run.movesWithData = movesWithData;
+    mSolidRuns.push_back(run);
 }
 
-std::span<const float> QCPExtrusionCache::translated(quint64 key, const QCPTransform& transform,
-                                                     float width, QPointF* delta)
+void QCPRecordingCache::keepDashed(std::span<const float> vertices, std::span<const float> pattern,
+                                   float dashOffset, bool movesWithData)
 {
-    if (key >= mEntries.size())
-        return { };
-    const Entry& entry = mEntries[key];
-    if (entry.vertices.empty() || !qFuzzyCompare(entry.width, width)
-        || !transform.isTranslationOf(entry.transform, delta))
-        return { };
-    return std::span<const float>(entry.vertices);
+    if (vertices.empty() || pattern.empty())
+        return;
+    const auto first = int(mDashed.size() / 7);
+    mDashed.insert(mDashed.end(), vertices.begin(), vertices.end());
+    // Same pattern and phase: the dashes continue across the commands, so one run draws them.
+    if (!mDashedRuns.empty() && mDashedRuns.back().movesWithData == movesWithData
+        && mDashedRuns.back().first + mDashedRuns.back().vertexCount == first
+        && qFuzzyCompare(mDashedRuns.back().dashOffset, dashOffset)
+        && mDashedRuns.back().patternCount == int(std::min<std::size_t>(pattern.size(), 8))
+        && std::equal(pattern.begin(), pattern.end(), mDashedRuns.back().pattern))
+    {
+        mDashedRuns.back().vertexCount += int(vertices.size()) / 7;
+        return;
+    }
+    DashedRun run;
+    run.first = first;
+    run.vertexCount = int(vertices.size()) / 7;
+    run.movesWithData = movesWithData;
+    run.dashOffset = dashOffset;
+    run.patternCount = int(std::min<std::size_t>(pattern.size(), 8));
+    std::copy_n(pattern.begin(), run.patternCount, run.pattern);
+    mDashedRuns.push_back(run);
 }
 
-void QCPExtrusionCache::keep(quint64 key, const QCPTransform& transform, float width,
-                             std::span<const float> vertices)
+void QCPRecordingCache::commit()
 {
-    if (key >= mEntries.size())
-        mEntries.resize(key + 1);
-    Entry& entry = mEntries[key];
-    entry.vertices.assign(vertices.begin(), vertices.end());
-    entry.transform = transform;
-    entry.width = width;
+    mValid = !mSpoiled;
+    if (mSpoiled)
+    {
+        mSolid.clear();
+        mSolidRuns.clear();
+        mDashed.clear();
+        mDashedRuns.clear();
+    }
+    mSpoiled = false;
 }
 
-void QCPExtrusionCache::clear()
+void QCPRecordingCache::invalidate()
 {
-    mEntries.clear();
-    mList = 0;
+    mSpoiled = true;
+}
+
+void QCPRecordingCache::clear()
+{
+    mSolid.clear();
+    mSolidRuns.clear();
+    mDashed.clear();
+    mDashedRuns.clear();
+    mValid = false;
+    mSpoiled = false;
 }
 
 void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                       QCPScatterRhiLayer& scatter, const QCPDrawFrame& frame,
                       QCPResolveCache& cache, qcp::QCPRasterFallback& fallback, double dpr,
-                      const QSize& outputSize, quint64 generation, QCPExtrusionCache* extrusion)
+                      const QSize& outputSize, quint64 generation, QCPRecordingCache* geometry,
+                      float alpha)
 {
     PROFILE_HERE_N("qcpReplayWithRhi");
-    cache.beginReplay();
-    fallback.beginReplay();
-    if (extrusion)
-        extrusion->beginReplay(list.id, list.commands.size());
     const int outputHeight = outputSize.height();
     const QRect clip = frame.clip.isEmpty() ? QRect() : frame.clip.toAlignedRect();
+
+    QPointF delta;
+    if (geometry && geometry->reuse(list, frame.transform, dpr, outputHeight, clip, &delta))
+    {
+        // A pan (or a frame that changed nothing): the recording is already built, it only needs
+        // its data-space runs shifted. Markers live in another layer, which is rebuilt anyway.
+        replayKept(*geometry, plottables, clip, dpr, outputHeight, delta, alpha);
+        addMarkers(list, scatter, cache, frame, generation, clip, dpr, outputHeight);
+        return;
+    }
+
+    cache.beginReplay();
+    fallback.beginReplay();
+    if (geometry)
+        geometry->beginBuild(list, frame.transform, dpr, outputHeight, clip);
     std::vector<QPointF>& pixels = pixelScratch();
 
     for (const qcp::QCPDrawCommand& command : list.commands)
@@ -360,30 +507,30 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                     const std::span<const QPointF> resolved
                         = cache.pixels(cmd.points, generation, frame.transform);
                     addRasterCommand(list, plottables, command, frame, fallback, clip, dpr,
-                                     outputSize, generation);
+                                     outputSize, generation, geometry);
                     if (!qcp::strokeNeedsRaster(command))
-                        addPolyline(list, command, plottables, resolved, cmd.pen, frame.transform,
-                                    clip, dpr, outputHeight, extrusion);
+                        addPolyline(plottables, resolved, cmd.pen, clip, dpr, outputHeight, alpha,
+                                    isDataOnlyCommand(command), geometry);
                 }
                 else if constexpr (std::is_same_v<T, qcp::PolylinePositionsCmd>)
                 {
                     qcpResolveInto(cmd.points, frame, pixels);
                     addRasterCommand(list, plottables, command, frame, fallback, clip, dpr,
-                                     outputSize, generation);
+                                     outputSize, generation, geometry);
                     if (!qcp::strokeNeedsRaster(command))
-                        addPolyline(list, command, plottables, pixels, cmd.pen, frame.transform,
-                                    clip, dpr, outputHeight, extrusion);
+                        addPolyline(plottables, pixels, cmd.pen, clip, dpr, outputHeight, alpha,
+                                    isDataOnlyCommand(command), geometry);
                 }
                 else if constexpr (std::is_same_v<T, qcp::PolygonCmd>)
                 {
                     // A free-form outline has no fan centre: its fill is a raster image, submitted
                     // before the stroke exactly as the painter draws it.
                     addRasterCommand(list, plottables, command, frame, fallback, clip, dpr,
-                                     outputSize, generation);
+                                     outputSize, generation, geometry);
                     qcpResolveInto(cmd.points, frame, pixels);
                     if (!qcp::strokeNeedsRaster(command))
-                        addPolyline(list, command, plottables, qcpRingOf(pixels), cmd.pen,
-                                    frame.transform, clip, dpr, outputHeight, extrusion, true);
+                        addPolyline(plottables, qcpRingOf(pixels), cmd.pen, clip, dpr, outputHeight,
+                                    alpha, isDataOnlyCommand(command), geometry, true);
                 }
                 else if constexpr (std::is_same_v<T, qcp::FillBetweenCmd>)
                 {
@@ -395,10 +542,10 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                     // otherwise the fill is an image.
                     if (qcp::gpuCanFill(cmd.brush) && upper.size() == lower.size())
                         addRibbonFill(plottables, upper, lower, cmd.brush.color(), clip, dpr,
-                                      outputHeight);
+                                      outputHeight, alpha, true, geometry);
                     else
                         addRasterCommand(list, plottables, command, frame, fallback, clip, dpr,
-                                         outputSize, generation);
+                                         outputSize, generation, geometry);
                 }
                 else if constexpr (std::is_same_v<T, qcp::RectCmd>)
                 {
@@ -412,16 +559,16 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                                                                box.bottomRight(),
                                                                box.bottomLeft() };
                         fanFill(plottables, box.center(), corners, cmd.brush.color(), clip, dpr,
-                                outputHeight);
+                                outputHeight, alpha, isDataOnlyCommand(command), geometry);
                     }
                     addRasterCommand(list, plottables, command, frame, fallback, clip, dpr,
-                                     outputSize, generation);
+                                     outputSize, generation, geometry);
                     if (!qcp::strokeNeedsRaster(command))
                     {
                         pixels.assign({ box.topLeft(), box.topRight(), box.bottomRight(),
                                         box.bottomLeft(), box.topLeft() });
-                        addPolyline(list, command, plottables, pixels, cmd.pen, frame.transform,
-                                    clip, dpr, outputHeight, extrusion, true);
+                        addPolyline(plottables, pixels, cmd.pen, clip, dpr, outputHeight, alpha,
+                                    isDataOnlyCommand(command), geometry, true);
                     }
                 }
                 else if constexpr (std::is_same_v<T, qcp::EllipseCmd>)
@@ -436,12 +583,13 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                     if (qcp::gpuCanFill(cmd.brush) && !qcp::needsRaster(command))
                         fanFill(plottables, centre,
                                 std::span<const QPointF>(pixels.data(), pixels.size() - 1),
-                                cmd.brush.color(), clip, dpr, outputHeight);
+                                cmd.brush.color(), clip, dpr, outputHeight, alpha,
+                                isDataOnlyCommand(command), geometry);
                     addRasterCommand(list, plottables, command, frame, fallback, clip, dpr,
-                                     outputSize, generation);
+                                     outputSize, generation, geometry);
                     if (!qcp::strokeNeedsRaster(command))
-                        addPolyline(list, command, plottables, pixels, cmd.pen, frame.transform,
-                                    clip, dpr, outputHeight, extrusion, true);
+                        addPolyline(plottables, pixels, cmd.pen, clip, dpr, outputHeight, alpha,
+                                    isDataOnlyCommand(command), geometry, true);
                 }
                 else if constexpr (std::is_same_v<T, qcp::ErrorBarsCmd>)
                 {
@@ -450,25 +598,23 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                     // place.
                     qcpErrorBarPixels(frame, std::span<const QPointF>(*cmd.centres),
                                       std::span<const QPointF>(*cmd.spans), pixels);
-                    addPolyline(list, command, plottables, pixels, cmd.pen, frame.transform, clip,
-                                dpr, outputHeight, extrusion);
+                    addPolyline(plottables, pixels, cmd.pen, clip, dpr, outputHeight, alpha, true,
+                                geometry);
                 }
                 else if constexpr (std::is_same_v<T, qcp::MarkersCmd>)
                 {
-                    const std::span<const QPointF> resolved
-                        = cache.pixels(cmd.points, generation, frame.transform);
-                    std::vector<float>& xy = markerScratch();
-                    xy.resize(resolved.size() * 2);
-                    for (std::size_t i = 0; i < resolved.size(); ++i)
-                    {
-                        xy[2 * i] = static_cast<float>(resolved[i].x());
-                        xy[2 * i + 1] = static_cast<float>(resolved[i].y());
-                    }
-                    scatter.addScatter(xy, cmd.style, clip, dpr, outputHeight);
+                    addMarker(scatter, cmd, cache, frame, generation, clip, dpr, outputHeight);
                 }
             },
             command);
     }
+    if (geometry)
+        geometry->commit();
+}
+
+quint64 qcpFillBuildCount()
+{
+    return fillBuilds();
 }
 
 std::vector<float> qcpFanFillVertices(const QPointF& centre, std::span<const QPointF> ring,

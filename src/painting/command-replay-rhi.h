@@ -65,64 +65,116 @@ private:
 };
 
 /*!
-  Tells a replay which extruded vertices it may stroke again instead of extruding them.
+  Keeps a recording's whole built geometry, so a pan re-emits it instead of building it again.
 
-  One per recording, indexed by the command's place in it (\ref qcpCommandIndex). A command's
-  triangles are kept with the transform they were built for: when the next frame's transform
-  differs by a translation only (a pan, not a zoom), the kept vertices go to the layer again with
-  the delta as the entry offset, which is today's fast path for GPU lines. A re-recorded list, or a
-  new recording, starts from nothing.
+  One per recording. A replay that starts on the list this cache was built for, at the same device
+  pixel ratio, clip and output size, and with a transform the kept one only translates, hands every
+  run back to the layer with one delta: no extrusion, no tessellation, no mapping. Anything else (a
+  zoom, a re-record, a new device pixel ratio) rebuilds everything and keeps the result. A command
+  the GPU draws as an image spoils the build: an image is not vertex geometry, so pans of that
+  recording rebuild.
 */
-class QCPExtrusionCache
+class QCPRecordingCache
 {
 public:
-    //! Starts a replay of \a list, which holds \a commands commands; a new list drops every slot.
-    void beginReplay(quint64 list, std::size_t commands);
+    //! Solid vertices as one submission built them: the fill triangles come first, then the stroke.
+    struct SolidRun
+    {
+        int first = 0; //!< first vertex in \ref solidVertices
+        int vertexCount = 0;
+        int fillVertexCount = 0; //!< the fill prefix; the rest is stroke (and later fills)
+        bool movesWithData
+            = false; //!< false: a pixel, ratio or anchor position must not be shifted
+    };
+
+    //! A dashed stroke: its dash phase lives in the arc lengths of its vertices. Never merges into
+    //! a solid run, whatever the pane.
+    struct DashedRun
+    {
+        int first = 0; //!< first vertex in \ref dashedVertices
+        int vertexCount = 0;
+        bool movesWithData = false;
+        float dashOffset = 0; //!< pixels
+        float pattern[8] = { };
+        int patternCount = 0;
+    };
 
     /*!
-      The triangles of command \a key when \a transform is a translation of the one they were built
-      for and the stroke is \a width pixels wide, \a delta then holding the pixels to add. An empty
-      span means the caller must extrude.
+      True when the kept geometry of \a list may be re-emitted: same list, same device pixel ratio,
+      output height and clip, and \a transform a translation of the one it was built for. \a delta
+      then holds the pixels to add to the runs that move with the data.
     */
-    [[nodiscard]] std::span<const float> translated(quint64 key, const QCPTransform& transform,
-                                                    float width, QPointF* delta);
+    bool reuse(const QCPDrawList& list, const QCPTransform& transform, double dpr, int outputHeight,
+               const QRect& clip, QPointF* delta);
 
-    //! Keeps \a vertices as command \a key's \a width-wide geometry for \a transform.
-    void keep(quint64 key, const QCPTransform& transform, float width,
-              std::span<const float> vertices);
+    //! Drops the runs and starts keeping a new build for \a list.
+    void beginBuild(const QCPDrawList& list, const QCPTransform& transform, double dpr,
+                    int outputHeight, const QRect& clip);
 
-    //! Test hook: how many command slots the cache holds.
-    [[nodiscard]] int entryCount() const { return int(mEntries.size()); }
+    /*!
+      Keeps \a vertices as the run a submission built; \a fillVertexCount of them are its fill.
+      Consecutive runs that move alike are kept as one, so a re-emit is a handful of submissions
+      whatever the recording's command count.
+    */
+    void keepSolid(std::span<const float> vertices, int fillVertexCount, bool movesWithData);
+
+    //! Keeps a dashed stroke, with the \a pattern (pixels) and \a dashOffset it is drawn with.
+    void keepDashed(std::span<const float> vertices, std::span<const float> pattern,
+                    float dashOffset, bool movesWithData);
+
+    //! Commits the build, unless a rasterised command spoiled it.
+    void commit();
+
+    //! The recording holds something this cache cannot reproduce (an image): it must be rebuilt.
+    void invalidate();
+
+    [[nodiscard]] std::span<const float> solidVertices() const { return mSolid; }
+
+    [[nodiscard]] std::span<const SolidRun> solidRuns() const { return mSolidRuns; }
+
+    [[nodiscard]] std::span<const float> dashedVertices() const { return mDashed; }
+
+    [[nodiscard]] std::span<const DashedRun> dashedRuns() const { return mDashedRuns; }
+
+    //! Test hook: how many runs the kept geometry holds.
+    [[nodiscard]] int runCount() const { return int(mSolidRuns.size() + mDashedRuns.size()); }
 
     void clear();
 
 private:
-    struct Entry
-    {
-        QCPTransform transform;
-        float width = 0; //!< the stroke width the vertices were extruded for
-        std::vector<float> vertices; //!< empty: nothing was kept for this command yet
-    };
-
-    // The key is the command's index, so an entry is found in constant time. A command the replay
-    // skips keeps its slot (and its geometry) until the list id changes.
-    std::vector<Entry> mEntries;
+    std::vector<float> mSolid; //!< six floats per vertex, in record order
+    std::vector<SolidRun> mSolidRuns;
+    std::vector<float> mDashed; //!< seven floats per vertex (the seventh is the arc length)
+    std::vector<DashedRun> mDashedRuns;
+    QCPTransform mTransform;
+    QRect mClip;
     quint64 mList = 0;
+    double mDpr = 0;
+    int mHeight = 0;
+    bool mValid = false;
+    bool mSpoiled = false;
 };
 
 /*!
   Draws the GPU kinds of \a list on \a plottables and \a scatter.
 
   Polylines in data or mixed spaces, fills, rects, ellipses, error bars and markers become triangles
-  or instanced sprites, dashed or solid depending on the pen. A fill or stroke the GPU cannot
-  express becomes an image through \a fallback. Text, painter paths, images and free-form callbacks
-  are skipped: the QPainter replay (QCPReplayKinds::PainterOnly) draws those.
+  or instanced sprites, dashed or solid depending on the pen, at \a alpha. A fill or stroke the GPU
+  cannot express becomes an image through \a fallback. Text, painter paths, images and free-form
+  callbacks are skipped: the QPainter replay (QCPReplayKinds::PainterOnly) draws those.
+
+  With \a geometry, the replay keeps what it built for this recording and re-emits it on a frame
+  that only translates it, instead of building it again.
 */
 void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                       QCPScatterRhiLayer& scatter, const QCPDrawFrame& frame,
                       QCPResolveCache& cache, qcp::QCPRasterFallback& fallback, double dpr,
                       const QSize& outputSize, quint64 generation = 0,
-                      QCPExtrusionCache* extrusion = nullptr);
+                      QCPRecordingCache* geometry = nullptr, float alpha = 1.0f);
+
+//! Test hook: how many fill vertex sets the replay has built (a pan must not add one). Counts the
+//! fan and ribbon fills together, like QCPLineExtruder::extruderCallCount() counts strokes.
+quint64 qcpFillBuildCount();
 
 //! Triangles of a fan fill from \a centre over an open \a ring: six floats per vertex.
 std::vector<float> qcpFanFillVertices(const QPointF& centre, std::span<const QPointF> ring,
