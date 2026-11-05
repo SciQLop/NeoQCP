@@ -1142,6 +1142,59 @@ void TestDrawable::rangeBandExampleDraws()
     QVERIFY2(inked > 10, qPrintable(QStringLiteral("%1 dark pixels, no label").arg(inked)));
 }
 
+void TestDrawable::rangeBandRescalesToItsData()
+{
+    // I5: the label's anchor is a data position, so it must not unbound the recording. While it
+    // did, getKeyRange/getValueRange reported nothing and rescaleAxes() left the band alone.
+    Fixture f;
+    auto* band = new RangeBand(f.plot->xAxis, f.plot->yAxis);
+    QVector<double> keys, lower(9, 3.0), upper(9, 5.0);
+    for (int i = 1; i <= 9; ++i)
+        keys << double(i);
+    band->setData(keys, lower, upper);
+    f.plot->xAxis->setRange(0, 100);
+    f.plot->yAxis->setRange(0, 100);
+
+    f.plot->rescaleAxes();
+
+    const QCPRange keys2 = f.plot->xAxis->range();
+    QVERIFY2(keys2.lower > 0.5 && keys2.lower <= 1.0 && keys2.upper >= 9.0 && keys2.upper < 10.0,
+             qPrintable(QStringLiteral("key range %1..%2, not the band's 1..9")
+                            .arg(keys2.lower)
+                            .arg(keys2.upper)));
+    const QCPRange values = f.plot->yAxis->range();
+    QVERIFY2(values.lower > 2.0 && values.lower <= 3.0 && values.upper >= 5.0 && values.upper < 6.0,
+             qPrintable(QStringLiteral("value range %1..%2, not the band's 3..5")
+                            .arg(values.lower)
+                            .arg(values.upper)));
+}
+
+void TestDrawable::rangeBandLegendIconIsInked()
+{
+    // I5: the recording that bounds the band also feeds its legend icon. The data sits outside the
+    // visible range, so the only pixels of the fill in the image are the icon's.
+    Fixture f;
+    const QColor fill(120, 180, 240);
+    auto* band = new RangeBand(f.plot->xAxis, f.plot->yAxis);
+    QVector<double> keys, lower(5, 3.0), upper(5, 5.0);
+    for (int i = 0; i < 5; ++i)
+        keys << 100.0 + i;
+    band->setData(keys, lower, upper);
+    band->setBrush(fill);
+    f.plot->xAxis->setRange(0, 10);
+    f.plot->yAxis->setRange(0, 10);
+    f.plot->legend->setVisible(true);
+    f.plot->replot();
+
+    const QImage frame = f.plot->toPixmap(300, 200).toImage();
+    int inked = 0;
+    for (int y = 0; y < frame.height(); ++y)
+        for (int x = 0; x < frame.width(); ++x)
+            if (frame.pixelColor(x, y) == fill)
+                ++inked;
+    QVERIFY2(inked > 20, qPrintable(QStringLiteral("%1 fill pixels, the icon is blank").arg(inked)));
+}
+
 void TestDrawable::exportStacksLikeTheScreen()
 {
     // Spec 5: a layer paints its QPainter content first, then the QPainter form of its GPU

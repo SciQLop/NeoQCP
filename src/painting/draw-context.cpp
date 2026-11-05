@@ -125,6 +125,29 @@ Extent unboundedExtent()
     return extent;
 }
 
+//! A command that says nothing about the data box: neutral, it leaves the box as it was.
+Extent neutralExtent()
+{
+    Extent extent;
+    extent.empty = true;
+    return extent;
+}
+
+//! The data box of a single position: its coordinates when both are data, nothing otherwise. A
+//! glyph hangs off its anchor by an amount only the painter knows, so the anchor is all it claims.
+Extent extentOfPosition(const QCP::Position& position)
+{
+    Extent extent;
+    if (const auto* data = std::get_if<QCP::Data>(&position))
+    {
+        extent.key(data->x);
+        extent.value(data->y);
+        extent.settle();
+        return extent;
+    }
+    return neutralExtent();
+}
+
 QCPDataBox boxOf(const Extent& extent)
 {
     return QCPDataBox { extent.keyBounded ? extent.keyLower : -Limit::infinity(),
@@ -168,33 +191,31 @@ bool holdsAnchor(const qcp::QCPDrawCommand& command)
         command);
 }
 
-//! A side is bounded only while every command so far is: one pixel or ratio command ends it.
-void record(QCPDrawList& list, qcp::QCPDrawCommand command, const Extent& extent)
+//! An unbounded side of \a extent says nothing about \a box: boxOf() leaves it at ±inf, so merging
+//! keeps the recording's side unbounded too. A neutral extent never touches the box.
+void mergeExtent(QCPDrawList::Box& box, const Extent& extent)
+{
+    if (!extent.empty)
+        box.merge(boxOf(extent), extent.keyBounded, extent.valueBounded);
+}
+
+//! Records \a command with its \a data box (ranges, legend icon) and its \a index box (item index,
+//! culling). A side is bounded only while every command so far is.
+void record(QCPDrawList& list, qcp::QCPDrawCommand command, const Extent& data,
+            const Extent& index)
 {
     if (holdsAnchor(command))
         list.anchorDependent = true;
     if (list.commands.empty())
         list.id = qcpNextDrawListId(); // a re-recorded list is a new recording
-    if (!extent.empty)
-    {
-        // An unbounded side of this command says nothing about the box: boxOf() leaves it at ±inf,
-        // so merging keeps the recording's side unbounded too.
-        const QCPDataBox box = boxOf(extent);
-        const bool first = !list.hasSamples;
-        if (first)
-            list.bounds = box;
-        else
-        {
-            list.bounds.keyLower = std::min(list.bounds.keyLower, box.keyLower);
-            list.bounds.keyUpper = std::max(list.bounds.keyUpper, box.keyUpper);
-            list.bounds.valueLower = std::min(list.bounds.valueLower, box.valueLower);
-            list.bounds.valueUpper = std::max(list.bounds.valueUpper, box.valueUpper);
-        }
-        list.keyBounded = first ? extent.keyBounded : list.keyBounded && extent.keyBounded;
-        list.valueBounded = first ? extent.valueBounded : list.valueBounded && extent.valueBounded;
-        list.hasSamples = true;
-    }
+    mergeExtent(list.data, data);
+    mergeExtent(list.index, index);
     list.commands.push_back(std::move(command));
+}
+
+void record(QCPDrawList& list, qcp::QCPDrawCommand command, const Extent& extent)
+{
+    record(list, std::move(command), extent, extent);
 }
 } // namespace
 
@@ -366,12 +387,12 @@ void QCPDrawContext::errorBars(std::shared_ptr<const std::vector<QPointF>> centr
 
 void QCPDrawContext::text(QCP::Position at, const QString& text, const QCPTextStyle& style)
 {
-    // The glyphs extend beyond the anchor by an amount only the painter knows, so no data box can
-    // describe this command: it leaves the recording unbounded.
+    // The anchor is the only data this command names; its glyphs hang off it by an amount only the
+    // painter knows. So it feeds the data box and leaves the index box unbounded, as it always did.
     record(*mList,
            qcp::TextCmd { at, text, std::make_shared<const QCPTextStyle>(style),
                           qcpMeasureText(style, text) },
-           unboundedExtent());
+           extentOfPosition(at), unboundedExtent());
 }
 
 void QCPDrawContext::recordEveryFrame()
@@ -382,8 +403,9 @@ void QCPDrawContext::recordEveryFrame()
 void QCPDrawContext::path(QCP::Position origin, const QPainterPath& path, const QPen& pen,
                           const QBrush& brush)
 {
-    // The path is pixels from the origin: like text, it has no data-space extent.
-    record(*mList, qcp::PathCmd { origin, path, pen, brush }, unboundedExtent());
+    // The path is pixels from the origin: like text, only the origin can be data.
+    record(*mList, qcp::PathCmd { origin, path, pen, brush }, extentOfPosition(origin),
+           unboundedExtent());
 }
 
 void QCPDrawContext::image(QCP::Position a, QCP::Position b, const QImage& image)
@@ -395,5 +417,5 @@ void QCPDrawContext::image(QCP::Position a, QCP::Position b, const QImage& image
 
 void QCPDrawContext::painter(std::function<void(QCPPainter&, const QCPTransform&)> callback)
 {
-    record(*mList, qcp::PainterCmd { std::move(callback) }, unboundedExtent());
+    record(*mList, qcp::PainterCmd { std::move(callback) }, neutralExtent(), unboundedExtent());
 }

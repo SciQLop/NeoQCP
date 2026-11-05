@@ -439,20 +439,21 @@ std::optional<QCPDataBox> QCPDrawnCore::dataRange(const QCPDrawable& object,
     const QCPDrawList& list = mState->recording;
     // The recording already knows which sides every command was data on; a log axis cannot index a
     // box that reaches zero or below, exactly as QCPAbstractItem::positionsExtent decides it.
-    bool keyBounded = list.keyBounded;
-    bool valueBounded = list.valueBounded;
+    const QCPDrawList::Box& side = list.data;
+    bool keyBounded = side.keyBounded;
+    bool valueBounded = side.valueBounded;
     if (applyLogRule)
     {
         const bool keyLog = view.keyAxis->scaleType() == QCPAxis::stLogarithmic;
         const bool valueLog = view.valueAxis->scaleType() == QCPAxis::stLogarithmic;
-        if (keyBounded && keyLog && !(list.bounds.keyLower > 0))
+        if (keyBounded && keyLog && !(side.bounds.keyLower > 0))
             keyBounded = false;
-        if (valueBounded && valueLog && !(list.bounds.valueLower > 0))
+        if (valueBounded && valueLog && !(side.bounds.valueLower > 0))
             valueBounded = false;
     }
     if (!keyBounded && !valueBounded)
         return std::nullopt;
-    QCPDataBox box = list.bounds;
+    QCPDataBox box = side.bounds;
     if (!keyBounded)
     {
         box.keyLower = -kInfinity;
@@ -469,11 +470,16 @@ std::optional<QCPDataBox> QCPDrawnCore::dataRange(const QCPDrawable& object,
 std::optional<QCPItemExtent> QCPDrawnCore::dataExtent(const QCPDrawable& object,
                                                       const QCPDrawnView& view)
 {
-    const std::optional<QCPDataBox> box = dataRange(object, view);
-    if (!box)
+    // The item index asks the index box, not the data one: a text's glyphs hang off its anchor, so
+    // its side stays unbounded and no click on them is ever culled. No log rule: a box that cannot
+    // be indexed simply is not.
+    if (!ensureRecording(object, view))
+        return std::nullopt;
+    const QCPDrawList::Box& side = mState->recording.index;
+    if (!side.keyBounded && !side.valueBounded)
         return std::nullopt;
     return QCPItemExtent { const_cast<QCPAxis*>(view.keyAxis), const_cast<QCPAxis*>(view.valueAxis),
-                           *box, pixelPad() };
+                           side.bounds, pixelPad() };
 }
 
 double QCPDrawnCore::pixelPad() const
@@ -506,7 +512,11 @@ std::optional<double> QCPDrawnCore::hitTest(const QCPDrawable& object, QCP::Pixe
         return std::nullopt;
     const double tolerance = view.plot ? double(view.plot->selectionTolerance()) : 5.0;
     const QPointF point(at.x, at.y);
-    const std::optional<QCPDataBox> box = dataRange(object, view);
+    // Culling uses the index box: the same box that decides whether the item index keeps it.
+    const QCPDrawList::Box& side = mState->recording.index;
+    std::optional<QCPDataBox> box;
+    if (side.keyBounded || side.valueBounded)
+        box = side.bounds;
     const QCPDrawFrame frame
         = qcpMakeFrame(view.keyAxis, view.valueAxis, view.axisRect, QRectF(view.clip));
     const double pad = pixelPad();
@@ -605,8 +615,8 @@ void QCPDrawnCore::paintIcon(const QCPDrawable& object, QCPPainter& painter, con
         mState->iconGeneration = mState->generation;
         mState->iconRecorded = true;
     }
-    if (!mState->icon.keyBounded || !mState->icon.valueBounded)
+    if (!mState->icon.data.keyBounded || !mState->icon.data.valueBounded)
         return; // nothing to fit the recording into the rect with
-    const QCPDrawFrame frame = qcpMakeFittedFrame(mState->icon.bounds, rect);
+    const QCPDrawFrame frame = qcpMakeFittedFrame(mState->icon.data.bounds, rect);
     qcpReplayWithPainter(mState->icon, painter, frame, QCPReplayKinds::All);
 }

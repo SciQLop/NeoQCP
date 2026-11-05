@@ -486,7 +486,7 @@ void TestDrawContext::boundsCoverEveryCommand()
         QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
                                nullptr);
         context.polyline(sharedPoints({ { -5, 20 }, { 30, 70 } }), pen);
-        const QCPDataBox& bounds = context.drawList().bounds;
+        const QCPDataBox& bounds = context.drawList().data.bounds;
         QCOMPARE(bounds.keyLower, -5.0);
         QCOMPARE(bounds.keyUpper, 30.0);
         QCOMPARE(bounds.valueLower, 20.0);
@@ -499,7 +499,7 @@ void TestDrawContext::boundsCoverEveryCommand()
         context.polyline(sharedPoints({ { 10, 20 }, { 30, 70 } }), pen);
         const std::vector<QCP::Position> absolute { QCP::Pixels { 1, 2 }, QCP::Pixels { 3, 4 } };
         context.polyline(std::span<const QCP::Position>(absolute), pen);
-        const QCPDataBox& bounds = context.drawList().bounds;
+        const QCPDataBox& bounds = context.drawList().data.bounds;
         QVERIFY(!std::isfinite(bounds.keyLower));
         QVERIFY(!std::isfinite(bounds.keyUpper));
         QVERIFY(!std::isfinite(bounds.valueLower));
@@ -512,7 +512,7 @@ void TestDrawContext::boundsCoverEveryCommand()
         const std::vector<QCP::Position> mixed { QCP::DataXRatioY { 50, 0.5 },
                                                  QCP::DataXRatioY { 70, 0.2 } };
         context.polyline(std::span<const QCP::Position>(mixed), pen);
-        const QCPDataBox& bounds = context.drawList().bounds;
+        const QCPDataBox& bounds = context.drawList().data.bounds;
         QCOMPARE(bounds.keyLower, 50.0);
         QCOMPARE(bounds.keyUpper, 70.0);
         QVERIFY(!std::isfinite(bounds.valueLower));
@@ -523,7 +523,7 @@ void TestDrawContext::boundsCoverEveryCommand()
                                nullptr);
         const std::vector<QCP::Position> mixed { QCP::RatioXDataY { 0.25, 60 } };
         context.polyline(std::span<const QCP::Position>(mixed), pen);
-        const QCPDataBox& bounds = context.drawList().bounds;
+        const QCPDataBox& bounds = context.drawList().data.bounds;
         QVERIFY(!std::isfinite(bounds.keyLower));
         QVERIFY(!std::isfinite(bounds.keyUpper));
         QCOMPARE(bounds.valueLower, 60.0);
@@ -535,7 +535,7 @@ void TestDrawContext::boundsCoverEveryCommand()
                                nullptr);
         context.polyline(sharedPoints({ { 1, 1 }, { 2, 2 } }), pen);
         context.polyline(sharedPoints({ { 8, 8 }, { 9, 9 } }), pen);
-        const QCPDataBox& bounds = context.drawList().bounds;
+        const QCPDataBox& bounds = context.drawList().data.bounds;
         QCOMPARE(bounds.keyLower, 1.0);
         QCOMPARE(bounds.keyUpper, 9.0);
         QCOMPARE(bounds.valueLower, 1.0);
@@ -545,7 +545,7 @@ void TestDrawContext::boundsCoverEveryCommand()
         // An empty recording is unbounded, not a box at the origin.
         QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
                                nullptr);
-        const QCPDataBox& bounds = context.drawList().bounds;
+        const QCPDataBox& bounds = context.drawList().data.bounds;
         QVERIFY(!std::isfinite(bounds.keyLower));
         QVERIFY(!std::isfinite(bounds.valueLower));
     }
@@ -563,12 +563,12 @@ void TestDrawContext::emptyCommandDoesNotUnboundTheRecording()
     context.markers(nothing, QCPScatterStyle(QCPScatterStyle::ssCircle));
     context.errorBars(nothing, nothing, pen);
     const QCPDrawList& list = context.drawList();
-    QVERIFY(list.keyBounded);
-    QVERIFY(list.valueBounded);
-    QCOMPARE(list.bounds.keyLower, 1.0);
-    QCOMPARE(list.bounds.keyUpper, 3.0);
-    QCOMPARE(list.bounds.valueLower, 2.0);
-    QCOMPARE(list.bounds.valueUpper, 4.0);
+    QVERIFY(list.data.keyBounded);
+    QVERIFY(list.data.valueBounded);
+    QCOMPARE(list.data.bounds.keyLower, 1.0);
+    QCOMPARE(list.data.bounds.keyUpper, 3.0);
+    QCOMPARE(list.data.bounds.valueLower, 2.0);
+    QCOMPARE(list.data.bounds.valueUpper, 4.0);
     QCOMPARE(int(list.commands.size()), 3);
 }
 

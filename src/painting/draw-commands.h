@@ -167,10 +167,13 @@ inline quint64 qcpNextDrawListId()
 /*!
   \brief What a QCPDrawContext recorded: the commands in draw order and their data box.
 
-  \a bounds follows the same rule as an item's data extent: a side is meaningful only while \a
-  keyBounded / \a valueBounded is set, which they are only when every command recorded so far is
+  Each box follows the same rule as an item's data extent: a side is meaningful only while its
+  keyBounded / valueBounded flag is set, which it is only when every command recorded so far is
   data on that side. One pixel, ratio or anchored command makes that side unbounded for the rest of
   the recording, and a side that stayed bounded holds the min/max of the data coordinates.
+  A recording keeps two of them: \a data, which feeds its ranges and its legend icon, and \a index,
+  the pixel-padded box the item index and the culling use. They differ on the commands whose glyphs
+  live at an anchor - a text at a data position is data, but its box never shrinks the index.
 
   A log axis makes a non-positive lower bound unmappable, exactly as it does for an item's extent
   (QCPAbstractItem::positionsExtent drops that side). QCPDrawnCore::dataRange applies that rule when
@@ -181,16 +184,44 @@ struct QCP_LIB_DECL QCPDrawList
 {
     QCPDrawList() = default;
 
+    //! The box of a recording on one side: bounds are meaningful on a side only while its flag is
+    //! set, and \a hasSamples goes true as soon as a command with a sample set them.
+    struct Box
+    {
+        QCPDataBox bounds { -std::numeric_limits<double>::infinity(),
+                            std::numeric_limits<double>::infinity(),
+                            -std::numeric_limits<double>::infinity(),
+                            std::numeric_limits<double>::infinity() };
+        bool keyBounded = false;
+        bool valueBounded = false;
+        bool hasSamples = false;
+
+        //! Merges one command's box: a side it does not bound leaves the recording's unbounded too.
+        void merge(const QCPDataBox& commandBox, bool commandHasKey, bool commandHasValue)
+        {
+            if (!hasSamples)
+                bounds = commandBox;
+            else
+            {
+                bounds.keyLower = std::min(bounds.keyLower, commandBox.keyLower);
+                bounds.keyUpper = std::max(bounds.keyUpper, commandBox.keyUpper);
+                bounds.valueLower = std::min(bounds.valueLower, commandBox.valueLower);
+                bounds.valueUpper = std::max(bounds.valueUpper, commandBox.valueUpper);
+            }
+            keyBounded = hasSamples ? keyBounded && commandHasKey : commandHasKey;
+            valueBounded = hasSamples ? valueBounded && commandHasValue : commandHasValue;
+            hasSamples = true;
+        }
+    };
+
     //! A copy is a new recording: it can never be matched by an image of the one it came from.
     QCPDrawList(const QCPDrawList& other) { *this = other; }
 
     QCPDrawList& operator=(const QCPDrawList& other)
     {
         commands = other.commands;
-        bounds = other.bounds;
-        keyBounded = other.keyBounded;
-        valueBounded = other.valueBounded;
-        hasSamples = other.hasSamples;
+        data = other.data;
+        index = other.index;
         viewDependent = other.viewDependent;
         anchorDependent = other.anchorDependent;
         transformDependent = other.transformDependent;
@@ -200,14 +231,11 @@ struct QCP_LIB_DECL QCPDrawList
     }
 
     std::vector<qcp::QCPDrawCommand> commands;
-    QCPDataBox bounds { -std::numeric_limits<double>::infinity(),
-                        std::numeric_limits<double>::infinity(),
-                        -std::numeric_limits<double>::infinity(),
-                        std::numeric_limits<double>::infinity() };
-    bool keyBounded = false;
-    bool valueBounded = false;
-    //! False until a command with at least one sample set the box: empty commands are neutral.
-    bool hasSamples = false;
+    //! What the recording covers in data: its key/value ranges and its legend-icon fit.
+    Box data;
+    //! The box for the item index and for culling, as it always was: a text, a path or a painter
+    //! callback leaves it unbounded, whatever position its anchor names.
+    Box index;
     //! A command read the theme (or another view fact the commands do not carry): re-record when
     //! the view epoch moves, even if the command list itself looks view-independent.
     bool viewDependent = false;
