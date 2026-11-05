@@ -128,6 +128,7 @@ void QCPBarsGroup::setSpacingType(SpacingType spacingType)
     for (QCPBars* bar : bars())
         bar->markDirty();
     mSpacingType = spacingType;
+    bumpRevision();
 }
 
 /*!
@@ -143,6 +144,7 @@ void QCPBarsGroup::setSpacing(double spacing)
     for (QCPBars* bar : bars())
         bar->markDirty();
     mSpacing = spacing;
+    bumpRevision();
 }
 
 /*!
@@ -219,6 +221,7 @@ void QCPBarsGroup::insert(int i, QCPBars* bars)
         bars->setBarsGroup(this);
     // then move to according position:
     mBars.move(mBars.indexOf(bars), qBound(0, i, mBars.size() - 1));
+    bumpRevision();
 }
 
 /*!
@@ -251,7 +254,10 @@ void QCPBarsGroup::remove(QCPBars* bars)
 void QCPBarsGroup::registerBars(QCPBars* bars)
 {
     if (!mBars.contains(bars))
+    {
         mBars.append(bars);
+        bumpRevision();
+    }
 }
 
 /*! \internal
@@ -264,6 +270,7 @@ void QCPBarsGroup::registerBars(QCPBars* bars)
 void QCPBarsGroup::unregisterBars(QCPBars* bars)
 {
     mBars.removeOne(bars);
+    bumpRevision();
 }
 
 /*! \internal
@@ -571,6 +578,7 @@ void QCPBars::setData(QSharedPointer<QCPBarsDataContainer> data)
         return;
     markDirty();
     mDataContainer = data;
+    notifyGroupRevision();
 }
 
 /*! \overload
@@ -589,6 +597,7 @@ void QCPBars::setData(const QVector<double>& keys, const QVector<double>& values
 {
     mDataContainer->clear();
     addData(keys, values, alreadySorted);
+    notifyGroupRevision();
 }
 
 /*!
@@ -603,6 +612,7 @@ void QCPBars::setWidth(double width)
         return;
     markDirty();
     mWidth = width;
+    notifyGroupRevision();
 }
 
 /*!
@@ -619,6 +629,7 @@ void QCPBars::setWidthType(QCPBars::WidthType widthType)
         return;
     markDirty();
     mWidthType = widthType;
+    notifyGroupRevision();
 }
 
 /*!
@@ -706,6 +717,7 @@ void QCPBars::addData(const QVector<double>& keys, const QVector<double>& values
     }
     mDataContainer->add(
         tempData, alreadySorted); // don't modify tempData beyond this to prevent copy on write
+    notifyGroupRevision();
 }
 
 /*! \overload
@@ -717,6 +729,7 @@ void QCPBars::addData(const QVector<double>& keys, const QVector<double>& values
 void QCPBars::addData(double key, double value)
 {
     mDataContainer->add(QCPBarsData(key, value));
+    notifyGroupRevision();
 }
 
 /*!
@@ -1027,9 +1040,8 @@ void QCPBars::recordBar(QCPDrawContext& context, double key, double value, const
     if (!hasPixelGeometry())
     {
         const double half = mWidth * 0.5;
-        const double centre = key + keyCoordOffset(key);
-        context.rect(QCP::Data { centre - half, base }, QCP::Data { centre + half, base + value },
-                     pen, brush);
+        context.rect(QCP::Data { key - half, base }, QCP::Data { key + half, base + value }, pen,
+                     brush);
         return;
     }
     const QRectF bar = getBarRect(key, value);
@@ -1049,24 +1061,25 @@ bool QCPBars::hasPixelGeometry() const
 {
     if (mWidthType != wtPlotCoords)
         return true;
-    if (mBarsGroup
-        && (mBarsGroup->spacingType() != QCPBarsGroup::stPlotCoords
-            || mKeyAxis->scaleType() != QCPAxis::stLinear))
-        return true;
-    return mBarBelow && (mStackingGap != 0 || mPen != Qt::NoPen);
+    // A group's centring and a bar's stack are pixel arithmetic whatever their units, and a bar on
+    // a log axis cannot turn a pixel offset back into a coordinate one: both read the transform.
+    return mBarsGroup != nullptr || mBarBelow != nullptr;
 }
 
-/*! \internal
-
-  The key coordinate a bars group moves this bar by, 0 without a group: the group's pixel offset
-  turned back into coordinates, which is the same offset for every key on a linear axis.
-*/
-double QCPBars::keyCoordOffset(double key) const
+quint64 QCPBars::dependencyRevision() const
 {
-    if (!mBarsGroup || !mKeyAxis)
-        return 0.0;
-    const double keyPixel = mKeyAxis->coordToPixel(key);
-    return mKeyAxis->pixelToCoord(keyPixel + mBarsGroup->keyPixelOffset(this, key)) - key;
+    quint64 key = QCPDrawn<QCPAbstractPlottable1D<QCPBarsData>>::dependencyRevision();
+    if (mBarBelow) // the base is read at record time: its own key carries the whole stack below it
+        key += mBarBelow->mCore.generation() + mBarBelow->dependencyRevision();
+    if (mBarsGroup) // the group centres every member by their widths
+        key += mBarsGroup->revision();
+    return key;
+}
+
+void QCPBars::notifyGroupRevision()
+{
+    if (mBarsGroup)
+        mBarsGroup->bumpRevision();
 }
 
 /* inherits documentation from base class */

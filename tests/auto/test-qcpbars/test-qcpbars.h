@@ -19,6 +19,10 @@ private slots:
   void stackedBarsFollowAPan();
   void groupedBarsFollowAPanOnGpu();
   void stackedBarsFollowAPanOnGpu();
+  void stackedBarFollowsTheBarBelow();
+  void moveAboveRestacks();
+  void groupJoinShiftsTheOthers();
+  void groupedBarsOnALogAxis();
   void plotWidthBarsNeverReRecord();
   void pixelWidthBarsReRecordOnEveryPan();
   void barsSelectionReRecordsAndUsesTheDecorator();

@@ -368,6 +368,11 @@ bool QCPDrawnCore::contentChanged()
     return true;
 }
 
+quint64 QCPDrawnCore::generation() const
+{
+    return mState->generation;
+}
+
 int QCPDrawnCore::recordingCount() const
 {
     return mState->recordings;

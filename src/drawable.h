@@ -119,6 +119,9 @@ public:
     void paintIcon(const QCPDrawable& object, QCPPainter& painter, const QRectF& rect,
                    const QCPDrawnView& view);
 
+    //! The object's content generation: a setter bumped it this many times.
+    [[nodiscard]] quint64 generation() const;
+
     //! Test hook: how many times the object was asked to record.
     [[nodiscard]] int recordingCount() const;
 

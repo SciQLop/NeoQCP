@@ -92,6 +92,15 @@ public:
 
     [[nodiscard]] bool contains(QCPBars* bars) const { return mBars.contains(bars); }
 
+    /*!
+      Bumped by every change to the group's composition or spacing, and by a member's width: a
+      member's recording is stale when the group moves it.
+    */
+    [[nodiscard]] quint64 revision() const { return mRevision; }
+
+    //! Bumps \ref revision(): a member changed something the others are positioned by.
+    void bumpRevision() { ++mRevision; }
+
     void append(QCPBars* bars);
     void insert(int i, QCPBars* bars);
     void remove(QCPBars* bars);
@@ -102,6 +111,7 @@ protected:
     SpacingType mSpacingType;
     double mSpacing;
     QList<QCPBars*> mBars;
+    quint64 mRevision = 0;
 
     // non-virtual methods:
     void registerBars(QCPBars* bars);
@@ -239,6 +249,9 @@ public:
                                    const QCPRange& inKeyRange = QCPRange()) const override;
     virtual QPointF dataPixelPosition(int index) const override;
 
+    //! The recording's key: this bar's data, the bar it is stacked on, and its group.
+    [[nodiscard]] quint64 dependencyRevision() const override;
+
 protected:
     // property members:
     double mWidth;
@@ -260,14 +273,14 @@ protected:
                    const QBrush& brush) const;
     //! Whether this bar's geometry is only expressible in pixels, and so reads the transform.
     bool hasPixelGeometry() const;
-    //! The key coordinate a bars group moves this bar by, 0 without a group.
-    double keyCoordOffset(double key) const;
     void getVisibleDataBounds(QCPBarsDataContainer::const_iterator& begin,
                               QCPBarsDataContainer::const_iterator& end) const;
     QRectF getBarRect(double key, double value) const;
     void getPixelWidth(double key, double& lower, double& upper) const;
     double getStackedBaseValue(double key, bool positive) const;
     static void connectBars(QCPBars* lower, QCPBars* upper);
+    //! Tells the group a member moved something the others are positioned by.
+    void notifyGroupRevision();
 
     friend class QCustomPlot;
     friend class QCPLegend;

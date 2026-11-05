@@ -114,6 +114,41 @@ void stackedPair(QCustomPlot* plot, QCPBars*& below, QCPBars*& above)
     above = new QCPBars(plot->xAxis, plot->yAxis);
     above->moveAbove(below);
 }
+
+//! A bar on \a plot at keys {2, 3}, painted \a colour without an outline.
+QCPBars* colouredBars(QCustomPlot* plot, const QColor& colour, double value = 1.0)
+{
+    auto* bars = new QCPBars(plot->xAxis, plot->yAxis);
+    bars->setWidth(0.6);
+    bars->setPen(Qt::NoPen);
+    bars->setBrush(colour);
+    bars->setData(QVector<double> { 2, 3 }, QVector<double> { value, value });
+    return bars;
+}
+
+//! The left-most pixel of \a colour inside \a plot's axis rect on the row of \a value.
+int leftEdgeOf(const QImage& frame, QCustomPlot* plot, double value, const QColor& colour)
+{
+    const double dpr = frame.devicePixelRatio();
+    const QRect rect = plot->axisRect()->rect();
+    const int row = qRound(plot->yAxis->coordToPixel(value) * dpr);
+    for (int x = qRound(rect.left() * dpr) + 4; x <= qRound(rect.right() * dpr) - 4; ++x)
+        if (frame.pixelColor(x, row) == colour)
+            return x;
+    return -1;
+}
+
+//! The bottom-most pixel of \a colour down the column of \a key, in device pixels.
+int lowestEdgeOf(const QImage& frame, QCustomPlot* plot, double key, const QColor& colour)
+{
+    const double dpr = frame.devicePixelRatio();
+    const QRect rect = plot->axisRect()->rect();
+    const int x = qRound(plot->xAxis->coordToPixel(key) * dpr);
+    for (int y = qRound(rect.bottom() * dpr) - 4; y >= qRound(rect.top() * dpr) + 4; --y)
+        if (frame.pixelColor(x, y) == colour)
+            return y;
+    return -1;
+}
 } // namespace
 
 void TestQCPBars::init()
@@ -399,6 +434,102 @@ void TestQCPBars::stackedBarsFollowAPanOnGpu()
     const int shift = leftEdgeShift(plot, [plot] { return plot->grabFramebuffer(); }, 1.5, 1.0);
     QVERIFY2(qAbs(shift) <= 1,
              qPrintable(QStringLiteral("the stacked bar moved %1 px off the axis").arg(shift)));
+}
+
+void TestQCPBars::stackedBarFollowsTheBarBelow()
+{
+    // A stacked bar's base is the bar below it at record time: when that bar grows, the base moves.
+    auto* below = colouredBars(mPlot, Qt::red, 1.0);
+    auto* above = colouredBars(mPlot, Qt::green, 1.0);
+    above->moveAbove(below);
+    mPlot->xAxis->setRange(0, 4);
+    mPlot->yAxis->setRange(0, 4);
+    mPlot->replot();
+    const int base = lowestEdgeOf(frameOf(mPlot), mPlot, 2.0, QColor(Qt::green));
+    QVERIFY2(base > 0, "the upper bar must be painted");
+
+    below->setData(QVector<double> { 2, 3 }, QVector<double> { 2, 2 }); // it grew under the upper bar
+    mPlot->replot();
+    const int raised = lowestEdgeOf(frameOf(mPlot), mPlot, 2.0, QColor(Qt::green));
+    QVERIFY2(raised >= 0, "the upper bar must still be painted");
+    QVERIFY2(raised < base - 1,
+             qPrintable(QStringLiteral("the upper bar's base stayed at %1 px").arg(base)));
+}
+
+void TestQCPBars::moveAboveRestacks()
+{
+    // Moving a bar above its neighbour restacks both: the one that lost its base must redraw too.
+    auto* first = colouredBars(mPlot, Qt::red, 3.0);
+    auto* second = colouredBars(mPlot, Qt::green, 1.0);
+    second->moveAbove(first);
+    mPlot->xAxis->setRange(0, 4);
+    mPlot->yAxis->setRange(0, 4);
+    mPlot->replot();
+    QCOMPARE(pixelAt(frameOf(mPlot), mPlot, 2.0, 3.5), QColor(Qt::green));
+
+    first->moveAbove(second);
+    mPlot->replot();
+    QCOMPARE(pixelAt(frameOf(mPlot), mPlot, 2.0, 3.5), QColor(Qt::red));
+}
+
+void TestQCPBars::groupJoinShiftsTheOthers()
+{
+    // A bar joining a group re-centres the others: the plot that gained it must render like one
+    // that had the member from the start.
+    QCustomPlot joined(0);
+    QCustomPlot reference(0);
+    for (QCustomPlot* plot : { &joined, &reference })
+    {
+        plot->resize(300, 200); // the frame of the assertion: a resize would re-record everything
+        plot->xAxis->setRange(0, 4);
+        plot->yAxis->setRange(0, 4);
+    }
+    auto* group = new QCPBarsGroup(&joined);
+    group->append(colouredBars(&joined, Qt::red));
+    group->append(colouredBars(&joined, Qt::green));
+    auto* referenceGroup = new QCPBarsGroup(&reference);
+    referenceGroup->append(colouredBars(&reference, Qt::red));
+    referenceGroup->append(colouredBars(&reference, Qt::green));
+    referenceGroup->append(colouredBars(&reference, Qt::blue));
+    joined.replot(); // the two-bar group is on screen, and recorded
+    reference.replot();
+
+    group->append(colouredBars(&joined, Qt::blue)); // a third member re-centres red and green
+    joined.replot();
+    QCOMPARE(leftEdgeOf(frameOf(&joined), &joined, 0.5, QColor(Qt::red)),
+             leftEdgeOf(frameOf(&reference), &reference, 0.5, QColor(Qt::red)));
+}
+
+void TestQCPBars::groupedBarsOnALogAxis()
+{
+    // A group spacing in plot coordinates is a coordinate offset on a linear axis only: switching
+    // the axis to logarithmic must re-record the bars on their new pixels.
+    QCustomPlot changed(0);
+    QCustomPlot reference(0);
+    for (QCustomPlot* plot : { &changed, &reference })
+    {
+        plot->resize(300, 200); // the frame of the assertion: a resize would re-record everything
+        plot->xAxis->setRange(0.5, 200);
+        plot->yAxis->setRange(0, 4);
+    }
+    auto* group = new QCPBarsGroup(&changed);
+    group->setSpacingType(QCPBarsGroup::stPlotCoords);
+    group->setSpacing(0.1);
+    group->append(colouredBars(&changed, Qt::red));
+    group->append(colouredBars(&changed, Qt::green));
+    auto* referenceGroup = new QCPBarsGroup(&reference);
+    referenceGroup->setSpacingType(QCPBarsGroup::stPlotCoords);
+    referenceGroup->setSpacing(0.1);
+    referenceGroup->append(colouredBars(&reference, Qt::red));
+    referenceGroup->append(colouredBars(&reference, Qt::green));
+    changed.replot(); // first frame on a linear key axis
+    reference.xAxis->setScaleType(QCPAxis::stLogarithmic);
+    reference.replot();
+
+    changed.xAxis->setScaleType(QCPAxis::stLogarithmic); // the axis the reference always had
+    changed.replot();
+    QCOMPARE(leftEdgeOf(frameOf(&changed), &changed, 0.5, QColor(Qt::red)),
+             leftEdgeOf(frameOf(&reference), &reference, 0.5, QColor(Qt::red)));
 }
 
 void TestQCPBars::plotWidthBarsNeverReRecord()
