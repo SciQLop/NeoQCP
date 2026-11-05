@@ -2,9 +2,7 @@
 
 #include "../plottables/plottable-draw-utils.h"
 #include "painter.h"
-#include "plottable-rhi-layer.h"
 
-#include <QDebug>
 #include <QPainter>
 
 #include <algorithm>
@@ -14,64 +12,59 @@ namespace qcp
 {
 namespace
 {
-std::vector<QPointF> resolved(std::span<const QCP::Position> positions, const QCPDrawFrame& frame)
-{
-    std::vector<QPointF> points(positions.size());
-    for (std::size_t i = 0; i < positions.size(); ++i)
-        points[i] = qcpResolvePosition(frame, positions[i]);
-    return points;
-}
+    //! \a positions through \a frame: pixels.
+    std::vector<QPointF> positionPixels(std::span<const QCP::Position> positions,
+                                        const QCPDrawFrame& frame)
+    {
+        std::vector<QPointF> pixels;
+        qcpResolveInto(positions, frame, pixels);
+        return pixels;
+    }
 
-QPolygonF polygonOf(std::span<const QPointF> points)
-{
-    QPolygonF polygon;
-    polygon.reserve(int(points.size()));
-    for (const QPointF& point : points)
-        polygon << point;
-    return polygon;
-}
+    //! Data-space series are positions like any other: they go through the frame's transform.
+    std::vector<QPointF> dataPixels(const std::vector<QPointF>& data, const QCPDrawFrame& frame)
+    {
+        std::vector<QPointF> pixels(data.size());
+        frame.transform.map(std::span<const QPointF>(data), std::span<QPointF>(pixels));
+        return pixels;
+    }
 
-// Data-space series are positions like any other: they go through the frame's transform.
-QPolygonF polygonOfData(const std::vector<QPointF>& data, const QCPDrawFrame& frame)
-{
-    QPolygonF polygon;
-    polygon.reserve(int(data.size()));
-    for (const QPointF& point : data)
-        polygon << qcpResolvePosition(frame, QCP::Data { point.x(), point.y() });
-    return polygon;
-}
+    QPolygonF polygonOf(std::span<const QPointF> points)
+    {
+        QPolygonF polygon;
+        qcpPolygonOf(points, polygon);
+        return polygon;
+    }
 
-QPolygonF polylineOfPositions(std::span<const QCP::Position> positions, const QCPDrawFrame& frame)
-{
-    QPolygonF polygon;
-    polygon.reserve(int(positions.size()));
-    for (const QCP::Position& position : positions)
-        polygon << qcpResolvePosition(frame, position);
-    return polygon;
-}
+    // The raster must keep the stroke's outer half and its antialiasing; the fill alone needs one
+    // pixel.
+    double marginOf(const QPen& pen, double dpr, bool withStroke)
+    {
+        if (!withStroke || pen.style() == Qt::NoPen)
+            return 1.0;
+        return double(qcp::extrusionPenWidth(pen, dpr)) / 2.0 + 1.0;
+    }
 
-// The raster must keep the stroke's outer half and its antialiasing; the fill alone needs one
-// pixel.
-double marginOf(const QPen& pen, double dpr, bool withStroke)
-{
-    if (!withStroke || pen.style() == Qt::NoPen)
-        return 1.0;
-    return double(qcp::extrusionPenWidth(pen, dpr)) / 2.0 + 1.0;
-}
+    QPen penOf(const QCPDrawCommand& command)
+    {
+        return std::visit(
+            [](const auto& cmd)
+            {
+                using T = std::decay_t<decltype(cmd)>;
+                if constexpr (requires { cmd.pen; })
+                    return cmd.pen;
+                else
+                    return QPen(Qt::NoPen);
+            },
+            command);
+    }
 
-QPen penOf(const QCPDrawCommand& command)
-{
-    return std::visit(
-        [](const auto& cmd)
-        {
-            using T = std::decay_t<decltype(cmd)>;
-            if constexpr (requires { cmd.pen; })
-                return cmd.pen;
-            else
-                return QPen(Qt::NoPen);
-        },
-        command);
-}
+    //! A brush that paints nothing: no brush at all, or a solid one whose colour is transparent.
+    bool brushPaintsNothing(const QBrush& brush)
+    {
+        return brush.style() == Qt::NoBrush
+            || (brush.style() == Qt::SolidPattern && brush.color().alpha() == 0);
+    }
 } // namespace
 
 bool strokeNeedsRaster(const QPen& pen)
@@ -91,12 +84,12 @@ bool fillNeedsRaster(const QCPDrawCommand& command)
         {
             using T = std::decay_t<decltype(cmd)>;
             if constexpr (std::is_same_v<T, PolygonCmd>)
-                return cmd.brush.style() != Qt::NoBrush;
+                return !brushPaintsNothing(cmd.brush);
             else if constexpr (std::is_same_v<T, FillBetweenCmd>)
-                return cmd.brush.style() != Qt::NoBrush
+                return !brushPaintsNothing(cmd.brush)
                     && (!gpuCanFill(cmd.brush) || cmd.upper->size() != cmd.lower->size());
             else if constexpr (std::is_same_v<T, RectCmd> || std::is_same_v<T, EllipseCmd>)
-                return cmd.brush.style() != Qt::NoBrush && !gpuCanFill(cmd.brush);
+                return !brushPaintsNothing(cmd.brush) && !gpuCanFill(cmd.brush);
             else
                 return false;
         },
@@ -108,8 +101,8 @@ bool needsRaster(const QCPDrawCommand& command)
     return fillNeedsRaster(command) || strokeNeedsRaster(penOf(command));
 }
 
-QRectF fallbackPixelBounds(const QCPDrawCommand& command, const QCPDrawFrame& frame,
-                                double dpr, bool withStroke)
+QRectF fallbackPixelBounds(const QCPDrawCommand& command, const QCPDrawFrame& frame, double dpr,
+                           bool withStroke)
 {
     QRectF box;
     QPen pen = Qt::NoPen;
@@ -119,13 +112,13 @@ QRectF fallbackPixelBounds(const QCPDrawCommand& command, const QCPDrawFrame& fr
             using T = std::decay_t<decltype(cmd)>;
             if constexpr (std::is_same_v<T, PolygonCmd>)
             {
-                box = polygonOf(resolved(cmd.points, frame)).boundingRect();
+                box = polygonOf(positionPixels(cmd.points, frame)).boundingRect();
                 pen = cmd.pen;
             }
             else if constexpr (std::is_same_v<T, FillBetweenCmd>)
             {
-                box = polygonOfData(*cmd.upper, frame).boundingRect();
-                box = box.united(polygonOfData(*cmd.lower, frame).boundingRect());
+                box = polygonOf(dataPixels(*cmd.upper, frame)).boundingRect();
+                box = box.united(polygonOf(dataPixels(*cmd.lower, frame)).boundingRect());
             }
             else if constexpr (std::is_same_v<T, RectCmd> || std::is_same_v<T, EllipseCmd>)
             {
@@ -135,12 +128,12 @@ QRectF fallbackPixelBounds(const QCPDrawCommand& command, const QCPDrawFrame& fr
             }
             else if constexpr (std::is_same_v<T, PolylinePositionsCmd>)
             {
-                box = polylineOfPositions(cmd.points, frame).boundingRect();
+                box = polygonOf(positionPixels(cmd.points, frame)).boundingRect();
                 pen = cmd.pen;
             }
             else if constexpr (std::is_same_v<T, PolylineDataCmd>)
             {
-                box = polygonOfData(*cmd.points, frame).boundingRect();
+                box = polygonOf(dataPixels(*cmd.points, frame)).boundingRect();
                 pen = cmd.pen;
             }
         },
@@ -152,7 +145,7 @@ QRectF fallbackPixelBounds(const QCPDrawCommand& command, const QCPDrawFrame& fr
 }
 
 void paintFallback(QCPPainter& painter, const QCPDrawCommand& command, const QCPDrawFrame& frame,
-                        bool withStroke)
+                   bool withStroke)
 {
     std::visit(
         [&](const auto& cmd)
@@ -161,7 +154,7 @@ void paintFallback(QCPPainter& painter, const QCPDrawCommand& command, const QCP
             painter.setAntialiasing(true);
             if constexpr (std::is_same_v<T, PolygonCmd>)
             {
-                const QPolygonF polygon = polygonOf(resolved(cmd.points, frame));
+                const QPolygonF polygon = polygonOf(positionPixels(cmd.points, frame));
                 if (polygon.size() < 3)
                     return;
                 painter.setBrush(cmd.brush);
@@ -170,8 +163,8 @@ void paintFallback(QCPPainter& painter, const QCPDrawCommand& command, const QCP
             }
             else if constexpr (std::is_same_v<T, FillBetweenCmd>)
             {
-                QPolygonF polygon = polygonOfData(*cmd.upper, frame);
-                const QPolygonF lower = polygonOfData(*cmd.lower, frame);
+                QPolygonF polygon = polygonOf(dataPixels(*cmd.upper, frame));
+                const QPolygonF lower = polygonOf(dataPixels(*cmd.lower, frame));
                 for (auto it = lower.crbegin(); it != lower.crend(); ++it)
                     polygon << *it;
                 painter.setBrush(cmd.brush);
@@ -194,20 +187,20 @@ void paintFallback(QCPPainter& painter, const QCPDrawCommand& command, const QCP
             {
                 painter.setBrush(Qt::NoBrush);
                 painter.setPen(cmd.pen);
-                drawPolylineSplitNaN(&painter, polylineOfPositions(cmd.points, frame));
+                drawPolylineSplitNaN(&painter, positionPixels(cmd.points, frame));
             }
             else if constexpr (std::is_same_v<T, PolylineDataCmd>)
             {
                 painter.setBrush(Qt::NoBrush);
                 painter.setPen(cmd.pen);
-                drawPolylineSplitNaN(&painter, polygonOfData(*cmd.points, frame));
+                drawPolylineSplitNaN(&painter, dataPixels(*cmd.points, frame));
             }
         },
         command);
 }
 
 QImage rasterizeFallback(const QCPDrawCommand& command, const QRectF& bounds,
-                              const QCPDrawFrame& frame, double dpr, bool withStroke)
+                         const QCPDrawFrame& frame, double dpr, bool withStroke)
 {
     const QSize device(int(std::ceil(bounds.width() * dpr)), int(std::ceil(bounds.height() * dpr)));
     if (device.isEmpty())
@@ -237,16 +230,15 @@ void QCPRasterFallback::beginReplay()
     }
 }
 
-const QImage& QCPRasterFallback::image(const QCPDrawCommand& command, const QCPDrawFrame& frame,
-                                       const QRectF& bounds, double dpr, quint64 generation,
-                                       bool& fresh)
+const QImage& QCPRasterFallback::image(quint64 list, quint64 index, const QCPDrawCommand& command,
+                                       const QCPDrawFrame& frame, const QRectF& bounds, double dpr,
+                                       quint64 generation, bool& fresh)
 {
-    const quintptr key = reinterpret_cast<quintptr>(&command);
-    const QSize size(int(std::ceil(bounds.width() * dpr)), int(std::ceil(bounds.height() * dpr)));
     for (Entry& entry : mEntries)
     {
-        if (entry.used || entry.command != key || entry.generation != generation || entry.dpr != dpr
-            || entry.size != size)
+        if (entry.used || entry.list != list || entry.index != index
+            || entry.generation != generation || entry.dpr != dpr || entry.bounds != bounds
+            || !(entry.transform == frame.transform))
             continue;
         entry.used = true;
         fresh = false;
@@ -254,30 +246,26 @@ const QImage& QCPRasterFallback::image(const QCPDrawCommand& command, const QCPD
     }
 
     Entry& entry = mEntries.emplace_back();
-    entry.command = key;
+    entry.list = list;
+    entry.index = index;
     entry.generation = generation;
+    entry.transform = frame.transform;
+    entry.bounds = bounds;
     entry.dpr = dpr;
-    entry.size = size;
     entry.used = true;
     entry.image = rasterizeFallback(command, bounds, frame, dpr, strokeNeedsRaster(penOf(command)));
     fresh = true;
     return entry.image;
 }
 
-void QCPRasterFallback::painterHandles(const QCPDrawCommand& command)
+void QCPRasterFallback::painterHandles(quint64 list, quint64 index)
 {
-    mPainterHandled.insert(reinterpret_cast<quintptr>(&command));
-    if (!mWarned)
-    {
-        mWarned = true;
-        qWarning() << "NeoQCP: more than" << QCPPlottableRhiLayer::kMaxImages
-                   << "rasterised styles in one layer, the rest is painted by QPainter";
-    }
+    mPainterHandled.insert({ list, index });
 }
 
-bool QCPRasterFallback::painterHandled(const QCPDrawCommand& command) const
+bool QCPRasterFallback::painterHandled(quint64 list, quint64 index) const
 {
-    return mPainterHandled.contains(reinterpret_cast<quintptr>(&command));
+    return mPainterHandled.contains({ list, index });
 }
 
 void QCPRasterFallback::clear()

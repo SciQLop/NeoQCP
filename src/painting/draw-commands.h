@@ -13,8 +13,10 @@
 #include <QPainterPath>
 #include <QPen>
 #include <QPointF>
+#include <QPolygonF>
 #include <QString>
 #include <algorithm>
+#include <atomic>
 
 #include <functional>
 #include <limits>
@@ -127,6 +129,13 @@ using QCPDrawCommand
                    EllipseCmd, MarkersCmd, ErrorBarsCmd, TextCmd, PathCmd, ImageCmd, PainterCmd>;
 } // namespace qcp
 
+//! A new identity per recording; copies and re-records take a fresh one.
+inline quint64 qcpNextDrawListId()
+{
+    static std::atomic<quint64> next { 1 };
+    return next.fetch_add(1, std::memory_order_relaxed);
+}
+
 /*!
   \brief What a QCPDrawContext recorded: the commands in draw order and their data box.
 
@@ -141,6 +150,21 @@ using QCPDrawCommand
 */
 struct QCP_LIB_DECL QCPDrawList
 {
+    QCPDrawList() = default;
+
+    //! A copy is a new recording: it can never be matched by an image of the one it came from.
+    QCPDrawList(const QCPDrawList& other) { *this = other; }
+
+    QCPDrawList& operator=(const QCPDrawList& other)
+    {
+        commands = other.commands;
+        bounds = other.bounds;
+        keyBounded = other.keyBounded;
+        valueBounded = other.valueBounded;
+        id = qcpNextDrawListId();
+        return *this;
+    }
+
     std::vector<qcp::QCPDrawCommand> commands;
     QCPDataBox bounds { -std::numeric_limits<double>::infinity(),
                         std::numeric_limits<double>::infinity(),
@@ -148,10 +172,42 @@ struct QCP_LIB_DECL QCPDrawList
                         std::numeric_limits<double>::infinity() };
     bool keyBounded = false;
     bool valueBounded = false;
+    quint64 id = qcpNextDrawListId(); //!< unique: with a command's index it is a cache key
 };
 
 //! The one place a QCP::Position becomes pixels: every command and every caller goes through it.
 [[nodiscard]] QPointF qcpResolvePosition(const QCPDrawFrame& frame, const QCP::Position& position);
+
+//! \a positions mapped through \a frame into \a out, in pixels.
+inline void qcpResolveInto(std::span<const QCP::Position> positions, const QCPDrawFrame& frame,
+                           std::vector<QPointF>& out)
+{
+    out.resize(positions.size());
+    for (std::size_t i = 0; i < positions.size(); ++i)
+        out[i] = qcpResolvePosition(frame, positions[i]);
+}
+
+//! \a points as a polygon in \a out: no allocation once its storage has grown.
+inline void qcpPolygonOf(std::span<const QPointF> points, QPolygonF& out)
+{
+    out.resize(int(points.size()));
+    std::copy(points.begin(), points.end(), out.begin());
+}
+
+//! \a open with its first point appended: what a closed stroke extrudes.
+inline std::vector<QPointF> qcpRingOf(std::span<const QPointF> open)
+{
+    std::vector<QPointF> ring(open.begin(), open.end());
+    if (!ring.empty())
+        ring.push_back(ring.front());
+    return ring;
+}
+
+//! \a command's place in \a list: with the list's id it names the command across replays.
+inline quint64 qcpCommandIndex(const QCPDrawList& list, const qcp::QCPDrawCommand& command)
+{
+    return quint64(&command - list.commands.data());
+}
 
 //! Draws \a list into \a painter through \a frame: the QPainter path (screen fallback and export).
 //! What a replay is for: All paints everything (an export has no GPU pass), PainterOnly is the

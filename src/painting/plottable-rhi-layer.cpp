@@ -307,7 +307,7 @@ bool QCPPlottableRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc, int 
 void QCPPlottableRhiLayer::createImagePipeline(QRhiRenderPassDescriptor* rpDesc, int sampleCount)
 {
     // Remembered even when this fails, like the dashed pipeline: ensurePipeline must not rebuild
-    // all three every frame; fills then fall back to the layer's painter through imagesAvailable().
+    // all three every frame; fills then fall back to the layer's painter through canAddImage().
     mLastImageSampleCount = sampleCount;
     mImageBroken = true;
 
@@ -530,50 +530,55 @@ void QCPPlottableRhiLayer::uploadResources(QRhiResourceUpdateBatch* updates,
 void QCPPlottableRhiLayer::uploadImages(QRhiResourceUpdateBatch* updates, const QSize& outputSize,
                                         float dpr, float yFlip)
 {
-    if (mImageEntries.isEmpty() || !mImageUniformBuffer)
+    // Not gated on mImageEntries: the sweep below must run on the frame that draws the last image
+    // away, or its texture stays on the GPU for the rest of the plot's life.
+    if (!mImageUniformBuffer)
         return;
 
-    if (!mImageQuadUploaded && mImageVertexBuffer)
+    if (!mImageEntries.isEmpty())
     {
-        // Unit quad: [0,1] positions with matching texcoords, stretched onto the entry's pixel
-        // rect.
-        static const float quad[16] = { 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1 };
-        updates->uploadStaticBuffer(mImageVertexBuffer, quad);
-        mImageQuadUploaded = true;
-    }
+        if (!mImageQuadUploaded && mImageVertexBuffer)
+        {
+            // Unit quad: [0,1] positions with matching texcoords, stretched onto the entry's pixel
+            // rect.
+            static const float quad[16] = { 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1 };
+            updates->uploadStaticBuffer(mImageVertexBuffer, quad);
+            mImageQuadUploaded = true;
+        }
 
-    const int stride = imageUbufStride();
-    for (int i = 0; i < mImageEntries.size(); ++i)
-    {
-        const ImageEntry& entry = mImageEntries[i];
-        const float dx = entry.offsetX * dpr;
-        const float dy = entry.offsetY * dpr;
-        const ImageUniforms params = { float(entry.pixelRect.left()) + dx,
-                                       float(entry.pixelRect.top()) + dy,
-                                       float(entry.pixelRect.right()) + dx,
-                                       float(entry.pixelRect.bottom()) + dy,
-                                       float(outputSize.width()),
-                                       float(outputSize.height()),
-                                       yFlip,
-                                       entry.alpha };
-        updates->updateDynamicBuffer(mImageUniformBuffer, i * stride, sizeof(params), &params);
+        const int stride = imageUbufStride();
+        for (int i = 0; i < mImageEntries.size(); ++i)
+        {
+            const ImageEntry& entry = mImageEntries[i];
+            const float dx = entry.offsetX * dpr;
+            const float dy = entry.offsetY * dpr;
+            const ImageUniforms params = { float(entry.pixelRect.left()) + dx,
+                                           float(entry.pixelRect.top()) + dy,
+                                           float(entry.pixelRect.right()) + dx,
+                                           float(entry.pixelRect.bottom()) + dy,
+                                           float(outputSize.width()),
+                                           float(outputSize.height()),
+                                           yFlip,
+                                           entry.alpha };
+            updates->updateDynamicBuffer(mImageUniformBuffer, i * stride, sizeof(params), &params);
 
-        ImageTexture* texture = mImageTextures.value(entry.imageKey, nullptr);
-        if (!texture)
-            continue;
-        texture->used = true;
-        if (!ensureImageTexture(*texture, entry.deviceSize))
-            continue;
-        if (texture->pending.isNull())
-            continue; // an unchanged replay after a pan: the texture is already on the GPU
-        updates->uploadTexture(
-            texture->texture,
-            QRhiTextureUploadDescription(QRhiTextureUploadEntry(
-                0, 0,
-                QRhiTextureSubresourceUploadDescription(texture->pending.convertedTo(
-                    qcp::rhi::imageFormatFor(texture->texture->format()))))));
-        texture->pending = QImage();
-        ++mImageUploads;
+            ImageTexture* texture = mImageTextures.value(entry.imageKey, nullptr);
+            if (!texture)
+                continue;
+            texture->used = true;
+            if (!ensureImageTexture(*texture, entry.deviceSize))
+                continue;
+            if (texture->pending.isNull())
+                continue; // an unchanged replay after a pan: the texture is already on the GPU
+            updates->uploadTexture(
+                texture->texture,
+                QRhiTextureUploadDescription(QRhiTextureUploadEntry(
+                    0, 0,
+                    QRhiTextureSubresourceUploadDescription(texture->pending.convertedTo(
+                        qcp::rhi::imageFormatFor(texture->texture->format()))))));
+            texture->pending = QImage();
+            ++mImageUploads;
+        }
     }
 
     // Drop the textures no entry uses any more: the recording that drew them is gone.

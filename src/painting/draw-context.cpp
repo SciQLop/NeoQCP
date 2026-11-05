@@ -131,6 +131,7 @@ void record(QCPDrawList& list, qcp::QCPDrawCommand command, const Extent& extent
 {
     if (list.commands.empty())
     {
+        list.id = qcpNextDrawListId(); // a re-recorded list is a new recording
         list.keyBounded = extent.keyBounded;
         list.valueBounded = extent.valueBounded;
         list.bounds = boxOf(extent);
@@ -199,11 +200,11 @@ QPointF qcpResolvePosition(const QCPDrawFrame& frame, const QCP::Position& posit
 
 QCPDrawContext::QCPDrawContext(const QCPAxis* keyAxis, const QCPAxis* valueAxis,
                                const QCPAxisRect* axisRect, const QCPTheme* theme)
-    : mList(std::make_unique<QCPDrawList>())
-    , mTransform(keyAxis, valueAxis)
-    , mRatio(axisRect)
-    , mClip(axisRect ? QRectF(axisRect->rect()) : QRectF())
-    , mTheme(theme)
+        : mList(std::make_unique<QCPDrawList>())
+        , mTransform(keyAxis, valueAxis)
+        , mRatio(axisRect)
+        , mClip(axisRect ? QRectF(axisRect->rect()) : QRectF())
+        , mTheme(theme)
 {
 }
 
@@ -229,8 +230,10 @@ void QCPDrawContext::polyline(std::shared_ptr<const std::vector<QPointF>> data, 
 void QCPDrawContext::polyline(std::span<const QCP::Position> points, const QPen& pen)
 {
     const Extent extent = extentOf(points);
-    record(*mList, qcp::PolylinePositionsCmd { std::vector<QCP::Position>(points.begin(), points.end()), pen },
-           extent);
+    record(
+        *mList,
+        qcp::PolylinePositionsCmd { std::vector<QCP::Position>(points.begin(), points.end()), pen },
+        extent);
 }
 
 void QCPDrawContext::polygon(std::span<const QCP::Position> points, const QPen& pen,

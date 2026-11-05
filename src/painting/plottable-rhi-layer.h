@@ -89,7 +89,8 @@ public:
         int index;
     };
 
-    //! At most this many rasterised fills per layer per frame; the rest go to the layer's painter.
+    //! At most this many rasterised fills per layer per frame; the rest is painted by QPainter,
+    //! under this layer's GPU content.
     static constexpr int kMaxImages = 4;
 
     // Offset-only update (no geometry change, no vertex re-upload)
@@ -125,13 +126,25 @@ public:
     const QVector<DashedEntry>& dashedDrawEntries() const { return mDashEntries; }
 
     //! False once the image pipeline failed to build: a rasterised fill must be painted instead.
-    bool imagesAvailable() const { return !mImageBroken; }
+    //! Every image goes through this one predicate, which also carries the per-frame cap.
+    bool canAddImage() const { return !mImageBroken && mImageEntries.size() < kMaxImages; }
 
-    //! Whether the layer can take one more rasterised fill this frame.
-    bool canAddImage() const { return mImageEntries.size() < kMaxImages; }
+    //! True the first time: the cap warning is one per layer, for the plot's lifetime.
+    bool warnRasterCapOnce()
+    {
+        const bool first = !mRasterCapWarned;
+        mRasterCapWarned = true;
+        return first;
+    }
 
     //! Test hook: how many rasterised fills reached a texture.
     int imageUploads() const { return mImageUploads; }
+
+    //! Test hook: how many textures the layer keeps for the images it drew.
+    int imageTextureCount() const { return mImageTextures.size(); }
+
+    //! Test hook: pretend the image pipeline failed to build.
+    void breakImagePipelineForTest() { mImageBroken = true; }
 
     const QVector<ImageEntry>& imageDrawEntries() const { return mImageEntries; }
 
@@ -227,6 +240,7 @@ private:
     QRhiSampler* mImageSampler = nullptr;
     int mLastImageSampleCount = 0;
     bool mImageBroken = false;
+    bool mRasterCapWarned = false; //!< the raster cap warned once for this plot
     bool mImageQuadUploaded = false;
     int mImageUploads = 0;
 

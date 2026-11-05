@@ -2584,6 +2584,13 @@ QColor sampleAt(QCustomPlot* plot, const QImage& image, double x, double y)
                             int(plot->yAxis->coordToPixel(y) * dpr));
 }
 
+// The colour at widget pixel (\a x, \a y) in \a image, whatever the ranges are now.
+QColor pixelAt(QCustomPlot* plot, const QImage& image, int x, int y)
+{
+    const double dpr = plot->bufferDevicePixelRatio();
+    return image.pixelColor(int(x * dpr), int(y * dpr));
+}
+
 QImage flatTexture(const QColor& colour)
 {
     QImage texture(4, 4, QImage::Format_ARGB32_Premultiplied);
@@ -2696,6 +2703,17 @@ QBrush gradientBrush()
     gradient.setCoordinateMode(QGradient::ObjectBoundingMode);
     gradient.setColorAt(0.0, QColor(220, 40, 40));
     gradient.setColorAt(1.0, QColor(40, 40, 220));
+    return QBrush(gradient);
+}
+
+// A brush the GPU cannot fill in one colour, painting flat: the style makes it a raster, the stops
+// decide what the pixels are.
+QBrush flatGradientBrush(const QColor& colour)
+{
+    QLinearGradient gradient(0, 0, 1, 0);
+    gradient.setCoordinateMode(QGradient::ObjectBoundingMode);
+    gradient.setColorAt(0.0, colour);
+    gradient.setColorAt(1.0, colour);
     return QBrush(gradient);
 }
 } // namespace
@@ -2838,8 +2856,8 @@ void TestRepaint::rasterFallbackIsCapped()
     replayWith(many, cache, fallback);
     QCOMPARE(int(layer->imageDrawEntries().size()), 4);
     int painterDrawn = 0;
-    for (const qcp::QCPDrawCommand& command : many.drawList().commands)
-        if (fallback.painterHandled(command))
+    for (std::size_t i = 0; i < many.drawList().commands.size(); ++i)
+        if (fallback.painterHandled(many.drawList().id, quint64(i)))
             ++painterDrawn;
     QCOMPARE(painterDrawn, 2);
 
@@ -2855,14 +2873,13 @@ void TestRepaint::rasterFallbackIsCapped()
     // White is (255, 255, 255): anything darker is paint, at the box's place in the frame.
     const auto inked = [&](const QRectF& box)
     {
-        const QColor colour
-            = sampleAt(plot, painted, box.center().x(), box.center().y());
+        const QColor colour = sampleAt(plot, painted, box.center().x(), box.center().y());
         return colour.red() + colour.green() + colour.blue() < 720;
     };
     QVERIFY2(!inked(boxes[0]), "the painter painted an image the GPU already draws");
     QVERIFY2(inked(boxes[4]) && inked(boxes[5]), "the painter skipped the commands past the cap");
 
-    // One warning per plot: the next frame is silent.
+    // One warning per plot, not per fallback: the next frame gets a fresh fallback and is silent.
     static int warnings = 0;
     warnings = 0;
     const QtMessageHandler previous = qInstallMessageHandler(
@@ -2872,7 +2889,214 @@ void TestRepaint::rasterFallbackIsCapped()
                 ++warnings;
         });
     layer->clear();
-    replayWith(many, cache, fallback);
+    qcp::QCPRasterFallback fresh;
+    replayWith(many, cache, fresh);
     qInstallMessageHandler(previous);
     QCOMPARE(warnings, 0);
+}
+
+// A zoom changes the transform, not the recording: the image covers the viewport either way, but
+// its pixels are the fill of the new range.
+void TestRepaint::zoomedFallbackIsRepainted()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    usePixelRanges(plot);
+    auto* layer = plot->plottableRhiLayer(plot->currentLayer());
+    QVERIFY(layer);
+    QCPDrawContext recording(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+    // Far wider than the viewport: any range crops it to the same device rect.
+    recording.rect(QCP::Data { 0, 60 }, QCP::Data { 400, 240 }, QPen(Qt::NoPen), gradientBrush());
+
+    QCPResolveCache cache;
+    qcp::QCPRasterFallback fallback;
+    const auto replayThrough = [&](const QCPDrawFrame& frame)
+    {
+        layer->clear();
+        qcpReplayWithRhi(recording.drawList(), *layer, *plot->scatterRhiLayer(plot->currentLayer()),
+                         frame, cache, fallback, plot->bufferDevicePixelRatio(),
+                         plot->rhiOutputSize());
+        return pixelAt(plot, screenOf(plot), 100, 150);
+    };
+
+    const QColor wide = replayThrough(recording.frame());
+    QCOMPARE(fallback.rasterCount(), 1);
+
+    // Twice the resolution over the same pixels: the fill's gradient is squeezed, so the pixel's
+    // colour changes while the cropped bounds keep their rect.
+    plot->xAxis->setRange(0, 200);
+    plot->replot();
+    waitUntilSettled(*plot);
+    QCPDrawContext zoomed(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+    const QColor squeezed = replayThrough(zoomed.frame());
+    QCOMPARE(fallback.rasterCount(), 2);
+    QVERIFY2(squeezed != wide,
+             qPrintable(QStringLiteral("the zoom re-used the old bitmap: %1 then %2")
+                            .arg(wide.name(), squeezed.name())));
+}
+
+// A shape clipped by the viewport keeps the same image rect when the range moves: its pixels are
+// the only thing that says the image is stale.
+void TestRepaint::clippedFallbackFollowsTheShape()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    usePixelRanges(plot);
+    auto* layer = plot->plottableRhiLayer(plot->currentLayer());
+    QVERIFY(layer);
+    QCPDrawContext recording(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+    // A U wider than the viewport, with its concavity at widget x 150..250.
+    const std::vector<QCP::Position> points { QCP::Data { -200, 50 }, QCP::Data { 600, 50 },
+                                              QCP::Data { 600, 250 }, QCP::Data { 250, 250 },
+                                              QCP::Data { 250, 100 }, QCP::Data { 150, 100 },
+                                              QCP::Data { 150, 250 }, QCP::Data { -200, 250 } };
+    recording.polygon(points, QPen(Qt::NoPen), QBrush(QColor(20, 160, 80)));
+
+    QCPResolveCache cache;
+    qcp::QCPRasterFallback fallback;
+    const auto replayThrough = [&](const QCPDrawFrame& frame)
+    {
+        layer->clear();
+        qcpReplayWithRhi(recording.drawList(), *layer, *plot->scatterRhiLayer(plot->currentLayer()),
+                         frame, cache, fallback, plot->bufferDevicePixelRatio(),
+                         plot->rhiOutputSize());
+        return screenOf(plot);
+    };
+
+    const QColor before = pixelAt(plot, replayThrough(recording.frame()), 100, 150);
+    QVERIFY2(before.green() > 120 && before.red() < 90,
+             qPrintable(QStringLiteral("the fill is missing at pixel 100: %1").arg(before.name())));
+
+    // The same width, moved right: the shape slides 80 pixels left, so pixel 100 enters the
+    // concavity. The cropped image rect is unchanged.
+    plot->xAxis->setRange(80, 480);
+    plot->replot();
+    waitUntilSettled(*plot);
+    QCPDrawContext moved(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+    const QColor after = pixelAt(plot, replayThrough(moved.frame()), 100, 150);
+    QVERIFY2(fallback.rasterCount() == 2, "the moved range re-used the old bitmap");
+    QVERIFY2(
+        after.red() > 200 && after.green() > 200 && after.blue() > 200,
+        qPrintable(
+            QStringLiteral("pixel 100 left the shape but is still filled: %1").arg(after.name())));
+}
+
+// The command a recording destroyed had the address its successor now holds: the second image must
+// be its own, not the first's.
+void TestRepaint::twoRecordingsDoNotShareAnImage()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    usePixelRanges(plot);
+    auto* layer = plot->plottableRhiLayer(plot->currentLayer());
+    QVERIFY(layer);
+    QCPResolveCache cache;
+    qcp::QCPRasterFallback fallback;
+    // The context is created and destroyed inside the call: the next one gets its freed memory.
+    const auto replayInNewRecording = [&](const QColor& colour)
+    {
+        QCPDrawContext context(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+        context.rect(QCP::Data { 60, 60 }, QCP::Data { 340, 240 }, QPen(Qt::NoPen),
+                     flatGradientBrush(colour));
+        layer->clear();
+        qcpReplayWithRhi(context.drawList(), *layer, *plot->scatterRhiLayer(plot->currentLayer()),
+                         context.frame(), cache, fallback, plot->bufferDevicePixelRatio(),
+                         plot->rhiOutputSize());
+        return pixelAt(plot, screenOf(plot), 200, 150);
+    };
+
+    const QColor first = replayInNewRecording(Qt::red);
+    QCOMPARE(fallback.rasterCount(), 1);
+    QVERIFY2(first.red() > 180 && first.green() < 80,
+             qPrintable(QStringLiteral("the first recording is not red: %1").arg(first.name())));
+
+    const QColor second = replayInNewRecording(Qt::green);
+    QCOMPARE(fallback.rasterCount(), 2);
+    QVERIFY2(second.green() > 120 && second.red() < 80,
+             qPrintable(QStringLiteral("the second recording shows the first one's image: %1")
+                            .arg(second.name())));
+}
+
+// A layer whose image pipeline failed to build cannot take one more image: the one predicate the
+// replay asks must say so, and the painter pass paints the command.
+void TestRepaint::brokenImagePipelineFallsBackToThePainter()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    usePixelRanges(plot);
+    auto* layer = plot->plottableRhiLayer(plot->currentLayer());
+    QVERIFY(layer);
+    QCPDrawContext context(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+    context.rect(QCP::Data { 60, 60 }, QCP::Data { 340, 240 }, QPen(Qt::NoPen), gradientBrush());
+
+    layer->clear();
+    layer->breakImagePipelineForTest();
+    QVERIFY2(!layer->canAddImage(), "a broken image pipeline still takes an image");
+
+    QCPResolveCache cache;
+    qcp::QCPRasterFallback fallback;
+    qcpReplayWithRhi(context.drawList(), *layer, *plot->scatterRhiLayer(plot->currentLayer()),
+                     context.frame(), cache, fallback, plot->bufferDevicePixelRatio(),
+                     plot->rhiOutputSize());
+    QVERIFY2(layer->imageDrawEntries().isEmpty(), "the layer took an image it cannot draw");
+    QVERIFY2(fallback.painterHandled(context.drawList().id, 0),
+             "the painter did not get the command the layer refused");
+
+    QImage painted(plot->rhiOutputSize(), QImage::Format_ARGB32_Premultiplied);
+    painted.fill(Qt::white);
+    {
+        QCPPainter painter(&painted);
+        qcpReplayWithPainter(context.drawList(), painter, context.frame(),
+                             QCPReplayKinds::PainterOnly, &fallback);
+    }
+    const QColor colour = pixelAt(plot, painted, 200, 150);
+    QVERIFY2(
+        colour.red() + colour.green() + colour.blue() < 720,
+        qPrintable(
+            QStringLiteral("the painter pass skipped the refused command: %1").arg(colour.name())));
+}
+
+// The image left the layer: its texture must not sit on the GPU for the rest of the plot's life,
+// and the frame that draws no image at all is the one that has to notice.
+void TestRepaint::unusedFallbackTexturesAreReleased()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    usePixelRanges(plot);
+    auto* layer = plot->plottableRhiLayer(plot->currentLayer());
+    QVERIFY(layer);
+    QCPDrawContext withImage(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+    withImage.rect(QCP::Data { 60, 60 }, QCP::Data { 340, 240 }, QPen(Qt::NoPen), gradientBrush());
+    const auto line = std::make_shared<const std::vector<QPointF>>(
+        std::vector<QPointF> { { 60, 150 }, { 340, 150 } });
+    QCPDrawContext withoutImage(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+    withoutImage.polyline(line, QPen(Qt::blue, 4));
+
+    QCPResolveCache cache;
+    qcp::QCPRasterFallback fallback;
+    const auto replay = [&](const QCPDrawContext& context)
+    {
+        layer->clear();
+        qcpReplayWithRhi(context.drawList(), *layer, *plot->scatterRhiLayer(plot->currentLayer()),
+                         context.frame(), cache, fallback, plot->bufferDevicePixelRatio(),
+                         plot->rhiOutputSize());
+        return screenOf(plot);
+    };
+
+    QVERIFY(!replay(withImage).isNull());
+    QCOMPARE(layer->imageTextureCount(), 1);
+
+    // A frame with no image at all: the sweep is not behind the image path.
+    QVERIFY(!replay(withoutImage).isNull());
+    QCOMPARE(layer->imageTextureCount(), 0);
 }

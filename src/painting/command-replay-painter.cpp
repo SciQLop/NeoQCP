@@ -35,22 +35,6 @@ QPointF dataPixel(const QCPDrawFrame& frame, const QPointF& point)
     return QPointF(pixels.x, pixels.y);
 }
 
-void resolveInto(const QCPDrawFrame& frame, const std::vector<QCP::Position>& positions,
-                 std::vector<QPointF>& pixels)
-{
-    pixels.resize(positions.size());
-    for (std::size_t i = 0; i < positions.size(); ++i)
-        pixels[i] = qcpResolvePosition(frame, positions[i]);
-}
-
-QPolygonF& polygonOf(const std::vector<QPointF>& pixels)
-{
-    QPolygonF& polygon = scratch().polygon;
-    polygon.resize(int(pixels.size()));
-    std::copy(pixels.begin(), pixels.end(), polygon.begin());
-    return polygon;
-}
-
 void replayText(const qcp::TextCmd& cmd, QCPPainter& painter, const QCPDrawFrame& frame)
 {
     const QCPTextStyle& style = *cmd.style;
@@ -117,6 +101,9 @@ bool isGpuKind(const qcp::QCPDrawCommand& command)
 void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QCPDrawFrame& frame,
                           QCPReplayKinds kinds, const qcp::QCPRasterFallback* fallback)
 {
+    // PainterOnly leaves the GPU kinds to the RHI replay: without the fallback it cannot know
+    // which of them the layer refused, so it would silently drop them.
+    Q_ASSERT(kinds == QCPReplayKinds::All || fallback);
     painter.save();
     if (!frame.clip.isEmpty())
         painter.setClipRect(frame.clip);
@@ -127,7 +114,7 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
         {
             // The layer could not take this command's image: paint it here, in the buffer the GPU
             // geometry draws over. A stroke the GPU cannot express is part of it.
-            if (fallback && fallback->painterHandled(command))
+            if (fallback && fallback->painterHandled(list.id, qcpCommandIndex(list, command)))
                 qcp::paintFallback(painter, command, frame, qcp::strokeNeedsRaster(command));
             continue;
         }
@@ -145,16 +132,17 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
                 }
                 else if constexpr (std::is_same_v<Command, qcp::PolylinePositionsCmd>)
                 {
-                    resolveInto(frame, cmd.points, local.pixels);
+                    qcpResolveInto(cmd.points, frame, local.pixels);
                     painter.setPen(cmd.pen);
                     qcp::drawPolylineSplitNaN(&painter, std::span<const QPointF>(local.pixels));
                 }
                 else if constexpr (std::is_same_v<Command, qcp::PolygonCmd>)
                 {
-                    resolveInto(frame, cmd.points, local.pixels);
+                    qcpResolveInto(cmd.points, frame, local.pixels);
                     painter.setPen(cmd.pen);
                     painter.setBrush(cmd.brush);
-                    painter.drawPolygon(polygonOf(local.pixels));
+                    qcpPolygonOf(local.pixels, local.polygon);
+                    painter.drawPolygon(local.polygon);
                 }
                 else if constexpr (std::is_same_v<Command, qcp::FillBetweenCmd>)
                 {
@@ -169,7 +157,8 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
                                         std::span<QPointF>(local.pixels));
                     painter.setPen(Qt::NoPen);
                     painter.setBrush(cmd.brush);
-                    painter.drawPolygon(polygonOf(local.pixels));
+                    qcpPolygonOf(local.pixels, local.polygon);
+                    painter.drawPolygon(local.polygon);
                 }
                 else if constexpr (std::is_same_v<Command, qcp::RectCmd>)
                 {

@@ -637,9 +637,15 @@ void TestDrawContext::mixedRecordingSplitsByKind()
         [&](QCPPainter& painter, const QCPTransform&)
         { qcpReplayWithPainter(context.drawList(), painter, frame, QCPReplayKinds::All); },
         context.transform());
+    // PainterOnly needs the fallback that says which GPU kinds the layer refused: an empty one
+    // means "none of them", so every GPU kind stays with the RHI pass.
+    const qcp::QCPRasterFallback nothingRefused;
     const QImage painterOnly = painted(
         [&](QCPPainter& painter, const QCPTransform&)
-        { qcpReplayWithPainter(context.drawList(), painter, frame, QCPReplayKinds::PainterOnly); },
+        {
+            qcpReplayWithPainter(context.drawList(), painter, frame, QCPReplayKinds::PainterOnly,
+                                 &nothingRefused);
+        },
         context.transform());
 
     const auto greenPixels = [](const QImage& image)
@@ -822,9 +828,24 @@ void TestDrawContext::nonSolidBrushIsNotFlattened()
     };
 
     // The image path owns the fill: the painter pass leaves it alone.
-    QCOMPARE(paintedCount(nullptr), 0);
+    qcp::QCPRasterFallback untouched;
+    QCOMPARE(paintedCount(&untouched), 0);
     // A full layer hands the command back to the painter, gradient intact.
     qcp::QCPRasterFallback fallback;
-    fallback.painterHandles(command);
+    fallback.painterHandles(context.drawList().id, 0);
     QVERIFY2(paintedCount(&fallback) > 50, "the gradient fill disappeared");
+}
+
+void TestDrawContext::transparentBrushNeedsNoRaster()
+{
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    context.rect(QCP::Data { 20, 20 }, QCP::Data { 120, 100 }, QPen(Qt::NoPen),
+                 QBrush(QColor(255, 0, 0, 0)));
+    const qcp::QCPDrawCommand& command = context.drawList().commands.front();
+    QVERIFY2(std::holds_alternative<qcp::RectCmd>(command),
+             "the recording dropped the command instead of recording it");
+    QVERIFY2(!qcp::fillNeedsRaster(command), "an invisible solid brush was rasterised");
+    QVERIFY2(!qcp::needsRaster(command), "an invisible fill needs no raster at all");
 }

@@ -82,6 +82,11 @@ private slots:
     void pannedFallbackDoesNotReupload();
     void gradientFillMatchesExport();
     void rasterFallbackIsCapped();
+    void zoomedFallbackIsRepainted();
+    void clippedFallbackFollowsTheShape();
+    void twoRecordingsDoNotShareAnImage();
+    void brokenImagePipelineFallsBackToThePainter();
+    void unusedFallbackTexturesAreReleased();
 
 private:
     // What the plot shows: its paint buffers composed, or the framebuffer under RHI.

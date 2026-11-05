@@ -7,6 +7,7 @@
 #include "draw-commands.h"
 
 #include <QImage>
+#include <QPair>
 #include <QRectF>
 #include <QSet>
 #include <deque>
@@ -54,13 +55,19 @@ public:
     //! uses. Images it kept are re-used.
     void beginReplay();
 
-    //! The raster of \a command over \a bounds, at \a dpr; \a fresh is set when it was painted now.
-    const QImage& image(const QCPDrawCommand& command, const QCPDrawFrame& frame,
-                        const QRectF& bounds, double dpr, quint64 generation, bool& fresh);
+    /*!
+      The raster of command \a index of recording \a list, over \a bounds, at \a dpr; \a fresh is
+      set when it was painted now. The key is the command's place in its recording, the generation,
+      the frame's transform and the clipped bounds: a zoom or a moved view repaints, a pan with the
+      same transform hits.
+    */
+    const QImage& image(quint64 list, quint64 index, const QCPDrawCommand& command,
+                        const QCPDrawFrame& frame, const QRectF& bounds, double dpr,
+                        quint64 generation, bool& fresh);
 
-    //! The layer is full: the painter pass draws \a command instead. Warns once.
-    void painterHandles(const QCPDrawCommand& command);
-    bool painterHandled(const QCPDrawCommand& command) const;
+    //! The layer is full: the painter pass draws command \a index of \a list instead.
+    void painterHandles(quint64 list, quint64 index);
+    bool painterHandled(quint64 list, quint64 index) const;
 
     int rasterCount() const { return int(mEntries.size()); }
 
@@ -69,16 +76,17 @@ public:
 private:
     struct Entry
     {
-        quintptr command = 0; //!< &command of the recording: a recording keeps its addresses
+        quint64 list = 0; //!< QCPDrawList::id of the recording
+        quint64 index = 0; //!< the command's place in it
         quint64 generation = 0;
-        QSize size; //!< device pixels
+        QCPTransform transform; //!< the frame's mapping the image was painted with
+        QRectF bounds; //!< the clipped pixel rect it covers
         qreal dpr = 1.0;
         bool used = false;
         QImage image;
     };
 
     std::deque<Entry> mEntries;
-    QSet<quintptr> mPainterHandled;
-    bool mWarned = false;
+    QSet<QPair<quint64, quint64>> mPainterHandled;
 };
 } // namespace qcp

@@ -31,6 +31,7 @@ private slots:
     void emptyCustomDashIsSolid();
     void closedRingJoinsTheSeam();
     void nonSolidBrushIsNotFlattened();
+    void transparentBrushNeedsNoRaster();
     void errorBarsMapTheirSpansAsExtents();
     void ellipseFanFillCoversTheDisc();
     void mixedRecordingSplitsByKind();
