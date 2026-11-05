@@ -29,7 +29,8 @@ with a label. It is a complete plot type in 73 lines that only uses public heade
 
 ````{literalinclude} ../examples/custom-drawable/rangeband.h
 :language: cpp
-:lines: 58-66
+:start-at: context.fillBetween
+:end-at: context.text(
 ````
 
 - `fillBetween` takes the upper series forward and the lower series backward, and fills between them.
@@ -68,21 +69,25 @@ A setter stores the value and calls `contentChanged()`:
 
 ````{literalinclude} ../examples/custom-drawable/rangeband.h
 :language: cpp
-:lines: 25-32
+:start-at: void setData
+:end-before: void setBrush
 ````
 
-`contentChanged()` starts a new generation and marks the object dirty, which schedules the repaint
-(milestone 2's setter rule: return early on an equal value, mark, then store). The recording is keyed
-on the generation and on the plot's view epoch; the epoch changes with the viewport size, the device
-pixel ratio and the theme, and neither a pan nor a zoom changes it. That is the whole cache policy:
+`contentChanged()` starts a new generation and marks the object dirty, which schedules the repaint.
+It is the same call as `markDirty()`, which the classic bases already make from their setters
+(`setPen`, `setSelected`, ...), so those keep working without a change.
 
-- a setter, a theme change, a resize or a device-pixel-ratio change re-records;
-- a pan replays the recording with a translation offset, and the GPU keeps the geometry it already
-  built;
-- a zoom replays the recording too, unless the recording read `transform()`.
+The plot records again only when it must:
 
-`markDirty()` from a setter is the same door; `contentChanged()` is the one to use, because it also
-starts the new generation.
+- after a setter, always;
+- after a resize, a device-pixel-ratio change or a theme change, only when the recording holds text,
+  a path, an image or `painter()` code, or when `draw()` read the theme: those are measured or
+  rasterised in pixels;
+- after a zoom, only when `draw()` read `transform()`;
+- every frame, only when `draw()` called `recordEveryFrame()`.
+
+A pan never records again. It replays the recording with a translation offset, and the GPU keeps
+the geometry it already built.
 
 ## Ranges, hit tests and the legend icon
 
