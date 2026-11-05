@@ -38,10 +38,30 @@ QCPTransform::QCPTransform(const QCPAxis* keyAxis, const QCPAxis* valueAxis)
     mValue.prepare();
 }
 
+namespace
+{
+//! A flat or single-point recording has no extent on one side: give it a small one, so it can be
+//! fitted to an icon instead of producing an invalid transform and an empty legend.
+void widenDegenerateSide(double& lower, double& upper, double otherSpan)
+{
+    if (lower < upper || !std::isfinite(lower) || !std::isfinite(upper))
+        return;
+    const double half = std::isfinite(otherSpan) && otherSpan > 0 ? 0.01 * otherSpan : 0.5;
+    const double centre = lower;
+    lower = centre - half;
+    upper = centre + half;
+}
+} // namespace
+
 QCPTransform QCPTransform::fitted(const QCPDataBox& box, const QRectF& rect)
 {
     QCPTransform transform;
-    if (!(box.keyLower < box.keyUpper) || !(box.valueLower < box.valueUpper) || rect.isEmpty())
+    if (rect.isEmpty())
+        return transform;
+    QCPDataBox widened = box;
+    widenDegenerateSide(widened.keyLower, widened.keyUpper, box.valueUpper - box.valueLower);
+    widenDegenerateSide(widened.valueLower, widened.valueUpper, box.keyUpper - box.keyLower);
+    if (!(widened.keyLower < widened.keyUpper) || !(widened.valueLower < widened.valueUpper))
         return transform;
     const auto fit
         = [](QCPTransform::Axis& axis, double lower, double upper, const QRectF& r, bool vertical)
@@ -58,8 +78,8 @@ QCPTransform QCPTransform::fitted(const QCPDataBox& box, const QRectF& rect)
         axis.length = vertical ? r.height() : r.width();
         axis.prepare();
     };
-    fit(transform.mKey, box.keyLower, box.keyUpper, rect, false);
-    fit(transform.mValue, box.valueLower, box.valueUpper, rect, true);
+    fit(transform.mKey, widened.keyLower, widened.keyUpper, rect, false);
+    fit(transform.mValue, widened.valueLower, widened.valueUpper, rect, true);
     return transform;
 }
 

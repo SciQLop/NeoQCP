@@ -643,6 +643,25 @@ void TestDrawable::defaultLegendIconIsTheRecordingFitted()
     QVERIFY(image.pixelColor(4, 4).lightness() > 240);
 }
 
+void TestDrawable::flatLineHasALegendIcon()
+{
+    // A horizontal line has no value extent: fitting it to the icon rect must widen that side, not
+    // reject the box and leave the icon blank.
+    Fixture f;
+    auto* line = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    line->mLine = std::make_shared<const std::vector<QPointF>>(
+        std::initializer_list<QPointF> { { 1, 3 }, { 9, 3 } });
+    const QRectF icon(0, 0, 100, 50);
+    QImage image(100, 50, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::white);
+    QCPPainter painter(&image);
+    line->paintIcon(&painter, icon);
+    painter.end();
+
+    QVERIFY2(image.pixelColor(50, 25).lightness() < 200,
+             qPrintable(QString("centre is %1").arg(image.pixelColor(50, 25).name())));
+}
+
 void TestDrawable::setPenReRecordsOnce()
 {
     Fixture f;

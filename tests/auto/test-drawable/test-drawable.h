@@ -29,6 +29,7 @@ private slots:
     void pixelAnchoredShapeIsHittable();
     void defaultDataRangeFollowsTheExtentRules();
     void defaultLegendIconIsTheRecordingFitted();
+    void flatLineHasALegendIcon();
     void panKeepsPixelAndRatioCornersInPlace();
     void setPenReRecordsOnce();
     void setCoordsMovesTheItem();
