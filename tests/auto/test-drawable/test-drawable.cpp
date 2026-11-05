@@ -259,11 +259,20 @@ public:
     }
 
     using QCPDrawn<QCPAbstractPlottable>::draw;
+    using QCPDrawn<QCPAbstractPlottable>::drawLegendIcon; // the painter overload stays reachable
 
     void draw(QCPDrawContext& context) const override
     {
         ++drawCalls;
         context.polyline(mLine, this->pen());
+    }
+
+    //! The icon is a recording too: one that reads the theme must not outlive the theme it read.
+    void drawLegendIcon(QCPDrawContext& context) const override
+    {
+        ++iconCalls;
+        const QColor colour = readsTheme ? context.theme().foreground() : this->pen().color();
+        context.polyline(mLine, QPen(colour, 4));
     }
 
     //! The adapter's old virtual, which the legend calls.
@@ -281,6 +290,8 @@ public:
 
 
     mutable int drawCalls = 0;
+    mutable int iconCalls = 0;
+    bool readsTheme = false;
     std::shared_ptr<const std::vector<QPointF>> mLine
         = std::make_shared<const std::vector<QPointF>>(
             std::initializer_list<QPointF> { { 1, 1 }, { 9, 9 } });
@@ -1007,6 +1018,32 @@ void TestDrawable::defaultLegendIconIsTheRecordingFitted()
     QVERIFY2(image.pixelColor(50, 25).lightness() < 200,
              qPrintable(QString("centre is %1").arg(image.pixelColor(50, 25).name())));
     QVERIFY(image.pixelColor(4, 4).lightness() > 240);
+}
+
+void TestDrawable::legendIconFollowsTheTheme()
+{
+    Fixture f;
+    auto* line = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    line->readsTheme = true;
+    const QRectF icon(0, 0, 100, 50);
+    const auto ink = [&]
+    {
+        QImage image(100, 50, QImage::Format_ARGB32_Premultiplied);
+        image.fill(Qt::white);
+        QCPPainter painter(&image);
+        line->paintIcon(&painter, icon);
+        painter.end();
+        return image.pixelColor(50, 25);
+    };
+    const QColor before = ink();
+    QVERIFY2(before.lightness() < 200, qPrintable(before.name()));
+
+    // The icon read the theme, so a new one leaves it stale - like the drawing it stands for.
+    f.plot->theme()->setForeground(Qt::red);
+    f.plot->applyTheme();
+    const QColor after = ink();
+    QVERIFY2(after.red() > 150 && after.green() < 120 && after.blue() < 120,
+             qPrintable(QStringLiteral("the icon kept its old colour: %1").arg(after.name())));
 }
 
 void TestDrawable::flatLineHasALegendIcon()

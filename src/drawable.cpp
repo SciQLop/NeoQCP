@@ -244,6 +244,9 @@ struct QCPDrawnCore::State
     const void* recordedSource = nullptr;
     QCPTransform recordedTransform;
     quint64 iconGeneration = 0;
+    quint64 iconEpoch = 0;
+    quint64 iconDependency = 0;
+    const void* iconSource = nullptr;
     int recordings = 0;
     bool recorded = false;
     bool viewDependent = false;
@@ -609,7 +612,15 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
 void QCPDrawnCore::paintIcon(const QCPDrawable& object, QCPPainter& painter, const QRectF& rect,
                              const QCPDrawnView& view)
 {
-    if (mState->iconGeneration != mState->generation || !mState->iconRecorded)
+    const quint64 epoch = view.plot ? view.plot->viewEpoch() : 0;
+    const void* source = object.dataSource();
+    const quint64 dependency = object.dependencyRevision();
+    // The icon is a recording of its own, so it outlives a frame only when none of the facts it
+    // read changed: its generation, the data it reads, and the view epoch a theme reader needs.
+    const bool stale = !mState->iconRecorded || mState->iconGeneration != mState->generation
+        || mState->iconSource != source || mState->iconDependency != dependency
+        || (mState->icon.viewDependent && mState->iconEpoch != epoch);
+    if (stale)
     {
         // An icon records through the same door, into a list of its own: the axes only feed the
         // context's unused frame, so an object outside a plot still gets its icon.
@@ -618,6 +629,9 @@ void QCPDrawnCore::paintIcon(const QCPDrawable& object, QCPPainter& painter, con
         object.drawLegendIcon(context);
         mState->icon = context.drawList();
         mState->iconGeneration = mState->generation;
+        mState->iconEpoch = epoch;
+        mState->iconSource = source;
+        mState->iconDependency = dependency;
         mState->iconRecorded = true;
     }
     if (!mState->icon.data.keyBounded || !mState->icon.data.valueBounded)

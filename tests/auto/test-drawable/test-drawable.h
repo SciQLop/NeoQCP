@@ -41,6 +41,7 @@ private slots:
     void defaultDataRangeFollowsTheExtentRules();
     void defaultLegendIconIsTheRecordingFitted();
     void flatLineHasALegendIcon();
+    void legendIconFollowsTheTheme();
     void logAxisRescaleKeepsThePositivePart();
     void mixedCornerRectFollowsAPan();
     void anchoredShapeFollowsItsParent();
