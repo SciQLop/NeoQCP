@@ -165,6 +165,9 @@ Task 10a (size sweep)
   path (Task 4 report).
 - The `src/` size sweep stopped at -214 lines (Task 10a ruling): the size lens stays for the final
   review.
+- `QCPAxis_SetRange10k` crept from 1.2 to 1.4-1.5 ms over milestones 1-2 and the item work (flat
+  through milestone 3): 0.02 us more per `setRange` call. Profile it when the setters are next
+  touched (`baseline.md`, End of milestone 3).
 - Porting `QCPGraph2`, `QCPMultigraph`, `QCPColorMap2` and `QCPHistogram2D` to the drawing API, and
   folding the `QCPDrawn` adapter into the bases (spec section 8, `src/drawable.h` comment).
 - The strong-type inventory (`strong-type-candidates.md`, Task 2): every public signature outside
