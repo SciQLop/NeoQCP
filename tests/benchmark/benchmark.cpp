@@ -88,6 +88,7 @@ private slots:
     void QCPAxisRects_Stack8_Replot();
     void QCPPlots_Stack8_Replot();
     void QCPInput_MouseMoveStorm();
+    void QCPInput_WheelOverGraph2_1M();
 
     void QCPSpatialIndex_Build10k();
     void QCPSpatialIndex_Query10k();
@@ -1441,6 +1442,33 @@ void Benchmark::QCPInput_MouseMoveStorm()
         }
     }
     QCOMPARE(moves, kMoves);
+}
+
+// One wheel event over a 1M-point graph2 with the cursor inside the axis rect but away from the
+// curve: the hit test must not walk the data. Target: <= 0.1 ms.
+void Benchmark::QCPInput_WheelOverGraph2_1M()
+{
+    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    const int n = 1000000;
+    std::vector<double> keys(n), values(n);
+    for (int i = 0; i < n; ++i)
+    {
+        keys[i] = i / static_cast<double>(n);
+        values[i] = qSin(keys[i] * 10 * M_PI);
+    }
+    graph->setData(std::move(keys), std::move(values));
+    mPlot->xAxis->setRange(0, 1);
+    mPlot->yAxis->setRange(-1.2, 1.2);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    const QRect axisRect = mPlot->axisRect()->rect();
+    const QPointF pos(axisRect.left() + 10, axisRect.top() + 10);
+    QWheelEvent event(pos, mPlot->mapToGlobal(pos), QPoint(), QPoint(0, 120), Qt::NoButton,
+                      Qt::NoModifier, Qt::NoScrollPhase, false);
+    QBENCHMARK
+    {
+        QCoreApplication::sendEvent(mPlot, &event);
+    }
 }
 
 namespace
