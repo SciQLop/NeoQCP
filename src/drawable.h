@@ -225,6 +225,15 @@ protected:
     double selectTest(const QPointF& pos, bool onlySelectable,
                       QVariant* details = nullptr) const override
     {
+        // Built-in plottables miss outside the axis rect unless the plot opts in: their geometry
+        // may still be painted there (an unclipped plottable), but a click does not grab it.
+        const QCPAxis* keyAxis = this->keyAxis();
+        const QCustomPlot* plot = this->parentPlot();
+        if (keyAxis && keyAxis->axisRect() && plot
+            && !keyAxis->axisRect()->rect().contains(pos.toPoint())
+            && !plot->interactions().testFlag(QCP::iSelectPlottablesBeyondAxisRect))
+            return -1;
+
         const double hit = QCPDrawnBase<Base>::selectTest(pos, onlySelectable, details);
         if (hit < 0 || !details)
             return hit;

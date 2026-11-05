@@ -33,4 +33,5 @@ private slots:
     void setCoordsMovesTheItem();
     void selectionChangeReRecords();
     void clickSelectsADrawnPlottable();
+    void clickOutsideTheAxisRectMisses();
 };

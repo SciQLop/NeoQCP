@@ -211,6 +211,8 @@ public:
         selectEvent(nullptr, false, details, &changed);
     }
 
+    double selectTestAt(const QPointF& pos) const { return selectTest(pos, true); }
+
     mutable int drawCalls = 0;
     std::shared_ptr<const std::vector<QPointF>> mLine
         = std::make_shared<const std::vector<QPointF>>(
@@ -677,6 +679,25 @@ void TestDrawable::clickSelectsADrawnPlottable()
     line->clickSelect(QPointF(f.plot->xAxis->coordToPixel(5), f.plot->yAxis->coordToPixel(5)));
     QVERIFY(line->selected());
     QCOMPARE(line->selection().dataRangeCount(), 1);
+}
+
+void TestDrawable::clickOutsideTheAxisRectMisses()
+{
+    Fixture f;
+    auto* line = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    line->setSelectable(QCP::stWhole);
+    // Data (1, 1), one end of the recorded line, now maps outside the axis rect.
+    f.plot->xAxis->setRange(5, 10);
+    f.plot->yAxis->setRange(5, 10);
+    f.plot->replot();
+    const QPointF outside(f.plot->xAxis->coordToPixel(1), f.plot->yAxis->coordToPixel(1));
+    QVERIFY(!f.plot->axisRect()->rect().contains(outside.toPoint()));
+
+    // Built-in plottables refuse a click outside the axis rect, though the geometry is there.
+    QVERIFY(line->selectTestAt(outside) < 0);
+
+    f.plot->setInteractions(QCP::iSelectPlottablesBeyondAxisRect);
+    QVERIFY(line->selectTestAt(outside) >= 0);
 }
 
 void TestDrawable::panKeepsPixelAndRatioCornersInPlace()
