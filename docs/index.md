@@ -39,6 +39,7 @@ colormaps
 axes
 layout
 items
+writing-a-plot-type
 interactions
 styling
 export
