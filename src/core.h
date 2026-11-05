@@ -374,7 +374,8 @@ public:
     qcp::HandleFor<T> add(Args&&... args);
 
     // Hands over an object built outside the plot (or taken from one) with the ownership of the
-    // plot: reparents it, attaches it to the default axes and the current layer (re-target with the
+    // plot: reparents it, attaches it to the default axes and its kind's default layer (the
+    // current layer for plottables, "annotations" for items; re-target with the
     // returned handle's setters) and adds the legend row as addGraph() does. Plottables and items.
     // An empty pointer, an object that already belongs to a plot, a plot being destroyed or one
     // without axes: one misuse and an empty handle. A refused add DESTROYS the object (it was moved

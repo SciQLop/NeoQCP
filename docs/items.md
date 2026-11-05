@@ -203,7 +203,7 @@ Connect to them to react to the user.
 Span edges are converted to pixels in double precision on the CPU.
 Spans stay exact on axes with large values, such as time in seconds since 1970.
 
-A span is drawn on its layer, after that layer's plottables. Put it on `"background"` to shade behind the data.
+A span is drawn on its layer, after that layer's plottables. Items default to the `"annotations"` layer, above the data; put a span on `"background"` to shade behind the data.
 
 ## Create items with the mouse
 
@@ -269,9 +269,8 @@ Turn on `QCP::iSelectItems` with `setInteractions()` to let the user click them.
 The plot then emits `itemClick()` and `itemDoubleClick()`.
 {doc}`interactions` has the details.
 
-Items are drawn on the current layer when created, `main` by default.
-Graph lines on the GPU are composited above everything painted on the same layer.
-To keep a label above the data on screen, move it to a higher layer with `setLayer()`.
+Items are created on the `annotations` layer, above the data, whatever the current layer is.
+`setLayer()` moves one anywhere else.
 {doc}`concepts` explains layers.
 
 When a theme is applied ({doc}`styling`), every `QCPItemText` takes the theme's foreground colour.

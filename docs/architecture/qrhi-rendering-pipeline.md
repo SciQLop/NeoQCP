@@ -62,7 +62,7 @@ Each paint buffer is a `QCPPaintBufferRhi` which wraps:
 - A `QRhiTexture*` (GPU texture, lazily created), in BGRA8 when the backend supports it so the upload needs no swizzle, RGBA8 otherwise
 - A dirty flag (`mNeedsUpload`) set when painting finishes
 
-Layers in `lmBuffered` mode get a buffer of their own; consecutive `lmLogical` layers share one. The default layers are `background`, `grid`, `main`, `axes`, `legend` and `overlay`, and `main` and `overlay` are buffered.
+Layers in `lmBuffered` mode get a buffer of their own; consecutive `lmLogical` layers share one. The default layers are `background`, `grid`, `main`, `annotations`, `axes`, `legend` and `overlay`, and `main`, `annotations` and `overlay` are buffered.
 
 ### Phase 2: Render
 

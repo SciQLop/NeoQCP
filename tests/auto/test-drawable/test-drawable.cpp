@@ -775,7 +775,7 @@ void TestDrawable::panKeepsPixelAndRatioCornersInPlace()
     f.plot->yAxis->setRange(2, 12);
     f.plot->replot();
 
-    auto* layer = f.plot->plottableRhiLayer(f.plot->currentLayer());
+    auto* layer = f.plot->plottableRhiLayer(shape->layer());
     QVERIFY(layer);
     QVERIFY(!layer->drawEntries().isEmpty());
     for (const auto& entry : layer->drawEntries())

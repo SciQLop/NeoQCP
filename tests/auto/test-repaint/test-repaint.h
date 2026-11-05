@@ -87,6 +87,9 @@ private slots:
     void twoRecordingsDoNotShareAnImage();
     void brokenImagePipelineFallsBackToThePainter();
     void unusedFallbackTexturesAreReleased();
+    void itemsDefaultToAnnotations();
+    void textAboveGraphLine();
+    void setLayerStillWins();
 
 private:
     // What the plot shows: its paint buffers composed, or the framebuffer under RHI.

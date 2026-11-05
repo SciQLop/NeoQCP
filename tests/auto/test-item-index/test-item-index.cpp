@@ -272,13 +272,7 @@ void TestItemIndex::dragOneItemKeepsTheTree()
     plot.replot();
     QCoreApplication::processEvents();
 
-    QCPAbstractItem* dragged = nullptr;
-    for (QCPLayerable* child : plot.layer(QStringLiteral("main"))->children())
-        if (auto* item = qobject_cast<QCPAbstractItem*>(child))
-        {
-            dragged = item;
-            break;
-        }
+    QCPAbstractItem* dragged = plot.item(0);
     QVERIFY(dragged);
     QCPLayer* layer = dragged->layer();
     QVERIFY(layer);
@@ -344,7 +338,7 @@ void TestItemIndex::scaleTypeChangeRebuildsTheIndex()
 
     plot.replot();
     QCoreApplication::processEvents();
-    QCPLayer* layer = plot.layer(QStringLiteral("main"));
+    QCPLayer* layer = bracket->layer();
     QVERIFY(layer);
     const int builds = layer->mItemIndexBuilds;
     QVERIFY(builds >= 1);

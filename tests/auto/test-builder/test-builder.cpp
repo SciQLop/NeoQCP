@@ -591,7 +591,7 @@ void TestBuilder::addEveryItem()
     QCustomPlot plot;
     QVERIFY(add(plot));
     QCOMPARE(plot.itemCount(), 1);
-    QCOMPARE(plot.item()->layer(), plot.currentLayer());
+    QCOMPARE(plot.item()->layer(), plot.layer(QStringLiteral("annotations")));
     QCOMPARE(plot.item()->parentPlot(), &plot);
     QCOMPARE(gMisuses, 0);
 }

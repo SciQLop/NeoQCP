@@ -56,26 +56,28 @@
 
   \section qcplayer-defaultlayers Default layers
 
-  Initially, QCustomPlot has six layers: "background", "grid", "main", "axes", "legend" and
-  "overlay" (in that order). On top is the "overlay" layer, which only contains the QCustomPlot's
-  selection rect (\ref QCustomPlot::selectionRect). The next two layers "axes" and "legend" contain
-  the default axes and legend, so they will be drawn above plottables. In the middle, there is the
-  "main" layer. It is initially empty and set as the current layer (see
-  QCustomPlot::setCurrentLayer). This means, all new plottables, items etc. are created on this
-  layer by default. Then comes the "grid" layer which contains the QCPGrid instances (which belong
-  tightly to QCPAxis, see \ref QCPAxis::grid). The Axis rect background shall be drawn behind
-  everything else, thus the default QCPAxisRect instance is placed on the "background" layer. Of
-  course, the layer affiliation of the individual objects can be changed as required (\ref
-  QCPLayerable::setLayer).
+  Initially, QCustomPlot has seven layers: "background", "grid", "main", "annotations", "axes",
+  "legend" and "overlay" (in that order). On top is the "overlay" layer, which only contains the
+  QCustomPlot's selection rect (\ref QCustomPlot::selectionRect). The next two layers "axes" and
+  "legend" contain the default axes and legend, so they will be drawn above plottables. Below them,
+  the "annotations" layer holds the items (text, lines, spans, tracers, shapes), so they are drawn
+  above the data. Then comes the "main" layer. It is initially empty and set as the current layer
+  (see QCustomPlot::setCurrentLayer). This means, all new plottables are created on this layer by
+  default, while new items go to "annotations" whatever the current layer is. The "grid" layer
+  contains the QCPGrid instances (which belong tightly to QCPAxis, see \ref QCPAxis::grid). The
+  Axis rect background shall be drawn behind everything else, thus the default QCPAxisRect instance
+  is placed on the "background" layer. Of course, the layer affiliation of the individual objects
+  can be changed as required (\ref QCPLayerable::setLayer).
 
   \section qcplayer-ordering Controlling the rendering order via layers
 
   Controlling the ordering of layerables in the plot is easy: Create a new layer in the position
   you want the layerable to be in, e.g. above "main", with \ref QCustomPlot::addLayer. Then set the
   current layer with \ref QCustomPlot::setCurrentLayer to that new layer and finally create the
-  objects normally. They will be placed on the new layer automatically, due to the current layer
-  setting. Alternatively you could have also ignored the current layer setting and just moved the
-  objects with \ref QCPLayerable::setLayer to the desired layer after creating them.
+  objects normally. Plottables and other layerables will be placed on the new layer automatically,
+  due to the current layer setting; items ignore it and go to "annotations" unless moved with \ref
+  QCPLayerable::setLayer. Alternatively you could also have ignored the current layer setting and
+  just moved the objects to the desired layer after creating them.
 
   It is also possible to move whole layers. For example, If you want the grid to be shown in front
   of all plottables/items on the "main" layer, just move it above "main" with
@@ -92,8 +94,8 @@
   If the layer mode (\ref setMode) is set to \ref lmBuffered, you can replot only this specific
   layer by calling \ref replot. In certain situations this can provide better replot performance,
   compared with a full replot of all layers. Upon creation of a new layer, the layer mode is
-  initialized to \ref lmLogical. In a new \ref QCustomPlot instance, the "main" layer and the
-  "overlay" layer, containing the selection rect, are set to \ref lmBuffered.
+  initialized to \ref lmLogical. In a new \ref QCustomPlot instance, the "main", "annotations" and
+  "overlay" layers, the last containing the selection rect, are set to \ref lmBuffered.
 */
 
 /* start documentation of inline functions */
@@ -185,7 +187,7 @@ void QCPLayer::setVisible(bool visible)
   you should carefully choose which layers benefit from having their own paint buffer. A typical
   example would be a layer which contains certain layerables (e.g. items) that need to be changed
   and thus replotted regularly, while all other layerables on other layers stay static. By default,
-  the "main" layer and the topmost layer called "overlay" (containing the selection rect) are in
+  the "main", "annotations" and topmost "overlay" (containing the selection rect) layers are in
   mode \ref lmBuffered.
 
   \see replot

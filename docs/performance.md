@@ -192,7 +192,8 @@ The classic plottables copy your data into a container of `double`, and do all t
 
 A pan can only shift a layer as a texture when every visible plottable on it can be shifted, and nothing else on it paints. Items and painting layout elements on the layer force a full repaint of it on every frame.
 
-- Put items on another layer. New items go to the current layer, which is `"main"`, like the plottables.
+- Items already go to `"annotations"`, not `"main"`, so they do not block panning the data layer.
+  Painting layout elements added by hand still default to `"main"`; move them.
 - An axis rect you add yourself also lands on `"main"`, with its axes and grids. Move them to the layers the default axis rect uses:
 
 ```{literalinclude} snippets/performance.cpp

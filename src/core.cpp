@@ -488,6 +488,7 @@ QCustomPlot::QCustomPlot(QWidget* parent)
     mLayers.append(new QCPLayer(this, QLatin1String("background")));
     mLayers.append(new QCPLayer(this, QLatin1String("grid")));
     mLayers.append(new QCPLayer(this, QLatin1String("main")));
+    mLayers.append(new QCPLayer(this, QLatin1String("annotations")));
     mLayers.append(new QCPLayer(this, QLatin1String("axes")));
     mLayers.append(new QCPLayer(this, QLatin1String("legend")));
     mLayers.append(new QCPLayer(this, QLatin1String("overlay")));
@@ -495,6 +496,7 @@ QCustomPlot::QCustomPlot(QWidget* parent)
     setCurrentLayer(QLatin1String("main"));
     layer(QLatin1String("overlay"))->setMode(QCPLayer::lmBuffered);
     layer(QLatin1String("main"))->setMode(QCPLayer::lmBuffered);
+    layer(QLatin1String("annotations"))->setMode(QCPLayer::lmBuffered);
 
     // create initial layout, axis rect and legend:
     createPlotLayout();
@@ -2194,7 +2196,8 @@ QCPLayer* QCustomPlot::currentLayer() const
 
 /*!
   Sets the layer with the specified \a name to be the current layer. All layerables (\ref
-  QCPLayerable), e.g. plottables and items, are created on the current layer.
+  QCPLayerable), e.g. plottables and items, are created on the current layer, except items: they
+  default to the "annotations" layer (see \ref QCPAbstractItem).
 
   Returns true on success, i.e. if there is a layer with the specified \a name in the QCustomPlot.
 
@@ -4899,8 +4902,12 @@ bool QCustomPlot::registerItem(QCPAbstractItem* item)
     }
 
     mItems.append(item);
-    if (!item->layer()) // usually the layer is already set in the constructor of the item (via
-                        // QCPLayerable constructor)
+    // Items annotate the data, so they go to the "annotations" layer whatever the current layer
+    // is (a user who removed that layer keeps the current-layer default). An explicit setLayer
+    // afterwards still moves them.
+    if (QCPLayer* annotations = layer(QLatin1String("annotations")))
+        item->setLayer(annotations);
+    else if (!item->layer())
         item->setLayer(currentLayer());
     if (mTheme) {
         if (auto* textItem = qobject_cast<QCPItemText*>(item)) {

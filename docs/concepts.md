@@ -82,18 +82,20 @@ A layer decides drawing order.
 Layers are drawn from bottom to top.
 Inside one layer, objects are drawn in the order they were added.
 
-A new plot has six layers, bottom to top:
+A new plot has seven layers, bottom to top:
 
 | Layer | What is on it |
 |---|---|
 | `background` | The axis rect backgrounds. |
 | `grid` | The grid lines. |
-| `main` | Plottables and items. This is the current layer. |
+| `main` | Plottables. This is the current layer. |
+| `annotations` | Items: text, lines, spans, tracers and shapes, above the data. |
 | `axes` | The axes, their ticks and labels. |
 | `legend` | The legend. |
 | `overlay` | The selection rectangle drawn while dragging. |
 
-New plottables and items go on the current layer, `main` unless you change it with `setCurrentLayer()`.
+New plottables go on the current layer, `main` unless you change it with `setCurrentLayer()`.
+New items go on `annotations`; call `setLayer()` to move one elsewhere.
 
 ```{literalinclude} snippets/concepts.cpp
 :start-after: // [concepts_layers]

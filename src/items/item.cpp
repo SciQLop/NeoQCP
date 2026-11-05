@@ -1041,6 +1041,9 @@ QCP::Position QCPItemPosition::asPosition() const
   class is abstract, it can't be instantiated. Use one of the subclasses or create a subclass
   yourself to create new items.
 
+  Items default to the "annotations" layer, above the data, whatever the current layer is (see
+  \ref QCPLayerable::setLayer to move one elsewhere).
+
   The built-in items are:
   <table>
   <tr><td>QCPItemLine</td><td>A line defined by a start and an end point. May have different ending

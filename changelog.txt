@@ -170,6 +170,8 @@ Behaviour changes (slots that delete their sender are now safe):
         the parent widget gets it; it used to be accepted always.
 
 Other behaviour changes:
+  - Items now default to a new `annotations` layer above `main` (behaviour change: 2.x programs that
+        stacked items on `main` call setLayer).
   - QCPContourExtractor::extract() returns segments in the image's UV [0,1] space, subsampled to at
         most 300x300 cells by default; it used to return full-resolution segments in data units.
   - QCPColorMap2::draw queues its viewport change: the first resample after a show or resize comes one

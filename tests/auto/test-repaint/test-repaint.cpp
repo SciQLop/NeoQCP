@@ -9,6 +9,7 @@
 #include "items/item-richtext.h"
 #include "items/item-text.h"
 #include "items/item-tracer.h"
+#include "items/item-vspan.h"
 #include "layoutelements/layoutelement-colorscale.h"
 #include "layoutelements/layoutelement-legend.h"
 #include "layoutelements/layoutelement-textelement.h"
@@ -1642,13 +1643,13 @@ void TestRepaint::anchoredChildOnOtherLayerFollowsRange()
     waitUntilSettled(plot);
     waitUntilSettled(plot);
     auto* labels = plot.layer(QStringLiteral("labels"));
-    auto* main = plot.layer(QStringLiteral("main"));
-    QVERIFY(labels && main);
+    auto* parentLayer = parent->layer();
+    QVERIFY(labels && parentLayer);
     QVERIFY2(!labels->dirtiedAfterDraw(), "a settled labels layer must not be dirty");
-    QVERIFY2(!main->dirtiedAfterDraw(), "a settled main layer must not be dirty");
+    QVERIFY2(!parentLayer->dirtiedAfterDraw(), "a settled parent layer must not be dirty");
 
     plot.xAxis2->setRange(150, 250); // moves the parent, and with it the follower
-    QVERIFY2(main->dirtiedAfterDraw(), "the parent's layer was not marked");
+    QVERIFY2(parentLayer->dirtiedAfterDraw(), "the parent's layer was not marked");
     QVERIFY2(labels->dirtiedAfterDraw(), "the layer of the anchored follower was not marked");
 }
 
@@ -2202,6 +2203,45 @@ void TestRepaint::layoutDescribesTheScreenAfterAnExport()
     QCOMPARE(plot.axisRect()->rect(), screenRect);
 }
 
+void TestRepaint::itemsDefaultToAnnotations()
+{
+    // Items are annotations: they belong above the data whatever the current layer is, so a label
+    // is not hidden by a GPU line drawn after it.
+    QCustomPlot plot;
+    auto* text = new QCPItemText(&plot);
+    auto* line = new QCPItemLine(&plot);
+    auto* span = new QCPItemVSpan(&plot);
+
+    QCPLayer* annotations = plot.layer(QStringLiteral("annotations"));
+    QVERIFY(annotations);
+    QCOMPARE(annotations->mode(), QCPLayer::lmBuffered);
+    QVERIFY(plot.layer(QStringLiteral("main"))->index() < annotations->index());
+    QVERIFY(annotations->index() < plot.layer(QStringLiteral("axes"))->index());
+    QCOMPARE(text->layer(), annotations);
+    QCOMPARE(line->layer(), annotations);
+    QCOMPARE(span->layer(), annotations);
+
+    QVERIFY(plot.setCurrentLayer(QStringLiteral("grid")));
+    auto* graph = plot.addGraph();
+    QCOMPARE(graph->layer(), plot.layer(QStringLiteral("grid")));
+    auto* other = new QCPItemText(&plot);
+    QCOMPARE(other->layer(), annotations);
+}
+
+void TestRepaint::setLayerStillWins()
+{
+    QCustomPlot plot;
+    auto* item = new QCPItemLine(&plot);
+    QVERIFY(item->setLayer(QStringLiteral("main")));
+    QCOMPARE(item->layer(), plot.layer(QStringLiteral("main")));
+
+    // Without the layer, an item falls back to the current layer like any other layerable.
+    QVERIFY(plot.setCurrentLayer(QStringLiteral("legend")));
+    QVERIFY(plot.removeLayer(plot.layer(QStringLiteral("annotations"))));
+    auto* fallback = new QCPItemLine(&plot);
+    QCOMPARE(fallback->layer(), plot.currentLayer());
+}
+
 void TestRepaint::hiddenPlotLaysOutAtItsSize()
 {
     // Qt sends a hidden widget no resize event until it is shown. The plot must still lay out at
@@ -2251,6 +2291,40 @@ QVector<int> inkedColumns(QCustomPlot* plot, const QImage& image)
 }
 } // namespace
 
+void TestRepaint::textAboveGraphLine()
+{
+    // The text is created first; the graph comes later with a thick solid pen crossing it. Items
+    // are annotations, so the text's opaque background stays on top of the GPU line.
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    plot->xAxis->setRange(0, 1);
+    plot->yAxis->setRange(0, 1);
+    const QColor background(40, 160, 90);
+    auto text = plot->add<QCPItemText>();
+    text->position->setCoords(0.5, 0.5);
+    text->setText(QString());
+    text->setPositionAlignment(Qt::AlignCenter);
+    text->setBrush(background);
+    text->setPadding(QMargins(10, 10, 10, 10));
+
+    auto* graph = plot->addGraph();
+    graph->setData(QVector<double> { 0, 1 }, QVector<double> { 0.5, 0.5 });
+    graph->setPen(QPen(Qt::black, 8));
+    plot->replot();
+    waitUntilSettled(*plot);
+
+    const QImage image = screenOf(plot);
+    const double dpr = plot->bufferDevicePixelRatio();
+    const QColor atCrossing = image.pixelColor(qRound(plot->xAxis->coordToPixel(0.5) * dpr),
+                                               qRound(plot->yAxis->coordToPixel(0.5) * dpr));
+    QVERIFY2(qAbs(atCrossing.red() - background.red()) < 40
+                 && qAbs(atCrossing.green() - background.green()) < 40
+                 && qAbs(atCrossing.blue() - background.blue()) < 40,
+             qPrintable("the line is over the text: " + atCrossing.name()));
+}
+
 void TestRepaint::dashedLineStacksLikeSolid()
 {
     // A pen style must not decide stacking: both cases have the graph on the GPU pass, above the
@@ -2273,6 +2347,7 @@ void TestRepaint::dashedLineStacksLikeSolid()
         plot->xAxis->setRange(0, 1);
         plot->yAxis->setRange(0, 1);
         auto rect = plot->add<QCPItemRect>();
+        rect->setLayer(QStringLiteral("main")); // under the graph, same layer
         rect->topLeft->setCoords(0.2, 0.7);
         rect->bottomRight->setCoords(0.8, 0.3);
         rect->setPen(Qt::NoPen);

@@ -314,6 +314,7 @@ void TestPaintBuffer::skipRepaint_disabledWithItems()
     graph2->setData(std::move(keys), std::move(vals));
 
     auto* line = new QCPItemLine(mPlot);
+    QVERIFY(line->setLayer(QStringLiteral("main"))); // same layer as the graph
     line->start->setCoords(1, 1);
     line->end->setCoords(3, 3);
 
