@@ -662,6 +662,23 @@ void TestDrawable::flatLineHasALegendIcon()
              qPrintable(QString("centre is %1").arg(image.pixelColor(50, 25).name())));
 }
 
+void TestDrawable::logAxisRescaleKeepsThePositivePart()
+{
+    // The recording reaches zero, so the item index drops the value side on a log axis; a
+    // plottable's range is data, and rescaleAxes must still fit the positive part.
+    Fixture f;
+    auto* line = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    line->mLine = std::make_shared<const std::vector<QPointF>>(
+        std::initializer_list<QPointF> { { 1, 0 }, { 2, 5 }, { 3, 10 } });
+    f.plot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    f.plot->yAxis->setRange(0.1, 100);
+
+    f.plot->yAxis->rescale();
+
+    QVERIFY2(f.plot->yAxis->range().lower > 0, "a log range must stay positive");
+    QVERIFY2(f.plot->yAxis->range().upper < 50, "the range must fit the data, not stay at 100");
+}
+
 void TestDrawable::setPenReRecordsOnce()
 {
     Fixture f;

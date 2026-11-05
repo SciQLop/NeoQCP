@@ -414,7 +414,7 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
 }
 
 std::optional<QCPDataBox> QCPDrawnCore::dataRange(const QCPDrawable& object,
-                                                  const QCPDrawnView& view)
+                                                  const QCPDrawnView& view, bool applyLogRule)
 {
     if (!ensureRecording(object, view))
         return std::nullopt;
@@ -423,12 +423,15 @@ std::optional<QCPDataBox> QCPDrawnCore::dataRange(const QCPDrawable& object,
     // box that reaches zero or below, exactly as QCPAbstractItem::positionsExtent decides it.
     bool keyBounded = list.keyBounded;
     bool valueBounded = list.valueBounded;
-    const bool keyLog = view.keyAxis->scaleType() == QCPAxis::stLogarithmic;
-    const bool valueLog = view.valueAxis->scaleType() == QCPAxis::stLogarithmic;
-    if (keyBounded && keyLog && !(list.bounds.keyLower > 0))
-        keyBounded = false;
-    if (valueBounded && valueLog && !(list.bounds.valueLower > 0))
-        valueBounded = false;
+    if (applyLogRule)
+    {
+        const bool keyLog = view.keyAxis->scaleType() == QCPAxis::stLogarithmic;
+        const bool valueLog = view.valueAxis->scaleType() == QCPAxis::stLogarithmic;
+        if (keyBounded && keyLog && !(list.bounds.keyLower > 0))
+            keyBounded = false;
+        if (valueBounded && valueLog && !(list.bounds.valueLower > 0))
+            valueBounded = false;
+    }
     if (!keyBounded && !valueBounded)
         return std::nullopt;
     QCPDataBox box = list.bounds;

@@ -30,6 +30,7 @@ private slots:
     void defaultDataRangeFollowsTheExtentRules();
     void defaultLegendIconIsTheRecordingFitted();
     void flatLineHasALegendIcon();
+    void logAxisRescaleKeepsThePositivePart();
     void panKeepsPixelAndRatioCornersInPlace();
     void setPenReRecordsOnce();
     void setCoordsMovesTheItem();

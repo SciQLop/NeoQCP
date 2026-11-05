@@ -84,7 +84,10 @@ public:
     bool contentChanged();
 
     //! What the object occupies, from the recording: QCPAbstractItem::dataExtent's two rules.
-    std::optional<QCPDataBox> dataRange(const QCPDrawable& object, const QCPDrawnView& view);
+    //! With \a applyLogRule false, a log axis does not drop a side that reaches zero: a plottable's
+    //! range is data, not an item index.
+    std::optional<QCPDataBox> dataRange(const QCPDrawable& object, const QCPDrawnView& view,
+                                        bool applyLogRule = true);
 
     //! The pixels the recording's widest stroke reaches around its geometry.
     [[nodiscard]] double pixelPad() const;
@@ -248,14 +251,16 @@ protected:
 
     QCPRange getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain) const override
     {
-        return qcpDrawnRange(this->dataRange(), QCPDrawnSide::Key, foundRange, inSignDomain);
+        return qcpDrawnRange(this->mCore.dataRange(*this, this->view(), false), QCPDrawnSide::Key,
+                             foundRange, inSignDomain);
     }
 
     QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain,
                            const QCPRange& inKeyRange = QCPRange()) const override
     {
         Q_UNUSED(inKeyRange) // simplify: a box keeps no per-key values, so it cannot be narrowed
-        return qcpDrawnRange(this->dataRange(), QCPDrawnSide::Value, foundRange, inSignDomain);
+        return qcpDrawnRange(this->mCore.dataRange(*this, this->view(), false), QCPDrawnSide::Value,
+                             foundRange, inSignDomain);
     }
 
     void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override
