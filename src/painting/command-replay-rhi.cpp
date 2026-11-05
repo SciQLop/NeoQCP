@@ -441,6 +441,21 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
 
     for (const qcp::QCPDrawCommand& command : list.commands)
     {
+        // Both answers are the same in every branch: ask once per command, not once per path.
+        const bool strokeRaster = qcp::strokeNeedsRaster(command);
+        const bool dataOnly = isDataOnlyCommand(command);
+        const auto raster = [&]
+        {
+            addRasterCommand(list, plottables, command, frame, fallback, clip, dpr, outputSize,
+                             generation, geometry);
+        };
+        const auto stroke
+            = [&](std::span<const QPointF> points, const QPen& pen, bool closed = false)
+        {
+            if (!strokeRaster)
+                addPolyline(plottables, points, pen, clip, dpr, outputHeight, alpha, dataOnly,
+                            geometry, closed);
+        };
         std::visit(
             [&](const auto& cmd)
             {
@@ -449,31 +464,22 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                 {
                     const std::span<const QPointF> resolved
                         = cache.pixels(cmd.points, generation, frame.transform);
-                    addRasterCommand(list, plottables, command, frame, fallback, clip, dpr,
-                                     outputSize, generation, geometry);
-                    if (!qcp::strokeNeedsRaster(command))
-                        addPolyline(plottables, resolved, cmd.pen, clip, dpr, outputHeight, alpha,
-                                    isDataOnlyCommand(command), geometry);
+                    raster();
+                    stroke(resolved, cmd.pen);
                 }
                 else if constexpr (std::is_same_v<T, qcp::PolylinePositionsCmd>)
                 {
                     qcpResolveInto(cmd.points, frame, pixels);
-                    addRasterCommand(list, plottables, command, frame, fallback, clip, dpr,
-                                     outputSize, generation, geometry);
-                    if (!qcp::strokeNeedsRaster(command))
-                        addPolyline(plottables, pixels, cmd.pen, clip, dpr, outputHeight, alpha,
-                                    isDataOnlyCommand(command), geometry);
+                    raster();
+                    stroke(pixels, cmd.pen);
                 }
                 else if constexpr (std::is_same_v<T, qcp::PolygonCmd>)
                 {
                     // A free-form outline has no fan centre: its fill is a raster image, submitted
                     // before the stroke exactly as the painter draws it.
-                    addRasterCommand(list, plottables, command, frame, fallback, clip, dpr,
-                                     outputSize, generation, geometry);
+                    raster();
                     qcpResolveInto(cmd.points, frame, pixels);
-                    if (!qcp::strokeNeedsRaster(command))
-                        addPolyline(plottables, qcpRingOf(pixels), cmd.pen, clip, dpr, outputHeight,
-                                    alpha, isDataOnlyCommand(command), geometry, true);
+                    stroke(qcpRingOf(pixels), cmd.pen, true);
                 }
                 else if constexpr (std::is_same_v<T, qcp::FillBetweenCmd>)
                 {
@@ -487,8 +493,7 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                         addRibbonFill(plottables, upper, lower, cmd.brush.color(), clip, dpr,
                                       outputHeight, alpha, true, geometry);
                     else
-                        addRasterCommand(list, plottables, command, frame, fallback, clip, dpr,
-                                         outputSize, generation, geometry);
+                        raster();
                 }
                 else if constexpr (std::is_same_v<T, qcp::RectCmd>)
                 {
@@ -502,17 +507,12 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                                                                box.bottomRight(),
                                                                box.bottomLeft() };
                         fanFill(plottables, box.center(), corners, cmd.brush.color(), clip, dpr,
-                                outputHeight, alpha, isDataOnlyCommand(command), geometry);
+                                outputHeight, alpha, dataOnly, geometry);
                     }
-                    addRasterCommand(list, plottables, command, frame, fallback, clip, dpr,
-                                     outputSize, generation, geometry);
-                    if (!qcp::strokeNeedsRaster(command))
-                    {
-                        pixels.assign({ box.topLeft(), box.topRight(), box.bottomRight(),
-                                        box.bottomLeft(), box.topLeft() });
-                        addPolyline(plottables, pixels, cmd.pen, clip, dpr, outputHeight, alpha,
-                                    isDataOnlyCommand(command), geometry, true);
-                    }
+                    raster();
+                    pixels.assign({ box.topLeft(), box.topRight(), box.bottomRight(),
+                                    box.bottomLeft(), box.topLeft() });
+                    stroke(pixels, cmd.pen, true);
                 }
                 else if constexpr (std::is_same_v<T, qcp::EllipseCmd>)
                 {
@@ -522,12 +522,9 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                     const std::vector<QPointF> ring = qcpEllipseRing(box);
                     if (qcp::gpuCanFill(cmd.brush) && !qcp::needsRaster(command))
                         fanFill(plottables, box.center(), ring, cmd.brush.color(), clip, dpr,
-                                outputHeight, alpha, isDataOnlyCommand(command), geometry);
-                    addRasterCommand(list, plottables, command, frame, fallback, clip, dpr,
-                                     outputSize, generation, geometry);
-                    if (!qcp::strokeNeedsRaster(command))
-                        addPolyline(plottables, qcpRingOf(ring), cmd.pen, clip, dpr, outputHeight,
-                                    alpha, isDataOnlyCommand(command), geometry, true);
+                                outputHeight, alpha, dataOnly, geometry);
+                    raster();
+                    stroke(qcpRingOf(ring), cmd.pen, true);
                 }
                 else if constexpr (std::is_same_v<T, qcp::ErrorBarsCmd>)
                 {
@@ -536,8 +533,7 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                     // place.
                     qcpErrorBarPixels(frame, std::span<const QPointF>(*cmd.centres),
                                       std::span<const QPointF>(*cmd.spans), pixels);
-                    addPolyline(plottables, pixels, cmd.pen, clip, dpr, outputHeight, alpha, true,
-                                geometry);
+                    stroke(pixels, cmd.pen);
                 }
                 else if constexpr (std::is_same_v<T, qcp::MarkersCmd>)
                 {
