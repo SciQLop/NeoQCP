@@ -384,6 +384,11 @@ quint64 QCPDrawnCore::resolveRemapCount() const
     return mState->resolve.remapCount();
 }
 
+int QCPDrawnCore::rasterCount() const
+{
+    return mState->raster.rasterCount();
+}
+
 bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView& view)
 {
     if (!view.keyAxis || !view.valueAxis)

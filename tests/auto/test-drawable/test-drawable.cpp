@@ -26,6 +26,16 @@ void countMisuse(const char*, const char*)
 int gAxisMessages = 0;
 QtMessageHandler gPreviousHandler = nullptr;
 
+//! A brush the GPU cannot fill in one colour: the replay rasterises it.
+QBrush gradientBrush()
+{
+    QLinearGradient gradient(0, 0, 1, 0);
+    gradient.setCoordinateMode(QGradient::ObjectBoundingMode);
+    gradient.setColorAt(0.0, QColor(220, 40, 40));
+    gradient.setColorAt(1.0, QColor(40, 40, 220));
+    return QBrush(gradient);
+}
+
 void countAxisMessages(QtMsgType type, const QMessageLogContext& context, const QString& message)
 {
     if (type == QtDebugMsg && message.contains(QLatin1String("no key or value axis")))
@@ -64,7 +74,8 @@ public:
         Ratio,
         PixelCorner,
         MixedRect,
-        FromAnchor
+        FromAnchor,
+        Raster //!< a texture-brush rect beside a long polyline: two kept runs of different kinds
     };
 
     //! Counts the base setter path: a range change must not come through here.
@@ -90,11 +101,13 @@ public:
         }
         if (bars > 0)
         {
+            const QBrush brush = filledBars ? (gradientBars ? gradientBrush() : QBrush(fill))
+                                            : QBrush(Qt::NoBrush);
             for (int i = 0; i < bars; ++i)
             {
                 const double key = 1.0 + 8.0 * i / bars;
                 context.rect(QCP::Data { key, 1.0 }, QCP::Data { key + 8.0 / bars, 3.0 },
-                             QPen(Qt::black), QBrush(filledBars ? fill : QColor(Qt::NoBrush)));
+                             QPen(Qt::black), brush);
             }
             return;
         }
@@ -165,6 +178,13 @@ public:
             context.polygon(span, QPen(Qt::black, 2), QBrush(Qt::NoBrush));
             return;
         }
+        if (mode == Raster) // a texture-brush rect and a long polyline, kept differently
+        {
+            context.rect(QCP::Data { 2, 2 }, QCP::Data { 7, 7 }, QPen(Qt::NoPen),
+                         gradientBrush());
+            context.polyline(mLine, QPen(Qt::black, 2));
+            return;
+        }
         if (mode == Image) // a raster box over data (3,3) to (5,5): its outline is a known rect
         {
             QImage image(2, 2, QImage::Format_ARGB32_Premultiplied);
@@ -185,6 +205,9 @@ public:
     //! Test hook: how many times the resolve cache mapped a recording again.
     [[nodiscard]] quint64 remaps() const { return mCore.resolveRemapCount(); }
 
+    //! Test hook: how many rasterised images the replay keeps for this object.
+    [[nodiscard]] int rasterCount() const { return mCore.rasterCount(); }
+
     //! The adapter's dataExtent(), which the layer index reads.
     [[nodiscard]] std::optional<QCPItemExtent> extent() const { return dataExtent(); }
 
@@ -199,6 +222,7 @@ public:
     int bars = 0;
     //! Fill the bar rects too, so a replay builds fills and strokes.
     bool filledBars = false;
+    bool gradientBars = false; //!< the bar fill cannot be a GPU vertex colour
     bool withText = false;
     bool withPolyline = false;
     bool escapeHatch = false;
@@ -583,6 +607,31 @@ void TestDrawable::panMovesAllDataEntriesByOneDelta()
     }
 }
 
+void TestDrawable::rasterPanKeepsImage()
+{
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - the raster image and the kept triangles are a GPU path only");
+    auto* shape = new TestShape(f.plot.get());
+    shape->mode = TestShape::Raster;
+    std::vector<QPointF> points;
+    points.reserve(5000);
+    for (int i = 0; i < 5000; ++i)
+        points.emplace_back(1.0 + 8.0 * i / 4999.0, 4.0 + std::sin(i * 0.05));
+    shape->mLine = std::make_shared<const std::vector<QPointF>>(std::move(points));
+    f.plot->replot();
+    QCOMPARE(shape->rasterCount(), 1);
+    const quint64 strokes = QCPLineExtruder::extruderCallCount();
+    QVERIFY2(strokes > 0, "the first frame must extrude the polyline");
+
+    // A pan moves the whole recording by one delta: the image is kept and shifted, and the polyline
+    // is handed back as the triangles it was built from.
+    f.plot->xAxis->setRange(1, 11);
+    f.plot->replot();
+    QCOMPARE(shape->rasterCount(), 1);
+    QCOMPARE(QCPLineExtruder::extruderCallCount(), strokes);
+}
+
 void TestDrawable::zoomRebuildsOnce()
 {
     Fixture f;
@@ -630,6 +679,36 @@ void TestDrawable::tenThousandBarsAreOneDraw()
     const auto& entry = layer->drawEntries().first();
     QVERIFY(entry.fillVertexCount > 0);
     QVERIFY(entry.vertexCount > entry.fillVertexCount);
+}
+
+void TestDrawable::gradientBarsStackAsOne()
+{
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - the rasterised fills are a GPU path only");
+    // The graph is created first, so it must stay under every bar.
+    auto* graph = f.plot->addGraph();
+    graph->setData(QVector<double> { 1, 9 }, QVector<double> { 2, 2 });
+    graph->setPen(QPen(Qt::red, 24));
+    auto* shape = new TestShape(f.plot.get());
+    shape->bars = 10;
+    shape->filledBars = true;
+    shape->gradientBars = true; // more images than one layer can take
+    shape->setLayer(QLatin1String("main")); // the graph's layer: only then can the two mix
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+
+    const QImage frame = f.plot->grabFramebuffer();
+    // Every bar's crossing pixel must be the graph's red: the recording is painted whole by the
+    // layer's QPainter pass, under the layer's GPU content. A split at the cap would leave the
+    // images it did take above the graph and the rest under it.
+    for (int i = 0; i < 10; ++i)
+    {
+        const QColor colour = pixelAt(frame, f.plot.get(), 1.0 + 8.0 * (i + 0.5) / 10.0, 2);
+        QVERIFY2(colour.red() > 200 && colour.green() < 60 && colour.blue() < 60,
+                 qPrintable(QStringLiteral("bar %1 is not under the graph: %2")
+                                .arg(i)
+                                .arg(colour.name())));
+    }
 }
 
 void TestDrawable::fadeSplitsTheRun()

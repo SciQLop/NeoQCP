@@ -222,7 +222,8 @@ void fanFill(QCPPlottableRhiLayer& layer, const QPointF& centre, std::span<const
 
 // A fill or stroke the GPU cannot express (a texture, a gradient, a hatch, a free-form outline) is
 // painted into an image and drawn as a quad at the command's place in the layer. The layer's image
-// slots are the cap: past them the painter pass takes the command, under this layer's GPU content.
+// slots are the cap; a recording that needs more of them than are left is painted whole by the
+// painter pass, so one object never splits between stacking levels (see rasterOverflows()).
 void addRasterCommand(const QCPDrawList& list, QCPPlottableRhiLayer& layer,
                       const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame,
                       qcp::QCPRasterFallback& fallback, const QRect& clip, double dpr,
@@ -230,18 +231,21 @@ void addRasterCommand(const QCPDrawList& list, QCPPlottableRhiLayer& layer,
 {
     if (!qcp::needsRaster(command))
         return;
-    // An image is not vertex geometry: the kept runs cannot place it on a pan frame.
-    if (cache)
-        cache->invalidate();
     const quint64 listId = list.id;
     const quint64 index = qcpCommandIndex(list, command);
+    const bool movesWithData = isDataOnlyCommand(command);
+    // A data command moves with the data and a pixel command stays put, so a pan may draw the kept
+    // image shifted (or not); anything else has to be rasterised again for its new transform.
+    const qcp::PanBehaviour behaviour = movesWithData ? qcp::PanBehaviour::Moves
+        : isStaticCommand(command)                    ? qcp::PanBehaviour::Stays
+                                                      : qcp::PanBehaviour::Exact;
     if (!layer.canAddImage())
     {
         fallback.painterHandles(listId, index);
         if (layer.warnRasterCapOnce())
             qWarning() << "NeoQCP: more than" << QCPPlottableRhiLayer::kMaxImages
-                       << "rasterised styles in one layer, the rest is painted by QPainter,"
-                          " under this layer's GPU content";
+                       << "rasterised styles in one layer, the objects past the cap are painted"
+                          " by QPainter, under this layer's GPU content";
         return;
     }
     const bool withStroke = qcp::strokeNeedsRaster(command);
@@ -254,10 +258,34 @@ void addRasterCommand(const QCPDrawList& list, QCPPlottableRhiLayer& layer,
         fallback.painterHandles(listId, index);
         return;
     }
-    const QImage& image = fallback.image(listId, index, command, frame, bounds, dpr, generation);
+    QPointF shift;
+    const QImage& image
+        = fallback.image(listId, index, command, frame, bounds, dpr, generation, behaviour, &shift);
     const QRectF device(bounds.left() * dpr, bounds.top() * dpr, image.width(), image.height());
-    if (!layer.addImage(image, device, clip, dpr, viewport.height()))
+    if (!layer.addImage(image, device, clip, dpr, viewport.height(), static_cast<float>(shift.x()),
+                        static_cast<float>(shift.y())))
+    {
         fallback.painterHandles(listId, index);
+        return;
+    }
+    if (cache)
+        cache->keepRaster(int(index), bounds, movesWithData);
+}
+
+//! True when this recording needs more images than the layer has left: the whole of it then goes to
+//! the painter pass, because a split at the cap would put half of one object over the layer's GPU
+//! content and half under it.
+bool rasterOverflows(const QCPDrawList& list, const QCPPlottableRhiLayer& layer)
+{
+    int needed = 0;
+    for (const qcp::QCPDrawCommand& command : list.commands)
+        if (qcp::needsRaster(command))
+            ++needed;
+    if (needed == 0)
+        return false;
+    if (!layer.canAddImage())
+        return true;
+    return needed > QCPPlottableRhiLayer::kMaxImages - int(layer.imageDrawEntries().size());
 }
 
 // One markers command on the scatter layer. Its own layer is rebuilt every frame, so the points are
@@ -288,9 +316,11 @@ void addMarkers(const QCPDrawList& list, QCPScatterRhiLayer& scatter, QCPResolve
 }
 
 //! Hands a kept recording back to the layer: one submission per run, shifted by the pan delta when
-//! the run moves with the data, and by nothing otherwise.
-void replayKept(const QCPRecordingCache& kept, QCPPlottableRhiLayer& layer, const QRect& clip,
-                double dpr, int height, const QPointF& delta, float alpha)
+//! the run moves with the data, and by nothing otherwise. A rasterised command is re-submitted from
+//! the raster cache, its texture untouched.
+void replayKept(const QCPDrawList& list, const QCPRecordingCache& kept, QCPPlottableRhiLayer& layer,
+                qcp::QCPRasterFallback& fallback, const QCPDrawFrame& frame, quint64 generation,
+                const QRect& clip, double dpr, int height, const QPointF& delta, float alpha)
 {
     const std::span<const float> solid = kept.solidVertices();
     for (const QCPRecordingCache::SolidRun& run : kept.solidRuns())
@@ -312,6 +342,19 @@ void replayKept(const QCPRecordingCache& kept, QCPPlottableRhiLayer& layer, cons
                                  std::span<const float>(run.pattern, std::size_t(run.patternCount)),
                                  run.dashOffset, clip, dpr, height, static_cast<float>(offset.x()),
                                  static_cast<float>(offset.y()), alpha);
+    }
+    for (const QCPRecordingCache::RasterRun& run : kept.rasterRuns())
+    {
+        const qcp::QCPDrawCommand& command = list.commands[std::size_t(run.index)];
+        const qcp::PanBehaviour behaviour
+            = run.movesWithData ? qcp::PanBehaviour::Moves : qcp::PanBehaviour::Stays;
+        const QImage& image = fallback.image(list.id, quint64(run.index), command, frame,
+                                             run.bounds, dpr, generation, behaviour);
+        const QRectF device(run.bounds.left() * dpr, run.bounds.top() * dpr, image.width(),
+                            image.height());
+        const QPointF offset = run.movesWithData ? delta : QPointF();
+        layer.addImage(image, device, clip, dpr, height, static_cast<float>(offset.x()),
+                       static_cast<float>(offset.y()), alpha);
     }
 }
 
@@ -387,6 +430,7 @@ void QCPRecordingCache::beginBuild(const QCPDrawList& list, const QCPTransform& 
     mSolidRuns.clear();
     mDashed.clear();
     mDashedRuns.clear();
+    mRasterRuns.clear();
     mReusable = mayReuseGeometry(list); // once, at build time: not on every pan frame
     mList = list.id;
     mTransform = transform;
@@ -447,6 +491,15 @@ void QCPRecordingCache::keepDashed(std::span<const float> vertices, std::span<co
     mDashedRuns.push_back(run);
 }
 
+void QCPRecordingCache::keepRaster(int index, const QRectF& bounds, bool movesWithData)
+{
+    RasterRun run;
+    run.index = index;
+    run.bounds = bounds;
+    run.movesWithData = movesWithData;
+    mRasterRuns.push_back(run);
+}
+
 void QCPRecordingCache::commit()
 {
     mValid = !mSpoiled;
@@ -456,6 +509,7 @@ void QCPRecordingCache::commit()
         mSolidRuns.clear();
         mDashed.clear();
         mDashedRuns.clear();
+        mRasterRuns.clear();
     }
     mSpoiled = false;
 }
@@ -471,6 +525,7 @@ void QCPRecordingCache::clear()
     mSolidRuns.clear();
     mDashed.clear();
     mDashedRuns.clear();
+    mRasterRuns.clear();
     mValid = false;
     mSpoiled = false;
 }
@@ -490,8 +545,23 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
     {
         // A pan (or a frame that changed nothing): the recording is already built, it only needs
         // its data-space runs shifted. Markers live in another layer, which is rebuilt anyway.
-        replayKept(*geometry, plottables, clip, dpr, outputHeight, delta, alpha);
+        replayKept(list, *geometry, plottables, fallback, frame, generation, clip, dpr,
+                   outputHeight, delta, alpha);
         addMarkers(list, scatter, cache, frame, generation, clip, dpr, outputHeight);
+        return;
+    }
+
+    if (rasterOverflows(list, plottables))
+    {
+        // Not one image fits: the painter pass draws this recording whole, under the layer's GPU
+        // content, rather than splitting it at the cap.
+        fallback.paintWholeRecordingWithPainter(list.id);
+        if (geometry)
+            geometry->invalidate(); // nothing of this recording goes to the GPU this frame
+        if (plottables.warnRasterCapOnce())
+            qWarning() << "NeoQCP: more than" << QCPPlottableRhiLayer::kMaxImages
+                       << "rasterised styles are needed for one recording, it is painted by"
+                          " QPainter, under this layer's GPU content";
         return;
     }
 

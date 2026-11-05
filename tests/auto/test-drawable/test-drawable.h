@@ -24,8 +24,10 @@ private slots:
     void panReusesResolvedGeometry();
     void panBuildsNoFillEither();
     void panMovesAllDataEntriesByOneDelta();
+    void rasterPanKeepsImage();
     void zoomRebuildsOnce();
     void tenThousandBarsAreOneDraw();
+    void gradientBarsStackAsOne();
     void fadeSplitsTheRun();
     void exportDoesNotPoisonTheResolveCache();
     void drawnPolygonStacksAboveAnEarlierGpuGraph();

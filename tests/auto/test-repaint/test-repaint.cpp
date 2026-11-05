@@ -3156,8 +3156,8 @@ void TestRepaint::gradientFillMatchesExport()
     }
 }
 
-// An image is never bigger than the viewport, and a layer keeps at most four of them: the rest is
-// painted by the layer's QPainter pass, with one warning per plot.
+// An image is never bigger than the viewport, and a layer keeps at most four of them: a recording
+// that needs more is painted whole by the layer's QPainter pass, with one warning per plot.
 void TestRepaint::rasterFallbackIsCapped()
 {
     QWidget host;
@@ -3205,14 +3205,17 @@ void TestRepaint::rasterFallbackIsCapped()
     layer->clear();
     QTest::ignoreMessage(QtWarningMsg, QRegularExpression(QStringLiteral("rasterised styles")));
     replayWith(many, cache, fallback);
-    QCOMPARE(int(layer->imageDrawEntries().size()), 4);
+    // Six images do not fit: the recording is not split at the cap, the painter draws all of it.
+    QVERIFY2(layer->imageDrawEntries().isEmpty(),
+             "a recording that does not fit was split between the stacking levels");
+    QVERIFY2(fallback.painterDrawsAll(many.drawList().id), "the painter did not get the recording");
     int painterDrawn = 0;
     for (std::size_t i = 0; i < many.drawList().commands.size(); ++i)
         if (fallback.painterHandled(many.drawList().id, quint64(i)))
             ++painterDrawn;
-    QCOMPARE(painterDrawn, 2);
+    QCOMPARE(painterDrawn, 6);
 
-    // The painter pass paints exactly those two, so the split is where the cap says it is.
+    // The painter pass draws every command of it, in the buffer the layer's GPU content draws over.
     QImage painted(viewport, QImage::Format_ARGB32_Premultiplied);
     painted.fill(Qt::white);
     {
@@ -3227,8 +3230,8 @@ void TestRepaint::rasterFallbackIsCapped()
         const QColor colour = sampleAt(plot, painted, box.center().x(), box.center().y());
         return colour.red() + colour.green() + colour.blue() < 720;
     };
-    QVERIFY2(!inked(boxes[0]), "the painter painted an image the GPU already draws");
-    QVERIFY2(inked(boxes[4]) && inked(boxes[5]), "the painter skipped the commands past the cap");
+    for (const QRectF& box : boxes)
+        QVERIFY2(inked(box), "the painter skipped a command of the recording it took whole");
 
     // One warning per plot, not per fallback: the next frame gets a fresh fallback and is silent.
     static int warnings = 0;
@@ -3288,8 +3291,8 @@ void TestRepaint::zoomedFallbackIsRepainted()
                             .arg(wide.name(), squeezed.name())));
 }
 
-// A shape clipped by the viewport keeps the same image rect when the range moves: its pixels are
-// the only thing that says the image is stale.
+// A shape clipped by the viewport keeps its image across a pan: the image is drawn shifted by the
+// pan delta, so the pixels still say where the shape moved.
 void TestRepaint::clippedFallbackFollowsTheShape()
 {
     QWidget host;
@@ -3323,13 +3326,13 @@ void TestRepaint::clippedFallbackFollowsTheShape()
              qPrintable(QStringLiteral("the fill is missing at pixel 100: %1").arg(before.name())));
 
     // The same width, moved right: the shape slides 80 pixels left, so pixel 100 enters the
-    // concavity. The cropped image rect is unchanged.
+    // concavity. The image is kept and drawn shifted, not rasterised again.
     plot->xAxis->setRange(80, 480);
     plot->replot();
     waitUntilSettled(*plot);
     QCPDrawContext moved(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
     const QColor after = pixelAt(plot, replayThrough(moved.frame()), 100, 150);
-    QVERIFY2(fallback.rasterCount() == 2, "the moved range re-used the old bitmap");
+    QVERIFY2(fallback.rasterCount() == 1, "the pan re-rasterised the image instead of shifting it");
     QVERIFY2(
         after.red() > 200 && after.green() > 200 && after.blue() > 200,
         qPrintable(

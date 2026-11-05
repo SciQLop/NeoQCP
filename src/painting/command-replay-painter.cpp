@@ -212,7 +212,10 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
     {
         if (kinds == QCPReplayKinds::GpuOnly && !isGpuKind(command))
             continue;
-        if (kinds == QCPReplayKinds::PainterOnly && isGpuKind(command))
+        // A recording the layer could not take whole is painted by this pass like any other
+        // recording: the visit below draws every one of its commands.
+        const bool painterDrawsAll = fallback && fallback->painterDrawsAll(list.id);
+        if (kinds == QCPReplayKinds::PainterOnly && isGpuKind(command) && !painterDrawsAll)
         {
             // The layer could not take this command's image: paint it here, in the buffer the GPU
             // geometry draws over. A stroke the GPU cannot express is part of it.

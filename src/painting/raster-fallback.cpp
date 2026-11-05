@@ -223,6 +223,7 @@ QImage rasterizeFallback(const QCPDrawCommand& command, const QRectF& bounds,
 void QCPRasterFallback::beginReplay()
 {
     mPainterHandled.clear();
+    mPainterLists.clear();
     for (auto it = mEntries.begin(); it != mEntries.end();)
     {
         if (!it->used)
@@ -237,15 +238,26 @@ void QCPRasterFallback::beginReplay()
 
 const QImage& QCPRasterFallback::image(quint64 list, quint64 index, const QCPDrawCommand& command,
                                        const QCPDrawFrame& frame, const QRectF& bounds, double dpr,
-                                       quint64 generation)
+                                       quint64 generation, PanBehaviour behaviour, QPointF* delta)
 {
     for (Entry& entry : mEntries)
     {
-        if (entry.used || entry.list != list || entry.index != index
-            || entry.generation != generation || entry.dpr != dpr || entry.bounds != bounds
-            || !(entry.transform == frame.transform))
+        // Not keyed on used: a recording replayed through its kept geometry matches the very image
+        // its last build made, and that image was already used by the frame that built it.
+        if (entry.list != list || entry.index != index || entry.generation != generation
+            || entry.dpr != dpr || entry.bounds != bounds || entry.behaviour != behaviour)
             continue;
+        QPointF shift;
+        if (entry.transform == frame.transform)
+            shift = QPointF();
+        else if (behaviour == PanBehaviour::Exact
+                 || !frame.transform.isTranslationOf(entry.transform, &shift))
+            continue;
+        else if (behaviour == PanBehaviour::Stays)
+            shift = QPointF();
         entry.used = true;
+        if (delta)
+            *delta = shift;
         return entry.image;
     }
 
@@ -256,7 +268,10 @@ const QImage& QCPRasterFallback::image(quint64 list, quint64 index, const QCPDra
     entry.transform = frame.transform;
     entry.bounds = bounds;
     entry.dpr = dpr;
+    entry.behaviour = behaviour;
     entry.used = true;
+    if (delta)
+        *delta = QPointF();
     entry.image = rasterizeFallback(command, bounds, frame, dpr, strokeNeedsRaster(command));
     return entry.image;
 }
@@ -268,12 +283,23 @@ void QCPRasterFallback::painterHandles(quint64 list, quint64 index)
 
 bool QCPRasterFallback::painterHandled(quint64 list, quint64 index) const
 {
-    return mPainterHandled.contains({ list, index });
+    return mPainterLists.contains(list) || mPainterHandled.contains({ list, index });
+}
+
+void QCPRasterFallback::paintWholeRecordingWithPainter(quint64 list)
+{
+    mPainterLists.insert(list);
+}
+
+bool QCPRasterFallback::painterDrawsAll(quint64 list) const
+{
+    return mPainterLists.contains(list);
 }
 
 void QCPRasterFallback::clear()
 {
     mEntries.clear();
     mPainterHandled.clear();
+    mPainterLists.clear();
 }
 } // namespace qcp

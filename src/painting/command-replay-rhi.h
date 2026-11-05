@@ -5,6 +5,7 @@
 
 #include <QColor>
 #include <QPointF>
+#include <QRectF>
 #include <QSize>
 #include <deque>
 #include <memory>
@@ -71,10 +72,10 @@ private:
   pixel ratio, clip and output size, and with a transform the kept one only translates, hands every
   run back to the layer with one delta: no extrusion, no tessellation, no mapping. Anything else (a
   zoom, a re-record, a new device pixel ratio) rebuilds everything and keeps the result. A command
-  the GPU draws as an image spoils the build: an image is not vertex geometry, so pans of that
-  recording rebuild. So does a recording whose geometry moves in more than one way (a ratio, an
-  anchor, a rect with one data and one pixel corner): a kept run can only be shifted by one delta
-  or not at all.
+  the GPU draws as an image is kept as a run of its own: the image comes from the raster cache,
+  which shifts it by the same delta, so it never invalidates the triangles beside it. A recording
+  whose geometry moves in more than one way (a ratio, an anchor, a rect with one data and one pixel
+  corner) is rebuilt, because a kept run can only be shifted by one delta or not at all.
 */
 class QCPRecordingCache
 {
@@ -101,6 +102,16 @@ public:
         int patternCount = 0;
     };
 
+    //! A rasterised command kept as a run of its own: an image is not vertex geometry, so a pan
+    //! re-submits it from the raster cache shifted by the delta, and the rest of the recording
+    //! keeps its triangles.
+    struct RasterRun
+    {
+        int index = 0; //!< the command's place in the recording
+        QRectF bounds; //!< the clipped pixel rect the image covers
+        bool movesWithData = false;
+    };
+
     /*!
       True when the kept geometry of \a list may be re-emitted: same list, same device pixel ratio,
       output height and clip, and \a transform a translation of the one it was built for. \a delta
@@ -124,10 +135,13 @@ public:
     void keepDashed(std::span<const float> vertices, std::span<const float> pattern,
                     float dashOffset, bool movesWithData);
 
+    //! Keeps command \a index, rasterised over \a bounds, as a run of its own.
+    void keepRaster(int index, const QRectF& bounds, bool movesWithData);
+
     //! Commits the build, unless a rasterised command spoiled it.
     void commit();
 
-    //! The recording holds something this cache cannot reproduce (an image): it must be rebuilt.
+    //! The recording holds something this cache cannot reproduce: it must be rebuilt.
     void invalidate();
 
     [[nodiscard]] std::span<const float> solidVertices() const { return mSolid; }
@@ -138,8 +152,13 @@ public:
 
     [[nodiscard]] std::span<const DashedRun> dashedRuns() const { return mDashedRuns; }
 
+    [[nodiscard]] std::span<const RasterRun> rasterRuns() const { return mRasterRuns; }
+
     //! Test hook: how many runs the kept geometry holds.
-    [[nodiscard]] int runCount() const { return int(mSolidRuns.size() + mDashedRuns.size()); }
+    [[nodiscard]] int runCount() const
+    {
+        return int(mSolidRuns.size() + mDashedRuns.size() + mRasterRuns.size());
+    }
 
     void clear();
 
@@ -148,6 +167,7 @@ private:
     std::vector<SolidRun> mSolidRuns;
     std::vector<float> mDashed; //!< seven floats per vertex (the seventh is the arc length)
     std::vector<DashedRun> mDashedRuns;
+    std::vector<RasterRun> mRasterRuns;
     QCPTransform mTransform;
     QRect mClip;
     quint64 mList = 0;

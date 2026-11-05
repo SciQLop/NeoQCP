@@ -128,6 +128,9 @@ public:
     //! Test hook: how many times the resolve cache mapped a recording again.
     [[nodiscard]] quint64 resolveRemapCount() const;
 
+    //! Test hook: how many rasterised images the object's replay keeps.
+    [[nodiscard]] int rasterCount() const;
+
 private:
     bool ensureRecording(const QCPDrawable& object, const QCPDrawnView& view);
 
@@ -288,8 +291,7 @@ public:
                              foundRange, inSignDomain);
     }
 
-    QCPRange getValueRange(bool& foundRange,
-                           QCP::SignDomain inSignDomain = QCP::sdBoth,
+    QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth,
                            const QCPRange& inKeyRange = QCPRange()) const override
     {
         Q_UNUSED(inKeyRange) // simplify: a box keeps no per-key values, so it cannot be narrowed
