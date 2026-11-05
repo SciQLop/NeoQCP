@@ -81,6 +81,7 @@ private slots:
     void unequalFillBetweenBecomesAnImage();
     void pannedFallbackDoesNotReupload();
     void gradientFillMatchesExport();
+    void rasterFallbackIsCapped();
 
 private:
     // What the plot shows: its paint buffers composed, or the framebuffer under RHI.

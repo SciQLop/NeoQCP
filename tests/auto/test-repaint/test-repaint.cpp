@@ -2786,3 +2786,93 @@ void TestRepaint::gradientFillMatchesExport()
                                 .arg(dpr)));
     }
 }
+
+// An image is never bigger than the viewport, and a layer keeps at most four of them: the rest is
+// painted by the layer's QPainter pass, with one warning per plot.
+void TestRepaint::rasterFallbackIsCapped()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    usePixelRanges(plot);
+    auto* layer = plot->plottableRhiLayer(plot->currentLayer());
+    QVERIFY(layer);
+    const QSize viewport = plot->rhiOutputSize();
+    const auto replayWith
+        = [&](QCPDrawContext& context, QCPResolveCache& cache, qcp::QCPRasterFallback& fallback)
+    {
+        qcpReplayWithRhi(context.drawList(), *layer, *plot->scatterRhiLayer(plot->currentLayer()),
+                         context.frame(), cache, fallback, plot->bufferDevicePixelRatio(),
+                         viewport);
+    };
+
+    // A command far bigger than the viewport is clipped to it before it is rasterised.
+    QCPDrawContext oversized(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+    oversized.rect(QCP::Data { -900, -900 }, QCP::Data { 1200, 1100 }, QPen(Qt::NoPen),
+                   gradientBrush());
+    layer->clear();
+    QCPResolveCache cache;
+    qcp::QCPRasterFallback fallback;
+    replayWith(oversized, cache, fallback);
+    QCOMPARE(int(layer->imageDrawEntries().size()), 1);
+    const QSize device = layer->imageDrawEntries().first().deviceSize;
+    QVERIFY2(device.width() <= viewport.width() && device.height() <= viewport.height(),
+             qPrintable(QStringLiteral("the image is %1x%2, the viewport %3x%4")
+                            .arg(device.width())
+                            .arg(device.height())
+                            .arg(viewport.width())
+                            .arg(viewport.height())));
+
+    // Six fallback commands in one layer: four images, two painter draws.
+    QCPDrawContext many(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+    const std::array<QRectF, 6> boxes { QRectF(10, 20, 110, 110),   QRectF(145, 20, 110, 110),
+                                        QRectF(280, 20, 110, 110),  QRectF(10, 170, 110, 110),
+                                        QRectF(145, 170, 110, 110), QRectF(280, 170, 110, 110) };
+    for (const QRectF& box : boxes)
+        many.rect(QCP::Data { box.left(), box.top() }, QCP::Data { box.right(), box.bottom() },
+                  QPen(Qt::NoPen), gradientBrush());
+
+    layer->clear();
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression(QStringLiteral("rasterised styles")));
+    replayWith(many, cache, fallback);
+    QCOMPARE(int(layer->imageDrawEntries().size()), 4);
+    int painterDrawn = 0;
+    for (const qcp::QCPDrawCommand& command : many.drawList().commands)
+        if (fallback.painterHandled(command))
+            ++painterDrawn;
+    QCOMPARE(painterDrawn, 2);
+
+    // The painter pass paints exactly those two, so the split is where the cap says it is.
+    QImage painted(viewport, QImage::Format_ARGB32_Premultiplied);
+    painted.fill(Qt::white);
+    {
+        QCPPainter painter(&painted);
+        painter.setAntialiasing(true);
+        qcpReplayWithPainter(many.drawList(), painter, many.frame(), QCPReplayKinds::PainterOnly,
+                             &fallback);
+    }
+    // White is (255, 255, 255): anything darker is paint, at the box's place in the frame.
+    const auto inked = [&](const QRectF& box)
+    {
+        const QColor colour
+            = sampleAt(plot, painted, box.center().x(), box.center().y());
+        return colour.red() + colour.green() + colour.blue() < 720;
+    };
+    QVERIFY2(!inked(boxes[0]), "the painter painted an image the GPU already draws");
+    QVERIFY2(inked(boxes[4]) && inked(boxes[5]), "the painter skipped the commands past the cap");
+
+    // One warning per plot: the next frame is silent.
+    static int warnings = 0;
+    warnings = 0;
+    const QtMessageHandler previous = qInstallMessageHandler(
+        +[](QtMsgType type, const QMessageLogContext&, const QString& message)
+        {
+            if (type == QtWarningMsg && message.contains(QStringLiteral("rasterised styles")))
+                ++warnings;
+        });
+    layer->clear();
+    replayWith(many, cache, fallback);
+    qInstallMessageHandler(previous);
+    QCOMPARE(warnings, 0);
+}
