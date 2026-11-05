@@ -81,13 +81,15 @@ public:
 
     /*!
       The triangles of command \a key when \a transform is a translation of the one they were built
-      for, \a delta then holding the pixels to add. An empty span means the caller must extrude.
+      for and the stroke is \a width pixels wide, \a delta then holding the pixels to add. An empty
+      span means the caller must extrude.
     */
     [[nodiscard]] std::span<const float> translated(quint64 key, const QCPTransform& transform,
-                                                    QPointF* delta);
+                                                    float width, QPointF* delta);
 
-    //! Keeps \a vertices as command \a key's geometry for \a transform.
-    void keep(quint64 key, const QCPTransform& transform, std::span<const float> vertices);
+    //! Keeps \a vertices as command \a key's \a width-wide geometry for \a transform.
+    void keep(quint64 key, const QCPTransform& transform, float width,
+              std::span<const float> vertices);
 
     //! Test hook: how many command slots the cache holds.
     [[nodiscard]] int entryCount() const { return int(mEntries.size()); }
@@ -98,6 +100,7 @@ private:
     struct Entry
     {
         QCPTransform transform;
+        float width = 0; //!< the stroke width the vertices were extruded for
         std::vector<float> vertices; //!< empty: nothing was kept for this command yet
     };
 

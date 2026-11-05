@@ -107,7 +107,7 @@ void addPolyline(const QCPDrawList& list, const qcp::QCPDrawCommand& command,
     }
     const quint64 key = qcpCommandIndex(list, command);
     QPointF delta;
-    const std::span<const float> kept = cache->translated(key, transform, &delta);
+    const std::span<const float> kept = cache->translated(key, transform, width, &delta);
     if (!kept.empty())
     {
         qcp::addGpuStroke(layer, kept, pen, width, clip, dpr, height, delta);
@@ -115,7 +115,7 @@ void addPolyline(const QCPDrawList& list, const qcp::QCPDrawCommand& command,
     }
     qcp::extrudeStroke(points, pen, width, verts, closed);
     qcp::addGpuStroke(layer, verts, pen, width, clip, dpr, height);
-    cache->keep(key, transform, verts);
+    cache->keep(key, transform, width, verts);
 }
 
 // Triangle strip between two pixel-space curves of the same length.
@@ -307,17 +307,18 @@ void QCPExtrusionCache::beginReplay(quint64 list, std::size_t commands)
 }
 
 std::span<const float> QCPExtrusionCache::translated(quint64 key, const QCPTransform& transform,
-                                                     QPointF* delta)
+                                                     float width, QPointF* delta)
 {
     if (key >= mEntries.size())
         return { };
     const Entry& entry = mEntries[key];
-    if (entry.vertices.empty() || !transform.isTranslationOf(entry.transform, delta))
+    if (entry.vertices.empty() || !qFuzzyCompare(entry.width, width)
+        || !transform.isTranslationOf(entry.transform, delta))
         return { };
     return std::span<const float>(entry.vertices);
 }
 
-void QCPExtrusionCache::keep(quint64 key, const QCPTransform& transform,
+void QCPExtrusionCache::keep(quint64 key, const QCPTransform& transform, float width,
                              std::span<const float> vertices)
 {
     if (key >= mEntries.size())
@@ -325,6 +326,7 @@ void QCPExtrusionCache::keep(quint64 key, const QCPTransform& transform,
     Entry& entry = mEntries[key];
     entry.vertices.assign(vertices.begin(), vertices.end());
     entry.transform = transform;
+    entry.width = width;
 }
 
 void QCPExtrusionCache::clear()

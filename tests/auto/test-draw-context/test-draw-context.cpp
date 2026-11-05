@@ -4,7 +4,9 @@
 #include <painting/draw-commands.h>
 #include <painting/draw-context.h>
 #include <painting/line-extruder.h>
+#include <painting/plottable-rhi-layer.h>
 #include <painting/raster-fallback.h>
+#include <painting/scatter-rhi-layer.h>
 #include <qcustomplot.h>
 
 #include <QFontMetrics>
@@ -700,6 +702,44 @@ void TestDrawContext::extruderContinuesArcLengthAcrossRuns()
     const float afterGap = QCPLineExtruder::appendPolylineWithDistance(
         std::span<const QPointF>(gapped), 2.0f, Qt::black, verts);
     QVERIFY2(std::abs(afterGap - 10.0f) < 1e-4f, "a NaN gap restarts the arc length at zero");
+}
+
+void TestDrawContext::extrusionCacheDropsOnADprChange()
+{
+    // A cosmetic pen's extrusion width is 1/dpr, so the triangles kept for one device pixel ratio
+    // must not be reused at another: they would be twice too wide or too thin.
+    Fixture fixture;
+    QCPPlottableRhiLayer plottables(nullptr);
+    QCPScatterRhiLayer scatter(nullptr);
+    QCPResolveCache resolve;
+    qcp::QCPRasterFallback fallback;
+    QCPExtrusionCache extrusion;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    QPen pen(Qt::black);
+    pen.setCosmetic(true);
+    context.polyline(sharedPoints({ { 1, 1 }, { 2, 2 }, { 3, 3 } }), pen);
+    const QSize outputSize(kWidth, kHeight);
+    const QCPDrawList& list = context.drawList();
+    const QCPDrawFrame& frame = context.frame();
+
+    const quint64 before = QCPLineExtruder::extruderCallCount();
+    plottables.clear();
+    qcpReplayWithRhi(list, plottables, scatter, frame, resolve, fallback, 1.0, outputSize, 0,
+                     &extrusion);
+    const quint64 afterDpr1 = QCPLineExtruder::extruderCallCount();
+    QVERIFY2(afterDpr1 > before, "the first replay extrudes");
+
+    plottables.clear();
+    qcpReplayWithRhi(list, plottables, scatter, frame, resolve, fallback, 1.0, outputSize, 0,
+                     &extrusion);
+    QCOMPARE(QCPLineExtruder::extruderCallCount(), afterDpr1);
+
+    plottables.clear();
+    qcpReplayWithRhi(list, plottables, scatter, frame, resolve, fallback, 2.0, outputSize, 0,
+                     &extrusion);
+    QVERIFY2(QCPLineExtruder::extruderCallCount() > afterDpr1,
+             "a new device pixel ratio rebuilds the cosmetic pen's triangles");
 }
 
 void TestDrawContext::resolveCacheSurvivesNewEntries()

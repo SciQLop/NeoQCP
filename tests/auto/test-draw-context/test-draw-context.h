@@ -36,4 +36,5 @@ private slots:
     void ellipseFanFillCoversTheDisc();
     void mixedRecordingSplitsByKind();
     void extruderContinuesArcLengthAcrossRuns();
+    void extrusionCacheDropsOnADprChange();
 };
