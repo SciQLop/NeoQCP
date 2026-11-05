@@ -26,6 +26,7 @@ private slots:
   void plotWidthBarsNeverReRecord();
   void pixelWidthBarsReRecordOnEveryPan();
   void barsSelectionReRecordsAndUsesTheDecorator();
+  void bracketDecorationOverTheBars();
   void barsPanDoesNotReRecord();
   
 private:

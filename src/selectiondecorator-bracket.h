@@ -28,6 +28,10 @@
 
 #include "plottables/plottable.h"
 
+#include <QPolygonF>
+
+class QCPDrawContext;
+
 class QCP_LIB_DECL QCPSelectionDecoratorBracket : public QCPSelectionDecorator
 {
     Q_GADGET
@@ -86,6 +90,13 @@ public:
     // introduced virtual methods:
     virtual void drawBracket(QCPPainter* painter, int direction) const;
 
+    /*! Records \a selection's brackets as draw commands instead of drawing them with a painter, so
+      that a recorded plottable draws them after its own geometry. Returns false when the bracket
+      style is a custom one: the caller then draws \ref drawDecoration through a painter callback,
+      which lands with the plottable's other painted content.
+    */
+    bool recordDecoration(QCPDrawContext& context, QCPDataSelection selection) const;
+
     // virtual methods:
     virtual void drawDecoration(QCPPainter* painter, QCPDataSelection selection) override;
 
@@ -100,6 +111,7 @@ protected:
     int mTangentAverage;
 
     // non-virtual methods:
+    QList<QPolygonF> bracketOutline(int direction) const;
     double getTangentAngle(const QCPPlottableInterface1D* interface1d, int dataIndex,
                            int direction) const;
     QPointF getPixelCoordinates(const QCPPlottableInterface1D* interface1d, int dataIndex) const;

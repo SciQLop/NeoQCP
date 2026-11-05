@@ -608,6 +608,45 @@ void TestQCPBars::barsSelectionReRecordsAndUsesTheDecorator()
     QCOMPARE(pixelOfBar(1), unselected);        // its neighbour did not change
 }
 
+void TestQCPBars::bracketDecorationOverTheBars()
+{
+    // The bracket decorator marks the ends of a selection: it must stay visible over the bar it
+    // marks, which is drawn by the GPU on screen.
+    QWidget host;
+    QCustomPlot* plot = shownPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    auto* bars = new QCPBars(plot->xAxis, plot->yAxis);
+    bars->setData(QVector<double> { 1 }, QVector<double> { 2 });
+    bars->setWidth(0.6);
+    bars->setPen(Qt::NoPen);
+    bars->setBrush(Qt::blue);
+    plot->xAxis->setRange(0, 2);
+    plot->yAxis->setRange(0, 4);
+
+    auto* bracket = new QCPSelectionDecoratorBracket;
+    bracket->setBracketStyle(QCPSelectionDecoratorBracket::bsSquareBracket);
+    bracket->setBracketPen(QPen(Qt::green, 3));
+    bracket->setBrush(Qt::blue); // the selected bar's fill, under the brackets
+    bracket->setBracketWidth(10);
+    bracket->setBracketHeight(40);
+    bars->setSelectionDecorator(bracket);
+    bars->setSelectable(QCP::stSingleData);
+    bars->setSelection(QCPDataSelection(QCPDataRange(0, 1)));
+
+    plot->replot(QCustomPlot::rpImmediateRefresh);
+    QTest::qWait(10);
+    const QImage frame = plot->grabFramebuffer();
+    const double dpr = frame.devicePixelRatio();
+    // The brackets sit on the bar's top pixel and are 40 pixels tall: the vertical stroke runs
+    // through the bar, six pixels under its top edge.
+    const QColor over
+        = frame.pixelColor(qRound(plot->xAxis->coordToPixel(1) * dpr),
+                           qRound((plot->yAxis->coordToPixel(2) + 6) * dpr));
+    QVERIFY2(over.green() > 150 && over.red() < 120 && over.blue() < 120,
+             qPrintable(QStringLiteral("the bar covers its bracket: %1").arg(over.name())));
+}
+
 void TestQCPBars::barsPanDoesNotReRecord()
 {
     // 10 000 bars, all positions in plot coordinates: a pan reuses both the recording and the

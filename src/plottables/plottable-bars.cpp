@@ -30,6 +30,7 @@
 #include "../layoutelements/layoutelement-axisrect.h"
 #include "../painting/draw-context.h"
 #include "../painting/painter.h"
+#include "../selectiondecorator-bracket.h"
 
 #include <typeinfo>
 
@@ -1000,9 +1001,15 @@ void QCPBars::draw(QCPDrawContext& context) const
     if (mSelectionDecorator && !selection().isEmpty()
         && typeid(*mSelectionDecorator) != typeid(QCPSelectionDecorator))
     {
-        context.painter([this](QCPPainter& painter, const QCPTransform&) {
-            mSelectionDecorator->drawDecoration(&painter, selection());
-        });
+        // A bracket decorator's shapes are recorded after the bars, so the replay draws them over
+        // the bars the GPU draws. A custom style stays on the painter callback, under them.
+        const auto* bracket = dynamic_cast<const QCPSelectionDecoratorBracket*>(mSelectionDecorator);
+        if (!bracket || !bracket->recordDecoration(context, selection()))
+        {
+            context.painter([this](QCPPainter& painter, const QCPTransform&) {
+                mSelectionDecorator->drawDecoration(&painter, selection());
+            });
+        }
     }
 }
 

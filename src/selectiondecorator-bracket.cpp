@@ -25,7 +25,11 @@
 
 #include "selectiondecorator-bracket.h"
 
+#include "painting/draw-context.h"
 #include "plottables/plottable1d.h"
+
+#include <cmath>
+#include <vector>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPSelectionDecoratorBracket
@@ -153,43 +157,59 @@ void QCPSelectionDecoratorBracket::setTangentAverage(int pointCount)
 */
 void QCPSelectionDecoratorBracket::drawBracket(QCPPainter* painter, int direction) const
 {
+    const QList<QPolygonF> outline = bracketOutline(direction);
+    if (outline.isEmpty())
+    {
+        qDebug() << Q_FUNC_INFO
+                 << "unknown/custom bracket style can't be handeld by default implementation:"
+                 << static_cast<int>(mBracketStyle);
+        return;
+    }
+    for (const QPolygonF& polygon : outline)
+    {
+        if (mBracketStyle == bsEllipse)
+            painter->drawPolygon(polygon);
+        else
+            painter->drawPolyline(polygon);
+    }
+}
+
+/*! \internal
+
+  The shape of one bracket, in pixels around its tip at the origin, one polygon per stroke. It is the
+  single source of the shape: \ref drawBracket paints it and \ref recordDecoration records it as
+  commands. A custom style (\ref bsUserStyle) has no outline here and draws itself in
+  \ref drawBracket.
+*/
+QList<QPolygonF> QCPSelectionDecoratorBracket::bracketOutline(int direction) const
+{
+    const double halfWidth = mBracketWidth * 0.5;
+    const double halfHeight = mBracketHeight * 0.5;
+    const double reach = mBracketWidth * direction;
+    const auto sampled = [&](double fromDegrees, double sweepDegrees, int steps)
+    {
+        QPolygonF polygon;
+        for (int i = 0; i <= steps; ++i)
+        {
+            const double angle = (fromDegrees + sweepDegrees * i / steps) * M_PI / 180.0;
+            polygon << QPointF(halfWidth * std::cos(angle), halfHeight * std::sin(angle));
+        }
+        return polygon;
+    };
     switch (mBracketStyle)
     {
         case bsSquareBracket:
-        {
-            painter->drawLine(
-                QLineF(mBracketWidth * direction, -mBracketHeight * 0.5, 0, -mBracketHeight * 0.5));
-            painter->drawLine(
-                QLineF(mBracketWidth * direction, mBracketHeight * 0.5, 0, mBracketHeight * 0.5));
-            painter->drawLine(QLineF(0, -mBracketHeight * 0.5, 0, mBracketHeight * 0.5));
-            break;
-        }
-        case bsHalfEllipse:
-        {
-            painter->drawArc(
-                QRectF(-mBracketWidth * 0.5, -mBracketHeight * 0.5, mBracketWidth, mBracketHeight),
-                -90 * 16, -180 * 16 * direction);
-            break;
-        }
-        case bsEllipse:
-        {
-            painter->drawEllipse(
-                QRectF(-mBracketWidth * 0.5, -mBracketHeight * 0.5, mBracketWidth, mBracketHeight));
-            break;
-        }
+            return { QPolygonF { QPointF(reach, -halfHeight), QPointF(0, -halfHeight),
+                                 QPointF(0, halfHeight), QPointF(reach, halfHeight) } };
         case bsPlus:
-        {
-            painter->drawLine(QLineF(0, -mBracketHeight * 0.5, 0, mBracketHeight * 0.5));
-            painter->drawLine(QLineF(-mBracketWidth * 0.5, 0, mBracketWidth * 0.5, 0));
-            break;
-        }
+            return { QPolygonF { QPointF(0, -halfHeight), QPointF(0, halfHeight) },
+                     QPolygonF { QPointF(-halfWidth, 0), QPointF(halfWidth, 0) } };
+        case bsHalfEllipse: // the arc drawArc(-90, -180 * direction) described, flattened
+            return { sampled(-90.0, -180.0 * direction, 24) };
+        case bsEllipse:
+            return { sampled(0.0, 360.0, 32) };
         default:
-        {
-            qDebug() << Q_FUNC_INFO
-                     << "unknown/custom bracket style can't be handeld by default implementation:"
-                     << static_cast<int>(mBracketStyle);
-            break;
-        }
+            return {};
     }
 }
 
@@ -241,6 +261,52 @@ void QCPSelectionDecoratorBracket::drawDecoration(QCPPainter* painter, QCPDataSe
             painter->setTransform(oldTransform);
         }
     }
+}
+
+/*! \internal
+
+  Records the brackets of \a selection as draw commands, so a recorded plottable draws them after
+  the geometry it draws with the GPU instead of under it. A custom bracket style has no outline to
+  record: false is returned and the caller draws the decoration with a painter.
+*/
+bool QCPSelectionDecoratorBracket::recordDecoration(QCPDrawContext& context,
+                                                    QCPDataSelection selection) const
+{
+    if (!mPlottable || !mPlottable->interface1D() || selection.isEmpty()
+        || bracketOutline(1).isEmpty())
+        return false;
+    // The brackets are pixel-sized around a pixel anchor: the recording follows the transform, as
+    // any other baked pixel does.
+    (void)context.transform();
+    QCPAxis* keyAxis = mPlottable->keyAxis();
+    const int openDirection = (keyAxis && !keyAxis->rangeReversed()) ? 1 : -1;
+    const auto recordBracket = [&](int dataIndex, int direction)
+    {
+        const QPointF at = getPixelCoordinates(mPlottable->interface1D(), dataIndex);
+        QTransform placement;
+        placement.translate(at.x(), at.y());
+        if (mTangentToData)
+            placement.rotate(getTangentAngle(mPlottable->interface1D(), dataIndex, direction)
+                             / M_PI * 180.0);
+        std::vector<QCP::Position> points;
+        for (const QPolygonF& outline : bracketOutline(direction))
+        {
+            const QPolygonF polygon = placement.map(outline);
+            points.assign(polygon.size(), QCP::Pixels {});
+            for (std::size_t i = 0; i < std::size_t(polygon.size()); ++i)
+                points[i] = QCP::Pixels { polygon[int(i)].x(), polygon[int(i)].y() };
+            if (mBracketStyle == bsEllipse)
+                context.polygon(points, mBracketPen, mBracketBrush);
+            else
+                context.polyline(points, mBracketPen);
+        }
+    };
+    for (const QCPDataRange& dataRange : selection.dataRanges())
+    {
+        recordBracket(dataRange.begin(), openDirection);
+        recordBracket(dataRange.end() - 1, -openDirection);
+    }
+    return true;
 }
 
 /*! \internal
