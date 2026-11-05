@@ -55,6 +55,40 @@ std::vector<float>& markerScratch()
     return points;
 }
 
+//! True when every position the command was recorded from is QCP::Data.
+//!
+//! Only then do the resolved pixels move by one delta when the transform pans: a pixel or ratio
+//! position stays put, and an anchor follows its item. Kept triangles for anything else would be
+//! shifted to the wrong place.
+bool isDataOnlyCommand(const qcp::QCPDrawCommand& command)
+{
+    const auto allData = [](const std::vector<QCP::Position>& positions)
+    {
+        return std::all_of(positions.begin(), positions.end(), [](const QCP::Position& p)
+                           { return std::holds_alternative<QCP::Data>(p); });
+    };
+    return std::visit(
+        [&allData](const auto& cmd)
+        {
+            using T = std::decay_t<decltype(cmd)>;
+            if constexpr (std::is_same_v<T, qcp::PolylineDataCmd>
+                          || std::is_same_v<T, qcp::FillBetweenCmd>
+                          || std::is_same_v<T, qcp::MarkersCmd>
+                          || std::is_same_v<T, qcp::ErrorBarsCmd>)
+                return true;
+            else if constexpr (std::is_same_v<T, qcp::PolylinePositionsCmd>
+                               || std::is_same_v<T, qcp::PolygonCmd>)
+                return allData(cmd.points);
+            else if constexpr (std::is_same_v<T, qcp::RectCmd>
+                               || std::is_same_v<T, qcp::EllipseCmd>)
+                return std::holds_alternative<QCP::Data>(cmd.a)
+                    && std::holds_alternative<QCP::Data>(cmd.b);
+            else
+                return false;
+        },
+        command);
+}
+
 //! Strokes \a points on the layer, through \a cache when the command's triangles may be kept.
 void addPolyline(const QCPDrawList& list, const qcp::QCPDrawCommand& command,
                  QCPPlottableRhiLayer& layer, std::span<const QPointF> points, const QPen& pen,
@@ -65,7 +99,7 @@ void addPolyline(const QCPDrawList& list, const qcp::QCPDrawCommand& command,
         return;
     const float width = qcp::extrusionPenWidth(pen, dpr);
     std::vector<float>& verts = strokeScratch();
-    if (!cache)
+    if (!cache || !isDataOnlyCommand(command))
     {
         qcp::extrudeStroke(points, pen, width, verts, closed);
         qcp::addGpuStroke(layer, verts, pen, width, clip, dpr, height);

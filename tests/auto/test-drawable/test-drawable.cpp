@@ -4,6 +4,7 @@
 #include <misuse.h>
 #include <painting/draw-context.h>
 #include <painting/line-extruder.h>
+#include <painting/plottable-rhi-layer.h>
 #include <qcustomplot.h>
 
 #include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
@@ -56,7 +57,8 @@ public:
         ZeroValue,
         Disjoint,
         Image,
-        Ratio
+        Ratio,
+        PixelCorner
     };
 
     void draw(QCPDrawContext& context) const override
@@ -112,6 +114,16 @@ public:
                 = { QCP::DataXRatioY { 2, 0.2 }, QCP::DataXRatioY { 6, 0.2 },
                     QCP::DataXRatioY { 6, 0.8 }, QCP::DataXRatioY { 2, 0.8 } };
             context.polygon(corners, QPen(Qt::black, 2), QBrush(Qt::NoBrush));
+            return;
+        }
+        if (mode == PixelCorner) // one data corner, one pixel corner; a ratio span beside it
+        {
+            context.rect(QCP::Data { 2, 2 }, QCP::Pixels { 50, 50 }, QPen(Qt::black, 2),
+                         QBrush(Qt::NoBrush));
+            const QCP::Position span[]
+                = { QCP::DataXRatioY { 2, 0.2 }, QCP::DataXRatioY { 6, 0.2 },
+                    QCP::DataXRatioY { 6, 0.8 }, QCP::DataXRatioY { 2, 0.8 } };
+            context.polygon(span, QPen(Qt::black, 2), QBrush(Qt::NoBrush));
             return;
         }
         if (mode == Image) // a raster box over data (3,3) to (5,5): its outline is a known rect
@@ -573,4 +585,27 @@ void TestDrawable::defaultLegendIconIsTheRecordingFitted()
     QVERIFY2(image.pixelColor(50, 25).lightness() < 200,
              qPrintable(QString("centre is %1").arg(image.pixelColor(50, 25).name())));
     QVERIFY(image.pixelColor(4, 4).lightness() > 240);
+}
+
+void TestDrawable::panKeepsPixelAndRatioCornersInPlace()
+{
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - the kept triangles are a GPU path only");
+    auto* shape = new TestShape(f.plot.get());
+    shape->mode = TestShape::PixelCorner;
+    f.plot->replot();
+
+    // A pan moves only data-space positions. The pixel corner and the ratio span stay put, so
+    // their triangles cannot be kept and shifted: they must be extruded again at offset zero.
+    f.plot->yAxis->setRange(2, 12);
+    f.plot->replot();
+
+    auto* layer = f.plot->plottableRhiLayer(f.plot->currentLayer());
+    QVERIFY(layer);
+    QVERIFY(!layer->drawEntries().isEmpty());
+    for (const auto& entry : layer->drawEntries())
+        QVERIFY2(
+            qFuzzyIsNull(entry.offsetX) && qFuzzyIsNull(entry.offsetY),
+            qPrintable(QStringLiteral("entry offset %1,%2").arg(entry.offsetX).arg(entry.offsetY)));
 }

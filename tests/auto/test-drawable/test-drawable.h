@@ -28,4 +28,5 @@ private slots:
     void pixelAnchoredShapeIsHittable();
     void defaultDataRangeFollowsTheExtentRules();
     void defaultLegendIconIsTheRecordingFitted();
+    void panKeepsPixelAndRatioCornersInPlace();
 };
