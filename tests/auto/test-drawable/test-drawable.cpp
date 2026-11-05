@@ -54,7 +54,9 @@ public:
         Mixed,
         Anchored,
         ZeroValue,
-        Disjoint
+        Disjoint,
+        Image,
+        Ratio
     };
 
     void draw(QCPDrawContext& context) const override
@@ -98,10 +100,25 @@ public:
         }
         if (mode == Anchored)
         {
-            const QCP::Position corners[] = { QCP::AnchorOffset { mAnchor, QCP::PixelOffset { } },
-                                              QCP::AnchorOffset { mAnchor,
-                                                                  QCP::PixelOffset { 20, 20 } } };
+            const QCP::Position corners[]
+                = { QCP::AnchorOffset { mAnchor, QCP::PixelOffset { } },
+                    QCP::AnchorOffset { mAnchor, QCP::PixelOffset { 20, 20 } } };
             context.polygon(corners, QPen(Qt::black), QBrush(fill));
+            return;
+        }
+        if (mode == Ratio) // data keys, axis-ratio values: the value side cannot be indexed
+        {
+            const QCP::Position corners[]
+                = { QCP::DataXRatioY { 2, 0.2 }, QCP::DataXRatioY { 6, 0.2 },
+                    QCP::DataXRatioY { 6, 0.8 }, QCP::DataXRatioY { 2, 0.8 } };
+            context.polygon(corners, QPen(Qt::black, 2), QBrush(Qt::NoBrush));
+            return;
+        }
+        if (mode == Image) // a raster box over data (3,3) to (5,5): its outline is a known rect
+        {
+            QImage image(2, 2, QImage::Format_ARGB32_Premultiplied);
+            image.fill(Qt::darkGray);
+            context.image(QCP::Data { 3, 3 }, QCP::Data { 5, 5 }, image);
             return;
         }
         const double valueTop = mode == ZeroValue ? 0.0 : 2.0;
@@ -151,10 +168,7 @@ public:
     }
 
     //! The adapter's old virtual, which the legend calls.
-    void paintIcon(QCPPainter* painter, const QRectF& rect) const
-    {
-        drawLegendIcon(painter, rect);
-    }
+    void paintIcon(QCPPainter* painter, const QRectF& rect) const { drawLegendIcon(painter, rect); }
 
     std::shared_ptr<const std::vector<QPointF>> mLine
         = std::make_shared<const std::vector<QPointF>>(
@@ -374,8 +388,7 @@ void TestDrawable::defaultHitTestMatchesGeometry()
     f.plot->replot();
     const auto at = [&](double key, double value)
     {
-        return QCP::Pixels { f.plot->xAxis->coordToPixel(key),
-                             f.plot->yAxis->coordToPixel(value) };
+        return QCP::Pixels { f.plot->xAxis->coordToPixel(key), f.plot->yAxis->coordToPixel(value) };
     };
 
     const std::optional<double> inside = shape->hitTest(at(4, 4), nullptr);
@@ -383,12 +396,59 @@ void TestDrawable::defaultHitTestMatchesGeometry()
     QCOMPARE(*inside, 0.0); // inside a visible fill
 
     const double edge = f.plot->xAxis->coordToPixel(2);
-    const std::optional<double> near = shape->hitTest(QCP::Pixels { edge - 3, at(0, 4).y },
-                                                      nullptr);
+    const std::optional<double> near
+        = shape->hitTest(QCP::Pixels { edge - 3, at(0, 4).y }, nullptr);
     QVERIFY2(near.has_value(), "3 px from the outline is inside the selection tolerance");
     QVERIFY2(*near > 1.0 && *near < 4.0, qPrintable(QString("distance %1").arg(*near)));
 
     QVERIFY(!shape->hitTest(QCP::Pixels { edge - 60, at(0, 4).y }, nullptr).has_value());
+}
+
+void TestDrawable::hitTestBesideTextIsTheGap()
+{
+    Fixture f;
+    auto* shape = new TestShape(f.plot.get());
+    shape->mode = TestShape::Image; // a box over data (3,3) to (5,5)
+    f.plot->replot();
+
+    const double left = f.plot->xAxis->coordToPixel(3);
+    const double right = f.plot->xAxis->coordToPixel(5);
+    const double top = f.plot->yAxis->coordToPixel(5);
+    const double bottom = f.plot->yAxis->coordToPixel(3);
+    const double middle = (top + bottom) / 2.0;
+    QVERIFY(right > left && bottom > top);
+
+    const std::optional<double> beside = shape->hitTest(QCP::Pixels { right + 3, middle }, nullptr);
+    QVERIFY2(beside.has_value(), "3 px beside the box at mid-height is inside the tolerance");
+    QVERIFY2(*beside > 2.0 && *beside < 4.0, qPrintable(QString("distance %1").arg(*beside)));
+    QVERIFY(!shape->hitTest(QCP::Pixels { right + 30, middle }, nullptr).has_value());
+}
+
+void TestDrawable::pixelAnchoredShapeIsHittable()
+{
+    Fixture f;
+    auto* shape = new TestShape(f.plot.get());
+    shape->mode = TestShape::Ratio; // data keys, ratio values: the value side is unbounded
+    f.plot->replot();
+
+    const double middle = f.plot->xAxis->coordToPixel(4);
+    const double ratioY
+        = f.plot->axisRect()->top() + 0.2 * f.plot->axisRect()->height(); // the top outline
+    const std::optional<double> ratioHit = shape->hitTest(QCP::Pixels { middle, ratioY }, nullptr);
+    QVERIFY2(ratioHit.has_value(), "an unbounded value side must not reject the click");
+    QVERIFY(*ratioHit < 1.0);
+
+    // The same on a log value axis: the box reaches zero, so that side cannot be indexed either.
+    shape->mode = TestShape::ZeroValue; // data (2,0) to (6,6)
+    shape->touch();
+    f.plot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    f.plot->yAxis->setRange(0.1, 100);
+    f.plot->replot();
+
+    const std::optional<double> logHit = shape->hitTest(
+        QCP::Pixels { f.plot->xAxis->coordToPixel(4), f.plot->yAxis->coordToPixel(6) }, nullptr);
+    QVERIFY2(logHit.has_value(), "a box reaching zero on a log axis must not reject the click");
+    QVERIFY(*logHit < 1.0);
 }
 
 void TestDrawable::defaultDataRangeFollowsTheExtentRules()

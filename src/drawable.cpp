@@ -52,6 +52,14 @@ bool finite(const QPointF& point)
     return std::isfinite(point.x()) && std::isfinite(point.y());
 }
 
+//! True when \a value is within \a grow of the mapped \a side: \a lower..\a upper are pixels.
+bool nearSide(double lower, double upper, double value, double grow)
+{
+    if (!std::isfinite(lower) || !std::isfinite(upper))
+        return true; // an unbounded side holds every point, so it cannot reject one
+    return value >= std::min(lower, upper) - grow && value <= std::max(lower, upper) + grow;
+}
+
 //! The distance from \a at to the polyline \a points, in pixels; infinite for an empty polyline.
 double distanceTo(std::span<const QPointF> points, const QPointF& at, bool closed)
 {
@@ -74,12 +82,12 @@ double distanceTo(std::span<const QPointF> points, const QPointF& at, bool close
     return std::sqrt(best);
 }
 
-//! The distance from \a at to \a rect, 0 inside.
+//! The distance from \a at to \a rect, 0 inside: the gap to its nearest point, not to a corner.
 double distanceTo(const QRectF& rect, const QPointF& at)
 {
-    if (rect.contains(at))
-        return 0.0;
-    return std::hypot(rect.left() - at.x(), rect.top() - at.y());
+    const double dx = std::max({ rect.left() - at.x(), 0.0, at.x() - rect.right() });
+    const double dy = std::max({ rect.top() - at.y(), 0.0, at.y() - rect.bottom() });
+    return std::hypot(dx, dy);
 }
 
 //! The outline of an ellipse inscribed in \a box, closed: the hit test samples what the GPU fills.
@@ -401,13 +409,17 @@ std::optional<double> QCPDrawnCore::hitTest(const QCPDrawable& object, QCP::Pixe
     const double pad = pixelPad();
     if (box)
     {
-        // Bounds first: the whole recording's box, mapped and grown by the widest stroke.
-        const QPointF first
-            = qcpResolvePosition(frame, QCP::Data { box->keyLower, box->valueLower });
-        const QPointF second
-            = qcpResolvePosition(frame, QCP::Data { box->keyUpper, box->valueUpper });
+        // Bounds first: the recording's box, mapped and grown by the widest stroke. Only the sides
+        // the box really has are checked: an unbounded one is ±inf, which maps to a pixel far
+        // outside the rect or to NaN on a log axis, and either would reject every point.
         const double grow = pad + tolerance;
-        if (!QRectF(first, second).normalized().adjusted(-grow, -grow, grow, grow).contains(point))
+        const auto keyPixels
+            = [&](double key) { return frame.transform.map(QCP::Data { key, 0.0 }).x; };
+        const auto valuePixels
+            = [&](double value) { return frame.transform.map(QCP::Data { 0.0, value }).y; };
+        if (!nearSide(keyPixels(box->keyLower), keyPixels(box->keyUpper), point.x(), grow)
+            || !nearSide(valuePixels(box->valueLower), valuePixels(box->valueUpper), point.y(),
+                         grow))
             return std::nullopt;
     }
     double best = kInfinity;

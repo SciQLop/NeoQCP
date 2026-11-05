@@ -23,6 +23,8 @@ private slots:
     void drawnPolygonStacksAboveAnEarlierGpuGraph();
 
     void defaultHitTestMatchesGeometry();
+    void hitTestBesideTextIsTheGap();
+    void pixelAnchoredShapeIsHittable();
     void defaultDataRangeFollowsTheExtentRules();
     void defaultLegendIconIsTheRecordingFitted();
 };
