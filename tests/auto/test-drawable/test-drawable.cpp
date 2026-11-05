@@ -239,7 +239,6 @@ public:
         selectEvent(nullptr, false, details, &changed);
     }
 
-    double selectTestAt(const QPointF& pos) const { return selectTest(pos, true); }
 
     mutable int drawCalls = 0;
     std::shared_ptr<const std::vector<QPointF>> mLine
@@ -970,10 +969,10 @@ void TestDrawable::clickOutsideTheAxisRectMisses()
     QVERIFY(!f.plot->axisRect()->rect().contains(outside.toPoint()));
 
     // Built-in plottables refuse a click outside the axis rect, though the geometry is there.
-    QVERIFY(line->selectTestAt(outside) < 0);
+    QVERIFY(line->selectTest(outside, true) < 0);
 
     f.plot->setInteractions(QCP::iSelectPlottablesBeyondAxisRect);
-    QVERIFY(line->selectTestAt(outside) >= 0);
+    QVERIFY(line->selectTest(outside, true) >= 0);
 }
 
 void TestDrawable::mixedCornerRectFollowsAPan()
@@ -1140,6 +1139,34 @@ void TestDrawable::rangeBandExampleDraws()
             if (qGray(frame.pixel(x, y)) < 100)
                 ++inked;
     QVERIFY2(inked > 10, qPrintable(QStringLiteral("%1 dark pixels, no label").arg(inked)));
+}
+
+void TestDrawable::adapterExposesThePublicSelectAndRanges()
+{
+    // I6: QCPAbstractPlottable declares selectTest, getKeyRange and getValueRange public. The
+    // adapter's overrides may not narrow that: a user's `bars->selectTest(...)` and
+    // `band->getKeyRange(...)` must keep compiling.
+    Fixture f;
+    auto* bars = new QCPBars(f.plot->xAxis, f.plot->yAxis);
+    bars->setData(QVector<double> { 5 }, QVector<double> { 4 });
+    auto* band = new RangeBand(f.plot->xAxis, f.plot->yAxis);
+    band->setData(QVector<double> { 1, 9 }, QVector<double> { 3, 3 }, QVector<double> { 5, 5 });
+    f.plot->replot();
+
+    const QPointF onTheBar(f.plot->xAxis->coordToPixel(5), f.plot->yAxis->coordToPixel(2));
+    QVERIFY(bars->selectTest(onTheBar, false) >= 0);
+    QVERIFY(bars->selectTest(QPointF(-50, -50), false) < 0);
+
+    bool foundKey = false;
+    const QCPRange keys = band->getKeyRange(foundKey);
+    QVERIFY(foundKey);
+    QCOMPARE(keys.lower, 1.0);
+    QCOMPARE(keys.upper, 9.0);
+    bool foundValue = false;
+    const QCPRange values = band->getValueRange(foundValue);
+    QVERIFY(foundValue);
+    QCOMPARE(values.lower, 3.0);
+    QCOMPARE(values.upper, 5.0);
 }
 
 void TestDrawable::rangeBandRescalesToItsData()

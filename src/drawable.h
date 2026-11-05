@@ -253,9 +253,9 @@ public:
             return 0;
     }
 
-protected:
-    using QCPDrawnAdapter::drawLegendIcon; // the contract's icon stays reachable
-
+public:
+    // The bases declare these public; re-declaring them under another access would hide them from
+    // name lookup, so a user's `bars->selectTest(...)` and `band->getKeyRange(...)` stop compiling.
     //! A hit hands selectEvent a selection covering the whole recording.
     //!
     //! The recording has no per-point index to hand out: selectEvent only needs a non-empty
@@ -280,19 +280,25 @@ protected:
         return hit;
     }
 
-    QCPRange getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain) const override
+public:
+    QCPRange getKeyRange(bool& foundRange,
+                         QCP::SignDomain inSignDomain = QCP::sdBoth) const override
     {
         return qcpDrawnRange(this->mCore.dataRange(*this, this->view(), false), QCPDrawnSide::Key,
                              foundRange, inSignDomain);
     }
 
-    QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain,
+    QCPRange getValueRange(bool& foundRange,
+                           QCP::SignDomain inSignDomain = QCP::sdBoth,
                            const QCPRange& inKeyRange = QCPRange()) const override
     {
         Q_UNUSED(inKeyRange) // simplify: a box keeps no per-key values, so it cannot be narrowed
         return qcpDrawnRange(this->mCore.dataRange(*this, this->view(), false), QCPDrawnSide::Value,
                              foundRange, inSignDomain);
     }
+
+protected:
+    using QCPDrawnAdapter::drawLegendIcon; // the contract's icon stays reachable
 
     void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override
     {

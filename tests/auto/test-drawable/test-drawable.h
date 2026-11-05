@@ -49,6 +49,7 @@ private slots:
     void removedAnchorItemDoesNotDangle();
     void pannedTimeAxisKeepsTheShapeOnAxis();
     void rangeBandExampleDraws();
+    void adapterExposesThePublicSelectAndRanges();
     void rangeBandRescalesToItsData();
     void rangeBandLegendIconIsInked();
     void exportStacksLikeTheScreen();
