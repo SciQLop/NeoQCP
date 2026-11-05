@@ -5,6 +5,106 @@
 #include <algorithm>
 #include <cstring>
 
+namespace
+{
+QRhiVertexInputLayout vertexLayoutOf(int strideFloats,
+                                     std::initializer_list<QRhiVertexInputAttribute> attributes)
+{
+    QRhiVertexInputLayout layout;
+    layout.setBindings({ { quint32(strideFloats) * quint32(sizeof(float)) } });
+    layout.setAttributes(attributes);
+    return layout;
+}
+
+// All three pipelines differ only in their shaders, vertex layout, topology and SRB.
+QRhiGraphicsPipeline* createGraphicsPipeline(QRhi* rhi, QRhiRenderPassDescriptor* rpDesc,
+                                             int sampleCount, const unsigned char* vertData,
+                                             unsigned int vertLength, const unsigned char* fragData,
+                                             unsigned int fragLength,
+                                             const QRhiVertexInputLayout& layout,
+                                             QRhiGraphicsPipeline::Topology topology,
+                                             QRhiShaderResourceBindings* srb, const char* name)
+{
+    const QShader vertShader = qcp::rhi::loadEmbeddedShader(vertData, vertLength);
+    const QShader fragShader = qcp::rhi::loadEmbeddedShader(fragData, fragLength);
+    if (!vertShader.isValid() || !fragShader.isValid())
+    {
+        qDebug() << "Failed to load" << name << "shaders";
+        return nullptr;
+    }
+
+    QRhiGraphicsPipeline* pipeline = rhi->newGraphicsPipeline();
+    pipeline->setShaderStages(
+        { { QRhiShaderStage::Vertex, vertShader }, { QRhiShaderStage::Fragment, fragShader } });
+    pipeline->setVertexInputLayout(layout);
+    pipeline->setTargetBlends({ qcp::rhi::premultipliedAlphaBlend() });
+    pipeline->setFlags(QRhiGraphicsPipeline::UsesScissor);
+    pipeline->setTopology(topology);
+    pipeline->setSampleCount(sampleCount);
+    pipeline->setRenderPassDescriptor(rpDesc);
+    pipeline->setShaderResourceBindings(srb);
+    if (!pipeline->create())
+    {
+        qDebug() << "Failed to create" << name << "pipeline";
+        delete pipeline;
+        return nullptr;
+    }
+    return pipeline;
+}
+
+QRhiBuffer* createUniformBuffer(QRhi* rhi, int size, const char* failure)
+{
+    QRhiBuffer* buffer = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, size);
+    if (!buffer->create())
+    {
+        qDebug() << failure;
+        delete buffer;
+        return nullptr;
+    }
+    return buffer;
+}
+
+// The SRB names the buffer size, so it has to be recreated after a resize.
+bool growUniformBuffer(QRhiBuffer* buffer, int& size, int required, QRhiShaderResourceBindings* srb,
+                       const char* failure)
+{
+    if (required <= size)
+        return true;
+    size = required;
+    buffer->setSize(size);
+    if (!buffer->create())
+    {
+        qDebug() << failure;
+        return false;
+    }
+    if (srb)
+        srb->create();
+    return true;
+}
+
+bool uploadVertices(QRhi* rhi, QRhiResourceUpdateBatch* updates, QRhiBuffer*& buffer,
+                    int& bufferSize, const float* floats, int floatCount, const char* failure)
+{
+    const int requiredSize = floatCount * static_cast<int>(sizeof(float));
+    if (!buffer || bufferSize < requiredSize)
+    {
+        delete buffer;
+        buffer = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, requiredSize);
+        if (!buffer->create())
+        {
+            qDebug() << failure;
+            delete buffer;
+            buffer = nullptr;
+            bufferSize = 0;
+            return false;
+        }
+        bufferSize = requiredSize;
+    }
+    updates->updateDynamicBuffer(buffer, 0, requiredSize, floats);
+    return true;
+}
+} // namespace
+
 QCPPlottableRhiLayer::QCPPlottableRhiLayer(QRhi* rhi) : mRhi(rhi) { }
 
 QCPPlottableRhiLayer::~QCPPlottableRhiLayer()
@@ -270,30 +370,15 @@ bool QCPPlottableRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc, int 
     // Rebuild pipeline if sample count changed or first creation
     invalidatePipeline();
 
-    // Load shaders from embedded data
-    auto vertShader
-        = qcp::rhi::loadEmbeddedShader(plottable_vert_qsb_data, plottable_vert_qsb_data_len);
-    auto fragShader
-        = qcp::rhi::loadEmbeddedShader(plottable_frag_qsb_data, plottable_frag_qsb_data_len);
-
-    if (!vertShader.isValid() || !fragShader.isValid())
-    {
-        qDebug() << "Failed to load plottable shaders";
-        return false;
-    }
-
     // Create a small initial UBO — will be grown in uploadResources as needed.
     // Uses dynamic offsets: one PerDrawUniforms slot per draw entry.
     const int stride = ubufStride();
     mUniformBufferSize = stride; // start with 1 slot
     delete mUniformBuffer;
-    mUniformBuffer
-        = mRhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, mUniformBufferSize);
-    if (!mUniformBuffer->create())
-    {
-        qDebug() << "Failed to create plottable uniform buffer";
+    mUniformBuffer = createUniformBuffer(mRhi, mUniformBufferSize,
+                                         "Failed to create plottable uniform buffer");
+    if (!mUniformBuffer)
         return false;
-    }
 
     // SRB with dynamic offset: bind the full buffer, one slot at a time
     delete mSrb;
@@ -306,32 +391,16 @@ bool QCPPlottableRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc, int 
         return false;
     }
 
-    mPipeline = mRhi->newGraphicsPipeline();
-    mPipeline->setShaderStages(
-        { { QRhiShaderStage::Vertex, vertShader }, { QRhiShaderStage::Fragment, fragShader } });
-
     // Vertex layout: (x, y) float2 + (r, g, b, a) float4
-    QRhiVertexInputLayout inputLayout;
-    inputLayout.setBindings({ { 6 * sizeof(float) } });
-    inputLayout.setAttributes({ { 0, 0, QRhiVertexInputAttribute::Float2, 0 },
-                                { 0, 1, QRhiVertexInputAttribute::Float4, 2 * sizeof(float) } });
-    mPipeline->setVertexInputLayout(inputLayout);
-
-    mPipeline->setTargetBlends({ qcp::rhi::premultipliedAlphaBlend() });
-
-    mPipeline->setFlags(QRhiGraphicsPipeline::UsesScissor);
-    mPipeline->setTopology(QRhiGraphicsPipeline::Triangles);
-    mPipeline->setSampleCount(sampleCount);
-    mPipeline->setRenderPassDescriptor(rpDesc);
-    mPipeline->setShaderResourceBindings(mSrb);
-
-    if (!mPipeline->create())
-    {
-        qDebug() << "Failed to create plottable pipeline";
-        delete mPipeline;
-        mPipeline = nullptr;
+    mPipeline = createGraphicsPipeline(
+        mRhi, rpDesc, sampleCount, plottable_vert_qsb_data, plottable_vert_qsb_data_len,
+        plottable_frag_qsb_data, plottable_frag_qsb_data_len,
+        vertexLayoutOf(6,
+                       { { 0, 0, QRhiVertexInputAttribute::Float2, 0 },
+                         { 0, 1, QRhiVertexInputAttribute::Float4, 2 * sizeof(float) } }),
+        QRhiGraphicsPipeline::Triangles, mSrb, "plottable");
+    if (!mPipeline)
         return false;
-    }
 
     mLastSampleCount = sampleCount;
     createImagePipeline(rpDesc, sampleCount);
@@ -345,16 +414,6 @@ void QCPPlottableRhiLayer::createImagePipeline(QRhiRenderPassDescriptor* rpDesc,
     // all three every frame; fills then fall back to the layer's painter through canAddImage().
     mLastImageSampleCount = sampleCount;
     mImageBroken = true;
-
-    auto vertShader = qcp::rhi::loadEmbeddedShader(plottable_image_vert_qsb_data,
-                                                   plottable_image_vert_qsb_data_len);
-    auto fragShader = qcp::rhi::loadEmbeddedShader(plottable_image_frag_qsb_data,
-                                                   plottable_image_frag_qsb_data_len);
-    if (!vertShader.isValid() || !fragShader.isValid())
-    {
-        qDebug() << "Failed to load image plottable shaders";
-        return;
-    }
 
     if (!mImageSampler)
     {
@@ -371,15 +430,10 @@ void QCPPlottableRhiLayer::createImagePipeline(QRhiRenderPassDescriptor* rpDesc,
     }
 
     // kMaxImages slots, created once: a resized UBO would invalidate every image's SRB.
-    mImageUniformBuffer = mRhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
-                                          imageUbufStride() * kMaxImages);
-    if (!mImageUniformBuffer->create())
-    {
-        qDebug() << "Failed to create image uniform buffer";
-        delete mImageUniformBuffer;
-        mImageUniformBuffer = nullptr;
+    mImageUniformBuffer = createUniformBuffer(mRhi, imageUbufStride() * kMaxImages,
+                                              "Failed to create image uniform buffer");
+    if (!mImageUniformBuffer)
         return;
-    }
 
     if (!mImageVertexBuffer)
     {
@@ -412,30 +466,17 @@ void QCPPlottableRhiLayer::createImagePipeline(QRhiRenderPassDescriptor* rpDesc,
         return;
     }
 
-    mImagePipeline = mRhi->newGraphicsPipeline();
-    mImagePipeline->setShaderStages(
-        { { QRhiShaderStage::Vertex, vertShader }, { QRhiShaderStage::Fragment, fragShader } });
-    QRhiVertexInputLayout inputLayout;
-    inputLayout.setBindings({ { 4 * sizeof(float) } });
-    inputLayout.setAttributes({ { 0, 0, QRhiVertexInputAttribute::Float2, 0 },
-                                { 0, 1, QRhiVertexInputAttribute::Float2, 2 * sizeof(float) } });
-    mImagePipeline->setVertexInputLayout(inputLayout);
-    mImagePipeline->setTargetBlends({ qcp::rhi::premultipliedAlphaBlend() });
-    mImagePipeline->setFlags(QRhiGraphicsPipeline::UsesScissor);
-    mImagePipeline->setTopology(QRhiGraphicsPipeline::TriangleStrip);
-    mImagePipeline->setSampleCount(sampleCount);
-    mImagePipeline->setRenderPassDescriptor(rpDesc);
-    mImagePipeline->setShaderResourceBindings(layoutSrb);
-
-    if (!mImagePipeline->create())
-    {
-        qDebug() << "Failed to create image plottable pipeline";
-        delete mImagePipeline;
-        mImagePipeline = nullptr;
-        delete layoutSrb;
-        return;
-    }
+    // Vertex layout: (x, y) float2 position + (u, v) float2 texcoord
+    mImagePipeline = createGraphicsPipeline(
+        mRhi, rpDesc, sampleCount, plottable_image_vert_qsb_data, plottable_image_vert_qsb_data_len,
+        plottable_image_frag_qsb_data, plottable_image_frag_qsb_data_len,
+        vertexLayoutOf(4,
+                       { { 0, 0, QRhiVertexInputAttribute::Float2, 0 },
+                         { 0, 1, QRhiVertexInputAttribute::Float2, 2 * sizeof(float) } }),
+        QRhiGraphicsPipeline::TriangleStrip, layoutSrb, "image plottable");
     delete layoutSrb;
+    if (!mImagePipeline)
+        return;
     mImageBroken = false;
 }
 
@@ -492,25 +533,13 @@ void QCPPlottableRhiLayer::createDashedPipeline(QRhiRenderPassDescriptor* rpDesc
     // frame; dashed strokes then fall back to QPainter through dashedAvailable().
     mLastDashSampleCount = sampleCount;
     mDashBroken = true;
-    auto vertShader = qcp::rhi::loadEmbeddedShader(plottable_dashed_vert_qsb_data,
-                                                   plottable_dashed_vert_qsb_data_len);
-    auto fragShader = qcp::rhi::loadEmbeddedShader(plottable_dashed_frag_qsb_data,
-                                                   plottable_dashed_frag_qsb_data_len);
-    if (!vertShader.isValid() || !fragShader.isValid())
-    {
-        qDebug() << "Failed to load dashed plottable shaders";
-        return;
-    }
 
     const int stride = dashUbufStride();
     mDashUniformBufferSize = stride;
-    mDashUniformBuffer
-        = mRhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, mDashUniformBufferSize);
-    if (!mDashUniformBuffer->create())
-    {
-        qDebug() << "Failed to create dashed plottable uniform buffer";
+    mDashUniformBuffer = createUniformBuffer(mRhi, mDashUniformBufferSize,
+                                             "Failed to create dashed plottable uniform buffer");
+    if (!mDashUniformBuffer)
         return;
-    }
 
     mDashSrb = mRhi->newShaderResourceBindings();
     mDashSrb->setBindings({ QRhiShaderResourceBinding::uniformBufferWithDynamicOffset(
@@ -522,31 +551,18 @@ void QCPPlottableRhiLayer::createDashedPipeline(QRhiRenderPassDescriptor* rpDesc
         return;
     }
 
-    mDashPipeline = mRhi->newGraphicsPipeline();
-    mDashPipeline->setShaderStages(
-        { { QRhiShaderStage::Vertex, vertShader }, { QRhiShaderStage::Fragment, fragShader } });
-
     // Vertex layout: (x, y) float2 + (r, g, b, a) float4 + distance float
-    QRhiVertexInputLayout inputLayout;
-    inputLayout.setBindings({ { 7 * sizeof(float) } });
-    inputLayout.setAttributes({ { 0, 0, QRhiVertexInputAttribute::Float2, 0 },
-                                { 0, 1, QRhiVertexInputAttribute::Float4, 2 * sizeof(float) },
-                                { 0, 2, QRhiVertexInputAttribute::Float, 6 * sizeof(float) } });
-    mDashPipeline->setVertexInputLayout(inputLayout);
-    mDashPipeline->setTargetBlends({ qcp::rhi::premultipliedAlphaBlend() });
-    mDashPipeline->setFlags(QRhiGraphicsPipeline::UsesScissor);
-    mDashPipeline->setTopology(QRhiGraphicsPipeline::Triangles);
-    mDashPipeline->setSampleCount(sampleCount);
-    mDashPipeline->setRenderPassDescriptor(rpDesc);
-    mDashPipeline->setShaderResourceBindings(mDashSrb);
-
-    if (!mDashPipeline->create())
-    {
-        qDebug() << "Failed to create dashed plottable pipeline";
-        delete mDashPipeline;
-        mDashPipeline = nullptr;
+    mDashPipeline = createGraphicsPipeline(
+        mRhi, rpDesc, sampleCount, plottable_dashed_vert_qsb_data,
+        plottable_dashed_vert_qsb_data_len, plottable_dashed_frag_qsb_data,
+        plottable_dashed_frag_qsb_data_len,
+        vertexLayoutOf(7,
+                       { { 0, 0, QRhiVertexInputAttribute::Float2, 0 },
+                         { 0, 1, QRhiVertexInputAttribute::Float4, 2 * sizeof(float) },
+                         { 0, 2, QRhiVertexInputAttribute::Float, 6 * sizeof(float) } }),
+        QRhiGraphicsPipeline::Triangles, mDashSrb, "dashed plottable");
+    if (!mDashPipeline)
         return;
-    }
     mDashBroken = false;
 }
 
@@ -641,20 +657,9 @@ void QCPPlottableRhiLayer::uploadSolid(QRhiResourceUpdateBatch* updates, const Q
 
     // Grow UBO if needed (one aligned slot per draw entry)
     const int stride = ubufStride();
-    const int requiredUboSize = stride * mDrawEntries.size();
-    if (requiredUboSize > mUniformBufferSize)
-    {
-        mUniformBufferSize = requiredUboSize;
-        mUniformBuffer->setSize(mUniformBufferSize);
-        if (!mUniformBuffer->create())
-        {
-            qDebug() << "Failed to resize plottable uniform buffer";
-            return;
-        }
-        // SRB must be rebuilt after UBO resize
-        if (mSrb)
-            mSrb->create();
-    }
+    if (!growUniformBuffer(mUniformBuffer, mUniformBufferSize, stride * int(mDrawEntries.size()),
+                           mSrb, "Failed to resize plottable uniform buffer"))
+        return;
 
     // Upload per-draw uniforms (always — offsets change on pan frames)
     for (int i = 0; i < mDrawEntries.size(); ++i)
@@ -674,24 +679,9 @@ void QCPPlottableRhiLayer::uploadSolid(QRhiResourceUpdateBatch* updates, const Q
     if (mStagingSize == 0 || !mDirty)
         return; // a pan only moves the uniforms; the vertices are already on the GPU
 
-    const int requiredSize = mStagingSize * static_cast<int>(sizeof(float));
-    if (!mVertexBuffer || mVertexBufferSize < requiredSize)
-    {
-        delete mVertexBuffer;
-        mVertexBuffer
-            = mRhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, requiredSize);
-        if (!mVertexBuffer->create())
-        {
-            qDebug() << "Failed to create plottable vertex buffer";
-            delete mVertexBuffer;
-            mVertexBuffer = nullptr;
-            mVertexBufferSize = 0;
-            return;
-        }
-        mVertexBufferSize = requiredSize;
-    }
-    updates->updateDynamicBuffer(mVertexBuffer, 0, requiredSize, mStagingData);
-    ++mSolidVertexUploads;
+    if (uploadVertices(mRhi, updates, mVertexBuffer, mVertexBufferSize, mStagingData, mStagingSize,
+                       "Failed to create plottable vertex buffer"))
+        ++mSolidVertexUploads;
 }
 
 void QCPPlottableRhiLayer::uploadDashed(QRhiResourceUpdateBatch* updates, const QSize& outputSize,
@@ -701,19 +691,10 @@ void QCPPlottableRhiLayer::uploadDashed(QRhiResourceUpdateBatch* updates, const 
         return;
 
     const int stride = dashUbufStride();
-    const int requiredUboSize = stride * mDashEntries.size();
-    if (requiredUboSize > mDashUniformBufferSize)
-    {
-        mDashUniformBufferSize = requiredUboSize;
-        mDashUniformBuffer->setSize(mDashUniformBufferSize);
-        if (!mDashUniformBuffer->create())
-        {
-            qDebug() << "Failed to resize dashed plottable uniform buffer";
-            return;
-        }
-        if (mDashSrb)
-            mDashSrb->create();
-    }
+    if (!growUniformBuffer(mDashUniformBuffer, mDashUniformBufferSize,
+                           stride * int(mDashEntries.size()), mDashSrb,
+                           "Failed to resize dashed plottable uniform buffer"))
+        return;
 
     for (int i = 0; i < mDashEntries.size(); ++i)
     {
@@ -737,24 +718,9 @@ void QCPPlottableRhiLayer::uploadDashed(QRhiResourceUpdateBatch* updates, const 
     if (mDashStagingSize == 0 || !mDirty)
         return; // as above: nothing moved but the offsets
 
-    const int requiredSize = mDashStagingSize * static_cast<int>(sizeof(float));
-    if (!mDashVertexBuffer || mDashVertexBufferSize < requiredSize)
-    {
-        delete mDashVertexBuffer;
-        mDashVertexBuffer
-            = mRhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, requiredSize);
-        if (!mDashVertexBuffer->create())
-        {
-            qDebug() << "Failed to create dashed plottable vertex buffer";
-            delete mDashVertexBuffer;
-            mDashVertexBuffer = nullptr;
-            mDashVertexBufferSize = 0;
-            return;
-        }
-        mDashVertexBufferSize = requiredSize;
-    }
-    updates->updateDynamicBuffer(mDashVertexBuffer, 0, requiredSize, mDashStagingData);
-    ++mDashVertexUploads;
+    if (uploadVertices(mRhi, updates, mDashVertexBuffer, mDashVertexBufferSize, mDashStagingData,
+                       mDashStagingSize, "Failed to create dashed plottable vertex buffer"))
+        ++mDashVertexUploads;
 }
 
 void QCPPlottableRhiLayer::render(QRhiCommandBuffer* cb, const QSize& outputSize)
@@ -766,84 +732,80 @@ void QCPPlottableRhiLayer::render(QRhiCommandBuffer* cb, const QSize& outputSize
 
     const QRhiViewport viewport(0, 0, float(outputSize.width()), float(outputSize.height()));
 
-    // Walk the submissions in order and rebind only when the pipeline actually changes: a solid,
-    // dashed or image plottable keeps its relative stacking whatever its style looks like.
-    enum class Bound
+    // Everything one submission needs. A null pipeline means the entry cannot be drawn.
+    struct DrawCall
     {
-        None,
-        Solid,
-        Dashed,
-        Image
-    } bound = Bound::None;
-    const QRhiCommandBuffer::VertexInput solidBinding(mVertexBuffer, 0);
-    const QRhiCommandBuffer::VertexInput dashBinding(mDashVertexBuffer, 0);
-    const QRhiCommandBuffer::VertexInput imageBinding(mImageVertexBuffer, 0);
-    for (const OrderedDraw& record : mDrawOrder)
+        QRhiGraphicsPipeline* pipeline = nullptr;
+        QRhiShaderResourceBindings* srb = nullptr;
+        QRhiBuffer* vertices = nullptr;
+        QRect scissor;
+        int firstVertex = 0;
+        int vertexCount = 0;
+        int uniformIndex = 0;
+        int uniformStride = 0;
+    };
+
+    const auto callOf = [&](const OrderedDraw& record)
     {
+        DrawCall call;
         if (record.kind == DrawKind::Dashed)
         {
             if (!mDashPipeline || !mDashVertexBuffer || !mDashSrb)
-                continue;
-            if (bound != Bound::Dashed)
-            {
-                cb->setGraphicsPipeline(mDashPipeline);
-                cb->setViewport(viewport); // QRhi: the viewport belongs to the pipeline binding
-                bound = Bound::Dashed;
-            }
-            const auto& entry = mDashEntries[record.index];
-            const QPair<int, quint32> dynamicOffset(0, quint32(record.index * dashUbufStride()));
-            cb->setShaderResources(mDashSrb, 1, &dynamicOffset);
-            cb->setVertexInput(0, 1, &dashBinding);
-            cb->setScissor({ entry.scissorRect.x(), entry.scissorRect.y(),
-                             entry.scissorRect.width(), entry.scissorRect.height() });
-            cb->draw(entry.vertexCount, 1, entry.vertexOffset, 0);
-            continue;
+                return call;
+            const DashedEntry& entry = mDashEntries[record.index];
+            return DrawCall { mDashPipeline,     mDashSrb,           mDashVertexBuffer,
+                              entry.scissorRect, entry.vertexOffset, entry.vertexCount,
+                              record.index,      dashUbufStride() };
         }
-
         if (record.kind == DrawKind::Image)
         {
             if (!mImagePipeline || !mImageVertexBuffer)
-                continue;
-            const auto& entry = mImageEntries[record.index];
+                return call;
+            const ImageEntry& entry = mImageEntries[record.index];
             const ImageTexture* texture = mImageTextures.value(entry.imageKey, nullptr);
             if (!texture || !texture->srb)
-                continue;
-            if (bound != Bound::Image)
-            {
-                cb->setGraphicsPipeline(mImagePipeline);
-                cb->setViewport(viewport);
-                bound = Bound::Image;
-            }
-            const QPair<int, quint32> dynamicOffset(0, quint32(record.index * imageUbufStride()));
-            cb->setShaderResources(texture->srb, 1, &dynamicOffset);
-            cb->setVertexInput(0, 1, &imageBinding);
-            cb->setScissor({ entry.scissorRect.x(), entry.scissorRect.y(),
-                             entry.scissorRect.width(), entry.scissorRect.height() });
-            cb->draw(4);
-            continue;
+                return call;
+            return DrawCall {
+                mImagePipeline, texture->srb,     mImageVertexBuffer, entry.scissorRect, 0, 4,
+                record.index,   imageUbufStride()
+            };
         }
-
         if (!mPipeline || !mVertexBuffer || !mSrb)
-            continue;
-        if (bound != Bound::Solid)
-        {
-            cb->setGraphicsPipeline(mPipeline);
-            cb->setViewport(viewport);
-            bound = Bound::Solid;
-        }
-        const auto& entry = mDrawEntries[record.index];
+            return call;
+        const DrawEntry& entry = mDrawEntries[record.index];
         if (entry.vertexCount == 0)
+            return call;
+        return DrawCall { mPipeline,          mSrb,
+                          mVertexBuffer,      entry.scissorRect,
+                          entry.vertexOffset, entry.vertexCount,
+                          record.index,       ubufStride() };
+    };
+
+    // Walk the submissions in order and rebind only when the pipeline actually changes: a solid,
+    // dashed or image plottable keeps its relative stacking whatever its style looks like.
+    const QRhiGraphicsPipeline* bound = nullptr;
+    for (const OrderedDraw& record : mDrawOrder)
+    {
+        const DrawCall call = callOf(record);
+        if (!call.pipeline)
             continue;
+        if (bound != call.pipeline)
+        {
+            cb->setGraphicsPipeline(call.pipeline);
+            cb->setViewport(viewport); // QRhi: the viewport belongs to the pipeline binding
+            bound = call.pipeline;
+        }
         // Bind per-draw uniform slot via dynamic offset.
         // setShaderResources must precede setVertexInput — on Metal, QRhi offsets
         // vertex buffer indices by the number of SRB buffer bindings.
-        const QPair<int, quint32> dynamicOffset(0, quint32(record.index * ubufStride()));
-        cb->setShaderResources(mSrb, 1, &dynamicOffset);
-        cb->setVertexInput(0, 1, &solidBinding);
-        cb->setScissor({ entry.scissorRect.x(), entry.scissorRect.y(), entry.scissorRect.width(),
-                         entry.scissorRect.height() });
+        const QPair<int, quint32> dynamicOffset(0, quint32(call.uniformIndex * call.uniformStride));
+        cb->setShaderResources(call.srb, 1, &dynamicOffset);
+        const QRhiCommandBuffer::VertexInput input(call.vertices, 0);
+        cb->setVertexInput(0, 1, &input);
+        cb->setScissor(
+            { call.scissor.x(), call.scissor.y(), call.scissor.width(), call.scissor.height() });
         // Fill and stroke are one contiguous range: the triangles do not care which is which, so
-        // one draw covers both.
-        cb->draw(entry.vertexCount, 1, entry.vertexOffset, 0);
+        // one draw covers both. The image quad is four vertices.
+        cb->draw(call.vertexCount, 1, call.firstVertex, 0);
     }
 }
