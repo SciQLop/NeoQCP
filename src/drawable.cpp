@@ -240,6 +240,7 @@ struct QCPDrawnCore::State
     quint64 recordedGeneration = 0;
     quint64 recordedEpoch = 0;
     quint64 recordedItemsEpoch = 0;
+    quint64 recordedFrame = 0;
     quint64 recordedDependency = 0;
     const void* recordedSource = nullptr;
     QCPTransform recordedTransform;
@@ -415,10 +416,14 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
     mState->reportedMissingAxis = false;
     const quint64 epoch = view.plot ? view.plot->viewEpoch() : 0;
     const quint64 itemsEpoch = view.plot ? view.plot->itemsEpoch() : 0;
+    const quint64 frame = view.plot ? view.plot->frameEpoch() : 0;
     const QCPTransform transform(view.keyAxis, view.valueAxis);
     const void* source = object.dataSource();
     const quint64 dependency = object.dependencyRevision();
-    const bool stale = !mState->recorded || mState->recording.everyFrame
+    // An everyFrame() recording reads something the object cannot declare, so it is rebuilt by each
+    // frame - once: the frame's paint and the queries it makes see the recording it built.
+    const bool everyFrame = mState->recording.everyFrame && (!view.plot || mState->recordedFrame != frame);
+    const bool stale = !mState->recorded || everyFrame
         || mState->recordedGeneration != mState->generation || mState->recordedSource != source
         || mState->recordedDependency != dependency
         || (mState->viewDependent && mState->recordedEpoch != epoch)
@@ -440,6 +445,7 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
     mState->recordedGeneration = mState->generation;
     mState->recordedEpoch = epoch;
     mState->recordedItemsEpoch = itemsEpoch;
+    mState->recordedFrame = frame;
     mState->recordedSource = source;
     mState->recordedDependency = dependency;
     mState->recordedTransform = transform;

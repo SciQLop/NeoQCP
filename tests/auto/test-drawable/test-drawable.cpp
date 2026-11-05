@@ -90,6 +90,8 @@ public:
     void draw(QCPDrawContext& context) const override
     {
         ++drawCalls;
+        if (everyFrame)
+            context.recordEveryFrame();
         if (contentChangeInsideDraw)
             const_cast<TestShape*>(this)->contentChanged();
         if (rangeInsideDraw)
@@ -250,6 +252,8 @@ public:
     bool escapeHatch = false;
     bool readsTheme = false;
     bool readsTransform = false;
+    //! Declare that the recording reads something no setter tells the object about.
+    bool everyFrame = false;
     bool contentChangeInsideDraw = false;
     //! Ask for the object's own range while recording it, as a custom draw() may.
     bool rangeInsideDraw = false;
@@ -526,6 +530,29 @@ void TestDrawable::transformReaderReRecordsOnEveryPan()
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 3);
     QCOMPARE(shape->dirtyCalls, 0); // a view change is not a content change
+}
+
+void TestDrawable::everyFrameRecordingRebuildsOncePerFrame()
+{
+    Fixture f;
+    auto* shape = new TestShape(f.plot.get());
+    shape->everyFrame = true;
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 1);
+
+    // The queries of the frame the paint opened read what the paint recorded.
+    const auto at = [&](double key, double value)
+    {
+        return QCP::Pixels { f.plot->xAxis->coordToPixel(key), f.plot->yAxis->coordToPixel(value) };
+    };
+    (void)shape->hitTest(at(4, 4), nullptr);
+    (void)shape->extent();
+    QCOMPARE(shape->drawCalls, 1);
+
+    // The next frame is a new one: that is what everyFrame() is for.
+    shape->layer()->markDirty(); // the second replot must repaint the layer the shape sits in
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 2);
 }
 
 void TestDrawable::contentChangedInsideDrawIsAMisuse()

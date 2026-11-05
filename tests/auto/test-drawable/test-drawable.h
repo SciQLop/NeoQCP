@@ -17,6 +17,7 @@ private slots:
     void viewEpochReRecordsEscapeHatch();
     void themeReaderReRecordsOnThemeChange();
     void transformReaderReRecordsOnEveryPan();
+    void everyFrameRecordingRebuildsOncePerFrame();
     void contentChangedInsideDrawIsAMisuse();
     void contentChangedInsideLegendIconIsAMisuse();
     void recordingFromInsideDrawIsAMisuse();

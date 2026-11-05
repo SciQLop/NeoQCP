@@ -2903,6 +2903,9 @@ void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
             crl->setPixelOffset(0.0f, 0.0f);
         }
     }
+    // One frame for the layer paints below: an everyFrame() recording is rebuilt once for it, and
+    // the queries made while painting it read what it built.
+    ++mFrameEpoch;
     bool translated = false;
     for (auto& layer : mLayers)
     {
@@ -4325,6 +4328,7 @@ void QCustomPlot::draw(QCPPainter* painter)
     PROFILE_HERE_N("QCustomPlot::draw");
     const QCPEmissionScope scope(this);
     const QPointer<QCustomPlot> alive(this); // an afterLayout slot may delete the plot
+    ++mFrameEpoch; // an export frame: everyFrame() recordings are rebuilt once for it
     updateLayout();
     if (!alive)
         return;

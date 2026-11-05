@@ -183,6 +183,15 @@ public:
     */
     [[nodiscard]] quint64 itemsEpoch() const { return mItemsEpoch; }
 
+    /*!
+      Bumped once per painted frame.
+
+      An \ref QCPDrawContext::recordEveryFrame "everyFrame()" recording is rebuilt by the frame it is
+      painted in, and every query of that frame - the paint itself, a hit test, a range - sees the
+      recording the frame built, not one per query.
+    */
+    [[nodiscard]] quint64 frameEpoch() const { return mFrameEpoch; }
+
     [[nodiscard]] QRhi* rhi() const { return mRhi; }
     [[nodiscard]] QCPPlottableRhiLayer* plottableRhiLayer(QCPLayer* layer);
     [[nodiscard]] QCPScatterRhiLayer* scatterRhiLayer(QCPLayer* layer);
@@ -508,6 +517,7 @@ protected:
     QSize mViewportWidgetSize; // the widget size the viewport was last taken from
     quint64 mViewEpoch = 0; // bumped on a viewport, device pixel ratio or theme change (viewEpoch)
     quint64 mItemsEpoch = 0; // bumped when an item is removed (itemsEpoch)
+    quint64 mFrameEpoch = 0; // bumped when a frame starts painting (frameEpoch)
     double mBufferDevicePixelRatio;
     QPointer<QCPLayoutGrid> mPlotLayout;
     bool mAutoAddPlottableToLegend;
