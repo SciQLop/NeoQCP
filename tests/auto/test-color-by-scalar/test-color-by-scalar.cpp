@@ -639,26 +639,6 @@ void TestColorByScalar::colorRunsMergeEqualBucketsAndSkipGaps()
     QCOMPARE(runs[2].first, 5); QCOMPARE(runs[2].last, 6); QCOMPARE(runs[2].bucket, 255);
 }
 
-void TestColorByScalar::extrudedRunsCarryTheirColour()
-{
-    const auto m = mapperFor({0, 1, 0, 1}, QCPRange(0, 1));
-    const QVector<QPointF> pts {{0, 0}, {10, 0}, {20, 5}, {30, 0}};
-    const QVector<int> idx {0, 1, 2, 3};
-    const auto runs = qcp::colorRuns(pts, idx, m);   // three one-segment runs: blue, red, blue
-    QCOMPARE(static_cast<int>(runs.size()), 3);
-
-    std::vector<float> out;
-    qcp::extrudeColorRuns(pts, runs, 2.0f, m, out);
-    int expected = 0;
-    for (const auto& r : runs)
-        expected += QCPLineExtruder::extrudePolyline(pts.mid(r.first, r.last - r.first + 1), 2.0f,
-                                                     Qt::black).size();
-    QCOMPARE(static_cast<int>(out.size()), expected);
-    // first run is blue (bucket 255): every vertex of it has r == 0, b == 1
-    QCOMPARE(out[2], 0.0f);
-    QCOMPARE(out[4], 1.0f);
-}
-
 void TestColorByScalar::coloredReextrusionOnlyOnColorChangeNotPan()
 {
     qcp::ExtrusionCache cache;

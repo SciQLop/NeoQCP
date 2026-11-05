@@ -14,25 +14,30 @@ namespace
 constexpr float MITER_LIMIT = 4.0f;
 
 // Write cursor: tracks position in a pre-allocated float buffer.
-// All vertex writes go through this — no per-float append() calls.
+// All vertex writes go through this — no per-float append() calls. The vertex format is a
+// compile-time choice, so the solid path pays neither the arc length nor a branch per vertex.
+template <bool WithDistance>
 struct WriteCursor
 {
     float* data;
     int pos = 0;
-    bool withDistance = false; //!< 7 floats per vertex: (x, y, r, g, b, a, distance)
 
-    void vertex(float x, float y, const std::array<float, 4>& rgba, float distance)
+    //! \a arcLength is written only when the format carries it.
+    void vertex(float x, float y, const std::array<float, 4>& rgba, float arcLength)
     {
         float* p = data + pos;
         p[0] = x;  p[1] = y;
         p[2] = rgba[0];  p[3] = rgba[1];  p[4] = rgba[2];  p[5] = rgba[3];
-        if (withDistance)
+        if constexpr (WithDistance)
         {
-            p[6] = distance;
+            p[6] = arcLength;
             pos += 7;
         }
         else
+        {
+            (void)arcLength;
             pos += 6;
+        }
     }
 
     //! \a dPrev is the arc length of the previous point, \a dCur of the current one.
@@ -103,15 +108,16 @@ QVector<SegmentData> splitByNonFinite(std::span<const QPointF> points)
     return segments;
 }
 
-void extrudeSegment(WriteCursor& cur, std::span<const QPointF> points,
-                    int start, int end, float halfWidth, const std::array<float, 4>& rgba)
+//! \a walked carries the arc length in and out: a caller chaining colour runs continues the dash
+//! pattern, and the caller resets it between NaN-separated segments.
+template <bool WithDistance>
+void extrudeSegment(WriteCursor<WithDistance>& cur, std::span<const QPointF> points, int start,
+                    int end, float halfWidth, const std::array<float, 4>& rgba, double& walked)
 {
     int count = end - start;
     if (count < 2) return;
 
-    // Sliding window: only previous and current normal/left/right needed. The arc length restarts
-    // at each segment, so a NaN gap starts the dash pattern over.
-    double walked = 0.0;
+    // Sliding window: only previous and current normal/left/right needed.
     QPointF prevNormal = perp(normalized(points[start + 1] - points[start]));
     QPointF prevLeft = points[start] + prevNormal * halfWidth;
     QPointF prevRight = points[start] - prevNormal * halfWidth;
@@ -119,7 +125,8 @@ void extrudeSegment(WriteCursor& cur, std::span<const QPointF> points,
     for (int i = 1; i < count - 1; ++i)
     {
         const double prevWalked = walked;
-        walked += distance(points[start + i - 1], points[start + i]);
+        if constexpr (WithDistance)
+            walked += distance(points[start + i - 1], points[start + i]);
         QPointF curNormal = perp(normalized(points[start + i + 1] - points[start + i]));
         QPointF mo = miterOffset(prevNormal, curNormal, halfWidth);
 
@@ -165,29 +172,32 @@ void extrudeSegment(WriteCursor& cur, std::span<const QPointF> points,
         prevNormal = curNormal;
     }
 
-    walked += distance(points[start + count - 2], points[start + count - 1]);
+    const double lastStep = distance(points[start + count - 2], points[start + count - 1]);
+    if constexpr (WithDistance)
+        walked += lastStep;
     QPointF lastLeft = points[start + count - 1] + prevNormal * halfWidth;
     QPointF lastRight = points[start + count - 1] - prevNormal * halfWidth;
-    cur.quad(prevLeft, lastLeft, lastRight, prevRight, rgba,
-             float(walked - distance(points[start + count - 2], points[start + count - 1])),
+    cur.quad(prevLeft, lastLeft, lastRight, prevRight, rgba, float(walked - lastStep),
              float(walked));
 }
 
-// Upper bound on floats written by extrudePolyline for N input points.
-// Each segment of K points produces at most (K-1) quads (6 verts × 6 floats = 36)
-// plus (K-2) bevel triangles (3 verts × 6 floats = 18).
-// Worst case per point: 36 + 18 = 54 floats. We round up to 6*6*2 = 72.
+// Upper bound on floats written for N input points.
+// Each segment of K points produces at most (K-1) quads (6 verts) plus (K-2) bevel triangles
+// (3 verts): 9 vertices per point, times 6 floats (72) or 7 with the arc length (84).
 int maxExtrusionFloats(int pointCount, bool withDistance)
 {
     return pointCount * (withDistance ? 84 : 72);
 }
 
-void appendPolylineImpl(std::span<const QPointF> points, float penWidth,
-                        const QColor& color, std::vector<float>& out, bool withDistance)
+//! Appends the extrusion of \a points, starting the arc length at \a startDistance and returning
+//! the arc length at the end of the last segment. Each NaN-separated segment restarts the pattern.
+template <bool WithDistance>
+float appendPolylineImpl(std::span<const QPointF> points, float penWidth, const QColor& color,
+                         std::vector<float>& out, float startDistance)
 {
     PROFILE_HERE_N("extrudePolyline");
     if (points.size() < 2 || penWidth <= 0.0f)
-        return;
+        return startDistance;
     PROFILE_PASS_VALUE(points.size());
 
     auto rgba = qcp::rhi::premultipliedColor(color);
@@ -198,15 +208,23 @@ void appendPolylineImpl(std::span<const QPointF> points, float penWidth,
     // Pre-allocate worst case on top of whatever's already in out — the vector
     // retains capacity across frames/runs, so repeated appends amortize to zero alloc.
     const size_t base = out.size();
-    int maxFloats = maxExtrusionFloats(static_cast<int>(points.size()), withDistance);
+    int maxFloats = maxExtrusionFloats(static_cast<int>(points.size()), WithDistance);
     out.resize(base + maxFloats);
 
-    WriteCursor cur{out.data() + base};
-    cur.withDistance = withDistance;
+    WriteCursor<WithDistance> cur{out.data() + base};
+    double walked = startDistance;
+    bool firstSegment = true;
     for (const auto& seg : segments)
-        extrudeSegment(cur, points, seg.startIdx, seg.endIdx, halfWidth, rgba);
+    {
+        if (!firstSegment)
+            walked = 0.0; // a NaN gap restarts the dash pattern
+        extrudeSegment<WithDistance>(cur, points, seg.startIdx, seg.endIdx, halfWidth, rgba,
+                                     walked);
+        firstSegment = false;
+    }
 
     out.resize(base + cur.pos); // trim to actual size (no realloc — smaller than capacity)
+    return static_cast<float>(walked);
 }
 
 } // anonymous namespace
@@ -214,13 +232,14 @@ void appendPolylineImpl(std::span<const QPointF> points, float penWidth,
 void appendPolyline(std::span<const QPointF> points, float penWidth,
                      const QColor& color, std::vector<float>& out)
 {
-    appendPolylineImpl(points, penWidth, color, out, false);
+    appendPolylineImpl<false>(points, penWidth, color, out, 0.0f);
 }
 
-void appendPolylineWithDistance(std::span<const QPointF> points, float penWidth,
-                                const QColor& color, std::vector<float>& out)
+float appendPolylineWithDistance(std::span<const QPointF> points, float penWidth,
+                                 const QColor& color, std::vector<float>& out,
+                                 float startDistance)
 {
-    appendPolylineImpl(points, penWidth, color, out, true);
+    return appendPolylineImpl<true>(points, penWidth, color, out, startDistance);
 }
 
 void extrudePolyline(const QVector<QPointF>& points, float penWidth,
@@ -246,9 +265,10 @@ QVector<float> extrudePolyline(const QVector<QPointF>& points, float penWidth,
     int maxFloats = maxExtrusionFloats(points.size(), false);
     QVector<float> out(maxFloats);
 
-    WriteCursor cur{out.data()};
+    WriteCursor<false> cur{out.data()};
+    double walked = 0.0;
     for (const auto& seg : segments)
-        extrudeSegment(cur, points, seg.startIdx, seg.endIdx, halfWidth, rgba);
+        extrudeSegment<false>(cur, points, seg.startIdx, seg.endIdx, halfWidth, rgba, walked);
 
     out.resize(cur.pos);
     return out;
@@ -266,7 +286,7 @@ QVector<float> tessellateFillPolygon(const QPolygonF& polygon, const QColor& col
 
     int maxFloats = (curveCount < 2) ? 18 : ((curveCount - 1) * 36 + 2 * 18);
     QVector<float> out(maxFloats);
-    WriteCursor cur{out.data()};
+    WriteCursor<false> cur{out.data()};
 
     const QPointF base0 = polygon.first();
     const QPointF base1 = polygon.last();

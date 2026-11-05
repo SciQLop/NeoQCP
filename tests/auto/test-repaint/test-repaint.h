@@ -73,6 +73,7 @@ private slots:
     void dashPhaseSurvivesPan();
     void dashedLineMatchesExportDashes();
     void solidLinesKeepTheirVertexFormat();
+    void dashedUnderSolidStaysUnder();
 
 private:
     // What the plot shows: its paint buffers composed, or the framebuffer under RHI.

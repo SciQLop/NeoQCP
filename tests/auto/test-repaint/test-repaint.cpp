@@ -2355,3 +2355,56 @@ void TestRepaint::solidLinesKeepTheirVertexFormat()
     QVERIFY(!layer->drawEntries().isEmpty());
     QVERIFY(layer->drawEntries().first().strokeVertexCount > 0);
 }
+
+// A pen style must not move a plottable up or down its layer: the GPU pass has to draw the
+// submissions in the order they were added, whatever pipelines they need.
+void TestRepaint::dashedUnderSolidStaysUnder()
+{
+    QWidget host;
+    QCustomPlot *plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform (qoffscreen)");
+    plot->resize(400, 300);
+    plot->xAxis->setRange(0, 1);
+    plot->yAxis->setRange(0, 1);
+
+    // Dashed first, solid second: the solid line crosses the dashed one and must be on top.
+    auto *dashed = plot->addGraph();
+    QPen alwaysOnDash(Qt::red, 6, Qt::CustomDashLine);
+    alwaysOnDash.setDashPattern({ 1000.0, 1.0 }); // on for 6000 px: the crossing is mid-dash
+    dashed->setPen(alwaysOnDash);
+    dashed->setData(QVector<double> { 0, 1 }, QVector<double> { 0.5, 0.5 });
+    auto *solid = plot->addGraph();
+    solid->setPen(QPen(Qt::blue, 6, Qt::SolidLine));
+    solid->setData(QVector<double> { 0.5, 0.5 }, QVector<double> { 0, 1 });
+    waitUntilSettled(*plot);
+    const QPoint centre(int(plot->xAxis->coordToPixel(0.5)),
+                        int(plot->yAxis->coordToPixel(0.5)));
+    const QColor crossing = screenOf(plot).pixelColor(centre);
+    QVERIFY2(crossing.blue() > 120 && crossing.red() < 90,
+             "a solid line added after a dashed one must stay above it");
+
+    // The other way round: a dash that is on at the crossing stays above the solid line, so the
+    // fix is submission order, not "dashed always below solid".
+    QWidget host2;
+    QCustomPlot *plot2 = shownGpuPlot(host2);
+    if (!plot2)
+        QSKIP("no QRhi on this platform (qoffscreen)");
+    plot2->resize(400, 300);
+    plot2->xAxis->setRange(0, 1);
+    plot2->yAxis->setRange(0, 1);
+    auto *solid2 = plot2->addGraph();
+    solid2->setPen(QPen(Qt::blue, 6, Qt::SolidLine));
+    solid2->setData(QVector<double> { 0.5, 0.5 }, QVector<double> { 0, 1 });
+    auto *dashed2 = plot2->addGraph();
+    QPen longDash(Qt::red, 6, Qt::CustomDashLine);
+    longDash.setDashPattern({ 1000.0, 1.0 }); // on for 6000 px: the crossing is mid-dash
+    dashed2->setPen(longDash);
+    dashed2->setData(QVector<double> { 0, 1 }, QVector<double> { 0.5, 0.5 });
+    waitUntilSettled(*plot2);
+    const QPoint centre2(int(plot2->xAxis->coordToPixel(0.5)),
+                         int(plot2->yAxis->coordToPixel(0.5)));
+    const QColor crossing2 = screenOf(plot2).pixelColor(centre2);
+    QVERIFY2(crossing2.red() > 120 && crossing2.blue() < 90,
+             "a dash that is on must stay above a solid line added before it");
+}

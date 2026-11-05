@@ -13,6 +13,7 @@
 #include <QPainterPath>
 #include <QPen>
 #include <QPointF>
+#include <algorithm>
 #include <QString>
 
 #include <functional>
@@ -153,4 +154,31 @@ struct QCP_LIB_DECL QCPDrawList
 [[nodiscard]] QPointF qcpResolvePosition(const QCPDrawFrame& frame, const QCP::Position& position);
 
 //! Draws \a list into \a painter through \a frame: the QPainter path (screen fallback and export).
-void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QCPDrawFrame& frame);
+//! What a replay is for: All paints everything (an export has no GPU pass), PainterOnly is the
+//! other half of a screen frame and leaves the GPU kinds to the RHI replay.
+enum class QCPReplayKinds
+{
+    All,
+    PainterOnly
+};
+
+//! The four corners of each error bar in data space: above, below, left and right of the centre.
+//! Both replays start here, so a span is never mistaken for a position.
+inline void qcpErrorBarCorners(std::span<const QPointF> centres, std::span<const QPointF> spans,
+                               std::vector<QPointF>& out)
+{
+    const std::size_t count = std::min(centres.size(), spans.size());
+    out.resize(4 * count);
+    for (std::size_t i = 0; i < count; ++i)
+    {
+        const QPointF centre = centres[i];
+        const QPointF span = spans[i];
+        out[4 * i + 0] = QPointF(centre.x(), centre.y() + span.y());
+        out[4 * i + 1] = QPointF(centre.x(), centre.y() - span.y());
+        out[4 * i + 2] = QPointF(centre.x() - span.x(), centre.y());
+        out[4 * i + 3] = QPointF(centre.x() + span.x(), centre.y());
+    }
+}
+
+void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QCPDrawFrame& frame,
+                          QCPReplayKinds kinds = QCPReplayKinds::All);

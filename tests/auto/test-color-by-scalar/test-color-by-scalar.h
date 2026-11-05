@@ -43,7 +43,6 @@ private slots:
     void uncolourRoutesDiscardAPendingStash();
 
     void colorRunsMergeEqualBucketsAndSkipGaps();
-    void extrudedRunsCarryTheirColour();
     void coloredReextrusionOnlyOnColorChangeNotPan();
     void coloredLineRendersTheGradient();
     void coloredRunsMeetWithButtEndsOnExport();

@@ -3,6 +3,7 @@
 #include "coords.h"
 #include "draw-commands.h"
 
+#include <QColor>
 #include <QPointF>
 #include <span>
 #include <vector>
@@ -38,18 +39,22 @@ private:
     std::vector<Entry> mEntries;
 };
 
-//! True when every command of \\a list has a GPU path (the replay is all or nothing).
-[[nodiscard]] bool qcpCanReplayOnRhi(const QCPDrawList& list);
-
 /*!
-  Draws \\a list on \\a plottables and \\a scatter.
+  Draws the GPU kinds of \a list on \a plottables and \a scatter.
 
-  Returns false, having drawn nothing, when a command has no GPU path: text, a painter path, an
-  image, a free-form callback, or a filled free-form polygon. Everything else - polylines in data or
-  mixed spaces, fills, rects, ellipses, error bars and markers - becomes triangles or instanced
-  sprites, dashed or solid depending on the pen.
+  Polylines in data or mixed spaces, fills, rects, ellipses, error bars and markers become triangles
+  or instanced sprites, dashed or solid depending on the pen. Text, painter paths, images and
+  free-form callbacks are skipped: the QPainter replay (QCPReplayKinds::PainterOnly) draws those.
 */
-bool qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
+void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                       QCPScatterRhiLayer& scatter, const QCPDrawFrame& frame,
                       QCPResolveCache& cache, double dpr, int outputHeight,
                       quint64 generation = 0);
+
+//! Triangles of a fan fill from \a centre over an open \a ring: six floats per vertex.
+std::vector<float> qcpFanFillVertices(const QPointF& centre, std::span<const QPointF> ring,
+                                      const QColor& color);
+
+//! The pixel polyline of a recording's error bars: the bar and its two caps, NaN gaps between bars.
+void qcpErrorBarPixels(const QCPDrawFrame& frame, std::span<const QPointF> centres,
+                       std::span<const QPointF> spans, std::vector<QPointF>& out);

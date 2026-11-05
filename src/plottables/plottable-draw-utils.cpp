@@ -132,6 +132,16 @@ std::vector<float>& strokeScratch()
 
 } // namespace
 
+void extrudeStroke(std::span<const QPointF> pts, const QPen& pen, float penWidth,
+                   std::vector<float>& out)
+{
+    out.clear();
+    if (pen.style() == Qt::SolidLine)
+        QCPLineExtruder::appendPolyline(pts, penWidth, pen.color(), out);
+    else
+        QCPLineExtruder::appendPolylineWithDistance(pts, penWidth, pen.color(), out);
+}
+
 void addGpuStroke(QCPPlottableRhiLayer& layer, std::span<const float> verts, const QPen& pen,
                   float penWidth, const QRect& clipRect, double dpr, int outputHeight,
                   const QPointF& offset, float alpha)
@@ -149,17 +159,6 @@ void addGpuStroke(QCPPlottableRhiLayer& layer, std::span<const float> verts, con
                            static_cast<float>(offset.x()), static_cast<float>(offset.y()), alpha);
 }
 
-namespace
-{
-// Thin alias so the call sites below stay readable.
-void addStroke(QCPPlottableRhiLayer* prl, std::span<const float> verts, const QPen& pen,
-               float penWidth, const QRect& clipRect, double dpr, int outputHeight,
-               const QPointF& gpuOffset, float alpha)
-{
-    addGpuStroke(*prl, verts, pen, penWidth, clipRect, dpr, outputHeight, gpuOffset, alpha);
-}
-} // namespace
-
 bool strokePolylineOnGpu(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer* layer,
                          std::span<const QPointF> pts, const QPen& pen, const QPointF& gpuOffset,
                          const QRect& clipRect)
@@ -171,15 +170,11 @@ bool strokePolylineOnGpu(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer*
     const double dpr = parentPlot->bufferDevicePixelRatio();
     const float penWidth = extrusionPenWidth(pen, dpr);
     std::vector<float>& verts = strokeScratch();
-    verts.clear();
-    if (pen.style() == Qt::SolidLine)
-        QCPLineExtruder::appendPolyline(pts, penWidth, pen.color(), verts);
-    else
-        QCPLineExtruder::appendPolylineWithDistance(pts, penWidth, pen.color(), verts);
+    extrudeStroke(pts, pen, penWidth, verts);
     if (verts.empty())
         return false;
-    addStroke(prl, verts, pen, penWidth, clipRect, dpr, parentPlot->rhiOutputSize().height(),
-              gpuOffset, static_cast<float>(painter->opacity()));
+    addGpuStroke(*prl, verts, pen, penWidth, clipRect, dpr, parentPlot->rhiOutputSize().height(),
+                 gpuOffset, static_cast<float>(painter->opacity()));
     return true;
 }
 
@@ -195,21 +190,16 @@ bool strokePolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer
     const float penWidth = extrusionPenWidth(pen, dpr);
     if (needsReextrusion(cache, freshLines, pen, dpr))
     {
-        const bool dashed = pen.style() != Qt::SolidLine;
-        cache.vertices.clear();
-        if (dashed)
-            QCPLineExtruder::appendPolylineWithDistance(pts, penWidth, pen.color(), cache.vertices);
-        else
-            QCPLineExtruder::appendPolyline(pts, penWidth, pen.color(), cache.vertices);
-        cache.withDistance = dashed;
+        extrudeStroke(pts, pen, penWidth, cache.vertices);
+        cache.withDistance = pen.style() != Qt::SolidLine;
         cache.penWidth = penWidth;
         cache.penColor = pen.color().rgba();
     }
     if (cache.isEmpty())
         return false;
-    addStroke(prl, cache.vertices, pen, penWidth, clipRect, dpr,
-              parentPlot->rhiOutputSize().height(), gpuOffset,
-              static_cast<float>(painter->opacity()));
+    addGpuStroke(*prl, cache.vertices, pen, penWidth, clipRect, dpr,
+                 parentPlot->rhiOutputSize().height(), gpuOffset,
+                 static_cast<float>(painter->opacity()));
     return true;
 }
 
@@ -252,18 +242,6 @@ void drawPolylineCached(QCPPainter* painter,
         return;
     // Software fallback — no caching benefit, delegate to regular path
     drawPolylineWithGpuFallback(painter, parentPlot, layer, pts, pen, gpuOffset, clipRect);
-}
-
-void extrudeColorRuns(const QVector<QPointF>& points, const std::vector<ColorRun>& runs,
-                      float penWidth, const ColorScalarMapper& mapper, std::vector<float>& out)
-{
-    out.clear();
-    for (const auto& run : runs)
-    {
-        QCPLineExtruder::appendPolyline(
-            std::span<const QPointF>(points.constData() + run.first, run.last - run.first + 1),
-            penWidth, runColor(mapper, run.bucket), out);
-    }
 }
 
 bool needsColoredReextrusion(const ExtrusionCache& cache, bool freshLines,
@@ -314,14 +292,16 @@ void drawColoredPolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCP
     {
         const std::vector<ColorRun> runs = colorRuns(points, indices, mapper);
         cache.vertices.clear();
+        // The runs share their end points, so carrying the arc length over keeps one dash phase
+        // across a colour change instead of restarting the pattern at every run.
+        float arcLength = 0.0f;
         for (const auto& run : runs)
         {
             const std::span<const QPointF> runPoints(points.constData() + run.first,
                                                     run.last - run.first + 1);
             if (dashed)
-                QCPLineExtruder::appendPolylineWithDistance(runPoints, penWidth,
-                                                            runColor(mapper, run.bucket),
-                                                            cache.vertices);
+                arcLength = QCPLineExtruder::appendPolylineWithDistance(
+                    runPoints, penWidth, runColor(mapper, run.bucket), cache.vertices, arcLength);
             else
                 QCPLineExtruder::appendPolyline(runPoints, penWidth, runColor(mapper, run.bucket),
                                                 cache.vertices);
@@ -332,9 +312,9 @@ void drawColoredPolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCP
     }
     if (cache.isEmpty())
         return;
-    addStroke(prl, cache.vertices, pen, penWidth, clipRect, dpr,
-              parentPlot->rhiOutputSize().height(), gpuOffset,
-              static_cast<float>(painter->opacity()));
+    addGpuStroke(*prl, cache.vertices, pen, penWidth, clipRect, dpr,
+                 parentPlot->rhiOutputSize().height(), gpuOffset,
+                 static_cast<float>(painter->opacity()));
 }
 
 } // namespace qcp

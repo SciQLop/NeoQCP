@@ -24,4 +24,8 @@ private slots:
     void boundsCoverEveryCommand();
     void sharedDataIsNotCopied();
     void drawListIsCompact();
+    void errorBarsMapTheirSpansAsExtents();
+    void ellipseFanFillCoversTheDisc();
+    void mixedRecordingSplitsByKind();
+    void extruderContinuesArcLengthAcrossRuns();
 };

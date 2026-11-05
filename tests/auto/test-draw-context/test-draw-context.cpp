@@ -1,6 +1,8 @@
 #include "test-draw-context.h"
 
+#include <painting/command-replay-rhi.h>
 #include <painting/draw-commands.h>
+#include <painting/line-extruder.h>
 #include <painting/draw-context.h>
 #include <qcustomplot.h>
 
@@ -527,4 +529,136 @@ void TestDrawContext::sharedDataIsNotCopied()
 
     const auto& command = std::get<qcp::PolylineDataCmd>(context.drawList().commands.front());
     QCOMPARE(command.points.get(), points.get());
+}
+
+// A span is a half extent, not a position: the corners are built in data space and mapped once, so a
+// pan offset or a log axis cannot leak into the result.
+void TestDrawContext::errorBarsMapTheirSpansAsExtents()
+{
+    Fixture fixture;
+    fixture.plot->xAxis->setRange(10, 20);
+    fixture.plot->yAxis->setRange(100, 200);
+    fixture.plot->replot();
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+
+    const auto centres = sharedPoints({{12.0, 120.0}});
+    const auto spans = sharedPoints({{1.0, 10.0}});
+    context.errorBars(centres, spans, kPen);
+
+    std::vector<QPointF> bar;
+    qcpErrorBarPixels(context.frame(), std::span<const QPointF>(*centres),
+                      std::span<const QPointF>(*spans), bar);
+    QCOMPARE(int(bar.size()), 9);
+
+    const QCPTransform& transform = context.transform();
+    const QPointF top = pixelOf(transform, 12.0, 130.0);
+    const QPointF bottom = pixelOf(transform, 12.0, 110.0);
+    QVERIFY2(std::abs(bar[0].y() - top.y()) < 1e-6,
+             "the top cap must sit at the centre plus the span, mapped like a data point");
+    QVERIFY2(std::abs(bar[0].x() - top.x()) < 1e-6, "the bar is vertical");
+    QVERIFY2(std::abs(bar[1].y() - bottom.y()) < 1e-6, "the bottom cap mirrors the top one");
+}
+
+// A fan from the centre covers the whole ring, which the baseline tessellator did not.
+void TestDrawContext::ellipseFanFillCoversTheDisc()
+{
+    const QPointF centre(100.0, 75.0);
+    const double radius = 40.0;
+    std::vector<QPointF> ring;
+    for (int i = 0; i < 32; ++i)
+    {
+        const double angle = 2.0 * M_PI * i / 32.0;
+        ring.emplace_back(centre.x() + radius * std::cos(angle),
+                          centre.y() + radius * std::sin(angle));
+    }
+    const std::vector<float> verts =
+        qcpFanFillVertices(centre, std::span<const QPointF>(ring), QColor(200, 90, 30));
+    QCOMPARE(int(verts.size()), int(ring.size()) * 3 * 6);
+
+    const auto inside = [&verts](const QPointF& p) {
+        for (std::size_t v = 0; v + 17 < verts.size(); v += 18)
+        {
+            const QPointF a(verts[v], verts[v + 1]);
+            const QPointF b(verts[v + 6], verts[v + 7]);
+            const QPointF c(verts[v + 12], verts[v + 13]);
+            const auto side = [](const QPointF& p0, const QPointF& p1, const QPointF& q) {
+                return (p1.x() - p0.x()) * (q.y() - p0.y()) - (p1.y() - p0.y()) * (q.x() - p0.x());
+            };
+            const double d1 = side(a, b, p);
+            const double d2 = side(b, c, p);
+            const double d3 = side(c, a, p);
+            if ((d1 >= 0 && d2 >= 0 && d3 >= 0) || (d1 <= 0 && d2 <= 0 && d3 <= 0))
+                return true;
+        }
+        return false;
+    };
+    for (int i = 0; i < 8; ++i)
+    {
+        const double angle = 2.0 * M_PI * i / 8.0;
+        const QPointF sample(centre.x() + 0.8 * radius * std::cos(angle),
+                             centre.y() + 0.8 * radius * std::sin(angle));
+        QVERIFY2(inside(sample), "a point at 0.8 r must be inside the fan fill");
+    }
+}
+
+// The painter replay can be asked for the half that belongs to it: on the screen the GPU kinds are
+// drawn by the RHI pass, so painting them here too would double-draw them.
+void TestDrawContext::mixedRecordingSplitsByKind()
+{
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    context.polyline(sharedPoints({{10.0, 10.0}, {180.0, 140.0}}), QPen(Qt::green, 5.0));
+    context.text(QCP::Data {100.0, 20.0}, QStringLiteral("hi"), QCPTextStyle {});
+
+    const QCPDrawFrame& frame = context.frame();
+    const QImage all = painted(
+        [&](QCPPainter& painter, const QCPTransform&) {
+            qcpReplayWithPainter(context.drawList(), painter, frame, QCPReplayKinds::All);
+        },
+        context.transform());
+    const QImage painterOnly = painted(
+        [&](QCPPainter& painter, const QCPTransform&) {
+            qcpReplayWithPainter(context.drawList(), painter, frame, QCPReplayKinds::PainterOnly);
+        },
+        context.transform());
+
+    const auto greenPixels = [](const QImage& image) {
+        int count = 0;
+        for (int y = 0; y < image.height(); ++y)
+            for (int x = 0; x < image.width(); ++x)
+            {
+                const QColor c = image.pixelColor(x, y);
+                if (c.green() > 150 && c.red() < 100 && c.blue() < 100)
+                    ++count;
+            }
+        return count;
+    };
+    QVERIFY2(greenPixels(all) > 100, "the all-kinds replay paints the polyline");
+    QVERIFY2(greenPixels(painterOnly) == 0, "the painter-only replay leaves the polyline to the GPU");
+    QVERIFY2(all != painterOnly, "the two kinds do different work");
+}
+
+// Colour runs share their end points, so the arc length has to carry over or every run restarts the
+// dash pattern and the line looks striped at each colour change.
+void TestDrawContext::extruderContinuesArcLengthAcrossRuns()
+{
+    const std::vector<QPointF> first {{0, 0}, {10, 0}, {20, 0}};
+    const std::vector<QPointF> second {{20, 0}, {30, 0}, {40, 0}};
+    std::vector<float> verts;
+    const float afterFirst = QCPLineExtruder::appendPolylineWithDistance(
+        std::span<const QPointF>(first), 2.0f, Qt::black, verts);
+    QVERIFY2(std::abs(afterFirst - 20.0f) < 1e-4f, "the first run is 20 px long");
+    const float afterSecond = QCPLineExtruder::appendPolylineWithDistance(
+        std::span<const QPointF>(second), 2.0f, Qt::black, verts, afterFirst);
+    QVERIFY2(std::abs(afterSecond - 40.0f) < 1e-4f,
+             "the second run continues the arc length instead of restarting it");
+
+    // A NaN gap restarts the pattern: the length reported is the last segment's, not the sum.
+    const std::vector<QPointF> gapped {{0, 0}, {50, 0}, {qQNaN(), qQNaN()}, {50, 0}, {60, 0}};
+    const float afterGap =
+        QCPLineExtruder::appendPolylineWithDistance(std::span<const QPointF>(gapped), 2.0f,
+                                                    Qt::black, verts);
+    QVERIFY2(std::abs(afterGap - 10.0f) < 1e-4f, "a NaN gap restarts the arc length at zero");
 }

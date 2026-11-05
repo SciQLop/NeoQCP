@@ -56,6 +56,14 @@ public:
                             const QRect& clipRect, double dpr, int outputHeight,
                             float offsetX = 0, float offsetY = 0, float alpha = 1);
 
+    //! One record per submission: which list it went to and where in that list. Drawing walks this
+    //! in submission order, so a pen style never moves an object up or down the layer.
+    struct OrderedDraw
+    {
+        bool dashed;
+        int index;
+    };
+
     // Offset-only update (no geometry change, no vertex re-upload)
     void setAllOffsets(float offsetX, float offsetY);
     QPointF lastUniformOffset() const { return QPointF(mLastOffsetX, mLastOffsetY); }
@@ -98,7 +106,6 @@ private:
                      float yFlip);
     void uploadDashed(QRhiResourceUpdateBatch* updates, const QSize& outputSize, float dpr,
                       float yFlip);
-    void renderDashed(QRhiCommandBuffer* cb, const QSize& outputSize);
 
     int ubufStride() const; // aligned slot size for dynamic UBO offsets
     int dashUbufStride() const;
@@ -112,6 +119,7 @@ private:
 
     QRhi* mRhi; // non-owned; lifetime managed by QRhiWidget
     QVector<DrawEntry> mDrawEntries;
+    QVector<OrderedDraw> mDrawOrder; //!< submission order across both lists
 
     float* mDashStagingData = nullptr;
     int mDashStagingSize = 0;

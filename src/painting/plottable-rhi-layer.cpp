@@ -131,6 +131,7 @@ QCPPlottableRhiLayer::addPlottable(std::span<const float> fillVerts,
     }
 
     mDrawEntries.append(entry);
+    mDrawOrder.append({false, mDrawEntries.size() - 1});
     mDirty = true;
 }
 
@@ -164,6 +165,7 @@ void QCPPlottableRhiLayer::addDashedPlottable(std::span<const float> strokeVerts
     entry.vertexCount = int(strokeVerts.size()) / 7;
     dashStagingAppend(strokeVerts.data(), int(strokeVerts.size()));
     mDashEntries.append(entry);
+    mDrawOrder.append({true, mDashEntries.size() - 1});
     mDirty = true;
 }
 
@@ -457,58 +459,57 @@ void QCPPlottableRhiLayer::render(QRhiCommandBuffer* cb,
 {
     PROFILE_HERE_N("QCPPlottableRhiLayer::render");
 
-    if (!mPipeline || !mVertexBuffer || !mSrb || mDrawEntries.isEmpty())
-    {
-        renderDashed(cb, outputSize);
+    if (mDrawOrder.isEmpty())
         return;
-    }
 
-    cb->setGraphicsPipeline(mPipeline);
     cb->setViewport({0, 0, float(outputSize.width()), float(outputSize.height())});
 
-    const QRhiCommandBuffer::VertexInput vbufBinding(mVertexBuffer, 0);
-    const int stride = ubufStride();
-    for (int i = 0; i < mDrawEntries.size(); ++i)
+    // Walk the submissions in order and rebind only when the pipeline actually changes: a solid
+    // and a dashed plottable keep their relative stacking whatever their pens look like.
+    enum class Bound { None, Solid, Dashed } bound = Bound::None;
+    const QRhiCommandBuffer::VertexInput solidBinding(mVertexBuffer, 0);
+    const QRhiCommandBuffer::VertexInput dashBinding(mDashVertexBuffer, 0);
+    for (const OrderedDraw& record : mDrawOrder)
     {
-        const auto& entry = mDrawEntries[i];
+        if (record.dashed)
+        {
+            if (!mDashPipeline || !mDashVertexBuffer || !mDashSrb)
+                continue;
+            if (bound != Bound::Dashed)
+            {
+                cb->setGraphicsPipeline(mDashPipeline);
+                bound = Bound::Dashed;
+            }
+            const auto& entry = mDashEntries[record.index];
+            const QPair<int, quint32> dynamicOffset(0, quint32(record.index * dashUbufStride()));
+            cb->setShaderResources(mDashSrb, 1, &dynamicOffset);
+            cb->setVertexInput(0, 1, &dashBinding);
+            cb->setScissor({entry.scissorRect.x(), entry.scissorRect.y(),
+                            entry.scissorRect.width(), entry.scissorRect.height()});
+            cb->draw(entry.vertexCount, 1, entry.vertexOffset, 0);
+            continue;
+        }
 
+        if (!mPipeline || !mVertexBuffer || !mSrb)
+            continue;
+        if (bound != Bound::Solid)
+        {
+            cb->setGraphicsPipeline(mPipeline);
+            bound = Bound::Solid;
+        }
+        const auto& entry = mDrawEntries[record.index];
         // Bind per-draw uniform slot via dynamic offset.
         // setShaderResources must precede setVertexInput — on Metal, QRhi offsets
         // vertex buffer indices by the number of SRB buffer bindings.
-        const QPair<int, quint32> dynamicOffset(0, quint32(i * stride));
+        const QPair<int, quint32> dynamicOffset(0, quint32(record.index * ubufStride()));
         cb->setShaderResources(mSrb, 1, &dynamicOffset);
-        cb->setVertexInput(0, 1, &vbufBinding);
-
+        cb->setVertexInput(0, 1, &solidBinding);
         cb->setScissor({entry.scissorRect.x(), entry.scissorRect.y(),
                         entry.scissorRect.width(), entry.scissorRect.height()});
-
         if (entry.fillVertexCount > 0)
             cb->draw(entry.fillVertexCount, 1, entry.fillOffset, 0);
         if (entry.strokeVertexCount > 0)
             cb->draw(entry.strokeVertexCount, 1, entry.strokeOffset, 0);
     }
-    renderDashed(cb, outputSize);
 }
 
-void QCPPlottableRhiLayer::renderDashed(QRhiCommandBuffer* cb, const QSize& outputSize)
-{
-    if (!mDashPipeline || !mDashVertexBuffer || !mDashSrb || mDashEntries.isEmpty())
-        return;
-    PROFILE_HERE_N("QCPPlottableRhiLayer::renderDashed");
-
-    cb->setGraphicsPipeline(mDashPipeline);
-    cb->setViewport({0, 0, float(outputSize.width()), float(outputSize.height())});
-
-    const QRhiCommandBuffer::VertexInput vbufBinding(mDashVertexBuffer, 0);
-    const int stride = dashUbufStride();
-    for (int i = 0; i < mDashEntries.size(); ++i)
-    {
-        const auto& entry = mDashEntries[i];
-        const QPair<int, quint32> dynamicOffset(0, quint32(i * stride));
-        cb->setShaderResources(mDashSrb, 1, &dynamicOffset);
-        cb->setVertexInput(0, 1, &vbufBinding);
-        cb->setScissor({entry.scissorRect.x(), entry.scissorRect.y(), entry.scissorRect.width(),
-                        entry.scissorRect.height()});
-        cb->draw(entry.vertexCount, 1, entry.vertexOffset, 0);
-    }
-}

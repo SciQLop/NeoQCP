@@ -16,6 +16,18 @@ namespace
 {
 
 // Per-replay buffers: a frame allocates nothing once they have grown.
+std::vector<QPointF>& dataScratch()
+{
+    static thread_local std::vector<QPointF> buffer;
+    return buffer;
+}
+
+std::vector<QPointF>& cornerScratch()
+{
+    static thread_local std::vector<QPointF> buffer;
+    return buffer;
+}
+
 std::vector<QPointF>& pixelScratch()
 {
     static thread_local std::vector<QPointF> points;
@@ -52,11 +64,7 @@ void addPolyline(QCPPlottableRhiLayer& layer, std::span<const QPointF> points, c
         return;
     const float width = qcp::extrusionPenWidth(pen, dpr);
     std::vector<float>& verts = strokeScratch();
-    verts.clear();
-    if (pen.style() == Qt::SolidLine)
-        QCPLineExtruder::appendPolyline(points, width, pen.color(), verts);
-    else
-        QCPLineExtruder::appendPolylineWithDistance(points, width, pen.color(), verts);
+    qcp::extrudeStroke(points, pen, width, verts);
     qcp::addGpuStroke(layer, verts, pen, width, clip, dpr, height);
 }
 
@@ -89,16 +97,15 @@ void addRibbonFill(QCPPlottableRhiLayer& layer, const std::vector<QPointF>& uppe
     layer.addPlottable(verts, {}, clip, dpr, height);
 }
 
-// A fill polygon in the baseline form tessellateFillPolygon expects: first and last share a y.
-void addBaselineFill(QCPPlottableRhiLayer& layer, const QPolygonF& polygon, const QColor& color,
-                     const QRect& clip, double dpr, int height)
+// A triangle fan from \a centre over the (open) \a ring: correct for any convex outline, which is
+// what a rect and an ellipse are, and cheaper than clipping a baseline tessellator to its shape.
+void fanFill(QCPPlottableRhiLayer& layer, const QPointF& centre,
+             std::span<const QPointF> ring, const QColor& color, const QRect& clip, double dpr,
+             int height)
 {
-    if (color.alpha() == 0 || polygon.size() < 4)
-        return;
-    const QVector<float> verts = QCPLineExtruder::tessellateFillPolygon(polygon, color);
-    if (!verts.isEmpty())
-        layer.addPlottable(std::span<const float>(verts.constData(), verts.size()), {}, clip, dpr,
-                           height);
+    const std::vector<float> verts = qcpFanFillVertices(centre, ring, color);
+    if (!verts.empty())
+        layer.addPlottable(verts, {}, clip, dpr, height);
 }
 
 void resolveInto(std::span<const QCP::Position> positions, const QCPDrawFrame& frame,
@@ -117,27 +124,28 @@ std::vector<QPointF> ringOf(std::span<const QPointF> open)
     return ring;
 }
 
-// Pixel-space error bars: the bar and its two caps, gaps between them.
-void errorBarPolyline(const std::vector<QPointF>& centres, const std::vector<QPointF>& spans,
-                      std::vector<QPointF>& out)
+// Pixel-space error bars from the four mapped corners of each bar: bar plus two caps, with gaps.
+void errorBarPolyline(const std::vector<QPointF>& corners, std::vector<QPointF>& out)
 {
     const QPointF gap(std::numeric_limits<double>::quiet_NaN(),
                       std::numeric_limits<double>::quiet_NaN());
     out.clear();
-    const std::size_t count = std::min(centres.size(), spans.size());
+    const std::size_t count = corners.size() / 4;
     out.reserve(count * 9);
     for (std::size_t i = 0; i < count; ++i)
     {
-        const QPointF centre = centres[i];
-        const QPointF span = spans[i];
-        out.push_back(QPointF(centre.x(), centre.y() - span.y()));
-        out.push_back(QPointF(centre.x(), centre.y() + span.y()));
+        const QPointF& above = corners[4 * i + 0];
+        const QPointF& below = corners[4 * i + 1];
+        const QPointF& left = corners[4 * i + 2];
+        const QPointF& right = corners[4 * i + 3];
+        out.push_back(above);
+        out.push_back(below);
         out.push_back(gap);
-        out.push_back(QPointF(centre.x() - span.x(), centre.y() + span.y()));
-        out.push_back(QPointF(centre.x() + span.x(), centre.y() + span.y()));
+        out.push_back(QPointF(left.x(), above.y()));
+        out.push_back(QPointF(right.x(), above.y()));
         out.push_back(gap);
-        out.push_back(QPointF(centre.x() - span.x(), centre.y() - span.y()));
-        out.push_back(QPointF(centre.x() + span.x(), centre.y() - span.y()));
+        out.push_back(QPointF(left.x(), below.y()));
+        out.push_back(QPointF(right.x(), below.y()));
         out.push_back(gap);
     }
 }
@@ -190,50 +198,11 @@ void QCPResolveCache::clear()
     mEntries.clear();
 }
 
-bool qcpCanReplayOnRhi(const QCPDrawList& list)
-{
-    for (const qcp::QCPDrawCommand& command : list.commands)
-    {
-        bool replayable = true;
-        std::visit(
-            [&replayable](const auto& cmd) {
-                using T = std::decay_t<decltype(cmd)>;
-                if constexpr (std::is_same_v<T, qcp::PolygonCmd>)
-                {
-                    // A free-form polygon has a GPU stroke but no GPU fill: its shape is arbitrary,
-                    // and the only tessellator at hand fills a baseline curve.
-                    replayable = !isFillable(cmd.brush);
-                }
-                else if constexpr (std::is_same_v<T, qcp::PolylineDataCmd>
-                                   || std::is_same_v<T, qcp::PolylinePositionsCmd>
-                                   || std::is_same_v<T, qcp::FillBetweenCmd>
-                                   || std::is_same_v<T, qcp::RectCmd>
-                                   || std::is_same_v<T, qcp::EllipseCmd>
-                                   || std::is_same_v<T, qcp::ErrorBarsCmd>
-                                   || std::is_same_v<T, qcp::MarkersCmd>)
-                {
-                    // always replayable
-                }
-                else
-                {
-                    replayable = false; // text, path, image, free-form painter callback
-                }
-            },
-            command);
-        if (!replayable)
-            return false;
-    }
-    return true;
-}
-
-bool qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
+void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                       QCPScatterRhiLayer& scatter, const QCPDrawFrame& frame,
                       QCPResolveCache& cache, double dpr, int outputHeight, quint64 generation)
 {
     PROFILE_HERE_N("qcpReplayWithRhi");
-    if (!qcpCanReplayOnRhi(list))
-        return false;
-
     const QRect clip = frame.clip.isEmpty() ? QRect() : frame.clip.toAlignedRect();
     std::vector<QPointF>& pixels = pixelScratch();
 
@@ -258,6 +227,8 @@ bool qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                 {
                     resolveInto(cmd.points, frame, pixels);
                     addPolyline(plottables, ringOf(pixels), cmd.pen, clip, dpr, outputHeight);
+                    // simplify: a free-form outline has no fan centre, so its fill is left to the
+                    // PainterOnly pass; Task 5 rasterises it to a CPU image and keeps the GPU slot.
                 }
                 else if constexpr (std::is_same_v<T, qcp::FillBetweenCmd>)
                 {
@@ -281,13 +252,11 @@ bool qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                     addPolyline(plottables, pixels, cmd.pen, clip, dpr, outputHeight);
                     if (isFillable(cmd.brush))
                     {
-                        QPolygonF baseline;
-                        baseline << QPointF(box.left(), box.bottom())
-                                 << QPointF(box.left(), box.top())
-                                 << QPointF(box.right(), box.top())
-                                 << QPointF(box.right(), box.bottom());
-                        addBaselineFill(plottables, baseline, cmd.brush.color(), clip, dpr,
-                                        outputHeight);
+                        const std::array<QPointF, 4> corners {
+                            box.topLeft(), box.topRight(), box.bottomRight(), box.bottomLeft()
+                        };
+                        fanFill(plottables, box.center(), corners, cmd.brush.color(), clip, dpr,
+                                outputHeight);
                     }
                 }
                 else if constexpr (std::is_same_v<T, qcp::EllipseCmd>)
@@ -299,35 +268,16 @@ bool qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                         pixels[std::size_t(i)] = ring.at(i);
                     addPolyline(plottables, pixels, cmd.pen, clip, dpr, outputHeight);
                     if (isFillable(cmd.brush))
-                    {
-                        const QRectF box = ring.boundingRect();
-                        QPolygonF upper;
-                        QPolygonF lower;
-                        for (int i = 0; i < ring.size(); ++i)
-                        {
-                            const QPointF p = ring.at(i);
-                            if (p.y() <= box.center().y())
-                                upper << p;
-                            else
-                                lower << p;
-                        }
-                        upper << QPointF(box.right(), box.center().y());
-                        lower << QPointF(box.left(), box.center().y());
-                        addBaselineFill(plottables, upper, cmd.brush.color(), clip, dpr,
-                                        outputHeight);
-                        addBaselineFill(plottables, lower, cmd.brush.color(), clip, dpr,
-                                        outputHeight);
-                    }
+                        fanFill(plottables, QRectF(ring.first(), ring.last()).center(),
+                                std::span<const QPointF>(pixels.data(), pixels.size() - 1),
+                                cmd.brush.color(), clip, dpr, outputHeight);
                 }
                 else if constexpr (std::is_same_v<T, qcp::ErrorBarsCmd>)
                 {
-                    const std::vector<QPointF>& centres =
-                        cache.pixels(cmd.centres.get(), generation, frame.transform,
-                                     std::span<const QPointF>(*cmd.centres));
-                    const std::vector<QPointF>& spans =
-                        cache.pixels(cmd.spans.get(), generation + 1, frame.transform,
-                                     std::span<const QPointF>(*cmd.spans));
-                    errorBarPolyline(centres, spans, pixels);
+                    // The spans are half extents, not positions: the corners have to be built in
+                    // data space and mapped, or a pan offset and a log axis land in the wrong place.
+                    qcpErrorBarPixels(frame, std::span<const QPointF>(*cmd.centres),
+                                      std::span<const QPointF>(*cmd.spans), pixels);
                     addPolyline(plottables, pixels, cmd.pen, clip, dpr, outputHeight);
                 }
                 else if constexpr (std::is_same_v<T, qcp::MarkersCmd>)
@@ -347,5 +297,38 @@ bool qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
             },
             command);
     }
-    return true;
+}
+
+std::vector<float> qcpFanFillVertices(const QPointF& centre, std::span<const QPointF> ring,
+                                      const QColor& color)
+{
+    std::vector<float> verts;
+    if (color.alpha() == 0 || ring.size() < 3)
+        return verts;
+    const std::array<float, 4> rgba = qcp::rhi::premultipliedColor(color);
+    verts.reserve(ring.size() * 18);
+    const auto push = [&verts, &rgba](const QPointF& p) {
+        verts.push_back(static_cast<float>(p.x()));
+        verts.push_back(static_cast<float>(p.y()));
+        verts.insert(verts.end(), rgba.begin(), rgba.end());
+    };
+    for (std::size_t i = 0; i < ring.size(); ++i)
+    {
+        push(centre);
+        push(ring[i]);
+        push(ring[(i + 1) % ring.size()]);
+    }
+    return verts;
+}
+
+void qcpErrorBarPixels(const QCPDrawFrame& frame, std::span<const QPointF> centres,
+                       std::span<const QPointF> spans, std::vector<QPointF>& out)
+{
+    std::vector<QPointF>& data = dataScratch();
+    qcpErrorBarCorners(centres, spans, data);
+    // Not pixelScratch(): the caller may hand its own pixel buffer as \a out.
+    std::vector<QPointF>& corners = cornerScratch();
+    corners.resize(data.size());
+    frame.transform.map(std::span<const QPointF>(data), std::span<QPointF>(corners));
+    errorBarPolyline(corners, out);
 }

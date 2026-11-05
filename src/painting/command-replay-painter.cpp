@@ -74,16 +74,8 @@ void replayErrorBars(const qcp::ErrorBarsCmd& cmd, QCPPainter& painter, const QC
 {
     const std::size_t count = std::min(cmd.centres->size(), cmd.spans->size());
     Scratch& local = scratch();
-    local.data.resize(4 * count);
-    for (std::size_t i = 0; i < count; ++i)
-    {
-        const QPointF centre = cmd.centres->at(i);
-        const QPointF span = cmd.spans->at(i);
-        local.data[4 * i + 0] = QPointF(centre.x(), centre.y() + span.y());
-        local.data[4 * i + 1] = QPointF(centre.x(), centre.y() - span.y());
-        local.data[4 * i + 2] = QPointF(centre.x() - span.x(), centre.y());
-        local.data[4 * i + 3] = QPointF(centre.x() + span.x(), centre.y());
-    }
+    qcpErrorBarCorners(std::span<const QPointF>(*cmd.centres),
+                       std::span<const QPointF>(*cmd.spans), local.data);
     local.pixels.resize(local.data.size());
     frame.transform.map(std::span<const QPointF>(local.data), std::span<QPointF>(local.pixels));
     painter.setPen(cmd.pen);
@@ -100,7 +92,29 @@ void replayErrorBars(const qcp::ErrorBarsCmd& cmd, QCPPainter& painter, const QC
 }
 } // namespace
 
-void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QCPDrawFrame& frame)
+namespace
+{
+//! The kinds the RHI replay draws: on the screen the painter must leave them to it.
+bool isGpuKind(const qcp::QCPDrawCommand& command)
+{
+    return std::visit(
+        [](const auto& cmd) {
+            using Command = std::decay_t<decltype(cmd)>;
+            return std::is_same_v<Command, qcp::PolylineDataCmd>
+                || std::is_same_v<Command, qcp::PolylinePositionsCmd>
+                || std::is_same_v<Command, qcp::PolygonCmd>
+                || std::is_same_v<Command, qcp::FillBetweenCmd>
+                || std::is_same_v<Command, qcp::RectCmd>
+                || std::is_same_v<Command, qcp::EllipseCmd>
+                || std::is_same_v<Command, qcp::ErrorBarsCmd>
+                || std::is_same_v<Command, qcp::MarkersCmd>;
+        },
+        command);
+}
+} // namespace
+
+void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QCPDrawFrame& frame,
+                          QCPReplayKinds kinds)
 {
     painter.save();
     if (!frame.clip.isEmpty())
@@ -108,6 +122,8 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
     Scratch& local = scratch();
     for (const qcp::QCPDrawCommand& command : list.commands)
     {
+        if (kinds == QCPReplayKinds::PainterOnly && isGpuKind(command))
+            continue;
         std::visit(
             [&](const auto& cmd) {
                 using Command = std::decay_t<decltype(cmd)>;

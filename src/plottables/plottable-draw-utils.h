@@ -37,6 +37,11 @@ struct DashPattern
 };
 DashPattern dashPatternOf(const QPen& pen, float penWidth);
 
+/// Extrudes \a pts in the format \a pen needs: 6 floats, or 7 with the arc length when dashed.
+/// The one place that chooses the extruder for a stroke.
+void extrudeStroke(std::span<const QPointF> pts, const QPen& pen, float penWidth,
+                   std::vector<float>& out);
+
 /// Strokes \a pts on the GPU, solid or dashed. False means the caller must paint them itself
 /// (no QRhi, exporting, no layer, or nothing to stroke).
 bool strokePolylineOnGpu(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer* layer,
@@ -110,10 +115,6 @@ void drawPolylineCached(QCPPainter* painter,
                          const QRect& clipRect,
                          bool freshLines,
                          ExtrusionCache& cache);
-
-/// Extrudes each run in its own colour into one vertex buffer (6 floats per vertex).
-void extrudeColorRuns(const QVector<QPointF>& points, const std::vector<ColorRun>& runs,
-                      float penWidth, const ColorScalarMapper& mapper, std::vector<float>& out);
 
 /// A coloured cache survives pans; it is rebuilt on fresh lines, pen width or colour change.
 bool needsColoredReextrusion(const ExtrusionCache& cache, bool freshLines,
