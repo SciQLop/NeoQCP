@@ -394,6 +394,15 @@ int QCPDrawnCore::rasterCount() const
 
 bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView& view)
 {
+    if (mState->insideDraw)
+    {
+        // The object is asking for the recording it is drawing right now: it has no answer yet, and
+        // re-entering draw() for it would never end. The previous recording is the closest thing.
+        qcp::reportMisuse(Q_FUNC_INFO,
+                          "a drawn object read its own range, hit test or extent from inside its "
+                          "draw(): the last recording is used");
+        return mState->recorded;
+    }
     if (!view.keyAxis || !view.valueAxis)
     {
         if (!mState->reportedMissingAxis)

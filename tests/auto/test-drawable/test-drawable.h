@@ -19,6 +19,7 @@ private slots:
     void transformReaderReRecordsOnEveryPan();
     void contentChangedInsideDrawIsAMisuse();
     void contentChangedInsideLegendIconIsAMisuse();
+    void recordingFromInsideDrawIsAMisuse();
     void missingAxisHidesWithAMessage();
 
     void panReusesResolvedGeometry();

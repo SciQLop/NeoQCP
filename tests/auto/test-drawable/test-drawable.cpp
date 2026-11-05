@@ -92,6 +92,12 @@ public:
         ++drawCalls;
         if (contentChangeInsideDraw)
             const_cast<TestShape*>(this)->contentChanged();
+        if (rangeInsideDraw)
+        {
+            const std::optional<QCPItemExtent> range = extent();
+            sawRange = true;
+            hadRangeInsideDraw = range.has_value();
+        }
         if (readsTheme)
             (void)context.theme();
         if (readsTransform)
@@ -245,6 +251,10 @@ public:
     bool readsTheme = false;
     bool readsTransform = false;
     bool contentChangeInsideDraw = false;
+    //! Ask for the object's own range while recording it, as a custom draw() may.
+    bool rangeInsideDraw = false;
+    mutable bool sawRange = false;
+    mutable bool hadRangeInsideDraw = false;
     mutable int drawCalls = 0;
     mutable int dirtyCalls = 0;
 };
@@ -547,6 +557,26 @@ void TestDrawable::contentChangedInsideLegendIconIsAMisuse()
 
     f.plot->replot(); // a bumped generation would re-record the screen list too
     QCOMPARE(line->drawCalls, 1);
+}
+
+void TestDrawable::recordingFromInsideDrawIsAMisuse()
+{
+    Fixture f;
+    auto* shape = new TestShape(f.plot.get());
+    shape->rangeInsideDraw = true;
+    f.plot->replot(); // must not re-enter draw() from inside draw()
+
+    QCOMPARE(shape->drawCalls, 1);
+    QVERIFY2(shape->sawRange, "draw() did not ask for its own range");
+    QCOMPARE(gMisuseCount, 1);
+    QVERIFY2(!shape->hadRangeInsideDraw, "the first recording has no earlier one to answer with");
+
+    // A later recording answers from the previous one instead of recursing again.
+    shape->touch();
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 2);
+    QCOMPARE(gMisuseCount, 2);
+    QVERIFY2(shape->hadRangeInsideDraw, "the last recording was not handed back");
 }
 
 void TestDrawable::missingAxisHidesWithAMessage()
