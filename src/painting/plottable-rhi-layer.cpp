@@ -47,6 +47,7 @@ void QCPPlottableRhiLayer::clear()
     mDrawEntries.resize(0);       // preserve capacity
     mDashStagingSize = 0;
     mDashEntries.resize(0);
+    mDrawOrder.resize(0);
     mDirty = true;
 }
 
