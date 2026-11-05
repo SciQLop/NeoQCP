@@ -160,7 +160,7 @@ Writing a plot type: derive from QCPDrawn<Base> (QCPAbstractPlottable, a QCPAbst
         or QCPAbstractItem), override draw(QCPDrawContext&), append commands with the context's
         helpers, and mark a change from a setter with contentChanged(). The base's old drawing
         virtuals are answered from the recording. examples/custom-drawable (RangeBand: a fill and a
-        label in 60 lines) is a complete one.
+        label, under 60 lines of code) is a complete one.
   - A recording is transform independent; a replay is not. The plot records once and replays the
         commands until the object changed or the view epoch did (viewport size, device pixel ratio,
         theme: QCustomPlot::viewEpoch()). A pan and a zoom change neither key, so both replay.
@@ -187,7 +187,7 @@ The draw context: one helper per command kind, each taking typed positions and a
         renderer as QCPItemText always did.
   - Escapes: painter(callback) runs raw QPainter code in pixels with the frame's transform, and
         recordEveryFrame() marks a command position that only exists in pixels.
-Plottables and items on the drawing API: QCPBars records one polygon per bar (selected bars last, as
+Plottables and items on the drawing API: QCPBars records one rect per bar (selected bars last, as
         before) and QCPItemText records one text command; QCPItemRichText follows and keeps its text
         document as a painter callback. QCPItemPosition::set(const QCP::Position&) and
         QCPItemText::setPosition(const QCP::Position&) place an object with a typed position, without
