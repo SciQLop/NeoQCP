@@ -69,6 +69,10 @@ private slots:
     void crossAxisAnchorCycleIsRefused();
     void layoutDescribesTheScreenAfterAnExport();
     void hiddenPlotLaysOutAtItsSize();
+    void dashedLineStacksLikeSolid();
+    void dashPhaseSurvivesPan();
+    void dashedLineMatchesExportDashes();
+    void solidLinesKeepTheirVertexFormat();
 
 private:
     // What the plot shows: its paint buffers composed, or the framebuffer under RHI.

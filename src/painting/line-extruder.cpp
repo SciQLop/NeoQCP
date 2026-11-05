@@ -19,26 +19,39 @@ struct WriteCursor
 {
     float* data;
     int pos = 0;
+    bool withDistance = false; //!< 7 floats per vertex: (x, y, r, g, b, a, distance)
 
-    void vertex(float x, float y, const std::array<float, 4>& rgba)
+    void vertex(float x, float y, const std::array<float, 4>& rgba, float distance)
     {
         float* p = data + pos;
         p[0] = x;  p[1] = y;
         p[2] = rgba[0];  p[3] = rgba[1];  p[4] = rgba[2];  p[5] = rgba[3];
-        pos += 6;
+        if (withDistance)
+        {
+            p[6] = distance;
+            pos += 7;
+        }
+        else
+            pos += 6;
     }
 
+    //! \a dPrev is the arc length of the previous point, \a dCur of the current one.
     void quad(QPointF tl, QPointF tr, QPointF br, QPointF bl,
-              const std::array<float, 4>& rgba)
+              const std::array<float, 4>& rgba, float dPrev, float dCur)
     {
-        vertex(tl.x(), tl.y(), rgba);
-        vertex(tr.x(), tr.y(), rgba);
-        vertex(br.x(), br.y(), rgba);
-        vertex(tl.x(), tl.y(), rgba);
-        vertex(br.x(), br.y(), rgba);
-        vertex(bl.x(), bl.y(), rgba);
+        vertex(tl.x(), tl.y(), rgba, dPrev);
+        vertex(tr.x(), tr.y(), rgba, dCur);
+        vertex(br.x(), br.y(), rgba, dCur);
+        vertex(tl.x(), tl.y(), rgba, dPrev);
+        vertex(br.x(), br.y(), rgba, dCur);
+        vertex(bl.x(), bl.y(), rgba, dPrev);
     }
 };
+
+double distance(const QPointF& a, const QPointF& b)
+{
+    return qSqrt((b.x() - a.x()) * (b.x() - a.x()) + (b.y() - a.y()) * (b.y() - a.y()));
+}
 
 bool isNonFinite(const QPointF& p) { return !qIsFinite(p.x()) || !qIsFinite(p.y()); }
 
@@ -96,13 +109,17 @@ void extrudeSegment(WriteCursor& cur, std::span<const QPointF> points,
     int count = end - start;
     if (count < 2) return;
 
-    // Sliding window: only previous and current normal/left/right needed.
+    // Sliding window: only previous and current normal/left/right needed. The arc length restarts
+    // at each segment, so a NaN gap starts the dash pattern over.
+    double walked = 0.0;
     QPointF prevNormal = perp(normalized(points[start + 1] - points[start]));
     QPointF prevLeft = points[start] + prevNormal * halfWidth;
     QPointF prevRight = points[start] - prevNormal * halfWidth;
 
     for (int i = 1; i < count - 1; ++i)
     {
+        const double prevWalked = walked;
+        walked += distance(points[start + i - 1], points[start + i]);
         QPointF curNormal = perp(normalized(points[start + i + 1] - points[start + i]));
         QPointF mo = miterOffset(prevNormal, curNormal, halfWidth);
 
@@ -115,20 +132,21 @@ void extrudeSegment(WriteCursor& cur, std::span<const QPointF> points,
             QPointF leftNext = p + curNormal * halfWidth;
             QPointF rightNext = p - curNormal * halfWidth;
 
-            cur.quad(prevLeft, leftPrev, rightPrev, prevRight, rgba);
+            cur.quad(prevLeft, leftPrev, rightPrev, prevRight, rgba, float(prevWalked),
+                     float(walked));
 
             double cross = prevNormal.x() * curNormal.y() - prevNormal.y() * curNormal.x();
             if (cross > 0)
             {
-                cur.vertex(rightPrev.x(), rightPrev.y(), rgba);
-                cur.vertex(rightNext.x(), rightNext.y(), rgba);
-                cur.vertex(p.x(), p.y(), rgba);
+                cur.vertex(rightPrev.x(), rightPrev.y(), rgba, float(walked));
+                cur.vertex(rightNext.x(), rightNext.y(), rgba, float(walked));
+                cur.vertex(p.x(), p.y(), rgba, float(walked));
             }
             else
             {
-                cur.vertex(leftPrev.x(), leftPrev.y(), rgba);
-                cur.vertex(leftNext.x(), leftNext.y(), rgba);
-                cur.vertex(p.x(), p.y(), rgba);
+                cur.vertex(leftPrev.x(), leftPrev.y(), rgba, float(walked));
+                cur.vertex(leftNext.x(), leftNext.y(), rgba, float(walked));
+                cur.vertex(p.x(), p.y(), rgba, float(walked));
             }
 
             curLeft = leftNext;
@@ -138,7 +156,8 @@ void extrudeSegment(WriteCursor& cur, std::span<const QPointF> points,
         {
             curLeft = points[start + i] + mo;
             curRight = points[start + i] - mo;
-            cur.quad(prevLeft, curLeft, curRight, prevRight, rgba);
+            cur.quad(prevLeft, curLeft, curRight, prevRight, rgba, float(prevWalked),
+                     float(walked));
         }
 
         prevLeft = curLeft;
@@ -146,24 +165,25 @@ void extrudeSegment(WriteCursor& cur, std::span<const QPointF> points,
         prevNormal = curNormal;
     }
 
+    walked += distance(points[start + count - 2], points[start + count - 1]);
     QPointF lastLeft = points[start + count - 1] + prevNormal * halfWidth;
     QPointF lastRight = points[start + count - 1] - prevNormal * halfWidth;
-    cur.quad(prevLeft, lastLeft, lastRight, prevRight, rgba);
+    cur.quad(prevLeft, lastLeft, lastRight, prevRight, rgba,
+             float(walked - distance(points[start + count - 2], points[start + count - 1])),
+             float(walked));
 }
 
 // Upper bound on floats written by extrudePolyline for N input points.
 // Each segment of K points produces at most (K-1) quads (6 verts × 6 floats = 36)
 // plus (K-2) bevel triangles (3 verts × 6 floats = 18).
 // Worst case per point: 36 + 18 = 54 floats. We round up to 6*6*2 = 72.
-int maxExtrusionFloats(int pointCount)
+int maxExtrusionFloats(int pointCount, bool withDistance)
 {
-    return pointCount * 72;
+    return pointCount * (withDistance ? 84 : 72);
 }
 
-} // anonymous namespace
-
-void appendPolyline(std::span<const QPointF> points, float penWidth,
-                     const QColor& color, std::vector<float>& out)
+void appendPolylineImpl(std::span<const QPointF> points, float penWidth,
+                        const QColor& color, std::vector<float>& out, bool withDistance)
 {
     PROFILE_HERE_N("extrudePolyline");
     if (points.size() < 2 || penWidth <= 0.0f)
@@ -178,14 +198,29 @@ void appendPolyline(std::span<const QPointF> points, float penWidth,
     // Pre-allocate worst case on top of whatever's already in out — the vector
     // retains capacity across frames/runs, so repeated appends amortize to zero alloc.
     const size_t base = out.size();
-    int maxFloats = maxExtrusionFloats(static_cast<int>(points.size()));
+    int maxFloats = maxExtrusionFloats(static_cast<int>(points.size()), withDistance);
     out.resize(base + maxFloats);
 
     WriteCursor cur{out.data() + base};
+    cur.withDistance = withDistance;
     for (const auto& seg : segments)
         extrudeSegment(cur, points, seg.startIdx, seg.endIdx, halfWidth, rgba);
 
     out.resize(base + cur.pos); // trim to actual size (no realloc — smaller than capacity)
+}
+
+} // anonymous namespace
+
+void appendPolyline(std::span<const QPointF> points, float penWidth,
+                     const QColor& color, std::vector<float>& out)
+{
+    appendPolylineImpl(points, penWidth, color, out, false);
+}
+
+void appendPolylineWithDistance(std::span<const QPointF> points, float penWidth,
+                                const QColor& color, std::vector<float>& out)
+{
+    appendPolylineImpl(points, penWidth, color, out, true);
 }
 
 void extrudePolyline(const QVector<QPointF>& points, float penWidth,
@@ -208,7 +243,7 @@ QVector<float> extrudePolyline(const QVector<QPointF>& points, float penWidth,
 
     auto segments = splitByNonFinite(points);
 
-    int maxFloats = maxExtrusionFloats(points.size());
+    int maxFloats = maxExtrusionFloats(points.size(), false);
     QVector<float> out(maxFloats);
 
     WriteCursor cur{out.data()};
@@ -238,9 +273,9 @@ QVector<float> tessellateFillPolygon(const QPolygonF& polygon, const QColor& col
 
     if (curveCount < 2)
     {
-        cur.vertex(base0.x(), base0.y(), rgba);
-        cur.vertex(polygon[1].x(), polygon[1].y(), rgba);
-        cur.vertex(base1.x(), base1.y(), rgba);
+        cur.vertex(base0.x(), base0.y(), rgba, 0.0f);
+        cur.vertex(polygon[1].x(), polygon[1].y(), rgba, 0.0f);
+        cur.vertex(base1.x(), base1.y(), rgba, 0.0f);
         out.resize(cur.pos);
         return out;
     }
@@ -255,9 +290,9 @@ QVector<float> tessellateFillPolygon(const QPolygonF& polygon, const QColor& col
     };
 
     QPointF proj0 = projectToBaseline(polygon[1]);
-    cur.vertex(base0.x(), base0.y(), rgba);
-    cur.vertex(polygon[1].x(), polygon[1].y(), rgba);
-    cur.vertex(proj0.x(), proj0.y(), rgba);
+    cur.vertex(base0.x(), base0.y(), rgba, 0.0f);
+    cur.vertex(polygon[1].x(), polygon[1].y(), rgba, 0.0f);
+    cur.vertex(proj0.x(), proj0.y(), rgba, 0.0f);
 
     for (int i = 1; i < curveCount; ++i)
     {
@@ -266,13 +301,13 @@ QVector<float> tessellateFillPolygon(const QPolygonF& polygon, const QColor& col
         QPointF p0 = projectToBaseline(c0);
         QPointF p1 = projectToBaseline(c1);
 
-        cur.quad(c0, c1, p1, p0, rgba);
+        cur.quad(c0, c1, p1, p0, rgba, 0.0f, 0.0f);
     }
 
     QPointF projLast = projectToBaseline(polygon[polygon.size() - 2]);
-    cur.vertex(polygon[polygon.size() - 2].x(), polygon[polygon.size() - 2].y(), rgba);
-    cur.vertex(base1.x(), base1.y(), rgba);
-    cur.vertex(projLast.x(), projLast.y(), rgba);
+    cur.vertex(polygon[polygon.size() - 2].x(), polygon[polygon.size() - 2].y(), rgba, 0.0f);
+    cur.vertex(base1.x(), base1.y(), rgba, 0.0f);
+    cur.vertex(projLast.x(), projLast.y(), rgba, 0.0f);
 
     out.resize(cur.pos);
     return out;

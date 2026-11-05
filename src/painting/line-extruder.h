@@ -27,6 +27,11 @@ void extrudePolyline(const QVector<QPointF>& points, float penWidth,
 void appendPolyline(std::span<const QPointF> points, float penWidth,
                      const QColor& color, std::vector<float>& out);
 
+// Same, with 7 floats per vertex: (x, y, r, g, b, a, arc length in pixels). The arc length
+// restarts at every NaN gap, so a dashed line's pattern restarts after the gap too.
+void appendPolylineWithDistance(std::span<const QPointF> points, float penWidth,
+                                const QColor& color, std::vector<float>& out);
+
 // Tessellate a baseline fill polygon into a triangle-list vertex buffer.
 // The polygon structure is: basePoint0, curvePoint0..N, basePoint1.
 // Uses trapezoid decomposition between consecutive curve points.

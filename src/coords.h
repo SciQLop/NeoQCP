@@ -140,6 +140,12 @@ public:
     //! False when an axis is gone, the orientations are the same or the snapshot cannot map.
     [[nodiscard]] bool valid() const { return mKey.usable && mValue.usable; }
 
+    //! Two snapshots that map identically compare equal (the axes themselves are not compared).
+    [[nodiscard]] bool operator==(const QCPTransform& other) const
+    {
+        return mKey == other.mKey && mValue == other.mValue;
+    }
+
 private:
     struct Axis
     {
@@ -160,6 +166,8 @@ private:
         double logSlope = 0; //!< pixels = logSlope * ln(|value|) + logIntercept
         double logIntercept = 0;
         double positive = 1; //!< the sign of the log range: the values it can map
+
+        bool operator==(const Axis&) const = default;
 
         void snapshot(const QCPAxis* axis);
         void prepare();

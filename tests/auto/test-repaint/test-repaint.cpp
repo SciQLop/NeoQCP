@@ -1,4 +1,5 @@
 #include "test-repaint.h"
+#include "painting/plottable-rhi-layer.h"
 #include "plottables/plottable-multigraph.h"
 #include "datasource/soa-multi-datasource.h"
 #include "plottables/plottable-bars.h"
@@ -2147,4 +2148,210 @@ void TestRepaint::hiddenPlotLaysOutAtItsSize()
     QCOMPARE(plot.viewport(), QRect(0, 0, 400, 300));
     QVERIFY(plot.axisRect()->outerRect().right() < 400);
     QVERIFY(plot.axisRect()->outerRect().bottom() < 300);
+}
+
+namespace
+{
+// A shown plot that owns a QRhi, or nullptr offscreen: the GPU cases skip there.
+QCustomPlot* shownGpuPlot(QWidget& host)
+{
+    host.resize(400, 300);
+    auto* plot = new QCustomPlot(&host);
+    plot->setGeometry(0, 0, 400, 300);
+    host.show();
+    if (!QTest::qWaitForWindowExposed(&host))
+        return nullptr;
+    QElapsedTimer waited;
+    waited.start();
+    while (!plot->rhi() && waited.elapsed() < 5000)
+    {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+        QTest::qWait(10);
+    }
+    return plot->rhi() ? plot : nullptr;
+}
+
+// The columns where the middle row of the plot is inked.
+QVector<int> inkedColumns(QCustomPlot* plot, const QImage& image)
+{
+    const double dpr = plot->bufferDevicePixelRatio();
+    const int y = qBound(0, int(plot->yAxis->coordToPixel(0.5) * dpr), image.height() - 1);
+    const QRect rect = plot->axisRect()->rect();
+    const int first = qBound(0, int(rect.left() * dpr) + 2, image.width() - 1);
+    const int last = qBound(0, int(rect.right() * dpr) - 2, image.width() - 1);
+    QVector<int> columns;
+    for (int x = first; x <= last; ++x)
+        if (qGray(image.pixel(x, y)) < 110)
+            columns.append(x);
+    return columns;
+}
+} // namespace
+
+void TestRepaint::dashedLineStacksLikeSolid()
+{
+    // A pen style must not decide stacking: both cases have the graph on the GPU pass, above the
+    // rect item that was created after it.
+    const auto darkPixelsOverTheRect = [](Qt::PenStyle style) {
+        QWidget host;
+        QCustomPlot* plot = shownGpuPlot(host);
+        if (!plot)
+            return -1;
+        auto* graph = plot->addGraph();
+        QVector<double> keys, values;
+        for (int i = 0; i <= 400; ++i)
+        {
+            keys << i / 400.0;
+            values << 0.5;
+        }
+        graph->setData(keys, values);
+        graph->setPen(QPen(Qt::black, 5, style));
+        plot->xAxis->setRange(0, 1);
+        plot->yAxis->setRange(0, 1);
+        auto rect = plot->add<QCPItemRect>();
+        rect->topLeft->setCoords(0.2, 0.7);
+        rect->bottomRight->setCoords(0.8, 0.3);
+        rect->setPen(Qt::NoPen);
+        rect->setBrush(QColor(210, 40, 40));
+        plot->replot();
+        waitUntilSettled(*plot);
+        const QImage image = screenOf(plot);
+        const double dpr = plot->bufferDevicePixelRatio();
+        const QRect box(QPoint(int(plot->xAxis->coordToPixel(0.25) * dpr),
+                               int(plot->yAxis->coordToPixel(0.7) * dpr)),
+                        QPoint(int(plot->xAxis->coordToPixel(0.75) * dpr),
+                               int(plot->yAxis->coordToPixel(0.3) * dpr)));
+        int dark = 0;
+        int red = 0;
+        for (int y = box.top(); y <= box.bottom(); ++y)
+            for (int x = box.left(); x <= box.right(); ++x)
+            {
+                const int gray = qGray(image.pixel(x, y));
+                if (gray < 60) // the black line; the brush's red sits at 97
+                    ++dark;
+                else if (gray > 90 && gray < 150)
+                    ++red;
+            }
+        return red > 1000 ? dark : -1; // the rect was not drawn: the case proves nothing
+    };
+
+    const int solid = darkPixelsOverTheRect(Qt::SolidLine);
+    if (solid < 0)
+        QSKIP("no QRhi on this platform");
+    const int dashed = darkPixelsOverTheRect(Qt::DashLine);
+    QVERIFY2(solid > 0, "the solid line is not over the rect");
+    // Both are drawn on the GPU pass, above the rect created after them; the dashes only cover
+    // part of the line, so fewer dark pixels - but never none, which is what a QPainter line under
+    // the rect would give.
+    QVERIFY2(dashed > 0, "the dashed line is under the rect: a pen style changed stacking");
+    QVERIFY(dashed < solid);
+}
+
+void TestRepaint::dashPhaseSurvivesPan()
+{
+    // The dash phase is measured along the drawn line, so a pan restarts it where the visible line
+    // starts - exactly what the QPainter export does. Pinning that: after a pan the GPU pattern and
+    // the export agree, and the pattern is still a dashed one.
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    auto* graph = plot->addGraph();
+    QVector<double> keys, values;
+    for (int i = 0; i <= 400; ++i)
+    {
+        keys << i / 400.0;
+        values << 0.5;
+    }
+    graph->setData(keys, values);
+    graph->setPen(QPen(Qt::black, 4, Qt::DashLine));
+    plot->xAxis->setRange(0, 1);
+    plot->yAxis->setRange(0, 1);
+    plot->replot();
+    waitUntilSettled(*plot);
+
+    const auto runs = [](const QVector<int>& columns) {
+        int count = 0;
+        for (int i = 1; i < columns.size(); ++i)
+            if (columns[i] != columns[i - 1] + 1)
+                ++count;
+        return count;
+    };
+    const double step = 7.0 / plot->axisRect()->width();
+    plot->xAxis->setRange(step, 1 + step);
+    waitUntilSettled(*plot);
+
+    const QVector<int> screenColumns = inkedColumns(plot, screenOf(plot));
+    QVERIFY2(screenColumns.size() > 20, "the pan drew no dashed line at all");
+    const int screenRuns = runs(screenColumns);
+    const int exportRuns = runs(inkedColumns(plot, plot->toPixmap(400, 300).toImage()));
+    QVERIFY(screenRuns > 3);
+    QVERIFY2(qAbs(screenRuns - exportRuns) <= 1,
+             qPrintable(QStringLiteral("after the pan: screen %1 dashes, export %2")
+                            .arg(screenRuns)
+                            .arg(exportRuns)));
+}
+
+void TestRepaint::dashedLineMatchesExportDashes()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    auto* graph = plot->addGraph();
+    QVector<double> keys, values;
+    for (int i = 0; i <= 400; ++i)
+    {
+        keys << i / 400.0;
+        values << 0.5;
+    }
+    graph->setData(keys, values);
+    graph->setPen(QPen(Qt::black, 4, Qt::DashLine));
+    plot->xAxis->setRange(0, 1);
+    plot->yAxis->setRange(0, 1);
+    plot->replot();
+    waitUntilSettled(*plot);
+
+    const auto runs = [](const QVector<int>& columns) {
+        int count = 0;
+        for (int i = 1; i < columns.size(); ++i)
+            if (columns[i] != columns[i - 1] + 1)
+                ++count;
+        return count;
+    };
+    const int screenRuns = runs(inkedColumns(plot, screenOf(plot)));
+    const QImage exported = plot->toPixmap(400, 300).toImage();
+    const int exportRuns = runs(inkedColumns(plot, exported));
+    QVERIFY(screenRuns > 3);
+    // The GPU pattern and the QPainter one start at the same place; allow one dash of slack.
+    QVERIFY2(qAbs(screenRuns - exportRuns) <= 1,
+             qPrintable(QStringLiteral("screen %1 dashes, export %2")
+                            .arg(screenRuns)
+                            .arg(exportRuns)));
+}
+
+void TestRepaint::solidLinesKeepTheirVertexFormat()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    auto* graph = plot->addGraph();
+    QVector<double> keys, values;
+    for (int i = 0; i <= 100; ++i)
+    {
+        keys << i / 100.0;
+        values << qSin(i / 12.0);
+    }
+    graph->setData(keys, values);
+    graph->setPen(QPen(Qt::black, 3, Qt::SolidLine));
+    plot->replot();
+    waitUntilSettled(*plot);
+
+    auto* layer = plot->plottableRhiLayer(graph->layer());
+    QVERIFY(layer);
+    // A solid line never reaches the dashed pipeline, and its vertices keep the 6-float format.
+    QVERIFY(layer->dashedDrawEntries().isEmpty());
+
+    QVERIFY(!layer->drawEntries().isEmpty());
+    QVERIFY(layer->drawEntries().first().strokeVertexCount > 0);
 }

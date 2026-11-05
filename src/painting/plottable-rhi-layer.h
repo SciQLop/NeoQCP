@@ -22,6 +22,21 @@ public:
         QRect scissorRect; // in physical pixels, Y-flipped for Y-up backends
     };
 
+    //! A dashed stroke: 7 floats per vertex (x, y, r, g, b, a, arc length in pixels).
+    struct DashedEntry
+    {
+        int vertexOffset = 0;
+        int vertexCount = 0;
+        float offsetX = 0;
+        float offsetY = 0;
+        float alpha = 1;
+        float dashOffset = 0;   // pixels
+        float patternLength = 0; // pixels
+        float pattern[8] = {};
+        int patternCount = 0;
+        QRect scissorRect;
+    };
+
     explicit QCPPlottableRhiLayer(QRhi* rhi);
     ~QCPPlottableRhiLayer();
 
@@ -33,6 +48,13 @@ public:
                       int outputHeight,
                       float offsetX = 0, float offsetY = 0,
                       float alpha = 1);
+
+    // Dashed strokes have their own pipeline and vertex buffer: the solid path keeps its 6-float
+    // format and pays nothing for this one.
+    void addDashedPlottable(std::span<const float> strokeVerts,
+                            std::span<const float> dashPattern, float dashOffset,
+                            const QRect& clipRect, double dpr, int outputHeight,
+                            float offsetX = 0, float offsetY = 0, float alpha = 1);
 
     // Offset-only update (no geometry change, no vertex re-upload)
     void setAllOffsets(float offsetX, float offsetY);
@@ -46,8 +68,9 @@ public:
     void render(QRhiCommandBuffer* cb, const QSize& outputSize);
 
     bool isDirty() const { return mDirty; }
-    bool hasGeometry() const { return !mDrawEntries.isEmpty(); }
+    bool hasGeometry() const { return !mDrawEntries.isEmpty() || !mDashEntries.isEmpty(); }
     const QVector<DrawEntry>& drawEntries() const { return mDrawEntries; }
+    const QVector<DashedEntry>& dashedDrawEntries() const { return mDashEntries; }
 
 private:
     // Per-draw uniform data, aligned to GPU requirements.
@@ -60,7 +83,26 @@ private:
     };
     static_assert(sizeof(PerDrawUniforms) == 32);
 
+    //! Matches the ViewportParams UBO in plottable_dashed.vert/.frag.
+    struct alignas(16) DashUniforms
+    {
+        float width, height, yFlip, dpr;
+        float offsetX, offsetY, alpha, dashOffset;
+        float patternLength, patternCount, _pad0, _pad1;
+        float pattern[2][4];
+    };
+    static_assert(sizeof(DashUniforms) == 80);
+
+    void createDashedPipeline(QRhiRenderPassDescriptor* rpDesc, int sampleCount);
+    void uploadSolid(QRhiResourceUpdateBatch* updates, const QSize& outputSize, float dpr,
+                     float yFlip);
+    void uploadDashed(QRhiResourceUpdateBatch* updates, const QSize& outputSize, float dpr,
+                      float yFlip);
+    void renderDashed(QRhiCommandBuffer* cb, const QSize& outputSize);
+
     int ubufStride() const; // aligned slot size for dynamic UBO offsets
+    int dashUbufStride() const;
+    void dashStagingAppend(const float* src, int count);
 
     // Raw staging buffer — avoids QVector::resize zero-initialization overhead
     void stagingAppend(const float* src, int count);
@@ -70,6 +112,18 @@ private:
 
     QRhi* mRhi; // non-owned; lifetime managed by QRhiWidget
     QVector<DrawEntry> mDrawEntries;
+
+    float* mDashStagingData = nullptr;
+    int mDashStagingSize = 0;
+    int mDashStagingCapacity = 0;
+    QVector<DashedEntry> mDashEntries;
+    QRhiBuffer* mDashVertexBuffer = nullptr;
+    QRhiBuffer* mDashUniformBuffer = nullptr;
+    QRhiShaderResourceBindings* mDashSrb = nullptr;
+    QRhiGraphicsPipeline* mDashPipeline = nullptr;
+    int mDashVertexBufferSize = 0;
+    int mDashUniformBufferSize = 0;
+    int mLastDashSampleCount = 0;
 
     QRhiBuffer* mVertexBuffer = nullptr;
     QRhiBuffer* mUniformBuffer = nullptr;

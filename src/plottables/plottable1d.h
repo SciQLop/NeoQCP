@@ -29,9 +29,8 @@
 #include "core.h"
 #include "datacontainer.h"
 #include "global.h"
-#include "painting/line-extruder.h"
 #include "painting/painter.h"
-#include "painting/plottable-rhi-layer.h"
+#include "plottable-draw-utils.h"
 #include "plottable.h"
 
 class QCPPlottableInterface1D
@@ -566,28 +565,11 @@ template <class DataType>
 void QCPAbstractPlottable1D<DataType>::drawPolyline(QCPPainter* painter,
                                                     const QVector<QPointF>& lineData) const
 {
-    // GPU rendering path: extrude polyline into triangle strip
-    if (auto* rhi = mParentPlot ? mParentPlot->rhi() : nullptr;
-        rhi && !painter->isExporting()
-            && painter->pen().style() == Qt::SolidLine)
-    {
-        auto* prl = mParentPlot->plottableRhiLayer(mLayer);
-        if (prl)
-        {
-            QColor penColor = painter->pen().color();
-            float penWidth = qMax(1.0f, static_cast<float>(painter->pen().widthF()));
-            auto strokeVerts = QCPLineExtruder::extrudePolyline(lineData, penWidth, penColor);
-            if (!strokeVerts.isEmpty())
-            {
-                const double dpr = mParentPlot->bufferDevicePixelRatio();
-                const QSize outputSize = mParentPlot->rhiOutputSize();
-                prl->addPlottable({}, strokeVerts, clipRect(), dpr,
-                                   outputSize.height(), 0.0f, 0.0f,
-                                   static_cast<float>(painter->opacity()));
-            }
-            return;
-        }
-    }
+    // GPU rendering path: extrude the polyline into triangles, dashed or solid.
+    if (qcp::strokePolylineOnGpu(painter, mParentPlot, mLayer,
+                                 std::span<const QPointF>(lineData.constData(), lineData.size()),
+                                 painter->pen(), QPointF(), clipRect()))
+        return;
 
     // if drawing lines in plot (instead of PDF), reduce 1px lines to cosmetic, because at least in
     // Qt6 drawing of "1px" width lines is much slower even though it has same appearance apart from

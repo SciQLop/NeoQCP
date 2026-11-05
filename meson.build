@@ -106,6 +106,7 @@ neoqcp_moc_headers = ['src/axis/axis.h',
             'src/painting/painter.h',
             'src/painting/draw-commands.h',
             'src/painting/draw-context.h',
+            'src/painting/command-replay-rhi.h',
             'src/painting/paintbuffer-pixmap.h',
             'src/plottables/plottable.h',
             'src/plottables/plottable-bars.h',
@@ -168,6 +169,16 @@ plottable_frag_qsb = custom_target('plottable_frag_qsb',
     output: 'plottable.frag.qsb',
     command: [qsb, '--qt6', '-o', '@OUTPUT@', '@INPUT@'])
 
+plottable_dashed_vert_qsb = custom_target('plottable_dashed_vert_qsb',
+    input: 'src/painting/shaders/plottable_dashed.vert',
+    output: 'plottable_dashed.vert.qsb',
+    command: [qsb, '--qt6', '-o', '@OUTPUT@', '@INPUT@'])
+
+plottable_dashed_frag_qsb = custom_target('plottable_dashed_frag_qsb',
+    input: 'src/painting/shaders/plottable_dashed.frag',
+    output: 'plottable_dashed.frag.qsb',
+    command: [qsb, '--qt6', '-o', '@OUTPUT@', '@INPUT@'])
+
 span_vert_qsb = custom_target('span_vert_qsb',
     input: 'src/painting/shaders/span.vert',
     output: 'span.vert.qsb',
@@ -208,7 +219,8 @@ embedded_shaders = custom_target('embedded_shaders',
     input: [composite_vert_qsb, composite_frag_qsb, plottable_vert_qsb, plottable_frag_qsb,
             span_vert_qsb, contour_line_vert_qsb, contour_line_frag_qsb,
             scatter_vert_qsb, scatter_frag_qsb,
-            scatter_colored_vert_qsb, scatter_colored_frag_qsb],
+            scatter_colored_vert_qsb, scatter_colored_frag_qsb,
+            plottable_dashed_vert_qsb, plottable_dashed_frag_qsb],
     output: 'embedded_shaders.h',
     command: [python3, files('src/painting/shaders/embed_shaders.py'),
               '@OUTPUT@',
@@ -222,7 +234,9 @@ embedded_shaders = custom_target('embedded_shaders',
               'scatter_vert_qsb_data:@INPUT7@',
               'scatter_frag_qsb_data:@INPUT8@',
               'scatter_colored_vert_qsb_data:@INPUT9@',
-              'scatter_colored_frag_qsb_data:@INPUT10@'])
+              'scatter_colored_frag_qsb_data:@INPUT10@',
+              'plottable_dashed_vert_qsb_data:@INPUT11@',
+              'plottable_dashed_frag_qsb_data:@INPUT12@'])
 
 # Overridden by a host (meson.override_dependency) that wants NeoQCP's zones in its own tracer.
 if get_option('zone_stats')
@@ -251,6 +265,7 @@ NeoQCP = static_library('NeoQCP',
            'src/painting/painter.cpp',
            'src/painting/draw-context.cpp',
            'src/painting/command-replay-painter.cpp',
+           'src/painting/command-replay-rhi.cpp',
            'src/painting/paintbuffer-pixmap.cpp',
            'src/painting/paintbuffer-rhi.cpp',
            'src/painting/plottable-rhi-layer.cpp',
