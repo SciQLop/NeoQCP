@@ -515,10 +515,19 @@ std::optional<double> QCPDrawnCore::hitTest(const QCPDrawable& object, QCP::Pixe
         // the box really has are checked: an unbounded one is ±inf, which maps to a pixel far
         // outside the rect or to NaN on a log axis, and either would reject every point.
         const double grow = pad + tolerance;
-        const auto keyPixels
-            = [&](double key) { return frame.transform.map(QCP::Data { key, 0.0 }).x; };
-        const auto valuePixels
-            = [&](double value) { return frame.transform.map(QCP::Data { 0.0, value }).y; };
+        // Each side moves along its own pixel axis: with a vertical key axis, map() returns the
+        // value pixel first (QCPTransform::map).
+        const bool keyVertical = frame.transform.keyIsVertical();
+        const auto keyPixels = [&](double key)
+        {
+            const QCP::Pixels pixels = frame.transform.map(QCP::Data { key, 0.0 });
+            return keyVertical ? pixels.y : pixels.x;
+        };
+        const auto valuePixels = [&](double value)
+        {
+            const QCP::Pixels pixels = frame.transform.map(QCP::Data { 0.0, value });
+            return keyVertical ? pixels.x : pixels.y;
+        };
         if (!nearSide(keyPixels(box->keyLower), keyPixels(box->keyUpper), point.x(), grow)
             || !nearSide(valuePixels(box->valueLower), valuePixels(box->valueUpper), point.y(),
                          grow))

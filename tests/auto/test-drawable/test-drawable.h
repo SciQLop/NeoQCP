@@ -31,6 +31,7 @@ private slots:
     void drawnPolygonStacksAboveAnEarlierGpuGraph();
 
     void defaultHitTestMatchesGeometry();
+    void hitTestWithAVerticalKeyAxis();
     void hitTestBesideTextIsTheGap();
     void pixelAnchoredShapeIsHittable();
     void defaultDataRangeFollowsTheExtentRules();

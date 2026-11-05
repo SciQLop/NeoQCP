@@ -720,6 +720,29 @@ void TestDrawable::defaultHitTestMatchesGeometry()
     QVERIFY(!shape->hitTest(QCP::Pixels { edge - 60, at(0, 4).y }, nullptr).has_value());
 }
 
+void TestDrawable::hitTestWithAVerticalKeyAxis()
+{
+    // A horizontal plot: the key axis is vertical and the value axis horizontal, so the transform
+    // swaps the two pixel coordinates. The bounds check must map each side on its own axis.
+    Fixture f;
+    auto* shape = new TestShape(f.plot.get());
+    shape->mAnchor->setAxes(f.plot->yAxis, f.plot->xAxis); // drawn through the vertical key frame
+    f.plot->replot();
+    const auto at = [&](double key, double value)
+    {
+        return QCP::Pixels { f.plot->xAxis->coordToPixel(value), f.plot->yAxis->coordToPixel(key) };
+    };
+
+    const std::optional<double> inside = shape->hitTest(at(4, 4), nullptr);
+    QVERIFY2(inside.has_value(), "a click on the shape must hit through a vertical key axis");
+    QCOMPARE(*inside, 0.0); // inside a visible fill
+
+    QVERIFY2(!shape->hitTest(at(4, 12), nullptr).has_value(),
+             "a click beyond the shape's value side must miss");
+    QVERIFY2(!shape->hitTest(at(-3, 4), nullptr).has_value(),
+             "a click beyond the shape's key side must miss");
+}
+
 void TestDrawable::hitTestBesideTextIsTheGap()
 {
     Fixture f;
@@ -977,8 +1000,9 @@ void TestDrawable::mixedCornerRectFollowsAPan()
              qPrintable(QStringLiteral("the data corner moved %1 px, the axis %2 px")
                             .arg(after.bottom() - before.bottom())
                             .arg(moved)));
-    QVERIFY2(qAbs(after.top() - before.top()) <= 1,
-             qPrintable(QStringLiteral("the pixel corner moved %1 px").arg(after.top() - before.top())));
+    QVERIFY2(
+        qAbs(after.top() - before.top()) <= 1,
+        qPrintable(QStringLiteral("the pixel corner moved %1 px").arg(after.top() - before.top())));
 }
 
 void TestDrawable::anchoredShapeFollowsItsParent()

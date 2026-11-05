@@ -143,6 +143,9 @@ public:
     //! gets it.
     [[nodiscard]] bool isTranslationOf(const QCPTransform& other, QPointF* delta = nullptr) const;
 
+    //! True when the key axis is vertical: map() then returns the value pixel first.
+    [[nodiscard]] bool keyIsVertical() const { return mKey.vertical; }
+
     //! False when an axis is gone, the orientations are the same or the snapshot cannot map.
     [[nodiscard]] bool valid() const { return mKey.usable && mValue.usable; }
 
