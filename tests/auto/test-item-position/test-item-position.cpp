@@ -4,6 +4,14 @@
 
 namespace
 {
+//! A text that says how many times it recorded.
+class CountingText : public QCPItemText
+{
+public:
+    using QCPItemText::QCPItemText;
+    int recordings() const { return mCore.recordingCount(); }
+};
+
 // The axis rect only has a meaningful geometry once the layout has run.
 QCPItemText* laidOutTextItem(QCustomPlot* plot)
 {
@@ -146,6 +154,114 @@ void TestItemPosition::textAnchorParentDeletedKeepsPlace()
              qPrintable(QStringLiteral("x moved from %1 to %2").arg(before.x()).arg(after.x())));
     QVERIFY2(qAbs(after.y() - before.y()) <= 1.0,
              qPrintable(QStringLiteral("y moved from %1 to %2").arg(before.y()).arg(after.y())));
+}
+
+void TestItemPosition::oneAxisAnchoredTextFollowsItsAnchor()
+{
+    // A position QCP::Position cannot express (here: x on an item's anchor, y a ratio) is recorded
+    // as the pixels it had at that instant. Nothing in the recording moves them, so the recording
+    // must be remade; the count is the observable, because a text always re-records on an export.
+    mPlot->xAxis->setRange(0, 10);
+    mPlot->yAxis->setRange(0, 10);
+    auto* anchorItem = new QCPItemText(mPlot);
+    anchorItem->setText(QStringLiteral("anchor"));
+    anchorItem->position->setCoords(2.0, 5.0); // plot coordinates: a pan moves it
+    anchorItem->setPositionAlignment(Qt::AlignLeft | Qt::AlignTop);
+
+    auto* text = new CountingText(mPlot);
+    text->setText(QStringLiteral("label"));
+    text->position->setType(QCPItemPosition::ptAxisRectRatio);
+    text->position->setCoords(0, 0.5);
+    QVERIFY(text->position->setParentAnchorX(anchorItem->bottomRight));
+    mPlot->replot();
+
+    const int recorded = text->recordings();
+    const double before = text->position->pixelPosition().x();
+    QVERIFY2(recorded > 0, "the first frame must record");
+
+    mPlot->xAxis->setRange(4, 14); // a pan: the anchor moves, nothing marks the text
+    mPlot->replot();
+
+    QVERIFY2(text->position->pixelPosition().x() < before - 50,
+             "the anchor did not move: the case proves nothing");
+    QVERIFY2(text->recordings() > recorded, "the text did not follow its anchor");
+}
+
+void TestItemPosition::axisRectAbsoluteTextFollowsTheAxisRect()
+{
+    // The same snapshot problem in its other form: an axis-rect pixel position follows a margin
+    // change, so the recording that holds its pixels must be remade when the frame is redrawn.
+    auto* text = new CountingText(mPlot);
+    text->setText(QStringLiteral("label"));
+    text->position->setType(QCPItemPosition::ptAxisRectAbsolute);
+    text->position->setCoords(20, 30);
+    mPlot->replot();
+
+    const int recorded = text->recordings();
+    const double before = text->position->pixelPosition().x();
+    QVERIFY2(recorded > 0, "the first frame must record");
+
+    QCPAxisRect* axisRect = mPlot->axisRect();
+    axisRect->setAutoMargins(axisRect->autoMargins() & ~QCP::msLeft);
+    axisRect->setMargins(axisRect->margins() + QMargins(40, 0, 0, 0));
+    text->layer()->invalidatePaintBuffer(); // a layout change alone leaves this layer's buffer
+    mPlot->replot();
+
+    QVERIFY2(text->position->pixelPosition().x() > before + 20,
+             "the axis rect did not move: the case proves nothing");
+    QVERIFY2(text->recordings() > recorded, "the text did not follow the axis rect");
+}
+
+void TestItemPosition::parentDeletedBeforeAnyFrameKeepsPlace()
+{
+    // A child of a live parent reports where it is; the one whose parent is deleted before any frame
+    // or hit test asked for a pixel must keep exactly that pixel, not zero. Each way of attaching
+    // holds its own side, so all three are checked.
+    const auto attach = [](QCPItemText* parent, QCPItemPosition* child, int axes)
+    {
+        if (axes & 1)
+            child->setParentAnchorX(parent->bottomRight);
+        if (axes & 2)
+            child->setParentAnchorY(parent->bottomRight);
+    };
+    const auto newText = [this]()
+    {
+        auto* text = new QCPItemText(mPlot);
+        text->position->setType(QCPItemPosition::ptAbsolute);
+        text->position->setCoords(400, 300);
+        text->setText(QStringLiteral("reference"));
+        return text;
+    };
+    const auto newChild = [this]()
+    {
+        auto* child = new QCPItemText(mPlot);
+        child->position->setType(QCPItemPosition::ptAbsolute);
+        child->position->setCoords(5, 7);
+        return child;
+    };
+
+    for (const int axes : { 3, 1, 2 }) // both, x only, y only
+    {
+        auto* reference = newText();
+        QCPItemText* live = newChild();
+        attach(reference, live->position, axes);
+        mPlot->replot(); // a frame: the anchor reports its pixel
+        const QPointF expected = live->position->pixelPosition();
+
+        auto* doomed = newText(); // the same box, so the same anchor pixel
+        QCPItemText* orphan = newChild();
+        attach(doomed, orphan->position, axes);
+        QVERIFY(mPlot->removeItem(doomed)); // no frame and no hit test between attach and delete
+
+        const QPointF after = orphan->position->pixelPosition();
+        QVERIFY2(qAbs(after.x() - expected.x()) <= 1 && qAbs(after.y() - expected.y()) <= 1,
+                 qPrintable(QStringLiteral("axes %1: the child moved from %2,%3 to %4,%5")
+                                .arg(axes)
+                                .arg(expected.x())
+                                .arg(expected.y())
+                                .arg(after.x())
+                                .arg(after.y())));
+    }
 }
 
 // SciQLop#151: an item anchored far outside the view has a pixel position beyond int range (or NaN).

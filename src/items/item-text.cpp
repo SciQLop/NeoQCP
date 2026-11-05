@@ -295,7 +295,11 @@ QRectF QCPItemText::textBoxAtOrigin() const
 /* inherits documentation from base class */
 void QCPItemText::draw(QCPDrawContext& context) const
 {
-    context.text(position->asPosition(), mText, textStyle());
+    bool snapshot = false;
+    const QCP::Position at = position->asPosition(&snapshot);
+    if (snapshot) // the position's space had to become pixels: they go stale without a new read
+        context.recordEveryFrame();
+    context.text(at, mText, textStyle());
 }
 
 /* inherits documentation from base class */

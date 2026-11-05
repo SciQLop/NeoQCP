@@ -407,7 +407,8 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
     const quint64 epoch = view.plot ? view.plot->viewEpoch() : 0;
     const quint64 itemsEpoch = view.plot ? view.plot->itemsEpoch() : 0;
     const QCPTransform transform(view.keyAxis, view.valueAxis);
-    const bool stale = !mState->recorded || mState->recordedGeneration != mState->generation
+    const bool stale = !mState->recorded || mState->recording.everyFrame
+        || mState->recordedGeneration != mState->generation
         || (mState->viewDependent && mState->recordedEpoch != epoch)
         || (mState->anchorDependent && mState->recordedItemsEpoch != itemsEpoch)
         || (mState->transformDependent && !transform.isTranslationOf(mState->recordedTransform));

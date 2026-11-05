@@ -3,7 +3,8 @@
 
 class QCustomPlot;
 
-class TestItemPosition : public QObject {
+class TestItemPosition : public QObject
+{
     Q_OBJECT
 private slots:
     void init();
@@ -16,6 +17,9 @@ private slots:
     void absoluteRemainsWidgetRelative();
     void textRotatedHitTest();
     void textAnchorParentDeletedKeepsPlace();
+    void oneAxisAnchoredTextFollowsItsAnchor();
+    void axisRectAbsoluteTextFollowsTheAxisRect();
+    void parentDeletedBeforeAnyFrameKeepsPlace();
     void farOffscreenItemsDoNotOverflow_data();
     void farOffscreenItemsDoNotOverflow();
 

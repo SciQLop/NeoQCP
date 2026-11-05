@@ -527,7 +527,12 @@ bool QCPItemPosition::setParentAnchorX(QCPItemAnchor* parentAnchor, bool keepPix
         mParentAnchorX->removeChildX(this);
     // register at new parent anchor:
     if (parentAnchor)
+    {
         parentAnchor->addChildX(this);
+        // The pixel a child keeps if the parent goes away before any frame or hit test resolves the
+        // anchor: resolve it now, while the parent can still answer.
+        parentAnchor->pixelPosition();
+    }
     if (mParentItem)
         mParentItem->markDirty();
     mParentAnchorX = parentAnchor;
@@ -579,7 +584,12 @@ bool QCPItemPosition::setParentAnchorY(QCPItemAnchor* parentAnchor, bool keepPix
         mParentAnchorY->removeChildY(this);
     // register at new parent anchor:
     if (parentAnchor)
+    {
         parentAnchor->addChildY(this);
+        // The pixel a child keeps if the parent goes away before any frame or hit test resolves the
+        // anchor: resolve it now, while the parent can still answer.
+        parentAnchor->pixelPosition();
+    }
     if (mParentItem)
         mParentItem->markDirty();
     mParentAnchorY = parentAnchor;
@@ -1015,21 +1025,16 @@ void QCPItemPosition::set(const QCP::Position& position)
 /*! \internal
 
   Reads the position back in the space it was written in. The variant models data, pixels, an axis-rect
-  fraction, an anchor offset and the two half-data/half-ratio spaces; the remaining 2.x combinations
-  (ptViewportRatio, ptAxisRectAbsolute, an anchor on one axis only) come back as the pixels the
-  position has now, so a caller that only needs the value is never stuck.
+  fraction, an anchor offset and the two half-data/half-ratio spaces; every other 2.x combination
+  (ptViewportRatio, ptAxisRectAbsolute, an anchor on one axis only, an anchored data or ratio type)
+  comes back as the pixels the position has now, and \a snapshot says so: those pixels are this
+  frame's, and nothing in a recording that holds them moves them.
 */
-QCP::Position QCPItemPosition::asPosition() const
+QCP::Position QCPItemPosition::asPosition(bool* snapshot) const
 {
+  if (snapshot)
+    *snapshot = false;
   const bool anchored = mParentAnchorX != nullptr || mParentAnchorY != nullptr;
-  if (mPositionTypeX == ptPlotCoords && mPositionTypeY == ptPlotCoords)
-    return QCP::Data { mKey, mValue };
-  if (mPositionTypeX == ptAxisRectRatio && mPositionTypeY == ptAxisRectRatio)
-    return QCP::AxisRatio { mKey, mValue };
-  if (mPositionTypeX == ptPlotCoords && mPositionTypeY == ptAxisRectRatio)
-    return QCP::DataXRatioY { mKey, mValue };
-  if (mPositionTypeX == ptAxisRectRatio && mPositionTypeY == ptPlotCoords)
-    return QCP::RatioXDataY { mKey, mValue };
   if (mPositionTypeX == ptAbsolute && mPositionTypeY == ptAbsolute
       && mParentAnchorX == mParentAnchorY)
   {
@@ -1037,6 +1042,19 @@ QCP::Position QCPItemPosition::asPosition() const
       return QCP::AnchorOffset { mParentAnchorX, QCP::PixelOffset { mKey, mValue } };
     return QCP::Pixels { mKey, mValue };
   }
+  if (!anchored)
+  {
+    if (mPositionTypeX == ptPlotCoords && mPositionTypeY == ptPlotCoords)
+      return QCP::Data { mKey, mValue };
+    if (mPositionTypeX == ptAxisRectRatio && mPositionTypeY == ptAxisRectRatio)
+      return QCP::AxisRatio { mKey, mValue };
+    if (mPositionTypeX == ptPlotCoords && mPositionTypeY == ptAxisRectRatio)
+      return QCP::DataXRatioY { mKey, mValue };
+    if (mPositionTypeX == ptAxisRectRatio && mPositionTypeY == ptPlotCoords)
+      return QCP::RatioXDataY { mKey, mValue };
+  }
+  if (snapshot)
+    *snapshot = true;
   const QPointF pixels = pixelPosition();
   return QCP::Pixels { pixels.x(), pixels.y() };
 }

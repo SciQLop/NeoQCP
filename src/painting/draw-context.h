@@ -150,6 +150,14 @@ public:
                    std::shared_ptr<const std::vector<QPointF>> spans, const QPen& pen);
     //! Text anchored at \a at, measured and placed relative to that anchor.
     void text(QCP::Position at, const QString& text, const QCPTextStyle& style);
+    /*!
+      Marks the recording as holding a position only available in pixels: the recorder fell back on
+      the position's current pixel (see \ref QCPItemPosition::asPosition), so that command is a
+      snapshot of this frame and nothing in the recording moves it. The recording is then remade on
+      every frame, which is the only way such a position can follow what it is anchored to.
+    */
+    void recordEveryFrame();
+
     //! A painter path whose origin is \a origin; the path itself is in pixels from there.
     void path(QCP::Position origin, const QPainterPath& path, const QPen& pen, const QBrush& brush);
     //! A raster image stretched into the rectangle between two corners.

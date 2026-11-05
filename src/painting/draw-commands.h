@@ -192,6 +192,7 @@ struct QCP_LIB_DECL QCPDrawList
         viewDependent = other.viewDependent;
         anchorDependent = other.anchorDependent;
         transformDependent = other.transformDependent;
+        everyFrame = other.everyFrame;
         id = qcpNextDrawListId();
         return *this;
     }
@@ -214,6 +215,10 @@ struct QCP_LIB_DECL QCPDrawList
     //! A command read the frame's transform and baked a pixel out of it (a bar width in pixels):
     //! the recording is still good after a pan, but not after a zoom or a resize.
     bool transformDependent = false;
+    //! A command holds a position recorded as pixels because its own space cannot express it (see
+    //! QCPItemPosition::asPosition): a snapshot, which goes stale without the object's generation
+    //! moving. Such a recording is remade every frame.
+    bool everyFrame = false;
     quint64 id = qcpNextDrawListId(); //!< unique: with a command's index it is a cache key
 };
 

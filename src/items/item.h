@@ -175,8 +175,9 @@ public:
     //! Writes the position in a typed space (see coords.h), on top of the 2.x setters.
     void set(const QCP::Position& position);
     //! Reads the position back; a 2.x combination the variant does not model comes back as pixels.
-    //! Named asPosition() because value() already returns the value coordinate.
-    [[nodiscard]] QCP::Position asPosition() const;
+    //! Named asPosition() because value() already returns the value coordinate. \a snapshot is set
+    //! to true by that fallback: the pixels are this instant's, and only a re-read moves them.
+    [[nodiscard]] QCP::Position asPosition(bool* snapshot = nullptr) const;
 
 protected:
     // property members:

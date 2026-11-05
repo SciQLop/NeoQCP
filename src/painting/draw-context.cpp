@@ -384,6 +384,11 @@ void QCPDrawContext::text(QCP::Position at, const QString& text, const QCPTextSt
            unboundedExtent());
 }
 
+void QCPDrawContext::recordEveryFrame()
+{
+    mList->everyFrame = true;
+}
+
 void QCPDrawContext::path(QCP::Position origin, const QPainterPath& path, const QPen& pen,
                           const QBrush& brush)
 {
