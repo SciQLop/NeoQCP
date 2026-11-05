@@ -1,6 +1,7 @@
 #include "drawable.h"
 
 #include "core.h"
+#include "layer.h"
 #include "layoutelements/layoutelement-axisrect.h"
 #include "misuse.h"
 #include "painting/command-replay-rhi.h"
@@ -565,9 +566,21 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
     QCPScatterRhiLayer* scatter = plottables ? view.plot->scatterRhiLayer(view.layer) : nullptr;
     if (!plottables || !scatter)
     {
-        // An export has no GPU pass, and so has a screen without a backend: the painter draws it
-        // all, and never touches the caches a screen frame resolves into.
-        qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::All);
+        if (!painter.isExporting())
+        {
+            // A screen without a backend: the painter draws it all, and never touches the caches a
+            // screen frame resolves into.
+            qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::All);
+            return;
+        }
+        // Spec 5: an export stacks like the screen - this layer's painter content first, then the
+        // GPU commands' QPainter forms over it. The recording lives until the layer's pass ends
+        // (nothing here re-records or runs user code in between), so the second pass may hold it.
+        qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::PainterOnly);
+        if (view.layer)
+            view.layer->deferGpuPainter(
+                [list = &mState->recording, frame](QCPPainter& target)
+                { qcpReplayWithPainter(*list, target, frame, QCPReplayKinds::GpuOnly); });
         return;
     }
     qcpReplayWithRhi(mState->recording, *plottables, *scatter, frame, mState->resolve,

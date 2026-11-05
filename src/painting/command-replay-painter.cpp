@@ -201,15 +201,17 @@ bool outsideClip(const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame)
 void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QCPDrawFrame& frame,
                           QCPReplayKinds kinds, const qcp::QCPRasterFallback* fallback)
 {
-    // PainterOnly leaves the GPU kinds to the RHI replay: without the fallback it cannot know
-    // which of them the layer refused, so it would silently drop them.
-    Q_ASSERT(kinds == QCPReplayKinds::All || fallback);
+    // PainterOnly leaves the GPU kinds to another pass: on screen the RHI replay, in an export the
+    // layer's deferred GpuOnly pass. \a fallback, when there is one, draws the kinds the layer
+    // refused; GpuOnly draws exactly the GPU kinds, so it never needs one.
     painter.save();
     if (!frame.clip.isEmpty())
         painter.setClipRect(frame.clip);
     Scratch& local = scratch();
     for (const qcp::QCPDrawCommand& command : list.commands)
     {
+        if (kinds == QCPReplayKinds::GpuOnly && !isGpuKind(command))
+            continue;
         if (kinds == QCPReplayKinds::PainterOnly && isGpuKind(command))
         {
             // The layer could not take this command's image: paint it here, in the buffer the GPU

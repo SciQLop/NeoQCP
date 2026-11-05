@@ -259,12 +259,14 @@ inline quint64 qcpCommandIndex(const QCPDrawList& list, const qcp::QCPDrawComman
 }
 
 //! Draws \a list into \a painter through \a frame: the QPainter path (screen fallback and export).
-//! What a replay is for: All paints everything (an export has no GPU pass), PainterOnly is the
-//! other half of a screen frame and leaves the GPU kinds to the RHI replay.
+//! What a replay is for: All paints everything (no GPU pass), PainterOnly is the other half of a
+//! screen frame and leaves the GPU kinds to the RHI replay, GpuOnly is the export's second pass:
+//! the QPainter form of the GPU kinds, which an export draws over the layer's painter content.
 enum class QCPReplayKinds
 {
     All,
-    PainterOnly
+    PainterOnly,
+    GpuOnly
 };
 
 //! The four corners of each error bar in data space: above, below, left and right of the centre.

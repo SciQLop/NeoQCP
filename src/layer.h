@@ -30,6 +30,7 @@
 #include "spatial-index.h"
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <vector>
 #include <QPointer>
@@ -107,6 +108,10 @@ public:
 
     // non-virtual methods:
     void replot();
+    //! Defers \a replay to the end of this layer's next paint pass: a drawn object's GPU content
+    //! is submitted while it paints, and an export must draw those QPainter forms over the whole
+    //! layer's painter content, like the screen does. Called during \ref draw only.
+    void deferGpuPainter(std::function<void(QCPPainter&)> replay);
     // Marks the layer for the next turn's repaint; a pan may still shift its old frame. GUI thread
     // only.
     void markDirty();
@@ -122,6 +127,7 @@ protected:
 
     // non-property members:
     QWeakPointer<QCPAbstractPaintBuffer> mPaintBuffer;
+    std::vector<std::function<void(QCPPainter&)>> mDeferredGpu;
     quint64 mDirtyGeneration = 0;
     quint64 mDrawnGeneration = 0;
 

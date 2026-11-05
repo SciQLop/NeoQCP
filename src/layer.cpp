@@ -214,6 +214,7 @@ void QCPLayer::draw(QCPPainter* painter)
     // One tree lookup per axis pair for the whole frame; the answer says which indexed children
     // can be on screen at all. Items outside it are skipped before the painter is touched.
     const bool useIndex = mParentPlot && mParentPlot->itemIndexing() && !mChildren.isEmpty();
+    mDeferredGpu.clear();
     if (useIndex)
         itemCandidates(QRectF(mParentPlot->viewport()));
     for (int childIndex = 0; childIndex < mChildren.size(); ++childIndex)
@@ -238,6 +239,16 @@ void QCPLayer::draw(QCPPainter* painter)
             painter->restore();
         }
     }
+    // The export's second pass: the GPU commands' QPainter forms, over every painter content of
+    // this layer, exactly where the screen's GPU pass puts them.
+    for (const auto& replay : mDeferredGpu)
+        replay(*painter);
+    mDeferredGpu.clear();
+}
+
+void QCPLayer::deferGpuPainter(std::function<void(QCPPainter&)> replay)
+{
+    mDeferredGpu.push_back(std::move(replay));
 }
 
 /*! \internal

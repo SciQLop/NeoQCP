@@ -49,4 +49,5 @@ private slots:
     void removedAnchorItemDoesNotDangle();
     void pannedTimeAxisKeepsTheShapeOnAxis();
     void rangeBandExampleDraws();
+    void exportStacksLikeTheScreen();
 };

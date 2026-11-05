@@ -1141,3 +1141,69 @@ void TestDrawable::rangeBandExampleDraws()
                 ++inked;
     QVERIFY2(inked > 10, qPrintable(QStringLiteral("%1 dark pixels, no label").arg(inked)));
 }
+
+void TestDrawable::exportStacksLikeTheScreen()
+{
+    // Spec 5: a layer paints its QPainter content first, then the QPainter form of its GPU
+    // commands. The glyph of an item text is painter content, so the bars of its own layer,
+    // submitted before it, still cover it - on screen and in every export. Replaying each object
+    // whole stacked the glyph above the bars in the exports only.
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - this compares the screen with the export paths");
+
+    auto* bars = new QCPBars(f.plot->xAxis, f.plot->yAxis);
+    bars->setWidthType(QCPBars::wtPlotCoords);
+    bars->setWidth(6);
+    bars->setData(QVector<double> { 5 }, QVector<double> { 8 }); // 0..8, so it covers the text
+    bars->setPen(QPen(Qt::NoPen));
+    bars->setBrush(QColor(Qt::red));
+
+    auto* text = new QCPItemText(f.plot.get()); // after the bars: topmost in the item index
+    text->setLayer(QLatin1String("main")); // items default to "annotations", above the bars
+    text->setText(QStringLiteral("X"));
+    text->setPen(QPen(Qt::black));
+    QFont font = text->font();
+    font.setPixelSize(20);
+    text->setFont(font);
+    text->setPositionAlignment(Qt::AlignCenter);
+    text->position->setCoords(5, 4);
+
+    const QRect glyphBox(QPoint(qRound(f.plot->xAxis->coordToPixel(5)),
+                                qRound(f.plot->yAxis->coordToPixel(4)))
+                             - QPoint(10, 10),
+                         QSize(20, 20));
+    const auto inkIn = [](const QImage& image, QRect box)
+    {
+        const double dpr = image.devicePixelRatio();
+        int ink = 0;
+        for (int y = box.top(); y <= box.bottom(); ++y)
+            for (int x = box.left(); x <= box.right(); ++x)
+            {
+                const QColor colour = image.pixelColor(qRound(x * dpr), qRound(y * dpr));
+                if (colour.red() < 80 && colour.green() < 80 && colour.blue() < 80)
+                    ++ink;
+            }
+        return ink;
+    };
+
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+    const int onScreen = inkIn(f.plot->grabFramebuffer(), glyphBox);
+    QVERIFY2(onScreen == 0,
+             qPrintable(QStringLiteral("%1 glyph pixels over the bars on screen").arg(onScreen)));
+
+    const QImage pixmap = f.plot->toPixmap(300, 200).toImage();
+    const int inPixmap = inkIn(pixmap, glyphBox);
+    QVERIFY2(inPixmap == 0,
+             qPrintable(QStringLiteral("%1 glyph pixels over the bars in toPixmap").arg(inPixmap)));
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("out.png"));
+    QVERIFY(f.plot->savePng(path, 300, 200));
+    const QImage png = QImage(path).convertToFormat(QImage::Format_ARGB32);
+    QVERIFY(!png.isNull());
+    const int inPng = inkIn(png, glyphBox);
+    QVERIFY2(inPng == 0,
+             qPrintable(QStringLiteral("%1 glyph pixels over the bars in savePng").arg(inPng)));
+}
