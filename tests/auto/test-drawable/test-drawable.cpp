@@ -43,6 +43,7 @@ public:
         mAnchor = createPosition(QStringLiteral("anchor"));
         mAnchor->setCoords(3, 3);
         setClipAxisRect(plot->axisRect());
+        dirtyCalls = 0; // construction is not a content change
     }
 
     // The old painter virtual is final in the adapter: keep it visible so overriding the new
@@ -58,8 +59,16 @@ public:
         Disjoint,
         Image,
         Ratio,
-        PixelCorner
+        PixelCorner,
+        FromAnchor
     };
+
+    //! Counts the base setter path: a range change must not come through here.
+    void markDirty() override
+    {
+        ++dirtyCalls;
+        QCPDrawn<QCPAbstractItem>::markDirty();
+    }
 
     void draw(QCPDrawContext& context) const override
     {
@@ -116,6 +125,14 @@ public:
             context.polygon(corners, QPen(Qt::black, 2), QBrush(Qt::NoBrush));
             return;
         }
+        if (mode == FromAnchor) // data positions read from an item position the setters move
+        {
+            const QPointF at = mAnchor->coords();
+            const QCP::Position corners[]
+                = { QCP::Data { at.x(), at.y() }, QCP::Data { at.x() + 1, at.y() + 1 } };
+            context.polygon(corners, QPen(Qt::black), QBrush(fill));
+            return;
+        }
         if (mode == PixelCorner) // one data corner, one pixel corner; a ratio span beside it
         {
             context.rect(QCP::Data { 2, 2 }, QCP::Pixels { 50, 50 }, QPen(Qt::black, 2),
@@ -161,6 +178,7 @@ public:
     bool escapeHatch = false;
     bool contentChangeInsideDraw = false;
     mutable int drawCalls = 0;
+    mutable int dirtyCalls = 0;
 };
 
 //! A drawn plottable: one data-space line, so the default icon has something to fit.
@@ -176,12 +194,14 @@ public:
 
     void draw(QCPDrawContext& context) const override
     {
-        context.polyline(mLine, QPen(Qt::black, 2));
+        ++drawCalls;
+        context.polyline(mLine, this->pen());
     }
 
     //! The adapter's old virtual, which the legend calls.
     void paintIcon(QCPPainter* painter, const QRectF& rect) const { drawLegendIcon(painter, rect); }
 
+    mutable int drawCalls = 0;
     std::shared_ptr<const std::vector<QPointF>> mLine
         = std::make_shared<const std::vector<QPointF>>(
             std::initializer_list<QPointF> { { 1, 1 }, { 9, 9 } });
@@ -283,6 +303,7 @@ void TestDrawable::panDoesNotReRecord()
     f.plot->xAxis->setRange(2, 12);
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 1);
+    QCOMPARE(shape->dirtyCalls, 0); // a range change is not a content change
 }
 
 void TestDrawable::zoomDoesNotReRecord()
@@ -296,6 +317,7 @@ void TestDrawable::zoomDoesNotReRecord()
     f.plot->yAxis->setRange(4, 6);
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 1);
+    QCOMPARE(shape->dirtyCalls, 0); // a zoom is not a content change
 }
 
 void TestDrawable::setterReRecordsOnce()
@@ -585,6 +607,51 @@ void TestDrawable::defaultLegendIconIsTheRecordingFitted()
     QVERIFY2(image.pixelColor(50, 25).lightness() < 200,
              qPrintable(QString("centre is %1").arg(image.pixelColor(50, 25).name())));
     QVERIFY(image.pixelColor(4, 4).lightness() > 240);
+}
+
+void TestDrawable::setPenReRecordsOnce()
+{
+    Fixture f;
+    auto* line = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    f.plot->replot();
+    QCOMPARE(line->drawCalls, 1);
+
+    line->setPen(QPen(Qt::red, 3)); // an old-base setter: not contentChanged()
+    f.plot->replot();
+    QCOMPARE(line->drawCalls, 2);
+}
+
+void TestDrawable::setCoordsMovesTheItem()
+{
+    Fixture f;
+    auto* shape = new TestShape(f.plot.get());
+    shape->mode = TestShape::FromAnchor; // a box at the item position's coords, (3,3)
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 1);
+    const std::optional<QCPDataBox> before = shape->dataRange();
+    QVERIFY(before);
+    QCOMPARE(before->keyLower, 3.0);
+    QCOMPARE(before->valueLower, 3.0);
+
+    shape->mAnchor->setCoords(5, 6); // an old-base setter, through QCPAbstractItem::markDirty
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 2);
+    const std::optional<QCPDataBox> after = shape->dataRange();
+    QVERIFY(after);
+    QCOMPARE(after->keyLower, 5.0);
+    QCOMPARE(after->valueLower, 6.0);
+}
+
+void TestDrawable::selectionChangeReRecords()
+{
+    Fixture f;
+    auto* shape = new TestShape(f.plot.get());
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 1);
+
+    shape->setSelected(true); // QCPAbstractItem::setSelected marks the layer, not the recording
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 2);
 }
 
 void TestDrawable::panKeepsPixelAndRatioCornersInPlace()

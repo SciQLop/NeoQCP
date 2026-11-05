@@ -177,11 +177,18 @@ public:
     using Base::Base;
 
     //! The setter rule: a new generation, then the layer mark the base needs.
-    void contentChanged()
+    //!
+    //! This is the layerable markDirty the old bases call from their setters (setPen, setCoords,
+    //! setSelected, ...). A pan or a zoom never reaches it, so a range change still reuses the
+    //! recording.
+    void markDirty() override
     {
         if (mCore.contentChanged())
             Base::markDirty();
     }
+
+    //! The adapter's own name for the same thing.
+    void contentChanged() { markDirty(); }
 
     using QCPDrawable::draw; // keep draw(QCPDrawContext&) reachable from this class
 

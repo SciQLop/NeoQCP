@@ -29,4 +29,7 @@ private slots:
     void defaultDataRangeFollowsTheExtentRules();
     void defaultLegendIconIsTheRecordingFitted();
     void panKeepsPixelAndRatioCornersInPlace();
+    void setPenReRecordsOnce();
+    void setCoordsMovesTheItem();
+    void selectionChangeReRecords();
 };
