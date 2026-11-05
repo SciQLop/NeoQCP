@@ -157,6 +157,9 @@ using QCPDrawCommand
 [[nodiscard]] QCP_LIB_DECL qcp::QCPTextLayout qcpTextLayout(const QCPTextStyle& style,
                                                             const QString& text);
 
+//! Test hook: how many texts have been measured since the process started.
+[[nodiscard]] QCP_LIB_DECL quint64 qcpTextMeasureCount();
+
 //! A new identity per recording; copies and re-records take a fresh one.
 inline quint64 qcpNextDrawListId()
 {

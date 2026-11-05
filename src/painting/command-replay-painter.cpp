@@ -10,6 +10,7 @@
 #include <QPolygonF>
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <type_traits>
 
@@ -49,12 +50,21 @@ const QCPLabelRenderer* textRenderer(const QCPTextStyle& style)
 {
     return style.mathText ? QCPLabelRenderer::defaultRenderer() : nullptr;
 }
+
+//! Counts the measurements, so a test can tell a cached box from a re-measure.
+std::atomic<quint64> gTextMeasures { 0 };
 } // namespace
 
 QSize qcpMeasureText(const QCPTextStyle& style, const QString& text)
 {
+    gTextMeasures.fetch_add(1, std::memory_order_relaxed);
     return QCPLabelRenderer::measureRectWith(textRenderer(style), style.font, text, style.textFlags)
         .size();
+}
+
+quint64 qcpTextMeasureCount()
+{
+    return gTextMeasures.load(std::memory_order_relaxed);
 }
 
 qcp::QCPTextLayout qcpTextLayout(const QCPTextStyle& style, const QSize& glyphSize)

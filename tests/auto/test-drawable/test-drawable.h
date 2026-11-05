@@ -18,6 +18,7 @@ private slots:
     void themeReaderReRecordsOnThemeChange();
     void transformReaderReRecordsOnEveryPan();
     void everyFrameRecordingRebuildsOncePerFrame();
+    void itemTextMeasuresOnceForItsQueries();
     void contentChangedInsideDrawIsAMisuse();
     void contentChangedInsideLegendIconIsAMisuse();
     void recordingFromInsideDrawIsAMisuse();

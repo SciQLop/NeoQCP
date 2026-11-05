@@ -141,6 +141,12 @@ protected:
     Qt::Alignment mTextAlignment;
     double mRotation;
     QMargins mPadding;
+    //! The measurement the box queries reuse; text and font are the only inputs it depends on.
+    mutable QSize mGlyphSize;
+    mutable QString mGlyphText;
+    mutable QFont mGlyphFont;
+    mutable bool mGlyphMath = false;
+    mutable bool mGlyphValid = false;
 
     // reimplemented virtual methods:
     void draw(QCPDrawContext& context) const override;
@@ -152,6 +158,8 @@ protected:
     QCPTextStyle textStyle() const;
     //! The box around the text before rotation, placed as if the position were the origin.
     QRectF textBoxAtOrigin() const;
+    //! The size of the text in its current font, measured once per text and font.
+    QSize glyphSize() const;
     QPointF getTextDrawPoint(const QPointF& pos, const QRectF& rect,
                              Qt::Alignment positionAlignment) const;
     QFont mainFont() const;

@@ -152,6 +152,9 @@ public:
                    std::shared_ptr<const std::vector<QPointF>> spans, const QPen& pen);
     //! Text anchored at \a at, measured and placed relative to that anchor.
     void text(QCP::Position at, const QString& text, const QCPTextStyle& style);
+    //! The same, for a recorder that already measured \a glyphSize and will ask for it again.
+    void text(QCP::Position at, const QString& text, const QCPTextStyle& style,
+              const QSize& glyphSize);
     /*!
       Marks the recording as holding a position only available in pixels: the recorder fell back on
       the position's current pixel (see \ref QCPItemPosition::asPosition), so that command is a

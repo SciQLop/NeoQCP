@@ -287,9 +287,24 @@ QCPTextStyle QCPItemText::textStyle() const
   The text box before rotation, placed as if the position were the origin: the layout puts it around
   that point according to the position alignment, and the caller translates and rotates it.
 */
+QSize QCPItemText::glyphSize() const
+{
+    const QCPTextStyle style = textStyle();
+    if (!mGlyphValid || mGlyphText != mText || mGlyphFont != style.font
+        || mGlyphMath != style.mathText)
+    {
+        mGlyphText = mText;
+        mGlyphFont = style.font;
+        mGlyphMath = style.mathText;
+        mGlyphSize = qcpMeasureText(style, mText);
+        mGlyphValid = true;
+    }
+    return mGlyphSize;
+}
+
 QRectF QCPItemText::textBoxAtOrigin() const
 {
-    return QRectF(qcpTextLayout(textStyle(), mText).box);
+    return QRectF(qcpTextLayout(textStyle(), glyphSize()).box);
 }
 
 /* inherits documentation from base class */
@@ -299,7 +314,7 @@ void QCPItemText::draw(QCPDrawContext& context) const
     const QCP::Position at = position->asPosition(&snapshot);
     if (snapshot) // the position's space had to become pixels: they go stale without a new read
         context.recordEveryFrame();
-    context.text(at, mText, textStyle());
+    context.text(at, mText, textStyle(), glyphSize());
 }
 
 /* inherits documentation from base class */

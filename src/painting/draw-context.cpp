@@ -387,11 +387,16 @@ void QCPDrawContext::errorBars(std::shared_ptr<const std::vector<QPointF>> centr
 
 void QCPDrawContext::text(QCP::Position at, const QString& text, const QCPTextStyle& style)
 {
+    this->text(at, text, style, qcpMeasureText(style, text));
+}
+
+void QCPDrawContext::text(QCP::Position at, const QString& text, const QCPTextStyle& style,
+                          const QSize& glyphSize)
+{
     // The anchor is the only data this command names; its glyphs hang off it by an amount only the
     // painter knows. So it feeds the data box and leaves the index box unbounded, as it always did.
     record(*mList,
-           qcp::TextCmd { at, text, std::make_shared<const QCPTextStyle>(style),
-                          qcpMeasureText(style, text) },
+           qcp::TextCmd { at, text, std::make_shared<const QCPTextStyle>(style), glyphSize },
            extentOfPosition(at), unboundedExtent());
 }
 

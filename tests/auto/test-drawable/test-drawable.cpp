@@ -555,6 +555,27 @@ void TestDrawable::everyFrameRecordingRebuildsOncePerFrame()
     QCOMPARE(shape->drawCalls, 2);
 }
 
+void TestDrawable::itemTextMeasuresOnceForItsQueries()
+{
+    Fixture f;
+    auto* item = new QCPItemText(f.plot.get());
+    item->setText(QStringLiteral("measured once"));
+    item->setFont(QFont(QStringLiteral("DejaVu Sans"), 14));
+    item->position->setCoords(5, 5);
+    f.plot->replot();
+
+    // The box the recording measured serves the hit tests and the anchors of the frame.
+    const quint64 measured = qcpTextMeasureCount();
+    const QPointF centre(f.plot->xAxis->coordToPixel(5), f.plot->yAxis->coordToPixel(5));
+    for (int i = 0; i < 5; ++i)
+    {
+        QVERIFY(item->selectTest(centre, false) >= 0.0);
+        (void)item->top->pixelPosition();
+        (void)item->bottomRight->pixelPosition();
+    }
+    QCOMPARE(qcpTextMeasureCount(), measured);
+}
+
 void TestDrawable::contentChangedInsideDrawIsAMisuse()
 {
     Fixture f;
