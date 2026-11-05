@@ -22,6 +22,7 @@ private slots:
     void painterMatchesHandPainting();
     void painterCallbackStateDoesNotLeak();
     void boundsCoverEveryCommand();
+    void emptyCommandDoesNotUnboundTheRecording();
     void sharedDataIsNotCopied();
     void drawListIsCompact();
     void resolveCacheSurvivesNewEntries();

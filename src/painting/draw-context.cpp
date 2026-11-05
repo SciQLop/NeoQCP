@@ -25,6 +25,8 @@ struct Extent
 {
     bool keyBounded = true;
     bool valueBounded = true;
+    //! True when the command carries no sample at all: it is neutral, it does not touch the box.
+    bool empty = false;
     double keyLower = Limit::infinity();
     double keyUpper = -Limit::infinity();
     double valueLower = Limit::infinity();
@@ -57,6 +59,7 @@ struct Extent
 
     void merge(const Extent& other)
     {
+        empty = empty && other.empty;
         keyBounded = keyBounded && other.keyBounded;
         valueBounded = valueBounded && other.valueBounded;
         keyLower = std::min(keyLower, other.keyLower);
@@ -70,6 +73,7 @@ struct Extent
 Extent extentOf(const std::vector<QPointF>& data)
 {
     Extent extent;
+    extent.empty = data.empty();
     for (const QPointF& point : data)
     {
         extent.key(point.x());
@@ -82,6 +86,7 @@ Extent extentOf(const std::vector<QPointF>& data)
 Extent extentOf(std::span<const QCP::Position> positions)
 {
     Extent extent;
+    extent.empty = positions.empty();
     for (const QCP::Position& position : positions)
     {
         if (const auto* data = std::get_if<QCP::Data>(&position))
@@ -130,25 +135,30 @@ QCPDataBox boxOf(const Extent& extent)
 void record(QCPDrawList& list, qcp::QCPDrawCommand command, const Extent& extent)
 {
     if (list.commands.empty())
-    {
         list.id = qcpNextDrawListId(); // a re-recorded list is a new recording
-        list.keyBounded = extent.keyBounded;
-        list.valueBounded = extent.valueBounded;
-        list.bounds = boxOf(extent);
-    }
-    else
+    if (!extent.empty)
     {
-        list.keyBounded = list.keyBounded && extent.keyBounded;
-        list.valueBounded = list.valueBounded && extent.valueBounded;
-        if (list.keyBounded)
+        if (!list.hasSamples)
         {
-            list.bounds.keyLower = std::min(list.bounds.keyLower, extent.keyLower);
-            list.bounds.keyUpper = std::max(list.bounds.keyUpper, extent.keyUpper);
+            list.keyBounded = extent.keyBounded;
+            list.valueBounded = extent.valueBounded;
+            list.bounds = boxOf(extent);
+            list.hasSamples = true;
         }
-        if (list.valueBounded)
+        else
         {
-            list.bounds.valueLower = std::min(list.bounds.valueLower, extent.valueLower);
-            list.bounds.valueUpper = std::max(list.bounds.valueUpper, extent.valueUpper);
+            list.keyBounded = list.keyBounded && extent.keyBounded;
+            list.valueBounded = list.valueBounded && extent.valueBounded;
+            if (list.keyBounded)
+            {
+                list.bounds.keyLower = std::min(list.bounds.keyLower, extent.keyLower);
+                list.bounds.keyUpper = std::max(list.bounds.keyUpper, extent.keyUpper);
+            }
+            if (list.valueBounded)
+            {
+                list.bounds.valueLower = std::min(list.bounds.valueLower, extent.valueLower);
+                list.bounds.valueUpper = std::max(list.bounds.valueUpper, extent.valueUpper);
+            }
         }
     }
     if (!list.keyBounded)
@@ -298,6 +308,7 @@ void QCPDrawContext::errorBars(std::shared_ptr<const std::vector<QPointF>> centr
 {
     Extent extent;
     const std::size_t count = std::min(centres->size(), spans->size());
+    extent.empty = count == 0;
     for (std::size_t i = 0; i < count; ++i)
     {
         const QPointF centre = centres->at(i);

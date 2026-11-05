@@ -145,8 +145,9 @@ inline quint64 qcpNextDrawListId()
   the recording, and a side that stayed bounded holds the min/max of the data coordinates.
 
   A log axis makes a non-positive lower bound unmappable, exactly as it does for an item's extent
-  (QCPAbstractItem::positionsExtent drops that side); that widening is not applied here yet because
-  nothing culls on this box -- it becomes part of the contract when a consumer does.
+  (QCPAbstractItem::positionsExtent drops that side). QCPDrawnCore::dataRange applies that rule when
+  the box describes an item; a plottable's range is data, so its getters ask for the bounds without
+  the rule and let the sign domain decide.
 */
 struct QCP_LIB_DECL QCPDrawList
 {
@@ -161,6 +162,7 @@ struct QCP_LIB_DECL QCPDrawList
         bounds = other.bounds;
         keyBounded = other.keyBounded;
         valueBounded = other.valueBounded;
+        hasSamples = other.hasSamples;
         viewDependent = other.viewDependent;
         id = qcpNextDrawListId();
         return *this;
@@ -173,6 +175,8 @@ struct QCP_LIB_DECL QCPDrawList
                         std::numeric_limits<double>::infinity() };
     bool keyBounded = false;
     bool valueBounded = false;
+    //! False until a command with at least one sample set the box: empty commands are neutral.
+    bool hasSamples = false;
     //! A command read the theme (or another view fact the commands do not carry): re-record when
     //! the view epoch moves, even if the command list itself looks view-independent.
     bool viewDependent = false;

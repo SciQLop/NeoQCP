@@ -551,6 +551,27 @@ void TestDrawContext::boundsCoverEveryCommand()
     }
 }
 
+void TestDrawContext::emptyCommandDoesNotUnboundTheRecording()
+{
+    // A command with no samples says nothing; it must not erase the box the others described.
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    const QPen pen(Qt::black);
+    context.polyline(sharedPoints({ { 1, 2 }, { 3, 4 } }), pen);
+    const auto nothing = std::make_shared<const std::vector<QPointF>>();
+    context.markers(nothing, QCPScatterStyle(QCPScatterStyle::ssCircle));
+    context.errorBars(nothing, nothing, pen);
+    const QCPDrawList& list = context.drawList();
+    QVERIFY(list.keyBounded);
+    QVERIFY(list.valueBounded);
+    QCOMPARE(list.bounds.keyLower, 1.0);
+    QCOMPARE(list.bounds.keyUpper, 3.0);
+    QCOMPARE(list.bounds.valueLower, 2.0);
+    QCOMPARE(list.bounds.valueUpper, 4.0);
+    QCOMPARE(int(list.commands.size()), 3);
+}
+
 void TestDrawContext::sharedDataIsNotCopied()
 {
     Fixture fixture;
