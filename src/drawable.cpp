@@ -2,6 +2,7 @@
 
 #include "axis/labelrenderer.h"
 #include "core.h"
+#include "layoutelements/layoutelement-axisrect.h"
 #include "misuse.h"
 #include "painting/command-replay-rhi.h"
 #include "painting/draw-commands.h"
@@ -314,6 +315,16 @@ QCPRange qcpDrawnRange(const std::optional<QCPDataBox>& box, QCPDrawnSide side, 
         return { };
     }
     return QCPRange(lower, upper);
+}
+
+bool qcpDrawnClickInsideAxisRect(const QCPAbstractPlottable& plottable, const QPointF& pos)
+{
+    const QCPAxis* keyAxis = plottable.keyAxis();
+    QCustomPlot* plot = plottable.parentPlot();
+    if (!keyAxis || !keyAxis->axisRect() || !plot)
+        return true;
+    return keyAxis->axisRect()->rect().contains(pos.toPoint())
+        || plot->interactions().testFlag(QCP::iSelectPlottablesBeyondAxisRect);
 }
 
 namespace

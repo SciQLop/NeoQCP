@@ -143,6 +143,10 @@ enum class QCPDrawnSide
                                                   QCPDrawnSide side, bool& foundRange,
                                                   QCP::SignDomain inSignDomain);
 
+//! False when \a pos is outside \a plottable's axis rect and the plot did not opt in.
+[[nodiscard]] QCP_LIB_DECL bool qcpDrawnClickInsideAxisRect(const QCPAbstractPlottable& plottable,
+                                                            const QPointF& pos);
+
 /*!
   \brief The non-template half of an adapter: the contract's methods, answered from the recording.
 
@@ -230,11 +234,7 @@ protected:
     {
         // Built-in plottables miss outside the axis rect unless the plot opts in: their geometry
         // may still be painted there (an unclipped plottable), but a click does not grab it.
-        const QCPAxis* keyAxis = this->keyAxis();
-        const QCustomPlot* plot = this->parentPlot();
-        if (keyAxis && keyAxis->axisRect() && plot
-            && !keyAxis->axisRect()->rect().contains(pos.toPoint())
-            && !plot->interactions().testFlag(QCP::iSelectPlottablesBeyondAxisRect))
+        if (!qcpDrawnClickInsideAxisRect(*this, pos))
             return -1;
 
         const double hit = QCPDrawnBase<Base>::selectTest(pos, onlySelectable, details);
