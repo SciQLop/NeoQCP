@@ -75,10 +75,12 @@ private slots:
     void solidLinesKeepTheirVertexFormat();
     void panDoesNotMarkTheLayerDirty();
     void gpuRectFillsBeforeStroking();
-    void unequalFillBetweenStaysOnThePainter();
     void dashedUnderSolidStaysUnder();
     void textureBrushStacksLikeSolid();
     void freePolygonFillKeepsItsPlace();
+    void unequalFillBetweenBecomesAnImage();
+    void pannedFallbackDoesNotReupload();
+    void gradientFillMatchesExport();
 
 private:
     // What the plot shows: its paint buffers composed, or the framebuffer under RHI.

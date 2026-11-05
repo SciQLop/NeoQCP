@@ -15,6 +15,7 @@
 #include "painting/command-replay-rhi.h"
 #include "painting/draw-context.h"
 #include "painting/plottable-rhi-layer.h"
+#include "painting/raster-fallback.h"
 #include "plottables/plottable-bars.h"
 #include "plottables/plottable-colormap.h"
 #include "plottables/plottable-colormap2.h"
@@ -56,12 +57,15 @@ class DrawHook : public QCPLayerable
 public:
     using QCPLayerable::QCPLayerable;
     std::function<void()> onDraw;
+    std::function<void(QCPPainter*)> onPaint;
 
 protected:
     void applyDefaultAntialiasingHint(QCPPainter*) const override { }
 
-    void draw(QCPPainter*) override
+    void draw(QCPPainter* painter) override
     {
+        if (onPaint)
+            onPaint(painter);
         if (onDraw)
             onDraw();
     }
@@ -2515,9 +2519,10 @@ void TestRepaint::gpuRectFillsBeforeStroking()
     QVERIFY(layer);
     layer->clear();
     QCPResolveCache cache;
+    qcp::QCPRasterFallback fallback;
     qcpReplayWithRhi(context.drawList(), *layer, *plot->scatterRhiLayer(plot->currentLayer()),
-                     context.frame(), cache, plot->bufferDevicePixelRatio(),
-                     plot->rhiOutputSize().height());
+                     context.frame(), cache, fallback, plot->bufferDevicePixelRatio(),
+                     plot->rhiOutputSize());
     const auto& entries = layer->drawEntries();
     QCOMPARE(int(entries.size()), 2);
     QVERIFY2(entries.first().fillVertexCount > 0, "the fill must be submitted first");
@@ -2526,7 +2531,7 @@ void TestRepaint::gpuRectFillsBeforeStroking()
     QVERIFY(entries.last().strokeVertexCount > 0);
 }
 
-void TestRepaint::unequalFillBetweenStaysOnThePainter()
+void TestRepaint::unequalFillBetweenBecomesAnImage()
 {
     QWidget host;
     QCustomPlot* plot = shownGpuPlot(host);
@@ -2543,11 +2548,14 @@ void TestRepaint::unequalFillBetweenStaysOnThePainter()
     QVERIFY(layer);
     layer->clear();
     QCPResolveCache cache;
+    qcp::QCPRasterFallback fallback;
     qcpReplayWithRhi(context.drawList(), *layer, *plot->scatterRhiLayer(plot->currentLayer()),
-                     context.frame(), cache, plot->bufferDevicePixelRatio(),
-                     plot->rhiOutputSize().height());
-    // Pairing two series of different lengths is not a ribbon: the painter pass fills it.
+                     context.frame(), cache, fallback, plot->bufferDevicePixelRatio(),
+                     plot->rhiOutputSize());
+    // Pairing two series of different lengths is not a ribbon: the fill is rasterised instead, and
+    // it still stacks where the command was recorded.
     QVERIFY2(layer->drawEntries().isEmpty(), "a mismatched ribbon was filled on the GPU");
+    QCOMPARE(int(layer->imageDrawEntries().size()), 1);
 }
 
 namespace
@@ -2618,9 +2626,10 @@ void TestRepaint::textureBrushStacksLikeSolid()
         }
         layer->clear();
         QCPResolveCache cache;
+        qcp::QCPRasterFallback fallback;
         qcpReplayWithRhi(context.drawList(), *layer, *plot->scatterRhiLayer(plot->currentLayer()),
-                         context.frame(), cache, plot->bufferDevicePixelRatio(),
-                         plot->rhiOutputSize().height());
+                         context.frame(), cache, fallback, plot->bufferDevicePixelRatio(),
+                         plot->rhiOutputSize());
         return sampleAt(plot, screenOf(plot), 200, 150);
     };
 
@@ -2658,9 +2667,10 @@ void TestRepaint::freePolygonFillKeepsItsPlace()
     QVERIFY(layer);
     layer->clear();
     QCPResolveCache cache;
+    qcp::QCPRasterFallback fallback;
     qcpReplayWithRhi(context.drawList(), *layer, *plot->scatterRhiLayer(plot->currentLayer()),
-                     context.frame(), cache, plot->bufferDevicePixelRatio(),
-                     plot->rhiOutputSize().height());
+                     context.frame(), cache, fallback, plot->bufferDevicePixelRatio(),
+                     plot->rhiOutputSize());
     const QImage image = screenOf(plot);
 
     const QColor inside = sampleAt(plot, image, 75, 120);
@@ -2675,4 +2685,104 @@ void TestRepaint::freePolygonFillKeepsItsPlace()
     const QColor concavity = sampleAt(plot, image, 150, 175);
     QVERIFY2(concavity.red() > 200 && concavity.green() > 200 && concavity.blue() > 200,
              qPrintable(QStringLiteral("the concavity was filled: %1").arg(concavity.name())));
+}
+
+namespace
+{
+// A gradient the GPU cannot draw: it is rasterised once and reused.
+QBrush gradientBrush()
+{
+    QLinearGradient gradient(0, 0, 1, 0);
+    gradient.setCoordinateMode(QGradient::ObjectBoundingMode);
+    gradient.setColorAt(0.0, QColor(220, 40, 40));
+    gradient.setColorAt(1.0, QColor(40, 40, 220));
+    return QBrush(gradient);
+}
+} // namespace
+
+// The image lives in the layer's cache: a pan moves the quad, it does not rasterise or upload
+// again.
+void TestRepaint::pannedFallbackDoesNotReupload()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    usePixelRanges(plot);
+    QCPDrawContext context(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+    context.rect(QCP::Data { 60, 60 }, QCP::Data { 340, 240 }, QPen(Qt::NoPen), gradientBrush());
+
+    auto* layer = plot->plottableRhiLayer(plot->currentLayer());
+    QVERIFY(layer);
+    QCPResolveCache cache;
+    qcp::QCPRasterFallback fallback;
+    const auto replay = [&]
+    {
+        qcpReplayWithRhi(context.drawList(), *layer, *plot->scatterRhiLayer(plot->currentLayer()),
+                         context.frame(), cache, fallback, plot->bufferDevicePixelRatio(),
+                         plot->rhiOutputSize());
+    };
+
+    layer->clear();
+    replay();
+    QCOMPARE(int(layer->imageDrawEntries().size()), 1);
+    QCOMPARE(fallback.rasterCount(), 1);
+    QImage frame = screenOf(plot);
+    QCOMPARE(layer->imageUploads(), 1);
+
+    // Pan: the recording is replayed with a new offset, the image is the same one.
+    layer->clear();
+    layer->setAllOffsets(7.0f, 0.0f);
+    replay();
+    QCOMPARE(int(layer->imageDrawEntries().size()), 1);
+    QCOMPARE(fallback.rasterCount(), 1);
+    frame = screenOf(plot);
+    QCOMPARE(layer->imageUploads(), 1);
+    const QColor shifted = sampleAt(plot, frame, 200, 150);
+    QVERIFY2(shifted.red() > 80 && shifted.blue() > 80,
+             qPrintable(QStringLiteral("the panned image left the frame: %1").arg(shifted.name())));
+}
+
+// The GPU image of a gradient matches what the painter produces for the same recording.
+void TestRepaint::gradientFillMatchesExport()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    usePixelRanges(plot);
+    QCPDrawContext context(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+    context.rect(QCP::Data { 60, 60 }, QCP::Data { 340, 240 }, QPen(Qt::NoPen), gradientBrush());
+
+    auto* layer = plot->plottableRhiLayer(plot->currentLayer());
+    QVERIFY(layer);
+    layer->clear();
+    QCPResolveCache cache;
+    qcp::QCPRasterFallback fallback;
+    qcpReplayWithRhi(context.drawList(), *layer, *plot->scatterRhiLayer(plot->currentLayer()),
+                     context.frame(), cache, fallback, plot->bufferDevicePixelRatio(),
+                     plot->rhiOutputSize());
+    const QImage screen = screenOf(plot);
+
+    // The export paints the same recording through QPainter, which is what a non-GPU target does.
+    auto* hook = new DrawHook(plot, QStringLiteral("overlay"));
+    hook->onPaint = [&](QCPPainter* painter)
+    { qcpReplayWithPainter(context.drawList(), *painter, context.frame()); };
+    const QImage exported = plot->toPixmap(400, 300).toImage();
+    delete hook;
+
+    const double dpr = plot->bufferDevicePixelRatio();
+    const double ratio = exported.height() / 300.0;
+    for (int x : { 100, 200, 300 })
+    {
+        const QColor gpu = sampleAt(plot, screen, x, 150);
+        const QColor painter = exported.pixelColor(int(x * ratio), int(150 * ratio));
+        const bool close = qAbs(gpu.red() - painter.red()) <= 12
+            && qAbs(gpu.green() - painter.green()) <= 12 && qAbs(gpu.blue() - painter.blue()) <= 12;
+        QVERIFY2(close,
+                 qPrintable(QStringLiteral("x=%1: GPU %2, export %3 (dpr %4)")
+                                .arg(x)
+                                .arg(gpu.name(), painter.name())
+                                .arg(dpr)));
+    }
 }

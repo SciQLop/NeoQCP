@@ -2,6 +2,7 @@
 
 #include "draw-context.h"
 #include "painter.h"
+#include "raster-fallback.h"
 
 #include "../axis/labelrenderer.h"
 #include "../plottables/plottable-draw-utils.h"
@@ -17,7 +18,7 @@ namespace
 // Reused across replays on this thread: a steady-state replay allocates nothing.
 struct Scratch
 {
-    std::vector<QPointF> data;   // data-space points of one command, before the batch map
+    std::vector<QPointF> data; // data-space points of one command, before the batch map
     std::vector<QPointF> pixels; // the same points in pixels, or the resolved positions
     QPolygonF polygon;
 };
@@ -74,8 +75,8 @@ void replayErrorBars(const qcp::ErrorBarsCmd& cmd, QCPPainter& painter, const QC
 {
     const std::size_t count = std::min(cmd.centres->size(), cmd.spans->size());
     Scratch& local = scratch();
-    qcpErrorBarCorners(std::span<const QPointF>(*cmd.centres),
-                       std::span<const QPointF>(*cmd.spans), local.data);
+    qcpErrorBarCorners(std::span<const QPointF>(*cmd.centres), std::span<const QPointF>(*cmd.spans),
+                       local.data);
     local.pixels.resize(local.data.size());
     frame.transform.map(std::span<const QPointF>(local.data), std::span<QPointF>(local.pixels));
     painter.setPen(cmd.pen);
@@ -98,14 +99,14 @@ namespace
 bool isGpuKind(const qcp::QCPDrawCommand& command)
 {
     return std::visit(
-        [](const auto& cmd) {
+        [](const auto& cmd)
+        {
             using Command = std::decay_t<decltype(cmd)>;
             return std::is_same_v<Command, qcp::PolylineDataCmd>
                 || std::is_same_v<Command, qcp::PolylinePositionsCmd>
                 || std::is_same_v<Command, qcp::PolygonCmd>
                 || std::is_same_v<Command, qcp::FillBetweenCmd>
-                || std::is_same_v<Command, qcp::RectCmd>
-                || std::is_same_v<Command, qcp::EllipseCmd>
+                || std::is_same_v<Command, qcp::RectCmd> || std::is_same_v<Command, qcp::EllipseCmd>
                 || std::is_same_v<Command, qcp::ErrorBarsCmd>
                 || std::is_same_v<Command, qcp::MarkersCmd>;
         },
@@ -113,59 +114,8 @@ bool isGpuKind(const qcp::QCPDrawCommand& command)
 }
 } // namespace
 
-namespace
-{
-// The fills a GPU frame leaves to this pass: a free-form polygon (no GPU tessellator) and any
-// brush the GPU would flatten. Fill only, no outline: the GPU drew the stroke.
-void paintSkippedFill(QCPPainter& painter, const QCPDrawFrame& frame,
-                      const qcp::QCPDrawCommand& command)
-{
-    Scratch& local = scratch();
-    painter.setPen(Qt::NoPen);
-    std::visit(
-        [&](const auto& cmd) {
-            using Command = std::decay_t<decltype(cmd)>;
-            if constexpr (std::is_same_v<Command, qcp::PolygonCmd>)
-            {
-                painter.setBrush(cmd.brush);
-                resolveInto(frame, cmd.points, local.pixels);
-                painter.drawPolygon(polygonOf(local.pixels));
-            }
-            else if constexpr (std::is_same_v<Command, qcp::FillBetweenCmd>)
-            {
-                if (qcpGpuFillsBrush(cmd.brush))
-                    return;
-                painter.setBrush(cmd.brush);
-                const std::size_t count = std::min(cmd.upper->size(), cmd.lower->size());
-                local.data.resize(2 * count);
-                for (std::size_t i = 0; i < count; ++i)
-                {
-                    local.data[i] = (*cmd.upper)[i];
-                    local.data[2 * count - 1 - i] = (*cmd.lower)[i];
-                }
-                frame.transform.map(std::span<const QPointF>(local.data),
-                                    std::span<QPointF>(local.pixels));
-                painter.drawPolygon(polygonOf(local.pixels));
-            }
-            else if constexpr (std::is_same_v<Command, qcp::RectCmd>
-                               || std::is_same_v<Command, qcp::EllipseCmd>)
-            {
-                if (qcpGpuFillsBrush(cmd.brush))
-                    return;
-                painter.setBrush(cmd.brush);
-                const QRectF box(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b));
-                if constexpr (std::is_same_v<Command, qcp::RectCmd>)
-                    painter.drawRect(box.normalized());
-                else
-                    painter.drawEllipse(box.normalized());
-            }
-        },
-        command);
-}
-} // namespace
-
 void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QCPDrawFrame& frame,
-                          QCPReplayKinds kinds)
+                          QCPReplayKinds kinds, const qcp::QCPRasterFallback* fallback)
 {
     painter.save();
     if (!frame.clip.isEmpty())
@@ -175,11 +125,15 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
     {
         if (kinds == QCPReplayKinds::PainterOnly && isGpuKind(command))
         {
-            paintSkippedFill(painter, frame, command);
+            // The layer could not take this command's image: paint it here, in the buffer the GPU
+            // geometry draws over. A stroke the GPU cannot express is part of it.
+            if (fallback && fallback->painterHandled(command))
+                qcp::paintFallback(painter, command, frame, qcp::strokeNeedsRaster(command));
             continue;
         }
         std::visit(
-            [&](const auto& cmd) {
+            [&](const auto& cmd)
+            {
                 using Command = std::decay_t<decltype(cmd)>;
                 if constexpr (std::is_same_v<Command, qcp::PolylineDataCmd>)
                 {
@@ -219,18 +173,18 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
                 }
                 else if constexpr (std::is_same_v<Command, qcp::RectCmd>)
                 {
-                    const QRectF rect =
-                        QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
-                            .normalized();
+                    const QRectF rect
+                        = QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
+                              .normalized();
                     painter.setPen(cmd.pen);
                     painter.setBrush(cmd.brush);
                     painter.drawRect(rect);
                 }
                 else if constexpr (std::is_same_v<Command, qcp::EllipseCmd>)
                 {
-                    const QRectF rect =
-                        QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
-                            .normalized();
+                    const QRectF rect
+                        = QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
+                              .normalized();
                     painter.setPen(cmd.pen);
                     painter.setBrush(cmd.brush);
                     painter.drawEllipse(rect);
@@ -263,9 +217,9 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
                 }
                 else if constexpr (std::is_same_v<Command, qcp::ImageCmd>)
                 {
-                    const QRectF rect =
-                        QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
-                            .normalized();
+                    const QRectF rect
+                        = QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
+                              .normalized();
                     painter.drawImage(rect, cmd.image);
                 }
                 else if constexpr (std::is_same_v<Command, qcp::PainterCmd>)

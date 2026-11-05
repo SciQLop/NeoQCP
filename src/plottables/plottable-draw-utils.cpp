@@ -8,16 +8,16 @@
 #include <cmath>
 #include <span>
 
-namespace qcp {
+namespace qcp
+{
 
 QColor defaultPlottableColor(int index)
 {
-    static const QList<QColor> colors = {
-        QColor(31, 119, 180),  QColor(255, 127, 14), QColor(44, 160, 44),
-        QColor(214, 39, 40),   QColor(148, 103, 189), QColor(140, 86, 75),
-        QColor(227, 119, 194), QColor(127, 127, 127), QColor(188, 189, 34),
-        QColor(23, 190, 207)
-    };
+    static const QList<QColor> colors
+        = { QColor(31, 119, 180),  QColor(255, 127, 14),  QColor(44, 160, 44),
+            QColor(214, 39, 40),   QColor(148, 103, 189), QColor(140, 86, 75),
+            QColor(227, 119, 194), QColor(127, 127, 127), QColor(188, 189, 34),
+            QColor(23, 190, 207) };
     return colors[index % colors.size()];
 }
 
@@ -57,11 +57,10 @@ float extrusionPenWidth(const QPen& pen, double devicePixelRatio)
         : qMax(1.0f, static_cast<float>(pen.widthF()));
 }
 
-bool needsReextrusion(const ExtrusionCache& cache, bool freshLines,
-                      const QPen& pen, double devicePixelRatio)
+bool needsReextrusion(const ExtrusionCache& cache, bool freshLines, const QPen& pen,
+                      double devicePixelRatio)
 {
-    return freshLines || cache.isEmpty()
-        || cache.withDistance != isDashed(pen)
+    return freshLines || cache.isEmpty() || cache.withDistance != isDashed(pen)
         || cache.penWidth != extrusionPenWidth(pen, devicePixelRatio)
         || cache.penColor != pen.color().rgba();
 }
@@ -71,40 +70,45 @@ bool canStrokeOnGpu(const QPen& pen)
     return pen.style() != Qt::NoPen;
 }
 
+bool gpuCanFill(const QBrush& brush)
+{
+    return brush.style() == Qt::SolidPattern && brush.color().alpha() != 0;
+}
+
 DashPattern dashPatternOf(const QPen& pen, float penWidth)
 {
     DashPattern result;
-    std::array<double, 8> units = {};
+    std::array<double, 8> units = { };
     int count = 0;
     switch (pen.style())
     {
-    case Qt::SolidLine:
-    case Qt::NoPen:
-        return result;
-    case Qt::DashLine:
-        units = { 4, 2 };
-        count = 2;
-        break;
-    case Qt::DotLine:
-        units = { 1, 2 };
-        count = 2;
-        break;
-    case Qt::DashDotLine:
-        units = { 4, 2, 1, 2 };
-        count = 4;
-        break;
-    case Qt::DashDotDotLine:
-        units = { 4, 2, 1, 2, 1, 2 };
-        count = 6;
-        break;
-    case Qt::CustomDashLine:
-    {
-        const QList<qreal> custom = pen.dashPattern();
-        count = qMin(int(custom.size()), 8);
-        for (int i = 0; i < count; ++i)
-            units[i] = custom.at(i);
-        break;
-    }
+        case Qt::SolidLine:
+        case Qt::NoPen:
+            return result;
+        case Qt::DashLine:
+            units = { 4, 2 };
+            count = 2;
+            break;
+        case Qt::DotLine:
+            units = { 1, 2 };
+            count = 2;
+            break;
+        case Qt::DashDotLine:
+            units = { 4, 2, 1, 2 };
+            count = 4;
+            break;
+        case Qt::DashDotDotLine:
+            units = { 4, 2, 1, 2, 1, 2 };
+            count = 6;
+            break;
+        case Qt::CustomDashLine:
+        {
+            const QList<qreal> custom = pen.dashPattern();
+            count = qMin(int(custom.size()), 8);
+            for (int i = 0; i < count; ++i)
+                units[i] = custom.at(i);
+            break;
+        }
     }
     // QPen's Square and Round caps extend every dash by half the width at both ends, so QPainter
     // draws an "on" of L + width and an "off" of max(0, L - width): DashLine is 5w on / 1w off.
@@ -115,7 +119,7 @@ DashPattern dashPatternOf(const QPen& pen, float penWidth)
     for (int i = 0; i < count; ++i)
         rawTotal += static_cast<float>(units[i]);
     if (rawTotal <= 0)
-        return {};
+        return { };
     float total = 0;
     for (int i = 0; i < count; ++i)
     {
@@ -128,7 +132,7 @@ DashPattern dashPatternOf(const QPen& pen, float penWidth)
         total += length;
     }
     if (total <= 0)
-        return {};
+        return { };
     result.count = count;
     result.total = total;
     result.offset = static_cast<float>(pen.dashOffset()) * penWidth;
@@ -142,13 +146,13 @@ bool isDashed(const QPen& pen)
 
 namespace
 {
-// Extrusions for the uncached GPU paths: one buffer reused across draws, so a frame does not
-// allocate per plottable.
-std::vector<float>& strokeScratch()
-{
-    static thread_local std::vector<float> buffer;
-    return buffer;
-}
+    // Extrusions for the uncached GPU paths: one buffer reused across draws, so a frame does not
+    // allocate per plottable.
+    std::vector<float>& strokeScratch()
+    {
+        static thread_local std::vector<float> buffer;
+        return buffer;
+    }
 
 } // namespace
 
@@ -175,14 +179,14 @@ bool addGpuStroke(QCPPlottableRhiLayer& layer, std::span<const float> verts, con
         if (!layer.dashedAvailable())
             return false;
         const DashPattern pattern = dashPatternOf(pen, penWidth);
-        layer.addDashedPlottable(verts, std::span<const float>(pattern.lengths.data(), pattern.count),
-                                 pattern.offset, clipRect, dpr, outputHeight,
-                                 static_cast<float>(offset.x()), static_cast<float>(offset.y()),
-                                 alpha);
+        layer.addDashedPlottable(
+            verts, std::span<const float>(pattern.lengths.data(), pattern.count), pattern.offset,
+            clipRect, dpr, outputHeight, static_cast<float>(offset.x()),
+            static_cast<float>(offset.y()), alpha);
     }
     else
-        layer.addPlottable({}, verts, clipRect, dpr, outputHeight,
-                           static_cast<float>(offset.x()), static_cast<float>(offset.y()), alpha);
+        layer.addPlottable({ }, verts, clipRect, dpr, outputHeight, static_cast<float>(offset.x()),
+                           static_cast<float>(offset.y()), alpha);
     return true;
 }
 
@@ -229,13 +233,9 @@ bool strokePolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer
                         static_cast<float>(painter->opacity()));
 }
 
-void drawPolylineWithGpuFallback(QCPPainter* painter,
-                                  QCustomPlot* parentPlot,
-                                  QCPLayer* layer,
-                                  const QVector<QPointF>& pts,
-                                  const QPen& pen,
-                                  const QPointF& gpuOffset,
-                                  const QRect& clipRect)
+void drawPolylineWithGpuFallback(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer* layer,
+                                 const QVector<QPointF>& pts, const QPen& pen,
+                                 const QPointF& gpuOffset, const QRect& clipRect)
 {
     if (strokePolylineOnGpu(painter, parentPlot, layer,
                             std::span<const QPointF>(pts.constData(), pts.size()), pen, gpuOffset,
@@ -252,15 +252,9 @@ void drawPolylineWithGpuFallback(QCPPainter* painter,
         painter->translate(-gpuOffset);
 }
 
-void drawPolylineCached(QCPPainter* painter,
-                         QCustomPlot* parentPlot,
-                         QCPLayer* layer,
-                         const QVector<QPointF>& pts,
-                         const QPen& pen,
-                         const QPointF& gpuOffset,
-                         const QRect& clipRect,
-                         bool freshLines,
-                         ExtrusionCache& cache)
+void drawPolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer* layer,
+                        const QVector<QPointF>& pts, const QPen& pen, const QPointF& gpuOffset,
+                        const QRect& clipRect, bool freshLines, ExtrusionCache& cache)
 {
     if (strokePolylineCached(painter, parentPlot, layer,
                              std::span<const QPointF>(pts.constData(), pts.size()), pen, gpuOffset,
@@ -270,8 +264,8 @@ void drawPolylineCached(QCPPainter* painter,
     drawPolylineWithGpuFallback(painter, parentPlot, layer, pts, pen, gpuOffset, clipRect);
 }
 
-bool needsColoredReextrusion(const ExtrusionCache& cache, bool freshLines,
-                             float penWidth, quint64 colorGeneration, bool dashed)
+bool needsColoredReextrusion(const ExtrusionCache& cache, bool freshLines, float penWidth,
+                             quint64 colorGeneration, bool dashed)
 {
     return freshLines || cache.isEmpty() || cache.penWidth != penWidth
         || cache.withDistance != dashed || cache.colorGeneration != colorGeneration;
@@ -301,13 +295,13 @@ void drawColoredPolylineRuns(QCPPainter* painter, const QVector<QPointF>& points
 void drawColoredPolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer* layer,
                                const QVector<QPointF>& points, const QVector<int>& indices,
                                const ColorScalarMapper& mapper, const QPen& pen,
-                               const QPointF& gpuOffset, const QRect& clipRect,
-                               bool freshLines, ExtrusionCache& cache)
+                               const QPointF& gpuOffset, const QRect& clipRect, bool freshLines,
+                               ExtrusionCache& cache)
 {
     auto* prl = canStrokeOnGpu(pen) ? gpuLayer(parentPlot, layer, painter->isExporting()) : nullptr;
     if (!prl)
-        return drawColoredPolylineRuns(painter, points, colorRuns(points, indices, mapper),
-                                       mapper, pen, gpuOffset);
+        return drawColoredPolylineRuns(painter, points, colorRuns(points, indices, mapper), mapper,
+                                       pen, gpuOffset);
 
     const double dpr = parentPlot->bufferDevicePixelRatio();
     const float penWidth = (pen.isCosmetic() || qFuzzyIsNull(pen.widthF()))
@@ -324,7 +318,7 @@ void drawColoredPolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCP
         for (const auto& run : runs)
         {
             const std::span<const QPointF> runPoints(points.constData() + run.first,
-                                                    run.last - run.first + 1);
+                                                     run.last - run.first + 1);
             if (dashed)
                 arcLength = QCPLineExtruder::appendPolylineWithDistance(
                     runPoints, penWidth, runColor(mapper, run.bucket), cache.vertices, arcLength);

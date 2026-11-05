@@ -2,13 +2,14 @@
 
 #include <painting/command-replay-rhi.h>
 #include <painting/draw-commands.h>
-#include <painting/line-extruder.h>
 #include <painting/draw-context.h>
+#include <painting/line-extruder.h>
+#include <painting/raster-fallback.h>
 #include <qcustomplot.h>
 
 #include <QFontMetrics>
-#include <cmath>
 #include <QPainterPath>
+#include <cmath>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -33,6 +34,7 @@ struct Fixture
         plot->yAxis->setRange(0, kHeight);
         plot->replot();
     }
+
     std::unique_ptr<QCustomPlot> plot;
 };
 
@@ -67,11 +69,9 @@ QVector<QPointF> pixelsOf(const QCPTransform& transform, const std::vector<QPoin
 
 QImage replayOf(QCPDrawContext& context)
 {
-    return painted(
-        [&context](QCPPainter& painter, const QCPTransform&) {
-            qcpReplayWithPainter(context.drawList(), painter, context.frame());
-        },
-        context.transform());
+    return painted([&context](QCPPainter& painter, const QCPTransform&)
+                   { qcpReplayWithPainter(context.drawList(), painter, context.frame()); },
+                   context.transform());
 }
 
 std::shared_ptr<const std::vector<QPointF>> sharedPoints(std::vector<QPointF> points)
@@ -115,13 +115,15 @@ void TestDrawContext::polylineMatchesHandPainting()
     QCOMPARE(mapped.x(), 20.0);
     QVERIFY2(std::abs(mapped.y() - 120.0) <= 1.0, qPrintable(QString::number(mapped.y())));
 
-    const std::vector<QPointF> points { { 10, 10 }, { 40, 90 }, { 80, 30 }, { 120, 120 },
-                                        { 170, 60 } };
+    const std::vector<QPointF> points {
+        { 10, 10 }, { 40, 90 }, { 80, 30 }, { 120, 120 }, { 170, 60 }
+    };
     context.polyline(sharedPoints(points), kPen);
 
     const QImage replay = replayOf(context);
     const QImage hand = painted(
-        [&points](QCPPainter& painter, const QCPTransform& transform) {
+        [&points](QCPPainter& painter, const QCPTransform& transform)
+        {
             painter.setPen(kPen);
             painter.drawPolyline(pixelsOf(transform, points));
         },
@@ -137,16 +139,17 @@ void TestDrawContext::polylinePositionsMatchesHandPainting()
     auto* item = new QCPItemLine(fixture.plot.get());
     item->start->setPixelPosition(QPointF(150, 40));
 
-    const std::vector<QCP::Position> positions { QCP::Data { 10, 10 }, QCP::Pixels { 40, 60 },
-                                                 QCP::AxisRatio { 0.5, 0.4 },
-                                                 QCP::AnchorOffset { item->start,
-                                                                     QCP::PixelOffset { 5, 7 } } };
+    const std::vector<QCP::Position> positions {
+        QCP::Data { 10, 10 }, QCP::Pixels { 40, 60 }, QCP::AxisRatio { 0.5, 0.4 },
+        QCP::AnchorOffset { item->start, QCP::PixelOffset { 5, 7 } }
+    };
     context.polyline(std::span<const QCP::Position>(positions), kPen);
 
     const QRectF rect = fixture.plot->axisRect()->rect();
     const QImage replay = replayOf(context);
     const QImage hand = painted(
-        [&positions, &rect](QCPPainter& painter, const QCPTransform& transform) {
+        [&positions, &rect](QCPPainter& painter, const QCPTransform& transform)
+        {
             painter.setPen(kPen);
             QVector<QPointF> pixels;
             for (const QCP::Position& position : positions)
@@ -182,7 +185,8 @@ void TestDrawContext::polygonMatchesHandPainting()
 
     const QImage replay = replayOf(context);
     const QImage hand = painted(
-        [&positions](QCPPainter& painter, const QCPTransform& transform) {
+        [&positions](QCPPainter& painter, const QCPTransform& transform)
+        {
             painter.setPen(kPen);
             painter.setBrush(kBrush);
             QPolygonF polygon;
@@ -208,7 +212,8 @@ void TestDrawContext::fillBetweenMatchesHandPainting()
 
     const QImage replay = replayOf(context);
     const QImage hand = painted(
-        [&upper, &lower](QCPPainter& painter, const QCPTransform& transform) {
+        [&upper, &lower](QCPPainter& painter, const QCPTransform& transform)
+        {
             QPolygonF polygon = pixelsOf(transform, upper);
             for (int i = int(lower.size()) - 1; i >= 0; --i)
                 polygon.append(pixelOf(transform, lower[i].x(), lower[i].y()));
@@ -230,7 +235,8 @@ void TestDrawContext::rectMatchesHandPainting()
 
     const QImage replay = replayOf(context);
     const QImage hand = painted(
-        [](QCPPainter& painter, const QCPTransform& transform) {
+        [](QCPPainter& painter, const QCPTransform& transform)
+        {
             const QRectF rect = QRectF(pixelOf(transform, 20, 30), QPointF(150, 110)).normalized();
             painter.setPen(kPen);
             painter.setBrush(kBrush);
@@ -249,9 +255,10 @@ void TestDrawContext::ellipseMatchesHandPainting()
 
     const QImage replay = replayOf(context);
     const QImage hand = painted(
-        [](QCPPainter& painter, const QCPTransform& transform) {
-            const QRectF rect =
-                QRectF(pixelOf(transform, 20, 30), pixelOf(transform, 150, 120)).normalized();
+        [](QCPPainter& painter, const QCPTransform& transform)
+        {
+            const QRectF rect
+                = QRectF(pixelOf(transform, 20, 30), pixelOf(transform, 150, 120)).normalized();
             painter.setPen(kPen);
             painter.setBrush(kBrush);
             painter.drawEllipse(rect);
@@ -271,7 +278,8 @@ void TestDrawContext::markersMatchesHandPainting()
 
     const QImage replay = replayOf(context);
     const QImage hand = painted(
-        [&points, &style](QCPPainter& painter, const QCPTransform& transform) {
+        [&points, &style](QCPPainter& painter, const QCPTransform& transform)
+        {
             style.applyTo(&painter, QPen(Qt::black));
             for (const QPointF& point : points)
                 style.drawShape(&painter, pixelOf(transform, point.x(), point.y()));
@@ -286,21 +294,27 @@ void TestDrawContext::errorBarsMatchesHandPainting()
     QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
                            nullptr);
     const std::vector<QPointF> centres { { 30, 50 }, { 80, 70 }, { 140, 40 } };
-    const std::vector<QPointF> spans { { 6, 20 }, { 6, 12 }, { 6, 25 } }; // half extents, data units
+    const std::vector<QPointF> spans { { 6, 20 },
+                                       { 6, 12 },
+                                       { 6, 25 } }; // half extents, data units
     context.errorBars(sharedPoints(centres), sharedPoints(spans), kPen);
 
     const QImage replay = replayOf(context);
     const QImage hand = painted(
-        [&centres, &spans](QCPPainter& painter, const QCPTransform& transform) {
+        [&centres, &spans](QCPPainter& painter, const QCPTransform& transform)
+        {
             painter.setPen(kPen);
             for (std::size_t i = 0; i < centres.size(); ++i)
             {
                 const QPointF centre = pixelOf(transform, centres[i].x(), centres[i].y());
-                const QPointF above = pixelOf(transform, centres[i].x(), centres[i].y() + spans[i].y());
-                const QPointF below = pixelOf(transform, centres[i].x(), centres[i].y() - spans[i].y());
-                const QPointF left = pixelOf(transform, centres[i].x() - spans[i].x(), centres[i].y());
-                const QPointF right =
-                    pixelOf(transform, centres[i].x() + spans[i].x(), centres[i].y());
+                const QPointF above
+                    = pixelOf(transform, centres[i].x(), centres[i].y() + spans[i].y());
+                const QPointF below
+                    = pixelOf(transform, centres[i].x(), centres[i].y() - spans[i].y());
+                const QPointF left
+                    = pixelOf(transform, centres[i].x() - spans[i].x(), centres[i].y());
+                const QPointF right
+                    = pixelOf(transform, centres[i].x() + spans[i].x(), centres[i].y());
                 painter.drawLine(above, below);
                 painter.drawLine(QPointF(left.x(), above.y()), QPointF(right.x(), above.y()));
                 painter.drawLine(QPointF(left.x(), below.y()), QPointF(right.x(), below.y()));
@@ -324,7 +338,8 @@ void TestDrawContext::textMatchesHandPainting()
 
     const QImage replay = replayOf(context);
     const QImage hand = painted(
-        [&text, &style](QCPPainter& painter, const QCPTransform& transform) {
+        [&text, &style](QCPPainter& painter, const QCPTransform& transform)
+        {
             const int flags = int(style.alignment);
             painter.translate(pixelOf(transform, 40, 100));
             painter.setFont(style.font);
@@ -349,7 +364,8 @@ void TestDrawContext::pathMatchesHandPainting()
 
     const QImage replay = replayOf(context);
     const QImage hand = painted(
-        [&path](QCPPainter& painter, const QCPTransform& transform) {
+        [&path](QCPPainter& painter, const QCPTransform& transform)
+        {
             painter.translate(pixelOf(transform, 20, 110));
             painter.setPen(kPen);
             painter.setBrush(kBrush);
@@ -372,9 +388,9 @@ void TestDrawContext::imageMatchesHandPainting()
 
     const QImage replay = replayOf(context);
     const QImage hand = painted(
-        [&image](QCPPainter& painter, const QCPTransform& transform) {
-            const QRectF rect =
-                QRectF(pixelOf(transform, 30, 110), QPointF(150, 40)).normalized();
+        [&image](QCPPainter& painter, const QCPTransform& transform)
+        {
+            const QRectF rect = QRectF(pixelOf(transform, 30, 110), QPointF(150, 40)).normalized();
             painter.drawImage(rect, image);
         },
         context.transform());
@@ -395,7 +411,8 @@ void TestDrawContext::pathDoesNotShiftLaterCommands()
 
     const QImage replay = replayOf(context);
     const QImage hand = painted(
-        [&path](QCPPainter& painter, const QCPTransform& transform) {
+        [&path](QCPPainter& painter, const QCPTransform& transform)
+        {
             painter.save();
             painter.translate(pixelOf(transform, 20, 110));
             painter.setPen(kPen);
@@ -404,8 +421,8 @@ void TestDrawContext::pathDoesNotShiftLaterCommands()
             painter.restore();
             painter.setPen(kPen);
             painter.setBrush(kBrush);
-            painter.drawRect(QRectF(pixelOf(transform, 120, 20), pixelOf(transform, 180, 60))
-                                 .normalized());
+            painter.drawRect(
+                QRectF(pixelOf(transform, 120, 20), pixelOf(transform, 180, 60)).normalized());
         },
         context.transform());
     QCOMPARE(replay, hand);
@@ -416,7 +433,8 @@ void TestDrawContext::painterCallbackStateDoesNotLeak()
     Fixture fixture;
     QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
                            nullptr);
-    const auto callback = [](QCPPainter& painter, const QCPTransform& transform) {
+    const auto callback = [](QCPPainter& painter, const QCPTransform& transform)
+    {
         painter.setPen(QPen(Qt::red, 1.0));
         painter.translate(50, 0);
         painter.drawLine(pixelOf(transform, 0, 0), pixelOf(transform, 10, 10));
@@ -426,14 +444,15 @@ void TestDrawContext::painterCallbackStateDoesNotLeak()
 
     const QImage replay = replayOf(context);
     const QImage hand = painted(
-        [&callback](QCPPainter& painter, const QCPTransform& transform) {
+        [&callback](QCPPainter& painter, const QCPTransform& transform)
+        {
             painter.save();
             callback(painter, transform);
             painter.restore();
             painter.setPen(kPen);
             painter.setBrush(kBrush);
-            painter.drawRect(QRectF(pixelOf(transform, 120, 20), pixelOf(transform, 180, 60))
-                                 .normalized());
+            painter.drawRect(
+                QRectF(pixelOf(transform, 120, 20), pixelOf(transform, 180, 60)).normalized());
         },
         context.transform());
     QCOMPARE(replay, hand);
@@ -444,7 +463,8 @@ void TestDrawContext::painterMatchesHandPainting()
     Fixture fixture;
     QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
                            nullptr);
-    const auto callback = [](QCPPainter& painter, const QCPTransform& transform) {
+    const auto callback = [](QCPPainter& painter, const QCPTransform& transform)
+    {
         painter.setPen(kPen);
         painter.drawLine(pixelOf(transform, 10, 10), pixelOf(transform, 180, 130));
     };
@@ -461,8 +481,8 @@ void TestDrawContext::boundsCoverEveryCommand()
     const QPen pen(Qt::black);
 
     {
-        QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis,
-                               fixture.plot->axisRect(), nullptr);
+        QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                               nullptr);
         context.polyline(sharedPoints({ { -5, 20 }, { 30, 70 } }), pen);
         const QCPDataBox& bounds = context.drawList().bounds;
         QCOMPARE(bounds.keyLower, -5.0);
@@ -472,8 +492,8 @@ void TestDrawContext::boundsCoverEveryCommand()
     }
     {
         // A pixel command leaves both sides unbounded, and it does not widen an earlier box either.
-        QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis,
-                               fixture.plot->axisRect(), nullptr);
+        QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                               nullptr);
         context.polyline(sharedPoints({ { 10, 20 }, { 30, 70 } }), pen);
         const std::vector<QCP::Position> absolute { QCP::Pixels { 1, 2 }, QCP::Pixels { 3, 4 } };
         context.polyline(std::span<const QCP::Position>(absolute), pen);
@@ -485,8 +505,8 @@ void TestDrawContext::boundsCoverEveryCommand()
     }
     {
         // Mixed spaces bound only the side that is data on every position.
-        QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis,
-                               fixture.plot->axisRect(), nullptr);
+        QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                               nullptr);
         const std::vector<QCP::Position> mixed { QCP::DataXRatioY { 50, 0.5 },
                                                  QCP::DataXRatioY { 70, 0.2 } };
         context.polyline(std::span<const QCP::Position>(mixed), pen);
@@ -497,8 +517,8 @@ void TestDrawContext::boundsCoverEveryCommand()
         QVERIFY(!std::isfinite(bounds.valueUpper));
     }
     {
-        QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis,
-                               fixture.plot->axisRect(), nullptr);
+        QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                               nullptr);
         const std::vector<QCP::Position> mixed { QCP::RatioXDataY { 0.25, 60 } };
         context.polyline(std::span<const QCP::Position>(mixed), pen);
         const QCPDataBox& bounds = context.drawList().bounds;
@@ -509,8 +529,8 @@ void TestDrawContext::boundsCoverEveryCommand()
     }
     {
         // An empty recording is unbounded, not a box at the origin.
-        QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis,
-                               fixture.plot->axisRect(), nullptr);
+        QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                               nullptr);
         const QCPDataBox& bounds = context.drawList().bounds;
         QVERIFY(!std::isfinite(bounds.keyLower));
         QVERIFY(!std::isfinite(bounds.valueLower));
@@ -531,8 +551,8 @@ void TestDrawContext::sharedDataIsNotCopied()
     QCOMPARE(command.points.get(), points.get());
 }
 
-// A span is a half extent, not a position: the corners are built in data space and mapped once, so a
-// pan offset or a log axis cannot leak into the result.
+// A span is a half extent, not a position: the corners are built in data space and mapped once, so
+// a pan offset or a log axis cannot leak into the result.
 void TestDrawContext::errorBarsMapTheirSpansAsExtents()
 {
     Fixture fixture;
@@ -542,8 +562,8 @@ void TestDrawContext::errorBarsMapTheirSpansAsExtents()
     QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
                            nullptr);
 
-    const auto centres = sharedPoints({{12.0, 120.0}});
-    const auto spans = sharedPoints({{1.0, 10.0}});
+    const auto centres = sharedPoints({ { 12.0, 120.0 } });
+    const auto spans = sharedPoints({ { 1.0, 10.0 } });
     context.errorBars(centres, spans, kPen);
 
     std::vector<QPointF> bar;
@@ -572,19 +592,19 @@ void TestDrawContext::ellipseFanFillCoversTheDisc()
         ring.emplace_back(centre.x() + radius * std::cos(angle),
                           centre.y() + radius * std::sin(angle));
     }
-    const std::vector<float> verts =
-        qcpFanFillVertices(centre, std::span<const QPointF>(ring), QColor(200, 90, 30));
+    const std::vector<float> verts
+        = qcpFanFillVertices(centre, std::span<const QPointF>(ring), QColor(200, 90, 30));
     QCOMPARE(int(verts.size()), int(ring.size()) * 3 * 6);
 
-    const auto inside = [&verts](const QPointF& p) {
+    const auto inside = [&verts](const QPointF& p)
+    {
         for (std::size_t v = 0; v + 17 < verts.size(); v += 18)
         {
             const QPointF a(verts[v], verts[v + 1]);
             const QPointF b(verts[v + 6], verts[v + 7]);
             const QPointF c(verts[v + 12], verts[v + 13]);
-            const auto side = [](const QPointF& p0, const QPointF& p1, const QPointF& q) {
-                return (p1.x() - p0.x()) * (q.y() - p0.y()) - (p1.y() - p0.y()) * (q.x() - p0.x());
-            };
+            const auto side = [](const QPointF& p0, const QPointF& p1, const QPointF& q)
+            { return (p1.x() - p0.x()) * (q.y() - p0.y()) - (p1.y() - p0.y()) * (q.x() - p0.x()); };
             const double d1 = side(a, b, p);
             const double d2 = side(b, c, p);
             const double d3 = side(c, a, p);
@@ -609,22 +629,21 @@ void TestDrawContext::mixedRecordingSplitsByKind()
     Fixture fixture;
     QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
                            nullptr);
-    context.polyline(sharedPoints({{10.0, 10.0}, {180.0, 140.0}}), QPen(Qt::green, 5.0));
-    context.text(QCP::Data {100.0, 20.0}, QStringLiteral("hi"), QCPTextStyle {});
+    context.polyline(sharedPoints({ { 10.0, 10.0 }, { 180.0, 140.0 } }), QPen(Qt::green, 5.0));
+    context.text(QCP::Data { 100.0, 20.0 }, QStringLiteral("hi"), QCPTextStyle { });
 
     const QCPDrawFrame& frame = context.frame();
     const QImage all = painted(
-        [&](QCPPainter& painter, const QCPTransform&) {
-            qcpReplayWithPainter(context.drawList(), painter, frame, QCPReplayKinds::All);
-        },
+        [&](QCPPainter& painter, const QCPTransform&)
+        { qcpReplayWithPainter(context.drawList(), painter, frame, QCPReplayKinds::All); },
         context.transform());
     const QImage painterOnly = painted(
-        [&](QCPPainter& painter, const QCPTransform&) {
-            qcpReplayWithPainter(context.drawList(), painter, frame, QCPReplayKinds::PainterOnly);
-        },
+        [&](QCPPainter& painter, const QCPTransform&)
+        { qcpReplayWithPainter(context.drawList(), painter, frame, QCPReplayKinds::PainterOnly); },
         context.transform());
 
-    const auto greenPixels = [](const QImage& image) {
+    const auto greenPixels = [](const QImage& image)
+    {
         int count = 0;
         for (int y = 0; y < image.height(); ++y)
             for (int x = 0; x < image.width(); ++x)
@@ -636,7 +655,8 @@ void TestDrawContext::mixedRecordingSplitsByKind()
         return count;
     };
     QVERIFY2(greenPixels(all) > 100, "the all-kinds replay paints the polyline");
-    QVERIFY2(greenPixels(painterOnly) == 0, "the painter-only replay leaves the polyline to the GPU");
+    QVERIFY2(greenPixels(painterOnly) == 0,
+             "the painter-only replay leaves the polyline to the GPU");
     QVERIFY2(all != painterOnly, "the two kinds do different work");
 }
 
@@ -644,8 +664,8 @@ void TestDrawContext::mixedRecordingSplitsByKind()
 // dash pattern and the line looks striped at each colour change.
 void TestDrawContext::extruderContinuesArcLengthAcrossRuns()
 {
-    const std::vector<QPointF> first {{0, 0}, {10, 0}, {20, 0}};
-    const std::vector<QPointF> second {{20, 0}, {30, 0}, {40, 0}};
+    const std::vector<QPointF> first { { 0, 0 }, { 10, 0 }, { 20, 0 } };
+    const std::vector<QPointF> second { { 20, 0 }, { 30, 0 }, { 40, 0 } };
     std::vector<float> verts;
     const float afterFirst = QCPLineExtruder::appendPolylineWithDistance(
         std::span<const QPointF>(first), 2.0f, Qt::black, verts);
@@ -656,10 +676,11 @@ void TestDrawContext::extruderContinuesArcLengthAcrossRuns()
              "the second run continues the arc length instead of restarting it");
 
     // A NaN gap restarts the pattern: the length reported is the last segment's, not the sum.
-    const std::vector<QPointF> gapped {{0, 0}, {50, 0}, {qQNaN(), qQNaN()}, {50, 0}, {60, 0}};
-    const float afterGap =
-        QCPLineExtruder::appendPolylineWithDistance(std::span<const QPointF>(gapped), 2.0f,
-                                                    Qt::black, verts);
+    const std::vector<QPointF> gapped {
+        { 0, 0 }, { 50, 0 }, { qQNaN(), qQNaN() }, { 50, 0 }, { 60, 0 }
+    };
+    const float afterGap = QCPLineExtruder::appendPolylineWithDistance(
+        std::span<const QPointF>(gapped), 2.0f, Qt::black, verts);
     QVERIFY2(std::abs(afterGap - 10.0f) < 1e-4f, "a NaN gap restarts the arc length at zero");
 }
 
@@ -668,8 +689,8 @@ void TestDrawContext::resolveCacheSurvivesNewEntries()
     // A span handed out before another recording was cached must still point at its own pixels.
     Fixture fixture;
     const QCPTransform transform(fixture.plot->xAxis, fixture.plot->yAxis);
-    const auto first = sharedPoints({{1, 2}, {3, 4}});
-    const auto second = sharedPoints({{5, 6}, {7, 8}, {9, 10}});
+    const auto first = sharedPoints({ { 1, 2 }, { 3, 4 } });
+    const auto second = sharedPoints({ { 5, 6 }, { 7, 8 }, { 9, 10 } });
     QCPResolveCache cache;
     const std::span<const QPointF> a = cache.pixels(first, 1, transform);
     QCOMPARE(int(a.size()), 2);
@@ -686,13 +707,13 @@ void TestDrawContext::resolveCacheIgnoresAReusedAddress()
 {
     Fixture fixture;
     const QCPTransform transform(fixture.plot->xAxis, fixture.plot->yAxis);
-    const auto first = sharedPoints({{1, 2}, {3, 4}});
+    const auto first = sharedPoints({ { 1, 2 }, { 3, 4 } });
     QCPResolveCache cache;
     const std::span<const QPointF> a = cache.pixels(first, 1, transform);
     QCOMPARE(int(a.size()), 2);
     const auto* address = first.get();
     // Freed, and a different recording of another size takes its place.
-    auto* replaced = new std::vector<QPointF>{{9, 9}, {9, 9}, {9, 9}, {9, 9}};
+    auto* replaced = new std::vector<QPointF> { { 9, 9 }, { 9, 9 }, { 9, 9 }, { 9, 9 } };
     auto second = std::shared_ptr<const std::vector<QPointF>>(replaced);
     cache.beginReplay();
     const std::span<const QPointF> b = cache.pixels(second, 1, transform);
@@ -709,7 +730,7 @@ void TestDrawContext::resolveCacheEvictsUnusedEntries()
     for (int i = 0; i < 100; ++i)
     {
         cache.beginReplay();
-        const auto recording = sharedPoints({{double(i), 1}, {2, 3}});
+        const auto recording = sharedPoints({ { double(i), 1 }, { 2, 3 } });
         QCOMPARE(int(cache.pixels(recording, 1, transform).size()), 2);
         QVERIFY(cache.entryCount() <= 1);
     }
@@ -739,12 +760,11 @@ void TestDrawContext::dashLengthsIncludeTheCaps()
 void TestDrawContext::emptyCustomDashIsSolid()
 {
     QPen pen(Qt::black, 2.0, Qt::CustomDashLine);
-    pen.setDashPattern({0, 0});
+    pen.setDashPattern({ 0, 0 });
     QVERIFY(!qcp::isDashed(pen));
     std::vector<float> verts;
-    qcp::extrudeStroke(std::span<const QPointF>(std::array<QPointF, 3> { QPointF(0, 0),
-                                                                        QPointF(10, 0),
-                                                                        QPointF(20, 0) }),
+    qcp::extrudeStroke(std::span<const QPointF>(std::array<QPointF, 3> {
+                           QPointF(0, 0), QPointF(10, 0), QPointF(20, 0) }),
                        pen, 2.0f, verts);
     QVERIFY(!verts.empty());
     QCOMPARE(verts.size() % 6, std::size_t(0)); // 6 floats: the solid format
@@ -779,19 +799,32 @@ void TestDrawContext::nonSolidBrushIsNotFlattened()
     gradient.setColorAt(0, Qt::red);
     gradient.setColorAt(1, Qt::blue);
     context.rect(QCP::Data { 20, 20 }, QCP::Data { 120, 100 }, QPen(Qt::NoPen), QBrush(gradient));
+    const qcp::QCPDrawCommand& command = context.drawList().commands.front();
+    // The GPU has no gradient: the command becomes an image, it is never flattened to one colour.
+    QVERIFY2(qcp::fillNeedsRaster(command), "a gradient fill was offered to the GPU");
 
-    QImage image(kWidth, kHeight, QImage::Format_ARGB32_Premultiplied);
-    image.fill(Qt::white);
+    const auto paintedCount = [&](const qcp::QCPRasterFallback* fallback)
     {
-        QCPPainter painter(&image);
-        painter.setAntialiasing(true);
-        // The GPU cannot fill a gradient: the painter pass keeps it, fill only.
-        qcpReplayWithPainter(context.drawList(), painter, context.frame(), QCPReplayKinds::PainterOnly);
-    }
-    int painted = 0;
-    for (int y = 25; y < 95; y += 5)
-        for (int x = 25; x < 115; x += 5)
-            if (image.pixelColor(x, y) != QColor(Qt::white))
-                ++painted;
-    QVERIFY2(painted > 50, "the gradient fill disappeared");
+        QImage image(kWidth, kHeight, QImage::Format_ARGB32_Premultiplied);
+        image.fill(Qt::white);
+        {
+            QCPPainter painter(&image);
+            painter.setAntialiasing(true);
+            qcpReplayWithPainter(context.drawList(), painter, context.frame(),
+                                 QCPReplayKinds::PainterOnly, fallback);
+        }
+        int painted = 0;
+        for (int y = 25; y < 95; y += 5)
+            for (int x = 25; x < 115; x += 5)
+                if (image.pixelColor(x, y) != QColor(Qt::white))
+                    ++painted;
+        return painted;
+    };
+
+    // The image path owns the fill: the painter pass leaves it alone.
+    QCOMPARE(paintedCount(nullptr), 0);
+    // A full layer hands the command back to the painter, gradient intact.
+    qcp::QCPRasterFallback fallback;
+    fallback.painterHandles(command);
+    QVERIFY2(paintedCount(&fallback) > 50, "the gradient fill disappeared");
 }

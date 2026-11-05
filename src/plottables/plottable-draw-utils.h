@@ -1,9 +1,10 @@
 #pragma once
 
 #include "plottable-color-runs.h"
+#include <QBrush>
 #include <QColor>
-#include <QPointF>
 #include <QPen>
+#include <QPointF>
 #include <QRect>
 #include <QVector>
 #include <span>
@@ -14,7 +15,8 @@ class QCPPainter;
 class QCPLayer;
 class QCPPlottableRhiLayer;
 
-namespace qcp {
+namespace qcp
+{
 
 /// The colour of the index-th component or column when none is set (cycles after 10).
 QColor defaultPlottableColor(int index);
@@ -26,15 +28,20 @@ QCPPlottableRhiLayer* gpuLayer(QCustomPlot* parentPlot, QCPLayer* layer, bool ex
 /// dashed pipeline, so the pen's style never changes where the line stacks.
 bool canStrokeOnGpu(const QPen& pen);
 
+/// True when \a brush's colour alone can stand in for it: a solid pattern with a visible colour.
+/// Anything else (a texture, a gradient, a hatch) has to become an image.
+bool gpuCanFill(const QBrush& brush);
+
 /// The dash pattern of \a pen in pixels: QPen's on/off lengths multiplied by the pen width (a
 /// cosmetic pen uses 1). \a count is 0 for a solid pen; patterns longer than eight entries are cut.
 struct DashPattern
 {
-    std::array<float, 8> lengths = {};
+    std::array<float, 8> lengths = { };
     int count = 0;
     float offset = 0; //!< QPen::dashOffset in pixels
-    float total = 0;  //!< the length of one period, pixels
+    float total = 0; //!< the length of one period, pixels
 };
+
 DashPattern dashPatternOf(const QPen& pen, float penWidth);
 
 /// One definition of "this pen is dashed": the pattern the GPU can draw has at least one entry.
@@ -63,14 +70,17 @@ void drawPolylineSplitNaN(QCPPainter* painter, std::span<const QPointF> pts);
 /// Stores the untranslated GPU vertices so they can be reused across frames
 /// with only a cheap translation applied. Uses std::vector to retain capacity
 /// across frames (no COW overhead, no detach on non-const data()).
-struct ExtrusionCache {
-    std::vector<float> vertices;   // untranslated extruded verts (6 floats per vertex)
+struct ExtrusionCache
+{
+    std::vector<float> vertices; // untranslated extruded verts (6 floats per vertex)
     float penWidth = 0;
     QRgb penColor = 0;
-    quint64 colorGeneration = 0;   // coloured lines: the mapper generation the vertices were built with
-    bool withDistance = false;     // 7 floats per vertex (dashed) instead of 6
+    quint64 colorGeneration
+        = 0; // coloured lines: the mapper generation the vertices were built with
+    bool withDistance = false; // 7 floats per vertex (dashed) instead of 6
 
     void clear() { vertices.clear(); }
+
     [[nodiscard]] bool isEmpty() const { return vertices.empty(); }
 };
 
@@ -91,13 +101,9 @@ bool addGpuStroke(QCPPlottableRhiLayer& layer, std::span<const float> verts, con
 /// When gpuOffset is non-null, points are pre-translated so other plottables
 /// on the same shared layer are unaffected.
 /// @param clipRect the plottable's clip rect (passed explicitly to avoid protected access)
-void drawPolylineWithGpuFallback(QCPPainter* painter,
-                                  QCustomPlot* parentPlot,
-                                  QCPLayer* layer,
-                                  const QVector<QPointF>& pts,
-                                  const QPen& pen,
-                                  const QPointF& gpuOffset,
-                                  const QRect& clipRect);
+void drawPolylineWithGpuFallback(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer* layer,
+                                 const QVector<QPointF>& pts, const QPen& pen,
+                                 const QPointF& gpuOffset, const QRect& clipRect);
 
 /// GPU stroke width for @a pen: cosmetic or zero-width pens are one device pixel.
 float extrusionPenWidth(const QPen& pen, double devicePixelRatio);
@@ -105,33 +111,27 @@ float extrusionPenWidth(const QPen& pen, double devicePixelRatio);
 /// A plain cache survives pans; it is rebuilt on fresh lines or any pen change
 /// (e.g. selection). Callers that pass pre-transformed points (steps) must pass them
 /// whenever this is true, since the cache is then re-extruded from those points.
-bool needsReextrusion(const ExtrusionCache& cache, bool freshLines,
-                      const QPen& pen, double devicePixelRatio);
+bool needsReextrusion(const ExtrusionCache& cache, bool freshLines, const QPen& pen,
+                      double devicePixelRatio);
 
 /// Same as above but with cached extrusion.
 /// When @a freshLines is true, re-extrudes and stores in @a cache.
 /// When false, translates cached vertices by gpuOffset.
-void drawPolylineCached(QCPPainter* painter,
-                         QCustomPlot* parentPlot,
-                         QCPLayer* layer,
-                         const QVector<QPointF>& pts,
-                         const QPen& pen,
-                         const QPointF& gpuOffset,
-                         const QRect& clipRect,
-                         bool freshLines,
-                         ExtrusionCache& cache);
+void drawPolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer* layer,
+                        const QVector<QPointF>& pts, const QPen& pen, const QPointF& gpuOffset,
+                        const QRect& clipRect, bool freshLines, ExtrusionCache& cache);
 
 /// A coloured cache survives pans; it is rebuilt on fresh lines, pen width or colour change.
-bool needsColoredReextrusion(const ExtrusionCache& cache, bool freshLines,
-                             float penWidth, quint64 colorGeneration, bool dashed);
+bool needsColoredReextrusion(const ExtrusionCache& cache, bool freshLines, float penWidth,
+                             quint64 colorGeneration, bool dashed);
 
 /// Coloured counterpart of drawPolylineCached. Builds the runs itself, only when it
 /// re-extrudes (or has no GPU layer), so any reason to re-extrude gets correct runs.
 void drawColoredPolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer* layer,
                                const QVector<QPointF>& points, const QVector<int>& indices,
                                const ColorScalarMapper& mapper, const QPen& pen,
-                               const QPointF& gpuOffset, const QRect& clipRect,
-                               bool freshLines, ExtrusionCache& cache);
+                               const QPointF& gpuOffset, const QRect& clipRect, bool freshLines,
+                               ExtrusionCache& cache);
 
 /// QPainter path for coloured lines: one polyline per run.
 void drawColoredPolylineRuns(QCPPainter* painter, const QVector<QPointF>& points,

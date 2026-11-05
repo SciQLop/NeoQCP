@@ -13,8 +13,8 @@
 #include <QPainterPath>
 #include <QPen>
 #include <QPointF>
-#include <algorithm>
 #include <QString>
+#include <algorithm>
 
 #include <functional>
 #include <limits>
@@ -122,9 +122,9 @@ struct PainterCmd
 };
 
 //! One draw command. Ordered by the alternatives below, so a replay is a single visit.
-using QCPDrawCommand =
-    std::variant<PolylineDataCmd, PolylinePositionsCmd, PolygonCmd, FillBetweenCmd, RectCmd,
-                 EllipseCmd, MarkersCmd, ErrorBarsCmd, TextCmd, PathCmd, ImageCmd, PainterCmd>;
+using QCPDrawCommand
+    = std::variant<PolylineDataCmd, PolylinePositionsCmd, PolygonCmd, FillBetweenCmd, RectCmd,
+                   EllipseCmd, MarkersCmd, ErrorBarsCmd, TextCmd, PathCmd, ImageCmd, PainterCmd>;
 } // namespace qcp
 
 /*!
@@ -149,13 +149,6 @@ struct QCP_LIB_DECL QCPDrawList
     bool keyBounded = false;
     bool valueBounded = false;
 };
-
-//! True when the GPU can fill \a brush exactly: a solid pattern with opaque-enough colour. Anything
-//! else (gradient, texture, hatch) is flattened by a vertex colour, so the painter pass keeps it.
-inline bool qcpGpuFillsBrush(const QBrush& brush)
-{
-    return brush.style() == Qt::SolidPattern && brush.color().alpha() != 0;
-}
 
 //! The one place a QCP::Position becomes pixels: every command and every caller goes through it.
 [[nodiscard]] QPointF qcpResolvePosition(const QCPDrawFrame& frame, const QCP::Position& position);
@@ -187,5 +180,14 @@ inline void qcpErrorBarCorners(std::span<const QPointF> centres, std::span<const
     }
 }
 
+namespace qcp
+{
+class QCPRasterFallback;
+}
+
+//! The commands a full frame could not draw on the GPU (no QRhi, export, or the layer's image cap)
+//! are painted here: in PainterOnly a GPU kind is drawn only when \a fallback says the layer left
+//! it to this pass.
 void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QCPDrawFrame& frame,
-                          QCPReplayKinds kinds = QCPReplayKinds::All);
+                          QCPReplayKinds kinds = QCPReplayKinds::All,
+                          const qcp::QCPRasterFallback* fallback = nullptr);
