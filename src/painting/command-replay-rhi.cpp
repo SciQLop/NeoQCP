@@ -250,6 +250,7 @@ void addRasterCommand(const QCPDrawList& list, QCPPlottableRhiLayer& layer,
         return;
     }
     QRectF bounds = qcp::fallbackPixelBounds(command, frame, dpr, withStroke);
+    const QRectF extent = bounds;
     bounds = bounds.intersected(QRectF(QPointF(0, 0), QSizeF(viewport) / dpr));
     if (!clip.isEmpty())
         bounds = bounds.intersected(QRectF(clip));
@@ -269,7 +270,7 @@ void addRasterCommand(const QCPDrawList& list, QCPPlottableRhiLayer& layer,
         return;
     }
     if (cache)
-        cache->keepRaster(int(index), bounds, movesWithData);
+        cache->keepRaster(int(index), bounds, movesWithData, bounds != extent);
 }
 
 //! True when this recording needs more images than the layer has left: the whole of it then goes to
@@ -426,8 +427,9 @@ void QCPResolveCache::clear()
 bool QCPRecordingCache::reuse(const QCPDrawList& list, const QCPTransform& transform, double dpr,
                               int outputHeight, const QRect& clip, QPointF* delta)
 {
-    const bool same = mReusable && mValid && list.id == mList && qFuzzyCompare(dpr, mDpr)
-        && outputHeight == mHeight && clip == mClip && transform.isTranslationOf(mTransform, delta);
+    const bool same = mReusable && mValid && !mClippedRaster && list.id == mList
+        && qFuzzyCompare(dpr, mDpr) && outputHeight == mHeight && clip == mClip
+        && transform.isTranslationOf(mTransform, delta);
     if (!same)
         mValid = false;
     return same;
@@ -447,6 +449,7 @@ void QCPRecordingCache::beginBuild(const QCPDrawList& list, const QCPTransform& 
     mClip = clip;
     mValid = false;
     mSpoiled = false;
+    mClippedRaster = false;
 }
 
 void QCPRecordingCache::keepSolid(std::span<const float> vertices, int fillVertexCount,
@@ -503,7 +506,8 @@ void QCPRecordingCache::keepDashed(std::span<const float> vertices, std::span<co
     mRuns.push_back(run);
 }
 
-void QCPRecordingCache::keepRaster(int index, const QRectF& bounds, bool movesWithData)
+void QCPRecordingCache::keepRaster(int index, const QRectF& bounds, bool movesWithData,
+                                   bool clipped)
 {
     Run run;
     run.kind = RunKind::Raster;
@@ -511,6 +515,7 @@ void QCPRecordingCache::keepRaster(int index, const QRectF& bounds, bool movesWi
     run.bounds = bounds;
     run.movesWithData = movesWithData;
     mRuns.push_back(run);
+    mClippedRaster = mClippedRaster || clipped;
 }
 
 void QCPRecordingCache::commit()
@@ -537,6 +542,7 @@ void QCPRecordingCache::clear()
     mRuns.clear();
     mValid = false;
     mSpoiled = false;
+    mClippedRaster = false;
 }
 
 void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
@@ -699,35 +705,13 @@ quint64 qcpFillBuildCount()
 
 bool qcpRecordingMovesWithTheData(const QCPDrawList& list)
 {
-    for (const qcp::QCPDrawCommand& command : list.commands)
-    {
-        if (!isPainterOnlyCommand(command))
-        {
-            if (!isDataOnlyCommand(command))
-                return false;
-            continue;
-        }
-        // The painter draws these into the same texture every frame: only a data anchor makes them
-        // follow the pan. A painter callback is opaque, so it keeps the layer off this path.
-        const bool dataAnchored = std::visit(
-            [](const auto& cmd)
-            {
-                using T = std::decay_t<decltype(cmd)>;
-                if constexpr (std::is_same_v<T, qcp::TextCmd>)
-                    return std::holds_alternative<QCP::Data>(cmd.at);
-                else if constexpr (std::is_same_v<T, qcp::PathCmd>)
-                    return std::holds_alternative<QCP::Data>(cmd.origin);
-                else if constexpr (std::is_same_v<T, qcp::ImageCmd>)
-                    return std::holds_alternative<QCP::Data>(cmd.a)
-                        && std::holds_alternative<QCP::Data>(cmd.b);
-                else
-                    return false;
-            },
-            command);
-        if (!dataAnchored)
-            return false;
-    }
-    return true;
+    // Only GPU vertex geometry may be shifted. The painter draws text, paths and images into the
+    // layer's paint buffer, and a rasterised command is an image clipped to the view it was painted
+    // for: shifting the buffer moves what it holds, it cannot reveal what the clip cut away, so a
+    // recording that holds either is replayed again instead.
+    return std::all_of(list.commands.begin(), list.commands.end(),
+                       [](const qcp::QCPDrawCommand& command)
+                       { return isDataOnlyCommand(command) && !qcp::needsRaster(command); });
 }
 
 std::vector<float> qcpFanFillVertices(const QPointF& centre, std::span<const QPointF> ring,

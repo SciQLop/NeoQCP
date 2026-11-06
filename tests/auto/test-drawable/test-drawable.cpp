@@ -297,6 +297,15 @@ public:
     {
         ++drawCalls;
         context.polyline(mLine, this->pen());
+        if (labelAt)
+        {
+            QCPTextStyle style;
+            style.font.setPointSize(20);
+            style.color = QColor(Qt::blue);
+            context.text(QCP::Data { labelAt->x(), labelAt->y() }, QStringLiteral("W"), style);
+        }
+        if (rasterRect) // a gradient fill: the replay can only draw it as an image
+            context.rect(QCP::Data { 2, 2 }, QCP::Data { 14, 6 }, QPen(Qt::NoPen), gradientBrush());
     }
 
     //! The icon is a recording too: one that reads the theme must not outlive the theme it read.
@@ -323,6 +332,10 @@ public:
     mutable int drawCalls = 0;
     mutable int iconCalls = 0;
     bool readsTheme = false;
+    //! A data-anchored label the painter draws: a shifted layer cannot reveal it.
+    std::optional<QPointF> labelAt;
+    //! A gradient rect half outside the visible range: its image is clipped to the view.
+    bool rasterRect = false;
     std::shared_ptr<const std::vector<QPointF>> mLine
         = std::make_shared<const std::vector<QPointF>>(
             std::initializer_list<QPointF> { { 1, 1 }, { 9, 9 } });
@@ -421,6 +434,12 @@ bool isBlue(const QColor& c)
 bool isGreenInk(const QColor& c)
 {
     return c.green() > 150 && c.red() < 100;
+}
+
+//! Anything but the white background, the test inkedBounds() uses.
+bool isInk(const QColor& c)
+{
+    return c != QColor(Qt::white);
 }
 
 //! How many pixels of \a frame inside \a box \a matches accepts.
@@ -793,6 +812,90 @@ void TestDrawable::dataOnlyDrawingLetsItsLayerTranslate()
              qPrintable(QStringLiteral("the line moved %1 px, the axis %2 px")
                             .arg(after.left() - before.left())
                             .arg(moved)));
+}
+
+void TestDrawable::translatedLayerRevealsAnEnteringLabel()
+{
+    // The painter draws a recording's text into the layer's paint buffer, which only holds what was
+    // inside the clip when it was painted. A translated layer shifts that buffer, so a label that
+    // was outside the key range can never appear while the user pans: a recording holding one must
+    // be repainted, not shifted.
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - the translate path is a GPU one");
+    hideAxes(f.plot.get());
+    auto* line = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    line->mLine = std::make_shared<const std::vector<QPointF>>(
+        std::initializer_list<QPointF> { { 1, 1 }, { 9, 9 } });
+    line->labelAt = QPointF(12.0, 5.0); // just right of the visible key range
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+
+    f.plot->xAxis->setRange(5, 15); // a pan: the label's anchor is well inside now
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+    const QImage frame = f.plot->grabFramebuffer();
+    const QRect box = deviceRect(f.plot.get(), frame, { 12.0, 4.4 }, { 14.0, 5.6 });
+    const int ink = countPixels(frame, box, isBlue);
+    QVERIFY2(
+        ink > 10,
+        qPrintable(
+            QStringLiteral("the label did not enter the view on the pan: %1 pixels").arg(ink)));
+}
+
+void TestDrawable::translatedLayerRevealsAClippedRaster()
+{
+    // A rasterised command is an image clipped to the view it was painted for. Shifting the layer
+    // moves that image, but nothing was ever painted for the part the clip cut away: the recording
+    // has to be replayed so the newly revealed half is drawn.
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - the raster fallback is a GPU path");
+    hideAxes(f.plot.get());
+    auto* line = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    line->rasterRect = true; // a gradient from (2,2) to (14,6): half of it is outside the view
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+
+    f.plot->xAxis->setRange(4, 14); // a pan: the rect is inside the view, its right half is new
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+    const QImage frame = f.plot->grabFramebuffer();
+    const QRect box = deviceRect(f.plot.get(), frame, { 10.5, 2.5 }, { 13.5, 5.5 });
+    const int ink = countPixels(frame, box, isInk);
+    QVERIFY2(
+        ink > 100,
+        qPrintable(QStringLiteral("the revealed half of the raster is blank: %1 pixels").arg(ink)));
+}
+
+void TestDrawable::translatedBarsRevealTheNextBar()
+{
+    // The guard for the restriction above: bars are pure GPU rect geometry, so a recording of them
+    // still answers a stall offset, and the pan row's gain must survive.
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - the translate path is a GPU one");
+    hideAxes(f.plot.get());
+    auto* bars = new QCPBars(f.plot->xAxis, f.plot->yAxis);
+    QVector<double> keys(10000), values(10000);
+    for (int i = 0; i < 10000; ++i)
+    {
+        keys[i] = i;
+        values[i] = 0.5;
+    }
+    bars->setData(keys, values);
+    f.plot->xAxis->setRange(0, 100); // the first hundred bars
+    f.plot->yAxis->setRange(0, 1);
+    f.plot->replot();
+    auto* layer = f.plot->plottableRhiLayer(bars->layer());
+    QVERIFY(layer);
+    QTRY_VERIFY_WITH_TIMEOUT(layer->solidVertexUploads() > 0, 5000); // the first frame is painted
+
+    f.plot->xAxis->setRange(10, 110); // a pan: bars that were off screen enter it
+    f.plot->replot();
+    QVERIFY2(!layer->isDirty(), "the bars' layer has to translate, not repaint");
+
+    const QColor entered = pixelAt(f.plot->grabFramebuffer(), f.plot.get(), 105.0, 0.25);
+    QVERIFY2(
+        isInk(entered),
+        qPrintable(
+            QStringLiteral("the bar that entered the view is not drawn: %1").arg(entered.name())));
 }
 
 void TestDrawable::rasterPanKeepsImage()

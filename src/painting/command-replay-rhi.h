@@ -115,6 +115,9 @@ public:
       True when the kept geometry of \a list may be re-emitted: same list, same device pixel ratio,
       output height and clip, and \a transform a translation of the one it was built for. \a delta
       then holds the pixels to add to the runs that move with the data.
+
+      False when a rasterised command was clipped by the view it was painted for: shifting its image
+      moves what it holds, it cannot reveal what the clip cut away, so the recording is replayed.
     */
     bool reuse(const QCPDrawList& list, const QCPTransform& transform, double dpr, int outputHeight,
                const QRect& clip, QPointF* delta);
@@ -134,8 +137,10 @@ public:
     void keepDashed(std::span<const float> vertices, std::span<const float> pattern,
                     float dashOffset, bool movesWithData);
 
-    //! Keeps command \a index, rasterised over \a bounds, as a run of its own.
-    void keepRaster(int index, const QRectF& bounds, bool movesWithData);
+    //! Keeps command \a index, rasterised over \a bounds, as a run of its own. \a clipped is true
+    //! when the frame's clip cut the image down: what it cut away was never painted, so the command
+    //! can only be replayed, not shifted (see reuse()).
+    void keepRaster(int index, const QRectF& bounds, bool movesWithData, bool clipped);
 
     //! Commits the build, unless a rasterised command spoiled it.
     void commit();
@@ -164,6 +169,7 @@ private:
     bool mReusable = false; //!< every kept command moves alike: see beginBuild()
     bool mValid = false;
     bool mSpoiled = false;
+    bool mClippedRaster = false; //!< an image was cut by the clip: it cannot be shifted
 };
 
 /*!
@@ -188,11 +194,14 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
 quint64 qcpFillBuildCount();
 
 /*!
-  True when every position \\a list was recorded from is a data one, so a pan moves the whole
-  drawing by one delta: its layer may shift the texture it already has instead of repainting it.
+  True when \\a list holds GPU vertex geometry only, every position of it a data one, so a pan moves
+  the whole drawing by one delta: its layer may shift the texture it already has instead of
+  repainting it.
 
-  Opaque painter callbacks are not: nothing tells where they draw, so they keep the layer off that
-  path.
+  A painter command (text, a path, an image, an opaque callback) or a command the raster fallback
+  draws is not vertex geometry: the painter wrote it into the layer's buffer, or the image was
+  clipped to the view it was painted for, so shifting the buffer cannot reveal what the clip cut
+  away. Such a recording keeps the layer off that path.
 */
 [[nodiscard]] bool qcpRecordingMovesWithTheData(const QCPDrawList& list);
 
