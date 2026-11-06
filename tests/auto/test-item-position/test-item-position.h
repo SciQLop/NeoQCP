@@ -23,6 +23,7 @@ private slots:
     void farOffscreenItemsDoNotOverflow_data();
     void farOffscreenItemsDoNotOverflow();
     void setRefusedAnchorIsReported();
+    void mixedPlotCoordinatePairsKeepTheKeyAndValueRole();
 
 private:
     QCustomPlot* mPlot = nullptr;

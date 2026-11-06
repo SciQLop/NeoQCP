@@ -47,6 +47,71 @@ void detachFromParent(QCPItemPosition* position)
   if (position->parentAnchorX() || position->parentAnchorY())
     position->setParentAnchor(nullptr, false);
 }
+
+//! A position slot that is not ptPlotCoords, along one screen axis: \a horizontal picks the
+//! viewport's and the axis rect's width/left, \a vertical their height/top. An \a anchor pixel,
+//! given, replaces the viewport or rect origin, which is what 2.x's anchor arithmetic does. Empty
+//! when the slot's type needs an axis rect and none is set.
+std::optional<double> slotAlongScreenAxis(double coord, QCPItemPosition::PositionType type,
+                                          bool horizontal, const QCustomPlot& plot,
+                                          const QCPAxisRect* rect,
+                                          const std::optional<double>& anchor)
+{
+    const double viewportLength = horizontal ? plot.viewport().width() : plot.viewport().height();
+    const double viewportOrigin = horizontal ? plot.viewport().left() : plot.viewport().top();
+    const double rectLength = rect ? (horizontal ? rect->width() : rect->height()) : 0.0;
+    const double rectOrigin = rect ? (horizontal ? rect->left() : rect->top()) : 0.0;
+    switch (type)
+    {
+        case QCPItemPosition::ptAbsolute:
+            return coord + anchor.value_or(0.0);
+        case QCPItemPosition::ptViewportRatio:
+            return coord * viewportLength + anchor.value_or(viewportOrigin);
+        case QCPItemPosition::ptAxisRectRatio:
+            if (rect)
+                return coord * rectLength + anchor.value_or(rectOrigin);
+            return std::nullopt;
+        case QCPItemPosition::ptAxisRectAbsolute:
+            if (rect)
+                return coord + anchor.value_or(rectOrigin);
+            return std::nullopt;
+        case QCPItemPosition::ptPlotCoords:
+            break;
+    }
+    return std::nullopt;
+}
+
+//! A plot-coordinate slot along one screen axis: the slot's own axis (the key for the X slot, the
+//! value for the Y slot), or whichever of the two runs along that axis. Empty when neither does.
+std::optional<double> plotSlotAlongScreenAxis(const QCPAxis* slotAxis, const QCPAxis* otherAxis,
+                                              double coord, bool horizontal)
+{
+    const Qt::Orientation wanted = horizontal ? Qt::Horizontal : Qt::Vertical;
+    if (slotAxis && slotAxis->orientation() == wanted)
+        return slotAxis->coordToPixel(coord);
+    if (otherAxis && otherAxis->orientation() == wanted)
+        return otherAxis->coordToPixel(coord);
+    return std::nullopt;
+}
+
+//! The 2.x name of a position type, for the messages that name the type that cannot be resolved.
+const char* positionTypeName(QCPItemPosition::PositionType type)
+{
+    switch (type)
+    {
+        case QCPItemPosition::ptAbsolute:
+            return "ptAbsolute";
+        case QCPItemPosition::ptViewportRatio:
+            return "ptViewportRatio";
+        case QCPItemPosition::ptAxisRectRatio:
+            return "ptAxisRectRatio";
+        case QCPItemPosition::ptAxisRectAbsolute:
+            return "ptAxisRectAbsolute";
+        case QCPItemPosition::ptPlotCoords:
+            break;
+    }
+    return "ptPlotCoords";
+}
 } // namespace
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -664,132 +729,76 @@ QPointF QCPItemPosition::pixelPosition() const
         return qcpResolvePosition(qcpMakeFrame(mKeyAxis.data(), mValueAxis.data(), mAxisRect.data(),
                                                mAxisRect.data()->rect()),
                                   asPosition());
+
+    // A position with one plot-coordinate slot is a key and a value: the X slot holds the key, the
+    // Y slot the value (milestone 3, round C). On a vertical key axis the key runs along screen y
+    // and the value along screen x, so each slot's number takes the screen axis of its role: a plot
+    // slot through its own axis, the other slot through its own type's formula. On a horizontal key
+    // axis every slot stays on the screen axis it names.
+    const bool xPlot = mPositionTypeX == ptPlotCoords;
+    const bool yPlot = mPositionTypeY == ptPlotCoords;
+    const bool keyVertical = mKeyAxis && mKeyAxis.data()->orientation() == Qt::Vertical;
+    const bool crossing = keyVertical && xPlot != yPlot
+        && !(xPlot ? mParentAnchorX : mParentAnchorY) // an anchor on the plot slot keeps its axis
+        && (xPlot || (mValueAxis && mValueAxis.data()->orientation() == Qt::Horizontal));
+
+    // The 2.x misconfiguration messages, unchanged: a slot whose axes or axis rect went away.
+    const auto resolved =
+        [](const std::optional<double>& value, const char* slot, QCPItemPosition::PositionType type)
+    {
+        if (value)
+            return *value;
+        qDebug().noquote()
+            << Q_FUNC_INFO
+            << (type == QCPItemPosition::ptPlotCoords
+                    ? QStringLiteral("Item position type %1 is ptPlotCoords, but no axes were "
+                                     "defined")
+                          .arg(QString::fromLatin1(slot))
+                    : QStringLiteral("Item position type %1 is %2, but no axis rect was defined")
+                          .arg(QString::fromLatin1(slot),
+                               QString::fromLatin1(positionTypeName(type))));
+        return 0.0;
+    };
+
+    //! A slot that is not ptPlotCoords, on \a horizontal or the vertical screen axis.
+    const auto otherSlot = [this, &resolved](double coord, PositionType type, bool horizontal,
+                                             const QCPItemAnchor* anchor, const char* slot)
+    {
+        // An anchor on the other slot shifts it along that same screen axis.
+        const std::optional<double> shift = anchor
+            ? std::optional<double>(horizontal ? anchor->pixelPosition().x()
+                                               : anchor->pixelPosition().y())
+            : std::nullopt;
+        return resolved(
+            slotAlongScreenAxis(coord, type, horizontal, *mParentPlot, mAxisRect.data(), shift),
+            slot, type);
+    };
+
+    //! A ptPlotCoords slot on \a horizontal or the vertical screen axis.
+    const auto plotSlot = [&resolved](const QCPAxis* slotAxis, const QCPAxis* otherAxis,
+                                      double coord, bool horizontal, const char* slot)
+    {
+        return resolved(plotSlotAlongScreenAxis(slotAxis, otherAxis, coord, horizontal), slot,
+                        ptPlotCoords);
+    };
+
     QPointF result;
-
-    // determine X:
-    switch (mPositionTypeX)
+    if (crossing && xPlot)
     {
-        case ptAbsolute:
-        {
-            result.rx() = mKey;
-            if (mParentAnchorX)
-                result.rx() += mParentAnchorX->pixelPosition().x();
-            break;
-        }
-        case ptViewportRatio:
-        {
-            result.rx() = mKey * mParentPlot->viewport().width();
-            if (mParentAnchorX)
-                result.rx() += mParentAnchorX->pixelPosition().x();
-            else
-                result.rx() += mParentPlot->viewport().left();
-            break;
-        }
-        case ptAxisRectRatio:
-        {
-            if (mAxisRect)
-            {
-                result.rx() = mKey * mAxisRect.data()->width();
-                if (mParentAnchorX)
-                    result.rx() += mParentAnchorX->pixelPosition().x();
-                else
-                    result.rx() += mAxisRect.data()->left();
-            }
-            else
-                qDebug() << Q_FUNC_INFO
-                         << "Item position type x is ptAxisRectRatio, but no axis rect was defined";
-            break;
-        }
-        case ptAxisRectAbsolute:
-        {
-            if (mAxisRect)
-            {
-                result.rx() = mKey;
-                if (mParentAnchorX)
-                    result.rx() += mParentAnchorX->pixelPosition().x();
-                else
-                    result.rx() += mAxisRect.data()->left();
-            }
-            else
-                qDebug()
-                    << Q_FUNC_INFO
-                    << "Item position type x is ptAxisRectAbsolute, but no axis rect was defined";
-            break;
-        }
-        case ptPlotCoords:
-        {
-            if (mKeyAxis && mKeyAxis.data()->orientation() == Qt::Horizontal)
-                result.rx() = mKeyAxis.data()->coordToPixel(mKey);
-            else if (mValueAxis && mValueAxis.data()->orientation() == Qt::Horizontal)
-                result.rx() = mValueAxis.data()->coordToPixel(mValue);
-            else
-                qDebug() << Q_FUNC_INFO
-                         << "Item position type x is ptPlotCoords, but no axes were defined";
-            break;
-        }
+        result.rx() = otherSlot(mValue, mPositionTypeY, true, mParentAnchorY, "y");
+        result.ry() = plotSlot(mKeyAxis.data(), nullptr, mKey, false, "x");
     }
-
-    // determine Y:
-    switch (mPositionTypeY)
+    else if (crossing)
     {
-        case ptAbsolute:
-        {
-            result.ry() = mValue;
-            if (mParentAnchorY)
-                result.ry() += mParentAnchorY->pixelPosition().y();
-            break;
-        }
-        case ptViewportRatio:
-        {
-            result.ry() = mValue * mParentPlot->viewport().height();
-            if (mParentAnchorY)
-                result.ry() += mParentAnchorY->pixelPosition().y();
-            else
-                result.ry() += mParentPlot->viewport().top();
-            break;
-        }
-        case ptAxisRectRatio:
-        {
-            if (mAxisRect)
-            {
-                result.ry() = mValue * mAxisRect.data()->height();
-                if (mParentAnchorY)
-                    result.ry() += mParentAnchorY->pixelPosition().y();
-                else
-                    result.ry() += mAxisRect.data()->top();
-            }
-            else
-                qDebug() << Q_FUNC_INFO
-                         << "Item position type y is ptAxisRectRatio, but no axis rect was defined";
-            break;
-        }
-        case ptAxisRectAbsolute:
-        {
-            if (mAxisRect)
-            {
-                result.ry() = mValue;
-                if (mParentAnchorY)
-                    result.ry() += mParentAnchorY->pixelPosition().y();
-                else
-                    result.ry() += mAxisRect.data()->top();
-            }
-            else
-                qDebug()
-                    << Q_FUNC_INFO
-                    << "Item position type y is ptAxisRectAbsolute, but no axis rect was defined";
-            break;
-        }
-        case ptPlotCoords:
-        {
-            if (mKeyAxis && mKeyAxis.data()->orientation() == Qt::Vertical)
-                result.ry() = mKeyAxis.data()->coordToPixel(mKey);
-            else if (mValueAxis && mValueAxis.data()->orientation() == Qt::Vertical)
-                result.ry() = mValueAxis.data()->coordToPixel(mValue);
-            else
-                qDebug() << Q_FUNC_INFO
-                         << "Item position type y is ptPlotCoords, but no axes were defined";
-            break;
-        }
+        result.rx() = plotSlot(mValueAxis.data(), nullptr, mValue, true, "y");
+        result.ry() = otherSlot(mKey, mPositionTypeX, false, mParentAnchorX, "x");
+    }
+    else
+    {
+        result.rx() = xPlot ? plotSlot(mKeyAxis.data(), mValueAxis.data(), mKey, true, "x")
+                            : otherSlot(mKey, mPositionTypeX, true, mParentAnchorX, "x");
+        result.ry() = yPlot ? plotSlot(mKeyAxis.data(), mValueAxis.data(), mValue, false, "y")
+                            : otherSlot(mValue, mPositionTypeY, false, mParentAnchorY, "y");
     }
 
     // coordToPixel can produce NaN (e.g. log axis with negative value); clamp to avoid

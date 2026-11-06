@@ -1,6 +1,8 @@
 #include "test-item-position.h"
 #include "qcustomplot.h"
 #include <functional>
+#include <limits>
+#include <optional>
 
 namespace
 {
@@ -290,6 +292,138 @@ void TestItemPosition::setRefusedAnchorIsReported()
     parent->position->set(QCP::AnchorOffset { child->position, QCP::PixelOffset { 5, 6 } });
     QVERIFY2(!parent->position->parentAnchor(), "a refused anchor was attached");
     QCOMPARE(parent->position->pixelPosition(), before);
+}
+
+void TestItemPosition::mixedPlotCoordinatePairsKeepTheKeyAndValueRole()
+{
+    // A position with one plot-coordinate slot is a key and a value (milestone 3, round C): the X
+    // slot holds the key, the Y slot the value. On a vertical key axis the key runs along screen y
+    // and the value along screen x, so the plot slot's number goes through its own axis and the
+    // other slot's number takes the other screen axis with its own type's formula. A horizontal key
+    // axis keeps every slot on the screen axis it names.
+    mPlot->xAxis->setRange(0, 10);
+    mPlot->yAxis->setRange(0, 10);
+    mPlot->replot();
+    const QRectF rect(mPlot->axisRect()->rect());
+    const QRectF viewport = mPlot->viewport();
+
+    using Type = QCPItemPosition::PositionType;
+
+    struct Case
+    {
+        Type type;
+        bool plotOnX; // the X slot holds the plot coordinate (the key), the Y slot the other number
+        bool keyVertical;
+        double plotCoord;
+        double otherCoord;
+    };
+
+    const QList<Case> cases = {
+        { Type::ptAbsolute, true, true, 3.0, 111.5 },
+        { Type::ptAbsolute, false, true, 7.0, 111.5 },
+        { Type::ptViewportRatio, true, true, 3.0, 0.25 },
+        { Type::ptViewportRatio, false, true, 7.0, 0.25 },
+        { Type::ptAxisRectRatio, true, true, 3.0, 0.25 },
+        { Type::ptAxisRectRatio, false, true, 7.0, 0.25 },
+        { Type::ptAxisRectAbsolute, true, true, 3.0, 40.0 },
+        { Type::ptAxisRectAbsolute, false, true, 7.0, 40.0 },
+        // The horizontal-key controls: unchanged, each slot on the screen axis it is named for.
+        { Type::ptAbsolute, true, false, 3.0, 111.5 },
+        { Type::ptAbsolute, false, false, 7.0, 111.5 },
+        { Type::ptViewportRatio, true, false, 3.0, 0.25 },
+        { Type::ptViewportRatio, false, false, 7.0, 0.25 },
+        { Type::ptAxisRectRatio, true, false, 3.0, 0.25 },
+        { Type::ptAxisRectRatio, false, false, 7.0, 0.25 },
+        { Type::ptAxisRectAbsolute, true, false, 3.0, 40.0 },
+        { Type::ptAxisRectAbsolute, false, false, 7.0, 40.0 },
+    };
+    const auto name = [](const Case& c)
+    {
+        return QStringLiteral("type %1, plot on %2, %3 key")
+            .arg(int(c.type))
+            .arg(c.plotOnX ? "x" : "y")
+            .arg(c.keyVertical ? "vertical" : "horizontal");
+    };
+
+    for (const Case& c : cases)
+    {
+        QCPAxis* keyAxis = c.keyVertical ? mPlot->yAxis : mPlot->xAxis;
+        QCPAxis* valueAxis = c.keyVertical ? mPlot->xAxis : mPlot->yAxis;
+        auto* item = new QCPItemRect(mPlot);
+        const QList<QCPItemPosition*> positions = item->positions();
+        for (QCPItemPosition* position : positions)
+        {
+            position->setAxes(keyAxis, valueAxis);
+            position->setTypeX(c.plotOnX ? Type::ptPlotCoords : c.type);
+            position->setTypeY(c.plotOnX ? c.type : Type::ptPlotCoords);
+            position->setCoords(c.plotOnX ? c.plotCoord : c.otherCoord,
+                                c.plotOnX ? c.otherCoord : c.plotCoord);
+        }
+        const QCPItemPosition* position = positions.first();
+
+        // The other slot's screen axis: with the key on screen y, the value slot (Y) owns screen x;
+        // with the key on screen x, the Y slot owns screen y.
+        const bool otherHorizontal = c.keyVertical ? c.plotOnX : !c.plotOnX;
+        double other = 0;
+        switch (c.type)
+        {
+            case Type::ptAbsolute:
+                other = c.otherCoord;
+                break;
+            case Type::ptViewportRatio:
+                other = otherHorizontal ? viewport.left() + c.otherCoord * viewport.width()
+                                        : viewport.top() + c.otherCoord * viewport.height();
+                break;
+            case Type::ptAxisRectRatio:
+                other = otherHorizontal ? rect.left() + c.otherCoord * rect.width()
+                                        : rect.top() + c.otherCoord * rect.height();
+                break;
+            case Type::ptAxisRectAbsolute:
+                other = (otherHorizontal ? rect.left() : rect.top()) + c.otherCoord;
+                break;
+            case Type::ptPlotCoords:
+                QFAIL("the case names a plot-coordinate type as the other slot");
+        }
+
+        // The plot slot's axis follows its slot: X is the key, Y the value, whatever the
+        // orientation.
+        const QCPAxis* plotAxis = c.plotOnX ? keyAxis : valueAxis;
+        const double plotPixel = plotAxis->coordToPixel(c.plotCoord);
+        const bool plotHorizontal = (c.plotOnX != c.keyVertical);
+        const QPointF expected
+            = plotHorizontal ? QPointF(plotPixel, other) : QPointF(other, plotPixel);
+
+        QVERIFY2(qFuzzyCompare(position->pixelPosition().x() + 1, expected.x() + 1)
+                     && qFuzzyCompare(position->pixelPosition().y() + 1, expected.y() + 1),
+                 qPrintable(QStringLiteral("%1: pixelPosition %2,%3, expected %4,%5")
+                                .arg(name(c))
+                                .arg(position->pixelPosition().x())
+                                .arg(position->pixelPosition().y())
+                                .arg(expected.x())
+                                .arg(expected.y())));
+
+        // The item index boxes the same numbers as key and value, so its box must agree with the
+        // pixels: a mismatch here is the same slot-crossing bug on the culling path.
+        const std::optional<QCPItemExtent> extent = item->dataExtent();
+        QVERIFY2(extent.has_value(), qPrintable(name(c)));
+        QCOMPARE(extent->keyAxis, keyAxis);
+        QCOMPARE(extent->valueAxis, valueAxis);
+        const double infinity = std::numeric_limits<double>::infinity();
+        if (c.plotOnX)
+        {
+            QCOMPARE(extent->box.keyLower, c.plotCoord);
+            QCOMPARE(extent->box.keyUpper, c.plotCoord);
+            QCOMPARE(extent->box.valueLower, -infinity);
+            QCOMPARE(extent->box.valueUpper, infinity);
+        }
+        else
+        {
+            QCOMPARE(extent->box.keyLower, -infinity);
+            QCOMPARE(extent->box.keyUpper, infinity);
+            QCOMPARE(extent->box.valueLower, c.plotCoord);
+            QCOMPARE(extent->box.valueUpper, c.plotCoord);
+        }
+    }
 }
 
 void TestItemPosition::farOffscreenItemsDoNotOverflow_data()

@@ -246,7 +246,11 @@ Behaviour changes for 2.x users:
   - An item position with one plot coordinate and one axis-rect ratio is a key and a value, like a
         data point. On a vertical key axis 2.x sent the ratio through the value axis and ignored the
         plot coordinate; now the coordinate goes through the key axis (screen y) and the ratio runs
-        along the value axis (screen x). On a horizontal key axis nothing changes.
+        along the value axis (screen x). On a horizontal key axis nothing changes. The same holds for
+        every other mix with one plot coordinate — an absolute pixel, a viewport ratio, an axis-rect
+        offset: the plot coordinate is the key (screen y when the key axis is vertical), and the
+        other number takes the other screen axis with its own type's formula, as a data point's
+        value does.
 
 #### NeoQCP, unreleased ####
 
