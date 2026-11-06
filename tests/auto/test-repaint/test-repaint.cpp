@@ -1463,6 +1463,95 @@ void TestRepaint::graphTracerSettles()
     QVERIFY(!plot->isRepaintQueued());
 }
 
+namespace
+{
+//! A text that counts its recordings: an everyFrame one is rebuilt once per frame.
+class CountingText : public QCPItemText
+{
+public:
+    using QCPItemText::QCPItemText;
+    using QCPItemText::draw;
+
+    void draw(QCPDrawContext& context) const override
+    {
+        ++draws;
+        QCPItemText::draw(context);
+    }
+
+    mutable int draws = 0;
+};
+} // namespace
+
+void TestRepaint::layerReplotStartsAFrameForEveryFrameRecordings()
+{
+    // A crosshair overlay: a label anchored to a tracer's position. The anchor hands the label its
+    // pixels, so its recording is rebuilt every frame instead of following the transform. A layer's
+    // own replot must start a frame like QCustomPlot::replot() does, or the label keeps the pixels
+    // of the ranges it recorded.
+    auto plot = settledPlot();
+    auto* tracer = new QCPItemTracer(plot.get());
+    tracer->setGraph(plot->graph(0));
+    tracer->setInterpolating(true); // the marker follows a key between the graph's two samples
+    tracer->setGraphKey(5.0);
+    auto* label = new CountingText(plot.get());
+    label->setText(QStringLiteral("W"));
+    label->setColor(Qt::blue);
+    QFont font = label->font();
+    font.setPointSize(22);
+    label->setFont(font);
+    label->setPositionAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    // Anchored on one screen axis only: the other one stays in plot coordinates, and that
+    // combination records the anchor's pixels, so the label's drawing is rebuilt every frame.
+    label->position->setCoords(5, 0);
+    label->position->setTypeY(QCPItemPosition::ptAbsolute);
+    label->position->setParentAnchorY(tracer->position);
+    plot->replot();
+    waitUntilSettled(*plot);
+
+    QCPLayer* overlay = plot->layer(QStringLiteral("annotations"));
+    QVERIFY(overlay);
+    QCOMPARE(overlay->mode(), QCPLayer::lmBuffered);
+
+    const auto labelInk = [](const QImage& image)
+    {
+        QRect box;
+        for (int y = 0; y < image.height(); ++y)
+            for (int x = 0; x < image.width(); ++x)
+            {
+                const QColor c = image.pixelColor(x, y);
+                if (c.blue() > 150 && c.red() < 100 && c.green() < 100)
+                    box = box.isNull() ? QRect(x, y, 1, 1) : box.united(QRect(x, y, 1, 1));
+            }
+        return box;
+    };
+    const QRect before = labelInk(screenOf(plot.get()));
+    const int recorded = label->draws;
+    QVERIFY2(!before.isNull(), "the label must be inked before the ranges change");
+    QVERIFY2(recorded > 0, "the label must have recorded a drawing");
+    QVERIFY2(qAbs(before.left() - plot->xAxis->coordToPixel(5.0)) <= 3.0,
+             "the label must sit at the plot-coordinate key it was placed at");
+
+    // A range change dirties the layers without invalidating their buffers: the layer's own
+    // replot is the frame the label has to be rebuilt in.
+    plot->xAxis->setRange(0, 20);
+    QVERIFY2(!plot->hasInvalidatedPaintBuffers(),
+             "a range change must leave the layer's own replot allowed");
+    overlay->replot();
+
+    const QRect after = labelInk(screenOf(plot.get()));
+    const double expected = plot->xAxis->coordToPixel(5.0);
+    QVERIFY2(qAbs(after.left() - expected) <= 3.0,
+             qPrintable(QStringLiteral("the label starts at x %1, the tracer's key is at x %2 "
+                                       "(it was at x %3, draws %4 then %5)")
+                            .arg(after.left())
+                            .arg(expected)
+                            .arg(before.left())
+                            .arg(recorded)
+                            .arg(label->draws)));
+    QVERIFY2(label->draws > recorded,
+             "the layer's own replot must start a frame: an everyFrame recording is rebuilt in it");
+}
+
 void TestRepaint::secondLegendRowFollowsRename()
 {
     // The default legend lives in an axis rect's inset layout: the rename walk has to descend

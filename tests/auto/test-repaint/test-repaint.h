@@ -27,6 +27,7 @@ private slots:
     void axisUnlistedHandsOffsetToSibling();
     void layoutSettersIgnoreEqualValues();
     void graphTracerSettles();
+    void layerReplotStartsAFrameForEveryFrameRecordings();
     void remainingEqualValueDoesNotDirty_data();
     void remainingEqualValueDoesNotDirty();
     void remainingSettersScheduleRepaint_data();
