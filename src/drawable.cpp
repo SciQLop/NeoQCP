@@ -260,7 +260,7 @@ double distanceTo(const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame,
             else if constexpr (std::is_same_v<Command, qcp::MarkersCmd>)
             {
                 const std::vector<QPointF> pixels = resolve(*cmd.points, frame);
-                return distanceTo(pixels, at, false) - cmd.style.size() / 2.0;
+                return distanceTo(pixels, at, false) - cmd.style->size() / 2.0;
             }
             else if constexpr (std::is_same_v<Command, qcp::ErrorBarsCmd>)
             {
@@ -632,7 +632,7 @@ double QCPDrawnCore::pixelPad() const
                            {
                                using Command = std::decay_t<decltype(cmd)>;
                                if constexpr (std::is_same_v<Command, qcp::MarkersCmd>)
-                                   return cmd.style.size() / 2.0;
+                                   return cmd.style->size() / 2.0;
                                else if constexpr (std::is_same_v<Command, qcp::TextCmd>
                                                   || std::is_same_v<Command, qcp::ImageCmd>
                                                   || std::is_same_v<Command, qcp::FillBetweenCmd>

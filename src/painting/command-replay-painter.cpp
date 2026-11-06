@@ -180,8 +180,20 @@ void paintCommand(QCPPainter& painter, const QCPDrawCommand& command, const QCPD
                 const std::span<const QPointF> data(*cmd.points);
                 local.pixels.resize(data.size());
                 frame.transform.map(data, std::span<QPointF>(local.pixels));
-                painter.setPen(cmd.pen);
-                drawPolylineSplitNaN(&painter, std::span<const QPointF>(local.pixels));
+                if (!cmd.colours)
+                {
+                    painter.setPen(cmd.pen);
+                    drawPolylineSplitNaN(&painter, std::span<const QPointF>(local.pixels));
+                }
+                else
+                {
+                    // One polyline per colour run: the spans skip the gaps a NaN makes, so a run
+                    // never joins across one.
+                    const std::vector<ColorSpan> spans
+                        = colorSpans(std::span<const QPointF>(local.pixels),
+                                     std::span<const QRgb>(*cmd.colours));
+                    drawColoredPolylineSpans(&painter, local.pixels, spans, cmd.pen);
+                }
             }
             else if constexpr (std::is_same_v<Command, PolylinePositionsCmd>)
             {
@@ -243,9 +255,26 @@ void paintCommand(QCPPainter& painter, const QCPDrawCommand& command, const QCPD
                 const std::span<const QPointF> data(*cmd.points);
                 local.pixels.resize(data.size());
                 frame.transform.map(data, std::span<QPointF>(local.pixels));
-                cmd.style.applyTo(&painter, QPen(Qt::black));
-                for (const QPointF& point : local.pixels)
-                    cmd.style.drawShape(&painter, point);
+                if (!cmd.colours)
+                {
+                    cmd.style->applyTo(&painter, QPen(Qt::black));
+                    for (const QPointF& point : local.pixels)
+                        cmd.style->drawShape(&painter, point);
+                }
+                else
+                {
+                    // One style per point, its pen and brush replaced by the point's colour: the
+                    // style's other properties (shape, size, a pixmap) are the command's.
+                    for (std::size_t i = 0; i < local.pixels.size(); ++i)
+                    {
+                        const QColor colour = QColor::fromRgba((*cmd.colours)[i]);
+                        QCPScatterStyle style = *cmd.style;
+                        style.setPen(QPen(colour));
+                        style.setBrush(colour);
+                        style.applyTo(&painter, style.pen());
+                        style.drawShape(&painter, local.pixels[i]);
+                    }
+                }
             }
             else if constexpr (std::is_same_v<Command, ErrorBarsCmd>)
             {

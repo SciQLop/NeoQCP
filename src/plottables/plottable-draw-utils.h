@@ -142,6 +142,17 @@ void drawColoredPolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCP
                                const QPointF& gpuOffset, const QRect& clipRect, bool freshLines,
                                ExtrusionCache& cache);
 
+/// Extrudes \a points into \a out one coloured run at a time, the runs being \a spans.
+/// Dashed strokes carry one dash phase across the whole polyline: the runs share their end points,
+/// so restarting the pattern at every colour change would stripe the line.
+void extrudeColoredStroke(std::span<const QPointF> points, std::span<const ColorSpan> spans,
+                          const QPen& pen, float penWidth, std::vector<float>& out);
+
+/// QPainter path for coloured lines: one polyline per run, butt-ended so a run never overpaints the
+/// next one's half pen width.
+void drawColoredPolylineSpans(QCPPainter* painter, std::span<const QPointF> points,
+                              std::span<const ColorSpan> spans, const QPen& pen);
+
 /// QPainter path for coloured lines: one polyline per run.
 void drawColoredPolylineRuns(QCPPainter* painter, const QVector<QPointF>& points,
                              const std::vector<ColorRun>& runs, const ColorScalarMapper& mapper,

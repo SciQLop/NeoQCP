@@ -1,5 +1,7 @@
 #include "test-draw-context.h"
 
+#include "../misuse-recorder.h"
+
 #include <painting/command-replay-rhi.h>
 #include <painting/draw-commands.h>
 #include <painting/draw-context.h>
@@ -79,6 +81,11 @@ QImage replayOf(QCPDrawContext& context)
 std::shared_ptr<const std::vector<QPointF>> sharedPoints(std::vector<QPointF> points)
 {
     return std::make_shared<const std::vector<QPointF>>(std::move(points));
+}
+
+std::shared_ptr<const std::vector<QRgb>> sharedColours(std::vector<QRgb> colours)
+{
+    return std::make_shared<const std::vector<QRgb>>(std::move(colours));
 }
 
 const QPen kPen(QColor(20, 40, 160), 3.0);
@@ -953,16 +960,21 @@ void TestDrawContext::mixedPositionsKeepKeyAndValueOnAVerticalKeyAxis()
         item.start->set(position);
         const QPointF recorded = qcpResolvePosition(frame, position);
         const QPointF legacy = item.start->pixelPosition();
-        const auto near = [](QPointF a, QPointF b) { return std::hypot(a.x() - b.x(), a.y() - b.y()) <= 0.5; };
-        QVERIFY2(near(recorded, expected) && near(legacy, expected),
-                 qPrintable(QStringLiteral("%1: expected (%2, %3), recorded (%4, %5), item (%6, %7)")
-                                .arg(QLatin1String(what))
-                                .arg(expected.x()).arg(expected.y())
-                                .arg(recorded.x()).arg(recorded.y())
-                                .arg(legacy.x()).arg(legacy.y())));
+        const auto near
+            = [](QPointF a, QPointF b) { return std::hypot(a.x() - b.x(), a.y() - b.y()) <= 0.5; };
+        QVERIFY2(
+            near(recorded, expected) && near(legacy, expected),
+            qPrintable(QStringLiteral("%1: expected (%2, %3), recorded (%4, %5), item (%6, %7)")
+                           .arg(QLatin1String(what))
+                           .arg(expected.x())
+                           .arg(expected.y())
+                           .arg(recorded.x())
+                           .arg(recorded.y())
+                           .arg(legacy.x())
+                           .arg(legacy.y())));
     };
-    // The data number is the key, wherever the key axis is: on a vertical key axis it is a screen y,
-    // and the ratio runs along the value axis, across the rect's width.
+    // The data number is the key, wherever the key axis is: on a vertical key axis it is a screen
+    // y, and the ratio runs along the value axis, across the rect's width.
     check(QCP::DataXRatioY { 7.0, 0.8 },
           QPointF(rect.left() + 0.8 * rect.width(), keyAxis->coordToPixel(7.0)),
           "key data, value ratio");
@@ -1124,8 +1136,9 @@ void TestDrawContext::rasterBrushRectsStayOneCommandEach()
     QCOMPARE(int(list.commands.size()), 3);
     for (const qcp::QCPDrawCommand& command : list.commands)
     {
-        QVERIFY2(std::holds_alternative<qcp::RectCmd>(command),
-                 "a rect whose fill needs the raster joined a batch and lost its place in the order");
+        QVERIFY2(
+            std::holds_alternative<qcp::RectCmd>(command),
+            "a rect whose fill needs the raster joined a batch and lost its place in the order");
         QVERIFY2(qcp::needsRaster(command), "a gradient fill is an image, not a vertex colour");
     }
 
@@ -1202,4 +1215,120 @@ void TestDrawContext::batchExportsOneRectPerBar()
         },
         context.transform());
     QCOMPARE(replay, hand);
+}
+
+void TestDrawContext::colouredPolylineIsOneCommand()
+{
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    const auto colours = sharedColours(
+        { qRgb(255, 0, 0), qRgb(0, 255, 0), qRgb(0, 0, 255), qRgb(255, 0, 0), qRgb(0, 255, 0) });
+    context.polyline(
+        sharedPoints({ { 10, 10 }, { 40, 90 }, { 80, 30 }, { 120, 120 }, { 170, 60 } }), colours,
+        kPen);
+
+    // The colours are payload, not commands: a line of five points is one command whatever it is
+    // painted with.
+    QCOMPARE(int(context.drawList().commands.size()), 1);
+    const auto* command = std::get_if<qcp::PolylineDataCmd>(&context.drawList().commands.front());
+    QVERIFY(command);
+    QVERIFY2(command->colours == colours, "the command keeps the caller's colour vector");
+    QCOMPARE(int(command->colours->size()), 5);
+}
+
+void TestDrawContext::segmentTakesItsFirstVertexColour()
+{
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    // A horizontal line across the widget, red then green then blue: each half of it is one colour.
+    context.polyline(sharedPoints({ { 20, 75 }, { 100, 75 }, { 180, 75 } }),
+                     sharedColours({ qRgb(255, 0, 0), qRgb(0, 255, 0), qRgb(0, 0, 255) }), kPen);
+
+    const QImage replay = replayOf(context);
+    const QColor first = replay.pixelColor(60, 75);
+    const QColor second = replay.pixelColor(140, 75);
+    QVERIFY2(first.red() > 150 && first.green() < 90 && first.blue() < 90,
+             qPrintable(QStringLiteral("the first segment is red, not %1").arg(first.name())));
+    QVERIFY2(second.green() > 150 && second.red() < 90 && second.blue() < 90,
+             qPrintable(QStringLiteral("the second segment is green, not %1").arg(second.name())));
+}
+
+void TestDrawContext::colouredMarkersKeepTheirColours()
+{
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    const QCPScatterStyle style(QCPScatterStyle::ssDisc, QPen(Qt::black), QBrush(Qt::black), 11.0);
+    context.markers(sharedPoints({ { 40, 40 }, { 100, 75 }, { 160, 110 } }),
+                    sharedColours({ qRgb(255, 0, 0), qRgb(0, 255, 0), qRgb(0, 0, 255) }), style);
+
+    const QImage replay = replayOf(context);
+    // Data (x, y) lands at (x, height - y): each disc is checked at its centre.
+    const QColor first = replay.pixelColor(40, 110);
+    const QColor second = replay.pixelColor(100, 75);
+    const QColor third = replay.pixelColor(160, 40);
+    QVERIFY2(first.red() > 150 && first.green() < 90 && first.blue() < 90,
+             qPrintable(QStringLiteral("the first marker is red, not %1").arg(first.name())));
+    QVERIFY2(second.green() > 150 && second.red() < 90 && second.blue() < 90,
+             qPrintable(QStringLiteral("the second marker is green, not %1").arg(second.name())));
+    QVERIFY2(third.blue() > 150 && third.red() < 90 && third.green() < 90,
+             qPrintable(QStringLiteral("the third marker is blue, not %1").arg(third.name())));
+}
+
+void TestDrawContext::mismatchedColourCountIsRefused()
+{
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    test_misuse::calls.clear();
+    qcp::setMisuseHandler(test_misuse::record);
+    const auto points = sharedPoints({ { 10, 10 }, { 40, 90 }, { 80, 30 } });
+    // Two colours for three points: which vertex carries which colour is a guess, so nothing is
+    // recorded rather than a line painted from a half-read vector.
+    context.polyline(points, sharedColours({ qRgb(255, 0, 0), qRgb(0, 255, 0) }), kPen);
+    context.markers(points, sharedColours({ qRgb(255, 0, 0), qRgb(0, 255, 0) }),
+                    QCPScatterStyle(QCPScatterStyle::ssDisc, 7.0));
+    qcp::setMisuseHandler(nullptr);
+
+    QCOMPARE(int(context.drawList().commands.size()), 0);
+    QCOMPARE(test_misuse::calls.size(), size_t(2));
+}
+
+// The R2 recording cache translates kept geometry on a pan: a coloured line must be built once,
+// like a plain one, or a pan of a colour-by-scalar line extrudes its vertices again on every frame.
+void TestDrawContext::colouredPolylinePanReusesTheKeptGeometry()
+{
+    Fixture fixture;
+    QCPPlottableRhiLayer plottables(nullptr);
+    QCPScatterRhiLayer scatter(nullptr);
+    QCPResolveCache resolve;
+    qcp::QCPRasterFallback fallback;
+    QCPRecordingCache geometry;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    std::vector<QRgb> colours;
+    std::vector<QPointF> points;
+    for (int i = 0; i < 20; ++i)
+    {
+        points.emplace_back(2.0 + 9.0 * i, 20.0 + 50.0 * (i % 3));
+        colours.push_back(qRgb(255 * (i % 3 == 0), 255 * (i % 3 == 1), 255 * (i % 3 == 2)));
+    }
+    context.polyline(sharedPoints(points), sharedColours(colours), kPen);
+
+    const QSize outputSize(kWidth, kHeight);
+    const QCPDrawList& list = context.drawList();
+    plottables.clear();
+    qcpReplayWithRhi(list, plottables, scatter, context.frame(), resolve, fallback, 1.0, outputSize,
+                     0, &geometry);
+    const quint64 extruded = QCPLineExtruder::extruderCallCount();
+    QVERIFY2(extruded > 0, "the first frame must extrude the coloured line");
+
+    fixture.plot->xAxis->setRange(2.5, 202.5); // a translation, same pixels per key
+    plottables.clear();
+    qcpReplayWithRhi(list, plottables, scatter, context.frame(), resolve, fallback, 1.0, outputSize,
+                     0, &geometry);
+    QCOMPARE(QCPLineExtruder::extruderCallCount(), extruded);
+    QVERIFY2(plottables.hasGeometry(), "the kept vertices are submitted again, with the pan delta");
 }

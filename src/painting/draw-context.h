@@ -168,6 +168,13 @@ public:
 
     //! A polyline whose vertices are data coordinates (keys, values).
     void polyline(std::shared_ptr<const std::vector<QPointF>> data, const QPen& pen);
+    /*!
+      The same, each segment painted in the colour of its first vertex: \a colours holds one entry
+      per point, and null means the pen's colour everywhere. A vector of another size is refused
+      through the misuse tier and records nothing, since no point could own its colour.
+    */
+    void polyline(std::shared_ptr<const std::vector<QPointF>> data,
+                  std::shared_ptr<const std::vector<QRgb>> colours, const QPen& pen);
     //! A polyline whose vertices each carry their own space.
     void polyline(std::span<const QCP::Position> points, const QPen& pen);
     //! A filled and stroked polygon; its vertices each carry their own space.
@@ -181,6 +188,9 @@ public:
     void ellipse(QCP::Position a, QCP::Position b, const QPen& pen, const QBrush& brush);
     //! One scatter symbol per data-space point.
     void markers(std::shared_ptr<const std::vector<QPointF>> data, const QCPScatterStyle& style);
+    //! The same, each symbol in its own colour; one entry per point, null for the style's own.
+    void markers(std::shared_ptr<const std::vector<QPointF>> data,
+                 std::shared_ptr<const std::vector<QRgb>> colours, const QCPScatterStyle& style);
     //! Vertical error bars: \a spans holds the half extents in data units, in keys and values.
     void errorBars(std::shared_ptr<const std::vector<QPointF>> centres,
                    std::shared_ptr<const std::vector<QPointF>> spans, const QPen& pen);

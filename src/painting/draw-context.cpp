@@ -7,6 +7,7 @@
 #include "../datasource/graph-resampler.h"
 #include "../items/item.h"
 #include "../layoutelements/layoutelement-axisrect.h"
+#include "../misuse.h"
 #include "../theme.h"
 
 #include <algorithm>
@@ -452,8 +453,16 @@ const QCPDrawList& QCPDrawContext::drawList() const
 
 void QCPDrawContext::polyline(std::shared_ptr<const std::vector<QPointF>> data, const QPen& pen)
 {
+    polyline(std::move(data), nullptr, pen);
+}
+
+void QCPDrawContext::polyline(std::shared_ptr<const std::vector<QPointF>> data,
+                              std::shared_ptr<const std::vector<QRgb>> colours, const QPen& pen)
+{
+    QCP_CHECK_OR_RETURN(!colours || colours->size() == data->size(),
+                        "a polyline needs one colour per point");
     const Extent extent = extentOf(*data);
-    record(*mList, qcp::PolylineDataCmd { std::move(data), pen }, extent);
+    record(*mList, qcp::PolylineDataCmd { std::move(data), std::move(colours), pen }, extent);
 }
 
 void QCPDrawContext::polyline(std::span<const QCP::Position> points, const QPen& pen)
@@ -515,8 +524,20 @@ void QCPDrawContext::ellipse(QCP::Position a, QCP::Position b, const QPen& pen, 
 void QCPDrawContext::markers(std::shared_ptr<const std::vector<QPointF>> data,
                              const QCPScatterStyle& style)
 {
+    markers(std::move(data), nullptr, style);
+}
+
+void QCPDrawContext::markers(std::shared_ptr<const std::vector<QPointF>> data,
+                             std::shared_ptr<const std::vector<QRgb>> colours,
+                             const QCPScatterStyle& style)
+{
+    QCP_CHECK_OR_RETURN(!colours || colours->size() == data->size(),
+                        "markers need one colour per point");
     const Extent extent = extentOf(*data);
-    record(*mList, qcp::MarkersCmd { std::move(data), style }, extent);
+    record(*mList,
+           qcp::MarkersCmd { std::move(data), std::move(colours),
+                             std::make_shared<const QCPScatterStyle>(style) },
+           extent);
 }
 
 void QCPDrawContext::errorBars(std::shared_ptr<const std::vector<QPointF>> centres,

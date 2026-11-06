@@ -46,4 +46,9 @@ private slots:
     void rasterBrushRectsStayOneCommandEach();
     void ellipsesStayOneBatch();
     void batchExportsOneRectPerBar();
+    void colouredPolylineIsOneCommand();
+    void segmentTakesItsFirstVertexColour();
+    void colouredMarkersKeepTheirColours();
+    void mismatchedColourCountIsRefused();
+    void colouredPolylinePanReusesTheKeptGeometry();
 };

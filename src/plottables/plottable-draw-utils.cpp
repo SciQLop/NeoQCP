@@ -266,25 +266,53 @@ bool needsColoredReextrusion(const ExtrusionCache& cache, bool freshLines, float
         || cache.withDistance != dashed || cache.colorGeneration != colorGeneration;
 }
 
-void drawColoredPolylineRuns(QCPPainter* painter, const QVector<QPointF>& points,
-                             const std::vector<ColorRun>& runs, const ColorScalarMapper& mapper,
-                             const QPen& pen, const QPointF& gpuOffset)
+void drawColoredPolylineSpans(QCPPainter* painter, std::span<const QPointF> points,
+                              std::span<const ColorSpan> spans, const QPen& pen)
 {
     painter->setBrush(Qt::NoBrush);
-    if (!gpuOffset.isNull())
-        painter->translate(gpuOffset);
     QPen runPen = pen;
     // Butt ends at colour changes, like the GPU extruder: a square/round cap would
     // overpaint pen/2 of the neighbouring run.
     runPen.setCapStyle(Qt::FlatCap);
-    for (const auto& run : runs)
+    for (const ColorSpan& span : spans)
     {
-        runPen.setColor(runColor(mapper, run.bucket));
+        runPen.setColor(QColor::fromRgba(span.colour));
         painter->setPen(runPen);
-        painter->drawPolyline(points.constData() + run.first, run.last - run.first + 1);
+        painter->drawPolyline(points.data() + span.first, span.last - span.first + 1);
     }
+}
+
+void drawColoredPolylineRuns(QCPPainter* painter, const QVector<QPointF>& points,
+                             const std::vector<ColorRun>& runs, const ColorScalarMapper& mapper,
+                             const QPen& pen, const QPointF& gpuOffset)
+{
+    if (!gpuOffset.isNull())
+        painter->translate(gpuOffset);
+    drawColoredPolylineSpans(painter, std::span<const QPointF>(points.constData(), points.size()),
+                             colorSpans(runs, mapper), pen);
     if (!gpuOffset.isNull())
         painter->translate(-gpuOffset);
+}
+
+void extrudeColoredStroke(std::span<const QPointF> points, std::span<const ColorSpan> spans,
+                          const QPen& pen, float penWidth, std::vector<float>& out)
+{
+    out.clear();
+    const bool dashed = isDashed(pen);
+    // The runs share their end points, so carrying the arc length over keeps one dash phase across
+    // a colour change instead of restarting the pattern at every run.
+    float arcLength = 0.0f;
+    for (const ColorSpan& span : spans)
+    {
+        const std::span<const QPointF> run(points.data() + span.first,
+                                           std::size_t(span.last - span.first + 1));
+        const QColor colour = QColor::fromRgba(span.colour);
+        if (dashed)
+            arcLength = QCPLineExtruder::appendPolylineWithDistance(run, penWidth, colour, out,
+                                                                    arcLength);
+        else
+            QCPLineExtruder::appendPolyline(run, penWidth, colour, out);
+    }
 }
 
 void drawColoredPolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer* layer,
@@ -303,22 +331,8 @@ void drawColoredPolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCP
     const bool dashed = isDashed(pen);
     if (needsColoredReextrusion(cache, freshLines, penWidth, mapper.generation(), dashed))
     {
-        const std::vector<ColorRun> runs = colorRuns(points, indices, mapper);
-        cache.vertices.clear();
-        // The runs share their end points, so carrying the arc length over keeps one dash phase
-        // across a colour change instead of restarting the pattern at every run.
-        float arcLength = 0.0f;
-        for (const auto& run : runs)
-        {
-            const std::span<const QPointF> runPoints(points.constData() + run.first,
-                                                     run.last - run.first + 1);
-            if (dashed)
-                arcLength = QCPLineExtruder::appendPolylineWithDistance(
-                    runPoints, penWidth, runColor(mapper, run.bucket), cache.vertices, arcLength);
-            else
-                QCPLineExtruder::appendPolyline(runPoints, penWidth, runColor(mapper, run.bucket),
-                                                cache.vertices);
-        }
+        extrudeColoredStroke(std::span<const QPointF>(points.constData(), points.size()),
+                             colorSpans(points, indices, mapper), pen, penWidth, cache.vertices);
         cache.withDistance = dashed;
         cache.penWidth = penWidth;
         cache.colorGeneration = mapper.generation();

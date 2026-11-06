@@ -34,10 +34,12 @@ class QCPPainter;
 
 namespace qcp
 {
-//! A polyline of data-space vertices.
+//! A polyline of data-space vertices, each pair of them painted in the colour of its first vertex
+//! when \a colours is set: one entry per point, null for the pen's own colour.
 struct PolylineDataCmd
 {
     std::shared_ptr<const std::vector<QPointF>> points;
+    std::shared_ptr<const std::vector<QRgb>> colours;
     QPen pen;
 };
 
@@ -134,11 +136,15 @@ struct EllipsesCmd
     bool sortedByKey = true;
 };
 
-//! One scatter symbol per data-space point.
+//! One scatter symbol per data-space point, each in its own colour when \a colours is set: one
+//! entry per point, null for the style's own pen and brush.
 struct MarkersCmd
 {
     std::shared_ptr<const std::vector<QPointF>> points;
-    QCPScatterStyle style;
+    std::shared_ptr<const std::vector<QRgb>> colours;
+    //! Shared: a style carries a QPen, a QBrush, a QPixmap and a QPainterPath, which would widen
+    //! the command past the variant's cache line and a half for a copy nobody ever mutates.
+    std::shared_ptr<const QCPScatterStyle> style;
 };
 
 //! Vertical error bars around data-space centres; the spans are half extents in data units.
@@ -643,7 +649,7 @@ inline CommandExtent commandExtent(const QCPDrawCommand& command, const QCPDrawF
             else if constexpr (std::is_same_v<T, MarkersCmd>)
             {
                 extent.box = qcpDataBox(*cmd.points, frame.transform);
-                extent.pad = cmd.style.size() + 1.0;
+                extent.pad = cmd.style->size() + 1.0;
                 extent.cullable = true;
             }
             else if constexpr (std::is_same_v<T, TextCmd>)

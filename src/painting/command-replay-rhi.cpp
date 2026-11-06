@@ -41,6 +41,12 @@ std::vector<float>& markerScratch()
     return points;
 }
 
+std::vector<float>& markerColourScratch()
+{
+    static thread_local std::vector<float> rgba;
+    return rgba;
+}
+
 // Every fill the replay tessellates: the two builders below are the only places that make one.
 quint64& fillBuilds()
 {
@@ -72,15 +78,19 @@ bool mayReuseGeometry(const QCPDrawList& list)
 }
 
 //! Strokes \a points on the layer, and keeps the triangles when the replay may re-emit them.
+//! \a colours, when it has one entry per point, paints each segment in its first vertex's colour.
 void addPolyline(QCPPlottableRhiLayer& layer, std::span<const QPointF> points, const QPen& pen,
                  const QRect& clip, double dpr, int height, float alpha, bool movesWithData,
-                 QCPRecordingCache* cache, bool closed = false)
+                 QCPRecordingCache* cache, bool closed = false, std::span<const QRgb> colours = { })
 {
     if (!qcp::canStrokeOnGpu(pen) || points.size() < 2)
         return;
     const float width = qcp::extrusionPenWidth(pen, dpr);
     std::vector<float>& verts = strokeScratch();
-    qcp::extrudeStroke(points, pen, width, verts, closed);
+    if (colours.empty())
+        qcp::extrudeStroke(points, pen, width, verts, closed);
+    else
+        qcp::extrudeColoredStroke(points, qcp::colorSpans(points, colours), pen, width, verts);
     const QPointF none;
     if (!qcp::addGpuStroke(layer, verts, pen, width, clip, dpr, height, none, alpha))
         return; // no dashed pipeline: nothing was drawn, so nothing is kept
@@ -264,7 +274,21 @@ void addMarker(QCPScatterRhiLayer& scatter, const qcp::MarkersCmd& markers, QCPR
         xy[2 * i] = static_cast<float>(resolved[i].x());
         xy[2 * i + 1] = static_cast<float>(resolved[i].y());
     }
-    scatter.addScatter(xy, markers.style, clip, dpr, height);
+    if (!markers.colours)
+    {
+        scatter.addScatter(xy, *markers.style, clip, dpr, height);
+        return;
+    }
+    // One colour per marker: the scatter pipeline takes them premultiplied, a float per channel.
+    std::vector<float>& rgba = markerColourScratch();
+    rgba.resize(resolved.size() * 4);
+    for (std::size_t i = 0; i < resolved.size(); ++i)
+    {
+        const std::array<float, 4> colour
+            = qcp::rhi::premultipliedColor(QColor::fromRgba((*markers.colours)[i]));
+        std::copy(colour.begin(), colour.end(), rgba.begin() + std::ptrdiff_t(4 * i));
+    }
+    scatter.addScatterColored(xy, rgba, *markers.style, clip, dpr, height);
 }
 
 void addMarkers(const QCPDrawList& list, QCPScatterRhiLayer& scatter, QCPResolveCache& cache,
@@ -534,12 +558,12 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
             addRasterCommand(list, plottables, command, frame, fallback, clip, dpr, outputSize,
                              generation, geometry, needs.fill || strokeRaster, strokeRaster);
         };
-        const auto stroke
-            = [&](std::span<const QPointF> points, const QPen& pen, bool closed = false)
+        const auto stroke = [&](std::span<const QPointF> points, const QPen& pen,
+                                bool closed = false, std::span<const QRgb> colours = { })
         {
             if (!strokeRaster)
                 addPolyline(plottables, points, pen, clip, dpr, outputHeight, alpha, dataOnly,
-                            geometry, closed);
+                            geometry, closed, colours);
         };
         std::visit(
             [&](const auto& cmd)
@@ -550,7 +574,9 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                     const std::span<const QPointF> resolved
                         = cache.pixels(cmd.points, generation, frame.transform);
                     raster();
-                    stroke(resolved, cmd.pen);
+                    stroke(resolved, cmd.pen, false,
+                           cmd.colours ? std::span<const QRgb>(*cmd.colours)
+                                       : std::span<const QRgb>());
                 }
                 else if constexpr (std::is_same_v<T, qcp::PolylinePositionsCmd>)
                 {
