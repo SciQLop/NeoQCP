@@ -187,6 +187,120 @@ bool outsideClip(const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame)
 }
 } // namespace
 
+namespace qcp
+{
+void paintCommand(QCPPainter& painter, const QCPDrawCommand& command, const QCPDrawFrame& frame,
+                  PaintMode mode)
+{
+    if (mode.antialiased)
+        painter.setAntialiasing(true);
+    Scratch& local = scratch();
+    std::visit(
+        [&](const auto& cmd)
+        {
+            using Command = std::decay_t<decltype(cmd)>;
+            if constexpr (std::is_same_v<Command, PolylineDataCmd>)
+            {
+                const std::span<const QPointF> data(*cmd.points);
+                local.pixels.resize(data.size());
+                frame.transform.map(data, std::span<QPointF>(local.pixels));
+                painter.setPen(cmd.pen);
+                drawPolylineSplitNaN(&painter, std::span<const QPointF>(local.pixels));
+            }
+            else if constexpr (std::is_same_v<Command, PolylinePositionsCmd>)
+            {
+                qcpResolveInto(cmd.points, frame, local.pixels);
+                painter.setPen(cmd.pen);
+                drawPolylineSplitNaN(&painter, std::span<const QPointF>(local.pixels));
+            }
+            else if constexpr (std::is_same_v<Command, PolygonCmd>)
+            {
+                qcpResolveInto(cmd.points, frame, local.pixels);
+                painter.setPen(mode.withStroke ? cmd.pen : QPen(Qt::NoPen));
+                painter.setBrush(cmd.brush);
+                qcpPolygonOf(local.pixels, local.polygon);
+                painter.drawPolygon(local.polygon);
+            }
+            else if constexpr (std::is_same_v<Command, FillBetweenCmd>)
+            {
+                const std::size_t upper = cmd.upper->size();
+                local.data.resize(upper + cmd.lower->size());
+                std::copy(cmd.upper->cbegin(), cmd.upper->cend(), local.data.begin());
+                std::reverse_copy(cmd.lower->cbegin(), cmd.lower->cend(),
+                                  local.data.begin() + std::ptrdiff_t(upper));
+                local.pixels.resize(local.data.size());
+                frame.transform.map(std::span<const QPointF>(local.data),
+                                    std::span<QPointF>(local.pixels));
+                painter.setPen(Qt::NoPen);
+                painter.setBrush(cmd.brush);
+                qcpPolygonOf(local.pixels, local.polygon);
+                painter.drawPolygon(local.polygon);
+            }
+            else if constexpr (std::is_same_v<Command, RectCmd>)
+            {
+                const QRectF rect
+                    = QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
+                          .normalized();
+                painter.setPen(mode.withStroke ? cmd.pen : QPen(Qt::NoPen));
+                painter.setBrush(cmd.brush);
+                painter.drawRect(rect);
+            }
+            else if constexpr (std::is_same_v<Command, EllipseCmd>)
+            {
+                const QRectF rect
+                    = QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
+                          .normalized();
+                painter.setPen(mode.withStroke ? cmd.pen : QPen(Qt::NoPen));
+                painter.setBrush(cmd.brush);
+                painter.drawEllipse(rect);
+            }
+            else if constexpr (std::is_same_v<Command, MarkersCmd>)
+            {
+                const std::span<const QPointF> data(*cmd.points);
+                local.pixels.resize(data.size());
+                frame.transform.map(data, std::span<QPointF>(local.pixels));
+                cmd.style.applyTo(&painter, QPen(Qt::black));
+                for (const QPointF& point : local.pixels)
+                    cmd.style.drawShape(&painter, point);
+            }
+            else if constexpr (std::is_same_v<Command, ErrorBarsCmd>)
+            {
+                qcpErrorBarPixels(frame, std::span<const QPointF>(*cmd.centres),
+                                  std::span<const QPointF>(*cmd.spans), local.data);
+                painter.setPen(cmd.pen);
+                drawPolylineSplitNaN(&painter, std::span<const QPointF>(local.data));
+            }
+            else if constexpr (std::is_same_v<Command, TextCmd>)
+            {
+                replayText(cmd, painter, frame);
+            }
+            else if constexpr (std::is_same_v<Command, PathCmd>)
+            {
+                painter.save(); // the origin translation is this command's own
+                painter.translate(qcpResolvePosition(frame, cmd.origin));
+                painter.setPen(cmd.pen);
+                painter.setBrush(cmd.brush);
+                painter.drawPath(cmd.path);
+                painter.restore();
+            }
+            else if constexpr (std::is_same_v<Command, ImageCmd>)
+            {
+                const QRectF rect
+                    = QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
+                          .normalized();
+                painter.drawImage(rect, cmd.image);
+            }
+            else if constexpr (std::is_same_v<Command, PainterCmd>)
+            {
+                painter.save(); // a callback may leave any state changed
+                cmd.callback(painter, frame.transform);
+                painter.restore();
+            }
+        },
+        command);
+}
+} // namespace qcp
+
 void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QCPDrawFrame& frame,
                           QCPReplayKinds kinds, const qcp::QCPRasterFallback* fallback)
 {
@@ -196,14 +310,13 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
     painter.save();
     if (!frame.clip.isEmpty())
         painter.setClipRect(frame.clip);
-    Scratch& local = scratch();
     for (const qcp::QCPDrawCommand& command : list.commands)
     {
         const qcp::CommandKind kind = qcp::commandKind(command);
         if (kinds == QCPReplayKinds::GpuOnly && !kind.gpu)
             continue;
         // A recording the layer could not take whole is painted by this pass like any other
-        // recording: the visit below draws every one of its commands.
+        // recording: the call below draws every one of its commands.
         const bool painterDrawsAll = fallback && fallback->painterDrawsAll(list.id);
         if (kinds == QCPReplayKinds::PainterOnly && kind.gpu && !painterDrawsAll)
         {
@@ -215,110 +328,7 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
         }
         if (outsideClip(command, frame))
             continue;
-        std::visit(
-            [&](const auto& cmd)
-            {
-                using Command = std::decay_t<decltype(cmd)>;
-                if constexpr (std::is_same_v<Command, qcp::PolylineDataCmd>)
-                {
-                    const std::span<const QPointF> data(*cmd.points);
-                    local.pixels.resize(data.size());
-                    frame.transform.map(data, std::span<QPointF>(local.pixels));
-                    painter.setPen(cmd.pen);
-                    qcp::drawPolylineSplitNaN(&painter, std::span<const QPointF>(local.pixels));
-                }
-                else if constexpr (std::is_same_v<Command, qcp::PolylinePositionsCmd>)
-                {
-                    qcpResolveInto(cmd.points, frame, local.pixels);
-                    painter.setPen(cmd.pen);
-                    qcp::drawPolylineSplitNaN(&painter, std::span<const QPointF>(local.pixels));
-                }
-                else if constexpr (std::is_same_v<Command, qcp::PolygonCmd>)
-                {
-                    qcpResolveInto(cmd.points, frame, local.pixels);
-                    painter.setPen(cmd.pen);
-                    painter.setBrush(cmd.brush);
-                    qcpPolygonOf(local.pixels, local.polygon);
-                    painter.drawPolygon(local.polygon);
-                }
-                else if constexpr (std::is_same_v<Command, qcp::FillBetweenCmd>)
-                {
-                    const std::size_t upper = cmd.upper->size();
-                    const std::size_t lower = cmd.lower->size();
-                    local.data.resize(upper + lower);
-                    std::copy(cmd.upper->cbegin(), cmd.upper->cend(), local.data.begin());
-                    std::reverse_copy(cmd.lower->cbegin(), cmd.lower->cend(),
-                                      local.data.begin() + std::ptrdiff_t(upper));
-                    local.pixels.resize(local.data.size());
-                    frame.transform.map(std::span<const QPointF>(local.data),
-                                        std::span<QPointF>(local.pixels));
-                    painter.setPen(Qt::NoPen);
-                    painter.setBrush(cmd.brush);
-                    qcpPolygonOf(local.pixels, local.polygon);
-                    painter.drawPolygon(local.polygon);
-                }
-                else if constexpr (std::is_same_v<Command, qcp::RectCmd>)
-                {
-                    const QRectF rect
-                        = QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
-                              .normalized();
-                    painter.setPen(cmd.pen);
-                    painter.setBrush(cmd.brush);
-                    painter.drawRect(rect);
-                }
-                else if constexpr (std::is_same_v<Command, qcp::EllipseCmd>)
-                {
-                    const QRectF rect
-                        = QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
-                              .normalized();
-                    painter.setPen(cmd.pen);
-                    painter.setBrush(cmd.brush);
-                    painter.drawEllipse(rect);
-                }
-                else if constexpr (std::is_same_v<Command, qcp::MarkersCmd>)
-                {
-                    const std::span<const QPointF> data(*cmd.points);
-                    local.pixels.resize(data.size());
-                    frame.transform.map(data, std::span<QPointF>(local.pixels));
-                    cmd.style.applyTo(&painter, QPen(Qt::black));
-                    for (const QPointF& point : local.pixels)
-                        cmd.style.drawShape(&painter, point);
-                }
-                else if constexpr (std::is_same_v<Command, qcp::ErrorBarsCmd>)
-                {
-                    qcpErrorBarPixels(frame, std::span<const QPointF>(*cmd.centres),
-                                      std::span<const QPointF>(*cmd.spans), local.data);
-                    painter.setPen(cmd.pen);
-                    qcp::drawPolylineSplitNaN(&painter, std::span<const QPointF>(local.data));
-                }
-                else if constexpr (std::is_same_v<Command, qcp::TextCmd>)
-                {
-                    replayText(cmd, painter, frame);
-                }
-                else if constexpr (std::is_same_v<Command, qcp::PathCmd>)
-                {
-                    painter.save(); // the origin translation is this command's own
-                    painter.translate(qcpResolvePosition(frame, cmd.origin));
-                    painter.setPen(cmd.pen);
-                    painter.setBrush(cmd.brush);
-                    painter.drawPath(cmd.path);
-                    painter.restore();
-                }
-                else if constexpr (std::is_same_v<Command, qcp::ImageCmd>)
-                {
-                    const QRectF rect
-                        = QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
-                              .normalized();
-                    painter.drawImage(rect, cmd.image);
-                }
-                else if constexpr (std::is_same_v<Command, qcp::PainterCmd>)
-                {
-                    painter.save(); // a callback may leave any state changed
-                    cmd.callback(painter, frame.transform);
-                    painter.restore();
-                }
-            },
-            command);
+        qcp::paintCommand(painter, command, frame);
     }
     painter.restore();
 }

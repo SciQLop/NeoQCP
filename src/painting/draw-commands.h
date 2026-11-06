@@ -440,7 +440,23 @@ inline void qcpErrorBarPixels(const QCPDrawFrame& frame, std::span<const QPointF
 namespace qcp
 {
 class QCPRasterFallback;
-}
+
+/*!
+  How \a command is painted: \a withStroke leaves out the outline of a filled shape when the
+  caller wants its fill alone, and \a antialiased turns antialiasing on, since a command
+  rasterised on its own has no plot to inherit the setting from.
+*/
+struct PaintMode
+{
+    bool withStroke = true;
+    bool antialiased = false;
+};
+
+//! Paints \a command into \a painter at \a frame: the one painter path of a command, used by the
+//! painter replay and by the raster fallback.
+void paintCommand(QCPPainter& painter, const QCPDrawCommand& command, const QCPDrawFrame& frame,
+                  PaintMode mode = { });
+} // namespace qcp
 
 //! The commands a full frame could not draw on the GPU (no QRhi, export, or the layer's image cap)
 //! are painted here: in PainterOnly a GPU kind is drawn only when \a fallback says the layer left

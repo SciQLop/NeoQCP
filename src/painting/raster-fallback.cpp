@@ -180,69 +180,12 @@ QRectF fallbackPixelBounds(const QCPDrawCommand& command, const QCPDrawFrame& fr
 void paintFallback(QCPPainter& painter, const QCPDrawCommand& command, const QCPDrawFrame& frame,
                    bool withStroke)
 {
-    std::visit(
-        [&](const auto& cmd)
-        {
-            using T = std::decay_t<decltype(cmd)>;
-            painter.setAntialiasing(true);
-            if constexpr (std::is_same_v<T, PolygonCmd>)
-            {
-                const QPolygonF polygon = polygonOf(cmd.points, frame);
-                if (polygon.size() < 3)
-                    return;
-                painter.setBrush(cmd.brush);
-                painter.setPen(withStroke ? cmd.pen : QPen(Qt::NoPen));
-                painter.drawPolygon(polygon);
-            }
-            else if constexpr (std::is_same_v<T, FillBetweenCmd>)
-            {
-                QPolygonF polygon = polygonOf(*cmd.upper, frame);
-                const QPolygonF lower = polygonOf(*cmd.lower, frame);
-                for (auto it = lower.crbegin(); it != lower.crend(); ++it)
-                    polygon << *it;
-                painter.setBrush(cmd.brush);
-                painter.setPen(Qt::NoPen);
-                painter.drawPolygon(polygon);
-            }
-            else if constexpr (std::is_same_v<T, RectCmd> || std::is_same_v<T, EllipseCmd>)
-            {
-                const QRectF box
-                    = QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
-                          .normalized();
-                painter.setBrush(cmd.brush);
-                painter.setPen(withStroke ? cmd.pen : QPen(Qt::NoPen));
-                if constexpr (std::is_same_v<T, RectCmd>)
-                    painter.drawRect(box);
-                else
-                    painter.drawEllipse(box);
-            }
-            else if constexpr (std::is_same_v<T, PolylinePositionsCmd>)
-            {
-                std::vector<QPointF> pixels;
-                qcpResolveInto(cmd.points, frame, pixels);
-                painter.setBrush(Qt::NoBrush);
-                painter.setPen(cmd.pen);
-                drawPolylineSplitNaN(&painter, pixels);
-            }
-            else if constexpr (std::is_same_v<T, PolylineDataCmd>)
-            {
-                std::vector<QPointF> pixels;
-                qcpMapDataInto(*cmd.points, frame.transform, pixels);
-                painter.setBrush(Qt::NoBrush);
-                painter.setPen(cmd.pen);
-                drawPolylineSplitNaN(&painter, pixels);
-            }
-            else if constexpr (std::is_same_v<T, ErrorBarsCmd>)
-            {
-                std::vector<QPointF> pixels;
-                qcpErrorBarPixels(frame, std::span<const QPointF>(*cmd.centres),
-                                  std::span<const QPointF>(*cmd.spans), pixels);
-                painter.setBrush(Qt::NoBrush);
-                painter.setPen(cmd.pen);
-                drawPolylineSplitNaN(&painter, pixels);
-            }
-        },
-        command);
+    // Two points of a fill enclose nothing to raster, and the painter would draw the outline as a
+    // line where the replay draws none.
+    if (const auto* polygon = std::get_if<qcp::PolygonCmd>(&command);
+        polygon && polygon->points.size() < 3)
+        return;
+    qcp::paintCommand(painter, command, frame, { withStroke, true });
 }
 
 QImage rasterizeFallback(const QCPDrawCommand& command, const QRectF& bounds,
