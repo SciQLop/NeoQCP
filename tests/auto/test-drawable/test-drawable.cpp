@@ -28,18 +28,13 @@ int gAxisMessages = 0;
 QtMessageHandler gPreviousHandler = nullptr;
 
 //! A brush the GPU cannot fill in one colour: the replay rasterises it.
-QBrush gradientBrush(const QColor& from, const QColor& to)
+QBrush gradientBrush()
 {
     QLinearGradient gradient(0, 0, 1, 0);
     gradient.setCoordinateMode(QGradient::ObjectBoundingMode);
-    gradient.setColorAt(0.0, from);
-    gradient.setColorAt(1.0, to);
+    gradient.setColorAt(0.0, QColor(220, 40, 40));
+    gradient.setColorAt(1.0, QColor(40, 40, 220));
     return QBrush(gradient);
-}
-
-QBrush gradientBrush()
-{
-    return gradientBrush(QColor(220, 40, 40), QColor(40, 40, 220));
 }
 
 void countAxisMessages(QtMsgType type, const QMessageLogContext& context, const QString& message)
@@ -121,15 +116,11 @@ public:
         }
         if (bars > 0)
         {
+            const QBrush brush = filledBars ? (gradientBars ? gradientBrush() : QBrush(fill))
+                                            : QBrush(Qt::NoBrush);
             for (int i = 0; i < bars; ++i)
             {
                 const double key = 1.0 + 8.0 * i / bars;
-                // A gradient of its own per bar: a batch shares one brush, and the cap tests need
-                // one image per bar to reach the layer's limit.
-                const QColor tint = QColor::fromHsv((i * 37) % 360, 200, 220);
-                const QBrush brush = !filledBars ? QBrush(Qt::NoBrush)
-                    : gradientBars               ? gradientBrush(tint, tint.darker(200))
-                                                 : QBrush(fill);
                 context.rect(QCP::Data { key, 1.0 }, QCP::Data { key + 8.0 / bars, 3.0 },
                              QPen(Qt::black), brush);
             }

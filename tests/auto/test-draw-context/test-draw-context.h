@@ -43,6 +43,7 @@ private slots:
     void tenThousandDataRectsAreOneCommand();
     void aPixelCornerStaysASingleRect();
     void perRectColoursStayOneBatch();
+    void rasterBrushRectsStayOneCommandEach();
     void ellipsesStayOneBatch();
     void batchExportsOneRectPerBar();
 };

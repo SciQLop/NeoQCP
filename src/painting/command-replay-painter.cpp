@@ -137,23 +137,24 @@ void paintBoxes(QCPPainter& painter, const Batch& batch, const QCPDrawFrame& fra
                 const qcp::PaintMode& mode, bool ellipse)
 {
     painter.setPen(mode.withStroke ? batch.pen : QPen(Qt::NoPen));
-    const bool perBoxColour = !batch.fills.empty();
+    const qcp::BatchBoxes& boxes = *batch.boxes;
+    const bool perBoxColour = !boxes.fills.empty();
     if (!perBoxColour)
         painter.setBrush(batch.brush);
     const bool clipKnown = !frame.clip.isEmpty();
     const double pad = qcp::qcpStrokePad(batch.pen);
     const QRectF visible = frame.clip.adjusted(-pad, -pad, pad, pad);
-    const std::size_t count = std::min(batch.aKey.size(), batch.bKey.size());
+    const std::size_t count = std::min(boxes.aKey.size(), boxes.bKey.size());
     for (std::size_t i = 0; i < count; ++i)
     {
         const QRectF box
-            = QRectF(qcpResolvePosition(frame, QCP::Data { batch.aKey[i], batch.aValue[i] }),
-                     qcpResolvePosition(frame, QCP::Data { batch.bKey[i], batch.bValue[i] }))
+            = QRectF(qcpResolvePosition(frame, QCP::Data { boxes.aKey[i], boxes.aValue[i] }),
+                     qcpResolvePosition(frame, QCP::Data { boxes.bKey[i], boxes.bValue[i] }))
                   .normalized();
         if (clipKnown && !box.intersects(visible))
             continue;
         if (perBoxColour)
-            painter.setBrush(QBrush(QColor::fromRgba(batch.fills[i])));
+            painter.setBrush(QBrush(QColor::fromRgba(boxes.fills[i])));
         if (ellipse)
             painter.drawEllipse(box);
         else

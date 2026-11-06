@@ -98,20 +98,16 @@ static_assert(sizeof(qcp::TextCmd) <= 96);
 static_assert(sizeof(qcp::PathCmd) <= 96);
 static_assert(sizeof(qcp::ImageCmd) <= 96);
 static_assert(sizeof(qcp::PainterCmd) <= 96);
-// A batch is the one command that is not a single shape: it is a header over SoA arrays (four
-// vectors of corners, an optional colour per rect, a pen, a brush, a box and a sort flag), and the
-// per-rect storage it stands for is 32 bytes instead of the ~100 a RectCmd takes. The variant grows
-// to hold that header once; the one-shape commands above did not.
-static_assert(sizeof(qcp::RectsCmd) <= 184);
-static_assert(sizeof(qcp::EllipsesCmd) <= 184);
-static_assert(sizeof(qcp::QCPDrawCommand) <= 192);
+static_assert(sizeof(qcp::QCPDrawCommand) <= 104);
+// A batch is a header: its arrays live behind one pointer, so a recording that holds no batch pays
+// nothing for the ones that exist, and a batch costs a command slot like any other.
+static_assert(sizeof(qcp::RectsCmd) <= 96);
+static_assert(sizeof(qcp::EllipsesCmd) <= 96);
 
 void TestDrawContext::drawListIsCompact()
 {
-    // The static_asserts above are the contract; this keeps the slot visible in the report. A batch
-    // is the header over its arrays, so the variant is as wide as that header and no wider.
-    QVERIFY(sizeof(qcp::QCPDrawCommand) <= 192);
-    QVERIFY(sizeof(qcp::QCPDrawCommand) <= sizeof(qcp::RectsCmd) + 8);
+    // The static_asserts above are the contract; this keeps the slot visible in the report.
+    QVERIFY(sizeof(qcp::QCPDrawCommand) <= 104);
 }
 
 void TestDrawContext::polylineMatchesHandPainting()
@@ -1006,11 +1002,11 @@ void TestDrawContext::tenThousandDataRectsAreOneCommand()
     QVERIFY2(std::holds_alternative<qcp::RectsCmd>(list.commands.front()),
              "a run of data-space rects was not recorded as one batch");
     const auto& batch = std::get<qcp::RectsCmd>(list.commands.front());
-    QCOMPARE(int(batch.aKey.size()), 10000);
-    QCOMPARE(int(batch.aValue.size()), 10000);
-    QCOMPARE(int(batch.bKey.size()), 10000);
-    QCOMPARE(int(batch.bValue.size()), 10000);
-    QVERIFY2(batch.fills.empty(),
+    QCOMPARE(int(batch.boxes->aKey.size()), 10000);
+    QCOMPARE(int(batch.boxes->aValue.size()), 10000);
+    QCOMPARE(int(batch.boxes->bKey.size()), 10000);
+    QCOMPARE(int(batch.boxes->bValue.size()), 10000);
+    QVERIFY2(batch.boxes->fills.empty(),
              "one colour belongs to the batch's brush, not to a fill per rect");
     QVERIFY2(batch.sortedByKey, "the keys arrived in ascending order");
     QCOMPARE(batch.pen, kPen);
@@ -1064,9 +1060,9 @@ void TestDrawContext::aPixelCornerStaysASingleRect()
         QVERIFY2(std::holds_alternative<qcp::RectCmd>(list.commands[std::size_t(i)]),
                  qPrintable(QStringLiteral("command %1 is not a single rect").arg(i)));
     const auto& batch = std::get<qcp::RectsCmd>(list.commands.back());
-    QCOMPARE(int(batch.aKey.size()), 2);
-    QCOMPARE(batch.aKey.front(), 4.0);
-    QCOMPARE(batch.aKey.back(), 6.0);
+    QCOMPARE(int(batch.boxes->aKey.size()), 2);
+    QCOMPARE(batch.boxes->aKey.front(), 4.0);
+    QCOMPARE(batch.boxes->aKey.back(), 6.0);
     // The pixel rects left both sides of the box unbounded, so the batch's own box is all it has.
     QCOMPARE(batch.bounds.keyLower, 4.0);
     QCOMPARE(batch.bounds.keyUpper, 7.0);
@@ -1086,9 +1082,9 @@ void TestDrawContext::perRectColoursStayOneBatch()
     const QCPDrawList& list = context.drawList();
     QCOMPARE(int(list.commands.size()), 1);
     const auto& batch = std::get<qcp::RectsCmd>(list.commands.front());
-    QCOMPARE(int(batch.fills.size()), 10);
-    QCOMPARE(batch.fills[0], red.color().rgba());
-    QCOMPARE(batch.fills[1], blue.color().rgba());
+    QCOMPARE(int(batch.boxes->fills.size()), 10);
+    QCOMPARE(batch.boxes->fills[0], red.color().rgba());
+    QCOMPARE(batch.boxes->fills[1], blue.color().rgba());
 
     // A per-rect colour is a solid brush: the painter paints each rect its own, not the batch's.
     const QImage image = replayOf(context);
@@ -1099,6 +1095,56 @@ void TestDrawContext::perRectColoursStayOneBatch()
     };
     QVERIFY2(centre(0).red() > centre(0).blue() + 100, "the first bar kept the red brush");
     QVERIFY2(centre(1).blue() > centre(1).red() + 100, "the second bar kept the blue brush");
+}
+
+// A fill the GPU cannot take becomes one image per command, so a batch that needed one would put
+// every fill under every stroke. Overlapping translucent or patterned boxes would then paint in a
+// different order than a command per box does, so such a box keeps its own command.
+void TestDrawContext::rasterBrushRectsStayOneCommandEach()
+{
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    QLinearGradient fade(0, 0, 0, 1);
+    fade.setCoordinateMode(QGradient::ObjectBoundingMode);
+    fade.setColorAt(0.0, QColor(200, 40, 40, 160));
+    fade.setColorAt(1.0, QColor(40, 40, 200, 160));
+    const QBrush gradient(fade);
+
+    // Three boxes that overlap: the order of their fills and strokes is visible where they do.
+    std::vector<QRectF> boxes;
+    for (int i = 0; i < 3; ++i)
+    {
+        const double left = 20.0 + 25.0 * i;
+        context.rect(QCP::Data { left, 20.0 }, QCP::Data { left + 60.0, 120.0 }, kPen, gradient);
+        boxes.emplace_back(left, 20.0, 60.0, 100.0);
+    }
+
+    const QCPDrawList& list = context.drawList();
+    QCOMPARE(int(list.commands.size()), 3);
+    for (const qcp::QCPDrawCommand& command : list.commands)
+    {
+        QVERIFY2(std::holds_alternative<qcp::RectCmd>(command),
+                 "a rect whose fill needs the raster joined a batch and lost its place in the order");
+        QVERIFY2(qcp::needsRaster(command), "a gradient fill is an image, not a vertex colour");
+    }
+
+    // One draw per box, fill and stroke interleaved: the replay is the hand painting of the three,
+    // so the overlaps come out in the order they were recorded.
+    const QImage replay = replayOf(context);
+    const QImage hand = painted(
+        [&boxes, &gradient](QCPPainter& painter, const QCPTransform& transform)
+        {
+            painter.setClipRect(QRectF(0, 0, kWidth, kHeight));
+            painter.setPen(kPen);
+            painter.setBrush(gradient);
+            for (const QRectF& box : boxes)
+                painter.drawRect(QRectF(pixelOf(transform, box.left(), box.top()),
+                                        pixelOf(transform, box.right(), box.bottom()))
+                                     .normalized());
+        },
+        context.transform());
+    QCOMPARE(replay, hand);
 }
 
 void TestDrawContext::ellipsesStayOneBatch()
@@ -1115,7 +1161,7 @@ void TestDrawContext::ellipsesStayOneBatch()
     QVERIFY2(std::holds_alternative<qcp::EllipsesCmd>(list.commands.front()),
              "a run of data-space ellipses was not recorded as one batch");
     const auto& batch = std::get<qcp::EllipsesCmd>(list.commands.front());
-    QCOMPARE(int(batch.aKey.size()), 5);
+    QCOMPARE(int(batch.boxes->aKey.size()), 5);
     QCOMPARE(batch.bounds.valueUpper, 90.0);
 
     // The disc is filled and the corner of its box is not: the replay draws the ellipses, not

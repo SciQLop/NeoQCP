@@ -194,17 +194,18 @@ double distanceTo(const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame,
             {
                 // A batch is one command over many rects: the caller gets the distance to the
                 // nearest one and, in \a index, which one it was.
-                const std::size_t count = std::min(cmd.aKey.size(), cmd.bKey.size());
+                const qcp::BatchBoxes& boxes = *cmd.boxes;
+                const std::size_t count = std::min(boxes.aKey.size(), boxes.bKey.size());
                 double best = kInfinity;
                 for (std::size_t i = 0; i < count; ++i)
                 {
                     const QRectF box
                         = QRectF(
-                              qcpResolvePosition(frame, QCP::Data { cmd.aKey[i], cmd.aValue[i] }),
-                              qcpResolvePosition(frame, QCP::Data { cmd.bKey[i], cmd.bValue[i] }))
+                              qcpResolvePosition(frame, QCP::Data { boxes.aKey[i], boxes.aValue[i] }),
+                              qcpResolvePosition(frame, QCP::Data { boxes.bKey[i], boxes.bValue[i] }))
                               .normalized();
                     const QBrush rectBrush
-                        = i < cmd.fills.size() ? QBrush(QColor::fromRgba(cmd.fills[i])) : cmd.brush;
+                        = i < boxes.fills.size() ? QBrush(QColor::fromRgba(boxes.fills[i])) : cmd.brush;
                     double distance = 0.0;
                     if (!visibleBrush(rectBrush) || !box.contains(at))
                     {
@@ -224,17 +225,18 @@ double distanceTo(const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame,
             }
             else if constexpr (std::is_same_v<Command, qcp::EllipsesCmd>)
             {
-                const std::size_t count = std::min(cmd.aKey.size(), cmd.bKey.size());
+                const qcp::BatchBoxes& boxes = *cmd.boxes;
+                const std::size_t count = std::min(boxes.aKey.size(), boxes.bKey.size());
                 double best = kInfinity;
                 for (std::size_t i = 0; i < count; ++i)
                 {
                     const QRectF box
                         = QRectF(
-                              qcpResolvePosition(frame, QCP::Data { cmd.aKey[i], cmd.aValue[i] }),
-                              qcpResolvePosition(frame, QCP::Data { cmd.bKey[i], cmd.bValue[i] }))
+                              qcpResolvePosition(frame, QCP::Data { boxes.aKey[i], boxes.aValue[i] }),
+                              qcpResolvePosition(frame, QCP::Data { boxes.bKey[i], boxes.bValue[i] }))
                               .normalized();
                     const QBrush rectBrush
-                        = i < cmd.fills.size() ? QBrush(QColor::fromRgba(cmd.fills[i])) : cmd.brush;
+                        = i < boxes.fills.size() ? QBrush(QColor::fromRgba(boxes.fills[i])) : cmd.brush;
                     double distance = kInfinity;
                     if (visibleBrush(rectBrush) && box.contains(at))
                     {

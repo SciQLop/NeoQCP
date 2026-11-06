@@ -226,28 +226,51 @@ void record(QCPDrawList& list, qcp::QCPDrawCommand command, const Extent& extent
 
   A batch keeps one brush, so a pattern, a texture or a gradient has to be the very same one: two
   different gradients with the same style would silently paint as one. A solid colour may differ,
-  though - it becomes a per-rect fill, which is how a selected bar keeps its colour in the batch.
+  though - it becomes a per-box fill, which is how a selected bar keeps its colour in the batch.
+
+  A brush the GPU cannot fill needs the raster fallback, and a batch that needs one is a single image
+  over the whole run: its fill would land under the strokes of every box beside it, where a command
+  per box interleaves fill and stroke. Such a box keeps its own command.
 */
 bool joinsBatch(const QBrush& batchBrush, const QBrush& brush)
 {
+    if (qcp::fillNeedsRaster(brush) || qcp::fillNeedsRaster(batchBrush))
+        return false;
     return brush == batchBrush
         || (brush.style() == Qt::SolidPattern && batchBrush.style() == Qt::SolidPattern);
+}
+
+/*!
+  The payload of \a batch, mutable.
+
+  The command holds it as const - a recording is read-only once it is made - while the recorder is
+  the one writer. It hands out a mutable reference only when it owns the payload alone; a copy of the
+  recording that shares it gets a copy of its own first, so a recording already taken never changes
+  under the one that keeps appending.
+*/
+template <class Batch>
+qcp::BatchBoxes& editableBoxes(Batch& batch)
+{
+    if (batch.boxes.use_count() > 1)
+        batch.boxes = std::make_shared<qcp::BatchBoxes>(*batch.boxes);
+    return const_cast<qcp::BatchBoxes&>(*batch.boxes);
 }
 
 //! Appends \a a, \a b and \a brush to \a batch, keeping its fills, its sort flag and its box.
 template <class Batch>
 void appendBox(Batch& batch, const QPointF& a, const QPointF& b, const QBrush& brush)
 {
-    // The batch's own brush needs no entry; the first colour that differs gives every rect one.
-    if (batch.fills.empty() && brush.color().rgba() != batch.brush.color().rgba())
-        batch.fills.assign(batch.aKey.size(), batch.brush.color().rgba());
-    if (!batch.fills.empty())
-        batch.fills.push_back(brush.color().rgba());
-    batch.sortedByKey = batch.sortedByKey && (batch.aKey.empty() || a.x() >= batch.aKey.back());
-    batch.aKey.push_back(a.x());
-    batch.aValue.push_back(a.y());
-    batch.bKey.push_back(b.x());
-    batch.bValue.push_back(b.y());
+    qcp::BatchBoxes& boxes = editableBoxes(batch);
+    // The batch's own brush needs no entry; the first colour that differs gives every box one.
+    if (boxes.fills.empty() && brush.color().rgba() != batch.brush.color().rgba())
+        boxes.fills.assign(boxes.aKey.size(), batch.brush.color().rgba());
+    if (!boxes.fills.empty())
+        boxes.fills.push_back(brush.color().rgba());
+    batch.sortedByKey = batch.sortedByKey && (boxes.aKey.empty() || a.x() >= boxes.aKey.back());
+    boxes.aKey.push_back(a.x());
+    boxes.aValue.push_back(a.y());
+    boxes.bKey.push_back(b.x());
+    boxes.bValue.push_back(b.y());
     batch.bounds.keyLower = std::min(batch.bounds.keyLower, std::min(a.x(), b.x()));
     batch.bounds.keyUpper = std::max(batch.bounds.keyUpper, std::max(a.x(), b.x()));
     batch.bounds.valueLower = std::min(batch.bounds.valueLower, std::min(a.y(), b.y()));
@@ -284,6 +307,7 @@ bool appendShape(QCPDrawList& list, const QPointF& a, const QPointF& b, const QP
         Batch batch;
         batch.pen = single->pen;
         batch.brush = single->brush;
+        batch.boxes = std::make_shared<qcp::BatchBoxes>();
         batch.bounds
             = QCPDataBox { std::min(firstA->x, firstB->x), std::max(firstA->x, firstB->x),
                            std::min(firstA->y, firstB->y), std::max(firstA->y, firstB->y) };

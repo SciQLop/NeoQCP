@@ -619,19 +619,20 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                     // strokes exactly as a single rect submits its own.
                     raster();
                     const bool fillEach = !needs.fill && !strokeRaster;
+                    const qcp::BatchBoxes& boxes = *cmd.boxes;
                     // A batch of one colour asks the same question of every rect: answer it once.
-                    const bool uniform = cmd.fills.empty();
+                    const bool uniform = boxes.fills.empty();
                     const bool canFill = uniform ? qcp::gpuCanFill(cmd.brush) : true;
-                    const std::size_t count = std::min(cmd.aKey.size(), cmd.bKey.size());
+                    const std::size_t count = std::min(boxes.aKey.size(), boxes.bKey.size());
                     for (std::size_t i = 0; i < count; ++i)
                     {
                         const QPointF a
-                            = qcpResolvePosition(frame, QCP::Data { cmd.aKey[i], cmd.aValue[i] });
+                            = qcpResolvePosition(frame, QCP::Data { boxes.aKey[i], boxes.aValue[i] });
                         const QPointF b
-                            = qcpResolvePosition(frame, QCP::Data { cmd.bKey[i], cmd.bValue[i] });
+                            = qcpResolvePosition(frame, QCP::Data { boxes.bKey[i], boxes.bValue[i] });
                         const QRectF box = QRectF(a, b).normalized();
                         const QColor colour
-                            = uniform ? cmd.brush.color() : QColor::fromRgba(cmd.fills[i]);
+                            = uniform ? cmd.brush.color() : QColor::fromRgba(boxes.fills[i]);
                         // The fill is submitted first: the stroke's inner half must stay visible.
                         if (fillEach && canFill && colour.alpha() != 0)
                         {
@@ -650,18 +651,19 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                 {
                     raster();
                     const bool fillEach = !needs.fill && !strokeRaster;
-                    const bool uniform = cmd.fills.empty();
+                    const qcp::BatchBoxes& boxes = *cmd.boxes;
+                    const bool uniform = boxes.fills.empty();
                     const bool canFill = uniform ? qcp::gpuCanFill(cmd.brush) : true;
-                    const std::size_t count = std::min(cmd.aKey.size(), cmd.bKey.size());
+                    const std::size_t count = std::min(boxes.aKey.size(), boxes.bKey.size());
                     for (std::size_t i = 0; i < count; ++i)
                     {
                         const QPointF a
-                            = qcpResolvePosition(frame, QCP::Data { cmd.aKey[i], cmd.aValue[i] });
+                            = qcpResolvePosition(frame, QCP::Data { boxes.aKey[i], boxes.aValue[i] });
                         const QPointF b
-                            = qcpResolvePosition(frame, QCP::Data { cmd.bKey[i], cmd.bValue[i] });
+                            = qcpResolvePosition(frame, QCP::Data { boxes.bKey[i], boxes.bValue[i] });
                         const QRectF box = QRectF(a, b).normalized();
                         const QColor colour
-                            = uniform ? cmd.brush.color() : QColor::fromRgba(cmd.fills[i]);
+                            = uniform ? cmd.brush.color() : QColor::fromRgba(boxes.fills[i]);
                         const std::vector<QPointF> ring = qcpEllipseRing(box);
                         if (fillEach && canFill && colour.alpha() != 0)
                             fanFill(plottables, box.center(), ring, colour, clip, dpr, outputHeight,

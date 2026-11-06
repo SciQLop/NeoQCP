@@ -3287,17 +3287,9 @@ void TestRepaint::rasterFallbackIsCapped()
     const std::array<QRectF, 6> boxes { QRectF(10, 20, 110, 110),   QRectF(145, 20, 110, 110),
                                         QRectF(280, 20, 110, 110),  QRectF(10, 170, 110, 110),
                                         QRectF(145, 170, 110, 110), QRectF(280, 170, 110, 110) };
-    // A gradient of its own per box: a batch shares one brush, and this test needs six images to
-    // reach the layer's cap.
-    const std::array<QColor, 6> tints { QColor(220, 40, 40),  QColor(40, 220, 40),
-                                        QColor(40, 40, 220),  QColor(220, 220, 40),
-                                        QColor(220, 40, 220), QColor(40, 220, 220) };
-    for (std::size_t i = 0; i < boxes.size(); ++i)
-    {
-        const QRectF& box = boxes[i];
+    for (const QRectF& box : boxes)
         many.rect(QCP::Data { box.left(), box.top() }, QCP::Data { box.right(), box.bottom() },
-                  QPen(Qt::NoPen), flatGradientBrush(tints[i]));
-    }
+                  QPen(Qt::NoPen), gradientBrush());
 
     layer->clear();
     QTest::ignoreMessage(QtWarningMsg, QRegularExpression(QStringLiteral("rasterised styles")));

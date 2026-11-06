@@ -82,7 +82,25 @@ struct EllipseCmd
 };
 
 /*!
-  Many rectangles, one command: four arrays of corners and an optional colour per rect.
+  The arrays of a box batch: four corners and an optional colour per box.
+
+  Filled while the recorder appends, shared read-only once it stops. A recording is copied - the
+  item index keeps one, the legend icon another - and behind a pointer a copy costs a refcount
+  instead of a megabyte. \a fills is either empty, and every box is the command's \a brush, or one
+  colour per box: a solid brush of that colour replaces \a brush for that box (a selected bar paints
+  its own colour without breaking the batch).
+*/
+struct BatchBoxes
+{
+    std::vector<double> aKey;
+    std::vector<double> aValue;
+    std::vector<double> bKey;
+    std::vector<double> bValue;
+    std::vector<QRgb> fills;
+};
+
+/*!
+  Many rectangles, one command.
 
   A bar chart records ten thousand rects a frame, and as commands they cost a variant slot, a cache
   key and a visit each. Here they are one command: the recorder appends a rect in constant time,
@@ -90,18 +108,15 @@ struct EllipseCmd
   at a time, so a PDF keeps one vector rect per bar.
 
   The corners are data on both sides by construction, which is why the batch moves by one delta on
-  a pan. \a fills is either empty, and every rect is \a brush, or one colour per rect: a solid brush
-  of that colour replaces \a brush for that rect (a selected bar paints its own colour without
-  breaking the batch). \a bounds is the data box the recorder widened as it appended, and
-  \a sortedByKey says whether the keys arrived in ascending order (R5's fast paths read it).
+  a pan. The arrays live behind \a boxes, so a command that is not a batch does not pay for them:
+  the variant stays as wide as the one-shape commands. \a bounds is the data box the recorder
+  widened as it appended, and \a sortedByKey says whether the keys arrived in ascending order (R5's
+  fast paths read it).
 */
 struct RectsCmd
 {
-    std::vector<double> aKey;
-    std::vector<double> aValue;
-    std::vector<double> bKey;
-    std::vector<double> bValue;
-    std::vector<QRgb> fills;
+    //! Never null in a recording; two commands never share one (see appendShape in draw-context).
+    std::shared_ptr<const BatchBoxes> boxes;
     QPen pen;
     QBrush brush;
     QCPDataBox bounds;
@@ -111,11 +126,7 @@ struct RectsCmd
 //! Many ellipses, one command: the same batch, with an ellipse in each box.
 struct EllipsesCmd
 {
-    std::vector<double> aKey;
-    std::vector<double> aValue;
-    std::vector<double> bKey;
-    std::vector<double> bValue;
-    std::vector<QRgb> fills;
+    std::shared_ptr<const BatchBoxes> boxes;
     QPen pen;
     QBrush brush;
     QCPDataBox bounds;
@@ -582,7 +593,8 @@ inline CommandExtent commandExtent(const QCPDrawCommand& command, const QCPDrawF
                 // A batch is one command over many boxes: the union is what culling and the raster
                 // ask for. Built from both corners, so a rect whose corners arrive reversed still
                 // widens the box it occupies.
-                const std::size_t count = std::min(cmd.aKey.size(), cmd.bKey.size());
+                const BatchBoxes& boxes = *cmd.boxes;
+                const std::size_t count = std::min(boxes.aKey.size(), boxes.bKey.size());
                 double left = 0.0;
                 double top = 0.0;
                 double right = 0.0;
@@ -590,9 +602,9 @@ inline CommandExtent commandExtent(const QCPDrawCommand& command, const QCPDrawF
                 for (std::size_t i = 0; i < count; ++i)
                 {
                     const QPointF a
-                        = qcpResolvePosition(frame, QCP::Data { cmd.aKey[i], cmd.aValue[i] });
+                        = qcpResolvePosition(frame, QCP::Data { boxes.aKey[i], boxes.aValue[i] });
                     const QPointF b
-                        = qcpResolvePosition(frame, QCP::Data { cmd.bKey[i], cmd.bValue[i] });
+                        = qcpResolvePosition(frame, QCP::Data { boxes.bKey[i], boxes.bValue[i] });
                     const double x0 = std::min(a.x(), b.x());
                     const double x1 = std::max(a.x(), b.x());
                     const double y0 = std::min(a.y(), b.y());

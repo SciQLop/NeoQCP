@@ -31,6 +31,11 @@ bool strokeNeedsRaster(const QPen& pen)
     return pen.style() != Qt::NoPen && !gpuCanFill(pen.brush());
 }
 
+bool fillNeedsRaster(const QBrush& brush)
+{
+    return !brushPaintsNothing(brush) && !gpuCanFill(brush);
+}
+
 RasterNeeds rasterNeedsOf(const QCPDrawCommand& command)
 {
     return std::visit(
@@ -49,12 +54,12 @@ RasterNeeds rasterNeedsOf(const QCPDrawCommand& command)
                 needs.fill = !brushPaintsNothing(cmd.brush)
                     && (!gpuCanFill(cmd.brush) || cmd.upper->size() != cmd.lower->size());
             else if constexpr (std::is_same_v<T, RectCmd> || std::is_same_v<T, EllipseCmd>)
-                needs.fill = !brushPaintsNothing(cmd.brush) && !gpuCanFill(cmd.brush);
+                needs.fill = fillNeedsRaster(cmd.brush);
             else if constexpr (std::is_same_v<T, RectsCmd> || std::is_same_v<T, EllipsesCmd>)
-                // A per-rect colour is a solid brush, which the GPU fills from a vertex colour, so
-                // a batch only needs an image when its shared brush is one the GPU cannot fill.
-                needs.fill
-                    = cmd.fills.empty() && !brushPaintsNothing(cmd.brush) && !gpuCanFill(cmd.brush);
+                // The recorder keeps a fill the GPU cannot take out of a batch (see joinsBatch), so
+                // this only answers for a batch built by other means. A per-box colour is a solid
+                // brush, which the GPU fills from a vertex colour.
+                needs.fill = cmd.boxes->fills.empty() && fillNeedsRaster(cmd.brush);
             return needs;
         },
         command);

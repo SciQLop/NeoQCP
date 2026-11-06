@@ -31,6 +31,11 @@ void sweepUnused(std::deque<Entry>& entries, Expired&& expired)
 //! has to be part of the command's image.
 bool strokeNeedsRaster(const QPen& pen);
 
+//! True when \a brush paints something the GPU cannot fill from a vertex colour, so a command that
+//! uses it needs an image for its fill. A brush that paints nothing (none, or a transparent solid)
+//! needs none.
+bool fillNeedsRaster(const QBrush& brush);
+
 //! What \a command needs from the raster: a fill that cannot become a GPU vertex colour (a texture,
 //! gradient or hatch brush, a free-form polygon, a series pair that is not a ribbon), a stroke the
 //! GPU cannot draw in one colour, and whether that stroke is a dash pattern only a layer with the
