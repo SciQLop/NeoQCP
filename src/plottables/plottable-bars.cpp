@@ -1121,50 +1121,40 @@ void QCPBars::getVisibleDataBounds(QCPBarsDataContainer::const_iterator& begin,
         return;
     }
 
-    // get visible data range as QMap iterators
-    begin = mDataContainer->findBegin(mKeyAxis.data()->range().lower);
-    end = mDataContainer->findEnd(mKeyAxis.data()->range().upper);
-    double lowerPixelBound = mKeyAxis.data()->coordToPixel(mKeyAxis.data()->range().lower);
-    double upperPixelBound = mKeyAxis.data()->coordToPixel(mKeyAxis.data()->range().upper);
-    bool isVisible = false;
-    // walk left from begin to find lower bar that actually is completely outside visible pixel
-    // range:
+    const QCPAxis* const keyAxis = mKeyAxis.data();
+    const QCPRange range = keyAxis->range();
+    begin = mDataContainer->findBegin(range.lower);
+    end = mDataContainer->findEnd(range.upper);
+    // Progress along the key axis: pixels that grow with the key, whichever way the axis runs.
+    const int sign = keyAxis->pixelOrientation();
+    const bool horizontal = keyAxis->orientation() == Qt::Horizontal;
+    // The edge of a bar that faces the visible range: the furthest one below the range, the
+    // nearest one above it.
+    const auto nearEdge = [&](const QRectF& bar, bool fromUpperBound)
+    {
+        const double first = sign * (horizontal ? bar.left() : bar.top());
+        const double second = sign * (horizontal ? bar.right() : bar.bottom());
+        return fromUpperBound ? qMin(first, second) : qMax(first, second);
+    };
+    const double lowerBound = sign * keyAxis->coordToPixel(range.lower);
+    const double upperBound = sign * keyAxis->coordToPixel(range.upper);
+
+    // walk down from the first data point inside the range, keeping every bar that still reaches
+    // into it:
     QCPBarsDataContainer::const_iterator it = begin;
     while (it != mDataContainer->constBegin())
     {
         --it;
-        const QRectF barRect = getBarRect(it->key, it->value);
-        if (mKeyAxis.data()->orientation() == Qt::Horizontal)
-            isVisible
-                = ((!mKeyAxis.data()->rangeReversed() && barRect.right() >= lowerPixelBound)
-                   || (mKeyAxis.data()->rangeReversed() && barRect.left() <= lowerPixelBound));
-        else // keyaxis is vertical
-            isVisible
-                = ((!mKeyAxis.data()->rangeReversed() && barRect.top() <= lowerPixelBound)
-                   || (mKeyAxis.data()->rangeReversed() && barRect.bottom() >= lowerPixelBound));
-        if (isVisible)
-            begin = it;
-        else
+        if (nearEdge(getBarRect(it->key, it->value), false) < lowerBound)
             break;
+        begin = it;
     }
-    // walk right from ubound to find upper bar that actually is completely outside visible pixel
-    // range:
-    it = end;
-    while (it != mDataContainer->constEnd())
+    // walk up from one past the last data point inside the range, likewise:
+    for (it = end; it != mDataContainer->constEnd(); ++it)
     {
-        const QRectF barRect = getBarRect(it->key, it->value);
-        if (mKeyAxis.data()->orientation() == Qt::Horizontal)
-            isVisible
-                = ((!mKeyAxis.data()->rangeReversed() && barRect.left() <= upperPixelBound)
-                   || (mKeyAxis.data()->rangeReversed() && barRect.right() >= upperPixelBound));
-        else // keyaxis is vertical
-            isVisible = ((!mKeyAxis.data()->rangeReversed() && barRect.bottom() >= upperPixelBound)
-                         || (mKeyAxis.data()->rangeReversed() && barRect.top() <= upperPixelBound));
-        if (isVisible)
-            end = it + 1;
-        else
+        if (nearEdge(getBarRect(it->key, it->value), true) > upperBound)
             break;
-        ++it;
+        end = it + 1;
     }
 }
 
