@@ -201,6 +201,43 @@ B (round of performance and docs)
   5.4 → 5.3, inside noise) and reverted, and the replay's two extra visits per command are 0.03 % of a
   rebuild frame. Cost if wrong: those allocations and visits stay.
 
+## Size loop, re-review and fix round C
+
+Size loop (two passes, f9b37b5..75a98a4, `src/` -312 lines, tree net -239)
+- Pass 1 kept the `createSrb` overloads merge at -5 lines and moved one candidate to pass 2. Cost if
+  wrong: a few lines.
+- Pass 2 took the dead code, the `QCPItemText` accessors, the single raster-needs visit and the bars
+  visible-bounds rewrite (after its 8-case edge test was committed green on the old code). It skipped
+  the per-frame upload path and the hit-test merge (risk above the lines saved). Cost if wrong: about
+  20 lines left in.
+- The loop stopped after pass 2: the best remaining candidate was under 30 lines. Cost if wrong: a
+  few more lines.
+- Pass 1's extent refactor broke culling: `QRectF::united` drops a zero-size rect, so a box built
+  from points kept only the last one. `qcpPixelBox` tracks the corners by hand, and
+  `shapeEndingOutsideTheClipIsDrawn` guards it. Cost if wrong: none (fixed and tested).
+
+Re-review (two reviewers on e2ef986..75a98a4): both found the refactors preserve behaviour kind by
+kind; the fix rounds left five Important and eight Minor findings, fixed in round C.
+
+Round C (75a98a4..465cf64)
+- M3 (the stack's dependency key is a sum and could collide) is ruled false: the moved bar's own
+  generation makes its recording stale whatever the key says. Cost if wrong: a stale stack after a
+  restack whose sums happen to match.
+- M8 (grid group with a failed SRB) is fixed without a test: no hook makes an SRB creation fail.
+  Cost if wrong: an untested skip path.
+- A layer's shift is now added to each entry's offset instead of replacing it, so a reused recording
+  keeps its own pan delta. Pan rows unchanged. Cost if wrong: a float drift over very long pans
+  without a repaint (each repaint clears it).
+- Found during the round, in no review: every image on a GPU layer read the first image's uniform
+  slot (the offset named binding 0, the texture's). Fixed with its own test. Cost if wrong: none.
+- A mixed data/ratio position is a key and a value, like `QCP::Data` *(maintainer, 2026-11-06)*. On
+  a vertical key axis the data number goes through the key axis (screen y) and the ratio runs along
+  the value axis (screen x). The 2.x `pixelPosition()` sent the ratio through the value axis and
+  ignored the data number; the brief said to match it and the first fix (8fde011) did, which
+  contradicted the extent the culling uses. `efe0dde` replaces it, and the item path resolves a
+  data/ratio pair without anchors through the same function. Changelog: behaviour change. Cost if
+  wrong: a 2.x program relying on the broken vertical-key result moves (it could not have meant it).
+
 ## Review findings ruled false (so nobody re-fixes them)
 
 - Task 4, review M8: "the histogram outline ignores the pen style". The outline pen is built
@@ -238,6 +275,14 @@ B (round of performance and docs)
   folding the `QCPDrawn` adapter into the bases (spec section 8, `src/drawable.h` comment).
 - The strong-type inventory (`strong-type-candidates.md`, Task 2): every public signature outside
   drawing where a raw `double`, `int`, `QPointF` or `QString` invites a mix-up.
+- Re-review M6: a bar stack's staleness check recurses down the stack, O(N²) in its depth.
+  Negligible for real stacks.
+- Re-review OC F4: the GPU stroke's `thread_local` scratch buffer keeps its peak size. Memory only.
+- Re-review OC guess: a deferred painter callback could dangle if an object were deleted mid-pass.
+  No path deletes one mid-pass today; recheck if that changes.
+- Other mixed 2.x position pairs (plot coordinates with `ptAbsolute` or `ptViewportRatio`) still
+  read the crossed slot on a vertical key axis in `pixelPosition()`. The drawing API has no such
+  type; they go with the old API in milestone 5.
 
 ## Format decisions for milestone 4 (survey)
 
