@@ -84,9 +84,7 @@ void QCPPainter::setPen(const QPen& pen)
 */
 void QCPPainter::setPen(const QColor& color)
 {
-    QPainter::setPen(color);
-    if (mModes.testFlag(pmNonCosmetic))
-        makeNonCosmetic();
+    setPen(QPen(color));
 }
 
 /*! \overload
@@ -98,9 +96,7 @@ void QCPPainter::setPen(const QColor& color)
 */
 void QCPPainter::setPen(Qt::PenStyle penStyle)
 {
-    QPainter::setPen(penStyle);
-    if (mModes.testFlag(pmNonCosmetic))
-        makeNonCosmetic();
+    setPen(QPen(penStyle));
 }
 
 /*! \overload

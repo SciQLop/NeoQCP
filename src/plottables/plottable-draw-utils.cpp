@@ -209,6 +209,9 @@ bool strokePolylineOnGpu(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer*
                         static_cast<float>(painter->opacity()));
 }
 
+namespace
+{
+// Same, with an extrusion cache that survives pans: \a freshLines forces a rebuild.
 bool strokePolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer* layer,
                           std::span<const QPointF> pts, const QPen& pen, const QPointF& gpuOffset,
                           const QRect& clipRect, bool freshLines, ExtrusionCache& cache)
@@ -232,6 +235,7 @@ bool strokePolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer
                         parentPlot->rhiOutputSize().height(), gpuOffset,
                         static_cast<float>(painter->opacity()));
 }
+} // namespace
 
 void drawPolylineWithGpuFallback(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer* layer,
                                  const QVector<QPointF>& pts, const QPen& pen,
@@ -304,9 +308,7 @@ void drawColoredPolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCP
                                        pen, gpuOffset);
 
     const double dpr = parentPlot->bufferDevicePixelRatio();
-    const float penWidth = (pen.isCosmetic() || qFuzzyIsNull(pen.widthF()))
-        ? static_cast<float>(1.0 / dpr)
-        : qMax(1.0f, static_cast<float>(pen.widthF()));
+    const float penWidth = extrusionPenWidth(pen, dpr);
     const bool dashed = isDashed(pen);
     if (needsColoredReextrusion(cache, freshLines, penWidth, mapper.generation(), dashed))
     {

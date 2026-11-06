@@ -86,11 +86,6 @@ struct ExtrusionCache
     [[nodiscard]] bool isEmpty() const { return vertices.empty(); }
 };
 
-/// Same with an extrusion cache that survives pans; \a freshLines forces a rebuild.
-bool strokePolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer* layer,
-                          std::span<const QPointF> pts, const QPen& pen, const QPointF& gpuOffset,
-                          const QRect& clipRect, bool freshLines, ExtrusionCache& cache);
-
 /// Adds already-extruded stroke vertices to \a layer: the dashed pipeline when \a pen is not
 /// solid, the solid one otherwise. Shared by the plottable paths and the command replay.
 /// False when a dashed pen has no dashed pipeline (it failed to build): the caller paints it.
