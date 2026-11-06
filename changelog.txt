@@ -265,8 +265,8 @@ One signal per fact: a signal that used to carry a copy of a getter's value now 
         misuse. An axis, a legend and the polar axes answer stWhole when any part is selectable and
         stNone when none is; setSelectableParts still sets the parts.
   - The selection signals are delivered when the outermost NeoQCP call returns, as everywhere else
-        (see milestone 1): a slot can delete the sender, and what it reads is the state from the
-        moment the object emitted.
+        (see milestone 1): a slot can delete the sender, and what it reads is the state when the
+        slot runs, after the whole call.
 
 Behaviour changes for 2.x users:
   - The selection signals lost their arguments: connect to selectionChanged()/selectableChanged() and
