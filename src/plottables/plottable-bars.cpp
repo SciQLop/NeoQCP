@@ -1082,6 +1082,14 @@ bool QCPBars::hasPixelGeometry() const
 quint64 QCPBars::dependencyRevision() const
 {
     quint64 key = QCPDrawn<QCPAbstractPlottable1D<QCPBarsData>>::dependencyRevision();
+    // simplify: every bar of a stack walks the whole stack below it, and a check round asks each of
+    // them (stallOffset per plottable, then ensureRecording per paint), so the round costs
+    // O(depth^2) - 20k virtual calls for a 200-bar stack, twice a pan frame. A per-frame cache is
+    // not enough on its own: a change deep in the stack bumps only that bar's generation, which no
+    // key cached above it can see, so a cached key would hide a stale recording. The upgrade is a
+    // revision counter shared by the members of one stack and bumped by any of them changing, which
+    // a cached key is validated against: O(1) per bar per frame, and only a null check for a bar
+    // that is not stacked.
     if (mBarBelow) // the base is read at record time: its own key carries the whole stack below it
         key += mBarBelow->mCore.generation() + mBarBelow->dependencyRevision();
     if (mBarsGroup) // the group centres every member by their widths
