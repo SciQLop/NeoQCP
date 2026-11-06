@@ -265,16 +265,7 @@ void QCPRasterFallback::beginReplay()
 {
     mPainterHandled.clear();
     mPainterLists.clear();
-    for (auto it = mEntries.begin(); it != mEntries.end();)
-    {
-        if (!it->used)
-            it = mEntries.erase(it);
-        else
-        {
-            it->used = false;
-            ++it;
-        }
-    }
+    sweepUnused(mEntries, [](const Entry&) { return false; });
 }
 
 const QImage& QCPRasterFallback::image(quint64 list, quint64 index, const QCPDrawCommand& command,

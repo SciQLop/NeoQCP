@@ -10,12 +10,23 @@
 #include <QPair>
 #include <QRectF>
 #include <QSet>
+#include <algorithm>
 #include <deque>
 
 class QCPPainter;
 
 namespace qcp
 {
+//! Drops the entries the previous replay did not touch -- \a expired also drops those whose key is
+//! gone -- and marks the rest as not yet touched by this one.
+template <class Entry, class Expired>
+void sweepUnused(std::deque<Entry>& entries, Expired&& expired)
+{
+    std::erase_if(entries, [&](const Entry& entry) { return !entry.used || expired(entry); });
+    for (Entry& entry : entries)
+        entry.used = false;
+}
+
 //! True when \a pen's brush is not a solid colour: the GPU strokes it in one colour, so the stroke
 //! has to be part of the command's image.
 bool strokeNeedsRaster(const QPen& pen);

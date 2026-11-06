@@ -99,6 +99,14 @@ void addPolyline(QCPPlottableRhiLayer& layer, std::span<const QPointF> points, c
         cache->keepSolid(verts, 0, movesWithData);
 }
 
+// One vertex of a triangle list: its pixels, then its colour.
+void appendVertex(std::vector<float>& out, const QPointF& p, const std::array<float, 4>& rgba)
+{
+    out.push_back(static_cast<float>(p.x()));
+    out.push_back(static_cast<float>(p.y()));
+    out.insert(out.end(), rgba.begin(), rgba.end());
+}
+
 // Triangle strip between two pixel-space curves of the same length.
 void addRibbonFill(QCPPlottableRhiLayer& layer, std::span<const QPointF> upper,
                    std::span<const QPointF> lower, const QColor& color, const QRect& clip,
@@ -113,20 +121,14 @@ void addRibbonFill(QCPPlottableRhiLayer& layer, std::span<const QPointF> upper,
     std::vector<float>& verts = fillScratch();
     verts.clear();
     verts.reserve((count - 1) * 36);
-    const auto push = [&verts, &rgba](const QPointF& p)
-    {
-        verts.push_back(static_cast<float>(p.x()));
-        verts.push_back(static_cast<float>(p.y()));
-        verts.insert(verts.end(), rgba.begin(), rgba.end());
-    };
     for (std::size_t i = 0; i + 1 < count; ++i)
     {
-        push(upper[i]);
-        push(upper[i + 1]);
-        push(lower[i + 1]);
-        push(upper[i]);
-        push(lower[i + 1]);
-        push(lower[i]);
+        appendVertex(verts, upper[i], rgba);
+        appendVertex(verts, upper[i + 1], rgba);
+        appendVertex(verts, lower[i + 1], rgba);
+        appendVertex(verts, upper[i], rgba);
+        appendVertex(verts, lower[i + 1], rgba);
+        appendVertex(verts, lower[i], rgba);
     }
     layer.addPlottable(verts, { }, clip, dpr, height, 0, 0, alpha);
     if (cache)
@@ -302,49 +304,38 @@ void replayKept(const QCPDrawList& list, const QCPRecordingCache& kept, QCPPlott
 
 void QCPResolveCache::beginReplay()
 {
-    // Sweep what the previous replay did not touch: a recording that is gone or no longer drawn.
-    for (auto it = mEntries.begin(); it != mEntries.end();)
-    {
-        if (!it->used || it->recording.expired())
-            it = mEntries.erase(it);
-        else
-        {
-            it->used = false;
-            ++it;
-        }
-    }
+    // A recording that is gone or no longer drawn is dropped, not kept for the next replay.
+    qcp::sweepUnused(mEntries, [](const Entry& entry) { return entry.recording.expired(); });
 }
 
 std::span<const QPointF>
 QCPResolveCache::pixels(const std::shared_ptr<const std::vector<QPointF>>& recording,
                         quint64 generation, const QCPTransform& transform)
 {
+    const std::span<const QPointF> data(*recording);
+    const auto remap = [&](Entry& entry)
+    {
+        entry.pixels.resize(data.size());
+        transform.map(data, std::span<QPointF>(entry.pixels));
+        entry.generation = generation;
+        entry.transform = transform;
+        ++mRemaps;
+    };
+
     for (Entry& entry : mEntries)
     {
         if (entry.recording.lock() != recording)
             continue;
         entry.used = true;
         if (entry.generation != generation || !(entry.transform == transform))
-        {
-            const std::span<const QPointF> data(*recording);
-            entry.pixels.resize(data.size());
-            transform.map(data, std::span<QPointF>(entry.pixels));
-            entry.generation = generation;
-            entry.transform = transform;
-            ++mRemaps;
-        }
+            remap(entry);
         return std::span<const QPointF>(entry.pixels);
     }
 
     Entry& entry = mEntries.emplace_back();
     entry.recording = recording;
-    entry.generation = generation;
-    entry.transform = transform;
     entry.used = true;
-    const std::span<const QPointF> data(*recording);
-    entry.pixels.resize(data.size());
-    transform.map(data, std::span<QPointF>(entry.pixels));
-    ++mRemaps;
+    remap(entry);
     return std::span<const QPointF>(entry.pixels);
 }
 
@@ -651,17 +642,11 @@ std::vector<float> qcpFanFillVertices(const QPointF& centre, std::span<const QPo
         return verts;
     const std::array<float, 4> rgba = qcp::rhi::premultipliedColor(color);
     verts.reserve(ring.size() * 18);
-    const auto push = [&verts, &rgba](const QPointF& p)
-    {
-        verts.push_back(static_cast<float>(p.x()));
-        verts.push_back(static_cast<float>(p.y()));
-        verts.insert(verts.end(), rgba.begin(), rgba.end());
-    };
     for (std::size_t i = 0; i < ring.size(); ++i)
     {
-        push(centre);
-        push(ring[i]);
-        push(ring[(i + 1) % ring.size()]);
+        appendVertex(verts, centre, rgba);
+        appendVertex(verts, ring[i], rgba);
+        appendVertex(verts, ring[(i + 1) % ring.size()], rgba);
     }
     return verts;
 }
