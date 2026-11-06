@@ -1344,7 +1344,7 @@ void QCPAbstractItem::setSelectable(bool selectable)
     if (mSelectable != selectable)
     {
         mSelectable = selectable;
-        emit selectableChanged(mSelectable);
+        qcpEmit(this, mParentPlot, &QCPAbstractItem::selectableChanged, mSelectable);
     }
 }
 
@@ -1369,7 +1369,7 @@ void QCPAbstractItem::setSelected(bool selected)
         return;
     markDirty();
     mSelected = selected;
-    emit selectionChanged(mSelected);
+    qcpEmit(this, mParentPlot, &QCPAbstractItem::selectionChanged, mSelected);
 }
 
 /*!

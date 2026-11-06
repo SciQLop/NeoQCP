@@ -45,7 +45,7 @@ void QCPItemVSpan::setRange(const QCPRange& range)
     // Emit last: a slot may delete this span.
     if (mParentPlot)
         markRhiDirty();
-    emit rangeChanged(range);
+    qcpEmit(this, mParentPlot, &QCPItemVSpan::rangeChanged, range);
 }
 
 double QCPItemVSpan::selectTest(const QPointF& pos, bool onlySelectable, QVariant* details) const
@@ -173,7 +173,7 @@ void QCPItemVSpan::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
         markRhiDirty();
         mParentPlot->replot(QCustomPlot::rpQueuedReplot);
     }
-    emit rangeChanged(range());
+    qcpEmit(this, mParentPlot, &QCPItemVSpan::rangeChanged, range());
 }
 
 void QCPItemVSpan::mouseReleaseEvent([[maybe_unused]] QMouseEvent* event,

@@ -38,6 +38,19 @@ QPoint pixelOf(const QCustomPlot& plot, double key, double value)
     return {qRound(plot.xAxis->coordToPixel(key)), qRound(plot.yAxis->coordToPixel(value))};
 }
 
+void sendMouse(QCustomPlot* plot, QEvent::Type type, QPoint pos, Qt::MouseButtons buttons)
+{
+    QMouseEvent event(type, pos, plot->mapToGlobal(pos), Qt::LeftButton, buttons, Qt::NoModifier);
+    QCoreApplication::sendEvent(plot, &event);
+}
+
+void dragFromTo(QCustomPlot* plot, QPoint from, QPoint to)
+{
+    sendMouse(plot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+    sendMouse(plot, QEvent::MouseMove, to, Qt::LeftButton);
+    sendMouse(plot, QEvent::MouseButtonRelease, to, Qt::NoButton);
+}
+
 class WheelRecorder : public QWidget
 {
 public:
@@ -691,4 +704,177 @@ void TestSignalDelivery::slotReenteringAScopedSetterLeavesTheLastSignalCurrent()
     QCOMPARE(axis->scaleType(), QCPAxis::stLinear);
     QVERIFY(!received.isEmpty());
     QCOMPARE(received.last(), axis->scaleType());
+}
+
+void TestSignalDelivery::colorMapGradientSlotDeletingThePlot()
+{
+    auto* plot = new QCustomPlot;
+    plot->resize(400, 300);
+    plot->xAxis->setRange(0, 10);
+    plot->yAxis->setRange(0, 10);
+    auto* map = new QCPColorMap(plot->xAxis, plot->yAxis);
+    auto* scale = new QCPColorScale(plot);
+    plot->plotLayout()->addElement(0, 1, scale);
+
+    const QPointer<QCustomPlot> alive(plot);
+    int scaleGradients = 0;
+    int mapGradients = 0;
+    // The deleting slot is the map's first one, and the colour scale is wired after it: the echo
+    // on the scale, and every later slot of the map, must be dropped with the plot.
+    connect(map, &QCPColorMap::gradientChanged, plot,
+            [plot](const QCPColorGradient&) { delete plot; });
+    map->setColorScale(scale);
+    connect(scale, &QCPColorScale::gradientChanged, plot,
+            [&scaleGradients](const QCPColorGradient&) { ++scaleGradients; });
+    connect(map, &QCPColorMap::gradientChanged, plot,
+            [&mapGradients](const QCPColorGradient&) { ++mapGradients; });
+
+    map->setGradient(QCPColorGradient(QCPColorGradient::gpJet));
+
+    QVERIFY(!alive);
+    QCOMPARE(scaleGradients, 0);
+    QCOMPARE(mapGradients, 0);
+}
+
+void TestSignalDelivery::spanDragSlotDeletingThePlot()
+{
+    auto* plot = new QCustomPlot;
+    plot->resize(400, 300);
+    plot->xAxis->setRange(0, 10);
+    plot->yAxis->setRange(0, 10);
+    auto* span = new QCPItemRSpan(plot);
+    span->setKeyRange(QCPRange(3, 7));
+    span->setValueRange(QCPRange(3, 7));
+    plot->replot();
+
+    const QPointer<QCustomPlot> alive(plot);
+    int keyMoves = 0;
+    int valueMoves = 0;
+    // A fill drag emits the two ranges one after the other.
+    connect(span, &QCPItemRSpan::keyRangeChanged, plot,
+            [&keyMoves, plot](const QCPRange&)
+            {
+                ++keyMoves;
+                delete plot;
+            });
+    connect(span, &QCPItemRSpan::valueRangeChanged, plot,
+            [&valueMoves](const QCPRange&) { ++valueMoves; });
+
+    const QPoint from = pixelOf(*plot, 5, 5);
+    sendMouse(plot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+    sendMouse(plot, QEvent::MouseMove, from + QPoint(20, 20), Qt::LeftButton);
+
+    QVERIFY(!alive);
+    QCOMPARE(keyMoves, 1);
+    QCOMPARE(valueMoves, 0);
+}
+
+void TestSignalDelivery::selectionRectSlotDeletingThePlot()
+{
+    auto* plot = new QCustomPlot;
+    plot->resize(400, 300);
+    auto* graph = plot->addGraph();
+    graph->setData(QVector<double>{0, 5, 10}, QVector<double>{8, 8, 8});
+    graph->setSelectable(QCP::stWhole);
+    plot->xAxis->setRange(0, 10);
+    plot->yAxis->setRange(0, 10);
+    plot->setInteractions(QCP::iSelectPlottables);
+    plot->setSelectionRectMode(QCP::srmSelect);
+    plot->replot();
+
+    const QPointer<QCustomPlot> alive(plot);
+    int plottableSelections = 0;
+    connect(graph, qOverload<bool>(&QCPAbstractPlottable::selectionChanged), plot,
+            [&plottableSelections](bool) { ++plottableSelections; });
+    connect(plot->selectionRect(), &QCPSelectionRect::accepted, plot,
+            [plot](const QRect&, QMouseEvent*) { delete plot; });
+
+    dragFromTo(plot, pixelOf(*plot, 1, 9), pixelOf(*plot, 9, 7));
+
+    // Guard: the rect's action ran before accepted, and deleting the plot from it is harmless. The
+    // accepted delivery moves out of the release handler, so nothing may touch the plot after it.
+    QVERIFY(!alive);
+    QVERIFY2(plottableSelections > 0, "the rect must reach the plottable before accepted returns");
+}
+
+void TestSignalDelivery::overlayCollapseSlotDeletingThePlot()
+{
+    auto* plot = new QCustomPlot;
+    plot->resize(400, 300);
+    auto* overlay = plot->overlay();
+    const QPointer<QCustomPlot> alive(plot);
+    int laterCollapses = 0;
+    connect(overlay, &QCPOverlay::collapsedChanged, plot, [plot](bool) { delete plot; });
+    connect(overlay, &QCPOverlay::collapsedChanged, plot,
+            [&laterCollapses](bool) { ++laterCollapses; });
+
+    overlay->setCollapsed(true);
+
+    QVERIFY(!alive);
+    QCOMPARE(laterCollapses, 0);
+}
+
+void TestSignalDelivery::groupMembersSlotDeletingThePlot()
+{
+    auto* plot = new QCustomPlot;
+    plot->resize(400, 300);
+    auto* member = plot->addGraph();
+    member->setData(QVector<double>{0, 10}, QVector<double>{0, 10});
+    auto* first = plot->addPlottableGroup(QStringLiteral("first"));
+    first->addMember(member);
+    auto* second = plot->addPlottableGroup(QStringLiteral("second"));
+
+    const QPointer<QCustomPlot> alive(plot);
+    int secondChanges = 0;
+    // Taking the member away from the first group tells it first, then the new group.
+    connect(first, &QCPPlottableGroup::membersChanged, plot, [plot] { delete plot; });
+    connect(second, &QCPPlottableGroup::membersChanged, plot,
+            [&secondChanges] { ++secondChanges; });
+
+    second->addMember(member);
+
+    QVERIFY(!alive);
+    QCOMPARE(secondChanges, 0);
+}
+
+void TestSignalDelivery::overlayMessageSlotDeletingThePlot()
+{
+    auto* plot = new QCustomPlot;
+    plot->resize(400, 300);
+    auto* overlay = plot->overlay();
+    const QPointer<QCustomPlot> alive(plot);
+    int laterMessages = 0;
+    connect(overlay, &QCPOverlay::messageChanged, plot,
+            [plot](const QString&, QCPOverlay::Level) { delete plot; });
+    connect(overlay, &QCPOverlay::messageChanged, plot,
+            [&laterMessages](const QString&, QCPOverlay::Level) { ++laterMessages; });
+
+    overlay->showMessage(QStringLiteral("boom"), QCPOverlay::Error);
+
+    QVERIFY(!alive);
+    QCOMPARE(laterMessages, 0);
+}
+
+void TestSignalDelivery::plottableSelectionSlotDeletingThePlot()
+{
+    auto* plot = new QCustomPlot;
+    plot->resize(400, 300);
+    auto* graph = plot->addGraph();
+    graph->setData(QVector<double>{0, 5, 10}, QVector<double>{0, 5, 10});
+    graph->setSelectable(QCP::stWhole);
+    plot->xAxis->setRange(0, 10);
+    plot->yAxis->setRange(0, 10);
+
+    const QPointer<QCustomPlot> alive(plot);
+    int selectionChanges = 0;
+    // emitSelectionChanged tells the bool overload first, then the data-selection one.
+    connect(graph, qOverload<bool>(&QCPAbstractPlottable::selectionChanged), plot,
+            [plot](bool) { delete plot; });
+    connect(graph, qOverload<const QCPDataSelection&>(&QCPAbstractPlottable::selectionChanged), plot,
+            [&selectionChanges](const QCPDataSelection&) { ++selectionChanges; });
+
+    graph->setSelection(QCPDataSelection(QCPDataRange(0, 1)));
+
+    QVERIFY(!alive);
+    QCOMPARE(selectionChanges, 0);
 }

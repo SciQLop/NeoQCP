@@ -278,11 +278,11 @@ void QCPHistogram::takeResult(std::shared_ptr<Histogram1D> result)
 {
     const bool edgesMoved = storeResult(std::move(result));
     requestReplot();
-    const QPointer<QCPHistogram> alive(this);
+    // Two emissions, and a slot may delete this histogram: deliver at the outermost call.
+    const QCPEmissionScope scope(mParentPlot);
     if (edgesMoved)
-        Q_EMIT edgesChanged();
-    if (alive)
-        Q_EMIT histogramReady();
+        qcpEmit(this, mParentPlot, &QCPHistogram::edgesChanged);
+    qcpEmit(this, mParentPlot, &QCPHistogram::histogramReady);
 }
 
 // setTransform does not restart the pipeline, so reinstalling here cannot loop.

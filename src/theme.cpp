@@ -12,6 +12,7 @@ QCPTheme::QCPTheme(QObject* parent)
 {
 }
 
+// A theme owns no plot and no emission queue: its setters deliver at once.
 void QCPTheme::setBackground(const QColor& color)
 {
     if (mBackground != color) { mBackground = color; emit changed(); }

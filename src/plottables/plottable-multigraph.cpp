@@ -572,7 +572,7 @@ void QCPMultiGraph::setComponentInLegend(int index, bool inLegend)
     if (mComponents[index].inLegend != inLegend)
     {
         mComponents[index].inLegend = inLegend;
-        Q_EMIT componentVisibilityChanged();
+        qcpEmit(this, mParentPlot, &QCPMultiGraph::componentVisibilityChanged);
     }
 }
 
@@ -594,7 +594,7 @@ void QCPMultiGraph::setComponentVisible(int index, bool visible)
     markLinesDirty();
     if (mLayer)
         mLayer->invalidatePaintBuffer();
-    emit componentVisibilityChanged();
+    qcpEmit(this, mParentPlot, &QCPMultiGraph::componentVisibilityChanged);
 }
 
 void QCPMultiGraph::setLineStyle(LineStyle style)

@@ -691,8 +691,9 @@ void QCPIntervals::finishGesture()
     if (g.kind != Gesture::Create)
         emitEdits(g.preview);
     else if (g.preview[0].stop > g.preview[0].start)
-        emit intervalCreated(g.preview[0].start, g.preview[0].stop, g.preview[0].lane,
-                             categoryRowAt(g.pressLane, g.pressPos.y()).value_or(-1));
+        qcpEmit(this, mParentPlot, &QCPIntervals::intervalCreated, g.preview[0].start,
+                g.preview[0].stop, g.preview[0].lane,
+                categoryRowAt(g.pressLane, g.pressPos.y()).value_or(-1));
 }
 
 bool QCPIntervals::changesAnyRow(const std::vector<qcp::intervals::Edit>& edits) const
@@ -710,7 +711,7 @@ void QCPIntervals::emitEdits(const std::vector<qcp::intervals::Edit>& edits)
     QVector<QCPIntervalEdit> out;
     for (const auto& e : edits)
         out.append({ mColumns.ids[e.row], e.start, e.stop, e.lane });
-    emit intervalsEdited(out);
+    qcpEmit(this, mParentPlot, &QCPIntervals::intervalsEdited, out);
 }
 
 bool QCPIntervals::keyPress(QKeyEvent* event)
@@ -732,7 +733,7 @@ bool QCPIntervals::keyPress(QKeyEvent* event)
         case Qt::Key_Backspace:
             if (!(mEditModes & emDelete))
                 return false;
-            emit deleteRequested(selectedIds());
+            qcpEmit(this, mParentPlot, &QCPIntervals::deleteRequested, selectedIds());
             return true;
         case Qt::Key_Left:
             return nudge(-1, 0);

@@ -1,5 +1,5 @@
-#include <QtTest/QtTest>
 #include "qcustomplot.h"
+#include <QtTest/QtTest>
 
 class TestSignalDelivery : public QObject
 {
@@ -48,4 +48,12 @@ private slots:
     void teardownOpensNoDelivery();
     void oneArgumentRangeSlotConnects();
     void slotReenteringAScopedSetterLeavesTheLastSignalCurrent();
+
+    void colorMapGradientSlotDeletingThePlot();
+    void spanDragSlotDeletingThePlot();
+    void selectionRectSlotDeletingThePlot();
+    void groupMembersSlotDeletingThePlot();
+    void overlayMessageSlotDeletingThePlot();
+    void overlayCollapseSlotDeletingThePlot();
+    void plottableSelectionSlotDeletingThePlot();
 };

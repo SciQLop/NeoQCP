@@ -60,7 +60,7 @@ void QCPItemRSpan::setKeyRange(const QCPRange& range)
     // Emit last: a slot may delete this span.
     if (mParentPlot)
         markRhiDirty();
-    emit keyRangeChanged(range);
+    qcpEmit(this, mParentPlot, &QCPItemRSpan::keyRangeChanged, range);
 }
 
 void QCPItemRSpan::setValueRange(const QCPRange& range)
@@ -73,7 +73,7 @@ void QCPItemRSpan::setValueRange(const QCPRange& range)
     // Emit last: a slot may delete this span.
     if (mParentPlot)
         markRhiDirty();
-    emit valueRangeChanged(range);
+    qcpEmit(this, mParentPlot, &QCPItemRSpan::valueRangeChanged, range);
 }
 
 double QCPItemRSpan::selectTest(const QPointF& pos, bool onlySelectable, QVariant* details) const
@@ -266,16 +266,18 @@ void QCPItemRSpan::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
     emitDraggedRanges();
 }
 
-// A slot may delete this span: emit last, and the value range only while it is alive.
+// A drag moves both ranges, and a slot may delete this span: deliver at the outermost call, reading
+// each value when it is delivered.
 void QCPItemRSpan::emitDraggedRanges()
 {
     const bool keyMoved = mDragPart == hpLeft || mDragPart == hpRight || mDragPart == hpFill;
     const bool valueMoved = mDragPart == hpTop || mDragPart == hpBottom || mDragPart == hpFill;
-    const QPointer<QCPItemRSpan> alive(this);
+    const QCPEmissionScope scope(mParentPlot);
     if (keyMoved)
-        emit keyRangeChanged(keyRange());
-    if (alive && valueMoved)
-        emit valueRangeChanged(valueRange());
+        qcpEmit(this, mParentPlot, &QCPItemRSpan::keyRangeChanged, keyRange());
+    if (valueMoved)
+        qcpEmitCurrent(this, mParentPlot, &QCPItemRSpan::valueRangeChanged,
+                       [this] { return valueRange(); });
 }
 
 void QCPItemRSpan::mouseReleaseEvent([[maybe_unused]] QMouseEvent* event,

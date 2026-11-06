@@ -670,15 +670,17 @@ void QCPAbstractPlottable::setSelection(QCPDataSelection selection)
 
 /*! \internal
 
-  Emits both \ref selectionChanged signals. A slot may delete this plottable: the second signal is
-  only emitted while it is alive.
+  Emits both \ref selectionChanged signals, at the outermost call: a slot may delete this plottable,
+  and the values are read when they are delivered.
 */
 void QCPAbstractPlottable::emitSelectionChanged()
 {
-    const QPointer<QCPAbstractPlottable> alive(this);
-    emit selectionChanged(selected());
-    if (alive)
-        emit selectionChanged(mSelection);
+    const QCPEmissionScope scope(mParentPlot);
+    qcpEmitCurrent(this, mParentPlot, qOverload<bool>(&QCPAbstractPlottable::selectionChanged),
+                   [this] { return selected(); });
+    qcpEmitCurrent(this, mParentPlot,
+                   qOverload<const QCPDataSelection&>(&QCPAbstractPlottable::selectionChanged),
+                   [this] { return mSelection; });
 }
 
 /*!
@@ -725,9 +727,9 @@ void QCPAbstractPlottable::setSelectable(QCP::SelectionType selectable)
         QCPDataSelection oldSelection = mSelection;
         mSelection.enforceType(mSelectable);
         const bool selectionTrimmed = mSelection != oldSelection;
-        const QPointer<QCPAbstractPlottable> alive(this);
-        emit selectableChanged(mSelectable);
-        if (alive && selectionTrimmed)
+        const QCPEmissionScope scope(mParentPlot);
+        qcpEmit(this, mParentPlot, &QCPAbstractPlottable::selectableChanged, mSelectable);
+        if (selectionTrimmed)
             emitSelectionChanged();
     }
 }
@@ -1214,7 +1216,7 @@ void QCPAbstractPlottable::updateEffectiveBusy()
     const int delay = mEffectiveBusy ? effectiveBusyShowDelayMs() : effectiveBusyHideDelayMs();
     mBusyDebounceTimer.start(delay);
     // Last: a slot may delete this plottable.
-    emit busyChanged(mEffectiveBusy);
+    qcpEmit(this, mParentPlot, &QCPAbstractPlottable::busyChanged, mEffectiveBusy);
 }
 
 void QCPAbstractPlottable::onDebounceTimeout()
@@ -1228,7 +1230,7 @@ void QCPAbstractPlottable::onDebounceTimeout()
     if (mLayer)
         mLayer->invalidatePaintBuffer(); // invalidating schedules the repaint
     // Last: a slot may delete this plottable.
-    emit visuallyBusyChanged(mVisuallyBusy);
+    qcpEmit(this, mParentPlot, &QCPAbstractPlottable::visuallyBusyChanged, mVisuallyBusy);
 }
 
 // per-plottable overrides

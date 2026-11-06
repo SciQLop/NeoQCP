@@ -179,7 +179,9 @@ void QCPColorMap2::setGradient(const QCPColorGradient& gradient)
         return;
     mRenderer.setGradient(gradient);
     redrawLater();
-    Q_EMIT gradientChanged(mRenderer.gradient()); // last: a slot may delete this colour map
+    // A colour scale echoes this signal: two emissions, and a slot may delete this colour map.
+    const QCPEmissionScope scope(mParentPlot);
+    qcpEmit(this, mParentPlot, &QCPColorMap2::gradientChanged, mRenderer.gradient());
 }
 
 void QCPColorMap2::setColorScale(QCPColorScale* colorScale)
@@ -224,7 +226,7 @@ void QCPColorMap2::setDataRange(const QCPRange& range)
     if (prev.lower != cur.lower || prev.upper != cur.upper)
     {
         redrawLater();
-        Q_EMIT dataRangeChanged(cur); // last: a slot may delete this colour map
+        qcpEmit(this, mParentPlot, &QCPColorMap2::dataRangeChanged, cur);
     }
 }
 
@@ -242,10 +244,13 @@ void QCPColorMap2::setDataScaleType(QCPAxis::ScaleType type)
         return; // its busyChanged slot deleted this colour map
     redrawLater();
     const QCPRange curRange = mRenderer.dataRange();
+    // A changed range is announced first: deliver both at the outermost call, the scale type last
+    // so a listener sees the type that is current when it runs.
+    const QCPEmissionScope scope(mParentPlot);
     if (prevRange.lower != curRange.lower || prevRange.upper != curRange.upper)
-        Q_EMIT dataRangeChanged(curRange);
-    if (alive)
-        Q_EMIT dataScaleTypeChanged(type);
+        qcpEmit(this, mParentPlot, &QCPColorMap2::dataRangeChanged, curRange);
+    qcpEmitCurrent(this, mParentPlot, &QCPColorMap2::dataScaleTypeChanged,
+                   [this] { return mRenderer.dataScaleType(); });
 }
 
 void QCPColorMap2::redrawLater()

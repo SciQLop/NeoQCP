@@ -183,6 +183,7 @@ void QCPLaneLayout::flush()
 {
     if (!std::exchange(mPending, false))
         return;
+    // No plot belongs to a lane layout: the batch guard, not a scope, orders a re-entrant pack.
     const Batch emitting(this);
     emit changed();
 }

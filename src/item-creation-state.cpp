@@ -133,7 +133,7 @@ void QCPItemCreationState::commitItem()
         mPlot->setCursor(Qt::ArrowCursor);
     mPlot->replot(QCustomPlot::rpQueuedReplot);
     if (item)
-        emit itemCreated(item);
+        qcpEmit(this, mPlot, &QCPItemCreationState::itemCreated, item);
 }
 
 void QCPItemCreationState::cancelItem()
@@ -148,7 +148,7 @@ void QCPItemCreationState::cancelItem()
     if (!mPlot->creationModeEnabled())
         mPlot->setCursor(Qt::ArrowCursor);
     mPlot->replot(QCustomPlot::rpQueuedReplot);
-    emit itemCanceled();
+    qcpEmit(this, mPlot, &QCPItemCreationState::itemCanceled);
 }
 
 void QCPItemCreationState::updateItemPosition(const QPointF& pixelPos)

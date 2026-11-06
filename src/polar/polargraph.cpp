@@ -328,9 +328,9 @@ void QCPPolarGraph::setSelectable(QCP::SelectionType selectable)
         QCPDataSelection oldSelection = mSelection;
         mSelection.enforceType(mSelectable);
         const bool selectionTrimmed = mSelection != oldSelection;
-        const QPointer<QCPPolarGraph> alive(this);
-        emit selectableChanged(mSelectable);
-        if (alive && selectionTrimmed)
+        const QCPEmissionScope scope(mParentPlot);
+        qcpEmit(this, mParentPlot, &QCPPolarGraph::selectableChanged, mSelectable);
+        if (selectionTrimmed)
             emitSelectionChanged();
     }
 }
@@ -366,15 +366,17 @@ void QCPPolarGraph::setSelection(QCPDataSelection selection)
 
 /*! \internal
 
-  Emits both \ref selectionChanged signals. A slot may delete this graph: the second signal is only
-  emitted while it is alive.
+  Emits both \ref selectionChanged signals, at the outermost call: a slot may delete this graph, and
+  the values are read when they are delivered.
 */
 void QCPPolarGraph::emitSelectionChanged()
 {
-    const QPointer<QCPPolarGraph> alive(this);
-    emit selectionChanged(selected());
-    if (alive)
-        emit selectionChanged(mSelection);
+    const QCPEmissionScope scope(mParentPlot);
+    qcpEmitCurrent(this, mParentPlot, qOverload<bool>(&QCPPolarGraph::selectionChanged),
+                   [this] { return selected(); });
+    qcpEmitCurrent(this, mParentPlot,
+                   qOverload<const QCPDataSelection&>(&QCPPolarGraph::selectionChanged),
+                   [this] { return mSelection; });
 }
 
 /*! \overload

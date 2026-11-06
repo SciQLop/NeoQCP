@@ -827,7 +827,7 @@ void QCPColorMap::setDataRange(const QCPRange& dataRange)
         mDataRange = dataRange.sanitizedForLinScale();
     mMapImageInvalidated = true;
     markDirty();
-    emit dataRangeChanged(mDataRange);
+    qcpEmit(this, mParentPlot, &QCPColorMap::dataRangeChanged, mDataRange);
 }
 
 /*!
@@ -842,9 +842,10 @@ void QCPColorMap::setDataScaleType(QCPAxis::ScaleType scaleType)
     mDataScaleType = scaleType;
     mMapImageInvalidated = true;
     markDirty();
-    const QPointer<QCPColorMap> alive(this);
-    emit dataScaleTypeChanged(mDataScaleType);
-    if (alive && mDataScaleType == QCPAxis::stLogarithmic)
+    // A range emission follows below: deliver both at the outermost call.
+    const QCPEmissionScope scope(mParentPlot);
+    qcpEmit(this, mParentPlot, &QCPColorMap::dataScaleTypeChanged, mDataScaleType);
+    if (mDataScaleType == QCPAxis::stLogarithmic)
         setDataRange(mDataRange.sanitizedForLogScale());
 }
 
@@ -866,7 +867,9 @@ void QCPColorMap::setGradient(const QCPColorGradient& gradient)
     mGradient = gradient;
     mMapImageInvalidated = true;
     markDirty();
-    emit gradientChanged(mGradient);
+    // A colour scale echoes this signal: two emissions, and a slot may delete this map.
+    const QCPEmissionScope scope(mParentPlot);
+    qcpEmit(this, mParentPlot, &QCPColorMap::gradientChanged, mGradient);
 }
 
 /*!

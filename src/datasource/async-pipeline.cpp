@@ -47,7 +47,8 @@ void QCPAsyncPipelineBase::emitBusyIfNeeded(QMutexLocker<QMutex>& lock)
     if (shouldEmitBusy)
         mWasBusy = true;
     lock.unlock();
-    // Last, and callers return at once: a slot may delete the owner and this pipeline.
+    // Last, and callers return at once: a slot may delete the owner and this pipeline. No plot to
+    // deliver through, and a worker thread can reach this.
     if (shouldEmitBusy)
         Q_EMIT busyChanged(true);
 }
@@ -72,7 +73,8 @@ void QCPAsyncPipelineBase::startJob(QMutexLocker<QMutex>& lock,
     const bool becameBusy = !std::exchange(mWasBusy, true);
     lock.unlock();
     submit(priority, std::move(job));
-    // Last, and callers return at once: a slot may delete the owner and this pipeline.
+    // Last, and callers return at once: a slot may delete the owner and this pipeline. No plot to
+    // deliver through, and a worker thread can reach this.
     if (becameBusy)
         Q_EMIT busyChanged(true);
 }
@@ -141,7 +143,8 @@ void QCPAsyncPipelineBase::settleIdle(QMutexLocker<QMutex>& lock, uint64_t gen)
     const bool shouldEmitIdle = mWasBusy;
     mWasBusy = false;
     lock.unlock();
-    // Last, and callers return at once: a slot may delete the owner and this pipeline.
+    // Last, and callers return at once: a slot may delete the owner and this pipeline. No plot to
+    // deliver through, and a worker thread can reach this.
     if (shouldEmitIdle)
         Q_EMIT busyChanged(false);
 }
@@ -234,7 +237,8 @@ void QCPAsyncPipelineBase::deliverResult(uint64_t generation, std::any cache, st
     if (claimDisplayedGeneration(generation))
     {
         applyResult(generation, std::move(result));
-        // A finished() slot may delete the plottable, and this pipeline with it.
+        // A finished() slot may delete the plottable, and this pipeline with it. No plot to deliver
+        // through, and a worker thread can reach this.
         const QPointer<QCPAsyncPipelineBase> alive(this);
         Q_EMIT finished(generation);
         if (!alive)
@@ -257,7 +261,7 @@ void QCPAsyncPipelineBase::deliverResult(uint64_t generation, std::any cache, st
     }
 
     const auto busyEdge = claimBusyEdge();
-    // Last: a slot may delete the owner and this pipeline.
+    // Last: a slot may delete the owner and this pipeline. No plot to deliver through.
     if (busyEdge)
         Q_EMIT busyChanged(*busyEdge);
 }

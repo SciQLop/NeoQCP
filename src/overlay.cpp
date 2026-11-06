@@ -17,17 +17,21 @@ void QCPOverlay::showMessage(const QString& text, Level level,
     mLevel = level;
     mSizeMode = sizeMode;
     mPosition = position;
+    // setVisible signals too, and a slot may delete this overlay: deliver at the outermost call,
+    // after the redraw it asks for.
+    const QCPEmissionScope scope(mParentPlot);
     setVisible(!text.isEmpty());
-    emit messageChanged(mText, mLevel);
     redraw();
+    qcpEmit(this, mParentPlot, &QCPOverlay::messageChanged, mText, mLevel);
 }
 
 void QCPOverlay::clearMessage()
 {
     mText.clear();
+    const QCPEmissionScope scope(mParentPlot);
     setVisible(false);
-    emit messageChanged(mText, mLevel);
     redraw();
+    qcpEmit(this, mParentPlot, &QCPOverlay::messageChanged, mText, mLevel);
 }
 
 void QCPOverlay::setCollapsible(bool enabled)
@@ -35,11 +39,12 @@ void QCPOverlay::setCollapsible(bool enabled)
     if (mCollapsible == enabled)
         return;
     mCollapsible = enabled;
-    if (!mCollapsible && mCollapsed) {
+    const bool unsetting = !mCollapsible && mCollapsed;
+    if (unsetting)
         mCollapsed = false;
-        emit collapsedChanged(false);
-    }
     redraw();
+    if (unsetting)
+        qcpEmit(this, mParentPlot, &QCPOverlay::collapsedChanged, false);
 }
 
 void QCPOverlay::setCollapsed(bool collapsed)
@@ -47,8 +52,8 @@ void QCPOverlay::setCollapsed(bool collapsed)
     if (mCollapsed == collapsed)
         return;
     mCollapsed = collapsed;
-    emit collapsedChanged(mCollapsed);
     redraw();
+    qcpEmit(this, mParentPlot, &QCPOverlay::collapsedChanged, mCollapsed);
 }
 
 void QCPOverlay::setOpacity(qreal opacity)

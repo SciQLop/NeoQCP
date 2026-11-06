@@ -171,7 +171,9 @@ void QCPHistogram2D::setGradient(const QCPColorGradient& gradient)
         return;
     markDirty();
     mRenderer.setGradient(gradient);
-    Q_EMIT gradientChanged(mRenderer.gradient()); // last: a slot may delete this histogram
+    // A colour scale echoes this signal: two emissions, and a slot may delete this histogram.
+    const QCPEmissionScope scope(mParentPlot);
+    qcpEmit(this, mParentPlot, &QCPHistogram2D::gradientChanged, mRenderer.gradient());
 }
 
 void QCPHistogram2D::setColorScale(QCPColorScale* scale)
@@ -216,7 +218,7 @@ void QCPHistogram2D::setDataRange(const QCPRange& range)
     if (prev.lower != cur.lower || prev.upper != cur.upper)
     {
         redrawLater();
-        Q_EMIT dataRangeChanged(cur); // last: a slot may delete this histogram
+        qcpEmit(this, mParentPlot, &QCPHistogram2D::dataRangeChanged, cur);
     }
 }
 
@@ -229,10 +231,13 @@ void QCPHistogram2D::setDataScaleType(QCPAxis::ScaleType type)
     mRenderer.setDataScaleType(type);
     redrawLater();
     const QCPRange curRange = mRenderer.dataRange();
+    // A changed range is announced first: deliver both at the outermost call, the scale type last
+    // so a listener sees the type that is current when it runs.
+    const QCPEmissionScope scope(mParentPlot);
     if (prevRange.lower != curRange.lower || prevRange.upper != curRange.upper)
-        Q_EMIT dataRangeChanged(curRange);
-    if (alive)
-        Q_EMIT dataScaleTypeChanged(type);
+        qcpEmit(this, mParentPlot, &QCPHistogram2D::dataRangeChanged, curRange);
+    qcpEmitCurrent(this, mParentPlot, &QCPHistogram2D::dataScaleTypeChanged,
+                   [this] { return mRenderer.dataScaleType(); });
 }
 
 void QCPHistogram2D::redrawLater()

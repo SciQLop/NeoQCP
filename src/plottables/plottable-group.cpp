@@ -47,7 +47,7 @@ QCPPlottableGroup::QCPPlottableGroup(QCustomPlot* parentPlot, const QString& nam
             [this](QCPLegend*, QCPAbstractLegendItem* item, QMouseEvent*)
             {
                 if (item && item == mLegendRow)
-                    emit doubleClicked();
+                    qcpEmit(this, mParentPlot, &QCPPlottableGroup::doubleClicked);
             });
 }
 
@@ -101,14 +101,14 @@ bool QCPPlottableGroup::addMember(QCPAbstractPlottable* plottable)
                 &QCPPlottableGroup::markRowDirty);
     updateLegendRow();
 
-    QPointer<QCPPlottableGroup> self = this;
+    // Two groups are told, and a slot may delete either: deliver at the outermost call.
+    const QCPEmissionScope scope(mParentPlot);
     if (previous)
     {
         previous->updateLegendRow();
-        emit previous->membersChanged();
+        qcpEmit(previous.data(), mParentPlot, &QCPPlottableGroup::membersChanged);
     }
-    if (self)
-        emit membersChanged();
+    qcpEmit(this, mParentPlot, &QCPPlottableGroup::membersChanged);
     return true;
 }
 
@@ -118,7 +118,7 @@ void QCPPlottableGroup::removeMember(QCPAbstractPlottable* plottable)
         return;
     detach(plottable, true);
     updateLegendRow();
-    emit membersChanged();
+    qcpEmit(this, mParentPlot, &QCPPlottableGroup::membersChanged);
 }
 
 /*! \internal

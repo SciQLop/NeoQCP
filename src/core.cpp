@@ -1496,7 +1496,7 @@ bool QCustomPlot::detach(QCPAbstractPlottable* plottable)
     if (group)
     {
         group->updateLegendRow();
-        emit group->membersChanged();
+        qcpEmit(group.data(), this, &QCPPlottableGroup::membersChanged);
     }
     return true;
 }
@@ -1664,7 +1664,7 @@ void QCustomPlot::deletePlottable(QCPAbstractPlottable* plottable)
     if (group)
     {
         group->updateLegendRow();
-        emit group->membersChanged();
+        qcpEmit(group.data(), this, &QCPPlottableGroup::membersChanged);
     }
 }
 
@@ -1700,7 +1700,7 @@ void QCustomPlot::plottableDestroyed(QCPAbstractPlottable* plottable)
     if (group)
     {
         group->updateLegendRow();
-        emit group->membersChanged();
+        qcpEmit(group.data(), this, &QCPPlottableGroup::membersChanged);
     }
 }
 
@@ -4796,7 +4796,7 @@ void QCustomPlot::processPointSelection(QMouseEvent* event)
 void QCustomPlot::announceUserSelection()
 {
     replot(rpQueuedReplot);
-    emit selectionChangedByUser(); // last: a slot may delete the plot
+    qcpEmit(this, this, &QCustomPlot::selectionChangedByUser); // last: a slot may delete the plot
 }
 
 /*! \internal
