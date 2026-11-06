@@ -364,3 +364,35 @@ sorted flag, optional per-element colour). Can come later: R1, R4, R5, R6, R7.
   origin. Log axes with non-positive values must be dropped the same way the CPU path drops them.
 - **Small instances (R4).** Some GPUs run tiny instances inefficiently [K, not verified]. Keep R1's
   merged triangles as the fallback and measure on real hardware, not only llvmpipe.
+
+---------------------------------------------------------------------------------------------------
+
+## R3 decision (milestone 4b, 2026-11-06)
+
+**Adopted** (commits 8da0e07, cc066f6). `qcp::RectsCmd` and `qcp::EllipsesCmd` hold a run of
+data-space boxes: four corner arrays, an optional colour per box, the shared pen and brush, the run's
+data box and a sorted-by-key flag. The arrays sit behind one `shared_ptr`, so the command variant
+stays 96 B. `rect()` and `ellipse()` join the previous command when both corners are data, the pen is
+equal and the brush has the same style; a solid colour may differ and becomes a per-box fill. A brush
+the GPU cannot fill never joins a batch: one image for the run would put every fill under every
+stroke.
+
+Measured (llvmpipe, `-median 5`, interleaved with the old binary):
+
+| row | gate | before | after |
+|---|---|---|---|
+| QCPGpu_Bars10k | 5.5 | 5.0 | 4.2 (-16 %) |
+| QCPGpu_BarsPan10k | 0.12 | 0.12 | 0.12 |
+| QCPBars_Pan10k | 5.6 | 5.4 | 5.5 |
+| QCPDrawn_Zoom10k | 0.30 | 0.30 | 0.31 |
+| QCPItems_Zoom10k | 0.43 | 0.42 | 0.42 |
+
+Ten thousand bars record in 524 KB instead of 1 573 KB.
+
+What later recorders inherit:
+- Culling moves from the command to the box: the painter replay tests each box against the clip
+  (without it `QCPBars_Pan10k` was +24 %). The GPU replay builds the whole run, so its kept geometry
+  survives a pan.
+- Every recorder of many rects or ellipses uses the batch (answer 12): intervals, histogram columns,
+  error-bar caps.
+- `sortedByKey` waits for R5; the SoA layout is what R4 needs.
