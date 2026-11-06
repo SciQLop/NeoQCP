@@ -42,8 +42,6 @@ public:
     pixels(const std::shared_ptr<const std::vector<QPointF>>& recording, quint64 generation,
            const QCPTransform& transform);
 
-    void clear();
-
     //! Test hook: how many recordings the cache holds.
     [[nodiscard]] int entryCount() const { return int(mEntries.size()); }
 
@@ -154,8 +152,6 @@ public:
 
     //! The kept submissions, in the recording's order: a reuse frame replays exactly this.
     [[nodiscard]] std::span<const Run> runs() const { return mRuns; }
-
-    void clear();
 
 private:
     std::vector<float> mSolid; //!< six floats per vertex, in record order

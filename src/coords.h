@@ -201,9 +201,6 @@ public:
 
     //! Maps a fraction of the axis rect to pixels.
     [[nodiscard]] QCP::Pixels map(QCP::AxisRatio ratio) const;
-    //! True when the two transforms differ by a pixel offset only (the rect moved, same size).
-    [[nodiscard]] bool isTranslationOf(const QCPRatioTransform& other,
-                                       QPointF* delta = nullptr) const;
 
     //! False when the axis rect is gone or has no area.
     [[nodiscard]] bool valid() const { return mAxisRect && mWidth > 0.0 && mHeight > 0.0; }

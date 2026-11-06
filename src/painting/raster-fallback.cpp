@@ -3,9 +3,6 @@
 #include "../plottables/plottable-draw-utils.h"
 #include "painter.h"
 
-#include <QPainter>
-
-#include <algorithm>
 #include <cmath>
 
 namespace qcp
@@ -199,10 +196,4 @@ bool QCPRasterFallback::painterDrawsAll(quint64 list) const
     return mPainterLists.contains(list);
 }
 
-void QCPRasterFallback::clear()
-{
-    mEntries.clear();
-    mPainterHandled.clear();
-    mPainterLists.clear();
-}
 } // namespace qcp

@@ -10,8 +10,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cmath>
-#include <limits>
 
 #include <QDebug>
 
@@ -339,11 +337,6 @@ QCPResolveCache::pixels(const std::shared_ptr<const std::vector<QPointF>>& recor
     return std::span<const QPointF>(entry.pixels);
 }
 
-void QCPResolveCache::clear()
-{
-    mEntries.clear();
-}
-
 bool QCPRecordingCache::reuse(const QCPDrawList& list, const QCPTransform& transform, double dpr,
                               int outputHeight, const QRect& clip, QPointF* delta)
 {
@@ -453,16 +446,6 @@ void QCPRecordingCache::commit()
 void QCPRecordingCache::invalidate()
 {
     mSpoiled = true;
-}
-
-void QCPRecordingCache::clear()
-{
-    mSolid.clear();
-    mDashed.clear();
-    mRuns.clear();
-    mValid = false;
-    mSpoiled = false;
-    mClippedRaster = false;
 }
 
 void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,

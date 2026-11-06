@@ -101,8 +101,6 @@ public:
 
     int rasterCount() const { return int(mEntries.size()); }
 
-    void clear();
-
 private:
     struct Entry
     {

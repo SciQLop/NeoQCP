@@ -308,12 +308,3 @@ QCP::Pixels QCPRatioTransform::map(QCP::AxisRatio ratio) const
     // The same arithmetic as QCPItemPosition's ptAxisRectRatio branch.
     return QCP::Pixels { mLeft + ratio.x * mWidth, mTop + ratio.y * mHeight };
 }
-
-bool QCPRatioTransform::isTranslationOf(const QCPRatioTransform& other, QPointF* delta) const
-{
-    if (!valid() || !other.valid() || mWidth != other.mWidth || mHeight != other.mHeight)
-        return false;
-    if (delta)
-        *delta = QPointF(mLeft - other.mLeft, mTop - other.mTop);
-    return true;
-}
