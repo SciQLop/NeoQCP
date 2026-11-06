@@ -265,10 +265,10 @@ void paintCommand(QCPPainter& painter, const QCPDrawCommand& command, const QCPD
                 {
                     // One style per point, its pen and brush replaced by the point's colour: the
                     // style's other properties (shape, size, a pixmap) are the command's.
+                    QCPScatterStyle style = *cmd.style;
                     for (std::size_t i = 0; i < local.pixels.size(); ++i)
                     {
                         const QColor colour = QColor::fromRgba((*cmd.colours)[i]);
-                        QCPScatterStyle style = *cmd.style;
                         style.setPen(QPen(colour));
                         style.setBrush(colour);
                         style.applyTo(&painter, style.pen());
