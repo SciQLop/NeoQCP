@@ -79,7 +79,8 @@ public:
         DashedUnderRect, //!< a dashed line an opaque rect covers: the record order must survive
         RasterUnderRect, //!< a rasterised fill an opaque rect covers: the same
         ErrorBars, //!< three error bars in a pen no vertex colour can carry
-        Raster //!< a texture-brush rect beside a long polyline: two kept runs of different kinds
+        Raster, //!< a texture-brush rect beside a long polyline: two kept runs of different kinds
+        AsymmetricBox //!< keys 2..3, values 8..9: the two sides sit on different pixel intervals
     };
 
     //! Counts the base setter path: a range change must not come through here.
@@ -222,6 +223,13 @@ public:
         {
             context.rect(QCP::Data { 2, 2 }, QCP::Data { 7, 7 }, QPen(Qt::NoPen), gradientBrush());
             context.polyline(mLine, QPen(Qt::black, 2));
+            return;
+        }
+        if (mode == AsymmetricBox) // keys 2..3, values 8..9: far apart on the two screen axes
+        {
+            const QCP::Position corners[] = { QCP::Data { 2, 8 }, QCP::Data { 3, 8 },
+                                              QCP::Data { 3, 9 }, QCP::Data { 2, 9 } };
+            context.polygon(corners, QPen(Qt::black), QBrush(fill));
             return;
         }
         if (mode == Image) // a raster box over data (3,3) to (5,5): its outline is a known rect
@@ -1165,6 +1173,26 @@ void TestDrawable::hitTestWithAVerticalKeyAxis()
              "a click beyond the shape's value side must miss");
     QVERIFY2(!shape->hitTest(at(-3, 4), nullptr).has_value(),
              "a click beyond the shape's key side must miss");
+}
+
+void TestDrawable::hitTestWithAVerticalKeyAxisChecksEachSideOnItsOwnAxis()
+{
+    // A box whose two sides land far apart on screen: keys 2..3 are a narrow vertical band,
+    // values 8..9 a band further right. Each side must be compared with the click coordinate
+    // along its own screen axis, or the pre-check rejects a click at the centre.
+    Fixture f;
+    auto* shape = new TestShape(f.plot.get());
+    shape->mode = TestShape::AsymmetricBox;
+    shape->mAnchor->setAxes(f.plot->yAxis, f.plot->xAxis); // drawn through the vertical key frame
+    f.plot->replot();
+
+    const QCP::Pixels centre { f.plot->xAxis->coordToPixel(8.5), f.plot->yAxis->coordToPixel(2.5) };
+    const std::optional<double> inside = shape->hitTest(centre, nullptr);
+    QVERIFY2(inside.has_value(),
+             qPrintable(QStringLiteral("a click at the box centre (%1, %2) must hit")
+                            .arg(centre.x)
+                            .arg(centre.y)));
+    QCOMPARE(*inside, 0.0); // inside a visible fill
 }
 
 void TestDrawable::hitTestBesideTextIsTheGap()

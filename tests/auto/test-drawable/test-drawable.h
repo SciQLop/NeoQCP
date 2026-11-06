@@ -43,6 +43,7 @@ private slots:
 
     void defaultHitTestMatchesGeometry();
     void hitTestWithAVerticalKeyAxis();
+    void hitTestWithAVerticalKeyAxisChecksEachSideOnItsOwnAxis();
     void hitTestBesideTextIsTheGap();
     void pixelAnchoredShapeIsHittable();
     void defaultDataRangeFollowsTheExtentRules();

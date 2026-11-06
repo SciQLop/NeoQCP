@@ -593,8 +593,12 @@ std::optional<double> QCPDrawnCore::hitTest(const QCPDrawable& object, QCP::Pixe
             const QCP::Pixels pixels = frame.transform.map(QCP::Data { 0.0, value });
             return keyVertical ? pixels.x : pixels.y;
         };
-        if (!nearSide(keyPixels(box->keyLower), keyPixels(box->keyUpper), point.x(), grow)
-            || !nearSide(valuePixels(box->valueLower), valuePixels(box->valueUpper), point.y(),
+        // The click coordinate follows the same swap: with a vertical key axis the key runs down
+        // the screen and the value across it.
+        const double keyClick = keyVertical ? point.y() : point.x();
+        const double valueClick = keyVertical ? point.x() : point.y();
+        if (!nearSide(keyPixels(box->keyLower), keyPixels(box->keyUpper), keyClick, grow)
+            || !nearSide(valuePixels(box->valueLower), valuePixels(box->valueUpper), valueClick,
                          grow))
             return std::nullopt;
     }
