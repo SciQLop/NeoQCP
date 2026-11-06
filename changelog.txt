@@ -212,17 +212,18 @@ Drawing on the GPU and in an export:
         rasterised into an image covering the command, and drawn as a GPU image command at the
         same place in the order. The image is redone when the transform changes, and shifted across
         a pan. A layer keeps at most 4 such images; a recording that needs more than the layer has
-        left is painted whole with QPainter under the layer's GPU content, with one warning per
-        layer.
+        left, when it is built or when it is replayed from its kept geometry, is painted whole with
+        QPainter under the layer's GPU content, with one warning per layer.
   - The layer's replay keeps the built geometry per recording, in the recording's order, and shifts
         it on a pan (a data-only recording lets the layer shift its texture instead: no repaint, no
         upload), and merges neighbouring solid runs: 10 000 bars go from 20 000 draw calls to 1. A
         recording whose geometry moves in more than one way (a ratio, an anchor, one data and one
         pixel corner) is rebuilt, since one shift cannot express it.
   - The painter replay (exports, and the screen without a GPU) skips a command that provably misses
-        the clip, except a polyline, which maps every point it has. Every command kind paints itself
-        with QPainter, written once per kind instead of once per class, so an export stacks like the
-        screen.
+        the clip, except the kinds whose pixels are not bounded up front: a data series, a fill
+        between two series, error bars, a path and a painter callback. Every command kind paints
+        itself with QPainter, written once per kind instead of once per class, so an export stacks
+        like the screen.
 Hit testing: one rule for press, selection and wheel. The hits are delivered topmost first
         (QCustomPlot::hitsAt, QCPHitAction) and the first that can take the action wins; a selection
         skips what cannot be selected while a press still lands on it. QCPHitAction has Press and
