@@ -9,6 +9,7 @@
 #include "painting/draw-context.h"
 #include "painting/painter.h"
 #include "painting/raster-fallback.h"
+#include "painting/viewport-offset.h"
 #include "plottables/plottable-draw-utils.h"
 #include "vector2d.h"
 
@@ -244,6 +245,11 @@ struct QCPDrawnCore::State
     quint64 recordedDependency = 0;
     const void* recordedSource = nullptr;
     QCPTransform recordedTransform;
+    //! The ranges the recording was last painted at: the layer shifts from here on a pan.
+    QCPRange paintedKey;
+    QCPRange paintedValue;
+    bool painted = false;
+    bool movesWithTheData = false;
     quint64 iconGeneration = 0;
     quint64 iconEpoch = 0;
     quint64 iconDependency = 0;
@@ -360,6 +366,38 @@ QCPDrawnCore::QCPDrawnCore() : mState(std::make_unique<State>()) { }
 
 QCPDrawnCore::~QCPDrawnCore() = default;
 
+bool QCPDrawnCore::recordingIsStale(const QCPDrawable& object, const QCPDrawnView& view) const
+{
+    const quint64 epoch = view.plot ? view.plot->viewEpoch() : 0;
+    const quint64 itemsEpoch = view.plot ? view.plot->itemsEpoch() : 0;
+    // An everyFrame() recording reads something the object cannot declare, so it is rebuilt by each
+    // frame - once: the frame's paint and the queries it makes see the recording it built.
+    const bool everyFrame = mState->recording.everyFrame
+        && (!view.plot || mState->recordedFrame != (view.plot ? view.plot->frameEpoch() : 0));
+    return !mState->recorded || everyFrame || mState->recordedGeneration != mState->generation
+        || mState->recordedSource != object.dataSource()
+        || mState->recordedDependency != object.dependencyRevision()
+        || (mState->viewDependent && mState->recordedEpoch != epoch)
+        || (mState->anchorDependent && mState->recordedItemsEpoch != itemsEpoch)
+        || (mState->transformDependent
+            && !(QCPTransform(view.keyAxis, view.valueAxis) == mState->recordedTransform));
+}
+
+QPointF QCPDrawnCore::stallOffset(const QCPDrawable& object, const QCPDrawnView& view) const
+{
+    if (!mState->painted || mState->recording.everyFrame || mState->transformDependent
+        || !mState->movesWithTheData || !view.keyAxis || !view.valueAxis)
+        return { };
+    if (recordingIsStale(object, view))
+        return { }; // it has to be drawn again, whatever the pan says
+    const double keyRatio = qcp::axisRangeSizeRatio(view.keyAxis, mState->paintedKey);
+    const double valueRatio = qcp::axisRangeSizeRatio(view.valueAxis, mState->paintedValue);
+    if (qAbs(keyRatio - 1.0) > 1e-4 || qAbs(valueRatio - 1.0) > 1e-4)
+        return { }; // a zoom: the shift cannot express a new scale
+    return qcp::computeViewportOffset(view.keyAxis, view.valueAxis, mState->paintedKey,
+                                      mState->paintedValue);
+}
+
 bool QCPDrawnCore::contentChanged()
 {
     if (mState->insideDraw)
@@ -420,20 +458,11 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
     const QCPTransform transform(view.keyAxis, view.valueAxis);
     const void* source = object.dataSource();
     const quint64 dependency = object.dependencyRevision();
-    // An everyFrame() recording reads something the object cannot declare, so it is rebuilt by each
-    // frame - once: the frame's paint and the queries it makes see the recording it built.
-    const bool everyFrame = mState->recording.everyFrame && (!view.plot || mState->recordedFrame != frame);
-    const bool stale = !mState->recorded || everyFrame
-        || mState->recordedGeneration != mState->generation || mState->recordedSource != source
-        || mState->recordedDependency != dependency
-        || (mState->viewDependent && mState->recordedEpoch != epoch)
-        || (mState->anchorDependent && mState->recordedItemsEpoch != itemsEpoch)
-        || (mState->transformDependent && !(transform == mState->recordedTransform));
     // simplify: a translation still remakes a transform-dependent recording, so a pan of stacked,
     // grouped or pixel-width bars re-records every frame. A data-plus-pixel-offset position type
     // would keep them; it is on the deferred list.
 
-    if (!stale)
+    if (!recordingIsStale(object, view))
         return true;
     QCPDrawContext context(view.keyAxis, view.valueAxis, view.axisRect, view.theme);
     const InsideDraw drawing(mState->insideDraw);
@@ -442,6 +471,8 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
     mState->viewDependent = usesTheView(mState->recording);
     mState->anchorDependent = mState->recording.anchorDependent;
     mState->transformDependent = mState->recording.transformDependent;
+    // Asked once per recording: a pan then knows whether the whole of it may be shifted.
+    mState->movesWithTheData = qcpRecordingMovesWithTheData(mState->recording);
     mState->recordedGeneration = mState->generation;
     mState->recordedEpoch = epoch;
     mState->recordedItemsEpoch = itemsEpoch;
@@ -622,6 +653,11 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
                      static_cast<float>(painter.opacity()));
     qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::PainterOnly,
                          &mState->raster);
+    // The layer now holds this object drawn at these ranges: a pan may shift them instead of
+    // repainting. An export never does (it paints into another image, not the layer's).
+    mState->paintedKey = view.keyAxis->range();
+    mState->paintedValue = view.valueAxis->range();
+    mState->painted = true;
 }
 
 void QCPDrawnCore::paintIcon(const QCPDrawable& object, QCPPainter& painter, const QRectF& rect,

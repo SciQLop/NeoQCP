@@ -27,6 +27,7 @@ private slots:
     void panReusesResolvedGeometry();
     void panBuildsNoFillEither();
     void panMovesAllDataEntriesByOneDelta();
+    void dataOnlyDrawingLetsItsLayerTranslate();
     void rasterPanKeepsImage();
     void recordedErrorBarsAreDrawn();
     void brokenDashedPipelineStillDraws();

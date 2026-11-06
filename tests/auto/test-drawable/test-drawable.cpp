@@ -757,6 +757,44 @@ void TestDrawable::panMovesAllDataEntriesByOneDelta()
     }
 }
 
+void TestDrawable::dataOnlyDrawingLetsItsLayerTranslate()
+{
+    // One drawn object on a layer used to disable the translate path (it offered no stall offset),
+    // so every pan repainted the layer and re-uploaded its vertices. A recording that is one piece
+    // in data space may be shifted instead: nothing is drawn and nothing is uploaded.
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - the translate path is a GPU one");
+    hideAxes(f.plot.get());
+    auto* line = new TestLine(f.plot->xAxis, f.plot->yAxis);
+    line->mLine = std::make_shared<const std::vector<QPointF>>(
+        std::initializer_list<QPointF> { { 1, 1 }, { 9, 9 } });
+    f.plot->replot();
+    auto* layer = f.plot->plottableRhiLayer(line->layer());
+    QVERIFY(layer);
+    QTRY_VERIFY_WITH_TIMEOUT(layer->solidVertexUploads() > 0, 5000);
+    const int uploads = layer->solidVertexUploads();
+    const int draws = line->drawCalls;
+    const double anchor = f.plot->xAxis->coordToPixel(2.0);
+    const QRect before = inkedBounds(f.plot->grabFramebuffer());
+    QVERIFY2(!before.isNull(), "the line must be painted");
+
+    f.plot->xAxis->setRange(1, 11); // a pan: the layer texture is shifted, not repainted
+    f.plot->replot();
+    // Synchronous: replot() is where a layer that will be rebuilt is cleared.
+    QVERIFY2(!layer->isDirty(), "a translated layer has nothing to rebuild");
+    QCOMPARE(line->drawCalls, draws);
+    QTest::qWait(50); // give a scheduled upload the time to happen before counting
+    QCOMPARE(layer->solidVertexUploads(), uploads);
+
+    const QRect after = inkedBounds(f.plot->grabFramebuffer());
+    const double moved = f.plot->xAxis->coordToPixel(2.0) - anchor;
+    QVERIFY2(qAbs((after.left() - before.left()) - moved) <= 2,
+             qPrintable(QStringLiteral("the line moved %1 px, the axis %2 px")
+                            .arg(after.left() - before.left())
+                            .arg(moved)));
+}
+
 void TestDrawable::rasterPanKeepsImage()
 {
     Fixture f;

@@ -131,8 +131,21 @@ public:
     //! Test hook: how many rasterised images the object's replay keeps.
     [[nodiscard]] int rasterCount() const;
 
+    /*!
+      The pixels a pan has to shift this object's layer texture by, or a null point when the layer
+      must repaint it instead.
+
+      A drawn object's pixels are its recording replayed at a transform: a pan moves all of them by
+      one delta exactly when the recording is one piece in data space and needs no remake. The layer
+      then shifts the texture it has, which is the whole cost of the frame.
+    */
+    [[nodiscard]] QPointF stallOffset(const QCPDrawable& object, const QCPDrawnView& view) const;
+
 private:
     bool ensureRecording(const QCPDrawable& object, const QCPDrawnView& view);
+
+    //! True when the recording would be remade for \a view: the test ensureRecording() takes.
+    [[nodiscard]] bool recordingIsStale(const QCPDrawable& object, const QCPDrawnView& view) const;
 
     struct State;
     std::unique_ptr<State> mState;
@@ -281,6 +294,12 @@ public:
             count = this->dataCount();
         *details = QVariant::fromValue(QCPDataSelection(QCPDataRange(0, count)));
         return hit;
+    }
+
+    //! A recording that is one piece in data space lets its layer shift instead of repaint.
+    QPointF stallPixelOffset() const override
+    {
+        return this->mCore.stallOffset(*this, this->view());
     }
 
 public:

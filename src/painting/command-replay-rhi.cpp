@@ -697,6 +697,39 @@ quint64 qcpFillBuildCount()
     return fillBuilds();
 }
 
+bool qcpRecordingMovesWithTheData(const QCPDrawList& list)
+{
+    for (const qcp::QCPDrawCommand& command : list.commands)
+    {
+        if (!isPainterOnlyCommand(command))
+        {
+            if (!isDataOnlyCommand(command))
+                return false;
+            continue;
+        }
+        // The painter draws these into the same texture every frame: only a data anchor makes them
+        // follow the pan. A painter callback is opaque, so it keeps the layer off this path.
+        const bool dataAnchored = std::visit(
+            [](const auto& cmd)
+            {
+                using T = std::decay_t<decltype(cmd)>;
+                if constexpr (std::is_same_v<T, qcp::TextCmd>)
+                    return std::holds_alternative<QCP::Data>(cmd.at);
+                else if constexpr (std::is_same_v<T, qcp::PathCmd>)
+                    return std::holds_alternative<QCP::Data>(cmd.origin);
+                else if constexpr (std::is_same_v<T, qcp::ImageCmd>)
+                    return std::holds_alternative<QCP::Data>(cmd.a)
+                        && std::holds_alternative<QCP::Data>(cmd.b);
+                else
+                    return false;
+            },
+            command);
+        if (!dataAnchored)
+            return false;
+    }
+    return true;
+}
+
 std::vector<float> qcpFanFillVertices(const QPointF& centre, std::span<const QPointF> ring,
                                       const QColor& color)
 {

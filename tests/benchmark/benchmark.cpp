@@ -98,6 +98,7 @@ private slots:
     void QCPGpu_Pan100k();
     void QCPGpu_Graph2Render1M();
     void QCPGpu_Bars10k();
+    void QCPGpu_BarsPan10k();
     void QCPGpu_Text1k();
     void QCPGpu_MixedLayer();
 
@@ -1747,6 +1748,32 @@ void Benchmark::QCPGpu_Bars10k()
     QBENCHMARK
     {
         zoomInPlace(plot, 50.5, 1.0, step);
+    }
+}
+
+void Benchmark::QCPGpu_BarsPan10k()
+{
+    QWidget host;
+    QCustomPlot* plot = nullptr;
+    if (!makeGpuPlot(host, plot))
+        QSKIP("no QRhi on this platform (qoffscreen)");
+    auto* bars = new QCPBars(plot->xAxis, plot->yAxis);
+    QVector<double> keys(10000), values(10000);
+    for (int i = 0; i < 10000; ++i)
+    {
+        keys[i] = 100.0 * i / 10000;
+        values[i] = 0.5 + 0.5 * qSin(i * 0.01);
+    }
+    bars->setData(keys, values);
+    plot->xAxis->setRange(50, 51);
+    plot->yAxis->setRange(0, 1);
+    settleGpuPlot(plot);
+    double left = 50;
+    QBENCHMARK
+    {
+        left += 0.01; // a pan: a plot-width bar's pixels all move by one delta
+        plot->xAxis->setRange(left, left + 1);
+        plot->replot(QCustomPlot::rpImmediateRefresh);
     }
 }
 

@@ -187,6 +187,15 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
 //! fan and ribbon fills together, like QCPLineExtruder::extruderCallCount() counts strokes.
 quint64 qcpFillBuildCount();
 
+/*!
+  True when every position \\a list was recorded from is a data one, so a pan moves the whole
+  drawing by one delta: its layer may shift the texture it already has instead of repainting it.
+
+  Opaque painter callbacks are not: nothing tells where they draw, so they keep the layer off that
+  path.
+*/
+[[nodiscard]] bool qcpRecordingMovesWithTheData(const QCPDrawList& list);
+
 //! Triangles of a fan fill from \a centre over an open \a ring: six floats per vertex.
 std::vector<float> qcpFanFillVertices(const QPointF& centre, std::span<const QPointF> ring,
                                       const QColor& color);
