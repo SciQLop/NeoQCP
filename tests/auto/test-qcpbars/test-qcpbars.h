@@ -28,6 +28,9 @@ private slots:
   void barsSelectionReRecordsAndUsesTheDecorator();
   void bracketDecorationOverTheBars();
   void barsPanDoesNotReRecord();
+
+  void barsOnTheKeyBoundEdgeAreHit_data();
+  void barsOnTheKeyBoundEdgeAreHit();
   
 private:
   QCustomPlot *mPlot;

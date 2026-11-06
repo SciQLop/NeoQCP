@@ -674,3 +674,90 @@ void TestQCPBars::barsPanDoesNotReRecord()
     QCOMPARE(bars->recordings(), recorded);
     QCOMPARE(QCPLineExtruder::extruderCallCount(), extruded);
 }
+
+void TestQCPBars::barsOnTheKeyBoundEdgeAreHit_data()
+{
+    QTest::addColumn<bool>("horizontalKey");
+    QTest::addColumn<bool>("reversed");
+    QTest::addColumn<bool>("upperEnd");
+    for (const bool horizontal : { true, false })
+        for (const bool reversed : { false, true })
+            for (const bool upper : { false, true })
+            {
+                const QByteArray name
+                    = QStringLiteral("%1 key axis, %2, %3 bound")
+                          .arg(QString::fromLatin1(horizontal ? "horizontal" : "vertical"),
+                               QString::fromLatin1(reversed ? "reversed" : "forward"),
+                               QString::fromLatin1(upper ? "upper" : "lower"))
+                          .toLatin1();
+                QTest::newRow(name.constData()) << horizontal << reversed << upper;
+            }
+}
+
+// The visible window keeps a bar whose near edge lands exactly on the key bound, and drops the one
+// a pixel further out. Both are only a pixel apart, so this pins which side of the edge is inside.
+void TestQCPBars::barsOnTheKeyBoundEdgeAreHit()
+{
+    QFETCH(bool, horizontalKey);
+    QFETCH(bool, reversed);
+    QFETCH(bool, upperEnd);
+
+    mPlot->resize(300, 200);
+    QCPAxis* keyAxis = horizontalKey ? mPlot->xAxis : mPlot->yAxis;
+    QCPAxis* valueAxis = horizontalKey ? mPlot->yAxis : mPlot->xAxis;
+    keyAxis->setRange(0, 10);
+    keyAxis->setRangeReversed(reversed);
+    valueAxis->setRange(0, 1);
+    // A click may reach outside the axis rect here, so only the bars' visible window decides.
+    mPlot->setInteractions(QCP::iSelectPlottablesBeyondAxisRect);
+    mPlot->replot();
+
+    // A bar one key unit wide has its edges half a unit either side of its key, so a key half a
+    // unit past the bound lands its near edge on the bound pixel exactly.
+    const double keysPerPixel = keyAxis->range().size()
+        / (horizontalKey ? mPlot->axisRect()->width() : mPlot->axisRect()->height());
+    const double bound = upperEnd ? keyAxis->range().upper : keyAxis->range().lower;
+    const double outward = upperEnd ? 1.0 : -1.0;
+    const double onEdge = bound + outward * 0.5;
+    const double onePixelOut = onEdge + outward * keysPerPixel;
+
+    auto* bars = new QCPBars(keyAxis, valueAxis);
+    bars->setWidth(1.0);
+    bars->setData(QVector<double> { 5.0, onEdge, onePixelOut },
+                  QVector<double> { 1.0, 1.0, 1.0 });
+
+    const auto pixelOfKey = [&](double key)
+    {
+        const double keyPixel = keyAxis->coordToPixel(key);
+        const double valuePixel = valueAxis->coordToPixel(0.5);
+        return horizontalKey ? QCP::Pixels { keyPixel, valuePixel }
+                             : QCP::Pixels { valuePixel, keyPixel };
+    };
+    const auto keyOfSelected = [&](const QCPDataSelection& selection)
+    { return (bars->data()->constBegin() + selection.dataRange().begin())->key; };
+    //! The key of the bar a click at \a key lands on, or NaN when the click hits no bar.
+    const auto keyClicked = [&](double key)
+    {
+        QVariant details;
+        const QCP::Pixels at = pixelOfKey(key);
+        if (bars->selectTest(QPointF(at.x, at.y), false, &details) < 0)
+            return qQNaN();
+        return keyOfSelected(details.value<QCPDataSelection>());
+    };
+
+    // The bar one pixel out overlaps the one on the bound with a single pixel to spare: that sliver
+    // is the only place a click can tell the two apart.
+    const double sliver = onePixelOut + outward * (0.5 - keysPerPixel * 0.5);
+
+    QCOMPARE(keyClicked(5.0), 5.0);
+    QVERIFY2(keyClicked(onEdge) == onEdge, "a bar whose near edge lands on the bound is hit");
+    QVERIFY2(qIsNaN(keyClicked(sliver)), "a bar one pixel outside the bound is not hit");
+
+    const auto rectAround = [](QCP::Pixels at) { return QRectF(at.x - 3, at.y - 3, 6, 6); };
+    const QCPDataSelection overBound = bars->selectTestRect(rectAround(pixelOfKey(onEdge)), false);
+    QCOMPARE(overBound.dataPointCount(), 1);
+    QCOMPARE(keyOfSelected(overBound), onEdge);
+    const QCPDataSelection overSliver = bars->selectTestRect(rectAround(pixelOfKey(sliver)), false);
+    QCOMPARE(overSliver.dataPointCount(), 1);
+    QCOMPARE(keyOfSelected(overSliver), onEdge); // the bar one pixel out is not reported
+}
