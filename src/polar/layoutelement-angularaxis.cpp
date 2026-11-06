@@ -1887,5 +1887,6 @@ bool QCPPolarAxisAngular::registerPolarGraph(QCPPolarGraph* graph)
 
 void QCPPolarAxisAngular::emitRangeChanged(const QCPRange& oldRange)
 {
-    qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::rangeChanged, mRange, oldRange);
+    qcpEmitIf(this, mParentPlot, &QCPPolarAxisAngular::rangeChanged,
+              [this, range = mRange] { return mRange == range; }, mRange, oldRange);
 }

@@ -1626,5 +1626,6 @@ QCP::Interaction QCPPolarAxisRadial::selectionCategory() const
 
 void QCPPolarAxisRadial::emitRangeChanged(const QCPRange& oldRange)
 {
-    qcpEmit(this, mParentPlot, &QCPPolarAxisRadial::rangeChanged, mRange, oldRange);
+    qcpEmitIf(this, mParentPlot, &QCPPolarAxisRadial::rangeChanged,
+              [this, range = mRange] { return mRange == range; }, mRange, oldRange);
 }

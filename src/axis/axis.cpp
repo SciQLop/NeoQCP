@@ -657,7 +657,8 @@ void QCPAxis::rangeDidChange(const QCPRange& oldRange)
         mAxisRect->markAffectedLayersDirty();
         mAxisRect->markItemsUsingAxisDirty(this);
     }
-    qcpEmit(this, mParentPlot, &QCPAxis::rangeChanged, mRange, oldRange);
+    qcpEmitIf(this, mParentPlot, &QCPAxis::rangeChanged,
+              [this, range = mRange] { return mRange == range; }, mRange, oldRange);
 }
 
 /*! \internal

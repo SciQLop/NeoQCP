@@ -711,6 +711,9 @@ protected:
     template <typename Sender, typename... SignalArgs, typename... Args>
     friend void qcpEmit(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(SignalArgs...),
                         Args&&... args);
+    template <typename Sender, typename... SignalArgs, typename StillValid, typename... Args>
+    friend void qcpEmitIf(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(SignalArgs...),
+                          StillValid stillValid, Args&&... args);
     template <typename Sender, typename Arg, typename Current>
     friend void qcpEmitCurrent(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(Arg),
                                Current current);
@@ -758,6 +761,24 @@ void qcpEmitCurrent(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(Ar
     if (!plot || !plot->mEmissions.isOpen())
         return (sender->*signal)(current());
     plot->deliver(sender, [sender, signal, current]() { (sender->*signal)(current()); });
+}
+
+/*!
+  Like qcpEmit, but a deferred emission is dropped when \a stillValid returns false at delivery:
+  the item it names was deleted, or the state it reports was replaced by a slot that ran first
+  (whose own signal the listeners already heard).
+*/
+template <typename Sender, typename... SignalArgs, typename StillValid, typename... Args>
+void qcpEmitIf(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(SignalArgs...),
+               StillValid stillValid, Args&&... args)
+{
+    if (!plot || !plot->mEmissions.isOpen())
+        return (sender->*signal)(std::forward<Args>(args)...);
+    auto copied = std::make_tuple(std::forward<Args>(args)...);
+    plot->deliver(sender, [sender, signal, stillValid, copied = std::move(copied)]() mutable {
+        if (stillValid())
+            std::apply([&](auto&... values) { (sender->*signal)(values...); }, copied);
+    });
 }
 
 // implementation of template functions:

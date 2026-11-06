@@ -875,3 +875,22 @@ void TestSignalDelivery::plottableSelectionSlotDeletingThePlot()
     QVERIFY(!alive);
     QCOMPARE(selectionChanges, 0);
 }
+
+// A one-way link (setupFullAxesBox) sets the second axis from the first one's signal. When both
+// axes changed inside one call, the second axis's own queued signal must not land last with a range
+// the axis no longer holds.
+void TestSignalDelivery::linkedAxisLastRangeSignalIsItsRange()
+{
+    QCustomPlot plot;
+    plot.axisRect()->setupFullAxesBox(true);
+    QCPRange lastHeard;
+    connect(plot.xAxis2, &QCPAxis::rangeChanged, &plot,
+            [&lastHeard](const QCPRange& range, const QCPRange&) { lastHeard = range; });
+    {
+        const QCPEmissionScope scope(&plot);
+        plot.xAxis->setRange(1, 2);
+        plot.xAxis2->setRange(5, 6);
+    }
+    QCOMPARE(plot.xAxis2->range(), QCPRange(1, 2));
+    QCOMPARE(lastHeard, plot.xAxis2->range());
+}

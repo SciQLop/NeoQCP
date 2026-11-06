@@ -48,6 +48,7 @@ private slots:
     void teardownOpensNoDelivery();
     void oneArgumentRangeSlotConnects();
     void slotReenteringAScopedSetterLeavesTheLastSignalCurrent();
+    void linkedAxisLastRangeSignalIsItsRange();
 
     void colorMapGradientSlotDeletingThePlot();
     void spanDragSlotDeletingThePlot();

@@ -40,8 +40,7 @@ Deferred delivery rule (signals that run user code at a moment the plot may be h
   - Input signals carry the event itself: accept() or ignore() in a slot is what Qt sees next. An
         ignored mouse event or wheel only goes on to the parent widget if the user clears
         Qt::WA_NoMousePropagation, which QCustomPlot sets by default, as in 2.x.
-  - Still direct: QCPSelectionRect::accepted and the QCPIntervals edit signals (intervalsEdited,
-        intervalCreated, deleteRequested). beforeReplot and afterLayout keep 2.x timing.
+  - beforeReplot and afterLayout keep 2.x timing.
 
 Parts the plot re-creates, and getters that never create:
   - QCPAxis::grid() (a new hidden grid), plotLayout() and overlay() make a new part when the old one
@@ -276,7 +275,17 @@ Behaviour changes for 2.x users:
         items, legend rows and text elements.
   - selectable() returns a QCP::SelectionType everywhere. On an item, a legend row or a text element,
         setSelectable(bool) is now setSelectable(QCP::SelectionType) (QCP::stWhole or QCP::stNone).
-  - rangeChanged has one signature, (newRange, oldRange).
+  - rangeChanged has one signature, (newRange, oldRange). When one call changes an axis twice, or a
+        slot sets the axis again before its queued signal is delivered, only the signal that matches
+        the axis's range is delivered.
+  - The selectable property of an item, a legend row and a text element is a QCP::SelectionType.
+        The selectableParts and selectedParts properties of a legend and a legend row notify their own
+        signal; the two were swapped.
+  - The signals of the selection rect, item creation, text elements and QCPIntervals edits are
+        delivered at the end of the event too, in the order they were emitted: after mousePress or
+        mouseRelease. The plot selects or zooms on the rect's accepted, so a mouseRelease slot sees
+        the old selection after a rect drag (and the new one after a click).
+  - itemCreated is not delivered for an item a slot deleted first.
   - Signals are delivered when the outermost NeoQCP call returns. Three signals stay direct, either
         because the emitting object has no plot to deliver through or because it already runs on
         another thread: QCPTheme::changed(), QCPLaneLayout::changed() and the asynchronous pipeline's

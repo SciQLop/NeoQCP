@@ -8,6 +8,7 @@ class TestCreationMode : public QObject {
 private slots:
     void init();
     void cleanup();
+    void itemDeletedByAPressSlotIsNotAnnounced();
 
     // State machine basics
     void initialStateIsIdle();

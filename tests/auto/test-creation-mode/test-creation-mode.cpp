@@ -413,3 +413,25 @@ void TestCreationMode::itemCreatedInASecondAxisRectIsClippedToIt()
     QCOMPARE(mPlot->itemCount(), 1);
     QCOMPARE(mPlot->item(0)->clipAxisRect(), second);
 }
+
+void TestCreationMode::itemDeletedByAPressSlotIsNotAnnounced()
+{
+    mPlot->setItemCreator([](QCustomPlot* p, QCPAxis*, QCPAxis*) { return new QCPItemVSpan(p); });
+    mPlot->setItemPositioner(vspanPositioner);
+    mPlot->setCreationModeEnabled(true);
+    int presses = 0;
+    connect(mPlot, &QCustomPlot::mousePress, mPlot,
+            [this, &presses] { if (++presses == 2) mPlot->clearItems(); });
+    QList<QCPAbstractItem*> announced;
+    connect(mPlot, &QCustomPlot::itemCreated, mPlot,
+            [this, &announced](QCPAbstractItem* item) { announced << item; });
+
+    const int y = mPlot->axisRect()->center().y();
+    sendMouseClick(mPlot, Qt::LeftButton, Qt::NoModifier, QPoint(mPlot->xAxis->coordToPixel(2), y));
+    sendMouseMove(mPlot, QPoint(mPlot->xAxis->coordToPixel(6), y));
+    sendMouseClick(mPlot, Qt::LeftButton, Qt::NoModifier, QPoint(mPlot->xAxis->coordToPixel(6), y));
+
+    QCOMPARE(presses, 2);
+    QCOMPARE(mPlot->itemCount(), 0);
+    QVERIFY2(announced.isEmpty(), "itemCreated announced an item a mousePress slot had deleted");
+}

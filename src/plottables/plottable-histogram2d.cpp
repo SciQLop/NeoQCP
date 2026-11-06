@@ -226,7 +226,6 @@ void QCPHistogram2D::setDataScaleType(QCPAxis::ScaleType type)
 {
     if (mRenderer.dataScaleType() == type)
         return;
-    const QPointer<QCPHistogram2D> alive(this); // a dataRangeChanged slot may delete this histogram
     const QCPRange prevRange = mRenderer.dataRange();
     mRenderer.setDataScaleType(type);
     redrawLater();

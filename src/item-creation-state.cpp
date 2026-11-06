@@ -133,7 +133,8 @@ void QCPItemCreationState::commitItem()
         mPlot->setCursor(Qt::ArrowCursor);
     mPlot->replot(QCustomPlot::rpQueuedReplot);
     if (item)
-        qcpEmit(this, mPlot, &QCPItemCreationState::itemCreated, item);
+        qcpEmitIf(this, mPlot, &QCPItemCreationState::itemCreated,
+                  [alive = QPointer<QCPAbstractItem>(item)] { return !alive.isNull(); }, item);
 }
 
 void QCPItemCreationState::cancelItem()
