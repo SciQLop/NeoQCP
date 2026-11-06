@@ -3338,6 +3338,80 @@ void TestRepaint::rasterFallbackIsCapped()
     QCOMPARE(warnings, 0);
 }
 
+// A layer's images are a shared cap: the frame that takes one for a re-recorded plottable must
+// leave the ones the kept recordings hold, and a kept recording that no longer fits is painted
+// whole, like one that does not fit when it is built.
+void TestRepaint::reusedRecordingKeepsItsImagesAtTheCap()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    plot->xAxis->setRange(0, 6);
+    plot->yAxis->setRange(0, 2);
+    auto* layer = plot->plottableRhiLayer(plot->currentLayer());
+    QVERIFY(layer);
+
+    const QColor solid(200, 60, 60);
+    const QColor changed(20, 20, 20);
+    const std::array<QColor, 4> colours { QColor(60, 180, 60), QColor(60, 60, 200),
+                                          QColor(190, 170, 40), QColor(150, 60, 180) };
+    QVector<QCPBars*> bars;
+    for (int i = 0; i < 5; ++i)
+    {
+        auto* bar = new QCPBars(plot->xAxis, plot->yAxis);
+        bar->setPen(Qt::NoPen);
+        // The first bar starts solid: four images fit, the fifth one comes from its re-record.
+        bar->setBrush(i == 0 ? QBrush(solid)
+                             : flatGradientBrush(colours[std::size_t(i - 1)]));
+        bar->setWidth(0.8);
+        bar->setData(QVector<double> { i + 0.5 }, QVector<double> { 1.0 });
+        bars.append(bar);
+    }
+
+    const auto sampled = [&](const QImage& frame, int index)
+    {
+        return pixelAt(plot, frame, qRound(plot->xAxis->coordToPixel(index + 0.5)),
+                       qRound(plot->yAxis->coordToPixel(0.5)));
+    };
+    const auto failure = [&](const QColor& found, const QColor& expected, int index)
+    {
+        if (qAbs(found.red() - expected.red()) <= 40
+            && qAbs(found.green() - expected.green()) <= 40
+            && qAbs(found.blue() - expected.blue()) <= 40)
+            return QString();
+        return QStringLiteral("bar %1: found %2, expected %3")
+            .arg(index + 1)
+            .arg(found.name(), expected.name());
+    };
+    plot->replot();
+    waitUntilSettled(*plot);
+    QCOMPARE(int(layer->imageDrawEntries().size()), 4);
+    const int uploads = layer->imageUploads();
+    QImage frame = screenOf(plot);
+    for (int i = 1; i < 5; ++i)
+        QVERIFY2(failure(sampled(frame, i), colours[std::size_t(i - 1)], i).isEmpty(),
+                 qPrintable(QStringLiteral("the first frame must draw every bar: ")
+                            + failure(sampled(frame, i), colours[std::size_t(i - 1)], i)));
+
+    // The solid bar takes an image now: the four kept ones stay in their slots, re-uploading
+    // nothing; the fifth has nowhere left to go and is painted whole.
+    bars[0]->setBrush(flatGradientBrush(changed));
+    plot->replot();
+    waitUntilSettled(*plot);
+    frame = screenOf(plot);
+    QVERIFY2(failure(sampled(frame, 0), changed, 0).isEmpty(), "the re-recorded bar is missing");
+    for (int i = 1; i < 5; ++i)
+    {
+        const QString why = failure(sampled(frame, i), colours[std::size_t(i - 1)], i);
+        QVERIFY2(why.isEmpty(),
+                 qPrintable(QStringLiteral("the kept recording of bar %1 was lost at the cap: %2")
+                                .arg(i + 1)
+                                .arg(why)));
+    }
+    QCOMPARE(layer->imageUploads() - uploads, 1);
+}
+
 // A zoom changes the transform, not the recording: the image covers the viewport either way, but
 // its pixels are the fill of the new range.
 void TestRepaint::zoomedFallbackIsRepainted()

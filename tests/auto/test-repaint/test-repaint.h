@@ -86,6 +86,7 @@ private slots:
     void pannedFallbackDoesNotReupload();
     void gradientFillMatchesExport();
     void rasterFallbackIsCapped();
+    void reusedRecordingKeepsItsImagesAtTheCap();
     void zoomedFallbackIsRepainted();
     void clippedFallbackFollowsTheShape();
     void twoRecordingsDoNotShareAnImage();

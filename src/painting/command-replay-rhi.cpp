@@ -224,6 +224,30 @@ bool rasterOverflows(const QCPDrawList& list, const QCPPlottableRhiLayer& layer)
     return needed > QCPPlottableRhiLayer::kMaxImages - int(layer.imageDrawEntries().size());
 }
 
+//! True when \a kept holds more images than the layer has slots left: the recording no longer fits,
+//! exactly as one that does not fit when it is built (see rasterOverflows()).
+bool keptRasterOverflows(const QCPRecordingCache& kept, const QCPPlottableRhiLayer& layer)
+{
+    const int images = kept.rasterRunCount();
+    if (images == 0)
+        return false;
+    return images > QCPPlottableRhiLayer::kMaxImages - int(layer.imageDrawEntries().size());
+}
+
+//! The whole of \a list goes to the painter pass, under the layer's GPU content: a recording that
+//! needs more images than the layer has left is never split at the cap.
+void paintWholeRecording(const QCPDrawList& list, QCPPlottableRhiLayer& layer,
+                         qcp::QCPRasterFallback& fallback, QCPRecordingCache* geometry)
+{
+    fallback.paintWholeRecordingWithPainter(list.id);
+    if (geometry)
+        geometry->invalidate(); // nothing of this recording goes to the GPU this frame
+    if (layer.warnRasterCapOnce())
+        qWarning() << "NeoQCP: more than" << QCPPlottableRhiLayer::kMaxImages
+                   << "rasterised styles are needed for one recording, it is painted by"
+                      " QPainter, under this layer's GPU content";
+}
+
 // One markers command on the scatter layer. Its own layer is rebuilt every frame, so the points are
 // mapped again from the resolve cache even when the plottable geometry is re-emitted.
 void addMarker(QCPScatterRhiLayer& scatter, const qcp::MarkersCmd& markers, QCPResolveCache& cache,
@@ -357,6 +381,7 @@ void QCPRecordingCache::beginBuild(const QCPDrawList& list, const QCPTransform& 
     mSolid.clear();
     mDashed.clear();
     mRuns.clear();
+    mRasterRuns = 0;
     mReusable = mayReuseGeometry(list); // once, at build time: not on every pan frame
     mList = list.id;
     mTransform = transform;
@@ -431,6 +456,7 @@ void QCPRecordingCache::keepRaster(int index, const QRectF& bounds, bool movesWi
     run.bounds = bounds;
     run.movesWithData = movesWithData;
     mRuns.push_back(run);
+    ++mRasterRuns;
     mClippedRaster = mClippedRaster || clipped;
 }
 
@@ -464,6 +490,13 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
     QPointF delta;
     if (geometry && geometry->reuse(list, frame.transform, dpr, outputHeight, clip, &delta))
     {
+        // The images it holds are still the layer's; when the re-recorded plottables took their
+        // room, it is painted whole like a recording that does not fit when it is built.
+        if (keptRasterOverflows(*geometry, plottables))
+        {
+            paintWholeRecording(list, plottables, fallback, geometry);
+            return;
+        }
         // A pan (or a frame that changed nothing): the recording is already built, it only needs
         // its data-space runs shifted. Markers live in another layer, which is rebuilt anyway.
         replayKept(list, *geometry, plottables, fallback, frame, generation, clip, dpr,
@@ -476,13 +509,7 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
     {
         // Not one image fits: the painter pass draws this recording whole, under the layer's GPU
         // content, rather than splitting it at the cap.
-        fallback.paintWholeRecordingWithPainter(list.id);
-        if (geometry)
-            geometry->invalidate(); // nothing of this recording goes to the GPU this frame
-        if (plottables.warnRasterCapOnce())
-            qWarning() << "NeoQCP: more than" << QCPPlottableRhiLayer::kMaxImages
-                       << "rasterised styles are needed for one recording, it is painted by"
-                          " QPainter, under this layer's GPU content";
+        paintWholeRecording(list, plottables, fallback, geometry);
         return;
     }
 

@@ -153,10 +153,14 @@ public:
     //! The kept submissions, in the recording's order: a reuse frame replays exactly this.
     [[nodiscard]] std::span<const Run> runs() const { return mRuns; }
 
+    //! The images the kept recording holds. Counted at build, so a reuse frame does not rescan it.
+    [[nodiscard]] int rasterRunCount() const { return mRasterRuns; }
+
 private:
     std::vector<float> mSolid; //!< six floats per vertex, in record order
     std::vector<float> mDashed; //!< seven floats per vertex (the seventh is the arc length)
     std::vector<Run> mRuns;
+    int mRasterRuns = 0; //!< the Raster runs in \ref mRuns
     QCPTransform mTransform;
     QRect mClip;
     quint64 mList = 0;
