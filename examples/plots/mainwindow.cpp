@@ -811,8 +811,8 @@ void MainWindow::setupBarChartDemo(QCustomPlot *customPlot)
   regen->setPen(QPen(QColor(0, 168, 140).lighter(130)));
   regen->setBrush(QColor(0, 168, 140));
   // stack bars on top of each other:
-  nuclear->moveAbove(fossil);
-  regen->moveAbove(nuclear);
+  nuclear->moveAbove(fossil.get());
+  regen->moveAbove(nuclear.get());
   
   // prepare x axis with country labels:
   QVector<double> ticks;
@@ -955,8 +955,8 @@ void MainWindow::setupItemDemo(QCustomPlot *customPlot)
   
   // add the phase tracer (red circle) which sticks to the graph data (and gets updated in bracketDataSlot by timer event):
   auto phaseTracer = customPlot->add<QCPItemTracer>();
-  itemDemoPhaseTracer = phaseTracer; // so we can access it later in the bracketDataSlot for animation
-  phaseTracer->setGraph(graph);
+  itemDemoPhaseTracer = phaseTracer.get(); // so we can access it later in the bracketDataSlot for animation
+  phaseTracer->setGraph(graph.get());
   phaseTracer->setGraphKey((M_PI*1.5-phase)/k);
   phaseTracer->setInterpolating(true);
   phaseTracer->setStyle(QCPItemTracer::tsCircle);
@@ -988,7 +988,7 @@ void MainWindow::setupItemDemo(QCustomPlot *customPlot)
   
   // add the group velocity tracer (green circle):
   auto groupTracer = customPlot->add<QCPItemTracer>();
-  groupTracer->setGraph(graph);
+  groupTracer->setGraph(graph.get());
   groupTracer->setGraphKey(5.5);
   groupTracer->setInterpolating(true);
   groupTracer->setStyle(QCPItemTracer::tsCircle);
@@ -1077,7 +1077,7 @@ void MainWindow::setupStyledDemo(QCustomPlot *customPlot)
   graph2->setData(x2, y2);
   graph2->setPen(Qt::NoPen);
   graph2->setBrush(QColor(200, 200, 200, 20));
-  graph2->setChannelFillGraph(graph1);
+  graph2->setChannelFillGraph(graph1.get());
   
   auto bars1 = customPlot->add<QCPBars>();
   bars1->setWidth(9/(double)x3.size());
@@ -1090,7 +1090,7 @@ void MainWindow::setupStyledDemo(QCustomPlot *customPlot)
   bars2->setData(x4, y4);
   bars2->setPen(Qt::NoPen);
   bars2->setBrush(QColor(10, 100, 50, 70));
-  bars2->moveAbove(bars1);
+  bars2->moveAbove(bars1.get());
   
   // move bars above graphs and grid below bars:
   customPlot->addLayer("abovemain", customPlot->layer("main"), QCustomPlot::limAbove);
@@ -1211,7 +1211,7 @@ void MainWindow::setupAdvancedAxesDemo(QCustomPlot *customPlot)
   mainGraphGauss->data()->set(dataGauss);
   mainGraphGauss->setPen(QPen(QColor("#8070B8"), 2));
   mainGraphGauss->setBrush(QColor(110, 170, 110, 30));
-  mainGraphCos->setChannelFillGraph(mainGraphGauss);
+  mainGraphCos->setChannelFillGraph(mainGraphGauss.get());
   mainGraphCos->setBrush(QColor(255, 161, 0, 50));
   mainGraphGauss->valueAxis()->setRange(0, 1000);
   mainGraphGauss->rescaleKeyAxis();

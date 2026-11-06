@@ -296,6 +296,11 @@ int QCPPolarAxisAngular::radialAxisCount() const
 
   \see axisCount, axes
 */
+bool QCPPolarAxisAngular::plotTakesNewParts() const
+{
+    return mParentPlot && !mParentPlot->isBeingDestroyed();
+}
+
 QCPPolarAxisRadial* QCPPolarAxisAngular::radialAxis(int index) const
 {
     if (index >= 0 && index < mRadialAxes.size())

@@ -249,6 +249,8 @@ public:
     bool removeRadialAxis(QCPPolarAxisRadial* axis);
 
     QCPLayoutInset* insetLayout() const { return mInsetLayout; }
+    // Out of line: QCustomPlot is incomplete here, and clang checks add<T>'s body at its definition.
+    [[nodiscard]] bool plotTakesNewParts() const;
 
     // The handle form of the graph constructor: the polar graph belongs to this axis and draws on
     // its first radial axis. args go to the handle's setData.
@@ -258,8 +260,7 @@ public:
         using Handle = qcp::HandleFor<T>;
         static_assert(requires(Handle h) { h.setData(std::declval<Args>()...); },
                       "add<T>(args...): the graph's handle has no setData taking these arguments");
-        QCP_CHECK_OR_RETURN(mParentPlot && !mParentPlot->isBeingDestroyed(),
-                            "the plot is being destroyed", Handle{});
+        QCP_CHECK_OR_RETURN(plotTakesNewParts(), "the plot is being destroyed", Handle{});
         QCP_CHECK_OR_RETURN(radialAxis(0), "the angular axis has no radial axis", Handle{});
         Handle handle = qcp::makeHandle<Handle>(new T(this, radialAxis(0)));
         handle.get()->markDirty();
