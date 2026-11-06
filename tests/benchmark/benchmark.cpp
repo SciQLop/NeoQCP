@@ -97,6 +97,11 @@ private slots:
     void QCPGpu_LineDashed100k();
     void QCPGpu_Pan100k();
     void QCPGpu_Graph2Render1M();
+    void QCPMultiGraph_SetData1M();
+    void QCPGpu_MultiGraphPan1M();
+    void QCPGpu_MultiGraphZoom1M();
+    void QCPGpu_MultiGraphColored100kPan();
+    void QCPGpu_CurvePan100k();
     void QCPGpu_Bars10k();
     void QCPGpu_BarsPan10k();
     void QCPGpu_Text1k();
@@ -1628,12 +1633,52 @@ void fillSine(QVector<double>& keys, QVector<double>& values, double span)
 
 namespace
 {
+// The multigraph rows: 3 sine columns a third of a period apart, so the three lines differ.
+void fillSineMulti(int n, double span, int columns, std::vector<double>& keys,
+                   std::vector<std::vector<double>>& values)
+{
+    keys.resize(n);
+    values.assign(columns, std::vector<double>(n));
+    for (int i = 0; i < n; ++i)
+    {
+        const double phase = 6 * M_PI * i / n;
+        keys[i] = span * i / n;
+        for (int c = 0; c < columns; ++c)
+            values[c][i] = qSin(phase + c * (2 * M_PI / 3));
+    }
+}
+} // namespace
+
+namespace
+{
 // A freshly shown plot has to paint once before the loop so texture/pipeline setup stays out of
 // the measurement.
 void settleGpuPlot(QCustomPlot* plot)
 {
     plot->replot();
     QCoreApplication::processEvents();
+}
+} // namespace
+
+namespace
+{
+// A multigraph above kResampleThreshold builds its L1 off-thread: paint, pump until that first
+// resample has landed, then paint again. Otherwise a pan row would time the L1 build, not the pan.
+bool settleMultiGraph(QCustomPlot* plot, QCPMultiGraph* graph)
+{
+    plot->replot();
+    QElapsedTimer waited;
+    waited.start();
+    while (graph->pipeline().isBusy() && waited.elapsed() < 10000)
+    {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+        QTest::qWait(10);
+    }
+    if (graph->pipeline().isBusy())
+        return false;
+    plot->replot();
+    QCoreApplication::processEvents();
+    return true;
 }
 } // namespace
 
@@ -1724,6 +1769,123 @@ void Benchmark::QCPGpu_Graph2Render1M()
     QBENCHMARK
     {
         zoomInPlace(plot, 0.5, 1.0, step);
+    }
+}
+
+void Benchmark::QCPMultiGraph_SetData1M()
+{
+    // Offscreen row: the multigraph never had a rendered range, so setData installs at once and
+    // the loop times the copy into the source, as QCPGraph2_SetDataDouble does.
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    const int n = 1000000;
+    QBENCHMARK
+    {
+        std::vector<double> keys;
+        std::vector<std::vector<double>> values;
+        fillSineMulti(n, 1.0, 3, keys, values);
+        mg->setData(std::move(keys), std::move(values));
+    }
+}
+
+void Benchmark::QCPGpu_MultiGraphPan1M()
+{
+    QWidget host;
+    QCustomPlot* plot = nullptr;
+    if (!makeGpuPlot(host, plot))
+        QSKIP("no QRhi on this platform (qoffscreen)");
+    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    std::vector<double> keys;
+    std::vector<std::vector<double>> values;
+    fillSineMulti(1000000, 100.0, 3, keys, values);
+    mg->setData(std::move(keys), std::move(values));
+    plot->xAxis->setRange(50, 51);
+    plot->yAxis->setRange(-1.2, 1.2);
+    QVERIFY2(settleMultiGraph(plot, mg), "the first multigraph resample did not land");
+    double left = 50;
+    QBENCHMARK
+    {
+        left += 0.01; // 1 % of the window
+        plot->xAxis->setRange(left, left + 1);
+        plot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+}
+
+void Benchmark::QCPGpu_MultiGraphZoom1M()
+{
+    QWidget host;
+    QCustomPlot* plot = nullptr;
+    if (!makeGpuPlot(host, plot))
+        QSKIP("no QRhi on this platform (qoffscreen)");
+    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    std::vector<double> keys;
+    std::vector<std::vector<double>> values;
+    fillSineMulti(1000000, 100.0, 3, keys, values);
+    mg->setData(std::move(keys), std::move(values));
+    plot->xAxis->setRange(49.5, 50.5);
+    plot->yAxis->setRange(-1.2, 1.2);
+    QVERIFY2(settleMultiGraph(plot, mg), "the first multigraph resample did not land");
+    int step = 0;
+    QBENCHMARK
+    {
+        const double width = (step++ % 2) ? 1.0 : 0.99; // zoom in place by 1 %
+        plot->xAxis->setRange(50 - width / 2, 50 + width / 2);
+        plot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+}
+
+void Benchmark::QCPGpu_MultiGraphColored100kPan()
+{
+    QWidget host;
+    QCustomPlot* plot = nullptr;
+    if (!makeGpuPlot(host, plot))
+        QSKIP("no QRhi on this platform (qoffscreen)");
+    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    const int n = 100000;
+    std::vector<double> keys;
+    std::vector<std::vector<double>> values;
+    fillSineMulti(n, 100.0, 1, keys, values);
+    mg->setData(std::move(keys), std::move(values));
+    std::vector<double> scalar(n);
+    for (int i = 0; i < n; ++i)
+        scalar[i] = 50 + 50 * qSin(6 * M_PI * i / n); // colour by another scalar
+    mg->setColorValues(std::move(scalar));
+    plot->xAxis->setRange(50, 51);
+    plot->yAxis->setRange(-1.2, 1.2);
+    QVERIFY2(settleMultiGraph(plot, mg), "the first multigraph resample did not land");
+    double left = 50;
+    QBENCHMARK
+    {
+        left += 0.01; // 1 % of the window
+        plot->xAxis->setRange(left, left + 1);
+        plot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+}
+
+void Benchmark::QCPGpu_CurvePan100k()
+{
+    QWidget host;
+    QCustomPlot* plot = nullptr;
+    if (!makeGpuPlot(host, plot))
+        QSKIP("no QRhi on this platform (qoffscreen)");
+    auto* curve = new QCPCurve(plot->xAxis, plot->yAxis);
+    const int n = 100000;
+    QVector<double> t(n), keys(n), values(n);
+    for (int i = 0; i < n; ++i)
+    {
+        t[i] = i; // a Lissajous: three loops of the key against two of the value
+        keys[i] = 50 + 50 * qSin(6 * M_PI * i / n);
+        values[i] = qSin(4 * M_PI * i / n);
+    }
+    curve->setData(t, keys, values);
+    plot->xAxis->setRange(50, 51);
+    plot->yAxis->setRange(-1.2, 1.2);
+    settleGpuPlot(plot);
+    double left = 50;
+    QBENCHMARK
+    {
+        left += 0.01; // 1 % of the window
+        plot->xAxis->setRange(left, left + 1);
+        plot->replot(QCustomPlot::rpImmediateRefresh);
     }
 }
 

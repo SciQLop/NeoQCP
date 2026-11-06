@@ -599,3 +599,46 @@ composite happen in `render()`, which an offscreen benchmark does not run).
 | QCPGpu_MixedLayer | 8.7 | 8 | 8 / 8 / 8.1 | 0.92 |
 | QCPGpu_Pan100k | 0.22 | 0.22 | 0.21 / 0.22 / 0.22 | 1.00 |
 | QCPGpu_Text1k | 1 | 1.1 | 1.1 / 1.1 / 1 | 1.10 |
+
+## M4b start: rows added for the line family
+
+- Commit: 65a6efe (neoqcp-3.0) plus the rows of `bench: line-family rows, measured before milestone 4b`. The
+  numbers are measured on the pre-4b library code: task 1 of milestone 4b adds rows only, no library change.
+  Machine, renderer and command shape as in "End of milestone 4a" above.
+- Commands: `QT_QPA_PLATFORM=offscreen build-qt612/tests/benchmark/qcp_benchmark -median 5 QCPMultiGraph_SetData1M`
+  for the CPU row; the four GPU rows as in "GPU rows" above: `xvfb-run -a -s "-screen 0 1600x1200x24" env
+  QT_QPA_PLATFORM=xcb build-qt612/tests/benchmark/qcp_benchmark -median 5 <rows>` (llvmpipe, CPU side only).
+  Three runs of each, one row set per invocation, median of the five measurements of a run.
+- What each row times:
+  - QCPMultiGraph_SetData1M: `setData` of 1 000 000 keys x 3 sine columns into a multigraph that never rendered,
+    so the source installs at once; the vector fill is inside the loop as in QCPGraph2_SetDataDouble.
+  - QCPGpu_MultiGraphPan1M: 3-column, 1 000 000-key multigraph (keys over 0..100), a 1-wide window over 50..51,
+    panned by 1 % of the window per iteration. Same shape as QCPGpu_Pan100k.
+  - QCPGpu_MultiGraphZoom1M: the same data, zoomed in place by 1 % (window 1.0 / 0.99 alternating), as
+    QCPGpu_LineSolid100k.
+  - QCPGpu_MultiGraphColored100kPan: 1-column, 100 000-key multigraph coloured by a scalar (`setColorValues`),
+    panned by 1 % of the window per iteration.
+  - QCPGpu_CurvePan100k: a 100 000-point Lissajous `QCPCurve`, panned by 1 % of the window per iteration.
+- The GPU rows QSKIP without a QRhi (qoffscreen). Before QBENCHMARK they warm the plot as QCPGpu_Pan100k does and
+  then pump the event loop until the multigraph's first L1 resample has landed (3 000 000 values is above the
+  100 000-value async threshold, and the coloured row rebuilds L1 once for its origin), so the numbers are
+  steady-state frames, not the first L1 build.
+- Load average (1/5/15 min) at the start of each run. GPU rows, run 1: 10.34 / 7.85 / 6.69, run 2: 10.94 / 8.44 /
+  6.94, run 3: 11.10 / 8.70 / 7.07. CPU row, run 1: 10.37 / 7.75 / 6.64, runs 2 and 3: 6.78 / 7.89 / 6.86. Higher
+  than the 4a window and bursty: short-lived ~300 % CPU helpers of another session (`ui_csrf...`) appeared and
+  vanished within seconds. The pan rows, the zoom row and the GPU series as a whole repeat to 1-2 % anyway. No
+  1600x1200 Xvfb server was left behind.
+- A first QCPMultiGraph_SetData1M run read 60 ms during one of those bursts; it is not one of the three runs below.
+  The three left (40 / 38 / 38) agree to 5 %. This is the noisiest of the five rows across runs.
+- QCPGpu_MultiGraphZoom1M is 4x QCPGpu_MultiGraphPan1M (0.62 vs 0.16 ms). Likely the line cache: a 1 % pan keeps
+  the cached lines and translates the GPU entries, while a zoom in place changes the rendered range and rebuilds
+  L2 in `draw()` every frame.
+- These five numbers are the gate for the rows this task adds: 5 %, as for `QCPGpu_*` (plan Global Constraints).
+
+| row | run 1 / 2 / 3 | median |
+|---|---|---|
+| QCPGpu_CurvePan100k | 0.4 / 0.394 / 0.43 | 0.4 |
+| QCPGpu_MultiGraphColored100kPan | 0.14 / 0.14 / 0.14 | 0.14 |
+| QCPGpu_MultiGraphPan1M | 0.16 / 0.17 / 0.15 | 0.16 |
+| QCPGpu_MultiGraphZoom1M | 0.62 / 0.62 / 0.62 | 0.62 |
+| QCPMultiGraph_SetData1M | 40 / 38 / 38 | 38 |
