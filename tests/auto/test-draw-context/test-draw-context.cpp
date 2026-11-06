@@ -932,6 +932,48 @@ void TestDrawContext::nonSolidBrushIsNotFlattened()
     QVERIFY2(paintedCount(&fallback) > 50, "the gradient fill disappeared");
 }
 
+void TestDrawContext::mixedPositionsFollowTheLegacyPixelsOnAVerticalKeyAxis()
+{
+    Fixture fixture;
+    // Ranges far apart, so a pixel taken from the wrong space cannot hide behind a rounding.
+    fixture.plot->xAxis->setRange(0, 2);
+    fixture.plot->yAxis->setRange(0, 10);
+    QCPItemLine item(fixture.plot.get());
+    // A vertical key axis: the key coordinate is on the screen's y axis, the value on its x.
+    item.start->setAxes(fixture.plot->yAxis, fixture.plot->xAxis);
+    const QCPDrawFrame frame = qcpMakeFrame(fixture.plot->yAxis, fixture.plot->xAxis,
+                                           fixture.plot->axisRect(),
+                                           fixture.plot->axisRect()->rect());
+    const auto distance = [](const QPointF& a, const QPointF& b)
+    { return std::hypot(a.x() - b.x(), a.y() - b.y()); };
+
+    item.start->setTypeX(QCPItemPosition::ptPlotCoords);
+    item.start->setTypeY(QCPItemPosition::ptAxisRectRatio);
+    item.start->setCoords(7.0, 0.8);
+    const QPointF dataThenRatio = qcpResolvePosition(frame, QCP::DataXRatioY { 7.0, 0.8 });
+    const QPointF legacyDataThenRatio = item.start->pixelPosition();
+    QVERIFY2(distance(legacyDataThenRatio, dataThenRatio) <= 0.5,
+             qPrintable(QStringLiteral("a plot-coordinate x with a rect-ratio y must land where "
+                                       "the 2.x position lands: legacy (%1, %2), recorded (%3, %4)")
+                            .arg(legacyDataThenRatio.x())
+                            .arg(legacyDataThenRatio.y())
+                            .arg(dataThenRatio.x())
+                            .arg(dataThenRatio.y())));
+
+    item.start->setTypeX(QCPItemPosition::ptAxisRectRatio);
+    item.start->setTypeY(QCPItemPosition::ptPlotCoords);
+    item.start->setCoords(0.25, 8.0);
+    const QPointF ratioThenData = qcpResolvePosition(frame, QCP::RatioXDataY { 0.25, 8.0 });
+    const QPointF legacyRatioThenData = item.start->pixelPosition();
+    QVERIFY2(distance(legacyRatioThenData, ratioThenData) <= 0.5,
+             qPrintable(QStringLiteral("a rect-ratio x with a plot-coordinate y must land where "
+                                       "the 2.x position lands: legacy (%1, %2), recorded (%3, %4)")
+                            .arg(legacyRatioThenData.x())
+                            .arg(legacyRatioThenData.y())
+                            .arg(ratioThenData.x())
+                            .arg(ratioThenData.y())));
+}
+
 void TestDrawContext::transparentBrushNeedsNoRaster()
 {
     Fixture fixture;
