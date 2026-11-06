@@ -259,10 +259,22 @@ void QCPGridRhiLayer::rebuildGeometry(float dpr, int outputHeight)
         sy = outputHeight - sy - sh;
 
         auto* ubo = mRhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, kUniformBufferSize);
-        ubo->create();
+        if (!ubo->create())
+        {
+            qDebug() << Q_FUNC_INFO << "Failed to create grid UBO";
+            delete ubo;
+            continue;
+        }
 
         auto* srb = qcp::rhi::createSrb(mRhi, ubo, 0, QRhiShaderResourceBinding::VertexStage,
                                         "Failed to create grid SRB");
+        if (!srb)
+        {
+            // Without its own ranges the group would be drawn with the layout's, another axis
+            // rect's grid over this one's lines.
+            delete ubo;
+            continue;
+        }
 
         DrawGroup group;
         group.axisRect = ar;
@@ -284,11 +296,21 @@ void QCPGridRhiLayer::rebuildGeometry(float dpr, int outputHeight)
         if (tickGroupVertexCount > 0)
         {
             auto* tickUbo = mRhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, kUniformBufferSize);
-            tickUbo->create();
+            if (!tickUbo->create())
+            {
+                qDebug() << Q_FUNC_INFO << "Failed to create grid tick UBO";
+                delete tickUbo;
+                continue;
+            }
 
             auto* tickSrb = qcp::rhi::createSrb(mRhi, tickUbo, 0,
                                                 QRhiShaderResourceBinding::VertexStage,
                                                 "Failed to create grid tick SRB");
+            if (!tickSrb)
+            {
+                delete tickUbo;
+                continue;
+            }
 
             DrawGroup tickGroup;
             tickGroup.axisRect     = ar;
@@ -565,7 +587,7 @@ void QCPGridRhiLayer::renderGroups(QRhiCommandBuffer* cb, const QSize& outputSiz
     const QRhiCommandBuffer::VertexInput vbufBinding(mVertexBuffer, 0);
     for (const auto& group : mDrawGroups)
     {
-        if (group.isGridLines != gridLines)
+        if (group.isGridLines != gridLines || !group.srb)
             continue;
         // setShaderResources must precede setVertexInput — on Metal, QRhi offsets
         // vertex buffer indices by the number of SRB buffer bindings.
