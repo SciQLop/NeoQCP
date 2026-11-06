@@ -213,7 +213,10 @@ bool rasterOverflows(const QCPDrawList& list, const QCPPlottableRhiLayer& layer)
     if (!layer.dashedAvailable())
         needed += int(std::count_if(
             list.commands.begin(), list.commands.end(), [](const qcp::QCPDrawCommand& command)
-            { return qcp::strokeIsDashed(command) && !qcp::strokeNeedsRaster(command); }));
+            {
+                const qcp::RasterNeeds needs = qcp::rasterNeedsOf(command);
+                return needs.dashed && !needs.stroke;
+            }));
     if (needed == 0)
         return false;
     if (!layer.canAddImage())
@@ -491,17 +494,17 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
 
     for (const qcp::QCPDrawCommand& command : list.commands)
     {
-        // Both answers are the same in every branch: ask once per command, not once per path.
+        // One visit answers both halves and the dashes, in every branch.
         // The dashed pipeline is built with the layer, so a layer that failed to build it can only
         // rasterise a dashed stroke; the painter copy would land under the layer's GPU content.
-        const bool strokeRaster = qcp::strokeNeedsRaster(command)
-            || (!plottables.dashedAvailable() && qcp::strokeIsDashed(command));
-        const bool fillRaster = qcp::fillNeedsRaster(command);
+        const qcp::RasterNeeds needs = qcp::rasterNeedsOf(command);
+        const bool strokeRaster
+            = needs.stroke || (!plottables.dashedAvailable() && needs.dashed);
         const bool dataOnly = qcp::commandKind(command).dataOnly;
         const auto raster = [&]
         {
             addRasterCommand(list, plottables, command, frame, fallback, clip, dpr, outputSize,
-                             generation, geometry, fillRaster || strokeRaster, strokeRaster);
+                             generation, geometry, needs.fill || strokeRaster, strokeRaster);
         };
         const auto stroke
             = [&](std::span<const QPointF> points, const QPen& pen, bool closed = false)
@@ -555,7 +558,7 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                         = QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
                               .normalized();
                     // The fill is submitted first: the stroke's inner half must stay visible.
-                    if (qcp::gpuCanFill(cmd.brush) && !fillRaster && !strokeRaster)
+                    if (qcp::gpuCanFill(cmd.brush) && !needs.fill && !strokeRaster)
                     {
                         const std::array<QPointF, 4> corners { box.topLeft(), box.topRight(),
                                                                box.bottomRight(),
@@ -574,7 +577,7 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                     const QPointF b = qcpResolvePosition(frame, cmd.b);
                     const QRectF box = QRectF(a, b).normalized();
                     const std::vector<QPointF> ring = qcpEllipseRing(box);
-                    if (qcp::gpuCanFill(cmd.brush) && !fillRaster && !strokeRaster)
+                    if (qcp::gpuCanFill(cmd.brush) && !needs.fill && !strokeRaster)
                         fanFill(plottables, box.center(), ring, cmd.brush.color(), clip, dpr,
                                 outputHeight, alpha, dataOnly, geometry);
                     raster();

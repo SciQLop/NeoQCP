@@ -903,7 +903,7 @@ void TestDrawContext::nonSolidBrushIsNotFlattened()
     context.rect(QCP::Data { 20, 20 }, QCP::Data { 120, 100 }, QPen(Qt::NoPen), QBrush(gradient));
     const qcp::QCPDrawCommand& command = context.drawList().commands.front();
     // The GPU has no gradient: the command becomes an image, it is never flattened to one colour.
-    QVERIFY2(qcp::fillNeedsRaster(command), "a gradient fill was offered to the GPU");
+    QVERIFY2(qcp::rasterNeedsOf(command).fill, "a gradient fill was offered to the GPU");
 
     const auto paintedCount = [&](const qcp::QCPRasterFallback* fallback)
     {
@@ -942,6 +942,6 @@ void TestDrawContext::transparentBrushNeedsNoRaster()
     const qcp::QCPDrawCommand& command = context.drawList().commands.front();
     QVERIFY2(std::holds_alternative<qcp::RectCmd>(command),
              "the recording dropped the command instead of recording it");
-    QVERIFY2(!qcp::fillNeedsRaster(command), "an invisible solid brush was rasterised");
+    QVERIFY2(!qcp::rasterNeedsOf(command).fill, "an invisible solid brush was rasterised");
     QVERIFY2(!qcp::needsRaster(command), "an invisible fill needs no raster at all");
 }

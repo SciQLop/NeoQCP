@@ -260,7 +260,7 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
             // The layer could not take this command's image: paint it here, in the buffer the GPU
             // geometry draws over. A stroke the GPU cannot express is part of it.
             if (fallback && fallback->painterHandled(list.id, qcpCommandIndex(list, command)))
-                qcp::paintFallback(painter, command, frame, qcp::strokeNeedsRaster(command));
+                qcp::paintFallback(painter, command, frame, qcp::rasterNeedsOf(command).stroke);
             continue;
         }
         if (outsideClip(command, frame))

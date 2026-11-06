@@ -31,20 +31,28 @@ void sweepUnused(std::deque<Entry>& entries, Expired&& expired)
 //! has to be part of the command's image.
 bool strokeNeedsRaster(const QPen& pen);
 
-/// True when \a command's stroke is a dash pattern: the GPU can only draw it through its dashed
-/// pipeline, so a layer without one has to rasterise it.
-bool strokeIsDashed(const QCPDrawCommand& command);
+//! What \a command needs from the raster: a fill that cannot become a GPU vertex colour (a texture,
+//! gradient or hatch brush, a free-form polygon, a series pair that is not a ribbon), a stroke the
+//! GPU cannot draw in one colour, and whether that stroke is a dash pattern only a layer with the
+//! dashed pipeline can draw. One dispatch answers all three: every caller that asks one asks more.
+struct RasterNeeds
+{
+    bool fill = false;
+    bool stroke = false;
+    bool dashed = false;
 
-//! Same for \a command's pen (false for the kinds that have none).
-bool strokeNeedsRaster(const QCPDrawCommand& command);
+    //! True when either half needs the raster.
+    [[nodiscard]] bool any() const { return fill || stroke; }
+};
 
-//! True when \a command's fill cannot become a GPU vertex colour: a texture, gradient or hatch
-//! brush, a free-form polygon (no fan centre), or a series pair that is not a ribbon.
-bool fillNeedsRaster(const QCPDrawCommand& command);
+//! One visit over \a command; the kinds without a pen answer stroke and dashed false.
+[[nodiscard]] RasterNeeds rasterNeedsOf(const QCPDrawCommand& command);
 
-//! True when \a command is an image (or the painter's) rather than GPU triangles: its fill needs
-//! the raster, or its stroke does.
-bool needsRaster(const QCPDrawCommand& command);
+//! True when \a command is an image (or the painter's) rather than GPU triangles.
+inline bool needsRaster(const QCPDrawCommand& command)
+{
+    return rasterNeedsOf(command).any();
+}
 
 //! The pixel bounds the raster has to cover; \a withStroke adds the outline's outer half and its
 //! antialiasing.
