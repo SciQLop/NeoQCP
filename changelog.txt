@@ -175,8 +175,8 @@ Writing a plot type: derive from QCPDrawn<Base> (QCPAbstractPlottable, a QCPAbst
         width in pixels, and grouped or stacked bars, do this; a width in plot coordinates never
         reads it). clip() marks a recording the same way.
   - A container edit shows up: the bars (and any QCPAbstractPlottable1D) compare the container's
-        revision, so setData(), addData(), an edit through data()->set() and a successful
-        replace/remove repaint the new values, with no setter to call.
+        revision, so setData(), addData(), a remove or a clear, and a write through the container's
+        mutable iterators repaint the new values, with no setter to call.
   - The defaults save the boilerplate: dataRange() is the recording's data box (an axis side counts
         only when every position on it is data with no anchor; a log axis drops a box reaching zero
         or below), hitTest() is the distance to the geometry minus half the pen, 0 inside a visible
