@@ -47,4 +47,5 @@ private slots:
     void slotDeletingThePlotDropsTheRestOfTheChain();
     void teardownOpensNoDelivery();
     void oneArgumentRangeSlotConnects();
+    void slotReenteringAScopedSetterLeavesTheLastSignalCurrent();
 };

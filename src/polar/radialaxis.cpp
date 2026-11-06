@@ -285,7 +285,8 @@ void QCPPolarAxisRadial::setScaleType(QCPPolarAxisRadial::ScaleType type)
         mScaleType = type;
         if (mScaleType == stLogarithmic)
             setRange(mRange.sanitizedForLogScale());
-        qcpEmit(this, mParentPlot, &QCPPolarAxisRadial::scaleTypeChanged, mScaleType);
+        qcpEmitCurrent(this, mParentPlot, &QCPPolarAxisRadial::scaleTypeChanged,
+                       [this] { return mScaleType; });
     }
 }
 

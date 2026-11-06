@@ -711,6 +711,9 @@ protected:
     template <typename Sender, typename... SignalArgs, typename... Args>
     friend void qcpEmit(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(SignalArgs...),
                         Args&&... args);
+    template <typename Sender, typename Arg, typename Current>
+    friend void qcpEmitCurrent(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(Arg),
+                               Current current);
     friend class TestSignalDelivery;
     friend class TestRepaint;
     friend class TestItemIndex;
@@ -740,6 +743,21 @@ void qcpEmit(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(SignalArg
     plot->deliver(sender, [sender, signal, copied = std::move(copied)]() mutable {
         std::apply([&](auto&... values) { (sender->*signal)(values...); }, copied);
     });
+}
+
+/*!
+  Like qcpEmit, for a signal that reports a state: \a current is read when the signal is
+  delivered, not when it is queued. A setter that queues it after a nested call (setScaleType after
+  setRange) stays right when a slot of that nested call sets the state again: the last signal a
+  listener gets carries the current state.
+*/
+template <typename Sender, typename Arg, typename Current>
+void qcpEmitCurrent(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(Arg),
+                    Current current)
+{
+    if (!plot || !plot->mEmissions.isOpen())
+        return (sender->*signal)(current());
+    plot->deliver(sender, [sender, signal, current]() { (sender->*signal)(current()); });
 }
 
 // implementation of template functions:

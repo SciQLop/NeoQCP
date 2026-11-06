@@ -268,7 +268,8 @@ void QCPColorScale::setDataRange(const QCPRange& dataRange)
             mColorAxis.data()->setRange(mDataRange); // emits the axis rangeChanged too
         if (mLayer)
             mLayer->markDirty();
-        qcpEmit(this, mParentPlot, &QCPColorScale::dataRangeChanged, mDataRange);
+        qcpEmitCurrent(this, mParentPlot, &QCPColorScale::dataRangeChanged,
+                       [this] { return mDataRange; });
     }
 }
 
@@ -302,7 +303,8 @@ void QCPColorScale::setDataScaleType(QCPAxis::ScaleType scaleType)
             mColorAxis.data()->setScaleType(mDataScaleType);
         if (mDataScaleType == QCPAxis::stLogarithmic)
             setDataRange(mDataRange.sanitizedForLogScale());
-        qcpEmit(this, mParentPlot, &QCPColorScale::dataScaleTypeChanged, mDataScaleType);
+        qcpEmitCurrent(this, mParentPlot, &QCPColorScale::dataScaleTypeChanged,
+                       [this] { return mDataScaleType; });
     }
 }
 

@@ -725,7 +725,8 @@ void QCPLegend::setSelectedParts(const SelectableParts& selected)
                 return;
         }
         mSelectedParts = newSelected;
-        qcpEmit(this, mParentPlot, &QCPLegend::selectionChanged, mSelectedParts);
+        qcpEmitCurrent(this, mParentPlot, &QCPLegend::selectionChanged,
+                       [this] { return mSelectedParts; });
     }
 }
 

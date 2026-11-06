@@ -676,3 +676,19 @@ void TestSignalDelivery::oneArgumentRangeSlotConnects()
     plot.xAxis->setRange(1, 2);
     QCOMPARE(received, QCPRange(1, 2));
 }
+
+void TestSignalDelivery::slotReenteringAScopedSetterLeavesTheLastSignalCurrent()
+{
+    QCustomPlot plot;
+    QCPAxis* axis = plot.xAxis;
+    axis->setRange(-5, 10);
+    QList<QCPAxis::ScaleType> received;
+    connect(axis, &QCPAxis::rangeChanged, &plot,
+            [axis](const QCPRange&, const QCPRange&) { axis->setScaleType(QCPAxis::stLinear); });
+    connect(axis, &QCPAxis::scaleTypeChanged, &plot,
+            [&received](QCPAxis::ScaleType type) { received << type; });
+    axis->setScaleType(QCPAxis::stLogarithmic);
+    QCOMPARE(axis->scaleType(), QCPAxis::stLinear);
+    QVERIFY(!received.isEmpty());
+    QCOMPARE(received.last(), axis->scaleType());
+}

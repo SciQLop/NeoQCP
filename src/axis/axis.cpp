@@ -635,7 +635,7 @@ void QCPAxis::setScaleType(QCPAxis::ScaleType type)
         if (mScaleType == stLogarithmic)
             setRange(mRange.sanitizedForLogScale());
         markAppearanceDirty();
-        qcpEmit(this, mParentPlot, &QCPAxis::scaleTypeChanged, mScaleType);
+        qcpEmitCurrent(this, mParentPlot, &QCPAxis::scaleTypeChanged, [this] { return mScaleType; });
     }
 }
 
