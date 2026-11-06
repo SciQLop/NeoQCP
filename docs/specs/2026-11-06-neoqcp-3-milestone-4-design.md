@@ -123,6 +123,14 @@ API's job until milestone 5).
     `selectableParts()` for the detail), and `selectableChanged()` loses its argument too. The 2.x
     signals with arguments are emitted alongside, through the same delivery, until milestone 5.
 
+## Corrections made while planning M4a (2026-11-06)
+
+- Calls 2 and 16: the 2.x selection signals with arguments are removed in M4a, not emitted
+  alongside: a `selectionChanged()` next to `selectionChanged(bool)` makes every
+  `&Class::selectionChanged` ambiguous, which breaks 2.x code anyway and breaks decision 5. The getter
+  keeps its 2.x name `selected()`; no `isSelected()` is added.
+- `rangeChanged` keeps only `(newRange, oldRange)`: a 2.x slot taking one range still connects.
+
 ## Left to the builder
 
 Class and method names beyond the ones above, the base-class split, how the resampler outputs become
