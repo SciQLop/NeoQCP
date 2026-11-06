@@ -243,6 +243,10 @@ Behaviour changes for 2.x users:
         per buffer. 2.x exports drew everything with QPainter, so a dashed graph could export under
         an item it screens over. Screen and export are compared on layout, colours and order, not
         byte for byte (MSAA versus QPainter antialiasing).
+  - An item position with one plot coordinate and one axis-rect ratio is a key and a value, like a
+        data point. On a vertical key axis 2.x sent the ratio through the value axis and ignored the
+        plot coordinate; now the coordinate goes through the key axis (screen y) and the ratio runs
+        along the value axis (screen x). On a horizontal key axis nothing changes.
 
 #### NeoQCP, unreleased ####
 
