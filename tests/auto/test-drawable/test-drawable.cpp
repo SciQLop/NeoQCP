@@ -2034,6 +2034,22 @@ void TestDrawable::aLogKeyAxisRecordsEveryTransform()
     QCOMPARE(shape->drawCalls, 3);
 }
 
+// A linear-to-log switch can keep the range and the axis width, so the window's scale test alone
+// would keep a recording made for a linear axis.
+void TestDrawable::switchingTheKeyAxisToLogRecords()
+{
+    Fixture f;
+    auto* shape = new TestShape(f.plot.get());
+    shape->readsKeyWindow = true;
+    f.plot->xAxis->setRange(1, 10);
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 1);
+
+    f.plot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 2);
+}
+
 void TestDrawable::keyWindowCoversOneViewWidthEachSide()
 {
     Fixture f;
