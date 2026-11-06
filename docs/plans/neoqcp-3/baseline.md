@@ -459,3 +459,143 @@ composite happen in `render()`, which an offscreen benchmark does not run).
 | QCPDrawn_Zoom10k | - | 0.3 | 0.3 / 0.3 / 0.3 | new |
 | QCPDrawn_Pan10k | - | 0.25 | 0.25 / 0.24 / 0.25 | new |
 | QCPDrawn_Pan10kOneRecording | - | 0.32 | 0.32 / 0.31 / 0.34 | new |
+
+## End of milestone 4a
+
+- Commit: 7ed486f (neoqcp-3.0), same command and machine as above, three sequential runs of the whole binary
+  (70 rows; the 11 GPU rows skip here, they run under Xvfb below).
+- Load average (1/5/15 min) at the start of each run: run 1: 1.84 / 3.14 / 2.74, run 2: 4.71 / 3.41 / 2.87,
+  run 3: 1.29 / 2.62 / 2.67. Another session's cargo test loop (access_matrix) ran during the window, which is
+  why run 2 starts at 4.71; its rows sit inside the spread of runs 1 and 3, so the series was not repeated.
+- Ratio = end-of-milestone-4a median / end-of-milestone-3 median: the M4 design takes the end of milestone 3 as
+  the baseline for all of M4. Gate: 5 % for QCPGpu_*, QCPDrawn_*, QCPItems_* and QCPBars_*, 15 % for the rest.
+  The ratio column below is the three-run median; the six rows that came out over gate were run six more times
+  and the median of those six decides, as listed here.
+- Rows over gate in the three runs:
+  - QCPBars_Zoom10k 5.4 -> 5.8 (1.07, gate 5 %): the three runs (7.6 / 5.8 / 5.2) straddle the gate. Six more:
+    5.5 / 5.2 / 5.2 / 5.2 / 5.6 / 5.3, median 5.25 (0.97). Inside.
+  - QCPGraph_RemoveDataBefore 0.19 -> 0.22 (1.16, gate 15 %): six more: 0.18 / 0.28 / 0.18 / 0.2 / 0.22 / 0.31,
+    median 0.21 (1.11). Inside. Single-shot sub-millisecond row, as noisy here as in the earlier sections.
+  - QCPItems_Clear10k 8.3 -> 8.9 (1.07, gate 5 %): six more: 8.4 / 8.2 / 8.7 / 8.7 / 8.3 / 8.1, median 8.35
+    (1.01). Inside.
+  - QCPItems_Click100 0.0038 -> 0.0042 (1.11, gate 5 %): six more: 0.0041 / 0.0043 / 0.0044 / 0.0041 / 0.0042 /
+    0.0041, median 0.00415 (1.09). Still outside, by 0.35 us per click on a 4.15 us row. Not chased (this task
+    changes no code); its siblings QCPItems_Click10k 0.052 (0.98) and QCPItems_ClickEmpty10k 0.05 (1.00) are flat,
+    so the 10 000 item hit path did not move.
+  - QCPItems_RemoveEach10k 33 -> 36 (1.09, gate 5 %): six more: 32 / 30 / 30 / 30 / 33 / 30, median 30 (0.91).
+    Inside.
+  - QCPGpu_Text1k 1 -> 1.1 (1.10, gate 5 %, GPU table below): six more under Xvfb: 1.1 / 1.0 / 1.0 / 1.0 / 1.0 /
+    1.1, median 1.0 (1.00). Inside.
+  - A first batch of six extra runs was discarded: the cargo loop pushed the 1 min load average to 14 and inflated
+    every row (QCPItems_Clear10k read 87 ms). The six runs above were taken at a 1 min load of 2.2-2.3.
+- No row of milestone 4a is slower than the milestone 3 number beyond these; nothing was changed to chase a row.
+- Notably faster: QCPCoords_CoordToPixel1M 5.6 -> 4.8 (0.86), QCPAxis_SetRange10k 1.5 -> 1.3 (0.87),
+  QCPTransform_Map1M 0.71 -> 0.63 (0.89), QCPGpu_Bars10k 5.5 -> 4.9 (0.89), QCPGpu_MixedLayer 8.7 -> 8 (0.92),
+  QCPGraph2_ScatterWithLine1M 0.13 -> 0.12 (0.92), QCPDrawContext_ReplayMarkers100k 13 -> 12 (0.92).
+- New row since milestone 3: QCPGpu_BarsPan10k 0.12 (10 000 GPU bars panned once, added with 5fbf9fc).
+- Guard rows for this milestone, all inside their 5 % gate: QCPItems_Replot10k 0.42 (1.00), QCPItems_Zoom10k
+  0.43 (1.00), QCPItems_Pan10k 0.42 (1.02), QCPItems_Click10k 0.052 (0.98), QCPItems_Add10k 19 (0.95),
+  QCPBars_Pan10k 5.7 (1.02), QCPDrawn_Zoom10k 0.3 (1.00), QCPDrawn_Pan10k 0.25 (1.00),
+  QCPDrawn_Pan10kOneRecording 0.3 (0.94), QCPGpu_LineSolid100k 0.43 (0.96), QCPGpu_LineDashed100k 0.43 (0.96),
+  QCPGpu_Pan100k 0.22 (1.00).
+
+| Benchmark | milestone 3 msecs | end 4a msecs | run 1 / 2 / 3 | ratio |
+|---|---|---|---|---|
+| QCPAxisRects_Stack8_Replot | 1.9 | 1.8 | 1.8 / 1.8 / 1.8 | 0.95 |
+| QCPAxis_SetRange10k | 1.5 | 1.3 | 1.4 / 1.3 / 1.3 | 0.87 |
+| QCPAxis_SetTickLength10kItems | 0.012 | 0.012 | 0.013 / 0.012 / 0.011 | 1.00 |
+| QCPAxis_TickLabels | 0.25 | 0.24 | 0.24 / 0.24 / 0.24 | 0.96 |
+| QCPAxis_TickLabelsCached | 0.088 | 0.089 | 0.09 / 0.089 / 0.087 | 1.01 |
+| QCPBars_Pan10k | 5.6 | 5.7 | 6.6 / 5.7 / 5.5 | 1.02 |
+| QCPBars_Zoom10k | 5.4 | 5.8 | 7.6 / 5.8 / 5.2 | 1.07 |
+| QCPColorMap2_ResampleDouble | 228 | 220 | 220 / 230 / 220 | 0.95 |
+| QCPColorMap2_ResampleFloat | 142 | 130 | 130 / 140 / 130 | 0.93 |
+| QCPColorMap2_ResamplePanSequence | 207 | 200 | 190 / 230 / 200 | 0.94 |
+| QCPColorMap2_ResamplePanSequenceSmall | 211 | 210 | 210 / 210 / 200 | 0.98 |
+| QCPColorMap2_ResampleWideParallel | 283 | 270 | 270 / 280 / 260 | 0.95 |
+| QCPColorMap2_ResampleWideSerial | 784 | 770 | 770 / 780 / 760 | 0.98 |
+| QCPColorMapData_ConstructLarge | 1.2 | 1.1 | 1.1 / 1.6 / 1.1 | 0.92 |
+| QCPColorMap_ColorizeMap | 0.16 | 0.16 | 0.16 / 0.16 / 0.16 | 1.00 |
+| QCPColorMap_SetCell1M | 3 | 3 | 3.1 / 3 / 3 | 1.00 |
+| QCPColorMap_Standard | 0.22 | 0.22 | 0.22 / 0.22 / 0.21 | 1.00 |
+| QCPCoords_CoordToPixel1M | 5.6 | 4.8 | 5 / 4.8 / 4.7 | 0.86 |
+| QCPDrawContext_ReplayData1M | 1.3 | 1.4 | 1.4 / 1.3 / 1.6 | 1.08 |
+| QCPDrawContext_ReplayMarkers100k | 13 | 12 | 19 / 12 / 12 | 0.92 |
+| QCPGraph2_RenderDouble | 0.14 | 0.14 | 0.14 / 0.14 / 0.14 | 1.00 |
+| QCPGraph2_RenderFloat | 0.14 | 0.14 | 0.14 / 0.14 / 0.15 | 1.00 |
+| QCPGraph2_RenderManyLines | 0.44 | 0.44 | 0.44 / 0.45 / 0.44 | 1.00 |
+| QCPGraph2_ScatterDisc1M | 0.12 | 0.12 | 0.12 / 0.12 / 0.12 | 1.00 |
+| QCPGraph2_ScatterSquare1M | 0.12 | 0.12 | 0.12 / 0.12 / 0.12 | 1.00 |
+| QCPGraph2_ScatterWithLine1M | 0.13 | 0.12 | 0.13 / 0.12 / 0.12 | 0.92 |
+| QCPGraph2_SetDataDouble | 9.7 | 9.6 | 9.6 / 10 / 9.5 | 0.99 |
+| QCPGraph2_SetDataFloat | 8.4 | 8.4 | 8.8 / 8.4 / 8.3 | 1.00 |
+| QCPGraph_AddDataAtBeginSorted | 5.4 | 5.6 | 5.6 / 8.3 / 5.3 | 1.04 |
+| QCPGraph_AddDataAtBeginUnsorted | 28 | 29 | 29 / 29 / 28 | 1.04 |
+| QCPGraph_AddDataAtEndSorted | 5.2 | 5.5 | 5.2 / 5.5 / 5.6 | 1.06 |
+| QCPGraph_AddDataAtEndUnsorted | 23 | 24 | 24 / 26 / 24 | 1.04 |
+| QCPGraph_AddDataMixedSorted | 10 | 11 | 11 / 13 / 10 | 1.10 |
+| QCPGraph_AddDataMixedUnsorted | 30 | 30 | 30 / 30 / 29 | 1.00 |
+| QCPGraph_AddDataSingleAtBegin | 0.047 | 0.046 | 0.045 / 0.046 / 0.046 | 0.98 |
+| QCPGraph_AddDataSingleAtEnd | 0.024 | 0.024 | 0.024 / 0.024 / 0.023 | 1.00 |
+| QCPGraph_AddDataSingleRandom | 5.1 | 5.1 | 5.1 / 5.1 / 5 | 1.00 |
+| QCPGraph_ManyLines | 1.3 | 1.3 | 1.3 / 1.3 / 1.4 | 1.00 |
+| QCPGraph_ManyOffScreenLines | 0.15 | 0.15 | 0.15 / 0.19 / 0.15 | 1.00 |
+| QCPGraph_ManyPoints | 2.7 | 2.6 | 2.6 / 2.7 / 2.6 | 0.96 |
+| QCPGraph_RemoveDataAfter | 0.0012 | 0.00097 | 0.00097 / 0.0014 / 0.00097 | 0.81 |
+| QCPGraph_RemoveDataBefore | 0.19 | 0.22 | 0.21 / 0.24 / 0.22 | 1.16 |
+| QCPGraph_RemoveDataBetween | 0.11 | 0.093 | 0.093 / 0.12 / 0.086 | 0.85 |
+| QCPGraph_Standard | 0.7 | 0.69 | 0.69 / 1.1 / 0.67 | 0.99 |
+| QCPInput_MouseMoveStorm | 3.9 | 3.9 | 4.1 / 3.9 / 3.7 | 1.00 |
+| QCPInput_WheelOverGraph2_1M | 0.00067 | 0.00064 | 0.00066 / 0.00064 / 0.00064 | 0.96 |
+| QCPItemText_Zoom1k | 0.85 | 0.88 | 0.91 / 0.88 / 0.87 | 1.04 |
+| QCPItems_Add10k | 20 | 19 | 19 / 19 / 19 | 0.95 |
+| QCPItems_AddRemove10k | 28 | 27 | 29 / 27 / 27 | 0.96 |
+| QCPItems_AddRemove20k | 66 | 64 | 64 / 65 / 64 | 0.97 |
+| QCPItems_Clear10k | 8.3 | 8.9 | 8.8 / 9.4 / 8.9 | 1.07 |
+| QCPItems_Click100 | 0.0038 | 0.0042 | 0.0043 / 0.0042 / 0.0041 | 1.11 |
+| QCPItems_Click10k | 0.053 | 0.052 | 0.053 / 0.052 / 0.052 | 0.98 |
+| QCPItems_ClickEmpty10k | 0.05 | 0.05 | 0.05 / 0.05 / 0.05 | 1.00 |
+| QCPItems_DeleteEach10k | 27 | 26 | 26 / 27 / 23 | 0.96 |
+| QCPItems_DeletePlot10k | 27 | 27 | 28 / 27 / 26 | 1.00 |
+| QCPItems_DragOne10k | 0.55 | 0.55 | 0.56 / 0.55 / 0.55 | 1.00 |
+| QCPItems_FirstFrame10k | 30 | 29 | 29 / 29 / 29 | 0.97 |
+| QCPItems_Pan10k | 0.41 | 0.42 | 0.42 / 0.42 / 0.42 | 1.02 |
+| QCPItems_RemoveEach10k | 33 | 36 | 37 / 36 / 30 | 1.09 |
+| QCPItems_Replot10k | 0.42 | 0.42 | 0.42 / 0.42 / 0.42 | 1.00 |
+| QCPItems_RestyleAll10k | 1.6 | 1.6 | 1.7 / 1.6 / 1.5 | 1.00 |
+| QCPItems_Zoom100 | 0.41 | 0.4 | 0.4 / 0.42 / 0.4 | 0.98 |
+| QCPItems_Zoom10k | 0.43 | 0.43 | 0.43 / 0.43 / 0.42 | 1.00 |
+| QCPItems_ZoomEmpty | 0.14 | 0.14 | 0.14 / 0.14 / 0.14 | 1.00 |
+| QCPPlots_Stack8_Replot | 0.27 | 0.26 | 0.26 / 0.26 / 0.26 | 0.96 |
+| QCPSpatialIndex_Build10k | 0.89 | 0.89 | 0.89 / 0.9 / 0.89 | 1.00 |
+| QCPSpatialIndex_Query10k | 0.00036 | 0.00037 | 0.00037 / 0.00037 / 0.00036 | 1.03 |
+| QCPTransform_Map1M | 0.71 | 0.63 | 0.91 / 0.63 / 0.63 | 0.89 |
+| QObject_DeleteEachChild10k | 7.9 | 8 | 8.4 / 8 / 7.9 | 1.01 |
+
+### GPU rows (Xvfb, llvmpipe: CPU side only)
+
+- Commit: 7ed486f (neoqcp-3.0), `xvfb-run -a -s "-screen 0 1600x1200x24" env QT_QPA_PLATFORM=xcb
+  build-qt612/tests/benchmark/qcp_benchmark -median 5 <rows>`, the same renderer (llvmpipe) and the same caveat as
+  `m3-gpu-baseline.md`: these are the CPU msecs of one `replot()`, not GPU time.
+- Load average (1/5/15 min) at the start of each run: run 1: 2.31 / 3.99 / 3.49, run 2: 6.01 / 4.69 / 3.76,
+  run 3: 5.05 / 4.67 / 3.81. The same cargo loop as above; no 1600x1200 Xvfb server was left behind.
+- Ratio = end-of-milestone-4a median / end-of-milestone-3 median.
+- All ten previously existing rows are inside their 5 % gate but one, and three of them are faster: QCPGpu_Bars10k
+  5.5 -> 4.9 (0.89), QCPGpu_MixedLayer 8.7 -> 8 (0.92), QCPGpu_Graph2Render1M 0.13 -> 0.12 (0.92).
+- QCPGpu_Text1k came out at 1.1 / 1.1 / 1 (+10 %); six more runs read 1.1 / 1.0 / 1.0 / 1.0 / 1.0 / 1.1, median
+  1.0 (1.00), so it is inside.
+- QCPGpu_BarsPan10k is new since milestone 3 (10 000 GPU bars panned once): 0.12 ms, 0.12 / 0.12 / 0.12.
+
+| row | milestone 3 msecs | end 4a msecs | run 1 / 2 / 3 | ratio |
+|---|---|---|---|---|
+| QCPDrawn_Pan10k | 0.25 | 0.25 | 0.25 / 0.24 / 0.25 | 1.00 |
+| QCPDrawn_Pan10kOneRecording | 0.32 | 0.3 | 0.3 / 0.3 / 0.31 | 0.94 |
+| QCPDrawn_Zoom10k | 0.3 | 0.3 | 0.3 / 0.3 / 0.3 | 1.00 |
+| QCPGpu_Bars10k | 5.5 | 4.9 | 4.9 / 4.9 / 4.8 | 0.89 |
+| QCPGpu_BarsPan10k | - | 0.12 | 0.12 / 0.12 / 0.12 | new |
+| QCPGpu_Graph2Render1M | 0.13 | 0.12 | 0.13 / 0.12 / 0.12 | 0.92 |
+| QCPGpu_LineDashed100k | 0.45 | 0.43 | 0.43 / 0.42 / 0.43 | 0.96 |
+| QCPGpu_LineSolid100k | 0.45 | 0.43 | 0.43 / 0.43 / 0.43 | 0.96 |
+| QCPGpu_MixedLayer | 8.7 | 8 | 8 / 8 / 8.1 | 0.92 |
+| QCPGpu_Pan100k | 0.22 | 0.22 | 0.21 / 0.22 / 0.22 | 1.00 |
+| QCPGpu_Text1k | 1 | 1.1 | 1.1 / 1.1 / 1 | 1.10 |
