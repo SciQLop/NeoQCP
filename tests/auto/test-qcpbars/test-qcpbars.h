@@ -28,6 +28,7 @@ private slots:
   void pixelWidthBarsReRecordOnEveryPan();
   void barsSelectionReRecordsAndUsesTheDecorator();
   void bracketDecorationOverTheBars();
+  void bracketSubclassKeepsItsDrawBracket();
   void barsPanDoesNotReRecord();
 
   void barsOnTheKeyBoundEdgeAreHit_data();

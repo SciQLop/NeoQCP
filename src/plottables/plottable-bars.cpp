@@ -1005,8 +1005,12 @@ void QCPBars::draw(QCPDrawContext& context) const
     {
         // A bracket decorator's shapes are recorded after the bars, so the replay draws them over
         // the bars the GPU draws. A custom style stays on the painter callback, under them.
+        // Only the built-in bracket can be recorded: a subclass may redraw its brackets, and its
+        // overrides are what the user sees.
         const auto* bracket = dynamic_cast<const QCPSelectionDecoratorBracket*>(mSelectionDecorator);
-        if (!bracket || !bracket->recordDecoration(context, selection()))
+        const bool builtInBracket
+            = bracket && typeid(*bracket) == typeid(QCPSelectionDecoratorBracket);
+        if (!builtInBracket || !bracket->recordDecoration(context, selection()))
         {
             context.painter([this](QCPPainter& painter, const QCPTransform&) {
                 mSelectionDecorator->drawDecoration(&painter, selection());

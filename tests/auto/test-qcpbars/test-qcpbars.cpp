@@ -16,6 +16,20 @@ public:
     int recordings() const { return mCore.recordingCount(); }
 };
 
+//! A bracket decorator with a look of its own: only its drawBracket can ink the selection.
+class CustomBracket : public QCPSelectionDecoratorBracket
+{
+public:
+    mutable int draws = 0;
+
+    void drawBracket(QCPPainter* painter, int) const override
+    {
+        ++draws;
+        painter->setPen(QPen(QColor(220, 0, 220), 3));
+        painter->drawLine(QPointF(0, 0), QPointF(0, 40));
+    }
+};
+
 //! A plot with a real QRhi under it, or none: only the GPU replay extrudes bar outlines.
 QCustomPlot* shownPlot(QWidget& host)
 {
@@ -682,6 +696,44 @@ void TestQCPBars::bracketDecorationOverTheBars()
                            qRound((plot->yAxis->coordToPixel(2) + 6) * dpr));
     QVERIFY2(over.green() > 150 && over.red() < 120 && over.blue() < 120,
              qPrintable(QStringLiteral("the bar covers its bracket: %1").arg(over.name())));
+}
+
+// A bracket decorator subclass may redraw the brackets: the recording must not take the built-in
+// outline for it.
+void TestQCPBars::bracketSubclassKeepsItsDrawBracket()
+{
+    QWidget host;
+    QCustomPlot* plot = shownPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    auto* bars = new QCPBars(plot->xAxis, plot->yAxis);
+    bars->setData(QVector<double> { 1 }, QVector<double> { 2 });
+    bars->setWidth(0.6);
+    bars->setPen(Qt::NoPen);
+    bars->setBrush(QColor(40, 40, 200));
+    plot->xAxis->setRange(0, 2);
+    plot->yAxis->setRange(0, 4);
+
+    auto* bracket = new CustomBracket;
+    bracket->setBracketStyle(QCPSelectionDecoratorBracket::bsSquareBracket);
+    bracket->setBracketPen(QPen(Qt::green, 3));
+    bracket->setBracketWidth(10);
+    bracket->setBracketHeight(40);
+    bars->setSelectionDecorator(bracket);
+    bars->setSelectable(QCP::stSingleData);
+    bars->setSelection(QCPDataSelection(QCPDataRange(0, 1)));
+
+    plot->replot(QCustomPlot::rpImmediateRefresh);
+    QTest::qWait(10);
+    const QImage frame = plot->grabFramebuffer();
+    const double dpr = frame.devicePixelRatio();
+    QVERIFY2(bracket->draws > 0, "the subclass never drew its bracket");
+    const QColor over
+        = frame.pixelColor(qRound(plot->xAxis->coordToPixel(1) * dpr),
+                           qRound((plot->yAxis->coordToPixel(2) + 6) * dpr));
+    QVERIFY2(over.red() > 150 && over.blue() > 150 && over.green() < 120,
+             qPrintable(QStringLiteral("the built-in bracket is drawn over the subclass's: %1")
+                            .arg(over.name())));
 }
 
 void TestQCPBars::barsPanDoesNotReRecord()
