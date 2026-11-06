@@ -40,8 +40,7 @@ Deferred delivery rule (signals that run user code at a moment the plot may be h
   - Input signals carry the event itself: accept() or ignore() in a slot is what Qt sees next. An
         ignored mouse event or wheel only goes on to the parent widget if the user clears
         Qt::WA_NoMousePropagation, which QCustomPlot sets by default, as in 2.x.
-  - Still direct (milestone 4): selectionChangedByUser, selectionChanged, rangeChanged,
-        QCPSelectionRect::accepted and the QCPIntervals edit signals (intervalsEdited,
+  - Still direct: QCPSelectionRect::accepted and the QCPIntervals edit signals (intervalsEdited,
         intervalCreated, deleteRequested). beforeReplot and afterLayout keep 2.x timing.
 
 Parts the plot re-creates, and getters that never create:
@@ -251,6 +250,37 @@ Behaviour changes for 2.x users:
         offset: the plot coordinate is the key (screen y when the key axis is vertical), and the
         other number takes the other screen axis with its own type's formula, as a data point's
         value does.
+
+Milestone 4a (signals and selection). Additive, except for the behaviour changes listed below.
+
+One signal per fact: a signal that used to carry a copy of a getter's value now carries nothing, and
+        the slot reads the object. selectionChanged() and selectableChanged() say that something
+        changed; selected(), selection(), selectedParts(), selectable() and selectableParts() say
+        what.
+  - A plottable, an item, an axis, a legend, a legend row, a text element and the two polar axes
+        answer selection the same way: selected(), selectable(), one selectionChanged(), one
+        selectableChanged().
+  - selectable() is a QCP::SelectionType on all nine. An item, a legend row and a text element are
+        whole or not at all: setSelectable(QCP::stNone/stWhole), and any other type is refused as
+        misuse. An axis, a legend and the polar axes answer stWhole when any part is selectable and
+        stNone when none is; setSelectableParts still sets the parts.
+  - The selection signals are delivered when the outermost NeoQCP call returns, as everywhere else
+        (see milestone 1): a slot can delete the sender, and what it reads is the state from the
+        moment the object emitted.
+
+Behaviour changes for 2.x users:
+  - The selection signals lost their arguments: connect to selectionChanged()/selectableChanged() and
+        read selected(), selection(), selectedParts(), selectable() or selectableParts() in the slot.
+        QCPAbstractPlottable::selectionChanged(bool) and selectionChanged(const QCPDataSelection&) are
+        gone, as are the parts form of QCPAxis, QCPLegend and the polar axes, and the bool form of the
+        items, legend rows and text elements.
+  - selectable() returns a QCP::SelectionType everywhere. On an item, a legend row or a text element,
+        setSelectable(bool) is now setSelectable(QCP::SelectionType) (QCP::stWhole or QCP::stNone).
+  - rangeChanged has one signature, (newRange, oldRange).
+  - Signals are delivered when the outermost NeoQCP call returns. Three signals stay direct, either
+        because the emitting object has no plot to deliver through or because it already runs on
+        another thread: QCPTheme::changed(), QCPLaneLayout::changed() and the asynchronous pipeline's
+        cross-thread signals, which were queued already.
 
 #### NeoQCP, unreleased ####
 

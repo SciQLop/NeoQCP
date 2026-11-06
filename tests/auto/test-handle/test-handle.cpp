@@ -52,20 +52,18 @@ void TestHandle::handleConnects()
     QCustomPlot plot;
     QCPHandle<QCPGraph> h(plot.addGraph());
     int fired = 0;
-    auto c = qcpConnect(h, qOverload<bool>(&QCPAbstractPlottable::selectionChanged), &plot,
-                        [&fired](bool) { ++fired; });
+    auto c = qcpConnect(h, &QCPAbstractPlottable::selectionChanged, &plot, [&fired] { ++fired; });
     QVERIFY(c);
     h->setSelectable(QCP::stWhole);
     h->setSelection(QCPDataSelection(QCPDataRange(0, 1)));
     QVERIFY(fired > 0);
 
     QCPHandle<QCPGraph> dead;
-    QVERIFY(!qcpConnect(dead, qOverload<bool>(&QCPAbstractPlottable::selectionChanged), &plot, [](bool) {}));
+    QVERIFY(!qcpConnect(dead, &QCPAbstractPlottable::selectionChanged, &plot, [] {}));
 
     QCPHandle<QCPGraph> deleted(plot.addGraph());
     delete deleted.get();
-    QVERIFY(!qcpConnect(deleted, qOverload<bool>(&QCPAbstractPlottable::selectionChanged), &plot,
-                        [](bool) {}));
+    QVERIFY(!qcpConnect(deleted, &QCPAbstractPlottable::selectionChanged, &plot, [] {}));
 }
 
 void TestHandle::handleIsNotARawPointer()

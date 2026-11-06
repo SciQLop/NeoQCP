@@ -94,16 +94,16 @@
   This signal is emitted when the scale type changes, by calls to \ref setScaleType
 */
 
-/*! \fn void QCPPolarAxisRadial::selectionChanged(QCPPolarAxisRadial::SelectableParts selection)
+/*! \fn void QCPPolarAxisRadial::selectionChanged()
 
   This signal is emitted when the selection state of this axis has changed, either by user
-  interaction or by a direct call to \ref setSelectedParts.
+  interaction or by a direct call to \ref setSelectedParts. The slot reads \ref selectedParts.
 */
 
-/*! \fn void QCPPolarAxisRadial::selectableChanged(const QCPPolarAxisRadial::SelectableParts
-  &parts);
+/*! \fn void QCPPolarAxisRadial::selectableChanged()
 
-  This signal is emitted when the selectability changes, by calls to \ref setSelectableParts
+  This signal is emitted when the selectability changes, by calls to \ref setSelectableParts. The
+  slot reads \ref selectableParts.
 */
 
 /* end of documentation of signals */
@@ -333,7 +333,7 @@ void QCPPolarAxisRadial::setSelectableParts(const SelectableParts& selectable)
     if (mSelectableParts != selectable)
     {
         mSelectableParts = selectable;
-        qcpEmit(this, mParentPlot, &QCPPolarAxisRadial::selectableChanged, mSelectableParts);
+        qcpEmit(this, mParentPlot, &QCPPolarAxisRadial::selectableChanged);
     }
 }
 
@@ -361,7 +361,7 @@ void QCPPolarAxisRadial::setSelectedParts(const SelectableParts& selected)
     {
         markDirty();
         mSelectedParts = selected;
-        qcpEmit(this, mParentPlot, &QCPPolarAxisRadial::selectionChanged, mSelectedParts);
+        qcpEmit(this, mParentPlot, &QCPPolarAxisRadial::selectionChanged);
     }
 }
 

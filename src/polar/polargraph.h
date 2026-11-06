@@ -179,9 +179,8 @@ public:
                                    const QCPRange& inKeyRange = QCPRange()) const;
 
 signals:
-    void selectionChanged(bool selected);
-    void selectionChanged(const QCPDataSelection& selection);
-    void selectableChanged(QCP::SelectionType selectable);
+    void selectionChanged();
+    void selectableChanged();
 
 protected:
     // property members:

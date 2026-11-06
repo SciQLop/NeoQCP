@@ -28,6 +28,7 @@
 #include "../axis/labelrenderer.h"
 
 #include "../core.h"
+#include "../misuse.h"
 #include "../painting/painter.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -46,12 +47,18 @@
 
 /* start documentation of signals */
 
-/*! \fn void QCPTextElement::selectionChanged(bool selected)
+/*! \fn void QCPTextElement::selectionChanged()
 
-  This signal is emitted when the selection state has changed to \a selected, either by user
-  interaction or by a direct call to \ref setSelected.
+  This signal is emitted when the selection state has changed, either by user interaction or by a
+  direct call to \ref setSelected. The slot reads \ref selected.
 
   \see setSelected, setSelectable
+*/
+
+/*! \fn void QCPTextElement::selectableChanged()
+
+  This signal is emitted when the selectability of this text element has changed. The slot reads
+  \ref selectable.
 */
 
 /*! \fn void QCPTextElement::clicked(QMouseEvent *event)
@@ -295,15 +302,21 @@ void QCPTextElement::setSelectedTextColor(const QColor& color)
 /*!
   Sets whether the user may select this text element.
 
-  Note that even when \a selectable is set to <tt>false</tt>, the selection state may be changed
+  Note that even when \a selectable is set to \ref QCP::stNone, the selection state may be changed
   programmatically via \ref setSelected.
+
+  A text element is either wholly selectable or not at all, so any other \ref QCP::SelectionType is
+  refused through the misuse channel.
 */
-void QCPTextElement::setSelectable(bool selectable)
+void QCPTextElement::setSelectable(QCP::SelectionType selectable)
 {
-    if (mSelectable != selectable)
+    QCP_CHECK_OR_RETURN(selectable == QCP::stNone || selectable == QCP::stWhole,
+                        "a text element is either stNone or stWhole selectable");
+    const bool selectableWhole = selectable == QCP::stWhole;
+    if (mSelectable != selectableWhole)
     {
-        mSelectable = selectable;
-        qcpEmit(this, mParentPlot, &QCPTextElement::selectableChanged, mSelectable);
+        mSelectable = selectableWhole;
+        qcpEmit(this, mParentPlot, &QCPTextElement::selectableChanged);
     }
 }
 
@@ -320,7 +333,7 @@ void QCPTextElement::setSelected(bool selected)
         return;
     markDirty();
     mSelected = selected;
-    qcpEmit(this, mParentPlot, &QCPTextElement::selectionChanged, mSelected);
+    qcpEmit(this, mParentPlot, &QCPTextElement::selectionChanged);
 }
 
 /* inherits documentation from base class */

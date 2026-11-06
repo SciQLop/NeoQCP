@@ -671,10 +671,8 @@ void TestSignalDelivery::teardownOpensNoDelivery()
     {
         connect(axis, &QCPAxis::rangeChanged, plot,
                 [&received](const QCPRange&, const QCPRange&) { ++received; });
-        connect(axis, &QCPAxis::selectionChanged, plot,
-                [&received](QCPAxis::SelectableParts) { ++received; });
-        connect(axis, &QCPAxis::selectableChanged, plot,
-                [&received](QCPAxis::SelectableParts) { ++received; });
+        connect(axis, &QCPAxis::selectionChanged, plot, [&received] { ++received; });
+        connect(axis, &QCPAxis::selectableChanged, plot, [&received] { ++received; });
     }
     delete plot;
     QCOMPARE(received, 0);
@@ -784,8 +782,8 @@ void TestSignalDelivery::selectionRectSlotDeletingThePlot()
 
     const QPointer<QCustomPlot> alive(plot);
     int plottableSelections = 0;
-    connect(graph, qOverload<bool>(&QCPAbstractPlottable::selectionChanged), plot,
-            [&plottableSelections](bool) { ++plottableSelections; });
+    connect(graph, &QCPAbstractPlottable::selectionChanged, plot,
+            [&plottableSelections] { ++plottableSelections; });
     connect(plot->selectionRect(), &QCPSelectionRect::accepted, plot,
             [plot](const QRect&, QMouseEvent*) { delete plot; });
 
@@ -867,11 +865,10 @@ void TestSignalDelivery::plottableSelectionSlotDeletingThePlot()
 
     const QPointer<QCustomPlot> alive(plot);
     int selectionChanges = 0;
-    // emitSelectionChanged tells the bool overload first, then the data-selection one.
-    connect(graph, qOverload<bool>(&QCPAbstractPlottable::selectionChanged), plot,
-            [plot](bool) { delete plot; });
-    connect(graph, qOverload<const QCPDataSelection&>(&QCPAbstractPlottable::selectionChanged), plot,
-            [&selectionChanges](const QCPDataSelection&) { ++selectionChanges; });
+    // The first slot deletes the plot: the second slot of the same signal must not run.
+    connect(graph, &QCPAbstractPlottable::selectionChanged, plot, [plot] { delete plot; });
+    connect(graph, &QCPAbstractPlottable::selectionChanged, plot,
+            [&selectionChanges] { ++selectionChanges; });
 
     graph->setSelection(QCPDataSelection(QCPDataRange(0, 1)));
 

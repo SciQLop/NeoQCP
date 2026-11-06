@@ -45,8 +45,9 @@ class QCP_LIB_DECL QCPAbstractLegendItem : public QCPLayoutElement
     Q_PROPERTY(QColor textColor READ textColor WRITE setTextColor)
     Q_PROPERTY(QFont selectedFont READ selectedFont WRITE setSelectedFont)
     Q_PROPERTY(QColor selectedTextColor READ selectedTextColor WRITE setSelectedTextColor)
-    Q_PROPERTY(bool selectable READ selectable WRITE setSelectable NOTIFY selectionChanged)
-    Q_PROPERTY(bool selected READ selected WRITE setSelected NOTIFY selectableChanged)
+    Q_PROPERTY(QCP::SelectionType selectable READ selectable WRITE setSelectable NOTIFY
+                       selectableChanged)
+    Q_PROPERTY(bool selected READ selected WRITE setSelected NOTIFY selectionChanged)
     /// \endcond
 
 public:
@@ -63,7 +64,7 @@ public:
 
     QColor selectedTextColor() const { return mSelectedTextColor; }
 
-    bool selectable() const { return mSelectable; }
+    QCP::SelectionType selectable() const { return mSelectable ? QCP::stWhole : QCP::stNone; }
 
     bool selected() const { return mSelected; }
 
@@ -72,7 +73,7 @@ public:
     void setTextColor(const QColor& color);
     void setSelectedFont(const QFont& font);
     void setSelectedTextColor(const QColor& color);
-    Q_SLOT void setSelectable(bool selectable);
+    Q_SLOT void setSelectable(QCP::SelectionType selectable);
     Q_SLOT void setSelected(bool selected);
 
     // reimplemented virtual methods:
@@ -80,8 +81,8 @@ public:
                               QVariant* details = nullptr) const override;
 
 signals:
-    void selectionChanged(bool selected);
-    void selectableChanged(bool selectable);
+    void selectionChanged();
+    void selectableChanged();
 
 protected:
     // property members:
@@ -155,9 +156,9 @@ class QCP_LIB_DECL QCPLegend : public QCPLayoutGrid
     Q_PROPERTY(int iconTextPadding READ iconTextPadding WRITE setIconTextPadding)
     Q_PROPERTY(QPen iconBorderPen READ iconBorderPen WRITE setIconBorderPen)
     Q_PROPERTY(SelectableParts selectableParts READ selectableParts WRITE setSelectableParts NOTIFY
-                   selectionChanged)
-    Q_PROPERTY(SelectableParts selectedParts READ selectedParts WRITE setSelectedParts NOTIFY
                    selectableChanged)
+    Q_PROPERTY(SelectableParts selectedParts READ selectedParts WRITE setSelectedParts NOTIFY
+                   selectionChanged)
     Q_PROPERTY(QPen selectedBorderPen READ selectedBorderPen WRITE setSelectedBorderPen)
     Q_PROPERTY(QPen selectedIconBorderPen READ selectedIconBorderPen WRITE setSelectedIconBorderPen)
     Q_PROPERTY(QBrush selectedBrush READ selectedBrush WRITE setSelectedBrush)
@@ -208,6 +209,13 @@ public:
 
     SelectableParts selectedParts() const;
 
+    bool selected() const { return selectedParts() != spNone; }
+
+    QCP::SelectionType selectable() const
+    {
+        return mSelectableParts != spNone ? QCP::stWhole : QCP::stNone;
+    }
+
     QPen selectedBorderPen() const { return mSelectedBorderPen; }
 
     QPen selectedIconBorderPen() const { return mSelectedIconBorderPen; }
@@ -252,8 +260,8 @@ public:
     QList<QCPAbstractLegendItem*> selectedItems() const;
 
 signals:
-    void selectionChanged(QCPLegend::SelectableParts parts);
-    void selectableChanged(QCPLegend::SelectableParts parts);
+    void selectionChanged();
+    void selectableChanged();
 
 protected:
     // property members:

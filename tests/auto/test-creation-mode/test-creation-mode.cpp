@@ -339,7 +339,7 @@ void TestCreationMode::batchModeIgnoresExistingItems()
 {
     auto* existing = new QCPItemVSpan(mPlot);
     existing->setRange(QCPRange(4, 6));
-    existing->setSelectable(true);
+    existing->setSelectable(QCP::stWhole);
     mPlot->replot();
     QCOMPARE(mPlot->itemCount(), 1);
 

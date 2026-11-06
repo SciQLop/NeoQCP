@@ -407,27 +407,19 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
 /* end of documentation of pure virtual functions */
 /* start of documentation of signals */
 
-/*! \fn void QCPAbstractPlottable::selectionChanged(bool selected)
+/*! \fn void QCPAbstractPlottable::selectionChanged()
 
   This signal is emitted when the selection state of this plottable has changed, either by user
-  interaction or by a direct call to \ref setSelection. The parameter \a selected indicates whether
-  there are any points selected or not.
+  interaction or by a direct call to \ref setSelection. The slot reads \ref selected to learn
+  whether any points are selected, and \ref selection for the selected data ranges.
 
-  \see selectionChanged(const QCPDataSelection &selection)
+  \see setSelection
 */
 
-/*! \fn void QCPAbstractPlottable::selectionChanged(const QCPDataSelection &selection)
+/*! \fn void QCPAbstractPlottable::selectableChanged()
 
-  This signal is emitted when the selection state of this plottable has changed, either by user
-  interaction or by a direct call to \ref setSelection. The parameter \a selection holds the
-  currently selected data ranges.
-
-  \see selectionChanged(bool selected)
-*/
-
-/*! \fn void QCPAbstractPlottable::selectableChanged(QCP::SelectionType selectable);
-
-  This signal is emitted when the selectability of this plottable has changed.
+  This signal is emitted when the selectability of this plottable has changed. The slot reads
+  \ref selectable.
 
   \see setSelectable
 */
@@ -670,17 +662,12 @@ void QCPAbstractPlottable::setSelection(QCPDataSelection selection)
 
 /*! \internal
 
-  Emits both \ref selectionChanged signals, at the outermost call: a slot may delete this plottable,
-  and the values are read when they are delivered.
+  Emits \ref selectionChanged, at the outermost call: a slot may delete this plottable, and the
+  selection is read with \ref selection when the signal is delivered.
 */
 void QCPAbstractPlottable::emitSelectionChanged()
 {
-    const QCPEmissionScope scope(mParentPlot);
-    qcpEmitCurrent(this, mParentPlot, qOverload<bool>(&QCPAbstractPlottable::selectionChanged),
-                   [this] { return selected(); });
-    qcpEmitCurrent(this, mParentPlot,
-                   qOverload<const QCPDataSelection&>(&QCPAbstractPlottable::selectionChanged),
-                   [this] { return mSelection; });
+    qcpEmit(this, mParentPlot, &QCPAbstractPlottable::selectionChanged);
 }
 
 /*!
@@ -728,7 +715,7 @@ void QCPAbstractPlottable::setSelectable(QCP::SelectionType selectable)
         mSelection.enforceType(mSelectable);
         const bool selectionTrimmed = mSelection != oldSelection;
         const QCPEmissionScope scope(mParentPlot);
-        qcpEmit(this, mParentPlot, &QCPAbstractPlottable::selectableChanged, mSelectable);
+        qcpEmit(this, mParentPlot, &QCPAbstractPlottable::selectableChanged);
         if (selectionTrimmed)
             emitSelectionChanged();
     }

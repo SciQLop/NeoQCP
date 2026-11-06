@@ -35,7 +35,7 @@ QCPItemRSpan::QCPItemRSpan(QCustomPlot* parentPlot)
     setBorderPen(QPen(Qt::black, 2));
     setSelectedBorderPen(QPen(Qt::blue, 2));
 
-    connect(this, &QCPAbstractItem::selectionChanged, this, [this](bool) {
+    connect(this, &QCPAbstractItem::selectionChanged, this, [this] {
         markRhiDirty();
     });
 }

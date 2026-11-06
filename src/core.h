@@ -827,7 +827,8 @@ PlottableType* QCustomPlot::plottableAt(const QPointF& pos, bool onlySelectable,
         PlottableType* currentPlottable = qobject_cast<PlottableType*>(plottable);
         if (!currentPlottable
             || (onlySelectable
-                && !currentPlottable->selectable())) // we could have also passed onlySelectable to
+                && currentPlottable->selectable()
+                       == QCP::stNone)) // we could have also passed onlySelectable to
                                                      // the selectTest function, but checking here
                                                      // is faster, because we have access to
                                                      // QCPAbstractPlottable::selectable
@@ -883,8 +884,8 @@ ItemType* QCustomPlot::itemAt(const QPointF& pos, bool onlySelectable) const
         ItemType* currentItem = qobject_cast<ItemType*>(item);
         if (!currentItem
             || (onlySelectable
-                && !currentItem
-                        ->selectable())) // we could have also passed onlySelectable to the
+                && currentItem->selectable()
+                       == QCP::stNone)) // we could have also passed onlySelectable to the
                                          // selectTest function, but checking here is faster,
                                          // because we have access to QCPAbstractItem::selectable
             continue;

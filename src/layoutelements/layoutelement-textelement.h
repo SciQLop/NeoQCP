@@ -45,7 +45,8 @@ class QCP_LIB_DECL QCPTextElement : public QCPLayoutElement
     Q_PROPERTY(QColor textColor READ textColor WRITE setTextColor)
     Q_PROPERTY(QFont selectedFont READ selectedFont WRITE setSelectedFont)
     Q_PROPERTY(QColor selectedTextColor READ selectedTextColor WRITE setSelectedTextColor)
-    Q_PROPERTY(bool selectable READ selectable WRITE setSelectable NOTIFY selectableChanged)
+    Q_PROPERTY(QCP::SelectionType selectable READ selectable WRITE setSelectable NOTIFY
+                       selectableChanged)
     Q_PROPERTY(bool selected READ selected WRITE setSelected NOTIFY selectionChanged)
     /// \endcond
 
@@ -73,7 +74,7 @@ public:
 
     QColor selectedTextColor() const { return mSelectedTextColor; }
 
-    bool selectable() const { return mSelectable; }
+    QCP::SelectionType selectable() const { return mSelectable ? QCP::stWhole : QCP::stNone; }
 
     bool selected() const { return mSelected; }
 
@@ -84,7 +85,7 @@ public:
     void setTextColor(const QColor& color);
     void setSelectedFont(const QFont& font);
     void setSelectedTextColor(const QColor& color);
-    Q_SLOT void setSelectable(bool selectable);
+    Q_SLOT void setSelectable(QCP::SelectionType selectable);
     Q_SLOT void setSelected(bool selected);
 
     // reimplemented virtual methods:
@@ -95,8 +96,8 @@ public:
     virtual void mouseDoubleClickEvent(QMouseEvent* event, const QVariant& details) override;
 
 signals:
-    void selectionChanged(bool selected);
-    void selectableChanged(bool selectable);
+    void selectionChanged();
+    void selectableChanged();
     void clicked(QMouseEvent* event);
     void doubleClicked(QMouseEvent* event);
 

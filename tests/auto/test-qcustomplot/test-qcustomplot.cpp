@@ -280,8 +280,8 @@ void TestQCustomPlot::clickSlotDeletingTheGraphIsSafe()
 {
   layOut(mPlot, QCP::iSelectPlottables);
   auto* g = flatGraph(mPlot);
-  connect(g, qOverload<bool>(&QCPAbstractPlottable::selectionChanged), mPlot,
-          [this, g](bool) { QVERIFY(mPlot->removePlottable(g)); });
+  connect(g, &QCPAbstractPlottable::selectionChanged, mPlot,
+          [this, g] { QVERIFY(mPlot->removePlottable(g)); });
   clickAt(mPlot, pixelOf(mPlot, 5, 5));
   QCOMPARE(mPlot->plottableCount(), 0);
 }
@@ -292,8 +292,8 @@ void TestQCustomPlot::deselectSlotDeletingTheClickedGraphIsSafe()
   auto* selected = flatGraph(mPlot, 2);
   auto* clicked = flatGraph(mPlot, 8);
   selected->setSelection(QCPDataSelection(QCPDataRange(0, 3)));
-  connect(selected, qOverload<bool>(&QCPAbstractPlottable::selectionChanged), mPlot,
-          [this, clicked](bool) { QVERIFY(mPlot->removePlottable(clicked)); });
+  connect(selected, &QCPAbstractPlottable::selectionChanged, mPlot,
+          [this, clicked] { QVERIFY(mPlot->removePlottable(clicked)); });
   clickAt(mPlot, pixelOf(mPlot, 5, 8));
   QCOMPARE(mPlot->plottableCount(), 1);
   QVERIFY(!selected->selected());
@@ -306,8 +306,8 @@ void TestQCustomPlot::rectDeselectSlotDeletingACandidateIsSafe()
   auto* selected = flatGraph(mPlot, 2);
   auto* candidate = flatGraph(mPlot, 8);
   selected->setSelection(QCPDataSelection(QCPDataRange(0, 3)));
-  connect(selected, qOverload<bool>(&QCPAbstractPlottable::selectionChanged), mPlot,
-          [this, candidate](bool) { QVERIFY(mPlot->removePlottable(candidate)); });
+  connect(selected, &QCPAbstractPlottable::selectionChanged, mPlot,
+          [this, candidate] { QVERIFY(mPlot->removePlottable(candidate)); });
   dragFromTo(mPlot, pixelOf(mPlot, 1, 9), pixelOf(mPlot, 9, 7));
   QCOMPARE(mPlot->plottableCount(), 1);
 }
@@ -319,7 +319,7 @@ void TestQCustomPlot::clickSlotDeletingTheItemIsSafe()
   line->start->setCoords(2, 5);
   line->end->setCoords(8, 5);
   connect(line, &QCPAbstractItem::selectionChanged, mPlot,
-          [this, line](bool) { QVERIFY(mPlot->removeItem(line)); });
+          [this, line] { QVERIFY(mPlot->removeItem(line)); });
   clickAt(mPlot, pixelOf(mPlot, 5, 5));
   QCOMPARE(mPlot->itemCount(), 0);
 }

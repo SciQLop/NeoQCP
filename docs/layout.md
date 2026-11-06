@@ -43,7 +43,7 @@ Its cells hold the legend entries, and it accepts any other element.
 A <a href="api/classQCPTextElement.html">QCPTextElement</a> asks for just the height of its text, so the axis rect keeps the rest.
 
 `QCPTextElement` also takes `$...$` spans and typesets them, like axis labels do.
-It can be made selectable with `setSelectable(true)`, and emits `clicked()` and `doubleClicked()`.
+It can be made selectable with `setSelectable(QCP::stWhole)`, and emits `clicked()` and `doubleClicked()`.
 
 ## Move the legend inside the axis rect
 

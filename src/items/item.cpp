@@ -33,6 +33,7 @@
 
 #include "axis/axis.h"
 #include "core.h"
+#include "misuse.h"
 #include "layoutelements/layoutelement-axisrect.h"
 #include "painting/draw-commands.h"
 #include "painting/draw-context.h"
@@ -1252,9 +1253,14 @@ QCP::Position QCPItemPosition::asPosition(bool* snapshot) const
 /* end documentation of pure virtual functions */
 /* start documentation of signals */
 
-/*! \fn void QCPAbstractItem::selectionChanged(bool selected)
+/*! \fn void QCPAbstractItem::selectionChanged()
   This signal is emitted when the selection state of this item has changed, either by user
-  interaction or by a direct call to \ref setSelected.
+  interaction or by a direct call to \ref setSelected. The slot reads \ref selected.
+*/
+
+/*! \fn void QCPAbstractItem::selectableChanged()
+  This signal is emitted when the selectability of this item has changed. The slot reads
+  \ref selectable.
 */
 
 /* end documentation of signals */
@@ -1334,17 +1340,23 @@ void QCPAbstractItem::setClipAxisRect(QCPAxisRect* rect)
   Sets whether the user can (de-)select this item by clicking on the QCustomPlot surface.
   (When \ref QCustomPlot::setInteractions contains QCustomPlot::iSelectItems.)
 
-  However, even when \a selectable was set to false, it is possible to set the selection manually,
-  by calling \ref setSelected.
+  However, even when \a selectable was set to \ref QCP::stNone, it is possible to set the selection
+  manually, by calling \ref setSelected.
+
+  An item is either wholly selectable or not at all, so any other \ref QCP::SelectionType is
+  refused through the misuse channel.
 
   \see QCustomPlot::setInteractions, setSelected
 */
-void QCPAbstractItem::setSelectable(bool selectable)
+void QCPAbstractItem::setSelectable(QCP::SelectionType selectable)
 {
-    if (mSelectable != selectable)
+    QCP_CHECK_OR_RETURN(selectable == QCP::stNone || selectable == QCP::stWhole,
+                        "an item is either stNone or stWhole selectable");
+    const bool selectableWhole = selectable == QCP::stWhole;
+    if (mSelectable != selectableWhole)
     {
-        mSelectable = selectable;
-        qcpEmit(this, mParentPlot, &QCPAbstractItem::selectableChanged, mSelectable);
+        mSelectable = selectableWhole;
+        qcpEmit(this, mParentPlot, &QCPAbstractItem::selectableChanged);
     }
 }
 
@@ -1369,7 +1381,7 @@ void QCPAbstractItem::setSelected(bool selected)
         return;
     markDirty();
     mSelected = selected;
-    qcpEmit(this, mParentPlot, &QCPAbstractItem::selectionChanged, mSelected);
+    qcpEmit(this, mParentPlot, &QCPAbstractItem::selectionChanged);
 }
 
 /*!

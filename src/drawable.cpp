@@ -336,7 +336,7 @@ QCPDrawnView qcpLayerableView(const QCPLayerable& object)
 QCPDrawnView qcpDrawnViewOf(const QCPAbstractItem& item, QRect clip)
 {
     QCPDrawnView view = qcpLayerableView(item);
-    view.selectable = item.selectable();
+    view.selectable = item.selectable() != QCP::stNone;
     view.clip = clip;
     // simplify: an item mixing axis pairs across its positions is drawn through the first pair;
     // per-position frames when an item needs them.

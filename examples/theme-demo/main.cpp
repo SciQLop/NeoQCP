@@ -36,14 +36,14 @@ static void populatePlot(QCustomPlot* plot)
     graph2->setName("exp\u00B7cos");
 
     auto* title = new QCPTextElement(plot, "Click to select elements");
-    title->setSelectable(true);
+    title->setSelectable(QCP::stWhole);
     plot->plotLayout()->insertRow(0);
     plot->plotLayout()->addElement(0, 0, title);
 
     auto textItem = plot->add<QCPItemText>();
     textItem->position->setCoords(0, 0.5);
     textItem->setText("Selectable\nAnnotation");
-    textItem->setSelectable(true);
+    textItem->setSelectable(QCP::stWhole);
     textItem->setPen(QPen(Qt::gray));
     textItem->setPadding(QMargins(4, 4, 4, 4));
 

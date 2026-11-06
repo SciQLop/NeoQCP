@@ -57,8 +57,8 @@ protected:
     using QCPAxisRect::wheelEvent;
     virtual void draw(QCPPainter* painter) override;
     void updateGradientImage();
-    Q_SLOT void axisSelectionChanged(QCPAxis::SelectableParts selectedParts);
-    Q_SLOT void axisSelectableChanged(QCPAxis::SelectableParts selectableParts);
+    Q_SLOT void axisSelectionChanged();
+    Q_SLOT void axisSelectableChanged();
     friend class QCPColorScale;
 };
 

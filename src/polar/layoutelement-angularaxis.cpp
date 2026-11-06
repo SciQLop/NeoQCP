@@ -857,7 +857,7 @@ void QCPPolarAxisAngular::setSelectableParts(const SelectableParts& selectable)
     if (mSelectableParts != selectable)
     {
         mSelectableParts = selectable;
-        qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::selectableChanged, mSelectableParts);
+        qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::selectableChanged);
     }
 }
 
@@ -885,7 +885,7 @@ void QCPPolarAxisAngular::setSelectedParts(const SelectableParts& selected)
     {
         markDirty();
         mSelectedParts = selected;
-        qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::selectionChanged, mSelectedParts);
+        qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::selectionChanged);
     }
 }
 

@@ -116,7 +116,7 @@ This example selects a range from code, and draws it with brackets:
 
 ![A data range drawn in red between two brackets](images/interactions-selection-types.png)
 
-`setSelection()` trims what you give it to the selectable type. It emits the plottable's `selectionChanged` signals, but not `QCustomPlot::selectionChangedByUser`.
+`setSelection()` trims what you give it to the selectable type. It emits the plottable's `selectionChanged` signal, but not `QCustomPlot::selectionChangedByUser`.
 
 ### Reading a selection
 
@@ -211,11 +211,13 @@ A Qt event filter sees the press first:
 
 The objects have their own signals:
 
-- `QCPAxis::rangeChanged(newRange)` and `rangeChanged(newRange, oldRange)`: on every pan, zoom or `setRange()`.
-- `QCPAbstractPlottable::selectionChanged(bool)` and `selectionChanged(const QCPDataSelection&)`.
-- `QCPAxis::selectionChanged(parts)` and `QCPLegend::selectionChanged(parts)`.
+- `QCPAxis::rangeChanged(newRange, oldRange)`: on every pan, zoom or `setRange()`.
+- `selectionChanged()` on a plottable, an item, an axis, a legend, a legend row, a text element and the polar axes, and `selectableChanged()` on the same objects.
 
-Several of these signals are overloaded. Pick one with `qOverload`:
+A selection signal carries no argument: it says that something changed, and the slot reads the object.
+`selected()` answers whether anything is selected, `selection()` the selected data ranges of a plottable, and `selectedParts()` the selected parts of an axis, a legend or a polar axis. `selectable()` tells whether the user may select the object at all, as a `QCP::SelectionType`.
+
+For example:
 
 ```{literalinclude} snippets/interactions.cpp
 :start-after: // [interactions_signals]

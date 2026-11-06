@@ -54,6 +54,7 @@
 #include "test-draw-context/test-draw-context.h"
 #include "test-drawable/test-drawable.h"
 #include "test-hit-rule/test-hit-rule.h"
+#include "test-selection-model/test-selection-model.h"
 #include "test-gestures/test-gestures.h"
 
 static bool shouldRun(const char* name)
@@ -150,6 +151,7 @@ int main(int argc, char **argv)
   QCPTEST(TestDrawContext);
   QCPTEST(TestDrawable);
   QCPTEST(TestHitRule);
+  QCPTEST(TestSelectionModel);
 
   return failures == 0 ? 0 : 1;
 }

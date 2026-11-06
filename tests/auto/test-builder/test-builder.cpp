@@ -356,8 +356,8 @@ void TestBuilder::setterSlotDeletesInsideTheSetter()
 {
     QCustomPlot plot;
     auto g = plot.add<QCPGraph>(kKeys, kValues);
-    connect(g.get(), qOverload<bool>(&QCPAbstractPlottable::selectionChanged), &plot,
-            [g](bool) mutable { g.remove(); });
+    connect(g.get(), &QCPAbstractPlottable::selectionChanged, &plot,
+            [g]() mutable { g.remove(); });
     auto after = g.with([](QCPGraph& graph) { graph.setSelection(QCPDataSelection(QCPDataRange(0, 1))); })
                      .setName("gone");
     QVERIFY(!g);

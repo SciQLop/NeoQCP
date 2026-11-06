@@ -116,7 +116,7 @@ void TestHitRule::nonSelectableLabelTakesPressGraphTakesSelection()
     auto* text = new CountingText(mPlot);
     text->setText(QStringLiteral("label"));
     text->position->setCoords(5, 5);
-    text->setSelectable(false);
+    text->setSelectable(QCP::stNone);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
     const QPointF pos = pixelOf(5, 5);

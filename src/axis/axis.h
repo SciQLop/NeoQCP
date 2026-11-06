@@ -291,6 +291,13 @@ public:
 
     SelectableParts selectableParts() const { return mSelectableParts; }
 
+    bool selected() const { return mSelectedParts != spNone; }
+
+    QCP::SelectionType selectable() const
+    {
+        return mSelectableParts != spNone ? QCP::stWhole : QCP::stNone;
+    }
+
     QFont selectedTickLabelFont() const { return mSelectedTickLabelFont; }
 
     QFont selectedLabelFont() const { return mSelectedLabelFont; }
@@ -398,8 +405,8 @@ public:
 signals:
     void rangeChanged(const QCPRange& newRange, const QCPRange& oldRange);
     void scaleTypeChanged(QCPAxis::ScaleType scaleType);
-    void selectionChanged(const QCPAxis::SelectableParts& parts);
-    void selectableChanged(const QCPAxis::SelectableParts& parts);
+    void selectionChanged();
+    void selectableChanged();
 
 protected:
     // property members:

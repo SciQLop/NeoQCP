@@ -332,7 +332,7 @@ void TestMultiGraph::componentSelectionUpdatesBase()
     mg->setData(std::vector<double>{1.0, 2.0, 3.0},
                 std::vector<std::vector<double>>{{10.0, 20.0, 30.0}});
     QVERIFY(!mg->selected());
-    QSignalSpy spy(mg, qOverload<bool>(&QCPAbstractPlottable::selectionChanged));
+    QSignalSpy spy(mg, SIGNAL(selectionChanged()));
     mg->setComponentSelection(0, QCPDataSelection(QCPDataRange(0, 2)));
     QVERIFY(mg->selected());
     QCOMPARE(spy.count(), 1);

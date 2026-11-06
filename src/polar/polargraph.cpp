@@ -329,7 +329,7 @@ void QCPPolarGraph::setSelectable(QCP::SelectionType selectable)
         mSelection.enforceType(mSelectable);
         const bool selectionTrimmed = mSelection != oldSelection;
         const QCPEmissionScope scope(mParentPlot);
-        qcpEmit(this, mParentPlot, &QCPPolarGraph::selectableChanged, mSelectable);
+        qcpEmit(this, mParentPlot, &QCPPolarGraph::selectableChanged);
         if (selectionTrimmed)
             emitSelectionChanged();
     }
@@ -366,17 +366,12 @@ void QCPPolarGraph::setSelection(QCPDataSelection selection)
 
 /*! \internal
 
-  Emits both \ref selectionChanged signals, at the outermost call: a slot may delete this graph, and
-  the values are read when they are delivered.
+  Emits \ref selectionChanged, at the outermost call: a slot may delete this graph, and the
+  selection is read with \ref selection when the signal is delivered.
 */
 void QCPPolarGraph::emitSelectionChanged()
 {
-    const QCPEmissionScope scope(mParentPlot);
-    qcpEmitCurrent(this, mParentPlot, qOverload<bool>(&QCPPolarGraph::selectionChanged),
-                   [this] { return selected(); });
-    qcpEmitCurrent(this, mParentPlot,
-                   qOverload<const QCPDataSelection&>(&QCPPolarGraph::selectionChanged),
-                   [this] { return mSelection; });
+    qcpEmit(this, mParentPlot, &QCPPolarGraph::selectionChanged);
 }
 
 /*! \overload
@@ -656,7 +651,8 @@ bool QCPPolarGraph::addToLegend(QCPLegend* legend)
 QCPPolarLegendItem* QCPPolarGraph::legendItemIn(const QCPLegend* legend) const
 {
     for (int i = 0; i < legend->itemCount(); ++i)
-        if (auto* pli = qobject_cast<QCPPolarLegendItem*>(legend->item(i)); pli && pli->polarGraph() == this)
+        if (auto* pli = qobject_cast<QCPPolarLegendItem*>(legend->item(i));
+            pli && pli->polarGraph() == this)
             return pli;
     return nullptr;
 }
@@ -1076,8 +1072,7 @@ void QCPPolarGraph::drawPolyline(QCPPainter* painter, const QVector<QPointF>& li
 {
     // if drawing solid line and not in PDF, use much faster line drawing instead of polyline:
     if (mParentPlot->plottingHints().testFlag(QCP::phFastPolylines)
-        && painter->pen().style() == Qt::SolidLine
-        && !painter->isExporting())
+        && painter->pen().style() == Qt::SolidLine && !painter->isExporting())
     {
         int i = 0;
         bool lastIsNan = false;

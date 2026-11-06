@@ -109,7 +109,7 @@ static QWidget* createSpansTab()
     label->position->setType(QCPItemPosition::ptAxisRectRatio);
     label->position->setCoords(0.02, 0.02);
     label->setText("Drag edges/fill. Select + Delete to remove.\nShift+click to draw a span.");
-    label->setSelectable(false);
+    label->setSelectable(QCP::stNone);
 
     plot->replot();
     splitter->addWidget(plot);

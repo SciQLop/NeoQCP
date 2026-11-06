@@ -1486,8 +1486,8 @@ void TestIntervals::createdIntervalCarriesItsRowCategory()
 namespace {
 void removeOnSelection(QCustomPlot* plot, QCPIntervals* iv)
 {
-    QObject::connect(iv, qOverload<const QCPDataSelection&>(&QCPAbstractPlottable::selectionChanged),
-                     plot, [plot, iv] { QVERIFY(plot->removePlottable(iv)); });
+    QObject::connect(iv, &QCPAbstractPlottable::selectionChanged, plot,
+                     [plot, iv] { QVERIFY(plot->removePlottable(iv)); });
 }
 } // namespace
 
@@ -1572,7 +1572,7 @@ void TestIntervals::nestedRepacksNotifyOnceAfterTheOuterCall()
     iv->setStackMode(QCPIntervals::skTime);
     iv->setSelection(QCPDataSelection(QCPDataRange(0, 1)));
     QObject::connect(
-        iv, qOverload<const QCPDataSelection&>(&QCPAbstractPlottable::selectionChanged), mPlot,
+        iv, &QCPAbstractPlottable::selectionChanged, mPlot,
         [iv] {
             iv->setStackMode(QCPIntervals::skNone);
             iv->setCategoryOrder({ 0 });

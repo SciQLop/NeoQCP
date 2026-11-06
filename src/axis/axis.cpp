@@ -393,15 +393,16 @@ void QCPGrid::drawSubGridLines(QCPPainter* painter) const
   This signal is emitted when the scale type changes, by calls to \ref setScaleType
 */
 
-/*! \fn void QCPAxis::selectionChanged(QCPAxis::SelectableParts selection)
+/*! \fn void QCPAxis::selectionChanged()
 
   This signal is emitted when the selection state of this axis has changed, either by user
-  interaction or by a direct call to \ref setSelectedParts.
+  interaction or by a direct call to \ref setSelectedParts. The slot reads \ref selectedParts.
 */
 
-/*! \fn void QCPAxis::selectableChanged(const QCPAxis::SelectableParts &parts);
+/*! \fn void QCPAxis::selectableChanged()
 
-  This signal is emitted when the selectability changes, by calls to \ref setSelectableParts
+  This signal is emitted when the selectability changes, by calls to \ref setSelectableParts. The
+  slot reads \ref selectableParts.
 */
 
 /* end of documentation of signals */
@@ -718,7 +719,7 @@ void QCPAxis::setSelectableParts(const SelectableParts& selectable)
     if (mSelectableParts != selectable)
     {
         mSelectableParts = selectable;
-        qcpEmit(this, mParentPlot, &QCPAxis::selectableChanged, mSelectableParts);
+        qcpEmit(this, mParentPlot, &QCPAxis::selectableChanged);
     }
 }
 
@@ -746,7 +747,7 @@ void QCPAxis::setSelectedParts(const SelectableParts& selected)
         return;
     mSelectedParts = selected;
     markAppearanceDirty();
-    qcpEmit(this, mParentPlot, &QCPAxis::selectionChanged, mSelectedParts);
+    qcpEmit(this, mParentPlot, &QCPAxis::selectionChanged);
 }
 
 /*!

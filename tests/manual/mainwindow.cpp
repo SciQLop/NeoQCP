@@ -713,7 +713,7 @@ void MainWindow::setupLegendTest(QCustomPlot *customPlot)
   title->setText("This is a Plot Title");
   title->setFont(QFont(title->font().family(), 15, QFont::Bold));
   title->setSelectedFont(title->font());
-  title->setSelectable(true);
+  title->setSelectable(QCP::stWhole);
   grid->addElement(0, 0, title);
   
   customPlot->graph(0)->addData(QVector<double>() << 1 << 2, QVector<double>() << 1 << 1.2);

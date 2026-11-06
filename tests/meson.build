@@ -8,5 +8,4 @@ subdir('perf')
 test('check-signals',
      python3,
      args: [meson.project_source_root() / 'tools' / 'check-signals.py',
-            meson.project_source_root() / 'src'],
-     should_fail: true) # until Task 4
+            meson.project_source_root() / 'src'])

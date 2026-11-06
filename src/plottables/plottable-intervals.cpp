@@ -83,8 +83,7 @@ QCPIntervals::QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* 
             regroupIfLanesWereAdded();
             markLayersDirty();
         });
-    connect(this, qOverload<const QCPDataSelection&>(&QCPAbstractPlottable::selectionChanged),
-            this, &QCPIntervals::markLayersDirty);
+    connect(this, &QCPAbstractPlottable::selectionChanged, this, &QCPIntervals::markLayersDirty);
     if (!mParentPlot)
         return; // inert (null axis): no plot to put a label layer in
     mLabelLayer = new LabelLayer(mParentPlot, this, layerAbove(mParentPlot, layer()));
@@ -354,7 +353,7 @@ QCPIntervals::Hit QCPIntervals::hitTest(const QPointF& pos) const
 
 double QCPIntervals::selectTest(const QPointF& pos, bool onlySelectable, QVariant* details) const
 {
-    if (onlySelectable && !selectable())
+    if (onlySelectable && selectable() == QCP::stNone)
         return -1;
     const Hit hit = hitTest(pos);
     // Empty lane space is not selectable, so a click there reaches a sibling
@@ -454,7 +453,7 @@ QVector<int> QCPIntervals::rowsInRect(const QRectF& rect) const
 QCPDataSelection QCPIntervals::selectTestRect(const QRectF& rect, bool onlySelectable) const
 {
     QCPDataSelection sel;
-    if (onlySelectable && !selectable())
+    if (onlySelectable && selectable() == QCP::stNone)
         return sel;
     for (int row : rowsInRect(rect.normalized()))
         sel.addDataRange(QCPDataRange(row, row + 1), false);

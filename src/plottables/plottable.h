@@ -250,9 +250,8 @@ public:
     int effectiveBusyHideDelayMs() const;
 
 signals:
-    void selectionChanged(bool selected);
-    void selectionChanged(const QCPDataSelection& selection);
-    void selectableChanged(QCP::SelectionType selectable);
+    void selectionChanged();
+    void selectableChanged();
     void busyChanged(bool busy);
     void visuallyBusyChanged(bool visuallyBusy);
 

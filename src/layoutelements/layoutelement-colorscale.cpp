@@ -742,16 +742,19 @@ void QCPColorScaleAxisRectPrivate::updateGradientImage()
   This slot is connected to the selectionChanged signals of the four axes in the constructor. It
   synchronizes the selection state of the axes.
 */
-void QCPColorScaleAxisRectPrivate::axisSelectionChanged(QCPAxis::SelectableParts selectedParts)
+void QCPColorScaleAxisRectPrivate::axisSelectionChanged()
 {
     // axis bases of four axes shall always (de-)selected synchronously:
+    const QCPAxis* senderAxis = qobject_cast<const QCPAxis*>(sender());
+    if (!senderAxis)
+        return;
+    const QCPAxis::SelectableParts selectedParts = senderAxis->selectedParts();
     const QList<QCPAxis::AxisType> allAxisTypes = QList<QCPAxis::AxisType>()
         << QCPAxis::atBottom << QCPAxis::atTop << QCPAxis::atLeft << QCPAxis::atRight;
     for (QCPAxis::AxisType type : allAxisTypes)
     {
-        if (QCPAxis* senderAxis = qobject_cast<QCPAxis*>(sender()))
-            if (senderAxis->axisType() == type)
-                continue;
+        if (senderAxis->axisType() == type)
+            continue;
 
         if (axis(type)->selectableParts().testFlag(QCPAxis::spAxis))
         {
@@ -768,16 +771,19 @@ void QCPColorScaleAxisRectPrivate::axisSelectionChanged(QCPAxis::SelectableParts
   This slot is connected to the selectableChanged signals of the four axes in the constructor. It
   synchronizes the selectability of the axes.
 */
-void QCPColorScaleAxisRectPrivate::axisSelectableChanged(QCPAxis::SelectableParts selectableParts)
+void QCPColorScaleAxisRectPrivate::axisSelectableChanged()
 {
     // synchronize axis base selectability:
+    const QCPAxis* senderAxis = qobject_cast<const QCPAxis*>(sender());
+    if (!senderAxis)
+        return;
+    const QCPAxis::SelectableParts selectableParts = senderAxis->selectableParts();
     const QList<QCPAxis::AxisType> allAxisTypes = QList<QCPAxis::AxisType>()
         << QCPAxis::atBottom << QCPAxis::atTop << QCPAxis::atLeft << QCPAxis::atRight;
     for (QCPAxis::AxisType type : allAxisTypes)
     {
-        if (QCPAxis* senderAxis = qobject_cast<QCPAxis*>(sender()))
-            if (senderAxis->axisType() == type)
-                continue;
+        if (senderAxis->axisType() == type)
+            continue;
 
         if (axis(type)->selectableParts().testFlag(QCPAxis::spAxis))
         {

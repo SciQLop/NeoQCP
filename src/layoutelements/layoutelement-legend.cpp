@@ -28,6 +28,7 @@
 #include "../axis/labelrenderer.h"
 
 #include "../core.h"
+#include "../misuse.h"
 #include "../painting/painter.h"
 #include "../plottables/plottable.h"
 
@@ -62,10 +63,16 @@
 
 /* start of documentation of signals */
 
-/*! \fn void QCPAbstractLegendItem::selectionChanged(bool selected)
+/*! \fn void QCPAbstractLegendItem::selectionChanged()
 
   This signal is emitted when the selection state of this legend item has changed, either by user
-  interaction or by a direct call to \ref setSelected.
+  interaction or by a direct call to \ref setSelected. The slot reads \ref selected.
+*/
+
+/*! \fn void QCPAbstractLegendItem::selectableChanged()
+
+  This signal is emitted when the selectability of this legend item has changed. The slot reads
+  \ref selectable.
 */
 
 /* end of documentation of signals */
@@ -149,14 +156,20 @@ void QCPAbstractLegendItem::setSelectedTextColor(const QColor& color)
 /*!
   Sets whether this specific legend item is selectable.
 
+  A legend item is either wholly selectable or not at all, so any other \ref QCP::SelectionType is
+  refused through the misuse channel.
+
   \see setSelectedParts, QCustomPlot::setInteractions
 */
-void QCPAbstractLegendItem::setSelectable(bool selectable)
+void QCPAbstractLegendItem::setSelectable(QCP::SelectionType selectable)
 {
-    if (mSelectable != selectable)
+    QCP_CHECK_OR_RETURN(selectable == QCP::stNone || selectable == QCP::stWhole,
+                        "a legend item is either stNone or stWhole selectable");
+    const bool selectableWhole = selectable == QCP::stWhole;
+    if (mSelectable != selectableWhole)
     {
-        mSelectable = selectable;
-        qcpEmit(this, mParentPlot, &QCPAbstractLegendItem::selectableChanged, mSelectable);
+        mSelectable = selectableWhole;
+        qcpEmit(this, mParentPlot, &QCPAbstractLegendItem::selectableChanged);
     }
 }
 
@@ -164,7 +177,7 @@ void QCPAbstractLegendItem::setSelectable(bool selectable)
   Sets whether this specific legend item is selected.
 
   It is possible to set the selection state of this item by calling this function directly, even if
-  setSelectable is set to false.
+  setSelectable is set to \ref QCP::stNone.
 
   \see setSelectableParts, QCustomPlot::setInteractions
 */
@@ -174,7 +187,7 @@ void QCPAbstractLegendItem::setSelected(bool selected)
         return;
     markDirty();
     mSelected = selected;
-    qcpEmit(this, mParentPlot, &QCPAbstractLegendItem::selectionChanged, mSelected);
+    qcpEmit(this, mParentPlot, &QCPAbstractLegendItem::selectionChanged);
 }
 
 /* inherits documentation from base class */
@@ -460,11 +473,20 @@ QSize QCPPlottableLegendItem::minimumOuterSizeHint() const
 
 /* start of documentation of signals */
 
-/*! \fn void QCPLegend::selectionChanged(QCPLegend::SelectableParts selection);
+/*! \fn void QCPLegend::selectionChanged()
 
-  This signal is emitted when the selection state of this legend has changed.
+  This signal is emitted when the selection state of this legend has changed. The slot reads
+  \ref selectedParts.
 
   \see setSelectedParts, setSelectableParts
+*/
+
+/*! \fn void QCPLegend::selectableChanged()
+
+  This signal is emitted when the selectability of this legend has changed. The slot reads
+  \ref selectableParts.
+
+  \see setSelectableParts
 */
 
 /* end of documentation of signals */
@@ -661,7 +683,7 @@ void QCPLegend::setSelectableParts(const SelectableParts& selectable)
     if (mSelectableParts != selectable)
     {
         mSelectableParts = selectable;
-        qcpEmit(this, mParentPlot, &QCPLegend::selectableChanged, mSelectableParts);
+        qcpEmit(this, mParentPlot, &QCPLegend::selectableChanged);
     }
 }
 
@@ -725,8 +747,7 @@ void QCPLegend::setSelectedParts(const SelectableParts& selected)
                 return;
         }
         mSelectedParts = newSelected;
-        qcpEmitCurrent(this, mParentPlot, &QCPLegend::selectionChanged,
-                       [this] { return mSelectedParts; });
+        qcpEmit(this, mParentPlot, &QCPLegend::selectionChanged);
     }
 }
 

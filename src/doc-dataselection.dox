@@ -51,10 +51,9 @@
   \section dataselection-selectioretrieving Retrieving the selected data
   
   Once the selection state of a plottable changes either by user interaction or programmatically,
-  the affected plottable emits the signal \ref QCPAbstractPlottable::selectionChanged, carrying the
-  currently selected data points in the form of a \ref QCPDataSelection. An overload of this signal
-  is available, which just indicates in a \c bool whether the plottable has any selected data
-  points.
+  the affected plottable emits the signal \ref QCPAbstractPlottable::selectionChanged. The slot
+  reads \ref QCPAbstractPlottable::selection for the currently selected data points in the form of a
+  \ref QCPDataSelection, or \ref QCPAbstractPlottable::selected to learn whether there are any.
   
   By calling \ref QCustomPlot::selectedPlottables you can retrieve a list of plottables which
   currently have selected data points. The current selection of a plottable can be retrieved via
