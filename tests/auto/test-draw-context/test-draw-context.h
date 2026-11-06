@@ -27,13 +27,13 @@ private slots:
     void sharedDataIsNotCopied();
     void drawListIsCompact();
     void resolveCacheSurvivesNewEntries();
-    void mixedPositionsFollowTheLegacyPixelsOnAVerticalKeyAxis();
     void resolveCacheIgnoresAReusedAddress();
     void resolveCacheEvictsUnusedEntries();
     void dashLengthsIncludeTheCaps();
     void emptyCustomDashIsSolid();
     void closedRingJoinsTheSeam();
     void nonSolidBrushIsNotFlattened();
+    void mixedPositionsKeepKeyAndValueOnAVerticalKeyAxis();
     void transparentBrushNeedsNoRaster();
     void errorBarsMapTheirSpansAsExtents();
     void ellipseFanFillCoversTheDisc();

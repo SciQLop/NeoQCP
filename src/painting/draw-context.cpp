@@ -241,30 +241,17 @@ QPointF qcpResolvePosition(const QCPDrawFrame& frame, const QCP::Position& posit
         const QPointF anchor = anchored->anchor ? anchored->anchor->pixelPosition() : QPointF();
         return anchor + QPointF(anchored->offset.dx, anchored->offset.dy);
     }
-    // A mixed position's two numbers are not the two screen axes: on a vertical key axis the key
-    // coordinate is on screen y, so a plot-coordinate slot reads the axis of the other orientation.
-    // The 2.x pixelPosition() resolves it the same way, and both paths must land on one pixel.
+    // A mixed position is a key and a value, like QCP::Data, one of them a fraction of the axis rect.
+    // A vertical key axis runs along screen y, so each number takes the screen axis of its own side.
     const bool keyVertical = frame.transform.keyIsVertical();
+    const auto keyAndValue = [keyVertical](QCP::Pixels keySide, QCP::Pixels valueSide)
+    { return keyVertical ? QPointF(valueSide.x, keySide.y) : QPointF(keySide.x, valueSide.y); };
     if (const auto* mixed = std::get_if<QCP::DataXRatioY>(&position))
-    {
-        // One axis of the transform: the key pixel does not depend on the value coordinate, so any
-        // value serves and only its key half is used.
-        const QCP::Pixels keyPixels = frame.transform.map(QCP::Data { mixed->x, 0.0 });
-        const QCP::Pixels ratioPixels = frame.ratio.map(QCP::AxisRatio { 0.0, mixed->y });
-        if (!keyVertical)
-            return QPointF(keyPixels.x, ratioPixels.y);
-        // The plot-coordinate slot of a mixed position is its key, which a vertical key axis puts on
-        // screen y; the ratio stays where the ratio transform puts it.
-        const QCP::Pixels valuePixels = frame.transform.map(QCP::Data { 0.0, mixed->y });
-        return QPointF(valuePixels.x, ratioPixels.y);
-    }
+        return keyAndValue(frame.transform.map(QCP::Data { mixed->x, 0.0 }),
+                           frame.ratio.map(QCP::AxisRatio { mixed->y, mixed->y }));
     const auto& mixed = std::get<QCP::RatioXDataY>(position);
-    const QCP::Pixels ratioPixels = frame.ratio.map(QCP::AxisRatio { mixed.x, 0.0 });
-    const QCP::Pixels valuePixels = frame.transform.map(QCP::Data { 0.0, mixed.y });
-    if (!keyVertical)
-        return QPointF(ratioPixels.x, valuePixels.y);
-    const QCP::Pixels keyPixels = frame.transform.map(QCP::Data { mixed.x, 0.0 });
-    return QPointF(ratioPixels.x, keyPixels.y);
+    return keyAndValue(frame.ratio.map(QCP::AxisRatio { mixed.x, mixed.x }),
+                       frame.transform.map(QCP::Data { 0.0, mixed.y }));
 }
 
 QCPDrawFrame qcpMakeFrame(const QCPAxis* keyAxis, const QCPAxis* valueAxis,

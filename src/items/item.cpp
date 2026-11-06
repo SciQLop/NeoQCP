@@ -34,6 +34,8 @@
 #include "axis/axis.h"
 #include "core.h"
 #include "layoutelements/layoutelement-axisrect.h"
+#include "painting/draw-commands.h"
+#include "painting/draw-context.h"
 #include "painting/painter.h"
 
 namespace
@@ -654,6 +656,14 @@ QPointF QCPItemPosition::pixelPosition() const
 {
     if (!mParentPlot) // an item taken out of its plot has no pixels to be at
         return QPointF();
+    // A data/ratio pair is a key and a value, as in a recording: one function resolves both paths,
+    // and the switches below would cross the slots on a vertical key axis.
+    const bool dataAndRatio = (mPositionTypeX == ptPlotCoords && mPositionTypeY == ptAxisRectRatio)
+        || (mPositionTypeX == ptAxisRectRatio && mPositionTypeY == ptPlotCoords);
+    if (dataAndRatio && !mParentAnchorX && !mParentAnchorY && mKeyAxis && mValueAxis && mAxisRect)
+        return qcpResolvePosition(qcpMakeFrame(mKeyAxis.data(), mValueAxis.data(), mAxisRect.data(),
+                                               mAxisRect.data()->rect()),
+                                  asPosition());
     QPointF result;
 
     // determine X:

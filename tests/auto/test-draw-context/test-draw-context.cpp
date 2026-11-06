@@ -932,46 +932,39 @@ void TestDrawContext::nonSolidBrushIsNotFlattened()
     QVERIFY2(paintedCount(&fallback) > 50, "the gradient fill disappeared");
 }
 
-void TestDrawContext::mixedPositionsFollowTheLegacyPixelsOnAVerticalKeyAxis()
+void TestDrawContext::mixedPositionsKeepKeyAndValueOnAVerticalKeyAxis()
 {
     Fixture fixture;
     // Ranges far apart, so a pixel taken from the wrong space cannot hide behind a rounding.
     fixture.plot->xAxis->setRange(0, 2);
     fixture.plot->yAxis->setRange(0, 10);
+    QCPAxis* keyAxis = fixture.plot->yAxis;
+    QCPAxis* valueAxis = fixture.plot->xAxis;
+    const QRect rect = fixture.plot->axisRect()->rect();
+    const QCPDrawFrame frame = qcpMakeFrame(keyAxis, valueAxis, fixture.plot->axisRect(), rect);
     QCPItemLine item(fixture.plot.get());
-    // A vertical key axis: the key coordinate is on the screen's y axis, the value on its x.
-    item.start->setAxes(fixture.plot->yAxis, fixture.plot->xAxis);
-    const QCPDrawFrame frame = qcpMakeFrame(fixture.plot->yAxis, fixture.plot->xAxis,
-                                           fixture.plot->axisRect(),
-                                           fixture.plot->axisRect()->rect());
-    const auto distance = [](const QPointF& a, const QPointF& b)
-    { return std::hypot(a.x() - b.x(), a.y() - b.y()); };
-
-    item.start->setTypeX(QCPItemPosition::ptPlotCoords);
-    item.start->setTypeY(QCPItemPosition::ptAxisRectRatio);
-    item.start->setCoords(7.0, 0.8);
-    const QPointF dataThenRatio = qcpResolvePosition(frame, QCP::DataXRatioY { 7.0, 0.8 });
-    const QPointF legacyDataThenRatio = item.start->pixelPosition();
-    QVERIFY2(distance(legacyDataThenRatio, dataThenRatio) <= 0.5,
-             qPrintable(QStringLiteral("a plot-coordinate x with a rect-ratio y must land where "
-                                       "the 2.x position lands: legacy (%1, %2), recorded (%3, %4)")
-                            .arg(legacyDataThenRatio.x())
-                            .arg(legacyDataThenRatio.y())
-                            .arg(dataThenRatio.x())
-                            .arg(dataThenRatio.y())));
-
-    item.start->setTypeX(QCPItemPosition::ptAxisRectRatio);
-    item.start->setTypeY(QCPItemPosition::ptPlotCoords);
-    item.start->setCoords(0.25, 8.0);
-    const QPointF ratioThenData = qcpResolvePosition(frame, QCP::RatioXDataY { 0.25, 8.0 });
-    const QPointF legacyRatioThenData = item.start->pixelPosition();
-    QVERIFY2(distance(legacyRatioThenData, ratioThenData) <= 0.5,
-             qPrintable(QStringLiteral("a rect-ratio x with a plot-coordinate y must land where "
-                                       "the 2.x position lands: legacy (%1, %2), recorded (%3, %4)")
-                            .arg(legacyRatioThenData.x())
-                            .arg(legacyRatioThenData.y())
-                            .arg(ratioThenData.x())
-                            .arg(ratioThenData.y())));
+    item.start->setAxes(keyAxis, valueAxis);
+    const auto check = [&](const QCP::Position& position, QPointF expected, const char* what)
+    {
+        item.start->set(position);
+        const QPointF recorded = qcpResolvePosition(frame, position);
+        const QPointF legacy = item.start->pixelPosition();
+        const auto near = [](QPointF a, QPointF b) { return std::hypot(a.x() - b.x(), a.y() - b.y()) <= 0.5; };
+        QVERIFY2(near(recorded, expected) && near(legacy, expected),
+                 qPrintable(QStringLiteral("%1: expected (%2, %3), recorded (%4, %5), item (%6, %7)")
+                                .arg(QLatin1String(what))
+                                .arg(expected.x()).arg(expected.y())
+                                .arg(recorded.x()).arg(recorded.y())
+                                .arg(legacy.x()).arg(legacy.y())));
+    };
+    // The data number is the key, wherever the key axis is: on a vertical key axis it is a screen y,
+    // and the ratio runs along the value axis, across the rect's width.
+    check(QCP::DataXRatioY { 7.0, 0.8 },
+          QPointF(rect.left() + 0.8 * rect.width(), keyAxis->coordToPixel(7.0)),
+          "key data, value ratio");
+    check(QCP::RatioXDataY { 0.25, 1.5 },
+          QPointF(valueAxis->coordToPixel(1.5), rect.top() + 0.25 * rect.height()),
+          "key ratio, value data");
 }
 
 void TestDrawContext::transparentBrushNeedsNoRaster()
