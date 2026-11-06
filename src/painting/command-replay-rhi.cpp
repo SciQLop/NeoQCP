@@ -611,6 +611,64 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                     raster();
                     stroke(qcpRingOf(ring), cmd.pen, true);
                 }
+                else if constexpr (std::is_same_v<T, qcp::RectsCmd>)
+                {
+                    // One command, many rects: the fan and the closed stroke RectCmd builds, in the
+                    // order the bars were recorded. A fill the GPU cannot take is one image for the
+                    // whole batch (the painter draws every rect into it), submitted before the
+                    // strokes exactly as a single rect submits its own.
+                    raster();
+                    const bool fillEach = !needs.fill && !strokeRaster;
+                    // A batch of one colour asks the same question of every rect: answer it once.
+                    const bool uniform = cmd.fills.empty();
+                    const bool canFill = uniform ? qcp::gpuCanFill(cmd.brush) : true;
+                    const std::size_t count = std::min(cmd.aKey.size(), cmd.bKey.size());
+                    for (std::size_t i = 0; i < count; ++i)
+                    {
+                        const QPointF a
+                            = qcpResolvePosition(frame, QCP::Data { cmd.aKey[i], cmd.aValue[i] });
+                        const QPointF b
+                            = qcpResolvePosition(frame, QCP::Data { cmd.bKey[i], cmd.bValue[i] });
+                        const QRectF box = QRectF(a, b).normalized();
+                        const QColor colour
+                            = uniform ? cmd.brush.color() : QColor::fromRgba(cmd.fills[i]);
+                        // The fill is submitted first: the stroke's inner half must stay visible.
+                        if (fillEach && canFill && colour.alpha() != 0)
+                        {
+                            const std::array<QPointF, 4> corners { box.topLeft(), box.topRight(),
+                                                                   box.bottomRight(),
+                                                                   box.bottomLeft() };
+                            fanFill(plottables, box.center(), corners, colour, clip, dpr,
+                                    outputHeight, alpha, dataOnly, geometry);
+                        }
+                        pixels.assign({ box.topLeft(), box.topRight(), box.bottomRight(),
+                                        box.bottomLeft(), box.topLeft() });
+                        stroke(pixels, cmd.pen, true);
+                    }
+                }
+                else if constexpr (std::is_same_v<T, qcp::EllipsesCmd>)
+                {
+                    raster();
+                    const bool fillEach = !needs.fill && !strokeRaster;
+                    const bool uniform = cmd.fills.empty();
+                    const bool canFill = uniform ? qcp::gpuCanFill(cmd.brush) : true;
+                    const std::size_t count = std::min(cmd.aKey.size(), cmd.bKey.size());
+                    for (std::size_t i = 0; i < count; ++i)
+                    {
+                        const QPointF a
+                            = qcpResolvePosition(frame, QCP::Data { cmd.aKey[i], cmd.aValue[i] });
+                        const QPointF b
+                            = qcpResolvePosition(frame, QCP::Data { cmd.bKey[i], cmd.bValue[i] });
+                        const QRectF box = QRectF(a, b).normalized();
+                        const QColor colour
+                            = uniform ? cmd.brush.color() : QColor::fromRgba(cmd.fills[i]);
+                        const std::vector<QPointF> ring = qcpEllipseRing(box);
+                        if (fillEach && canFill && colour.alpha() != 0)
+                            fanFill(plottables, box.center(), ring, colour, clip, dpr, outputHeight,
+                                    alpha, dataOnly, geometry);
+                        stroke(qcpRingOf(ring), cmd.pen, true);
+                    }
+                }
                 else if constexpr (std::is_same_v<T, qcp::ErrorBarsCmd>)
                 {
                     // The spans are half extents, not positions: the corners have to be built in

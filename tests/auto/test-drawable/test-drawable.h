@@ -48,6 +48,7 @@ private slots:
     void hitTestWithAVerticalKeyAxisChecksEachSideOnItsOwnAxis();
     void hitTestBesideTextIsTheGap();
     void pixelAnchoredShapeIsHittable();
+    void batchHitTestNamesTheRect();
     void defaultDataRangeFollowsTheExtentRules();
     void defaultLegendIconIsTheRecordingFitted();
     void flatLineHasALegendIcon();

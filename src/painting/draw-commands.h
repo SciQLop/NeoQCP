@@ -81,6 +81,47 @@ struct EllipseCmd
     QBrush brush;
 };
 
+/*!
+  Many rectangles, one command: four arrays of corners and an optional colour per rect.
+
+  A bar chart records ten thousand rects a frame, and as commands they cost a variant slot, a cache
+  key and a visit each. Here they are one command: the recorder appends a rect in constant time,
+  the GPU replay builds the same vertices one rect at a time, and the painter replay draws one rect
+  at a time, so a PDF keeps one vector rect per bar.
+
+  The corners are data on both sides by construction, which is why the batch moves by one delta on
+  a pan. \a fills is either empty, and every rect is \a brush, or one colour per rect: a solid brush
+  of that colour replaces \a brush for that rect (a selected bar paints its own colour without
+  breaking the batch). \a bounds is the data box the recorder widened as it appended, and
+  \a sortedByKey says whether the keys arrived in ascending order (R5's fast paths read it).
+*/
+struct RectsCmd
+{
+    std::vector<double> aKey;
+    std::vector<double> aValue;
+    std::vector<double> bKey;
+    std::vector<double> bValue;
+    std::vector<QRgb> fills;
+    QPen pen;
+    QBrush brush;
+    QCPDataBox bounds;
+    bool sortedByKey = true;
+};
+
+//! Many ellipses, one command: the same batch, with an ellipse in each box.
+struct EllipsesCmd
+{
+    std::vector<double> aKey;
+    std::vector<double> aValue;
+    std::vector<double> bKey;
+    std::vector<double> bValue;
+    std::vector<QRgb> fills;
+    QPen pen;
+    QBrush brush;
+    QCPDataBox bounds;
+    bool sortedByKey = true;
+};
+
 //! One scatter symbol per data-space point.
 struct MarkersCmd
 {
@@ -142,7 +183,8 @@ struct PainterCmd
 //! One draw command. Ordered by the alternatives below, so a replay is a single visit.
 using QCPDrawCommand
     = std::variant<PolylineDataCmd, PolylinePositionsCmd, PolygonCmd, FillBetweenCmd, RectCmd,
-                   EllipseCmd, MarkersCmd, ErrorBarsCmd, TextCmd, PathCmd, ImageCmd, PainterCmd>;
+                   EllipseCmd, RectsCmd, EllipsesCmd, MarkersCmd, ErrorBarsCmd, TextCmd, PathCmd,
+                   ImageCmd, PainterCmd>;
 
 //! What a replay asks of a command: one visit answers every question about its kind.
 //!
@@ -176,7 +218,8 @@ inline CommandKind commandKind(const QCPDrawCommand& command)
         {
             using T = std::decay_t<decltype(cmd)>;
             if constexpr (std::is_same_v<T, PolylineDataCmd> || std::is_same_v<T, FillBetweenCmd>
-                          || std::is_same_v<T, MarkersCmd> || std::is_same_v<T, ErrorBarsCmd>)
+                          || std::is_same_v<T, MarkersCmd> || std::is_same_v<T, ErrorBarsCmd>
+                          || std::is_same_v<T, RectsCmd> || std::is_same_v<T, EllipsesCmd>)
                 return CommandKind { true, false, true, false }; // data by type, never mapped
             else if constexpr (std::is_same_v<T, TextCmd> || std::is_same_v<T, PathCmd>
                                || std::is_same_v<T, ImageCmd> || std::is_same_v<T, PainterCmd>)
@@ -193,6 +236,7 @@ inline CommandKind commandKind(const QCPDrawCommand& command)
         },
         command);
 }
+
 //! True when the GPU replay draws \a command. Answered by type, so a polygon or a long position
 //! list does not pay the per-point scans of commandKind() on a painter pass.
 inline bool isGpuCommand(const QCPDrawCommand& command)
@@ -533,7 +577,47 @@ inline CommandExtent commandExtent(const QCPDrawCommand& command, const QCPDrawF
                           .normalized();
                 extent.cullable = true;
             }
-            else if constexpr (std::is_same_v<T, PolygonCmd> || std::is_same_v<T, PolylinePositionsCmd>)
+            else if constexpr (std::is_same_v<T, RectsCmd> || std::is_same_v<T, EllipsesCmd>)
+            {
+                // A batch is one command over many boxes: the union is what culling and the raster
+                // ask for. Built from both corners, so a rect whose corners arrive reversed still
+                // widens the box it occupies.
+                const std::size_t count = std::min(cmd.aKey.size(), cmd.bKey.size());
+                double left = 0.0;
+                double top = 0.0;
+                double right = 0.0;
+                double bottom = 0.0;
+                for (std::size_t i = 0; i < count; ++i)
+                {
+                    const QPointF a
+                        = qcpResolvePosition(frame, QCP::Data { cmd.aKey[i], cmd.aValue[i] });
+                    const QPointF b
+                        = qcpResolvePosition(frame, QCP::Data { cmd.bKey[i], cmd.bValue[i] });
+                    const double x0 = std::min(a.x(), b.x());
+                    const double x1 = std::max(a.x(), b.x());
+                    const double y0 = std::min(a.y(), b.y());
+                    const double y1 = std::max(a.y(), b.y());
+                    if (i == 0)
+                    {
+                        left = x0;
+                        top = y0;
+                        right = x1;
+                        bottom = y1;
+                    }
+                    else
+                    {
+                        left = std::min(left, x0);
+                        top = std::min(top, y0);
+                        right = std::max(right, x1);
+                        bottom = std::max(bottom, y1);
+                    }
+                }
+                if (count > 0)
+                    extent.box = QRectF(QPointF(left, top), QPointF(right, bottom));
+                extent.cullable = true;
+            }
+            else if constexpr (std::is_same_v<T, PolygonCmd>
+                               || std::is_same_v<T, PolylinePositionsCmd>)
             {
                 extent.box = qcpPositionBox(cmd.points, frame);
                 extent.cullable = true;

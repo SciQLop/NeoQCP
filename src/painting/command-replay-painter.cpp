@@ -124,6 +124,44 @@ bool outsideClip(const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame)
 }
 } // namespace
 
+namespace
+{
+//! One draw per box of \a batch, rects or ellipses: the painter path of a batch command.
+//!
+//! A box outside the clip is skipped here, exactly as the command that held it alone used to be.
+//! A bar chart records every bar and the frame shows a hundred of them, so this test is what keeps
+//! a batch as cheap as the commands it replaced. The stroke's reach is part of the test: a bar half
+//! off the edge still draws its half.
+template <class Batch>
+void paintBoxes(QCPPainter& painter, const Batch& batch, const QCPDrawFrame& frame,
+                const qcp::PaintMode& mode, bool ellipse)
+{
+    painter.setPen(mode.withStroke ? batch.pen : QPen(Qt::NoPen));
+    const bool perBoxColour = !batch.fills.empty();
+    if (!perBoxColour)
+        painter.setBrush(batch.brush);
+    const bool clipKnown = !frame.clip.isEmpty();
+    const double pad = qcp::qcpStrokePad(batch.pen);
+    const QRectF visible = frame.clip.adjusted(-pad, -pad, pad, pad);
+    const std::size_t count = std::min(batch.aKey.size(), batch.bKey.size());
+    for (std::size_t i = 0; i < count; ++i)
+    {
+        const QRectF box
+            = QRectF(qcpResolvePosition(frame, QCP::Data { batch.aKey[i], batch.aValue[i] }),
+                     qcpResolvePosition(frame, QCP::Data { batch.bKey[i], batch.bValue[i] }))
+                  .normalized();
+        if (clipKnown && !box.intersects(visible))
+            continue;
+        if (perBoxColour)
+            painter.setBrush(QBrush(QColor::fromRgba(batch.fills[i])));
+        if (ellipse)
+            painter.drawEllipse(box);
+        else
+            painter.drawRect(box);
+    }
+}
+} // namespace
+
 namespace qcp
 {
 void paintCommand(QCPPainter& painter, const QCPDrawCommand& command, const QCPDrawFrame& frame,
@@ -190,6 +228,14 @@ void paintCommand(QCPPainter& painter, const QCPDrawCommand& command, const QCPD
                 painter.setPen(mode.withStroke ? cmd.pen : QPen(Qt::NoPen));
                 painter.setBrush(cmd.brush);
                 painter.drawEllipse(rect);
+            }
+            else if constexpr (std::is_same_v<Command, RectsCmd>)
+            {
+                paintBoxes(painter, cmd, frame, mode, false);
+            }
+            else if constexpr (std::is_same_v<Command, EllipsesCmd>)
+            {
+                paintBoxes(painter, cmd, frame, mode, true);
             }
             else if constexpr (std::is_same_v<Command, MarkersCmd>)
             {

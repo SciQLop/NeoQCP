@@ -120,8 +120,10 @@ double textDistance(const qcp::TextCmd& cmd, const QCPDrawFrame& frame, const QP
     return distanceTo(QRectF(qcpTextLayout(*cmd.style, cmd.glyphSize).box), local);
 }
 
-//! The distance from \a at to one command's geometry, in pixels.
-double distanceTo(const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame, const QPointF& at)
+//! The distance from \a at to one command's geometry, in pixels. For a batch, \a index receives
+//! the place of the rect (or ellipse) that came nearest.
+double distanceTo(const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame, const QPointF& at,
+                  int* index = nullptr)
 {
     return std::visit(
         [&](const auto& cmd) -> double
@@ -187,6 +189,71 @@ double distanceTo(const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame,
                         return 0.0;
                 }
                 return distanceTo(qcpRingOf(qcpEllipseRing(box)), at, true) - halfPen(cmd.pen);
+            }
+            else if constexpr (std::is_same_v<Command, qcp::RectsCmd>)
+            {
+                // A batch is one command over many rects: the caller gets the distance to the
+                // nearest one and, in \a index, which one it was.
+                const std::size_t count = std::min(cmd.aKey.size(), cmd.bKey.size());
+                double best = kInfinity;
+                for (std::size_t i = 0; i < count; ++i)
+                {
+                    const QRectF box
+                        = QRectF(
+                              qcpResolvePosition(frame, QCP::Data { cmd.aKey[i], cmd.aValue[i] }),
+                              qcpResolvePosition(frame, QCP::Data { cmd.bKey[i], cmd.bValue[i] }))
+                              .normalized();
+                    const QBrush rectBrush
+                        = i < cmd.fills.size() ? QBrush(QColor::fromRgba(cmd.fills[i])) : cmd.brush;
+                    double distance = 0.0;
+                    if (!visibleBrush(rectBrush) || !box.contains(at))
+                    {
+                        const std::array<QPointF, 4> corners { box.topLeft(), box.topRight(),
+                                                               box.bottomRight(),
+                                                               box.bottomLeft() };
+                        distance = distanceTo(corners, at, true) - halfPen(cmd.pen);
+                    }
+                    if (distance < best)
+                    {
+                        best = distance;
+                        if (index)
+                            *index = int(i);
+                    }
+                }
+                return best;
+            }
+            else if constexpr (std::is_same_v<Command, qcp::EllipsesCmd>)
+            {
+                const std::size_t count = std::min(cmd.aKey.size(), cmd.bKey.size());
+                double best = kInfinity;
+                for (std::size_t i = 0; i < count; ++i)
+                {
+                    const QRectF box
+                        = QRectF(
+                              qcpResolvePosition(frame, QCP::Data { cmd.aKey[i], cmd.aValue[i] }),
+                              qcpResolvePosition(frame, QCP::Data { cmd.bKey[i], cmd.bValue[i] }))
+                              .normalized();
+                    const QBrush rectBrush
+                        = i < cmd.fills.size() ? QBrush(QColor::fromRgba(cmd.fills[i])) : cmd.brush;
+                    double distance = kInfinity;
+                    if (visibleBrush(rectBrush) && box.contains(at))
+                    {
+                        const double nx = 2.0 * (at.x() - box.center().x()) / box.width();
+                        const double ny = 2.0 * (at.y() - box.center().y()) / box.height();
+                        if (nx * nx + ny * ny <= 1.0)
+                            distance = 0.0;
+                    }
+                    if (distance > 0.0)
+                        distance = distanceTo(qcpRingOf(qcpEllipseRing(box)), at, true)
+                            - halfPen(cmd.pen);
+                    if (distance < best)
+                    {
+                        best = distance;
+                        if (index)
+                            *index = int(i);
+                    }
+                }
+                return best;
             }
             else if constexpr (std::is_same_v<Command, qcp::MarkersCmd>)
             {
@@ -560,8 +627,8 @@ double QCPDrawnCore::pixelPad() const
     return pad + 1.0; // antialiasing
 }
 
-std::optional<double> QCPDrawnCore::hitTest(const QCPDrawable& object, QCP::Pixels at, QVariant*,
-                                            const QCPDrawnView& view)
+std::optional<double> QCPDrawnCore::hitTest(const QCPDrawable& object, QCP::Pixels at,
+                                            QVariant* details, const QCPDrawnView& view)
 {
     if (!ensureRecording(object, view))
         return std::nullopt;
@@ -604,10 +671,23 @@ std::optional<double> QCPDrawnCore::hitTest(const QCPDrawable& object, QCP::Pixe
             return std::nullopt;
     }
     double best = kInfinity;
+    int hit = -1; //!< the rect of a batch the click came nearest: what \a details reports
     for (const qcp::QCPDrawCommand& command : mState->recording.commands)
-        best = std::min(best, distanceTo(command, frame, point));
+    {
+        int index = -1;
+        const double distance = distanceTo(command, frame, point, &index);
+        if (distance < best)
+        {
+            best = distance;
+            hit = index;
+        }
+    }
     if (!(best <= tolerance))
         return std::nullopt;
+    // A batch names the rect that was hit, so the caller can act on one bar without scanning the
+    // geometry again. Commands of a single shape say nothing, as they always did.
+    if (details && hit >= 0)
+        *details = QVariant(hit);
     // A distance is never negative: distanceTo() subtracts the stroke's half width, so a click
     // inside the stroke came out below zero, and the callers (the layerable selectTest contract)
     // reject a negative distance as a miss.

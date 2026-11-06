@@ -220,6 +220,87 @@ void record(QCPDrawList& list, qcp::QCPDrawCommand command, const Extent& extent
 {
     record(list, std::move(command), extent, extent);
 }
+
+/*!
+  True when \a brush can join a batch whose brush is \a batchBrush.
+
+  A batch keeps one brush, so a pattern, a texture or a gradient has to be the very same one: two
+  different gradients with the same style would silently paint as one. A solid colour may differ,
+  though - it becomes a per-rect fill, which is how a selected bar keeps its colour in the batch.
+*/
+bool joinsBatch(const QBrush& batchBrush, const QBrush& brush)
+{
+    return brush == batchBrush
+        || (brush.style() == Qt::SolidPattern && batchBrush.style() == Qt::SolidPattern);
+}
+
+//! Appends \a a, \a b and \a brush to \a batch, keeping its fills, its sort flag and its box.
+template <class Batch>
+void appendBox(Batch& batch, const QPointF& a, const QPointF& b, const QBrush& brush)
+{
+    // The batch's own brush needs no entry; the first colour that differs gives every rect one.
+    if (batch.fills.empty() && brush.color().rgba() != batch.brush.color().rgba())
+        batch.fills.assign(batch.aKey.size(), batch.brush.color().rgba());
+    if (!batch.fills.empty())
+        batch.fills.push_back(brush.color().rgba());
+    batch.sortedByKey = batch.sortedByKey && (batch.aKey.empty() || a.x() >= batch.aKey.back());
+    batch.aKey.push_back(a.x());
+    batch.aValue.push_back(a.y());
+    batch.bKey.push_back(b.x());
+    batch.bValue.push_back(b.y());
+    batch.bounds.keyLower = std::min(batch.bounds.keyLower, std::min(a.x(), b.x()));
+    batch.bounds.keyUpper = std::max(batch.bounds.keyUpper, std::max(a.x(), b.x()));
+    batch.bounds.valueLower = std::min(batch.bounds.valueLower, std::min(a.y(), b.y()));
+    batch.bounds.valueUpper = std::max(batch.bounds.valueUpper, std::max(a.y(), b.y()));
+}
+
+/*!
+  Appends one more box to the \a Batch the previous command holds, or turns the single \a Single it
+  holds into one: the second rect of a run is what makes the batch, so a recording of one rect stays
+  the command it always was.
+
+  False when the new box cannot join it - another shape, another pen, a brush of another kind - and
+  the caller records a single command instead.
+*/
+template <class Batch, class Single>
+bool appendShape(QCPDrawList& list, const QPointF& a, const QPointF& b, const QPen& pen,
+                 const QBrush& brush, const Extent& extent)
+{
+    if (list.commands.empty())
+        return false;
+    qcp::QCPDrawCommand& previous = list.commands.back();
+    if (auto* batch = std::get_if<Batch>(&previous))
+    {
+        if (!(batch->pen == pen) || !joinsBatch(batch->brush, brush))
+            return false;
+        appendBox(*batch, a, b, brush);
+    }
+    else if (const auto* single = std::get_if<Single>(&previous))
+    {
+        const auto* firstA = std::get_if<QCP::Data>(&single->a);
+        const auto* firstB = std::get_if<QCP::Data>(&single->b);
+        if (!firstA || !firstB || !(single->pen == pen) || !joinsBatch(single->brush, brush))
+            return false;
+        Batch batch;
+        batch.pen = single->pen;
+        batch.brush = single->brush;
+        batch.bounds
+            = QCPDataBox { std::min(firstA->x, firstB->x), std::max(firstA->x, firstB->x),
+                           std::min(firstA->y, firstB->y), std::max(firstA->y, firstB->y) };
+        appendBox(batch, QPointF(firstA->x, firstA->y), QPointF(firstB->x, firstB->y),
+                  single->brush);
+        appendBox(batch, a, b, brush);
+        // The pen and the brush style did not change, so what the replay asks of the raster cannot
+        // either: the count record() took for the single command stays right.
+        previous = std::move(batch);
+    }
+    else
+        return false;
+    // The box is kept as the recorder appends, so a batch is never re-scanned to answer its range.
+    mergeExtent(list.data, extent);
+    mergeExtent(list.index, extent);
+    return true;
+}
 } // namespace
 
 QPointF qcpResolvePosition(const QCPDrawFrame& frame, const QCP::Position& position)
@@ -351,6 +432,14 @@ void QCPDrawContext::rect(QCP::Position a, QCP::Position b, const QPen& pen, con
 {
     const QCP::Position corners[] = { a, b };
     const Extent extent = extentOf(corners);
+    // A run of data-space rects is one batch: a bar chart records ten thousand a frame, and joining
+    // it is a constant-time push. A pixel, ratio or anchored corner has no data box to widen.
+    const auto* first = std::get_if<QCP::Data>(&a);
+    const auto* second = std::get_if<QCP::Data>(&b);
+    if (first && second
+        && appendShape<qcp::RectsCmd, qcp::RectCmd>(
+            *mList, QPointF(first->x, first->y), QPointF(second->x, second->y), pen, brush, extent))
+        return;
     record(*mList, qcp::RectCmd { a, b, pen, brush }, extent);
 }
 
@@ -358,6 +447,12 @@ void QCPDrawContext::ellipse(QCP::Position a, QCP::Position b, const QPen& pen, 
 {
     const QCP::Position corners[] = { a, b };
     const Extent extent = extentOf(corners);
+    const auto* first = std::get_if<QCP::Data>(&a);
+    const auto* second = std::get_if<QCP::Data>(&b);
+    if (first && second
+        && appendShape<qcp::EllipsesCmd, qcp::EllipseCmd>(
+            *mList, QPointF(first->x, first->y), QPointF(second->x, second->y), pen, brush, extent))
+        return;
     record(*mList, qcp::EllipseCmd { a, b, pen, brush }, extent);
 }
 

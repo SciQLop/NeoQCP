@@ -28,13 +28,18 @@ int gAxisMessages = 0;
 QtMessageHandler gPreviousHandler = nullptr;
 
 //! A brush the GPU cannot fill in one colour: the replay rasterises it.
-QBrush gradientBrush()
+QBrush gradientBrush(const QColor& from, const QColor& to)
 {
     QLinearGradient gradient(0, 0, 1, 0);
     gradient.setCoordinateMode(QGradient::ObjectBoundingMode);
-    gradient.setColorAt(0.0, QColor(220, 40, 40));
-    gradient.setColorAt(1.0, QColor(40, 40, 220));
+    gradient.setColorAt(0.0, from);
+    gradient.setColorAt(1.0, to);
     return QBrush(gradient);
+}
+
+QBrush gradientBrush()
+{
+    return gradientBrush(QColor(220, 40, 40), QColor(40, 40, 220));
 }
 
 void countAxisMessages(QtMsgType type, const QMessageLogContext& context, const QString& message)
@@ -116,11 +121,15 @@ public:
         }
         if (bars > 0)
         {
-            const QBrush brush = filledBars ? (gradientBars ? gradientBrush() : QBrush(fill))
-                                            : QBrush(Qt::NoBrush);
             for (int i = 0; i < bars; ++i)
             {
                 const double key = 1.0 + 8.0 * i / bars;
+                // A gradient of its own per bar: a batch shares one brush, and the cap tests need
+                // one image per bar to reach the layer's limit.
+                const QColor tint = QColor::fromHsv((i * 37) % 360, 200, 220);
+                const QBrush brush = !filledBars ? QBrush(Qt::NoBrush)
+                    : gradientBars               ? gradientBrush(tint, tint.darker(200))
+                                                 : QBrush(fill);
                 context.rect(QCP::Data { key, 1.0 }, QCP::Data { key + 8.0 / bars, 3.0 },
                              QPen(Qt::black), brush);
             }
@@ -1220,6 +1229,37 @@ void TestDrawable::defaultHitTestMatchesGeometry()
     QVERIFY2(*near > 1.0 && *near < 4.0, qPrintable(QString("distance %1").arg(*near)));
 
     QVERIFY(!shape->hitTest(QCP::Pixels { edge - 60, at(0, 4).y }, nullptr).has_value());
+}
+
+void TestDrawable::batchHitTestNamesTheRect()
+{
+    // A batch is one command over many rects: the hit test must still say which bar was clicked,
+    // and it says it once per scan instead of once per command.
+    Fixture f;
+    auto* shape = new TestShape(f.plot.get());
+    shape->bars = 10; // ten data rects: keys 1..9, values 1..3, one pen and one brush
+    shape->filledBars = true;
+    f.plot->replot();
+    const auto at = [&](double key, double value)
+    {
+        return QCP::Pixels { f.plot->xAxis->coordToPixel(key), f.plot->yAxis->coordToPixel(value) };
+    };
+
+    // Bar i covers keys 1 + 0.8 i .. 1 + 0.8 (i + 1), so the seventh one spans 6.6 .. 7.4.
+    QVariant details;
+    const std::optional<double> hit = shape->hitTest(at(7.0, 2.0), &details);
+    QVERIFY2(hit.has_value(), "a click inside the seventh bar must hit the recording");
+    QCOMPARE(*hit, 0.0); // inside a visible fill
+    QCOMPARE(details.userType(), int(QMetaType::Int));
+    QCOMPARE(details.toInt(), 7);
+
+    // A hit on the first bar names the first rect: the index is the batch's, not the command's.
+    QVariant first;
+    QVERIFY(shape->hitTest(at(1.4, 2.0), &first).has_value());
+    QCOMPARE(first.toInt(), 0);
+
+    // A miss is still a miss, and it leaves the details alone.
+    QVERIFY(!shape->hitTest(at(20.0, 2.0), &details).has_value());
 }
 
 void TestDrawable::hitTestWithAVerticalKeyAxis()
