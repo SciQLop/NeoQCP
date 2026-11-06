@@ -668,6 +668,7 @@ void QCPPlottableRhiLayer::render(QRhiCommandBuffer* cb, const QSize& outputSize
         int vertexCount = 0;
         int uniformIndex = 0;
         int uniformStride = 0;
+        int uniformBinding = 0; //!< the SRB binding the dynamic offset names
     };
 
     const auto callOf = [&](const OrderedDraw& record)
@@ -690,9 +691,11 @@ void QCPPlottableRhiLayer::render(QRhiCommandBuffer* cb, const QSize& outputSize
             const ImageTexture* texture = mImageTextures.value(entry.imageKey, nullptr);
             if (!texture || !texture->srb)
                 return call;
+            // The uniform sits past the texture at binding 0: name the right one, or every quad
+            // draws with the first image's rect.
             return DrawCall {
                 mImagePipeline, texture->srb,     mImageVertexBuffer, entry.scissorRect, 0, 4,
-                record.index,   imageUbufStride()
+                record.index,   imageUbufStride(), 1
             };
         }
         if (!mPipeline || !mVertexBuffer || !mSrb)
@@ -723,7 +726,8 @@ void QCPPlottableRhiLayer::render(QRhiCommandBuffer* cb, const QSize& outputSize
         // Bind per-draw uniform slot via dynamic offset.
         // setShaderResources must precede setVertexInput — on Metal, QRhi offsets
         // vertex buffer indices by the number of SRB buffer bindings.
-        const QPair<int, quint32> dynamicOffset(0, quint32(call.uniformIndex * call.uniformStride));
+        const QPair<int, quint32> dynamicOffset(call.uniformBinding,
+                                                quint32(call.uniformIndex * call.uniformStride));
         cb->setShaderResources(call.srb, 1, &dynamicOffset);
         const QRhiCommandBuffer::VertexInput input(call.vertices, 0);
         cb->setVertexInput(0, 1, &input);

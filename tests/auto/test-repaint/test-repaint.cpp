@@ -3466,6 +3466,40 @@ void TestRepaint::twoRecordingsDoNotShareAnImage()
                             .arg(second.name())));
 }
 
+// Every image of a layer carries its own rect in a uniform slot: two of them in one recording do
+// not land on top of each other.
+void TestRepaint::eachRasterisedCommandDrawsAtItsPlace()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    usePixelRanges(plot);
+    auto* layer = plot->plottableRhiLayer(plot->currentLayer());
+    QVERIFY(layer);
+    QCPDrawContext context(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+    context.rect(QCP::Data { 60, 60 }, QCP::Data { 160, 240 }, QPen(Qt::NoPen),
+                 flatGradientBrush(QColor(220, 40, 40)));
+    context.rect(QCP::Data { 240, 60 }, QCP::Data { 340, 240 }, QPen(Qt::NoPen),
+                 flatGradientBrush(QColor(40, 160, 40)));
+
+    layer->clear();
+    QCPResolveCache cache;
+    qcp::QCPRasterFallback fallback;
+    qcpReplayWithRhi(context.drawList(), *layer, *plot->scatterRhiLayer(plot->currentLayer()),
+                     context.frame(), cache, fallback, plot->bufferDevicePixelRatio(),
+                     plot->rhiOutputSize());
+    QCOMPARE(int(layer->imageDrawEntries().size()), 2);
+
+    const QImage frame = screenOf(plot);
+    const QColor left = pixelAt(plot, frame, 110, 150);
+    const QColor right = pixelAt(plot, frame, 290, 150);
+    QVERIFY2(left.red() > 150 && left.green() < 90,
+             qPrintable(QStringLiteral("the first image is not in its box: %1").arg(left.name())));
+    QVERIFY2(right.green() > 120 && right.red() < 90,
+             qPrintable(QStringLiteral("the second image left its box: %1").arg(right.name())));
+}
+
 // A layer whose image pipeline failed to build cannot take one more image: the one predicate the
 // replay asks must say so, and the painter pass paints the command.
 void TestRepaint::brokenImagePipelineFallsBackToThePainter()

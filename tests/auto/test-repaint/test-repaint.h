@@ -89,6 +89,7 @@ private slots:
     void zoomedFallbackIsRepainted();
     void clippedFallbackFollowsTheShape();
     void twoRecordingsDoNotShareAnImage();
+    void eachRasterisedCommandDrawsAtItsPlace();
     void brokenImagePipelineFallsBackToThePainter();
     void unusedFallbackTexturesAreReleased();
     void itemsDefaultToAnnotations();
