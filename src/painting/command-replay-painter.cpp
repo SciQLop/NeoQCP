@@ -111,79 +111,16 @@ void replayText(const qcp::TextCmd& cmd, QCPPainter& painter, const QCPDrawFrame
 
 namespace
 {
-//! How far a command's stroke reaches beyond the geometry it is given.
-double strokePad(const QPen& pen)
-{
-    return pen.style() == Qt::NoPen ? 1.0 : std::max(1.0, pen.widthF()) + 1.0;
-}
-
 //! True only when the command is provably outside \a clip: a recording may cover far more than the
 //! frame shows (a bar chart records every bar), and drawing what nobody sees costs the most.
 bool outsideClip(const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame)
 {
     if (frame.clip.isEmpty())
         return false;
-    return std::visit(
-        [&](const auto& cmd)
-        {
-            using Command = std::decay_t<decltype(cmd)>;
-            if constexpr (std::is_same_v<Command, qcp::RectCmd>
-                          || std::is_same_v<Command, qcp::EllipseCmd>
-                          || std::is_same_v<Command, qcp::ImageCmd>)
-            {
-                double pad = 1.0;
-                if constexpr (!std::is_same_v<Command, qcp::ImageCmd>)
-                    pad = strokePad(cmd.pen);
-                const QPointF a = qcpResolvePosition(frame, cmd.a);
-                const QPointF b = qcpResolvePosition(frame, cmd.b);
-                return !QRectF(a, b)
-                            .normalized()
-                            .adjusted(-pad, -pad, pad, pad)
-                            .intersects(frame.clip);
-            }
-            else if constexpr (std::is_same_v<Command, qcp::PolygonCmd>
-                               || std::is_same_v<Command, qcp::PolylinePositionsCmd>)
-            {
-                if (cmd.points.empty())
-                    return true;
-                QRectF box;
-                for (const QCP::Position& position : cmd.points)
-                {
-                    const QPointF point = qcpResolvePosition(frame, position);
-                    box |= QRectF(point.x(), point.y(), 0.0, 0.0);
-                }
-                const double pad = strokePad(cmd.pen);
-                return !box.normalized().adjusted(-pad, -pad, pad, pad).intersects(frame.clip);
-            }
-            else if constexpr (std::is_same_v<Command, qcp::TextCmd>)
-            {
-                QTransform transform;
-                const QPointF at = qcpResolvePosition(frame, cmd.at);
-                transform.translate(at.x(), at.y());
-                transform.rotate(cmd.style->rotationDegrees);
-                return !transform.mapRect(QRectF(qcpTextLayout(*cmd.style, cmd.glyphSize).box))
-                            .intersects(frame.clip);
-            }
-            else if constexpr (std::is_same_v<Command, qcp::MarkersCmd>)
-            {
-                if (cmd.points->empty())
-                    return true;
-                QRectF box;
-                for (const QPointF& point : *cmd.points)
-                {
-                    const QCP::Pixels pixel
-                        = frame.transform.map(QCP::Data { point.x(), point.y() });
-                    box |= QRectF(pixel.x, pixel.y, 0.0, 0.0);
-                }
-                const double pad = cmd.style.size() + 1.0;
-                return !box.normalized().adjusted(-pad, -pad, pad, pad).intersects(frame.clip);
-            }
-            else
-            {
-                return false; // a data polyline: mapping its points costs what drawing it costs
-            }
-        },
-        command);
+    const qcp::CommandExtent extent = qcp::commandExtent(command, frame);
+    return extent.cullable
+        && !extent.box.adjusted(-extent.pad, -extent.pad, extent.pad, extent.pad)
+                .intersects(frame.clip);
 }
 } // namespace
 

@@ -17,6 +17,7 @@
 #include <QRect>
 #include <QRectF>
 #include <QString>
+#include <QTransform>
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -436,6 +437,133 @@ inline void qcpErrorBarPixels(const QCPDrawFrame& frame, std::span<const QPointF
     frame.transform.map(std::span<const QPointF>(data), std::span<QPointF>(corners));
     qcpErrorBarPolyline(corners, out);
 }
+
+namespace qcp
+{
+//! How far the stroke of \a pen reaches beyond the geometry it strokes, in pixels.
+inline double qcpStrokePad(const QPen& pen)
+{
+    return pen.style() == Qt::NoPen ? 1.0 : std::max(1.0, pen.widthF()) + 1.0;
+}
+
+//! The box \a pixels cover; a pixel that is not finite carries nothing, so a gap in a series or
+//! between two error bars never widens the box to infinity.
+inline QRectF qcpPixelBox(std::span<const QPointF> pixels)
+{
+    QRectF box;
+    bool empty = true;
+    for (const QPointF& pixel : pixels)
+    {
+        if (!std::isfinite(pixel.x()) || !std::isfinite(pixel.y()))
+            continue;
+        const QRectF point(pixel, QSizeF(0.0, 0.0));
+        box = empty ? point : box.united(point);
+        empty = false;
+    }
+    return box;
+}
+
+//! \a positions resolved through \a frame and boxed; \a points mapped through \a transform and
+//! boxed: the extent of one command's geometry either way.
+inline QRectF qcpPositionBox(std::span<const QCP::Position> positions, const QCPDrawFrame& frame)
+{
+    static thread_local std::vector<QPointF> pixels;
+    qcpResolveInto(positions, frame, pixels);
+    return qcpPixelBox(pixels);
+}
+
+inline QRectF qcpDataBox(std::span<const QPointF> points, const QCPTransform& transform)
+{
+    static thread_local std::vector<QPointF> pixels;
+    qcpMapDataInto(points, transform, pixels);
+    return qcpPixelBox(pixels);
+}
+
+/*!
+  What the paint of \a command covers in pixels: the box its geometry spans, the pen that strokes
+  it, and how far that paint reaches beyond the box. The clip test asks whether a command is
+  visible, the raster asks how much room the image it needs takes: one visit answers both, and the
+  caller adds only the inflation its own question takes.
+*/
+struct CommandExtent
+{
+    QRectF box; //!< the geometry's box, empty when the command spans nothing
+    QPen pen = Qt::NoPen; //!< the stroke, where the command has one
+    double pad = 1.0; //!< how far the paint reaches beyond \a box
+    //! False where boxing would cost what drawing costs: a data series (unless \a mapSeries asked
+    //! for it) and the kinds whose geometry is a path or a callback.
+    bool cullable = false;
+};
+
+//! \a command's extent at \a frame; \a mapSeries boxes a data series too.
+inline CommandExtent commandExtent(const QCPDrawCommand& command, const QCPDrawFrame& frame,
+                                   bool mapSeries = false)
+{
+    return std::visit(
+        [&](const auto& cmd)
+        {
+            using T = std::decay_t<decltype(cmd)>;
+            CommandExtent extent;
+            if constexpr (requires { cmd.pen; })
+            {
+                extent.pen = cmd.pen;
+                extent.pad = qcpStrokePad(cmd.pen);
+            }
+            if constexpr (std::is_same_v<T, RectCmd> || std::is_same_v<T, EllipseCmd>
+                          || std::is_same_v<T, ImageCmd>)
+            {
+                extent.box
+                    = QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
+                          .normalized();
+                extent.cullable = true;
+            }
+            else if constexpr (std::is_same_v<T, PolygonCmd> || std::is_same_v<T, PolylinePositionsCmd>)
+            {
+                extent.box = qcpPositionBox(cmd.points, frame);
+                extent.cullable = true;
+            }
+            else if constexpr (std::is_same_v<T, MarkersCmd>)
+            {
+                extent.box = qcpDataBox(*cmd.points, frame.transform);
+                extent.pad = cmd.style.size() + 1.0;
+                extent.cullable = true;
+            }
+            else if constexpr (std::is_same_v<T, TextCmd>)
+            {
+                QTransform rotation;
+                const QPointF at = qcpResolvePosition(frame, cmd.at);
+                rotation.translate(at.x(), at.y());
+                rotation.rotate(cmd.style->rotationDegrees);
+                extent.box = rotation.mapRect(QRectF(qcpTextLayout(*cmd.style, cmd.glyphSize).box));
+                extent.pad = 0.0;
+                extent.cullable = true;
+            }
+            else if constexpr (std::is_same_v<T, PolylineDataCmd>)
+            {
+                if (mapSeries)
+                    extent.box = qcpDataBox(*cmd.points, frame.transform);
+            }
+            else if constexpr (std::is_same_v<T, FillBetweenCmd>)
+            {
+                if (mapSeries)
+                    extent.box = qcpDataBox(*cmd.upper, frame.transform)
+                                     .united(qcpDataBox(*cmd.lower, frame.transform));
+            }
+            else if constexpr (std::is_same_v<T, ErrorBarsCmd>)
+            {
+                if (mapSeries)
+                {
+                    static thread_local std::vector<QPointF> bars;
+                    qcpErrorBarPixels(frame, std::span<const QPointF>(*cmd.centres),
+                                      std::span<const QPointF>(*cmd.spans), bars);
+                    extent.box = qcpPixelBox(std::span<const QPointF>(bars));
+                }
+            }
+            return extent;
+        },
+        command);
+}
+} // namespace qcp
 
 namespace qcp
 {
