@@ -787,15 +787,26 @@ void QCPBars::moveRelativeTo(QCPBars* bars, bool above)
         return;
     }
     markDirty(); // the restacking below changes what is drawn
+    // A group centres its members from the base each one stands on, so restacking rewires bars of
+    // groups other than this one: every group holding a bar that moves here re-records.
+    QList<QCPBarsGroup*> groups;
+    for (QCPBars* const bar : { this, bars, mBarBelow.data(), mBarAbove.data(),
+                                bars ? bars->mBarBelow.data() : nullptr,
+                                bars ? bars->mBarAbove.data() : nullptr })
+        if (bar && bar->mBarsGroup && !groups.contains(bar->mBarsGroup))
+            groups.append(bar->mBarsGroup);
     // remove from stacking:
     connectBars(mBarBelow.data(),
                 mBarAbove.data()); // Note: also works if one (or both) of them is 0
-    if (!bars)
-        return;
-    // insert this bar on the given side of \a bars, between it and whatever it was stacked on:
-    if (QCPBars* const neighbour = above ? bars->mBarAbove.data() : bars->mBarBelow.data())
-        connectBars(above ? this : neighbour, above ? neighbour : this);
-    connectBars(above ? bars : this, above ? this : bars);
+    if (bars)
+    {
+        // insert this bar on the given side of \a bars, between it and whatever it was stacked on:
+        if (QCPBars* const neighbour = above ? bars->mBarAbove.data() : bars->mBarBelow.data())
+            connectBars(above ? this : neighbour, above ? neighbour : this);
+        connectBars(above ? bars : this, above ? this : bars);
+    }
+    for (QCPBarsGroup* const group : groups)
+        group->bumpRevision();
 }
 
 /*!

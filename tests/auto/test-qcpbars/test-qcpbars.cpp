@@ -472,6 +472,43 @@ void TestQCPBars::moveAboveRestacks()
     QCOMPARE(pixelAt(frameOf(mPlot), mPlot, 2.0, 3.5), QColor(Qt::red));
 }
 
+void TestQCPBars::restackMovesTheGroupSiblingsToTheCentre()
+{
+    // A group centres its members from the base each one stands on: stacking one member on another
+    // leaves the group with a single base, so the bar that bar was paired with moves to the centre.
+    QCustomPlot restacked(0);
+    QCustomPlot alone(0);
+    for (QCustomPlot* plot : { &restacked, &alone })
+    {
+        plot->resize(300, 200); // the frame of the assertion: a resize would re-record everything
+        plot->xAxis->setRange(0, 4);
+        plot->yAxis->setRange(0, 4);
+    }
+    auto* group = new QCPBarsGroup(&restacked);
+    QCPBars* const lower = colouredBars(&restacked, Qt::red);
+    QCPBars* const upper = colouredBars(&restacked, Qt::blue);
+    group->append(lower);
+    group->append(upper);
+    colouredBars(&alone, Qt::red);
+    restacked.replot();
+    alone.replot();
+    const int sideBySide = leftEdgeOf(frameOf(&restacked), &restacked, 0.5, QColor(Qt::red));
+    const int centred = leftEdgeOf(frameOf(&alone), &alone, 0.5, QColor(Qt::red));
+    QVERIFY2(sideBySide < centred - 1,
+             qPrintable(QStringLiteral("the two bars must first be side by side (red at %1, centre %2)")
+                            .arg(sideBySide)
+                            .arg(centred)));
+
+    upper->moveAbove(lower);
+    restacked.replot();
+    const int moved = leftEdgeOf(frameOf(&restacked), &restacked, 0.5, QColor(Qt::red));
+    QVERIFY2(moved == centred,
+             qPrintable(QStringLiteral("the bar left on its own must move to the centre (at %1, "
+                                       "centre %2)")
+                            .arg(moved)
+                            .arg(centred)));
+}
+
 void TestQCPBars::groupJoinShiftsTheOthers()
 {
     // A bar joining a group re-centres the others: the plot that gained it must render like one
