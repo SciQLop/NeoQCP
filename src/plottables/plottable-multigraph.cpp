@@ -314,6 +314,7 @@ void QCPMultiGraph::syncComponentCount(const QCPAbstractMultiDataSource* source)
             c.lineStyle = mLineStyle;
             c.inLegend = !isErrorBound(i);
             c.hiddenByErrorBars = !c.inLegend;
+            applyRememberedStyle(i);
         }
     } else if (newCount < oldCount) {
         mComponents.resize(newCount);
@@ -554,15 +555,12 @@ void QCPMultiGraph::pensChanged(int componentCount)
         decorationsChanged();
 }
 
-void QCPMultiGraph::applyBrushToComponents(const QBrush& brush)
+void QCPMultiGraph::applyBrushToComponent(int index, const QBrush& brush)
 {
-    for (int i = 0; i < mComponents.size(); ++i)
-    {
-        if (brush.style() == Qt::NoBrush)
-            clearComponentFill(i);
-        else
-            setComponentFill(i, 0.0, brush);
-    }
+    if (brush.style() == Qt::NoBrush)
+        clearComponentFill(index);
+    else
+        setComponentFill(index, 0.0, brush);
 }
 
 const QCPAbstractMultiDataSource* QCPMultiGraph::colorValueSource() const

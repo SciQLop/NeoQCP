@@ -2480,6 +2480,29 @@ const std::vector<SetterCase>& setterCases()
     return cases;
 }
 
+//! Two components with distinct keys and a visible zero baseline.
+void setTwoLines(QCPMultiGraph* mg)
+{
+    mg->setData(std::vector<double> { 0, 1, 2, 3, 4 },
+                std::vector<std::vector<double>> { { 1, 2, 1.5, 2.5, 1 }, { 0.5, 1, 2, 1, 2 } });
+}
+
+void frameGraph(QCustomPlot* plot)
+{
+    plot->xAxis->setRange(0, 4);
+    plot->yAxis->setRange(0, 3);
+}
+
+//! The same two lines with no style set on their graph: what a styled frame is compared to.
+QImage plainTwoLines()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    setTwoLines(new QCPMultiGraph(plot.xAxis, plot.yAxis));
+    frameGraph(&plot);
+    return renderOf(&plot);
+}
+
 } // namespace
 
 void TestMultiGraph::noSetterIsIgnored_data()
@@ -2524,4 +2547,101 @@ void TestMultiGraph::noSetterIsIgnored()
     plot.replot(QCustomPlot::rpImmediateRefresh);
     const QImage after = renderOf(&plot);
     QVERIFY2(before != after, qPrintable(setter + QStringLiteral(" changed nothing it draws")));
+}
+
+// setComponentColors() rewrites the pens behind setPen()'s back, so handing setPen() the pen it
+// already remembers must still reach every component: mPen alone does not say what is drawn.
+void TestMultiGraph::setPenAfterComponentColoursRepensEveryComponent()
+{
+    auto* mg = redAndBlueHorizontalLines(mPlot);
+    const QPen pen(Qt::darkGreen, 4);
+    mg->setPen(pen);
+    mg->setComponentColors({ Qt::magenta, Qt::magenta });
+    const QImage recoloured = renderOf(mPlot);
+
+    mg->setPen(pen);
+
+    for (int i = 0; i < mg->componentCount(); ++i)
+    {
+        QCOMPARE(mg->component(i).pen.color(), pen.color());
+        QCOMPARE(mg->component(i).pen.width(), pen.width());
+    }
+    QVERIFY2(recoloured != renderOf(mPlot), "the frame kept the component colours");
+}
+
+// setComponentFill() replaces what setBrush() installed, so handing setBrush() the brush it
+// already remembers must still refill every component.
+void TestMultiGraph::setBrushAfterAComponentFillRefillsEveryComponent()
+{
+    auto* mg = redAndBlueHorizontalLines(mPlot);
+    const QBrush brush(QColor(0, 160, 255, 120));
+    mg->setBrush(brush);
+    mg->setComponentFill(0, 0.0, QBrush(QColor(255, 0, 255, 120)));
+    const QImage overridden = renderOf(mPlot);
+
+    mg->setBrush(brush);
+
+    for (int i = 0; i < mg->componentCount(); ++i)
+    {
+        const std::optional<QCPMultiGraph::Fill> fill = mg->componentFill(i);
+        QVERIFY(fill.has_value());
+        QCOMPARE(fill->brush, brush);
+    }
+    QVERIFY2(overridden != renderOf(mPlot), "the frame kept the component fill");
+}
+
+// 2.x code wrote graph->setPen(red) before graph->setData(): the components the data creates
+// must take that pen, not the default palette.
+void TestMultiGraph::setPenBeforeDataColoursTheNewComponents()
+{
+    const QPen pen(Qt::darkGreen, 4);
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setPen(pen);
+    setTwoLines(mg);
+
+    QCOMPARE(mg->componentCount(), 2);
+    for (int i = 0; i < mg->componentCount(); ++i)
+    {
+        QCOMPARE(mg->component(i).pen.color(), pen.color());
+        QCOMPARE(mg->component(i).pen.width(), pen.width());
+    }
+    frameGraph(mPlot);
+    QVERIFY2(renderOf(mPlot) != plainTwoLines(), "the new components kept the default palette");
+}
+
+// The same ordering for the fill: setBrush() before the data reaches the components it creates.
+void TestMultiGraph::setBrushBeforeDataFillsTheNewComponents()
+{
+    const QBrush brush(QColor(0, 160, 255, 120));
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setBrush(brush);
+    setTwoLines(mg);
+
+    QCOMPARE(mg->componentCount(), 2);
+    for (int i = 0; i < mg->componentCount(); ++i)
+    {
+        const std::optional<QCPMultiGraph::Fill> fill = mg->componentFill(i);
+        QVERIFY(fill.has_value());
+        QCOMPARE(fill->brush, brush);
+    }
+    frameGraph(mPlot);
+    QVERIFY2(renderOf(mPlot) != plainTwoLines(), "the new components were not filled");
+}
+
+// And for the marker style, which lives on each component too.
+void TestMultiGraph::setScatterStyleBeforeDataReachesTheNewComponents()
+{
+    const QCPScatterStyle markers(QCPScatterStyle::ssDisc, 9);
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setScatterStyle(markers);
+    setTwoLines(mg);
+
+    QCOMPARE(mg->componentCount(), 2);
+    for (int i = 0; i < mg->componentCount(); ++i)
+    {
+        QCOMPARE(mg->component(i).scatterStyle.shape(), markers.shape());
+        QCOMPARE(mg->component(i).scatterStyle.size(), markers.size());
+    }
+    frameGraph(mPlot);
+    QVERIFY2(renderOf(mPlot) != plainTwoLines(), "the new components were left without markers");
 }

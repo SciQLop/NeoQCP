@@ -176,6 +176,11 @@ private slots:
 
     void noSetterIsIgnored_data();
     void noSetterIsIgnored();
+    void setPenAfterComponentColoursRepensEveryComponent();
+    void setBrushAfterAComponentFillRefillsEveryComponent();
+    void setPenBeforeDataColoursTheNewComponents();
+    void setBrushBeforeDataFillsTheNewComponents();
+    void setScatterStyleBeforeDataReachesTheNewComponents();
 
 private:
     // The staged source stays staged, as while its pipeline prepares it: exports commit ready ones.

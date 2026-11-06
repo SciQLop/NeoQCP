@@ -209,7 +209,7 @@ protected:
     void lineChanged() override;
     void componentVisibilityToggled() override;
     void pensChanged(int componentCount) override;
-    void applyBrushToComponents(const QBrush& brush) override;
+    void applyBrushToComponent(int index, const QBrush& brush) override;
     [[nodiscard]] const QCPAbstractMultiDataSource* colorValueSource() const override;
     [[nodiscard]] bool hasPendingDataSource() const override;
     void colorValuesStarted() override;

@@ -60,12 +60,13 @@ void QCPAbstractLine::setComponentPens(const QList<QPen>& pens)
     pensChanged(n);
 }
 
+// No equality early return: the components can have been given another pen since the last call
+// (setComponentPens, setComponentColors, component(i).pen), so mPen alone does not say what is
+// drawn. The fan-out is cheap.
 void QCPAbstractLine::setPen(const QPen& pen)
 {
-    if (mPen == pen)
-        return;
     mPen = pen;
-    markDirty();
+    mExplicitPen = pen;
     for (auto& c : mComponents) {
         c.pen = pen;
         c.selectedPen = defaultSelectedPen(pen);
@@ -74,13 +75,30 @@ void QCPAbstractLine::setPen(const QPen& pen)
     lineChanged();
 }
 
+// Same for the brush: setComponentFill()/clearComponentFill() can have replaced a component's
+// fill since the last call.
 void QCPAbstractLine::setBrush(const QBrush& brush)
 {
-    if (mBrush == brush)
-        return;
     mBrush = brush;
-    applyBrushToComponents(brush);
+    mExplicitBrush = brush;
+    for (int i = 0; i < mComponents.size(); ++i)
+        applyBrushToComponent(i, brush);
     lineChanged();
+}
+
+void QCPAbstractLine::applyRememberedStyle(int index)
+{
+    if (index < 0 || index >= mComponents.size())
+        return;
+    auto& c = mComponents[index];
+    if (mExplicitPen) {
+        c.pen = *mExplicitPen;
+        c.selectedPen = defaultSelectedPen(*mExplicitPen);
+    }
+    if (mExplicitScatterStyle)
+        c.scatterStyle = *mExplicitScatterStyle;
+    if (mExplicitBrush)
+        applyBrushToComponent(index, *mExplicitBrush);
 }
 
 void QCPAbstractLine::setComponentInLegend(int index, bool inLegend)
@@ -140,6 +158,7 @@ void QCPAbstractLine::setComponentLineStyle(int index, LineStyle style)
 
 void QCPAbstractLine::setScatterStyle(const QCPScatterStyle& style)
 {
+    mExplicitScatterStyle = style;
     for (auto& c : mComponents)
         c.scatterStyle = style;
     lineChanged();

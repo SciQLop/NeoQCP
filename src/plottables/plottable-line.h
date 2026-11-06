@@ -3,6 +3,7 @@
 #include "plottable-color-mapper.h"
 #include <QStringList>
 #include <memory>
+#include <optional>
 #include <vector>
 
 class QCPAbstractMultiDataSource;
@@ -88,8 +89,17 @@ protected:
     //! Whether a decoration derived from a pen (fill or error bar without its own) must be
     //! rebuilt: called with the number of components that were just repenned.
     virtual void pensChanged(int componentCount) { Q_UNUSED(componentCount); }
-    //! Applies a brush to every component: NoBrush clears them, anything else fills them.
-    virtual void applyBrushToComponents(const QBrush& brush) { Q_UNUSED(brush); }
+    //! Gives component \a index the brush a component fill takes: NoBrush clears it, anything
+    //! else fills it. Called for every component by setBrush() and for the new ones by
+    //! applyRememberedStyle().
+    virtual void applyBrushToComponent(int index, const QBrush& brush)
+    {
+        Q_UNUSED(index);
+        Q_UNUSED(brush);
+    }
+    //! Gives a component created after a setter the pen, fill and marker style that setter
+    //! installed: subclasses call it when their data brings a new component.
+    void applyRememberedStyle(int index);
     //! The source the colour values must match the size of, when the subclass has one.
     [[nodiscard]] virtual const QCPAbstractMultiDataSource* colorValueSource() const
     {
@@ -109,6 +119,11 @@ protected:
     QVector<Component> mComponents;
     LineStyle mLineStyle = lsLine;
     int mScatterSkip = 0;
+    // Set by setPen/setBrush/setScatterStyle: what a component created later must take. Unset
+    // means the subclass's default palette, as before.
+    std::optional<QPen> mExplicitPen;
+    std::optional<QBrush> mExplicitBrush;
+    std::optional<QCPScatterStyle> mExplicitScatterStyle;
     qcp::ColorScalarMapper mColor;
     // Set while a source is staged: validated against that source's size, applied by
     // QCPMultiGraph::commitPendingData().
