@@ -4,6 +4,7 @@
 #include "raster-fallback.h"
 
 #include "../axis/axis.h"
+#include "../datasource/graph-resampler.h"
 #include "../items/item.h"
 #include "../layoutelements/layoutelement-axisrect.h"
 #include "../theme.h"
@@ -370,6 +371,18 @@ QCPDrawFrame qcpMakeFittedFrame(const QCPDataBox& box, const QRectF& rect)
     return QCPDrawFrame { QCPTransform::fitted(box, rect), QCPRatioTransform::fitted(rect), rect };
 }
 
+double qcpKeyPixelsPerUnit(const QCPAxis* keyAxis)
+{
+    if (!keyAxis)
+        return 0.0;
+    const QCPRange range = keyAxis->range();
+    if (!(range.size() > 0.0))
+        return 0.0;
+    // A magnitude: a reversed or vertical axis reads the same as a plain horizontal one.
+    return std::abs(keyAxis->coordToPixel(range.upper) - keyAxis->coordToPixel(range.lower))
+        / range.size();
+}
+
 QCPDrawContext::QCPDrawContext(const QCPAxis* keyAxis, const QCPAxis* valueAxis,
                                const QCPAxisRect* axisRect, const QCPTheme* theme)
         : mKeyAxis(keyAxis)
@@ -406,6 +419,25 @@ const QCPTheme& QCPDrawContext::theme() const
     mList->viewDependent = true;
     static const QCPTheme fallback;
     return mTheme ? *mTheme : fallback;
+}
+
+QCPKeyWindow QCPDrawContext::keyWindow() const
+{
+    if (!mKeyAxis)
+        return { };
+    const bool logarithmic = mKeyAxis->scaleType() == QCPAxis::stLogarithmic;
+    const QCPKeyWindow window { qcp::algo::lineCacheKeyRange(mKeyAxis->range(), logarithmic),
+                                qcpKeyPixelsPerUnit(mKeyAxis) };
+    if (logarithmic)
+    {
+        // simplify: pixels per key are not constant on a log axis, so no window in data units can
+        // promise them; the recording is remade on every transform change, a log-key pan included.
+        // Upgrade: a window in log units with the scale checked in those.
+        mList->transformDependent = true;
+        return window;
+    }
+    mList->keyWindow = window;
+    return window;
 }
 
 QCPDrawList QCPDrawContext::takeDrawList()

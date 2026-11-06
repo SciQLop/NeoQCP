@@ -114,6 +114,15 @@ public:
                          QBrush(fill));
             return;
         }
+        if (readsKeyWindow) // one data polyline over the whole window the context says is valid
+        {
+            keyWindow = context.keyWindow();
+            const QPointF keys[] = { { keyWindow.keys.lower, 5.0 }, { keyWindow.keys.upper, 5.0 } };
+            context.polyline(
+                std::make_shared<const std::vector<QPointF>>(std::begin(keys), std::end(keys)),
+                QPen(Qt::black, 2));
+            return;
+        }
         if (bars > 0)
         {
             const QBrush brush = filledBars ? (gradientBars ? gradientBrush() : QBrush(fill))
@@ -286,6 +295,9 @@ public:
     bool escapeHatch = false;
     bool readsTheme = false;
     bool readsTransform = false;
+    //! Record a data polyline over the key window the context hands out.
+    bool readsKeyWindow = false;
+    mutable QCPKeyWindow keyWindow;
     //! Declare that the recording reads something no setter tells the object about.
     bool everyFrame = false;
     bool contentChangeInsideDraw = false;
@@ -1928,4 +1940,184 @@ void TestDrawable::exportStacksLikeTheScreen()
     const int inPng = inkIn(png, glyphBox);
     QVERIFY2(inPng == 0,
              qPrintable(QStringLiteral("%1 glyph pixels over the bars in savePng").arg(inPng)));
+}
+
+void TestDrawable::aPanInsideTheKeyWindowKeepsTheRecording()
+{
+    // A recording made for a window wider than the view survives a pan that stays inside it: the
+    // replay moves the kept geometry by one delta, exactly like a recording with no window at all.
+    Fixture f;
+    auto* shape = new TestShape(f.plot.get());
+    shape->readsKeyWindow = true;
+    f.plot->xAxis->setRange(10, 20);
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 1);
+
+    f.plot->xAxis->setRange(12.5, 22.5); // a quarter of a view width
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 1);
+    QCOMPARE(shape->recordings(), 1);
+}
+
+void TestDrawable::aPanPastTheKeyWindowRecords()
+{
+    Fixture f;
+    auto* shape = new TestShape(f.plot.get());
+    shape->readsKeyWindow = true;
+    f.plot->xAxis->setRange(10, 20);
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 1);
+
+    f.plot->xAxis->setRange(25, 35); // one and a half view widths: the view left the window
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 2);
+}
+
+void TestDrawable::aZoomRecords()
+{
+    // A zoom changes pixels per key, so the half of the window that is off screen is no longer the
+    // half the recording covers.
+    Fixture f;
+    auto* shape = new TestShape(f.plot.get());
+    shape->readsKeyWindow = true;
+    f.plot->xAxis->setRange(10, 20);
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 1);
+
+    f.plot->xAxis->setRange(12.5, 17.5); // half the span, same centre
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 2);
+}
+
+void TestDrawable::aValueZoomKeepsTheRecording()
+{
+    // Only the key scale is part of the window: a value zoom keeps the recording and re-resolves
+    // its commands through the frame that replays them.
+    Fixture f;
+    auto* shape = new TestShape(f.plot.get());
+    shape->readsKeyWindow = true;
+    f.plot->xAxis->setRange(10, 20);
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 1);
+    const quint64 remaps = shape->remaps();
+
+    f.plot->yAxis->setRange(0, 20);
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 1);
+    QCOMPARE(shape->recordings(), 1);
+
+    if (f.hasRhi())
+    {
+        f.plot->replot(); // the same transform: the resolve cache already holds these pixels
+        QCOMPARE(shape->remaps(), remaps + 1);
+    }
+}
+
+void TestDrawable::aLogKeyAxisRecordsEveryTransform()
+{
+    // Pixels per key are not constant on a log axis, so no window can describe them: the recording
+    // is marked transform-dependent and remade on every pan.
+    Fixture f;
+    auto* shape = new TestShape(f.plot.get());
+    shape->readsKeyWindow = true;
+    f.plot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    f.plot->xAxis->setRange(1, 10);
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 1);
+
+    f.plot->xAxis->setRange(2, 20);
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 2);
+
+    f.plot->xAxis->setRange(4, 40);
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 3);
+}
+
+void TestDrawable::keyWindowCoversOneViewWidthEachSide()
+{
+    Fixture f;
+    auto* shape = new TestShape(f.plot.get());
+    shape->readsKeyWindow = true;
+    f.plot->xAxis->setRange(10, 20);
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 1);
+
+    QCOMPARE(shape->keyWindow.keys.lower, 0.0);
+    QCOMPARE(shape->keyWindow.keys.upper, 30.0);
+    const double width = f.plot->axisRect()->rect().width();
+    QVERIFY2(qAbs(shape->keyWindow.pixelsPerKey - width / 10.0) < 1e-9,
+             qPrintable(QStringLiteral("pixelsPerKey %1, axis rect %2 px")
+                            .arg(shape->keyWindow.pixelsPerKey)
+                            .arg(width)));
+}
+
+void TestDrawable::aResizeRecords()
+{
+    // The axis rect's size is part of the scale: a resize changes pixels per key even though the
+    // data range did not move, so the kept window is no longer the one the recording drew.
+    Fixture f;
+    f.plot->show();
+    QVERIFY(QTest::qWaitForWindowExposed(f.plot.get()));
+    auto* plain = new TestShape(f.plot.get());
+    auto* shape = new TestShape(f.plot.get());
+    shape->readsKeyWindow = true;
+    f.plot->xAxis->setRange(10, 20);
+    f.plot->replot();
+    QCOMPARE(plain->drawCalls, 1);
+    QCOMPARE(shape->drawCalls, 1);
+    const int width = f.plot->axisRect()->rect().width();
+
+    f.plot->resize(400, 300);
+    f.plot->replot();
+    QVERIFY2(f.plot->axisRect()->rect().width() != width, "the resize must change the axis rect");
+    QCOMPARE(plain->drawCalls, 1); // a resize alone is not a content or view change for it
+    QCOMPARE(shape->drawCalls, 2);
+}
+
+void TestDrawable::aVerticalKeyAxisUsesTheSameKeyWindow()
+{
+    // pixelsPerKey is a magnitude: the vertical key axis takes its pixels from the axis rect's
+    // height, and the same window still lets a pan inside it keep the recording.
+    Fixture f;
+    auto* shape = new TestShape(f.plot.get());
+    shape->mAnchor->setAxes(f.plot->yAxis, f.plot->xAxis); // key axis vertical, value horizontal
+    shape->readsKeyWindow = true;
+    f.plot->yAxis->setRange(10, 20);
+    f.plot->xAxis->setRange(0, 10);
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 1);
+
+    QCOMPARE(shape->keyWindow.keys.lower, 0.0);
+    QCOMPARE(shape->keyWindow.keys.upper, 30.0);
+    const double height = f.plot->axisRect()->rect().height();
+    QVERIFY2(qAbs(shape->keyWindow.pixelsPerKey - height / 10.0) < 1e-9,
+             qPrintable(QStringLiteral("pixelsPerKey %1, axis rect %2 px")
+                            .arg(shape->keyWindow.pixelsPerKey)
+                            .arg(height)));
+
+    f.plot->yAxis->setRange(12.5, 22.5); // inside the window, one delta
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 1);
+}
+
+void TestDrawable::aKeyWindowPanReusesTheKeptGeometry()
+{
+    // The window is a data-space promise, so the recording still moves with the data: a pan inside
+    // it hands the kept vertices back with one offset instead of building them again.
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - the kept geometry is a GPU path only");
+    auto* shape = new TestShape(f.plot.get());
+    shape->readsKeyWindow = true;
+    f.plot->xAxis->setRange(10, 20);
+    f.plot->replot();
+    const quint64 extruded = QCPLineExtruder::extruderCallCount();
+    QVERIFY2(extruded > 0, "the first frame must extrude the line");
+    QCOMPARE(shape->drawCalls, 1);
+
+    f.plot->xAxis->setRange(12.5, 22.5); // inside the window: a translation
+    f.plot->replot();
+    QCOMPARE(shape->drawCalls, 1);
+    QCOMPARE(QCPLineExtruder::extruderCallCount(), extruded);
 }

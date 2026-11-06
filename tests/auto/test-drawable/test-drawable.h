@@ -71,4 +71,14 @@ private slots:
     void rangeBandRescalesToItsData();
     void rangeBandLegendIconIsInked();
     void exportStacksLikeTheScreen();
+
+    void aPanInsideTheKeyWindowKeepsTheRecording();
+    void aPanPastTheKeyWindowRecords();
+    void aZoomRecords();
+    void aValueZoomKeepsTheRecording();
+    void aLogKeyAxisRecordsEveryTransform();
+    void keyWindowCoversOneViewWidthEachSide();
+    void aResizeRecords();
+    void aVerticalKeyAxisUsesTheSameKeyWindow();
+    void aKeyWindowPanReusesTheKeptGeometry();
 };

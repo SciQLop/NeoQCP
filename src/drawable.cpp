@@ -444,13 +444,29 @@ bool QCPDrawnCore::recordingIsStale(const QCPDrawable& object, const QCPDrawnVie
     // frame - once: the frame's paint and the queries it makes see the recording it built.
     const bool everyFrame = mState->recording.everyFrame
         && (!view.plot || mState->recordedFrame != (view.plot ? view.plot->frameEpoch() : 0));
+    const bool windowStale = mState->recording.keyWindow && [&]
+    {
+        // A key window only promises its key range and scale: a pan inside it is a translation, a
+        // value zoom re-resolves the commands, and anything that changes the key scale remakes it.
+        const QCPKeyWindow& window = *mState->recording.keyWindow;
+        if (!view.keyAxis)
+            return true;
+        const double pixelsPerKey = qcpKeyPixelsPerUnit(view.keyAxis);
+        if (!(pixelsPerKey > 0.0) || !(window.pixelsPerKey > 0.0))
+            return true;
+        if (qAbs(pixelsPerKey / window.pixelsPerKey - 1.0) > 1e-9)
+            return true;
+        const QCPRange keys = view.keyAxis->range();
+        return keys.lower < window.keys.lower || keys.upper > window.keys.upper;
+    }();
     return !mState->recorded || everyFrame || mState->recordedGeneration != mState->generation
         || mState->recordedSource != object.dataSource()
         || mState->recordedDependency != object.dependencyRevision()
         || (mState->viewDependent && mState->recordedEpoch != epoch)
         || (mState->anchorDependent && mState->recordedItemsEpoch != itemsEpoch)
         || (mState->transformDependent
-            && !(QCPTransform(view.keyAxis, view.valueAxis) == mState->recordedTransform));
+            && !(QCPTransform(view.keyAxis, view.valueAxis) == mState->recordedTransform))
+        || windowStale;
 }
 
 QPointF QCPDrawnCore::stallOffset(const QCPDrawable& object, const QCPDrawnView& view) const

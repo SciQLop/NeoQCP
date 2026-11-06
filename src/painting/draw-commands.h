@@ -25,6 +25,7 @@
 #include <functional>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <type_traits>
 #include <variant>
 #include <vector>
@@ -349,6 +350,7 @@ struct QCP_LIB_DECL QCPDrawList
         anchorDependent = other.anchorDependent;
         transformDependent = other.transformDependent;
         everyFrame = other.everyFrame;
+        keyWindow = other.keyWindow;
         rasterCommands = other.rasterCommands;
         id = qcpNextDrawListId();
         return *this;
@@ -373,6 +375,10 @@ struct QCP_LIB_DECL QCPDrawList
     //! QCPItemPosition::asPosition): a snapshot, which goes stale without the object's generation
     //! moving. Such a recording is remade every frame.
     bool everyFrame = false;
+    //! The key range and scale the recording drew for, when it asked for one (see
+    //! QCPDrawContext::keyWindow): the recording is reused while the view stays inside that window
+    //! at the same scale, and translated rather than remade for a pan inside it.
+    std::optional<QCPKeyWindow> keyWindow;
     //! How many commands the replay has to rasterise (see needsRaster): a raster image is a
     //! scarce resource, and counting here keeps the query off every frame's replay.
     int rasterCommands = 0;

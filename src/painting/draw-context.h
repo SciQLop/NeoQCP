@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../axis/range.h"
 #include "../coords.h"
 #include "../global.h"
 
@@ -67,6 +68,24 @@ struct QCP_LIB_DECL QCPDrawFrame
 };
 
 /*!
+  \brief The key range a recording stays valid for, and the scale it was recorded at.
+
+  \a keys is the view's key range widened by one view width on each side, the window the resampler
+  already keeps its line cache for. A recording that declared this window is reused while the view's
+  key range stays inside it and \a pixelsPerKey, the key axis' pixels per data unit, is unchanged:
+  a pan inside the window only translates the kept geometry. \a pixelsPerKey is a magnitude, so a
+  reversed or vertical key axis reads the same.
+*/
+struct QCP_LIB_DECL QCPKeyWindow
+{
+    QCPRange keys;
+    double pixelsPerKey = 0.0;
+};
+
+//! The key axis' pixels per data unit, as a magnitude; 0 when the range has no extent.
+[[nodiscard]] QCP_LIB_DECL double qcpKeyPixelsPerUnit(const QCPAxis* keyAxis);
+
+/*!
   \brief The frame of one axis pair and one clip rect, built without recording anything.
 
   A recording usually does not depend on the transform, only its replay does, so a cached recording
@@ -131,6 +150,21 @@ public:
 
     //! The colours the plot is themed with, so a recorder can pick its default pen and brush.
     [[nodiscard]] const QCPTheme& theme() const;
+
+    /*!
+      The key range this recording stays valid for, and the scale it was recorded at.
+
+      \a keys is the view's key range widened by one view width on each side, the window the
+      resampler's line cache already uses. A recording that keeps its geometry in data space stays
+      valid, and is translated rather than remade, while the view pans inside that window; it is
+      remade once the view leaves the window or \a pixelsPerKey changes (a zoom or a resize).
+      Reading this does not count as reading the transform: the recording still moves with the
+      data.
+
+      A logarithmic key axis has no constant pixels per key, so there the recording is marked
+      transform-dependent instead and a pan remakes it.
+    */
+    [[nodiscard]] QCPKeyWindow keyWindow() const;
 
     //! A polyline whose vertices are data coordinates (keys, values).
     void polyline(std::shared_ptr<const std::vector<QPointF>> data, const QPen& pen);
