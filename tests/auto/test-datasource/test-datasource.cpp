@@ -1,8 +1,76 @@
 #include "test-datasource.h"
 #include "qcustomplot.h"
 #include "datasource/algorithms.h"
+#include "datasource/resampled-multi-datasource.h"
+#include "datasource/row-major-multi-datasource.h"
 #include "datasource/soa-datasource.h"
+#include "datasource/soa-multi-datasource.h"
+#include "plottables/plottable-waterfall.h"
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <memory>
 #include <vector>
+
+namespace
+{
+
+// The data-space line maps onto the pixel-space one exactly (NaN markers included).
+bool samePixels(const QCPTransform& tf, const std::vector<QPointF>& data,
+                const QVector<QPointF>& pixels)
+{
+    if (static_cast<int>(data.size()) != pixels.size())
+        return false;
+    constexpr double kTolerance = 1e-6;
+    for (int i = 0; i < pixels.size(); ++i)
+    {
+        const bool dataNaN = std::isnan(data[i].x()) || std::isnan(data[i].y());
+        const bool pixelNaN = std::isnan(pixels[i].x()) || std::isnan(pixels[i].y());
+        if (dataNaN || pixelNaN)
+        {
+            if (dataNaN != pixelNaN)
+                return false;
+            continue;
+        }
+        const QCP::Pixels p = tf.map(QCP::Data { data[i].x(), data[i].y() });
+        if (qAbs(p.x - pixels[i].x()) > kTolerance || qAbs(p.y - pixels[i].y()) > kTolerance)
+            return false;
+    }
+    return true;
+}
+
+// 1M points, one NaN run per 1000 rows, kept deterministic so the thinning is reproducible.
+QCPSoAMultiDataSource<std::vector<double>, std::vector<double>> millionPointSource()
+{
+    const int n = 1000000;
+    std::vector<double> keys(n);
+    std::vector<double> values(n);
+    quint32 state = 12345;
+    double v = 0.0;
+    for (int i = 0; i < n; ++i)
+    {
+        state = state * 1664525u + 1013904223u;
+        keys[i] = i * 0.37;
+        v += (state >> 8) / 16777216.0 - 0.5;
+        values[i] = (i % 1000 == 500) ? std::numeric_limits<double>::quiet_NaN() : v;
+    }
+    return { std::move(keys), std::vector<std::vector<double>> { std::move(values) } };
+}
+
+// Fits the axes to the source and returns its key pixels per key unit.
+double fitKeyPixelsPerUnit(QCustomPlot* plot, const QCPAbstractMultiDataSource& src)
+{
+    plot->xAxis->setRange(src.keyAt(0), src.keyAt(src.size() - 1));
+    bool found = false;
+    const QCPRange values = src.valueRange(0, found);
+    plot->yAxis->setRange(values.lower, values.upper);
+    plot->replot(QCustomPlot::rpImmediateRefresh);
+    const double pixels = qAbs(plot->xAxis->coordToPixel(src.keyAt(0))
+                               - plot->xAxis->coordToPixel(src.keyAt(src.size() - 1)));
+    return pixels / (src.keyAt(src.size() - 1) - src.keyAt(0));
+}
+
+} // namespace
 
 void TestDataSource::init() {}
 
@@ -293,6 +361,133 @@ void TestDataSource::soaGapThresholdZeroDisablesGaps()
     QCOMPARE(src.gapThreshold(), 0.0);
     QCOMPARE(nanBreaks(src.getLines(0, 5, mPlot->xAxis, mPlot->yAxis)), 0);
     QCOMPARE(nanBreaks(src.getOptimizedLineData(0, 5, 400, mPlot->xAxis, mPlot->yAxis)), 0);
+}
+
+void TestDataSource::linesInDataMapToGetLines()
+{
+    mPlot = new QCustomPlot();
+    mPlot->resize(400, 300);
+    mPlot->xAxis->setRange(0, 10);
+    mPlot->yAxis->setRange(-2, 5);
+
+    // One key gap (3 -> 7) and one NaN sample, so both kinds of break are exercised.
+    const std::vector<double> keys = { 0.0, 1.0, 2.0, 3.0, 7.0, 8.0, 9.0 };
+    const std::vector<std::vector<double>> columns = {
+        { 1.0, 2.0, std::numeric_limits<double>::quiet_NaN(), 3.0, 4.0, 5.0, 6.0 },
+        { 2.0, 1.0, 4.0, -1.0, -2.0, 3.0, 5.0 },
+    };
+
+    QCPSoAMultiDataSource<std::vector<double>, std::vector<double>> soa(keys, columns);
+
+    // Row-major, with a stride wider than the column count.
+    const int rows = static_cast<int>(keys.size());
+    const int stride = 3;
+    std::vector<double> rowMajor(rows * stride, 0.0);
+    for (int r = 0; r < rows; ++r)
+        for (int c = 0; c < 2; ++c)
+            rowMajor[r * stride + c] = columns[c][r];
+    QCPRowMajorMultiDataSource<double, double> rowMajorSource(std::span<const double>(keys),
+                                                              rowMajor.data(), rows, 2, stride);
+
+    // Already-thinned (L2) bins: their lines must not be thinned again.
+    qcp::algo::MultiColumnBinResult bins;
+    bins.numColumns = 2;
+    bins.keys = keys;
+    bins.values = columns[0];
+    bins.values.insert(bins.values.end(), columns[1].begin(), columns[1].end());
+    bins.gapRatio.assign(keys.size(), 0.0f);
+    QCPResampledMultiDataSource resampled(std::move(bins));
+
+    auto shared = std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
+        keys, columns);
+    QCPWaterfallDataAdapter waterfall(shared, { 0.0, 5.0 }, { 1.0, -1.0 }, 2.0);
+
+    const QCPAbstractMultiDataSource* sources[] = { &soa, &rowMajorSource, &resampled, &waterfall };
+    const QCPTransform tf(mPlot->xAxis, mPlot->yAxis);
+
+    for (const auto* src : sources)
+    {
+        for (int column = 0; column < src->columnCount(); ++column)
+        {
+            const auto data = src->linesInData(column, 0, src->size(), 0.0);
+            const auto pixels = src->getLines(column, 0, src->size(), mPlot->xAxis, mPlot->yAxis);
+            QVERIFY2(samePixels(tf, data, pixels), "linesInData does not map onto getLines");
+            if (src != &resampled)
+            {
+                const auto isBreak = [](const QPointF& p) { return std::isnan(p.x()); };
+                QVERIFY2(std::any_of(pixels.begin(), pixels.end(), isBreak),
+                         "getLines kept no break");
+                QVERIFY2(std::any_of(data.begin(), data.end(), isBreak),
+                         "linesInData kept no break");
+            }
+        }
+    }
+}
+
+void TestDataSource::thinnedLinesInDataMatchTheOptimizedPixels()
+{
+    mPlot = new QCustomPlot();
+    mPlot->resize(400, 300);
+    auto src = millionPointSource();
+
+    const int end = src.size();
+    const double pixelsPerKey = fitKeyPixelsPerUnit(mPlot, src);
+
+    const auto data = src.linesInData(0, 0, end, pixelsPerKey);
+    const auto optimized = src.getOptimizedLineData(0, 0, end, mPlot->axisRect()->width(),
+                                                    mPlot->xAxis, mPlot->yAxis);
+    QVERIFY(!optimized.isEmpty());
+    QVERIFY2(static_cast<int>(data.size()) < end / 100, "linesInData did not thin");
+    QCOMPARE(static_cast<int>(data.size()), optimized.size());
+    QVERIFY2(samePixels(QCPTransform(mPlot->xAxis, mPlot->yAxis), data, optimized),
+             "thinned linesInData does not map onto getOptimizedLineData");
+}
+
+void TestDataSource::indicesFollowTheThinnedPoints()
+{
+    mPlot = new QCustomPlot();
+    mPlot->resize(400, 300);
+    auto src = millionPointSource();
+
+    const int end = src.size();
+    const double pixelsPerKey = fitKeyPixelsPerUnit(mPlot, src);
+
+    std::vector<int> indices;
+    const auto data = src.linesInData(0, 0, end, pixelsPerKey, &indices);
+    QCOMPARE(static_cast<int>(indices.size()), static_cast<int>(data.size()));
+    int realPoints = 0;
+    for (int i = 0; i < static_cast<int>(data.size()); ++i)
+    {
+        if (std::isnan(data[i].x()))
+        {
+            QCOMPARE(indices[i], -1);
+            continue;
+        }
+        QVERIFY(indices[i] >= 0 && indices[i] < end);
+        // The envelope nudges a min/max point inside its bucket; the index still names the
+        // row the point took its value from.
+        QVERIFY2(std::abs(src.keyAt(indices[i]) - data[i].x()) <= 1.0 / pixelsPerKey,
+                 "index is outside the point's bucket");
+        QCOMPARE(src.valueAt(0, indices[i]), data[i].y());
+        ++realPoints;
+    }
+    QVERIFY(realPoints > 0);
+
+    // Unthinned: the index is the source row, and a NaN sample keeps its own break marker.
+    std::vector<int> rawIndices;
+    const auto raw = src.linesInData(0, 495, 505, 0.0, &rawIndices);
+    QCOMPARE(static_cast<int>(rawIndices.size()), static_cast<int>(raw.size()));
+    for (int i = 0; i < static_cast<int>(raw.size()); ++i)
+    {
+        if (std::isnan(raw[i].x()))
+        {
+            QCOMPARE(rawIndices[i], -1);
+            continue;
+        }
+        QCOMPARE(rawIndices[i], 495 + i);
+    }
+    QVERIFY(
+        std::any_of(raw.begin(), raw.end(), [](const QPointF& p) { return std::isnan(p.x()); }));
 }
 
 void TestDataSource::soaMismatchedLengthsDegradeToEmpty()

@@ -5,6 +5,7 @@
 #include "layoutelements/layoutelement-legend-group.h"
 #include "plottables/plottable-draw-utils.h"
 #include <algorithm>
+#include <functional>
 #include <cmath>
 #include <limits>
 #include <vector>
@@ -2440,4 +2441,87 @@ void TestMultiGraph::anAlmostTransparentFillStillPaints()
     renderOf(mPlot); // lays the axis rect out
     const QImage img = renderOf(mPlot);
     QVERIFY(img.pixelColor(pixelOf(mPlot, 2, 1.5)).green() < 255);
+}
+
+namespace {
+
+// A setter every drawing path must honour: the layer it dirties and the pixels it changes.
+struct SetterCase
+{
+    QString name;
+    std::function<void(QCPMultiGraph*)> prepare;
+    std::function<void(QCPMultiGraph*)> change;
+};
+
+const std::vector<SetterCase>& setterCases()
+{
+    // Distinct keys and values, and a visible zero baseline, so every style change shows.
+    const auto markersOn = [](QCPMultiGraph* mg) {
+        mg->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 7));
+    };
+    static const std::vector<SetterCase> cases = {
+        { QStringLiteral("setPen"), {}, [](QCPMultiGraph* mg) { mg->setPen(QPen(Qt::darkGreen, 4)); } },
+        { QStringLiteral("setBrush"), {},
+          [](QCPMultiGraph* mg) { mg->setBrush(QBrush(QColor(0, 160, 255, 120))); } },
+        { QStringLiteral("setLineStyle"), {},
+          [](QCPMultiGraph* mg) { mg->setLineStyle(QCPMultiGraph::lsStepLeft); } },
+        { QStringLiteral("setScatterStyle"), {},
+          [](QCPMultiGraph* mg) { mg->setComponentScatterStyle(0, QCPScatterStyle(QCPScatterStyle::ssDisc, 9)); } },
+        { QStringLiteral("setScatterSkip"), markersOn,
+          [](QCPMultiGraph* mg) { mg->setScatterSkip(1); } },
+        { QStringLiteral("setColorValues"), {},
+          [](QCPMultiGraph* mg) {
+              std::vector<double> values(static_cast<size_t>(mg->dataSource()->size()));
+              for (size_t i = 0; i < values.size(); ++i)
+                  values[i] = static_cast<double>(i);
+              mg->setColorValues(std::move(values));
+          } },
+    };
+    return cases;
+}
+
+} // namespace
+
+void TestMultiGraph::noSetterIsIgnored_data()
+{
+    QTest::addColumn<QString>("setter");
+    for (const SetterCase& c : setterCases())
+        QTest::newRow(qPrintable(c.name)) << c.name;
+}
+
+void TestMultiGraph::noSetterIsIgnored()
+{
+    QFETCH(QString, setter);
+    const auto& cases = setterCases();
+    const auto it = std::find_if(cases.begin(), cases.end(),
+                                 [&](const SetterCase& c) { return c.name == setter; });
+    QVERIFY(it != cases.end());
+
+    // hasInvalidatedPaintBuffers() is what a setter must turn on: protected in QCustomPlot.
+    class DirtyAwarePlot : public QCustomPlot
+    {
+    public:
+        using QCustomPlot::hasInvalidatedPaintBuffers;
+    };
+
+    DirtyAwarePlot plot;
+    plot.resize(400, 300);
+    auto* mg = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    mg->setData(std::vector<double> { 0, 1, 2, 3, 4 },
+                std::vector<std::vector<double>> { { 1, 2, 1.5, 2.5, 1 }, { 0.5, 1, 2, 1, 2 } });
+    plot.xAxis->setRange(0, 4);
+    plot.yAxis->setRange(0, 3);
+    if (it->prepare)
+        it->prepare(mg);
+    plot.replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY2(!plot.hasInvalidatedPaintBuffers(), "the frame was not clean before the change");
+    const QImage before = renderOf(&plot);
+
+    it->change(mg);
+
+    QVERIFY2(plot.hasInvalidatedPaintBuffers(),
+             qPrintable(setter + QStringLiteral(" marked nothing dirty")));
+    plot.replot(QCustomPlot::rpImmediateRefresh);
+    const QImage after = renderOf(&plot);
+    QVERIFY2(before != after, qPrintable(setter + QStringLiteral(" changed nothing it draws")));
 }

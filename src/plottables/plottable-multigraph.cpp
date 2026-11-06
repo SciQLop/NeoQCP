@@ -19,18 +19,8 @@
 #include <algorithm>
 #include <cmath>
 
-static QPen defaultSelectedPen(const QPen& pen)
-{
-    QPen sel = pen;
-    sel.setWidthF(pen.widthF() + 1.5);
-    QColor c = pen.color();
-    c.setAlphaF(qMin(1.0, c.alphaF() * 1.3));
-    sel.setColor(c);
-    return sel;
-}
-
 QCPMultiGraph::QCPMultiGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
-    : QCPAbstractPlottable(keyAxis, valueAxis)
+    : QCPAbstractLine(keyAxis, valueAxis)
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
 {
     // Base constructor auto-adds a QCPPlottableLegendItem (vtable not yet set up
@@ -519,107 +509,6 @@ void QCPMultiGraph::updateBaseSelection()
 
 // --- Component API ---
 
-void QCPMultiGraph::setComponentNames(const QStringList& names)
-{
-    int n = qMin(names.size(), mComponents.size());
-    if (std::equal(names.cbegin(), names.cbegin() + n, mComponents.cbegin(),
-                   [](const QString& name, const auto& c) { return c.name == name; }))
-        return;
-    markDirty();
-    for (int i = 0; i < n; ++i)
-        mComponents[i].name = names[i];
-}
-
-void QCPMultiGraph::setComponentColors(const QList<QColor>& colors)
-{
-    int n = qMin(colors.size(), mComponents.size());
-    if (std::equal(colors.cbegin(), colors.cbegin() + n, mComponents.cbegin(),
-                   [](const QColor& color, const auto& c) { return c.pen.color() == color; }))
-        return;
-    markDirty();
-    for (int i = 0; i < n; ++i) {
-        mComponents[i].pen.setColor(colors[i]);
-        mComponents[i].selectedPen = defaultSelectedPen(mComponents[i].pen);
-    }
-    if (hasPenDerivedDecoration(n))
-        decorationsChanged();
-}
-
-void QCPMultiGraph::setComponentPens(const QList<QPen>& pens)
-{
-    int n = qMin(pens.size(), mComponents.size());
-    if (std::equal(pens.cbegin(), pens.cbegin() + n, mComponents.cbegin(),
-                   [](const QPen& pen, const auto& c) { return c.pen == pen; }))
-        return;
-    markDirty();
-    for (int i = 0; i < n; ++i) {
-        mComponents[i].pen = pens[i];
-        mComponents[i].selectedPen = defaultSelectedPen(pens[i]);
-    }
-    if (hasPenDerivedDecoration(n))
-        decorationsChanged();
-}
-
-void QCPMultiGraph::setComponentInLegend(int index, bool inLegend)
-{
-    if (index < 0 || index >= mComponents.size())
-        return;
-    const bool hidden = mComponents[index].hiddenByErrorBars;
-    if (mComponents[index].inLegend == inLegend && !hidden)
-        return;
-    markDirty();
-    mComponents[index].hiddenByErrorBars = false; // from here on, the caller's choice
-    if (mComponents[index].inLegend != inLegend)
-    {
-        mComponents[index].inLegend = inLegend;
-        qcpEmit(this, mParentPlot, &QCPMultiGraph::componentVisibilityChanged);
-    }
-}
-
-QVector<int> QCPMultiGraph::legendComponents() const
-{
-    QVector<int> shown;
-    for (int i = 0; i < mComponents.size(); ++i)
-        if (mComponents[i].inLegend)
-            shown.append(i);
-    return shown;
-}
-
-void QCPMultiGraph::setComponentVisible(int index, bool visible)
-{
-    if (index < 0 || index >= mComponents.size() || mComponents[index].visible == visible)
-        return;
-    mComponents[index].visible = visible;
-    // A rebuild while the component was hidden dropped its cached lines: rebuild again.
-    markLinesDirty();
-    if (mLayer)
-        mLayer->invalidatePaintBuffer();
-    qcpEmit(this, mParentPlot, &QCPMultiGraph::componentVisibilityChanged);
-}
-
-void QCPMultiGraph::setLineStyle(LineStyle style)
-{
-    // mLineStyle alone is not enough: a component may have been given its own style since.
-    const bool allComponentsFollow = std::all_of(
-        mComponents.cbegin(), mComponents.cend(), [style](const auto& c) { return c.lineStyle == style; });
-    if (style == mLineStyle && allComponentsFollow)
-        return;
-    markDirty();
-    mLineStyle = style;
-    for (auto& c : mComponents)
-        c.lineStyle = style;
-    invalidateLines();
-}
-
-void QCPMultiGraph::setComponentLineStyle(int index, LineStyle style)
-{
-    if (index < 0 || index >= mComponents.size() || mComponents[index].lineStyle == style)
-        return;
-    markDirty();
-    mComponents[index].lineStyle = style;
-    invalidateLines();
-}
-
 void QCPMultiGraph::setAdaptiveSampling(bool enabled)
 {
     if (mAdaptiveSampling == enabled)
@@ -644,6 +533,46 @@ void QCPMultiGraph::invalidateLines()
     mCachedLines.clear();
     mCachedIndices.clear();
 }
+
+void QCPMultiGraph::lineChanged()
+{
+    invalidateLines();
+    markDirty();
+}
+
+void QCPMultiGraph::componentVisibilityToggled()
+{
+    // A rebuild while the component was hidden dropped its cached lines: rebuild again.
+    markLinesDirty();
+    if (mLayer)
+        mLayer->invalidatePaintBuffer();
+}
+
+void QCPMultiGraph::pensChanged(int componentCount)
+{
+    if (hasPenDerivedDecoration(componentCount))
+        decorationsChanged();
+}
+
+void QCPMultiGraph::applyBrushToComponents(const QBrush& brush)
+{
+    for (int i = 0; i < mComponents.size(); ++i)
+    {
+        if (brush.style() == Qt::NoBrush)
+            clearComponentFill(i);
+        else
+            setComponentFill(i, 0.0, brush);
+    }
+}
+
+const QCPAbstractMultiDataSource* QCPMultiGraph::colorValueSource() const
+{
+    return mPendingSource ? mPendingSource.get() : mDataSource.get();
+}
+
+bool QCPMultiGraph::hasPendingDataSource() const { return mPendingSource != nullptr; }
+
+void QCPMultiGraph::colorValuesStarted() { requestOrigin(); }
 
 QVector<int> QCPMultiGraph::lineIndices(LineStyle style, const QVector<int>& dataIdx)
 {
@@ -802,80 +731,6 @@ void QCPMultiGraph::applyColorSizeRule(int newSize)
     if (!mColor.hasValues())
         mWantOrigin->store(false);
 }
-
-void QCPMultiGraph::setColorValues(std::shared_ptr<const std::vector<double>> values)
-{
-    markDirty();
-    if (!values || values->empty())
-        return clearColorValues();
-    // A pending source (staged but not yet committed) is what the values will apply to
-    // once the swap lands — validate against its size, not the still-displayed source's.
-    const QCPAbstractMultiDataSource* target = mPendingSource ? mPendingSource.get() : mDataSource.get();
-    const int expected = target ? target->size() : 0;
-    if (static_cast<int>(values->size()) != expected)
-    {
-        qWarning() << "QCPMultiGraph::setColorValues: expected" << expected
-                   << "values (one per key), got" << values->size();
-        clearColorValues();   // refused: the graph is drawn uncoloured, not left stale
-        return;
-    }
-    if (mPendingSource)
-    {
-        mPendingColorValues = std::move(values);
-        return;
-    }
-    const bool wasColoured = mColor.hasValues();
-    mColor.setValues(std::move(values));
-    if (!wasColoured)
-    {
-        invalidateLines();
-        requestOrigin();
-    }
-}
-
-void QCPMultiGraph::setColorValues(std::vector<double> values)
-{
-    setColorValues(std::make_shared<const std::vector<double>>(std::move(values)));
-}
-
-void QCPMultiGraph::clearColorValues()
-{
-    // Every "uncolour" route (wrong length, an empty vector, or an explicit call) must
-    // also drop a stash left by an earlier, valid setColorValues() while a source was
-    // pending — otherwise a graph "coloured" only through that stash survives this call
-    // and commitPendingData() re-colours it from the stale stash.
-    mPendingColorValues.reset();
-    if (!mColor.hasValues())
-        return;
-    mColor.clearValues();
-    invalidateLines();
-}
-
-bool QCPMultiGraph::hasColorValues() const { return mColor.hasValues(); }
-void QCPMultiGraph::setColorGradient(const QCPColorGradient& gradient)
-{
-    if (gradient == mColor.gradient())
-        return;
-    markDirty();
-    mColor.setGradient(gradient);
-}
-QCPColorGradient QCPMultiGraph::colorGradient() const { return mColor.gradient(); }
-void QCPMultiGraph::setColorRange(const QCPRange& range)
-{
-    if (range == mColor.range())
-        return;
-    markDirty();
-    mColor.setRange(range);
-}
-QCPRange QCPMultiGraph::colorRange() const { return mColor.range(); }
-void QCPMultiGraph::setColorScaleType(QCPAxis::ScaleType type)
-{
-    if (type == mColor.scaleType())
-        return;
-    markDirty();
-    mColor.setScaleType(type);
-}
-QCPAxis::ScaleType QCPMultiGraph::colorScaleType() const { return mColor.scaleType(); }
 
 double QCPMultiGraph::componentValueAt(int column, int index) const
 {

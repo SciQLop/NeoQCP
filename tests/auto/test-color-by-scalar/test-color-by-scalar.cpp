@@ -12,12 +12,31 @@
 #include "painting/line-extruder.h"
 #include "painting/viewport-offset.h"
 #include "painting/scatter-rhi-layer.h"
+#include "misuse.h"
 #include "scatterstyle.h"
 #include <any>
 #include <cmath>
 #include <numeric>
 
 using SoA = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
+
+namespace
+{
+int gRefusals = 0;
+
+void countRefusal(const char*, const char*) { ++gRefusals; }
+
+//! Runs \a refused and returns the number of misuse reports it made.
+template <typename F>
+int refusalsIn(F&& refused)
+{
+    const auto previous = qcp::setMisuseHandler(countRefusal);
+    gRefusals = 0;
+    refused();
+    qcp::setMisuseHandler(previous);
+    return gRefusals;
+}
+} // namespace
 
 void TestColorByScalar::init()
 {
@@ -420,7 +439,7 @@ void TestColorByScalar::colorValuesOfTheWrongLengthAreRefused()
     mg->setColorValues(std::vector<double>{1, 2, 3});      // no data yet
     QVERIFY(!mg->hasColorValues());
     mg->setDataSource(makeSource({0, 1, 2, 3}, {{0, 1, 0, 1}}));
-    mg->setColorValues(std::vector<double>{1, 2, 3});      // 3 != 4
+    QCOMPARE(refusalsIn([&] { mg->setColorValues(std::vector<double>{1, 2, 3}); }), 1); // 3 != 4
     QVERIFY(!mg->hasColorValues());
     mg->setColorValues(std::vector<double>{1, 2, 3, 4});
     QVERIFY(mg->hasColorValues());
@@ -555,7 +574,7 @@ void TestColorByScalar::wrongLengthOnColouredGraphLeavesItUncoloured()
     mg->setColorValues(std::vector<double>{1, 2, 3, 4});
     QVERIFY(mg->hasColorValues());
 
-    mg->setColorValues(std::vector<double>{1, 2, 3});   // wrong length
+    QCOMPARE(refusalsIn([&] { mg->setColorValues(std::vector<double>{1, 2, 3}); }), 1);
     QVERIFY(!mg->hasColorValues());
 }
 
@@ -575,7 +594,10 @@ void TestColorByScalar::uncolourRoutesDiscardAPendingStash()
         QVERIFY(mg->hasPendingData());
 
         mg->setColorValues(std::vector<double>{1, 2, 3, 4, 5});   // sized for the pending: stashed
-        mg->setColorValues(std::vector<double>{1, 2, 3});         // wrong length: must discard the stash too
+        QCOMPARE(refusalsIn([&] {
+                     mg->setColorValues(std::vector<double>{1, 2, 3}); // wrong length: discards the stash
+                 }),
+                 1);
 
         QVERIFY(mg->commitPendingData());
         QVERIFY(!mg->hasColorValues());

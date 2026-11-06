@@ -69,6 +69,7 @@ set(NEOQCP_SOURCES
     src/layoutelements/layoutelement-legend-intervals.cpp
     src/layoutelements/layoutelement-textelement.cpp
     src/plottables/plottable.cpp
+    src/plottables/plottable-line.cpp
     src/plottables/plottable-bars.cpp
     src/plottables/plottable-colormap.cpp
     src/plottables/plottable-curve.cpp
@@ -154,6 +155,7 @@ set(NEOQCP_MOC_HEADERS
     src/painting/painter.h
     src/painting/paintbuffer-pixmap.h
     src/plottables/plottable.h
+    src/plottables/plottable-line.h
     src/plottables/plottable-bars.h
     src/plottables/plottable-colormap.h
     src/plottables/plottable-curve.h

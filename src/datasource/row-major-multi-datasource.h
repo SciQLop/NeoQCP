@@ -159,6 +159,16 @@ public:
                                          gapThreshold(), &mGapCache.gaps);
     }
 
+    std::vector<QPointF> linesInData(int column, int begin, int end, double pixelsPerKey,
+                                     std::vector<int>* sourceIndices = nullptr) const override
+    {
+        Q_ASSERT(column >= 0 && column < mColumns);
+        qcp::detail::StridedColumnView<V> colView(mValues + column, mRows, mStride);
+        ensureGapCache(begin, end);
+        return qcp::algo::linesInData(mKeys, colView, begin, end, pixelsPerKey, sourceIndices,
+                                      gapThreshold(), &mGapCache.gaps);
+    }
+
     qcp::algo::GapVector gapsBefore(int begin, int end) const override
     {
         ensureGapCache(begin, end);

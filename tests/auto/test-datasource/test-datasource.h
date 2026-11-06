@@ -28,6 +28,9 @@ private slots:
     void soaIntValues();
     void soaMismatchedLengthsDegradeToEmpty();
     void soaGapThresholdZeroDisablesGaps();
+    void linesInDataMapToGetLines();
+    void thinnedLinesInDataMatchTheOptimizedPixels();
+    void indicesFollowTheThinnedPoints();
 
     // QCPGraph2 integration tests
     void graph2Creation();

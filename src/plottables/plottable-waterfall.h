@@ -28,8 +28,20 @@ public:
                                QCPAxis* keyAxis, QCPAxis* valueAxis) const override;
     QVector<QPointF> getOptimizedLineData(int column, int begin, int end, int pixelWidth,
                                            QCPAxis* keyAxis, QCPAxis* valueAxis) const override;
+    std::vector<QPointF> linesInData(int column, int begin, int end, double pixelsPerKey,
+                                     std::vector<int>* sourceIndices = nullptr) const override;
 
 private:
+    struct TransformedWindow
+    {
+        std::vector<double> keys;
+        std::vector<double> values;
+    };
+
+    // Keys and transformed values of one column, so every line algorithm sees the same
+    // shifted/scaled data.
+    TransformedWindow transformedWindow(int column, int begin, int end) const;
+
     const std::shared_ptr<QCPAbstractMultiDataSource> mSource;
     const QVector<double> mOffsets;
     const QVector<double> mNormFactors;

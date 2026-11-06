@@ -88,6 +88,15 @@ public:
                                          gapThreshold(), &mGapCache.gaps);
     }
 
+    std::vector<QPointF> linesInData(int column, int begin, int end, double pixelsPerKey,
+                                     std::vector<int>* sourceIndices = nullptr) const override
+    {
+        Q_ASSERT(column >= 0 && column < columnCount());
+        ensureGapCache(begin, end);
+        return qcp::algo::linesInData(mKeys, mValues[column], begin, end, pixelsPerKey,
+                                      sourceIndices, gapThreshold(), &mGapCache.gaps);
+    }
+
     qcp::algo::GapVector gapsBefore(int begin, int end) const override
     {
         ensureGapCache(begin, end);

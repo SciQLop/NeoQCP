@@ -50,9 +50,9 @@ public:
     [[nodiscard]] virtual int findEnd(double sortKey, bool expandedRange = true) const = 0;
 };
 
-template <class DataType>
+template <class DataType, class Base = QCPAbstractPlottable>
 class QCPAbstractPlottable1D
-        : public QCPAbstractPlottable,
+        : public Base,
           public QCPPlottableInterface1D // no QCP_LIB_DECL, template class ends up in header (cpp
                                          // included below)
 {
@@ -289,22 +289,23 @@ private:
   Forwards \a keyAxis and \a valueAxis to the \ref QCPAbstractPlottable::QCPAbstractPlottable
   "QCPAbstractPlottable" constructor and allocates the \a mDataContainer.
 */
-template <class DataType>
-QCPAbstractPlottable1D<DataType>::QCPAbstractPlottable1D(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPAbstractPlottable(keyAxis, valueAxis), mDataContainer(new QCPDataContainer<DataType>)
+template <class DataType, class Base>
+QCPAbstractPlottable1D<DataType, Base>::QCPAbstractPlottable1D(QCPAxis* keyAxis,
+                                                               QCPAxis* valueAxis)
+        : Base(keyAxis, valueAxis), mDataContainer(new QCPDataContainer<DataType>)
 {
 }
 
-template <class DataType>
-QCPAbstractPlottable1D<DataType>::~QCPAbstractPlottable1D()
+template <class DataType, class Base>
+QCPAbstractPlottable1D<DataType, Base>::~QCPAbstractPlottable1D()
 {
 }
 
 /*!
   \copydoc QCPPlottableInterface1D::dataCount
 */
-template <class DataType>
-int QCPAbstractPlottable1D<DataType>::dataCount() const
+template <class DataType, class Base>
+int QCPAbstractPlottable1D<DataType, Base>::dataCount() const
 {
     return mDataContainer->size();
 }
@@ -312,8 +313,8 @@ int QCPAbstractPlottable1D<DataType>::dataCount() const
 /*!
   \copydoc QCPPlottableInterface1D::dataMainKey
 */
-template <class DataType>
-double QCPAbstractPlottable1D<DataType>::dataMainKey(int index) const
+template <class DataType, class Base>
+double QCPAbstractPlottable1D<DataType, Base>::dataMainKey(int index) const
 {
     if (auto* d = dataAt(index)) return d->mainKey();
     return 0;
@@ -322,8 +323,8 @@ double QCPAbstractPlottable1D<DataType>::dataMainKey(int index) const
 /*!
   \copydoc QCPPlottableInterface1D::dataSortKey
 */
-template <class DataType>
-double QCPAbstractPlottable1D<DataType>::dataSortKey(int index) const
+template <class DataType, class Base>
+double QCPAbstractPlottable1D<DataType, Base>::dataSortKey(int index) const
 {
     if (auto* d = dataAt(index)) return d->sortKey();
     return 0;
@@ -332,8 +333,8 @@ double QCPAbstractPlottable1D<DataType>::dataSortKey(int index) const
 /*!
   \copydoc QCPPlottableInterface1D::dataMainValue
 */
-template <class DataType>
-double QCPAbstractPlottable1D<DataType>::dataMainValue(int index) const
+template <class DataType, class Base>
+double QCPAbstractPlottable1D<DataType, Base>::dataMainValue(int index) const
 {
     if (auto* d = dataAt(index)) return d->mainValue();
     return 0;
@@ -342,8 +343,8 @@ double QCPAbstractPlottable1D<DataType>::dataMainValue(int index) const
 /*!
   \copydoc QCPPlottableInterface1D::dataValueRange
 */
-template <class DataType>
-QCPRange QCPAbstractPlottable1D<DataType>::dataValueRange(int index) const
+template <class DataType, class Base>
+QCPRange QCPAbstractPlottable1D<DataType, Base>::dataValueRange(int index) const
 {
     if (auto* d = dataAt(index)) return d->valueRange();
     return QCPRange(0, 0);
@@ -352,18 +353,18 @@ QCPRange QCPAbstractPlottable1D<DataType>::dataValueRange(int index) const
 /*!
   \copydoc QCPPlottableInterface1D::dataPixelPosition
 */
-template <class DataType>
-QPointF QCPAbstractPlottable1D<DataType>::dataPixelPosition(int index) const
+template <class DataType, class Base>
+QPointF QCPAbstractPlottable1D<DataType, Base>::dataPixelPosition(int index) const
 {
-    if (auto* d = dataAt(index)) return coordsToPixels(d->mainKey(), d->mainValue());
+    if (auto* d = dataAt(index)) return this->coordsToPixels(d->mainKey(), d->mainValue());
     return QPointF();
 }
 
 /*!
   \copydoc QCPPlottableInterface1D::sortKeyIsMainKey
 */
-template <class DataType>
-bool QCPAbstractPlottable1D<DataType>::sortKeyIsMainKey() const
+template <class DataType, class Base>
+bool QCPAbstractPlottable1D<DataType, Base>::sortKeyIsMainKey() const
 {
     return DataType::sortKeyIsMainKey();
 }
@@ -375,20 +376,20 @@ bool QCPAbstractPlottable1D<DataType>::sortKeyIsMainKey() const
 
   \seebaseclassmethod
 */
-template <class DataType>
-QCPDataSelection QCPAbstractPlottable1D<DataType>::selectTestRect(const QRectF& rect,
+template <class DataType, class Base>
+QCPDataSelection QCPAbstractPlottable1D<DataType, Base>::selectTestRect(const QRectF& rect,
                                                                   bool onlySelectable) const
 {
     QCPDataSelection result;
-    if ((onlySelectable && mSelectable == QCP::stNone) || mDataContainer->isEmpty())
+    if ((onlySelectable && this->mSelectable == QCP::stNone) || mDataContainer->isEmpty())
         return result;
-    if (!mKeyAxis || !mValueAxis)
+    if (!this->mKeyAxis || !this->mValueAxis)
         return result;
 
     // convert rect given in pixels to ranges given in plot coordinates:
     double key1, value1, key2, value2;
-    pixelsToCoords(rect.topLeft(), key1, value1);
-    pixelsToCoords(rect.bottomRight(), key2, value2);
+    this->pixelsToCoords(rect.topLeft(), key1, value1);
+    this->pixelsToCoords(rect.bottomRight(), key2, value2);
     QCPRange keyRange(
         key1,
         key2); // QCPRange normalizes internally so we don't have to care about whether key1 < key2
@@ -430,8 +431,8 @@ QCPDataSelection QCPAbstractPlottable1D<DataType>::selectTestRect(const QRectF& 
 /*!
   \copydoc QCPPlottableInterface1D::findBegin
 */
-template <class DataType>
-int QCPAbstractPlottable1D<DataType>::findBegin(double sortKey, bool expandedRange) const
+template <class DataType, class Base>
+int QCPAbstractPlottable1D<DataType, Base>::findBegin(double sortKey, bool expandedRange) const
 {
     return int(mDataContainer->findBegin(sortKey, expandedRange) - mDataContainer->constBegin());
 }
@@ -439,8 +440,8 @@ int QCPAbstractPlottable1D<DataType>::findBegin(double sortKey, bool expandedRan
 /*!
   \copydoc QCPPlottableInterface1D::findEnd
 */
-template <class DataType>
-int QCPAbstractPlottable1D<DataType>::findEnd(double sortKey, bool expandedRange) const
+template <class DataType, class Base>
+int QCPAbstractPlottable1D<DataType, Base>::findEnd(double sortKey, bool expandedRange) const
 {
     return int(mDataContainer->findEnd(sortKey, expandedRange) - mDataContainer->constBegin());
 }
@@ -455,13 +456,13 @@ int QCPAbstractPlottable1D<DataType>::findEnd(double sortKey, bool expandedRange
 
   \seebaseclassmethod
 */
-template <class DataType>
-double QCPAbstractPlottable1D<DataType>::selectTest(const QPointF& pos, bool onlySelectable,
+template <class DataType, class Base>
+double QCPAbstractPlottable1D<DataType, Base>::selectTest(const QPointF& pos, bool onlySelectable,
                                                     QVariant* details) const
 {
-    if ((onlySelectable && mSelectable == QCP::stNone) || mDataContainer->isEmpty())
+    if ((onlySelectable && this->mSelectable == QCP::stNone) || mDataContainer->isEmpty())
         return -1;
-    if (!mKeyAxis || !mValueAxis)
+    if (!this->mKeyAxis || !this->mValueAxis)
         return -1;
 
     QCPDataSelection selectionResult;
@@ -476,11 +477,11 @@ double QCPAbstractPlottable1D<DataType>::selectTest(const QPointF& pos, bool onl
         // determine which key range comes into question, taking selection tolerance around pos into
         // account:
         double posKeyMin, posKeyMax, dummy;
-        pixelsToCoords(
-            pos - QPointF(mParentPlot->selectionTolerance(), mParentPlot->selectionTolerance()),
+        this->pixelsToCoords(
+            pos - QPointF(this->mParentPlot->selectionTolerance(), this->mParentPlot->selectionTolerance()),
             posKeyMin, dummy);
-        pixelsToCoords(
-            pos + QPointF(mParentPlot->selectionTolerance(), mParentPlot->selectionTolerance()),
+        this->pixelsToCoords(
+            pos + QPointF(this->mParentPlot->selectionTolerance(), this->mParentPlot->selectionTolerance()),
             posKeyMax, dummy);
         if (posKeyMin > posKeyMax)
             qSwap(posKeyMin, posKeyMax);
@@ -489,8 +490,8 @@ double QCPAbstractPlottable1D<DataType>::selectTest(const QPointF& pos, bool onl
     }
     if (begin == end)
         return -1;
-    QCPRange keyRange(mKeyAxis->range());
-    QCPRange valueRange(mValueAxis->range());
+    QCPRange keyRange(this->mKeyAxis->range());
+    QCPRange valueRange(this->mValueAxis->range());
     for (auto it = begin; it != end; ++it)
     {
         const double mainKey = it->mainKey();
@@ -501,7 +502,7 @@ double QCPAbstractPlottable1D<DataType>::selectTest(const QPointF& pos, bool onl
                             // where sort key isn't main key and we iterate over all points
         {
             const double currentDistSqr
-                = QCPVector2D(coordsToPixels(mainKey, mainValue) - pos).lengthSquared();
+                = QCPVector2D(this->coordsToPixels(mainKey, mainValue) - pos).lengthSquared();
             if (currentDistSqr < minDistSqr)
             {
                 minDistSqr = currentDistSqr;
@@ -528,23 +529,23 @@ double QCPAbstractPlottable1D<DataType>::selectTest(const QPointF& pos, bool onl
 
   \see setSelection
 */
-template <class DataType>
-void QCPAbstractPlottable1D<DataType>::getDataSegments(
+template <class DataType, class Base>
+void QCPAbstractPlottable1D<DataType, Base>::getDataSegments(
     QList<QCPDataRange>& selectedSegments, QList<QCPDataRange>& unselectedSegments) const
 {
     selectedSegments.clear();
     unselectedSegments.clear();
-    if (mSelectable == QCP::stWhole) // stWhole selection type draws the entire plottable with
-                                     // selected style if mSelection isn't empty
+    if (this->mSelectable == QCP::stWhole) // stWhole selection type draws the entire plottable with
+                                     // selected style if this->mSelection isn't empty
     {
-        if (selected())
+        if (this->selected())
             selectedSegments << QCPDataRange(0, dataCount());
         else
             unselectedSegments << QCPDataRange(0, dataCount());
     }
     else
     {
-        QCPDataSelection sel(selection());
+        QCPDataSelection sel(this->selection());
         sel.simplify();
         selectedSegments = sel.dataRanges();
         unselectedSegments = sel.inverse(QCPDataRange(0, dataCount())).dataRanges();
@@ -561,14 +562,14 @@ void QCPAbstractPlottable1D<DataType>::getDataSegments(
   QPainter::drawPolyline if the configured \ref QCustomPlot::setPlottingHints() and \a painter
   style allows.
 */
-template <class DataType>
-void QCPAbstractPlottable1D<DataType>::drawPolyline(QCPPainter* painter,
+template <class DataType, class Base>
+void QCPAbstractPlottable1D<DataType, Base>::drawPolyline(QCPPainter* painter,
                                                     const QVector<QPointF>& lineData) const
 {
     // GPU rendering path: extrude the polyline into triangles, dashed or solid.
-    if (qcp::strokePolylineOnGpu(painter, mParentPlot, mLayer,
+    if (qcp::strokePolylineOnGpu(painter, this->mParentPlot, this->mLayer,
                                  std::span<const QPointF>(lineData.constData(), lineData.size()),
-                                 painter->pen(), QPointF(), clipRect()))
+                                 painter->pen(), QPointF(), this->clipRect()))
         return;
 
     // if drawing lines in plot (instead of PDF), reduce 1px lines to cosmetic, because at least in
@@ -584,7 +585,7 @@ void QCPAbstractPlottable1D<DataType>::drawPolyline(QCPPainter* painter,
     }
 
     // if drawing solid line and not in PDF, use much faster line drawing instead of polyline:
-    if (mParentPlot->plottingHints().testFlag(QCP::phFastPolylines)
+    if (this->mParentPlot->plottingHints().testFlag(QCP::phFastPolylines)
         && painter->pen().style() == Qt::SolidLine
         && !painter->isExporting())
     {

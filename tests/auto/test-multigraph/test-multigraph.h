@@ -174,6 +174,9 @@ private slots:
     void panIsRedrawnFreshWhileAnotherLayerIsDirty();
     void resampledLinesFollowANewKeyAxis();
 
+    void noSetterIsIgnored_data();
+    void noSetterIsIgnored();
+
 private:
     // The staged source stays staged, as while its pipeline prepares it: exports commit ready ones.
     static void stillPreparing(QCPMultiGraph* mg);

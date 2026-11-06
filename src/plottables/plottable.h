@@ -157,8 +157,8 @@ public:
     void setName(const QString& name);
     void setAntialiasedFill(bool enabled);
     void setAntialiasedScatters(bool enabled);
-    void setPen(const QPen& pen);
-    void setBrush(const QBrush& brush);
+    virtual void setPen(const QPen& pen);
+    virtual void setBrush(const QBrush& brush);
     void setKeyAxis(QCPAxis* axis);
     void setValueAxis(QCPAxis* axis);
     Q_SLOT void setSelectable(QCP::SelectionType selectable);

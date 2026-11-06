@@ -28,6 +28,14 @@ public:
         int column, int begin, int end,
         QCPAxis* keyAxis, QCPAxis* valueAxis) const = 0;
 
+    // Data-space counterpart of getLines: the same points in (key, value) units, with a
+    // NaN marker wherever getLines breaks the line. pixelsPerKey <= 0 returns every point;
+    // otherwise the line is reduced to the same min/max envelope getOptimizedLineData draws,
+    // one bucket per key pixel. A source that is already a resampled level never thins again.
+    // sourceIndices, when given, receives each point's source row (-1 for a marker).
+    virtual std::vector<QPointF> linesInData(int column, int begin, int end, double pixelsPerKey,
+                                            std::vector<int>* sourceIndices = nullptr) const;
+
     virtual void getOptimizedLineDataAll(
         int begin, int end, int pixelWidth,
         QCPAxis* keyAxis, QCPAxis* valueAxis,

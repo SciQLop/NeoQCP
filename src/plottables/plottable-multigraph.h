@@ -1,4 +1,5 @@
 #pragma once
+#include "plottable-line.h"
 #include "plottable.h"
 #include "plottable1d.h"
 #include "datasource/abstract-multi-datasource.h"
@@ -24,27 +25,11 @@ class QCPPlottableRhiLayer;
 template <typename T, typename Self = void>
 class QCPMultiGraphOps;
 
-class QCP_LIB_DECL QCPMultiGraph : public QCPAbstractPlottable, public QCPPlottableInterface1D {
+class QCP_LIB_DECL QCPMultiGraph : public QCPAbstractLine, public QCPPlottableInterface1D {
     Q_OBJECT
 public:
     template <typename T>
     using OpsFor = QCPMultiGraphOps<T>;
-
-    enum LineStyle { lsNone, lsLine, lsStepLeft, lsStepRight, lsStepCenter, lsImpulse };
-    Q_ENUM(LineStyle)
-
-    struct Component {
-        QString name;
-        QPen pen;
-        QPen selectedPen;
-        QCPScatterStyle scatterStyle;
-        QCPDataSelection selection;
-        bool visible = true;
-        bool inLegend = true;
-        bool hiddenByErrorBars = false; //!< out of the legend as an error bound, not by the user
-        //! Set through setComponentLineStyle(): a direct write leaves the cached lines stale.
-        LineStyle lineStyle = lsLine;
-    };
 
     explicit QCPMultiGraph(QCPAxis* keyAxis, QCPAxis* valueAxis);
     ~QCPMultiGraph() override;
@@ -92,22 +77,6 @@ public:
             keys, values, static_cast<int>(keys.size()), columns, stride));
     }
 
-    // Components
-    [[nodiscard]] int componentCount() const { return mComponents.size(); }
-    Component& component(int index) { return mComponents[index]; }
-    //! Shows or hides one component and repaints the layer. Setting `component(i).visible`
-    //! directly is not observed: a layer that translates after a pan would keep the old
-    //! GPU entries.
-    void setComponentVisible(int index, bool visible);
-    //! Keeps a component out of the legend (a band edge, an error bound) while it still draws
-    //! and counts for auto-scale.
-    void setComponentInLegend(int index, bool inLegend);
-    [[nodiscard]] QVector<int> legendComponents() const;
-    const Component& component(int index) const { return mComponents[index]; }
-    void setComponentNames(const QStringList& names);
-    void setComponentColors(const QList<QColor>& colors);
-    void setComponentPens(const QList<QPen>& pens);
-
     struct Fill {
         int owner = -1;
         std::variant<double, int> target;   // a constant, or another column
@@ -141,32 +110,11 @@ public:
     // Per-component value access (for tracers/tooltips)
     [[nodiscard]] double componentValueAt(int column, int index) const;
 
-    //! The style given to new components; setLineStyle() also applies it to every component.
-    [[nodiscard]] LineStyle lineStyle() const { return mLineStyle; }
-    void setLineStyle(LineStyle style);
-    void setComponentLineStyle(int index, LineStyle style);
     [[nodiscard]] bool adaptiveSampling() const { return mAdaptiveSampling; }
     void setAdaptiveSampling(bool enabled);
     // Gap detection on the lines (see QCPAbstractMultiDataSource::setGapThreshold); 0 turns it off.
     [[nodiscard]] double gapThreshold() const { return mGapThreshold; }
     void setGapThreshold(double threshold);
-    [[nodiscard]] int scatterSkip() const { return mScatterSkip; }
-    void setScatterSkip(int skip) { mScatterSkip = qMax(0, skip); }
-
-    // Colour by scalar: one value per key, shared by all components.
-    // QCustomPlot convention: these setters do not replot -- the caller must
-    // call replot() (the first colouring may repaint on its own once the
-    // one-time origin L1 rebuild lands).
-    void setColorValues(std::shared_ptr<const std::vector<double>> values);
-    void setColorValues(std::vector<double> values);
-    void clearColorValues();
-    [[nodiscard]] bool hasColorValues() const;
-    void setColorGradient(const QCPColorGradient& gradient);
-    [[nodiscard]] QCPColorGradient colorGradient() const;
-    void setColorRange(const QCPRange& range);
-    [[nodiscard]] QCPRange colorRange() const;
-    void setColorScaleType(QCPAxis::ScaleType type);
-    [[nodiscard]] QCPAxis::ScaleType colorScaleType() const;
 
     // Per-component selection
     [[nodiscard]] QCPDataSelection componentSelection(int index) const;
@@ -203,10 +151,6 @@ public:
     //! with a gradient brush along `line` sampled from the colour mapper.
     void drawComponentLegendIcon(QCPPainter* painter, int component, const QLineF& line) const;
 
-Q_SIGNALS:
-    //! A component was shown or hidden: the legend group row draws one segment per visible one.
-    void componentVisibilityChanged();
-
 protected:
     void draw(QCPPainter* painter) override;
     void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
@@ -223,7 +167,6 @@ protected:
 
 protected:
     std::shared_ptr<QCPAbstractMultiDataSource> mDataSource;
-    QVector<Component> mComponents;
     struct FillEntry {
         Fill spec;
         std::vector<float> verts;   // triangle cache, rebuilt when lines change
@@ -238,10 +181,8 @@ protected:
     };
     QVector<ErrorBarsEntry> mErrorBars;
     mutable QVector<QCPDataSelection> mLastRectSelections; // per-component selections from selectTestRect
-    LineStyle mLineStyle = lsLine;
     bool mAdaptiveSampling = true;
     double mGapThreshold = qcp::algo::kDefaultGapThreshold;
-    int mScatterSkip = 0;
     QCPMultiGraphPipeline mPipeline;
     std::shared_ptr<qcp::algo::MultiGraphResamplerCache> mL1Cache;
     std::shared_ptr<QCPAbstractMultiDataSource> mL2Result;
@@ -259,12 +200,19 @@ protected:
     // Debounce timer: defers expensive L2 rebuild until panning stops
     QTimer mViewportDebounce;
 
-    qcp::ColorScalarMapper mColor;
     // Read by the L1 transform on the pipeline thread: build origin tables only for coloured graphs.
     std::shared_ptr<std::atomic<bool>> mWantOrigin = std::make_shared<std::atomic<bool>>(false);
     bool mL2HasOrigin = false;
     QVector<QVector<int>> mCachedIndices;   // per component, aligned with mCachedLines when coloured
     void invalidateLines();
+    // The shared line base's hooks: every drawing change also drops the cached lines.
+    void lineChanged() override;
+    void componentVisibilityToggled() override;
+    void pensChanged(int componentCount) override;
+    void applyBrushToComponents(const QBrush& brush) override;
+    [[nodiscard]] const QCPAbstractMultiDataSource* colorValueSource() const override;
+    [[nodiscard]] bool hasPendingDataSource() const override;
+    void colorValuesStarted() override;
     // Source indices aligned with the line-style-transformed points of a component.
     static QVector<int> lineIndices(LineStyle style, const QVector<int>& dataIdx);
     // Draws impulse line pairs coloured per point, batched by colour bucket.
@@ -290,9 +238,6 @@ protected:
     // plot commits it through commitPendingData() (see QCustomPlot::requestDataSwap).
     std::shared_ptr<QCPAbstractMultiDataSource> mPendingSource;
     std::shared_ptr<qcp::algo::MultiGraphResamplerCache> mPendingL1;
-    // Colour values set while a source is staged: validated against mPendingSource's
-    // size (not the still-displayed mDataSource's), applied by commitPendingData().
-    std::shared_ptr<const std::vector<double>> mPendingColorValues;
     bool mPendingReady = false;
     uint64_t mPendingGeneration = 0;
     // Generation floor below which a pipeline result is from a source that's

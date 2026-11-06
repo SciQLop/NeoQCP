@@ -109,6 +109,34 @@ public:
         return lines;
     }
 
+    // Keys and values of an L2 level are already one min/max pair per bin: pixelsPerKey is
+    // ignored so the level is never thinned twice.
+    std::vector<QPointF> linesInData(int column, int begin, int end, double /*pixelsPerKey*/,
+                                     std::vector<int>* sourceIndices = nullptr) const override
+    {
+        if (sourceIndices) sourceIndices->clear();
+        if (column < 0 || column >= mBins.numColumns) return {};
+        const int s = mBins.stride();
+        const bool hasOrigin = !mBins.origin.empty();
+        ensureGapCache(begin, end);
+        std::vector<QPointF> lines;
+        lines.reserve(end - begin + (end - begin) / 10);
+        for (int i = begin; i < end; ++i)
+        {
+            if (mGapCache.gaps.hasAnyGap && mGapCache.gaps[i - begin])
+            {
+                lines.emplace_back(qQNaN(), qQNaN());
+                if (sourceIndices) sourceIndices->push_back(-1);
+            }
+            const double v = mBins.values[column * s + i];
+            if (std::isnan(v)) continue;
+            lines.emplace_back(mBins.keys[i], v);
+            if (sourceIndices)
+                sourceIndices->push_back(hasOrigin ? mBins.origin[column * s + i] : -1);
+        }
+        return lines;
+    }
+
     void getOptimizedLineDataAll(int begin, int end, int /*pixelWidth*/,
                                   QCPAxis* keyAxis, QCPAxis* valueAxis,
                                   QVector<QPointF>* results, int numColumns) const override
