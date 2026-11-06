@@ -20,6 +20,8 @@ private slots:
     void legendItemMovedToSecondLegend();
     void plottableDeathLeavesSecondLegend();
 
+    void deletingAPlottableFromAnotherDrawKeepsTheDeferredPainterSafe();
+
     void deleteItemLeavesList();
     void deleteLaterItem();
     void removeItemFromDestroyedSlot();

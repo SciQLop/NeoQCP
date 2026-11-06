@@ -363,7 +363,7 @@ QCPDrawnView qcpDrawnViewOf(const QCPAbstractPlottable& plottable, QRect clip)
     return view;
 }
 
-QCPDrawnCore::QCPDrawnCore() : mState(std::make_unique<State>()) { }
+QCPDrawnCore::QCPDrawnCore() : mState(std::make_shared<State>()) { }
 
 QCPDrawnCore::~QCPDrawnCore() = default;
 
@@ -643,13 +643,19 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
             return;
         }
         // Spec 5: an export stacks like the screen - this layer's painter content first, then the
-        // GPU commands' QPainter forms over it. The recording lives until the layer's pass ends
-        // (nothing here re-records or runs user code in between), so the second pass may hold it.
+        // GPU commands' QPainter forms over it, at the end of the layer's pass. Another object's
+        // draw can delete this one before then, so the callback asks whether the recording is
+        // still there: an object deleted mid-pass draws nothing more.
         qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::PainterOnly);
         if (view.layer)
             view.layer->deferGpuPainter(
-                [list = &mState->recording, frame](QCPPainter& target)
-                { qcpReplayWithPainter(*list, target, frame, QCPReplayKinds::GpuOnly); });
+                [list = &mState->recording, state = std::weak_ptr<State>(mState), frame](
+                    QCPPainter& target)
+                {
+                    if (state.expired())
+                        return;
+                    qcpReplayWithPainter(*list, target, frame, QCPReplayKinds::GpuOnly);
+                });
         return;
     }
     qcpReplayWithRhi(mState->recording, *plottables, *scatter, frame, mState->resolve,

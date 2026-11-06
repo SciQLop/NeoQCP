@@ -99,6 +99,43 @@ void TestOwnership::deleteLaterPlottable()
     draw();
 }
 
+namespace
+{
+// A drawn plottable that deletes another one while it records itself: an export defers barA's GPU
+// callback to the end of the layer's pass, so this delete lands before that callback runs.
+class DeletingBars : public QCPBars
+{
+public:
+    using QCPBars::QCPBars;
+    mutable QCPBars* victim = nullptr;
+
+protected:
+    void draw(QCPDrawContext& context) const override
+    {
+        if (QCPBars* doomed = victim)
+        {
+            victim = nullptr;
+            delete doomed;
+        }
+        QCPBars::draw(context);
+    }
+};
+} // namespace
+
+void TestOwnership::deletingAPlottableFromAnotherDrawKeepsTheDeferredPainterSafe()
+{
+    mPlot->legend->setVisible(false);
+    auto* doomed = new QCPBars(mPlot->xAxis, mPlot->yAxis);
+    doomed->setData({ 1.0, 2.0, 3.0 }, { 1.0, 2.0, 1.5 });
+    auto* deleter = new DeletingBars(mPlot->xAxis, mPlot->yAxis);
+    deleter->victim = doomed;
+    deleter->setData({ 4.0, 5.0 }, { 1.0, 2.0 });
+    mPlot->rescaleAxes();
+
+    QVERIFY(!mPlot->toPixmap(400, 300).isNull());
+    QCOMPARE(mPlot->plottableCount(), 1);
+}
+
 void TestOwnership::deleteMultiGraphLeavesItsRow()
 {
     auto* multiGraph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);

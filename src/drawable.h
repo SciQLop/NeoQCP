@@ -148,7 +148,8 @@ private:
     [[nodiscard]] bool recordingIsStale(const QCPDrawable& object, const QCPDrawnView& view) const;
 
     struct State;
-    std::unique_ptr<State> mState;
+    //! Shared with the deferred painter callbacks: they check the object is still there.
+    std::shared_ptr<State> mState;
 };
 
 //! A box side, for the one range helper both plottable ranges answer through.
