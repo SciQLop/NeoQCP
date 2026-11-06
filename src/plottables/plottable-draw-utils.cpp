@@ -144,18 +144,6 @@ bool isDashed(const QPen& pen)
     return dashPatternOf(pen, 1.0f).count > 0;
 }
 
-namespace
-{
-    // Extrusions for the uncached GPU paths: one buffer reused across draws, so a frame does not
-    // allocate per plottable.
-    std::vector<float>& strokeScratch()
-    {
-        static thread_local std::vector<float> buffer;
-        return buffer;
-    }
-
-} // namespace
-
 void extrudeStroke(std::span<const QPointF> pts, const QPen& pen, float penWidth,
                    std::vector<float>& out, bool closed)
 {
@@ -190,25 +178,6 @@ bool addGpuStroke(QCPPlottableRhiLayer& layer, std::span<const float> verts, con
     return true;
 }
 
-bool strokePolylineOnGpu(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer* layer,
-                         std::span<const QPointF> pts, const QPen& pen, const QPointF& gpuOffset,
-                         const QRect& clipRect)
-{
-    QCPPlottableRhiLayer* prl = gpuLayer(parentPlot, layer, painter->isExporting());
-    if (!prl || !canStrokeOnGpu(pen) || pts.size() < 2)
-        return false;
-
-    const double dpr = parentPlot->bufferDevicePixelRatio();
-    const float penWidth = extrusionPenWidth(pen, dpr);
-    std::vector<float>& verts = strokeScratch();
-    extrudeStroke(pts, pen, penWidth, verts);
-    if (verts.empty())
-        return false;
-    return addGpuStroke(*prl, verts, pen, penWidth, clipRect, dpr,
-                        parentPlot->rhiOutputSize().height(), gpuOffset,
-                        static_cast<float>(painter->opacity()));
-}
-
 namespace
 {
 // Same, with an extrusion cache that survives pans: \a freshLines forces a rebuild.
@@ -236,6 +205,16 @@ bool strokePolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer
                         static_cast<float>(painter->opacity()));
 }
 } // namespace
+
+// The uncached path is this one, with a scratch cache that always rebuilds.
+bool strokePolylineOnGpu(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer* layer,
+                         std::span<const QPointF> pts, const QPen& pen, const QPointF& gpuOffset,
+                         const QRect& clipRect)
+{
+    static thread_local ExtrusionCache scratch;
+    return strokePolylineCached(painter, parentPlot, layer, pts, pen, gpuOffset, clipRect, true,
+                                scratch);
+}
 
 void drawPolylineWithGpuFallback(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer* layer,
                                  const QVector<QPointF>& pts, const QPen& pen,
