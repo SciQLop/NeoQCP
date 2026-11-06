@@ -642,3 +642,8 @@ composite happen in `render()`, which an offscreen benchmark does not run).
 | QCPGpu_MultiGraphPan1M | 0.16 / 0.17 / 0.15 | 0.16 |
 | QCPGpu_MultiGraphZoom1M | 0.62 / 0.62 / 0.62 | 0.62 |
 | QCPMultiGraph_SetData1M | 40 / 38 / 38 | 38 |
+
+Controller re-measure (same build, load 3.3-8.4): QCPGpu_MultiGraphPan1M 0.15 / 0.15 / 0.15,
+QCPGpu_MultiGraphZoom1M 0.61 / 0.61 / 0.64, QCPGpu_MultiGraphColored100kPan 0.13 / 0.14 / 0.13,
+QCPGpu_CurvePan100k 0.40 / 0.41 / 0.39, QCPMultiGraph_SetData1M 38. The gate for these rows is the lower
+median of the two series: 0.15, 0.61, 0.13, 0.40 and 38 ms.
