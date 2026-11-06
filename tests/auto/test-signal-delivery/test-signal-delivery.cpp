@@ -537,3 +537,49 @@ void TestSignalDelivery::deleteLaterDeliversTeardownSignalsLikeDelete()
     QVERIFY(byDelete > 0);
     QCOMPARE(layerChangesDuringTeardown(true), byDelete);
 }
+
+void TestSignalDelivery::qcpEmitHoldsUntilTheScopeCloses()
+{
+    QCustomPlot plot;
+    QCPAxis* axis = plot.xAxis;
+    int received = 0;
+    QCPRange receivedRange;
+    connect(axis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged), &plot,
+            [&](const QCPRange& range) {
+                ++received;
+                receivedRange = range;
+            });
+    const int before = received;
+    {
+        const QCPEmissionScope scope(&plot);
+        QCPRange range(3, 7);
+        qcpEmit(axis, &plot, qOverload<const QCPRange&>(&QCPAxis::rangeChanged), range);
+        range = QCPRange(1, 2); // the emission took a copy at the call
+        QCOMPARE(received, before);
+    }
+    QCOMPARE(received, before + 1);
+    QCOMPARE(receivedRange, QCPRange(3, 7));
+}
+
+void TestSignalDelivery::noPlotEmitsAtOnce()
+{
+    QCPTheme theme;
+    int received = 0;
+    connect(&theme, &QCPTheme::changed, &theme, [&received] { ++received; });
+    qcpEmit(&theme, nullptr, &QCPTheme::changed);
+    QCOMPARE(received, 1);
+}
+
+void TestSignalDelivery::deadSenderIsNotDelivered()
+{
+    QCustomPlot plot;
+    auto* sender = new QCPTheme;
+    int received = 0;
+    connect(sender, &QCPTheme::changed, &plot, [&received] { ++received; });
+    {
+        const QCPEmissionScope scope(&plot);
+        qcpEmit(sender, &plot, &QCPTheme::changed);
+        delete sender;
+    }
+    QCOMPARE(received, 0);
+}

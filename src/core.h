@@ -41,6 +41,7 @@
 #include <QTimer>
 #include <functional>
 #include <memory>
+#include <tuple>
 #include <utility>
 
 class QCPPainter;
@@ -707,6 +708,9 @@ protected:
     friend class QCPAbstractItem;
     friend class QCPLayerable;
     friend class QCPEmissionScope;
+    template <typename Sender, typename... SignalArgs, typename... Args>
+    friend void qcpEmit(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(SignalArgs...),
+                        Args&&... args);
     friend class TestSignalDelivery;
     friend class TestRepaint;
     friend class TestItemIndex;
@@ -714,6 +718,26 @@ protected:
 };
 Q_DECLARE_METATYPE(QCustomPlot::LayerInsertMode)
 Q_DECLARE_METATYPE(QCustomPlot::RefreshPriority)
+
+/*!
+  Emits \a signal of \a sender, through \a plot's delivery when there is one, so its slots run
+  when the plot's emission scope closes rather than inside the setter. The arguments are copied,
+  so a deferred slot sees the values the setter emitted. Without a plot, the signal is emitted at
+  once.
+*/
+template <typename Sender, typename... SignalArgs, typename... Args>
+void qcpEmit(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(SignalArgs...),
+             Args&&... args)
+{
+    auto copied = std::make_tuple(std::forward<Args>(args)...);
+    auto emitNow = [sender, signal, copied = std::move(copied)]() mutable {
+        std::apply([&](auto&... values) { (sender->*signal)(values...); }, copied);
+    };
+    if (plot)
+        plot->deliver(sender, std::move(emitNow));
+    else
+        emitNow();
+}
 
 // implementation of template functions:
 

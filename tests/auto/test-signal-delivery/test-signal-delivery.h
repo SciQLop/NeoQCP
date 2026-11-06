@@ -37,4 +37,8 @@ private slots:
     void releaseSlotIgnoringAndDeletingThePlotIsSafe();
     void nestedEventKeepsOuterEntriesQueued();
     void deleteLaterDeliversTeardownSignalsLikeDelete();
+
+    void qcpEmitHoldsUntilTheScopeCloses();
+    void noPlotEmitsAtOnce();
+    void deadSenderIsNotDelivered();
 };
