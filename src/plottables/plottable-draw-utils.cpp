@@ -65,6 +65,15 @@ bool needsReextrusion(const ExtrusionCache& cache, bool freshLines, const QPen& 
         || cache.penColor != pen.color().rgba();
 }
 
+void trimExtrusionScratch(ExtrusionCache& cache)
+{
+    std::vector<float>& verts = cache.vertices;
+    // Handing it back is a swap with an empty one, which frees the block: the cache then reads as
+    // empty, which is what the uncached path expects - it rebuilds on every stroke.
+    if (verts.capacity() > STROKE_SCRATCH_LIMIT && verts.size() * 4 < verts.capacity())
+        std::vector<float>().swap(verts);
+}
+
 bool canStrokeOnGpu(const QPen& pen)
 {
     return pen.style() != Qt::NoPen && gpuCanFill(pen.brush());
@@ -212,8 +221,11 @@ bool strokePolylineOnGpu(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer*
                          const QRect& clipRect)
 {
     static thread_local ExtrusionCache scratch;
-    return strokePolylineCached(painter, parentPlot, layer, pts, pen, gpuOffset, clipRect, true,
-                                scratch);
+    const bool stroked
+        = strokePolylineCached(painter, parentPlot, layer, pts, pen, gpuOffset, clipRect, true,
+                               scratch);
+    trimExtrusionScratch(scratch); // a stroke drawn once does not pin its size on this thread
+    return stroked;
 }
 
 void drawPolylineWithGpuFallback(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer* layer,

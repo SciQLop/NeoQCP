@@ -890,6 +890,29 @@ void TestMultiGraph::plainReextrusionOnPenChangeNotPan()
     QVERIFY(qcp::needsReextrusion(cache, false, pen, 1.0));                   // empty
 }
 
+// The uncached stroke path keeps its extrusion in a scratch of the drawing thread. A stroke that
+// used what the scratch grew to must keep it - a pan of the same data extrudes the same size - but
+// the largest stroke ever drawn cannot hold its buffers for the life of the process.
+void TestMultiGraph::aHugeStrokeThenASmallOneGivesTheScratchBack()
+{
+    qcp::ExtrusionCache cache;
+    const std::size_t huge = qcp::STROKE_SCRATCH_LIMIT * 4;
+    cache.vertices.resize(huge);
+    qcp::trimExtrusionScratch(cache);
+    QCOMPARE(cache.vertices.capacity(), huge); // a stroke that used it all keeps it
+
+    cache.vertices.resize(600); // the next stroke is a few hundred vertices
+    qcp::trimExtrusionScratch(cache);
+    QVERIFY2(cache.vertices.capacity() < qcp::STROKE_SCRATCH_LIMIT,
+             qPrintable(QStringLiteral("capacity %1 floats").arg(cache.vertices.capacity())));
+    QVERIFY(cache.vertices.empty());
+
+    qcp::ExtrusionCache small;
+    small.vertices.resize(600);
+    qcp::trimExtrusionScratch(small);
+    QCOMPARE(small.vertices.size(), std::size_t(600)); // under the limit: untouched
+}
+
 void TestMultiGraph::selectedStepLineKeepsItsSteps()
 {
     if (!showWithRhi(mPlot))

@@ -7,6 +7,7 @@
 #include <QPointF>
 #include <QRect>
 #include <QVector>
+#include <cstddef>
 #include <span>
 #include <vector>
 
@@ -110,6 +111,17 @@ float extrusionPenWidth(const QPen& pen, double devicePixelRatio);
 /// whenever this is true, since the cache is then re-extruded from those points.
 bool needsReextrusion(const ExtrusionCache& cache, bool freshLines, const QPen& pen,
                       double devicePixelRatio);
+
+/// The vertex storage the uncached stroke's thread-local scratch hands back above, in floats: a
+/// megabyte, some 43k vertices of the 6 a solid extrusion writes per segment.
+inline constexpr std::size_t STROKE_SCRATCH_LIMIT = std::size_t(1) << 18;
+
+/// Gives @a cache's vertex storage back when it grew past STROKE_SCRATCH_LIMIT and the stroke it
+/// holds used less than a quarter of it, so that a stroke extruded once cannot pin its size on the
+/// thread for the life of the process (see strokePolylineOnGpu). A stroke that uses what it grew to
+/// keeps it, so a pan of the same data still allocates nothing. The cache is left empty: the
+/// uncached path rebuilds it on every stroke anyway.
+void trimExtrusionScratch(ExtrusionCache& cache);
 
 /// Same as above but with cached extrusion.
 /// When @a freshLines is true, re-extrudes and stores in @a cache.

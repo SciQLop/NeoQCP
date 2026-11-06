@@ -166,6 +166,7 @@ private slots:
     void setLineStyleAppliesToEveryComponent();
     void newComponentsTakeTheGraphLineStyle();
     void plainReextrusionOnPenChangeNotPan();
+    void aHugeStrokeThenASmallOneGivesTheScratchBack();
     void selectedStepLineKeepsItsSteps();
     void committedDataIsDrawnOnScreen();
     void selectedStepGraph2KeepsItsSteps();
