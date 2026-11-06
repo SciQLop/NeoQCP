@@ -193,6 +193,19 @@ inline CommandKind commandKind(const QCPDrawCommand& command)
         },
         command);
 }
+//! True when the GPU replay draws \a command. Answered by type, so a polygon or a long position
+//! list does not pay the per-point scans of commandKind() on a painter pass.
+inline bool isGpuCommand(const QCPDrawCommand& command)
+{
+    return std::visit(
+        [](const auto& cmd)
+        {
+            using T = std::decay_t<decltype(cmd)>;
+            return !(std::is_same_v<T, TextCmd> || std::is_same_v<T, PathCmd>
+                     || std::is_same_v<T, ImageCmd> || std::is_same_v<T, PainterCmd>);
+        },
+        command);
+}
 } // namespace qcp
 
 //! The size \a text needs in \a style: the measurement a text command keeps.

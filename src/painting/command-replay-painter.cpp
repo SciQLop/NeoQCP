@@ -248,15 +248,15 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
     painter.save();
     if (!frame.clip.isEmpty())
         painter.setClipRect(frame.clip);
+    // A recording the layer could not take whole is painted by this pass like any other recording:
+    // the call below draws every one of its commands.
+    const bool painterDrawsAll = fallback && fallback->painterDrawsAll(list.id);
     for (const qcp::QCPDrawCommand& command : list.commands)
     {
-        const qcp::CommandKind kind = qcp::commandKind(command);
-        if (kinds == QCPReplayKinds::GpuOnly && !kind.gpu)
+        const bool gpu = qcp::isGpuCommand(command);
+        if (kinds == QCPReplayKinds::GpuOnly && !gpu)
             continue;
-        // A recording the layer could not take whole is painted by this pass like any other
-        // recording: the call below draws every one of its commands.
-        const bool painterDrawsAll = fallback && fallback->painterDrawsAll(list.id);
-        if (kinds == QCPReplayKinds::PainterOnly && kind.gpu && !painterDrawsAll)
+        if (kinds == QCPReplayKinds::PainterOnly && gpu && !painterDrawsAll)
         {
             // The layer could not take this command's image: paint it here, in the buffer the GPU
             // geometry draws over. A stroke the GPU cannot express is part of it.
