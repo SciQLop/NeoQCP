@@ -749,25 +749,7 @@ void QCPBars::addData(double key, double value)
 */
 void QCPBars::moveBelow(QCPBars* bars)
 {
-    if (bars == this)
-        return;
-    if (bars && (bars->keyAxis() != mKeyAxis.data() || bars->valueAxis() != mValueAxis.data()))
-    {
-        qDebug() << Q_FUNC_INFO
-                 << "passed QCPBars* doesn't have same key and value axis as this QCPBars";
-        return;
-    }
-    markDirty(); // the restacking below changes what is drawn
-    // remove from stacking:
-    connectBars(mBarBelow.data(),
-                mBarAbove.data()); // Note: also works if one (or both) of them is 0
-    // if new bar given, insert this bar below it:
-    if (bars)
-    {
-        if (bars->mBarBelow)
-            connectBars(bars->mBarBelow.data(), this);
-        connectBars(this, bars);
-    }
+    moveRelativeTo(bars, false);
 }
 
 /*!
@@ -786,6 +768,16 @@ void QCPBars::moveBelow(QCPBars* bars)
 */
 void QCPBars::moveAbove(QCPBars* bars)
 {
+    moveRelativeTo(bars, true);
+}
+
+/*! \internal
+
+  Puts this plottable \a above \a bars in the stacking, or below it: the two public moves differ in
+  which side of \a bars this bar lands on, and in nothing else.
+*/
+void QCPBars::moveRelativeTo(QCPBars* bars, bool above)
+{
     if (bars == this)
         return;
     if (bars && (bars->keyAxis() != mKeyAxis.data() || bars->valueAxis() != mValueAxis.data()))
@@ -798,13 +790,12 @@ void QCPBars::moveAbove(QCPBars* bars)
     // remove from stacking:
     connectBars(mBarBelow.data(),
                 mBarAbove.data()); // Note: also works if one (or both) of them is 0
-    // if new bar given, insert this bar above it:
-    if (bars)
-    {
-        if (bars->mBarAbove)
-            connectBars(this, bars->mBarAbove.data());
-        connectBars(bars, this);
-    }
+    if (!bars)
+        return;
+    // insert this bar on the given side of \a bars, between it and whatever it was stacked on:
+    if (QCPBars* const neighbour = above ? bars->mBarAbove.data() : bars->mBarBelow.data())
+        connectBars(above ? this : neighbour, above ? neighbour : this);
+    connectBars(above ? bars : this, above ? this : bars);
 }
 
 /*!
@@ -882,23 +873,23 @@ QCPRange QCPBars::getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain) co
     // determine exact range of bars by including bar width and barsgroup offset:
     if (foundRange && mKeyAxis)
     {
-        double lowerPixelWidth, upperPixelWidth, keyPixel;
-        // lower range bound:
-        getPixelWidth(range.lower, lowerPixelWidth, upperPixelWidth);
-        keyPixel = mKeyAxis.data()->coordToPixel(range.lower) + lowerPixelWidth;
-        if (mBarsGroup)
-            keyPixel += mBarsGroup->keyPixelOffset(this, range.lower);
-        const double lowerCorrected = mKeyAxis.data()->pixelToCoord(keyPixel);
-        if (!qIsNaN(lowerCorrected) && qIsFinite(lowerCorrected) && range.lower > lowerCorrected)
-            range.lower = lowerCorrected;
-        // upper range bound:
-        getPixelWidth(range.upper, lowerPixelWidth, upperPixelWidth);
-        keyPixel = mKeyAxis.data()->coordToPixel(range.upper) + upperPixelWidth;
-        if (mBarsGroup)
-            keyPixel += mBarsGroup->keyPixelOffset(this, range.upper);
-        const double upperCorrected = mKeyAxis.data()->pixelToCoord(keyPixel);
-        if (!qIsNaN(upperCorrected) && qIsFinite(upperCorrected) && range.upper < upperCorrected)
-            range.upper = upperCorrected;
+        // A bound's outer pixel edge back in coordinates, `upper` taking the far side of the bar.
+        const auto outerEdge = [&](double bound, bool upper)
+        {
+            double lowerPixelWidth, upperPixelWidth;
+            getPixelWidth(bound, lowerPixelWidth, upperPixelWidth);
+            double keyPixel = mKeyAxis.data()->coordToPixel(bound)
+                + (upper ? upperPixelWidth : lowerPixelWidth);
+            if (mBarsGroup)
+                keyPixel += mBarsGroup->keyPixelOffset(this, bound);
+            return mKeyAxis.data()->pixelToCoord(keyPixel);
+        };
+        const double lower = outerEdge(range.lower, false);
+        if (qIsFinite(lower) && lower < range.lower)
+            range.lower = lower;
+        const double upper = outerEdge(range.upper, true);
+        if (qIsFinite(upper) && upper > range.upper)
+            range.upper = upper;
     }
     return range;
 }

@@ -267,6 +267,7 @@ protected:
     std::optional<double> hitTest(QCP::Pixels at, QVariant* details) const override;
 
     // non-virtual methods:
+    void moveRelativeTo(QCPBars* bars, bool above);
     void recordSegments(QCPDrawContext& context, const QList<QCPDataRange>& segments,
                         bool selected) const;
     void recordBar(QCPDrawContext& context, double key, double value, const QPen& pen,
