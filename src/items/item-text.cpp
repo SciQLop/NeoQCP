@@ -270,10 +270,10 @@ void QCPItemText::setPosition(const QCP::Position& position)
 QCPTextStyle QCPItemText::textStyle() const
 {
     QCPTextStyle style;
-    style.font = mainFont();
-    style.color = mainColor();
-    style.pen = mainPen();
-    style.brush = mainBrush();
+    style.font = mSelected ? mSelectedFont : mFont;
+    style.color = mSelected ? mSelectedColor : mColor;
+    style.pen = mSelected ? mSelectedPen : mPen;
+    style.brush = mSelected ? mSelectedBrush : mBrush;
     style.alignment = mPositionAlignment;
     style.textFlags = int(Qt::TextDontClip | mTextAlignment);
     style.rotationDegrees = mRotation;
@@ -403,44 +403,4 @@ QPointF QCPItemText::getTextDrawPoint(const QPointF& pos, const QRectF& rect,
     else if (positionAlignment.testFlag(Qt::AlignBottom))
         result.ry() -= rect.height();
     return result;
-}
-
-/*! \internal
-
-  Returns the font that should be used for drawing text. Returns mFont when the item is not selected
-  and mSelectedFont when it is.
-*/
-QFont QCPItemText::mainFont() const
-{
-    return mSelected ? mSelectedFont : mFont;
-}
-
-/*! \internal
-
-  Returns the color that should be used for drawing text. Returns mColor when the item is not
-  selected and mSelectedColor when it is.
-*/
-QColor QCPItemText::mainColor() const
-{
-    return mSelected ? mSelectedColor : mColor;
-}
-
-/*! \internal
-
-  Returns the pen that should be used for drawing lines. Returns mPen when the item is not selected
-  and mSelectedPen when it is.
-*/
-QPen QCPItemText::mainPen() const
-{
-    return mSelected ? mSelectedPen : mPen;
-}
-
-/*! \internal
-
-  Returns the brush that should be used for drawing fills of the item. Returns mBrush when the item
-  is not selected and mSelectedBrush when it is.
-*/
-QBrush QCPItemText::mainBrush() const
-{
-    return mSelected ? mSelectedBrush : mBrush;
 }

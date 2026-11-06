@@ -162,10 +162,6 @@ protected:
     QSize glyphSize(const QCPTextStyle& style) const;
     QPointF getTextDrawPoint(const QPointF& pos, const QRectF& rect,
                              Qt::Alignment positionAlignment) const;
-    QFont mainFont() const;
-    QColor mainColor() const;
-    QPen mainPen() const;
-    QBrush mainBrush() const;
 };
 
 // The fluent handle of a QCPItemText; see QCPItemOps for the subclass contract.

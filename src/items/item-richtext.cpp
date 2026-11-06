@@ -18,7 +18,7 @@ void QCPItemRichText::setHtml(const QString& html)
         return;
     markDirty();
     mHtml = html;
-    mDoc.setDefaultFont(mainFont());
+    mDoc.setDefaultFont(textStyle().font);
     mDoc.setHtml(html);
     mBoundingRect = QRectF(QPointF(0, 0), mDoc.size());
     mUseHtml = true;
@@ -52,7 +52,7 @@ void QCPItemRichText::draw(QCPDrawContext& context) const
         return;
     }
 
-    const QFont currentFont = mainFont();
+    const QFont currentFont = textStyle().font;
     if (mDoc.defaultFont() != currentFont)
     {
         mDoc.setDefaultFont(currentFont);
@@ -80,17 +80,18 @@ void QCPItemRichText::drawHtml(QCPPainter& painter) const
     const QPointF drawPos = getTextDrawPoint(QPointF(0, 0), textBoxRect, mPositionAlignment);
     textBoxRect.moveTopLeft(drawPos);
 
-    const int clipPad = qCeil(mainPen().widthF());
+    const QCPTextStyle style = textStyle();
+    const int clipPad = qCeil(style.pen.widthF());
     const QRectF boundingRect = textBoxRect.adjusted(-clipPad, -clipPad, clipPad, clipPad);
     if (!transform.mapRect(boundingRect).intersects(painter.transform().mapRect(clipRect())))
         return;
 
     painter.setTransform(transform);
-    if ((mainBrush().style() != Qt::NoBrush && mainBrush().color().alpha() != 0)
-        || (mainPen().style() != Qt::NoPen && mainPen().color().alpha() != 0))
+    if ((style.brush.style() != Qt::NoBrush && style.brush.color().alpha() != 0)
+        || (style.pen.style() != Qt::NoPen && style.pen.color().alpha() != 0))
     {
-        painter.setPen(mainPen());
-        painter.setBrush(mainBrush());
+        painter.setPen(style.pen);
+        painter.setBrush(style.brush);
         if (mCornerRadius > 0)
             painter.drawRoundedRect(textBoxRect, mCornerRadius, mCornerRadius);
         else

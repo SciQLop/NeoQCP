@@ -196,6 +196,9 @@ Plottables and items on the drawing API: QCPBars records one rect per bar (selec
         document as a painter callback. QCPItemPosition::set(const QCP::Position&) and
         QCPItemText::setPosition(const QCP::Position&) place an object with a typed position, without
         a setter sequence or a type flag.
+  - QCPItemText resolves its font, colour, pen and brush in textStyle() alone: the protected
+        mainFont/mainColor/mainPen/mainBrush accessors are gone, nothing used them separately (a
+        subclass reads mSelected ? mSelectedFont : mFont).
   - An item whose visible geometry is not its recording (a bar) answers selectTest through its own
         hitTest(). QCPBars keeps its getKeyRange/getValueRange overrides.
 Drawing on the GPU and in an export:
