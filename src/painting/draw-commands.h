@@ -447,20 +447,23 @@ inline double qcpStrokePad(const QPen& pen)
 }
 
 //! The box \a pixels cover; a pixel that is not finite carries nothing, so a gap in a series or
-//! between two error bars never widens the box to infinity.
+//! between two error bars never widens the box to infinity. The corners are tracked by hand: a box
+//! of points has no extent, and QRectF::united() returns the other rect when either is null, so it
+//! would keep the last point alone.
 inline QRectF qcpPixelBox(std::span<const QPointF> pixels)
 {
-    QRectF box;
+    QPointF low;
+    QPointF high;
     bool empty = true;
     for (const QPointF& pixel : pixels)
     {
         if (!std::isfinite(pixel.x()) || !std::isfinite(pixel.y()))
             continue;
-        const QRectF point(pixel, QSizeF(0.0, 0.0));
-        box = empty ? point : box.united(point);
+        low = empty ? pixel : QPointF(std::min(low.x(), pixel.x()), std::min(low.y(), pixel.y()));
+        high = empty ? pixel : QPointF(std::max(high.x(), pixel.x()), std::max(high.y(), pixel.y()));
         empty = false;
     }
-    return box;
+    return empty ? QRectF() : QRectF(low, high);
 }
 
 //! \a positions resolved through \a frame and boxed; \a points mapped through \a transform and
