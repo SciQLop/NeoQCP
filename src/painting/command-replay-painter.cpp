@@ -111,27 +111,6 @@ void replayText(const qcp::TextCmd& cmd, QCPPainter& painter, const QCPDrawFrame
 
 namespace
 {
-//! The kinds the RHI replay draws: on the screen the painter must leave them to it.
-bool isGpuKind(const qcp::QCPDrawCommand& command)
-{
-    return std::visit(
-        [](const auto& cmd)
-        {
-            using Command = std::decay_t<decltype(cmd)>;
-            return std::is_same_v<Command, qcp::PolylineDataCmd>
-                || std::is_same_v<Command, qcp::PolylinePositionsCmd>
-                || std::is_same_v<Command, qcp::PolygonCmd>
-                || std::is_same_v<Command, qcp::FillBetweenCmd>
-                || std::is_same_v<Command, qcp::RectCmd> || std::is_same_v<Command, qcp::EllipseCmd>
-                || std::is_same_v<Command, qcp::ErrorBarsCmd>
-                || std::is_same_v<Command, qcp::MarkersCmd>;
-        },
-        command);
-}
-} // namespace
-
-namespace
-{
 //! How far a command's stroke reaches beyond the geometry it is given.
 double strokePad(const QPen& pen)
 {
@@ -220,12 +199,13 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
     Scratch& local = scratch();
     for (const qcp::QCPDrawCommand& command : list.commands)
     {
-        if (kinds == QCPReplayKinds::GpuOnly && !isGpuKind(command))
+        const qcp::CommandKind kind = qcp::commandKind(command);
+        if (kinds == QCPReplayKinds::GpuOnly && !kind.gpu)
             continue;
         // A recording the layer could not take whole is painted by this pass like any other
         // recording: the visit below draws every one of its commands.
         const bool painterDrawsAll = fallback && fallback->painterDrawsAll(list.id);
-        if (kinds == QCPReplayKinds::PainterOnly && isGpuKind(command) && !painterDrawsAll)
+        if (kinds == QCPReplayKinds::PainterOnly && kind.gpu && !painterDrawsAll)
         {
             // The layer could not take this command's image: paint it here, in the buffer the GPU
             // geometry draws over. A stroke the GPU cannot express is part of it.

@@ -50,79 +50,6 @@ quint64& fillBuilds()
     return count;
 }
 
-//! True when every position the command was recorded from is QCP::Data.
-//!
-//! Only then do the resolved pixels move by one delta when the transform pans: a pixel or ratio
-//! position stays put, and an anchor follows its item. Kept triangles for anything else would be
-//! shifted to the wrong place.
-bool isDataOnlyCommand(const qcp::QCPDrawCommand& command)
-{
-    const auto allData = [](const std::vector<QCP::Position>& positions)
-    {
-        return std::all_of(positions.begin(), positions.end(), [](const QCP::Position& p)
-                           { return std::holds_alternative<QCP::Data>(p); });
-    };
-    return std::visit(
-        [&allData](const auto& cmd)
-        {
-            using T = std::decay_t<decltype(cmd)>;
-            if constexpr (std::is_same_v<T, qcp::PolylineDataCmd>
-                          || std::is_same_v<T, qcp::FillBetweenCmd>
-                          || std::is_same_v<T, qcp::MarkersCmd>
-                          || std::is_same_v<T, qcp::ErrorBarsCmd>)
-                return true;
-            else if constexpr (std::is_same_v<T, qcp::PolylinePositionsCmd>
-                               || std::is_same_v<T, qcp::PolygonCmd>)
-                return allData(cmd.points);
-            else if constexpr (std::is_same_v<T, qcp::RectCmd>
-                               || std::is_same_v<T, qcp::EllipseCmd>)
-                return std::holds_alternative<QCP::Data>(cmd.a)
-                    && std::holds_alternative<QCP::Data>(cmd.b);
-            else
-                return false;
-        },
-        command);
-}
-
-//! True when every position of \a command is a Pixels one: it stays where it is, whatever the
-//! transform does.
-bool isStaticCommand(const qcp::QCPDrawCommand& command)
-{
-    const auto allPixels = [](const std::vector<QCP::Position>& positions)
-    {
-        return std::all_of(positions.begin(), positions.end(), [](const QCP::Position& p)
-                           { return std::holds_alternative<QCP::Pixels>(p); });
-    };
-    return std::visit(
-        [&allPixels](const auto& cmd)
-        {
-            using T = std::decay_t<decltype(cmd)>;
-            if constexpr (std::is_same_v<T, qcp::PolylinePositionsCmd>
-                          || std::is_same_v<T, qcp::PolygonCmd>)
-                return allPixels(cmd.points);
-            else if constexpr (std::is_same_v<T, qcp::RectCmd>
-                               || std::is_same_v<T, qcp::EllipseCmd>)
-                return std::holds_alternative<QCP::Pixels>(cmd.a)
-                    && std::holds_alternative<QCP::Pixels>(cmd.b);
-            else
-                return false;
-        },
-        command);
-}
-
-//! True when the GPU replay keeps no geometry for \a command: the painter draws it every frame.
-bool isPainterOnlyCommand(const qcp::QCPDrawCommand& command)
-{
-    return std::visit(
-        [](const auto& cmd)
-        {
-            using T = std::decay_t<decltype(cmd)>;
-            return std::is_same_v<T, qcp::TextCmd> || std::is_same_v<T, qcp::PathCmd>
-                || std::is_same_v<T, qcp::ImageCmd> || std::is_same_v<T, qcp::PainterCmd>;
-        },
-        command);
-}
-
 //! Whether the kept geometry of \a list may be re-emitted on a translated frame.
 //!
 //! Every command the GPU keeps must move the same way: all data (one delta shifts them all), or all
@@ -136,11 +63,12 @@ bool mayReuseGeometry(const QCPDrawList& list)
     bool kept = false;
     for (const qcp::QCPDrawCommand& command : list.commands)
     {
-        if (isPainterOnlyCommand(command))
+        const qcp::CommandKind kind = qcp::commandKind(command);
+        if (kind.painterOnly)
             continue;
         kept = true;
-        allMove = allMove && isDataOnlyCommand(command);
-        allStay = allStay && isStaticCommand(command);
+        allMove = allMove && kind.dataOnly;
+        allStay = allStay && kind.staticOnly;
     }
     return !kept || allMove || (allStay && !list.transformDependent);
 }
@@ -234,11 +162,12 @@ void addRasterCommand(const QCPDrawList& list, QCPPlottableRhiLayer& layer,
         return;
     const quint64 listId = list.id;
     const quint64 index = qcpCommandIndex(list, command);
-    const bool movesWithData = isDataOnlyCommand(command);
+    const qcp::CommandKind kind = qcp::commandKind(command);
+    const bool movesWithData = kind.dataOnly;
     // A data command moves with the data and a pixel command stays put, so a pan may draw the kept
     // image shifted (or not); anything else has to be rasterised again for its new transform.
     const qcp::PanBehaviour behaviour = movesWithData ? qcp::PanBehaviour::Moves
-        : isStaticCommand(command)                    ? qcp::PanBehaviour::Stays
+        : kind.staticOnly                             ? qcp::PanBehaviour::Stays
                                                       : qcp::PanBehaviour::Exact;
     if (!layer.canAddImage())
     {
@@ -594,7 +523,7 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
         const bool strokeRaster = qcp::strokeNeedsRaster(command)
             || (!plottables.dashedAvailable() && qcp::strokeIsDashed(command));
         const bool fillRaster = qcp::fillNeedsRaster(command);
-        const bool dataOnly = isDataOnlyCommand(command);
+        const bool dataOnly = qcp::commandKind(command).dataOnly;
         const auto raster = [&]
         {
             addRasterCommand(list, plottables, command, frame, fallback, clip, dpr, outputSize,
@@ -711,7 +640,7 @@ bool qcpRecordingMovesWithTheData(const QCPDrawList& list)
     // recording that holds either is replayed again instead.
     return std::all_of(list.commands.begin(), list.commands.end(),
                        [](const qcp::QCPDrawCommand& command)
-                       { return isDataOnlyCommand(command) && !qcp::needsRaster(command); });
+                       { return qcp::commandKind(command).dataOnly && !qcp::needsRaster(command); });
 }
 
 std::vector<float> qcpFanFillVertices(const QPointF& centre, std::span<const QPointF> ring,

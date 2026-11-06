@@ -24,6 +24,7 @@
 #include <functional>
 #include <limits>
 #include <memory>
+#include <type_traits>
 #include <variant>
 #include <vector>
 
@@ -141,6 +142,56 @@ struct PainterCmd
 using QCPDrawCommand
     = std::variant<PolylineDataCmd, PolylinePositionsCmd, PolygonCmd, FillBetweenCmd, RectCmd,
                    EllipseCmd, MarkersCmd, ErrorBarsCmd, TextCmd, PathCmd, ImageCmd, PainterCmd>;
+
+//! What a replay asks of a command: one visit answers every question about its kind.
+//!
+//! \a gpu is what the RHI replay draws (on the screen the painter leaves it to it), \a painterOnly
+//! is what keeps no geometry at all (the painter draws it every frame), and the last two name the
+//! space its positions are in: \a dataOnly when every one is data, so a kept triangle set moves by
+//! one delta when the transform pans, and \a staticOnly when every one is pixels, so it stays where
+//! it is. A ratio or an anchor is neither: a recording that keeps one is rebuilt from its commands
+//! rather than shifted.
+struct CommandKind
+{
+    bool gpu = false;
+    bool painterOnly = false;
+    bool dataOnly = false;
+    bool staticOnly = false;
+};
+
+//! True when every position of \a positions is a \a Space.
+template <class Space>
+bool allPositionsIn(const std::vector<QCP::Position>& positions)
+{
+    return std::all_of(positions.begin(), positions.end(),
+                       [](const QCP::Position& position)
+                       { return std::holds_alternative<Space>(position); });
+}
+
+inline CommandKind commandKind(const QCPDrawCommand& command)
+{
+    return std::visit(
+        [](const auto& cmd)
+        {
+            using T = std::decay_t<decltype(cmd)>;
+            if constexpr (std::is_same_v<T, PolylineDataCmd> || std::is_same_v<T, FillBetweenCmd>
+                          || std::is_same_v<T, MarkersCmd> || std::is_same_v<T, ErrorBarsCmd>)
+                return CommandKind { true, false, true, false }; // data by type, never mapped
+            else if constexpr (std::is_same_v<T, TextCmd> || std::is_same_v<T, PathCmd>
+                               || std::is_same_v<T, ImageCmd> || std::is_same_v<T, PainterCmd>)
+                return CommandKind { false, true, false, false };
+            else if constexpr (std::is_same_v<T, RectCmd> || std::is_same_v<T, EllipseCmd>)
+                return CommandKind { true, false,
+                                     std::holds_alternative<QCP::Data>(cmd.a)
+                                         && std::holds_alternative<QCP::Data>(cmd.b),
+                                     std::holds_alternative<QCP::Pixels>(cmd.a)
+                                         && std::holds_alternative<QCP::Pixels>(cmd.b) };
+            else
+                return CommandKind { true, false, allPositionsIn<QCP::Data>(cmd.points),
+                                     allPositionsIn<QCP::Pixels>(cmd.points) };
+        },
+        command);
+}
 } // namespace qcp
 
 //! The size \a text needs in \a style: the measurement a text command keeps.
