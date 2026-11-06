@@ -275,14 +275,16 @@ Round C (75a98a4..465cf64)
   folding the `QCPDrawn` adapter into the bases (spec section 8, `src/drawable.h` comment).
 - The strong-type inventory (`strong-type-candidates.md`, Task 2): every public signature outside
   drawing where a raw `double`, `int`, `QPointF` or `QString` invites a mix-up.
-- Re-review M6: a bar stack's staleness check recurses down the stack, O(N²) in its depth.
+- Re-review M6: a bar stack's staleness check recurses down the stack, O(N²) in its depth (a
+  `simplify:` note at the recursion, 07293ed). A per-frame cache is unsound: a change deep in the
+  stack bumps only that bar's generation. The upgrade is a revision shared by one stack's members.
   Negligible for real stacks.
-- Re-review OC F4: the GPU stroke's `thread_local` scratch buffer keeps its peak size. Memory only.
-- Re-review OC guess: a deferred painter callback could dangle if an object were deleted mid-pass.
-  No path deletes one mid-pass today; recheck if that changes.
-- Other mixed 2.x position pairs (plot coordinates with `ptAbsolute` or `ptViewportRatio`) still
-  read the crossed slot on a vertical key axis in `pixelPosition()`. The drawing API has no such
-  type; they go with the old API in milestone 5.
+
+Round D (2026-11-06) closed the other re-review minors: every plot-coordinate position mix follows
+the key/value rule (47e4e02), the stroke scratch gives back a peak above 1 MB (03ec2ff), and the
+deferred-painter "guess" was a real crash: an object deleted by another one's draw during an export
+left the callback reading freed commands. The callback now holds the state weakly (19a9831).
+Verified at 19a9831: offscreen 1843/0/122, Xvfb 1965/0/0, ASan 1843/0/122 (opencode).
 
 ## Format decisions for milestone 4 (survey)
 
