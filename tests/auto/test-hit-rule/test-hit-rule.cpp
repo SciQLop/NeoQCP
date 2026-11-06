@@ -87,12 +87,12 @@ void TestHitRule::wheelNeedsDistanceToo()
 
     const QPointF far = pixelOf(1, 9);
     QVERIFY(mPlot->axisRect()->rect().contains(far.toPoint()));
-    QVERIFY(!hitsContain(mPlot->hitsAt(far, QCPHitAction::Wheel), graph));
-    QVERIFY(!hitsContain(mPlot->hitsAt(far, QCPHitAction::Wheel), multi));
+    QVERIFY(!hitsContain(mPlot->hitsAt(far, QCPHitAction::Press), graph));
+    QVERIFY(!hitsContain(mPlot->hitsAt(far, QCPHitAction::Press), multi));
 
     const QPointF onCurve = pixelOf(5, 5);
-    QVERIFY(hitsContain(mPlot->hitsAt(onCurve, QCPHitAction::Wheel), graph));
-    QVERIFY(hitsContain(mPlot->hitsAt(onCurve, QCPHitAction::Wheel), multi));
+    QVERIFY(hitsContain(mPlot->hitsAt(onCurve, QCPHitAction::Press), graph));
+    QVERIFY(hitsContain(mPlot->hitsAt(onCurve, QCPHitAction::Press), multi));
 }
 
 void TestHitRule::pressAndSelectionAgreeWhenSelectable()
@@ -153,8 +153,7 @@ void TestHitRule::topmostWithinToleranceWins()
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
     const QPointF pos = pixelOf(5, 5);
-    for (const QCPHitAction action :
-         { QCPHitAction::Press, QCPHitAction::Select, QCPHitAction::Wheel })
+    for (const QCPHitAction action : { QCPHitAction::Press, QCPHitAction::Select })
     {
         const QList<QCPHit> hits = mPlot->hitsAt(pos, action);
         QVERIFY(hits.size() >= 2);

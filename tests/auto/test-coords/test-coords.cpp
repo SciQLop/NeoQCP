@@ -121,49 +121,6 @@ void TestCoords::mapMatchesCoordToPixel()
     }
 }
 
-void TestCoords::inverseRoundTrips()
-{
-    std::mt19937 rng(7);
-    for (const ScaleCase& testCase : kCases)
-    {
-        auto plot = layoutPlot();
-        QCPAxis* keyAxis = plot->xAxis;
-        QCPAxis* valueAxis = plot->yAxis;
-        if (testCase.verticalKey)
-        {
-            keyAxis = plot->axisRect()->addAxis(QCPAxis::atLeft);
-            valueAxis = plot->axisRect()->addAxis(QCPAxis::atBottom);
-        }
-        const auto scale = testCase.logarithmic ? QCPAxis::stLogarithmic : QCPAxis::stLinear;
-        keyAxis->setScaleType(scale);
-        valueAxis->setScaleType(scale);
-        keyAxis->setRange(2, 2000);
-        valueAxis->setRange(2, 2000);
-        keyAxis->setRangeReversed(testCase.reversed);
-        valueAxis->setRangeReversed(testCase.reversed);
-        plot->replot();
-
-        const QCPTransform transform(keyAxis, valueAxis);
-        std::uniform_real_distribution<double> fx(double(keyAxis->axisRect()->left()),
-                                                  double(keyAxis->axisRect()->right()));
-        std::uniform_real_distribution<double> fy(double(valueAxis->axisRect()->top()),
-                                                  double(valueAxis->axisRect()->bottom()));
-        for (int i = 0; i < 200; ++i)
-        {
-            const QCP::Pixels start { fx(rng), fy(rng) };
-            const QCP::Pixels roundTrip = transform.map(transform.inverse(start));
-            QVERIFY2(nearlyEqual(roundTrip.x, start.x, 1e-6)
-                         && nearlyEqual(roundTrip.y, start.y, 1e-6),
-                     qPrintable(QStringLiteral("%1: %2,%3 came back as %4,%5")
-                                    .arg(QLatin1String(testCase.name))
-                                    .arg(start.x)
-                                    .arg(start.y)
-                                    .arg(roundTrip.x)
-                                    .arg(roundTrip.y)));
-        }
-    }
-}
-
 void TestCoords::batchMatchesScalar()
 {
     std::mt19937 rng(11);
@@ -328,7 +285,8 @@ void TestCoords::panDeltaIsMeasuredInsideTheRange()
     const QCPTransform after(plot->xAxis, plot->yAxis);
 
     QPointF delta;
-    QVERIFY2(before.isTranslationOf(after, &delta), "the two slopes are a thousandth of a pixel apart");
+    QVERIFY2(before.isTranslationOf(after, &delta),
+             "the two slopes are a thousandth of a pixel apart");
     for (const double key : { start, start + span * 0.5, start + span })
     {
         const QPointF moved = pixelsOf(before, key, 5.0) - pixelsOf(after, key, 5.0);
@@ -484,8 +442,6 @@ void TestCoords::ratioTransformMatchesPixels()
     const QCP::Pixels centre = transform.map(QCP::AxisRatio { 0.5, 0.5 });
     QVERIFY(nearlyEqual(centre.x, plot->axisRect()->left() + plot->axisRect()->width() * 0.5));
     QVERIFY(nearlyEqual(centre.y, plot->axisRect()->top() + plot->axisRect()->height() * 0.5));
-    const QCP::AxisRatio back = transform.inverse(centre);
-    QVERIFY(nearlyEqual(back.x, 0.5) && nearlyEqual(back.y, 0.5));
 
     // 2.x agreement: an item position of type ptAxisRectRatio lands on the same pixels.
     auto* item = new QCPItemText(plot.get());

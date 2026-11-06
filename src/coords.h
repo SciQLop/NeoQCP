@@ -65,12 +65,6 @@ struct PixelOffset
     double dy = 0;
 };
 
-//! A length in pixels.
-struct PixelLength
-{
-    double value = 0;
-};
-
 //! Pixels relative to an anchor: the item position type ptAbsolute with a parent anchor.
 struct AnchorOffset
 {
@@ -131,9 +125,6 @@ public:
 
     //! Maps one data point to pixels.
     [[nodiscard]] QCP::Pixels map(QCP::Data data) const;
-    //! Maps one pixel point back to data coordinates (the inverse of map, not clamped to the
-    //! range).
-    [[nodiscard]] QCP::Data inverse(QCP::Pixels pixels) const;
     //! Maps keys and values in bulk into \a out; stops at the shortest of the three spans.
     void map(std::span<const double> keys, std::span<const double> values,
              std::span<QPointF> out) const;
@@ -181,7 +172,6 @@ private:
         void snapshot(const QCPAxis* axis);
         void prepare();
         [[nodiscard]] double toPixel(double value) const;
-        [[nodiscard]] double toValue(double pixel) const;
     };
 
     template <bool KeyLog, bool ValueLog, typename KeyAt, typename ValueAt>
@@ -211,8 +201,6 @@ public:
 
     //! Maps a fraction of the axis rect to pixels.
     [[nodiscard]] QCP::Pixels map(QCP::AxisRatio ratio) const;
-    //! Maps pixels back to a fraction of the axis rect (not clamped to 0..1).
-    [[nodiscard]] QCP::AxisRatio inverse(QCP::Pixels pixels) const;
     //! True when the two transforms differ by a pixel offset only (the rect moved, same size).
     [[nodiscard]] bool isTranslationOf(const QCPRatioTransform& other,
                                        QPointF* delta = nullptr) const;

@@ -85,8 +85,7 @@ struct Construct;
 enum class QCPHitAction
 {
     Press,
-    Select,
-    Wheel
+    Select
 };
 
 //! One hit of QCustomPlot::hitsAt: the layerable and the selection details of the hit.

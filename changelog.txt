@@ -167,9 +167,9 @@ Writing a plot type: derive from QCPDrawn<Base> (QCPAbstractPlottable, a QCPAbst
   - Positions keep the space they were written in: QCP::Data, QCP::Pixels, QCP::AxisRatio,
         QCP::AnchorOffset (an anchor plus a QCP::PixelOffset) and the per-axis mixes QCP::DataXRatioY
         and QCP::RatioXDataY. QCP::PixelOffset keeps a data value from being passed where pixels are
-        expected (Data + Pixels does not compile); QCP::PixelLength is the same marker for a length,
-        with no API taking it yet. QCPTransform and QCPRatioTransform map, invert, recognise a pure
-        translation (QCPTransform::isTranslationOf) and map a whole batch without a per-point branch.
+        expected (Data + Pixels does not compile). QCPTransform and QCPRatioTransform map, recognise
+        a pure translation (QCPTransform::isTranslationOf) and map a whole batch without a per-point
+        branch.
   - Drawing that is genuinely pixels reads QCPDrawContext::transform(); the recording is then marked
         transform dependent and is remade on every transform change, a pan included (QCPBars with a
         width in pixels, and grouped or stacked bars, do this; a width in plot coordinates never
@@ -222,9 +222,11 @@ Drawing on the GPU and in an export:
         screen.
 Hit testing: one rule for press, selection and wheel. The hits are delivered topmost first
         (QCustomPlot::hitsAt, QCPHitAction) and the first that can take the action wins; a selection
-        skips what cannot be selected while a press still lands on it. The "no details asked means
-        anywhere in the axis rect" path is gone, so a wheel over a graph2 needs its distance like a
-        press does. The layer's item index is asked first; hitTest() runs only for candidates.
+        skips what cannot be selected while a press still lands on it. QCPHitAction has Press and
+        Select only: a wheel asks for Press, since the two take the same layerables. The "no details
+        asked means anywhere in the axis rect" path is gone, so a wheel over a graph2 needs its
+        distance like a press does. The layer's item index is asked first; hitTest() runs only for
+        candidates.
 
 Behaviour changes for 2.x users:
   - Items now default to a new `annotations` layer above `main` (behaviour change: 2.x programs that

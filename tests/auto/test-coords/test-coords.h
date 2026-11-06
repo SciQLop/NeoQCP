@@ -8,7 +8,6 @@ class TestCoords : public QObject
     Q_OBJECT
 private slots:
     void mapMatchesCoordToPixel();
-    void inverseRoundTrips();
     void batchMatchesScalar();
     void interleavedBatchMatchesScalar();
     void translationDetected();

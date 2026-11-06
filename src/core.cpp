@@ -4941,9 +4941,9 @@ void QCustomPlot::updateLayerIndices() const
 
   \a action says what the hit is for: Select skips the layerables that cannot be selected (a
   layerable says so by returning -1 from selectTest() when only selectable ones are asked for),
-  Press and Wheel take any layerable that is hit. A layerable is hit when its selectTest() distance
-  is below the selection tolerance, whatever the action: there is no "anywhere in my rectangle"
-  shortcut any more.
+  Press takes any layerable that is hit, and a wheel asks for Press too. A layerable is hit when its
+  selectTest() distance is below the selection tolerance, whatever the action: there is no
+  "anywhere in my rectangle" shortcut any more.
 
   Precedence is the mouse grabber (mMouseEventLayerable, which the event handlers consult before
   this list), then this list. The axis rect lies under the drawables, so it comes last: its own

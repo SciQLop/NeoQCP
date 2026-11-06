@@ -156,13 +156,6 @@ double QCPTransform::Axis::toPixel(double value) const
     return logSlope * std::log(std::abs(value)) + logIntercept;
 }
 
-double QCPTransform::Axis::toValue(double pixel) const
-{
-    if (!logarithmic)
-        return (pixel - intercept) / slope;
-    return positive * std::exp((pixel - logIntercept) / logSlope);
-}
-
 QCP::Pixels QCPTransform::map(QCP::Data data) const
 {
     if (!mKey.usable || !mValue.usable)
@@ -172,16 +165,6 @@ QCP::Pixels QCPTransform::map(QCP::Data data) const
     const double valuePixel = mValue.toPixel(data.y);
     return mKey.vertical ? QCP::Pixels { valuePixel, keyPixel }
                          : QCP::Pixels { keyPixel, valuePixel };
-}
-
-QCP::Data QCPTransform::inverse(QCP::Pixels pixels) const
-{
-    if (!mKey.usable || !mValue.usable)
-        return QCP::Data { std::numeric_limits<double>::quiet_NaN(),
-                           std::numeric_limits<double>::quiet_NaN() };
-    const double keyPixel = mKey.vertical ? pixels.y : pixels.x;
-    const double valuePixel = mKey.vertical ? pixels.x : pixels.y;
-    return QCP::Data { mKey.toValue(keyPixel), mValue.toValue(valuePixel) };
 }
 
 template <bool KeyLog, bool ValueLog, typename KeyAt, typename ValueAt>
@@ -324,14 +307,6 @@ QCP::Pixels QCPRatioTransform::map(QCP::AxisRatio ratio) const
                              std::numeric_limits<double>::quiet_NaN() };
     // The same arithmetic as QCPItemPosition's ptAxisRectRatio branch.
     return QCP::Pixels { mLeft + ratio.x * mWidth, mTop + ratio.y * mHeight };
-}
-
-QCP::AxisRatio QCPRatioTransform::inverse(QCP::Pixels pixels) const
-{
-    if (!valid())
-        return QCP::AxisRatio { std::numeric_limits<double>::quiet_NaN(),
-                                std::numeric_limits<double>::quiet_NaN() };
-    return QCP::AxisRatio { (pixels.x - mLeft) / mWidth, (pixels.y - mTop) / mHeight };
 }
 
 bool QCPRatioTransform::isTranslationOf(const QCPRatioTransform& other, QPointF* delta) const
