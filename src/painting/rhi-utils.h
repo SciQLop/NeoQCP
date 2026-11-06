@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QColor>
+#include <QDebug>
 #include <QImage>
 #include <array>
 #include <rhi/qrhi.h>
@@ -87,6 +88,43 @@ inline QRhiGraphicsPipeline* createPipeline(QRhi* rhi, QRhiRenderPassDescriptor*
 {
     return createPipeline(rhi, rpDesc, sampleCount, loadEmbeddedShader(vertData, vertLength),
                           loadEmbeddedShader(fragData, fragLength), layout, srb, topology);
+}
+
+// The shader-resource-bindings object every layer creates, from explicit bindings (a layer that
+// binds more than one texture). Returns nullptr and reports \a failure when creation fails; the
+// caller owns it.
+inline QRhiShaderResourceBindings*
+createSrb(QRhi* rhi, const QList<QRhiShaderResourceBinding>& bindings, const char* failure)
+{
+    QRhiShaderResourceBindings* srb = rhi->newShaderResourceBindings();
+    srb->setBindings(bindings.cbegin(), bindings.cend());
+    if (!srb->create())
+    {
+        qDebug() << failure;
+        delete srb;
+        return nullptr;
+    }
+    return srb;
+}
+
+// The same object for the shape every layer has: a uniform buffer at \a binding (bound a
+// \a size-byte slot at a time when \a size is non-zero) and, when given, a sampled texture at
+// binding 0 (a null texture is allowed when the pipeline only needs the layout).
+inline QRhiShaderResourceBindings*
+createSrb(QRhi* rhi, QRhiBuffer* ubo, int binding, QRhiShaderResourceBinding::StageFlags stages,
+          const char* failure, int size = 0, QRhiTexture* texture = nullptr,
+          QRhiSampler* sampler = nullptr)
+{
+    QList<QRhiShaderResourceBinding> bindings;
+    if (texture || sampler)
+        bindings.append(QRhiShaderResourceBinding::sampledTexture(
+            0, QRhiShaderResourceBinding::FragmentStage, texture, sampler));
+    if (size != 0)
+        bindings.append(
+            QRhiShaderResourceBinding::uniformBufferWithDynamicOffset(binding, stages, ubo, size));
+    else
+        bindings.append(QRhiShaderResourceBinding::uniformBuffer(binding, stages, ubo));
+    return createSrb(rhi, bindings, failure);
 }
 
 // The vertex format of every extruded line: dataCoord, colour, extrudeDir, extrudeWidth, isPixel.

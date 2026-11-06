@@ -97,8 +97,8 @@ private:
     bool createLookResources(Look& look, QRhiResourceUpdateBatch* updates);
     static void releaseLookResources(Look& look);
     QRhiTexture* uploadedTexture(const QImage& image, QRhiResourceUpdateBatch* updates);
-    void setBindings(QRhiShaderResourceBindings* srb, QRhiTexture* sprite,
-                     QRhiTexture* colormap) const;
+    QList<QRhiShaderResourceBinding> bindings(QRhiTexture* sprite,
+                                              QRhiTexture* colormap) const;
 
     void stagingAppend(const float* src, int count);
     float* mStagingData = nullptr;

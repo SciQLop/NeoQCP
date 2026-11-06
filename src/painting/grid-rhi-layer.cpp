@@ -96,12 +96,9 @@ bool QCPGridRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc, int sampl
     mLayoutUbo = mRhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, kUniformBufferSize);
     mLayoutUbo->create();
 
-    mLayoutSrb = mRhi->newShaderResourceBindings();
-    mLayoutSrb->setBindings({
-        QRhiShaderResourceBinding::uniformBuffer(
-            0, QRhiShaderResourceBinding::VertexStage, mLayoutUbo)
-    });
-    mLayoutSrb->create();
+    mLayoutSrb = qcp::rhi::createSrb(mRhi, mLayoutUbo, 0,
+                                     QRhiShaderResourceBinding::VertexStage,
+                                     "Failed to create grid layout SRB");
 
     mPipeline = qcp::rhi::createPipeline(mRhi, rpDesc, sampleCount, vertShader, fragShader,
                                          qcp::rhi::strokeVertexLayout(), mLayoutSrb);
@@ -264,12 +261,8 @@ void QCPGridRhiLayer::rebuildGeometry(float dpr, int outputHeight)
         auto* ubo = mRhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, kUniformBufferSize);
         ubo->create();
 
-        auto* srb = mRhi->newShaderResourceBindings();
-        srb->setBindings({
-            QRhiShaderResourceBinding::uniformBuffer(
-                0, QRhiShaderResourceBinding::VertexStage, ubo)
-        });
-        srb->create();
+        auto* srb = qcp::rhi::createSrb(mRhi, ubo, 0, QRhiShaderResourceBinding::VertexStage,
+                                        "Failed to create grid SRB");
 
         DrawGroup group;
         group.axisRect = ar;
@@ -293,12 +286,9 @@ void QCPGridRhiLayer::rebuildGeometry(float dpr, int outputHeight)
             auto* tickUbo = mRhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, kUniformBufferSize);
             tickUbo->create();
 
-            auto* tickSrb = mRhi->newShaderResourceBindings();
-            tickSrb->setBindings({
-                QRhiShaderResourceBinding::uniformBuffer(
-                    0, QRhiShaderResourceBinding::VertexStage, tickUbo)
-            });
-            tickSrb->create();
+            auto* tickSrb = qcp::rhi::createSrb(mRhi, tickUbo, 0,
+                                                QRhiShaderResourceBinding::VertexStage,
+                                                "Failed to create grid tick SRB");
 
             DrawGroup tickGroup;
             tickGroup.axisRect     = ar;

@@ -163,12 +163,11 @@ bool QCPColormapRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc,
             {0, 1, QRhiVertexInputAttribute::Float2, 2 * sizeof(float)}
         });
 
-        auto* layoutSrb = mRhi->newShaderResourceBindings();
-        layoutSrb->setBindings({
-            QRhiShaderResourceBinding::sampledTexture(0, QRhiShaderResourceBinding::FragmentStage, nullptr, mSampler),
-            QRhiShaderResourceBinding::uniformBuffer(1, QRhiShaderResourceBinding::VertexStage, compositeUbo)
-        });
-        if (!layoutSrb->create()) { delete layoutSrb; return false; }
+        auto* layoutSrb = qcp::rhi::createSrb(
+            mRhi, compositeUbo, 1, QRhiShaderResourceBinding::VertexStage,
+            "Failed to create colormap layout SRB", 0, nullptr, mSampler);
+        if (!layoutSrb)
+            return false;
         mPipeline = qcp::rhi::createPipeline(mRhi, rpDesc, sampleCount, compositeVert,
                                        compositeFrag, inputLayout, layoutSrb,
                                        QRhiGraphicsPipeline::TriangleStrip);
@@ -197,21 +196,21 @@ bool QCPColormapRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc,
             {0, 0, QRhiVertexInputAttribute::Float2, 0}
         });
 
-        auto* layoutSrb = mRhi->newShaderResourceBindings();
-        layoutSrb->setBindings({
-            QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage, mLineUbo)
-        });
-        if (!layoutSrb->create()) { delete layoutSrb; return true; }
+        auto* layoutSrb = qcp::rhi::createSrb(
+            mRhi, mLineUbo, 0,
+            QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage,
+            "Failed to create colormap line layout SRB");
+        if (!layoutSrb)
+            return true;
 
         mLinePipeline = qcp::rhi::createPipeline(mRhi, rpDesc, sampleCount, lineVert, lineFrag,
                                            inputLayout, layoutSrb, QRhiGraphicsPipeline::Lines);
 
         // Create real SRB for draw calls
-        mLineSrb = mRhi->newShaderResourceBindings();
-        mLineSrb->setBindings({
-            QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage, mLineUbo)
-        });
-        mLineSrb->create();
+        mLineSrb = qcp::rhi::createSrb(
+            mRhi, mLineUbo, 0,
+            QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage,
+            "Failed to create colormap line SRB");
 
         delete layoutSrb;
     }
@@ -254,12 +253,12 @@ bool QCPColormapRhiLayer::ensureTexture(Quad& quad, QRhiBuffer* compositeUbo)
     if (!quad.srb || texRecreated)
     {
         delete quad.srb;
-        quad.srb = mRhi->newShaderResourceBindings();
-        quad.srb->setBindings({
-            QRhiShaderResourceBinding::sampledTexture(0, QRhiShaderResourceBinding::FragmentStage, quad.texture, mSampler),
-            QRhiShaderResourceBinding::uniformBuffer(1, QRhiShaderResourceBinding::VertexStage, compositeUbo)
-        });
-        if (!quad.srb->create()) { delete quad.srb; quad.srb = nullptr; return false; }
+        quad.srb = qcp::rhi::createSrb(mRhi, compositeUbo, 1,
+                                       QRhiShaderResourceBinding::VertexStage,
+                                       "Failed to create colormap quad SRB", 0, quad.texture,
+                                       mSampler);
+        if (!quad.srb)
+            return false;
     }
 
     return true;

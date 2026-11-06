@@ -346,14 +346,10 @@ bool QCPPlottableRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc, int 
 
     // SRB with dynamic offset: bind the full buffer, one slot at a time
     delete mSrb;
-    mSrb = mRhi->newShaderResourceBindings();
-    mSrb->setBindings({ QRhiShaderResourceBinding::uniformBufferWithDynamicOffset(
-        0, QRhiShaderResourceBinding::VertexStage, mUniformBuffer, sizeof(PerDrawUniforms)) });
-    if (!mSrb->create())
-    {
-        qDebug() << "Failed to create plottable SRB";
+    mSrb = qcp::rhi::createSrb(mRhi, mUniformBuffer, 0, QRhiShaderResourceBinding::VertexStage,
+                               "Failed to create plottable SRB", sizeof(PerDrawUniforms));
+    if (!mSrb)
         return false;
-    }
 
     // Vertex layout: (x, y) float2 + (r, g, b, a) float4
     mPipeline = qcp::rhi::createPipeline(
@@ -416,19 +412,12 @@ void QCPPlottableRhiLayer::createImagePipeline(QRhiRenderPassDescriptor* rpDesc,
     }
 
     // One layout SRB with no texture (the colormap pipeline's idiom): each image binds its own SRB.
-    QRhiShaderResourceBindings* layoutSrb = mRhi->newShaderResourceBindings();
-    layoutSrb->setBindings(
-        { QRhiShaderResourceBinding::sampledTexture(0, QRhiShaderResourceBinding::FragmentStage,
-                                                    nullptr, mImageSampler),
-          QRhiShaderResourceBinding::uniformBufferWithDynamicOffset(
-              1, QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage,
-              mImageUniformBuffer, sizeof(ImageUniforms)) });
-    if (!layoutSrb->create())
-    {
-        qDebug() << "Failed to create image layout SRB";
-        delete layoutSrb;
+    QRhiShaderResourceBindings* layoutSrb = qcp::rhi::createSrb(
+        mRhi, mImageUniformBuffer, 1,
+        QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage,
+        "Failed to create image layout SRB", sizeof(ImageUniforms), nullptr, mImageSampler);
+    if (!layoutSrb)
         return;
-    }
 
     // Vertex layout: (x, y) float2 position + (u, v) float2 texcoord
     mImagePipeline = qcp::rhi::createPipeline(
@@ -472,21 +461,13 @@ bool QCPPlottableRhiLayer::ensureImageTexture(ImageTexture& texture, const QSize
     }
     if (!texture.srb)
     {
-        texture.srb = mRhi->newShaderResourceBindings();
-        texture.srb->setBindings(
-            { QRhiShaderResourceBinding::sampledTexture(0, QRhiShaderResourceBinding::FragmentStage,
-                                                        texture.texture, mImageSampler),
-              QRhiShaderResourceBinding::uniformBufferWithDynamicOffset(
-                  1,
-                  QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage,
-                  mImageUniformBuffer, sizeof(ImageUniforms)) });
-        if (!texture.srb->create())
-        {
-            qDebug() << "Failed to create fallback image SRB";
-            delete texture.srb;
-            texture.srb = nullptr;
+        texture.srb = qcp::rhi::createSrb(
+            mRhi, mImageUniformBuffer, 1,
+            QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage,
+            "Failed to create fallback image SRB", sizeof(ImageUniforms), texture.texture,
+            mImageSampler);
+        if (!texture.srb)
             return false;
-        }
     }
     return true;
 }
@@ -505,15 +486,12 @@ void QCPPlottableRhiLayer::createDashedPipeline(QRhiRenderPassDescriptor* rpDesc
     if (!mDashUniformBuffer)
         return;
 
-    mDashSrb = mRhi->newShaderResourceBindings();
-    mDashSrb->setBindings({ QRhiShaderResourceBinding::uniformBufferWithDynamicOffset(
-        0, QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage,
-        mDashUniformBuffer, sizeof(DashUniforms)) });
-    if (!mDashSrb->create())
-    {
-        qDebug() << "Failed to create dashed plottable SRB";
+    mDashSrb = qcp::rhi::createSrb(
+        mRhi, mDashUniformBuffer, 0,
+        QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage,
+        "Failed to create dashed plottable SRB", sizeof(DashUniforms));
+    if (!mDashSrb)
         return;
-    }
 
     // Vertex layout: (x, y) float2 + (r, g, b, a) float4 + distance float
     mDashPipeline = qcp::rhi::createPipeline(

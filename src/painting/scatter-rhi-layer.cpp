@@ -230,9 +230,9 @@ bool QCPScatterRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc,
     if (!mUniformBuffer->create())
         return false;
 
-    mSrb = mRhi->newShaderResourceBindings();
-    setBindings(mSrb, mPlaceholderTexture, mPlaceholderTexture);
-    if (!mSrb->create())
+    mSrb = qcp::rhi::createSrb(mRhi, bindings(mPlaceholderTexture, mPlaceholderTexture),
+                               "Failed to create scatter SRB");
+    if (!mSrb)
         return false;
 
     // Vertex layout: binding 0 = quad corners (PerVertex), binding 1 = instance data (PerInstance)
@@ -263,18 +263,17 @@ bool QCPScatterRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc,
 }
 
 // UBO (binding 0, vert+frag), sprite (binding 1, frag), colormap (binding 2, frag)
-void QCPScatterRhiLayer::setBindings(QRhiShaderResourceBindings* srb, QRhiTexture* sprite,
-                                     QRhiTexture* colormap) const
+QList<QRhiShaderResourceBinding> QCPScatterRhiLayer::bindings(QRhiTexture* sprite,
+                                                              QRhiTexture* colormap) const
 {
-    srb->setBindings({
-        QRhiShaderResourceBinding::uniformBufferWithDynamicOffset(
-            0, QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage,
-            mUniformBuffer, sizeof(PerDrawUniforms)),
-        QRhiShaderResourceBinding::sampledTexture(
-            1, QRhiShaderResourceBinding::FragmentStage, sprite, mSampler),
-        QRhiShaderResourceBinding::sampledTexture(
-            2, QRhiShaderResourceBinding::FragmentStage, colormap, mSampler)
-    });
+    return { QRhiShaderResourceBinding::uniformBufferWithDynamicOffset(
+                 0,
+                 QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage,
+                 mUniformBuffer, sizeof(PerDrawUniforms)),
+             QRhiShaderResourceBinding::sampledTexture(
+                 1, QRhiShaderResourceBinding::FragmentStage, sprite, mSampler),
+             QRhiShaderResourceBinding::sampledTexture(
+                 2, QRhiShaderResourceBinding::FragmentStage, colormap, mSampler) };
 }
 
 QRhiTexture* QCPScatterRhiLayer::uploadedTexture(const QImage& image,
@@ -303,10 +302,11 @@ bool QCPScatterRhiLayer::createLookResources(Look& look, QRhiResourceUpdateBatch
         releaseLookResources(look);
         return false;
     }
-    look.srb = mRhi->newShaderResourceBindings();
-    setBindings(look.srb, look.spriteTexture,
-                look.colormapTexture ? look.colormapTexture : mPlaceholderTexture);
-    if (!look.srb->create())
+    look.srb = qcp::rhi::createSrb(
+        mRhi, bindings(look.spriteTexture,
+                       look.colormapTexture ? look.colormapTexture : mPlaceholderTexture),
+        "Failed to create scatter sprite SRB");
+    if (!look.srb)
     {
         releaseLookResources(look);
         return false;

@@ -201,16 +201,11 @@ bool QCPSpanRhiLayer::ensurePipeline(QRhiRenderPassDescriptor* rpDesc, int sampl
         return false;
     }
 
-    mLayoutSrb = mRhi->newShaderResourceBindings();
-    mLayoutSrb->setBindings({
-        QRhiShaderResourceBinding::uniformBuffer(
-            0, QRhiShaderResourceBinding::VertexStage, mLayoutUbo)
-    });
-    if (!mLayoutSrb->create())
-    {
-        qDebug() << Q_FUNC_INFO << "Failed to create span layout SRB";
+    mLayoutSrb = qcp::rhi::createSrb(mRhi, mLayoutUbo, 0,
+                                     QRhiShaderResourceBinding::VertexStage,
+                                     "Failed to create span layout SRB");
+    if (!mLayoutSrb)
         return false;
-    }
 
     mPipeline = qcp::rhi::createPipeline(mRhi, rpDesc, sampleCount, span_vert_qsb_data,
                                          span_vert_qsb_data_len, plottable_frag_qsb_data,
@@ -306,17 +301,12 @@ bool QCPSpanRhiLayer::rebuildGeometry(float dpr, int outputHeight)
                 allocationFailed = true;
                 continue;
             }
-            group.srb = mRhi->newShaderResourceBindings();
-            group.srb->setBindings({
-                QRhiShaderResourceBinding::uniformBuffer(
-                    0, QRhiShaderResourceBinding::VertexStage, group.uniformBuffer)
-            });
-            if (!group.srb->create())
+            group.srb = qcp::rhi::createSrb(mRhi, group.uniformBuffer, 0,
+                                            QRhiShaderResourceBinding::VertexStage,
+                                            "Failed to create per-group SRB");
+            if (!group.srb)
             {
-                qDebug() << Q_FUNC_INFO << "Failed to create per-group SRB";
-                delete group.srb;
                 delete group.uniformBuffer;
-                group.srb = nullptr;
                 group.uniformBuffer = nullptr;
                 allocationFailed = true;
                 continue;
