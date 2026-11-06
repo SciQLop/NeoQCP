@@ -135,6 +135,72 @@ Task 10a (size sweep)
   finds nothing dead, the legacy extrusion cluster is the live no-RHI path, and the rest is dense.
   Cost if wrong: dead or duplicate code stays; the final review gets a size lens.
 
+## Final review fix rounds (A1, A2, B)
+
+A1 (review findings C1-C4, I1, I2, `clip()`)
+- A transform-dependent recording is remade on every transform change, a pan included (the
+  `isTranslationOf` exemption is gone): pixel-width, grouped and stacked bars pay one re-record per
+  pan, as 2.x did. A data-plus-pixel-offset position type would keep them; it stays deferred. Cost if
+  wrong: pan time on those bars.
+- The GPU kept geometry is re-emitted only when every kept command moves alike: all data, or all
+  pixels in a recording that never read the transform. A mixed, ratio or anchored recording is
+  rebuilt from its positions. Cost if wrong: a rebuild where a shift would do.
+- The data container's revision counter is the one hook for "the data changed under the recording":
+  no setter marks the layer dirty for it, the layer repaints by the 2.x replot contract. Cost if
+  wrong: a container edit repaints only when something else asks.
+- Grouped or stacked bars, and any bar whose width is not in plot coordinates, count as pixel
+  geometry; a group's revision and the bar below join the dependency key. Cost if wrong: a stack or
+  group change that no setter reports.
+- The pan delta is measured at the range's lower corner, not at data (0, 0): at a 1.7e9 epoch the
+  origin is 40 px away from the range. Cost if wrong: a wrong shift on time axes.
+- The R-C3 test shifts the span by 1.7 ulp instead of dragging: at 1.7e9 a drag of an ulp-multiple
+  span cannot round differently, and the same 40 px error is reproduced. Cost if wrong: none.
+- `anchoredShapeFollowsItsParent` was green before the fix; it is kept as a guard and its cause went
+  to A2. Cost if wrong: a test that guards nothing.
+- `clip()` marks a recording transform dependent (it reads the transform). No `src/` caller yet, so
+  it costs nothing today. Cost if wrong: a clipped recording re-records per pan.
+
+A2 (review findings I3-I7, M1-M5, OC-P3, OC-I5, plus the A1 doubt)
+- The per-command raster cap is gone: a recording that needs more images than the layer has left is
+  painted whole by the layer's QPainter pass, with one warning per layer, so one object never splits
+  between stacking levels. Cost if wrong: an object that would have fit draws on the painter.
+- A kept raster is shifted across a pan, its texture untouched, and it is its own run, so it never
+  spoils the triangles beside it. The one-frame band at the leading edge is accepted. Cost if wrong:
+  a few pixels at the edge for one frame.
+- The M4 bracket decoration is ported to commands (+85 `src/` lines, 5 over its budget): the only
+  option that keeps the stacking fix without a new buffer or command kind. Cost if wrong: 85 lines
+  the size loop may trim.
+- `setPosition()`'s refusal is reported with `qDebug()`, not the misuse tier: the tier is `qFatal` in
+  debug builds and the refusal was only a debug message before. Cost if wrong: a quiet refusal.
+- An `everyFrame()` recording is rebuilt once per frame (`QCustomPlot::frameEpoch()`), not once per
+  query. Cost if wrong: a stale frame for one paint.
+- A drawn object that asks for its own range, hit test or extent from inside `draw()` reports through
+  the misuse tier and gets the last recording, instead of recursing into the stack. Cost if wrong: a
+  quiet misuse.
+- `QCPItemText` caches its measured size on text, font and math mode, so a hit test and an anchor
+  query no longer re-measure. Cost if wrong: a size that a font change does not refresh.
+- Item 14 (the A1 doubt) is a mechanism, not luck: the recording is kept and the kept *geometry* is
+  rebuilt because an anchored recording is neither all data nor all static. The test pins exactly
+  that. Cost if wrong: none.
+
+B (round of performance and docs)
+- The kept replay keeps ONE run list in record order, so a build frame and a pan frame stack
+  identically; merging neighbouring runs stays. Cost if wrong: a run list with a kind tag per run.
+- A drawn object whose recording is one piece in data space answers `stallPixelOffset()` with the pan
+  delta, so its layer shifts the texture it has instead of repainting and re-uploading
+  (`QCPGpu_BarsPan10k`: 0.45 → 0.125 ms, -72 %). Every frame, a transform-dependent or a stale
+  recording still vetoes the shift. Cost if wrong: a shift of pixels that should have been redrawn.
+- `QCPResolveCache` is kept and not turned into a hash: it is one entry per data vector (1-2 in the
+  recordings that use it), the whole cache is 0.08 % of a rebuild frame's profile and no bench row
+  consults it, so neither deleting it nor a hash can be measured. The O(k²) risk is real only for a
+  recording with many series (1000 contour polylines ≈ 500k `weak_ptr::lock()` per rebuild), which no
+  row covers; it stays noted for the format survey (R3). Cost if wrong: that many-series case keeps
+  its quadratic scan.
+- No per-shape-allocation, extra-visit or linear-pass candidate passed the 5 %-of-frame gate: the
+  fan-fill scratch variant was measured on `QCPDrawn_Zoom10k` and `QCPGpu_Bars10k` (0.30 → 0.31,
+  5.4 → 5.3, inside noise) and reverted, and the replay's two extra visits per command are 0.03 % of a
+  rebuild frame. Cost if wrong: those allocations and visits stay.
+
 ## Review findings ruled false (so nobody re-fixes them)
 
 - Task 4, review M8: "the histogram outline ignores the pen style". The outline pen is built

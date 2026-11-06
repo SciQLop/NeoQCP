@@ -18,7 +18,8 @@ with a label. It is a complete plot type in 73 lines that only uses public heade
   constructor (`new RangeBand(plot.xAxis, plot.yAxis)`), appears in the legend and can be selected.
 - A drawn item derives from `QCPDrawn<QCPAbstractItem>` instead, and a plottable with a data
   container from `QCPDrawn<QCPAbstractPlottable1D<MyData>>`. The base class keeps its data and its
-  ranges; the adapter only answers the drawing virtuals.
+  ranges; the adapter only answers the drawing virtuals (one exception: the value range ignores its
+  key window, see [Ranges](#ranges-hit-tests-and-the-legend-icon)).
 - `draw()` is `const` and runs only when the recording is stale. It must not change the object.
 
 ## draw() records commands
@@ -58,10 +59,13 @@ The replay resolves them through the frame's <a href="api/classQCPTransform.html
   recording again; nothing is recorded twice.
 - **Pixels do not follow a zoom.** A command in pixels stays where it is on screen when the axes
   move, which is what a fixed-size marker or a hairline wants.
-- **Reading `context.transform()` costs a re-record on zoom.** Doing it marks the recording
-  transform dependent: it is remade on a zoom, a log/linear change or a resize, and kept across a
-  pan. Read it only when the geometry really depends on the pixel size, as `QCPBars` does for a bar
-  width given in pixels; a bar width in plot coordinates never reads it and keeps zoom reuse.
+- **Reading `context.transform()` costs a re-record on every transform change.** Doing it marks the
+  recording transform dependent: it is remade on a pan as well as on a zoom, a log/linear change or a
+  resize, because the pixels it baked from the transform are not a translation of the old ones.
+  Read it only when the geometry really depends on the pixel size, as `QCPBars` does for a bar width
+  given in pixels; a bar width in plot coordinates never reads it and keeps pan and zoom reuse.
+  Grouped or stacked bars, and any bar whose width is not in plot coordinates, are pixel geometry
+  too, for the same reason.
 
 ## Telling the plot what changed
 
@@ -83,11 +87,14 @@ The plot records again only when it must:
 - after a resize, a device-pixel-ratio change or a theme change, only when the recording holds text,
   a path, an image or `painter()` code, or when `draw()` read the theme: those are measured or
   rasterised in pixels;
-- after a zoom, only when `draw()` read `transform()`;
+- after a zoom or a pan, only when `draw()` read `transform()`;
 - every frame, only when `draw()` called `recordEveryFrame()`.
 
-A pan never records again. It replays the recording with a translation offset, and the GPU keeps
-the geometry it already built.
+A pan of a recording whose every position is `QCP::Data` never records again, and the layer it is on
+shifts the texture it already painted instead of repainting: nothing is extruded and nothing is
+uploaded. A recording that holds a pixel, a ratio or an anchor position, or one that read
+`transform()`, is rebuilt for the new transform, because a single shift cannot express what those
+pixels do.
 
 ## Ranges, hit tests and the legend icon
 
@@ -99,6 +106,9 @@ The defaults follow the recording, so most plot types need none of these overrid
 - `hitTest(QCP::Pixels at, QVariant* details)` measures the distance to the recorded geometry minus
   half the pen, answers 0 inside a visible fill, and uses the measured box for text. Return
   `std::nullopt` for a miss. `QCPBars` overrides it with its bar rectangles.
+- `getValueRange(foundRange, signDomain, inKeyRange)` ignores `inKeyRange` here: a recording keeps
+  one data box, not the values of each key, so the window cannot narrow it. Override the range if
+  your type needs the visible-key rule (as `QCPBars` does).
 - `drawLegendIcon(QCPDrawContext& icon)` replays the recording fitted into the icon rect. Override it
   to draw something else in the legend.
 
@@ -107,17 +117,17 @@ base) is worth an override; everything else is free.
 
 ## What is fast
 
-- Data positions: a pan and a zoom resolve and replay, and the GPU reuses its built geometry across
-  a pan.
+- Data positions: a pan shifts the texture the layer already has, and a zoom resolves and replays
+  the recording without recording it again.
 - Shared point vectors: the recording holds your `shared_ptr`, so a large series costs one copy at
   most, in your own `draw()`.
 - Many small shapes: neighbouring solid commands merge into one draw, so a bar chart does not pay one
-  draw call per bar.
+  draw call per bar; a pan re-submits them in their recorded order, so stacking never changes.
 - Recording once: put everything in `draw()`, and reach for `recordEveryFrame()` only when a position
   exists in pixels alone.
 - Avoid `context.painter()` for shapes a helper covers: painter code goes into the buffer's QPainter
   pass, which the same layer's GPU content is drawn over, so a painter command can end up under a
-  later object; the GPU also cannot merge it. Keep it for what the helpers do not model (a text
-  document, an exotic path).
-- Avoid reading `transform()` and `clip()` in a hot plot type: both are per-frame facts, and the
-  first one costs a re-record per zoom.
+  later object; the GPU also cannot merge it, and an opaque callback keeps its layer off the pan
+  fast path. Keep it for what the helpers do not model (a text document, an exotic path).
+- Avoid reading `transform()` and `clip()` in a hot plot type: both are per-frame facts, and the first
+  one costs a re-record per transform change, a pan included.

@@ -392,6 +392,10 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
   If \a inKeyRange has both lower and upper bound set to zero (is equal to <tt>QCPRange()</tt>),
   all data points are considered, without any restriction on the keys.
 
+  A plottable that draws through a recording (\ref QCPDrawn) answers this from the recording's data
+  box, which keeps no values per key: it ignores \a inKeyRange. A subclass that needs the
+  visible-key rule overrides this function, as \ref QCPBars does.
+
   Note that \a foundRange is not the same as \ref QCPRange::validRange, since the range returned by
   this function may have size zero (e.g. when there is only one data point). In this case \a
   foundRange would return true, but the returned range is not a valid range in terms of \ref
