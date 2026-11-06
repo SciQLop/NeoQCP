@@ -99,8 +99,6 @@ private:
     QRhiTexture* uploadedTexture(const QImage& image, QRhiResourceUpdateBatch* updates);
     QList<QRhiShaderResourceBinding> bindings(QRhiTexture* sprite,
                                               QRhiTexture* colormap) const;
-
-    void stagingAppend(const float* src, int count);
     float* mStagingData = nullptr;
     int mStagingSize = 0;
     int mStagingCapacity = 0;

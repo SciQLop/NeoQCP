@@ -121,18 +121,6 @@ int QCPScatterRhiLayer::ubufStride() const
     return mRhi->ubufAligned(sizeof(PerDrawUniforms));
 }
 
-void QCPScatterRhiLayer::stagingAppend(const float* src, int count)
-{
-    if (mStagingSize + count > mStagingCapacity)
-    {
-        mStagingCapacity = std::max(mStagingCapacity * 2, mStagingSize + count);
-        mStagingData = static_cast<float*>(
-            std::realloc(mStagingData, mStagingCapacity * sizeof(float)));
-    }
-    std::memcpy(mStagingData + mStagingSize, src, count * sizeof(float));
-    mStagingSize += count;
-}
-
 void QCPScatterRhiLayer::addDraw(std::span<const float> xyz, const QCPScatterStyle& style,
                                  const QRect& clipRect, double dpr, int outputHeight,
                                  float offsetX, float offsetY, float alpha,
@@ -150,7 +138,8 @@ void QCPScatterRhiLayer::addDraw(std::span<const float> xyz, const QCPScatterSty
     entry.colorOffset = colorOffset;
     entry.look = lookFor(style, colormapImage);
 
-    stagingAppend(xyz.data(), static_cast<int>(xyz.size()));
+    qcp::rhi::appendFloats(mStagingData, mStagingSize, mStagingCapacity, xyz.data(),
+                           int(xyz.size()));
     mDrawEntries.append(entry);
     mDirty = true;
 }

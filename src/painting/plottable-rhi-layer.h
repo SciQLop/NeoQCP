@@ -205,7 +205,6 @@ private:
     int ubufStride() const; // aligned slot size for dynamic UBO offsets
     int dashUbufStride() const;
     int imageUbufStride() const;
-    void dashStagingAppend(const float* src, int count);
 
     //! Extends the last submission when \a entry continues it with the same draw state, so a
     //! hundred thousand consecutive shapes are one draw. False when it has to be its own entry.
@@ -213,7 +212,6 @@ private:
     bool extendLastDashed(const DashedEntry& entry);
 
     // Raw staging buffer — avoids QVector::resize zero-initialization overhead
-    void stagingAppend(const float* src, int count);
     float* mStagingData = nullptr;
     int mStagingSize = 0; // floats used
     int mStagingCapacity = 0; // floats allocated

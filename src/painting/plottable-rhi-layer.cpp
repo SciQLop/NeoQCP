@@ -171,34 +171,6 @@ int QCPPlottableRhiLayer::dashUbufStride() const
     return mRhi->ubufAligned(sizeof(DashUniforms));
 }
 
-void QCPPlottableRhiLayer::dashStagingAppend(const float* src, int count)
-{
-    if (count <= 0)
-        return;
-    if (mDashStagingSize + count > mDashStagingCapacity)
-    {
-        mDashStagingCapacity = std::max(mDashStagingCapacity * 2, mDashStagingSize + count);
-        mDashStagingData = static_cast<float*>(
-            std::realloc(mDashStagingData, mDashStagingCapacity * sizeof(float)));
-    }
-    std::memcpy(mDashStagingData + mDashStagingSize, src, count * sizeof(float));
-    mDashStagingSize += count;
-}
-
-void QCPPlottableRhiLayer::stagingAppend(const float* src, int count)
-{
-    if (count <= 0)
-        return;
-    if (mStagingSize + count > mStagingCapacity)
-    {
-        mStagingCapacity = std::max(mStagingCapacity * 2, mStagingSize + count);
-        mStagingData
-            = static_cast<float*>(std::realloc(mStagingData, mStagingCapacity * sizeof(float)));
-    }
-    std::memcpy(mStagingData + mStagingSize, src, count * sizeof(float));
-    mStagingSize += count;
-}
-
 void QCPPlottableRhiLayer::addPlottable(std::span<const float> fillVerts,
                                         std::span<const float> strokeVerts, const QRect& clipRect,
                                         double dpr, int outputHeight, float offsetX, float offsetY,
@@ -215,8 +187,10 @@ void QCPPlottableRhiLayer::addPlottable(std::span<const float> fillVerts,
     entry.vertexOffset = mStagingSize / 6;
     entry.fillVertexCount = static_cast<int>(fillVerts.size()) / 6;
 
-    stagingAppend(fillVerts.data(), static_cast<int>(fillVerts.size()));
-    stagingAppend(strokeVerts.data(), static_cast<int>(strokeVerts.size()));
+    qcp::rhi::appendFloats(mStagingData, mStagingSize, mStagingCapacity, fillVerts.data(),
+                           int(fillVerts.size()));
+    qcp::rhi::appendFloats(mStagingData, mStagingSize, mStagingCapacity, strokeVerts.data(),
+                           int(strokeVerts.size()));
     entry.vertexCount = mStagingSize / 6 - entry.vertexOffset;
 
     mDirty = true;
@@ -267,7 +241,8 @@ void QCPPlottableRhiLayer::addDashedPlottable(std::span<const float> strokeVerts
 
     entry.vertexOffset = mDashStagingSize / 7;
     entry.vertexCount = int(strokeVerts.size()) / 7;
-    dashStagingAppend(strokeVerts.data(), int(strokeVerts.size()));
+    qcp::rhi::appendFloats(mDashStagingData, mDashStagingSize, mDashStagingCapacity,
+                           strokeVerts.data(), int(strokeVerts.size()));
     mDirty = true;
     if (extendLastDashed(entry))
         return;

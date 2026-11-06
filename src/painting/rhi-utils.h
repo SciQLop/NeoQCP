@@ -3,10 +3,28 @@
 #include <QColor>
 #include <QDebug>
 #include <QImage>
+#include <algorithm>
 #include <array>
+#include <cstdlib>
+#include <cstring>
 #include <rhi/qrhi.h>
 
 namespace qcp::rhi {
+
+//! \a count floats of \a src at the end of a layer's staging buffer (\a data holding \a size
+//! floats in \a capacity), growing it geometrically: the buffer is raw floats, one per component.
+inline void appendFloats(float*& data, int& size, int& capacity, const float* src, int count)
+{
+    if (count <= 0)
+        return;
+    if (size + count > capacity)
+    {
+        capacity = std::max(capacity * 2, size + count);
+        data = static_cast<float*>(std::realloc(data, capacity * sizeof(float)));
+    }
+    std::memcpy(data + size, src, count * sizeof(float));
+    size += count;
+}
 
 inline std::array<float, 4> premultipliedColor(const QColor& c)
 {
