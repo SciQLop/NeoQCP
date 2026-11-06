@@ -127,6 +127,10 @@ void QCPPlottableRhiLayer::clear()
 {
     mStagingSize = 0; // preserve allocation
     mDrawEntries.resize(0); // preserve capacity
+    // The entries that go are gone with the shifts they carried; the ones a replay adds next hold
+    // only their own build offset.
+    mLastOffsetX = 0;
+    mLastOffsetY = 0;
     mDashStagingSize = 0;
     mDashEntries.resize(0);
     mImageEntries.resize(0); // the textures stay: a clear and replay must not re-upload them
@@ -136,22 +140,27 @@ void QCPPlottableRhiLayer::clear()
 
 void QCPPlottableRhiLayer::setAllOffsets(float offsetX, float offsetY)
 {
+    // An entry keeps the offset it was submitted with: a reused recording is built for the pan it
+    // saw, not for this frame. Only the layer's shift since the last call is added, so a pan that
+    // repainted the layer and one that translated it add up instead of replacing each other.
+    const float shiftX = offsetX - mLastOffsetX;
+    const float shiftY = offsetY - mLastOffsetY;
     mLastOffsetX = offsetX;
     mLastOffsetY = offsetY;
     for (auto& entry : mDrawEntries)
     {
-        entry.offsetX = offsetX;
-        entry.offsetY = offsetY;
+        entry.offsetX += shiftX;
+        entry.offsetY += shiftY;
     }
     for (auto& entry : mDashEntries)
     {
-        entry.offsetX = offsetX;
-        entry.offsetY = offsetY;
+        entry.offsetX += shiftX;
+        entry.offsetY += shiftY;
     }
     for (auto& entry : mImageEntries)
     {
-        entry.offsetX = offsetX;
-        entry.offsetY = offsetY;
+        entry.offsetX += shiftX;
+        entry.offsetY += shiftY;
     }
     // UBO needs re-upload but vertex data is unchanged
 }

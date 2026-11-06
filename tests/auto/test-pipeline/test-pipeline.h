@@ -191,6 +191,7 @@ private slots:
     void colormapQuadOffsetTranslatesRect();
     void colormapQuadFollowsPanWhileTranslating();
     void plottableOffsetsRefreshedAtRenderTime();
+    void pannedReuseKeepsBarsUnderTheirKeys();
 
     // GPU translation offset
     void viewportOffsetLinearHorizontal();
