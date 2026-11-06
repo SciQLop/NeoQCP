@@ -203,6 +203,29 @@ void TestDrawContext::polygonMatchesHandPainting()
     QCOMPARE(replay, hand);
 }
 
+// The painter culls a command outside the clip by its box. A shape that crosses the view but whose
+// last point lies outside it is still drawn: the box spans every point, not the last one alone.
+void TestDrawContext::shapeEndingOutsideTheClipIsDrawn()
+{
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    const double far = 10.0 * kWidth;
+    const std::vector<QCP::Position> corners { QCP::Data { 20, 20 }, QCP::Data { 120, 30 },
+                                               QCP::Data { far, far } };
+    context.polygon(std::span<const QCP::Position>(corners), kPen, kBrush);
+    const QCPScatterStyle style(QCPScatterStyle::ssDisc, kPen, kBrush, 9.0);
+    context.markers(sharedPoints({ { 60, 90 }, { far, far } }), style);
+
+    const QImage replay = replayOf(context);
+    const QPointF vertex = pixelOf(context.transform(), 20, 20);
+    const QPointF marker = pixelOf(context.transform(), 60, 90);
+    QVERIFY2(replay.pixelColor(vertex.toPoint()) != QColor(Qt::white),
+             "the polygon was culled on its last vertex");
+    QVERIFY2(replay.pixelColor(marker.toPoint()) != QColor(Qt::white),
+             "the markers were culled on their last point");
+}
+
 void TestDrawContext::fillBetweenMatchesHandPainting()
 {
     Fixture fixture;

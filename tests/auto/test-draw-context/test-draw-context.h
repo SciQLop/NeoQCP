@@ -10,6 +10,7 @@ private slots:
     void polylineMatchesHandPainting();
     void polylinePositionsMatchesHandPainting();
     void polygonMatchesHandPainting();
+    void shapeEndingOutsideTheClipIsDrawn();
     void fillBetweenMatchesHandPainting();
     void rectMatchesHandPainting();
     void ellipseMatchesHandPainting();
