@@ -54,6 +54,10 @@ inline bool needsRaster(const QCPDrawCommand& command)
     return rasterNeedsOf(command).any();
 }
 
+//! True when the stroke of \a command has to be part of its image: the GPU cannot stroke it, or it
+//! is dashed and the layer has no dashed pipeline to draw it.
+[[nodiscard]] bool strokeGoesToRaster(const QCPDrawCommand& command, bool dashedAvailable);
+
 //! The pixel bounds the raster has to cover; \a withStroke adds the outline's outer half and its
 //! antialiasing.
 QRectF fallbackPixelBounds(const QCPDrawCommand& command, const QCPDrawFrame& frame, double dpr,
@@ -96,7 +100,8 @@ public:
     */
     const QImage& image(quint64 list, quint64 index, const QCPDrawCommand& command,
                         const QCPDrawFrame& frame, const QRectF& bounds, double dpr,
-                        quint64 generation, PanBehaviour behaviour, QPointF* delta = nullptr);
+                        quint64 generation, PanBehaviour behaviour, bool withStroke,
+                        QPointF* delta = nullptr);
 
     //! The layer is full: the painter pass draws command \a index of \a list instead.
     void painterHandles(quint64 list, quint64 index);

@@ -239,7 +239,8 @@ void paintCommand(QCPPainter& painter, const QCPDrawCommand& command, const QCPD
 } // namespace qcp
 
 void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QCPDrawFrame& frame,
-                          QCPReplayKinds kinds, const qcp::QCPRasterFallback* fallback)
+                          QCPReplayKinds kinds, const qcp::QCPRasterFallback* fallback,
+                          bool dashedAvailable)
 {
     // PainterOnly leaves the GPU kinds to another pass: on screen the RHI replay, in an export the
     // layer's deferred GpuOnly pass. \a fallback, when there is one, draws the kinds the layer
@@ -260,7 +261,8 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
             // The layer could not take this command's image: paint it here, in the buffer the GPU
             // geometry draws over. A stroke the GPU cannot express is part of it.
             if (fallback && fallback->painterHandled(list.id, qcpCommandIndex(list, command)))
-                qcp::paintFallback(painter, command, frame, qcp::rasterNeedsOf(command).stroke);
+                qcp::paintFallback(painter, command, frame,
+                                   qcp::strokeGoesToRaster(command, dashedAvailable));
             continue;
         }
         if (outsideClip(command, frame))

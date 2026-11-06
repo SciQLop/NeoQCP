@@ -594,4 +594,5 @@ void paintCommand(QCPPainter& painter, const QCPDrawCommand& command, const QCPD
 //! it to this pass.
 void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QCPDrawFrame& frame,
                           QCPReplayKinds kinds = QCPReplayKinds::All,
-                          const qcp::QCPRasterFallback* fallback = nullptr);
+                          const qcp::QCPRasterFallback* fallback = nullptr,
+                          bool dashedAvailable = true);

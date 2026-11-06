@@ -8,6 +8,7 @@
 #include "painting/draw-commands.h"
 #include "painting/draw-context.h"
 #include "painting/painter.h"
+#include "painting/plottable-rhi-layer.h"
 #include "painting/raster-fallback.h"
 #include "painting/viewport-offset.h"
 #include "plottables/plottable-draw-utils.h"
@@ -655,8 +656,11 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
                      mState->raster, view.plot->bufferDevicePixelRatio(),
                      view.plot->rhiOutputSize(), mState->recordedGeneration, &mState->geometry,
                      static_cast<float>(painter.opacity()));
+    // The painter pass completes what the layer refused, so it makes the same dashed decision.
+    if (!plottables->dashedAvailable() && mState->movesWithTheData)
+        mState->movesWithTheData = qcpRecordingMovesWithTheData(mState->recording, false);
     qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::PainterOnly,
-                         &mState->raster);
+                         &mState->raster, plottables->dashedAvailable());
     // The layer now holds this object drawn at these ranges: a pan may shift them instead of
     // repainting. An export never does (it paints into another image, not the layer's).
     mState->paintedKey = view.keyAxis->range();

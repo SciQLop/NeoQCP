@@ -55,6 +55,12 @@ RasterNeeds rasterNeedsOf(const QCPDrawCommand& command)
         command);
 }
 
+bool strokeGoesToRaster(const QCPDrawCommand& command, bool dashedAvailable)
+{
+    const RasterNeeds needs = rasterNeedsOf(command);
+    return needs.stroke || (!dashedAvailable && needs.dashed);
+}
+
 QRectF fallbackPixelBounds(const QCPDrawCommand& command, const QCPDrawFrame& frame, double dpr,
                            bool withStroke)
 {
@@ -101,7 +107,8 @@ void QCPRasterFallback::beginReplay()
 
 const QImage& QCPRasterFallback::image(quint64 list, quint64 index, const QCPDrawCommand& command,
                                        const QCPDrawFrame& frame, const QRectF& bounds, double dpr,
-                                       quint64 generation, PanBehaviour behaviour, QPointF* delta)
+                                       quint64 generation, PanBehaviour behaviour, bool withStroke,
+                                       QPointF* delta)
 {
     for (Entry& entry : mEntries)
     {
@@ -135,7 +142,7 @@ const QImage& QCPRasterFallback::image(quint64 list, quint64 index, const QCPDra
     entry.used = true;
     if (delta)
         *delta = QPointF();
-    entry.image = rasterizeFallback(command, bounds, frame, dpr, rasterNeedsOf(command).stroke);
+    entry.image = rasterizeFallback(command, bounds, frame, dpr, withStroke);
     return entry.image;
 }
 

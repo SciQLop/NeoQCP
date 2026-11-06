@@ -6,6 +6,7 @@
 #include <painting/command-replay-rhi.h>
 #include <painting/draw-context.h>
 #include <painting/line-extruder.h>
+#include <plottables/plottable-draw-utils.h>
 #include <painting/plottable-rhi-layer.h>
 #include <qcustomplot.h>
 
@@ -76,6 +77,7 @@ public:
         MixedRect,
         FromAnchor,
         Dashed, //!< one dashed stroke: the GPU needs its dashed pipeline for it
+        DashedOutline, //!< a dashed outline and no fill: only the stroke has to come out
         DashedUnderRect, //!< a dashed line an opaque rect covers: the record order must survive
         RasterUnderRect, //!< a rasterised fill an opaque rect covers: the same
         ErrorBars, //!< three error bars in a pen no vertex colour can carry
@@ -194,6 +196,12 @@ public:
         if (mode == Dashed)
         {
             context.polyline(mLine, QPen(Qt::black, 2, Qt::DashLine));
+            return;
+        }
+        if (mode == DashedOutline) // a dashed outline with no fill: nothing else can ink it
+        {
+            context.rect(QCP::Data { 2, 2 }, QCP::Data { 8, 8 }, QPen(Qt::black, 2, Qt::DashLine),
+                         QBrush(Qt::NoBrush));
             return;
         }
         if (mode == DashedUnderRect) // a thick dashed line, then an opaque rect over its middle
@@ -984,6 +992,68 @@ void TestDrawable::brokenDashedPipelineStillDraws()
     f.plot->xAxis->setRange(0, 11);
     f.plot->replot(QCustomPlot::rpImmediateRefresh);
     QVERIFY2(ink(f.plot->grabFramebuffer()) > 10, "the pan lost the rasterised dash");
+}
+
+// The dashed pipeline is missing, so the dashed stroke becomes an image: the image has to hold the
+// stroke too, or a dashed outline leaves nothing at all.
+void TestDrawable::brokenDashedPipelineKeepsTheOutline()
+{
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - the dashed pipeline is a GPU path");
+    auto* bars = new QCPBars(f.plot->xAxis, f.plot->yAxis);
+    bars->setPen(QPen(Qt::black, 2, Qt::DashLine));
+    bars->setBrush(Qt::NoBrush);
+    bars->setWidth(1.0);
+    bars->setData(QVector<double> { 2.0 }, QVector<double> { 1.0 });
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+    auto* layer = f.plot->plottableRhiLayer(bars->layer());
+    QVERIFY(layer);
+    layer->breakDashedPipelineForTest();
+    QVERIFY(!layer->dashedAvailable());
+    // A re-record made now has no dashed pipeline to draw its stroke.
+    bars->setData(QVector<double> { 2.0 }, QVector<double> { 1.5 });
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(!layer->dashedAvailable());
+
+    const QImage frame = f.plot->grabFramebuffer();
+    int ink = 0;
+    for (int i = 0; i <= 60; ++i)
+    {
+        const QColor c = pixelAt(frame, f.plot.get(), 1.55 + 0.9 * i / 60.0, 1.5);
+        ink += c.red() + c.green() + c.blue() < 720 ? 1 : 0;
+    }
+    QVERIFY2(ink > 5, "a dashed outline was lost when the dashed pipeline could not be built");
+}
+
+// A recording that rasterises its dashes holds an image the pan would shift: it cannot be moved
+// as a whole, the layer has to replay it.
+void TestDrawable::rasterisedDashesStopTheLayerFromTranslating()
+{
+    Fixture f;
+    if (!f.hasRhi())
+        QSKIP("No QRhi available - the dashed pipeline is a GPU path");
+    auto* bars = new QCPBars(f.plot->xAxis, f.plot->yAxis);
+    bars->setPen(QPen(Qt::black, 2));
+    bars->setBrush(QColor(200, 60, 60));
+    bars->setWidth(1.0);
+    bars->setData(QVector<double> { 2.0 }, QVector<double> { 1.0 });
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+    f.plot->xAxis->setRange(0.5, 10.5);
+    QVERIFY2(!bars->stallPixelOffset().isNull(),
+             "a recording of solid strokes and fills can be shifted as a whole");
+
+    // No dashed pipeline: the stroke of the re-record is an image, and an image cannot be shifted.
+    auto* layer = f.plot->plottableRhiLayer(bars->layer());
+    QVERIFY(layer);
+    layer->breakDashedPipelineForTest();
+    bars->setPen(QPen(Qt::black, 2, Qt::DashLine));
+    bars->setData(QVector<double> { 2.0 }, QVector<double> { 1.5 });
+    f.plot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(!layer->dashedAvailable());
+    f.plot->xAxis->setRange(1.0, 11.0);
+    QVERIFY2(bars->stallPixelOffset().isNull(),
+             "a recording that rasterises its dashes cannot be shifted as a whole");
 }
 
 void TestDrawable::zoomRebuildsOnce()

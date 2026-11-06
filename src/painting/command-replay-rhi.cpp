@@ -190,7 +190,8 @@ void addRasterCommand(const QCPDrawList& list, QCPPlottableRhiLayer& layer,
     }
     QPointF shift;
     const QImage& image
-        = fallback.image(listId, index, command, frame, bounds, dpr, generation, behaviour, &shift);
+        = fallback.image(listId, index, command, frame, bounds, dpr, generation, behaviour,
+                         withStroke, &shift);
     const QRectF device(bounds.left() * dpr, bounds.top() * dpr, image.width(), image.height());
     if (!layer.addImage(image, device, clip, dpr, viewport.height(), static_cast<float>(shift.x()),
                         static_cast<float>(shift.y())))
@@ -314,8 +315,9 @@ void replayKept(const QCPDrawList& list, const QCPRecordingCache& kept, QCPPlott
                 const qcp::QCPDrawCommand& command = list.commands[std::size_t(run.index)];
                 const qcp::PanBehaviour behaviour
                     = run.movesWithData ? qcp::PanBehaviour::Moves : qcp::PanBehaviour::Stays;
-                const QImage& image = fallback.image(list.id, quint64(run.index), command, frame,
-                                                     run.bounds, dpr, generation, behaviour);
+                const QImage& image = fallback.image(
+                    list.id, quint64(run.index), command, frame, run.bounds, dpr, generation,
+                    behaviour, qcp::strokeGoesToRaster(command, layer.dashedAvailable()));
                 const QRectF device(run.bounds.left() * dpr, run.bounds.top() * dpr, image.width(),
                                     image.height());
                 layer.addImage(image, device, clip, dpr, height, offsetX, offsetY, alpha);
@@ -525,8 +527,7 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
         // The dashed pipeline is built with the layer, so a layer that failed to build it can only
         // rasterise a dashed stroke; the painter copy would land under the layer's GPU content.
         const qcp::RasterNeeds needs = qcp::rasterNeedsOf(command);
-        const bool strokeRaster
-            = needs.stroke || (!plottables.dashedAvailable() && needs.dashed);
+        const bool strokeRaster = qcp::strokeGoesToRaster(command, plottables.dashedAvailable());
         const bool dataOnly = qcp::commandKind(command).dataOnly;
         const auto raster = [&]
         {
@@ -636,15 +637,21 @@ quint64 qcpFillBuildCount()
     return fillBuilds();
 }
 
-bool qcpRecordingMovesWithTheData(const QCPDrawList& list)
+bool qcpRecordingMovesWithTheData(const QCPDrawList& list, bool dashedAvailable)
 {
     // Only GPU vertex geometry may be shifted. The painter draws text, paths and images into the
     // layer's paint buffer, and a rasterised command is an image clipped to the view it was painted
     // for: shifting the buffer moves what it holds, it cannot reveal what the clip cut away, so a
-    // recording that holds either is replayed again instead.
-    return std::all_of(list.commands.begin(), list.commands.end(),
-                       [](const qcp::QCPDrawCommand& command)
-                       { return qcp::commandKind(command).dataOnly && !qcp::needsRaster(command); });
+    // recording that holds either is replayed again instead. A dashed stroke the layer cannot draw
+    // is an image too, whatever the pen's colour.
+    return std::all_of(
+        list.commands.begin(), list.commands.end(),
+        [dashedAvailable](const qcp::QCPDrawCommand& command)
+        {
+            const qcp::RasterNeeds needs = qcp::rasterNeedsOf(command);
+            const bool raster = needs.fill || needs.stroke || (!dashedAvailable && needs.dashed);
+            return qcp::commandKind(command).dataOnly && !raster;
+        });
 }
 
 std::vector<float> qcpFanFillVertices(const QPointF& centre, std::span<const QPointF> ring,

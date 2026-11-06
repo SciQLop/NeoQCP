@@ -34,6 +34,8 @@ private slots:
     void rasterPanKeepsImage();
     void recordedErrorBarsAreDrawn();
     void brokenDashedPipelineStillDraws();
+    void brokenDashedPipelineKeepsTheOutline();
+    void rasterisedDashesStopTheLayerFromTranslating();
     void zoomRebuildsOnce();
     void tenThousandBarsAreOneDraw();
     void gradientBarsStackAsOne();

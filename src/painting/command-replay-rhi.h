@@ -203,7 +203,7 @@ quint64 qcpFillBuildCount();
   clipped to the view it was painted for, so shifting the buffer cannot reveal what the clip cut
   away. Such a recording keeps the layer off that path.
 */
-[[nodiscard]] bool qcpRecordingMovesWithTheData(const QCPDrawList& list);
+[[nodiscard]] bool qcpRecordingMovesWithTheData(const QCPDrawList& list, bool dashedAvailable = true);
 
 //! Triangles of a fan fill from \a centre over an open \a ring: six floats per vertex.
 std::vector<float> qcpFanFillVertices(const QPointF& centre, std::span<const QPointF> ring,
