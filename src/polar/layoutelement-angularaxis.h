@@ -320,7 +320,6 @@ public:
     double radius() const { return mRadius; }
 
 signals:
-    void rangeChanged(const QCPRange& newRange);
     void rangeChanged(const QCPRange& newRange, const QCPRange& oldRange);
     void selectionChanged(const QCPPolarAxisAngular::SelectableParts& parts);
     void selectableChanged(const QCPPolarAxisAngular::SelectableParts& parts);

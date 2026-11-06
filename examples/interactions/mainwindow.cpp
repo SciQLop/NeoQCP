@@ -40,8 +40,8 @@ MainWindow::MainWindow(QWidget *parent) :
   ui->customPlot->installEventFilter(this);
   
   // make bottom and left axes transfer their ranges to top and right axes:
-  connect(ui->customPlot->xAxis, SIGNAL(rangeChanged(QCPRange)), ui->customPlot->xAxis2, SLOT(setRange(QCPRange)));
-  connect(ui->customPlot->yAxis, SIGNAL(rangeChanged(QCPRange)), ui->customPlot->yAxis2, SLOT(setRange(QCPRange)));
+  connect(ui->customPlot->xAxis, SIGNAL(rangeChanged(QCPRange, QCPRange)), ui->customPlot->xAxis2, SLOT(setRange(QCPRange)));
+  connect(ui->customPlot->yAxis, SIGNAL(rangeChanged(QCPRange, QCPRange)), ui->customPlot->yAxis2, SLOT(setRange(QCPRange)));
   
   // connect some interaction slots:
   connect(ui->customPlot, SIGNAL(axisDoubleClick(QCPAxis*,QCPAxis::SelectablePart,QMouseEvent*)), this, SLOT(axisLabelDoubleClick(QCPAxis*,QCPAxis::SelectablePart)));

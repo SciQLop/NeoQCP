@@ -624,6 +624,7 @@ void QCPAxis::setScaleType(QCPAxis::ScaleType type)
 {
     if (mScaleType != type)
     {
+        const QCPEmissionScope scope(mParentPlot);
         mScaleType = type;
         mCachedMarginValid = false;
         // An item's extent depends on the scale type (a non-positive coordinate has no pixel on a
@@ -631,14 +632,10 @@ void QCPAxis::setScaleType(QCPAxis::ScaleType type)
         if (mParentPlot)
             for (int layerIndex = 0; layerIndex < mParentPlot->layerCount(); ++layerIndex)
                 mParentPlot->layer(layerIndex)->invalidateItemIndex();
-        const QPointer<QCPAxis> alive(this); // a rangeChanged slot may delete this axis
         if (mScaleType == stLogarithmic)
             setRange(mRange.sanitizedForLogScale());
-        if (alive)
-        {
-            emit scaleTypeChanged(mScaleType);
-            markAppearanceDirty();
-        }
+        markAppearanceDirty();
+        qcpEmit(this, mParentPlot, &QCPAxis::scaleTypeChanged, mScaleType);
     }
 }
 
@@ -659,10 +656,7 @@ void QCPAxis::rangeDidChange(const QCPRange& oldRange)
         mAxisRect->markAffectedLayersDirty();
         mAxisRect->markItemsUsingAxisDirty(this);
     }
-    const QPointer<QCPAxis> alive(this); // a slot may delete this axis
-    emit rangeChanged(mRange);
-    if (alive)
-        emit rangeChanged(mRange, oldRange);
+    qcpEmit(this, mParentPlot, &QCPAxis::rangeChanged, mRange, oldRange);
 }
 
 /*! \internal
@@ -724,7 +718,7 @@ void QCPAxis::setSelectableParts(const SelectableParts& selectable)
     if (mSelectableParts != selectable)
     {
         mSelectableParts = selectable;
-        emit selectableChanged(mSelectableParts);
+        qcpEmit(this, mParentPlot, &QCPAxis::selectableChanged, mSelectableParts);
     }
 }
 
@@ -750,11 +744,9 @@ void QCPAxis::setSelectedParts(const SelectableParts& selected)
 {
     if (mSelectedParts == selected)
         return;
-    const QPointer<QCPAxis> alive(this);
     mSelectedParts = selected;
-    emit selectionChanged(mSelectedParts);
-    if (alive)
-        markAppearanceDirty();
+    markAppearanceDirty();
+    qcpEmit(this, mParentPlot, &QCPAxis::selectionChanged, mSelectedParts);
 }
 
 /*!

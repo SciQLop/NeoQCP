@@ -396,7 +396,6 @@ public:
     static AxisType opposite(AxisType type);
 
 signals:
-    void rangeChanged(const QCPRange& newRange);
     void rangeChanged(const QCPRange& newRange, const QCPRange& oldRange);
     void scaleTypeChanged(QCPAxis::ScaleType scaleType);
     void selectionChanged(const QCPAxis::SelectableParts& parts);

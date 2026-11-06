@@ -255,7 +255,6 @@ public:
     SelectablePart getPartAt(const QPointF& pos) const;
 
 signals:
-    void rangeChanged(const QCPRange& newRange);
     void rangeChanged(const QCPRange& newRange, const QCPRange& oldRange);
     void scaleTypeChanged(QCPPolarAxisRadial::ScaleType scaleType);
     void selectionChanged(const QCPPolarAxisRadial::SelectableParts& parts);

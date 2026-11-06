@@ -280,13 +280,12 @@ void QCPPolarAxisRadial::setScaleType(QCPPolarAxisRadial::ScaleType type)
 {
     if (mScaleType != type)
     {
+        const QCPEmissionScope scope(mParentPlot);
         markDirty();
         mScaleType = type;
-        const QPointer<QCPPolarAxisRadial> alive(this); // a rangeChanged slot may delete this axis
         if (mScaleType == stLogarithmic)
             setRange(mRange.sanitizedForLogScale());
-        if (alive)
-            emit scaleTypeChanged(mScaleType);
+        qcpEmit(this, mParentPlot, &QCPPolarAxisRadial::scaleTypeChanged, mScaleType);
     }
 }
 
@@ -333,7 +332,7 @@ void QCPPolarAxisRadial::setSelectableParts(const SelectableParts& selectable)
     if (mSelectableParts != selectable)
     {
         mSelectableParts = selectable;
-        emit selectableChanged(mSelectableParts);
+        qcpEmit(this, mParentPlot, &QCPPolarAxisRadial::selectableChanged, mSelectableParts);
     }
 }
 
@@ -361,7 +360,7 @@ void QCPPolarAxisRadial::setSelectedParts(const SelectableParts& selected)
     {
         markDirty();
         mSelectedParts = selected;
-        emit selectionChanged(mSelectedParts);
+        qcpEmit(this, mParentPlot, &QCPPolarAxisRadial::selectionChanged, mSelectedParts);
     }
 }
 
@@ -1624,11 +1623,7 @@ QCP::Interaction QCPPolarAxisRadial::selectionCategory() const
     return QCP::iSelectAxes;
 }
 
-// Both range signals: a slot of the first may delete this axis.
 void QCPPolarAxisRadial::emitRangeChanged(const QCPRange& oldRange)
 {
-    const QPointer<QCPPolarAxisRadial> alive(this);
-    emit rangeChanged(mRange);
-    if (alive)
-        emit rangeChanged(mRange, oldRange);
+    qcpEmit(this, mParentPlot, &QCPPolarAxisRadial::rangeChanged, mRange, oldRange);
 }

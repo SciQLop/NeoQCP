@@ -153,7 +153,7 @@ void QCPGroupLegendItem::selectEvent([[maybe_unused]] QMouseEvent* event,
         if (selectionStateChanged)
             *selectionStateChanged = !alive || mSelected != selBefore;
         if (alive)
-            emit componentClicked(componentIndex);
+            qcpEmit(this, mParentPlot, &QCPGroupLegendItem::componentClicked, componentIndex);
     }
 }
 

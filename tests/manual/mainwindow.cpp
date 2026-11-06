@@ -490,8 +490,8 @@ void MainWindow::setupTickLabelTest(QCustomPlot *customPlot)
   customPlot->axisRect()->setupFullAxesBox();
   customPlot->xAxis2->setTickLabels(true);
   customPlot->yAxis2->setTickLabels(true);
-  connect(customPlot->xAxis, SIGNAL(rangeChanged(QCPRange)), customPlot->xAxis2, SLOT(setRange(QCPRange)));
-  connect(customPlot->yAxis, SIGNAL(rangeChanged(QCPRange)), customPlot->yAxis2, SLOT(setRange(QCPRange)));
+  connect(customPlot->xAxis, SIGNAL(rangeChanged(QCPRange, QCPRange)), customPlot->xAxis2, SLOT(setRange(QCPRange)));
+  connect(customPlot->yAxis, SIGNAL(rangeChanged(QCPRange, QCPRange)), customPlot->yAxis2, SLOT(setRange(QCPRange)));
   customPlot->setPlottingHint(QCP::phCacheLabels, false);
   QTimer *timer = new QTimer(this);
   connect(timer, SIGNAL(timeout()), this, SLOT(tickLabelTestTimerSlot()));

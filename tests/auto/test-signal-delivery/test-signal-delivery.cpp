@@ -130,9 +130,9 @@ void TestSignalDelivery::slotDeletesAxisDuringRescale()
         if (!std::exchange(removed, true))
             rect->removeAxis(other);
     };
-    connect(x, qOverload<const QCPRange&>(&QCPAxis::rangeChanged), plot.get(),
+    connect(x, &QCPAxis::rangeChanged, plot.get(),
             [&, y] { removeOther(y); });
-    connect(y, qOverload<const QCPRange&>(&QCPAxis::rangeChanged), plot.get(),
+    connect(y, &QCPAxis::rangeChanged, plot.get(),
             [&, x] { removeOther(x); });
     plot->graph(0)->setData(QVector<double>{-5, 20}, QVector<double>{-5, 20});
     plot->rescaleAxes();
@@ -426,7 +426,7 @@ void TestSignalDelivery::nestedEventDeliversWhenItReturns()
     plot->graph(0)->setData(QVector<double>{-5, 20}, QVector<double>{-5, 20});
     int clicksWhenTheEventReturned = -1;
     QPoint onGraph;
-    connect(plot->xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged), plot.get(),
+    connect(plot->xAxis, &QCPAxis::rangeChanged, plot.get(),
             [&] {
                 onGraph = pixelOf(*plot, 5, 5);
                 QTest::mouseClick(plot.get(), Qt::LeftButton, Qt::NoModifier, onGraph);
@@ -544,7 +544,7 @@ void TestSignalDelivery::qcpEmitHoldsUntilTheScopeCloses()
     QCPAxis* axis = plot.xAxis;
     int received = 0;
     QCPRange receivedRange;
-    connect(axis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged), &plot,
+    connect(axis, &QCPAxis::rangeChanged, &plot,
             [&](const QCPRange& range) {
                 ++received;
                 receivedRange = range;
@@ -553,7 +553,7 @@ void TestSignalDelivery::qcpEmitHoldsUntilTheScopeCloses()
     {
         const QCPEmissionScope scope(&plot);
         QCPRange range(3, 7);
-        qcpEmit(axis, &plot, qOverload<const QCPRange&>(&QCPAxis::rangeChanged), range);
+        qcpEmit(axis, &plot, &QCPAxis::rangeChanged, range, QCPRange(2, 6));
         range = QCPRange(1, 2); // the emission took a copy at the call
         QCOMPARE(received, before);
     }
@@ -582,4 +582,97 @@ void TestSignalDelivery::deadSenderIsNotDelivered()
         delete sender;
     }
     QCOMPARE(received, 0);
+}
+
+void TestSignalDelivery::rangeSlotSeesTheNewScaleType()
+{
+    QCustomPlot plot;
+    QCPAxis* axis = plot.xAxis;
+    axis->setRange(-5, 10);
+    QStringList order;
+    QCPAxis::ScaleType seenType = QCPAxis::stLinear;
+    QCPRange seenRange;
+    connect(axis, &QCPAxis::rangeChanged, &plot,
+            [&](const QCPRange&, const QCPRange&)
+            {
+                order << QStringLiteral("rangeChanged");
+                seenType = axis->scaleType();
+                seenRange = axis->range();
+            });
+    connect(axis, &QCPAxis::scaleTypeChanged, &plot,
+            [&order](QCPAxis::ScaleType) { order << QStringLiteral("scaleTypeChanged"); });
+    axis->setScaleType(QCPAxis::stLogarithmic);
+    QCOMPARE(order,
+             QStringList({ QStringLiteral("rangeChanged"), QStringLiteral("scaleTypeChanged") }));
+    QCOMPARE(seenType, QCPAxis::stLogarithmic);
+    QCOMPARE(seenRange, axis->range());
+    QVERIFY2(seenRange.lower > 0, "the slot saw the range from before the log sanitisation");
+}
+
+void TestSignalDelivery::slotReenteringTheSetterDeliversInOrder()
+{
+    QCustomPlot plot;
+    QCPAxis* axis = plot.xAxis;
+    axis->setRange(0, 10);
+    QList<QCPRange> received;
+    connect(axis, &QCPAxis::rangeChanged, &plot,
+            [&](const QCPRange& range, const QCPRange&)
+            {
+                received << range;
+                if (received.size() == 1)
+                    axis->setRange(2, 3);
+            });
+    axis->setRange(1, 2);
+    QCOMPARE(received.size(), 2);
+    QCOMPARE(received.at(0), QCPRange(1, 2));
+    QCOMPARE(received.at(1), QCPRange(2, 3));
+}
+
+void TestSignalDelivery::slotDeletingThePlotDropsTheRestOfTheChain()
+{
+    auto* plot = new QCustomPlot;
+    const QPointer<QCustomPlot> alive(plot);
+    plot->xAxis->setRange(0, 10);
+    bool sawRangeChanged = false;
+    int scaleTypes = 0;
+    connect(plot->xAxis, &QCPAxis::rangeChanged, plot,
+            [&, plot](const QCPRange&, const QCPRange&)
+            {
+                sawRangeChanged = true;
+                delete plot;
+            });
+    connect(plot->xAxis, &QCPAxis::scaleTypeChanged, plot, [&scaleTypes] { ++scaleTypes; });
+    plot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    QVERIFY(sawRangeChanged);
+    QVERIFY(!alive);
+    QCOMPARE(scaleTypes, 0);
+}
+
+void TestSignalDelivery::teardownOpensNoDelivery()
+{
+    auto* plot = new QCustomPlot;
+    plot->resize(400, 300);
+    int received = 0;
+    const QList<QCPAxis*> axes = { plot->xAxis, plot->yAxis, plot->xAxis2, plot->yAxis2 };
+    for (QCPAxis* axis : axes)
+    {
+        connect(axis, &QCPAxis::rangeChanged, plot,
+                [&received](const QCPRange&, const QCPRange&) { ++received; });
+        connect(axis, &QCPAxis::selectionChanged, plot,
+                [&received](QCPAxis::SelectableParts) { ++received; });
+        connect(axis, &QCPAxis::selectableChanged, plot,
+                [&received](QCPAxis::SelectableParts) { ++received; });
+    }
+    delete plot;
+    QCOMPARE(received, 0);
+}
+
+void TestSignalDelivery::oneArgumentRangeSlotConnects()
+{
+    QCustomPlot plot;
+    QCPRange received;
+    connect(plot.xAxis, &QCPAxis::rangeChanged, &plot,
+            [&received](const QCPRange& range) { received = range; });
+    plot.xAxis->setRange(1, 2);
+    QCOMPARE(received, QCPRange(1, 2));
 }

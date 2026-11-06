@@ -729,14 +729,17 @@ template <typename Sender, typename... SignalArgs, typename... Args>
 void qcpEmit(Sender* sender, QCustomPlot* plot, void (Sender::*signal)(SignalArgs...),
              Args&&... args)
 {
+    // Nothing is deferred, so the tuple and the std::function (a heap allocation per emit) would be
+    // pure overhead. Every range setter of a drag or a pan lands here.
+    if (!plot || !plot->mEmissions.isOpen())
+    {
+        (sender->*signal)(std::forward<Args>(args)...);
+        return;
+    }
     auto copied = std::make_tuple(std::forward<Args>(args)...);
-    auto emitNow = [sender, signal, copied = std::move(copied)]() mutable {
+    plot->deliver(sender, [sender, signal, copied = std::move(copied)]() mutable {
         std::apply([&](auto&... values) { (sender->*signal)(values...); }, copied);
-    };
-    if (plot)
-        plot->deliver(sender, std::move(emitNow));
-    else
-        emitNow();
+    });
 }
 
 // implementation of template functions:

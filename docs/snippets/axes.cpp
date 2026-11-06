@@ -177,9 +177,9 @@ DOC_SNIPPET(axes_linked, 600, 400)
     QCPAxis* lowerX = lowerRect->axis(QCPAxis::atBottom);
 
     // Whichever x axis moves, the other one follows.
-    QObject::connect(upperX, QOverload<const QCPRange&>::of(&QCPAxis::rangeChanged),
+    QObject::connect(upperX, &QCPAxis::rangeChanged,
                      lowerX, QOverload<const QCPRange&>::of(&QCPAxis::setRange));
-    QObject::connect(lowerX, QOverload<const QCPRange&>::of(&QCPAxis::rangeChanged),
+    QObject::connect(lowerX, &QCPAxis::rangeChanged,
                      upperX, QOverload<const QCPRange&>::of(&QCPAxis::setRange));
 
     // Line the two axis rects up on the left and right.

@@ -649,7 +649,7 @@ void QCPLayerable::setVisible(bool on)
     // its old GPU entries, which lack (or still hold) the toggled item.
     if (mLayer)
         mLayer->invalidatePaintBuffer();
-    emit visibleChanged(on);
+    qcpEmit(this, mParentPlot, &QCPLayerable::visibleChanged, on);
 }
 
 /*!
@@ -855,11 +855,8 @@ bool QCPLayerable::moveToLayer(QCPLayer* layer, bool prepend)
 // qobject_cast: null when the plot is down to ~QObject, where nothing of it may be touched.
 void QCPLayerable::emitLayerChanged()
 {
-    const auto emission = [this, layer = QPointer<QCPLayer>(mLayer)] { emit layerChanged(layer); };
-    if (auto* plot = qobject_cast<QCustomPlot*>(mParentPlot))
-        plot->deliver(this, emission);
-    else
-        emission();
+    qcpEmit(this, qobject_cast<QCustomPlot*>(mParentPlot), &QCPLayerable::layerChanged,
+            QPointer<QCPLayer>(mLayer));
 }
 
 /*! \internal

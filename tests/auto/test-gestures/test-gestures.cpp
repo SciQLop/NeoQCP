@@ -231,7 +231,7 @@ void TestGestures::drag(QPoint from, QPoint to)
 template <typename Slot>
 void TestGestures::onFirstXRangeChange(Slot slot)
 {
-    connect(mPlot->xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged), this,
+    connect(mPlot->xAxis, &QCPAxis::rangeChanged, this,
             [this, slot] {
                 mRangeSlotRan = true;
                 slot();
@@ -352,7 +352,7 @@ void TestGestures::dragSlotDeletingTheAxisRectRestoresAntialiasing()
     mPlot->setAntialiasedElements(QCP::aePlottables);
     const auto on = mPlot->antialiasedElements(), off = mPlot->notAntialiasedElements();
     int changes = 0; // the first move turns antialiasing off, the second deletes the rect
-    connect(mPlot->xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged), this, [this, &changes] {
+    connect(mPlot->xAxis, &QCPAxis::rangeChanged, this, [this, &changes] {
         if (++changes != 2)
             return;
         mRangeSlotRan = true;

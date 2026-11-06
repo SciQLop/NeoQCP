@@ -89,9 +89,9 @@ DOC_SNIPPET(gallery_space_weather, 800, 560)
     spectraTime->setTicker(dates);
     fieldTime->setTicker(dates);
     fieldTime->setTickLabels(false);
-    QObject::connect(fieldTime, qOverload<const QCPRange&>(&QCPAxis::rangeChanged), spectraTime,
+    QObject::connect(fieldTime, &QCPAxis::rangeChanged, spectraTime,
                      qOverload<const QCPRange&>(&QCPAxis::setRange));
-    QObject::connect(spectraTime, qOverload<const QCPRange&>(&QCPAxis::rangeChanged), fieldTime,
+    QObject::connect(spectraTime, &QCPAxis::rangeChanged, fieldTime,
                      qOverload<const QCPRange&>(&QCPAxis::setRange));
     auto* margins = new QCPMarginGroup(customPlot);
     customPlot->axisRect()->setMarginGroup(QCP::msLeft, margins);
@@ -446,7 +446,7 @@ DOC_SNIPPET(gallery_stock_chart, 800, 520)
     customPlot->xAxis->setTicker(dates);
     volumeTime->setTicker(dates);
     customPlot->xAxis->setTickLabels(false);
-    QObject::connect(customPlot->xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged), volumeTime,
+    QObject::connect(customPlot->xAxis, &QCPAxis::rangeChanged, volumeTime,
                      qOverload<const QCPRange&>(&QCPAxis::setRange));
     auto* margins = new QCPMarginGroup(customPlot);
     customPlot->axisRect()->setMarginGroup(QCP::msLeft | QCP::msRight, margins);

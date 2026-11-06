@@ -221,7 +221,7 @@ void QCPColorScale::setType(QCPAxis::AxisType type)
             labelTransfer = mColorAxis.data()->label();
             tickerTransfer = mColorAxis.data()->ticker();
             mColorAxis.data()->setLabel(QString());
-            disconnect(mColorAxis.data(), qOverload<const QCPRange&>(&QCPAxis::rangeChanged), this, &QCPColorScale::setDataRange);
+            disconnect(mColorAxis.data(), &QCPAxis::rangeChanged, this, &QCPColorScale::setDataRange);
             disconnect(mColorAxis.data(), &QCPAxis::scaleTypeChanged, this, &QCPColorScale::setDataScaleType);
         }
         const QList<QCPAxis::AxisType> allAxisTypes = QList<QCPAxis::AxisType>()
@@ -243,7 +243,7 @@ void QCPColorScale::setType(QCPAxis::AxisType type)
             mColorAxis.data()->setLabel(labelTransfer);
             mColorAxis.data()->setTicker(tickerTransfer);
         }
-        connect(mColorAxis.data(), qOverload<const QCPRange&>(&QCPAxis::rangeChanged), this, &QCPColorScale::setDataRange);
+        connect(mColorAxis.data(), &QCPAxis::rangeChanged, this, &QCPColorScale::setDataRange);
         connect(mColorAxis.data(), &QCPAxis::scaleTypeChanged, this, &QCPColorScale::setDataScaleType);
         mAxisRect.data()->setRangeDragAxes(QList<QCPAxis*>() << mColorAxis.data());
     }
@@ -262,12 +262,13 @@ void QCPColorScale::setDataRange(const QCPRange& dataRange)
 {
     if (mDataRange.lower != dataRange.lower || mDataRange.upper != dataRange.upper)
     {
+        const QCPEmissionScope scope(mParentPlot);
         mDataRange = dataRange;
         if (mColorAxis)
-            mColorAxis.data()->setRange(mDataRange);
+            mColorAxis.data()->setRange(mDataRange); // emits the axis rangeChanged too
         if (mLayer)
             mLayer->markDirty();
-        emit dataRangeChanged(mDataRange);
+        qcpEmit(this, mParentPlot, &QCPColorScale::dataRangeChanged, mDataRange);
     }
 }
 
@@ -294,16 +295,14 @@ void QCPColorScale::setDataScaleType(QCPAxis::ScaleType scaleType)
 {
     if (mDataScaleType != scaleType)
     {
+        const QCPEmissionScope scope(mParentPlot);
         markDirty();
         mDataScaleType = scaleType;
-        // Both calls may signal a new range, and a dataRangeChanged slot may delete this scale.
-        const QPointer<QCPColorScale> alive(this);
         if (mColorAxis)
             mColorAxis.data()->setScaleType(mDataScaleType);
-        if (alive && mDataScaleType == QCPAxis::stLogarithmic)
+        if (mDataScaleType == QCPAxis::stLogarithmic)
             setDataRange(mDataRange.sanitizedForLogScale());
-        if (alive)
-            emit dataScaleTypeChanged(mDataScaleType);
+        qcpEmit(this, mParentPlot, &QCPColorScale::dataScaleTypeChanged, mDataScaleType);
     }
 }
 
@@ -324,7 +323,7 @@ void QCPColorScale::setGradient(const QCPColorGradient& gradient)
         mGradient = gradient;
         if (mAxisRect)
             mAxisRect.data()->mGradientImageInvalidated = true;
-        emit gradientChanged(mGradient);
+        qcpEmit(this, mParentPlot, &QCPColorScale::gradientChanged, mGradient);
     }
 }
 
@@ -644,10 +643,10 @@ QCPColorScaleAxisRectPrivate::QCPColorScaleAxisRectPrivate(QCPColorScale* parent
         connect(axis(type), &QCPAxis::selectableChanged, this, &QCPColorScaleAxisRectPrivate::axisSelectableChanged);
     }
 
-    connect(axis(QCPAxis::atLeft), qOverload<const QCPRange&>(&QCPAxis::rangeChanged), axis(QCPAxis::atRight), qOverload<const QCPRange&>(&QCPAxis::setRange));
-    connect(axis(QCPAxis::atRight), qOverload<const QCPRange&>(&QCPAxis::rangeChanged), axis(QCPAxis::atLeft), qOverload<const QCPRange&>(&QCPAxis::setRange));
-    connect(axis(QCPAxis::atBottom), qOverload<const QCPRange&>(&QCPAxis::rangeChanged), axis(QCPAxis::atTop), qOverload<const QCPRange&>(&QCPAxis::setRange));
-    connect(axis(QCPAxis::atTop), qOverload<const QCPRange&>(&QCPAxis::rangeChanged), axis(QCPAxis::atBottom), qOverload<const QCPRange&>(&QCPAxis::setRange));
+    connect(axis(QCPAxis::atLeft), &QCPAxis::rangeChanged, axis(QCPAxis::atRight), qOverload<const QCPRange&>(&QCPAxis::setRange));
+    connect(axis(QCPAxis::atRight), &QCPAxis::rangeChanged, axis(QCPAxis::atLeft), qOverload<const QCPRange&>(&QCPAxis::setRange));
+    connect(axis(QCPAxis::atBottom), &QCPAxis::rangeChanged, axis(QCPAxis::atTop), qOverload<const QCPRange&>(&QCPAxis::setRange));
+    connect(axis(QCPAxis::atTop), &QCPAxis::rangeChanged, axis(QCPAxis::atBottom), qOverload<const QCPRange&>(&QCPAxis::setRange));
     connect(axis(QCPAxis::atLeft), &QCPAxis::scaleTypeChanged, axis(QCPAxis::atRight), &QCPAxis::setScaleType);
     connect(axis(QCPAxis::atRight), &QCPAxis::scaleTypeChanged, axis(QCPAxis::atLeft), &QCPAxis::setScaleType);
     connect(axis(QCPAxis::atBottom), &QCPAxis::scaleTypeChanged, axis(QCPAxis::atTop), &QCPAxis::setScaleType);

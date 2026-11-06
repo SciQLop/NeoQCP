@@ -857,7 +857,7 @@ void QCPPolarAxisAngular::setSelectableParts(const SelectableParts& selectable)
     if (mSelectableParts != selectable)
     {
         mSelectableParts = selectable;
-        emit selectableChanged(mSelectableParts);
+        qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::selectableChanged, mSelectableParts);
     }
 }
 
@@ -885,7 +885,7 @@ void QCPPolarAxisAngular::setSelectedParts(const SelectableParts& selected)
     {
         markDirty();
         mSelectedParts = selected;
-        emit selectionChanged(mSelectedParts);
+        qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::selectionChanged, mSelectedParts);
     }
 }
 
@@ -1885,11 +1885,7 @@ bool QCPPolarAxisAngular::registerPolarGraph(QCPPolarGraph* graph)
     return true;
 }
 
-// Both range signals: a slot of the first may delete this axis.
 void QCPPolarAxisAngular::emitRangeChanged(const QCPRange& oldRange)
 {
-    const QPointer<QCPPolarAxisAngular> alive(this);
-    emit rangeChanged(mRange);
-    if (alive)
-        emit rangeChanged(mRange, oldRange);
+    qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::rangeChanged, mRange, oldRange);
 }

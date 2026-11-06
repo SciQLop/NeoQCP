@@ -138,7 +138,7 @@ DOC_SNIPPET(layout_margin_group, 600, 460)
     customPlot->axisRect()->setMarginGroup(QCP::msLeft | QCP::msRight, group);
     lower->setMarginGroup(QCP::msLeft | QCP::msRight, group);
 
-    QObject::connect(customPlot->xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged),
+    QObject::connect(customPlot->xAxis, &QCPAxis::rangeChanged,
                      lower->axis(QCPAxis::atBottom), qOverload<const QCPRange&>(&QCPAxis::setRange));
     // [/layout_margin_group]
 }

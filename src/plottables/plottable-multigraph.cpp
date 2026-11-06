@@ -60,7 +60,7 @@ void QCPMultiGraph::followAxes()
         disconnect(link);
     if (mKeyAxis)
     {
-        mAxisLinks << connect(mKeyAxis.data(), QOverload<const QCPRange&>::of(&QCPAxis::rangeChanged),
+        mAxisLinks << connect(mKeyAxis.data(), &QCPAxis::rangeChanged,
                               this, &QCPMultiGraph::onViewportChanged);
         mAxisLinks << connect(mKeyAxis.data(), &QCPAxis::scaleTypeChanged,
                               this, [this] { invalidateLines(); });

@@ -663,8 +663,8 @@ void QCPAxisRect::setupFullAxesBox(bool connectRanges)
 
     if (connectRanges)
     {
-        connect(xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged), xAxis2, qOverload<const QCPRange&>(&QCPAxis::setRange));
-        connect(yAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged), yAxis2, qOverload<const QCPRange&>(&QCPAxis::setRange));
+        connect(xAxis, &QCPAxis::rangeChanged, xAxis2, qOverload<const QCPRange&>(&QCPAxis::setRange));
+        connect(yAxis, &QCPAxis::rangeChanged, yAxis2, qOverload<const QCPRange&>(&QCPAxis::setRange));
     }
 }
 

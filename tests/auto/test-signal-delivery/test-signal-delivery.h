@@ -41,4 +41,10 @@ private slots:
     void qcpEmitHoldsUntilTheScopeCloses();
     void noPlotEmitsAtOnce();
     void deadSenderIsNotDelivered();
+
+    void rangeSlotSeesTheNewScaleType();
+    void slotReenteringTheSetterDeliversInOrder();
+    void slotDeletingThePlotDropsTheRestOfTheChain();
+    void teardownOpensNoDelivery();
+    void oneArgumentRangeSlotConnects();
 };

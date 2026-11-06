@@ -467,7 +467,7 @@ void TestQCustomPlot::settingTheCurrentSelectionRectKeepsIt()
   auto* rect = mPlot->selectionRect();
   mPlot->setSelectionRect(rect);
   QCOMPARE(mPlot->selectionRect(), rect);
-  QSignalSpy zooms(mPlot->xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged));
+  QSignalSpy zooms(mPlot->xAxis, &QCPAxis::rangeChanged);
   dragFromTo(mPlot, pixelOf(mPlot, 2, 2), pixelOf(mPlot, 6, 6));
   QCOMPARE(zooms.count(), 1);
 }
@@ -482,7 +482,7 @@ void TestQCustomPlot::cancelSlotReinstallingThePreviousRectZoomsOnce()
   mPlot->setSelectionRect(new QCPSelectionRect(mPlot));
   QCOMPARE(mPlot->selectionRect(), original);
   sendMouse(mPlot, QEvent::MouseButtonRelease, pixelOf(mPlot, 2, 2), Qt::NoButton);
-  QSignalSpy zooms(mPlot->xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged));
+  QSignalSpy zooms(mPlot->xAxis, &QCPAxis::rangeChanged);
   dragFromTo(mPlot, pixelOf(mPlot, 2, 2), pixelOf(mPlot, 6, 6));
   QCOMPARE(zooms.count(), 1);
 }
@@ -548,7 +548,7 @@ void TestQCustomPlot::rectZoomSlotDeletingThePlotIsSafe()
   layOut(mPlot, QCP::Interactions());
   mPlot->setSelectionRectMode(QCP::srmZoom);
   bool ran = false;
-  deletePlotOn(mPlot, mPlot->xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged), &ran);
+  deletePlotOn(mPlot, mPlot->xAxis, &QCPAxis::rangeChanged, &ran);
   dragFromTo(mPlot, pixelOf(mPlot, 2, 2), pixelOf(mPlot, 6, 6));
   QVERIFY(ran);
 }
@@ -604,14 +604,11 @@ void TestQCustomPlot::rightPressSlotDeletingATopLevelPlotIsSafe()
 }
 
 namespace {
-// A slot of the first rangeChanged deletes the axes: the second must not be emitted from them.
+// A slot of rangeChanged deletes the axis' owner: nothing of that chain may reach the dead axis.
 template <typename Axis>
-void expectNoSecondRangeSignal(Axis* axis, QCPPolarAxisAngular* owner, int* second)
+void deleteOwnerOnRangeChange(Axis* axis, QObject* owner)
 {
-  QObject::connect(axis, qOverload<const QCPRange&, const QCPRange&>(&Axis::rangeChanged), owner,
-                   [second] { ++*second; });
-  QObject::connect(axis, qOverload<const QCPRange&>(&Axis::rangeChanged), owner,
-                   [owner] { delete owner; });
+  QObject::connect(axis, &Axis::rangeChanged, owner, [owner] { delete owner; });
 }
 } // namespace
 
@@ -619,11 +616,9 @@ void TestQCustomPlot::angularRangeSlotDeletingTheAxisIsSafe()
 {
   auto* angular = new QCPPolarAxisAngular(mPlot);
   const QPointer<QCPPolarAxisAngular> alive(angular);
-  int second = 0;
-  expectNoSecondRangeSignal(angular, angular, &second);
+  deleteOwnerOnRangeChange(angular, angular);
   angular->setRange(0, 180);
   QVERIFY(!alive);
-  QCOMPARE(second, 0);
 }
 
 void TestQCustomPlot::radialRangeSlotDeletingTheAxisIsSafe()
@@ -634,15 +629,14 @@ void TestQCustomPlot::radialRangeSlotDeletingTheAxisIsSafe()
     auto* radial = angular->radialAxis();
     radial->setRange(-1, 10);
     const QPointer<QCPPolarAxisRadial> alive(radial);
-    int second = 0, scaleTypes = 0;
+    int scaleTypes = 0;
     connect(radial, &QCPPolarAxisRadial::scaleTypeChanged, angular, [&scaleTypes] { ++scaleTypes; });
-    expectNoSecondRangeSignal(radial, angular, &second);
+    deleteOwnerOnRangeChange(radial, angular);
     if (viaScaleType)
       radial->setScaleType(QCPPolarAxisRadial::stLogarithmic); // sanitises the range first
     else
       radial->setRange(2, 3);
     QVERIFY(!alive);
-    QCOMPARE(second, 0);
     QCOMPARE(scaleTypes, 0);
   }
 }
@@ -688,7 +682,7 @@ void wheelOnPolar(QCustomPlot* plot, QCPPolarAxisAngular* angular)
 template <typename Slot>
 void onFirstRangeChange(QCPPolarAxisRadial* axis, QObject* context, Slot slot)
 {
-  QObject::connect(axis, qOverload<const QCPRange&>(&QCPPolarAxisRadial::rangeChanged), context,
+  QObject::connect(axis, &QCPPolarAxisRadial::rangeChanged, context,
                    slot, Qt::SingleShotConnection);
 }
 } // namespace
@@ -750,7 +744,7 @@ void TestQCustomPlot::angularDragSlotDeletingTheAngularAxisIsSafe()
   QList<QCPPolarAxisRadial*> radials;
   QPointer<QCPPolarAxisAngular> angular = polarPlot(mPlot, radials);
   angular->setRangeDrag(true);
-  connect(angular, qOverload<const QCPRange&>(&QCPPolarAxisAngular::rangeChanged), mPlot,
+  connect(angular, &QCPPolarAxisAngular::rangeChanged, mPlot,
           [this, angular] { mPlot->plotLayout()->remove(angular); }, Qt::SingleShotConnection);
   const QPoint from = polarPoint(angular, 0.6);
   const QPoint to = (angular->center() + QPointF(0.6 * angular->radius(), 0)).toPoint();
@@ -765,7 +759,7 @@ void TestQCustomPlot::angularWheelSlotDeletingTheAngularAxisIsSafe()
   QList<QCPPolarAxisRadial*> radials;
   QPointer<QCPPolarAxisAngular> angular = polarPlot(mPlot, radials);
   angular->setRangeZoom(true);
-  connect(angular, qOverload<const QCPRange&>(&QCPPolarAxisAngular::rangeChanged), mPlot,
+  connect(angular, &QCPPolarAxisAngular::rangeChanged, mPlot,
           [this, angular] { mPlot->plotLayout()->remove(angular); }, Qt::SingleShotConnection);
   wheelOnPolar(mPlot, angular);
   QVERIFY(!angular);
@@ -779,7 +773,7 @@ void TestQCustomPlot::radialDragSlotDeletingTheAngularAxisRestoresAntialiasing()
   mPlot->setAntialiasedElements(QCP::aePlottables);
   const auto on = mPlot->antialiasedElements(), off = mPlot->notAntialiasedElements();
   int changes = 0; // the first move turns antialiasing off, the second deletes the axis
-  connect(radials[0], qOverload<const QCPRange&>(&QCPPolarAxisRadial::rangeChanged), mPlot,
+  connect(radials[0], &QCPPolarAxisRadial::rangeChanged, mPlot,
           [this, angular, &changes] {
             if (++changes == 2)
               mPlot->plotLayout()->remove(angular);

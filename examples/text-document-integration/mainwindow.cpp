@@ -71,8 +71,8 @@ void MainWindow::setupPlot()
   ui->plot->yAxis2->setVisible(true);
   ui->plot->yAxis2->setTickLabels(false);
   // make left and bottom axes always transfer their ranges to right and top axes:
-  connect(ui->plot->xAxis, SIGNAL(rangeChanged(QCPRange)), ui->plot->xAxis2, SLOT(setRange(QCPRange)));
-  connect(ui->plot->yAxis, SIGNAL(rangeChanged(QCPRange)), ui->plot->yAxis2, SLOT(setRange(QCPRange)));
+  connect(ui->plot->xAxis, SIGNAL(rangeChanged(QCPRange, QCPRange)), ui->plot->xAxis2, SLOT(setRange(QCPRange)));
+  connect(ui->plot->yAxis, SIGNAL(rangeChanged(QCPRange, QCPRange)), ui->plot->yAxis2, SLOT(setRange(QCPRange)));
   // pass data points to graphs:
   ui->plot->graph(0)->setData(x, y0);
   ui->plot->graph(1)->setData(x, y1);

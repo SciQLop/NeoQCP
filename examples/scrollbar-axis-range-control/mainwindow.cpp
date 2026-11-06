@@ -44,8 +44,8 @@ MainWindow::MainWindow(QWidget *parent) :
   // create connection between axes and scroll bars:
   connect(ui->horizontalScrollBar, SIGNAL(valueChanged(int)), this, SLOT(horzScrollBarChanged(int)));
   connect(ui->verticalScrollBar, SIGNAL(valueChanged(int)), this, SLOT(vertScrollBarChanged(int)));
-  connect(ui->plot->xAxis, SIGNAL(rangeChanged(QCPRange)), this, SLOT(xAxisChanged(QCPRange)));
-  connect(ui->plot->yAxis, SIGNAL(rangeChanged(QCPRange)), this, SLOT(yAxisChanged(QCPRange)));
+  connect(ui->plot->xAxis, SIGNAL(rangeChanged(QCPRange, QCPRange)), this, SLOT(xAxisChanged(QCPRange)));
+  connect(ui->plot->yAxis, SIGNAL(rangeChanged(QCPRange, QCPRange)), this, SLOT(yAxisChanged(QCPRange)));
   
   // initialize axis range (and scroll bar positions via signals we just connected):
   ui->plot->xAxis->setRange(0, 6, Qt::AlignCenter);

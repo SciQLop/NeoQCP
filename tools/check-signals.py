@@ -29,7 +29,6 @@ SIGNAL_NAME_RE = re.compile(r"(\w+)\s*\(")
 EMIT_RE = re.compile(r"\b(emit|Q_EMIT)\b")
 DELIVERY_RE = re.compile(r"\b(deliver|qcpEmit)\s*\(")
 DEFINITION_RE = re.compile(r"(\w+)::(~?\w+)\s*\(")
-LAMBDA_ASSIGN_RE = re.compile(r"(\w+)\s*=\s*\[")
 
 
 def strip_comments(text: str) -> str:
@@ -153,21 +152,6 @@ def defined_function(text: str, offset: int) -> str:
     return "?"
 
 
-def delivered_by_named_lambda(text: str, offset: int) -> bool:
-    """A lambda stored in a variable and handed to deliver later is delivered, not direct."""
-    assigned = None
-    for assigned in LAMBDA_ASSIGN_RE.finditer(text, 0, offset):
-        pass
-    if assigned is None:
-        return False
-    return (
-        re.search(
-            rf"\b(?:deliver|qcpEmit)\s*\([^;]*\b{assigned.group(1)}\b", text[offset:]
-        )
-        is not None
-    )
-
-
 def direct_emits(text: str) -> list[tuple[int, str]]:
     """The emit sites outside any qcpEmit/deliver call."""
     spans = delivery_spans(text)
@@ -177,8 +161,6 @@ def direct_emits(text: str) -> list[tuple[int, str]]:
         for match in EMIT_RE.finditer(line):
             at = offset + match.start()
             if any(open_at < at < close_at for open_at, close_at in spans):
-                continue
-            if delivered_by_named_lambda(text, at):
                 continue
             name = re.match(r"\s*(\w+)", text[at + len(match.group(0)) :])
             emitted = f"{match.group(0)} {name.group(1)}" if name else match.group(0)

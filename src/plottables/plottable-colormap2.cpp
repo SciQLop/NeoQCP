@@ -47,7 +47,7 @@ void QCPColorMap2::followAxes()
     {
         if (!axis)
             continue;
-        mAxisLinks << connect(axis, QOverload<const QCPRange&>::of(&QCPAxis::rangeChanged),
+        mAxisLinks << connect(axis, &QCPAxis::rangeChanged,
                               this, &QCPColorMap2::onViewportChanged);
         mAxisLinks << connect(axis, &QCPAxis::scaleTypeChanged,
                               this, &QCPColorMap2::onViewportChanged);

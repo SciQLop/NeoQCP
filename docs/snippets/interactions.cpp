@@ -254,7 +254,7 @@ DOC_CODE(interactions_signals)
 {
     customPlot->addGraph()->setData(QVector<double> { 0, 1, 2 }, QVector<double> { 1, 0, 1 });
     // [interactions_signals]
-    QObject::connect(customPlot->xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged),
+    QObject::connect(customPlot->xAxis, &QCPAxis::rangeChanged,
                      [](const QCPRange& range) { qDebug() << "x now spans" << range.lower << range.upper; });
 
     QObject::connect(customPlot, &QCustomPlot::plottableClick,

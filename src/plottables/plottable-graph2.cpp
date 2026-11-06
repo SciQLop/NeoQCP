@@ -46,7 +46,7 @@ void QCPGraph2::followAxes()
         disconnect(link);
     if (mKeyAxis)
     {
-        mAxisLinks << connect(mKeyAxis.data(), QOverload<const QCPRange&>::of(&QCPAxis::rangeChanged),
+        mAxisLinks << connect(mKeyAxis.data(), &QCPAxis::rangeChanged,
                               this, &QCPGraph2::onViewportChanged);
         mAxisLinks << connect(mKeyAxis.data(), &QCPAxis::scaleTypeChanged, this, dropLines);
     }

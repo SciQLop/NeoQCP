@@ -40,7 +40,7 @@ MainWindow::MainWindow(QWidget *parent) :
   
   // configure plot to have two right axes:
   mPlot->yAxis->setTickLabels(false);
-  connect(mPlot->yAxis2, SIGNAL(rangeChanged(QCPRange)), mPlot->yAxis, SLOT(setRange(QCPRange))); // left axis only mirrors inner right axis
+  connect(mPlot->yAxis2, SIGNAL(rangeChanged(QCPRange, QCPRange)), mPlot->yAxis, SLOT(setRange(QCPRange))); // left axis only mirrors inner right axis
   mPlot->yAxis2->setVisible(true);
   mPlot->axisRect()->addAxis(QCPAxis::atRight);
   mPlot->axisRect()->axis(QCPAxis::atRight, 0)->setPadding(30); // add some padding to have space for tags

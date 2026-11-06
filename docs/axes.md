@@ -214,10 +214,12 @@ Connect one to the other, and the second axis follows the first.
 
 ![Two plots sharing one time range](images/axes-linked.png)
 
-- Both `rangeChanged` and `setRange` are overloaded, so `QOverload<const QCPRange&>::of` picks the one-argument versions.
+- `setRange` is overloaded, so `QOverload<const QCPRange&>::of` picks the range version. `rangeChanged`
+  has a single signature, `(newRange, oldRange)`, so `&QCPAxis::rangeChanged` connects directly.
 - Connecting both ways is safe. `setRange()` does nothing when the range does not change, so the signals stop after one round.
 - The user can pan and zoom either plot, the other one follows. {doc}`interactions` covers range dragging and zooming.
 - The margin group keeps the two axis rects aligned when their tick labels have different widths. {doc}`layout` explains margin groups.
 
-`rangeChanged` also has a two-argument version that passes the old range too.
+`rangeChanged` passes the old range too, so a slot can take either `(newRange, oldRange)` or just
+`newRange`.
 The axis also emits `scaleTypeChanged` when the scale type changes.

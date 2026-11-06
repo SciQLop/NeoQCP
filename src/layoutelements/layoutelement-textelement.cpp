@@ -303,7 +303,7 @@ void QCPTextElement::setSelectable(bool selectable)
     if (mSelectable != selectable)
     {
         mSelectable = selectable;
-        emit selectableChanged(mSelectable);
+        qcpEmit(this, mParentPlot, &QCPTextElement::selectableChanged, mSelectable);
     }
 }
 
@@ -320,7 +320,7 @@ void QCPTextElement::setSelected(bool selected)
         return;
     markDirty();
     mSelected = selected;
-    emit selectionChanged(mSelected);
+    qcpEmit(this, mParentPlot, &QCPTextElement::selectionChanged, mSelected);
 }
 
 /* inherits documentation from base class */
@@ -435,7 +435,7 @@ void QCPTextElement::mousePressEvent(QMouseEvent* event, [[maybe_unused]] const 
 void QCPTextElement::mouseReleaseEvent(QMouseEvent* event, const QPointF& startPos)
 {
     if ((QPointF(event->pos()) - startPos).manhattanLength() <= 3)
-        emit clicked(event);
+        qcpEmit(this, mParentPlot, &QCPTextElement::clicked, event);
 }
 
 /*!
@@ -446,7 +446,7 @@ void QCPTextElement::mouseReleaseEvent(QMouseEvent* event, const QPointF& startP
 void QCPTextElement::mouseDoubleClickEvent(QMouseEvent* event,
                                            [[maybe_unused]] const QVariant& details)
 {
-    emit doubleClicked(event);
+    qcpEmit(this, mParentPlot, &QCPTextElement::doubleClicked, event);
 }
 
 /*! \internal

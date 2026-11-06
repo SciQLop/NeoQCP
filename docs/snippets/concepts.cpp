@@ -123,7 +123,7 @@ DOC_CODE(concepts_replot_batch)
 DOC_CODE(concepts_queued_replot)
 {
     // [concepts_queued_replot]
-    QObject::connect(customPlot->xAxis, qOverload<const QCPRange&>(&QCPAxis::rangeChanged),
+    QObject::connect(customPlot->xAxis, &QCPAxis::rangeChanged,
                      customPlot, [customPlot](const QCPRange&) {
                          customPlot->replot(QCustomPlot::rpQueuedReplot);
                      });

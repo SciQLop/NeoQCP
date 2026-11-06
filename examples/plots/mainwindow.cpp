@@ -163,8 +163,8 @@ void MainWindow::setupSimpleDemo(QCustomPlot *customPlot)
   customPlot->yAxis2->setVisible(true);
   customPlot->yAxis2->setTickLabels(false);
   // make left and bottom axes always transfer their ranges to right and top axes:
-  connect(customPlot->xAxis, SIGNAL(rangeChanged(QCPRange)), customPlot->xAxis2, SLOT(setRange(QCPRange)));
-  connect(customPlot->yAxis, SIGNAL(rangeChanged(QCPRange)), customPlot->yAxis2, SLOT(setRange(QCPRange)));
+  connect(customPlot->xAxis, SIGNAL(rangeChanged(QCPRange, QCPRange)), customPlot->xAxis2, SLOT(setRange(QCPRange)));
+  connect(customPlot->yAxis, SIGNAL(rangeChanged(QCPRange, QCPRange)), customPlot->yAxis2, SLOT(setRange(QCPRange)));
   // pass data points to graphs:
   customPlot->graph(0)->setData(x, y0);
   customPlot->graph(1)->setData(x, y1);
@@ -699,8 +699,8 @@ void MainWindow::setupLogarithmicDemo(QCustomPlot *customPlot)
   // make top right axes clones of bottom left axes:
   customPlot->axisRect()->setupFullAxesBox();
   // connect signals so top and right axes move in sync with bottom and left axes:
-  connect(customPlot->xAxis, SIGNAL(rangeChanged(QCPRange)), customPlot->xAxis2, SLOT(setRange(QCPRange)));
-  connect(customPlot->yAxis, SIGNAL(rangeChanged(QCPRange)), customPlot->yAxis2, SLOT(setRange(QCPRange)));
+  connect(customPlot->xAxis, SIGNAL(rangeChanged(QCPRange, QCPRange)), customPlot->xAxis2, SLOT(setRange(QCPRange)));
+  connect(customPlot->yAxis, SIGNAL(rangeChanged(QCPRange, QCPRange)), customPlot->yAxis2, SLOT(setRange(QCPRange)));
   
   customPlot->legend->setVisible(true);
   customPlot->legend->setBrush(QBrush(QColor(255,255,255,150)));
@@ -732,8 +732,8 @@ void MainWindow::setupRealtimeDataDemo(QCustomPlot *customPlot)
   customPlot->yAxis->setRange(-1.2, 1.2);
   
   // make left and bottom axes transfer their ranges to right and top axes:
-  connect(customPlot->xAxis, SIGNAL(rangeChanged(QCPRange)), customPlot->xAxis2, SLOT(setRange(QCPRange)));
-  connect(customPlot->yAxis, SIGNAL(rangeChanged(QCPRange)), customPlot->yAxis2, SLOT(setRange(QCPRange)));
+  connect(customPlot->xAxis, SIGNAL(rangeChanged(QCPRange, QCPRange)), customPlot->xAxis2, SLOT(setRange(QCPRange)));
+  connect(customPlot->yAxis, SIGNAL(rangeChanged(QCPRange, QCPRange)), customPlot->yAxis2, SLOT(setRange(QCPRange)));
   
   // setup a timer that repeatedly calls MainWindow::realtimeDataSlot:
   connect(&dataTimer, SIGNAL(timeout()), this, SLOT(realtimeDataSlot()));
@@ -1361,8 +1361,8 @@ void MainWindow::setupFinancialDemo(QCustomPlot *customPlot)
   volumeNeg->setBrush(QColor(180, 90, 90));
   
   // interconnect x axis ranges of main and bottom axis rects:
-  connect(customPlot->xAxis, SIGNAL(rangeChanged(QCPRange)), volumeAxisRect->axis(QCPAxis::atBottom), SLOT(setRange(QCPRange)));
-  connect(volumeAxisRect->axis(QCPAxis::atBottom), SIGNAL(rangeChanged(QCPRange)), customPlot->xAxis, SLOT(setRange(QCPRange)));
+  connect(customPlot->xAxis, SIGNAL(rangeChanged(QCPRange, QCPRange)), volumeAxisRect->axis(QCPAxis::atBottom), SLOT(setRange(QCPRange)));
+  connect(volumeAxisRect->axis(QCPAxis::atBottom), SIGNAL(rangeChanged(QCPRange, QCPRange)), customPlot->xAxis, SLOT(setRange(QCPRange)));
   // configure axes of both main and bottom axis rect:
   QSharedPointer<QCPAxisTickerDateTime> dateTimeTicker(new QCPAxisTickerDateTime);
   dateTimeTicker->setDateTimeSpec(Qt::UTC);

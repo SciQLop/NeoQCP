@@ -156,7 +156,7 @@ void QCPAbstractLegendItem::setSelectable(bool selectable)
     if (mSelectable != selectable)
     {
         mSelectable = selectable;
-        emit selectableChanged(mSelectable);
+        qcpEmit(this, mParentPlot, &QCPAbstractLegendItem::selectableChanged, mSelectable);
     }
 }
 
@@ -174,7 +174,7 @@ void QCPAbstractLegendItem::setSelected(bool selected)
         return;
     markDirty();
     mSelected = selected;
-    emit selectionChanged(mSelected);
+    qcpEmit(this, mParentPlot, &QCPAbstractLegendItem::selectionChanged, mSelected);
 }
 
 /* inherits documentation from base class */
@@ -661,7 +661,7 @@ void QCPLegend::setSelectableParts(const SelectableParts& selectable)
     if (mSelectableParts != selectable)
     {
         mSelectableParts = selectable;
-        emit selectableChanged(mSelectableParts);
+        qcpEmit(this, mParentPlot, &QCPLegend::selectableChanged, mSelectableParts);
     }
 }
 
@@ -709,6 +709,7 @@ void QCPLegend::setSelectedParts(const SelectableParts& selected)
 
     if (mSelectedParts != newSelected)
     {
+        const QCPEmissionScope scope(mParentPlot);
         markDirty();
         if (!mSelectedParts.testFlag(spItems)
             && newSelected.testFlag(spItems)) // attempt to set spItems flag (can't do that)
@@ -724,7 +725,7 @@ void QCPLegend::setSelectedParts(const SelectableParts& selected)
                 return;
         }
         mSelectedParts = newSelected;
-        emit selectionChanged(mSelectedParts);
+        qcpEmit(this, mParentPlot, &QCPLegend::selectionChanged, mSelectedParts);
     }
 }
 
