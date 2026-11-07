@@ -785,6 +785,10 @@ QCPColorScaleOps<QCPColorScale> QCPAxisRect::colorScale()
     {
         mColorScale = new QCPColorScale(mParentPlot);
         mColorScale->mOwnerRect = this;
+        // Off the data layer: a visible bar there would make every pan repaint that layer instead
+        // of shifting it. The axes layer repaints on a pan anyway, for its ticks.
+        if (QCPLayer* axesLayer = mParentPlot->layer(QLatin1String("axes")))
+            mColorScale->setLayer(axesLayer);
         colorScaleUsersChanged();
     }
     return qcp::makeHandle<QCPColorScaleOps<QCPColorScale>>(mColorScale.data());

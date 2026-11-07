@@ -29,6 +29,12 @@ private slots:
     // The renderer of a map made later reads the values the scale already had.
     void aSecondMapTakesTheRectsGradient();
 
+    // A rect-owned scale is part of the plot like a layout one: margin groups and the mouse see it.
+    void groupedRectsLeaveRoomForTheScale();
+    void theWheelZoomsTheRectsScale();
+    // The bar must not share the data layer, or a pan repaints that layer instead of shifting it.
+    void theScaleIsNotOnTheDataLayer();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };

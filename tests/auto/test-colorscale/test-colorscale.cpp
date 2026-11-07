@@ -197,3 +197,52 @@ void TestColorScale::aSecondMapTakesTheRectsGradient()
                             .arg(c.green())
                             .arg(c.blue())));
 }
+
+// Two stacked rects share their right margin through a group; only the top one shows a scale. Both
+// must stop short of it, so their right edges line up left of the bar.
+void TestColorScale::groupedRectsLeaveRoomForTheScale()
+{
+    auto* bottom = new QCPAxisRect(mPlot);
+    mPlot->plotLayout()->addElement(1, 0, bottom);
+    auto* group = new QCPMarginGroup(mPlot);
+    QCPAxisRect* top = mPlot->axisRect();
+    top->setMarginGroup(QCP::msRight, group);
+    bottom->setMarginGroup(QCP::msRight, group);
+    mapWithRange(mPlot->xAxis, mPlot->yAxis, 0, 1);
+    mPlot->replot();
+    mPlot->replot();
+
+    const auto scale = top->colorScale();
+    QVERIFY(scale->visible());
+    QVERIFY2(top->rect().right() <= scale->outerRect().left(),
+             qPrintable(QString("rect right %1, scale left %2")
+                            .arg(top->rect().right())
+                            .arg(scale->outerRect().left())));
+    QCOMPARE(bottom->rect().right(), top->rect().right());
+}
+
+void TestColorScale::theWheelZoomsTheRectsScale()
+{
+    mPlot->setInteractions(QCP::iRangeZoom);
+    mapWithRange(mPlot->xAxis, mPlot->yAxis, 0, 10);
+    const auto scale = mPlot->axisRect()->colorScale();
+    scale->setDataRange(QCPRange(0, 10));
+    mPlot->replot();
+    const QCPRange before = scale->dataRange();
+
+    const QPointF pos = QRectF(scale->outerRect()).center();
+    QWheelEvent event(pos, mPlot->mapToGlobal(pos), QPoint(), QPoint(0, 120), Qt::NoButton,
+                      Qt::NoModifier, Qt::NoScrollPhase, false);
+    QCoreApplication::sendEvent(mPlot, &event);
+    QVERIFY2(scale->dataRange() != before, "the wheel over the bar zooms its range");
+}
+
+void TestColorScale::theScaleIsNotOnTheDataLayer()
+{
+    auto* map = mapWithRange(mPlot->xAxis, mPlot->yAxis, 0, 1);
+    mPlot->replot();
+    const auto scale = mPlot->axisRect()->colorScale();
+    QVERIFY(scale->visible());
+    QVERIFY2(scale->layer() != map->layer(), "a visible bar on the map's layer stops pans translating");
+    QCOMPARE(scale->layer(), mPlot->layer("axes"));
+}
