@@ -50,6 +50,10 @@ public:
     bool canProduceContent() const override;
     bool hasPendingData() const override { return mPendingSource != nullptr; }
     bool commitPendingData() override;
+    //! Whether a new source waits for the plot's debounced swap instead of replacing the
+    //! displayed one at once. Off (default): setDataSource() applies before it returns.
+    [[nodiscard]] bool deferredDataSwap() const { return mDeferredDataSwap; }
+    void setDeferredDataSwap(bool enabled);
 
     // Convenience: owning
     template <IndexableNumericRange KC, IndexableNumericRange VC>
@@ -224,6 +228,7 @@ protected:
 
     // Replacement data staged while the displayed source keeps rendering; the
     // plot commits it through commitPendingData() (see QCustomPlot::requestDataSwap).
+    bool mDeferredDataSwap = false;
     std::shared_ptr<QCPAbstractMultiDataSource> mPendingSource;
     std::shared_ptr<qcp::algo::MultiGraphResamplerCache> mPendingL1;
     bool mPendingReady = false;

@@ -219,10 +219,11 @@ void QCPWaterfallGraph::dataChanged()
 {
     // In-place mutation of the inner source: norm factors are stale, snapshot
     // a fresh adapter (which also invalidates line/L1/L2 caches). rebuildAdapter()
-    // already routes through QCPMultiGraph::setDataSource(), which does the full
-    // staged/immediate invalidation. Do NOT also call QCPMultiGraph::dataChanged()
-    // here: once geometry is rendered, that sees the fresh adapter we just staged
-    // in mPendingSource and — treating it as "a mutation superseded the pending
+    // already routes through QCPMultiGraph::setDataSource(), which replaces the
+    // displayed data at once (the default) or, with the deferred swap on, stages
+    // the adapter. Do NOT also call QCPMultiGraph::dataChanged() here: with the
+    // deferred swap on, that sees the fresh adapter we just staged in
+    // mPendingSource and — treating it as "a mutation superseded the pending
     // replacement" — re-stages the OLD displayed adapter over it, discarding the
     // rebuild (stale normalization on the eventual commit).
     mNormDirty = true;

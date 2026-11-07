@@ -291,6 +291,12 @@ Behaviour changes for 2.x users:
         another thread: QCPTheme::changed(), QCPLaneLayout::changed() and the asynchronous pipeline's
         cross-thread signals, which were queued already.
 
+Milestone 4b (the line family). Additive, except for the behaviour changes listed below.
+
+Behaviour changes for 2.x users:
+  - New data on a multigraph is seen at once; setDeferredDataSwap(true) keeps the old data
+        drawn until the new is ready.
+
 #### NeoQCP, unreleased ####
 
 Behaviour changes (slots that delete their sender are now safe):

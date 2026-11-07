@@ -112,11 +112,21 @@ void QCPMultiGraph::setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> so
 {
     // Keep the displayed geometry (and its GPU translation) alive while the
     // replacement is prepared; the plot commits it in one debounced swap.
-    const bool canDefer = source && mDataSource && hasRenderedRange() && mParentPlot;
+    const bool canDefer = mDeferredDataSwap && source && mDataSource && hasRenderedRange()
+        && mParentPlot;
     if (canDefer)
         stagePendingSource(std::move(source));
     else
         applySourceNow(std::move(source));
+}
+
+void QCPMultiGraph::setDeferredDataSwap(bool enabled)
+{
+    if (enabled == mDeferredDataSwap)
+        return;
+    mDeferredDataSwap = enabled;
+    if (!enabled && mPendingSource && !commitPendingData())
+        applySourceNow(std::move(mPendingSource));
 }
 
 void QCPMultiGraph::applySourceNow(std::shared_ptr<QCPAbstractMultiDataSource> source)

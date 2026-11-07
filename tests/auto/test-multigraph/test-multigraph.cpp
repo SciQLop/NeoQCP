@@ -1004,6 +1004,7 @@ void TestMultiGraph::committedDataIsDrawnOnScreen()
     if (!showWithRhi(mPlot))
         QSKIP("no QRhi available in this environment");
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDeferredDataSwap(true);
     mg->setData(std::vector<double>{0, 4}, std::vector<std::vector<double>>{{1, 1}});
     mg->setComponentPens({QPen(Qt::red, 5)});
     mPlot->xAxis->setRange(-1, 5);
@@ -1284,6 +1285,9 @@ static bool blueNear(const QImage& img, QPoint p)
 static bool commitEmptyWindow(QCustomPlot* plot, QCPMultiGraph* mg)
 {
     plot->replot(QCustomPlot::rpImmediateRefresh);
+    // The replacement is only staged with the deferred swap on; a live replot
+    // then commits it through the plot's sweep.
+    mg->setDeferredDataSwap(true);
     const std::vector<double> none;
     mg->setDataSource(std::make_shared<QCPRowMajorMultiDataSource<double, double>>(
         std::span<const double>(none), none.data(), 0, 3, 3));
@@ -1810,6 +1814,7 @@ void TestMultiGraph::anEmptyWiderSourceDoesNotGrowTheComponents()
 void TestMultiGraph::aStagedEmptyWiderSourceDoesNotGrowTheComponents()
 {
     auto* mg = threeColumnGraph(mPlot);
+    mg->setDeferredDataSwap(true);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     mg->setData(std::vector<double>{}, std::vector<std::vector<double>>(5));
     QVERIFY(mg->hasPendingData());
@@ -2126,6 +2131,7 @@ static QPoint pixelOf(QCustomPlot* plot, double key, double value)
 static QCPMultiGraph* graphWithAStagedSourceOfColumns(QCustomPlot* plot, int displayed, int staged)
 {
     auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    mg->setDeferredDataSwap(true);
     std::vector<std::vector<double>> columns;
     for (int c = 0; c < displayed; ++c)
         columns.push_back({1.0 + c / 2.0, 2.0 + c / 2.0, 3.0 + c / 2.0}); // one line each, apart

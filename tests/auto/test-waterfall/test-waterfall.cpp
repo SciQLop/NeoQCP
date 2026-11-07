@@ -114,6 +114,7 @@ void TestWaterfall::invalidateNormalization()
     wf->setOffsets({0.0});
     wf->setNormalize(true);
     wf->setGain(1.0);
+    wf->setDeferredDataSwap(true);
 
     auto keys = std::make_shared<std::vector<double>>(std::vector<double>{0.0, 1.0});
     auto vals0 = std::make_shared<std::vector<double>>(std::vector<double>{2.0, -2.0});
@@ -127,9 +128,9 @@ void TestWaterfall::invalidateNormalization()
     (*vals0)[0] = 10.0;
     (*vals0)[1] = -10.0;
 
-    // rebuildAdapter() now stages the recomputed adapter as pending data (the
-    // graph has already rendered once): wait for the plot's swap window to
-    // commit it instead of expecting an immediate replace.
+    // With the deferred swap on, rebuildAdapter() stages the recomputed adapter
+    // as pending data (the graph has already rendered once): wait for the plot's
+    // swap window to commit it instead of expecting an immediate replace.
     wf->invalidateNormalization();
     QTRY_VERIFY_WITH_TIMEOUT(!wf->hasPendingData(), 5000);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -147,7 +148,8 @@ void TestWaterfall::dataChangedWhileRenderedKeepsRebuiltAdapter()
 {
     // Regression: QCPWaterfallGraph::dataChanged() used to call
     // QCPMultiGraph::dataChanged() right after rebuildAdapter(). Once the graph
-    // has rendered once, rebuildAdapter() stages the fresh adapter as pending;
+    // has rendered once, rebuildAdapter() stages the fresh adapter as pending (the
+    // deferred swap is on here);
     // QCPMultiGraph::dataChanged() then saw mPendingSource set and re-staged the
     // OLD displayed adapter over it (its "a mutation superseded the pending
     // replacement" branch), so the eventual commit showed the stale
@@ -157,6 +159,7 @@ void TestWaterfall::dataChangedWhileRenderedKeepsRebuiltAdapter()
     wf->setOffsets({0.0});
     wf->setNormalize(true);
     wf->setGain(1.0);
+    wf->setDeferredDataSwap(true);
 
     constexpr int n = 300;
     auto keys = std::make_shared<std::vector<double>>(n);

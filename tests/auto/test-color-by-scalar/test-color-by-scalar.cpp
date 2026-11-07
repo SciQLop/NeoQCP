@@ -520,6 +520,7 @@ void TestColorByScalar::firstColoringRebuildsL1OnceWithOrigin()
 void TestColorByScalar::deferredSetColorValuesUsesThePendingSourceSize()
 {
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDeferredDataSwap(true);
     mg->setDataSource(makeSource({0, 1, 2, 3}, {{0, 1, 0, 1}}));   // n = 4, displayed
     mPlot->xAxis->setRange(0, 3);
     mPlot->yAxis->setRange(-1, 2);
@@ -540,6 +541,7 @@ void TestColorByScalar::deferredSetColorValuesUsesThePendingSourceSize()
 void TestColorByScalar::deferredCommitAppliesTheColorSizeRule()
 {
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDeferredDataSwap(true);
     mg->setDataSource(makeSource({0, 1, 2, 3}, {{0, 1, 0, 1}}));
     mg->setColorValues(std::vector<double>{1, 2, 3, 4});
     mPlot->xAxis->setRange(0, 3);
@@ -599,6 +601,7 @@ void TestColorByScalar::uncolourRoutesDiscardAPendingStash()
     // survive to re-colour the graph once the pending source commits.
     {
         auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+        mg->setDeferredDataSwap(true);
         mg->setDataSource(makeSource({0, 1, 2, 3}, {{0, 1, 0, 1}}));   // n = 4, displayed
         mPlot->xAxis->setRange(0, 3);
         mPlot->yAxis->setRange(-1, 2);
@@ -622,6 +625,7 @@ void TestColorByScalar::uncolourRoutesDiscardAPendingStash()
     // early-return path (nothing in mColor yet, only a pending stash).
     {
         auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+        mg->setDeferredDataSwap(true);
         mg->setDataSource(makeSource({0, 1, 2, 3}, {{0, 1, 0, 1}}));
         mPlot->xAxis->setRange(0, 3);
         mPlot->yAxis->setRange(-1, 2);
@@ -1134,6 +1138,7 @@ void TestColorByScalar::graph2ScatterColoursFollowTheirPointAcrossBreaks()
 void TestColorByScalar::firstColouredCommitSlotDeletingTheGraphIsSafe()
 {
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDeferredDataSwap(true);
     const int n = 200'000; // above kResampleThreshold: the async L1 pipeline runs
     std::vector<double> keys(n), values(n), scalar(n);
     for (int i = 0; i < n; ++i) { keys[i] = i; values[i] = std::sin(i * 0.001); scalar[i] = i; }

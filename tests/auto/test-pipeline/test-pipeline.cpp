@@ -2908,6 +2908,7 @@ void TestPipeline::multiGraphPendingSourceCommitsAfterZoomTriggeredRefetch()
     // already-rendered graph). Checks the newly fetched/resampled data
     // actually reaches the display, not just that a job runs.
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDeferredDataSwap(true); // keep the old data until the fetched one commits
 
     const int N1 = 10'000'001;
     auto source1 = std::make_shared<SyntheticLargeMultiSource>(N1, 3);
@@ -2964,6 +2965,7 @@ void TestPipeline::multiGraphMultipleRapidLegitimateSupersessionsCommitLast()
     // and neither call actually stages a pending source -- it doesn't
     // exercise this path at all.
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDeferredDataSwap(true); // the staging path this test exercises is opt-in
 
     const int N = 10'000'001;
     auto source0 = std::make_shared<SyntheticLargeMultiSource>(N, 3);

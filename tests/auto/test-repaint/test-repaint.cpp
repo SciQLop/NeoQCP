@@ -456,6 +456,7 @@ void TestRepaint::exportShowsReadyStagedData()
     QCustomPlot plot;
     plot.resize(400, 300);
     auto* mg = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    mg->setDeferredDataSwap(true); // the staged export path is opt-in
     mg->setData(std::vector<double> { 0, 10 }, std::vector<std::vector<double>> { { 2, 2 } });
     mg->setComponentPens({ QPen(Qt::red, 4) });
     plot.xAxis->setRange(0, 10);

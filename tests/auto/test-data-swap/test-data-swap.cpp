@@ -163,11 +163,99 @@ void TestDataSwap::swapCapForcesCommitWhilePanning()
     QVERIFY2(clock.elapsed() >= 250, qPrintable(QString::number(clock.elapsed())));
 }
 
+void TestDataSwap::newDataIsSeenAtOnceByDefault()
+{
+    // A rendered graph takes the new data at once: the getters answer for it before any
+    // event-loop turn, so nothing that runs right after setData() sees the old data.
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(ramp(200), sines(200, 1));
+    mPlot->xAxis->setRange(0, 200);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot();
+    QVERIFY(mg->hasRenderedRange());
+
+    constexpr int m = 100;
+    mg->setData(ramp(m, 1000.0), sines(m, 1));
+
+    bool found = false;
+    const QCPRange range = mg->getKeyRange(found);
+    QVERIFY(found);
+    QCOMPARE(range.lower, 1000.0);
+    QCOMPARE(range.upper, 1000.0 + m - 1);
+    QCOMPARE(mg->dataCount(), m);
+    QVERIFY(!mg->hasPendingData());
+}
+
+void TestDataSwap::rescaleAxesSeesNewDataAtOnce()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(ramp(10), std::vector<std::vector<double>>{{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}});
+    mPlot->replot();
+    QVERIFY(mg->hasRenderedRange());
+
+    mg->setData(ramp(10, 100.0),
+                std::vector<std::vector<double>>{{0, 10, 20, 30, 40, 50, 60, 70, 80, 90}});
+    mg->rescaleAxes();
+
+    QCOMPARE(mPlot->xAxis->range(), QCPRange(100.0, 109.0));
+    QCOMPARE(mPlot->yAxis->range().upper, 90.0);
+    QCOMPARE(mPlot->yAxis->range().lower, 0.0);
+}
+
+void TestDataSwap::deferredSwapKeepsTheOldDataUntilCommit()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDeferredDataSwap(true);
+    QVERIFY(mg->deferredDataSwap());
+    mg->setData(ramp(200), sines(200, 1));
+    mPlot->xAxis->setRange(0, 200);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot();
+    QVERIFY(mg->hasRenderedRange());
+
+    mPlot->setDataSwapDebounceMs(60'000); // the test commits by hand
+    constexpr int m = 100;
+    mg->setData(ramp(m, 1000.0), sines(m, 1));
+
+    // Staged: the old data is still what the getters answer for.
+    QVERIFY(mg->hasPendingData());
+    QCOMPARE(mg->dataCount(), 200);
+    bool found = false;
+    QCOMPARE(mg->getKeyRange(found).upper, 199.0);
+
+    QVERIFY(mg->commitPendingData());
+    QVERIFY(!mg->hasPendingData());
+    QCOMPARE(mg->dataCount(), m);
+    QCOMPARE(mg->getKeyRange(found).lower, 1000.0);
+}
+
+void TestDataSwap::turningTheDeferredSwapOffAppliesThePendingData()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDeferredDataSwap(true);
+    mg->setData(ramp(200), sines(200, 1));
+    mPlot->xAxis->setRange(0, 200);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot();
+    QVERIFY(mg->hasRenderedRange());
+
+    mPlot->setDataSwapDebounceMs(60'000); // nothing would commit before the test ends
+    constexpr int m = 100;
+    mg->setData(ramp(m, 1000.0), sines(m, 1));
+    QVERIFY(mg->hasPendingData());
+
+    mg->setDeferredDataSwap(false);
+    QVERIFY(!mg->hasPendingData());
+    QCOMPARE(mg->dataCount(), m);
+    QCOMPARE(mg->dataSource()->keyAt(0), 1000.0);
+}
+
 void TestDataSwap::multiGraphKeepsTranslationWhileDataPending()
 {
     // Large data so the L1 cache is built asynchronously.
     constexpr int n = 120'000;
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDeferredDataSwap(true);
     mg->setData(ramp(n), sines(n, 2));
     mPlot->xAxis->setRange(0, n);
     mPlot->yAxis->setRange(-1.5, 1.5);
@@ -195,6 +283,7 @@ void TestDataSwap::multiGraphCommitsAfterWindow()
 {
     constexpr int n = 120'000;
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDeferredDataSwap(true);
     mg->setData(ramp(n), sines(n, 2));
     mPlot->xAxis->setRange(0, n);
     mPlot->yAxis->setRange(-1.5, 1.5);
@@ -231,6 +320,7 @@ void TestDataSwap::multiGraphLatestPendingWins()
 {
     constexpr int n = 120'000;
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDeferredDataSwap(true);
     mg->setData(ramp(n), sines(n, 2));
     mPlot->xAxis->setRange(0, n);
     mPlot->yAxis->setRange(-1.5, 1.5);
@@ -256,6 +346,7 @@ void TestDataSwap::multiGraphDataChangedWhilePendingKeepsDisplayedGeometry()
     // on-screen geometry (and GPU translation) must stay put throughout.
     constexpr int n = 120'000;
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDeferredDataSwap(true);
     mg->setData(ramp(n), sines(n, 2));
     mPlot->xAxis->setRange(0, n);
     mPlot->yAxis->setRange(-1.5, 1.5);
@@ -293,6 +384,7 @@ void TestDataSwap::multiGraphPendingWiderSourceDrawsSafely()
     // to its columnCount() themselves once mComponents was resized for a
     // wider pending source, or this reads past the row-major buffer.
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDeferredDataSwap(true);
     mg->setAdaptiveSampling(false); // force the getLinesAll() path in draw()
 
     constexpr int n = 500;
@@ -346,6 +438,7 @@ void TestDataSwap::multiGraphSmallPendingIgnoresLateLargeJob()
     // and land in mPendingL1 for the small (already-committed) source.
     constexpr int n = 120'000;
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDeferredDataSwap(true);
     mg->setData(ramp(n), sines(n, 2));
     mPlot->xAxis->setRange(0, n);
     mPlot->yAxis->setRange(-1.5, 1.5);
@@ -381,6 +474,7 @@ void TestDataSwap::multiGraphLateLargeJobDoesNotContaminateCommittedSmallSource(
     // would render A's stale data even though dataSource() correctly reports B.
     constexpr int n = 120'000;
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDeferredDataSwap(true);
     mg->setData(ramp(n), sines(n, 2));
     mPlot->xAxis->setRange(0, n);
     mPlot->yAxis->setRange(-1.5, 1.5);

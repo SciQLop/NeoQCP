@@ -16,6 +16,11 @@ private slots:
     void swapWaitsForPanToSettle();
     void swapCapForcesCommitWhilePanning();
 
+    void newDataIsSeenAtOnceByDefault();
+    void rescaleAxesSeesNewDataAtOnce();
+    void deferredSwapKeepsTheOldDataUntilCommit();
+    void turningTheDeferredSwapOffAppliesThePendingData();
+
     void multiGraphKeepsTranslationWhileDataPending();
     void multiGraphCommitsAfterWindow();
     void multiGraphFirstDataCommitsImmediately();
