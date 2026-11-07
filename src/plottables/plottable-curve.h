@@ -28,8 +28,9 @@
 
 #include "../axis/range.h"
 #include "../datacontainer.h"
+#include "../drawable.h"
 #include "../global.h"
-#include "../painting/painter.h"
+#include "plottable-line.h"
 #include "plottable1d.h"
 
 class QCPPainter;
@@ -74,7 +75,16 @@ using QCPCurveDataContainer = QCPDataContainer<QCPCurveData>;
 template <typename T, typename Self = void>
 class QCPCurveOps;
 
-class QCP_LIB_DECL QCPCurve : public QCPAbstractPlottable1D<QCPCurveData>
+/*!
+  A parametric curve: its points are ordered by \a t, which is not necessarily the key axis, so the
+  line may double back and cross itself.
+
+  The curve is one line component on \ref QCPAbstractLine: the whole curve is recorded once in data
+  space as one polyline, so a pan translates the recording instead of walking the data again. The
+  fill is one polygon of data positions (the replay rasterises it, which is what a self-crossing
+  curve needs), and colour by scalar rides the shared coloured polyline.
+*/
+class QCP_LIB_DECL QCPCurve : public QCPDrawn<QCPAbstractPlottable1D<QCPCurveData, QCPAbstractLine>>
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
@@ -87,30 +97,17 @@ public:
     template <typename T>
     using OpsFor = QCPCurveOps<T>;
 
-    /*!
-      Defines how the curve's line is represented visually in the plot. The line is drawn with the
-      current pen of the curve (\ref setPen).
-      \see setLineStyle
-    */
-    enum LineStyle
-    {
-        lsNone ///< No line is drawn between data points (e.g. only scatters)
-        ,
-        lsLine ///< Data points are connected with a straight line
-    };
-    Q_ENUM(LineStyle)
+    //! The shared line styles, so 2.x code naming QCPCurve::lsLine keeps compiling. A curve draws
+    //! \ref lsLine or \ref lsNone; a step or an impulse style is refused through the misuse tier.
+    using LineStyle = QCPAbstractLine::LineStyle;
 
     explicit QCPCurve(QCPAxis* keyAxis, QCPAxis* valueAxis);
-    virtual ~QCPCurve() override;
+    ~QCPCurve() override;
 
     // getters:
     [[nodiscard]] QSharedPointer<QCPCurveDataContainer> data() const { return mDataContainer; }
 
-    [[nodiscard]] QCPScatterStyle scatterStyle() const { return mScatterStyle; }
-
-    [[nodiscard]] int scatterSkip() const { return mScatterSkip; }
-
-    [[nodiscard]] LineStyle lineStyle() const { return mLineStyle; }
+    [[nodiscard]] QCPScatterStyle scatterStyle() const { return component(0).scatterStyle; }
 
     // setters:
     void setData(QSharedPointer<QCPCurveDataContainer> data);
@@ -120,6 +117,12 @@ public:
     void setScatterStyle(const QCPScatterStyle& style);
     void setScatterSkip(int skip);
     void setLineStyle(LineStyle style);
+    //! An equal pen leaves the recording alone: the curve has one component.
+    void setPen(const QPen& pen) override;
+
+    //! One value per data point, in container order: the curve has no key window to colour.
+    void setColorValues(std::shared_ptr<const std::vector<double>> values);
+    void setColorValues(std::vector<double> values);
 
     // non-property methods:
     void addData(const QVector<double>& t, const QVector<double>& keys,
@@ -137,41 +140,17 @@ public:
                                    const QCPRange& inKeyRange = QCPRange()) const override;
 
 protected:
-    // property members:
-    QCPScatterStyle mScatterStyle;
-    int mScatterSkip;
-    LineStyle mLineStyle;
-
     // reimplemented virtual methods:
-    virtual void draw(QCPPainter* painter) override;
-    virtual void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
-
-    // introduced virtual methods:
-    virtual void drawCurveLine(QCPPainter* painter, const QVector<QPointF>& lines) const;
-    virtual void drawScatterPlot(QCPPainter* painter, const QVector<QPointF>& points,
-                                 const QCPScatterStyle& style) const;
+    virtual void draw(QCPDrawContext& context) const override;
+    virtual void drawLegendIcon(QCPDrawContext& icon) const override;
 
     // non-virtual methods:
-    void getCurveLines(QVector<QPointF>* lines, const QCPDataRange& dataRange,
-                       double penWidth) const;
-    void getScatters(QVector<QPointF>* scatters, const QCPDataRange& dataRange,
-                     double scatterWidth) const;
-    int getRegion(double key, double value, double keyMin, double valueMax, double keyMax,
-                  double valueMin) const;
-    QPointF getOptimizedPoint(int otherRegion, double otherKey, double otherValue, double key,
-                              double value, double keyMin, double valueMax, double keyMax,
-                              double valueMin) const;
-    QVector<QPointF> getOptimizedCornerPoints(int prevRegion, int currentRegion, double prevKey,
-                                              double prevValue, double key, double value,
-                                              double keyMin, double valueMax, double keyMax,
-                                              double valueMin) const;
-    bool mayTraverse(int prevRegion, int currentRegion) const;
-    bool getTraverse(double prevKey, double prevValue, double key, double value, double keyMin,
-                     double valueMax, double keyMax, double valueMin, QPointF& crossA,
-                     QPointF& crossB) const;
-    void getTraverseCornerPoints(int prevRegion, int currentRegion, double keyMin, double valueMax,
-                                 double keyMax, double valueMin, QVector<QPointF>& beforeTraverse,
-                                 QVector<QPointF>& afterTraverse) const;
+    void recordSegments(QCPDrawContext& context, const QList<QCPDataRange>& segments, bool selected,
+                        bool coloured) const;
+    void recordLine(QCPDrawContext& context, const QCPDataRange& range, const QPen& pen,
+                    bool coloured) const;
+    void recordMarkers(QCPDrawContext& context, const QCPDataRange& range,
+                       const QCPScatterStyle& style, bool coloured) const;
     double pointDistance(const QPointF& pixelPoint,
                          QCPCurveDataContainer::const_iterator& closestData) const;
 
@@ -187,30 +166,35 @@ class QCPCurveOps : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPCurveOps<T>>>
     using Base = QCPPlottableOps<T, qcp::OpsRet<Self, QCPCurveOps<T>>>;
 
 public:
-    using typename Base::Ret;
     using Base::Base;
+    using typename Base::Ret;
 
     Ret setData(QSharedPointer<QCPCurveDataContainer> data)
     {
         return this->apply([&](T& p) { p.setData(std::move(data)); });
     }
-    Ret setData(const QVector<double>& t, const QVector<double>& keys, const QVector<double>& values,
-            bool alreadySorted = false)
+
+    Ret setData(const QVector<double>& t, const QVector<double>& keys,
+                const QVector<double>& values, bool alreadySorted = false)
     {
         return this->apply([&](T& p) { p.setData(t, keys, values, alreadySorted); });
     }
+
     Ret setData(const QVector<double>& keys, const QVector<double>& values)
     {
         return this->apply([&](T& p) { p.setData(keys, values); });
     }
+
     Ret setScatterStyle(const QCPScatterStyle& style)
     {
         return this->apply([&](T& p) { p.setScatterStyle(style); });
     }
+
     Ret setScatterSkip(int skip)
     {
         return this->apply([&](T& p) { p.setScatterSkip(skip); });
     }
+
     Ret setLineStyle(QCPCurve::LineStyle style)
     {
         return this->apply([&](T& p) { p.setLineStyle(style); });

@@ -10,6 +10,16 @@ private slots:
   
   void dataManipulation();
   void dataSharing();
+
+  void curveIsOnePolylineCommand();
+  void curveRefusesAStepStyle();
+  void curveColoursByValue();
+  void curveFillIsAPolygon();
+  void selectedSegmentUsesTheSelectedPen();
+  void clickOnASegmentSelectsTheCurve();
+  void nanBreaksTheCurveLine();
+  void noSetterIsIgnored_data();
+  void noSetterIsIgnored();
   
 private:
   QCustomPlot *mPlot;
