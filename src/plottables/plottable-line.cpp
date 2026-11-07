@@ -50,7 +50,6 @@ void QCPAbstractLine::setComponentColors(const QList<QColor>& colors)
         mComponents[i].pen.setColor(colors[i]);
         mComponents[i].selectedPen = defaultSelectedPen(mComponents[i].pen);
     }
-    pensChanged(n);
 }
 
 void QCPAbstractLine::setComponentPens(const QList<QPen>& pens)
@@ -64,7 +63,6 @@ void QCPAbstractLine::setComponentPens(const QList<QPen>& pens)
         mComponents[i].pen = pens[i];
         mComponents[i].selectedPen = defaultSelectedPen(pens[i]);
     }
-    pensChanged(n);
 }
 
 // No equality early return: the components can have been given another pen since the last call
@@ -78,7 +76,6 @@ void QCPAbstractLine::setPen(const QPen& pen)
         c.pen = pen;
         c.selectedPen = defaultSelectedPen(pen);
     }
-    pensChanged(mComponents.size());
     lineChanged();
 }
 

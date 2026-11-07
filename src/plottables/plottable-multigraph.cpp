@@ -402,14 +402,6 @@ bool QCPMultiGraph::isValidColumn(int column) const
 
 // A default-brush fill or error band takes its owner's pen colour, which the GPU vertices have
 // baked in.
-bool QCPMultiGraph::hasPenDerivedDecoration(int ownerCount) const
-{
-    return std::any_of(mFills.begin(), mFills.end(), [ownerCount](const Fill& e)
-                       { return e.owner < ownerCount && e.brush.style() == Qt::NoBrush; })
-        || std::any_of(mErrorBars.begin(), mErrorBars.end(),
-                       [ownerCount](const ErrorBars& e) { return e.value < ownerCount && !e.pen; });
-}
-
 void QCPMultiGraph::decorationsChanged()
 {
     linesChanged();
@@ -557,12 +549,6 @@ void QCPMultiGraph::componentVisibilityToggled()
     linesChanged();
     if (mLayer)
         mLayer->invalidatePaintBuffer();
-}
-
-void QCPMultiGraph::pensChanged(int componentCount)
-{
-    if (hasPenDerivedDecoration(componentCount))
-        decorationsChanged();
 }
 
 void QCPMultiGraph::applyBrushToComponent(int index, const QBrush& brush)

@@ -259,13 +259,6 @@ void drawPolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer* 
     drawPolylineWithGpuFallback(painter, parentPlot, layer, pts, pen, gpuOffset, clipRect);
 }
 
-bool needsColoredReextrusion(const ExtrusionCache& cache, bool freshLines, float penWidth,
-                             quint64 colorGeneration, bool dashed)
-{
-    return freshLines || cache.isEmpty() || cache.penWidth != penWidth
-        || cache.withDistance != dashed || cache.colorGeneration != colorGeneration;
-}
-
 void drawColoredPolylineSpans(QCPPainter* painter, std::span<const QPointF> points,
                               std::span<const ColorSpan> spans, const QPen& pen)
 {
@@ -280,18 +273,6 @@ void drawColoredPolylineSpans(QCPPainter* painter, std::span<const QPointF> poin
         painter->setPen(runPen);
         painter->drawPolyline(points.data() + span.first, span.last - span.first + 1);
     }
-}
-
-void drawColoredPolylineRuns(QCPPainter* painter, const QVector<QPointF>& points,
-                             const std::vector<ColorRun>& runs, const ColorScalarMapper& mapper,
-                             const QPen& pen, const QPointF& gpuOffset)
-{
-    if (!gpuOffset.isNull())
-        painter->translate(gpuOffset);
-    drawColoredPolylineSpans(painter, std::span<const QPointF>(points.constData(), points.size()),
-                             colorSpans(runs, mapper), pen);
-    if (!gpuOffset.isNull())
-        painter->translate(-gpuOffset);
 }
 
 void extrudeColoredStroke(std::span<const QPointF> points, std::span<const ColorSpan> spans,
@@ -313,35 +294,6 @@ void extrudeColoredStroke(std::span<const QPointF> points, std::span<const Color
         else
             QCPLineExtruder::appendPolyline(run, penWidth, colour, out);
     }
-}
-
-void drawColoredPolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer* layer,
-                               const QVector<QPointF>& points, const QVector<int>& indices,
-                               const ColorScalarMapper& mapper, const QPen& pen,
-                               const QPointF& gpuOffset, const QRect& clipRect, bool freshLines,
-                               ExtrusionCache& cache)
-{
-    auto* prl = canStrokeOnGpu(pen) ? gpuLayer(parentPlot, layer, painter->isExporting()) : nullptr;
-    if (!prl)
-        return drawColoredPolylineRuns(painter, points, colorRuns(points, indices, mapper), mapper,
-                                       pen, gpuOffset);
-
-    const double dpr = parentPlot->bufferDevicePixelRatio();
-    const float penWidth = extrusionPenWidth(pen, dpr);
-    const bool dashed = isDashed(pen);
-    if (needsColoredReextrusion(cache, freshLines, penWidth, mapper.generation(), dashed))
-    {
-        extrudeColoredStroke(std::span<const QPointF>(points.constData(), points.size()),
-                             colorSpans(points, indices, mapper), pen, penWidth, cache.vertices);
-        cache.withDistance = dashed;
-        cache.penWidth = penWidth;
-        cache.colorGeneration = mapper.generation();
-    }
-    if (cache.isEmpty())
-        return;
-    addGpuStroke(*prl, cache.vertices, pen, penWidth, clipRect, dpr,
-                 parentPlot->rhiOutputSize().height(), gpuOffset,
-                 static_cast<float>(painter->opacity()));
 }
 
 } // namespace qcp

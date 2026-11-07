@@ -42,9 +42,6 @@ private slots:
     void toBucketClampsHugeAndInfinitePositions();
     void wrongLengthOnColouredGraphLeavesItUncoloured();
     void uncolourRoutesDiscardAPendingStash();
-
-    void colorRunsMergeEqualBucketsAndSkipGaps();
-    void coloredReextrusionOnlyOnColorChangeNotPan();
     void coloredLineRendersTheGradient();
     void coloredRunsMeetWithButtEndsOnExport();
 

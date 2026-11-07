@@ -86,9 +86,6 @@ Q_SIGNALS:
     void componentVisibilityChanged();
 
 protected:
-    //! Whether a decoration derived from a pen (fill or error bar without its own) must be
-    //! rebuilt: called with the number of components that were just repenned.
-    virtual void pensChanged(int componentCount) { Q_UNUSED(componentCount); }
     //! Gives component \a index the brush a component fill takes: NoBrush clears it, anything
     //! else fills it. Called for every component by setBrush() and for the new ones by
     //! applyRememberedStyle().

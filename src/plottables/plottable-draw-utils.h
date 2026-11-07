@@ -78,8 +78,6 @@ struct ExtrusionCache
     std::vector<float> vertices; // untranslated extruded verts (6 floats per vertex)
     float penWidth = 0;
     QRgb penColor = 0;
-    quint64 colorGeneration
-        = 0; // coloured lines: the mapper generation the vertices were built with
     bool withDistance = false; // 7 floats per vertex (dashed) instead of 6
 
     void clear() { vertices.clear(); }
@@ -130,18 +128,6 @@ void drawPolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer* 
                         const QVector<QPointF>& pts, const QPen& pen, const QPointF& gpuOffset,
                         const QRect& clipRect, bool freshLines, ExtrusionCache& cache);
 
-/// A coloured cache survives pans; it is rebuilt on fresh lines, pen width or colour change.
-bool needsColoredReextrusion(const ExtrusionCache& cache, bool freshLines, float penWidth,
-                             quint64 colorGeneration, bool dashed);
-
-/// Coloured counterpart of drawPolylineCached. Builds the runs itself, only when it
-/// re-extrudes (or has no GPU layer), so any reason to re-extrude gets correct runs.
-void drawColoredPolylineCached(QCPPainter* painter, QCustomPlot* parentPlot, QCPLayer* layer,
-                               const QVector<QPointF>& points, const QVector<int>& indices,
-                               const ColorScalarMapper& mapper, const QPen& pen,
-                               const QPointF& gpuOffset, const QRect& clipRect, bool freshLines,
-                               ExtrusionCache& cache);
-
 /// Extrudes \a points into \a out one coloured run at a time, the runs being \a spans.
 /// Dashed strokes carry one dash phase across the whole polyline: the runs share their end points,
 /// so restarting the pattern at every colour change would stripe the line.
@@ -153,9 +139,5 @@ void extrudeColoredStroke(std::span<const QPointF> points, std::span<const Color
 void drawColoredPolylineSpans(QCPPainter* painter, std::span<const QPointF> points,
                               std::span<const ColorSpan> spans, const QPen& pen);
 
-/// QPainter path for coloured lines: one polyline per run.
-void drawColoredPolylineRuns(QCPPainter* painter, const QVector<QPointF>& points,
-                             const std::vector<ColorRun>& runs, const ColorScalarMapper& mapper,
-                             const QPen& pen, const QPointF& gpuOffset);
 
 } // namespace qcp

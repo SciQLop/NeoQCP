@@ -211,7 +211,6 @@ protected:
     // The shared line base's hooks: every drawing change also drops the cached lines.
     void lineChanged() override;
     void componentVisibilityToggled() override;
-    void pensChanged(int componentCount) override;
     void applyBrushToComponent(int index, const QBrush& brush) override;
     [[nodiscard]] std::optional<int> colorValueCount() const override;
     [[nodiscard]] bool hasPendingDataSource() const override;
@@ -250,7 +249,6 @@ protected:
     bool setFill(Fill fill);
     [[nodiscard]] bool isErrorBound(int column) const;
     void decorationsChanged();
-    [[nodiscard]] bool hasPenDerivedDecoration(int ownerCount) const;
     [[nodiscard]] bool fillDrawable(const Fill& fill, int columnCount) const;
     [[nodiscard]] static qcp::fill::Step ownerStep(const Component& owner);
     [[nodiscard]] std::vector<qcp::fill::StripPoint> fillRows(const Fill& fill,

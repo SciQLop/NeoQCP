@@ -698,35 +698,6 @@ qcp::ColorScalarMapper mapperFor(std::vector<double> values, QCPRange range)
 
 } // namespace
 
-void TestColorByScalar::colorRunsMergeEqualBucketsAndSkipGaps()
-{
-    // values per data index: 0, 0, 1, 1, NaN, 1
-    const auto m = mapperFor({0, 0, 1, 1, std::nan(""), 1}, QCPRange(0, 1));
-    const QVector<QPointF> pts {{0, 0}, {1, 0}, {2, 0}, {3, 0}, {qQNaN(), qQNaN()}, {5, 0}, {6, 0}};
-    const QVector<int> idx     {0,      1,      2,      3,      -1,                  4,      5};
-    const auto runs = qcp::colorRuns(pts, idx, m);
-    // Segment k -> k+1 uses idx[k+1]: 0->1 value 0 (bucket 0); 1->2 and 2->3 value 1
-    // (bucket 255, merged); 3->4 and 4->5 touch the NaN point (skipped); 5->6 value 1.
-    QCOMPARE(static_cast<int>(runs.size()), 3);
-    QCOMPARE(runs[0].first, 0); QCOMPARE(runs[0].last, 1); QCOMPARE(runs[0].bucket, 0);
-    QCOMPARE(runs[1].first, 1); QCOMPARE(runs[1].last, 3); QCOMPARE(runs[1].bucket, 255);
-    QCOMPARE(runs[2].first, 5); QCOMPARE(runs[2].last, 6); QCOMPARE(runs[2].bucket, 255);
-}
-
-void TestColorByScalar::coloredReextrusionOnlyOnColorChangeNotPan()
-{
-    qcp::ExtrusionCache cache;
-    cache.vertices = {1, 2, 3, 4, 5, 6};
-    cache.penWidth = 2.0f;
-    cache.colorGeneration = 7;
-    QVERIFY(!qcp::needsColoredReextrusion(cache, false, 2.0f, 7, false));   // pan frame
-    QVERIFY(qcp::needsColoredReextrusion(cache, true, 2.0f, 7, false));     // fresh lines
-    QVERIFY(qcp::needsColoredReextrusion(cache, false, 3.0f, 7, false));    // pen width
-    QVERIFY(qcp::needsColoredReextrusion(cache, false, 2.0f, 8, false));    // colour changed
-    cache.clear();
-    QVERIFY(qcp::needsColoredReextrusion(cache, false, 2.0f, 7, false));    // empty
-}
-
 void TestColorByScalar::coloredLineRendersTheGradient()
 {
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
