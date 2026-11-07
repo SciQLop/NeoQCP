@@ -36,6 +36,7 @@ class QCPPainter;
 class QCustomPlot;
 class QCPColorMap;
 class QCPColorScale;
+class QCPAbstractColorMapped;
 
 class QCPColorScaleAxisRectPrivate : public QCPAxisRect
 {
@@ -117,6 +118,10 @@ public:
 
     // non-property methods:
     QList<QCPColorMap*> colorMaps() const;
+
+    //! Every plottable that takes its gradient, range and scale type from this scale.
+    QList<QCPAbstractColorMapped*> users() const { return mUsers; }
+
     void rescaleDataRange(bool onlyVisibleMaps);
 
     // reimplemented virtual methods:
@@ -138,6 +143,7 @@ protected:
     // non-property members:
     QPointer<QCPColorScaleAxisRectPrivate> mAxisRect;
     QPointer<QCPAxis> mColorAxis;
+    QList<QCPAbstractColorMapped*> mUsers;
 
     // reimplemented virtual methods:
     virtual void applyDefaultAntialiasingHint(QCPPainter* painter) const override;
@@ -152,39 +158,45 @@ private:
     Q_DISABLE_COPY(QCPColorScale)
 
     friend class QCPColorScaleAxisRectPrivate;
+    friend class QCPAbstractColorMapped;
 };
 
-
-// The handle of a colour scale: created in the layout by QCustomPlot::add<QCPColorScale>(row, column).
+// The handle of a colour scale: created in the layout by QCustomPlot::add<QCPColorScale>(row,
+// column).
 template <typename T, typename Self>
 class QCPColorScaleOps : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPColorScaleOps<T>>>
 {
     using Base = QCPLayerableOps<T, qcp::OpsRet<Self, QCPColorScaleOps<T>>>;
 
 public:
-    using typename Base::Ret;
     using Base::Base;
+    using typename Base::Ret;
 
     Ret setType(QCPAxis::AxisType type)
     {
         return this->apply([&](T& p) { p.setType(type); });
     }
+
     Ret setLabel(const QString& label)
     {
         return this->apply([&](T& p) { p.setLabel(label); });
     }
+
     Ret setBarWidth(int width)
     {
         return this->apply([&](T& p) { p.setBarWidth(width); });
     }
+
     Ret setGradient(const QCPColorGradient& gradient)
     {
         return this->apply([&](T& p) { p.setGradient(gradient); });
     }
+
     Ret setDataRange(const QCPRange& range)
     {
         return this->apply([&](T& p) { p.setDataRange(range); });
     }
+
     Ret setDataScaleType(QCPAxis::ScaleType type)
     {
         return this->apply([&](T& p) { p.setDataScaleType(type); });

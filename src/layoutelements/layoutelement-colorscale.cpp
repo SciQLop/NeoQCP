@@ -32,6 +32,22 @@
 #include "../plottables/plottable-colormap.h"
 #include "../plottables/plottable-colormap2.h"
 #include "../plottables/plottable-histogram2d.h"
+#include "../plottables/plottable-colormapped.h"
+#include <QPointer>
+#include <utility>
+
+namespace
+{
+// A snapshot that goes null when a slot deletes one of the users mid-loop.
+QList<QPointer<QCPAbstractColorMapped>> liveUsers(const QList<QCPAbstractColorMapped*>& users)
+{
+    QList<QPointer<QCPAbstractColorMapped>> result;
+    result.reserve(users.size());
+    for (auto* user : users)
+        result.append(user);
+    return result;
+}
+} // namespace
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPColorScale
@@ -120,8 +136,8 @@
 /*!
   Constructs a new QCPColorScale.
 
-  Deleting a color scale detaches every color map that uses it, without a signal: their
-  colorScale() returns \c nullptr afterwards.
+  Deleting a color scale detaches every plottable that uses it: their colorScale() returns \c nullptr
+  afterwards, and each receives one colorScaleChanged().
 */
 QCPColorScale::QCPColorScale(QCustomPlot* parentPlot)
         : QCPLayoutElement(parentPlot)
@@ -147,6 +163,9 @@ QCPColorScale::QCPColorScale(QCustomPlot* parentPlot)
 
 QCPColorScale::~QCPColorScale()
 {
+    for (const auto& user : liveUsers(std::exchange(mUsers, {})))
+        if (user)
+            user->detachColorScale();
     delete mAxisRect;
 }
 
@@ -270,6 +289,14 @@ void QCPColorScale::setDataRange(const QCPRange& dataRange)
             mLayer->markDirty();
         qcpEmitCurrent(this, mParentPlot, &QCPColorScale::dataRangeChanged,
                        [this] { return mDataRange; });
+        const QPointer<QCPColorScale> alive(this);
+        for (const auto& user : liveUsers(mUsers))
+        {
+            if (user)
+                user->applyDataRange(mDataRange);
+            if (!alive)
+                return;
+        }
     }
 }
 
@@ -305,6 +332,14 @@ void QCPColorScale::setDataScaleType(QCPAxis::ScaleType scaleType)
             setDataRange(mDataRange.sanitizedForLogScale());
         qcpEmitCurrent(this, mParentPlot, &QCPColorScale::dataScaleTypeChanged,
                        [this] { return mDataScaleType; });
+        const QPointer<QCPColorScale> alive(this);
+        for (const auto& user : liveUsers(mUsers))
+        {
+            if (user)
+                user->applyDataScaleType(mDataScaleType);
+            if (!alive)
+                return;
+        }
     }
 }
 
@@ -326,6 +361,14 @@ void QCPColorScale::setGradient(const QCPColorGradient& gradient)
         if (mAxisRect)
             mAxisRect.data()->mGradientImageInvalidated = true;
         qcpEmit(this, mParentPlot, &QCPColorScale::gradientChanged, mGradient);
+        const QPointer<QCPColorScale> alive(this);
+        for (const auto& user : liveUsers(mUsers))
+        {
+            if (user)
+                user->applyGradient(mGradient);
+            if (!alive)
+                return;
+        }
     }
 }
 
@@ -415,12 +458,9 @@ void QCPColorScale::setRangeZoom(bool enabled)
 QList<QCPColorMap*> QCPColorScale::colorMaps() const
 {
     QList<QCPColorMap*> result;
-    for (int i = 0; i < mParentPlot->plottableCount(); ++i)
-    {
-        if (QCPColorMap* cm = qobject_cast<QCPColorMap*>(mParentPlot->plottable(i)))
-            if (cm->colorScale() == this)
-                result.append(cm);
-    }
+    for (auto* user : mUsers)
+        if (auto* cm = qobject_cast<QCPColorMap*>(user))
+            result.append(cm);
     return result;
 }
 
@@ -460,24 +500,14 @@ void QCPColorScale::rescaleDataRange(bool onlyVisibleMaps)
     };
     // Every colormap attached to this scale: classic maps, and the zero-copy QCPColorMap2 and
     // QCPHistogram2D, which this loop used to miss.
-    for (int i = 0; mParentPlot && i < mParentPlot->plottableCount(); ++i)
+    // Every plottable attached to this scale: classic maps, and the zero-copy QCPColorMap2 and
+    // QCPHistogram2D, which this loop used to miss.
+    for (const auto& user : liveUsers(mUsers))
     {
-        QCPAbstractPlottable* plottable = mParentPlot->plottable(i);
-        if (!plottable->realVisibility() && onlyVisibleMaps)
+        if (!user || (onlyVisibleMaps && !user->realVisibility()))
             continue;
         bool found = false;
-        QCPRange mapRange;
-        if (auto* map = qobject_cast<QCPColorMap*>(plottable); map && map->colorScale() == this)
-        {
-            mapRange = map->data()->dataBounds();
-            found = true;
-        }
-        else if (auto* map2 = qobject_cast<QCPColorMap2*>(plottable);
-                 map2 && map2->colorScale() == this)
-            mapRange = map2->colorDataBounds(found, true); // all data, as for classic maps
-        else if (auto* hist = qobject_cast<QCPHistogram2D*>(plottable);
-                 hist && hist->colorScale() == this)
-            mapRange = hist->colorDataBounds(found);
+        const QCPRange mapRange = user->colorDataBounds(found);
         if (found)
             include(mapRange);
     }

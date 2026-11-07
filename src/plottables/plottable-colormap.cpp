@@ -748,10 +748,8 @@ bool QCPColorMapData::createAlpha(bool initializeOpaque)
   manually but use QCustomPlot::removePlottable() instead.
 */
 QCPColorMap::QCPColorMap(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPAbstractPlottable(keyAxis, valueAxis)
-        , mDataScaleType(QCPAxis::stLinear)
+        : QCPAbstractColorMapped(keyAxis, valueAxis)
         , mMapData(new QCPColorMapData(10, 10, QCPRange(0, 5), QCPRange(0, 5)))
-        , mGradient(QCPColorGradient::gpCold)
         , mInterpolate(true)
         , mTightBoundary(false)
         , mMapImageInvalidated(true)
@@ -808,71 +806,6 @@ void QCPColorMap::setData(QCPColorMapData* data, bool copy)
 }
 
 /*!
-  Sets the data range of this color map to \a dataRange. The data range defines which data values
-  are mapped to the color gradient.
-
-  To make the data range span the full range of the data set, use \ref rescaleDataRange.
-
-  \see QCPColorScale::setDataRange
-*/
-void QCPColorMap::setDataRange(const QCPRange& dataRange)
-{
-    if (!QCPRange::validRange(dataRange))
-        return;
-    if (mDataRange.lower == dataRange.lower && mDataRange.upper == dataRange.upper)
-        return;
-    if (mDataScaleType == QCPAxis::stLogarithmic)
-        mDataRange = dataRange.sanitizedForLogScale();
-    else
-        mDataRange = dataRange.sanitizedForLinScale();
-    mMapImageInvalidated = true;
-    markDirty();
-    qcpEmit(this, mParentPlot, &QCPColorMap::dataRangeChanged, mDataRange);
-}
-
-/*!
-  Sets whether the data is correlated with the color gradient linearly or logarithmically.
-
-  \see QCPColorScale::setDataScaleType
-*/
-void QCPColorMap::setDataScaleType(QCPAxis::ScaleType scaleType)
-{
-    if (mDataScaleType == scaleType)
-        return;
-    mDataScaleType = scaleType;
-    mMapImageInvalidated = true;
-    markDirty();
-    // A range emission follows below: deliver both at the outermost call.
-    const QCPEmissionScope scope(mParentPlot);
-    qcpEmit(this, mParentPlot, &QCPColorMap::dataScaleTypeChanged, mDataScaleType);
-    if (mDataScaleType == QCPAxis::stLogarithmic)
-        setDataRange(mDataRange.sanitizedForLogScale());
-}
-
-/*!
-  Sets the color gradient that is used to represent the data. For more details on how to create an
-  own gradient or use one of the preset gradients, see \ref QCPColorGradient.
-
-  The colors defined by the gradient will be used to represent data values in the currently set
-  data range, see \ref setDataRange. Data points that are outside this data range will either be
-  colored uniformly with the respective gradient boundary color, or the gradient will repeat,
-  depending on \ref QCPColorGradient::setPeriodic.
-
-  \see QCPColorScale::setGradient
-*/
-void QCPColorMap::setGradient(const QCPColorGradient& gradient)
-{
-    if (mGradient == gradient)
-        return;
-    mGradient = gradient;
-    mMapImageInvalidated = true;
-    markDirty();
-    // A colour scale echoes this signal: two emissions, and a slot may delete this map.
-    const QCPEmissionScope scope(mParentPlot);
-    qcpEmit(this, mParentPlot, &QCPColorMap::gradientChanged, mGradient);
-}
-
-/*!
   Sets whether the color map image shall use bicubic interpolation when displaying the color map
   shrinked or expanded, and not at a 1:1 pixel-to-data scale.
 
@@ -907,52 +840,16 @@ void QCPColorMap::setTightBoundary(bool enabled)
     mTightBoundary = enabled;
 }
 
-/*!
-  Associates the color scale \a colorScale with this color map.
-
-  This means that both the color scale and the color map synchronize their gradient, data range and
-  data scale type (\ref setGradient, \ref setDataRange, \ref setDataScaleType). Multiple color maps
-  can be associated with one single color scale. This causes the color maps to also synchronize
-  those properties, via the mutual color scale.
-
-  This function causes the color map to adopt the current color gradient, data range and data scale
-  type of \a colorScale. After this call, you may change these properties at either the color map
-  or the color scale, and the setting will be applied to both.
-
-  Pass \c nullptr as \a colorScale to disconnect the color scale from this color map again.
-  Deleting the color scale disconnects it too, silently: \ref colorScale then returns \c nullptr.
-*/
-void QCPColorMap::setColorScale(QCPColorScale* colorScale)
+QCPRange QCPColorMap::colorDataBounds(bool& found) const
 {
+    found = true;
+    return mMapData->dataBounds();
+}
+
+void QCPColorMap::colorMappingChanged()
+{
+    mMapImageInvalidated = true;
     markDirty();
-    if (mColorScale) // unconnect signals from old color scale
-    {
-        disconnect(this, &QCPColorMap::dataRangeChanged, mColorScale.data(), &QCPColorScale::setDataRange);
-        disconnect(this, &QCPColorMap::dataScaleTypeChanged, mColorScale.data(), &QCPColorScale::setDataScaleType);
-        disconnect(this, &QCPColorMap::gradientChanged, mColorScale.data(), &QCPColorScale::setGradient);
-        disconnect(mColorScale.data(), &QCPColorScale::dataRangeChanged, this, &QCPColorMap::setDataRange);
-        disconnect(mColorScale.data(), &QCPColorScale::gradientChanged, this, &QCPColorMap::setGradient);
-        disconnect(mColorScale.data(), &QCPColorScale::dataScaleTypeChanged, this, &QCPColorMap::setDataScaleType);
-    }
-    mColorScale = colorScale;
-    if (mColorScale) // connect signals to new color scale
-    {
-        // Each setter signals, and a slot may delete this colour map or the scale.
-        const QPointer<QCPColorMap> alive(this);
-        setGradient(colorScale->gradient());
-        if (alive && mColorScale)
-            setDataRange(mColorScale->dataRange());
-        if (alive && mColorScale)
-            setDataScaleType(mColorScale->dataScaleType());
-        if (!alive || !mColorScale)
-            return;
-        connect(this, &QCPColorMap::dataRangeChanged, mColorScale.data(), &QCPColorScale::setDataRange);
-        connect(this, &QCPColorMap::dataScaleTypeChanged, mColorScale.data(), &QCPColorScale::setDataScaleType);
-        connect(this, &QCPColorMap::gradientChanged, mColorScale.data(), &QCPColorScale::setGradient);
-        connect(mColorScale.data(), &QCPColorScale::dataRangeChanged, this, &QCPColorMap::setDataRange);
-        connect(mColorScale.data(), &QCPColorScale::gradientChanged, this, &QCPColorMap::setGradient);
-        connect(mColorScale.data(), &QCPColorScale::dataScaleTypeChanged, this, &QCPColorMap::setDataScaleType);
-    }
 }
 
 /*!

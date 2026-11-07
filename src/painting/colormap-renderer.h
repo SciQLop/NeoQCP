@@ -4,12 +4,10 @@
 #include <QImage>
 #include <QLineF>
 #include <QPen>
-#include <QPointer>
 #include <QPointF>
 #include <QVector>
 
 class QCPAbstractPlottable;
-class QCPColorScale;
 class QCPColorMapData;
 class QCPColormapRhiLayer;
 class QCPPainter;
@@ -30,10 +28,6 @@ public:
 
     void setDataScaleType(QCPAxis::ScaleType type);
     QCPAxis::ScaleType dataScaleType() const { return mDataScaleType; }
-
-    void setColorScale(QCPColorScale* scale);
-    //! Null once the scale is deleted. Out of line since the QPointer member: rebuild users.
-    QCPColorScale* colorScale() const;
 
     // Rendering
     void updateMapImage(const QCPColorMapData* data);
@@ -89,7 +83,6 @@ private:
     QImage mFlippedMapImage;
     Qt::Orientations mLastFlips {};
     bool mMapImageInvalidated = true;
-    QPointer<QCPColorScale> mColorScale; // the scale may be deleted first
     QCPColormapRhiLayer* mRhiLayer = nullptr;
     bool mContourOnGpu = false;
     bool mImageOnGpu = false;

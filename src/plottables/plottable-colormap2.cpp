@@ -10,7 +10,6 @@
 #include <core.h>
 #include <painting/painter.h>
 #include <painting/contour-extractor.h> // kept for QPainter export fallback
-#include <layoutelements/layoutelement-colorscale.h>
 #include <layoutelements/layoutelement-axisrect.h>
 #include <axis/axis.h>
 #include <layer.h>
@@ -20,7 +19,7 @@
 #include <cmath>
 
 QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
-    : QCPAbstractPlottable(keyAxis, valueAxis)
+    : QCPAbstractColorMapped(keyAxis, valueAxis, true)
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
     , mRenderer(this)
 {
@@ -173,89 +172,10 @@ void QCPColorMap2::dataChanged()
     mPipeline.onDataChanged();
 }
 
-void QCPColorMap2::setGradient(const QCPColorGradient& gradient)
+QCPRange QCPColorMap2::colorDataBounds(bool& found) const
 {
-    if (mRenderer.gradient() == gradient)
-        return;
-    mRenderer.setGradient(gradient);
-    redrawLater();
-    // A colour scale echoes this signal: two emissions, and a slot may delete this colour map.
-    const QCPEmissionScope scope(mParentPlot);
-    qcpEmit(this, mParentPlot, &QCPColorMap2::gradientChanged, mRenderer.gradient());
-}
-
-void QCPColorMap2::setColorScale(QCPColorScale* colorScale)
-{
-    markDirty();
-    if (mRenderer.colorScale())
-    {
-        disconnect(this, &QCPColorMap2::dataRangeChanged, mRenderer.colorScale(), &QCPColorScale::setDataRange);
-        disconnect(this, &QCPColorMap2::gradientChanged, mRenderer.colorScale(), &QCPColorScale::setGradient);
-        disconnect(this, &QCPColorMap2::dataScaleTypeChanged, mRenderer.colorScale(), &QCPColorScale::setDataScaleType);
-        disconnect(mRenderer.colorScale(), &QCPColorScale::dataRangeChanged, this, &QCPColorMap2::setDataRange);
-        disconnect(mRenderer.colorScale(), &QCPColorScale::gradientChanged, this, &QCPColorMap2::setGradient);
-        disconnect(mRenderer.colorScale(), &QCPColorScale::dataScaleTypeChanged, this, &QCPColorMap2::setDataScaleType);
-    }
-    mRenderer.setColorScale(colorScale);
-    if (colorScale)
-    {
-        // Each setter signals, and a slot may delete this colour map or the scale.
-        const QPointer<QCPColorMap2> alive(this);
-        const QPointer<QCPColorScale> live(colorScale);
-        setGradient(colorScale->gradient());
-        if (alive && live)
-            setDataScaleType(live->dataScaleType());
-        if (alive && live)
-            setDataRange(live->dataRange());
-        if (!alive || !live)
-            return;
-        connect(this, &QCPColorMap2::dataRangeChanged, colorScale, &QCPColorScale::setDataRange);
-        connect(this, &QCPColorMap2::gradientChanged, colorScale, &QCPColorScale::setGradient);
-        connect(this, &QCPColorMap2::dataScaleTypeChanged, colorScale, &QCPColorScale::setDataScaleType);
-        connect(colorScale, &QCPColorScale::dataRangeChanged, this, &QCPColorMap2::setDataRange);
-        connect(colorScale, &QCPColorScale::gradientChanged, this, &QCPColorMap2::setGradient);
-        connect(colorScale, &QCPColorScale::dataScaleTypeChanged, this, &QCPColorMap2::setDataScaleType);
-    }
-}
-
-void QCPColorMap2::setDataRange(const QCPRange& range)
-{
-    QCPRange prev = mRenderer.dataRange();
-    mRenderer.setDataRange(range);
-    QCPRange cur = mRenderer.dataRange();
-    if (prev.lower != cur.lower || prev.upper != cur.upper)
-    {
-        redrawLater();
-        qcpEmit(this, mParentPlot, &QCPColorMap2::dataRangeChanged, cur);
-    }
-}
-
-void QCPColorMap2::setDataScaleType(QCPAxis::ScaleType type)
-{
-    if (mRenderer.dataScaleType() == type)
-        return;
-    const QPointer<QCPColorMap2> alive(this); // the pipeline's and dataRangeChanged's slots may delete this map
-    const QCPRange prevRange = mRenderer.dataRange();
-    mRenderer.setDataScaleType(type);
-    installResampleTransform();
-    if (mDataSource)
-        mPipeline.onDataChanged();
-    if (!alive)
-        return; // its busyChanged slot deleted this colour map
-    redrawLater();
-    const QCPRange curRange = mRenderer.dataRange();
-    // A changed range is announced first: deliver both at the outermost call, the scale type last
-    // so a listener sees the type that is current when it runs.
-    const QCPEmissionScope scope(mParentPlot);
-    if (prevRange.lower != curRange.lower || prevRange.upper != curRange.upper)
-        qcpEmit(this, mParentPlot, &QCPColorMap2::dataRangeChanged, curRange);
-    qcpEmitCurrent(this, mParentPlot, &QCPColorMap2::dataScaleTypeChanged,
-                   [this] { return mRenderer.dataScaleType(); });
-}
-
-void QCPColorMap2::redrawLater()
-{
-    markDirty(); // marking schedules the repaint
+    found = false;
+    return mDataSource ? mDataSource->zRange(found) : QCPRange();
 }
 
 QCPRange QCPColorMap2::colorDataBounds(bool& found, bool recalc) const
@@ -271,12 +191,23 @@ QCPRange QCPColorMap2::colorDataBounds(bool& found, bool recalc) const
     return mDataSource->zRange(found);
 }
 
-void QCPColorMap2::rescaleDataRange(bool recalc)
+void QCPColorMap2::colorMappingChanged()
 {
-    bool found = false;
-    const QCPRange range = colorDataBounds(found, recalc);
-    if (found && range.lower < range.upper)
-        setDataRange(range);
+    const bool scaleTypeChanged = mRenderer.dataScaleType() != dataScaleType();
+    mRenderer.setDataScaleType(dataScaleType());
+    mRenderer.setDataRange(dataRange());
+    mRenderer.setGradient(gradient());
+    if (scaleTypeChanged)
+    {
+        // The resample transform captured the old colour scale type; a job may delete this map.
+        const QPointer<QCPColorMap2> alive(this);
+        installResampleTransform();
+        if (mDataSource)
+            mPipeline.onDataChanged();
+        if (!alive)
+            return;
+    }
+    markDirty();
 }
 
 bool QCPColorMap2::resampledForAnotherSize() const

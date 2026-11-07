@@ -79,6 +79,7 @@
 #include "plottables/plottable1d.h"
 #include "plottables/plottable-bars.h"
 #include "plottables/plottable-colormap.h"
+#include "plottables/plottable-colormapped.h"
 #include "plottables/plottable-curve.h"
 #include "plottables/plottable-errorbar.h"
 #include "plottables/plottable-financial.h"

@@ -1,5 +1,5 @@
 #pragma once
-#include "plottable.h"
+#include "plottable-colormapped.h"
 #include <axis/axis.h>
 #include <datasource/async-pipeline.h>
 #include <datasource/soa-datasource-2d.h>
@@ -17,7 +17,7 @@ class QCPColormapRhiLayer;
 template <typename T, typename Self = void>
 class QCPColorMap2Ops;
 
-class QCP_LIB_DECL QCPColorMap2 : public QCPAbstractPlottable
+class QCP_LIB_DECL QCPColorMap2 : public QCPAbstractColorMapped
 {
     Q_OBJECT
 
@@ -64,18 +64,11 @@ public:
     void setGapThreshold(double threshold);
     [[nodiscard]] double gapThreshold() const { return mGapThreshold; }
 
-    [[nodiscard]] QCPColorGradient gradient() const { return mRenderer.gradient(); }
-    //! Deleting the scale detaches it silently: this turns null, no signal is emitted.
-    [[nodiscard]] QCPColorScale* colorScale() const { return mRenderer.colorScale(); }
-    [[nodiscard]] QCPRange dataRange() const { return mRenderer.dataRange(); }
-    [[nodiscard]] QCPAxis::ScaleType dataScaleType() const { return mRenderer.dataScaleType(); }
-    void setDataScaleType(QCPAxis::ScaleType type);
-
-    void setColorScale(QCPColorScale* colorScale);
-    void rescaleDataRange(bool recalc = false);
+    using QCPAbstractColorMapped::colorDataBounds;
+    QCPRange colorDataBounds(bool& found) const override;
     //! The range of the colour values: of the resampled view, or of all data with \a recalc
     //! (or before the first resample). \a found is false when there is none.
-    [[nodiscard]] QCPRange colorDataBounds(bool& found, bool recalc = false) const;
+    [[nodiscard]] QCPRange colorDataBounds(bool& found, bool recalc) const;
 
     QCPColormapPipeline& pipeline() { return mPipeline; }
     const QCPColormapPipeline& pipeline() const { return mPipeline; }
@@ -126,23 +119,16 @@ public:
     [[nodiscard]] uint64_t fallbackBuildCount() const { return mContours.extractionCount(); }
 
 public Q_SLOTS:
-    void setGradient(const QCPColorGradient& gradient);
-    void setDataRange(const QCPRange& range);
-
     double selectTest(const QPointF& pos, bool onlySelectable, QVariant* details = nullptr) const override;
 
     QCPRange getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth) const override;
     QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth,
                            const QCPRange& inKeyRange = QCPRange()) const override;
 
-Q_SIGNALS:
-    void dataRangeChanged(const QCPRange& newRange);
-    void gradientChanged(const QCPColorGradient& newGradient);
-    void dataScaleTypeChanged(QCPAxis::ScaleType newType);
-
 protected:
     void draw(QCPPainter* painter) override;
     void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
+    void colorMappingChanged() override;
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
     void setPipelineScheduler(QCPPipelineScheduler* scheduler) override { mPipeline.setScheduler(scheduler); }
     bool canProduceContent() const override;
@@ -154,7 +140,6 @@ protected:
 private:
     [[nodiscard]] bool resampledForAnotherSize() const;
     void installResampleTransform();
-    void redrawLater();
 
     std::shared_ptr<QCPAbstractDataSource2D> mDataSource;
     // Captured by value in the pipeline transform (re-baked by setGapThreshold / setDataScaleType)

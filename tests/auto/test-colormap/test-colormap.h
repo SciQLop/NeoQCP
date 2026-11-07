@@ -47,6 +47,11 @@ private slots:
   void QCPHistogram2D_forgetsADeletedColorScale();
   void QCPColorMap_forgetsADeletedColorScale();
   void QCPColorMap_colorScaleSlotDeletingTheMapIsSafe();
+  void QCPColorScale_rescaleSeesEveryUser();
+  void QCPColorScale_aSetterOnOneUserReachesTheOthers();
+  void QCPColorScale_attachingTakesTheScaleValues();
+  void QCPColorScale_deletingTheScaleIsNoticed();
+  void QCPColorScale_deletingAUserLeavesTheScaleList();
 
 private:
   QCustomPlot *mPlot;

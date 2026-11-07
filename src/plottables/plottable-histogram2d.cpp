@@ -3,14 +3,13 @@
 #include <core.h>
 #include <limits>
 #include <painting/painter.h>
-#include <layoutelements/layoutelement-colorscale.h>
 #include <layoutelements/layoutelement-axisrect.h>
 #include <axis/axis.h>
 #include <datasource/histogram-binner.h>
 #include <Profiling.hpp>
 
 QCPHistogram2D::QCPHistogram2D(QCPAxis* keyAxis, QCPAxis* valueAxis)
-    : QCPAbstractPlottable(keyAxis, valueAxis)
+    : QCPAbstractColorMapped(keyAxis, valueAxis, true)
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
     , mRenderer(this)
 {
@@ -165,78 +164,12 @@ void QCPHistogram2D::setNormalization(Normalization norm)
     binsChanged();
 }
 
-void QCPHistogram2D::setGradient(const QCPColorGradient& gradient)
+void QCPHistogram2D::colorMappingChanged()
 {
-    if (mRenderer.gradient() == gradient)
-        return;
+    mRenderer.setDataScaleType(dataScaleType());
+    mRenderer.setDataRange(dataRange());
+    mRenderer.setGradient(gradient());
     markDirty();
-    mRenderer.setGradient(gradient);
-    // A colour scale echoes this signal: two emissions, and a slot may delete this histogram.
-    const QCPEmissionScope scope(mParentPlot);
-    qcpEmit(this, mParentPlot, &QCPHistogram2D::gradientChanged, mRenderer.gradient());
-}
-
-void QCPHistogram2D::setColorScale(QCPColorScale* scale)
-{
-    markDirty();
-    if (mRenderer.colorScale())
-    {
-        disconnect(this, &QCPHistogram2D::dataRangeChanged, mRenderer.colorScale(), &QCPColorScale::setDataRange);
-        disconnect(this, &QCPHistogram2D::gradientChanged, mRenderer.colorScale(), &QCPColorScale::setGradient);
-        disconnect(this, &QCPHistogram2D::dataScaleTypeChanged, mRenderer.colorScale(), &QCPColorScale::setDataScaleType);
-        disconnect(mRenderer.colorScale(), &QCPColorScale::dataRangeChanged, this, &QCPHistogram2D::setDataRange);
-        disconnect(mRenderer.colorScale(), &QCPColorScale::gradientChanged, this, &QCPHistogram2D::setGradient);
-        disconnect(mRenderer.colorScale(), &QCPColorScale::dataScaleTypeChanged, this, &QCPHistogram2D::setDataScaleType);
-    }
-    mRenderer.setColorScale(scale);
-    if (scale)
-    {
-        // Each setter signals, and a slot may delete this histogram or the scale.
-        const QPointer<QCPHistogram2D> alive(this);
-        const QPointer<QCPColorScale> live(scale);
-        setGradient(scale->gradient());
-        if (alive && live)
-            setDataScaleType(live->dataScaleType());
-        if (alive && live)
-            setDataRange(live->dataRange());
-        if (!alive || !live)
-            return;
-        connect(this, &QCPHistogram2D::dataRangeChanged, scale, &QCPColorScale::setDataRange);
-        connect(this, &QCPHistogram2D::gradientChanged, scale, &QCPColorScale::setGradient);
-        connect(this, &QCPHistogram2D::dataScaleTypeChanged, scale, &QCPColorScale::setDataScaleType);
-        connect(scale, &QCPColorScale::dataRangeChanged, this, &QCPHistogram2D::setDataRange);
-        connect(scale, &QCPColorScale::gradientChanged, this, &QCPHistogram2D::setGradient);
-        connect(scale, &QCPColorScale::dataScaleTypeChanged, this, &QCPHistogram2D::setDataScaleType);
-    }
-}
-
-void QCPHistogram2D::setDataRange(const QCPRange& range)
-{
-    QCPRange prev = mRenderer.dataRange();
-    mRenderer.setDataRange(range);
-    QCPRange cur = mRenderer.dataRange();
-    if (prev.lower != cur.lower || prev.upper != cur.upper)
-    {
-        redrawLater();
-        qcpEmit(this, mParentPlot, &QCPHistogram2D::dataRangeChanged, cur);
-    }
-}
-
-void QCPHistogram2D::setDataScaleType(QCPAxis::ScaleType type)
-{
-    if (mRenderer.dataScaleType() == type)
-        return;
-    const QCPRange prevRange = mRenderer.dataRange();
-    mRenderer.setDataScaleType(type);
-    redrawLater();
-    const QCPRange curRange = mRenderer.dataRange();
-    // A changed range is announced first: deliver both at the outermost call, the scale type last
-    // so a listener sees the type that is current when it runs.
-    const QCPEmissionScope scope(mParentPlot);
-    if (prevRange.lower != curRange.lower || prevRange.upper != curRange.upper)
-        qcpEmit(this, mParentPlot, &QCPHistogram2D::dataRangeChanged, curRange);
-    qcpEmitCurrent(this, mParentPlot, &QCPHistogram2D::dataScaleTypeChanged,
-                   [this] { return mRenderer.dataScaleType(); });
 }
 
 void QCPHistogram2D::redrawLater()
@@ -318,22 +251,6 @@ QCPRange QCPHistogram2D::colorDataBounds(bool& found) const
     }
     found = mShown.found;
     return mShown.bounds;
-}
-
-void QCPHistogram2D::rescaleDataRange(bool recalc)
-{
-    if (!mDataSource)
-        return;
-    if (!mPipeline.result())
-    {
-        if (recalc)
-            mPipeline.onDataChanged();
-        return;
-    }
-    bool found = false;
-    const QCPRange range = colorDataBounds(found);
-    if (found && range.lower < range.upper)
-        setDataRange(range);
 }
 
 bool QCPHistogram2D::canProduceContent() const

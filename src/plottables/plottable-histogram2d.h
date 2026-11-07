@@ -1,5 +1,5 @@
 #pragma once
-#include "plottable.h"
+#include "plottable-colormapped.h"
 #include <axis/axis.h>
 #include <datasource/async-pipeline.h>
 #include <datasource/soa-datasource.h>
@@ -17,7 +17,7 @@ class QCPColorMapData;
 template <typename T, typename Self = void>
 class QCPHistogram2DOps;
 
-class QCP_LIB_DECL QCPHistogram2D : public QCPAbstractPlottable
+class QCP_LIB_DECL QCPHistogram2D : public QCPAbstractColorMapped
 {
     Q_OBJECT
 public:
@@ -79,15 +79,8 @@ public:
     // scale with that signal blocked (e.g. SciQLop's axis wrapper).
     Q_SLOT void refreshBinning();
 
-    // Forwarded to QCPColormapRenderer
-    QCPColorGradient gradient() const { return mRenderer.gradient(); }
-    QCPRange dataRange() const { return mRenderer.dataRange(); }
-    QCPAxis::ScaleType dataScaleType() const { return mRenderer.dataScaleType(); }
-    //! Deleting the scale detaches it silently: this turns null, no signal is emitted.
-    QCPColorScale* colorScale() const { return mRenderer.colorScale(); }
-    void rescaleDataRange(bool recalc = false);
     //! The range of the binned (normalized) counts; \a found is false before the first binning.
-    [[nodiscard]] QCPRange colorDataBounds(bool& found) const;
+    [[nodiscard]] QCPRange colorDataBounds(bool& found) const override;
 
     // Contours, as on QCPColorMap2, over the values shown: the column fractions with nColumn.
     void setContourLevels(const QVector<double>& levels);
@@ -110,24 +103,15 @@ public:
     QCPHistogramPipeline& pipeline() { return mPipeline; }
     const QCPHistogramPipeline& pipeline() const { return mPipeline; }
 public Q_SLOTS:
-    void setGradient(const QCPColorGradient& gradient);
-    void setDataRange(const QCPRange& range);
-    void setDataScaleType(QCPAxis::ScaleType type);
-    void setColorScale(QCPColorScale* scale);
-
     double selectTest(const QPointF& pos, bool onlySelectable, QVariant* details = nullptr) const override;
     QCPRange getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth) const override;
     QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth,
                            const QCPRange& inKeyRange = QCPRange()) const override;
 
-Q_SIGNALS:
-    void dataRangeChanged(const QCPRange& newRange);
-    void gradientChanged(const QCPColorGradient& newGradient);
-    void dataScaleTypeChanged(QCPAxis::ScaleType newType);
-
 protected:
     void draw(QCPPainter* painter) override;
     void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
+    void colorMappingChanged() override;
     void axesChanged() override { followAxisScales(); }
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
     void setPipelineScheduler(QCPPipelineScheduler* scheduler) override { mPipeline.setScheduler(scheduler); }

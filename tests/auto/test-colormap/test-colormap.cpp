@@ -862,7 +862,7 @@ void TestColorMap::QCPColorScale_rescaleDataRangeIncludesColorMap2()
   mPlot->yAxis->setRange(0, 1);
   mPlot->replot();
   QTRY_VERIFY_WITH_TIMEOUT(!cm->busy(), 5000);
-  const QCPRange view = cm->colorDataBounds(found);
+  const QCPRange view = cm->colorDataBounds(found, false);
   QVERIFY2(found && view.size() < 10.0, "the resampled view should be narrower than the data");
   scale->rescaleDataRange(false);
   QCOMPARE(scale->dataRange().lower, 0.0);
@@ -981,7 +981,10 @@ void forgetsADeletedColorScale(QCustomPlot* plot, Map* map)
 {
   auto* scale = new QCPColorScale(plot);
   map->setColorScale(scale);
+  int forgotten = 0;
+  QObject::connect(map, &Map::colorScaleChanged, plot, [&forgotten] { ++forgotten; });
   delete scale;
+  QCOMPARE(forgotten, 1);
   QCOMPARE(map->colorScale(), nullptr);
   map->setColorScale(nullptr);
   auto* other = new QCPColorScale(plot);
@@ -1018,6 +1021,122 @@ void TestColorMap::QCPColorMap_colorScaleSlotDeletingTheMapIsSafe()
   mColorMap->setColorScale(scale);
   QCOMPARE(mPlot->plottableCount(), 0);
   QCOMPARE(scale->dataScaleType(), QCPAxis::stLogarithmic);
+}
+
+// One scale, three kinds of user: rescaling must see the bounds of each of them.
+void TestColorMap::QCPColorScale_rescaleSeesEveryUser()
+{
+    auto* scale = new QCPColorScale(mPlot);
+    mPlot->plotLayout()->addElement(0, 1, scale);
+
+    auto* map = new QCPColorMap(mPlot->xAxis, mPlot->yAxis);
+    map->setColorScale(scale);
+    map->data()->setSize(1, 1);
+    map->data()->setCell(0, 0, 1.0);
+    map->data()->recalculateDataBounds();
+
+    auto* map2 = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    map2->setColorScale(scale);
+    map2->setData(std::vector<double> { 0, 1 }, std::vector<double> { 0, 1 },
+                  std::vector<double>(4, 5.0));
+
+    auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
+    hist->setColorScale(scale);
+    hist->setBins(1, 1);
+    hist->setData(std::vector<double>(9, 0.5), std::vector<double>(9, 0.5));
+    QTRY_VERIFY_WITH_TIMEOUT(!hist->pipeline().isBusy(), 2000);
+    QTRY_VERIFY_WITH_TIMEOUT(hist->pipeline().result() != nullptr, 2000);
+
+    scale->rescaleDataRange(false);
+    QCOMPARE(scale->dataRange().lower, 1.0);
+    QCOMPARE(scale->dataRange().upper, 9.0);
+    QCOMPARE(map->dataRange().upper, 9.0);
+    QCOMPARE(map2->dataRange().upper, 9.0);
+    QCOMPARE(hist->dataRange().upper, 9.0);
+}
+
+// A setter on one user reaches the scale, and from there every other user.
+void TestColorMap::QCPColorScale_aSetterOnOneUserReachesTheOthers()
+{
+    auto* scale = new QCPColorScale(mPlot);
+    auto* map = new QCPColorMap(mPlot->xAxis, mPlot->yAxis);
+    auto* map2 = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    map->setColorScale(scale);
+    map2->setColorScale(scale);
+
+    const QCPColorGradient hot(QCPColorGradient::gpHot);
+    map2->setGradient(hot);
+    QCOMPARE(map->gradient(), hot);
+    QCOMPARE(scale->gradient(), hot);
+
+    map2->setDataRange(QCPRange(1, 2));
+    QCOMPARE(map->dataRange(), QCPRange(1, 2));
+    QCOMPARE(scale->dataRange(), QCPRange(1, 2));
+
+    map2->setDataScaleType(QCPAxis::stLogarithmic);
+    QCOMPARE(map->dataScaleType(), QCPAxis::stLogarithmic);
+    QCOMPARE(scale->dataScaleType(), QCPAxis::stLogarithmic);
+}
+
+// Attaching takes the scale's gradient, range and scale type.
+void TestColorMap::QCPColorScale_attachingTakesTheScaleValues()
+{
+    auto* scale = new QCPColorScale(mPlot);
+    const QCPColorGradient hot(QCPColorGradient::gpHot);
+    scale->setGradient(hot);
+    scale->setDataRange(QCPRange(2, 4));
+    scale->setDataScaleType(QCPAxis::stLogarithmic);
+
+    mColorMap->setColorScale(scale);
+    QCOMPARE(mColorMap->gradient(), hot);
+    QCOMPARE(mColorMap->dataRange(), scale->dataRange());
+    QCOMPARE(mColorMap->dataScaleType(), scale->dataScaleType());
+}
+
+// Deleting the scale forgets it on every user, keeps their values, and tells each of them once.
+void TestColorMap::QCPColorScale_deletingTheScaleIsNoticed()
+{
+    auto* scale = new QCPColorScale(mPlot);
+    auto* map = new QCPColorMap(mPlot->xAxis, mPlot->yAxis);
+    auto* map2 = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
+    map->setColorScale(scale);
+    map2->setColorScale(scale);
+    hist->setColorScale(scale);
+    scale->setGradient(QCPColorGradient(QCPColorGradient::gpHot));
+    scale->setDataRange(QCPRange(3, 7));
+
+    int forgotten[3] = {};
+    connect(map, &QCPColorMap::colorScaleChanged, map, [&] { ++forgotten[0]; });
+    connect(map2, &QCPColorMap2::colorScaleChanged, map2, [&] { ++forgotten[1]; });
+    connect(hist, &QCPHistogram2D::colorScaleChanged, hist, [&] { ++forgotten[2]; });
+
+    delete scale;
+    for (int i = 0; i < 3; ++i)
+        QCOMPARE(forgotten[i], 1);
+    for (QCPAbstractColorMapped* user : { static_cast<QCPAbstractColorMapped*>(map),
+                                          static_cast<QCPAbstractColorMapped*>(map2),
+                                          static_cast<QCPAbstractColorMapped*>(hist) })
+    {
+        QCOMPARE(user->colorScale(), nullptr);
+        QCOMPARE(user->gradient(), QCPColorGradient(QCPColorGradient::gpHot));
+        QCOMPARE(user->dataRange(), QCPRange(3, 7));
+    }
+}
+
+// A user that goes away leaves the scale's list.
+void TestColorMap::QCPColorScale_deletingAUserLeavesTheScaleList()
+{
+    auto* scale = new QCPColorScale(mPlot);
+    auto* map = new QCPColorMap(mPlot->xAxis, mPlot->yAxis);
+    auto* map2 = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    map->setColorScale(scale);
+    map2->setColorScale(scale);
+    QCOMPARE(scale->users().size(), 2);
+
+    delete map;
+    QCOMPARE(scale->users().size(), 1);
+    QCOMPARE(scale->users().first(), static_cast<QCPAbstractColorMapped*>(map2));
 }
 
 // The colour-map image is a GPU quad composited after the layer's paint buffer: labels painted

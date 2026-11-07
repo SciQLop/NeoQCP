@@ -29,12 +29,13 @@
 #include "../axis/range.h"
 #include "../colorgradient.h"
 #include "../global.h"
-#include "../layoutelements/layoutelement-colorscale.h"
 #include "../plottables/plottable.h"
+#include "plottable-colormapped.h"
 
 class QCPPainter;
 class QCPAxis;
 class QCPColorMap;
+class QCPColorScale;
 
 class QCP_LIB_DECL QCPColorMapData
 {
@@ -57,6 +58,7 @@ public:
     QCPRange dataBounds() const { return mDataBounds; }
 
     const double* rawData() const { return mData; }
+
     double* rawData() { return mData; }
 
     double data(double key, double value);
@@ -109,17 +111,12 @@ protected:
 template <typename T, typename Self = void>
 class QCPColorMapOps;
 
-class QCP_LIB_DECL QCPColorMap : public QCPAbstractPlottable
+class QCP_LIB_DECL QCPColorMap : public QCPAbstractColorMapped
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(QCPRange dataRange READ dataRange WRITE setDataRange NOTIFY dataRangeChanged)
-    Q_PROPERTY(QCPAxis::ScaleType dataScaleType READ dataScaleType WRITE setDataScaleType NOTIFY
-                   dataScaleTypeChanged)
-    Q_PROPERTY(QCPColorGradient gradient READ gradient WRITE setGradient NOTIFY gradientChanged)
     Q_PROPERTY(bool interpolate READ interpolate WRITE setInterpolate)
     Q_PROPERTY(bool tightBoundary READ tightBoundary WRITE setTightBoundary)
-    Q_PROPERTY(QCPColorScale* colorScale READ colorScale WRITE setColorScale)
     /// \endcond
 
 public:
@@ -132,30 +129,18 @@ public:
     // getters:
     [[nodiscard]] QCPColorMapData* data() const { return mMapData; }
 
-    [[nodiscard]] QCPRange dataRange() const { return mDataRange; }
-
-    [[nodiscard]] QCPAxis::ScaleType dataScaleType() const { return mDataScaleType; }
-
     [[nodiscard]] bool interpolate() const { return mInterpolate; }
 
     [[nodiscard]] bool tightBoundary() const { return mTightBoundary; }
 
-    [[nodiscard]] QCPColorGradient gradient() const { return mGradient; }
-
-    //! Deleting the scale detaches it silently: this turns null, no signal is emitted.
-    [[nodiscard]] QCPColorScale* colorScale() const { return mColorScale.data(); }
-
     // setters:
     void setData(QCPColorMapData* data, bool copy = false);
-    Q_SLOT void setDataRange(const QCPRange& dataRange);
-    Q_SLOT void setDataScaleType(QCPAxis::ScaleType scaleType);
-    Q_SLOT void setGradient(const QCPColorGradient& gradient);
     void setInterpolate(bool enabled);
     void setTightBoundary(bool enabled);
-    void setColorScale(QCPColorScale* colorScale);
 
     // non-property methods:
     void rescaleDataRange(bool recalculateDataBounds = false);
+    QCPRange colorDataBounds(bool& found) const override;
     Q_SLOT void updateLegendIcon(Qt::TransformationMode transformMode = Qt::SmoothTransformation,
                                  const QSize& thumbSize = QSize(32, 18));
 
@@ -167,17 +152,9 @@ public:
     virtual QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth,
                                    const QCPRange& inKeyRange = QCPRange()) const override;
 
-signals:
-    void dataRangeChanged(const QCPRange& newRange);
-    void dataScaleTypeChanged(QCPAxis::ScaleType scaleType);
-    void gradientChanged(const QCPColorGradient& newGradient);
-
 protected:
     // property members:
-    QCPRange mDataRange;
-    QCPAxis::ScaleType mDataScaleType;
     QCPColorMapData* mMapData;
-    QCPColorGradient mGradient;
     bool mInterpolate;
     bool mTightBoundary;
     QPointer<QCPColorScale> mColorScale;
@@ -189,6 +166,7 @@ protected:
 
     // introduced virtual methods:
     virtual void updateMapImage();
+    void colorMappingChanged() override;
 
     // reimplemented virtual methods:
     virtual void draw(QCPPainter* painter) override;
@@ -206,8 +184,8 @@ class QCPColorMapOps : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPColorMapOp
     using Base = QCPPlottableOps<T, qcp::OpsRet<Self, QCPColorMapOps<T>>>;
 
 public:
-    using typename Base::Ret;
     using Base::Base;
+    using typename Base::Ret;
 
     // The map takes the data over (it frees it, as setData(data, false) does).
     Ret setData(std::unique_ptr<QCPColorMapData> data)
@@ -220,22 +198,27 @@ public:
     {
         return this->apply([&](T& p) { p.setData(const_cast<QCPColorMapData*>(&data), true); });
     }
+
     Ret setInterpolate(bool enabled)
     {
         return this->apply([&](T& p) { p.setInterpolate(enabled); });
     }
+
     Ret setTightBoundary(bool enabled)
     {
         return this->apply([&](T& p) { p.setTightBoundary(enabled); });
     }
+
     Ret setGradient(const QCPColorGradient& gradient)
     {
         return this->apply([&](T& p) { p.setGradient(gradient); });
     }
+
     Ret setDataRange(const QCPRange& range)
     {
         return this->apply([&](T& p) { p.setDataRange(range); });
     }
+
     Ret setDataScaleType(QCPAxis::ScaleType type)
     {
         return this->apply([&](T& p) { p.setDataScaleType(type); });
