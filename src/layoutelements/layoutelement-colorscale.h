@@ -49,6 +49,8 @@ protected:
     QCPColorScale* mParentColorScale;
     QImage mGradientImage;
     bool mGradientImageInvalidated;
+    // The scale inside a scale must not make a scale of its own.
+    bool mayOwnColorScale() const override { return false; }
     // re-using some methods of QCPAxisRect to make them available to friend class QCPColorScale
     using QCPAxisRect::calculateAutoMargin;
     using QCPAxisRect::mouseMoveEvent;
@@ -63,7 +65,7 @@ protected:
     friend class QCPColorScale;
 };
 
-template <typename T, typename Self = void>
+template <typename T, typename Self>
 class QCPColorScaleOps;
 
 class QCP_LIB_DECL QCPColorScale : public QCPLayoutElement
@@ -144,6 +146,8 @@ protected:
     QPointer<QCPColorScaleAxisRectPrivate> mAxisRect;
     QPointer<QCPAxis> mColorAxis;
     QList<QCPAbstractColorMapped*> mUsers;
+    // The rect that owns and places this scale, null for a scale the user put in a layout.
+    QPointer<QCPAxisRect> mOwnerRect;
 
     // reimplemented virtual methods:
     virtual void applyDefaultAntialiasingHint(QCPPainter* painter) const override;
@@ -157,6 +161,10 @@ protected:
 private:
     Q_DISABLE_COPY(QCPColorScale)
 
+    // The owner reports a user or size change, which moves the margin the scale sits in.
+    void usersChanged();
+
+    friend class QCPAxisRect;
     friend class QCPColorScaleAxisRectPrivate;
     friend class QCPAbstractColorMapped;
 };

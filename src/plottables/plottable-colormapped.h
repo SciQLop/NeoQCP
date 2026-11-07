@@ -55,6 +55,10 @@ protected:
     //! Called after the gradient, range or scale type changed: repaint, or hand it to a renderer.
     virtual void colorMappingChanged() { markDirty(); }
 
+    //! Takes the key axis rect's scale, if it has one, and hands its values to the renderer.
+    //! Called at the end of a subclass constructor, where colorMappingChanged() is the subclass's.
+    void followKeyAxisRectScale();
+
     // property members:
     QCPRange mDataRange;
     QCPAxis::ScaleType mDataScaleType;

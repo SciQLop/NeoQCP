@@ -24,6 +24,8 @@ QCPHistogram2D::QCPHistogram2D(QCPAxis* keyAxis, QCPAxis* valueAxis)
             this, [this](bool) { updateEffectiveBusy(); });
 
     followAxisScales();
+
+    followKeyAxisRectScale();
 }
 
 // The renderer can't reposition cells itself: a log/linear toggle needs a re-bin.

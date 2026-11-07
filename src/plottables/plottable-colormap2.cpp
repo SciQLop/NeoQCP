@@ -35,6 +35,8 @@ QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
             });
     connect(&mPipeline, &QCPColormapPipeline::busyChanged,
             this, [this](bool) { updateEffectiveBusy(); });
+
+    followKeyAxisRectScale();
 }
 
 void QCPColorMap2::followAxes()

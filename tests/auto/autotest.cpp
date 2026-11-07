@@ -4,6 +4,7 @@
 #include "test-qcpbars/test-qcpbars.h"
 #include "test-qcpfinancial/test-qcpfinancial.h"
 #include "test-colormap/test-colormap.h"
+#include "test-colorscale/test-colorscale.h"
 #include "test-qcplayout/test-qcplayout.h"
 #include "test-qcplegend/test-qcplegend.h"
 #include "test-qcpaxisrect/test-qcpaxisrect.h"
@@ -100,6 +101,7 @@ int main(int argc, char **argv)
   QCPTEST(TestQCPBars);
   QCPTEST(TestQCPFinancial);
   QCPTEST(TestColorMap);
+  QCPTEST(TestColorScale);
   QCPTEST(TestQCPLayout);
   QCPTEST(TestQCPLegend);
   QCPTEST(TestQCPAxisRect);

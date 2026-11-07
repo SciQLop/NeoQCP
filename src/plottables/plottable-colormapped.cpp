@@ -15,8 +15,11 @@ QCPAbstractColorMapped::QCPAbstractColorMapped(QCPAxis* keyAxis, QCPAxis* valueA
 
 QCPAbstractColorMapped::~QCPAbstractColorMapped()
 {
+    const QPointer<QCPColorScale> scale(mColorScale);
     if (mColorScale)
         mColorScale->mUsers.removeOne(this);
+    if (scale)
+        scale->usersChanged();
 }
 
 void QCPAbstractColorMapped::setDataRange(const QCPRange& dataRange)
@@ -67,15 +70,19 @@ void QCPAbstractColorMapped::setColorScale(QCPColorScale* colorScale)
     if (mColorScale == colorScale)
         return;
     markDirty();
+    const QPointer<QCPColorScale> previous(mColorScale);
     if (mColorScale)
         mColorScale->mUsers.removeOne(this);
     mColorScale = colorScale;
+    if (previous)
+        previous->usersChanged(); // a scale nobody uses takes no room
     if (!colorScale)
     {
         qcpEmit(this, mParentPlot, &QCPAbstractColorMapped::colorScaleChanged);
         return;
     }
     colorScale->mUsers.append(this);
+    colorScale->usersChanged();
 
     // Each setter signals, and a slot may delete this plottable or the scale.
     const QPointer<QCPAbstractColorMapped> alive(this);
@@ -141,4 +148,21 @@ void QCPAbstractColorMapped::detachColorScale()
         return;
     mColorScale = nullptr;
     qcpEmit(this, mParentPlot, &QCPAbstractColorMapped::colorScaleChanged);
+}
+
+void QCPAbstractColorMapped::followKeyAxisRectScale()
+{
+    QCPAxisRect* rect = mKeyAxis ? mKeyAxis->axisRect() : nullptr;
+    if (!rect || rect->parentPlot() != mParentPlot)
+        return;
+    const bool madeHere = !rect->mColorScale;
+    const auto scale = rect->colorScale();
+    if (!scale)
+        return;
+    // A scale this plottable made has no state of its own: it starts as its first user, so this
+    // plottable's own defaults (such as transparent NaN) are not silently dropped.
+    if (madeHere)
+        scale->setGradient(mGradient);
+    setColorScale(scale.get());
+    colorMappingChanged();
 }

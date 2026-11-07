@@ -755,6 +755,7 @@ QCPColorMap::QCPColorMap(QCPAxis* keyAxis, QCPAxis* valueAxis)
         , mMapImageInvalidated(true)
 {
     mMapData->mOwner = this;
+    followKeyAxisRectScale();
 }
 
 QCPColorMap::~QCPColorMap()

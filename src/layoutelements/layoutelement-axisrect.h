@@ -36,6 +36,10 @@ class QCPAxis;
 class QCPAbstractPlottable;
 class QCPGraph;
 class QCPAbstractItem;
+class QCPColorScale;
+
+template <typename T, typename Self = void>
+class QCPColorScaleOps;
 
 template <typename T, typename Self = void>
 class QCPAxisRectOps;
@@ -125,6 +129,9 @@ public:
     QList<QCPAbstractPlottable*> plottables() const;
     QList<QCPGraph*> graphs() const;
     QList<QCPAbstractItem*> items() const;
+    //! The colour scale this rect owns and places in its margin, made on first call. It is visible
+    //! exactly while a plottable uses it.
+    QCPColorScaleOps<QCPColorScale> colorScale();
 
     // read-only interface imitating a QRect:
     int left() const { return mRect.left(); }
@@ -177,11 +184,14 @@ protected:
     bool mWheelZooming = false;
     QTimer mWheelZoomRestoreTimer;
     QHash<QCPAxis::AxisType, QList<QCPAxis*>> mAxes;
+    QPointer<QCPColorScale> mColorScale;
 
     // reimplemented virtual methods:
     virtual void applyDefaultAntialiasingHint(QCPPainter* painter) const override;
     virtual void draw(QCPPainter* painter) override;
     virtual void layoutChanged() override;
+    // A rect inside a QCPColorScale must not make a scale of its own.
+    virtual bool mayOwnColorScale() const { return true; }
     // events:
     virtual void mousePressEvent(QMouseEvent* event, const QVariant& details) override;
     virtual void mouseMoveEvent(QMouseEvent* event, const QPointF& startPos) override;
@@ -200,6 +210,14 @@ protected:
 private:
     Q_DISABLE_COPY(QCPAxisRect)
 
+    // The rect's own scale while it has at least one user, otherwise null.
+    QCPColorScale* usedColorScale() const;
+    // The width a vertical scale takes in the margin, or the height of a horizontal one.
+    int colorScaleExtent() const;
+    void placeColorScale();
+    // The scale gained or lost a user, or changed the side or width it needs: the margin moves.
+    void colorScaleUsersChanged();
+
     // Takes axis out of mAxes and the plot's shortcuts, without deleting it. False if not listed.
     bool unlistAxis(QCPAxis* axis);
     // Afterwards the plottables' and items' axis pointers are null and nothing can find them.
@@ -209,6 +227,8 @@ private:
     void detachFromOwners();
 
     friend class QCPAxis; // rangeDidChange() -> markAffectedLayersDirty(), ~QCPAxis -> unlistAxis()
+    friend class QCPColorScale; // it reports user and size changes that move this rect's margin
+    friend class QCPAbstractColorMapped; // it seeds the scale it causes this rect to make
 
     friend class QCustomPlot;
     friend class TestPaintBuffer;

@@ -24,6 +24,7 @@
 ****************************************************************************/
 
 #include "layoutelement-axisrect.h"
+#include "layoutelement-colorscale.h"
 
 #include "../axis/axis.h"
 #include "../axis/axisticker.h"
@@ -254,6 +255,16 @@ QCPAxisRect::~QCPAxisRect()
     }
     delete mInsetLayout;
     mInsetLayout = nullptr;
+
+    // The rect owns its scale: it goes with the rect, and its users detach (they emit inside the
+    // scope above).
+    if (mColorScale)
+    {
+        QCPColorScale* scale = mColorScale.data();
+        scale->mOwnerRect = nullptr;
+        delete scale;
+        mColorScale = nullptr;
+    }
 
     for (const auto& axis : qcp::guarded(axes()))
         if (axis)
@@ -755,6 +766,95 @@ QList<QCPAbstractItem*> QCPAxisRect::items() const
 }
 
 /*!
+  Returns the colour scale this rect owns, making it on the first call.
+
+  The scale sits in the margin of the side its \ref QCPColorScale::type names, outside that side's
+  axes, and this rect's auto margin on that side grows to hold it. It is visible exactly while a
+  plottable uses it: a scale nobody uses takes no room and is never laid out.
+
+  The rect deletes the scale with itself. Removing the scale leaves this rect working; the next
+  call makes a new scale.
+
+  \see QCPColorScale
+*/
+QCPColorScaleOps<QCPColorScale> QCPAxisRect::colorScale()
+{
+    if (!mayOwnColorScale() || !mParentPlot)
+        return {};
+    if (!mColorScale)
+    {
+        mColorScale = new QCPColorScale(mParentPlot);
+        mColorScale->mOwnerRect = this;
+        colorScaleUsersChanged();
+    }
+    return qcp::makeHandle<QCPColorScaleOps<QCPColorScale>>(mColorScale.data());
+}
+
+/*! \internal
+
+  Returns the rect's own scale while at least one plottable uses it, otherwise null. A scale with
+  no user is hidden and costs nothing per replot.
+*/
+QCPColorScale* QCPAxisRect::usedColorScale() const
+{
+    return (mColorScale && !mColorScale->users().isEmpty()) ? mColorScale.data() : nullptr;
+}
+
+/*! \internal
+
+  The width a vertical scale takes in a left or right margin, or the height a horizontal scale
+  takes in a top or bottom margin, its own margins included.
+*/
+int QCPAxisRect::colorScaleExtent() const
+{
+    if (!mColorScale)
+        return 0;
+    const bool vertical = QCPAxis::orientation(mColorScale->type()) == Qt::Vertical;
+    const QSize barSize = mColorScale->minimumSize();
+    const QMargins barMargins = mColorScale->margins();
+    return vertical ? barSize.width() + barMargins.left() + barMargins.right()
+                    : barSize.height() + barMargins.top() + barMargins.bottom();
+}
+
+/*! \internal
+
+  Puts the rect's scale in the margin of the side its type names, outside that side's axes.
+*/
+void QCPAxisRect::placeColorScale()
+{
+    const int extent = colorScaleExtent();
+    QRect scaleOuterRect;
+    switch (mColorScale->type())
+    {
+        case QCPAxis::atLeft:
+            scaleOuterRect = QRect(outerRect().left(), rect().top(), extent, rect().height());
+            break;
+        case QCPAxis::atBottom:
+            scaleOuterRect = QRect(rect().left(), outerRect().bottom() - extent + 1, rect().width(),
+                                   extent);
+            break;
+        case QCPAxis::atTop:
+            scaleOuterRect = QRect(rect().left(), outerRect().top(), rect().width(), extent);
+            break;
+        default:
+            scaleOuterRect = QRect(outerRect().right() - extent + 1, rect().top(), extent,
+                                   rect().height());
+            break;
+    }
+    mColorScale->setOuterRect(scaleOuterRect);
+}
+
+/*! \internal
+
+  Called when the rect's scale gains or loses a user or changes the room it needs: the margin
+  holding it moves.
+*/
+void QCPAxisRect::colorScaleUsersChanged()
+{
+    markLayoutAppearanceDirty();
+}
+
+/*!
   This method is called automatically upon replot and doesn't need to be called by users of
   QCPAxisRect.
 
@@ -766,6 +866,13 @@ QList<QCPAbstractItem*> QCPAxisRect::items() const
 */
 void QCPAxisRect::update(UpdatePhase phase)
 {
+    QCPColorScale* scale = usedColorScale();
+    if (mColorScale)
+        mColorScale->setVisible(scale != nullptr);
+    // A hidden scale is not touched at all: no layout pass, no draw, no cost per replot.
+    if (scale && phase == upMargins)
+        scale->update(phase); // its minimum size is the margin this rect has to add
+
     QCPLayoutElement::update(phase);
 
     switch (phase)
@@ -783,6 +890,14 @@ void QCPAxisRect::update(UpdatePhase phase)
         }
         default:
             break;
+    }
+
+    if (scale)
+    {
+        if (phase == upLayout)
+            placeColorScale();
+        if (phase != upMargins) // already done before the margins were computed
+            scale->update(phase);
     }
 
     // pass update call on to inset layout (doesn't happen automatically, because QCPAxisRect
@@ -1312,10 +1427,11 @@ int QCPAxisRect::calculateAutoMargin(QCP::MarginSide side)
     // note: only need to look at the last (outer most) axis to determine the total margin, due to
     // updateAxisOffset call
     const QList<QCPAxis*> axesList = mAxes.value(QCPAxis::marginSideToAxisType(side));
-    if (!axesList.isEmpty())
-        return axesList.last()->offset() + axesList.last()->calculateMargin();
-    else
-        return 0;
+    int margin = axesList.isEmpty() ? 0 : axesList.last()->offset() + axesList.last()->calculateMargin();
+    if (const QCPColorScale* scale = usedColorScale())
+        if (QCPAxis::marginSideToAxisType(side) == scale->type())
+            margin += colorScaleExtent();
+    return margin;
 }
 
 /*! \internal

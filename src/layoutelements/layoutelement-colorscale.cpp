@@ -163,10 +163,24 @@ QCPColorScale::QCPColorScale(QCustomPlot* parentPlot)
 
 QCPColorScale::~QCPColorScale()
 {
+    const QPointer<QCPAxisRect> owner = mOwnerRect;
     for (const auto& user : liveUsers(std::exchange(mUsers, {})))
         if (user)
             user->detachColorScale();
     delete mAxisRect;
+    if (owner)
+        owner->colorScaleUsersChanged();
+}
+
+/*! \internal
+
+  Tells the owning rect that this scale's users or its size changed, so the rect recomputes the
+  margin holding the scale.
+*/
+void QCPColorScale::usersChanged()
+{
+    if (mOwnerRect)
+        mOwnerRect->colorScaleUsersChanged();
 }
 
 /* undocumented getter */
@@ -265,6 +279,7 @@ void QCPColorScale::setType(QCPAxis::AxisType type)
         connect(mColorAxis.data(), &QCPAxis::rangeChanged, this, &QCPColorScale::setDataRange);
         connect(mColorAxis.data(), &QCPAxis::scaleTypeChanged, this, &QCPColorScale::setDataScaleType);
         mAxisRect.data()->setRangeDragAxes(QList<QCPAxis*>() << mColorAxis.data());
+        usersChanged(); // the scale now needs a different side's width or height
     }
 }
 
@@ -402,6 +417,7 @@ void QCPColorScale::setBarWidth(int width)
     if (mColorAxis)
         mColorAxis.data()->markDirty(); // the bar width moves the axis beside it
     mBarWidth = width;
+    usersChanged();
 }
 
 /*!
