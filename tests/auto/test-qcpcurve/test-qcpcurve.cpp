@@ -105,6 +105,20 @@ const std::vector<CurveSetterCase>& curveSetterCases()
                 values[i] = static_cast<double>(i);
             curve->setColorValues(std::move(values));
         } },
+      { QStringLiteral("setColorScale"),
+        [](QCPCurve* curve)
+        {
+            std::vector<double> values(static_cast<size_t>(curve->data()->size()));
+            for (size_t i = 0; i < values.size(); ++i)
+                values[i] = static_cast<double>(i);
+            curve->setColorValues(std::move(values));
+        },
+        [](QCPCurve* curve)
+        {
+            auto* scale = new QCPColorScale(curve->parentPlot());
+            scale->setGradient(QCPColorGradient(QCPColorGradient::gpHot));
+            curve->setColorScale(scale);
+        } },
   };
   return cases;
 }
@@ -310,8 +324,8 @@ void TestQCPCurve::legendIconMarkerTakesTheCurvePen()
 void TestQCPCurve::curveColoursByValue()
 {
   setFivePoints(mCurve);
-  mCurve->setColorGradient(QCPColorGradient(QCPColorGradient::gpJet));
-  mCurve->setColorRange(QCPRange(0, 4));
+  mCurve->setGradient(QCPColorGradient(QCPColorGradient::gpJet));
+  mCurve->setDataRange(QCPRange(0, 4));
   mCurve->setColorValues(std::vector<double> { 0, 1, 2, 3, 4 });
   QVERIFY(mCurve->hasColorValues());
   mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -331,7 +345,7 @@ void TestQCPCurve::curveColoursByValue()
 void TestQCPCurve::newDataOfAnotherSizeDrawsUncoloured()
 {
   setFivePoints(mCurve);
-  mCurve->setColorRange(QCPRange(0, 4));
+  mCurve->setDataRange(QCPRange(0, 4));
   mCurve->setColorValues(std::vector<double> { 0, 1, 2, 3, 4 });
   mCurve->setData(QVector<double> { 0, 1, 2 }, QVector<double> { 0, 1, 0 });
   mPlot->replot(QCustomPlot::rpImmediateRefresh);

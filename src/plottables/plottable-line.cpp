@@ -5,8 +5,12 @@
 #include <algorithm>
 
 QCPAbstractLine::QCPAbstractLine(QCPAxis* keyAxis, QCPAxis* valueAxis)
-    : QCPAbstractPlottable(keyAxis, valueAxis)
+    : QCPAbstractColorMapped(keyAxis, valueAxis)
 {
+    // A coloured line on a fresh rect keeps what the mapper had: gpJet over 0..1. Written through
+    // the members, not the setters: the subclasses are not constructed yet.
+    mGradient = QCPColorGradient(QCPColorGradient::gpJet);
+    mDataRange = QCPRange(0, 1);
 }
 
 QCPScatterStyle QCPAbstractLine::markerStyle(QCPScatterStyle style, const QPen& pen)
@@ -220,6 +224,10 @@ void QCPAbstractLine::setColorValues(std::shared_ptr<const std::vector<double>> 
     mColor.setValues(std::move(values));
     if (!wasColoured)
     {
+        // A line is a user of a scale only while it is coloured: joining on the first colouring
+        // keeps a plain line from showing the rect's colour bar.
+        if (!colorScale())
+            followKeyAxisRectScale();
         lineChanged();
         colorValuesStarted();
     }
@@ -237,40 +245,41 @@ void QCPAbstractLine::clearColorValues()
     // pending -- otherwise a line "coloured" only through that stash survives this call
     // and the swap re-colours it from the stale stash.
     mPendingColorValues.reset();
-    if (!mColor.hasValues())
-        return;
-    mColor.clearValues();
-    lineChanged();
+    const bool hadValues = mColor.hasValues();
+    if (hadValues)
+        mColor.clearValues();
+    if (colorScale())
+        setColorScale(nullptr);
+    if (hadValues)
+        lineChanged();
 }
 
 bool QCPAbstractLine::hasColorValues() const { return mColor.hasValues(); }
 
-void QCPAbstractLine::setColorGradient(const QCPColorGradient& gradient)
+QCPRange QCPAbstractLine::colorDataBounds(bool& found) const
 {
-    if (gradient == mColor.gradient())
-        return;
-    markDirty();
-    mColor.setGradient(gradient);
+    found = false;
+    if (!mColor.values())
+        return { };
+    const bool log = dataScaleType() == QCPAxis::stLogarithmic;
+    QCPRange bounds;
+    for (const double value : *mColor.values())
+    {
+        if (!std::isfinite(value) || (log && value <= 0))
+            continue;
+        if (!found)
+            bounds = QCPRange(value, value);
+        else
+            bounds.expand(value);
+        found = true;
+    }
+    return bounds;
 }
 
-QCPColorGradient QCPAbstractLine::colorGradient() const { return mColor.gradient(); }
-
-void QCPAbstractLine::setColorRange(const QCPRange& range)
+void QCPAbstractLine::colorMappingChanged()
 {
-    if (range == mColor.range())
-        return;
-    markDirty();
-    mColor.setRange(range);
+    mColor.setGradient(gradient());
+    mColor.setRange(dataRange());
+    mColor.setScaleType(dataScaleType());
+    lineChanged();
 }
-
-QCPRange QCPAbstractLine::colorRange() const { return mColor.range(); }
-
-void QCPAbstractLine::setColorScaleType(QCPAxis::ScaleType type)
-{
-    if (type == mColor.scaleType())
-        return;
-    markDirty();
-    mColor.setScaleType(type);
-}
-
-QCPAxis::ScaleType QCPAbstractLine::colorScaleType() const { return mColor.scaleType(); }

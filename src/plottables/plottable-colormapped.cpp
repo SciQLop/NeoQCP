@@ -160,9 +160,14 @@ void QCPAbstractColorMapped::followKeyAxisRectScale()
     if (!scale)
         return;
     // A scale this plottable made has no state of its own: it starts as its first user, so this
-    // plottable's own defaults (such as transparent NaN) are not silently dropped.
+    // plottable's own defaults (such as transparent NaN) are not silently dropped. A plottable
+    // with no range of its own yet leaves the scale's own default range alone.
     if (madeHere)
+    {
         scale->setGradient(mGradient);
+        if (QCPRange::validRange(mDataRange))
+            scale->setDataRange(mDataRange);
+    }
     setColorScale(scale.get());
     colorMappingChanged();
 }

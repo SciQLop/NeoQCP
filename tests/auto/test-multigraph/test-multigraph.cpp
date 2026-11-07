@@ -2706,6 +2706,18 @@ const std::vector<SetterCase>& setterCases()
                   values[i] = static_cast<double>(i);
               mg->setColorValues(std::move(values));
           } },
+        { QStringLiteral("setColorScale"),
+          [](QCPMultiGraph* mg) {
+              std::vector<double> values(static_cast<size_t>(mg->dataSource()->size()));
+              for (size_t i = 0; i < values.size(); ++i)
+                  values[i] = static_cast<double>(i);
+              mg->setColorValues(std::move(values));
+          },
+          [](QCPMultiGraph* mg) {
+              auto* scale = new QCPColorScale(mg->parentPlot());
+              scale->setGradient(QCPColorGradient(QCPColorGradient::gpHot));
+              mg->setColorScale(scale);
+          } },
     };
     return cases;
 }
@@ -3026,7 +3038,7 @@ void TestMultiGraph::colouredLineIsOneCommandPerComponent()
     }
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::move(keys), std::move(columns));
-    mg->setColorRange(QCPRange(-1.0, 1.0));
+    mg->setDataRange(QCPRange(-1.0, 1.0));
     mg->setColorValues(std::vector<double>(n, 0.0));
     QVERIFY(mg->hasColorValues());
     mPlot->xAxis->setRange(0, n);

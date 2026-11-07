@@ -508,9 +508,9 @@ void TestColorByScalar::firstColoringRebuildsL1OnceWithOrigin()
     QVERIFY(!mg->mL1Cache->level1.origin.empty());
 
     const auto colouredL1 = mg->mL1Cache;
-    mg->setColorGradient(QCPColorGradient(QCPColorGradient::gpHot));
-    mg->setColorRange(QCPRange(0, 10));
-    mg->setColorScaleType(QCPAxis::stLogarithmic);
+    mg->setGradient(QCPColorGradient(QCPColorGradient::gpHot));
+    mg->setDataRange(QCPRange(0, 10));
+    mg->setDataScaleType(QCPAxis::stLogarithmic);
     std::vector<double> other(n, 1.0);
     mg->setColorValues(other);                        // same length: no rebuild either
     QTest::qWait(200);
@@ -705,8 +705,8 @@ void TestColorByScalar::coloredLineRendersTheGradient()
     for (int i = 0; i < 200; ++i) { keys[i] = i; scalar[i] = i / 199.0; }
     mg->setDataSource(makeSource(keys, {values}));
     mg->setComponentPens({QPen(Qt::black, 6)});
-    mg->setColorGradient(redToBlue());
-    mg->setColorRange(QCPRange(0, 1));
+    mg->setGradient(redToBlue());
+    mg->setDataRange(QCPRange(0, 1));
     mg->setColorValues(scalar);
     mPlot->xAxis->setRange(0, 199);
     mPlot->yAxis->setRange(-1, 1);
@@ -726,8 +726,8 @@ void TestColorByScalar::coloredRunsMeetWithButtEndsOnExport()
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDataSource(makeSource({0, 1, 2}, {{0, 0, 0}}));
     mg->setComponentPens({QPen(Qt::black, 20)});
-    mg->setColorGradient(redToBlue());
-    mg->setColorRange(QCPRange(0, 1));
+    mg->setGradient(redToBlue());
+    mg->setDataRange(QCPRange(0, 1));
     mg->setColorValues(std::vector<double>{0, 0, 1});
     mPlot->xAxis->setRange(0, 2);
     mPlot->yAxis->setRange(-1, 1);
@@ -751,8 +751,8 @@ QCPMultiGraph* rampGraph(QCustomPlot* plot, std::shared_ptr<QCPAbstractMultiData
     auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
     mg->setDataSource(std::move(src));
     mg->setComponentPens({QPen(Qt::black, 6)});
-    mg->setColorGradient(redToBlue());
-    mg->setColorRange(QCPRange(0, 1));
+    mg->setGradient(redToBlue());
+    mg->setDataRange(QCPRange(0, 1));
     mg->setColorValues(std::move(scalar));
     plot->xAxis->setRange(0, 199);
     plot->yAxis->setRange(-1, 1);
@@ -1051,6 +1051,121 @@ void TestColorByScalar::coloredLegendLineShowsTheGradient()
     QCOMPARE(img.pixelColor(50, 10), QColor(Qt::black));   // uncoloured: the component pen
 }
 
+void TestColorByScalar::aColouredLineShowsItsRectScale()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDataSource(makeSource({ 0, 1, 2, 3 }, { { 0, 1, 0, 1 } }));
+    auto* curve = new QCPCurve(mPlot->xAxis, mPlot->yAxis);
+    curve->setData(QVector<double> { 0, 1, 2, 3 }, QVector<double> { 0, 1, 0, 1 });
+    mPlot->replot();
+
+    QVERIFY2(mPlot->findChildren<QCPColorScale*>().isEmpty(),
+             "a plain line made the rect show a colour bar");
+    QCOMPARE(mg->colorScale(), static_cast<QCPColorScale*>(nullptr));
+    QCOMPARE(curve->colorScale(), static_cast<QCPColorScale*>(nullptr));
+
+    mg->setColorValues(std::vector<double> { 0, 1, 0, 1 });
+    mPlot->replot();
+    QCPColorScale* scale = mg->colorScale();
+    QVERIFY2(scale, "the coloured line did not join the rect's scale");
+    QCOMPARE(scale, mPlot->axisRect()->colorScale().get());
+    QVERIFY2(scale->visible(), "the coloured line's scale is hidden");
+    // A fresh rect's scale is gpCold over 0..6; a line that made it keeps the mapper's defaults.
+    QCOMPARE(mg->gradient(), QCPColorGradient(QCPColorGradient::gpJet));
+    QCOMPARE(mg->dataRange(), QCPRange(0, 1));
+    QCOMPARE(scale->dataRange(), QCPRange(0, 1));
+
+    mg->clearColorValues();
+    mPlot->replot();
+    QCOMPARE(mg->colorScale(), static_cast<QCPColorScale*>(nullptr));
+    QVERIFY2(!scale->visible(), "the bar stayed after the line lost its colours");
+}
+
+void TestColorByScalar::aLineFollowsItsScale()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    std::vector<double> keys(200), values(200, 0.0), scalar(200);
+    for (int i = 0; i < 200; ++i) { keys[i] = i; scalar[i] = i / 199.0; }
+    mg->setDataSource(makeSource(keys, { values }));
+    mg->setComponentPens({ QPen(Qt::black, 6) });
+    mg->setGradient(redToBlue());
+    mg->setDataRange(QCPRange(0, 1));
+    mg->setColorValues(scalar);
+    mPlot->xAxis->setRange(0, 199);
+    mPlot->yAxis->setRange(-1, 1);
+
+    QCPColorScale* scale = mg->colorScale();
+    QVERIFY(scale);
+    const QImage before = mPlot->toPixmap(400, 300).toImage();
+    QVERIFY2(isRed(pixelAt(mPlot, before, 10, 0)), "the line did not take its own gradient");
+    QVERIFY2(isBlue(pixelAt(mPlot, before, 189, 0)), "the line did not take its own gradient");
+
+    scale->setGradient(QCPColorGradient(QCPColorGradient::gpGrayscale));
+    mPlot->replot();
+
+    QCOMPARE(mg->gradient(), QCPColorGradient(QCPColorGradient::gpGrayscale));
+    const QImage after = mPlot->toPixmap(400, 300).toImage();
+    const QColor left = pixelAt(mPlot, after, 10, 0);
+    QVERIFY2(qAbs(left.red() - left.green()) <= 2 && qAbs(left.green() - left.blue()) <= 2,
+             qPrintable(QString("the line kept its own gradient: pixel is %1").arg(left.name())));
+}
+
+void TestColorByScalar::rescaleSeesALine()
+{
+    auto* map = new QCPColorMap(mPlot->xAxis, mPlot->yAxis);
+    map->data()->setSize(2, 2);
+    map->data()->setCell(0, 0, 1.0);
+    map->data()->setCell(1, 0, 1.0);
+    map->data()->setCell(0, 1, 3.0);
+    map->data()->setCell(1, 1, 3.0);
+
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDataSource(makeSource({ 0, 1, 2 }, { { 0, 0, 0 } }));
+    mg->setColorValues(std::vector<double> { 1, 7, 3 });
+
+    QCPColorScale* scale = mPlot->axisRect()->colorScale().get();
+    QVERIFY(scale);
+    QCOMPARE(mg->colorScale(), scale);
+
+    bool found = false;
+    QVERIFY2(mg->colorDataBounds(found) == QCPRange(1, 7),
+             "the line's colour bounds are not the range of its values");
+    QVERIFY(found);
+
+    scale->rescaleDataRange(true);
+    QCOMPARE(scale->dataRange().upper, 7.0);
+    QCOMPARE(mg->dataRange().upper, 7.0);
+}
+
+void TestColorByScalar::aCurveFollowsItsScale()
+{
+    auto* curve = new QCPCurve(mPlot->xAxis, mPlot->yAxis);
+    QVector<double> keys(200), values(200, 0.0), scalar(200);
+    for (int i = 0; i < 200; ++i) { keys[i] = i; scalar[i] = i / 199.0; }
+    curve->setData(keys, values);
+    curve->setPen(QPen(Qt::black, 6));
+    curve->setGradient(redToBlue());
+    curve->setDataRange(QCPRange(0, 1));
+    curve->setColorValues(std::vector<double>(scalar.begin(), scalar.end()));
+    mPlot->xAxis->setRange(0, 199);
+    mPlot->yAxis->setRange(-1, 1);
+
+    QCPColorScale* scale = curve->colorScale();
+    QVERIFY(scale);
+    const QImage before = mPlot->toPixmap(400, 300).toImage();
+    QVERIFY2(isRed(pixelAt(mPlot, before, 10, 0)), "the curve did not take its own gradient");
+    QVERIFY2(isBlue(pixelAt(mPlot, before, 189, 0)), "the curve did not take its own gradient");
+
+    scale->setGradient(QCPColorGradient(QCPColorGradient::gpGrayscale));
+    mPlot->replot();
+
+    QCOMPARE(curve->gradient(), QCPColorGradient(QCPColorGradient::gpGrayscale));
+    const QImage after = mPlot->toPixmap(400, 300).toImage();
+    const QColor left = pixelAt(mPlot, after, 10, 0);
+    QVERIFY2(qAbs(left.red() - left.green()) <= 2 && qAbs(left.green() - left.blue()) <= 2,
+             qPrintable(QString("the curve kept its own gradient: pixel is %1").arg(left.name())));
+}
+
 void TestColorByScalar::coloredGraphDrawnFromL2KeepsIndicesConsistent()
 {
     // The colour of a vertex is looked up by the data row the L2 point came from. A misaligned
@@ -1068,8 +1183,8 @@ void TestColorByScalar::coloredGraphDrawnFromL2KeepsIndicesConsistent()
     }
     mg->setDataSource(makeSource(keys, { values, negated, flat }));
     mg->setComponentPens({ QPen(Qt::black, 6), QPen(Qt::black, 6), QPen(Qt::black, 6) });
-    mg->setColorGradient(redToBlue());
-    mg->setColorRange(QCPRange(0, 1));
+    mg->setGradient(redToBlue());
+    mg->setDataRange(QCPRange(0, 1));
     mg->setColorValues(scalar);
     mPlot->xAxis->setRange(0, n);
     mPlot->yAxis->setRange(-1.5, 1.5);

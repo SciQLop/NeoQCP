@@ -206,7 +206,7 @@ The entry starts collapsed; a click expands it to one row per component, and so 
 - `component(i)` gives access to one component. Use `setComponentVisible()` and `setComponentLineStyle()` to change those two: writing the fields directly does not redraw.
 - `setLineStyle()` sets the style of every component.
 
-A multigraph can also colour its lines by a scalar shared by all components, with `setColorValues()`, `setColorGradient()` and `setColorRange()`.
+A multigraph can also colour its lines by a scalar shared by all components, with `setColorValues()`, `setGradient()` and `setDataRange()`.
 
 ### Fill under a component
 

@@ -61,6 +61,11 @@ private slots:
 
     void coloredLegendLineShowsTheGradient();
 
+    void aColouredLineShowsItsRectScale();
+    void aLineFollowsItsScale();
+    void rescaleSeesALine();
+    void aCurveFollowsItsScale();
+
     void coloredGraphDrawnFromL2KeepsIndicesConsistent();
 
     void graph2ScatterColoursFollowTheirPointAcrossBreaks();

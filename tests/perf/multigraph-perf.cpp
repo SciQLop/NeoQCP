@@ -344,7 +344,7 @@ static void colourAndSettle(QCustomPlot* plot, QCPMultiGraph* mg)
     std::vector<double> scalar(mg->dataCount());
     for (size_t i = 0; i < scalar.size(); ++i)
         scalar[i] = std::sin(i * 1e-5);
-    mg->setColorRange(QCPRange(-1, 1));
+    mg->setDataRange(QCPRange(-1, 1));
     mg->setColorValues(std::move(scalar));
     for (int w = 0; w < 100 && mg->pipeline().isBusy(); ++w) {   // the one origin rebuild
         QThread::msleep(50);

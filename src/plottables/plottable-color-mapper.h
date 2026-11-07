@@ -34,6 +34,10 @@ public:
     [[nodiscard]] QCPRange range() const { return mRange; }
     void setScaleType(QCPAxis::ScaleType type) { mScaleType = type; ++mGeneration; }
     [[nodiscard]] QCPAxis::ScaleType scaleType() const { return mScaleType; }
+    [[nodiscard]] const std::shared_ptr<const std::vector<double>>& values() const
+    {
+        return mValues;
+    }
     [[nodiscard]] quint64 generation() const { return mGeneration; }
 
     [[nodiscard]] int bucket(int dataIndex) const

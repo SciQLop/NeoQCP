@@ -503,8 +503,8 @@ static QWidget* createColoredMultiGraphTab()
     mg->setData(std::move(keys), std::vector<std::vector<double>>{std::move(a), std::move(b)});
     mg->setComponentPens({QPen(Qt::black, 2), QPen(Qt::black, 2)});
     mg->component(0).scatterStyle = QCPScatterStyle(QCPScatterStyle::ssDisc, 5);
-    mg->setColorGradient(QCPColorGradient(QCPColorGradient::gpJet));
-    mg->setColorRange(QCPRange(-1, 1));
+    mg->setGradient(QCPColorGradient(QCPColorGradient::gpJet));
+    mg->setDataRange(QCPRange(-1, 1));
     mg->setColorValues(std::move(scalar));
     plot->rescaleAxes();
     plot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom);

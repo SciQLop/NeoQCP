@@ -344,16 +344,6 @@ public:
         return this->apply([&](T& o) { o.setColorValues(std::move(values)); });
     }
 
-    Ret setColorGradient(const QCPColorGradient& gradient)
-    {
-        return this->apply([&](T& o) { o.setColorGradient(gradient); });
-    }
-
-    Ret setColorScaleType(QCPAxis::ScaleType type)
-    {
-        return this->apply([&](T& o) { o.setColorScaleType(type); });
-    }
-
     Ret setScatterSkip(int skip)
     {
         return this->apply([&](T& o) { o.setScatterSkip(skip); });
@@ -387,11 +377,6 @@ public:
     Ret setGapThreshold(double threshold)
     {
         return this->apply([&](T& o) { o.setGapThreshold(threshold); });
-    }
-
-    Ret setColorRange(const QCPRange& range)
-    {
-        return this->apply([&](T& o) { o.setColorRange(range); });
     }
 };
 

@@ -1,5 +1,5 @@
 #pragma once
-#include "plottable.h"
+#include "plottable-colormapped.h"
 #include "plottable-color-mapper.h"
 #include <QStringList>
 #include <memory>
@@ -13,7 +13,7 @@ class QCPAbstractMultiDataSource;
 //! Owns the components (one line each, with its own pens, marker style and line style) and the
 //! colour-by-scalar mapper shared by them. Subclasses supply the data and draw the components;
 //! every setter here changes what they draw, so it dirties the layer through lineChanged().
-class QCP_LIB_DECL QCPAbstractLine : public QCPAbstractPlottable
+class QCP_LIB_DECL QCPAbstractLine : public QCPAbstractColorMapped
 {
     Q_OBJECT
 public:
@@ -70,16 +70,14 @@ public:
     // QCustomPlot convention: these setters do not replot -- the caller must
     // call replot() (the first colouring may repaint on its own once
     // startColouring() has rebuilt what it needs).
+    // The gradient, range and scale type are the colour mapping inherited from
+    // QCPAbstractColorMapped: a coloured line follows its key axis rect's colour
+    // scale, and setColorScale() on an uncoloured line makes it a user at once.
+    // A plain line never shows a colour bar; clearColorValues() drops the scale.
     void setColorValues(std::shared_ptr<const std::vector<double>> values);
     void setColorValues(std::vector<double> values);
     void clearColorValues();
     [[nodiscard]] bool hasColorValues() const;
-    void setColorGradient(const QCPColorGradient& gradient);
-    [[nodiscard]] QCPColorGradient colorGradient() const;
-    void setColorRange(const QCPRange& range);
-    [[nodiscard]] QCPRange colorRange() const;
-    void setColorScaleType(QCPAxis::ScaleType type);
-    [[nodiscard]] QCPAxis::ScaleType colorScaleType() const;
 
 Q_SIGNALS:
     //! A component was shown or hidden: the legend group row draws one segment per visible one.
@@ -105,6 +103,10 @@ protected:
     [[nodiscard]] virtual bool hasPendingDataSource() const { return false; }
     //! The first colouring: the subclass rebuilds whatever the per-point colours need.
     virtual void colorValuesStarted() {}
+    //! The finite colour values: positive only on a log data scale. found is false with none.
+    [[nodiscard]] QCPRange colorDataBounds(bool& found) const override;
+    //! Feeds the base's gradient, range and scale type to the mapper, then redraws.
+    void colorMappingChanged() override;
     //! The cached drawing is stale: mark the layer dirty.
     virtual void lineChanged() { markDirty(); }
     //! A component's visibility changed: mark the layer dirty.

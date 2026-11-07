@@ -598,7 +598,11 @@ void QCPMultiGraph::applyColorSizeRule(int newSize)
     if (mColor.hasValues() && mColor.size() != newSize)
         mColor.clearValues();
     if (!mColor.hasValues())
+    {
         mWantOrigin->store(false);
+        if (colorScale())
+            setColorScale(nullptr);
+    }
 }
 
 double QCPMultiGraph::componentValueAt(int column, int index) const
