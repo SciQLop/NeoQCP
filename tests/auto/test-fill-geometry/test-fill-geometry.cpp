@@ -131,30 +131,6 @@ void TestFillGeometry::binToSpansKeepsBreaks()
     QVERIFY(spans[1].breakBefore);
 }
 
-void TestFillGeometry::stripPolygonsOnePerRun()
-{
-    const std::vector<StripPoint> rows { {0, 0, 10}, {10, 0, 10}, {20, 0, 10, true}, {30, 0, 10} };
-    const auto polys = qcp::fill::stripPolygons(rows, false);
-    QCOMPARE(polys.size(), 2);
-    QCOMPARE(polys[0].size(), 4); // a forward (2), b back (2)
-}
-
-void TestFillGeometry::aBrokenSecondRowDoesNotJoinTheFirst()
-{
-    const std::vector<StripPoint> rows { {0, 0, 10}, {10, 0, 10, true}, {20, 0, 10}, {30, 0, 10} };
-    const auto polys = qcp::fill::stripPolygons(rows, false);
-    QCOMPARE(polys.size(), 1);
-    QCOMPARE(polys[0].size(), 6);
-}
-
-void TestFillGeometry::aSingleRowRunMakesNoPolygon()
-{
-    const std::vector<StripPoint> rows { {0, 0, 10}, {10, kNan, 10}, {20, 0, 10}, {30, 0, 10} };
-    const auto polys = qcp::fill::stripPolygons(rows, false);
-    QCOMPARE(polys.size(), 1);
-    QCOMPARE(polys[0].size(), 4);
-}
-
 void TestFillGeometry::binToSpansJoinsRowsOfALaterBin()
 {
     const std::vector<StripPoint> rows { {5.1, 1, 2}, {5.4, 0, 3} };

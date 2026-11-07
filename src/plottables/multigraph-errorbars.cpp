@@ -1,5 +1,4 @@
 #include "multigraph-errorbars.h"
-#include "plottable-geometry-utils.h"
 #include <cmath>
 #include <limits>
 
@@ -10,21 +9,6 @@ namespace {
 constexpr double kNan = std::numeric_limits<double>::quiet_NaN();
 
 double orValue(double bound, double value) { return std::isfinite(bound) ? bound : value; }
-
-using qcp::geometry::point;
-using qcp::geometry::breakPoint;
-
-void appendRun(QVector<QPointF>& out, QPointF a, QPointF b) { out << a << b; }
-
-void appendBar(QVector<QPointF>& out, const Bar& b, double halfCap, bool vertical)
-{
-    appendRun(out, point(b.key, b.lower, vertical), point(b.key, b.upper, vertical));
-    for (const double end : { b.lower, b.upper })
-    {
-        out << breakPoint();
-        appendRun(out, point(b.key - halfCap, end, vertical), point(b.key + halfCap, end, vertical));
-    }
-}
 
 } // namespace
 
@@ -37,20 +21,6 @@ bool resolve(Bar& bar)
     bar.lower = orValue(bar.lower, bar.value);
     bar.upper = orValue(bar.upper, bar.value);
     return true;
-}
-
-QVector<QPointF> barRuns(std::span<const Bar> bars, double capHalfWidthPx, bool keyIsVertical)
-{
-    QVector<QPointF> out;
-    for (Bar bar : bars)
-    {
-        if (!std::isfinite(bar.key) || !resolve(bar))
-            continue;
-        if (!out.isEmpty())
-            out << breakPoint();
-        appendBar(out, bar, capHalfWidthPx, keyIsVertical);
-    }
-    return out;
 }
 
 bool barsFit(std::span<const Bar> bars, double minSpacingPx)

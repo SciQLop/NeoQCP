@@ -326,18 +326,18 @@ void QCPMultiGraph::syncComponentCount(const QCPAbstractMultiDataSource* source)
 // source puts unrelated data in that column.
 void QCPMultiGraph::dropDecorationsBeyond(int columnCount)
 {
-    const auto outside = [columnCount](const FillEntry& e) {
-        const auto* col = std::get_if<int>(&e.spec.target);
-        return e.spec.owner >= columnCount || (col && *col >= columnCount);
+    const auto outside = [columnCount](const Fill& e)
+    {
+        const auto* col = std::get_if<int>(&e.target);
+        return e.owner >= columnCount || (col && *col >= columnCount);
     };
     mFills.erase(std::remove_if(mFills.begin(), mFills.end(), outside), mFills.end());
-    const auto barsOutside = [columnCount](const ErrorBarsEntry& e) {
-        return std::max({e.spec.value, e.spec.lower, e.spec.upper}) >= columnCount;
-    };
+    const auto barsOutside = [columnCount](const ErrorBars& e)
+    { return std::max({ e.value, e.lower, e.upper }) >= columnCount; };
     QVector<ErrorBars> dropped;
     for (const auto& e : mErrorBars)
         if (barsOutside(e))
-            dropped.append(e.spec);
+            dropped.append(e);
     mErrorBars.erase(std::remove_if(mErrorBars.begin(), mErrorBars.end(), barsOutside),
                      mErrorBars.end());
     for (const auto& spec : dropped)
@@ -365,9 +365,8 @@ void QCPMultiGraph::releaseErrorBounds(const ErrorBars& removed)
 // Error bars can be set before the data that creates their bound components.
 bool QCPMultiGraph::isErrorBound(int column) const
 {
-    return std::any_of(mErrorBars.begin(), mErrorBars.end(), [column](const ErrorBarsEntry& e) {
-        return e.spec.lower == column || e.spec.upper == column;
-    });
+    return std::any_of(mErrorBars.begin(), mErrorBars.end(), [column](const ErrorBars& e)
+                       { return e.lower == column || e.upper == column; });
 }
 
 bool QCPMultiGraph::isValidColumn(int column) const
@@ -385,11 +384,10 @@ bool QCPMultiGraph::isValidColumn(int column) const
 // baked in.
 bool QCPMultiGraph::hasPenDerivedDecoration(int ownerCount) const
 {
-    return std::any_of(mFills.begin(), mFills.end(), [ownerCount](const FillEntry& e) {
-        return e.spec.owner < ownerCount && e.spec.brush.style() == Qt::NoBrush;
-    }) || std::any_of(mErrorBars.begin(), mErrorBars.end(), [ownerCount](const ErrorBarsEntry& e) {
-        return e.spec.value < ownerCount && !e.spec.pen;
-    });
+    return std::any_of(mFills.begin(), mFills.end(), [ownerCount](const Fill& e)
+                       { return e.owner < ownerCount && e.brush.style() == Qt::NoBrush; })
+        || std::any_of(mErrorBars.begin(), mErrorBars.end(),
+                       [ownerCount](const ErrorBars& e) { return e.value < ownerCount && !e.pen; });
 }
 
 void QCPMultiGraph::decorationsChanged()
@@ -403,7 +401,7 @@ bool QCPMultiGraph::setFill(Fill fill)
     if (!isValidColumn(fill.owner) || (col && (!isValidColumn(*col) || *col == fill.owner)))
         return false;
     clearComponentFill(fill.owner);
-    mFills.append({std::move(fill), {}});
+    mFills.append(std::move(fill));
     decorationsChanged();
     return true;
 }
@@ -422,10 +420,10 @@ void QCPMultiGraph::setComponentFillBrush(int owner, const QBrush& brush)
 {
     markDirty();
     const auto it = std::find_if(mFills.begin(), mFills.end(),
-                                 [owner](const FillEntry& e) { return e.spec.owner == owner; });
+                                 [owner](const Fill& e) { return e.owner == owner; });
     if (it == mFills.end())
         return;
-    it->spec.brush = brush;
+    it->brush = brush;
     decorationsChanged();
 }
 
@@ -433,7 +431,7 @@ void QCPMultiGraph::clearComponentFill(int owner)
 {
     const auto before = mFills.size();
     mFills.erase(std::remove_if(mFills.begin(), mFills.end(),
-                                [owner](const FillEntry& e) { return e.spec.owner == owner; }),
+                                [owner](const Fill& e) { return e.owner == owner; }),
                  mFills.end());
     if (mFills.size() != before)
         decorationsChanged();
@@ -442,8 +440,8 @@ void QCPMultiGraph::clearComponentFill(int owner)
 std::optional<QCPMultiGraph::Fill> QCPMultiGraph::componentFill(int owner) const
 {
     for (const auto& e : mFills)
-        if (e.spec.owner == owner)
-            return e.spec;
+        if (e.owner == owner)
+            return e;
     return std::nullopt;
 }
 
@@ -463,9 +461,7 @@ bool QCPMultiGraph::setComponentErrorBars(int value, int lower, int upper, doubl
         || lower == upper || value == lower || value == upper)
         return false;
     clearComponentErrorBars(value);
-    ErrorBarsEntry entry;
-    entry.spec = {value, lower, upper, std::move(pen), capWidthPx};
-    mErrorBars.append(std::move(entry));
+    mErrorBars.append({ value, lower, upper, std::move(pen), capWidthPx });
     hideErrorBound(lower);
     hideErrorBound(upper);
     decorationsChanged();
@@ -478,7 +474,7 @@ void QCPMultiGraph::clearComponentErrorBars(int value)
     if (!old)
         return;
     mErrorBars.erase(std::remove_if(mErrorBars.begin(), mErrorBars.end(),
-                                    [value](const ErrorBarsEntry& e) { return e.spec.value == value; }),
+                                    [value](const ErrorBars& e) { return e.value == value; }),
                      mErrorBars.end());
     releaseErrorBounds(*old);
     decorationsChanged();
@@ -487,8 +483,8 @@ void QCPMultiGraph::clearComponentErrorBars(int value)
 std::optional<QCPMultiGraph::ErrorBars> QCPMultiGraph::componentErrorBars(int value) const
 {
     for (const auto& e : mErrorBars)
-        if (e.spec.value == value)
-            return e.spec;
+        if (e.value == value)
+            return e;
     return std::nullopt;
 }
 
@@ -977,6 +973,49 @@ std::shared_ptr<const std::vector<QPointF>> sharedPoints(const QVector<QPointF>&
     return std::make_shared<const std::vector<QPointF>>(points.begin(), points.end());
 }
 
+using FillSeries = std::pair<std::shared_ptr<const std::vector<QPointF>>,
+                             std::shared_ptr<const std::vector<QPointF>>>;
+
+// The two edges of a fill, as equal-length series. A gap pinches them together at the row before
+// it and the row after it: the polygon and the ribbon then add no triangles across the break, and
+// one fill stays one command.
+FillSeries fillSeries(std::span<const qcp::fill::StripPoint> rows)
+{
+    std::vector<QPointF> upper, lower;
+    upper.reserve(rows.size());
+    lower.reserve(rows.size());
+    bool havePrevious = false;
+    bool pendingBreak = false;
+    double previousKey = 0.0;
+    double previousLower = 0.0;
+    for (const qcp::fill::StripPoint& row : rows)
+    {
+        if (!std::isfinite(row.key) || !std::isfinite(row.a) || !std::isfinite(row.b))
+        {
+            pendingBreak = true;
+            continue;
+        }
+        if ((row.breakBefore || pendingBreak) && havePrevious)
+        {
+            upper.emplace_back(previousKey, previousLower);
+            lower.emplace_back(previousKey, previousLower);
+            upper.emplace_back(row.key, row.b);
+            lower.emplace_back(row.key, row.b);
+        }
+        pendingBreak = false;
+        upper.emplace_back(row.key, row.a);
+        lower.emplace_back(row.key, row.b);
+        previousKey = row.key;
+        previousLower = row.b;
+        havePrevious = true;
+    }
+    if (upper.size() < 2)
+        return { };
+    return { std::make_shared<const std::vector<QPointF>>(std::move(upper)),
+             std::make_shared<const std::vector<QPointF>>(std::move(lower)) };
+}
+
+
 } // namespace
 
 void QCPMultiGraph::draw(QCPDrawContext& context) const
@@ -1044,22 +1083,11 @@ void QCPMultiGraph::draw(QCPDrawContext& context) const
     }
     const bool coloured = mColor.hasValues() && (ds == mDataSource.get() || mL2HasOrigin);
 
-    // Fills and error bars still paint themselves until they are commands of their own. Only a
-    // graph that has one pays for the callback, which is view-dependent by nature.
-    if (!mFills.isEmpty() || !mErrorBars.isEmpty())
-    {
-        // The callback outlives this call: it keeps the source it draws from alive, so a later
-        // L2 rebuild can replace mL2Result without freeing what a kept recording still holds.
-        const std::shared_ptr<QCPAbstractMultiDataSource> kept = mL2Result ? mL2Result : mDataSource;
-        const bool drawsRaw = kept == mDataSource;
-        context.painter(
-            [this, kept, drawsRaw, begin, end](QCPPainter& painter, const QCPTransform&)
-            {
-                drawFills(&painter, *kept, begin, end, /*fresh=*/true, { }, /*isExportMode=*/true);
-                drawErrorBars(&painter, *kept, drawsRaw, begin, end, /*fresh=*/true, { },
-                              /*isExportMode=*/true);
-            });
-    }
+    // Fills and error bars are commands built in data space: the replays turn them into ribbons,
+    // polygons or strokes. They record before the lines so both replays keep fills under bars
+    // under lines.
+    recordFills(context, *ds, begin, end);
+    recordErrorBars(context, *ds, mL2Result == nullptr, begin, end);
 
     // In data space the impulse baseline is a value: zero, or the bottom of a log value axis,
     // which is where the pixel path clamps it.
@@ -1193,19 +1221,25 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::fillRows(const Fill& fill,
 {
     const auto gaps = ds.gapsBefore(begin, end);
     const auto* targetColumn = std::get_if<int>(&fill.target);
-    const auto edgePixel = [this](double value) {
-        return qcp::fill::baselinePixel(*mValueAxis, value);
-    };
+    const auto edge = [this](double value) { return fillValue(*mValueAxis, value); };
     Q_ASSERT(gaps.size() == std::max(0, end - begin)); // gapsBefore() holds one entry per row
-    const double constantPixel = targetColumn ? 0.0 : edgePixel(std::get<double>(fill.target));
+    const double constant = targetColumn ? 0.0 : edge(std::get<double>(fill.target));
     std::vector<qcp::fill::StripPoint> rows;
     rows.reserve(std::max(0, end - begin));
     for (int i = begin; i < end; ++i)
-        rows.push_back({mKeyAxis->coordToPixel(ds.keyAt(i)),
-                        edgePixel(ds.valueAt(fill.owner, i)),
-                        targetColumn ? edgePixel(ds.valueAt(*targetColumn, i)) : constantPixel,
-                        gaps[i - begin] != 0});
+        rows.push_back({ ds.keyAt(i), edge(ds.valueAt(fill.owner, i)),
+                         targetColumn ? edge(ds.valueAt(*targetColumn, i)) : constant,
+                         gaps[i - begin] != 0 });
     return rows;
+}
+
+// A log value axis has no zero: a fill to zero stops at the axis' lower bound, where the pixel
+// path clamped it. The recording then follows that bound, so it is transform-dependent.
+double QCPMultiGraph::fillValue(const QCPAxis& valueAxis, double value)
+{
+    if (valueAxis.scaleType() == QCPAxis::stLinear || value > 0 || std::isnan(value))
+        return value;
+    return valueAxis.range().lower;
 }
 
 // Binned when the rows outnumber 4 per pixel, the lines' own L2 density (kLevel2PixelMultiplier).
@@ -1221,66 +1255,49 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::binnedWhenDense(
 {
     const QRect rect = mKeyAxis->axisRect()->rect();
     const int pixelLength = mKeyAxis->orientation() == Qt::Vertical ? rect.height() : rect.width();
-    if (rows.size() > 4 * std::size_t(std::max(0, pixelLength)))
-        return qcp::fill::binToSpans(rows, 0.25);
-    return rows;
-}
-
-void QCPMultiGraph::drawFills(QCPPainter* painter, const QCPAbstractMultiDataSource& ds, int begin,
-                              int end, bool fresh, const QPointF& gpuOffset,
-                              bool isExportMode) const
-{
-    if (mFills.isEmpty())
-        return; // gpuLayer() creates the layer it looks up
-    auto* gpuLayer = qcp::gpuLayer(mParentPlot, mLayer, isExportMode);
-    for (const auto& entry : mFills)
+    if (rows.size() <= 4 * std::size_t(std::max(0, pixelLength)))
+        return rows;
+    const double quarterPixel = 4.0 * std::max(1, pixelLength);
+    if (mKeyAxis->scaleType() == QCPAxis::stLogarithmic)
     {
-        if (!fillDrawable(entry.spec, ds.columnCount()))
-            continue;
-        const QBrush brush = effectiveFillBrush(entry.spec);
-        if (brush.color().alpha() == 0) continue;
-        // The GPU fill is one flat colour: gradients and patterns are painted with QPainter.
-        if (gpuLayer && brush.style() == Qt::SolidPattern)
-            drawFillOnGpu(painter, gpuLayer, entry.verts, brush.color(),
-                          fresh ? shapedFillRows(entry.spec, ds, begin, end)
-                                : std::vector<qcp::fill::StripPoint>{},
-                          fresh, gpuOffset);
-        else
-            paintFill(painter, brush, shapedFillRows(entry.spec, ds, begin, end));
+        const QCPRange range = mKeyAxis->range();
+        if (range.lower <= 0.0 || range.upper <= 0.0)
+            return rows;
+        const double width = std::log10(range.upper / range.lower) / quarterPixel;
+        if (!(width > 0.0))
+            return rows;
+        for (qcp::fill::StripPoint& row : rows)
+            row.key = row.key > 0.0 && std::isfinite(row.key) ? std::log10(row.key) : std::nan("");
+        std::vector<qcp::fill::StripPoint> spans = qcp::fill::binToSpans(rows, width);
+        for (qcp::fill::StripPoint& span : spans)
+            span.key = std::pow(10.0, span.key);
+        return spans;
     }
+    const double width = std::abs(mKeyAxis->range().size()) / quarterPixel;
+    if (!(width > 0.0))
+        return rows;
+    return qcp::fill::binToSpans(rows, width);
 }
 
-// rows are read only on fresh frames: pan frames translate the cached verts.
-void QCPMultiGraph::drawFillOnGpu(QCPPainter* painter, QCPPlottableRhiLayer* layer,
-                                  std::vector<float>& verts, const QColor& color,
-                                  std::span<const qcp::fill::StripPoint> rows, bool fresh,
-                                  const QPointF& gpuOffset) const
+// One fillBetween command per fill: a gap pinches both series together, so neither the polygon
+// nor the ribbon spans it.
+void QCPMultiGraph::recordFills(QCPDrawContext& context, const QCPAbstractMultiDataSource& ds,
+                                int begin, int end) const
 {
-    if (fresh)
-        qcp::fill::appendStrip(rows, mKeyAxis->orientation() == Qt::Vertical,
-                               qcp::rhi::premultipliedColor(color), verts);
-    if (verts.empty())
-        return;
-    layer->addPlottable(verts, {}, clipRect(), mParentPlot->bufferDevicePixelRatio(),
-                        mParentPlot->rhiOutputSize().height(), float(gpuOffset.x()),
-                        float(gpuOffset.y()), float(painter->opacity()));
-}
-
-// Built from the current axes on every frame, so unlike the cached GPU vertices it needs no pan
-// offset.
-// simplify: O(rows in the cache window) per frame. Bounded by the binning to 4 rows per pixel, but
-// the rows are still walked: raw sources below the resample threshold, or any source on a log key
-// axis. Upgrade: cache the shaped rows per fill, like the GPU vertices, and translate them.
-void QCPMultiGraph::paintFill(QCPPainter* painter, const QBrush& brush,
-                              std::span<const qcp::fill::StripPoint> rows) const
-{
-    painter->save();
-    applyFillAntialiasingHint(painter);
-    painter->setPen(Qt::NoPen);
-    painter->setBrush(brush);
-    for (const QPolygonF& polygon : qcp::fill::stripPolygons(rows, mKeyAxis->orientation() == Qt::Vertical))
-        painter->drawPolygon(polygon);
-    painter->restore();
+    for (const Fill& fill : mFills)
+    {
+        if (!fillDrawable(fill, ds.columnCount()))
+            continue;
+        const QBrush brush = effectiveFillBrush(fill);
+        if (brush.color().alpha() == 0)
+            continue;
+        const auto [upper, lower] = fillSeries(shapedFillRows(fill, ds, begin, end));
+        if (!upper)
+            continue;
+        if (mValueAxis->scaleType() == QCPAxis::stLogarithmic)
+            (void)context.transform(); // the baseline follows the axis' lower bound
+        context.fillBetween(upper, lower, brush);
+    }
 }
 
 bool QCPMultiGraph::errorBarsDrawable(const ErrorBars& spec, int columnCount) const
@@ -1294,33 +1311,27 @@ QPen QCPMultiGraph::errorBarPen(const ErrorBars& spec) const
     return spec.pen.value_or(mComponents[spec.value].pen);
 }
 
-// A log axis has no pixel for a value <= 0: a bar's bound there stops at the axis edge.
-double QCPMultiGraph::errorPixel(const QCPAxis& valueAxis, double value)
-{
-    if (valueAxis.scaleType() == QCPAxis::stLinear || value > 0 || std::isnan(value))
-        return valueAxis.coordToPixel(value);
-    return qcp::fill::logZeroSideEdges(valueAxis).first;
-}
-
-std::vector<qcp::errorbars::Bar> QCPMultiGraph::errorBarRows(
-    const ErrorBars& spec, const QCPAbstractMultiDataSource& ds, int begin, int end,
-    BoundPixel boundPixel) const
+std::vector<qcp::errorbars::Bar> QCPMultiGraph::errorBarRows(const ErrorBars& spec,
+                                                             const QCPAbstractMultiDataSource& ds,
+                                                             int begin, int end) const
 {
     std::vector<qcp::errorbars::Bar> bars;
     bars.reserve(std::max(0, end - begin));
     for (int i = begin; i < end; ++i)
     {
-        const double y = ds.valueAt(spec.value, i);
+        const double y = fillValue(*mValueAxis, ds.valueAt(spec.value, i));
         // std::min/max return their first argument when either is NaN, so a NaN bound stays NaN.
         // Unlike the helpers they replace, a -inf lower or +inf upper value now wins over the
         // bound.
-        bars.push_back({ mKeyAxis->coordToPixel(ds.keyAt(i)), boundPixel(*mValueAxis, y),
-                        boundPixel(*mValueAxis, std::min(ds.valueAt(spec.lower, i), y)),
-                        boundPixel(*mValueAxis, std::max(ds.valueAt(spec.upper, i), y))});
+        bars.push_back({ ds.keyAt(i), y,
+                         fillValue(*mValueAxis, std::min(ds.valueAt(spec.lower, i), y)),
+                         fillValue(*mValueAxis, std::max(ds.valueAt(spec.upper, i), y)) });
     }
     return bars;
 }
 
+// The fit question is asked in pixels: a bar outside the view, or one without a value, does not
+// count.
 bool QCPMultiGraph::errorBarsFitInView(std::span<const qcp::errorbars::Bar> bars,
                                        double minSpacingPx) const
 {
@@ -1330,15 +1341,21 @@ bool QCPMultiGraph::errorBarsFitInView(std::span<const qcp::errorbars::Bar> bars
     const double last = vertical ? rect.bottom() : rect.right();
     std::vector<qcp::errorbars::Bar> shown;
     for (qcp::errorbars::Bar bar : bars)
-        if (bar.key >= first && bar.key <= last && qcp::errorbars::resolve(bar))
+    {
+        const double pixel = mKeyAxis->coordToPixel(bar.key);
+        if (std::isfinite(pixel) && pixel >= first && pixel <= last && qcp::errorbars::resolve(bar))
+        {
+            bar.key = pixel;
             shown.push_back(bar);
+        }
+    }
     return qcp::errorbars::barsFit(shown, minSpacingPx);
 }
 
 std::vector<qcp::fill::StripPoint> QCPMultiGraph::errorBandRows(
     const ErrorBars& spec, const QCPAbstractMultiDataSource& ds, int begin, int end) const
 {
-    const auto bars = errorBarRows(spec, ds, begin, end, &qcp::fill::baselinePixel);
+    const auto bars = errorBarRows(spec, ds, begin, end);
     const auto gaps = ds.gapsBefore(begin, end);
     Q_ASSERT(gaps.size() == int(bars.size())); // gapsBefore() holds one entry per row
     std::vector<qcp::fill::StripPoint> rows;
@@ -1352,87 +1369,103 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::errorBandRows(
     return binnedWhenDense(std::move(rows));
 }
 
-// Pan frames reuse the mode and the geometry of the last fresh frame, translated on the GPU;
-// only a QPainter band is rebuilt from the current axes on every frame, like a fill.
-void QCPMultiGraph::drawErrorBars(QCPPainter* painter, const QCPAbstractMultiDataSource& ds,
-                                  bool rawRows, int begin, int end, bool fresh,
-                                  const QPointF& gpuOffset, bool isExportMode) const
+// Sparse bars are one command: the replay draws every stem and cap. Dense bars are the band they
+// were, a fillBetween at the bars' colour, alpha 64.
+void QCPMultiGraph::recordErrorBars(QCPDrawContext& context, const QCPAbstractMultiDataSource& ds,
+                                    bool rawRows, int begin, int end) const
 {
-    if (mErrorBars.isEmpty())
-        return; // gpuLayer() creates the layer it looks up
-    auto* gpuLayer = qcp::gpuLayer(mParentPlot, mLayer, isExportMode);
-    const bool rebuild = fresh || isExportMode;
-    for (const auto& entry : mErrorBars)
+    for (const ErrorBars& spec : mErrorBars)
     {
-        if (!errorBarsDrawable(entry.spec, ds.columnCount()))
+        if (!errorBarsDrawable(spec, ds.columnCount()))
             continue;
-        // A band builds its own rows: its bounds <= 0 on a log axis go past the edge, not to it.
-        const bool checkFit = rebuild && rawRows;
-        const auto bars = checkFit ? errorBarRows(entry.spec, ds, begin, end)
-                                   : std::vector<qcp::errorbars::Bar>{};
-        const bool asBand = rebuild
-            ? !(checkFit && errorBarsFitInView(bars, 3 * entry.spec.capWidthPx))
-            : entry.asBand;
-        if (!isExportMode)
-            entry.asBand = asBand;
-        const bool needBandRows = rebuild || !gpuLayer;
-        if (asBand)
-            drawBarsAsBand(painter, gpuLayer, entry,
-                           needBandRows ? errorBandRows(entry.spec, ds, begin, end)
-                                        : std::vector<qcp::fill::StripPoint>{},
-                           fresh, gpuOffset);
-        else
-            drawBarsAsPolylines(painter, entry, bars, fresh, gpuOffset, isExportMode);
+        (void)context.transform(); // the caps are a pixel width and the fit is a pixel question
+        const std::vector<qcp::errorbars::Bar> bars = errorBarRows(spec, ds, begin, end);
+        // A band builds its own rows: its bounds <= 0 on a log axis stop at the axis edge.
+        const bool band = !rawRows || !errorBarsFitInView(bars, 3.0 * spec.capWidthPx);
+        if (band)
+        {
+            const auto [upper, lower] = fillSeries(errorBandRows(spec, ds, begin, end));
+            if (!upper)
+                continue;
+            QColor color = errorBarPen(spec).color();
+            color.setAlpha(64);
+            context.fillBetween(upper, lower, QBrush(color));
+            continue;
+        }
+
+        std::vector<QPointF> centres, spans;
+        centres.reserve(bars.size());
+        spans.reserve(bars.size());
+        const double halfCap = spec.capWidthPx / 2.0;
+        for (qcp::errorbars::Bar bar : bars)
+        {
+            if (!qcp::errorbars::resolve(bar) || !std::isfinite(bar.key))
+                continue;
+            const double pixel = mKeyAxis->coordToPixel(bar.key);
+            const double left = mKeyAxis->pixelToCoord(pixel - halfCap);
+            const double right = mKeyAxis->pixelToCoord(pixel + halfCap);
+            centres.emplace_back(bar.key, 0.5 * (bar.lower + bar.upper));
+            spans.emplace_back(0.5 * std::abs(right - left), 0.5 * (bar.upper - bar.lower));
+        }
+        if (centres.empty())
+            continue;
+        const Component& comp = mComponents[spec.value];
+        const QPen pen = comp.selection.isEmpty() ? errorBarPen(spec) : comp.selectedPen;
+        context.errorBars(std::make_shared<const std::vector<QPointF>>(std::move(centres)),
+                          std::make_shared<const std::vector<QPointF>>(std::move(spans)), pen);
     }
 }
 
-void QCPMultiGraph::drawBarsAsPolylines(QCPPainter* painter, const ErrorBarsEntry& entry,
-                                        std::span<const qcp::errorbars::Bar> bars, bool fresh,
-                                        const QPointF& gpuOffset, bool isExportMode) const
+// The icon is a recording of its own: one unit-wide segment per shown component, fitted into the
+// rect by the replay, so it never depends on the plot's data or axis ranges.
+void QCPMultiGraph::drawLegendIcon(QCPDrawContext& icon) const
 {
-    const Component& comp = mComponents[entry.spec.value];
-    const QPen pen = comp.selection.isEmpty() ? errorBarPen(entry.spec) : comp.selectedPen;
-    const bool keyIsVertical = mKeyAxis->orientation() == Qt::Vertical;
-    const double capHalfWidth = entry.spec.capWidthPx / 2;
-    if (isExportMode) {
-        qcp::drawPolylineWithGpuFallback(painter, mParentPlot, mLayer,
-                                         qcp::errorbars::barRuns(bars, capHalfWidth, keyIsVertical),
-                                         pen, gpuOffset, clipRect());
-        return;
-    }
-    if (fresh)
-        entry.runs = qcp::errorbars::barRuns(bars, capHalfWidth, keyIsVertical);
-    qcp::drawPolylineCached(painter, mParentPlot, mLayer, entry.runs, pen, gpuOffset, clipRect(),
-                            fresh, entry.bars);
-}
-
-void QCPMultiGraph::drawBarsAsBand(QCPPainter* painter, QCPPlottableRhiLayer* gpuLayer,
-                                   const ErrorBarsEntry& entry,
-                                   std::span<const qcp::fill::StripPoint> rows, bool fresh,
-                                   const QPointF& gpuOffset) const
-{
-    // Not the selected colour: the GPU band bakes its colour in, and selecting would rebuild it.
-    QColor color = errorBarPen(entry.spec).color();
-    color.setAlpha(64);
-    if (gpuLayer)
-        drawFillOnGpu(painter, gpuLayer, entry.band, color, rows, fresh, gpuOffset);
-    else
-        paintFill(painter, QBrush(color), rows);
-}
-
-void QCPMultiGraph::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
-{
-    applyDefaultAntialiasingHint(painter);
     const QVector<int> shown = legendComponents();
-    if (shown.isEmpty()) return;
+    if (shown.isEmpty())
+        return;
 
-    double segWidth = rect.width() / shown.size();
-    double y = rect.center().y();
-    for (int k = 0; k < shown.size(); ++k) {
-        if (!mComponents[shown[k]].visible) continue;
-        double x0 = rect.left() + k * segWidth;
-        double x1 = x0 + segWidth;
-        drawComponentLegendIcon(painter, shown[k], QLineF(x0, y, x1, y));
+    const double segments = shown.size();
+    // The visible extent: it gives the fitted transform the icon's box.
+    icon.rect(QCP::Data { 0.0, -0.5 }, QCP::Data { segments, 0.5 }, QPen(Qt::NoPen),
+              QBrush(Qt::NoBrush));
+    for (int k = 0; k < shown.size(); ++k)
+    {
+        const Component& comp = mComponents[shown[k]];
+        if (!comp.visible)
+            continue;
+        const double x0 = k;
+        const double x1 = k + 1;
+        const double centre = 0.5 * (x0 + x1);
+        if (const auto fill = componentFill(shown[k]))
+            icon.rect(QCP::Data { x0, -0.3 }, QCP::Data { x1, 0.3 }, QPen(Qt::NoPen),
+                      effectiveFillBrush(*fill));
+        if (mColor.hasValues())
+        {
+            std::vector<QPointF> points;
+            std::vector<QRgb> colours;
+            for (int s = 0; s <= 4; ++s)
+            {
+                points.emplace_back(x0 + (x1 - x0) * s / 4.0, 0.0);
+                colours.push_back(qcp::runColor(mColor, s * 255 / 4).rgba());
+            }
+            icon.polyline(std::make_shared<const std::vector<QPointF>>(std::move(points)),
+                          std::make_shared<const std::vector<QRgb>>(std::move(colours)), comp.pen);
+        }
+        else if (comp.lineStyle != lsNone)
+        {
+            icon.polyline(sharedPoints(QVector<QPointF> { QPointF(x0, 0.0), QPointF(x1, 0.0) }),
+                          comp.pen);
+        }
+        if (!comp.scatterStyle.isNone())
+            icon.markers(sharedPoints(QVector<QPointF> { QPointF(centre, 0.0) }),
+                         comp.scatterStyle);
+        if (const auto bars = componentErrorBars(shown[k]))
+        {
+            // 5 px half stem, 3 px half cap on a 20 px segment, in segment fractions.
+            icon.errorBars(sharedPoints(QVector<QPointF> { QPointF(centre, 0.0) }),
+                           sharedPoints(QVector<QPointF> { QPointF(0.15, 0.25) }),
+                           errorBarPen(*bars));
+        }
     }
 }
 

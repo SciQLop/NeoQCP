@@ -86,9 +86,10 @@ private slots:
     void aRebuiltGpuFillIsNotDrawnTwice();
     void aFillOnAColumnOnlyTheStagedSourceHasIsNotDrawn();
     void denseFillRowsAreBinnedAboveFourPerPixel();
-    void paintFillDrawsNoOutline();
-    void paintFillHonoursTheFillAntialiasing();
-    void paintFillRestoresThePainter();
+    void fillIsOneRibbonCommand();
+    void fillBetweenComponentsIsOneRibbon();
+    void fillsDrawUnderErrorBarsUnderLines();
+    void fillsDrawUnderLinesOnTheGpu();
 
     // Error bars
     void sparseErrorBarsAreDrawnAsBars();
@@ -116,6 +117,9 @@ private slots:
     void legendIconOfErrorBarsUsesTheBarsPen();
     void legendIconHasOneSegmentPerComponent();
     void legendSwatchIsTwelvePixelsTall();
+    void errorBarsAreOneCommand();
+    void denseErrorBarsAreABand();
+    void legendIconShowsEachComponent();
     void settingErrorBarsRepaintsTheLayer();
     void clearingErrorBarsRepaintsTheLayer();
     void errorBarsOfDifferentColumnsCoexist();

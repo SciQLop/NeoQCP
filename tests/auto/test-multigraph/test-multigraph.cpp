@@ -5,6 +5,7 @@
 #include "plottables/plottable-draw-utils.h"
 #include "plottables/plottable-waterfall.h"
 #include "qcustomplot.h"
+#include <painting/draw-commands.h>
 #include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
 #include <algorithm>
 #include <cmath>
@@ -1416,11 +1417,10 @@ void TestMultiGraph::bandEdgeAtZeroOnALogAxisIsClampedLikeABaseline()
     auto* mg = bandDownToZeroOnALogAxis(mPlot);
     renderOf(mPlot); // lays the axis rect out
     const auto rows = mg->fillRows(*mg->componentFill(1), *mg->dataSource(), 0, 4);
-    const double zeroBaseline = qcp::fill::baselinePixel(*mPlot->yAxis, 0.0);
-    QCOMPARE(rows[0].b, zeroBaseline);
-    QCOMPARE(rows[1].b, zeroBaseline);
+    QCOMPARE(rows[0].b, 0.1);
+    QCOMPARE(rows[1].b, 0.1);
     QVERIFY(std::isnan(rows[2].b)); // a NaN row still breaks the strip
-    QCOMPARE(rows[3].b, zeroBaseline);
+    QCOMPARE(rows[3].b, 0.1);
 }
 
 void TestMultiGraph::fillsFollowTheViewOnTheGpu()
@@ -1640,9 +1640,9 @@ void TestMultiGraph::errorBoundsBelowZeroOnALogAxisReachTheEdge()
             lit = lit || c.red() > c.green() + 60;
         }
     QVERIFY(lit); // the stem reaches the bottom edge
-    // ... and stops there: the clipped pixels cannot tell the edge from 200 px past it.
+    // ... and stops there: in data space that is the axis' lower bound.
     const auto bars = mg->errorBarRows(*mg->componentErrorBars(0), *mg->dataSource(), 0, 3);
-    QCOMPARE(bars[1].lower, mPlot->yAxis->coordToPixel(0.1));
+    QCOMPARE(bars[1].lower, 0.1);
 }
 
 // A band's bound <= 0 goes two axis lengths out, like a fill edge: the GPU pans the cached band,
@@ -1657,10 +1657,9 @@ void TestMultiGraph::errorBandBoundsBelowZeroOnALogAxisAreClampedLikeABaseline()
     mPlot->yAxis->setRange(0.1, 10);
     renderOf(mPlot); // lays the axis rect out
     const auto rows = mg->errorBandRows(*mg->componentErrorBars(0), *mg->dataSource(), 0, 3);
-    const double zeroBaseline = qcp::fill::baselinePixel(*mPlot->yAxis, 0.0);
-    QCOMPARE(rows[0].a, zeroBaseline);
-    QCOMPARE(rows[1].a, zeroBaseline);
-    QCOMPARE(rows[2].a, mPlot->yAxis->coordToPixel(0.5));
+    QCOMPARE(rows[0].a, 0.1);
+    QCOMPARE(rows[1].a, 0.1);
+    QCOMPARE(rows[2].a, 0.5);
 }
 
 void TestMultiGraph::selectedErrorBarsUseTheSelectedPen()
@@ -2323,49 +2322,6 @@ void TestMultiGraph::denseFillRowsAreBinnedAboveFourPerPixel()
     QCOMPARE(mg->binnedWhenDense(rowsAtOnePixel(4 * width + 1)).size(), std::size_t(1));
 }
 
-static const std::vector<qcp::fill::StripPoint> kSquareRows{{10, 10, 30}, {30, 10, 30}};
-
-void TestMultiGraph::paintFillDrawsNoOutline()
-{
-    auto* mg = threeColumnGraph(mPlot);
-    QImage img(40, 40, QImage::Format_ARGB32);
-    img.fill(Qt::white);
-    QCPPainter p(&img);
-    p.setPen(QPen(Qt::blue, 8));
-    mg->paintFill(&p, QBrush(Qt::red), kSquareRows);
-    p.end();
-    QVERIFY(isRedish(img.pixelColor(11, 20)));
-}
-
-void TestMultiGraph::paintFillHonoursTheFillAntialiasing()
-{
-    auto* mg = threeColumnGraph(mPlot);
-    mg->setAntialiasedFill(false);
-    QImage img(40, 40, QImage::Format_ARGB32);
-    img.fill(Qt::white);
-    QCPPainter p(&img);
-    p.setAntialiasing(true);
-    mg->paintFill(&p, QBrush(Qt::red), kSquareRows);
-    p.end();
-    const int green = img.pixelColor(10, 20).green(); // the edge pixel: half covered if antialiased
-    QVERIFY2(green == 0 || green == 255, qPrintable(QString::number(green)));
-}
-
-void TestMultiGraph::paintFillRestoresThePainter()
-{
-    auto* mg = threeColumnGraph(mPlot);
-    mg->setAntialiasedFill(false);
-    QImage img(40, 40, QImage::Format_ARGB32);
-    QCPPainter p(&img);
-    p.setAntialiasing(true);
-    p.setPen(QPen(Qt::blue, 3));
-    p.setBrush(Qt::green);
-    mg->paintFill(&p, QBrush(Qt::red), kSquareRows);
-    QCOMPARE(p.pen().color(), QColor(Qt::blue));
-    QCOMPARE(p.brush().color(), QColor(Qt::green));
-    QVERIFY(p.testRenderHint(QPainter::Antialiasing));
-}
-
 void TestMultiGraph::errorBoundOfZeroOnALogAxisStopsAtTheEdge()
 {
     auto* mg = errorBarGraph(mPlot, 3, 1.0);
@@ -2374,7 +2330,7 @@ void TestMultiGraph::errorBoundOfZeroOnALogAxisStopsAtTheEdge()
     mPlot->yAxis->setRange(0.1, 10);
     renderOf(mPlot); // lays the axis rect out
     const auto bars = mg->errorBarRows(*mg->componentErrorBars(0), *mg->dataSource(), 0, 3);
-    QCOMPARE(bars[1].lower, mPlot->yAxis->coordToPixel(0.1));
+    QCOMPARE(bars[1].lower, 0.1);
 }
 
 void TestMultiGraph::errorBoundsInsideALogAxisAreNotClamped()
@@ -2386,9 +2342,9 @@ void TestMultiGraph::errorBoundsInsideALogAxisAreNotClamped()
     mPlot->yAxis->setRange(0.1, 10);
     renderOf(mPlot);
     const auto bars = mg->errorBarRows(*mg->componentErrorBars(0), *mg->dataSource(), 0, 3);
-    QCOMPARE(bars[1].value, mPlot->yAxis->coordToPixel(0.5));
-    QCOMPARE(bars[1].lower, mPlot->yAxis->coordToPixel(0.25));
-    QCOMPARE(bars[1].upper, mPlot->yAxis->coordToPixel(2));
+    QCOMPARE(bars[1].value, 0.5);
+    QCOMPARE(bars[1].lower, 0.25);
+    QCOMPARE(bars[1].upper, 2.0);
 }
 
 static std::vector<qcp::errorbars::Bar> barsAt(std::initializer_list<double> keys)
@@ -2404,8 +2360,11 @@ void TestMultiGraph::barsCrowdedAtAnEdgeOfTheViewForceABand()
     auto* mg = errorBarGraph(mPlot, 5, 1.0);
     renderOf(mPlot); // lays the axis rect out
     const QRect rect = mPlot->axisRect()->rect();
-    QVERIFY(!mg->errorBarsFitInView(barsAt({double(rect.left()), rect.left() + 1.0}), 10));
-    QVERIFY(!mg->errorBarsFitInView(barsAt({rect.right() - 1.0, double(rect.right())}), 10));
+    const auto atPixel = [this](double pixel) { return mPlot->xAxis->pixelToCoord(pixel); };
+    QVERIFY(
+        !mg->errorBarsFitInView(barsAt({ atPixel(rect.left()), atPixel(rect.left() + 1.0) }), 10));
+    QVERIFY(!mg->errorBarsFitInView(barsAt({ atPixel(rect.right() - 1.0), atPixel(rect.right()) }),
+                                    10));
 }
 
 void TestMultiGraph::barsOutsideTheViewDoNotForceABand()
@@ -2413,8 +2372,11 @@ void TestMultiGraph::barsOutsideTheViewDoNotForceABand()
     auto* mg = errorBarGraph(mPlot, 5, 1.0);
     renderOf(mPlot);
     const QRect rect = mPlot->axisRect()->rect();
-    QVERIFY(mg->errorBarsFitInView(barsAt({rect.left() - 2.0, rect.left() - 1.0}), 10));
-    QVERIFY(mg->errorBarsFitInView(barsAt({rect.right() + 1.0, rect.right() + 2.0}), 10));
+    const auto atPixel = [this](double pixel) { return mPlot->xAxis->pixelToCoord(pixel); };
+    QVERIFY(mg->errorBarsFitInView(
+        barsAt({ atPixel(rect.left() - 2.0), atPixel(rect.left() - 1.0) }), 10));
+    QVERIFY(mg->errorBarsFitInView(
+        barsAt({ atPixel(rect.right() + 1.0), atPixel(rect.right() + 2.0) }), 10));
 }
 
 void TestMultiGraph::aOneSidedErrorBandKeepsItsValueEdge()
@@ -2426,8 +2388,8 @@ void TestMultiGraph::aOneSidedErrorBandKeepsItsValueEdge()
     mPlot->yAxis->setRange(0, 10);
     renderOf(mPlot);
     const auto rows = mg->errorBandRows(*mg->componentErrorBars(0), *mg->dataSource(), 0, 3);
-    QCOMPARE(rows[1].a, mPlot->yAxis->coordToPixel(5));
-    QCOMPARE(rows[1].b, mPlot->yAxis->coordToPixel(7));
+    QCOMPARE(rows[1].a, 5.0);
+    QCOMPARE(rows[1].b, 7.0);
 }
 
 // Resampled rows are not the data's rows: they can only make a band, however far apart.
@@ -2965,4 +2927,183 @@ void TestMultiGraph::logKeyAxisBigGraphIsThinned()
     QVERIFY2(points > 0, "nothing was recorded");
     QVERIFY2(points <= budget,
              qPrintable(QString("%1 points recorded for a %2 pixel wide axis").arg(points).arg(budget)));
+}
+
+// A fill is one fillBetween command over the whole window, in data space: the replays turn it into
+// a ribbon (GPU) or a polygon (QPainter), not one strip per frame.
+void TestMultiGraph::fillIsOneRibbonCommand()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    mg->setComponentFillBetween(1, 2, QBrush(QColor(255, 0, 0, 64)));
+    mPlot->xAxis->setRange(1, 3);
+    mPlot->yAxis->setRange(-1, 5);
+    renderOf(mPlot);
+
+    const qcp::FillBetweenCmd* fill = nullptr;
+    int fills = 0;
+    int painterCommands = 0;
+    for (int i = 0; i < mg->mCore.recordedCommandCount(); ++i)
+    {
+        const qcp::QCPDrawCommand& command = mg->mCore.recordedList().commands[i];
+        if (const auto* candidate = std::get_if<qcp::FillBetweenCmd>(&command))
+        {
+            fill = candidate;
+            ++fills;
+        }
+        painterCommands += std::get_if<qcp::PainterCmd>(&command) != nullptr;
+    }
+    QCOMPARE(fills, 1);
+    QCOMPARE(painterCommands, 0);
+    QVERIFY(fill);
+    QCOMPARE(fill->upper->size(), std::size_t(3));
+    QCOMPARE(fill->lower->size(), std::size_t(3));
+    QCOMPARE(fill->brush.color().alpha(), 64);
+    QVERIFY(qcp::commandKind(mg->mCore.recordedList().commands[0]).gpu);
+}
+
+// A fill between two components is still one ribbon: both edges are series of the same length.
+void TestMultiGraph::fillBetweenComponentsIsOneRibbon()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    mg->setComponentFillBetween(1, 2, QBrush(Qt::red));
+    mPlot->xAxis->setRange(1, 3);
+    mPlot->yAxis->setRange(-1, 5);
+    renderOf(mPlot);
+
+    const qcp::FillBetweenCmd* fill = nullptr;
+    for (const qcp::QCPDrawCommand& command : mg->mCore.recordedList().commands)
+        if (const auto* candidate = std::get_if<qcp::FillBetweenCmd>(&command))
+            fill = candidate;
+    QVERIFY(fill);
+    QCOMPARE(fill->upper->size(), fill->lower->size());
+    QCOMPARE((*fill->upper)[0], QPointF(1, 0));
+    QCOMPARE((*fill->lower)[0], QPointF(1, 2));
+    QCOMPARE((*fill->upper)[1], QPointF(2, 1));
+    QCOMPARE((*fill->lower)[1], QPointF(2, 3));
+}
+
+// The order the drawing API keeps on both replays: fills, then bars, then lines.
+void TestMultiGraph::fillsDrawUnderErrorBarsUnderLines()
+{
+    auto* mg = errorBarGraph(mPlot, 5, 1.0);
+    mg->setComponentPens({ QPen(Qt::red, 3), QPen(Qt::red, 3), QPen(Qt::red, 3) });
+    mg->setComponentLineStyle(0, QCPMultiGraph::lsLine);
+    mg->setComponentFillBetween(1, 2, QBrush(Qt::green));
+    mPlot->xAxis->setRange(-0.5, 4.5);
+    mPlot->yAxis->setRange(0, 10);
+    const QImage image = renderOf(mPlot);
+
+    int fill = -1, bars = -1, line = -1;
+    const auto& commands = mg->mCore.recordedList().commands;
+    for (int i = 0; i < int(commands.size()); ++i)
+    {
+        if (fill < 0 && std::get_if<qcp::FillBetweenCmd>(&commands[i]))
+            fill = i;
+        if (bars < 0 && std::get_if<qcp::ErrorBarsCmd>(&commands[i]))
+            bars = i;
+        if (line < 0 && std::get_if<qcp::PolylineDataCmd>(&commands[i]))
+            line = i;
+    }
+    QVERIFY2(fill >= 0 && bars >= 0 && line >= 0, "a command is missing");
+    QVERIFY2(fill < bars && bars < line, "fills and bars must record before the lines");
+
+    QVERIFY2(isRedish(image.pixelColor(pixelOf(mPlot, 2.5, 5.0))),
+             "the line must draw over the fill");
+    const QColor between = image.pixelColor(pixelOf(mPlot, 2.5, 4.0));
+    QVERIFY2(between.green() > between.red() + 60, "the fill must be visible between the bars");
+}
+
+// The same order on the GPU replay: a line crossing an opaque fill keeps its pixel.
+void TestMultiGraph::fillsDrawUnderLinesOnTheGpu()
+{
+    if (!showWithRhi(mPlot))
+        QSKIP("no exposed window with a QRhi in this environment");
+    auto* mg = errorBarGraph(mPlot, 5, 1.0);
+    mg->setComponentPens({ QPen(Qt::red, 3), QPen(Qt::red, 3), QPen(Qt::red, 3) });
+    mg->setComponentLineStyle(0, QCPMultiGraph::lsLine);
+    mg->setComponentFillBetween(1, 2, QBrush(Qt::green));
+    mPlot->xAxis->setRange(-0.5, 4.5);
+    mPlot->yAxis->setRange(0, 10);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(mPlot->plottableRhiLayer(mg->layer()));
+    const QImage frame = mPlot->grabFramebuffer();
+    QVERIFY2(isRedish(frame.pixelColor(pixelOf(mPlot, 2.5, 5.0))),
+             "the line must draw over the fill on the GPU");
+    const QColor between = frame.pixelColor(pixelOf(mPlot, 2.5, 4.0));
+    QVERIFY2(between.green() > between.red() + 60, "the fill must be visible between the bars");
+}
+
+// Error bars are one command: the replay builds every stem and cap from the centres and spans.
+void TestMultiGraph::errorBarsAreOneCommand()
+{
+    auto* mg = errorBarGraph(mPlot, 5, 1.0);
+    mPlot->xAxis->setRange(-0.5, 4.5);
+    mPlot->yAxis->setRange(0, 10);
+    renderOf(mPlot);
+
+    const qcp::ErrorBarsCmd* bars = nullptr;
+    int count = 0;
+    for (const qcp::QCPDrawCommand& command : mg->mCore.recordedList().commands)
+        if (const auto* candidate = std::get_if<qcp::ErrorBarsCmd>(&command))
+        {
+            bars = candidate;
+            ++count;
+        }
+    QCOMPARE(count, 1);
+    QVERIFY(bars);
+    QCOMPARE(bars->centres->size(), std::size_t(5));
+    QCOMPARE(bars->spans->size(), std::size_t(5));
+    QCOMPARE((*bars->centres)[2], QPointF(2, 5));
+    QCOMPARE((*bars->spans)[2].y(), 2.0);
+    QVERIFY((*bars->spans)[2].x() > 0.0);
+}
+
+// Dense bars stay the translucent band they were: a fillBetween at the bars' colour, alpha 64.
+void TestMultiGraph::denseErrorBarsAreABand()
+{
+    auto* mg = errorBarGraph(mPlot, 2000, 0.01);
+    mg->setComponentErrorBars(0, 1, 2, 6);
+    mPlot->xAxis->setRange(0, 20);
+    mPlot->yAxis->setRange(0, 10);
+    renderOf(mPlot);
+
+    int fills = 0, bars = 0;
+    const qcp::FillBetweenCmd* fill = nullptr;
+    for (const qcp::QCPDrawCommand& command : mg->mCore.recordedList().commands)
+    {
+        if (const auto* candidate = std::get_if<qcp::FillBetweenCmd>(&command))
+        {
+            fill = candidate;
+            ++fills;
+        }
+        bars += std::get_if<qcp::ErrorBarsCmd>(&command) != nullptr;
+    }
+    QCOMPARE(fills, 1);
+    QCOMPARE(bars, 0);
+    QVERIFY(fill);
+    QCOMPARE(fill->brush.color().alpha(), 64);
+}
+
+// The icon recording is a summary of its own: one segment per component, not the plot's lines.
+void TestMultiGraph::legendIconShowsEachComponent()
+{
+    auto* mg = threeColumnGraph(mPlot);
+    mg->setComponentPens({ QPen(Qt::red, 3), QPen(Qt::green, 3), QPen(Qt::blue, 3) });
+    QImage image(60, 20, QImage::Format_ARGB32);
+    image.fill(Qt::white);
+    QCPPainter painter(&image);
+    mg->drawLegendIcon(&painter, QRectF(0, 0, 60, 20));
+    painter.end();
+    QCOMPARE(image.pixelColor(10, 10).rgb(), QColor(Qt::red).rgb());
+    QCOMPARE(image.pixelColor(30, 10).rgb(), QColor(Qt::green).rgb());
+    QCOMPARE(image.pixelColor(50, 10).rgb(), QColor(Qt::blue).rgb());
+
+    int lines = 0;
+    for (const qcp::QCPDrawCommand& command : mg->mCore.iconRecordedList().commands)
+        if (const auto* line = std::get_if<qcp::PolylineDataCmd>(&command))
+        {
+            ++lines;
+            QCOMPARE(line->points->size(), std::size_t(2));
+        }
+    QCOMPARE(lines, 3);
 }

@@ -530,6 +530,18 @@ int QCPDrawnCore::recordedCommandCount() const
     return mState->recorded ? int(mState->recording.commands.size()) : 0;
 }
 
+const QCPDrawList& QCPDrawnCore::recordedList() const
+{
+    static const QCPDrawList empty;
+    return mState->recorded ? mState->recording : empty;
+}
+
+const QCPDrawList& QCPDrawnCore::iconRecordedList() const
+{
+    static const QCPDrawList empty;
+    return mState->iconRecorded ? mState->icon : empty;
+}
+
 int QCPDrawnCore::recordedPolylinePointCount() const
 {
     int points = 0;

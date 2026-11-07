@@ -19,6 +19,7 @@
 class QCPAxis;
 class QCPAxisRect;
 class QCPDrawContext;
+struct QCPDrawList;
 class QCPLayer;
 class QCPPainter;
 class QCPTheme;
@@ -138,6 +139,12 @@ public:
 
     //! Test hook: how many commands the recording holds.
     [[nodiscard]] int recordedCommandCount() const;
+
+    //! Test hook: the recording itself, empty before the object has drawn.
+    [[nodiscard]] const QCPDrawList& recordedList() const;
+
+    //! Test hook: the legend icon recording, empty before the icon was painted.
+    [[nodiscard]] const QCPDrawList& iconRecordedList() const;
 
     //! Test hook: how many vertices the recording's polylines hold.
     [[nodiscard]] int recordedPolylinePointCount() const;

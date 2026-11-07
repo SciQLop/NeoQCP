@@ -14,9 +14,6 @@ private slots:
     void thinStripsAreOneQuad();
     void binToSpansTakesMinAndMaxOfBothEdges();
     void binToSpansKeepsBreaks();
-    void stripPolygonsOnePerRun();
-    void aBrokenSecondRowDoesNotJoinTheFirst();
-    void aSingleRowRunMakesNoPolygon();
     void binToSpansJoinsRowsOfALaterBin();
     void binToSpansPutsEachSpanAtItsBinCentre();
     void stepLeftHoldsEachValueUntilTheNextKey();

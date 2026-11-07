@@ -1,5 +1,4 @@
 #include "multigraph-fill.h"
-#include "plottable-geometry-utils.h"
 #include "../axis/axis.h"
 #include <algorithm>
 #include <cmath>
@@ -50,35 +49,6 @@ void quad(std::vector<float>& out, bool v, const StripPoint& p, const StripPoint
     const double crossValue = p.a + t * (q.a - p.a);
     triangle(out, v, { { { p.key, p.a }, { crossKey, crossValue }, { p.key, p.b } } }, c);
     triangle(out, v, { { { crossKey, crossValue }, { q.key, q.a }, { q.key, q.b } } }, c);
-}
-
-std::vector<std::span<const StripPoint>> runs(std::span<const StripPoint> rows)
-{
-    std::vector<std::span<const StripPoint>> result;
-    std::size_t start = 0;
-    for (std::size_t i = 1; i <= rows.size(); ++i)
-    {
-        const bool runEnds = i == rows.size() || !joined(rows[i - 1], rows[i]);
-        if (!runEnds)
-            continue;
-        if (i - start >= 2)
-            result.push_back(rows.subspan(start, i - start));
-        start = i;
-    }
-    return result;
-}
-
-using qcp::geometry::point;
-
-QPolygonF closedPolygon(std::span<const StripPoint> run, bool keyIsVertical)
-{
-    QPolygonF poly;
-    poly.reserve(static_cast<qsizetype>(run.size() * 2));
-    for (const auto& r : run)
-        poly << point(r.key, r.a, keyIsVertical);
-    for (auto it = run.rbegin(); it != run.rend(); ++it)
-        poly << point(it->key, it->b, keyIsVertical);
-    return poly;
 }
 
 void widen(StripPoint& span, const StripPoint& r)
@@ -173,14 +143,6 @@ std::vector<StripPoint> binToSpans(std::span<const StripPoint> rows, double binW
     return spans;
 }
 
-QVector<QPolygonF> stripPolygons(std::span<const StripPoint> rows, bool keyIsVertical)
-{
-    QVector<QPolygonF> polygons;
-    for (const auto& run : runs(rows))
-        polygons.push_back(closedPolygon(run, keyIsVertical));
-    return polygons;
-}
-
 std::vector<StripPoint> stepped(std::span<const StripPoint> rows, Step step)
 {
     if (step == Step::None)
@@ -199,7 +161,7 @@ std::vector<StripPoint> stepped(std::span<const StripPoint> rows, Step step)
 
 // simplify: a value <= 0 is taken as invalid on every log axis, but on an all-negative range the
 // invalid values are the ones >= 0. Callers then push valid negative values to the edge. Upgrade:
-// test the value's sign against the range's sign in baselinePixel and QCPMultiGraph::errorPixel.
+// test the value's sign against the range's sign in baselinePixel and QCPMultiGraph::fillValue.
 std::pair<double, double> logZeroSideEdges(const QCPAxis& valueAxis)
 {
     const QCPRange range = valueAxis.range();

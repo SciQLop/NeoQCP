@@ -1,7 +1,5 @@
 #pragma once
 
-#include <QPolygonF>
-#include <QVector>
 #include <array>
 #include <span>
 #include <utility>
@@ -31,10 +29,6 @@ void appendStrip(std::span<const StripPoint> rows, bool keyIsVertical,
 //! a = min and b = max of both edges. Bins never join across a break.
 //! \pre binWidthPx > 0
 std::vector<StripPoint> binToSpans(std::span<const StripPoint> rows, double binWidthPx);
-
-//! The same strip as closed polygons, one per gap-free run (edge a forward, edge b back), for
-//! QPainter and export.
-QVector<QPolygonF> stripPolygons(std::span<const StripPoint> rows, bool keyIsVertical);
 
 //! Step transforms applied to both edges, matching qcp::toStepLeftLines & co.
 enum class Step { None, Left, Right, Center };
