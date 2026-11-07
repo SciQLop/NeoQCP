@@ -1578,3 +1578,56 @@ void TestColorMap::exportMatchesTheOldCode()
                              .arg(want, 8, 16, QLatin1Char('0'))));
     }
 }
+
+// One hot cell at key upper, value lower, in a 2x2 map: each axis layout puts it in
+// a known quarter of the export. Guards the image corners on every orientation.
+void TestColorMap::theHotCellLandsInItsCornerOnEveryAxisLayout()
+{
+  struct Layout
+  {
+    const char* name;
+    bool keyIsVertical, keyReversed, valueReversed;
+    bool hotOnRight, hotOnTop;
+  };
+  const Layout layouts[] = {
+    { "normal", false, false, false, true, false },
+    { "key reversed", false, true, false, false, false },
+    { "value reversed", false, false, true, true, true },
+    { "vertical key", true, false, false, false, true },
+    { "vertical key reversed", true, true, false, false, false },
+  };
+  mColorMap->setVisible(false);
+  mPlot->resize(200, 200);
+  mPlot->axisRect()->setAutoMargins(QCP::msNone);
+  mPlot->axisRect()->setMargins(QMargins(0, 0, 0, 0));
+  for (const Layout& layout : layouts)
+  {
+    QCPAxis* keyAxis = layout.keyIsVertical ? mPlot->yAxis : mPlot->xAxis;
+    QCPAxis* valueAxis = layout.keyIsVertical ? mPlot->xAxis : mPlot->yAxis;
+    keyAxis->setRangeReversed(layout.keyReversed);
+    valueAxis->setRangeReversed(layout.valueReversed);
+    auto* map = new QCPColorMap(keyAxis, valueAxis);
+    map->data()->setSize(2, 2);
+    map->data()->setRange(QCPRange(0, 1), QCPRange(0, 1));
+    map->data()->setCell(1, 0, 1.0);
+    map->setGradient(QCPColorGradient::gpGrayscale);
+    map->setDataRange(QCPRange(0, 1));
+    keyAxis->setRange(-0.5, 1.5);
+    valueAxis->setRange(-0.5, 1.5);
+
+    const QImage exported
+        = mPlot->toPixmap(200, 200).toImage().convertToFormat(QImage::Format_ARGB32);
+    const QRect area = mPlot->axisRect()->rect();
+    const int x = layout.hotOnRight ? area.left() + area.width() * 3 / 4
+                                    : area.left() + area.width() / 4;
+    const int y = layout.hotOnTop ? area.top() + area.height() / 4
+                                  : area.top() + area.height() * 3 / 4;
+    QVERIFY2(qGray(exported.pixel(x, y)) > 200, layout.name);
+    QVERIFY2(qGray(exported.pixel(area.left() + area.right() - x, y)) < 50, layout.name);
+    QVERIFY2(qGray(exported.pixel(x, area.top() + area.bottom() - y)) < 50, layout.name);
+
+    QVERIFY(mPlot->removePlottable(map));
+    keyAxis->setRangeReversed(false);
+    valueAxis->setRangeReversed(false);
+  }
+}

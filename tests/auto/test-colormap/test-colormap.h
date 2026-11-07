@@ -59,6 +59,7 @@ private slots:
   void tightBoundaryCropsHalfACell();
   void aPanDoesNotRebuildTheImage();
   void exportMatchesTheOldCode();
+  void theHotCellLandsInItsCornerOnEveryAxisLayout();
 
 private:
   QCustomPlot *mPlot;
