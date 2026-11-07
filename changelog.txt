@@ -293,9 +293,29 @@ Behaviour changes for 2.x users:
 
 Milestone 4b (the line family). Additive, except for the behaviour changes listed below.
 
+  - QCPMultiGraph, QCPWaterfallGraph and QCPCurve share one line base, QCPAbstractLine: pen, brush,
+        line style, markers, marker skip and colour by value are one API on all three.
+  - The three draw through the drawing API. A multigraph records its lines, markers, fills, error
+        bars and legend icon as commands; a pan inside the recorded key range moves them on the GPU
+        without a rebuild. Fills draw under error bars under lines on the GPU as on the CPU.
+  - A curve records itself whole, once per change: a pan moves it. Its data-space clipping code is
+        gone; the plot's clip does that work.
+  - setPen and setBrush are virtual and a multigraph honours them: they set every component, also
+        the components that arrive with later data.
+  - A curve can be coloured by value: setColorValues, setColorGradient, setColorRange, as a
+        multigraph.
+  - QCPMultiGraph::setDeferredDataSwap(bool), off by default, keeps the old data drawn until the new
+        data is ready.
+  - QCPGraph and QCPGraph2 are deprecated: use QCPMultiGraph with one column. They go in 3.0.
+
 Behaviour changes for 2.x users:
   - New data on a multigraph is seen at once; setDeferredDataSwap(true) keeps the old data
         drawn until the new is ready.
+  - A curve refuses a step or impulse line style as misuse; it draws a plain line or none.
+  - A selected part of a filled curve keeps the curve's brush. 2.x filled it with the selection
+        decorator's brush, which by default is none.
+  - Colour values whose count does not match the data are refused as misuse; 2.x cleared them
+        without a word. The line is drawn uncoloured either way.
 
 #### NeoQCP, unreleased ####
 

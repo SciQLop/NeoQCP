@@ -122,6 +122,8 @@ QCPGraphData::QCPGraphData(double key, double value) : key(key), value(value) { 
 /*! \class QCPGraph
   \brief A plottable representing a graph in a plot.
 
+  \deprecated Use QCPMultiGraph with one column; this class goes in 3.0.
+
   \image html QCPGraph.png
 
   Usually you create new graphs by calling QCustomPlot::addGraph. The resulting instance can be

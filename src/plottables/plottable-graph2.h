@@ -14,6 +14,7 @@
 template <typename T, typename Self = void>
 class QCPGraph2Ops;
 
+/*! \deprecated Use QCPMultiGraph with one column; this class goes in 3.0. */
 class QCP_LIB_DECL QCPGraph2 : public QCPAbstractPlottable, public QCPPlottableInterface1D {
     Q_OBJECT
 public:
