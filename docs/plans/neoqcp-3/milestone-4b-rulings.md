@@ -75,7 +75,7 @@ Benchmarks: `baseline.md` ("M4b start" and "End of milestone 4b").
 
 Each fix has a test that failed first.
 
-## Deferred minors
+## Deferred minors (also in backlog.md)
 
 - No test checks that colours reach the GPU vertex buffer through the markers path (Task 4).
 - On a log key axis, an error bar's cap is symmetric in data, so slightly lopsided on screen.
