@@ -14,6 +14,8 @@ private slots:
   void curveIsOnePolylineCommand();
   void curveRefusesAStepStyle();
   void curveColoursByValue();
+  void curveRefusesAStepComponentStyle();
+  void legendIconMarkerTakesTheCurvePen();
   void newDataOfAnotherSizeDrawsUncoloured();
   void curveFillIsAPolygon();
   void selectedSegmentUsesTheSelectedPen();

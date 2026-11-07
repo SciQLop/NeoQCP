@@ -21,6 +21,7 @@ public:
   const QCPDrawList& recording() const { return mCore.recordedList(); }
 
   int polylineNaNs() const { return mCore.recordedPolylineNaNs(); }
+  using QCPDrawn<QCPAbstractPlottable1D<QCPCurveData, QCPAbstractLine>>::drawLegendIcon;
 };
 
 InspectableCurve* inspectable(QCPCurve* curve)
@@ -83,6 +84,18 @@ const std::vector<CurveSetterCase>& curveSetterCases()
         { curve->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 9)); } },
       { QStringLiteral("setScatterSkip"), markersOn,
         [](QCPCurve* curve) { curve->setScatterSkip(1); } },
+      { QStringLiteral("setComponentLineStyle"),
+        { },
+        [](QCPCurve* curve) { curve->setComponentLineStyle(0, QCPAbstractLine::lsNone); } },
+      { QStringLiteral("setColorValuesThroughTheBase"),
+        { },
+        [](QCPCurve* curve)
+        {
+            std::vector<double> values(static_cast<size_t>(curve->data()->size()));
+            for (size_t i = 0; i < values.size(); ++i)
+                values[i] = static_cast<double>(i);
+            static_cast<QCPAbstractLine*>(curve)->setColorValues(std::move(values));
+        } },
       { QStringLiteral("setColorValues"),
         { },
         [](QCPCurve* curve)
@@ -264,6 +277,32 @@ void TestQCPCurve::curveRefusesAStepStyle()
 
   QCOMPARE(test_misuse::calls.size(), std::size_t(1));
   QCOMPARE(mCurve->lineStyle(), QCPCurve::lsLine);
+}
+
+// The component setter is the same door as setLineStyle: a step style is refused there too.
+void TestQCPCurve::curveRefusesAStepComponentStyle()
+{
+  test_misuse::calls.clear();
+  qcp::setMisuseHandler(test_misuse::record);
+  mCurve->setComponentLineStyle(0, QCPAbstractLine::lsStepLeft);
+  qcp::setMisuseHandler(nullptr);
+
+  QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+  QCOMPARE(mCurve->lineStyle(), QCPCurve::lsLine);
+}
+
+// A marker style with no pen of its own takes the curve's pen, in the legend as on the plot.
+void TestQCPCurve::legendIconMarkerTakesTheCurvePen()
+{
+  mCurve->setPen(QPen(Qt::red, 2));
+  mCurve->setLineStyle(QCPCurve::lsNone);
+  mCurve->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 10));
+  QImage image(40, 20, QImage::Format_ARGB32);
+  image.fill(Qt::white);
+  QCPPainter painter(&image);
+  inspectable(mCurve)->drawLegendIcon(&painter, QRectF(0, 0, 40, 20));
+  painter.end();
+  QCOMPARE(image.pixelColor(20, 10).rgb(), QColor(Qt::red).rgb());
 }
 
 // Colour by scalar goes through the shared coloured polyline: one colour per vertex, taken from

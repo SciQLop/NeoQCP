@@ -213,7 +213,7 @@ protected:
     void componentVisibilityToggled() override;
     void pensChanged(int componentCount) override;
     void applyBrushToComponent(int index, const QBrush& brush) override;
-    [[nodiscard]] const QCPAbstractMultiDataSource* colorValueSource() const override;
+    [[nodiscard]] std::optional<int> colorValueCount() const override;
     [[nodiscard]] bool hasPendingDataSource() const override;
     void colorValuesStarted() override;
     // Source indices aligned with the line-style-transformed points of a component.
@@ -276,7 +276,7 @@ protected:
     void recordErrorBars(QCPDrawContext& context, const QCPAbstractMultiDataSource& ds,
                          bool rawRows, int begin, int end) const;
     void rebuildL2(const ViewportParams& vp) const;
-    void onViewportChanged();
+    void onViewportChanged(const QCPRange& newRange, const QCPRange& oldRange);
     void followAxes();
     QList<QMetaObject::Connection> mAxisLinks;
     bool pipelineBusy() const override { return mPipeline.isBusy(); }

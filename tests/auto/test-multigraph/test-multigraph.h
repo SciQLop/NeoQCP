@@ -119,6 +119,14 @@ private slots:
     void legendSwatchIsTwelvePixelsTall();
     void errorBarsAreOneCommand();
     void verticalKeyErrorBarsRunAlongTheValue();
+    void clickSelectionRedrawsTheComponent();
+    void adaptiveSamplingOffRecordsEveryRow();
+    void logValueImpulsesFollowTheValueRange();
+    void logKeyCentreStepSitsHalfwayOnScreen();
+    void logKeyCentreStepFillSitsHalfwayOnScreen();
+    void anEmptyViewDoesNotOutliveAZoomOut();
+    void aZoomRecordsOnce();
+    void legendIconMarkerTakesTheComponentPen();
     void denseErrorBarsAreABand();
     void legendIconShowsEachComponent();
     void settingErrorBarsRepaintsTheLayer();

@@ -301,15 +301,18 @@ void QCPMultiGraph::rebuildL2(const ViewportParams& vp) const
     mL2HasOrigin = mL2Result && !mL1Cache->level1.origin.empty();
 }
 
-void QCPMultiGraph::onViewportChanged()
+void QCPMultiGraph::onViewportChanged(const QCPRange& newRange, const QCPRange& oldRange)
 {
     if (!mL1Cache)
         return;
     // The bins are only stale; nothing recorded reads them until the recording is remade. A pan
     // inside the key window is served by a translation, so the fresh bins wait for the settle.
-        mL2Dirty = true;
-    if (hasRenderedRange())
-                mViewportDebounce.start();
+    mL2Dirty = true;
+    // A zoom records on its own frame: only a pan, served by a translation, waits for the settle.
+    const bool pan = oldRange.size() > 0
+        && qAbs(newRange.size() / oldRange.size() - 1.0) < 1e-4;
+    if (pan && hasRenderedRange())
+        mViewportDebounce.start();
 }
 
 void QCPMultiGraph::syncComponentCount(const QCPAbstractMultiDataSource* source)
@@ -507,6 +510,8 @@ std::optional<QCPMultiGraph::ErrorBars> QCPMultiGraph::componentErrorBars(int va
 
 void QCPMultiGraph::updateBaseSelection()
 {
+    // The components' selections changed: their pens are in the recording.
+    markDirty();
     QCPDataSelection combined;
     for (const auto& c : mComponents) {
         for (int i = 0; i < c.selection.dataRangeCount(); ++i)
@@ -568,9 +573,11 @@ void QCPMultiGraph::applyBrushToComponent(int index, const QBrush& brush)
         setComponentFill(index, 0.0, brush);
 }
 
-const QCPAbstractMultiDataSource* QCPMultiGraph::colorValueSource() const
+// A staged source is what the values will colour once the swap lands.
+std::optional<int> QCPMultiGraph::colorValueCount() const
 {
-    return mPendingSource ? mPendingSource.get() : mDataSource.get();
+    const QCPAbstractMultiDataSource* target = mPendingSource ? mPendingSource.get() : mDataSource.get();
+    return target ? std::optional<int>(target->size()) : std::nullopt;
 }
 
 bool QCPMultiGraph::hasPendingDataSource() const { return mPendingSource != nullptr; }
@@ -985,6 +992,33 @@ QVector<QPointF> separatedPairs(const QVector<QPointF>& vertices)
     return separated;
 }
 
+// A centre step sits halfway between two points on screen: on a log key axis that is halfway in
+// log10(key), so the steps are built there and mapped back.
+QVector<QPointF> stepCentreLines(QVector<QPointF> points, bool logKeyAxis)
+{
+    if (!logKeyAxis)
+        return qcp::toStepCenterLines(points, /*keyIsVertical=*/false);
+    for (QPointF& point : points)
+        point.setX(point.x() > 0.0 ? std::log10(point.x()) : qQNaN());
+    QVector<QPointF> vertices = qcp::toStepCenterLines(points, /*keyIsVertical=*/false);
+    for (QPointF& vertex : vertices)
+        vertex.setX(std::pow(10.0, vertex.x()));
+    return vertices;
+}
+
+std::vector<qcp::fill::StripPoint> steppedOnScreen(std::vector<qcp::fill::StripPoint> rows,
+                                                   qcp::fill::Step step, bool logKeyAxis)
+{
+    if (!logKeyAxis || step != qcp::fill::Step::Center)
+        return qcp::fill::stepped(rows, step);
+    for (qcp::fill::StripPoint& row : rows)
+        row.key = row.key > 0.0 ? std::log10(row.key) : qQNaN();
+    std::vector<qcp::fill::StripPoint> stepped = qcp::fill::stepped(rows, step);
+    for (qcp::fill::StripPoint& row : stepped)
+        row.key = std::pow(10.0, row.key);
+    return stepped;
+}
+
 std::shared_ptr<const std::vector<QPointF>> sharedPoints(const QVector<QPointF>& points)
 {
     return std::make_shared<const std::vector<QPointF>>(points.begin(), points.end());
@@ -1073,10 +1107,16 @@ void QCPMultiGraph::draw(QCPDrawContext& context) const
     else
         return;
 
+    // The bins cover the view, not the key window: an empty view says nothing about the window
+    // around it, so its recording is remade on the next frame (it costs nothing).
     if (!ds || ds->empty())
+    {
+        (void)context.transform();
         return;
+    }
 
     const QCPKeyWindow window = context.keyWindow();
+
     const int begin = ds->findBegin(window.keys.lower);
     const int end = ds->findEnd(window.keys.upper);
     if (begin >= end)
@@ -1098,6 +1138,8 @@ void QCPMultiGraph::draw(QCPDrawContext& context) const
         const double decades = std::log10(keyRange.upper / keyRange.lower);
         pixelsPerKey = decades > 0.0 ? axisPixels / decades : 0.0;
     }
+    if (!mAdaptiveSampling)
+        pixelsPerKey = 0.0; // every row
     const bool coloured = mColor.hasValues() && (ds == mDataSource.get() || mL2HasOrigin);
 
     // Fills and error bars are commands built in data space: the replays turn them into ribbons,
@@ -1108,8 +1150,12 @@ void QCPMultiGraph::draw(QCPDrawContext& context) const
 
     // In data space the impulse baseline is a value: zero, or the bottom of a log value axis,
     // which is where the pixel path clamps it.
-    const double impulseBaseline
-        = mValueAxis->scaleType() == QCPAxis::stLogarithmic ? mValueAxis->range().lower : 0.0;
+    const bool logValueAxis = mValueAxis->scaleType() == QCPAxis::stLogarithmic;
+    const double impulseBaseline = logValueAxis ? mValueAxis->range().lower : 0.0;
+    const bool impulses = std::any_of(mComponents.begin(), mComponents.end(), [](const Component& c)
+                                      { return c.visible && c.lineStyle == lsImpulse; });
+    if (logValueAxis && impulses)
+        (void)context.transform(); // the baseline follows the axis' lower bound
 
     const int columns = std::min(componentCount(), ds->columnCount());
     for (int c = 0; c < columns; ++c)
@@ -1162,7 +1208,7 @@ void QCPMultiGraph::draw(QCPDrawContext& context) const
                         vertices = qcp::toStepRightLines(points, /*keyIsVertical=*/false);
                         break;
                     case lsStepCenter:
-                        vertices = qcp::toStepCenterLines(points, /*keyIsVertical=*/false);
+                        vertices = stepCentreLines(points, logKeyAxis);
                         break;
                     case lsImpulse:
                         vertices = separatedPairs(
@@ -1191,9 +1237,7 @@ void QCPMultiGraph::draw(QCPDrawContext& context) const
         // Markers sit at the data positions, not at the corners a step or an impulse adds.
         if (!hasMarkers)
             continue;
-        QCPScatterStyle style = comp.scatterStyle;
-        if (!style.isPenDefined())
-            style.setPen(comp.pen);
+        const QCPScatterStyle style = markerStyle(comp.scatterStyle, comp.pen);
         auto markerPoints = std::make_shared<std::vector<QPointF>>();
         auto markerColours = std::make_shared<std::vector<QRgb>>();
         const int skip = mScatterSkip + 1;
@@ -1263,8 +1307,9 @@ double QCPMultiGraph::fillValue(const QCPAxis& valueAxis, double value)
 std::vector<qcp::fill::StripPoint> QCPMultiGraph::shapedFillRows(
     const Fill& fill, const QCPAbstractMultiDataSource& ds, int begin, int end) const
 {
-    return qcp::fill::stepped(binnedWhenDense(fillRows(fill, ds, begin, end)),
-                              ownerStep(mComponents[fill.owner]));
+    return steppedOnScreen(binnedWhenDense(fillRows(fill, ds, begin, end)),
+                           ownerStep(mComponents[fill.owner]),
+                           mKeyAxis->scaleType() == QCPAxis::stLogarithmic);
 }
 
 std::vector<qcp::fill::StripPoint> QCPMultiGraph::binnedWhenDense(
@@ -1475,7 +1520,7 @@ void QCPMultiGraph::drawLegendIcon(QCPDrawContext& icon) const
         }
         if (!comp.scatterStyle.isNone())
             icon.markers(sharedPoints(QVector<QPointF> { QPointF(centre, 0.0) }),
-                         comp.scatterStyle);
+                         markerStyle(comp.scatterStyle, comp.pen));
         if (const auto bars = componentErrorBars(shown[k]))
         {
             // 5 px half stem, 3 px half cap on a 20 px segment, in segment fractions.

@@ -114,15 +114,8 @@ public:
     void setData(const QVector<double>& t, const QVector<double>& keys,
                  const QVector<double>& values, bool alreadySorted = false);
     void setData(const QVector<double>& keys, const QVector<double>& values);
-    void setScatterStyle(const QCPScatterStyle& style);
-    void setScatterSkip(int skip);
-    void setLineStyle(LineStyle style);
     //! An equal pen leaves the recording alone: the curve has one component.
     void setPen(const QPen& pen) override;
-
-    //! One value per data point, in container order: the curve has no key window to colour.
-    void setColorValues(std::shared_ptr<const std::vector<double>> values);
-    void setColorValues(std::vector<double> values);
 
     // non-property methods:
     void addData(const QVector<double>& t, const QVector<double>& keys,
@@ -141,6 +134,10 @@ public:
 
 protected:
     // reimplemented virtual methods:
+    //! One value per data point, in container order: the curve has no key window to colour.
+    [[nodiscard]] std::optional<int> colorValueCount() const override;
+    //! A plain line or none: a step or an impulse needs vertices the curve does not have.
+    [[nodiscard]] bool acceptsLineStyle(LineStyle style) const override;
     virtual void draw(QCPDrawContext& context) const override;
     virtual void drawLegendIcon(QCPDrawContext& icon) const override;
 

@@ -1062,6 +1062,140 @@ QCPMultiGraph* denseGraphDrawn(QCustomPlot* plot)
 
 } // namespace
 
+// A click selection changes the components behind the plottable's back: the recording must follow,
+// or the line keeps its old pen.
+void TestMultiGraph::clickSelectionRedrawsTheComponent()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double> { 0, 1, 2, 3 }, std::vector<std::vector<double>> { { 0, 1, 0, 1 } });
+    mg->setSelectable(QCP::stDataRange);
+    mPlot->xAxis->setRange(0, 3);
+    mPlot->yAxis->setRange(-1, 2);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const int before = mg->mCore.recordingCount();
+
+    QVariantMap details;
+    details.insert("componentIndex", 0);
+    details.insert("dataIndex", 1);
+    bool changed = false;
+    mg->selectEvent(nullptr, false, details, &changed);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCOMPARE(mg->mCore.recordingCount(), before + 1);
+
+    mg->deselectEvent(&changed);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCOMPARE(mg->mCore.recordingCount(), before + 2);
+}
+
+// Adaptive sampling off draws every row, not the per-pixel envelope.
+void TestMultiGraph::adaptiveSamplingOffRecordsEveryRow()
+{
+    const int n = 20'000; // raw rows: below the resampling threshold, far more than the pixels
+    std::vector<double> keys(n), values(n);
+    for (int i = 0; i < n; ++i)
+    {
+        keys[i] = i;
+        values[i] = std::sin(i * 0.37);
+    }
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::move(keys), std::vector<std::vector<double>> { std::move(values) });
+    mg->setAdaptiveSampling(false);
+    mPlot->xAxis->setRange(0, n - 1);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCOMPARE(mg->mCore.recordedPolylinePointCount(), n);
+}
+
+// On a log value axis an impulse drops to the axis' bottom, which moves with the value range: a
+// value-axis change must re-record, or the impulses float above the new bottom.
+void TestMultiGraph::logValueImpulsesFollowTheValueRange()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double> { 0, 1, 2 }, std::vector<std::vector<double>> { { 10, 100, 10 } });
+    mg->setLineStyle(QCPMultiGraph::lsImpulse);
+    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setRange(-0.5, 2.5);
+    mPlot->yAxis->setRange(1, 1000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const int before = mg->mCore.recordingCount();
+
+    mPlot->yAxis->setRange(0.01, 1000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY2(mg->mCore.recordingCount() > before, "the impulses kept the old axis bottom");
+}
+
+// A centre step sits halfway between two points on screen: on a log key axis that is the
+// geometric mean of the keys, not their average.
+void TestMultiGraph::logKeyCentreStepSitsHalfwayOnScreen()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double> { 1, 10, 100 }, std::vector<std::vector<double>> { { 0, 1, 0 } });
+    mg->setLineStyle(QCPMultiGraph::lsStepCenter);
+    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setRange(1, 100);
+    mPlot->yAxis->setRange(-1, 2);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    bool found = false;
+    for (const qcp::QCPDrawCommand& command : mg->mCore.recordedList().commands)
+        if (const auto* line = std::get_if<qcp::PolylineDataCmd>(&command))
+            for (const QPointF& point : *line->points)
+                found = found || std::abs(point.x() - std::sqrt(10.0)) < 1e-9;
+    QVERIFY2(found, "no step corner at the geometric mean of 1 and 10");
+}
+
+// The fill under a centre step steps where the line does.
+void TestMultiGraph::logKeyCentreStepFillSitsHalfwayOnScreen()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double> { 1, 10, 100 }, std::vector<std::vector<double>> { { 1, 2, 1 } });
+    mg->setLineStyle(QCPMultiGraph::lsStepCenter);
+    mg->setComponentFill(0, 0.0, QBrush(Qt::red));
+    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setRange(1, 100);
+    mPlot->yAxis->setRange(-1, 3);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    bool found = false;
+    for (const qcp::QCPDrawCommand& command : mg->mCore.recordedList().commands)
+        if (const auto* fill = std::get_if<qcp::FillBetweenCmd>(&command))
+            for (const QPointF& point : *fill->upper)
+                found = found || std::abs(point.x() - std::sqrt(10.0)) < 1e-9;
+    QVERIFY2(found, "the fill does not step at the geometric mean of 1 and 10");
+}
+
+// A view with no data records an empty frame; a zoom or pan back onto the data must not replay it.
+void TestMultiGraph::anEmptyViewDoesNotOutliveAZoomOut()
+{
+    if (!showWithRhi(mPlot))
+        QSKIP("no QRhi available in this environment");
+    auto* mg = denseGraphDrawn(mPlot);
+    // Just past the last row: the window around the view holds rows, the view itself none.
+    mPlot->xAxis->setRange(400'010, 500'010);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(mg->mL2Result && mg->mL2Result->empty());
+    const int empty = mg->mCore.recordingCount();
+
+    mPlot->xAxis->setRange(300'010, 400'010); // a pan back onto the data
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY2(mg->mCore.recordingCount() > empty, "the empty recording was replayed over the data");
+}
+
+// A zoom re-records on its own frame; the settle that follows a pan must not record it again.
+void TestMultiGraph::aZoomRecordsOnce()
+{
+    if (!showWithRhi(mPlot))
+        QSKIP("no QRhi available in this environment");
+    auto* mg = denseGraphDrawn(mPlot);
+    const int before = mg->mCore.recordingCount();
+    mPlot->xAxis->setRange(0, 50'000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCOMPARE(mg->mCore.recordingCount(), before + 1);
+    QTest::qWait(400); // past the 150 ms settle
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCOMPARE(mg->mCore.recordingCount(), before + 1);
+}
+
 void TestMultiGraph::panIsRedrawnFreshAfterTheDebounce()
 {
     if (!showWithRhi(mPlot))
@@ -3113,6 +3247,22 @@ void TestMultiGraph::denseErrorBarsAreABand()
 }
 
 // The icon recording is a summary of its own: one segment per component, not the plot's lines.
+// A marker style with no pen of its own takes the component's pen, in the legend as on the plot.
+void TestMultiGraph::legendIconMarkerTakesTheComponentPen()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double> { 0, 1 }, std::vector<std::vector<double>> { { 0, 1 } });
+    mg->setComponentPens({ QPen(Qt::red, 2) });
+    mg->setComponentLineStyle(0, QCPMultiGraph::lsNone);
+    mg->setComponentScatterStyle(0, QCPScatterStyle(QCPScatterStyle::ssDisc, 10));
+    QImage image(40, 20, QImage::Format_ARGB32);
+    image.fill(Qt::white);
+    QCPPainter painter(&image);
+    mg->drawLegendIcon(&painter, QRectF(0, 0, 40, 20));
+    painter.end();
+    QCOMPARE(image.pixelColor(20, 10).rgb(), QColor(Qt::red).rgb());
+}
+
 void TestMultiGraph::legendIconShowsEachComponent()
 {
     auto* mg = threeColumnGraph(mPlot);

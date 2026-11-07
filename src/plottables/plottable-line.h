@@ -100,11 +100,10 @@ protected:
     //! Gives a component created after a setter the pen, fill and marker style that setter
     //! installed: subclasses call it when their data brings a new component.
     void applyRememberedStyle(int index);
-    //! The source the colour values must match the size of, when the subclass has one.
-    [[nodiscard]] virtual const QCPAbstractMultiDataSource* colorValueSource() const
-    {
-        return nullptr;
-    }
+    //! How many colour values the data takes: one per point, none before any data.
+    [[nodiscard]] virtual std::optional<int> colorValueCount() const { return std::nullopt; }
+    //! Whether this line can draw \a style; a subclass refuses the others as misuse.
+    [[nodiscard]] virtual bool acceptsLineStyle(LineStyle) const { return true; }
     //! Whether a source is staged, so colour values are stashed instead of applied.
     [[nodiscard]] virtual bool hasPendingDataSource() const { return false; }
     //! The first colouring: the subclass rebuilds whatever the per-point colours need.
@@ -115,6 +114,8 @@ protected:
     virtual void componentVisibilityToggled() { markDirty(); }
 
     static QPen defaultSelectedPen(const QPen& pen);
+    //! \a style as it draws for \a pen: a style with no pen of its own takes it.
+    static QCPScatterStyle markerStyle(QCPScatterStyle style, const QPen& pen);
 
     QVector<Component> mComponents;
     LineStyle mLineStyle = lsLine;

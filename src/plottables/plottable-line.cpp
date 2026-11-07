@@ -9,6 +9,13 @@ QCPAbstractLine::QCPAbstractLine(QCPAxis* keyAxis, QCPAxis* valueAxis)
 {
 }
 
+QCPScatterStyle QCPAbstractLine::markerStyle(QCPScatterStyle style, const QPen& pen)
+{
+    if (!style.isPenDefined())
+        style.setPen(pen);
+    return style;
+}
+
 QPen QCPAbstractLine::defaultSelectedPen(const QPen& pen)
 {
     QPen sel = pen;
@@ -137,6 +144,8 @@ void QCPAbstractLine::setComponentVisible(int index, bool visible)
 
 void QCPAbstractLine::setLineStyle(LineStyle style)
 {
+    if (!acceptsLineStyle(style))
+        return;
     // mLineStyle alone is not enough: a component may have been given its own style since.
     const bool allComponentsFollow = std::all_of(
         mComponents.cbegin(), mComponents.cend(), [style](const auto& c) { return c.lineStyle == style; });
@@ -150,6 +159,8 @@ void QCPAbstractLine::setLineStyle(LineStyle style)
 
 void QCPAbstractLine::setComponentLineStyle(int index, LineStyle style)
 {
+    if (!acceptsLineStyle(style))
+        return;
     if (index < 0 || index >= mComponents.size() || mComponents[index].lineStyle == style)
         return;
     mComponents[index].lineStyle = style;
@@ -190,15 +201,14 @@ void QCPAbstractLine::setColorValues(std::shared_ptr<const std::vector<double>> 
         return clearColorValues();
     // A pending source (staged but not yet committed) is what the values will apply to
     // once the swap lands -- validate against its size, not the still-displayed source's.
-    const QCPAbstractMultiDataSource* target = colorValueSource();
-    const int expected = target ? target->size() : 0;
-    if (!target)
+    const std::optional<int> expected = colorValueCount();
+    if (!expected)
     {
         // Before any data there is nothing to compare against: nothing to colour, not misuse.
         clearColorValues();
         return;
     }
-    if (static_cast<int>(values->size()) != expected)
+    if (static_cast<int>(values->size()) != *expected)
     {
         clearColorValues(); // refused: the line is drawn uncoloured, not left stale
         QCP_CHECK_OR_RETURN(false, "setColorValues() needs one value per key", );

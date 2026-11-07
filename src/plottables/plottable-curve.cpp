@@ -290,18 +290,6 @@ void QCPCurve::setData(const QVector<double>& keys, const QVector<double>& value
     addData(keys, values);
 }
 
-/*!
-  Sets the visual appearance of single data points in the plot. If set to \ref
-  QCPScatterStyle::ssNone, no scatter points are drawn (e.g. for line-only plots with appropriate
-  line style).
-
-  \see QCPScatterStyle, setLineStyle
-*/
-void QCPCurve::setScatterStyle(const QCPScatterStyle& style)
-{
-    QCPAbstractLine::setScatterStyle(style);
-}
-
 /*! \overload
 
   The curve has one component, so the pen it remembers is the pen it draws with: handing it the
@@ -313,65 +301,6 @@ void QCPCurve::setPen(const QPen& pen)
         && component(0).selectedPen == QCPAbstractLine::defaultSelectedPen(pen))
         return;
     QCPAbstractLine::setPen(pen);
-}
-
-/*!
-  If scatters are displayed (scatter style not \ref QCPScatterStyle::ssNone), \a skip number of
-  scatter points are skipped/not drawn after every drawn scatter point.
-
-  This can be used to make the data appear sparser while for example still having a smooth line,
-  and to improve performance for very high density plots.
-
-  If \a skip is set to 0 (default), all scatter points are drawn.
-
-  \see setScatterStyle
-*/
-void QCPCurve::setScatterSkip(int skip)
-{
-    QCPAbstractLine::setScatterSkip(skip);
-}
-
-/*!
-  Sets how the single data points are connected in the plot or how they are represented visually
-  apart from the scatter symbol. For scatter-only plots, set \a style to \ref lsNone and \ref
-  setScatterStyle to the desired scatter style.
-
-  \see setScatterStyle
-*/
-void QCPCurve::setLineStyle(QCPCurve::LineStyle style)
-{
-    QCP_CHECK_OR_RETURN(
-        style == lsNone || style == lsLine,
-        "a curve draws a plain line or none: a step or impulse style needs vertices "
-        "the curve does not have", );
-    QCPAbstractLine::setLineStyle(style);
-}
-
-/*!
-  Colours the curve by a scalar, one value per data point in container order. The shared line base
-  has no data source of its own, so the curve validates against its container.
-*/
-void QCPCurve::setColorValues(std::shared_ptr<const std::vector<double>> values)
-{
-    markDirty();
-    if (!values || values->empty())
-    {
-        clearColorValues();
-        return;
-    }
-    if (static_cast<int>(values->size()) != mDataContainer->size())
-    {
-        clearColorValues(); // refused: the curve is drawn uncoloured, not left stale
-        QCP_CHECK_OR_RETURN(false, "setColorValues() needs one value per key", );
-        return;
-    }
-    mColor.setValues(std::move(values));
-}
-
-/*! \overload */
-void QCPCurve::setColorValues(std::vector<double> values)
-{
-    setColorValues(std::make_shared<const std::vector<double>>(std::move(values)));
 }
 
 /*! \overload
@@ -521,6 +450,21 @@ QCPRange QCPCurve::getValueRange(bool& foundRange, QCP::SignDomain inSignDomain,
     return mDataContainer->valueRange(foundRange, inSignDomain, inKeyRange);
 }
 
+std::optional<int> QCPCurve::colorValueCount() const
+{
+    return mDataContainer->isEmpty() ? std::nullopt
+                                     : std::optional<int>(mDataContainer->size());
+}
+
+bool QCPCurve::acceptsLineStyle(LineStyle style) const
+{
+    QCP_CHECK_OR_RETURN(style == lsNone || style == lsLine,
+                        "a curve draws a plain line or none: a step or impulse style needs "
+                        "vertices the curve does not have",
+                        false);
+    return true;
+}
+
 /* inherits documentation from base class */
 void QCPCurve::draw(QCPDrawContext& context) const
 {
@@ -574,13 +518,13 @@ void QCPCurve::recordSegments(QCPDrawContext& context, const QList<QCPDataRange>
                                               : qMin(dataCount(), segment.end() + 1));
         recordLine(context, lineRange, pen, coloured);
 
-        QCPScatterStyle style = selected && mSelectionDecorator
-            ? mSelectionDecorator->getFinalScatterStyle(comp.scatterStyle)
-            : comp.scatterStyle;
+        const QCPScatterStyle style = markerStyle(
+            selected && mSelectionDecorator
+                ? mSelectionDecorator->getFinalScatterStyle(comp.scatterStyle)
+                : comp.scatterStyle,
+            comp.pen);
         if (style.isNone())
             continue;
-        if (!style.isPenDefined())
-            style.setPen(comp.pen);
         recordMarkers(context, segment, style, coloured);
     }
 }
@@ -593,7 +537,7 @@ void QCPCurve::recordSegments(QCPDrawContext& context, const QList<QCPDataRange>
 void QCPCurve::recordLine(QCPDrawContext& context, const QCPDataRange& range, const QPen& pen,
                           bool coloured) const
 {
-    if (lineStyle() == lsNone || range.size() < 2)
+    if (component(0).lineStyle == lsNone || range.size() < 2)
         return;
 
     std::vector<QPointF> points;
@@ -653,7 +597,7 @@ void QCPCurve::drawLegendIcon(QCPDrawContext& icon) const
     if (mBrush.style() != Qt::NoBrush && mBrush.color().alpha() != 0)
         icon.rect(QCP::Data { 0.0, -0.15 }, QCP::Data { 1.0, 0.15 }, QPen(Qt::NoPen), mBrush);
 
-    if (lineStyle() != lsNone)
+    if (component(0).lineStyle != lsNone)
     {
         std::vector<QPointF> points;
         std::shared_ptr<const std::vector<QRgb>> colours;
@@ -678,7 +622,7 @@ void QCPCurve::drawLegendIcon(QCPDrawContext& icon) const
     if (!comp.scatterStyle.isNone())
     {
         std::vector<QPointF> marker { { 0.5, 0.0 } };
-        icon.markers(sharedPoints(std::move(marker)), comp.scatterStyle);
+        icon.markers(sharedPoints(std::move(marker)), markerStyle(comp.scatterStyle, comp.pen));
     }
 }
 
@@ -697,7 +641,7 @@ double QCPCurve::pointDistance(const QPointF& pixelPoint,
     closestData = mDataContainer->constEnd();
     if (mDataContainer->isEmpty())
         return -1.0;
-    if (lineStyle() == lsNone && scatterStyle().isNone())
+    if (component(0).lineStyle == lsNone && component(0).scatterStyle.isNone())
         return -1.0;
 
     double minDistSqr = (std::numeric_limits<double>::max)();
@@ -720,7 +664,7 @@ double QCPCurve::pointDistance(const QPointF& pixelPoint,
 
     // The distance to a segment is usually smaller than the distance to its endpoints, which is
     // what makes a click midway along a line hit the curve.
-    if (lineStyle() != lsNone)
+    if (component(0).lineStyle != lsNone)
     {
         for (int i = 0; i + 1 < pixels.size(); ++i)
         {
