@@ -223,14 +223,17 @@ void QCPAbstractLine::setColorValues(std::shared_ptr<const std::vector<double>> 
     const bool wasColoured = mColor.hasValues();
     mColor.setValues(std::move(values));
     if (!wasColoured)
-    {
-        // A line is a user of a scale only while it is coloured: joining on the first colouring
-        // keeps a plain line from showing the rect's colour bar.
-        if (!colorScale())
-            followKeyAxisRectScale();
-        lineChanged();
-        colorValuesStarted();
-    }
+        startColouring();
+}
+
+void QCPAbstractLine::startColouring()
+{
+    // A line is a user of a scale only while it is coloured: joining on the first colouring
+    // keeps a plain line from showing the rect's colour bar.
+    if (!colorScale())
+        followKeyAxisRectScale();
+    lineChanged();
+    colorValuesStarted();
 }
 
 void QCPAbstractLine::setColorValues(std::vector<double> values)

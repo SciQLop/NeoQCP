@@ -103,6 +103,8 @@ protected:
     [[nodiscard]] virtual bool hasPendingDataSource() const { return false; }
     //! The first colouring: the subclass rebuilds whatever the per-point colours need.
     virtual void colorValuesStarted() {}
+    //! The first colouring: joins the rect's scale if this line has none, then rebuilds.
+    void startColouring();
     //! The finite colour values: positive only on a log data scale. found is false with none.
     [[nodiscard]] QCPRange colorDataBounds(bool& found) const override;
     //! Feeds the base's gradient, range and scale type to the mapper, then redraws.

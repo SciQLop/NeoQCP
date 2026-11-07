@@ -218,7 +218,7 @@ bool QCPMultiGraph::commitPendingData()
         {
             // The pipeline's busyChanged slot may delete this graph.
             const QPointer<QCPMultiGraph> alive(this);
-            requestOrigin();
+            startColouring();
             if (!alive)
                 return true;
         }

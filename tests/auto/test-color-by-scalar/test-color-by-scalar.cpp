@@ -601,6 +601,32 @@ void TestColorByScalar::deferredCommitAppliesTheColorSizeRule()
     QVERIFY(!mg->mWantOrigin->load());
 }
 
+void TestColorByScalar::deferredCommitJoinsTheRectScale()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDeferredDataSwap(true);
+    mg->setDataSource(makeSource({ 0, 1, 2, 3 }, { { 0, 1, 0, 1 } }));
+    mPlot->xAxis->setRange(0, 3);
+    mPlot->yAxis->setRange(-1, 2);
+    mPlot->replot();
+    QVERIFY(mg->hasRenderedRange());
+    QVERIFY(!mg->colorScale());
+
+    // New data staged, then colour values for it: the first colouring happens on commit.
+    mg->setDataSource(makeSource({ 0, 1, 2, 3 }, { { 1, 0, 1, 0 } }));
+    QVERIFY(mg->hasPendingData());
+    mg->setColorValues(std::vector<double> { 0, 1, 0, 1 });
+    QVERIFY(mg->commitPendingData());
+
+    QCPColorScale* scale = mg->colorScale();
+    QVERIFY2(scale, "the deferred commit did not join the rect's scale");
+    QCOMPARE(scale, mPlot->axisRect()->colorScale().get());
+
+    scale->setGradient(QCPColorGradient(QCPColorGradient::gpHot));
+    QCOMPARE(mg->gradient(), QCPColorGradient(QCPColorGradient::gpHot));
+    QCOMPARE(mg->mColor.gradient(), QCPColorGradient(QCPColorGradient::gpHot));
+}
+
 void TestColorByScalar::toBucketClampsHugeAndInfinitePositions()
 {
     qcp::ColorScalarMapper huge;

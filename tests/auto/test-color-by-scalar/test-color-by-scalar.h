@@ -39,6 +39,7 @@ private slots:
     void deferredSetColorValuesUsesThePendingSourceSize();
     void turningTheDeferredSwapOffKeepsThePendingColours();
     void deferredCommitAppliesTheColorSizeRule();
+    void deferredCommitJoinsTheRectScale();
     void toBucketClampsHugeAndInfinitePositions();
     void wrongLengthOnColouredGraphLeavesItUncoloured();
     void uncolourRoutesDiscardAPendingStash();
