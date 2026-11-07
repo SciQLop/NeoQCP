@@ -420,6 +420,7 @@ void QCPPlottableRhiLayer::createImagePipeline(QRhiRenderPassDescriptor* rpDesc,
             qDebug() << "Failed to create nearest image sampler";
             delete mImageNearestSampler;
             mImageNearestSampler = nullptr;
+            return;
         }
     }
 
