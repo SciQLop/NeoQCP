@@ -59,18 +59,20 @@ QRectF gridRect(const QCPColorMapData* grid, const QCPAxis* keyAxis, const QCPAx
 
 //! A point of a contour segment (in the extractor's UV space) in data coordinates.
 //!
-//! The grid is uniform in pixels, not in data: X is always sampled linearly, and a log value
-//! axis spans its rows geometrically (the resampler's Y range is log10-spaced there). Mapping v
-//! accordingly is what puts a contour on its pixel row on a log axis, exactly like the image's
-//! two data corners do for the texture.
+//! The grid is uniform in pixels, not in data: a log key axis spans its columns geometrically
+//! (bins are even in log10 space) and a log value axis its rows geometrically (the resampler's
+//! Y range is log10-spaced there). Mapping u and v accordingly is what puts a contour on its
+//! pixel, exactly like the image's two data corners do for the texture.
 QPointF dataPoint(const QCPColorMapData* grid, const QLineF& segment, bool second,
-                  bool valueLog)
+                  bool keyLog, bool valueLog)
 {
     const QCPRange keys = grid->keyRange();
     const QCPRange values = grid->valueRange();
     const double u = second ? segment.x2() : segment.x1();
     const double v = second ? segment.y2() : segment.y1();
-    const double key = keys.lower + u * keys.size();
+    const double key = keyLog && keys.lower > 0 && keys.upper > 0
+        ? keys.lower * std::pow(keys.upper / keys.lower, u)
+        : keys.lower + u * keys.size();
     const double value = valueLog && values.lower > 0 && values.upper > 0
         ? values.upper * std::pow(values.lower / values.upper, v)
         : values.upper - v * values.size();
@@ -146,9 +148,10 @@ void QCPContourOverlay::update(const QCPColorMapData* grid, QCPDrawContext& cont
         key.maxDim = fullDim;
         mDrawn = &linesFor(grid, key, true);
     }
-    // The value axis' scale is what the resampler followed: a log axis spans the rows
-    // geometrically, a linear one evenly (see dataPoint).
+    // The axes' scales are what the bins and the resampler followed: a log axis spans its
+    // columns or rows geometrically, a linear one evenly (see dataPoint).
     recordLines(context, grid, *mDrawn,
+                keyAxis->scaleType() == QCPAxis::stLogarithmic,
                 valueAxis->scaleType() == QCPAxis::stLogarithmic);
     mLastLevels = key.levels;
     mLastLabels.clear();
@@ -157,7 +160,7 @@ void QCPContourOverlay::update(const QCPColorMapData* grid, QCPDrawContext& cont
 }
 
 void QCPContourOverlay::recordLines(QCPDrawContext& context, const QCPColorMapData* grid,
-                                    const Lines& lines, bool valueLog) const
+                                    const Lines& lines, bool keyLog, bool valueLog) const
 {
     for (const auto& line : lines.lines)
     {
@@ -169,8 +172,8 @@ void QCPContourOverlay::recordLines(QCPDrawContext& context, const QCPColorMapDa
         {
             if (!points->empty())
                 points->emplace_back(qQNaN(), qQNaN());
-            points->push_back(dataPoint(grid, segment, false, valueLog));
-            points->push_back(dataPoint(grid, segment, true, valueLog));
+            points->push_back(dataPoint(grid, segment, false, keyLog, valueLog));
+            points->push_back(dataPoint(grid, segment, true, keyLog, valueLog));
         }
         if (!points->empty())
             context.polyline(points, mPen);

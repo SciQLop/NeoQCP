@@ -174,6 +174,7 @@ private slots:
     void histogram2dContoursFollowTheCounts();
     void histogram2dContoursFollowTheNormalizedCounts();
     void histogram2dContourLabelsFollowAColourScaleToggle();
+    void histogram2dContoursMapALogKeyGeometrically();
     void histogram2dChangingTheGradientRequestsARepaint();
     void histogram2dChangingTheDataRangeRequestsARepaint();
     void histogram2dChangingTheDataScaleTypeRequestsARepaint();

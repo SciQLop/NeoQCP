@@ -2674,6 +2674,58 @@ bool TestPipeline::repaintFollows(QCPHistogram2D* hist, const std::function<void
     return true;
 }
 
+// A contour sits where the image's cell boundary sits: on a log key axis the extractor's
+// key coordinate must be mapped geometrically, like the image corners and the value rows.
+void TestPipeline::histogram2dContoursMapALogKeyGeometrically()
+{
+    auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
+    hist->setBins(10, 2);
+    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+
+    // Column i holds i + 1 samples in each value row, so level 5.5 separates column 4 from
+    // column 5: u = 0.5 of the grid.
+    std::vector<double> keys;
+    std::vector<double> values;
+    for (int column = 0; column < 10; ++column)
+    {
+        const double centre = std::pow(10.0, 0.3 * (column + 0.5));
+        for (int row = 0; row < 2; ++row)
+            for (int sample = 0; sample <= column; ++sample)
+            {
+                const double key = column == 0 ? 1.0 : column == 9 && sample == 0 ? 1000.0 : centre;
+                keys.push_back(key);
+                values.push_back(row == 0 ? 0.25 : 0.75);
+            }
+    }
+    hist->setData(std::move(keys), std::move(values));
+
+    QSignalSpy spy(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(spy.wait(2000));
+    hist->setContourLevels({ 5.5 });
+    hist->setContourPen(QPen(Qt::red, 2));
+    mPlot->toPixmap();
+
+    QPointF point(qQNaN(), qQNaN());
+    for (const auto& command : hist->mCore.recordedList().commands)
+        if (const auto* line = std::get_if<qcp::PolylineDataCmd>(&command))
+        {
+            for (const QPointF& candidate : *line->points)
+                if (!std::isnan(candidate.x()))
+                {
+                    point = candidate;
+                    break;
+                }
+            if (std::isfinite(point.x()))
+                break;
+        }
+    QVERIFY2(std::isfinite(point.x()), "the recording holds a contour point");
+    const double midpoint = std::sqrt(1000.0);
+    QVERIFY2(std::abs(point.x() - midpoint) < 1.0,
+             qPrintable(QString("contour key %1 is not the geometric midpoint %2")
+                            .arg(point.x())
+                            .arg(midpoint)));
+}
+
 void TestPipeline::histogram2dChangingTheGradientRequestsARepaint()
 {
     auto* hist = decadeHistogram(mPlot, true);
