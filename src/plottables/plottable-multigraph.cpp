@@ -126,7 +126,14 @@ void QCPMultiGraph::setDeferredDataSwap(bool enabled)
         return;
     mDeferredDataSwap = enabled;
     if (!enabled && mPendingSource && !commitPendingData())
+    {
+        // Not ready yet: apply it now, with the colours set for it, which applySourceNow() drops.
+        auto colours = std::move(mPendingColorValues);
+        const QPointer<QCPMultiGraph> alive(this);
         applySourceNow(std::move(mPendingSource));
+        if (alive && colours)
+            setColorValues(std::move(colours));
+    }
 }
 
 void QCPMultiGraph::applySourceNow(std::shared_ptr<QCPAbstractMultiDataSource> source)

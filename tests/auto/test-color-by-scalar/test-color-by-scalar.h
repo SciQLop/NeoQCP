@@ -37,6 +37,7 @@ private slots:
     void firstColoringRebuildsL1OnceWithOrigin();
 
     void deferredSetColorValuesUsesThePendingSourceSize();
+    void turningTheDeferredSwapOffKeepsThePendingColours();
     void deferredCommitAppliesTheColorSizeRule();
     void toBucketClampsHugeAndInfinitePositions();
     void wrongLengthOnColouredGraphLeavesItUncoloured();

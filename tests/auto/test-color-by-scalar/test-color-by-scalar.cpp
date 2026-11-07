@@ -538,6 +538,39 @@ void TestColorByScalar::deferredSetColorValuesUsesThePendingSourceSize()
     QCOMPARE(mg->mColor.size(), 5);
 }
 
+// Turning the deferred swap off applies a source still being prepared: the colours set for it
+// must come along, not be dropped with the stash.
+void TestColorByScalar::turningTheDeferredSwapOffKeepsThePendingColours()
+{
+    const auto big = [this](int n)
+    {
+        std::vector<double> keys(n), values(n);
+        for (int i = 0; i < n; ++i)
+        {
+            keys[i] = i;
+            values[i] = i % 2;
+        }
+        return makeSource(std::move(keys), { std::move(values) });
+    };
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDeferredDataSwap(true);
+    mg->setDataSource(big(4));
+    mPlot->xAxis->setRange(0, 3);
+    mPlot->yAxis->setRange(-1, 2);
+    mPlot->replot();
+    QVERIFY(mg->hasRenderedRange());
+
+    constexpr int m = 150'000; // resampled: not ready until the worker's result is delivered
+    mg->setDataSource(big(m));
+    QVERIFY(mg->hasPendingData());
+    mg->setColorValues(std::vector<double>(m, 7.0));
+
+    mg->setDeferredDataSwap(false);
+    QVERIFY(!mg->hasPendingData());
+    QVERIFY(mg->hasColorValues());
+    QCOMPARE(mg->mColor.size(), m);
+}
+
 void TestColorByScalar::deferredCommitAppliesTheColorSizeRule()
 {
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
