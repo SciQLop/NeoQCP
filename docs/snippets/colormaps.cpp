@@ -168,7 +168,7 @@ DOC_SNIPPET(colormaps_histogram2d_contours, 600, 360)
 
     auto histogram = customPlot->add<QCPHistogram2D>();
     histogram->setBins(60, 60);
-    histogram->setNormalization(QCPHistogram2D::nColumn);   // each column sums to one
+    histogram->setColumnNormalized(true);   // each column sums to one
     histogram->setGradient(QCPColorGradient::gpViridis);
     histogram->setContourLevels({ 0.02, 0.05 });   // in column fractions, like the colours
     histogram->setContourPen(QPen(Qt::white, 1));

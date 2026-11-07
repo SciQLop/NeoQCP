@@ -136,6 +136,20 @@ enum SignDomain
 };
 
 /*!
+  Defines how a histogram turns its bin counts into display values.
+
+  \see QCPHistogram::setNormalization, QCPHistogram2D::setNormalization
+*/
+enum class HistogramNormalization
+{
+    Count ///< The number of samples in each bin
+    ,
+    Density ///< Counts divided by the total and by the bin width (2D: the cell area), in data units
+    ,
+    Probability ///< Counts divided by the total
+};
+
+/*!
   Defines the sides of a rectangular entity to which margins can be applied.
 
   \see QCPLayoutElement::setAutoMargins, QCPAxisRect::setAutoMargins
@@ -417,6 +431,7 @@ inline Qt::Orientations flipOrientations(bool horizontal, bool vertical)
 Q_ENUM_NS(ExportPen)
 Q_ENUM_NS(ResolutionUnit)
 Q_ENUM_NS(SignDomain)
+Q_ENUM_NS(HistogramNormalization)
 Q_ENUM_NS(MarginSide)
 Q_ENUM_NS(AntialiasedElement)
 Q_ENUM_NS(PlottingHint)

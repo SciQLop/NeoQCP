@@ -223,7 +223,7 @@ DOC_SNIPPET(plottables_histogram, 600, 320)
     auto histogram = customPlot->add<QCPHistogram>().setName("quiet / active");
     histogram->setBins(60);
     histogram->setStyle(QCPHistogram::sStep);
-    histogram->setNormalization(qcp::algo::HistogramNormalization::Density);
+    histogram->setNormalization(QCP::HistogramNormalization::Density);
     histogram->setDataSource(source);   // one histogram per column, on shared bins
     // The bars exist only once the background binning is done.
     QObject::connect(histogram.get(), &QCPHistogram::histogramReady, customPlot, [customPlot] {

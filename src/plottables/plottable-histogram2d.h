@@ -1,5 +1,6 @@
 #pragma once
 #include "plottable-colormapped.h"
+#include "plottable-histogram-base.h"
 #include <axis/axis.h>
 #include <datasource/async-pipeline.h>
 #include <datasource/soa-datasource.h>
@@ -29,8 +30,6 @@ public:
     template <typename T>
     using OpsFor = QCPHistogram2DOps<T>;
 
-    enum Normalization { nNone, nColumn };
-
     explicit QCPHistogram2D(QCPAxis* keyAxis, QCPAxis* valueAxis);
 
     // Data — same pattern as QCPGraph2
@@ -59,36 +58,36 @@ public:
     const QCPAbstractDataSource* dataSource() const { return mDataSource.get(); }
     void dataChanged();
 
-    // Binning
+    // Binning. Bins follow the axis scales: a logarithmic axis bins in log10 (dropping
+    // non-positive samples), so the grid re-distributes when an axis scale is toggled.
     void setBins(int keyBins, int valueBins);
-    int keyBins() const { return mKeyBins; }
-    int valueBins() const { return mValueBins; }
+    int keyBins() const { return mKeyBins.get(); }
+    int valueBins() const { return mValueBins.get(); }
 
     // Normalization
-    void setNormalization(Normalization norm);
-    Normalization normalization() const { return mNormalization; }
-
-    // Bin spacing follows the key/value axis scale: a logarithmic axis bins in
-    // log10 (dropping non-positive samples), so the histogram re-distributes when
-    // the axis scale is toggled (the renderer only stretches cells uniformly in
-    // pixels, so the bin layout must match the axis to be correct). These setters
-    // are convenience aliases that set the corresponding axis scale type.
-    void setKeyBinScale(QCPAxis::ScaleType type);
-    void setValueBinScale(QCPAxis::ScaleType type);
-    QCPAxis::ScaleType keyBinScale() const;
-    QCPAxis::ScaleType valueBinScale() const;
+    void setNormalization(QCP::HistogramNormalization norm);
+    QCP::HistogramNormalization normalization() const { return mNormalization.get(); }
+    //! Scale every key column to sum to one; overrides the normalization while on.
+    void setColumnNormalized(bool normalized);
+    bool columnNormalized() const { return mColumnNormalized; }
 
     // Re-read the key/value axis scale type and re-bin. Wired to the axes'
     // scaleTypeChanged, but also callable directly for callers that change the
     // scale with that signal blocked (e.g. SciQLop's axis wrapper).
     Q_SLOT void refreshBinning();
 
+Q_SIGNALS:
+    //! Emitted when a re-bin lands.
+    void histogramReady();
+
+public:
+
     //! The range of the binned (normalized) counts; \a found is false before the first binning.
     [[nodiscard]] QCPRange colorDataBounds(bool& found) const override;
     //! Before the first binning, \a recalc starts one; the range follows when it lands.
     void rescaleDataRange(bool recalc = false) override;
 
-    // Contours, as on QCPColorMap2, over the values shown: the column fractions with nColumn.
+    // Contours, as on QCPColorMap2, over the values shown: the normalized cells.
     void setContourLevels(const QVector<double>& levels);
     [[nodiscard]] QVector<double> contourLevels() const { return mContours.levels(); }
     void setAutoContourLevels(int count);
@@ -133,14 +132,15 @@ private:
     void followAxisScales();
 
     std::shared_ptr<QCPAbstractDataSource> mDataSource;
-    int mKeyBins = 100;
-    int mValueBins = 100;
-    Normalization mNormalization = nNone;
+    qcp::histogram::BinCount mKeyBins{ 100 };
+    qcp::histogram::BinCount mValueBins{ 100 };
+    qcp::histogram::Normalization mNormalization;
+    bool mColumnNormalized = false;
     QCPHistogramPipeline mPipeline;
     QCPColormapRenderer mRenderer;
     QCPContourOverlay mContours;
-    //! The binned counts as shown, column fractions with nColumn, with the colour bounds of the
-    //! non-empty columns. Rebuilt lazily after the bins or the normalization change.
+    //! The binned counts as shown, after the normalization, with the colour bounds of the
+    //! non-empty cells. Rebuilt lazily after the bins or the normalization change.
     struct Shown
     {
         std::shared_ptr<QCPColorMapData> normalized;
@@ -177,9 +177,9 @@ private:
     [[nodiscard]] bool binnedForTheAxisScales() const;
     //! The binned cells, or nullptr when there are none (yet).
     [[nodiscard]] const QCPColorMapData* binned() const;
-    //! The cells as drawn: binned(), or their column fractions with nColumn.
+    //! The cells as drawn: binned(), or theirs after the normalization.
     [[nodiscard]] const QCPColorMapData* shown() const;
-    void binsChanged();
+    void invalidateShown();
     void contoursChanged();
     void queueRefreshBinning();
     void binForExport();
@@ -213,17 +213,13 @@ public:
     {
         return this->apply([&](T& p) { p.setBins(keyBins, valueBins); });
     }
-    Ret setNormalization(QCPHistogram2D::Normalization norm)
+    Ret setNormalization(QCP::HistogramNormalization norm)
     {
         return this->apply([&](T& p) { p.setNormalization(norm); });
     }
-    Ret setKeyBinScale(QCPAxis::ScaleType type)
+    Ret setColumnNormalized(bool normalized)
     {
-        return this->apply([&](T& p) { p.setKeyBinScale(type); });
-    }
-    Ret setValueBinScale(QCPAxis::ScaleType type)
-    {
-        return this->apply([&](T& p) { p.setValueBinScale(type); });
+        return this->apply([&](T& p) { p.setColumnNormalized(normalized); });
     }
     Ret setContourLevels(const QVector<double>& levels)
     {

@@ -94,7 +94,7 @@ set(NEOQCP_SOURCES
     src/plottables/plottable-colormap2.cpp
     src/plottables/plottable-histogram2d.cpp
     src/plottables/plottable-histogram.cpp
-    src/plottables/histogram-geometry.cpp
+    src/plottables/plottable-histogram-base.cpp
     src/plottables/plottable-statisticalbox.cpp
     src/data-locator.cpp
     src/polar/layoutelement-angularaxis.cpp
@@ -173,6 +173,7 @@ set(NEOQCP_MOC_HEADERS
     src/datasource/async-pipeline.h
     src/plottables/plottable-colormap2.h
     src/plottables/plottable-histogram2d.h
+    src/plottables/plottable-histogram-base.h
     src/plottables/plottable-histogram.h
     src/qcp.h
     src/scatterstyle.h

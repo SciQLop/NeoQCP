@@ -1,15 +1,53 @@
 #include "test-histogram-plottable.h"
 #include "qcustomplot.h"
 #include "plottables/plottable-histogram.h"
-#include "plottables/histogram-geometry.h"
+#include "painting/draw-commands.h"
 #include "painting/plottable-rhi-layer.h"
 #include "datasource/soa-multi-datasource.h"
+#include <misuse.h>
 #include <QScopeGuard>
 #include <QThread>
+#include <algorithm>
 #include <atomic>
 #include <numeric>
+#include <variant>
 
 namespace {
+int gRefusals = 0;
+void countRefusal(const char*, const char*) { ++gRefusals; }
+
+struct Probe : QCPHistogram
+{
+    using QCPHistogram::QCPHistogram;
+    using QCPHistogram::canProduceContent;
+    void paintOn(QCPPainter* painter) { QCPDrawnBase<QCPAbstractPlottable>::draw(painter); }
+    [[nodiscard]] const QCPDrawnCore& core() const { return mCore; }
+};
+
+template <typename Command>
+int commandCount(const QCPDrawnCore& core)
+{
+    const auto& commands = core.recordedList().commands;
+    return int(std::count_if(commands.begin(), commands.end(),
+                             [](const auto& command) { return std::holds_alternative<Command>(command); }));
+}
+
+const qcp::RectsCmd* firstBatch(const QCPDrawnCore& core)
+{
+    for (const auto& command : core.recordedList().commands)
+        if (const auto* batch = std::get_if<qcp::RectsCmd>(&command))
+            return batch;
+    return nullptr;
+}
+
+const qcp::PolylineDataCmd* firstPolyline(const QCPDrawnCore& core)
+{
+    for (const auto& command : core.recordedList().commands)
+        if (const auto* line = std::get_if<qcp::PolylineDataCmd>(&command))
+            return line;
+    return nullptr;
+}
+
 using Src = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
 std::shared_ptr<Src> values(std::vector<double> v)
 {
@@ -120,6 +158,22 @@ void TestHistogramPlottable::binsInTheBackground()
     QCOMPARE(h->histogram()->heights[0].size(), std::size_t(4));
 }
 
+
+// The bins follow the key axis scale: no histogram-specific scale setting.
+void TestHistogramPlottable::binsFollowALogKeyAxis()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    h->setBins(3);
+    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    h->setDataSource(values({1, 10, 100, 1000}));
+    QVERIFY(waitForResult(h));
+    QVERIFY(h->histogram()->log);
+    QCOMPARE(h->histogram()->edges.front(), 1.0);
+    QCOMPARE(h->histogram()->edges[1], 10.0);
+    QCOMPARE(h->histogram()->edges[2], 100.0);
+    QCOMPARE(h->histogram()->edges.back(), 1000.0);
+    QCOMPARE(h->histogram()->heights[0], (std::vector<double> {1, 1, 2}));
+}
 void TestHistogramPlottable::preBinnedNeedsNoPipeline()
 {
     auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
@@ -143,11 +197,9 @@ void TestHistogramPlottable::autoEdgesStayWhenNewDataFitsInside()
     h->setDataSource(values({0, 10}));
     QVERIFY(waitForResult(h));
     const auto first = h->histogram()->edges;
-    QSignalSpy moved(h, &QCPHistogram::edgesChanged);
     h->setDataSource(values({2, 8}));
     QVERIFY(waitForResult(h));
     QCOMPARE(h->histogram()->edges, first);
-    QCOMPARE(moved.count(), 0);
 }
 
 void TestHistogramPlottable::autoEdgesWidenForDataOutside()
@@ -155,11 +207,10 @@ void TestHistogramPlottable::autoEdgesWidenForDataOutside()
     auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
     h->setDataSource(values({0, 10}));
     QVERIFY(waitForResult(h));
-    QSignalSpy moved(h, &QCPHistogram::edgesChanged);
     h->setDataSource(values({-5, 8}));
     QVERIFY(waitForResult(h));
     QCOMPARE(h->histogram()->edges.front(), -5.0);
-    QCOMPARE(moved.count(), 1);
+    QCOMPARE(h->histogram()->edges.back(), 10.0);
 }
 
 void TestHistogramPlottable::emptyDataAfterDataHasNoRangeAndNoCrash()
@@ -483,12 +534,10 @@ void TestHistogramPlottable::exportBinningEmitsNothing()
 {
     auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
     QSignalSpy ready(h, &QCPHistogram::histogramReady);
-    QSignalSpy moved(h, &QCPHistogram::edgesChanged);
     h->setDataSource(values({0, 1, 2, 3}));
     QVERIFY(!mPlot->toPixmap(400, 300).isNull());
     QVERIFY(h->histogram());
     QCOMPARE(ready.count(), 0);
-    QCOMPARE(moved.count(), 0);
 }
 
 void TestHistogramPlottable::exportWhileBinningShowsTheNewData()
@@ -523,106 +572,132 @@ void TestHistogramPlottable::barsAreDrawnUpToTheirHeight()
     QVERIFY(isRedish(px(1.5, 4.5)));
 }
 
-void TestHistogramPlottable::outlineRunsDoNotJoinBars()
+
+void TestHistogramPlottable::barsRecordFillAndOutline()
 {
-    const std::vector<qcp::histogram::BarRect> bars { {0, 10, 100, 50}, {10, 20, 100, 20} };
-    const auto runs = qcp::histogram::barOutlines(bars, false);
-    QCOMPARE(runs.size(), 5 + 1 + 5);
-    QVERIFY(std::isnan(runs[5].x()));
+    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
+    h->setColumnColors({Qt::red});
+    h->setBinned({0, 1, 2}, {{3, 6}});
+    mPlot->xAxis->setRange(0, 2);
+    mPlot->yAxis->setRange(0, 8);
+    QVERIFY(!mPlot->toPixmap(400, 300).isNull());
+    const auto* batch = firstBatch(h->core());
+    QVERIFY(batch);
+    QCOMPARE(batch->brush.color(), QColor(Qt::red));
+    QCOMPARE(batch->pen.color(), QColor(Qt::red).darker(125));
 }
 
-void TestHistogramPlottable::stepOutlineIsTheTopProfile()
+void TestHistogramPlottable::barsRecordAtTheirAxisCoordinates()
 {
-    const std::vector<qcp::histogram::BarRect> bars { {0, 10, 100, 50}, {10, 20, 100, 20} };
-    const auto run = qcp::histogram::stepOutline(bars, false);
-    QCOMPARE(run.first(), QPointF(0, 100));
-    QCOMPARE(run.last(), QPointF(20, 100));
-    QVERIFY(run.contains(QPointF(10, 50)) && run.contains(QPointF(10, 20)));
+    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
+    h->setBinned({0, 1, 2}, {{3, 6}});
+    mPlot->xAxis->setRange(0, 2);
+    mPlot->yAxis->setRange(0, 8);
+    QVERIFY(!mPlot->toPixmap(400, 300).isNull());
+    const auto* batch = firstBatch(h->core());
+    QVERIFY(batch);
+    QCOMPARE(batch->boxes->aKey, (std::vector<double> {0, 1}));
+    QCOMPARE(batch->boxes->aValue, (std::vector<double> {0, 0}));
+    QCOMPARE(batch->boxes->bKey, (std::vector<double> {1, 2}));
+    QCOMPARE(batch->boxes->bValue, (std::vector<double> {3, 6}));
 }
 
-namespace {
-std::vector<qcp::histogram::BarRect> rectsOf(QCustomPlot* plot, const qcp::algo::Histogram1D& h, int column)
+void TestHistogramPlottable::histogramColumnIsOneBatch()
 {
-    return qcp::histogram::barRects(h, column, plot->xAxis, plot->yAxis);
-}
-const qcp::algo::Histogram1D twoBins { .edges = {0, 1, 2}, .heights = {{3, 6}}, .counted = {9} };
-}
-
-void TestHistogramPlottable::barRectsOfAMissingColumnAreEmpty()
-{
-    QCOMPARE(rectsOf(mPlot, twoBins, 0).size(), std::size_t(2));
-    QVERIFY(rectsOf(mPlot, twoBins, -1).empty());
-    QVERIFY(rectsOf(mPlot, twoBins, 1).empty());
+    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
+    h->setBinned({0, 1, 2, 3}, {{3, 6, 2}});
+    mPlot->xAxis->setRange(0, 3);
+    mPlot->yAxis->setRange(0, 8);
+    QVERIFY(!mPlot->toPixmap(400, 300).isNull());
+    QCOMPARE(int(h->core().recordedCommandCount()), 1);
+    const auto* batch = firstBatch(h->core());
+    QVERIFY(batch);
+    QCOMPARE(int(batch->boxes->aKey.size()), 3);
 }
 
-void TestHistogramPlottable::barRectsOfRaggedEdgesAreEmpty()
+void TestHistogramPlottable::aPanKeepsTheRecording()
 {
-    const qcp::algo::Histogram1D tooManyHeights { .edges = {0, 1, 2}, .heights = {{3, 6, 5, 4}}, .counted = {9} };
-    const qcp::algo::Histogram1D tooManyEdges { .edges = {0, 1, 2, 3, 4}, .heights = {{3, 6}}, .counted = {9} };
-    const qcp::algo::Histogram1D oneEdge { .edges = {0}, .heights = {{3}}, .counted = {3} };
-    QVERIFY(rectsOf(mPlot, tooManyHeights, 0).empty());
-    QVERIFY(rectsOf(mPlot, tooManyEdges, 0).empty());
-    QVERIFY(rectsOf(mPlot, oneEdge, 0).empty());
+    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
+    h->setBinned({0, 1, 2}, {{3, 6}});
+    mPlot->xAxis->setRange(0, 2);
+    mPlot->yAxis->setRange(0, 8);
+    QVERIFY(!mPlot->toPixmap(400, 300).isNull());
+    QVERIFY(h->core().hasRecording());
+    const auto recordings = h->core().recordingCount();
+    mPlot->xAxis->moveRange(0.5);
+    QVERIFY(!mPlot->toPixmap(400, 300).isNull());
+    QCOMPARE(h->core().recordingCount(), recordings);
 }
 
-void TestHistogramPlottable::logAxisMarksOnlyNonPositiveOrNonFiniteBarsAbsent()
+void TestHistogramPlottable::stepIsOnePolylinePerColumn()
 {
+    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
+    h->setColumnColors({Qt::red, Qt::blue});
+    h->setStyle(QCPHistogram::sStep);
+    h->setBinned({0, 1, 2}, {{3, 6}, {1, 2}});
+    mPlot->xAxis->setRange(0, 2);
+    mPlot->yAxis->setRange(0, 8);
+    QVERIFY(!mPlot->toPixmap(400, 300).isNull());
+    QCOMPARE(commandCount<qcp::PolylineDataCmd>(h->core()), 2);
+    QCOMPARE(commandCount<qcp::RectsCmd>(h->core()), 2);
+}
+
+void TestHistogramPlottable::stepRecordsOnlyAPolyline()
+{
+    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
+    h->setColumnColors({Qt::red});
+    h->setStyle(QCPHistogram::sStep);
+    h->setBinned({0, 1, 2}, {{3, 6}});
+    mPlot->xAxis->setRange(0, 2);
+    mPlot->yAxis->setRange(0, 8);
+    QVERIFY(!mPlot->toPixmap(400, 300).isNull());
+    QCOMPARE(commandCount<qcp::RectsCmd>(h->core()), 0);
+    const auto* line = firstPolyline(h->core());
+    QVERIFY(line);
+    QCOMPARE(line->points->front(), QPointF(0, 0));
+    QCOMPARE(line->points->back(), QPointF(2, 0));
+    QVERIFY(std::find(line->points->begin(), line->points->end(), QPointF(1, 3)) != line->points->end());
+    QVERIFY(std::find(line->points->begin(), line->points->end(), QPointF(2, 6)) != line->points->end());
+}
+
+void TestHistogramPlottable::logValueAxisDrawsOnlyPositiveHeights()
+{
+    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
     mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
     mPlot->yAxis->setRange(1, 10);
-    const qcp::algo::Histogram1D h { .edges = {0, 1, 2, 3, 4, 5},
-                                     .heights = {{1, 0, -3, qQNaN(), 4}}, .counted = {5}, .log = true };
-    const auto bars = rectsOf(mPlot, h, 0);
-    QVERIFY(!bars[0].absent);
-    QCOMPARE(bars[0].top, mPlot->yAxis->coordToPixel(1));
-    QVERIFY(bars[1].absent);
-    QVERIFY(bars[2].absent);
-    QVERIFY(bars[3].absent);
-    QVERIFY(!bars[4].absent);
+    h->setBinned({0, 1, 2, 3, 4, 5}, {{1, 0, -3, qQNaN(), 4}});
+    mPlot->xAxis->setRange(0, 5);
+    QVERIFY(!mPlot->toPixmap(400, 300).isNull());
+    const auto* batch = firstBatch(h->core());
+    QVERIFY(batch);
+    QCOMPARE(int(batch->boxes->aKey.size()), 2);
+    QCOMPARE(batch->boxes->bValue, (std::vector<double> {1, 4}));
 }
 
-void TestHistogramPlottable::stepOutlineBreaksAtAnAbsentBar()
+void TestHistogramPlottable::stepBreaksAtAnAbsentBar()
 {
+    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
+    h->setStyle(QCPHistogram::sStep);
     mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
     mPlot->yAxis->setRange(1, 10);
-    const qcp::algo::Histogram1D h { .edges = {0, 1, 2, 3}, .heights = {{4, 0, 4}}, .counted = {8}, .log = true };
-    const auto bars = rectsOf(mPlot, h, 0);
-    const auto run = qcp::histogram::stepOutline(bars, false);
-    QCOMPARE(run.size(), 4 + 1 + 4);
-    QVERIFY(std::isnan(run[4].x()));
-    QCOMPARE(run[3], QPointF(bars[0].right, bars[0].base));
-    QCOMPARE(run[5], QPointF(bars[2].left, bars[2].base));
+    h->setBinned({0, 1, 2, 3}, {{4, 0, 4}});
+    mPlot->xAxis->setRange(0, 3);
+    QVERIFY(!mPlot->toPixmap(400, 300).isNull());
+    QVERIFY(h->core().recordedPolylineNaNs() > 0);
 }
 
-void TestHistogramPlottable::gpuQuadsOfBarsWithAGapStayInsideTheirBar()
+void TestHistogramPlottable::emptyBinsOnALogAxisHaveNoBoxes()
 {
-    const std::array<float, 4> rgba { 1, 0, 0, 1 };
-    const std::vector<qcp::histogram::BarRect> bars { {0, 10, 100, 50}, {20, 30, 100, 20} };
-    std::vector<float> out;
-    qcp::histogram::appendBarQuads(bars, false, rgba, out);
-    constexpr std::size_t floatsPerTriangle = 3 * 6;
-    QCOMPARE(out.size(), 2 * 2 * floatsPerTriangle);
-    for (std::size_t t = 0; t < out.size(); t += floatsPerTriangle)
-    {
-        const float x0 = out[t], x1 = out[t + 6], x2 = out[t + 12];
-        const float lo = std::min({x0, x1, x2}), hi = std::max({x0, x1, x2});
-        QVERIFY2((lo >= 0 && hi <= 10) || (lo >= 20 && hi <= 30), qPrintable(QString::number(lo) + " " + QString::number(hi)));
-    }
-}
-
-void TestHistogramPlottable::emptyBinsOnALogAxisStayOutOfTheOutline()
-{
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
     h->setBinned({0, 1, 2, 3}, {{4, 0, 4}});
     mPlot->xAxis->setRange(0, 3);
     mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
     mPlot->yAxis->setRange(1, 10);
-    mPlot->replot();
-    const auto bars = qcp::histogram::barRects(*h->histogram(), 0, mPlot->xAxis, mPlot->yAxis);
-    QCOMPARE(bars[1].top, bars[1].base);
-    for (const QPointF& p : qcp::histogram::stepOutline(bars, false))
-        QVERIFY(std::isnan(p.x()) || std::isfinite(p.y()));
+    QVERIFY(!mPlot->toPixmap(400, 300).isNull());
+    const auto* batch = firstBatch(h->core());
+    QVERIFY(batch);
+    QCOMPARE(int(batch->boxes->aKey.size()), 2);
 }
-
 // Drawing ignores the selection state, so a click must not select something that looks the same.
 void TestHistogramPlottable::aHistogramIsNotSelectable()
 {
@@ -647,24 +722,6 @@ void TestHistogramPlottable::verticalKeyAxisGrowsBarsAlongX()
     const auto at = [&](double value, double key) {
         return QPointF(mPlot->xAxis->coordToPixel(value), mPlot->yAxis->coordToPixel(key));
     };
-
-    const auto bars = qcp::histogram::barRects(*h->histogram(), 0, mPlot->yAxis, mPlot->xAxis);
-    QCOMPARE(bars.size(), std::size_t(2));
-    QCOMPARE(bars[0].left, mPlot->yAxis->coordToPixel(0));
-    QCOMPARE(bars[0].base, mPlot->xAxis->coordToPixel(0));
-    QCOMPARE(bars[0].top, mPlot->xAxis->coordToPixel(6));
-    const QRectF r = qcp::histogram::pixelRect(bars[0], true);
-    QCOMPARE(r.left(), mPlot->xAxis->coordToPixel(0));
-    QCOMPARE(r.right(), mPlot->xAxis->coordToPixel(6));
-    QCOMPARE(r.top(), mPlot->yAxis->coordToPixel(1));
-    QCOMPARE(r.bottom(), mPlot->yAxis->coordToPixel(0));
-    const auto outline = qcp::histogram::barOutlines(bars, true);
-    QCOMPARE(outline[0], at(0, 0));
-    QCOMPARE(outline[1], at(6, 0));
-    QCOMPARE(outline[2], at(6, 1));
-    QVERIFY(qcp::histogram::contains(bars, at(4.5, 0.5), true));
-    QVERIFY(!qcp::histogram::contains(bars, at(4.5, 1.5), true));
-    QVERIFY(qcp::histogram::contains(bars, at(1.5, 1.5), true));
 
     for (const double key : {0.25, 0.75, 1.25, 1.75})
         for (const double value : {0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5})
@@ -696,7 +753,6 @@ void TestHistogramPlottable::barsAreDrawnOnTheGpu()
     mPlot->xAxis->setRange(0, 2);
     mPlot->yAxis->setRange(0, 8);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(!mPlot->plottableRhiLayer(h->layer())->drawEntries().isEmpty());
     const QImage frame = mPlot->grabFramebuffer();
     const double dpr = frame.devicePixelRatio();
     const auto px = [&](double x, double y) {
@@ -707,21 +763,16 @@ void TestHistogramPlottable::barsAreDrawnOnTheGpu()
     QVERIFY(!isRedish(px(0.5, 4.5)));
 }
 
-void TestHistogramPlottable::emptyBinOnALinearAxisKeepsTheStepRun()
+void TestHistogramPlottable::emptyBinOnALinearAxisKeepsTheStepLine()
 {
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
+    h->setStyle(QCPHistogram::sStep);
     h->setBinned({0, 1, 2, 3}, {{4, 0, 4}});
     mPlot->xAxis->setRange(0, 3);
     mPlot->yAxis->setRange(0, 10);
-    mPlot->replot();
-    const auto bars = qcp::histogram::barRects(*h->histogram(), 0, mPlot->xAxis, mPlot->yAxis);
-    const auto run = qcp::histogram::stepOutline(bars, false);
-    for (const QPointF& p : run)
-        QVERIFY(!std::isnan(p.x()));
-    QVERIFY(run.contains(QPointF(bars[1].left, bars[1].base)));
-    QVERIFY(run.contains(QPointF(bars[1].right, bars[1].base)));
+    QVERIFY(!mPlot->toPixmap(400, 300).isNull());
+    QCOMPARE(h->core().recordedPolylineNaNs(), 0);
 }
-
 namespace {
 QColor exportedPixel(QCustomPlot* plot, double x, double y)
 {
@@ -789,15 +840,6 @@ void TestHistogramPlottable::readySlotRemovingTheHistogramIsSafe()
     QTest::qWait(50);
 }
 
-void TestHistogramPlottable::edgesSlotRemovingTheHistogramIsSafe()
-{
-    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
-    removeOn(mPlot, h, &QCPHistogram::edgesChanged);
-    h->setDataSource(values({0, 1, 2, 3, 4}));
-    QTRY_COMPARE_WITH_TIMEOUT(mPlot->plottableCount(), 0, 5000);
-    QTest::qWait(50);
-}
-
 void TestHistogramPlottable::preBinnedReadySlotRemovingTheHistogramIsSafe()
 {
     auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
@@ -807,13 +849,6 @@ void TestHistogramPlottable::preBinnedReadySlotRemovingTheHistogramIsSafe()
 }
 
 namespace {
-struct Probe : QCPHistogram
-{
-    using QCPHistogram::QCPHistogram;
-    using QCPHistogram::canProduceContent;
-    using QCPHistogram::draw;
-};
-
 QImage exportWithoutAntialiasing(QCustomPlot* plot)
 {
     plot->setNotAntialiasedElements(QCP::aeAll);
@@ -955,7 +990,7 @@ void TestHistogramPlottable::normalizationIsAppliedToTheBars()
 {
     auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
     h->setBins(2);
-    h->setNormalization(qcp::algo::HistogramNormalization::Probability);
+    h->setNormalization(QCP::HistogramNormalization::Probability);
     h->setDataSource(values({0, 1, 2, 3}));
     QVERIFY(waitForResult(h));
     QCOMPARE(h->histogram()->heights[0], (std::vector<double>{0.5, 0.5}));
@@ -1004,12 +1039,16 @@ void TestHistogramPlottable::resultOfTheOldScaleIsResetWithoutADraw()
 
 void TestHistogramPlottable::nonPositiveBinCountsAreIgnored()
 {
+    gRefusals = 0;
+    const auto previous = qcp::setMisuseHandler(countRefusal);
+    const auto restore = qScopeGuard([previous] { qcp::setMisuseHandler(previous); });
     auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
     h->setBins(4);
     h->setBins(0);
     QCOMPARE(h->bins(), 4);
     h->setBins(-3);
     QCOMPARE(h->bins(), 4);
+    QCOMPARE(gRefusals, 2); // refused, saying why
 }
 
 void TestHistogramPlottable::theSameBinCountDoesNotRebin()
@@ -1216,7 +1255,7 @@ void TestHistogramPlottable::fillHasNoBorderWhateverPenThePainterHad()
     {
         QCPPainter painter(&img);
         painter.setPen(QPen(Qt::green));
-        h->draw(&painter);
+        h->paintOn(&painter);
     }
     const int y = pixelY(mPlot, 1.5), edge = pixelX(mPlot, 1.0);
     for (int x = edge - 1; x <= edge + 1; ++x)
@@ -1240,60 +1279,16 @@ void TestHistogramPlottable::anAlmostTransparentFillStillPaints()
     QCOMPARE(inside.blue(), 254);
 }
 
-namespace {
-QVector<QCPPlottableRhiLayer::DrawEntry> gpuEntries(QCustomPlot* plot, QCPHistogram* h)
+void TestHistogramPlottable::anAlmostTransparentFillIsRecorded()
 {
-    plot->replot(QCustomPlot::rpImmediateRefresh);
-    return plot->plottableRhiLayer(h->layer())->drawEntries();
-}
-
-QCPHistogram* gpuHistogram(QCustomPlot* plot, QCPHistogram::Style style, QColor color)
-{
-    auto* h = new QCPHistogram(plot->xAxis, plot->yAxis);
-    h->setColumnColors({color});
-    h->setStyle(style);
+    auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);
+    h->setColumnColors({QColor(255, 0, 0, 1)});
     h->setBinned({0, 1, 2}, {{3, 6}});
-    plot->xAxis->setRange(0, 2);
-    plot->yAxis->setRange(0, 8);
-    return h;
-}
-}
-
-void TestHistogramPlottable::gpuBarsHaveFillAndOutline()
-{
-    if (!showWithRhi(mPlot))
-        QSKIP("no QRhi available in this environment");
-    const auto drawn = gpuEntries(mPlot, gpuHistogram(mPlot, QCPHistogram::sBars, Qt::red));
-    QCOMPARE(drawn.size(), 1);
-    QVERIFY(drawn[0].fillVertexCount > 0);
-    QVERIFY(drawn[0].vertexCount > drawn[0].fillVertexCount);
-}
-
-void TestHistogramPlottable::gpuBarsAreNotShifted()
-{
-    if (!showWithRhi(mPlot))
-        QSKIP("no QRhi available in this environment");
-    const auto drawn = gpuEntries(mPlot, gpuHistogram(mPlot, QCPHistogram::sBars, Qt::red));
-    QCOMPARE(drawn.size(), 1);
-    QCOMPARE(drawn[0].offsetX, 0.0f);
-    QCOMPARE(drawn[0].offsetY, 0.0f);
-}
-
-void TestHistogramPlottable::gpuStepOfOneColumnHasOnlyTheOutline()
-{
-    if (!showWithRhi(mPlot))
-        QSKIP("no QRhi available in this environment");
-    const auto drawn = gpuEntries(mPlot, gpuHistogram(mPlot, QCPHistogram::sStep, Qt::red));
-    QCOMPARE(drawn.size(), 1);
-    QCOMPARE(drawn[0].fillVertexCount, 0);
-    QVERIFY(drawn[0].vertexCount > 0);
-}
-
-void TestHistogramPlottable::gpuAnAlmostTransparentFillStillDraws()
-{
-    if (!showWithRhi(mPlot))
-        QSKIP("no QRhi available in this environment");
-    const auto drawn = gpuEntries(mPlot, gpuHistogram(mPlot, QCPHistogram::sBars, QColor(255, 0, 0, 1)));
-    QCOMPARE(drawn.size(), 1);
-    QVERIFY(drawn[0].fillVertexCount > 0);
+    mPlot->xAxis->setRange(0, 2);
+    mPlot->yAxis->setRange(0, 8);
+    QVERIFY(!mPlot->toPixmap(400, 300).isNull());
+    const auto* batch = firstBatch(h->core());
+    QVERIFY(batch);
+    QCOMPARE(batch->brush.color().alpha(), 1);
+    QCOMPARE(int(batch->boxes->aKey.size()), 2);
 }

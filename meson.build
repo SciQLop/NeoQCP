@@ -128,6 +128,7 @@ neoqcp_moc_headers = ['src/axis/axis.h',
             'src/datasource/async-pipeline.h',
             'src/plottables/plottable-colormap2.h',
             'src/plottables/plottable-histogram2d.h',
+            'src/plottables/plottable-histogram-base.h',
             'src/plottables/plottable-histogram.h',
             'src/qcp.h',
             'src/scatterstyle.h',
@@ -345,7 +346,7 @@ NeoQCP = static_library('NeoQCP',
            'src/plottables/plottable-colormap2.cpp',
            'src/plottables/plottable-histogram2d.cpp',
            'src/plottables/plottable-histogram.cpp',
-           'src/plottables/histogram-geometry.cpp',
+           'src/plottables/plottable-histogram-base.cpp',
            'src/plottables/plottable-statisticalbox.cpp',
            'src/data-locator.cpp',
            'src/polar/layoutelement-angularaxis.cpp',
@@ -359,7 +360,7 @@ NeoQCP = static_library('NeoQCP',
            cpp_args:cpp_args,
            dependencies: [qtdeps, profiling_hook_dep] + optional_deps + latex_deps,
            install: true,
-           extra_files: [neoqcp_moc_headers, 'src/handle-ops.h', 'src/construct.h', 'src/plottables/multigraph-fill.h', 'src/plottables/histogram-geometry.h', 'src/datasource/histogram-binner-1d.h', 'src/plottables/multigraph-errorbars.h', 'src/plottables/plottable-geometry-utils.h', 'src/Profiling.hpp', 'src/painting/paintbuffer-rhi.h', 'src/painting/plottable-rhi-layer.h', 'src/painting/raster-fallback.h', 'src/painting/span-rhi-layer.h', 'src/painting/grid-rhi-layer.h', 'src/painting/scatter-rhi-layer.h']
+           extra_files: [neoqcp_moc_headers, 'src/handle-ops.h', 'src/construct.h', 'src/plottables/multigraph-fill.h', 'src/plottables/plottable-histogram-base.h', 'src/datasource/histogram-binner-1d.h', 'src/plottables/multigraph-errorbars.h', 'src/plottables/plottable-geometry-utils.h', 'src/Profiling.hpp', 'src/painting/paintbuffer-rhi.h', 'src/painting/plottable-rhi-layer.h', 'src/painting/raster-fallback.h', 'src/painting/span-rhi-layer.h', 'src/painting/grid-rhi-layer.h', 'src/painting/scatter-rhi-layer.h']
            )
 
 

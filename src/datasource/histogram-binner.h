@@ -3,6 +3,7 @@
 #include <plottables/plottable-colormap.h>
 #include <cmath>
 #include <algorithm>
+#include <vector>
 
 namespace qcp::algo {
 
@@ -52,6 +53,38 @@ inline void expandIfFlat(QCPRange& range, bool log)
         range.lower -= 0.5;
         range.upper += 0.5;
     }
+}
+
+//! One bin count in display units. `measure` is the bin width in data units (2D: the cell area);
+//! both histograms go through this, so they share their normalization.
+inline double normalized(double count, double total, double measure, QCP::HistogramNormalization norm)
+{
+    switch (norm)
+    {
+    case QCP::HistogramNormalization::Count:
+        return count;
+    case QCP::HistogramNormalization::Probability:
+        return total > 0 ? count / total : 0;
+    case QCP::HistogramNormalization::Density:
+        return total > 0 && measure > 0 ? count / (total * measure) : 0;
+    }
+    return count;
+}
+
+//! Width of each bin in data units, matching BinAxis's even spacing in linear or log10 space.
+inline std::vector<double> binWidths(const QCPRange& range, int bins, bool log)
+{
+    std::vector<double> widths(static_cast<std::size_t>(std::max(0, bins)), 0.0);
+    const BinAxis axis = BinAxis::make(range, bins, log);
+    if (!(axis.invWidth > 0))
+        return widths;
+    for (int i = 0; i < bins; ++i)
+    {
+        const double lo = axis.lo + i / axis.invWidth;
+        const double hi = axis.lo + (i + 1) / axis.invWidth;
+        widths[std::size_t(i)] = log ? std::pow(10.0, hi) - std::pow(10.0, lo) : hi - lo;
+    }
+    return widths;
 }
 
 inline QCPColorMapData* bin2d(const QCPAbstractDataSource& src, int keyBins, int valueBins,

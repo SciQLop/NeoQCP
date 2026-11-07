@@ -16,8 +16,6 @@ struct Histogram1D
     bool log = false;
 };
 
-enum class HistogramNormalization { Count, Density, Probability };
-
 namespace detail {
 
 inline bool binnable(double v, bool positiveOnly)
@@ -91,19 +89,16 @@ inline Histogram1D bin1d(const QCPAbstractMultiDataSource& src, QCPRange range, 
 }
 
 //! Count: unchanged. Probability: count / N. Density: count / (N * width of that bin).
-inline void normalize(Histogram1D& h, HistogramNormalization norm)
+inline void normalize(Histogram1D& h, QCP::HistogramNormalization norm)
 {
-    if (norm == HistogramNormalization::Count)
+    if (norm == QCP::HistogramNormalization::Count)
         return;
     for (std::size_t c = 0; c < h.heights.size(); ++c)
     {
         if (h.counted[c] == 0)
             continue;
         for (std::size_t b = 0; b < h.heights[c].size(); ++b)
-        {
-            const double width = norm == HistogramNormalization::Density ? h.edges[b + 1] - h.edges[b] : 1.0;
-            h.heights[c][b] /= h.counted[c] * width;
-        }
+            h.heights[c][b] = normalized(h.heights[c][b], h.counted[c], h.edges[b + 1] - h.edges[b], norm);
     }
 }
 

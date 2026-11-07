@@ -5,13 +5,13 @@
 #include <core.h>
 #include <layer.h>
 #include <layoutelements/layoutelement-axisrect.h>
-#include <painting/line-extruder.h>
-#include <painting/painter.h>
-#include <painting/plottable-rhi-layer.h>
-#include <painting/rhi-utils.h>
+#include <misuse.h>
+#include <painting/draw-context.h>
 #include <Profiling.hpp>
 #include <algorithm>
+#include <cmath>
 #include <limits>
+#include <vector>
 
 using namespace qcp::algo;
 
@@ -70,7 +70,7 @@ double largest(const std::vector<std::vector<double>>& heights)
 } // namespace
 
 QCPHistogram::QCPHistogram(QCPAxis* keyAxis, QCPAxis* valueAxis)
-    : QCPAbstractPlottable(keyAxis, valueAxis)
+    : QCPDrawn<QCPAbstractPlottable>(keyAxis, valueAxis)
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
 {
     installTransform();
@@ -110,10 +110,10 @@ bool QCPHistogram::autoEdges() const
 
 void QCPHistogram::installTransform()
 {
-    const int bins = mBins;
+    const int bins = mBins.get();
     const bool log = keyLog();
     mBinnedKeyLog = log;
-    const auto normalization = mNormalization;
+    const auto normalization = mNormalization.get();
     const auto fixed = mFixedRange;
     const auto autoRange = mAutoRange;
     mPipeline.setTransform(TransformKind::ViewportIndependent,
@@ -218,10 +218,10 @@ void QCPHistogram::setBinned(std::vector<double> edges, std::vector<std::vector<
 
 void QCPHistogram::setBins(int bins)
 {
-    if (bins <= 0 || bins == mBins)
+    QCP_CHECK_OR_RETURN(bins > 0, "a histogram needs at least one bin", );
+    if (!mBins.set(bins))
         return;
     markDirty();
-    mBins = bins;
     refreshBinning();
 }
 
@@ -237,12 +237,11 @@ void QCPHistogram::setFixedRange(std::optional<QCPRange> range)
     refreshBinning();
 }
 
-void QCPHistogram::setNormalization(HistogramNormalization norm)
+void QCPHistogram::setNormalization(QCP::HistogramNormalization norm)
 {
-    if (norm == mNormalization)
+    if (!mNormalization.set(norm))
         return;
     markDirty();
-    mNormalization = norm;
     refreshBinning();
 }
 
@@ -264,24 +263,21 @@ void QCPHistogram::resetEdges()
     refreshBinning();
 }
 
-bool QCPHistogram::storeResult(std::shared_ptr<Histogram1D> result)
+void QCPHistogram::storeResult(std::shared_ptr<Histogram1D> result)
 {
     const bool edgesMoved = result && (!mResult || mResult->edges != result->edges);
     mResult = std::move(result);
     if (edgesMoved)
         rememberEdges();
-    return edgesMoved;
 }
 
 // Repaints before it signals: a slot may delete this histogram.
 void QCPHistogram::takeResult(std::shared_ptr<Histogram1D> result)
 {
-    const bool edgesMoved = storeResult(std::move(result));
+    storeResult(std::move(result));
     requestReplot();
-    // Two emissions, and a slot may delete this histogram: deliver at the outermost call.
+    // A slot may delete this histogram: deliver at the outermost call.
     const QCPEmissionScope scope(mParentPlot);
-    if (edgesMoved)
-        qcpEmit(this, mParentPlot, &QCPHistogram::edgesChanged);
     qcpEmit(this, mParentPlot, &QCPHistogram::histogramReady);
 }
 
@@ -344,27 +340,95 @@ bool QCPHistogram::canProduceContent() const
     return mKeyAxis && mValueAxis && (mResult || mPipeline.isBusy());
 }
 
-void QCPHistogram::draw(QCPPainter* painter)
+void QCPHistogram::draw(QCPDrawContext& context) const
 {
     PROFILE_HERE_N("QCPHistogram::draw");
+    auto* self = const_cast<QCPHistogram*>(this);
     const bool staleScale = scaleIsStale();
     if (staleScale)
-        queueResetEdges();
+        self->queueResetEdges();
     // Export does not pump the event loop, so a background result would never arrive.
-    if ((staleScale || !mResult || mPipeline.isBusy())
-        && painter->modes().testFlag(QCPPainter::pmNoCaching))
-        binForExport();
+    if (context.exporting() && (staleScale || !mResult || mPipeline.isBusy()))
+        self->binForExport();
     if (!mResult || !mKeyAxis || !mValueAxis)
         return;
-    auto* layer = qcp::gpuLayer(mParentPlot, mLayer, painter->isExporting());
     for (int c = 0; c < int(mResult->heights.size()); ++c)
     {
-        const auto bars = columnBars(c);
-        if (layer)
-            drawColumnOnGpu(painter, layer, bars, columnLook(c));
+        const ColumnLook look = columnLook(c);
+        if (mStyle == sBars)
+            recordBars(context, c, look);
         else
-            paintColumn(painter, bars, columnLook(c));
+            recordStep(context, c, look);
     }
+}
+
+// One rect per drawable bin. The same pen and brush join the whole column into one batch, so a
+// pan only moves it.
+void QCPHistogram::recordRects(QCPDrawContext& context, int column, const QPen& pen,
+                               const QBrush& brush) const
+{
+    const auto& heights = mResult->heights[std::size_t(column)];
+    const bool log = mValueAxis->scaleType() == QCPAxis::stLogarithmic;
+    for (std::size_t b = 0; b < heights.size(); ++b)
+    {
+        if (!drawableHeight(heights[b], log))
+            continue;
+        context.rect(QCP::Data{ mResult->edges[b], 0.0 },
+                     QCP::Data{ mResult->edges[b + 1], heights[b] }, pen, brush);
+    }
+}
+
+void QCPHistogram::recordBars(QCPDrawContext& context, int column, const ColumnLook& look) const
+{
+    recordRects(context, column, look.outline, look.fill);
+}
+
+// The top profile in data space: up over each bin, down to the base, one NaN break per gap. Same
+// shape as the old pixel outline, so the recording survives a pan.
+void QCPHistogram::recordStep(QCPDrawContext& context, int column, const ColumnLook& look) const
+{
+    // The fill has no edge of its own: the polyline below is the only outline of a step.
+    if (look.fill.alpha() > 0)
+        recordRects(context, column, QPen(Qt::NoPen), look.fill);
+    const auto& heights = mResult->heights[std::size_t(column)];
+    const bool log = mValueAxis->scaleType() == QCPAxis::stLogarithmic;
+    const QPointF breakPoint(qQNaN(), qQNaN());
+    std::vector<QPointF> points;
+    points.reserve(4 * heights.size() + 2);
+    bool inRun = false;
+    for (std::size_t b = 0; b < heights.size(); ++b)
+    {
+        if (absentHeight(heights[b], log))
+        {
+            inRun = false;
+            continue;
+        }
+        if (!inRun && !points.empty())
+            points.push_back(breakPoint);
+        inRun = true;
+        const double left = mResult->edges[b];
+        const double right = mResult->edges[b + 1];
+        points.emplace_back(left, 0.0);
+        points.emplace_back(left, heights[b]);
+        points.emplace_back(right, heights[b]);
+        points.emplace_back(right, 0.0);
+    }
+    if (!points.empty())
+        context.polyline(std::make_shared<const std::vector<QPointF>>(std::move(points)),
+                         look.outline);
+}
+
+// A zero height covers no pixels, and a log axis can only place positive ones.
+bool QCPHistogram::drawableHeight(double height, bool log)
+{
+    return std::isfinite(height) && (log ? height > 0 : height != 0);
+}
+
+// A step run still visits an empty bin on a linear axis, at the base: only a bar the axis cannot
+// place is a gap.
+bool QCPHistogram::absentHeight(double height, bool log)
+{
+    return !std::isfinite(height) || (log && height <= 0);
 }
 
 QCPHistogram::ColumnLook QCPHistogram::columnLook(int column) const
@@ -379,66 +443,16 @@ QCPHistogram::ColumnLook QCPHistogram::columnLook(int column) const
     return {fill, QPen(color, 1)};
 }
 
-bool QCPHistogram::keyIsVertical() const
+// The icon is the unit square in data space; one slot per column, full height.
+void QCPHistogram::drawLegendIcon(QCPDrawContext& icon) const
 {
-    return mKeyAxis->orientation() == Qt::Vertical;
-}
-
-std::vector<qcp::histogram::BarRect> QCPHistogram::columnBars(int column) const
-{
-    return qcp::histogram::barRects(*mResult, column, mKeyAxis.data(), mValueAxis.data());
-}
-
-QVector<QPointF> QCPHistogram::outline(std::span<const qcp::histogram::BarRect> bars) const
-{
-    return mStyle == sBars ? qcp::histogram::barOutlines(bars, keyIsVertical())
-                           : qcp::histogram::stepOutline(bars, keyIsVertical());
-}
-
-// Built from the current axes on every frame: no pan offset.
-void QCPHistogram::drawColumnOnGpu(QCPPainter* painter, QCPPlottableRhiLayer* layer,
-                                   std::span<const qcp::histogram::BarRect> bars,
-                                   const ColumnLook& look)
-{
-    std::vector<float> fill;
-    if (look.fill.alpha() > 0)
-        qcp::histogram::appendBarQuads(bars, keyIsVertical(), qcp::rhi::premultipliedColor(look.fill),
-                                       fill);
-    const double dpr = mParentPlot->bufferDevicePixelRatio();
-    // simplify: re-extruded per frame; fine for the hundreds of bins histograms use. Cache with
-    // qcp::ExtrusionCache (drawPolylineCached) if a 10^5-bin case appears.
-    const QVector<float> stroke = QCPLineExtruder::extrudePolyline(
-        outline(bars), qcp::extrusionPenWidth(look.outline, dpr), look.outline.color());
-    if (fill.empty() && stroke.isEmpty())
-        return;
-    layer->addPlottable(fill, stroke, clipRect(), dpr, mParentPlot->rhiOutputSize().height(), 0, 0,
-                        float(painter->opacity()));
-}
-
-void QCPHistogram::paintColumn(QCPPainter* painter, std::span<const qcp::histogram::BarRect> bars,
-                               const ColumnLook& look) const
-{
-    painter->setPen(Qt::NoPen);
-    painter->setBrush(look.fill);
-    for (const auto& bar : bars)
-        if (look.fill.alpha() > 0 && !qcp::histogram::isEmpty(bar))
-            painter->drawRect(qcp::histogram::pixelRect(bar, keyIsVertical()));
-    painter->setPen(look.outline);
-    painter->setBrush(Qt::NoBrush);
-    qcp::drawPolylineSplitNaN(painter, outline(bars));
-}
-
-void QCPHistogram::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
-{
-    applyDefaultAntialiasingHint(painter);
-    const int columns = mResult ? std::max<int>(1, mResult->heights.size()) : 1;
-    const double width = rect.width() / columns;
+    icon.rect(QCP::Data{ 0, 0 }, QCP::Data{ 1, 1 }, QPen(Qt::NoPen), QBrush(Qt::transparent));
+    const int columns = mResult ? std::max(1, int(mResult->heights.size())) : 1;
     for (int c = 0; c < columns; ++c)
     {
         const ColumnLook look = columnLook(c);
-        painter->setPen(look.outline);
-        painter->setBrush(look.fill);
-        painter->drawRect(QRectF(rect.left() + c * width, rect.top(), width, rect.height()));
+        icon.rect(QCP::Data{ double(c) / columns, 0.0 }, QCP::Data{ double(c + 1) / columns, 1.0 },
+                  look.outline, look.fill);
     }
 }
 
@@ -478,8 +492,8 @@ QCPRange QCPHistogram::getValueRange(bool& foundRange, QCP::SignDomain inSignDom
     return QCPRange(*lower, upper);
 }
 
-// simplify: not selectable in v1, draw() has no selected look. Hit-test the bar rects of
-// qcp::histogram::contains(columnBars(c), ...) when a selected look is added.
+// simplify: not selectable in v1, draw() has no selected look. Hit-test the recorded bar rects
+// when a selected look is added.
 double QCPHistogram::selectTest(const QPointF&, bool, QVariant*) const
 {
     return -1;

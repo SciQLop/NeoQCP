@@ -1070,7 +1070,7 @@ static QWidget* createHistogram2DTab()
     auto* hist = new QCPHistogram2D(plot->xAxis, plot->yAxis);
     hist->setData(std::move(keys), std::move(vals));
     hist->setBins(80, 80);
-    hist->setNormalization(QCPHistogram2D::nColumn);
+    hist->setColumnNormalized(true);
 
     auto* scale = new QCPColorScale(plot);
     plot->plotLayout()->addElement(0, 1, scale);
@@ -1112,7 +1112,7 @@ static QWidget* createHistogram2DLogTab()
     auto* hist = new QCPHistogram2D(plot->xAxis, plot->yAxis);
     hist->setData(std::move(keys), std::move(vals));
     hist->setBins(60, 60);
-    hist->setNormalization(QCPHistogram2D::nColumn);
+    hist->setColumnNormalized(true);
 
     plot->yAxis->setScaleType(QCPAxis::stLogarithmic);
     plot->yAxis->setTicker(QSharedPointer<QCPAxisTickerLog>::create());

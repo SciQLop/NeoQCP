@@ -1,6 +1,7 @@
 #include "plottable-histogram2d.h"
 #include "plottable-colormap.h" // for QCPColorMapData
 #include <core.h>
+#include <misuse.h>
 #include <limits>
 #include <painting/draw-context.h>
 #include <layoutelements/layoutelement-axisrect.h>
@@ -17,8 +18,10 @@ QCPHistogram2D::QCPHistogram2D(QCPAxis* keyAxis, QCPAxis* valueAxis)
 
     connect(&mPipeline, &QCPHistogramPipeline::finished,
             this, [this](uint64_t) {
-                binsChanged();
+                invalidateShown();
                 markDirty(); // marking schedules the repaint
+                const QCPEmissionScope scope(mParentPlot);
+                qcpEmit(this, mParentPlot, &QCPHistogram2D::histogramReady);
             });
     connect(&mPipeline, &QCPHistogramPipeline::busyChanged,
             this, [this](bool) { updateEffectiveBusy(); });
@@ -47,10 +50,10 @@ void QCPHistogram2D::refreshBinning()
 
 void QCPHistogram2D::installTransform()
 {
-    int capturedKeyBins = mKeyBins;
-    int capturedValueBins = mValueBins;
-    const bool keyLog = keyBinScale() == QCPAxis::stLogarithmic;
-    const bool valueLog = valueBinScale() == QCPAxis::stLogarithmic;
+    int capturedKeyBins = mKeyBins.get();
+    int capturedValueBins = mValueBins.get();
+    const bool keyLog = mKeyAxis && mKeyAxis->scaleType() == QCPAxis::stLogarithmic;
+    const bool valueLog = mValueAxis && mValueAxis->scaleType() == QCPAxis::stLogarithmic;
     mBinnedKeyLog = keyLog;
     mBinnedValueLog = valueLog;
 
@@ -113,52 +116,31 @@ bool QCPHistogram2D::cachedFiniteBounds(QCPRange& keyOut, QCPRange& valueOut,
 
 void QCPHistogram2D::setBins(int keyBins, int valueBins)
 {
-    if (keyBins <= 0 || valueBins <= 0)
-        return;
-    if (keyBins == mKeyBins && valueBins == mValueBins)
+    QCP_CHECK_OR_RETURN(keyBins > 0 && valueBins > 0, "a histogram needs at least one bin", );
+    const bool keyChanged = mKeyBins.set(keyBins);
+    const bool valueChanged = mValueBins.set(valueBins);
+    if (!keyChanged && !valueChanged)
         return;
     markDirty();
-    mKeyBins = keyBins;
-    mValueBins = valueBins;
     installTransform();
     mPipeline.onDataChanged();
 }
 
-void QCPHistogram2D::setKeyBinScale(QCPAxis::ScaleType type)
+void QCPHistogram2D::setNormalization(QCP::HistogramNormalization norm)
 {
-    if (mKeyAxis && mKeyAxis->scaleType() == type)
+    if (!mNormalization.set(norm))
         return;
     markDirty();
-    if (mKeyAxis)
-        mKeyAxis->setScaleType(type); // scaleTypeChanged -> re-bin
+    invalidateShown();
 }
 
-void QCPHistogram2D::setValueBinScale(QCPAxis::ScaleType type)
+void QCPHistogram2D::setColumnNormalized(bool normalized)
 {
-    if (mValueAxis && mValueAxis->scaleType() == type)
+    if (mColumnNormalized == normalized)
         return;
     markDirty();
-    if (mValueAxis)
-        mValueAxis->setScaleType(type);
-}
-
-QCPAxis::ScaleType QCPHistogram2D::keyBinScale() const
-{
-    return mKeyAxis ? mKeyAxis->scaleType() : QCPAxis::stLinear;
-}
-
-QCPAxis::ScaleType QCPHistogram2D::valueBinScale() const
-{
-    return mValueAxis ? mValueAxis->scaleType() : QCPAxis::stLinear;
-}
-
-void QCPHistogram2D::setNormalization(Normalization norm)
-{
-    if (mNormalization == norm)
-        return;
-    markDirty();
-    mNormalization = norm;
-    binsChanged();
+    mColumnNormalized = normalized;
+    invalidateShown();
 }
 
 void QCPHistogram2D::colorMappingChanged()
@@ -189,7 +171,7 @@ QCPRange rangeOrNothing(double lo, double hi, bool& found)
 }
 }
 
-void QCPHistogram2D::binsChanged()
+void QCPHistogram2D::invalidateShown()
 {
     mShown.stale = true;
     mRenderer.invalidateMapImage();
@@ -199,7 +181,7 @@ void QCPHistogram2D::binsChanged()
 const QCPColorMapData* QCPHistogram2D::shown() const
 {
     const auto* bins = binned();
-    if (!bins || mNormalization == nNone)
+    if (!bins || (!mColumnNormalized && mNormalization.get() == QCP::HistogramNormalization::Count))
         return bins;
     if (mShown.stale)
     {
@@ -207,7 +189,15 @@ const QCPColorMapData* QCPHistogram2D::shown() const
         // bogus -Wstringop-overflow on QVector's fill otherwise.
         const int keySz = qMax(0, bins->keySize());
         const int valSz = bins->valueSize();
-        auto fractions = std::make_shared<QCPColorMapData>(keySz, valSz, bins->keyRange(), bins->valueRange());
+        auto cells = std::make_shared<QCPColorMapData>(keySz, valSz, bins->keyRange(), bins->valueRange());
+        // Density needs the cell area, also for log-spaced bins: the 1-D and 2-D
+        // histograms read the same rule.
+        const auto keyWidths = qcp::algo::binWidths(bins->keyRange(), keySz, mBinnedKeyLog);
+        const auto valueWidths = qcp::algo::binWidths(bins->valueRange(), valSz, mBinnedValueLog);
+        double total = 0;
+        for (int ki = 0; ki < keySz; ++ki)
+            for (int vi = 0; vi < valSz; ++vi)
+                total += bins->cell(ki, vi);
         double lo = std::numeric_limits<double>::max();
         double hi = std::numeric_limits<double>::lowest();
         for (int ki = 0; ki < keySz; ++ki)
@@ -215,20 +205,25 @@ const QCPColorMapData* QCPHistogram2D::shown() const
             double sum = 0;
             for (int vi = 0; vi < valSz; ++vi)
                 sum += bins->cell(ki, vi);
+            const bool columnShown = mColumnNormalized ? sum > 0 : true;
             for (int vi = 0; vi < valSz; ++vi)
             {
-                const double fraction = sum > 0 ? bins->cell(ki, vi) / sum : 0.0;
-                fractions->setCell(ki, vi, fraction);
+                const double count = bins->cell(ki, vi);
+                const double area = keyWidths[std::size_t(ki)] * valueWidths[std::size_t(vi)];
+                const double shownCell = mColumnNormalized
+                    ? (sum > 0 ? count / sum : 0.0)
+                    : qcp::algo::normalized(count, total, area, mNormalization.get());
+                cells->setCell(ki, vi, shownCell);
                 // An empty column shows as 0 but does not stretch the colour range.
-                if (sum > 0)
+                if (columnShown)
                 {
-                    lo = std::min(lo, fraction);
-                    hi = std::max(hi, fraction);
+                    lo = std::min(lo, shownCell);
+                    hi = std::max(hi, shownCell);
                 }
             }
         }
-        fractions->recalculateDataBounds();
-        mShown.normalized = std::move(fractions);
+        cells->recalculateDataBounds();
+        mShown.normalized = std::move(cells);
         mShown.bounds = rangeOrNothing(lo, hi, mShown.found);
         mShown.stale = false;
     }
@@ -241,7 +236,7 @@ QCPRange QCPHistogram2D::colorDataBounds(bool& found) const
     const auto* cells = shown();
     if (!mDataSource || !cells)
         return {};
-    if (mNormalization == nNone)
+    if (!mColumnNormalized && mNormalization.get() == QCP::HistogramNormalization::Count)
     {
         found = true;
         return cells->dataBounds();
@@ -259,8 +254,9 @@ bool QCPHistogram2D::canProduceContent() const
 
 bool QCPHistogram2D::binnedForTheAxisScales() const
 {
-    return (keyBinScale() == QCPAxis::stLogarithmic) == mBinnedKeyLog
-        && (valueBinScale() == QCPAxis::stLogarithmic) == mBinnedValueLog;
+    const bool keyLog = mKeyAxis && mKeyAxis->scaleType() == QCPAxis::stLogarithmic;
+    const bool valueLog = mValueAxis && mValueAxis->scaleType() == QCPAxis::stLogarithmic;
+    return keyLog == mBinnedKeyLog && valueLog == mBinnedValueLog;
 }
 
 // refreshBinning() emits busyChanged at once, and nothing may emit during a paint. The scales
@@ -288,7 +284,7 @@ void QCPHistogram2D::binForExport()
         return;
     // A job still running may have the old scales: it must not replace these cells.
     mPipeline.supersedeEarlierJobs();
-    binsChanged();
+    invalidateShown();
 }
 
 void QCPHistogram2D::draw(QCPDrawContext& context) const

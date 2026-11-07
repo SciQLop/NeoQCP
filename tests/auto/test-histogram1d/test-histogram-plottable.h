@@ -14,6 +14,7 @@ private slots:
     void cleanup();
 
     void binsInTheBackground();
+    void binsFollowALogKeyAxis();
     void preBinnedNeedsNoPipeline();
     void preBinnedWithBadEdgesIsIgnored();
     void autoEdgesStayWhenNewDataFitsInside();
@@ -41,23 +42,23 @@ private slots:
     void exportBinningEmitsNothing();
     void exportWhileBinningShowsTheNewData();
     void barsAreDrawnUpToTheirHeight();
-    void outlineRunsDoNotJoinBars();
-    void stepOutlineIsTheTopProfile();
-    void barRectsOfAMissingColumnAreEmpty();
-    void barRectsOfRaggedEdgesAreEmpty();
-    void logAxisMarksOnlyNonPositiveOrNonFiniteBarsAbsent();
-    void stepOutlineBreaksAtAnAbsentBar();
-    void gpuQuadsOfBarsWithAGapStayInsideTheirBar();
-    void emptyBinsOnALogAxisStayOutOfTheOutline();
+    void barsRecordFillAndOutline();
+    void barsRecordAtTheirAxisCoordinates();
+    void histogramColumnIsOneBatch();
+    void aPanKeepsTheRecording();
+    void stepIsOnePolylinePerColumn();
+    void stepRecordsOnlyAPolyline();
+    void logValueAxisDrawsOnlyPositiveHeights();
+    void stepBreaksAtAnAbsentBar();
+    void emptyBinsOnALogAxisHaveNoBoxes();
     void aHistogramIsNotSelectable();
     void verticalKeyAxisGrowsBarsAlongX();
     void barsAreDrawnOnTheGpu();
-    void emptyBinOnALinearAxisKeepsTheStepRun();
+    void emptyBinOnALinearAxisKeepsTheStepLine();
     void stepWithOneColumnIsTheOutlineOnly();
     void stepWithSeveralColumnsHasALightFill();
     void barsKeepATranslucentUserColour();
     void readySlotRemovingTheHistogramIsSafe();
-    void edgesSlotRemovingTheHistogramIsSafe();
     void preBinnedReadySlotRemovingTheHistogramIsSafe();
     void logBinsHonourAFixedRangeStartingAtOne();
     void fixedRangeStartingAtZeroFallsBackWhenTheAxisTurnsLog();
@@ -90,10 +91,7 @@ private slots:
     void stepOutlineHasNoBase();
     void fillHasNoBorderWhateverPenThePainterHad();
     void anAlmostTransparentFillStillPaints();
-    void gpuBarsHaveFillAndOutline();
-    void gpuBarsAreNotShifted();
-    void gpuStepOfOneColumnHasOnlyTheOutline();
-    void gpuAnAlmostTransparentFillStillDraws();
+    void anAlmostTransparentFillIsRecorded();
 
 private:
     [[nodiscard]] bool repaintFollows(QCPHistogram* h, const std::function<void()>& change);

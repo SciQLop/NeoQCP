@@ -159,11 +159,13 @@ private slots:
     void histogram2dExportResultIsNotReplacedByAnOlderJob();
     void histogram2dWithNothingFiniteBinsOnce();
     void histogram2dDataWithNothingFiniteClearsTheOldCells();
-    void histogram2dNormalizationColumn();
-    void histogram2dNormalizationToggleNoRebind();
+    void histogram2dColumnNormalizedSumsEachKeyColumnToOne();
+    void histogram2dColumnNormalizedDoesNotRebin();
     void histogram2dRenderSmokeTest();
-    void histogram2dLogKeyBinScaleRebins();
-    void histogram2dBinScaleDefaultsLinear();
+    void histogram2dBinsFollowALogKeyAxis();
+    void histogram2dBinCountsDefaultAndSettable();
+    void histogram2dSaysReady();
+    void bothHistogramsShareTheNormalization();
     void histogram2dAxisScaleTogglesRebinning();
     void histogram2dLogValueAxisFromTheStartIsNotStale();
     void histogram2dStaleScaleIsReboundAgainAfterAQueuedRebin();

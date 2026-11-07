@@ -1,16 +1,15 @@
 #pragma once
 #include "plottable.h"
-#include "histogram-geometry.h"
+#include "plottable-histogram-base.h"
 #include <datasource/async-pipeline.h>
 #include <datasource/histogram-binner-1d.h>
+#include <drawable.h>
 #include <QColor>
 #include <QPen>
 #include <QList>
 #include <memory>
 #include <optional>
 #include <vector>
-
-class QCPPlottableRhiLayer;
 
 //! A 1-D histogram of every value column of a multi data source, with shared bin edges.
 //! Binning runs in the background; pre-binned data (setBinned) bypasses the pipeline.
@@ -19,7 +18,7 @@ class QCPPlottableRhiLayer;
 template <typename T, typename Self = void>
 class QCPHistogramOps;
 
-class QCP_LIB_DECL QCPHistogram : public QCPAbstractPlottable
+class QCP_LIB_DECL QCPHistogram : public QCPDrawn<QCPAbstractPlottable>
 {
     Q_OBJECT
 public:
@@ -38,15 +37,15 @@ public:
     void setBins(int bins);
     //! nullopt = automatic edges, fixed on the first data and only widened afterwards.
     void setFixedRange(std::optional<QCPRange> range);
-    void setNormalization(qcp::algo::HistogramNormalization norm);
+    void setNormalization(QCP::HistogramNormalization norm);
     void setStyle(Style style);
     void setColumnColors(const QList<QColor>& colors);
     //! Forget the automatic edges: the next data sets them again.
     void resetEdges();
 
-    [[nodiscard]] int bins() const { return mBins; }
+    [[nodiscard]] int bins() const { return mBins.get(); }
     [[nodiscard]] std::optional<QCPRange> fixedRange() const { return mFixedRange; }
-    [[nodiscard]] qcp::algo::HistogramNormalization normalization() const { return mNormalization; }
+    [[nodiscard]] QCP::HistogramNormalization normalization() const { return mNormalization.get(); }
     [[nodiscard]] Style style() const { return mStyle; }
     [[nodiscard]] QList<QColor> columnColors() const { return mColors; }
     //! The drawn result, or nullptr when there is nothing to draw.
@@ -58,13 +57,17 @@ public:
                            const QCPRange& inKeyRange = QCPRange()) const override;
     double selectTest(const QPointF& pos, bool onlySelectable, QVariant* details = nullptr) const override;
 
+public Q_SLOTS:
+    //! Bin again, e.g. after the data changed in place.
+    void refreshBinning();
+
 Q_SIGNALS:
-    void edgesChanged();
+    //! Emitted when a re-bin lands, after the data or an axis scale changed.
     void histogramReady();
 
 protected:
-    void draw(QCPPainter* painter) override;
-    void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
+    void draw(QCPDrawContext& context) const override;
+    void drawLegendIcon(QCPDrawContext& icon) const override;
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
     void setPipelineScheduler(QCPPipelineScheduler* scheduler) override { mPipeline.setScheduler(scheduler); }
     bool canProduceContent() const override;
@@ -76,8 +79,8 @@ private:
     std::shared_ptr<QCPAbstractMultiDataSource> mDataSource;
     std::shared_ptr<qcp::algo::Histogram1D> mResult;
     std::optional<QCPRange> mFixedRange, mAutoRange;
-    int mBins = 64;
-    qcp::algo::HistogramNormalization mNormalization = qcp::algo::HistogramNormalization::Count;
+    qcp::histogram::BinCount mBins{ 64 };
+    qcp::histogram::Normalization mNormalization;
     Style mStyle = sBars;
     QList<QColor> mColors;
     QCPHistogram1DPipeline mPipeline;
@@ -95,13 +98,12 @@ private:
     [[nodiscard]] bool scaleIsStale() const;
     [[nodiscard]] std::shared_ptr<qcp::algo::Histogram1D> pipelineResult() const;
     void installTransform();
-    void refreshBinning();
     void binForExport();
     void queueResetEdges();
     void resetForTheStaleScale();
     [[nodiscard]] bool coversAutoEdges(const qcp::algo::Histogram1D& h) const;
     void onPipelineFinished(uint64_t generation);
-    bool storeResult(std::shared_ptr<qcp::algo::Histogram1D> result);
+    void storeResult(std::shared_ptr<qcp::algo::Histogram1D> result);
     void takeResult(std::shared_ptr<qcp::algo::Histogram1D> result);
     void clearResult();
     void rememberEdges();
@@ -109,13 +111,11 @@ private:
 
     struct ColumnLook { QColor fill; QPen outline; };
     [[nodiscard]] ColumnLook columnLook(int column) const;
-    [[nodiscard]] bool keyIsVertical() const;
-    [[nodiscard]] std::vector<qcp::histogram::BarRect> columnBars(int column) const;
-    [[nodiscard]] QVector<QPointF> outline(std::span<const qcp::histogram::BarRect> bars) const;
-    void drawColumnOnGpu(QCPPainter* painter, QCPPlottableRhiLayer* layer,
-                         std::span<const qcp::histogram::BarRect> bars, const ColumnLook& look);
-    void paintColumn(QCPPainter* painter, std::span<const qcp::histogram::BarRect> bars,
-                     const ColumnLook& look) const;
+    void recordRects(QCPDrawContext& context, int column, const QPen& pen, const QBrush& brush) const;
+    void recordBars(QCPDrawContext& context, int column, const ColumnLook& look) const;
+    void recordStep(QCPDrawContext& context, int column, const ColumnLook& look) const;
+    [[nodiscard]] static bool drawableHeight(double height, bool log);
+    [[nodiscard]] static bool absentHeight(double height, bool log);
 };
 
 // The fluent handle of a QCPHistogram; see QCPPlottableOps for the subclass contract.
@@ -150,7 +150,7 @@ public:
     {
         return this->apply([&](T& p) { p.setFixedRange(std::move(range)); });
     }
-    Ret setNormalization(qcp::algo::HistogramNormalization norm)
+    Ret setNormalization(QCP::HistogramNormalization norm)
     {
         return this->apply([&](T& p) { p.setNormalization(norm); });
     }

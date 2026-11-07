@@ -63,13 +63,13 @@ void TestHistogram1D::normalizationSums()
 {
     const auto src = source({{0.5, 1.5, 1.5, 3.5}});
     auto probability = bin1d(src, QCPRange(0, 4), 4, false);
-    normalize(probability, HistogramNormalization::Probability);
+    normalize(probability, QCP::HistogramNormalization::Probability);
     double p = 0;
     for (double v : probability.heights[0]) p += v;
     QCOMPARE(p, 1.0);
 
     auto density = bin1d(src, QCPRange(0, 8), 4, false); // width 2
-    normalize(density, HistogramNormalization::Density);
+    normalize(density, QCP::HistogramNormalization::Density);
     double integral = 0;
     for (std::size_t b = 0; b < 4; ++b)
         integral += density.heights[0][b] * (density.edges[b + 1] - density.edges[b]);
@@ -80,7 +80,7 @@ void TestHistogram1D::densityUsesEachLogBinsOwnWidth()
 {
     const auto src = source({{2, 20}});
     auto h = bin1d(src, QCPRange(1, 100), 2, true); // widths 9 and 90
-    normalize(h, HistogramNormalization::Density);
+    normalize(h, QCP::HistogramNormalization::Density);
     QCOMPARE(h.heights[0][0], 1.0 / (2 * 9));
     QCOMPARE(h.heights[0][1], 1.0 / (2 * 90));
 }
@@ -142,13 +142,13 @@ void TestHistogram1D::interiorEdgesAreEvenlySpacedFromTheRangeStart()
 void TestHistogram1D::aSingleValueIsNormalizedToo()
 {
     auto h = bin1d(source({{3}}), QCPRange(0, 8), 4, false); // width 2
-    normalize(h, HistogramNormalization::Density);
+    normalize(h, QCP::HistogramNormalization::Density);
     QCOMPARE(h.heights[0], (std::vector<double>{0, 0.5, 0, 0}));
 }
 
 void TestHistogram1D::aColumnWithNothingCountedStaysZero()
 {
     auto h = bin1d(source({{kNan, 100}}), QCPRange(0, 8), 4, false);
-    normalize(h, HistogramNormalization::Probability);
+    normalize(h, QCP::HistogramNormalization::Probability);
     QCOMPARE(h.heights[0], (std::vector<double>{0, 0, 0, 0}));
 }

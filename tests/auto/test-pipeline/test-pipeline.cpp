@@ -18,6 +18,7 @@
 #include <plottables/plottable-colormap.h>
 #include <plottables/plottable-colormap2.h>
 #include <plottables/plottable-graph2.h>
+#include <plottables/plottable-histogram.h>
 #include <plottables/plottable-histogram2d.h>
 #include <plottables/plottable-multigraph.h>
 #include <plottables/plottable-waterfall.h>
@@ -2197,19 +2198,34 @@ void TestPipeline::histogram2dPipelineBins()
     QCOMPARE(result->valueSize(), 20);
 }
 
-void TestPipeline::histogram2dBinScaleDefaultsLinear()
+void TestPipeline::histogram2dBinCountsDefaultAndSettable()
 {
     auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
-    QCOMPARE(hist->keyBinScale(), QCPAxis::stLinear);
-    QCOMPARE(hist->valueBinScale(), QCPAxis::stLinear);
+    QCOMPARE(hist->keyBins(), 100);
+    QCOMPARE(hist->valueBins(), 100);
+    QCOMPARE(hist->normalization(), QCP::HistogramNormalization::Count);
+    hist->setBins(3, 4);
+    QCOMPARE(hist->keyBins(), 3);
+    QCOMPARE(hist->valueBins(), 4);
 }
 
-void TestPipeline::histogram2dLogKeyBinScaleRebins()
+void TestPipeline::histogram2dSaysReady()
+{
+    auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
+    hist->setBins(4, 4);
+    QSignalSpy ready(hist, &QCPHistogram2D::histogramReady);
+    std::vector<double> keys = {0.5, 1.5, 2.5, 3.5};
+    std::vector<double> vals = {0.5, 1.5, 2.5, 3.5};
+    hist->setData(std::move(keys), std::move(vals));
+    QVERIFY(ready.wait(2000));
+    QCOMPARE(ready.count(), 1); // one binning, one signal
+}
+
+void TestPipeline::histogram2dBinsFollowALogKeyAxis()
 {
     auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
     hist->setBins(3, 1);
-    hist->setKeyBinScale(QCPAxis::stLogarithmic);
-    QCOMPARE(hist->keyBinScale(), QCPAxis::stLogarithmic);
+    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
 
     std::vector<double> keys = {1.0, 10.0, 100.0, 1000.0};
     std::vector<double> vals = {5.0, 5.0, 5.0, 5.0};
@@ -2224,6 +2240,47 @@ void TestPipeline::histogram2dLogKeyBinScaleRebins()
     QCOMPARE(data->cell(0, 0), 1.0);
     QCOMPARE(data->cell(1, 0), 1.0);
     QCOMPARE(data->cell(2, 0), 2.0);
+}
+
+// One normalization rule for both histograms: the same sample, the same enum, the same meaning.
+void TestPipeline::bothHistogramsShareTheNormalization()
+{
+    // 100 samples: keys alternate 0.5/1.5, values 1.0 for the first 50 and 3.0 for the rest.
+    std::vector<double> keys(100), vals(100);
+    for (std::size_t i = 0; i < keys.size(); ++i)
+    {
+        keys[i] = i % 2 ? 1.5 : 0.5;
+        vals[i] = i < 50 ? 1.0 : 3.0;
+    }
+
+    auto* hist2d = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
+    hist2d->setBins(2, 2);
+    hist2d->setData(keys, vals);
+    QSignalSpy ready2d(hist2d, &QCPHistogram2D::histogramReady);
+    QVERIFY(ready2d.wait(2000));
+    // Keys 0.5..1.5 in two bins, values 1..3 in two: 25 per cell, cell area 0.5 * 1.
+    QVERIFY(hist2d->shown());
+    QCOMPARE(hist2d->shown()->cell(0, 0), 25.0);
+    hist2d->setNormalization(QCP::HistogramNormalization::Probability);
+    QCOMPARE(hist2d->shown()->cell(0, 0), 0.25);
+    hist2d->setNormalization(QCP::HistogramNormalization::Density);
+    QCOMPARE(hist2d->shown()->cell(0, 0), 0.5);
+
+    auto* hist1d = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    hist1d->setBins(2);
+    QSignalSpy ready1d(hist1d, &QCPHistogram::histogramReady);
+    // The 1-D histogram bins its value columns: the samples are the keys of the 2-D sample.
+    std::vector<double> index(keys.size());
+    for (std::size_t i = 0; i < index.size(); ++i)
+        index[i] = double(i);
+    hist1d->setDataSource(std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
+        index, std::vector<std::vector<double>> { keys }));
+    QTRY_COMPARE_WITH_TIMEOUT(hist1d->histogram() ? hist1d->histogram()->heights[0] : std::vector<double>(),
+                              (std::vector<double> { 50, 50 }), 5000);
+    hist1d->setNormalization(QCP::HistogramNormalization::Probability);
+    QTRY_COMPARE_WITH_TIMEOUT(hist1d->histogram()->heights[0], (std::vector<double> { 0.5, 0.5 }), 5000);
+    hist1d->setNormalization(QCP::HistogramNormalization::Density);
+    QTRY_COMPARE_WITH_TIMEOUT(hist1d->histogram()->heights[0], (std::vector<double> { 1, 1 }), 5000);
 }
 
 // The core of "changing the scale changes the look": toggling the key axis
@@ -2638,22 +2695,23 @@ void TestPipeline::histogram2dChangingTheDataScaleTypeRequestsARepaint()
 void TestPipeline::histogram2dChangingTheNormalizationRequestsARepaint()
 {
     auto* hist = decadeHistogram(mPlot, true);
-    QVERIFY(repaintFollows(hist, [&] { hist->setNormalization(QCPHistogram2D::nColumn); }));
+    QVERIFY(repaintFollows(hist, [&] { hist->setNormalization(QCP::HistogramNormalization::Density); }));
 }
 
-void TestPipeline::histogram2dNormalizationColumn()
+void TestPipeline::histogram2dColumnNormalizedSumsEachKeyColumnToOne()
 {
     auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
     // col 0: counts [3, 1] (sum=4), col 1: counts [0, 2] (sum=2)
     std::vector<double> keys = {0.25, 0.25, 0.25, 0.25, 0.75, 0.75};
     std::vector<double> vals = {0.25, 0.25, 0.25, 0.75, 0.75, 0.75};
     hist->setBins(2, 2);
-    hist->setNormalization(QCPHistogram2D::nColumn);
+    hist->setColumnNormalized(true);
     hist->setData(std::move(keys), std::move(vals));
 
     QSignalSpy spy(&hist->pipeline(), &QCPHistogramPipeline::finished);
     QVERIFY(spy.wait(2000));
 
+    // The counts are untouched: column normalization is a view of them.
     auto* data = hist->pipeline().result();
     QVERIFY(data);
     QCOMPARE(data->cell(0, 0), 3.0);
@@ -2661,14 +2719,29 @@ void TestPipeline::histogram2dNormalizationColumn()
     QCOMPARE(data->cell(1, 0), 0.0);
     QCOMPARE(data->cell(1, 1), 2.0);
 
-    // Render with normalization — exercises the draw() normalization lambda
+    auto* shown = hist->shown();
+    QVERIFY(shown);
+    QCOMPARE(shown->cell(0, 0), 0.75);
+    QCOMPARE(shown->cell(0, 1), 0.25);
+    QCOMPARE(shown->cell(1, 0), 0.0);
+    QCOMPARE(shown->cell(1, 1), 1.0);
+
+    // Column normalization replaces the normalization; what the user set is still reported.
+    QCOMPARE(hist->normalization(), QCP::HistogramNormalization::Count);
+    QSignalSpy rebin(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    hist->setNormalization(QCP::HistogramNormalization::Density);
+    QCOMPARE(hist->normalization(), QCP::HistogramNormalization::Density);
+    QCOMPARE(rebin.count(), 0);
+    QVERIFY(hist->shown());
+    QCOMPARE(hist->shown()->cell(0, 0), 0.75);
+
     hist->rescaleDataRange();
     mPlot->rescaleAxes();
     mPlot->replot();
     QCoreApplication::processEvents();
 }
 
-void TestPipeline::histogram2dNormalizationToggleNoRebind()
+void TestPipeline::histogram2dColumnNormalizedDoesNotRebin()
 {
     auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
     hist->setBins(1, 1); // set bins before data to avoid double pipeline trigger
@@ -2682,8 +2755,8 @@ void TestPipeline::histogram2dNormalizationToggleNoRebind()
     QCoreApplication::processEvents();
     int finishedCount = spy.count();
 
-    // Toggling normalization should NOT trigger a new pipeline run
-    hist->setNormalization(QCPHistogram2D::nColumn);
+    // Toggling column normalization should NOT trigger a new pipeline run
+    hist->setColumnNormalized(true);
     QCoreApplication::processEvents();
     QCOMPARE(spy.count(), finishedCount);
 }
@@ -4070,7 +4143,7 @@ void TestPipeline::histogram2dContoursFollowTheCounts()
 void TestPipeline::histogram2dContoursFollowTheNormalizedCounts()
 {
     auto* hist = bumpHistogram(mPlot);
-    hist->setNormalization(QCPHistogram2D::nColumn);
+    hist->setColumnNormalized(true);
     hist->setAutoContourLevels(3);
     QSignalSpy spy(&hist->pipeline(), &QCPHistogramPipeline::finished);
     QVERIFY(spy.wait(2000));
