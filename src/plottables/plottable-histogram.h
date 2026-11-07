@@ -1,6 +1,5 @@
 #pragma once
 #include "plottable.h"
-#include "plottable-histogram-base.h"
 #include <datasource/async-pipeline.h>
 #include <datasource/histogram-binner-1d.h>
 #include <drawable.h>
@@ -43,9 +42,9 @@ public:
     //! Forget the automatic edges: the next data sets them again.
     void resetEdges();
 
-    [[nodiscard]] int bins() const { return mBins.get(); }
+    [[nodiscard]] int bins() const { return mBins; }
     [[nodiscard]] std::optional<QCPRange> fixedRange() const { return mFixedRange; }
-    [[nodiscard]] QCP::HistogramNormalization normalization() const { return mNormalization.get(); }
+    [[nodiscard]] QCP::HistogramNormalization normalization() const { return mNormalization; }
     [[nodiscard]] Style style() const { return mStyle; }
     [[nodiscard]] QList<QColor> columnColors() const { return mColors; }
     //! The drawn result, or nullptr when there is nothing to draw.
@@ -79,8 +78,8 @@ private:
     std::shared_ptr<QCPAbstractMultiDataSource> mDataSource;
     std::shared_ptr<qcp::algo::Histogram1D> mResult;
     std::optional<QCPRange> mFixedRange, mAutoRange;
-    qcp::histogram::BinCount mBins{ 64 };
-    qcp::histogram::Normalization mNormalization;
+    int mBins = 64;
+    QCP::HistogramNormalization mNormalization = QCP::HistogramNormalization::Count;
     Style mStyle = sBars;
     QList<QColor> mColors;
     QCPHistogram1DPipeline mPipeline;
@@ -114,6 +113,7 @@ private:
     void recordRects(QCPDrawContext& context, int column, const QPen& pen, const QBrush& brush) const;
     void recordBars(QCPDrawContext& context, int column, const ColumnLook& look) const;
     void recordStep(QCPDrawContext& context, int column, const ColumnLook& look) const;
+    [[nodiscard]] double baseValue(QCPDrawContext& context) const;
     [[nodiscard]] static bool drawableHeight(double height, bool log);
     [[nodiscard]] static bool absentHeight(double height, bool log);
 };

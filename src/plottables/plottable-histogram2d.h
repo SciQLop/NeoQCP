@@ -1,6 +1,5 @@
 #pragma once
 #include "plottable-colormapped.h"
-#include "plottable-histogram-base.h"
 #include <axis/axis.h>
 #include <datasource/async-pipeline.h>
 #include <datasource/soa-datasource.h>
@@ -61,12 +60,12 @@ public:
     // Binning. Bins follow the axis scales: a logarithmic axis bins in log10 (dropping
     // non-positive samples), so the grid re-distributes when an axis scale is toggled.
     void setBins(int keyBins, int valueBins);
-    int keyBins() const { return mKeyBins.get(); }
-    int valueBins() const { return mValueBins.get(); }
+    int keyBins() const { return mKeyBins; }
+    int valueBins() const { return mValueBins; }
 
     // Normalization
     void setNormalization(QCP::HistogramNormalization norm);
-    QCP::HistogramNormalization normalization() const { return mNormalization.get(); }
+    QCP::HistogramNormalization normalization() const { return mNormalization; }
     //! Scale every key column to sum to one; overrides the normalization while on.
     void setColumnNormalized(bool normalized);
     bool columnNormalized() const { return mColumnNormalized; }
@@ -132,9 +131,9 @@ private:
     void followAxisScales();
 
     std::shared_ptr<QCPAbstractDataSource> mDataSource;
-    qcp::histogram::BinCount mKeyBins{ 100 };
-    qcp::histogram::BinCount mValueBins{ 100 };
-    qcp::histogram::Normalization mNormalization;
+    int mKeyBins = 100;
+    int mValueBins = 100;
+    QCP::HistogramNormalization mNormalization = QCP::HistogramNormalization::Count;
     bool mColumnNormalized = false;
     QCPHistogramPipeline mPipeline;
     QCPColormapRenderer mRenderer;

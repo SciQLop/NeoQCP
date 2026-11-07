@@ -674,6 +674,27 @@ void TestHistogramPlottable::logValueAxisDrawsOnlyPositiveHeights()
     QCOMPARE(batch->boxes->bValue, (std::vector<double> {1, 4}));
 }
 
+// A log axis has no zero: the bars and the step start at the axis' lower bound, and a pan of
+// that axis moves the bound, so the recording follows it instead of keeping a stale base.
+void TestHistogramPlottable::logValueAxisBaseFollowsTheAxisBottom()
+{
+    auto* bars = new Probe(mPlot->xAxis, mPlot->yAxis);
+    bars->setBinned({0, 1, 2}, {{20, 50}});
+    auto* step = new Probe(mPlot->xAxis, mPlot->yAxis);
+    step->setStyle(QCPHistogram::sStep);
+    step->setBinned({0, 1, 2}, {{20, 50}});
+    mPlot->xAxis->setRange(0, 2);
+    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->yAxis->setRange(1, 100);
+    QVERIFY(!mPlot->toPixmap(400, 300).isNull());
+    QCOMPARE(firstBatch(bars->core())->boxes->aValue, (std::vector<double> {1, 1}));
+    QCOMPARE(firstPolyline(step->core())->points->front(), QPointF(0, 1));
+    mPlot->yAxis->setRange(10, 1000);
+    QVERIFY(!mPlot->toPixmap(400, 300).isNull());
+    QCOMPARE(firstBatch(bars->core())->boxes->aValue, (std::vector<double> {10, 10}));
+    QCOMPARE(firstPolyline(step->core())->points->front(), QPointF(0, 10));
+}
+
 void TestHistogramPlottable::stepBreaksAtAnAbsentBar()
 {
     auto* h = new Probe(mPlot->xAxis, mPlot->yAxis);

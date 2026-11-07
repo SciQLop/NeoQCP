@@ -49,6 +49,7 @@ private slots:
     void stepIsOnePolylinePerColumn();
     void stepRecordsOnlyAPolyline();
     void logValueAxisDrawsOnlyPositiveHeights();
+    void logValueAxisBaseFollowsTheAxisBottom();
     void stepBreaksAtAnAbsentBar();
     void emptyBinsOnALogAxisHaveNoBoxes();
     void aHistogramIsNotSelectable();

@@ -50,8 +50,8 @@ void QCPHistogram2D::refreshBinning()
 
 void QCPHistogram2D::installTransform()
 {
-    int capturedKeyBins = mKeyBins.get();
-    int capturedValueBins = mValueBins.get();
+    int capturedKeyBins = mKeyBins;
+    int capturedValueBins = mValueBins;
     const bool keyLog = mKeyAxis && mKeyAxis->scaleType() == QCPAxis::stLogarithmic;
     const bool valueLog = mValueAxis && mValueAxis->scaleType() == QCPAxis::stLogarithmic;
     mBinnedKeyLog = keyLog;
@@ -117,20 +117,21 @@ bool QCPHistogram2D::cachedFiniteBounds(QCPRange& keyOut, QCPRange& valueOut,
 void QCPHistogram2D::setBins(int keyBins, int valueBins)
 {
     QCP_CHECK_OR_RETURN(keyBins > 0 && valueBins > 0, "a histogram needs at least one bin", );
-    const bool keyChanged = mKeyBins.set(keyBins);
-    const bool valueChanged = mValueBins.set(valueBins);
-    if (!keyChanged && !valueChanged)
+    if (keyBins == mKeyBins && valueBins == mValueBins)
         return;
     markDirty();
+    mKeyBins = keyBins;
+    mValueBins = valueBins;
     installTransform();
     mPipeline.onDataChanged();
 }
 
 void QCPHistogram2D::setNormalization(QCP::HistogramNormalization norm)
 {
-    if (!mNormalization.set(norm))
+    if (norm == mNormalization)
         return;
     markDirty();
+    mNormalization = norm;
     invalidateShown();
 }
 
@@ -181,7 +182,7 @@ void QCPHistogram2D::invalidateShown()
 const QCPColorMapData* QCPHistogram2D::shown() const
 {
     const auto* bins = binned();
-    if (!bins || (!mColumnNormalized && mNormalization.get() == QCP::HistogramNormalization::Count))
+    if (!bins || (!mColumnNormalized && mNormalization == QCP::HistogramNormalization::Count))
         return bins;
     if (mShown.stale)
     {
@@ -212,7 +213,7 @@ const QCPColorMapData* QCPHistogram2D::shown() const
                 const double area = keyWidths[std::size_t(ki)] * valueWidths[std::size_t(vi)];
                 const double shownCell = mColumnNormalized
                     ? (sum > 0 ? count / sum : 0.0)
-                    : qcp::algo::normalized(count, total, area, mNormalization.get());
+                    : qcp::algo::normalized(count, total, area, mNormalization);
                 cells->setCell(ki, vi, shownCell);
                 // An empty column shows as 0 but does not stretch the colour range.
                 if (columnShown)
@@ -236,7 +237,7 @@ QCPRange QCPHistogram2D::colorDataBounds(bool& found) const
     const auto* cells = shown();
     if (!mDataSource || !cells)
         return {};
-    if (!mColumnNormalized && mNormalization.get() == QCP::HistogramNormalization::Count)
+    if (!mColumnNormalized && mNormalization == QCP::HistogramNormalization::Count)
     {
         found = true;
         return cells->dataBounds();

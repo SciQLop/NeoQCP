@@ -110,10 +110,10 @@ bool QCPHistogram::autoEdges() const
 
 void QCPHistogram::installTransform()
 {
-    const int bins = mBins.get();
+    const int bins = mBins;
     const bool log = keyLog();
     mBinnedKeyLog = log;
-    const auto normalization = mNormalization.get();
+    const auto normalization = mNormalization;
     const auto fixed = mFixedRange;
     const auto autoRange = mAutoRange;
     mPipeline.setTransform(TransformKind::ViewportIndependent,
@@ -219,9 +219,10 @@ void QCPHistogram::setBinned(std::vector<double> edges, std::vector<std::vector<
 void QCPHistogram::setBins(int bins)
 {
     QCP_CHECK_OR_RETURN(bins > 0, "a histogram needs at least one bin", );
-    if (!mBins.set(bins))
+    if (bins == mBins)
         return;
     markDirty();
+    mBins = bins;
     refreshBinning();
 }
 
@@ -239,9 +240,10 @@ void QCPHistogram::setFixedRange(std::optional<QCPRange> range)
 
 void QCPHistogram::setNormalization(QCP::HistogramNormalization norm)
 {
-    if (!mNormalization.set(norm))
+    if (norm == mNormalization)
         return;
     markDirty();
+    mNormalization = norm;
     refreshBinning();
 }
 
@@ -369,11 +371,12 @@ void QCPHistogram::recordRects(QCPDrawContext& context, int column, const QPen& 
 {
     const auto& heights = mResult->heights[std::size_t(column)];
     const bool log = mValueAxis->scaleType() == QCPAxis::stLogarithmic;
+    const double base = baseValue(context);
     for (std::size_t b = 0; b < heights.size(); ++b)
     {
         if (!drawableHeight(heights[b], log))
             continue;
-        context.rect(QCP::Data{ mResult->edges[b], 0.0 },
+        context.rect(QCP::Data{ mResult->edges[b], base },
                      QCP::Data{ mResult->edges[b + 1], heights[b] }, pen, brush);
     }
 }
@@ -392,6 +395,7 @@ void QCPHistogram::recordStep(QCPDrawContext& context, int column, const ColumnL
         recordRects(context, column, QPen(Qt::NoPen), look.fill);
     const auto& heights = mResult->heights[std::size_t(column)];
     const bool log = mValueAxis->scaleType() == QCPAxis::stLogarithmic;
+    const double base = baseValue(context);
     const QPointF breakPoint(qQNaN(), qQNaN());
     std::vector<QPointF> points;
     points.reserve(4 * heights.size() + 2);
@@ -408,14 +412,23 @@ void QCPHistogram::recordStep(QCPDrawContext& context, int column, const ColumnL
         inRun = true;
         const double left = mResult->edges[b];
         const double right = mResult->edges[b + 1];
-        points.emplace_back(left, 0.0);
+        points.emplace_back(left, base);
         points.emplace_back(left, heights[b]);
         points.emplace_back(right, heights[b]);
-        points.emplace_back(right, 0.0);
+        points.emplace_back(right, base);
     }
     if (!points.empty())
         context.polyline(std::make_shared<const std::vector<QPointF>>(std::move(points)),
                          look.outline);
+}
+
+// A log axis has no zero: the bars start at its lower bound, so the recording follows that bound.
+double QCPHistogram::baseValue(QCPDrawContext& context) const
+{
+    if (mValueAxis->scaleType() == QCPAxis::stLinear)
+        return 0.0;
+    (void)context.transform();
+    return mValueAxis->range().lower;
 }
 
 // A zero height covers no pixels, and a log axis can only place positive ones.
