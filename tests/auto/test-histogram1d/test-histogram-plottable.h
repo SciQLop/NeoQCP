@@ -41,6 +41,7 @@ private slots:
     void clearingTheSourceDropsAnInFlightResult();
     void exportBinningEmitsNothing();
     void exportWhileBinningShowsTheNewData();
+    void exportAfterAScreenFrameWhileBinningShowsTheNewBars();
     void barsAreDrawnUpToTheirHeight();
     void barsRecordFillAndOutline();
     void barsRecordAtTheirAxisCoordinates();

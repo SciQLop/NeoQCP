@@ -70,6 +70,8 @@ protected:
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
     void setPipelineScheduler(QCPPipelineScheduler* scheduler) override { mPipeline.setScheduler(scheduler); }
     bool canProduceContent() const override;
+    //! An export bins synchronously, so the screen and export recordings differ.
+    [[nodiscard]] bool resolvesForTheExport() const override { return true; }
     void axesChanged() override { followKeyAxis(); }
 
 private:

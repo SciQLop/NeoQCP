@@ -554,6 +554,29 @@ void TestHistogramPlottable::exportWhileBinningShowsTheNewData()
     QCOMPARE(h->histogram()->heights[0][0], 5.0);
 }
 
+void TestHistogramPlottable::exportAfterAScreenFrameWhileBinningShowsTheNewBars()
+{
+    auto* h = new QCPHistogram(mPlot->xAxis, mPlot->yAxis);
+    h->setBins(1);
+    h->setFixedRange(QCPRange(0, 10));
+    h->setColumnColors({ Qt::red });
+    h->setDataSource(values({ 1, 2 }));
+    QVERIFY(waitForResult(h));
+    QVERIFY(settle(h));
+    mPlot->xAxis->setRange(0, 10);
+    mPlot->yAxis->setRange(0, 6);
+    mPlot->replot(); // screen frame: the two-sample bars
+
+    h->setDataSource(values({ 1, 2, 3, 4, 5 }));
+    QVERIFY(h->pipeline().isBusy());
+    mPlot->replot(); // screen frame while the new binning runs: still the old bars
+    const QImage img = mPlot->toPixmap(400, 300).toImage();
+    const QColor inside = img.pixelColor(int(mPlot->xAxis->coordToPixel(5)),
+                                         int(mPlot->yAxis->coordToPixel(4)));
+    QVERIFY2(inside.red() > 150 && inside.green() < 120 && inside.blue() < 120,
+             qPrintable(QString("the export replayed the screen bars: pixel is %1").arg(inside.name())));
+}
+
 static bool isRedish(QColor c) { return c.red() > 150 && c.green() < 120 && c.blue() < 120; }
 
 void TestHistogramPlottable::barsAreDrawnUpToTheirHeight()
