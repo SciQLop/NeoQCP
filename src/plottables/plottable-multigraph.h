@@ -344,6 +344,21 @@ public:
         return this->apply([&](T& o) { o.setColorValues(std::move(values)); });
     }
 
+    Ret setGradient(const QCPColorGradient& gradient)
+    {
+        return this->apply([&](T& o) { o.setGradient(gradient); });
+    }
+
+    Ret setDataRange(const QCPRange& range)
+    {
+        return this->apply([&](T& o) { o.setDataRange(range); });
+    }
+
+    Ret setDataScaleType(QCPAxis::ScaleType type)
+    {
+        return this->apply([&](T& o) { o.setDataScaleType(type); });
+    }
+
     Ret setScatterSkip(int skip)
     {
         return this->apply([&](T& o) { o.setScatterSkip(skip); });
