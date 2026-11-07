@@ -60,13 +60,14 @@ QVector<QPointF> QCPAbstractMultiDataSource::getOptimizedLineDataIndexed(
 }
 
 std::vector<QPointF> QCPAbstractMultiDataSource::linesInData(
-    int column, int begin, int end, double pixelsPerKey, std::vector<int>* sourceIndices) const
+    int column, int begin, int end, double pixelsPerKey, std::vector<int>* sourceIndices,
+    bool logKeys) const
 {
     if (end <= begin) { if (sourceIndices) sourceIndices->clear(); return {}; }
     ColumnWindow w(*this, column, begin, end);
     const auto gaps = qcp::algo::detectKeyGaps(w.keys, 0, end - begin, gapThreshold());
     auto pts = qcp::algo::linesInData(w.keys, w.values, 0, end - begin, pixelsPerKey,
-                                      sourceIndices, gapThreshold(), &gaps);
+                                      sourceIndices, gapThreshold(), &gaps, logKeys);
     if (sourceIndices) shiftIndices(*sourceIndices, begin);
     return pts;
 }

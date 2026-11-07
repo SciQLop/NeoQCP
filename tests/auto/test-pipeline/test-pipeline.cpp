@@ -1,28 +1,27 @@
 #include "test-pipeline.h"
-#include <qcustomplot.h>
-#include <datasource/pipeline-scheduler.h>
+#include <QSignalSpy>
+#include <QThread>
+#include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
+#include <cmath>
 #include <datasource/async-pipeline.h>
 #include <datasource/graph-resampler.h>
-#include <datasource/soa-datasource.h>
-#include <datasource/soa-datasource-2d.h>
-#include <datasource/soa-multi-datasource.h>
-#include <plottables/plottable-graph2.h>
-#include <plottables/plottable-colormap2.h>
-#include <plottables/plottable-colormap.h>
-#include <datasource/graph-resampler.h>
-#include <datasource/resampled-multi-datasource.h>
 #include <datasource/histogram-binner.h>
+#include <datasource/pipeline-scheduler.h>
+#include <datasource/resampled-multi-datasource.h>
+#include <datasource/soa-datasource-2d.h>
+#include <datasource/soa-datasource.h>
+#include <datasource/soa-multi-datasource.h>
+#include <future>
+#include <limits>
+#include <optional>
+#include <plottables/plottable-colormap.h>
+#include <plottables/plottable-colormap2.h>
+#include <plottables/plottable-graph2.h>
 #include <plottables/plottable-histogram2d.h>
 #include <plottables/plottable-multigraph.h>
 #include <plottables/plottable-waterfall.h>
-#include <QSignalSpy>
-#include <QThread>
+#include <qcustomplot.h>
 #include <thread>
-#include <future>
-#include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
-#include <cmath>
-#include <limits>
-#include <optional>
 
 namespace {
 // Combined L1+L2 helper — used only by tests below.
@@ -260,8 +259,8 @@ namespace {
 // The pipeline's mutex is the subject of the race test, so the test takes it directly.
 struct LockablePipeline : QCPGraphPipeline
 {
-    using QCPGraphPipeline::QCPGraphPipeline;
     using QCPAsyncPipelineBase::mMutex;
+    using QCPGraphPipeline::QCPGraphPipeline;
 };
 }
 
@@ -292,8 +291,9 @@ void TestPipeline::aDataChangeBumpedJustBeforeAResultLandsIsStillShown()
             pipeline.mMutex.lock();
             const uint64_t before = pipeline.currentGeneration();
             other = std::thread([&] { pipeline.onDataChanged(); });
-            // With the fix the bump waits for this lock, so the spin always runs out: the wait
-            // is what lets the unfixed bump-before-lock happen while the other thread is parked.
+                    // With the fix the bump waits for this lock, so the spin always runs out: the
+                    // wait is what lets the unfixed bump-before-lock happen while the other thread
+                    // is parked.
             QDeadlineTimer deadline(50);
             while (pipeline.currentGeneration() == before && !deadline.hasExpired())
                 QThread::yieldCurrentThread();
@@ -310,7 +310,8 @@ void TestPipeline::aDataChangeBumpedJustBeforeAResultLandsIsStillShown()
     }
 }
 
-// Nothing newer is on its way when the latest result lands: a finished() slot sees an idle pipeline.
+// Nothing newer is on its way when the latest result lands: a finished() slot sees an idle
+// pipeline.
 void TestPipeline::theLatestResultIsNotBusyWhenItLands()
 {
     QCPPipelineScheduler scheduler;
@@ -2884,20 +2885,20 @@ void TestPipeline::multiGraphLineCacheRebuiltOnZoom()
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QVERIFY(mg->mL2Result);
 
-    auto linesFullRange = mg->mCachedLines;
-    QVERIFY(!linesFullRange.isEmpty());
+    QVERIFY(mg->hasRenderedRange());
+    const int fullRangeRecordings = mg->mCore.recordingCount();
 
     // Zoom IN on the big (resampled) dataset.
     mPlot->xAxis->setRange(N * 0.25, N * 0.75);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    auto linesZoomedIn = mg->mCachedLines;
-    QVERIFY2(linesZoomedIn != linesFullRange, "zoom-in did not rebuild the line cache");
+    const int zoomedInRecordings = mg->mCore.recordingCount();
+    QVERIFY2(zoomedInRecordings > fullRangeRecordings, "zoom-in did not record fresh lines");
 
     // Zoom back OUT to the full range.
     mPlot->xAxis->setRange(0, N - 1);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    auto linesZoomedOut = mg->mCachedLines;
-    QVERIFY2(linesZoomedOut != linesZoomedIn, "zoom-out did not rebuild the line cache");
+    QVERIFY2(mg->mCore.recordingCount() > zoomedInRecordings,
+             "zoom-out did not record fresh lines");
 }
 
 void TestPipeline::multiGraphPendingSourceCommitsAfterZoomTriggeredRefetch()
@@ -2923,7 +2924,7 @@ void TestPipeline::multiGraphPendingSourceCommitsAfterZoomTriggeredRefetch()
     }
     QVERIFY(mg->mL1Cache);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(mg->mHasRenderedRange);
+    QVERIFY(mg->hasRenderedRange());
 
     // Zoom in and, as a real zoom-triggered refetch would, supply fresh
     // (still large) data for the new range.
@@ -2977,7 +2978,7 @@ void TestPipeline::multiGraphMultipleRapidLegitimateSupersessionsCommitLast()
         loop.exec();
     }
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(mg->mHasRenderedRange); // canDefer() now possible
+    QVERIFY(mg->hasRenderedRange()); // canDefer() now possible
 
     // Five legitimate, in-order, back-to-back "remote responses" -- each
     // superseding the previous PENDING one before it has any chance to
@@ -3379,15 +3380,15 @@ void TestPipeline::multiGraphLineCacheReusedOnSmallPan()
     mPlot->yAxis->setRange(-1.5, 1.5);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
-    QVERIFY(!mg->mCachedLines.isEmpty());
-    auto cachedBefore = mg->mCachedLines;
+    QVERIFY(mg->hasRenderedRange());
+    const int recordings = mg->mCore.recordingCount();
 
     // Small pan
     double shift = N * 0.05;
     mPlot->xAxis->setRange(shift, N + shift);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
-    QCOMPARE(mg->mCachedLines, cachedBefore);
+    QCOMPARE(mg->mCore.recordingCount(), recordings); // a pan inside the window is a translation
 }
 
 void TestPipeline::graph2FastPanNeverBlank()
@@ -3536,13 +3537,13 @@ void TestPipeline::multiGraphGapThresholdZeroDrawsIrregularSteps()
     mPlot->xAxis->setRange(0, 12);
     mPlot->yAxis->setRange(-1, 2);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QCOMPARE(g->mCachedLines.size(), 1);
-    QVERIFY(nanBreaks(g->mCachedLines[0]) > 0);
+    QCOMPARE(g->mCore.recordedCommandCount(), 1);
+    QVERIFY(g->mCore.recordedPolylineNaNs() > 0);
 
     g->setGapThreshold(0);
     QCOMPARE(g->gapThreshold(), 0.0);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QCOMPARE(nanBreaks(g->mCachedLines[0]), 0);
+    QCOMPARE(g->mCore.recordedPolylineNaNs(), 0);
 }
 
 namespace {
@@ -3597,11 +3598,11 @@ void TestPipeline::multiGraphGapThresholdReachesResampledSource()
     QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QVERIFY(g->mL2Result);
-    QVERIFY(nanBreaks(g->mCachedLines[0]) > 0);
+    QVERIFY(g->mCore.recordedPolylineNaNs() > 0);
 
     g->setGapThreshold(0);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QCOMPARE(nanBreaks(g->mCachedLines[0]), 0);
+    QCOMPARE(g->mCore.recordedPolylineNaNs(), 0);
 }
 
 namespace {
@@ -3629,8 +3630,8 @@ std::vector<double> uniformValues()
 const std::vector<double> kSamplesPerPixel = {0.5, 1.0, 1.5, 2.0, 3.4, 5.0, 8.0, 12.0, 20.0, 40.0};
 
 // The zooms at which the graph breaks a line drawn from gap-free data.
-template <typename Lines, typename UsesL2>
-QStringList zoomsThatBreakUniformData(QCustomPlot* plot, Lines lines, UsesL2 usesL2,
+template <typename Breaks, typename UsesL2>
+QStringList zoomsThatBreakUniformData(QCustomPlot* plot, Breaks breaks, UsesL2 usesL2,
                                      const std::vector<double>& zooms = kSamplesPerPixel)
 {
     QStringList broken;
@@ -3640,9 +3641,11 @@ QStringList zoomsThatBreakUniformData(QCustomPlot* plot, Lines lines, UsesL2 use
         const double start = kUniformN * kUniformStep / 2;
         plot->xAxis->setRange(start, start + perPixel * width * kUniformStep);
         plot->replot(QCustomPlot::rpImmediateRefresh);
-        if (const int breaks = nanBreaks(lines()); breaks > 0)
+        if (const int count = breaks(); count > 0)
             broken << QString("%1 samples/px (%2): %3 breaks")
-                          .arg(perPixel).arg(usesL2() ? "L2" : "raw").arg(breaks);
+                          .arg(perPixel)
+                          .arg(usesL2() ? "L2" : "raw")
+                          .arg(count);
     }
     return broken;
 }
@@ -3658,7 +3661,7 @@ void TestPipeline::graph2UniformDataNeverBreaksAtAnyZoom()
     QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
 
     const auto broken = zoomsThatBreakUniformData(
-        mPlot, [g] { return g->mCachedLines; }, [g] { return bool(g->mL2Result); });
+        mPlot, [g] { return nanBreaks(g->mCachedLines); }, [g] { return bool(g->mL2Result); });
     QVERIFY2(broken.isEmpty(), qPrintable(broken.join("; ")));
     QVERIFY2(g->mL2Result, "the widest zoom must be drawn from L2, or this test checks nothing");
 }
@@ -3674,7 +3677,7 @@ void TestPipeline::multiGraphUniformDataNeverBreaksAtAnyZoom()
     QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
 
     const auto broken = zoomsThatBreakUniformData(
-        mPlot, [g] { return g->mCachedLines[0]; }, [g] { return bool(g->mL2Result); });
+        mPlot, [g] { return g->mCore.recordedPolylineNaNs(); }, [g] { return bool(g->mL2Result); });
     QVERIFY2(broken.isEmpty(), qPrintable(broken.join("; ")));
     QVERIFY2(g->mL2Result, "the widest zoom must be drawn from L2, or this test checks nothing");
 }
@@ -3702,7 +3705,7 @@ void TestPipeline::multiGraphNaNHoleBreaksTheResampledLine()
         g->setGapThreshold(0);
         mPlot->replot(QCustomPlot::rpImmediateRefresh);
         QVERIFY(g->mL2Result);
-        QVERIFY2(nanBreaks(g->mCachedLines[0]) > 0, qPrintable(QString::number(perPixel)));
+        QVERIFY2(g->mCore.recordedPolylineNaNs() > 0, qPrintable(QString::number(perPixel)));
     }
 }
 
@@ -3724,14 +3727,9 @@ void TestPipeline::multiGraphNaNHoleInOneColumnBreaksThatLine()
     mPlot->xAxis->setRange(centre - span / 2, centre + span / 2);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QVERIFY(g->mL2Result);
-    const auto& line = g->mCachedLines[0];
-    double widest = 0;
-    for (int i = 1; i < line.size(); ++i)
-        if (!std::isnan(line[i].x()) && !std::isnan(line[i - 1].x()))
-            widest = std::max(widest, line[i].x() - line[i - 1].x());
-    qInfo() << "plot width" << mPlot->xAxis->axisRect()->width() << "px, column 0 breaks"
-            << nanBreaks(line) << ", widest segment" << widest << "px";
-    QVERIFY2(nanBreaks(line) > 0, qPrintable(QString("bridged, widest segment %1 px").arg(widest)));
+    const int breaks = g->mCore.recordedPolylineNaNs();
+    qInfo() << "plot width" << mPlot->xAxis->axisRect()->width() << "px, column 0 breaks" << breaks;
+    QVERIFY2(breaks > 0, "the hole was bridged: the recorded line has no break");
 }
 
 // A NaN narrower than a pixel cannot be seen: it must not break a resampled line. Narrower means
@@ -3750,7 +3748,8 @@ void TestPipeline::sporadicNaNNeverBreaksTheResampledLine()
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
     QStringList broken = zoomsThatBreakUniformData(
-        mPlot, [g] { return g->mCachedLines[0]; }, [g] { return bool(g->mL2Result); }, subPixelNaN);
+        mPlot, [g] { return g->mCore.recordedPolylineNaNs(); }, [g] { return bool(g->mL2Result); },
+        subPixelNaN);
 
     auto* g2 = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
     QSignalSpy spy2(&g2->pipeline(), &QCPGraphPipeline::finished);
@@ -3759,8 +3758,8 @@ void TestPipeline::sporadicNaNNeverBreaksTheResampledLine()
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QTRY_VERIFY_WITH_TIMEOUT(spy2.count() >= 1, 30000);
     for (const auto& b : zoomsThatBreakUniformData(
-             mPlot, [g2] { return g2->mCachedLines; }, [g2] { return bool(g2->mL2Result); },
-             subPixelNaN))
+             mPlot, [g2] { return nanBreaks(g2->mCachedLines); },
+             [g2] { return bool(g2->mL2Result); }, subPixelNaN))
         broken << "graph2 " + b;
     QVERIFY2(broken.isEmpty(), qPrintable(broken.join("; ")));
 }

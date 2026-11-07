@@ -47,6 +47,12 @@ std::vector<float>& markerColourScratch()
     return rgba;
 }
 
+std::vector<float>& markerXyzScratch()
+{
+    static thread_local std::vector<float> xyz;
+    return xyz;
+}
+
 // Every fill the replay tessellates: the two builders below are the only places that make one.
 quint64& fillBuilds()
 {
@@ -267,17 +273,26 @@ void addMarker(QCPScatterRhiLayer& scatter, const qcp::MarkersCmd& markers, QCPR
 {
     const std::span<const QPointF> resolved
         = cache.pixels(markers.points, generation, frame.transform);
+    if (!markers.colours)
+    {
+        // addScatter takes xyz triples; the coloured entry point takes the pairs and pads them.
+        std::vector<float>& xyz = markerXyzScratch();
+        xyz.resize(resolved.size() * 3);
+        for (std::size_t i = 0; i < resolved.size(); ++i)
+        {
+            xyz[3 * i] = static_cast<float>(resolved[i].x());
+            xyz[3 * i + 1] = static_cast<float>(resolved[i].y());
+            xyz[3 * i + 2] = 0.0f;
+        }
+        scatter.addScatter(xyz, *markers.style, clip, dpr, height);
+        return;
+    }
     std::vector<float>& xy = markerScratch();
     xy.resize(resolved.size() * 2);
     for (std::size_t i = 0; i < resolved.size(); ++i)
     {
         xy[2 * i] = static_cast<float>(resolved[i].x());
         xy[2 * i + 1] = static_cast<float>(resolved[i].y());
-    }
-    if (!markers.colours)
-    {
-        scatter.addScatter(xy, *markers.style, clip, dpr, height);
-        return;
     }
     // One colour per marker: the scatter pipeline takes them premultiplied, a float per channel.
     std::vector<float>& rgba = markerColourScratch();

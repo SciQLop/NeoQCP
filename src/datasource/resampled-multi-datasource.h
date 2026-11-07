@@ -1,8 +1,8 @@
 #pragma once
-#include "abstract-multi-datasource.h"
-#include "graph-resampler.h"
-#include "algorithms.h"
 #include "../Profiling.hpp"
+#include "abstract-multi-datasource.h"
+#include "algorithms.h"
+#include "graph-resampler.h"
 #include <algorithm>
 #include <cmath>
 #include <span>
@@ -109,31 +109,54 @@ public:
         return lines;
     }
 
-    // Keys and values of an L2 level are already one min/max pair per bin: pixelsPerKey is
-    // ignored so the level is never thinned twice.
-    std::vector<QPointF> linesInData(int column, int begin, int end, double /*pixelsPerKey*/,
-                                     std::vector<int>* sourceIndices = nullptr) const override
+    // Keys and values of an L2 level are one min/max pair per bin. pixelsPerKey only decides
+    // which bins survive (the window holds ~4 of them per pixel); the origin of a survivor is
+    // kept, so a colour lookup still finds the data row it came from.
+    std::vector<QPointF> linesInData(int column, int begin, int end, double pixelsPerKey,
+                                     std::vector<int>* sourceIndices = nullptr,
+                                     bool logKeys = false) const override
     {
         if (sourceIndices) sourceIndices->clear();
         if (column < 0 || column >= mBins.numColumns) return {};
         const int s = mBins.stride();
         const bool hasOrigin = !mBins.origin.empty();
         ensureGapCache(begin, end);
-        std::vector<QPointF> lines;
-        lines.reserve(end - begin + (end - begin) / 10);
-        for (int i = begin; i < end; ++i)
+        const auto originOf
+            = [&](int bin) { return bin < 0 || !hasOrigin ? -1 : mBins.origin[column * s + bin]; };
+        // A bin that holds no finite sample is a hole, not a break: getLines joins its
+        // neighbours, so the unthinned line joins them too.
+        if (pixelsPerKey <= 0.0)
         {
-            if (mGapCache.gaps.hasAnyGap && mGapCache.gaps[i - begin])
+            const auto nanPt = QPointF(qQNaN(), qQNaN());
+            std::vector<QPointF> lines;
+            lines.reserve(std::size_t(end - begin));
+            for (int i = begin; i < end; ++i)
             {
-                lines.emplace_back(qQNaN(), qQNaN());
-                if (sourceIndices) sourceIndices->push_back(-1);
+                if (mGapCache.gaps.hasAnyGap && mGapCache.gaps[i - begin])
+                {
+                    lines.push_back(nanPt);
+                    if (sourceIndices)
+                        sourceIndices->push_back(-1);
+                }
+                const double v = mBins.values[column * s + i];
+                if (std::isnan(v))
+                    continue;
+                lines.emplace_back(mBins.keys[i], v);
+                if (sourceIndices)
+                    sourceIndices->push_back(originOf(i));
             }
-            const double v = mBins.values[column * s + i];
-            if (std::isnan(v)) continue;
-            lines.emplace_back(mBins.keys[i], v);
-            if (sourceIndices)
-                sourceIndices->push_back(hasOrigin ? mBins.origin[column * s + i] : -1);
+            return lines;
         }
+        std::vector<int> bins;
+        std::vector<QPointF> lines
+            = qcp::algo::linesInData(mBins.keys,
+                                     std::span<const double>(mBins.values.data() + column * s, s),
+                                     begin, end, pixelsPerKey,
+                                     sourceIndices ? &bins : nullptr, gapThreshold(),
+                                     &mGapCache.gaps, logKeys);
+        if (sourceIndices)
+            for (const int bin : bins)
+                sourceIndices->push_back(originOf(bin));
         return lines;
     }
 

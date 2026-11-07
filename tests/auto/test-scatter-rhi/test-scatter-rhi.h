@@ -43,6 +43,7 @@ private slots:
     // Several scatters on one layer share one QCPScatterRhiLayer
     void scattersOnOneLayerKeepTheirOwnMarker();
     void multiGraphComponentsKeepTheirOwnMarker();
+    void uncolouredMarkersCommandDrawsEveryMarker();
     void graph2LineStyleChangeAfterFirstDrawIsShown();
     void graph2ScatterStyleChangeAfterFirstDrawIsShown();
     void graph2ScatterColorValuesChangeAfterFirstDrawIsShown();

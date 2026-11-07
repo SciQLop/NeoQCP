@@ -314,6 +314,7 @@ struct QCPDrawnCore::State
     quint64 recordedFrame = 0;
     quint64 recordedDependency = 0;
     const void* recordedSource = nullptr;
+    bool recordedExporting = false;
     QCPTransform recordedTransform;
     //! The ranges the recording was last painted at: the layer shifts from here on a pan.
     QCPRange paintedKey;
@@ -460,8 +461,9 @@ bool QCPDrawnCore::recordingIsStale(const QCPDrawable& object, const QCPDrawnVie
         return keys.lower < window.keys.lower || keys.upper > window.keys.upper;
     }();
     return !mState->recorded || everyFrame || mState->recordedGeneration != mState->generation
-        || mState->recordedSource != object.dataSource()
+        || mState->recordedSource != object.dataSourceIdentity()
         || mState->recordedDependency != object.dependencyRevision()
+        || (object.resolvesForTheExport() && mState->recordedExporting != view.exporting)
         || (mState->viewDependent && mState->recordedEpoch != epoch)
         || (mState->anchorDependent && mState->recordedItemsEpoch != itemsEpoch)
         || (mState->transformDependent
@@ -482,6 +484,17 @@ QPointF QCPDrawnCore::stallOffset(const QCPDrawable& object, const QCPDrawnView&
         return { }; // a zoom: the shift cannot express a new scale
     return qcp::computeViewportOffset(view.keyAxis, view.valueAxis, mState->paintedKey,
                                       mState->paintedValue);
+}
+
+// The layer now holds this object drawn at these ranges: a pan may shift them instead of
+// repainting. An export never does (it paints into another image, not the layer's).
+void QCPDrawnCore::notePainted(const QCPDrawnView& view)
+{
+    if (!view.keyAxis || !view.valueAxis)
+        return;
+    mState->paintedKey = view.keyAxis->range();
+    mState->paintedValue = view.valueAxis->range();
+    mState->painted = true;
 }
 
 bool QCPDrawnCore::contentChanged()
@@ -505,6 +518,38 @@ quint64 QCPDrawnCore::generation() const
 int QCPDrawnCore::recordingCount() const
 {
     return mState->recordings;
+}
+
+bool QCPDrawnCore::hasRecording() const
+{
+    return mState->recorded;
+}
+
+int QCPDrawnCore::recordedCommandCount() const
+{
+    return mState->recorded ? int(mState->recording.commands.size()) : 0;
+}
+
+int QCPDrawnCore::recordedPolylinePointCount() const
+{
+    int points = 0;
+    if (mState->recorded)
+        for (const qcp::QCPDrawCommand& command : mState->recording.commands)
+            if (const auto* polyline = std::get_if<qcp::PolylineDataCmd>(&command))
+                points += int(polyline->points->size());
+    return points;
+}
+
+int QCPDrawnCore::recordedPolylineNaNs() const
+{
+    int breaks = 0;
+    if (mState->recorded)
+        for (const qcp::QCPDrawCommand& command : mState->recording.commands)
+            if (const auto* polyline = std::get_if<qcp::PolylineDataCmd>(&command))
+                for (const QPointF& point : *polyline->points)
+                    if (!std::isfinite(point.x()) || !std::isfinite(point.y()))
+                        ++breaks;
+    return breaks;
 }
 
 quint64 QCPDrawnCore::resolveRemapCount() const
@@ -542,7 +587,7 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
     const quint64 itemsEpoch = view.plot ? view.plot->itemsEpoch() : 0;
     const quint64 frame = view.plot ? view.plot->frameEpoch() : 0;
     const QCPTransform transform(view.keyAxis, view.valueAxis);
-    const void* source = object.dataSource();
+    const void* source = object.dataSourceIdentity();
     const quint64 dependency = object.dependencyRevision();
     // simplify: a translation still remakes a transform-dependent recording, so a pan of stacked,
     // grouped or pixel-width bars re-records every frame. A data-plus-pixel-offset position type
@@ -550,7 +595,7 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
 
     if (!recordingIsStale(object, view))
         return true;
-    QCPDrawContext context(view.keyAxis, view.valueAxis, view.axisRect, view.theme);
+    QCPDrawContext context(view.keyAxis, view.valueAxis, view.axisRect, view.theme, view.exporting);
     const InsideDraw drawing(mState->insideDraw);
     object.draw(context);
     mState->recording = context.takeDrawList();
@@ -565,6 +610,7 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
     mState->recordedFrame = frame;
     mState->recordedSource = source;
     mState->recordedDependency = dependency;
+    mState->recordedExporting = view.exporting;
     mState->recordedTransform = transform;
     mState->recorded = true;
     ++mState->recordings;
@@ -724,7 +770,10 @@ double QCPDrawnCore::selectTest(const QCPDrawable& object, const QPointF& pos, b
 
 void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const QCPDrawnView& view)
 {
-    if (!ensureRecording(object, view))
+    // An export resolves what a screen frame waits for: the recording knows which it was made for.
+    QCPDrawnView painted = view;
+    painted.exporting = painter.isExporting();
+    if (!ensureRecording(object, painted))
         return;
     const QCPDrawFrame frame
         = qcpMakeFrame(view.keyAxis, view.valueAxis, view.axisRect, QRectF(view.clip));
@@ -738,6 +787,7 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
             // A screen without a backend: the painter draws it all, and never touches the caches a
             // screen frame resolves into.
             qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::All);
+            notePainted(view);
             return;
         }
         // Spec 5: an export stacks like the screen - this layer's painter content first, then the
@@ -765,18 +815,14 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
         mState->movesWithTheData = qcpRecordingMovesWithTheData(mState->recording, false);
     qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::PainterOnly,
                          &mState->raster, plottables->dashedAvailable());
-    // The layer now holds this object drawn at these ranges: a pan may shift them instead of
-    // repainting. An export never does (it paints into another image, not the layer's).
-    mState->paintedKey = view.keyAxis->range();
-    mState->paintedValue = view.valueAxis->range();
-    mState->painted = true;
+    notePainted(view);
 }
 
 void QCPDrawnCore::paintIcon(const QCPDrawable& object, QCPPainter& painter, const QRectF& rect,
                              const QCPDrawnView& view)
 {
     const quint64 epoch = view.plot ? view.plot->viewEpoch() : 0;
-    const void* source = object.dataSource();
+    const void* source = object.dataSourceIdentity();
     const quint64 dependency = object.dependencyRevision();
     // The icon is a recording of its own, so it outlives a frame only when none of the facts it
     // read changed: its generation, the data it reads, and the view epoch a theme reader needs.

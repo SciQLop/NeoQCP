@@ -74,7 +74,7 @@ private slots:
     void fillOnALogAxisClampsAZeroBaseline();
     void bandEdgeAtZeroOnALogAxisReachesTheEdge();
     void bandEdgeAtZeroOnALogAxisIsClampedLikeABaseline();
-    void fillCacheIsRebuiltOnZoom();
+    void fillsFollowTheViewOnTheGpu();
     void bandEdgeAtZeroOnALogAxisStaysPastTheEdgeUnderAGpuPan();
     void defaultFillFollowsTheOwnerColourOnTheGpu();
     void autoScaleIncludesHiddenLineBandEdges();
@@ -108,7 +108,7 @@ private slots:
     void keptComponentsStayEditableDuringAnEmptyWindow();
     void errorBarsRejectBadColumns();
     void capWidthChangeShowsOnTheNextFrame();
-    void errorBarsAreCachedOnTheGpu();
+    void errorBarsAreDrawnOnTheGpuPath();
     void errorBarsHideTheirBoundsFromTheLegend();
     void errorBoundsSetBeforeDataStayOutOfTheLegend();
     void legendIconOfErrorBarsHasABarGlyph();
@@ -147,6 +147,16 @@ private slots:
     void aWiderStagedSourceKeepsTheCachedLinesInRange();
     void zoomedOutLinesAreThinnedToThePixelWidth_data();
     void zoomedOutLinesAreThinnedToThePixelWidth();
+
+    // Recorded lines and markers
+    void panningABigGraphDoesNotRecord();
+    void panPastTheWindowRecordsFreshLines();
+    void theSettleAfterAPanRecordsAgain();
+    void logKeyAxisLinesMatchTheData();
+    void logKeyAxisBigGraphIsThinned();
+    void exportBeforeTheFirstResampleHasTheLines();
+    void colouredLineIsOneCommandPerComponent();
+    void waterfallDrawsItsOffsets();
 
     // Rendering
     void renderVerticalKeyAxisUsesHeight();

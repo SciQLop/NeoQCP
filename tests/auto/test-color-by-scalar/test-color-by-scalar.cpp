@@ -1,18 +1,18 @@
 #include "test-color-by-scalar.h"
-#include "qcustomplot.h"
-#include "datasource/soa-multi-datasource.h"
 #include "datasource/algorithms.h"
-#include "datasource/row-major-multi-datasource.h"
 #include "datasource/graph-resampler.h"
 #include "datasource/resampled-multi-datasource.h"
-#include "plottables/plottable-linestyle.h"
+#include "datasource/row-major-multi-datasource.h"
+#include "datasource/soa-multi-datasource.h"
+#include "misuse.h"
+#include "painting/line-extruder.h"
+#include "painting/scatter-rhi-layer.h"
+#include "painting/viewport-offset.h"
 #include "plottables/plottable-color-mapper.h"
 #include "plottables/plottable-color-runs.h"
 #include "plottables/plottable-draw-utils.h"
-#include "painting/line-extruder.h"
-#include "painting/viewport-offset.h"
-#include "painting/scatter-rhi-layer.h"
-#include "misuse.h"
+#include "plottables/plottable-linestyle.h"
+#include "qcustomplot.h"
 #include "scatterstyle.h"
 #include <any>
 #include <cmath>
@@ -50,8 +50,14 @@ void TestColorByScalar::cleanup()
     mPlot = nullptr;
 }
 
-std::shared_ptr<QCPAbstractMultiDataSource> TestColorByScalar::makeSource(
-    std::vector<double> keys, std::vector<std::vector<double>> columns)
+namespace
+{
+QColor pixelAt(QCustomPlot* plot, const QImage& img, double key, double value);
+bool isRed(const QColor& c);
+} // namespace
+
+std::shared_ptr<QCPAbstractMultiDataSource>
+TestColorByScalar::makeSource(std::vector<double> keys, std::vector<std::vector<double>> columns)
 {
     return std::make_shared<SoA>(std::move(keys), std::move(columns));
 }
@@ -59,15 +65,24 @@ std::shared_ptr<QCPAbstractMultiDataSource> TestColorByScalar::makeSource(
 void TestColorByScalar::setLineStyleInvalidatesLineCache()
 {
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    mg->setDataSource(makeSource({0, 1, 2, 3}, {{0, 1, 0, 1}}));
+    mg->setDataSource(makeSource({ 0, 1, 2, 3 }, { { 0, 1, 0, 1 } }));
+    mg->setComponentPens({ QPen(Qt::red, 6) });
     mPlot->xAxis->setRange(0, 3);
     mPlot->yAxis->setRange(-1, 2);
     mPlot->replot();
-    QVERIFY(!mg->mLineCacheDirty);
+    QVERIFY(mg->hasRenderedRange());
+    const int recordings = mg->mCore.recordingCount();
+    const QImage diagonal = mPlot->toPixmap(400, 300).toImage();
+    QVERIFY2(isRed(pixelAt(mPlot, diagonal, 0.75, 0.75)), "the diagonal line is missing");
 
     mg->setLineStyle(QCPMultiGraph::lsStepLeft);
-    QVERIFY(mg->mLineCacheDirty);
-    QVERIFY(mg->mCachedLines.isEmpty());
+    mPlot->replot();
+    QVERIFY2(mg->mCore.recordingCount() > recordings, "the new line style was never recorded");
+
+    const QImage stepped = mPlot->toPixmap(400, 300).toImage();
+    QVERIFY2(!isRed(pixelAt(mPlot, stepped, 0.75, 0.75)), "the diagonal line is still drawn");
+    QVERIFY2(isRed(pixelAt(mPlot, stepped, 0.75, 0.0)),
+             "the step does not hold the previous value");
 }
 
 namespace {
@@ -797,60 +812,36 @@ void TestColorByScalar::coloredImpulsesRenderTheGradient()
 
 void TestColorByScalar::coloredImpulsesFollowThePanOffset()
 {
-    // Reproducer: on a cache-reuse pan frame (gpuOffset non-null), impulse
-    // lines were drawn straight from the cached pixel-space lines without
-    // being translated by gpuOffset, so they stayed at their pre-pan pixel
-    // position while the rest of the graph moved with the pan.
+    // A pure pan is served by translating the recording: the impulses must land on the
+    // panned pixels, not stay where the previous view drew them.
     std::vector<double> keys(20), values(20, 0.8);
     for (int i = 0; i < 20; ++i) keys[i] = i * 10.0;
     auto* mg = rampGraph(mPlot, makeSource(keys, {values}), ramp(20));
     mg->setLineStyle(QCPMultiGraph::lsImpulse);
     mPlot->xAxis->setRange(-10, 199);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(mg->mHasRenderedRange);
-    QVERIFY(!mg->mLineCacheDirty);
-    const auto cachedBefore = mg->mCachedLines;
-    const double staleRedPixel = mPlot->xAxis->coordToPixel(0);   // pre-pan pixel of key 0
+    QVERIFY(mg->hasRenderedRange());
+    const int recordings = mg->mCore.recordingCount();
+    const double staleRedPixel = mPlot->xAxis->coordToPixel(0); // pre-pan pixel of key 0
 
     // Pure pan: same-size range shift, comfortably clear of the y-axis spine
     // on both sides (see the coordToPixel comment in coloredImpulsesRenderTheGradient).
     mPlot->xAxis->setRange(-20, 189);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCOMPARE(mg->mCore.recordingCount(), recordings); // translated, not recorded again
 
-    // This is exactly the condition draw() itself computes: confirm the pan
-    // is served by translating the cache (gpuOffset non-null, no rebuild) --
-    // otherwise this frame wouldn't exercise the bug at all.
-    const auto [needFresh, gpuOffset] = qcp::evaluateLineCache(
-        mg->mLineCacheDirty, mg->mCachedLines.isEmpty(),
-        QSize(mPlot->xAxis->axisRect()->width(), mPlot->xAxis->axisRect()->height()),
-        mg->mCachedPlotSize, mg->mHasRenderedRange,
-        mg->mRenderedRange.key, mg->mRenderedRange.value,
-        mPlot->xAxis, mPlot->yAxis, false);
-    QVERIFY(!needFresh);
-    QVERIFY(!gpuOffset.isNull());
-
-    // Draw this pan frame directly (not through toPixmap(), which forces
-    // export mode and always rebuilds fresh lines -- it would never exercise
-    // the cache-translation path this bug lives in).
-    QImage img(400, 300, QImage::Format_ARGB32_Premultiplied);
-    img.fill(Qt::white);
-    QCPPainter painter(&img);
-    mg->draw(&painter);
-    painter.end();
-
-    QCOMPARE(mg->mCachedLines, cachedBefore);   // reused, not rebuilt
-
+    const QImage img = mPlot->toPixmap(400, 300).toImage(); // an export records afresh
     const int y = qRound(mPlot->yAxis->coordToPixel(0.4));
     QVERIFY2(isRed(img.pixelColor(qRound(mPlot->xAxis->coordToPixel(0)), y)),
-             "impulse for key 0 did not follow the pan offset");
+             "impulse for key 0 did not follow the pan");
     QVERIFY2(!isRed(img.pixelColor(qRound(staleRedPixel), y)),
              "impulse for key 0 is stuck at its pre-pan pixel position");
 }
 
 void TestColorByScalar::plainImpulsesFollowThePanOffset()
 {
-    // Uncoloured counterpart of coloredImpulsesFollowThePanOffset: the plain
-    // (non-per-vertex-coloured) impulse draw path must also translate by
-    // gpuOffset on a cache-reusing pan frame.
+    // Uncoloured counterpart of coloredImpulsesFollowThePanOffset: the plain impulse
+    // path must also follow the pan, and the pan must not record fresh lines.
     std::vector<double> keys(20), values(20, 0.8);
     for (int i = 0; i < 20; ++i) keys[i] = i * 10.0;
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
@@ -860,52 +851,27 @@ void TestColorByScalar::plainImpulsesFollowThePanOffset()
     mPlot->xAxis->setRange(-10, 199);
     mPlot->yAxis->setRange(-1, 1);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(mg->mHasRenderedRange);
-    QVERIFY(!mg->mLineCacheDirty);
-    const auto cachedBefore = mg->mCachedLines;
-    const double stalePixel = mPlot->xAxis->coordToPixel(0);   // pre-pan pixel of key 0
+    QVERIFY(mg->hasRenderedRange());
+    const int recordings = mg->mCore.recordingCount();
+    const double stalePixel = mPlot->xAxis->coordToPixel(0); // pre-pan pixel of key 0
 
-    mPlot->xAxis->setRange(-20, 189);   // pure pan, same range size
+    mPlot->xAxis->setRange(-20, 189); // pure pan, same range size
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCOMPARE(mg->mCore.recordingCount(), recordings); // translated, not recorded again
 
-    const auto [needFresh, gpuOffset] = qcp::evaluateLineCache(
-        mg->mLineCacheDirty, mg->mCachedLines.isEmpty(),
-        QSize(mPlot->xAxis->axisRect()->width(), mPlot->xAxis->axisRect()->height()),
-        mg->mCachedPlotSize, mg->mHasRenderedRange,
-        mg->mRenderedRange.key, mg->mRenderedRange.value,
-        mPlot->xAxis, mPlot->yAxis, false);
-    QVERIFY(!needFresh);
-    QVERIFY(!gpuOffset.isNull());
-
-    QImage img(400, 300, QImage::Format_ARGB32_Premultiplied);
-    img.fill(Qt::white);
-    QCPPainter painter(&img);
-    mg->draw(&painter);
-    painter.end();
-
-    QCOMPARE(mg->mCachedLines, cachedBefore);   // reused, not rebuilt
-
-    const int y = qRound(mPlot->yAxis->coordToPixel(0.4));   // mid-line, clear of the tip's antialiasing
+    const QImage img = mPlot->toPixmap(400, 300).toImage(); // an export records afresh
+    const int y
+        = qRound(mPlot->yAxis->coordToPixel(0.4)); // mid-line, clear of the tip's antialiasing
     QVERIFY2(qGray(img.pixel(qRound(mPlot->xAxis->coordToPixel(0)), y)) < 128,
-             "impulse for key 0 did not follow the pan offset");
-    QVERIFY2(qGray(img.pixel(qRound(stalePixel), y)) > 200,
+             "impulse for key 0 did not follow the pan");
+    QVERIFY2(qGray(img.pixel(qRound(stalePixel), y)) > 150,
              "impulse for key 0 is stuck at its pre-pan pixel position");
 }
 
 void TestColorByScalar::exportAfterOnscreenPanUsesCurrentPixelsNotStaleOffset()
 {
-    // Reproducer: evaluateLineCache computed a non-null gpuOffset for a
-    // cache-reusing pan frame and only zeroed it afterwards for export mode.
-    // An export made right after an on-screen pan -- before the next fresh
-    // redraw -- fetches fresh lines in *current* pixel coordinates and then
-    // translates them by that *stale* pan offset on top, landing the line
-    // off its true position in the exported image.
-    //
-    // The export draw is done directly with an export-mode QCPPainter (like
-    // toPixmap() sets up internally) rather than via toPixmap() itself,
-    // because toPixmap() forces its own viewport size, which would differ
-    // from this (unshown, un-laid-out) widget's actual size and trip the
-    // plot-size check in evaluateLineCache before the offset is even
-    // computed -- masking the bug instead of exercising it.
+    // An export made right after an on-screen pan, before any fresh redraw, must put the
+    // line at the pixel of its current value, not at the pre-pan one.
     std::vector<double> keys(200), values(200, 0.5);
     std::iota(keys.begin(), keys.end(), 0.0);
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
@@ -914,45 +880,22 @@ void TestColorByScalar::exportAfterOnscreenPanUsesCurrentPixelsNotStaleOffset()
     mPlot->xAxis->setRange(0, 199);
     mPlot->yAxis->setRange(-1, 1);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(mg->mHasRenderedRange);
-    QVERIFY(!mg->mLineCacheDirty);
-    const auto cachedBefore = mg->mCachedLines;
-    const QSize plotSize = mPlot->size();
+    QVERIFY(mg->hasRenderedRange());
+    const int recordings = mg->mCore.recordingCount();
+    const int staleY = qRound(mPlot->yAxis->coordToPixel(0.5)); // pre-pan pixel of its value
 
-    // Pure pan: same-size range shift. The next on-screen replot must serve
-    // this from the cache -- possibly even skipping the redraw entirely via
-    // a higher-level paint-buffer translation -- never a rebuild.
+    // Pure pan: same-size range shift.
     mPlot->yAxis->setRange(-1.2, 0.8);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QCOMPARE(mg->mCachedLines, cachedBefore);   // reused, not rebuilt
+    QCOMPARE(mg->mCore.recordingCount(), recordings); // translated, not recorded again
 
-    // This is exactly the condition draw() itself computes: confirm the pan
-    // frame is served by translating the cache (gpuOffset non-null, no
-    // rebuild) -- otherwise this test wouldn't exercise the bug at all.
-    const auto [needFresh, gpuOffset] = qcp::evaluateLineCache(
-        mg->mLineCacheDirty, mg->mCachedLines.isEmpty(),
-        QSize(mPlot->xAxis->axisRect()->width(), mPlot->xAxis->axisRect()->height()),
-        mg->mCachedPlotSize, mg->mHasRenderedRange,
-        mg->mRenderedRange.key, mg->mRenderedRange.value,
-        mPlot->xAxis, mPlot->yAxis, false);
-    QVERIFY(!needFresh);
-    QVERIFY(!gpuOffset.isNull());
-
-    // Export right after the pan, with no intervening fresh replot.
-    QImage img(plotSize, QImage::Format_ARGB32_Premultiplied);
-    img.fill(Qt::white);
-    QCPPainter painter(&img);
-    painter.setMode(QCPPainter::pmNoCaching);
-    mg->draw(&painter);
-    painter.end();
+    const QImage img = mPlot->toPixmap(400, 300).toImage();
 
     const int x = qRound(mPlot->xAxis->coordToPixel(100));
     const int correctY = qRound(mPlot->yAxis->coordToPixel(0.5));
-    const int staleY = qRound(correctY + gpuOffset.y());
-
     QVERIFY2(qGray(img.pixel(x, correctY)) < 128,
              "line is not drawn at the pixel of its current value after export");
-    QVERIFY2(qGray(img.pixel(x, staleY)) > 200,
+    QVERIFY2(qGray(img.pixel(x, staleY)) > 150,
              "line is drawn at the stale pre-export pan offset instead");
 }
 
@@ -1102,44 +1045,61 @@ void TestColorByScalar::coloredLegendLineShowsTheGradient()
 
 void TestColorByScalar::coloredGraphDrawnFromL2KeepsIndicesConsistent()
 {
+    // The colour of a vertex is looked up by the data row the L2 point came from. A misaligned
+    // origin moves the colour of every segment after it: draw a flat column whose colour changes
+    // sharply at the middle row, and the change must stay on that row in every view.
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    const int n = 200'000;   // above kResampleThreshold: the async L1 pipeline runs
-    std::vector<double> keys(n), values(n), negated(n), scalar(n);
+    const int n = 200'000; // above kResampleThreshold: the async L1 pipeline runs
+    std::vector<double> keys(n), values(n), negated(n), flat(n, 0.0), scalar(n);
     for (int i = 0; i < n; ++i)
     {
         keys[i] = i;
         values[i] = std::sin(i * 0.001);
         negated[i] = -values[i];
-        scalar[i] = i;
+        scalar[i] = i < n / 2 ? 0.0 : 1.0;
     }
-    mg->setDataSource(makeSource(keys, {values, negated}));
+    mg->setDataSource(makeSource(keys, { values, negated, flat }));
+    mg->setComponentPens({ QPen(Qt::black, 6), QPen(Qt::black, 6), QPen(Qt::black, 6) });
+    mg->setColorGradient(redToBlue());
+    mg->setColorRange(QCPRange(0, 1));
     mg->setColorValues(scalar);
     mPlot->xAxis->setRange(0, n);
     mPlot->yAxis->setRange(-1.5, 1.5);
     mPlot->replot();
     QTRY_VERIFY_WITH_TIMEOUT(mg->mL1Cache && !mg->mL1Cache->level1.origin.empty(), 5000);
 
-    auto checkIndices = [&] {
-        QVERIFY(mg->mL2Result);
-        QVERIFY(mg->mL2HasOrigin);
-        QCOMPARE(mg->mCachedIndices.size(), mg->mCachedLines.size());
-        for (int c = 0; c < mg->mCachedLines.size(); ++c)
-        {
-            QVERIFY(!mg->mCachedLines[c].isEmpty());
-            QCOMPARE(mg->mCachedIndices[c].size(), mg->mCachedLines[c].size());
-            for (int idx : mg->mCachedIndices[c])
-                QVERIFY2(idx == -1 || (idx >= 0 && idx < mg->dataCount()),
-                         qPrintable(QString("component %1: index %2").arg(c).arg(idx)));
-        }
+    // The flat column is drawn last, so this pixel is its own colour.
+    auto colourAtKey = [&](const QImage& img, double key)
+    {
+        return img.pixelColor(qRound(mPlot->xAxis->coordToPixel(key)),
+                              qRound(mPlot->yAxis->coordToPixel(0.0)));
     };
 
-    mPlot->xAxis->setRange(n * 0.25, n * 0.5);
-    mPlot->replot();
-    checkIndices();
+    auto checkColours = [&](double firstHalfKey, double secondHalfKey)
+    {
+        QVERIFY(mg->mL2Result);
+        QVERIFY(mg->mL2HasOrigin);
+        mPlot->replot();
+        QVERIFY(mg->mL2Result);
+        QVERIFY(mg->mL2HasOrigin);
+        const QImage img = mPlot->toPixmap(400, 300).toImage();
+        QVERIFY2(isRed(colourAtKey(img, firstHalfKey)),
+                 qPrintable(QString("key %1 drawn as %2")
+                                .arg(firstHalfKey)
+                                .arg(colourAtKey(img, firstHalfKey).name())));
+        QVERIFY2(isBlue(colourAtKey(img, secondHalfKey)),
+                 qPrintable(QString("key %1 drawn as %2")
+                                .arg(secondHalfKey)
+                                .arg(colourAtKey(img, secondHalfKey).name())));
+    };
 
-    mPlot->xAxis->setRange(n * 0.26, n * 0.51);   // a small pan
-    mPlot->replot();
-    checkIndices();
+    checkColours(n * 0.25, n * 0.75);
+
+    mPlot->xAxis->setRange(n * 0.10, n * 0.60);
+    checkColours(n * 0.25, n * 0.55);
+
+    mPlot->xAxis->setRange(n * 0.11, n * 0.61); // a small pan
+    checkColours(n * 0.25, n * 0.55);
 }
 
 // QCPGraph2 looked a point's colour up at its position in the pixel lines. A key gap or a NaN

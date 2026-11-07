@@ -1,16 +1,17 @@
 #include "test-multigraph.h"
-#include "qcustomplot.h"
-#include "datasource/soa-multi-datasource.h"
 #include "datasource/row-major-multi-datasource.h"
+#include "datasource/soa-multi-datasource.h"
 #include "layoutelements/layoutelement-legend-group.h"
 #include "plottables/plottable-draw-utils.h"
-#include <algorithm>
-#include <functional>
-#include <cmath>
-#include <limits>
-#include <vector>
-#include <span>
+#include "plottables/plottable-waterfall.h"
+#include "qcustomplot.h"
 #include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
+#include <algorithm>
+#include <cmath>
+#include <functional>
+#include <limits>
+#include <span>
+#include <vector>
 
 void TestMultiGraph::init()
 {
@@ -23,6 +24,54 @@ void TestMultiGraph::cleanup()
     delete mPlot;
     mPlot = nullptr;
 }
+
+static QImage renderOf(QCustomPlot* plot);
+
+namespace
+{
+// Defined further down, next to the pixel helpers.
+bool isRed(const QColor& color);
+bool isBlue(const QColor& color);
+
+// A pixel band holding something darker than the light grid: a drawn line.
+bool inkAt(const QImage& image, int x, int y, int radius = 2)
+{
+    if (x < 0 || x >= image.width())
+        return false;
+    for (int dy = -radius; dy <= radius; ++dy)
+    {
+        const int row = y + dy;
+        if (row < 0 || row >= image.height())
+            continue;
+        if (QColor::fromRgb(image.pixel(x, row)).lightness() < 190)
+            return true;
+    }
+    return false;
+}
+
+bool inkNear(const QImage& image, const QPoint& at, int radius = 3)
+{
+    for (int dy = -radius; dy <= radius; ++dy)
+        for (int dx = -radius; dx <= radius; ++dx)
+        {
+            const QPoint probe = at + QPoint(dx, dy);
+            if (image.rect().contains(probe)
+                && QColor::fromRgb(image.pixel(probe)).lightness() < 190)
+                return true;
+        }
+    return false;
+}
+
+template <typename Match>
+bool draws(const QImage& image, const QRect& rect, Match match)
+{
+    for (int y = rect.top(); y <= rect.bottom(); ++y)
+        for (int x = rect.left(); x <= rect.right(); ++x)
+            if (match(image.pixelColor(x, y)))
+                return true;
+    return false;
+}
+} // namespace
 
 void TestMultiGraph::creation()
 {
@@ -512,40 +561,33 @@ void TestMultiGraph::legendGroupSelectsAll()
 
 void TestMultiGraph::cacheExtendsBeyondVisibleRange()
 {
-    // Reproducer: fast panning cropped curves because the line cache only
-    // covered the exact visible range.  After the fix, the cache must extend
-    // beyond the viewport so GPU-translated pans don't expose uncovered edges.
+    // Reproducer: fast panning cropped curves because the lines only covered the exact visible
+    // range. The recording covers a window wider than the view, so a pan inside that margin is
+    // served by a translation and both edges stay covered.
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    // Dense data from 0..20, show only 5..15
     std::vector<double> keys(21);
-    std::vector<double> vals(21);
-    for (int i = 0; i <= 20; ++i) { keys[i] = i; vals[i] = i * 10.0; }
-    mg->setData(std::vector<double>(keys),
-                std::vector<std::vector<double>>{std::vector<double>(vals)});
+    std::vector<double> vals(21, 100.0);
+    for (int i = 0; i <= 20; ++i)
+        keys[i] = i;
+    mg->setData(std::move(keys), std::vector<std::vector<double>> { std::move(vals) });
+    mg->setComponentPens({ QPen(Qt::red, 2) });
     mPlot->xAxis->setRange(5, 15);
     mPlot->yAxis->setRange(0, 200);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(mg->hasRenderedRange());
+    const int recordings = mg->mCore.recordingCount();
 
-    QVERIFY(!mg->mCachedLines.isEmpty());
-    const auto& cached = mg->mCachedLines[0];
-    QVERIFY(cached.size() > 0);
+    // A quarter of the view to the left: still inside the window the recording covers.
+    mPlot->xAxis->setRange(4.5, 14.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCOMPARE(mg->mCore.recordingCount(), recordings);
 
-    // The cached lines are in pixel space.  The leftmost/rightmost cached
-    // pixel-x must extend beyond the axis rect (margin coverage).
-    const QRectF axisRect = mPlot->xAxis->axisRect()->rect();
-    double minPx = cached[0].x(), maxPx = cached[0].x();
-    for (const auto& pt : cached) {
-        minPx = qMin(minPx, pt.x());
-        maxPx = qMax(maxPx, pt.x());
-    }
-    // Before the fix, minPx >= axisRect.left() and maxPx <= axisRect.right()
-    // After the fix, cache extends beyond the visible rect on both sides.
-    QVERIFY2(minPx < axisRect.left(),
-             qPrintable(QString("Cache left %1 should be < axis left %2")
-                        .arg(minPx).arg(axisRect.left())));
-    QVERIFY2(maxPx > axisRect.right(),
-             qPrintable(QString("Cache right %1 should be > axis right %2")
-                        .arg(maxPx).arg(axisRect.right())));
+    const QImage image = renderOf(mPlot);
+    const QRect axisRect = mPlot->axisRect()->rect();
+    const int y = qRound(mPlot->yAxis->coordToPixel(100));
+    QVERIFY2(inkAt(image, axisRect.left() + 2, y), "the panned view has no line at its left edge");
+    QVERIFY2(inkAt(image, axisRect.right() - 2, y),
+             "the panned view has no line at its right edge");
 }
 
 void TestMultiGraph::renderVerticalKeyAxisUsesHeight()
@@ -647,27 +689,41 @@ static void dirtyOverlayBuffer(QCustomPlot* plot)
 void TestMultiGraph::renderZoomRepaintsWhenAnotherBufferIsDirty()
 {
     auto* mg = renderedMultiGraph(mPlot);
-    QVERIFY(mg->mHasRenderedRange);
+    mg->setComponentPens({ QPen(Qt::red, 2) });
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(mg->hasRenderedRange());
+    const int recordings = mg->mCore.recordingCount();
     dirtyOverlayBuffer(mPlot);
 
     mPlot->xAxis->scaleRange(0.5, 10.0); // what SciQLopPlot::wheelEvent/_pinch_zoom do
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
-    QCOMPARE(mg->mRenderedRange.key.lower, mPlot->xAxis->range().lower);
-    QCOMPARE(mg->mRenderedRange.key.upper, mPlot->xAxis->range().upper);
+    QVERIFY2(mg->mCore.recordingCount() > recordings, "the zoomed view was never drawn fresh");
+    const QImage image = renderOf(mPlot);
+    QVERIFY2(inkNear(image,
+                     QPoint(qRound(mPlot->xAxis->coordToPixel(10)),
+                            qRound(mPlot->yAxis->coordToPixel(100)))),
+             "the line is missing at the zoomed view");
 }
 
 void TestMultiGraph::renderSetRangeRepaintsWhenAnotherBufferIsDirty()
 {
     auto* mg = renderedMultiGraph(mPlot);
-    QVERIFY(mg->mHasRenderedRange);
+    mg->setComponentPens({ QPen(Qt::red, 2) });
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY(mg->hasRenderedRange());
+    const int recordings = mg->mCore.recordingCount();
     dirtyOverlayBuffer(mPlot);
 
     mPlot->xAxis->setRange(5, 15); // SciQLopPlotAxis::set_range / axis synchronizers
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
-    QCOMPARE(mg->mRenderedRange.key.lower, 5.0);
-    QCOMPARE(mg->mRenderedRange.key.upper, 15.0);
+    QVERIFY2(mg->mCore.recordingCount() > recordings, "the new range was never drawn fresh");
+    const QImage image = renderOf(mPlot);
+    QVERIFY2(inkNear(image,
+                     QPoint(qRound(mPlot->xAxis->coordToPixel(10)),
+                            qRound(mPlot->yAxis->coordToPixel(100)))),
+             "the line is missing at the new range");
 }
 
 void TestMultiGraph::componentVisibilityToggleForcesLayerRepaint()
@@ -715,8 +771,8 @@ void TestMultiGraph::zoomedOutLinesAreThinnedToThePixelWidth_data()
 void TestMultiGraph::zoomedOutLinesAreThinnedToThePixelWidth()
 {
     // Zoomed out, L2 holds ~4 min/max bins per pixel. Adaptive sampling must thin them to
-    // ~2 points per pixel before extrusion, as QCPGraph2 does; drawing every L2 point made
-    // a full replot about twice as slow.
+    // ~2 points per pixel before the line is recorded, as QCPGraph2 does; drawing every L2
+    // point made a full replot about twice as slow.
     QFETCH(int, columns);
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     const int n = 500'000;
@@ -737,17 +793,16 @@ void TestMultiGraph::zoomedOutLinesAreThinnedToThePixelWidth()
     QVERIFY2(mg->mL2Result, "the test needs the L2 path");
 
     // ~2 points per pixel plus a few interval endpoints; unthinned L2 is ~8 per pixel.
-    const int budget = 3 * mPlot->xAxis->axisRect()->width();
-    for (int c = 0; c < columns; ++c)
-        QVERIFY2(mg->mCachedLines[c].size() <= budget,
-                 qPrintable(QString("column %1 drew %2 points for a budget of %3")
-                                .arg(c).arg(mg->mCachedLines[c].size()).arg(budget)));
+    const int budget = 3 * mPlot->xAxis->axisRect()->width() * columns;
+    const int points = mg->mCore.recordedPolylinePointCount();
+    QVERIFY2(points <= budget,
+             qPrintable(QString("recorded %1 points for a budget of %2").arg(points).arg(budget)));
 }
 
 void TestMultiGraph::componentShownAfterARebuildIsDrawnAgain()
 {
-    // A rebuild of the line cache while a component is hidden drops its lines. Showing it
-    // again must rebuild them: the cache is otherwise "clean" and the component stays empty.
+    // A rebuild of the lines while a component is hidden drops them. Showing it again must
+    // record them: the drawn state is otherwise "clean" and the component stays empty.
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> keys(1000);
     std::vector<std::vector<double>> columns(3, std::vector<double>(1000));
@@ -758,21 +813,23 @@ void TestMultiGraph::componentShownAfterARebuildIsDrawnAgain()
             columns[c][i] = std::sin(i * 0.01 + c);
     }
     mg->setData(std::move(keys), std::move(columns));
+    mg->setComponentPens({ QPen(Qt::red, 2), QPen(Qt::blue, 2), QPen(Qt::darkGreen, 2) });
     mPlot->xAxis->setRange(0, 1000);
     mPlot->yAxis->setRange(-1.5, 1.5);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QTRY_VERIFY_WITH_TIMEOUT(!mg->pipeline().isBusy(), 5000);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(!mg->mCachedLines[1].isEmpty());
+    const QRect axisRect = mPlot->axisRect()->rect();
+    QVERIFY2(draws(renderOf(mPlot), axisRect, isBlue), "the component was not drawn");
 
     mg->setComponentVisible(1, false);
     mPlot->xAxis->setRange(0, 200);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(mg->mCachedLines[1].isEmpty());
+    QVERIFY2(!draws(renderOf(mPlot), axisRect, isBlue), "the hidden component is still drawn");
 
     mg->setComponentVisible(1, true);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY2(!mg->mCachedLines[1].isEmpty(), "the shown component was not rebuilt");
+    QVERIFY2(draws(renderOf(mPlot), axisRect, isBlue), "the shown component was not drawn again");
 }
 
 namespace {
@@ -1008,14 +1065,12 @@ void TestMultiGraph::panIsRedrawnFreshAfterTheDebounce()
     if (!showWithRhi(mPlot))
         QSKIP("no QRhi available in this environment");
     auto* mg = denseGraphDrawn(mPlot);
-    QVERIFY(mg->mL2Result); // the cached lines cover only the view
+    QVERIFY(mg->mL2Result); // the recording covers only the view
+    const int recordings = mg->mCore.recordingCount();
     mPlot->xAxis->setRange(25'000, 125'000);
     mPlot->replot(QCustomPlot::rpImmediateRefresh); // pan frame: translated, edge uncovered
-    const auto renderedAtView = [&] {
-        return qFuzzyCompare(mg->mRenderedRange.key.lower, mPlot->xAxis->range().lower)
-            && qFuzzyCompare(mg->mRenderedRange.key.upper, mPlot->xAxis->range().upper);
-    };
-    QTRY_VERIFY2_WITH_TIMEOUT(renderedAtView(), "the panned view was never drawn fresh", 2000);
+    QTRY_VERIFY2_WITH_TIMEOUT(mg->mCore.recordingCount() > recordings,
+                              "the panned view was never drawn fresh", 2000);
 }
 
 // The new axis is ranged before the move: only the move itself can mark the resample stale.
@@ -1037,14 +1092,13 @@ void TestMultiGraph::panIsRedrawnFreshWhileAnotherLayerIsDirty()
         QSKIP("no QRhi available in this environment");
     auto* mg = denseGraphDrawn(mPlot);
     // Like a crosshair following the mouse: some other layer is dirty on every replot.
-    connect(mPlot, &QCustomPlot::beforeReplot, mPlot, [this] { mPlot->layer("overlay")->markDirty(); });
+    connect(mPlot, &QCustomPlot::beforeReplot, mPlot,
+            [this] { mPlot->layer("overlay")->markDirty(); });
+    const int recordings = mg->mCore.recordingCount();
     mPlot->xAxis->setRange(25'000, 125'000);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    const auto renderedAtView = [&] {
-        return qFuzzyCompare(mg->mRenderedRange.key.lower, mPlot->xAxis->range().lower)
-            && qFuzzyCompare(mg->mRenderedRange.key.upper, mPlot->xAxis->range().upper);
-    };
-    QTRY_VERIFY2_WITH_TIMEOUT(renderedAtView(), "the panned view was never drawn fresh", 2000);
+    QTRY_VERIFY2_WITH_TIMEOUT(mg->mCore.recordingCount() > recordings,
+                              "the panned view was never drawn fresh", 2000);
 }
 
 static QCPMultiGraph* threeColumnGraph(QCustomPlot* plot)
@@ -1369,7 +1423,7 @@ void TestMultiGraph::bandEdgeAtZeroOnALogAxisIsClampedLikeABaseline()
     QCOMPARE(rows[3].b, zeroBaseline);
 }
 
-void TestMultiGraph::fillCacheIsRebuiltOnZoom()
+void TestMultiGraph::fillsFollowTheViewOnTheGpu()
 {
     if (!showWithRhi(mPlot))
         QSKIP("no exposed window with a QRhi in this environment");
@@ -1379,20 +1433,19 @@ void TestMultiGraph::fillCacheIsRebuiltOnZoom()
     mPlot->yAxis->setRange(-1, 5);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QVERIFY(mPlot->plottableRhiLayer(mg->layer())); // the GPU branch ran, not only the export one
-    const auto before = mg->mFills.first().verts;
-    QVERIFY(!before.empty());
+    const QPoint inside(int(mPlot->xAxis->coordToPixel(2)), int(mPlot->yAxis->coordToPixel(1.5)));
+    QVERIFY2(isRedish(mPlot->grabFramebuffer().pixelColor(inside)),
+             "the fill is not drawn for the first view");
 
     mPlot->xAxis->setRange(1.5, 2.5);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    const auto zoomed = mg->mFills.first().verts;
-    QVERIFY(zoomed != before);
+    QVERIFY2(isRedish(mPlot->grabFramebuffer().pixelColor(inside)),
+             "the fill is not drawn for the zoomed view");
 
     mPlot->xAxis->setRange(1.55, 2.55);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY2(mg->mFills.first().verts == zoomed, "a pan within the cache reuses the vertices");
-    const QImage frame = mPlot->grabFramebuffer();
-    QVERIFY(isRedish(frame.pixelColor(int(mPlot->xAxis->coordToPixel(2)),
-                                      int(mPlot->yAxis->coordToPixel(1.5)))));
+    QVERIFY2(isRedish(mPlot->grabFramebuffer().pixelColor(inside)),
+             "the fill is not drawn after a pan inside the window");
 }
 
 // The GPU pans the cached strip: an edge stopped at the axis bottom would come into view.
@@ -1406,12 +1459,9 @@ void TestMultiGraph::bandEdgeAtZeroOnALogAxisStaysPastTheEdgeUnderAGpuPan()
     mPlot->xAxis->setTicks(false);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QVERIFY(mPlot->plottableRhiLayer(mg->layer()));
-    const auto before = mg->mFills.first().verts;
-    QVERIFY(!before.empty());
 
     mPlot->yAxis->setRange(0.05, 50); // the content moves up a tenth of the axis
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY2(mg->mFills.first().verts == before, "the pan must reuse the cached strip");
     const QImage frame = mPlot->grabFramebuffer();
     const double dpr = frame.devicePixelRatio();
     const QRect r = mPlot->axisRect()->rect();
@@ -1801,16 +1851,19 @@ void TestMultiGraph::capWidthChangeShowsOnTheNextFrame()
     QVERIFY(redNear(renderOf(mPlot), capEdge));
 }
 
-void TestMultiGraph::errorBarsAreCachedOnTheGpu()
+void TestMultiGraph::errorBarsAreDrawnOnTheGpuPath()
 {
     if (!showWithRhi(mPlot))
         QSKIP("no QRhi available in this environment");
     auto* sparse = errorBarGraph(mPlot, 5, 1.0);
+    sparse->setComponentErrorBars(0, 1, 2, 20); // wide caps: a clear target at the top edge
     mPlot->xAxis->setRange(-0.5, 4.5);
     mPlot->yAxis->setRange(0, 10);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(!sparse->mErrorBars.first().bars.isEmpty());
-    QVERIFY(!sparse->mErrorBars.first().asBand);
+    // A sparse set draws its caps as lines, a few pixels either side of the bar.
+    QVERIFY(redNear(
+        mPlot->grabFramebuffer(),
+        QPoint(int(mPlot->xAxis->coordToPixel(2)) + 8, int(mPlot->yAxis->coordToPixel(7)))));
 
     mPlot->clearPlottables();
     auto* dense = errorBarGraph(mPlot, 2000, 0.01);
@@ -1818,8 +1871,11 @@ void TestMultiGraph::errorBarsAreCachedOnTheGpu()
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QTRY_VERIFY_WITH_TIMEOUT(!dense->pipeline().isBusy(), 5000);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(dense->mErrorBars.first().asBand);
-    QVERIFY(!dense->mErrorBars.first().band.empty());
+    // A dense set fills the span instead: a translucent band between lower and upper.
+    const QImage denseFrame = mPlot->grabFramebuffer();
+    const QColor inside = denseFrame.pixelColor(int(mPlot->xAxis->coordToPixel(9.5)),
+                                                int(mPlot->yAxis->coordToPixel(5.5)));
+    QVERIFY2(inside.red() > 200 && inside.red() - inside.green() > 15, qPrintable(inside.name()));
 }
 
 void TestMultiGraph::errorBarsHideTheirBoundsFromTheLegend()
@@ -1886,10 +1942,17 @@ static QCPMultiGraph* settledThreeColumnGraph(QCustomPlot* plot)
     return mg;
 }
 
-static bool layerKeepsItsPixelsAfterAPan(QCustomPlot* plot)
+// A pan that claims nothing: with a fill or error bars the recording holds a painter command,
+// so the layer repaints on every view change until Task 7 records them too.
+static void settleAndPan(QCustomPlot* plot)
 {
     plot->replot(QCustomPlot::rpImmediateRefresh);
     plot->xAxis->moveRange(50);
+}
+
+static bool layerKeepsItsPixelsAfterAPan(QCustomPlot* plot)
+{
+    settleAndPan(plot);
     return plot->layer("main")->canSkipRepaintForTranslation();
 }
 
@@ -1905,7 +1968,7 @@ void TestMultiGraph::clearingAFillRepaintsTheLayer()
 {
     auto* mg = settledThreeColumnGraph(mPlot);
     QVERIFY(mg->setComponentFill(0, 0.0));
-    QVERIFY(layerKeepsItsPixelsAfterAPan(mPlot));
+    settleAndPan(mPlot);
     mg->clearComponentFill(0);
     QVERIFY(!mPlot->layer("main")->canSkipRepaintForTranslation());
 }
@@ -1914,7 +1977,7 @@ void TestMultiGraph::changingAFillBrushRepaintsTheLayerInTheNewBrush()
 {
     auto* mg = settledThreeColumnGraph(mPlot);
     QVERIFY(mg->setComponentFill(0, 0.0, QBrush(Qt::red)));
-    QVERIFY(layerKeepsItsPixelsAfterAPan(mPlot));
+    settleAndPan(mPlot);
     mg->setComponentFillBrush(0, QBrush(Qt::blue));
     QCOMPARE(mg->componentFill(0)->brush.color(), QColor(Qt::blue));
     QVERIFY(!mPlot->layer("main")->canSkipRepaintForTranslation());
@@ -1932,7 +1995,7 @@ void TestMultiGraph::clearingErrorBarsRepaintsTheLayer()
 {
     auto* mg = settledThreeColumnGraph(mPlot);
     QVERIFY(mg->setComponentErrorBars(0, 1, 2));
-    QVERIFY(layerKeepsItsPixelsAfterAPan(mPlot));
+    settleAndPan(mPlot);
     mg->clearComponentErrorBars(0);
     QVERIFY(!mPlot->layer("main")->canSkipRepaintForTranslation());
 }
@@ -2100,7 +2163,7 @@ void TestMultiGraph::aWiderStagedSourceKeepsTheCachedLinesInRange()
 {
     auto* mg = graphWithAStagedSourceOfColumns(mPlot, 5, 3);
     stillPreparing(mg);
-    mg->markLinesDirty();
+    mg->linesChanged();
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     stageColumns(mg, 5);
     stillPreparing(mg);
@@ -2131,14 +2194,28 @@ void TestMultiGraph::lineCacheWindowFollowsTheKeyScale()
         keys.push_back(logKeyAxis ? std::pow(10.0, i / 8.0) : double(i));
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>(keys),
-                std::vector<std::vector<double>>{std::vector<double>(keys.size(), 1.0)});
+                std::vector<std::vector<double>> { std::vector<double>(keys.size(), 1.0) });
+    mg->setComponentPens({ QPen(Qt::red, 2) });
     mPlot->xAxis->setScaleType(logKeyAxis ? QCPAxis::stLogarithmic : QCPAxis::stLinear);
     mPlot->xAxis->setRange(viewLower, viewUpper);
     mPlot->yAxis->setRange(0, 2);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    const auto& cached = mg->mCachedLines[0];
-    QCOMPARE(cached.first().x(), mPlot->xAxis->coordToPixel(keys.front()));
-    QCOMPARE(cached.last().x(), mPlot->xAxis->coordToPixel(keys.back()));
+    QVERIFY(mg->hasRenderedRange());
+    const int recordings = mg->mCore.recordingCount();
+
+    // A pan of a tenth of the view: still inside the window the recording covers.
+    const double shift = (viewUpper - viewLower) / 10.0;
+    mPlot->xAxis->setRange(viewLower + shift, viewUpper + shift);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    if (!logKeyAxis) // a log key axis makes the recording follow the transform again
+        QCOMPARE(mg->mCore.recordingCount(), recordings);
+
+    // The line reaches both edges of the panned view: the window holds the rows for that.
+    const QImage image = renderOf(mPlot);
+    const QRect axisRect = mPlot->axisRect()->rect();
+    const int y = qRound(mPlot->yAxis->coordToPixel(1.0));
+    QVERIFY2(inkAt(image, axisRect.left() + 2, y), "no line at the left edge of the panned view");
+    QVERIFY2(inkAt(image, axisRect.right() - 2, y), "no line at the right edge of the panned view");
 }
 
 static QCPMultiGraph* decadesOnTheSecondAxes(QCustomPlot* plot, bool newKeyAxis)
@@ -2156,26 +2233,31 @@ static QCPMultiGraph* decadesOnTheSecondAxes(QCustomPlot* plot, bool newKeyAxis)
     return mg;
 }
 
-static bool anyPoint(const QVector<QPointF>& line, const std::function<bool(QPointF)>& match)
-{
-    return std::any_of(line.cbegin(), line.cend(), match);
-}
-
 // No replot between the toggle and the first look: only the axis signal can drop the cache.
 void TestMultiGraph::lineCacheFollowsTheScaleOfANewKeyAxis()
 {
     auto* mg = decadesOnTheSecondAxes(mPlot, true);
+    mg->setComponentPens({ QPen(Qt::red, 2) });
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
     mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(anyPoint(mg->mCachedLines[0], [&](QPointF p) { return qFuzzyCompare(p.x(), mPlot->xAxis2->coordToPixel(10)); }));
+    const QPoint vertex(qRound(mPlot->xAxis2->coordToPixel(10)),
+                        qRound(mPlot->yAxis->coordToPixel(10)));
+    QVERIFY2(inkNear(renderOf(mPlot), vertex),
+             "the line does not pass through key 10 on the new key axis");
 }
 
 void TestMultiGraph::lineCacheFollowsTheScaleOfANewValueAxis()
 {
     auto* mg = decadesOnTheSecondAxes(mPlot, false);
+    mg->setComponentPens({ QPen(Qt::red, 2) });
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
     mPlot->yAxis2->setScaleType(QCPAxis::stLogarithmic);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(anyPoint(mg->mCachedLines[0], [&](QPointF p) { return qFuzzyCompare(p.y(), mPlot->yAxis2->coordToPixel(10)); }));
+    const QPoint vertex(qRound(mPlot->xAxis->coordToPixel(10)),
+                        qRound(mPlot->yAxis2->coordToPixel(10)));
+    QVERIFY2(inkNear(renderOf(mPlot), vertex),
+             "the line does not pass through value 10 on the new value axis");
 }
 
 // The log axis is ready before the swap and the range stays 1..100: no signal fires at the swap.
@@ -2199,21 +2281,33 @@ static QCPMultiGraph* decadesThenMovedToALogAxis(QCustomPlot* plot, bool keyAxis
 void TestMultiGraph::lineCacheIsRebuiltWhenMovedToALogKeyAxis()
 {
     auto* mg = decadesThenMovedToALogAxis(mPlot, true);
-    QVERIFY(anyPoint(mg->mCachedLines[0], [&](QPointF p) { return qFuzzyCompare(p.x(), mPlot->xAxis2->coordToPixel(10)); }));
+    mg->setComponentPens({ QPen(Qt::red, 2) });
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const QPoint vertex(qRound(mPlot->xAxis2->coordToPixel(10)),
+                        qRound(mPlot->yAxis->coordToPixel(10)));
+    QVERIFY2(inkNear(renderOf(mPlot), vertex),
+             "the line still sits where the linear key axis put it");
 }
 
 void TestMultiGraph::lineCacheIsRebuiltWhenMovedToALogValueAxis()
 {
     auto* mg = decadesThenMovedToALogAxis(mPlot, false);
-    QVERIFY(anyPoint(mg->mCachedLines[0], [&](QPointF p) { return qFuzzyCompare(p.y(), mPlot->yAxis2->coordToPixel(10)); }));
+    mg->setComponentPens({ QPen(Qt::red, 2) });
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const QPoint vertex(qRound(mPlot->xAxis->coordToPixel(10)),
+                        qRound(mPlot->yAxis2->coordToPixel(10)));
+    QVERIFY2(inkNear(renderOf(mPlot), vertex),
+             "the line still sits where the linear value axis put it");
 }
 
 // A scale change on the axis the graph left must not drop the lines drawn on its new axis.
 void TestMultiGraph::theKeyAxisItLeftIsNoLongerListenedTo()
 {
     auto* mg = decadesThenMovedToALogAxis(mPlot, true);
+    const int recordings = mg->mCore.recordingCount();
     mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
-    QVERIFY(!mg->mCachedLines.isEmpty());
+    QVERIFY(mg->hasRenderedRange());
+    QCOMPARE(mg->mCore.recordingCount(), recordings);
 }
 
 // Binned when the rows outnumber 4 per pixel of the key axis.
@@ -2347,6 +2441,7 @@ void TestMultiGraph::errorBarsOnResampledDataAreABand()
     mg->setData(std::move(x), std::vector<std::vector<double>>{std::move(y), std::move(lo), std::move(hi)});
     for (int c = 0; c < 3; ++c)
         mg->setComponentLineStyle(c, QCPMultiGraph::lsNone);
+    mg->setComponentPens({ QPen(Qt::red, 2), QPen(Qt::red, 2), QPen(Qt::red, 2) });
     mg->setComponentErrorBars(0, 1, 2, 0.0); // no cap: any spacing would fit as bars
     mPlot->xAxis->setRange(0, 20);
     mPlot->yAxis->setRange(0, 10);
@@ -2354,7 +2449,18 @@ void TestMultiGraph::errorBarsOnResampledDataAreABand()
     QTRY_VERIFY_WITH_TIMEOUT(!mg->pipeline().isBusy(), 5000);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QVERIFY(mg->mL2Result);
-    QVERIFY(mg->mErrorBars.first().asBand);
+
+    // A translucent band, not caps: the bar pen tinted inside the span, and nothing below it.
+    const QImage img = renderOf(mPlot);
+    const auto tinted = [](const QColor& c)
+    { return c.red() > 200 && c.red() - c.green() > 15 && c.red() - c.blue() > 15; };
+    bool band = false;
+    for (const double key : { 9.0, 9.25, 9.5, 9.75 })
+        for (const double value : { 4.5, 5.0, 5.5 })
+            band = band || tinted(img.pixelColor(pixelOf(mPlot, key, value)));
+    QVERIFY2(band, "no translucent band inside the error span");
+    for (const double key : { 9.0, 9.5 })
+        QVERIFY2(!tinted(img.pixelColor(pixelOf(mPlot, key, 1.0))), "the band is below its span");
 }
 
 void TestMultiGraph::denseErrorBandIsTranslucent()
@@ -2644,4 +2750,219 @@ void TestMultiGraph::setScatterStyleBeforeDataReachesTheNewComponents()
     }
     frameGraph(mPlot);
     QVERIFY2(renderOf(mPlot) != plainTwoLines(), "the new components were left without markers");
+}
+
+// The recording covers a window around the view: a pan inside it must not ask the object to
+// record again, or a 1M-point graph rebuilds its lines on every mouse move.
+void TestMultiGraph::panningABigGraphDoesNotRecord()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    const int n = 1'000'000;
+    std::vector<double> keys(n);
+    std::vector<double> values(n);
+    for (int i = 0; i < n; ++i)
+    {
+        keys[i] = i;
+        values[i] = std::sin(i * 1e-4);
+    }
+    mg->setData(std::move(keys), std::vector<std::vector<double>> { std::move(values) });
+    mPlot->xAxis->setRange(0, n / 10.0);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->pipeline().isBusy(), 10000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const int recordings = mg->mCore.recordingCount();
+    QVERIFY(recordings > 0);
+
+    // Ten pans of a tenth of the view: one view width in all, inside the window's margin.
+    const double width = mPlot->xAxis->range().size();
+    for (int i = 0; i < 10; ++i)
+    {
+        const double lower = mPlot->xAxis->range().lower - width / 10.0;
+        mPlot->xAxis->setRange(lower, lower + width);
+        mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+    QCOMPARE(mg->mCore.recordingCount(), recordings);
+}
+
+// A pan past the window leaves rows the recording was not made over: it must be remade, and the
+// new view must be covered, not left partly empty.
+void TestMultiGraph::panPastTheWindowRecordsFreshLines()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    const int n = 1'000'000;
+    std::vector<double> keys(n);
+    std::vector<double> values(n);
+    for (int i = 0; i < n; ++i)
+    {
+        keys[i] = i;
+        values[i] = std::sin(i * 1e-4);
+    }
+    mg->setData(std::move(keys), std::vector<std::vector<double>> { std::move(values) });
+    mg->setComponentPens({ QPen(Qt::red, 2) });
+    mPlot->xAxis->setRange(0, n / 10.0);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->pipeline().isBusy(), 10000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const int recordings = mg->mCore.recordingCount();
+    QVERIFY(recordings > 0);
+
+    // Three view widths away: outside the window the recording covers.
+    const double lower = n / 2.0;
+    mPlot->xAxis->setRange(lower, lower + n / 10.0);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY2_WITH_TIMEOUT(mg->mCore.recordingCount() > recordings,
+                              "the panned view was never drawn fresh", 5000);
+    QVERIFY2(draws(renderOf(mPlot), mPlot->axisRect()->rect(), isRed),
+             "the panned view has no lines");
+}
+
+// The lines a pan leaves behind are the ones of the viewport it was made for: once the pan
+// settles, they must be the lines of the view the next frame shows.
+void TestMultiGraph::theSettleAfterAPanRecordsAgain()
+{
+    if (!showWithRhi(mPlot))
+        QSKIP("no QRhi available in this environment");
+    auto* mg = denseGraphDrawn(mPlot);
+    const int recordings = mg->mCore.recordingCount();
+    const double width = mPlot->xAxis->range().size();
+    const double lower = mPlot->xAxis->range().lower - width / 4.0;
+    mPlot->xAxis->setRange(lower, lower + width);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh); // the pan frame itself is a translation
+    QCOMPARE(mg->mCore.recordingCount(), recordings);
+    QTRY_COMPARE_WITH_TIMEOUT(mg->mCore.recordingCount(), recordings + 1, 2000);
+}
+
+// A log key axis draws the line where the data is: the recording holds data coordinates, so
+// whatever a linear-axis frame would have put elsewhere must not leak through.
+void TestMultiGraph::logKeyAxisLinesMatchTheData()
+{
+    const int n = 1000;
+    std::vector<double> keys(n);
+    std::vector<double> values(n);
+    for (int i = 0; i < n; ++i)
+    {
+        keys[i] = std::pow(10.0, i * 0.01);
+        values[i] = i * 0.01;
+    }
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::move(keys), std::vector<std::vector<double>> { std::move(values) });
+    mg->setComponentPens({ QPen(Qt::red, 2) });
+    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setRange(1.0, std::pow(10.0, 9.99));
+    mPlot->yAxis->setRange(0.0, 9.99);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    const QImage image = renderOf(mPlot);
+    for (int i = 100; i < 1000; i += 150)
+    {
+        const QPoint expected(qRound(mPlot->xAxis->coordToPixel(std::pow(10.0, i * 0.01))),
+                              qRound(mPlot->yAxis->coordToPixel(i * 0.01)));
+        QVERIFY2(inkNear(image, expected, 1),
+                 qPrintable(QString("no line at key %1").arg(std::pow(10.0, i * 0.01))));
+    }
+}
+
+// An export does not wait for the event loop: it must resample itself and show the lines it was
+// asked for, not an empty frame.
+void TestMultiGraph::exportBeforeTheFirstResampleHasTheLines()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    const int n = 1'000'000;
+    std::vector<double> keys(n);
+    std::vector<double> values(n);
+    for (int i = 0; i < n; ++i)
+    {
+        keys[i] = i;
+        values[i] = std::sin(i * 1e-4);
+    }
+    mg->setData(std::move(keys), std::vector<std::vector<double>> { std::move(values) });
+    mg->setComponentPens({ QPen(Qt::red, 2) });
+    mPlot->xAxis->setRange(0, n);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+
+    // No replot first: the export is the first frame.
+    const QImage image = mPlot->toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QVERIFY2(draws(image, mPlot->axisRect()->rect(), isRed),
+             "the export right after setData has no lines");
+}
+
+// One command per component: the colours ride on the line, they are not a command each.
+void TestMultiGraph::colouredLineIsOneCommandPerComponent()
+{
+    const int n = 1000;
+    std::vector<double> keys(n);
+    std::vector<std::vector<double>> columns(3, std::vector<double>(n));
+    for (int i = 0; i < n; ++i)
+    {
+        keys[i] = i;
+        for (int c = 0; c < 3; ++c)
+            columns[c][i] = std::sin(i * 0.01 + c);
+    }
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::move(keys), std::move(columns));
+    mg->setColorRange(QCPRange(-1.0, 1.0));
+    mg->setColorValues(std::vector<double>(n, 0.0));
+    QVERIFY(mg->hasColorValues());
+    mPlot->xAxis->setRange(0, n);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    QCOMPARE(mg->componentCount(), 3);
+    QCOMPARE(mg->mCore.recordedCommandCount(), 3);
+}
+
+// The waterfall shifts each row through its own source: the drawn lines must sit at the offsets.
+void TestMultiGraph::waterfallDrawsItsOffsets()
+{
+    auto* wf = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    const int n = 64;
+    std::vector<double> keys(n);
+    for (int i = 0; i < n; ++i)
+        keys[i] = i;
+    std::vector<std::vector<double>> columns(3, std::vector<double>(n, 0.0));
+    wf->setData(std::move(keys), std::move(columns));
+    wf->setOffsetMode(QCPWaterfallGraph::omCustom);
+    wf->setOffsets({ 0.0, 1.0, 2.0 });
+    wf->setComponentPens({ QPen(Qt::red, 2), QPen(Qt::red, 2), QPen(Qt::red, 2) });
+    mPlot->xAxis->setRange(0, n - 1);
+    mPlot->yAxis->setRange(-0.5, 2.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    const QImage image = renderOf(mPlot);
+    const int x = mPlot->axisRect()->rect().center().x();
+    for (int row = 0; row < 3; ++row)
+    {
+        const int y = qRound(mPlot->yAxis->coordToPixel(row));
+        QVERIFY2(inkAt(image, x, y),
+                 qPrintable(QString("row %1 is not drawn at its offset").arg(row)));
+    }
+}
+
+void TestMultiGraph::logKeyAxisBigGraphIsThinned()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    const int n = 1000000;
+    std::vector<double> keys(n);
+    std::vector<double> values(n);
+    for (int i = 0; i < n; ++i)
+    {
+        keys[i] = std::pow(10.0, i * 1e-5);
+        values[i] = std::sin(i * 1e-4);
+    }
+    mg->setData(std::move(keys), std::vector<std::vector<double>> { std::move(values) });
+    mg->setComponentPens({ QPen(Qt::red, 2) });
+    mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setRange(1.0, 1e10);
+    mPlot->yAxis->setRange(-1.5, 1.5);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->pipeline().isBusy(), 10000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    const int points = mg->mCore.recordedPolylinePointCount();
+    const int budget = 4 * mPlot->axisRect()->width();
+    QVERIFY2(points > 0, "nothing was recorded");
+    QVERIFY2(points <= budget,
+             qPrintable(QString("%1 points recorded for a %2 pixel wide axis").arg(points).arg(budget)));
 }

@@ -297,26 +297,27 @@ namespace detail {
 
 // Shared point-sampling loop: one point per sample, a NaN marker for every key gap and
 // every NaN value. mapPoint(k, v) maps a sample into the output space (pixels or data).
-template <bool WithIndices, IndexableNumericRange KC, IndexableNumericRange VC, typename MapPoint>
-QVector<QPointF> linePointsImpl(const KC& keys, const VC& values, int begin, int end,
-                                double gapThreshold, const GapVector* precomputedGaps,
-                                QVector<int>* indices, const MapPoint& mapPoint)
+template <typename Out, typename Idx, IndexableNumericRange KC, IndexableNumericRange VC,
+          typename MapPoint>
+void linePointsInto(const KC& keys, const VC& values, int begin, int end, double gapThreshold,
+                    const GapVector* precomputedGaps, Out& result, Idx* indices,
+                    const MapPoint& mapPoint)
 {
     using V = std::ranges::range_value_t<VC>;
     Q_ASSERT(begin >= 0 && end <= static_cast<int>(std::ranges::size(keys)));
     Q_ASSERT(begin >= 0 && end <= static_cast<int>(std::ranges::size(values)));
-    if constexpr (WithIndices) indices->clear();
+    result.clear();
+    if (indices) indices->clear();
     const int count = end - begin;
-    if (count <= 0) return {};
+    if (count <= 0) return;
 
     GapVector computedGaps;
     if (!precomputedGaps)
         computedGaps = detectKeyGaps(keys, begin, end, gapThreshold);
     const auto& gaps = precomputedGaps ? *precomputedGaps : computedGaps;
 
-    QVector<QPointF> result;
     result.reserve(count + count / 10);
-    if constexpr (WithIndices) indices->reserve(count + count / 10);
+    if (indices) indices->reserve(count + count / 10);
 
     const auto nanPt = QPointF(qQNaN(), qQNaN());
     for (int i = begin; i < end; ++i)
@@ -324,8 +325,8 @@ QVector<QPointF> linePointsImpl(const KC& keys, const VC& values, int begin, int
         int ri = i - begin;
         if (gaps.hasAnyGap && gaps[ri])
         {
-            result.append(nanPt);
-            if constexpr (WithIndices) indices->append(-1);
+            result.push_back(nanPt);
+            if (indices) indices->push_back(-1);
         }
 
         double v = static_cast<double>(values[i]);
@@ -333,15 +334,26 @@ QVector<QPointF> linePointsImpl(const KC& keys, const VC& values, int begin, int
         {
             if (std::isnan(v))
             {
-                result.append(nanPt);
-                if constexpr (WithIndices) indices->append(-1);
+                result.push_back(nanPt);
+                if (indices) indices->push_back(-1);
                 continue;
             }
         }
 
-        result.append(mapPoint(static_cast<double>(keys[i]), v));
-        if constexpr (WithIndices) indices->append(i);
+        result.push_back(mapPoint(static_cast<double>(keys[i]), v));
+        if (indices) indices->push_back(i);
     }
+}
+
+// The pixel path keeps its container: same loop, a fresh QVector per call.
+template <bool WithIndices, IndexableNumericRange KC, IndexableNumericRange VC, typename MapPoint>
+QVector<QPointF> linePointsImpl(const KC& keys, const VC& values, int begin, int end,
+                                double gapThreshold, const GapVector* precomputedGaps,
+                                QVector<int>* indices, const MapPoint& mapPoint)
+{
+    QVector<QPointF> result;
+    linePointsInto(keys, values, begin, end, gapThreshold, precomputedGaps, result,
+                   WithIndices ? indices : nullptr, mapPoint);
     return result;
 }
 
@@ -443,14 +455,32 @@ struct KeyBucketGrid
     double epsilonFor(double) const { return width; }
 };
 
+// The same buckets on a log key axis, where a bucket must hold an equal span of log10(key):
+// equal key widths would thin a decade into one pixel and keep a thousand at the low end.
+// \a width and \a anchor are in decades, the keys it returns are in key units.
+struct LogKeyBucketGrid
+{
+    double anchor;
+    double width;
+
+    double startFor(double k) const
+    {
+        if (!(k > 0)) return k;
+        return std::pow(10.0, anchor + std::floor((std::log10(k) - anchor) / width) * width);
+    }
+    double epsilonFor(double start) const
+    {
+        return start > 0 ? start * (std::pow(10.0, width) - 1.0) : width;
+    }
+};
+
 // The min/max envelope: one bucket per grid cell, up to four points per bucket (first, min,
 // max, last) so peaks survive when many samples land on one pixel.
-template <bool WithIndices, IndexableNumericRange KC, IndexableNumericRange VC, typename Grid,
-          typename MapPoint>
-QVector<QPointF> envelopeImpl(const KC& keys, const VC& values, int begin, int end,
-                              int reserveHint, double gapThreshold,
-                              const GapVector* precomputedGaps, QVector<int>* indices,
-                              const Grid& grid, const MapPoint& mapPoint)
+template <typename Out, typename Idx, IndexableNumericRange KC, IndexableNumericRange VC,
+          typename Grid, typename MapPoint>
+void envelopeInto(const KC& keys, const VC& values, int begin, int end, int reserveHint,
+                  double gapThreshold, const GapVector* precomputedGaps, Out& result,
+                  Idx* indices, const Grid& grid, const MapPoint& mapPoint)
 {
     PROFILE_HERE_N("optimizedLineData");
     GapVector computedGaps;
@@ -459,13 +489,14 @@ QVector<QPointF> envelopeImpl(const KC& keys, const VC& values, int begin, int e
     const auto& gaps = precomputedGaps ? *precomputedGaps : computedGaps;
     const auto nanPt = QPointF(qQNaN(), qQNaN());
 
-    QVector<QPointF> result;
+    result.clear();
+    if (indices) indices->clear();
     result.reserve(reserveHint);
-    if constexpr (WithIndices) indices->reserve(reserveHint);
+    if (indices) indices->reserve(reserveHint);
 
     auto emitPoint = [&](const QPointF& p, int index) {
-        result.append(p);
-        if constexpr (WithIndices) indices->append(index);
+        result.push_back(p);
+        if (indices) indices->push_back(index);
     };
 
     auto flushInterval = [&](int intervalFirst, int intervalLast, int intervalCount,
@@ -500,7 +531,7 @@ QVector<QPointF> envelopeImpl(const KC& keys, const VC& values, int begin, int e
         while (i < end && std::isnan(static_cast<double>(values[i])))
             ++i;
     }
-    if (i >= end) return {};
+    if (i >= end) return;
 
     double minValue = static_cast<double>(values[i]);
     double maxValue = minValue;
@@ -585,7 +616,19 @@ QVector<QPointF> envelopeImpl(const KC& keys, const VC& values, int begin, int e
         ++i;
     }
     flushCurrent(currentIntervalStartKey + keyEpsilon * 3);
+}
 
+// The pixel path keeps its container: same envelope, a fresh QVector per call.
+template <bool WithIndices, IndexableNumericRange KC, IndexableNumericRange VC, typename Grid,
+          typename MapPoint>
+QVector<QPointF> envelopeImpl(const KC& keys, const VC& values, int begin, int end,
+                              int reserveHint, double gapThreshold,
+                              const GapVector* precomputedGaps, QVector<int>* indices,
+                              const Grid& grid, const MapPoint& mapPoint)
+{
+    QVector<QPointF> result;
+    envelopeInto(keys, values, begin, end, reserveHint, gapThreshold, precomputedGaps, result,
+                 WithIndices ? indices : nullptr, grid, mapPoint);
     return result;
 }
 
@@ -640,17 +683,21 @@ QVector<QPointF> optimizedLineDataImpl(const KC& keys, const VC& values, int beg
                                      PixelPointMap::of(keyAxis, valueAxis));
 }
 
-// Data-space counterpart: the same envelope, one bucket per 1 / pixelsPerKey key units.
+// Data-space counterpart: the same envelope, one bucket per 1 / pixelsPerKey key units, or per
+// 1 / pixelsPerKey decades when the key axis is logarithmic. The points are written straight into
+// the vector that goes back to the caller.
 template <bool WithIndices, IndexableNumericRange KC, IndexableNumericRange VC>
 std::vector<QPointF> linesInDataImpl(const KC& keys, const VC& values, int begin, int end,
                                      double pixelsPerKey, double gapThreshold,
                                      const GapVector* precomputedGaps,
-                                     [[maybe_unused]] std::vector<int>* sourceIndices)
+                                     [[maybe_unused]] std::vector<int>* sourceIndices,
+                                     bool logKeys)
 {
     Q_ASSERT(begin >= 0 && end <= static_cast<int>(std::ranges::size(keys)));
     Q_ASSERT(begin >= 0 && end <= static_cast<int>(std::ranges::size(values)));
-    QVector<int> indices;
-    QVector<int>* idx = nullptr;
+    std::vector<QPointF> pts;
+    std::vector<int> indices;
+    std::vector<int>* idx = nullptr;
     if constexpr (WithIndices)
     {
         sourceIndices->clear();
@@ -658,28 +705,32 @@ std::vector<QPointF> linesInDataImpl(const KC& keys, const VC& values, int begin
     }
 
     const int dataCount = end - begin;
-    if (dataCount <= 0) return {};
+    if (dataCount <= 0) return pts;
 
-    QVector<QPointF> pts;
-    const double keySpan = pixelsPerKey * qAbs(static_cast<double>(keys[end - 1])
-                                               - static_cast<double>(keys[begin]));
+    const double firstKey = static_cast<double>(keys[begin]);
+    const double lastKey = static_cast<double>(keys[end - 1]);
+    const bool decades = logKeys && firstKey > 0 && lastKey > 0;
+    const double keySpan = pixelsPerKey
+        * (decades ? qAbs(std::log10(lastKey) - std::log10(firstKey)) : qAbs(lastKey - firstKey));
     if (pixelsPerKey <= 0 || static_cast<double>(dataCount) < 2 * keySpan + 2)
     {
-        pts = linePointsImpl<WithIndices>(keys, values, begin, end, gapThreshold, precomputedGaps,
-                                          idx, DataPointMap {});
+        linePointsInto(keys, values, begin, end, gapThreshold, precomputedGaps, pts, idx,
+                       DataPointMap {});
     }
     else
     {
         const int reserveHint = static_cast<int>(2 * keySpan + 2) + 4;
-        pts = envelopeImpl<WithIndices>(keys, values, begin, end, reserveHint, gapThreshold,
-                                        precomputedGaps, idx,
-                                        KeyBucketGrid { static_cast<double>(keys[begin]),
-                                                        1.0 / pixelsPerKey },
-                                        DataPointMap {});
+        if (decades)
+            envelopeInto(keys, values, begin, end, reserveHint, gapThreshold, precomputedGaps, pts,
+                         idx, LogKeyBucketGrid { std::log10(firstKey), 1.0 / pixelsPerKey },
+                         DataPointMap {});
+        else
+            envelopeInto(keys, values, begin, end, reserveHint, gapThreshold, precomputedGaps, pts,
+                         idx, KeyBucketGrid { firstKey, 1.0 / pixelsPerKey }, DataPointMap {});
     }
 
-    if constexpr (WithIndices) sourceIndices->assign(indices.begin(), indices.end());
-    return { pts.begin(), pts.end() };
+    if constexpr (WithIndices) *sourceIndices = std::move(indices);
+    return pts;
 }
 
 } // namespace detail
@@ -707,18 +758,20 @@ QVector<QPointF> optimizedLineDataIndexed(const KC& keys, const VC& values,
 
 // Data-space line points: the same points as linesToPixels, in (key, value) units,
 // NaN-separated exactly where the pixel path breaks the line. pixelsPerKey <= 0 keeps every
-// point; otherwise the line is thinned to the min/max envelope, one bucket per key pixel.
+// point; otherwise the line is thinned to the min/max envelope, one bucket per key pixel (per
+// pixel of log10(key) when \a logKeys: pixelsPerKey then counts pixels per decade).
 template <IndexableNumericRange KC, IndexableNumericRange VC>
 std::vector<QPointF> linesInData(const KC& keys, const VC& values, int begin, int end,
                                  double pixelsPerKey, std::vector<int>* sourceIndices = nullptr,
                                  double gapThreshold = kDefaultGapThreshold,
-                                 const GapVector* precomputedGaps = nullptr)
+                                 const GapVector* precomputedGaps = nullptr,
+                                 bool logKeys = false)
 {
     if (!sourceIndices)
         return detail::linesInDataImpl<false>(keys, values, begin, end, pixelsPerKey, gapThreshold,
-                                             precomputedGaps, nullptr);
+                                             precomputedGaps, nullptr, logKeys);
     return detail::linesInDataImpl<true>(keys, values, begin, end, pixelsPerKey, gapThreshold,
-                                         precomputedGaps, sourceIndices);
+                                         precomputedGaps, sourceIndices, logKeys);
 }
 
 // Multi-column optimizedLineData: processes all columns in a single pass over the key array.

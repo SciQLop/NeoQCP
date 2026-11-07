@@ -348,8 +348,9 @@ QPointF qcpResolvePosition(const QCPDrawFrame& frame, const QCP::Position& posit
         const QPointF anchor = anchored->anchor ? anchored->anchor->pixelPosition() : QPointF();
         return anchor + QPointF(anchored->offset.dx, anchored->offset.dy);
     }
-    // A mixed position is a key and a value, like QCP::Data, one of them a fraction of the axis rect.
-    // A vertical key axis runs along screen y, so each number takes the screen axis of its own side.
+    // A mixed position is a key and a value, like QCP::Data, one of them a fraction of the axis
+    // rect. A vertical key axis runs along screen y, so each number takes the screen axis of its
+    // own side.
     const bool keyVertical = frame.transform.keyIsVertical();
     const auto keyAndValue = [keyVertical](QCP::Pixels keySide, QCP::Pixels valueSide)
     { return keyVertical ? QPointF(valueSide.x, keySide.y) : QPointF(keySide.x, valueSide.y); };
@@ -385,7 +386,7 @@ double qcpKeyPixelsPerUnit(const QCPAxis* keyAxis)
 }
 
 QCPDrawContext::QCPDrawContext(const QCPAxis* keyAxis, const QCPAxis* valueAxis,
-                               const QCPAxisRect* axisRect, const QCPTheme* theme)
+                               const QCPAxisRect* axisRect, const QCPTheme* theme, bool exporting)
         : mKeyAxis(keyAxis)
         , mValueAxis(valueAxis)
         , mAxisRect(axisRect)
@@ -394,6 +395,7 @@ QCPDrawContext::QCPDrawContext(const QCPAxis* keyAxis, const QCPAxis* valueAxis,
         , mRatio(axisRect)
         , mClip(axisRect ? QRectF(axisRect->rect()) : QRectF())
         , mTheme(theme)
+        , mExporting(exporting)
 {
 }
 

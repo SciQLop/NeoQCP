@@ -160,13 +160,14 @@ public:
     }
 
     std::vector<QPointF> linesInData(int column, int begin, int end, double pixelsPerKey,
-                                     std::vector<int>* sourceIndices = nullptr) const override
+                                     std::vector<int>* sourceIndices = nullptr,
+                                     bool logKeys = false) const override
     {
         Q_ASSERT(column >= 0 && column < mColumns);
         qcp::detail::StridedColumnView<V> colView(mValues + column, mRows, mStride);
         ensureGapCache(begin, end);
         return qcp::algo::linesInData(mKeys, colView, begin, end, pixelsPerKey, sourceIndices,
-                                      gapThreshold(), &mGapCache.gaps);
+                                      gapThreshold(), &mGapCache.gaps, logKeys);
     }
 
     qcp::algo::GapVector gapsBefore(int begin, int end) const override

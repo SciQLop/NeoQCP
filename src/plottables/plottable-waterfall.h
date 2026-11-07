@@ -29,7 +29,8 @@ public:
     QVector<QPointF> getOptimizedLineData(int column, int begin, int end, int pixelWidth,
                                            QCPAxis* keyAxis, QCPAxis* valueAxis) const override;
     std::vector<QPointF> linesInData(int column, int begin, int end, double pixelsPerKey,
-                                     std::vector<int>* sourceIndices = nullptr) const override;
+                                     std::vector<int>* sourceIndices = nullptr,
+                                     bool logKeys = false) const override;
 
 private:
     struct TransformedWindow

@@ -41,6 +41,8 @@ struct QCP_LIB_DECL QCPDrawnView
     QCPLayer* layer = nullptr;
     QRect clip; //!< what the layer clips this object with
     bool selectable = false; //!< whether the base lets the object be selected at all
+    //! Whether the painter is an export: the object may resolve what a screen frame waits for.
+    bool exporting = false;
 };
 
 /*!
@@ -65,13 +67,19 @@ public:
     virtual void drawLegendIcon(QCPDrawContext& icon) const = 0;
 
     //! The data the recording was made from, nullptr for none: a new pointer is a stale recording.
-    [[nodiscard]] virtual const void* dataSource() const { return nullptr; }
+    [[nodiscard]] virtual const void* dataSourceIdentity() const { return nullptr; }
 
     /*!
       Everything else the recording depends on that the generation does not cover: other data (a
       bar's stack, its group), a counter that only ever grows. A change makes the recording stale.
     */
     [[nodiscard]] virtual quint64 dependencyRevision() const { return 0; }
+
+    /*!
+      Whether an export resolves what a screen frame waits for, so the two need separate
+      recordings. Most objects draw the same either way and answer false.
+    */
+    [[nodiscard]] virtual bool resolvesForTheExport() const { return false; }
 };
 
 /*!
@@ -125,6 +133,18 @@ public:
     //! Test hook: how many times the object was asked to record.
     [[nodiscard]] int recordingCount() const;
 
+    //! Whether a recording exists: the object has drawn at least once.
+    [[nodiscard]] bool hasRecording() const;
+
+    //! Test hook: how many commands the recording holds.
+    [[nodiscard]] int recordedCommandCount() const;
+
+    //! Test hook: how many vertices the recording's polylines hold.
+    [[nodiscard]] int recordedPolylinePointCount() const;
+
+    //! Test hook: how many of those vertices are NaNs, i.e. where the line is broken.
+    [[nodiscard]] int recordedPolylineNaNs() const;
+
     //! Test hook: how many times the resolve cache mapped a recording again.
     [[nodiscard]] quint64 resolveRemapCount() const;
 
@@ -146,6 +166,9 @@ private:
 
     //! True when the recording would be remade for \a view: the test ensureRecording() takes.
     [[nodiscard]] bool recordingIsStale(const QCPDrawable& object, const QCPDrawnView& view) const;
+
+    //! notes the ranges the layer now holds this object drawn at: a pan may shift them.
+    void notePainted(const QCPDrawnView& view);
 
     struct State;
     //! Shared with the deferred painter callbacks: they check the object is still there.
@@ -253,7 +276,7 @@ public:
     using QCPDrawnBase<Base>::QCPDrawnBase;
 
     //! The data container the recording read, when the base has one.
-    [[nodiscard]] const void* dataSource() const override
+    [[nodiscard]] const void* dataSourceIdentity() const override
     {
         if constexpr (requires { this->mDataContainer.get(); })
             return this->mDataContainer.get();

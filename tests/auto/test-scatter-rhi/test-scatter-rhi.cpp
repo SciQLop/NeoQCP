@@ -1,6 +1,6 @@
 #include "test-scatter-rhi.h"
-#include "../../../src/qcp.h"
 #include "../../../src/painting/scatter-rhi-layer.h"
+#include "../../../src/qcp.h"
 #include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
 
 void TestScatterRhi::init()
@@ -545,4 +545,28 @@ void TestScatterRhi::graph2FirstColorValuesAfterFirstDrawAreShown()
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     const QColor marker = pixelAt(mPlot->grabFramebuffer(), mPlot, 2, 1);
     QVERIFY2(isBlue(marker), qPrintable(QString("marker drawn as %1").arg(marker.name())));
+}
+
+void TestScatterRhi::uncolouredMarkersCommandDrawsEveryMarker()
+{
+    if (!showAndHasRhi(mPlot))
+        QSKIP("No QRhi available — markers are only instanced on the GPU path");
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setLineStyle(QCPMultiGraph::lsNone);
+    // Three markers far apart, all strictly inside the fixed range (1..3 × 0.5..2.5).
+    const std::vector<double> keys { 1, 2, 3 };
+    const std::vector<double> values { 0.5, 1.5, 2.5 };
+    mg->setData(keys, std::vector<std::vector<double>> { values });
+    mg->setComponentPens({ QPen(Qt::red) });
+    mg->component(0).scatterStyle = filledSquare(Qt::red);
+    setFixedRanges(mPlot);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    const QImage frame = mPlot->grabFramebuffer();
+    for (std::size_t i = 0; i < keys.size(); ++i)
+    {
+        const QColor colour = pixelAt(frame, mPlot, keys[i], values[i]);
+        QVERIFY2(isRed(colour),
+                 qPrintable(QString("marker at key %1 drawn as %2").arg(keys[i]).arg(colour.name())));
+    }
 }

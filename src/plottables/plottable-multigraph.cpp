@@ -1,26 +1,27 @@
 #include "plottable-multigraph.h"
-#include <QPointer>
-#include <utility>
-#include "plottable-draw-utils.h"
-#include "plottable-l1-cache.h"
-#include "plottable-linestyle.h"
 #include "../axis/axis.h"
 #include "../core.h"
 #include "../datasource/graph-resampler.h"
 #include "../datasource/resampled-multi-datasource.h"
 #include "../layoutelements/layoutelement-axisrect.h"
 #include "../layoutelements/layoutelement-legend-group.h"
+#include "../painting/draw-context.h"
 #include "../painting/painter.h"
-#include "../painting/viewport-offset.h"
-#include "../painting/scatter-rhi-layer.h"
 #include "../painting/plottable-rhi-layer.h"
 #include "../painting/rhi-utils.h"
+#include "../painting/scatter-rhi-layer.h"
+#include "../painting/viewport-offset.h"
 #include "../vector2d.h"
+#include "plottable-draw-utils.h"
+#include "plottable-l1-cache.h"
+#include "plottable-linestyle.h"
+#include <QPointer>
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 QCPMultiGraph::QCPMultiGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
-    : QCPAbstractLine(keyAxis, valueAxis)
+        : QCPDrawn<QCPAbstractLine>(keyAxis, valueAxis)
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
 {
     // Base constructor auto-adds a QCPPlottableLegendItem (vtable not yet set up
@@ -39,7 +40,7 @@ QCPMultiGraph::QCPMultiGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
 
     mViewportDebounce.setSingleShot(true);
     mViewportDebounce.setInterval(150);
-    connect(&mViewportDebounce, &QTimer::timeout, this, [this] { markLinesDirty(); });
+    connect(&mViewportDebounce, &QTimer::timeout, this, [this] { linesChanged(); });
 }
 
 QCPMultiGraph::~QCPMultiGraph() = default;
@@ -50,23 +51,24 @@ void QCPMultiGraph::followAxes()
         disconnect(link);
     if (mKeyAxis)
     {
-        mAxisLinks << connect(mKeyAxis.data(), &QCPAxis::rangeChanged,
-                              this, &QCPMultiGraph::onViewportChanged);
-        mAxisLinks << connect(mKeyAxis.data(), &QCPAxis::scaleTypeChanged,
-                              this, [this] { invalidateLines(); });
+        mAxisLinks << connect(mKeyAxis.data(), &QCPAxis::rangeChanged, this,
+                              &QCPMultiGraph::onViewportChanged);
+        mAxisLinks << connect(mKeyAxis.data(), &QCPAxis::scaleTypeChanged, this,
+                              [this] { linesChanged(); });
     }
     if (mValueAxis)
-        mAxisLinks << connect(mValueAxis.data(), &QCPAxis::scaleTypeChanged,
-                              this, [this] { invalidateLines(); });
-    invalidateLines(); // pixels computed for the old axes mean nothing on the new ones
+        mAxisLinks << connect(mValueAxis.data(), &QCPAxis::scaleTypeChanged, this,
+                              [this] { linesChanged(); });
+    linesChanged(); // pixels computed for the old axes mean nothing on the new ones
     mL2Dirty = mL1Cache != nullptr; // nor do the bins resampled for the old key range
 }
 
-// Fresh lines are drawn only if the layer is repainted: a replot repaints dirty layers, and
-// falls back to marking the plot's layers dirty only when none is, so mark this one here.
-void QCPMultiGraph::markLinesDirty()
+// A finished resample, a rebuilt L2 or the settle after a pan changes what the recording says
+// without changing the object: the revision is what the adapter watches, and the layer is painted
+// again so it is asked for one.
+void QCPMultiGraph::linesChanged()
 {
-    mLineCacheDirty = true;
+    ++mRevision;
     if (mLayer)
         mLayer->markDirty();
 }
@@ -110,7 +112,7 @@ void QCPMultiGraph::setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> so
 {
     // Keep the displayed geometry (and its GPU translation) alive while the
     // replacement is prepared; the plot commits it in one debounced swap.
-    const bool canDefer = source && mDataSource && mHasRenderedRange && mParentPlot;
+    const bool canDefer = source && mDataSource && hasRenderedRange() && mParentPlot;
     if (canDefer)
         stagePendingSource(std::move(source));
     else
@@ -125,7 +127,7 @@ void QCPMultiGraph::applySourceNow(std::shared_ptr<QCPAbstractMultiDataSource> s
     mPendingReady = false;
     mDataSource = std::move(source);
     applyColorSizeRule(mDataSource ? mDataSource->size() : 0);
-    invalidateLines();
+    linesChanged();
     mL2HasOrigin = false;
     syncComponentCount(mDataSource.get());
     mL1Cache.reset();
@@ -209,7 +211,7 @@ bool QCPMultiGraph::commitPendingData()
         applyColorSizeRule(mDataSource->size());
     }
     mPendingColorValues.reset();
-    invalidateLines();
+    linesChanged();
     mL2HasOrigin = false;
 
     // Carry the barrier established while staging forward past the commit:
@@ -230,7 +232,7 @@ void QCPMultiGraph::dataChanged()
         return;
     }
 
-    markLinesDirty();
+    linesChanged();
     if (mDataSource)
     {
         applyColorSizeRule(mDataSource->size());
@@ -272,10 +274,10 @@ void QCPMultiGraph::onL1Ready(uint64_t generation)
     if (generation < mAcceptedGeneration)
         return; // result of a source that was superseded before this job finished
     qcp::extractL1Cache<qcp::algo::MultiGraphResamplerCache>(mPipeline.cache(), mL1Cache, mL2Dirty);
-    markLinesDirty();
+    linesChanged();
 }
 
-void QCPMultiGraph::rebuildL2(const ViewportParams& vp)
+void QCPMultiGraph::rebuildL2(const ViewportParams& vp) const
 {
     if (!mL1Cache) return;
     mL2Result = qcp::algo::resampleL2Multi(*mL1Cache, vp, *mDataSource);
@@ -284,16 +286,13 @@ void QCPMultiGraph::rebuildL2(const ViewportParams& vp)
 
 void QCPMultiGraph::onViewportChanged()
 {
-    if (mL1Cache)
-    {
+    if (!mL1Cache)
+        return;
+    // The bins are only stale; nothing recorded reads them until the recording is remade. A pan
+    // inside the key window is served by a translation, so the fresh bins wait for the settle.
         mL2Dirty = true;
-        if (mHasRenderedRange && mKeyAxis)
-        {
-            const double ratio = qcp::axisRangeSizeRatio(mKeyAxis.data(), mRenderedRange.key);
-            if (qAbs(ratio - 1.0) < 1e-4)
+    if (hasRenderedRange())
                 mViewportDebounce.start();
-        }
-    }
 }
 
 void QCPMultiGraph::syncComponentCount(const QCPAbstractMultiDataSource* source)
@@ -395,7 +394,7 @@ bool QCPMultiGraph::hasPenDerivedDecoration(int ownerCount) const
 
 void QCPMultiGraph::decorationsChanged()
 {
-    invalidateLines();
+    linesChanged();
 }
 
 bool QCPMultiGraph::setFill(Fill fill)
@@ -516,7 +515,7 @@ void QCPMultiGraph::setAdaptiveSampling(bool enabled)
         return;
     markDirty();
     mAdaptiveSampling = enabled;
-    invalidateLines();
+    linesChanged();
 }
 
 void QCPMultiGraph::setGapThreshold(double threshold)
@@ -525,26 +524,19 @@ void QCPMultiGraph::setGapThreshold(double threshold)
         return;
     markDirty();
     mGapThreshold = threshold;
-    invalidateLines();
-}
-
-void QCPMultiGraph::invalidateLines()
-{
-    markLinesDirty();
-    mCachedLines.clear();
-    mCachedIndices.clear();
+    linesChanged();
 }
 
 void QCPMultiGraph::lineChanged()
 {
-    invalidateLines();
+    linesChanged();
     markDirty();
 }
 
 void QCPMultiGraph::componentVisibilityToggled()
 {
     // A rebuild while the component was hidden dropped its cached lines: rebuild again.
-    markLinesDirty();
+    linesChanged();
     if (mLayer)
         mLayer->invalidatePaintBuffer();
 }
@@ -584,135 +576,8 @@ QVector<int> QCPMultiGraph::lineIndices(LineStyle style, const QVector<int>& dat
     }
 }
 
-// Batches impulse line pairs per colour bucket so each bucket is drawn with one
-// drawLines() call (at most 256, one per bucket) instead of one call per pair.
-void QCPMultiGraph::drawColoredImpulses(QCPPainter* painter, const QVector<QPointF>& pairs,
-                                        const QVector<int>& indices, QPen pen,
-                                        const QPointF& gpuOffset) const
-{
-    std::array<QVector<QLineF>, 256> byBucket;
-    for (int i = 0; i + 1 < pairs.size(); i += 2)
-    {
-        const int b = mColor.bucket(indices[i + 1]);
-        if (b != qcp::ColorScalarMapper::kGap)
-            byBucket[b].append(QLineF(pairs[i], pairs[i + 1]));
-    }
-    if (!gpuOffset.isNull())
-        painter->translate(gpuOffset);
-    for (int b = 0; b < 256; ++b)
-    {
-        if (byBucket[b].isEmpty()) continue;
-        pen.setColor(qcp::runColor(mColor, b));
-        painter->setPen(pen);
-        painter->drawLines(byBucket[b]);
-    }
-    if (!gpuOffset.isNull())
-        painter->translate(-gpuOffset);
-}
-
-void QCPMultiGraph::drawColoredScatters(QCPPainter* painter, const QVector<QPointF>& points,
-                                        const QVector<int>& indices, const QCPGraphComponent& comp,
-                                        const QPointF& gpuOffset, bool isExportMode) const
-{
-    const int skip = mScatterSkip + 1;
-    if (auto* srl = (!isExportMode && mParentPlot) ? mParentPlot->scatterRhiLayer(mLayer) : nullptr)
-    {
-        std::vector<float> xy, rgba;
-        xy.reserve((points.size() / skip) * 2);
-        rgba.reserve((points.size() / skip) * 4);
-        for (int i = 0; i < points.size(); i += skip)
-        {
-            const int b = mColor.bucket(indices[i]);
-            if (b == qcp::ColorScalarMapper::kGap || !qIsFinite(points[i].x()) || !qIsFinite(points[i].y()))
-                continue;
-            const QRgb c = mColor.color(b);   // premultiplied
-            xy.insert(xy.end(), {float(points[i].x()), float(points[i].y())});
-            rgba.insert(rgba.end(), {qRed(c) / 255.f, qGreen(c) / 255.f, qBlue(c) / 255.f, qAlpha(c) / 255.f});
-        }
-        if (!xy.empty())
-            srl->addScatterColored(xy, rgba, comp.scatterStyle, clipRect(),
-                                   mParentPlot->devicePixelRatioF(),
-                                   mParentPlot->rhiOutputSize().height(),
-                                   float(gpuOffset.x()), float(gpuOffset.y()),
-                                   static_cast<float>(painter->opacity()));
-        return;
-    }
-    applyScattersAntialiasingHint(painter);
-    if (!gpuOffset.isNull())
-        painter->translate(gpuOffset);
-    std::array<QVector<QPointF>, 256> byBucket;
-    for (int i = 0; i < points.size(); i += skip)
-    {
-        const int b = mColor.bucket(indices[i]);
-        if (b != qcp::ColorScalarMapper::kGap && qIsFinite(points[i].x()) && qIsFinite(points[i].y()))
-            byBucket[b].append(points[i]);
-    }
-    for (int b = 0; b < 256; ++b)
-    {
-        if (byBucket[b].isEmpty()) continue;
-        const QColor color = qcp::runColor(mColor, b);
-        QCPScatterStyle style = comp.scatterStyle;
-        style.setPen(QPen(color));
-        style.setBrush(color);
-        style.applyTo(painter, style.pen());
-        for (const auto& p : byBucket[b])
-            style.drawShape(painter, p.x(), p.y());
-    }
-    if (!gpuOffset.isNull())
-        painter->translate(-gpuOffset);
-}
-
-void QCPMultiGraph::drawPlainScatters(QCPPainter* painter, const QVector<QPointF>& dataLines,
-                                      const QCPGraphComponent& comp, const QPointF& gpuOffset,
-                                      bool isExportMode) const
-{
-    bool usedGpu = false;
-    if (!isExportMode && mParentPlot)
-    {
-        if (auto* srl = mParentPlot->scatterRhiLayer(mLayer))
-        {
-            const int skip = mScatterSkip + 1;
-            std::vector<float> pts;
-            pts.reserve((dataLines.size() / skip) * 3);
-            for (int i = 0; i < dataLines.size(); i += skip)
-            {
-                const double sx = dataLines[i].x(), sy = dataLines[i].y();
-                if (qIsFinite(sx) && qIsFinite(sy))
-                {
-                    pts.push_back(static_cast<float>(sx));
-                    pts.push_back(static_cast<float>(sy));
-                    pts.push_back(0.0f);
-                }
-            }
-            if (!pts.empty())
-            {
-                srl->addScatter(
-                    std::span<const float>(pts.data(), pts.size()),
-                    comp.scatterStyle, clipRect(),
-                    mParentPlot->devicePixelRatioF(),
-                    mParentPlot->rhiOutputSize().height(),
-                    static_cast<float>(gpuOffset.x()),
-                    static_cast<float>(gpuOffset.y()),
-                    QImage{}, static_cast<float>(painter->opacity()));
-            }
-            usedGpu = true;
-        }
-    }
-    if (!usedGpu)
-    {
-        applyScattersAntialiasingHint(painter);
-        comp.scatterStyle.applyTo(painter, comp.pen);
-        const int skip = mScatterSkip + 1;
-        for (int i = 0; i < dataLines.size(); i += skip)
-        {
-            const double sx = dataLines[i].x(), sy = dataLines[i].y();
-            if (qIsFinite(sx) && qIsFinite(sy))
-                comp.scatterStyle.drawShape(painter, sx, sy);
-        }
-    }
-}
-
-// One async L1 rebuild, the first time the graph is coloured; later colour changes never touch L1/L2.
+// One async L1 rebuild, the first time the graph is coloured; later colour changes never touch
+// L1/L2.
 void QCPMultiGraph::requestOrigin()
 {
     if (!mWantOrigin->exchange(true) && mPipeline.hasTransform())
@@ -858,69 +723,7 @@ double QCPMultiGraph::selectTest(const QPointF& pos, bool onlySelectable, QVaria
     if (!axisRect || !axisRect->rect().contains(pos.toPoint()))
         return -1;
 
-    // Keys are sorted — binary search for the nearest key, then check
-    // each component at that index.  O(log N + C) instead of O(C × M).
-    const QCPAbstractMultiDataSource* ds = mDataSource.get();
-    const int n = ds->size();
-
-    double posKey, dummy;
-    pixelsToCoords(pos, posKey, dummy);
-
-    // findEnd gives the first index > posKey; the nearest key is either
-    // that index or the one before it.
-    int idx = ds->findEnd(posKey, /*expandedRange=*/false);
-    int lo = qMax(0, idx - 1);
-    int hi = qMin(idx, n - 1);
-
-    double minDistSqr = (std::numeric_limits<double>::max)();
-    int minDistIndex = -1;
-    int minDistComponent = -1;
-    double minKey = 0, minValue = 0;
-
-    const int nComponents = qMin(mComponents.size(), ds->columnCount());
-    for (int i = lo; i <= hi; ++i) {
-        double k = ds->keyAt(i);
-        for (int c = 0; c < nComponents; ++c) {
-            if (!mComponents[c].visible) continue;
-            double v = ds->valueAt(c, i);
-            double distSqr = QCPVector2D(coordsToPixels(k, v) - pos).lengthSquared();
-            if (distSqr < minDistSqr) {
-                minDistSqr = distSqr;
-                minDistIndex = i;
-                minDistComponent = c;
-                minKey = k;
-                minValue = v;
-            }
-        }
-    }
-
-    // Also check distance to line segments between lo and hi for each component
-    if (lo < hi) {
-        for (int c = 0; c < nComponents; ++c) {
-            if (!mComponents[c].visible || mComponents[c].lineStyle == lsNone) continue;
-            QPointF pLo = coordsToPixels(ds->keyAt(lo), ds->valueAt(c, lo));
-            QPointF pHi = coordsToPixels(ds->keyAt(hi), ds->valueAt(c, hi));
-            double lineDistSqr = QCPVector2D(pos).distanceSquaredToLine(pLo, pHi);
-            if (lineDistSqr < minDistSqr) {
-                minDistSqr = lineDistSqr;
-                minDistComponent = c;
-                minDistIndex = lo;
-                minKey = ds->keyAt(lo);
-                minValue = ds->valueAt(c, lo);
-            }
-        }
-    }
-
-    if (minDistIndex >= 0) {
-        QVariantMap map;
-        map["componentIndex"] = minDistComponent;
-        map["dataIndex"] = minDistIndex;
-        map["key"] = minKey;
-        map["value"] = minValue;
-        if (details)
-            details->setValue(map);
-    }
-    return minDistIndex >= 0 ? qSqrt(minDistSqr) : -1;
+    return nearestDataPoint(pos, details).value_or(-1);
 }
 
 QCPDataSelection QCPMultiGraph::selectTestRect(const QRectF& rect, bool onlySelectable) const
@@ -1034,31 +837,149 @@ bool QCPMultiGraph::canProduceContent() const
     return true;
 }
 
-QPointF QCPMultiGraph::stallPixelOffset() const
+std::optional<double> QCPMultiGraph::hitTest(QCP::Pixels at, QVariant* details) const
 {
-    // Dirty lines (the pan debounce fired, or data changed) must be drawn again: offering a
-    // translation would let the layer shift the stale texture forever, edges left blank.
-    if (!mHasRenderedRange || mCachedLines.isEmpty() || mLineCacheDirty || !mKeyAxis || !mValueAxis)
-        return {};
-    // Only valid for pure translation (pan) — reject if zoom changed
-    // Scale-aware: a pan on a log axis multiplies both ends, which changes the linear size.
-    const double keyRatio = qcp::axisRangeSizeRatio(mKeyAxis.data(), mRenderedRange.key);
-    const double valRatio = qcp::axisRangeSizeRatio(mValueAxis.data(), mRenderedRange.value);
-    if (qAbs(keyRatio - 1.0) > 1e-4 || qAbs(valRatio - 1.0) > 1e-4)
-        return {};
-    QPointF offset = qcp::computeViewportOffset(mKeyAxis.data(), mValueAxis.data(),
-                                                mRenderedRange.key, mRenderedRange.value);
-    // Reject if panned too far (cached lines don't cover the viewport)
-    const bool keyVert = mKeyAxis->orientation() == Qt::Vertical;
-    double keyDim = keyVert ? mKeyAxis->axisRect()->height() : mKeyAxis->axisRect()->width();
-    double valDim = keyVert ? mKeyAxis->axisRect()->width() : mKeyAxis->axisRect()->height();
-    if (qAbs(keyVert ? offset.y() : offset.x()) > keyDim
-        || qAbs(keyVert ? offset.x() : offset.y()) > valDim)
-        return {};
-    return offset;
+    if (!mKeyAxis || !mValueAxis || !mDataSource || mDataSource->empty())
+        return std::nullopt;
+    return nearestDataPoint(QPointF(at.x, at.y), details);
 }
 
-void QCPMultiGraph::draw(QCPPainter* painter)
+// The nearest data point of any visible component, in pixels: the point itself, or the segment
+// that runs past it. Sets \a details to its component, row, key and value on a hit.
+std::optional<double> QCPMultiGraph::nearestDataPoint(const QPointF& pos, QVariant* details) const
+{
+    // Keys are sorted — binary search for the nearest key, then check
+    // each component at that index.  O(log N + C) instead of O(C × M).
+    const QCPAbstractMultiDataSource* ds = mDataSource.get();
+    const int n = ds->size();
+
+    double posKey, dummy;
+    pixelsToCoords(pos, posKey, dummy);
+
+    // findEnd gives the first index > posKey; the nearest key is either
+    // that index or the one before it.
+    int idx = ds->findEnd(posKey, /*expandedRange=*/false);
+    int lo = qMax(0, idx - 1);
+    int hi = qMin(idx, n - 1);
+
+    double minDistSqr = (std::numeric_limits<double>::max)();
+    int minDistIndex = -1;
+    int minDistComponent = -1;
+    double minKey = 0, minValue = 0;
+
+    const int nComponents = qMin(mComponents.size(), ds->columnCount());
+    for (int i = lo; i <= hi; ++i) {
+        double k = ds->keyAt(i);
+        for (int c = 0; c < nComponents; ++c) {
+            if (!mComponents[c].visible) continue;
+            double v = ds->valueAt(c, i);
+            double distSqr = QCPVector2D(coordsToPixels(k, v) - pos).lengthSquared();
+            if (distSqr < minDistSqr) {
+                minDistSqr = distSqr;
+                minDistIndex = i;
+                minDistComponent = c;
+                minKey = k;
+                minValue = v;
+            }
+        }
+    }
+
+    // Also check distance to line segments between lo and hi for each component
+    if (lo < hi) {
+        for (int c = 0; c < nComponents; ++c) {
+            if (!mComponents[c].visible || mComponents[c].lineStyle == lsNone) continue;
+            QPointF pLo = coordsToPixels(ds->keyAt(lo), ds->valueAt(c, lo));
+            QPointF pHi = coordsToPixels(ds->keyAt(hi), ds->valueAt(c, hi));
+            double lineDistSqr = QCPVector2D(pos).distanceSquaredToLine(pLo, pHi);
+            if (lineDistSqr < minDistSqr) {
+                minDistSqr = lineDistSqr;
+                minDistComponent = c;
+                minDistIndex = lo;
+                minKey = ds->keyAt(lo);
+                minValue = ds->valueAt(c, lo);
+            }
+        }
+    }
+
+    if (minDistIndex < 0)
+        return std::nullopt;
+    if (details)
+    {
+        QVariantMap map;
+        map["componentIndex"] = minDistComponent;
+        map["dataIndex"] = minDistIndex;
+        map["key"] = minKey;
+        map["value"] = minValue;
+            details->setValue(map);
+    }
+    return qSqrt(minDistSqr);
+}
+
+namespace
+{
+
+//! The colour of the data point \a dataIndex, transparent where it has none (a gap).
+QRgb pointColour(const qcp::ColorScalarMapper& mapper, int dataIndex)
+{
+    const int bucket = mapper.bucket(dataIndex);
+    return bucket == qcp::ColorScalarMapper::kGap ? qRgba(0, 0, 0, 0)
+                                                  : qcp::runColor(mapper, bucket).rgba();
+}
+
+//! One colour per vertex of a shaped line. The index tables are built for a k+1 lookup, so a
+//! segment takes the colour of the point it ends on and the last vertex repeats the one before it.
+std::shared_ptr<const std::vector<QRgb>> segmentColours(const qcp::ColorScalarMapper& mapper,
+                                                       const QVector<int>& vertexIndices)
+{
+    const int count = static_cast<int>(vertexIndices.size());
+    auto colours
+        = std::make_shared<std::vector<QRgb>>(static_cast<std::size_t>(count), qRgba(0, 0, 0, 0));
+    for (int k = 0; k < count; ++k)
+        (*colours)[static_cast<std::size_t>(k)]
+            = pointColour(mapper, vertexIndices[std::min(k + 1, count - 1)]);
+    return colours;
+}
+
+//! The same indices with a transparent vertex between each pair, aligned with separatedPairs().
+QVector<int> separatedPairIndices(const QVector<int>& pairIndices)
+{
+    QVector<int> separated;
+    separated.reserve(pairIndices.size() * 3 / 2);
+    for (int i = 0; i + 1 < pairIndices.size(); i += 2)
+    {
+        if (i > 0)
+            separated.append(-1);
+        separated.append(pairIndices[i]);
+        separated.append(pairIndices[i + 1]);
+    }
+    return separated;
+}
+
+//! One line of pairs with a vertex a polyline must not join through between them.
+QVector<QPointF> separatedPairs(const QVector<QPointF>& vertices)
+{
+    const QPointF breakpoint(std::numeric_limits<double>::quiet_NaN(),
+                             std::numeric_limits<double>::quiet_NaN());
+    QVector<QPointF> separated;
+    separated.reserve(vertices.size() * 3 / 2);
+    for (int i = 0; i + 1 < vertices.size(); i += 2)
+    {
+        if (i > 0)
+            separated.append(breakpoint);
+        separated.append(vertices[i]);
+        separated.append(vertices[i + 1]);
+    }
+    return separated;
+}
+
+std::shared_ptr<const std::vector<QPointF>> sharedPoints(const QVector<QPointF>& points)
+{
+    return std::make_shared<const std::vector<QPointF>>(points.begin(), points.end());
+}
+
+} // namespace
+
+void QCPMultiGraph::draw(QCPDrawContext& context) const
 {
     PROFILE_HERE_N("QCPMultiGraph::draw");
     if (!mKeyAxis || !mValueAxis || !mDataSource || mDataSource->empty())
@@ -1066,230 +987,183 @@ void QCPMultiGraph::draw(QCPPainter* painter)
     if (mKeyAxis->range().size() <= 0)
         return;
 
-    // Export path: synchronous fallback when no L1 cache yet
-    if (!mL1Cache && mNeedsResampling
-        && painter->modes().testFlag(QCPPainter::pmNoCaching))
+    // An export cannot wait for the scheduler: it resamples what it draws, now.
+    if (!mL1Cache && mNeedsResampling)
     {
-        auto vp = ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data());
-        mPipeline.runSynchronously(vp);
-        onL1Ready(mPipeline.currentGeneration());
+        if (!context.exporting())
+            return;
+        mPipeline.runSynchronously(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data()));
+        bool level2Dirty = false;
+        qcp::extractL1Cache<qcp::algo::MultiGraphResamplerCache>(mPipeline.cache(), mL1Cache,
+                                                                 level2Dirty);
     }
 
-    // Data source priority: L2 (viewport-optimized) > raw
-    // When L1 exists but L2 is null (sparse enough to draw directly), use raw source.
-    // Note: L2 rebuild is deferred until we know fresh lines are needed (below).
+    // The L2 bins are this frame's fresh lines: rebuilt here, and the revision does not move,
+    // since the recording being made right now is made from them.
+    if (mL1Cache && mL2Dirty)
+    {
+        rebuildL2(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data()));
+        mL2Dirty = false;
+    }
+
+    // Data source priority: L2 (viewport-optimized) > raw. A recording is only made from what is
+    // there: with no L1 yet and resampling needed, the frame it would record does not exist.
     QCPAbstractMultiDataSource* ds = nullptr;
     if (mL2Result)
         ds = mL2Result.get();
-    else if (!mNeedsResampling || mL1Cache
-             || painter->modes().testFlag(QCPPainter::pmNoCaching)
+    else if (!mNeedsResampling || mL1Cache || context.exporting()
              || mKeyAxis->scaleType() == QCPAxis::stLogarithmic)
         ds = mDataSource.get();
     else
-        return; // Pipeline active, no L1 yet — wait
+        return;
 
     if (!ds || ds->empty())
         return;
 
-    const QCPRange keyRange = mKeyAxis->range();
-    int begin = ds->findBegin(keyRange.lower);
-    int end = ds->findEnd(keyRange.upper);
+    const QCPKeyWindow window = context.keyWindow();
+    const int begin = ds->findBegin(window.keys.lower);
+    const int end = ds->findEnd(window.keys.upper);
     if (begin >= end)
         return;
 
-    const bool keyIsVertical = mKeyAxis->orientation() == Qt::Vertical;
-    const int pixelWidth = keyIsVertical
-        ? static_cast<int>(mKeyAxis->axisRect()->height())
-        : static_cast<int>(mKeyAxis->axisRect()->width());
-
-    // --- Line caching with GPU translation ---
-    const QSize currentPlotSize(mKeyAxis->axisRect()->width(), mKeyAxis->axisRect()->height());
-    const bool isExportMode = painter->isExporting();
-    auto [needFreshLines, gpuOffset] = qcp::evaluateLineCache(
-        mLineCacheDirty, mCachedLines.isEmpty(),
-        currentPlotSize, mCachedPlotSize,
-        mHasRenderedRange, mRenderedRange.key, mRenderedRange.value,
-        mKeyAxis.data(), mValueAxis.data(), isExportMode);
-
-    // Rebuild L2 only when fresh lines are needed — on cache-hit pan frames
-    // the previous L2 result + GPU offset is sufficient.
-    if (needFreshLines && mL2Dirty && mL1Cache)
-    {
-        rebuildL2(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data()));
-        mL2Dirty = false;
-        // Re-resolve ds in case L2 changed (e.g. became null for sparse data)
-        if (mL2Result)
-            ds = mL2Result.get();
-        else if (mL1Cache)
-            ds = mDataSource.get();
-    }
-
-    // Sources are replaced on every data update: the graph's setting is applied at draw time.
     ds->setGapThreshold(mGapThreshold);
-
+    const bool logKeyAxis = mKeyAxis->scaleType() == QCPAxis::stLogarithmic;
+    // The thinning buckets are equal spans of the key, mapped to equal pixel spans: on a log axis
+    // that span is a decade, so pixelsPerKey counts pixels per decade there.
+    const double axisPixels = window.pixelsPerKey > 0.0
+        ? window.pixelsPerKey * mKeyAxis->range().size()
+        : (mKeyAxis->coordToPixel(mKeyAxis->range().upper)
+           - mKeyAxis->coordToPixel(mKeyAxis->range().lower));
+    double pixelsPerKey = window.pixelsPerKey > 0.0 ? window.pixelsPerKey
+                                                    : qcpKeyPixelsPerUnit(mKeyAxis.data());
+    if (logKeyAxis)
+    {
+        const QCPRange keyRange = mKeyAxis->range();
+        const double decades = std::log10(keyRange.upper / keyRange.lower);
+        pixelsPerKey = decades > 0.0 ? axisPixels / decades : 0.0;
+    }
     const bool coloured = mColor.hasValues() && (ds == mDataSource.get() || mL2HasOrigin);
 
-    QVector<QVector<QPointF>> exportLines;
-    QVector<QVector<int>> exportIndices;
-    auto& linesTarget = isExportMode ? exportLines : mCachedLines;
-    auto& indicesTarget = isExportMode ? exportIndices : mCachedIndices;
-
-    const auto [cacheBegin, cacheEnd] = lineCacheWindow(*ds);
-    if (needFreshLines)
+    // Fills and error bars still paint themselves until they are commands of their own. Only a
+    // graph that has one pays for the callback, which is view-dependent by nature.
+    if (!mFills.isEmpty() || !mErrorBars.isEmpty())
     {
-        // The pending source may carry more columns than the displayed one
-        // (mComponents was already synced to it) — clamp so a mid-window
-        // replot never reads past the displayed source's columns.
-        const int nc = qMin(mComponents.size(), ds->columnCount());
-        resizePerColumn(nc, linesTarget, indicesTarget, coloured);
-
-        bool allVisible = true;
-        for (int c = 0; c < nc; ++c)
-            if (!mComponents[c].visible) { allVisible = false; break; }
-
-        if (coloured)
-        {
-            for (int c = 0; c < nc; ++c)
+        // The callback outlives this call: it keeps the source it draws from alive, so a later
+        // L2 rebuild can replace mL2Result without freeing what a kept recording still holds.
+        const std::shared_ptr<QCPAbstractMultiDataSource> kept = mL2Result ? mL2Result : mDataSource;
+        const bool drawsRaw = kept == mDataSource;
+        context.painter(
+            [this, kept, drawsRaw, begin, end](QCPPainter& painter, const QCPTransform&)
             {
-                if (!mComponents[c].visible) { linesTarget[c].clear(); indicesTarget[c].clear(); continue; }
-                linesTarget[c] = (mAdaptiveSampling && !mL2Result)
-                    ? ds->getOptimizedLineDataIndexed(c, cacheBegin, cacheEnd, pixelWidth,
-                                                      mKeyAxis.data(), mValueAxis.data(), indicesTarget[c])
-                    : ds->getLinesIndexed(c, cacheBegin, cacheEnd,
-                                          mKeyAxis.data(), mValueAxis.data(), indicesTarget[c]);
-            }
-        }
-        else if (allVisible && nc > 1 && !mAdaptiveSampling)
-        {
-            ds->getLinesAll(cacheBegin, cacheEnd,
-                            mKeyAxis.data(), mValueAxis.data(),
-                            linesTarget.data(), nc);
-        }
-        else
-        {
-            for (int c = 0; c < nc; ++c)
-            {
-                if (!mComponents[c].visible) { linesTarget[c].clear(); continue; }
-                if (mAdaptiveSampling)
-                    linesTarget[c] = ds->getOptimizedLineData(c, cacheBegin, cacheEnd, pixelWidth,
-                                                               mKeyAxis.data(), mValueAxis.data());
-                else
-                    linesTarget[c] = ds->getLines(c, cacheBegin, cacheEnd, mKeyAxis.data(), mValueAxis.data());
-            }
-        }
-        if (!isExportMode)
-        {
-            mRenderedRange = {mKeyAxis->range(), mValueAxis->range()};
-            mHasRenderedRange = true;
-            mLineCacheDirty = false;
-            mCachedPlotSize = currentPlotSize;
-            for (auto& ec : mExtrusionCaches) ec.clear();
-            for (auto& fill : mFills) fill.verts.clear();
-            for (auto& bars : mErrorBars) { bars.bars.clear(); bars.band.clear(); }
-            gpuOffset = {};
-        }
+                drawFills(&painter, *kept, begin, end, /*fresh=*/true, { }, /*isExportMode=*/true);
+                drawErrorBars(&painter, *kept, drawsRaw, begin, end, /*fresh=*/true, { },
+                              /*isExportMode=*/true);
+            });
     }
 
-    drawFills(painter, *ds, cacheBegin, cacheEnd, needFreshLines, gpuOffset, isExportMode);
-    drawErrorBars(painter, *ds, ds == mDataSource.get(), cacheBegin, cacheEnd, needFreshLines,
-                  gpuOffset, isExportMode);
+    // In data space the impulse baseline is a value: zero, or the bottom of a log value axis,
+    // which is where the pixel path clamps it.
+    const double impulseBaseline
+        = mValueAxis->scaleType() == QCPAxis::stLogarithmic ? mValueAxis->range().lower : 0.0;
 
-    for (int c = 0; c < mComponents.size(); ++c) {
-        const auto& comp = mComponents[c];
-        if (!comp.visible) continue;
-        if (comp.lineStyle == lsNone && comp.scatterStyle.isNone()) continue;
+    const int columns = std::min(componentCount(), ds->columnCount());
+    for (int c = 0; c < columns; ++c)
+    {
+        const Component& comp = component(c);
+        if (!comp.visible)
+            continue;
+        if (comp.lineStyle == lsNone && comp.scatterStyle.isNone())
+            continue;
 
-        if (c >= linesTarget.size() || c >= mExtrusionCaches.size()) continue;
-        const QVector<QPointF>& dataLines = linesTarget[c];
-        if (dataLines.isEmpty()) continue;
-        // Defensive: indices that do not match the lines are never used.
-        const QVector<int>* dataIdx = (coloured && c < indicesTarget.size()
-                                       && indicesTarget[c].size() == dataLines.size())
-            ? &indicesTarget[c] : nullptr;
+        // The rows a vertex comes from are only asked for when a colour needs them.
+        std::vector<int> sourceIndices;
+        std::vector<QPointF> line
+            = ds->linesInData(c, begin, end, pixelsPerKey, coloured ? &sourceIndices : nullptr,
+                              logKeyAxis);
+        if (line.empty())
+            continue;
+        // Defensive: indices that do not match the points are never used.
+        const bool indexed = coloured && sourceIndices.size() == line.size();
+        const QPen pen = comp.selection.isEmpty() ? comp.pen : comp.selectedPen;
+        const bool hasMarkers = !comp.scatterStyle.isNone();
+        // A plain line is the recorded line: it is handed over, not copied. A step, an impulse or
+        // a marker set needs the points in another shape.
+        const bool borrowsTheLine = comp.lineStyle == lsLine && !hasMarkers;
+        QVector<QPointF> points;
+        if (!borrowsTheLine)
+            points = QVector<QPointF>(line.begin(), line.end());
+        QVector<int> dataIdx;
+        if (indexed)
+            dataIdx = QVector<int>(sourceIndices.begin(), sourceIndices.end());
 
-        // Only compute step-transform when the extrusion cache needs rebuilding —
-        // on cache-hit pan frames, drawPolylineCached ignores pts entirely.
-        // A coloured component may re-extrude for reasons only drawColoredPolylineCached
-        // knows (pen width, colour generation), so it always gets its styled points.
-        const QPen& activePen = comp.selection.isEmpty() ? comp.pen : comp.selectedPen;
-        QVector<QPointF> styledLines;
-        const bool needStyledLines = dataIdx != nullptr
-            || qcp::needsReextrusion(mExtrusionCaches[c], needFreshLines, activePen,
-                                     mParentPlot->bufferDevicePixelRatio());
-        if (needStyledLines && comp.lineStyle != lsNone && comp.lineStyle != lsLine) {
-            switch (comp.lineStyle) {
-                case lsStepLeft:   styledLines = qcp::toStepLeftLines(dataLines, keyIsVertical); break;
-                case lsStepRight:  styledLines = qcp::toStepRightLines(dataLines, keyIsVertical); break;
-                case lsStepCenter: styledLines = qcp::toStepCenterLines(dataLines, keyIsVertical); break;
-                case lsImpulse:    styledLines = qcp::toImpulseLines(dataLines, keyIsVertical, mValueAxis->coordToPixel(0)); break;
-                default: break;
+        if (comp.lineStyle != lsNone)
+        {
+            QPen linePen = pen;
+            if (borrowsTheLine)
+            {
+                if (line.size() >= 2)
+                    context.polyline(std::make_shared<const std::vector<QPointF>>(std::move(line)),
+                                     indexed ? segmentColours(mColor, dataIdx) : nullptr, linePen);
             }
-        }
-        const QVector<QPointF>& lines = styledLines.isEmpty() ? dataLines : styledLines;
-
-        if (comp.lineStyle != lsNone) {
-            if (comp.lineStyle == lsImpulse) {
-                applyDefaultAntialiasingHint(painter);
-                QPen impulsePen = activePen;
-                impulsePen.setCapStyle(Qt::FlatCap);
-                if (dataIdx)
-                    drawColoredImpulses(painter, lines, qcp::impulseIndices(*dataIdx), impulsePen, gpuOffset);
-                else {
-                    painter->setPen(impulsePen);
-                    if (!gpuOffset.isNull())
-                        painter->translate(gpuOffset);
-                    painter->drawLines(lines);
-                    if (!gpuOffset.isNull())
-                        painter->translate(-gpuOffset);
+            else
+            {
+                QVector<QPointF> vertices;
+                switch (comp.lineStyle)
+                {
+                    case lsStepLeft:
+                        vertices = qcp::toStepLeftLines(points, /*keyIsVertical=*/false);
+                        break;
+                    case lsStepRight:
+                        vertices = qcp::toStepRightLines(points, /*keyIsVertical=*/false);
+                        break;
+                    case lsStepCenter:
+                        vertices = qcp::toStepCenterLines(points, /*keyIsVertical=*/false);
+                        break;
+                    case lsImpulse:
+                        vertices = separatedPairs(
+                            qcp::toImpulseLines(points, /*keyIsVertical=*/false, impulseBaseline));
+                        linePen.setCapStyle(Qt::FlatCap);
+                        break;
+                    default:
+                        vertices = points;
+                        break;
                 }
-            } else if (dataIdx) {
-                applyDefaultAntialiasingHint(painter);
-                if (!isExportMode)
-                    qcp::drawColoredPolylineCached(painter, mParentPlot, mLayer, lines,
-                                                   lineIndices(comp.lineStyle, *dataIdx), mColor, activePen,
-                                                   gpuOffset, clipRect(), needFreshLines,
-                                                   mExtrusionCaches[c]);
-                else
-                    qcp::drawColoredPolylineRuns(painter, lines,
-                                                 qcp::colorRuns(lines, lineIndices(comp.lineStyle, *dataIdx), mColor),
-                                                 mColor, activePen, gpuOffset);
-            } else {
-                applyDefaultAntialiasingHint(painter);
-                if (!isExportMode) {
-                    qcp::drawPolylineCached(painter, mParentPlot, mLayer, lines,
-                                             activePen, gpuOffset, clipRect(),
-                                             needFreshLines, mExtrusionCaches[c]);
-                } else {
-                    qcp::drawPolylineWithGpuFallback(painter, mParentPlot, mLayer, lines,
-                                                      activePen, gpuOffset, clipRect());
+                if (vertices.size() >= 2)
+                {
+                    std::shared_ptr<const std::vector<QRgb>> colours;
+                    if (indexed)
+                    {
+                        QVector<int> vertexIdx = lineIndices(comp.lineStyle, dataIdx);
+                        if (comp.lineStyle == lsImpulse)
+                            vertexIdx = separatedPairIndices(vertexIdx);
+                        colours = segmentColours(mColor, vertexIdx);
+                    }
+                    context.polyline(sharedPoints(vertices), colours, linePen);
                 }
             }
         }
 
-        // Draw scatters at original data positions (not step-transformed corners)
-        if (!comp.scatterStyle.isNone()) {
-            if (dataIdx) {
-                drawColoredScatters(painter, dataLines, *dataIdx, comp, gpuOffset, isExportMode);
-            } else {
-                drawPlainScatters(painter, dataLines, comp, gpuOffset, isExportMode);
-            }
+        // Markers sit at the data positions, not at the corners a step or an impulse adds.
+        if (!hasMarkers)
+            continue;
+        QCPScatterStyle style = comp.scatterStyle;
+        if (!style.isPenDefined())
+            style.setPen(comp.pen);
+        auto markerPoints = std::make_shared<std::vector<QPointF>>();
+        auto markerColours = std::make_shared<std::vector<QRgb>>();
+        const int skip = mScatterSkip + 1;
+        for (int i = 0; i < points.size(); i += skip)
+        {
+            if (!qIsFinite(points[i].x()) || !qIsFinite(points[i].y()))
+                continue;
+            markerPoints->push_back(points[i]);
+            if (indexed)
+                markerColours->push_back(
+                    pointColour(mColor, sourceIndices[static_cast<std::size_t>(i)]));
         }
+        if (!markerPoints->empty())
+            context.markers(markerPoints, indexed ? markerColours : nullptr, style);
     }
-}
-
-void QCPMultiGraph::resizePerColumn(int nc, QVector<QVector<QPointF>>& lines,
-                                    QVector<QVector<int>>& indices, bool coloured)
-{
-    lines.resize(nc);
-    indices.resize(coloured ? nc : 0);
-    mExtrusionCaches.resize(nc);
-}
-
-std::pair<int, int> QCPMultiGraph::lineCacheWindow(const QCPAbstractMultiDataSource& ds) const
-{
-    const QCPRange cacheRange = qcp::algo::lineCacheKeyRange(
-        mKeyAxis->range(), mKeyAxis->scaleType() == QCPAxis::stLogarithmic);
-    return {ds.findBegin(cacheRange.lower), ds.findEnd(cacheRange.upper)};
 }
 
 bool QCPMultiGraph::fillDrawable(const Fill& fill, int columnCount) const
@@ -1353,13 +1227,16 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::binnedWhenDense(
 }
 
 void QCPMultiGraph::drawFills(QCPPainter* painter, const QCPAbstractMultiDataSource& ds, int begin,
-                              int end, bool fresh, const QPointF& gpuOffset, bool isExportMode)
+                              int end, bool fresh, const QPointF& gpuOffset,
+                              bool isExportMode) const
 {
     if (mFills.isEmpty())
         return; // gpuLayer() creates the layer it looks up
     auto* gpuLayer = qcp::gpuLayer(mParentPlot, mLayer, isExportMode);
-    for (auto& entry : mFills) {
-        if (!fillDrawable(entry.spec, ds.columnCount())) continue;
+    for (const auto& entry : mFills)
+    {
+        if (!fillDrawable(entry.spec, ds.columnCount()))
+            continue;
         const QBrush brush = effectiveFillBrush(entry.spec);
         if (brush.color().alpha() == 0) continue;
         // The GPU fill is one flat colour: gradients and patterns are painted with QPainter.
@@ -1377,7 +1254,7 @@ void QCPMultiGraph::drawFills(QCPPainter* painter, const QCPAbstractMultiDataSou
 void QCPMultiGraph::drawFillOnGpu(QCPPainter* painter, QCPPlottableRhiLayer* layer,
                                   std::vector<float>& verts, const QColor& color,
                                   std::span<const qcp::fill::StripPoint> rows, bool fresh,
-                                  const QPointF& gpuOffset)
+                                  const QPointF& gpuOffset) const
 {
     if (fresh)
         qcp::fill::appendStrip(rows, mKeyAxis->orientation() == Qt::Vertical,
@@ -1435,8 +1312,9 @@ std::vector<qcp::errorbars::Bar> QCPMultiGraph::errorBarRows(
     {
         const double y = ds.valueAt(spec.value, i);
         // std::min/max return their first argument when either is NaN, so a NaN bound stays NaN.
-        // Unlike the helpers they replace, a -inf lower or +inf upper value now wins over the bound.
-        bars.push_back({mKeyAxis->coordToPixel(ds.keyAt(i)), boundPixel(*mValueAxis, y),
+        // Unlike the helpers they replace, a -inf lower or +inf upper value now wins over the
+        // bound.
+        bars.push_back({ mKeyAxis->coordToPixel(ds.keyAt(i)), boundPixel(*mValueAxis, y),
                         boundPixel(*mValueAxis, std::min(ds.valueAt(spec.lower, i), y)),
                         boundPixel(*mValueAxis, std::max(ds.valueAt(spec.upper, i), y))});
     }
@@ -1478,14 +1356,16 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::errorBandRows(
 // only a QPainter band is rebuilt from the current axes on every frame, like a fill.
 void QCPMultiGraph::drawErrorBars(QCPPainter* painter, const QCPAbstractMultiDataSource& ds,
                                   bool rawRows, int begin, int end, bool fresh,
-                                  const QPointF& gpuOffset, bool isExportMode)
+                                  const QPointF& gpuOffset, bool isExportMode) const
 {
     if (mErrorBars.isEmpty())
         return; // gpuLayer() creates the layer it looks up
     auto* gpuLayer = qcp::gpuLayer(mParentPlot, mLayer, isExportMode);
     const bool rebuild = fresh || isExportMode;
-    for (auto& entry : mErrorBars) {
-        if (!errorBarsDrawable(entry.spec, ds.columnCount())) continue;
+    for (const auto& entry : mErrorBars)
+    {
+        if (!errorBarsDrawable(entry.spec, ds.columnCount()))
+            continue;
         // A band builds its own rows: its bounds <= 0 on a log axis go past the edge, not to it.
         const bool checkFit = rebuild && rawRows;
         const auto bars = checkFit ? errorBarRows(entry.spec, ds, begin, end)
@@ -1506,9 +1386,9 @@ void QCPMultiGraph::drawErrorBars(QCPPainter* painter, const QCPAbstractMultiDat
     }
 }
 
-void QCPMultiGraph::drawBarsAsPolylines(QCPPainter* painter, ErrorBarsEntry& entry,
+void QCPMultiGraph::drawBarsAsPolylines(QCPPainter* painter, const ErrorBarsEntry& entry,
                                         std::span<const qcp::errorbars::Bar> bars, bool fresh,
-                                        const QPointF& gpuOffset, bool isExportMode)
+                                        const QPointF& gpuOffset, bool isExportMode) const
 {
     const Component& comp = mComponents[entry.spec.value];
     const QPen pen = comp.selection.isEmpty() ? errorBarPen(entry.spec) : comp.selectedPen;
@@ -1527,9 +1407,9 @@ void QCPMultiGraph::drawBarsAsPolylines(QCPPainter* painter, ErrorBarsEntry& ent
 }
 
 void QCPMultiGraph::drawBarsAsBand(QCPPainter* painter, QCPPlottableRhiLayer* gpuLayer,
-                                   ErrorBarsEntry& entry,
+                                   const ErrorBarsEntry& entry,
                                    std::span<const qcp::fill::StripPoint> rows, bool fresh,
-                                   const QPointF& gpuOffset)
+                                   const QPointF& gpuOffset) const
 {
     // Not the selected colour: the GPU band bakes its colour in, and selecting would rebuild it.
     QColor color = errorBarPen(entry.spec).color();

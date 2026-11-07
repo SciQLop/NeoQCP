@@ -166,6 +166,15 @@ public:
     */
     [[nodiscard]] QCPKeyWindow keyWindow() const;
 
+    /*!
+      Whether this frame is an export: a vectorised painter, or one that caches nothing.
+
+      An export resolves what a screen frame would wait for. An object that would record nothing
+      because it is still waiting for a resample records it synchronously here, so the export is
+      complete. A recording made for an export is remade for the screen, and the other way round.
+    */
+    [[nodiscard]] bool exporting() const { return mExporting; }
+
     //! A polyline whose vertices are data coordinates (keys, values).
     void polyline(std::shared_ptr<const std::vector<QPointF>> data, const QPen& pen);
     /*!
@@ -228,7 +237,7 @@ public:
 
 private:
     QCPDrawContext(const QCPAxis* keyAxis, const QCPAxis* valueAxis, const QCPAxisRect* axisRect,
-                   const QCPTheme* theme);
+                   const QCPTheme* theme, bool exporting = false);
     friend class TestDrawContext;
     friend class TestRepaint; //!< the GPU replay tests record through the same door
     friend class Benchmark; //!< records through the same door to time the replay
@@ -242,4 +251,5 @@ private:
     QCPRatioTransform mRatio;
     QRectF mClip;
     const QCPTheme* mTheme = nullptr;
+    bool mExporting = false;
 };

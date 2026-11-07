@@ -1,16 +1,18 @@
 #pragma once
+#include "../drawable.h"
+#include "datasource/abstract-multi-datasource.h"
+#include "datasource/async-pipeline.h"
+#include "datasource/graph-resampler.h"
+#include "datasource/row-major-multi-datasource.h"
+#include "datasource/soa-multi-datasource.h"
+#include "multigraph-errorbars.h"
+#include "multigraph-fill.h"
+#include "plottable-color-mapper.h"
+#include "plottable-draw-utils.h"
 #include "plottable-line.h"
 #include "plottable.h"
 #include "plottable1d.h"
-#include "datasource/abstract-multi-datasource.h"
-#include "datasource/soa-multi-datasource.h"
-#include "datasource/row-major-multi-datasource.h"
-#include "datasource/async-pipeline.h"
-#include "datasource/graph-resampler.h"
-#include "plottable-draw-utils.h"
-#include "plottable-color-mapper.h"
-#include "multigraph-fill.h"
-#include "multigraph-errorbars.h"
+#include <QTimer>
 #include <array>
 #include <atomic>
 #include <memory>
@@ -18,14 +20,14 @@
 #include <span>
 #include <variant>
 #include <vector>
-#include <QTimer>
 
 class QCPPlottableRhiLayer;
 
 template <typename T, typename Self = void>
 class QCPMultiGraphOps;
 
-class QCP_LIB_DECL QCPMultiGraph : public QCPAbstractLine, public QCPPlottableInterface1D {
+class QCP_LIB_DECL QCPMultiGraph : public QCPDrawn<QCPAbstractLine>, public QCPPlottableInterface1D
+{
     Q_OBJECT
 public:
     template <typename T>
@@ -42,8 +44,9 @@ public:
 
     QCPMultiGraphPipeline& pipeline() { return mPipeline; }
     const QCPMultiGraphPipeline& pipeline() const { return mPipeline; }
-    [[nodiscard]] bool hasRenderedRange() const { return mHasRenderedRange; }
-    QPointF stallPixelOffset() const override;
+
+    [[nodiscard]] bool hasRenderedRange() const { return mCore.hasRecording(); }
+
     bool canProduceContent() const override;
     bool hasPendingData() const override { return mPendingSource != nullptr; }
     bool commitPendingData() override;
@@ -100,8 +103,9 @@ public:
         double capWidthPx = 6;        // full cap width
     };
     //! Bars from `lower` to `upper` at each row of `value`; a band when rows are too dense.
-    //! One per value column: setting again replaces it. Takes the bounds out of the legend; clearing puts back those no other bars use.
-    //! False (nothing changed) for an unknown or repeated column.
+    //! One per value column: setting again replaces it. Takes the bounds out of the legend;
+    //! clearing puts back those no other bars use. False (nothing changed) for an unknown or
+    //! repeated column.
     bool setComponentErrorBars(int value, int lower, int upper, double capWidthPx = 6,
                                std::optional<QPen> pen = std::nullopt);
     void clearComponentErrorBars(int value);
@@ -152,7 +156,17 @@ public:
     void drawComponentLegendIcon(QCPPainter* painter, int component, const QLineF& line) const;
 
 protected:
-    void draw(QCPPainter* painter) override;
+    //! Records the lines and the markers: the pixels come from the replay.
+    void draw(QCPDrawContext& context) const override;
+    //! The data point under \a at: today's selectTest, without the gates around it.
+    std::optional<double> hitTest(QCP::Pixels at, QVariant* details) const override;
+
+    //! The lines, markers, fills or error bars changed: a counting bump, not a rebuild.
+    quint64 dependencyRevision() const override { return mRevision; }
+
+    //! Without a finished resample an export resamples on the spot: the two recordings differ.
+    bool resolvesForTheExport() const override { return true; }
+
     void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
     void axesChanged() override { followAxes(); }
 
@@ -169,42 +183,38 @@ protected:
     std::shared_ptr<QCPAbstractMultiDataSource> mDataSource;
     struct FillEntry {
         Fill spec;
-        std::vector<float> verts;   // triangle cache, rebuilt when lines change
+        mutable std::vector<float> verts; // triangle cache, rebuilt when lines change
     };
     QVector<FillEntry> mFills;
     struct ErrorBarsEntry {
         ErrorBars spec;
-        qcp::ExtrusionCache bars;
-        QVector<QPointF> runs;      // pixel runs at the rendered range, re-extruded on a pen change
-        std::vector<float> band;    // triangle cache of the dense fallback
-        bool asBand = false;        // mode picked on the last fresh frame, kept on pan frames
+        mutable qcp::ExtrusionCache bars;
+        mutable QVector<QPointF>
+            runs; // pixel runs at the rendered range, re-extruded on a pen change
+        mutable std::vector<float> band; // triangle cache of the dense fallback
+        mutable bool asBand = false; // mode picked on the last fresh frame, kept on pan frames
     };
     QVector<ErrorBarsEntry> mErrorBars;
     mutable QVector<QCPDataSelection> mLastRectSelections; // per-component selections from selectTestRect
     bool mAdaptiveSampling = true;
     double mGapThreshold = qcp::algo::kDefaultGapThreshold;
-    QCPMultiGraphPipeline mPipeline;
-    std::shared_ptr<qcp::algo::MultiGraphResamplerCache> mL1Cache;
-    std::shared_ptr<QCPAbstractMultiDataSource> mL2Result;
-    bool mL2Dirty = false;
+    // draw() is const: what it resolves for this frame is mutable state, not cached pixels.
+    mutable QCPMultiGraphPipeline mPipeline;
+    mutable std::shared_ptr<qcp::algo::MultiGraphResamplerCache> mL1Cache;
+    mutable std::shared_ptr<QCPAbstractMultiDataSource> mL2Result;
+    mutable bool mL2Dirty = false;
     bool mNeedsResampling = false;
-    struct { QCPRange key, value; } mRenderedRange {};
-    bool mHasRenderedRange = false;
-    // Line cache: per-component cached lines, reused with GPU offset
-    QVector<QVector<QPointF>> mCachedLines;
-    void markLinesDirty();
-    bool mLineCacheDirty = true;
-    QSize mCachedPlotSize;
-    // Per-component cached extruded GPU vertices — avoids re-extrusion on pan
-    QVector<qcp::ExtrusionCache> mExtrusionCaches;
+    //! The data the recording was made from changed: the adapter records it again.
+    mutable quint64 mRevision = 0;
     // Debounce timer: defers expensive L2 rebuild until panning stops
     QTimer mViewportDebounce;
 
-    // Read by the L1 transform on the pipeline thread: build origin tables only for coloured graphs.
+    // Read by the L1 transform on the pipeline thread: build origin tables only for coloured
+    // graphs.
     std::shared_ptr<std::atomic<bool>> mWantOrigin = std::make_shared<std::atomic<bool>>(false);
-    bool mL2HasOrigin = false;
-    QVector<QVector<int>> mCachedIndices;   // per component, aligned with mCachedLines when coloured
-    void invalidateLines();
+    mutable bool mL2HasOrigin = false;
+    // The lines this object draws from changed: bump the revision, paint the layer again.
+    void linesChanged();
     // The shared line base's hooks: every drawing change also drops the cached lines.
     void lineChanged() override;
     void componentVisibilityToggled() override;
@@ -215,19 +225,8 @@ protected:
     void colorValuesStarted() override;
     // Source indices aligned with the line-style-transformed points of a component.
     static QVector<int> lineIndices(LineStyle style, const QVector<int>& dataIdx);
-    // Draws impulse line pairs coloured per point, batched by colour bucket.
-    void drawColoredImpulses(QCPPainter* painter, const QVector<QPointF>& pairs,
-                             const QVector<int>& indices, QPen pen,
-                             const QPointF& gpuOffset) const;
-    // Draws markers coloured per point: GPU via addScatterColored, or QPainter
-    // fallback batched by colour bucket.
-    void drawColoredScatters(QCPPainter* painter, const QVector<QPointF>& points,
-                             const QVector<int>& indices, const Component& comp,
-                             const QPointF& gpuOffset, bool isExportMode) const;
-    // Draws markers in the component's own style: GPU via addScatter, or QPainter fallback.
-    void drawPlainScatters(QCPPainter* painter, const QVector<QPointF>& dataLines,
-                           const Component& comp, const QPointF& gpuOffset,
-                           bool isExportMode) const;
+    // The nearest data point of any visible component: what selectTest and hitTest both answer.
+    std::optional<double> nearestDataPoint(const QPointF& pos, QVariant* details) const;
     void requestOrigin();
     // Same-size-keeps/other-size-clears colour rule, shared by applySourceNow(),
     // commitPendingData() and dataChanged(): each installs or mutates mDataSource and
@@ -258,9 +257,6 @@ protected:
     [[nodiscard]] bool isErrorBound(int column) const;
     void decorationsChanged();
     [[nodiscard]] bool hasPenDerivedDecoration(int ownerCount) const;
-    void resizePerColumn(int nc, QVector<QVector<QPointF>>& lines, QVector<QVector<int>>& indices,
-                         bool coloured);
-    [[nodiscard]] std::pair<int, int> lineCacheWindow(const QCPAbstractMultiDataSource& ds) const;
     [[nodiscard]] bool fillDrawable(const Fill& fill, int columnCount) const;
     [[nodiscard]] static qcp::fill::Step ownerStep(const Component& owner);
     [[nodiscard]] std::vector<qcp::fill::StripPoint> fillRows(const Fill& fill,
@@ -269,12 +265,12 @@ protected:
     [[nodiscard]] std::vector<qcp::fill::StripPoint> shapedFillRows(
         const Fill& fill, const QCPAbstractMultiDataSource& ds, int begin, int end) const;
     void drawFills(QCPPainter* painter, const QCPAbstractMultiDataSource& ds, int begin, int end,
-                   bool fresh, const QPointF& gpuOffset, bool isExportMode);
+                   bool fresh, const QPointF& gpuOffset, bool isExportMode) const;
     void drawFillOnGpu(QCPPainter* painter, QCPPlottableRhiLayer* layer, std::vector<float>& verts,
-                       const QColor& color, std::span<const qcp::fill::StripPoint> rows,
-                       bool fresh, const QPointF& gpuOffset);
-    [[nodiscard]] std::vector<qcp::fill::StripPoint> binnedWhenDense(
-        std::vector<qcp::fill::StripPoint> rows) const;
+                       const QColor& color, std::span<const qcp::fill::StripPoint> rows, bool fresh,
+                       const QPointF& gpuOffset) const;
+    [[nodiscard]] std::vector<qcp::fill::StripPoint>
+    binnedWhenDense(std::vector<qcp::fill::StripPoint> rows) const;
     void paintFill(QCPPainter* painter, const QBrush& brush,
                    std::span<const qcp::fill::StripPoint> rows) const;
     [[nodiscard]] bool errorBarsDrawable(const ErrorBars& spec, int columnCount) const;
@@ -289,14 +285,15 @@ protected:
     [[nodiscard]] std::vector<qcp::fill::StripPoint> errorBandRows(
         const ErrorBars& spec, const QCPAbstractMultiDataSource& ds, int begin, int end) const;
     void drawErrorBars(QCPPainter* painter, const QCPAbstractMultiDataSource& ds, bool rawRows,
-                       int begin, int end, bool fresh, const QPointF& gpuOffset, bool isExportMode);
-    void drawBarsAsPolylines(QCPPainter* painter, ErrorBarsEntry& entry,
+                       int begin, int end, bool fresh, const QPointF& gpuOffset,
+                       bool isExportMode) const;
+    void drawBarsAsPolylines(QCPPainter* painter, const ErrorBarsEntry& entry,
                              std::span<const qcp::errorbars::Bar> bars, bool fresh,
-                             const QPointF& gpuOffset, bool isExportMode);
-    void drawBarsAsBand(QCPPainter* painter, QCPPlottableRhiLayer* gpuLayer, ErrorBarsEntry& entry,
-                        std::span<const qcp::fill::StripPoint> rows, bool fresh,
-                        const QPointF& gpuOffset);
-    void rebuildL2(const ViewportParams& vp);
+                             const QPointF& gpuOffset, bool isExportMode) const;
+    void drawBarsAsBand(QCPPainter* painter, QCPPlottableRhiLayer* gpuLayer,
+                        const ErrorBarsEntry& entry, std::span<const qcp::fill::StripPoint> rows,
+                        bool fresh, const QPointF& gpuOffset) const;
+    void rebuildL2(const ViewportParams& vp) const;
     void onViewportChanged();
     void followAxes();
     QList<QMetaObject::Connection> mAxisLinks;
@@ -316,8 +313,8 @@ class QCPMultiGraphOps : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPMultiGra
     using Base = QCPPlottableOps<T, qcp::OpsRet<Self, QCPMultiGraphOps<T>>>;
 
 public:
-    using typename Base::Ret;
     using Base::Base;
+    using typename Base::Ret;
 
     // Same arguments as QCPMultiGraph::setData: the keys and one value column per component.
     template <IndexableNumericRange KC, IndexableNumericRange VC>
