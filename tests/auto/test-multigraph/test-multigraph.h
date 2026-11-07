@@ -118,6 +118,7 @@ private slots:
     void legendIconHasOneSegmentPerComponent();
     void legendSwatchIsTwelvePixelsTall();
     void errorBarsAreOneCommand();
+    void verticalKeyErrorBarsRunAlongTheValue();
     void denseErrorBarsAreABand();
     void legendIconShowsEachComponent();
     void settingErrorBarsRepaintsTheLayer();

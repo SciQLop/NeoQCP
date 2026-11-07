@@ -1609,6 +1609,28 @@ void TestMultiGraph::sparseErrorBarsAreDrawnAsBars()
     QVERIFY(!isRedish(img.pixelColor(xBetween, yInside)));
 }
 
+// A vertical key axis turns the bars: the stems run along the value, now the x pixel axis.
+void TestMultiGraph::verticalKeyErrorBarsRunAlongTheValue()
+{
+    std::vector<double> keys { 0, 1, 2, 3, 4 };
+    auto* mg = new QCPMultiGraph(mPlot->yAxis, mPlot->xAxis);
+    mg->setData(std::move(keys), std::vector<std::vector<double>> { std::vector<double>(5, 5),
+                                                                    std::vector<double>(5, 3),
+                                                                    std::vector<double>(5, 7) });
+    mg->setComponentColors({ Qt::red, Qt::red, Qt::red });
+    for (int c = 0; c < 3; ++c)
+        mg->setComponentLineStyle(c, QCPMultiGraph::lsNone);
+    mg->setComponentErrorBars(0, 1, 2);
+    mPlot->yAxis->setRange(-0.5, 4.5);
+    mPlot->xAxis->setRange(0, 10);
+    const QImage img = renderOf(mPlot);
+    const int yBar = int(mPlot->yAxis->coordToPixel(2));
+    const int yBetween = int(mPlot->yAxis->coordToPixel(2.5));
+    const int xInside = int(mPlot->xAxis->coordToPixel(4));
+    QVERIFY(redNear(img, QPoint(xInside, yBar)));
+    QVERIFY(!isRedish(img.pixelColor(xInside, yBetween)));
+}
+
 void TestMultiGraph::denseErrorBarsBecomeABand()
 {
     errorBarGraph(mPlot, 2000, 0.01);
