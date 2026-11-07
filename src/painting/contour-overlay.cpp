@@ -48,13 +48,14 @@ bool drawable(const QCPColorMapData* grid)
         && keySpan > 0 && valueSpan > 0 && std::isfinite(keySpan) && std::isfinite(valueSpan);
 }
 
+//! The grid's extent in pixels, signed: a reversed axis runs the rect backwards, and the label
+//! painter needs that direction. Only the visibility intersection wants it normalized.
 QRectF gridRect(const QCPColorMapData* grid, const QCPAxis* keyAxis, const QCPAxis* valueAxis)
 {
     const QCPRange keys = grid->keyRange();
     const QCPRange values = grid->valueRange();
     return QRectF(QPointF(keyAxis->coordToPixel(keys.lower), valueAxis->coordToPixel(values.upper)),
-                  QPointF(keyAxis->coordToPixel(keys.upper), valueAxis->coordToPixel(values.lower)))
-        .normalized();
+                  QPointF(keyAxis->coordToPixel(keys.upper), valueAxis->coordToPixel(values.lower)));
 }
 
 //! A point of a contour segment (in the extractor's UV space) in data coordinates.
@@ -184,7 +185,7 @@ void QCPContourOverlay::recordLabels(QCPDrawContext& context, const QCPColorMapD
                                      const QCPAxis* keyAxis, const QCPAxis* valueAxis)
 {
     const QRectF imageRect = gridRect(grid, keyAxis, valueAxis);
-    const QRectF visible = imageRect.intersected(keyAxis->axisRect()->rect());
+    const QRectF visible = imageRect.normalized().intersected(keyAxis->axisRect()->rect());
     if (visible.isEmpty())
         return;
     // Labels drawn under the image would be hidden: they go in one raster over the part of the

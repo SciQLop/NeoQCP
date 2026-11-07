@@ -2674,6 +2674,56 @@ bool TestPipeline::repaintFollows(QCPHistogram2D* hist, const std::function<void
     return true;
 }
 
+// The label tile is drawn in pixels, computed from the grid's image rect: that rect must keep
+// the axes' direction, or every label is mirrored away from its line on a reversed axis.
+void TestPipeline::reversedKeyAxisKeepsContourLabelsWithTheirLines()
+{
+    auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
+    hist->setBins(3, 2);
+    const double keyOfColumn[3] = { 1.0, 11.0, 21.0 };
+    const int samplesOfColumn[3] = { 1, 3, 3 };
+    std::vector<double> keys;
+    std::vector<double> values;
+    for (int column = 0; column < 3; ++column)
+        for (int row = 0; row < 2; ++row)
+            for (int sample = 0; sample < samplesOfColumn[column]; ++sample)
+            {
+                keys.push_back(keyOfColumn[column]);
+                values.push_back(row == 0 ? 0.25 : 0.75);
+            }
+    hist->setData(std::move(keys), std::move(values));
+
+    mPlot->xAxis->setRange(0, 30);
+    mPlot->xAxis->setRangeReversed(true);
+    mPlot->yAxis->setRange(0, 1);
+    hist->setContourLevels({ 2.0 });
+    hist->setContourPen(QPen(Qt::red, 2));
+    hist->setContourLabelEnabled(true);
+
+    QSignalSpy spy(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(spy.wait(2000));
+    mPlot->toPixmap();
+
+    const auto& labels = hist->lastContourLabels();
+    QCOMPARE(labels.size(), 1);
+    // Level 2 sits between the 1 and 3 sample columns: u = 0.25 of the grid, key 6 here.
+    double key = qQNaN();
+    for (const auto& command : hist->mCore.recordedList().commands)
+        if (const auto* line = std::get_if<qcp::PolylineDataCmd>(&command))
+            for (const QPointF& candidate : *line->points)
+                if (!std::isnan(candidate.x()))
+                {
+                    key = candidate.x();
+                    break;
+                }
+    QVERIFY2(std::isfinite(key), "the recording holds a contour point");
+    const double linePixel = mPlot->xAxis->coordToPixel(key);
+    QVERIFY2(std::abs(labels.first().position.x() - linePixel) < 2.0,
+             qPrintable(QString("label at x %1, its line at x %2")
+                            .arg(labels.first().position.x())
+                            .arg(linePixel)));
+}
+
 // A contour sits where the image's cell boundary sits: on a log key axis the extractor's
 // key coordinate must be mapped geometrically, like the image corners and the value rows.
 void TestPipeline::histogram2dContoursMapALogKeyGeometrically()
