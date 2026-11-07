@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 
 #include <QDebug>
 
@@ -135,14 +136,29 @@ void addRibbonFill(QCPPlottableRhiLayer& layer, std::span<const QPointF> upper,
     std::vector<float>& verts = fillScratch();
     verts.clear();
     verts.reserve((count - 1) * 36);
+    const auto triangle = [&](const QPointF& a, const QPointF& b, const QPointF& c)
+    {
+        appendVertex(verts, a, rgba);
+        appendVertex(verts, b, rgba);
+        appendVertex(verts, c, rgba);
+    };
     for (std::size_t i = 0; i + 1 < count; ++i)
     {
-        appendVertex(verts, upper[i], rgba);
-        appendVertex(verts, upper[i + 1], rgba);
-        appendVertex(verts, lower[i + 1], rgba);
-        appendVertex(verts, upper[i], rgba);
-        appendVertex(verts, lower[i + 1], rgba);
-        appendVertex(verts, lower[i], rgba);
+        // Paired rows share their key, so the gaps between the edges are parallel: they cross
+        // where the gap changes sign, and the quad is then two triangles meeting there.
+        const QPointF gap = upper[i] - lower[i];
+        const QPointF nextGap = upper[i + 1] - lower[i + 1];
+        if (QPointF::dotProduct(gap, nextGap) < 0)
+        {
+            const double length = std::hypot(gap.x(), gap.y());
+            const double t = length / (length + std::hypot(nextGap.x(), nextGap.y()));
+            const QPointF crossing = upper[i] + t * (upper[i + 1] - upper[i]);
+            triangle(upper[i], crossing, lower[i]);
+            triangle(crossing, upper[i + 1], lower[i + 1]);
+            continue;
+        }
+        triangle(upper[i], upper[i + 1], lower[i + 1]);
+        triangle(upper[i], lower[i + 1], lower[i]);
     }
     layer.addPlottable(verts, { }, clip, dpr, height, 0, 0, alpha);
     if (cache)

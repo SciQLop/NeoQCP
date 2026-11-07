@@ -3195,6 +3195,29 @@ void TestMultiGraph::fillsDrawUnderLinesOnTheGpu()
     QVERIFY2(between.green() > between.red() + 60, "the fill must be visible between the bars");
 }
 
+// A fill whose edge crosses its target between two rows is two lobes, on the GPU as in an export:
+// under the line on the left, over it on the right, and nothing on the far side of either.
+void TestMultiGraph::aCrossingFillIsTwoLobesOnTheGpu()
+{
+    if (!showWithRhi(mPlot))
+        QSKIP("no exposed window with a QRhi in this environment");
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double> { 0, 1 }, std::vector<std::vector<double>> { { -1, 1 } });
+    mg->setComponentLineStyle(0, QCPMultiGraph::lsNone);
+    mg->setComponentFill(0, 0.0, QBrush(Qt::green));
+    mPlot->xAxis->setRange(0, 1);
+    mPlot->yAxis->setRange(-1, 1);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const QImage frame = mPlot->grabFramebuffer();
+    const auto green = [&](double key, double value)
+    {
+        const QColor c = frame.pixelColor(pixelOf(mPlot, key, value));
+        return c.green() > c.red() + 60;
+    };
+    QVERIFY2(green(0.25, -0.25) && green(0.75, 0.25), "a lobe is missing");
+    QVERIFY2(!green(0.6, -0.2) && !green(0.4, 0.2), "the fill reaches past where the edges cross");
+}
+
 // Error bars are one command: the replay builds every stem and cap from the centres and spans.
 void TestMultiGraph::errorBarsAreOneCommand()
 {

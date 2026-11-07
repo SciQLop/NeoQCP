@@ -126,6 +126,7 @@ private slots:
     void logKeyCentreStepFillSitsHalfwayOnScreen();
     void anEmptyViewDoesNotOutliveAZoomOut();
     void aZoomRecordsOnce();
+    void aCrossingFillIsTwoLobesOnTheGpu();
     void legendIconMarkerTakesTheComponentPen();
     void denseErrorBarsAreABand();
     void legendIconShowsEachComponent();
