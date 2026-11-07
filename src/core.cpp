@@ -49,7 +49,6 @@
 #include "painting/paintbuffer-pixmap.h"
 #include "painting/paintbuffer-rhi.h"
 #include "painting/plottable-rhi-layer.h"
-#include "painting/colormap-rhi-layer.h"
 #include "painting/span-rhi-layer.h"
 #include "painting/grid-rhi-layer.h"
 #include "painting/scatter-rhi-layer.h"
@@ -1291,16 +1290,6 @@ QCPScatterRhiLayer* QCustomPlot::scatterRhiLayer(QCPLayer* layer)
     return mScatterRhiLayers[layer];
 }
 
-void QCustomPlot::registerColormapRhiLayer(QCPColormapRhiLayer* layer)
-{
-    mColormapRhiLayers.insert(layer);
-}
-
-void QCustomPlot::unregisterColormapRhiLayer(QCPColormapRhiLayer* layer)
-{
-    mColormapRhiLayers.remove(layer);
-}
-
 QSize QCustomPlot::rhiOutputSize() const
 {
     return renderTarget() ? renderTarget()->pixelSize() : QSize();
@@ -1475,7 +1464,6 @@ bool QCustomPlot::detach(QCPAbstractPlottable* plottable)
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     QCP_CHECK_OR_RETURN(mPlottables.contains(plottable), "the object is not in this plot", false);
     leaveSiblings(plottable);
-    plottable->releaseGpuResources();
     plottable->setPipelineScheduler(nullptr);
     for (QCPLegend* legend : findChildren<QCPLegend*>())
         plottable->removeFromLegend(legend);
@@ -2882,27 +2870,6 @@ void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
             it.value()->clear();
         }
     }
-    // Colormap quads are positioned in pixel coordinates by QCPColorMap2::draw().
-    // When the layer skips its repaint, draw() never runs, so the quad must be
-    // shifted by the same offset the compositor applies to the layer texture —
-    // otherwise the image stays at the previous range's position while the axes,
-    // grid and line graphs move (colormaps visibly lagging behind on a pan).
-    for (auto* crl : mColormapRhiLayers)
-    {
-        QCPLayer* layer = crl->layer();
-        if (!layer)
-            continue;
-        if (layer->canSkipRepaintForTranslation())
-        {
-            const QPointF offset = layer->pixelOffset();
-            crl->setPixelOffset(static_cast<float>(offset.x()),
-                                static_cast<float>(offset.y()));
-        }
-        else
-        {
-            crl->setPixelOffset(0.0f, 0.0f);
-        }
-    }
     // One frame for the layer paints below: an everyFrame() recording is rebuilt once for it, and
     // the queries made while painting it read what it built.
     ++mFrameEpoch;
@@ -3297,8 +3264,6 @@ void QCustomPlot::initialize(QRhiCommandBuffer* cb)
             prl->invalidatePipeline();
         for (auto* srl : mScatterRhiLayers)
             srl->invalidatePipeline();
-        for (auto* crl : mColormapRhiLayers)
-            crl->invalidatePipeline();
         if (mSpanRhiLayer)
             mSpanRhiLayer->invalidatePipeline();
         if (mGridRhiLayer)
@@ -3451,16 +3416,6 @@ void QCustomPlot::refreshLayerTranslationOffsets()
                                       static_cast<float>(offset.y()));
         }
     }
-    for (auto* crl : mColormapRhiLayers)
-    {
-        QCPLayer* layer = crl->layer();
-        if (layer && layer->canSkipRepaintForTranslation())
-        {
-            const QPointF offset = layer->pixelOffset();
-            crl->setPixelOffset(static_cast<float>(offset.x()),
-                                static_cast<float>(offset.y()));
-        }
-    }
 }
 
 void QCustomPlot::uploadLayerTextures(QRhiResourceUpdateBatch* updates, const QSize& outputSize)
@@ -3500,16 +3455,6 @@ void QCustomPlot::uploadLayerTextures(QRhiResourceUpdateBatch* updates, const QS
     {
         mCompositeUbo = mRhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 32);
         mCompositeUbo->create();
-    }
-
-    for (auto* crl : mColormapRhiLayers)
-    {
-        if (!crl->ownerVisible())
-            continue;
-        crl->ensurePipeline(renderTarget()->renderPassDescriptor(), sampleCount(),
-                            mCompositeUbo);
-        crl->uploadResources(updates, outputSize, mBufferDevicePixelRatio,
-                              mRhi->isYUpInNDC(), mCompositeUbo);
     }
 
     if (mSpanRhiLayer && mSpanRhiLayer->hasSpans())
@@ -3634,31 +3579,6 @@ void QCustomPlot::executeRenderPass(QRhiCommandBuffer* cb, QRhiResourceUpdateBat
             }
         }
 
-        // Draw colormap texture quads for this layer
-        bool hasColormapsOnLayer = false;
-        for (auto* crl : mColormapRhiLayers)
-        {
-            if (crl->layer() == layer && crl->hasContent() && crl->ownerVisible())
-            {
-                if (!hasColormapsOnLayer)
-                {
-                    hasColormapsOnLayer = true;
-                    struct {
-                        float translateX, translateY, viewportW, viewportH, yFlip;
-                    } zeroParams = {
-                        0.0f, 0.0f,
-                        float(outputSize.width()),
-                        float(outputSize.height()),
-                        mRhi->isYUpInNDC() ? -1.0f : 1.0f
-                    };
-                    QRhiResourceUpdateBatch* cmapUboUpdate = mRhi->nextResourceUpdateBatch();
-                    cmapUboUpdate->updateDynamicBuffer(mCompositeUbo, 0, sizeof(zeroParams), &zeroParams);
-                    cb->resourceUpdate(cmapUboUpdate);
-                }
-                crl->render(cb, outputSize);
-            }
-        }
-
         // Draw GPU plottable geometry for this layer (after its paint buffer)
         if (auto* prl = mPlottableRhiLayers.value(layer, nullptr))
         {
@@ -3736,11 +3656,6 @@ void QCustomPlot::releaseResources()
     mPlottableRhiLayers.clear();
     qDeleteAll(mScatterRhiLayers);
     mScatterRhiLayers.clear();
-    // Colormap RHI layers are owned by plottable renderers — release them so
-    // ensureRhiLayer() recreates with the new QRhi on next draw().
-    for (auto* plottable : std::as_const(mPlottables))
-        plottable->releaseGpuResources();
-    mColormapRhiLayers.clear();
     mPaintBuffers.clear();
     releaseCompositeResources();
     mRhi = nullptr;

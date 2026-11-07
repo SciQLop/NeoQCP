@@ -2,14 +2,14 @@
 #include "plottable-colormap.h" // for QCPColorMapData
 #include <core.h>
 #include <limits>
-#include <painting/painter.h>
+#include <painting/draw-context.h>
 #include <layoutelements/layoutelement-axisrect.h>
 #include <axis/axis.h>
 #include <datasource/histogram-binner.h>
 #include <Profiling.hpp>
 
 QCPHistogram2D::QCPHistogram2D(QCPAxis* keyAxis, QCPAxis* valueAxis)
-    : QCPAbstractColorMapped(keyAxis, valueAxis, true)
+    : QCPDrawn<QCPAbstractColorMapped>(keyAxis, valueAxis, true)
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
     , mRenderer(this)
 {
@@ -43,11 +43,6 @@ void QCPHistogram2D::refreshBinning()
 {
     installTransform();
     mPipeline.onDataChanged();
-}
-
-QCPHistogram2D::~QCPHistogram2D()
-{
-    mRenderer.releaseRhiLayer();
 }
 
 void QCPHistogram2D::installTransform()
@@ -296,38 +291,43 @@ void QCPHistogram2D::binForExport()
     binsChanged();
 }
 
-void QCPHistogram2D::draw(QCPPainter* painter)
+void QCPHistogram2D::draw(QCPDrawContext& context) const
 {
     PROFILE_HERE_N("QCPHistogram2D::draw");
     if (!mKeyAxis || !mValueAxis)
         return;
+    auto* self = const_cast<QCPHistogram2D*>(this);
     const bool staleScales = !binnedForTheAxisScales();
     if (staleScales)
-        queueRefreshBinning();
+        self->queueRefreshBinning();
 
-    const bool exporting = painter->modes().testFlag(QCPPainter::pmNoCaching);
-    if (exporting && (staleScales || !mPipeline.result() || mPipeline.isBusy()))
-        binForExport();
+    if (context.exporting() && (staleScales || !mPipeline.result() || mPipeline.isBusy()))
+        self->binForExport();
     // Not re-binned from here when there is nothing: no result with an idle pipeline means the
     // data bins to nothing, and a re-bin would loop through finished() -> replot -> draw.
     const auto* cells = shown();
     if (!cells)
         return;
 
-    const bool imageWasInvalidated = mRenderer.mapImageInvalidated();
-    if (imageWasInvalidated)
-        mRenderer.updateMapImage(cells);
-
-    if (mRenderer.mapImage().isNull())
+    if (self->mRenderer.mapImageInvalidated())
+        self->mRenderer.updateMapImage(cells);
+    const QImage& image = mRenderer.mapImage();
+    if (image.isNull())
         return;
 
     const QCPRange keyRange = cells->keyRange();
     const QCPRange valueRange = cells->valueRange();
-    // Before the renderer paints: the painter path draws the contour lines with the image.
-    mContours.update(cells, painter, imageWasInvalidated, mKeyAxis.data(), mValueAxis.data());
-    applyDefaultAntialiasingHint(painter);
-    mRenderer.draw(painter, mKeyAxis.data(), mValueAxis.data(), keyRange, valueRange);
-    mContours.drawLabels(cells, painter, mKeyAxis.data(), mValueAxis.data());
+    // Data corners, then the contours in data space: a pan moves both, a zoom stretches both.
+    context.image(QCP::Data { keyRange.lower, valueRange.upper },
+                  QCP::Data { keyRange.upper, valueRange.lower }, image, {}, false);
+    self->mContours.update(cells, context, dataScaleType(), mKeyAxis.data(), mValueAxis.data());
+}
+
+void QCPHistogram2D::drawLegendIcon(QCPDrawContext& icon) const
+{
+    // A gradient brush would be replayed in logical pixels, not fitted to the icon frame:
+    // colourise a swatch and let the fitted frame place it.
+    icon.image(QCP::Data { 0, 0 }, QCP::Data { 1, 1 }, const_cast<QCPColormapRenderer&>(mRenderer).gradientImage(32, 18));
 }
 
 void QCPHistogram2D::contoursChanged()
@@ -363,13 +363,6 @@ void QCPHistogram2D::setContourLabelEnabled(bool enabled)
     markDirty();
     mContours.setLabelsEnabled(enabled);
     contoursChanged();
-}
-
-void QCPHistogram2D::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
-{
-    painter->setBrush(QBrush(gradient().toLinearGradient(rect.topLeft(), rect.topRight())));
-    painter->setPen(Qt::NoPen);
-    painter->drawRect(rect);
 }
 
 QCPRange QCPHistogram2D::getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain) const

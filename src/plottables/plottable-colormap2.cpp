@@ -1,25 +1,21 @@
 #include "plottable-colormap2.h"
-#include <QFontMetricsF>
-#include <QPainterPath>
+#include <QImage>
 #include <QPointer>
-#include <QtMath>
 #include <algorithm>
 #include <cmath>
 #include <utility>
 #include "plottable-colormap.h" // for QCPColorMapData
 #include <core.h>
-#include <painting/painter.h>
-#include <painting/contour-extractor.h> // kept for QPainter export fallback
+#include <painting/draw-context.h>
 #include <layoutelements/layoutelement-axisrect.h>
 #include <axis/axis.h>
 #include <layer.h>
 #include <datasource/resample.h>
-#include <painting/viewport-offset.h>
 #include <Profiling.hpp>
 #include <cmath>
 
 QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
-    : QCPAbstractColorMapped(keyAxis, valueAxis, true)
+    : QCPDrawn<QCPAbstractColorMapped>(keyAxis, valueAxis, true)
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
     , mRenderer(this)
 {
@@ -35,6 +31,15 @@ QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
             });
     connect(&mPipeline, &QCPColormapPipeline::busyChanged,
             this, [this](bool) { updateEffectiveBusy(); });
+
+    // A resize changes the axis rect's pixel size with no axis signal: the sharper image would
+    // never be asked for (the recording is reused, so draw() is not called again on its own).
+    if (auto* plot = parentPlot())
+        connect(plot, &QCustomPlot::afterLayout, this, [this]
+        {
+            if (mPipeline.result() && resampledForAnotherSize())
+                queueViewportChange();
+        });
 
     followKeyAxisRectScale();
 }
@@ -54,11 +59,6 @@ void QCPColorMap2::followAxes()
                               this, &QCPColorMap2::onViewportChanged);
     }
     onViewportChanged(); // the resample was made for the old axes
-}
-
-QCPColorMap2::~QCPColorMap2()
-{
-    mRenderer.releaseRhiLayer();
 }
 
 // The transform runs on the scheduler's pool, possibly after this plottable is
@@ -240,35 +240,6 @@ void QCPColorMap2::queueViewportChange()
     }, Qt::QueuedConnection);
 }
 
-QPointF QCPColorMap2::stallPixelOffset() const
-{
-    // Only valid when there is a rendered image to shift and no fresher one is
-    // pending (a finished resample / data / gradient change must redraw, not
-    // translate the stale texture).
-    if (!mHasRenderedRange || !mKeyAxis || !mValueAxis
-        || mRenderer.mapImage().isNull() || mRenderer.mapImageInvalidated())
-        return {};
-
-    // Pure translation only: reject genuine zoom. Scale-aware so a pure pan on a
-    // log axis (which changes the linear range size) is not misread as a zoom.
-    if (qAbs(qcp::axisRangeSizeRatio(mKeyAxis.data(), mRenderedKeyRange) - 1.0) > 1e-4
-        || qAbs(qcp::axisRangeSizeRatio(mValueAxis.data(), mRenderedValueRange) - 1.0) > 1e-4)
-        return {};
-
-    const QPointF offset = qcp::computeViewportOffset(
-        mKeyAxis.data(), mValueAxis.data(), mRenderedKeyRange, mRenderedValueRange);
-
-    // Reject if panned beyond the axis rect (texture no longer covers viewport).
-    const bool keyVert = mKeyAxis->orientation() == Qt::Vertical;
-    const double keyDim = keyVert ? mKeyAxis->axisRect()->height() : mKeyAxis->axisRect()->width();
-    const double valDim = keyVert ? mKeyAxis->axisRect()->width() : mKeyAxis->axisRect()->height();
-    if (qAbs(keyVert ? offset.y() : offset.x()) > keyDim
-        || qAbs(keyVert ? offset.x() : offset.y()) > valDim)
-        return {};
-
-    return offset;
-}
-
 bool QCPColorMap2::canProduceContent() const
 {
     if (!mKeyAxis || !mValueAxis || !mDataSource)
@@ -276,105 +247,72 @@ bool QCPColorMap2::canProduceContent() const
     return mPipeline.result() != nullptr;
 }
 
-void QCPColorMap2::draw(QCPPainter* painter)
+void QCPColorMap2::draw(QCPDrawContext& context) const
 {
     PROFILE_HERE_N("QCPColorMap2::draw");
     if (!mKeyAxis || !mValueAxis)
         return;
 
-    auto* resampledData = mPipeline.result();
-    if (resampledData && resampledForAnotherSize())
+    auto* self = const_cast<QCPColorMap2*>(this);
+    const QCPColorMapData* resampledData = mPipeline.result();
+    if (resampledData && self->resampledForAnotherSize())
     {
         // A colormap made before its plot was laid out was resampled for a tiny axis rect, and
         // a resize changes no axis range: nothing else would ask for a sharper image.
-        if (painter->modes().testFlag(QCPPainter::pmNoCaching))
+        if (context.exporting())
         {
-            if (mPipeline.runSynchronously(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data())))
+            if (self->mPipeline.runSynchronously(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data())))
             {
                 // finished() only fires for async results
-                mRenderer.invalidateMapImage();
-                mContours.dataChanged();
+                self->mRenderer.invalidateMapImage();
+                self->mContours.dataChanged();
             }
         }
         else
-            queueViewportChange();
-        resampledData = mPipeline.result();
+            self->queueViewportChange();
+        resampledData = self->mPipeline.result();
     }
     if (!resampledData)
     {
         if (!mDataSource) return;
-        if (painter->modes().testFlag(QCPPainter::pmNoCaching))
+        if (context.exporting())
         {
-            // Export path: run transform synchronously since event loop is not pumped
-            if (!mPipeline.runSynchronously(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data())))
+            // Export path: run transform synchronously since the event loop is not pumped
+            if (!self->mPipeline.runSynchronously(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data())))
                 return;
-            mContours.dataChanged();
-            resampledData = mPipeline.result();
+            self->mContours.dataChanged();
+            resampledData = self->mPipeline.result();
             if (!resampledData) return;
         }
         else
         {
-            queueViewportChange();
+            self->queueViewportChange();
             return;
         }
     }
 
-    // The pipeline can still be holding a result computed for an older
-    // viewport (e.g. the user panned more than a screen-width while a slow
-    // resample was in flight, and stallPixelOffset() rejected the translate
-    // fast path as out-of-bounds -- see plottable-colormap2.h). Drawing that
-    // stale image would position it via the CURRENT axes using its OLD
-    // key/value range, which can land entirely outside the axis rect (a
-    // blank-looking plot) and would also corrupt the stallPixelOffset()
-    // baseline below. The colormap's GPU quad (QCPColormapRhiLayer) only
-    // ever updates from the mRenderer.draw() call below, so skipping it
-    // without also hiding the quad would freeze the LAST relevant frame on
-    // screen indefinitely -- it does not fade or reposition on its own as
-    // the axes keep moving. Hide it instead: no data belongs there anymore.
-    if (mHasRenderedRange)
-    {
-        const QCPRange dataKeyRange = resampledData->keyRange();
-        const QCPRange dataValueRange = resampledData->valueRange();
-        auto overlaps = [](const QCPRange& a, const QCPRange& b)
-        { return a.lower <= b.upper && b.lower <= a.upper; };
-        if (!overlaps(dataKeyRange, mKeyAxis->range())
-            || !overlaps(dataValueRange, mValueAxis->range()))
-        {
-            mRenderer.clearRhiContent();
-            return;
-        }
-    }
-
-    bool imageWasInvalidated = mRenderer.mapImageInvalidated();
-    if (imageWasInvalidated)
-        mRenderer.updateMapImage(resampledData);
-
-    if (mRenderer.mapImage().isNull())
+    if (self->mRenderer.mapImageInvalidated())
+        self->mRenderer.updateMapImage(resampledData);
+    const QImage& image = mRenderer.mapImage();
+    if (image.isNull())
         return;
 
-    QCPRange keyRange = resampledData->keyRange();
-    QCPRange valRange = resampledData->valueRange();
+    const QCPRange keyRange = resampledData->keyRange();
+    const QCPRange valRange = resampledData->valueRange();
 
-    // Contours are (re)built BEFORE the renderer paints: the QPainter path
-    // (exports, non-RHI compositing) draws the fallback lines inline, so
-    // populating them after mRenderer.draw() would miss this frame.
-    mContours.update(resampledData, painter, imageWasInvalidated, mKeyAxis.data(), mValueAxis.data());
-
-    applyDefaultAntialiasingHint(painter);
-    mRenderer.draw(painter, mKeyAxis.data(), mValueAxis.data(), keyRange, valRange);
-    mContours.drawLabels(resampledData, painter, mKeyAxis.data(), mValueAxis.data());
-
-    // Baseline for stallPixelOffset: the axes this image was just drawn against.
-    mRenderedKeyRange = mKeyAxis->range();
-    mRenderedValueRange = mValueAxis->range();
-    mHasRenderedRange = true;
+    // The grid carries its own data corners, so a pan moves the texture and a zoom stretches it:
+    // the picture on a linear and on a log value axis alike. Contours are recorded after it, so
+    // they draw over it in the same recording.
+    context.image(QCP::Data { keyRange.lower, valRange.upper },
+                  QCP::Data { keyRange.upper, valRange.lower }, image, {}, false);
+    self->mContours.update(resampledData, context, dataScaleType(), mKeyAxis.data(), mValueAxis.data());
 }
 
-void QCPColorMap2::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
+void QCPColorMap2::drawLegendIcon(QCPDrawContext& icon) const
 {
-    painter->setBrush(QBrush(gradient().toLinearGradient(rect.topLeft(), rect.topRight())));
-    painter->setPen(Qt::NoPen);
-    painter->drawRect(rect);
+    // A gradient brush would be replayed in logical pixels, not fitted to the icon frame:
+    // colourise a swatch and let the fitted frame place it.
+    icon.image(QCP::Data { 0, 0 }, QCP::Data { 1, 1 }, const_cast<QCPColormapRenderer&>(mRenderer).gradientImage(32, 18));
 }
 
 QCPRange QCPColorMap2::getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain) const

@@ -1,9 +1,10 @@
 #include <QPainterPath>
 #include "test-colormap.h"
 #include <QMainWindow>
-#include <painting/colormap-rhi-layer.h>
 #include <painting/contour-extractor.h>
 #include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
+#include <algorithm>
+#include <cmath>
 #include <limits>
 #include <QDir>
 #include <painting/draw-commands.h>
@@ -274,88 +275,6 @@ void TestColorMap::QCPColorMap2_contourSettersScheduleReplot()
   }
 }
 
-void TestColorMap::QCPColorMapRhiLayer_setImageSkipsRedundantUpload()
-{
-  // draw() calls setImage() on every replot, even when the resample result
-  // hasn't changed (e.g. interactive zoom while the pipeline is still
-  // computing). Re-uploading an unchanged staging image wastes a full
-  // texture upload (up to ~4x the axis rect per dimension) every such call.
-  mPlot->show();
-  if (!QTest::qWaitForWindowExposed(mPlot))
-    QSKIP("window not exposed in this environment");
-  QCoreApplication::processEvents();
-  QRhi* rhi = mPlot->rhi();
-  if (!rhi)
-    QSKIP("no QRhi available in this environment");
-
-  auto* ubo = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 32);
-  QVERIFY(ubo->create());
-
-  QCPColormapRhiLayer layer(rhi);
-  QImage img(64, 64, QImage::Format_RGBA8888);
-  img.fill(Qt::red);
-
-  layer.setImage(img);
-  QVERIFY(layer.textureUploadPending());
-
-  auto* batch = rhi->nextResourceUpdateBatch();
-  layer.uploadResources(batch, QSize(400, 300), 1.0f, rhi->isYUpInNDC(), ubo);
-  batch->release();
-  QVERIFY(!layer.textureUploadPending());
-
-  // Re-submitting the exact same (unchanged) staging image must not
-  // schedule another upload.
-  layer.setImage(img);
-  QVERIFY(!layer.textureUploadPending());
-
-  // A genuinely new image must still be uploaded.
-  QImage img2(64, 64, QImage::Format_RGBA8888);
-  img2.fill(Qt::blue);
-  layer.setImage(img2);
-  QVERIFY(layer.textureUploadPending());
-
-  delete ubo;
-}
-
-void TestColorMap::QCPColorMapRhiLayer_oversizedImageDoesNotAbort()
-{
-  // Production crash (SciQLop, real Metal on macOS): a colormap wide/tall enough
-  // in physical pixels -- the resample clamp in QCPColorMap2::installResampleTransform
-  // allows up to plotWidthPx*4 (itself capped at only 32768, already above Metal's
-  // 16384 max 2D texture dimension) -- produced a staging image whose size exceeded
-  // the RHI backend's max texture size. ensureTexture() handed that QSize straight to
-  // QRhi::newTexture(), and on Metal an invalid descriptor aborts the whole process
-  // inside the platform's own validation layer instead of QRhiTexture::create()
-  // returning false the way the rest of ensureTexture() assumes.
-  mPlot->show();
-  if (!QTest::qWaitForWindowExposed(mPlot))
-    QSKIP("window not exposed in this environment");
-  QCoreApplication::processEvents();
-  QRhi* rhi = mPlot->rhi();
-  if (!rhi)
-    QSKIP("no QRhi available in this environment");
-
-  const int maxSize = rhi->resourceLimit(QRhi::TextureSizeMax);
-  QVERIFY(maxSize > 0);
-
-  auto* ubo = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 32);
-  QVERIFY(ubo->create());
-
-  QCPColormapRhiLayer layer(rhi);
-  QImage img(maxSize + 8, 2, QImage::Format_RGBA8888);
-  img.fill(Qt::red);
-  layer.setImage(img);
-
-  auto* batch = rhi->nextResourceUpdateBatch();
-  layer.uploadResources(batch, QSize(400, 300), 1.0f, rhi->isYUpInNDC(), ubo);
-  batch->release();
-
-  // The whole point: reaching this line without the process aborting IS the pass.
-  QVERIFY(true);
-
-  delete ubo;
-}
-
 void TestColorMap::QCPColorMap2_hidesStaleQuadWhenPannedPastData()
 {
   // Regression: once panning moves the axes far enough that the last
@@ -386,8 +305,8 @@ void TestColorMap::QCPColorMap2_hidesStaleQuadWhenPannedPastData()
   mPlot->replot();
   QCoreApplication::processEvents();
 
-  QVERIFY2(cm->rhiLayer() && cm->rhiLayer()->hasContent(),
-           "sanity: a real resample should have produced GPU quad content");
+  QVERIFY2(cm->mCore.recordedCommandCount() > 0,
+           "sanity: a real resample should have recorded the image");
 
   // Pan to a same-size range (pure pan, not a zoom) sharing no overlap with
   // the data at all, then replot immediately -- before any fresh (empty,
@@ -396,8 +315,15 @@ void TestColorMap::QCPColorMap2_hidesStaleQuadWhenPannedPastData()
   mPlot->xAxis->setRange(1000, 1004);
   mPlot->replot();
 
-  QVERIFY2(!cm->rhiLayer()->hasContent(),
-           "stale, non-overlapping GPU quad content must be hidden, not left frozen on screen");
+  // The image carries the grid's data corners, not a pixel rect: the old grid now lies
+  // outside the axes, so the stale picture cannot be frozen over them.
+  const auto* image = std::get_if<qcp::ImageCmd>(&cm->mCore.recordedList().commands.front());
+  QVERIFY2(image, "the grid is recorded as an image");
+  const auto* a = std::get_if<QCP::Data>(&image->a);
+  const auto* b = std::get_if<QCP::Data>(&image->b);
+  QVERIFY(a && b);
+  QVERIFY2(std::max(a->x, b->x) < mPlot->xAxis->range().lower,
+           "the stale grid must lie outside the panned axes, where nothing can show it");
 }
 
 void TestColorMap::QCPContourExtractor_extractUvKeepsSourceRegistration()
@@ -479,12 +405,13 @@ int countRedPixels(const QImage& img)
 {
   int red = 0;
   for (int py = 0; py < img.height(); ++py)
-  {
-    const QRgb* row = reinterpret_cast<const QRgb*>(img.constScanLine(py));
     for (int px = 0; px < img.width(); ++px)
-      if (qRed(row[px]) > 200 && qGreen(row[px]) < 100 && qBlue(row[px]) < 100)
+    {
+      // pixelColor() honours the image format: a grabFramebuffer() image is not ARGB32.
+      const QColor c = img.pixelColor(px, py);
+      if (c.red() > 200 && c.green() < 100 && c.blue() < 100)
         ++red;
-  }
+    }
   return red;
 }
 
@@ -510,9 +437,9 @@ QString referenceImagePath(const QString& name)
 
 void TestColorMap::QCPColorMap2_contourMirrorsReversedAxis()
 {
-  // z = x on a 5x5 grid, level at 1.0 -> vertical line at u = 0.25.
-  // Reversing the key axis flips the image; the contour UVs must mirror
-  // (u -> 1-u) instead of staying reflected against it.
+  // z = x on a 5x5 grid, level at 1.0 -> a vertical line at x = 1. The lines live in data
+  // space: reversing the key axis is the replay's business. The recording must be reused as
+  // it is, and the line follows the mirrored image because both carry the same data corners.
   mPlot->resize(400, 300);
   mPlot->xAxis->setRange(0, 4);
   mPlot->yAxis->setRange(0, 4);
@@ -531,27 +458,37 @@ void TestColorMap::QCPColorMap2_contourMirrorsReversedAxis()
   QTest::qWait(50);
   mPlot->replot();
 
-  const QVector<float> plain = cm->lastContourUv();
-  QVERIFY2(!plain.isEmpty(), "sanity: level must produce contour vertices");
+  const auto lines = [](const QCPDrawnCore& core)
+  {
+    std::vector<std::vector<QPointF>> out;
+    for (const auto& command : core.recordedList().commands)
+      if (const auto* line = std::get_if<qcp::PolylineDataCmd>(&command))
+        out.push_back(*line->points);
+    return out;
+  };
+  const auto plain = lines(cm->mCore);
+  QVERIFY2(!plain.empty(), "sanity: the level must record contour points");
+  const quint64 recordings = cm->mCore.recordingCount();
 
-  // setRangeReversed() emits no signal: this replot reaches draw() with a
-  // valid cache, so only the reversal polling can trigger the rebuild.
-  // The resampled field from sparse points is a staircase (exact contour
-  // positions are resampler-dependent), so assert the mirror relationship
-  // itself: every u maps to 1-u, every v is unchanged.
+  // setRangeReversed() emits no signal: the replot reuses the recording, the transform mirrors it.
   mPlot->xAxis->setRangeReversed(true);
   mPlot->replot();
 
-  const QVector<float> mirrored = cm->lastContourUv();
-  QCOMPARE(mirrored.size(), plain.size());
-  for (qsizetype i = 0; i < mirrored.size(); i += 2)
+  QVERIFY2(mPlot->xAxis->rangeReversed(), "sanity: the key axis is reversed");
+  QCOMPARE(cm->mCore.recordingCount(), recordings);
+  const auto reversed = lines(cm->mCore);
+  QCOMPARE(reversed.size(), plain.size());
+  const auto samePoint = [](const QPointF& l, const QPointF& r)
   {
-    QVERIFY2(qAbs(double(mirrored[i]) - (1.0 - double(plain[i]))) < 1e-6,
-             qPrintable(QString("u=%1, expected %2 after reversal")
-                            .arg(double(mirrored[i]))
-                            .arg(1.0 - double(plain[i]))));
-    QVERIFY2(qAbs(double(mirrored[i + 1]) - double(plain[i + 1])) < 1e-6,
-             "v must be unchanged by a key-axis reversal");
+    if (std::isnan(l.x()) && std::isnan(r.x()))
+      return std::isnan(l.y()) && std::isnan(r.y());
+    return l == r;
+  };
+  for (size_t i = 0; i < plain.size(); ++i)
+  {
+    QCOMPARE(reversed[i].size(), plain[i].size());
+    QVERIFY2(std::equal(reversed[i].cbegin(), reversed[i].cend(), plain[i].cbegin(), samePoint),
+             "data-space contour points must not be mirrored");
   }
 }
 
@@ -712,7 +649,14 @@ void TestColorMap::QCPColorMap2_contourDegenerateDataClearsLines()
   QTRY_VERIFY_WITH_TIMEOUT(!cm->pipeline().isBusy(), 2000);
   QTest::qWait(50);
   mPlot->replot();
-  QVERIFY2(!cm->lastContourUv().isEmpty(), "sanity: levels must produce contour vertices");
+  const auto lineCount = [](const QCPDrawnCore& core)
+  {
+    int count = 0;
+    for (const auto& command : core.recordedList().commands)
+      count += std::get_if<qcp::PolylineDataCmd>(&command) != nullptr;
+    return count;
+  };
+  QVERIFY2(lineCount(cm->mCore) > 0, "sanity: levels must record contour lines");
 
   // Constant data has degenerate bounds (lower == upper): the rebuild must
   // clear the previously built lines instead of leaving them stale.
@@ -721,7 +665,7 @@ void TestColorMap::QCPColorMap2_contourDegenerateDataClearsLines()
   QTRY_VERIFY_WITH_TIMEOUT(!cm->pipeline().isBusy(), 2000);
   QTest::qWait(50);
   mPlot->replot();
-  QVERIFY2(cm->lastContourUv().isEmpty(), "degenerate data must clear stale contour lines");
+  QVERIFY2(lineCount(cm->mCore) == 0, "degenerate data must clear stale contour lines");
   QVERIFY2(cm->lastContourLevels().isEmpty(), "degenerate data must clear resolved levels");
 }
 
@@ -793,8 +737,10 @@ void TestColorMap::QCPColorMap2_contourExportAfterRhiDraw()
   cm->setContourPen(QPen(Qt::red, 2));
   settleColorMap(mPlot, cm);
   QCoreApplication::processEvents();
-  QVERIFY2(cm->rhiLayer() && cm->rhiLayer()->hasContent(),
-           "sanity: on-screen RHI draw must have produced GPU content");
+  int recordedLines = 0;
+  for (const auto& command : cm->mCore.recordedList().commands)
+    recordedLines += std::get_if<qcp::PolylineDataCmd>(&command) != nullptr;
+  QVERIFY2(recordedLines > 0, "sanity: the on-screen draw must have recorded the lines");
 
   const QPixmap pm = mPlot->toPixmap();
   QVERIFY(!pm.isNull());
@@ -809,8 +755,8 @@ void TestColorMap::QCPColorMap2_contourExportCachesFallback()
   // painter-drawn plottables at the end of the layer's pass, as on screen. This
   // test is about the color map 2, so keep the fixture's classic map out.
   mColorMap->setVisible(false);
-  // Repeated exports of one frame must reuse the cached fallback segments,
-  // not re-march the full grid on every paint pass.
+  // Repeated exports of one frame must reuse the export recording, not re-march the full grid
+  // on every paint pass. The first export makes it (the screen one is only 300 cells wide).
   mPlot->resize(400, 300);
   mPlot->xAxis->setRange(0, 4);
   mPlot->yAxis->setRange(0, 4);
@@ -824,26 +770,13 @@ void TestColorMap::QCPColorMap2_contourExportCachesFallback()
   cm->setData(x, y, z);
   cm->setContourLevels({1.0, 2.0, 3.0});
   cm->setContourPen(QPen(Qt::red, 2));
-  // Settle to true quiescence: setData/replot can leave several chained
-  // pipeline jobs (each finished() bumps the contour data generation), so
-  // repeat until a full settle round neither builds nor leaves work behind.
-  // Otherwise a trailing job could land mid-export and legitimately rebuild.
-  for (int i = 0; i < 20; ++i)
-  {
-    const uint64_t roundBefore = cm->fallbackBuildCount();
-    settleColorMap(mPlot, cm);
-    QTRY_VERIFY_WITH_TIMEOUT(!cm->pipeline().isBusy(), 2000);
-    if (cm->fallbackBuildCount() == roundBefore)
-      break;
-  }
+  settleColorMap(mPlot, cm);
   QTRY_VERIFY_WITH_TIMEOUT(!cm->pipeline().isBusy(), 2000);
 
-  QVERIFY2(cm->fallbackBuildCount() >= 1, "sanity: settling must have built the lines once");
-  // The first export marches the grid at full resolution, later ones reuse it.
   const QImage img1 = mPlot->toPixmap().toImage();
-  const uint64_t buildsBefore = cm->fallbackBuildCount();
+  const quint64 recordings = cm->mCore.recordingCount();
   const QImage img2 = mPlot->toPixmap().toImage();
-  QCOMPARE(cm->fallbackBuildCount(), buildsBefore);
+  QCOMPARE(cm->mCore.recordingCount(), recordings);
   QVERIFY2(countRedPixels(img1) > 50, "export must draw contour lines");
   QVERIFY(img1 == img2);
 }
@@ -1204,7 +1137,7 @@ void TestColorMap::QCPColorMap2_contourLabelsShowOnTheGpuFrame()
   cm->setContourLevels({1.0, 2.0, 3.0});
   cm->setContourPen(QPen(Qt::red, 1));
   settleColorMap(mPlot, cm);
-  QVERIFY2(cm->rhiLayer() && cm->rhiLayer()->hasContent(), "sanity: the image is on the GPU");
+  QVERIFY2(cm->mCore.recordedCommandCount() > 0, "sanity: the image is recorded");
 
   mPlot->replot(QCustomPlot::rpImmediateRefresh);
   const QImage without = mPlot->grabFramebuffer();
@@ -1240,7 +1173,11 @@ QCPColorMap2* contouredGpuMap(QCustomPlot* plot)
       z[ki * n + vi] = x[ki];
   auto* cm = new QCPColorMap2(plot->xAxis, plot->yAxis);
   cm->setData(x, y, z);
+  // A grayscale image and a red pen: red pixels are the contour lines, nothing else.
+  cm->setGradient(QCPColorGradient::gpGrayscale);
+  cm->setDataRange(QCPRange(0, 4));
   cm->setContourLevels({1.0, 2.0, 3.0});
+  cm->setContourPen(QPen(Qt::red, 2));
   settleColorMap(plot, cm);
   return cm;
 }
@@ -1253,14 +1190,13 @@ void TestColorMap::QCPColorMap2_contourLinesComeBackAfterAPanAwayAndBack()
   auto* cm = contouredGpuMap(mPlot);
   if (!cm)
     QSKIP("no QRhi available in this environment");
-  QVERIFY2(cm->rhiLayer()->contourVertexCount() > 0, "sanity: the lines are on the GPU");
+  QVERIFY2(countRedPixels(mPlot->grabFramebuffer()) > 20, "sanity: the lines are drawn");
   mPlot->xAxis->setRange(1000, 1004);
   mPlot->replot();
-  QVERIFY2(!cm->rhiLayer()->hasContent(), "sanity: the stale quad is hidden");
+  QVERIFY2(countRedPixels(mPlot->grabFramebuffer()) < 20, "nothing stale draws over the panned axes");
   mPlot->xAxis->setRange(0, 4);
   mPlot->replot();
-  QVERIFY2(cm->rhiLayer()->hasContent(), "sanity: the image is back");
-  QVERIFY2(cm->rhiLayer()->contourVertexCount() > 0, "the contour lines must be back too");
+  QVERIFY2(countRedPixels(mPlot->grabFramebuffer()) > 20, "the contour lines must be back with the image");
 }
 
 // The label overlay is a full axis-rect texture: a repaint that changes nothing must not upload it.
@@ -1271,11 +1207,12 @@ void TestColorMap::QCPColorMap2_unchangedLabelsAreNotUploadedAgain()
     QSKIP("no QRhi available in this environment");
   cm->setContourLabelEnabled(true);
   mPlot->replot(QCustomPlot::rpImmediateRefresh);
-  mPlot->grabFramebuffer(); // renders, so the pending upload is done
-  QVERIFY2(cm->rhiLayer()->hasOverlay() && !cm->rhiLayer()->overlayUploadPending(), "sanity");
+  mPlot->grabFramebuffer(); // renders, so the labels are recorded
+  QVERIFY(!cm->lastContourLabels().isEmpty());
+  const quint64 recordings = cm->mCore.recordingCount();
   cm->layer()->markDirty();
   mPlot->replot(QCustomPlot::rpImmediateRefresh);
-  QVERIFY2(!cm->rhiLayer()->overlayUploadPending(), "unchanged labels were uploaded again");
+  QCOMPARE(cm->mCore.recordingCount(), recordings);
   QVERIFY(!cm->lastContourLabels().isEmpty());
 }
 
@@ -1630,4 +1567,231 @@ void TestColorMap::theHotCellLandsInItsCornerOnEveryAxisLayout()
     keyAxis->setRangeReversed(false);
     valueAxis->setRangeReversed(false);
   }
+}
+
+void TestColorMap::colourMap2IsOneImageCommand()
+{
+  mColorMap->setVisible(false);
+  mPlot->resize(400, 300);
+  mPlot->xAxis->setRange(0, 4);
+  mPlot->yAxis->setRange(0, 4);
+  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  std::vector<double> x = { 0, 1, 2, 3, 4 };
+  std::vector<double> y = { 0, 1, 2, 3, 4 };
+  std::vector<double> z(25);
+  for (int i = 0; i < 25; ++i)
+    z[i] = i;
+  cm->setData(x, y, z);
+  settleColorMap(mPlot, cm);
+
+  const QCPColorMapData* result = cm->pipeline().result();
+  QVERIFY(result);
+  QCOMPARE(cm->mCore.recordedCommandCount(), 1);
+  const auto& commands = cm->mCore.recordedList().commands;
+  QCOMPARE(int(commands.size()), 1);
+  const auto* image = std::get_if<qcp::ImageCmd>(&commands.front());
+  QVERIFY2(image, "the resampled grid is one image command");
+  QVERIFY(image->pixels && !image->pixels->image.isNull());
+  QVERIFY2(!image->pixels->smooth, "a colour map draws its cells nearest-neighbour");
+  const auto* a = std::get_if<QCP::Data>(&image->a);
+  const auto* b = std::get_if<QCP::Data>(&image->b);
+  QVERIFY2(a && b, "the grid carries its own data corners, not a pixel quad");
+  QCOMPARE(a->x, result->keyRange().lower);
+  QCOMPARE(a->y, result->valueRange().upper);
+  QCOMPARE(b->x, result->keyRange().upper);
+  QCOMPARE(b->y, result->valueRange().lower);
+}
+
+// A pan over the same-size window asks for no new resample and no new binning: the colourisation
+// stays the one the first result produced, and the recording is replayed, not rebuilt.
+void TestColorMap::aPanDoesNotRecolour()
+{
+  mColorMap->setVisible(false);
+  mPlot->resize(400, 300);
+  mPlot->xAxis->setRange(0, 4);
+  mPlot->yAxis->setRange(0, 4);
+
+  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  std::vector<double> x(50), y(50);
+  std::vector<double> z(2500);
+  for (int i = 0; i < 50; ++i)
+  {
+    x[i] = i / 49.0 * 100.0;
+    y[i] = i / 49.0 * 100.0;
+    for (int j = 0; j < 50; ++j)
+      z[i * 50 + j] = std::sin(i * 0.3) + std::cos(j * 0.3);
+  }
+  cm->setData(x, y, z);
+  settleColorMap(mPlot, cm);
+  const int builds = cm->mRenderer.buildCount();
+  const quint64 recordings = cm->mCore.recordingCount();
+  // A pan moves the axes of an existing recording: it must not recolour. (Should a resample
+  // land later, the pipeline result marks the recording stale; that is the result, not the pan.)
+  for (int step = 1; step <= 5; ++step)
+  {
+    mPlot->xAxis->setRange(step, step + 4);
+    mPlot->replot();
+  }
+  QCOMPARE(cm->mRenderer.buildCount(), builds);
+  QCOMPARE(cm->mCore.recordingCount(), recordings);
+  QTRY_VERIFY_WITH_TIMEOUT(!cm->pipeline().isBusy(), 2000);
+
+  auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
+  std::vector<double> keys(5000), values(5000);
+  for (int i = 0; i < 5000; ++i)
+  {
+    keys[i] = std::fmod(i * 0.61803398875, 1.0) * 100.0;
+    values[i] = std::fmod(i * 0.75487766625, 1.0) * 100.0;
+  }
+  hist->setBins(20, 20);
+  hist->setData(std::move(keys), std::move(values));
+  mPlot->replot();
+  QTRY_VERIFY_WITH_TIMEOUT(!hist->pipeline().isBusy(), 2000);
+  QTest::qWait(50);
+  mPlot->replot();
+  const int histBuilds = hist->mRenderer.buildCount();
+  const quint64 histRecordings = hist->mCore.recordingCount();
+  for (int step = 1; step <= 5; ++step)
+  {
+    mPlot->xAxis->setRange(step * 10, step * 10 + 20);
+    mPlot->replot();
+  }
+  QCOMPARE(hist->mRenderer.buildCount(), histBuilds);
+  QCOMPARE(hist->mCore.recordingCount(), histRecordings);
+  QTRY_VERIFY_WITH_TIMEOUT(!hist->pipeline().isBusy(), 2000);
+}
+
+// Each contour level is one polyline of data points, its segments NaN-separated, drawn over the
+// image in the same recording.
+void TestColorMap::contoursAreDataPolylines()
+{
+  mColorMap->setVisible(false);
+  mPlot->resize(400, 300);
+  mPlot->xAxis->setRange(0, 4);
+  mPlot->yAxis->setRange(0, 4);
+  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  std::vector<double> x = { 0, 1, 2, 3, 4 };
+  std::vector<double> y = { 0, 1, 2, 3, 4 };
+  std::vector<double> z(25);
+  for (int i = 0; i < 25; ++i)
+    z[i] = i % 5;
+  cm->setData(x, y, z);
+  cm->setContourLevels({ 1.0, 2.0, 3.0 });
+  cm->setContourPen(QPen(Qt::red, 2));
+  settleColorMap(mPlot, cm);
+
+  int images = 0, lines = 0;
+  bool nanSeparates = false;
+  for (const auto& command : cm->mCore.recordedList().commands)
+  {
+    if (std::get_if<qcp::ImageCmd>(&command))
+      ++images;
+    const auto* line = std::get_if<qcp::PolylineDataCmd>(&command);
+    if (!line)
+      continue;
+    ++lines;
+    QVERIFY(line->points && !line->points->empty());
+    for (const QPointF& point : *line->points)
+    {
+      if (std::isnan(point.x()))
+      {
+        nanSeparates = true;
+        continue;
+      }
+      QVERIFY2(point.x() >= -1e-9 && point.x() <= 4 + 1e-9, "contour points are keys");
+      QVERIFY2(point.y() >= -1e-9 && point.y() <= 4 + 1e-9, "contour points are values");
+    }
+  }
+  QCOMPARE(images, 1);
+  QCOMPARE(lines, 3);
+  QVERIFY2(nanSeparates, "segments of one level are separated by a NaN");
+}
+
+// The lines are GPU commands recorded after the image: on a screen they must land on top of it.
+void TestColorMap::contoursDrawOverTheImageOnTheGpu()
+{
+  mPlot->show();
+  if (!QTest::qWaitForWindowExposed(mPlot))
+    QSKIP("window not exposed in this environment");
+  QCoreApplication::processEvents();
+  if (!mPlot->rhi())
+    QSKIP("no QRhi available in this environment");
+  mColorMap->setVisible(false);
+  mPlot->resize(400, 300);
+  mPlot->xAxis->setRange(0, 4);
+  mPlot->yAxis->setRange(0, 4);
+
+  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  std::vector<double> x(41), y(41);
+  std::vector<double> z(41 * 41);
+  for (int i = 0; i < 41; ++i)
+  {
+    x[i] = i / 10.0;
+    y[i] = i / 10.0;
+    for (int j = 0; j < 41; ++j)
+      z[i * 41 + j] = i / 10.0;
+  }
+  cm->setData(x, y, z);
+  cm->setGradient(QCPColorGradient::gpGrayscale);
+  cm->setDataRange(QCPRange(0, 4));
+  cm->setContourLevels({ 1.0, 2.0, 3.0 });
+  cm->setContourPen(QPen(Qt::red, 2));
+  settleColorMap(mPlot, cm);
+
+  const QImage frame = mPlot->grabFramebuffer();
+  QVERIFY2(countRedPixels(frame) > 20,
+      "the contour lines must be drawn over the colour map on the GPU frame");
+}
+
+// An export before the first bin landed still bins synchronously and draws the image.
+void TestColorMap::histogram2DExportBeforeTheFirstBinHasTheImage()
+{
+  mColorMap->setVisible(false);
+  mPlot->resize(400, 300);
+  mPlot->xAxis->setRange(0, 100);
+  mPlot->yAxis->setRange(0, 100);
+  auto* hist = new QCPHistogram2D(mPlot->xAxis, mPlot->yAxis);
+  std::vector<double> keys(2000), values(2000);
+  for (int i = 0; i < 2000; ++i)
+  {
+    keys[i] = std::fmod(i * 0.61803398875, 1.0) * 100.0;
+    values[i] = std::fmod(i * 0.75487766625, 1.0) * 100.0;
+  }
+  hist->setBins(20, 20);
+  hist->setData(std::move(keys), std::move(values));
+
+  // No replot, no wait: the export itself must run the binning.
+  const QImage image = mPlot->toPixmap().toImage();
+  QVERIFY(hist->mCore.recordedCommandCount() >= 1);
+  const auto& commands = hist->mCore.recordedList().commands;
+  const auto* cmd = std::get_if<qcp::ImageCmd>(&commands.front());
+  QVERIFY2(cmd, "the export records the binned grid as an image");
+  QVERIFY(!cmd->pixels->image.isNull());
+  const QRect area = mPlot->axisRect()->rect();
+  QVERIFY2(image.pixelColor(area.center()) != image.pixelColor(QPoint(2, 2)),
+      "the export draws the binned image");
+}
+
+// The image is a data-space command of the generic plottable layer; no colour-map layer exists.
+void TestColorMap::noColourMapLayerIsCreated()
+{
+  mColorMap->setVisible(false);
+  mPlot->resize(400, 300);
+  mPlot->xAxis->setRange(0, 4);
+  mPlot->yAxis->setRange(0, 4);
+  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  std::vector<double> x = { 0, 1, 2, 3, 4 };
+  std::vector<double> y = { 0, 1, 2, 3, 4 };
+  std::vector<double> z(25, 1.0);
+  cm->setData(x, y, z);
+  settleColorMap(mPlot, cm);
+
+  const auto& commands = cm->mCore.recordedList().commands;
+  QVERIFY(!commands.empty());
+  const qcp::CommandKind kind = qcp::commandKind(commands.front());
+  QVERIFY2(kind.gpu && kind.dataOnly,
+      "the image is a data-space GPU command of the generic plottable layer");
+  for (QObject* child : mPlot->findChildren<QObject*>())
+    QVERIFY2(QString::fromLatin1(child->metaObject()->className()) != "QCPColormapRhiLayer",
+        "no dedicated colour-map layer may be created");
 }

@@ -14,6 +14,7 @@
 #include <future>
 #include <limits>
 #include <optional>
+#include <painting/draw-commands.h>
 #include <plottables/plottable-colormap.h>
 #include <plottables/plottable-colormap2.h>
 #include <plottables/plottable-graph2.h>
@@ -4026,6 +4027,15 @@ QCPHistogram2D* bumpHistogram(QCustomPlot* plot)
     return hist;
 }
 
+//! How many contour lines the last recording holds, one polyline per level.
+int recordedContourLines(const QCPDrawnCore& core)
+{
+    int lines = 0;
+    for (const auto& command : core.recordedList().commands)
+        lines += std::get_if<qcp::PolylineDataCmd>(&command) != nullptr;
+    return lines;
+}
+
 int redPixels(const QImage& img)
 {
     int red = 0;
@@ -4051,7 +4061,7 @@ void TestPipeline::histogram2dContoursFollowTheCounts()
     hist->setContourPen(QPen(Qt::red, 2));
     const QImage with = mPlot->toPixmap().toImage();
     QCOMPARE(hist->lastContourLevels(), (QVector<double> { 3.0, 6.0 }));
-    QVERIFY(!hist->lastContourUv().isEmpty());
+    QVERIFY2(recordedContourLines(hist->mCore) == 2, "one polyline per contour level");
     QVERIFY2(redPixels(without) == 0 && redPixels(with) > 50,
              qPrintable(QString("red pixels: %1 without, %2 with").arg(redPixels(without)).arg(redPixels(with))));
 }
@@ -4069,7 +4079,7 @@ void TestPipeline::histogram2dContoursFollowTheNormalizedCounts()
     QCOMPARE(levels.size(), 3);
     for (double level : levels)
         QVERIFY2(level > 0 && level < 1, qPrintable(QString("level %1 is not a column fraction").arg(level)));
-    QVERIFY(!hist->lastContourUv().isEmpty());
+    QVERIFY2(recordedContourLines(hist->mCore) == 3, "one polyline per auto level");
 }
 
 // Auto levels change with the colour scale type, which does not re-bin: the labels must follow.

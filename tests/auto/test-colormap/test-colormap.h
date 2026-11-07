@@ -18,8 +18,6 @@ private slots:
   void QCPHistogram2D_legendIconShowsTheGradient();
   void QCPColorMap2_selectTestMissReturnsNegativeOne();
   void QCPColorMap2_contourSettersScheduleReplot();
-  void QCPColorMapRhiLayer_setImageSkipsRedundantUpload();
-  void QCPColorMapRhiLayer_oversizedImageDoesNotAbort();
   void QCPColorMap2_hidesStaleQuadWhenPannedPastData();
   void QCPContourExtractor_extractUvKeepsSourceRegistration();
   void QCPColorMapData_recalculateDataBoundsSkipsInfinite();
@@ -55,6 +53,12 @@ private slots:
   void QCPColorMap2_rescaleKeepsItsViewMeaning();
   void QCPColorMap_rescaleThroughTheBaseRecalculates();
   void colourMapIsOneImageCommand();
+  void colourMap2IsOneImageCommand();
+  void aPanDoesNotRecolour();
+  void contoursAreDataPolylines();
+  void contoursDrawOverTheImageOnTheGpu();
+  void histogram2DExportBeforeTheFirstBinHasTheImage();
+  void noColourMapLayerIsCreated();
   void verticalKeyAxisMapMatchesTheExport();
   void tightBoundaryCropsHalfACell();
   void aPanDoesNotRebuildTheImage();

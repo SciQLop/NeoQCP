@@ -174,7 +174,6 @@ public:
     virtual QCPPlottableInterface1D* interface1D() { return nullptr; }
 
     virtual QPointF stallPixelOffset() const { return {}; }
-    virtual void releaseGpuResources() {}
     //! The plot's scheduler for a plottable that runs a pipeline: null while it is outside a plot
     //! (QCustomPlot::take binds it, QCustomPlot::add(std::unique_ptr) rebinds it).
     virtual void setPipelineScheduler(QCPPipelineScheduler*) {}

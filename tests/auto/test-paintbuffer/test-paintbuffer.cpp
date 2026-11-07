@@ -512,7 +512,11 @@ void TestPaintBuffer::colormap2_stallOffsetOnPan()
     std::vector<double> x{0, 5, 10}, y{0, 50, 100};
     std::vector<double> z(x.size() * y.size(), 1.0);
     cm->setData(std::move(x), std::move(y), std::move(z));
-    (void)mPlot->toPixmap(400, 300);  // synchronous draw establishes the rendered range
+    // A screen paint establishes the baseline a pan translates from (an export records for
+    // another image and never becomes the layer's painted frame).
+    mPlot->replot();
+    QTRY_VERIFY_WITH_TIMEOUT(!cm->pipeline().isBusy(), 2000);
+    mPlot->replot();
     QVERIFY(cm->hasRenderedRange());
     QCOMPARE(cm->stallPixelOffset(), QPointF(0, 0));  // no pan yet
 
@@ -536,7 +540,9 @@ void TestPaintBuffer::colormap2_stallOffsetOnLogYPan()
     std::vector<double> x{0, 5, 10}, y{1, 10, 100, 1000};
     std::vector<double> z(x.size() * y.size(), 1.0);
     cm->setData(std::move(x), std::move(y), std::move(z));
-    (void)mPlot->toPixmap(400, 300);
+    mPlot->replot();
+    QTRY_VERIFY_WITH_TIMEOUT(!cm->pipeline().isBusy(), 2000);
+    mPlot->replot();
     QVERIFY(cm->hasRenderedRange());
 
     mPlot->yAxis->setRange(2, 2000);  // pure pan in log space (x2)

@@ -188,7 +188,6 @@ private slots:
     void existingGraph2TranslationUnaffected();
     void hiddenElementDoesNotBlockTranslation();
     void visibleElementStillBlocksTranslation();
-    void colormapQuadOffsetTranslatesRect();
     void colormapQuadFollowsPanWhileTranslating();
     void plottableOffsetsRefreshedAtRenderTime();
     void pannedReuseKeepsBarsUnderTheirKeys();

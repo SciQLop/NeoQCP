@@ -3,6 +3,7 @@
 #include <axis/axis.h>
 #include <datasource/async-pipeline.h>
 #include <datasource/soa-datasource.h>
+#include <drawable.h>
 #include <painting/colormap-renderer.h>
 #include <painting/contour-overlay.h>
 #include <memory>
@@ -10,6 +11,8 @@
 
 class QCPColorScale;
 class QCPColorMapData;
+class TestColorMap;
+class TestPipeline;
 
 //! A 2-D density histogram of scattered (key, value) samples, binned in the background.
 //! Bins follow the axis scales, also those of an axis given later with setKeyAxis or
@@ -17,9 +20,11 @@ class QCPColorMapData;
 template <typename T, typename Self = void>
 class QCPHistogram2DOps;
 
-class QCP_LIB_DECL QCPHistogram2D : public QCPAbstractColorMapped
+class QCP_LIB_DECL QCPHistogram2D : public QCPDrawn<QCPAbstractColorMapped>
 {
     Q_OBJECT
+    friend class TestColorMap;
+    friend class TestPipeline;
 public:
     template <typename T>
     using OpsFor = QCPHistogram2DOps<T>;
@@ -27,7 +32,6 @@ public:
     enum Normalization { nNone, nColumn };
 
     explicit QCPHistogram2D(QCPAxis* keyAxis, QCPAxis* valueAxis);
-    ~QCPHistogram2D() override;
 
     // Data — same pattern as QCPGraph2
     template <IndexableNumericRange KC, IndexableNumericRange VC>
@@ -94,7 +98,6 @@ public:
     void setContourLabelEnabled(bool enabled);
     [[nodiscard]] bool contourLabelEnabled() const { return mContours.labelsEnabled(); }
     // Exposed for tests: see QCPColorMap2.
-    [[nodiscard]] const QVector<float>& lastContourUv() const { return mContours.lastUv(); }
     [[nodiscard]] QVector<double> lastContourLevels() const { return mContours.lastLevels(); }
     [[nodiscard]] const QVector<QCPContourOverlay::Label>& lastContourLabels() const
     {
@@ -104,6 +107,12 @@ public:
     // Pipeline access
     QCPHistogramPipeline& pipeline() { return mPipeline; }
     const QCPHistogramPipeline& pipeline() const { return mPipeline; }
+
+    //! The recording is the data: new data makes it stale, a pan does not.
+    [[nodiscard]] const void* dataSourceIdentity() const override { return mDataSource.get(); }
+    //! An export bins synchronously, so the screen and export recordings differ.
+    [[nodiscard]] bool resolvesForTheExport() const override { return true; }
+    using QCPDrawn<QCPAbstractColorMapped>::drawLegendIcon;
 public Q_SLOTS:
     double selectTest(const QPointF& pos, bool onlySelectable, QVariant* details = nullptr) const override;
     QCPRange getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth) const override;
@@ -111,14 +120,13 @@ public Q_SLOTS:
                            const QCPRange& inKeyRange = QCPRange()) const override;
 
 protected:
-    void draw(QCPPainter* painter) override;
-    void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
+    void draw(QCPDrawContext& context) const override;
+    void drawLegendIcon(QCPDrawContext& icon) const override;
     void colorMappingChanged() override;
     void axesChanged() override { followAxisScales(); }
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
     void setPipelineScheduler(QCPPipelineScheduler* scheduler) override { mPipeline.setScheduler(scheduler); }
     bool canProduceContent() const override;
-    void releaseGpuResources() override { mRenderer.releaseRhiLayer(); }
 
 private:
     void redrawLater();
@@ -130,7 +138,7 @@ private:
     Normalization mNormalization = nNone;
     QCPHistogramPipeline mPipeline;
     QCPColormapRenderer mRenderer;
-    QCPContourOverlay mContours { mRenderer };
+    QCPContourOverlay mContours;
     //! The binned counts as shown, column fractions with nColumn, with the colour bounds of the
     //! non-empty columns. Rebuilt lazily after the bins or the normalization change.
     struct Shown

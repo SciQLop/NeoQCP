@@ -196,16 +196,6 @@ span_vert_qsb = custom_target('span_vert_qsb',
     output: 'span.vert.qsb',
     command: [qsb, '--qt6', '-o', '@OUTPUT@', '@INPUT@'])
 
-contour_line_vert_qsb = custom_target('contour_line_vert_qsb',
-    input: 'src/painting/shaders/contour_line.vert',
-    output: 'contour_line.vert.qsb',
-    command: [qsb, '--qt6', '-o', '@OUTPUT@', '@INPUT@'])
-
-contour_line_frag_qsb = custom_target('contour_line_frag_qsb',
-    input: 'src/painting/shaders/contour_line.frag',
-    output: 'contour_line.frag.qsb',
-    command: [qsb, '--qt6', '-o', '@OUTPUT@', '@INPUT@'])
-
 scatter_vert_qsb = custom_target('scatter_vert_qsb',
     input: 'src/painting/shaders/scatter.vert',
     output: 'scatter.vert.qsb',
@@ -229,7 +219,7 @@ scatter_colored_frag_qsb = custom_target('scatter_colored_frag_qsb',
 python3 = find_program('python3')
 embedded_shaders = custom_target('embedded_shaders',
     input: [composite_vert_qsb, composite_frag_qsb, plottable_vert_qsb, plottable_frag_qsb,
-            span_vert_qsb, contour_line_vert_qsb, contour_line_frag_qsb,
+            span_vert_qsb,
             scatter_vert_qsb, scatter_frag_qsb,
             scatter_colored_vert_qsb, scatter_colored_frag_qsb,
             plottable_dashed_vert_qsb, plottable_dashed_frag_qsb,
@@ -242,16 +232,14 @@ embedded_shaders = custom_target('embedded_shaders',
               'plottable_vert_qsb_data:@INPUT2@',
               'plottable_frag_qsb_data:@INPUT3@',
               'span_vert_qsb_data:@INPUT4@',
-              'contour_line_vert_qsb_data:@INPUT5@',
-              'contour_line_frag_qsb_data:@INPUT6@',
-              'scatter_vert_qsb_data:@INPUT7@',
-              'scatter_frag_qsb_data:@INPUT8@',
-              'scatter_colored_vert_qsb_data:@INPUT9@',
-              'scatter_colored_frag_qsb_data:@INPUT10@',
-              'plottable_dashed_vert_qsb_data:@INPUT11@',
-              'plottable_dashed_frag_qsb_data:@INPUT12@',
-              'plottable_image_vert_qsb_data:@INPUT13@',
-              'plottable_image_frag_qsb_data:@INPUT14@'])
+              'scatter_vert_qsb_data:@INPUT5@',
+              'scatter_frag_qsb_data:@INPUT6@',
+              'scatter_colored_vert_qsb_data:@INPUT7@',
+              'scatter_colored_frag_qsb_data:@INPUT8@',
+              'plottable_dashed_vert_qsb_data:@INPUT9@',
+              'plottable_dashed_frag_qsb_data:@INPUT10@',
+              'plottable_image_vert_qsb_data:@INPUT11@',
+              'plottable_image_frag_qsb_data:@INPUT12@'])
 
 # Overridden by a host (meson.override_dependency) that wants NeoQCP's zones in its own tracer.
 if get_option('zone_stats')
@@ -288,7 +276,6 @@ NeoQCP = static_library('NeoQCP',
            'src/painting/plottable-rhi-layer.cpp',
            'src/painting/span-rhi-layer.cpp',
            'src/painting/grid-rhi-layer.cpp',
-           'src/painting/colormap-rhi-layer.cpp',
            'src/painting/scatter-rhi-layer.cpp',
            'src/painting/colormap-renderer.cpp',
            'src/painting/line-extruder.cpp',
@@ -372,7 +359,7 @@ NeoQCP = static_library('NeoQCP',
            cpp_args:cpp_args,
            dependencies: [qtdeps, profiling_hook_dep] + optional_deps + latex_deps,
            install: true,
-           extra_files: [neoqcp_moc_headers, 'src/handle-ops.h', 'src/construct.h', 'src/plottables/multigraph-fill.h', 'src/plottables/histogram-geometry.h', 'src/datasource/histogram-binner-1d.h', 'src/plottables/multigraph-errorbars.h', 'src/plottables/plottable-geometry-utils.h', 'src/Profiling.hpp', 'src/painting/paintbuffer-rhi.h', 'src/painting/plottable-rhi-layer.h', 'src/painting/raster-fallback.h', 'src/painting/span-rhi-layer.h', 'src/painting/colormap-rhi-layer.h', 'src/painting/grid-rhi-layer.h', 'src/painting/scatter-rhi-layer.h']
+           extra_files: [neoqcp_moc_headers, 'src/handle-ops.h', 'src/construct.h', 'src/plottables/multigraph-fill.h', 'src/plottables/histogram-geometry.h', 'src/datasource/histogram-binner-1d.h', 'src/plottables/multigraph-errorbars.h', 'src/plottables/plottable-geometry-utils.h', 'src/Profiling.hpp', 'src/painting/paintbuffer-rhi.h', 'src/painting/plottable-rhi-layer.h', 'src/painting/raster-fallback.h', 'src/painting/span-rhi-layer.h', 'src/painting/grid-rhi-layer.h', 'src/painting/scatter-rhi-layer.h']
            )
 
 

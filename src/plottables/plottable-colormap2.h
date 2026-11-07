@@ -3,6 +3,7 @@
 #include <axis/axis.h>
 #include <datasource/async-pipeline.h>
 #include <datasource/soa-datasource-2d.h>
+#include <drawable.h>
 #include <painting/colormap-renderer.h>
 #include <painting/contour-overlay.h>
 #include <atomic>
@@ -12,21 +13,23 @@
 
 class QCPColorScale;
 class QCPColorMapData;
-class QCPColormapRhiLayer;
+class TestColorMap;
+class TestPipeline;
 
 template <typename T, typename Self = void>
 class QCPColorMap2Ops;
 
-class QCP_LIB_DECL QCPColorMap2 : public QCPAbstractColorMapped
+class QCP_LIB_DECL QCPColorMap2 : public QCPDrawn<QCPAbstractColorMapped>
 {
     Q_OBJECT
+    friend class TestColorMap;
+    friend class TestPipeline;
 
 public:
     template <typename T>
     using OpsFor = QCPColorMap2Ops<T>;
 
     explicit QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis);
-    ~QCPColorMap2() override;
 
     // Data source management
     void setDataSource(std::unique_ptr<QCPAbstractDataSource2D> source);
@@ -75,24 +78,17 @@ public:
     QCPColormapPipeline& pipeline() { return mPipeline; }
     const QCPColormapPipeline& pipeline() const { return mPipeline; }
 
-    // Exposed for tests: the GPU quad layer backing this colormap when RHI
-    // rendering is active (lazily created; null if RHI was never engaged).
-    [[nodiscard]] QCPColormapRhiLayer* rhiLayer() { return mRenderer.ensureRhiLayer(); }
+    [[nodiscard]] bool hasRenderedRange() const { return mCore.recordedCommandCount() > 0; }
 
-    // Pure-pan pixel offset of the last-rendered image vs the current axes, so
-    // the compositor can translate the existing texture during a pan instead of
-    // repainting + re-uploading every frame (skip-on-translate fast path).
-    [[nodiscard]] QPointF stallPixelOffset() const override;
-    [[nodiscard]] bool hasRenderedRange() const { return mHasRenderedRange; }
+    //! The recording is the data: a new source makes it stale, a pan does not.
+    [[nodiscard]] const void* dataSourceIdentity() const override { return mDataSource.get(); }
+    //! An export resolves a pending resample synchronously, so the two recordings differ.
+    [[nodiscard]] bool resolvesForTheExport() const override { return true; }
 
     // Contour overlay
     void setContourLevels(const QVector<double>& levels);
     [[nodiscard]] QVector<double> contourLevels() const { return mContours.levels(); }
 
-    // NOTE: only pen.color() reaches the GPU line renderer (baked into the
-    // line geometry, always a fixed hairline regardless of pen width). The
-    // full pen -- including width -- applies to the QPainter fallback used
-    // for exports (pmNoCaching) and non-RHI compositing.
     void setContourPen(const QPen& pen);
     [[nodiscard]] QPen contourPen() const { return mContours.pen(); }
 
@@ -103,10 +99,6 @@ public:
     void setAutoContourLevels(int count);
     [[nodiscard]] int autoContourLevelCount() const { return mContours.autoLevelCount(); }
 
-    // Exposed for tests: the UV-space vertices built by the last contour
-    // rebuild (after axis-reversal mirroring). Empty when contours are
-    // inactive or the last rebuild was degenerate.
-    [[nodiscard]] const QVector<float>& lastContourUv() const { return mContours.lastUv(); }
     // Exposed for tests: the levels the last rebuild marched (explicit
     // levels filtered to finite values, or resolved auto levels).
     [[nodiscard]] QVector<double> lastContourLevels() const { return mContours.lastLevels(); }
@@ -116,10 +108,8 @@ public:
     static constexpr double kContourLabelClearance = QCPContourOverlay::kLabelClearance;
     // Exposed for tests: the labels the last draw placed.
     [[nodiscard]] const QVector<ContourLabel>& lastContourLabels() const { return mContours.lastLabels(); }
-    // Exposed for tests: how many times the contour lines were marched. Repeated exports of one
-    // frame must not re-march the grid.
-    [[nodiscard]] uint64_t fallbackBuildCount() const { return mContours.extractionCount(); }
 
+    using QCPDrawn<QCPAbstractColorMapped>::drawLegendIcon;
 public Q_SLOTS:
     double selectTest(const QPointF& pos, bool onlySelectable, QVariant* details = nullptr) const override;
 
@@ -128,16 +118,13 @@ public Q_SLOTS:
                            const QCPRange& inKeyRange = QCPRange()) const override;
 
 protected:
-    void draw(QCPPainter* painter) override;
-    void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
+    void draw(QCPDrawContext& context) const override;
+    void drawLegendIcon(QCPDrawContext& icon) const override;
     void colorMappingChanged() override;
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
     void setPipelineScheduler(QCPPipelineScheduler* scheduler) override { mPipeline.setScheduler(scheduler); }
     bool canProduceContent() const override;
     void axesChanged() override { followAxes(); }
-    // Releasing the RHI layer drops the uploaded contour lines with it; the
-    // contours see the renderer no longer holds them and upload them again.
-    void releaseGpuResources() override { mRenderer.releaseRhiLayer(); }
 
 private:
     [[nodiscard]] bool resampledForAnotherSize() const;
@@ -150,11 +137,7 @@ private:
     QCPColormapPipeline mPipeline;
     QCPColormapRenderer mRenderer;
 
-    // Axis ranges at the last full draw — baseline for the pan translation offset.
-    bool mHasRenderedRange = false;
-    QCPRange mRenderedKeyRange, mRenderedValueRange;
-
-    QCPContourOverlay mContours { mRenderer };
+    QCPContourOverlay mContours;
     void contoursChanged();
 
     void onViewportChanged();

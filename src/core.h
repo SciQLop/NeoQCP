@@ -61,7 +61,6 @@ class QRhiSampler;
 class QRhiBuffer;
 class QRhiShaderResourceBindings;
 class QCPPlottableRhiLayer;
-class QCPColormapRhiLayer;
 class QCPSpanRhiLayer;
 class QCPGridRhiLayer;
 class QCPScatterRhiLayer;
@@ -195,8 +194,6 @@ public:
     [[nodiscard]] QRhi* rhi() const { return mRhi; }
     [[nodiscard]] QCPPlottableRhiLayer* plottableRhiLayer(QCPLayer* layer);
     [[nodiscard]] QCPScatterRhiLayer* scatterRhiLayer(QCPLayer* layer);
-    void registerColormapRhiLayer(QCPColormapRhiLayer* layer);
-    void unregisterColormapRhiLayer(QCPColormapRhiLayer* layer);
     [[nodiscard]] QSize rhiOutputSize() const;
 
     [[nodiscard]] QPixmap background() const { return mBackgroundPixmap; }
@@ -595,7 +592,6 @@ protected:
     bool mRhiInitialized = false;
     QMap<QCPLayer*, QCPPlottableRhiLayer*> mPlottableRhiLayers;
     QMap<QCPLayer*, QCPScatterRhiLayer*> mScatterRhiLayers;
-    QSet<QCPColormapRhiLayer*> mColormapRhiLayers;
     QCPSpanRhiLayer* mSpanRhiLayer = nullptr;
     QCPGridRhiLayer* mGridRhiLayer = nullptr;
     QCPPipelineScheduler* mPipelineScheduler = nullptr;

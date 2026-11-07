@@ -1,17 +1,19 @@
 #include "contour-overlay.h"
-#include "colormap-renderer.h"
-#include <axis/axis.h>
-#include <core.h>
-#include <layoutelements/layoutelement-axisrect.h>
-#include <painting/painter.h>
-#include <plottables/plottable-colormap.h> // QCPColorMapData
 #include <Profiling.hpp>
 #include <QFontMetricsF>
 #include <QImage>
+#include <QPainter>
 #include <QPainterPath>
 #include <QtMath>
 #include <algorithm>
+#include <axis/axis.h>
 #include <cmath>
+#include <core.h>
+#include <layoutelements/layoutelement-axisrect.h>
+#include <memory>
+#include <painting/draw-context.h>
+#include <plottables/plottable-colormap.h> // QCPColorMapData
+#include <vector>
 
 void QCPContourOverlay::setLevels(const QVector<double>& levels)
 {
@@ -46,23 +48,38 @@ bool drawable(const QCPColorMapData* grid)
         && keySpan > 0 && valueSpan > 0 && std::isfinite(keySpan) && std::isfinite(valueSpan);
 }
 
-bool exporting(const QCPPainter* painter)
+QRectF gridRect(const QCPColorMapData* grid, const QCPAxis* keyAxis, const QCPAxis* valueAxis)
 {
-    return painter && painter->modes().testFlag(QCPPainter::pmNoCaching);
+    const QCPRange keys = grid->keyRange();
+    const QCPRange values = grid->valueRange();
+    return QRectF(QPointF(keyAxis->coordToPixel(keys.lower), valueAxis->coordToPixel(values.upper)),
+                  QPointF(keyAxis->coordToPixel(keys.upper), valueAxis->coordToPixel(values.lower)))
+        .normalized();
 }
 
-void mirror(QVector<QCPContourExtractor::ContourLine>& lines, bool mirrorX, bool mirrorY)
+//! A point of a contour segment (in the extractor's UV space) in data coordinates.
+//!
+//! The grid is uniform in pixels, not in data: X is always sampled linearly, and a log value
+//! axis spans its rows geometrically (the resampler's Y range is log10-spaced there). Mapping v
+//! accordingly is what puts a contour on its pixel row on a log axis, exactly like the image's
+//! two data corners do for the texture.
+QPointF dataPoint(const QCPColorMapData* grid, const QLineF& segment, bool second,
+                  bool valueLog)
 {
-    if (!mirrorX && !mirrorY)
-        return;
-    for (auto& line : lines)
-        for (QLineF& s : line.segments)
-            s = QLineF(mirrorX ? 1 - s.x1() : s.x1(), mirrorY ? 1 - s.y1() : s.y1(),
-                       mirrorX ? 1 - s.x2() : s.x2(), mirrorY ? 1 - s.y2() : s.y2());
+    const QCPRange keys = grid->keyRange();
+    const QCPRange values = grid->valueRange();
+    const double u = second ? segment.x2() : segment.x1();
+    const double v = second ? segment.y2() : segment.y1();
+    const double key = keys.lower + u * keys.size();
+    const double value = valueLog && values.lower > 0 && values.upper > 0
+        ? values.upper * std::pow(values.lower / values.upper, v)
+        : values.upper - v * values.size();
+    return QPointF(key, value);
 }
-}
+} // namespace
 
-QVector<double> QCPContourOverlay::resolveLevels(const QCPColorMapData* grid) const
+QVector<double> QCPContourOverlay::resolveLevels(const QCPColorMapData* grid,
+                                                 QCPAxis::ScaleType dataScaleType) const
 {
     QVector<double> levels;
     if (!mLevels.isEmpty())
@@ -72,7 +89,7 @@ QVector<double> QCPContourOverlay::resolveLevels(const QCPColorMapData* grid) co
         return levels;
     }
     const QCPRange bounds = grid->dataBounds();
-    if (mRenderer.dataScaleType() == QCPAxis::stLogarithmic && bounds.lower > 0 && bounds.upper > 0)
+    if (dataScaleType == QCPAxis::stLogarithmic && bounds.lower > 0 && bounds.upper > 0)
     {
         // Geometric spacing: equal ratios put one line per decade band
         // instead of bunching every line at the top decade.
@@ -99,27 +116,18 @@ const QCPContourOverlay::Lines& QCPContourOverlay::linesFor(const QCPColorMapDat
     Lines& slot = mCache[exporting ? 1 : 0];
     slot.key = key;
     slot.lines = QCPContourExtractor::extract(grid, key.levels, key.maxDim);
-    mirror(slot.lines, key.mirrorX, key.mirrorY);
-    slot.segments.clear();
-    for (const auto& line : slot.lines)
-        slot.segments += line.segments;
-    ++mExtractionCount;
     return slot;
 }
 
 void QCPContourOverlay::clear()
 {
-    mRenderer.clearContour();
-    mRenderer.clearLabelOverlay();
-    mLastKey = {};
-    mLastLabelKey = {};
     mDrawn = nullptr;
-    mLastUv.clear();
     mLastLevels.clear();
+    mLastLabels.clear();
 }
 
-void QCPContourOverlay::update(const QCPColorMapData* grid, const QCPPainter* painter,
-                               bool imageWasInvalidated, const QCPAxis* keyAxis,
+void QCPContourOverlay::update(const QCPColorMapData* grid, QCPDrawContext& context,
+                               QCPAxis::ScaleType dataScaleType, const QCPAxis* keyAxis,
                                const QCPAxis* valueAxis)
 {
     if (!active() || !drawable(grid) || !keyAxis || !valueAxis)
@@ -127,40 +135,76 @@ void QCPContourOverlay::update(const QCPColorMapData* grid, const QCPPainter* pa
         clear();
         return;
     }
-    const bool exportMode = exporting(painter);
+    const bool exportMode = context.exporting();
     // Keyed on the resolution actually marched, so a grid smaller than the screen limit is
     // marched once for both screen and export.
     const int fullDim = std::max(grid->keySize(), grid->valueSize());
-    Key key { mGeneration, resolveLevels(grid), std::min(kScreenMaxDim, fullDim),
-              keyAxis->rangeReversed(), valueAxis->rangeReversed() };
-
-    // The image's GPU quad is mirrored for a reversed axis (see QCPColormapRenderer::draw), so
-    // the lines are mirrored the same way.
-    const Lines& screen = linesFor(grid, key, false);
-    const bool newLines = !(mLastKey == key);
-    if (newLines)
-    {
-        mLastUv = QCPContourExtractor::flatten(screen.lines);
-        mLastLevels = key.levels;
-        mLastKey = key;
-    }
-    // Also when the GPU layer lost them: cleared off-view, too big a texture, or released.
-    // The layer is made by the renderer's first draw, which comes after this: make it now so the
-    // first frame's lines are not dropped.
-    if (newLines || imageWasInvalidated || !mRenderer.hasContourOnGpu())
-    {
-        mRenderer.ensureRhiLayer();
-        mRenderer.setContourLines(mLastUv, mPen.color());
-    }
-    mDrawn = &screen;
+    Key key { mGeneration, resolveLevels(grid, dataScaleType), std::min(kScreenMaxDim, fullDim) };
+    mDrawn = &linesFor(grid, key, false);
     if (exportMode)
     {
         key.maxDim = fullDim;
         mDrawn = &linesFor(grid, key, true);
     }
-    // Only the renderer knows whether this frame paints the image (export, no GPU, too big a
-    // texture), so it always gets the painter lines; a GPU frame ignores them.
-    mRenderer.setContourFallback(mDrawn->segments, mPen);
+    // The value axis' scale is what the resampler followed: a log axis spans the rows
+    // geometrically, a linear one evenly (see dataPoint).
+    recordLines(context, grid, *mDrawn,
+                valueAxis->scaleType() == QCPAxis::stLogarithmic);
+    mLastLevels = key.levels;
+    mLastLabels.clear();
+    if (mLabelsEnabled && keyAxis->axisRect() && !mDrawn->lines.isEmpty())
+        recordLabels(context, grid, keyAxis, valueAxis);
+}
+
+void QCPContourOverlay::recordLines(QCPDrawContext& context, const QCPColorMapData* grid,
+                                    const Lines& lines, bool valueLog) const
+{
+    for (const auto& line : lines.lines)
+    {
+        // One polyline per level, every segment kept apart by a NaN so the replays never join
+        // the ends of segments the extractor did not connect.
+        auto points = std::make_shared<std::vector<QPointF>>();
+        points->reserve(size_t(line.segments.size()) * 3);
+        for (const QLineF& segment : line.segments)
+        {
+            if (!points->empty())
+                points->emplace_back(qQNaN(), qQNaN());
+            points->push_back(dataPoint(grid, segment, false, valueLog));
+            points->push_back(dataPoint(grid, segment, true, valueLog));
+        }
+        if (!points->empty())
+            context.polyline(points, mPen);
+    }
+}
+
+void QCPContourOverlay::recordLabels(QCPDrawContext& context, const QCPColorMapData* grid,
+                                     const QCPAxis* keyAxis, const QCPAxis* valueAxis)
+{
+    const QRectF imageRect = gridRect(grid, keyAxis, valueAxis);
+    const QRectF visible = imageRect.intersected(keyAxis->axisRect()->rect());
+    if (visible.isEmpty())
+        return;
+    // Labels drawn under the image would be hidden: they go in one raster over the part of the
+    // grid the axes show, recorded after the lines so it draws above both.
+    // simplify: a zoom rebuilds the whole tile, only while labels are on. Upgrade path: one small
+    // tile per label in an atlas, drawn as one quad each.
+    const double dpr = keyAxis->parentPlot()->bufferDevicePixelRatio();
+    QImage overlay(QSize(qCeil(visible.width() * dpr), qCeil(visible.height() * dpr)),
+                   QImage::Format_ARGB32_Premultiplied);
+    overlay.fill(Qt::transparent);
+    QPainter painter(&overlay);
+    painter.scale(dpr, dpr);
+    painter.translate(-visible.topLeft());
+    painter.setFont(QFont());
+    paintLabels(&painter, imageRect, visible);
+    painter.end();
+
+    const QPointF topLeft(keyAxis->pixelToCoord(visible.left()),
+                          valueAxis->pixelToCoord(visible.top()));
+    const QPointF bottomRight(keyAxis->pixelToCoord(visible.right()),
+                              valueAxis->pixelToCoord(visible.bottom()));
+    context.image(QCP::Data { topLeft.x(), topLeft.y() },
+                  QCP::Data { bottomRight.x(), bottomRight.y() }, overlay);
 }
 
 bool QCPContourOverlay::labelFits(const QPointF& at, double level) const
@@ -170,33 +214,38 @@ bool QCPContourOverlay::labelFits(const QPointF& at, double level) const
                         [&](const Label& placed)
                         {
                             const double d = QLineF(placed.position, at).length();
-                            return d < kLabelClearance || (placed.level == level && d < kLabelSpacing);
+                            return d < kLabelClearance
+                                || (placed.level == level && d < kLabelSpacing);
                         });
 }
 
-void QCPContourOverlay::paintLabels(QPainter* painter, const QRectF& imageRect, const QRectF& area)
+void QCPContourOverlay::paintLabels(QPainter* painter, const QRectF& imageRect,
+                                    const QRectF& visible)
 {
     const QFontMetricsF metrics(painter->font());
     const QColor color = mPen.color();
     // The line cannot leave a gap for the text: a halo in the opposite lightness keeps the
     // label readable over its own line.
-    const QPen halo(color.lightness() > 127 ? QColor(0, 0, 0, 170) : QColor(255, 255, 255, 170), 3.0,
-                    Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+    const QPen halo(color.lightness() > 127 ? QColor(0, 0, 0, 170) : QColor(255, 255, 255, 170),
+                    3.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
     const auto toPixel = [&](double u, double v)
-    { return QPointF(imageRect.left() + u * imageRect.width(), imageRect.top() + v * imageRect.height()); };
+    {
+        return QPointF(imageRect.left() + u * imageRect.width(),
+                       imageRect.top() + v * imageRect.height());
+    };
     painter->setRenderHint(QPainter::Antialiasing);
     for (const auto& line : mDrawn->lines)
     {
         const QString text = QString::number(line.level, 'g', 4);
         QPainterPath glyphs;
-        glyphs.addText(-metrics.horizontalAdvance(text) / 2, metrics.ascent() / 2 - metrics.descent() / 2,
-                       painter->font(), text);
+        glyphs.addText(-metrics.horizontalAdvance(text) / 2,
+                       metrics.ascent() / 2 - metrics.descent() / 2, painter->font(), text);
         for (const QLineF& segment : line.segments)
         {
             const QPointF a = toPixel(segment.x1(), segment.y1());
             const QPointF b = toPixel(segment.x2(), segment.y2());
             const QPointF at = (a + b) / 2;
-            if (a == b || !area.contains(at) || !labelFits(at, line.level))
+            if (a == b || !visible.contains(at) || !labelFits(at, line.level))
                 continue;
             double angle = qRadiansToDegrees(std::atan2(b.y() - a.y(), b.x() - a.x()));
             if (angle > 90)
@@ -212,53 +261,4 @@ void QCPContourOverlay::paintLabels(QPainter* painter, const QRectF& imageRect, 
             mLastLabels.append({ line.level, at });
         }
     }
-}
-
-void QCPContourOverlay::drawLabels(const QCPColorMapData* grid, QCPPainter* painter,
-                                   const QCPAxis* keyAxis, const QCPAxis* valueAxis)
-{
-    const bool exportMode = exporting(painter);
-    if (!mLabelsEnabled || !mDrawn || !grid || !keyAxis || !valueAxis || !keyAxis->axisRect())
-    {
-        mLastLabels.clear();
-        if (!exportMode)
-        {
-            mRenderer.clearLabelOverlay();
-            mLastLabelKey = {};
-        }
-        return;
-    }
-    const QRectF area = keyAxis->axisRect()->rect();
-    const QRectF imageRect
-        = QCPColormapRenderer::imageRect(keyAxis, valueAxis, grid->keyRange(), grid->valueRange());
-    if (exportMode || !mRenderer.imageOnGpu())
-    {
-        mLastLabels.clear();
-        painter->save();
-        painter->setClipRect(area);
-        paintLabels(painter, imageRect, area);
-        painter->restore();
-        return;
-    }
-    // The image is a GPU quad composited after this layer's paint buffer: labels painted there
-    // would end up under it. They go in an overlay quad drawn over the image instead, rebuilt
-    // only when it would look different (it is a full axis-rect texture).
-    // simplify: a zoom changes imageRect, so each zoom frame rebuilds and uploads the whole
-    // texture (~1 ms of CPU at 1600x900, 4x that on a 2x screen, plus the upload), only while
-    // labels are on. Upgrade path: one small tile per label in an atlas, drawn as one quad each.
-    const double dpr = keyAxis->parentPlot()->bufferDevicePixelRatio();
-    const LabelKey labelKey { mLastKey, imageRect, area, dpr, painter->font(), mPen.color() };
-    if (labelKey == mLastLabelKey && mRenderer.hasLabelOverlay())
-        return;
-    mLastLabelKey = labelKey;
-    mLastLabels.clear();
-    QImage overlay((area.size() * dpr).toSize(), QImage::Format_ARGB32_Premultiplied);
-    overlay.setDevicePixelRatio(dpr);
-    overlay.fill(Qt::transparent);
-    QPainter overlayPainter(&overlay);
-    overlayPainter.setFont(painter->font());
-    overlayPainter.translate(-area.topLeft());
-    paintLabels(&overlayPainter, imageRect, area);
-    overlayPainter.end();
-    mRenderer.setLabelOverlay(overlay, area);
 }

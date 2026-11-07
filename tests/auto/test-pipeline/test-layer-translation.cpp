@@ -1,6 +1,6 @@
 #include "test-pipeline.h"
 #include <qcustomplot.h>
-#include <painting/colormap-rhi-layer.h>
+#include <painting/draw-commands.h>
 #include <painting/plottable-rhi-layer.h>
 #include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
 
@@ -260,31 +260,11 @@ void TestPipeline::visibleElementStillBlocksTranslation()
     QVERIFY(!mPlot->layer("main")->canTranslateInsteadOfRepaint());
 }
 
-void TestPipeline::colormapQuadOffsetTranslatesRect()
-{
-    // Unit-level contract: the quad the compositor draws is the rect set by draw()
-    // shifted by the pan offset. No GPU needed — the offset is CPU-side geometry.
-    QCPColormapRhiLayer layer(nullptr);
-    layer.setQuadRect(QRectF(10, 20, 100, 50));
-    QCOMPARE(layer.quadRect(), QRectF(10, 20, 100, 50));
-    QCOMPARE(layer.effectiveQuadRect(), QRectF(10, 20, 100, 50));
-
-    layer.setPixelOffset(-30, 7);
-    QCOMPARE(layer.pixelOffset(), QPointF(-30, 7));
-    QCOMPARE(layer.quadRect(), QRectF(10, 20, 100, 50));            // unchanged
-    QCOMPARE(layer.effectiveQuadRect(), QRectF(-20, 27, 100, 50));  // shifted
-
-    layer.setPixelOffset(0, 0);
-    QCOMPARE(layer.effectiveQuadRect(), QRectF(10, 20, 100, 50));
-}
-
 void TestPipeline::colormapQuadFollowsPanWhileTranslating()
 {
-    // Integration: on a frame where the colormap layer skips its repaint, draw()
-    // never runs, so setQuadRect() is never called and the quad holds the PREVIOUS
-    // range's pixel rect. The compositor must be handed the layer's pixel offset,
-    // or the image stays put while the axes move — colormaps visibly lagging
-    // behind line plots during a pan.
+    // Integration: on a frame where the layer skips its repaint, draw() never runs. The image
+    // command already carries the grid's data corners, so the compositor's pixel offset moves
+    // it with the axes: the recording is reused, not rebuilt, and nothing lags.
     if (!showAndHasRhiLT(mPlot)) QSKIP("No QRhi available — quad geometry needs draw()");
 
     auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
@@ -302,9 +282,17 @@ void TestPipeline::colormapQuadFollowsPanWhileTranslating()
     QTRY_VERIFY_WITH_TIMEOUT(!cm->pipeline().isBusy(), 5000);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
-    auto* crl = cm->rhiLayer();
-    QVERIFY(crl);
-    const QRectF before = crl->quadRect();
+    const quint64 recordings = cm->mCore.recordingCount();
+    const auto corners = [&]
+    {
+        const auto* image = std::get_if<qcp::ImageCmd>(&cm->mCore.recordedList().commands.front());
+        if (!image) return QRectF();
+        const auto* a = std::get_if<QCP::Data>(&image->a);
+        const auto* b = std::get_if<QCP::Data>(&image->b);
+        if (!a || !b) return QRectF();
+        return QRectF(QPointF(a->x, a->y), QPointF(b->x, b->y)).normalized();
+    };
+    const QRectF before = corners();
     QVERIFY(!before.isEmpty());
 
     mPlot->xAxis->setRange(100, 1100); // pure horizontal pan
@@ -314,13 +302,11 @@ void TestPipeline::colormapQuadFollowsPanWhileTranslating()
     if (!layer->canSkipRepaintForTranslation())
         QSKIP("layer repainted instead of translating — nothing to compensate");
 
-    // The repaint was skipped, so the raw quad is stale by construction...
-    QCOMPARE(crl->quadRect(), before);
-    // ...and the offset must make up the difference.
+    // The repaint was skipped: the recording is the same one, and the layer's offset moves it.
+    QCOMPARE(cm->mCore.recordingCount(), recordings);
+    QCOMPARE(corners(), before);
     const QPointF expected = asUniform(layer->pixelOffset());
-    QVERIFY(!expected.isNull());
-    QCOMPARE(crl->pixelOffset(), expected);
-    QCOMPARE(crl->effectiveQuadRect(), before.translated(expected));
+    QVERIFY2(!expected.isNull(), "the layer must translate the image with the axes");
 }
 
 void TestPipeline::plottableOffsetsRefreshedAtRenderTime()
