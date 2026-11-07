@@ -93,6 +93,14 @@ private slots:
     void eachRasterisedCommandDrawsAtItsPlace();
     void brokenImagePipelineFallsBackToThePainter();
     void unusedFallbackTexturesAreReleased();
+    void anImageIsAGpuCommand();
+    void aPannedImageIsNotUploadedAgain();
+    void imageFollowsReversedAxes();
+    void sourceRectCropsTheImage();
+    void smoothImageIsInterpolated();
+    void anImageTooBigForATextureIsPainted();
+    void vectorExportKeepsSharpCells();
+    void fiveImagesOnOneLayerStayOnTheGpu();
     void itemsDefaultToAnnotations();
     void textAboveGraphLine();
     void barsStackWithTextAbove();

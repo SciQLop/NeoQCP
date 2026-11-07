@@ -79,12 +79,14 @@ private:
 class QCPRecordingCache
 {
 public:
-    //! What a kept submission is: a solid run, a dashed one, or a rasterised command.
+    //! What a kept submission is: a solid run, a dashed one, a rasterised command, or a recorded
+    //! image whose texture the layer already holds.
     enum class RunKind
     {
         Solid,
         Dashed,
-        Raster
+        Raster,
+        Image
     };
 
     /*!
@@ -105,8 +107,8 @@ public:
         float dashOffset = 0; //!< dashed: pixels
         float pattern[8] = { }; //!< dashed: the dash pattern
         int patternCount = 0;
-        int index = 0; //!< raster: the command's place in the recording
-        QRectF bounds; //!< raster: the clipped pixel rect the image covers
+        int index = 0; //!< raster or image: the command's place in the recording
+        QRectF bounds; //!< raster: the clipped pixel rect the image covers; image: its corners
     };
 
     /*!
@@ -139,6 +141,11 @@ public:
     //! when the frame's clip cut the image down: what it cut away was never painted, so the command
     //! can only be replayed, not shifted (see reuse()).
     void keepRaster(int index, const QRectF& bounds, bool movesWithData, bool clipped);
+
+    //! Keeps command \a index, an image the layer holds as a quad, as a run of its own: \a bounds
+    //! is the rect its two corners span. Its texture is the layer's, keyed by the picture, so a
+    //! reuse frame only rewrites the quad's uniform: nothing is uploaded.
+    void keepCommandImage(int index, const QRectF& bounds, bool movesWithData);
 
     //! Commits the build, unless a rasterised command spoiled it.
     void commit();

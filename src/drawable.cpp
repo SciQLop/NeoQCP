@@ -34,8 +34,11 @@ bool usesTheView(const QCPDrawList& list)
     {
         if (std::holds_alternative<qcp::TextCmd>(command)
             || std::holds_alternative<qcp::PathCmd>(command)
-            || std::holds_alternative<qcp::ImageCmd>(command)
             || std::holds_alternative<qcp::PainterCmd>(command))
+            return true;
+        // An image with two data corners is a textured quad, which a pan moves; any other corner
+        // keeps it a picture the painter draws again.
+        if (std::holds_alternative<qcp::ImageCmd>(command) && !qcp::isGpuCommand(command))
             return true;
     }
     return false;

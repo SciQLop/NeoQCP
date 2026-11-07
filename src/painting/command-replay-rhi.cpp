@@ -235,6 +235,43 @@ void addRasterCommand(const QCPDrawList& list, QCPPlottableRhiLayer& layer,
         cache->keepRaster(int(index), bounds, movesWithData, bounds != extent);
 }
 
+//! A recorded image with two data corners is the picture itself on the GPU: a textured quad whose
+//! corners the vertex shader puts where the data is, so a pan rewrites a uniform and uploads no
+//! texel. It has a budget of its own (kMaxCommandImages): a colour map's picture is content, not a
+//! fallback, so it must not be squeezed out by the four rasterised fills a layer tolerates.
+void addCommandImage(const QCPDrawList& list, QCPPlottableRhiLayer& layer,
+                     const qcp::QCPDrawCommand& variant, const QCPDrawFrame& frame,
+                     qcp::QCPRasterFallback& fallback, const QRect& clip, double dpr,
+                     int outputHeight, QCPRecordingCache* cache)
+{
+    const auto& command = std::get<qcp::ImageCmd>(variant);
+    const quint64 listId = list.id;
+    const quint64 index = qcpCommandIndex(list, variant);
+    const QImage& image = command.pixels->image;
+    if (!layer.canAddCommandImage(image.size()))
+    {
+        fallback.painterHandles(listId, index);
+        if (layer.commandImageCount() >= QCPPlottableRhiLayer::kMaxCommandImages
+            && layer.warnCommandImageCapOnce())
+            qWarning() << "NeoQCP: more than" << QCPPlottableRhiLayer::kMaxCommandImages
+                       << "images in one layer, the ones past the cap are painted by QPainter,"
+                          " under this layer's GPU content";
+        return;
+    }
+    // One submission each, whatever the view: an image that is off it now must still be in the kept
+    // runs, or a pan that brings it back would not find it (the scissor clips it meanwhile).
+    const QPointF a = qcpResolvePosition(frame, command.a);
+    const QPointF b = qcpResolvePosition(frame, command.b);
+    if (!layer.addCommandImage(image, a * dpr, b * dpr, command.pixels->source,
+                               command.pixels->smooth, clip, dpr, outputHeight))
+    {
+        fallback.painterHandles(listId, index);
+        return;
+    }
+    if (cache)
+        cache->keepCommandImage(int(index), QRectF(a, b), true);
+}
+
 //! True when this recording needs more images than the layer has left: the whole of it then goes to
 //! the painter pass, because a split at the cap would put half of one object over the layer's GPU
 //! content and half under it.
@@ -254,7 +291,7 @@ bool rasterOverflows(const QCPDrawList& list, const QCPPlottableRhiLayer& layer)
         return false;
     if (!layer.canAddImage())
         return true;
-    return needed > QCPPlottableRhiLayer::kMaxImages - int(layer.imageDrawEntries().size());
+    return needed > QCPPlottableRhiLayer::kMaxImages - layer.rasterImageCount();
 }
 
 //! True when \a kept holds more images than the layer has slots left: the recording no longer fits,
@@ -264,7 +301,7 @@ bool keptRasterOverflows(const QCPRecordingCache& kept, const QCPPlottableRhiLay
     const int images = kept.rasterRunCount();
     if (images == 0)
         return false;
-    return images > QCPPlottableRhiLayer::kMaxImages - int(layer.imageDrawEntries().size());
+    return images > QCPPlottableRhiLayer::kMaxImages - layer.rasterImageCount();
 }
 
 //! The whole of \a list goes to the painter pass, under the layer's GPU content: a recording that
@@ -376,6 +413,19 @@ void replayKept(const QCPDrawList& list, const QCPRecordingCache& kept, QCPPlott
                 const QRectF device(run.bounds.left() * dpr, run.bounds.top() * dpr, image.width(),
                                     image.height());
                 layer.addImage(image, device, clip, dpr, height, offsetX, offsetY, alpha);
+                break;
+            }
+            case QCPRecordingCache::RunKind::Image:
+            {
+                const auto& command
+                    = std::get<qcp::ImageCmd>(list.commands[std::size_t(run.index)]);
+                // The corners keep their sign: a reversed axis mirrors the quad.
+                const QPointF a(run.bounds.left() * dpr, run.bounds.top() * dpr);
+                const QPointF b(run.bounds.right() * dpr, run.bounds.bottom() * dpr);
+                if (!layer.addCommandImage(command.pixels->image, a, b, command.pixels->source,
+                                           command.pixels->smooth, clip, dpr, height, offsetX,
+                                           offsetY, alpha))
+                    fallback.painterHandles(list.id, quint64(run.index));
                 break;
             }
         }
@@ -515,6 +565,16 @@ void QCPRecordingCache::keepRaster(int index, const QRectF& bounds, bool movesWi
     mRuns.push_back(run);
     ++mRasterRuns;
     mClippedRaster = mClippedRaster || clipped;
+}
+
+void QCPRecordingCache::keepCommandImage(int index, const QRectF& bounds, bool movesWithData)
+{
+    Run run;
+    run.kind = RunKind::Image;
+    run.index = index;
+    run.bounds = bounds;
+    run.movesWithData = movesWithData;
+    mRuns.push_back(run);
 }
 
 void QCPRecordingCache::commit()
@@ -741,6 +801,14 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                 else if constexpr (std::is_same_v<T, qcp::MarkersCmd>)
                 {
                     addMarker(scatter, cmd, cache, frame, generation, clip, dpr, outputHeight);
+                }
+                else if constexpr (std::is_same_v<T, qcp::ImageCmd>)
+                {
+                    // Two data corners: the quad. Anything else is the painter's, which draws it
+                    // on the PainterOnly pass; dataOnly is what commandKind() answered above.
+                    if (dataOnly)
+                        addCommandImage(list, plottables, command, frame, fallback, clip, dpr,
+                                        outputHeight, geometry);
                 }
             },
             command);

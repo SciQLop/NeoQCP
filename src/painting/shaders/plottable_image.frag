@@ -15,6 +15,10 @@ layout(std140, binding = 1) uniform ImageParams {
     float height;
     float yFlip;
     float alpha;
+    float u0;
+    float v0;
+    float u1;
+    float v1;
 } pc;
 
 void main()

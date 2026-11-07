@@ -218,8 +218,11 @@ public:
 
     //! A painter path whose origin is \a origin; the path itself is in pixels from there.
     void path(QCP::Position origin, const QPainterPath& path, const QPen& pen, const QBrush& brush);
-    //! A raster image stretched into the rectangle between two corners.
-    void image(QCP::Position a, QCP::Position b, const QImage& image);
+    //! A raster image stretched between two corners: \a a is where its top-left texel lands, \a b
+    //! where its bottom-right one does. \a source picks the texels to show (the whole image by
+    //! default) and \a smooth the linear sampler. Two data corners make it a GPU quad.
+    void image(QCP::Position a, QCP::Position b, const QImage& image, const QRectF& source = { },
+               bool smooth = false);
     //! The escape hatch: arbitrary painter code, in pixels, with the frame's transform to map with.
     void painter(std::function<void(QCPPainter&, const QCPTransform&)> callback);
 

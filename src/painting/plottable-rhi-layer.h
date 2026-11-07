@@ -61,16 +61,30 @@ public:
     bool addImage(const QImage& image, const QRectF& pixelRect, const QRect& clipRect, double dpr,
                   int outputHeight, float offsetX = 0, float offsetY = 0, float alpha = 1);
 
-    //! A rasterised fill the GPU cannot express, drawn as a textured quad in submission order.
+    //! Adds the picture of a recorded image command: \a a is where its top-left texel lands and
+    //! \a b where its bottom-right one does, in device pixels (on a reversed axis b is the smaller
+    //! corner), \a source picks the texels to show and \a smooth the sampler. A pan only rewrites
+    //! the quad's uniform. False when the layer cannot take it (kMaxCommandImages, a picture
+    //! larger than the GPU's largest texture, or no image pipeline): the caller then leaves the
+    //! command to the painter.
+    bool addCommandImage(const QImage& image, const QPointF& a, const QPointF& b,
+                         const QRectF& source, bool smooth, const QRect& clipRect, double dpr,
+                         int outputHeight, float offsetX = 0, float offsetY = 0, float alpha = 1);
+
+    //! A rasterised fill the GPU cannot express, drawn as a textured quad in submission order. A
+    //! recorded image travels the same path, with its own source rect and sampler.
     struct ImageEntry
     {
         qint64 imageKey = 0; //!< QImage::cacheKey() of the raster; identifies its texture
         QRectF pixelRect; //!< device pixels the quad covers (pan offset applied by the shader)
+        QRectF source; //!< texels of \a deviceSize to show
         QSize deviceSize; //!< texture size, device pixels
         float offsetX = 0;
         float offsetY = 0;
         float alpha = 1;
         QRect scissorRect;
+        bool smooth = true; //!< a linear sampler, else nearest
+        bool rasterised = true; //!< a raster fallback fill, not a recorded image command
     };
 
     //! One record per submission: which list it went to and where in that list. Drawing walks this
@@ -91,6 +105,11 @@ public:
     //! At most this many rasterised fills per layer per frame; the rest is painted by QPainter,
     //! under this layer's GPU content.
     static constexpr int kMaxImages = 4;
+
+    //! At most this many recorded image commands per layer per frame, a budget of their own: they
+    //! are the picture the colour maps draw, not a fallback, so they must not be squeezed by the
+    //! four a rasterised fill gets. Past it, the painter draws the rest.
+    static constexpr int kMaxCommandImages = 16;
 
     // Offset-only update (no geometry change, no vertex re-upload)
     void setAllOffsets(float offsetX, float offsetY);
@@ -124,13 +143,34 @@ public:
 
     //! False once the image pipeline failed to build: a rasterised fill must be painted instead.
     //! Every image goes through this one predicate, which also carries the per-frame cap.
-    bool canAddImage() const { return !mImageBroken && mImageEntries.size() < kMaxImages; }
+    bool canAddImage() const { return !mImageBroken && mRasterImages < kMaxImages; }
+
+    //! False when the layer cannot take the picture of a recorded image command: no image
+    //! pipeline, its budget spent, or a picture the GPU cannot hold as one texture (Metal aborts
+    //! on an oversized texture instead of failing the call).
+    bool canAddCommandImage(const QSize& imageSize) const
+    {
+        if (mImageBroken || imageSize.isEmpty() || mCommandImages >= kMaxCommandImages)
+            return false;
+        if (!mRhi)
+            return true;
+        const int limit = mRhi->resourceLimit(QRhi::TextureSizeMax);
+        return imageSize.width() <= limit && imageSize.height() <= limit;
+    }
 
     //! True the first time: the cap warning is one per layer, for the plot's lifetime.
     bool warnRasterCapOnce()
     {
         const bool first = !mRasterCapWarned;
         mRasterCapWarned = true;
+        return first;
+    }
+
+    //! True the first time: the command image cap warns once, like the raster one.
+    bool warnCommandImageCapOnce()
+    {
+        const bool first = !mCommandImageCapWarned;
+        mCommandImageCapWarned = true;
         return first;
     }
 
@@ -147,6 +187,12 @@ public:
     void breakDashedPipelineForTest() { mDashBroken = true; }
 
     const QVector<ImageEntry>& imageDrawEntries() const { return mImageEntries; }
+
+    //! How many rasterised fills hold a quad now: the raster cap counts only them.
+    int rasterImageCount() const { return mRasterImages; }
+
+    //! How many recorded image commands hold a quad now: their cap counts only them.
+    int commandImageCount() const { return mCommandImages; }
 
 private:
     // Per-draw uniform data, aligned to GPU requirements.
@@ -172,24 +218,32 @@ private:
     static_assert(sizeof(DashUniforms) == 80);
 
     //! Matches the ImageParams UBO in plottable_image.vert/.frag. The pan offset is already folded
-    //! into \a x0..\a y1 when the slot is written.
+    //! into \a x0..\a y1 when the slot is written, and \a u0..\a v1 name the texels to show.
     struct alignas(16) ImageUniforms
     {
         float x0, y0, x1, y1;
         float width, height, yFlip, alpha;
+        float u0, v0, u1, v1;
     };
 
-    static_assert(sizeof(ImageUniforms) == 32);
+    static_assert(sizeof(ImageUniforms) == 48);
 
-    //! One rasterised fill on the GPU. The texture and its SRB outlive a frame; the pending image
-    //! is what still has to be uploaded (an unchanged replay leaves it null and uploads nothing).
+    //! One image on the GPU. The texture and its SRBs outlive a frame; the pending image is what
+    //! still has to be uploaded (an unchanged replay leaves it null and uploads nothing). Two SRBs
+    //! share the texture so the sampler is chosen per draw, not by a second pipeline.
     struct ImageTexture
     {
         QRhiTexture* texture = nullptr;
-        QRhiShaderResourceBindings* srb = nullptr;
+        QRhiShaderResourceBindings* srb = nullptr; //!< the linear sampler
+        QRhiShaderResourceBindings* srbNearest = nullptr;
         QImage pending;
         bool used = false;
     };
+
+    //! The one place an image entry is created, whether a rasterised fill or a recorded command.
+    bool addImageEntry(const QImage& image, const QRectF& pixelRect, const QRectF& source,
+                       bool smooth, bool rasterised, const QRect& clipRect, double dpr,
+                       int outputHeight, float offsetX, float offsetY, float alpha);
 
     void createImagePipeline(QRhiRenderPassDescriptor* rpDesc, int sampleCount);
     bool ensureImageTexture(ImageTexture& texture, const QSize& size);
@@ -236,13 +290,17 @@ private:
 
     QVector<ImageEntry> mImageEntries;
     QHash<qint64, ImageTexture*> mImageTextures; //!< keyed by QImage::cacheKey()
-    QRhiBuffer* mImageUniformBuffer = nullptr; //!< kMaxImages slots, never resized
+    QRhiBuffer* mImageUniformBuffer = nullptr; //!< one slot per image, never resized
     QRhiBuffer* mImageVertexBuffer = nullptr; //!< the shared unit quad
     QRhiGraphicsPipeline* mImagePipeline = nullptr;
     QRhiSampler* mImageSampler = nullptr;
+    QRhiSampler* mImageNearestSampler = nullptr;
+    int mRasterImages = 0; //!< the entries that are rasterised fills
+    int mCommandImages = 0; //!< the entries that are recorded image commands
     int mLastImageSampleCount = 0;
     bool mImageBroken = false;
     bool mRasterCapWarned = false; //!< the raster cap warned once for this plot
+    bool mCommandImageCapWarned = false; //!< the command image cap warned once
     bool mImageQuadUploaded = false;
     int mImageUploads = 0;
 

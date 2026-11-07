@@ -3652,3 +3652,310 @@ void TestRepaint::unusedFallbackTexturesAreReleased()
     QVERIFY(!replay(withoutImage).isNull());
     QCOMPARE(layer->imageTextureCount(), 0);
 }
+
+namespace
+{
+//! A 2x1 image: the left texel red, the right one blue.
+QImage redBlueImage()
+{
+    QImage image(2, 1, QImage::Format_ARGB32_Premultiplied);
+    image.setPixelColor(0, 0, QColor(220, 30, 30));
+    image.setPixelColor(1, 0, QColor(30, 60, 220));
+    return image;
+}
+
+bool pureRed(const QColor& colour)
+{
+    return colour.red() > 150 && colour.blue() < 100;
+}
+
+bool pureBlue(const QColor& colour)
+{
+    return colour.blue() > 150 && colour.red() < 100;
+}
+
+//! An item whose whole recording is one image command: the plot's own replays then carry it, on
+//! screen and in an export, exactly as a plottable's recording would.
+class ImageItem : public QCPDrawn<QCPAbstractItem>
+{
+public:
+    ImageItem(QCustomPlot* plot, const QCP::Position& a, const QCP::Position& b,
+              const QImage& image, const QRectF& source = { }, bool smooth = false)
+            : QCPDrawn<QCPAbstractItem>(plot)
+            , m_a(a)
+            , m_b(b)
+            , m_image(image)
+            , m_source(source)
+            , m_smooth(smooth)
+    {
+        setClipAxisRect(plot->axisRect());
+        // An item with no position reports no extent, and the index then never asks it to draw.
+        createPosition(QStringLiteral("anchor"))->setCoords(45, 100);
+    }
+
+    using QCPDrawn<QCPAbstractItem>::draw;
+
+    void draw(QCPDrawContext& context) const override
+    {
+        context.image(m_a, m_b, m_image, m_source, m_smooth);
+    }
+
+private:
+    QCP::Position m_a;
+    QCP::Position m_b;
+    QImage m_image;
+    QRectF m_source;
+    bool m_smooth;
+};
+} // namespace
+
+// An image whose two corners are data is the layer's own textured quad: one image entry, and
+// nothing left for the painter pass to draw.
+void TestRepaint::anImageIsAGpuCommand()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    usePixelRanges(plot); // data units are widget pixels
+    auto* layer = plot->plottableRhiLayer(plot->currentLayer());
+    QVERIFY(layer);
+    QCPDrawContext context(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+    context.image(QCP::Data { 100, 100 }, QCP::Data { 300, 200 }, redBlueImage());
+
+    layer->clear();
+    QCPResolveCache cache;
+    qcp::QCPRasterFallback fallback;
+    qcpReplayWithRhi(context.drawList(), *layer, *plot->scatterRhiLayer(plot->currentLayer()),
+                     context.frame(), cache, fallback, plot->bufferDevicePixelRatio(),
+                     plot->rhiOutputSize());
+
+    QCOMPARE(int(layer->imageDrawEntries().size()), 1);
+    QVERIFY(layer->drawEntries().isEmpty());
+    QVERIFY2(!fallback.painterHandled(context.drawList().id, 0),
+             "a data image is a GPU command, not a rasterised one");
+    // The corners are kept as recorded: a is where the top-left texel lands, even below b.
+    const double dpr = plot->bufferDevicePixelRatio();
+    const QRectF rect = layer->imageDrawEntries().first().pixelRect;
+    const QPointF topLeft
+        = qcpResolvePosition(context.frame(), QCP::Data { 100, 100 }); // data y 100
+    const QPointF bottomRight
+        = qcpResolvePosition(context.frame(), QCP::Data { 300, 200 }); // data y 200
+    QCOMPARE(rect.top(), topLeft.y() * dpr);
+    QCOMPARE(rect.left(), topLeft.x() * dpr);
+    QCOMPARE(rect.bottom(), bottomRight.y() * dpr);
+    QCOMPARE(rect.right(), bottomRight.x() * dpr);
+    QVERIFY2(rect.height() < 0.0, "a is above b, and the quad keeps that order");
+}
+
+// A pan shifts the quad: the texture stays, and nothing is uploaded a second time.
+void TestRepaint::aPannedImageIsNotUploadedAgain()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    usePixelRanges(plot);
+    auto* item
+        = new ImageItem(plot, QCP::Data { 100, 100 }, QCP::Data { 300, 200 }, redBlueImage());
+    plot->replot();
+    waitUntilSettled(*plot);
+    auto* layer = plot->plottableRhiLayer(item->layer());
+    QVERIFY(layer);
+    QCOMPARE(int(layer->imageDrawEntries().size()), 1);
+    const int uploads = layer->imageUploads();
+    QVERIFY2(uploads >= 1, "the first frame must upload the texture");
+    const QRectF rect = layer->imageDrawEntries().first().pixelRect;
+    const float offset = layer->imageDrawEntries().first().offsetX;
+
+    plot->xAxis->setRange(10, 410);
+    plot->replot();
+    waitUntilSettled(*plot);
+
+    QCOMPARE(int(layer->imageDrawEntries().size()), 1);
+    QCOMPARE(layer->imageUploads(), uploads);
+    QCOMPARE(layer->imageDrawEntries().first().pixelRect, rect);
+    QVERIFY2(qAbs((layer->imageDrawEntries().first().offsetX - offset) + 10.0f) < 0.01f,
+             "the quad must move with the data, by the pan");
+    // And it is where the pan put it: data 110 is pixel 100 now, inside the red half.
+    const QImage screen = screenOf(plot);
+    QVERIFY(pureRed(pixelAt(plot, screen, 150, 150)));
+}
+
+// The corners keep their meaning on a reversed axis: a is the top-left texel, so the image mirrors
+// instead of flipping back.
+void TestRepaint::imageFollowsReversedAxes()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    usePixelRanges(plot);
+    plot->xAxis->setRangeReversed(true);
+    plot->replot();
+    waitUntilSettled(*plot);
+    new ImageItem(plot, QCP::Data { 100, 100 }, QCP::Data { 400, 200 }, redBlueImage());
+    plot->replot();
+    waitUntilSettled(*plot);
+
+    // a lands at widget x 300 and b at 0: the red texel is on the right half of the quad.
+    const QImage screen = screenOf(plot);
+    QVERIFY(pureRed(pixelAt(plot, screen, 250, 150)));
+    QVERIFY(pureBlue(pixelAt(plot, screen, 50, 150)));
+
+    const QImage exported = plot->toPixmap(400, 300).toImage();
+    QVERIFY(pureRed(pixelAt(plot, exported, 250, 150)));
+    QVERIFY(pureBlue(pixelAt(plot, exported, 50, 150)));
+}
+
+// The source rect names the texels to draw: a crop shows only them, stretched over the corners.
+void TestRepaint::sourceRectCropsTheImage()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    usePixelRanges(plot);
+    QImage stripes(4, 1, QImage::Format_ARGB32_Premultiplied);
+    stripes.setPixelColor(0, 0, QColor(220, 30, 30)); // red
+    stripes.setPixelColor(1, 0, QColor(40, 180, 60)); // green
+    stripes.setPixelColor(2, 0, QColor(40, 60, 220)); // blue
+    stripes.setPixelColor(3, 0, QColor(20, 20, 20)); // black
+    new ImageItem(plot, QCP::Data { 100, 100 }, QCP::Data { 300, 200 }, stripes,
+                  QRectF(1, 0, 2, 1));
+    plot->replot();
+    waitUntilSettled(*plot);
+
+    // Green then blue across the whole quad, and neither the red nor the black texel in it.
+    const QImage screen = screenOf(plot);
+    QVERIFY(pixelAt(plot, screen, 150, 150).green() > 150);
+    QVERIFY(pixelAt(plot, screen, 150, 150).red() < 100);
+    QVERIFY(pureBlue(pixelAt(plot, screen, 250, 150)));
+    QVERIFY(pixelAt(plot, screen, 105, 150).red() < 100);
+}
+
+// A smooth image interpolates between its texels, a non-smooth one does not.
+void TestRepaint::smoothImageIsInterpolated()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    usePixelRanges(plot);
+    new ImageItem(plot, QCP::Data { 100, 200 }, QCP::Data { 300, 250 }, redBlueImage(), { }, true);
+    new ImageItem(plot, QCP::Data { 100, 100 }, QCP::Data { 300, 150 }, redBlueImage());
+    plot->replot();
+    waitUntilSettled(*plot);
+
+    const QImage screen = screenOf(plot);
+    // Smooth, widget y 75 (data 225): the middle of the quad is a mix of both texels.
+    const QColor mixed = pixelAt(plot, screen, 200, 75);
+    QVERIFY2(mixed.red() > 80 && mixed.blue() > 80,
+             qPrintable(QStringLiteral("the linear sampler did not mix: %1").arg(mixed.name())));
+    QVERIFY2(!pureRed(mixed) && !pureBlue(mixed), "a smooth image must not pick one texel");
+    // Nearest, widget y 175 (data 125): the texel either side of the middle boundary is pure.
+    QVERIFY(pureRed(pixelAt(plot, screen, 190, 175)));
+    QVERIFY(pureBlue(pixelAt(plot, screen, 210, 175)));
+}
+
+// An image the GPU cannot hold as a texture stays with the painter, whole and in place.
+void TestRepaint::anImageTooBigForATextureIsPainted()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    usePixelRanges(plot);
+    const int limit = plot->rhi()->resourceLimit(QRhi::TextureSizeMax);
+    QImage huge(limit + 1, 1, QImage::Format_ARGB32_Premultiplied);
+    huge.fill(QColor(40, 180, 60));
+
+    auto* layer = plot->plottableRhiLayer(plot->currentLayer());
+    QVERIFY(layer);
+    QCPDrawContext context(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+    context.image(QCP::Data { 100, 100 }, QCP::Data { 300, 200 }, huge);
+    layer->clear();
+    QCPResolveCache cache;
+    qcp::QCPRasterFallback fallback;
+    qcpReplayWithRhi(context.drawList(), *layer, *plot->scatterRhiLayer(plot->currentLayer()),
+                     context.frame(), cache, fallback, plot->bufferDevicePixelRatio(),
+                     plot->rhiOutputSize());
+
+    QVERIFY(layer->imageDrawEntries().isEmpty());
+    QVERIFY(fallback.painterHandled(context.drawList().id, 0));
+}
+
+namespace
+{
+//! The widths, in texels, of the images \a plot embeds in a PDF export.
+QVector<int> embeddedImageWidths(const QByteArray& pdf)
+{
+    QVector<int> widths;
+    for (int at = pdf.indexOf("/Subtype /Image"); at >= 0;
+         at = pdf.indexOf("/Subtype /Image", at + 1))
+    {
+        const int start = pdf.indexOf("/Width ", at);
+        if (start < 0)
+            continue;
+        int end = start + 7;
+        while (end < pdf.size() && pdf.at(end) >= '0' && pdf.at(end) <= '9')
+            ++end;
+        widths.append(pdf.mid(start + 7, end - start - 7).toInt());
+    }
+    return widths;
+}
+} // namespace
+
+// A non-smooth image on a vectorised painter is upscaled three times first, as a colour map is, so
+// a viewer resamples it without blurring a texel: the PDF carries a 6-wide raster, not a 2-wide.
+void TestRepaint::vectorExportKeepsSharpCells()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    usePixelRanges(plot);
+    new ImageItem(plot, QCP::Data { 100, 100 }, QCP::Data { 300, 200 }, redBlueImage());
+    plot->replot();
+    waitUntilSettled(*plot);
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.path() + QStringLiteral("/plot.pdf");
+    QVERIFY(plot->savePdf(path, 400, 300));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    QCOMPARE(embeddedImageWidths(file.readAll()), QVector<int> { 6 });
+}
+
+// Five images fit the command budget of one layer, though four is all a rasterised command gets.
+void TestRepaint::fiveImagesOnOneLayerStayOnTheGpu()
+{
+    QWidget host;
+    QCustomPlot* plot = shownGpuPlot(host);
+    if (!plot)
+        QSKIP("no QRhi on this platform");
+    usePixelRanges(plot);
+    auto* layer = plot->plottableRhiLayer(plot->currentLayer());
+    QVERIFY(layer);
+    QCPDrawContext context(plot->xAxis, plot->yAxis, plot->axisRect(), nullptr);
+    for (int i = 0; i < 5; ++i)
+    {
+        QImage image(2, 1, QImage::Format_ARGB32_Premultiplied);
+        image.setPixelColor(0, 0, QColor(20 + 40 * i, 200, 40));
+        image.setPixelColor(1, 0, QColor(20 + 40 * i, 40, 200));
+        context.image(QCP::Data { 10.0 + 70 * i, 40 }, QCP::Data { 60.0 + 70 * i, 90 }, image);
+    }
+
+    layer->clear();
+    QCPResolveCache cache;
+    qcp::QCPRasterFallback fallback;
+    qcpReplayWithRhi(context.drawList(), *layer, *plot->scatterRhiLayer(plot->currentLayer()),
+                     context.frame(), cache, fallback, plot->bufferDevicePixelRatio(),
+                     plot->rhiOutputSize());
+
+    QCOMPARE(int(layer->imageDrawEntries().size()), 5);
+    QCOMPARE(layer->imageTextureCount(), 5);
+    for (int i = 0; i < 5; ++i)
+        QVERIFY(!fallback.painterHandled(context.drawList().id, quint64(i)));
+}

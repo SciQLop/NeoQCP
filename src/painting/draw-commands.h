@@ -184,12 +184,22 @@ struct PathCmd
     QBrush brush;
 };
 
-//! A raster image stretched between two corners.
+//! What an image command draws: the picture, the texels of it to show, and the sampler it wants.
+struct ImagePayload
+{
+    QImage image;
+    QRectF source; //!< in texels; the whole image when empty
+    bool smooth = false; //!< a linear sampler, else nearest
+};
+
+//! A raster image stretched between two corners: \a a is where the top-left texel lands, \a b where
+//! the bottom-right one does. The replay never normalises, so a reversed axis mirrors the image.
 struct ImageCmd
 {
     QCP::Position a;
     QCP::Position b;
-    QImage image;
+    //! Shared: the picture and those choices do not fit the budget a command is held to.
+    std::shared_ptr<const ImagePayload> pixels;
 };
 
 //! Arbitrary painter code; the escape hatch for what has no command yet.
@@ -240,8 +250,15 @@ inline CommandKind commandKind(const QCPDrawCommand& command)
                           || std::is_same_v<T, RectsCmd> || std::is_same_v<T, EllipsesCmd>)
                 return CommandKind { true, false, true, false }; // data by type, never mapped
             else if constexpr (std::is_same_v<T, TextCmd> || std::is_same_v<T, PathCmd>
-                               || std::is_same_v<T, ImageCmd> || std::is_same_v<T, PainterCmd>)
+                               || std::is_same_v<T, PainterCmd>)
                 return CommandKind { false, true, false, false };
+            else if constexpr (std::is_same_v<T, ImageCmd>)
+                // Two data corners make a textured quad a pan moves; any other corner keeps the
+                // picture the painter's, as before.
+                return std::holds_alternative<QCP::Data>(cmd.a)
+                        && std::holds_alternative<QCP::Data>(cmd.b)
+                    ? CommandKind { true, false, true, false }
+                    : CommandKind { false, true, false, false };
             else if constexpr (std::is_same_v<T, RectCmd> || std::is_same_v<T, EllipseCmd>)
                 return CommandKind { true, false,
                                      std::holds_alternative<QCP::Data>(cmd.a)
@@ -256,15 +273,20 @@ inline CommandKind commandKind(const QCPDrawCommand& command)
 }
 
 //! True when the GPU replay draws \a command. Answered by type, so a polygon or a long position
-//! list does not pay the per-point scans of commandKind() on a painter pass.
+//! list does not pay the per-point scans of commandKind() on a painter pass. An image is the
+//! exception: its two corners decide it, and there are only two.
 inline bool isGpuCommand(const QCPDrawCommand& command)
 {
     return std::visit(
         [](const auto& cmd)
         {
             using T = std::decay_t<decltype(cmd)>;
-            return !(std::is_same_v<T, TextCmd> || std::is_same_v<T, PathCmd>
-                     || std::is_same_v<T, ImageCmd> || std::is_same_v<T, PainterCmd>);
+            if constexpr (std::is_same_v<T, ImageCmd>)
+                return std::holds_alternative<QCP::Data>(cmd.a)
+                    && std::holds_alternative<QCP::Data>(cmd.b);
+            else
+                return !(std::is_same_v<T, TextCmd> || std::is_same_v<T, PathCmd>
+                         || std::is_same_v<T, PainterCmd>);
         },
         command);
 }

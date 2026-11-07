@@ -298,10 +298,29 @@ void paintCommand(QCPPainter& painter, const QCPDrawCommand& command, const QCPD
             }
             else if constexpr (std::is_same_v<Command, ImageCmd>)
             {
-                const QRectF rect
-                    = QRectF(qcpResolvePosition(frame, cmd.a), qcpResolvePosition(frame, cmd.b))
-                          .normalized();
-                painter.drawImage(rect, cmd.image);
+                const QPointF a = qcpResolvePosition(frame, cmd.a);
+                const QPointF b = qcpResolvePosition(frame, cmd.b);
+                if (cmd.pixels->image.isNull() || cmd.pixels->source.isEmpty())
+                    return;
+                QImage image = cmd.pixels->image;
+                QRectF source = cmd.pixels->source;
+                // A vector painter embeds the picture at its own resolution, so a viewer resamples
+                // it as it likes. Three times as many texels give it nothing to blur, as
+                // QCPColorMap::draw() does for its cells.
+                if (!cmd.pixels->smooth && painter.modes().testFlag(QCPPainter::pmVectorized))
+                {
+                    image = image.scaled(image.width() * 3, image.height() * 3,
+                                         Qt::IgnoreAspectRatio, Qt::FastTransformation);
+                    source = QRectF(source.topLeft() * 3, source.size() * 3);
+                }
+                painter.save();
+                painter.setRenderHint(QPainter::SmoothPixmapTransform, cmd.pixels->smooth);
+                // a is the top-left texel, so a reversed axis turns into a negative scale and the
+                // picture mirrors. A negative-width target rect would instead be empty.
+                painter.translate(a);
+                painter.scale((b.x() - a.x()) / source.width(), (b.y() - a.y()) / source.height());
+                painter.drawImage(QPointF(0, 0), image, source);
+                painter.restore();
             }
             else if constexpr (std::is_same_v<Command, PainterCmd>)
             {

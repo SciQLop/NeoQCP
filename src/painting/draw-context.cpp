@@ -589,11 +589,17 @@ void QCPDrawContext::path(QCP::Position origin, const QPainterPath& path, const 
            unboundedExtent());
 }
 
-void QCPDrawContext::image(QCP::Position a, QCP::Position b, const QImage& image)
+void QCPDrawContext::image(QCP::Position a, QCP::Position b, const QImage& image,
+                           const QRectF& source, bool smooth)
 {
     const QCP::Position corners[] = { a, b };
     const Extent extent = extentOf(corners);
-    record(*mList, qcp::ImageCmd { a, b, image }, extent);
+    const QRectF texels = source.isNull() ? QRectF(QPointF(0, 0), QSizeF(image.size())) : source;
+    record(*mList,
+           qcp::ImageCmd {
+               a, b,
+               std::make_shared<qcp::ImagePayload>(qcp::ImagePayload { image, texels, smooth }) },
+           extent);
 }
 
 void QCPDrawContext::painter(std::function<void(QCPPainter&, const QCPTransform&)> callback)

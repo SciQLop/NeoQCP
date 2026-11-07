@@ -85,9 +85,11 @@ QCPPlottableRhiLayer::~QCPPlottableRhiLayer()
     delete mImageUniformBuffer;
     delete mImageVertexBuffer;
     delete mImageSampler;
+    delete mImageNearestSampler;
     for (ImageTexture* texture : mImageTextures)
     {
         delete texture->srb;
+        delete texture->srbNearest;
         delete texture->texture;
         delete texture;
     }
@@ -119,7 +121,9 @@ void QCPPlottableRhiLayer::invalidatePipeline()
     for (ImageTexture* texture : mImageTextures)
     {
         delete texture->srb;
+        delete texture->srbNearest;
         texture->srb = nullptr;
+        texture->srbNearest = nullptr;
     }
 }
 
@@ -134,6 +138,8 @@ void QCPPlottableRhiLayer::clear()
     mDashStagingSize = 0;
     mDashEntries.resize(0);
     mImageEntries.resize(0); // the textures stay: a clear and replay must not re-upload them
+    mRasterImages = 0;
+    mCommandImages = 0;
     mDrawOrder.resize(0);
     mDirty = true;
 }
@@ -281,7 +287,34 @@ bool QCPPlottableRhiLayer::addImage(const QImage& image, const QRectF& pixelRect
                                     const QRect& clipRect, double dpr, int outputHeight,
                                     float offsetX, float offsetY, float alpha)
 {
-    if (image.isNull() || mImageBroken || mImageEntries.size() >= kMaxImages)
+    if (!canAddImage())
+        return false;
+    // A rasterised fill is already at device resolution, so its sampler never interpolates:
+    // keep the linear one, as every image did before the commands had a choice.
+    return addImageEntry(image, pixelRect, { }, true, true, clipRect, dpr, outputHeight, offsetX,
+                         offsetY, alpha);
+}
+
+bool QCPPlottableRhiLayer::addCommandImage(const QImage& image, const QPointF& a, const QPointF& b,
+                                           const QRectF& source, bool smooth, const QRect& clipRect,
+                                           double dpr, int outputHeight, float offsetX,
+                                           float offsetY, float alpha)
+{
+    if (!canAddCommandImage(image.size()))
+        return false;
+    // A reversed axis puts b left of or above a: the rect keeps that sign, and the shader mixes
+    // the corners, so the quad mirrors instead of flipping back.
+    const QRectF pixelRect(a, b);
+    return addImageEntry(image, pixelRect, source, smooth, false, clipRect, dpr, outputHeight,
+                         offsetX, offsetY, alpha);
+}
+
+bool QCPPlottableRhiLayer::addImageEntry(const QImage& image, const QRectF& pixelRect,
+                                         const QRectF& source, bool smooth, bool rasterised,
+                                         const QRect& clipRect, double dpr, int outputHeight,
+                                         float offsetX, float offsetY, float alpha)
+{
+    if (image.isNull() || mImageBroken)
         return false;
     const qint64 key = qint64(image.cacheKey());
     ImageTexture*& texture = mImageTextures[key];
@@ -295,13 +328,17 @@ bool QCPPlottableRhiLayer::addImage(const QImage& image, const QRectF& pixelRect
     ImageEntry entry;
     entry.imageKey = key;
     entry.pixelRect = pixelRect;
+    entry.source = source.isNull() ? QRectF(QPointF(0, 0), QSizeF(image.size())) : source;
     entry.deviceSize = image.size();
     entry.offsetX = offsetX;
     entry.offsetY = offsetY;
     entry.alpha = alpha;
+    entry.smooth = smooth;
+    entry.rasterised = rasterised;
     entry.scissorRect = qcp::rhi::computeScissor(clipRect, dpr, outputHeight);
     mImageEntries.append(entry);
     mDrawOrder.append({ DrawKind::Image, int(mImageEntries.size()) - 1 });
+    ++(rasterised ? mRasterImages : mCommandImages);
     return true;
 }
 
@@ -372,10 +409,25 @@ void QCPPlottableRhiLayer::createImagePipeline(QRhiRenderPassDescriptor* rpDesc,
             return;
         }
     }
+    if (!mImageNearestSampler)
+    {
+        // The other half of the per-image choice: a picture asked to stay sharp binds this one.
+        mImageNearestSampler
+            = mRhi->newSampler(QRhiSampler::Nearest, QRhiSampler::Nearest, QRhiSampler::None,
+                               QRhiSampler::ClampToEdge, QRhiSampler::ClampToEdge);
+        if (!mImageNearestSampler->create())
+        {
+            qDebug() << "Failed to create nearest image sampler";
+            delete mImageNearestSampler;
+            mImageNearestSampler = nullptr;
+        }
+    }
 
-    // kMaxImages slots, created once: a resized UBO would invalidate every image's SRB.
-    mImageUniformBuffer = createUniformBuffer(mRhi, imageUbufStride() * kMaxImages,
-                                              "Failed to create image uniform buffer");
+    // One slot per image, both budgets, created once: a resized UBO would invalidate every image's
+    // SRB.
+    mImageUniformBuffer
+        = createUniformBuffer(mRhi, imageUbufStride() * (kMaxImages + kMaxCommandImages),
+                              "Failed to create image uniform buffer");
     if (!mImageUniformBuffer)
         return;
 
@@ -428,7 +480,9 @@ bool QCPPlottableRhiLayer::ensureImageTexture(ImageTexture& texture, const QSize
     if (texture.texture && texture.texture->pixelSize() != size)
     {
         delete texture.srb;
+        delete texture.srbNearest;
         texture.srb = nullptr;
+        texture.srbNearest = nullptr;
         delete texture.texture;
         texture.texture = nullptr;
     }
@@ -445,13 +499,22 @@ bool QCPPlottableRhiLayer::ensureImageTexture(ImageTexture& texture, const QSize
     }
     if (!texture.srb)
     {
-        texture.srb = qcp::rhi::createSrb(
-            mRhi, mImageUniformBuffer, 1,
-            QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage,
-            "Failed to create fallback image SRB", sizeof(ImageUniforms), texture.texture,
-            mImageSampler);
+        texture.srb = qcp::rhi::createSrb(mRhi, mImageUniformBuffer, 1,
+                                          QRhiShaderResourceBinding::VertexStage
+                                              | QRhiShaderResourceBinding::FragmentStage,
+                                          "Failed to create fallback image SRB",
+                                          sizeof(ImageUniforms), texture.texture, mImageSampler);
         if (!texture.srb)
             return false;
+    }
+    if (!texture.srbNearest)
+    {
+        // Only a command image can ask for it, but the choice is made per draw, so both exist.
+        texture.srbNearest = qcp::rhi::createSrb(
+            mRhi, mImageUniformBuffer, 1,
+            QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage,
+            "Failed to create nearest image SRB", sizeof(ImageUniforms), texture.texture,
+            mImageNearestSampler);
     }
     return true;
 }
@@ -529,6 +592,10 @@ void QCPPlottableRhiLayer::uploadImages(QRhiResourceUpdateBatch* updates, const 
             const ImageEntry& entry = mImageEntries[i];
             const float dx = entry.offsetX * dpr;
             const float dy = entry.offsetY * dpr;
+            // The texels to show, as texture coordinates. A source rect that covers the picture
+            // gives 0..1, which is what a rasterised fill always asks for.
+            const double texelsWide = std::max(1, entry.deviceSize.width());
+            const double texelsHigh = std::max(1, entry.deviceSize.height());
             const ImageUniforms params = { float(entry.pixelRect.left()) + dx,
                                            float(entry.pixelRect.top()) + dy,
                                            float(entry.pixelRect.right()) + dx,
@@ -536,7 +603,11 @@ void QCPPlottableRhiLayer::uploadImages(QRhiResourceUpdateBatch* updates, const 
                                            float(outputSize.width()),
                                            float(outputSize.height()),
                                            yFlip,
-                                           entry.alpha };
+                                           entry.alpha,
+                                           float(entry.source.left() / texelsWide),
+                                           float(entry.source.top() / texelsHigh),
+                                           float(entry.source.right() / texelsWide),
+                                           float(entry.source.bottom() / texelsHigh) };
             updates->updateDynamicBuffer(mImageUniformBuffer, i * stride, sizeof(params), &params);
 
             ImageTexture* texture = mImageTextures.value(entry.imageKey, nullptr);
@@ -565,6 +636,7 @@ void QCPPlottableRhiLayer::uploadImages(QRhiResourceUpdateBatch* updates, const 
         if (!texture->used)
         {
             delete texture->srb;
+            delete texture->srbNearest;
             delete texture->texture;
             delete texture;
             it = mImageTextures.erase(it);
@@ -689,13 +761,17 @@ void QCPPlottableRhiLayer::render(QRhiCommandBuffer* cb, const QSize& outputSize
                 return call;
             const ImageEntry& entry = mImageEntries[record.index];
             const ImageTexture* texture = mImageTextures.value(entry.imageKey, nullptr);
-            if (!texture || !texture->srb)
+            if (!texture)
+                return call;
+            // One texture holds both SRBs: the draw names the sampler the command asked for.
+            QRhiShaderResourceBindings* srb = entry.smooth ? texture->srb : texture->srbNearest;
+            if (!srb)
                 return call;
             // The uniform sits past the texture at binding 0: name the right one, or every quad
             // draws with the first image's rect.
             return DrawCall {
-                mImagePipeline, texture->srb,     mImageVertexBuffer, entry.scissorRect, 0, 4,
-                record.index,   imageUbufStride(), 1
+                mImagePipeline,    srb, mImageVertexBuffer, entry.scissorRect, 0, 4, record.index,
+                imageUbufStride(), 1
             };
         }
         if (!mPipeline || !mVertexBuffer || !mSrb)
