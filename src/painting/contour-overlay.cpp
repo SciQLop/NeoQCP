@@ -184,6 +184,9 @@ void QCPContourOverlay::recordLines(QCPDrawContext& context, const QCPColorMapDa
 void QCPContourOverlay::recordLabels(QCPDrawContext& context, const QCPColorMapData* grid,
                                      const QCPAxis* keyAxis, const QCPAxis* valueAxis)
 {
+    // The tile holds pixels, not data, so it cannot be teleported into a new frame: reading the
+    // transform marks the recording for a rebuild on every zoom and pan while labels are on.
+    (void)context.transform();
     const QRectF imageRect = gridRect(grid, keyAxis, valueAxis);
     const QRectF visible = imageRect.normalized().intersected(keyAxis->axisRect()->rect());
     if (visible.isEmpty())

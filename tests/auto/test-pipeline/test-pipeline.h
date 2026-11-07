@@ -176,6 +176,8 @@ private slots:
     void histogram2dContourLabelsFollowAColourScaleToggle();
     void histogram2dContoursMapALogKeyGeometrically();
     void reversedKeyAxisKeepsContourLabelsWithTheirLines();
+    void zoomRebuildsTheContourLabelTile();
+    void zoomKeepsTheContourRecordingWithoutLabels();
     void histogram2dChangingTheGradientRequestsARepaint();
     void histogram2dChangingTheDataRangeRequestsARepaint();
     void histogram2dChangingTheDataScaleTypeRequestsARepaint();

@@ -4224,6 +4224,39 @@ int redPixels(const QImage& img)
 }
 } // namespace
 
+// The label tile is drawn in pixels, so a zoom must rebuild it: otherwise it is replayed
+// stretched, and the area a pan reveals has no labels at all.
+void TestPipeline::zoomRebuildsTheContourLabelTile()
+{
+    auto* hist = bumpHistogram(mPlot);
+    hist->setAutoContourLevels(3);
+    hist->setContourLabelEnabled(true);
+    QSignalSpy spy(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(spy.wait(2000));
+    mPlot->replot();
+    QVERIFY(!hist->lastContourLabels().isEmpty());
+    const int recordings = hist->mCore.recordingCount();
+
+    mPlot->xAxis->setRange(10, 20);
+    mPlot->replot();
+    QVERIFY2(hist->mCore.recordingCount() > recordings, "the label tile was replayed stretched");
+}
+
+// Without labels the recording is all data geometry, so a zoom may replay it as is.
+void TestPipeline::zoomKeepsTheContourRecordingWithoutLabels()
+{
+    auto* hist = bumpHistogram(mPlot);
+    hist->setAutoContourLevels(3);
+    QSignalSpy spy(&hist->pipeline(), &QCPHistogramPipeline::finished);
+    QVERIFY(spy.wait(2000));
+    mPlot->replot();
+    const int recordings = hist->mCore.recordingCount();
+
+    mPlot->xAxis->setRange(10, 20);
+    mPlot->replot();
+    QCOMPARE(hist->mCore.recordingCount(), recordings);
+}
+
 void TestPipeline::histogram2dContoursFollowTheCounts()
 {
     auto* hist = bumpHistogram(mPlot);
