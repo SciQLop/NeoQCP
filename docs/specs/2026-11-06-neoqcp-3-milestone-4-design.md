@@ -35,6 +35,14 @@ API's job until milestone 5).
   debounce later, so a pan never flashes blank) becomes an option the client turns on; SciQLopPlots
   turns it on. Below the resample threshold (100 000 points) nothing is resampled, as today.
 
+- **No interim designs** *(2026-11-07)*: a sub-milestone builds the final shape of what it touches;
+  nothing is built to be replaced by the next one. Hence the rect-owned colour scale is built in M4c
+  (with the relation it serves), not M4d; NeoQCP-only APIs a sub-milestone replaces are renamed
+  outright, without deprecated forwarders (the line colour setters take the colour base's names).
+- **One histogram API** *(2026-11-07)*: the 1D and 2D histograms share an API where it is common and
+  makes the API cleaner (bins, one normalization enum, binning that follows the axis scale, one ready
+  signal).
+
 ## Order (six sub-milestones, each its own plan, each leaves NeoQCP green)
 
 1. **M4a — signals and selection.** The ~105 direct emits move to `deliver`; selection gets one
@@ -47,7 +55,7 @@ API's job until milestone 5).
    the colour-map texture layer generic (images on the GPU); the graph's colour-by-scalar uses the
    relation; `QCPColorScale::rescaleDataRange` sees every user.
 4. **M4d — axes and alignment.** Drag and zoom on by default with per-axis opt-out, linked axes on
-   the transforms, the rect-owned colour scale, then the alignment decision (call 5).
+   the transforms, then the alignment decision (call 5). (The rect-owned colour scale moved to M4c.)
 5. **M4e — the rest.** Error bars, financial, statistical box, intervals, the remaining items, one span
    class, and folding the `QCPDrawn` adapter into the bases.
 6. **M4f — polar** on the object model (answer 10 below).

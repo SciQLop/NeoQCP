@@ -4,22 +4,27 @@
 
 **Goal:** `QCPColorMap`, `QCPColorMap2`, `QCPHistogram2D` and `QCPHistogram` draw through the drawing
 API; one colour-scale relation, set up once in a base class, serves them and the line family; a colour
-scale's rescale sees every user; deleting a scale is noticed.
+scale's rescale sees every user; deleting a scale is noticed; each axis rect owns and places its
+colour scale; the two histograms share one API. Every step is the final design: nothing interim.
 
 **Architecture:** First the image command becomes a GPU command: a textured quad with data-space
 corners, kept across a pan and re-uploaded only when its image changes, on the plottable GPU layer that
 already holds raster images. Then a base `QCPAbstractColorMapped` (between `QCPAbstractPlottable` and the
 colour-mapping classes) owns gradient, data range, scale type and the link to a `QCPColorScale`, which
-keeps a list of its users. The colour maps then record an image command (and contours as polylines and
-text); the separate colour-map GPU layer is deleted. The 1D histogram records rect batches. Last, the
-line family's colour-by-value moves onto the relation.
+keeps a list of its users. Each axis rect owns one scale, made on first use, hidden until used and
+placed in the rect's margin; colour-mapped plottables use it unless told otherwise. The colour maps then
+record an image command (and contours as polylines and text); the separate colour-map GPU layer is
+deleted. The histograms get one base API and the 1D one records rect batches. Last, the line family's
+colour-by-value moves onto the relation, under the base's names.
 
 **Tech Stack:** C++20, Qt 6.12 (QRhi), meson, QtTest, the in-tree benchmark (`tests/benchmark`).
 
 **Spec:** `docs/specs/2026-11-06-neoqcp-3-milestone-4-design.md` (order item 3 "M4c"; answers 7, 13,
 14), with `docs/specs/2026-11-02-neoqcp-3-object-model-design.md` (decision 14; answer "the
 one-interface rule covers every duplicated family") and `docs/specs/2026-11-04-neoqcp-3-drawing-api-design.md`
-(section 3: images move to the GPU in milestone 4). Facts: `docs/plans/neoqcp-3/m4c-inventory.md`
+(section 3: images move to the GPU in milestone 4). Maintainer, 2026-11-07: no interim designs; the
+rect-owned scale moves here from M4d; the histograms share one API where it is common and cleaner;
+the line colour setters take the base's names with no deprecated forwarders. Facts: `docs/plans/neoqcp-3/m4c-inventory.md`
 (file:line for everything this plan names).
 
 ## Global Constraints
@@ -33,8 +38,9 @@ one-interface rule covers every duplicated family") and `docs/specs/2026-11-04-n
   are measured on the old code by Task 1. `QCPGpu_*`, `QCPDrawn_*`, `QCPItems_*`, `QCPBars_*` and the
   rows Task 1 adds: 5 %; the rest 15 %. `-median 5`, three runs; a row over its gate gets six more runs
   and their median decides.
-- The rect-owned colour scale (answer 13's placement) is milestone 4d. Here a `QCPColorScale` stays a
-  layout element the user creates and places.
+- No interim design: a task builds the final shape of what it touches. No forwarder, alias or
+  `\deprecated` method is added for a NeoQCP-only API this milestone replaces; its tests move to the new
+  names. 2.x QCustomPlot API (`QCPColorMap`, `QCPColorScale`) keeps working until milestone 5.
 - The colour signals keep their 2.x arguments (`dataRangeChanged(const QCPRange&)`,
   `gradientChanged(const QCPColorGradient&)`, `dataScaleTypeChanged(QCPAxis::ScaleType)`); they are
   emitted through `qcpEmit` (`src/core.h`).
@@ -47,15 +53,17 @@ one-interface rule covers every duplicated family") and `docs/specs/2026-11-04-n
 ## Review Focus
 
 1. A pan of a colour map, colour map 2 or 2D histogram uploads no texture and colourises nothing; the
-   quad moves (Task 2 test `aPannedImageIsNotUploadedAgain`, Task 5 test `aPanDoesNotRecolour`).
+   quad moves (Task 2 test `aPannedImageIsNotUploadedAgain`, Task 6 test `aPanDoesNotRecolour`).
 2. Reversed axes and a vertical key axis put the first cell where 2.x put it (Task 2 test
-   `imageFollowsReversedAxes`, Task 4 test `verticalKeyAxisMapMatchesTheExport`).
+   `imageFollowsReversedAxes`, Task 5 test `verticalKeyAxisMapMatchesTheExport`).
 3. An image larger than the GPU's texture limit, and a vectorised export, still draw it at today's
    quality (Task 2 tests `anImageTooBigForATextureIsPainted`, `vectorExportKeepsSharpCells`).
 4. Deleting a colour scale that maps use: no crash, the maps keep the last gradient and range, and
    they say so with `colorScaleChanged()` (Task 3 test `deletingTheScaleIsNoticed`).
 5. Five colour maps on one layer all draw on the GPU, under that layer's lines (Task 2 test
    `fiveImagesOnOneLayerStayOnTheGpu`).
+6. Two colour maps on one rect share their rect's scale; a 2.x program that puts its own scale in the
+   plot layout still works (Task 4 tests `mapsOnOneRectShareItsScale`, `aUserMadeScaleStillWorks`).
 
 ---
 
@@ -160,7 +168,40 @@ one-interface rule covers every duplicated family") and `docs/specs/2026-11-04-n
 - [ ] **Step 4:** Run the tests and the offscreen suite. Expected: PASS, suite green.
 - [ ] **Step 5:** Commit: "feat(colour): one colour-scale relation in a base; rescale sees every user".
 
-### Task 4: `QCPColorMap` on the drawing API
+### Task 4: Each axis rect owns and places its colour scale
+
+**Files:**
+- Modify: `src/layoutelements/layoutelement-axisrect.{h,cpp}`,
+  `src/layoutelements/layoutelement-colorscale.{h,cpp}`, `src/plottables/plottable-colormapped.{h,cpp}`
+- Test: `tests/auto/test-colormap/` (or a new `test-colorscale/` if the slots exceed 15)
+
+**Interfaces:**
+- Consumes: Task 3's base and the scale's user list.
+- Produces: `QCPAxisRect::colorScale()` returns a handle to the rect's own scale, made on first call and
+  owned by the rect (deleted with it). It is visible exactly while it has at least one user.
+- Produces: the rect places its own scale in its margin on the side the scale's `type()` names (right
+  by default), outside that side's axes; the rect's auto margin on that side grows by the scale's
+  width; the scale is not in the plot's layout grid. Changing the scale's type moves it.
+- Rule (answer 13): a `QCPAbstractColorMapped` uses its key axis rect's scale from construction unless
+  `setColorScale` gives it another scale or none; the rect places only its own. A line counts as a
+  user only while it has colour values.
+- Rule: deleting the rect's own scale (through `remove`) is noticed as Task 3 says; the next
+  `colorScale()` call makes a new one.
+
+- [ ] **Step 1: Write the failing tests:** `aRectMakesItsScaleOnFirstUse`; `scaleIsHiddenUntilUsed`;
+  `mapsOnOneRectShareItsScale` (two maps, one rescale → both use the union range);
+  `scaleSitsOutsideTheRightAxis` (scale's outer rect left ≥ the right axis's outer edge, and inside the
+  plot); `rectShrinksForItsScale` (the rect's inner width drops by about the scale's width when a map
+  arrives, and comes back when it goes); `typeTopPutsTheScaleAbove`; `optingOutHidesTheScale`
+  (`setColorScale(nullptr)` on the only user → hidden); `aUserMadeScaleStillWorks` (a 2.x program:
+  `add<QCPColorScale>` in the layout, `map->setColorScale(s)`; the rect's scale stays hidden).
+- [ ] **Step 2:** Run them. Expected: FAIL (no `QCPAxisRect::colorScale`).
+- [ ] **Step 3:** Implement. Test `QCPColorScale`'s internal axis rect is not given a scale of its own.
+- [ ] **Step 4:** Run the tests, the offscreen suite and the Xvfb binary. Expected: PASS, suite green;
+  the 2.x colour-scale tests that build their own scale pass unchanged.
+- [ ] **Step 5:** Commit: "feat(axisrect): each rect owns and places its colour scale".
+
+### Task 5: `QCPColorMap` on the drawing API
 
 **Files:**
 - Modify: `src/plottables/plottable-colormap.{h,cpp}`
@@ -189,7 +230,7 @@ one-interface rule covers every duplicated family") and `docs/specs/2026-11-04-n
   `QCPColorMap_Standard`, `QCPColorMap_ColorizeMap`. Expected: PASS; rows within their gates.
 - [ ] **Step 5:** Commit: "feat(colormap): the classic colour map records an image".
 
-### Task 5: `QCPColorMap2` and `QCPHistogram2D` record their image and contours
+### Task 6: `QCPColorMap2` and `QCPHistogram2D` record their image and contours
 
 **Files:**
 - Modify: `src/plottables/plottable-colormap2.{h,cpp}`, `src/plottables/plottable-histogram2d.{h,cpp}`,
@@ -227,33 +268,44 @@ one-interface rule covers every duplicated family") and `docs/specs/2026-11-04-n
 - [ ] **Step 5:** Commit (one or two commits): "feat(colormap2, histogram2d): record the image and
   contours; the colour-map GPU layer goes".
 
-### Task 6: `QCPHistogram` (1D) on the drawing API
+### Task 7: One histogram API; the 1D histogram on the drawing API
 
 **Files:**
-- Modify: `src/plottables/plottable-histogram.{h,cpp}`
-- Test: `tests/auto/test-histogram1d/`
+- Create: `src/plottables/plottable-histogram-base.{h,cpp}`
+- Modify: `src/plottables/plottable-histogram.{h,cpp}`, `src/plottables/plottable-histogram2d.{h,cpp}`,
+  `src/datasource/histogram-binner-1d.h` (the enum moves), the 2D binning code, `meson.build`
+- Test: `tests/auto/test-histogram1d/`, `tests/auto/test-pipeline/` (the `histogram2d*` slots)
 
 **Interfaces:**
-- Produces: `class QCPHistogram : public QCPDrawn<QCPAbstractPlottable>`; `draw(QCPDrawContext&)`
-  records each column as one `RectsCmd` batch (R3, `draw-commands.h`) of fills with the column's
-  outline pen, or, in step style, one polyline per column; legend icon recorded. `drawColumnOnGpu`,
-  `paintColumn` and their helpers go if unused.
-- Decision: the 1D histogram has no colour scale (inventory §4) and does not derive the colour base;
-  the 1D and 2D histograms share no base this milestone (their only common setters, `setBins` and
-  `setNormalization`, take different arguments). Recorded as a ruling; the object-model spec asks for one
-  histogram API, so the maintainer may overrule it.
+- Produces: `enum class QCP::HistogramNormalization { Count, Density, Probability }` (numpy's meanings:
+  Density divides by the total and the bin area, Probability by the total), replacing
+  `qcp::algo::HistogramNormalization` and `QCPHistogram2D::Normalization`.
+- Produces: a shared API on both classes, from a mixin or a base as the code allows (the 2D class
+  derives the colour base, the 1D one does not): `setBins(int)` / `bins()`,
+  `setNormalization(QCP::HistogramNormalization)` / `normalization()`, `refreshBinning()` (slot), and
+  the signal `histogramReady()` when a re-bin lands. Bins follow the key (and value) axis scale on both:
+  a log axis bins in log10.
+- Produces, 2D only: `setBins(int keyBins, int valueBins)`, `keyBins()`, `valueBins()`,
+  `setColumnNormalized(bool)` / `columnNormalized()` (today's `nColumn`: each key column sums to 1; it
+  replaces the normalization while on). `setKeyBinScale`, `setValueBinScale` and their getters go (they
+  only set the axis scale). `binsChanged` becomes `histogramReady`.
+- Produces: `class QCPHistogram : public QCPDrawn<...>`; `draw(QCPDrawContext&)` records each column as
+  one `RectsCmd` batch (R3, `draw-commands.h`) with the column's outline pen, or, in step style, one
+  polyline per column; legend icon recorded. `drawColumnOnGpu`, `paintColumn` and their helpers go.
 
-- [ ] **Step 1: Write the failing tests:** `histogramColumnIsOneBatch`; `aPanKeepsTheRecording`
-  (recording count unchanged over a pan inside the view); rewrite the six `gpu*` tests of
-  `test-histogram-plottable.h` to read the recording or the pixels instead of layer geometry, keeping
-  their meaning.
-- [ ] **Step 2:** Run them. Expected: FAIL.
+- [ ] **Step 1: Write the failing tests:** `bothHistogramsShareTheNormalization` (Count, Density,
+  Probability on a known 2D sample: totals 100, 100/area, 1); `columnNormalizedSumsEachKeyColumnToOne`;
+  `binsFollowALogKeyAxis` (1D and 2D); `histogram2DSaysReady`; `histogramColumnIsOneBatch`;
+  `aPanKeepsTheRecording`; rewrite the six `gpu*` tests of `test-histogram-plottable.h` to read the
+  recording or the pixels instead of layer geometry, keeping their meaning; move the `histogram2d*`
+  tests that call the removed setters to the axis scale or the new names.
+- [ ] **Step 2:** Run them. Expected: FAIL (compile for the new names, then behaviour).
 - [ ] **Step 3:** Implement.
-- [ ] **Step 4:** Run the tests, the offscreen suite and the Xvfb binary; bench `QCPGpu_HistogramPan`.
-  Expected: PASS; within the gate.
-- [ ] **Step 5:** Commit: "feat(histogram): the 1D histogram records rect batches".
+- [ ] **Step 4:** Run the tests, the offscreen suite and the Xvfb binary; bench `QCPGpu_HistogramPan`,
+  `QCPGpu_Histogram2DPan`. Expected: PASS; within the gates.
+- [ ] **Step 5:** Commit: "feat(histogram): one histogram API; the 1D histogram records rect batches".
 
-### Task 7: The line family's colour on the relation
+### Task 8: The line family's colour on the relation
 
 **Files:**
 - Modify: `src/plottables/plottable-line.{h,cpp}`, `src/plottables/plottable-multigraph.{h,cpp}`,
@@ -262,16 +314,17 @@ one-interface rule covers every duplicated family") and `docs/specs/2026-11-04-n
   `tests/auto/test-qcpcurve/` (`noSetterIsIgnored`)
 
 **Interfaces:**
-- Consumes: Task 3's base.
+- Consumes: Task 3's base, Task 4's rect scale (a coloured line is a user of its rect's scale).
 - Produces: `class QCPAbstractLine : public QCPAbstractColorMapped`. The line's colour gradient, range
   and scale type are the base's; `qcp::ColorScalarMapper` keeps the values and the LUT and is fed from
   the base in `colorMappingChanged()`. `colorDataBounds` is the finite range of the colour values (the
   positive part on a log scale). A line can be given a scale (`setColorScale`) and then follows it.
-- Decision: `setColorGradient`, `colorGradient`, `setColorRange`, `colorRange`, `setColorScaleType`,
-  `colorScaleType` stay as one-line forwarders marked `\deprecated` (SciQLopPlots calls them); they go in
-  milestone 5. No second state.
+- Decision: `setColorGradient`, `colorGradient`, `setColorRange`, `colorRange`, `setColorScaleType` and
+  `colorScaleType` are deleted; a line uses the base's `setGradient`, `setDataRange`,
+  `setDataScaleType`. Their tests move to the new names. `setColorValues`, `clearColorValues` and
+  `hasColorValues` stay (the values are the line's own).
 
-- [ ] **Step 1: Write the failing tests:** `aLineFollowsItsScale` (a coloured multigraph on a scale;
+- [ ] **Step 1: Write the failing tests:** `aColouredLineShowsItsRectScale`; `aLineFollowsItsScale` (a coloured multigraph on a scale;
   `scale->setGradient(g)` → the recording's colours change); `rescaleSeesALine` (a line's colour values
   max 7, a colour map max 3 on one scale → range upper 7); `aCurveFollowsItsScale`; add a
   `setColorScale` row to both `noSetterIsIgnored` tests.
@@ -281,7 +334,7 @@ one-interface rule covers every duplicated family") and `docs/specs/2026-11-04-n
   `QCPGpu_MultiGraphColored100kPan`. Expected: PASS; within the gate.
 - [ ] **Step 5:** Commit: "feat(line): colour by value on the colour-scale relation".
 
-### Task 8: Finish
+### Task 9: Finish
 
 **Files:**
 - Modify: `changelog.txt`, `docs/plans/neoqcp-3/baseline.md`, `docs/plans/neoqcp-3/backlog.md`
@@ -290,7 +343,9 @@ one-interface rule covers every duplicated family") and `docs/specs/2026-11-04-n
 - [ ] **Step 1:** Changelog, milestone 4c section: the relation and its rules (scale wins, rescale
   unions every user, deletion noticed), images on the GPU, the colour-map layer gone, the deprecated
   line colour setters, and "Behaviour changes for 2.x users" (deleting a scale emits
-  `colorScaleChanged()`; `rescaleDataRange` sees colour map 2, 2D histogram and coloured lines).
+  `colorScaleChanged()`; `rescaleDataRange` sees colour map 2, 2D histogram and coloured lines;
+  colour maps on one rect share its scale unless told otherwise; the line colour setters and the 2D
+  histogram's normalization enum and bin-scale setters are renamed or gone).
 - [ ] **Step 2:** Offscreen suite, ASan suite, Xvfb binary, clang `-fsyntax-only` on every changed
   `.cpp`, the whole bench table three times appended as "End of milestone 4c".
 - [ ] **Step 3:** Rulings and deferred minors to `milestone-4c-rulings.md`; deferred minors also to
