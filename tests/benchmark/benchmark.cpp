@@ -1,5 +1,6 @@
 #include <QtTest/QtTest>
 
+#include <cmath>
 #include <coords.h>
 #include <datasource/resample.h>
 #include <datasource/soa-datasource-2d.h>
@@ -59,6 +60,7 @@ private slots:
     void QCPColorMap2_ResamplePanSequenceSmall();
     void QCPColorMap2_ResampleWideSerial();
     void QCPColorMap2_ResampleWideParallel();
+    void QCPColorScale_Rescale8();
 
 
     void QCPAxis_TickLabels();
@@ -106,6 +108,11 @@ private slots:
     void QCPGpu_BarsPan10k();
     void QCPGpu_Text1k();
     void QCPGpu_MixedLayer();
+    void QCPGpu_ColorMapPan();
+    void QCPGpu_ColorMap2Pan();
+    void QCPGpu_ColorMap2Zoom();
+    void QCPGpu_Histogram2DPan();
+    void QCPGpu_HistogramPan();
 
     void QCPCoords_CoordToPixel1M();
     void QCPTransform_Map1M();
@@ -859,6 +866,32 @@ void Benchmark::QCPColorMap_ColorizeMap()
         map->data()->setCell(0, 0, 0); // to invalidate the currently cached map image
         mPlot->replot();
     }
+}
+
+void Benchmark::QCPColorScale_Rescale8()
+{
+    // Offscreen row: one colour scale over 8 classic maps of 500x500. The rescale reads each
+    // map's cached bounds (no cell scan: dataBounds is kept by setCell) and sets the scale range.
+    auto* scale = new QCPColorScale(mPlot);
+    mPlot->plotLayout()->addElement(0, 1, scale);
+    const int n = 500;
+    for (int m = 0; m < 8; ++m)
+    {
+        auto* map = new QCPColorMap(mPlot->xAxis, mPlot->yAxis);
+        map->setColorScale(scale);
+        map->data()->setSize(n, n);
+        map->data()->setRange(QCPRange(0, 10), QCPRange(0, 10));
+        for (int x = 0; x < n; ++x)
+            for (int y = 0; y < n; ++y)
+                map->data()->setCell(x, y, double((x * 31 + y * 17 + m) % 1000));
+    }
+    QBENCHMARK
+    {
+        scale->rescaleDataRange(true);
+    }
+    // The row times the loop over the plot's plottables: if realVisibility ever hid the maps, the
+    // loop would walk past all 8 and time nothing.
+    QVERIFY2(scale->dataRange().upper > 900, "the rescale saw the maps");
 }
 
 namespace
@@ -1991,6 +2024,188 @@ void Benchmark::QCPGpu_MixedLayer()
     QBENCHMARK
     {
         zoomInPlace(plot, 0.5, 1.0, step);
+    }
+}
+
+namespace
+{
+// A 4000 x 1000 spectrogram: x and y index the cells, z a repeating ramp, as the resample rows.
+void fillSpectrogram(int nx, int ny, std::vector<double>& x, std::vector<double>& y,
+                     std::vector<double>& z)
+{
+    x.resize(nx);
+    for (int i = 0; i < nx; ++i)
+        x[i] = double(i);
+    y.resize(ny);
+    for (int j = 0; j < ny; ++j)
+        y[j] = double(j);
+    z.resize(std::size_t(nx) * ny);
+    for (std::size_t i = 0; i < z.size(); ++i)
+        z[i] = double(i % 997);
+}
+
+// One million deterministic samples over 0..100 in both coordinates (irrational strides).
+void fillScatter2D(int n, std::vector<double>& keys, std::vector<double>& values)
+{
+    keys.resize(n);
+    values.resize(n);
+    for (int i = 0; i < n; ++i)
+    {
+        keys[i] = 100 * std::fmod(i * 0.7548776662466927, 1.0);
+        values[i] = 100 * std::fmod(i * 0.5698402909980532, 1.0);
+    }
+}
+
+// A 2-D plottable above the async threshold bins or resamples off-thread: paint, pump until that
+// first result has landed, then paint again. Otherwise a pan row would time the first build.
+template <typename Plottable>
+bool settlePipeline(QCustomPlot* plot, Plottable* plottable)
+{
+    plot->replot();
+    QElapsedTimer waited;
+    waited.start();
+    while (plottable->pipeline().isBusy() && waited.elapsed() < 30000)
+    {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+        QTest::qWait(10);
+    }
+    if (plottable->pipeline().isBusy())
+        return false;
+    plot->replot();
+    QCoreApplication::processEvents();
+    return true;
+}
+} // namespace
+
+void Benchmark::QCPGpu_ColorMapPan()
+{
+    QWidget host;
+    QCustomPlot* plot = nullptr;
+    if (!makeGpuPlot(host, plot))
+        QSKIP("no QRhi on this platform (qoffscreen)");
+    const int n = 1000;
+    auto* map = new QCPColorMap(plot->xAxis, plot->yAxis);
+    map->data()->setSize(n, n);
+    map->data()->setRange(QCPRange(0, 10), QCPRange(0, 10));
+    for (int x = 0; x < n; ++x)
+        for (int y = 0; y < n; ++y)
+            map->data()->setCell(x, y, double((x * 31 + y * 17) % 1000));
+    map->setGradient(QCPColorGradient(QCPColorGradient::gpHot));
+    map->rescaleDataRange();
+    plot->xAxis->setRange(0, 2);
+    plot->yAxis->setRange(0, 10);
+    settleGpuPlot(plot);
+    double left = 0;
+    QBENCHMARK
+    {
+        left += 0.02; // 1 % of the window
+        if (left + 2 > 10)
+            left = 0; // wrap: one measurement runs far more steps than the data is wide
+        plot->xAxis->setRange(left, left + 2);
+        plot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+}
+
+void Benchmark::QCPGpu_ColorMap2Pan()
+{
+    QWidget host;
+    QCustomPlot* plot = nullptr;
+    if (!makeGpuPlot(host, plot))
+        QSKIP("no QRhi on this platform (qoffscreen)");
+    auto* cm = new QCPColorMap2(plot->xAxis, plot->yAxis);
+    std::vector<double> x, y, z;
+    fillSpectrogram(4000, 1000, x, y, z);
+    cm->setData(std::move(x), std::move(y), std::move(z));
+    plot->xAxis->setRange(0, 400);
+    plot->yAxis->setRange(0, 999);
+    QVERIFY2(settlePipeline(plot, cm), "the first colour-map resample did not land");
+    double left = 0;
+    QBENCHMARK
+    {
+        left += 4; // 1 % of the 400-wide window
+        if (left + 400 > 3999)
+            left = 0; // wrap: one measurement runs far more steps than the source is wide
+        plot->xAxis->setRange(left, left + 400);
+        plot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+}
+
+void Benchmark::QCPGpu_ColorMap2Zoom()
+{
+    QWidget host;
+    QCustomPlot* plot = nullptr;
+    if (!makeGpuPlot(host, plot))
+        QSKIP("no QRhi on this platform (qoffscreen)");
+    auto* cm = new QCPColorMap2(plot->xAxis, plot->yAxis);
+    std::vector<double> x, y, z;
+    fillSpectrogram(4000, 1000, x, y, z);
+    cm->setData(std::move(x), std::move(y), std::move(z));
+    plot->xAxis->setRange(1800, 2200);
+    plot->yAxis->setRange(0, 999);
+    QVERIFY2(settlePipeline(plot, cm), "the first colour-map resample did not land");
+    int step = 0;
+    QBENCHMARK
+    {
+        const double width = (step++ % 2) ? 400.0 : 396.0; // zoom in place by 1 %
+        plot->xAxis->setRange(2000 - width / 2, 2000 + width / 2);
+        plot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+}
+
+void Benchmark::QCPGpu_Histogram2DPan()
+{
+    QWidget host;
+    QCustomPlot* plot = nullptr;
+    if (!makeGpuPlot(host, plot))
+        QSKIP("no QRhi on this platform (qoffscreen)");
+    auto* hist = new QCPHistogram2D(plot->xAxis, plot->yAxis);
+    hist->setBins(200, 200);
+    std::vector<double> keys, values;
+    fillScatter2D(1000000, keys, values);
+    hist->setData(std::move(keys), std::move(values));
+    plot->xAxis->setRange(40, 60);
+    plot->yAxis->setRange(40, 60);
+    QVERIFY2(settlePipeline(plot, hist), "the first 2-D binning did not land");
+    double left = 40;
+    QBENCHMARK
+    {
+        left += 0.2; // 1 % of the window
+        if (left + 20 > 100)
+            left = 0; // wrap: one measurement runs far more steps than the data is wide
+        plot->xAxis->setRange(left, left + 20);
+        plot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+}
+
+void Benchmark::QCPGpu_HistogramPan()
+{
+    QWidget host;
+    QCustomPlot* plot = nullptr;
+    if (!makeGpuPlot(host, plot))
+        QSKIP("no QRhi on this platform (qoffscreen)");
+    auto* hist = new QCPHistogram(plot->xAxis, plot->yAxis);
+    hist->setBins(100);
+    const int n = 1000000;
+    std::vector<double> keys(n), values(n);
+    for (int i = 0; i < n; ++i)
+    {
+        keys[i] = double(i);
+        values[i] = 100 * std::fmod(i * 0.7548776662466927, 1.0);
+    }
+    using Src = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
+    hist->setDataSource(std::make_shared<Src>(
+        std::move(keys), std::vector<std::vector<double>> { std::move(values) }));
+    plot->xAxis->setRange(40, 60);
+    plot->yAxis->setRange(0, 15000);
+    QVERIFY2(settlePipeline(plot, hist), "the first 1-D binning did not land");
+    double left = 40;
+    QBENCHMARK
+    {
+        left += 0.2; // 1 % of the window
+        if (left + 20 > 100)
+            left = 0; // wrap: one measurement runs far more steps than the data is wide
+        plot->xAxis->setRange(left, left + 20);
+        plot->replot(QCustomPlot::rpImmediateRefresh);
     }
 }
 

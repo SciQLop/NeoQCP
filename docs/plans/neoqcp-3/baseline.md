@@ -757,3 +757,54 @@ median of the two series: 0.15, 0.61, 0.13, 0.40 and 38 ms.
 | QCPGpu_MultiGraphZoom1M | 0.61 | 0.69 | 0.69 / 0.68 / 0.69 | 1.13 |
 | QCPGpu_Pan100k | 0.22 | 0.22 | 0.22 / 0.22 / 0.22 | 1.00 |
 | QCPGpu_Text1k | 1.1 | 1 | 1.0 / 1.0 / 1.1 | 0.91 |
+
+## M4c start: rows added for the colour maps
+
+- Commit: b3bc0bd (neoqcp-3.0) plus the rows of `bench: rows for the colour maps and histograms, measured on the
+  old code`. The numbers are measured on the pre-4c library code: task 1 of milestone 4c adds rows only, no library
+  change. Machine, renderer and command shape as in "End of milestone 4a" above.
+- Commands: the five GPU rows in one Xvfb invocation (`xvfb-run -a -s "-screen 0 1600x1200x24" env
+  QT_QPA_PLATFORM=xcb build-qt612/tests/benchmark/qcp_benchmark -median 5 <rows>`, llvmpipe, CPU side only), then
+  the CPU row offscreen (`QT_QPA_PLATFORM=offscreen build-qt612/tests/benchmark/qcp_benchmark -median 5
+  QCPColorScale_Rescale8`). Three runs of the set, one set after another. Median of the five measurements of a run.
+- What each row times:
+  - QCPGpu_ColorMapPan: a 1000x1000 classic `QCPColorMap` over 0..10 on both axes, gpHot, a 2-wide by 10-tall
+    window (a fifth of the data), panned by 1 % of the window per iteration. The map image is only rebuilt when the
+    data, the data range, the gradient or the scale type changes, so a pan step draws the cached 1000x1000 image
+    through the painter and lets the clip do the rest: the row times that frame, not a re-colour. The pan wraps to
+    0 when it reaches the end of the data.
+  - QCPGpu_ColorMap2Pan: a `QCPColorMap2` over a 4000x1000 source, a 400-wide window (a tenth of the source),
+    panned by 1 % of the window per iteration. A range change submits an async resample; the row times the
+    steady-state pan, so every frame draws the last result and translates it when it can.
+  - QCPGpu_ColorMap2Zoom: the same source, zoomed in place by 1 % (window 400 / 396 alternating) around 2000.
+  - QCPGpu_Histogram2DPan: a `QCPHistogram2D` over 1 000 000 scattered (x, y) pairs in 0..100 over both axes,
+    200x200 bins, a 20-wide window, panned by 1 % of the window per iteration. The binning is viewport
+    independent, so a pan step redraws the 200x200 image and does not re-bin.
+  - QCPGpu_HistogramPan: a 1-D `QCPHistogram` over 1 000 000 keys in 0..100, 100 bins, a 20-wide window, panned by
+    1 % of the window per iteration. `draw()` rebuilds the bar geometry every frame.
+  - QCPColorScale_Rescale8: `rescaleDataRange(true)` on one `QCPColorScale` over 8 classic 500x500 maps that are
+    all visible. It times the walk over the plot's plottables, each map's cached `dataBounds` and `setDataRange`.
+    The cells are not read: `setCell` keeps the bounds, so this row cannot show a per-cell scan.
+- The GPU rows QSKIP without a QRhi (qoffscreen). Before QBENCHMARK they warm the plot as QCPGpu_Pan100k does; the
+  colour-map and histogram rows then replot and pump the event loop until their pipeline is idle, so the numbers are
+  steady-state frames, not the first resample or the first binning.
+- Load average (1/5/15 min) at the start of each run. GPU rows, run 1: 4.50 / 6.26 / 4.84, run 2: 5.63 / 6.36 /
+  4.94, run 3: 6.75 / 6.58 / 5.09. CPU row, run 1: 6.03 / 6.45 / 4.97, run 2: 7.25 / 6.68 / 5.11, run 3: 4.46 /
+  5.99 / 4.95. No 1600x1200 Xvfb server was left behind.
+- Every row ran under Xvfb; none skipped. The medians of five repeat to 2-8 % across the three runs. The
+  per-iteration spread inside one measurement is much wider than that for QCPGpu_ColorMapPan (std dev 0.17-0.28 on
+  0.41 ms) and QCPGpu_ColorMap2Zoom (0.07-0.08 on 0.15 ms); the median of five absorbs it.
+- QCPGpu_ColorMapPan is 3x QCPGpu_MultiGraphPan1M (0.41 vs 0.15 ms). Both draw a cached result, but the map frame
+  draws a 1000x1000 image into the axis rect on every step, while a multigraph pan translates cached lines.
+- QCPColorScale_Rescale8 is 0.00014 ms (0.14 us): 8 plottables, cached bounds, one range set. If the M4c code ever
+  reads cells here, the number moves by orders of magnitude, not percent.
+- These six numbers are the gate for the rows this task adds: 5 %, as for `QCPGpu_*` (plan Global Constraints).
+
+| row | run 1 / 2 / 3 | median |
+|---|---|---|
+| QCPColorScale_Rescale8 | 0.00014 / 0.00014 / 0.00014 | 0.00014 |
+| QCPGpu_ColorMap2Pan | 0.14 / 0.13 / 0.14 | 0.13 |
+| QCPGpu_ColorMap2Zoom | 0.15 / 0.15 / 0.15 | 0.15 |
+| QCPGpu_ColorMapPan | 0.41 / 0.41 / 0.42 | 0.41 |
+| QCPGpu_Histogram2DPan | 0.14 / 0.13 / 0.13 | 0.13 |
+| QCPGpu_HistogramPan | 0.19 / 0.18 / 0.18 | 0.18 |
