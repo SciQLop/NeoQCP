@@ -81,6 +81,8 @@ public:
 
     //! The range of the binned (normalized) counts; \a found is false before the first binning.
     [[nodiscard]] QCPRange colorDataBounds(bool& found) const override;
+    //! Before the first binning, \a recalc starts one; the range follows when it lands.
+    void rescaleDataRange(bool recalc = false) override;
 
     // Contours, as on QCPColorMap2, over the values shown: the column fractions with nColumn.
     void setContourLevels(const QVector<double>& levels);

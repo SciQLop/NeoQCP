@@ -139,7 +139,7 @@ public:
     void setTightBoundary(bool enabled);
 
     // non-property methods:
-    void rescaleDataRange(bool recalculateDataBounds = false);
+    void rescaleDataRange(bool recalculateDataBounds = false) override;
     QCPRange colorDataBounds(bool& found) const override;
     Q_SLOT void updateLegendIcon(Qt::TransformationMode transformMode = Qt::SmoothTransformation,
                                  const QSize& thumbSize = QSize(32, 18));

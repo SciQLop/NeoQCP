@@ -1288,3 +1288,42 @@ void TestColorMap::QCPColorMap2_contourLabelsDrawSpacedInsideThePlot()
         QVERIFY2(d >= QCPColorMap2::kContourLabelSpacing, "labels of one level must be spaced");
     }
 }
+
+// rescaleDataRange() on a colour map 2 fits the resampled view; with true it fits all the data.
+// Called through the base, as generic code does.
+void TestColorMap::QCPColorMap2_rescaleKeepsItsViewMeaning()
+{
+  auto* cm = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  std::vector<double> manyX(4000), twoY = {0, 1}, ramp(4000 * 2);
+  for (int i = 0; i < 4000; ++i)
+  {
+    manyX[i] = i;
+    ramp[i] = ramp[4000 + i] = 10.0 * i / 3999;
+  }
+  cm->setData(manyX, twoY, ramp);
+  mPlot->xAxis->setRange(0, 4000);
+  mPlot->yAxis->setRange(0, 1);
+  mPlot->replot();
+  QTRY_VERIFY_WITH_TIMEOUT(!cm->busy(), 5000);
+  QCPAbstractColorMapped* mapped = cm;
+  mapped->rescaleDataRange(false);
+  QVERIFY2(cm->dataRange().size() < 10.0, "the view's range should be narrower than the data");
+  mapped->rescaleDataRange(true);
+  QCOMPARE(cm->dataRange().lower, 0.0);
+  QCOMPARE(cm->dataRange().upper, 10.0);
+}
+
+// A maximum lowered after the bounds were cached is only seen when the call asks to recalculate.
+void TestColorMap::QCPColorMap_rescaleThroughTheBaseRecalculates()
+{
+  auto* map = new QCPColorMap(mPlot->xAxis, mPlot->yAxis);
+  map->data()->setSize(2, 2);
+  map->data()->setRange(QCPRange(0, 1), QCPRange(0, 1));
+  map->data()->setCell(0, 0, 1);
+  map->data()->setCell(1, 1, 2);
+  map->data()->recalculateDataBounds();
+  map->data()->setCell(1, 1, 1.5); // a lower maximum: the cached bounds keep 2
+  QCPAbstractColorMapped* mapped = map;
+  mapped->rescaleDataRange(true);
+  QCOMPARE(map->dataRange().upper, 1.5);
+}

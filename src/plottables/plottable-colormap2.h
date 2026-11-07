@@ -66,6 +66,8 @@ public:
 
     using QCPAbstractColorMapped::colorDataBounds;
     QCPRange colorDataBounds(bool& found) const override;
+    //! The resampled view's range, or all the data's when \a recalc.
+    void rescaleDataRange(bool recalc = false) override;
     //! The range of the colour values: of the resampled view, or of all data with \a recalc
     //! (or before the first resample). \a found is false when there is none.
     [[nodiscard]] QCPRange colorDataBounds(bool& found, bool recalc) const;

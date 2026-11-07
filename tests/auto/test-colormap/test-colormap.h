@@ -52,6 +52,8 @@ private slots:
   void QCPColorScale_attachingTakesTheScaleValues();
   void QCPColorScale_deletingTheScaleIsNoticed();
   void QCPColorScale_deletingAUserLeavesTheScaleList();
+  void QCPColorMap2_rescaleKeepsItsViewMeaning();
+  void QCPColorMap_rescaleThroughTheBaseRecalculates();
 
 private:
   QCustomPlot *mPlot;

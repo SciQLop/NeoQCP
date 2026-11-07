@@ -457,3 +457,11 @@ void QCPColorMap2::setAutoContourLevels(int count)
     mContours.setAutoLevels(count);
     contoursChanged();
 }
+
+void QCPColorMap2::rescaleDataRange(bool recalc)
+{
+    bool found = false;
+    const QCPRange range = colorDataBounds(found, recalc);
+    if (found && range.lower < range.upper)
+        setDataRange(range);
+}

@@ -436,3 +436,16 @@ double QCPHistogram2D::selectTest(const QPointF& pos, bool onlySelectable, QVari
         return 0;
     return -1;
 }
+
+void QCPHistogram2D::rescaleDataRange(bool recalc)
+{
+    if (!mDataSource)
+        return;
+    if (!mPipeline.result())
+    {
+        if (recalc)
+            mPipeline.onDataChanged();
+        return;
+    }
+    QCPAbstractColorMapped::rescaleDataRange(recalc);
+}

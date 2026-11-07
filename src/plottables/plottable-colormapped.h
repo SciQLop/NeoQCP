@@ -38,7 +38,9 @@ public:
     void setColorScale(QCPColorScale* colorScale);
 
     // non-property methods:
-    void rescaleDataRange(bool recalculate = false);
+    //! Fits the data range to colorDataBounds(). A class whose bounds can be cached or partial
+    //! overrides it to say what \a recalculate means for it.
+    virtual void rescaleDataRange(bool recalculate = false);
 
     //! The range of the coloured values over all the data; \a found is false when there is none.
     [[nodiscard]] virtual QCPRange colorDataBounds(bool& found) const = 0;
