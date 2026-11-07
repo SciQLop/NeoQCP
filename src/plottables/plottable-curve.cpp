@@ -541,7 +541,8 @@ void QCPCurve::draw(QCPDrawContext& context) const
         context.polygon(polygon, QPen(Qt::NoPen), mBrush);
     }
 
-    const bool coloured = mColor.hasValues();
+    // Values set for other data, of another size, would colour the wrong points.
+    const bool coloured = mColor.hasValues() && mColor.size() == mDataContainer->size();
     QList<QCPDataRange> selectedSegments, unselectedSegments;
     getDataSegments(selectedSegments, unselectedSegments);
     recordSegments(context, unselectedSegments, false, coloured);

@@ -287,6 +287,22 @@ void TestQCPCurve::curveColoursByValue()
   QVERIFY2(distinct.size() > 1, "every vertex took the same colour");
 }
 
+// Colour values belong to the data they were set for: new data of another size draws uncoloured,
+// as a multigraph does, instead of putting the old colours on the wrong points.
+void TestQCPCurve::newDataOfAnotherSizeDrawsUncoloured()
+{
+  setFivePoints(mCurve);
+  mCurve->setColorRange(QCPRange(0, 4));
+  mCurve->setColorValues(std::vector<double> { 0, 1, 2, 3, 4 });
+  mCurve->setData(QVector<double> { 0, 1, 2 }, QVector<double> { 0, 1, 0 });
+  mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+  const std::vector<const qcp::PolylineDataCmd*> lines
+      = polylines(inspectable(mCurve)->recording());
+  QCOMPARE(lines.size(), std::size_t(1));
+  QVERIFY2(!lines.front()->colours, "the old colours were put on the new points");
+}
+
 // The fill is one polygon of data-space positions, not a triangulation: the replay rasterises it,
 // which is what a self-crossing curve needs.
 void TestQCPCurve::curveFillIsAPolygon()
