@@ -54,6 +54,11 @@ private slots:
   void QCPColorScale_deletingAUserLeavesTheScaleList();
   void QCPColorMap2_rescaleKeepsItsViewMeaning();
   void QCPColorMap_rescaleThroughTheBaseRecalculates();
+  void colourMapIsOneImageCommand();
+  void verticalKeyAxisMapMatchesTheExport();
+  void tightBoundaryCropsHalfACell();
+  void aPanDoesNotRebuildTheImage();
+  void exportMatchesTheOldCode();
 
 private:
   QCustomPlot *mPlot;

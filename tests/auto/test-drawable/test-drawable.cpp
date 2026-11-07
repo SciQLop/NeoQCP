@@ -1361,7 +1361,7 @@ void TestDrawable::defaultDataRangeFollowsTheExtentRules()
     auto* shape = new TestShape(f.plot.get());
     f.plot->replot();
 
-    const std::optional<QCPDataBox> polygon = shape->dataRange();
+    const std::optional<QCPDataBox> polygon = shape->drawnDataRange();
     QVERIFY(polygon);
     QCOMPARE(polygon->keyLower, 2.0);
     QCOMPARE(polygon->keyUpper, 6.0);
@@ -1375,7 +1375,7 @@ void TestDrawable::defaultDataRangeFollowsTheExtentRules()
     shape->mode = TestShape::Disjoint; // two commands far apart: the box holds both, not their gap
     shape->touch();
     f.plot->replot();
-    const std::optional<QCPDataBox> disjoint = shape->dataRange();
+    const std::optional<QCPDataBox> disjoint = shape->drawnDataRange();
     QVERIFY(disjoint);
     QCOMPARE(disjoint->keyLower, 1.0);
     QCOMPARE(disjoint->keyUpper, 9.0);
@@ -1385,7 +1385,7 @@ void TestDrawable::defaultDataRangeFollowsTheExtentRules()
     shape->mode = TestShape::Mixed; // a ratio on the value axis: that side is unbounded
     shape->touch();
     f.plot->replot();
-    const std::optional<QCPDataBox> mixed = shape->dataRange();
+    const std::optional<QCPDataBox> mixed = shape->drawnDataRange();
     QVERIFY(mixed);
     QCOMPARE(mixed->keyLower, 2.0);
     QVERIFY(std::isinf(mixed->valueLower) && mixed->valueLower < 0);
@@ -1393,7 +1393,7 @@ void TestDrawable::defaultDataRangeFollowsTheExtentRules()
     shape->mode = TestShape::Anchored; // an anchored position: both sides unbounded
     shape->touch();
     f.plot->replot();
-    QVERIFY(!shape->dataRange().has_value());
+    QVERIFY(!shape->drawnDataRange().has_value());
     QVERIFY(!shape->extent().has_value());
 
     shape->mode = TestShape::ZeroValue; // a box reaching zero cannot be indexed on a log axis
@@ -1401,7 +1401,7 @@ void TestDrawable::defaultDataRangeFollowsTheExtentRules()
     f.plot->yAxis->setScaleType(QCPAxis::stLogarithmic);
     f.plot->yAxis->setRange(0.1, 100);
     f.plot->replot();
-    const std::optional<QCPDataBox> logarithmic = shape->dataRange();
+    const std::optional<QCPDataBox> logarithmic = shape->drawnDataRange();
     QVERIFY(logarithmic);
     QCOMPARE(logarithmic->keyLower, 2.0);
     QVERIFY(std::isinf(logarithmic->valueLower) && logarithmic->valueLower < 0);
@@ -1507,7 +1507,7 @@ void TestDrawable::setCoordsMovesTheItem()
     shape->mode = TestShape::FromAnchor; // a box at the item position's coords, (3,3)
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 1);
-    const std::optional<QCPDataBox> before = shape->dataRange();
+    const std::optional<QCPDataBox> before = shape->drawnDataRange();
     QVERIFY(before);
     QCOMPARE(before->keyLower, 3.0);
     QCOMPARE(before->valueLower, 3.0);
@@ -1515,7 +1515,7 @@ void TestDrawable::setCoordsMovesTheItem()
     shape->mAnchor->setCoords(5, 6); // an old-base setter, through QCPAbstractItem::markDirty
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 2);
-    const std::optional<QCPDataBox> after = shape->dataRange();
+    const std::optional<QCPDataBox> after = shape->drawnDataRange();
     QVERIFY(after);
     QCOMPARE(after->keyLower, 5.0);
     QCOMPARE(after->valueLower, 6.0);

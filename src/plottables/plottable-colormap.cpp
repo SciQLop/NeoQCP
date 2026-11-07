@@ -23,14 +23,14 @@
 **          Version: 2.1.1                                                **
 ****************************************************************************/
 
-#include <utility>
 #include "plottable-colormap.h"
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 #include "../axis/axis.h"
 #include "../core.h"
-#include "../painting/painter.h"
+#include "../painting/draw-context.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPColorMapData
@@ -566,10 +566,9 @@ void QCPColorMapData::cellToCoord(int keyIndex, int valueIndex, double* key, dou
     // the whole range, so its coordinate is the range's midpoint rather
     // than the NaN that keyIndex/double(size-1) would otherwise produce.
     if (key)
-        *key = mKeySize > 1
-            ? keyIndex / double(mKeySize - 1) * (mKeyRange.upper - mKeyRange.lower)
+        *key = mKeySize > 1 ? keyIndex / double(mKeySize - 1) * (mKeyRange.upper - mKeyRange.lower)
                 + mKeyRange.lower
-            : (mKeyRange.lower + mKeyRange.upper) * 0.5;
+                            : (mKeyRange.lower + mKeyRange.upper) * 0.5;
     if (value)
         *value = mValueSize > 1
             ? valueIndex / double(mValueSize - 1) * (mValueRange.upper - mValueRange.lower)
@@ -740,6 +739,31 @@ bool QCPColorMapData::createAlpha(bool initializeOpaque)
 
 /* end documentation of signals */
 
+namespace
+{
+//! The image is made this many times larger per axis, to stop a stretched small map jittering.
+int oversamplingFactor(bool interpolate, int size)
+{
+    return interpolate ? 1 : int(1.0 + 100.0 / double(size));
+}
+
+//! The data range grown by half a cell, so the picture covers the outer half cells.
+QCPRange rangeWithHalfACell(QCPAxis* axis, const QCPRange& range, int size)
+{
+    if (size <= 1)
+        return range;
+    if (axis->scaleType() == QCPAxis::stLogarithmic && range.lower * range.upper > 0)
+    {
+        // A log axis spaces cells geometrically: half a cell is a ratio, not a distance.
+        const double growth
+            = std::exp(0.5 * std::abs(std::log(range.upper / range.lower)) / double(size - 1));
+        return QCPRange(range.lower / growth, range.upper * growth);
+    }
+    const double half = 0.5 * range.size() / double(size - 1);
+    return QCPRange(range.lower - half, range.upper + half);
+}
+} // namespace
+
 /*!
   Constructs a color map with the specified \a keyAxis and \a valueAxis.
 
@@ -748,7 +772,7 @@ bool QCPColorMapData::createAlpha(bool initializeOpaque)
   manually but use QCustomPlot::removePlottable() instead.
 */
 QCPColorMap::QCPColorMap(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPAbstractColorMapped(keyAxis, valueAxis)
+        : QCPDrawn<QCPAbstractColorMapped>(keyAxis, valueAxis)
         , mMapData(new QCPColorMapData(10, 10, QCPRange(0, 5), QCPRange(0, 5)))
         , mInterpolate(true)
         , mTightBoundary(false)
@@ -902,39 +926,24 @@ void QCPColorMap::updateLegendIcon(Qt::TransformationMode transformMode, const Q
 
     if (!mMapImage.isNull()) // might still be null, e.g. if data is empty, so check here again
     {
-        bool mirrorX = (keyAxis()->orientation() == Qt::Horizontal ? keyAxis() : valueAxis())
-                           ->rangeReversed();
-        bool mirrorY = (valueAxis()->orientation() == Qt::Vertical ? valueAxis() : keyAxis())
-                           ->rangeReversed();
-        mLegendIcon = QPixmap::fromImage(mMapImage.flipped(QCP::flipOrientations(mirrorX, mirrorY)))
-                          .scaled(thumbSize, Qt::KeepAspectRatio, transformMode);
+        mLegendIcon
+            = QPixmap::fromImage(mMapImage).scaled(thumbSize, Qt::KeepAspectRatio, transformMode);
     }
 }
 
 /* inherits documentation from base class */
-double QCPColorMap::selectTest(const QPointF& pos, bool onlySelectable,
-                               [[maybe_unused]] QVariant* details) const
+std::optional<double> QCPColorMap::hitTest(QCP::Pixels at, QVariant* details) const
 {
-    if ((onlySelectable && mSelectable == QCP::stNone) || mMapData->isEmpty())
-        return -1;
-    if (!mKeyAxis || !mValueAxis)
-        return -1;
-
-    if (mKeyAxis.data()->axisRect()->rect().contains(pos.toPoint())
-        || mParentPlot->interactions().testFlag(QCP::iSelectPlottablesBeyondAxisRect))
-    {
-        double posKey, posValue;
-        pixelsToCoords(pos, posKey, posValue);
-        if (mMapData->keyRange().contains(posKey) && mMapData->valueRange().contains(posValue))
-        {
-            if (details)
-                details->setValue(QCPDataSelection(QCPDataRange(
-                    0, 1))); // temporary solution, to facilitate whole-plottable selection. Replace
-                             // in future version with segmented 2D selection.
-            return mParentPlot->selectionTolerance() * 0.99;
-        }
-    }
-    return -1;
+    if (!mKeyAxis || !mValueAxis || mMapData->isEmpty())
+        return std::nullopt;
+    double posKey = 0, posValue = 0;
+    pixelsToCoords(QPointF(at.x, at.y), posKey, posValue);
+    if (!mMapData->keyRange().contains(posKey) || !mMapData->valueRange().contains(posValue))
+        return std::nullopt;
+    if (details)
+        details->setValue(QCPDataSelection(
+            QCPDataRange(0, 1))); // the whole map, there is no per-cell selection yet
+    return (mParentPlot ? mParentPlot->selectionTolerance() : 5.0) * 0.99;
 }
 
 /* inherits documentation from base class */
@@ -970,7 +979,7 @@ QCPRange QCPColorMap::getValueRange(bool& foundRange, QCP::SignDomain inSignDoma
             || mMapData->keyRange().lower > inKeyRange.upper)
         {
             foundRange = false;
-            return {};
+            return { };
         }
     }
 
@@ -1016,6 +1025,7 @@ void QCPColorMap::updateMapImage()
     if (mMapData->isEmpty())
         return;
 
+    ++mImageBuildCount;
     const QImage::Format format = QImage::Format_ARGB32_Premultiplied;
     const int keySize = mMapData->keySize();
     const int valueSize = mMapData->valueSize();
@@ -1129,104 +1139,64 @@ void QCPColorMap::updateMapImage()
 }
 
 /* inherits documentation from base class */
-void QCPColorMap::draw(QCPPainter* painter)
+void QCPColorMap::draw(QCPDrawContext& context) const
 {
-    if (mMapData->isEmpty())
-        return;
     if (!mKeyAxis || !mValueAxis)
         return;
-    applyDefaultAntialiasingHint(painter);
-
+    if (mMapData->isEmpty())
+        return;
     if (mMapData->mDataModified || mMapImageInvalidated)
-        updateMapImage();
+        const_cast<QCPColorMap*>(this)->updateMapImage();
+    if (mMapImage.isNull())
+        return;
 
-    // use buffer if painting vectorized (PDF):
-    const bool useBuffer = painter->modes().testFlag(QCPPainter::pmVectorized);
-    QCPPainter* localPainter
-        = painter; // will be redirected to paint on mapBuffer if painting vectorized
-    QRectF mapBufferTarget; // the rect in absolute widget coordinates where the visible map
-                            // portion/buffer will end up in
-    QPixmap mapBuffer;
-    if (useBuffer)
+    const bool keyIsVertical = mKeyAxis->orientation() == Qt::Vertical;
+    const QCPRange keyRange = mTightBoundary
+        ? mMapData->keyRange()
+        : rangeWithHalfACell(mKeyAxis, mMapData->keyRange(), mMapData->keySize());
+    const QCPRange valueRange = mTightBoundary
+        ? mMapData->valueRange()
+        : rangeWithHalfACell(mValueAxis, mMapData->valueRange(), mMapData->valueSize());
+
+    QRectF source; // empty means the whole image
+    if (mTightBoundary)
     {
-        const double mapBufferPixelRatio
-            = 3; // factor by which DPI is increased in embedded bitmaps
-        mapBufferTarget = painter->clipRegion().boundingRect();
-        mapBuffer = QPixmap((mapBufferTarget.size() * mapBufferPixelRatio).toSize());
-        mapBuffer.fill(Qt::transparent);
-        localPainter = new QCPPainter(&mapBuffer);
-        localPainter->scale(mapBufferPixelRatio, mapBufferPixelRatio);
-        localPainter->translate(-mapBufferTarget.topLeft());
+        const int keyFactor = oversamplingFactor(mInterpolate, mMapData->keySize());
+        const int valueFactor = oversamplingFactor(mInterpolate, mMapData->valueSize());
+        const bool keyGrown = mMapData->keySize() > 1;
+        const bool valueGrown = mMapData->valueSize() > 1;
+        const double keyLength = keyGrown
+            ? double((mMapData->keySize() - 1) * keyFactor)
+            : double(keyIsVertical ? mMapImage.height() : mMapImage.width());
+        const double valueLength = valueGrown
+            ? double((mMapData->valueSize() - 1) * valueFactor)
+            : double(keyIsVertical ? mMapImage.width() : mMapImage.height());
+        const double keyStart = keyGrown ? 0.5 * keyFactor : 0.0;
+        const double valueStart = valueGrown ? 0.5 * valueFactor : 0.0;
+        if (keyIsVertical)
+            source = QRectF(valueStart, keyStart, valueLength, keyLength);
+        else
+            source = QRectF(keyStart, valueStart, keyLength, valueLength);
     }
 
-    QRectF imageRect
-        = QRectF(coordsToPixels(mMapData->keyRange().lower, mMapData->valueRange().lower),
-                 coordsToPixels(mMapData->keyRange().upper, mMapData->valueRange().upper))
-              .normalized();
-    // extend imageRect to contain outer halves/quarters of bordering/cornering pixels (cells are
-    // centered on map range boundary):
-    double halfCellWidth = 0; // in pixels
-    double halfCellHeight = 0; // in pixels
-    if (keyAxis()->orientation() == Qt::Horizontal)
-    {
-        if (mMapData->keySize() > 1)
-            halfCellWidth = 0.5 * imageRect.width() / double(mMapData->keySize() - 1);
-        if (mMapData->valueSize() > 1)
-            halfCellHeight = 0.5 * imageRect.height() / double(mMapData->valueSize() - 1);
-    }
-    else // keyAxis orientation is Qt::Vertical
-    {
-        if (mMapData->keySize() > 1)
-            halfCellHeight = 0.5 * imageRect.height() / double(mMapData->keySize() - 1);
-        if (mMapData->valueSize() > 1)
-            halfCellWidth = 0.5 * imageRect.width() / double(mMapData->valueSize() - 1);
-    }
-    imageRect.adjust(-halfCellWidth, -halfCellHeight, halfCellWidth, halfCellHeight);
+    // The top-left texel is the cell at the key lower, value upper corner of the range.
+    const QCP::Data leftTop = keyIsVertical ? QCP::Data { keyRange.upper, valueRange.lower }
+                                            : QCP::Data { keyRange.lower, valueRange.upper };
+    const QCP::Data rightBottom = keyIsVertical ? QCP::Data { keyRange.lower, valueRange.upper }
+                                                : QCP::Data { keyRange.upper, valueRange.lower };
+    context.image(leftTop, rightBottom, mMapImage, source, mInterpolate);
+}
+
+/* inherits documentation from base class */
+void QCPColorMap::drawLegendIcon(QCPDrawContext& icon) const
+{
+    if (!mKeyAxis || !mValueAxis || mLegendIcon.isNull())
+        return;
     const bool mirrorX
         = (keyAxis()->orientation() == Qt::Horizontal ? keyAxis() : valueAxis())->rangeReversed();
     const bool mirrorY
         = (valueAxis()->orientation() == Qt::Vertical ? valueAxis() : keyAxis())->rangeReversed();
-    const bool smoothBackup = localPainter->renderHints().testFlag(QPainter::SmoothPixmapTransform);
-    localPainter->setRenderHint(QPainter::SmoothPixmapTransform, mInterpolate);
-    QRegion clipBackup;
-    if (mTightBoundary)
-    {
-        clipBackup = localPainter->clipRegion();
-        QRectF tightClipRect
-            = QRectF(coordsToPixels(mMapData->keyRange().lower, mMapData->valueRange().lower),
-                     coordsToPixels(mMapData->keyRange().upper, mMapData->valueRange().upper))
-                  .normalized();
-        localPainter->setClipRect(tightClipRect, Qt::IntersectClip);
-    }
-    localPainter->drawImage(imageRect, mMapImage.flipped(QCP::flipOrientations(mirrorX, mirrorY)));
-    if (mTightBoundary)
-        localPainter->setClipRegion(clipBackup);
-    localPainter->setRenderHint(QPainter::SmoothPixmapTransform, smoothBackup);
-
-    if (useBuffer) // localPainter painted to mapBuffer, so now draw buffer with original painter
-    {
-        delete localPainter;
-        painter->drawPixmap(mapBufferTarget.toRect(), mapBuffer);
-    }
-}
-
-/* inherits documentation from base class */
-void QCPColorMap::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
-{
-    applyDefaultAntialiasingHint(painter);
-    // draw map thumbnail:
-    if (!mLegendIcon.isNull())
-    {
-        QPixmap scaledIcon
-            = mLegendIcon.scaled(rect.size().toSize(), Qt::KeepAspectRatio, Qt::FastTransformation);
-        QRectF iconRect = QRectF(0, 0, scaledIcon.width(), scaledIcon.height());
-        iconRect.moveCenter(rect.center());
-        painter->drawPixmap(iconRect.topLeft(), scaledIcon);
-    }
-    /*
-    // draw frame:
-    painter->setBrush(Qt::NoBrush);
-    painter->setPen(Qt::black);
-    painter->drawRect(rect.adjusted(1, 1, 0, 0));
-    */
+    const QCP::Data leftTop { mirrorX ? 1.0 : 0.0, mirrorY ? 0.0 : 1.0 };
+    const QCP::Data rightBottom { mirrorX ? 0.0 : 1.0, mirrorY ? 1.0 : 0.0 };
+    icon.image(leftTop, rightBottom, mLegendIcon.toImage());
 }

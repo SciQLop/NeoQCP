@@ -5,6 +5,8 @@
 #include <painting/contour-extractor.h>
 #include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
 #include <limits>
+#include <QDir>
+#include <painting/draw-commands.h>
 
 void TestColorMap::init()
 {
@@ -485,6 +487,25 @@ int countRedPixels(const QImage& img)
   }
   return red;
 }
+
+QCPColorMap* classicColorMap(QCustomPlot* plot, int size = 10)
+{
+  auto* map = new QCPColorMap(plot->xAxis, plot->yAxis);
+  map->data()->setSize(size, size);
+  map->data()->setRange(QCPRange(0, 10), QCPRange(0, 10));
+  for (int k = 0; k < size; ++k)
+    for (int v = 0; v < size; ++v)
+      map->data()->setCell(k, v, double(k * 17 + v * 31));
+  map->setGradient(QCPColorGradient::gpHot);
+  map->rescaleDataRange();
+  return map;
+}
+
+QString referenceImagePath(const QString& name)
+{
+  return QDir(QCoreApplication::applicationDirPath())
+      .absoluteFilePath(QStringLiteral("../../../tests/auto/test-colormap/reference/") + name);
+}
 } // namespace
 
 void TestColorMap::QCPColorMap2_contourMirrorsReversedAxis()
@@ -536,6 +557,10 @@ void TestColorMap::QCPColorMap2_contourMirrorsReversedAxis()
 
 void TestColorMap::QCPColorMap2_contourExportDrawsFallback()
 {
+  // The classic map now paints as a GPU command: on export it stacks above
+  // painter-drawn plottables at the end of the layer's pass, as on screen. This
+  // test is about the color map 2, so keep the fixture's classic map out.
+  mColorMap->setVisible(false);
   // toPixmap() paints with pmNoCaching, where the RHI contour layer never
   // receives the lines. The QPainter fallback must draw them instead --
   // previously the export silently dropped every contour.
@@ -614,6 +639,10 @@ void TestColorMap::QCPColorMap2_contourExportFollowsALogValueAxis()
 // exactly like the GPU quad does.
 void TestColorMap::QCPColorMap2_exportDrawsTheImageOnAReversedAxis()
 {
+  // The classic map now paints as a GPU command: on export it stacks above
+  // painter-drawn plottables at the end of the layer's pass, as on screen. This
+  // test is about the color map 2, so keep the fixture's classic map out.
+  mColorMap->setVisible(false);
   mPlot->resize(400, 300);
   mPlot->xAxis->setRange(0, 4);
   mPlot->xAxis->setRangeReversed(true);
@@ -734,6 +763,10 @@ void TestColorMap::QCPColorMap2_autoContourLevelsGeometricInLogScale()
 
 void TestColorMap::QCPColorMap2_contourExportAfterRhiDraw()
 {
+  // The classic map now paints as a GPU command: it stacks over painter-drawn
+  // content of the same layer, on screen and on export. This test is about the
+  // color map 2, so keep the fixture's classic map out.
+  mColorMap->setVisible(false);
   // An on-screen RHI draw uploads contour lines to the GPU layer only. A
   // later export (pmNoCaching bypasses RHI) must still draw them via the
   // QPainter fallback -- previously they vanished because the fallback
@@ -772,6 +805,10 @@ void TestColorMap::QCPColorMap2_contourExportAfterRhiDraw()
 
 void TestColorMap::QCPColorMap2_contourExportCachesFallback()
 {
+  // The classic map now paints as a GPU command: on export it stacks above
+  // painter-drawn plottables at the end of the layer's pass, as on screen. This
+  // test is about the color map 2, so keep the fixture's classic map out.
+  mColorMap->setVisible(false);
   // Repeated exports of one frame must reuse the cached fallback segments,
   // not re-march the full grid on every paint pass.
   mPlot->resize(400, 300);
@@ -1143,6 +1180,10 @@ void TestColorMap::QCPColorScale_deletingAUserLeavesTheScaleList()
 // into that buffer end up under the image.
 void TestColorMap::QCPColorMap2_contourLabelsShowOnTheGpuFrame()
 {
+  // The classic map now paints as a GPU command: it stacks over painter-drawn
+  // content of the same layer, on screen and on export. This test is about the
+  // color map 2, so keep the fixture's classic map out.
+  mColorMap->setVisible(false);
   if (!fontDrawsGlyphs())
     QSKIP("no usable font: labels draw no pixels");
   mPlot->resize(400, 300);
@@ -1240,6 +1281,10 @@ void TestColorMap::QCPColorMap2_unchangedLabelsAreNotUploadedAgain()
 
 void TestColorMap::QCPColorMap2_contourLabelsDrawSpacedInsideThePlot()
 {
+  // The classic map now paints as a GPU command: on export it stacks above
+  // painter-drawn plottables at the end of the layer's pass, as on screen. This
+  // test is about the color map 2, so keep the fixture's classic map out.
+  mColorMap->setVisible(false);
   if (!fontDrawsGlyphs())
     QSKIP("no usable font: labels draw no pixels");
   mPlot->resize(400, 300);
@@ -1326,4 +1371,210 @@ void TestColorMap::QCPColorMap_rescaleThroughTheBaseRecalculates()
   QCPAbstractColorMapped* mapped = map;
   mapped->rescaleDataRange(true);
   QCOMPARE(map->dataRange().upper, 1.5);
+}
+
+// A classic colour map records one image and nothing else: the corners span the
+// data range grown by half a cell, so the picture covers the outer half cells.
+void TestColorMap::colourMapIsOneImageCommand()
+{
+  mPlot->resize(400, 300);
+  mPlot->xAxis->setRange(0, 10);
+  mPlot->yAxis->setRange(0, 10);
+  auto* map = classicColorMap(mPlot, 10);
+  map->setInterpolate(false);
+  mPlot->replot();
+
+  QCOMPARE(map->mCore.recordingCount(), 1);
+  QCOMPARE(map->mCore.recordedCommandCount(), 1);
+  const auto& commands = map->mCore.recordedList().commands;
+  QCOMPARE(int(commands.size()), 1);
+  const auto* image = std::get_if<qcp::ImageCmd>(&commands.front());
+  QVERIFY2(image, "a colour map records one image and nothing else");
+  QVERIFY(image->pixels && !image->pixels->image.isNull());
+  QVERIFY(!image->pixels->smooth);
+  const auto* a = std::get_if<QCP::Data>(&image->a);
+  const auto* b = std::get_if<QCP::Data>(&image->b);
+  QVERIFY(a && b);
+  const double half = 0.5 * 10.0 / 9.0;
+  QVERIFY2(qAbs(a->x + half) < 1e-12,
+           "a is the top-left texel, half a cell left of the key range");
+  QVERIFY2(qAbs(a->y - (10.0 + half)) < 1e-12, "a is half a cell above the value range");
+  QVERIFY2(qAbs(b->x - (10.0 + half)) < 1e-12, "b is half a cell right of the key range");
+  QVERIFY2(qAbs(b->y + half) < 1e-12,
+           "b is the bottom-right texel, half a cell below the value range");
+}
+
+// With a vertical key axis the image is transposed; the GPU frame and the
+// painter export must agree on where every cell lands.
+void TestColorMap::verticalKeyAxisMapMatchesTheExport()
+{
+  mPlot->resize(400, 300);
+  mPlot->axisRect()->setAutoMargins(QCP::msNone);
+  mPlot->axisRect()->setMargins(QMargins(20, 20, 20, 20));
+  mPlot->setBackground(QBrush(Qt::white));
+  mPlot->axisRect()->setBackground(QBrush(Qt::white));
+  mPlot->xAxis->setVisible(false);
+  mPlot->yAxis->setVisible(false);
+  mPlot->show();
+  if (!QTest::qWaitForWindowExposed(mPlot) || (QCoreApplication::processEvents(), !mPlot->rhi()))
+    QSKIP("no QRhi available in this environment");
+
+  auto* map = new QCPColorMap(mPlot->yAxis, mPlot->xAxis);
+  map->data()->setSize(40, 30);
+  map->data()->setRange(QCPRange(0, 10), QCPRange(0, 12));
+  for (int k = 0; k < 40; ++k)
+    for (int v = 0; v < 30; ++v)
+      map->data()->setCell(k, v, double((k * 13 + v * 7) % 40));
+  map->setGradient(QCPColorGradient::gpHot);
+  map->setInterpolate(false);
+  map->rescaleDataRange();
+  mPlot->yAxis->setRange(0, 10);
+  mPlot->xAxis->setRange(0, 12);
+  mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+  const QImage gpu = mPlot->grabFramebuffer();
+  const QImage exported = mPlot->toPixmap(gpu.width(), gpu.height()).toImage();
+  QCOMPARE(gpu.size(), exported.size());
+  QVERIFY(gpu.width() > 40 && gpu.height() > 40);
+  for (int y = 0; y < gpu.height(); y += 10)
+    for (int x = 0; x < gpu.width(); x += 10)
+    {
+      const QRgb frame = gpu.pixel(x, y);
+      const QRgb picture = exported.pixel(x, y);
+      const bool close = qAbs(qRed(frame) - qRed(picture)) <= 2
+          && qAbs(qGreen(frame) - qGreen(picture)) <= 2
+          && qAbs(qBlue(frame) - qBlue(picture)) <= 2;
+      QVERIFY2(close, qPrintable(QStringLiteral("pixel (%1, %2) differs").arg(x).arg(y)));
+    }
+}
+
+// The tight boundary keeps the corners on the data range and crops half a cell
+// of the oversampled image on each side instead.
+void TestColorMap::tightBoundaryCropsHalfACell()
+{
+  auto* map = classicColorMap(mPlot, 10);
+  map->setInterpolate(false); // oversampling factor 11, image 110x110
+  map->setTightBoundary(true);
+  mPlot->replot();
+
+  const auto& tightCommands = map->mCore.recordedList().commands;
+  QCOMPARE(int(tightCommands.size()), 1);
+  const auto* tight = std::get_if<qcp::ImageCmd>(&tightCommands.front());
+  QVERIFY(tight);
+  const auto* a = std::get_if<QCP::Data>(&tight->a);
+  const auto* b = std::get_if<QCP::Data>(&tight->b);
+  QVERIFY(a && b);
+  QCOMPARE(a->x, 0.0);
+  QCOMPARE(a->y, 10.0);
+  QCOMPARE(b->x, 10.0);
+  QCOMPARE(b->y, 0.0);
+  QCOMPARE(tight->pixels->image.size(), QSize(110, 110));
+  QCOMPARE(tight->pixels->source, QRectF(5.5, 5.5, 99, 99));
+
+  // Without oversampling one texel is one cell, so half a cell is half a texel.
+  map->setInterpolate(true);
+  mPlot->replot();
+  const auto& smoothCommands = map->mCore.recordedList().commands;
+  QCOMPARE(int(smoothCommands.size()), 1);
+  const auto* smooth = std::get_if<qcp::ImageCmd>(&smoothCommands.front());
+  QVERIFY(smooth);
+  QCOMPARE(smooth->pixels->image.size(), QSize(10, 10));
+  QCOMPARE(smooth->pixels->source, QRectF(0.5, 0.5, 9, 9));
+  QVERIFY(smooth->pixels->smooth);
+
+  // A loose boundary draws the whole image and grows the corners by half a cell.
+  map->setInterpolate(false);
+  map->setTightBoundary(false);
+  mPlot->replot();
+  const auto& looseCommands = map->mCore.recordedList().commands;
+  QCOMPARE(int(looseCommands.size()), 1);
+  const auto* loose = std::get_if<qcp::ImageCmd>(&looseCommands.front());
+  QVERIFY(loose);
+  const auto* looseA = std::get_if<QCP::Data>(&loose->a);
+  const auto* looseB = std::get_if<QCP::Data>(&loose->b);
+  QVERIFY(looseA && looseB);
+  const double half = 0.5 * 10.0 / 9.0;
+  QVERIFY(qAbs(looseA->x + half) < 1e-12);
+  QVERIFY(qAbs(looseB->x - (10.0 + half)) < 1e-12);
+  QCOMPARE(loose->pixels->source, QRectF(0, 0, 110, 110));
+}
+
+// A pan moves the picture without rebuilding it and without a new recording;
+// new cells do both.
+void TestColorMap::aPanDoesNotRebuildTheImage()
+{
+  auto* map = classicColorMap(mPlot, 10);
+  mPlot->replot();
+  QCOMPARE(map->mImageBuildCount, 1);
+  QCOMPARE(map->mCore.recordingCount(), 1);
+
+  map->data()->setCell(0, 0, 1.0);
+  mPlot->replot();
+  QCOMPARE(map->mImageBuildCount, 2);
+  QCOMPARE(map->mCore.recordingCount(), 2);
+
+  for (int i = 0; i < 5; ++i)
+  {
+    mPlot->xAxis->setRange(1.0 + i, 11.0 + i);
+    mPlot->replot();
+  }
+  QCOMPARE(map->mImageBuildCount, 2);
+  QCOMPARE(map->mCore.recordingCount(), 2);
+}
+
+// The exported picture of a plain map must stay the one the painter drew before
+// the map recorded an image. The reference was rendered by the previous code.
+// The image is 399x399 and the plot area 398x398, so both codes sample the very
+// same texel for every pixel.
+void TestColorMap::exportMatchesTheOldCode()
+{
+  mPlot->resize(400, 400);
+  mPlot->axisRect()->setAutoMargins(QCP::msNone);
+  mPlot->axisRect()->setMargins(QMargins(1, 1, 1, 1));
+  mPlot->setBackground(QBrush(Qt::white));
+  mPlot->axisRect()->setBackground(QBrush(Qt::white));
+  mPlot->xAxis->setVisible(false);
+  mPlot->yAxis->setVisible(false);
+
+  auto* map = new QCPColorMap(mPlot->xAxis, mPlot->yAxis);
+  map->data()->setSize(399, 399);
+  map->data()->setRange(QCPRange(0, 10), QCPRange(0, 10));
+  for (int k = 0; k < 399; ++k)
+    for (int v = 0; v < 399; ++v)
+      map->data()->setCell(k, v, double((k * 31 + v * 17) % 200));
+  map->setGradient(QCPColorGradient::gpHot);
+  map->setInterpolate(false);
+  map->rescaleDataRange();
+  mPlot->xAxis->setRange(0, 10);
+  mPlot->yAxis->setRange(0, 10);
+
+  const QImage exported
+      = mPlot->toPixmap(400, 400).toImage().convertToFormat(QImage::Format_ARGB32);
+  const QString path = referenceImagePath(QStringLiteral("classic-colormap-export.png"));
+
+  if (qEnvironmentVariableIsSet("QCP_WRITE_COLORMAP_REFERENCE"))
+  {
+    QVERIFY2(exported.save(path), qPrintable(path));
+    QSKIP("reference image written");
+  }
+
+  const QImage reference = QImage(path).convertToFormat(QImage::Format_ARGB32);
+  QVERIFY2(!reference.isNull(), qPrintable(path));
+  QCOMPARE(exported.size(), reference.size());
+  // The export painter works half a pixel off the device grid: Qt snaps the old
+  // drawImage() clip one pixel up, while the replay clips to the axis rect. That
+  // moves the outer row and column only; everything inside is pixel-exact.
+  const QRect plotArea = mPlot->axisRect()->rect();
+  for (int y = plotArea.top() + 1; y < plotArea.bottom(); ++y)
+    for (int x = plotArea.left() + 1; x < plotArea.right(); ++x)
+    {
+      const QRgb got = exported.pixel(x, y);
+      const QRgb want = reference.pixel(x, y);
+      if (got != want)
+        QFAIL(qPrintable(QStringLiteral("pixel (%1, %2): %3, expected %4")
+                             .arg(x)
+                             .arg(y)
+                             .arg(got, 8, 16, QLatin1Char('0'))
+                             .arg(want, 8, 16, QLatin1Char('0'))));
+    }
 }

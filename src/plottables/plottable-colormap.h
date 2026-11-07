@@ -28,6 +28,7 @@
 
 #include "../axis/range.h"
 #include "../colorgradient.h"
+#include "../drawable.h"
 #include "../global.h"
 #include "../plottables/plottable.h"
 #include "plottable-colormapped.h"
@@ -111,7 +112,7 @@ protected:
 template <typename T, typename Self = void>
 class QCPColorMapOps;
 
-class QCP_LIB_DECL QCPColorMap : public QCPAbstractColorMapped
+class QCP_LIB_DECL QCPColorMap : public QCPDrawn<QCPAbstractColorMapped>
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
@@ -145,8 +146,6 @@ public:
                                  const QSize& thumbSize = QSize(32, 18));
 
     // reimplemented virtual methods:
-    virtual double selectTest(const QPointF& pos, bool onlySelectable,
-                              QVariant* details = nullptr) const override;
     virtual QCPRange getKeyRange(bool& foundRange,
                                  QCP::SignDomain inSignDomain = QCP::sdBoth) const override;
     virtual QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth,
@@ -163,18 +162,21 @@ protected:
     QImage mMapImage, mUndersampledMapImage;
     QPixmap mLegendIcon;
     bool mMapImageInvalidated;
+    int mImageBuildCount = 0; //!< test hook: how many times updateMapImage() rebuilt the image
 
     // introduced virtual methods:
     virtual void updateMapImage();
     void colorMappingChanged() override;
 
     // reimplemented virtual methods:
-    virtual void draw(QCPPainter* painter) override;
-    virtual void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
+    void draw(QCPDrawContext& context) const override;
+    void drawLegendIcon(QCPDrawContext& icon) const override;
+    std::optional<double> hitTest(QCP::Pixels at, QVariant* details) const override;
 
     friend class QCustomPlot;
     friend class QCPLegend;
     friend class QCPColorMapData;
+    friend class TestColorMap;
 };
 
 // The fluent handle of a colour map; see QCPPlottableOps for the subclass contract.

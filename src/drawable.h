@@ -61,7 +61,8 @@ public:
     //! Appends what this object draws to \a context. Called only when the recording is stale.
     virtual void draw(QCPDrawContext& context) const = 0;
     //! What the object occupies in data coordinates; the adapter answers it from the recording.
-    virtual std::optional<QCPDataBox> dataRange() const = 0;
+    //! Not called dataRange(): a colour-mapped plottable already exposes that for its colour scale.
+    virtual std::optional<QCPDataBox> drawnDataRange() const = 0;
     //! The pixel distance to \a at, or none when it missed.
     virtual std::optional<double> hitTest(QCP::Pixels at, QVariant* details) const = 0;
     //! Draws the object into a legend icon's rect; the adapter replays the recording, fitted.
@@ -215,7 +216,10 @@ enum class QCPDrawnSide
 class QCP_LIB_DECL QCPDrawnAdapter : public QCPDrawable
 {
 public:
-    std::optional<QCPDataBox> dataRange() const override { return mCore.dataRange(*this, view()); }
+    std::optional<QCPDataBox> drawnDataRange() const override
+    {
+        return mCore.dataRange(*this, view());
+    }
 
     std::optional<double> hitTest(QCP::Pixels at, QVariant* details) const override
     {

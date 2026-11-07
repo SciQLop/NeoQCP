@@ -305,8 +305,7 @@ void paintCommand(QCPPainter& painter, const QCPDrawCommand& command, const QCPD
                 QImage image = cmd.pixels->image;
                 QRectF source = cmd.pixels->source;
                 // A vector painter embeds the picture at its own resolution, so a viewer resamples
-                // it as it likes. Three times as many texels give it nothing to blur, as
-                // QCPColorMap::draw() does for its cells.
+                // it as it likes. Three times as many texels keep a colour map's cells sharp.
                 if (!cmd.pixels->smooth && painter.modes().testFlag(QCPPainter::pmVectorized))
                 {
                     image = image.scaled(image.width() * 3, image.height() * 3,
