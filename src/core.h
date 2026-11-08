@@ -373,7 +373,8 @@ public:
     //  - layout part: add<QCPTextElement>(row, column, text): inserted in the plot layout; the
     //    arguments after the cell go to the constructor after the plot;
     //  - group: add<QCPBarsGroup>(), add<QCPPlottableGroup>(name);
-    //  - axis: axisRect->add<QCPAxis>(type).
+    //  - axis: add<QCPAxis>(type), on the default axis rect; axisRect->add<QCPAxis>(type) for
+    //    another rect.
     // A refusal (plot being destroyed, no default axes, a taken cell, ...) reports misuse
     // (qcp::reportMisuse) and returns an empty handle; addGraph() logs with qDebug and returns nullptr.
     template <typename T, typename... Args>

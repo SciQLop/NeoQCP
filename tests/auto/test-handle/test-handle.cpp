@@ -217,3 +217,41 @@ void TestHandle::removeLastAxisRectThenAddIsRefused()
     QVERIFY(!plot.add<QCPGraph>());
     QCOMPARE(gMisuses, 1);
 }
+
+void TestHandle::axisAddedOnThePlotStacksOnItsSide()
+{
+    QCustomPlot plot;
+    QCPAxisRect* rect = plot.axisRect();
+    QCPAxis* first = rect->axis(QCPAxis::atLeft);
+    auto a = plot.add<QCPAxis>(QCPAxis::atLeft).setLabel("B").setColor(Qt::red);
+    QVERIFY(a);
+    QCOMPARE(rect->axisCount(QCPAxis::atLeft), 2);
+    QCOMPARE(a->label(), QStringLiteral("B"));
+    QCOMPARE(a->labelColor(), QColor(Qt::red));
+    QCOMPARE(a->basePen().color(), QColor(Qt::red));
+    QCOMPARE(a->tickLabelColor(), QColor(Qt::red));
+    plot.replot();
+    QVERIFY2(a->offset() > first->offset(), "the second left axis stacks outside the first");
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestHandle::axisAddedWithoutARectIsRefused()
+{
+    QCustomPlot plot;
+    plot.plotLayout()->clear();
+    QVERIFY(!plot.axisRect());
+    QVERIFY(!plot.add<QCPAxis>(QCPAxis::atLeft));
+    QCOMPARE(gMisuses, 1);
+}
+
+void TestHandle::colorKeepsPenWidthAndStyle()
+{
+    QCustomPlot plot;
+    auto handle = plot.add<QCPAxis>(QCPAxis::atLeft);
+    QVERIFY(handle);
+    handle->setBasePen(QPen(Qt::black, 3, Qt::DashLine));
+    handle.setColor(Qt::blue);
+    QCOMPARE(handle->basePen().color(), QColor(Qt::blue));
+    QCOMPARE(handle->basePen().width(), 3);
+    QCOMPARE(handle->basePen().style(), Qt::DashLine);
+}

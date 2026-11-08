@@ -31,6 +31,9 @@ template <typename T>
 concept Item = std::derived_from<T, QCPAbstractItem>;
 template <typename T>
 concept LayoutPart = std::derived_from<T, QCPLayoutElement>;
+// addAxis returns a QCPAxis*, and QCPAxis::OpsFor is the only axis handle: the family is one type.
+template <typename T>
+concept Axis = std::same_as<T, QCPAxis>;
 
 // Intervals share lane layouts; add<T>() gives each its own, owned by the plot.
 // simplify: one layout per intervals plottable; sharing one across several needs a setter on it.
@@ -120,6 +123,21 @@ struct Construct<T>
         if (!detail::plotHasAxisRect(plot))
             return Handle{};
         Handle handle = makeHandle<Handle>(new T(&plot));
+        handle.get()->markDirty();
+        return handle;
+    }
+};
+
+// add<QCPAxis>(type): a new axis on the default axis rect, on its side.
+template <detail::Axis T>
+struct Construct<T>
+{
+    static HandleFor<T> make(QCustomPlot& plot, QCPAxis::AxisType type)
+    {
+        using Handle = HandleFor<T>;
+        if (!detail::plotHasAxisRect(plot))
+            return Handle{};
+        Handle handle = makeHandle<Handle>(plot.axisRect()->addAxis(type));
         handle.get()->markDirty();
         return handle;
     }

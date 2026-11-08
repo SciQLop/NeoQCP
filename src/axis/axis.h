@@ -49,6 +49,9 @@ class QCPAbstractPlottable;
 class QCPGraph;
 class QCPAbstractItem;
 
+template <typename T, typename Self = void>
+class QCPAxisOps;
+
 class QCP_LIB_DECL QCPGrid : public QCPLayerable
 {
     Q_OBJECT
@@ -159,6 +162,9 @@ class QCP_LIB_DECL QCPAxis : public QCPLayerable
     /// \endcond
 
 public:
+    template <typename T>
+    using OpsFor = QCPAxisOps<T>;
+
     /*!
       Defines at which side of the axis rect the axis will appear. This also affects how the tick
       marks are drawn, on which side the labels are placed etc.
@@ -350,6 +356,8 @@ public:
     void setSubTickPen(const QPen& pen);
     void setLabelFont(const QFont& font);
     void setLabelColor(const QColor& color);
+    //! The colour of the label, the tick labels and of the base, tick and sub-tick pens.
+    void setColor(const QColor& color);
     void setLabel(const QString& str);
     /*! Substitute the label typesetter; \a renderer is not owned and must
         outlive the axis. nullptr restores plain QPainter::drawText. */
@@ -610,6 +618,42 @@ protected:
     virtual QPointF getTickLabelDrawOffset(const TickLabelData& labelData) const;
     virtual void getMaxTickLabelSize(const QFont& font, const QString& text,
                                      QSize* tickLabelsSize);
+};
+
+// The handle of an axis: the layerable setters and the axis' own.
+template <typename T, typename Self>
+class QCPAxisOps : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPAxisOps<T>>>
+{
+    using Base = QCPLayerableOps<T, qcp::OpsRet<Self, QCPAxisOps<T>>>;
+
+public:
+    using typename Base::Ret;
+    using Base::Base;
+
+    Ret setLabel(const QString& text)
+    {
+        return this->apply([&](T& a) { a.setLabel(text); });
+    }
+    Ret setRange(double lower, double upper)
+    {
+        return this->apply([&](T& a) { a.setRange(lower, upper); });
+    }
+    Ret setScaleType(QCPAxis::ScaleType type)
+    {
+        return this->apply([&](T& a) { a.setScaleType(type); });
+    }
+    Ret setColor(const QColor& color)
+    {
+        return this->apply([&](T& a) { a.setColor(color); });
+    }
+    Ret setTicker(const QSharedPointer<QCPAxisTicker>& ticker)
+    {
+        return this->apply([&](T& a) { a.setTicker(ticker); });
+    }
+    Ret setRangeReversed(bool reversed)
+    {
+        return this->apply([&](T& a) { a.setRangeReversed(reversed); });
+    }
 };
 
 #endif // QCP_AXIS_H

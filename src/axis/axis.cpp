@@ -1288,6 +1288,28 @@ void QCPAxis::setLabelColor(const QColor& color)
 }
 
 /*!
+  Sets the colour \a color of the axis label, the tick labels and of the base, tick and sub-tick
+  pens. Each pen keeps its width and style.
+
+  \see setLabelColor, setTickLabelColor, setBasePen
+*/
+void QCPAxis::setColor(const QColor& color)
+{
+    if (color == mLabelColor && color == mTickLabelColor && color == mBasePen.color()
+        && color == mTickPen.color() && color == mSubTickPen.color())
+        return;
+    mLabelColor = color;
+    mTickLabelColor = color;
+    for (QPen* pen : {&mBasePen, &mTickPen, &mSubTickPen})
+    {
+        QPen changed = *pen;
+        changed.setColor(color);
+        *pen = changed;
+    }
+    markAppearanceDirty();
+}
+
+/*!
   Sets the text of the axis label that will be shown below/above or next to the axis, depending on
   its orientation. To disable axis labels, pass an empty string as \a str.
 */

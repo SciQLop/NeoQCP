@@ -22,4 +22,8 @@ private slots:
     void noRemoveOnWidgets();
     void removeLooseLayoutElement();
     void removeLastAxisRectThenAddIsRefused();
+
+    void axisAddedOnThePlotStacksOnItsSide();
+    void axisAddedWithoutARectIsRefused();
+    void colorKeepsPenWidthAndStyle();
 };
