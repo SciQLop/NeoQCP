@@ -26,4 +26,6 @@ private slots:
     void slotDeletingAnAxisDuringDrag();
     void aSlotDeletingTheLinkedAxisDuringAWriteBackIsSafe();
     void aSlotDeletingTheSourceDuringARefreshIsSafe();
+    void reversingALinkedAxisToItsCurrentDirectionIsSilent();
+    void aFullAxesBoxWithoutRangeSyncLeavesPlainAxes();
 };

@@ -1074,9 +1074,9 @@ void QCPAxis::setRangeUpper(double upper)
 */
 void QCPAxis::setRangeReversed(bool reversed)
 {
-    QCP_CHECK_OR_RETURN(!mLink, "a linked axis follows its source's direction", );
     if (reversed == mRangeReversed)
-        return;
+        return; // a no-op asks for the direction the axis already shows, link or not
+    QCP_CHECK_OR_RETURN(!mLink, "a linked axis follows its source's direction", );
     mRangeReversed = reversed;
     markAppearanceDirty();
     // No signal carries a reversal, so the linked axes are told here; their slots may delete them.

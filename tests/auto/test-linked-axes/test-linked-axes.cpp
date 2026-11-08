@@ -505,6 +505,31 @@ void TestLinkedAxes::aSlotDeletingTheLinkedAxisDuringAWriteBackIsSafe()
     QCOMPARE(gMisuses, 0);
 }
 
+void TestLinkedAxes::reversingALinkedAxisToItsCurrentDirectionIsSilent()
+{
+    QCustomPlot plot;
+    plot.axisRect()->setupFullAxesBox(true);
+    gMisuses = 0;
+    plot.xAxis2->setRangeReversed(plot.xAxis2->rangeReversed()); // it already has that direction
+    QCOMPARE(gMisuses, 0);
+    plot.xAxis2->setRangeReversed(!plot.xAxis2->rangeReversed()); // a real change is refused
+    QCOMPARE(gMisuses, 1);
+}
+
+void TestLinkedAxes::aFullAxesBoxWithoutRangeSyncLeavesPlainAxes()
+{
+    QCustomPlot plot;
+    plot.axisRect()->setupFullAxesBox(true);
+    gMisuses = 0;
+    plot.axisRect()->setupFullAxesBox(false); // the second call must leave a plain pair again
+    QCOMPARE(gMisuses, 0);
+    QVERIFY(!plot.xAxis2->linkSource());
+    QVERIFY(!plot.yAxis2->linkSource());
+    const QCPRange before = plot.xAxis->range();
+    plot.xAxis2->setRange(1, 2);
+    QCOMPARE(plot.xAxis->range(), before);
+}
+
 void TestLinkedAxes::aSlotDeletingTheSourceDuringARefreshIsSafe()
 {
     QCustomPlot plot;

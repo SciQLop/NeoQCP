@@ -656,12 +656,9 @@ void QCPAxisRect::setupFullAxesBox(bool connectRanges)
     xAxis2->setTickLabels(false);
     yAxis2->setTickLabels(false);
 
-    if (connectRanges)
-    {
-        // A second call must re-copy from a plain axis, then link again.
-        xAxis2->unlink();
-        yAxis2->unlink();
-    }
+    // A second call must re-copy from plain axes, whatever it does with the ranges afterwards.
+    xAxis2->unlink();
+    yAxis2->unlink();
 
     xAxis2->setRange(xAxis->range());
     xAxis2->setRangeReversed(xAxis->rangeReversed());
