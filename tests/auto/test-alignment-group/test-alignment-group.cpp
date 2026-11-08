@@ -285,31 +285,31 @@ void TestAlignmentGroup::hiddenMemberIsLeftOut()
 
 void TestAlignmentGroup::destroyedPlotLeavesItsGroup()
 {
-    auto* a = makePlot();
-    auto* b = makePlot();
-    auto* c = makePlot();
+    QScopedPointer<QCustomPlot> a(makePlot());
+    QScopedPointer<QCustomPlot> b(makePlot());
+    QScopedPointer<QCustomPlot> c(makePlot());
     const auto group = QCPAlignmentGroup::create({ a->axisRect(), b->axisRect(), c->axisRect() });
     QVERIFY(group);
     QCOMPARE(group->elements().size(), 3);
-    delete a;
+    a.reset();
     QCOMPARE(group->elements().size(), 2);
     QCOMPARE(gMisuses, 0);
 
-    auto* holder = makePlot();
-    auto* second = new QCPAxisRect(holder);
+    QScopedPointer<QCustomPlot> holder(makePlot());
+    auto* second = new QCPAxisRect(holder.data());
     holder->plotLayout()->addElement(1, 0, second);
     group->add(holder->axisRect());
     group->add(second);
     QCOMPARE(group->elements().size(), 4);
-    delete holder;
+    holder.reset();
     QCOMPARE(group->elements().size(), 2);
     QCOMPARE(gMisuses, 0);
 }
 
 void TestAlignmentGroup::lastMemberLeavingDeletesTheGroup()
 {
-    auto* a = makePlot();
-    auto* b = makePlot();
+    QScopedPointer<QCustomPlot> a(makePlot());
+    QScopedPointer<QCustomPlot> b(makePlot());
     QPointer<QCPAlignmentGroup> group = QCPAlignmentGroup::create({ a->axisRect(), b->axisRect() });
     QVERIFY(group);
     group->remove(a->axisRect());
@@ -317,15 +317,15 @@ void TestAlignmentGroup::lastMemberLeavingDeletesTheGroup()
     group->remove(b->axisRect());
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
     QVERIFY(!group);
-    delete a;
-    delete b;
+    a.reset();
+    b.reset();
 }
 
 void TestAlignmentGroup::joiningAnotherGroupLeavesTheFirst()
 {
-    auto* a = makePlot();
-    auto* b = makePlot();
-    auto* c = makePlot();
+    QScopedPointer<QCustomPlot> a(makePlot());
+    QScopedPointer<QCustomPlot> b(makePlot());
+    QScopedPointer<QCustomPlot> c(makePlot());
     const auto first = QCPAlignmentGroup::create({ a->axisRect(), b->axisRect() });
     const auto second = QCPAlignmentGroup::create({ c->axisRect() });
     QVERIFY(first);
@@ -334,9 +334,9 @@ void TestAlignmentGroup::joiningAnotherGroupLeavesTheFirst()
     QCOMPARE(first->elements().size(), 1);
     QCOMPARE(second->elements().size(), 2);
     QVERIFY(!first->elements().contains(a->axisRect()));
-    delete a;
-    delete b;
-    delete c;
+    a.reset();
+    b.reset();
+    c.reset();
 }
 
 void TestAlignmentGroup::refusedCreate()
