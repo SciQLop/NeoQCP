@@ -175,7 +175,7 @@ The bins lie along the key axis, and the bar heights along the value axis.
 - By default the bins cover the data, from its smallest to its largest value. They are fixed on the first data. Later data can only widen them, never shrink them, so the bars do not jump around as data streams in. `resetEdges()` forgets them, and the next data sets them again.
 - `setFixedRange(range)` gives the bins a fixed range instead. Values outside it are not counted. `setFixedRange(std::nullopt)` goes back to automatic bins.
 - NaN and infinite values are skipped.
-- `edgesChanged` is emitted when the bins move, and `histogramReady` after every new result.
+- `histogramReady` is emitted after every new result.
 
 `setNormalization()` says what a bar's height means:
 

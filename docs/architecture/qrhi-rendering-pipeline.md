@@ -53,7 +53,7 @@ replot()
 
 Only layers whose content changed are repainted. Range changes mark the layers that depend on them (axes, grid, plottables); a layer that holds only static content keeps its texture.
 
-A layer **translates** instead of repainting when it is a pure pan: every visible plottable on it reports the same pixel offset (`stallPixelOffset()`: `QCPGraph2`, `QCPMultiGraph` and `QCPColorMap2` do), and the layer holds no item and no layout element that paints. The old texture and the cached GPU geometry are then shifted by that offset.
+A layer **translates** instead of repainting when it is a pure pan: every visible plottable on it reports the same pixel offset (`QCPLayer::pixelOffset()`, which asks each data-only recording through `QCPDrawnBase::stallPixelOffset()`), and the layer holds no item and no layout element that paints. The old texture and the cached GPU geometry are then shifted by that offset.
 
 A plottable whose async pipeline has not delivered yet (`canProduceContent()` false) does not clear its buffer: the stale frame stays on screen instead of blinking.
 
@@ -159,7 +159,7 @@ NeoQCP has several rendering paths depending on what is being drawn:
 | **QPainter → texture composite** | Axis lines and labels, legend, items (except spans), dashed and dotted lines, channel fills, scatters of the classic plottables, bars and the other classic plottables | QPainter draws into QImage staging buffer; uploaded as GPU texture |
 | **GPU plottable geometry** (`QCPPlottableRhiLayer`) | Solid lines of QCPGraph, QCPCurve, QCPGraph2, QCPMultiGraph; QCPGraph baseline fills; QCPIntervals bars | CPU extrudes polylines into triangles (`QCPLineExtruder`) or tessellates fills; uploaded as vertex buffer; rendered with scissor clipping. QCPGraph2 and QCPMultiGraph cache the extruded vertices across pans |
 | **GPU scatter sprites** (`QCPScatterRhiLayer`) | Scatter symbols of QCPGraph2 and QCPMultiGraph | One instanced quad per point; the symbol shape is computed in the fragment shader; optional per-point colour from a gradient texture |
-| **GPU colormap texture** (`QCPColormapRhiLayer`) | QCPColorMap2 and QCPHistogram2D images; QCPColorMap2 contour lines | CPU colorizes resampled data into QImage; uploaded as texture; rendered as scissored quad |
+| **Recorded colour-map image** (`qcp::ImageCmd`) | QCPColorMap2 and QCPHistogram2D images, and their contour lines and labels | CPU colorizes resampled data into a QImage (`QCPColormapRenderer`); the plottable records it with data-space corners, and the replay path uploads it as a texture or draws it into the paint buffer |
 | **GPU spans** (`QCPSpanRhiLayer`) | QCPItemVSpan, QCPItemHSpan, QCPItemRSpan | Pixel positions computed in double precision on the CPU, then drawn as quads |
 | **GPU grid** (`QCPGridRhiLayer`) | Grid lines and tick marks | Geometry rebuilt from the axes' tick vectors |
 
@@ -226,7 +226,7 @@ The painter modes tell the plottables to skip their GPU paths and caches and dra
 | `src/painting/shaders/embed_shaders.py` | Build-time shader embedding (`.qsb` → C array header) |
 | `src/painting/plottable-rhi-layer.h/.cpp` | Per-layer GPU resources for lines and fills |
 | `src/painting/scatter-rhi-layer.h/.cpp` | Per-layer GPU resources for scatter sprites |
-| `src/painting/colormap-rhi-layer.h/.cpp` | Per-colormap GPU resources for heatmap rendering |
+| `src/painting/colormap-renderer.h/.cpp` | Colourises a grid into a cached QImage (key-major, or transposed for a vertical key axis) |
 | `src/painting/span-rhi-layer.h/.cpp`, `grid-rhi-layer.h/.cpp` | GPU spans, grid lines and tick marks |
 | `src/painting/line-extruder.h/.cpp` | Polyline extrusion and fill tessellation |
 | `src/painting/viewport-offset.h` | Pan offset and line-cache decisions |

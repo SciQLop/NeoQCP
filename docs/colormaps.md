@@ -134,7 +134,7 @@ On screen, the lines are traced on a grid of at most 300 by 300 cells, so they s
 - `setBins(keyBins, valueBins)` sets the number of bins. The default is 100 by 100.
 - The bins cover the data, from its smallest to its largest value on each axis.
 - On a logarithmic axis the bins are evenly spaced in log, and points at or below zero are skipped. The histogram bins again when you change the axis scale type.
-- `setNormalization(QCPHistogram2D::nColumn)` divides each column by its total, so every column sums to one.
+- `setColumnNormalized(true)` divides each column by its total, so every column sums to one.
 
 Binning runs on a worker thread.
 Right after `setData()` there are no counts yet, so `rescaleDataRange()` has nothing to read.
@@ -142,7 +142,7 @@ That is why the example connects it to the pipeline's `finished` signal.
 If you know the range in advance, `setDataRange()` works at any time.
 
 A 2D histogram draws contour lines too, with the same functions as `QCPColorMap2`: `setContourLevels()`, `setAutoContourLevels()`, `setContourPen()` and `setContourLabelEnabled()`.
-The levels apply to the values shown. With `nColumn` those are the column fractions, not the counts.
+The levels apply to the values shown. With column normalization those are the column fractions, not the counts.
 
 ```{literalinclude} snippets/colormaps.cpp
 :start-after: // [colormaps_histogram2d_contours]
@@ -153,7 +153,7 @@ The levels apply to the values shown. With `nColumn` those are the column fracti
 
 ![A column-normalized 2D histogram with contour lines](images/colormaps-histogram2d-contours.png)
 
-With `nColumn`, a column without points shows as zero. It does not count for `rescaleDataRange()`.
+With column normalization, a column without points shows as zero. It does not count for `rescaleDataRange()`.
 
 ## Colour scales
 
