@@ -896,6 +896,38 @@ QCPAxis* QCPAxis::linkSource() const
 
 /*! \internal
 
+  The axis a range move of this one must act on: a linked axis is a view of another axis, so
+  dragging, panning or zooming it moves its source. Moving the linked axis itself would express
+  the move in linked units, which a non-linear link turns into a different source move.
+*/
+QCPAxis* QCPAxis::moveTarget() const
+{
+    return mLink && mLink->source ? mLink->source.data() : const_cast<QCPAxis*>(this);
+}
+
+/*! \internal
+
+  Maps \a pixel of this axis' rect onto the move target's rect, keeping the fraction of the axis
+  the pixel is at. Two axes of the same orientation but of different lengths therefore move by the
+  same fraction of the data.
+*/
+double QCPAxis::pixelOnMoveTarget(double pixel) const
+{
+    QCPAxis* target = moveTarget();
+    if (target == this || !mAxisRect || !target->mAxisRect)
+        return pixel;
+    const bool vertical = orientation() == Qt::Vertical;
+    const double length = vertical ? mAxisRect->height() : mAxisRect->width();
+    const double fraction = length > 0.0
+        ? (vertical ? mAxisRect->bottom() - pixel : pixel - mAxisRect->left()) / length
+        : 0.0;
+    const QCPAxisRect* targetRect = target->mAxisRect;
+    return vertical ? targetRect->bottom() - fraction * targetRect->height()
+                    : targetRect->left() + fraction * targetRect->width();
+}
+
+/*! \internal
+
   The pixel of \a value on a linked axis: the source's own position for inverse(value), taken as a
   fraction of the source's length and placed along this axis's length. A value the source draws
   200 pixels outside its rect therefore lands 200 * (ownLength / sourceLength) outside this one.
@@ -2264,7 +2296,10 @@ void QCPAxis::mousePressEvent(QMouseEvent* event, [[maybe_unused]] const QVarian
         }
         // Mouse range dragging interaction:
         if (mParentPlot->interactions().testFlag(QCP::iRangeDrag))
-            mDragStartRange = mRange;
+        {
+            mDragTarget = moveTarget();
+            mDragStartRange = mDragTarget ? mDragTarget->range() : mRange;
+        }
     }
 }
 
@@ -2288,17 +2323,22 @@ void QCPAxis::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
         const double currentPixel
             = orientation() == Qt::Horizontal ? event->pos().x() : event->pos().y();
         const QPointer<QCPAxis> alive(this); // a rangeChanged slot may delete this axis
-        if (mScaleType == QCPAxis::stLinear)
+        // A linked axis moves its source, in the source's pixels: the link maps values, not offsets.
+        QCPAxis* target = mDragTarget ? mDragTarget.data() : this;
+        const QPointer<QCPAxis> targetAlive(target);
+        const double from = pixelOnMoveTarget(startPixel);
+        const double to = pixelOnMoveTarget(currentPixel);
+        if (target->mScaleType == QCPAxis::stLinear)
         {
-            const double diff = pixelToCoord(startPixel) - pixelToCoord(currentPixel);
-            setRange(mDragStartRange.lower + diff, mDragStartRange.upper + diff);
+            const double diff = target->pixelToCoord(from) - target->pixelToCoord(to);
+            target->setRange(mDragStartRange.lower + diff, mDragStartRange.upper + diff);
         }
-        else if (mScaleType == QCPAxis::stLogarithmic)
+        else if (target->mScaleType == QCPAxis::stLogarithmic)
         {
-            const double diff = pixelToCoord(startPixel) / pixelToCoord(currentPixel);
-            setRange(mDragStartRange.lower * diff, mDragStartRange.upper * diff);
+            const double ratio = target->pixelToCoord(from) / target->pixelToCoord(to);
+            target->setRange(mDragStartRange.lower * ratio, mDragStartRange.upper * ratio);
         }
-        if (!alive)
+        if (!alive || !targetAlive)
             return;
 
         if (mParentPlot->noAntialiasingOnDrag())
@@ -2362,8 +2402,13 @@ void QCPAxis::wheelEvent(QWheelEvent* event)
     const double wheelSteps = delta / 120.0;
     const double factor = qPow(mAxisRect->rangeZoomFactor(orientation()), wheelSteps);
     const QPointer<QCPAxis> alive(this); // a rangeChanged slot may delete this axis
-    scaleRange(factor, pixelToCoord(orientation() == Qt::Horizontal ? pos.x() : pos.y()));
-    if (alive)
+    // A linked axis zooms its source, around the source value the cursor points at.
+    QCPAxis* target = moveTarget();
+    const QPointer<QCPAxis> targetAlive(target);
+    target->scaleRange(factor,
+                       target->pixelToCoord(pixelOnMoveTarget(
+                           orientation() == Qt::Horizontal ? pos.x() : pos.y())));
+    if (alive && targetAlive)
         mParentPlot->replot(QCustomPlot::rpQueuedReplot);
 }
 

@@ -31,6 +31,9 @@ private slots:
   void draggingOnlyTheLinkedAxisMovesTheSource();
   void fullAxesBoxZoomsOnce();
   void optingASourceOutStopsItsLinkedAxis();
+  void aDragOnALinkedAxisMovesItsSourceBySourcePixels();
+  void aWheelOnALinkedAxisZoomsItsSourceAroundTheSourceValue();
+  void aLinkedScaledAxisDragMovesItsSourceLinearly();
   
 private:
   QCustomPlot *mPlot;

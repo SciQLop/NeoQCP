@@ -573,7 +573,13 @@ void dragAxes(const QPointer<QCPAxisRect>& rect, const QList<QPointer<QCPAxis>> 
 {
     for (qsizetype i = 0; i < std::min(axes.size(), starts.size()) && rect; ++i)
         if (QCPAxis* axis = axes.at(i))
-            dragAxis(axis, starts.at(i), fromPixel, toPixel);
+        {
+            // A linked axis drags its source, through the source's pixels: the pointer's travel is
+            // mapped onto the source's rect, which may be longer or shorter than this one.
+            QCPAxis* target = axis->moveTarget();
+            dragAxis(target, starts.at(i), axis->pixelOnMoveTarget(fromPixel),
+                     axis->pixelOnMoveTarget(toPixel));
+        }
 }
 }
 
@@ -601,7 +607,9 @@ void QCPAxisRect::zoom(const QRectF& pixelRect, const QList<QCPAxis*>& affectedA
         const QCPRange pixelRange = axis->orientation() == Qt::Horizontal
             ? QCPRange(pixelRect.left(), pixelRect.right())
             : QCPRange(pixelRect.top(), pixelRect.bottom());
-        axis->setRange(axis->pixelToCoord(pixelRange.lower), axis->pixelToCoord(pixelRange.upper));
+        QCPAxis* target = axis->moveTarget(); // a linked axis zooms its source
+        target->setRange(target->pixelToCoord(axis->pixelOnMoveTarget(pixelRange.lower)),
+                         target->pixelToCoord(axis->pixelOnMoveTarget(pixelRange.upper)));
     });
 }
 
@@ -1562,14 +1570,14 @@ void QCPAxisRect::mousePressEvent(QMouseEvent* event, [[maybe_unused]] const QVa
             for (QCPAxis* axis : moveRepresentatives(effectiveRangeAxes(true, Qt::Horizontal)))
             {
                 mDragHorzAxes.append(axis);
-                mDragStartHorzRange.append(axis->range());
+                mDragStartHorzRange.append(axis->moveTarget()->range());
             }
             mDragVertAxes.clear();
             mDragStartVertRange.clear();
             for (QCPAxis* axis : moveRepresentatives(effectiveRangeAxes(true, Qt::Vertical)))
             {
                 mDragVertAxes.append(axis);
-                mDragStartVertRange.append(axis->range());
+                mDragStartVertRange.append(axis->moveTarget()->range());
             }
         }
     }
@@ -1633,16 +1641,20 @@ namespace
 // Moves the axis so its data follows a pointer moved by pixels along it, as a drag does.
 void followPointer(QCPAxis* axis, double pixels)
 {
-    const QCPRange range = axis->range();
-    if (axis->scaleType() == QCPAxis::stLogarithmic)
+    // A linked axis pans its source, through the source's pixels.
+    QCPAxis* target = axis->moveTarget();
+    const QCPRange range = target->range();
+    const double from = axis->pixelOnMoveTarget(0.0);
+    const double to = axis->pixelOnMoveTarget(pixels);
+    if (target->scaleType() == QCPAxis::stLogarithmic)
     {
-        const double ratio = axis->pixelToCoord(0) / axis->pixelToCoord(pixels);
-        axis->setRange(range.lower * ratio, range.upper * ratio);
+        const double ratio = target->pixelToCoord(from) / target->pixelToCoord(to);
+        target->setRange(range.lower * ratio, range.upper * ratio);
     }
     else
     {
-        const double diff = axis->pixelToCoord(0) - axis->pixelToCoord(pixels);
-        axis->setRange(range.lower + diff, range.upper + diff);
+        const double diff = target->pixelToCoord(from) - target->pixelToCoord(to);
+        target->setRange(range.lower + diff, range.upper + diff);
     }
 }
 
@@ -1688,7 +1700,8 @@ void QCPAxisRect::zoomAxesAt(const QPointF& pos, double horizontalFactor, double
         for (QCPAxis* axis : moveRepresentatives(effectiveRangeAxes(false, Qt::Horizontal)))
             moved.append(axis);
         forEachAxis(alive, moved, [&](QCPAxis* axis) {
-            axis->scaleRange(horizontalFactor, axis->pixelToCoord(pos.x()));
+            QCPAxis* target = axis->moveTarget(); // a linked axis zooms its source
+            target->scaleRange(horizontalFactor, target->pixelToCoord(axis->pixelOnMoveTarget(pos.x())));
         });
     }
     if (alive && mRangeZoom.testFlag(Qt::Vertical))
@@ -1697,7 +1710,8 @@ void QCPAxisRect::zoomAxesAt(const QPointF& pos, double horizontalFactor, double
         for (QCPAxis* axis : moveRepresentatives(effectiveRangeAxes(false, Qt::Vertical)))
             moved.append(axis);
         forEachAxis(alive, moved, [&](QCPAxis* axis) {
-            axis->scaleRange(verticalFactor, axis->pixelToCoord(pos.y()));
+            QCPAxis* target = axis->moveTarget(); // a linked axis zooms its source
+            target->scaleRange(verticalFactor, target->pixelToCoord(axis->pixelOnMoveTarget(pos.y())));
         });
     }
 }

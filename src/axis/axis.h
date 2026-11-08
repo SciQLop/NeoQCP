@@ -417,6 +417,10 @@ public:
     void unlink();
     QCPAxis* linkSource() const;
     std::shared_ptr<const QCPAxisLink> link() const { return mLink; }
+    /*! \internal The axis a range move of this one acts on: the link's source when linked. */
+    QCPAxis* moveTarget() const;
+    /*! \internal \a pixel seen on the move target's rect, at the same fraction of the axis. */
+    double pixelOnMoveTarget(double pixel) const;
     SelectablePart getPartAt(const QPointF& pos) const;
     QList<QCPAbstractPlottable*> plottables() const;
     QList<QCPGraph*> graphs() const;
@@ -488,6 +492,8 @@ protected:
     int mCachedMargin;
     bool mDragging;
     QCPRange mDragStartRange;
+    // The axis mDragStartRange belongs to: the link's source when the strip drags a linked axis.
+    QPointer<QCPAxis> mDragTarget;
     QCP::AntialiasedElements mAADragBackup, mNotAADragBackup;
     // linked axes:
     std::shared_ptr<const QCPAxisLink> mLink;

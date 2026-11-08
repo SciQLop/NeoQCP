@@ -725,3 +725,98 @@ void TestQCPAxisRect::fullAxesBoxZoomsOnce()
   QVERIFY2(sameRange(mPlot->xAxis2->range(), mPlot->xAxis->range()),
            "the full axes box zoomed its two horizontal axes apart");
 }
+
+void TestQCPAxisRect::aDragOnALinkedAxisMovesItsSourceBySourcePixels()
+{
+    mPlot->resize(400, 300);
+    mPlot->setInteractions(QCP::iRangeDrag);
+    auto* linkedRect = new QCPAxisRect(mPlot);
+    mPlot->plotLayout()->addElement(0, 1, linkedRect);
+    mPlot->plotLayout()->setColumnStretchFactor(0, 2);
+    mPlot->plotLayout()->setColumnStretchFactor(1, 1);
+    QCPAxis* linked = linkedRect->axis(QCPAxis::atBottom);
+    linked->linkTo(
+        mPlot->xAxis, [](double v) { return 1.0 / v; }, [](double v) { return 1.0 / v; });
+    mPlot->xAxis->setRange(1, 10);
+    linkedRect->setRangeDragAxes(linked, nullptr);
+    mPlot->replot();
+
+    const double sourceWidth = mPlot->axisRect()->rect().width();
+    const double linkedWidth = linkedRect->rect().width();
+    QVERIFY2(linkedWidth < sourceWidth, "the linked rect is the narrower one");
+    const QPointF centre = QRectF(linkedRect->rect()).center();
+    // The same fraction of the data: 40 px on the half-width rect is 80 px on the source.
+    const double sourceTravel = 40.0 * sourceWidth / linkedWidth;
+    const QCPRange expected
+        = draggedByPixels(mPlot->xAxis, centre.x(), centre.x() - sourceTravel);
+    const double sizeBefore = mPlot->xAxis->range().size();
+
+    dragOn(mPlot, centre.toPoint(), centre.toPoint() - QPoint(40, 0));
+
+    QVERIFY2(qAbs(mPlot->xAxis->range().size() - sizeBefore) < 1e-9,
+             "a drag translates the source, it does not scale it");
+    QVERIFY2(sameRange(mPlot->xAxis->range(), expected),
+             qPrintable(QStringLiteral("got (%1, %2), expected (%3, %4)")
+                            .arg(mPlot->xAxis->range().lower)
+                            .arg(mPlot->xAxis->range().upper)
+                            .arg(expected.lower)
+                            .arg(expected.upper)));
+}
+
+void TestQCPAxisRect::aWheelOnALinkedAxisZoomsItsSourceAroundTheSourceValue()
+{
+    mPlot->resize(400, 300);
+    mPlot->setInteractions(QCP::iRangeZoom);
+    auto* linkedRect = new QCPAxisRect(mPlot);
+    mPlot->plotLayout()->addElement(0, 1, linkedRect);
+    mPlot->plotLayout()->setColumnStretchFactor(0, 2);
+    mPlot->plotLayout()->setColumnStretchFactor(1, 1);
+    QCPAxis* linked = linkedRect->axis(QCPAxis::atBottom);
+    linked->linkTo(
+        mPlot->xAxis, [](double v) { return 1.0 / v; }, [](double v) { return 1.0 / v; });
+    mPlot->xAxis->setRange(1, 10);
+    linkedRect->setRangeZoomAxes(linked, nullptr);
+    mPlot->replot();
+
+    const QRect linkedArea = linkedRect->rect();
+    const QPointF pos = QRectF(linkedArea).center();
+    const double fraction = (pos.x() - linkedArea.left()) / double(linkedArea.width());
+    const QRect sourceArea = mPlot->axisRect()->rect();
+    const double sourcePixel = sourceArea.left() + fraction * sourceArea.width();
+    const QCPRange expected = zoomedBy(
+        mPlot->xAxis, mPlot->axisRect()->rangeZoomFactor(Qt::Horizontal), sourcePixel);
+
+    wheelOn(mPlot, pos);
+
+    QVERIFY2(sameRange(mPlot->xAxis->range(), expected),
+             qPrintable(QStringLiteral("got (%1, %2), expected (%3, %4)")
+                            .arg(mPlot->xAxis->range().lower)
+                            .arg(mPlot->xAxis->range().upper)
+                            .arg(expected.lower)
+                            .arg(expected.upper)));
+}
+
+void TestQCPAxisRect::aLinkedScaledAxisDragMovesItsSourceLinearly()
+{
+    mPlot->resize(400, 300);
+    mPlot->setInteractions(QCP::iRangeDrag);
+    QCPAxis* linked = mPlot->axisRect()->addAxis(QCPAxis::atTop);
+    linked->linkTo(mPlot->xAxis); // identity: the linked axis shows the source's values
+    mPlot->xAxis->setRange(1, 10);
+    linked->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->axisRect()->setRangeDragAxes(linked, nullptr);
+    mPlot->replot();
+
+    const QPointF centre = rectCentre(mPlot);
+    const QCPRange expected = draggedByPixels(mPlot->xAxis, centre.x(), centre.x() - 40.0);
+
+    dragOn(mPlot, centre.toPoint(), centre.toPoint() - QPoint(40, 0));
+
+    // The linked axis' own scale type picks its ticks; the source moves by its own linear pixels.
+    QVERIFY2(sameRange(mPlot->xAxis->range(), expected),
+             qPrintable(QStringLiteral("got (%1, %2), expected (%3, %4)")
+                            .arg(mPlot->xAxis->range().lower)
+                            .arg(mPlot->xAxis->range().upper)
+                            .arg(expected.lower)
+                            .arg(expected.upper)));
+}
