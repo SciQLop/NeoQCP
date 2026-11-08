@@ -97,6 +97,9 @@ public:
     void setRangeZoomAxes(QCPAxis* horizontal, QCPAxis* vertical);
     void setRangeZoomAxes(QList<QCPAxis*> axes);
     void setRangeZoomAxes(QList<QCPAxis*> horizontal, QList<QCPAxis*> vertical);
+    // Back to dragging/zooming every axis of the rect that allows it.
+    void resetRangeDragAxes();
+    void resetRangeZoomAxes();
     void setRangeZoomFactor(double horizontalFactor, double verticalFactor);
     void setRangeZoomFactor(double factor);
 
@@ -174,9 +177,13 @@ protected:
     Qt::Orientations mRangeDrag, mRangeZoom;
     QList<QPointer<QCPAxis>> mRangeDragHorzAxis, mRangeDragVertAxis;
     QList<QPointer<QCPAxis>> mRangeZoomHorzAxis, mRangeZoomVertAxis;
+    // A list set by the user wins whole; otherwise every axis of the rect that allows it is moved.
+    bool mRangeDragAxesSet = false, mRangeZoomAxesSet = false;
     double mRangeZoomFactorHorz, mRangeZoomFactorVert;
 
     // non-property members:
+    // The axes a drag in progress moves, one per source, snapshotted at the press.
+    QList<QPointer<QCPAxis>> mDragHorzAxes, mDragVertAxes;
     QList<QCPRange> mDragStartHorzRange, mDragStartVertRange;
     QCP::AntialiasedElements mAADragBackup, mNotAADragBackup;
     QCP::AntialiasedElements mAAWheelBackup, mNotAAWheelBackup;
@@ -217,6 +224,11 @@ private:
     void placeColorScale();
     // The scale gained or lost a user, or changed the side or width it needs: the margin moves.
     void colorScaleUsersChanged();
+    // The axes of that orientation a drag (or zoom) moves: the explicit set, or the default one.
+    QList<QCPAxis*> effectiveRangeAxes(bool drag, Qt::Orientation orientation) const;
+    // One axis per source: a listed source moves itself, otherwise the first listed axis linked
+    // to it moves it through its own pixel motion.
+    QList<QCPAxis*> moveRepresentatives(const QList<QCPAxis*>& axes) const;
 
     // Takes axis out of mAxes and the plot's shortcuts, without deleting it. False if not listed.
     bool unlistAxis(QCPAxis* axis);

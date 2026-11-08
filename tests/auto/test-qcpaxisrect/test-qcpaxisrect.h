@@ -22,6 +22,14 @@ private slots:
   void labelRenderersDecideWhatCanBeElided();
   void logAxisMarginIsRightOnTheFirstFrame();
   void beautifulPowersInEveryLocale();
+  void dragMovesEveryAxisByDefault();
+  void defaultSetKeepsThePrimaryAxisFirst();
+  void optedOutAxisStaysPut();
+  void explicitListWinsWhole();
+  void resetRestoresTheDefault();
+  void linkedAxisMovesItsSourceOnce();
+  void draggingOnlyTheLinkedAxisMovesTheSource();
+  void fullAxesBoxZoomsOnce();
   
 private:
   QCustomPlot *mPlot;

@@ -28,6 +28,55 @@ struct CountingLabelRenderer final : QCPLabelRenderer
         QCPLabelRenderer::drawWith(nullptr, painter, rect, font, color, text, flags);
     }
 };
+
+QPointF rectCentre(const QCustomPlot* plot)
+{
+    return QRectF(plot->axisRect()->rect()).center();
+}
+
+// A drag as the user makes it: press, two moves, release.
+void dragOn(QCustomPlot* plot, const QPoint& from, const QPoint& to)
+{
+    auto send = [plot](QEvent::Type type, const QPoint& pos, Qt::MouseButtons buttons) {
+        QMouseEvent event(type, pos, plot->mapToGlobal(pos), Qt::LeftButton, buttons,
+                          Qt::NoModifier);
+        QCoreApplication::sendEvent(plot, &event);
+    };
+    send(QEvent::MouseButtonPress, from, Qt::LeftButton);
+    send(QEvent::MouseMove, (from + to) / 2, Qt::LeftButton);
+    send(QEvent::MouseMove, to, Qt::LeftButton);
+    send(QEvent::MouseButtonRelease, to, Qt::NoButton);
+}
+
+void wheelOn(QCustomPlot* plot, const QPointF& pos, int steps = 1)
+{
+    QWheelEvent event(pos, plot->mapToGlobal(pos), QPoint(), QPoint(0, 120 * steps), Qt::NoButton,
+                      Qt::NoModifier, Qt::NoScrollPhase, false);
+    QCoreApplication::sendEvent(plot, &event);
+}
+
+bool sameRange(const QCPRange& a, const QCPRange& b)
+{
+    return qAbs(a.lower - b.lower) < 1e-9 * qMax(1.0, qAbs(a.lower))
+        && qAbs(a.upper - b.upper) < 1e-9 * qMax(1.0, qAbs(a.upper));
+}
+
+// The range a drag from one pixel to another leaves, on a linear axis.
+QCPRange draggedByPixels(const QCPAxis* axis, double fromPixel, double toPixel)
+{
+    const QCPRange start = axis->range();
+    const double diff = axis->pixelToCoord(fromPixel) - axis->pixelToCoord(toPixel);
+    return QCPRange(start.lower + diff, start.upper + diff);
+}
+
+// The range one zoom step around a pixel leaves, on a linear axis.
+QCPRange zoomedBy(const QCPAxis* axis, double factor, double pixel)
+{
+    const QCPRange start = axis->range();
+    const double center = axis->pixelToCoord(pixel);
+    return QCPRange((start.lower - center) * factor + center,
+                    (start.upper - center) * factor + center);
+}
 }
 
 void TestQCPAxisRect::init()
@@ -482,4 +531,178 @@ void TestQCPAxisRect::labelRenderersDecideWhatCanBeElided()
   const QString math = QStringLiteral("$B_{gse}$ a label much longer than the room it is given");
   QCOMPARE(QCPLabelRenderer::elideWith(latex, font, math, 80), math);
 #endif
+}
+
+void TestQCPAxisRect::dragMovesEveryAxisByDefault()
+{
+  mPlot->setInteractions(QCP::iRangeDrag);
+  mPlot->resize(400, 300);
+  QCPAxis* secondLeft = mPlot->axisRect()->addAxis(QCPAxis::atLeft);
+  mPlot->replot();
+
+  const QPointF centre = rectCentre(mPlot);
+  const QPointF to = centre - QPointF(0, 50);
+  const QCPRange startLeft = mPlot->yAxis->range();
+  const QCPRange expectedLeft = draggedByPixels(mPlot->yAxis, centre.y(), to.y());
+  const QCPRange expectedSecond = draggedByPixels(secondLeft, centre.y(), to.y());
+
+  dragOn(mPlot, centre.toPoint(), to.toPoint());
+
+  QVERIFY2(!sameRange(mPlot->yAxis->range(), startLeft), "the primary left axis did not move");
+  QVERIFY2(sameRange(mPlot->yAxis->range(), expectedLeft),
+           "the primary left axis did not move by its own 50 px");
+  QVERIFY2(sameRange(secondLeft->range(), expectedSecond),
+           "the second left axis did not move by its own 50 px");
+}
+
+void TestQCPAxisRect::defaultSetKeepsThePrimaryAxisFirst()
+{
+  mPlot->resize(400, 300);
+  mPlot->replot();
+  QCPAxisRect* ar = mPlot->axisRect();
+
+  QCOMPARE(ar->rangeDragAxis(Qt::Horizontal), mPlot->xAxis);
+  QCOMPARE(ar->rangeDragAxis(Qt::Vertical), mPlot->yAxis);
+  QCOMPARE(ar->rangeZoomAxis(Qt::Horizontal), mPlot->xAxis);
+  QCOMPARE(ar->rangeZoomAxis(Qt::Vertical), mPlot->yAxis);
+  QCOMPARE(ar->rangeDragAxes(Qt::Horizontal), (QList<QCPAxis*> { mPlot->xAxis, mPlot->xAxis2 }));
+  QCOMPARE(ar->rangeDragAxes(Qt::Vertical), (QList<QCPAxis*> { mPlot->yAxis, mPlot->yAxis2 }));
+  QCOMPARE(ar->rangeZoomAxes(Qt::Horizontal), (QList<QCPAxis*> { mPlot->xAxis, mPlot->xAxis2 }));
+  QCOMPARE(ar->rangeZoomAxes(Qt::Vertical), (QList<QCPAxis*> { mPlot->yAxis, mPlot->yAxis2 }));
+}
+
+void TestQCPAxisRect::optedOutAxisStaysPut()
+{
+  mPlot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom);
+  mPlot->resize(400, 300);
+  mPlot->replot();
+  const QPointF centre = rectCentre(mPlot);
+
+  mPlot->xAxis->setRangeDraggable(false);
+  const QCPRange start = mPlot->xAxis->range();
+  const QCPRange topStart = mPlot->xAxis2->range();
+  dragOn(mPlot, centre.toPoint(), (centre + QPointF(40, 0)).toPoint());
+  QCOMPARE(mPlot->xAxis->range(), start);
+  QVERIFY2(!sameRange(mPlot->xAxis2->range(), topStart), "the other horizontal axis stayed put too");
+
+  mPlot->xAxis->setRangeDraggable(true);
+  mPlot->xAxis->setRangeZoomable(false);
+  const QCPRange zoomStart = mPlot->xAxis->range();
+  const QCPRange topZoomStart = mPlot->xAxis2->range();
+  wheelOn(mPlot, centre);
+  QCOMPARE(mPlot->xAxis->range(), zoomStart);
+  QVERIFY2(!sameRange(mPlot->xAxis2->range(), topZoomStart),
+           "the other horizontal axis did not zoom");
+}
+
+void TestQCPAxisRect::explicitListWinsWhole()
+{
+  mPlot->setInteractions(QCP::iRangeDrag);
+  mPlot->resize(400, 300);
+  mPlot->replot();
+  QCPAxisRect* ar = mPlot->axisRect();
+  const QPointF centre = rectCentre(mPlot);
+
+  mPlot->xAxis->setRangeDraggable(false);
+  ar->setRangeDragAxes(mPlot->xAxis, nullptr);
+  const QCPRange xStart = mPlot->xAxis->range();
+  const QCPRange yStart = mPlot->yAxis->range();
+  const QCPRange y2Start = mPlot->yAxis2->range();
+
+  dragOn(mPlot, centre.toPoint(), (centre + QPointF(50, 50)).toPoint());
+
+  QVERIFY2(!sameRange(mPlot->xAxis->range(), xStart),
+           "the explicit list did not override the axis opt-out");
+  QCOMPARE(mPlot->yAxis->range(), yStart);
+  QCOMPARE(mPlot->yAxis2->range(), y2Start);
+}
+
+void TestQCPAxisRect::resetRestoresTheDefault()
+{
+  mPlot->setInteractions(QCP::iRangeDrag);
+  mPlot->resize(400, 300);
+  mPlot->replot();
+  QCPAxisRect* ar = mPlot->axisRect();
+  const QPointF centre = rectCentre(mPlot);
+
+  mPlot->xAxis->setRangeDraggable(false);
+  ar->setRangeDragAxes(mPlot->xAxis, nullptr);
+  ar->resetRangeDragAxes();
+
+  const QCPRange xStart = mPlot->xAxis->range();
+  const QCPRange yStart = mPlot->yAxis->range();
+  dragOn(mPlot, centre.toPoint(), (centre + QPointF(50, 50)).toPoint());
+
+  QCOMPARE(mPlot->xAxis->range(), xStart);
+  QVERIFY2(!sameRange(mPlot->yAxis->range(), yStart),
+           "the reset did not bring the default set back");
+}
+
+void TestQCPAxisRect::linkedAxisMovesItsSourceOnce()
+{
+  mPlot->setInteractions(QCP::iRangeZoom);
+  mPlot->resize(400, 300);
+  mPlot->replot();
+  mPlot->xAxis2->linkTo(mPlot->xAxis);
+
+  const QPointF centre = rectCentre(mPlot);
+  const double factor = mPlot->axisRect()->rangeZoomFactor(Qt::Horizontal);
+  const QCPRange expected = zoomedBy(mPlot->xAxis, factor, centre.x());
+
+  wheelOn(mPlot, centre);
+
+  QVERIFY2(sameRange(mPlot->xAxis->range(), expected),
+           qPrintable(QStringLiteral("source is (%1, %2)")
+                          .arg(mPlot->xAxis->range().lower)
+                          .arg(mPlot->xAxis->range().upper)));
+  QVERIFY2(sameRange(mPlot->xAxis2->range(), mPlot->xAxis->range()),
+           "the linked axis and its source disagree after one wheel step");
+}
+
+void TestQCPAxisRect::draggingOnlyTheLinkedAxisMovesTheSource()
+{
+  mPlot->setInteractions(QCP::iRangeDrag);
+  mPlot->resize(400, 300);
+  mPlot->replot();
+  mPlot->xAxis2->linkTo(mPlot->xAxis, [](double v) { return 2.0 * v; },
+                        [](double v) { return v / 2.0; });
+  mPlot->axisRect()->setRangeDragAxes(mPlot->xAxis2, nullptr);
+
+  const QPointF centre = rectCentre(mPlot);
+  const QCPRange start = mPlot->xAxis->range();
+  const double diff
+      = mPlot->xAxis->pixelToCoord(centre.x()) - mPlot->xAxis->pixelToCoord(centre.x() + 40);
+  const QCPRange expected(start.lower + diff, start.upper + diff);
+
+  dragOn(mPlot, centre.toPoint(), (centre + QPointF(40, 0)).toPoint());
+
+  QVERIFY2(sameRange(mPlot->xAxis->range(), expected),
+           qPrintable(QStringLiteral("source is (%1, %2)")
+                          .arg(mPlot->xAxis->range().lower)
+                          .arg(mPlot->xAxis->range().upper)));
+  QVERIFY2(sameRange(mPlot->xAxis2->range(),
+                     QCPRange(2.0 * expected.lower, 2.0 * expected.upper)),
+           "the linked axis no longer shows twice its source");
+}
+
+void TestQCPAxisRect::fullAxesBoxZoomsOnce()
+{
+  mPlot->setInteractions(QCP::iRangeZoom);
+  mPlot->resize(400, 300);
+  mPlot->replot();
+  mPlot->axisRect()->setupFullAxesBox(true);
+  mPlot->replot();
+
+  const QPointF centre = rectCentre(mPlot);
+  const double factor = mPlot->axisRect()->rangeZoomFactor(Qt::Horizontal);
+  const QCPRange expected = zoomedBy(mPlot->xAxis, factor, centre.x());
+
+  wheelOn(mPlot, centre);
+
+  QVERIFY2(sameRange(mPlot->xAxis->range(), expected),
+           qPrintable(QStringLiteral("source is (%1, %2)")
+                          .arg(mPlot->xAxis->range().lower)
+                          .arg(mPlot->xAxis->range().upper)));
+  QVERIFY2(sameRange(mPlot->xAxis2->range(), mPlot->xAxis->range()),
+           "the full axes box zoomed its two horizontal axes apart");
 }

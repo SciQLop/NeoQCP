@@ -1061,6 +1061,30 @@ void QCPAxis::setRangeReversed(bool reversed)
 }
 
 /*!
+  Sets whether a drag anywhere in the axis rect also moves this axis, when the rect allows range
+  dragging (\ref QCPAxisRect::setRangeDrag). The default is true, so a drag moves every axis of the
+  rect; pass false on an axis that must stay put.
+
+  \see QCPAxisRect::setRangeDragAxes, QCPAxisRect::resetRangeDragAxes
+*/
+void QCPAxis::setRangeDraggable(bool draggable)
+{
+    mRangeDraggable = draggable;
+}
+
+/*!
+  Sets whether the mouse wheel zooms this axis, when the rect allows range zooming
+  (\ref QCPAxisRect::setRangeZoom). The default is true; pass false on an axis that must keep its
+  range.
+
+  \see QCPAxisRect::setRangeZoomAxes, QCPAxisRect::resetRangeZoomAxes
+*/
+void QCPAxis::setRangeZoomable(bool zoomable)
+{
+    mRangeZoomable = zoomable;
+}
+
+/*!
   The axis ticker is responsible for generating the tick positions and tick labels. See the
   documentation of QCPAxisTicker for details on how to work with axis tickers.
 
@@ -2193,7 +2217,7 @@ void QCPAxis::deselectEvent(bool* selectionStateChanged)
 */
 void QCPAxis::mousePressEvent(QMouseEvent* event, [[maybe_unused]] const QVariant& details)
 {
-    if (!mParentPlot->interactions().testFlag(QCP::iRangeDrag)
+    if (!mParentPlot->interactions().testFlag(QCP::iRangeDrag) || !mRangeDraggable
         || !mAxisRect->rangeDrag().testFlag(orientation()))
     {
         event->ignore();
@@ -2295,7 +2319,7 @@ void QCPAxis::mouseReleaseEvent([[maybe_unused]] QMouseEvent* event,
 void QCPAxis::wheelEvent(QWheelEvent* event)
 {
     // Mouse range zooming interaction:
-    if (!mParentPlot->interactions().testFlag(QCP::iRangeZoom)
+    if (!mParentPlot->interactions().testFlag(QCP::iRangeZoom) || !mRangeZoomable
         || !mAxisRect->rangeZoom().testFlag(orientation()))
     {
         event->ignore();

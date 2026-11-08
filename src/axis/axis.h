@@ -250,6 +250,12 @@ public:
 
     bool rangeReversed() const { return mRangeReversed; }
 
+    //! Whether a drag in the axis rect moves this axis, when the rect allows range dragging.
+    bool rangeDraggable() const { return mRangeDraggable; }
+
+    //! Whether the mouse wheel zooms this axis, when the rect allows range zooming.
+    bool rangeZoomable() const { return mRangeZoomable; }
+
     QSharedPointer<QCPAxisTicker> ticker() const { return mTicker; }
 
     bool ticks() const { return mTicks; }
@@ -341,6 +347,8 @@ public:
     void setRangeLower(double lower);
     void setRangeUpper(double upper);
     void setRangeReversed(bool reversed);
+    void setRangeDraggable(bool draggable);
+    void setRangeZoomable(bool zoomable);
     void setTicker(QSharedPointer<QCPAxisTicker> ticker);
     void setTicks(bool show);
     void setTickLabels(bool show);
@@ -465,6 +473,8 @@ protected:
     // scale and range:
     QCPRange mRange;
     bool mRangeReversed;
+    bool mRangeDraggable = true;
+    bool mRangeZoomable = true;
     ScaleType mScaleType;
 
     // non-property members:
@@ -697,6 +707,14 @@ public:
     Ret setRangeReversed(bool reversed)
     {
         return this->apply([&](T& a) { a.setRangeReversed(reversed); });
+    }
+    Ret setRangeDraggable(bool draggable)
+    {
+        return this->apply([&](T& a) { a.setRangeDraggable(draggable); });
+    }
+    Ret setRangeZoomable(bool zoomable)
+    {
+        return this->apply([&](T& a) { a.setRangeZoomable(zoomable); });
     }
     Ret linkTo(QCPAxis* source, const QCPAxisFunction& forward = {},
                const QCPAxisFunction& inverse = {})

@@ -36,6 +36,7 @@
 #include "../plottables/plottable-graph.h"
 #include "../Profiling.hpp"
 #include <algorithm>
+#include <QSet>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPAxisRect
@@ -216,8 +217,6 @@ QCPAxisRect::QCPAxisRect(QCustomPlot* parentPlot, bool setupDefaultAxes)
         QCPAxis* yAxis = addAxis(QCPAxis::atLeft);
         QCPAxis* xAxis2 = addAxis(QCPAxis::atTop);
         QCPAxis* yAxis2 = addAxis(QCPAxis::atRight);
-        setRangeDragAxes(xAxis, yAxis);
-        setRangeZoomAxes(xAxis, yAxis);
         xAxis2->setVisible(false);
         yAxis2->setVisible(false);
         xAxis->grid()->setVisible(true);
@@ -595,7 +594,9 @@ void QCPAxisRect::zoom(const QRectF& pixelRect, const QList<QCPAxis*>& affectedA
 {
     if (affectedAxes.contains(nullptr))
         qDebug() << Q_FUNC_INFO << "a passed axis was zero";
-    const QList<QPointer<QCPAxis>> axes(affectedAxes.begin(), affectedAxes.end());
+    QList<QPointer<QCPAxis>> axes;
+    for (QCPAxis* axis : moveRepresentatives(affectedAxes))
+        axes.append(axis);
     forEachAxis(this, axes, [&pixelRect](QCPAxis* axis) {
         const QCPRange pixelRange = axis->orientation() == Qt::Horizontal
             ? QCPRange(pixelRect.left(), pixelRect.right())
@@ -620,8 +621,9 @@ void QCPAxisRect::zoom(const QRectF& pixelRect, const QList<QCPAxis*>& affectedA
 
   Tick label visibility (\ref QCPAxis::setTickLabels) of the right and top axes are set to false.
 
-  If \a connectRanges is true, the \ref QCPAxis::rangeChanged "rangeChanged" signals of the bottom
-  and left axes are connected to the \ref QCPAxis::setRange slots of the top and right axes.
+  If \a connectRanges is true, the top and right axes are linked to the bottom and left ones
+  (\ref QCPAxis::linkTo): moving either end of a pair moves the other, and a drag or a zoom moves
+  the pair once.
 */
 void QCPAxisRect::setupFullAxesBox(bool connectRanges)
 {
@@ -654,6 +656,13 @@ void QCPAxisRect::setupFullAxesBox(bool connectRanges)
     xAxis2->setTickLabels(false);
     yAxis2->setTickLabels(false);
 
+    if (connectRanges)
+    {
+        // A second call must re-copy from a plain axis, then link again.
+        xAxis2->unlink();
+        yAxis2->unlink();
+    }
+
     xAxis2->setRange(xAxis->range());
     xAxis2->setRangeReversed(xAxis->rangeReversed());
     xAxis2->setScaleType(xAxis->scaleType());
@@ -674,8 +683,8 @@ void QCPAxisRect::setupFullAxesBox(bool connectRanges)
 
     if (connectRanges)
     {
-        connect(xAxis, &QCPAxis::rangeChanged, xAxis2, qOverload<const QCPRange&>(&QCPAxis::setRange));
-        connect(yAxis, &QCPAxis::rangeChanged, yAxis2, qOverload<const QCPRange&>(&QCPAxis::setRange));
+        xAxis2->linkTo(xAxis);
+        yAxis2->linkTo(yAxis);
     }
 }
 
@@ -1033,6 +1042,70 @@ void QCPAxisRect::setBackgroundScaledMode(Qt::AspectRatioMode mode)
     markDirty();
 }
 
+/*! \internal
+
+  The axes of \a orientation a drag (\a drag true) or a zoom moves. A list the user set wins
+  whole; otherwise it is every axis of that orientation in the rect, bottom then top (left then
+  right), that allows the interaction: a 2.x plot dragged its bottom and left axes only, this one
+  moves all four unless an axis opted out.
+*/
+QList<QCPAxis*> QCPAxisRect::effectiveRangeAxes(bool drag, Qt::Orientation orientation) const
+{
+    const bool explicitSet = drag ? mRangeDragAxesSet : mRangeZoomAxesSet;
+    const QList<QPointer<QCPAxis>>& stored = drag
+        ? (orientation == Qt::Horizontal ? mRangeDragHorzAxis : mRangeDragVertAxis)
+        : (orientation == Qt::Horizontal ? mRangeZoomHorzAxis : mRangeZoomVertAxis);
+    QList<QCPAxis*> result;
+    if (explicitSet)
+    {
+        for (const QPointer<QCPAxis>& axis : stored)
+            if (axis)
+                result.append(axis.data());
+        return result;
+    }
+    const QList<QCPAxis::AxisType> sides = orientation == Qt::Horizontal
+        ? QList<QCPAxis::AxisType> { QCPAxis::atBottom, QCPAxis::atTop }
+        : QList<QCPAxis::AxisType> { QCPAxis::atLeft, QCPAxis::atRight };
+    for (QCPAxis::AxisType side : sides)
+    {
+        for (QCPAxis* axis : axes(side))
+        {
+            if (!axis || (drag ? !axis->rangeDraggable() : !axis->rangeZoomable()))
+                continue;
+            result.append(axis);
+        }
+    }
+    return result;
+}
+
+/*! \internal
+
+  Turns \a axes into the axes that actually move: one per source. A source listed itself wins and
+  moves once; otherwise the first listed axis linked to it moves it, through its own pixel motion
+  and the link's write-back, so a linked axis and its source never move twice.
+*/
+QList<QCPAxis*> QCPAxisRect::moveRepresentatives(const QList<QCPAxis*>& axes) const
+{
+    QList<QCPAxis*> moved;
+    QSet<QCPAxis*> covered;
+    for (QCPAxis* axis : axes)
+    {
+        if (!axis || axis->linkSource() || covered.contains(axis))
+            continue;
+        covered.insert(axis);
+        moved.append(axis);
+    }
+    for (QCPAxis* axis : axes)
+    {
+        QCPAxis* source = axis ? axis->linkSource() : nullptr;
+        if (!source || covered.contains(source))
+            continue;
+        covered.insert(source);
+        moved.append(axis);
+    }
+    return moved;
+}
+
 /*!
   Returns the range drag axis of the \a orientation provided. If multiple axes were set, returns
   the first one (use \ref rangeDragAxes to retrieve a list with all set axes).
@@ -1041,10 +1114,8 @@ void QCPAxisRect::setBackgroundScaledMode(Qt::AspectRatioMode mode)
 */
 QCPAxis* QCPAxisRect::rangeDragAxis(Qt::Orientation orientation)
 {
-    if (orientation == Qt::Horizontal)
-        return mRangeDragHorzAxis.isEmpty() ? nullptr : mRangeDragHorzAxis.first().data();
-    else
-        return mRangeDragVertAxis.isEmpty() ? nullptr : mRangeDragVertAxis.first().data();
+    const QList<QCPAxis*> axes = effectiveRangeAxes(true, orientation);
+    return axes.isEmpty() ? nullptr : axes.first();
 }
 
 /*!
@@ -1055,10 +1126,8 @@ QCPAxis* QCPAxisRect::rangeDragAxis(Qt::Orientation orientation)
 */
 QCPAxis* QCPAxisRect::rangeZoomAxis(Qt::Orientation orientation)
 {
-    if (orientation == Qt::Horizontal)
-        return mRangeZoomHorzAxis.isEmpty() ? nullptr : mRangeZoomHorzAxis.first().data();
-    else
-        return mRangeZoomVertAxis.isEmpty() ? nullptr : mRangeZoomVertAxis.first().data();
+    const QList<QCPAxis*> axes = effectiveRangeAxes(false, orientation);
+    return axes.isEmpty() ? nullptr : axes.first();
 }
 
 /*!
@@ -1068,24 +1137,7 @@ QCPAxis* QCPAxisRect::rangeZoomAxis(Qt::Orientation orientation)
 */
 QList<QCPAxis*> QCPAxisRect::rangeDragAxes(Qt::Orientation orientation)
 {
-    QList<QCPAxis*> result;
-    if (orientation == Qt::Horizontal)
-    {
-        for (QPointer<QCPAxis> axis : mRangeDragHorzAxis)
-        {
-            if (!axis.isNull())
-                result.append(axis.data());
-        }
-    }
-    else
-    {
-        for (QPointer<QCPAxis> axis : mRangeDragVertAxis)
-        {
-            if (!axis.isNull())
-                result.append(axis.data());
-        }
-    }
-    return result;
+    return effectiveRangeAxes(true, orientation);
 }
 
 /*!
@@ -1095,24 +1147,7 @@ QList<QCPAxis*> QCPAxisRect::rangeDragAxes(Qt::Orientation orientation)
 */
 QList<QCPAxis*> QCPAxisRect::rangeZoomAxes(Qt::Orientation orientation)
 {
-    QList<QCPAxis*> result;
-    if (orientation == Qt::Horizontal)
-    {
-        for (QPointer<QCPAxis> axis : mRangeZoomHorzAxis)
-        {
-            if (!axis.isNull())
-                result.append(axis.data());
-        }
-    }
-    else
-    {
-        for (QPointer<QCPAxis> axis : mRangeZoomVertAxis)
-        {
-            if (!axis.isNull())
-                result.append(axis.data());
-        }
-    }
-    return result;
+    return effectiveRangeAxes(false, orientation);
 }
 
 /*!
@@ -1128,9 +1163,8 @@ double QCPAxisRect::rangeZoomFactor(Qt::Orientation orientation)
 /*!
   Sets which axis orientation may be range dragged by the user with mouse interaction.
   What orientation corresponds to which specific axis can be set with
-  \ref setRangeDragAxes(QCPAxis *horizontal, QCPAxis *vertical). By
-  default, the horizontal axis is the bottom axis (xAxis) and the vertical axis
-  is the left axis (yAxis).
+  \ref setRangeDragAxes(QCPAxis *horizontal, QCPAxis *vertical). By default every axis of the rect
+  of that orientation moves, unless it opted out with \ref QCPAxis::setRangeDraggable.
 
   To disable range dragging entirely, pass \c nullptr as \a orientations or remove \ref
   QCP::iRangeDrag from \ref QCustomPlot::setInteractions. To enable range dragging for both
@@ -1150,8 +1184,8 @@ void QCPAxisRect::setRangeDrag(Qt::Orientations orientations)
 /*!
   Sets which axis orientation may be zoomed by the user with the mouse wheel. What orientation
   corresponds to which specific axis can be set with \ref setRangeZoomAxes(QCPAxis *horizontal,
-  QCPAxis *vertical). By default, the horizontal axis is the bottom axis (xAxis) and the vertical
-  axis is the left axis (yAxis).
+  QCPAxis *vertical). By default every axis of the rect of that orientation zooms, unless it opted
+  out with \ref QCPAxis::setRangeZoomable.
 
   To disable range zooming entirely, pass \c nullptr as \a orientations or remove \ref
   QCP::iRangeZoom from \ref QCustomPlot::setInteractions. To enable range zooming for both
@@ -1219,6 +1253,7 @@ void QCPAxisRect::setRangeDragAxes(QList<QCPAxis*> axes)
 */
 void QCPAxisRect::setRangeDragAxes(QList<QCPAxis*> horizontal, QList<QCPAxis*> vertical)
 {
+    mRangeDragAxesSet = true;
     mRangeDragHorzAxis.clear();
     for (QCPAxis* ax : horizontal)
     {
@@ -1293,6 +1328,7 @@ void QCPAxisRect::setRangeZoomAxes(QList<QCPAxis*> axes)
 */
 void QCPAxisRect::setRangeZoomAxes(QList<QCPAxis*> horizontal, QList<QCPAxis*> vertical)
 {
+    mRangeZoomAxesSet = true;
     mRangeZoomHorzAxis.clear();
     for (QCPAxis* ax : horizontal)
     {
@@ -1313,6 +1349,32 @@ void QCPAxisRect::setRangeZoomAxes(QList<QCPAxis*> horizontal, QList<QCPAxis*> v
             qDebug() << Q_FUNC_INFO
                      << "invalid axis passed in vertical list:" << reinterpret_cast<quintptr>(ax);
     }
+}
+
+/*!
+  Forgets the explicit drag axis lists and returns to dragging every axis of the rect that allows
+  it (see \ref QCPAxis::setRangeDraggable).
+
+  \see setRangeDragAxes
+*/
+void QCPAxisRect::resetRangeDragAxes()
+{
+    mRangeDragAxesSet = false;
+    mRangeDragHorzAxis.clear();
+    mRangeDragVertAxis.clear();
+}
+
+/*!
+  Forgets the explicit zoom axis lists and returns to zooming every axis of the rect that allows
+  it (see \ref QCPAxis::setRangeZoomable).
+
+  \see setRangeZoomAxes
+*/
+void QCPAxisRect::resetRangeZoomAxes()
+{
+    mRangeZoomAxesSet = false;
+    mRangeZoomHorzAxis.clear();
+    mRangeZoomVertAxis.clear();
 }
 
 /*!
@@ -1493,12 +1555,20 @@ void QCPAxisRect::mousePressEvent(QMouseEvent* event, [[maybe_unused]] const QVa
         // Mouse range dragging interaction:
         if (mParentPlot->interactions().testFlag(QCP::iRangeDrag))
         {
+            mDragHorzAxes.clear();
             mDragStartHorzRange.clear();
-            for (QPointer<QCPAxis> axis : mRangeDragHorzAxis)
-                mDragStartHorzRange.append(axis.isNull() ? QCPRange() : axis->range());
+            for (QCPAxis* axis : moveRepresentatives(effectiveRangeAxes(true, Qt::Horizontal)))
+            {
+                mDragHorzAxes.append(axis);
+                mDragStartHorzRange.append(axis->range());
+            }
+            mDragVertAxes.clear();
             mDragStartVertRange.clear();
-            for (QPointer<QCPAxis> axis : mRangeDragVertAxis)
-                mDragStartVertRange.append(axis.isNull() ? QCPRange() : axis->range());
+            for (QCPAxis* axis : moveRepresentatives(effectiveRangeAxes(true, Qt::Vertical)))
+            {
+                mDragVertAxes.append(axis);
+                mDragStartVertRange.append(axis->range());
+            }
         }
     }
 }
@@ -1518,9 +1588,9 @@ void QCPAxisRect::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
     const QPointer<QCPAxisRect> alive(this);
     const QPointF pos = event->pos();
     if (mRangeDrag.testFlag(Qt::Horizontal))
-        dragAxes(alive, mRangeDragHorzAxis, mDragStartHorzRange, startPos.x(), pos.x());
+        dragAxes(alive, mDragHorzAxes, mDragStartHorzRange, startPos.x(), pos.x());
     if (alive && mRangeDrag.testFlag(Qt::Vertical))
-        dragAxes(alive, mRangeDragVertAxis, mDragStartVertRange, startPos.y(), pos.y());
+        dragAxes(alive, mDragVertAxes, mDragStartVertRange, startPos.y(), pos.y());
 
     if (alive && mRangeDrag != 0) // if either vertical or horizontal drag was enabled, do a replot
     {
@@ -1586,10 +1656,20 @@ QPointF swipePixels(const QWheelEvent* event)
 void QCPAxisRect::panByPixels(const QPointF& delta)
 {
     const QPointer<QCPAxisRect> alive(this);
+    QList<QPointer<QCPAxis>> moved;
     if (mRangeDrag.testFlag(Qt::Horizontal))
-        forEachAxis(alive, mRangeDragHorzAxis, [&](QCPAxis* axis) { followPointer(axis, delta.x()); });
+    {
+        for (QCPAxis* axis : moveRepresentatives(effectiveRangeAxes(true, Qt::Horizontal)))
+            moved.append(axis);
+        forEachAxis(alive, moved, [&](QCPAxis* axis) { followPointer(axis, delta.x()); });
+    }
     if (alive && mRangeDrag.testFlag(Qt::Vertical))
-        forEachAxis(alive, mRangeDragVertAxis, [&](QCPAxis* axis) { followPointer(axis, delta.y()); });
+    {
+        moved.clear();
+        for (QCPAxis* axis : moveRepresentatives(effectiveRangeAxes(true, Qt::Vertical)))
+            moved.append(axis);
+        forEachAxis(alive, moved, [&](QCPAxis* axis) { followPointer(axis, delta.y()); });
+    }
 }
 
 void QCPAxisRect::zoomAt(const QPointF& pos, double factor)
@@ -1600,14 +1680,24 @@ void QCPAxisRect::zoomAt(const QPointF& pos, double factor)
 void QCPAxisRect::zoomAxesAt(const QPointF& pos, double horizontalFactor, double verticalFactor)
 {
     const QPointer<QCPAxisRect> alive(this);
+    QList<QPointer<QCPAxis>> moved;
     if (mRangeZoom.testFlag(Qt::Horizontal))
-        forEachAxis(alive, mRangeZoomHorzAxis, [&](QCPAxis* axis) {
+    {
+        for (QCPAxis* axis : moveRepresentatives(effectiveRangeAxes(false, Qt::Horizontal)))
+            moved.append(axis);
+        forEachAxis(alive, moved, [&](QCPAxis* axis) {
             axis->scaleRange(horizontalFactor, axis->pixelToCoord(pos.x()));
         });
+    }
     if (alive && mRangeZoom.testFlag(Qt::Vertical))
-        forEachAxis(alive, mRangeZoomVertAxis, [&](QCPAxis* axis) {
+    {
+        moved.clear();
+        for (QCPAxis* axis : moveRepresentatives(effectiveRangeAxes(false, Qt::Vertical)))
+            moved.append(axis);
+        forEachAxis(alive, moved, [&](QCPAxis* axis) {
             axis->scaleRange(verticalFactor, axis->pixelToCoord(pos.y()));
         });
+    }
 }
 
 void QCPAxisRect::wheelEvent(QWheelEvent* event)
