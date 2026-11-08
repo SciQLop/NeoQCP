@@ -661,6 +661,8 @@ void QCPAxis::setScaleType(QCPAxis::ScaleType type)
         {
             // A linked axis takes its range from the source: its own scale type only picks its
             // ticks, so it must not write a sanitized range back into the source.
+            // A linked axis shows the source's range even where a log axis could not draw it:
+            // sanitizing it here would break the invariant that its range is forward(source).
             if (mLink)
                 refreshFromLink();
             else
@@ -813,12 +815,10 @@ void QCPAxis::refreshFromLink()
     if (fresh.lower == mRange.lower && fresh.upper == mRange.upper && reversed == mRangeReversed)
         return;
     const QCPRange oldRange = mRange;
-    mRefreshingLink = true;
     mRange = mScaleType == stLogarithmic ? fresh.sanitizedForLogScale()
                                          : fresh.sanitizedForLinScale();
     const bool reversalChanged = reversed != mRangeReversed;
     mRangeReversed = reversed;
-    mRefreshingLink = false;
     if (reversalChanged)
         markAppearanceDirty();
     rangeDidChange(oldRange);
@@ -865,7 +865,11 @@ void QCPAxis::linkTo(QCPAxis* source, QCPAxisFunction forward, QCPAxisFunction i
         unlink();
     auto link = std::make_shared<QCPAxisLink>();
     link->source = source;
-    link->decreasing = forward(source->mRange.upper) < forward(source->mRange.lower);
+    const double forwardLower = forward(source->mRange.lower);
+    const double forwardUpper = forward(source->mRange.upper);
+    if (!std::isfinite(forwardLower) || !std::isfinite(forwardUpper))
+        qDebug() << Q_FUNC_INFO << "the forward function is not finite at the source's range";
+    link->decreasing = forwardUpper < forwardLower;
     link->forward = std::move(forward);
     link->inverse = std::move(inverse);
     mLink = link;

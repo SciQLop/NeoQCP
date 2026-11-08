@@ -1245,8 +1245,16 @@ void QCPAxisRect::setRangeDragAxes(QCPAxis* horizontal, QCPAxis* vertical)
 void QCPAxisRect::setRangeDragAxes(QList<QCPAxis*> axes)
 {
     QList<QCPAxis*> horz, vert;
+    bool refused = false;
     for (QCPAxis* ax : axes)
     {
+        if (!ax)
+        {
+            if (!refused)
+                qcp::reportMisuse(Q_FUNC_INFO, "a passed axis was null");
+            refused = true;
+            continue;
+        }
         if (ax->orientation() == Qt::Horizontal)
             horz.append(ax);
         else
@@ -1320,8 +1328,16 @@ void QCPAxisRect::setRangeZoomAxes(QCPAxis* horizontal, QCPAxis* vertical)
 void QCPAxisRect::setRangeZoomAxes(QList<QCPAxis*> axes)
 {
     QList<QCPAxis*> horz, vert;
+    bool refused = false;
     for (QCPAxis* ax : axes)
     {
+        if (!ax)
+        {
+            if (!refused)
+                qcp::reportMisuse(Q_FUNC_INFO, "a passed axis was null");
+            refused = true;
+            continue;
+        }
         if (ax->orientation() == Qt::Horizontal)
             horz.append(ax);
         else

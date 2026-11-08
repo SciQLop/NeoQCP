@@ -3716,7 +3716,7 @@ void QCustomPlot::resizeEvent([[maybe_unused]] QResizeEvent* event)
 void QCustomPlot::moveEvent(QMoveEvent* event)
 {
     notifyAlignmentGroups();
-    QWidget::moveEvent(event);
+    QRhiWidget::moveEvent(event);
 }
 
 /*! \internal
@@ -3771,7 +3771,7 @@ void QCustomPlot::showEvent(QShowEvent* event)
 void QCustomPlot::hideEvent(QHideEvent* event)
 {
     relayoutAlignmentGroups();
-    QWidget::hideEvent(event);
+    QRhiWidget::hideEvent(event);
 }
 
 /*! \internal

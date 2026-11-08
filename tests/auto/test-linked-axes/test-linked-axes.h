@@ -30,4 +30,5 @@ private slots:
     void aFullAxesBoxWithoutRangeSyncLeavesPlainAxes();
     void aSpanOnALinkedAxisLandsAtItsCoordToPixel();
     void aLinkedAxisGridLineLandsAtItsTick();
+    void aVerticalLinkFollowsALogReversedSource();
 };

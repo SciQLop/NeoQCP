@@ -255,3 +255,12 @@ void TestHandle::colorKeepsPenWidthAndStyle()
     QCOMPARE(handle->basePen().width(), 3);
     QCOMPARE(handle->basePen().style(), Qt::DashLine);
 }
+
+void TestHandle::aNullAxisInARangeListIsRefused()
+{
+    QCustomPlot plot;
+    plot.axisRect()->setRangeDragAxes(QList<QCPAxis*> {nullptr});
+    QCOMPARE(gMisuses, 1);
+    plot.axisRect()->setRangeZoomAxes(QList<QCPAxis*> {nullptr});
+    QCOMPARE(gMisuses, 2);
+}

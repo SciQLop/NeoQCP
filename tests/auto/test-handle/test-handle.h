@@ -26,4 +26,5 @@ private slots:
     void axisAddedOnThePlotStacksOnItsSide();
     void axisAddedWithoutARectIsRefused();
     void colorKeepsPenWidthAndStyle();
+    void aNullAxisInARangeListIsRefused();
 };

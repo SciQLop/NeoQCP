@@ -436,6 +436,42 @@ void TestAlignmentGroup::aPeerSidewaysMoveRealigns()
     QCOMPARE(innerLeft(a), innerLeft(b));
 }
 
+void TestAlignmentGroup::sideBySideRectsAlignAndSettle()
+{
+    QCustomPlot plot;
+    plot.resize(600, 300);
+    QCPAxisRect* left = plot.axisRect();
+    QCPAxisRect* right = new QCPAxisRect(&plot);
+    plot.plotLayout()->addElement(0, 1, right);
+    // Only the left rect carries a tall top axis: the two want different top margins.
+    left->axis(QCPAxis::atTop)->setVisible(true);
+    left->axis(QCPAxis::atTop)->setTickLabels(true);
+    left->axis(QCPAxis::atTop)->setLabel("top label");
+    right->axis(QCPAxis::atTop)->setVisible(false);
+    plot.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&plot));
+
+    QCPAlignmentGroup::create({left, right}, QCP::msTop | QCP::msBottom);
+    int repaints = 0;
+    const auto connection = QObject::connect(&plot, &QCustomPlot::afterReplot,
+                                            [&repaints] { ++repaints; });
+    plot.replot();
+    // Each round waits for the group's own follow-up pass. Once a round is quiet, aligned
+    // elements have stopped asking each other to lay out again.
+    int round = 0;
+    for (; round < 4; ++round)
+    {
+        repaints = 0;
+        QTest::qWait(60);
+        if (repaints == 0)
+            break;
+    }
+    QObject::disconnect(connection);
+    QVERIFY2(round < 4, "the side by side rects never settled");
+    QCOMPARE(innerEdge(left, &plot, QCP::msTop), innerEdge(right, &plot, QCP::msTop));
+    QCOMPARE(innerEdge(left, &plot, QCP::msBottom), innerEdge(right, &plot, QCP::msBottom));
+}
+
 void TestAlignmentGroup::alignmentWinsOverMarginGroup()
 {
     auto* a = makePlot();

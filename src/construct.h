@@ -137,7 +137,10 @@ struct Construct<T>
         using Handle = HandleFor<T>;
         if (!detail::plotHasAxisRect(plot))
             return Handle{};
-        Handle handle = makeHandle<Handle>(plot.axisRect()->addAxis(type));
+        QCPAxis* axis = plot.axisRect()->addAxis(type);
+        if (!axis)
+            return Handle{};
+        Handle handle = makeHandle<Handle>(axis);
         handle.get()->markDirty();
         return handle;
     }

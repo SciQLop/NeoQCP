@@ -636,3 +636,32 @@ void TestLinkedAxes::aLinkedAxisGridLineLandsAtItsTick()
                                 .arg(nearest)));
     }
 }
+
+void TestLinkedAxes::aVerticalLinkFollowsALogReversedSource()
+{
+    QCustomPlot plot;
+    plot.setGeometry(0, 0, 400, 300);
+    plot.yAxis->setScaleType(QCPAxis::stLogarithmic);
+    plot.yAxis->setRange(0.1, 1000);
+    plot.yAxis->setRangeReversed(true);
+    QCPAxisRect* second = new QCPAxisRect(&plot);
+    plot.plotLayout()->addElement(0, 1, second);
+    plot.plotLayout()->setColumnStretchFactor(0, 2);
+    plot.plotLayout()->setColumnStretchFactor(1, 1);
+    QCPAxis* linked = second->addAxis(QCPAxis::atLeft);
+    linked->setVisible(true);
+    linked->linkTo(plot.yAxis);
+    QVERIFY(linked->linkSource() == plot.yAxis);
+    plot.replot();
+
+    const auto fraction = [](const QCPAxis* axis, double value)
+    {
+        const QRect rect = axis->axisRect()->rect();
+        return (rect.bottom() - axis->coordToPixel(value)) / double(rect.height());
+    };
+    for (double value : {0.2, 1.0, 10.0, 500.0})
+    {
+        QVERIFY2(std::abs(fraction(plot.yAxis, value) - fraction(linked, value)) < 1e-9,
+                 "a vertical link must keep the source's fraction along its own height");
+    }
+}

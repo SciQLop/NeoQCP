@@ -26,6 +26,7 @@ private slots:
     void aPeerSidewaysMoveRealigns();
   void aMemberResizedRealigns();
     void alignmentWinsOverMarginGroup();
+    void sideBySideRectsAlignAndSettle();
 };
 
 #endif // TEST_ALIGNMENT_GROUP_H

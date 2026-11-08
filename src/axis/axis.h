@@ -498,7 +498,6 @@ protected:
     // linked axes:
     std::shared_ptr<const QCPAxisLink> mLink;
     QList<QPointer<QCPAxis>> mLinkedAxes;
-    bool mRefreshingLink = false;
 
     // introduced virtual methods:
     virtual int calculateMargin();

@@ -39,10 +39,12 @@ QCPAlignmentGroup::~QCPAlignmentGroup() = default;
 
 bool QCPAlignmentGroup::eligible(const QCPLayoutElement* element)
 {
-    if (!element)
+    if (!element || !element->layout())
         return false;
     const QCustomPlot* plot = element->parentPlot();
-    return plot && plot->isVisible();
+    // Hiding a widget keeps its geometry, so the plot itself must still be shown; a member whose
+    // outer rect is empty has not been laid out yet and would drag the shared edge elsewhere.
+    return plot && plot->isVisible() && !element->outerRect().isEmpty();
 }
 
 QList<QCPLayoutElement*> QCPAlignmentGroup::liveMembers() const
@@ -85,12 +87,20 @@ void QCPAlignmentGroup::remove(QCPLayoutElement* element)
 {
     if (!element || !mMembers.removeOne(element))
         return;
+    QCustomPlot* plot = element->parentPlot();
     element->mAlignmentGroup = nullptr;
     mUsedEdges.remove(element);
     invalidate();
     qcpEmit(this, nullptr, &QCPAlignmentGroup::membersChanged);
     if (mMembers.isEmpty())
-        deleteLater();
+    {
+        // A plot being torn down may never run the event loop again: waiting for a deferred
+        // delete would leak the group for the life of the process.
+        if (plot && plot->isBeingDestroyed())
+            delete this;
+        else
+            deleteLater();
+    }
 }
 
 QList<QCPLayoutElement*> QCPAlignmentGroup::elements() const
@@ -98,6 +108,9 @@ QList<QCPLayoutElement*> QCPAlignmentGroup::elements() const
     return liveMembers();
 }
 
+// simplify: every member asks for the shared edge and this recomputes each member's requirement,
+// so a pass costs O(n^2) calculateAutoMargin calls. Compute the shared edge once per pass when a
+// profile shows it.
 int QCPAlignmentGroup::marginFor(QCPLayoutElement* element, QCP::MarginSide side)
 {
     if (!element)
