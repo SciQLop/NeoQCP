@@ -25,6 +25,9 @@
 
 #include "axis.h"
 
+#include <cmath>
+#include <memory>
+#include <utility>
 
 #include "../core.h"
 #include "../painting/grid-rhi-layer.h"
@@ -499,6 +502,15 @@ QCPAxis::QCPAxis(QCPAxisRect* parent, AxisType type)
 
 QCPAxis::~QCPAxis()
 {
+    // A link cannot outlive its source: its axes keep their range and become plain.
+    if (!mLinkedAxes.isEmpty())
+    {
+        const QList<QPointer<QCPAxis>> users = mLinkedAxes;
+        mLinkedAxes.clear();
+        for (const QPointer<QCPAxis>& user : users)
+            if (user)
+                user->mLink.reset();
+    }
     if (mParentPlot)
         if (auto* grl = mParentPlot->gridRhiLayerIfExists())
             grl->unregisterAxis(this);
@@ -636,6 +648,16 @@ void QCPAxis::setScaleType(QCPAxis::ScaleType type)
         if (mScaleType == stLogarithmic)
             setRange(mRange.sanitizedForLogScale());
         markAppearanceDirty();
+        // A linked axis maps through the source's scale type: its pixels moved even when its own
+        // range did not.
+        const QList<QPointer<QCPAxis>> users = mLinkedAxes;
+        for (const QPointer<QCPAxis>& user : users)
+        {
+            if (!user)
+                continue;
+            user->refreshFromLink();
+            user->markAppearanceDirty();
+        }
         qcpEmitCurrent(this, mParentPlot, &QCPAxis::scaleTypeChanged, [this] { return mScaleType; });
     }
 }
@@ -657,6 +679,8 @@ void QCPAxis::rangeDidChange(const QCPRange& oldRange)
         mAxisRect->markAffectedLayersDirty();
         mAxisRect->markItemsUsingAxisDirty(this);
     }
+    // Before the signal: a slot that reads a linked axis sees the range it was told about.
+    refreshLinkedAxes();
     qcpEmitIf(this, mParentPlot, &QCPAxis::rangeChanged,
               [this, range = mRange] { return mRange == range; }, mRange, oldRange);
 }
@@ -678,6 +702,207 @@ void QCPAxis::markAppearanceDirty()
     mAxisRect->markItemsUsingAxisDirty(this);
 }
 
+/*! \internal
+
+  The one place that writes a range: every mutator (and every setRange overload) calls
+  commitRange, which either applies the range here or writes it back to the source of a link.
+*/
+void QCPAxis::applyRange(const QCPRange& range)
+{
+    if ((range.lower == mRange.lower && range.upper == mRange.upper)
+        || !QCPRange::validRange(range))
+        return;
+    const QCPRange oldRange = mRange;
+    mRange = mScaleType == stLogarithmic ? range.sanitizedForLogScale()
+                                         : range.sanitizedForLinScale();
+    rangeDidChange(oldRange);
+}
+
+/*! \internal
+
+  The range funnel: an unlinked axis takes the range, a linked one writes its ordered inverse to
+  its source and takes back the forward image the source settled on. Writing back, and then asking
+  the source what it kept, is what stops the round trip from oscillating when forward and inverse
+  are not exact inverses in floating point: the source's answer wins, once.
+*/
+void QCPAxis::commitRange(const QCPRange& range)
+{
+    if (!mLink)
+    {
+        applyRange(range);
+        return;
+    }
+    if (mRefreshingLink || !mLink->inverse || !QCPRange::validRange(range))
+        return;
+    const QCPRange clean = mScaleType == stLogarithmic ? range.sanitizedForLogScale()
+                                                       : range.sanitizedForLinScale();
+    if (clean.lower == mRange.lower && clean.upper == mRange.upper)
+        return;
+    const double lower = mLink->inverse(clean.lower);
+    const double upper = mLink->inverse(clean.upper);
+    QCPRange sourceRange(lower, upper);
+    sourceRange.normalize();
+    QCP_CHECK_OR_RETURN(std::isfinite(lower) && std::isfinite(upper)
+                            && QCPRange::validRange(sourceRange),
+                        "the inverse of the linked range is not a valid source range", );
+    QCPAxis* source = mLink->source;
+    QCP_CHECK_OR_RETURN(source, "the source of the link is gone", );
+    source->setRange(sourceRange);
+    refreshFromLink();
+}
+
+/*! \internal
+
+  Takes the linked range from the source again. The source may have refused the range a write back
+  asked for, rounded it, or been changed by someone else; this is the only place that reads it.
+*/
+void QCPAxis::refreshFromLink()
+{
+    if (!mLink)
+        return;
+    QCPAxis* source = mLink->source;
+    if (!source)
+    {
+        mLink.reset();
+        markAppearanceDirty();
+        return;
+    }
+    QCPRange fresh(mLink->forward(source->mRange.lower), mLink->forward(source->mRange.upper));
+    fresh.normalize();
+    if (!QCPRange::validRange(fresh))
+        return;
+    const bool reversed = source->mRangeReversed != mLink->decreasing;
+    if (fresh.lower == mRange.lower && fresh.upper == mRange.upper && reversed == mRangeReversed)
+        return;
+    const QCPRange oldRange = mRange;
+    mRefreshingLink = true;
+    mRange = mScaleType == stLogarithmic ? fresh.sanitizedForLogScale()
+                                         : fresh.sanitizedForLinScale();
+    const bool reversalChanged = reversed != mRangeReversed;
+    mRangeReversed = reversed;
+    mRefreshingLink = false;
+    if (reversalChanged)
+        markAppearanceDirty();
+    rangeDidChange(oldRange);
+}
+
+/*! \internal
+
+  Pushes this axis's range and direction to the axes linked to it. Walks a snapshot: a refresh can
+  never delete an axis, but a slot it runs may.
+*/
+void QCPAxis::refreshLinkedAxes()
+{
+    if (mLinkedAxes.isEmpty())
+        return;
+    const QList<QPointer<QCPAxis>> users = mLinkedAxes;
+    for (const QPointer<QCPAxis>& user : users)
+        if (user)
+            user->refreshFromLink();
+}
+
+void QCPAxis::linkTo(QCPAxis* source, QCPAxisFunction forward, QCPAxisFunction inverse)
+{
+    QCP_CHECK_OR_RETURN(source, "a link needs a source axis", );
+    QCP_CHECK_OR_RETURN(source != this, "an axis cannot be linked to itself", );
+    QCP_CHECK_OR_RETURN(mParentPlot && source->mParentPlot == mParentPlot,
+                        "the linked axes must belong to the same plot", );
+    QCP_CHECK_OR_RETURN(source->mOrientation == mOrientation,
+                        "the linked axes must have the same orientation", );
+    QCP_CHECK_OR_RETURN(!source->mLink, "the source axis is linked itself", );
+    QCP_CHECK_OR_RETURN(source->mLinkedAxes.isEmpty(),
+                        "the source axis already drives another link", );
+    QCP_CHECK_OR_RETURN(mLinkedAxes.isEmpty(), "the axis already drives a link of its own", );
+    QCP_CHECK_OR_RETURN(static_cast<bool>(forward) == static_cast<bool>(inverse),
+                        "a link needs both its forward and its inverse function", );
+    if (!forward)
+    {
+        forward = [](double value) { return value; };
+        inverse = [](double value) { return value; };
+    }
+    if (mLink)
+        unlink();
+    auto link = std::make_shared<QCPAxisLink>();
+    link->source = source;
+    link->decreasing = forward(source->mRange.upper) < forward(source->mRange.lower);
+    link->forward = std::move(forward);
+    link->inverse = std::move(inverse);
+    mLink = link;
+    source->mLinkedAxes.append(this);
+    refreshFromLink();
+    // Even an identity link on the same rect changes where the axis maps: its pixels come from
+    // the source now.
+    markAppearanceDirty();
+}
+
+void QCPAxis::unlink()
+{
+    if (!mLink)
+        return;
+    if (QCPAxis* source = mLink->source)
+        source->mLinkedAxes.removeAll(this);
+    mLink.reset();
+    markAppearanceDirty();
+}
+
+QCPAxis* QCPAxis::linkSource() const
+{
+    return mLink ? mLink->source.data() : nullptr;
+}
+
+/*! \internal
+
+  The pixel of \a value on a linked axis: the source's own position for inverse(value), taken as a
+  fraction of the source's length and placed along this axis's length. A value the source draws
+  200 pixels outside its rect therefore lands 200 * (ownLength / sourceLength) outside this one.
+*/
+double QCPAxis::linkedCoordToPixel(double value) const
+{
+    if (!mLink || !mLink->inverse || !mAxisRect)
+        return qQNaN();
+    const QCPAxis* source = mLink->source;
+    if (!source || !source->mAxisRect)
+        return qQNaN();
+    const QRectF sourceRect = source->mAxisRect->rect();
+    const QRectF ownRect = mAxisRect->rect();
+    const double sourcePixel = source->coordToPixel(mLink->inverse(value));
+    if (mOrientation == Qt::Horizontal)
+    {
+        const double fraction = (sourcePixel - sourceRect.left()) / sourceRect.width();
+        return ownRect.left() + fraction * ownRect.width();
+    }
+    const double fraction = (sourceRect.bottom() - sourcePixel) / sourceRect.height();
+    return ownRect.bottom() - fraction * ownRect.height();
+}
+
+/*! \internal
+
+  The inverse of linkedCoordToPixel: this axis's pixel as a fraction of its length, placed on the
+  source, read back through the source's own mapping and forward().
+*/
+double QCPAxis::linkedPixelToCoord(double value) const
+{
+    if (!mLink || !mLink->forward || !mAxisRect)
+        return qQNaN();
+    const QCPAxis* source = mLink->source;
+    if (!source || !source->mAxisRect)
+        return qQNaN();
+    const QRectF sourceRect = source->mAxisRect->rect();
+    const QRectF ownRect = mAxisRect->rect();
+    double sourcePixel;
+    if (mOrientation == Qt::Horizontal)
+    {
+        const double fraction = (value - ownRect.left()) / ownRect.width();
+        sourcePixel = sourceRect.left() + fraction * sourceRect.width();
+    }
+    else
+    {
+        const double fraction = (ownRect.bottom() - value) / ownRect.height();
+        sourcePixel = sourceRect.bottom() - fraction * sourceRect.height();
+    }
+    return mLink->forward(source->pixelToCoord(sourcePixel));
+}
+
 /*!
   Sets the range of the axis.
 
@@ -688,21 +913,7 @@ void QCPAxis::markAppearanceDirty()
 */
 void QCPAxis::setRange(const QCPRange& range)
 {
-    if (range.lower == mRange.lower && range.upper == mRange.upper)
-        return;
-
-    if (!QCPRange::validRange(range))
-        return;
-    QCPRange oldRange = mRange;
-    if (mScaleType == stLogarithmic)
-    {
-        mRange = range.sanitizedForLogScale();
-    }
-    else
-    {
-        mRange = range.sanitizedForLinScale();
-    }
-    rangeDidChange(oldRange);
+    commitRange(range);
 }
 
 /*!
@@ -762,23 +973,7 @@ void QCPAxis::setSelectedParts(const SelectableParts& selected)
 */
 void QCPAxis::setRange(double lower, double upper)
 {
-    if (lower == mRange.lower && upper == mRange.upper)
-        return;
-
-    if (!QCPRange::validRange(lower, upper))
-        return;
-    QCPRange oldRange = mRange;
-    mRange.lower = lower;
-    mRange.upper = upper;
-    if (mScaleType == stLogarithmic)
-    {
-        mRange = mRange.sanitizedForLogScale();
-    }
-    else
-    {
-        mRange = mRange.sanitizedForLinScale();
-    }
-    rangeDidChange(oldRange);
+    commitRange(QCPRange(lower, upper));
 }
 
 /*!
@@ -810,18 +1005,7 @@ void QCPAxis::setRangeLower(double lower)
 {
     if (mRange.lower == lower)
         return;
-
-    QCPRange oldRange = mRange;
-    mRange.lower = lower;
-    if (mScaleType == stLogarithmic)
-    {
-        mRange = mRange.sanitizedForLogScale();
-    }
-    else
-    {
-        mRange = mRange.sanitizedForLinScale();
-    }
-    rangeDidChange(oldRange);
+    commitRange(QCPRange(lower, mRange.upper));
 }
 
 /*!
@@ -832,18 +1016,7 @@ void QCPAxis::setRangeUpper(double upper)
 {
     if (mRange.upper == upper)
         return;
-
-    QCPRange oldRange = mRange;
-    mRange.upper = upper;
-    if (mScaleType == stLogarithmic)
-    {
-        mRange = mRange.sanitizedForLogScale();
-    }
-    else
-    {
-        mRange = mRange.sanitizedForLinScale();
-    }
-    rangeDidChange(oldRange);
+    commitRange(QCPRange(mRange.lower, upper));
 }
 
 /*!
@@ -857,10 +1030,13 @@ void QCPAxis::setRangeUpper(double upper)
 */
 void QCPAxis::setRangeReversed(bool reversed)
 {
+    QCP_CHECK_OR_RETURN(!mLink, "a linked axis follows its source's direction", );
     if (reversed == mRangeReversed)
         return;
     mRangeReversed = reversed;
     markAppearanceDirty();
+    // No signal carries a reversal, so the linked axes are told here.
+    refreshLinkedAxes();
 }
 
 /*!
@@ -1530,18 +1706,18 @@ void QCPAxis::setUpperEnding(const QCPLineEnding& ending)
 */
 void QCPAxis::moveRange(double diff)
 {
-    QCPRange oldRange = mRange;
+    QCPRange moved = mRange;
     if (mScaleType == stLinear)
     {
-        mRange.lower += diff;
-        mRange.upper += diff;
+        moved.lower += diff;
+        moved.upper += diff;
     }
     else // mScaleType == stLogarithmic
     {
-        mRange.lower *= diff;
-        mRange.upper *= diff;
+        moved.lower *= diff;
+        moved.upper *= diff;
     }
-    rangeDidChange(oldRange);
+    commitRange(moved);
 }
 
 /*!
@@ -1570,33 +1746,30 @@ void QCPAxis::scaleRange(double factor)
 void QCPAxis::scaleRange(double factor, double center)
 {
     PROFILE_HERE_N("QCPAxis::scaleRange");
-    QCPRange oldRange = mRange;
+    QCPRange scaled = mRange;
     if (mScaleType == stLinear)
     {
-        QCPRange newRange;
-        newRange.lower = (mRange.lower - center) * factor + center;
-        newRange.upper = (mRange.upper - center) * factor + center;
-        if (QCPRange::validRange(newRange))
-            mRange = newRange.sanitizedForLinScale();
+        scaled.lower = (mRange.lower - center) * factor + center;
+        scaled.upper = (mRange.upper - center) * factor + center;
     }
     else // mScaleType == stLogarithmic
     {
         if ((mRange.upper < 0 && center < 0)
             || (mRange.upper > 0 && center > 0)) // make sure center has same sign as range
         {
-            QCPRange newRange;
-            newRange.lower = qPow(mRange.lower / center, factor) * center;
-            newRange.upper = qPow(mRange.upper / center, factor) * center;
-            if (QCPRange::validRange(newRange))
-                mRange = newRange.sanitizedForLogScale();
+            scaled.lower = qPow(mRange.lower / center, factor) * center;
+            scaled.upper = qPow(mRange.upper / center, factor) * center;
         }
         else
+        {
             qDebug() << Q_FUNC_INFO
                      << "Center of scaling operation doesn't lie in same logarithmic sign domain "
                         "as range:"
                      << center;
+            return;
+        }
     }
-    rangeDidChange(oldRange);
+    commitRange(scaled);
 }
 
 /*!
@@ -1691,6 +1864,8 @@ void QCPAxis::rescale(bool onlyVisiblePlottables)
 */
 double QCPAxis::pixelToCoord(double value) const
 {
+    if (mLink)
+        return linkedPixelToCoord(value);
     if (orientation() == Qt::Horizontal)
     {
         if (mScaleType == stLinear)
@@ -1744,6 +1919,8 @@ double QCPAxis::pixelToCoord(double value) const
 */
 double QCPAxis::coordToPixel(double value) const
 {
+    if (mLink)
+        return linkedCoordToPixel(value);
     if (orientation() == Qt::Horizontal)
     {
         if (mScaleType == stLinear)

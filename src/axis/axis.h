@@ -26,6 +26,8 @@
 #ifndef QCP_AXIS_H
 #define QCP_AXIS_H
 
+#include <functional>
+#include <memory>
 #include <optional>
 #include <utility>
 #include "../global.h"
@@ -51,6 +53,11 @@ class QCPAbstractItem;
 
 template <typename T, typename Self = void>
 class QCPAxisOps;
+
+//! A real-valued function of one coordinate: the shape of a link's forward and inverse.
+using QCPAxisFunction = std::function<double(double)>;
+
+struct QCPAxisLink;
 
 class QCP_LIB_DECL QCPGrid : public QCPLayerable
 {
@@ -396,6 +403,12 @@ public:
     void rescale(bool onlyVisiblePlottables = false);
     double pixelToCoord(double value) const;
     double coordToPixel(double value) const;
+
+    // linked axes:
+    void linkTo(QCPAxis* source, QCPAxisFunction forward = {}, QCPAxisFunction inverse = {});
+    void unlink();
+    QCPAxis* linkSource() const;
+    std::shared_ptr<const QCPAxisLink> link() const { return mLink; }
     SelectablePart getPartAt(const QPointF& pos) const;
     QList<QCPAbstractPlottable*> plottables() const;
     QList<QCPGraph*> graphs() const;
@@ -466,6 +479,10 @@ protected:
     bool mDragging;
     QCPRange mDragStartRange;
     QCP::AntialiasedElements mAADragBackup, mNotAADragBackup;
+    // linked axes:
+    std::shared_ptr<const QCPAxisLink> mLink;
+    QList<QPointer<QCPAxis>> mLinkedAxes;
+    bool mRefreshingLink = false;
 
     // introduced virtual methods:
     virtual int calculateMargin();
@@ -498,6 +515,12 @@ protected:
 private:
     Q_DISABLE_COPY(QCPAxis)
     void rangeDidChange(const QCPRange& oldRange);
+    void applyRange(const QCPRange& range);
+    void commitRange(const QCPRange& range);
+    void refreshFromLink();
+    void refreshLinkedAxes();
+    double linkedCoordToPixel(double value) const;
+    double linkedPixelToCoord(double value) const;
     // Dirties the layers a change of look moves; call it at the end of the setter.
     void markAppearanceDirty();
 
@@ -511,6 +534,27 @@ Q_DECLARE_METATYPE(QCPAxis::AxisType)
 Q_DECLARE_METATYPE(QCPAxis::LabelSide)
 Q_DECLARE_METATYPE(QCPAxis::ScaleType)
 Q_DECLARE_METATYPE(QCPAxis::SelectablePart)
+
+/*! \brief A link from one axis to a plain source axis.
+
+  An axis linked to \a source shows whatever the source shows, mapped by \a forward: its range is
+  the ordered forward image of the source's range, and its pixels are the source's pixels placed
+  along its own length, so the two axes show the same data on rects of different sizes.
+
+  \a inverse takes a value of the linked axis back to the source, which is how a drag, a zoom or a
+  setRange on the linked axis moves the source. \a decreasing says whether \a forward falls as the
+  source grows; the linked axis is drawn reversed when exactly one of the two is reversed.
+
+  The struct is immutable once built and shared between the axis and the QCPTransform snapshots
+  that copy it, which is what lets two snapshots of an unchanged link compare equal.
+*/
+struct QCP_LIB_DECL QCPAxisLink
+{
+    QPointer<QCPAxis> source;
+    QCPAxisFunction forward;
+    QCPAxisFunction inverse;
+    bool decreasing = false;
+};
 
 class QCPAxisPainterPrivate
 {
@@ -653,6 +697,11 @@ public:
     Ret setRangeReversed(bool reversed)
     {
         return this->apply([&](T& a) { a.setRangeReversed(reversed); });
+    }
+    Ret linkTo(QCPAxis* source, const QCPAxisFunction& forward = {},
+               const QCPAxisFunction& inverse = {})
+    {
+        return this->apply([&](T& a) { a.linkTo(source, forward, inverse); });
     }
 };
 

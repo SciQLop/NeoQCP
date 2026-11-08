@@ -45,6 +45,7 @@
 #include "test-plottable-group/test-plottable-group.h"
 #include "test-misuse/test-misuse.h"
 #include "test-handle/test-handle.h"
+#include "test-linked-axes/test-linked-axes.h"
 #include "test-ownership/test-ownership.h"
 #include "test-signal-delivery/test-signal-delivery.h"
 #include "test-repaint/test-repaint.h"
@@ -143,6 +144,7 @@ int main(int argc, char **argv)
   QCPTEST(TestPlottableGroup);
   QCPTEST(TestMisuse);
   QCPTEST(TestHandle);
+  QCPTEST(TestLinkedAxes);
   QCPTEST(TestOwnership);
   QCPTEST(TestSignalDelivery);
   QCPTEST(TestRepaint);

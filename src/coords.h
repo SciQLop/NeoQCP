@@ -19,12 +19,15 @@
 #include <QPointF>
 #include <QPointer>
 #include <QRectF>
+#include <memory>
+#include <optional>
 #include <span>
 #include <variant>
 
 class QCPAxis;
 class QCPAxisRect;
 class QCPItemAnchor;
+struct QCPAxisLink;
 
 /*! \file coords.h
 
@@ -135,19 +138,21 @@ public:
     [[nodiscard]] bool isTranslationOf(const QCPTransform& other, QPointF* delta = nullptr) const;
 
     //! True when the key axis is vertical: map() then returns the value pixel first.
-    [[nodiscard]] bool keyIsVertical() const { return mKey.vertical; }
+    [[nodiscard]] bool keyIsVertical() const { return mKey.self.vertical; }
 
     //! False when an axis is gone, the orientations are the same or the snapshot cannot map.
-    [[nodiscard]] bool valid() const { return mKey.usable && mValue.usable; }
+    [[nodiscard]] bool valid() const { return mKey.usable() && mValue.usable(); }
 
     //! Two snapshots that map identically compare equal (the axes themselves are not compared).
+    //! A linked axis compares by its link and by the source snapshot it carries.
     [[nodiscard]] bool operator==(const QCPTransform& other) const
     {
         return mKey == other.mKey && mValue == other.mValue;
     }
 
 private:
-    struct Axis
+    //! One axis on its own: the mapping QCPAxis would draw, copied so a replay never reads it.
+    struct Snapshot
     {
         bool vertical = false;
         bool logarithmic = false;
@@ -167,10 +172,29 @@ private:
         double logIntercept = 0;
         double positive = 1; //!< the sign of the log range: the values it can map
 
+        bool operator==(const Snapshot&) const = default;
+
+        void take(const QCPAxis* axis);
+        void prepare();
+        [[nodiscard]] double toPixel(double value) const;
+        //! Where  pixel sits along the axis, as a fraction of its length from its origin.
+        [[nodiscard]] double fractionOf(double pixel) const;
+        //! The pixel at  fraction of the axis length, from its origin.
+        [[nodiscard]] double pixelAtFraction(double fraction) const;
+    };
+
+    //! An axis, mapped through its link when it has one. The link pointer is shared, not copied.
+    struct Axis
+    {
+        Snapshot self;
+        std::shared_ptr<const QCPAxisLink> link;
+        std::optional<Snapshot> source; //!< the source's mapping, when linked
+
         bool operator==(const Axis&) const = default;
 
         void snapshot(const QCPAxis* axis);
         void prepare();
+        [[nodiscard]] bool usable() const;
         [[nodiscard]] double toPixel(double value) const;
     };
 

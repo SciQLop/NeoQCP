@@ -64,7 +64,8 @@ QCPTransform QCPTransform::fitted(const QCPDataBox& box, const QRectF& rect)
     if (!(widened.keyLower < widened.keyUpper) || !(widened.valueLower < widened.valueUpper))
         return transform;
     const auto fit
-        = [](QCPTransform::Axis& axis, double lower, double upper, const QRectF& r, bool vertical)
+        = [](QCPTransform::Snapshot& axis, double lower, double upper, const QRectF& r,
+             bool vertical)
     {
         axis.vertical = vertical;
         axis.reversed = false;
@@ -78,8 +79,8 @@ QCPTransform QCPTransform::fitted(const QCPDataBox& box, const QRectF& rect)
         axis.length = vertical ? r.height() : r.width();
         axis.prepare();
     };
-    fit(transform.mKey, widened.keyLower, widened.keyUpper, rect, false);
-    fit(transform.mValue, widened.valueLower, widened.valueUpper, rect, true);
+    fit(transform.mKey.self, widened.keyLower, widened.keyUpper, rect, false);
+    fit(transform.mValue.self, widened.valueLower, widened.valueUpper, rect, true);
     return transform;
 }
 
@@ -93,7 +94,7 @@ QCPRatioTransform QCPRatioTransform::fitted(const QRectF& rect)
     return transform;
 }
 
-void QCPTransform::Axis::snapshot(const QCPAxis* axis)
+void QCPTransform::Snapshot::take(const QCPAxis* axis)
 {
     vertical = axis->orientation() == Qt::Vertical;
     logarithmic = axis->scaleType() == QCPAxis::stLogarithmic;
@@ -111,7 +112,7 @@ void QCPTransform::Axis::snapshot(const QCPAxis* axis)
     length = vertical ? rect->height() : rect->width();
 }
 
-void QCPTransform::Axis::prepare()
+void QCPTransform::Snapshot::prepare()
 {
     const double size = upper - lower;
     if (!(length > 0.0) || !(size > 0.0))
@@ -135,7 +136,7 @@ void QCPTransform::Axis::prepare()
     usable = !qIsNaN(logSlope) && !qIsInf(logSlope);
 }
 
-double QCPTransform::Axis::toPixel(double value) const
+double QCPTransform::Snapshot::toPixel(double value) const
 {
     if (!logarithmic)
         return slope * value + intercept;
@@ -156,23 +157,69 @@ double QCPTransform::Axis::toPixel(double value) const
     return logSlope * std::log(std::abs(value)) + logIntercept;
 }
 
+double QCPTransform::Snapshot::fractionOf(double pixel) const
+{
+    return vertical ? (bottom - pixel) / length : (pixel - left) / length;
+}
+
+double QCPTransform::Snapshot::pixelAtFraction(double fraction) const
+{
+    return vertical ? bottom - fraction * length : left + fraction * length;
+}
+
+void QCPTransform::Axis::snapshot(const QCPAxis* axis)
+{
+    self.take(axis);
+    link = axis->link();
+    if (!link || !link->source)
+        return;
+    source.emplace();
+    source->take(link->source);
+}
+
+void QCPTransform::Axis::prepare()
+{
+    self.prepare();
+    if (source)
+        source->prepare();
+}
+
+bool QCPTransform::Axis::usable() const
+{
+    if (link)
+        return self.length > 0.0 && source && source->usable;
+    return self.usable;
+}
+
+double QCPTransform::Axis::toPixel(double value) const
+{
+    if (!link)
+        return self.toPixel(value);
+    if (!source || !source->usable || !link->inverse)
+        return qQNaN();
+    // The source maps inverse(value) on its own rect; the fraction along the source is the
+    // fraction along this axis, so the same data fills a rect of any size. A value the source
+    // draws 200 px outside its rect lands 200 px * (own length / source length) outside this one.
+    return self.pixelAtFraction(source->fractionOf(source->toPixel(link->inverse(value))));
+}
+
 QCP::Pixels QCPTransform::map(QCP::Data data) const
 {
-    if (!mKey.usable || !mValue.usable)
+    if (!valid())
         return QCP::Pixels { std::numeric_limits<double>::quiet_NaN(),
                              std::numeric_limits<double>::quiet_NaN() };
     const double keyPixel = mKey.toPixel(data.x);
     const double valuePixel = mValue.toPixel(data.y);
-    return mKey.vertical ? QCP::Pixels { valuePixel, keyPixel }
-                         : QCP::Pixels { keyPixel, valuePixel };
+    return mKey.self.vertical ? QCP::Pixels { valuePixel, keyPixel }
+                              : QCP::Pixels { keyPixel, valuePixel };
 }
 
 template <bool KeyLog, bool ValueLog, typename KeyAt, typename ValueAt>
 void QCPTransform::mapRange(std::size_t count, KeyAt keyAt, ValueAt valueAt,
                             std::span<QPointF> out) const
 {
-    const Axis& keyAxis = mKey;
-    const Axis& valueAxis = mValue;
+    const Snapshot& keyAxis = mKey.self;
+    const Snapshot& valueAxis = mValue.self;
     const double keySlope = keyAxis.slope;
     const double keyIntercept = keyAxis.intercept;
     const double keyLogSlope = keyAxis.logSlope;
@@ -212,23 +259,36 @@ template <typename KeyAt, typename ValueAt>
 void QCPTransform::mapAny(std::size_t count, KeyAt keyAt, ValueAt valueAt,
                           std::span<QPointF> out) const
 {
-    if (!mKey.usable || !mValue.usable)
+    if (!valid())
     {
         const QPointF none(std::numeric_limits<double>::quiet_NaN(),
                            std::numeric_limits<double>::quiet_NaN());
         std::fill_n(out.begin(), count, none);
         return;
     }
-    if (mKey.logarithmic)
+    // A linked axis holds a function, not a line: it has no slope to hoist out of the loop.
+    if (mKey.link || mValue.link)
     {
-        if (mValue.logarithmic)
+        const bool keyIsX = !mKey.self.vertical;
+        QPointF* __restrict o = out.data();
+        for (std::size_t i = 0; i < count; ++i)
+        {
+            const double keyPixel = mKey.toPixel(keyAt(i));
+            const double valuePixel = mValue.toPixel(valueAt(i));
+            o[i] = keyIsX ? QPointF(keyPixel, valuePixel) : QPointF(valuePixel, keyPixel);
+        }
+        return;
+    }
+    if (mKey.self.logarithmic)
+    {
+        if (mValue.self.logarithmic)
             mapRange<true, true>(count, keyAt, valueAt, out);
         else
             mapRange<true, false>(count, keyAt, valueAt, out);
     }
     else
     {
-        if (mValue.logarithmic)
+        if (mValue.self.logarithmic)
             mapRange<false, true>(count, keyAt, valueAt, out);
         else
             mapRange<false, false>(count, keyAt, valueAt, out);
@@ -258,27 +318,31 @@ void QCPTransform::map(std::span<const QPointF> data, std::span<QPointF> out) co
 
 bool QCPTransform::isTranslationOf(const QCPTransform& other, QPointF* delta) const
 {
-    if (!valid() || !other.valid() || mKey.vertical != other.mKey.vertical)
+    if (!valid() || !other.valid() || mKey.self.vertical != other.mKey.self.vertical)
+        return false;
+    // A link is a function of the source, not a scaling of this axis: a source pan does not move
+    // it by a constant. Never replay it as a translation.
+    if (mKey.link || mValue.link || other.mKey.link || other.mValue.link)
         return false;
     // Only a linear mapping turns a range shift into a pixel shift: a log axis's shift is
     // multiplicative and is reported as "not a translation", which costs a repaint and can never
     // draw a wrong frame.
-    if (mKey.logarithmic || mValue.logarithmic || other.mKey.logarithmic
-        || other.mValue.logarithmic)
+    if (mKey.self.logarithmic || mValue.self.logarithmic || other.mKey.self.logarithmic
+        || other.mValue.self.logarithmic)
         return false;
     // The two mappings are translations only when they have the same scale. A drag adds the same
     // diff to both range ends, but the addition rounds, so the two spans can differ by an ulp:
     // allow the scale to move by less than a thousandth of a pixel across the visible span
     // (|delta slope| times the span is exactly that drift).
-    const auto sameScale = [](const Axis& a, const Axis& b)
+    const auto sameScale = [](const Snapshot& a, const Snapshot& b)
     { return std::abs(a.slope - b.slope) * std::abs(a.upper - a.lower) < 1e-3; };
-    if (!sameScale(mKey, other.mKey) || !sameScale(mValue, other.mValue))
+    if (!sameScale(mKey.self, other.mKey.self) || !sameScale(mValue.self, other.mValue.self))
         return false; // a zoom: the data-to-pixel scale changed
     // Measure the delta where the recording is, not at data (0, 0): the tolerance above allows the
     // two slopes to differ by a thousandth of a pixel across the visible span, which at a 1.7e9
     // epoch is tens of pixels of drift at the origin. At the range's lower corner the delta is the
     // one the visible pixels moved by.
-    const QCP::Data corner { mKey.lower, mValue.lower };
+    const QCP::Data corner { mKey.self.lower, mValue.self.lower };
     const QCP::Pixels here = map(corner);
     const QCP::Pixels there = other.map(corner);
     if (delta)
