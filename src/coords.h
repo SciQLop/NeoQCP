@@ -20,7 +20,6 @@
 #include <QPointer>
 #include <QRectF>
 #include <memory>
-#include <optional>
 #include <span>
 #include <variant>
 
@@ -188,7 +187,7 @@ private:
     {
         Snapshot self;
         std::shared_ptr<const QCPAxisLink> link;
-        std::optional<Snapshot> source; //!< the source's mapping, when linked
+        Snapshot source; //!< the source's mapping, filled when the axis is linked
 
         bool operator==(const Axis&) const = default;
 

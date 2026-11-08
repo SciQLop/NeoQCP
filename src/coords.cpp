@@ -173,21 +173,19 @@ void QCPTransform::Axis::snapshot(const QCPAxis* axis)
     link = axis->link();
     if (!link || !link->source)
         return;
-    source.emplace();
-    source->take(link->source);
+    source.take(link->source);
 }
 
 void QCPTransform::Axis::prepare()
 {
     self.prepare();
-    if (source)
-        source->prepare();
+    source.prepare();
 }
 
 bool QCPTransform::Axis::usable() const
 {
     if (link)
-        return self.length > 0.0 && source && source->usable;
+        return self.length > 0.0 && source.usable;
     return self.usable;
 }
 
@@ -195,12 +193,12 @@ double QCPTransform::Axis::toPixel(double value) const
 {
     if (!link)
         return self.toPixel(value);
-    if (!source || !source->usable || !link->inverse)
+    if (!source.usable || !link->inverse)
         return qQNaN();
     // The source maps inverse(value) on its own rect; the fraction along the source is the
     // fraction along this axis, so the same data fills a rect of any size. A value the source
     // draws 200 px outside its rect lands 200 px * (own length / source length) outside this one.
-    return self.pixelAtFraction(source->fractionOf(source->toPixel(link->inverse(value))));
+    return self.pixelAtFraction(source.fractionOf(source.toPixel(link->inverse(value))));
 }
 
 QCP::Pixels QCPTransform::map(QCP::Data data) const
