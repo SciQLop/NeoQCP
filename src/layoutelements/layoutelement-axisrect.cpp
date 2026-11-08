@@ -1069,6 +1069,11 @@ QList<QCPAxis*> QCPAxisRect::effectiveRangeAxes(bool drag, Qt::Orientation orien
         {
             if (!axis || (drag ? !axis->rangeDraggable() : !axis->rangeZoomable()))
                 continue;
+            // A linked axis only stands in for its source while the source allows it too: opting
+            // the source out must stop the link as well.
+            QCPAxis* source = axis->linkSource();
+            if (source && (drag ? !source->rangeDraggable() : !source->rangeZoomable()))
+                continue;
             result.append(axis);
         }
     }

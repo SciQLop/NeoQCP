@@ -685,6 +685,25 @@ void TestQCPAxisRect::draggingOnlyTheLinkedAxisMovesTheSource()
            "the linked axis no longer shows twice its source");
 }
 
+void TestQCPAxisRect::optingASourceOutStopsItsLinkedAxis()
+{
+    mPlot->resize(400, 300);
+    mPlot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom);
+    mPlot->axisRect()->setupFullAxesBox(true);
+    mPlot->xAxis->setRangeDraggable(false);
+    mPlot->replot();
+    const QPoint from = rectCentre(mPlot).toPoint();
+    const QCPRange before = mPlot->xAxis->range();
+    dragOn(mPlot, from, from + QPoint(40, 0));
+    QCOMPARE(mPlot->xAxis->range(), before); // the source opted out...
+    QCOMPARE(mPlot->xAxis2->range(), before); // ...so its linked axis stays put too
+    mPlot->xAxis->setRangeDraggable(true);
+    mPlot->xAxis->setRangeZoomable(false);
+    wheelOn(mPlot, rectCentre(mPlot));
+    QCOMPARE(mPlot->xAxis->range(), before);
+    QCOMPARE(mPlot->xAxis2->range(), before);
+}
+
 void TestQCPAxisRect::fullAxesBoxZoomsOnce()
 {
   mPlot->setInteractions(QCP::iRangeZoom);
