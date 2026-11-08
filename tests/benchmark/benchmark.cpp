@@ -89,6 +89,7 @@ private slots:
     void QCPItems_RestyleAll10k();
     void QCPAxisRects_Stack8_Replot();
     void QCPPlots_Stack8_Replot();
+    void QCPPlots_Stack8_Aligned_Replot();
     void QCPInput_MouseMoveStorm();
     void QCPInput_WheelOverGraph2_1M();
 
@@ -1450,6 +1451,41 @@ void Benchmark::QCPPlots_Stack8_Replot()
         plot->show();
         plots.push_back(std::move(plot));
     }
+    qApp->processEvents();
+    QCustomPlot* changing = plots[3].get();
+    changing->replot(QCustomPlot::rpImmediateRefresh);
+    int step = 0;
+    QBENCHMARK
+    {
+        changing->xAxis->setRange(0.001 * ++step, 0.7 + 0.001 * step);
+        changing->replot(QCustomPlot::rpImmediateRefresh);
+    }
+}
+
+// The same stack as QCPPlots_Stack8_Replot, its eight rects in one alignment group: the gate
+// covers the margin arithmetic two layout passes add, not eight separate plots.
+void Benchmark::QCPPlots_Stack8_Aligned_Replot()
+{
+    const auto x = sineKeys(100000);
+    const auto y = sineValues(x);
+    std::vector<std::unique_ptr<QCustomPlot>> plots;
+    QList<QCPLayoutElement*> members;
+    for (int i = 0; i < 8; ++i)
+    {
+        auto plot = std::make_unique<QCustomPlot>(&mContainerWidget);
+        plot->setGeometry(0, 45 * i, 640, 45);
+        plot->addGraph()->setData(x, y);
+        plot->rescaleAxes();
+        plot->show();
+        members.append(plot->axisRect());
+        plots.push_back(std::move(plot));
+    }
+    QCPAlignmentGroup::create(members);
+    qApp->processEvents();
+    // Two passes per plot settle the shared edges before the timed replots.
+    for (int round = 0; round < 2; ++round)
+        for (const auto& plot : plots)
+            plot->replot(QCustomPlot::rpImmediateRefresh);
     qApp->processEvents();
     QCustomPlot* changing = plots[3].get();
     changing->replot(QCustomPlot::rpImmediateRefresh);

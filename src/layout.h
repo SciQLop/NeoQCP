@@ -33,6 +33,8 @@ class QCPLayout;
 class QCPLayoutElement;
 class QCustomPlot;
 
+class QCPAlignmentGroup;
+
 class QCP_LIB_DECL QCPMarginGroup : public QObject
 {
     Q_OBJECT
@@ -141,6 +143,8 @@ public:
     }
 
     QHash<QCP::MarginSide, QCPMarginGroup*> marginGroups() const { return mMarginGroups; }
+    //! The group this element's edges align with, if any.
+    QPointer<QCPAlignmentGroup> alignmentGroup() const { return mAlignmentGroup; }
 
     // setters:
     void setOuterRect(const QRect& rect);
@@ -176,6 +180,7 @@ protected:
     QMargins mMargins, mMinimumMargins;
     QCP::MarginSides mAutoMargins;
     QHash<QCP::MarginSide, QCPMarginGroup*> mMarginGroups;
+    QPointer<QCPAlignmentGroup> mAlignmentGroup;
 
     // introduced virtual methods:
     virtual int calculateAutoMargin(QCP::MarginSide side);
@@ -196,6 +201,7 @@ private:
     friend class QCustomPlot;
     friend class QCPLayout;
     friend class QCPMarginGroup;
+    friend class QCPAlignmentGroup;
 };
 Q_DECLARE_METATYPE(QCPLayoutElement::UpdatePhase)
 

@@ -24,6 +24,8 @@
 ****************************************************************************/
 
 #include "layout.h"
+
+#include "alignment-group.h"
 #include "core.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -257,6 +259,8 @@ QCPLayoutElement::QCPLayoutElement(QCustomPlot* parentPlot)
 
 QCPLayoutElement::~QCPLayoutElement()
 {
+    if (mAlignmentGroup)
+        mAlignmentGroup->remove(this);
     setMarginGroup(QCP::msAll, nullptr); // unregister at margin groups, if there are any
     // unregister at layout:
     if (qobject_cast<QCPLayout*>(
@@ -519,7 +523,12 @@ void QCPLayoutElement::update(UpdatePhase phase)
                 if (mAutoMargins.testFlag(
                         side)) // this side's margin shall be calculated automatically
                 {
-                    if (mMarginGroups.contains(side))
+                    if (mAlignmentGroup && mAlignmentGroup->sides().testFlag(side))
+                        QCP::setMarginValue(newMargins, side,
+                                            mAlignmentGroup->marginFor(
+                                                this, side)); // this side aligns with other plots'
+                                                              // edges, which win over a margin group
+                    else if (mMarginGroups.contains(side))
                         QCP::setMarginValue(newMargins, side,
                                             mMarginGroups[side]->commonMargin(
                                                 side)); // this side is part of a margin group, so

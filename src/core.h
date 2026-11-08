@@ -619,6 +619,7 @@ protected:
     void executeRenderPass(QRhiCommandBuffer* cb, QRhiResourceUpdateBatch* updates,
                            const QSize& outputSize);
     virtual void resizeEvent(QResizeEvent* event) override;
+    virtual void moveEvent(QMoveEvent* event) override;
     virtual void showEvent(QShowEvent* event) override;
     virtual void mouseDoubleClickEvent(QMouseEvent* event) override;
     virtual void mousePressEvent(QMouseEvent* event) override;
@@ -652,6 +653,7 @@ protected:
     // introduced virtual methods:
     virtual void draw(QCPPainter* painter);
     virtual void updateLayout();
+    void notifyAlignmentGroups();
     void restoreViewportAfterExport(const QRect& screenViewport);
     void adoptWidgetViewport();
     void syncViewportToWidgetSize();

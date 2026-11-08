@@ -25,6 +25,7 @@
 
 /*! \file */
 
+#include "alignment-group.h"
 #include "core.h"
 #include <memory>
 #include <utility>
@@ -3702,7 +3703,35 @@ void QCustomPlot::resizeEvent([[maybe_unused]] QResizeEvent* event)
         mSpanRhiLayer->markGeometryDirty();
     if (mGridRhiLayer)
         mGridRhiLayer->markGeometryDirty();
+    notifyAlignmentGroups();
     replot(rpImmediateRefresh);
+}
+
+/*! \internal
+
+  Event handler for a move of the QCustomPlot widget. The elements' groups compare their edges in
+  window coordinates, so a move of the widget is a chance for one of them to have moved relative
+  to its peers: they forget their shared edges and recompute on the next layout pass.
+*/
+void QCustomPlot::moveEvent(QMoveEvent* event)
+{
+    notifyAlignmentGroups();
+    QWidget::moveEvent(event);
+}
+
+/*! \internal
+
+  Tells the alignment groups of this plot's layout elements that their members may have moved, so
+  each forgets the shared edges it last used and recomputes them on the next layout pass.
+*/
+void QCustomPlot::notifyAlignmentGroups()
+{
+    QSet<QCPAlignmentGroup*> groups;
+    for (QCPLayoutElement* element : plotLayout()->elements(true))
+        if (element && element->alignmentGroup())
+            groups.insert(element->alignmentGroup().data());
+    for (QCPAlignmentGroup* group : groups)
+        group->invalidate();
 }
 
 /*! \internal
