@@ -486,3 +486,41 @@ void TestLinkedAxes::slotDeletingAnAxisDuringDrag()
     }
     QCOMPARE(gMisuses, 0);
 }
+
+void TestLinkedAxes::aSlotDeletingTheLinkedAxisDuringAWriteBackIsSafe()
+{
+    QCustomPlot plot;
+    plot.setGeometry(0, 0, 400, 300);
+    QCPAxis* source = plot.xAxis;
+    QCPAxis* linked = plot.axisRect()->addAxis(QCPAxis::atTop);
+    linked->linkTo(source);
+    const QPointer<QCPAxis> linkedWatcher(linked);
+    // A plain API call opens no emission scope: the source's signal runs inside the funnel.
+    connect(
+        source, &QCPAxis::rangeChanged, &plot,
+        [&plot, linked] { plot.axisRect()->removeAxis(linked); }, Qt::SingleShotConnection);
+    linked->setRange(5, 6);
+    QVERIFY2(!linkedWatcher, "the slot deleted the linked axis");
+    QCOMPARE(source->range(), QCPRange(5, 6));
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestLinkedAxes::aSlotDeletingTheSourceDuringARefreshIsSafe()
+{
+    QCustomPlot plot;
+    plot.setGeometry(0, 0, 400, 300);
+    QCPAxis* source = plot.xAxis;
+    QCPAxis* linked = plot.axisRect()->addAxis(QCPAxis::atTop);
+    linked->linkTo(source);
+    const QPointer<QCPAxis> sourceWatcher(source);
+    const QPointer<QCPAxis> linkedWatcher(linked);
+    connect(
+        linked, &QCPAxis::rangeChanged, &plot,
+        [&plot, source] { plot.axisRect()->removeAxis(source); }, Qt::SingleShotConnection);
+    source->setRange(2, 3);
+    QVERIFY2(!sourceWatcher, "the slot deleted the source");
+    QVERIFY(linkedWatcher);
+    QVERIFY2(!linkedWatcher->linkSource(), "the linked axis became plain");
+    QCOMPARE(linkedWatcher->range(), QCPRange(2, 3));
+    QCOMPARE(gMisuses, 0);
+}

@@ -24,4 +24,6 @@ private slots:
     void refusedLinks();
     void deletedSourceLeavesAPlainAxis();
     void slotDeletingAnAxisDuringDrag();
+    void aSlotDeletingTheLinkedAxisDuringAWriteBackIsSafe();
+    void aSlotDeletingTheSourceDuringARefreshIsSafe();
 };

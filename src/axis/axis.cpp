@@ -692,15 +692,27 @@ void QCPAxis::setScaleType(QCPAxis::ScaleType type)
 */
 void QCPAxis::rangeDidChange(const QCPRange& oldRange)
 {
-    if (mAxisRect)
+    const auto apply = [&]
     {
-        mAxisRect->markAffectedLayersDirty();
-        mAxisRect->markItemsUsingAxisDirty(this);
+        if (mAxisRect)
+        {
+            mAxisRect->markAffectedLayersDirty();
+            mAxisRect->markItemsUsingAxisDirty(this);
+        }
+        // Before the signal: a slot that reads a linked axis sees the range it was told about.
+        refreshLinkedAxes();
+        qcpEmitIf(this, mParentPlot, &QCPAxis::rangeChanged,
+                  [this, range = mRange] { return mRange == range; }, mRange, oldRange);
+    };
+    // A linked user emits from inside the refresh, and its slot may delete an axis of the pair.
+    // Deferring to the end of this call keeps the refresh and the signal in one piece.
+    if (mLinkedAxes.isEmpty())
+    {
+        apply();
+        return;
     }
-    // Before the signal: a slot that reads a linked axis sees the range it was told about.
-    refreshLinkedAxes();
-    qcpEmitIf(this, mParentPlot, &QCPAxis::rangeChanged,
-              [this, range = mRange] { return mRange == range; }, mRange, oldRange);
+    const QCPEmissionScope scope(mParentPlot);
+    apply();
 }
 
 /*! \internal
@@ -750,7 +762,7 @@ void QCPAxis::commitRange(const QCPRange& range)
         applyRange(range);
         return;
     }
-    if (mRefreshingLink || !mLink->inverse || !QCPRange::validRange(range))
+    if (!mLink->inverse || !QCPRange::validRange(range))
         return;
     const QCPRange clean = mScaleType == stLogarithmic ? range.sanitizedForLogScale()
                                                        : range.sanitizedForLinScale();
@@ -765,6 +777,9 @@ void QCPAxis::commitRange(const QCPRange& range)
                         "the inverse of the linked range is not a valid source range", );
     QCPAxis* source = mLink->source;
     QCP_CHECK_OR_RETURN(source, "the source of the link is gone", );
+    // The source's signal runs inside this call unless it is deferred: a slot may delete either
+    // axis of the pair, and both the write back and the refresh below touch them afterwards.
+    const QCPEmissionScope scope(mParentPlot);
     source->setRange(sourceRange);
     refreshFromLink();
 }
@@ -850,7 +865,11 @@ void QCPAxis::linkTo(QCPAxis* source, QCPAxisFunction forward, QCPAxisFunction i
     link->inverse = std::move(inverse);
     mLink = link;
     source->mLinkedAxes.append(this);
-    refreshFromLink();
+    {
+        // Taking the source's range emits rangeChanged, whose slot may delete this axis.
+        const QCPEmissionScope scope(mParentPlot);
+        refreshFromLink();
+    }
     // Even an identity link on the same rect changes where the axis maps: its pixels come from
     // the source now.
     markAppearanceDirty();
@@ -1056,7 +1075,13 @@ void QCPAxis::setRangeReversed(bool reversed)
         return;
     mRangeReversed = reversed;
     markAppearanceDirty();
-    // No signal carries a reversal, so the linked axes are told here.
+    // No signal carries a reversal, so the linked axes are told here; their slots may delete them.
+    if (mLinkedAxes.isEmpty())
+    {
+        refreshLinkedAxes();
+        return;
+    }
+    const QCPEmissionScope scope(mParentPlot);
     refreshLinkedAxes();
 }
 
