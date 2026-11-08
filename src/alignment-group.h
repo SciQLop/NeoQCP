@@ -43,6 +43,8 @@ public:
     int marginFor(QCPLayoutElement* element, QCP::MarginSide side);
     //! Forgets the shared edges and dirties the members, so the next layout pass recomputes them.
     void invalidate();
+    //! Relays out every member: for a plot whose visibility changed.
+    void relayoutMembers();
 
 signals:
     void membersChanged();

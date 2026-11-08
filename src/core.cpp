@@ -3710,8 +3710,8 @@ void QCustomPlot::resizeEvent([[maybe_unused]] QResizeEvent* event)
 /*! \internal
 
   Event handler for a move of the QCustomPlot widget. The elements' groups compare their edges in
-  window coordinates, so a move of the widget is a chance for one of them to have moved relative
-  to its peers: they forget their shared edges and recompute on the next layout pass.
+  window coordinates, so a move of the widget moves one member relative to its peers: this plot
+  relays out, and its group marks the peers only if the shared edge actually changed.
 */
 void QCustomPlot::moveEvent(QMoveEvent* event)
 {
@@ -3721,17 +3721,30 @@ void QCustomPlot::moveEvent(QMoveEvent* event)
 
 /*! \internal
 
-  Tells the alignment groups of this plot's layout elements that their members may have moved, so
-  each forgets the shared edges it last used and recomputes them on the next layout pass.
+  Relays out this plot's grouped elements, which recompute the shared edges from their new
+  geometry. Peers are left alone unless a shared edge changed, so moving or resizing one plot of a
+  splitter does not repaint the whole stack.
 */
 void QCustomPlot::notifyAlignmentGroups()
+{
+    for (QCPLayoutElement* element : plotLayout()->elements(true))
+        if (element && element->alignmentGroup())
+            element->markLayoutAppearanceDirty();
+}
+
+/*! \internal
+
+  Relays out every member of this plot's alignment groups, so they pick up a member that was just
+  hidden or shown: a hidden plot does not lay out, so its peers must be told instead.
+*/
+void QCustomPlot::relayoutAlignmentGroups()
 {
     QSet<QCPAlignmentGroup*> groups;
     for (QCPLayoutElement* element : plotLayout()->elements(true))
         if (element && element->alignmentGroup())
             groups.insert(element->alignmentGroup().data());
     for (QCPAlignmentGroup* group : groups)
-        group->invalidate();
+        group->relayoutMembers();
 }
 
 /*! \internal
@@ -3747,6 +3760,18 @@ void QCustomPlot::showEvent(QShowEvent* event)
     mWasShown = true;
     if (std::exchange(mReplotSkippedWhileHidden, false))
         replot(rpQueuedReplot);
+    relayoutAlignmentGroups();
+}
+
+/*! \internal
+
+  Event handler for when the widget is hidden. The peers of the alignment groups this plot's
+  elements belong to relay out, so a hidden member stops widening their shared edge.
+*/
+void QCustomPlot::hideEvent(QHideEvent* event)
+{
+    relayoutAlignmentGroups();
+    QWidget::hideEvent(event);
 }
 
 /*! \internal

@@ -21,6 +21,9 @@ private slots:
     void joiningAnotherGroupLeavesTheFirst();
     void refusedCreate();
     void settledStackRepaintsNoPeer();
+    void aPeerMoveRepaintsNoOtherPlot();
+    void aPeerHeightChangeRepaintsNoOtherPlot();
+    void aPeerSidewaysMoveRealigns();
     void alignmentWinsOverMarginGroup();
 };
 

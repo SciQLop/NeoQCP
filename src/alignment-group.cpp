@@ -142,3 +142,14 @@ void QCPAlignmentGroup::invalidate()
         if (eligible(member))
             member->markLayoutAppearanceDirty();
 }
+
+/*! \internal
+
+  Marks every member's layout dirty without forgetting the shared edges: a member that was hidden
+  or shown changes the requirements, and the next pass tells whether the shared edge moved.
+*/
+void QCPAlignmentGroup::relayoutMembers()
+{
+    for (QCPLayoutElement* member : liveMembers())
+        member->markLayoutAppearanceDirty();
+}

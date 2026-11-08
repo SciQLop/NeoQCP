@@ -77,6 +77,22 @@ QWidget* makeStack(const QList<QCustomPlot*>& plots, int spacer = 0)
     return window;
 }
 
+//! A window that places the plots by geometry only: one plot's move or resize leaves the others.
+QWidget* makeFreeStack(const QList<QCustomPlot*>& plots, int left = 0)
+{
+    auto* window = new QWidget;
+    int top = 0;
+    for (auto* plot : plots)
+    {
+        plot->setParent(window);
+        plot->setGeometry(left, top, 300, 100);
+        plot->show();
+        top += 120;
+    }
+    window->resize(400, top);
+    return window;
+}
+
 /*! Replots the plots until a round causes no extra repaint, so a group that marks its peers has
   settled. Returns false when that did not happen within maxRounds; roundsUsed gets the rounds. */
 bool settle(const QList<QCustomPlot*>& plots, int maxRounds = 4, int* roundsUsed = nullptr)
@@ -229,25 +245,25 @@ void TestAlignmentGroup::hiddenMemberIsLeftOut()
 {
     auto* a = makePlot();
     auto* b = makePlot(false);
-    const auto group = QCPAlignmentGroup::create({ a->axisRect(), b->axisRect() });
-    QVERIFY(group);
-    QScopedPointer<QWidget> window(makeStack({ a, b }, 24));
-    window->resize(420, 260);
+    auto* reference = makePlot(false); // the same plot, never grouped
+    QScopedPointer<QWidget> window(makeFreeStack({ a, b, reference }, 24));
     window->show();
     QVERIFY(QTest::qWaitForWindowExposed(window.data()));
-    QVERIFY(settle({ a, b }));
+    const auto group = QCPAlignmentGroup::create({ a->axisRect(), b->axisRect() });
+    QVERIFY(group);
+    QVERIFY(settle({ a, b, reference }));
     QCOMPARE(innerLeft(a), innerLeft(b));
+    QVERIFY(innerLeft(b) > innerLeft(reference)); // the wide labels moved B inwards
+    const int own = innerLeft(reference);        // B's edge without the group
 
     a->hide();
-    QVERIFY(settle({ b }));
-    const int alone = innerLeft(b);
-    QVERIFY2(alone != innerLeft(a) || b->axisRect()->margins().left() < a->axisRect()->margins().left(),
-             "the hidden member still widened the shared edge");
+    QTest::qWait(150); // no replot of B: hiding A must schedule it
+    QCOMPARE(innerLeft(b), own);
 
     a->show();
-    QVERIFY(QTest::qWaitForWindowExposed(window.data()));
-    QVERIFY(settle({ a, b }));
+    QTest::qWait(150);
     QCOMPARE(innerLeft(a), innerLeft(b));
+    QVERIFY(innerLeft(b) > own);
 }
 
 void TestAlignmentGroup::destroyedPlotLeavesItsGroup()
@@ -342,6 +358,63 @@ void TestAlignmentGroup::settledStackRepaintsNoPeer()
     QTest::qWait(200);
     QVERIFY2(peerRepaints >= 1, "the peer did not repaint after the shared edge moved");
     QObject::disconnect(connection);
+    QVERIFY(settle({ a, b }));
+    QCOMPARE(innerLeft(a), innerLeft(b));
+}
+
+void TestAlignmentGroup::aPeerMoveRepaintsNoOtherPlot()
+{
+    auto* a = makePlot();
+    auto* b = makePlot(false);
+    QScopedPointer<QWidget> window(makeFreeStack({ a, b }, 24));
+    window->show();
+    QVERIFY(QTest::qWaitForWindowExposed(window.data()));
+    const auto group = QCPAlignmentGroup::create({ a->axisRect(), b->axisRect() });
+    QVERIFY(group);
+    QVERIFY(settle({ a, b }));
+
+    int repaints = 0;
+    const auto counted
+        = connect(a, &QCustomPlot::afterReplot, a, [&repaints] { ++repaints; });
+    b->move(b->x(), b->y() + 10);
+    QTest::qWait(200);
+    disconnect(counted);
+    QCOMPARE(repaints, 0);
+}
+
+void TestAlignmentGroup::aPeerHeightChangeRepaintsNoOtherPlot()
+{
+    auto* a = makePlot();
+    auto* b = makePlot(false);
+    QScopedPointer<QWidget> window(makeFreeStack({ a, b }, 24));
+    window->show();
+    QVERIFY(QTest::qWaitForWindowExposed(window.data()));
+    const auto group = QCPAlignmentGroup::create({ a->axisRect(), b->axisRect() });
+    QVERIFY(group);
+    QVERIFY(settle({ a, b }));
+
+    int repaints = 0;
+    const auto counted
+        = connect(a, &QCustomPlot::afterReplot, a, [&repaints] { ++repaints; });
+    b->resize(b->width(), b->height() + 20);
+    QTest::qWait(200);
+    disconnect(counted);
+    QCOMPARE(repaints, 0);
+}
+
+void TestAlignmentGroup::aPeerSidewaysMoveRealigns()
+{
+    auto* a = makePlot();
+    auto* b = makePlot(false);
+    QScopedPointer<QWidget> window(makeFreeStack({ a, b }, 24));
+    window->show();
+    QVERIFY(QTest::qWaitForWindowExposed(window.data()));
+    const auto group = QCPAlignmentGroup::create({ a->axisRect(), b->axisRect() });
+    QVERIFY(group);
+    QVERIFY(settle({ a, b }));
+    QCOMPARE(innerLeft(a), innerLeft(b));
+
+    b->move(b->x() + 30, b->y());
     QVERIFY(settle({ a, b }));
     QCOMPARE(innerLeft(a), innerLeft(b));
 }
