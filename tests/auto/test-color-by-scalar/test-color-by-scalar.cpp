@@ -1297,6 +1297,19 @@ void TestColorByScalar::newDataKeepsAnUncolouredLinesChosenScale()
     QCOMPARE(mg->colorScale(), nullptr);
 }
 
+// An uncoloured line stops asking the pipeline for the colour origin at its next data.
+void TestColorByScalar::newDataAfterUncolouringStopsTheOriginRequest()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDataSource(makeSource({ 0, 1, 2, 3 }, { { 0, 1, 0, 1 } }));
+    mg->setColorValues(std::vector<double> { 0.0, 1.0, 0.0, 1.0 });
+    QVERIFY(mg->mWantOrigin->load());
+    mg->clearColorValues();
+
+    mg->setDataSource(makeSource({ 0, 1, 2 }, { { 0, 1, 0 } }));
+    QVERIFY(!mg->mWantOrigin->load());
+}
+
 // Taking a coloured line drops its old plot's scale; adding it elsewhere joins the new rect's.
 void TestColorByScalar::aTakenColouredLineJoinsItsNewPlotsScale()
 {

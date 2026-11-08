@@ -606,11 +606,12 @@ void QCPMultiGraph::applyColorSizeRule(int newSize)
     // A scale the user picked on an uncoloured graph is not this rule's to drop: only a resize
     // that clears the values this graph had leaves only an uncoloured graph behind.
     const bool clearedValues = mColor.hasValues() && mColor.size() != newSize;
-    if (!clearedValues)
+    if (clearedValues)
+        mColor.clearValues();
+    if (mColor.hasValues())
         return;
-    mColor.clearValues();
     mWantOrigin->store(false);
-    if (colorScale())
+    if (clearedValues && colorScale())
         setColorScale(nullptr);
 }
 

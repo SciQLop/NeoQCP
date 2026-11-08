@@ -264,7 +264,6 @@ public:
     [[nodiscard]] QCPTheme* theme() const;
     void setTheme(QCPTheme* theme);
     void applyTheme();
-    void applyThemeToAxis(QCPAxis* axis);
     [[nodiscard]] QColor themeBackground() const;
     void setThemeBackground(const QColor& color);
     [[nodiscard]] QColor themeForeground() const;
@@ -508,6 +507,8 @@ private:
     bool adopt(QCPAbstractItem* item);
     bool adopt(QCPPolarGraph* graph);
     void cutAnchorLinks(QCPAbstractItem* item);
+    // Also themes a rect's own colour scale, which QCPAxisRect makes after the theme was set.
+    void applyThemeToAxis(QCPAxis* axis);
 
 protected:
     // property members:
