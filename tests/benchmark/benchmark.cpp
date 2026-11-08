@@ -128,6 +128,14 @@ private slots:
     void QCPDrawn_Pan10k();
     void QCPDrawn_Pan10kOneRecording();
 
+    // M4e: the classes the next ports take over.
+    void QCPErrorBars_Pan10k();
+    void QCPFinancial_Pan10k();
+    void QCPStatisticalBox_Pan1k();
+    void QCPIntervals_Pan10k();
+    void QCPItems_MixedKinds_Pan1k();
+    void QCPSpans_Pan100();
+
 private:
     QCustomPlot* mPlot;
     QWidget mContainerWidget;
@@ -2536,5 +2544,259 @@ void Benchmark::QCPDrawn_Pan10kOneRecording()
         left += 0.01; // a pan step: the kept triangles only need the delta
         plot->xAxis->setRange(left, left + 1);
         plot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+}
+
+////////////////////////////////////////////////////////////////////
+/////// Milestone 4e rows: the classes the next ports take over
+
+// Every row below pans the same window over the same span, so the numbers compare with the
+// QCPItems_Pan10k / QCPBars_Pan10k rows above.
+void Benchmark::QCPErrorBars_Pan10k()
+{
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    QVector<double> keys(10000);
+    QVector<double> values(10000);
+    QVector<double> errors(10000);
+    for (int i = 0; i < 10000; ++i)
+    {
+        keys[i] = 100.0 * i / 10000;
+        values[i] = 0.5 + 0.5 * qSin(i * 0.01);
+        errors[i] = 0.05;
+    }
+    graph->setData(keys, values);
+    auto* bars = new QCPErrorBars(mPlot->xAxis, mPlot->yAxis);
+    bars->setDataPlottable(graph);
+    bars->setData(errors);
+    bars->setErrorType(QCPErrorBars::etValueError);
+    bars->setWhiskerWidth(4);
+    mPlot->xAxis->setRange(50, 51);
+    mPlot->yAxis->setRange(0, 1);
+    mPlot->replot();
+    double left = 50;
+    QBENCHMARK
+    {
+        left += 0.01;
+        mPlot->xAxis->setRange(left, left + 1);
+        mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+}
+
+void Benchmark::QCPFinancial_Pan10k()
+{
+    auto* financial = new QCPFinancial(mPlot->xAxis, mPlot->yAxis);
+    QVector<double> keys(10000);
+    QVector<double> open(10000);
+    QVector<double> high(10000);
+    QVector<double> low(10000);
+    QVector<double> close(10000);
+    for (int i = 0; i < 10000; ++i)
+    {
+        keys[i] = 100.0 * i / 10000;
+        const double mid = 0.5 + 0.3 * qSin(i * 0.01);
+        open[i] = mid - 0.05;
+        close[i] = mid + 0.05;
+        high[i] = mid + 0.15;
+        low[i] = mid - 0.15;
+    }
+    financial->setData(keys, open, high, low, close);
+    financial->setChartStyle(QCPFinancial::csCandlestick);
+    financial->setWidth(0.008);
+    mPlot->xAxis->setRange(50, 51);
+    mPlot->yAxis->setRange(0, 1);
+    mPlot->replot();
+    double left = 50;
+    QBENCHMARK
+    {
+        left += 0.01;
+        mPlot->xAxis->setRange(left, left + 1);
+        mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+}
+
+void Benchmark::QCPStatisticalBox_Pan1k()
+{
+    auto* box = new QCPStatisticalBox(mPlot->xAxis, mPlot->yAxis);
+    QVector<double> keys(1000);
+    QVector<double> minimum(1000);
+    QVector<double> lowerQuartile(1000);
+    QVector<double> median(1000);
+    QVector<double> upperQuartile(1000);
+    QVector<double> maximum(1000);
+    for (int i = 0; i < 1000; ++i)
+    {
+        keys[i] = 100.0 * i / 1000;
+        const double mid = 0.5 + 0.3 * qSin(i * 0.03);
+        minimum[i] = mid - 0.2;
+        lowerQuartile[i] = mid - 0.08;
+        median[i] = mid;
+        upperQuartile[i] = mid + 0.08;
+        maximum[i] = mid + 0.2;
+    }
+    box->setData(keys, minimum, lowerQuartile, median, upperQuartile, maximum);
+    box->setWidth(0.06);
+    mPlot->xAxis->setRange(50, 51);
+    mPlot->yAxis->setRange(0, 1);
+    mPlot->replot();
+    double left = 50;
+    QBENCHMARK
+    {
+        left += 0.01;
+        mPlot->xAxis->setRange(left, left + 1);
+        mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+}
+
+void Benchmark::QCPIntervals_Pan10k()
+{
+    QCPLaneLayout layout;
+    auto* intervals = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    qcp::intervals::Columns columns;
+    columns.start.reserve(10000);
+    columns.stop.reserve(10000);
+    columns.lane.reserve(10000);
+    columns.category.reserve(10000);
+    columns.ids.reserve(10000);
+    for (int i = 0; i < 10000; ++i)
+    {
+        const double start = 100.0 * i / 10000;
+        columns.start.push_back(start);
+        columns.stop.push_back(start + 0.008);
+        columns.lane.push_back(i % 2);
+        columns.category.push_back(i % 2);
+        columns.ids.push_back(i);
+    }
+    intervals->setData(columns);
+    intervals->setCategoryNames({ QStringLiteral("a"), QStringLiteral("b") });
+    mPlot->xAxis->setRange(50, 51);
+    mPlot->yAxis->setRange(0, 1);
+    mPlot->replot();
+    double left = 50;
+    QBENCHMARK
+    {
+        left += 0.01;
+        mPlot->xAxis->setRange(left, left + 1);
+        mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+}
+
+void Benchmark::QCPItems_MixedKinds_Pan1k()
+{
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    QVector<double> keys(101);
+    QVector<double> values(101);
+    for (int i = 0; i <= 100; ++i)
+    {
+        keys[i] = 100.0 * i / 100;
+        values[i] = 0.5 + 0.4 * qSin(i * 0.1);
+    }
+    graph->setData(keys, values);
+    graph->setLineStyle(QCPGraph::lsLine);
+    graph->setScatterStyle(QCPScatterStyle::ssNone);
+
+    QPixmap pixmap(8, 6);
+    pixmap.fill(Qt::darkCyan);
+
+    for (int i = 0; i < 100; ++i)
+    {
+        const double x = 0.5 + i;
+        const double y = 0.5 + 0.3 * qSin(i * 0.2);
+
+        auto* line = new QCPItemLine(mPlot);
+        line->start->setCoords(x, y - 0.1);
+        line->end->setCoords(x + 0.4, y + 0.1);
+
+        auto* straight = new QCPItemStraightLine(mPlot);
+        straight->point1->setCoords(x, 0.1);
+        straight->point2->setCoords(x + 0.5, 0.9);
+
+        auto* curve = new QCPItemCurve(mPlot);
+        curve->start->setCoords(x, y - 0.15);
+        curve->startDir->setCoords(x + 0.3, y + 0.2);
+        curve->endDir->setCoords(x + 0.7, y - 0.2);
+        curve->end->setCoords(x + 0.9, y + 0.15);
+
+        auto* bracket = new QCPItemBracket(mPlot);
+        bracket->left->setCoords(x, y);
+        bracket->right->setCoords(x + 1, y);
+        bracket->setLength(12);
+
+        auto* rect = new QCPItemRect(mPlot);
+        rect->topLeft->setCoords(x, y + 0.1);
+        rect->bottomRight->setCoords(x + 0.6, y - 0.1);
+
+        auto* ellipse = new QCPItemEllipse(mPlot);
+        ellipse->topLeft->setCoords(x, y + 0.1);
+        ellipse->bottomRight->setCoords(x + 0.6, y - 0.1);
+
+        auto* image = new QCPItemPixmap(mPlot);
+        image->topLeft->setCoords(x, y + 0.1);
+        image->bottomRight->setCoords(x + 0.3, y - 0.1);
+        image->setPixmap(pixmap);
+
+        auto* tracer = new QCPItemTracer(mPlot);
+        tracer->setGraph(graph);
+        tracer->setGraphKey(x);
+        tracer->setStyle(QCPItemTracer::tsCircle);
+
+        auto* rspan = new QCPItemRSpan(mPlot);
+        rspan->leftEdge->setCoords(x, 0);
+        rspan->rightEdge->setCoords(x + 0.8, 0);
+        rspan->topEdge->setCoords(x, y + 0.2);
+        rspan->bottomEdge->setCoords(x, y - 0.2);
+
+        if (i % 2 == 0)
+        {
+            auto* hspan = new QCPItemHSpan(mPlot);
+            hspan->lowerEdge->setCoords(x, y - 0.05);
+            hspan->upperEdge->setCoords(x, y + 0.05);
+        }
+        else
+        {
+            auto* vspan = new QCPItemVSpan(mPlot);
+            vspan->lowerEdge->setCoords(x, y - 0.05);
+            vspan->upperEdge->setCoords(x + 0.05, y);
+        }
+    }
+    mPlot->xAxis->setRange(50, 51);
+    mPlot->yAxis->setRange(0, 1);
+    mPlot->replot();
+    double left = 50;
+    QBENCHMARK
+    {
+        left += 0.01;
+        mPlot->xAxis->setRange(left, left + 1);
+        mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+}
+
+void Benchmark::QCPSpans_Pan100()
+{
+    for (int i = 0; i < 100; ++i)
+    {
+        const double x = 0.5 + i;
+        const double y = 0.5 + 0.3 * qSin(i * 0.2);
+        if (i % 2 == 0)
+        {
+            auto* hspan = new QCPItemHSpan(mPlot);
+            hspan->lowerEdge->setCoords(x, y - 0.1);
+            hspan->upperEdge->setCoords(x, y + 0.1);
+        }
+        else
+        {
+            auto* vspan = new QCPItemVSpan(mPlot);
+            vspan->lowerEdge->setCoords(x, y - 0.1);
+            vspan->upperEdge->setCoords(x + 0.2, y);
+        }
+    }
+    mPlot->xAxis->setRange(50, 51);
+    mPlot->yAxis->setRange(0, 1);
+    mPlot->replot();
+    double left = 50;
+    QBENCHMARK
+    {
+        left += 0.01;
+        mPlot->xAxis->setRange(left, left + 1);
+        mPlot->replot(QCustomPlot::rpImmediateRefresh);
     }
 }

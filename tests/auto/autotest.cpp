@@ -47,6 +47,7 @@
 #include "test-handle/test-handle.h"
 #include "test-alignment-group/test-alignment-group.h"
 #include "test-linked-axes/test-linked-axes.h"
+#include "test-reference-m4e/test-reference-m4e.h"
 #include "test-ownership/test-ownership.h"
 #include "test-signal-delivery/test-signal-delivery.h"
 #include "test-repaint/test-repaint.h"
@@ -146,6 +147,7 @@ int main(int argc, char **argv)
   QCPTEST(TestMisuse);
   QCPTEST(TestHandle);
   QCPTEST(TestLinkedAxes);
+  QCPTEST(TestReferenceM4e);
   QCPTEST(TestAlignmentGroup);
   QCPTEST(TestOwnership);
   QCPTEST(TestSignalDelivery);

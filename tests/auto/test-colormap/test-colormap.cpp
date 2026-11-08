@@ -1,5 +1,6 @@
 #include <QPainterPath>
 #include "test-colormap.h"
+#include "reference-image.h"
 #include <QMainWindow>
 #include <painting/contour-extractor.h>
 #include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
@@ -428,11 +429,6 @@ QCPColorMap* classicColorMap(QCustomPlot* plot, int size = 10)
   return map;
 }
 
-QString referenceImagePath(const QString& name)
-{
-  return QDir(QCoreApplication::applicationDirPath())
-      .absoluteFilePath(QStringLiteral("../../../tests/auto/test-colormap/reference/") + name);
-}
 } // namespace
 
 void TestColorMap::QCPColorMap2_contourMirrorsReversedAxis()
@@ -1657,33 +1653,13 @@ void TestColorMap::exportMatchesTheOldCode()
 
   const QImage exported
       = mPlot->toPixmap(400, 400).toImage().convertToFormat(QImage::Format_ARGB32);
-  const QString path = referenceImagePath(QStringLiteral("classic-colormap-export.png"));
-
-  if (qEnvironmentVariableIsSet("QCP_WRITE_COLORMAP_REFERENCE"))
-  {
-    QVERIFY2(exported.save(path), qPrintable(path));
+  QString why;
+  const bool matches = qcp::test::matchesReference(
+      exported, QStringLiteral("test-colormap"), QStringLiteral("classic-colormap-export.png"),
+      &why, 0, mPlot->axisRect()->rect());
+  if (qEnvironmentVariableIsSet("QCP_WRITE_REFERENCE"))
     QSKIP("reference image written");
-  }
-
-  const QImage reference = QImage(path).convertToFormat(QImage::Format_ARGB32);
-  QVERIFY2(!reference.isNull(), qPrintable(path));
-  QCOMPARE(exported.size(), reference.size());
-  // The export painter works half a pixel off the device grid: Qt snaps the old
-  // drawImage() clip one pixel up, while the replay clips to the axis rect. That
-  // moves the outer row and column only; everything inside is pixel-exact.
-  const QRect plotArea = mPlot->axisRect()->rect();
-  for (int y = plotArea.top() + 1; y < plotArea.bottom(); ++y)
-    for (int x = plotArea.left() + 1; x < plotArea.right(); ++x)
-    {
-      const QRgb got = exported.pixel(x, y);
-      const QRgb want = reference.pixel(x, y);
-      if (got != want)
-        QFAIL(qPrintable(QStringLiteral("pixel (%1, %2): %3, expected %4")
-                             .arg(x)
-                             .arg(y)
-                             .arg(got, 8, 16, QLatin1Char('0'))
-                             .arg(want, 8, 16, QLatin1Char('0'))));
-    }
+  QVERIFY2(matches, qPrintable(why));
 }
 
 // One hot cell at key upper, value lower, in a 2x2 map: each axis layout puts it in
