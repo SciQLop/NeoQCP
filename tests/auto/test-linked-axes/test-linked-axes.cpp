@@ -307,6 +307,67 @@ void TestLinkedAxes::dataOnALinkedAxisMapsThroughTheLink()
     QVERIFY(!(linked == panned));
 }
 
+void TestLinkedAxes::severalAxesShareASource()
+{
+    QCustomPlot plot;
+    plot.xAxis->setRange(1, 10);
+    QCPAxis* identity = plot.axisRect()->addAxis(QCPAxis::atBottom);
+    QCPAxis* doubled = plot.axisRect()->addAxis(QCPAxis::atBottom);
+    identity->linkTo(plot.xAxis);
+    doubled->linkTo(plot.xAxis, twice, half);
+    QCOMPARE(gMisuses, 0);
+    QCOMPARE(identity->range(), QCPRange(1, 10));
+    QCOMPARE(doubled->range(), QCPRange(2, 20));
+
+    plot.xAxis->setRange(2, 4);
+    QCOMPARE(identity->range(), QCPRange(2, 4));
+    QCOMPARE(doubled->range(), QCPRange(4, 8));
+
+    doubled->setRange(10, 20); // writes back through the inverse, the other link follows
+    QCOMPARE(plot.xAxis->range(), QCPRange(5, 10));
+    QCOMPARE(identity->range(), QCPRange(5, 10));
+    QCOMPARE(doubled->range(), QCPRange(10, 20));
+
+    identity->setRange(1, 3);
+    QCOMPARE(plot.xAxis->range(), QCPRange(1, 3));
+    QCOMPARE(doubled->range(), QCPRange(2, 6));
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestLinkedAxes::aLinksSourceCanBeLinkedAgain()
+{
+    QCustomPlot plot;
+    QCPAxis* first = plot.axisRect()->addAxis(QCPAxis::atBottom);
+    QCPAxis* second = plot.axisRect()->addAxis(QCPAxis::atBottom);
+    first->linkTo(plot.xAxis, twice, half);
+    QCOMPARE(first->linkSource(), plot.xAxis);
+
+    plot.axisRect()->removeAxis(first); // a dead link must not keep the source busy
+    plot.xAxis->linkTo(second, twice, half);
+    QCOMPARE(gMisuses, 0);
+    QCOMPARE(plot.xAxis->linkSource(), second);
+
+    second->setRange(1, 5);
+    QCOMPARE(plot.xAxis->range(), QCPRange(2, 10));
+}
+
+void TestLinkedAxes::scaleTypeOnALinkedAxisLeavesTheSourceAlone()
+{
+    QCustomPlot plot;
+    plot.xAxis->setRange(-5, 5);
+    plot.xAxis2->linkTo(plot.xAxis);
+    QCOMPARE(plot.xAxis2->range(), QCPRange(-5, 5));
+
+    plot.xAxis2->setScaleType(QCPAxis::stLogarithmic);
+    QCOMPARE(gMisuses, 0);
+    QCOMPARE(plot.xAxis->range(), QCPRange(-5, 5));
+    QCOMPARE(plot.xAxis2->range(), QCPRange(-5, 5));
+    QCOMPARE(plot.xAxis2->scaleType(), QCPAxis::stLogarithmic);
+
+    plot.xAxis->setRange(1, 10);
+    QCOMPARE(plot.xAxis2->range(), QCPRange(1, 10));
+}
+
 void TestLinkedAxes::refusedLinks()
 {
     QCustomPlot plot;
@@ -338,17 +399,17 @@ void TestLinkedAxes::refusedLinks()
 
     QCPAxis* extra = plot.axisRect()->addAxis(QCPAxis::atBottom);
     QVERIFY(extra);
-    extra->linkTo(plot.xAxis); // refused: that axis already has a link of its own
-    QCOMPARE(gMisuses, 6);
-    QVERIFY(!extra->linkSource());
+    extra->linkTo(plot.xAxis); // a source drives several links, so this one works
+    QCOMPARE(gMisuses, 5);
+    QCOMPARE(extra->linkSource(), plot.xAxis);
 
     plot.xAxis->linkTo(extra); // refused: that axis is a source
-    QCOMPARE(gMisuses, 7);
+    QCOMPARE(gMisuses, 6);
     QVERIFY(!plot.xAxis->linkSource());
 
     extra->linkTo(plot.xAxis2); // refused: that axis is linked itself
-    QCOMPARE(gMisuses, 8);
-    QVERIFY(!extra->linkSource());
+    QCOMPARE(gMisuses, 7);
+    QCOMPARE(extra->linkSource(), plot.xAxis); // the refused call left the first link alone
 }
 
 void TestLinkedAxes::deletedSourceLeavesAPlainAxis()

@@ -25,6 +25,7 @@
 
 #include "axis.h"
 
+#include <algorithm>
 #include <cmath>
 #include <memory>
 #include <utility>
@@ -502,6 +503,13 @@ QCPAxis::QCPAxis(QCPAxisRect* parent, AxisType type)
 
 QCPAxis::~QCPAxis()
 {
+    // A linked axis leaves its source's list: a dead link must not keep the source busy.
+    if (mLink)
+    {
+        if (QCPAxis* source = mLink->source)
+            source->mLinkedAxes.removeAll(this);
+        mLink.reset();
+    }
     // A link cannot outlive its source: its axes keep their range and become plain.
     if (!mLinkedAxes.isEmpty())
     {
@@ -509,7 +517,10 @@ QCPAxis::~QCPAxis()
         mLinkedAxes.clear();
         for (const QPointer<QCPAxis>& user : users)
             if (user)
+            {
                 user->mLink.reset();
+                user->markAppearanceDirty(); // its pixels come from the axis no more
+            }
     }
     if (mParentPlot)
         if (auto* grl = mParentPlot->gridRhiLayerIfExists())
@@ -646,7 +657,14 @@ void QCPAxis::setScaleType(QCPAxis::ScaleType type)
             for (int layerIndex = 0; layerIndex < mParentPlot->layerCount(); ++layerIndex)
                 mParentPlot->layer(layerIndex)->invalidateItemIndex();
         if (mScaleType == stLogarithmic)
-            setRange(mRange.sanitizedForLogScale());
+        {
+            // A linked axis takes its range from the source: its own scale type only picks its
+            // ticks, so it must not write a sanitized range back into the source.
+            if (mLink)
+                refreshFromLink();
+            else
+                setRange(mRange.sanitizedForLogScale());
+        }
         markAppearanceDirty();
         // A linked axis maps through the source's scale type: its pixels moved even when its own
         // range did not.
@@ -810,9 +828,12 @@ void QCPAxis::linkTo(QCPAxis* source, QCPAxisFunction forward, QCPAxisFunction i
     QCP_CHECK_OR_RETURN(source->mOrientation == mOrientation,
                         "the linked axes must have the same orientation", );
     QCP_CHECK_OR_RETURN(!source->mLink, "the source axis is linked itself", );
-    QCP_CHECK_OR_RETURN(source->mLinkedAxes.isEmpty(),
-                        "the source axis already drives another link", );
-    QCP_CHECK_OR_RETURN(mLinkedAxes.isEmpty(), "the axis already drives a link of its own", );
+    // A source may drive several links. Only a live user keeps this axis from being linked itself:
+    // a destroyed user leaves a null QPointer behind until its destructor removes it.
+    const bool drivesALink = std::any_of(
+        mLinkedAxes.cbegin(), mLinkedAxes.cend(),
+        [](const QPointer<QCPAxis>& user) { return !user.isNull(); });
+    QCP_CHECK_OR_RETURN(!drivesALink, "the axis already drives a link of its own", );
     QCP_CHECK_OR_RETURN(static_cast<bool>(forward) == static_cast<bool>(inverse),
                         "a link needs both its forward and its inverse function", );
     if (!forward)
@@ -1477,11 +1498,7 @@ void QCPAxis::setColor(const QColor& color)
     mLabelColor = color;
     mTickLabelColor = color;
     for (QPen* pen : {&mBasePen, &mTickPen, &mSubTickPen})
-    {
-        QPen changed = *pen;
-        changed.setColor(color);
-        *pen = changed;
-    }
+        pen->setColor(color);
     markAppearanceDirty();
 }
 

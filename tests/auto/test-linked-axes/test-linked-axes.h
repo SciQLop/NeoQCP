@@ -18,6 +18,9 @@ private slots:
     void nonFiniteInverseIsRefused();
     void reversingTheSourceRefreshesTheLink();
     void dataOnALinkedAxisMapsThroughTheLink();
+    void severalAxesShareASource();
+    void aLinksSourceCanBeLinkedAgain();
+    void scaleTypeOnALinkedAxisLeavesTheSourceAlone();
     void refusedLinks();
     void deletedSourceLeavesAPlainAxis();
     void slotDeletingAnAxisDuringDrag();

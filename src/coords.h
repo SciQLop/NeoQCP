@@ -177,9 +177,9 @@ private:
         void take(const QCPAxis* axis);
         void prepare();
         [[nodiscard]] double toPixel(double value) const;
-        //! Where  pixel sits along the axis, as a fraction of its length from its origin.
+        //! Where \a pixel sits along the axis, as a fraction of its length from its origin.
         [[nodiscard]] double fractionOf(double pixel) const;
-        //! The pixel at  fraction of the axis length, from its origin.
+        //! The pixel at \a fraction of the axis length, from its origin.
         [[nodiscard]] double pixelAtFraction(double fraction) const;
     };
 
