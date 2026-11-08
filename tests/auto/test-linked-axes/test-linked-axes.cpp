@@ -234,7 +234,7 @@ void TestLinkedAxes::nonFiniteInverseIsRefused()
     const QCPRange linked = plot.xAxis2->range();
 
     plot.xAxis2->setRange(0, 5); // the inverse of 0 is infinite
-    QCOMPARE(gMisuses, 1);
+    QCOMPARE(gMisuses, 0); // a data condition, not a misuse
     QCOMPARE(plot.xAxis->range(), source);
     QCOMPARE(plot.xAxis2->range(), linked);
 }

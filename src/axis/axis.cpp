@@ -772,9 +772,13 @@ void QCPAxis::commitRange(const QCPRange& range)
     const double upper = mLink->inverse(clean.upper);
     QCPRange sourceRange(lower, upper);
     sourceRange.normalize();
-    QCP_CHECK_OR_RETURN(std::isfinite(lower) && std::isfinite(upper)
-                            && QCPRange::validRange(sourceRange),
-                        "the inverse of the linked range is not a valid source range", );
+    // A value outside the inverse's domain (a wheel step across zero on a 1/x link) is data, not a
+    // misuse: the range simply does not move.
+    if (!(std::isfinite(lower) && std::isfinite(upper) && QCPRange::validRange(sourceRange)))
+    {
+        qDebug() << Q_FUNC_INFO << "the linked range has no source range under the inverse";
+        return;
+    }
     QCPAxis* source = mLink->source;
     QCP_CHECK_OR_RETURN(source, "the source of the link is gone", );
     // The source's signal runs inside this call unless it is deferred: a slot may delete either
