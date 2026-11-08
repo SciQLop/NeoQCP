@@ -520,6 +520,7 @@ QCPAxis::~QCPAxis()
             if (user)
             {
                 user->mLink.reset();
+                user->mLinked = false;
                 user->markAppearanceDirty(); // its pixels come from the axis no more
             }
     }
@@ -804,6 +805,7 @@ void QCPAxis::refreshFromLink()
     if (!source)
     {
         mLink.reset();
+        mLinked = false;
         markAppearanceDirty();
         return;
     }
@@ -874,6 +876,7 @@ void QCPAxis::linkTo(QCPAxis* source, QCPAxisFunction forward, QCPAxisFunction i
     link->inverse = std::move(inverse);
     mLink = link;
     source->mLinkedAxes.append(this);
+    mLinked = true;
     {
         // Taking the source's range emits rangeChanged, whose slot may delete this axis.
         const QCPEmissionScope scope(mParentPlot);
@@ -891,6 +894,7 @@ void QCPAxis::unlink()
     if (QCPAxis* source = mLink->source)
         source->mLinkedAxes.removeAll(this);
     mLink.reset();
+    mLinked = false;
     markAppearanceDirty();
 }
 
@@ -1971,7 +1975,7 @@ void QCPAxis::rescale(bool onlyVisiblePlottables)
 */
 double QCPAxis::pixelToCoord(double value) const
 {
-    if (mLink)
+    if (mLinked) [[unlikely]]
         return linkedPixelToCoord(value);
     if (orientation() == Qt::Horizontal)
     {
@@ -2026,7 +2030,7 @@ double QCPAxis::pixelToCoord(double value) const
 */
 double QCPAxis::coordToPixel(double value) const
 {
-    if (mLink)
+    if (mLinked) [[unlikely]]
         return linkedCoordToPixel(value);
     if (orientation() == Qt::Horizontal)
     {

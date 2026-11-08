@@ -477,6 +477,9 @@ protected:
     // scale and range:
     QCPRange mRange;
     bool mRangeReversed;
+    // The link flag sits next to the range: coordToPixel reads it on every point, and the
+    // shared_ptr at the end of the object would cost a second cache line per call.
+    bool mLinked = false;
     bool mRangeDraggable = true;
     bool mRangeZoomable = true;
     ScaleType mScaleType;
