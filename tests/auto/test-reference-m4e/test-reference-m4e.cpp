@@ -48,7 +48,7 @@ QImage errorBarsScene(bool verticalKey, bool logValue, bool selected, bool legen
         QCPAxis* key = verticalKey ? plot.yAxis : plot.xAxis;
         QCPAxis* value = verticalKey ? plot.xAxis : plot.yAxis;
         key->setRange(0, 6);
-        value->setRange(logValue ? -0.5 : -1, logValue ? 9 : 1.5);
+        value->setRange(logValue ? 0.5 : -1, logValue ? 10 : 1.5);
         auto* graph = new QCPGraph(key, value);
         graph->setLineStyle(QCPGraph::lsNone);
         graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
@@ -62,7 +62,10 @@ QImage errorBarsScene(bool verticalKey, bool logValue, bool selected, bool legen
         bars->setWhiskerWidth(6);
         bars->setPen(QPen(QColor(200, 30, 30)));
         if (selected)
-            bars->setSelection(QCPDataSelection(QCPDataRange(1, 3)));
+        {
+            bars->setSelectable(QCP::stDataRange);
+            bars->setSelection(QCPDataSelection(QCPDataRange(2, 4)));
+        }
         if (legend)
         {
             plot.legend->setVisible(true);
@@ -79,7 +82,7 @@ QImage financialScene(bool ohlc, bool verticalKey, bool logValue, bool selected,
         QCPAxis* key = verticalKey ? plot.yAxis : plot.xAxis;
         QCPAxis* value = verticalKey ? plot.xAxis : plot.yAxis;
         key->setRange(0, 7);
-        value->setRange(0, logValue ? 20 : 10);
+        value->setRange(logValue ? 1 : 0, 10);
         auto* financial = new QCPFinancial(key, value);
         const QVector<double> keys{0.6, 1.4, 2.2, 3.0, 3.8, 4.6, 5.4, 6.2};
         QVector<double> open, high, low, close;
@@ -95,7 +98,10 @@ QImage financialScene(bool ohlc, bool verticalKey, bool logValue, bool selected,
         financial->setChartStyle(ohlc ? QCPFinancial::csOhlc : QCPFinancial::csCandlestick);
         financial->setWidth(0.7);
         if (selected)
+        {
+            financial->setSelectable(QCP::stDataRange);
             financial->setSelection(QCPDataSelection(QCPDataRange(2, 5)));
+        }
         if (legend)
         {
             plot.legend->setVisible(true);
@@ -120,7 +126,10 @@ QImage statisticalBoxScene(bool verticalKey, bool selected, bool legend)
         box->setWidth(0.5);
         box->setWhiskerWidth(0.3);
         if (selected)
-            box->setSelection(QCPDataSelection(QCPDataRange(1, 3)));
+        {
+            box->setSelectable(QCP::stDataRange);
+            box->setSelection(QCPDataSelection(QCPDataRange(1, 2)));
+        }
         if (legend)
         {
             plot.legend->setVisible(true);
@@ -129,12 +138,14 @@ QImage statisticalBoxScene(bool verticalKey, bool selected, bool legend)
     });
 }
 
-qcp::intervals::Columns intervalColumns()
+qcp::intervals::Columns intervalColumns(QCPLaneLayout& layout)
 {
     qcp::intervals::Columns columns;
+    const int laneA = layout.laneIndex(QStringLiteral("A"));
+    const int laneB = layout.laneIndex(QStringLiteral("B"));
     columns.start = {0.2, 1.0, 2.1, 3.0, 4.2, 5.0};
     columns.stop = {0.8, 1.7, 2.6, 3.9, 4.9, 5.8};
-    columns.lane = {0, 1, 0, 1, 0, 1};
+    columns.lane = {laneA, laneB, laneA, laneB, laneA, laneB};
     columns.category.assign(columns.start.size(), 0);
     columns.ids.resize(columns.start.size());
     std::iota(columns.ids.begin(), columns.ids.end(), qint64(101));
@@ -150,7 +161,7 @@ QImage intervalsScene(bool lanes, bool selected, bool legend)
         plot.xAxis->setRange(0, 6);
         plot.yAxis->setRange(-0.5, 2.5);
         auto* intervals = new QCPIntervals(plot.xAxis, plot.yAxis, &layout);
-        intervals->setData(intervalColumns());
+        intervals->setData(intervalColumns(layout));
         intervals->setCategoryNames(QStringList{QStringLiteral("A")});
         intervals->setCategoryColors(QVector<QColor>{QColor(70, 130, 200)});
         if (selected)
@@ -165,12 +176,12 @@ QImage intervalsScene(bool lanes, bool selected, bool legend)
 
 QPixmap testPixmap()
 {
-    QImage image(8, 6, QImage::Format_ARGB32);
-    for (int y = 0; y < 6; ++y)
-        for (int x = 0; x < 8; ++x)
+    QImage image(48, 36, QImage::Format_ARGB32);
+    for (int y = 0; y < 36; ++y)
+        for (int x = 0; x < 48; ++x)
             image.setPixel(x, y,
-                           x < 4 ? (y < 3 ? qRgb(40, 120, 200) : qRgb(230, 200, 40))
-                                 : (y < 3 ? qRgb(220, 60, 60) : qRgb(60, 170, 90)));
+                           x < 24 ? (y < 18 ? qRgb(40, 120, 200) : qRgb(230, 200, 40))
+                                  : (y < 18 ? qRgb(220, 60, 60) : qRgb(60, 170, 90)));
     return QPixmap::fromImage(image);
 }
 
