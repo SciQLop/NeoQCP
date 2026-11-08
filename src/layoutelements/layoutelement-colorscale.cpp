@@ -279,6 +279,8 @@ void QCPColorScale::setType(QCPAxis::AxisType type)
         connect(mColorAxis.data(), &QCPAxis::rangeChanged, this, &QCPColorScale::setDataRange);
         connect(mColorAxis.data(), &QCPAxis::scaleTypeChanged, this, &QCPColorScale::setDataScaleType);
         mAxisRect.data()->setRangeDragAxes(QList<QCPAxis*>() << mColorAxis.data());
+        // Its opposite axes are synchronized by signals: zooming them both would zoom twice.
+        mAxisRect.data()->setRangeZoomAxes(QList<QCPAxis*>() << mColorAxis.data());
         usersChanged(); // the scale now needs a different side's width or height
     }
 }

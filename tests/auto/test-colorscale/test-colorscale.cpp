@@ -237,6 +237,36 @@ void TestColorScale::theWheelZoomsTheRectsScale()
     QVERIFY2(scale->dataRange() != before, "the wheel over the bar zooms its range");
 }
 
+void TestColorScale::theWheelZoomsTheScaleOnce()
+{
+    mPlot->setInteractions(QCP::iRangeZoom);
+    mapWithRange(mPlot->xAxis, mPlot->yAxis, 0, 10);
+    const auto scale = mPlot->axisRect()->colorScale();
+    scale->setDataRange(QCPRange(0, 10));
+    mPlot->replot();
+
+    // The inner rect keeps its opposite axes equal, so one wheel step must reach the colour axis
+    // once, not once per synchronized axis.
+    QCPAxis* axis = scale->axis();
+    const QPointF pos = QRectF(scale->outerRect()).center();
+    const double centre = axis->pixelToCoord(pos.y());
+    const double factor = mPlot->axisRect()->rangeZoomFactor(Qt::Vertical);
+    const QCPRange expected((0.0 - centre) * factor + centre, (10.0 - centre) * factor + centre);
+
+    QWheelEvent event(pos, mPlot->mapToGlobal(pos), QPoint(), QPoint(0, 120), Qt::NoButton,
+                      Qt::NoModifier, Qt::NoScrollPhase, false);
+    QCoreApplication::sendEvent(mPlot, &event);
+
+    const QCPRange after = scale->dataRange();
+    QVERIFY2(qAbs(after.lower - expected.lower) < 1e-9
+                 && qAbs(after.upper - expected.upper) < 1e-9,
+             qPrintable(QStringLiteral("one wheel step zooms the scale once: got %1..%2, expected %3..%4")
+                            .arg(after.lower)
+                            .arg(after.upper)
+                            .arg(expected.lower)
+                            .arg(expected.upper)));
+}
+
 void TestColorScale::theScaleIsNotOnTheDataLayer()
 {
     auto* map = mapWithRange(mPlot->xAxis, mPlot->yAxis, 0, 1);
