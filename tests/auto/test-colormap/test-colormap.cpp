@@ -943,6 +943,28 @@ void TestColorMap::QCPColorScale_rangeSlotDeletingTheScaleIsSafe()
   QCOMPARE(scaleTypeSignals, 0);
 }
 
+// A taken colour map drops its plot's scale, and joins the scale of the rect it is added to.
+void TestColorMap::colourMap2JoinsItsNewPlotsScaleWhenAdded()
+{
+  QVERIFY(mPlot->removePlottable(mColorMap)); // the fixture's map shares the rect's scale
+  auto* map = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  const auto oldScale = mPlot->axisRect()->colorScale();
+  QVERIFY(oldScale);
+  QVERIFY(oldScale->users().contains(map));
+
+  QCustomPlot other;
+  other.resize(400, 300);
+  auto taken = mPlot->take(qcp::makeHandle<QCPHandle<QCPColorMap2>>(map));
+  QVERIFY(taken);
+  QVERIFY2(oldScale->users().isEmpty(), "the taken map still uses its old plot's scale");
+
+  auto added = other.add(std::move(taken));
+  QVERIFY(added);
+  QVERIFY2(other.axisRect()->colorScale(), "the re-added map did not make the new rect's scale");
+  QCOMPARE(added->colorScale(), other.axisRect()->colorScale().get());
+  QVERIFY(other.axisRect()->colorScale()->users().contains(added.get()));
+}
+
 // The scale signals its gradient before it applies it to its users: the slot must run once the
 // users are up to date, and deleting the scale there must not leave it walking freed memory.
 void TestColorMap::QCPColorScale_gradientSlotDeletingTheScaleIsSafe()

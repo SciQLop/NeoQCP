@@ -74,6 +74,7 @@ private slots:
     void colourValuesAreCompleteBeforeTheColourScaleSignal();
     void uncolouringIsCompleteBeforeTheColourScaleSignal();
     void colourSlotDeletingTheLineIsSafe();
+    void aTakenColouredLineJoinsItsNewPlotsScale();
 
 private:
     QCustomPlot* mPlot = nullptr;

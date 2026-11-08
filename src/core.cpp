@@ -1440,12 +1440,8 @@ namespace
 // its bars group and its stack. Destruction undoes these by itself.
 void leaveSiblings(QCPAbstractPlottable* plottable)
 {
-    if (auto* map = qobject_cast<QCPColorMap*>(plottable))
-        map->setColorScale(nullptr);
-    else if (auto* map2 = qobject_cast<QCPColorMap2*>(plottable))
-        map2->setColorScale(nullptr);
-    else if (auto* histogram = qobject_cast<QCPHistogram2D*>(plottable))
-        histogram->setColorScale(nullptr);
+    if (auto* mapped = qobject_cast<QCPAbstractColorMapped*>(plottable))
+        mapped->setColorScale(nullptr);
     else if (auto* bars = qobject_cast<QCPBars*>(plottable))
     {
         bars->setBarsGroup(nullptr);
@@ -1548,6 +1544,10 @@ bool QCustomPlot::adopt(QCPAbstractPlottable* plottable)
     plottable->mRegisteredPlot = this;
     if (auto* graph = qobject_cast<QCPGraph*>(plottable))
         registerGraph(graph);
+    // The scale it followed belonged to the plot it left: join the new rect's, as a fresh one does.
+    if (auto* mapped = qobject_cast<QCPAbstractColorMapped*>(plottable);
+        mapped && mapped->joinsOnArrival())
+        mapped->followKeyAxisRectScale();
     return true;
 }
 

@@ -45,6 +45,10 @@ public:
     //! The range of the coloured values over all the data; \a found is false when there is none.
     [[nodiscard]] virtual QCPRange colorDataBounds(bool& found) const = 0;
 
+    //! Whether being added to a plot makes this plottable join its new key axis rect's scale.
+    //! A colour map always does; a line only once it has colour values.
+    [[nodiscard]] virtual bool joinsOnArrival() const { return true; }
+
 signals:
     void dataRangeChanged(const QCPRange& newRange);
     void dataScaleTypeChanged(QCPAxis::ScaleType scaleType);
@@ -66,6 +70,8 @@ protected:
 
 private:
     friend class QCPColorScale;
+    // adopt() joins the new rect's scale through followKeyAxisRectScale().
+    friend class QCustomPlot;
     void applyDataRange(const QCPRange& dataRange);
     void applyDataScaleType(QCPAxis::ScaleType scaleType);
     void applyGradient(const QCPColorGradient& gradient);

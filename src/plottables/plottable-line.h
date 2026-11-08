@@ -78,6 +78,8 @@ public:
     void setColorValues(std::vector<double> values);
     void clearColorValues();
     [[nodiscard]] bool hasColorValues() const;
+    //! A plain line shows no colour bar, and must not pick one up by being re-added.
+    [[nodiscard]] bool joinsOnArrival() const override { return hasColorValues(); }
 
 Q_SIGNALS:
     //! A component was shown or hidden: the legend group row draws one segment per visible one.

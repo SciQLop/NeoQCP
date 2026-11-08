@@ -1278,6 +1278,38 @@ void TestColorByScalar::graph2ScatterColoursFollowTheirPointAcrossBreaks()
     QVERIFY2(isRed(colourAt(13)), qPrintable("key 13 drawn as " + colourAt(13).name()));
 }
 
+// Taking a coloured line drops its old plot's scale; adding it elsewhere joins the new rect's.
+void TestColorByScalar::aTakenColouredLineJoinsItsNewPlotsScale()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDataSource(makeSource({ 0, 1, 2, 3 }, { { 0, 1, 0, 1 } }));
+    mg->setColorValues(std::vector<double> { 0.0, 1.0, 0.0, 1.0 });
+    const auto oldScale = mPlot->axisRect()->colorScale();
+    QVERIFY(oldScale);
+    QVERIFY(oldScale->users().contains(mg));
+    oldScale->setGradient(QCPColorGradient(QCPColorGradient::gpHot));
+    QCOMPARE(mg->gradient(), QCPColorGradient(QCPColorGradient::gpHot));
+
+    QCustomPlot other;
+    other.resize(400, 300);
+    auto taken = mPlot->take(qcp::makeHandle<QCPHandle<QCPMultiGraph>>(mg));
+    QVERIFY(taken);
+    QVERIFY2(oldScale->users().isEmpty(), "the taken line still uses its old plot's scale");
+    QCOMPARE(taken->colorScale(), nullptr);
+
+    auto added = other.add(std::move(taken));
+    QVERIFY(added);
+    QVERIFY2(other.axisRect()->colorScale(), "the re-added line did not make the new rect's scale");
+    QCOMPARE(added->colorScale(), other.axisRect()->colorScale().get());
+    QVERIFY(other.axisRect()->colorScale()->users().contains(added.get()));
+
+    // The old scale is no longer wired to it; the new one is.
+    oldScale->setGradient(QCPColorGradient(QCPColorGradient::gpCold));
+    QCOMPARE(added->gradient(), QCPColorGradient(QCPColorGradient::gpHot));
+    other.axisRect()->colorScale()->setGradient(QCPColorGradient(QCPColorGradient::gpJet));
+    QCOMPARE(added->gradient(), QCPColorGradient(QCPColorGradient::gpJet));
+}
+
 // The line finishes updating itself before colorScaleChanged is delivered: a slot may delete the
 // line, so it must see the colouring complete, not mid-way.
 void TestColorByScalar::colourValuesAreCompleteBeforeTheColourScaleSignal()
