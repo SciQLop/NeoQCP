@@ -2649,32 +2649,34 @@ void Benchmark::QCPStatisticalBox_Pan1k()
 
 void Benchmark::QCPIntervals_Pan10k()
 {
-    QCPLaneLayout layout;
-    auto* intervals = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    // 10 000 intervals in two lanes, every one of them inside the one-key window below.
+    auto* layout = new QCPLaneLayout();
+    layout->setParent(mPlot);
+    const int laneA = layout->laneIndex(QStringLiteral("A"));
+    const int laneB = layout->laneIndex(QStringLiteral("B"));
+    auto* intervals = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, layout);
     qcp::intervals::Columns columns;
-    columns.start.reserve(10000);
-    columns.stop.reserve(10000);
-    columns.lane.reserve(10000);
-    columns.category.reserve(10000);
-    columns.ids.reserve(10000);
+    columns.start.resize(10000);
+    columns.stop.resize(10000);
+    columns.lane.resize(10000);
+    columns.category.assign(10000, 0);
+    columns.ids.resize(10000);
     for (int i = 0; i < 10000; ++i)
     {
-        const double start = 100.0 * i / 10000;
-        columns.start.push_back(start);
-        columns.stop.push_back(start + 0.008);
-        columns.lane.push_back(i % 2);
-        columns.category.push_back(i % 2);
-        columns.ids.push_back(i);
+        columns.start[i] = 50.0 + 0.9 * i / 10000.0;
+        columns.stop[i] = columns.start[i] + 0.0004;
+        columns.lane[i] = i % 2 ? laneB : laneA;
+        columns.ids[i] = i;
     }
     intervals->setData(columns);
-    intervals->setCategoryNames({ QStringLiteral("a"), QStringLiteral("b") });
+    intervals->setCategoryNames(QStringList { QStringLiteral("A") });
     mPlot->xAxis->setRange(50, 51);
-    mPlot->yAxis->setRange(0, 1);
+    mPlot->yAxis->setRange(0, 2);
     mPlot->replot();
     double left = 50;
     QBENCHMARK
     {
-        left += 0.01;
+        left += 0.001; // a pan step: the width never changes, only the window slides
         mPlot->xAxis->setRange(left, left + 1);
         mPlot->replot(QCustomPlot::rpImmediateRefresh);
     }
@@ -2682,69 +2684,91 @@ void Benchmark::QCPIntervals_Pan10k()
 
 void Benchmark::QCPItems_MixedKinds_Pan1k()
 {
+    // 100 of every item kind plus 50 spans of each orientation, all inside 50..51: the pan
+    // below draws each of them on every frame instead of culling almost all of them.
     auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     QVector<double> keys(101);
     QVector<double> values(101);
-    for (int i = 0; i <= 100; ++i)
+    for (int i = 0; i < 101; ++i)
     {
-        keys[i] = 100.0 * i / 100;
-        values[i] = 0.5 + 0.4 * qSin(i * 0.1);
+        keys[i] = 50.0 + 0.9 * i / 100.0;
+        values[i] = 0.5 + 0.3 * qSin(i * 0.2);
     }
     graph->setData(keys, values);
-    graph->setLineStyle(QCPGraph::lsLine);
-    graph->setScatterStyle(QCPScatterStyle::ssNone);
 
-    QPixmap pixmap(8, 6);
-    pixmap.fill(Qt::darkCyan);
+    QPixmap pixmap(48, 36);
+    pixmap.fill(QColor(40, 120, 200));
 
     for (int i = 0; i < 100; ++i)
     {
-        const double x = 0.5 + i;
+        const double x = 50.0 + i * 0.009;
         const double y = 0.5 + 0.3 * qSin(i * 0.2);
-
         auto* line = new QCPItemLine(mPlot);
-        line->start->setCoords(x, y - 0.1);
-        line->end->setCoords(x + 0.4, y + 0.1);
-
+        line->start->setCoords(x, y - 0.05);
+        line->end->setCoords(x + 0.006, y + 0.05);
         auto* straight = new QCPItemStraightLine(mPlot);
-        straight->point1->setCoords(x, 0.1);
-        straight->point2->setCoords(x + 0.5, 0.9);
-
+        straight->point1->setCoords(x, y - 0.04);
+        straight->point2->setCoords(x + 0.006, y + 0.04);
         auto* curve = new QCPItemCurve(mPlot);
-        curve->start->setCoords(x, y - 0.15);
-        curve->startDir->setCoords(x + 0.3, y + 0.2);
-        curve->endDir->setCoords(x + 0.7, y - 0.2);
-        curve->end->setCoords(x + 0.9, y + 0.15);
-
+        curve->start->setCoords(x, y - 0.04);
+        curve->startDir->setCoords(x + 0.002, y - 0.01);
+        curve->endDir->setCoords(x + 0.004, y + 0.01);
+        curve->end->setCoords(x + 0.006, y + 0.04);
         auto* bracket = new QCPItemBracket(mPlot);
         bracket->left->setCoords(x, y);
-        bracket->right->setCoords(x + 1, y);
-        bracket->setLength(12);
-
+        bracket->right->setCoords(x + 0.006, y);
+        bracket->setLength(6);
         auto* rect = new QCPItemRect(mPlot);
-        rect->topLeft->setCoords(x, y + 0.1);
-        rect->bottomRight->setCoords(x + 0.6, y - 0.1);
-
+        rect->topLeft->setCoords(x, y + 0.02);
+        rect->bottomRight->setCoords(x + 0.006, y - 0.02);
         auto* ellipse = new QCPItemEllipse(mPlot);
-        ellipse->topLeft->setCoords(x, y + 0.1);
-        ellipse->bottomRight->setCoords(x + 0.6, y - 0.1);
-
+        ellipse->topLeft->setCoords(x, y + 0.02);
+        ellipse->bottomRight->setCoords(x + 0.006, y - 0.02);
         auto* image = new QCPItemPixmap(mPlot);
-        image->topLeft->setCoords(x, y + 0.1);
-        image->bottomRight->setCoords(x + 0.3, y - 0.1);
+        image->topLeft->setCoords(x, y + 0.02);
+        image->bottomRight->setCoords(x + 0.006, y - 0.02);
         image->setPixmap(pixmap);
-
         auto* tracer = new QCPItemTracer(mPlot);
         tracer->setGraph(graph);
         tracer->setGraphKey(x);
         tracer->setStyle(QCPItemTracer::tsCircle);
-
         auto* rspan = new QCPItemRSpan(mPlot);
-        rspan->leftEdge->setCoords(x, 0);
-        rspan->rightEdge->setCoords(x + 0.8, 0);
-        rspan->topEdge->setCoords(x, y + 0.2);
-        rspan->bottomEdge->setCoords(x, y - 0.2);
+        rspan->leftEdge->setCoords(x, y);
+        rspan->rightEdge->setCoords(x + 0.004, y);
+        rspan->topEdge->setCoords(x, y + 0.03);
+        rspan->bottomEdge->setCoords(x, y - 0.03);
+        if (i % 2 == 0)
+        {
+            auto* hspan = new QCPItemHSpan(mPlot);
+            hspan->lowerEdge->setCoords(x, y - 0.02);
+            hspan->upperEdge->setCoords(x, y + 0.02);
+        }
+        else
+        {
+            auto* vspan = new QCPItemVSpan(mPlot);
+            vspan->lowerEdge->setCoords(x, y);
+            vspan->upperEdge->setCoords(x + 0.004, y);
+        }
+    }
+    mPlot->xAxis->setRange(50, 51);
+    mPlot->yAxis->setRange(0, 1);
+    mPlot->replot();
+    double left = 50;
+    QBENCHMARK
+    {
+        left += 0.001; // a pan step: the width never changes, only the window slides
+        mPlot->xAxis->setRange(left, left + 1);
+        mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+}
 
+void Benchmark::QCPSpans_Pan100()
+{
+    // 100 spans, all inside the one-key window, so every one of them draws on each frame.
+    for (int i = 0; i < 100; ++i)
+    {
+        const double x = 50.0 + i * 0.009;
+        const double y = 0.5 + 0.3 * qSin(i * 0.2);
         if (i % 2 == 0)
         {
             auto* hspan = new QCPItemHSpan(mPlot);
@@ -2754,8 +2778,8 @@ void Benchmark::QCPItems_MixedKinds_Pan1k()
         else
         {
             auto* vspan = new QCPItemVSpan(mPlot);
-            vspan->lowerEdge->setCoords(x, y - 0.05);
-            vspan->upperEdge->setCoords(x + 0.05, y);
+            vspan->lowerEdge->setCoords(x, y);
+            vspan->upperEdge->setCoords(x + 0.005, y);
         }
     }
     mPlot->xAxis->setRange(50, 51);
@@ -2764,38 +2788,7 @@ void Benchmark::QCPItems_MixedKinds_Pan1k()
     double left = 50;
     QBENCHMARK
     {
-        left += 0.01;
-        mPlot->xAxis->setRange(left, left + 1);
-        mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    }
-}
-
-void Benchmark::QCPSpans_Pan100()
-{
-    for (int i = 0; i < 100; ++i)
-    {
-        const double x = 0.5 + i;
-        const double y = 0.5 + 0.3 * qSin(i * 0.2);
-        if (i % 2 == 0)
-        {
-            auto* hspan = new QCPItemHSpan(mPlot);
-            hspan->lowerEdge->setCoords(x, y - 0.1);
-            hspan->upperEdge->setCoords(x, y + 0.1);
-        }
-        else
-        {
-            auto* vspan = new QCPItemVSpan(mPlot);
-            vspan->lowerEdge->setCoords(x, y - 0.1);
-            vspan->upperEdge->setCoords(x + 0.2, y);
-        }
-    }
-    mPlot->xAxis->setRange(50, 51);
-    mPlot->yAxis->setRange(0, 1);
-    mPlot->replot();
-    double left = 50;
-    QBENCHMARK
-    {
-        left += 0.01;
+        left += 0.001; // a pan step: the width never changes, only the window slides
         mPlot->xAxis->setRange(left, left + 1);
         mPlot->replot(QCustomPlot::rpImmediateRefresh);
     }

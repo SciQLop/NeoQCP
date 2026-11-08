@@ -9,19 +9,31 @@
 
 namespace qcp::test
 {
+/*! \brief How far an export may drift from its reference.
+
+  \a pixels pixels may differ, by more than \a channel in any channel. {0, 0} is a pixel-exact
+  comparison.
+*/
+struct Tolerance
+{
+    int pixels = 20;
+    int channel = 32;
+};
+
 /*! \brief Compares \a image with the reference stored for \a testDir/\a name, or writes it.
 
   With \c QCP_WRITE_REFERENCE set the image is saved to
   \c tests/auto/<testDir>/reference/<name> and the comparison succeeds, which is how the images
-  are made. Otherwise the sizes must match and at most \a maxBadPixels pixels of the compared area
-  (\a area, the whole image when null; its outer row and column are excluded: the export painter
-  sits half a pixel off the device grid and moves only those) may differ by more than 32 in a
-  channel. \a why receives the first difference and the total, when the caller wants to print it.
+  are made. Otherwise the sizes must match and at most \a tolerance pixels differ by more than
+  \a tolerance's channel in a channel, inside the compared area (\a area, the whole image when
+  null; its outer row and column are excluded: the export painter sits half a pixel off the device
+  grid and moves only those). \a why receives the first difference and the total, when the caller
+  wants to print it.
 
   The path is resolved from the test binary, so the helper works from any build directory.
 */
 inline bool matchesReference(const QImage& image, const QString& testDir, const QString& name,
-                             QString* why = nullptr, int maxBadPixels = 20,
+                             QString* why = nullptr, Tolerance tolerance = {},
                              const QRect& area = QRect())
 {
     const QString path = QDir(QCoreApplication::applicationDirPath())
@@ -65,8 +77,10 @@ inline bool matchesReference(const QImage& image, const QString& testDir, const 
         {
             const QRgb a = actual.pixel(x, y);
             const QRgb b = reference.pixel(x, y);
-            if (qAbs(qRed(a) - qRed(b)) > 32 || qAbs(qGreen(a) - qGreen(b)) > 32
-                || qAbs(qBlue(a) - qBlue(b)) > 32 || qAbs(qAlpha(a) - qAlpha(b)) > 32)
+            if (qAbs(qRed(a) - qRed(b)) > tolerance.channel
+                || qAbs(qGreen(a) - qGreen(b)) > tolerance.channel
+                || qAbs(qBlue(a) - qBlue(b)) > tolerance.channel
+                || qAbs(qAlpha(a) - qAlpha(b)) > tolerance.channel)
             {
                 if (bad == 0)
                     first = QPoint(x, y);
@@ -74,12 +88,12 @@ inline bool matchesReference(const QImage& image, const QString& testDir, const 
             }
         }
     }
-    if (bad > maxBadPixels)
+    if (bad > tolerance.pixels)
     {
         if (why)
             *why = QStringLiteral("%1 pixels differ (at most %2), first at %3,%4")
                        .arg(bad)
-                       .arg(maxBadPixels)
+                       .arg(tolerance.pixels)
                        .arg(first.x())
                        .arg(first.y());
         return false;

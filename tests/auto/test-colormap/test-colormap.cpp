@@ -1656,7 +1656,7 @@ void TestColorMap::exportMatchesTheOldCode()
   QString why;
   const bool matches = qcp::test::matchesReference(
       exported, QStringLiteral("test-colormap"), QStringLiteral("classic-colormap-export.png"),
-      &why, 0, mPlot->axisRect()->rect());
+      &why, qcp::test::Tolerance{0, 0}, mPlot->axisRect()->rect());
   if (qEnvironmentVariableIsSet("QCP_WRITE_REFERENCE"))
     QSKIP("reference image written");
   QVERIFY2(matches, qPrintable(why));
