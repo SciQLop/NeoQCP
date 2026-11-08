@@ -603,14 +603,15 @@ void QCPMultiGraph::requestOrigin()
 // when nothing was stashed for the committed source, and dataChanged on an in-place mutation).
 void QCPMultiGraph::applyColorSizeRule(int newSize)
 {
-    if (mColor.hasValues() && mColor.size() != newSize)
-        mColor.clearValues();
-    if (!mColor.hasValues())
-    {
-        mWantOrigin->store(false);
-        if (colorScale())
-            setColorScale(nullptr);
-    }
+    // A scale the user picked on an uncoloured graph is not this rule's to drop: only a resize
+    // that clears the values this graph had leaves only an uncoloured graph behind.
+    const bool clearedValues = mColor.hasValues() && mColor.size() != newSize;
+    if (!clearedValues)
+        return;
+    mColor.clearValues();
+    mWantOrigin->store(false);
+    if (colorScale())
+        setColorScale(nullptr);
 }
 
 double QCPMultiGraph::componentValueAt(int column, int index) const

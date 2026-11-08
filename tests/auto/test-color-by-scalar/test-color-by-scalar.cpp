@@ -1278,6 +1278,25 @@ void TestColorByScalar::graph2ScatterColoursFollowTheirPointAcrossBreaks()
     QVERIFY2(isRed(colourAt(13)), qPrintable("key 13 drawn as " + colourAt(13).name()));
 }
 
+// A scale the user picked on an uncoloured line is not the size rule's to drop; only a resize
+// that actually clears colour values leaves it.
+void TestColorByScalar::newDataKeepsAnUncolouredLinesChosenScale()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDataSource(makeSource({ 0, 1, 2, 3 }, { { 0, 1, 0, 1 } }));
+    auto* scale = new QCPColorScale(mPlot);
+    mg->setColorScale(scale);
+    QCOMPARE(mg->colorScale(), scale);
+
+    mg->setDataSource(makeSource({ 0, 1, 2, 3, 4 }, { { 0, 1, 0, 1, 0 } }));
+    QCOMPARE(mg->colorScale(), scale);
+
+    // Coloured, then resized: the values are gone, so the scale goes with them.
+    mg->setColorValues(std::vector<double> { 0.0, 1.0, 0.0, 1.0, 0.0 });
+    mg->setDataSource(makeSource({ 0, 1, 2 }, { { 0, 1, 0 } }));
+    QCOMPARE(mg->colorScale(), nullptr);
+}
+
 // Taking a coloured line drops its old plot's scale; adding it elsewhere joins the new rect's.
 void TestColorByScalar::aTakenColouredLineJoinsItsNewPlotsScale()
 {
