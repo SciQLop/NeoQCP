@@ -86,6 +86,7 @@ void QCPAlignmentGroup::remove(QCPLayoutElement* element)
     if (!element || !mMembers.removeOne(element))
         return;
     element->mAlignmentGroup = nullptr;
+    mUsedEdges.remove(element);
     invalidate();
     qcpEmit(this, nullptr, &QCPAlignmentGroup::membersChanged);
     if (mMembers.isEmpty())
@@ -125,6 +126,7 @@ int QCPAlignmentGroup::marginFor(QCPLayoutElement* element, QCP::MarginSide side
         if (member == element)
             own = edge;
     }
+    mUsedEdges[element][side] = windowEdge(element, side);
     if (mLastEdge.value(side, INT_MIN) != shared)
     {
         mLastEdge[side] = shared;
@@ -135,9 +137,21 @@ int QCPAlignmentGroup::marginFor(QCPLayoutElement* element, QCP::MarginSide side
     return growsInward ? shared - own : own - shared;
 }
 
+bool QCPAlignmentGroup::edgeMoved(const QCPLayoutElement* element) const
+{
+    const auto used = mUsedEdges.constFind(element);
+    if (used == mUsedEdges.constEnd())
+        return false;
+    for (auto it = used->constBegin(); it != used->constEnd(); ++it)
+        if (windowEdge(element, it.key()) != it.value())
+            return true;
+    return false;
+}
+
 void QCPAlignmentGroup::invalidate()
 {
     mLastEdge.clear();
+    mUsedEdges.clear();
     for (QCPLayoutElement* member : liveMembers())
         if (eligible(member))
             member->markLayoutAppearanceDirty();

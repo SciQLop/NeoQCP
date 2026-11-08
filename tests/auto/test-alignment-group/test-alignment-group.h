@@ -24,6 +24,7 @@ private slots:
     void aPeerMoveRepaintsNoOtherPlot();
     void aPeerHeightChangeRepaintsNoOtherPlot();
     void aPeerSidewaysMoveRealigns();
+  void aMemberResizedRealigns();
     void alignmentWinsOverMarginGroup();
 };
 

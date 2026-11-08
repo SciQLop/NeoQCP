@@ -241,6 +241,23 @@ void TestAlignmentGroup::firstShowSettlesInTwoRepaints()
     QCOMPARE(innerLeft(a), innerLeft(b));
 }
 
+void TestAlignmentGroup::aMemberResizedRealigns()
+{
+    auto* a = makePlot();
+    auto* b = makePlot(false);
+    QScopedPointer<QWidget> window(makeFreeStack({ a, b }, 24));
+    window->show();
+    QVERIFY(QTest::qWaitForWindowExposed(window.data()));
+    const auto group = QCPAlignmentGroup::create({ a->axisRect(), b->axisRect() }, QCP::msRight);
+    QVERIFY(group);
+    QVERIFY(settle({ a, b }));
+    QCOMPARE(innerRight(a), innerRight(b));
+
+    b->resize(b->width() - 60, b->height());
+    QTest::qWait(200); // only the group's own follow-up pass may relay the peer out
+    QCOMPARE(innerRight(a), innerRight(b));
+}
+
 void TestAlignmentGroup::hiddenMemberIsLeftOut()
 {
     auto* a = makePlot();

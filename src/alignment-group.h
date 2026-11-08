@@ -45,6 +45,8 @@ public:
     void invalidate();
     //! Relays out every member: for a plot whose visibility changed.
     void relayoutMembers();
+    //! True when a member's outer edge moved since marginFor last used it (checked after layout).
+    bool edgeMoved(const QCPLayoutElement* element) const;
 
 signals:
     void membersChanged();
@@ -58,6 +60,9 @@ private:
     QList<QPointer<QCPLayoutElement>> mMembers;
     QCP::MarginSides mSides;
     QHash<QCP::MarginSide, int> mLastEdge;
+    // The outer edge each member's margin was computed from, per side: a pass that sees it move
+    // afterwards (a resize tightens the rect only in upLayout) relay out.
+    QHash<const QCPLayoutElement*, QHash<QCP::MarginSide, int>> mUsedEdges;
 };
 
 #endif // QCP_ALIGNMENT_GROUP_H

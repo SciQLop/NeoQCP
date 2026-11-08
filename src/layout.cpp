@@ -508,6 +508,16 @@ void QCPLayoutElement::setMarginGroup(QCP::MarginSides sides, QCPMarginGroup* gr
 */
 void QCPLayoutElement::update(UpdatePhase phase)
 {
+    // The margins were computed from the outer rect of the previous pass. A resize only tightens
+    // the rect in upLayout, so a pass whose rect no longer matches what its margin assumed must
+    // run once more: this is what makes an aligned peer follow a resized member.
+    if (phase == upLayout && mAlignmentGroup && mAlignmentGroup->edgeMoved(this))
+    {
+        markLayoutAppearanceDirty();
+        // markDirty is dropped while this very replot runs, so ask for the follow-up pass.
+        if (QCustomPlot* plot = parentPlot())
+            plot->requestRepaint();
+    }
     if (phase == upMargins)
     {
         if (mAutoMargins != QCP::msNone)
