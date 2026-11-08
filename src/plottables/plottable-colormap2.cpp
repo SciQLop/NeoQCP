@@ -291,8 +291,9 @@ void QCPColorMap2::draw(QCPDrawContext& context) const
         }
     }
 
-    if (self->mRenderer.mapImageInvalidated())
-        self->mRenderer.updateMapImage(resampledData);
+    const bool keyIsVertical = mKeyAxis->orientation() == Qt::Vertical;
+    if (self->mRenderer.mapImageInvalidated() || self->mRenderer.keyIsVertical() != keyIsVertical)
+        self->mRenderer.updateMapImage(resampledData, keyIsVertical);
     const QImage& image = mRenderer.mapImage();
     if (image.isNull())
         return;
@@ -301,10 +302,13 @@ void QCPColorMap2::draw(QCPDrawContext& context) const
     const QCPRange valRange = resampledData->valueRange();
 
     // The grid carries its own data corners, so a pan moves the texture and a zoom stretches it:
-    // the picture on a linear and on a log value axis alike. Contours are recorded after it, so
-    // they draw over it in the same recording.
-    context.image(QCP::Data { keyRange.lower, valRange.upper },
-                  QCP::Data { keyRange.upper, valRange.lower }, image, {}, false);
+    // the picture on a linear and on a log value axis alike. A vertical key axis puts the key
+    // down the screen, so the transposed picture takes its corners with the key on y.
+    const QCP::Data leftTop = keyIsVertical ? QCP::Data { keyRange.upper, valRange.lower }
+                                            : QCP::Data { keyRange.lower, valRange.upper };
+    const QCP::Data rightBottom = keyIsVertical ? QCP::Data { keyRange.lower, valRange.upper }
+                                                : QCP::Data { keyRange.upper, valRange.lower };
+    context.image(leftTop, rightBottom, image, {}, false);
     self->mContours.update(resampledData, context, dataScaleType(), mKeyAxis.data(), mValueAxis.data());
 }
 

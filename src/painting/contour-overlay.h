@@ -91,7 +91,8 @@ private:
     void invalidate() { ++mGeneration; }
 
     [[nodiscard]] bool labelFits(const QPointF& at, double level) const;
-    void paintLabels(QPainter* painter, const QRectF& imageRect, const QRectF& visible);
+    void paintLabels(QPainter* painter, const QRectF& imageRect, const QRectF& visible,
+                     bool keyIsVertical);
 
     QVector<double> mLevels;
     int mAutoCount = 0;

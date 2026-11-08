@@ -53,7 +53,7 @@ void QCPColormapRenderer::setDataScaleType(QCPAxis::ScaleType type)
         mDataRange = mDataRange.sanitizedForLogScale();
 }
 
-void QCPColormapRenderer::updateMapImage(const QCPColorMapData* data)
+void QCPColormapRenderer::updateMapImage(const QCPColorMapData* data, bool keyIsVertical)
 {
     PROFILE_HERE_N("QCPColormapRenderer::updateMapImage");
     if (!data)
@@ -64,17 +64,32 @@ void QCPColormapRenderer::updateMapImage(const QCPColorMapData* data)
     if (keySize == 0 || valueSize == 0)
         return;
 
-    QImage argbImage(keySize, valueSize, QImage::Format_ARGB32_Premultiplied);
     const bool isLog = (mDataScaleType == QCPAxis::stLogarithmic);
-
     const double* rawData = data->rawData();
-    for (int y = 0; y < valueSize; ++y)
+    mKeyIsVertical = keyIsVertical;
+    if (!keyIsVertical)
     {
-        QRgb* pixels = reinterpret_cast<QRgb*>(argbImage.scanLine(valueSize - 1 - y));
-        mGradient.colorize(rawData + y * keySize, mDataRange, pixels, keySize, 1, isLog);
+        QImage argbImage(keySize, valueSize, QImage::Format_ARGB32_Premultiplied);
+        for (int y = 0; y < valueSize; ++y)
+        {
+            QRgb* pixels = reinterpret_cast<QRgb*>(argbImage.scanLine(valueSize - 1 - y));
+            mGradient.colorize(rawData + y * keySize, mDataRange, pixels, keySize, 1, isLog);
+        }
+        mMapImage = std::move(argbImage);
+    }
+    else
+    {
+        // Key down the rows, value along them: the picture the screen wants for a vertical key
+        // axis. Built once here, not transposed on every pan.
+        QImage argbImage(valueSize, keySize, QImage::Format_ARGB32_Premultiplied);
+        for (int k = 0; k < keySize; ++k)
+        {
+            QRgb* pixels = reinterpret_cast<QRgb*>(argbImage.scanLine(keySize - 1 - k));
+            mGradient.colorize(rawData + k, mDataRange, pixels, valueSize, keySize, isLog);
+        }
+        mMapImage = std::move(argbImage);
     }
 
-    mMapImage = std::move(argbImage);
     mMapImageInvalidated = false;
     ++mBuildCount;
 }

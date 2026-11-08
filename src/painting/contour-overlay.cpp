@@ -50,10 +50,14 @@ bool drawable(const QCPColorMapData* grid)
 
 //! The grid's extent in pixels, signed: a reversed axis runs the rect backwards, and the label
 //! painter needs that direction. Only the visibility intersection wants it normalized.
+//! A vertical key axis runs the key down the rows, with the value along them.
 QRectF gridRect(const QCPColorMapData* grid, const QCPAxis* keyAxis, const QCPAxis* valueAxis)
 {
     const QCPRange keys = grid->keyRange();
     const QCPRange values = grid->valueRange();
+    if (keyAxis->orientation() == Qt::Vertical)
+        return QRectF(QPointF(valueAxis->coordToPixel(values.upper), keyAxis->coordToPixel(keys.lower)),
+                      QPointF(valueAxis->coordToPixel(values.lower), keyAxis->coordToPixel(keys.upper)));
     return QRectF(QPointF(keyAxis->coordToPixel(keys.lower), valueAxis->coordToPixel(values.upper)),
                   QPointF(keyAxis->coordToPixel(keys.upper), valueAxis->coordToPixel(values.lower)));
 }
@@ -199,19 +203,23 @@ void QCPContourOverlay::recordLabels(QCPDrawContext& context, const QCPColorMapD
     QImage overlay(QSize(qCeil(visible.width() * dpr), qCeil(visible.height() * dpr)),
                    QImage::Format_ARGB32_Premultiplied);
     overlay.fill(Qt::transparent);
+    const bool keyIsVertical = keyAxis->orientation() == Qt::Vertical;
     QPainter painter(&overlay);
     painter.scale(dpr, dpr);
     painter.translate(-visible.topLeft());
     painter.setFont(QFont());
-    paintLabels(&painter, imageRect, visible);
+    paintLabels(&painter, imageRect, visible, keyIsVertical);
     painter.end();
 
-    const QPointF topLeft(keyAxis->pixelToCoord(visible.left()),
-                          valueAxis->pixelToCoord(visible.top()));
-    const QPointF bottomRight(keyAxis->pixelToCoord(visible.right()),
-                              valueAxis->pixelToCoord(visible.bottom()));
-    context.image(QCP::Data { topLeft.x(), topLeft.y() },
-                  QCP::Data { bottomRight.x(), bottomRight.y() }, overlay);
+    // The tile is screen pixels: its corners are the visible rect's pixels read back through
+    // whichever axis runs along that screen direction.
+    const QCP::Data topLeft = keyIsVertical
+        ? QCP::Data { keyAxis->pixelToCoord(visible.top()), valueAxis->pixelToCoord(visible.left()) }
+        : QCP::Data { keyAxis->pixelToCoord(visible.left()), valueAxis->pixelToCoord(visible.top()) };
+    const QCP::Data bottomRight = keyIsVertical
+        ? QCP::Data { keyAxis->pixelToCoord(visible.bottom()), valueAxis->pixelToCoord(visible.right()) }
+        : QCP::Data { keyAxis->pixelToCoord(visible.right()), valueAxis->pixelToCoord(visible.bottom()) };
+    context.image(topLeft, bottomRight, overlay);
 }
 
 bool QCPContourOverlay::labelFits(const QPointF& at, double level) const
@@ -227,7 +235,7 @@ bool QCPContourOverlay::labelFits(const QPointF& at, double level) const
 }
 
 void QCPContourOverlay::paintLabels(QPainter* painter, const QRectF& imageRect,
-                                    const QRectF& visible)
+                                    const QRectF& visible, bool keyIsVertical)
 {
     const QFontMetricsF metrics(painter->font());
     const QColor color = mPen.color();
@@ -235,10 +243,15 @@ void QCPContourOverlay::paintLabels(QPainter* painter, const QRectF& imageRect,
     // label readable over its own line.
     const QPen halo(color.lightness() > 127 ? QColor(0, 0, 0, 170) : QColor(255, 255, 255, 170),
                     3.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+    // u runs along the grid's keys, v along its values; on a vertical key axis the keys run down
+    // the screen and the values across it.
     const auto toPixel = [&](double u, double v)
     {
-        return QPointF(imageRect.left() + u * imageRect.width(),
-                       imageRect.top() + v * imageRect.height());
+        return keyIsVertical
+            ? QPointF(imageRect.left() + v * imageRect.width(),
+                      imageRect.top() + u * imageRect.height())
+            : QPointF(imageRect.left() + u * imageRect.width(),
+                      imageRect.top() + v * imageRect.height());
     };
     painter->setRenderHint(QPainter::Antialiasing);
     for (const auto& line : mDrawn->lines)

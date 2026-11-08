@@ -943,6 +943,133 @@ void TestColorMap::QCPColorScale_rangeSlotDeletingTheScaleIsSafe()
   QCOMPARE(scaleTypeSignals, 0);
 }
 
+// A vertical key axis turns the picture: the grid's key runs down the screen. A hot block at
+// key upper, value lower is a wide strip at the top-left; a merely rotated image would put a
+// tall strip there instead.
+void TestColorMap::colourMap2HonoursAVerticalKeyAxis()
+{
+  QVERIFY(mPlot->removePlottable(mColorMap));
+  mPlot->resize(200, 200);
+  mPlot->axisRect()->setAutoMargins(QCP::msNone);
+  mPlot->axisRect()->setMargins(QMargins(0, 0, 0, 0));
+  mPlot->yAxis->setRange(0, 7);
+  mPlot->xAxis->setRange(0, 3);
+
+  auto* map = new QCPColorMap2(mPlot->yAxis, mPlot->xAxis);
+  std::vector<double> keys, values, z;
+  for (int k = 0; k < 8; ++k)
+    keys.push_back(k);
+  for (int v = 0; v < 4; ++v)
+    values.push_back(v);
+  for (int k = 0; k < 8; ++k)
+    for (int v = 0; v < 4; ++v)
+      z.push_back(k >= 6 && v <= 1 ? 1.0 : 0.0);
+  map->setData(std::move(keys), std::move(values), std::move(z));
+  map->setGradient(QCPColorGradient(QCPColorGradient::gpGrayscale));
+  map->setDataRange(QCPRange(0, 1));
+  settleColorMap(mPlot, map);
+
+  const QImage exported = mPlot->toPixmap(200, 200).toImage().convertToFormat(QImage::Format_ARGB32);
+  const QRect area = mPlot->axisRect()->rect();
+  const auto at = [&](double fx, double fy) {
+    return exported.pixel(area.left() + qRound(fx * area.width()),
+                          area.top() + qRound(fy * area.height()));
+  };
+  QVERIFY2(qGray(at(0.4, 0.15)) > 200, "the key-upper, value-lower block is not at the top-left");
+  QVERIFY2(qGray(at(0.15, 0.4)) < 50, "the picture is rotated, not turned onto the vertical key axis");
+}
+
+// Same picture for a histogram, whose cells are not resampled: key column upper, value row
+// lower is the screen's top-left, one cell tall and two cells wide.
+void TestColorMap::histogram2dHonoursAVerticalKeyAxis()
+{
+  QVERIFY(mPlot->removePlottable(mColorMap));
+  mPlot->resize(200, 200);
+  mPlot->axisRect()->setAutoMargins(QCP::msNone);
+  mPlot->axisRect()->setMargins(QMargins(0, 0, 0, 0));
+
+  auto* hist = new QCPHistogram2D(mPlot->yAxis, mPlot->xAxis);
+  hist->setBins(4, 2);
+  std::vector<double> keys, values;
+  for (int k = 0; k < 4; ++k)
+    for (int v = 0; v < 2; ++v)
+      for (int n = 0; n < (k == 3 && v == 0 ? 6 : 1); ++n)
+      {
+        keys.push_back(0.5 + k);
+        values.push_back(0.5 + v);
+      }
+  hist->setData(std::move(keys), std::move(values));
+  hist->setGradient(QCPColorGradient(QCPColorGradient::gpGrayscale));
+  hist->setDataRange(QCPRange(0, 6));
+  QSignalSpy spy(&hist->pipeline(), &QCPHistogramPipeline::finished);
+  QVERIFY(spy.wait(2000));
+  mPlot->yAxis->setRange(0.5, 3.5);
+  mPlot->xAxis->setRange(0.5, 1.5);
+
+  const QImage exported = mPlot->toPixmap(200, 200).toImage().convertToFormat(QImage::Format_ARGB32);
+  const QRect area = mPlot->axisRect()->rect();
+  const auto at = [&](double fx, double fy) {
+    return exported.pixel(area.left() + qRound(fx * area.width()),
+                          area.top() + qRound(fy * area.height()));
+  };
+  QVERIFY2(qGray(at(0.4, 0.15)) > 200, "the hot cell is not at the top-left");
+  QVERIFY2(qGray(at(0.15, 0.4)) < 60, "the picture is rotated, not turned onto the vertical key axis");
+}
+
+// The label tile is painted in screen pixels too: its geometry must follow the axes' own
+// orientation, or every label lands at a swapped coordinate on a vertical key axis.
+void TestColorMap::contourLabelsFollowAVerticalKeyAxis()
+{
+  QVERIFY(mPlot->removePlottable(mColorMap));
+  auto* hist = new QCPHistogram2D(mPlot->yAxis, mPlot->xAxis);
+  hist->setBins(3, 2);
+  const double keyOfColumn[3] = { 1.0, 11.0, 21.0 };
+  const int samplesOfColumn[3] = { 1, 3, 3 };
+  std::vector<double> keys, values;
+  for (int column = 0; column < 3; ++column)
+    for (int row = 0; row < 2; ++row)
+      for (int sample = 0; sample < samplesOfColumn[column]; ++sample)
+      {
+        keys.push_back(keyOfColumn[column]);
+        values.push_back(row == 0 ? 0.25 : 0.75);
+      }
+  hist->setData(std::move(keys), std::move(values));
+  mPlot->yAxis->setRange(0, 30);
+  mPlot->xAxis->setRange(0, 1);
+  hist->setContourLevels({ 2.0 });
+  hist->setContourPen(QPen(Qt::red, 2));
+  hist->setContourLabelEnabled(true);
+  QSignalSpy spy(&hist->pipeline(), &QCPHistogramPipeline::finished);
+  QVERIFY(spy.wait(2000));
+  mPlot->toPixmap();
+
+  const auto& labels = hist->lastContourLabels();
+  QCOMPARE(labels.size(), 1);
+  // The label sits at the segment's midpoint: average the segment's two endpoints.
+  double key = 0, value = 0;
+  int points = 0;
+  for (const auto& command : hist->mCore.recordedList().commands)
+    if (const auto* line = std::get_if<qcp::PolylineDataCmd>(&command))
+      for (const QPointF& candidate : *line->points)
+        if (!std::isnan(candidate.x()) && points < 2)
+        {
+          key += candidate.x();
+          value += candidate.y();
+          ++points;
+        }
+  QVERIFY2(points == 2, "the recording holds one contour segment");
+  key /= points;
+  value /= points;
+  const QPointF linePixel(mPlot->xAxis->coordToPixel(value), mPlot->yAxis->coordToPixel(key));
+  QVERIFY2(std::abs(labels.first().position.x() - linePixel.x()) < 2.0
+               && std::abs(labels.first().position.y() - linePixel.y()) < 2.0,
+           qPrintable(QString("label at (%1, %2), its line at (%3, %4)")
+                          .arg(labels.first().position.x())
+                          .arg(labels.first().position.y())
+                          .arg(linePixel.x())
+                          .arg(linePixel.y())));
+}
+
 // A taken colour map drops its plot's scale, and joins the scale of the rect it is added to.
 void TestColorMap::colourMap2JoinsItsNewPlotsScaleWhenAdded()
 {

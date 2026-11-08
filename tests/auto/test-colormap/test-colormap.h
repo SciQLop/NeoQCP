@@ -43,6 +43,9 @@ private slots:
   void QCPColorScale_rangeSlotDeletingTheScaleIsSafe();
   void QCPColorScale_gradientSlotDeletingTheScaleIsSafe();
   void colourMap2JoinsItsNewPlotsScaleWhenAdded();
+  void colourMap2HonoursAVerticalKeyAxis();
+  void histogram2dHonoursAVerticalKeyAxis();
+  void contourLabelsFollowAVerticalKeyAxis();
   void QCPColorMap2_forgetsADeletedColorScale();
   void QCPHistogram2D_forgetsADeletedColorScale();
   void QCPColorMap_forgetsADeletedColorScale();

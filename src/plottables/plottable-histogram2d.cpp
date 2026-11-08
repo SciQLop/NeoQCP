@@ -306,8 +306,9 @@ void QCPHistogram2D::draw(QCPDrawContext& context) const
     if (!cells)
         return;
 
-    if (self->mRenderer.mapImageInvalidated())
-        self->mRenderer.updateMapImage(cells);
+    const bool keyIsVertical = mKeyAxis->orientation() == Qt::Vertical;
+    if (self->mRenderer.mapImageInvalidated() || self->mRenderer.keyIsVertical() != keyIsVertical)
+        self->mRenderer.updateMapImage(cells, keyIsVertical);
     const QImage& image = mRenderer.mapImage();
     if (image.isNull())
         return;
@@ -315,8 +316,13 @@ void QCPHistogram2D::draw(QCPDrawContext& context) const
     const QCPRange keyRange = cells->keyRange();
     const QCPRange valueRange = cells->valueRange();
     // Data corners, then the contours in data space: a pan moves both, a zoom stretches both.
-    context.image(QCP::Data { keyRange.lower, valueRange.upper },
-                  QCP::Data { keyRange.upper, valueRange.lower }, image, {}, false);
+    // A vertical key axis puts the key down the screen, so the picture takes its corners that
+    // way round.
+    const QCP::Data leftTop = keyIsVertical ? QCP::Data { keyRange.upper, valueRange.lower }
+                                            : QCP::Data { keyRange.lower, valueRange.upper };
+    const QCP::Data rightBottom = keyIsVertical ? QCP::Data { keyRange.lower, valueRange.upper }
+                                                : QCP::Data { keyRange.upper, valueRange.lower };
+    context.image(leftTop, rightBottom, image, {}, false);
     self->mContours.update(cells, context, dataScaleType(), mKeyAxis.data(), mValueAxis.data());
 }
 

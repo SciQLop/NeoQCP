@@ -26,7 +26,8 @@ public:
     QCPAxis::ScaleType dataScaleType() const { return mDataScaleType; }
 
     // Rendering
-    void updateMapImage(const QCPColorMapData* data);
+    //! Colourises \a data key-major, or transposed (key down the rows) for a vertical key axis.
+    void updateMapImage(const QCPColorMapData* data, bool keyIsVertical);
     //! A horizontal ramp of the gradient over the data range: a legend icon's swatch.
     QImage gradientImage(int width, int height);
 
@@ -36,6 +37,9 @@ public:
     void invalidateMapImage();
 
     const QImage& mapImage() const { return mMapImage; }
+
+    //! The orientation the cached image was built for.
+    [[nodiscard]] bool keyIsVertical() const { return mKeyIsVertical; }
 
     //! How many times a grid was colourised (test hook).
     [[nodiscard]] int buildCount() const { return mBuildCount; }
@@ -47,5 +51,6 @@ private:
     QCPAxis::ScaleType mDataScaleType = QCPAxis::stLinear;
     QImage mMapImage;
     bool mMapImageInvalidated = true;
+    bool mKeyIsVertical = false;
     int mBuildCount = 0;
 };
