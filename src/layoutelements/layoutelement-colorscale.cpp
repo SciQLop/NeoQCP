@@ -369,13 +369,15 @@ void QCPColorScale::setGradient(const QCPColorGradient& gradient)
 {
     if (mGradient != gradient)
     {
+        const QCPEmissionScope scope(mParentPlot);
         markDirty();
         if (mColorAxis)
             mColorAxis.data()->markDirty(); // the axis draws the tick labels beside the bar
         mGradient = gradient;
         if (mAxisRect)
             mAxisRect.data()->mGradientImageInvalidated = true;
-        qcpEmit(this, mParentPlot, &QCPColorScale::gradientChanged, mGradient);
+        qcpEmitCurrent(this, mParentPlot, &QCPColorScale::gradientChanged,
+                       [this] { return mGradient; });
         const QPointer<QCPColorScale> alive(this);
         for (const auto& user : liveUsers(mUsers))
         {

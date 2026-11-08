@@ -943,6 +943,27 @@ void TestColorMap::QCPColorScale_rangeSlotDeletingTheScaleIsSafe()
   QCOMPARE(scaleTypeSignals, 0);
 }
 
+// The scale signals its gradient before it applies it to its users: the slot must run once the
+// users are up to date, and deleting the scale there must not leave it walking freed memory.
+void TestColorMap::QCPColorScale_gradientSlotDeletingTheScaleIsSafe()
+{
+  auto* scale = new QCPColorScale(mPlot);
+  scale->setGradient(QCPColorGradient(QCPColorGradient::gpHot));
+  auto* map = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  map->setColorScale(scale);
+  const QPointer<QCPColorScale> alive(scale);
+  QCPColorGradient seen = map->gradient();
+  connect(scale, &QCPColorScale::gradientChanged, mPlot,
+          [&seen, map, scale](const QCPColorGradient&) {
+              seen = map->gradient();
+              delete scale;
+          },
+          Qt::SingleShotConnection);
+  scale->setGradient(QCPColorGradient(QCPColorGradient::gpCold));
+  QVERIFY(!alive);
+  QCOMPARE(seen, QCPColorGradient(QCPColorGradient::gpCold));
+}
+
 namespace {
 // The map kept a raw pointer to its scale: after the scale died, the next setColorScale
 // disconnected from freed memory.

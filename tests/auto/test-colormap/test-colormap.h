@@ -41,6 +41,7 @@ private slots:
   void QCPHistogram2D_colourSlotDeletingTheMapIsSafe();
   void QCPColorMap_scaleTypeSlotDeletingTheMapIsSafe();
   void QCPColorScale_rangeSlotDeletingTheScaleIsSafe();
+  void QCPColorScale_gradientSlotDeletingTheScaleIsSafe();
   void QCPColorMap2_forgetsADeletedColorScale();
   void QCPHistogram2D_forgetsADeletedColorScale();
   void QCPColorMap_forgetsADeletedColorScale();
