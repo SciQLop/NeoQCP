@@ -51,6 +51,10 @@ protected:
 
     // Returns true if draw() should return early (RHI layer handles rendering)
     bool tryRhiDraw(QCPPainter* painter);
+
+protected:
+    //! Whether a position of this span sits on a linked axis, which the layer cannot place.
+    virtual bool usesLinkedAxis() const { return false; }
 };
 
 #endif // QCP_ITEM_SPANBASE_H

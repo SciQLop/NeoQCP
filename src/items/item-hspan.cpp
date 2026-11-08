@@ -4,6 +4,13 @@
 #include "../painting/painter.h"
 #include "../painting/span-rhi-layer.h"
 
+bool QCPItemHSpan::usesLinkedAxis() const
+{
+    const QCPAxis* key = lowerEdge->keyAxis();
+    const QCPAxis* value = lowerEdge->valueAxis();
+    return (key && key->linkSource()) || (value && value->linkSource());
+}
+
 QCPItemHSpan::QCPItemHSpan(QCustomPlot* parentPlot)
     : QCPAbstractSpanItem(parentPlot)
     , lowerEdge(createPosition(QLatin1String("lowerEdge")))

@@ -1800,7 +1800,8 @@ void QCPAxisRect::markAffectedLayersDirty(bool invalidate)
         for (QCPAxis* ax : axisList)
         {
             markOnce(ax->layer());
-            if (QCPGrid* grid = ax->gridIfExists(); grid && !gpuGrid)
+            // A linked axis' grid is drawn by the CPU while the GPU grid has it skipped.
+            if (QCPGrid* grid = ax->gridIfExists(); grid && (!gpuGrid || ax->linkSource()))
                 markOnce(grid->layer());
         }
     }

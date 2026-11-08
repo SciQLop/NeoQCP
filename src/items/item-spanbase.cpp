@@ -1,6 +1,7 @@
 #include "item-spanbase.h"
 
 #include "../core.h"
+#include "../layoutelements/layoutelement-axisrect.h"
 #include "../painting/painter.h"
 #include "../painting/span-rhi-layer.h"
 
@@ -77,6 +78,13 @@ bool QCPAbstractSpanItem::tryRhiDraw(QCPPainter* painter)
         // The GPU fill is one flat colour: a gradient or pattern brush is painted with QPainter.
         const Qt::BrushStyle fill = mainBrush().style();
         if (fill != Qt::NoBrush && fill != Qt::SolidPattern)
+        {
+            layer->unregisterSpan(this);
+            return false;
+        }
+        // The span layer places a band from the rect's axis ranges, which a linked key or value
+        // axis does not follow: such a span stays on the painter path.
+        if (usesLinkedAxis())
         {
             layer->unregisterSpan(this);
             return false;

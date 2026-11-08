@@ -28,4 +28,6 @@ private slots:
     void aSlotDeletingTheSourceDuringARefreshIsSafe();
     void reversingALinkedAxisToItsCurrentDirectionIsSilent();
     void aFullAxesBoxWithoutRangeSyncLeavesPlainAxes();
+    void aSpanOnALinkedAxisLandsAtItsCoordToPixel();
+    void aLinkedAxisGridLineLandsAtItsTick();
 };

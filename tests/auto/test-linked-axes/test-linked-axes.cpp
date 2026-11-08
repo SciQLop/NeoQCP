@@ -2,7 +2,13 @@
 
 #include <coords.h>
 
+#include "items/item-vspan.h"
+
+#include <QGuiApplication>
+
+#include <QSet>
 #include <cmath>
+#include <limits>
 
 namespace
 {
@@ -548,4 +554,85 @@ void TestLinkedAxes::aSlotDeletingTheSourceDuringARefreshIsSafe()
     QVERIFY2(!linkedWatcher->linkSource(), "the linked axis became plain");
     QCOMPARE(linkedWatcher->range(), QCPRange(2, 3));
     QCOMPARE(gMisuses, 0);
+}
+
+void TestLinkedAxes::aSpanOnALinkedAxisLandsAtItsCoordToPixel()
+{
+    if (QGuiApplication::platformName() != QLatin1String("xcb"))
+        QSKIP("the span layer needs a platform with an RHI backend");
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.xAxis->setRange(0.1, 1);
+    QCPAxis* linked = plot.axisRect()->addAxis(QCPAxis::atBottom);
+    linked->setVisible(true);
+    linked->linkTo(plot.xAxis, reciprocal, reciprocal);
+    auto* span = new QCPItemVSpan(&plot);
+    span->lowerEdge->setAxes(linked, plot.yAxis);
+    span->upperEdge->setAxes(linked, plot.yAxis);
+    span->setPen(Qt::NoPen);
+    span->setBorderPen(Qt::NoPen);
+    span->setBrush(Qt::red);
+    span->setRange(QCPRange(1.9, 2.1));
+    plot.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&plot));
+    plot.replot();
+    // The span layer places a band from the rect's own axis ranges; a span on a linked axis is
+    // not a linear function of them and must be painted by the painter path.
+    QVERIFY2(plot.spanRhiLayerIfExists(), "the span layer was not made");
+    QVERIFY2(!plot.spanRhiLayerIfExists()->hasSpans(), "the span went to the GPU layer");
+    const QImage image = plot.grab().toImage();
+    const QRect rect = plot.axisRect()->rect();
+    const double scale = image.width() / double(plot.width());
+    QList<int> redColumns;
+    for (int x = rect.left() + 1; x < rect.right(); ++x)
+    {
+        const QColor c = image.pixelColor(x, qRound(rect.center().y() * scale));
+        if (c.red() > 150 && c.green() < 100 && c.blue() < 100)
+            redColumns.append(x);
+    }
+    QVERIFY2(!redColumns.isEmpty(), "the span was not drawn");
+    const double expected = linked->coordToPixel(2.0) * scale;
+    const double middle = (redColumns.first() + redColumns.last()) / 2.0;
+    QVERIFY2(std::abs(middle - expected) <= 2.0,
+             qPrintable(QStringLiteral("span middle at %1, coordToPixel %2")
+                            .arg(middle)
+                            .arg(expected)));
+}
+
+void TestLinkedAxes::aLinkedAxisGridLineLandsAtItsTick()
+{
+    if (QGuiApplication::platformName() != QLatin1String("xcb"))
+        QSKIP("the grid layer needs a platform with an RHI backend");
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.xAxis->setRange(0.1, 1);
+    QCPAxis* linked = plot.axisRect()->addAxis(QCPAxis::atBottom);
+    linked->setVisible(true);
+    linked->linkTo(plot.xAxis, reciprocal, reciprocal);
+    linked->grid()->setVisible(true);
+    linked->grid()->setPen(QPen(Qt::blue));
+    plot.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&plot));
+    plot.replot();
+    const QImage image = plot.grab().toImage();
+    const QRect rect = plot.axisRect()->rect();
+    const double scale = image.width() / double(plot.width());
+    QSet<int> columns;
+    for (int x = rect.left() + 2; x < rect.right() - 1; ++x)
+    {
+        const QColor c = image.pixelColor(x, qRound(rect.center().y() * scale));
+        if (c.blue() > 150 && c.red() < 100 && c.green() < 100)
+            columns.insert(x);
+    }
+    QVERIFY2(!columns.isEmpty(), "the linked axis' grid was not drawn");
+    for (int column : columns)
+    {
+        double nearest = std::numeric_limits<double>::max();
+        for (double tick : linked->tickVector())
+            nearest = std::min(nearest, std::abs(column - linked->coordToPixel(tick) * scale));
+        QVERIFY2(nearest <= 2.0,
+                 qPrintable(QStringLiteral("grid line at %1 is not at a tick (%2)")
+                                .arg(column)
+                                .arg(nearest)));
+    }
 }

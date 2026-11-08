@@ -42,6 +42,7 @@ signals:
     void rangeChanged(const QCPRange& newRange);
 
 protected:
+    bool usesLinkedAxis() const override;
     enum AnchorIndex { aiCenter };
 
     HitPart mDragPart = hpNone;

@@ -171,7 +171,9 @@ QVector<QCPAxis*> QCPGridRhiLayer::orderedAxesForRect(QCPAxisRect* ar) const
     QVector<QCPAxis*> axes;
     for (auto* axis : mAxes)
     {
-        if (axis->axisRect() == ar)
+        // A linked axis is not a linear function of its own range, which is all the grid shader
+        // knows: it is painted by the CPU path instead.
+        if (axis->axisRect() == ar && !axis->linkSource())
             axes.append(axis);
     }
     return axes;
