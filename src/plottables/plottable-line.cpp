@@ -197,6 +197,9 @@ void QCPAbstractLine::setScatterSkip(int skip)
 
 void QCPAbstractLine::setColorValues(std::shared_ptr<const std::vector<double>> values)
 {
+    // Joining or leaving a scale signals colorScaleChanged: deliver it once this line is done,
+    // so a slot may delete it.
+    const QCPEmissionScope scope(mParentPlot);
     markDirty();
     if (!values || values->empty())
         return clearColorValues();
@@ -243,6 +246,7 @@ void QCPAbstractLine::setColorValues(std::vector<double> values)
 
 void QCPAbstractLine::clearColorValues()
 {
+    const QCPEmissionScope scope(mParentPlot);
     // Every "uncolour" route (wrong length, an empty vector, or an explicit call) must
     // also drop a stash left by an earlier, valid setColorValues() while a source was
     // pending -- otherwise a line "coloured" only through that stash survives this call

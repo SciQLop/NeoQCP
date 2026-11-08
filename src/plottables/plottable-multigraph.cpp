@@ -110,6 +110,9 @@ static bool needsResamplingMulti(const QCPAbstractMultiDataSource& src)
 
 void QCPMultiGraph::setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> source)
 {
+    // Dropping the colour scale signals colorScaleChanged: deliver it once this graph is done,
+    // so a slot may delete it.
+    const QCPEmissionScope scope(mParentPlot);
     // Keep the displayed geometry (and its GPU translation) alive while the
     // replacement is prepared; the plot commits it in one debounced swap.
     const bool canDefer = mDeferredDataSwap && source && mDataSource && hasRenderedRange()
@@ -124,6 +127,7 @@ void QCPMultiGraph::setDeferredDataSwap(bool enabled)
 {
     if (enabled == mDeferredDataSwap)
         return;
+    const QCPEmissionScope scope(mParentPlot);
     mDeferredDataSwap = enabled;
     if (!enabled && mPendingSource && !commitPendingData())
     {
@@ -203,6 +207,8 @@ bool QCPMultiGraph::commitPendingData()
 {
     if (!mPendingSource || !mPendingReady)
         return false;
+    // A busyChanged or colorScaleChanged slot may delete this graph mid-commit.
+    const QCPEmissionScope scope(mParentPlot);
     mDataSource = std::move(mPendingSource);
     mL1Cache = std::move(mPendingL1);
     mPendingReady = false;
@@ -241,6 +247,8 @@ bool QCPMultiGraph::commitPendingData()
 
 void QCPMultiGraph::dataChanged()
 {
+    // The colour size rule may drop the scale and signal: deliver once this graph is done.
+    const QCPEmissionScope scope(mParentPlot);
     // A mutated displayed source supersedes whatever replacement was staged:
     // stage it like any other new data so the on-screen geometry stays put.
     if (mPendingSource)

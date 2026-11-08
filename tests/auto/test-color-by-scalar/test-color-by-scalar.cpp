@@ -1278,6 +1278,54 @@ void TestColorByScalar::graph2ScatterColoursFollowTheirPointAcrossBreaks()
     QVERIFY2(isRed(colourAt(13)), qPrintable("key 13 drawn as " + colourAt(13).name()));
 }
 
+// The line finishes updating itself before colorScaleChanged is delivered: a slot may delete the
+// line, so it must see the colouring complete, not mid-way.
+void TestColorByScalar::colourValuesAreCompleteBeforeTheColourScaleSignal()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDataSource(makeSource({ 0, 1, 2, 3 }, { { 0, 1, 0, 1 } }));
+    mPlot->xAxis->setRange(0, 3);
+    mPlot->yAxis->setRange(-1, 2);
+
+    const int before = mg->mRevision;
+    bool completeAtDelivery = false;
+    connect(mg, &QCPAbstractColorMapped::colorScaleChanged, mPlot,
+            [&completeAtDelivery, mg, before] { completeAtDelivery = mg->mRevision > before; });
+    mg->setColorValues(std::vector<double> { 0.0, 1.0, 0.0, 1.0 });
+    QVERIFY2(completeAtDelivery, "colorScaleChanged was delivered before the line was updated");
+}
+
+void TestColorByScalar::uncolouringIsCompleteBeforeTheColourScaleSignal()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDataSource(makeSource({ 0, 1, 2, 3 }, { { 0, 1, 0, 1 } }));
+    mPlot->xAxis->setRange(0, 3);
+    mPlot->yAxis->setRange(-1, 2);
+    mg->setColorValues(std::vector<double> { 0.0, 1.0, 0.0, 1.0 });
+    QVERIFY(mg->colorScale());
+
+    const int before = mg->mRevision;
+    bool completeAtDelivery = false;
+    connect(mg, &QCPAbstractColorMapped::colorScaleChanged, mPlot,
+            [&completeAtDelivery, mg, before] { completeAtDelivery = mg->mRevision > before; });
+    mg->clearColorValues();
+    QVERIFY2(completeAtDelivery, "colorScaleChanged was delivered before the line was updated");
+}
+
+// With the update finished the slot may delete the line: the setter must not use it afterwards.
+void TestColorByScalar::colourSlotDeletingTheLineIsSafe()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setDataSource(makeSource({ 0, 1, 2, 3 }, { { 0, 1, 0, 1 } }));
+    mPlot->xAxis->setRange(0, 3);
+    mPlot->yAxis->setRange(-1, 2);
+    const QPointer<QCPMultiGraph> alive(mg);
+    connect(mg, &QCPAbstractColorMapped::colorScaleChanged, mPlot, [mg] { delete mg; },
+            Qt::SingleShotConnection);
+    mg->setColorValues(std::vector<double> { 0.0, 1.0, 0.0, 1.0 });
+    QVERIFY(!alive);
+}
+
 // The first colour values commit with a pending source, and turn the origin on: the pipeline
 // restarts and goes busy, and a slot on that may delete the graph mid-commit.
 void TestColorByScalar::firstColouredCommitSlotDeletingTheGraphIsSafe()

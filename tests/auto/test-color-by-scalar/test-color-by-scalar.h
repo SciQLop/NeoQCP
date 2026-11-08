@@ -71,6 +71,9 @@ private slots:
 
     void graph2ScatterColoursFollowTheirPointAcrossBreaks();
     void firstColouredCommitSlotDeletingTheGraphIsSafe();
+    void colourValuesAreCompleteBeforeTheColourScaleSignal();
+    void uncolouringIsCompleteBeforeTheColourScaleSignal();
+    void colourSlotDeletingTheLineIsSafe();
 
 private:
     QCustomPlot* mPlot = nullptr;
