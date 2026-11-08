@@ -15,6 +15,7 @@
 #include "layoutelements/layoutelement-legend.h"
 #include "layoutelements/layoutelement-textelement.h"
 #include "painting/command-replay-rhi.h"
+#include "painting/draw-commands.h"
 #include "painting/draw-context.h"
 #include "painting/plottable-rhi-layer.h"
 #include "painting/raster-fallback.h"
@@ -3905,6 +3906,16 @@ QVector<int> embeddedImageWidths(const QByteArray& pdf)
     return widths;
 }
 } // namespace
+
+// The upscale reaches three times the target rect's resolution, and stops there: a source already
+// finer than that is not blown up needlessly.
+void TestRepaint::vectorExportUpscaleFollowsTheTarget()
+{
+    QCOMPARE(qcp::vectorExportUpscaleFactor(QSizeF(900, 600), QSizeF(2, 1)), 3);
+    QCOMPARE(qcp::vectorExportUpscaleFactor(QSizeF(200, 200), QSizeF(300, 300)), 2);
+    QCOMPARE(qcp::vectorExportUpscaleFactor(QSizeF(200, 160), QSizeF(1000, 800)), 1);
+    QCOMPARE(qcp::vectorExportUpscaleFactor(QSizeF(1000, 10), QSizeF(300, 300)), 3);
+}
 
 // A non-smooth image on a vectorised painter is upscaled three times first, as a colour map is, so
 // a viewer resamples it without blurring a texel: the PDF carries a 6-wide raster, not a 2-wide.

@@ -14,6 +14,7 @@
 #include <QPen>
 #include <QPointF>
 #include <QPolygonF>
+#include <QSizeF>
 #include <QRect>
 #include <QRectF>
 #include <QString>
@@ -34,6 +35,17 @@ class QCPPainter;
 
 namespace qcp
 {
+//! How many times a vector export upscales an image: enough to reach three times the target
+//! rect's resolution, never more than three, never less than one.
+[[nodiscard]] inline int vectorExportUpscaleFactor(const QSizeF& target, const QSizeF& source)
+{
+    if (source.width() <= 0 || source.height() <= 0)
+        return 1;
+    const double needed = 3.0 * std::max(target.width() / source.width(),
+                                         target.height() / source.height());
+    return std::clamp(static_cast<int>(std::ceil(needed)), 1, 3);
+}
+
 //! A polyline of data-space vertices, each pair of them painted in the colour of its first vertex
 //! when \a colours is set: one entry per point, null for the pen's own colour.
 struct PolylineDataCmd

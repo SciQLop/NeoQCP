@@ -100,6 +100,7 @@ private slots:
     void smoothImageIsInterpolated();
     void anImageTooBigForATextureIsPainted();
     void vectorExportKeepsSharpCells();
+    void vectorExportUpscaleFollowsTheTarget();
     void fiveImagesOnOneLayerStayOnTheGpu();
     void itemsDefaultToAnnotations();
     void textAboveGraphLine();

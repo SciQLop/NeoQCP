@@ -305,12 +305,19 @@ void paintCommand(QCPPainter& painter, const QCPDrawCommand& command, const QCPD
                 QImage image = cmd.pixels->image;
                 QRectF source = cmd.pixels->source;
                 // A vector painter embeds the picture at its own resolution, so a viewer resamples
-                // it as it likes. Three times as many texels keep a colour map's cells sharp.
+                // it as it likes. Three times as many texels keep a colour map's cells sharp, but a
+                // source already finer than that is left alone.
                 if (!cmd.pixels->smooth && painter.modes().testFlag(QCPPainter::pmVectorized))
                 {
-                    image = image.scaled(image.width() * 3, image.height() * 3,
-                                         Qt::IgnoreAspectRatio, Qt::FastTransformation);
-                    source = QRectF(source.topLeft() * 3, source.size() * 3);
+                    const int factor = qcp::vectorExportUpscaleFactor(
+                        QSizeF(std::abs(b.x() - a.x()), std::abs(b.y() - a.y())),
+                        QSizeF(source.size()));
+                    if (factor > 1)
+                    {
+                        image = image.scaled(image.width() * factor, image.height() * factor,
+                                             Qt::IgnoreAspectRatio, Qt::FastTransformation);
+                        source = QRectF(source.topLeft() * factor, source.size() * factor);
+                    }
                 }
                 painter.save();
                 painter.setRenderHint(QPainter::SmoothPixmapTransform, cmd.pixels->smooth);
