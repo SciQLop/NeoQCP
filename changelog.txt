@@ -317,6 +317,52 @@ Behaviour changes for 2.x users:
   - Colour values whose count does not match the data are refused as misuse; 2.x cleared them
         without a word. The line is drawn uncoloured either way.
 
+Milestone 4c (colour maps and the colour scale). Additive, except for the behaviour changes listed below.
+
+  - One colour relation for every colour-mapped plottable: QCPColorMap, QCPColorMap2, QCPHistogram2D
+        and coloured lines (QCPMultiGraph, QCPWaterfallGraph, QCPCurve) share a base,
+        QCPAbstractColorMapped, with setGradient, setDataRange, setDataScaleType and setColorScale.
+  - The scale wins: a setter on a plottable that uses a scale sets the scale, and the scale passes
+        the value to all its users. QCPColorScale::rescaleDataRange covers every user, of any class.
+  - Each axis rect has its own colour scale (QCPAxisRect::colorScale()), made on first use, placed by
+        the rect in its margin and shown only while a plottable uses it. A colour map or 2D histogram
+        joins it when created; a line joins it on its first colour values and leaves it when they are
+        cleared, so a plain line never shows a colour bar.
+  - Images are GPU textures: a recorded image with two data corners is moved by a pan without a new
+        upload. The three colour maps record one image (plus their contours as data-space lines) and
+        a pan moves them. The colour maps' own GPU layer and its shaders are gone.
+  - QCPHistogram and QCPHistogram2D share one API: setBins/bins (2D: setBins(keyBins, valueBins),
+        keyBins, valueBins), setNormalization with QCP::HistogramNormalization (Count, Density,
+        Probability, as numpy, in data units also on log bins), the refreshBinning() slot and the
+        histogramReady() signal. QCPHistogram2D::setColumnNormalized(bool) makes each key column sum
+        to one. Bins follow the axis scale on both.
+  - QCPHistogram draws through the drawing API: one rect batch per column, or one line per column in
+        step style; a pan moves them.
+
+Behaviour changes for 2.x users:
+  - Deleting a colour scale emits colorScaleChanged() on each plottable that used it.
+  - rescaleDataRange on a scale sees colour map 2, the 2D histogram and coloured lines as well.
+  - Colour maps on one axis rect share the rect's scale unless given another one, and a colour bar
+        shows next to them without code. A program that places its own scale keeps working.
+  - Removed or renamed (no forwarders):
+        QCPAbstractLine::setColorGradient/colorGradient, setColorRange/colorRange and
+        setColorScaleType/colorScaleType: use setGradient, setDataRange, setDataScaleType.
+        QCPHistogram2D::Normalization (nNone, nColumn): use setColumnNormalized(bool).
+        QCPHistogram2D::setKeyBinScale/setValueBinScale and their getters: set the axis scale.
+        qcp::algo::HistogramNormalization: now QCP::HistogramNormalization.
+        QCPHistogram::edgesChanged(): use histogramReady().
+  - A colour map's image draws above the painter content of its layer, as graphs do since milestone 3.
+  - Contour labels of colour map 2 and the 2D histogram are an image: in a PDF or SVG export they are
+        not text.
+  - On a log value axis, histogram bars and steps start at the axis' lower bound.
+  - A plottable taken from one plot and added to another joins the new rect's scale; a line joins it
+        only if it has colour values.
+  - The rect's own scale follows the plot's theme, also when it is made after setTheme.
+  - Colour map 2 and the 2D histogram follow a vertical key axis; they drew the picture turned on
+        its side before.
+  - A vector export (PDF, SVG) enlarges a non-smooth image only as far as three times the size it
+        is drawn at; a large image is embedded as is.
+
 #### NeoQCP, unreleased ####
 
 Behaviour changes (slots that delete their sender are now safe):

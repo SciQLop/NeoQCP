@@ -3,6 +3,31 @@
 Work that was deferred during the 3.0 milestones, to triage before 3.0 ships. Each item says what a
 user would see and where the code is. Fixed items are deleted, not ticked.
 
+## From milestone 4c (colour maps and the colour scale)
+
+- **A visible colour bar costs about 0.07 ms per pan frame.** The bar sits on the axes layer, which a
+  pan repaints for its ticks. A layer of its own that a pan leaves alone would remove the cost
+  (rulings T4, T5, T8). `QCPAxisRect::colorScale()`.
+- **Contour labels are a picture in PDF and SVG exports.** They are one raster tile over the visible
+  grid, not text (ruling T6). `QCPContourOverlay::recordLabels`.
+- **Images in a recording are never culled by the view.** Each one keeps a texture even off screen,
+  at most 16 (ruling T2). `src/painting/command-replay-rhi.cpp`.
+- **A 2.x program now shows a colour bar it never asked for.** Each axis rect shows its own scale as
+  soon as a colour map or a coloured line uses it. A 2.x program that made its own scale is
+  unchanged. Release notes must say it.
+- **A legend icon of a colour map stretches to the icon rect.** It used to keep its aspect ratio;
+  only visible with non-default icon sizes (Task 5).
+- **The export reference compare skips the plot's outer row and column.** The image clip differs by
+  half a pixel from the old drawImage (Task 5). `tests/auto/test-colormap`.
+- **A zero-height histogram bin draws no hairline at the base** on a linear axis (Task 7).
+- **A step histogram's legend icon is a filled box**, not a line sample (Task 7).
+- **A curve given data of another size keeps its colour values** and so stays on its scale: the
+  bar stays visible while the curve draws uncoloured (Task 8). `QCPCurve`.
+- **Moving a plottable to another rect's axis keeps the old rect's scale** (F10d).
+  `setKeyAxis` does not re-run the join a fresh plottable does.
+- **A 1000-text zoom is 5 % slower on llvmpipe** (ruling R-21): 1.04 -> 1.09 ms, with the same CPU
+  work on the plot's thread. Check the row on a real GPU before chasing it.
+
 ## From milestone 4b (the line family)
 
 - **No test checks that marker colours reach the GPU.** Coloured markers go through the markers
