@@ -363,6 +363,38 @@ Behaviour changes for 2.x users:
   - A vector export (PDF, SVG) enlarges a non-smooth image only as far as three times the size it
         is drawn at; a large image is embedded as is.
 
+Milestone 4d (axes, linked axes, alignment groups). Additive, except for the behaviour changes listed below.
+  - Axes have a handle: plot.add<QCPAxis>(QCPAxis::atLeft).setLabel("B").setColor(Qt::red) adds an
+        axis on the default rect; axisRect->add<QCPAxis>(type) on another. Axes on one side stack.
+        QCPAxis::setColor colours the label, the tick labels and the base, tick and sub-tick pens.
+  - Linked axes: QCPAxis::linkTo(source, forward, inverse) shows the source's coordinate in other
+        units (energy and wavelength, UTC and local time), as matplotlib's secondary_xaxis. Its range
+        is always forward(source range); setting it, dragging or zooming it moves the source. Its
+        pixels are the source's, placed along its own length, so it may sit on another rect. Data
+        and items on a linked axis map through the link. A source may drive several links; a linked
+        axis cannot itself be a source. Only monotonic pairs are supported. unlink(), linkSource().
+  - Drag and zoom follow every axis of a rect by default. QCPAxis::setRangeDraggable(false) and
+        setRangeZoomable(false) opt an axis out (and the axes linked to it). setRangeDragAxes and
+        setRangeZoomAxes still set an exact list; resetRangeDragAxes() and resetRangeZoomAxes() go
+        back to the default. A source and its linked axes move once.
+  - QCPAlignmentGroup::create({rects...}, sides) aligns the edges of axis rects (or any layout
+        element) across plot widgets, colour bars included. The members own the group; it is deleted
+        when the last one leaves. A plot only repaints its peers when a shared edge moves.
+  - QCPMarginGroup is deprecated: use QCPAlignmentGroup. It goes with the old API.
+
+Behaviour changes for 2.x users:
+  - With range drag or zoom on, every axis of the rect moves, also the hidden top and right axes and
+        extra axes on a side. 2.x moved the bottom and left axes only. Opt an axis out, or set the
+        lists explicitly.
+  - setupFullAxesBox(true) links the top and right axes to the bottom and left ones, both ways:
+        setting the top axis's range moves the bottom one. setupFullAxesBox(false) removes that link.
+  - setRangeReversed on a linked axis that would change it is refused as misuse: a linked axis
+        follows its source's direction.
+  - QCPAxis::moveRange and scaleRange no longer emit rangeChanged when the range does not change
+        (an invalid result, or a log zoom centred on the wrong sign).
+  - QCPAxisRect::setRangeDragAxes / setRangeZoomAxes refuse a null axis in a list as misuse; 2.x
+        crashed.
+
 #### NeoQCP, unreleased ####
 
 Behaviour changes (slots that delete their sender are now safe):

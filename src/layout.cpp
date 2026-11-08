@@ -36,6 +36,9 @@
   \brief A margin group allows synchronization of margin sides if working with multiple layout
   elements.
 
+  \deprecated Use QCPAlignmentGroup: it aligns edges rather than margin sizes, also across plot
+  widgets. This class goes in 3.0 with the old API.
+
   QCPMarginGroup allows you to tie a margin side of two or more layout elements together, such that
   they will all have the same size, based on the largest required margin in the group.
 

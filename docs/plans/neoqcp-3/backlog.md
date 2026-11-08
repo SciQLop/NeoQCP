@@ -3,6 +3,17 @@
 Work that was deferred during the 3.0 milestones, to triage before 3.0 ships. Each item says what a
 user would see and where the code is. Fixed items are deleted, not ticked.
 
+## From milestone 4d (axes, linked axes, alignment groups)
+
+- **A log linked axis is re-clamped late.** After `setScaleType(stLogarithmic)` on a linked axis whose
+  source range crosses 0, the axis shows no ticks until the source's range next changes
+  (`QCPAxis::refreshFromLink`, `src/axis/axis.cpp`). No drag or zoom reads that range.
+- **The colour scale asks its rect for the drag and zoom axis twice per event**, building two short
+  lists (`QCPColorScale::rangeDrag()`/`rangeZoom()`, `layoutelement-colorscale.cpp`). Negligible.
+- **An alignment group hears a plot's own move, not an ancestor's move inside the window**
+  (`simplify:` in `src/alignment-group.cpp`; upgrade: an event filter on the ancestors). A plot moved
+  sideways by its container keeps its old edge until its next layout.
+
 ## From milestone 4c (colour maps and the colour scale)
 
 - **A visible colour bar costs about 0.07 ms per pan frame.** The bar sits on the axes layer, which a
