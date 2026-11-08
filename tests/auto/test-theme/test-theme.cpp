@@ -198,6 +198,30 @@ void TestTheme::applyThemePropagatesColorScaleAxis()
     delete theme;
 }
 
+// The rect's own scale sits outside the layout tree, and a rect may make it after the theme was
+// applied: both must come out themed.
+void TestTheme::applyThemeReachesTheRectsOwnScale()
+{
+    auto* map = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+    Q_UNUSED(map);
+    auto scale = mPlot->axisRect()->colorScale();
+    QVERIFY(scale);
+    auto* theme = QCPTheme::dark();
+    mPlot->setTheme(theme);
+    QCOMPARE(scale->axis()->tickLabelColor(), QColor("#e0e0e0"));
+
+    auto* other = new QCustomPlot;
+    other->setTheme(theme);
+    auto* otherMap = new QCPColorMap2(other->xAxis, other->yAxis);
+    Q_UNUSED(otherMap);
+    auto otherScale = other->axisRect()->colorScale();
+    QVERIFY(otherScale);
+    QCOMPARE(otherScale->axis()->tickLabelColor(), QColor("#e0e0e0"));
+    delete other;
+
+    delete theme;
+}
+
 void TestTheme::busyIndicatorDefaults()
 {
     QCPTheme theme;

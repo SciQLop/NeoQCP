@@ -789,6 +789,9 @@ QCPColorScaleOps<QCPColorScale> QCPAxisRect::colorScale()
         // of shifting it. The axes layer repaints on a pan anyway, for its ticks.
         if (QCPLayer* axesLayer = mParentPlot->layer(QLatin1String("axes")))
             mColorScale->setLayer(axesLayer);
+        // A theme set before this scale existed must reach it like any other axis.
+        if (mParentPlot->mTheme)
+            mParentPlot->applyThemeToAxis(mColorScale->axis());
         colorScaleUsersChanged();
     }
     return qcp::makeHandle<QCPColorScaleOps<QCPColorScale>>(mColorScale.data());

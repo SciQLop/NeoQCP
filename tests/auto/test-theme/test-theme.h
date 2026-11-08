@@ -22,6 +22,7 @@ private slots:
     void qssProxyProperties();
     void coalescing();
     void applyThemePropagatesColorScaleAxis();
+    void applyThemeReachesTheRectsOwnScale();
     void busyIndicatorDefaults();
     void busyIndicatorLightFactory();
 

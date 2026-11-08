@@ -647,6 +647,30 @@ void QCustomPlot::connectThemeSignal()
     });
 }
 
+void QCustomPlot::applyThemeToAxis(QCPAxis* axis)
+{
+    const QColor fg = mTheme->foreground();
+    const QColor sel = mTheme->selection();
+    auto recoloredPen = [](QPen pen, const QColor& c) { pen.setColor(c); return pen; };
+
+    axis->setBasePen(recoloredPen(axis->basePen(), fg));
+    axis->setTickPen(recoloredPen(axis->tickPen(), fg));
+    axis->setSubTickPen(recoloredPen(axis->subTickPen(), fg));
+    axis->setLabelColor(fg);
+    axis->setTickLabelColor(fg);
+
+    axis->setSelectedBasePen(recoloredPen(axis->selectedBasePen(), sel));
+    axis->setSelectedTickPen(recoloredPen(axis->selectedTickPen(), sel));
+    axis->setSelectedSubTickPen(recoloredPen(axis->selectedSubTickPen(), sel));
+    axis->setSelectedLabelColor(sel);
+    axis->setSelectedTickLabelColor(sel);
+
+    auto* grid = axis->grid();
+    grid->setPen(recoloredPen(grid->pen(), mTheme->grid()));
+    grid->setSubGridPen(recoloredPen(grid->subGridPen(), mTheme->subGrid()));
+    grid->setZeroLinePen(recoloredPen(grid->zeroLinePen(), mTheme->grid()));
+}
+
 void QCustomPlot::applyTheme()
 {
     if (!mTheme || mBeingDestroyed)
@@ -661,28 +685,14 @@ void QCustomPlot::applyTheme()
     const QColor fg = mTheme->foreground();
     const QColor sel = mTheme->selection();
 
-    auto applyThemeToAxis = [&](QCPAxis* axis) {
-        axis->setBasePen(recoloredPen(axis->basePen(), fg));
-        axis->setTickPen(recoloredPen(axis->tickPen(), fg));
-        axis->setSubTickPen(recoloredPen(axis->subTickPen(), fg));
-        axis->setLabelColor(fg);
-        axis->setTickLabelColor(fg);
-
-        axis->setSelectedBasePen(recoloredPen(axis->selectedBasePen(), sel));
-        axis->setSelectedTickPen(recoloredPen(axis->selectedTickPen(), sel));
-        axis->setSelectedSubTickPen(recoloredPen(axis->selectedSubTickPen(), sel));
-        axis->setSelectedLabelColor(sel);
-        axis->setSelectedTickLabelColor(sel);
-
-        auto* grid = axis->grid();
-        grid->setPen(recoloredPen(grid->pen(), mTheme->grid()));
-        grid->setSubGridPen(recoloredPen(grid->subGridPen(), mTheme->subGrid()));
-        grid->setZeroLinePen(recoloredPen(grid->zeroLinePen(), mTheme->grid()));
-    };
-
     for (auto* rect : axisRects())
+    {
         for (auto* axis : rect->axes())
             applyThemeToAxis(axis);
+        // The rect's own scale is outside the layout tree: theme its axis here.
+        if (rect->mColorScale)
+            applyThemeToAxis(rect->mColorScale->axis());
+    }
 
     if (legend) {
         legend->setBrush(QBrush(mTheme->legendBackground()));

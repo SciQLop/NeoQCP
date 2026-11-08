@@ -264,6 +264,7 @@ public:
     [[nodiscard]] QCPTheme* theme() const;
     void setTheme(QCPTheme* theme);
     void applyTheme();
+    void applyThemeToAxis(QCPAxis* axis);
     [[nodiscard]] QColor themeBackground() const;
     void setThemeBackground(const QColor& color);
     [[nodiscard]] QColor themeForeground() const;
