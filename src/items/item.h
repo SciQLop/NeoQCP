@@ -310,9 +310,9 @@ protected:
     virtual QCP::Interaction selectionCategory() const override;
     virtual QRect clipRect() const override;
     virtual void applyDefaultAntialiasingHint(QCPPainter* painter) const override;
-    //! Replays the recording: the default draw. An item that still paints through the old virtual
-    //! (lines, rects, spans...) overrides this and never records.
-    void draw(QCPPainter* painter) override;
+    //! Replays the recording. Every item records, so this is final: draw(QCPDrawContext&) is the
+    //! one an item overrides.
+    void draw(QCPPainter* painter) final;
 
     //! What the core reads from this item this frame.
     [[nodiscard]] QCPDrawnView view() const;

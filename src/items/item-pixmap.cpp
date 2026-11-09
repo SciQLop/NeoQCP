@@ -26,7 +26,7 @@
 #include "item-pixmap.h"
 
 #include "../core.h"
-#include "../painting/painter.h"
+#include "../painting/draw-context.h"
 #include <cmath>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -135,16 +135,6 @@ void QCPItemPixmap::setSelectedPen(const QPen& pen)
     mSelectedPen = pen;
 }
 
-/* inherits documentation from base class */
-double QCPItemPixmap::selectTest(const QPointF& pos, bool onlySelectable,
-                                 [[maybe_unused]] QVariant* details) const
-{
-    if (onlySelectable && !mSelectable)
-        return -1;
-
-    return rectDistance(getFinalRect(), pos, true);
-}
-
 namespace
 {
 // A pixmap larger than this could not be allocated anyway; past it, its int rect would overflow.
@@ -156,26 +146,26 @@ bool fitsInPixels(const QRectF& rect)
 }
 
 /* inherits documentation from base class */
-void QCPItemPixmap::draw(QCPPainter* painter)
+void QCPItemPixmap::draw(QCPDrawContext& context) const
 {
     bool flipHorz = false;
     bool flipVert = false;
     const QRectF finalRect = getFinalRect(&flipHorz, &flipVert);
     const double clipPad = mainPen().style() == Qt::NoPen ? 0 : qCeil(mainPen().widthF());
     const QRectF boundingRect = finalRect.adjusted(-clipPad, -clipPad, clipPad, clipPad);
-    if (boundingRect.intersects(clipRect()) && fitsInPixels(finalRect))
-    {
-        const QRect rect = finalRect.toRect();
-        updateScaledPixmap(rect, flipHorz, flipVert);
-        painter->drawPixmap(rect.topLeft(), mScaled ? mScaledPixmap : mPixmap);
-        QPen pen = mainPen();
-        if (pen.style() != Qt::NoPen)
-        {
-            painter->setPen(pen);
-            painter->setBrush(Qt::NoBrush);
-            painter->drawRect(rect);
-        }
-    }
+    if (!boundingRect.intersects(context.clip()) || !fitsInPixels(finalRect))
+        return;
+    // The scale is cached beside the item, so a recording converts the pixmap only when it changes.
+    const_cast<QCPItemPixmap*>(this)->updateScaledPixmap(finalRect.toRect(), flipHorz, flipVert);
+    if (mImage.isNull())
+        return;
+    // The rect the old painter path filled: its outer corners, so the pen frame lands where it did.
+    const QCP::Pixels topLeft { finalRect.left(), finalRect.top() };
+    const QCP::Pixels bottomRight { finalRect.left() + finalRect.width(),
+                                    finalRect.top() + finalRect.height() };
+    context.image(topLeft, bottomRight, mImage);
+    if (mainPen().style() != Qt::NoPen)
+        context.rect(topLeft, bottomRight, mainPen(), QBrush(Qt::NoBrush));
 }
 
 /* inherits documentation from base class */
@@ -227,7 +217,10 @@ QPointF QCPItemPixmap::anchorPixelPosition(int anchorId) const
 void QCPItemPixmap::updateScaledPixmap(QRect finalRect, bool flipHorz, bool flipVert)
 {
     if (mPixmap.isNull())
+    {
+        mImage = QImage();
         return;
+    }
 
     if (mScaled)
     {
@@ -247,6 +240,7 @@ void QCPItemPixmap::updateScaledPixmap(QRect finalRect, bool flipHorz, bool flip
     }
     else if (!mScaledPixmap.isNull())
         mScaledPixmap = QPixmap();
+    mImage = (mScaled ? mScaledPixmap : mPixmap).toImage();
     mScaledPixmapInvalidated = false;
 }
 

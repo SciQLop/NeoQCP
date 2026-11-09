@@ -109,8 +109,7 @@ public:
     void setInterpolating(bool enabled);
 
     // reimplemented virtual methods:
-    virtual double selectTest(const QPointF& pos, bool onlySelectable,
-                              QVariant* details = nullptr) const override;
+    void draw(QCPDrawContext& context) const override;
 
     // non-virtual methods:
     void updatePosition();
@@ -127,9 +126,6 @@ protected:
     bool mFollowsGraph = false; // set by setGraph, so a graph's death is told from no graph
     double mGraphKey;
     bool mInterpolating;
-
-    // reimplemented virtual methods:
-    virtual void draw(QCPPainter* painter) override;
 
     bool lostGraph() const { return mFollowsGraph && !mGraph; }
 

@@ -134,6 +134,7 @@ private slots:
     void QCPStatisticalBox_Pan1k();
     void QCPIntervals_Pan10k();
     void QCPItems_MixedKinds_Pan1k();
+    void QCPItems_Tracers_Pan1k();
     void QCPSpans_Pan100();
 
 private:
@@ -2747,6 +2748,39 @@ void Benchmark::QCPItems_MixedKinds_Pan1k()
             vspan->lowerEdge->setCoords(x, y);
             vspan->upperEdge->setCoords(x + 0.004, y);
         }
+    }
+    mPlot->xAxis->setRange(50, 51);
+    mPlot->yAxis->setRange(0, 1);
+    mPlot->replot();
+    double left = 50;
+    QBENCHMARK
+    {
+        left += 0.001; // a pan step: the width never changes, only the window slides
+        mPlot->xAxis->setRange(left, left + 1);
+        mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+}
+
+void Benchmark::QCPItems_Tracers_Pan1k()
+{
+    // A thousand tracers on one graph, each at its own key inside the one-key window: every one of
+    // them draws on each frame, and each asks its graph where it is.
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    QVector<double> keys(1001);
+    QVector<double> values(1001);
+    for (int i = 0; i < 1001; ++i)
+    {
+        keys[i] = 50.0 + 0.9 * i / 1000.0;
+        values[i] = 0.5 + 0.3 * qSin(i * 0.2);
+    }
+    graph->setData(keys, values);
+    for (int i = 0; i < 1000; ++i)
+    {
+        auto* tracer = new QCPItemTracer(mPlot);
+        tracer->setGraph(graph);
+        tracer->setGraphKey(50.0 + 0.9 * i / 1000.0);
+        tracer->setStyle(QCPItemTracer::tsCircle);
+        tracer->setSize(6);
     }
     mPlot->xAxis->setRange(50, 51);
     mPlot->yAxis->setRange(0, 1);

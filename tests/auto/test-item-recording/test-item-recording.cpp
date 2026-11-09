@@ -50,6 +50,34 @@ QImage renderItem(int* commands, const std::function<void(QCustomPlot&, Item*)>&
     return plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
 }
 
+//! The four coloured quadrants the reference scenes draw: its size is what a pixmap item shows.
+QPixmap testPixmap()
+{
+    QImage image(48, 36, QImage::Format_ARGB32);
+    for (int y = 0; y < 36; ++y)
+        for (int x = 0; x < 48; ++x)
+            image.setPixel(x, y,
+                           x < 24 ? (y < 18 ? qRgb(40, 120, 200) : qRgb(230, 200, 40))
+                                  : (y < 18 ? qRgb(220, 60, 60) : qRgb(60, 170, 90)));
+    return QPixmap::fromImage(image);
+}
+
+//! The pixels of \a image that are mostly red: what a tracer marker leaves.
+int redPixelsNear(const QImage& image, const QPointF& at, int radius)
+{
+    int red = 0;
+    for (int y = qRound(at.y()) - radius; y <= qRound(at.y()) + radius; ++y)
+        for (int x = qRound(at.x()) - radius; x <= qRound(at.x()) + radius; ++x)
+        {
+            if (!image.rect().contains(x, y))
+                continue;
+            const QColor colour = image.pixelColor(x, y);
+            if (colour.red() > 150 && colour.red() > colour.blue() + 60)
+                ++red;
+        }
+    return red;
+}
+
 void check(const QImage& image, const char* name)
 {
     QString why;
@@ -190,4 +218,140 @@ void TestItemRecording::everyStyleSetterReRecords()
     reRecords("setHead", [&] { line->setHead(QCPLineEnding::esDisc); });
     reRecords("setTail", [&] { line->setTail(QCPLineEnding::esBar); });
     reRecords("setSelected", [&] { line->setSelected(true); });
+}
+
+void TestItemRecording::aRectRecords()
+{
+    int commands = 0;
+    const QImage image = renderItem<RecordingItem<QCPItemRect>>(
+        &commands,
+        [](QCustomPlot&, RecordingItem<QCPItemRect>* rect)
+        {
+            rect->topLeft->setCoords(1.0, 0.8);
+            rect->bottomRight->setCoords(4.5, 0.2);
+            rect->setPen(QPen(QColor(200, 120, 20), 2));
+            rect->setBrush(QColor(200, 120, 20, 60));
+        });
+    QVERIFY2(commands > 0, "the rect recorded nothing");
+    check(image, "item-rect.png");
+}
+
+void TestItemRecording::anEllipseRecords()
+{
+    int commands = 0;
+    const QImage image = renderItem<RecordingItem<QCPItemEllipse>>(
+        &commands,
+        [](QCustomPlot&, RecordingItem<QCPItemEllipse>* ellipse)
+        {
+            ellipse->topLeft->setCoords(1.5, 0.85);
+            ellipse->bottomRight->setCoords(4.5, 0.15);
+            ellipse->setPen(QPen(QColor(120, 60, 180), 2));
+            ellipse->setBrush(QColor(120, 60, 180, 60));
+        });
+    QVERIFY2(commands > 0, "the ellipse recorded nothing");
+    check(image, "item-ellipse.png");
+}
+
+void TestItemRecording::aPixmapRecords()
+{
+    int commands = 0;
+    const QImage image = renderItem<RecordingItem<QCPItemPixmap>>(
+        &commands,
+        [](QCustomPlot&, RecordingItem<QCPItemPixmap>* pixmap)
+        {
+            pixmap->setPixmap(testPixmap());
+            pixmap->topLeft->setCoords(1.0, 0.8);
+            pixmap->bottomRight->setCoords(4.5, 0.2);
+            pixmap->setScaled(false, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        });
+    QVERIFY2(commands > 0, "the pixmap recorded nothing");
+    check(image, "item-pixmap.png");
+}
+
+void TestItemRecording::aScaledPixmapRecords()
+{
+    int commands = 0;
+    const QImage image = renderItem<RecordingItem<QCPItemPixmap>>(
+        &commands,
+        [](QCustomPlot&, RecordingItem<QCPItemPixmap>* pixmap)
+        {
+            pixmap->setPixmap(testPixmap());
+            pixmap->topLeft->setCoords(1.0, 0.8);
+            pixmap->bottomRight->setCoords(4.5, 0.2);
+            pixmap->setScaled(true, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        });
+    QVERIFY2(commands > 0, "the scaled pixmap recorded nothing");
+    check(image, "item-pixmap-scaled.png");
+}
+
+void TestItemRecording::aTracerRecords()
+{
+    int commands = 0;
+    const QImage image = renderItem<RecordingItem<QCPItemTracer>>(
+        &commands,
+        [](QCustomPlot& plot, RecordingItem<QCPItemTracer>* tracer)
+        {
+            auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
+            QVector<double> keys, values;
+            for (int i = 0; i <= 60; ++i)
+            {
+                keys << i * 0.1;
+                values << 0.5 + 0.35 * qSin(i * 0.1);
+            }
+            graph->setData(keys, values);
+            tracer->setGraph(graph);
+            tracer->setGraphKey(3.2);
+            tracer->setStyle(QCPItemTracer::tsCircle);
+            tracer->setSize(9);
+            tracer->setPen(QPen(Qt::red, 2));
+        });
+    QVERIFY2(commands > 0, "the tracer recorded nothing");
+    check(image, "item-tracer.png");
+}
+
+void TestItemRecording::aTracerFollowsItsGraph()
+{
+    // The marker is where the graph's data says: new data moves it, without a call on the tracer.
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
+    graph->setData(QVector<double> { 1, 2, 3, 4 }, QVector<double> { 0.2, 0.2, 0.2, 0.2 });
+    auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
+    tracer->setGraph(graph);
+    tracer->setGraphKey(3.0);
+    tracer->setStyle(QCPItemTracer::tsCircle);
+    tracer->setSize(9);
+    tracer->setPen(QPen(Qt::red, 2));
+    plot.replot();
+
+    const QPointF low(plot.xAxis->coordToPixel(3.0), plot.yAxis->coordToPixel(0.2));
+    const QPointF high(plot.xAxis->coordToPixel(3.0), plot.yAxis->coordToPixel(0.8));
+    QImage image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QVERIFY2(redPixelsNear(image, low, 8) > 0, "the tracer did not draw its marker");
+
+    graph->setData(QVector<double> { 1, 2, 3, 4 }, QVector<double> { 0.8, 0.8, 0.8, 0.8 });
+    plot.replot();
+
+    image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QVERIFY2(redPixelsNear(image, high, 8) > 0, "the marker did not follow the graph's new data");
+    QCOMPARE(redPixelsNear(image, low, 8), 0);
+}
+
+void TestItemRecording::selectionReRecords()
+{
+    // A selected item draws its selected pen and brush: the selection is a content change.
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto* rect = new RecordingItem<QCPItemRect>(&plot);
+    rect->topLeft->setCoords(1.0, 0.8);
+    rect->bottomRight->setCoords(4.5, 0.2);
+    rect->setPen(QPen(QColor(200, 120, 20), 2));
+    rect->setBrush(QColor(200, 120, 20, 60));
+    rect->setSelectedPen(QPen(Qt::blue, 4));
+    plot.replot();
+    const int before = rect->recordings();
+
+    rect->setSelected(true);
+    plot.replot();
+    QCOMPARE(rect->recordings(), before + 1);
 }

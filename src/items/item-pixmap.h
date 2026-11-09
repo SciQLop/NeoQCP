@@ -28,6 +28,7 @@
 
 #include "../global.h"
 #include "item.h"
+#include <QImage>
 
 class QCPPainter;
 class QCustomPlot;
@@ -75,8 +76,7 @@ public:
     void setSelectedPen(const QPen& pen);
 
     // reimplemented virtual methods:
-    virtual double selectTest(const QPointF& pos, bool onlySelectable,
-                              QVariant* details = nullptr) const override;
+    void draw(QCPDrawContext& context) const override;
 
     QCPItemPosition* const topLeft;
     QCPItemPosition* const bottomRight;
@@ -101,6 +101,7 @@ protected:
     // property members:
     QPixmap mPixmap;
     QPixmap mScaledPixmap;
+    QImage mImage; //!< the pixmap as drawn, converted once per scale: what a recording embeds
     bool mScaled;
     bool mScaledPixmapInvalidated;
     Qt::AspectRatioMode mAspectRatioMode;
@@ -108,7 +109,6 @@ protected:
     QPen mPen, mSelectedPen;
 
     // reimplemented virtual methods:
-    virtual void draw(QCPPainter* painter) override;
     virtual QPointF anchorPixelPosition(int anchorId) const override;
 
     // non-virtual methods:

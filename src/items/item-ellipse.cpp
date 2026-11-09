@@ -26,7 +26,7 @@
 #include "item-ellipse.h"
 
 #include "../core.h"
-#include "../painting/painter.h"
+#include "../painting/draw-context.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPItemEllipse
@@ -128,62 +128,32 @@ void QCPItemEllipse::setSelectedBrush(const QBrush& brush)
 }
 
 /* inherits documentation from base class */
-double QCPItemEllipse::selectTest(const QPointF& pos, bool onlySelectable,
-                                  [[maybe_unused]] QVariant* details) const
+void QCPItemEllipse::draw(QCPDrawContext& context) const
 {
-    if (onlySelectable && !mSelectable)
-        return -1;
-
-    QPointF p1 = topLeft->pixelPosition();
-    QPointF p2 = bottomRight->pixelPosition();
-    QPointF center((p1 + p2) / 2.0);
-    double a = qAbs(p1.x() - p2.x()) / 2.0;
-    double b = qAbs(p1.y() - p2.y()) / 2.0;
-    double x = pos.x() - center.x();
-    double y = pos.y() - center.y();
-
-    // distance to border:
-    double c = 1.0 / qSqrt(x * x / (a * a) + y * y / (b * b));
-    double result = qAbs(c - 1) * qSqrt(x * x + y * y);
-    // filled ellipse, allow click inside to count as hit:
-    if (result > mParentPlot->selectionTolerance() * 0.99 && mBrush.style() != Qt::NoBrush
-        && mBrush.color().alpha() != 0)
+    bool snapshot = false;
+    const QCP::Position from = topLeft->asPosition(&snapshot);
+    const QCP::Position to = bottomRight->asPosition(&snapshot);
+    if (snapshot)
+        context.recordEveryFrame();
+    // Both corners in data coordinates: the recording is data, so a pan only shifts it.
+    if (std::holds_alternative<QCP::Data>(from) && std::holds_alternative<QCP::Data>(to))
     {
-        if (x * x / (a * a) + y * y / (b * b) <= 1)
-            result = mParentPlot->selectionTolerance() * 0.99;
-    }
-    return result;
-}
-
-/* inherits documentation from base class */
-void QCPItemEllipse::draw(QCPPainter* painter)
-{
-    QPointF p1 = topLeft->pixelPosition();
-    QPointF p2 = bottomRight->pixelPosition();
-    if (p1.toPoint() == p2.toPoint())
+        context.ellipse(from, to, mainPen(), mainBrush());
         return;
-    QRectF ellipseRect = QRectF(p1, p2).normalized();
-    const int clipEnlarge = qCeil(mainPen().widthF());
-    QRect clip = clipRect().adjusted(-clipEnlarge, -clipEnlarge, clipEnlarge, clipEnlarge);
-    if (ellipseRect.intersects(
-            clip)) // only draw if bounding rect of ellipse is visible in cliprect
-    {
-        painter->setPen(mainPen());
-        painter->setBrush(mainBrush());
-#ifdef __EXCEPTIONS
-        try // drawEllipse sometimes throws exceptions if ellipse is too big
-        {
-#endif
-            painter->drawEllipse(ellipseRect);
-#ifdef __EXCEPTIONS
-        }
-        catch (...)
-        {
-            qDebug() << Q_FUNC_INFO << "Item too large for memory, setting invisible";
-            setVisible(false);
-        }
-#endif
     }
+    // A corner is pixels or anchored: where the ellipse is depends on the view.
+    const QCPTransform& transform = context.transform();
+    const auto pixelOf = [&](const QCP::Position& at, QCPItemPosition* position)
+    {
+        if (const auto* data = std::get_if<QCP::Data>(&at))
+        {
+            const QCP::Pixels pixels = transform.map(*data);
+            return QCP::Pixels { pixels.x, pixels.y };
+        }
+        const QPointF pixels = position->pixelPosition();
+        return QCP::Pixels { pixels.x(), pixels.y() };
+    };
+    context.ellipse(pixelOf(from, topLeft), pixelOf(to, bottomRight), mainPen(), mainBrush());
 }
 
 /* inherits documentation from base class */
@@ -236,6 +206,14 @@ QBrush QCPItemEllipse::mainBrush() const
     return mSelected ? mSelectedBrush : mBrush;
 }
 
+/*! \internal
+
+  Returns the item's extent from its positions, grown by the widest pen.
+
+  The recording cannot answer this one: a position may be data on one axis and pixels on the other,
+  and a recorded position is either wholly data or wholly pixels, so the recording would lose the
+  data side and the layer's index would never keep the item.
+*/
 std::optional<QCPItemExtent> QCPItemEllipse::dataExtent() const
 {
     const double pad = qMax(mPen.widthF(), mSelectedPen.widthF()) + 2.0;

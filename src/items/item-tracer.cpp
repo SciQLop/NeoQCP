@@ -26,8 +26,9 @@
 #include "item-tracer.h"
 
 #include "../core.h"
-#include "../painting/painter.h"
+#include "../painting/draw-context.h"
 #include "../plottables/plottable-graph.h"
+#include <array>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPItemTracer
@@ -239,82 +240,23 @@ void QCPItemTracer::setInterpolating(bool enabled)
 }
 
 /* inherits documentation from base class */
-double QCPItemTracer::selectTest(const QPointF& pos, bool onlySelectable,
-                                 [[maybe_unused]] QVariant* details) const
+void QCPItemTracer::draw(QCPDrawContext& context) const
 {
-    if ((onlySelectable && !mSelectable) || lostGraph())
-        return -1;
-
-    QPointF center(position->pixelPosition());
-    double w = mSize / 2.0;
-    QRect clip = clipRect();
-    switch (mStyle)
-    {
-        case tsNone:
-            return -1;
-        case tsPlus:
-        {
-            if (clipRect().intersects(
-                    QRectF(center - QPointF(w, w), center + QPointF(w, w)).toRect()))
-                return qSqrt(qMin(QCPVector2D(pos).distanceSquaredToLine(center + QPointF(-w, 0),
-                                                                         center + QPointF(w, 0)),
-                                  QCPVector2D(pos).distanceSquaredToLine(center + QPointF(0, -w),
-                                                                         center + QPointF(0, w))));
-            break;
-        }
-        case tsCrosshair:
-        {
-            return qSqrt(qMin(
-                QCPVector2D(pos).distanceSquaredToLine(QCPVector2D(clip.left(), center.y()),
-                                                       QCPVector2D(clip.right(), center.y())),
-                QCPVector2D(pos).distanceSquaredToLine(QCPVector2D(center.x(), clip.top()),
-                                                       QCPVector2D(center.x(), clip.bottom()))));
-        }
-        case tsCircle:
-        {
-            if (clip.intersects(QRectF(center - QPointF(w, w), center + QPointF(w, w)).toRect()))
-            {
-                // distance to border:
-                double centerDist = QCPVector2D(center - pos).length();
-                double circleLine = w;
-                double result = qAbs(centerDist - circleLine);
-                // filled ellipse, allow click inside to count as hit:
-                if (result > mParentPlot->selectionTolerance() * 0.99
-                    && mBrush.style() != Qt::NoBrush && mBrush.color().alpha() != 0)
-                {
-                    if (centerDist <= circleLine)
-                        result = mParentPlot->selectionTolerance() * 0.99;
-                }
-                return result;
-            }
-            break;
-        }
-        case tsSquare:
-        {
-            if (clip.intersects(QRectF(center - QPointF(w, w), center + QPointF(w, w)).toRect()))
-            {
-                QRectF rect = QRectF(center - QPointF(w, w), center + QPointF(w, w));
-                bool filledRect = mBrush.style() != Qt::NoBrush && mBrush.color().alpha() != 0;
-                return rectDistance(rect, pos, filledRect);
-            }
-            break;
-        }
-    }
-    return -1;
-}
-
-/* inherits documentation from base class */
-void QCPItemTracer::draw(QCPPainter* painter)
-{
-    updatePosition();
+    // The position store deliberately does not mark the item (see QCPItemPosition): the graph's
+    // data decides where the marker is, and reading it here must not dirty the tracer.
+    const_cast<QCPItemTracer*>(this)->updatePosition();
     if (mStyle == tsNone || lostGraph())
         return;
+    // The marker is a size in pixels around a position, and a crosshair spans the clip rect: the
+    // view decides where it is, so the recording is remade every frame (P-5).
+    context.recordEveryFrame();
 
-    painter->setPen(mainPen());
-    painter->setBrush(mainBrush());
-    QPointF center(position->pixelPosition());
-    double w = mSize / 2.0;
-    QRect clip = clipRect();
+    const QPointF center(position->pixelPosition());
+    const double w = mSize / 2.0;
+    const QRect clip = clipRect();
+    const QPen pen = mainPen();
+    const auto pixels = [](const QPointF& at)
+    { return QCP::Pixels { at.x(), at.y() }; };
     switch (mStyle)
     {
         case tsNone:
@@ -323,29 +265,43 @@ void QCPItemTracer::draw(QCPPainter* painter)
         {
             if (clip.intersects(QRectF(center - QPointF(w, w), center + QPointF(w, w)).toRect()))
             {
-                painter->drawLine(QLineF(center + QPointF(-w, 0), center + QPointF(w, 0)));
-                painter->drawLine(QLineF(center + QPointF(0, -w), center + QPointF(0, w)));
+                context.polyline(std::array<QCP::Position, 2> { pixels(center + QPointF(-w, 0)),
+                                                               pixels(center + QPointF(w, 0)) },
+                                 pen);
+                context.polyline(std::array<QCP::Position, 2> { pixels(center + QPointF(0, -w)),
+                                                               pixels(center + QPointF(0, w)) },
+                                 pen);
             }
             break;
         }
         case tsCrosshair:
         {
             if (center.y() > clip.top() && center.y() < clip.bottom())
-                painter->drawLine(QLineF(clip.left(), center.y(), clip.right(), center.y()));
+                context.polyline(
+                    std::array<QCP::Position, 2> {
+                        QCP::Pixels { double(clip.left()), center.y() },
+                        QCP::Pixels { double(clip.right()), center.y() } },
+                    pen);
             if (center.x() > clip.left() && center.x() < clip.right())
-                painter->drawLine(QLineF(center.x(), clip.top(), center.x(), clip.bottom()));
+                context.polyline(
+                    std::array<QCP::Position, 2> {
+                        QCP::Pixels { center.x(), double(clip.top()) },
+                        QCP::Pixels { center.x(), double(clip.bottom()) } },
+                    pen);
             break;
         }
         case tsCircle:
         {
             if (clip.intersects(QRectF(center - QPointF(w, w), center + QPointF(w, w)).toRect()))
-                painter->drawEllipse(center, w, w);
+                context.ellipse(pixels(center - QPointF(w, w)), pixels(center + QPointF(w, w)), pen,
+                                mainBrush());
             break;
         }
         case tsSquare:
         {
             if (clip.intersects(QRectF(center - QPointF(w, w), center + QPointF(w, w)).toRect()))
-                painter->drawRect(QRectF(center - QPointF(w, w), center + QPointF(w, w)));
+                context.rect(pixels(center - QPointF(w, w)), pixels(center + QPointF(w, w)), pen,
+                             mainBrush());
             break;
         }
     }

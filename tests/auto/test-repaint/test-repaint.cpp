@@ -28,6 +28,8 @@
 #include "plottables/plottable-graph2.h"
 #include "plottables/plottable-group.h"
 #include "plottables/plottable-histogram2d.h"
+
+#include <array>
 #include "plottables/plottable-multigraph.h"
 #include "plottables/plottable-statisticalbox.h"
 #include "plottables/plottable-waterfall.h"
@@ -1927,14 +1929,20 @@ public:
 class PlainItem : public QCPAbstractItem
 {
 public:
-    explicit PlainItem(QCustomPlot* plot) : QCPAbstractItem(plot) { }
+    explicit PlainItem(QCustomPlot* plot) : QCPAbstractItem(plot)
+    {
+        // A recording needs the axes: they come from a position, even one this item never reads.
+        mAnchor = createPosition(QStringLiteral("anchor"));
+    }
 
-    void draw(QCPPainter* painter) override
+    void draw(QCPDrawContext& context) const override
     {
         ++mDrawCalls;
-        painter->setPen(QPen(Qt::darkMagenta, 2));
-        painter->drawLine(mCentre + QPointF(-4, 0), mCentre + QPointF(4, 0));
-        painter->drawLine(mCentre + QPointF(0, -4), mCentre + QPointF(0, 4));
+        const auto at = [this](double dx, double dy)
+        { return QCP::Pixels { mCentre.x() + dx, mCentre.y() + dy }; };
+        const QPen pen(Qt::darkMagenta, 2);
+        context.polyline(std::array<QCP::Position, 2> { at(-4, 0), at(4, 0) }, pen);
+        context.polyline(std::array<QCP::Position, 2> { at(0, -4), at(0, 4) }, pen);
     }
 
     double selectTest(const QPointF& pos, bool onlySelectable, QVariant*) const override
@@ -1945,6 +1953,7 @@ public:
     }
 
     QPointF mCentre;
+    QCPItemPosition* mAnchor = nullptr;
     mutable int mDrawCalls = 0;
     mutable int mSelectCalls = 0;
 };
@@ -2533,14 +2542,20 @@ void TestRepaint::textBorderAndBackgroundMatchTheOldLook()
 
 void TestRepaint::dashedLineStacksLikeSolid()
 {
-    // A pen style must not decide stacking: both cases have the graph on the GPU pass, above the
-    // rect item that was created after it.
+    // A pen style must not decide stacking: the graph and the rect are both GPU content, and the
+    // layer's child order puts the graph (created after the rect) above it.
     const auto darkPixelsOverTheRect = [](Qt::PenStyle style)
     {
         QWidget host;
         QCustomPlot* plot = shownGpuPlot(host);
         if (!plot)
             return -1;
+        auto rect = plot->add<QCPItemRect>();
+        rect->setLayer(QStringLiteral("main")); // under the graph, same layer
+        rect->topLeft->setCoords(0.2, 0.7);
+        rect->bottomRight->setCoords(0.8, 0.3);
+        rect->setPen(Qt::NoPen);
+        rect->setBrush(QColor(210, 40, 40));
         auto* graph = plot->addGraph();
         QVector<double> keys, values;
         for (int i = 0; i <= 400; ++i)
@@ -2552,12 +2567,6 @@ void TestRepaint::dashedLineStacksLikeSolid()
         graph->setPen(QPen(Qt::black, 5, style));
         plot->xAxis->setRange(0, 1);
         plot->yAxis->setRange(0, 1);
-        auto rect = plot->add<QCPItemRect>();
-        rect->setLayer(QStringLiteral("main")); // under the graph, same layer
-        rect->topLeft->setCoords(0.2, 0.7);
-        rect->bottomRight->setCoords(0.8, 0.3);
-        rect->setPen(Qt::NoPen);
-        rect->setBrush(QColor(210, 40, 40));
         plot->replot();
         waitUntilSettled(*plot);
         const QImage image = screenOf(plot);
@@ -2585,7 +2594,7 @@ void TestRepaint::dashedLineStacksLikeSolid()
         QSKIP("no QRhi on this platform");
     const int dashed = darkPixelsOverTheRect(Qt::DashLine);
     QVERIFY2(solid > 0, "the solid line is not over the rect");
-    // Both are drawn on the GPU pass, above the rect created after them; the dashes only cover
+    // Both are drawn on the GPU pass, above the rect created before them; the dashes only cover
     // part of the line, so fewer dark pixels - but never none, which is what a QPainter line under
     // the rect would give.
     QVERIFY2(dashed > 0, "the dashed line is under the rect: a pen style changed stacking");

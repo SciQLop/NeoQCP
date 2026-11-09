@@ -1240,7 +1240,7 @@ QCP::Position QCPItemPosition::asPosition(bool* snapshot) const
 /* end of documentation of inline functions */
 /* start documentation of pure virtual functions */
 
-/*! \fn void QCPAbstractItem::draw(QCPPainter *painter) = 0
+/*! \fn void QCPAbstractItem::draw(QCPPainter *painter)
   \internal
 
   Draws this item with the provided \a painter.
@@ -1305,8 +1305,8 @@ QCPAxisRect* QCPAbstractItem::clipAxisRect() const
 }
 
 /*!
-  Replays the recording. An item that still paints through this virtual (lines, rects, spans...)
-  overrides it and never records.
+  Replays the recording into \a painter. Every item records: what an item draws, it records in
+  draw(QCPDrawContext&), and this is the one place the recording reaches a painter.
 */
 void QCPAbstractItem::draw(QCPPainter* painter)
 {

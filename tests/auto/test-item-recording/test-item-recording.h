@@ -13,4 +13,11 @@ private slots:
     void aPannedPlainLineIsNotReRecorded();
     void aPannedArrowIsRightAfterThePan();
     void everyStyleSetterReRecords();
+    void aRectRecords();
+    void anEllipseRecords();
+    void aPixmapRecords();
+    void aScaledPixmapRecords();
+    void aTracerRecords();
+    void aTracerFollowsItsGraph();
+    void selectionReRecords();
 };

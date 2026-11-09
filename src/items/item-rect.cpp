@@ -26,7 +26,7 @@
 #include "item-rect.h"
 
 #include "../core.h"
-#include "../painting/painter.h"
+#include "../painting/draw-context.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPItemRect
@@ -123,35 +123,34 @@ void QCPItemRect::setSelectedBrush(const QBrush& brush)
     mSelectedBrush = brush;
 }
 
-/* inherits documentation from base class */
-double QCPItemRect::selectTest(const QPointF& pos, bool onlySelectable,
-                               [[maybe_unused]] QVariant* details) const
-{
-    if (onlySelectable && !mSelectable)
-        return -1;
-
-    QRectF rect = QRectF(topLeft->pixelPosition(), bottomRight->pixelPosition()).normalized();
-    bool filledRect = mBrush.style() != Qt::NoBrush && mBrush.color().alpha() != 0;
-    return rectDistance(rect, pos, filledRect);
-}
 
 /* inherits documentation from base class */
-void QCPItemRect::draw(QCPPainter* painter)
+void QCPItemRect::draw(QCPDrawContext& context) const
 {
-    QPointF p1 = topLeft->pixelPosition();
-    QPointF p2 = bottomRight->pixelPosition();
-    if (p1.toPoint() == p2.toPoint())
-        return;
-    QRectF rect = QRectF(p1, p2).normalized();
-    double clipPad = mainPen().widthF();
-    QRectF boundingRect = rect.adjusted(-clipPad, -clipPad, clipPad, clipPad);
-    if (boundingRect.intersects(
-            clipRect())) // only draw if bounding rect of rect item is visible in cliprect
+    bool snapshot = false;
+    const QCP::Position from = topLeft->asPosition(&snapshot);
+    const QCP::Position to = bottomRight->asPosition(&snapshot);
+    if (snapshot)
+        context.recordEveryFrame();
+    // Both corners in data coordinates: the recording is data, so a pan only shifts it.
+    if (std::holds_alternative<QCP::Data>(from) && std::holds_alternative<QCP::Data>(to))
     {
-        painter->setPen(mainPen());
-        painter->setBrush(mainBrush());
-        painter->drawRect(rect);
+        context.rect(from, to, mainPen(), mainBrush());
+        return;
     }
+    // A corner is pixels or anchored: where the rectangle is depends on the view.
+    const QCPTransform& transform = context.transform();
+    const auto pixelOf = [&](const QCP::Position& at, QCPItemPosition* position)
+    {
+        if (const auto* data = std::get_if<QCP::Data>(&at))
+        {
+            const QCP::Pixels pixels = transform.map(*data);
+            return QCP::Pixels { pixels.x, pixels.y };
+        }
+        const QPointF pixels = position->pixelPosition();
+        return QCP::Pixels { pixels.x(), pixels.y() };
+    };
+    context.rect(pixelOf(from, topLeft), pixelOf(to, bottomRight), mainPen(), mainBrush());
 }
 
 /* inherits documentation from base class */
@@ -198,6 +197,14 @@ QBrush QCPItemRect::mainBrush() const
     return mSelected ? mSelectedBrush : mBrush;
 }
 
+/*! \internal
+
+  Returns the item's extent from its positions, grown by the widest pen.
+
+  The recording cannot answer this one: a position may be data on one axis and pixels on the other,
+  and a recorded position is either wholly data or wholly pixels, so the recording would lose the
+  data side and the layer's index would never keep the item.
+*/
 std::optional<QCPItemExtent> QCPItemRect::dataExtent() const
 {
     const double pad = qMax(mPen.widthF(), mSelectedPen.widthF()) + 2.0;
