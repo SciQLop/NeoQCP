@@ -349,7 +349,7 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
     const bool owned = state == QCPReplayState::Save;
     if (owned)
         painter.save();
-    if (!frame.clip.isEmpty())
+    if (owned && !frame.clip.isEmpty())
         painter.setClipRect(frame.clip);
     // A recording the layer could not take whole is painted by this pass like any other recording:
     // the call below draws every one of its commands.

@@ -744,8 +744,9 @@ void paintCommand(QCPPainter& painter, const QCPDrawCommand& command, const QCPD
                   PaintMode mode = { });
 } // namespace qcp
 
-//! Whether the replay has to bracket its work with save()/restore(): the layer already does, for
-//! every child it draws, so a layerable's own replay is AlreadySaved.
+//! Whether the replay has to bracket its work with save()/restore() and set the frame's clip: the
+//! layer already saves and clips at clipRect().translated(0, -1) for every child it draws
+//! (QCPLayer::draw), so a layerable's own replay is AlreadySaved and does neither.
 enum class QCPReplayState
 {
     Save,
