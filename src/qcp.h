@@ -41,6 +41,8 @@
 #include "axis/axistickertime.h"
 #include "axis/range.h"
 #include "colorgradient.h"
+#include "coords.h"
+#include "coords-custom.h"
 #include "theme.h"
 #include "misuse.h"
 #include "handle.h"
