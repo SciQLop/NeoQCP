@@ -12,6 +12,8 @@ private slots:
     void aBracketRecords();
     void aPannedPlainLineIsNotReRecorded();
     void aPannedArrowIsRightAfterThePan();
+    void anAnchoredArrowFollowsThePan();
+    void aRatioArrowFollowsTheAxisRect();
     void everyStyleSetterReRecords();
     void aRectRecords();
     void anEllipseRecords();

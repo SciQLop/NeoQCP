@@ -78,6 +78,22 @@ int redPixelsNear(const QImage& image, const QPointF& at, int radius)
     return red;
 }
 
+//! The pixels of \a image that are mostly blue: what a blue arrow head leaves.
+int bluePixelsNear(const QImage& image, const QPointF& at, int radius)
+{
+    int blue = 0;
+    for (int y = qRound(at.y()) - radius; y <= qRound(at.y()) + radius; ++y)
+        for (int x = qRound(at.x()) - radius; x <= qRound(at.x()) + radius; ++x)
+        {
+            if (!image.rect().contains(x, y))
+                continue;
+            const QColor colour = image.pixelColor(x, y);
+            if (colour.blue() > 100 && colour.blue() > colour.red() + 40)
+                ++blue;
+        }
+    return blue;
+}
+
 void check(const QImage& image, const char* name)
 {
     QString why;
@@ -192,6 +208,84 @@ void TestItemRecording::aPannedArrowIsRightAfterThePan()
     const QColor atEnd = image.pixelColor(qRound(end.x()) - 1, qRound(end.y()));
     QVERIFY2(atEnd.blue() > 100 && atEnd.blue() > atEnd.red() + 40,
              qPrintable(QStringLiteral("the arrow head is not on the end: %1").arg(atEnd.name())));
+}
+
+void TestItemRecording::anAnchoredArrowFollowsThePan()
+{
+    // Both ends are anchored, so the recording bakes pixel endings. The shaft is re-resolved on
+    // replay; the head must be remade too, or a pan leaves it behind.
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
+    graph->setData(QVector<double> { 1, 2, 3, 4 }, QVector<double> { 0.2, 0.3, 0.4, 0.5 });
+    auto* tracer = new QCPItemTracer(&plot);
+    tracer->setGraph(graph);
+    tracer->setGraphKey(3.0);
+    tracer->setStyle(QCPItemTracer::tsNone);
+    auto* text = new QCPItemText(&plot);
+    text->setText(QStringLiteral("label"));
+    text->position->setCoords(1.0, 0.6);
+    auto* line = new RecordingItem<QCPItemLine>(&plot);
+    line->start->setParentAnchor(text->bottom);
+    line->end->setParentAnchor(tracer->position);
+    line->setHead(QCPLineEnding(QCPLineEnding::esDisc, 14));
+    line->setPen(QPen(QColor(30, 80, 160), 2));
+    plot.replot();
+    const int before = line->recordings();
+    const QPointF oldEnd = line->end->pixelPosition();
+
+    plot.xAxis->setRange(1, 7);
+    plot.replot();
+    QVERIFY2(line->recordings() > before, "the arrowed line kept a stale recording");
+    const QImage image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    const QPointF end = line->end->pixelPosition();
+    QVERIFY2(end != oldEnd, "the pan did not move the anchored end");
+    QVERIFY2(bluePixelsNear(image, end, 7) > 40,
+             qPrintable(QStringLiteral("the arrow head is not on the anchored end: %1,%2")
+                            .arg(end.x())
+                            .arg(end.y())));
+    QVERIFY2(bluePixelsNear(image, oldEnd, 7) < 20,
+             qPrintable(QStringLiteral("the arrow head stayed at the old end: %1,%2")
+                            .arg(oldEnd.x())
+                            .arg(oldEnd.y())));
+}
+
+void TestItemRecording::aRatioArrowFollowsTheAxisRect()
+{
+    // Both ends are axis-rect ratios: the shaft re-resolves against the new rect, the head must
+    // too. A longer tick label grows the left margin without changing the axis ranges.
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto* line = new RecordingItem<QCPItemLine>(&plot);
+    line->start->setType(QCPItemPosition::ptAxisRectRatio);
+    line->end->setType(QCPItemPosition::ptAxisRectRatio);
+    line->start->setCoords(0.1, 0.85);
+    line->end->setCoords(0.6, 0.15);
+    line->setHead(QCPLineEnding(QCPLineEnding::esDisc, 14));
+    line->setPen(QPen(QColor(30, 80, 160), 2));
+    plot.replot();
+    const int before = line->recordings();
+    const QPointF oldEnd = line->end->pixelPosition();
+
+    auto ticker = QSharedPointer<QCPAxisTickerText>::create();
+    ticker->addTick(0, QStringLiteral("123456789"));
+    ticker->addTick(1, QStringLiteral("987654321"));
+    plot.yAxis->setTicker(ticker);
+    plot.replot();
+    const QPointF after = line->end->pixelPosition();
+    QVERIFY2(after != oldEnd, "the longer tick labels did not move the axis rect");
+    QVERIFY2(line->recordings() > before, "the ratio arrow kept a stale recording");
+    const QImage image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QVERIFY2(bluePixelsNear(image, after, 7) > 40,
+             qPrintable(QStringLiteral("the arrow head stayed at the old axis rect: %1,%2 -> %3,%4")
+                            .arg(oldEnd.x())
+                            .arg(oldEnd.y())
+                            .arg(after.x())
+                            .arg(after.y())));
+    QVERIFY2(bluePixelsNear(image, oldEnd, 7) < 20,
+             qPrintable(QStringLiteral("the arrow head is still at the old axis rect: %1,%2")
+                            .arg(oldEnd.x())
+                            .arg(oldEnd.y())));
 }
 
 void TestItemRecording::everyStyleSetterReRecords()

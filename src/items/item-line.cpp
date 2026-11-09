@@ -155,7 +155,9 @@ void QCPItemLine::draw(QCPDrawContext& context) const
         return;
     }
     // The endings are pixels: their direction comes from the view, so this recording is remade
-    // whenever the view changes (a pan included), as P-6 allows.
+    // whenever the view changes (a pan included), as P-6 allows. Reading the transform says so even
+    // when both ends are anchored or ratios: their pixel is the view's, not the position's.
+    (void)context.transform();
     const QPointF startPixel = pixelOf(context, from, start);
     const QPointF endPixel = pixelOf(context, to, end);
     const QCPVector2D startVec(startPixel);
