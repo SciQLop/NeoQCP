@@ -3977,3 +3977,42 @@ void TestRepaint::fiveImagesOnOneLayerStayOnTheGpu()
     for (int i = 0; i < 5; ++i)
         QVERIFY(!fallback.painterHandled(context.drawList().id, quint64(i)));
 }
+
+// The busy fade is a painter opacity the layer sets around a plottable's draw. The export's second
+// pass replays the GPU commands after the layer's restore(), so it must carry the fade too.
+void TestRepaint::busyFadeCoversTheGpuCommandsInAnExport()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    // Bars record their rects: those are GPU commands, replayed by the export's deferred pass.
+    auto* bars = new QCPBars(plot.xAxis, plot.yAxis);
+    bars->setData(QVector<double> { 1, 2, 3 }, QVector<double> { 0.5, 0.7, 0.4 });
+    bars->setPen(QPen(Qt::black, 2));
+    bars->setBrush(QColor(20, 40, 160));
+    plot.xAxis->setRange(0, 4);
+    plot.yAxis->setRange(0, 1);
+    plot.layer(QStringLiteral("main"))->setMode(QCPLayer::lmLogical);
+    plot.replot();
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const auto exportImage = [&](const QString& name)
+    {
+        const QString file = dir.filePath(name);
+        return plot.savePng(file, 400, 300) ? QImage(file) : QImage();
+    };
+    const QImage solid = exportImage(QStringLiteral("solid.png"));
+
+    bars->setBusyShowDelayMs(0);
+    bars->setBusy(true);
+    QTest::qWait(5); // the busy state settles through the plottable's debounce timer
+    plot.replot();
+    QVERIFY2(bars->visuallyBusy(), "the bars are not in their busy state");
+    const QImage faded = exportImage(QStringLiteral("faded.png"));
+
+    const QPoint at(int(plot.xAxis->coordToPixel(2.0)), int(plot.yAxis->coordToPixel(0.3)));
+    const int solidInk = solid.pixelColor(at).lightness();
+    const int fadedInk = faded.pixelColor(at).lightness();
+    QVERIFY2(solidInk < 120, "the bar is not drawn where the test looks");
+    QVERIFY2(fadedInk > solidInk, "the busy fade does not cover the exported GPU commands");
+}

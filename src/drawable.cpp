@@ -830,15 +830,23 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
             // painter is in whatever state the last layerable left, and a GPU command's QPainter
             // form must look like the command did on screen. QCPPainter::setAntialiasing also
             // restores the half-pixel shift the off state carried.
+            // The busy fade the layer put on this object is part of that state too: the deferred
+            // pass runs after the layer's restore(), where the painter is opaque again.
+            // The busy fade the layer put on this object is part of that state too: the deferred
+            // pass runs after the layer's restore(), where the painter is opaque again.
             const bool antialiased = painter.renderHints().testFlag(QPainter::Antialiasing);
+            const qreal opacity = painter.opacity();
             view.layer->deferGpuPainter(
                 [list = &mState->recording, state = std::weak_ptr<State>(mState), frame,
-                 antialiased](QCPPainter& target)
+                 antialiased, opacity](QCPPainter& target)
                 {
                     if (state.expired())
                         return;
+                    target.save();
+                    target.setOpacity(opacity);
                     qcpReplayWithPainter(*list, target, frame, QCPReplayKinds::GpuOnly, nullptr,
                                          true, antialiased);
+                    target.restore();
                 });
         }
         return;

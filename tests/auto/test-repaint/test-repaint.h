@@ -71,6 +71,7 @@ private slots:
     void layoutDescribesTheScreenAfterAnExport();
     void hiddenPlotLaysOutAtItsSize();
     void dashedLineStacksLikeSolid();
+    void busyFadeCoversTheGpuCommandsInAnExport();
     void dashPhaseSurvivesPan();
     void dashedLineMatchesExportDashes();
     void solidLinesKeepTheirVertexFormat();
