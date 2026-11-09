@@ -302,3 +302,32 @@ void TestErrorBarGeometry::swappingThePlottablesAxesReRecords()
     plot->replot();
     QCOMPARE(bars->recordings(), before + 1);
 }
+
+// The vector overloads replace the container's contents without going through data(), and the
+// dependency hash only saw the count: the same number of bars with other errors kept the old
+// recording, so the plot kept drawing the old whiskers while the click test read the new ones.
+void TestErrorBarGeometry::aSameCountSetDataReRecords()
+{
+    RecordingErrorBars* bars = nullptr;
+    auto plot = makeBarsPlot(&bars);
+    const int recorded = bars->recordings();
+    const QPointF oldEnd(plot->xAxis->coordToPixel(0.5), plot->yAxis->coordToPixel(0.6));
+    QVERIFY2(redPixelsNear(imageOf(*plot), oldEnd, 2) > 0, "the first whisker is not at 0.6");
+
+    bars->setData(QVector<double> { 1.0, 1.0, 1.0 });
+    plot->replot();
+    QVERIFY2(bars->recordings() > recorded, "a same-count setData kept the old recording");
+    const QPointF newEnd(plot->xAxis->coordToPixel(0.5), plot->yAxis->coordToPixel(1.2));
+    QVERIFY2(redPixelsNear(imageOf(*plot), newEnd, 2) > 0, "the new error is not drawn");
+
+    // Every addData overload appends to the same container: it must remake the recording too, even
+    // when the attached plottable has no data point for the new bar.
+    int before = bars->recordings();
+    bars->addData(QVector<double> { 0.5 });
+    plot->replot();
+    QVERIFY2(bars->recordings() > before, "a vector addData kept the old recording");
+    before = bars->recordings();
+    bars->addData(0.5, 0.5);
+    plot->replot();
+    QVERIFY2(bars->recordings() > before, "an addData kept the old recording");
+}

@@ -179,6 +179,7 @@ void QCPErrorBars::setData(QSharedPointer<QCPErrorBarsDataContainer> data)
 */
 void QCPErrorBars::setData(const QVector<double>& error)
 {
+    markDirty();
     mDataContainer->clear();
     addData(error);
 }
@@ -195,6 +196,7 @@ void QCPErrorBars::setData(const QVector<double>& error)
 */
 void QCPErrorBars::setData(const QVector<double>& errorMinus, const QVector<double>& errorPlus)
 {
+    markDirty();
     mDataContainer->clear();
     addData(errorMinus, errorPlus);
 }
@@ -302,6 +304,9 @@ void QCPErrorBars::addData(const QVector<double>& errorMinus, const QVector<doub
                  << "minus and plus error vectors have different sizes:" << errorMinus.size()
                  << errorPlus.size();
     const int n = qMin(errorMinus.size(), errorPlus.size());
+    if (n == 0)
+        return;
+    markDirty();
     mDataContainer->reserve(n);
     for (int i = 0; i < n; ++i)
         mDataContainer->append(QCPErrorBarsData(errorMinus.at(i), errorPlus.at(i)));
@@ -318,6 +323,7 @@ void QCPErrorBars::addData(const QVector<double>& errorMinus, const QVector<doub
 */
 void QCPErrorBars::addData(double error)
 {
+    markDirty();
     mDataContainer->append(QCPErrorBarsData(error));
 }
 
@@ -333,6 +339,7 @@ void QCPErrorBars::addData(double error)
 */
 void QCPErrorBars::addData(double errorMinus, double errorPlus)
 {
+    markDirty();
     mDataContainer->append(QCPErrorBarsData(errorMinus, errorPlus));
 }
 

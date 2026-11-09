@@ -17,4 +17,5 @@ private slots:
     void anInPlaceEditThroughDataIsDrawn();
     void aReplotWithoutADataAccessDoesNotReRecord();
     void swappingThePlottablesAxesReRecords();
+    void aSameCountSetDataReRecords();
 };
