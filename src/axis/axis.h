@@ -350,6 +350,9 @@ public:
 
     static AxisType opposite(AxisType type);
 
+    // The part of this axis at pos, spNone where there is none. Public as in 2.x.
+    SelectablePart getPartAt(const QPointF& pos) const override;
+
 protected:
     // property members:
     // axis base:
@@ -404,7 +407,6 @@ protected:
     virtual void markAppearanceDirty() override;
     virtual bool checkLinkSource(const QCPAxisBase* source) const override;
     virtual void rangeDidChange(const QCPRange& oldRange) override;
-    SelectablePart getPartAt(const QPointF& pos) const override;
 
     // reimplemented virtual methods:
     virtual void applyDefaultAntialiasingHint(QCPPainter* painter) const override;

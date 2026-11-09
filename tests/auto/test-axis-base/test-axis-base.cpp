@@ -206,6 +206,9 @@ void TestAxisBase::cartesianAxisApiStillCompiles()
     connect(axis, &QCPAxis::scaleTypeChanged, &plot, [&fired](QCPAxis::ScaleType) { ++fired; });
     axis->setScaleType(QCPAxis::stLinear);
     QCOMPARE(fired, 1);
+
+    // getPartAt is 2.x public API: hover cursors and context menus call it from outside.
+    QCOMPARE(axis->getPartAt(QPointF(-100, -100)), QCPAxis::spNone);
 }
 
 void TestAxisBase::axisPropertiesStillNotify()

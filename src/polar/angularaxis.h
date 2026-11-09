@@ -160,6 +160,9 @@ public:
     void pixelToCoord(QPointF pixelPos, double& angleCoord, double& radiusCoord) const;
     QPointF coordToPixel(double angleCoord, double radiusCoord) const;
 
+    // The part of this axis at pos, spNone where there is none. Public as in 2.x.
+    SelectablePart getPartAt(const QPointF& pos) const override;
+
 protected:
     // property members:
     double mAngle, mAngleRad;
@@ -198,7 +201,6 @@ protected:
     // reimplemented virtual methods:
     virtual void applyDefaultAntialiasingHint(QCPPainter* painter) const override;
     virtual void draw(QCPPainter* painter) override;
-    SelectablePart getPartAt(const QPointF& pos) const override;
     void rangeDidChange(const QCPRange& oldRange) override;
     bool checkLinkSource(const QCPAxisBase* source) const override;
 

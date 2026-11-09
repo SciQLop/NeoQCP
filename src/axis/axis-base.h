@@ -172,6 +172,10 @@ public:
     // The area this axis is drawn in.
     virtual QCPArea* area() const = 0;
 
+    // The part of this axis at pos, spNone where there is none. Public as in 2.x, where hover
+    // cursors and context menus call it directly.
+    virtual SelectablePart getPartAt(const QPointF& pos) const = 0;
+
 signals:
     void rangeChanged(const QCPRange& newRange, const QCPRange& oldRange);
     void scaleTypeChanged(QCPAxisBase::ScaleType scaleType);
@@ -221,9 +225,6 @@ protected:
     virtual void markAppearanceDirty();
     // The checks a subclass adds before it lets a link be made. The default accepts.
     virtual bool checkLinkSource(const QCPAxisBase* source) const;
-
-    // The part of this axis at pos, spNone where there is none.
-    virtual SelectablePart getPartAt(const QPointF& pos) const = 0;
 
     // Takes the source's range, its direction included, through the link's forward function.
     void refreshFromLink();
