@@ -3,6 +3,29 @@
 Work that was deferred during the 3.0 milestones, to triage before 3.0 ships. Each item says what a
 user would see and where the code is. Fixed items are deleted, not ticked.
 
+## From milestone 4e (the remaining plottables and items record; one span class)
+
+- **A recording made again allocates fresh buffers** (command list, context, pens): a click that
+  selects an item is +23 % (about 3.5 us). Upgrade: recycle the previous recording's buffers through
+  `QCPDrawContext`.
+- **Per-item replay overhead** (view, staleness check, frame; `qcpDrawnViewOf`,
+  `QCPDrawnCore::ensureRecording`) is the rest of the item rows' cost (mixed kinds +4..6 %). A layer
+  whose items all move with the data could shift its texture on a pan
+  (`QCPLayer::canTranslateInsteadOfRepaint`).
+- **A span edge in pixels or on an anchor records every frame** (`QCPItemSpan::draw`).
+- **`QCPLineEnding::draw` builds a `QPainterPath` per call** for its painter users (axes).
+- **An unclipped tracer's crosshair spans the axis rect**, not the widget (2.x spanned the viewport).
+- **Rect and ellipse keep a positions-based `dataExtent`**: `asPosition()` gives pixels for a position
+  mixing plot and absolute coordinates.
+- **The layer index pads an error-bar command by its pen only**, not the whisker half-width; a click on
+  a whisker tip just outside the data box can miss through the index (`selectTest` is exact).
+- **Two-colour OHLC strokes are grouped per colour**: overlapping entries of different colours no
+  longer interleave in entry order.
+- **A painter-only plottable records an empty list when hit-tested**, so its `recordingCount()` counts
+  hit tests; a subclass that forgets `draw(QCPDrawContext&)` draws nothing, silently.
+- **SciQLopPlots names `QCPItemVSpan`/`QCPItemHSpan` in 16 places**: port to `QCPItemSpan` at the next
+  NeoQCP pin bump.
+
 ## From milestone 4d (axes, linked axes, alignment groups)
 
 - **A log linked axis is re-clamped late.** After `setScaleType(stLogarithmic)` on a linked axis whose
