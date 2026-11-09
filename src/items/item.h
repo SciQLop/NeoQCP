@@ -262,6 +262,13 @@ public:
     //! The pixel distance from \a at to the recording, or none when it missed.
     std::optional<double> hitTest(QCP::Pixels at, QVariant* details) const override;
 
+    /*!
+      What this item's drawing depends on besides its own content: the items its positions hang
+      from, hashed in order by their content generation and their own dependency revision. An item
+      without parent anchors answers 0, and the walk costs only the null checks of its positions.
+    */
+    [[nodiscard]] quint64 dependencyRevision() const override;
+
     //! The legend icon: the recording, unless the class records its own.
     void drawLegendIcon(QCPDrawContext& icon) const override { draw(icon); }
 

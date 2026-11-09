@@ -354,11 +354,12 @@ void QCPItemTracer::draw(QCPDrawContext& context) const
 /*! \internal
 
   The revision of the graph whose data the recorded position came from: a new sample moves the
-  tracer, so the recording is stale even though nothing on the tracer itself changed.
+  tracer, so the recording is stale even though nothing on the tracer itself changed. An item
+  anchored to this tracer follows it through the base's answer too, so both are hashed in order.
 */
 quint64 QCPItemTracer::dependencyRevision() const
 {
-    return qcpDependencyKey(mGraph.data());
+    return qHashMulti(qcpDependencyKey(mGraph.data()), QCPAbstractItem::dependencyRevision());
 }
 
 /*!

@@ -1331,6 +1331,26 @@ std::optional<double> QCPAbstractItem::hitTest(QCP::Pixels at, QVariant* details
     return mCore.hitTest(*this, at, details, view());
 }
 
+/*!
+  The items this one hangs from, through its positions' parent anchors: their content generation and
+  everything they in turn depend on, hashed in order. The anchor chain is acyclic (setParentAnchor
+  refuses one that closes a loop), so this walk terminates; a self anchor is skipped all the same.
+*/
+quint64 QCPAbstractItem::dependencyRevision() const
+{
+    quint64 revision = 0;
+    for (const QCPItemPosition* position : mPositions)
+        for (const QCPItemAnchor* anchor : { position->parentAnchorX(), position->parentAnchorY() })
+        {
+            const QCPAbstractItem* parent = anchor ? anchor->mParentItem : nullptr;
+            if (!parent || parent->mDetachingAnchors || parent == this)
+                continue;
+            revision = qHashMulti(revision, quint64(parent->mCore.generation()),
+                                  parent->dependencyRevision());
+        }
+    return revision;
+}
+
 //! The click path: the distance to the recording, or -1 when the click misses it.
 double QCPAbstractItem::selectTest(const QPointF& pos, bool onlySelectable, QVariant* details) const
 {

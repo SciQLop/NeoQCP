@@ -14,6 +14,7 @@ private slots:
     void aPannedArrowIsRightAfterThePan();
     void anAnchoredArrowFollowsThePan();
     void aRatioArrowFollowsTheAxisRect();
+    void aFollowerFollowsItsAnchorItem();
     void everyStyleSetterReRecords();
     void aRectRecords();
     void anEllipseRecords();

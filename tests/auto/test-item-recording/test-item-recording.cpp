@@ -288,6 +288,40 @@ void TestItemRecording::aRatioArrowFollowsTheAxisRect()
                             .arg(oldEnd.y())));
 }
 
+void TestItemRecording::aFollowerFollowsItsAnchorItem()
+{
+    // The curve hangs from a tracer by its end. New graph data moves the tracer, and nothing calls
+    // the curve: its recording must depend on the item it hangs from, or it draws the old pixels.
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
+    graph->setData(QVector<double> { 1, 2, 3, 4 }, QVector<double> { 0.2, 0.2, 0.2, 0.2 });
+    auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
+    tracer->setGraph(graph);
+    tracer->setGraphKey(2.0);
+    tracer->setStyle(QCPItemTracer::tsNone);
+    tracer->setLayer(plot.layer(QStringLiteral("main")));
+    auto* curve = new RecordingItem<QCPItemCurve>(&plot);
+    curve->start->setCoords(1.0, 0.9);
+    curve->startDir->setCoords(2.0, 0.9);
+    curve->endDir->setCoords(2.0, 0.1);
+    curve->end->setParentAnchor(tracer->position);
+    // The graph's layer is repainted, so this test is about the dependency and not the scheduling.
+    curve->setLayer(plot.layer(QStringLiteral("main")));
+    plot.replot();
+
+    const int before = curve->recordings();
+    const QPointF oldEnd = curve->end->pixelPosition();
+    graph->setData(QVector<double> { 1, 2, 3, 4 }, QVector<double> { 0.8, 0.8, 0.8, 0.8 });
+    plot.replot();
+
+    QVERIFY2(curve->recordings() > before, "the follower kept a stale recording");
+    const QPointF end = curve->end->pixelPosition();
+    QVERIFY2(end != oldEnd, "the anchored end did not follow the tracer");
+    QVERIFY2(qAbs(end.y() - plot.yAxis->coordToPixel(0.8)) < 1.0,
+             "the anchored end is not on the tracer's new sample");
+}
+
 void TestItemRecording::everyStyleSetterReRecords()
 {
     QCustomPlot plot;
