@@ -966,10 +966,12 @@ void QCPIntervals::draw(QCPDrawContext& context) const
     // The bars are merged per pixel and laid out in pixel bands, and the wave style slants their
     // ends: the geometry is pixels, so the recording is made from the view and remade whenever the
     // view changes, a pan included (P-6). The recording is the only cache the bars need.
-    (void)context.transform();
+    mRecordedBarsTransform = context.transform();
+    mRecordedBars = mergedBars();
+    mRecordedBarsValid = true;
     if (mStyle == stWave)
         appendLaneBackdrops(context);
-    for (const auto& bar : mergedBars())
+    for (const auto& bar : mRecordedBars)
         recordBar(context, bar);
 }
 
@@ -1004,6 +1006,22 @@ std::vector<qcp::intervals::PixelBar> QCPIntervals::mergedBars() const
         if (const auto band = mLayout->laneBand(lane, mKeyAxis->axisRect()->rect()))
             appendLaneBars(bars, lane, *band);
     return bars;
+}
+
+//! The bars the labels are put on. The recording has just made them for this view: reusing them
+//! saves the label layer the scan of the same rows in the same frame. When the transform the
+//! recording read no longer matches the axes, that recording is stale (its layer was repainted
+//! alone), and the layer scans for itself.
+const std::vector<qcp::intervals::PixelBar>& QCPIntervals::labelBars()
+{
+    const QCPTransform now(mKeyAxis, mValueAxis);
+    if (!mRecordedBarsValid || mRecordedBarsTransform != now)
+    {
+        mRecordedBars = mergedBars();
+        mRecordedBarsTransform = now;
+        mRecordedBarsValid = true;
+    }
+    return mRecordedBars;
 }
 
 void QCPIntervals::recordBar(QCPDrawContext& context, const qcp::intervals::PixelBar& bar) const
@@ -1165,9 +1183,8 @@ void QCPIntervals::setStyle(Style style)
 {
     if (mStyle == style)
         return;
-    markDirty();
+    markDirty(); // it marks the label layer too
     mStyle = style;
-    markLayersDirty();
 }
 
 void QCPIntervals::drawLabels(QCPPainter* painter)
@@ -1177,7 +1194,7 @@ void QCPIntervals::drawLabels(QCPPainter* painter)
     // No label text, no second scan of the bars: the labels are the only reason this layer reads
     // the geometry at all.
     if (!mColumns.labels.isEmpty())
-        for (const auto& bar : mergedBars())
+        for (const auto& bar : labelBars())
         {
             // Merged bars (row == -1, see appendMerged) never get a label: it's ambiguous which
             // source row's text a bar spanning several rows would show.

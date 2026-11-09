@@ -154,6 +154,8 @@ protected:
     //! The bars to draw now, merged per pixel and in the current lane bands: the geometry both the
     //! recording and the labels are made of.
     [[nodiscard]] std::vector<qcp::intervals::PixelBar> mergedBars() const;
+    //! The bars to label: the ones the last recording made, when they still describe this view.
+    const std::vector<qcp::intervals::PixelBar>& labelBars();
     void appendLaneBars(std::vector<qcp::intervals::PixelBar>& bars, int lane,
                         const QCPLaneBand& band) const;
     [[nodiscard]] bool sameLabelAsLastBar(const std::vector<qcp::intervals::PixelBar>& bars,
@@ -252,6 +254,12 @@ protected:
         QString text;
     };
     std::vector<LabelRect> mLabelRects;
+    // The bars of the last recording, kept for the label layer so that it does not scan them again
+    // in the same frame; the transform they were made for says whether they still describe this
+    // view (a pan, a zoom or a resize makes them stale, and the layer scans as before).
+    mutable std::vector<qcp::intervals::PixelBar> mRecordedBars;
+    mutable QCPTransform mRecordedBarsTransform;
+    mutable bool mRecordedBarsValid = false;
     Style mStyle = stBars;
     StackMode mStack = skNone;
     bool mForbid = false;
