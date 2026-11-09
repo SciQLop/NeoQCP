@@ -180,15 +180,12 @@ void TestQCPAxisRect::axisRemovalConsequencesToItems()
   mPlot->replot();
 
   QVERIFY(mPlot->axisRect()->removeAxis(mPlot->xAxis));
-  expectDebugFrom("QCPItemPosition::pixelPosition", "Item position type x is ptPlotCoords, but no axes were defined"); // for start position
-  expectDebugFrom("QCPItemPosition::pixelPosition", "Item position type x is ptPlotCoords, but no axes were defined"); // for end position
+  // The item is recorded from its axes: without them the recording is refused, once for the item,
+  // and it draws nothing.
+  expectMissingAxis();
   mPlot->replot();
   QVERIFY(mPlot->axisRect()->removeAxis(mPlot->yAxis));
-  expectDebugFrom("QCPItemPosition::pixelPosition", "Item position type x is ptPlotCoords, but no axes were defined"); // for start position
-  expectDebugFrom("QCPItemPosition::pixelPosition", "Item position type y is ptPlotCoords, but no axes were defined"); // for start position
-  expectDebugFrom("QCPItemPosition::pixelPosition", "Item position type x is ptPlotCoords, but no axes were defined"); // for end position
-  expectDebugFrom("QCPItemPosition::pixelPosition", "Item position type y is ptPlotCoords, but no axes were defined"); // for end position
-  mPlot->replot();
+  mPlot->replot(); // the item already reported its missing axis
   
   
   expectDebugFrom("QCPItemPosition::setPixelPosition", "Item position type x is ptPlotCoords, but no axes were defined");
@@ -255,10 +252,8 @@ void TestQCPAxisRect::axisRectRemovalConsequencesToItems()
   QVERIFY(mPlot->plotLayout()->removeAt(0));
   mPlot->plotLayout()->simplify();
   QCOMPARE(mPlot->plotLayout()->elementCount(), 0);
-  expectDebugFrom("QCPItemPosition::pixelPosition", "Item position type x is ptAxisRectRatio, but no axis rect was defined"); // for start position
-  expectDebugFrom("QCPItemPosition::pixelPosition", "Item position type y is ptAxisRectRatio, but no axis rect was defined"); // for start position
-  expectDebugFrom("QCPItemPosition::pixelPosition", "Item position type x is ptPlotCoords, but no axes were defined"); // for end position
-  expectDebugFrom("QCPItemPosition::pixelPosition", "Item position type y is ptPlotCoords, but no axes were defined"); // for end position
+  // Both positions lost their axis rect and their axes: the recording is refused, once.
+  expectMissingAxis();
   mPlot->layer("main")->markDirty();
   mPlot->replot();
   

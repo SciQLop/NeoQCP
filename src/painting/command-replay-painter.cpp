@@ -341,12 +341,14 @@ void paintCommand(QCPPainter& painter, const QCPDrawCommand& command, const QCPD
 
 void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QCPDrawFrame& frame,
                           QCPReplayKinds kinds, const qcp::QCPRasterFallback* fallback,
-                          bool dashedAvailable, bool antialiasStrokes)
+                          bool dashedAvailable, bool antialiasStrokes, QCPReplayState state)
 {
     // PainterOnly leaves the GPU kinds to another pass: on screen the RHI replay, in an export the
     // layer's deferred GpuOnly pass. \a fallback, when there is one, draws the kinds the layer
     // refused; GpuOnly draws exactly the GPU kinds, so it never needs one.
-    painter.save();
+    const bool owned = state == QCPReplayState::Save;
+    if (owned)
+        painter.save();
     if (!frame.clip.isEmpty())
         painter.setClipRect(frame.clip);
     // A recording the layer could not take whole is painted by this pass like any other recording:
@@ -373,5 +375,6 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
         const bool stroke = !std::holds_alternative<qcp::ImageCmd>(command);
         qcp::paintCommand(painter, command, frame, { true, antialiasStrokes && stroke });
     }
-    painter.restore();
+    if (owned)
+        painter.restore();
 }

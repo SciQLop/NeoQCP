@@ -26,7 +26,25 @@
 #include "item-line.h"
 
 #include "../core.h"
-#include "../painting/painter.h"
+#include "../painting/draw-context.h"
+
+#include <array>
+
+namespace
+{
+//! The pixel of a recorded position: read through the transform when it is data (so the recording
+//! knows it follows the view), from the position itself otherwise.
+QPointF pixelOf(const QCPDrawContext& context, const QCP::Position& at, QCPItemPosition* position)
+{
+    if (const auto* data = std::get_if<QCP::Data>(&at))
+    {
+        const QCP::Pixels pixels = context.transform().map(*data);
+        return QPointF(pixels.x, pixels.y);
+    }
+    return position->pixelPosition();
+}
+} // namespace
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPItemLine
@@ -123,144 +141,38 @@ void QCPItemLine::setTail(const QCPLineEnding& tail)
 }
 
 /* inherits documentation from base class */
-double QCPItemLine::selectTest(const QPointF& pos, bool onlySelectable,
-                               [[maybe_unused]] QVariant* details) const
+void QCPItemLine::draw(QCPDrawContext& context) const
 {
-    if (onlySelectable && !mSelectable)
-        return -1;
-
-    return qSqrt(
-        QCPVector2D(pos).distanceSquaredToLine(start->pixelPosition(), end->pixelPosition()));
-}
-
-/* inherits documentation from base class */
-void QCPItemLine::draw(QCPPainter* painter)
-{
-    QCPVector2D startVec(start->pixelPosition());
-    QCPVector2D endVec(end->pixelPosition());
+    bool snapshot = false;
+    const QCP::Position from = start->asPosition(&snapshot);
+    const QCP::Position to = end->asPosition(&snapshot);
+    if (snapshot)
+        context.recordEveryFrame();
+    // A plain line is data on both ends: it is recorded as data and a pan only shifts it.
+    if (mHead.style() == QCPLineEnding::esNone && mTail.style() == QCPLineEnding::esNone)
+    {
+        context.polyline(std::array<QCP::Position, 2> { from, to }, mainPen());
+        return;
+    }
+    // The endings are pixels: their direction comes from the view, so this recording is remade
+    // whenever the view changes (a pan included), as P-6 allows.
+    const QPointF startPixel = pixelOf(context, from, start);
+    const QPointF endPixel = pixelOf(context, to, end);
+    const QCPVector2D startVec(startPixel);
+    const QCPVector2D endVec(endPixel);
     if (qFuzzyIsNull((startVec - endVec).lengthSquared()))
         return;
-    // get visible segment of straight line inside clipRect:
-    int clipPad = int(qMax(mHead.boundingDistance(), mTail.boundingDistance()));
-    clipPad = qMax(clipPad, qCeil(mainPen().widthF()));
-    QLineF line = getRectClippedLine(startVec, endVec,
-                                     clipRect().adjusted(-clipPad, -clipPad, clipPad, clipPad));
-    // paint visible segment, if existent:
-    if (!line.isNull())
-    {
-        painter->setPen(mainPen());
-        painter->drawLine(line);
-        painter->setBrush(Qt::SolidPattern);
-        if (mTail.style() != QCPLineEnding::esNone)
-            mTail.draw(painter, startVec, startVec - endVec);
-        if (mHead.style() != QCPLineEnding::esNone)
-            mHead.draw(painter, endVec, endVec - startVec);
-    }
-}
-
-/*! \internal
-
-  Returns the section of the line defined by \a start and \a end, that is visible in the specified
-  \a rect.
-
-  This is a helper function for \ref draw.
-*/
-QLineF QCPItemLine::getRectClippedLine(const QCPVector2D& start, const QCPVector2D& end,
-                                       const QRect& rect) const
-{
-    // No rounding to int: an end far outside the view is beyond int range (SciQLop#151).
-    const QRectF bounds(rect);
-    bool containsStart = bounds.contains(start.toPointF());
-    bool containsEnd = bounds.contains(end.toPointF());
-    if (containsStart && containsEnd)
-        return { start.toPointF(), end.toPointF() };
-
-    QCPVector2D base = start;
-    QCPVector2D vec = end - start;
-    double bx, by;
-    double gamma, mu;
-    QLineF result;
-    QList<QCPVector2D> pointVectors;
-
-    if (!qFuzzyIsNull(vec.y())) // line is not horizontal
-    {
-        // check top of rect:
-        bx = rect.left();
-        by = rect.top();
-        mu = (by - base.y()) / vec.y();
-        if (mu >= 0 && mu <= 1)
-        {
-            gamma = base.x() - bx + mu * vec.x();
-            if (gamma >= 0 && gamma <= rect.width())
-                pointVectors.append(QCPVector2D(bx + gamma, by));
-        }
-        // check bottom of rect:
-        bx = rect.left();
-        by = rect.bottom();
-        mu = (by - base.y()) / vec.y();
-        if (mu >= 0 && mu <= 1)
-        {
-            gamma = base.x() - bx + mu * vec.x();
-            if (gamma >= 0 && gamma <= rect.width())
-                pointVectors.append(QCPVector2D(bx + gamma, by));
-        }
-    }
-    if (!qFuzzyIsNull(vec.x())) // line is not vertical
-    {
-        // check left of rect:
-        bx = rect.left();
-        by = rect.top();
-        mu = (bx - base.x()) / vec.x();
-        if (mu >= 0 && mu <= 1)
-        {
-            gamma = base.y() - by + mu * vec.y();
-            if (gamma >= 0 && gamma <= rect.height())
-                pointVectors.append(QCPVector2D(bx, by + gamma));
-        }
-        // check right of rect:
-        bx = rect.right();
-        by = rect.top();
-        mu = (bx - base.x()) / vec.x();
-        if (mu >= 0 && mu <= 1)
-        {
-            gamma = base.y() - by + mu * vec.y();
-            if (gamma >= 0 && gamma <= rect.height())
-                pointVectors.append(QCPVector2D(bx, by + gamma));
-        }
-    }
-
-    if (containsStart)
-        pointVectors.append(start);
-    if (containsEnd)
-        pointVectors.append(end);
-
-    // evaluate points:
-    if (pointVectors.size() == 2)
-    {
-        result.setPoints(pointVectors.at(0).toPointF(), pointVectors.at(1).toPointF());
-    }
-    else if (pointVectors.size() > 2)
-    {
-        // line probably goes through corner of rect, and we got two points there. single out the
-        // point pair with greatest distance:
-        double distSqrMax = 0;
-        QCPVector2D pv1, pv2;
-        for (int i = 0; i < pointVectors.size() - 1; ++i)
-        {
-            for (int k = i + 1; k < pointVectors.size(); ++k)
-            {
-                double distSqr = (pointVectors.at(i) - pointVectors.at(k)).lengthSquared();
-                if (distSqr > distSqrMax)
-                {
-                    pv1 = pointVectors.at(i);
-                    pv2 = pointVectors.at(k);
-                    distSqrMax = distSqr;
-                }
-            }
-        }
-        result.setPoints(pv1.toPointF(), pv2.toPointF());
-    }
-    return result;
+    context.polyline(std::array<QCP::Position, 2> { from, to }, mainPen());
+    const QPen pen = mainPen();
+    const double penWidth = pen.widthF();
+    if (mTail.style() != QCPLineEnding::esNone)
+        context.path(QCP::Pixels { startPixel.x(), startPixel.y() },
+                     mTail.path(startVec - endVec, penWidth), mTail.penFor(pen),
+                     mTail.brushFor(pen));
+    if (mHead.style() != QCPLineEnding::esNone)
+        context.path(QCP::Pixels { endPixel.x(), endPixel.y() },
+                     mHead.path(endVec - startVec, penWidth), mHead.penFor(pen),
+                     mHead.brushFor(pen));
 }
 
 /*! \internal

@@ -813,7 +813,9 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
         {
             // A screen without a backend: the painter draws it all, and never touches the caches a
             // screen frame resolves into.
-            qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::All);
+            // The layer brackets this draw with save()/restore(): the replay need not repeat it.
+            qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::All, nullptr,
+                                 true, false, QCPReplayState::AlreadySaved);
             notePainted(view);
             return;
         }
@@ -821,7 +823,8 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
         // GPU commands' QPainter forms over it, at the end of the layer's pass. Another object's
         // draw can delete this one before then, so the callback asks whether the recording is
         // still there: an object deleted mid-pass draws nothing more.
-        qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::PainterOnly);
+        qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::PainterOnly, nullptr,
+                             true, false, QCPReplayState::AlreadySaved);
         if (view.layer)
         {
             // The deferred pass paints with the antialiasing this object drew with: the layer's
@@ -849,7 +852,8 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
     if (!plottables->dashedAvailable() && mState->movesWithTheData)
         mState->movesWithTheData = qcpRecordingMovesWithTheData(mState->recording, false);
     qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::PainterOnly,
-                         &mState->raster, plottables->dashedAvailable());
+                         &mState->raster, plottables->dashedAvailable(), false,
+                         QCPReplayState::AlreadySaved);
     notePainted(view);
 }
 

@@ -26,7 +26,9 @@
 #include "item-straightline.h"
 
 #include "../core.h"
-#include "../painting/painter.h"
+#include "../painting/draw-context.h"
+
+#include <array>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPItemStraightLine
@@ -88,31 +90,20 @@ void QCPItemStraightLine::setSelectedPen(const QPen& pen)
 }
 
 /* inherits documentation from base class */
-double QCPItemStraightLine::selectTest(const QPointF& pos, bool onlySelectable,
-                                       [[maybe_unused]] QVariant* details) const
+void QCPItemStraightLine::draw(QCPDrawContext& context) const
 {
-    if (onlySelectable && !mSelectable)
-        return -1;
-
-    return QCPVector2D(pos).distanceToStraightLine(
-        point1->pixelPosition(), point2->pixelPosition() - point1->pixelPosition());
-}
-
-/* inherits documentation from base class */
-void QCPItemStraightLine::draw(QCPPainter* painter)
-{
-    QCPVector2D start(point1->pixelPosition());
-    QCPVector2D end(point2->pixelPosition());
-    // get visible segment of straight line inside clipRect:
-    int clipPad = qCeil(mainPen().widthF());
-    QLineF line = getRectClippedStraightLine(
+    // The line fills the view: it is cut to the clip rect, which moves with the view.
+    context.recordEveryFrame();
+    const QCPVector2D start(point1->pixelPosition());
+    const QCPVector2D end(point2->pixelPosition());
+    const int clipPad = qCeil(mainPen().widthF());
+    const QLineF line = getRectClippedStraightLine(
         start, end - start, clipRect().adjusted(-clipPad, -clipPad, clipPad, clipPad));
-    // paint visible segment, if existent:
-    if (!line.isNull())
-    {
-        painter->setPen(mainPen());
-        painter->drawLine(line);
-    }
+    if (line.isNull())
+        return;
+    context.polyline(std::array<QCP::Position, 2> { QCP::Pixels { line.x1(), line.y1() },
+                                                   QCP::Pixels { line.x2(), line.y2() } },
+                     mainPen());
 }
 
 /*! \internal

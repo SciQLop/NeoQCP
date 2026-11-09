@@ -29,6 +29,8 @@
 #include "global.h"
 #include "vector2d.h"
 
+#include <QPainterPath>
+
 class QCPPainter;
 
 class QCP_LIB_DECL QCPLineEnding
@@ -97,6 +99,20 @@ public:
     double realLength() const;
     void draw(QCPPainter* painter, const QCPVector2D& pos, const QCPVector2D& dir) const;
     void draw(QCPPainter* painter, const QCPVector2D& pos, double angle) const;
+
+    //! The ending's outline with its tip at the origin, pointing along \a direction. \a penWidth
+    //! is the width of the pen it is drawn with: a skewed bar is shifted along the line by half of
+    //! it.
+    QPainterPath path(const QCPVector2D& direction, double penWidth) const;
+
+    //! Whether a brush fills the ending (a solid shape), or the pen alone strokes it.
+    bool filled() const;
+
+    //! The pen to draw this ending with, given the pen of the line it decorates.
+    QPen penFor(const QPen& base) const;
+
+    //! The brush to fill this ending with, given the pen of the line it decorates.
+    QBrush brushFor(const QPen& base) const;
 
 protected:
     // property members:

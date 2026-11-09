@@ -29,7 +29,7 @@
 #include <array>
 
 #include "../core.h"
-#include "../painting/painter.h"
+#include "../painting/draw-context.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPItemCurve
@@ -136,47 +136,23 @@ void QCPItemCurve::setTail(const QCPLineEnding& tail)
 }
 
 /* inherits documentation from base class */
-double QCPItemCurve::selectTest(const QPointF& pos, bool onlySelectable,
-                                [[maybe_unused]] QVariant* details) const
+void QCPItemCurve::draw(QCPDrawContext& context) const
 {
-    if (onlySelectable && !mSelectable)
-        return -1;
-
-    QPointF startVec(start->pixelPosition());
-    QPointF startDirVec(startDir->pixelPosition());
-    QPointF endDirVec(endDir->pixelPosition());
-    QPointF endVec(end->pixelPosition());
-
-    QPainterPath cubicPath(startVec);
-    cubicPath.cubicTo(startDirVec, endDirVec, endVec);
-
-    QList<QPolygonF> polygons = cubicPath.toSubpathPolygons();
-    if (polygons.isEmpty())
-        return -1;
-    const QPolygonF polygon = polygons.first();
-    QCPVector2D p(pos);
-    double minDistSqr = (std::numeric_limits<double>::max)();
-    for (int i = 1; i < polygon.size(); ++i)
-    {
-        double distSqr = p.distanceSquaredToLine(polygon.at(i - 1), polygon.at(i));
-        if (distSqr < minDistSqr)
-            minDistSqr = distSqr;
-    }
-    return qSqrt(minDistSqr);
-}
-
-/* inherits documentation from base class */
-void QCPItemCurve::draw(QCPPainter* painter)
-{
-    QCPVector2D startVec(start->pixelPosition());
-    QCPVector2D startDirVec(startDir->pixelPosition());
-    QCPVector2D endDirVec(endDir->pixelPosition());
-    QCPVector2D endVec(end->pixelPosition());
-    if ((endVec - startVec).length() > 1e10) // too large curves cause crash
+    const QPointF startPixel(start->pixelPosition());
+    const QPointF startDirPixel(startDir->pixelPosition());
+    const QPointF endDirPixel(endDir->pixelPosition());
+    const QPointF endPixel(end->pixelPosition());
+    if ((QCPVector2D(endPixel) - QCPVector2D(startPixel)).length()
+        > 1e10) // too large curves cause crash
         return;
 
-    QPainterPath cubicPath(startVec.toPointF());
-    cubicPath.cubicTo(startDirVec.toPointF(), endDirVec.toPointF(), endVec.toPointF());
+    // The curve is recorded in pixels, so the view decides where it is: reading the transform
+    // remakes the recording whenever the view changes (P-6).
+    const QCPTransform& transform = context.transform();
+    Q_UNUSED(transform)
+
+    QPainterPath cubicPath(startPixel);
+    cubicPath.cubicTo(startDirPixel, endDirPixel, endPixel);
 
     // paint visible segment, if existent:
     const int clipEnlarge = qCeil(mainPen().widthF());
@@ -186,15 +162,26 @@ void QCPItemCurve::draw(QCPPainter* painter)
     QRectF cubicRect = cubicPath.controlPointRect();
     if (cubicRect.isEmpty()) // may happen when start and end exactly on same x or y position
         cubicRect.adjust(0, 0, 1, 1);
-    if (clip.intersects(cubicRect))
+    if (!clip.intersects(cubicRect))
+        return;
+
+    const QPen pen = mainPen();
+    const QCP::Pixels origin { startPixel.x(), startPixel.y() };
+    // The path is recorded in pixels from the origin, so it is shifted there.
+    context.path(origin, cubicPath.translated(-startPixel), pen, Qt::NoBrush);
+    const double penWidth = pen.widthF();
+    if (mTail.style() != QCPLineEnding::esNone)
     {
-        painter->setPen(mainPen());
-        painter->drawPath(cubicPath);
-        painter->setBrush(Qt::SolidPattern);
-        if (mTail.style() != QCPLineEnding::esNone)
-            mTail.draw(painter, startVec, M_PI - cubicPath.angleAtPercent(0) / 180.0 * M_PI);
-        if (mHead.style() != QCPLineEnding::esNone)
-            mHead.draw(painter, endVec, -cubicPath.angleAtPercent(1) / 180.0 * M_PI);
+        const double angle = M_PI - cubicPath.angleAtPercent(0) / 180.0 * M_PI;
+        context.path(origin, mTail.path(QCPVector2D(qCos(angle), qSin(angle)), penWidth),
+                     mTail.penFor(pen), mTail.brushFor(pen));
+    }
+    if (mHead.style() != QCPLineEnding::esNone)
+    {
+        const double angle = -cubicPath.angleAtPercent(1) / 180.0 * M_PI;
+        context.path(QCP::Pixels { endPixel.x(), endPixel.y() },
+                     mHead.path(QCPVector2D(qCos(angle), qSin(angle)), penWidth),
+                     mHead.penFor(pen), mHead.brushFor(pen));
     }
 }
 

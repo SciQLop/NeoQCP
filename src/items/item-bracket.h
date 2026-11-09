@@ -86,8 +86,7 @@ public:
     void setStyle(BracketStyle style);
 
     // reimplemented virtual methods:
-    virtual double selectTest(const QPointF& pos, bool onlySelectable,
-                              QVariant* details = nullptr) const override;
+    void draw(QCPDrawContext& context) const override;
 
     // what the layer's index needs; see QCPAbstractItem::dataExtent()
     [[nodiscard]] std::optional<QCPItemExtent> dataExtent() const override;
@@ -108,7 +107,6 @@ protected:
     BracketStyle mStyle;
 
     // reimplemented virtual methods:
-    virtual void draw(QCPPainter* painter) override;
     virtual QPointF anchorPixelPosition(int anchorId) const override;
 
     // non-virtual methods:

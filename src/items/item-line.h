@@ -68,8 +68,7 @@ public:
     void setTail(const QCPLineEnding& tail);
 
     // reimplemented virtual methods:
-    virtual double selectTest(const QPointF& pos, bool onlySelectable,
-                              QVariant* details = nullptr) const override;
+    void draw(QCPDrawContext& context) const override;
 
     // what the layer's index needs; see QCPAbstractItem::dataExtent()
     [[nodiscard]] std::optional<QCPItemExtent> dataExtent() const override;
@@ -82,12 +81,7 @@ protected:
     QPen mPen, mSelectedPen;
     QCPLineEnding mHead, mTail;
 
-    // reimplemented virtual methods:
-    virtual void draw(QCPPainter* painter) override;
-
     // non-virtual methods:
-    QLineF getRectClippedLine(const QCPVector2D& start, const QCPVector2D& end,
-                              const QRect& rect) const;
     QPen mainPen() const;
 };
 

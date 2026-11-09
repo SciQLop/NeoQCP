@@ -60,8 +60,7 @@ public:
     void setSelectedPen(const QPen& pen);
 
     // reimplemented virtual methods:
-    virtual double selectTest(const QPointF& pos, bool onlySelectable,
-                              QVariant* details = nullptr) const override;
+    void draw(QCPDrawContext& context) const override;
 
     QCPItemPosition* const point1;
     QCPItemPosition* const point2;
@@ -69,9 +68,6 @@ public:
 protected:
     // property members:
     QPen mPen, mSelectedPen;
-
-    // reimplemented virtual methods:
-    virtual void draw(QCPPainter* painter) override;
 
     // non-virtual methods:
     QLineF getRectClippedStraightLine(const QCPVector2D& base, const QCPVector2D& vec,

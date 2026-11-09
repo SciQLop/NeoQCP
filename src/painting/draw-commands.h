@@ -744,10 +744,19 @@ void paintCommand(QCPPainter& painter, const QCPDrawCommand& command, const QCPD
                   PaintMode mode = { });
 } // namespace qcp
 
+//! Whether the replay has to bracket its work with save()/restore(): the layer already does, for
+//! every child it draws, so a layerable's own replay is AlreadySaved.
+enum class QCPReplayState
+{
+    Save,
+    AlreadySaved
+};
+
 //! The commands a full frame could not draw on the GPU (no QRhi, export, or the layer's image cap)
 //! are painted here: in PainterOnly a GPU kind is drawn only when \a fallback says the layer left
 //! it to this pass.
 void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QCPDrawFrame& frame,
                           QCPReplayKinds kinds = QCPReplayKinds::All,
                           const qcp::QCPRasterFallback* fallback = nullptr,
-                          bool dashedAvailable = true, bool antialiasStrokes = false);
+                          bool dashedAvailable = true, bool antialiasStrokes = false,
+                          QCPReplayState state = QCPReplayState::Save);

@@ -186,109 +186,153 @@ void QCPLineEnding::draw(QCPPainter* painter, const QCPVector2D& pos, const QCPV
     if (mStyle == esNone)
         return;
 
-    QCPVector2D lengthVec = dir.normalized() * mLength * (mInverted ? -1 : 1);
+    const QPen base = painter->pen();
+    painter->save();
+    painter->setPen(penFor(base));
+    painter->setBrush(brushFor(base));
+    painter->translate(pos.x(), pos.y());
+    painter->drawPath(path(dir, base.widthF()));
+    painter->restore();
+}
+
+/*! \internal
+
+  Returns the ending's outline with its tip at the origin, pointing along \a direction. \a penWidth
+  is the width of the pen the ending is drawn with: a skewed bar is shifted along the line by half of
+  it, so that a thick line does not stick through the bar.
+*/
+QPainterPath QCPLineEnding::path(const QCPVector2D& direction, double penWidth) const
+{
+    QPainterPath path;
+    if (mStyle == esNone)
+        return path;
+
+    const QCPVector2D dir = direction.normalized();
+    QCPVector2D lengthVec = dir * mLength * (mInverted ? -1 : 1);
     if (lengthVec.isNull())
         lengthVec = QCPVector2D(1, 0);
-    QCPVector2D widthVec = dir.normalized().perpendicular() * mWidth * 0.5 * (mInverted ? -1 : 1);
-
-    QPen penBackup = painter->pen();
-    QBrush brushBackup = painter->brush();
-    QPen miterPen = penBackup;
-    miterPen.setJoinStyle(Qt::MiterJoin); // to make arrow heads spikey
-    QBrush brush(painter->pen().color(), Qt::SolidPattern);
+    const QCPVector2D widthVec = dir.perpendicular() * mWidth * 0.5 * (mInverted ? -1 : 1);
+    const QCPVector2D widthVecPerp = widthVec.perpendicular();
+    const auto at = [](const QCPVector2D& point) { return point.toPointF(); };
     switch (mStyle)
     {
         case esNone:
             break;
         case esFlatArrow:
         {
-            QPointF points[3] = { pos.toPointF(), (pos - lengthVec + widthVec).toPointF(),
-                                  (pos - lengthVec - widthVec).toPointF() };
-            painter->setPen(miterPen);
-            painter->setBrush(brush);
-            painter->drawConvexPolygon(points, 3);
-            painter->setBrush(brushBackup);
-            painter->setPen(penBackup);
+            path.addPolygon(QPolygonF { at(QCPVector2D()), at(-lengthVec + widthVec),
+                                        at(-lengthVec - widthVec) });
+            path.closeSubpath();
             break;
         }
         case esSpikeArrow:
         {
-            QPointF points[4]
-                = { pos.toPointF(), (pos - lengthVec + widthVec).toPointF(),
-                    (pos - lengthVec * 0.8).toPointF(), (pos - lengthVec - widthVec).toPointF() };
-            painter->setPen(miterPen);
-            painter->setBrush(brush);
-            painter->drawConvexPolygon(points, 4);
-            painter->setBrush(brushBackup);
-            painter->setPen(penBackup);
+            path.addPolygon(QPolygonF { at(QCPVector2D()), at(-lengthVec + widthVec),
+                                        at(-lengthVec * 0.8), at(-lengthVec - widthVec) });
+            path.closeSubpath();
             break;
         }
         case esLineArrow:
         {
-            QPointF points[3] = { (pos - lengthVec + widthVec).toPointF(), pos.toPointF(),
-                                  (pos - lengthVec - widthVec).toPointF() };
-            painter->setPen(miterPen);
-            painter->drawPolyline(points, 3);
-            painter->setPen(penBackup);
+            path.moveTo(at(-lengthVec + widthVec));
+            path.lineTo(at(QCPVector2D()));
+            path.lineTo(at(-lengthVec - widthVec));
             break;
         }
         case esDisc:
         {
-            painter->setBrush(brush);
-            painter->drawEllipse(pos.toPointF(), mWidth * 0.5, mWidth * 0.5);
-            painter->setBrush(brushBackup);
+            path.addEllipse(QPointF(0, 0), mWidth * 0.5, mWidth * 0.5);
             break;
         }
         case esSquare:
         {
-            QCPVector2D widthVecPerp = widthVec.perpendicular();
-            QPointF points[4] = { (pos - widthVecPerp + widthVec).toPointF(),
-                                  (pos - widthVecPerp - widthVec).toPointF(),
-                                  (pos + widthVecPerp - widthVec).toPointF(),
-                                  (pos + widthVecPerp + widthVec).toPointF() };
-            painter->setPen(miterPen);
-            painter->setBrush(brush);
-            painter->drawConvexPolygon(points, 4);
-            painter->setBrush(brushBackup);
-            painter->setPen(penBackup);
+            path.addPolygon(QPolygonF { at(-widthVecPerp + widthVec), at(-widthVecPerp - widthVec),
+                                        at(widthVecPerp - widthVec), at(widthVecPerp + widthVec) });
+            path.closeSubpath();
             break;
         }
         case esDiamond:
         {
-            QCPVector2D widthVecPerp = widthVec.perpendicular();
-            QPointF points[4] = { (pos - widthVecPerp).toPointF(), (pos - widthVec).toPointF(),
-                                  (pos + widthVecPerp).toPointF(), (pos + widthVec).toPointF() };
-            painter->setPen(miterPen);
-            painter->setBrush(brush);
-            painter->drawConvexPolygon(points, 4);
-            painter->setBrush(brushBackup);
-            painter->setPen(penBackup);
+            path.addPolygon(QPolygonF { at(-widthVecPerp), at(-widthVec), at(widthVecPerp),
+                                        at(widthVec) });
+            path.closeSubpath();
             break;
         }
         case esBar:
         {
-            painter->drawLine((pos + widthVec).toPointF(), (pos - widthVec).toPointF());
+            path.moveTo(at(widthVec));
+            path.lineTo(at(-widthVec));
             break;
         }
         case esHalfBar:
         {
-            painter->drawLine((pos + widthVec).toPointF(), pos.toPointF());
+            path.moveTo(at(widthVec));
+            path.lineTo(at(QCPVector2D()));
             break;
         }
         case esSkewedBar:
         {
+            // A thick line would stick through the bar: shift the bar along the line by half the
+            // pen width.
             QCPVector2D shift;
-            if (!qFuzzyIsNull(painter->pen().widthF())
-                || painter->modes().testFlag(QCPPainter::pmNonCosmetic))
-                shift = dir.normalized() * qMax(qreal(1.0), painter->pen().widthF()) * qreal(0.5);
-            // if drawing with thick (non-cosmetic) pen, shift bar a little in line direction to
-            // prevent line from sticking through bar slightly
-            painter->drawLine(
-                (pos + widthVec + lengthVec * 0.2 * (mInverted ? -1 : 1) + shift).toPointF(),
-                (pos - widthVec - lengthVec * 0.2 * (mInverted ? -1 : 1) + shift).toPointF());
+            if (!qFuzzyIsNull(penWidth))
+                shift = dir * qMax(qreal(1.0), qreal(penWidth)) * qreal(0.5);
+            const QCPVector2D tilt = lengthVec * 0.2 * (mInverted ? -1 : 1);
+            path.moveTo(at(widthVec + tilt + shift));
+            path.lineTo(at(-widthVec - tilt + shift));
             break;
         }
     }
+    return path;
+}
+
+/*! \internal
+
+  Whether a brush fills the ending, or the pen alone strokes it.
+*/
+bool QCPLineEnding::filled() const
+{
+    switch (mStyle)
+    {
+        case esFlatArrow:
+        case esSpikeArrow:
+        case esDisc:
+        case esSquare:
+        case esDiamond:
+            return true;
+        case esNone:
+        case esLineArrow:
+        case esBar:
+        case esHalfBar:
+        case esSkewedBar:
+            return false;
+    }
+    return false;
+}
+
+/*! \internal
+
+  The pen to draw this ending with, given the pen of the line it decorates: an arrow head joins
+  with a miter so its tip stays spikey, a disc keeps the line's join.
+*/
+QPen QCPLineEnding::penFor(const QPen& base) const
+{
+    QPen pen = base;
+    if (filled() && mStyle != esDisc)
+        pen.setJoinStyle(Qt::MiterJoin);
+    return pen;
+}
+
+/*! \internal
+
+  The brush to fill this ending with, given the pen of the line it decorates: a filled ending is
+  solid in the pen's colour, a stroked one is not filled at all.
+*/
+QBrush QCPLineEnding::brushFor(const QPen& base) const
+{
+    if (!filled())
+        return Qt::NoBrush;
+    return QBrush(base.color(), Qt::SolidPattern);
 }
 
 /*! \internal
