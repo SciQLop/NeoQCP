@@ -434,3 +434,31 @@ void TestErrorBarGeometry::aSwappedPlottableContainerReRecords()
     QVERIFY2(redPixelsNear(imageOf(*plot), newEnd, 2) > 0,
              "the bars did not follow the swapped container");
 }
+
+// A curve sorts by t, not by key: culling it with a key window drops the bars whose t is outside it.
+void TestErrorBarGeometry::aCurveRecordsEveryBar()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.xAxis->setRange(-1, 1);
+    plot.yAxis->setRange(-1, 1);
+    auto* curve = new QCPCurve(plot.xAxis, plot.yAxis);
+    const int n = 41;
+    QVector<QCPCurveData> points;
+    for (int i = 0; i < n; ++i)
+        points.append(QCPCurveData(i, -1.0 + 2.0 * i / (n - 1), 0.2));
+    curve->data()->set(points, true);
+    QVERIFY(!curve->sortKeyIsMainKey());
+    auto* bars = new RecordingErrorBars(plot.xAxis, plot.yAxis);
+    bars->setDataPlottable(curve);
+    bars->setErrorType(QCPErrorBars::etValueError);
+    bars->setData(QVector<double>(n, 0.3));
+    bars->setWhiskerWidth(6);
+    bars->setPen(QPen(QColor(200, 30, 30)));
+    plot.replot();
+
+    // The bar at t = 30 sits at key 0.5, far outside the key window in t units.
+    const QPointF end(plot.xAxis->coordToPixel(0.5), plot.yAxis->coordToPixel(0.5));
+    QVERIFY2(redPixelsNear(imageOf(plot), end, 3) > 0,
+             "a bar whose t is outside the key window was culled");
+}

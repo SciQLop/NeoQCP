@@ -1108,12 +1108,19 @@ void QCPErrorBars::recordSegment(QCPDrawContext& context, const QCPDataRange& se
                                  const QPen& pen) const
 {
     const QCPPlottableInterface1D* source = mDataPlottable->interface1D();
-    // Only the bars around the visible keys are recorded: the window reaches one view width past
-    // each side, so a pan inside it shifts them, and the recording is remade once it leaves.
-    const QCPKeyWindow window = context.keyWindow();
     const int count = qMin(mDataContainer->size(), source->dataCount());
-    const int begin = qBound(0, qMax(segment.begin(), source->findBegin(window.keys.lower)), count);
-    const int end = qBound(begin, qMin(segment.end(), source->findEnd(window.keys.upper)), count);
+    int begin = qBound(0, segment.begin(), count);
+    int end = qBound(begin, segment.end(), count);
+    // Only the bars around the visible keys are recorded: the window reaches one view width past
+    // each side, so a pan inside it shifts them, and the recording is remade once it leaves. A curve
+    // sorts by t, not by key, so a key window would cull it by the wrong quantity: such a source
+    // records its whole segment, as 2.x did when it skipped range culling there.
+    if (source->sortKeyIsMainKey())
+    {
+        const QCPKeyWindow window = context.keyWindow();
+        begin = qBound(0, qMax(segment.begin(), source->findBegin(window.keys.lower)), count);
+        end = qBound(begin, qMin(segment.end(), source->findEnd(window.keys.upper)), count);
+    }
     std::vector<QPointF> centres;
     std::vector<QPointF> ends;
     centres.reserve(std::size_t(end - begin));
