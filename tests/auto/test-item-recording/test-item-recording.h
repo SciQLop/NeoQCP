@@ -26,6 +26,7 @@ private slots:
     void aPixmapRecords();
     void aScaledPixmapRecords();
     void aRatioPixmapFollowsTheAxisRect();
+    void aStaticPixmapIsConvertedOnce();
     void aTracerRecords();
     void aTracerFollowsItsGraph();
     void aPannedTracerIsNotReRecorded();

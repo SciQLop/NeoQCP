@@ -23,6 +23,15 @@ public:
 
     int recordedCommands() const { return this->mCore.recordedCommandCount(); }
 
+    //! The identity of the picture the image command the item recorded last carries.
+    qint64 recordedImageKey() const
+    {
+        for (const qcp::QCPDrawCommand& command : this->mCore.recordedList().commands)
+            if (const auto* image = std::get_if<qcp::ImageCmd>(&command))
+                return image->pixels ? image->pixels->image.cacheKey() : 0;
+        return 0;
+    }
+
     //! The top-left pixel of the image command the item recorded last.
     QCP::Pixels recordedImageCorner() const
     {
@@ -615,6 +624,43 @@ void TestItemRecording::aRatioPixmapFollowsTheAxisRect()
                             .arg(corner.y)
                             .arg(after.left() + 0.2 * after.width())
                             .arg(after.top() + 0.2 * after.height())));
+}
+
+void TestItemRecording::aStaticPixmapIsConvertedOnce()
+{
+    // The comment beside the scale cache promises a conversion only when the picture changes: the
+    // hook counts them, because Qt shares the raster data and the recorded image cannot show it.
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto* pixmap = new RecordingItem<QCPItemPixmap>(&plot);
+    pixmap->setPixmap(testPixmap());
+    pixmap->setScaled(true);
+    pixmap->topLeft->setType(QCPItemPosition::ptAxisRectRatio);
+    pixmap->topLeft->setCoords(0.2, 0.2);
+    pixmap->bottomRight->setType(QCPItemPosition::ptAxisRectRatio);
+    pixmap->bottomRight->setCoords(0.6, 0.6);
+    plot.replot();
+    const quint64 conversions = QCPItemPixmap::imageConversionCount();
+    const int recordings = pixmap->recordings();
+    QVERIFY2(conversions > 0, "the first recording converted nothing");
+    QVERIFY2(recordings > 0, "the pixmap recorded nothing");
+
+    // A border change remakes the recording; the picture itself is the same at the same size.
+    pixmap->setPen(QPen(Qt::black, 1));
+    plot.replot();
+    QVERIFY2(pixmap->recordings() > recordings, "the border change did not remake the recording");
+    QVERIFY2(QCPItemPixmap::imageConversionCount() == conversions,
+             "a recording converted the pixmap to an image again although nothing changed");
+
+    // A new picture converts again, even at the same size: the cache follows the content.
+    const qint64 picture = pixmap->recordedImageKey();
+    QImage other(48, 36, QImage::Format_ARGB32);
+    other.fill(QColor(20, 160, 90));
+    pixmap->setPixmap(QPixmap::fromImage(other));
+    plot.replot();
+    QVERIFY2(QCPItemPixmap::imageConversionCount() > conversions,
+             "a new picture did not convert");
+    QVERIFY2(pixmap->recordedImageKey() != picture, "the recording kept the old picture");
 }
 
 void TestItemRecording::aTracerRecords()

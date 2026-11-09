@@ -75,6 +75,10 @@ public:
     void setPen(const QPen& pen);
     void setSelectedPen(const QPen& pen);
 
+    //! Test hook: the recordings that converted the picture to an image since the process started.
+    //! A recording that finds the scale it already holds converts nothing.
+    [[nodiscard]] static quint64 imageConversionCount();
+
     // reimplemented virtual methods:
     void draw(QCPDrawContext& context) const override;
 

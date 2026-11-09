@@ -27,6 +27,7 @@
 
 #include "../core.h"
 #include "../painting/draw-context.h"
+#include <atomic>
 #include <cmath>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -88,6 +89,7 @@ void QCPItemPixmap::setPixmap(const QPixmap& pixmap)
     markDirty();
     mPixmap = pixmap;
     mScaledPixmapInvalidated = true;
+    mImage = QImage(); // the converted picture is the old one
     if (mPixmap.isNull())
         qDebug() << Q_FUNC_INFO << "pixmap is null";
 }
@@ -137,12 +139,20 @@ void QCPItemPixmap::setSelectedPen(const QPen& pen)
 
 namespace
 {
+//! Test hook: the conversions since the process started (see imageConversionCount()).
+std::atomic<quint64> gImageConversions { 0 };
+
 // A pixmap larger than this could not be allocated anyway; past it, its int rect would overflow.
 bool fitsInPixels(const QRectF& rect)
 {
     constexpr double limit = 1 << 24;
     return QRectF(-limit, -limit, 2 * limit, 2 * limit).contains(rect);
 }
+}
+
+quint64 QCPItemPixmap::imageConversionCount()
+{
+    return gImageConversions.load(std::memory_order_relaxed);
 }
 
 /* inherits documentation from base class */
@@ -155,7 +165,8 @@ void QCPItemPixmap::draw(QCPDrawContext& context) const
     const QRectF boundingRect = finalRect.adjusted(-clipPad, -clipPad, clipPad, clipPad);
     if (!boundingRect.intersects(context.clip()) || !fitsInPixels(finalRect))
         return;
-    // The scale is cached beside the item, so a recording converts the pixmap only when it changes.
+    // The scale and the converted picture are cached beside the item, so a recording only converts
+    // the pixmap when it is rescaled (or resized): a moved or restyled pixmap converts nothing.
     const_cast<QCPItemPixmap*>(this)->updateScaledPixmap(finalRect.toRect(), flipHorz, flipVert);
     if (mImage.isNull())
         return;
@@ -222,6 +233,7 @@ void QCPItemPixmap::updateScaledPixmap(QRect finalRect, bool flipHorz, bool flip
         return;
     }
 
+    bool rebuilt = false;
     if (mScaled)
     {
         double devicePixelRatio = mPixmap.devicePixelRatio();
@@ -236,11 +248,21 @@ void QCPItemPixmap::updateScaledPixmap(QRect finalRect, bool flipHorz, bool flip
                     = QPixmap::fromImage(mScaledPixmap.toImage().flipped(
                         QCP::flipOrientations(flipHorz, flipVert)));
             mScaledPixmap.setDevicePixelRatio(devicePixelRatio);
+            rebuilt = true;
         }
     }
     else if (!mScaledPixmap.isNull())
+    {
         mScaledPixmap = QPixmap();
-    mImage = (mScaled ? mScaledPixmap : mPixmap).toImage();
+        rebuilt = true; // the picture the recording embeds is the original again
+    }
+    // The conversion is what a frame pays for, and the recording only needs the picture it already
+    // holds: a move or a restyle re-records without converting the same pixmap again.
+    if (rebuilt || mImage.isNull())
+    {
+        mImage = (mScaled ? mScaledPixmap : mPixmap).toImage();
+        ++gImageConversions;
+    }
     mScaledPixmapInvalidated = false;
 }
 
