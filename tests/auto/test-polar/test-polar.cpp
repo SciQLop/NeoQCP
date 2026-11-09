@@ -286,3 +286,64 @@ void TestPolar::hidingTheAngularAxisKeepsTheGraphs()
     const QColor pixel = pixelAt(plot, (area->center() + QPointF(0, 0.5 * area->radius())).toPoint());
     QVERIFY2(pixel.blue() > 150 && pixel.red() < 120, qPrintable(pixel.name()));
 }
+
+void TestPolar::deletingAPolarChildIsSafe()
+{
+    // The area holds its children by raw pointer: a direct delete must unlist, or the next replot
+    // and the area's own teardown reach freed memory.
+    {
+        QCustomPlot plot;
+        auto* area = polarArea(plot);
+        auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 180 }, QVector<double> { 1, 1 });
+        QVERIFY(graph);
+        delete area->angularAxis();
+        QCOMPARE(area->angularAxis(), nullptr);
+        settle(plot);
+        QVERIFY(plot.plotLayout()->remove(area));
+        settle(plot);
+    }
+    {
+        QCustomPlot plot;
+        auto* area = polarArea(plot);
+        delete area->radialAxis(0);
+        QCOMPARE(area->radialAxisCount(), 0);
+        settle(plot);
+        QVERIFY(plot.plotLayout()->remove(area));
+        settle(plot);
+    }
+    {
+        QCustomPlot plot;
+        auto* area = polarArea(plot);
+        delete area->grid();
+        QCOMPARE(area->grid(), nullptr);
+        settle(plot);
+        QVERIFY(plot.plotLayout()->remove(area));
+        settle(plot);
+    }
+}
+
+void TestPolar::deletingTheAngularAxisMidDragIsSafe()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    plot.setInteractions(QCP::iRangeDrag | QCP::iRangeZoom);
+    auto* angular = area->angularAxis();
+    angular->setRangeDraggable(true);
+    angular->setRangeZoomable(true);
+    angular->setRange(0, 360);
+
+    QPointer<QCPPolarAxisAngular> alive(angular);
+    connect(
+        angular, &QCPPolarAxisAngular::rangeChanged, area, [&alive] { delete alive.data(); },
+        Qt::DirectConnection);
+
+    const QPoint from = area->center().toPoint() + QPoint(int(0.6 * area->radius()), 0);
+    const QPoint to = area->center().toPoint() + QPoint(0, int(0.6 * area->radius()));
+    sendMouse(&plot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+    sendMouse(&plot, QEvent::MouseMove, to, Qt::LeftButton);
+    sendMouse(&plot, QEvent::MouseButtonRelease, to, Qt::NoButton);
+
+    QVERIFY(!alive);
+    QCOMPARE(area->angularAxis(), nullptr);
+    settle(plot);
+}

@@ -177,7 +177,16 @@ QCPPolarAxisRadial::QCPPolarAxisRadial(QCPPolarArea* area)
     mLabelPainter.setAbbreviateDecimalPowers(false);
 }
 
-QCPPolarAxisRadial::~QCPPolarAxisRadial() { }
+/*! \internal
+
+  The area keeps this axis in a raw list: leaving the entry behind would leave a dangling handle in
+  every path that draws or maps the polar plot, and the area's teardown would delete it twice.
+*/
+QCPPolarAxisRadial::~QCPPolarAxisRadial()
+{
+    if (mArea)
+        mArea->mRadialAxes.removeOne(this);
+}
 
 QCPPolarArea* QCPPolarAxisRadial::area() const
 {
@@ -835,6 +844,11 @@ void QCPPolarAxisRadial::rescale([[maybe_unused]] bool onlyVisiblePlottables)
 void QCPPolarAxisRadial::pixelToCoord(QPointF pixelPos, double& angleCoord,
                                       double& radiusCoord) const
 {
+    if (!angularAxis())
+    {
+        angleCoord = radiusCoord = qQNaN();
+        return;
+    }
     QCPVector2D posVector(pixelPos - mCenter);
     radiusCoord = radiusToCoord(posVector.length());
     angleCoord = angularAxis()->angleRadToCoord(posVector.angle());
@@ -845,6 +859,8 @@ void QCPPolarAxisRadial::pixelToCoord(QPointF pixelPos, double& angleCoord,
 */
 QPointF QCPPolarAxisRadial::coordToPixel(double angleCoord, double radiusCoord) const
 {
+    if (!angularAxis())
+        return QPointF(qQNaN(), qQNaN());
     const double radiusPixel = coordToRadius(radiusCoord);
     const double angleRad = angularAxis()->coordToAngleRad(angleCoord);
     return QPointF(mCenter.x() + qCos(angleRad) * radiusPixel,
@@ -908,7 +924,7 @@ double QCPPolarAxisRadial::radiusToCoord(double radius) const
 */
 QCPPolarAxisRadial::SelectablePart QCPPolarAxisRadial::getPartAt(const QPointF& pos) const
 {
-    if (!mVisible || !mArea)
+    if (!mVisible || !mArea || !angularAxis())
         return spNone;
     // A label wins over the spoke it sits on: it is what the user aims at.
     for (const QRectF& box : mTickLabelBoxes)
@@ -984,6 +1000,8 @@ void QCPPolarAxisRadial::applyDefaultAntialiasingHint(QCPPainter* painter) const
 */
 void QCPPolarAxisRadial::draw(QCPPainter* painter)
 {
+    if (!angularAxis())
+        return;
     const double axisAngleRad
         = (mAngle + (mAngleReference == arAngularAxis ? angularAxis()->angle() : 0)) / 180.0 * M_PI;
     const QPointF axisVector(qCos(axisAngleRad),

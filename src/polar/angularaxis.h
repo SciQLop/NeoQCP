@@ -46,6 +46,8 @@ public:
     using OpsFor = QCPPolarAxisAngularOps<T>;
 
     explicit QCPPolarAxisAngular(QCPPolarArea* area);
+    // Out of line: it unlists from the area, whose definition needs this class complete.
+    virtual ~QCPPolarAxisAngular() override;
 
     // getters:
     // Out of line: QCPPolarArea is incomplete here, and the covariant return needs it complete.

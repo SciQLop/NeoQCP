@@ -19,4 +19,6 @@ private slots:
     void polarAxisPartsAreClickable();
     void radialDragAndWheelWork();
     void hidingTheAngularAxisKeepsTheGraphs();
+    void deletingAPolarChildIsSafe();
+    void deletingTheAngularAxisMidDragIsSafe();
 };

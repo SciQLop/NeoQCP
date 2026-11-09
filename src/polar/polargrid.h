@@ -65,6 +65,8 @@ public:
     using OpsFor = QCPPolarGridOps<T>;
 
     explicit QCPPolarGrid(QCPPolarArea* area);
+    // Out of line: it unlists from the area, whose definition needs this class complete.
+    virtual ~QCPPolarGrid() override;
 
     // getters:
     QCPPolarAxisRadial* radialAxis() const { return mRadialAxis.data(); }

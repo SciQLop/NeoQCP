@@ -124,6 +124,17 @@ QCPPolarArea* QCPPolarAxisAngular::area() const
     return mArea;
 }
 
+/*! \internal
+
+  The area holds the angular axis by raw pointer: leaving it behind would leave a dangling
+  handle in every path that draws or maps the polar plot.
+*/
+QCPPolarAxisAngular::~QCPPolarAxisAngular()
+{
+    if (mArea)
+        mArea->mAngularAxis = nullptr;
+}
+
 QCPPolarAxisAngular::LabelMode QCPPolarAxisAngular::tickLabelMode() const
 {
     switch (mLabelPainter.anchorMode())
@@ -159,6 +170,11 @@ QString QCPPolarAxisAngular::numberFormat() const
 void QCPPolarAxisAngular::pixelToCoord(QPointF pixelPos, double& angleCoord,
                                        double& radiusCoord) const
 {
+    if (!mArea)
+    {
+        angleCoord = radiusCoord = qQNaN();
+        return;
+    }
     if (mArea->radialAxisCount() > 0)
         mArea->radialAxis()->pixelToCoord(pixelPos, angleCoord, radiusCoord);
     else
@@ -170,6 +186,8 @@ void QCPPolarAxisAngular::pixelToCoord(QPointF pixelPos, double& angleCoord,
 */
 QPointF QCPPolarAxisAngular::coordToPixel(double angleCoord, double radiusCoord) const
 {
+    if (!mArea)
+        return QPointF(qQNaN(), qQNaN());
     if (mArea->radialAxisCount() > 0)
     {
         return mArea->radialAxis()->coordToPixel(angleCoord, radiusCoord);
@@ -213,6 +231,8 @@ void QCPPolarAxisAngular::applyDefaultAntialiasingHint(QCPPainter* painter) cons
 /* inherits documentation from base class */
 void QCPPolarAxisAngular::draw(QCPPainter* painter)
 {
+    if (!mArea)
+        return;
     const QPointF center = mArea->center();
     const double radius = mArea->radius();
     mTickLabelBoxes.clear();
@@ -788,7 +808,8 @@ void QCPPolarAxisAngular::setupTickVectors()
 {
     if (!mParentPlot)
         return;
-    if ((!mTicks && !mTickLabels && !mArea->grid()->visible()) || mRange.size() <= 0)
+    if ((!mTicks && !mTickLabels && (!mArea || !mArea->grid() || !mArea->grid()->visible()))
+        || mRange.size() <= 0)
         return;
 
     mSubTickVector.clear(); // since we might not pass it to mTicker->generate(), and we don't want

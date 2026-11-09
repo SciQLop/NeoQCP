@@ -70,6 +70,17 @@ QCPPolarGrid::QCPPolarGrid(QCPPolarArea* area)
     setAntialiased(true);
 }
 
+/*! \internal
+
+  The area keeps the grid by raw pointer: leaving it behind would leave a dangling handle in every
+  draw path, and the area's teardown would delete it twice.
+*/
+QCPPolarGrid::~QCPPolarGrid()
+{
+    if (mArea)
+        mArea->mGrid = nullptr;
+}
+
 void QCPPolarGrid::setRadialAxis(QCPPolarAxisRadial* axis)
 {
     if (axis == mRadialAxis)

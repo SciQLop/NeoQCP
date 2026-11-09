@@ -105,6 +105,7 @@ public:
             requires(Handle h) { h.setData(std::declval<Args>()...); },
             "add<T>(args...): the graph's handle has no setData taking these arguments");
         QCP_CHECK_OR_RETURN(plotTakesNewParts(), "the plot is being destroyed", Handle { });
+        QCP_CHECK_OR_RETURN(mAngularAxis, "the polar area has no angular axis", Handle { });
         QCP_CHECK_OR_RETURN(radialAxis(0), "the polar area has no radial axis", Handle { });
         Handle handle = qcp::makeHandle<Handle>(new T(mAngularAxis, radialAxis(0)));
         handle.get()->markDirty();
@@ -161,6 +162,7 @@ private:
     friend class QCustomPlot;
     friend class QCPPolarAxisAngular;
     friend class QCPPolarAxisRadial;
+    friend class QCPPolarGrid;
     friend class QCPPolarGraph;
 };
 

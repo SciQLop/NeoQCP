@@ -215,7 +215,7 @@ void QCPPolarArea::rescale(bool onlyVisiblePlottables)
             haveRange = true;
         }
     }
-    if (haveRange)
+    if (haveRange && mAngularAxis)
     {
         const QCPRange current = mAngularAxis->range();
         if (!QCPRange::validRange(newRange)) // likely due to range being zero (plottable has only
@@ -322,7 +322,8 @@ void QCPPolarArea::mousePressEvent(QMouseEvent* event, [[maybe_unused]] const QV
 
         if (mParentPlot->interactions().testFlag(QCP::iRangeDrag))
         {
-            mDragAngularStart = mAngularAxis->range();
+            if (mAngularAxis)
+                mDragAngularStart = mAngularAxis->range();
             mDragRadialStart.clear();
             for (QCPPolarAxisRadial* axis : mRadialAxes)
                 mDragRadialStart.append({ axis, axis->range() });
@@ -337,7 +338,7 @@ void QCPPolarArea::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
     if (mDragging && mParentPlot->interactions().testFlag(QCP::iRangeDrag))
     {
         // angular axis:
-        if (mAngularAxis->rangeDraggable())
+        if (mAngularAxis && mAngularAxis->rangeDraggable())
         {
             doReplot = true;
             double angleCoordStart, radiusCoordStart;
@@ -407,7 +408,7 @@ void QCPPolarArea::wheelEvent(QWheelEvent* event)
         const QPointF pos = event->position();
         const double wheelSteps = delta / 120.0; // a single step delta is +/- 120
 
-        if (mAngularAxis->rangeZoomable())
+        if (mAngularAxis && mAngularAxis->rangeZoomable())
         {
             double angleCoord, radiusCoord;
             mAngularAxis->pixelToCoord(pos, angleCoord, radiusCoord);
