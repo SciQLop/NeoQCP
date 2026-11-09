@@ -62,6 +62,7 @@
 #include "test-statisticalbox/test-statisticalbox.h"
 #include "test-theme/test-theme.h"
 #include "test-tick-label-cache/test-tick-label-cache.h"
+#include "test-transform/test-transform.h"
 #include "test-waterfall/test-waterfall.h"
 
 static bool shouldRun(const char* name)
@@ -163,6 +164,7 @@ int main(int argc, char** argv)
     QCPTEST(TestSpatialIndex);
     QCPTEST(TestItemIndex);
     QCPTEST(TestCoords);
+    QCPTEST(TestTransform);
     QCPTEST(TestDrawContext);
     QCPTEST(TestDrawable);
     QCPTEST(TestHitRule);

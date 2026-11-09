@@ -14,28 +14,86 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <utility>
+#include <vector>
 
 #include "axis/axis.h"
 #include "layoutelements/layoutelement-axisrect.h"
+#include "polar/angularaxis.h"
+#include "polar/polar-area.h"
+#include "polar/radialaxis.h"
+#include "vector2d.h"
 
 namespace
 {
 constexpr double kOffRange = 200.0; // QCPAxis draws a log-axis value of the wrong sign this far out
+constexpr double kPolarClamp = 1.05; // the radial fraction QCPTransform::polar clamps to
+
+QCP::Pixels noPixel()
+{
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    return QCP::Pixels { nan, nan };
+}
+
+QCP::Data noData()
+{
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    return QCP::Data { nan, nan };
+}
 } // namespace
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////// QCPCustomMapping
+
+void QCPCustomMapping::map(std::span<const QPointF> data, std::span<QPointF> out) const
+{
+    // The default split costs one copy per span; a mapping that can do better overrides this.
+    const std::size_t count = std::min(data.size(), out.size());
+    std::vector<double> keys(count);
+    std::vector<double> values(count);
+    for (std::size_t i = 0; i < count; ++i)
+    {
+        keys[i] = data[i].x();
+        values[i] = data[i].y();
+    }
+    map(std::span<const double>(keys), std::span<const double>(values), out.first(count));
+}
+
+QCP::Pixels QCPCustomMapping::mapPoint(QCP::Data data) const
+{
+    const double keys[1] = { data.x };
+    const double values[1] = { data.y };
+    QPointF out[1];
+    map(std::span<const double>(keys), std::span<const double>(values), std::span<QPointF>(out));
+    return QCP::Pixels { out[0].x(), out[0].y() };
+}
+
+bool QCPCustomMapping::equivalentTo(const QCPCustomMapping& other, QPointF* delta) const
+{
+    Q_UNUSED(other);
+    Q_UNUSED(delta);
+    return false;
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPTransform
 
+// The variant's default constructor needs the alternatives complete, which they are only here.
+QCPTransform::QCPTransform()
+        : mFrame(std::in_place_type<Cartesian>)
+{
+}
+
 QCPTransform::QCPTransform(const QCPAxis* keyAxis, const QCPAxis* valueAxis)
-        : mKeyAxis(const_cast<QCPAxis*>(keyAxis)), mValueAxis(const_cast<QCPAxis*>(valueAxis))
+        : QCPTransform()
 {
     if (!keyAxis || !valueAxis || keyAxis->orientation() == valueAxis->orientation())
         return; // same orientation: there is no pixel for one of the two, pixelPosition() would
                 // report 0
-    mKey.snapshot(keyAxis);
-    mValue.snapshot(valueAxis);
-    mKey.prepare();
-    mValue.prepare();
+    Cartesian& frame = std::get<Cartesian>(mFrame);
+    frame.key.snapshot(keyAxis);
+    frame.value.snapshot(valueAxis);
+    frame.prepare();
 }
 
 namespace
@@ -63,9 +121,8 @@ QCPTransform QCPTransform::fitted(const QCPDataBox& box, const QRectF& rect)
     widenDegenerateSide(widened.valueLower, widened.valueUpper, box.keyUpper - box.keyLower);
     if (!(widened.keyLower < widened.keyUpper) || !(widened.valueLower < widened.valueUpper))
         return transform;
-    const auto fit
-        = [](QCPTransform::Snapshot& axis, double lower, double upper, const QRectF& r,
-             bool vertical)
+    const auto fit =
+        [](QCPTransform::Snapshot& axis, double lower, double upper, const QRectF& r, bool vertical)
     {
         axis.vertical = vertical;
         axis.reversed = false;
@@ -79,8 +136,27 @@ QCPTransform QCPTransform::fitted(const QCPDataBox& box, const QRectF& rect)
         axis.length = vertical ? r.height() : r.width();
         axis.prepare();
     };
-    fit(transform.mKey.self, widened.keyLower, widened.keyUpper, rect, false);
-    fit(transform.mValue.self, widened.valueLower, widened.valueUpper, rect, true);
+    Cartesian& frame = std::get<Cartesian>(transform.mFrame);
+    fit(frame.key.self, widened.keyLower, widened.keyUpper, rect, false);
+    fit(frame.value.self, widened.valueLower, widened.valueUpper, rect, true);
+    return transform;
+}
+
+QCPTransform QCPTransform::polar(const QCPPolarAxisAngular& angular,
+                                 const QCPPolarAxisRadial& radial)
+{
+    QCPTransform transform;
+    // A polar frame never reads the axes again: everything it maps is copied here.
+    transform.mFrame.emplace<Polar>().take(angular, radial);
+    return transform;
+}
+
+QCPTransform QCPTransform::custom(std::shared_ptr<const QCPCustomMapping> mapping, quint64 revision)
+{
+    QCPTransform transform;
+    Custom& custom = transform.mFrame.emplace<Custom>();
+    custom.mapping = std::move(mapping);
+    custom.revision = revision;
     return transform;
 }
 
@@ -97,7 +173,7 @@ QCPRatioTransform QCPRatioTransform::fitted(const QRectF& rect)
 void QCPTransform::Snapshot::take(const QCPAxis* axis)
 {
     vertical = axis->orientation() == Qt::Vertical;
-    logarithmic = axis->scaleType() == QCPAxis::stLogarithmic;
+    logarithmic = axis->scaleType() == QCPAxisBase::stLogarithmic;
     reversed = axis->rangeReversed();
     lower = axis->range().lower;
     upper = axis->range().upper;
@@ -157,6 +233,15 @@ double QCPTransform::Snapshot::toPixel(double value) const
     return logSlope * std::log(std::abs(value)) + logIntercept;
 }
 
+double QCPTransform::Snapshot::toValue(double pixel) const
+{
+    if (!usable)
+        return qQNaN();
+    if (!logarithmic)
+        return (pixel - intercept) / slope;
+    return positive * std::exp((pixel - logIntercept) / logSlope);
+}
+
 double QCPTransform::Snapshot::fractionOf(double pixel) const
 {
     return vertical ? (bottom - pixel) / length : (pixel - left) / length;
@@ -202,23 +287,137 @@ double QCPTransform::Axis::toPixel(double value) const
     return self.pixelAtFraction(source.fractionOf(source.toPixel(link->inverse(value))));
 }
 
+double QCPTransform::Axis::toValue(double pixel) const
+{
+    if (!link)
+        return self.toValue(pixel);
+    if (!source.usable || !link->forward)
+        return qQNaN();
+    // The inverse of toPixel: where the pixel is along this axis, mapped on the source, and
+    // carried back through the link's forward function.
+    return link->forward(source.toValue(source.pixelAtFraction(self.fractionOf(pixel))));
+}
+
+void QCPTransform::Cartesian::prepare()
+{
+    key.prepare();
+    value.prepare();
+}
+
+void QCPTransform::Polar::take(const QCPPolarAxisAngular& angular, const QCPPolarAxisRadial& radial)
+{
+    const QCPPolarArea* area = angular.area();
+    if (!area)
+        return;
+    centreX = area->center().x();
+    centreY = area->center().y();
+    radius = area->radius();
+    const QCPRange angularRange = angular.range();
+    angleLower = angularRange.lower;
+    angleUpper = angularRange.upper;
+    // coordToAngleRad(lower) is the axis' start angle, without reading its private members.
+    startAngle = angular.coordToAngleRad(angularRange.lower);
+    startReversed = angular.rangeReversed();
+    const QCPRange radialRange = radial.range();
+    lower = radialRange.lower;
+    upper = radialRange.upper;
+    logarithmic = radial.scaleType() == QCPAxisBase::stLogarithmic;
+    reversed = radial.rangeReversed();
+}
+
+bool QCPTransform::Polar::usable() const
+{
+    if (!(radius >= 1.0) || !(angleUpper > angleLower) || !(upper > lower))
+        return false;
+    return !logarithmic || lower > 0.0 || upper < 0.0;
+}
+
+double QCPTransform::Polar::fraction(double value) const
+{
+    double fraction = 0;
+    if (!logarithmic)
+        fraction = (reversed ? upper - value : value - lower) / (upper - lower);
+    else
+    {
+        if (value == 0.0 || (value > 0.0) != (lower > 0.0))
+            return qQNaN(); // the range's opposite sign has no log position
+        const double ratio = upper / lower;
+        fraction = reversed ? qLn(upper / value) / qLn(ratio) : qLn(value / lower) / qLn(ratio);
+    }
+    return qBound(0.0, fraction, kPolarClamp);
+}
+
+QPointF QCPTransform::Polar::toPixel(double angleCoord, double value) const
+{
+    const double radiusPixel = fraction(value) * radius;
+    const double theta = startAngle
+        + (angleCoord - angleLower) / (angleUpper - angleLower)
+            * (startReversed ? -2.0 * M_PI : 2.0 * M_PI);
+    return QPointF(centreX + qCos(theta) * radiusPixel, centreY + qSin(theta) * radiusPixel);
+}
+
+QCP::Data QCPTransform::Polar::toData(QPointF pixel) const
+{
+    // The radial axis' pixelToCoord arithmetic, written on the snapshot.
+    const QCPVector2D offset(pixel - QPointF(centreX, centreY));
+    const double radiusPixel = offset.length();
+    const double angleCoord = radiusPixel > 0.0 ? angleLower
+            + (offset.angle() - startAngle) / (startReversed ? -2.0 * M_PI : 2.0 * M_PI)
+                * (angleUpper - angleLower)
+                                                : angleLower;
+    double value;
+    if (!logarithmic)
+        value = reversed ? upper - radiusPixel / radius * (upper - lower)
+                         : lower + radiusPixel / radius * (upper - lower);
+    else
+    {
+        const double ratio = upper / lower;
+        value = reversed ? qPow(ratio, -radiusPixel / radius) * upper
+                         : qPow(ratio, radiusPixel / radius) * lower;
+    }
+    return QCP::Data { angleCoord, value };
+}
+
 QCP::Pixels QCPTransform::map(QCP::Data data) const
 {
     if (!valid())
-        return QCP::Pixels { std::numeric_limits<double>::quiet_NaN(),
-                             std::numeric_limits<double>::quiet_NaN() };
-    const double keyPixel = mKey.toPixel(data.x);
-    const double valuePixel = mValue.toPixel(data.y);
-    return mKey.self.vertical ? QCP::Pixels { valuePixel, keyPixel }
-                              : QCP::Pixels { keyPixel, valuePixel };
+        return noPixel();
+    if (const Cartesian* frame = cartesian())
+    {
+        const double keyPixel = frame->key.toPixel(data.x);
+        const double valuePixel = frame->value.toPixel(data.y);
+        return frame->key.self.vertical ? QCP::Pixels { valuePixel, keyPixel }
+                                        : QCP::Pixels { keyPixel, valuePixel };
+    }
+    if (const Polar* polar = std::get_if<Polar>(&mFrame))
+    {
+        const QPointF pixel = polar->toPixel(data.x, data.y);
+        return QCP::Pixels { pixel.x(), pixel.y() };
+    }
+    return std::get<Custom>(mFrame).mapping->mapPoint(data);
+}
+
+QCP::Data QCPTransform::inverse(QPointF pixel) const
+{
+    if (!valid())
+        return noData();
+    if (const Cartesian* frame = cartesian())
+    {
+        const bool vertical = frame->key.self.vertical;
+        return QCP::Data { frame->key.toValue(vertical ? pixel.y() : pixel.x()),
+                           frame->value.toValue(vertical ? pixel.x() : pixel.y()) };
+    }
+    if (const Polar* polar = std::get_if<Polar>(&mFrame))
+        return polar->toData(pixel);
+    return std::get<Custom>(mFrame).mapping->inverse(pixel);
 }
 
 template <bool KeyLog, bool ValueLog, typename KeyAt, typename ValueAt>
-void QCPTransform::mapRange(std::size_t count, KeyAt keyAt, ValueAt valueAt,
+void QCPTransform::mapRange(const Cartesian& frame, std::size_t count, KeyAt keyAt, ValueAt valueAt,
                             std::span<QPointF> out) const
 {
-    const Snapshot& keyAxis = mKey.self;
-    const Snapshot& valueAxis = mValue.self;
+    const Snapshot& keyAxis = frame.key.self;
+    const Snapshot& valueAxis = frame.value.self;
     const double keySlope = keyAxis.slope;
     const double keyIntercept = keyAxis.intercept;
     const double keyLogSlope = keyAxis.logSlope;
@@ -255,9 +454,58 @@ void QCPTransform::mapRange(std::size_t count, KeyAt keyAt, ValueAt valueAt,
 
 // One dispatch for every batch flavour: the four log/linear instantiations are written once.
 template <typename KeyAt, typename ValueAt>
-void QCPTransform::mapAny(std::size_t count, KeyAt keyAt, ValueAt valueAt,
+void QCPTransform::mapAny(const Cartesian& frame, std::size_t count, KeyAt keyAt, ValueAt valueAt,
                           std::span<QPointF> out) const
 {
+    // A linked axis holds a function, not a line: it has no slope to hoist out of the loop.
+    if (frame.key.link || frame.value.link)
+    {
+        const bool keyIsX = !frame.key.self.vertical;
+        QPointF* __restrict o = out.data();
+        for (std::size_t i = 0; i < count; ++i)
+        {
+            const double keyPixel = frame.key.toPixel(keyAt(i));
+            const double valuePixel = frame.value.toPixel(valueAt(i));
+            o[i] = keyIsX ? QPointF(keyPixel, valuePixel) : QPointF(valuePixel, keyPixel);
+        }
+        return;
+    }
+    if (frame.key.self.logarithmic)
+    {
+        if (frame.value.self.logarithmic)
+            mapRange<true, true>(frame, count, keyAt, valueAt, out);
+        else
+            mapRange<true, false>(frame, count, keyAt, valueAt, out);
+    }
+    else
+    {
+        if (frame.value.self.logarithmic)
+            mapRange<false, true>(frame, count, keyAt, valueAt, out);
+        else
+            mapRange<false, false>(frame, count, keyAt, valueAt, out);
+    }
+}
+
+void QCPTransform::mapPolar(const Polar& polar, std::size_t count, const double* keys,
+                            const double* values, std::span<QPointF> out) const
+{
+    QPointF* o = out.data();
+    for (std::size_t i = 0; i < count; ++i)
+        o[i] = polar.toPixel(keys[i], values[i]);
+}
+
+void QCPTransform::mapPoints(const Polar& polar, std::size_t count, const QPointF* data,
+                             std::span<QPointF> out) const
+{
+    QPointF* o = out.data();
+    for (std::size_t i = 0; i < count; ++i)
+        o[i] = polar.toPixel(data[i].x(), data[i].y());
+}
+
+void QCPTransform::map(std::span<const double> keys, std::span<const double> values,
+                       std::span<QPointF> out) const
+{
+    const std::size_t count = std::min({ keys.size(), values.size(), out.size() });
     if (!valid())
     {
         const QPointF none(std::numeric_limits<double>::quiet_NaN(),
@@ -265,69 +513,77 @@ void QCPTransform::mapAny(std::size_t count, KeyAt keyAt, ValueAt valueAt,
         std::fill_n(out.begin(), count, none);
         return;
     }
-    // A linked axis holds a function, not a line: it has no slope to hoist out of the loop.
-    if (mKey.link || mValue.link)
+    if (const Cartesian* frame = cartesian())
     {
-        const bool keyIsX = !mKey.self.vertical;
-        QPointF* __restrict o = out.data();
-        for (std::size_t i = 0; i < count; ++i)
-        {
-            const double keyPixel = mKey.toPixel(keyAt(i));
-            const double valuePixel = mValue.toPixel(valueAt(i));
-            o[i] = keyIsX ? QPointF(keyPixel, valuePixel) : QPointF(valuePixel, keyPixel);
-        }
+        // Raw restrict pointers captured by value: the stores to out cannot alias the inputs, so
+        // the compiler keeps the loop free of reloads (capturing the spans by reference cost 13 %).
+        const double* __restrict k = keys.data();
+        const double* __restrict v = values.data();
+        mapAny(
+            *frame, count, [k](std::size_t i) { return k[i]; }, [v](std::size_t i) { return v[i]; },
+            out);
         return;
     }
-    if (mKey.self.logarithmic)
+    if (const Polar* polar = std::get_if<Polar>(&mFrame))
     {
-        if (mValue.self.logarithmic)
-            mapRange<true, true>(count, keyAt, valueAt, out);
-        else
-            mapRange<true, false>(count, keyAt, valueAt, out);
+        mapPolar(*polar, count, keys.data(), values.data(), out);
+        return;
     }
-    else
-    {
-        if (mValue.self.logarithmic)
-            mapRange<false, true>(count, keyAt, valueAt, out);
-        else
-            mapRange<false, false>(count, keyAt, valueAt, out);
-    }
-}
-
-void QCPTransform::map(std::span<const double> keys, std::span<const double> values,
-                       std::span<QPointF> out) const
-{
-    // Raw restrict pointers captured by value: the stores to out cannot alias the inputs, so the
-    // compiler keeps the loop free of reloads (capturing the spans by reference cost 13 %).
-    const double* __restrict k = keys.data();
-    const double* __restrict v = values.data();
-    mapAny(
-        std::min({ keys.size(), values.size(), out.size() }), [k](std::size_t i) { return k[i]; },
-        [v](std::size_t i) { return v[i]; }, out);
+    std::get<Custom>(mFrame).mapping->map(keys.first(count), values.first(count), out.first(count));
 }
 
 void QCPTransform::map(std::span<const QPointF> data, std::span<QPointF> out) const
 {
-    // data[i].x() is the key, data[i].y() the value. out must not overlap data (restrict).
-    const QPointF* __restrict d = data.data();
-    mapAny(
-        std::min(data.size(), out.size()), [d](std::size_t i) { return d[i].x(); },
-        [d](std::size_t i) { return d[i].y(); }, out);
+    const std::size_t count = std::min(data.size(), out.size());
+    if (!valid())
+    {
+        const QPointF none(std::numeric_limits<double>::quiet_NaN(),
+                           std::numeric_limits<double>::quiet_NaN());
+        std::fill_n(out.begin(), count, none);
+        return;
+    }
+    if (const Cartesian* frame = cartesian())
+    {
+        // data[i].x() is the key, data[i].y() the value. out must not overlap data (restrict).
+        const QPointF* __restrict d = data.data();
+        mapAny(
+            *frame, count, [d](std::size_t i) { return d[i].x(); },
+            [d](std::size_t i) { return d[i].y(); }, out);
+        return;
+    }
+    if (const Polar* polar = std::get_if<Polar>(&mFrame))
+    {
+        mapPoints(*polar, count, data.data(), out);
+        return;
+    }
+    std::get<Custom>(mFrame).mapping->map(data.first(count), out.first(count));
 }
 
 bool QCPTransform::isTranslationOf(const QCPTransform& other, QPointF* delta) const
 {
-    if (!valid() || !other.valid() || mKey.self.vertical != other.mKey.self.vertical)
+    if (kind() != other.kind() || !valid() || !other.valid())
+        return false;
+    const Cartesian* here = cartesian();
+    if (!here && std::get_if<Polar>(&mFrame))
+        return false; // a rotation is not a pan
+    if (!here)
+    {
+        // A custom mapping knows what a pan means for it; the default says it does not.
+        const Custom& mine = std::get<Custom>(mFrame);
+        return mine.mapping->equivalentTo(*std::get<Custom>(other.mFrame).mapping, delta);
+    }
+    const Cartesian* there = other.cartesian();
+    if (here->key.self.vertical != there->key.self.vertical)
         return false;
     // A link is a function of the source, not a scaling of this axis: a source pan does not move
     // it by a constant. Never replay it as a translation.
-    if (mKey.link || mValue.link || other.mKey.link || other.mValue.link)
+    if (here->key.link || here->value.link || there->key.link || there->value.link)
         return false;
     // Only a linear mapping turns a range shift into a pixel shift: a log axis's shift is
     // multiplicative and is reported as "not a translation", which costs a repaint and can never
     // draw a wrong frame.
-    if (mKey.self.logarithmic || mValue.self.logarithmic || other.mKey.self.logarithmic
-        || other.mValue.self.logarithmic)
+    if (here->key.self.logarithmic || here->value.self.logarithmic || there->key.self.logarithmic
+        || there->value.self.logarithmic)
         return false;
     // The two mappings are translations only when they have the same scale. A drag adds the same
     // diff to both range ends, but the addition rounds, so the two spans can differ by an ulp:
@@ -335,18 +591,34 @@ bool QCPTransform::isTranslationOf(const QCPTransform& other, QPointF* delta) co
     // (|delta slope| times the span is exactly that drift).
     const auto sameScale = [](const Snapshot& a, const Snapshot& b)
     { return std::abs(a.slope - b.slope) * std::abs(a.upper - a.lower) < 1e-3; };
-    if (!sameScale(mKey.self, other.mKey.self) || !sameScale(mValue.self, other.mValue.self))
+    if (!sameScale(here->key.self, there->key.self)
+        || !sameScale(here->value.self, there->value.self))
         return false; // a zoom: the data-to-pixel scale changed
     // Measure the delta where the recording is, not at data (0, 0): the tolerance above allows the
     // two slopes to differ by a thousandth of a pixel across the visible span, which at a 1.7e9
     // epoch is tens of pixels of drift at the origin. At the range's lower corner the delta is the
     // one the visible pixels moved by.
-    const QCP::Data corner { mKey.self.lower, mValue.self.lower };
-    const QCP::Pixels here = map(corner);
-    const QCP::Pixels there = other.map(corner);
+    const QCP::Data corner { here->key.self.lower, here->value.self.lower };
+    const QCP::Pixels herePixel = map(corner);
+    const QCP::Pixels therePixel = other.map(corner);
     if (delta)
-        *delta = QPointF(here.x - there.x, here.y - there.y);
+        *delta = QPointF(herePixel.x - therePixel.x, herePixel.y - therePixel.y);
     return true;
+}
+
+bool QCPTransform::keyIsVertical() const
+{
+    const Cartesian* frame = cartesian();
+    return frame && frame->key.self.vertical;
+}
+
+bool QCPTransform::valid() const
+{
+    if (const Cartesian* frame = cartesian())
+        return frame->usable();
+    if (const Polar* polar = std::get_if<Polar>(&mFrame))
+        return polar->usable();
+    return std::get<Custom>(mFrame).mapping != nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -366,8 +638,7 @@ QCPRatioTransform::QCPRatioTransform(const QCPAxisRect* axisRect)
 QCP::Pixels QCPRatioTransform::map(QCP::AxisRatio ratio) const
 {
     if (!valid())
-        return QCP::Pixels { std::numeric_limits<double>::quiet_NaN(),
-                             std::numeric_limits<double>::quiet_NaN() };
+        return noPixel();
     // The same arithmetic as QCPItemPosition's ptAxisRectRatio branch.
     return QCP::Pixels { mLeft + ratio.x * mWidth, mTop + ratio.y * mHeight };
 }

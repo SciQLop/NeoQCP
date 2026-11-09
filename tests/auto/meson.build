@@ -70,6 +70,7 @@ test_srcs = [
     'test-selection-model/test-selection-model.cpp',
     'test-polar/test-polar.cpp',
     'test-axis-base/test-axis-base.cpp',
+    'test-transform/test-transform.cpp',
 ]
 
 test_headers = [
@@ -138,6 +139,7 @@ test_headers = [
     'test-selection-model/test-selection-model.h',
     'test-polar/test-polar.h',
     'test-axis-base/test-axis-base.h',
+    'test-transform/test-transform.h',
 ]
 test_moc_files = qtmod.compile_moc(headers : test_headers)
 

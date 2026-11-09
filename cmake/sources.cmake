@@ -146,6 +146,7 @@ set(NEOQCP_MOC_HEADERS
     src/layer.h
     src/spatial-index.h
     src/coords.h
+    src/coords-custom.h
     src/layout.h
     src/layoutelements/area.h
     src/layoutelements/layoutelement-axisrect.h

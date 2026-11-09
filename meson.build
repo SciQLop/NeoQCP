@@ -95,6 +95,7 @@ neoqcp_moc_headers = [
             'src/layer.h',
             'src/spatial-index.h',
             'src/coords.h',
+            'src/coords-custom.h',
             'src/alignment-group.h',
             'src/layout.h',
             'src/layoutelements/area.h',

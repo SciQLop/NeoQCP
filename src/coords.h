@@ -17,7 +17,6 @@
 #include "spatial-index.h"
 
 #include <QPointF>
-#include <QPointer>
 #include <QRectF>
 #include <memory>
 #include <span>
@@ -26,6 +25,8 @@
 class QCPAxis;
 class QCPAxisRect;
 class QCPItemAnchor;
+class QCPPolarAxisAngular;
+class QCPPolarAxisRadial;
 struct QCPAxisLink;
 
 /*! \file coords.h
@@ -104,27 +105,57 @@ using Position = std::variant<Data, Pixels, AxisRatio, AnchorOffset, DataXRatioY
 }
 } // namespace QCP
 
-/*! \brief Maps plot coordinates to pixels and back, snapshotted from two axes.
+// The custom mapping is written in the position types above: it comes after them, not before.
+#include "coords-custom.h"
 
-  A transform copies the ranges, scale types, reversal and the axis rect of its two axes when it is
-  constructed, so replaying it never touches the axes again: valid() is the only member that looks
-  at them, to say whether they still exist. A transform with an axis of the wrong orientation, no
-  axis rect or an unusable range maps to NaN and reports valid() == false.
+/*! \brief Maps plot coordinates to pixels and back: one frame type, three mappings.
 
-  The mapping is exactly QCPAxis::coordToPixel, including log axes, reversed axes and the two sign
-  cases QCPAxis draws 200 pixels outside the rect. batchMap() runs the same arithmetic without the
-  per-point type dispatch, which is what makes it several times faster than calling coordToPixel
-  twice per point.
+  A transform copies what it needs when it is constructed, so replaying it never touches the axes
+  again. The mapping is one of:
+
+  - cartesian: the ranges, scale types, reversal and the axis rect of two axes, exactly
+    QCPAxis::coordToPixel;
+  - polar: the centre and radius of a polar area, the angular range, start angle and direction, and
+    the radial range, scale and reversal, exactly QCPPolarAxisRadial::coordToPixel, with the radial
+    fraction clamped to [0, 1.05];
+  - custom: a QCPCustomMapping, which maps a whole span at once.
+
+  Every public call dispatches on the kind once and then runs a plain loop: batchMap() runs the same
+  arithmetic without the per-point type dispatch, which is what makes it several times faster than
+  calling coordToPixel twice per point.
+
+  A transform with the wrong axes, no area or an unusable range maps to NaN and reports valid()
+  false.
+
+  The cartesian mapping is non-virtual and keeps the snapshot code it always had: the drawing paths
+  depend on it.
 */
 class QCP_LIB_DECL QCPTransform
 {
 public:
-    QCPTransform() = default;
+    //! Which mapping the transform holds; the variant's index, so kind() never walks it.
+    enum class Kind
+    {
+        Cartesian,
+        Polar,
+        Custom
+    };
+
+    // Out of line: the variant's alternatives are complete only once this class is, and it is
+    // constructed from one of them.
+    QCPTransform();
     QCPTransform(const QCPAxis* keyAxis, const QCPAxis* valueAxis);
 
     //! A transform that fits \a box into \a rect: what a legend icon replays a recording through.
     [[nodiscard]] static QCPTransform fitted(const QCPDataBox& box, const QRectF& rect);
 
+    //! A transform over \a angular's area: its centre, radius and angular range decide the frame.
+    [[nodiscard]] static QCPTransform polar(const QCPPolarAxisAngular& angular,
+                                            const QCPPolarAxisRadial& radial);
+
+    //! A transform that maps through \a mapping, whose \a revision identifies its state.
+    [[nodiscard]] static QCPTransform custom(std::shared_ptr<const QCPCustomMapping> mapping,
+                                             quint64 revision);
     //! Maps one data point to pixels.
     [[nodiscard]] QCP::Pixels map(QCP::Data data) const;
     //! Maps keys and values in bulk into \a out; stops at the shortest of the three spans.
@@ -132,21 +163,25 @@ public:
              std::span<QPointF> out) const;
     //! Maps interleaved data (x = key, y = value) into \a out; stops at the shortest span.
     void map(std::span<const QPointF> data, std::span<QPointF> out) const;
+    //! Maps one pixel back to data.
+    [[nodiscard]] QCP::Data inverse(QPointF pixel) const;
     //! True when the two transforms differ by a pixel offset only (a pan, not a zoom); \a delta
     //! gets it.
     [[nodiscard]] bool isTranslationOf(const QCPTransform& other, QPointF* delta = nullptr) const;
 
     //! True when the key axis is vertical: map() then returns the value pixel first.
-    [[nodiscard]] bool keyIsVertical() const { return mKey.self.vertical; }
+    [[nodiscard]] bool keyIsVertical() const;
+    //! False when an axis or area is unusable or the snapshot cannot map.
+    [[nodiscard]] bool valid() const;
 
-    //! False when an axis is gone, the orientations are the same or the snapshot cannot map.
-    [[nodiscard]] bool valid() const { return mKey.usable() && mValue.usable(); }
+    //! Which mapping the transform holds.
+    [[nodiscard]] Kind kind() const { return static_cast<Kind>(mFrame.index()); }
 
-    //! Two snapshots that map identically compare equal (the axes themselves are not compared).
-    //! A linked axis compares by its link and by the source snapshot it carries.
+    //! Two transforms that map identically compare equal: the snapshots by value, a custom mapping
+    //! by its pointer and revision.
     [[nodiscard]] bool operator==(const QCPTransform& other) const
     {
-        return mKey == other.mKey && mValue == other.mValue;
+        return mFrame == other.mFrame;
     }
 
 private:
@@ -176,6 +211,7 @@ private:
         void take(const QCPAxis* axis);
         void prepare();
         [[nodiscard]] double toPixel(double value) const;
+        [[nodiscard]] double toValue(double pixel) const;
         //! Where \a pixel sits along the axis, as a fraction of its length from its origin.
         [[nodiscard]] double fractionOf(double pixel) const;
         //! The pixel at \a fraction of the axis length, from its origin.
@@ -195,17 +231,70 @@ private:
         void prepare();
         [[nodiscard]] bool usable() const;
         [[nodiscard]] double toPixel(double value) const;
+        [[nodiscard]] double toValue(double pixel) const;
     };
 
-    template <bool KeyLog, bool ValueLog, typename KeyAt, typename ValueAt>
-    void mapRange(std::size_t count, KeyAt keyAt, ValueAt valueAt, std::span<QPointF> out) const;
-    template <typename KeyAt, typename ValueAt>
-    void mapAny(std::size_t count, KeyAt keyAt, ValueAt valueAt, std::span<QPointF> out) const;
+    //! The two-axis snapshot: today's mapping, unchanged.
+    struct Cartesian
+    {
+        Axis key;
+        Axis value;
 
-    Axis mKey;
-    Axis mValue;
-    QPointer<QCPAxis> mKeyAxis;
-    QPointer<QCPAxis> mValueAxis;
+        bool operator==(const Cartesian&) const = default;
+
+        void prepare();
+
+        [[nodiscard]] bool usable() const { return key.usable() && value.usable(); }
+    };
+
+    //! The polar frame: QCPPolarAxisRadial::coordToPixel with the radial fraction clamped.
+    struct Polar
+    {
+        double centreX = 0;
+        double centreY = 0;
+        double radius = 0;
+        double startAngle = 0; //!< radians, the angular axis' offset
+        double angleLower = 0;
+        double angleUpper = 0;
+        double lower = 0; //!< the radial range
+        double upper = 0;
+        bool startReversed = false; //!< the angular axis' direction
+        bool logarithmic = false;
+        bool reversed = false;
+
+        bool operator==(const Polar&) const = default;
+
+        void take(const QCPPolarAxisAngular& angular, const QCPPolarAxisRadial& radial);
+        [[nodiscard]] bool usable() const;
+        //! The clamped [0, 1.05] position of \a value along the radius, in the axis' own scale.
+        [[nodiscard]] double fraction(double value) const;
+        [[nodiscard]] QPointF toPixel(double angleCoord, double value) const;
+        [[nodiscard]] QCP::Data toData(QPointF pixel) const;
+    };
+
+    //! A mapping that is not a two-axis frame, with the revision it was taken at.
+    struct Custom
+    {
+        std::shared_ptr<const QCPCustomMapping> mapping;
+        quint64 revision = 0;
+
+        bool operator==(const Custom&) const = default;
+    };
+
+    [[nodiscard]] const Cartesian* cartesian() const { return std::get_if<Cartesian>(&mFrame); }
+
+    template <bool KeyLog, bool ValueLog, typename KeyAt, typename ValueAt>
+    void mapRange(const Cartesian& frame, std::size_t count, KeyAt keyAt, ValueAt valueAt,
+                  std::span<QPointF> out) const;
+    template <typename KeyAt, typename ValueAt>
+    void mapAny(const Cartesian& frame, std::size_t count, KeyAt keyAt, ValueAt valueAt,
+                std::span<QPointF> out) const;
+    void mapPolar(const Polar& polar, std::size_t count, const double* keys, const double* values,
+                  std::span<QPointF> out) const;
+    void mapPoints(const Polar& polar, std::size_t count, const QPointF* data,
+                   std::span<QPointF> out) const;
+
+    std::variant<Cartesian, Polar, Custom> mFrame;
 };
 
 /*! \brief Maps an axis-rect fraction to pixels and back.
