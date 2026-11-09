@@ -462,3 +462,20 @@ void TestErrorBarGeometry::aCurveRecordsEveryBar()
     QVERIFY2(redPixelsNear(imageOf(plot), end, 3) > 0,
              "a bar whose t is outside the key window was culled");
 }
+
+// 2.x drew no backbone when the gap swallowed the whole error: the backbone must not run backwards
+// from the end of the gap towards the centre.
+void TestErrorBarGeometry::aBackboneShorterThanTheGapIsNotDrawn()
+{
+    RecordingErrorBars* bars = nullptr;
+    auto plot = makeBarsPlot(&bars);
+    // An error of one pixel against the default ten-pixel gap.
+    const double onePixel = plot->yAxis->range().size() / plot->yAxis->axisRect()->height();
+    bars->setData(QVector<double>(3, onePixel));
+    plot->replot();
+
+    const QPointF centre(plot->xAxis->coordToPixel(0.5), plot->yAxis->coordToPixel(0.2));
+    const QPointF insideTheGap(centre.x(), centre.y() - 4.0);
+    QVERIFY2(redPixelsNear(imageOf(*plot), centre, 2) > 0, "the bar is not at its key");
+    QCOMPARE(redPixelsNear(imageOf(*plot), insideTheGap, 1), 0);
+}

@@ -23,4 +23,5 @@ private slots:
     void aDecoratorScatterStyleReachesTheSelectedOutliers();
     void aSwappedPlottableContainerReRecords();
     void aCurveRecordsEveryBar();
+    void aBackboneShorterThanTheGapIsNotDrawn();
 };

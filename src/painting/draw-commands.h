@@ -623,7 +623,9 @@ inline void qcpErrorBarPixels(const QCPDrawFrame& frame, const qcp::ErrorBarsCmd
             const QPointF start = centre + sign * cmd.symbolGap * 0.5 * axisDir;
             const double along = (end.x() - centre.x()) * axisDir.x()
                 + (end.y() - centre.y()) * axisDir.y();
-            if (along * sign >= 0.0) // a gap wider than the error leaves no backbone
+            // The backbone starts at the end of the gap: an error that does not reach past it has
+            // no backbone at all, rather than a stub running backwards towards the centre.
+            if (along * sign > cmd.symbolGap * 0.5)
             {
                 out.push_back(start);
                 out.push_back(end);
