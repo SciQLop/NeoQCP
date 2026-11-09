@@ -27,6 +27,20 @@ QCPPlottableRhiLayer* gpuLayer(QCustomPlot* parentPlot, QCPLayer* layer, bool ex
                                                          : nullptr;
 }
 
+namespace
+{
+// A two-point run is a line: Qt rasterises drawLine directly, while drawPolyline goes through the
+// general stroker (about 4x the cost per span border). QPainter's own drawLine, not QCPPainter's,
+// so the geometry is not rounded to whole pixels and matches the polyline's.
+void drawRun(QCPPainter* painter, const QPointF* points, int count)
+{
+    if (count == 2)
+        painter->QPainter::drawLine(QLineF(points[0], points[1]));
+    else if (count > 2)
+        painter->drawPolyline(points, count);
+}
+} // namespace
+
 void drawPolylineSplitNaN(QCPPainter* painter, std::span<const QPointF> pts)
 {
     int segStart = 0;
@@ -34,15 +48,11 @@ void drawPolylineSplitNaN(QCPPainter* painter, std::span<const QPointF> pts)
     {
         if (std::isnan(pts[i].x()) || std::isnan(pts[i].y()))
         {
-            int segLen = i - segStart;
-            if (segLen >= 2)
-                painter->drawPolyline(pts.data() + segStart, segLen);
+            drawRun(painter, pts.data() + segStart, i - segStart);
             segStart = i + 1;
         }
     }
-    int segLen = int(pts.size()) - segStart;
-    if (segLen >= 2)
-        painter->drawPolyline(pts.data() + segStart, segLen);
+    drawRun(painter, pts.data() + segStart, int(pts.size()) - segStart);
 }
 
 void drawPolylineSplitNaN(QCPPainter* painter, const QVector<QPointF>& pts)
