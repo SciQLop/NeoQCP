@@ -88,6 +88,19 @@ QCPPolarArea::~QCPPolarArea()
         removeRadialAxis(axis);
 }
 
+/*! \internal
+
+  Draws the background inside the disc the axes are drawn in, where the angular axis used to fill
+  and clip it: the rect corners stay clear.
+*/
+void QCPPolarArea::drawBackground(QCPPainter* painter)
+{
+    painter->save();
+    painter->setClipRegion(exactClipRegion());
+    QCPArea::drawBackground(painter);
+    painter->restore();
+}
+
 /*!
   Returns the radial axis with the given \a index.
 */

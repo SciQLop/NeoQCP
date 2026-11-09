@@ -117,6 +117,11 @@ public:
     virtual void update(UpdatePhase phase) override;
 
 protected:
+    virtual void drawBackground(QCPPainter* painter) override;
+
+public:
+
+protected:
     // non-property members:
     QCPPolarAxisAngular* mAngularAxis = nullptr;
     QList<QCPPolarAxisRadial*> mRadialAxes;

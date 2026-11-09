@@ -15,4 +15,5 @@ private slots:
     void deletingTheAreaMidDragIsSafe();
     void aPolarGraphAddsToTheArea();
     void insetAndBackgroundAreAreaFeatures();
+    void backgroundStaysInsideTheDisc();
 };

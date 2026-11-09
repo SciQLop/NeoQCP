@@ -87,7 +87,9 @@ protected:
     virtual void draw(QCPPainter* painter) override;
 
     // non-property methods:
-    void drawBackground(QCPPainter* painter);
+    //! Draws the background inside the area's shape: the whole rect here, a subclass may narrow it
+    //! (a polar area keeps it inside its disc).
+    virtual void drawBackground(QCPPainter* painter);
     //! Deletes the inset layout now. A subclass calls it before it drops what its plot still has to
     //! deliver: the elements leaving the layout emit. The destructor calls it if nobody did.
     void destroyInsetLayout();

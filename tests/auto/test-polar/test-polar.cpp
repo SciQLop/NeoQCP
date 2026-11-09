@@ -120,6 +120,25 @@ void TestPolar::aPolarGraphAddsToTheArea()
     QVERIFY(!area->removeGraph(nullptr));
 }
 
+void TestPolar::backgroundStaysInsideTheDisc()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    area->setBackground(QBrush(Qt::red));
+    area->grid()->setVisible(false);
+    area->radialAxis()->setVisible(false); // nothing drawn over the centre
+    settle(plot);
+
+    // The area's background is the disc, not the rect: the corner stays the plot's paper.
+    const QColor corner = pixelAt(plot, area->rect().topLeft() + QPoint(5, 5));
+    const bool cornerIsRed = corner.red() > 200 && corner.green() < 60 && corner.blue() < 60;
+    QVERIFY2(!cornerIsRed, qPrintable(corner.name()));
+
+    const QColor centre = pixelAt(plot, area->center().toPoint());
+    const bool centreIsRed = centre.red() > 200 && centre.green() < 60 && centre.blue() < 60;
+    QVERIFY2(centreIsRed, qPrintable(centre.name()));
+}
+
 void TestPolar::insetAndBackgroundAreAreaFeatures()
 {
     QCustomPlot plot;
@@ -137,9 +156,9 @@ void TestPolar::insetAndBackgroundAreAreaFeatures()
     // The inset layout aligns the legend's outer rect to the area's: QRect::right() is inclusive.
     QVERIFY(qAbs(legend->outerRect().right() - area->rect().right()) <= 1);
     QVERIFY(qAbs(legend->outerRect().top() - area->rect().top()) <= 1);
-    // The area fills its whole rect, not just the circle the angular axis used to fill.
+    // The background follows the disc, so the corner outside it keeps the paper.
     const QColor corner = pixelAt(plot, area->rect().topLeft() + QPoint(5, 5));
-    QVERIFY2(corner.red() > 200 && corner.green() < 60 && corner.blue() < 60,
+    QVERIFY2(!(corner.red() > 200 && corner.green() < 60 && corner.blue() < 60),
              qPrintable(corner.name()));
     const QColor middle = pixelAt(plot, area->center().toPoint() + QPoint(40, 40));
     QVERIFY2(middle.red() > 200 && middle.green() < 60 && middle.blue() < 60,
