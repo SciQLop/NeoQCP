@@ -441,8 +441,8 @@ void TestItemPosition::farOffscreenItemsDoNotOverflow_data()
         {"curve", [](QCustomPlot* p) { return new QCPItemCurve(p); }},
         {"bracket", [](QCustomPlot* p) { return new QCPItemBracket(p); }},
         {"straightline", [](QCustomPlot* p) { return new QCPItemStraightLine(p); }},
-        {"vspan", [](QCustomPlot* p) { return new QCPItemVSpan(p); }},
-        {"hspan", [](QCustomPlot* p) { return new QCPItemHSpan(p); }},
+        {"vspan", [](QCustomPlot* p) { return new QCPItemSpan(p, Qt::Vertical); }},
+        {"hspan", [](QCustomPlot* p) { return new QCPItemSpan(p, Qt::Horizontal); }},
         {"rspan", [](QCustomPlot* p) { return new QCPItemRSpan(p); }},
     };
     for (const auto& [name, make] : items)

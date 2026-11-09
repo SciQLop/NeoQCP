@@ -1,8 +1,9 @@
 #include "item-rspan.h"
 
 #include "../core.h"
-#include "../painting/painter.h"
-#include "../painting/span-rhi-layer.h"
+#include <array>
+
+#include "../painting/draw-context.h"
 
 QCPItemRSpan::QCPItemRSpan(QCustomPlot* parentPlot)
     : QCPAbstractSpanItem(parentPlot)
@@ -35,9 +36,6 @@ QCPItemRSpan::QCPItemRSpan(QCustomPlot* parentPlot)
     setBorderPen(QPen(Qt::black, 2));
     setSelectedBorderPen(QPen(Qt::blue, 2));
 
-    connect(this, &QCPAbstractItem::selectionChanged, this, [this] {
-        markRhiDirty();
-    });
 }
 
 QCPRange QCPItemRSpan::keyRange() const
@@ -58,8 +56,6 @@ void QCPItemRSpan::setKeyRange(const QCPRange& range)
     leftEdge->setCoords(range.lower, leftEdge->coords().y());
     rightEdge->setCoords(range.upper, rightEdge->coords().y());
     // Emit last: a slot may delete this span.
-    if (mParentPlot)
-        markRhiDirty();
     qcpEmit(this, mParentPlot, &QCPItemRSpan::keyRangeChanged, range);
 }
 
@@ -71,20 +67,12 @@ void QCPItemRSpan::setValueRange(const QCPRange& range)
     bottomEdge->setCoords(bottomEdge->coords().x(), range.lower);
     topEdge->setCoords(topEdge->coords().x(), range.upper);
     // Emit last: a slot may delete this span.
-    if (mParentPlot)
-        markRhiDirty();
     qcpEmit(this, mParentPlot, &QCPItemRSpan::valueRangeChanged, range);
 }
 
-double QCPItemRSpan::selectTest(const QPointF& pos, bool onlySelectable, QVariant* details) const
+std::optional<double> QCPItemRSpan::hitTest(QCP::Pixels at, QVariant* details) const
 {
-    if (onlySelectable && !mSelectable)
-        return -1;
-
-    auto* keyAxis = leftEdge->keyAxis();
-    auto* valAxis = leftEdge->valueAxis();
-    if (!keyAxis || !valAxis)
-        return -1;
+    const QPointF pos(at.x, at.y);
 
     // Resolve through the positions so their type (plot coords, absolute pixels,
     // axis-rect pixels, ...) is honoured; coordToPixel() would reinterpret
@@ -142,49 +130,56 @@ double QCPItemRSpan::selectTest(const QPointF& pos, bool onlySelectable, QVarian
     {
         if (details)
             details->setValue(static_cast<int>(hpFill));
-        return 0;
+        return 0.0;
     }
 
-    return -1;
+    return std::nullopt;
 }
 
-void QCPItemRSpan::draw(QCPPainter* painter)
+void QCPItemRSpan::draw(QCPDrawContext& context) const
 {
-    if (tryRhiDraw(painter))
-        return;
+    // A corner is data only when both of its edges are: an edge in pixels or on an anchor is
+    // placed against the axis rect, which moves, so the recording cannot outlive the frame.
+    const auto dataOf = [](const QCPItemPosition* edge) -> std::optional<QCP::Data>
+    {
+        [[maybe_unused]] bool snapshot = false;
+        const QCP::Position at = edge->asPosition(&snapshot);
+        if (const auto* data = std::get_if<QCP::Data>(&at))
+            return *data;
+        return std::nullopt;
+    };
+    const std::optional<QCP::Data> left = dataOf(leftEdge);
+    const std::optional<QCP::Data> right = dataOf(rightEdge);
+    const std::optional<QCP::Data> top = dataOf(topEdge);
+    const std::optional<QCP::Data> bottom = dataOf(bottomEdge);
+    const bool allData = left && right && top && bottom;
+    if (!allData)
+        context.recordEveryFrame();
 
-    auto* keyAxis = leftEdge->keyAxis();
-    auto* valAxis = leftEdge->valueAxis();
-    if (!keyAxis || !valAxis)
-        return;
+    // A corner takes its x from a vertical edge and its y from a horizontal one; without the data
+    // form it is the pair of pixels those edges sit at.
+    const auto at = [&](const std::optional<QCP::Data>& x, const std::optional<QCP::Data>& y,
+                        const QCPItemPosition* xEdge, const QCPItemPosition* yEdge)
+        -> QCP::Position
+    {
+        if (allData)
+            return QCP::Data { x->x, y->y };
+        return QCP::Pixels { xEdge->pixelPosition().x(), yEdge->pixelPosition().y() };
+    };
 
-    const double leftPx = leftEdge->pixelPosition().x();
-    const double rightPx = rightEdge->pixelPosition().x();
-    const double topPx = topEdge->pixelPosition().y();
-    const double bottomPx = bottomEdge->pixelPosition().y();
-
-    const double pxLeft = qMin(leftPx, rightPx);
-    const double pxRight = qMax(leftPx, rightPx);
-    const double pxTop = qMin(topPx, bottomPx);
-    const double pxBottom = qMax(topPx, bottomPx);
-
-    QRectF spanRect(pxLeft, pxTop, pxRight - pxLeft, pxBottom - pxTop);
-    const QRectF axRect = clipRect();
-
-    if (!spanRect.intersects(axRect))
-        return;
+    const QCP::Position leftTop = at(left, top, leftEdge, topEdge);
+    const QCP::Position leftBottom = at(left, bottom, leftEdge, bottomEdge);
+    const QCP::Position rightTop = at(right, top, rightEdge, topEdge);
+    const QCP::Position rightBottom = at(right, bottom, rightEdge, bottomEdge);
+    context.rect(leftTop, rightBottom, QPen(Qt::NoPen), mainBrush());
 
     // The band is filled and its edges are the border lines, as on screen (the GPU path): an
     // outline in the item pen framed every exported span along the axis rect edges.
-    painter->setPen(Qt::NoPen);
-    painter->setBrush(mainBrush());
-    painter->drawRect(spanRect);
-
-    painter->setPen(mainBorderPen());
-    painter->drawLine(QPointF(leftPx, pxTop), QPointF(leftPx, pxBottom));
-    painter->drawLine(QPointF(rightPx, pxTop), QPointF(rightPx, pxBottom));
-    painter->drawLine(QPointF(pxLeft, topPx), QPointF(pxRight, topPx));
-    painter->drawLine(QPointF(pxLeft, bottomPx), QPointF(pxRight, bottomPx));
+    const QPen border = mainBorderPen();
+    context.polyline(std::array<QCP::Position, 2> { leftTop, leftBottom }, border);
+    context.polyline(std::array<QCP::Position, 2> { rightTop, rightBottom }, border);
+    context.polyline(std::array<QCP::Position, 2> { leftTop, rightTop }, border);
+    context.polyline(std::array<QCP::Position, 2> { leftBottom, rightBottom }, border);
 }
 
 QPointF QCPItemRSpan::anchorPixelPosition(int anchorId) const
@@ -259,10 +254,7 @@ void QCPItemRSpan::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
     }
 
     if (mParentPlot)
-    {
-        markRhiDirty();
         mParentPlot->replot(QCustomPlot::rpQueuedReplot);
-    }
     emitDraggedRanges();
 }
 

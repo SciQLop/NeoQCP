@@ -31,8 +31,8 @@ public:
     void setKeyRange(const QCPRange& range);
     void setValueRange(const QCPRange& range);
 
-    virtual double selectTest(const QPointF& pos, bool onlySelectable,
-                              QVariant* details = nullptr) const override;
+    virtual void draw(QCPDrawContext& context) const override;
+    virtual std::optional<double> hitTest(QCP::Pixels at, QVariant* details) const override;
 
     QCPItemPosition* const leftEdge;
     QCPItemPosition* const rightEdge;
@@ -58,7 +58,6 @@ protected:
     double mDragStartLeft = 0, mDragStartRight = 0;
     double mDragStartTop = 0, mDragStartBottom = 0;
 
-    virtual void draw(QCPPainter* painter) override;
     virtual QPointF anchorPixelPosition(int anchorId) const override;
     virtual void mousePressEvent(QMouseEvent* event, const QVariant& details) override;
     virtual void mouseMoveEvent(QMouseEvent* event, const QPointF& startPos) override;

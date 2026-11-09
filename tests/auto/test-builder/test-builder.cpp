@@ -566,14 +566,14 @@ void TestBuilder::addEveryItem_data()
     row("itemvspan",
         [](QCustomPlot& p)
         {
-            auto i = p.add<QCPItemVSpan>()
+            auto i = p.add<QCPItemSpan>(Qt::Vertical)
                          .setLowerEdge(1, 2);
             return i->lowerEdge->coords() == QPointF(1, 2);
         });
     row("itemhspan",
         [](QCustomPlot& p)
         {
-            auto i = p.add<QCPItemHSpan>()
+            auto i = p.add<QCPItemSpan>(Qt::Horizontal)
                          .setLowerEdge(1, 2);
             return i->lowerEdge->coords() == QPointF(1, 2);
         });

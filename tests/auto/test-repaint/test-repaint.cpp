@@ -10,7 +10,7 @@
 #include "items/item-richtext.h"
 #include "items/item-text.h"
 #include "items/item-tracer.h"
-#include "items/item-vspan.h"
+#include "items/item-span.h"
 #include "layoutelements/layoutelement-colorscale.h"
 #include "layoutelements/layoutelement-legend.h"
 #include "layoutelements/layoutelement-textelement.h"
@@ -1090,10 +1090,10 @@ const QVector<RemainingCase>& remainingCases()
         { "span.setRange",
           [](QCustomPlot& plot) -> QObject*
           {
-              auto* span = new QCPItemHSpan(&plot);
+              auto* span = new QCPItemSpan(&plot, Qt::Horizontal);
               return span;
           },
-          [](QObject* o) { static_cast<QCPItemHSpan*>(o)->setRange(QCPRange(2.5, 7.5)); } },
+          [](QObject* o) { static_cast<QCPItemSpan*>(o)->setRange(QCPRange(2.5, 7.5)); } },
         { "legend.setFont", [](QCustomPlot& plot) -> QObject* { return plot.legend; },
           [](QObject* o)
           { static_cast<QCPLegend*>(o)->setFont(QFont(QStringLiteral("Helvetica"), 17)); } },
@@ -1141,8 +1141,8 @@ const QVector<RemainingCase>& remainingCases()
           { static_cast<QCPPolarGrid*>(o)->setRadialZeroLinePen(QPen(Qt::magenta, 2)); } },
         { "layerable.setAntialiased", [](QCustomPlot& plot) -> QObject* { return plot.graph(0); },
           [](QObject* o) { static_cast<QCPLayerable*>(o)->setAntialiased(false); } },
-        { "span.setPen", [](QCustomPlot& plot) -> QObject* { return new QCPItemHSpan(&plot); },
-          [](QObject* o) { static_cast<QCPItemHSpan*>(o)->setPen(QPen(Qt::darkRed, 3)); } },
+        { "span.setPen", [](QCustomPlot& plot) -> QObject* { return new QCPItemSpan(&plot, Qt::Horizontal); },
+          [](QObject* o) { static_cast<QCPItemSpan*>(o)->setPen(QPen(Qt::darkRed, 3)); } },
         { "line.setHead",
           [](QCustomPlot& plot) -> QObject*
           {
@@ -2303,7 +2303,7 @@ void TestRepaint::itemsDefaultToAnnotations()
     QCustomPlot plot;
     auto* text = new QCPItemText(&plot);
     auto* line = new QCPItemLine(&plot);
-    auto* span = new QCPItemVSpan(&plot);
+    auto* span = new QCPItemSpan(&plot, Qt::Vertical);
 
     QCPLayer* annotations = plot.layer(QStringLiteral("annotations"));
     QVERIFY(annotations);

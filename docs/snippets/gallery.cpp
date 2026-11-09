@@ -100,7 +100,7 @@ DOC_SNIPPET(gallery_space_weather, 800, 560)
     // The shock, marked on both panels.
     for (QCPAxisRect* rect : { customPlot->axisRect(), spectraRect })
     {
-        auto span = customPlot->add<QCPItemVSpan>();
+        auto span = customPlot->add<QCPItemSpan>(Qt::Vertical);
         span->setClipAxisRect(rect);
         for (QCPItemPosition* edge : { span->lowerEdge, span->upperEdge })
             edge->setAxes(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
@@ -552,7 +552,7 @@ DOC_SNIPPET(gallery_fit_residuals, 680, 560)
     customPlot->plotLayout()->setRowStretchFactors({ 3, 1.2 });
     QCPAxis* residualT = residualRect->axis(QCPAxis::atBottom);
     QCPAxis* residualAxis = residualRect->axis(QCPAxis::atLeft);
-    auto* band = new QCPItemHSpan(customPlot);   // the 1 sigma band
+    auto* band = new QCPItemSpan(customPlot, Qt::Horizontal);   // the 1 sigma band
     band->setClipAxisRect(residualRect);
     for (QCPItemPosition* edge : { band->lowerEdge, band->upperEdge })
         edge->setAxes(residualT, residualAxis);

@@ -2737,13 +2737,13 @@ void Benchmark::QCPItems_MixedKinds_Pan1k()
         rspan->bottomEdge->setCoords(x, y - 0.03);
         if (i % 2 == 0)
         {
-            auto* hspan = new QCPItemHSpan(mPlot);
+            auto* hspan = new QCPItemSpan(mPlot, Qt::Horizontal);
             hspan->lowerEdge->setCoords(x, y - 0.02);
             hspan->upperEdge->setCoords(x, y + 0.02);
         }
         else
         {
-            auto* vspan = new QCPItemVSpan(mPlot);
+            auto* vspan = new QCPItemSpan(mPlot, Qt::Vertical);
             vspan->lowerEdge->setCoords(x, y);
             vspan->upperEdge->setCoords(x + 0.004, y);
         }
@@ -2769,13 +2769,13 @@ void Benchmark::QCPSpans_Pan100()
         const double y = 0.5 + 0.3 * qSin(i * 0.2);
         if (i % 2 == 0)
         {
-            auto* hspan = new QCPItemHSpan(mPlot);
+            auto* hspan = new QCPItemSpan(mPlot, Qt::Horizontal);
             hspan->lowerEdge->setCoords(x, y - 0.05);
             hspan->upperEdge->setCoords(x, y + 0.05);
         }
         else
         {
-            auto* vspan = new QCPItemVSpan(mPlot);
+            auto* vspan = new QCPItemSpan(mPlot, Qt::Vertical);
             vspan->lowerEdge->setCoords(x, y);
             vspan->upperEdge->setCoords(x + 0.005, y);
         }

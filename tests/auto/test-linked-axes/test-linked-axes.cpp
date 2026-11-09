@@ -2,7 +2,7 @@
 
 #include <coords.h>
 
-#include "items/item-vspan.h"
+#include "items/item-span.h"
 
 #include <QGuiApplication>
 
@@ -566,7 +566,7 @@ void TestLinkedAxes::aSpanOnALinkedAxisLandsAtItsCoordToPixel()
     QCPAxis* linked = plot.axisRect()->addAxis(QCPAxis::atBottom);
     linked->setVisible(true);
     linked->linkTo(plot.xAxis, reciprocal, reciprocal);
-    auto* span = new QCPItemVSpan(&plot);
+    auto* span = new QCPItemSpan(&plot, Qt::Vertical);
     span->lowerEdge->setAxes(linked, plot.yAxis);
     span->upperEdge->setAxes(linked, plot.yAxis);
     span->setPen(Qt::NoPen);
@@ -576,10 +576,8 @@ void TestLinkedAxes::aSpanOnALinkedAxisLandsAtItsCoordToPixel()
     plot.show();
     QVERIFY(QTest::qWaitForWindowExposed(&plot));
     plot.replot();
-    // The span layer places a band from the rect's own axis ranges; a span on a linked axis is
-    // not a linear function of them and must be painted by the painter path.
-    QVERIFY2(plot.spanRhiLayerIfExists(), "the span layer was not made");
-    QVERIFY2(!plot.spanRhiLayerIfExists()->hasSpans(), "the span went to the GPU layer");
+    // A recorded span maps through the axis transform, links included: it lands on the linked
+    // axis's keys, which the old span layer could not place.
     const QImage image = plot.grab().toImage();
     const QRect rect = plot.axisRect()->rect();
     const double scale = image.width() / double(plot.width());

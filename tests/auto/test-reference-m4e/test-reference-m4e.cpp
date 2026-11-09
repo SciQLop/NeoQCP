@@ -277,14 +277,14 @@ QImage spanScene(const char* kind)
         plot.yAxis->setRange(0, 1);
         if (name == QLatin1String("h"))
         {
-            auto* span = new QCPItemHSpan(&plot);
+            auto* span = new QCPItemSpan(&plot, Qt::Horizontal);
             span->setRange(QCPRange(0.3, 0.6));
             span->setBrush(QColor(40, 90, 200, 50));
             span->setBorderPen(QPen(QColor(40, 90, 200), 2));
         }
         else if (name == QLatin1String("v"))
         {
-            auto* span = new QCPItemVSpan(&plot);
+            auto* span = new QCPItemSpan(&plot, Qt::Vertical);
             span->setRange(QCPRange(2.0, 4.0));
             span->setBrush(QColor(200, 60, 40, 50));
             span->setBorderPen(QPen(QColor(200, 60, 40), 2));
@@ -301,7 +301,7 @@ QImage spanScene(const char* kind)
         }
         else if (name == QLatin1String("selected"))
         {
-            auto* span = new QCPItemVSpan(&plot);
+            auto* span = new QCPItemSpan(&plot, Qt::Vertical);
             span->setRange(QCPRange(1.5, 3.5));
             span->setBrush(QColor(200, 60, 40, 50));
             span->setBorderPen(QPen(QColor(200, 60, 40), 2));

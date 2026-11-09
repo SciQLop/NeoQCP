@@ -31,7 +31,6 @@ private slots:
     void itemOrderAfterRemove();
     void layerOrderAfterMoves();
     void deleteParentAnchorItem();
-    void spanDestructorCreatesNoGpuLayer();
 
     void deleteAxisLeavesRectAndShortcuts();
     void plottablesOfAnotherRectAfterAxisRemoval();

@@ -203,13 +203,13 @@ DOC_SNIPPET(items_spans, 600, 360)
     customPlot->xAxis->setRange(0, 100);
     customPlot->yAxis->setRange(-2, 2);
 
-    auto event = customPlot->add<QCPItemVSpan>();
+    auto event = customPlot->add<QCPItemSpan>(Qt::Vertical);
     event->setRange(QCPRange(20, 35));
     event->setPen(Qt::NoPen);
     event->setBrush(QColor(255, 127, 14, 50));
     event->setBorderPen(QPen(QColor(255, 127, 14), 2));
 
-    auto band = customPlot->add<QCPItemHSpan>();
+    auto band = customPlot->add<QCPItemSpan>(Qt::Horizontal);
     band->setRange(QCPRange(-0.5, 0.5));
     band->setPen(Qt::NoPen);
     band->setBrush(QColor(44, 160, 44, 40));
@@ -223,7 +223,7 @@ DOC_SNIPPET(items_spans, 600, 360)
     box->setBrush(QColor(148, 103, 189, 50));
     box->setBorderPen(QPen(QColor(148, 103, 189), 2));
 
-    QObject::connect(event.get(), &QCPItemVSpan::rangeChanged, customPlot,
+    QObject::connect(event.get(), &QCPItemSpan::rangeChanged, customPlot,
                      [](const QCPRange& range) { qDebug() << "event:" << range.lower << range.upper; });
     // [/items_spans]
 }
@@ -236,7 +236,7 @@ DOC_SNIPPET(items_creation, 600, 360)
 
     customPlot->setItemCreator([](QCustomPlot* plot, QCPAxis*, QCPAxis*) -> QCPAbstractItem*
     {
-        auto span = plot->add<QCPItemVSpan>().setPen(Qt::NoPen);
+        auto span = plot->add<QCPItemSpan>(Qt::Vertical).setPen(Qt::NoPen);
         span->setBrush(QColor(255, 127, 14, 50));
         span->setBorderPen(QPen(QColor(255, 127, 14), 2));
         return span.get();
@@ -244,13 +244,13 @@ DOC_SNIPPET(items_creation, 600, 360)
     customPlot->setItemPositioner([](QCPAbstractItem* item, double anchorKey, double,
                                      double currentKey, double)
     {
-        static_cast<QCPItemVSpan*>(item)->setRange(QCPRange(anchorKey, currentKey));
+        static_cast<QCPItemSpan*>(item)->setRange(QCPRange(anchorKey, currentKey));
     });
     customPlot->setCreationModeEnabled(true); // or hold Shift on the first click
 
     QObject::connect(customPlot, &QCustomPlot::itemCreated, customPlot,
                      [](QCPAbstractItem* item)
-                     { qDebug() << "new span:" << static_cast<QCPItemVSpan*>(item)->range().lower; });
+                     { qDebug() << "new span:" << static_cast<QCPItemSpan*>(item)->range().lower; });
     // [/items_creation]
 }
 

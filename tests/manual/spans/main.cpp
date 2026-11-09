@@ -12,13 +12,13 @@ int main(int argc, char* argv[])
     plot.setInteractions(QCP::iSelectItems | QCP::iRangeDrag | QCP::iRangeZoom);
 
     // vertical span
-    auto* vspan = new QCPItemVSpan(&plot);
+    auto* vspan = new QCPItemSpan(&plot, Qt::Vertical);
     vspan->setRange(QCPRange(20, 40));
     vspan->setBrush(QBrush(QColor(0, 100, 255, 60)));
     vspan->setBorderPen(QPen(Qt::blue, 2));
 
     // horizontal span
-    auto* hspan = new QCPItemHSpan(&plot);
+    auto* hspan = new QCPItemSpan(&plot, Qt::Horizontal);
     hspan->setRange(QCPRange(30, 60));
     hspan->setBrush(QBrush(QColor(255, 100, 0, 60)));
     hspan->setBorderPen(QPen(Qt::red, 2));
@@ -31,7 +31,7 @@ int main(int argc, char* argv[])
     rspan->setBorderPen(QPen(Qt::green, 2));
 
     // connect delete
-    QObject::connect(vspan, &QCPItemVSpan::deleteRequested, [&]() {
+    QObject::connect(vspan, &QCPItemSpan::deleteRequested, [&]() {
         plot.removeItem(vspan);
         plot.replot();
     });

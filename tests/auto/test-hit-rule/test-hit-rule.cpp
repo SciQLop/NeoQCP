@@ -165,7 +165,7 @@ void TestHitRule::topmostWithinToleranceWins()
 void TestHitRule::spanDragStillBeatsRangeDrag()
 {
     mPlot->setInteraction(QCP::iRangeDrag);
-    auto* span = new QCPItemVSpan(mPlot);
+    auto* span = new QCPItemSpan(mPlot, Qt::Vertical);
     span->setRange(QCPRange(3, 7));
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 

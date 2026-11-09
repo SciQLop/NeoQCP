@@ -2,7 +2,7 @@
 #include <QtTest/QtTest>
 
 class QCustomPlot;
-class QCPItemVSpan;
+class QCPItemSpan;
 
 class TestSpanRhi : public QObject {
     Q_OBJECT
@@ -10,12 +10,7 @@ private slots:
     void init();
     void cleanup();
 
-    void firstDetectionReportsChange();
-    void unchangedFrameReportsNoChange();
-    void detectsEdgeMove();
-    void detectsBrushChange();
-    void detectsAxisRangeChange();
-    void detectsAxisRectResize();
+    void aRecordedSpanDrawsOnTheGpuPath();
     void exportedSpanHasNoOutlineTheScreenLacks();
     void dashedSpanBorderIsDashedOnScreen();
     void gradientSpanBrushLooksTheSameOnScreen();
@@ -23,5 +18,5 @@ private slots:
 
 private:
     QCustomPlot* mPlot = nullptr;
-    QCPItemVSpan* mSpan = nullptr;
+    QCPItemSpan* mSpan = nullptr;
 };

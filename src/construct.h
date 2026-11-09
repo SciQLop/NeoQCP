@@ -113,16 +113,19 @@ struct Construct<T>
     }
 };
 
-// add<T>(): an item takes the plot only.
+// add<T>(ctorArgs...): an item takes the plot, then its own arguments.
 template <detail::Item T>
 struct Construct<T>
 {
-    static HandleFor<T> make(QCustomPlot& plot)
+    template <typename... Args>
+    static HandleFor<T> make(QCustomPlot& plot, Args&&... args)
     {
         using Handle = HandleFor<T>;
+        static_assert(std::constructible_from<T, QCustomPlot*, Args...>,
+                      "add<T>(args...): T has no constructor taking the plot and these arguments");
         if (!detail::plotHasAxisRect(plot))
             return Handle{};
-        Handle handle = makeHandle<Handle>(new T(&plot));
+        Handle handle = makeHandle<Handle>(new T(&plot, std::forward<Args>(args)...));
         handle.get()->markDirty();
         return handle;
     }

@@ -341,7 +341,7 @@ void paintCommand(QCPPainter& painter, const QCPDrawCommand& command, const QCPD
 
 void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QCPDrawFrame& frame,
                           QCPReplayKinds kinds, const qcp::QCPRasterFallback* fallback,
-                          bool dashedAvailable)
+                          bool dashedAvailable, bool antialiasStrokes)
 {
     // PainterOnly leaves the GPU kinds to another pass: on screen the RHI replay, in an export the
     // layer's deferred GpuOnly pass. \a fallback, when there is one, draws the kinds the layer
@@ -368,7 +368,10 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
         }
         if (outsideClip(command, frame))
             continue;
-        qcp::paintCommand(painter, command, frame);
+        // A stroke is antialiased as its object drew it; an image is not, as the GPU draws its quad
+        // with hard edges, and the export has to agree with the frame.
+        const bool stroke = !std::holds_alternative<qcp::ImageCmd>(command);
+        qcp::paintCommand(painter, command, frame, { true, antialiasStrokes && stroke });
     }
     painter.restore();
 }

@@ -644,7 +644,7 @@ void QCPLayerable::setVisible(bool on)
     // Invalidate (not just dirty) the owning layer's paint buffer so the next replot
     // really redraws it. Without this, items toggled invisible→visible after their
     // initial replot never reach drawToPaintBuffer() — breaking lazy GPU registration
-    // paths (e.g. QCPSpanRhiLayer registers spans only via tryRhiDraw() during draw).
+    // paths (a layer that registers its geometry only while it is drawn).
     // Dirty alone is not enough after a pan: the layer may then repaint by translating
     // its old GPU entries, which lack (or still hold) the toggled item.
     if (mLayer)

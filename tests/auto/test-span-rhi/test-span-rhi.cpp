@@ -1,8 +1,6 @@
 #include "test-span-rhi.h"
 #include <QtWidgets/qtestsupport_widgets.h>
 #include "../../../src/qcp.h"
-#include "../../../src/painting/span-rhi-layer.h"
-#include "../../../src/items/item-vspan.h"
 
 void TestSpanRhi::init()
 {
@@ -10,7 +8,7 @@ void TestSpanRhi::init()
     mPlot->resize(400, 300);
     mPlot->xAxis->setRange(0, 10);
     mPlot->yAxis->setRange(0, 10);
-    mSpan = new QCPItemVSpan(mPlot);
+    mSpan = new QCPItemSpan(mPlot, Qt::Vertical);
     mSpan->lowerEdge->setCoords(2, 0);
     mSpan->upperEdge->setCoords(4, 0);
     // Shown so that resize() delivers a resizeEvent (hidden widgets defer it),
@@ -26,59 +24,16 @@ void TestSpanRhi::cleanup()
     mSpan = nullptr;
 }
 
-void TestSpanRhi::firstDetectionReportsChange()
-{
-    QCPSpanRhiLayer layer(nullptr);
-    layer.registerSpan(mSpan);
-    QVERIFY(layer.detectGeometryChanges());
-}
-
-void TestSpanRhi::unchangedFrameReportsNoChange()
-{
-    QCPSpanRhiLayer layer(nullptr);
-    layer.registerSpan(mSpan);
-    QVERIFY(layer.detectGeometryChanges());
-    QVERIFY(!layer.detectGeometryChanges());
-}
-
-void TestSpanRhi::detectsEdgeMove()
-{
-    QCPSpanRhiLayer layer(nullptr);
-    layer.registerSpan(mSpan);
-    QVERIFY(layer.detectGeometryChanges());
-    mSpan->upperEdge->setCoords(6, 0);
-    QVERIFY(layer.detectGeometryChanges());
-}
-
-void TestSpanRhi::detectsBrushChange()
-{
-    QCPSpanRhiLayer layer(nullptr);
-    layer.registerSpan(mSpan);
-    QVERIFY(layer.detectGeometryChanges());
-    mSpan->setBrush(QBrush(Qt::red));
-    QVERIFY(layer.detectGeometryChanges());
-}
-
-void TestSpanRhi::detectsAxisRangeChange()
-{
-    QCPSpanRhiLayer layer(nullptr);
-    layer.registerSpan(mSpan);
-    QVERIFY(layer.detectGeometryChanges());
-    mPlot->xAxis->setRange(5, 15);
-    QVERIFY(layer.detectGeometryChanges());
-}
-
-void TestSpanRhi::detectsAxisRectResize()
-{
-    QCPSpanRhiLayer layer(nullptr);
-    layer.registerSpan(mSpan);
-    QVERIFY(layer.detectGeometryChanges());
-    mPlot->resize(500, 400);
-    mPlot->replot();
-    QVERIFY(layer.detectGeometryChanges());
-}
-
 namespace {
+//! A span that exposes its recording: the GPU path replays it.
+class RecordingSpan : public QCPItemSpan
+{
+public:
+    using QCPItemSpan::QCPItemSpan;
+
+    int recordedCommands() const { return mCore.recordedCommandCount(); }
+};
+
 bool waitForRhi(QCustomPlot* plot)
 {
     if (!QTest::qWaitForWindowExposed(plot))
@@ -114,7 +69,7 @@ void TestSpanRhi::exportedSpanHasNoOutlineTheScreenLacks()
         QSKIP("No QRhi available — spans are drawn on the GPU only with a real backend");
     mPlot->xAxis->setRange(0, 10);
     mPlot->yAxis->setRange(0, 10);
-    auto* span = new QCPItemVSpan(mPlot);
+    auto* span = new QCPItemSpan(mPlot, Qt::Vertical);
     span->setRange(QCPRange(2, 8));
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
@@ -137,7 +92,7 @@ void TestSpanRhi::dashedSpanBorderIsDashedOnScreen()
     mPlot->xAxis->setRange(0, 10);
     mPlot->yAxis->setRange(0, 10);
     mPlot->xAxis->grid()->setVisible(false);
-    auto* span = new QCPItemVSpan(mPlot); // clear of the fixture's span (2..4)
+    auto* span = new QCPItemSpan(mPlot, Qt::Vertical); // clear of the fixture's span (2..4)
     span->setRange(QCPRange(5, 8));
     span->setBrush(Qt::NoBrush);
     span->setBorderPen(QPen(Qt::black, 2, Qt::DashLine));
@@ -158,7 +113,7 @@ void TestSpanRhi::gradientSpanBrushLooksTheSameOnScreen()
 {
     if (!waitForRhi(mPlot))
         QSKIP("No QRhi available — spans are drawn on the GPU only with a real backend");
-    auto* span = new QCPItemVSpan(mPlot);
+    auto* span = new QCPItemSpan(mPlot, Qt::Vertical);
     span->setRange(QCPRange(5, 9));
     QLinearGradient gradient(0, 0, 0, 300);
     gradient.setColorAt(0, Qt::red);
@@ -182,7 +137,7 @@ void TestSpanRhi::spanOnALowerLayerStaysUnderTheData()
 {
     if (!waitForRhi(mPlot))
         QSKIP("No QRhi available — spans are drawn on the GPU only with a real backend");
-    auto* span = new QCPItemVSpan(mPlot);
+    auto* span = new QCPItemSpan(mPlot, Qt::Vertical);
     span->setRange(QCPRange(5, 9));
     span->setBrush(QColor(0, 0, 255));
     span->setLayer("background");
@@ -197,4 +152,26 @@ void TestSpanRhi::spanOnALowerLayerStaysUnderTheData()
                                             qRound(mPlot->yAxis->coordToPixel(5) * dpr));
     QVERIFY2(onLine.red() > 200 && onLine.blue() < 60,
              qPrintable("the line under a background span is " + onLine.name()));
+}
+
+// The span is recorded and the GPU path draws that recording: the band is on screen and the
+// recording is what was replayed.
+void TestSpanRhi::aRecordedSpanDrawsOnTheGpuPath()
+{
+    if (!waitForRhi(mPlot))
+        QSKIP("No QRhi available — spans are drawn on the GPU only with a real backend");
+    mPlot->xAxis->setRange(0, 10);
+    mPlot->yAxis->setRange(0, 10);
+    auto* span = new RecordingSpan(mPlot, Qt::Vertical);
+    span->setRange(QCPRange(5, 9));
+    span->setBrush(QColor(0, 0, 255));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    QVERIFY2(span->recordedCommands() > 0, "the span did not record");
+    const QImage screen = mPlot->grabFramebuffer();
+    const double dpr = screen.devicePixelRatio();
+    const QColor inBand = screen.pixelColor(qRound(mPlot->xAxis->coordToPixel(7) * dpr),
+                                            qRound(mPlot->yAxis->coordToPixel(5) * dpr));
+    QVERIFY2(inBand.blue() > 200 && inBand.red() < 60,
+             qPrintable("the recorded span is " + inBand.name()));
 }

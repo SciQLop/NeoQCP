@@ -61,7 +61,6 @@ class QRhiSampler;
 class QRhiBuffer;
 class QRhiShaderResourceBindings;
 class QCPPlottableRhiLayer;
-class QCPSpanRhiLayer;
 class QCPGridRhiLayer;
 class QCPScatterRhiLayer;
 class QCPTheme;
@@ -296,10 +295,6 @@ public:
     void settle();
     // overlay:
     QCPOverlay* overlay();
-    // span GPU layer:
-    QCPSpanRhiLayer* spanRhiLayer();
-    // Non-lazy accessor: never creates the span RHI layer. Safe from destructors.
-    QCPSpanRhiLayer* spanRhiLayerIfExists() const;
     // grid GPU layer:
     QCPGridRhiLayer* gridRhiLayer();
     // Non-lazy accessor: returns the grid RHI layer only if it already exists and
@@ -595,7 +590,6 @@ protected:
     bool mRhiInitialized = false;
     QMap<QCPLayer*, QCPPlottableRhiLayer*> mPlottableRhiLayers;
     QMap<QCPLayer*, QCPScatterRhiLayer*> mScatterRhiLayers;
-    QCPSpanRhiLayer* mSpanRhiLayer = nullptr;
     QCPGridRhiLayer* mGridRhiLayer = nullptr;
     QCPPipelineScheduler* mPipelineScheduler = nullptr;
     QPointer<QCPOverlay> mOverlay;

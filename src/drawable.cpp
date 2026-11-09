@@ -799,8 +799,11 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
     painted.exporting = painter.isExporting();
     if (!ensureRecording(object, painted))
         return;
-    const QCPDrawFrame frame
-        = qcpMakeFrame(view.keyAxis, view.valueAxis, view.axisRect, QRectF(view.clip));
+    // The layer clips every child it draws at clipRect().translated(0, -1), the half pixel
+    // QCPPainter's antialiasing shifts it by: the replay sets the same clip, so a fill that ends on
+    // the clip's edge lands on the same rows it does on screen.
+    const QCPDrawFrame frame = qcpMakeFrame(view.keyAxis, view.valueAxis, view.axisRect,
+                                            QRectF(view.clip).translated(0, -1));
     QCPPlottableRhiLayer* plottables
         = painter.isExporting() ? nullptr : qcp::gpuLayer(view.plot, view.layer, false);
     QCPScatterRhiLayer* scatter = plottables ? view.plot->scatterRhiLayer(view.layer) : nullptr;
@@ -820,14 +823,22 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
         // still there: an object deleted mid-pass draws nothing more.
         qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::PainterOnly);
         if (view.layer)
+        {
+            // The deferred pass paints with the antialiasing this object drew with: the layer's
+            // painter is in whatever state the last layerable left, and a GPU command's QPainter
+            // form must look like the command did on screen. QCPPainter::setAntialiasing also
+            // restores the half-pixel shift the off state carried.
+            const bool antialiased = painter.renderHints().testFlag(QPainter::Antialiasing);
             view.layer->deferGpuPainter(
-                [list = &mState->recording, state = std::weak_ptr<State>(mState), frame](
-                    QCPPainter& target)
+                [list = &mState->recording, state = std::weak_ptr<State>(mState), frame,
+                 antialiased](QCPPainter& target)
                 {
                     if (state.expired())
                         return;
-                    qcpReplayWithPainter(*list, target, frame, QCPReplayKinds::GpuOnly);
+                    qcpReplayWithPainter(*list, target, frame, QCPReplayKinds::GpuOnly, nullptr,
+                                         true, antialiased);
                 });
+        }
         return;
     }
     qcpReplayWithRhi(mState->recording, *plottables, *scatter, frame, mState->resolve,

@@ -469,20 +469,6 @@ void TestOwnership::deleteParentAnchorItem()
     draw();
 }
 
-void TestOwnership::spanDestructorCreatesNoGpuLayer()
-{
-    mPlot->show();
-    if (!QTest::qWaitForWindowExposed(mPlot)
-        || (QCoreApplication::processEvents(), !mPlot->rhi()))
-        QSKIP("no QRhi on this platform");
-    mPlot->replot();
-    QVERIFY(mPlot->spanRhiLayerIfExists() == nullptr);
-
-    delete new QCPItemVSpan(mPlot);
-
-    QVERIFY(mPlot->spanRhiLayerIfExists() == nullptr);
-}
-
 void TestOwnership::deleteAxisLeavesRectAndShortcuts()
 {
     auto* graph = addRedGraph();
@@ -1148,12 +1134,11 @@ void TestOwnership::shownPlotTeardownFreesGpuResources()
     showAndExpose();
     if (!mPlot->rhi())
         QSKIP("no QRhi on this platform");
-    auto* span = new QCPItemVSpan(mPlot);
+    auto* span = new QCPItemSpan(mPlot, Qt::Vertical);
     span->setRange(QCPRange(2, 4));
     mPlot->xAxis->grid()->setVisible(true);
     mPlot->replot();
     QCoreApplication::processEvents();
-    QVERIFY(mPlot->spanRhiLayerIfExists() != nullptr);
     QVERIFY(mPlot->gridRhiLayerIfExists() != nullptr);
     delete mPlot;
     mPlot = nullptr;

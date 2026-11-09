@@ -50,7 +50,6 @@
 #include "painting/paintbuffer-pixmap.h"
 #include "painting/paintbuffer-rhi.h"
 #include "painting/plottable-rhi-layer.h"
-#include "painting/span-rhi-layer.h"
 #include "painting/grid-rhi-layer.h"
 #include "painting/scatter-rhi-layer.h"
 #include <QSet>
@@ -777,18 +776,6 @@ QCPOverlay* QCustomPlot::overlay()
         mOverlay->setLayer(notifLayer);
     }
     return mOverlay;
-}
-
-QCPSpanRhiLayer* QCustomPlot::spanRhiLayer()
-{
-    if (!mSpanRhiLayer && mRhi && !mBeingDestroyed)
-        mSpanRhiLayer = new QCPSpanRhiLayer(mRhi);
-    return mSpanRhiLayer;
-}
-
-QCPSpanRhiLayer* QCustomPlot::spanRhiLayerIfExists() const
-{
-    return mSpanRhiLayer;
 }
 
 QCPGridRhiLayer* QCustomPlot::gridRhiLayer()
@@ -3275,8 +3262,6 @@ void QCustomPlot::initialize(QRhiCommandBuffer* cb)
             prl->invalidatePipeline();
         for (auto* srl : mScatterRhiLayers)
             srl->invalidatePipeline();
-        if (mSpanRhiLayer)
-            mSpanRhiLayer->invalidatePipeline();
         if (mGridRhiLayer)
             mGridRhiLayer->invalidatePipeline();
         // QRhiWidget calls initialize() on resize BEFORE resizeEvent() fires.
@@ -3468,13 +3453,6 @@ void QCustomPlot::uploadLayerTextures(QRhiResourceUpdateBatch* updates, const QS
         mCompositeUbo->create();
     }
 
-    if (mSpanRhiLayer && mSpanRhiLayer->hasSpans())
-    {
-        mSpanRhiLayer->ensurePipeline(renderTarget()->renderPassDescriptor(), sampleCount());
-        mSpanRhiLayer->uploadResources(updates, outputSize, mBufferDevicePixelRatio,
-                                        mRhi->isYUpInNDC());
-    }
-
     // Register all axes with the grid RHI layer
     if (mGridRhiLayer || mRhi)
     {
@@ -3604,10 +3582,6 @@ void QCustomPlot::executeRenderPass(QRhiCommandBuffer* cb, QRhiResourceUpdateBat
                 srl->render(cb, outputSize);
         }
 
-        // Draw the GPU spans that are on this layer (after its plottables)
-        if (mSpanRhiLayer && mSpanRhiLayer->hasSpans())
-            mSpanRhiLayer->render(cb, outputSize, layer);
-
         // Draw GPU grid lines on the "grid" layer
         if (layer == this->layer(QLatin1String("grid"))
             && mGridRhiLayer && mGridRhiLayer->hasContent())
@@ -3675,12 +3649,11 @@ void QCustomPlot::releaseResources()
 
 /*! \internal
 
-  Frees the span and grid GPU layers and the compositing resources. Safe to call twice: by
+  Frees the grid GPU layer and the compositing resources. Safe to call twice: by
   releaseResources, then by the destructor.
 */
 void QCustomPlot::releaseCompositeResources()
 {
-    delete std::exchange(mSpanRhiLayer, nullptr);
     delete std::exchange(mGridRhiLayer, nullptr);
     delete std::exchange(mCompositePipeline, nullptr);
     delete std::exchange(mLayoutSrb, nullptr);
@@ -3699,8 +3672,6 @@ void QCustomPlot::resizeEvent([[maybe_unused]] QResizeEvent* event)
 {
     // resize and repaint the buffer:
     adoptWidgetViewport();
-    if (mSpanRhiLayer)
-        mSpanRhiLayer->markGeometryDirty();
     if (mGridRhiLayer)
         mGridRhiLayer->markGeometryDirty();
     notifyAlignmentGroups();

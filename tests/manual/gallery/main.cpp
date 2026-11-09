@@ -78,12 +78,12 @@ static QWidget* createSpansTab()
     graph->setData(x, y);
     graph->setPen(QPen(Qt::darkGray, 1.5));
 
-    auto* vspan = new QCPItemVSpan(plot);
+    auto* vspan = new QCPItemSpan(plot, Qt::Vertical);
     vspan->setRange(QCPRange(15, 35));
     vspan->setBrush(QBrush(QColor(0, 100, 255, 50)));
     vspan->setBorderPen(QPen(QColor(0, 100, 255), 2));
 
-    auto* hspan = new QCPItemHSpan(plot);
+    auto* hspan = new QCPItemSpan(plot, Qt::Horizontal);
     hspan->setRange(QCPRange(60, 80));
     hspan->setBrush(QBrush(QColor(255, 100, 0, 50)));
     hspan->setBorderPen(QPen(QColor(255, 100, 0), 2));
@@ -146,12 +146,12 @@ static QWidget* createSpansTab()
         plot->setItemCreator([plot, type](QCustomPlot* p, QCPAxis*, QCPAxis*) -> QCPAbstractItem* {
             QCPAbstractItem* item = nullptr;
             if (type == 0) {
-                auto* s = new QCPItemVSpan(p);
+                auto* s = new QCPItemSpan(p, Qt::Vertical);
                 s->setBrush(QBrush(QColor(0, 100, 255, 50)));
                 s->setBorderPen(QPen(QColor(0, 100, 255), 2));
                 item = s;
             } else if (type == 1) {
-                auto* s = new QCPItemHSpan(p);
+                auto* s = new QCPItemSpan(p, Qt::Horizontal);
                 s->setBrush(QBrush(QColor(255, 100, 0, 50)));
                 s->setBorderPen(QPen(QColor(255, 100, 0), 2));
                 item = s;
@@ -169,11 +169,11 @@ static QWidget* createSpansTab()
         });
         if (type == 0) {
             plot->setItemPositioner([](QCPAbstractItem* item, double ak, double, double ck, double) {
-                static_cast<QCPItemVSpan*>(item)->setRange(QCPRange(ak, ck));
+                static_cast<QCPItemSpan*>(item)->setRange(QCPRange(ak, ck));
             });
         } else if (type == 1) {
             plot->setItemPositioner([](QCPAbstractItem* item, double, double av, double, double cv) {
-                static_cast<QCPItemHSpan*>(item)->setRange(QCPRange(av, cv));
+                static_cast<QCPItemSpan*>(item)->setRange(QCPRange(av, cv));
             });
         } else {
             plot->setItemPositioner([](QCPAbstractItem* item, double ak, double av, double ck, double cv) {
@@ -782,7 +782,7 @@ static QWidget* createThemeTab()
     g2->setName("Signal B");
 
     // vspan on dark theme
-    auto* vspan = new QCPItemVSpan(plot);
+    auto* vspan = new QCPItemSpan(plot, Qt::Vertical);
     vspan->setRange(QCPRange(3, 5));
     vspan->setBrush(QBrush(QColor(100, 180, 255, 40)));
     vspan->setBorderPen(QPen(QColor(100, 180, 255, 120), 1));
