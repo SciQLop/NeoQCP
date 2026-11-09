@@ -160,6 +160,9 @@ private:
     mutable std::vector<ItemIndexGroup> mItemGroups;
     mutable std::vector<int> mItemSide;
     mutable bool mItemIndexDirty = true;
+    //! Whether the child list changed since the last build: a set of boxes that did not move still
+    //! has to be sorted again when an item joined or left the layer.
+    mutable bool mItemIndexMembershipChanged = true;
     mutable int mItemIndexBuilds = 0;
 
     // Every cache derived from the child list (index, axes, plottables) is stale after it changes.

@@ -1121,6 +1121,7 @@ std::optional<QCPDataBox> dataBoxOfRect(QCPAxis* keyAxis, QCPAxis* valueAxis, co
 void QCPLayer::childrenChanged()
 {
     mItemIndexDirty = true;
+    mItemIndexMembershipChanged = true;
     mItemAxesDirty = true;
     mPlottableChildrenDirty = true;
 }
@@ -1240,7 +1241,8 @@ void QCPLayer::rebuildItemIndex() const
     std::vector<std::pair<int, QCPItemExtent>> extents;
     // Whether anything the sort sees has moved: a box, or the axis pair a group stands for. The pad
     // only widens the query, so a pen that grows leaves the sort alone.
-    bool moved = false;
+    bool moved = mItemIndexMembershipChanged;
+    mItemIndexMembershipChanged = false;
     for (int i = 0; i < mChildren.size(); ++i)
     {
         auto* item = qobject_cast<QCPAbstractItem*>(mChildren.at(i));
