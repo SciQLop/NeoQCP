@@ -752,21 +752,29 @@ void QCPFinancial::recordSegment(QCPDrawContext& context, const QCPDataRange& se
     QCPAxis* valueAxis = mValueAxis.data();
     if (!keyAxis || !valueAxis)
         return;
-    const QCPKeyWindow window = context.keyWindow();
-    // A bar straddles its key by half its width, so the window grows by that much in keys.
-    const double halfPixel = qAbs(getPixelWidth(window.keys.lower, 0.0));
-    const double margin = mWidthType == wtPlotCoords
+    // 2.x centred a plot-coordinate body symmetrically in pixels. On a log key axis the two data
+    // halves are not equal on screen, so such a body is recorded in pixels, as a pixel width is.
+    const bool logKey = keyAxis->scaleType() == QCPAxis::stLogarithmic;
+    const bool dataSpace = mWidthType == wtPlotCoords && !logKey;
+    if (!dataSpace)
+        (void)context.transform(); // a pixel width (or a log key axis): this geometry is this view's
+    // A bar straddles its key by half its width, so the window grows by that much in keys. A window
+    // is only recorded on a linear key axis, so a log one culls nothing.
+    const QCPKeyWindow window = logKey ? QCPKeyWindow { } : context.keyWindow();
+    const double halfPixel = logKey ? 0.0 : qAbs(getPixelWidth(window.keys.lower, 0.0));
+    const double margin = dataSpace
         ? mWidth * 0.5
         : (window.pixelsPerKey > 0 ? halfPixel / window.pixelsPerKey : 0.0);
-    auto begin = mDataContainer->findBegin(window.keys.lower - margin);
-    auto end = mDataContainer->findEnd(window.keys.upper + margin);
+    auto begin = mDataContainer->constBegin();
+    auto end = mDataContainer->constEnd();
+    if (!logKey)
+    {
+        begin = mDataContainer->findBegin(window.keys.lower - margin);
+        end = mDataContainer->findEnd(window.keys.upper + margin);
+    }
     mDataContainer->limitIteratorsToDataRange(begin, end, segment);
     if (begin == end)
         return;
-
-    const bool dataSpace = mWidthType == wtPlotCoords;
-    if (!dataSpace)
-        (void)context.transform(); // a pixel width: this geometry holds for this view alone
     // A point of the chart, in the space the width type allows.
     const auto at = [&](double key, double value) -> QCP::Position
     {

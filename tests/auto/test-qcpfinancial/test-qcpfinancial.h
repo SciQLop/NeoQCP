@@ -15,6 +15,7 @@ private slots:
   void recordedChartsMatchTheirReferences_data();
   void aPannedCandlestickIsNotReRecorded();
   void everyStyleSetterReRecords();
+  void aLogKeyAxisCentresTheBodyInPixels();
   
 private:
   QCustomPlot *mPlot;

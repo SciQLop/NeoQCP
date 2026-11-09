@@ -1,4 +1,5 @@
 #include "test-qcpfinancial.h"
+#include "painting/draw-commands.h"
 #include "qcustomplot.h"
 #include "reference-image.h"
 #include <QImage>
@@ -178,6 +179,7 @@ public:
 
   [[nodiscard]] int recordings() const { return mCore.recordingCount(); }
   [[nodiscard]] int recordedCommands() const { return mCore.recordedCommandCount(); }
+  [[nodiscard]] const QCPDrawList& recordedList() const { return mCore.recordedList(); }
 };
 
 struct Scene
@@ -324,4 +326,43 @@ void TestQCPFinancial::everyStyleSetterReRecords()
   financial->setSelectable(QCP::stDataRange);
   QVERIFY2(reRecords([&] { financial->setSelection(QCPDataSelection(QCPDataRange(1, 3))); }),
            "a selection change did not remake the recording");
+}
+
+// 2.x centred a plot-coordinate body symmetrically in pixels. On a log key axis the two data halves
+// are not equal on screen, so the body must be recorded in pixels there.
+void TestQCPFinancial::aLogKeyAxisCentresTheBodyInPixels()
+{
+  QCustomPlot plot;
+  plot.resize(400, 300);
+  plot.xAxis->setScaleType(QCPAxis::stLogarithmic);
+  plot.xAxis->setRange(1, 100);
+  plot.yAxis->setRange(0, 10);
+  auto* chart = new RecordingFinancial(plot.xAxis, plot.yAxis);
+  chart->setChartStyle(QCPFinancial::csCandlestick);
+  chart->setWidthType(QCPFinancial::wtPlotCoords);
+  chart->setWidth(10.0);
+  chart->setTwoColored(false);
+  chart->setPen(Qt::NoPen);
+  chart->setBrush(QColor(200, 30, 30));
+  chart->setData(QVector<double> { 20.0 }, QVector<double> { 2.0 }, QVector<double> { 8.0 },
+                 QVector<double> { 3.0 }, QVector<double> { 7.0 });
+  plot.replot();
+
+  // The body is the recording's only rect, and on a log key axis it is pixels, centred on the key.
+  const qcp::RectCmd* body = nullptr;
+  for (const qcp::QCPDrawCommand& command : chart->recordedList().commands)
+    if (const auto* rect = std::get_if<qcp::RectCmd>(&command))
+      body = rect;
+  QVERIFY2(body, "the candlestick body was not recorded");
+  const auto* left = std::get_if<QCP::Pixels>(&body->a);
+  const auto* right = std::get_if<QCP::Pixels>(&body->b);
+  QVERIFY2(left && right, "a log key axis must record the body in pixels");
+  const double centre = plot.xAxis->coordToPixel(20.0);
+  const double low = qMin(left->x, right->x);
+  const double high = qMax(left->x, right->x);
+  QVERIFY2(qAbs((centre - low) - (high - centre)) <= 0.5,
+           qPrintable(QStringLiteral("the body spans %1..%2 about %3")
+                          .arg(low)
+                          .arg(high)
+                          .arg(centre)));
 }
