@@ -115,7 +115,7 @@ namespace
 //! frame shows (a bar chart records every bar), and drawing what nobody sees costs the most.
 bool outsideClip(const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame)
 {
-    if (frame.clip.isEmpty())
+    if (frame.clip.isEmpty() || !qcp::qcpCullsByExtent(command))
         return false;
     const qcp::CommandExtent extent = qcp::commandExtent(command, frame);
     return extent.cullable

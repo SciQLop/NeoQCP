@@ -764,6 +764,24 @@ struct CommandExtent
     bool cullable = false;
 };
 
+//! Whether commandExtent() can cull \a command at all: the kinds it boxes and strokes. Asking the
+//! extent of a command costs a visit, a pen copy and the box of its geometry, and a frame is mostly
+//! data series, which it never boxes - so the test is asked first.
+inline bool qcpCullsByExtent(const QCPDrawCommand& command)
+{
+    return std::visit(
+        [](const auto& cmd)
+        {
+            using T = std::decay_t<decltype(cmd)>;
+            return std::is_same_v<T, RectCmd> || std::is_same_v<T, EllipseCmd>
+                || std::is_same_v<T, ImageCmd> || std::is_same_v<T, RectsCmd>
+                || std::is_same_v<T, EllipsesCmd> || std::is_same_v<T, PolygonCmd>
+                || std::is_same_v<T, PolylinePositionsCmd> || std::is_same_v<T, MarkersCmd>
+                || std::is_same_v<T, TextCmd>;
+        },
+        command);
+}
+
 //! \a command's extent at \a frame; \a mapSeries boxes a data series too.
 inline CommandExtent commandExtent(const QCPDrawCommand& command, const QCPDrawFrame& frame,
                                    bool mapSeries = false)
