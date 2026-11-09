@@ -311,7 +311,6 @@ struct QCPDrawnCore::State
     QCPResolveCache resolve;
     qcp::QCPRasterFallback raster;
     QCPRecordingCache geometry;
-    quint64 generation = 0;
     quint64 recordedGeneration = 0;
     quint64 recordedEpoch = 0;
     quint64 recordedItemsEpoch = 0;
@@ -335,7 +334,6 @@ struct QCPDrawnCore::State
     bool anchorDependent = false;
     bool transformDependent = false;
     bool iconRecorded = false;
-    bool insideDraw = false;
     bool reportedMissingAxis = false;
     //! The generation at which a recording without axes was refused, and whether that stands: the
     //! answer costs one draw to learn, and no other fact can change it while the content does not.
@@ -462,9 +460,15 @@ QCPDrawnView qcpDrawnViewOf(const QCPAbstractPlottable& plottable, QRect clip)
     return view;
 }
 
-QCPDrawnCore::QCPDrawnCore() : mState(std::make_shared<State>()) { }
+QCPDrawnCore::QCPDrawnCore() = default;
 
 QCPDrawnCore::~QCPDrawnCore() = default;
+
+void QCPDrawnCore::ensureState()
+{
+    if (!mState)
+        mState = std::make_shared<State>();
+}
 
 bool QCPDrawnCore::frameTransformMatches(const QCPDrawnView& view, const QCPDrawFrame* known,
                                         const QCPTransform& recorded)
@@ -477,6 +481,8 @@ bool QCPDrawnCore::frameTransformMatches(const QCPDrawnView& view, const QCPDraw
 bool QCPDrawnCore::recordingIsStale(const QCPDrawable& object, const QCPDrawnView& view,
                                    const QCPDrawFrame* known) const
 {
+    if (!mState)
+        return true; // it has never recorded, so nothing it holds can be replayed
     const quint64 epoch = view.plot ? view.plot->viewEpoch() : 0;
     const quint64 itemsEpoch = view.plot ? view.plot->itemsEpoch() : 0;
     // An everyFrame() recording reads something the object cannot declare, so it is rebuilt by each
@@ -498,7 +504,7 @@ bool QCPDrawnCore::recordingIsStale(const QCPDrawable& object, const QCPDrawnVie
         const QCPRange keys = view.keyAxis->range();
         return keys.lower < window.keys.lower || keys.upper > window.keys.upper;
     }();
-    return !mState->recorded || everyFrame || mState->recordedGeneration != mState->generation
+    return !mState->recorded || everyFrame || mState->recordedGeneration != mGeneration
         || mState->recordedSource != object.dataSourceIdentity()
         || mState->recordedDependency != object.dependencyRevision()
         || (object.resolvesForTheExport() && mState->recordedExporting != view.exporting)
@@ -511,7 +517,7 @@ bool QCPDrawnCore::recordingIsStale(const QCPDrawable& object, const QCPDrawnVie
 
 QPointF QCPDrawnCore::stallOffset(const QCPDrawable& object, const QCPDrawnView& view) const
 {
-    if (!mState->painted || mState->recording.everyFrame || mState->transformDependent
+    if (!mState || !mState->painted || mState->recording.everyFrame || mState->transformDependent
         || !mState->movesWithTheData || !view.keyAxis || !view.valueAxis)
         return { };
     if (recordingIsStale(object, view))
@@ -528,7 +534,7 @@ QPointF QCPDrawnCore::stallOffset(const QCPDrawable& object, const QCPDrawnView&
 // repainting. An export never does (it paints into another image, not the layer's).
 void QCPDrawnCore::notePainted(const QCPDrawnView& view)
 {
-    if (!view.keyAxis || !view.valueAxis)
+    if (!mState || !view.keyAxis || !view.valueAxis)
         return;
     mState->paintedKey = view.keyAxis->range();
     mState->paintedValue = view.valueAxis->range();
@@ -537,30 +543,30 @@ void QCPDrawnCore::notePainted(const QCPDrawnView& view)
 
 bool QCPDrawnCore::contentChanged()
 {
-    if (mState->insideDraw)
+    if (mInsideDraw)
     {
         qcp::reportMisuse(Q_FUNC_INFO,
                           "contentChanged() from inside a drawing: ignored, it would "
                           "re-record on every frame");
         return false;
     }
-    ++mState->generation;
+    ++mGeneration;
     return true;
 }
 
 quint64 QCPDrawnCore::generation() const
 {
-    return mState->generation;
+    return mGeneration;
 }
 
 int QCPDrawnCore::recordingCount() const
 {
-    return mState->recordings;
+    return mState ? mState->recordings : 0;
 }
 
 bool QCPDrawnCore::hasRecording() const
 {
-    return mState->recorded;
+    return mState && mState->recorded;
 }
 
 bool QCPDrawnCore::recordsTheDrawing(const QCPDrawable& object, const QCPDrawnView& view)
@@ -572,25 +578,25 @@ bool QCPDrawnCore::recordsTheDrawing(const QCPDrawable& object, const QCPDrawnVi
 
 int QCPDrawnCore::recordedCommandCount() const
 {
-    return mState->recorded ? int(mState->recording.commands.size()) : 0;
+    return mState && mState->recorded ? int(mState->recording.commands.size()) : 0;
 }
 
 const QCPDrawList& QCPDrawnCore::recordedList() const
 {
     static const QCPDrawList empty;
-    return mState->recorded ? mState->recording : empty;
+    return mState && mState->recorded ? mState->recording : empty;
 }
 
 const QCPDrawList& QCPDrawnCore::iconRecordedList() const
 {
     static const QCPDrawList empty;
-    return mState->iconRecorded ? mState->icon : empty;
+    return mState && mState->iconRecorded ? mState->icon : empty;
 }
 
 int QCPDrawnCore::recordedPolylinePointCount() const
 {
     int points = 0;
-    if (mState->recorded)
+    if (mState && mState->recorded)
         for (const qcp::QCPDrawCommand& command : mState->recording.commands)
             if (const auto* polyline = std::get_if<qcp::PolylineDataCmd>(&command))
                 points += int(polyline->points->size());
@@ -600,7 +606,7 @@ int QCPDrawnCore::recordedPolylinePointCount() const
 int QCPDrawnCore::recordedPolylineNaNs() const
 {
     int breaks = 0;
-    if (mState->recorded)
+    if (mState && mState->recorded)
         for (const qcp::QCPDrawCommand& command : mState->recording.commands)
             if (const auto* polyline = std::get_if<qcp::PolylineDataCmd>(&command))
                 for (const QPointF& point : *polyline->points)
@@ -611,18 +617,19 @@ int QCPDrawnCore::recordedPolylineNaNs() const
 
 quint64 QCPDrawnCore::resolveRemapCount() const
 {
-    return mState->resolve.remapCount();
+    return mState ? mState->resolve.remapCount() : 0;
 }
 
 int QCPDrawnCore::rasterCount() const
 {
-    return mState->raster.rasterCount();
+    return mState ? mState->raster.rasterCount() : 0;
 }
 
 bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView& view,
                                    const QCPDrawFrame* known)
 {
-    if (mState->insideDraw)
+    ensureState();
+    if (mInsideDraw)
     {
         // The object is asking for the recording it is drawing right now: it has no answer yet, and
         // re-entering draw() for it would never end. The previous recording is the closest thing.
@@ -635,11 +642,11 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
     // and only a drawing that needs a transform is refused - after it was recorded, so the answer is
     // about what it actually holds.
     const bool axes = view.keyAxis && view.valueAxis;
-    if (!axes && mState->refusedMissingAxis && mState->refusedAxesGeneration == mState->generation)
+    if (!axes && mState->refusedMissingAxis && mState->refusedAxesGeneration == mGeneration)
         return false;
     const auto refuseWithoutAxes = [this]() {
         mState->refusedMissingAxis = true;
-        mState->refusedAxesGeneration = mState->generation;
+        mState->refusedAxesGeneration = mGeneration;
         if (!mState->reportedMissingAxis)
         {
             mState->reportedMissingAxis = true;
@@ -669,7 +676,7 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
     const QRectF clip = axes ? QRectF() : QRectF(view.clip).translated(0, -1);
     QCPDrawContext context(view.keyAxis, view.valueAxis, view.axisRect, view.theme, view.exporting,
                            clip);
-    const InsideDraw drawing(mState->insideDraw);
+    const InsideDraw drawing(mInsideDraw);
     object.draw(context);
     QCPDrawList recording = context.takeDrawList();
     if (!axes && qcpNeedsAxes(recording))
@@ -685,7 +692,7 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
     mState->transformDependent = mState->recording.transformDependent;
     // Asked once per recording: a pan then knows whether the whole of it may be shifted.
     mState->movesWithTheData = qcpRecordingMovesWithTheData(mState->recording);
-    mState->recordedGeneration = mState->generation;
+    mState->recordedGeneration = mGeneration;
     mState->recordedEpoch = epoch;
     mState->recordedItemsEpoch = itemsEpoch;
     mState->recordedFrame = frameEpoch;
@@ -705,6 +712,7 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
 std::optional<QCPDataBox> QCPDrawnCore::dataRange(const QCPDrawable& object,
                                                   const QCPDrawnView& view, bool applyLogRule)
 {
+    ensureState();
     if (!ensureRecording(object, view))
         return std::nullopt;
     const QCPDrawList& list = mState->recording;
@@ -755,6 +763,8 @@ std::optional<QCPItemExtent> QCPDrawnCore::dataExtent(const QCPDrawable& object,
 
 double QCPDrawnCore::pixelPad() const
 {
+    if (!mState)
+        return 0.0;
     double pad = 0.0;
     for (const qcp::QCPDrawCommand& command : mState->recording.commands)
         pad = std::max(pad,
@@ -943,12 +953,13 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
 void QCPDrawnCore::paintIcon(const QCPDrawable& object, QCPPainter& painter, const QRectF& rect,
                              const QCPDrawnView& view)
 {
+    ensureState();
     const quint64 epoch = view.plot ? view.plot->viewEpoch() : 0;
     const void* source = object.dataSourceIdentity();
     const quint64 dependency = object.dependencyRevision();
     // The icon is a recording of its own, so it outlives a frame only when none of the facts it
     // read changed: its generation, the data it reads, and the view epoch a theme reader needs.
-    const bool stale = !mState->iconRecorded || mState->iconGeneration != mState->generation
+    const bool stale = !mState->iconRecorded || mState->iconGeneration != mGeneration
         || mState->iconSource != source || mState->iconDependency != dependency
         || (mState->icon.viewDependent && mState->iconEpoch != epoch);
     if (stale)
@@ -956,10 +967,10 @@ void QCPDrawnCore::paintIcon(const QCPDrawable& object, QCPPainter& painter, con
         // An icon records through the same door, into a list of its own: the axes only feed the
         // context's unused frame, so an object outside a plot still gets its icon.
         QCPDrawContext context(view.keyAxis, view.valueAxis, view.axisRect, view.theme);
-        const InsideDraw drawing(mState->insideDraw);
+        const InsideDraw drawing(mInsideDraw);
         object.drawLegendIcon(context);
         mState->icon = context.drawList();
-        mState->iconGeneration = mState->generation;
+        mState->iconGeneration = mGeneration;
         mState->iconEpoch = epoch;
         mState->iconSource = source;
         mState->iconDependency = dependency;

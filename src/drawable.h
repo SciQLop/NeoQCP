@@ -219,8 +219,17 @@ private:
     void notePainted(const QCPDrawnView& view);
 
     struct State;
+
+    //! Allocates the state on first use: an object created, restyled and removed without ever being
+    //! drawn allocates none, and the generation keeps counting without it.
+    void ensureState();
+
     //! Shared with the deferred painter callbacks: they check the object is still there.
     std::shared_ptr<State> mState;
+    //! Beside the state, not in it: an object that never draws still counts its changes.
+    quint64 mGeneration = 0;
+    //! Whether the object is inside a recording, where a setter is a misuse.
+    bool mInsideDraw = false;
 };
 
 //! A box side, for the one range helper both plottable ranges answer through.
