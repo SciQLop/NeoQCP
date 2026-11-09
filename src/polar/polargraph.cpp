@@ -150,7 +150,8 @@ QFont QCPPolarLegendItem::getFont() const
   QCPPolarArea::add<QCPPolarGraph>().
 */
 QCPPolarGraph::QCPPolarGraph(QCPPolarAxisAngular* keyAxis, QCPPolarAxisRadial* valueAxis)
-        : QCPLayerable(keyAxis->parentPlot(), QString(), keyAxis)
+        // The graph draws on the area, not on the ring: hiding the angular axis keeps the data.
+        : QCPLayerable(keyAxis->parentPlot(), QString(), keyAxis->area())
         , mDataContainer(new QCPGraphDataContainer)
         , mName()
         , mAntialiasedFill(true)
@@ -290,7 +291,12 @@ void QCPPolarGraph::setKeyAxis(QCPPolarAxisAngular* axis)
     markDirty();
     mKeyAxis = axis;
     if (mKeyAxis)
+    {
+        setParentLayerable(mKeyAxis->area());
         mKeyAxis->area()->registerPolarGraph(this);
+    }
+    else
+        setParentLayerable(nullptr);
 }
 
 /*!

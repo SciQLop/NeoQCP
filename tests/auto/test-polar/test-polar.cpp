@@ -3,6 +3,7 @@
 #include "polar/angularaxis.h"
 #include "polar/polar-area.h"
 #include "polar/polargraph.h"
+#include "polar/polargrid.h"
 #include "polar/radialaxis.h"
 #include <QPointer>
 
@@ -263,4 +264,25 @@ void TestPolar::radialDragAndWheelWork()
     QVERIFY2(qAbs(radial->range().lower + 0.3) < 1e-9,
              qPrintable(QString::number(radial->range().lower)));
     QCOMPARE(angular->range(), angularBefore);
+}
+
+void TestPolar::hidingTheAngularAxisKeepsTheGraphs()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 180 }, QVector<double> { 0.5, 0.5 });
+    QVERIFY(graph);
+    graph->setPen(QPen(Qt::blue, 4));
+    area->angularAxis()->setVisible(false);
+    area->radialAxis()->setVisible(false);
+    area->grid()->setVisible(false);
+    settle(plot);
+
+    // The graphs belong to the area, not to the ring: hiding the ring keeps the data.
+    QCOMPARE(graph->parentLayerable(), static_cast<QCPLayerable*>(area));
+    QVERIFY(graph->realVisibility());
+    const QColor pixel = pixelAt(plot, (area->center() + QPointF(0, 0.5 * area->radius())).toPoint());
+    QVERIFY2(pixel.blue() > 150 && pixel.red() < 120, qPrintable(pixel.name()));
 }

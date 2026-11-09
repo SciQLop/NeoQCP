@@ -18,4 +18,5 @@ private slots:
     void backgroundStaysInsideTheDisc();
     void polarAxisPartsAreClickable();
     void radialDragAndWheelWork();
+    void hidingTheAngularAxisKeepsTheGraphs();
 };
