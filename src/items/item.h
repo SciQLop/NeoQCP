@@ -269,6 +269,9 @@ public:
     */
     [[nodiscard]] quint64 dependencyRevision() const override;
 
+    //! The first position, without copying the list: the view asks it for its axes every frame.
+    [[nodiscard]] const QCPItemPosition* firstPosition() const { return mPositions.value(0); }
+
     //! The legend icon: the recording, unless the class records its own.
     void drawLegendIcon(QCPDrawContext& icon) const override { draw(icon); }
 
@@ -329,6 +332,10 @@ protected:
 
     void markFollowersDirty();
     bool mMarking = false;
+    //! How many of the positions hang from another item's anchor, so that an item that hangs from
+    //! nothing can answer dependencyRevision() without walking them.
+    void noteAnchoredPosition(int change) { mAnchoredPositions += change; }
+    int mAnchoredPositions = 0;
     // The extent of these positions, or nullopt when they do not share one axis pair or when both
     // axes are unusable. \a pixelPad is the room the drawing needs around the positions.
     [[nodiscard]] std::optional<QCPItemExtent>
@@ -356,6 +363,7 @@ private:
 
     friend class QCustomPlot;
     friend class QCPItemAnchor;
+    friend class QCPItemPosition; // keeps mAnchoredPositions true
     friend class QCPLayer; // writes mItemSlot at rebuild, so a move costs no search
 };
 

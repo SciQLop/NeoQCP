@@ -603,7 +603,11 @@ bool QCPItemPosition::setParentAnchorX(QCPItemAnchor* parentAnchor, bool keepPix
     }
     if (mParentItem)
         mParentItem->markDirty();
+    const bool wasAnchored = mParentAnchorX || mParentAnchorY;
     mParentAnchorX = parentAnchor;
+    const bool anchored = mParentAnchorX || mParentAnchorY;
+    if (mParentItem && anchored != wasAnchored)
+        mParentItem->noteAnchoredPosition(anchored ? 1 : -1);
     // restore pixel position under new parent:
     if (keepPixelPosition)
         setPixelPosition(pixelP);
@@ -660,7 +664,11 @@ bool QCPItemPosition::setParentAnchorY(QCPItemAnchor* parentAnchor, bool keepPix
     }
     if (mParentItem)
         mParentItem->markDirty();
+    const bool wasAnchored = mParentAnchorX || mParentAnchorY;
     mParentAnchorY = parentAnchor;
+    const bool anchored = mParentAnchorX || mParentAnchorY;
+    if (mParentItem && anchored != wasAnchored)
+        mParentItem->noteAnchoredPosition(anchored ? 1 : -1);
     // restore pixel position under new parent:
     if (keepPixelPosition)
         setPixelPosition(pixelP);
@@ -1338,6 +1346,9 @@ std::optional<double> QCPAbstractItem::hitTest(QCP::Pixels at, QVariant* details
 */
 quint64 QCPAbstractItem::dependencyRevision() const
 {
+    // Most items hang from nothing: no walk, no hash, in the answer every frame asks of every item.
+    if (!mAnchoredPositions)
+        return 0;
     quint64 revision = 0;
     for (const QCPItemPosition* position : mPositions)
         for (const QCPItemAnchor* anchor : { position->parentAnchorX(), position->parentAnchorY() })
