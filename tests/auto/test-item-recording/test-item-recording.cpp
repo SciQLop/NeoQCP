@@ -337,6 +337,85 @@ void TestItemRecording::aTracerFollowsItsGraph()
     QCOMPARE(redPixelsNear(image, low, 8), 0);
 }
 
+void TestItemRecording::aPannedTracerIsNotReRecorded()
+{
+    // A tracer on plot coordinates is data: a pan only shifts its marker.
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
+    graph->setData(QVector<double> { 1, 2, 3, 4, 5 }, QVector<double> { 0.2, 0.3, 0.4, 0.5, 0.6 });
+    auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
+    tracer->setGraph(graph);
+    tracer->setGraphKey(3.0);
+    tracer->setStyle(QCPItemTracer::tsCircle);
+    tracer->setSize(9);
+    plot.replot();
+    const int before = tracer->recordings();
+    QCOMPARE(before, 1);
+
+    plot.xAxis->setRange(1, 7);
+    plot.replot();
+    QCOMPARE(tracer->recordings(), before);
+}
+
+void TestItemRecording::aTracerFollowsSetGraphKey()
+{
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
+    graph->setData(QVector<double> { 1, 2, 3, 4, 5 }, QVector<double> { 0.2, 0.3, 0.4, 0.5, 0.6 });
+    auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
+    tracer->setGraph(graph);
+    tracer->setGraphKey(2.0);
+    tracer->setStyle(QCPItemTracer::tsCircle);
+    tracer->setSize(9);
+    tracer->setPen(QPen(Qt::red, 2));
+    plot.replot();
+
+    const auto markerAt = [&plot](double key, double value)
+    {
+        return QPointF(plot.xAxis->coordToPixel(key), plot.yAxis->coordToPixel(value));
+    };
+    QImage image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QVERIFY2(redPixelsNear(image, markerAt(2.0, 0.3), 8) > 0, "the marker is not at its key");
+
+    tracer->setGraphKey(4.0);
+    plot.replot();
+    image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QVERIFY2(redPixelsNear(image, markerAt(4.0, 0.5), 8) > 0, "the marker did not follow the new key");
+    QCOMPARE(redPixelsNear(image, markerAt(2.0, 0.3), 8), 0);
+}
+
+void TestItemRecording::aTracerFollowsInterpolation()
+{
+    // Between two samples the tracer snaps to the nearer one, or interpolates when asked to.
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
+    graph->setData(QVector<double> { 1, 5 }, QVector<double> { 0.2, 0.6 });
+    auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
+    tracer->setGraph(graph);
+    tracer->setGraphKey(2.0);
+    tracer->setStyle(QCPItemTracer::tsCircle);
+    tracer->setSize(9);
+    tracer->setPen(QPen(Qt::red, 2));
+    plot.replot();
+
+    const auto markerAt = [&plot](double key, double value)
+    {
+        return QPointF(plot.xAxis->coordToPixel(key), plot.yAxis->coordToPixel(value));
+    };
+    QImage image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    // Not interpolating, the tracer sits on the nearer sample's key, not on the queried one.
+    QVERIFY2(redPixelsNear(image, markerAt(1.0, 0.2), 8) > 0, "the marker did not snap to the nearer sample");
+
+    tracer->setInterpolating(true);
+    plot.replot();
+    image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QVERIFY2(redPixelsNear(image, markerAt(2.0, 0.3), 8) > 0, "the marker did not interpolate");
+    QCOMPARE(redPixelsNear(image, markerAt(1.0, 0.2), 8), 0);
+}
+
 void TestItemRecording::selectionReRecords()
 {
     // A selected item draws its selected pen and brush: the selection is a content change.

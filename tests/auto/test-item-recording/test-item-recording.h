@@ -19,5 +19,8 @@ private slots:
     void aScaledPixmapRecords();
     void aTracerRecords();
     void aTracerFollowsItsGraph();
+    void aPannedTracerIsNotReRecorded();
+    void aTracerFollowsSetGraphKey();
+    void aTracerFollowsInterpolation();
     void selectionReRecords();
 };

@@ -111,6 +111,12 @@ public:
     // reimplemented virtual methods:
     void draw(QCPDrawContext& context) const override;
 
+    //! The graph the recorded position comes from: another one makes the recording stale.
+    [[nodiscard]] const void* dataSourceIdentity() const override { return mGraph.data(); }
+
+    //! The graph's revision: a new sample moves the tracer without a call on it.
+    [[nodiscard]] quint64 dependencyRevision() const override;
+
     // non-virtual methods:
     void updatePosition();
 

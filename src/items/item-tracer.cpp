@@ -239,6 +239,25 @@ void QCPItemTracer::setInterpolating(bool enabled)
     mInterpolating = enabled;
 }
 
+namespace
+{
+//! The scatter shape a tracer style draws as one marker on plot coordinates.
+QCPScatterStyle::ScatterShape markerShapeOf(QCPItemTracer::TracerStyle style)
+{
+    switch (style)
+    {
+        case QCPItemTracer::tsCircle:
+            return QCPScatterStyle::ssCircle;
+        case QCPItemTracer::tsSquare:
+            return QCPScatterStyle::ssSquare;
+        case QCPItemTracer::tsPlus:
+            return QCPScatterStyle::ssPlus;
+        default:
+            return QCPScatterStyle::ssNone;
+    }
+}
+} // namespace
+
 /* inherits documentation from base class */
 void QCPItemTracer::draw(QCPDrawContext& context) const
 {
@@ -247,10 +266,35 @@ void QCPItemTracer::draw(QCPDrawContext& context) const
     const_cast<QCPItemTracer*>(this)->updatePosition();
     if (mStyle == tsNone || lostGraph())
         return;
-    // The marker is a size in pixels around a position, and a crosshair spans the clip rect: the
-    // view decides where it is, so the recording is remade every frame (P-5).
-    context.recordEveryFrame();
 
+    bool snapshot = false;
+    const QCP::Position at = position->asPosition(&snapshot);
+    // A tracer that follows a graph sits on plot coordinates: what it draws is data, so a pan only
+    // shifts it and the recording is kept. The graph's revision makes it stale when the data moves.
+    if (!snapshot && std::holds_alternative<QCP::Data>(at))
+    {
+        const QCP::Data point = std::get<QCP::Data>(at);
+        const QPen pen = mainPen();
+        if (mStyle == tsCrosshair)
+        {
+            // The crosshair spans the axis rect, which is the clip rect of an item.
+            context.polyline(std::array<QCP::Position, 2> { QCP::RatioXDataY { 0.0, point.y },
+                                                            QCP::RatioXDataY { 1.0, point.y } },
+                             pen);
+            context.polyline(std::array<QCP::Position, 2> { QCP::DataXRatioY { point.x, 0.0 },
+                                                            QCP::DataXRatioY { point.x, 1.0 } },
+                             pen);
+            return;
+        }
+        // The marker is one scatter symbol of the tracer's size, as the old painter drew it.
+        const auto points = std::make_shared<const std::vector<QPointF>>(1, QPointF(point.x, point.y));
+        context.markers(points, QCPScatterStyle(markerShapeOf(mStyle), pen, mainBrush(), mSize));
+        return;
+    }
+
+    // A position in pixels or anchored is a snapshot of this frame: the recording is remade every
+    // frame (P-5).
+    context.recordEveryFrame();
     const QPointF center(position->pixelPosition());
     const double w = mSize / 2.0;
     const QRect clip = clipRect();
@@ -305,6 +349,16 @@ void QCPItemTracer::draw(QCPDrawContext& context) const
             break;
         }
     }
+}
+
+/*! \internal
+
+  The revision of the graph whose data the recorded position came from: a new sample moves the
+  tracer, so the recording is stale even though nothing on the tracer itself changed.
+*/
+quint64 QCPItemTracer::dependencyRevision() const
+{
+    return mGraph ? mGraph->dependencyRevision() : 0;
 }
 
 /*!
