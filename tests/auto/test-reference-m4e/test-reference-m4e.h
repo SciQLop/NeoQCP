@@ -47,6 +47,13 @@ private slots:
     void spanVertical();
     void spanRect();
     void spanSelected();
+
+    void polarBasic();
+    void polarRadians();
+    void polarGallery();
+    void polarLog();
+    void polarRotated();
+    void polarAxisSelected();
 };
 
 #endif // TEST_REFERENCE_M4E_H

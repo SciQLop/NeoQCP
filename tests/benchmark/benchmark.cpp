@@ -138,6 +138,14 @@ private slots:
     void QCPItems_Tracers_Pan1k();
     void QCPSpans_Pan100();
 
+    // M4f: polar pictures and the plottable-list rows.
+    void QCPPolar_Draw10k();
+    void QCPPolar_Rotate10k();
+    void QCPPolar_RadialZoom10k();
+    void QCPPolar_Export10k();
+    void QCPPlottables_Pan200();
+    void QCPPlottables_Zoom200();
+
 private:
     QCustomPlot* mPlot;
     QWidget mContainerWidget;
@@ -2444,7 +2452,6 @@ public:
         mB = QCP::Data { key + width, 1.0 };
     }
 
-
     void draw(QCPDrawContext& context) const override
     {
         context.rect(mA, mB, mPen, QBrush(Qt::NoBrush));
@@ -2479,7 +2486,6 @@ public:
             mBars.emplace_back(QCP::Data { key, 0.0 }, QCP::Data { key + 0.01, 1.0 });
         }
     }
-
 
     void draw(QCPDrawContext& context) const override
     {
@@ -2861,6 +2867,130 @@ void Benchmark::QCPSpans_Pan100()
     {
         left += 0.001; // a pan step: the width never changes, only the window slides
         mPlot->xAxis->setRange(left, left + 1);
+        mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+}
+
+////////////////////////////////////////////////////////////////////
+/////// Milestone 4f rows: polar pictures and the plottable list
+
+namespace
+{
+// The polar area replaces the default axis rect, so every polar row starts from a cleared layout.
+QCPPolarAxisAngular* benchPolarPlot(QCustomPlot* plot)
+{
+    plot->plotLayout()->clear();
+    auto* angular = new QCPPolarAxisAngular(plot);
+    plot->plotLayout()->addElement(0, 0, angular);
+    angular->setRange(0, 360);
+    angular->radialAxis()->setRange(0, 1);
+    QVector<double> angle(10000), radius(10000);
+    for (int i = 0; i < 10000; ++i)
+    {
+        angle[i] = 360.0 * i / 10000;
+        radius[i] = 0.5 + 0.35 * qSin(6 * M_PI * i / 10000); // stays inside [0.15, 0.85]
+    }
+    auto* graph = new QCPPolarGraph(angular, angular->radialAxis());
+    graph->setData(angle, radius);
+    return angular;
+}
+} // namespace
+
+void Benchmark::QCPPolar_Draw10k()
+{
+    benchPolarPlot(mPlot);
+    mPlot->replot(); // build once, so the row measures drawing only
+    QBENCHMARK
+    {
+        mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+}
+
+void Benchmark::QCPPolar_Rotate10k()
+{
+    // No polar recording exists before 4h: this is a full repaint after an angular range step.
+    QCPPolarAxisAngular* angular = benchPolarPlot(mPlot);
+    mPlot->replot();
+    double lower = 0;
+    QBENCHMARK
+    {
+        lower += 0.5; // a rotation step: the angular window slides, its width never changes
+        angular->setRange(lower, lower + 360);
+        mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+}
+
+void Benchmark::QCPPolar_RadialZoom10k()
+{
+    QCPPolarAxisAngular* angular = benchPolarPlot(mPlot);
+    QCPPolarAxisRadial* radial = angular->radialAxis();
+    mPlot->replot();
+    double factor = 1.01;
+    QBENCHMARK
+    {
+        radial->scaleRange(factor); // alternating, so the data stays inside the visible disc
+        factor = 1.0 / factor;
+        mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+}
+
+void Benchmark::QCPPolar_Export10k()
+{
+    benchPolarPlot(mPlot);
+    mPlot->replot();
+    QBENCHMARK
+    {
+        Q_UNUSED(mPlot->toPixmap(400, 300));
+    }
+}
+
+void Benchmark::QCPPlottables_Pan200()
+{
+    // 200 graphs of 1 000 points, all inside the window: a one-pixel pan step keeps them there.
+    QVector<double> keys(1000);
+    for (int i = 0; i < 1000; ++i)
+        keys[i] = 1000.0 * i / 1000;
+    for (int g = 0; g < 200; ++g)
+    {
+        QVector<double> values(1000);
+        for (int i = 0; i < 1000; ++i)
+            values[i] = 0.5 + 0.4 * qSin(0.01 * i + 0.03 * g);
+        auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+        graph->setData(keys, values);
+    }
+    mPlot->xAxis->setRange(0, 1000);
+    mPlot->yAxis->setRange(0, 1);
+    mPlot->replot();
+    double left = 0;
+    QBENCHMARK
+    {
+        left += 0.002; // about a pixel: the window slides, its width never changes
+        mPlot->xAxis->setRange(left, left + 1000);
+        mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+}
+
+void Benchmark::QCPPlottables_Zoom200()
+{
+    QVector<double> keys(1000);
+    for (int i = 0; i < 1000; ++i)
+        keys[i] = 1000.0 * i / 1000;
+    for (int g = 0; g < 200; ++g)
+    {
+        QVector<double> values(1000);
+        for (int i = 0; i < 1000; ++i)
+            values[i] = 0.5 + 0.4 * qSin(0.01 * i + 0.03 * g);
+        auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+        graph->setData(keys, values);
+    }
+    mPlot->xAxis->setRange(0, 1000);
+    mPlot->yAxis->setRange(0, 1);
+    mPlot->replot();
+    double factor = 1.01;
+    QBENCHMARK
+    {
+        mPlot->xAxis->scaleRange(factor); // alternating about the centre keeps every graph in view
+        factor = 1.0 / factor;
         mPlot->replot(QCustomPlot::rpImmediateRefresh);
     }
 }
