@@ -185,6 +185,30 @@ void TestPolar::insetAndBackgroundAreAreaFeatures()
              qPrintable(middle.name()));
 }
 
+void TestPolar::angularWheelZoomRequeuesTheRepaint()
+{
+    // With only the angular axis zoomable, the wheel changes what the ring and the graphs draw:
+    // the area must ask for that repaint itself.
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    auto* angular = area->angularAxis();
+    angular->setRangeZoomable(true);
+    area->radialAxis()->setRangeZoomable(false);
+    plot.setInteractions(QCP::iRangeZoom);
+    angular->setRange(0, 360);
+    settle(plot);
+    QVERIFY(!plot.isRepaintQueued());
+
+    const QPointF cursor = area->center() + QPointF(0.5 * area->radius(), 0);
+    QWheelEvent wheel(cursor, plot.mapToGlobal(cursor.toPoint()), QPoint(), QPoint(0, 120),
+                      Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+    QCoreApplication::sendEvent(&plot, &wheel);
+
+    QVERIFY2(angular->range().size() < 360,
+             qPrintable(QString::number(angular->range().size())));
+    QVERIFY2(plot.isRepaintQueued(), "an angular-only wheel zoom scheduled no repaint");
+}
+
 void TestPolar::polarAxisPartsAreClickable()
 {
     QCustomPlot plot;

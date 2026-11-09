@@ -18,6 +18,7 @@ private slots:
     void backgroundStaysInsideTheDisc();
     void polarAxisPartsAreClickable();
     void radialDragAndWheelWork();
+    void angularWheelZoomRequeuesTheRepaint();
     void hidingTheAngularAxisKeepsTheGraphs();
     void deletingAPolarChildIsSafe();
     void deletingTheAngularAxisMidDragIsSafe();
