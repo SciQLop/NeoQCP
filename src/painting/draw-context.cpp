@@ -558,7 +558,37 @@ void QCPDrawContext::errorBars(std::shared_ptr<const std::vector<QPointF>> centr
         extent.value(centre.y() + span.y());
     }
     extent.settle();
-    record(*mList, qcp::ErrorBarsCmd { std::move(centres), std::move(spans), pen }, extent);
+    record(*mList,
+           qcp::ErrorBarsCmd { std::move(centres), std::move(spans), nullptr, false, 0.0, 0.0, pen },
+           extent);
+}
+
+void QCPDrawContext::errorBars(std::shared_ptr<const std::vector<QPointF>> centres,
+                               std::shared_ptr<const std::vector<QPointF>> ends, bool alongKeys,
+                               double whiskerWidth, double symbolGap, const QPen& pen)
+{
+    Extent extent;
+    const std::size_t count = std::min(centres->size(), ends->size() / 2);
+    extent.empty = count == 0;
+    for (std::size_t i = 0; i < count; ++i)
+    {
+        const QPointF centre = centres->at(i);
+        extent.key(centre.x());
+        extent.value(centre.y());
+        for (std::size_t side = 0; side < 2; ++side)
+        {
+            const QPointF end = ends->at(2 * i + side);
+            extent.key(end.x());
+            extent.value(end.y());
+        }
+    }
+    extent.settle();
+    // The whiskers reach across the bar by a pixel width the box cannot know; the index pads a
+    // command by its pen, which is all a bar needs for a hit test on its own backbone.
+    record(*mList,
+           qcp::ErrorBarsCmd { std::move(centres), nullptr, std::move(ends), alongKeys,
+                               whiskerWidth, symbolGap, pen },
+           extent);
 }
 
 void QCPDrawContext::text(QCP::Position at, const QString& text, const QCPTextStyle& style)

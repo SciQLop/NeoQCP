@@ -203,6 +203,12 @@ public:
     //! Vertical error bars: \a spans holds the half extents in data units, in keys and values.
     void errorBars(std::shared_ptr<const std::vector<QPointF>> centres,
                    std::shared_ptr<const std::vector<QPointF>> spans, const QPen& pen);
+    //! Error bars whose two sides differ: \a ends holds the minus and plus end points of each bar,
+    //! in plot coordinates, along the keys when \a alongKeys is set. The whisker and the gap around
+    //! the centre are pixels, applied by the replay.
+    void errorBars(std::shared_ptr<const std::vector<QPointF>> centres,
+                   std::shared_ptr<const std::vector<QPointF>> ends, bool alongKeys,
+                   double whiskerWidth, double symbolGap, const QPen& pen);
     //! Text anchored at \a at, measured and placed relative to that anchor.
     void text(QCP::Position at, const QString& text, const QCPTextStyle& style);
     //! The same, for a recorder that already measured \a glyphSize and will ask for it again.

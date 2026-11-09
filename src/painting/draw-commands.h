@@ -159,11 +159,25 @@ struct MarkersCmd
     std::shared_ptr<const QCPScatterStyle> style;
 };
 
-//! Vertical error bars around data-space centres; the spans are half extents in data units.
+//! Error bars around data-space centres. Both forms carry data only, plus pixel widths the replay
+//! applies, so a pan shifts the bars instead of remaking them; which one is drawn follows from
+//! \a ends being set.
 struct ErrorBarsCmd
 {
+    //! The bar centres, in plot coordinates.
     std::shared_ptr<const std::vector<QPointF>> centres;
+    //! Half extents in data units, in keys and values: a symmetric bar, drawn as a cross with its
+    //! caps, which is what a multi graph's error bars are.
     std::shared_ptr<const std::vector<QPointF>> spans;
+    //! Two end points in plot coordinates per bar, the minus one first: a bar whose two sides may
+    //! differ, drawn with a pixel \a whiskerWidth and a pixel \a symbolGap. A side that is not a
+    //! number is a side the bar does not have.
+    std::shared_ptr<const std::vector<QPointF>> ends;
+    //! Whether \a ends run along the keys, or else along the values.
+    bool alongKeys = false;
+    //! The whisker width and the gap left around the centre, in pixels.
+    double whiskerWidth = 0.0;
+    double symbolGap = 0.0;
     QPen pen;
 };
 
@@ -552,6 +566,76 @@ inline void qcpErrorBarPixels(const QCPDrawFrame& frame, std::span<const QPointF
     qcpErrorBarPolyline(corners, out);
 }
 
+//! The pixel polyline of \a cmd's bars, through \a frame: what every replay strokes, what the hit
+//! test measures and what the index boxes. A bar whose \a ends are given is two backbones, each
+//! starting at the gap around the centre, with a whisker across each end.
+inline void qcpErrorBarPixels(const QCPDrawFrame& frame, const qcp::ErrorBarsCmd& cmd,
+                              std::vector<QPointF>& out)
+{
+    if (!cmd.ends)
+    {
+        qcpErrorBarPixels(frame, std::span<const QPointF>(*cmd.centres),
+                          std::span<const QPointF>(*cmd.spans), out);
+        return;
+    }
+    static thread_local std::vector<QPointF> centres;
+    static thread_local std::vector<QPointF> ends;
+    const std::size_t count = std::min(cmd.centres->size(), cmd.ends->size() / 2);
+    centres.resize(count);
+    ends.resize(2 * count);
+    frame.transform.map(std::span<const QPointF>(*cmd.centres), std::span<QPointF>(centres));
+    frame.transform.map(std::span<const QPointF>(*cmd.ends), std::span<QPointF>(ends));
+
+    // The error axis's pixel direction, taken from one bar: a reversed axis, a vertical key axis
+    // and a log axis all come out of the transform, so none of them needs a case of its own.
+    QPointF axisDir(cmd.alongKeys ? 1.0 : 0.0, cmd.alongKeys ? 0.0 : 1.0);
+    for (std::size_t i = 0; i < count; ++i)
+    {
+        if (!std::isfinite(centres[i].x()) || !std::isfinite(centres[i].y()))
+            continue;
+        const QPointF data = cmd.centres->at(i);
+        const QCP::Pixels base = frame.transform.map(QCP::Data { data.x(), data.y() });
+        const QCP::Pixels ahead = frame.transform.map(
+            QCP::Data { data.x() + (cmd.alongKeys ? 1.0 : 0.0),
+                        data.y() + (cmd.alongKeys ? 0.0 : 1.0) });
+        const double length = std::hypot(ahead.x - base.x, ahead.y - base.y);
+        if (std::isfinite(length) && length > 0.0)
+            axisDir = QPointF((ahead.x - base.x) / length, (ahead.y - base.y) / length);
+        break;
+    }
+    const QPointF across(-axisDir.y(), axisDir.x());
+    const QPointF gap(std::numeric_limits<double>::quiet_NaN(),
+                      std::numeric_limits<double>::quiet_NaN());
+    const double halfWhisker = cmd.whiskerWidth * 0.5;
+    out.clear();
+    out.reserve(12 * count);
+    for (std::size_t i = 0; i < count; ++i)
+    {
+        const QPointF centre = centres[i];
+        if (!std::isfinite(centre.x()) || !std::isfinite(centre.y()))
+            continue;
+        for (int side = 0; side < 2; ++side)
+        {
+            const QPointF end = ends[2 * i + std::size_t(side)];
+            if (!std::isfinite(end.x()) || !std::isfinite(end.y()))
+                continue;
+            const double sign = side == 0 ? -1.0 : 1.0;
+            const QPointF start = centre + sign * cmd.symbolGap * 0.5 * axisDir;
+            const double along = (end.x() - centre.x()) * axisDir.x()
+                + (end.y() - centre.y()) * axisDir.y();
+            if (along * sign >= 0.0) // a gap wider than the error leaves no backbone
+            {
+                out.push_back(start);
+                out.push_back(end);
+                out.push_back(gap);
+            }
+            out.push_back(end - halfWhisker * across);
+            out.push_back(end + halfWhisker * across);
+            out.push_back(gap);
+        }
+    }
+}
+
 namespace qcp
 {
 //! How far the stroke of \a pen reaches beyond the geometry it strokes, in pixels.
@@ -712,8 +796,7 @@ inline CommandExtent commandExtent(const QCPDrawCommand& command, const QCPDrawF
                 if (mapSeries)
                 {
                     static thread_local std::vector<QPointF> bars;
-                    qcpErrorBarPixels(frame, std::span<const QPointF>(*cmd.centres),
-                                      std::span<const QPointF>(*cmd.spans), bars);
+                    qcpErrorBarPixels(frame, cmd, bars);
                     extent.box = qcpPixelBox(std::span<const QPointF>(bars));
                 }
             }

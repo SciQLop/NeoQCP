@@ -145,6 +145,12 @@ public:
 
     virtual QCPPlottableInterface1D* interface1D() override { return this; }
 
+    //! The error bars' own data: the container they are read from.
+    [[nodiscard]] const void* dataSourceIdentity() const override;
+
+    //! The bars depend on the plottable they are attached to: its identity, its data and its axes.
+    [[nodiscard]] quint64 dependencyRevision() const override;
+
 protected:
     // property members:
     QSharedPointer<QCPErrorBarsDataContainer> mDataContainer;
@@ -154,7 +160,9 @@ protected:
     double mSymbolGap;
 
     // reimplemented virtual methods:
-    virtual void draw(QCPPainter* painter) override;
+    void draw(QCPDrawContext& context) const override;
+    // The icon's geometry is a few pixels of the icon rect, which a recording cannot know: it is
+    // fitted into a rect of the caller's choosing, so this one stays on the painter.
     virtual void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
     virtual QCPRange getKeyRange(bool& foundRange,
                                  QCP::SignDomain inSignDomain = QCP::sdBoth) const override;
@@ -172,6 +180,9 @@ protected:
     // helpers:
     void getDataSegments(QList<QCPDataRange>& selectedSegments,
                          QList<QCPDataRange>& unselectedSegments) const;
+    void recordSegments(QCPDrawContext& context, const QList<QCPDataRange>& segments,
+                        bool selected) const;
+    void recordSegment(QCPDrawContext& context, const QCPDataRange& segment, const QPen& pen) const;
     bool errorBarVisible(int index) const;
     bool rectIntersectsLine(const QRectF& pixelRect, const QLineF& line) const;
 

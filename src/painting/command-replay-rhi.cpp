@@ -790,11 +790,9 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                 }
                 else if constexpr (std::is_same_v<T, qcp::ErrorBarsCmd>)
                 {
-                    // The spans are half extents, not positions: the corners have to be built in
-                    // data space and mapped, or a pan offset and a log axis land in the wrong
-                    // place.
-                    qcpErrorBarPixels(frame, std::span<const QPointF>(*cmd.centres),
-                                      std::span<const QPointF>(*cmd.spans), pixels);
+                    // A bar is data: its corners (or its ends) have to be built and mapped, or a
+                    // pan offset and a log axis land in the wrong place.
+                    qcpErrorBarPixels(frame, cmd, pixels);
                     raster();
                     stroke(pixels, cmd.pen);
                 }

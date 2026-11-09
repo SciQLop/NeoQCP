@@ -270,8 +270,7 @@ double distanceTo(const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame,
             else if constexpr (std::is_same_v<Command, qcp::ErrorBarsCmd>)
             {
                 std::vector<QPointF> pixels;
-                qcpErrorBarPixels(frame, std::span<const QPointF>(*cmd.centres),
-                                  std::span<const QPointF>(*cmd.spans), pixels);
+                qcpErrorBarPixels(frame, cmd, pixels);
                 return distanceTo(pixels, at, false) - halfPen(cmd.pen);
             }
             else if constexpr (std::is_same_v<Command, qcp::TextCmd>)

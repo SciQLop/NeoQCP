@@ -28,7 +28,10 @@
 #include "../axis/axis.h"
 #include "../core.h"
 #include "../layoutelements/layoutelement-axisrect.h"
+#include "../painting/draw-context.h"
 #include "../painting/painter.h"
+#include <typeinfo>
+#include <vector>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPErrorBarsData
@@ -517,27 +520,18 @@ double QCPErrorBars::selectTest(const QPointF& pos, bool onlySelectable, QVarian
 }
 
 /* inherits documentation from base class */
-void QCPErrorBars::draw(QCPPainter* painter)
+void QCPErrorBars::draw(QCPDrawContext& context) const
 {
     if (!mDataPlottable)
         return;
     if (!mKeyAxis || !mValueAxis)
-    {
-        qDebug() << Q_FUNC_INFO << "invalid key or value axis";
-        return;
-    }
+        return; // the base refuses the recording without them
     if (mKeyAxis.data()->range().size() <= 0 || mDataContainer->isEmpty())
         return;
 
-    // if the sort key isn't the main key, we must check the visibility for each data point/error
-    // bar individually (getVisibleDataBounds applies range restriction, but otherwise can only
-    // return full data range):
-    bool checkPointVisibility = !mDataPlottable->interface1D()->sortKeyIsMainKey();
-
     // check data validity if flag set:
 #ifdef QCUSTOMPLOT_CHECK_DATA
-    QCPErrorBarsDataContainer::const_iterator it;
-    for (it = mDataContainer->constBegin(); it != mDataContainer->constEnd(); ++it)
+    for (auto it = mDataContainer->constBegin(); it != mDataContainer->constEnd(); ++it)
     {
         if (QCP::isInvalidData(it->errorMinus, it->errorPlus))
             qDebug() << Q_FUNC_INFO << "Data point at index" << it - mDataContainer->constBegin()
@@ -545,45 +539,21 @@ void QCPErrorBars::draw(QCPPainter* painter)
     }
 #endif
 
-    applyDefaultAntialiasingHint(painter);
-    painter->setBrush(Qt::NoBrush);
-    // loop over and draw segments of unselected/selected data:
-    QList<QCPDataRange> selectedSegments, unselectedSegments, allSegments;
+    // Every bar is recorded, visible or not: the recording outlives the visible range, and the
+    // replay culls what is off screen. Selected bars go last, as they always did.
+    QList<QCPDataRange> selectedSegments, unselectedSegments;
     getDataSegments(selectedSegments, unselectedSegments);
-    allSegments << unselectedSegments << selectedSegments;
-    QVector<QLineF> backbones, whiskers;
-    for (int i = 0; i < allSegments.size(); ++i)
+    recordSegments(context, unselectedSegments, false);
+    recordSegments(context, selectedSegments, true);
+
+    // Only a decorator subclass draws a decoration of its own: the base class's is empty, and
+    // recording a painter callback for it would make every selection change a view change.
+    if (mSelectionDecorator && !selection().isEmpty()
+        && typeid(*mSelectionDecorator) != typeid(QCPSelectionDecorator))
     {
-        QCPErrorBarsDataContainer::const_iterator begin, end;
-        getVisibleDataBounds(begin, end, allSegments.at(i));
-        if (begin == end)
-            continue;
-
-        bool isSelectedSegment = i >= unselectedSegments.size();
-        if (isSelectedSegment && mSelectionDecorator)
-            mSelectionDecorator->applyPen(painter);
-        else
-            painter->setPen(mPen);
-        if (painter->pen().capStyle() == Qt::SquareCap)
-        {
-            QPen capFixPen(painter->pen());
-            capFixPen.setCapStyle(Qt::FlatCap);
-            painter->setPen(capFixPen);
-        }
-        backbones.clear();
-        whiskers.clear();
-        for (QCPErrorBarsDataContainer::const_iterator it = begin; it != end; ++it)
-        {
-            if (!checkPointVisibility || errorBarVisible(int(it - mDataContainer->constBegin())))
-                getErrorBarLines(it, backbones, whiskers);
-        }
-        painter->drawLines(backbones);
-        painter->drawLines(whiskers);
+        context.painter([this](QCPPainter& painter, const QCPTransform&)
+                        { mSelectionDecorator->drawDecoration(&painter, selection()); });
     }
-
-    // draw other selection decoration that isn't just line/scatter pens and brushes:
-    if (mSelectionDecorator)
-        mSelectionDecorator->drawDecoration(painter, selection());
 }
 
 /* inherits documentation from base class */
@@ -1073,4 +1043,90 @@ bool QCPErrorBars::rectIntersectsLine(const QRectF& pixelRect, const QLineF& lin
         return false;
     else
         return true;
+}
+
+/*! \internal
+
+  The recording is keyed on the bars' own container: another one, or the same one handed in again,
+  is another data source.
+*/
+const void* QCPErrorBars::dataSourceIdentity() const
+{
+    return mDataContainer.get();
+}
+
+/*! \internal
+
+  The bars read the plottable they are attached to, so the recording is stale when that plottable,
+  its data or its axes change. The container is a plain vector and carries no revision: a change
+  made through \ref data() in place is only seen once something marks this plottable dirty, which
+  every setter here does.
+*/
+quint64 QCPErrorBars::dependencyRevision() const
+{
+    quint64 key = quint64(mDataContainer->size());
+    if (!mDataPlottable)
+        return key;
+    key += quint64(quintptr(mDataPlottable.data()));
+    key += mDataPlottable->dependencyRevision();
+    key += quint64(quintptr(mDataPlottable->keyAxis()))
+        + quint64(quintptr(mDataPlottable->valueAxis()));
+    return key;
+}
+
+/*! \internal
+
+  Records \a segments of the data container, each bar with the pen its segment draws with: the
+  selection decorator's for a selected one.
+*/
+void QCPErrorBars::recordSegments(QCPDrawContext& context, const QList<QCPDataRange>& segments,
+                                  bool selected) const
+{
+    QPen pen = selected && mSelectionDecorator ? mSelectionDecorator->pen() : mPen;
+    // A square cap would run the whiskers past the ends of the bar: the painter path flattened it.
+    if (pen.capStyle() == Qt::SquareCap)
+        pen.setCapStyle(Qt::FlatCap);
+    for (const QCPDataRange& segment : segments)
+        recordSegment(context, segment, pen);
+}
+
+/*! \internal
+
+  Records one segment as centres and two end points per bar, in plot coordinates, with the whisker
+  width and the symbol gap as pixels. A bar whose point or error is not a number is left out: it
+  would only widen the box the hit test rejects points with.
+*/
+void QCPErrorBars::recordSegment(QCPDrawContext& context, const QCPDataRange& segment,
+                                 const QPen& pen) const
+{
+    const QCPPlottableInterface1D* source = mDataPlottable->interface1D();
+    // Only the bars around the visible keys are recorded: the window reaches one view width past
+    // each side, so a pan inside it shifts them, and the recording is remade once it leaves.
+    const QCPKeyWindow window = context.keyWindow();
+    const int count = qMin(mDataContainer->size(), source->dataCount());
+    const int begin = qBound(0, qMax(segment.begin(), source->findBegin(window.keys.lower)), count);
+    const int end = qBound(begin, qMin(segment.end(), source->findEnd(window.keys.upper)), count);
+    std::vector<QPointF> centres;
+    std::vector<QPointF> ends;
+    centres.reserve(std::size_t(end - begin));
+    ends.reserve(std::size_t(2 * (end - begin)));
+    const bool alongKeys = mErrorType == etKeyError;
+    for (int index = begin; index < end; ++index)
+    {
+        const double key = source->dataMainKey(index);
+        const double value = source->dataMainValue(index);
+        if (!qIsFinite(key) || !qIsFinite(value))
+            continue;
+        const QCPErrorBarsData& bar = mDataContainer->at(index);
+        centres.emplace_back(key, value);
+        ends.emplace_back(alongKeys ? QPointF(key - bar.errorMinus, value)
+                                    : QPointF(key, value - bar.errorMinus));
+        ends.emplace_back(alongKeys ? QPointF(key + bar.errorPlus, value)
+                                    : QPointF(key, value + bar.errorPlus));
+    }
+    if (centres.empty())
+        return;
+    context.errorBars(std::make_shared<const std::vector<QPointF>>(std::move(centres)),
+                      std::make_shared<const std::vector<QPointF>>(std::move(ends)), alongKeys,
+                      mWhiskerWidth, mSymbolGap, pen);
 }

@@ -278,8 +278,7 @@ void paintCommand(QCPPainter& painter, const QCPDrawCommand& command, const QCPD
             }
             else if constexpr (std::is_same_v<Command, ErrorBarsCmd>)
             {
-                qcpErrorBarPixels(frame, std::span<const QPointF>(*cmd.centres),
-                                  std::span<const QPointF>(*cmd.spans), local.data);
+                qcpErrorBarPixels(frame, cmd, local.data);
                 painter.setPen(cmd.pen);
                 drawPolylineSplitNaN(&painter, std::span<const QPointF>(local.data));
             }

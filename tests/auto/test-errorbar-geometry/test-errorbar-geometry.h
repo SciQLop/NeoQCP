@@ -9,4 +9,9 @@ private slots:
     void twoNanPointsGiveNoBar();
     void missingValueStillDrawsBetweenBounds();
     void barsFitNeedsTheSpacing();
+    void recordedErrorBarsMatchTheirReferences_data();
+    void recordedErrorBarsMatchTheirReferences();
+    void barsFollowTheirPlottablesData();
+    void attachDetachReattach();
+    void everyStyleSetterReRecords();
 };
