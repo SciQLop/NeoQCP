@@ -126,7 +126,8 @@ public:
     virtual QList<QCPAxisBase*> allAxes() const override;
 
 protected:
-    virtual void drawBackground(QCPPainter* painter) override;
+    void drawBackgroundBrush(QCPPainter* painter) override;
+    void drawBackgroundPixmap(QCPPainter* painter) override;
 
     // Dirties every layer a change of the axes' ranges moves: the axes and the grid, then what the
     // graphs and their items draw. Mirrors QCPAxisRect::markAffectedLayersDirty.

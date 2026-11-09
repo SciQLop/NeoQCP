@@ -176,29 +176,40 @@ void QCPArea::setBackgroundScaledMode(Qt::AspectRatioMode mode)
 */
 void QCPArea::drawBackground(QCPPainter* painter)
 {
-    // draw background fill:
     if (mBackgroundBrush != Qt::NoBrush)
-        painter->fillRect(mRect, mBackgroundBrush);
-
-    // draw background pixmap (on top of fill, if brush specified):
+        drawBackgroundBrush(painter);
     if (!mBackgroundPixmap.isNull())
+        drawBackgroundPixmap(painter);
+}
+
+/*! \internal
+  Fills the area's whole rect with \ref backgroundBrush.
+*/
+void QCPArea::drawBackgroundBrush(QCPPainter* painter)
+{
+    painter->fillRect(mRect, mBackgroundBrush);
+}
+
+/*! \internal
+  Draws \ref background, scaled as \ref backgroundScaled says, over the whole rect.
+*/
+void QCPArea::drawBackgroundPixmap(QCPPainter* painter)
+{
+    if (mBackgroundScaled)
     {
-        if (mBackgroundScaled)
-        {
-            // check whether mScaledBackground needs to be updated:
-            QSize scaledSize(mBackgroundPixmap.size());
-            scaledSize.scale(mRect.size(), mBackgroundScaledMode);
-            if (mScaledBackgroundPixmap.size() != scaledSize)
-                mScaledBackgroundPixmap = mBackgroundPixmap.scaled(
-                    mRect.size(), mBackgroundScaledMode, Qt::SmoothTransformation);
-            painter->drawPixmap(mRect.topLeft() + QPoint(0, -1), mScaledBackgroundPixmap,
-                                QRect(0, 0, mRect.width(), mRect.height())
-                                    & mScaledBackgroundPixmap.rect());
-        }
-        else
-        {
-            painter->drawPixmap(mRect.topLeft() + QPoint(0, -1), mBackgroundPixmap,
-                                QRect(0, 0, mRect.width(), mRect.height()));
-        }
+        // check whether mScaledBackground needs to be updated:
+        QSize scaledSize(mBackgroundPixmap.size());
+        scaledSize.scale(mRect.size(), mBackgroundScaledMode);
+        if (mScaledBackgroundPixmap.size() != scaledSize)
+            mScaledBackgroundPixmap = mBackgroundPixmap.scaled(
+                mRect.size(), mBackgroundScaledMode, Qt::SmoothTransformation);
+        painter->drawPixmap(mRect.topLeft() + QPoint(0, -1), mScaledBackgroundPixmap,
+                            QRect(0, 0, mRect.width(), mRect.height())
+                                & mScaledBackgroundPixmap.rect());
+    }
+    else
+    {
+        painter->drawPixmap(mRect.topLeft() + QPoint(0, -1), mBackgroundPixmap,
+                            QRect(0, 0, mRect.width(), mRect.height()));
     }
 }

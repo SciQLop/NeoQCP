@@ -28,6 +28,7 @@
 #include "polargraph.h"
 #include "polargrid.h"
 #include "radialaxis.h"
+#include <QPainterPath>
 #include <utility>
 
 #include "../core.h"
@@ -98,11 +99,23 @@ QCPPolarArea::~QCPPolarArea()
   Draws the background inside the disc the axes are drawn in, where the angular axis used to fill
   and clip it: the rect corners stay clear.
 */
-void QCPPolarArea::drawBackground(QCPPainter* painter)
+void QCPPolarArea::drawBackgroundBrush(QCPPainter* painter)
+{
+    // The region clip is a 1-bit mask: filling the disc through it would leave a jagged rim, where
+    // the ring used to have an antialiased one.
+    QPainterPath disc;
+    disc.addEllipse(mCenter, mRadius, mRadius);
+    painter->save();
+    painter->setAntialiasing(true);
+    painter->fillPath(disc, mBackgroundBrush);
+    painter->restore();
+}
+
+void QCPPolarArea::drawBackgroundPixmap(QCPPainter* painter)
 {
     painter->save();
     painter->setClipRegion(exactClipRegion());
-    QCPArea::drawBackground(painter);
+    QCPArea::drawBackgroundPixmap(painter);
     painter->restore();
 }
 

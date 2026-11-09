@@ -39,6 +39,7 @@ private slots:
     void rangeChangeRepaintsItsLayers_data();
     void rangeChangeRepaintsItsLayers();
     void aPolarLookChangeDirtiesTheGraphLayers();
+    void polarBackgroundEdgeIsAntialiased();
     void exportSettlesPendingTheme();
     void plottableSettersScheduleRepaint_data();
     void plottableSettersScheduleRepaint();

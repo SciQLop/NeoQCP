@@ -1509,6 +1509,42 @@ void TestRepaint::aPolarLookChangeDirtiesTheGraphLayers()
     QVERIFY2(graphLayer->dirtiedAfterDraw(), "the radial look change did not mark the graph layer");
 }
 
+void TestRepaint::polarBackgroundEdgeIsAntialiased()
+{
+    // The brush used to be filled through the disc's 1-bit region clip: the rim was either brush or
+    // background, never the blend an antialiased ellipse leaves.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.setBackground(Qt::white);
+    plot.plotLayout()->clear();
+    auto* area = new QCPPolarArea(&plot);
+    plot.plotLayout()->addElement(0, 0, area);
+    area->setBackground(QBrush(Qt::red));
+    area->grid()->setVisible(false);
+    area->angularAxis()->setTicks(false);
+    area->angularAxis()->setTickLabels(false);
+    area->radialAxis()->setTicks(false);
+    area->radialAxis()->setTickLabels(false);
+    // The axes' own pens draw over the brush: the ring on the rim, the spoke through the centre.
+    area->angularAxis()->setBasePen(Qt::NoPen);
+    area->radialAxis()->setBasePen(Qt::NoPen);
+    plot.replot();
+    waitUntilSettled(plot);
+
+    const QImage image = screenOf(&plot);
+    const int y = qRound(area->center().y());
+    const int rim = qRound(area->center().x() + area->radius());
+    QCOMPARE(image.pixelColor(qRound(area->center().x()), y), QColor(Qt::red));
+    int blended = 0;
+    for (int x = rim - 2; x <= rim + 2; ++x)
+    {
+        const QColor pixel = image.pixelColor(x, y);
+        if (pixel != QColor(Qt::red) && pixel != QColor(Qt::white))
+            ++blended;
+    }
+    QVERIFY2(blended > 0, "the rim jumps from the brush to the background: no antialiased edge");
+}
+
 void TestRepaint::exportSettlesPendingTheme()
 {
     auto plot = settledPlot();
