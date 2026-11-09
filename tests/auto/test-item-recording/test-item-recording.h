@@ -22,5 +22,6 @@ private slots:
     void aPannedTracerIsNotReRecorded();
     void aTracerFollowsSetGraphKey();
     void aTracerFollowsInterpolation();
+    void aSwappedGraphContainerReRecords();
     void selectionReRecords();
 };

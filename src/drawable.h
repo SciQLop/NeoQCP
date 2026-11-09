@@ -9,6 +9,7 @@
 #include "global.h"
 #include "spatial-index.h"
 
+#include <QHashFunctions>
 #include <QRect>
 #include <memory>
 #include <optional>
@@ -92,6 +93,20 @@ public:
     */
     [[nodiscard]] virtual bool resolvesForTheExport() const { return false; }
 };
+
+/*!
+  \internal
+
+  The key a recording that read \a source is stale on: the identity of the data it read and that
+  data's revision, hashed in order. A revision alone misses a container swapped for another one that
+  happens to be at the same revision, as two refilled buffers are.
+*/
+inline quint64 qcpDependencyKey(const QCPDrawable* source)
+{
+    if (!source)
+        return 0;
+    return qHashMulti(0, source->dataSourceIdentity(), source->dependencyRevision());
+}
 
 /*!
   \brief Everything a plottable or an item keeps between frames: the recording, its keys and the

@@ -1078,8 +1078,7 @@ const void* QCPErrorBars::dataSourceIdentity() const
 quint64 QCPErrorBars::dependencyRevision() const
 {
     const QCPAbstractPlottable* source = mDataPlottable.data();
-    return qHashMulti(0, mDataContainer->size(), mDataAccess, source,
-                      source ? source->dependencyRevision() : 0,
+    return qHashMulti(0, mDataContainer->size(), mDataAccess, source, qcpDependencyKey(source),
                       source ? source->keyAxis() : nullptr, source ? source->valueAxis() : nullptr);
 }
 

@@ -358,7 +358,7 @@ void QCPItemTracer::draw(QCPDrawContext& context) const
 */
 quint64 QCPItemTracer::dependencyRevision() const
 {
-    return mGraph ? mGraph->dependencyRevision() : 0;
+    return qcpDependencyKey(mGraph.data());
 }
 
 /*!

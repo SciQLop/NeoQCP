@@ -21,4 +21,5 @@ private slots:
     void aDecoratorChangeReRecords();
     void clearingTheDecoratorWhileSelectedIsSafe();
     void aDecoratorScatterStyleReachesTheSelectedOutliers();
+    void aSwappedPlottableContainerReRecords();
 };

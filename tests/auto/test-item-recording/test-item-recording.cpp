@@ -434,3 +434,41 @@ void TestItemRecording::selectionReRecords()
     plot.replot();
     QCOMPARE(rect->recordings(), before + 1);
 }
+
+// Double-buffered streaming: two containers refilled in lockstep carry the same revision, so a swap
+// is only visible through the container's identity.
+void TestItemRecording::aSwappedGraphContainerReRecords()
+{
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
+    auto first = QSharedPointer<QCPGraphDataContainer>::create();
+    auto second = QSharedPointer<QCPGraphDataContainer>::create();
+    first->set(QVector<QCPGraphData> { { 1, 0.2 }, { 2, 0.2 }, { 3, 0.2 }, { 4, 0.2 } });
+    second->set(QVector<QCPGraphData> { { 1, 0.8 }, { 2, 0.8 }, { 3, 0.8 }, { 4, 0.8 } });
+    QCOMPARE(first->revision(), second->revision());
+    graph->setData(first);
+    auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
+    tracer->setGraph(graph);
+    tracer->setGraphKey(3.0);
+    tracer->setStyle(QCPItemTracer::tsCircle);
+    tracer->setSize(9);
+    tracer->setPen(QPen(Qt::red, 2));
+    // Items live on the annotations layer, which a plottable's data change does not repaint: put the
+    // tracer where the graph is, so this test is about the dependency and not the layer scheduling.
+    tracer->setLayer(plot.layer(QStringLiteral("main")));
+    plot.replot();
+    const int before = tracer->recordings();
+    const QPointF low(plot.xAxis->coordToPixel(3.0), plot.yAxis->coordToPixel(0.2));
+    const QPointF high(plot.xAxis->coordToPixel(3.0), plot.yAxis->coordToPixel(0.8));
+    QImage image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QVERIFY2(redPixelsNear(image, low, 8) > 0, "the tracer did not draw its marker");
+
+    graph->setData(second);
+    plot.replot();
+    QVERIFY2(tracer->recordings() > before,
+             "a swapped container with the same revision kept the recording");
+    image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QVERIFY2(redPixelsNear(image, high, 8) > 0, "the tracer did not follow the swapped container");
+    QCOMPARE(redPixelsNear(image, low, 8), 0);
+}

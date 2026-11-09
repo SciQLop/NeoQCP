@@ -406,3 +406,31 @@ void TestErrorBarGeometry::aDecoratorScatterStyleReachesTheSelectedOutliers()
     QVERIFY2(small > 0, "the selected outlier is not drawn");
     QVERIFY2(big > small, "the decorator's scatter style is not on the selected outlier");
 }
+
+// The bars key on the attached plottable's revision, which is per container: a container swapped for
+// another one at the same revision (two refilled buffers) must still remake the recording.
+void TestErrorBarGeometry::aSwappedPlottableContainerReRecords()
+{
+    RecordingErrorBars* bars = nullptr;
+    auto plot = makeBarsPlot(&bars);
+    auto* graph = qobject_cast<QCPGraph*>(bars->dataPlottable());
+    QVERIFY(graph);
+    auto first = QSharedPointer<QCPGraphDataContainer>::create();
+    auto second = QSharedPointer<QCPGraphDataContainer>::create();
+    first->set(QVector<QCPGraphData> { { 0.5, 0.2 }, { 1.5, 0.2 }, { 2.5, 0.2 } });
+    second->set(QVector<QCPGraphData> { { 0.5, 0.8 }, { 1.5, 0.8 }, { 2.5, 0.8 } });
+    QCOMPARE(first->revision(), second->revision());
+    graph->setData(first);
+    plot->replot();
+    const int recorded = bars->recordings();
+    const QPointF oldEnd(plot->xAxis->coordToPixel(0.5), plot->yAxis->coordToPixel(0.6));
+    QVERIFY2(redPixelsNear(imageOf(*plot), oldEnd, 2) > 0, "the whisker is not at the first value");
+
+    graph->setData(second);
+    plot->replot();
+    QVERIFY2(bars->recordings() > recorded,
+             "a swapped container with the same revision kept the recording");
+    const QPointF newEnd(plot->xAxis->coordToPixel(0.5), plot->yAxis->coordToPixel(1.2));
+    QVERIFY2(redPixelsNear(imageOf(*plot), newEnd, 2) > 0,
+             "the bars did not follow the swapped container");
+}
