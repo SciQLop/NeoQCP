@@ -33,7 +33,8 @@
 #include "plottables/plottable-multigraph.h"
 #include "plottables/plottable-statisticalbox.h"
 #include "plottables/plottable-waterfall.h"
-#include "polar/layoutelement-angularaxis.h"
+#include "polar/angularaxis.h"
+#include "polar/polar-area.h"
 #include "polar/polargrid.h"
 #include <QTemporaryDir>
 #include <QtWidgets/qtestsupport_widgets.h>
@@ -1115,9 +1116,9 @@ const QVector<RemainingCase>& remainingCases()
         { "polarAxis.setTickLabelMode",
           [](QCustomPlot& plot) -> QObject*
           {
-              auto* polar = new QCPPolarAxisAngular(&plot);
-              plot.plotLayout()->addElement(1, 0, polar);
-              return polar;
+              auto* area = new QCPPolarArea(&plot);
+              plot.plotLayout()->addElement(1, 0, area);
+              return area->angularAxis();
           },
           [](QObject* o)
           {
@@ -1127,17 +1128,18 @@ const QVector<RemainingCase>& remainingCases()
         { "polarAxis.setSelectedSubTickPen",
           [](QCustomPlot& plot) -> QObject*
           {
-              auto* polar = new QCPPolarAxisAngular(&plot);
-              plot.plotLayout()->addElement(1, 0, polar);
-              return polar;
+              auto* area = new QCPPolarArea(&plot);
+              plot.plotLayout()->addElement(1, 0, area);
+              return area->angularAxis();
           },
           [](QObject* o)
           { static_cast<QCPPolarAxisAngular*>(o)->setSelectedSubTickPen(QPen(Qt::magenta, 3)); } },
         { "polarGrid.setRadialZeroLinePen",
           [](QCustomPlot& plot) -> QObject*
           {
-              auto* polar = new QCPPolarAxisAngular(&plot);
-              return polar->grid();
+              auto* area = new QCPPolarArea(&plot);
+              plot.plotLayout()->addElement(1, 0, area);
+              return area->grid();
           },
           [](QObject* o)
           { static_cast<QCPPolarGrid*>(o)->setRadialZeroLinePen(QPen(Qt::magenta, 2)); } },
@@ -1169,31 +1171,31 @@ const QVector<RemainingCase>& remainingCases()
         { "polarAxis.setAngle",
           [](QCustomPlot& plot) -> QObject*
           {
-              auto* polar = new QCPPolarAxisAngular(&plot);
-              plot.plotLayout()->addElement(1, 0, polar);
-              return polar;
+              auto* area = new QCPPolarArea(&plot);
+              plot.plotLayout()->addElement(1, 0, area);
+              return area->angularAxis();
           },
           [](QObject* o) { static_cast<QCPPolarAxisAngular*>(o)->setAngle(45); } },
         { "polarAxis.setNumberFormat",
           [](QCustomPlot& plot) -> QObject*
           {
-              auto* polar = new QCPPolarAxisAngular(&plot);
-              plot.plotLayout()->addElement(1, 0, polar);
-              return polar;
+              auto* area = new QCPPolarArea(&plot);
+              plot.plotLayout()->addElement(1, 0, area);
+              return area->angularAxis();
           },
           [](QObject* o)
           { static_cast<QCPPolarAxisAngular*>(o)->setNumberFormat(QStringLiteral("f")); } },
-        { "polarAxis.setBackground",
+        { "polarArea.setBackground",
           [](QCustomPlot& plot) -> QObject*
           {
-              auto* polar = new QCPPolarAxisAngular(&plot);
-              plot.plotLayout()->addElement(1, 0, polar);
-              return polar;
+              auto* area = new QCPPolarArea(&plot);
+              plot.plotLayout()->addElement(1, 0, area);
+              return area;
           },
           [](QObject* o)
           {
               static const QPixmap pixmap(8, 8); // one instance, so the cacheKey repeats
-              static_cast<QCPPolarAxisAngular*>(o)->setBackground(pixmap);
+              static_cast<QCPPolarArea*>(o)->setBackground(pixmap);
           } },
         { "pixmap.setScaled",
           [](QCustomPlot& plot) -> QObject*
@@ -1260,16 +1262,16 @@ const QVector<RemainingCase>& remainingCases()
         { "legend.setBorderPen", [](QCustomPlot& plot) -> QObject* { return plot.legend; },
           [](QObject* o) { static_cast<QCPLegend*>(o)->setBorderPen(QPen(Qt::darkBlue, 2)); } },
         { "polarAxis.setTickLabelColor", [](QCustomPlot& plot) -> QObject*
-          { return new QCPPolarAxisAngular(&plot); }, [](QObject* o)
+          { return (new QCPPolarArea(&plot))->angularAxis(); }, [](QObject* o)
           { static_cast<QCPPolarAxisAngular*>(o)->setTickLabelColor(Qt::darkBlue); } },
         { "polarAxis.setBasePen", [](QCustomPlot& plot) -> QObject*
-          { return new QCPPolarAxisAngular(&plot); }, [](QObject* o)
+          { return (new QCPPolarArea(&plot))->angularAxis(); }, [](QObject* o)
           { static_cast<QCPPolarAxisAngular*>(o)->setBasePen(QPen(Qt::darkBlue, 3)); } },
         { "polarGrid.setAngularPen",
           [](QCustomPlot& plot) -> QObject*
           {
-              auto* polar = new QCPPolarAxisAngular(&plot);
-              auto* grid = new QCPPolarGrid(polar);
+              auto* area = new QCPPolarArea(&plot);
+              auto* grid = new QCPPolarGrid(area);
               return grid;
           },
           [](QObject* o)
@@ -1398,12 +1400,12 @@ void TestRepaint::polarPlotSettles()
     // An unscaled background pixmap used to mark dirty from inside drawBackground(), so every draw
     // queued another repaint.
     auto plot = settledPlot();
-    auto* polar = new QCPPolarAxisAngular(plot.get());
-    plot->plotLayout()->addElement(1, 0, polar);
-    polar->setBackground(QPixmap(8, 8));
-    polar->setBackgroundScaled(false);
-    polar->setRange(0, 360);
-    if (auto* radial = polar->radialAxis())
+    auto* area = new QCPPolarArea(plot.get());
+    plot->plotLayout()->addElement(1, 0, area);
+    area->setBackground(QPixmap(8, 8));
+    area->setBackgroundScaled(false);
+    area->angularAxis()->setRange(0, 360);
+    if (auto* radial = area->radialAxis())
         radial->setRange(0, 1);
     plot->replot();
     waitUntilSettled(*plot);

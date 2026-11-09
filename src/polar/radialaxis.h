@@ -31,10 +31,11 @@
 #include "../axis/range.h"
 #include "../global.h"
 #include "../handle-ops.h"
-#include "../layout.h"
+#include "../layer.h"
 
 class QCPPainter;
 class QCustomPlot;
+class QCPPolarArea;
 class QCPPolarAxisRadial;
 class QCPPolarAxisAngular;
 
@@ -104,7 +105,7 @@ public:
     template <typename T>
     using OpsFor = QCPPolarAxisRadialOps<T>;
 
-    explicit QCPPolarAxisRadial(QCPPolarAxisAngular* parent);
+    explicit QCPPolarAxisRadial(QCPPolarArea* area);
     virtual ~QCPPolarAxisRadial();
 
     // getters:
@@ -114,7 +115,10 @@ public:
 
     double rangeZoomFactor() const { return mRangeZoomFactor; }
 
-    QCPPolarAxisAngular* angularAxis() const { return mAngularAxis; }
+    QCPPolarArea* area() const { return mArea; }
+
+    // Out of line: QCPPolarArea is incomplete here.
+    QCPPolarAxisAngular* angularAxis() const;
 
     ScaleType scaleType() const { return mScaleType; }
 
@@ -274,7 +278,7 @@ protected:
     double mRangeZoomFactor;
 
     // axis base:
-    QCPPolarAxisAngular* mAngularAxis;
+    QCPPolarArea* mArea;
     double mAngle;
     AngleReference mAngleReference;
     SelectableParts mSelectableParts, mSelectedParts;
@@ -347,7 +351,7 @@ private:
     void emitRangeChanged(const QCPRange& oldRange);
 
     friend class QCustomPlot;
-    friend class QCPPolarAxisAngular;
+    friend class QCPPolarArea;
 };
 Q_DECLARE_OPERATORS_FOR_FLAGS(QCPPolarAxisRadial::SelectableParts)
 Q_DECLARE_METATYPE(QCPPolarAxisRadial::AngleReference)

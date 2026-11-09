@@ -28,7 +28,7 @@
 
 #include "../axis/axis.h"
 #include "../global.h"
-#include "../layout.h"
+#include "area.h"
 
 class QCPPainter;
 class QCustomPlot;
@@ -44,14 +44,10 @@ class QCPColorScaleOps;
 template <typename T, typename Self = void>
 class QCPAxisRectOps;
 
-class QCP_LIB_DECL QCPAxisRect : public QCPLayoutElement
+class QCP_LIB_DECL QCPAxisRect : public QCPArea
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
-    Q_PROPERTY(QPixmap background READ background WRITE setBackground)
-    Q_PROPERTY(bool backgroundScaled READ backgroundScaled WRITE setBackgroundScaled)
-    Q_PROPERTY(Qt::AspectRatioMode backgroundScaledMode READ backgroundScaledMode WRITE
-                   setBackgroundScaledMode)
     Q_PROPERTY(Qt::Orientations rangeDrag READ rangeDrag WRITE setRangeDrag)
     Q_PROPERTY(Qt::Orientations rangeZoom READ rangeZoom WRITE setRangeZoom)
     /// \endcond
@@ -64,14 +60,6 @@ public:
     virtual ~QCPAxisRect() override;
 
     // getters:
-    QPixmap background() const { return mBackgroundPixmap; }
-
-    QBrush backgroundBrush() const { return mBackgroundBrush; }
-
-    bool backgroundScaled() const { return mBackgroundScaled; }
-
-    Qt::AspectRatioMode backgroundScaledMode() const { return mBackgroundScaledMode; }
-
     Qt::Orientations rangeDrag() const { return mRangeDrag; }
 
     Qt::Orientations rangeZoom() const { return mRangeZoom; }
@@ -83,12 +71,6 @@ public:
     double rangeZoomFactor(Qt::Orientation orientation);
 
     // setters:
-    void setBackground(const QPixmap& pm);
-    void setBackground(const QPixmap& pm, bool scaled,
-                       Qt::AspectRatioMode mode = Qt::KeepAspectRatioByExpanding);
-    void setBackground(const QBrush& brush);
-    void setBackgroundScaled(bool scaled);
-    void setBackgroundScaledMode(Qt::AspectRatioMode mode);
     void setRangeDrag(Qt::Orientations orientations);
     void setRangeZoom(Qt::Orientations orientations);
     void setRangeDragAxes(QCPAxis* horizontal, QCPAxis* vertical);
@@ -108,19 +90,19 @@ public:
     QCPAxis* axis(QCPAxis::AxisType type, int index = 0) const;
     QList<QCPAxis*> axes(QCPAxis::AxisTypes types) const;
     QList<QCPAxis*> axes() const;
+
     // The handle form of addAxis(type): the rect owns the new axis.
     template <std::same_as<QCPAxis> T>
     qcp::HandleFor<T> add(QCPAxis::AxisType type)
     {
         using Handle = qcp::HandleFor<T>;
         QCPAxis* axis = addAxis(type);
-        return axis ? qcp::makeHandle<Handle>(axis) : Handle{};
+        return axis ? qcp::makeHandle<Handle>(axis) : Handle { };
     }
+
     QCPAxis* addAxis(QCPAxis::AxisType type, QCPAxis* axis = nullptr);
     QList<QCPAxis*> addAxes(QCPAxis::AxisTypes types);
     bool removeAxis(QCPAxis* axis);
-
-    QCPLayoutInset* insetLayout() const { return mInsetLayout; }
 
     void zoom(const QRectF& pixelRect);
     void zoom(const QRectF& pixelRect, const QList<QCPAxis*>& affectedAxes);
@@ -163,17 +145,10 @@ public:
 
     // reimplemented virtual methods:
     virtual void update(UpdatePhase phase) override;
-    virtual QList<QCPLayoutElement*> elements(bool recursive) const override;
     virtual int calculateAutoMargin(QCP::MarginSide side) override;
 
 protected:
     // property members:
-    QBrush mBackgroundBrush;
-    QPixmap mBackgroundPixmap;
-    QPixmap mScaledBackgroundPixmap;
-    bool mBackgroundScaled;
-    Qt::AspectRatioMode mBackgroundScaledMode;
-    QCPLayoutInset* mInsetLayout;
     Qt::Orientations mRangeDrag, mRangeZoom;
     QList<QPointer<QCPAxis>> mRangeDragHorzAxis, mRangeDragVertAxis;
     QList<QPointer<QCPAxis>> mRangeZoomHorzAxis, mRangeZoomVertAxis;
@@ -194,11 +169,11 @@ protected:
     QPointer<QCPColorScale> mColorScale;
 
     // reimplemented virtual methods:
-    virtual void applyDefaultAntialiasingHint(QCPPainter* painter) const override;
-    virtual void draw(QCPPainter* painter) override;
     virtual void layoutChanged() override;
+
     // A rect inside a QCPColorScale must not make a scale of its own.
     virtual bool mayOwnColorScale() const { return true; }
+
     // events:
     virtual void mousePressEvent(QMouseEvent* event, const QVariant& details) override;
     virtual void mouseMoveEvent(QMouseEvent* event, const QPointF& startPos) override;
@@ -206,7 +181,6 @@ protected:
     virtual void wheelEvent(QWheelEvent* event) override;
 
     // non-property methods:
-    void drawBackground(QCPPainter* painter);
     void updateAxesOffset(QCPAxis::AxisType type);
     void zoomAxesAt(const QPointF& pos, double horizontalFactor, double verticalFactor);
     void markAffectedLayersDirty(bool invalidate = false);
@@ -246,7 +220,6 @@ private:
     friend class TestPaintBuffer;
 };
 
-
 // The handle of an axis rect: created in the layout by QCustomPlot::add<QCPAxisRect>(row, column).
 template <typename T, typename Self>
 class QCPAxisRectOps : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPAxisRectOps<T>>>
@@ -254,25 +227,29 @@ class QCPAxisRectOps : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPAxisRectOp
     using Base = QCPLayerableOps<T, qcp::OpsRet<Self, QCPAxisRectOps<T>>>;
 
 public:
-    using typename Base::Ret;
     using Base::Base;
+    using typename Base::Ret;
 
     Ret setBackground(const QBrush& brush)
     {
         return this->apply([&](T& p) { p.setBackground(brush); });
     }
+
     Ret setBackground(const QPixmap& pixmap)
     {
         return this->apply([&](T& p) { p.setBackground(pixmap); });
     }
+
     Ret setRangeDrag(Qt::Orientations orientations)
     {
         return this->apply([&](T& p) { p.setRangeDrag(orientations); });
     }
+
     Ret setRangeZoom(Qt::Orientations orientations)
     {
         return this->apply([&](T& p) { p.setRangeZoom(orientations); });
     }
+
     Ret setRangeZoomFactor(double factor)
     {
         return this->apply([&](T& p) { p.setRangeZoomFactor(factor); });

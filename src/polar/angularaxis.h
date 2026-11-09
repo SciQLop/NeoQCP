@@ -23,27 +23,31 @@
 **          Version: 2.1.1                                                **
 ****************************************************************************/
 
-#ifndef QCP_LAYOUTELEMENT_ANGULARAXIS_H
-#define QCP_LAYOUTELEMENT_ANGULARAXIS_H
+#ifndef QCP_POLAR_ANGULARAXIS_H
+#define QCP_POLAR_ANGULARAXIS_H
 
 #include "../axis/axistickerfixed.h"
 #include "../axis/labelpainter.h"
 #include "../axis/range.h"
 #include "../global.h"
 #include "../handle-ops.h"
-#include "../layout.h"
+#include "../layer.h"
 
 class QCPPainter;
 class QCustomPlot;
+class QCPPolarArea;
 class QCPPolarAxisRadial;
-class QCPPolarAxisAngular;
 class QCPPolarGrid;
-class QCPPolarGraph;
 
 template <typename T, typename Self = void>
 class QCPPolarAxisAngularOps;
 
-class QCP_LIB_DECL QCPPolarAxisAngular : public QCPLayoutElement
+/*!
+  The angular axis of a polar plot: its range, ticks, labels and drawing, and the angle at which
+  its zero coordinate points. It is a child of the \ref QCPPolarArea that lays it out and that owns
+  its radial axes and graphs.
+*/
+class QCP_LIB_DECL QCPPolarAxisAngular : public QCPLayerable
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
@@ -83,17 +87,10 @@ public:
     template <typename T>
     using OpsFor = QCPPolarAxisAngularOps<T>;
 
-    explicit QCPPolarAxisAngular(QCustomPlot* parentPlot);
-    virtual ~QCPPolarAxisAngular();
+    explicit QCPPolarAxisAngular(QCPPolarArea* area);
 
     // getters:
-    QPixmap background() const { return mBackgroundPixmap; }
-
-    QBrush backgroundBrush() const { return mBackgroundBrush; }
-
-    bool backgroundScaled() const { return mBackgroundScaled; }
-
-    Qt::AspectRatioMode backgroundScaledMode() const { return mBackgroundScaledMode; }
+    QCPPolarArea* area() const { return mArea; }
 
     bool rangeDrag() const { return mRangeDrag; }
 
@@ -179,15 +176,7 @@ public:
 
     QPen selectedSubTickPen() const { return mSelectedSubTickPen; }
 
-    QCPPolarGrid* grid() const { return mGrid; }
-
     // setters:
-    void setBackground(const QPixmap& pm);
-    void setBackground(const QPixmap& pm, bool scaled,
-                       Qt::AspectRatioMode mode = Qt::KeepAspectRatioByExpanding);
-    void setBackground(const QBrush& brush);
-    void setBackgroundScaled(bool scaled);
-    void setBackgroundScaledMode(Qt::AspectRatioMode mode);
     void setRangeDrag(bool enabled);
     void setRangeZoom(bool enabled);
     void setRangeZoomFactor(double factor);
@@ -234,55 +223,10 @@ public:
     Q_SLOT void setSelectableParts(const QCPPolarAxisAngular::SelectableParts& selectableParts);
     Q_SLOT void setSelectedParts(const QCPPolarAxisAngular::SelectableParts& selectedParts);
 
-    // reimplemented virtual methods:
-    virtual double selectTest(const QPointF& pos, bool onlySelectable,
-                              QVariant* details = 0) const override;
-    virtual void update(UpdatePhase phase) override;
-    virtual QList<QCPLayoutElement*> elements(bool recursive) const override;
-
     // non-property methods:
-    bool removeGraph(QCPPolarGraph* graph);
-    int radialAxisCount() const;
-    QCPPolarAxisRadial* radialAxis(int index = 0) const;
-    QList<QCPPolarAxisRadial*> radialAxes() const;
-    QCPPolarAxisRadial* addRadialAxis(QCPPolarAxisRadial* axis = 0);
-    bool removeRadialAxis(QCPPolarAxisRadial* axis);
-
-    QCPLayoutInset* insetLayout() const { return mInsetLayout; }
-    // Out of line: QCustomPlot is incomplete here, and clang checks add<T>'s body at its definition.
-    [[nodiscard]] bool plotTakesNewParts() const;
-
-    // The handle form of the graph constructor: the polar graph belongs to this axis and draws on
-    // its first radial axis. args go to the handle's setData.
-    template <std::same_as<QCPPolarGraph> T, typename... Args>
-    qcp::HandleFor<T> add(Args&&... args)
-    {
-        using Handle = qcp::HandleFor<T>;
-        static_assert(requires(Handle h) { h.setData(std::declval<Args>()...); },
-                      "add<T>(args...): the graph's handle has no setData taking these arguments");
-        QCP_CHECK_OR_RETURN(plotTakesNewParts(), "the plot is being destroyed", Handle{});
-        QCP_CHECK_OR_RETURN(radialAxis(0), "the angular axis has no radial axis", Handle{});
-        Handle handle = qcp::makeHandle<Handle>(new T(this, radialAxis(0)));
-        handle.get()->markDirty();
-        try
-        {
-            handle.setData(std::forward<Args>(args)...);
-        }
-        catch (...)
-        {
-            handle.remove(); // the graph unregisters itself from this axis
-            throw;
-        }
-        return handle;
-    }
-
-
-    QRegion exactClipRegion() const;
-
     void moveRange(double diff);
     void scaleRange(double factor);
     void scaleRange(double factor, double center);
-    void rescale(bool onlyVisiblePlottables = false);
 
     double coordToAngleRad(double coord) const
     {
@@ -300,33 +244,6 @@ public:
     QPointF coordToPixel(double angleCoord, double radiusCoord) const;
     SelectablePart getPartAt(const QPointF& pos) const;
 
-    // read-only interface imitating a QRect:
-    int left() const { return mRect.left(); }
-
-    int right() const { return mRect.right(); }
-
-    int top() const { return mRect.top(); }
-
-    int bottom() const { return mRect.bottom(); }
-
-    int width() const { return mRect.width(); }
-
-    int height() const { return mRect.height(); }
-
-    QSize size() const { return mRect.size(); }
-
-    QPoint topLeft() const { return mRect.topLeft(); }
-
-    QPoint topRight() const { return mRect.topRight(); }
-
-    QPoint bottomLeft() const { return mRect.bottomLeft(); }
-
-    QPoint bottomRight() const { return mRect.bottomRight(); }
-
-    QPointF center() const { return mCenter; }
-
-    double radius() const { return mRadius; }
-
 signals:
     void rangeChanged(const QCPRange& newRange, const QCPRange& oldRange);
     void selectionChanged();
@@ -334,12 +251,6 @@ signals:
 
 protected:
     // property members:
-    QBrush mBackgroundBrush;
-    QPixmap mBackgroundPixmap;
-    QPixmap mScaledBackgroundPixmap;
-    bool mBackgroundScaled;
-    Qt::AspectRatioMode mBackgroundScaledMode;
-    QCPLayoutInset* mInsetLayout;
     bool mRangeDrag;
     bool mRangeZoom;
     double mRangeZoomFactor;
@@ -374,36 +285,20 @@ protected:
     bool mRangeReversed;
 
     // non-property members:
-    QPointF mCenter;
-    double mRadius;
-    QList<QCPPolarAxisRadial*> mRadialAxes;
-    QCPPolarGrid* mGrid;
-    QList<QCPPolarGraph*> mGraphs;
+    QCPPolarArea* mArea;
     QSharedPointer<QCPAxisTicker> mTicker;
     QVector<double> mTickVector;
     QVector<QString> mTickVectorLabels;
     QVector<QPointF> mTickVectorCosSin;
     QVector<double> mSubTickVector;
     QVector<QPointF> mSubTickVectorCosSin;
-    bool mDragging;
-    QCPRange mDragAngularStart;
-    QList<QPair<QPointer<QCPPolarAxisRadial>, QCPRange>> mDragRadialStart;
-    QCP::AntialiasedElements mAADragBackup, mNotAADragBackup;
     QCPLabelPainterPrivate mLabelPainter;
 
     // reimplemented virtual methods:
     virtual void applyDefaultAntialiasingHint(QCPPainter* painter) const override;
     virtual void draw(QCPPainter* painter) override;
-    virtual QCP::Interaction selectionCategory() const override;
-    // events:
-    virtual void mousePressEvent(QMouseEvent* event, const QVariant& details) override;
-    virtual void mouseMoveEvent(QMouseEvent* event, const QPointF& startPos) override;
-    virtual void mouseReleaseEvent(QMouseEvent* event, const QPointF& startPos) override;
-    virtual void wheelEvent(QWheelEvent* event) override;
 
     // non-virtual methods:
-    bool registerPolarGraph(QCPPolarGraph* graph);
-    void drawBackground(QCPPainter* painter, const QPointF& center, double radius);
     void setupTickVectors();
     QPen getBasePen() const;
     QPen getTickPen() const;
@@ -418,150 +313,153 @@ private:
     void emitRangeChanged(const QCPRange& oldRange);
 
     friend class QCustomPlot;
+    friend class QCPPolarArea;
     friend class QCPPolarGrid;
-    friend class QCPPolarGraph;
 };
 Q_DECLARE_OPERATORS_FOR_FLAGS(QCPPolarAxisAngular::SelectableParts)
 Q_DECLARE_METATYPE(QCPPolarAxisAngular::SelectablePart)
 
-
 // The handle of QCPPolarAxisAngular: what add<T>() returns for it.
 template <typename T, typename Self>
-class QCPPolarAxisAngularOps : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPPolarAxisAngularOps<T>>>
+class QCPPolarAxisAngularOps
+        : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPPolarAxisAngularOps<T>>>
 {
     using Base = QCPLayerableOps<T, qcp::OpsRet<Self, QCPPolarAxisAngularOps<T>>>;
 
 public:
-    using typename Base::Ret;
     using Base::Base;
+    using typename Base::Ret;
 
-    Ret setBackground(const QBrush& brush)
-    {
-        return this->apply([&](T& o) { o.setBackground(brush); });
-    }
-    Ret setBackground(const QPixmap& pixmap)
-    {
-        return this->apply([&](T& o) { o.setBackground(pixmap); });
-    }
-    Ret setBackground(const QPixmap& pixmap, bool scaled, Qt::AspectRatioMode mode)
-    {
-        return this->apply([&](T& o) { o.setBackground(pixmap, scaled, mode); });
-    }
     Ret setRange(double lower, double upper)
     {
         return this->apply([&](T& o) { o.setRange(lower, upper); });
     }
+
     Ret setRangeLower(double lower)
     {
         return this->apply([&](T& o) { o.setRangeLower(lower); });
     }
+
     Ret setRangeUpper(double upper)
     {
         return this->apply([&](T& o) { o.setRangeUpper(upper); });
     }
+
     Ret setRangeReversed(bool reversed)
     {
         return this->apply([&](T& o) { o.setRangeReversed(reversed); });
     }
+
     Ret setAngle(double degrees)
     {
         return this->apply([&](T& o) { o.setAngle(degrees); });
     }
+
     Ret setTicks(bool show)
     {
         return this->apply([&](T& o) { o.setTicks(show); });
     }
+
     Ret setTickLabels(bool show)
     {
         return this->apply([&](T& o) { o.setTickLabels(show); });
     }
+
     Ret setTickLabelPadding(int padding)
     {
         return this->apply([&](T& o) { o.setTickLabelPadding(padding); });
     }
+
     Ret setTickLabelFont(const QFont& font)
     {
         return this->apply([&](T& o) { o.setTickLabelFont(font); });
     }
+
     Ret setTickLabelColor(const QColor& color)
     {
         return this->apply([&](T& o) { o.setTickLabelColor(color); });
     }
+
     Ret setTickLabelRotation(double degrees)
     {
         return this->apply([&](T& o) { o.setTickLabelRotation(degrees); });
     }
+
     Ret setNumberFormat(const QString& formatCode)
     {
         return this->apply([&](T& o) { o.setNumberFormat(formatCode); });
     }
+
     Ret setNumberPrecision(int precision)
     {
         return this->apply([&](T& o) { o.setNumberPrecision(precision); });
     }
+
     Ret setTickLength(int inside, int outside)
     {
         return this->apply([&](T& o) { o.setTickLength(inside, outside); });
     }
+
     Ret setSubTicks(bool show)
     {
         return this->apply([&](T& o) { o.setSubTicks(show); });
     }
+
     Ret setSubTickLength(int inside, int outside)
     {
         return this->apply([&](T& o) { o.setSubTickLength(inside, outside); });
     }
+
     Ret setBasePen(const QPen& pen)
     {
         return this->apply([&](T& o) { o.setBasePen(pen); });
     }
+
     Ret setTickPen(const QPen& pen)
     {
         return this->apply([&](T& o) { o.setTickPen(pen); });
     }
+
     Ret setSubTickPen(const QPen& pen)
     {
         return this->apply([&](T& o) { o.setSubTickPen(pen); });
     }
+
     Ret setLabelFont(const QFont& font)
     {
         return this->apply([&](T& o) { o.setLabelFont(font); });
     }
+
     Ret setLabelColor(const QColor& color)
     {
         return this->apply([&](T& o) { o.setLabelColor(color); });
     }
+
     Ret setLabel(const QString& str)
     {
         return this->apply([&](T& o) { o.setLabel(str); });
     }
+
     Ret setLabelPadding(int padding)
     {
         return this->apply([&](T& o) { o.setLabelPadding(padding); });
     }
+
     Ret setRangeZoom(bool enabled)
     {
         return this->apply([&](T& o) { o.setRangeZoom(enabled); });
     }
+
     Ret setRangeZoomFactor(double factor)
     {
         return this->apply([&](T& o) { o.setRangeZoomFactor(factor); });
     }
-
-    // The handle form of addGraph(): the polar graph belongs to this axis and draws on its first
-    // radial axis. args go to the graph handle's setData.
-    template <std::same_as<QCPPolarGraph> Graph, typename... Args>
-    qcp::HandleFor<Graph> add(Args&&... args)
-    {
-        auto* axis = this->get();
-        QCP_CHECK_OR_RETURN(axis, "the handle is dead", qcp::HandleFor<Graph>{});
-        return axis->template add<Graph>(std::forward<Args>(args)...);
-    }
 };
 
-// The handle is complete with only this header included: plot.add<QCPPolarAxisAngular>() is usable
-// without polargraph.h (the graph's own handle only needs it when a graph is added).
-static_assert(requires(qcp::HandleFor<QCPPolarAxisAngular> handle) { handle.setRange(0.0, 1.0); },
-              "the angular axis handle must be complete in this header");
+// The handle is complete with only this header included: the area's angularAxis() handle is usable
+// without polargraph.h (a graph needs the polar area's own header).
+static_assert(
+    requires(qcp::HandleFor<QCPPolarAxisAngular> handle) { handle.setRange(0.0, 1.0); },
+    "the angular axis handle must be complete in this header");
 
-#endif // QCP_LAYOUTELEMENT_ANGULARAXIS_H
+#endif // QCP_POLAR_ANGULARAXIS_H

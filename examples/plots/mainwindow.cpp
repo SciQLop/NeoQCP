@@ -1388,8 +1388,9 @@ void MainWindow::setupPolarPlotDemo(QCustomPlot *customPlot)
   // Warning: Polar plots are a still a tech preview
   
   customPlot->plotLayout()->clear();
-  QCPPolarAxisAngular *angularAxis = new QCPPolarAxisAngular(customPlot);
-  customPlot->plotLayout()->addElement(0, 0, angularAxis);
+  QCPPolarArea *area = new QCPPolarArea(customPlot);
+  customPlot->plotLayout()->addElement(0, 0, area);
+  QCPPolarAxisAngular *angularAxis = area->angularAxis();
   /* This is how we could set the angular axis to show pi symbols instead of degree numbers:
   QSharedPointer<QCPAxisTickerPi> ticker(new QCPAxisTickerPi);
   ticker->setPiValue(180);
@@ -1400,15 +1401,15 @@ void MainWindow::setupPolarPlotDemo(QCustomPlot *customPlot)
   angularAxis->setRangeDrag(false);
   angularAxis->setTickLabelMode(QCPPolarAxisAngular::lmUpright);
   
-  angularAxis->radialAxis()->setTickLabelMode(QCPPolarAxisRadial::lmUpright);
-  angularAxis->radialAxis()->setTickLabelRotation(0);
-  angularAxis->radialAxis()->setAngle(45);
+  area->radialAxis()->setTickLabelMode(QCPPolarAxisRadial::lmUpright);
+  area->radialAxis()->setTickLabelRotation(0);
+  area->radialAxis()->setAngle(45);
   
-  angularAxis->grid()->setAngularPen(QPen(QColor(200, 200, 200), 0, Qt::SolidLine));
-  angularAxis->grid()->setSubGridType(QCPPolarGrid::gtAll);
+  area->grid()->setAngularPen(QPen(QColor(200, 200, 200), 0, Qt::SolidLine));
+  area->grid()->setSubGridType(QCPPolarGrid::gtAll);
   
-  QCPPolarGraph *g1 = new QCPPolarGraph(angularAxis, angularAxis->radialAxis());
-  QCPPolarGraph *g2 = new QCPPolarGraph(angularAxis, angularAxis->radialAxis());
+  QCPPolarGraph *g1 = new QCPPolarGraph(angularAxis, area->radialAxis());
+  QCPPolarGraph *g2 = new QCPPolarGraph(angularAxis, area->radialAxis());
   g2->setPen(QPen(QColor(255, 150, 20)));
   g2->setBrush(QColor(255, 150, 20, 50));
   g1->setScatterStyle(QCPScatterStyle::ssDisc);
@@ -1418,7 +1419,7 @@ void MainWindow::setupPolarPlotDemo(QCustomPlot *customPlot)
     g2->addData(i/100.0*360.0, qSin(i/100.0*M_PI*6)*2);
   }
   angularAxis->setRange(0, 360);
-  angularAxis->radialAxis()->setRange(-10, 10);
+  area->radialAxis()->setRange(-10, 10);
 }
 
 void MainWindow::realtimeDataSlot()

@@ -1285,8 +1285,9 @@ void MainWindow::setupPolarAxisTest(QCustomPlot *customPlot)
   presetInteractive(customPlot);
   customPlot->setPlottingHint(QCP::phCacheLabels, true);
   customPlot->plotLayout()->clear();
-  QCPPolarAxisAngular *polarAxis = new QCPPolarAxisAngular(customPlot);
-  customPlot->plotLayout()->addElement(0, 0, polarAxis);
+  QCPPolarArea *area = new QCPPolarArea(customPlot);
+  customPlot->plotLayout()->addElement(0, 0, area);
+  QCPPolarAxisAngular *polarAxis = area->angularAxis();
   QSharedPointer<QCPAxisTickerPi> ticker(new QCPAxisTickerPi);
   ticker->setPiValue(180);
   ticker->setTickCount(8);
@@ -1294,19 +1295,19 @@ void MainWindow::setupPolarAxisTest(QCustomPlot *customPlot)
   polarAxis->setRangeDrag(true);
   polarAxis->setTickLabelMode(QCPPolarAxisAngular::lmUpright);
   
-  polarAxis->radialAxis()->setTickLabelMode(QCPPolarAxisRadial::lmUpright);
-  //polarAxis->radialAxis()->setScaleType(QCPPolarAxisRadial::stLogarithmic);
-  //polarAxis->radialAxis()->setTicker(QSharedPointer<QCPAxisTicker>(new QCPAxisTickerLog));
-  //polarAxis->radialAxis()->setRange(0.001, 1e1);
-  polarAxis->radialAxis()->setTickLabelRotation(0);
-  polarAxis->radialAxis()->setAngle(45);
+  area->radialAxis()->setTickLabelMode(QCPPolarAxisRadial::lmUpright);
+  //area->radialAxis()->setScaleType(QCPPolarAxisRadial::stLogarithmic);
+  //area->radialAxis()->setTicker(QSharedPointer<QCPAxisTicker>(new QCPAxisTickerLog));
+  //area->radialAxis()->setRange(0.001, 1e1);
+  area->radialAxis()->setTickLabelRotation(0);
+  area->radialAxis()->setAngle(45);
   
-  polarAxis->grid()->setAngularPen(QPen(QColor(200, 200, 200), 0, Qt::SolidLine));
-  polarAxis->grid()->setSubGridType(QCPPolarGrid::gtAll);
-  //polarAxis->radialAxis()->setRangeReversed(true);
+  area->grid()->setAngularPen(QPen(QColor(200, 200, 200), 0, Qt::SolidLine));
+  area->grid()->setSubGridType(QCPPolarGrid::gtAll);
+  //area->radialAxis()->setRangeReversed(true);
   
-  QCPPolarGraph *g1 = new QCPPolarGraph(polarAxis, polarAxis->radialAxis());
-  QCPPolarGraph *g2 = new QCPPolarGraph(polarAxis, polarAxis->radialAxis());
+  QCPPolarGraph *g1 = new QCPPolarGraph(polarAxis, area->radialAxis());
+  QCPPolarGraph *g2 = new QCPPolarGraph(polarAxis, area->radialAxis());
   g2->setPen(QPen(QColor(255, 150, 20)));
   g2->setBrush(QColor(255, 150, 20, 50));
   g1->setScatterStyle(QCPScatterStyle::ssStar);
@@ -1315,7 +1316,7 @@ void MainWindow::setupPolarAxisTest(QCustomPlot *customPlot)
     g1->addData(i, qSin(i/360.0*M_PI*8)*8+1);
     g2->addData(i, qSin(i/360.0*M_PI*6)*2);
   }
-  polarAxis->radialAxis()->rescale();
+  area->radialAxis()->rescale();
   
   /*
   QTimer *timer = new QTimer(this);
@@ -1665,8 +1666,9 @@ void MainWindow::mouseMoveRotateTickLabels(QMouseEvent *event)
 
 void MainWindow::mouseMoveRotateAngularTickLabels(QMouseEvent *event)
 {
-  if (QCPPolarAxisAngular *polarAxis = qobject_cast<QCPPolarAxisAngular*>(mCustomPlot->plotLayout()->element(0, 0)))
+  if (QCPPolarArea *area = qobject_cast<QCPPolarArea*>(mCustomPlot->plotLayout()->element(0, 0)))
   {
+    QCPPolarAxisAngular *polarAxis = area->angularAxis();
     //polarAxis->setTickLabelRotation(event->pos().x()-mCustomPlot->width()/2.0);
     polarAxis->setAngle(std::atan2(event->pos().y()-mCustomPlot->height()/2.0, event->pos().x()-mCustomPlot->width()/2.0)/M_PI*180.0);
   }

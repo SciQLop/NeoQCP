@@ -30,6 +30,7 @@
 #include "../handle-ops.h"
 #include "radialaxis.h"
 
+class QCPPolarArea;
 class QCPPolarAxisAngular;
 
 template <typename T, typename Self = void>
@@ -63,7 +64,7 @@ public:
     template <typename T>
     using OpsFor = QCPPolarGridOps<T>;
 
-    explicit QCPPolarGrid(QCPPolarAxisAngular* parentAxis);
+    explicit QCPPolarGrid(QCPPolarArea* area);
 
     // getters:
     QCPPolarAxisRadial* radialAxis() const { return mRadialAxis.data(); }
@@ -107,7 +108,7 @@ protected:
     QPen mRadialPen, mRadialSubGridPen, mRadialZeroLinePen;
 
     // non-property members:
-    QCPPolarAxisAngular* mParentAxis;
+    QCPPolarArea* mArea;
     QPointer<QCPPolarAxisRadial> mRadialAxis;
 
     // reimplemented virtual methods:

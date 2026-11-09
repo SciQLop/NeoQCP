@@ -753,22 +753,23 @@ void TestOwnership::deleteBarsInGroup()
 void TestOwnership::polarRemoveGraphUnlistsFirst()
 {
     mPlot->plotLayout()->clear();
-    auto* angular = new QCPPolarAxisAngular(mPlot);
-    mPlot->plotLayout()->addElement(0, 0, angular);
-    auto* first = new QCPPolarGraph(angular, angular->radialAxis());
-    auto* second = new QCPPolarGraph(angular, angular->radialAxis());
+    auto* area = new QCPPolarArea(mPlot);
+    mPlot->plotLayout()->addElement(0, 0, area);
+    auto* angular = area->angularAxis();
+    auto* first = new QCPPolarGraph(angular, area->radialAxis());
+    auto* second = new QCPPolarGraph(angular, area->radialAxis());
     first->setData(QVector<double> { 0, 90 }, QVector<double> { 1, 2 });
     second->setData(QVector<double> { 0, 90 }, QVector<double> { 2, 1 });
     const QPointer<QCPPolarGraph> firstAlive(first), secondAlive(second);
     // Raw captures on purpose: the second slot asks to remove the graph being deleted.
-    connect(first, &QObject::destroyed, angular, [angular, second] { angular->removeGraph(second); });
-    connect(second, &QObject::destroyed, angular, [angular, first] { angular->removeGraph(first); });
+    connect(first, &QObject::destroyed, area, [area, second] { area->removeGraph(second); });
+    connect(second, &QObject::destroyed, area, [area, first] { area->removeGraph(first); });
 
-    QVERIFY(angular->removeGraph(first));
+    QVERIFY(area->removeGraph(first));
 
     QVERIFY(firstAlive.isNull());
     QVERIFY(secondAlive.isNull());
-    QVERIFY(!angular->removeGraph(second));
+    QVERIFY(!area->removeGraph(second));
     draw();
 }
 
@@ -878,10 +879,10 @@ void TestOwnership::intervalsWithoutLaneLayout()
 
 void TestOwnership::deletePolarGraphInLegend()
 {
-    auto* angular = new QCPPolarAxisAngular(mPlot);
-    mPlot->plotLayout()->addElement(0, 1, angular);
+    auto* area = new QCPPolarArea(mPlot);
+    mPlot->plotLayout()->addElement(0, 1, area);
     const int rows = mPlot->legend->itemCount();
-    auto* graph = new QCPPolarGraph(angular, angular->radialAxis());
+    auto* graph = new QCPPolarGraph(area->angularAxis(), area->radialAxis());
     graph->setName("polar");
     graph->setData(QVector<double> { 0, 90 }, QVector<double> { 1, 2 });
     QCOMPARE(mPlot->legend->itemCount(), rows + 1);
@@ -926,21 +927,22 @@ void TestOwnership::intervalsWithoutAxes()
     QVERIFY(mPlot->removePlottable(bereft)); // before the stack layout goes
 }
 
-void TestOwnership::deleteAngularAxisWithGraphs()
+void TestOwnership::deletePolarAreaWithGraphs()
 {
-    auto* angular = new QCPPolarAxisAngular(mPlot);
-    auto* other = new QCPPolarAxisAngular(mPlot);
-    mPlot->plotLayout()->addElement(0, 1, angular);
+    auto* area = new QCPPolarArea(mPlot);
+    auto* other = new QCPPolarArea(mPlot);
+    QCPPolarAxisAngular* angular = area->angularAxis();
+    mPlot->plotLayout()->addElement(0, 1, area);
     mPlot->plotLayout()->addElement(0, 2, other);
-    auto* survivor = new QCPPolarGraph(angular, angular->radialAxis());
+    auto* survivor = new QCPPolarGraph(angular, area->radialAxis());
     survivor->setData(QVector<double> { 0, 90 }, QVector<double> { 1, 2 });
-    auto* moved = new QCPPolarGraph(angular, angular->radialAxis());
-    moved->setKeyAxis(other);
+    auto* moved = new QCPPolarGraph(angular, area->radialAxis());
+    moved->setKeyAxis(other->angularAxis());
     delete moved;
-    angular->rescale(); // walks its graph list: the moved graph left it
+    area->rescale(); // walks its graph list: the moved graph left it
     draw();
 
-    delete angular;
+    delete area;
 
     QVERIFY(survivor->keyAxis() == nullptr);
     draw();
@@ -948,22 +950,23 @@ void TestOwnership::deleteAngularAxisWithGraphs()
     draw();
 
     auto* plot = new QCustomPlot;
-    auto* held = new QCPPolarAxisAngular(plot);
+    auto* held = new QCPPolarArea(plot);
     plot->plotLayout()->addElement(0, 1, held);
-    new QCPPolarGraph(held, held->radialAxis());
+    new QCPPolarGraph(held->angularAxis(), held->radialAxis());
     delete plot;
 }
 
 void TestOwnership::movePolarGraphKeepsOneLegendRow()
 {
-    auto* angular = new QCPPolarAxisAngular(mPlot);
-    auto* other = new QCPPolarAxisAngular(mPlot);
-    mPlot->plotLayout()->addElement(0, 1, angular);
+    auto* area = new QCPPolarArea(mPlot);
+    auto* other = new QCPPolarArea(mPlot);
+    QCPPolarAxisAngular* angular = area->angularAxis();
+    mPlot->plotLayout()->addElement(0, 1, area);
     mPlot->plotLayout()->addElement(0, 2, other);
-    auto* graph = new QCPPolarGraph(angular, angular->radialAxis());
+    auto* graph = new QCPPolarGraph(angular, area->radialAxis());
     const int rows = mPlot->legend->itemCount();
 
-    graph->setKeyAxis(other);
+    graph->setKeyAxis(other->angularAxis());
     QCOMPARE(mPlot->legend->itemCount(), rows);
 
     QVERIFY(!graph->addToLegend());

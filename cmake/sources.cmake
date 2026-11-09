@@ -62,6 +62,7 @@ set(NEOQCP_SOURCES
     src/items/item-hspan.cpp
     src/items/item-rspan.cpp
     src/items/item-vspan.cpp
+    src/layoutelements/area.cpp
     src/layoutelements/layoutelement-axisrect.cpp
     src/layoutelements/layoutelement-colorscale.cpp
     src/layoutelements/layoutelement-legend.cpp
@@ -96,7 +97,8 @@ set(NEOQCP_SOURCES
     src/plottables/plottable-histogram.cpp
     src/plottables/plottable-statisticalbox.cpp
     src/data-locator.cpp
-    src/polar/layoutelement-angularaxis.cpp
+    src/polar/angularaxis.cpp
+    src/polar/polar-area.cpp
     src/polar/polargraph.cpp
     src/polar/polargrid.cpp
     src/polar/radialaxis.cpp
@@ -143,6 +145,7 @@ set(NEOQCP_MOC_HEADERS
     src/spatial-index.h
     src/coords.h
     src/layout.h
+    src/layoutelements/area.h
     src/layoutelements/layoutelement-axisrect.h
     src/layoutelements/layoutelement-colorscale.h
     src/layoutelements/layoutelement-legend.h
@@ -179,7 +182,8 @@ set(NEOQCP_MOC_HEADERS
     src/selectiondecorator-bracket.h
     src/selectionrect.h
     src/vector2d.h
-    src/polar/layoutelement-angularaxis.h
+    src/polar/angularaxis.h
+    src/polar/polar-area.h
     src/polar/polargraph.h
     src/polar/polargrid.h
     src/polar/radialaxis.h

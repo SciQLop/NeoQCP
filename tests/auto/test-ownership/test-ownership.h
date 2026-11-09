@@ -51,7 +51,7 @@ private slots:
     void intervalsWithoutLaneLayout();
     void deletePolarGraphInLegend();
     void intervalsWithoutAxes();
-    void deleteAngularAxisWithGraphs();
+    void deletePolarAreaWithGraphs();
     void movePolarGraphKeepsOneLegendRow();
 
     void destroyedSlotAddsDuringTeardown();

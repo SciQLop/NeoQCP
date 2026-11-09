@@ -23,11 +23,10 @@
 **          Version: 2.1.1                                                **
 ****************************************************************************/
 
-#include "layoutelement-angularaxis.h"
-#include "polargraph.h"
+#include "angularaxis.h"
+#include "polar-area.h"
 #include "polargrid.h"
 #include "radialaxis.h"
-#include <utility>
 
 #include "../axis/axistickerfixed.h"
 #include "../axis/labelpainter.h"
@@ -40,106 +39,19 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /*! \class QCPPolarAxisAngular
-  \brief The main container for polar plots, representing the angular axis as a circle
+  \brief The angular axis of a polar plot, drawn as a circle around the viewport centre
+
+  The axis belongs to a \ref QCPPolarArea, which owns its geometry and interactions, and draws it
+  as one of its layerables.
 
   \warning In this QCustomPlot version, polar plots are a tech preview. Expect documentation and
   functionality to be incomplete, as well as changing public interfaces in the future.
 */
-
-/* start documentation of inline functions */
-
-/*! \fn QCPLayoutInset *QCPPolarAxisAngular::insetLayout() const
-
-  Returns the inset layout of this axis rect. It can be used to place other layout elements (or
-  even layouts with multiple other elements) inside/on top of an axis rect.
-
-  \see QCPLayoutInset
-*/
-
-/*! \fn int QCPPolarAxisAngular::left() const
-
-  Returns the pixel position of the left border of this axis rect. Margins are not taken into
-  account here, so the returned value is with respect to the inner \ref rect.
-*/
-
-/*! \fn int QCPPolarAxisAngular::right() const
-
-  Returns the pixel position of the right border of this axis rect. Margins are not taken into
-  account here, so the returned value is with respect to the inner \ref rect.
-*/
-
-/*! \fn int QCPPolarAxisAngular::top() const
-
-  Returns the pixel position of the top border of this axis rect. Margins are not taken into
-  account here, so the returned value is with respect to the inner \ref rect.
-*/
-
-/*! \fn int QCPPolarAxisAngular::bottom() const
-
-  Returns the pixel position of the bottom border of this axis rect. Margins are not taken into
-  account here, so the returned value is with respect to the inner \ref rect.
-*/
-
-/*! \fn int QCPPolarAxisAngular::width() const
-
-  Returns the pixel width of this axis rect. Margins are not taken into account here, so the
-  returned value is with respect to the inner \ref rect.
-*/
-
-/*! \fn int QCPPolarAxisAngular::height() const
-
-  Returns the pixel height of this axis rect. Margins are not taken into account here, so the
-  returned value is with respect to the inner \ref rect.
-*/
-
-/*! \fn QSize QCPPolarAxisAngular::size() const
-
-  Returns the pixel size of this axis rect. Margins are not taken into account here, so the
-  returned value is with respect to the inner \ref rect.
-*/
-
-/*! \fn QPoint QCPPolarAxisAngular::topLeft() const
-
-  Returns the top left corner of this axis rect in pixels. Margins are not taken into account here,
-  so the returned value is with respect to the inner \ref rect.
-*/
-
-/*! \fn QPoint QCPPolarAxisAngular::topRight() const
-
-  Returns the top right corner of this axis rect in pixels. Margins are not taken into account
-  here, so the returned value is with respect to the inner \ref rect.
-*/
-
-/*! \fn QPoint QCPPolarAxisAngular::bottomLeft() const
-
-  Returns the bottom left corner of this axis rect in pixels. Margins are not taken into account
-  here, so the returned value is with respect to the inner \ref rect.
-*/
-
-/*! \fn QPoint QCPPolarAxisAngular::bottomRight() const
-
-  Returns the bottom right corner of this axis rect in pixels. Margins are not taken into account
-  here, so the returned value is with respect to the inner \ref rect.
-*/
-
-/*! \fn QPoint QCPPolarAxisAngular::center() const
-
-  Returns the center of this axis rect in pixels. Margins are not taken into account here, so the
-  returned value is with respect to the inner \ref rect.
-*/
-
-/* end documentation of inline functions */
-
 /*!
-  Creates a QCPPolarAxis instance and sets default values. An axis is added for each of the four
-  sides, the top and right axes are set invisible initially.
+  Creates the angular axis belonging to \a area.
 */
-QCPPolarAxisAngular::QCPPolarAxisAngular(QCustomPlot* parentPlot)
-        : QCPLayoutElement(parentPlot)
-        , mBackgroundBrush(Qt::NoBrush)
-        , mBackgroundScaled(true)
-        , mBackgroundScaledMode(Qt::KeepAspectRatioByExpanding)
-        , mInsetLayout(new QCPLayoutInset)
+QCPPolarAxisAngular::QCPPolarAxisAngular(QCPPolarArea* area)
+        : QCPLayerable(area->parentPlot(), QString(), area)
         , mRangeDrag(false)
         , mRangeZoom(false)
         , mRangeZoomFactor(0.85)
@@ -192,25 +104,15 @@ QCPPolarAxisAngular::QCPPolarAxisAngular(QCustomPlot* parentPlot)
         , mRangeReversed(false)
         ,
         // internal members:
-        mRadius(1)
-        , // non-zero initial value, will be overwritten in ::update() according to inner rect
-        mGrid(new QCPPolarGrid(this))
+        mArea(area)
         , mTicker(new QCPAxisTickerFixed)
-        , mDragging(false)
-        , mLabelPainter(parentPlot)
+        , mLabelPainter(mParentPlot)
 {
-    // TODO:
-    // mInsetLayout->initializeParentPlot(mParentPlot);
-    // mInsetLayout->setParentLayerable(this);
-    // mInsetLayout->setParent(this);
-
     if (QCPAxisTickerFixed* fixedTicker = mTicker.dynamicCast<QCPAxisTickerFixed>().data())
     {
         fixedTicker->setTickStep(30);
     }
     setAntialiased(true);
-    setLayer(mParentPlot->currentLayer()); // it's actually on that layer already, but we want it in
-                                           // front of the grid, so we place it on there again
 
     setTickLabelPadding(5);
     setTickLabelRotation(0);
@@ -219,37 +121,6 @@ QCPPolarAxisAngular::QCPPolarAxisAngular(QCustomPlot* parentPlot)
     mLabelPainter.setAbbreviateDecimalPowers(false);
     mLabelPainter.setCacheSize(24); // so we can cache up to 15-degree intervals, polar angular axis
                                     // uses a bit larger cache than normal axes
-
-    setMinimumSize(50, 50);
-    setMinimumMargins(QMargins(30, 30, 30, 30));
-
-    addRadialAxis();
-    mGrid->setRadialAxis(radialAxis());
-}
-
-QCPPolarAxisAngular::~QCPPolarAxisAngular()
-{
-    // Deleted mid-drag (by a rangeChanged slot): give the plot its antialiasing back. Without a
-    // layer, the plot itself is being torn down.
-    if (mParentPlot && layer() && mDragging && mParentPlot->noAntialiasingOnDrag())
-    {
-        mParentPlot->setAntialiasedElements(mAADragBackup);
-        mParentPlot->setNotAntialiasedElements(mNotAADragBackup);
-    }
-    delete mGrid; // delete grid here instead of via parent ~QObject for better defined deletion
-                  // order
-    mGrid = 0;
-
-    // The graphs outlive their axis: none may reach back into this list once it is gone.
-    for (QCPPolarGraph* graph : std::exchange(mGraphs, {}))
-        graph->mKeyAxis = nullptr;
-
-    delete mInsetLayout;
-    mInsetLayout = 0;
-
-    QList<QCPPolarAxisRadial*> radialAxesList = radialAxes();
-    for (int i = 0; i < radialAxesList.size(); ++i)
-        removeRadialAxis(radialAxesList.at(i));
 }
 
 QCPPolarAxisAngular::LabelMode QCPPolarAxisAngular::tickLabelMode() const
@@ -279,126 +150,6 @@ QString QCPPolarAxisAngular::numberFormat() const
             result.append(QLatin1Char('c'));
     }
     return result;
-}
-
-/*!
-  Returns the number of axes on the axis rect side specified with \a type.
-
-  \see axis
-*/
-int QCPPolarAxisAngular::radialAxisCount() const
-{
-    return mRadialAxes.size();
-}
-
-/*!
-  Returns the axis with the given \a index on the axis rect side specified with \a type.
-
-  \see axisCount, axes
-*/
-bool QCPPolarAxisAngular::plotTakesNewParts() const
-{
-    return mParentPlot && !mParentPlot->isBeingDestroyed();
-}
-
-QCPPolarAxisRadial* QCPPolarAxisAngular::radialAxis(int index) const
-{
-    if (index >= 0 && index < mRadialAxes.size())
-    {
-        return mRadialAxes.at(index);
-    }
-    else
-    {
-        qDebug() << Q_FUNC_INFO << "Axis index out of bounds:" << index;
-        return 0;
-    }
-}
-
-/*!
-  Returns all axes on the axis rect sides specified with \a types.
-
-  \a types may be a single \ref QCPAxis::AxisType or an <tt>or</tt>-combination, to get the axes of
-  multiple sides.
-
-  \see axis
-*/
-QList<QCPPolarAxisRadial*> QCPPolarAxisAngular::radialAxes() const
-{
-    return mRadialAxes;
-}
-
-/*!
-  Adds a new axis to the axis rect side specified with \a type, and returns it. If \a axis is 0, a
-  new QCPAxis instance is created internally. QCustomPlot owns the returned axis, so if you want to
-  remove an axis, use \ref removeAxis instead of deleting it manually.
-
-  You may inject QCPAxis instances (or subclasses of QCPAxis) by setting \a axis to an axis that was
-  previously created outside QCustomPlot. It is important to note that QCustomPlot takes ownership
-  of the axis, so you may not delete it afterwards. Further, the \a axis must have been created
-  with this axis rect as parent and with the same axis type as specified in \a type. If this is not
-  the case, a debug output is generated, the axis is not added, and the method returns 0.
-
-  This method can not be used to move \a axis between axis rects. The same \a axis instance must
-  not be added multiple times to the same or different axis rects.
-
-  If an axis rect side already contains one or more axes, the lower and upper endings of the new
-  axis (\ref QCPAxis::setLowerEnding, \ref QCPAxis::setUpperEnding) are set to \ref
-  QCPLineEnding::esHalfBar.
-
-  \see addAxes, setupFullAxesBox
-*/
-QCPPolarAxisRadial* QCPPolarAxisAngular::addRadialAxis(QCPPolarAxisRadial* axis)
-{
-    QCPPolarAxisRadial* newAxis = axis;
-    if (!newAxis)
-    {
-        newAxis = new QCPPolarAxisRadial(this);
-    }
-    else // user provided existing axis instance, do some sanity checks
-    {
-        if (newAxis->angularAxis() != this)
-        {
-            qDebug() << Q_FUNC_INFO
-                     << "passed radial axis doesn't have this angular axis as parent angular axis";
-            return 0;
-        }
-        if (radialAxes().contains(newAxis))
-        {
-            qDebug() << Q_FUNC_INFO << "passed axis is already owned by this angular axis";
-            return 0;
-        }
-    }
-    mRadialAxes.append(newAxis);
-    return newAxis;
-}
-
-/*!
-  Removes the specified \a axis from the axis rect and deletes it.
-
-  Returns true on success, i.e. if \a axis was a valid axis in this axis rect.
-
-  \see addAxis
-*/
-bool QCPPolarAxisAngular::removeRadialAxis(QCPPolarAxisRadial* radialAxis)
-{
-    if (mRadialAxes.contains(radialAxis))
-    {
-        mRadialAxes.removeOne(radialAxis);
-        delete radialAxis;
-        return true;
-    }
-    else
-    {
-        qDebug() << Q_FUNC_INFO << "Radial axis isn't associated with this angular axis:"
-                 << reinterpret_cast<quintptr>(radialAxis);
-        return false;
-    }
-}
-
-QRegion QCPPolarAxisAngular::exactClipRegion() const
-{
-    return QRegion(mCenter.x() - mRadius, mCenter.y() - mRadius, qRound(2 * mRadius),
-                   qRound(2 * mRadius), QRegion::Ellipse);
 }
 
 /*!
@@ -451,58 +202,13 @@ void QCPPolarAxisAngular::scaleRange(double factor, double center)
 }
 
 /*!
-  Changes the axis range such that all plottables associated with this axis are fully visible in
-  that dimension.
-
-  \see QCPAbstractPlottable::rescaleAxes, QCustomPlot::rescaleAxes
-*/
-void QCPPolarAxisAngular::rescale(bool onlyVisiblePlottables)
-{
-    QCPRange newRange;
-    bool haveRange = false;
-    for (int i = 0; i < mGraphs.size(); ++i)
-    {
-        if (!mGraphs.at(i)->realVisibility() && onlyVisiblePlottables)
-            continue;
-        QCPRange range;
-        bool currentFoundRange;
-        if (mGraphs.at(i)->keyAxis() == this)
-            range = mGraphs.at(i)->getKeyRange(currentFoundRange, QCP::sdBoth);
-        else
-            range = mGraphs.at(i)->getValueRange(currentFoundRange, QCP::sdBoth);
-        if (currentFoundRange)
-        {
-            if (!haveRange)
-                newRange = range;
-            else
-                newRange.expand(range);
-            haveRange = true;
-        }
-    }
-    if (haveRange)
-    {
-        if (!QCPRange::validRange(newRange)) // likely due to range being zero (plottable has only
-                                             // constant data in this axis dimension), shift current
-                                             // range to at least center the plottable
-        {
-            double center = (newRange.lower + newRange.upper)
-                * 0.5; // upper and lower should be equal anyway, but just to make sure, incase
-                       // validRange returned false for other reason
-            newRange.lower = center - mRange.size() / 2.0;
-            newRange.upper = center + mRange.size() / 2.0;
-        }
-        setRange(newRange);
-    }
-}
-
-/*!
   Transforms \a value, in pixel coordinates of the QCustomPlot widget, to axis coordinates.
 */
 void QCPPolarAxisAngular::pixelToCoord(QPointF pixelPos, double& angleCoord,
                                        double& radiusCoord) const
 {
-    if (!mRadialAxes.isEmpty())
-        mRadialAxes.first()->pixelToCoord(pixelPos, angleCoord, radiusCoord);
+    if (mArea->radialAxisCount() > 0)
+        mArea->radialAxis()->pixelToCoord(pixelPos, angleCoord, radiusCoord);
     else
         qDebug() << Q_FUNC_INFO << "no radial axis configured";
 }
@@ -512,9 +218,9 @@ void QCPPolarAxisAngular::pixelToCoord(QPointF pixelPos, double& angleCoord,
 */
 QPointF QCPPolarAxisAngular::coordToPixel(double angleCoord, double radiusCoord) const
 {
-    if (!mRadialAxes.isEmpty())
+    if (mArea->radialAxisCount() > 0)
     {
-        return mRadialAxes.first()->coordToPixel(angleCoord, radiusCoord);
+        return mArea->radialAxis()->coordToPixel(angleCoord, radiusCoord);
     }
     else
     {
@@ -553,110 +259,6 @@ QCPPolarAxisAngular::getPartAt([[maybe_unused]] const QPointF& pos) const
 }
 
 /* inherits documentation from base class */
-double QCPPolarAxisAngular::selectTest(const QPointF& pos, bool onlySelectable,
-                                       [[maybe_unused]] QVariant* details) const
-{
-    /*
-    if (!mParentPlot) return -1;
-    SelectablePart part = getPartAt(pos);
-    if ((onlySelectable && !mSelectableParts.testFlag(part)) || part == spNone)
-      return -1;
-
-    if (details)
-      details->setValue(part);
-    return mParentPlot->selectionTolerance()*0.99;
-    */
-
-    if (onlySelectable)
-        return -1;
-
-    if (QRectF(mOuterRect).contains(pos))
-    {
-        if (mParentPlot)
-            return mParentPlot->selectionTolerance() * 0.99;
-        else
-        {
-            qDebug() << Q_FUNC_INFO << "parent plot not defined";
-            return -1;
-        }
-    }
-    else
-        return -1;
-}
-
-/*!
-  This method is called automatically upon replot and doesn't need to be called by users of
-  QCPPolarAxisAngular.
-
-  Calls the base class implementation to update the margins (see \ref QCPLayoutElement::update),
-  and finally passes the \ref rect to the inset layout (\ref insetLayout) and calls its
-  QCPInsetLayout::update function.
-
-  \seebaseclassmethod
-*/
-void QCPPolarAxisAngular::update(UpdatePhase phase)
-{
-    QCPLayoutElement::update(phase);
-
-    switch (phase)
-    {
-        case upPreparation:
-        {
-            setupTickVectors();
-            for (int i = 0; i < mRadialAxes.size(); ++i)
-                mRadialAxes.at(i)->setupTickVectors();
-            break;
-        }
-        case upLayout:
-        {
-            mCenter = mRect.center();
-            mRadius = 0.5 * qMin(qAbs(mRect.width()), qAbs(mRect.height()));
-            if (mRadius < 1)
-                mRadius = 1; // prevent cases where radius might become 0 which causes trouble
-            for (int i = 0; i < mRadialAxes.size(); ++i)
-                mRadialAxes.at(i)->updateGeometry(mCenter, mRadius);
-
-            mInsetLayout->setOuterRect(rect());
-            break;
-        }
-        default:
-            break;
-    }
-
-    // pass update call on to inset layout (doesn't happen automatically, because QCPPolarAxis
-    // doesn't derive from QCPLayout):
-    mInsetLayout->update(phase);
-}
-
-/* inherits documentation from base class */
-QList<QCPLayoutElement*> QCPPolarAxisAngular::elements(bool recursive) const
-{
-    QList<QCPLayoutElement*> result;
-    if (mInsetLayout)
-    {
-        result << mInsetLayout;
-        if (recursive)
-            result << mInsetLayout->elements(recursive);
-    }
-    return result;
-}
-
-bool QCPPolarAxisAngular::removeGraph(QCPPolarGraph* graph)
-{
-    if (!mGraphs.contains(graph))
-    {
-        qDebug() << Q_FUNC_INFO << "graph not in list:" << reinterpret_cast<quintptr>(graph);
-        return false;
-    }
-
-    // Unlisted before the delete: a destroyed slot may call removeGraph again.
-    mGraphs.removeOne(graph);
-    graph->removeFromLegend();
-    delete graph;
-    return true;
-}
-
-/* inherits documentation from base class */
 void QCPPolarAxisAngular::applyDefaultAntialiasingHint(QCPPainter* painter) const
 {
     applyAntialiasingHint(painter, mAntialiased, QCP::aeAxes);
@@ -665,11 +267,12 @@ void QCPPolarAxisAngular::applyDefaultAntialiasingHint(QCPPainter* painter) cons
 /* inherits documentation from base class */
 void QCPPolarAxisAngular::draw(QCPPainter* painter)
 {
-    drawBackground(painter, mCenter, mRadius);
+    const QPointF center = mArea->center();
+    const double radius = mArea->radius();
 
     // draw baseline circle:
     painter->setPen(getBasePen());
-    painter->drawEllipse(mCenter, mRadius, mRadius);
+    painter->drawEllipse(center, radius, radius);
 
     // draw subticks:
     if (!mSubTickVector.isEmpty())
@@ -677,15 +280,15 @@ void QCPPolarAxisAngular::draw(QCPPainter* painter)
         painter->setPen(getSubTickPen());
         for (int i = 0; i < mSubTickVector.size(); ++i)
         {
-            painter->drawLine(mCenter + mSubTickVectorCosSin.at(i) * (mRadius - mSubTickLengthIn),
-                              mCenter + mSubTickVectorCosSin.at(i) * (mRadius + mSubTickLengthOut));
+            painter->drawLine(center + mSubTickVectorCosSin.at(i) * (radius - mSubTickLengthIn),
+                              center + mSubTickVectorCosSin.at(i) * (radius + mSubTickLengthOut));
         }
     }
 
     // draw ticks and labels:
     if (!mTickVector.isEmpty())
     {
-        mLabelPainter.setAnchorReference(mCenter);
+        mLabelPainter.setAnchorReference(center);
         mLabelPainter.setFont(getTickLabelFont());
         mLabelPainter.setColor(getTickLabelColor());
         const QPen ticksPen = getTickPen();
@@ -693,8 +296,8 @@ void QCPPolarAxisAngular::draw(QCPPainter* painter)
         for (int i = 0; i < mTickVector.size(); ++i)
         {
             const QPointF outerTick
-                = mCenter + mTickVectorCosSin.at(i) * (mRadius + mTickLengthOut);
-            painter->drawLine(mCenter + mTickVectorCosSin.at(i) * (mRadius - mTickLengthIn),
+                = center + mTickVectorCosSin.at(i) * (radius + mTickLengthOut);
+            painter->drawLine(center + mTickVectorCosSin.at(i) * (radius - mTickLengthIn),
                               outerTick);
             // draw tick labels:
             if (!mTickVectorLabels.isEmpty())
@@ -707,108 +310,6 @@ void QCPPolarAxisAngular::draw(QCPPainter* painter)
             }
         }
     }
-}
-
-/* inherits documentation from base class */
-QCP::Interaction QCPPolarAxisAngular::selectionCategory() const
-{
-    return QCP::iSelectAxes;
-}
-
-/*!
-  Sets \a pm as the axis background pixmap. The axis background pixmap will be drawn inside the
-  axis rect. Since axis rects place themselves on the "background" layer by default, the axis rect
-  backgrounds are usually drawn below everything else.
-
-  For cases where the provided pixmap doesn't have the same size as the axis rect, scaling can be
-  enabled with \ref setBackgroundScaled and the scaling mode (i.e. whether and how the aspect ratio
-  is preserved) can be set with \ref setBackgroundScaledMode. To set all these options in one call,
-  consider using the overloaded version of this function.
-
-  Below the pixmap, the axis rect may be optionally filled with a brush, if specified with \ref
-  setBackground(const QBrush &brush).
-
-  \see setBackgroundScaled, setBackgroundScaledMode, setBackground(const QBrush &brush)
-*/
-void QCPPolarAxisAngular::setBackground(const QPixmap& pm)
-{
-    if (pm.cacheKey() == mBackgroundPixmap.cacheKey())
-        return;
-    markDirty();
-    mBackgroundPixmap = pm;
-    mScaledBackgroundPixmap = QPixmap();
-}
-
-/*! \overload
-
-  Sets \a brush as the background brush. The axis rect background will be filled with this brush.
-  Since axis rects place themselves on the "background" layer by default, the axis rect backgrounds
-  are usually drawn below everything else.
-
-  The brush will be drawn before (under) any background pixmap, which may be specified with \ref
-  setBackground(const QPixmap &pm).
-
-  To disable drawing of a background brush, set \a brush to Qt::NoBrush.
-
-  \see setBackground(const QPixmap &pm)
-*/
-void QCPPolarAxisAngular::setBackground(const QBrush& brush)
-{
-    if (brush == mBackgroundBrush)
-        return;
-    markDirty();
-    mBackgroundBrush = brush;
-}
-
-/*! \overload
-
-  Allows setting the background pixmap of the axis rect, whether it shall be scaled and how it
-  shall be scaled in one call.
-
-  \see setBackground(const QPixmap &pm), setBackgroundScaled, setBackgroundScaledMode
-*/
-void QCPPolarAxisAngular::setBackground(const QPixmap& pm, bool scaled, Qt::AspectRatioMode mode)
-{
-    if (pm.cacheKey() == mBackgroundPixmap.cacheKey() && scaled == mBackgroundScaled
-        && mode == mBackgroundScaledMode)
-        return;
-    markDirty();
-    mBackgroundPixmap = pm;
-    mScaledBackgroundPixmap = QPixmap();
-    mBackgroundScaled = scaled;
-    mBackgroundScaledMode = mode;
-}
-
-/*!
-  Sets whether the axis background pixmap shall be scaled to fit the axis rect or not. If \a scaled
-  is set to true, you may control whether and how the aspect ratio of the original pixmap is
-  preserved with \ref setBackgroundScaledMode.
-
-  Note that the scaled version of the original pixmap is buffered, so there is no performance
-  penalty on replots. (Except when the axis rect dimensions are changed continuously.)
-
-  \see setBackground, setBackgroundScaledMode
-*/
-void QCPPolarAxisAngular::setBackgroundScaled(bool scaled)
-{
-    if (scaled == mBackgroundScaled)
-        return;
-    markDirty();
-    mBackgroundScaled = scaled;
-}
-
-/*!
-  If scaling of the axis background pixmap is enabled (\ref setBackgroundScaled), use this function
-  to define whether and how the aspect ratio of the original pixmap passed to \ref setBackground is
-  preserved.
-  \see setBackground, setBackgroundScaled
-*/
-void QCPPolarAxisAngular::setBackgroundScaledMode(Qt::AspectRatioMode mode)
-{
-    if (mode == mBackgroundScaledMode)
-        return;
-    markDirty();
-    mBackgroundScaledMode = mode;
 }
 
 void QCPPolarAxisAngular::setRangeDrag(bool enabled)
@@ -1535,62 +1036,6 @@ void QCPPolarAxisAngular::setSelectedSubTickPen(const QPen& pen)
 
 /*! \internal
 
-  Draws the background of this axis rect. It may consist of a background fill (a QBrush) and a
-  pixmap.
-
-  If a brush was given via \ref setBackground(const QBrush &brush), this function first draws an
-  according filling inside the axis rect with the provided \a painter.
-
-  Then, if a pixmap was provided via \ref setBackground, this function buffers the scaled version
-  depending on \ref setBackgroundScaled and \ref setBackgroundScaledMode and then draws it inside
-  the axis rect with the provided \a painter. The scaled version is buffered in
-  mScaledBackgroundPixmap to prevent expensive rescaling at every redraw. It is only updated, when
-  the axis rect has changed in a way that requires a rescale of the background pixmap (this is
-  dependent on the \ref setBackgroundScaledMode), or when a differend axis background pixmap was
-  set.
-
-  \see setBackground, setBackgroundScaled, setBackgroundScaledMode
-*/
-void QCPPolarAxisAngular::drawBackground(QCPPainter* painter, const QPointF& center, double radius)
-{
-    // draw background fill (don't use circular clip, looks bad):
-    if (mBackgroundBrush != Qt::NoBrush)
-    {
-        QPainterPath ellipsePath;
-        ellipsePath.addEllipse(center, radius, radius);
-        painter->fillPath(ellipsePath, mBackgroundBrush);
-    }
-
-    // draw background pixmap (on top of fill, if brush specified):
-    if (!mBackgroundPixmap.isNull())
-    {
-        QRegion clipCircle(center.x() - radius, center.y() - radius, qRound(2 * radius),
-                           qRound(2 * radius), QRegion::Ellipse);
-        QRegion originalClip = painter->clipRegion();
-        painter->setClipRegion(clipCircle);
-        if (mBackgroundScaled)
-        {
-            // check whether mScaledBackground needs to be updated:
-            QSize scaledSize(mBackgroundPixmap.size());
-            scaledSize.scale(mRect.size(), mBackgroundScaledMode);
-            if (mScaledBackgroundPixmap.size() != scaledSize)
-                mScaledBackgroundPixmap = mBackgroundPixmap.scaled(
-                    mRect.size(), mBackgroundScaledMode, Qt::SmoothTransformation);
-            painter->drawPixmap(mRect.topLeft() + QPoint(0, -1), mScaledBackgroundPixmap,
-                                QRect(0, 0, mRect.width(), mRect.height())
-                                    & mScaledBackgroundPixmap.rect());
-        }
-        else
-        {
-            painter->drawPixmap(mRect.topLeft() + QPoint(0, -1), mBackgroundPixmap,
-                                QRect(0, 0, mRect.width(), mRect.height()));
-        }
-        painter->setClipRegion(originalClip);
-    }
-}
-
-/*! \internal
-
   Prepares the internal tick vector, sub tick vector and tick label vector. This is done by calling
   QCPAxisTicker::generate on the currently installed ticker.
 
@@ -1601,7 +1046,7 @@ void QCPPolarAxisAngular::setupTickVectors()
 {
     if (!mParentPlot)
         return;
-    if ((!mTicks && !mTickLabels && !mGrid->visible()) || mRange.size() <= 0)
+    if ((!mTicks && !mTickLabels && !mArea->grid()->visible()) || mRange.size() <= 0)
         return;
 
     mSubTickVector.clear(); // since we might not pass it to mTicker->generate(), and we don't want
@@ -1696,202 +1141,9 @@ QColor QCPPolarAxisAngular::getLabelColor() const
     return mSelectedParts.testFlag(spAxisLabel) ? mSelectedLabelColor : mLabelColor;
 }
 
-/*! \internal
-
-  Event handler for when a mouse button is pressed on the axis rect. If the left mouse button is
-  pressed, the range dragging interaction is initialized (the actual range manipulation happens in
-  the \ref mouseMoveEvent).
-
-  The mDragging flag is set to true and some anchor points are set that are needed to determine the
-  distance the mouse was dragged in the mouse move/release events later.
-
-  \see mouseMoveEvent, mouseReleaseEvent
-*/
-void QCPPolarAxisAngular::mousePressEvent(QMouseEvent* event,
-                                          [[maybe_unused]] const QVariant& details)
-{
-    if (event->buttons() & Qt::LeftButton)
-    {
-        mDragging = true;
-        // initialize antialiasing backup in case we start dragging:
-        if (mParentPlot->noAntialiasingOnDrag())
-        {
-            mAADragBackup = mParentPlot->antialiasedElements();
-            mNotAADragBackup = mParentPlot->notAntialiasedElements();
-        }
-        // Mouse range dragging interaction:
-        if (mParentPlot->interactions().testFlag(QCP::iRangeDrag))
-        {
-            mDragAngularStart = range();
-            // Paired with its axis: a rangeChanged slot may remove an axis mid-drag.
-            mDragRadialStart.clear();
-            for (QCPPolarAxisRadial* axis : mRadialAxes)
-                mDragRadialStart.append({ axis, axis->range() });
-        }
-    }
-}
-
-/*! \internal
-
-  Event handler for when the mouse is moved on the axis rect. If range dragging was activated in a
-  preceding \ref mousePressEvent, the range is moved accordingly.
-
-  \see mousePressEvent, mouseReleaseEvent
-*/
-void QCPPolarAxisAngular::mouseMoveEvent(QMouseEvent* event,
-                                         [[maybe_unused]] const QPointF& startPos)
-{
-    bool doReplot = false;
-    const QPointer<QCPPolarAxisAngular> alive(this); // a rangeChanged slot may delete this axis
-    // Mouse range dragging interaction:
-    if (mDragging && mParentPlot->interactions().testFlag(QCP::iRangeDrag))
-    {
-        if (mRangeDrag)
-        {
-            doReplot = true;
-            double angleCoordStart, radiusCoordStart;
-            double angleCoord, radiusCoord;
-            pixelToCoord(startPos, angleCoordStart, radiusCoordStart);
-            pixelToCoord(event->pos(), angleCoord, radiusCoord);
-            double diff = angleCoordStart - angleCoord;
-            setRange(mDragAngularStart.lower + diff, mDragAngularStart.upper + diff);
-            if (!alive)
-                return;
-        }
-
-        const auto dragStart = mDragRadialStart; // a slot may delete this axis and the list
-        for (const auto& [ax, start] : dragStart)
-        {
-            if (!alive)
-                break;
-            if (!ax || !ax->rangeDrag())
-                continue;
-            doReplot = true;
-            double angleCoordStart, radiusCoordStart;
-            double angleCoord, radiusCoord;
-            ax->pixelToCoord(startPos, angleCoordStart, radiusCoordStart);
-            ax->pixelToCoord(event->pos(), angleCoord, radiusCoord);
-            if (ax->scaleType() == QCPPolarAxisRadial::stLinear)
-            {
-                double diff = radiusCoordStart - radiusCoord;
-                ax->setRange(start.lower + diff, start.upper + diff);
-            }
-            else if (ax->scaleType() == QCPPolarAxisRadial::stLogarithmic)
-            {
-                if (radiusCoord != 0)
-                {
-                    double diff = radiusCoordStart / radiusCoord;
-                    ax->setRange(start.lower * diff, start.upper * diff);
-                }
-            }
-        }
-
-        if (alive && doReplot) // if either vertical or horizontal drag was enabled, do a replot
-        {
-            if (mParentPlot->noAntialiasingOnDrag())
-                mParentPlot->setNotAntialiasedElements(QCP::aeAll);
-            mParentPlot->replot(QCustomPlot::rpQueuedReplot);
-        }
-    }
-}
-
-/* inherits documentation from base class */
-void QCPPolarAxisAngular::mouseReleaseEvent([[maybe_unused]] QMouseEvent* event,
-                                            [[maybe_unused]] const QPointF& startPos)
-{
-    mDragging = false;
-    if (mParentPlot->noAntialiasingOnDrag())
-    {
-        mParentPlot->setAntialiasedElements(mAADragBackup);
-        mParentPlot->setNotAntialiasedElements(mNotAADragBackup);
-    }
-}
-
-/*! \internal
-
-  Event handler for mouse wheel events. If rangeZoom is Qt::Horizontal, Qt::Vertical or both, the
-  ranges of the axes defined as rangeZoomHorzAxis and rangeZoomVertAxis are scaled. The center of
-  the scaling operation is the current cursor position inside the axis rect. The scaling factor is
-  dependent on the mouse wheel delta (which direction the wheel was rotated) to provide a natural
-  zooming feel. The Strength of the zoom can be controlled via \ref setRangeZoomFactor.
-
-  Note, that event->delta() is usually +/-120 for single rotation steps. However, if the mouse
-  wheel is turned rapidly, many steps may bunch up to one event, so the event->delta() may then be
-  multiples of 120. This is taken into account here, by calculating \a wheelSteps and using it as
-  exponent of the range zoom factor. This takes care of the wheel direction automatically, by
-  inverting the factor, when the wheel step is negative (f^-1 = 1/f).
-*/
-void QCPPolarAxisAngular::wheelEvent(QWheelEvent* event)
-{
-    bool doReplot = false;
-    const QPointer<QCPPolarAxisAngular> alive(this); // a rangeChanged slot may delete this axis
-    // Mouse range zooming interaction:
-    if (mParentPlot->interactions().testFlag(QCP::iRangeZoom))
-    {
-#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
-        const double delta = event->delta();
-#else
-        const double delta = event->angleDelta().y();
-#endif
-
-#if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
-        const QPointF pos = event->pos();
-#else
-        const QPointF pos = event->position();
-#endif
-        const double wheelSteps = delta / 120.0; // a single step delta is +/-120 usually
-        if (mRangeZoom)
-        {
-            double angleCoord, radiusCoord;
-            pixelToCoord(pos, angleCoord, radiusCoord);
-            scaleRange(qPow(mRangeZoomFactor, wheelSteps), angleCoord);
-            if (!alive)
-                return;
-        }
-
-        const QList<QPointer<QCPPolarAxisRadial>> axes(mRadialAxes.begin(), mRadialAxes.end());
-        for (const QPointer<QCPPolarAxisRadial>& ax : axes) // a slot may remove axes
-        {
-            if (!alive)
-                break;
-            if (!ax || !ax->rangeZoom())
-                continue;
-            doReplot = true;
-            double angleCoord, radiusCoord;
-            ax->pixelToCoord(pos, angleCoord, radiusCoord);
-            ax->scaleRange(qPow(ax->rangeZoomFactor(), wheelSteps), radiusCoord);
-        }
-    }
-    if (alive && doReplot)
-        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
-}
-
-bool QCPPolarAxisAngular::registerPolarGraph(QCPPolarGraph* graph)
-{
-    if (mGraphs.contains(graph))
-    {
-        qDebug() << Q_FUNC_INFO << "plottable already added:" << reinterpret_cast<quintptr>(graph);
-        return false;
-    }
-    if (graph->keyAxis() != this)
-    {
-        qDebug() << Q_FUNC_INFO
-                 << "plottable not created with this as axis:" << reinterpret_cast<quintptr>(graph);
-        return false;
-    }
-
-    mGraphs.append(graph);
-    // possibly add plottable to legend:
-    if (mParentPlot->autoAddPlottableToLegend())
-        graph->addToLegend();
-    if (!graph->layer()) // usually the layer is already set in the constructor of the plottable
-                         // (via QCPLayerable constructor)
-        graph->setLayer(mParentPlot->currentLayer());
-    return true;
-}
-
 void QCPPolarAxisAngular::emitRangeChanged(const QCPRange& oldRange)
 {
-    qcpEmitIf(this, mParentPlot, &QCPPolarAxisAngular::rangeChanged,
-              [this, range = mRange] { return mRange == range; }, mRange, oldRange);
+    qcpEmitIf(
+        this, mParentPlot, &QCPPolarAxisAngular::rangeChanged,
+        [this, range = mRange] { return mRange == range; }, mRange, oldRange);
 }

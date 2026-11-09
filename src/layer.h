@@ -26,14 +26,14 @@
 #ifndef QCP_LAYER_H
 #define QCP_LAYER_H
 
-#include <QSet>
 #include "spatial-index.h"
+#include <QSet>
 
+#include <QPointer>
 #include <cstdint>
 #include <functional>
 #include <optional>
 #include <vector>
-#include <QPointer>
 
 #include "global.h"
 #include "handle-ops.h"
@@ -133,7 +133,9 @@ protected:
 
     // non-virtual methods:
     void noteDirtied();
+
     [[nodiscard]] bool dirtiedAfterDraw() const { return mDirtyGeneration > mDrawnGeneration; }
+
     void draw(QCPPainter* painter);
     void drawToPaintBuffer();
     void addChild(QCPLayerable* layerable, bool prepend);
@@ -148,15 +150,17 @@ private:
     mutable std::vector<std::uint8_t> mItemKind;
     mutable std::vector<int> mItemGroup;
     mutable std::vector<std::uint8_t> mItemCandidates;
+
     struct ItemIndexGroup
     {
-        // QPointers: removeAxis() deletes an axis and this group outlives it until the next rebuild.
-        // A dead axis makes the group unusable, and its items are then simply not culled.
+        // QPointers: removeAxis() deletes an axis and this group outlives it until the next
+        // rebuild. A dead axis makes the group unusable, and its items are then simply not culled.
         QPointer<QCPAxis> keyAxis;
         QPointer<QCPAxis> valueAxis;
         QCPSpatialIndex index;
         double maxPad = 0.0;
     };
+
     mutable std::vector<ItemIndexGroup> mItemGroups;
     mutable std::vector<int> mItemSide;
     mutable bool mItemIndexDirty = true;
@@ -171,8 +175,8 @@ private:
     void noteItemExtentChanged(QCPAbstractItem* item);
 
     // The axes the item children of this layer follow: a range change on one of them marks this
-    // layer without walking every item of the plot. Rebuilt lazily from the child list; a moved item
-    // unions its own axes in, and a superset only costs a repaint.
+    // layer without walking every item of the plot. Rebuilt lazily from the child list; a moved
+    // item unions its own axes in, and a superset only costs a repaint.
     void rebuildItemAxes() const;
     void noteItemAxes(QCPAbstractItem* item);
     void collectItemAxes(QCPAbstractItem* item, std::vector<QPointer<QCPAxis>>& axes) const;
@@ -181,14 +185,14 @@ private:
     mutable bool mItemAxesDirty = true;
 
     // The plottable children, in child order. Frame code asks for them on every replot; a cast per
-    // child was a sixth of a frame on a layer of 10 000 items. Rebuilt lazily: a layerable joins its
-    // layer from the base constructor, before it is a plottable.
+    // child was a sixth of a frame on a layer of 10 000 items. Rebuilt lazily: a layerable joins
+    // its layer from the base constructor, before it is a plottable.
     [[nodiscard]] const QList<QCPAbstractPlottable*>& plottableChildren() const;
     mutable QList<QCPAbstractPlottable*> mPlottableChildren;
     mutable bool mPlottableChildrenDirty = true;
 
     friend class QCPAbstractItem;
-    friend class QCPAxis;     // a scale type change invalidates the item index
+    friend class QCPAxis; // a scale type change invalidates the item index
     friend class QCPAxisRect; // a range change asks which layers follow the axis
     friend class TestItemIndex;
 
@@ -250,6 +254,7 @@ public:
     Q_SLOT bool setLayer(QCPLayer* layer);
     bool setLayer(const QString& layerName);
     void setAntialiased(bool enabled);
+
     void setMouseTransparent(bool transparent) { mMouseTransparent = transparent; }
 
     // introduced virtual methods:
@@ -258,9 +263,11 @@ public:
 
     // non-property methods:
     [[nodiscard]] bool realVisibility() const;
+
     // False only when deselectEvent() would change nothing, so a deselect pass may skip this
     // layerable. The default answers "maybe"; items know exactly.
     [[nodiscard]] virtual bool mayBeSelected() const { return true; }
+
     // Schedules a full repaint of this layerable's layer next turn; a no-op without a plot or a
     // layer. GUI thread only. Virtual so an item can tell its layer that its extent may have
     // changed: an item that moves leaves the index and is tested one by one until the next rebuild.
@@ -310,6 +317,7 @@ private:
     friend class QCustomPlot;
     friend class QCPLayer;
     friend class QCPAxisRect;
+    friend class QCPArea; // it hands its inset layout a parent plot and itself as parent
 };
 
 #endif // QCP_LAYER_H

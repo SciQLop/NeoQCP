@@ -1,6 +1,7 @@
 #include "test-selection-model.h"
 #include "../misuse-recorder.h"
-#include "polar/layoutelement-angularaxis.h"
+#include "polar/angularaxis.h"
+#include "polar/polar-area.h"
 #include "polar/polargraph.h"
 #include "polar/radialaxis.h"
 #include <QSignalSpy>
@@ -88,11 +89,10 @@ Target targetFor(QCustomPlot* plot, const QString& name)
         return wholeObjectTarget(new QCPTextElement(plot, QStringLiteral("title")));
     if (name == QLatin1String("polarGraph"))
     {
-        QCPPolarAxisAngular* angular = plot->add<QCPPolarAxisAngular>(1, 0).get();
-        angular->radialAxis(0)->setRange(0, 10);
+        QCPPolarArea* area = plot->add<QCPPolarArea>(1, 0).get();
+        area->radialAxis(0)->setRange(0, 10);
         QCPPolarGraph* graph
-            = angular
-                  ->add<QCPPolarGraph>(QVector<double> { 0, 90, 180 }, QVector<double> { 1, 2, 3 })
+            = area->add<QCPPolarGraph>(QVector<double> { 0, 90, 180 }, QVector<double> { 1, 2, 3 })
                   .get();
         return { graph, [graph] { return graph->selected(); },
                  [graph] { graph->setSelection(QCPDataSelection(QCPDataRange(0, 2))); },
@@ -101,12 +101,12 @@ Target targetFor(QCustomPlot* plot, const QString& name)
     }
     if (name == QLatin1String("polarAxisAngular"))
     {
-        QCPPolarAxisAngular* angular = plot->add<QCPPolarAxisAngular>(1, 0).get();
-        return partsTarget(angular, QCPPolarAxisAngular::spAxis);
+        QCPPolarArea* area = plot->add<QCPPolarArea>(1, 0).get();
+        return partsTarget(area->angularAxis(), QCPPolarAxisAngular::spAxis);
     }
     Q_ASSERT(name == QLatin1String("polarAxisRadial"));
-    QCPPolarAxisAngular* angular = plot->add<QCPPolarAxisAngular>(1, 0).get();
-    return partsTarget(angular->radialAxis(0), QCPPolarAxisRadial::spAxis);
+    QCPPolarArea* area = plot->add<QCPPolarArea>(1, 0).get();
+    return partsTarget(area->radialAxis(0), QCPPolarAxisRadial::spAxis);
 }
 
 QPoint pixelOf(QCustomPlot* plot, double key, double value)

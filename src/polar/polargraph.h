@@ -35,7 +35,7 @@
 #include "../scatterstyle.h"
 #include "../selection.h"
 #include "../vector2d.h"
-#include "layoutelement-angularaxis.h"
+#include "angularaxis.h"
 #include "radialaxis.h"
 
 class QCPPainter;
@@ -246,6 +246,7 @@ private:
 
     friend class QCPPolarLegendItem;
     friend class QCPPolarAxisAngular;
+    friend class QCPPolarArea; // it unlists a graph that a slot of a range change deletes
 };
 
 // The handle of QCPPolarGraph: what add<T>() returns for it.
@@ -255,43 +256,51 @@ class QCPPolarGraphOps : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPPolarGra
     using Base = QCPLayerableOps<T, qcp::OpsRet<Self, QCPPolarGraphOps<T>>>;
 
 public:
-    using typename Base::Ret;
     using Base::Base;
+    using typename Base::Ret;
 
     Ret setName(const QString& name)
     {
         return this->apply([&](T& o) { o.setName(name); });
     }
+
     Ret setPen(const QPen& pen)
     {
         return this->apply([&](T& o) { o.setPen(pen); });
     }
+
     Ret setBrush(const QBrush& brush)
     {
         return this->apply([&](T& o) { o.setBrush(brush); });
     }
+
     Ret setPeriodic(bool enabled)
     {
         return this->apply([&](T& o) { o.setPeriodic(enabled); });
     }
+
     Ret setLineStyle(QCPPolarGraph::LineStyle style)
     {
         return this->apply([&](T& o) { o.setLineStyle(style); });
     }
+
     Ret setScatterStyle(const QCPScatterStyle& style)
     {
         return this->apply([&](T& o) { o.setScatterStyle(style); });
     }
+
     Ret setAntialiasedFill(bool enabled)
     {
         return this->apply([&](T& o) { o.setAntialiasedFill(enabled); });
     }
+
     Ret setAntialiasedScatters(bool enabled)
     {
         return this->apply([&](T& o) { o.setAntialiasedScatters(enabled); });
     }
+
     Ret setData(const QVector<double>& keys, const QVector<double>& values,
-                 bool alreadySorted = false)
+                bool alreadySorted = false)
     {
         return this->apply([&](T& o) { o.setData(keys, values, alreadySorted); });
     }

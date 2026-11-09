@@ -26,17 +26,17 @@
 #include "layoutelement-axisrect.h"
 #include "layoutelement-colorscale.h"
 
+#include "../Profiling.hpp"
 #include "../axis/axis.h"
 #include "../axis/axisticker.h"
 #include "../core.h"
-#include "../misuse.h"
 #include "../items/item.h"
+#include "../misuse.h"
 #include "../painting/painter.h"
-#include "../plottables/plottable.h"
 #include "../plottables/plottable-graph.h"
-#include "../Profiling.hpp"
-#include <algorithm>
+#include "../plottables/plottable.h"
 #include <QSet>
+#include <algorithm>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPAxisRect
@@ -176,11 +176,7 @@ bool beingDestroyed(const QCustomPlot* plot)
   sides, the top and right axes are set invisible initially.
 */
 QCPAxisRect::QCPAxisRect(QCustomPlot* parentPlot, bool setupDefaultAxes)
-        : QCPLayoutElement(parentPlot)
-        , mBackgroundBrush(Qt::NoBrush)
-        , mBackgroundScaled(true)
-        , mBackgroundScaledMode(Qt::KeepAspectRatioByExpanding)
-        , mInsetLayout(new QCPLayoutInset)
+        : QCPArea(parentPlot)
         , mRangeDrag(Qt::Horizontal | Qt::Vertical)
         , mRangeZoom(Qt::Horizontal | Qt::Vertical)
         , mRangeZoomFactorHorz(0.85)
@@ -189,18 +185,17 @@ QCPAxisRect::QCPAxisRect(QCustomPlot* parentPlot, bool setupDefaultAxes)
 {
     mWheelZoomRestoreTimer.setSingleShot(true);
     mWheelZoomRestoreTimer.setInterval(300);
-    connect(&mWheelZoomRestoreTimer, &QTimer::timeout, this, [this]() {
-        if (mWheelZooming)
-        {
-            mWheelZooming = false;
-            mParentPlot->setAntialiasedElements(mAAWheelBackup);
-            mParentPlot->setNotAntialiasedElements(mNotAAWheelBackup);
-            mParentPlot->replot(QCustomPlot::rpQueuedReplot);
-        }
-    });
-    mInsetLayout->initializeParentPlot(mParentPlot);
-    mInsetLayout->setParentLayerable(this);
-    mInsetLayout->setParent(this);
+    connect(&mWheelZoomRestoreTimer, &QTimer::timeout, this,
+            [this]()
+            {
+                if (mWheelZooming)
+                {
+                    mWheelZooming = false;
+                    mParentPlot->setAntialiasedElements(mAAWheelBackup);
+                    mParentPlot->setNotAntialiasedElements(mNotAAWheelBackup);
+                    mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+                }
+            });
 
     setMinimumSize(50, 50);
     setMinimumMargins(QMargins(15, 15, 15, 15));
@@ -252,9 +247,8 @@ QCPAxisRect::~QCPAxisRect()
             mParentPlot->setNotAntialiasedElements(mNotAADragBackup);
         }
     }
-    delete mInsetLayout;
-    mInsetLayout = nullptr;
-
+    // Elements leave the inset layout by emitting, so it goes while the plot still delivers.
+    destroyInsetLayout();
     // The rect owns its scale: it goes with the rect, and its users detach (they emit inside the
     // scope above).
     if (mColorScale)
@@ -490,7 +484,8 @@ bool QCPAxisRect::unlistAxis(QCPAxis* axis)
         QList<QCPAxis*>& sideAxes = it.value();
         if (!sideAxes.contains(axis))
             continue;
-        if (alive && sideAxes.first() == axis && sideAxes.size() > 1) // the next axis inherits the offset
+        if (alive && sideAxes.first() == axis
+            && sideAxes.size() > 1) // the next axis inherits the offset
             sideAxes[1]->setOffset(axis->offset());
         sideAxes.removeOne(axis);
         if (plot)
@@ -522,8 +517,8 @@ void QCPAxisRect::markItemsUsingAxisDirty(const QCPAxis* axis)
 {
     if (!mParentPlot || !axis)
         return;
-    // Each layer knows which axes its items follow (and the axes of the items their anchors follow):
-    // a range change marks those layers, not every item of the plot.
+    // Each layer knows which axes its items follow (and the axes of the items their anchors
+    // follow): a range change marks those layers, not every item of the plot.
     for (QCPLayer* layer : std::as_const(mParentPlot->mLayers))
         if (layer->itemsUseAxis(axis))
             layer->markDirty();
@@ -603,14 +598,17 @@ void QCPAxisRect::zoom(const QRectF& pixelRect, const QList<QCPAxis*>& affectedA
     QList<QPointer<QCPAxis>> axes;
     for (QCPAxis* axis : moveRepresentatives(affectedAxes))
         axes.append(axis);
-    forEachAxis(this, axes, [&pixelRect](QCPAxis* axis) {
-        const QCPRange pixelRange = axis->orientation() == Qt::Horizontal
-            ? QCPRange(pixelRect.left(), pixelRect.right())
-            : QCPRange(pixelRect.top(), pixelRect.bottom());
-        QCPAxis* target = axis->moveTarget(); // a linked axis zooms its source
-        target->setRange(target->pixelToCoord(axis->pixelOnMoveTarget(pixelRange.lower)),
-                         target->pixelToCoord(axis->pixelOnMoveTarget(pixelRange.upper)));
-    });
+    forEachAxis(this, axes,
+                [&pixelRect](QCPAxis* axis)
+                {
+                    const QCPRange pixelRange = axis->orientation() == Qt::Horizontal
+                        ? QCPRange(pixelRect.left(), pixelRect.right())
+                        : QCPRange(pixelRect.top(), pixelRect.bottom());
+                    QCPAxis* target = axis->moveTarget(); // a linked axis zooms its source
+                    target->setRange(
+                        target->pixelToCoord(axis->pixelOnMoveTarget(pixelRange.lower)),
+                        target->pixelToCoord(axis->pixelOnMoveTarget(pixelRange.upper)));
+                });
 }
 
 /*!
@@ -794,7 +792,7 @@ QList<QCPAbstractItem*> QCPAxisRect::items() const
 QCPColorScaleOps<QCPColorScale> QCPAxisRect::colorScale()
 {
     if (!mayOwnColorScale() || !mParentPlot)
-        return {};
+        return { };
     if (!mColorScale)
     {
         mColorScale = new QCPColorScale(mParentPlot);
@@ -851,15 +849,15 @@ void QCPAxisRect::placeColorScale()
             scaleOuterRect = QRect(outerRect().left(), rect().top(), extent, rect().height());
             break;
         case QCPAxis::atBottom:
-            scaleOuterRect = QRect(rect().left(), outerRect().bottom() - extent + 1, rect().width(),
-                                   extent);
+            scaleOuterRect
+                = QRect(rect().left(), outerRect().bottom() - extent + 1, rect().width(), extent);
             break;
         case QCPAxis::atTop:
             scaleOuterRect = QRect(rect().left(), outerRect().top(), rect().width(), extent);
             break;
         default:
-            scaleOuterRect = QRect(outerRect().right() - extent + 1, rect().top(), extent,
-                                   rect().height());
+            scaleOuterRect
+                = QRect(outerRect().right() - extent + 1, rect().top(), extent, rect().height());
             break;
     }
     mColorScale->setOuterRect(scaleOuterRect);
@@ -879,9 +877,8 @@ void QCPAxisRect::colorScaleUsersChanged()
   This method is called automatically upon replot and doesn't need to be called by users of
   QCPAxisRect.
 
-  Calls the base class implementation to update the margins (see \ref QCPLayoutElement::update),
-  and finally passes the \ref rect to the inset layout (\ref insetLayout) and calls its
-  QCPInsetLayout::update function.
+  Calls the base class implementation to update the margins (see \ref QCPArea::update), which also
+  lays out the inset layout inside the rect, then prepares the axes' ticks.
 
   \seebaseclassmethod
 */
@@ -894,24 +891,11 @@ void QCPAxisRect::update(UpdatePhase phase)
     if (scale && phase == upMargins)
         scale->update(phase); // its minimum size is the margin this rect has to add
 
-    QCPLayoutElement::update(phase);
+    QCPArea::update(phase);
 
-    switch (phase)
-    {
-        case upPreparation:
-        {
-            for (QCPAxis* axis : axes())
-                axis->setupTickVectors();
-            break;
-        }
-        case upLayout:
-        {
-            mInsetLayout->setOuterRect(rect());
-            break;
-        }
-        default:
-            break;
-    }
+    if (phase == upPreparation)
+        for (QCPAxis* axis : axes())
+            axis->setupTickVectors();
 
     if (scale)
     {
@@ -920,131 +904,6 @@ void QCPAxisRect::update(UpdatePhase phase)
         if (phase != upMargins) // already done before the margins were computed
             scale->update(phase);
     }
-
-    // pass update call on to inset layout (doesn't happen automatically, because QCPAxisRect
-    // doesn't derive from QCPLayout):
-    mInsetLayout->update(phase);
-}
-
-/* inherits documentation from base class */
-QList<QCPLayoutElement*> QCPAxisRect::elements(bool recursive) const
-{
-    QList<QCPLayoutElement*> result;
-    if (mInsetLayout)
-    {
-        result << mInsetLayout;
-        if (recursive)
-            result << mInsetLayout->elements(recursive);
-    }
-    return result;
-}
-
-/* inherits documentation from base class */
-void QCPAxisRect::applyDefaultAntialiasingHint(QCPPainter* painter) const
-{
-    painter->setAntialiasing(false);
-}
-
-/* inherits documentation from base class */
-void QCPAxisRect::draw(QCPPainter* painter)
-{
-    drawBackground(painter);
-}
-
-/*!
-  Sets \a pm as the axis background pixmap. The axis background pixmap will be drawn inside the
-  axis rect. Since axis rects place themselves on the "background" layer by default, the axis rect
-  backgrounds are usually drawn below everything else.
-
-  For cases where the provided pixmap doesn't have the same size as the axis rect, scaling can be
-  enabled with \ref setBackgroundScaled and the scaling mode (i.e. whether and how the aspect ratio
-  is preserved) can be set with \ref setBackgroundScaledMode. To set all these options in one call,
-  consider using the overloaded version of this function.
-
-  Below the pixmap, the axis rect may be optionally filled with a brush, if specified with \ref
-  setBackground(const QBrush &brush).
-
-  \see setBackgroundScaled, setBackgroundScaledMode, setBackground(const QBrush &brush)
-*/
-void QCPAxisRect::setBackground(const QPixmap& pm)
-{
-    if (pm.cacheKey() == mBackgroundPixmap.cacheKey())
-        return;
-    mBackgroundPixmap = pm;
-    mScaledBackgroundPixmap = QPixmap();
-    markDirty();
-}
-
-/*! \overload
-
-  Sets \a brush as the background brush. The axis rect background will be filled with this brush.
-  Since axis rects place themselves on the "background" layer by default, the axis rect backgrounds
-  are usually drawn below everything else.
-
-  The brush will be drawn before (under) any background pixmap, which may be specified with \ref
-  setBackground(const QPixmap &pm).
-
-  To disable drawing of a background brush, set \a brush to Qt::NoBrush.
-
-  \see setBackground(const QPixmap &pm)
-*/
-void QCPAxisRect::setBackground(const QBrush& brush)
-{
-    if (brush == mBackgroundBrush)
-        return;
-    mBackgroundBrush = brush;
-    markDirty();
-}
-
-/*! \overload
-
-  Allows setting the background pixmap of the axis rect, whether it shall be scaled and how it
-  shall be scaled in one call.
-
-  \see setBackground(const QPixmap &pm), setBackgroundScaled, setBackgroundScaledMode
-*/
-void QCPAxisRect::setBackground(const QPixmap& pm, bool scaled, Qt::AspectRatioMode mode)
-{
-    if (pm.cacheKey() == mBackgroundPixmap.cacheKey() && scaled == mBackgroundScaled
-        && mode == mBackgroundScaledMode)
-        return;
-    mBackgroundPixmap = pm;
-    mScaledBackgroundPixmap = QPixmap();
-    mBackgroundScaled = scaled;
-    mBackgroundScaledMode = mode;
-    markDirty();
-}
-
-/*!
-  Sets whether the axis background pixmap shall be scaled to fit the axis rect or not. If \a scaled
-  is set to true, you may control whether and how the aspect ratio of the original pixmap is
-  preserved with \ref setBackgroundScaledMode.
-
-  Note that the scaled version of the original pixmap is buffered, so there is no performance
-  penalty on replots. (Except when the axis rect dimensions are changed continuously.)
-
-  \see setBackground, setBackgroundScaledMode
-*/
-void QCPAxisRect::setBackgroundScaled(bool scaled)
-{
-    if (scaled == mBackgroundScaled)
-        return;
-    mBackgroundScaled = scaled;
-    markDirty();
-}
-
-/*!
-  If scaling of the axis background pixmap is enabled (\ref setBackgroundScaled), use this function
-  to define whether and how the aspect ratio of the original pixmap passed to \ref setBackground is
-  preserved.
-  \see setBackground, setBackgroundScaled
-*/
-void QCPAxisRect::setBackgroundScaledMode(Qt::AspectRatioMode mode)
-{
-    if (mode == mBackgroundScaledMode)
-        return;
-    mBackgroundScaledMode = mode;
-    markDirty();
 }
 
 /*! \internal
@@ -1431,53 +1290,6 @@ void QCPAxisRect::setRangeZoomFactor(double factor)
 
 /*! \internal
 
-  Draws the background of this axis rect. It may consist of a background fill (a QBrush) and a
-  pixmap.
-
-  If a brush was given via \ref setBackground(const QBrush &brush), this function first draws an
-  according filling inside the axis rect with the provided \a painter.
-
-  Then, if a pixmap was provided via \ref setBackground, this function buffers the scaled version
-  depending on \ref setBackgroundScaled and \ref setBackgroundScaledMode and then draws it inside
-  the axis rect with the provided \a painter. The scaled version is buffered in
-  mScaledBackgroundPixmap to prevent expensive rescaling at every redraw. It is only updated, when
-  the axis rect has changed in a way that requires a rescale of the background pixmap (this is
-  dependent on the \ref setBackgroundScaledMode), or when a differend axis background pixmap was
-  set.
-
-  \see setBackground, setBackgroundScaled, setBackgroundScaledMode
-*/
-void QCPAxisRect::drawBackground(QCPPainter* painter)
-{
-    // draw background fill:
-    if (mBackgroundBrush != Qt::NoBrush)
-        painter->fillRect(mRect, mBackgroundBrush);
-
-    // draw background pixmap (on top of fill, if brush specified):
-    if (!mBackgroundPixmap.isNull())
-    {
-        if (mBackgroundScaled)
-        {
-            // check whether mScaledBackground needs to be updated:
-            QSize scaledSize(mBackgroundPixmap.size());
-            scaledSize.scale(mRect.size(), mBackgroundScaledMode);
-            if (mScaledBackgroundPixmap.size() != scaledSize)
-                mScaledBackgroundPixmap = mBackgroundPixmap.scaled(
-                    mRect.size(), mBackgroundScaledMode, Qt::SmoothTransformation);
-            painter->drawPixmap(mRect.topLeft() + QPoint(0, -1), mScaledBackgroundPixmap,
-                                QRect(0, 0, mRect.width(), mRect.height())
-                                    & mScaledBackgroundPixmap.rect());
-        }
-        else
-        {
-            painter->drawPixmap(mRect.topLeft() + QPoint(0, -1), mBackgroundPixmap,
-                                QRect(0, 0, mRect.width(), mRect.height()));
-        }
-    }
-}
-
-/*! \internal
-
   This function makes sure multiple axes on the side specified with \a type don't collide, but are
   distributed according to their respective space requirement (QCPAxis::calculateMargin).
 
@@ -1522,7 +1334,8 @@ int QCPAxisRect::calculateAutoMargin(QCP::MarginSide side)
     // note: only need to look at the last (outer most) axis to determine the total margin, due to
     // updateAxisOffset call
     const QList<QCPAxis*> axesList = mAxes.value(QCPAxis::marginSideToAxisType(side));
-    int margin = axesList.isEmpty() ? 0 : axesList.last()->offset() + axesList.last()->calculateMargin();
+    int margin
+        = axesList.isEmpty() ? 0 : axesList.last()->offset() + axesList.last()->calculateMargin();
     if (const QCPColorScale* scale = usedColorScale())
         if (QCPAxis::marginSideToAxisType(side) == scale->type())
             margin += colorScaleExtent();
@@ -1678,8 +1491,9 @@ void followPointer(QCPAxis* axis, double pixels)
 QPointF swipePixels(const QWheelEvent* event)
 {
     constexpr double pixelsPerWheelStep = 50.0;
-    return event->pixelDelta().isNull() ? QPointF(event->angleDelta()) * (pixelsPerWheelStep / 120.0)
-                                        : QPointF(event->pixelDelta());
+    return event->pixelDelta().isNull()
+        ? QPointF(event->angleDelta()) * (pixelsPerWheelStep / 120.0)
+        : QPointF(event->pixelDelta());
 }
 }
 
@@ -1715,20 +1529,26 @@ void QCPAxisRect::zoomAxesAt(const QPointF& pos, double horizontalFactor, double
     {
         for (QCPAxis* axis : moveRepresentatives(effectiveRangeAxes(false, Qt::Horizontal)))
             moved.append(axis);
-        forEachAxis(alive, moved, [&](QCPAxis* axis) {
-            QCPAxis* target = axis->moveTarget(); // a linked axis zooms its source
-            target->scaleRange(horizontalFactor, target->pixelToCoord(axis->pixelOnMoveTarget(pos.x())));
-        });
+        forEachAxis(alive, moved,
+                    [&](QCPAxis* axis)
+                    {
+                        QCPAxis* target = axis->moveTarget(); // a linked axis zooms its source
+                        target->scaleRange(horizontalFactor,
+                                           target->pixelToCoord(axis->pixelOnMoveTarget(pos.x())));
+                    });
     }
     if (alive && mRangeZoom.testFlag(Qt::Vertical))
     {
         moved.clear();
         for (QCPAxis* axis : moveRepresentatives(effectiveRangeAxes(false, Qt::Vertical)))
             moved.append(axis);
-        forEachAxis(alive, moved, [&](QCPAxis* axis) {
-            QCPAxis* target = axis->moveTarget(); // a linked axis zooms its source
-            target->scaleRange(verticalFactor, target->pixelToCoord(axis->pixelOnMoveTarget(pos.y())));
-        });
+        forEachAxis(alive, moved,
+                    [&](QCPAxis* axis)
+                    {
+                        QCPAxis* target = axis->moveTarget(); // a linked axis zooms its source
+                        target->scaleRange(verticalFactor,
+                                           target->pixelToCoord(axis->pixelOnMoveTarget(pos.y())));
+                    });
     }
 }
 
@@ -1736,8 +1556,8 @@ void QCPAxisRect::wheelEvent(QWheelEvent* event)
 {
     PROFILE_HERE_N("QCPAxisRect::wheelEvent");
     // A browser pinch can come with a pixel delta only.
-    const double delta = event->angleDelta().y() != 0 ? event->angleDelta().y()
-                                                       : event->pixelDelta().y();
+    const double delta
+        = event->angleDelta().y() != 0 ? event->angleDelta().y() : event->pixelDelta().y();
     const QPointF pos = event->position();
 
     // With gestures, a swipe pans; a pinch arrives as Ctrl+wheel and zooms below.
@@ -1766,7 +1586,8 @@ void QCPAxisRect::wheelEvent(QWheelEvent* event)
                     mWheelZooming = true;
                     // During a drag the plot shows the drag's forced state.
                     const bool dragForced = mDragging && mParentPlot->noAntialiasingOnDrag();
-                    mAAWheelBackup = dragForced ? mAADragBackup : mParentPlot->antialiasedElements();
+                    mAAWheelBackup
+                        = dragForced ? mAADragBackup : mParentPlot->antialiasedElements();
                     mNotAAWheelBackup
                         = dragForced ? mNotAADragBackup : mParentPlot->notAntialiasedElements();
                 }
@@ -1799,7 +1620,8 @@ void QCPAxisRect::markAffectedLayersDirty(bool invalidate)
     // Collect unique layers from axes, grids, and plottables in this rect.
     // Typically <=4 unique layers, so linear scan is fine.
     QVarLengthArray<QCPLayer*, 8> seen;
-    auto markOnce = [&](QCPLayer* l) {
+    auto markOnce = [&](QCPLayer* l)
+    {
         if (l && !seen.contains(l))
         {
             seen.append(l);

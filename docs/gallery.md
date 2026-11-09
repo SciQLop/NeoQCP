@@ -227,7 +227,7 @@ Try it online
 The gain of a 16-element antenna array steered 20° off axis, in decibels.
 A Hann taper widens the main lobe but pushes the side lobes far down.
 
-- `QCPPolarAxisAngular` and `QCPPolarGraph` replace the usual axis rect ({doc}`polar`).
+- `QCPPolarArea`, `QCPPolarAxisAngular` and `QCPPolarGraph` replace the usual axis rect ({doc}`polar`).
 - The radial axis runs from -50 dB at the centre to 0 dB at the rim.
 
 ![The radiation pattern of an antenna array](images/gallery-antenna-pattern.png)

@@ -68,6 +68,7 @@ test_srcs = [
     'test-drawable/test-drawable.cpp',
     'test-hit-rule/test-hit-rule.cpp',
     'test-selection-model/test-selection-model.cpp',
+    'test-polar/test-polar.cpp',
 ]
 
 test_headers = [
@@ -134,6 +135,7 @@ test_headers = [
     'test-drawable/test-drawable.h',
     'test-hit-rule/test-hit-rule.h',
     'test-selection-model/test-selection-model.h',
+    'test-polar/test-polar.h',
 ]
 test_moc_files = qtmod.compile_moc(headers : test_headers)
 

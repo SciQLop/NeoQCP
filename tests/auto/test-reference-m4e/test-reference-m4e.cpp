@@ -329,12 +329,12 @@ QImage spanScene(const char* kind)
         });
 }
 
-QCPPolarAxisAngular* polarAxis(QCustomPlot& plot)
+QCPPolarArea* polarArea(QCustomPlot& plot)
 {
     plot.plotLayout()->clear();
-    auto* angular = new QCPPolarAxisAngular(&plot);
-    plot.plotLayout()->addElement(0, 0, angular);
-    return angular;
+    auto* area = new QCPPolarArea(&plot);
+    plot.plotLayout()->addElement(0, 0, area);
+    return area;
 }
 
 QImage polarScene(const char* kind)
@@ -345,8 +345,9 @@ QImage polarScene(const char* kind)
         {
             if (name == QLatin1String("polar-basic"))
             {
-                QCPPolarAxisAngular* angular = polarAxis(plot);
-                QCPPolarAxisRadial* radial = angular->radialAxis();
+                QCPPolarArea* area = polarArea(plot);
+                QCPPolarAxisAngular* angular = area->angularAxis();
+                QCPPolarAxisRadial* radial = area->radialAxis();
                 angular->setRange(0, 360);
                 radial->setRange(0, 1.05);
                 const QList<std::pair<double, QColor>> patterns {
@@ -369,30 +370,33 @@ QImage polarScene(const char* kind)
             }
             else if (name == QLatin1String("polar-radians"))
             {
-                QCPPolarAxisAngular* angular = polarAxis(plot);
+                QCPPolarArea* area = polarArea(plot);
+                QCPPolarAxisAngular* angular = area->angularAxis();
+                QCPPolarAxisRadial* radial = area->radialAxis();
                 angular->setAngle(0);
                 angular->setRangeReversed(true);
                 angular->setRange(0, 2 * std::numbers::pi);
                 auto ticker = QSharedPointer<QCPAxisTickerPi>::create();
                 ticker->setTickCount(8);
                 angular->setTicker(ticker);
-                angular->grid()->setSubGridType(QCPPolarGrid::gtAll);
-                angular->radialAxis()->setRange(0, 1);
+                area->grid()->setSubGridType(QCPPolarGrid::gtAll);
+                radial->setRange(0, 1);
                 QVector<double> theta(721), r(721);
                 for (int i = 0; i <= 720; ++i)
                 {
                     theta[i] = i * std::numbers::pi / 360;
                     r[i] = std::abs(std::cos(3 * theta[i]));
                 }
-                auto* rose = new QCPPolarGraph(angular, angular->radialAxis());
+                auto* rose = new QCPPolarGraph(angular, radial);
                 rose->setData(theta, r);
                 rose->setPen(QPen(QColor(148, 103, 189), 2));
                 rose->setBrush(QColor(148, 103, 189, 60));
             }
             else if (name == QLatin1String("polar-gallery"))
             {
-                QCPPolarAxisAngular* angular = polarAxis(plot);
-                QCPPolarAxisRadial* radial = angular->radialAxis();
+                QCPPolarArea* area = polarArea(plot);
+                QCPPolarAxisAngular* angular = area->angularAxis();
+                QCPPolarAxisRadial* radial = area->radialAxis();
                 angular->setRange(0, 360);
                 radial->setRange(-50, 0);
                 radial->setLabel(QStringLiteral("gain [dB]"));
@@ -437,8 +441,9 @@ QImage polarScene(const char* kind)
             }
             else if (name == QLatin1String("polar-log"))
             {
-                QCPPolarAxisAngular* angular = polarAxis(plot);
-                QCPPolarAxisRadial* radial = angular->radialAxis();
+                QCPPolarArea* area = polarArea(plot);
+                QCPPolarAxisAngular* angular = area->angularAxis();
+                QCPPolarAxisRadial* radial = area->radialAxis();
                 angular->setRange(0, 360);
                 radial->setRange(1, 1000);
                 radial->setScaleType(QCPPolarAxisRadial::stLogarithmic);
@@ -451,14 +456,15 @@ QImage polarScene(const char* kind)
                     angle[i] = i;
                     r[i] = std::pow(10.0, 1.5 + 1.4 * std::sin(i * std::numbers::pi / 90));
                 }
-                auto* graph = new QCPPolarGraph(angular, angular->radialAxis());
+                auto* graph = new QCPPolarGraph(angular, radial);
                 graph->setData(angle, r);
                 graph->setPen(QPen(QColor(20, 120, 140), 2));
             }
             else if (name == QLatin1String("polar-rotated"))
             {
-                QCPPolarAxisAngular* angular = polarAxis(plot);
-                QCPPolarAxisRadial* radial = angular->radialAxis();
+                QCPPolarArea* area = polarArea(plot);
+                QCPPolarAxisAngular* angular = area->angularAxis();
+                QCPPolarAxisRadial* radial = area->radialAxis();
                 angular->setAngle(30);
                 angular->setRangeReversed(true);
                 angular->setRange(0, 360);
@@ -475,8 +481,9 @@ QImage polarScene(const char* kind)
             }
             else if (name == QLatin1String("polar-axis-selected"))
             {
-                QCPPolarAxisAngular* angular = polarAxis(plot);
-                QCPPolarAxisRadial* radial = angular->radialAxis();
+                QCPPolarArea* area = polarArea(plot);
+                QCPPolarAxisAngular* angular = area->angularAxis();
+                QCPPolarAxisRadial* radial = area->radialAxis();
                 angular->setRange(0, 360);
                 radial->setRange(0, 1);
                 QVector<double> angle(361), r(361);

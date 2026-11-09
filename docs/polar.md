@@ -8,15 +8,16 @@ It works, but it is smaller than the Cartesian side: one graph type, no selectio
 
 ## The pieces
 
-- <a href="api/classQCPPolarAxisAngular.html">QCPPolarAxisAngular</a> is the angle axis. It is a layout element, like an axis rect: it takes a cell in the plot layout and draws the circle.
-- <a href="api/classQCPPolarAxisRadial.html">QCPPolarAxisRadial</a> is the distance axis, drawn as a spoke from the centre. The angular axis creates one; `radialAxis()` returns it.
-- <a href="api/classQCPPolarGrid.html">QCPPolarGrid</a> draws the circles and spokes. The angular axis owns it; `grid()` returns it.
+- <a href="api/classQCPPolarArea.html">QCPPolarArea</a> takes a cell in the plot layout, like an axis rect, and owns the polar axes and the grid. It carries the area's background and inset layout.
+- <a href="api/classQCPPolarAxisAngular.html">QCPPolarAxisAngular</a> is the angle axis: it draws the circle. The area creates one; `angularAxis()` returns it.
+- <a href="api/classQCPPolarAxisRadial.html">QCPPolarAxisRadial</a> is the distance axis, drawn as a spoke from the centre. The area creates one; `radialAxis()` returns it.
+- <a href="api/classQCPPolarGrid.html">QCPPolarGrid</a> draws the circles and spokes. The area owns it; `grid()` returns it.
 - <a href="api/classQCPPolarGraph.html">QCPPolarGraph</a> is the data: a line through (angle, radius) points.
 
 ## A first polar plot
 
-A polar axis does not share the default axis rect.
-It replaces it: clear the plot layout, then add the angular axis in its place.
+A polar area does not share the default axis rect.
+It replaces it: clear the plot layout, then add the polar area in its place.
 
 ```{literalinclude} snippets/polar.cpp
 :start-after: // [polar_basic]
@@ -28,7 +29,7 @@ It replaces it: clear the plot layout, then add the angular axis in its place.
 ![Three microphone pickup patterns](images/polar-basic.png)
 
 - `plotLayout()->clear()` deletes the default axis rect, with its four axes and the legend. `xAxis`, `yAxis` and `legend` become null.
-- `angular->add<QCPPolarGraph>()` creates a graph on the angular axis's first radial axis and registers it. The plot owns it.
+- `area->add<QCPPolarGraph>()` creates a graph on the area's first radial axis and registers it. The plot owns it.
 - `setData(angles, radii)` copies the points. The angles are in the angular axis' coordinates: degrees here.
 - `setPen()`, `setBrush()` and `setScatterStyle()` work as on a `QCPGraph`. A brush fills the closed curve.
 - `setLineStyle(QCPPolarGraph::lsNone)` shows the points only. Give them a scatter style, or nothing is drawn.
@@ -72,7 +73,7 @@ The angular axis has most of those setters too, for its tick labels around the c
 
 ## The grid
 
-`angularAxis->grid()` controls the circles and spokes.
+`area->grid()` controls the circles and spokes.
 
 - `setType()` picks which lines to draw: `QCPPolarGrid::gtAngular` (spokes at the angle ticks), `gtRadial` (circles at the radius ticks), `gtAll` (both, the default) or `gtNone`.
 - `setSubGridType()` does the same for the sub ticks. It is `gtNone` by default.
@@ -82,7 +83,7 @@ The angular axis has most of those setters too, for its tick labels around the c
 
 A polar graph is not a `QCPAbstractPlottable`.
 So `QCustomPlot::rescaleAxes()` and `plottableCount()` do not see it.
-Use the graph's own `rescaleAxes()`, `rescaleKeyAxis()` and `rescaleValueAxis()`, or `rescale()` on an axis.
+Use the graph's own `rescaleAxes()`, `rescaleKeyAxis()` and `rescaleValueAxis()`, or `rescale()` on the area or an axis.
 
 With `QCP::iRangeDrag` and `QCP::iRangeZoom` turned on, the mouse pans and zooms the radial axis.
 Rotating and zooming the angular axis with the mouse is off by default. Turn it on with `angularAxis->setRangeDrag(true)` and `setRangeZoom(true)`.

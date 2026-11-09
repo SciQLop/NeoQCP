@@ -2877,22 +2877,23 @@ void Benchmark::QCPSpans_Pan100()
 namespace
 {
 // The polar area replaces the default axis rect, so every polar row starts from a cleared layout.
-QCPPolarAxisAngular* benchPolarPlot(QCustomPlot* plot)
+QCPPolarArea* benchPolarPlot(QCustomPlot* plot)
 {
     plot->plotLayout()->clear();
-    auto* angular = new QCPPolarAxisAngular(plot);
-    plot->plotLayout()->addElement(0, 0, angular);
+    auto* area = new QCPPolarArea(plot);
+    plot->plotLayout()->addElement(0, 0, area);
+    QCPPolarAxisAngular* angular = area->angularAxis();
     angular->setRange(0, 360);
-    angular->radialAxis()->setRange(0, 1);
+    area->radialAxis()->setRange(0, 1);
     QVector<double> angle(10000), radius(10000);
     for (int i = 0; i < 10000; ++i)
     {
         angle[i] = 360.0 * i / 10000;
         radius[i] = 0.5 + 0.35 * qSin(6 * M_PI * i / 10000); // stays inside [0.15, 0.85]
     }
-    auto* graph = new QCPPolarGraph(angular, angular->radialAxis());
+    auto* graph = new QCPPolarGraph(angular, area->radialAxis());
     graph->setData(angle, radius);
-    return angular;
+    return area;
 }
 } // namespace
 
@@ -2909,7 +2910,7 @@ void Benchmark::QCPPolar_Draw10k()
 void Benchmark::QCPPolar_Rotate10k()
 {
     // No polar recording exists before 4h: this is a full repaint after an angular range step.
-    QCPPolarAxisAngular* angular = benchPolarPlot(mPlot);
+    QCPPolarAxisAngular* angular = benchPolarPlot(mPlot)->angularAxis();
     mPlot->replot();
     double lower = 0;
     QBENCHMARK
@@ -2922,8 +2923,8 @@ void Benchmark::QCPPolar_Rotate10k()
 
 void Benchmark::QCPPolar_RadialZoom10k()
 {
-    QCPPolarAxisAngular* angular = benchPolarPlot(mPlot);
-    QCPPolarAxisRadial* radial = angular->radialAxis();
+    QCPPolarArea* area = benchPolarPlot(mPlot);
+    QCPPolarAxisRadial* radial = area->radialAxis();
     mPlot->replot();
     double factor = 1.01;
     QBENCHMARK

@@ -24,7 +24,8 @@
 ****************************************************************************/
 
 #include "polargrid.h"
-#include "layoutelement-angularaxis.h"
+#include "angularaxis.h"
+#include "polar-area.h"
 
 #include "../core.h"
 #include "../painting/painter.h"
@@ -43,19 +44,19 @@
 /*!
   Creates a QCPPolarGrid instance and sets default values.
 
-  You shouldn't instantiate grids on their own, since every axis brings its own grid.
+  You shouldn't instantiate grids on their own, since every polar area brings its own grid.
 */
-QCPPolarGrid::QCPPolarGrid(QCPPolarAxisAngular* parentAxis)
-        : QCPLayerable(parentAxis->parentPlot(), QString(), parentAxis)
+QCPPolarGrid::QCPPolarGrid(QCPPolarArea* area)
+        : QCPLayerable(area->parentPlot(), QString(), area)
         , mType(gtNone)
         , mSubGridType(gtNone)
         , mAntialiasedSubGrid(true)
         , mAntialiasedZeroLine(true)
-        , mParentAxis(parentAxis)
+        , mArea(area)
 {
-    // warning: this is called in QCPPolarAxisAngular constructor, so parentAxis members should not
-    // be accessed/called
-    setParent(parentAxis);
+    // warning: this is called in QCPPolarArea constructor, so area members should not be
+    // accessed/called
+    setParent(area);
     setType(gtAll);
     setSubGridType(gtNone);
 
@@ -186,19 +187,20 @@ void QCPPolarGrid::applyDefaultAntialiasingHint(QCPPainter* painter) const
 */
 void QCPPolarGrid::draw(QCPPainter* painter)
 {
-    if (!mParentAxis)
+    QCPPolarAxisAngular* angularAxis = mArea ? mArea->angularAxis() : nullptr;
+    if (!angularAxis)
     {
-        qDebug() << Q_FUNC_INFO << "invalid parent axis";
+        qDebug() << Q_FUNC_INFO << "invalid polar area";
         return;
     }
 
-    const QPointF center = mParentAxis->mCenter;
-    const double radius = mParentAxis->mRadius;
+    const QPointF center = mArea->center();
+    const double radius = mArea->radius();
 
     painter->setBrush(Qt::NoBrush);
     // draw main angular grid:
     if (mType.testFlag(gtAngular))
-        drawAngularGrid(painter, center, radius, mParentAxis->mTickVectorCosSin, mAngularPen);
+        drawAngularGrid(painter, center, radius, angularAxis->mTickVectorCosSin, mAngularPen);
     // draw main radial grid:
     if (mType.testFlag(gtRadial) && mRadialAxis)
         drawRadialGrid(painter, center, mRadialAxis->tickVector(), mRadialPen, mRadialZeroLinePen);
@@ -206,7 +208,7 @@ void QCPPolarGrid::draw(QCPPainter* painter)
     applyAntialiasingHint(painter, mAntialiasedSubGrid, QCP::aeGrid);
     // draw sub angular grid:
     if (mSubGridType.testFlag(gtAngular))
-        drawAngularGrid(painter, center, radius, mParentAxis->mSubTickVectorCosSin,
+        drawAngularGrid(painter, center, radius, angularAxis->mSubTickVectorCosSin,
                         mAngularSubGridPen);
     // draw sub radial grid:
     if (mSubGridType.testFlag(gtRadial) && mRadialAxis)

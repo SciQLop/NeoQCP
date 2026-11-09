@@ -28,6 +28,7 @@
 #include "../core.h"
 #include "../misuse.h"
 #include "../painting/painter.h"
+#include "polar-area.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPPolarLegendItem
@@ -142,10 +143,11 @@ QFont QCPPolarLegendItem::getFont() const
 
   The created QCPPolarGraph is automatically registered with the QCustomPlot instance inferred from
   \a keyAxis. This QCustomPlot instance takes ownership of the QCPPolarGraph, so do not delete it
-  manually but use QCPPolarAxisAngular::removeGraph() instead.
+  manually but use QCPPolarArea::removeGraph() instead.
 
   This constructor is how a polar graph is created: \c new QCPPolarGraph(angularAxis,
-  angularAxis->radialAxis()). (There is no QCPPolarAxisAngular::addGraph.)
+  angularAxis->radialAxis()). A graph built by the plot's handle interface comes from
+  QCPPolarArea::add<QCPPolarGraph>().
 */
 QCPPolarGraph::QCPPolarGraph(QCPPolarAxisAngular* keyAxis, QCPPolarAxisRadial* valueAxis)
         : QCPLayerable(keyAxis->parentPlot(), QString(), keyAxis)
@@ -164,7 +166,7 @@ QCPPolarGraph::QCPPolarGraph(QCPPolarAxisAngular* keyAxis, QCPPolarAxisRadial* v
     if (keyAxis->parentPlot() != valueAxis->parentPlot())
         qDebug() << Q_FUNC_INFO << "Parent plot of keyAxis is not the same as that of valueAxis.";
 
-    mKeyAxis->registerPolarGraph(this);
+    mKeyAxis->area()->registerPolarGraph(this);
 
     // setSelectionDecorator(new QCPSelectionDecorator); // TODO
 
@@ -175,8 +177,8 @@ QCPPolarGraph::QCPPolarGraph(QCPPolarAxisAngular* keyAxis, QCPPolarAxisRadial* v
 
 QCPPolarGraph::~QCPPolarGraph()
 {
-    if (mKeyAxis) // a plain delete leaves the axis's list, as removeGraph does
-        mKeyAxis->mGraphs.removeOne(this);
+    if (mKeyAxis) // a plain delete leaves the area's list, as removeGraph does
+        mKeyAxis->area()->mGraphs.removeOne(this);
     /* TODO
     if (mSelectionDecorator)
     {
@@ -284,11 +286,11 @@ void QCPPolarGraph::setKeyAxis(QCPPolarAxisAngular* axis)
     if (mKeyAxis == axis)
         return;
     if (mKeyAxis)
-        mKeyAxis->mGraphs.removeOne(this);
+        mKeyAxis->area()->mGraphs.removeOne(this);
     markDirty();
     mKeyAxis = axis;
     if (mKeyAxis)
-        mKeyAxis->registerPolarGraph(this);
+        mKeyAxis->area()->registerPolarGraph(this);
 }
 
 /*!
@@ -694,7 +696,7 @@ double QCPPolarGraph::selectTest(const QPointF& pos, bool onlySelectable, QVaria
     if (!mKeyAxis || !mValueAxis)
         return -1;
 
-    if (mKeyAxis->rect().contains(pos.toPoint()))
+    if (mKeyAxis->area()->rect().contains(pos.toPoint()))
     {
         QCPGraphDataContainer::const_iterator closestDataPoint = mDataContainer->constEnd();
         double result = pointDistance(pos, closestDataPoint);
@@ -726,7 +728,7 @@ QCPRange QCPPolarGraph::getValueRange(bool& foundRange, QCP::SignDomain inSignDo
 QRect QCPPolarGraph::clipRect() const
 {
     if (mKeyAxis)
-        return mKeyAxis.data()->rect();
+        return mKeyAxis->area()->rect();
     else
         return QRect();
 }
@@ -743,7 +745,7 @@ void QCPPolarGraph::draw(QCPPainter* painter)
     if (mLineStyle == lsNone && mScatterStyle.isNone())
         return;
 
-    painter->setClipRegion(mKeyAxis->exactClipRegion());
+    painter->setClipRegion(mKeyAxis->area()->exactClipRegion());
 
     QVector<QPointF> lines, scatters; // line and (if necessary) scatter pixel coordinates will be
                                       // stored here while iterating over segments

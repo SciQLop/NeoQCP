@@ -24,7 +24,8 @@
 ****************************************************************************/
 
 #include "radialaxis.h"
-#include "layoutelement-angularaxis.h"
+#include "angularaxis.h"
+#include "polar-area.h"
 
 #include "../core.h"
 #include "../items/item.h"
@@ -109,20 +110,19 @@
 /* end of documentation of signals */
 
 /*!
-  Constructs an Axis instance of Type \a type for the axis rect \a parent.
+  Creates a radial axis belonging to \a area.
 
-  Usually it isn't necessary to instantiate axes directly, because you can let QCustomPlot create
-  them for you with \ref QCPAxisRect::addAxis. If you want to use own QCPAxis-subclasses however,
-  create them manually and then inject them also via \ref QCPAxisRect::addAxis.
+  Usually it isn't necessary to instantiate radial axes directly, because you can let the polar area
+  create them for you with \ref QCPPolarArea::addRadialAxis.
 */
-QCPPolarAxisRadial::QCPPolarAxisRadial(QCPPolarAxisAngular* parent)
-        : QCPLayerable(parent->parentPlot(), QString(), parent)
+QCPPolarAxisRadial::QCPPolarAxisRadial(QCPPolarArea* area)
+        : QCPLayerable(area->parentPlot(), QString(), area)
         , mRangeDrag(true)
         , mRangeZoom(true)
         , mRangeZoomFactor(0.85)
         ,
         // axis base:
-        mAngularAxis(parent)
+        mArea(area)
         , mAngle(45)
         , mAngleReference(arAngularAxis)
         , mSelectableParts(spAxis | spTickLabels | spAxisLabel)
@@ -176,7 +176,7 @@ QCPPolarAxisRadial::QCPPolarAxisRadial(QCPPolarAxisAngular* parent)
         mTicker(new QCPAxisTicker)
         , mLabelPainter(mParentPlot)
 {
-    setParent(parent);
+    setParent(area);
     setAntialiased(true);
 
     setTickLabelPadding(5);
@@ -187,6 +187,11 @@ QCPPolarAxisRadial::QCPPolarAxisRadial(QCPPolarAxisAngular* parent)
 }
 
 QCPPolarAxisRadial::~QCPPolarAxisRadial() { }
+
+QCPPolarAxisAngular* QCPPolarAxisRadial::angularAxis() const
+{
+    return mArea ? mArea->angularAxis() : nullptr;
+}
 
 QCPPolarAxisRadial::LabelMode QCPPolarAxisRadial::tickLabelMode() const
 {
@@ -1175,7 +1180,7 @@ void QCPPolarAxisRadial::pixelToCoord(QPointF pixelPos, double& angleCoord,
 {
     QCPVector2D posVector(pixelPos - mCenter);
     radiusCoord = radiusToCoord(posVector.length());
-    angleCoord = mAngularAxis->angleRadToCoord(posVector.angle());
+    angleCoord = angularAxis()->angleRadToCoord(posVector.angle());
 }
 
 /*!
@@ -1184,7 +1189,7 @@ void QCPPolarAxisRadial::pixelToCoord(QPointF pixelPos, double& angleCoord,
 QPointF QCPPolarAxisRadial::coordToPixel(double angleCoord, double radiusCoord) const
 {
     const double radiusPixel = coordToRadius(radiusCoord);
-    const double angleRad = mAngularAxis->coordToAngleRad(angleCoord);
+    const double angleRad = angularAxis()->coordToAngleRad(angleCoord);
     return QPointF(mCenter.x() + qCos(angleRad) * radiusPixel,
                    mCenter.y() + qSin(angleRad) * radiusPixel);
 }
@@ -1472,7 +1477,7 @@ void QCPPolarAxisRadial::applyDefaultAntialiasingHint(QCPPainter* painter) const
 void QCPPolarAxisRadial::draw(QCPPainter* painter)
 {
     const double axisAngleRad
-        = (mAngle + (mAngleReference == arAngularAxis ? mAngularAxis->angle() : 0)) / 180.0 * M_PI;
+        = (mAngle + (mAngleReference == arAngularAxis ? angularAxis()->angle() : 0)) / 180.0 * M_PI;
     const QPointF axisVector(qCos(axisAngleRad),
                              qSin(axisAngleRad)); // semantically should be QCPVector2D, but we save
                                                   // time in loops when we keep it as QPointF

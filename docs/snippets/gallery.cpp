@@ -466,9 +466,10 @@ DOC_SNIPPET(gallery_antenna_pattern, 600, 600)
     // 16 antennas half a wavelength apart, steered 20 degrees off broadside.
     // A Hann taper trades a wider main lobe for much lower side lobes.
     customPlot->plotLayout()->clear();
-    auto* angular = new QCPPolarAxisAngular(customPlot);
-    customPlot->plotLayout()->addElement(0, 0, angular);
-    QCPPolarAxisRadial* radial = angular->radialAxis();
+    auto* area = new QCPPolarArea(customPlot);
+    customPlot->plotLayout()->addElement(0, 0, area);
+    QCPPolarAxisAngular* angular = area->angularAxis();
+    QCPPolarAxisRadial* radial = area->radialAxis();
     angular->setRange(0, 360);
     radial->setRange(-50, 0);
     radial->setLabel("gain [dB]");

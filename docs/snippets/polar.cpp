@@ -7,9 +7,10 @@ DOC_SNIPPET(polar_basic, 600, 420)
 {
     // [polar_basic]
     customPlot->plotLayout()->clear();   // drop the default axis rect
-    auto* angularAxis = new QCPPolarAxisAngular(customPlot);
-    customPlot->plotLayout()->addElement(0, 0, angularAxis);
-    QCPPolarAxisRadial* radialAxis = angularAxis->radialAxis();
+    auto* area = new QCPPolarArea(customPlot);
+    customPlot->plotLayout()->addElement(0, 0, area);
+    QCPPolarAxisAngular* angularAxis = area->angularAxis();
+    QCPPolarAxisRadial* radialAxis = area->radialAxis();
     angularAxis->setRange(0, 360);   // degrees, 0 on top, clockwise
     radialAxis->setRange(0, 1.05);
 
@@ -37,16 +38,17 @@ DOC_SNIPPET(polar_radians, 600, 420)
 {
     // [polar_radians]
     customPlot->plotLayout()->clear();
-    auto* angularAxis = new QCPPolarAxisAngular(customPlot);
-    customPlot->plotLayout()->addElement(0, 0, angularAxis);
+    auto* area = new QCPPolarArea(customPlot);
+    customPlot->plotLayout()->addElement(0, 0, area);
+    QCPPolarAxisAngular* angularAxis = area->angularAxis();
+    area->radialAxis()->setRange(0, 1);
     angularAxis->setAngle(0);              // 0 on the right ...
     angularAxis->setRangeReversed(true);   // ... and counter-clockwise, as in mathematics
     angularAxis->setRange(0, 2 * std::numbers::pi);
     auto ticker = QSharedPointer<QCPAxisTickerPi>::create();
     ticker->setTickCount(8);
     angularAxis->setTicker(ticker);
-    angularAxis->grid()->setSubGridType(QCPPolarGrid::gtAll);
-    angularAxis->radialAxis()->setRange(0, 1);
+    area->grid()->setSubGridType(QCPPolarGrid::gtAll);
 
     QVector<double> theta(721), r(721);
     for (int i = 0; i <= 720; ++i)
@@ -54,7 +56,7 @@ DOC_SNIPPET(polar_radians, 600, 420)
         theta[i] = i * std::numbers::pi / 360;   // 0 to 2 pi
         r[i] = std::abs(std::cos(3 * theta[i]));  // a six-petal rose
     }
-    auto* rose = new QCPPolarGraph(angularAxis, angularAxis->radialAxis());
+    auto* rose = new QCPPolarGraph(angularAxis, area->radialAxis());
     rose->setData(theta, r);
     rose->setPen(QPen(QColor(148, 103, 189), 2));
     rose->setBrush(QColor(148, 103, 189, 60));

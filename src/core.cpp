@@ -40,7 +40,7 @@
 #include "items/item.h"
 #include "items/item-text.h"
 #include "items/item-tracer.h"
-#include "polar/layoutelement-angularaxis.h"
+#include "polar/angularaxis.h"
 #include "polar/polargraph.h"
 #include "layer.h"
 #include "layoutelements/layoutelement-axisrect.h"
@@ -1485,7 +1485,7 @@ bool QCustomPlot::detach(QCPAbstractPlottable* plottable)
 
 /*! \internal
 
-  Take for a polar graph: it leaves every legend and its angular axis, and the caller owns it.
+  Take for a polar graph: it leaves every legend and its polar area, and the caller owns it.
 */
 bool QCustomPlot::detach(QCPPolarGraph* graph)
 {
@@ -1495,7 +1495,7 @@ bool QCustomPlot::detach(QCPPolarGraph* graph)
     QCP_CHECK_OR_RETURN(graph->parentPlot() == this, "the graph belongs to another plot", false);
     for (QCPLegend* legend : findChildren<QCPLegend*>())
         graph->removeFromLegend(legend);
-    // Unlists the graph from the angular axis (and nulls its radial axis); a no-op for an orphan.
+    // Unlists the graph from its polar area (and nulls its radial axis); a no-op for an orphan.
     graph->setKeyAxis(nullptr);
     graph->setValueAxis(nullptr);
     graph->moveToLayer(nullptr, false);
@@ -1507,14 +1507,14 @@ bool QCustomPlot::detach(QCPPolarGraph* graph)
 
 /*! \internal
 
-  The inverse of detach for a polar graph: its axes are polar, so only an angular axis can adopt it.
+  The inverse of detach for a polar graph: its axes are polar, so only a polar area can adopt it.
 */
 bool QCustomPlot::adopt(QCPPolarGraph*)
 {
-    // The plot cannot pick an angular axis for a polar graph, so this always refuses.
+    // The plot cannot pick a polar area for a polar graph, so this always refuses.
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     qcp::reportMisuse(Q_FUNC_INFO,
-                      "a polar graph is added through its angular axis, not through the plot");
+                      "a polar graph is added through its polar area, not through the plot");
     return false;
 }
 

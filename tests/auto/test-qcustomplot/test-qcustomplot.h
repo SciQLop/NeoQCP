@@ -40,15 +40,15 @@ private slots:
   void wheelSlotDeletingThePlotIsSafe();
   void rightPressSlotDeletingThePlotIsSafe();
   void rightPressSlotDeletingATopLevelPlotIsSafe();
-  void angularRangeSlotDeletingTheAxisIsSafe();
-  void radialRangeSlotDeletingTheAxisIsSafe();
+  void angularRangeSlotDeletingTheAreaIsSafe();
+  void radialRangeSlotDeletingTheAreaIsSafe();
   void radialDragSlotRemovingARadialAxisKeepsTheOthersBaselines();
-  void radialDragSlotDeletingTheAngularAxisIsSafe();
+  void radialDragSlotDeletingTheAreaIsSafe();
   void radialWheelSlotRemovingARadialAxisZoomsTheOthers();
-  void radialWheelSlotDeletingTheAngularAxisIsSafe();
-  void angularDragSlotDeletingTheAngularAxisIsSafe();
-  void angularWheelSlotDeletingTheAngularAxisIsSafe();
-  void radialDragSlotDeletingTheAngularAxisRestoresAntialiasing();
+  void radialWheelSlotDeletingTheAreaIsSafe();
+  void angularDragSlotDeletingTheAreaIsSafe();
+  void angularWheelSlotDeletingTheAreaIsSafe();
+  void radialDragSlotDeletingTheAreaRestoresAntialiasing();
 
 private:
   QCustomPlot *mPlot;
