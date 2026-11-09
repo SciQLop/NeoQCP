@@ -8,9 +8,9 @@
 #include "items/item-pixmap.h"
 #include "items/item-rect.h"
 #include "items/item-richtext.h"
+#include "items/item-span.h"
 #include "items/item-text.h"
 #include "items/item-tracer.h"
-#include "items/item-span.h"
 #include "layoutelements/layoutelement-colorscale.h"
 #include "layoutelements/layoutelement-legend.h"
 #include "layoutelements/layoutelement-textelement.h"
@@ -29,7 +29,6 @@
 #include "plottables/plottable-group.h"
 #include "plottables/plottable-histogram2d.h"
 
-#include <array>
 #include "plottables/plottable-multigraph.h"
 #include "plottables/plottable-statisticalbox.h"
 #include "plottables/plottable-waterfall.h"
@@ -39,6 +38,7 @@
 #include <QTemporaryDir>
 #include <QtWidgets/qtestsupport_widgets.h>
 #include <algorithm>
+#include <array>
 #include <drawable.h>
 #include <functional>
 #include <memory>
@@ -161,6 +161,10 @@ int pixelsOfColor(const QImage& image, const QColor& color)
         }
     return count;
 }
+
+// The mean x of the blue pixels: where a vertical blue line was drawn, or -1 if none was. Defined
+// further down, declared here for the range-change test above it.
+double blueColumn(const QImage& image);
 
 // Returns the exported image, or a null image for a vector export.
 QImage exportWith(QCustomPlot& plot, const QString& how, const QString& dir)
@@ -1416,6 +1420,63 @@ void TestRepaint::polarPlotSettles()
     QTest::qWait(200);
     QCOMPARE(replots, 0);
     QVERIFY(!plot->isRepaintQueued());
+}
+
+void TestRepaint::rangeChangeRepaintsItsLayers_data()
+{
+    QTest::addColumn<QString>("kind");
+    QTest::newRow("cartesian") << QStringLiteral("cartesian");
+    QTest::newRow("polar") << QStringLiteral("polar");
+}
+
+void TestRepaint::rangeChangeRepaintsItsLayers()
+{
+    // A range change moves what every layer of the axis draws, so it must dirty those layers and
+    // not only the axis itself (R19).
+    QFETCH(QString, kind);
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    if (kind == QLatin1String("cartesian"))
+    {
+        plot.addLayer(QStringLiteral("items"));
+        auto* line = new QCPItemLine(&plot);
+        line->setLayer(QStringLiteral("items"));
+        line->setPen(QPen(kBlue, 3));
+        line->start->setCoords(5, 0);
+        line->end->setCoords(5, 10);
+        plot.xAxis->setRange(0, 10);
+        plot.yAxis->setRange(0, 10);
+        plot.replot();
+        waitUntilSettled(plot);
+        QVERIFY(qAbs(blueColumn(screenOf(&plot)) - plot.xAxis->coordToPixel(5)) <= 2);
+        plot.xAxis->setRange(0, 20);
+        waitUntilSettled(plot);
+        QVERIFY2(qAbs(blueColumn(screenOf(&plot)) - plot.xAxis->coordToPixel(5)) <= 2,
+                 "the item's layer kept the pixels of the old range");
+        return;
+    }
+
+    plot.plotLayout()->clear();
+    auto* area = new QCPPolarArea(&plot);
+    plot.plotLayout()->addElement(0, 0, area);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 90, 180, 270, 360 },
+                                          QVector<double> { 1, 1, 1, 1, 1 });
+    QVERIFY(graph);
+    graph->setPen(QPen(kBlue, 3));
+    area->grid()->setVisible(false);
+    area->angularAxis()->setTicks(false);
+    area->angularAxis()->setTickLabels(false);
+    area->radialAxis()->setTicks(false);
+    area->radialAxis()->setTickLabels(false);
+    plot.replot();
+    waitUntilSettled(plot);
+    const QImage before = screenOf(&plot);
+    area->radialAxis()->setRange(0, 2);
+    waitUntilSettled(plot);
+    QVERIFY2(screenOf(&plot) != before,
+             "a polar range change left the graph layer at its old pixels");
 }
 
 void TestRepaint::exportSettlesPendingTheme()

@@ -338,6 +338,20 @@ QList<QCPAxis*> QCPAxisRect::axes() const
     return result;
 }
 
+/*! \overload
+
+  Returns all axes of this axis rect as base pointers, the type the range model lives in.
+*/
+QList<QCPAxisBase*> QCPAxisRect::allAxes() const
+{
+    QList<QCPAxisBase*> result;
+    const QList<QCPAxis*> cartesianAxes = axes();
+    result.reserve(cartesianAxes.size());
+    for (QCPAxis* axis : cartesianAxes)
+        result << axis;
+    return result;
+}
+
 /*!
   Adds a new axis to the axis rect side specified with \a type, and returns it. If \a axis is 0, a
   new QCPAxis instance is created internally. QCustomPlot owns the returned axis, so if you want to

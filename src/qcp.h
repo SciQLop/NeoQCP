@@ -26,6 +26,7 @@
 #ifndef QCP_H
 #define QCP_H
 
+#include "axis/axis-base.h"
 #include "axis/axis.h"
 #include "axis/labelrenderer.h"
 #if NEOQCP_WITH_LATEX

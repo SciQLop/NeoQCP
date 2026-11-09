@@ -56,7 +56,9 @@ config_h = configure_file(
 NEOQCP_INCLUDE_DIR = include_directories('src','.')
 
 
-neoqcp_moc_headers = ['src/axis/axis.h',
+neoqcp_moc_headers = [
+            'src/axis/axis-base.h',
+            'src/axis/axis.h',
             'src/axis/axisticker.h',
             'src/axis/axistickerdatetime.h',
             'src/axis/axistickerfixed.h',
@@ -287,6 +289,7 @@ NeoQCP = static_library('NeoQCP',
            'src/selectiondecorator-bracket.cpp',
            'src/selectionrect.cpp',
            'src/vector2d.cpp',
+           'src/axis/axis-base.cpp',
            'src/axis/axis.cpp',
            'src/axis/axisticker.cpp',
            'src/axis/axistickerdatetime.cpp',

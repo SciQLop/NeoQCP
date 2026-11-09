@@ -30,14 +30,14 @@
 #include <memory>
 #include <utility>
 
+#include "../Profiling.hpp"
 #include "../core.h"
-#include "../painting/grid-rhi-layer.h"
 #include "../items/item.h"
 #include "../layoutelements/layoutelement-axisrect.h"
+#include "../painting/grid-rhi-layer.h"
 #include "../painting/painter.h"
-#include "../plottables/plottable.h"
 #include "../plottables/plottable-graph.h"
-#include "../Profiling.hpp"
+#include "../plottables/plottable.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPGrid
@@ -420,15 +420,13 @@ void QCPGrid::drawSubGridLines(QCPPainter* painter) const
   create them manually and then inject them also via \ref QCPAxisRect::addAxis.
 */
 QCPAxis::QCPAxis(QCPAxisRect* parent, AxisType type)
-        : QCPLayerable(parent->parentPlot(), QString(), parent)
+        : QCPAxisBase(parent)
         ,
         // axis base:
         mAxisType(type)
         , mAxisRect(parent)
         , mPadding(5)
         , mOrientation(orientation(type))
-        , mSelectableParts(spAxis | spTickLabels | spAxisLabel)
-        , mSelectedParts(spNone)
         , mBasePen(QPen(Qt::black, 0, Qt::SolidLine, Qt::SquareCap))
         , mSelectedBasePen(QPen(Qt::blue, 2))
         ,
@@ -458,19 +456,14 @@ QCPAxis::QCPAxis(QCPAxisRect* parent, AxisType type)
         , mSubTickPen(QPen(Qt::black, 0, Qt::SolidLine, Qt::SquareCap))
         , mSelectedSubTickPen(QPen(Qt::blue, 2))
         ,
-        // scale and range:
-        mRange(0, 5)
-        , mRangeReversed(false)
-        , mScaleType(stLinear)
-        ,
         // internal members:
         mGrid(new QCPGrid(this))
         , mAxisPainter(new QCPAxisPainterPrivate(parent->parentPlot()))
-        , mTicker(new QCPAxisTicker)
         , mCachedMarginValid(false)
         , mCachedMargin(0)
         , mDragging(false)
 {
+    mRange = QCPRange(0, 5);
     // Opt out with setLabelRenderer(nullptr); plain labels are unaffected
     // either way, since a renderer only diverts text with a `$...$` span.
     mLabelRenderer = QCPLabelRenderer::defaultRenderer();
@@ -504,26 +497,6 @@ QCPAxis::QCPAxis(QCPAxisRect* parent, AxisType type)
 
 QCPAxis::~QCPAxis()
 {
-    // A linked axis leaves its source's list: a dead link must not keep the source busy.
-    if (mLink)
-    {
-        if (QCPAxis* source = mLink->source)
-            source->mLinkedAxes.removeAll(this);
-        mLink.reset();
-    }
-    // A link cannot outlive its source: its axes keep their range and become plain.
-    if (!mLinkedAxes.isEmpty())
-    {
-        const QList<QPointer<QCPAxis>> users = mLinkedAxes;
-        mLinkedAxes.clear();
-        for (const QPointer<QCPAxis>& user : users)
-            if (user)
-            {
-                user->mLink.reset();
-                user->mLinked = false;
-                user->markAppearanceDirty(); // its pixels come from the axis no more
-            }
-    }
     if (mParentPlot)
         if (auto* grl = mParentPlot->gridRhiLayerIfExists())
             grl->unregisterAxis(this);
@@ -632,288 +605,6 @@ QCPLineEnding QCPAxis::upperEnding() const
     return mAxisPainter->upperEnding;
 }
 
-/*!
-  Sets whether the axis uses a linear scale or a logarithmic scale.
-
-  Note that this method controls the coordinate transformation. For logarithmic scales, you will
-  likely also want to use a logarithmic tick spacing and labeling, which can be achieved by setting
-  the axis ticker to an instance of \ref QCPAxisTickerLog :
-
-  \snippet documentation/doc-code-snippets/mainwindow.cpp qcpaxisticker-log-creation
-
-  See the documentation of \ref QCPAxisTickerLog about the details of logarithmic axis tick
-  creation.
-
-  \ref setNumberPrecision
-*/
-void QCPAxis::setScaleType(QCPAxis::ScaleType type)
-{
-    if (mScaleType != type)
-    {
-        const QCPEmissionScope scope(mParentPlot);
-        mScaleType = type;
-        mCachedMarginValid = false;
-        // An item's extent depends on the scale type (a non-positive coordinate has no pixel on a
-        // log axis), so every tree built for the old type is stale.
-        if (mParentPlot)
-            for (int layerIndex = 0; layerIndex < mParentPlot->layerCount(); ++layerIndex)
-                mParentPlot->layer(layerIndex)->invalidateItemIndex();
-        if (mScaleType == stLogarithmic)
-        {
-            // A linked axis takes its range from the source: its own scale type only picks its
-            // ticks, so it must not write a sanitized range back into the source.
-            // A linked axis shows the source's range even where a log axis could not draw it:
-            // sanitizing it here would break the invariant that its range is forward(source).
-            if (mLink)
-                refreshFromLink();
-            else
-                setRange(mRange.sanitizedForLogScale());
-        }
-        markAppearanceDirty();
-        // A linked axis maps through the source's scale type: its pixels moved even when its own
-        // range did not.
-        const QList<QPointer<QCPAxis>> users = mLinkedAxes;
-        for (const QPointer<QCPAxis>& user : users)
-        {
-            if (!user)
-                continue;
-            user->refreshFromLink();
-            user->markAppearanceDirty();
-        }
-        qcpEmitCurrent(this, mParentPlot, &QCPAxis::scaleTypeChanged, [this] { return mScaleType; });
-    }
-}
-
-/*! \internal
-
-  Every range setter ends here. A range change invalidates every layer that
-  depends on this axis (its own, the grid, the plottables and items attached to it), and
-  QCustomPlot::replot only repaints dirty buffers — so the layers are dirtied
-  here, at the source, rather than by each caller (drag, wheel, pinch, setRange
-  from axis synchronizers). QCustomPlot::ensureAtLeastOneBufferDirty() only
-  covers the case where nothing else is dirty; any unrelated dirty buffer would
-  otherwise leave the graph layer stale while axes and grid move.
-*/
-void QCPAxis::rangeDidChange(const QCPRange& oldRange)
-{
-    const auto apply = [&]
-    {
-        if (mAxisRect)
-        {
-            mAxisRect->markAffectedLayersDirty();
-            mAxisRect->markItemsUsingAxisDirty(this);
-        }
-        // Before the signal: a slot that reads a linked axis sees the range it was told about.
-        refreshLinkedAxes();
-        qcpEmitIf(this, mParentPlot, &QCPAxis::rangeChanged,
-                  [this, range = mRange] { return mRange == range; }, mRange, oldRange);
-    };
-    // A linked user emits from inside the refresh, and its slot may delete an axis of the pair.
-    // Deferring to the end of this call keeps the refresh and the signal in one piece.
-    if (mLinkedAxes.isEmpty())
-    {
-        apply();
-        return;
-    }
-    const QCPEmissionScope scope(mParentPlot);
-    apply();
-}
-
-/*! \internal
-
-  Dirties every layer a change of look moves. A different font, tick length or label padding changes
-  the axis margin, and the margin sets the rect every axis, grid and plottable in it is laid out in;
-  QCPAxisRect::markAffectedLayersDirty() walks those, the items on the axis are what
-  markLayersUsingAxisDirty() adds. No-op until the axis is in a rect.
-*/
-void QCPAxis::markAppearanceDirty()
-{
-    if (!mAxisRect)
-        return;
-    // A margin change moves every axis, grid and plottable of the rect: invalidate their buffers
-    // instead of dirtying them, so a pending pan translation cannot show the old frame.
-    mAxisRect->markAffectedLayersDirty(true);
-    mAxisRect->markItemsUsingAxisDirty(this);
-}
-
-/*! \internal
-
-  The one place that writes a range: every mutator (and every setRange overload) calls
-  commitRange, which either applies the range here or writes it back to the source of a link.
-*/
-void QCPAxis::applyRange(const QCPRange& range)
-{
-    if ((range.lower == mRange.lower && range.upper == mRange.upper)
-        || !QCPRange::validRange(range))
-        return;
-    const QCPRange oldRange = mRange;
-    mRange = mScaleType == stLogarithmic ? range.sanitizedForLogScale()
-                                         : range.sanitizedForLinScale();
-    rangeDidChange(oldRange);
-}
-
-/*! \internal
-
-  The range funnel: an unlinked axis takes the range, a linked one writes its ordered inverse to
-  its source and takes back the forward image the source settled on. Writing back, and then asking
-  the source what it kept, is what stops the round trip from oscillating when forward and inverse
-  are not exact inverses in floating point: the source's answer wins, once.
-*/
-void QCPAxis::commitRange(const QCPRange& range)
-{
-    if (!mLink)
-    {
-        applyRange(range);
-        return;
-    }
-    if (!mLink->inverse || !QCPRange::validRange(range))
-        return;
-    const QCPRange clean = mScaleType == stLogarithmic ? range.sanitizedForLogScale()
-                                                       : range.sanitizedForLinScale();
-    if (clean.lower == mRange.lower && clean.upper == mRange.upper)
-        return;
-    const double lower = mLink->inverse(clean.lower);
-    const double upper = mLink->inverse(clean.upper);
-    QCPRange sourceRange(lower, upper);
-    sourceRange.normalize();
-    // A value outside the inverse's domain (a wheel step across zero on a 1/x link) is data, not a
-    // misuse: the range simply does not move.
-    if (!(std::isfinite(lower) && std::isfinite(upper) && QCPRange::validRange(sourceRange)))
-    {
-        qDebug() << Q_FUNC_INFO << "the linked range has no source range under the inverse";
-        return;
-    }
-    QCPAxis* source = mLink->source;
-    QCP_CHECK_OR_RETURN(source, "the source of the link is gone", );
-    // The source's signal runs inside this call unless it is deferred: a slot may delete either
-    // axis of the pair, and both the write back and the refresh below touch them afterwards.
-    const QCPEmissionScope scope(mParentPlot);
-    source->setRange(sourceRange);
-    refreshFromLink();
-}
-
-/*! \internal
-
-  Takes the linked range from the source again. The source may have refused the range a write back
-  asked for, rounded it, or been changed by someone else; this is the only place that reads it.
-*/
-void QCPAxis::refreshFromLink()
-{
-    if (!mLink)
-        return;
-    QCPAxis* source = mLink->source;
-    if (!source)
-    {
-        mLink.reset();
-        mLinked = false;
-        markAppearanceDirty();
-        return;
-    }
-    QCPRange fresh(mLink->forward(source->mRange.lower), mLink->forward(source->mRange.upper));
-    fresh.normalize();
-    if (!QCPRange::validRange(fresh))
-        return;
-    const bool reversed = source->mRangeReversed != mLink->decreasing;
-    if (fresh.lower == mRange.lower && fresh.upper == mRange.upper && reversed == mRangeReversed)
-        return;
-    const QCPRange oldRange = mRange;
-    mRange = mScaleType == stLogarithmic ? fresh.sanitizedForLogScale()
-                                         : fresh.sanitizedForLinScale();
-    const bool reversalChanged = reversed != mRangeReversed;
-    mRangeReversed = reversed;
-    if (reversalChanged)
-        markAppearanceDirty();
-    rangeDidChange(oldRange);
-}
-
-/*! \internal
-
-  Pushes this axis's range and direction to the axes linked to it. Walks a snapshot: a refresh can
-  never delete an axis, but a slot it runs may.
-*/
-void QCPAxis::refreshLinkedAxes()
-{
-    if (mLinkedAxes.isEmpty())
-        return;
-    const QList<QPointer<QCPAxis>> users = mLinkedAxes;
-    for (const QPointer<QCPAxis>& user : users)
-        if (user)
-            user->refreshFromLink();
-}
-
-void QCPAxis::linkTo(QCPAxis* source, QCPAxisFunction forward, QCPAxisFunction inverse)
-{
-    QCP_CHECK_OR_RETURN(source, "a link needs a source axis", );
-    QCP_CHECK_OR_RETURN(source != this, "an axis cannot be linked to itself", );
-    QCP_CHECK_OR_RETURN(mParentPlot && source->mParentPlot == mParentPlot,
-                        "the linked axes must belong to the same plot", );
-    QCP_CHECK_OR_RETURN(source->mOrientation == mOrientation,
-                        "the linked axes must have the same orientation", );
-    QCP_CHECK_OR_RETURN(!source->mLink, "the source axis is linked itself", );
-    // A source may drive several links. Only a live user keeps this axis from being linked itself:
-    // a destroyed user leaves a null QPointer behind until its destructor removes it.
-    const bool drivesALink = std::any_of(
-        mLinkedAxes.cbegin(), mLinkedAxes.cend(),
-        [](const QPointer<QCPAxis>& user) { return !user.isNull(); });
-    QCP_CHECK_OR_RETURN(!drivesALink, "the axis already drives a link of its own", );
-    QCP_CHECK_OR_RETURN(static_cast<bool>(forward) == static_cast<bool>(inverse),
-                        "a link needs both its forward and its inverse function", );
-    if (!forward)
-    {
-        forward = [](double value) { return value; };
-        inverse = [](double value) { return value; };
-    }
-    if (mLink)
-        unlink();
-    auto link = std::make_shared<QCPAxisLink>();
-    link->source = source;
-    const double forwardLower = forward(source->mRange.lower);
-    const double forwardUpper = forward(source->mRange.upper);
-    if (!std::isfinite(forwardLower) || !std::isfinite(forwardUpper))
-        qDebug() << Q_FUNC_INFO << "the forward function is not finite at the source's range";
-    link->decreasing = forwardUpper < forwardLower;
-    link->forward = std::move(forward);
-    link->inverse = std::move(inverse);
-    mLink = link;
-    source->mLinkedAxes.append(this);
-    mLinked = true;
-    {
-        // Taking the source's range emits rangeChanged, whose slot may delete this axis.
-        const QCPEmissionScope scope(mParentPlot);
-        refreshFromLink();
-    }
-    // Even an identity link on the same rect changes where the axis maps: its pixels come from
-    // the source now.
-    markAppearanceDirty();
-}
-
-void QCPAxis::unlink()
-{
-    if (!mLink)
-        return;
-    if (QCPAxis* source = mLink->source)
-        source->mLinkedAxes.removeAll(this);
-    mLink.reset();
-    mLinked = false;
-    markAppearanceDirty();
-}
-
-QCPAxis* QCPAxis::linkSource() const
-{
-    return mLink ? mLink->source.data() : nullptr;
-}
-
-/*! \internal
-
-  The axis a range move of this one must act on: a linked axis is a view of another axis, so
-  dragging, panning or zooming it moves its source. Moving the linked axis itself would express
-  the move in linked units, which a non-linear link turns into a different source move.
-*/
-QCPAxis* QCPAxis::moveTarget() const
-{
-    return mLink && mLink->source ? mLink->source.data() : const_cast<QCPAxis*>(this);
-}
-
 /*! \internal
 
   Maps \a pixel of this axis' rect onto the move target's rect, keeping the fraction of the axis
@@ -945,7 +636,7 @@ double QCPAxis::linkedCoordToPixel(double value) const
 {
     if (!mLink || !mLink->inverse || !mAxisRect)
         return qQNaN();
-    const QCPAxis* source = mLink->source;
+    const auto* source = qobject_cast<const QCPAxis*>(mLink->source.data());
     if (!source || !source->mAxisRect)
         return qQNaN();
     const QRectF sourceRect = source->mAxisRect->rect();
@@ -969,7 +660,7 @@ double QCPAxis::linkedPixelToCoord(double value) const
 {
     if (!mLink || !mLink->forward || !mAxisRect)
         return qQNaN();
-    const QCPAxis* source = mLink->source;
+    const auto* source = qobject_cast<const QCPAxis*>(mLink->source.data());
     if (!source || !source->mAxisRect)
         return qQNaN();
     const QRectF sourceRect = source->mAxisRect->rect();
@@ -986,200 +677,6 @@ double QCPAxis::linkedPixelToCoord(double value) const
         sourcePixel = sourceRect.bottom() - fraction * sourceRect.height();
     }
     return mLink->forward(source->pixelToCoord(sourcePixel));
-}
-
-/*!
-  Sets the range of the axis.
-
-  This slot may be connected with the \ref rangeChanged signal of another axis so this axis
-  is always synchronized with the other axis range, when it changes.
-
-  To invert the direction of an axis, use \ref setRangeReversed.
-*/
-void QCPAxis::setRange(const QCPRange& range)
-{
-    commitRange(range);
-}
-
-/*!
-  Sets whether the user can (de-)select the parts in \a selectable by clicking on the QCustomPlot
-  surface. (When \ref QCustomPlot::setInteractions contains iSelectAxes.)
-
-  However, even when \a selectable is set to a value not allowing the selection of a specific part,
-  it is still possible to set the selection of this part manually, by calling \ref setSelectedParts
-  directly.
-
-  \see SelectablePart, setSelectedParts
-*/
-void QCPAxis::setSelectableParts(const SelectableParts& selectable)
-{
-    if (mSelectableParts != selectable)
-    {
-        mSelectableParts = selectable;
-        qcpEmit(this, mParentPlot, &QCPAxis::selectableChanged);
-    }
-}
-
-/*!
-  Sets the selected state of the respective axis parts described by \ref SelectablePart. When a part
-  is selected, it uses a different pen/font.
-
-  The entire selection mechanism for axes is handled automatically when \ref
-  QCustomPlot::setInteractions contains iSelectAxes. You only need to call this function when you
-  wish to change the selection state manually.
-
-  This function can change the selection state of a part, independent of the \ref setSelectableParts
-  setting.
-
-  emits the \ref selectionChanged signal when \a selected is different from the previous selection
-  state.
-
-  \see SelectablePart, setSelectableParts, selectTest, setSelectedBasePen, setSelectedTickPen,
-  setSelectedSubTickPen, setSelectedTickLabelFont, setSelectedLabelFont, setSelectedTickLabelColor,
-  setSelectedLabelColor
-*/
-void QCPAxis::setSelectedParts(const SelectableParts& selected)
-{
-    if (mSelectedParts == selected)
-        return;
-    mSelectedParts = selected;
-    markAppearanceDirty();
-    qcpEmit(this, mParentPlot, &QCPAxis::selectionChanged);
-}
-
-/*!
-  \overload
-
-  Sets the lower and upper bound of the axis range.
-
-  To invert the direction of an axis, use \ref setRangeReversed.
-
-  There is also a slot to set a range, see \ref setRange(const QCPRange &range).
-*/
-void QCPAxis::setRange(double lower, double upper)
-{
-    commitRange(QCPRange(lower, upper));
-}
-
-/*!
-  \overload
-
-  Sets the range of the axis.
-
-  The \a position coordinate indicates together with the \a alignment parameter, where the new
-  range will be positioned. \a size defines the size of the new axis range. \a alignment may be
-  Qt::AlignLeft, Qt::AlignRight or Qt::AlignCenter. This will cause the left border, right border,
-  or center of the range to be aligned with \a position. Any other values of \a alignment will
-  default to Qt::AlignCenter.
-*/
-void QCPAxis::setRange(double position, double size, Qt::AlignmentFlag alignment)
-{
-    if (alignment == Qt::AlignLeft)
-        setRange(position, position + size);
-    else if (alignment == Qt::AlignRight)
-        setRange(position - size, position);
-    else // alignment == Qt::AlignCenter
-        setRange(position - size / 2.0, position + size / 2.0);
-}
-
-/*!
-  Sets the lower bound of the axis range. The upper bound is not changed.
-  \see setRange
-*/
-void QCPAxis::setRangeLower(double lower)
-{
-    if (mRange.lower == lower)
-        return;
-    commitRange(QCPRange(lower, mRange.upper));
-}
-
-/*!
-  Sets the upper bound of the axis range. The lower bound is not changed.
-  \see setRange
-*/
-void QCPAxis::setRangeUpper(double upper)
-{
-    if (mRange.upper == upper)
-        return;
-    commitRange(QCPRange(mRange.lower, upper));
-}
-
-/*!
-  Sets whether the axis range (direction) is displayed reversed. Normally, the values on horizontal
-  axes increase left to right, on vertical axes bottom to top. When \a reversed is set to true, the
-  direction of increasing values is inverted.
-
-  Note that the range and data interface stays the same for reversed axes, e.g. the \a lower part
-  of the \ref setRange interface will still reference the mathematically smaller number than the \a
-  upper part.
-*/
-void QCPAxis::setRangeReversed(bool reversed)
-{
-    if (reversed == mRangeReversed)
-        return; // a no-op asks for the direction the axis already shows, link or not
-    QCP_CHECK_OR_RETURN(!mLink, "a linked axis follows its source's direction", );
-    mRangeReversed = reversed;
-    markAppearanceDirty();
-    // No signal carries a reversal, so the linked axes are told here; their slots may delete them.
-    if (mLinkedAxes.isEmpty())
-    {
-        refreshLinkedAxes();
-        return;
-    }
-    const QCPEmissionScope scope(mParentPlot);
-    refreshLinkedAxes();
-}
-
-/*!
-  Sets whether a drag anywhere in the axis rect also moves this axis, when the rect allows range
-  dragging (\ref QCPAxisRect::setRangeDrag). The default is true, so a drag moves every axis of the
-  rect; pass false on an axis that must stay put.
-
-  \see QCPAxisRect::setRangeDragAxes, QCPAxisRect::resetRangeDragAxes
-*/
-void QCPAxis::setRangeDraggable(bool draggable)
-{
-    mRangeDraggable = draggable;
-}
-
-/*!
-  Sets whether the mouse wheel zooms this axis, when the rect allows range zooming
-  (\ref QCPAxisRect::setRangeZoom). The default is true; pass false on an axis that must keep its
-  range.
-
-  \see QCPAxisRect::setRangeZoomAxes, QCPAxisRect::resetRangeZoomAxes
-*/
-void QCPAxis::setRangeZoomable(bool zoomable)
-{
-    mRangeZoomable = zoomable;
-}
-
-/*!
-  The axis ticker is responsible for generating the tick positions and tick labels. See the
-  documentation of QCPAxisTicker for details on how to work with axis tickers.
-
-  You can change the tick positioning/labeling behaviour of this axis by setting a different
-  QCPAxisTicker subclass using this method. If you only wish to modify the currently installed axis
-  ticker, access it via \ref ticker.
-
-  Since the ticker is stored in the axis as a shared pointer, multiple axes may share the same axis
-  ticker simply by passing the same shared pointer to multiple axes.
-
-  \see ticker
-*/
-void QCPAxis::setTicker(QSharedPointer<QCPAxisTicker> ticker)
-{
-    if (!ticker)
-    {
-        qDebug() << Q_FUNC_INFO << "can not set nullptr as axis ticker";
-        return;
-    }
-    if (mTicker == ticker)
-        return;
-    mTicker = ticker;
-    // no need to invalidate margin cache here because produced tick labels are checked for changes
-    // in setupTickVector
-    markAppearanceDirty();
 }
 
 /*!
@@ -1615,7 +1112,7 @@ void QCPAxis::setLabelRenderer(QCPLabelRenderer* renderer)
     if (mLabelRenderer != renderer)
     {
         mLabelRenderer = renderer;
-        mCachedMarginValid = false;   // a different typesetter means a different size
+        mCachedMarginValid = false; // a different typesetter means a different size
         markAppearanceDirty();
     }
 }
@@ -1806,81 +1303,6 @@ void QCPAxis::setUpperEnding(const QCPLineEnding& ending)
         return;
     mAxisPainter->upperEnding = ending;
     markAppearanceDirty();
-}
-
-/*!
-  If the scale type (\ref setScaleType) is \ref stLinear, \a diff is added to the lower and upper
-  bounds of the range. The range is simply moved by \a diff.
-
-  If the scale type is \ref stLogarithmic, the range bounds are multiplied by \a diff. This
-  corresponds to an apparent "linear" move in logarithmic scaling by a distance of log(diff).
-*/
-void QCPAxis::moveRange(double diff)
-{
-    QCPRange moved = mRange;
-    if (mScaleType == stLinear)
-    {
-        moved.lower += diff;
-        moved.upper += diff;
-    }
-    else // mScaleType == stLogarithmic
-    {
-        moved.lower *= diff;
-        moved.upper *= diff;
-    }
-    commitRange(moved);
-}
-
-/*!
-  Scales the range of this axis by \a factor around the center of the current axis range. For
-  example, if \a factor is 2.0, then the axis range will double its size, and the point at the axis
-  range center won't have changed its position in the QCustomPlot widget (i.e. coordinates around
-  the center will have moved symmetrically closer).
-
-  If you wish to scale around a different coordinate than the current axis range center, use the
-  overload \ref scaleRange(double factor, double center).
-*/
-void QCPAxis::scaleRange(double factor)
-{
-    scaleRange(factor, range().center());
-}
-
-/*! \overload
-
-  Scales the range of this axis by \a factor around the coordinate \a center. For example, if \a
-  factor is 2.0, \a center is 1.0, then the axis range will double its size, and the point at
-  coordinate 1.0 won't have changed its position in the QCustomPlot widget (i.e. coordinates
-  around 1.0 will have moved symmetrically closer to 1.0).
-
-  \see scaleRange(double factor)
-*/
-void QCPAxis::scaleRange(double factor, double center)
-{
-    PROFILE_HERE_N("QCPAxis::scaleRange");
-    QCPRange scaled = mRange;
-    if (mScaleType == stLinear)
-    {
-        scaled.lower = (mRange.lower - center) * factor + center;
-        scaled.upper = (mRange.upper - center) * factor + center;
-    }
-    else // mScaleType == stLogarithmic
-    {
-        if ((mRange.upper < 0 && center < 0)
-            || (mRange.upper > 0 && center > 0)) // make sure center has same sign as range
-        {
-            scaled.lower = qPow(mRange.lower / center, factor) * center;
-            scaled.upper = qPow(mRange.upper / center, factor) * center;
-        }
-        else
-        {
-            qDebug() << Q_FUNC_INFO
-                     << "Center of scaling operation doesn't lie in same logarithmic sign domain "
-                        "as range:"
-                     << center;
-            return;
-        }
-    }
-    commitRange(scaled);
 }
 
 /*!
@@ -2123,19 +1545,6 @@ QCPAxis::SelectablePart QCPAxis::getPartAt(const QPointF& pos) const
 }
 
 /* inherits documentation from base class */
-double QCPAxis::selectTest(const QPointF& pos, bool onlySelectable, QVariant* details) const
-{
-    if (!mParentPlot)
-        return -1;
-    SelectablePart part = getPartAt(pos);
-    if ((onlySelectable && !mSelectableParts.testFlag(part)) || part == spNone)
-        return -1;
-
-    if (details)
-        details->setValue(part);
-    return mParentPlot->selectionTolerance() * 0.99;
-}
-
 /*!
   Returns a list of all the plottables that have this axis as key or value axis.
 
@@ -2246,30 +1655,7 @@ QCPAxis::AxisType QCPAxis::opposite(QCPAxis::AxisType type)
 }
 
 /* inherits documentation from base class */
-void QCPAxis::selectEvent([[maybe_unused]] QMouseEvent* event, bool additive,
-                          const QVariant& details, bool* selectionStateChanged)
-{
-    SelectablePart part = details.value<SelectablePart>();
-    if (mSelectableParts.testFlag(part))
-    {
-        SelectableParts selBefore = mSelectedParts;
-        const QPointer<QCPAxis> alive(this);
-        setSelectedParts(additive ? mSelectedParts ^ part : part);
-        if (selectionStateChanged)
-            *selectionStateChanged = !alive || mSelectedParts != selBefore;
-    }
-}
-
 /* inherits documentation from base class */
-void QCPAxis::deselectEvent(bool* selectionStateChanged)
-{
-    SelectableParts selBefore = mSelectedParts;
-    const QPointer<QCPAxis> alive(this);
-    setSelectedParts(mSelectedParts & ~mSelectableParts);
-    if (selectionStateChanged)
-        *selectionStateChanged = !alive || mSelectedParts != selBefore;
-}
-
 /*! \internal
 
   This mouse event reimplementation provides the functionality to let the user drag individual axes
@@ -2332,7 +1718,8 @@ void QCPAxis::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
         const double currentPixel
             = orientation() == Qt::Horizontal ? event->pos().x() : event->pos().y();
         const QPointer<QCPAxis> alive(this); // a rangeChanged slot may delete this axis
-        // A linked axis moves its source, in the source's pixels: the link maps values, not offsets.
+        // A linked axis moves its source, in the source's pixels: the link maps values, not
+        // offsets.
         QCPAxis* target = mDragTarget ? mDragTarget.data() : this;
         const QPointer<QCPAxis> targetAlive(target);
         const double from = pixelOnMoveTarget(startPixel);
@@ -2415,8 +1802,8 @@ void QCPAxis::wheelEvent(QWheelEvent* event)
     QCPAxis* target = moveTarget();
     const QPointer<QCPAxis> targetAlive(target);
     target->scaleRange(factor,
-                       target->pixelToCoord(pixelOnMoveTarget(
-                           orientation() == Qt::Horizontal ? pos.x() : pos.y())));
+                       target->pixelToCoord(
+                           pixelOnMoveTarget(orientation() == Qt::Horizontal ? pos.x() : pos.y())));
     if (alive && targetAlive)
         mParentPlot->replot(QCustomPlot::rpQueuedReplot);
 }
@@ -2671,11 +2058,6 @@ void QCPAxis::applyTickLabelFormat()
 }
 
 /* inherits documentation from base class */
-QCP::Interaction QCPAxis::selectionCategory() const
-{
-    return QCP::iSelectAxes;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPAxisPainterPrivate
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3617,4 +2999,92 @@ const QFontMetrics& QCPAxisPainterPrivate::fontMetricsFor(const QFont& font)
         mCachedFontMetrics = QFontMetrics(font);
     }
     return mCachedFontMetrics;
+}
+
+/*!
+  Returns the axis rect this axis is drawn in.
+*/
+QCPArea* QCPAxis::area() const
+{
+    return mAxisRect;
+}
+
+/*! \internal
+
+  A scale type change stales the cached margin and every item tree: an item's extent depends on the
+  scale type, as a non-positive coordinate has no pixel on a log axis.
+*/
+void QCPAxis::scaleTypeWillChange()
+{
+    mCachedMarginValid = false;
+    if (mParentPlot)
+        for (int layerIndex = 0; layerIndex < mParentPlot->layerCount(); ++layerIndex)
+            mParentPlot->layer(layerIndex)->invalidateItemIndex();
+}
+
+/*! \internal
+
+  Dirties every layer a change of look moves. A different font, tick length or label padding changes
+  the axis margin, and the margin sets the rect every axis, grid and plottable in it is laid out in;
+  QCPAxisRect::markAffectedLayersDirty() walks those, the items on the axis are what
+  markLayersUsingAxisDirty() adds. No-op until the axis is in a rect.
+*/
+void QCPAxis::markAppearanceDirty()
+{
+    if (!mAxisRect)
+        return;
+    // A margin change moves every axis, grid and plottable of the rect: invalidate their buffers
+    // instead of dirtying them, so a pending pan translation cannot show the old frame.
+    mAxisRect->markAffectedLayersDirty(true);
+    mAxisRect->markItemsUsingAxisDirty(this);
+}
+
+/*! \internal
+
+  A cartesian axis links to another cartesian axis of the same orientation only: the two must be
+  drawn along the same direction for the pixel mapping to make sense.
+*/
+bool QCPAxis::checkLinkSource(const QCPAxisBase* source) const
+{
+    const auto* axis = qobject_cast<const QCPAxis*>(source);
+    QCP_CHECK_OR_RETURN(axis, "the linked axes must both be cartesian", false);
+    QCP_CHECK_OR_RETURN(axis->mOrientation == mOrientation,
+                        "the linked axes must have the same orientation", false);
+    return true;
+}
+
+/*! \internal
+
+  Every range setter ends here. A range change invalidates every layer that depends on this axis
+  (its own, the grid, the plottables and items attached to it), and QCustomPlot::replot only
+  repaints dirty buffers - so the layers are dirtied here, at the source, rather than by each
+  caller (drag, wheel, pinch, setRange from axis synchronizers).
+  QCustomPlot::ensureAtLeastOneBufferDirty() only covers the case where nothing else is dirty; any
+  unrelated dirty buffer would otherwise leave the graph layer stale while axes and grid move.
+*/
+void QCPAxis::rangeDidChange(const QCPRange& oldRange)
+{
+    if (mAxisRect)
+    {
+        mAxisRect->markAffectedLayersDirty();
+        mAxisRect->markItemsUsingAxisDirty(this);
+    }
+    QCPAxisBase::rangeDidChange(oldRange);
+}
+
+/*!
+  Returns the source this axis follows, or null when it is not linked.
+*/
+QCPAxis* QCPAxis::linkSource() const
+{
+    return qobject_cast<QCPAxis*>(QCPAxisBase::linkSource());
+}
+
+/*! \internal
+
+  The axis a range move of this one acts on: the link's source when linked.
+*/
+QCPAxis* QCPAxis::moveTarget() const
+{
+    return qobject_cast<QCPAxis*>(QCPAxisBase::moveTarget());
 }

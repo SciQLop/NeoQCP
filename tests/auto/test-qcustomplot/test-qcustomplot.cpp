@@ -745,7 +745,7 @@ void TestQCustomPlot::angularDragSlotDeletingTheAreaIsSafe()
   QList<QCPPolarAxisRadial*> radials;
   QPointer<QCPPolarArea> area = polarPlot(mPlot, radials);
   QCPPolarAxisAngular* angular = area->angularAxis();
-  angular->setRangeDrag(true);
+  angular->setRangeDraggable(true);
   connect(angular, &QCPPolarAxisAngular::rangeChanged, mPlot,
           [this, area] { mPlot->plotLayout()->remove(area); }, Qt::SingleShotConnection);
   const QPoint from = polarPoint(area, 0.6);
@@ -761,7 +761,7 @@ void TestQCustomPlot::angularWheelSlotDeletingTheAreaIsSafe()
   QList<QCPPolarAxisRadial*> radials;
   QPointer<QCPPolarArea> area = polarPlot(mPlot, radials);
   QCPPolarAxisAngular* angular = area->angularAxis();
-  angular->setRangeZoom(true);
+  angular->setRangeZoomable(true);
   connect(angular, &QCPPolarAxisAngular::rangeChanged, mPlot,
           [this, area] { mPlot->plotLayout()->remove(area); }, Qt::SingleShotConnection);
   wheelOnPolar(mPlot, area);

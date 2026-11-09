@@ -36,6 +36,7 @@ set(NEOQCP_SOURCES
     src/selectiondecorator-bracket.cpp
     src/selectionrect.cpp
     src/vector2d.cpp
+    src/axis/axis-base.cpp
     src/axis/axis.cpp
     src/axis/axisticker.cpp
     src/axis/axistickerdatetime.cpp
@@ -106,6 +107,7 @@ set(NEOQCP_SOURCES
 
 # The headers moc runs on, as in meson.build.
 set(NEOQCP_MOC_HEADERS
+    src/axis/axis-base.h
     src/axis/axis.h
     src/axis/axisticker.h
     src/axis/axistickerdatetime.h

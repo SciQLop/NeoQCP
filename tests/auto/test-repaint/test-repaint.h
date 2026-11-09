@@ -36,6 +36,8 @@ private slots:
     void orphanPlottableKeepsName();
     void axisRectMarginsMoveTheContent();
     void polarPlotSettles();
+    void rangeChangeRepaintsItsLayers_data();
+    void rangeChangeRepaintsItsLayers();
     void exportSettlesPendingTheme();
     void plottableSettersScheduleRepaint_data();
     void plottableSettersScheduleRepaint();

@@ -16,4 +16,6 @@ private slots:
     void aPolarGraphAddsToTheArea();
     void insetAndBackgroundAreAreaFeatures();
     void backgroundStaysInsideTheDisc();
+    void polarAxisPartsAreClickable();
+    void radialDragAndWheelWork();
 };

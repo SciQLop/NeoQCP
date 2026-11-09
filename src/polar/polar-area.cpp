@@ -86,6 +86,11 @@ QCPPolarArea::~QCPPolarArea()
     const QList<QCPPolarAxisRadial*> axes = mRadialAxes;
     for (QCPPolarAxisRadial* axis : axes)
         removeRadialAxis(axis);
+
+    // The axes are the plot's children, not the area's: they go with the area whose geometry they
+    // draw, or they would reach back into it once it is gone.
+    delete mAngularAxis;
+    mAngularAxis = nullptr;
 }
 
 /*! \internal
@@ -263,6 +268,47 @@ void QCPPolarArea::update(UpdatePhase phase)
     }
 }
 
+/* inherits documentation from base class */
+QList<QCPAxisBase*> QCPPolarArea::allAxes() const
+{
+    QList<QCPAxisBase*> result;
+    if (mAngularAxis)
+        result << mAngularAxis;
+    result.reserve(result.size() + mRadialAxes.size());
+    for (QCPPolarAxisRadial* axis : mRadialAxes)
+        result << axis;
+    return result;
+}
+
+/*! \internal
+
+  Dirties every layer a change of an axis' range moves: the angular and radial axes and the grid,
+  then what each graph and its items draw. Mirrors QCPAxisRect::markAffectedLayersDirty.
+*/
+void QCPPolarArea::markAffectedLayersDirty(bool invalidate)
+{
+    QVarLengthArray<QCPLayer*, 8> seen;
+    auto markOnce = [&](QCPLayer* l)
+    {
+        if (l && !seen.contains(l))
+        {
+            seen.append(l);
+            if (invalidate)
+                l->invalidatePaintBuffer();
+            else
+                l->markDirty();
+        }
+    };
+    if (mAngularAxis)
+        markOnce(mAngularAxis->layer());
+    for (QCPPolarAxisRadial* axis : mRadialAxes)
+        markOnce(axis->layer());
+    if (mGrid)
+        markOnce(mGrid->layer());
+    for (QCPPolarGraph* graph : mGraphs)
+        markOnce(graph->layer());
+}
+
 void QCPPolarArea::mousePressEvent(QMouseEvent* event, [[maybe_unused]] const QVariant& details)
 {
     if (event->buttons() & Qt::LeftButton)
@@ -291,7 +337,7 @@ void QCPPolarArea::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
     if (mDragging && mParentPlot->interactions().testFlag(QCP::iRangeDrag))
     {
         // angular axis:
-        if (mAngularAxis->rangeDrag())
+        if (mAngularAxis->rangeDraggable())
         {
             doReplot = true;
             double angleCoordStart, radiusCoordStart;
@@ -310,7 +356,7 @@ void QCPPolarArea::mouseMoveEvent(QMouseEvent* event, const QPointF& startPos)
         {
             if (!alive)
                 break;
-            if (!axis || !axis->rangeDrag())
+            if (!axis || !axis->rangeDraggable())
                 continue;
             doReplot = true;
             double angleCoordStart, radiusCoordStart;
@@ -361,11 +407,11 @@ void QCPPolarArea::wheelEvent(QWheelEvent* event)
         const QPointF pos = event->position();
         const double wheelSteps = delta / 120.0; // a single step delta is +/- 120
 
-        if (mAngularAxis->rangeZoom())
+        if (mAngularAxis->rangeZoomable())
         {
             double angleCoord, radiusCoord;
             mAngularAxis->pixelToCoord(pos, angleCoord, radiusCoord);
-            mAngularAxis->scaleRange(qPow(mAngularAxis->rangeZoomFactor(), wheelSteps), angleCoord);
+            mAngularAxis->scaleRange(qPow(mRangeZoomFactor, wheelSteps), angleCoord);
             if (!alive)
                 return;
         }
@@ -374,12 +420,12 @@ void QCPPolarArea::wheelEvent(QWheelEvent* event)
         {
             if (!alive)
                 break;
-            if (!axis || !axis->rangeZoom())
+            if (!axis || !axis->rangeZoomable())
                 continue;
             doReplot = true;
             double angleCoord, radiusCoord;
             axis->pixelToCoord(pos, angleCoord, radiusCoord);
-            axis->scaleRange(qPow(axis->rangeZoomFactor(), wheelSteps), radiusCoord);
+            axis->scaleRange(qPow(mRangeZoomFactor, wheelSteps), radiusCoord);
         }
     }
     if (alive && doReplot)

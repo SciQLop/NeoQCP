@@ -1,34 +1,10 @@
-/***************************************************************************
-**                                                                        **
-**  QCustomPlot, an easy to use, modern plotting widget for Qt            **
-**  Copyright (C) 2011-2022 Emanuel Eichhammer                            **
-**                                                                        **
-**  This program is free software: you can redistribute it and/or modify  **
-**  it under the terms of the GNU General Public License as published by  **
-**  the Free Software Foundation, either version 3 of the License, or     **
-**  (at your option) any later version.                                   **
-**                                                                        **
-**  This program is distributed in the hope that it will be useful,       **
-**  but WITHOUT ANY WARRANTY; without even the implied warranty of        **
-**  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         **
-**  GNU General Public License for more details.                          **
-**                                                                        **
-**  You should have received a copy of the GNU General Public License     **
-**  along with this program.  If not, see http://www.gnu.org/licenses/.   **
-**                                                                        **
-****************************************************************************
-**           Author: Emanuel Eichhammer                                   **
-**  Website/Contact: https://www.qcustomplot.com/                         **
-**             Date: 06.11.22                                             **
-**          Version: 2.1.1                                                **
-****************************************************************************/
-
 #ifndef QCP_POLAR_ANGULARAXIS_H
 #define QCP_POLAR_ANGULARAXIS_H
 
+#include "../axis/axis-base.h"
+#include "polar-area.h"
 #include "../axis/axistickerfixed.h"
 #include "../axis/labelpainter.h"
-#include "../axis/range.h"
 #include "../global.h"
 #include "../handle-ops.h"
 #include "../layer.h"
@@ -45,9 +21,9 @@ class QCPPolarAxisAngularOps;
 /*!
   The angular axis of a polar plot: its range, ticks, labels and drawing, and the angle at which
   its zero coordinate points. It is a child of the \ref QCPPolarArea that lays it out and that owns
-  its radial axes and graphs.
+  its radial axes and graphs. The range model is the one of \ref QCPAxisBase.
 */
-class QCP_LIB_DECL QCPPolarAxisAngular : public QCPLayerable
+class QCP_LIB_DECL QCPPolarAxisAngular : public QCPAxisBase
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
@@ -56,31 +32,13 @@ class QCP_LIB_DECL QCPPolarAxisAngular : public QCPLayerable
 
 public:
     /*!
-      Defines the selectable parts of an axis.
-      \see setSelectableParts, setSelectedParts
-    */
-    enum SelectablePart
-    {
-        spNone = 0 ///< None of the selectable parts
-        ,
-        spAxis = 0x001 ///< The axis backbone and tick marks
-        ,
-        spTickLabels = 0x002 ///< Tick labels (numbers) of this axis (as a whole, not individually)
-        ,
-        spAxisLabel = 0x004 ///< The axis label
-    };
-    Q_ENUM(SelectablePart)
-    Q_DECLARE_FLAGS(SelectableParts, SelectablePart)
-    Q_FLAG(SelectableParts)
-
-    /*!
-      TODO
+      Defines how the tick labels are turned around the circle.
     */
     enum LabelMode
     {
-        lmUpright ///<
+        lmUpright ///< The labels stay upright
         ,
-        lmRotated ///<
+        lmRotated ///< The labels follow the tick direction
     };
     Q_ENUM(LabelMode)
 
@@ -90,21 +48,10 @@ public:
     explicit QCPPolarAxisAngular(QCPPolarArea* area);
 
     // getters:
-    QCPPolarArea* area() const { return mArea; }
-
-    bool rangeDrag() const { return mRangeDrag; }
-
-    bool rangeZoom() const { return mRangeZoom; }
-
-    double rangeZoomFactor() const { return mRangeZoomFactor; }
-
-    const QCPRange range() const { return mRange; }
-
-    bool rangeReversed() const { return mRangeReversed; }
+    // Out of line: QCPPolarArea is incomplete here, and the covariant return needs it complete.
+    QCPPolarArea* area() const override;
 
     double angle() const { return mAngle; }
-
-    QSharedPointer<QCPAxisTicker> ticker() const { return mTicker; }
 
     bool ticks() const { return mTicks; }
 
@@ -122,10 +69,6 @@ public:
     QString numberFormat() const;
 
     int numberPrecision() const { return mNumberPrecision; }
-
-    QVector<double> tickVector() const { return mTickVector; }
-
-    QVector<QString> tickVectorLabels() const { return mTickVectorLabels; }
 
     int tickLengthIn() const { return mTickLengthIn; }
 
@@ -151,17 +94,6 @@ public:
 
     int labelPadding() const { return mLabelPadding; }
 
-    SelectableParts selectedParts() const { return mSelectedParts; }
-
-    SelectableParts selectableParts() const { return mSelectableParts; }
-
-    bool selected() const { return mSelectedParts != spNone; }
-
-    QCP::SelectionType selectable() const
-    {
-        return mSelectableParts != spNone ? QCP::stWhole : QCP::stNone;
-    }
-
     QFont selectedTickLabelFont() const { return mSelectedTickLabelFont; }
 
     QFont selectedLabelFont() const { return mSelectedLabelFont; }
@@ -177,18 +109,7 @@ public:
     QPen selectedSubTickPen() const { return mSelectedSubTickPen; }
 
     // setters:
-    void setRangeDrag(bool enabled);
-    void setRangeZoom(bool enabled);
-    void setRangeZoomFactor(double factor);
-
-    Q_SLOT void setRange(const QCPRange& range);
-    void setRange(double lower, double upper);
-    void setRange(double position, double size, Qt::AlignmentFlag alignment);
-    void setRangeLower(double lower);
-    void setRangeUpper(double upper);
-    void setRangeReversed(bool reversed);
     void setAngle(double degrees);
-    void setTicker(QSharedPointer<QCPAxisTicker> ticker);
     void setTicks(bool show);
     void setTickLabels(bool show);
     void setTickLabelPadding(int padding);
@@ -220,14 +141,8 @@ public:
     void setSelectedBasePen(const QPen& pen);
     void setSelectedTickPen(const QPen& pen);
     void setSelectedSubTickPen(const QPen& pen);
-    Q_SLOT void setSelectableParts(const QCPPolarAxisAngular::SelectableParts& selectableParts);
-    Q_SLOT void setSelectedParts(const QCPPolarAxisAngular::SelectableParts& selectedParts);
 
     // non-property methods:
-    void moveRange(double diff);
-    void scaleRange(double factor);
-    void scaleRange(double factor, double center);
-
     double coordToAngleRad(double coord) const
     {
         return mAngleRad
@@ -242,23 +157,12 @@ public:
 
     void pixelToCoord(QPointF pixelPos, double& angleCoord, double& radiusCoord) const;
     QPointF coordToPixel(double angleCoord, double radiusCoord) const;
-    SelectablePart getPartAt(const QPointF& pos) const;
-
-signals:
-    void rangeChanged(const QCPRange& newRange, const QCPRange& oldRange);
-    void selectionChanged();
-    void selectableChanged();
 
 protected:
     // property members:
-    bool mRangeDrag;
-    bool mRangeZoom;
-    double mRangeZoomFactor;
-
-    // axis base:
     double mAngle, mAngleRad;
-    SelectableParts mSelectableParts, mSelectedParts;
     QPen mBasePen, mSelectedBasePen;
+
     // axis label:
     int mLabelPadding;
     QString mLabel;
@@ -280,23 +184,21 @@ protected:
     int mTickLengthIn, mTickLengthOut, mSubTickLengthIn, mSubTickLengthOut;
     QPen mTickPen, mSelectedTickPen;
     QPen mSubTickPen, mSelectedSubTickPen;
-    // scale and range:
-    QCPRange mRange;
-    bool mRangeReversed;
 
     // non-property members:
     QCPPolarArea* mArea;
-    QSharedPointer<QCPAxisTicker> mTicker;
-    QVector<double> mTickVector;
-    QVector<QString> mTickVectorLabels;
     QVector<QPointF> mTickVectorCosSin;
-    QVector<double> mSubTickVector;
     QVector<QPointF> mSubTickVectorCosSin;
+    // The boxes of the tick labels last drawn: what a click on a label lands in.
+    QList<QRectF> mTickLabelBoxes;
     QCPLabelPainterPrivate mLabelPainter;
 
     // reimplemented virtual methods:
     virtual void applyDefaultAntialiasingHint(QCPPainter* painter) const override;
     virtual void draw(QCPPainter* painter) override;
+    SelectablePart getPartAt(const QPointF& pos) const override;
+    void rangeDidChange(const QCPRange& oldRange) override;
+    bool checkLinkSource(const QCPAxisBase* source) const override;
 
     // non-virtual methods:
     void setupTickVectors();
@@ -310,14 +212,11 @@ protected:
 
 private:
     Q_DISABLE_COPY(QCPPolarAxisAngular)
-    void emitRangeChanged(const QCPRange& oldRange);
 
     friend class QCustomPlot;
     friend class QCPPolarArea;
     friend class QCPPolarGrid;
 };
-Q_DECLARE_OPERATORS_FOR_FLAGS(QCPPolarAxisAngular::SelectableParts)
-Q_DECLARE_METATYPE(QCPPolarAxisAngular::SelectablePart)
 
 // The handle of QCPPolarAxisAngular: what add<T>() returns for it.
 template <typename T, typename Self>
@@ -445,14 +344,14 @@ public:
         return this->apply([&](T& o) { o.setLabelPadding(padding); });
     }
 
-    Ret setRangeZoom(bool enabled)
+    Ret setRangeDraggable(bool draggable)
     {
-        return this->apply([&](T& o) { o.setRangeZoom(enabled); });
+        return this->apply([&](T& o) { o.setRangeDraggable(draggable); });
     }
 
-    Ret setRangeZoomFactor(double factor)
+    Ret setRangeZoomable(bool zoomable)
     {
-        return this->apply([&](T& o) { o.setRangeZoomFactor(factor); });
+        return this->apply([&](T& o) { o.setRangeZoomable(zoomable); });
     }
 };
 

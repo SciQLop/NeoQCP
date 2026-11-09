@@ -29,6 +29,7 @@
 
 #include "../core.h"
 #include "../items/item.h"
+#include "../misuse.h"
 #include "../painting/painter.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -116,17 +117,12 @@
   create them for you with \ref QCPPolarArea::addRadialAxis.
 */
 QCPPolarAxisRadial::QCPPolarAxisRadial(QCPPolarArea* area)
-        : QCPLayerable(area->parentPlot(), QString(), area)
-        , mRangeDrag(true)
-        , mRangeZoom(true)
-        , mRangeZoomFactor(0.85)
+        : QCPAxisBase(area)
         ,
         // axis base:
         mArea(area)
         , mAngle(45)
         , mAngleReference(arAngularAxis)
-        , mSelectableParts(spAxis | spTickLabels | spAxisLabel)
-        , mSelectedParts(spNone)
         , mBasePen(QPen(Qt::black, 0, Qt::SolidLine, Qt::SquareCap))
         , mSelectedBasePen(QPen(Qt::blue, 2))
         ,
@@ -165,17 +161,12 @@ QCPPolarAxisRadial::QCPPolarAxisRadial(QCPPolarArea* area)
         , mSubTickPen(QPen(Qt::black, 0, Qt::SolidLine, Qt::SquareCap))
         , mSelectedSubTickPen(QPen(Qt::blue, 2))
         ,
-        // scale and range:
-        mRange(0, 5)
-        , mRangeReversed(false)
-        , mScaleType(stLinear)
-        ,
         // internal members:
         mRadius(1)
         , // non-zero initial value, will be overwritten in ::update() according to inner rect
-        mTicker(new QCPAxisTicker)
-        , mLabelPainter(mParentPlot)
+        mLabelPainter(mParentPlot)
 {
+    mRange = QCPRange(0, 5);
     setParent(area);
     setAntialiased(true);
 
@@ -187,6 +178,11 @@ QCPPolarAxisRadial::QCPPolarAxisRadial(QCPPolarArea* area)
 }
 
 QCPPolarAxisRadial::~QCPPolarAxisRadial() { }
+
+QCPPolarArea* QCPPolarAxisRadial::area() const
+{
+    return mArea;
+}
 
 QCPPolarAxisAngular* QCPPolarAxisRadial::angularAxis() const
 {
@@ -252,240 +248,6 @@ int QCPPolarAxisRadial::labelPadding() const
     return mLabelPadding;
 }
 
-void QCPPolarAxisRadial::setRangeDrag(bool enabled)
-{
-    mRangeDrag = enabled;
-}
-
-void QCPPolarAxisRadial::setRangeZoom(bool enabled)
-{
-    mRangeZoom = enabled;
-}
-
-void QCPPolarAxisRadial::setRangeZoomFactor(double factor)
-{
-    mRangeZoomFactor = factor;
-}
-
-/*!
-  Sets whether the axis uses a linear scale or a logarithmic scale.
-
-  Note that this method controls the coordinate transformation. For logarithmic scales, you will
-  likely also want to use a logarithmic tick spacing and labeling, which can be achieved by setting
-  the axis ticker to an instance of \ref QCPAxisTickerLog :
-
-  \snippet documentation/doc-code-snippets/mainwindow.cpp qcpaxisticker-log-creation
-
-  See the documentation of \ref QCPAxisTickerLog about the details of logarithmic axis tick
-  creation.
-
-  \ref setNumberPrecision
-*/
-void QCPPolarAxisRadial::setScaleType(QCPPolarAxisRadial::ScaleType type)
-{
-    if (mScaleType != type)
-    {
-        const QCPEmissionScope scope(mParentPlot);
-        markDirty();
-        mScaleType = type;
-        if (mScaleType == stLogarithmic)
-            setRange(mRange.sanitizedForLogScale());
-        qcpEmitCurrent(this, mParentPlot, &QCPPolarAxisRadial::scaleTypeChanged,
-                       [this] { return mScaleType; });
-    }
-}
-
-/*!
-  Sets the range of the axis.
-
-  This slot may be connected with the \ref rangeChanged signal of another axis so this axis
-  is always synchronized with the other axis range, when it changes.
-
-  To invert the direction of an axis, use \ref setRangeReversed.
-*/
-void QCPPolarAxisRadial::setRange(const QCPRange& range)
-{
-    if (range.lower == mRange.lower && range.upper == mRange.upper)
-        return;
-
-    if (!QCPRange::validRange(range))
-        return;
-    markDirty();
-    QCPRange oldRange = mRange;
-    if (mScaleType == stLogarithmic)
-    {
-        mRange = range.sanitizedForLogScale();
-    }
-    else
-    {
-        mRange = range.sanitizedForLinScale();
-    }
-    emitRangeChanged(oldRange);
-}
-
-/*!
-  Sets whether the user can (de-)select the parts in \a selectable by clicking on the QCustomPlot
-  surface. (When \ref QCustomPlot::setInteractions contains iSelectAxes.)
-
-  However, even when \a selectable is set to a value not allowing the selection of a specific part,
-  it is still possible to set the selection of this part manually, by calling \ref setSelectedParts
-  directly.
-
-  \see SelectablePart, setSelectedParts
-*/
-void QCPPolarAxisRadial::setSelectableParts(const SelectableParts& selectable)
-{
-    if (mSelectableParts != selectable)
-    {
-        mSelectableParts = selectable;
-        qcpEmit(this, mParentPlot, &QCPPolarAxisRadial::selectableChanged);
-    }
-}
-
-/*!
-  Sets the selected state of the respective axis parts described by \ref SelectablePart. When a part
-  is selected, it uses a different pen/font.
-
-  The entire selection mechanism for axes is handled automatically when \ref
-  QCustomPlot::setInteractions contains iSelectAxes. You only need to call this function when you
-  wish to change the selection state manually.
-
-  This function can change the selection state of a part, independent of the \ref setSelectableParts
-  setting.
-
-  emits the \ref selectionChanged signal when \a selected is different from the previous selection
-  state.
-
-  \see SelectablePart, setSelectableParts, selectTest, setSelectedBasePen, setSelectedTickPen,
-  setSelectedSubTickPen, setSelectedTickLabelFont, setSelectedLabelFont, setSelectedTickLabelColor,
-  setSelectedLabelColor
-*/
-void QCPPolarAxisRadial::setSelectedParts(const SelectableParts& selected)
-{
-    if (mSelectedParts != selected)
-    {
-        markDirty();
-        mSelectedParts = selected;
-        qcpEmit(this, mParentPlot, &QCPPolarAxisRadial::selectionChanged);
-    }
-}
-
-/*!
-  \overload
-
-  Sets the lower and upper bound of the axis range.
-
-  To invert the direction of an axis, use \ref setRangeReversed.
-
-  There is also a slot to set a range, see \ref setRange(const QCPRange &range).
-*/
-void QCPPolarAxisRadial::setRange(double lower, double upper)
-{
-    if (lower == mRange.lower && upper == mRange.upper)
-        return;
-
-    if (!QCPRange::validRange(lower, upper))
-        return;
-    markDirty();
-    QCPRange oldRange = mRange;
-    mRange.lower = lower;
-    mRange.upper = upper;
-    if (mScaleType == stLogarithmic)
-    {
-        mRange = mRange.sanitizedForLogScale();
-    }
-    else
-    {
-        mRange = mRange.sanitizedForLinScale();
-    }
-    emitRangeChanged(oldRange);
-}
-
-/*!
-  \overload
-
-  Sets the range of the axis.
-
-  The \a position coordinate indicates together with the \a alignment parameter, where the new
-  range will be positioned. \a size defines the size of the new axis range. \a alignment may be
-  Qt::AlignLeft, Qt::AlignRight or Qt::AlignCenter. This will cause the left border, right border,
-  or center of the range to be aligned with \a position. Any other values of \a alignment will
-  default to Qt::AlignCenter.
-*/
-void QCPPolarAxisRadial::setRange(double position, double size, Qt::AlignmentFlag alignment)
-{
-    // each branch delegates to setRange(double, double), which dirties
-    if (alignment == Qt::AlignLeft)
-        setRange(position, position + size);
-    else if (alignment == Qt::AlignRight)
-        setRange(position - size, position);
-    else // alignment == Qt::AlignCenter
-        setRange(position - size / 2.0, position + size / 2.0);
-}
-
-/*!
-  Sets the lower bound of the axis range. The upper bound is not changed.
-  \see setRange
-*/
-void QCPPolarAxisRadial::setRangeLower(double lower)
-{
-    if (mRange.lower == lower)
-        return;
-
-    markDirty();
-    QCPRange oldRange = mRange;
-    mRange.lower = lower;
-    if (mScaleType == stLogarithmic)
-    {
-        mRange = mRange.sanitizedForLogScale();
-    }
-    else
-    {
-        mRange = mRange.sanitizedForLinScale();
-    }
-    emitRangeChanged(oldRange);
-}
-
-/*!
-  Sets the upper bound of the axis range. The lower bound is not changed.
-  \see setRange
-*/
-void QCPPolarAxisRadial::setRangeUpper(double upper)
-{
-    if (mRange.upper == upper)
-        return;
-
-    markDirty();
-    QCPRange oldRange = mRange;
-    mRange.upper = upper;
-    if (mScaleType == stLogarithmic)
-    {
-        mRange = mRange.sanitizedForLogScale();
-    }
-    else
-    {
-        mRange = mRange.sanitizedForLinScale();
-    }
-    emitRangeChanged(oldRange);
-}
-
-/*!
-  Sets whether the axis range (direction) is displayed reversed. Normally, the values on horizontal
-  axes increase left to right, on vertical axes bottom to top. When \a reversed is set to true, the
-  direction of increasing values is inverted.
-
-  Note that the range and data interface stays the same for reversed axes, e.g. the \a lower part
-  of the \ref setRange interface will still reference the mathematically smaller number than the \a
-  upper part.
-*/
-void QCPPolarAxisRadial::setRangeReversed(bool reversed)
-{
-    if (reversed == mRangeReversed)
-        return;
-    markDirty();
-    mRangeReversed = reversed;
-}
-
 void QCPPolarAxisRadial::setAngle(double degrees)
 {
     if (degrees == mAngle)
@@ -500,34 +262,6 @@ void QCPPolarAxisRadial::setAngleReference(AngleReference reference)
         return;
     markDirty();
     mAngleReference = reference;
-}
-
-/*!
-  The axis ticker is responsible for generating the tick positions and tick labels. See the
-  documentation of QCPAxisTicker for details on how to work with axis tickers.
-
-  You can change the tick positioning/labeling behaviour of this axis by setting a different
-  QCPAxisTicker subclass using this method. If you only wish to modify the currently installed axis
-  ticker, access it via \ref ticker.
-
-  Since the ticker is stored in the axis as a shared pointer, multiple axes may share the same axis
-  ticker simply by passing the same shared pointer to multiple axes.
-
-  \see ticker
-*/
-void QCPPolarAxisRadial::setTicker(QSharedPointer<QCPAxisTicker> ticker)
-{
-    if (!ticker)
-    {
-        qDebug() << Q_FUNC_INFO << "can not set 0 as axis ticker";
-        return;
-    }
-    if (mTicker == ticker)
-        return;
-    markDirty();
-    mTicker = ticker;
-    // no need to invalidate margin cache here because produced tick labels are checked for changes
-    // in setupTickVector
 }
 
 /*!
@@ -1040,83 +774,6 @@ void QCPPolarAxisRadial::setSelectedSubTickPen(const QPen& pen)
 }
 
 /*!
-  If the scale type (\ref setScaleType) is \ref stLinear, \a diff is added to the lower and upper
-  bounds of the range. The range is simply moved by \a diff.
-
-  If the scale type is \ref stLogarithmic, the range bounds are multiplied by \a diff. This
-  corresponds to an apparent "linear" move in logarithmic scaling by a distance of log(diff).
-*/
-void QCPPolarAxisRadial::moveRange(double diff)
-{
-    QCPRange oldRange = mRange;
-    if (mScaleType == stLinear)
-    {
-        mRange.lower += diff;
-        mRange.upper += diff;
-    }
-    else // mScaleType == stLogarithmic
-    {
-        mRange.lower *= diff;
-        mRange.upper *= diff;
-    }
-    emitRangeChanged(oldRange);
-}
-
-/*!
-  Scales the range of this axis by \a factor around the center of the current axis range. For
-  example, if \a factor is 2.0, then the axis range will double its size, and the point at the axis
-  range center won't have changed its position in the QCustomPlot widget (i.e. coordinates around
-  the center will have moved symmetrically closer).
-
-  If you wish to scale around a different coordinate than the current axis range center, use the
-  overload \ref scaleRange(double factor, double center).
-*/
-void QCPPolarAxisRadial::scaleRange(double factor)
-{
-    scaleRange(factor, range().center());
-}
-
-/*! \overload
-
-  Scales the range of this axis by \a factor around the coordinate \a center. For example, if \a
-  factor is 2.0, \a center is 1.0, then the axis range will double its size, and the point at
-  coordinate 1.0 won't have changed its position in the QCustomPlot widget (i.e. coordinates
-  around 1.0 will have moved symmetrically closer to 1.0).
-
-  \see scaleRange(double factor)
-*/
-void QCPPolarAxisRadial::scaleRange(double factor, double center)
-{
-    QCPRange oldRange = mRange;
-    if (mScaleType == stLinear)
-    {
-        QCPRange newRange;
-        newRange.lower = (mRange.lower - center) * factor + center;
-        newRange.upper = (mRange.upper - center) * factor + center;
-        if (QCPRange::validRange(newRange))
-            mRange = newRange.sanitizedForLinScale();
-    }
-    else // mScaleType == stLogarithmic
-    {
-        if ((mRange.upper < 0 && center < 0)
-            || (mRange.upper > 0 && center > 0)) // make sure center has same sign as range
-        {
-            QCPRange newRange;
-            newRange.lower = qPow(mRange.lower / center, factor) * center;
-            newRange.upper = qPow(mRange.upper / center, factor) * center;
-            if (QCPRange::validRange(newRange))
-                mRange = newRange.sanitizedForLogScale();
-        }
-        else
-            qDebug() << Q_FUNC_INFO
-                     << "Center of scaling operation doesn't lie in same logarithmic sign domain "
-                        "as range:"
-                     << center;
-    }
-    emitRangeChanged(oldRange);
-}
-
-/*!
   Changes the axis range such that all plottables associated with this axis are fully visible in
   that dimension.
 
@@ -1249,195 +906,46 @@ double QCPPolarAxisRadial::radiusToCoord(double radius) const
 
   \see setSelectedParts, setSelectableParts, QCustomPlot::setInteractions
 */
-QCPPolarAxisRadial::SelectablePart
-QCPPolarAxisRadial::getPartAt([[maybe_unused]] const QPointF& pos) const
+QCPPolarAxisRadial::SelectablePart QCPPolarAxisRadial::getPartAt(const QPointF& pos) const
 {
-    // TODO remove later
-    if (!mVisible)
+    if (!mVisible || !mArea)
         return spNone;
-
-    /*
-      TODO:
-    if (mAxisPainter->axisSelectionBox().contains(pos.toPoint()))
-      return spAxis;
-    else if (mAxisPainter->tickLabelsSelectionBox().contains(pos.toPoint()))
-      return spTickLabels;
-    else if (mAxisPainter->labelSelectionBox().contains(pos.toPoint()))
-      return spAxisLabel;
-    else */
+    // A label wins over the spoke it sits on: it is what the user aims at.
+    for (const QRectF& box : mTickLabelBoxes)
+        if (box.contains(pos))
+            return spTickLabels;
+    const double axisAngleRad
+        = (mAngle + (mAngleReference == arAngularAxis ? angularAxis()->angle() : 0)) / 180.0 * M_PI;
+    const QPointF axisVector(qCos(axisAngleRad), qSin(axisAngleRad));
+    const QPointF rel = pos - mCenter;
+    const double along = qBound(0.0, QPointF::dotProduct(rel, axisVector), mRadius);
+    const double tolerance = mParentPlot ? mParentPlot->selectionTolerance() : 5.0;
+    if (QLineF(pos, mCenter + axisVector * along).length() <= tolerance)
+        return spAxis;
     return spNone;
 }
 
-/* inherits documentation from base class */
-double QCPPolarAxisRadial::selectTest(const QPointF& pos, bool onlySelectable,
-                                      QVariant* details) const
-{
-    if (!mParentPlot)
-        return -1;
-    SelectablePart part = getPartAt(pos);
-    if ((onlySelectable && !mSelectableParts.testFlag(part)) || part == spNone)
-        return -1;
+/*! \internal
 
-    if (details)
-        details->setValue(part);
-    return mParentPlot->selectionTolerance() * 0.99;
-}
-
-/* inherits documentation from base class */
-void QCPPolarAxisRadial::selectEvent([[maybe_unused]] QMouseEvent* event, bool additive,
-                                     const QVariant& details, bool* selectionStateChanged)
+  A range change moves the ticks along the spoke and every graph drawn from the area, so the area's
+  layers are dirtied, then the base emits and refreshes any linked axis (a polar axis never is).
+*/
+void QCPPolarAxisRadial::rangeDidChange(const QCPRange& oldRange)
 {
-    SelectablePart part = details.value<SelectablePart>();
-    if (mSelectableParts.testFlag(part))
-    {
-        SelectableParts selBefore = mSelectedParts;
-        const QPointer<QCPPolarAxisRadial> alive(this);
-        setSelectedParts(additive ? mSelectedParts ^ part : part);
-        if (selectionStateChanged)
-            *selectionStateChanged = !alive || mSelectedParts != selBefore;
-    }
-}
-
-/* inherits documentation from base class */
-void QCPPolarAxisRadial::deselectEvent(bool* selectionStateChanged)
-{
-    SelectableParts selBefore = mSelectedParts;
-    const QPointer<QCPPolarAxisRadial> alive(this);
-    setSelectedParts(mSelectedParts & ~mSelectableParts);
-    if (selectionStateChanged)
-        *selectionStateChanged = !alive || mSelectedParts != selBefore;
+    markDirty();
+    if (mArea)
+        mArea->markAffectedLayersDirty();
+    QCPAxisBase::rangeDidChange(oldRange);
 }
 
 /*! \internal
 
-  This mouse event reimplementation provides the functionality to let the user drag individual axes
-  exclusively, by startig the drag on top of the axis.
-
-  For the axis to accept this event and perform the single axis drag, the parent \ref QCPAxisRect
-  must be configured accordingly, i.e. it must allow range dragging in the orientation of this axis
-  (\ref QCPAxisRect::setRangeDrag) and this axis must be a draggable axis (\ref
-  QCPAxisRect::setRangeDragAxes)
-
-  \seebaseclassmethod
-
-  \note The dragging of possibly multiple axes at once by starting the drag anywhere in the axis
-  rect is handled by the axis rect's mouse event, e.g. \ref QCPAxisRect::mousePressEvent.
+  A polar axis has no cartesian geometry to follow a source with, so it refuses every link.
 */
-void QCPPolarAxisRadial::mousePressEvent(QMouseEvent* event,
-                                         [[maybe_unused]] const QVariant& details)
+bool QCPPolarAxisRadial::checkLinkSource([[maybe_unused]] const QCPAxisBase* source) const
 {
-    if (!mParentPlot->interactions().testFlag(QCP::iRangeDrag))
-    {
-        event->ignore();
-        return;
-    }
-
-    if (event->buttons() & Qt::LeftButton)
-    {
-        mDragging = true;
-        // initialize antialiasing backup in case we start dragging:
-        if (mParentPlot->noAntialiasingOnDrag())
-        {
-            mAADragBackup = mParentPlot->antialiasedElements();
-            mNotAADragBackup = mParentPlot->notAntialiasedElements();
-        }
-        // Mouse range dragging interaction:
-        if (mParentPlot->interactions().testFlag(QCP::iRangeDrag))
-            mDragStartRange = mRange;
-    }
-}
-
-/*! \internal
-
-  This mouse event reimplementation provides the functionality to let the user drag individual axes
-  exclusively, by startig the drag on top of the axis.
-
-  \seebaseclassmethod
-
-  \note The dragging of possibly multiple axes at once by starting the drag anywhere in the axis
-  rect is handled by the axis rect's mouse event, e.g. \ref QCPAxisRect::mousePressEvent.
-
-  \see QCPAxis::mousePressEvent
-*/
-void QCPPolarAxisRadial::mouseMoveEvent([[maybe_unused]] QMouseEvent* event,
-                                        [[maybe_unused]] const QPointF& startPos)
-{
-    // TODO remove later
-    if (mDragging)
-    {
-        /* TODO
-        const double startPixel = orientation() == Qt::Horizontal ? startPos.x() : startPos.y();
-        const double currentPixel = orientation() == Qt::Horizontal ? event->pos().x() :
-        event->pos().y(); if (mScaleType == QCPPolarAxisRadial::stLinear)
-        {
-          const double diff = pixelToCoord(startPixel) - pixelToCoord(currentPixel);
-          setRange(mDragStartRange.lower+diff, mDragStartRange.upper+diff);
-        } else if (mScaleType == QCPPolarAxisRadial::stLogarithmic)
-        {
-          const double diff = pixelToCoord(startPixel) / pixelToCoord(currentPixel);
-          setRange(mDragStartRange.lower*diff, mDragStartRange.upper*diff);
-        }
-        */
-
-        if (mParentPlot->noAntialiasingOnDrag())
-            mParentPlot->setNotAntialiasedElements(QCP::aeAll);
-        mParentPlot->replot(QCustomPlot::rpQueuedReplot);
-    }
-}
-
-/*! \internal
-
-  This mouse event reimplementation provides the functionality to let the user drag individual axes
-  exclusively, by startig the drag on top of the axis.
-
-  \seebaseclassmethod
-
-  \note The dragging of possibly multiple axes at once by starting the drag anywhere in the axis
-  rect is handled by the axis rect's mouse event, e.g. \ref QCPAxisRect::mousePressEvent.
-
-  \see QCPAxis::mousePressEvent
-*/
-void QCPPolarAxisRadial::mouseReleaseEvent([[maybe_unused]] QMouseEvent* event,
-                                           [[maybe_unused]] const QPointF& startPos)
-{
-    mDragging = false;
-    if (mParentPlot->noAntialiasingOnDrag())
-    {
-        mParentPlot->setAntialiasedElements(mAADragBackup);
-        mParentPlot->setNotAntialiasedElements(mNotAADragBackup);
-    }
-}
-
-/*! \internal
-
-  This mouse event reimplementation provides the functionality to let the user zoom individual axes
-  exclusively, by performing the wheel event on top of the axis.
-
-  For the axis to accept this event and perform the single axis zoom, the parent \ref QCPAxisRect
-  must be configured accordingly, i.e. it must allow range zooming in the orientation of this axis
-  (\ref QCPAxisRect::setRangeZoom) and this axis must be a zoomable axis (\ref
-  QCPAxisRect::setRangeZoomAxes)
-
-  \seebaseclassmethod
-
-  \note The zooming of possibly multiple axes at once by performing the wheel event anywhere in the
-  axis rect is handled by the axis rect's mouse event, e.g. \ref QCPAxisRect::wheelEvent.
-*/
-void QCPPolarAxisRadial::wheelEvent(QWheelEvent* event)
-{
-    // Mouse range zooming interaction:
-    if (!mParentPlot->interactions().testFlag(QCP::iRangeZoom))
-    {
-        event->ignore();
-        return;
-    }
-
-    // TODO:
-    // const double wheelSteps = event->delta()/120.0; // a single step delta is +/-120 usually
-    // const double factor = qPow(mRangeZoomFactor, wheelSteps);
-    // scaleRange(factor, pixelToCoord(orientation() == Qt::Horizontal ? event->pos().x() :
-    // event->pos().y()));
-    mParentPlot->replot(QCustomPlot::rpQueuedReplot);
+    qcp::reportMisuse(Q_FUNC_INFO, "a polar axis cannot be linked");
+    return false;
 }
 
 void QCPPolarAxisRadial::updateGeometry(const QPointF& center, double radius)
@@ -1503,6 +1011,7 @@ void QCPPolarAxisRadial::draw(QCPPainter* painter)
     }
 
     // draw ticks and labels:
+    mTickLabelBoxes.clear();
     if (!mTickVector.isEmpty())
     {
         mLabelPainter.setAnchorReference(
@@ -1525,9 +1034,18 @@ void QCPPolarAxisRadial::draw(QCPPainter* painter)
                     || (mRangeReversed
                         && (i > 0 || mRadius - r > 10))) // skip last label if it's closer than 10
                                                          // pixels to angular axis
-                    mLabelPainter.drawTickLabel(painter,
-                                                tickPosition + tickNormal * mSubTickLengthOut,
-                                                mTickVectorLabels.at(i));
+                {
+                    const QPointF tickAnchor = tickPosition + tickNormal * mSubTickLengthOut;
+                    const QString text = mTickVectorLabels.at(i);
+                    mLabelPainter.drawTickLabel(painter, tickAnchor, text);
+                    // The same box is kept, for clicks on the label.
+                    const QSizeF extent
+                        = QFontMetricsF(getTickLabelFont()).boundingRect(text).size();
+                    const QPointF anchor = tickAnchor
+                        + tickNormal * (mLabelPainter.padding() + extent.height() / 2.0);
+                    mTickLabelBoxes.append(QRectF(
+                        anchor - QPointF(extent.width() / 2.0, extent.height() / 2.0), extent));
+                }
             }
         }
     }
@@ -1621,16 +1139,4 @@ QColor QCPPolarAxisRadial::getTickLabelColor() const
 QColor QCPPolarAxisRadial::getLabelColor() const
 {
     return mSelectedParts.testFlag(spAxisLabel) ? mSelectedLabelColor : mLabelColor;
-}
-
-/* inherits documentation from base class */
-QCP::Interaction QCPPolarAxisRadial::selectionCategory() const
-{
-    return QCP::iSelectAxes;
-}
-
-void QCPPolarAxisRadial::emitRangeChanged(const QCPRange& oldRange)
-{
-    qcpEmitIf(this, mParentPlot, &QCPPolarAxisRadial::rangeChanged,
-              [this, range = mRange] { return mRange == range; }, mRange, oldRange);
 }

@@ -1292,7 +1292,7 @@ void MainWindow::setupPolarAxisTest(QCustomPlot *customPlot)
   ticker->setPiValue(180);
   ticker->setTickCount(8);
   polarAxis->setTicker(ticker);
-  polarAxis->setRangeDrag(true);
+  polarAxis->setRangeDraggable(true);
   polarAxis->setTickLabelMode(QCPPolarAxisAngular::lmUpright);
   
   area->radialAxis()->setTickLabelMode(QCPPolarAxisRadial::lmUpright);

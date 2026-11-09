@@ -1398,7 +1398,7 @@ void MainWindow::setupPolarPlotDemo(QCustomPlot *customPlot)
   polarAxis->setTicker(ticker);
   */
   customPlot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom);
-  angularAxis->setRangeDrag(false);
+  angularAxis->setRangeDraggable(false);
   angularAxis->setTickLabelMode(QCPPolarAxisAngular::lmUpright);
   
   area->radialAxis()->setTickLabelMode(QCPPolarAxisRadial::lmUpright);

@@ -31,6 +31,7 @@
 
 class QCPPainter;
 class QCustomPlot;
+class QCPAxisBase;
 
 /*!
   The parts every area of a plot has: a background, an inset layout for elements that sit in the
@@ -72,6 +73,9 @@ public:
     // reimplemented virtual methods:
     virtual void update(UpdatePhase phase) override;
     virtual QList<QCPLayoutElement*> elements(bool recursive) const override;
+
+    //! The axes of the area, as the base type the range model lives in.
+    virtual QList<QCPAxisBase*> allAxes() const = 0;
 
 protected:
     // property members:

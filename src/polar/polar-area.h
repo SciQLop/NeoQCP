@@ -74,6 +74,8 @@ public:
 
     double radius() const { return mRadius; }
 
+    double rangeZoomFactor() const { return mRangeZoomFactor; }
+
     QRegion exactClipRegion() const;
 
     QList<QCPPolarGraph*> graphs() const { return mGraphs; }
@@ -83,6 +85,11 @@ public:
     bool removeRadialAxis(QCPPolarAxisRadial* axis);
     bool removeGraph(QCPPolarGraph* graph);
     void rescale(bool onlyVisiblePlottables = false);
+
+    /*! Sets the factor a wheel step zooms every radial range by, around the radius under the
+     * cursor.
+     */
+    void setRangeZoomFactor(double factor) { mRangeZoomFactor = factor; }
 
     // Out of line: QCustomPlot is incomplete here, and clang checks add<T>'s body at its
     // definition.
@@ -115,11 +122,14 @@ public:
 
     // reimplemented virtual methods:
     virtual void update(UpdatePhase phase) override;
+    virtual QList<QCPAxisBase*> allAxes() const override;
 
 protected:
     virtual void drawBackground(QCPPainter* painter) override;
 
-public:
+    // Dirties every layer a change of the axes' ranges moves: the axes and the grid, then what the
+    // graphs and their items draw. Mirrors QCPAxisRect::markAffectedLayersDirty.
+    void markAffectedLayersDirty(bool invalidate = false);
 
 protected:
     // non-property members:
@@ -129,6 +139,7 @@ protected:
     QList<QCPPolarGraph*> mGraphs;
     QPointF mCenter;
     double mRadius = 1;
+    double mRangeZoomFactor = 0.85;
     bool mDragging = false;
     QCPRange mDragAngularStart;
     QList<QPair<QPointer<QCPPolarAxisRadial>, QCPRange>> mDragRadialStart;
@@ -148,6 +159,7 @@ private:
     Q_DISABLE_COPY(QCPPolarArea)
 
     friend class QCustomPlot;
+    friend class QCPPolarAxisAngular;
     friend class QCPPolarAxisRadial;
     friend class QCPPolarGraph;
 };

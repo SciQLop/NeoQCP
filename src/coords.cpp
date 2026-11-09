@@ -173,7 +173,8 @@ void QCPTransform::Axis::snapshot(const QCPAxis* axis)
     link = axis->link();
     if (!link || !link->source)
         return;
-    source.take(link->source);
+    // Only cartesian axes link, so a link source always is one.
+    source.take(qobject_cast<const QCPAxis*>(link->source.data()));
 }
 
 void QCPTransform::Axis::prepare()

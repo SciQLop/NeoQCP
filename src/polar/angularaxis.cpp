@@ -51,16 +51,11 @@
   Creates the angular axis belonging to \a area.
 */
 QCPPolarAxisAngular::QCPPolarAxisAngular(QCPPolarArea* area)
-        : QCPLayerable(area->parentPlot(), QString(), area)
-        , mRangeDrag(false)
-        , mRangeZoom(false)
-        , mRangeZoomFactor(0.85)
+        : QCPAxisBase(area)
         ,
         // axis base:
         mAngle(-90)
         , mAngleRad(mAngle / 180.0 * M_PI)
-        , mSelectableParts(spAxis | spTickLabels | spAxisLabel)
-        , mSelectedParts(spNone)
         , mBasePen(QPen(Qt::black, 0, Qt::SolidLine, Qt::SquareCap))
         , mSelectedBasePen(QPen(Qt::blue, 2))
         ,
@@ -99,20 +94,21 @@ QCPPolarAxisAngular::QCPPolarAxisAngular(QCPPolarArea* area)
         , mSubTickPen(QPen(Qt::black, 0, Qt::SolidLine, Qt::SquareCap))
         , mSelectedSubTickPen(QPen(Qt::blue, 2))
         ,
-        // scale and range:
-        mRange(0, 360)
-        , mRangeReversed(false)
-        ,
         // internal members:
         mArea(area)
-        , mTicker(new QCPAxisTickerFixed)
         , mLabelPainter(mParentPlot)
 {
+    // A polar area zooms and drags through its own handlers, not by default.
+    mRange = QCPRange(0, 360);
+    mRangeDraggable = false;
+    mRangeZoomable = false;
+    mTicker = QSharedPointer<QCPAxisTickerFixed>::create();
     if (QCPAxisTickerFixed* fixedTicker = mTicker.dynamicCast<QCPAxisTickerFixed>().data())
     {
         fixedTicker->setTickStep(30);
     }
     setAntialiased(true);
+
 
     setTickLabelPadding(5);
     setTickLabelRotation(0);
@@ -121,6 +117,11 @@ QCPPolarAxisAngular::QCPPolarAxisAngular(QCPPolarArea* area)
     mLabelPainter.setAbbreviateDecimalPowers(false);
     mLabelPainter.setCacheSize(24); // so we can cache up to 15-degree intervals, polar angular axis
                                     // uses a bit larger cache than normal axes
+}
+
+QCPPolarArea* QCPPolarAxisAngular::area() const
+{
+    return mArea;
 }
 
 QCPPolarAxisAngular::LabelMode QCPPolarAxisAngular::tickLabelMode() const
@@ -150,55 +151,6 @@ QString QCPPolarAxisAngular::numberFormat() const
             result.append(QLatin1Char('c'));
     }
     return result;
-}
-
-/*!
-  If the scale type (\ref setScaleType) is \ref stLinear, \a diff is added to the lower and upper
-  bounds of the range. The range is simply moved by \a diff.
-
-  If the scale type is \ref stLogarithmic, the range bounds are multiplied by \a diff. This
-  corresponds to an apparent "linear" move in logarithmic scaling by a distance of log(diff).
-*/
-void QCPPolarAxisAngular::moveRange(double diff)
-{
-    QCPRange oldRange = mRange;
-    mRange.lower += diff;
-    mRange.upper += diff;
-    emitRangeChanged(oldRange);
-}
-
-/*!
-  Scales the range of this axis by \a factor around the center of the current axis range. For
-  example, if \a factor is 2.0, then the axis range will double its size, and the point at the axis
-  range center won't have changed its position in the QCustomPlot widget (i.e. coordinates around
-  the center will have moved symmetrically closer).
-
-  If you wish to scale around a different coordinate than the current axis range center, use the
-  overload \ref scaleRange(double factor, double center).
-*/
-void QCPPolarAxisAngular::scaleRange(double factor)
-{
-    scaleRange(factor, range().center());
-}
-
-/*! \overload
-
-  Scales the range of this axis by \a factor around the coordinate \a center. For example, if \a
-  factor is 2.0, \a center is 1.0, then the axis range will double its size, and the point at
-  coordinate 1.0 won't have changed its position in the QCustomPlot widget (i.e. coordinates
-  around 1.0 will have moved symmetrically closer to 1.0).
-
-  \see scaleRange(double factor)
-*/
-void QCPPolarAxisAngular::scaleRange(double factor, double center)
-{
-    QCPRange oldRange = mRange;
-    QCPRange newRange;
-    newRange.lower = (mRange.lower - center) * factor + center;
-    newRange.upper = (mRange.upper - center) * factor + center;
-    if (QCPRange::validRange(newRange))
-        mRange = newRange.sanitizedForLinScale();
-    emitRangeChanged(oldRange);
 }
 
 /*!
@@ -238,23 +190,17 @@ QPointF QCPPolarAxisAngular::coordToPixel(double angleCoord, double radiusCoord)
 
   \see setSelectedParts, setSelectableParts, QCustomPlot::setInteractions
 */
-QCPPolarAxisAngular::SelectablePart
-QCPPolarAxisAngular::getPartAt([[maybe_unused]] const QPointF& pos) const
+QCPPolarAxisAngular::SelectablePart QCPPolarAxisAngular::getPartAt(const QPointF& pos) const
 {
-    // TODO remove later
-
-    if (!mVisible)
+    if (!mVisible || !mArea)
         return spNone;
-
-    /*
-      TODO:
-    if (mAxisPainter->axisSelectionBox().contains(pos.toPoint()))
-      return spAxis;
-    else if (mAxisPainter->tickLabelsSelectionBox().contains(pos.toPoint()))
-      return spTickLabels;
-    else if (mAxisPainter->labelSelectionBox().contains(pos.toPoint()))
-      return spAxisLabel;
-    else */
+    // A label wins over the circle it sits on: it is what the user aims at.
+    for (const QRectF& box : mTickLabelBoxes)
+        if (box.contains(pos))
+            return spTickLabels;
+    const double tolerance = mParentPlot ? mParentPlot->selectionTolerance() : 5.0;
+    if (qAbs(QLineF(mArea->center(), pos).length() - mArea->radius()) <= tolerance)
+        return spAxis;
     return spNone;
 }
 
@@ -269,23 +215,16 @@ void QCPPolarAxisAngular::draw(QCPPainter* painter)
 {
     const QPointF center = mArea->center();
     const double radius = mArea->radius();
-
-    // draw baseline circle:
+    mTickLabelBoxes.clear();
     painter->setPen(getBasePen());
     painter->drawEllipse(center, radius, radius);
-
-    // draw subticks:
     if (!mSubTickVector.isEmpty())
     {
         painter->setPen(getSubTickPen());
         for (int i = 0; i < mSubTickVector.size(); ++i)
-        {
             painter->drawLine(center + mSubTickVectorCosSin.at(i) * (radius - mSubTickLengthIn),
                               center + mSubTickVectorCosSin.at(i) * (radius + mSubTickLengthOut));
-        }
     }
-
-    // draw ticks and labels:
     if (!mTickVector.isEmpty())
     {
         mLabelPainter.setAnchorReference(center);
@@ -295,199 +234,30 @@ void QCPPolarAxisAngular::draw(QCPPainter* painter)
         painter->setPen(ticksPen);
         for (int i = 0; i < mTickVector.size(); ++i)
         {
-            const QPointF outerTick
-                = center + mTickVectorCosSin.at(i) * (radius + mTickLengthOut);
+            const QPointF outerTick = center + mTickVectorCosSin.at(i) * (radius + mTickLengthOut);
             painter->drawLine(center + mTickVectorCosSin.at(i) * (radius - mTickLengthIn),
                               outerTick);
-            // draw tick labels:
             if (!mTickVectorLabels.isEmpty())
             {
                 if (i < mTickVectorLabels.count() - 1
-                    || (mTickVectorCosSin.at(i) - mTickVectorCosSin.first()).manhattanLength() > 5
-                            / 180.0
-                            * M_PI) // skip last label if it's closer than approx 5 degrees to first
-                    mLabelPainter.drawTickLabel(painter, outerTick, mTickVectorLabels.at(i));
+                    || (mTickVectorCosSin.at(i) - mTickVectorCosSin.first()).manhattanLength()
+                        > 5 / 180.0 * M_PI)
+                {
+                    const QString text = mTickVectorLabels.at(i);
+                    mLabelPainter.drawTickLabel(painter, outerTick, text);
+                    // The label painter centres the text on the anchor it computes from the tick;
+                    // the same box is kept here, for clicks on the label.
+                    const QSizeF extent
+                        = QFontMetricsF(getTickLabelFont()).boundingRect(text).size();
+                    const QPointF anchor = outerTick
+                        + mTickVectorCosSin.at(i)
+                            * (mLabelPainter.padding() + extent.height() / 2.0);
+                    mTickLabelBoxes.append(QRectF(
+                        anchor - QPointF(extent.width() / 2.0, extent.height() / 2.0), extent));
+                }
             }
         }
     }
-}
-
-void QCPPolarAxisAngular::setRangeDrag(bool enabled)
-{
-    mRangeDrag = enabled;
-}
-
-void QCPPolarAxisAngular::setRangeZoom(bool enabled)
-{
-    mRangeZoom = enabled;
-}
-
-void QCPPolarAxisAngular::setRangeZoomFactor(double factor)
-{
-    mRangeZoomFactor = factor;
-}
-
-/*!
-  Sets the range of the axis.
-
-  This slot may be connected with the \ref rangeChanged signal of another axis so this axis
-  is always synchronized with the other axis range, when it changes.
-
-  To invert the direction of an axis, use \ref setRangeReversed.
-*/
-void QCPPolarAxisAngular::setRange(const QCPRange& range)
-{
-    if (range.lower == mRange.lower && range.upper == mRange.upper)
-        return;
-
-    if (!QCPRange::validRange(range))
-        return;
-    markDirty();
-    QCPRange oldRange = mRange;
-    mRange = range.sanitizedForLinScale();
-    emitRangeChanged(oldRange);
-}
-
-/*!
-  Sets whether the user can (de-)select the parts in \a selectable by clicking on the QCustomPlot
-  surface. (When \ref QCustomPlot::setInteractions contains iSelectAxes.)
-
-  However, even when \a selectable is set to a value not allowing the selection of a specific part,
-  it is still possible to set the selection of this part manually, by calling \ref setSelectedParts
-  directly.
-
-  \see SelectablePart, setSelectedParts
-*/
-void QCPPolarAxisAngular::setSelectableParts(const SelectableParts& selectable)
-{
-    if (mSelectableParts != selectable)
-    {
-        mSelectableParts = selectable;
-        qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::selectableChanged);
-    }
-}
-
-/*!
-  Sets the selected state of the respective axis parts described by \ref SelectablePart. When a part
-  is selected, it uses a different pen/font.
-
-  The entire selection mechanism for axes is handled automatically when \ref
-  QCustomPlot::setInteractions contains iSelectAxes. You only need to call this function when you
-  wish to change the selection state manually.
-
-  This function can change the selection state of a part, independent of the \ref setSelectableParts
-  setting.
-
-  emits the \ref selectionChanged signal when \a selected is different from the previous selection
-  state.
-
-  \see SelectablePart, setSelectableParts, selectTest, setSelectedBasePen, setSelectedTickPen,
-  setSelectedSubTickPen, setSelectedTickLabelFont, setSelectedLabelFont, setSelectedTickLabelColor,
-  setSelectedLabelColor
-*/
-void QCPPolarAxisAngular::setSelectedParts(const SelectableParts& selected)
-{
-    if (mSelectedParts != selected)
-    {
-        markDirty();
-        mSelectedParts = selected;
-        qcpEmit(this, mParentPlot, &QCPPolarAxisAngular::selectionChanged);
-    }
-}
-
-/*!
-  \overload
-
-  Sets the lower and upper bound of the axis range.
-
-  To invert the direction of an axis, use \ref setRangeReversed.
-
-  There is also a slot to set a range, see \ref setRange(const QCPRange &range).
-*/
-void QCPPolarAxisAngular::setRange(double lower, double upper)
-{
-    if (lower == mRange.lower && upper == mRange.upper)
-        return;
-
-    if (!QCPRange::validRange(lower, upper))
-        return;
-    markDirty();
-    QCPRange oldRange = mRange;
-    mRange.lower = lower;
-    mRange.upper = upper;
-    mRange = mRange.sanitizedForLinScale();
-    emitRangeChanged(oldRange);
-}
-
-/*!
-  \overload
-
-  Sets the range of the axis.
-
-  The \a position coordinate indicates together with the \a alignment parameter, where the new
-  range will be positioned. \a size defines the size of the new axis range. \a alignment may be
-  Qt::AlignLeft, Qt::AlignRight or Qt::AlignCenter. This will cause the left border, right border,
-  or center of the range to be aligned with \a position. Any other values of \a alignment will
-  default to Qt::AlignCenter.
-*/
-void QCPPolarAxisAngular::setRange(double position, double size, Qt::AlignmentFlag alignment)
-{
-    // each branch delegates to setRange(double, double), which dirties
-    if (alignment == Qt::AlignLeft)
-        setRange(position, position + size);
-    else if (alignment == Qt::AlignRight)
-        setRange(position - size, position);
-    else // alignment == Qt::AlignCenter
-        setRange(position - size / 2.0, position + size / 2.0);
-}
-
-/*!
-  Sets the lower bound of the axis range. The upper bound is not changed.
-  \see setRange
-*/
-void QCPPolarAxisAngular::setRangeLower(double lower)
-{
-    if (mRange.lower == lower)
-        return;
-
-    markDirty();
-    QCPRange oldRange = mRange;
-    mRange.lower = lower;
-    mRange = mRange.sanitizedForLinScale();
-    emitRangeChanged(oldRange);
-}
-
-/*!
-  Sets the upper bound of the axis range. The lower bound is not changed.
-  \see setRange
-*/
-void QCPPolarAxisAngular::setRangeUpper(double upper)
-{
-    if (mRange.upper == upper)
-        return;
-
-    markDirty();
-    QCPRange oldRange = mRange;
-    mRange.upper = upper;
-    mRange = mRange.sanitizedForLinScale();
-    emitRangeChanged(oldRange);
-}
-
-/*!
-  Sets whether the axis range (direction) is displayed reversed. Normally, the values on horizontal
-  axes increase left to right, on vertical axes bottom to top. When \a reversed is set to true, the
-  direction of increasing values is inverted.
-
-  Note that the range and data interface stays the same for reversed axes, e.g. the \a lower part
-  of the \ref setRange interface will still reference the mathematically smaller number than the \a
-  upper part.
-*/
-void QCPPolarAxisAngular::setRangeReversed(bool reversed)
-{
-    if (reversed == mRangeReversed)
-        return;
-    markDirty();
-    mRangeReversed = reversed;
 }
 
 void QCPPolarAxisAngular::setAngle(double degrees)
@@ -497,34 +267,6 @@ void QCPPolarAxisAngular::setAngle(double degrees)
     markDirty();
     mAngle = degrees;
     mAngleRad = mAngle / 180.0 * M_PI;
-}
-
-/*!
-  The axis ticker is responsible for generating the tick positions and tick labels. See the
-  documentation of QCPAxisTicker for details on how to work with axis tickers.
-
-  You can change the tick positioning/labeling behaviour of this axis by setting a different
-  QCPAxisTicker subclass using this method. If you only wish to modify the currently installed axis
-  ticker, access it via \ref ticker.
-
-  Since the ticker is stored in the axis as a shared pointer, multiple axes may share the same axis
-  ticker simply by passing the same shared pointer to multiple axes.
-
-  \see ticker
-*/
-void QCPPolarAxisAngular::setTicker(QSharedPointer<QCPAxisTicker> ticker)
-{
-    if (!ticker)
-    {
-        qDebug() << Q_FUNC_INFO << "can not set 0 as axis ticker";
-        return;
-    }
-    if (mTicker == ticker)
-        return;
-    markDirty();
-    mTicker = ticker;
-    // no need to invalidate margin cache here because produced tick labels are checked for changes
-    // in setupTickVector
 }
 
 /*!
@@ -1141,9 +883,25 @@ QColor QCPPolarAxisAngular::getLabelColor() const
     return mSelectedParts.testFlag(spAxisLabel) ? mSelectedLabelColor : mLabelColor;
 }
 
-void QCPPolarAxisAngular::emitRangeChanged(const QCPRange& oldRange)
+/*! \internal
+
+  A range change moves the ticks on the circle and every graph drawn from the area, so the area's
+  layers are dirtied, then the base emits and refreshes any linked axis (a polar axis never is).
+*/
+void QCPPolarAxisAngular::rangeDidChange(const QCPRange& oldRange)
 {
-    qcpEmitIf(
-        this, mParentPlot, &QCPPolarAxisAngular::rangeChanged,
-        [this, range = mRange] { return mRange == range; }, mRange, oldRange);
+    markDirty();
+    if (mArea)
+        mArea->markAffectedLayersDirty();
+    QCPAxisBase::rangeDidChange(oldRange);
+}
+
+/*! \internal
+
+  A polar axis has no cartesian geometry to follow a source with, so it refuses every link.
+*/
+bool QCPPolarAxisAngular::checkLinkSource([[maybe_unused]] const QCPAxisBase* source) const
+{
+    qcp::reportMisuse(Q_FUNC_INFO, "a polar axis cannot be linked");
+    return false;
 }

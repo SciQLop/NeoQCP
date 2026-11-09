@@ -566,7 +566,8 @@ void TestSignalDelivery::qcpEmitHoldsUntilTheScopeCloses()
     {
         const QCPEmissionScope scope(&plot);
         QCPRange range(3, 7);
-        qcpEmit(axis, &plot, &QCPAxis::rangeChanged, range, QCPRange(2, 6));
+        qcpEmit(static_cast<QCPAxisBase*>(axis), &plot, &QCPAxisBase::rangeChanged, range,
+                QCPRange(2, 6));
         range = QCPRange(1, 2); // the emission took a copy at the call
         QCOMPARE(received, before);
     }

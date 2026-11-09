@@ -1,4 +1,5 @@
 #include "test-alignment-group/test-alignment-group.h"
+#include "test-axis-base/test-axis-base.h"
 #include "test-axis-ticker-log/test-axis-ticker-log.h"
 #include "test-builder/test-builder.h"
 #include "test-busy-indicator/test-busy-indicator.h"
@@ -167,6 +168,7 @@ int main(int argc, char** argv)
     QCPTEST(TestHitRule);
     QCPTEST(TestSelectionModel);
     QCPTEST(TestPolar);
+    QCPTEST(TestAxisBase);
 
     return failures == 0 ? 0 : 1;
 }

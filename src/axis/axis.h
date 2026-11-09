@@ -39,6 +39,7 @@ Q_MOC_INCLUDE(
 #include "../layout.h"
 #include "../lineending.h"
 #include "../vector2d.h"
+#include "axis-base.h"
 #include "axisticker.h"
 #include "range.h"
 
@@ -53,9 +54,6 @@ class QCPAbstractItem;
 
 template <typename T, typename Self = void>
 class QCPAxisOps;
-
-//! A real-valued function of one coordinate: the shape of a link's forward and inverse.
-using QCPAxisFunction = std::function<double(double)>;
 
 struct QCPAxisLink;
 
@@ -115,16 +113,12 @@ protected:
     friend class QCPAxis;
 };
 
-class QCP_LIB_DECL QCPAxis : public QCPLayerable
+class QCP_LIB_DECL QCPAxis : public QCPAxisBase
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(AxisType axisType READ axisType)
     Q_PROPERTY(QCPAxisRect* axisRect READ axisRect)
-    Q_PROPERTY(ScaleType scaleType READ scaleType WRITE setScaleType NOTIFY scaleTypeChanged)
-    Q_PROPERTY(QCPRange range READ range WRITE setRange NOTIFY rangeChanged)
-    Q_PROPERTY(bool rangeReversed READ rangeReversed WRITE setRangeReversed)
-    Q_PROPERTY(QSharedPointer<QCPAxisTicker> ticker READ ticker WRITE setTicker)
     Q_PROPERTY(bool ticks READ ticks WRITE setTicks)
     Q_PROPERTY(bool tickLabels READ tickLabels WRITE setTickLabels)
     Q_PROPERTY(int tickLabelPadding READ tickLabelPadding WRITE setTickLabelPadding)
@@ -134,8 +128,6 @@ class QCP_LIB_DECL QCPAxis : public QCPLayerable
     Q_PROPERTY(LabelSide tickLabelSide READ tickLabelSide WRITE setTickLabelSide)
     Q_PROPERTY(QString numberFormat READ numberFormat WRITE setNumberFormat)
     Q_PROPERTY(int numberPrecision READ numberPrecision WRITE setNumberPrecision)
-    Q_PROPERTY(QVector<double> tickVector READ tickVector)
-    Q_PROPERTY(QVector<QString> tickVectorLabels READ tickVectorLabels)
     Q_PROPERTY(int tickLengthIn READ tickLengthIn WRITE setTickLengthIn)
     Q_PROPERTY(int tickLengthOut READ tickLengthOut WRITE setTickLengthOut)
     Q_PROPERTY(bool subTicks READ subTicks WRITE setSubTicks)
@@ -150,10 +142,6 @@ class QCP_LIB_DECL QCPAxis : public QCPLayerable
     Q_PROPERTY(int labelPadding READ labelPadding WRITE setLabelPadding)
     Q_PROPERTY(int padding READ padding WRITE setPadding)
     Q_PROPERTY(int offset READ offset WRITE setOffset)
-    Q_PROPERTY(SelectableParts selectedParts READ selectedParts WRITE setSelectedParts NOTIFY
-                   selectionChanged)
-    Q_PROPERTY(SelectableParts selectableParts READ selectableParts WRITE setSelectableParts NOTIFY
-                   selectableChanged)
     Q_PROPERTY(
         QFont selectedTickLabelFont READ selectedTickLabelFont WRITE setSelectedTickLabelFont)
     Q_PROPERTY(QFont selectedLabelFont READ selectedLabelFont WRITE setSelectedLabelFont)
@@ -205,37 +193,6 @@ public:
     };
     Q_ENUM(LabelSide)
 
-    /*!
-      Defines the scale of an axis.
-      \see setScaleType
-    */
-    enum ScaleType
-    {
-        stLinear ///< Linear scaling
-        ,
-        stLogarithmic ///< Logarithmic scaling with correspondingly transformed axis coordinates
-                      ///< (possibly also \ref setTicker to a \ref QCPAxisTickerLog instance).
-    };
-    Q_ENUM(ScaleType)
-
-    /*!
-      Defines the selectable parts of an axis.
-      \see setSelectableParts, setSelectedParts
-    */
-    enum SelectablePart
-    {
-        spNone = 0 ///< None of the selectable parts
-        ,
-        spAxis = 0x001 ///< The axis backbone and tick marks
-        ,
-        spTickLabels = 0x002 ///< Tick labels (numbers) of this axis (as a whole, not individually)
-        ,
-        spAxisLabel = 0x004 ///< The axis label
-    };
-    Q_ENUM(SelectablePart)
-    Q_DECLARE_FLAGS(SelectableParts, SelectablePart)
-    Q_FLAG(SelectableParts)
-
     explicit QCPAxis(QCPAxisRect* parent, AxisType type);
     virtual ~QCPAxis() override;
 
@@ -244,19 +201,7 @@ public:
 
     QCPAxisRect* axisRect() const { return mAxisRect; }
 
-    ScaleType scaleType() const { return mScaleType; }
-
-    const QCPRange range() const { return mRange; }
-
-    bool rangeReversed() const { return mRangeReversed; }
-
-    //! Whether a drag in the axis rect moves this axis, when the rect allows range dragging.
-    bool rangeDraggable() const { return mRangeDraggable; }
-
-    //! Whether the mouse wheel zooms this axis, when the rect allows range zooming.
-    bool rangeZoomable() const { return mRangeZoomable; }
-
-    QSharedPointer<QCPAxisTicker> ticker() const { return mTicker; }
+    QCPArea* area() const override;
 
     bool ticks() const { return mTicks; }
 
@@ -275,6 +220,7 @@ public:
     int numberPrecision() const { return mNumberPrecision; }
 
     QVector<double> tickVector() const { return mTickVector; }
+
     QVector<double> subTickVector() const { return mSubTickVector; }
 
     QVector<QString> tickVectorLabels() const { return mTickVectorLabels; }
@@ -298,6 +244,7 @@ public:
     QColor labelColor() const { return mLabelColor; }
 
     QString label() const { return mLabel; }
+
     QCPLabelRenderer* labelRenderer() const { return mLabelRenderer; }
 
     int labelPadding() const;
@@ -305,17 +252,6 @@ public:
     int padding() const { return mPadding; }
 
     int offset() const;
-
-    SelectableParts selectedParts() const { return mSelectedParts; }
-
-    SelectableParts selectableParts() const { return mSelectableParts; }
-
-    bool selected() const { return mSelectedParts != spNone; }
-
-    QCP::SelectionType selectable() const
-    {
-        return mSelectableParts != spNone ? QCP::stWhole : QCP::stNone;
-    }
 
     QFont selectedTickLabelFont() const { return mSelectedTickLabelFont; }
 
@@ -335,21 +271,12 @@ public:
     QCPLineEnding upperEnding() const;
 
     QCPGrid* grid() const;
+
     // Never creates a grid: null once the user deleted it. For internal draw and dirty-marking
     // paths, which must not bring back a deleted grid.
     QCPGrid* gridIfExists() const { return mGrid; }
 
     // setters:
-    Q_SLOT void setScaleType(QCPAxis::ScaleType type);
-    Q_SLOT void setRange(const QCPRange& range);
-    void setRange(double lower, double upper);
-    void setRange(double position, double size, Qt::AlignmentFlag alignment);
-    void setRangeLower(double lower);
-    void setRangeUpper(double upper);
-    void setRangeReversed(bool reversed);
-    void setRangeDraggable(bool draggable);
-    void setRangeZoomable(bool zoomable);
-    void setTicker(QSharedPointer<QCPAxisTicker> ticker);
     void setTicks(bool show);
     void setTickLabels(bool show);
     void setTickLabelPadding(int padding);
@@ -387,14 +314,8 @@ public:
     void setSelectedBasePen(const QPen& pen);
     void setSelectedTickPen(const QPen& pen);
     void setSelectedSubTickPen(const QPen& pen);
-    Q_SLOT void setSelectableParts(const QCPAxis::SelectableParts& selectableParts);
-    Q_SLOT void setSelectedParts(const QCPAxis::SelectableParts& selectedParts);
     void setLowerEnding(const QCPLineEnding& ending);
     void setUpperEnding(const QCPLineEnding& ending);
-
-    // reimplemented virtual methods:
-    virtual double selectTest(const QPointF& pos, bool onlySelectable,
-                              QVariant* details = nullptr) const override;
 
     // non-property methods:
     Qt::Orientation orientation() const { return mOrientation; }
@@ -404,24 +325,18 @@ public:
         return rangeReversed() != (orientation() == Qt::Vertical) ? -1 : 1;
     }
 
-    void moveRange(double diff);
-    void scaleRange(double factor);
-    void scaleRange(double factor, double center);
     void setScaleRatio(const QCPAxis* otherAxis, double ratio = 1.0);
     void rescale(bool onlyVisiblePlottables = false);
     double pixelToCoord(double value) const;
     double coordToPixel(double value) const;
 
     // linked axes:
-    void linkTo(QCPAxis* source, QCPAxisFunction forward = {}, QCPAxisFunction inverse = {});
-    void unlink();
-    QCPAxis* linkSource() const;
-    std::shared_ptr<const QCPAxisLink> link() const { return mLink; }
+    QCPAxis* linkSource() const override;
+
     /*! \internal The axis a range move of this one acts on: the link's source when linked. */
-    QCPAxis* moveTarget() const;
+    QCPAxis* moveTarget() const override;
     /*! \internal \a pixel seen on the move target's rect, at the same fraction of the axis. */
     double pixelOnMoveTarget(double pixel) const;
-    SelectablePart getPartAt(const QPointF& pos) const;
     QList<QCPAbstractPlottable*> plottables() const;
     QList<QCPGraph*> graphs() const;
     QList<QCPAbstractItem*> items() const;
@@ -435,12 +350,6 @@ public:
 
     static AxisType opposite(AxisType type);
 
-signals:
-    void rangeChanged(const QCPRange& newRange, const QCPRange& oldRange);
-    void scaleTypeChanged(QCPAxis::ScaleType scaleType);
-    void selectionChanged();
-    void selectableChanged();
-
 protected:
     // property members:
     // axis base:
@@ -449,7 +358,6 @@ protected:
     // int mOffset; // in QCPAxisPainter
     int mPadding;
     Qt::Orientation mOrientation;
-    SelectableParts mSelectableParts, mSelectedParts;
     QPen mBasePen, mSelectedBasePen;
     // QCPLineEnding mLowerEnding, mUpperEnding; // in QCPAxisPainter
     //  axis label:
@@ -474,23 +382,10 @@ protected:
     // int mTickLengthIn, mTickLengthOut, mSubTickLengthIn, mSubTickLengthOut; // QCPAxisPainter
     QPen mTickPen, mSelectedTickPen;
     QPen mSubTickPen, mSelectedSubTickPen;
-    // scale and range:
-    QCPRange mRange;
-    bool mRangeReversed;
-    // The link flag sits next to the range: coordToPixel reads it on every point, and the
-    // shared_ptr at the end of the object would cost a second cache line per call.
-    bool mLinked = false;
-    bool mRangeDraggable = true;
-    bool mRangeZoomable = true;
-    ScaleType mScaleType;
 
     // non-property members:
     mutable QPointer<QCPGrid> mGrid;
     QCPAxisPainterPrivate* mAxisPainter;
-    QSharedPointer<QCPAxisTicker> mTicker;
-    QVector<double> mTickVector;
-    QVector<QString> mTickVectorLabels;
-    QVector<double> mSubTickVector;
     bool mCachedMarginValid;
     int mCachedMargin;
     bool mDragging;
@@ -498,23 +393,23 @@ protected:
     // The axis mDragStartRange belongs to: the link's source when the strip drags a linked axis.
     QPointer<QCPAxis> mDragTarget;
     QCP::AntialiasedElements mAADragBackup, mNotAADragBackup;
-    // linked axes:
-    std::shared_ptr<const QCPAxisLink> mLink;
-    QList<QPointer<QCPAxis>> mLinkedAxes;
 
     // introduced virtual methods:
     virtual int calculateMargin();
     void applyTickLabelFormat();
+    // A scale type change stales the margin and every item tree of the plot, then moves the axes
+    // that follow this one.
+    virtual void scaleTypeWillChange() override;
+    // A look change moves every axis, grid and plottable of the rect.
+    virtual void markAppearanceDirty() override;
+    virtual bool checkLinkSource(const QCPAxisBase* source) const override;
+    virtual void rangeDidChange(const QCPRange& oldRange) override;
+    SelectablePart getPartAt(const QPointF& pos) const override;
 
     // reimplemented virtual methods:
     virtual void applyDefaultAntialiasingHint(QCPPainter* painter) const override;
     virtual void draw(QCPPainter* painter) override;
-    virtual QCP::Interaction selectionCategory() const override;
     // events:
-    virtual void selectEvent(QMouseEvent* event, bool additive, const QVariant& details,
-                             bool* selectionStateChanged) override;
-    virtual void deselectEvent(bool* selectionStateChanged) override;
-    // mouse events:
     virtual void mousePressEvent(QMouseEvent* event, const QVariant& details) override;
     virtual void mouseMoveEvent(QMouseEvent* event, const QPointF& startPos) override;
     virtual void mouseReleaseEvent(QMouseEvent* event, const QPointF& startPos) override;
@@ -532,47 +427,16 @@ protected:
 
 private:
     Q_DISABLE_COPY(QCPAxis)
-    void rangeDidChange(const QCPRange& oldRange);
-    void applyRange(const QCPRange& range);
-    void commitRange(const QCPRange& range);
-    void refreshFromLink();
-    void refreshLinkedAxes();
     double linkedCoordToPixel(double value) const;
     double linkedPixelToCoord(double value) const;
-    // Dirties the layers a change of look moves; call it at the end of the setter.
-    void markAppearanceDirty();
 
     friend class QCustomPlot;
     friend class QCPGrid;
     friend class QCPAxisRect;
 };
-Q_DECLARE_OPERATORS_FOR_FLAGS(QCPAxis::SelectableParts)
 Q_DECLARE_OPERATORS_FOR_FLAGS(QCPAxis::AxisTypes)
 Q_DECLARE_METATYPE(QCPAxis::AxisType)
 Q_DECLARE_METATYPE(QCPAxis::LabelSide)
-Q_DECLARE_METATYPE(QCPAxis::ScaleType)
-Q_DECLARE_METATYPE(QCPAxis::SelectablePart)
-
-/*! \brief A link from one axis to a plain source axis.
-
-  An axis linked to \a source shows whatever the source shows, mapped by \a forward: its range is
-  the ordered forward image of the source's range, and its pixels are the source's pixels placed
-  along its own length, so the two axes show the same data on rects of different sizes.
-
-  \a inverse takes a value of the linked axis back to the source, which is how a drag, a zoom or a
-  setRange on the linked axis moves the source. \a decreasing says whether \a forward falls as the
-  source grows; the linked axis is drawn reversed when exactly one of the two is reversed.
-
-  The struct is immutable once built and shared between the axis and the QCPTransform snapshots
-  that copy it, which is what lets two snapshots of an unchanged link compare equal.
-*/
-struct QCP_LIB_DECL QCPAxisLink
-{
-    QPointer<QCPAxis> source;
-    QCPAxisFunction forward;
-    QCPAxisFunction inverse;
-    bool decreasing = false;
-};
 
 class QCPAxisPainterPrivate
 {

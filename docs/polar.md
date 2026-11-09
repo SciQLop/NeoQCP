@@ -86,5 +86,5 @@ So `QCustomPlot::rescaleAxes()` and `plottableCount()` do not see it.
 Use the graph's own `rescaleAxes()`, `rescaleKeyAxis()` and `rescaleValueAxis()`, or `rescale()` on the area or an axis.
 
 With `QCP::iRangeDrag` and `QCP::iRangeZoom` turned on, the mouse pans and zooms the radial axis.
-Rotating and zooming the angular axis with the mouse is off by default. Turn it on with `angularAxis->setRangeDrag(true)` and `setRangeZoom(true)`.
+Rotating and zooming the angular axis with the mouse is off by default. Turn it on with `angularAxis->setRangeDraggable(true)` and `setRangeZoomable(true)`.
 {doc}`interactions` covers the interaction flags.

@@ -36,6 +36,25 @@ QColor pixelAt(QCustomPlot& plot, QPoint pos)
 {
     return QColor(plot.toPixmap(400, 300).toImage().pixel(pos));
 }
+
+// The selectable part the axis reports under pos, or spNone where it reports nothing.
+QCPAxisBase::SelectablePart partAt(QCPAxisBase* axis, QPointF pos)
+{
+    QVariant details;
+    if (axis->selectTest(pos, false, &details) <= 0)
+        return QCPAxisBase::spNone;
+    return details.value<QCPAxisBase::SelectablePart>();
+}
+
+// The first point of a coarse scan of rect where the axis reports that part.
+QPointF findPart(QCPAxisBase* axis, const QRect& rect, QCPAxisBase::SelectablePart wanted)
+{
+    for (int y = rect.top(); y <= rect.bottom(); y += 2)
+        for (int x = rect.left(); x <= rect.right(); x += 2)
+            if (partAt(axis, QPointF(x, y)) == wanted)
+                return QPointF(x, y);
+    return QPointF(-1, -1);
+}
 } // namespace
 
 void TestPolar::init()
@@ -85,7 +104,7 @@ void TestPolar::deletingTheAreaMidDragIsSafe()
     QCustomPlot plot;
     auto* area = polarArea(plot);
     plot.setInteractions(QCP::iRangeDrag | QCP::iRangeZoom);
-    area->angularAxis()->setRangeDrag(true);
+    area->angularAxis()->setRangeDraggable(true);
     area->angularAxis()->setRange(0, 360);
 
     QPointer<QCPPolarArea> alive(area);
@@ -163,4 +182,85 @@ void TestPolar::insetAndBackgroundAreAreaFeatures()
     const QColor middle = pixelAt(plot, area->center().toPoint() + QPoint(40, 40));
     QVERIFY2(middle.red() > 200 && middle.green() < 60 && middle.blue() < 60,
              qPrintable(middle.name()));
+}
+
+void TestPolar::polarAxisPartsAreClickable()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    auto* angular = area->angularAxis();
+    auto* radial = area->radialAxis();
+    angular->setRange(0, 360);
+    radial->setRange(0, 1);
+    settle(plot);
+
+    // The angular axis is the circle: the point straight right of the centre is on its backbone.
+    const QPointF onCircle = area->center() + QPointF(area->radius(), 0);
+    QCOMPARE(partAt(angular, onCircle), QCPAxisBase::spAxis);
+    QCOMPARE(angular->selectTest(onCircle, false), plot.selectionTolerance() * 0.99);
+
+    const QPointF angularLabel = findPart(angular, area->rect(), QCPAxisBase::spTickLabels);
+    QVERIFY2(angularLabel.x() >= 0, "no angular tick label is hittable");
+
+    // The radial axis is a spoke from the centre, at its angle measured against the angular axis.
+    const double spokeRad = (radial->angle() + angular->angle()) / 180.0 * M_PI;
+    const QPointF onSpoke = radial->coordToPixel(angular->angleRadToCoord(spokeRad), 0.5);
+    QCOMPARE(partAt(radial, onSpoke), QCPAxisBase::spAxis);
+
+    const QPointF radialLabel = findPart(radial, area->rect(), QCPAxisBase::spTickLabels);
+    QVERIFY2(radialLabel.x() >= 0, "no radial tick label is hittable");
+
+    // The area's corner is far outside the circle and every label box.
+    const QPointF corner = area->rect().topLeft() + QPoint(2, 2);
+    QCOMPARE(partAt(angular, corner), QCPAxisBase::spNone);
+    QCOMPARE(partAt(radial, corner), QCPAxisBase::spNone);
+
+    // Unselectable parts are refused when only selectable axes are wanted.
+    angular->setSelectableParts(QCPPolarAxisAngular::spNone);
+    QCOMPARE(angular->selectTest(onCircle, true, nullptr), -1.0);
+    QVERIFY(angular->selectTest(onCircle, false, nullptr) > 0.0);
+    radial->setSelectableParts(QCPPolarAxisRadial::spNone);
+    QCOMPARE(radial->selectTest(onSpoke, true, nullptr), -1.0);
+    QVERIFY(radial->selectTest(onSpoke, false, nullptr) > 0.0);
+}
+
+void TestPolar::radialDragAndWheelWork()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    auto* angular = area->angularAxis();
+    auto* radial = area->radialAxis();
+    plot.setInteractions(QCP::iRangeDrag | QCP::iRangeZoom);
+    angular->setRange(0, 360);
+    radial->setRange(0, 1);
+    settle(plot);
+
+    // A wheel zooms the radial range about the radius under the cursor.
+    const QPointF cursor = area->center() + QPointF(0.5 * area->radius(), 0);
+    double angleBefore = 0, radiusBefore = 0, angleAfter = 0, radiusAfter = 0;
+    angular->pixelToCoord(cursor, angleBefore, radiusBefore);
+    QWheelEvent wheel(cursor, plot.mapToGlobal(cursor.toPoint()), QPoint(), QPoint(0, 120),
+                      Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+    QCoreApplication::sendEvent(&plot, &wheel);
+    angular->pixelToCoord(cursor, angleAfter, radiusAfter);
+    QVERIFY2(qAbs(radial->range().size() - 0.85) < 1e-9,
+             qPrintable(QString::number(radial->range().size())));
+    QVERIFY2(qAbs(radiusAfter - radiusBefore) < 1e-9,
+             qPrintable(QString::number(radiusAfter - radiusBefore)));
+    QCOMPARE(angleAfter, angleBefore);
+
+    // A drag along the spoke pans it by the radius the cursor moved.
+    radial->setRange(0, 1);
+    settle(plot);
+    const QPointF from = radial->coordToPixel(0.0, 0.3);
+    const QPointF to = radial->coordToPixel(0.0, 0.6);
+    const QCPRange angularBefore = angular->range();
+    sendMouse(&plot, QEvent::MouseButtonPress, from.toPoint(), Qt::LeftButton);
+    sendMouse(&plot, QEvent::MouseMove, to.toPoint(), Qt::LeftButton);
+    sendMouse(&plot, QEvent::MouseButtonRelease, to.toPoint(), Qt::NoButton);
+    QVERIFY2(qAbs(radial->range().size() - 1.0) < 1e-9,
+             qPrintable(QString::number(radial->range().size())));
+    QVERIFY2(qAbs(radial->range().lower + 0.3) < 1e-9,
+             qPrintable(QString::number(radial->range().lower)));
+    QCOMPARE(angular->range(), angularBefore);
 }
