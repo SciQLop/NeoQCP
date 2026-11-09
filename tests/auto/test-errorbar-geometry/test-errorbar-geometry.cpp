@@ -287,3 +287,18 @@ void TestErrorBarGeometry::aReplotWithoutADataAccessDoesNotReRecord()
     plot->replot();
     QCOMPARE(bars->recordings(), before);
 }
+
+// The dependency once summed its inputs, so a key/value swap on the attached plottable (the same two
+// axis pointers in the other order) left it unchanged and the bars kept their old orientation.
+void TestErrorBarGeometry::swappingThePlottablesAxesReRecords()
+{
+    RecordingErrorBars* bars = nullptr;
+    auto plot = makeBarsPlot(&bars);
+    auto* graph = qobject_cast<QCPGraph*>(bars->dataPlottable());
+    QVERIFY(graph);
+    const int before = bars->recordings();
+    graph->setKeyAxis(plot->yAxis);
+    graph->setValueAxis(plot->xAxis);
+    plot->replot();
+    QCOMPARE(bars->recordings(), before + 1);
+}

@@ -16,4 +16,5 @@ private slots:
     void everyStyleSetterReRecords();
     void anInPlaceEditThroughDataIsDrawn();
     void aReplotWithoutADataAccessDoesNotReRecord();
+    void swappingThePlottablesAxesReRecords();
 };

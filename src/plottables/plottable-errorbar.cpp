@@ -1061,18 +1061,15 @@ const void* QCPErrorBars::dataSourceIdentity() const
   The bars read the plottable they are attached to, so the recording is stale when that plottable,
   its data or its axes change. The container is a plain vector and carries no revision of its own,
   so \ref data() counts how often it hands the container out: an edit made through it in place is
-  assumed and the recording is remade.
+  assumed and the recording is remade. The inputs are hashed in order, not summed: a sum lets two
+  changes cancel (a removal through data(), a swap of the plottable's key and value axes).
 */
 quint64 QCPErrorBars::dependencyRevision() const
 {
-    quint64 key = quint64(mDataContainer->size()) + mDataAccess;
-    if (!mDataPlottable)
-        return key;
-    key += quint64(quintptr(mDataPlottable.data()));
-    key += mDataPlottable->dependencyRevision();
-    key += quint64(quintptr(mDataPlottable->keyAxis()))
-        + quint64(quintptr(mDataPlottable->valueAxis()));
-    return key;
+    const QCPAbstractPlottable* source = mDataPlottable.data();
+    return qHashMulti(0, mDataContainer->size(), mDataAccess, source,
+                      source ? source->dependencyRevision() : 0,
+                      source ? source->keyAxis() : nullptr, source ? source->valueAxis() : nullptr);
 }
 
 /*! \internal
