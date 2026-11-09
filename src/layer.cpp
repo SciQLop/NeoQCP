@@ -1235,9 +1235,12 @@ void QCPLayer::rebuildItemIndex() const
     ++mItemIndexBuilds;
     mItemKind.assign(static_cast<std::size_t>(mChildren.size()), 0);
     mItemGroup.assign(static_cast<std::size_t>(mChildren.size()), -1);
-    mItemGroups.clear();
     mItemSide.clear();
+    std::vector<ItemIndexGroup> groups;
     std::vector<std::pair<int, QCPItemExtent>> extents;
+    // Whether anything the sort sees has moved: a box, or the axis pair a group stands for. The pad
+    // only widens the query, so a pen that grows leaves the sort alone.
+    bool moved = false;
     for (int i = 0; i < mChildren.size(); ++i)
     {
         auto* item = qobject_cast<QCPAbstractItem*>(mChildren.at(i));
@@ -1246,32 +1249,61 @@ void QCPLayer::rebuildItemIndex() const
         // Cached child slot: a move is O(1) instead of an indexOf over the whole layer.
         item->mItemSlot = i;
         const std::optional<QCPItemExtent> extent = item->dataExtent();
-        if (!extent)
-            continue;
         // A NaN side describes nothing drawable: such an item stays unindexed and is tested as before.
-        if (std::isnan(extent->box.keyLower) || std::isnan(extent->box.keyUpper)
-            || std::isnan(extent->box.valueLower) || std::isnan(extent->box.valueUpper))
+        const bool indexable
+            = extent && !std::isnan(extent->box.keyLower) && !std::isnan(extent->box.keyUpper)
+              && !std::isnan(extent->box.valueLower) && !std::isnan(extent->box.valueUpper);
+        if (!indexable)
+        {
+            moved = moved || item->mIndexExtentValid;
+            item->mIndexExtentValid = false;
             continue;
+        }
         int group = -1;
-        for (int g = 0; g < int(mItemGroups.size()); ++g)
-            if (mItemGroups[g].keyAxis == extent->keyAxis
-                && mItemGroups[g].valueAxis == extent->valueAxis)
+        for (int g = 0; g < int(groups.size()); ++g)
+            if (groups[g].keyAxis == extent->keyAxis && groups[g].valueAxis == extent->valueAxis)
             {
                 group = g;
                 break;
             }
         if (group < 0)
         {
-            mItemGroups.push_back(ItemIndexGroup { extent->keyAxis, extent->valueAxis, {},
-                                                   extent->pixelPad });
-            group = int(mItemGroups.size()) - 1;
+            groups.push_back(ItemIndexGroup { extent->keyAxis, extent->valueAxis, {},
+                                              extent->pixelPad });
+            group = int(groups.size()) - 1;
         }
-        ItemIndexGroup& groupIndex = mItemGroups[group];
-        groupIndex.maxPad = std::max(groupIndex.maxPad, extent->pixelPad);
+        groups[group].maxPad = std::max(groups[group].maxPad, extent->pixelPad);
         mItemKind[i] = 1;
         mItemGroup[i] = group;
         extents.emplace_back(i, *extent);
+        const QCPItemExtent& seen = item->mIndexExtent;
+        moved = moved || !item->mIndexExtentValid || seen.keyAxis != extent->keyAxis
+                || seen.valueAxis != extent->valueAxis || seen.box.keyLower != extent->box.keyLower
+                || seen.box.keyUpper != extent->box.keyUpper
+                || seen.box.valueLower != extent->box.valueLower
+                || seen.box.valueUpper != extent->box.valueUpper;
+        item->mIndexExtent = *extent;
+        item->mIndexExtentValid = true;
     }
+    if (groups.size() != mItemGroups.size())
+        moved = true;
+    else
+        for (std::size_t g = 0; g < groups.size(); ++g)
+            if (groups[g].keyAxis != mItemGroups[g].keyAxis
+                || groups[g].valueAxis != mItemGroups[g].valueAxis)
+            {
+                moved = true;
+                break;
+            }
+    if (!moved)
+    {
+        // Nothing to sort again: the boxes and their groups stand where the index has them, and the
+        // pads only widen the query.
+        for (std::size_t g = 0; g < groups.size(); ++g)
+            mItemGroups[g].maxPad = groups[g].maxPad;
+        return;
+    }
+    mItemGroups = std::move(groups);
     for (int g = 0; g < int(mItemGroups.size()); ++g)
     {
         std::vector<std::pair<QCPDataBox, int>> entries;

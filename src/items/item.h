@@ -336,6 +336,10 @@ protected:
     //! nothing can answer dependencyRevision() without walking them.
     void noteAnchoredPosition(int change) { mAnchoredPositions += change; }
     int mAnchoredPositions = 0;
+    //! What the layer's index saw of this item at its last build. A restyle marks the item and moves
+    //! no box, and comparing against this one is what lets the index keep its sort.
+    QCPItemExtent mIndexExtent;
+    bool mIndexExtentValid = false;
     // The extent of these positions, or nullopt when they do not share one axis pair or when both
     // axes are unusable. \a pixelPad is the room the drawing needs around the positions.
     [[nodiscard]] std::optional<QCPItemExtent>
@@ -364,7 +368,9 @@ private:
     friend class QCustomPlot;
     friend class QCPItemAnchor;
     friend class QCPItemPosition; // keeps mAnchoredPositions true
-    friend class QCPLayer; // writes mItemSlot at rebuild, so a move costs no search
+    // Writes mItemSlot at rebuild, so a move costs no search, and reads mIndexExtent to see whether
+    // a rebuild has anything to re-sort.
+    friend class QCPLayer;
 };
 
 /*!
