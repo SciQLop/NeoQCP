@@ -115,6 +115,14 @@ std::vector<QPointF> resolve(const std::vector<QPointF>& data, const QCPDrawFram
     return pixels;
 }
 
+//! Where a hit test resolves the one polyline it measures: a click visits every candidate, and a
+//! vector per candidate would allocate and free for each of them.
+std::vector<QPointF>& measuredPixels()
+{
+    thread_local std::vector<QPointF> pixels;
+    return pixels;
+}
+
 //! The distance from \a at to the text's box, in pixels: the box turns with the text.
 double textDistance(const qcp::TextCmd& cmd, const QCPDrawFrame& frame, const QPointF& at)
 {
@@ -136,17 +144,20 @@ double distanceTo(const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame,
             using Command = std::decay_t<decltype(cmd)>;
             if constexpr (std::is_same_v<Command, qcp::PolylineDataCmd>)
             {
-                const std::vector<QPointF> pixels = resolve(*cmd.points, frame);
+                std::vector<QPointF>& pixels = measuredPixels();
+                qcpMapDataInto(*cmd.points, frame.transform, pixels);
                 return distanceTo(pixels, at, false) - halfPen(cmd.pen);
             }
             else if constexpr (std::is_same_v<Command, qcp::PolylinePositionsCmd>)
             {
-                const std::vector<QPointF> pixels = resolve(cmd.points, frame);
+                std::vector<QPointF>& pixels = measuredPixels();
+                qcpResolveInto(cmd.points, frame, pixels);
                 return distanceTo(pixels, at, false) - halfPen(cmd.pen);
             }
             else if constexpr (std::is_same_v<Command, qcp::PolygonCmd>)
             {
-                const std::vector<QPointF> pixels = resolve(cmd.points, frame);
+                std::vector<QPointF>& pixels = measuredPixels();
+                qcpResolveInto(cmd.points, frame, pixels);
                 if (visibleBrush(cmd.brush)
                     && QPolygonF(QVector<QPointF>(pixels.begin(), pixels.end()))
                            .containsPoint(at, Qt::OddEvenFill))
@@ -410,6 +421,8 @@ struct FrameMemo
     const QCPAxis* keyAxis = nullptr;
     const QCPAxis* valueAxis = nullptr;
     const QCPAxisRect* axisRect = nullptr;
+    QCPRange keyRange;
+    QCPRange valueRange;
     QRect clip;
     QCPDrawFrame frame;
 };
@@ -418,6 +431,35 @@ FrameMemo& frameMemo()
 {
     thread_local FrameMemo memo;
     return memo;
+}
+
+//! The frame for \a view and \a clip, rebuilt only when the plot, the frame epoch or one of the
+//! axes, the rect and the clip changed: a layer paints all its children through one frame, and a
+//! click pass asks every candidate for the same one.
+const QCPDrawFrame& memoFrame(const QCPDrawnView& view, const QRect& clip)
+{
+    FrameMemo& memo = frameMemo();
+    const quint64 epoch = view.plot ? view.plot->frameEpoch() : 0;
+    // The ranges are part of the key although a frame's axes do not move while it paints: a click
+    // may follow a setRange() without a replot, and the epoch alone would then measure it against
+    // the frame of the range before.
+    const QCPRange keyRange = view.keyAxis ? view.keyAxis->range() : QCPRange();
+    const QCPRange valueRange = view.valueAxis ? view.valueAxis->range() : QCPRange();
+    if (memo.plot != view.plot || memo.epoch != epoch || memo.keyAxis != view.keyAxis
+        || memo.valueAxis != view.valueAxis || memo.axisRect != view.axisRect
+        || memo.keyRange != keyRange || memo.valueRange != valueRange || memo.clip != clip)
+    {
+        memo.frame = qcpMakeFrame(view.keyAxis, view.valueAxis, view.axisRect, QRectF(clip));
+        memo.plot = view.plot;
+        memo.epoch = epoch;
+        memo.keyAxis = view.keyAxis;
+        memo.valueAxis = view.valueAxis;
+        memo.axisRect = view.axisRect;
+        memo.keyRange = keyRange;
+        memo.valueRange = valueRange;
+        memo.clip = clip;
+    }
+    return memo.frame;
 }
 
 //! The part of a view every object has: its plot, layer and theme.
@@ -789,7 +831,8 @@ double QCPDrawnCore::pixelPad() const
 std::optional<double> QCPDrawnCore::hitTest(const QCPDrawable& object, QCP::Pixels at,
                                             QVariant* details, const QCPDrawnView& view)
 {
-    if (!ensureRecording(object, view))
+    const QCPDrawFrame& frame = memoFrame(view, view.clip.translated(0, -1));
+    if (!ensureRecording(object, view, &frame))
         return std::nullopt;
     const double tolerance = view.plot ? double(view.plot->selectionTolerance()) : 5.0;
     const QPointF point(at.x, at.y);
@@ -798,8 +841,6 @@ std::optional<double> QCPDrawnCore::hitTest(const QCPDrawable& object, QCP::Pixe
     std::optional<QCPDataBox> box;
     if (side.keyBounded || side.valueBounded)
         box = side.bounds;
-    const QCPDrawFrame frame
-        = qcpMakeFrame(view.keyAxis, view.valueAxis, view.axisRect, QRectF(view.clip));
     const double pad = pixelPad();
     if (box)
     {
@@ -808,25 +849,21 @@ std::optional<double> QCPDrawnCore::hitTest(const QCPDrawable& object, QCP::Pixe
         // outside the rect or to NaN on a log axis, and either would reject every point.
         const double grow = pad + tolerance;
         // Each side moves along its own pixel axis: with a vertical key axis, map() returns the
-        // value pixel first (QCPTransform::map).
+        // value pixel first (QCPTransform::map). The mapping is monotone on each axis, so the two
+        // opposite corners carry both sides' pixels and two maps do for four.
         const bool keyVertical = frame.transform.keyIsVertical();
-        const auto keyPixels = [&](double key)
-        {
-            const QCP::Pixels pixels = frame.transform.map(QCP::Data { key, 0.0 });
-            return keyVertical ? pixels.y : pixels.x;
-        };
-        const auto valuePixels = [&](double value)
-        {
-            const QCP::Pixels pixels = frame.transform.map(QCP::Data { 0.0, value });
-            return keyVertical ? pixels.x : pixels.y;
-        };
+        const QCP::Pixels lower = frame.transform.map(QCP::Data { box->keyLower, box->valueLower });
+        const QCP::Pixels upper = frame.transform.map(QCP::Data { box->keyUpper, box->valueUpper });
+        const auto keyPixels = [&](bool high)
+        { return keyVertical ? (high ? upper.y : lower.y) : (high ? upper.x : lower.x); };
+        const auto valuePixels = [&](bool high)
+        { return keyVertical ? (high ? upper.x : lower.x) : (high ? upper.y : lower.y); };
         // The click coordinate follows the same swap: with a vertical key axis the key runs down
         // the screen and the value across it.
         const double keyClick = keyVertical ? point.y() : point.x();
         const double valueClick = keyVertical ? point.x() : point.y();
-        if (!nearSide(keyPixels(box->keyLower), keyPixels(box->keyUpper), keyClick, grow)
-            || !nearSide(valuePixels(box->valueLower), valuePixels(box->valueUpper), valueClick,
-                         grow))
+        if (!nearSide(keyPixels(false), keyPixels(true), keyClick, grow)
+            || !nearSide(valuePixels(false), valuePixels(true), valueClick, grow))
             return std::nullopt;
     }
     double best = kInfinity;
@@ -871,22 +908,7 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
     // The layer clips every child it draws at clipRect().translated(0, -1), the half pixel
     // QCPPainter's antialiasing shifts it by: the replay sets the same clip, so a fill that ends on
     // the clip's edge lands on the same rows it does on screen.
-    const QRect clip = view.clip.translated(0, -1);
-    const quint64 frameEpoch = view.plot ? view.plot->frameEpoch() : 0;
-    FrameMemo& memo = frameMemo();
-    if (memo.plot != view.plot || memo.epoch != frameEpoch || memo.keyAxis != view.keyAxis
-        || memo.valueAxis != view.valueAxis || memo.axisRect != view.axisRect
-        || memo.clip != clip)
-    {
-        memo.frame = qcpMakeFrame(view.keyAxis, view.valueAxis, view.axisRect, QRectF(clip));
-        memo.plot = view.plot;
-        memo.epoch = frameEpoch;
-        memo.keyAxis = view.keyAxis;
-        memo.valueAxis = view.valueAxis;
-        memo.axisRect = view.axisRect;
-        memo.clip = clip;
-    }
-    const QCPDrawFrame& frame = memo.frame;
+    const QCPDrawFrame& frame = memoFrame(view, view.clip.translated(0, -1));
     if (!ensureRecording(object, painted, &frame))
         return;
     QCPPlottableRhiLayer* plottables
