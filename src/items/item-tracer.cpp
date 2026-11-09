@@ -182,6 +182,8 @@ void QCPItemTracer::setGraph(QCPGraph* graph)
 {
     if (graph == mGraph && !graph)
         return;
+    if (mGraph)
+        mGraph->removeDependent(this);
     markDirty();
     if (graph)
     {
@@ -191,6 +193,9 @@ void QCPItemTracer::setGraph(QCPGraph* graph)
             position->setAxes(graph->keyAxis(), graph->valueAxis());
             mGraph = graph;
             mFollowsGraph = true;
+            // The tracer follows the graph's data wherever its own layer is: a data change must
+            // repaint it even when the graph's layer is the only one the change marks.
+            graph->addDependent(this);
             updatePosition();
         }
         else

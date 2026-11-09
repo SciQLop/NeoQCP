@@ -557,13 +557,51 @@ QPointF QCPAbstractPlottable::stallPixelOffset() const
 }
 
 /*!
-  The setter rule: a new content generation, then the layer mark the base needs. A pan or a zoom
-  never reaches it, so a range change still reuses the recording.
+  The setter rule: a new content generation, then the layer mark the base needs and the dependents
+  that draw this plottable's data. A pan or a zoom never reaches it, so a range change still reuses
+  the recording.
 */
 void QCPAbstractPlottable::markDirty()
 {
-    if (mCore.contentChanged())
-        QCPLayerable::markDirty();
+    if (!mCore.contentChanged())
+        return;
+    QCPLayerable::markDirty();
+    markDependentsDirty();
+}
+
+/*!
+  Registers \a dependent, a layerable whose drawing follows this plottable's data, so a content
+  change repaints it wherever its own layer is. A null or already registered layerable is ignored.
+*/
+void QCPAbstractPlottable::addDependent(QCPLayerable* dependent)
+{
+    if (dependent && !mDependents.contains(dependent))
+        mDependents.append(dependent);
+}
+
+/*!
+  Unregisters \a dependent. A dependent that dies without calling this is forgotten on the next
+  content change.
+*/
+void QCPAbstractPlottable::removeDependent(QCPLayerable* dependent)
+{
+    mDependents.removeAll(dependent);
+}
+
+/*!
+  Marks every live dependent dirty. A dependent never marks its source back: a tracer marks its
+  graph only through its own content change, so the walk ends here.
+*/
+void QCPAbstractPlottable::markDependentsDirty()
+{
+    for (int i = int(mDependents.size()) - 1; i >= 0; --i)
+    {
+        QCPLayerable* dependent = mDependents.at(i).data();
+        if (!dependent)
+            mDependents.removeAt(i);
+        else
+            dependent->markDirty();
+    }
 }
 
 QCPRange QCPAbstractPlottable::getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain) const

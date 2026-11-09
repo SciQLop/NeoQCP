@@ -322,6 +322,81 @@ void TestItemRecording::aFollowerFollowsItsAnchorItem()
              "the anchored end is not on the tracer's new sample");
 }
 
+void TestItemRecording::aTracerOnAnotherLayerFollowsItsGraph()
+{
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
+    auto low = QSharedPointer<QCPGraphDataContainer>::create();
+    auto high = QSharedPointer<QCPGraphDataContainer>::create();
+    low->set(QVector<QCPGraphData> { { 1, 0.2 }, { 2, 0.2 }, { 3, 0.2 }, { 4, 0.2 } });
+    high->set(QVector<QCPGraphData> { { 1, 0.8 }, { 2, 0.8 }, { 3, 0.8 }, { 4, 0.8 } });
+    graph->setData(low);
+    graph->setPen(QPen(Qt::black, 1));
+    auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
+    tracer->setGraph(graph);
+    tracer->setGraphKey(3.0);
+    tracer->setStyle(QCPItemTracer::tsCircle);
+    tracer->setSize(9);
+    tracer->setPen(QPen(Qt::red, 2));
+    QCOMPARE(tracer->layer()->name(), QStringLiteral("annotations"));
+    QCOMPARE(graph->layer()->name(), QStringLiteral("main"));
+    plot.replot();
+    const QPointF atLow(plot.xAxis->coordToPixel(3.0), plot.yAxis->coordToPixel(0.2));
+    QImage image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QVERIFY2(redPixelsNear(image, atLow, 8) > 0, "the tracer did not draw its marker");
+    // Read after the pixmap: toPixmap() changes the viewport, which re-records view dependent
+    // drawings by itself.
+    const int before = tracer->recordings();
+
+    graph->setData(high);
+    plot.replot();
+    QVERIFY2(tracer->recordings() > before,
+             "a tracer on another layer than its graph kept the recording");
+    image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    const QPointF atHigh(plot.xAxis->coordToPixel(3.0), plot.yAxis->coordToPixel(0.8));
+    QVERIFY2(redPixelsNear(image, atHigh, 8) > 0, "the tracer did not follow the graph's new data");
+    QCOMPARE(redPixelsNear(image, atLow, 8), 0);
+}
+
+void TestItemRecording::anErrorBarOnAnotherLayerFollowsItsGraph()
+{
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
+    auto low = QSharedPointer<QCPGraphDataContainer>::create();
+    auto high = QSharedPointer<QCPGraphDataContainer>::create();
+    low->set(QVector<QCPGraphData> { { 1, 0.2 }, { 2, 0.2 }, { 3, 0.2 }, { 4, 0.2 } });
+    high->set(QVector<QCPGraphData> { { 1, 0.7 }, { 2, 0.7 }, { 3, 0.7 }, { 4, 0.7 } });
+    graph->setData(low);
+    graph->setPen(QPen(Qt::black, 1));
+    auto* bars = new RecordingItem<QCPErrorBars>(plot.xAxis, plot.yAxis);
+    bars->setDataPlottable(graph);
+    for (int i = 0; i < 4; ++i)
+        bars->addData(0.15, 0.15);
+    bars->setPen(QPen(QColor(30, 80, 160), 2));
+    QVERIFY(bars->setLayer(QStringLiteral("annotations")));
+    QCOMPARE(graph->layer()->name(), QStringLiteral("main"));
+    plot.replot();
+    const QPointF atLowWhisker(plot.xAxis->coordToPixel(2.0), plot.yAxis->coordToPixel(0.05));
+    QImage image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QVERIFY2(bluePixelsNear(image, atLowWhisker, 4) > 0,
+             "the error bar did not draw its whisker");
+    // Read after the pixmap: toPixmap() changes the viewport, which re-records view dependent
+    // drawings by itself.
+    const int before = bars->recordings();
+
+    graph->setData(high);
+    plot.replot();
+    QVERIFY2(bars->recordings() > before,
+             "error bars on another layer than their graph kept the recording");
+    image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    const QPointF atHighWhisker(plot.xAxis->coordToPixel(2.0), plot.yAxis->coordToPixel(0.55));
+    QVERIFY2(bluePixelsNear(image, atHighWhisker, 4) > 0,
+             "the error bar did not follow the graph's new data");
+    QCOMPARE(bluePixelsNear(image, atLowWhisker, 4), 0);
+}
+
 void TestItemRecording::everyStyleSetterReRecords()
 {
     QCustomPlot plot;

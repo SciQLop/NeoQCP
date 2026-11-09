@@ -15,6 +15,8 @@ private slots:
     void anAnchoredArrowFollowsThePan();
     void aRatioArrowFollowsTheAxisRect();
     void aFollowerFollowsItsAnchorItem();
+    void aTracerOnAnotherLayerFollowsItsGraph();
+    void anErrorBarOnAnotherLayerFollowsItsGraph();
     void everyStyleSetterReRecords();
     void aRectRecords();
     void anEllipseRecords();

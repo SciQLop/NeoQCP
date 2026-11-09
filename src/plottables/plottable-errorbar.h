@@ -179,6 +179,8 @@ protected:
                                    const QCPRange& inKeyRange = QCPRange()) const override;
 
     // non-virtual methods:
+    //! Drops the data plottable and the dependents registration that came with it.
+    void detachDataPlottable();
     void getErrorBarLines(QCPErrorBarsDataContainer::const_iterator it, QVector<QLineF>& backbones,
                           QVector<QLineF>& whiskers) const;
     void getVisibleDataBounds(QCPErrorBarsDataContainer::const_iterator& begin,

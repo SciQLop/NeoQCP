@@ -195,6 +195,12 @@ public:
 
     //! A setter's name for the same thing.
     void contentChanged() { markDirty(); }
+
+    // Overlays, tracers and error bars whose drawing follows this plottable's data. A dependent
+    // registers when it attaches and unregisters when it detaches; a content change then marks each
+    // live one dirty, so a dependent on another layer than this plottable's is repainted too.
+    void addDependent(QCPLayerable* dependent);
+    void removeDependent(QCPLayerable* dependent);
     //! The plot's scheduler for a plottable that runs a pipeline: null while it is outside a plot
     //! (QCustomPlot::take binds it, QCustomPlot::add(std::unique_ptr) rebinds it).
     virtual void setPipelineScheduler(QCPPipelineScheduler*) {}
@@ -309,6 +315,9 @@ protected:
     //! The recording, its keys and its caches.
     mutable QCPDrawnCore mCore;
 
+    //! Marks every live dependent dirty, and forgets the ones that died without unregistering.
+    void markDependentsDirty();
+
     // busy indicator
     virtual bool pipelineBusy() const { return false; }
     void updateEffectiveBusy();
@@ -333,6 +342,7 @@ private:
     bool mEffectiveBusy = false;
     mutable bool mReportedLostAxis = false; // one misuse per loss, not one per replot
     QTimer mBusyDebounceTimer;
+    QList<QPointer<QCPLayerable>> mDependents;
 
     std::optional<QString> mBusyIndicatorSymbol;
     std::optional<qreal> mBusyFadeAlpha;

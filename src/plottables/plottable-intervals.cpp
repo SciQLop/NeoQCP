@@ -264,8 +264,10 @@ void QCPIntervals::requestRepaint()
 
 void QCPIntervals::markDirty()
 {
-    if (mCore.contentChanged())
-        markLayersDirty(); // the labels are made from the same geometry
+    if (!mCore.contentChanged())
+        return;
+    markLayersDirty(); // the labels are made from the same geometry
+    markDependentsDirty();
 }
 
 bool QCPIntervals::hasLaneLayout() const

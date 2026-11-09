@@ -220,13 +220,13 @@ void QCPErrorBars::setDataPlottable(QCPAbstractPlottable* plottable)
 {
     if (plottable && qobject_cast<QCPErrorBars*>(plottable))
     {
-        mDataPlottable = nullptr;
+        detachDataPlottable();
         qDebug() << Q_FUNC_INFO << "can't set another QCPErrorBars instance as data plottable";
         return;
     }
     if (plottable && !plottable->interface1D())
     {
-        mDataPlottable = nullptr;
+        detachDataPlottable();
         qDebug()
             << Q_FUNC_INFO
             << "passed plottable doesn't implement 1d interface, can't associate with QCPErrorBars";
@@ -234,7 +234,23 @@ void QCPErrorBars::setDataPlottable(QCPAbstractPlottable* plottable)
     }
 
     markDirty();
+    if (QCPAbstractPlottable* previous = mDataPlottable.data())
+        previous->removeDependent(this);
     mDataPlottable = plottable;
+    // The whiskers follow the data plottable's values wherever their own layer is.
+    if (plottable)
+        plottable->addDependent(this);
+}
+
+/*!
+  Drops the data plottable: the error bars draw nothing until setDataPlottable() gives them one.
+*/
+void QCPErrorBars::detachDataPlottable()
+{
+    markDirty();
+    if (QCPAbstractPlottable* previous = mDataPlottable.data())
+        previous->removeDependent(this);
+    mDataPlottable = nullptr;
 }
 
 /*!
