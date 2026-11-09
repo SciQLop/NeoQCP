@@ -850,3 +850,42 @@ void TestQCPBars::barsOnTheKeyBoundEdgeAreHit()
     QCOMPARE(overSliver.dataPointCount(), 1);
     QCOMPARE(keyOfSelected(overSliver), onEdge); // the bar one pixel out is not reported
 }
+
+// A click on a bar selects that bar, as 2.x did: the recording hit test must name the data point,
+// not the whole series.
+void TestQCPBars::aClickSelectsTheBarUnderTheCursor()
+{
+    // selectEvent is what the plot calls on a click, and it is protected: reach it through a subclass.
+    class ClickableBars : public QCPBars
+    {
+    public:
+        using QCPBars::QCPBars;
+        void click(const QVariant& details)
+        {
+            bool changed = false;
+            selectEvent(nullptr, false, details, &changed);
+        }
+    };
+    auto* bars = new ClickableBars(mPlot->xAxis, mPlot->yAxis);
+    QVector<double> keys;
+    QVector<double> values;
+    for (int i = 0; i < 8; ++i)
+    {
+        keys << double(i);
+        values << 1.0;
+    }
+    bars->setData(keys, values);
+    bars->setWidth(0.8);
+    bars->setSelectable(QCP::stSingleData);
+    mPlot->xAxis->setRange(-0.5, 7.5);
+    mPlot->yAxis->setRange(0, 2);
+    mPlot->replot();
+
+    const QPointF onTheFourthBar(mPlot->xAxis->coordToPixel(3.0),
+                                 mPlot->yAxis->coordToPixel(0.5));
+    QVariant details;
+    QVERIFY2(bars->selectTest(onTheFourthBar, true, &details) >= 0, "the click missed the bar");
+    bars->click(details);
+    QCOMPARE(bars->selection().dataRangeCount(), 1);
+    QCOMPARE(bars->selection().dataRange(0), QCPDataRange(3, 4));
+}

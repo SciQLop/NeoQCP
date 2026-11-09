@@ -31,6 +31,7 @@ private slots:
   void bracketSubclassKeepsItsDrawBracket();
   void barsPanDoesNotReRecord();
 
+  void aClickSelectsTheBarUnderTheCursor();
   void barsOnTheKeyBoundEdgeAreHit_data();
   void barsOnTheKeyBoundEdgeAreHit();
   
