@@ -30,6 +30,22 @@ QImage imageOf(QCustomPlot& plot)
     return plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
 }
 
+//! The pixels around \a at that are mostly red: what a marker in a red pen leaves.
+int redPixelsNear(const QImage& image, const QPointF& at, int radius)
+{
+    int red = 0;
+    for (int y = int(at.y()) - radius; y <= int(at.y()) + radius; ++y)
+        for (int x = int(at.x()) - radius; x <= int(at.x()) + radius; ++x)
+        {
+            if (!image.valid(x, y))
+                continue;
+            const QColor colour = image.pixelColor(x, y);
+            if (colour.red() > 150 && colour.red() > colour.blue() + 60)
+                ++red;
+        }
+    return red;
+}
+
 //! The scene the reference suite renders: the same three boxes, width and axes, through a plottable
 //! that says what it recorded.
 Scene statisticalBoxScene(bool verticalKey, bool selected)
@@ -135,4 +151,17 @@ void TestStatisticalBox::everyStyleSetterReRecords()
     box->setSelectable(QCP::stDataRange);
     QVERIFY2(reRecords([&] { box->setSelection(QCPDataSelection(QCPDataRange(1, 2))); }),
              "a selection change did not remake the recording");
+}
+
+// 2.x applied the box's pen to an outlier style that carries none of its own.
+void TestStatisticalBox::anUnstyledOutlierMarkerTakesTheBoxPen()
+{
+    QCustomPlot plot;
+    RecordingBox* box = makeBoxPlot(plot);
+    box->setPen(QPen(Qt::red, 2));
+    box->setOutlierStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 5));
+    plot.replot();
+    const QPointF outlier(plot.xAxis->coordToPixel(0.8), plot.yAxis->coordToPixel(9.2));
+    QVERIFY2(redPixelsNear(imageOf(plot), outlier, 6) > 0,
+             "the outlier marker is not drawn in the box's pen");
 }

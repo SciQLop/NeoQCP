@@ -8,4 +8,5 @@ private slots:
     void recordedBoxesMatchTheirReferences();
     void recordedBoxesMatchTheirReferences_data();
     void everyStyleSetterReRecords();
+    void anUnstyledOutlierMarkerTakesTheBoxPen();
 };

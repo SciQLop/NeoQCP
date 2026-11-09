@@ -640,6 +640,10 @@ void QCPStatisticalBox::recordSegment(QCPDrawContext& context, const QCPDataRang
     QCPScatterStyle outlierStyle = mOutlierStyle;
     if (selected && mSelectionDecorator)
         outlierStyle = mSelectionDecorator->getFinalScatterStyle(mOutlierStyle);
+    // An outlier style with no pen of its own is drawn in the box's pen, as 2.x's applyTo(painter,
+    // mPen) did: the replay has no box pen to fall back to.
+    if (!outlierStyle.isPenDefined())
+        outlierStyle.setPen(pen);
 
     std::vector<QCP::Position> medians;
     std::vector<QCP::Position> backbones, whiskerBars;
