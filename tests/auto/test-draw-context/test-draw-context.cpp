@@ -11,6 +11,7 @@
 #include <painting/scatter-rhi-layer.h>
 #include <qcustomplot.h>
 
+#include <QElapsedTimer>
 #include <QFontMetrics>
 #include <QPainterPath>
 #include <cmath>
@@ -1331,4 +1332,34 @@ void TestDrawContext::colouredPolylinePanReusesTheKeptGeometry()
                      0, &geometry);
     QCOMPARE(QCPLineExtruder::extruderCallCount(), extruded);
     QVERIFY2(plottables.hasGeometry(), "the kept vertices are submitted again, with the pan delta");
+}
+
+// The brief's export question: a data ellipse whose box spans a billion pixels. The axes show a unit
+// square, so the ellipse covers the frame many times over; 2.x caught the allocation failure and hid
+// the item. The replay must keep the frame affordable whether the ellipse is batched or alone.
+void TestDrawContext::aHugeEllipseKeepsTheFrame()
+{
+    Fixture fixture; // one pixel per unit, so 1e9 data units are 1e9 pixels
+    const QBrush otherBrush(QColor(10, 200, 90));
+    for (const double extent : { 1e9, 1e12 })
+    {
+        QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis,
+                               fixture.plot->axisRect(), nullptr);
+        context.ellipse(QCP::Data { 0.0, 0.0 }, QCP::Data { extent, extent }, kPen, kBrush);
+        // A corner in pixels cannot join the batch, so this one replays as an EllipseCmd of its own.
+        context.ellipse(QCP::Data { 0.0, 0.0 }, QCP::Pixels { extent, extent }, kPen, otherBrush);
+        context.ellipse(QCP::Data { 150.0, 40.0 }, QCP::Data { 180.0, 80.0 }, kPen,
+                        QBrush(QColor(200, 90, 30)));
+
+        QElapsedTimer timer;
+        timer.start();
+        const QImage image = replayOf(context);
+        QVERIFY2(timer.elapsed() < 2000,
+                 qPrintable(QStringLiteral("a %1-wide ellipse took %2 ms")
+                                .arg(extent)
+                                .arg(timer.elapsed())));
+        // The small ellipse after the huge ones still paints: the replay survived them.
+        const QPointF centre = pixelOf(context.transform(), 165.0, 60.0);
+        QCOMPARE(image.pixelColor(int(centre.x()), int(centre.y())), QColor(200, 90, 30));
+    }
 }

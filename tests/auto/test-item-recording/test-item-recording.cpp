@@ -1,5 +1,6 @@
 #include "test-item-recording.h"
 
+#include <QElapsedTimer>
 #include <functional>
 
 #include "../../../src/qcp.h"
@@ -447,6 +448,36 @@ void TestItemRecording::aDataItemWithoutAxesDrawsNothing()
     QCOMPARE(rect->recordings(), 0);
     const QImage image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
     QCOMPARE(redPixelsNear(image, QPointF(200, 150), 200), 0);
+}
+
+void TestItemRecording::aHugeDataEllipseExports()
+{
+    // 2.x wrapped the data-space drawEllipse in a try/catch ("Item too large for memory"): a box
+    // spanning a billion pixels made Qt allocate before it clipped. This port replays the box, so a
+    // guard would belong to the replay; the export is measured here so a regression shows up.
+    for (const double extent : { 1e9, 1e12 })
+    {
+        QCustomPlot plot;
+        plot.resize(400, 300);
+        plot.xAxis->setRange(0, 1);
+        plot.yAxis->setRange(0, 1);
+        auto* ellipse = new QCPItemEllipse(&plot);
+        ellipse->topLeft->setCoords(0, 0);
+        ellipse->bottomRight->setCoords(extent, extent);
+        ellipse->setPen(QPen(Qt::darkBlue, 2));
+        ellipse->setBrush(QBrush(QColor(200, 90, 30, 60)));
+        plot.replot();
+
+        QElapsedTimer timer;
+        timer.start();
+        const QImage image
+            = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+        const qint64 elapsed = timer.elapsed();
+        QVERIFY2(elapsed < 2000, qPrintable(QStringLiteral("a %1-wide ellipse took %2 ms")
+                                                .arg(extent)
+                                                .arg(elapsed)));
+        QCOMPARE(image.size(), QSize(400, 300));
+    }
 }
 
 void TestItemRecording::everyStyleSetterReRecords()

@@ -19,6 +19,7 @@ private slots:
     void anErrorBarOnAnotherLayerFollowsItsGraph();
     void aPixelOnlyItemDrawsWithoutAxes();
     void aDataItemWithoutAxesDrawsNothing();
+    void aHugeDataEllipseExports();
     void everyStyleSetterReRecords();
     void aRectRecords();
     void anEllipseRecords();
