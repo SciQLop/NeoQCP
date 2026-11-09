@@ -43,7 +43,8 @@ public:
     bool addToLegend(QCPLegend* legend) override;
     bool removeFromLegend(QCPLegend* legend) const override;
     [[nodiscard]] QColor categoryColor(int category) const;
-    [[nodiscard]] quint64 buildCount() const { return mBuildCount; }
+    //! How many times the bars were recorded: the recording is their only cache.
+    [[nodiscard]] quint64 buildCount() const { return mCore.recordingCount(); }
     [[nodiscard]] QCPLayer* labelLayer() const;
     [[nodiscard]] QList<QCPLayer*> dependentLayers() const override;
 
@@ -105,6 +106,9 @@ public:
 
     bool keyPress(QKeyEvent* event) override;
 
+    //! A change that remakes the bars repaints the labels too: they live on a layer of their own.
+    void markDirty() override;
+
     double selectTest(const QPointF& pos, bool onlySelectable,
                       QVariant* details = nullptr) const override;
     QCPRange getKeyRange(bool& foundRange,
@@ -139,16 +143,7 @@ Q_SIGNALS:
     void deleteRequested(const QVector<qint64>& ids);
 
 protected:
-    struct BuildKey
-    {
-        double lower, upper;
-        QRect rect;
-        quint64 data, layout, colors, subRows;
-        Style style;
-        bool operator==(const BuildKey&) const = default;
-    };
-
-    void draw(QCPPainter* painter) override;
+    void draw(QCPDrawContext& context) const override;
     void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
 
     void regroupIfLanesWereAdded();
@@ -156,21 +151,22 @@ protected:
     [[nodiscard]] int subRowOf(int row) const { return mSubRow.empty() ? 0 : mSubRow[row]; }
     //! The vertical band of sub-row \a subRow of \a lane (the whole lane when not stacking).
     [[nodiscard]] std::optional<QCPLaneBand> rowBand(int lane, int subRow) const;
-    [[nodiscard]] BuildKey currentBuildKey() const;
-    void rebuildBarsIfNeeded();
-    void rebuildBars();
-    void appendLaneBars(int lane, const QCPLaneBand& band);
-    [[nodiscard]] bool sameLabelAsLastBar(int row) const;
-    void appendLabelRect(const qcp::intervals::PixelBar& bar);
-    void appendLaneBackdrops(const QRect& axisRect);
+    //! The bars to draw now, merged per pixel and in the current lane bands: the geometry both the
+    //! recording and the labels are made of.
+    [[nodiscard]] std::vector<qcp::intervals::PixelBar> mergedBars() const;
+    void appendLaneBars(std::vector<qcp::intervals::PixelBar>& bars, int lane,
+                        const QCPLaneBand& band) const;
+    [[nodiscard]] bool sameLabelAsLastBar(const std::vector<qcp::intervals::PixelBar>& bars,
+                                          int row) const;
+    void recordBar(QCPDrawContext& context, const qcp::intervals::PixelBar& bar) const;
+    void appendLaneBackdrops(QCPDrawContext& context) const;
     [[nodiscard]] QPolygonF barShape(const qcp::intervals::PixelBar& bar) const;
     [[nodiscard]] QColor fillColor(int category) const;
-    void drawLabels(QCPPainter* painter) const;
+    void appendLabelRect(const qcp::intervals::PixelBar& bar);
+    void drawLabels(QCPPainter* painter);
     void drawLaneNames(QCPPainter* painter) const;
     [[nodiscard]] bool drawsLaneNames() const;
     [[nodiscard]] double fillOpacity() const;
-    bool drawBarsOnGpu(QCPPainter* painter);
-    void drawBarsWithPainter(QCPPainter* painter) const;
 
     void selectEvent(QMouseEvent* event, bool additive, const QVariant& details,
                      bool* selectionStateChanged) override;
@@ -249,20 +245,12 @@ protected:
     std::vector<qcp::intervals::LaneRows> mLanes;
     QVector<QColor> mCategoryColors;
     QStringList mCategoryNames;
-    std::vector<qcp::intervals::PixelBar> mBars;
-    struct Shape
-    {
-        QPolygonF polygon;
-        QColor color;
-    };
     struct LabelRect
     {
         QRectF rect;
         int row;
         QString text;
     };
-    std::vector<Shape> mShapes; // what both the GPU and the painter path draw, bottom first
-    std::vector<float> mVertices;
     std::vector<LabelRect> mLabelRects;
     Style mStyle = stBars;
     StackMode mStack = skNone;
@@ -272,15 +260,10 @@ protected:
     std::vector<std::vector<int>> mRowCategories; // per lane, the category of each sub-row (skCategory)
     std::vector<std::pair<QRectF, QString>> mRowNames;
     quint64 mSubRowGeneration = 0;
-    std::optional<BuildKey> mBuiltFor;
-    quint64 mDataGeneration = 0;
-    quint64 mColorGeneration = 0;
-    quint64 mBuildCount = 0;
 
-    // The GPU bar path renders its vertex quads after its own layer's painter
-    // output is composited (see QCustomPlot::render), so text drawn by
-    // QCPIntervals::draw() on the same layer would end up underneath the bars.
-    // This layerable lives one layer above and draws the labels/lane names instead.
+    // The labels are painter text, the bars are recorded commands: on screen the bars reach the GPU
+    // after their layer's painter output, so text drawn on the plottable's own layer would end up
+    // underneath them. This layerable lives one layer above and draws the labels/lane names.
     class LabelLayer;
     LabelLayer* mLabelLayer = nullptr;
 

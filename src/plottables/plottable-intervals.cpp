@@ -1,8 +1,7 @@
 #include "plottable-intervals.h"
 #include "../core.h"
 #include "../painting/painter.h"
-#include "../painting/plottable-rhi-layer.h"
-#include "../painting/rhi-utils.h"
+#include "../painting/draw-context.h"
 #include "../axis/axis.h"
 #include "../layoutelements/layoutelement-axisrect.h"
 #include "../layoutelements/layoutelement-legend-intervals.h"
@@ -81,7 +80,7 @@ QCPIntervals::QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* 
     if (hasLaneLayout())
         connect(layout, &QCPLaneLayout::changed, this, [this] {
             regroupIfLanesWereAdded();
-            markLayersDirty();
+            markDirty();
         });
     connect(this, &QCPAbstractPlottable::selectionChanged, this, &QCPIntervals::markLayersDirty);
     if (!mParentPlot)
@@ -106,7 +105,6 @@ void QCPIntervals::setData(qcp::intervals::Columns columns)
     mColumns = std::move(columns);
     mLanes = qcp::intervals::groupByLane(mColumns, mLayout ? mLayout->laneNames().size() : 0);
     updateSubRows();
-    ++mDataGeneration;
     markLayersDirty();
     setSelectedRows(rowsWithIds(selected));
 }
@@ -231,7 +229,6 @@ void QCPIntervals::setCategoryColors(const QVector<QColor>& colors)
         return;
     markDirty();
     mCategoryColors = colors;
-    ++mColorGeneration;
 }
 
 QColor QCPIntervals::categoryColor(int category) const
@@ -263,6 +260,12 @@ void QCPIntervals::markLayersDirty()
 void QCPIntervals::requestRepaint()
 {
     markLayersDirty(); // marking schedules the repaint
+}
+
+void QCPIntervals::markDirty()
+{
+    if (mCore.contentChanged())
+        markLayersDirty(); // the labels are made from the same geometry
 }
 
 bool QCPIntervals::hasLaneLayout() const
@@ -956,13 +959,18 @@ QCPRange QCPIntervals::getValueRange(bool& foundRange, QCP::SignDomain, const QC
     return {};
 }
 
-void QCPIntervals::draw(QCPPainter* painter)
+void QCPIntervals::draw(QCPDrawContext& context) const
 {
     if (!laidOut())
         return;
-    rebuildBarsIfNeeded();
-    if (!drawBarsOnGpu(painter))
-        drawBarsWithPainter(painter);
+    // The bars are merged per pixel and laid out in pixel bands, and the wave style slants their
+    // ends: the geometry is pixels, so the recording is made from the view and remade whenever the
+    // view changes, a pan included (P-6). The recording is the only cache the bars need.
+    (void)context.transform();
+    if (mStyle == stWave)
+        appendLaneBackdrops(context);
+    for (const auto& bar : mergedBars())
+        recordBar(context, bar);
 }
 
 void QCPIntervals::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
@@ -970,51 +978,49 @@ void QCPIntervals::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
     painter->fillRect(rect.adjusted(0, rect.height() / 4, 0, -rect.height() / 4), categoryColor(0));
 }
 
-QCPIntervals::BuildKey QCPIntervals::currentBuildKey() const
+namespace {
+//! The rectangle a polygon fills, when it is an axis-aligned one: a plain bar is recorded as a
+//! rect, which the replay draws as a quad instead of triangulating it.
+std::optional<QRectF> axisAlignedRect(const QPolygonF& polygon)
 {
-    const QCPRange range = mKeyAxis->range();
-    return { range.lower, range.upper, mKeyAxis->axisRect()->rect(), mDataGeneration,
-             mLayout->generation(), mColorGeneration, mSubRowGeneration, mStyle };
+    if (polygon.size() != 4)
+        return std::nullopt;
+    const QRectF box = polygon.boundingRect();
+    for (const QPointF& point : polygon)
+        if ((point.x() != box.left() && point.x() != box.right())
+            || (point.y() != box.top() && point.y() != box.bottom()))
+            return std::nullopt;
+    return box;
 }
+} // namespace
 
-void QCPIntervals::rebuildBarsIfNeeded()
+// simplify: the bars are merged per pixel over the visible rows on every recording, so a pan costs
+// one scan of the visible rows. Upgrade path: record a wider key range once and translate it while
+// panning, as QCPMultiGraph does.
+std::vector<qcp::intervals::PixelBar> QCPIntervals::mergedBars() const
 {
-    const BuildKey key = currentBuildKey();
-    if (mBuiltFor == key)
-        return;
-    rebuildBars();
-    mBuiltFor = key;
-}
-
-// simplify: rebuilds on every view change. The merge bounds the output to about
-// lanes x plot width, so a pan costs one scan of the visible rows. Upgrade path: build a
-// wider key range once and translate on the GPU while panning, as QCPMultiGraph does.
-void QCPIntervals::rebuildBars()
-{
-    ++mBuildCount;
-    mBars.clear();
-    mLabelRects.clear();
-    mShapes.clear();
-    const QRect rect = mKeyAxis->axisRect()->rect();
-    if (mStyle == stWave)
-        appendLaneBackdrops(rect);
+    std::vector<qcp::intervals::PixelBar> bars;
     for (int lane = 0; lane < static_cast<int>(mLanes.size()); ++lane)
-        if (const auto band = mLayout->laneBand(lane, rect))
-            appendLaneBars(lane, *band);
-    mRowNames.clear();
-    if (mStack == skCategory)
-        appendRowNames(rect);
-    for (const auto& bar : mBars)
+        if (const auto band = mLayout->laneBand(lane, mKeyAxis->axisRect()->rect()))
+            appendLaneBars(bars, lane, *band);
+    return bars;
+}
+
+void QCPIntervals::recordBar(QCPDrawContext& context, const qcp::intervals::PixelBar& bar) const
+{
+    const QColor colour = fillColor(bar.category);
+    const QPolygonF shape = barShape(bar);
+    if (const auto box = axisAlignedRect(shape))
     {
-        // Merged bars (row == -1, see appendMerged) never get a label: it's ambiguous
-        // which source row's text a bar spanning several rows would show.
-        if (bar.row != -1)
-            appendLabelRect(bar);
-        mShapes.push_back({ barShape(bar), fillColor(bar.category) });
+        context.rect(QCP::Pixels { box->left(), box->top() },
+                     QCP::Pixels { box->right(), box->bottom() }, QPen(Qt::NoPen), colour);
+        return;
     }
-    mVertices.clear();
-    for (const auto& shape : mShapes)
-        qcp::intervals::appendFan(mVertices, shape.polygon, qcp::rhi::premultipliedColor(shape.color));
+    std::vector<QCP::Position> points;
+    points.reserve(shape.size());
+    for (const QPointF& point : shape)
+        points.emplace_back(QCP::Pixels { point.x(), point.y() });
+    context.polygon(points, QPen(Qt::NoPen), colour);
 }
 
 namespace {
@@ -1034,9 +1040,15 @@ QPolygonF rectPolygon(const QRectF& r)
 } // namespace
 
 //! Wave style: every other lane shaded, and a thin idle line through each lane, under the bars.
-void QCPIntervals::appendLaneBackdrops(const QRect& axisRect)
+void QCPIntervals::appendLaneBackdrops(QCPDrawContext& context) const
 {
     const QColor ink = mKeyAxis->tickLabelColor();
+    const QRect axisRect = mKeyAxis->axisRect()->rect();
+    const auto record = [&context](const QRectF& box, const QColor& colour)
+    {
+        context.rect(QCP::Pixels { box.left(), box.top() },
+                     QCP::Pixels { box.right(), box.bottom() }, QPen(Qt::NoPen), colour);
+    };
     const auto& lanes = mLayout->displayLanes();
     for (std::size_t position = 0; position < lanes.size(); ++position)
     {
@@ -1044,17 +1056,15 @@ void QCPIntervals::appendLaneBackdrops(const QRect& axisRect)
         if (!band)
             continue;
         if (position % 2 == 1)
-            mShapes.push_back({ rectPolygon(QRectF(axisRect.left(), band->top, axisRect.width(),
-                                                   band->bottom - band->top)),
-                                withAlpha(ink, 0.06) });
+            record(QRectF(axisRect.left(), band->top, axisRect.width(), band->bottom - band->top),
+                   withAlpha(ink, 0.06));
         // One idle line per row: in a stacked lane each sub-row is its own signal.
         const int rows = mStack != skNone ? mLayout->laneRows(lanes[position]) : 1;
         const double rowHeight = (band->bottom - band->top) / rows;
         for (int r = 0; r < rows; ++r)
         {
             const double mid = std::floor(band->top + (r + 0.5) * rowHeight);
-            mShapes.push_back({ rectPolygon(QRectF(axisRect.left(), mid, axisRect.width(), 1)),
-                                withAlpha(ink, 0.45) });
+            record(QRectF(axisRect.left(), mid, axisRect.width(), 1), withAlpha(ink, 0.45));
         }
     }
 }
@@ -1090,14 +1100,16 @@ QPolygonF QCPIntervals::barShape(const qcp::intervals::PixelBar& bar) const
     return rectPolygon(rect);
 }
 
-bool QCPIntervals::sameLabelAsLastBar(int row) const
+bool QCPIntervals::sameLabelAsLastBar(const std::vector<qcp::intervals::PixelBar>& bars,
+                                      int row) const
 {
-    if (mBars.empty() || mBars.back().row == -1 || mColumns.labels.isEmpty())
+    if (bars.empty() || bars.back().row == -1 || mColumns.labels.isEmpty())
         return false;
-    return mColumns.labels[mBars.back().row] == mColumns.labels[row];
+    return mColumns.labels[bars.back().row] == mColumns.labels[row];
 }
 
-void QCPIntervals::appendLaneBars(int lane, const QCPLaneBand& band)
+void QCPIntervals::appendLaneBars(std::vector<qcp::intervals::PixelBar>& bars, int lane,
+                                  const QCPLaneBand& band) const
 {
     const QCPRange range = mKeyAxis->range();
     const auto& rows = mLanes[lane];
@@ -1110,11 +1122,11 @@ void QCPIntervals::appendLaneBars(int lane, const QCPLaneBand& band)
             continue;
         const QCPLaneBand rows = mStack != skNone ? *rowBand(lane, subRowOf(row)) : band;
         qcp::intervals::appendMerged(
-            mBars, qcp::intervals::toPixelBar(mKeyAxis->coordToPixel(mColumns.start[row]),
-                                              mKeyAxis->coordToPixel(mColumns.stop[row]),
-                                              rows.top + inset, rows.bottom - inset,
-                                              mColumns.category[row], row),
-            sameLabelAsLastBar(row));
+            bars, qcp::intervals::toPixelBar(mKeyAxis->coordToPixel(mColumns.start[row]),
+                                             mKeyAxis->coordToPixel(mColumns.stop[row]),
+                                             rows.top + inset, rows.bottom - inset,
+                                             mColumns.category[row], row),
+            sameLabelAsLastBar(bars, row));
     }
 }
 
@@ -1158,22 +1170,22 @@ void QCPIntervals::setStyle(Style style)
     markLayersDirty();
 }
 
-bool QCPIntervals::drawBarsOnGpu(QCPPainter* painter)
+void QCPIntervals::drawLabels(QCPPainter* painter)
 {
-    auto* rhi = mParentPlot->rhi();
-    if (!rhi || painter->isExporting())
-        return false;
-    auto* layer = mParentPlot->plottableRhiLayer(mLayer);
-    if (!layer)
-        return false;
-    if (!mVertices.empty())
-        layer->addPlottable(mVertices, {}, clipRect(), mParentPlot->bufferDevicePixelRatio(),
-                            mParentPlot->rhiOutputSize().height());
-    return true;
-}
-
-void QCPIntervals::drawLabels(QCPPainter* painter) const
-{
+    mLabelRects.clear();
+    mRowNames.clear();
+    // No label text, no second scan of the bars: the labels are the only reason this layer reads
+    // the geometry at all.
+    if (!mColumns.labels.isEmpty())
+        for (const auto& bar : mergedBars())
+        {
+            // Merged bars (row == -1, see appendMerged) never get a label: it's ambiguous which
+            // source row's text a bar spanning several rows would show.
+            if (bar.row != -1)
+                appendLabelRect(bar);
+        }
+    if (mStack == skCategory)
+        appendRowNames(mKeyAxis->axisRect()->rect());
     painter->setPen(mKeyAxis->tickLabelColor());
     for (const auto& label : mLabelRects)
         painter->drawText(label.rect, Qt::AlignCenter, label.text);
@@ -1209,14 +1221,4 @@ void QCPIntervals::drawLaneNames(QCPPainter* painter) const
                               withAlpha(mParentPlot->backgroundBrush().color(), 0.85));
             painter->drawText(box, Qt::AlignVCenter | Qt::AlignLeft, names[lane]);
         }
-}
-
-void QCPIntervals::drawBarsWithPainter(QCPPainter* painter) const
-{
-    painter->setPen(Qt::NoPen);
-    for (const auto& shape : mShapes)
-    {
-        painter->setBrush(shape.color);
-        painter->drawPolygon(shape.polygon);
-    }
 }

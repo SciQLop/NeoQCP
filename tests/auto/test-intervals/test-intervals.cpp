@@ -1,5 +1,6 @@
 #include "test-intervals.h"
 #include "qcustomplot.h"
+#include "reference-image.h"
 #include "plottables/lane-layout.h"
 #include <QPointer>
 #include "plottables/intervals-algo.h"
@@ -547,6 +548,157 @@ void TestIntervals::labelLayerFollowsThePlottablesLayer()
     QVERIFY(mPlot->addLayer(QStringLiteral("custom")));
     QVERIFY(iv->setLayer(QStringLiteral("custom")));
     QCOMPARE(iv->labelLayer(), mPlot->layer(QStringLiteral("custom.intervals-labels")));
+}
+
+namespace {
+//! The intervals of the reference images (test-reference-m4e): six bars, two lanes.
+qcp::intervals::Columns intervalColumns(QCPLaneLayout& layout)
+{
+    qcp::intervals::Columns c;
+    const int laneA = layout.laneIndex(QStringLiteral("A"));
+    const int laneB = layout.laneIndex(QStringLiteral("B"));
+    c.start = { 0.2, 1.0, 2.1, 3.0, 4.2, 5.0 };
+    c.stop = { 0.8, 1.7, 2.6, 3.9, 4.9, 5.8 };
+    c.lane = { laneA, laneB, laneA, laneB, laneA, laneB };
+    c.category.assign(c.start.size(), 0);
+    c.ids.resize(c.start.size());
+    std::iota(c.ids.begin(), c.ids.end(), qint64(101));
+    return c;
+}
+
+void checkReference(const QImage& image, const QString& name)
+{
+    QString why;
+    QVERIFY2(qcp::test::matchesReference(image, QStringLiteral("test-reference-m4e"), name, &why),
+             qPrintable(QStringLiteral("%1: %2").arg(name, why)));
+}
+
+//! The non-red pixels of a bar's middle: the label text, or nothing when there is no label.
+int labelPixels(const QImage& image, QCustomPlot* plot, double laneCentreFromTop)
+{
+    int n = 0;
+    for (double key = 30; key < 70; key += 0.5)
+        n += isRedish(pixelAt(image, plot, key, laneCentreFromTop)) ? 0 : 1;
+    return n;
+}
+} // namespace
+
+void TestIntervals::recordedIntervalsMatchTheirReferences_data()
+{
+    QTest::addColumn<QString>("name");
+    QTest::addColumn<bool>("lanes");
+    QTest::addColumn<bool>("selected");
+    QTest::addColumn<bool>("legend");
+    QTest::newRow("plain") << QStringLiteral("intervals-plain.png") << false << false << false;
+    QTest::newRow("lanes") << QStringLiteral("intervals-lanes.png") << true << false << false;
+    QTest::newRow("selected") << QStringLiteral("intervals-selected.png") << false << true << false;
+    QTest::newRow("legend") << QStringLiteral("intervals-legend.png") << false << false << true;
+}
+
+void TestIntervals::recordedIntervalsMatchTheirReferences()
+{
+    QFETCH(QString, name);
+    QFETCH(bool, lanes);
+    QFETCH(bool, selected);
+    QFETCH(bool, legend);
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    QFont font(QStringLiteral("Helvetica"));
+    font.setPixelSize(10);
+    plot.setFont(font);
+    for (QCPAxis* axis : plot.axisRect()->axes())
+    {
+        axis->setTickLabelFont(font);
+        axis->setLabelFont(font);
+    }
+    QCPLaneLayout layout;
+    if (lanes)
+        layout.setPlacement(QCPLaneLayout::plLanes);
+    plot.xAxis->setRange(0, 6);
+    plot.yAxis->setRange(-0.5, 2.5);
+    auto* intervals = new QCPIntervals(plot.xAxis, plot.yAxis, &layout);
+    intervals->setData(intervalColumns(layout));
+    intervals->setCategoryNames(QStringList { QStringLiteral("A") });
+    intervals->setCategoryColors(QVector<QColor> { QColor(70, 130, 200) });
+    if (selected)
+        intervals->setSelectedRows(QVector<int> { 1, 2 });
+    if (legend)
+    {
+        plot.legend->setVisible(true);
+        intervals->addToLegend();
+    }
+    plot.replot();
+    QVERIFY2(intervals->mCore.recordedCommandCount() > 0, "the intervals recorded nothing");
+    checkReference(plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32), name);
+}
+
+void TestIntervals::aPannedIntervalStaysCorrect()
+{
+    QCPLaneLayout layout;
+    layout.setPlacement(QCPLaneLayout::plLanes);
+    layout.setLaneHeight(24);
+    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    iv->setData(columns({ 10, 150 }, { 40, 190 }, { layout.laneIndex("A"), layout.laneIndex("A") }));
+    iv->setCategoryColors({ Qt::red });
+    mPlot->xAxis->setRange(0, 100);
+    mPlot->yAxis->setRange(-0.5, 0.5);
+    const double centre = layout.lanePixelHeight(mPlot->axisRect()->rect()) / 2;
+    const int rowY = qRound(mPlot->axisRect()->rect().top() + centre);
+    const int oldX = qRound(mPlot->xAxis->coordToPixel(25));
+    const QImage before = mPlot->toPixmap(400, 300).toImage();
+    QVERIFY2(iv->mCore.recordedCommandCount() > 0, "the intervals recorded nothing");
+    QVERIFY2(isRedish(pixelAt(before, mPlot, 25, centre)), "the visible bar was not drawn");
+    const int recordings = iv->mCore.recordingCount();
+
+    // The bars are pixels: a pan remakes the recording, and the bar that was out of view comes in.
+    mPlot->xAxis->setRange(100, 300);
+    const QImage after = mPlot->toPixmap(400, 300).toImage();
+    QCOMPARE(iv->mCore.recordingCount(), recordings + 1);
+    const double dpr = after.devicePixelRatio();
+    QVERIFY2(!isRedish(after.pixelColor(qRound(oldX * dpr), qRound(rowY * dpr))),
+             "a stale recording kept the bar at its old pixels");
+    QVERIFY2(isRedish(pixelAt(after, mPlot, 170, centre)),
+             "the bar that came into view was not drawn");
+}
+
+void TestIntervals::labelsStayAboveTheBars()
+{
+    QCPLaneLayout layout;
+    layout.setPlacement(QCPLaneLayout::plLanes);
+    layout.setLaneHeight(24);
+    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    iv->setCategoryColors({ Qt::red });
+    mPlot->xAxis->setRange(0, 100);
+    mPlot->replot();
+    auto c = columns({ 0 }, { 100 }, { layout.laneIndex("A") });
+    c.labels = QStringList { labelSpanningHalfTheAxisRect(mPlot) };
+    iv->setData(std::move(c));
+    const QImage image = mPlot->toPixmap(400, 300).toImage();
+    const double centre = layout.lanePixelHeight(mPlot->axisRect()->rect()) / 2;
+    QVERIFY(isRedish(pixelAt(image, mPlot, 5, centre)));
+    QVERIFY2(labelPixels(image, mPlot, centre) > 5, "the label is under the bars");
+}
+
+void TestIntervals::aDataChangeRedrawsTheLabels()
+{
+    QCPLaneLayout layout;
+    layout.setPlacement(QCPLaneLayout::plLanes);
+    layout.setLaneHeight(24);
+    auto* iv = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, &layout);
+    iv->setCategoryColors({ Qt::red });
+    mPlot->xAxis->setRange(0, 100);
+    mPlot->replot(); // lay the axes out before measuring a label that must fit
+    auto c = columns({ 0 }, { 100 }, { layout.laneIndex("A") });
+    c.labels = QStringList { labelSpanningHalfTheAxisRect(mPlot) };
+    iv->setData(std::move(c));
+    const double centre = layout.lanePixelHeight(mPlot->axisRect()->rect()) / 2;
+    QVERIFY(labelPixels(mPlot->toPixmap(400, 300).toImage(), mPlot, centre) > 5);
+
+    // The labels live on a layer of their own: new data must repaint it too.
+    auto again = columns({ 0 }, { 100 }, { layout.laneIndex("A") });
+    again.labels = QStringList { QString() };
+    iv->setData(std::move(again));
+    QCOMPARE(labelPixels(mPlot->toPixmap(400, 300).toImage(), mPlot, centre), 0);
 }
 
 void TestIntervals::hitTestOnEmptyPlottable()

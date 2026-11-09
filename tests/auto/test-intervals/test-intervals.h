@@ -51,6 +51,12 @@ private slots:
     void mergedBarsGetNoLabel();
     void labelLayerFollowsThePlottablesLayer();
 
+    void recordedIntervalsMatchTheirReferences_data();
+    void recordedIntervalsMatchTheirReferences();
+    void aPannedIntervalStaysCorrect();
+    void labelsStayAboveTheBars();
+    void aDataChangeRedrawsTheLabels();
+
     void hitTestOnEmptyPlottable();
     void hitTestFindsBodyAndEdges();
     void narrowBarResizesFromJustOutside();
