@@ -1,6 +1,6 @@
 # NeoQCP 3.0 — coordinate systems (design addendum to milestone 4; replaces the M4f "polar" scope)
 
-Status: draft 2, for the maintainer's review. Draft 1 was reviewed adversarially against the code
+Status: approved by the maintainer on 2026-11-09 (draft 2 plus the answers in section 6). Draft 1 was reviewed adversarially against the code
 (`.superpowers/coordsys-design-review.md`, findings F1-F28); every finding is folded in below and cited.
 Facts: `docs/plans/neoqcp-3/coordsys-inventory.md` (C-x) and `docs/plans/neoqcp-3/m4f-inventory.md` (P-x).
 
@@ -38,15 +38,15 @@ axes a plottable uses.
 
 | Role | Cartesian | Polar | User's own |
 |---|---|---|---|
-| **Area**: a layout element; owns its axes and its coordinate systems; gets its rect from the layout; drag, zoom, wheel; dirty propagation | `QCPAxisRect` | `QCPPolarArea` (new; takes the layout role `QCPPolarAxisAngular` has today) | a `QCPAbstractArea` subclass |
-| **Axis**: one dimension: range, scale type, reversal, ticker, `rangeChanged`, drag/zoom opt-outs, range link, part selection | `QCPAxis` (a straight line on a side) | `QCPPolarAxisAngular`, `QCPPolarAxisRadial` (plain axes, no layout role) | an axis-base subclass |
+| **Area**: a layout element; owns its axes and its coordinate systems; gets its rect from the layout; drag, zoom, wheel; dirty propagation | `QCPAxisRect` | `QCPPolarArea` (new; takes the layout role `QCPPolarAxisAngular` has today) | a `QCPArea` subclass |
+| **Axis**: one dimension: range, scale type, reversal, ticker, `rangeChanged`, drag/zoom opt-outs, range link, part selection | `QCPAxis` (a straight line on a side) | `QCPPolarAxisAngular`, `QCPPolarAxisRadial` (plain axes, no layout role) | a `QCPAxisBase` subclass |
 | **Coordinate system**: what a plottable or item is drawn in: one key axis and one value axis of one area | `QCPCartesianSystem` | `QCPPolarSystem` | a `QCPCoordinateSystem` subclass |
 
-`QCPAbstractArea` is a `QCPLayoutElement` that owns axes and systems and keeps the per-system lists
+`QCPArea` is a `QCPLayoutElement` that owns axes and systems and keeps the per-system lists
 below. `QCPAxisRect` derives from it. Because a layout element is already a `QCPLayerable`, no class is
 both an area and an axis (F1): the angular axis loses its layout role before it gains the axis base.
 
-### 2.2 The axis base
+### 2.2 The axis base (`QCPAxisBase`)
 
 The range model the polar axes duplicate today (P-4) moves into one base under `QCPAxis`: range and its
 setters, scale type, reversal, ticker and tick vectors, `rangeChanged(newRange, oldRange)`,
@@ -65,7 +65,7 @@ as misuse (F16). `moveTarget`/`pixelOnMoveTarget` stay cartesian.
 class QCP_LIB_DECL QCPCoordinateSystem : public QObject
 {
 public:
-    QCPAbstractArea* area() const;
+    QCPArea* area() const;
     QCPAxisBase* keyAxis() const;
     QCPAxisBase* valueAxis() const;
     bool usesAxis(const QCPAxisBase*) const;
@@ -191,7 +191,7 @@ radius fraction). The item index groups items by system instead of by axis pair 
 ### 2.10 Colour scale
 
 The colour scale stays a cartesian-area feature in 3.0 (`ColourScale` capability, offered only by
-`QCPAxisRect`), with `QCPAbstractArea::colorScale()` nullable as the extension point. A polar or custom
+`QCPAxisRect`), with `QCPArea::colorScale()` nullable as the extension point. A polar or custom
 colour scale is later work (F15).
 
 ## 3. Performance
@@ -209,7 +209,7 @@ colour scale is later work (F15).
 
 1. **Baseline**: polar reference images on the old code (`docs/snippets/polar.cpp` scenes, the gallery
    scene, the example), the new bench rows.
-2. **Areas**: `QCPAbstractArea` under `QCPAxisRect`; `QCPPolarArea` takes the layout role of the angular
+2. **Areas**: `QCPArea` under `QCPAxisRect`; `QCPPolarArea` takes the layout role of the angular
    axis (polar API change, 5).
 3. **Axis base** under `QCPAxis` and the two polar axes; polar range model deduplicated; real polar
    axis selection.
@@ -237,13 +237,10 @@ These become milestone plans 4f-4i (proposed: 4f = steps 1-4, 4g = 5-8, 4h = 9, 
   code adds a `QCPPolarArea` to the layout and gets the angular axis from it. `QCPPolarGraph` keeps its
   name and its constructor from (angular, radial) axes. Listed in the changelog and the migration page.
 
-## 6. Questions for the maintainer
+## 6. Maintainer answers (2026-11-09)
 
-1. **Items** (2.9): in the same release as plottables (steps 10-11 before 3.0 ships, as proposed), or
-   is a later 3.x acceptable?
-2. **Polar 2.1 API** (5): break it now (the area must exist before the axis base, F1), or keep it
-   compiling to milestone 5 with a forwarding shim?
-3. **Names**: `QCPAbstractArea`, `QCPPolarArea`, `QCPCoordinateSystem`, `QCPCartesianSystem`,
-   `QCPPolarSystem`, and for the axis base `QCPAxisBase` (the reviewer's preference: `QCPAxis` is already
-   the concrete class) or `QCPAbstractAxis`.
-4. **Milestone split** (4): four sub-milestones 4f-4i as proposed?
+- D5. Items move onto coordinate systems in 3.0 (steps 10-11 ship with the rest).
+- D6. The polar 2.1 tech-preview API breaks now, without a shim or any intermediate form.
+- D7. Names without "Abstract": `QCPArea`, `QCPAxisBase`, `QCPPolarArea`, `QCPCoordinateSystem`,
+  `QCPCartesianSystem`, `QCPPolarSystem`.
+- D8. The split into plans is the implementer's call: 4f = steps 1-4, 4g = 5-8, 4h = 9, 4i = 10-11.
