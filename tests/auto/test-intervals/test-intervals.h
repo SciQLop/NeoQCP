@@ -56,6 +56,7 @@ private slots:
     void aPannedIntervalStaysCorrect();
     void labelsStayAboveTheBars();
     void aDataChangeRedrawsTheLabels();
+    void aTickLabelColourChangeReInksTheWaveBackdrop();
 
     void hitTestOnEmptyPlottable();
     void hitTestFindsBodyAndEdges();

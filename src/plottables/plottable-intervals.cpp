@@ -1057,6 +1057,17 @@ QPolygonF rectPolygon(const QRectF& r)
 }
 } // namespace
 
+/*! \internal
+
+  The wave style shades its lanes and draws its idle lines in the key axis's tick label colour,
+  which no setter of this plottable moves: a theme change or setTickLabelColor has to remake the
+  recording, so the colour is part of its key.
+*/
+quint64 QCPIntervals::dependencyRevision() const
+{
+    return qHashMulti(0, mKeyAxis ? mKeyAxis->tickLabelColor().rgba() : 0u);
+}
+
 //! Wave style: every other lane shaded, and a thin idle line through each lane, under the bars.
 void QCPIntervals::appendLaneBackdrops(QCPDrawContext& context) const
 {

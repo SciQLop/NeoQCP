@@ -1775,3 +1775,21 @@ void TestIntervals::reapplyingTheCategoryOrderDoesNotRestack()
     iv->setCategoryOrder({ 0, 1, 2 });
     QCOMPARE(iv->mSubRowGeneration, generation);
 }
+
+// The wave style shades its lanes with the key axis's tick label colour, which no setter of the
+// plottable moves: the recording must know it read that colour.
+void TestIntervals::aTickLabelColourChangeReInksTheWaveBackdrop()
+{
+    QCPLaneLayout layout;
+    mPlot->xAxis->setTickLabelColor(QColor(255, 0, 0));
+    const QImage red = waveImage(mPlot, &layout, QCPIntervals::stWave);
+    const double lane = layout.lanePixelHeight(mPlot->axisRect()->rect());
+    const QColor redInk = pixelAt(red, mPlot, 10, lane + 3); // lane B is the shaded one
+
+    mPlot->xAxis->setTickLabelColor(QColor(0, 0, 255));
+    mPlot->replot();
+    const QColor blueInk = pixelAt(mPlot->toPixmap(400, 300).toImage(), mPlot, 10, lane + 3);
+
+    QVERIFY2(redInk.red() > redInk.blue(), "the shading is not in the tick label colour");
+    QVERIFY2(blueInk.blue() > blueInk.red(), "the shading kept the old tick label colour");
+}

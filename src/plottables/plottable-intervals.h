@@ -47,6 +47,9 @@ public:
     [[nodiscard]] quint64 buildCount() const { return mCore.recordingCount(); }
     [[nodiscard]] QCPLayer* labelLayer() const;
     [[nodiscard]] QList<QCPLayer*> dependentLayers() const override;
+    //! The recording's key beyond its own setters: the wave shading is inked in the key axis's tick
+    //! label colour, which a theme or setTickLabelColor changes without touching the plottable.
+    [[nodiscard]] quint64 dependencyRevision() const override;
 
     enum HitPart { hpNone, hpEmpty, hpBody, hpLeftEdge, hpRightEdge };
 
