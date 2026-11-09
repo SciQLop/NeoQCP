@@ -120,5 +120,3 @@ milestone 4e".
 - Intervals lay out on a horizontal key axis only (as before); no vertical-key reference.
 - A painter-only plottable records an empty list when hit-tested, so its `recordingCount()` counts
   hit tests too; a subclass that forgets `draw(QCPDrawContext&)` draws nothing, silently.
-- Downstream: SciQLopPlots names `QCPItemVSpan`/`QCPItemHSpan` in 16 places; port them to
-  `QCPItemSpan` at the next NeoQCP pin bump.

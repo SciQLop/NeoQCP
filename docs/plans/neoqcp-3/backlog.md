@@ -23,8 +23,6 @@ user would see and where the code is. Fixed items are deleted, not ticked.
   longer interleave in entry order.
 - **A painter-only plottable records an empty list when hit-tested**, so its `recordingCount()` counts
   hit tests; a subclass that forgets `draw(QCPDrawContext&)` draws nothing, silently.
-- **SciQLopPlots names `QCPItemVSpan`/`QCPItemHSpan` in 16 places**: port to `QCPItemSpan` at the next
-  NeoQCP pin bump.
 
 ## From milestone 4d (axes, linked axes, alignment groups)
 
