@@ -496,8 +496,12 @@ void QCPCurve::draw(QCPDrawContext& context) const
     // recording a painter callback for it would make every selection change a view change.
     if (mSelectionDecorator && !selection().isEmpty()
         && typeid(*mSelectionDecorator) != typeid(QCPSelectionDecorator))
-        context.painter([this](QCPPainter& painter, const QCPTransform&)
-                        { mSelectionDecorator->drawDecoration(&painter, selection()); });
+        context.painter(
+            [this](QCPPainter& painter, const QCPTransform&)
+            {
+                if (mSelectionDecorator)
+                    mSelectionDecorator->drawDecoration(&painter, selection());
+            });
 }
 
 /*! \internal

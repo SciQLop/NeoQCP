@@ -1012,9 +1012,12 @@ void QCPBars::draw(QCPDrawContext& context) const
             = bracket && typeid(*bracket) == typeid(QCPSelectionDecoratorBracket);
         if (!builtInBracket || !bracket->recordDecoration(context, selection()))
         {
-            context.painter([this](QCPPainter& painter, const QCPTransform&) {
-                mSelectionDecorator->drawDecoration(&painter, selection());
-            });
+            context.painter(
+                [this](QCPPainter& painter, const QCPTransform&)
+                {
+                    if (mSelectionDecorator)
+                        mSelectionDecorator->drawDecoration(&painter, selection());
+                });
         }
     }
 }

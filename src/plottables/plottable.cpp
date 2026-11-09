@@ -110,6 +110,8 @@ void QCPSelectionDecorator::setScatterStyle(const QCPScatterStyle& scatterStyle,
 {
     mScatterStyle = scatterStyle;
     setUsedScatterProperties(usedProperties);
+    if (mPlottable)
+        mPlottable->markDirty(); // the decorator paints through the plottable, which records its look
 }
 
 /*!
@@ -123,6 +125,8 @@ void QCPSelectionDecorator::setUsedScatterProperties(
     const QCPScatterStyle::ScatterProperties& properties)
 {
     mUsedScatterProperties = properties;
+    if (mPlottable)
+        mPlottable->markDirty(); // the decorator paints through the plottable, which records its look
 }
 
 /*!
@@ -778,12 +782,14 @@ void QCPAbstractPlottable::setSelectionDecorator(QCPSelectionDecorator* decorato
     {
         if (decorator->registerWithPlottable(this))
         {
+            markDirty(); // the recording baked the old decorator's look, or a callback to it
             delete mSelectionDecorator; // delete old decorator if necessary
             mSelectionDecorator = decorator;
         }
     }
     else if (mSelectionDecorator) // just clear decorator
     {
+        markDirty(); // a recording that still held the decorator's callback would run it
         delete mSelectionDecorator;
         mSelectionDecorator = nullptr;
     }

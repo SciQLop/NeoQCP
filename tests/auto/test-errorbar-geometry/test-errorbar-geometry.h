@@ -18,4 +18,7 @@ private slots:
     void aReplotWithoutADataAccessDoesNotReRecord();
     void swappingThePlottablesAxesReRecords();
     void aSameCountSetDataReRecords();
+    void aDecoratorChangeReRecords();
+    void clearingTheDecoratorWhileSelectedIsSafe();
+    void aDecoratorScatterStyleReachesTheSelectedOutliers();
 };

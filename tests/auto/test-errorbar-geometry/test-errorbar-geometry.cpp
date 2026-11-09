@@ -156,6 +156,17 @@ std::unique_ptr<QCustomPlot> makeBarsPlot(RecordingErrorBars** out)
 }
 } // namespace
 
+//! The dark pixels in a box around \a at: how much ink a marker leaves.
+int inkNear(const QImage& image, const QPointF& at, int radius)
+{
+    int ink = 0;
+    for (int y = int(at.y()) - radius; y <= int(at.y()) + radius; ++y)
+        for (int x = int(at.x()) - radius; x <= int(at.x()) + radius; ++x)
+            if (image.valid(x, y) && image.pixelColor(x, y).lightness() < 240)
+                ++ink;
+    return ink;
+}
+
 void TestErrorBarGeometry::recordedErrorBarsMatchTheirReferences_data()
 {
     QTest::addColumn<QString>("kind");
@@ -330,4 +341,68 @@ void TestErrorBarGeometry::aSameCountSetDataReRecords()
     bars->addData(0.5, 0.5);
     plot->replot();
     QVERIFY2(bars->recordings() > before, "an addData kept the old recording");
+}
+
+// A decorator is part of what a plottable records: its pen and brush already re-recorded, its
+// scatter style and the decorator itself did not.
+void TestErrorBarGeometry::aDecoratorChangeReRecords()
+{
+    RecordingErrorBars* bars = nullptr;
+    auto plot = makeBarsPlot(&bars);
+    int before = bars->recordings();
+    bars->setSelectionDecorator(new QCPSelectionDecoratorBracket);
+    plot->replot();
+    QVERIFY2(bars->recordings() > before, "a new selection decorator kept the old recording");
+    before = bars->recordings();
+    bars->selectionDecorator()->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCross, 9));
+    plot->replot();
+    QVERIFY2(bars->recordings() > before, "a decorator scatter style kept the old recording");
+    before = bars->recordings();
+    bars->selectionDecorator()->setUsedScatterProperties(QCPScatterStyle::spShape);
+    plot->replot();
+    QVERIFY2(bars->recordings() > before,
+             "a decorator used-properties change kept the old recording");
+}
+
+// A recorded decorator callback runs later, from the recording: clearing the decorator while it is
+// selected must not leave the callback pointing at the deleted decorator.
+void TestErrorBarGeometry::clearingTheDecoratorWhileSelectedIsSafe()
+{
+    RecordingErrorBars* bars = nullptr;
+    auto plot = makeBarsPlot(&bars);
+    bars->setSelectable(QCP::stDataRange);
+    bars->setSelection(QCPDataSelection(QCPDataRange(0, 2)));
+    bars->setSelectionDecorator(new QCPSelectionDecoratorBracket);
+    plot->replot();
+    const int before = bars->recordings();
+    bars->setSelectionDecorator(nullptr);
+    // A pan inside the recording's key window would reuse it: the recording must be remade instead.
+    plot->xAxis->setRange(0.05, 6.05);
+    plot->replot();
+    QVERIFY2(bars->recordings() > before, "clearing the decorator kept the old recording");
+}
+
+// The statistical box bakes the decorator's scatter style into the selected outliers.
+void TestErrorBarGeometry::aDecoratorScatterStyleReachesTheSelectedOutliers()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.xAxis->setRange(0, 6);
+    plot.yAxis->setRange(0, 10);
+    auto* box = new QCPStatisticalBox(plot.xAxis, plot.yAxis);
+    box->addData(2.0, 1.0, 3.0, 4.0, 6.0, 7.0, QVector<double> { 9.0 });
+    box->setOutlierStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 5));
+    box->setSelectable(QCP::stDataRange);
+    box->setSelection(QCPDataSelection(QCPDataRange(0, 1)));
+    plot.replot();
+    const QPointF outlier(plot.xAxis->coordToPixel(2.0), plot.yAxis->coordToPixel(9.0));
+    const int small = inkNear(imageOf(plot), outlier, 12);
+
+    box->selectionDecorator()->setScatterStyle(
+        QCPScatterStyle(QCPScatterStyle::ssCross, 20),
+        QCPScatterStyle::spShape | QCPScatterStyle::spSize | QCPScatterStyle::spPen);
+    plot.replot();
+    const int big = inkNear(imageOf(plot), outlier, 12);
+    QVERIFY2(small > 0, "the selected outlier is not drawn");
+    QVERIFY2(big > small, "the decorator's scatter style is not on the selected outlier");
 }
