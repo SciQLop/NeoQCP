@@ -124,8 +124,7 @@ class QCP_LIB_DECL QCPAbstractPlottable : public QCPLayerable, public QCPDrawabl
     /// \endcond
 
 public:
-    // The handle QCustomPlot::add<T>() returns for a T that declares no Handle (see
-    // QCPPlottableOps).
+    // The handle QCustomPlot::add<T>() returns for a T that declares no Handle (see QCPPlottableOps).
     template <typename T>
     using OpsFor = QCPPlottableOps<T>;
 
@@ -196,17 +195,15 @@ public:
 
     //! A setter's name for the same thing.
     void contentChanged() { markDirty(); }
-
     //! The plot's scheduler for a plottable that runs a pipeline: null while it is outside a plot
     //! (QCustomPlot::take binds it, QCustomPlot::add(std::unique_ptr) rebinds it).
-    virtual void setPipelineScheduler(QCPPipelineScheduler*) { }
+    virtual void setPipelineScheduler(QCPPipelineScheduler*) {}
 
     // Offered each key press by QCustomPlot::keyPressEvent before item handling. Every
     // plottable sees the key; return true to consume it, which stops it reaching items.
     // Layers whose content follows this plottable (an overlay drawn above it, say). The axis
     // rect marks them dirty with the plottable's own layer whenever its range changes.
-    [[nodiscard]] virtual QList<QCPLayer*> dependentLayers() const { return { }; }
-
+    [[nodiscard]] virtual QList<QCPLayer*> dependentLayers() const { return {}; }
     virtual bool keyPress(QKeyEvent* event)
     {
         Q_UNUSED(event);
@@ -218,8 +215,7 @@ public:
     // stale buffer content instead of clearing to transparent.
     virtual bool canProduceContent() const { return true; }
 
-    virtual QCPRange getKeyRange(bool& foundRange,
-                                 QCP::SignDomain inSignDomain = QCP::sdBoth) const;
+    virtual QCPRange getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth) const;
     virtual QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth,
                                    const QCPRange& inKeyRange = QCPRange()) const;
 
@@ -238,17 +234,13 @@ public:
 
     // A grouped plottable has no legend row of its own: its group has one (QCPPlottableGroup).
     QCPPlottableGroup* group() const { return mGroup; }
-
     // False keeps the plottable out of the legend, also after it leaves a group.
     bool wantsLegend() const { return mWantsLegend; }
-
     void setWantsLegend(bool wants);
 
     // busy indicator
     bool busy() const;
-
     bool visuallyBusy() const { return mVisuallyBusy; }
-
     void setBusy(bool busy);
 
     // Deferred data: a replacement source staged while the displayed one keeps
@@ -257,7 +249,6 @@ public:
     // replacement, so QCustomPlot::commitPendingData() can skip the replot
     // when every plottable's pending source was superseded (no-op commit).
     virtual bool hasPendingData() const { return false; }
-
     virtual bool commitPendingData() { return false; }
 
     // per-plottable overrides (std::optional -- nullopt falls through to theme)
@@ -284,7 +275,7 @@ signals:
 
 protected:
     //! Called after setKeyAxis or setValueAxis; not called by the constructor.
-    virtual void axesChanged() { }
+    virtual void axesChanged() {}
 
     // property members:
     QString mName;
@@ -320,12 +311,10 @@ protected:
 
     // busy indicator
     virtual bool pipelineBusy() const { return false; }
-
     void updateEffectiveBusy();
 
     // non-virtual methods:
     bool legendAllowed() const { return mWantsLegend && !mGroup; }
-
     void emitSelectionChanged();
     void applyFillAntialiasingHint(QCPPainter* painter) const;
     void applyScattersAntialiasingHint(QCPPainter* painter) const;
@@ -400,36 +389,31 @@ class QCPPlottableOps : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPPlottable
     using Base = QCPLayerableOps<T, qcp::OpsRet<Self, QCPPlottableOps<T>>>;
 
 public:
-    using Base::Base;
     using typename Base::Ret;
+    using Base::Base;
 
     Ret setName(const QString& name)
     {
         return this->apply([&](T& p) { p.setName(name); });
     }
-
     Ret setPen(const QPen& pen)
     {
         return this->apply([&](T& p) { p.setPen(pen); });
     }
-
     Ret setBrush(const QBrush& brush)
     {
         return this->apply([&](T& p) { p.setBrush(brush); });
     }
-
     // By role, on the plottable's current axis rect: survives the axes being replaced.
     Ret setAxes(QCPAxis::AxisType keyType, QCPAxis::AxisType valueType)
     {
         return this->apply([&](T& p) { qcp::ops::setAxes(p, keyType, valueType); });
     }
-
     // Moves to the rect's bottom and left axes.
     Ret setAxisRect(QCPAxisRect* rect)
     {
         return this->apply([&](T& p) { qcp::ops::setAxisRect(p, rect); });
     }
-
     // Escape hatch while raw axis getters exist; goes away with them.
     Ret setAxes(QCPAxis* keyAxis, QCPAxis* valueAxis)
     {

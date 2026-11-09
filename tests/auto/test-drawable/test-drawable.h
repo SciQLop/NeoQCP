@@ -86,4 +86,5 @@ private slots:
     void aPlottableRecordsWithoutTheAdapter();
     void anItemRecordsWithoutTheAdapter();
     void aStyleSetterReRecords();
+    void aPainterOnly1DPlottableKeepsThePointClick();
 };

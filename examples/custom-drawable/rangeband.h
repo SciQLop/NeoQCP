@@ -18,7 +18,9 @@
 class RangeBand : public QCPAbstractPlottable
 {
 public:
-    RangeBand(QCPAxis* keyAxis, QCPAxis* valueAxis) : QCPAbstractPlottable(keyAxis, valueAxis) { }
+    RangeBand(QCPAxis* keyAxis, QCPAxis* valueAxis)
+        : QCPAbstractPlottable(keyAxis, valueAxis)
+    { }
 
     void setData(const QVector<double>& keys, const QVector<double>& lower,
                  const QVector<double>& upper)
@@ -54,7 +56,8 @@ public:
             upper.emplace_back(mKeys[i], mUpper[i]);
         }
         context.fillBetween(std::make_shared<const std::vector<QPointF>>(std::move(upper)),
-                            std::make_shared<const std::vector<QPointF>>(std::move(lower)), mBrush);
+                            std::make_shared<const std::vector<QPointF>>(std::move(lower)),
+                            mBrush);
 
         QCPTextStyle style;
         style.color = QColor(20, 20, 20);

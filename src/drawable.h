@@ -148,6 +148,10 @@ public:
     //! Whether a recording exists: the object has drawn at least once.
     [[nodiscard]] bool hasRecording() const;
 
+    //! Whether \a object draws through the recording: it records on demand, and an empty recording
+    //! means the object paints through draw(QCPPainter*) instead.
+    bool recordsTheDrawing(const QCPDrawable& object, const QCPDrawnView& view);
+
     //! Test hook: how many commands the recording holds.
     [[nodiscard]] int recordedCommandCount() const;
 

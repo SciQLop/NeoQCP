@@ -1,8 +1,8 @@
 #pragma once
-#include "intervals-algo.h"
-#include "lane-layout.h"
 #include "plottable.h"
 #include "plottable1d.h"
+#include "intervals-algo.h"
+#include "lane-layout.h"
 #include <QKeyEvent>
 #include <QPointer>
 #include <optional>
@@ -21,7 +21,6 @@ class QCPIntervalsOps;
 class QCP_LIB_DECL QCPIntervals : public QCPAbstractPlottable, public QCPPlottableInterface1D
 {
     Q_OBJECT
-
 public:
     template <typename T>
     using OpsFor = QCPIntervalsOps<T>;
@@ -30,11 +29,8 @@ public:
     ~QCPIntervals() override;
 
     void setData(qcp::intervals::Columns columns);
-
     [[nodiscard]] const qcp::intervals::Columns& columns() const { return mColumns; }
-
     [[nodiscard]] int rowCount() const { return static_cast<int>(mColumns.start.size()); }
-
     [[nodiscard]] QCPLaneLayout* laneLayout() const { return mLayout; }
 
     void setCategoryColors(const QVector<QColor>& colors);
@@ -47,20 +43,11 @@ public:
     bool addToLegend(QCPLegend* legend) override;
     bool removeFromLegend(QCPLegend* legend) const override;
     [[nodiscard]] QColor categoryColor(int category) const;
-
     [[nodiscard]] quint64 buildCount() const { return mBuildCount; }
-
     [[nodiscard]] QCPLayer* labelLayer() const;
     [[nodiscard]] QList<QCPLayer*> dependentLayers() const override;
 
-    enum HitPart
-    {
-        hpNone,
-        hpEmpty,
-        hpBody,
-        hpLeftEdge,
-        hpRightEdge
-    };
+    enum HitPart { hpNone, hpEmpty, hpBody, hpLeftEdge, hpRightEdge };
 
     struct Hit
     {
@@ -69,69 +56,33 @@ public:
         HitPart part = hpNone;
     };
 
-    enum EditMode
-    {
-        emMove = 0x01,
-        emResize = 0x02,
-        emChangeLane = 0x04,
-        emCreate = 0x08,
-        emDelete = 0x10
-    };
+    enum EditMode { emMove = 0x01, emResize = 0x02, emChangeLane = 0x04, emCreate = 0x08, emDelete = 0x10 };
     Q_DECLARE_FLAGS(EditModes, EditMode)
 
-    enum SnapMode
-    {
-        snNone,
-        snEdges,
-        snStep,
-        snTimes
-    };
-
+    enum SnapMode { snNone, snEdges, snStep, snTimes };
     //! stBars: plain coloured bars. stWave: a logic-analyzer look, with angled bus-value ends,
     //! an idle line through each lane and every other lane shaded.
-    enum Style
-    {
-        stBars,
-        stWave
-    };
-
+    enum Style { stBars, stWave };
     //! How a lane's intervals are split into sub-rows. skNone: one row, overlaps drawn over each
     //! other. skTime: overlapping intervals go into the first free sub-row. skCategory: one
     //! fixed sub-row per category, ordered by setCategoryOrder() then first seen.
-    enum StackMode
-    {
-        skNone,
-        skTime,
-        skCategory
-    };
-
+    enum StackMode { skNone, skTime, skCategory };
     void setStackMode(StackMode mode);
-
     [[nodiscard]] StackMode stackMode() const { return mStack; }
-
     //! Category indices to stack first, in this order (skCategory).
     void setCategoryOrder(std::vector<int> order);
-
     [[nodiscard]] const std::vector<int>& categoryOrder() const { return mCategoryOrder; }
-
     //! Move, resize, create and nudges stop at the neighbouring block's edge in the same row
     //! (same lane; same lane and category with skCategory), so an edit never overlaps one.
     void setForbidOverlap(bool forbid) { mForbid = forbid; }
-
     [[nodiscard]] bool forbidOverlap() const { return mForbid; }
-
     //! Each sub-row's name and box when stacking by category, for drawing and tests.
-    [[nodiscard]] const std::vector<std::pair<QRectF, QString>>& rowNames() const
-    {
-        return mRowNames;
-    }
+    [[nodiscard]] const std::vector<std::pair<QRectF, QString>>& rowNames() const { return mRowNames; }
 
     void setStyle(Style style);
-
     [[nodiscard]] Style style() const { return mStyle; }
 
-    // The recording's hit test, kept reachable beside this class's own (different signature).
-    using QCPAbstractPlottable::hitTest;
+    using QCPAbstractPlottable::hitTest; // the base's recording hit test stays reachable
     [[nodiscard]] Hit hitTest(const QPointF& pos) const;
     [[nodiscard]] QVector<int> selectedRows() const;
     [[nodiscard]] QVector<qint64> selectedIds() const;
@@ -140,26 +91,16 @@ public:
     [[nodiscard]] QPointF pixelOf(double key, int lane) const;
 
     void setEditable(bool editable);
-
     [[nodiscard]] bool editable() const { return mEditable; }
-
     void setEditModes(EditModes modes);
-
     [[nodiscard]] EditModes editModes() const { return mEditModes; }
-
     void setSnap(SnapMode mode, double step = 0);
-
     [[nodiscard]] SnapMode snapMode() const { return mSnap; }
-
     [[nodiscard]] double snapStep() const { return mSnapStep; }
-
     //! Snap dragged edges to these keys only (e.g. orbit events); sets the snTimes mode.
     void setSnapTimes(std::vector<double> times);
-
     [[nodiscard]] const std::vector<double>& snapTimes() const { return mSnapTimes; }
-
     [[nodiscard]] std::optional<Qt::CursorShape> cursorAt(const QPointF& pos) const;
-
     [[nodiscard]] bool gestureActive() const { return mGesture.has_value(); }
 
     bool keyPress(QKeyEvent* event) override;
@@ -175,25 +116,18 @@ public:
 
     // QCPPlottableInterface1D
     [[nodiscard]] int dataCount() const override { return rowCount(); }
-
     [[nodiscard]] double dataMainKey(int index) const override { return mColumns.start[index]; }
-
     [[nodiscard]] double dataSortKey(int index) const override { return mColumns.start[index]; }
-
     [[nodiscard]] double dataMainValue(int index) const override { return mColumns.lane[index]; }
-
     [[nodiscard]] QCPRange dataValueRange(int index) const override
     {
         return QCPRange(mColumns.lane[index], mColumns.lane[index]);
     }
-
     [[nodiscard]] QPointF dataPixelPosition(int index) const override
     {
         return pixelOf(mColumns.start[index], mColumns.lane[index]);
     }
-
     [[nodiscard]] bool sortKeyIsMainKey() const override { return false; }
-
     QCPDataSelection selectTestRect(const QRectF& rect, bool onlySelectable) const override;
     [[nodiscard]] int findBegin(double sortKey, bool expandedRange = true) const override;
     [[nodiscard]] int findEnd(double sortKey, bool expandedRange = true) const override;
@@ -219,9 +153,7 @@ protected:
 
     void regroupIfLanesWereAdded();
     void updateSubRows();
-
     [[nodiscard]] int subRowOf(int row) const { return mSubRow.empty() ? 0 : mSubRow[row]; }
-
     //! The vertical band of sub-row \a subRow of \a lane (the whole lane when not stacking).
     [[nodiscard]] std::optional<QCPLaneBand> rowBand(int lane, int subRow) const;
     [[nodiscard]] BuildKey currentBuildKey() const;
@@ -254,14 +186,7 @@ protected:
 
     struct Gesture
     {
-        enum Kind
-        {
-            Move,
-            ResizeLeft,
-            ResizeRight,
-            Create
-        } kind;
-
+        enum Kind { Move, ResizeLeft, ResizeRight, Create } kind;
         QPointF pressPos;
         double pressKey = 0;
         int pressLane = -1;
@@ -276,10 +201,8 @@ protected:
     bool startGesture(const Hit& hit, const QPointF& pos);
     void updateGesture(const QPointF& pos);
     void finishGesture();
-    [[nodiscard]] std::vector<qcp::intervals::DraggedRow> draggedRowsFor(const Hit& hit,
-                                                                         Gesture::Kind kind) const;
-    [[nodiscard]] std::vector<double>
-    snapCandidatesExcluding(const std::vector<qcp::intervals::DraggedRow>& rows) const;
+    [[nodiscard]] std::vector<qcp::intervals::DraggedRow> draggedRowsFor(const Hit& hit, Gesture::Kind kind) const;
+    [[nodiscard]] std::vector<double> snapCandidatesExcluding(const std::vector<qcp::intervals::DraggedRow>& rows) const;
     [[nodiscard]] double snappedDelta(double raw) const;
     [[nodiscard]] double snappedToStep(double key) const;
     [[nodiscard]] int laneStepsTo(const QPointF& pos) const;
@@ -289,25 +212,21 @@ protected:
     //! False, and one misuse the first time, while there is no lane layout (none given, or
     //! deleted): such a timeline draws and edits nothing.
     [[nodiscard]] bool hasLaneLayout() const;
-
     //! Both axes and the lane layout, each loss reported once: what drawing and editing need.
     [[nodiscard]] bool laidOut() const { return drawableAxes() && hasLaneLayout(); }
-
     [[nodiscard]] bool changesAnyRow(const std::vector<qcp::intervals::Edit>& edits) const;
     void emitEdits(const std::vector<qcp::intervals::Edit>& edits);
     void drawPreview(QCPPainter* painter) const;
     bool nudge(int keySteps, int laneSteps);
-
     struct Shift
     {
         double dt;
         int laneSteps;
     };
-
     [[nodiscard]] Shift withoutOverlaps(const std::vector<qcp::intervals::DraggedRow>& rows,
                                         qcp::intervals::DragKind kind, Shift wanted) const;
-    [[nodiscard]] double createWithoutOverlaps(double pressKey, int lane,
-                                               std::optional<int> category, double dt) const;
+    [[nodiscard]] double createWithoutOverlaps(double pressKey, int lane, std::optional<int> category,
+                                               double dt) const;
     [[nodiscard]] std::optional<int> categoryRowAt(int lane, double y) const;
     [[nodiscard]] std::vector<qcp::intervals::Span>
     obstaclesIn(int lane, const std::vector<qcp::intervals::DraggedRow>& dragged,
@@ -331,20 +250,17 @@ protected:
     QVector<QColor> mCategoryColors;
     QStringList mCategoryNames;
     std::vector<qcp::intervals::PixelBar> mBars;
-
     struct Shape
     {
         QPolygonF polygon;
         QColor color;
     };
-
     struct LabelRect
     {
         QRectF rect;
         int row;
         QString text;
     };
-
     std::vector<Shape> mShapes; // what both the GPU and the painter path draw, bottom first
     std::vector<float> mVertices;
     std::vector<LabelRect> mLabelRects;
@@ -353,8 +269,7 @@ protected:
     bool mForbid = false;
     std::vector<int> mCategoryOrder;
     std::vector<int> mSubRow; // per row, when stacking
-    std::vector<std::vector<int>>
-        mRowCategories; // per lane, the category of each sub-row (skCategory)
+    std::vector<std::vector<int>> mRowCategories; // per lane, the category of each sub-row (skCategory)
     std::vector<std::pair<QRectF, QString>> mRowNames;
     quint64 mSubRowGeneration = 0;
     std::optional<BuildKey> mBuiltFor;
@@ -380,11 +295,10 @@ class QCPIntervalsOps : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPIntervals
     using Base = QCPPlottableOps<T, qcp::OpsRet<Self, QCPIntervalsOps<T>>>;
 
 public:
-    using Base::Base;
     using typename Base::Ret;
+    using Base::Base;
 
-    // Moves the columns in. Invalid columns throw std::invalid_argument, as QCPIntervals::setData
-    // does.
+    // Moves the columns in. Invalid columns throw std::invalid_argument, as QCPIntervals::setData does.
     Ret setData(qcp::intervals::Columns columns)
     {
         return this->apply([&](T& p) { p.setData(std::move(columns)); });

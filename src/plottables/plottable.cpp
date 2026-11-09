@@ -29,10 +29,10 @@
 #include "core.h"
 #include "layoutelements/layoutelement-axisrect.h"
 #include "layoutelements/layoutelement-legend-group.h"
+#include "plottable-multigraph.h"
 #include "layoutelements/layoutelement-legend.h"
 #include "misuse.h"
 #include "painting/painter.h"
-#include "plottable-multigraph.h"
 #include "theme.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -85,8 +85,7 @@ void QCPSelectionDecorator::setPen(const QPen& pen)
 {
     mPen = pen;
     if (mPlottable)
-        mPlottable
-            ->markDirty(); // the decorator paints through the plottable, which records its look
+        mPlottable->markDirty(); // the decorator paints through the plottable, which records its look
 }
 
 /*!
@@ -465,8 +464,7 @@ QCPAbstractPlottable::QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis)
     connect(&mBusyDebounceTimer, &QTimer::timeout, this, &QCPAbstractPlottable::onDebounceTimeout);
 
     // Without both axes there is no plot to join: the plottable stays inert, never drawn. Neither
-    // axis is a valid detached object (QCustomPlot::add(std::unique_ptr) attaches it); one axis is
-    // not.
+    // axis is a valid detached object (QCustomPlot::add(std::unique_ptr) attaches it); one axis is not.
     mReportedLostAxis = !(keyAxis && valueAxis); // this check is the one report of that loss
     if (!keyAxis && !valueAxis)
         return;
@@ -603,8 +601,8 @@ void markLegendRows(QCPLayoutElement* element, QCPAbstractPlottable* plottable)
             QCPAbstractLegendItem* item = legend->item(i);
             auto* row = qobject_cast<QCPPlottableLegendItem*>(item);
             auto* group = qobject_cast<QCPGroupLegendItem*>(item);
-            const bool shows
-                = row ? row->plottable() == plottable : group && group->multiGraph() == plottable;
+            const bool shows = row ? row->plottable() == plottable
+                                   : group && group->multiGraph() == plottable;
             if (!shows)
                 continue;
             item->markDirty();
@@ -750,8 +748,7 @@ void QCPAbstractPlottable::setSelection(QCPDataSelection selection)
     if (mSelection != selection)
     {
         mSelection = selection;
-        markDirty(); // the selection decides what a plottable draws: the next frame must not reuse
-                     // the last one
+        markDirty(); // the selection decides what a plottable draws: the next frame must not reuse the last one
         emitSelectionChanged();
     }
 }
@@ -1158,7 +1155,7 @@ QRect QCPAbstractPlottable::clipRect() const
     if (mKeyAxis && mValueAxis)
         return mKeyAxis.data()->axisRect()->rect() & mValueAxis.data()->axisRect()->rect();
     else
-        return { };
+        return {};
 }
 
 /* inherits documentation from base class */
@@ -1419,21 +1416,21 @@ void setAxes(QCPAbstractPlottable& plottable, QCPAxis* keyAxis, QCPAxis* valueAx
 
 namespace
 {
-    // axis(type) would log on a missing type; a refusal here is already reported as misuse.
-    QCPAxis* firstAxis(const QCPAxisRect* rect, QCPAxis::AxisType type)
-    {
-        const QList<QCPAxis*> axes = rect->axes(type);
-        return axes.isEmpty() ? nullptr : axes.first();
-    }
+// axis(type) would log on a missing type; a refusal here is already reported as misuse.
+QCPAxis* firstAxis(const QCPAxisRect* rect, QCPAxis::AxisType type)
+{
+    const QList<QCPAxis*> axes = rect->axes(type);
+    return axes.isEmpty() ? nullptr : axes.first();
+}
 
-    void setAxesOfRect(QCPAbstractPlottable& plottable, QCPAxisRect* rect,
-                       QCPAxis::AxisType keyType, QCPAxis::AxisType valueType)
-    {
-        QCPAxis* keyAxis = firstAxis(rect, keyType);
-        QCPAxis* valueAxis = firstAxis(rect, valueType);
-        QCP_CHECK_OR_RETURN(keyAxis && valueAxis, "the axis rect has no axis of that type");
-        setAxes(plottable, keyAxis, valueAxis);
-    }
+void setAxesOfRect(QCPAbstractPlottable& plottable, QCPAxisRect* rect, QCPAxis::AxisType keyType,
+                   QCPAxis::AxisType valueType)
+{
+    QCPAxis* keyAxis = firstAxis(rect, keyType);
+    QCPAxis* valueAxis = firstAxis(rect, valueType);
+    QCP_CHECK_OR_RETURN(keyAxis && valueAxis, "the axis rect has no axis of that type");
+    setAxes(plottable, keyAxis, valueAxis);
+}
 } // namespace
 
 void setAxes(QCPAbstractPlottable& plottable, QCPAxis::AxisType keyType,

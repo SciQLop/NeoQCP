@@ -195,8 +195,8 @@ private:
     Q_DISABLE_COPY(QCPItemPosition)
     friend class QCPItemTracer;
 
-    // True when the pixel dependency graph above  parent comes back here: a position depends on
-    // its own parent anchor on the same axis, a plain anchor on every position of its item.
+    // True when the pixel dependency graph above  parent comes back here: a position depends on its
+    // own parent anchor on the same axis, a plain anchor on every position of its item.
     [[nodiscard]] bool parentChainReachesThis(QCPItemAnchor* parent) const;
 
     // The tracer derives this position from its graph on every draw: storing must not mark, or the
@@ -215,8 +215,8 @@ class QCP_LIB_DECL QCPAbstractItem : public QCPLayerable, public QCPDrawable
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(bool clipToAxisRect READ clipToAxisRect WRITE setClipToAxisRect)
     Q_PROPERTY(QCPAxisRect* clipAxisRect READ clipAxisRect WRITE setClipAxisRect)
-    Q_PROPERTY(
-        QCP::SelectionType selectable READ selectable WRITE setSelectable NOTIFY selectableChanged)
+    Q_PROPERTY(QCP::SelectionType selectable READ selectable WRITE setSelectable NOTIFY
+                       selectableChanged)
     Q_PROPERTY(bool selected READ selected WRITE setSelected NOTIFY selectionChanged)
     /// \endcond
 
@@ -238,7 +238,6 @@ public:
     }
 
     [[nodiscard]] bool selected() const { return mSelected; }
-
     [[nodiscard]] bool mayBeSelected() const override { return mSelected; }
 
     // setters:
@@ -365,14 +364,13 @@ class QCPItemOps : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPItemOps<T>>>
     using Base = QCPLayerableOps<T, qcp::OpsRet<Self, QCPItemOps<T>>>;
 
 public:
-    using Base::Base;
     using typename Base::Ret;
+    using Base::Base;
 
     Ret setClipToAxisRect(bool clip)
     {
         return this->apply([&](T& i) { i.setClipToAxisRect(clip); });
     }
-
     Ret setPen(const QPen& pen)
     {
         return this->apply([&](T& i) { i.setPen(pen); });
