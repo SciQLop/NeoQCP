@@ -395,6 +395,41 @@ Behaviour changes for 2.x users:
   - QCPAxisRect::setRangeDragAxes / setRangeZoomAxes refuse a null axis in a list as misuse; 2.x
         crashed.
 
+Milestone 4e (the remaining plottables and items record; one span class). Additive, except for the removals and behaviour changes listed below.
+  - Every plottable and item NeoQCP keeps draws through the drawing API: error bars, financial,
+        statistical box, intervals, and the line, straight line, curve, bracket, rect, ellipse,
+        pixmap, tracer and span items. A pan shifts what is recorded in data coordinates instead of
+        drawing it again; error bars, financial charts and statistical boxes pan 30-55 % faster.
+  - QCPAbstractPlottable and QCPAbstractItem record: a class of your own derives from one of them and
+        overrides draw(QCPDrawContext&). The QCPDrawn<> adapter is gone. QCPGraph, QCPGraph2 and the
+        polar classes still paint themselves.
+  - QCPItemSpan(plot, Qt::Orientation) is one span class for both directions:
+        plot.add<QCPItemSpan>(Qt::Vertical) covers a key range over the full height,
+        Qt::Horizontal a value range over the full width. QCPItemRSpan stays as it is.
+  - Recorded objects draw on the GPU path: their lines, rectangles, ellipses, polygons, scatter
+        symbols and error bars. Text, line endings, curves, brackets and pixmaps stay on QPainter.
+  - QCPLineEnding::path(direction, penWidth) gives an ending's outline; QCPLineEnding::filled() says
+        whether it is filled.
+  - Error bars follow their plottable: new data, another container or other axes on the attached
+        plottable redraw them without a call on the bars. They sit on grouped and stacked bars as
+        before.
+  - A tracer that follows a graph records once and moves when the graph's data changes.
+
+Removed (NeoQCP-only API, no forwarders):
+  - QCPItemHSpan and QCPItemVSpan: use QCPItemSpan with Qt::Horizontal or Qt::Vertical.
+  - QCPDrawn<Base>: derive from QCPAbstractPlottable or QCPAbstractItem directly.
+
+Behaviour changes for 2.x users:
+  - QCPAbstractItem::draw(QCPPainter*) is final: a custom item overrides draw(QCPDrawContext&).
+  - QCPStatisticalBox::drawStatisticalBox, the per-box painter hook, is gone: the box records once
+        per plottable. Override draw(QCPDrawContext&) instead.
+  - The statistical box's whiskerAntialiased flag no longer sets a painter state of its own: the
+        whiskers follow the plot's antialiasing for plottables, which already turned them on.
+  - A recorded item created after a plottable draws above it on the GPU path too, as on the painter
+        path (the creation order). Before, items always sat under the GPU plottables.
+  - An unclipped tracer's crosshair spans its axis rect, not the whole widget.
+  - QCPErrorBars::data() counts as an edit: the bars are recorded again after it is called.
+
 #### NeoQCP, unreleased ####
 
 Behaviour changes (slots that delete their sender are now safe):

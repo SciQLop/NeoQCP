@@ -152,5 +152,7 @@ Plot-wide settings:
 | `QCustomPlot::paintEvent()` override | items, layers or `overlay()` |
 | qmake project files, the amalgamated source | the Meson build |
 | Qt 4 / Qt 5 compatibility code | Qt 6.7 or newer |
+| Overriding `QCPAbstractItem::draw(QCPPainter*)` (it is final) | override `draw(QCPDrawContext&)` and record what the item draws |
+| Overriding `QCPStatisticalBox::drawStatisticalBox()` | override `draw(QCPDrawContext&)` |
 
 Everything else in the public API of QCustomPlot 2.1.1 is still there.
