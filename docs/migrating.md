@@ -86,7 +86,7 @@ Most changes are confined to the new classes. A few touch existing code.
   - Deleting a selection rect no longer emits its `canceled` signal. If your code resets its own drag state on `canceled`, also watch the rect's `destroyed` signal.
   - `setSelectionRect()` with the rect already in use does nothing. It used to delete and reinstall it.
   - Deleting a `QCPColorScale` detaches the colour maps that use it, without a signal. Their `colorScale()` then returns `nullptr`.
-- **Span dragging.** Dragging a `QCPItemVSpan`, `QCPItemHSpan` or `QCPItemRSpan` moves its edges by the mouse movement in pixels, whatever the type of their positions. An edge placed in pixels used to move by the wrong amount. If the axis moves during the drag, the edge now stays under the pointer.
+- **Span dragging.** Dragging a `QCPItemSpan` or `QCPItemRSpan` moves its edges by the mouse movement in pixels, whatever the type of their positions. An edge placed in pixels used to move by the wrong amount. If the axis moves during the drag, the edge now stays under the pointer.
 - **Native pinch.** A macOS pinch that the plot does not zoom on is left to the parent widget. It used to be swallowed.
 - **New axes are followed.** `QCPGraph2`, `QCPMultiGraph`, `QCPColorMap2`, `QCPHistogram2D` and `QCPHistogram` follow the scale and range of an axis given later with `setKeyAxis()` or `setValueAxis()`, not only the axes they were built with.
 
@@ -125,7 +125,7 @@ Data sources, for the zero-copy plottables: `QCPSoADataSource`, `QCPSoAMultiData
 
 Items and overlays:
 
-- <a href="api/classQCPItemVSpan.html">QCPItemVSpan</a>, `QCPItemHSpan`, `QCPItemRSpan`: shaded key, value or rectangular ranges, drawn on the GPU, draggable. See {doc}`items`.
+- <a href="api/classQCPItemSpan.html">QCPItemSpan</a> (vertical or horizontal) and `QCPItemRSpan`: shaded key, value or rectangular ranges, drawn on the GPU, draggable. See {doc}`items`.
 - <a href="api/classQCPItemRichText.html">QCPItemRichText</a>: an item showing HTML text in a rounded box.
 - <a href="api/classQCPOverlay.html">QCPOverlay</a>: a message banner over the plot, from `QCustomPlot::overlay()`.
 - Interactive item creation: `setItemCreator()`, `setItemPositioner()`, `setCreationModeEnabled()` on `QCustomPlot`, with the `itemCreated()` and `itemCanceled()` signals. See {doc}`interactions`.

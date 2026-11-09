@@ -18,9 +18,10 @@ These parts are drawn by GPU shaders:
 - Scatter symbols of `QCPGraph2` and `QCPMultiGraph`, as instanced sprites.
 - `QCPColorMap2` and `QCPHistogram2D` images, their contour lines and contour labels.
 - `QCPHistogram` bars.
-- Grid lines, tick marks, `QCPItemVSpan` / `QCPItemHSpan` / `QCPItemRSpan`, and `QCPIntervals` bars.
+- Grid lines and tick marks.
+- What a plottable or an item records as lines, rectangles, ellipses, polygons, scatter symbols or error bars: `QCPBars`, `QCPErrorBars`, `QCPFinancial`, `QCPStatisticalBox`, `QCPIntervals` bars, and the spans, lines, rectangles, ellipses and tracers among the items.
 
-Everything else goes through `QPainter`: text and tick labels, dashed or dotted lines, channel fills, scatters of the classic plottables, the classic `QCPBars` and `QCPErrorBars`, the classic `QCPColorMap`, and all other items.
+Everything else goes through `QPainter`: text and tick labels, dashed or dotted lines, channel fills, the scatters of `QCPGraph`, the classic `QCPColorMap`, line endings, curve and bracket items (pixel paths), pixmap items, and the labels of `QCPIntervals`.
 
 Lines on the GPU are antialiased by multisampling. The widget uses 4 samples on a normal screen and 1 on a HiDPI screen (device pixel ratio 2 or more), where pixels are already small. `setSampleCount()` (from `QRhiWidget`) overrides it.
 

@@ -175,8 +175,7 @@ They are drawn on the GPU, and the user can drag and resize them with the mouse.
 
 ![A vertical span, a horizontal band and a rectangular box over a signal](images/items-spans.png)
 
-- <a href="api/classQCPItemVSpan.html">QCPItemVSpan</a> covers a key range, over the full height of the axis rect. Set it with `setRange()`.
-- <a href="api/classQCPItemHSpan.html">QCPItemHSpan</a> covers a value range, over the full width. Set it with `setRange()`.
+- <a href="api/classQCPItemSpan.html">QCPItemSpan</a> covers a range on one axis, across the whole axis rect. `add<QCPItemSpan>(Qt::Vertical)` makes a key range over the full height, `add<QCPItemSpan>(Qt::Horizontal)` a value range over the full width. The orientation is fixed when it is made. Set the range with `setRange()`.
 - <a href="api/classQCPItemRSpan.html">QCPItemRSpan</a> covers a key range and a value range. Set them with `setKeyRange()` and `setValueRange()`.
 
 Their style has three parts:
@@ -196,7 +195,7 @@ The mouse:
 - `setMovable(false)` turns both off.
 - A drag only starts within the selection tolerance of an edge, or on a visible fill.
 
-`QCPItemVSpan` and `QCPItemHSpan` emit `rangeChanged()` while they move.
+`QCPItemSpan` emits `rangeChanged()` while it moves.
 `QCPItemRSpan` emits `keyRangeChanged()` and `valueRangeChanged()`.
 Connect to them to react to the user.
 

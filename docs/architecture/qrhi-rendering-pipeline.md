@@ -156,11 +156,11 @@ NeoQCP has several rendering paths depending on what is being drawn:
 
 | Path | Used For | How It Works |
 |---|---|---|
-| **QPainter → texture composite** | Axis lines and labels, legend, items (except spans), dashed and dotted lines, channel fills, scatters of the classic plottables, bars and the other classic plottables | QPainter draws into QImage staging buffer; uploaded as GPU texture |
-| **GPU plottable geometry** (`QCPPlottableRhiLayer`) | Solid lines of QCPGraph, QCPCurve, QCPGraph2, QCPMultiGraph; QCPGraph baseline fills; QCPIntervals bars | CPU extrudes polylines into triangles (`QCPLineExtruder`) or tessellates fills; uploaded as vertex buffer; rendered with scissor clipping. QCPGraph2 and QCPMultiGraph cache the extruded vertices across pans |
+| **QPainter → texture composite** | Axis lines and labels, legend, text, line endings, curve and bracket items, pixmap items, dashed and dotted lines, channel fills, the scatters and classic plottables that do not record (QCPGraph, QCPColorMap) | QPainter draws into QImage staging buffer; uploaded as GPU texture |
+| **GPU plottable geometry** (`QCPPlottableRhiLayer`) | Solid lines of QCPGraph, QCPCurve, QCPGraph2, QCPMultiGraph; QCPGraph baseline fills | CPU extrudes polylines into triangles (`QCPLineExtruder`) or tessellates fills; uploaded as vertex buffer; rendered with scissor clipping. QCPGraph2 and QCPMultiGraph cache the extruded vertices across pans |
 | **GPU scatter sprites** (`QCPScatterRhiLayer`) | Scatter symbols of QCPGraph2 and QCPMultiGraph | One instanced quad per point; the symbol shape is computed in the fragment shader; optional per-point colour from a gradient texture |
 | **Recorded colour-map image** (`qcp::ImageCmd`) | QCPColorMap2 and QCPHistogram2D images, and their contour lines and labels | CPU colorizes resampled data into a QImage (`QCPColormapRenderer`); the plottable records it with data-space corners, and the replay path uploads it as a texture or draws it into the paint buffer |
-| **GPU spans** (`QCPSpanRhiLayer`) | QCPItemVSpan, QCPItemHSpan, QCPItemRSpan | Pixel positions computed in double precision on the CPU, then drawn as quads |
+| **Recorded geometry** (`QCPDrawnCore` replay, `command-replay-rhi.cpp`) | Every plottable and item that records: bars, error bars, financial, statistical box, interval bars, spans, lines, rects, ellipses, tracers | The recording's lines, rects, ellipses, polygons, markers and error bars are resolved through the frame's transforms and drawn by the layer's GPU passes; a data-space recording is shifted on a pan, ratio and pixel positions are re-resolved |
 | **GPU grid** (`QCPGridRhiLayer`) | Grid lines and tick marks | Geometry rebuilt from the axes' tick vectors |
 
 Each plottable and scatter GPU layer belongs to one `QCPLayer`, so GPU geometry keeps the stacking order of the layers.

@@ -67,7 +67,7 @@ The magnetic field jumps and turns turbulent, and the cold ion beam heats into a
 - The field is one `QCPMultiGraph`: four components, one key array, one legend entry expanded to a row per component ({doc}`graphs`).
 - The ion spectrogram is a `QCPColorMap2` with a log energy axis and a log colour scale ({doc}`colormaps`).
 - The two panels share a date axis: linked ranges, a margin group, tick labels only below ({doc}`layout`).
-- A `QCPItemVSpan` marks the shock on both panels ({doc}`items`), and the dark theme styles everything ({doc}`styling`).
+- A vertical `QCPItemSpan` marks the shock on both panels ({doc}`items`), and the dark theme styles everything ({doc}`styling`).
 
 ![Magnetic field and ion spectrogram across a shock](images/gallery-space-weather.png)
 
@@ -254,7 +254,7 @@ Try it online
 Measurements of a damped oscillator with their uncertainties, the model, and the residuals in units of sigma.
 
 - `QCPErrorBars` attach to the measurement graph ({doc}`plottables`).
-- The residual panel uses `lsImpulse` lines and a `QCPItemHSpan` for the ±1σ band ({doc}`graphs`, {doc}`items`).
+- The residual panel uses `lsImpulse` lines and a horizontal `QCPItemSpan` for the ±1σ band ({doc}`graphs`, {doc}`items`).
 - The axis labels are LaTeX ({doc}`axes`).
 
 ![Measurements with error bars, a model and residuals](images/gallery-fit-residuals.png)
