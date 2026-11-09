@@ -12,8 +12,8 @@ class QCPItemSpanOps;
 /*!
   A band across the whole axis rect, from \a lowerEdge to \a upperEdge.
 
-  Qt::Vertical is a band between two keys (today's QCPItemVSpan); Qt::Horizontal is the same band
-  between two values (today's QCPItemHSpan). The orientation is fixed at construction: the edges'
+  Qt::Vertical is a band between two keys, over the full height; Qt::Horizontal is the same band
+  between two values, over the full width. The orientation is fixed at construction: the edges'
   position types are the vertical or the horizontal pair, and an orientation setter would have to
   rewrite them.
 */
