@@ -19,6 +19,7 @@ class QCPAxisRect;
 class QCPAbstractItem;
 class QCPAbstractPlottable;
 class QCPDrawContext;
+struct QCPDrawFrame;
 struct QCPDrawList;
 class QCPLayer;
 class QCPPainter;
@@ -199,10 +200,20 @@ public:
     [[nodiscard]] QPointF stallOffset(const QCPDrawable& object, const QCPDrawnView& view) const;
 
 private:
-    bool ensureRecording(const QCPDrawable& object, const QCPDrawnView& view);
+    //! \a known is the frame the caller already built when it has one: the paint path hands the
+    //! frame it replays with here, so an object that records nothing new builds no transform.
+    bool ensureRecording(const QCPDrawable& object, const QCPDrawnView& view,
+                         const QCPDrawFrame* known = nullptr);
 
-    //! True when the recording would be remade for \a view: the test ensureRecording() takes.
-    [[nodiscard]] bool recordingIsStale(const QCPDrawable& object, const QCPDrawnView& view) const;
+    //! True when the recording would be remade for \a view: the test ensureRecording() takes. \a known
+    //! is the frame the caller built, when it has one, so the paint path builds no second transform.
+    [[nodiscard]] bool recordingIsStale(const QCPDrawable& object, const QCPDrawnView& view,
+                                       const QCPDrawFrame* known = nullptr) const;
+
+    //! True when \a recorded is the transform of the frame \a view describes, without building it when
+    //! the caller hands over the frame it already has.
+    static bool frameTransformMatches(const QCPDrawnView& view, const QCPDrawFrame* known,
+                                      const QCPTransform& recorded);
 
     //! notes the ranges the layer now holds this object drawn at: a pan may shift them.
     void notePainted(const QCPDrawnView& view);

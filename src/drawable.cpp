@@ -400,6 +400,28 @@ bool qcpDrawnClickInsideAxisRect(const QCPAbstractPlottable& plottable, const QP
 
 namespace
 {
+// A layer paints its items through one frame: the same axes, rect and clip, within one replot.
+// Taking the axes' snapshots per item costs more than the item's own recording check, so the frame
+// of the last paint is kept and reused while nothing it was made from has changed. Proof that the
+// key is enough: an axis moves only between frames - a range change, a layout pass and a viewport
+// change all happen before the layers draw, and a frame epoch separates them.
+struct FrameMemo
+{
+    const QCustomPlot* plot = nullptr;
+    quint64 epoch = 0;
+    const QCPAxis* keyAxis = nullptr;
+    const QCPAxis* valueAxis = nullptr;
+    const QCPAxisRect* axisRect = nullptr;
+    QRect clip;
+    QCPDrawFrame frame;
+};
+
+FrameMemo& frameMemo()
+{
+    thread_local FrameMemo memo;
+    return memo;
+}
+
 //! The part of a view every object has: its plot, layer and theme.
 QCPDrawnView qcpLayerableView(const QCPLayerable& object)
 {
@@ -418,11 +440,10 @@ QCPDrawnView qcpDrawnViewOf(const QCPAbstractItem& item, QRect clip)
     view.clip = clip;
     // simplify: an item mixing axis pairs across its positions is drawn through the first pair;
     // per-position frames when an item needs them.
-    const QList<QCPItemPosition*> positions = item.positions();
-    if (!positions.isEmpty())
+    if (const QCPItemPosition* first = item.firstPosition())
     {
-        view.keyAxis = positions.first()->keyAxis();
-        view.valueAxis = positions.first()->valueAxis();
+        view.keyAxis = first->keyAxis();
+        view.valueAxis = first->valueAxis();
     }
     view.axisRect = item.clipAxisRect();
     if (!view.axisRect && view.keyAxis)
@@ -445,7 +466,16 @@ QCPDrawnCore::QCPDrawnCore() : mState(std::make_shared<State>()) { }
 
 QCPDrawnCore::~QCPDrawnCore() = default;
 
-bool QCPDrawnCore::recordingIsStale(const QCPDrawable& object, const QCPDrawnView& view) const
+bool QCPDrawnCore::frameTransformMatches(const QCPDrawnView& view, const QCPDrawFrame* known,
+                                        const QCPTransform& recorded)
+{
+    if (known)
+        return known->transform == recorded;
+    return QCPTransform(view.keyAxis, view.valueAxis) == recorded;
+}
+
+bool QCPDrawnCore::recordingIsStale(const QCPDrawable& object, const QCPDrawnView& view,
+                                   const QCPDrawFrame* known) const
 {
     const quint64 epoch = view.plot ? view.plot->viewEpoch() : 0;
     const quint64 itemsEpoch = view.plot ? view.plot->itemsEpoch() : 0;
@@ -475,7 +505,7 @@ bool QCPDrawnCore::recordingIsStale(const QCPDrawable& object, const QCPDrawnVie
         || (mState->viewDependent && mState->recordedEpoch != epoch)
         || (mState->anchorDependent && mState->recordedItemsEpoch != itemsEpoch)
         || (mState->transformDependent
-            && !(QCPTransform(view.keyAxis, view.valueAxis) == mState->recordedTransform))
+            && !frameTransformMatches(view, known, mState->recordedTransform))
         || windowStale;
 }
 
@@ -589,7 +619,8 @@ int QCPDrawnCore::rasterCount() const
     return mState->raster.rasterCount();
 }
 
-bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView& view)
+bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView& view,
+                                   const QCPDrawFrame* known)
 {
     if (mState->insideDraw)
     {
@@ -624,15 +655,14 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
     }
     const quint64 epoch = view.plot ? view.plot->viewEpoch() : 0;
     const quint64 itemsEpoch = view.plot ? view.plot->itemsEpoch() : 0;
-    const quint64 frame = view.plot ? view.plot->frameEpoch() : 0;
-    const QCPTransform transform(view.keyAxis, view.valueAxis);
+    const quint64 frameEpoch = view.plot ? view.plot->frameEpoch() : 0;
     const void* source = object.dataSourceIdentity();
     const quint64 dependency = object.dependencyRevision();
     // simplify: a translation still remakes a transform-dependent recording, so a pan of stacked,
     // grouped or pixel-width bars re-records every frame. A data-plus-pixel-offset position type
     // would keep them; it is on the deferred list.
 
-    if (!recordingIsStale(object, view))
+    if (!recordingIsStale(object, view, known))
         return true;
     // Without axes the frame's clip is not the axis rect's: the object is painted into the viewport
     // its layer clips it with, so that is what its recording is measured against.
@@ -658,11 +688,15 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
     mState->recordedGeneration = mState->generation;
     mState->recordedEpoch = epoch;
     mState->recordedItemsEpoch = itemsEpoch;
-    mState->recordedFrame = frame;
+    mState->recordedFrame = frameEpoch;
     mState->recordedSource = source;
     mState->recordedDependency = dependency;
     mState->recordedExporting = view.exporting;
-    mState->recordedTransform = transform;
+    // A caller that built the frame already has the transform; one that did not (a hit test, an
+    // extent) builds it, and only a recording that reads it keeps it.
+    if (mState->transformDependent)
+        mState->recordedTransform = known ? known->transform
+                                          : QCPTransform(view.keyAxis, view.valueAxis);
     mState->recorded = true;
     ++mState->recordings;
     return true;
@@ -824,13 +858,27 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
     // An export resolves what a screen frame waits for: the recording knows which it was made for.
     QCPDrawnView painted = view;
     painted.exporting = painter.isExporting();
-    if (!ensureRecording(object, painted))
-        return;
     // The layer clips every child it draws at clipRect().translated(0, -1), the half pixel
     // QCPPainter's antialiasing shifts it by: the replay sets the same clip, so a fill that ends on
     // the clip's edge lands on the same rows it does on screen.
-    const QCPDrawFrame frame = qcpMakeFrame(view.keyAxis, view.valueAxis, view.axisRect,
-                                            QRectF(view.clip).translated(0, -1));
+    const QRect clip = view.clip.translated(0, -1);
+    const quint64 frameEpoch = view.plot ? view.plot->frameEpoch() : 0;
+    FrameMemo& memo = frameMemo();
+    if (memo.plot != view.plot || memo.epoch != frameEpoch || memo.keyAxis != view.keyAxis
+        || memo.valueAxis != view.valueAxis || memo.axisRect != view.axisRect
+        || memo.clip != clip)
+    {
+        memo.frame = qcpMakeFrame(view.keyAxis, view.valueAxis, view.axisRect, QRectF(clip));
+        memo.plot = view.plot;
+        memo.epoch = frameEpoch;
+        memo.keyAxis = view.keyAxis;
+        memo.valueAxis = view.valueAxis;
+        memo.axisRect = view.axisRect;
+        memo.clip = clip;
+    }
+    const QCPDrawFrame& frame = memo.frame;
+    if (!ensureRecording(object, painted, &frame))
+        return;
     QCPPlottableRhiLayer* plottables
         = painter.isExporting() ? nullptr : qcp::gpuLayer(view.plot, view.layer, false);
     QCPScatterRhiLayer* scatter = plottables ? view.plot->scatterRhiLayer(view.layer) : nullptr;
