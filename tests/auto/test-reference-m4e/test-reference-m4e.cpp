@@ -112,13 +112,13 @@ QImage financialScene(bool ohlc, bool verticalKey, bool logValue, bool selected,
     });
 }
 
-QImage statisticalBoxScene(bool verticalKey, bool selected, bool legend)
+QImage statisticalBoxScene(bool verticalKey, bool selected, bool legend, bool logValue = false)
 {
     return render([=](QCustomPlot& plot) {
         QCPAxis* key = verticalKey ? plot.yAxis : plot.xAxis;
         QCPAxis* value = verticalKey ? plot.xAxis : plot.yAxis;
         key->setRange(0, 4);
-        value->setRange(0, 10);
+        value->setRange(logValue ? 0.1 : 0, 10);
         auto* box = new QCPStatisticalBox(key, value);
         box->addData(0.8, 1.0, 2.5, 4.0, 6.0, 8.5);
         box->addData(1.8, 0.5, 3.0, 5.2, 7.0, 9.5);
@@ -135,6 +135,8 @@ QImage statisticalBoxScene(bool verticalKey, bool selected, bool legend)
             plot.legend->setVisible(true);
             box->addToLegend();
         }
+        if (logValue)
+            value->setScaleType(QCPAxis::stLogarithmic);
     });
 }
 
@@ -328,6 +330,7 @@ void TestReferenceM4e::statisticalBoxPlain() { check(statisticalBoxScene(false, 
 void TestReferenceM4e::statisticalBoxVerticalKey() { check(statisticalBoxScene(true, false, false), "statbox-vertical-key.png"); }
 void TestReferenceM4e::statisticalBoxSelected() { check(statisticalBoxScene(false, true, false), "statbox-selected.png"); }
 void TestReferenceM4e::statisticalBoxLegend() { check(statisticalBoxScene(false, false, true), "statbox-legend.png"); }
+void TestReferenceM4e::statisticalBoxLog() { check(statisticalBoxScene(false, false, false, true), "statbox-log.png"); }
 
 void TestReferenceM4e::intervalsPlain() { check(intervalsScene(false, false, false), "intervals-plain.png"); }
 void TestReferenceM4e::intervalsLanes() { check(intervalsScene(true, false, false), "intervals-lanes.png"); }

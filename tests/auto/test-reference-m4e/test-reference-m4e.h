@@ -26,6 +26,7 @@ private slots:
     void statisticalBoxVerticalKey();
     void statisticalBoxSelected();
     void statisticalBoxLegend();
+    void statisticalBoxLog();
 
     void intervalsPlain();
     void intervalsLanes();
