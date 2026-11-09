@@ -386,14 +386,15 @@ double qcpKeyPixelsPerUnit(const QCPAxis* keyAxis)
 }
 
 QCPDrawContext::QCPDrawContext(const QCPAxis* keyAxis, const QCPAxis* valueAxis,
-                               const QCPAxisRect* axisRect, const QCPTheme* theme, bool exporting)
+                               const QCPAxisRect* axisRect, const QCPTheme* theme, bool exporting,
+                               const QRectF& clip)
         : mKeyAxis(keyAxis)
         , mValueAxis(valueAxis)
         , mAxisRect(axisRect)
         , mList(std::make_unique<QCPDrawList>())
         , mTransform(keyAxis, valueAxis)
         , mRatio(axisRect)
-        , mClip(axisRect ? QRectF(axisRect->rect()) : QRectF())
+        , mClip(clip.isNull() ? (axisRect ? QRectF(axisRect->rect()) : QRectF()) : clip)
         , mTheme(theme)
         , mExporting(exporting)
 {

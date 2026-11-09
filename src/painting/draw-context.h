@@ -246,8 +246,10 @@ public:
     }
 
 private:
+    //! \a clip overrides the axis rect's own rect as the recording's clip: a plot without axes
+    //! records what it draws against the rect its layer clips it with instead.
     QCPDrawContext(const QCPAxis* keyAxis, const QCPAxis* valueAxis, const QCPAxisRect* axisRect,
-                   const QCPTheme* theme, bool exporting = false);
+                   const QCPTheme* theme, bool exporting = false, const QRectF& clip = { });
     friend class TestDrawContext;
     friend class TestRepaint; //!< the GPU replay tests record through the same door
     friend class Benchmark; //!< records through the same door to time the replay

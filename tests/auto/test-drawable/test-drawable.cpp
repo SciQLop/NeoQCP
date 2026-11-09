@@ -827,7 +827,9 @@ void TestDrawable::missingAxisHidesWithAMessage()
     shape->mAnchor->setAxes(nullptr, nullptr);
     f.plot->replot();
     f.plot->replot();
-    QCOMPARE(shape->drawCalls, 0);
+    // Whether a drawing needs the axes depends on what it records, so it is drawn once to learn
+    // that; the refusal then stands until the object changes, and it is never painted.
+    QCOMPARE(shape->drawCalls, 1);
     QCOMPARE(gAxisMessages, 1); // once per object, not once per frame
 }
 

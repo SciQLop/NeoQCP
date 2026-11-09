@@ -319,6 +319,43 @@ inline bool isGpuCommand(const QCPDrawCommand& command)
         },
         command);
 }
+
+/*!
+  Whether replaying \a command needs a key and a value axis: it holds a position the transform maps,
+  a data one or a half data and half ratio one, or it is data by construction. Pixels, axis-rect
+  fractions and anchor offsets replay on a plot whose layout holds no axis at all.
+*/
+inline bool qcpCommandNeedsAxes(const QCPDrawCommand& command)
+{
+    const auto needsAxes = [](const QCP::Position& position)
+    {
+        return std::holds_alternative<QCP::Data>(position)
+            || std::holds_alternative<QCP::DataXRatioY>(position)
+            || std::holds_alternative<QCP::RatioXDataY>(position);
+    };
+    return std::visit(
+        [&needsAxes](const auto& cmd)
+        {
+            using T = std::decay_t<decltype(cmd)>;
+            if constexpr (std::is_same_v<T, PolylineDataCmd> || std::is_same_v<T, FillBetweenCmd>
+                          || std::is_same_v<T, MarkersCmd> || std::is_same_v<T, RectsCmd>
+                          || std::is_same_v<T, EllipsesCmd> || std::is_same_v<T, PainterCmd>)
+                return true; // data by type, or a callback that maps with the transform itself
+            else if constexpr (std::is_same_v<T, ErrorBarsCmd>)
+                return !cmd.inPixels; // a grouped or stacked bar records where it sits, in pixels
+            else if constexpr (std::is_same_v<T, RectCmd> || std::is_same_v<T, EllipseCmd>
+                               || std::is_same_v<T, ImageCmd>)
+                return needsAxes(cmd.a) || needsAxes(cmd.b);
+            else if constexpr (std::is_same_v<T, TextCmd>)
+                return needsAxes(cmd.at);
+            else if constexpr (std::is_same_v<T, PathCmd>)
+                return needsAxes(cmd.origin);
+            else
+                return std::any_of(cmd.points.begin(), cmd.points.end(), needsAxes);
+        },
+        command);
+}
+
 } // namespace qcp
 
 //! The size \a text needs in \a style: the measurement a text command keeps.
@@ -441,6 +478,13 @@ struct QCP_LIB_DECL QCPDrawList
     int rasterCommands = 0;
     quint64 id = qcpNextDrawListId(); //!< unique: with a command's index it is a cache key
 };
+
+//! True when any command of \a list needs a key and a value axis (see qcpCommandNeedsAxes): the
+//! answer a recording made without axes has to give before it may be replayed.
+inline bool qcpNeedsAxes(const QCPDrawList& list)
+{
+    return std::any_of(list.commands.begin(), list.commands.end(), qcp::qcpCommandNeedsAxes);
+}
 
 //! The one place a QCP::Position becomes pixels: every command and every caller goes through it.
 [[nodiscard]] QPointF qcpResolvePosition(const QCPDrawFrame& frame, const QCP::Position& position);

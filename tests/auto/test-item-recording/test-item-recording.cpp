@@ -397,6 +397,58 @@ void TestItemRecording::anErrorBarOnAnotherLayerFollowsItsGraph()
     QCOMPARE(bluePixelsNear(image, atLowWhisker, 4), 0);
 }
 
+void TestItemRecording::aPixelOnlyItemDrawsWithoutAxes()
+{
+    // A plot with no axes still holds items placed in pixels: 2.x drew them from pixelPosition().
+    // A recording whose every position is axis free must go through, even without a transform.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.plotLayout()->clear();
+    auto* rect = new RecordingItem<QCPItemRect>(&plot);
+    rect->topLeft->setType(QCPItemPosition::ptAbsolute);
+    rect->topLeft->setCoords(40, 40);
+    rect->bottomRight->setType(QCPItemPosition::ptAbsolute);
+    rect->bottomRight->setCoords(140, 120);
+    rect->setPen(QPen(QColor(200, 0, 0), 2));
+    rect->setBrush(QBrush(Qt::NoBrush));
+    auto* pixmap = new RecordingItem<QCPItemPixmap>(&plot);
+    pixmap->setPixmap(testPixmap());
+    pixmap->setScaled(true);
+    pixmap->topLeft->setType(QCPItemPosition::ptViewportRatio);
+    pixmap->topLeft->setCoords(0.5, 0.5);
+    pixmap->bottomRight->setType(QCPItemPosition::ptViewportRatio);
+    pixmap->bottomRight->setCoords(0.9, 0.9);
+    plot.replot();
+    QVERIFY2(rect->recordings() > 0, "the pixel rectangle has no recording without axes");
+    QVERIFY2(pixmap->recordings() > 0, "the viewport ratio pixmap has no recording without axes");
+    const QImage image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QVERIFY2(redPixelsNear(image, QPointF(40, 80), 4) > 0,
+             "the pixel rectangle did not draw without axes");
+    // The pixmap spans 0.5..0.9 of the 400x300 viewport, and its top left quadrant is blue.
+    QVERIFY2(bluePixelsNear(image, QPointF(240, 180), 8) > 20,
+             "the viewport ratio pixmap did not draw without axes");
+}
+
+void TestItemRecording::aDataItemWithoutAxesDrawsNothing()
+{
+    // A position in plot coordinates has no pixel without its axes: the recording stays refused, so
+    // no NaN box ever reaches the replay.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.plotLayout()->clear();
+    auto* rect = new RecordingItem<QCPItemRect>(&plot);
+    rect->topLeft->setType(QCPItemPosition::ptPlotCoords);
+    rect->topLeft->setCoords(1, 1);
+    rect->bottomRight->setType(QCPItemPosition::ptPlotCoords);
+    rect->bottomRight->setCoords(2, 2);
+    rect->setPen(QPen(QColor(200, 0, 0), 2));
+    rect->setBrush(QBrush(Qt::NoBrush));
+    plot.replot();
+    QCOMPARE(rect->recordings(), 0);
+    const QImage image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QCOMPARE(redPixelsNear(image, QPointF(200, 150), 200), 0);
+}
+
 void TestItemRecording::everyStyleSetterReRecords()
 {
     QCustomPlot plot;

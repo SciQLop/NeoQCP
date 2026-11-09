@@ -337,6 +337,10 @@ struct QCPDrawnCore::State
     bool iconRecorded = false;
     bool insideDraw = false;
     bool reportedMissingAxis = false;
+    //! The generation at which a recording without axes was refused, and whether that stands: the
+    //! answer costs one draw to learn, and no other fact can change it while the content does not.
+    quint64 refusedAxesGeneration = 0;
+    bool refusedMissingAxis = false;
 };
 
 namespace
@@ -596,16 +600,28 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
                           "draw(): the last recording is used");
         return mState->recorded;
     }
-    if (!view.keyAxis || !view.valueAxis)
-    {
+    // A plot may hold no axis at all: an item placed in pixels still draws there, as it did in 2.x,
+    // and only a drawing that needs a transform is refused - after it was recorded, so the answer is
+    // about what it actually holds.
+    const bool axes = view.keyAxis && view.valueAxis;
+    if (!axes && mState->refusedMissingAxis && mState->refusedAxesGeneration == mState->generation)
+        return false;
+    const auto refuseWithoutAxes = [this]() {
+        mState->refusedMissingAxis = true;
+        mState->refusedAxesGeneration = mState->generation;
         if (!mState->reportedMissingAxis)
         {
             mState->reportedMissingAxis = true;
             qDebug() << "NeoQCP: a drawn object has no key or value axis; it is not drawn";
         }
+        mState->recorded = false;
+    };
+    // The recording kept from the axes' time is placed through them: it cannot be reused now.
+    if (!axes && mState->recorded && qcpNeedsAxes(mState->recording))
+    {
+        refuseWithoutAxes();
         return false;
     }
-    mState->reportedMissingAxis = false;
     const quint64 epoch = view.plot ? view.plot->viewEpoch() : 0;
     const quint64 itemsEpoch = view.plot ? view.plot->itemsEpoch() : 0;
     const quint64 frame = view.plot ? view.plot->frameEpoch() : 0;
@@ -618,10 +634,22 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
 
     if (!recordingIsStale(object, view))
         return true;
-    QCPDrawContext context(view.keyAxis, view.valueAxis, view.axisRect, view.theme, view.exporting);
+    // Without axes the frame's clip is not the axis rect's: the object is painted into the viewport
+    // its layer clips it with, so that is what its recording is measured against.
+    const QRectF clip = axes ? QRectF() : QRectF(view.clip).translated(0, -1);
+    QCPDrawContext context(view.keyAxis, view.valueAxis, view.axisRect, view.theme, view.exporting,
+                           clip);
     const InsideDraw drawing(mState->insideDraw);
     object.draw(context);
-    mState->recording = context.takeDrawList();
+    QCPDrawList recording = context.takeDrawList();
+    if (!axes && qcpNeedsAxes(recording))
+    {
+        refuseWithoutAxes();
+        return false;
+    }
+    mState->reportedMissingAxis = false;
+    mState->refusedMissingAxis = false;
+    mState->recording = std::move(recording);
     mState->viewDependent = usesTheView(mState->recording);
     mState->anchorDependent = mState->recording.anchorDependent;
     mState->transformDependent = mState->recording.transformDependent;

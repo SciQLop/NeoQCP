@@ -17,6 +17,8 @@ private slots:
     void aFollowerFollowsItsAnchorItem();
     void aTracerOnAnotherLayerFollowsItsGraph();
     void anErrorBarOnAnotherLayerFollowsItsGraph();
+    void aPixelOnlyItemDrawsWithoutAxes();
+    void aDataItemWithoutAxesDrawsNothing();
     void everyStyleSetterReRecords();
     void aRectRecords();
     void anEllipseRecords();
