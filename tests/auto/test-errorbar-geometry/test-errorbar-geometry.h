@@ -14,4 +14,6 @@ private slots:
     void barsFollowTheirPlottablesData();
     void attachDetachReattach();
     void everyStyleSetterReRecords();
+    void anInPlaceEditThroughDataIsDrawn();
+    void aReplotWithoutADataAccessDoesNotReRecord();
 };

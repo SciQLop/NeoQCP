@@ -110,7 +110,8 @@ QCPErrorBarsData::QCPErrorBarsData(double errorMinus, double errorPlus)
 
   Returns a shared pointer to the internal data storage of type \ref QCPErrorBarsDataContainer. You
   may use it to directly manipulate the error values, which may be more convenient and faster than
-  using the regular \ref setData methods.
+  using the regular \ref setData methods. Taking the pointer counts as an edit: the next replot
+  remakes the recording.
 */
 
 /* end of documentation of inline functions */
@@ -1058,13 +1059,13 @@ const void* QCPErrorBars::dataSourceIdentity() const
 /*! \internal
 
   The bars read the plottable they are attached to, so the recording is stale when that plottable,
-  its data or its axes change. The container is a plain vector and carries no revision: a change
-  made through \ref data() in place is only seen once something marks this plottable dirty, which
-  every setter here does.
+  its data or its axes change. The container is a plain vector and carries no revision of its own,
+  so \ref data() counts how often it hands the container out: an edit made through it in place is
+  assumed and the recording is remade.
 */
 quint64 QCPErrorBars::dependencyRevision() const
 {
-    quint64 key = quint64(mDataContainer->size());
+    quint64 key = quint64(mDataContainer->size()) + mDataAccess;
     if (!mDataPlottable)
         return key;
     key += quint64(quintptr(mDataPlottable.data()));

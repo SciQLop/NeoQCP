@@ -101,7 +101,14 @@ public:
     virtual ~QCPErrorBars() override;
 
     // getters:
-    [[nodiscard]] QSharedPointer<QCPErrorBarsDataContainer> data() const { return mDataContainer; }
+    //! The data container. Handing it out gives the caller a mutable container, which it may edit
+    //! in place: assume it did, as QCPDataContainer does for a mutable iterator, so the next
+    //! recording is remade.
+    [[nodiscard]] QSharedPointer<QCPErrorBarsDataContainer> data() const
+    {
+        ++mDataAccess;
+        return mDataContainer;
+    }
 
     [[nodiscard]] QCPAbstractPlottable* dataPlottable() const { return mDataPlottable.data(); }
 
@@ -154,6 +161,8 @@ public:
 protected:
     // property members:
     QSharedPointer<QCPErrorBarsDataContainer> mDataContainer;
+    //! How often data() handed the container out: a caller may have changed it in place.
+    mutable quint64 mDataAccess = 0;
     QPointer<QCPAbstractPlottable> mDataPlottable;
     ErrorType mErrorType;
     double mWhiskerWidth;

@@ -262,3 +262,28 @@ void TestErrorBarGeometry::everyStyleSetterReRecords()
     reRecords("a selection change did not remake the recording",
               [&] { bars->setSelection(QCPDataSelection(QCPDataRange(0, 1))); });
 }
+
+void TestErrorBarGeometry::anInPlaceEditThroughDataIsDrawn()
+{
+    RecordingErrorBars* bars = nullptr;
+    auto plot = makeBarsPlot(&bars);
+    const int before = bars->recordings();
+    // The 2.x idiom: the container is mutable, and the caller edits a value in place.
+    (*bars->data())[1].errorPlus = 0.9;
+    plot->replot();
+    QVERIFY2(bars->recordings() == before + 1,
+             "an edit through data() did not remake the recording");
+    // The second bar now reaches 0.2 + 0.9, and its whisker is drawn there.
+    const QImage image = imageOf(*plot);
+    const QPointF end(plot->xAxis->coordToPixel(1.5), plot->yAxis->coordToPixel(1.1));
+    QVERIFY2(redPixelsNear(image, end, 3) > 0, "the new error is not drawn");
+}
+
+void TestErrorBarGeometry::aReplotWithoutADataAccessDoesNotReRecord()
+{
+    RecordingErrorBars* bars = nullptr;
+    auto plot = makeBarsPlot(&bars);
+    const int before = bars->recordings();
+    plot->replot();
+    QCOMPARE(bars->recordings(), before);
+}
