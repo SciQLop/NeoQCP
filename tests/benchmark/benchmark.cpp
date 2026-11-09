@@ -133,6 +133,7 @@ private slots:
     void QCPFinancial_Pan10k();
     void QCPStatisticalBox_Pan1k();
     void QCPIntervals_Pan10k();
+    void QCPIntervals_Pan10kLabelled();
     void QCPItems_MixedKinds_Pan1k();
     void QCPItems_Tracers_Pan1k();
     void QCPSpans_Pan100();
@@ -2666,6 +2667,44 @@ void Benchmark::QCPIntervals_Pan10k()
         columns.stop[i] = columns.start[i] + 0.0004;
         columns.lane[i] = i % 2 ? laneB : laneA;
         columns.ids[i] = i;
+    }
+    intervals->setData(columns);
+    intervals->setCategoryNames(QStringList { QStringLiteral("A") });
+    mPlot->xAxis->setRange(50, 51);
+    mPlot->yAxis->setRange(0, 2);
+    mPlot->replot();
+    double left = 50;
+    QBENCHMARK
+    {
+        left += 0.001; // a pan step: the width never changes, only the window slides
+        mPlot->xAxis->setRange(left, left + 1);
+        mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    }
+}
+
+void Benchmark::QCPIntervals_Pan10kLabelled()
+{
+    // QCPIntervals_Pan10k with a short text on every interval: the real timeline of SciQLop,
+    // where the labels are made from the same merged bars the recording draws.
+    auto* layout = new QCPLaneLayout();
+    layout->setParent(mPlot);
+    const int laneA = layout->laneIndex(QStringLiteral("A"));
+    const int laneB = layout->laneIndex(QStringLiteral("B"));
+    auto* intervals = new QCPIntervals(mPlot->xAxis, mPlot->yAxis, layout);
+    qcp::intervals::Columns columns;
+    columns.start.resize(10000);
+    columns.stop.resize(10000);
+    columns.lane.resize(10000);
+    columns.category.assign(10000, 0);
+    columns.ids.resize(10000);
+    columns.labels.reserve(10000);
+    for (int i = 0; i < 10000; ++i)
+    {
+        columns.start[i] = 50.0 + 0.9 * i / 10000.0;
+        columns.stop[i] = columns.start[i] + 0.0004;
+        columns.lane[i] = i % 2 ? laneB : laneA;
+        columns.ids[i] = i;
+        columns.labels << QStringLiteral("e%1").arg(i);
     }
     intervals->setData(columns);
     intervals->setCategoryNames(QStringList { QStringLiteral("A") });
