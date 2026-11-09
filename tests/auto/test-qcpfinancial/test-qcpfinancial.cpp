@@ -1,5 +1,9 @@
 #include "test-qcpfinancial.h"
+#include "qcustomplot.h"
+#include "reference-image.h"
+#include <QImage>
 #include <QMainWindow>
+#include <functional>
 
 void TestQCPFinancial::init()
 {
@@ -160,3 +164,164 @@ void TestQCPFinancial::dataSharing()
   QCOMPARE(financial2->data()->size(), 6);
 }
 
+
+namespace
+{
+const QString kDir = QStringLiteral("test-reference-m4e");
+
+//! The financial chart of the reference scenes, with what it recorded: the recording is what these
+//! tests hold to the reference images.
+class RecordingFinancial : public QCPFinancial
+{
+public:
+  using QCPFinancial::QCPFinancial;
+
+  [[nodiscard]] int recordings() const { return mCore.recordingCount(); }
+  [[nodiscard]] int recordedCommands() const { return mCore.recordedCommandCount(); }
+};
+
+struct Scene
+{
+  QImage image;
+  int commands = 0;
+};
+
+QImage imageOf(QCustomPlot& plot)
+{
+  return plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+}
+
+//! The scene the reference suite renders: the same data, width and axes, through a plottable that
+//! says what it recorded.
+Scene financialScene(bool ohlc, bool verticalKey, bool logValue, bool selected)
+{
+  QCustomPlot plot;
+  plot.resize(400, 300);
+  QFont font(QStringLiteral("Helvetica"));
+  font.setPixelSize(10);
+  plot.setFont(font);
+  for (QCPAxis* axis : plot.axisRect()->axes())
+  {
+    axis->setTickLabelFont(font);
+    axis->setLabelFont(font);
+  }
+  QCPAxis* key = verticalKey ? plot.yAxis : plot.xAxis;
+  QCPAxis* value = verticalKey ? plot.xAxis : plot.yAxis;
+  key->setRange(0, 7);
+  value->setRange(logValue ? 1 : 0, 10);
+  auto* financial = new RecordingFinancial(key, value);
+  const QVector<double> keys { 0.6, 1.4, 2.2, 3.0, 3.8, 4.6, 5.4, 6.2 };
+  QVector<double> open, high, low, close;
+  for (int i = 0; i < keys.size(); ++i)
+  {
+    const double base = 3.0 + qSin(0.9 * i) * 1.5 + i * 0.4;
+    open << base;
+    close << base + (i % 3 == 0 ? 0.8 : -0.6);
+    high << qMax(open.last(), close.last()) + 0.7;
+    low << qMin(open.last(), close.last()) - 0.6;
+  }
+  financial->setData(keys, open, high, low, close);
+  financial->setChartStyle(ohlc ? QCPFinancial::csOhlc : QCPFinancial::csCandlestick);
+  financial->setWidth(0.7);
+  if (selected)
+  {
+    financial->setSelectable(QCP::stDataRange);
+    financial->setSelection(QCPDataSelection(QCPDataRange(2, 5)));
+  }
+  if (logValue)
+    value->setScaleType(QCPAxis::stLogarithmic);
+  plot.replot();
+  return { imageOf(plot), financial->recordedCommands() };
+}
+
+//! A candlestick chart to poke at: the reference scene's axes and width, unselected.
+RecordingFinancial* makeFinancialPlot(QCustomPlot& plot)
+{
+  plot.resize(400, 300);
+  plot.xAxis->setRange(0, 7);
+  plot.yAxis->setRange(0, 10);
+  auto* financial = new RecordingFinancial(plot.xAxis, plot.yAxis);
+  financial->setData(QVector<double> { 0.6, 1.4, 2.2, 3.0, 3.8, 4.6, 5.4, 6.2 },
+                     QVector<double> { 3.0, 3.6, 4.2, 4.8, 5.4, 6.0, 6.6, 7.2 },
+                     QVector<double> { 4.0, 4.6, 5.2, 5.8, 6.4, 7.0, 7.6, 8.2 },
+                     QVector<double> { 2.0, 2.6, 3.2, 3.8, 4.4, 5.0, 5.6, 6.2 },
+                     QVector<double> { 3.4, 4.0, 4.6, 5.2, 5.8, 6.4, 7.0, 7.6 });
+  financial->setChartStyle(QCPFinancial::csCandlestick);
+  financial->setWidth(0.7);
+  plot.replot();
+  return financial;
+}
+} // namespace
+
+void TestQCPFinancial::recordedChartsMatchTheirReferences_data()
+{
+  QTest::addColumn<bool>("ohlc");
+  QTest::addColumn<bool>("verticalKey");
+  QTest::addColumn<bool>("logValue");
+  QTest::addColumn<bool>("selected");
+  QTest::addColumn<QString>("name");
+  QTest::newRow("candle")
+      << false << false << false << false << QStringLiteral("financial-candle.png");
+  QTest::newRow("ohlc") << true << false << false << false << QStringLiteral("financial-ohlc.png");
+  QTest::newRow("vertical-key")
+      << false << true << false << false << QStringLiteral("financial-vertical-key.png");
+  QTest::newRow("log") << false << false << true << false << QStringLiteral("financial-log.png");
+  QTest::newRow("selected")
+      << false << false << false << true << QStringLiteral("financial-selected.png");
+}
+
+void TestQCPFinancial::recordedChartsMatchTheirReferences()
+{
+  QFETCH(bool, ohlc);
+  QFETCH(bool, verticalKey);
+  QFETCH(bool, logValue);
+  QFETCH(bool, selected);
+  QFETCH(QString, name);
+  const Scene scene = financialScene(ohlc, verticalKey, logValue, selected);
+  QVERIFY2(scene.commands > 0, "the financial chart recorded nothing");
+  QString why;
+  QVERIFY2(qcp::test::matchesReference(scene.image, kDir, name, &why),
+           qPrintable(QStringLiteral("%1: %2").arg(name, why)));
+}
+
+void TestQCPFinancial::aPannedCandlestickIsNotReRecorded()
+{
+  QCustomPlot plot;
+  RecordingFinancial* financial = makeFinancialPlot(plot);
+  QCOMPARE(financial->recordings(), 1);
+  plot.xAxis->setRange(1, 8); // a pan: the same width, one key further
+  plot.replot();
+  QCOMPARE(financial->recordings(), 1);
+}
+
+void TestQCPFinancial::everyStyleSetterReRecords()
+{
+  QCustomPlot plot;
+  RecordingFinancial* financial = makeFinancialPlot(plot);
+  const auto reRecords = [&](const std::function<void()>& change)
+  {
+    const int before = financial->recordings();
+    change();
+    plot.replot();
+    return financial->recordings() == before + 1;
+  };
+  QVERIFY2(reRecords([&] { financial->setChartStyle(QCPFinancial::csOhlc); }),
+           "setChartStyle did not remake the recording");
+  QVERIFY2(reRecords([&] { financial->setWidth(0.3); }),
+           "setWidth did not remake the recording");
+  QVERIFY2(reRecords([&] { financial->setWidthType(QCPFinancial::wtAbsolute); }),
+           "setWidthType did not remake the recording");
+  QVERIFY2(reRecords([&] { financial->setTwoColored(false); }),
+           "setTwoColored did not remake the recording");
+  QVERIFY2(reRecords([&] { financial->setBrushPositive(QBrush(Qt::red)); }),
+           "setBrushPositive did not remake the recording");
+  QVERIFY2(reRecords([&] { financial->setBrushNegative(QBrush(Qt::green)); }),
+           "setBrushNegative did not remake the recording");
+  QVERIFY2(reRecords([&] { financial->setPenPositive(QPen(Qt::blue)); }),
+           "setPenPositive did not remake the recording");
+  QVERIFY2(reRecords([&] { financial->setPenNegative(QPen(Qt::darkRed)); }),
+           "setPenNegative did not remake the recording");
+  financial->setSelectable(QCP::stDataRange);
+  QVERIFY2(reRecords([&] { financial->setSelection(QCPDataSelection(QCPDataRange(1, 3))); }),
+           "a selection change did not remake the recording");
+}

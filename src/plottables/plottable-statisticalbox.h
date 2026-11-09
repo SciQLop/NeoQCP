@@ -31,6 +31,7 @@
 #include "../global.h"
 #include "../painting/painter.h"
 #include "../plottables/plottable1d.h"
+#include <vector>
 
 class QCPPainter;
 class QCPAxis;
@@ -165,21 +166,16 @@ protected:
     QCPScatterStyle mOutlierStyle;
 
     // reimplemented virtual methods:
-    virtual void draw(QCPPainter* painter) override;
+    void draw(QCPDrawContext& context) const override;
     virtual void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
 
-    // introduced virtual methods:
-    virtual void drawStatisticalBox(QCPPainter* painter,
-                                    QCPStatisticalBoxDataContainer::const_iterator it,
-                                    const QCPScatterStyle& outlierStyle) const;
-
     // non-virtual methods:
+    void recordSegment(QCPDrawContext& context, const QCPDataRange& segment, bool selected) const;
     void getVisibleDataBounds(QCPStatisticalBoxDataContainer::const_iterator& begin,
                               QCPStatisticalBoxDataContainer::const_iterator& end) const;
     QRectF getQuartileBox(QCPStatisticalBoxDataContainer::const_iterator it) const;
     QVector<QLineF>
     getWhiskerBackboneLines(QCPStatisticalBoxDataContainer::const_iterator it) const;
-    QVector<QLineF> getWhiskerBarLines(QCPStatisticalBoxDataContainer::const_iterator it) const;
 
     friend class QCustomPlot;
     friend class QCPLegend;

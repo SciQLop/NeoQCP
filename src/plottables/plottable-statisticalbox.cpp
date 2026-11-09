@@ -28,6 +28,18 @@
 #include "../axis/axis.h"
 #include "../core.h"
 #include "../layoutelements/layoutelement-axisrect.h"
+#include "../painting/draw-context.h"
+#include "../painting/painter.h"
+#include <limits>
+#include <span>
+#include <typeinfo>
+#include <vector>
+
+namespace
+{
+//! A separator between two segments of one polyline.
+constexpr double kNan = std::numeric_limits<double>::quiet_NaN();
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPStatisticalBoxData
@@ -557,7 +569,7 @@ QCPRange QCPStatisticalBox::getValueRange(bool& foundRange, QCP::SignDomain inSi
 }
 
 /* inherits documentation from base class */
-void QCPStatisticalBox::draw(QCPPainter* painter)
+void QCPStatisticalBox::draw(QCPDrawContext& context) const
 {
     if (mDataContainer->isEmpty())
         return;
@@ -569,57 +581,22 @@ void QCPStatisticalBox::draw(QCPPainter* painter)
         return;
     }
 
-    QCPStatisticalBoxDataContainer::const_iterator visibleBegin, visibleEnd;
-    getVisibleDataBounds(visibleBegin, visibleEnd);
-
-    // loop over and draw segments of unselected/selected data:
-    QList<QCPDataRange> selectedSegments, unselectedSegments, allSegments;
+    // Selected boxes go last, as they always did, with the decorator's look baked in.
+    QList<QCPDataRange> selectedSegments, unselectedSegments;
     getDataSegments(selectedSegments, unselectedSegments);
-    allSegments << unselectedSegments << selectedSegments;
-    for (int i = 0; i < allSegments.size(); ++i)
+    for (const QCPDataRange& segment : unselectedSegments)
+        recordSegment(context, segment, false);
+    for (const QCPDataRange& segment : selectedSegments)
+        recordSegment(context, segment, true);
+
+    // Only a decorator subclass draws a decoration of its own: the base class's is empty, and
+    // recording a painter callback for it would make every selection change a view change.
+    if (mSelectionDecorator && !selection().isEmpty()
+        && typeid(*mSelectionDecorator) != typeid(QCPSelectionDecorator))
     {
-        bool isSelectedSegment = i >= unselectedSegments.size();
-        QCPStatisticalBoxDataContainer::const_iterator begin = visibleBegin;
-        QCPStatisticalBoxDataContainer::const_iterator end = visibleEnd;
-        mDataContainer->limitIteratorsToDataRange(begin, end, allSegments.at(i));
-        if (begin == end)
-            continue;
-
-        for (QCPStatisticalBoxDataContainer::const_iterator it = begin; it != end; ++it)
-        {
-            // check data validity if flag set:
-#ifdef QCUSTOMPLOT_CHECK_DATA
-            if (QCP::isInvalidData(it->key, it->minimum)
-                || QCP::isInvalidData(it->lowerQuartile, it->median)
-                || QCP::isInvalidData(it->upperQuartile, it->maximum))
-                qDebug() << Q_FUNC_INFO << "Data point at" << it->key
-                         << "of drawn range has invalid data." << "Plottable name:" << name();
-            for (int i = 0; i < it->outliers.size(); ++i)
-                if (QCP::isInvalidData(it->outliers.at(i)))
-                    qDebug() << Q_FUNC_INFO << "Data point outlier at" << it->key
-                             << "of drawn range invalid." << "Plottable name:" << name();
-#endif
-
-            if (isSelectedSegment && mSelectionDecorator)
-            {
-                mSelectionDecorator->applyPen(painter);
-                mSelectionDecorator->applyBrush(painter);
-            }
-            else
-            {
-                painter->setPen(mPen);
-                painter->setBrush(mBrush);
-            }
-            QCPScatterStyle finalOutlierStyle = mOutlierStyle;
-            if (isSelectedSegment && mSelectionDecorator)
-                finalOutlierStyle = mSelectionDecorator->getFinalScatterStyle(mOutlierStyle);
-            drawStatisticalBox(painter, it, finalOutlierStyle);
-        }
+        context.painter([this](QCPPainter& painter, const QCPTransform&)
+                        { mSelectionDecorator->drawDecoration(&painter, selection()); });
     }
-
-    // draw other selection decoration that isn't just line/scatter pens and brushes:
-    if (mSelectionDecorator)
-        mSelectionDecorator->drawDecoration(painter, selection());
 }
 
 /* inherits documentation from base class */
@@ -634,40 +611,78 @@ void QCPStatisticalBox::drawLegendIcon(QCPPainter* painter, const QRectF& rect) 
     painter->drawRect(r);
 }
 
-/*!
-  Draws the graphical representation of a single statistical box with the data given by the
-  iterator \a it with the provided \a painter.
+/*! \internal
 
-  If the statistical box has a set of outlier data points, they are drawn with \a outlierStyle.
+  Records one segment of the data container, with the pen and brush its boxes draw with: the
+  selection decorator's for a selected segment.
 
-  \see getQuartileBox, getWhiskerBackboneLines, getWhiskerBarLines
+  Only the boxes whose bars touch the key window are recorded: the window reaches one view width
+  past each side, so a pan inside it only shifts them, and the recording is remade once it leaves.
 */
-void QCPStatisticalBox::drawStatisticalBox(QCPPainter* painter,
-                                           QCPStatisticalBoxDataContainer::const_iterator it,
-                                           const QCPScatterStyle& outlierStyle) const
+void QCPStatisticalBox::recordSegment(QCPDrawContext& context, const QCPDataRange& segment,
+                                      bool selected) const
 {
-    // draw quartile box:
-    applyDefaultAntialiasingHint(painter);
-    const QRectF quartileBox = getQuartileBox(it);
-    painter->drawRect(quartileBox);
-    // draw median line with cliprect set to quartile box:
-    painter->save();
-    painter->setClipRect(quartileBox, Qt::IntersectClip);
-    painter->setPen(mMedianPen);
-    painter->drawLine(QLineF(coordsToPixels(it->key - mWidth * 0.5, it->median),
-                             coordsToPixels(it->key + mWidth * 0.5, it->median)));
-    painter->restore();
-    // draw whisker lines:
-    applyAntialiasingHint(painter, mWhiskerAntialiased, QCP::aePlottables);
-    painter->setPen(mWhiskerPen);
-    painter->drawLines(getWhiskerBackboneLines(it));
-    painter->setPen(mWhiskerBarPen);
-    painter->drawLines(getWhiskerBarLines(it));
-    // draw outliers:
-    applyScattersAntialiasingHint(painter);
-    outlierStyle.applyTo(painter, mPen);
-    for (int i = 0; i < it->outliers.size(); ++i)
-        outlierStyle.drawShape(painter, coordsToPixels(it->key, it->outliers.at(i)));
+    // A box straddles its key by half its width, so the window grows by that much in keys.
+    const QCPKeyWindow window = context.keyWindow();
+    const double margin = qMax(mWidth, mWhiskerWidth) * 0.5;
+    auto begin = mDataContainer->findBegin(window.keys.lower - margin);
+    auto end = mDataContainer->findEnd(window.keys.upper + margin);
+    mDataContainer->limitIteratorsToDataRange(begin, end, segment);
+    if (begin == end)
+        return;
+
+    const QPen pen = selected && mSelectionDecorator ? mSelectionDecorator->pen() : mPen;
+    const QBrush brush = selected && mSelectionDecorator ? mSelectionDecorator->brush() : mBrush;
+    QCPScatterStyle outlierStyle = mOutlierStyle;
+    if (selected && mSelectionDecorator)
+        outlierStyle = mSelectionDecorator->getFinalScatterStyle(mOutlierStyle);
+
+    std::vector<QCP::Position> medians;
+    std::vector<QCP::Position> backbones, whiskerBars;
+    std::vector<QPointF> outliers;
+    for (auto it = begin; it != end; ++it)
+    {
+        const QCPStatisticalBoxData& entry = *it;
+        if (!qIsFinite(entry.key) || !qIsFinite(entry.minimum) || !qIsFinite(entry.lowerQuartile)
+            || !qIsFinite(entry.median) || !qIsFinite(entry.upperQuartile)
+            || !qIsFinite(entry.maximum))
+            continue;
+        const double half = mWidth * 0.5;
+        // The quartile box, filled with the box's brush and stroked with its pen.
+        context.rect(QCP::Data { entry.key - half, entry.upperQuartile },
+                     QCP::Data { entry.key + half, entry.lowerQuartile }, pen, brush);
+        // The median spans the box, so the box's own edges clip it: it needs no clip of its own.
+        medians.push_back(QCP::Data { entry.key - half, entry.median });
+        medians.push_back(QCP::Data { entry.key + half, entry.median });
+        medians.push_back(QCP::Data { kNan, kNan });
+        const double whiskerHalf = mWhiskerWidth * 0.5;
+        backbones.push_back(QCP::Data { entry.key, entry.lowerQuartile });
+        backbones.push_back(QCP::Data { entry.key, entry.minimum });
+        backbones.push_back(QCP::Data { kNan, kNan });
+        backbones.push_back(QCP::Data { entry.key, entry.upperQuartile });
+        backbones.push_back(QCP::Data { entry.key, entry.maximum });
+        backbones.push_back(QCP::Data { kNan, kNan });
+        whiskerBars.push_back(QCP::Data { entry.key - whiskerHalf, entry.minimum });
+        whiskerBars.push_back(QCP::Data { entry.key + whiskerHalf, entry.minimum });
+        whiskerBars.push_back(QCP::Data { kNan, kNan });
+        whiskerBars.push_back(QCP::Data { entry.key - whiskerHalf, entry.maximum });
+        whiskerBars.push_back(QCP::Data { entry.key + whiskerHalf, entry.maximum });
+        whiskerBars.push_back(QCP::Data { kNan, kNan });
+        for (double outlier : entry.outliers)
+        {
+            if (qIsFinite(outlier))
+                outliers.emplace_back(entry.key, outlier);
+        }
+    }
+    if (!medians.empty())
+        context.polyline(std::span<const QCP::Position>(medians), mMedianPen);
+    if (!backbones.empty())
+        context.polyline(std::span<const QCP::Position>(backbones), mWhiskerPen);
+    if (!whiskerBars.empty())
+        context.polyline(std::span<const QCP::Position>(whiskerBars), mWhiskerBarPen);
+    if (!outliers.empty())
+        context.markers(std::make_shared<const std::vector<QPointF>>(std::move(outliers)),
+                        outlierStyle);
 }
 
 /*!  \internal
@@ -708,7 +723,7 @@ void QCPStatisticalBox::getVisibleDataBounds(
   Returns the box in plot coordinates (keys in x, values in y of the returned rect) that covers the
   value range from the lower to the upper quartile, of the data given by \a it.
 
-  \see drawStatisticalBox, getWhiskerBackboneLines, getWhiskerBarLines
+  \see getWhiskerBackboneLines, QCPStatisticalBox::draw
 */
 QRectF QCPStatisticalBox::getQuartileBox(QCPStatisticalBoxDataContainer::const_iterator it) const
 {
@@ -724,7 +739,7 @@ QRectF QCPStatisticalBox::getQuartileBox(QCPStatisticalBoxDataContainer::const_i
   range from the minimum to the lower quartile, and from the upper quartile to the maximum of the
   data given by \a it.
 
-  \see drawStatisticalBox, getQuartileBox, getWhiskerBarLines
+  \see getQuartileBox, QCPStatisticalBox::draw
 */
 QVector<QLineF>
 QCPStatisticalBox::getWhiskerBackboneLines(QCPStatisticalBoxDataContainer::const_iterator it) const
@@ -734,23 +749,5 @@ QCPStatisticalBox::getWhiskerBackboneLines(QCPStatisticalBoxDataContainer::const
                         coordsToPixels(it->key, it->minimum)); // min backbone
     result[1].setPoints(coordsToPixels(it->key, it->upperQuartile),
                         coordsToPixels(it->key, it->maximum)); // max backbone
-    return result;
-}
-
-/*!  \internal
-
-  Returns the whisker bars (keys in x, values in y of the returned lines) that are placed at the
-  end of the whisker backbones, at the minimum and maximum of the data given by \a it.
-
-  \see drawStatisticalBox, getQuartileBox, getWhiskerBackboneLines
-*/
-QVector<QLineF>
-QCPStatisticalBox::getWhiskerBarLines(QCPStatisticalBoxDataContainer::const_iterator it) const
-{
-    QVector<QLineF> result(2);
-    result[0].setPoints(coordsToPixels(it->key - mWhiskerWidth * 0.5, it->minimum),
-                        coordsToPixels(it->key + mWhiskerWidth * 0.5, it->minimum)); // min bar
-    result[1].setPoints(coordsToPixels(it->key - mWhiskerWidth * 0.5, it->maximum),
-                        coordsToPixels(it->key + mWhiskerWidth * 0.5, it->maximum)); // max bar
     return result;
 }

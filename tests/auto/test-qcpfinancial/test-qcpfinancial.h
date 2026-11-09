@@ -10,6 +10,11 @@ private slots:
   
   void dataManipulation();
   void dataSharing();
+
+  void recordedChartsMatchTheirReferences();
+  void recordedChartsMatchTheirReferences_data();
+  void aPannedCandlestickIsNotReRecorded();
+  void everyStyleSetterReRecords();
   
 private:
   QCustomPlot *mPlot;

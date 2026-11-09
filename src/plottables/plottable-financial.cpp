@@ -28,7 +28,19 @@
 #include "../axis/axis.h"
 #include "../core.h"
 #include "../layoutelements/layoutelement-axisrect.h"
+#include "../painting/draw-context.h"
 #include "../painting/painter.h"
+#include <array>
+#include <limits>
+#include <span>
+#include <typeinfo>
+#include <vector>
+
+namespace
+{
+//! A separator between two segments of one polyline.
+constexpr double kNan = std::numeric_limits<double>::quiet_NaN();
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPFinancialData
@@ -585,40 +597,32 @@ QCPFinancialDataContainer QCPFinancial::timeSeriesToOhlc(const QVector<double>& 
 }
 
 /* inherits documentation from base class */
-void QCPFinancial::draw(QCPPainter* painter)
+void QCPFinancial::draw(QCPDrawContext& context) const
 {
-    // get visible data range:
-    QCPFinancialDataContainer::const_iterator visibleBegin, visibleEnd;
-    getVisibleDataBounds(visibleBegin, visibleEnd);
-
-    // loop over and draw segments of unselected/selected data:
-    QList<QCPDataRange> selectedSegments, unselectedSegments, allSegments;
-    getDataSegments(selectedSegments, unselectedSegments);
-    allSegments << unselectedSegments << selectedSegments;
-    for (int i = 0; i < allSegments.size(); ++i)
+    if (!mKeyAxis || !mValueAxis)
     {
-        bool isSelectedSegment = i >= unselectedSegments.size();
-        QCPFinancialDataContainer::const_iterator begin = visibleBegin;
-        QCPFinancialDataContainer::const_iterator end = visibleEnd;
-        mDataContainer->limitIteratorsToDataRange(begin, end, allSegments.at(i));
-        if (begin == end)
-            continue;
-
-        // draw data segment according to configured style:
-        switch (mChartStyle)
-        {
-            case QCPFinancial::csOhlc:
-                drawOhlcPlot(painter, begin, end, isSelectedSegment);
-                break;
-            case QCPFinancial::csCandlestick:
-                drawCandlestickPlot(painter, begin, end, isSelectedSegment);
-                break;
-        }
+        qDebug() << Q_FUNC_INFO << "both key and value axis pointer must be set";
+        return;
     }
+    if (mDataContainer->isEmpty())
+        return;
 
-    // draw other selection decoration that isn't just line/scatter pens and brushes:
-    if (mSelectionDecorator)
-        mSelectionDecorator->drawDecoration(painter, selection());
+    // Selected entries go last, as they always did, with the decorator's look baked in.
+    QList<QCPDataRange> selectedSegments, unselectedSegments;
+    getDataSegments(selectedSegments, unselectedSegments);
+    for (const QCPDataRange& segment : unselectedSegments)
+        recordSegment(context, segment, false);
+    for (const QCPDataRange& segment : selectedSegments)
+        recordSegment(context, segment, true);
+
+    // Only a decorator subclass draws a decoration of its own: the base class's is empty, and
+    // recording a painter callback for it would make every selection change a view change.
+    if (mSelectionDecorator && !selection().isEmpty()
+        && typeid(*mSelectionDecorator) != typeid(QCPSelectionDecorator))
+    {
+        context.painter([this](QCPPainter& painter, const QCPTransform&)
+                        { mSelectionDecorator->drawDecoration(&painter, selection()); });
+    }
 }
 
 /* inherits documentation from base class */
@@ -727,168 +731,132 @@ void QCPFinancial::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
 
 /*! \internal
 
-  Draws the data from \a begin to \a end-1 as OHLC bars with the provided \a painter.
+  Records one segment of the data container, with the pen and brush its entries draw with: the
+  selection decorator's for a selected segment.
 
-  This method is a helper function for \ref draw. It is used when the chart style is \ref csOhlc.
+  Only the entries whose bars touch the key window are recorded: the window reaches one view width
+  past each side, so a pan inside it only shifts them, and the recording is remade once it leaves.
+
+  A width in plot coordinates is geometry in plot coordinates, so a pan only shifts the recording. A
+  width in pixels is only right for the view it was recorded in, so that recording reads the
+  transform and is remade whenever the view changes.
 */
-void QCPFinancial::drawOhlcPlot(QCPPainter* painter,
-                                const QCPFinancialDataContainer::const_iterator& begin,
-                                const QCPFinancialDataContainer::const_iterator& end,
-                                bool isSelected)
+void QCPFinancial::recordSegment(QCPDrawContext& context, const QCPDataRange& segment,
+                                 bool selected) const
 {
     QCPAxis* keyAxis = mKeyAxis.data();
     QCPAxis* valueAxis = mValueAxis.data();
     if (!keyAxis || !valueAxis)
+        return;
+    const QCPKeyWindow window = context.keyWindow();
+    // A bar straddles its key by half its width, so the window grows by that much in keys.
+    const double halfPixel = qAbs(getPixelWidth(window.keys.lower, 0.0));
+    const double margin = mWidthType == wtPlotCoords
+        ? mWidth * 0.5
+        : (window.pixelsPerKey > 0 ? halfPixel / window.pixelsPerKey : 0.0);
+    auto begin = mDataContainer->findBegin(window.keys.lower - margin);
+    auto end = mDataContainer->findEnd(window.keys.upper + margin);
+    mDataContainer->limitIteratorsToDataRange(begin, end, segment);
+    if (begin == end)
+        return;
+
+    const bool dataSpace = mWidthType == wtPlotCoords;
+    if (!dataSpace)
+        (void)context.transform(); // a pixel width: this geometry holds for this view alone
+    // A point of the chart, in the space the width type allows.
+    const auto at = [&](double key, double value) -> QCP::Position
     {
-        qDebug() << Q_FUNC_INFO << "invalid key or value axis";
+        if (dataSpace)
+            return QCP::Data { key, value };
+        const double keyPixel = keyAxis->coordToPixel(key);
+        const double valuePixel = valueAxis->coordToPixel(value);
+        return keyAxis->orientation() == Qt::Horizontal
+            ? QCP::Position(QCP::Pixels { keyPixel, valuePixel })
+            : QCP::Position(QCP::Pixels { valuePixel, keyPixel });
+    };
+    // A point of the chart, \a offset to the high-key side of \a key (in keys, or in pixels).
+    const auto across = [&](double key, double value, double offset) -> QCP::Position
+    {
+        if (dataSpace)
+            return QCP::Data { key + offset, value };
+        const double keyPixel = keyAxis->coordToPixel(key) + offset;
+        const double valuePixel = valueAxis->coordToPixel(value);
+        return keyAxis->orientation() == Qt::Horizontal
+            ? QCP::Position(QCP::Pixels { keyPixel, valuePixel })
+            : QCP::Position(QCP::Pixels { valuePixel, keyPixel });
+    };
+    // How far the bar of \a key reaches to the high-key side: its half width, signed as the axis
+    // runs, so the open and close flags sit on the sides they always did.
+    const auto halfOf = [&](double key)
+    { return dataSpace ? mWidth * 0.5 : getPixelWidth(key, keyAxis->coordToPixel(key)); };
+    const QCP::Position gap = dataSpace ? QCP::Position(QCP::Data { kNan, kNan })
+                                        : QCP::Position(QCP::Pixels { kNan, kNan });
+    const QPen pen = selected && mSelectionDecorator ? mSelectionDecorator->pen() : mPen;
+    const QBrush brush = selected && mSelectionDecorator ? mSelectionDecorator->brush() : mBrush;
+    const auto penOf = [&](const QCPFinancialData& entry)
+    {
+        return selected || !mTwoColored ? pen
+                                        : (entry.close >= entry.open ? mPenPositive : mPenNegative);
+    };
+    const auto brushOf = [&](const QCPFinancialData& entry)
+    {
+        return selected || !mTwoColored
+            ? brush
+            : (entry.close >= entry.open ? mBrushPositive : mBrushNegative);
+    };
+    const auto isDrawn = [](const QCPFinancialData& entry)
+    {
+        return qIsFinite(entry.key) && qIsFinite(entry.open) && qIsFinite(entry.close)
+            && qIsFinite(entry.high) && qIsFinite(entry.low);
+    };
+
+    if (mChartStyle == csCandlestick)
+    {
+        for (auto it = begin; it != end; ++it)
+        {
+            const QCPFinancialData& entry = *it;
+            if (!isDrawn(entry))
+                continue;
+            // The wick is two segments, ending where the body starts: it does not run behind it.
+            const std::array<QCP::Position, 5> wick {
+                at(entry.key, entry.high), at(entry.key, qMax(entry.open, entry.close)), gap,
+                at(entry.key, entry.low), at(entry.key, qMin(entry.open, entry.close))
+            };
+            context.polyline(std::span<const QCP::Position>(wick), penOf(entry));
+            const double half = halfOf(entry.key);
+            context.rect(across(entry.key, entry.open, half), across(entry.key, entry.close, -half),
+                         penOf(entry), brushOf(entry));
+        }
         return;
     }
 
-    if (keyAxis->orientation() == Qt::Horizontal)
+    // OHLC: one polyline per colour, so a segment of ten thousand entries is one or two commands. A
+    // stroke drawn over another stroke of the same pen looks the same whichever came first.
+    std::vector<QCP::Position> lines[2];
+    for (auto it = begin; it != end; ++it)
     {
-        for (QCPFinancialDataContainer::const_iterator it = begin; it != end; ++it)
-        {
-            if (isSelected && mSelectionDecorator)
-                mSelectionDecorator->applyPen(painter);
-            else if (mTwoColored)
-                painter->setPen(it->close >= it->open ? mPenPositive : mPenNegative);
-            else
-                painter->setPen(mPen);
-            double keyPixel = keyAxis->coordToPixel(it->key);
-            double openPixel = valueAxis->coordToPixel(it->open);
-            double closePixel = valueAxis->coordToPixel(it->close);
-            // draw backbone:
-            painter->drawLine(QPointF(keyPixel, valueAxis->coordToPixel(it->high)),
-                              QPointF(keyPixel, valueAxis->coordToPixel(it->low)));
-            // draw open:
-            double pixelWidth = getPixelWidth(
-                it->key, keyPixel); // sign of this makes sure open/close are on correct sides
-            painter->drawLine(QPointF(keyPixel - pixelWidth, openPixel),
-                              QPointF(keyPixel, openPixel));
-            // draw close:
-            painter->drawLine(QPointF(keyPixel, closePixel),
-                              QPointF(keyPixel + pixelWidth, closePixel));
-        }
+        const QCPFinancialData& entry = *it;
+        if (!isDrawn(entry))
+            continue;
+        const double half = halfOf(entry.key);
+        std::vector<QCP::Position>& line = lines[entry.close >= entry.open ? 0 : 1];
+        line.push_back(at(entry.key, entry.high)); // backbone
+        line.push_back(at(entry.key, entry.low));
+        line.push_back(gap);
+        line.push_back(across(entry.key, entry.open, -half)); // open flag
+        line.push_back(at(entry.key, entry.open));
+        line.push_back(gap);
+        line.push_back(at(entry.key, entry.close)); // close flag
+        line.push_back(across(entry.key, entry.close, half));
+        line.push_back(gap);
     }
-    else
+    const bool coloured = mTwoColored && !selected;
+    const QPen groupPen[2] = { coloured ? mPenPositive : pen, coloured ? mPenNegative : pen };
+    for (int group = 0; group < 2; ++group)
     {
-        for (QCPFinancialDataContainer::const_iterator it = begin; it != end; ++it)
-        {
-            if (isSelected && mSelectionDecorator)
-                mSelectionDecorator->applyPen(painter);
-            else if (mTwoColored)
-                painter->setPen(it->close >= it->open ? mPenPositive : mPenNegative);
-            else
-                painter->setPen(mPen);
-            double keyPixel = keyAxis->coordToPixel(it->key);
-            double openPixel = valueAxis->coordToPixel(it->open);
-            double closePixel = valueAxis->coordToPixel(it->close);
-            // draw backbone:
-            painter->drawLine(QPointF(valueAxis->coordToPixel(it->high), keyPixel),
-                              QPointF(valueAxis->coordToPixel(it->low), keyPixel));
-            // draw open:
-            double pixelWidth = getPixelWidth(
-                it->key, keyPixel); // sign of this makes sure open/close are on correct sides
-            painter->drawLine(QPointF(openPixel, keyPixel - pixelWidth),
-                              QPointF(openPixel, keyPixel));
-            // draw close:
-            painter->drawLine(QPointF(closePixel, keyPixel),
-                              QPointF(closePixel, keyPixel + pixelWidth));
-        }
-    }
-}
-
-/*! \internal
-
-  Draws the data from \a begin to \a end-1 as Candlesticks with the provided \a painter.
-
-  This method is a helper function for \ref draw. It is used when the chart style is \ref
-  csCandlestick.
-*/
-void QCPFinancial::drawCandlestickPlot(QCPPainter* painter,
-                                       const QCPFinancialDataContainer::const_iterator& begin,
-                                       const QCPFinancialDataContainer::const_iterator& end,
-                                       bool isSelected)
-{
-    QCPAxis* keyAxis = mKeyAxis.data();
-    QCPAxis* valueAxis = mValueAxis.data();
-    if (!keyAxis || !valueAxis)
-    {
-        qDebug() << Q_FUNC_INFO << "invalid key or value axis";
-        return;
-    }
-
-    if (keyAxis->orientation() == Qt::Horizontal)
-    {
-        for (QCPFinancialDataContainer::const_iterator it = begin; it != end; ++it)
-        {
-            if (isSelected && mSelectionDecorator)
-            {
-                mSelectionDecorator->applyPen(painter);
-                mSelectionDecorator->applyBrush(painter);
-            }
-            else if (mTwoColored)
-            {
-                painter->setPen(it->close >= it->open ? mPenPositive : mPenNegative);
-                painter->setBrush(it->close >= it->open ? mBrushPositive : mBrushNegative);
-            }
-            else
-            {
-                painter->setPen(mPen);
-                painter->setBrush(mBrush);
-            }
-            double keyPixel = keyAxis->coordToPixel(it->key);
-            double openPixel = valueAxis->coordToPixel(it->open);
-            double closePixel = valueAxis->coordToPixel(it->close);
-            // draw high:
-            painter->drawLine(
-                QPointF(keyPixel, valueAxis->coordToPixel(it->high)),
-                QPointF(keyPixel, valueAxis->coordToPixel(qMax(it->open, it->close))));
-            // draw low:
-            painter->drawLine(
-                QPointF(keyPixel, valueAxis->coordToPixel(it->low)),
-                QPointF(keyPixel, valueAxis->coordToPixel(qMin(it->open, it->close))));
-            // draw open-close box:
-            double pixelWidth = getPixelWidth(it->key, keyPixel);
-            painter->drawRect(QRectF(QPointF(keyPixel - pixelWidth, closePixel),
-                                     QPointF(keyPixel + pixelWidth, openPixel)));
-        }
-    }
-    else // keyAxis->orientation() == Qt::Vertical
-    {
-        for (QCPFinancialDataContainer::const_iterator it = begin; it != end; ++it)
-        {
-            if (isSelected && mSelectionDecorator)
-            {
-                mSelectionDecorator->applyPen(painter);
-                mSelectionDecorator->applyBrush(painter);
-            }
-            else if (mTwoColored)
-            {
-                painter->setPen(it->close >= it->open ? mPenPositive : mPenNegative);
-                painter->setBrush(it->close >= it->open ? mBrushPositive : mBrushNegative);
-            }
-            else
-            {
-                painter->setPen(mPen);
-                painter->setBrush(mBrush);
-            }
-            double keyPixel = keyAxis->coordToPixel(it->key);
-            double openPixel = valueAxis->coordToPixel(it->open);
-            double closePixel = valueAxis->coordToPixel(it->close);
-            // draw high:
-            painter->drawLine(
-                QPointF(valueAxis->coordToPixel(it->high), keyPixel),
-                QPointF(valueAxis->coordToPixel(qMax(it->open, it->close)), keyPixel));
-            // draw low:
-            painter->drawLine(
-                QPointF(valueAxis->coordToPixel(it->low), keyPixel),
-                QPointF(valueAxis->coordToPixel(qMin(it->open, it->close)), keyPixel));
-            // draw open-close box:
-            double pixelWidth = getPixelWidth(it->key, keyPixel);
-            painter->drawRect(QRectF(QPointF(closePixel, keyPixel - pixelWidth),
-                                     QPointF(openPixel, keyPixel + pixelWidth)));
-        }
+        if (lines[group].empty())
+            continue;
+        context.polyline(std::span<const QCP::Position>(lines[group]), groupPen[group]);
     }
 }
 

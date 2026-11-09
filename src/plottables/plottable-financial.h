@@ -193,15 +193,11 @@ protected:
     QPen mPenPositive, mPenNegative;
 
     // reimplemented virtual methods:
-    virtual void draw(QCPPainter* painter) override;
+    void draw(QCPDrawContext& context) const override;
     virtual void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
 
     // non-virtual methods:
-    void drawOhlcPlot(QCPPainter* painter, const QCPFinancialDataContainer::const_iterator& begin,
-                      const QCPFinancialDataContainer::const_iterator& end, bool isSelected);
-    void drawCandlestickPlot(QCPPainter* painter,
-                             const QCPFinancialDataContainer::const_iterator& begin,
-                             const QCPFinancialDataContainer::const_iterator& end, bool isSelected);
+    void recordSegment(QCPDrawContext& context, const QCPDataRange& segment, bool selected) const;
     double getPixelWidth(double key, double keyPixel) const;
     double ohlcSelectTest(const QPointF& pos,
                           const QCPFinancialDataContainer::const_iterator& begin,

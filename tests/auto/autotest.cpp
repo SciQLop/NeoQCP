@@ -26,6 +26,7 @@
 #include "test-rspan/test-rspan.h"
 #include "test-span/test-span.h"
 #include "test-item-recording/test-item-recording.h"
+#include "test-statisticalbox/test-statisticalbox.h"
 #include "test-richtext/test-richtext.h"
 #include "test-data-locator/test-data-locator.h"
 #include "test-overlay/test-overlay.h"
@@ -125,6 +126,7 @@ int main(int argc, char **argv)
   QCPTEST(TestRSpan);
   QCPTEST(TestSpan);
   QCPTEST(TestItemRecording);
+  QCPTEST(TestStatisticalBox);
   QCPTEST(TestWaterfall);
   QCPTEST(TestPipeline);
   QCPTEST(TestRichText);
