@@ -4,6 +4,7 @@
 #include <functional>
 
 #include "../../../src/qcp.h"
+#include <painting/draw-commands.h>
 #include "reference-image.h"
 
 namespace
@@ -21,6 +22,16 @@ public:
     int recordings() const { return this->mCore.recordingCount(); }
 
     int recordedCommands() const { return this->mCore.recordedCommandCount(); }
+
+    //! The top-left pixel of the image command the item recorded last.
+    QCP::Pixels recordedImageCorner() const
+    {
+        for (const qcp::QCPDrawCommand& command : this->mCore.recordedList().commands)
+            if (const auto* image = std::get_if<qcp::ImageCmd>(&command))
+                if (const auto* pixels = std::get_if<QCP::Pixels>(&image->a))
+                    return *pixels;
+        return { };
+    }
 };
 
 void preparePlot(QCustomPlot& plot)
@@ -568,6 +579,42 @@ void TestItemRecording::aScaledPixmapRecords()
         });
     QVERIFY2(commands > 0, "the scaled pixmap recorded nothing");
     check(image, "item-pixmap-scaled.png");
+}
+
+void TestItemRecording::aRatioPixmapFollowsTheAxisRect()
+{
+    // A pixmap placed by axis-rect ratio records pixels, and those pixels are only right for the
+    // rect they were taken in: a layout change that moves the rect must remake the recording.
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto* pixmap = new RecordingItem<QCPItemPixmap>(&plot);
+    pixmap->setPixmap(testPixmap());
+    pixmap->setScaled(true);
+    pixmap->topLeft->setType(QCPItemPosition::ptAxisRectRatio);
+    pixmap->topLeft->setCoords(0.2, 0.2);
+    pixmap->bottomRight->setType(QCPItemPosition::ptAxisRectRatio);
+    pixmap->bottomRight->setCoords(0.6, 0.6);
+    plot.replot();
+    const int recordings = pixmap->recordings();
+    const QRect before = plot.axisRect()->rect();
+
+    // A value-axis label widens the left margin, so the rect the ratios are taken in shrinks.
+    plot.yAxis->setLabel(QStringLiteral("value (arbitrary units)"));
+    plot.replot();
+    const QRect after = plot.axisRect()->rect();
+    QVERIFY2(after != before, "the axis label did not move the axis rect");
+    QVERIFY2(pixmap->recordings() > recordings,
+             "the ratio pixmap kept a stale recording through a layout change");
+
+    const QCP::Pixels corner = pixmap->recordedImageCorner();
+    QVERIFY2(std::abs(corner.x - (after.left() + 0.2 * after.width())) <= 1.0
+                 && std::abs(corner.y - (after.top() + 0.2 * after.height())) <= 1.0,
+             qPrintable(QStringLiteral("the recording kept the pixel %1,%2 instead of the ratio's "
+                                       "%3,%4")
+                            .arg(corner.x)
+                            .arg(corner.y)
+                            .arg(after.left() + 0.2 * after.width())
+                            .arg(after.top() + 0.2 * after.height())));
 }
 
 void TestItemRecording::aTracerRecords()

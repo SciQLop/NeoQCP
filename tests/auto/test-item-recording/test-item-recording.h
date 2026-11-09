@@ -25,6 +25,7 @@ private slots:
     void anEllipseRecords();
     void aPixmapRecords();
     void aScaledPixmapRecords();
+    void aRatioPixmapFollowsTheAxisRect();
     void aTracerRecords();
     void aTracerFollowsItsGraph();
     void aPannedTracerIsNotReRecorded();
