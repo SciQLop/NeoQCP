@@ -26,6 +26,7 @@
 #ifndef QCP_ITEM_H
 #define QCP_ITEM_H
 
+#include "../drawable.h"
 #include "axis/axis.h"
 #include "coords.h"
 #include "global.h"
@@ -194,8 +195,8 @@ private:
     Q_DISABLE_COPY(QCPItemPosition)
     friend class QCPItemTracer;
 
-    // True when the pixel dependency graph above  parent comes back here: a position depends on its
-    // own parent anchor on the same axis, a plain anchor on every position of its item.
+    // True when the pixel dependency graph above  parent comes back here: a position depends on
+    // its own parent anchor on the same axis, a plain anchor on every position of its item.
     [[nodiscard]] bool parentChainReachesThis(QCPItemAnchor* parent) const;
 
     // The tracer derives this position from its graph on every draw: storing must not mark, or the
@@ -204,25 +205,18 @@ private:
 };
 Q_DECLARE_METATYPE(QCPItemPosition::PositionType)
 
-// What an item occupies, for the layer's spatial index: the data box of its positions on one axis
-// pair, plus the pixels its drawing may add around them (pens, line endings, a bracket's arms).
-// A side that cannot be expressed in data coordinates is infinite.
-struct QCPItemExtent
-{
-    QCPAxis* keyAxis = nullptr;
-    QCPAxis* valueAxis = nullptr;
-    QCPDataBox box {};
-    double pixelPad = 0.0;
-};
+// What an item occupies, for the layer's spatial index, is QCPItemExtent (drawable.h): the data box
+// of its recording on one axis pair, plus the pixels its drawing may add around it. A side that
+// cannot be expressed in data coordinates is infinite.
 
-class QCP_LIB_DECL QCPAbstractItem : public QCPLayerable
+class QCP_LIB_DECL QCPAbstractItem : public QCPLayerable, public QCPDrawable
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
     Q_PROPERTY(bool clipToAxisRect READ clipToAxisRect WRITE setClipToAxisRect)
     Q_PROPERTY(QCPAxisRect* clipAxisRect READ clipAxisRect WRITE setClipAxisRect)
-    Q_PROPERTY(QCP::SelectionType selectable READ selectable WRITE setSelectable NOTIFY
-                       selectableChanged)
+    Q_PROPERTY(
+        QCP::SelectionType selectable READ selectable WRITE setSelectable NOTIFY selectableChanged)
     Q_PROPERTY(bool selected READ selected WRITE setSelected NOTIFY selectionChanged)
     /// \endcond
 
@@ -244,6 +238,7 @@ public:
     }
 
     [[nodiscard]] bool selected() const { return mSelected; }
+
     [[nodiscard]] bool mayBeSelected() const override { return mSelected; }
 
     // setters:
@@ -255,26 +250,37 @@ public:
     void markDirty() override;
 
     // reimplemented virtual methods:
-    virtual double selectTest(const QPointF& pos, bool onlySelectable,
-                              QVariant* details = nullptr) const override
-        = 0;
+    //! The click path: the distance to the recording, or -1 when the click misses it.
+    double selectTest(const QPointF& pos, bool onlySelectable,
+                      QVariant* details = nullptr) const override;
+
+    // introduced virtual methods:
+    //! The recording: append what this item draws to \a context. The default records nothing.
+    virtual void draw(QCPDrawContext& context) const { Q_UNUSED(context) }
+
+    //! What the recording occupies in data coordinates.
+    std::optional<QCPDataBox> drawnDataRange() const override;
+    //! The pixel distance from \a at to the recording, or none when it missed.
+    std::optional<double> hitTest(QCP::Pixels at, QVariant* details) const override;
+
+    //! The legend icon: the recording, unless the class records its own.
+    void drawLegendIcon(QCPDrawContext& icon) const override { draw(icon); }
+
+    //! A setter's name for the content generation the layer needs.
+    void contentChanged() { markDirty(); }
 
     /*! Returns what this item occupies, in data coordinates, or none when a box cannot describe it.
 
-      The layer's spatial index skips the item in a frame or a hit test that cannot touch it. The box
-      must contain everything draw() paints and every point selectTest() can return a distance below
-      the selection tolerance for; \a pixelPad is the slack around it that pens, line endings and
-      other pixel-space growth need.
+      The layer's spatial index skips the item in a frame or a hit test that cannot touch it. The
+      box must contain everything draw() paints and every point selectTest() can return a distance
+      below the selection tolerance for; \a pixelPad is the slack around it that pens, line endings
+      and other pixel-space growth need.
 
-      A coordinate is boxed only when its position is a plot coordinate
-      (QCPItemPosition::ptPlotCoords) with no parent anchor on that axis; anything else (a ratio, a
-      pixel position, a position that follows another item) makes that side unbounded, and an item
-      unbounded on both axes is not indexed. The default returns none, so a user item is drawn and
-      tested exactly as before. */
-    [[nodiscard]] virtual std::optional<QCPItemExtent> dataExtent() const
-    {
-        return std::nullopt;
-    }
+      An item that records answers from its recording, once it has one: the box of what draw()
+      appended, made of data positions only. An item that does not record keeps the positions-based
+      answer of its subclass; the default here returns none, so a user item is drawn and tested
+      exactly as before. */
+    [[nodiscard]] virtual std::optional<QCPItemExtent> dataExtent() const;
 
     // Child slot in the owning layer, written when that layer rebuilds its index (QCPLayer).
     mutable int mItemSlot = -1;
@@ -305,7 +311,16 @@ protected:
     virtual QCP::Interaction selectionCategory() const override;
     virtual QRect clipRect() const override;
     virtual void applyDefaultAntialiasingHint(QCPPainter* painter) const override;
-    virtual void draw(QCPPainter* painter) override = 0;
+    //! Replays the recording: the default draw. An item that still paints through the old virtual
+    //! (lines, rects, spans...) overrides this and never records.
+    void draw(QCPPainter* painter) override;
+
+    //! What the core reads from this item this frame.
+    [[nodiscard]] QCPDrawnView view() const;
+
+    //! The recording, its keys and its caches.
+    mutable QCPDrawnCore mCore;
+
     void markFollowersDirty();
     bool mMarking = false;
     // The extent of these positions, or nullopt when they do not share one axis pair or when both
@@ -350,13 +365,14 @@ class QCPItemOps : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPItemOps<T>>>
     using Base = QCPLayerableOps<T, qcp::OpsRet<Self, QCPItemOps<T>>>;
 
 public:
-    using typename Base::Ret;
     using Base::Base;
+    using typename Base::Ret;
 
     Ret setClipToAxisRect(bool clip)
     {
         return this->apply([&](T& i) { i.setClipToAxisRect(clip); });
     }
+
     Ret setPen(const QPen& pen)
     {
         return this->apply([&](T& i) { i.setPen(pen); });

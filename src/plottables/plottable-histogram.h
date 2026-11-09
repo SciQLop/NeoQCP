@@ -17,7 +17,7 @@
 template <typename T, typename Self = void>
 class QCPHistogramOps;
 
-class QCP_LIB_DECL QCPHistogram : public QCPDrawn<QCPAbstractPlottable>
+class QCP_LIB_DECL QCPHistogram : public QCPAbstractPlottable
 {
     Q_OBJECT
 public:

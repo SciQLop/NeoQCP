@@ -37,7 +37,7 @@ class QCustomPlot;
 template <typename T, typename Self = void>
 class QCPItemTextOps;
 
-class QCP_LIB_DECL QCPItemText : public QCPDrawn<QCPAbstractItem>
+class QCP_LIB_DECL QCPItemText : public QCPAbstractItem
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES

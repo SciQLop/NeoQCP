@@ -170,7 +170,7 @@ using QCPBarsDataContainer = QCPDataContainer<QCPBarsData>;
 template <typename T, typename Self = void>
 class QCPBarsOps;
 
-class QCP_LIB_DECL QCPBars : public QCPDrawn<QCPAbstractPlottable1D<QCPBarsData>>
+class QCP_LIB_DECL QCPBars : public QCPAbstractPlottable1D<QCPBarsData>
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES

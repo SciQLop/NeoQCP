@@ -2430,10 +2430,10 @@ void Benchmark::QCPDrawContext_ReplayMarkers100k()
 namespace
 {
 //! A drawn item the benchmarks own: one bar, recorded through the new contract only.
-class BenchDrawnBar : public QCPDrawn<QCPAbstractItem>
+class BenchDrawnBar : public QCPAbstractItem
 {
 public:
-    BenchDrawnBar(QCustomPlot* plot, double key, double width) : QCPDrawn<QCPAbstractItem>(plot)
+    BenchDrawnBar(QCustomPlot* plot, double key, double width) : QCPAbstractItem(plot)
     {
         mAnchor = createPosition(QStringLiteral("anchor")); // the axes the replay maps through
         mAnchor->setCoords(key, 0);
@@ -2442,7 +2442,6 @@ public:
         mB = QCP::Data { key + width, 1.0 };
     }
 
-    using QCPDrawn<QCPAbstractItem>::draw;
 
     void draw(QCPDrawContext& context) const override
     {
@@ -2463,10 +2462,10 @@ void addDrawnBars(QCustomPlot* plot, int count, double xMax)
 }
 
 //! The same bars, but all of them recorded by ONE object: one recording, \a count commands.
-class BenchDrawnBarSet : public QCPDrawn<QCPAbstractItem>
+class BenchDrawnBarSet : public QCPAbstractItem
 {
 public:
-    BenchDrawnBarSet(QCustomPlot* plot, int count, double xMax) : QCPDrawn<QCPAbstractItem>(plot)
+    BenchDrawnBarSet(QCustomPlot* plot, int count, double xMax) : QCPAbstractItem(plot)
     {
         auto* anchor = createPosition(QStringLiteral("anchor"));
         anchor->setCoords(xMax / 2, 0);
@@ -2479,7 +2478,6 @@ public:
         }
     }
 
-    using QCPDrawn<QCPAbstractItem>::draw;
 
     void draw(QCPDrawContext& context) const override
     {

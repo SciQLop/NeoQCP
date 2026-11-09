@@ -82,4 +82,8 @@ private slots:
     void aResizeRecords();
     void aVerticalKeyAxisUsesTheSameKeyWindow();
     void aKeyWindowPanReusesTheKeptGeometry();
+
+    void aPlottableRecordsWithoutTheAdapter();
+    void anItemRecordsWithoutTheAdapter();
+    void aStyleSetterReRecords();
 };

@@ -6,8 +6,8 @@
 #include <painting/command-replay-rhi.h>
 #include <painting/draw-context.h>
 #include <painting/line-extruder.h>
-#include <plottables/plottable-draw-utils.h>
 #include <painting/plottable-rhi-layer.h>
+#include <plottables/plottable-draw-utils.h>
 #include <qcustomplot.h>
 
 #include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
@@ -49,10 +49,10 @@ void countAxisMessages(QtMsgType type, const QMessageLogContext& context, const 
 }
 
 //! A drawn item: one polygon and, when asked, a text or a painter() escape hatch.
-class TestShape : public QCPDrawn<QCPAbstractItem>
+class TestShape : public QCPAbstractItem
 {
 public:
-    explicit TestShape(QCustomPlot* plot) : QCPDrawn<QCPAbstractItem>(plot)
+    explicit TestShape(QCustomPlot* plot) : QCPAbstractItem(plot)
     {
         mAnchor = createPosition(QStringLiteral("anchor"));
         mAnchor->setCoords(3, 3);
@@ -62,7 +62,6 @@ public:
 
     // The old painter virtual is final in the adapter: keep it visible so overriding the new
     // draw() does not hide it (-Woverloaded-virtual).
-    using QCPDrawn<QCPAbstractItem>::draw;
 
     enum Mode
     {
@@ -89,7 +88,7 @@ public:
     void markDirty() override
     {
         ++dirtyCalls;
-        QCPDrawn<QCPAbstractItem>::markDirty();
+        QCPAbstractItem::markDirty();
     }
 
     void draw(QCPDrawContext& context) const override
@@ -310,16 +309,15 @@ public:
 };
 
 //! A drawn plottable: one data-space line, so the default icon has something to fit.
-class TestLine : public QCPDrawn<QCPAbstractPlottable>
+class TestLine : public QCPAbstractPlottable
 {
 public:
     TestLine(QCPAxis* keyAxis, QCPAxis* valueAxis)
-            : QCPDrawn<QCPAbstractPlottable>(keyAxis, valueAxis)
+            : QCPAbstractPlottable(keyAxis, valueAxis)
     {
     }
 
-    using QCPDrawn<QCPAbstractPlottable>::draw;
-    using QCPDrawn<QCPAbstractPlottable>::drawLegendIcon; // the painter overload stays reachable
+    using QCPAbstractPlottable::drawLegendIcon; // the painter overload stays reachable
 
     void draw(QCPDrawContext& context) const override
     {
@@ -370,16 +368,15 @@ public:
 };
 
 //! A drawn plottable whose legend icon calls a setter: a misuse, like contentChanged() in draw().
-class TestIconSetter : public QCPDrawn<QCPAbstractPlottable>
+class TestIconSetter : public QCPAbstractPlottable
 {
 public:
     TestIconSetter(QCPAxis* keyAxis, QCPAxis* valueAxis)
-            : QCPDrawn<QCPAbstractPlottable>(keyAxis, valueAxis)
+            : QCPAbstractPlottable(keyAxis, valueAxis)
     {
     }
 
-    using QCPDrawn<QCPAbstractPlottable>::draw;
-    using QCPDrawn<QCPAbstractPlottable>::drawLegendIcon; // the painter overload stays reachable
+    using QCPAbstractPlottable::drawLegendIcon; // the painter overload stays reachable
 
     void draw(QCPDrawContext& context) const override
     {
@@ -402,6 +399,71 @@ public:
     std::shared_ptr<const std::vector<QPointF>> mLine
         = std::make_shared<const std::vector<QPointF>>(
             std::initializer_list<QPointF> { { 1, 1 }, { 9, 9 } });
+};
+
+//! A plottable with nothing but a recording: the base answers every old virtual from it.
+class BareLine : public QCPAbstractPlottable1D<QCPGraphData>
+{
+public:
+    BareLine(QCPAxis* keyAxis, QCPAxis* valueAxis)
+            : QCPAbstractPlottable1D<QCPGraphData>(keyAxis, valueAxis)
+    {
+    }
+
+    void draw(QCPDrawContext& context) const override
+    {
+        ++drawCalls;
+        context.polyline(mLine, this->pen());
+    }
+
+    //! The old virtual the legend calls, which the base now answers from the recording.
+    void paintIcon(QCPPainter* painter, const QRectF& rect) const { drawLegendIcon(painter, rect); }
+
+    int recordings() const { return mCore.recordingCount(); }
+
+    int recordedCommands() const { return mCore.recordedCommandCount(); }
+
+    mutable int drawCalls = 0;
+    std::shared_ptr<const std::vector<QPointF>> mLine
+        = std::make_shared<const std::vector<QPointF>>(
+            std::initializer_list<QPointF> { { 1, 1 }, { 9, 9 } });
+};
+
+//! An item with nothing but a recording: the base owns the recording the same way.
+class BareShape : public QCPAbstractItem
+{
+public:
+    explicit BareShape(QCustomPlot* plot) : QCPAbstractItem(plot)
+    {
+        mAnchor = createPosition(QStringLiteral("anchor"));
+        mAnchor->setCoords(5, 5);
+        setClipAxisRect(plot->axisRect());
+    }
+
+    void draw(QCPDrawContext& context) const override
+    {
+        ++drawCalls;
+        context.polyline(mLine, QPen(Qt::black, 2));
+    }
+
+    int recordings() const { return mCore.recordingCount(); }
+
+    int recordedCommands() const { return mCore.recordedCommandCount(); }
+
+    mutable int drawCalls = 0;
+    QCPItemPosition* mAnchor = nullptr;
+    std::shared_ptr<const std::vector<QPointF>> mLine
+        = std::make_shared<const std::vector<QPointF>>(
+            std::initializer_list<QPointF> { { 1, 1 }, { 9, 9 } });
+};
+
+//! Bars with their recording count exposed: a style setter must make the recording stale.
+class CountingBars : public QCPBars
+{
+public:
+    using QCPBars::QCPBars;
+
+    int recordings() const { return mCore.recordingCount(); }
 };
 
 struct Fixture
@@ -2136,4 +2198,57 @@ void TestDrawable::aKeyWindowPanReusesTheKeptGeometry()
     f.plot->replot();
     QCOMPARE(shape->drawCalls, 1);
     QCOMPARE(QCPLineExtruder::extruderCallCount(), extruded);
+}
+
+void TestDrawable::aPlottableRecordsWithoutTheAdapter()
+{
+    // The base owns the recording: a plottable that overrides only draw(QCPDrawContext&) records,
+    // hit-tests and draws its legend icon without any adapter in between.
+    Fixture f;
+    auto* line = new BareLine(f.plot->xAxis, f.plot->yAxis);
+    QCOMPARE(line->recordings(), 0); // nothing recorded before the first frame
+    f.plot->replot();
+    QCOMPARE(line->recordings(), 1);
+    QCOMPARE(line->recordedCommands(), 1);
+    QCOMPARE(line->drawCalls, 1);
+
+    const QPointF onTheLine(f.plot->xAxis->coordToPixel(5), f.plot->yAxis->coordToPixel(5));
+    QVERIFY2(line->selectTest(onTheLine, false) < 1.0, "the recorded line is not hittable");
+
+    const QRectF icon(0, 0, 100, 50);
+    QImage image(100, 50, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::white);
+    QCPPainter painter(&image);
+    line->paintIcon(&painter, icon);
+    painter.end();
+    QVERIFY2(image.pixelColor(50, 25).lightness() < 200, "the legend icon is blank");
+}
+
+void TestDrawable::anItemRecordsWithoutTheAdapter()
+{
+    Fixture f;
+    auto* shape = new BareShape(f.plot.get());
+    QCOMPARE(shape->recordings(), 0);
+    f.plot->replot();
+    QCOMPARE(shape->recordings(), 1);
+    QCOMPARE(shape->recordedCommands(), 1);
+    QCOMPARE(shape->drawCalls, 1);
+
+    const QPointF onTheLine(f.plot->xAxis->coordToPixel(5), f.plot->yAxis->coordToPixel(5));
+    QVERIFY2(shape->selectTest(onTheLine, false) < 1.0, "the recorded item is not hittable");
+}
+
+void TestDrawable::aStyleSetterReRecords()
+{
+    // setPen is a content change: the recording is remade, not replayed in the old colour.
+    Fixture f;
+    auto* bars = new CountingBars(f.plot->xAxis, f.plot->yAxis);
+    bars->setData(QVector<double> { 5 }, QVector<double> { 4 });
+    f.plot->replot();
+    const int before = bars->recordings();
+    QCOMPARE(before, 1);
+
+    bars->setPen(QPen(Qt::red));
+    f.plot->replot();
+    QCOMPARE(bars->recordings(), before + 1);
 }

@@ -10,7 +10,7 @@
 #include <Profiling.hpp>
 
 QCPHistogram2D::QCPHistogram2D(QCPAxis* keyAxis, QCPAxis* valueAxis)
-    : QCPDrawn<QCPAbstractColorMapped>(keyAxis, valueAxis, true)
+    : QCPAbstractColorMapped(keyAxis, valueAxis, true)
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
     , mRenderer(this)
 {

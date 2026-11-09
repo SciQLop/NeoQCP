@@ -20,7 +20,7 @@ class TestPipeline;
 template <typename T, typename Self = void>
 class QCPHistogram2DOps;
 
-class QCP_LIB_DECL QCPHistogram2D : public QCPDrawn<QCPAbstractColorMapped>
+class QCP_LIB_DECL QCPHistogram2D : public QCPAbstractColorMapped
 {
     Q_OBJECT
     friend class TestColorMap;
@@ -110,7 +110,7 @@ public:
     [[nodiscard]] const void* dataSourceIdentity() const override { return mDataSource.get(); }
     //! An export bins synchronously, so the screen and export recordings differ.
     [[nodiscard]] bool resolvesForTheExport() const override { return true; }
-    using QCPDrawn<QCPAbstractColorMapped>::drawLegendIcon;
+    using QCPAbstractColorMapped::drawLegendIcon;
 public Q_SLOTS:
     double selectTest(const QPointF& pos, bool onlySelectable, QVariant* details = nullptr) const override;
     QCPRange getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth) const override;

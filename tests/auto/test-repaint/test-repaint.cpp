@@ -3045,17 +3045,16 @@ namespace
 {
 // Three overlapping "bars" as one recording: their fills and outlines are six commands, so the
 // merge has to keep the order the painter would have used.
-class OverlappingBars : public QCPDrawn<QCPAbstractItem>
+class OverlappingBars : public QCPAbstractItem
 {
 public:
-    explicit OverlappingBars(QCustomPlot* plot) : QCPDrawn<QCPAbstractItem>(plot)
+    explicit OverlappingBars(QCustomPlot* plot) : QCPAbstractItem(plot)
     {
         setClipAxisRect(plot->axisRect());
         // An item with no position reports no extent, and the index then never asks it to draw.
         createPosition(QStringLiteral("anchor"))->setCoords(45, 100);
     }
 
-    using QCPDrawn<QCPAbstractItem>::draw;
 
     void draw(QCPDrawContext& context) const override
     {
@@ -3677,12 +3676,12 @@ bool pureBlue(const QColor& colour)
 
 //! An item whose whole recording is one image command: the plot's own replays then carry it, on
 //! screen and in an export, exactly as a plottable's recording would.
-class ImageItem : public QCPDrawn<QCPAbstractItem>
+class ImageItem : public QCPAbstractItem
 {
 public:
     ImageItem(QCustomPlot* plot, const QCP::Position& a, const QCP::Position& b,
               const QImage& image, const QRectF& source = { }, bool smooth = false)
-            : QCPDrawn<QCPAbstractItem>(plot)
+            : QCPAbstractItem(plot)
             , m_a(a)
             , m_b(b)
             , m_image(image)
@@ -3694,7 +3693,6 @@ public:
         createPosition(QStringLiteral("anchor"))->setCoords(45, 100);
     }
 
-    using QCPDrawn<QCPAbstractItem>::draw;
 
     void draw(QCPDrawContext& context) const override
     {

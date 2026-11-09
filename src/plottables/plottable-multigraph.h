@@ -26,7 +26,7 @@ class QCPPlottableRhiLayer;
 template <typename T, typename Self = void>
 class QCPMultiGraphOps;
 
-class QCP_LIB_DECL QCPMultiGraph : public QCPDrawn<QCPAbstractLine>, public QCPPlottableInterface1D
+class QCP_LIB_DECL QCPMultiGraph : public QCPAbstractLine, public QCPPlottableInterface1D
 {
     Q_OBJECT
 public:
@@ -171,7 +171,7 @@ protected:
     //! Without a finished resample an export resamples on the spot: the two recordings differ.
     bool resolvesForTheExport() const override { return true; }
 
-    using QCPDrawn<QCPAbstractLine>::drawLegendIcon;
+    using QCPAbstractLine::drawLegendIcon;
     void drawLegendIcon(QCPDrawContext& icon) const override;
     void axesChanged() override { followAxes(); }
 

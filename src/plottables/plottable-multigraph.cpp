@@ -21,7 +21,7 @@
 #include <utility>
 
 QCPMultiGraph::QCPMultiGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPDrawn<QCPAbstractLine>(keyAxis, valueAxis)
+        : QCPAbstractLine(keyAxis, valueAxis)
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
 {
     // Base constructor auto-adds a QCPPlottableLegendItem (vtable not yet set up

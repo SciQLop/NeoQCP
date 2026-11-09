@@ -21,7 +21,7 @@ public:
   const QCPDrawList& recording() const { return mCore.recordedList(); }
 
   int polylineNaNs() const { return mCore.recordedPolylineNaNs(); }
-  using QCPDrawn<QCPAbstractPlottable1D<QCPCurveData, QCPAbstractLine>>::drawLegendIcon;
+  using QCPAbstractPlottable1D<QCPCurveData, QCPAbstractLine>::drawLegendIcon;
 };
 
 InspectableCurve* inspectable(QCPCurve* curve)

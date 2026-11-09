@@ -70,14 +70,16 @@ public:
     [[nodiscard]] virtual QCPRange dataValueRange(int index) const override;
     [[nodiscard]] virtual QPointF dataPixelPosition(int index) const override;
     [[nodiscard]] virtual bool sortKeyIsMainKey() const override;
-    virtual QCPDataSelection selectTestRect(const QRectF& rect,
-                                            bool onlySelectable) const override;
+    virtual QCPDataSelection selectTestRect(const QRectF& rect, bool onlySelectable) const override;
     [[nodiscard]] virtual int findBegin(double sortKey, bool expandedRange = true) const override;
     [[nodiscard]] virtual int findEnd(double sortKey, bool expandedRange = true) const override;
 
     // reimplemented virtual methods:
-    virtual double selectTest(const QPointF& pos, bool onlySelectable,
-                              QVariant* details = nullptr) const override;
+    //! The data container the recording was made from: a new pointer makes the recording stale.
+    [[nodiscard]] const void* dataSourceIdentity() const override { return mDataContainer.get(); }
+
+    //! The container's revision: a setter that only fills it still makes the recording stale.
+    [[nodiscard]] quint64 dependencyRevision() const override { return mDataContainer->revision(); }
 
     virtual QCPPlottableInterface1D* interface1D() override { return this; }
 
@@ -267,10 +269,10 @@ private:
   draw selected segments with a different pen/brush than unselected segments (also see \ref
   QCPSelectionDecorator).
 
-  This class implements basic functionality of \ref QCPAbstractPlottable::selectTest and \ref
-  QCPPlottableInterface1D::selectTestRect, assuming point-like data points, based on the 1D data
-  interface. In spite of that, most plottable subclasses will want to reimplement those methods
-  again, to provide a more accurate hit test based on their specific data visualization geometry.
+  This class implements \ref QCPPlottableInterface1D::selectTestRect, assuming point-like data
+  points, based on the 1D data interface, and hands the base its data source and revision for the
+  recording. Most plottable subclasses will want to reimplement selectTest, to provide a more
+  accurate hit test based on their specific data visualization geometry.
 */
 
 /* start documentation of inline functions */
@@ -290,8 +292,7 @@ private:
   "QCPAbstractPlottable" constructor and allocates the \a mDataContainer.
 */
 template <class DataType, class Base>
-QCPAbstractPlottable1D<DataType, Base>::QCPAbstractPlottable1D(QCPAxis* keyAxis,
-                                                               QCPAxis* valueAxis)
+QCPAbstractPlottable1D<DataType, Base>::QCPAbstractPlottable1D(QCPAxis* keyAxis, QCPAxis* valueAxis)
         : Base(keyAxis, valueAxis), mDataContainer(new QCPDataContainer<DataType>)
 {
 }
@@ -316,7 +317,8 @@ int QCPAbstractPlottable1D<DataType, Base>::dataCount() const
 template <class DataType, class Base>
 double QCPAbstractPlottable1D<DataType, Base>::dataMainKey(int index) const
 {
-    if (auto* d = dataAt(index)) return d->mainKey();
+    if (auto* d = dataAt(index))
+        return d->mainKey();
     return 0;
 }
 
@@ -326,7 +328,8 @@ double QCPAbstractPlottable1D<DataType, Base>::dataMainKey(int index) const
 template <class DataType, class Base>
 double QCPAbstractPlottable1D<DataType, Base>::dataSortKey(int index) const
 {
-    if (auto* d = dataAt(index)) return d->sortKey();
+    if (auto* d = dataAt(index))
+        return d->sortKey();
     return 0;
 }
 
@@ -336,7 +339,8 @@ double QCPAbstractPlottable1D<DataType, Base>::dataSortKey(int index) const
 template <class DataType, class Base>
 double QCPAbstractPlottable1D<DataType, Base>::dataMainValue(int index) const
 {
-    if (auto* d = dataAt(index)) return d->mainValue();
+    if (auto* d = dataAt(index))
+        return d->mainValue();
     return 0;
 }
 
@@ -346,7 +350,8 @@ double QCPAbstractPlottable1D<DataType, Base>::dataMainValue(int index) const
 template <class DataType, class Base>
 QCPRange QCPAbstractPlottable1D<DataType, Base>::dataValueRange(int index) const
 {
-    if (auto* d = dataAt(index)) return d->valueRange();
+    if (auto* d = dataAt(index))
+        return d->valueRange();
     return QCPRange(0, 0);
 }
 
@@ -356,7 +361,8 @@ QCPRange QCPAbstractPlottable1D<DataType, Base>::dataValueRange(int index) const
 template <class DataType, class Base>
 QPointF QCPAbstractPlottable1D<DataType, Base>::dataPixelPosition(int index) const
 {
-    if (auto* d = dataAt(index)) return this->coordsToPixels(d->mainKey(), d->mainValue());
+    if (auto* d = dataAt(index))
+        return this->coordsToPixels(d->mainKey(), d->mainValue());
     return QPointF();
 }
 
@@ -378,7 +384,7 @@ bool QCPAbstractPlottable1D<DataType, Base>::sortKeyIsMainKey() const
 */
 template <class DataType, class Base>
 QCPDataSelection QCPAbstractPlottable1D<DataType, Base>::selectTestRect(const QRectF& rect,
-                                                                  bool onlySelectable) const
+                                                                        bool onlySelectable) const
 {
     QCPDataSelection result;
     if ((onlySelectable && this->mSelectable == QCP::stNone) || mDataContainer->isEmpty())
@@ -408,8 +414,8 @@ QCPDataSelection QCPAbstractPlottable1D<DataType, Base>::selectTestRect(const QR
     int currentSegmentBegin = -1;
     for (auto it = begin; it != end; ++it)
     {
-        const bool inRect = valueRange.contains(it->mainValue())
-                            && keyRange.contains(it->mainKey());
+        const bool inRect
+            = valueRange.contains(it->mainValue()) && keyRange.contains(it->mainKey());
         const int idx = int(it - mDataContainer->constBegin());
         if (currentSegmentBegin == -1 && inRect)
             currentSegmentBegin = idx;
@@ -447,79 +453,6 @@ int QCPAbstractPlottable1D<DataType, Base>::findEnd(double sortKey, bool expande
 }
 
 /*!
-  Implements a point-selection algorithm assuming the data (accessed via the 1D data interface) is
-  point-like. Most subclasses will want to reimplement this method again, to provide a more
-  accurate hit test based on the true data visualization geometry.
-
-  If \a details is not 0, it will be set to a \ref QCPDataSelection, describing the closest data
-  point to \a pos.
-
-  \seebaseclassmethod
-*/
-template <class DataType, class Base>
-double QCPAbstractPlottable1D<DataType, Base>::selectTest(const QPointF& pos, bool onlySelectable,
-                                                    QVariant* details) const
-{
-    if ((onlySelectable && this->mSelectable == QCP::stNone) || mDataContainer->isEmpty())
-        return -1;
-    if (!this->mKeyAxis || !this->mValueAxis)
-        return -1;
-
-    QCPDataSelection selectionResult;
-    double minDistSqr = (std::numeric_limits<double>::max)();
-    int minDistIndex = mDataContainer->size();
-
-    auto begin = mDataContainer->constBegin();
-    auto end = mDataContainer->constEnd();
-    if (DataType::sortKeyIsMainKey()) // we can assume that data is sorted by main key, so can
-                                      // reduce the searched key interval:
-    {
-        // determine which key range comes into question, taking selection tolerance around pos into
-        // account:
-        double posKeyMin, posKeyMax, dummy;
-        this->pixelsToCoords(
-            pos - QPointF(this->mParentPlot->selectionTolerance(), this->mParentPlot->selectionTolerance()),
-            posKeyMin, dummy);
-        this->pixelsToCoords(
-            pos + QPointF(this->mParentPlot->selectionTolerance(), this->mParentPlot->selectionTolerance()),
-            posKeyMax, dummy);
-        if (posKeyMin > posKeyMax)
-            qSwap(posKeyMin, posKeyMax);
-        begin = mDataContainer->findBegin(posKeyMin, true);
-        end = mDataContainer->findEnd(posKeyMax, true);
-    }
-    if (begin == end)
-        return -1;
-    QCPRange keyRange(this->mKeyAxis->range());
-    QCPRange valueRange(this->mValueAxis->range());
-    for (auto it = begin; it != end; ++it)
-    {
-        const double mainKey = it->mainKey();
-        const double mainValue = it->mainValue();
-        if (keyRange.contains(mainKey)
-            && valueRange.contains(
-                mainValue)) // make sure data point is inside visible range, for speedup in cases
-                            // where sort key isn't main key and we iterate over all points
-        {
-            const double currentDistSqr
-                = QCPVector2D(this->coordsToPixels(mainKey, mainValue) - pos).lengthSquared();
-            if (currentDistSqr < minDistSqr)
-            {
-                minDistSqr = currentDistSqr;
-                minDistIndex = int(it - mDataContainer->constBegin());
-            }
-        }
-    }
-    if (minDistIndex != mDataContainer->size())
-        selectionResult.addDataRange(QCPDataRange(minDistIndex, minDistIndex + 1), false);
-
-    selectionResult.simplify();
-    if (details)
-        details->setValue(selectionResult);
-    return qSqrt(minDistSqr);
-}
-
-/*!
   Splits all data into selected and unselected segments and outputs them via \a selectedSegments
   and \a unselectedSegments, respectively.
 
@@ -536,7 +469,7 @@ void QCPAbstractPlottable1D<DataType, Base>::getDataSegments(
     selectedSegments.clear();
     unselectedSegments.clear();
     if (this->mSelectable == QCP::stWhole) // stWhole selection type draws the entire plottable with
-                                     // selected style if this->mSelection isn't empty
+                                           // selected style if this->mSelection isn't empty
     {
         if (this->selected())
             selectedSegments << QCPDataRange(0, dataCount());
@@ -564,7 +497,7 @@ void QCPAbstractPlottable1D<DataType, Base>::getDataSegments(
 */
 template <class DataType, class Base>
 void QCPAbstractPlottable1D<DataType, Base>::drawPolyline(QCPPainter* painter,
-                                                    const QVector<QPointF>& lineData) const
+                                                          const QVector<QPointF>& lineData) const
 {
     // GPU rendering path: extrude the polyline into triangles, dashed or solid.
     if (qcp::strokePolylineOnGpu(painter, this->mParentPlot, this->mLayer,
@@ -586,8 +519,7 @@ void QCPAbstractPlottable1D<DataType, Base>::drawPolyline(QCPPainter* painter,
 
     // if drawing solid line and not in PDF, use much faster line drawing instead of polyline:
     if (this->mParentPlot->plottingHints().testFlag(QCP::phFastPolylines)
-        && painter->pen().style() == Qt::SolidLine
-        && !painter->isExporting())
+        && painter->pen().style() == Qt::SolidLine && !painter->isExporting())
     {
         int i = 0;
         bool lastIsNan = false;

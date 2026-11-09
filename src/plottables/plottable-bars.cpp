@@ -536,7 +536,7 @@ QCPBarsData::QCPBarsData(double key, double value) : key(key), value(value) { }
   but use QCustomPlot::removePlottable() instead.
 */
 QCPBars::QCPBars(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPDrawn<QCPAbstractPlottable1D<QCPBarsData>>(keyAxis, valueAxis)
+        : QCPAbstractPlottable1D<QCPBarsData>(keyAxis, valueAxis)
         , mWidth(0.75)
         , mWidthType(wtPlotCoords)
         , mBarsGroup(nullptr)
@@ -1081,7 +1081,7 @@ bool QCPBars::hasPixelGeometry() const
 
 quint64 QCPBars::dependencyRevision() const
 {
-    quint64 key = QCPDrawn<QCPAbstractPlottable1D<QCPBarsData>>::dependencyRevision();
+    quint64 key = QCPAbstractPlottable1D<QCPBarsData>::dependencyRevision();
     // simplify: every bar of a stack walks the whole stack below it, and a check round asks each of
     // them (stallOffset per plottable, then ensureRecording per paint), so the round costs
     // O(depth^2) - 20k virtual calls for a 200-bar stack, twice a pan frame. A per-frame cache is

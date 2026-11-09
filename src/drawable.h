@@ -1,23 +1,22 @@
 #pragma once
 
-// The drawing contract (QCPDrawable) and its adapter QCPDrawn<Base>: a ported class keeps its old
-// base (data, groups, legend, selection) and the adapter answers the old drawing virtuals from the
-// new ones. Library-private; milestone 4 folds the adapter into the bases.
+// The drawing contract (QCPDrawable) and the core that keeps one recording per object.
+// QCPAbstractPlottable and QCPAbstractItem derive from the contract and answer the old drawing
+// virtuals from the recording. Library-private.
 
+#include "axis/range.h"
 #include "coords.h"
-#include "core.h"
 #include "global.h"
-#include "items/item.h"
-#include "plottables/plottable.h"
 #include "spatial-index.h"
 
 #include <QRect>
 #include <memory>
 #include <optional>
-#include <type_traits>
 
 class QCPAxis;
 class QCPAxisRect;
+class QCPAbstractItem;
+class QCPAbstractPlottable;
 class QCPDrawContext;
 struct QCPDrawList;
 class QCPLayer;
@@ -46,10 +45,20 @@ struct QCP_LIB_DECL QCPDrawnView
     bool exporting = false;
 };
 
+//! What an item occupies, for the layer's spatial index: the data box of its recording on one axis
+//! pair, plus the pixels its drawing may add around it (pens, line endings, a bracket's arms).
+struct QCP_LIB_DECL QCPItemExtent
+{
+    QCPAxis* keyAxis = nullptr;
+    QCPAxis* valueAxis = nullptr;
+    QCPDataBox box { };
+    double pixelPad = 0.0;
+};
+
 /*!
   \brief The drawing contract: \a draw records, the three others default to the recording.
 
-  A recording is transform independent; a replay is not. The adapter keeps one recording per object
+  A recording is transform independent; a replay is not. The core keeps one recording per object
   and re-makes it only when the object says it changed (contentChanged) or when the view changed
   and the recording contains view-dependent commands.
 */
@@ -85,11 +94,12 @@ public:
 };
 
 /*!
-  \brief Everything a \ref QCPDrawn keeps between frames: the recording, its keys and the caches.
+  \brief Everything a plottable or an item keeps between frames: the recording, its keys and the
+  caches.
 
-  One per object, non-template so the template above it stays thin: the recording itself, the
-  (generation, view epoch) pair it was made under, the resolve cache, the raster fallback, the
-  per-command extruded vertices, and the guard that catches a setter called from inside draw().
+  One per object, non-template so the bases stay thin: the recording itself, the (generation, view
+  epoch) pair it was made under, the resolve cache, the raster fallback, the per-command extruded
+  vertices, and the guard that catches a setter called from inside draw().
 */
 class QCP_LIB_DECL QCPDrawnCore
 {
@@ -206,181 +216,3 @@ enum class QCPDrawnSide
 //! False when \a pos is outside \a plottable's axis rect and the plot did not opt in.
 [[nodiscard]] QCP_LIB_DECL bool qcpDrawnClickInsideAxisRect(const QCPAbstractPlottable& plottable,
                                                             const QPointF& pos);
-
-/*!
-  \brief The non-template half of an adapter: the contract's methods, answered from the recording.
-
-  Only \a view() waits for the base, because only the base knows where its axes, its clip and its
-  selection rule are.
-*/
-class QCP_LIB_DECL QCPDrawnAdapter : public QCPDrawable
-{
-public:
-    std::optional<QCPDataBox> drawnDataRange() const override
-    {
-        return mCore.dataRange(*this, view());
-    }
-
-    std::optional<double> hitTest(QCP::Pixels at, QVariant* details) const override
-    {
-        return mCore.hitTest(*this, at, details, view());
-    }
-
-    //! The default icon is the object's own drawing; an override records a summary instead.
-    void drawLegendIcon(QCPDrawContext& icon) const override { draw(icon); }
-
-protected:
-    //! What the core reads from the object this frame.
-    [[nodiscard]] virtual QCPDrawnView view() const = 0;
-
-    mutable QCPDrawnCore mCore;
-};
-
-/*!
-  \brief The common part of an adapter: what needs \a Base, which is the old virtuals and the
-  setter.
-*/
-template <typename Base>
-class QCPDrawnBase : public Base, public QCPDrawnAdapter
-{
-public:
-    using Base::Base;
-
-    //! The setter rule: a new generation, then the layer mark the base needs.
-    //!
-    //! This is the layerable markDirty the old bases call from their setters (setPen, setCoords,
-    //! setSelected, ...). A pan or a zoom never reaches it, so a range change still reuses the
-    //! recording.
-    void markDirty() override
-    {
-        if (mCore.contentChanged())
-            Base::markDirty();
-    }
-
-    //! The adapter's own name for the same thing.
-    void contentChanged() { markDirty(); }
-
-    using QCPDrawable::draw; // keep draw(QCPDrawContext&) reachable from this class
-
-    //! The base's public virtual, answered from the object's own hit test.
-    double selectTest(const QPointF& pos, bool onlySelectable,
-                      QVariant* details = nullptr) const override
-    {
-        return mCore.selectTest(*this, pos, onlySelectable, details, view());
-    }
-
-protected:
-    void draw(QCPPainter* painter) final { mCore.paint(*this, *painter, view()); }
-
-    //! This frame's view: the clip comes from here, since the bases keep clipRect() protected.
-    [[nodiscard]] QCPDrawnView view() const override
-    {
-        return qcpDrawnViewOf(*this, this->clipRect());
-    }
-};
-
-//! A drawn plottable: the recording answers its two ranges and its legend icon.
-template <typename Base>
-class QCPDrawnPlottable : public QCPDrawnBase<Base>
-{
-public:
-    using QCPDrawnBase<Base>::QCPDrawnBase;
-
-    //! The data container the recording read, when the base has one.
-    [[nodiscard]] const void* dataSourceIdentity() const override
-    {
-        if constexpr (requires { this->mDataContainer.get(); })
-            return this->mDataContainer.get();
-        else
-            return nullptr;
-    }
-
-    //! The container's revision: a setter that only fills the container still makes a stale record.
-    [[nodiscard]] quint64 dependencyRevision() const override
-    {
-        if constexpr (requires { this->mDataContainer->revision(); })
-            return this->mDataContainer->revision();
-        else
-            return 0;
-    }
-
-public:
-    // The bases declare these public; re-declaring them under another access would hide them from
-    // name lookup, so a user's `bars->selectTest(...)` and `band->getKeyRange(...)` stop compiling.
-    //! A hit hands selectEvent a selection covering the whole recording.
-    //!
-    //! The recording has no per-point index to hand out: selectEvent only needs a non-empty
-    //! QCPDataSelection, and without one it sets an empty selection and the click selects nothing.
-    double selectTest(const QPointF& pos, bool onlySelectable,
-                      QVariant* details = nullptr) const override
-    {
-        // Built-in plottables miss outside the axis rect unless the plot opts in: their geometry
-        // may still be painted there (an unclipped plottable), but a click does not grab it.
-        if (!qcpDrawnClickInsideAxisRect(*this, pos))
-            return -1;
-
-        const double hit = QCPDrawnBase<Base>::selectTest(pos, onlySelectable, details);
-        if (hit < 0 || !details)
-            return hit;
-        if (details->isValid() && !details->value<QCPDataSelection>().isEmpty())
-            return hit;
-        int count = 1;
-        if constexpr (requires { this->dataCount(); })
-            count = this->dataCount();
-        *details = QVariant::fromValue(QCPDataSelection(QCPDataRange(0, count)));
-        return hit;
-    }
-
-    //! A recording that is one piece in data space lets its layer shift instead of repaint.
-    QPointF stallPixelOffset() const override
-    {
-        return this->mCore.stallOffset(*this, this->view());
-    }
-
-public:
-    QCPRange getKeyRange(bool& foundRange,
-                         QCP::SignDomain inSignDomain = QCP::sdBoth) const override
-    {
-        return qcpDrawnRange(this->mCore.dataRange(*this, this->view(), false), QCPDrawnSide::Key,
-                             foundRange, inSignDomain);
-    }
-
-    QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth,
-                           const QCPRange& inKeyRange = QCPRange()) const override
-    {
-        Q_UNUSED(inKeyRange) // simplify: a box keeps no per-key values, so it cannot be narrowed
-        return qcpDrawnRange(this->mCore.dataRange(*this, this->view(), false), QCPDrawnSide::Value,
-                             foundRange, inSignDomain);
-    }
-
-protected:
-    using QCPDrawnAdapter::drawLegendIcon; // the contract's icon stays reachable
-
-    void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override
-    {
-        this->mCore.paintIcon(*this, *painter, rect, this->view());
-    }
-};
-
-//! A drawn item: the recording answers its extent.
-template <typename Base>
-class QCPDrawnItem : public QCPDrawnBase<Base>
-{
-public:
-    using QCPDrawnBase<Base>::QCPDrawnBase;
-
-protected:
-    std::optional<QCPItemExtent> dataExtent() const override
-    {
-        return this->mCore.dataExtent(*this, this->view());
-    }
-};
-
-/*!
-  \brief What a ported class derives from: \a Base is QCPAbstractPlottable, a
-  QCPAbstractPlottable1D<T> or QCPAbstractItem, and the adapter adds the virtuals that base actually
-  declares.
-*/
-template <typename Base>
-using QCPDrawn = std::conditional_t<std::is_base_of_v<QCPAbstractItem, Base>, QCPDrawnItem<Base>,
-                                    QCPDrawnPlottable<Base>>;

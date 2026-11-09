@@ -20,7 +20,7 @@ struct Probe : QCPHistogram
 {
     using QCPHistogram::QCPHistogram;
     using QCPHistogram::canProduceContent;
-    void paintOn(QCPPainter* painter) { QCPDrawnBase<QCPAbstractPlottable>::draw(painter); }
+    void paintOn(QCPPainter* painter) { QCPAbstractPlottable::draw(painter); }
     [[nodiscard]] const QCPDrawnCore& core() const { return mCore; }
 };
 

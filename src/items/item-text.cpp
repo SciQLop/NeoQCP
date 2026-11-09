@@ -54,7 +54,7 @@
   ownership of the item, so do not delete it manually but use QCustomPlot::removeItem() instead.
 */
 QCPItemText::QCPItemText(QCustomPlot* parentPlot)
-        : QCPDrawn<QCPAbstractItem>(parentPlot)
+        : QCPAbstractItem(parentPlot)
         , position(createPosition(QLatin1String("position")))
         , topLeft(createAnchor(QLatin1String("topLeft"), aiTopLeft))
         , top(createAnchor(QLatin1String("top"), aiTop))

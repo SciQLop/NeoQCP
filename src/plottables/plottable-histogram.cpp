@@ -70,7 +70,7 @@ double largest(const std::vector<std::vector<double>>& heights)
 } // namespace
 
 QCPHistogram::QCPHistogram(QCPAxis* keyAxis, QCPAxis* valueAxis)
-    : QCPDrawn<QCPAbstractPlottable>(keyAxis, valueAxis)
+    : QCPAbstractPlottable(keyAxis, valueAxis)
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
 {
     installTransform();

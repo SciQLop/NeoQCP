@@ -15,7 +15,7 @@
 #include <cmath>
 
 QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
-    : QCPDrawn<QCPAbstractColorMapped>(keyAxis, valueAxis, true)
+    : QCPAbstractColorMapped(keyAxis, valueAxis, true)
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
     , mRenderer(this)
 {

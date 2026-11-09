@@ -29,10 +29,10 @@
 #include "core.h"
 #include "layoutelements/layoutelement-axisrect.h"
 #include "layoutelements/layoutelement-legend-group.h"
-#include "plottable-multigraph.h"
 #include "layoutelements/layoutelement-legend.h"
 #include "misuse.h"
 #include "painting/painter.h"
+#include "plottable-multigraph.h"
 #include "theme.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -85,7 +85,8 @@ void QCPSelectionDecorator::setPen(const QPen& pen)
 {
     mPen = pen;
     if (mPlottable)
-        mPlottable->markDirty(); // the decorator paints through the plottable, which records its look
+        mPlottable
+            ->markDirty(); // the decorator paints through the plottable, which records its look
 }
 
 /*!
@@ -346,9 +347,9 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
 */
 
 /* end of documentation of inline functions */
-/* start of documentation of pure virtual functions */
+/* start of documentation of the drawing virtuals */
 
-/*! \fn void QCPAbstractPlottable::drawLegendIcon(QCPPainter *painter, const QRect &rect) const = 0
+/*! \fn void QCPAbstractPlottable::drawLegendIcon(QCPPainter *painter, const QRectF &rect) const
   \internal
 
   called by QCPLegend::draw (via QCPPlottableLegendItem::draw) to create a graphical representation
@@ -356,10 +357,13 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
 
   The passed \a painter has its cliprect set to \a rect, so painting outside of \a rect won't
   appear outside the legend icon border.
+
+  The default replays the icon recording, fitted to \a rect: a plottable that records its own
+  icon through \ref drawLegendIcon(QCPDrawContext&) gets that summary instead.
 */
 
 /*! \fn QCPRange QCPAbstractPlottable::getKeyRange(bool &foundRange, QCP::SignDomain inSignDomain)
-  const = 0
+  const
 
   Returns the coordinate range that all data in this plottable span in the key axis dimension. For
   logarithmic plots, one can set \a inSignDomain to either \ref QCP::sdNegative or \ref
@@ -368,6 +372,9 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
   will be ignored for range calculation. For no restriction, just set \a inSignDomain to \ref
   QCP::sdBoth (default). \a foundRange is an output parameter that indicates whether a range could
   be found or not. If this is false, you shouldn't use the returned range (e.g. no points in data).
+
+  The default answers this from the recording's data box, without the log rule: a side that
+  reaches zero stays, since the range is data, not an item index.
 
   Note that \a foundRange is not the same as \ref QCPRange::validRange, since the range returned by
   this function may have size zero (e.g. when there is only one data point). In this case \a
@@ -378,7 +385,7 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
 */
 
 /*! \fn QCPRange QCPAbstractPlottable::getValueRange(bool &foundRange, QCP::SignDomain inSignDomain,
-  const QCPRange &inKeyRange) const = 0
+  const QCPRange &inKeyRange) const
 
   Returns the coordinate range that the data points in the specified key range (\a inKeyRange) span
   in the value axis dimension. For logarithmic plots, one can set \a inSignDomain to either \ref
@@ -392,9 +399,9 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
   If \a inKeyRange has both lower and upper bound set to zero (is equal to <tt>QCPRange()</tt>),
   all data points are considered, without any restriction on the keys.
 
-  A plottable that draws through a recording (\ref QCPDrawn) answers this from the recording's data
-  box, which keeps no values per key: it ignores \a inKeyRange. A subclass that needs the
-  visible-key rule overrides this function, as \ref QCPBars does.
+  The default answers this from the recording's data box, which keeps no values per key: it ignores
+  \a inKeyRange. A subclass that needs the visible-key rule overrides this function, as \ref
+  QCPBars does.
 
   Note that \a foundRange is not the same as \ref QCPRange::validRange, since the range returned by
   this function may have size zero (e.g. when there is only one data point). In this case \a
@@ -404,7 +411,7 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
   \see rescaleAxes, getKeyRange
 */
 
-/* end of documentation of pure virtual functions */
+/* end of documentation of the drawing virtuals */
 /* start of documentation of signals */
 
 /*! \fn void QCPAbstractPlottable::selectionChanged()
@@ -458,7 +465,8 @@ QCPAbstractPlottable::QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis)
     connect(&mBusyDebounceTimer, &QTimer::timeout, this, &QCPAbstractPlottable::onDebounceTimeout);
 
     // Without both axes there is no plot to join: the plottable stays inert, never drawn. Neither
-    // axis is a valid detached object (QCustomPlot::add(std::unique_ptr) attaches it); one axis is not.
+    // axis is a valid detached object (QCustomPlot::add(std::unique_ptr) attaches it); one axis is
+    // not.
     mReportedLostAxis = !(keyAxis && valueAxis); // this check is the one report of that loss
     if (!keyAxis && !valueAxis)
         return;
@@ -490,6 +498,93 @@ QCPAbstractPlottable::~QCPAbstractPlottable()
 }
 
 /*!
+  Replays the recording. A plottable that still paints through this virtual (QCPGraph, the polar
+  plottables) overrides it and never records.
+*/
+void QCPAbstractPlottable::draw(QCPPainter* painter)
+{
+    mCore.paint(*this, *painter, view());
+}
+
+//! What the core reads from this plottable this frame.
+QCPDrawnView QCPAbstractPlottable::view() const
+{
+    return qcpDrawnViewOf(*this, clipRect());
+}
+
+//! What the recording occupies in data coordinates.
+std::optional<QCPDataBox> QCPAbstractPlottable::drawnDataRange() const
+{
+    return mCore.dataRange(*this, view());
+}
+
+//! The pixel distance from \a at to the recording, or none when it missed.
+std::optional<double> QCPAbstractPlottable::hitTest(QCP::Pixels at, QVariant* details) const
+{
+    return mCore.hitTest(*this, at, details, view());
+}
+
+/*!
+  A click inside the axis rect hits the recording. \a details then names the whole recording as a
+  data selection: the recording keeps no per-point index to hand out, and an empty selection would
+  make the click select nothing.
+*/
+double QCPAbstractPlottable::selectTest(const QPointF& pos, bool onlySelectable,
+                                        QVariant* details) const
+{
+    // Built-in plottables miss outside the axis rect unless the plot opts in: their geometry may
+    // still be painted there (an unclipped plottable), but a click does not grab it.
+    if (!qcpDrawnClickInsideAxisRect(*this, pos))
+        return -1;
+
+    const double hit = mCore.selectTest(*this, pos, onlySelectable, details, view());
+    if (hit < 0 || !details)
+        return hit;
+    if (details->isValid() && !details->value<QCPDataSelection>().isEmpty())
+        return hit;
+    const QCPPlottableInterface1D* iface = const_cast<QCPAbstractPlottable*>(this)->interface1D();
+    const int count = iface ? iface->dataCount() : 1;
+    *details = QVariant::fromValue(QCPDataSelection(QCPDataRange(0, count)));
+    return hit;
+}
+
+//! The pixels a pan may shift this plottable's layer by instead of repainting it.
+QPointF QCPAbstractPlottable::stallPixelOffset() const
+{
+    return mCore.stallOffset(*this, view());
+}
+
+/*!
+  The setter rule: a new content generation, then the layer mark the base needs. A pan or a zoom
+  never reaches it, so a range change still reuses the recording.
+*/
+void QCPAbstractPlottable::markDirty()
+{
+    if (mCore.contentChanged())
+        QCPLayerable::markDirty();
+}
+
+QCPRange QCPAbstractPlottable::getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain) const
+{
+    return qcpDrawnRange(mCore.dataRange(*this, view(), false), QCPDrawnSide::Key, foundRange,
+                         inSignDomain);
+}
+
+QCPRange QCPAbstractPlottable::getValueRange(bool& foundRange, QCP::SignDomain inSignDomain,
+                                             const QCPRange& inKeyRange) const
+{
+    Q_UNUSED(inKeyRange) // simplify: a box keeps no per-key values, so it cannot be narrowed
+    return qcpDrawnRange(mCore.dataRange(*this, view(), false), QCPDrawnSide::Value, foundRange,
+                         inSignDomain);
+}
+
+//! The old painter icon: replays the icon recording, fitted to \a rect.
+void QCPAbstractPlottable::drawLegendIcon(QCPPainter* painter, const QRectF& rect) const
+{
+    mCore.paintIcon(*this, *painter, rect, view());
+}
+
+/*!
    The name is the textual representation of this plottable as it is displayed in the legend
    (\ref QCPLegend). It may contain any UTF-8 characters, including newlines.
 */
@@ -508,8 +603,8 @@ void markLegendRows(QCPLayoutElement* element, QCPAbstractPlottable* plottable)
             QCPAbstractLegendItem* item = legend->item(i);
             auto* row = qobject_cast<QCPPlottableLegendItem*>(item);
             auto* group = qobject_cast<QCPGroupLegendItem*>(item);
-            const bool shows = row ? row->plottable() == plottable
-                                   : group && group->multiGraph() == plottable;
+            const bool shows
+                = row ? row->plottable() == plottable : group && group->multiGraph() == plottable;
             if (!shows)
                 continue;
             item->markDirty();
@@ -655,7 +750,8 @@ void QCPAbstractPlottable::setSelection(QCPDataSelection selection)
     if (mSelection != selection)
     {
         mSelection = selection;
-        markDirty(); // the selection decides what a plottable draws: the next frame must not reuse the last one
+        markDirty(); // the selection decides what a plottable draws: the next frame must not reuse
+                     // the last one
         emitSelectionChanged();
     }
 }
@@ -1062,7 +1158,7 @@ QRect QCPAbstractPlottable::clipRect() const
     if (mKeyAxis && mValueAxis)
         return mKeyAxis.data()->axisRect()->rect() & mValueAxis.data()->axisRect()->rect();
     else
-        return {};
+        return { };
 }
 
 /* inherits documentation from base class */
@@ -1323,21 +1419,21 @@ void setAxes(QCPAbstractPlottable& plottable, QCPAxis* keyAxis, QCPAxis* valueAx
 
 namespace
 {
-// axis(type) would log on a missing type; a refusal here is already reported as misuse.
-QCPAxis* firstAxis(const QCPAxisRect* rect, QCPAxis::AxisType type)
-{
-    const QList<QCPAxis*> axes = rect->axes(type);
-    return axes.isEmpty() ? nullptr : axes.first();
-}
+    // axis(type) would log on a missing type; a refusal here is already reported as misuse.
+    QCPAxis* firstAxis(const QCPAxisRect* rect, QCPAxis::AxisType type)
+    {
+        const QList<QCPAxis*> axes = rect->axes(type);
+        return axes.isEmpty() ? nullptr : axes.first();
+    }
 
-void setAxesOfRect(QCPAbstractPlottable& plottable, QCPAxisRect* rect, QCPAxis::AxisType keyType,
-                   QCPAxis::AxisType valueType)
-{
-    QCPAxis* keyAxis = firstAxis(rect, keyType);
-    QCPAxis* valueAxis = firstAxis(rect, valueType);
-    QCP_CHECK_OR_RETURN(keyAxis && valueAxis, "the axis rect has no axis of that type");
-    setAxes(plottable, keyAxis, valueAxis);
-}
+    void setAxesOfRect(QCPAbstractPlottable& plottable, QCPAxisRect* rect,
+                       QCPAxis::AxisType keyType, QCPAxis::AxisType valueType)
+    {
+        QCPAxis* keyAxis = firstAxis(rect, keyType);
+        QCPAxis* valueAxis = firstAxis(rect, valueType);
+        QCP_CHECK_OR_RETURN(keyAxis && valueAxis, "the axis rect has no axis of that type");
+        setAxes(plottable, keyAxis, valueAxis);
+    }
 } // namespace
 
 void setAxes(QCPAbstractPlottable& plottable, QCPAxis::AxisType keyType,

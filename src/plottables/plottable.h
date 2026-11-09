@@ -29,6 +29,7 @@
 #include <QTimer>
 #include <optional>
 
+#include "../drawable.h"
 #include "axis/axis.h"
 #include "axis/range.h"
 #include "global.h"
@@ -104,7 +105,7 @@ private:
 };
 Q_DECLARE_METATYPE(QCPSelectionDecorator*)
 
-class QCP_LIB_DECL QCPAbstractPlottable : public QCPLayerable
+class QCP_LIB_DECL QCPAbstractPlottable : public QCPLayerable, public QCPDrawable
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
@@ -123,7 +124,8 @@ class QCP_LIB_DECL QCPAbstractPlottable : public QCPLayerable
     /// \endcond
 
 public:
-    // The handle QCustomPlot::add<T>() returns for a T that declares no Handle (see QCPPlottableOps).
+    // The handle QCustomPlot::add<T>() returns for a T that declares no Handle (see
+    // QCPPlottableOps).
     template <typename T>
     using OpsFor = QCPPlottableOps<T>;
 
@@ -166,23 +168,45 @@ public:
     void setSelectionDecorator(QCPSelectionDecorator* decorator);
 
     // introduced virtual methods:
-    virtual double selectTest(const QPointF& pos, bool onlySelectable,
-                              QVariant* details = nullptr) const override
-        = 0; // actually introduced in QCPLayerable as non-pure, but we want to force
-             // reimplementation for plottables
+    //! The recording: append what this plottable draws to \a context. The default records nothing.
+    virtual void draw(QCPDrawContext& context) const { Q_UNUSED(context) }
+
+    //! What the recording occupies in data coordinates.
+    std::optional<QCPDataBox> drawnDataRange() const override;
+    //! The pixel distance from \a at to the recording, or none when it missed.
+    std::optional<double> hitTest(QCP::Pixels at, QVariant* details) const override;
+
+    //! The legend icon: the recording fitted to \a icon's rect, unless the class records its own.
+    void drawLegendIcon(QCPDrawContext& icon) const override { draw(icon); }
+
+    //! The click path: a click outside the axis rect misses, and a hit hands selectEvent a data
+    //! selection covering the whole recording.
+    double selectTest(const QPointF& pos, bool onlySelectable,
+                      QVariant* details = nullptr) const override;
 
     virtual QCPPlottableInterface1D* interface1D() { return nullptr; }
 
-    virtual QPointF stallPixelOffset() const { return {}; }
+    //! The pixels a pan may shift this plottable's layer by instead of repainting it.
+    virtual QPointF stallPixelOffset() const;
+
+    //! The setter rule: a new content generation, then the layer mark the base needs.
+    //!
+    //! A pan or a zoom never reaches it, so a range change still reuses the recording.
+    void markDirty() override;
+
+    //! A setter's name for the same thing.
+    void contentChanged() { markDirty(); }
+
     //! The plot's scheduler for a plottable that runs a pipeline: null while it is outside a plot
     //! (QCustomPlot::take binds it, QCustomPlot::add(std::unique_ptr) rebinds it).
-    virtual void setPipelineScheduler(QCPPipelineScheduler*) {}
+    virtual void setPipelineScheduler(QCPPipelineScheduler*) { }
 
     // Offered each key press by QCustomPlot::keyPressEvent before item handling. Every
     // plottable sees the key; return true to consume it, which stops it reaching items.
     // Layers whose content follows this plottable (an overlay drawn above it, say). The axis
     // rect marks them dirty with the plottable's own layer whenever its range changes.
-    [[nodiscard]] virtual QList<QCPLayer*> dependentLayers() const { return {}; }
+    [[nodiscard]] virtual QList<QCPLayer*> dependentLayers() const { return { }; }
+
     virtual bool keyPress(QKeyEvent* event)
     {
         Q_UNUSED(event);
@@ -194,11 +218,10 @@ public:
     // stale buffer content instead of clearing to transparent.
     virtual bool canProduceContent() const { return true; }
 
-    virtual QCPRange getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth) const
-        = 0;
+    virtual QCPRange getKeyRange(bool& foundRange,
+                                 QCP::SignDomain inSignDomain = QCP::sdBoth) const;
     virtual QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth,
-                                   const QCPRange& inKeyRange = QCPRange()) const
-        = 0;
+                                   const QCPRange& inKeyRange = QCPRange()) const;
 
     // non-property methods:
     void coordsToPixels(double key, double value, double& x, double& y) const;
@@ -215,13 +238,17 @@ public:
 
     // A grouped plottable has no legend row of its own: its group has one (QCPPlottableGroup).
     QCPPlottableGroup* group() const { return mGroup; }
+
     // False keeps the plottable out of the legend, also after it leaves a group.
     bool wantsLegend() const { return mWantsLegend; }
+
     void setWantsLegend(bool wants);
 
     // busy indicator
     bool busy() const;
+
     bool visuallyBusy() const { return mVisuallyBusy; }
+
     void setBusy(bool busy);
 
     // Deferred data: a replacement source staged while the displayed one keeps
@@ -230,6 +257,7 @@ public:
     // replacement, so QCustomPlot::commitPendingData() can skip the replot
     // when every plottable's pending source was superseded (no-op commit).
     virtual bool hasPendingData() const { return false; }
+
     virtual bool commitPendingData() { return false; }
 
     // per-plottable overrides (std::optional -- nullopt falls through to theme)
@@ -256,7 +284,7 @@ signals:
 
 protected:
     //! Called after setKeyAxis or setValueAxis; not called by the constructor.
-    virtual void axesChanged() {}
+    virtual void axesChanged() { }
 
     // property members:
     QString mName;
@@ -270,7 +298,9 @@ protected:
 
     // reimplemented virtual methods:
     virtual QRect clipRect() const override;
-    virtual void draw(QCPPainter* painter) override = 0;
+    //! Replays the recording: the default draw. A class that paints through the old virtual
+    //! (QCPGraph, the polar plottables) overrides this and never records.
+    void draw(QCPPainter* painter) override;
     virtual QCP::Interaction selectionCategory() const override;
     void applyDefaultAntialiasingHint(QCPPainter* painter) const override;
     // events:
@@ -279,14 +309,23 @@ protected:
     virtual void deselectEvent(bool* selectionStateChanged) override;
 
     // introduced virtual methods:
-    virtual void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const = 0;
+    //! The old painter icon: replays the icon recording.
+    virtual void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const;
+
+    //! What the core reads from this plottable this frame.
+    [[nodiscard]] QCPDrawnView view() const;
+
+    //! The recording, its keys and its caches.
+    mutable QCPDrawnCore mCore;
 
     // busy indicator
     virtual bool pipelineBusy() const { return false; }
+
     void updateEffectiveBusy();
 
     // non-virtual methods:
     bool legendAllowed() const { return mWantsLegend && !mGroup; }
+
     void emitSelectionChanged();
     void applyFillAntialiasingHint(QCPPainter* painter) const;
     void applyScattersAntialiasingHint(QCPPainter* painter) const;
@@ -361,31 +400,36 @@ class QCPPlottableOps : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPPlottable
     using Base = QCPLayerableOps<T, qcp::OpsRet<Self, QCPPlottableOps<T>>>;
 
 public:
-    using typename Base::Ret;
     using Base::Base;
+    using typename Base::Ret;
 
     Ret setName(const QString& name)
     {
         return this->apply([&](T& p) { p.setName(name); });
     }
+
     Ret setPen(const QPen& pen)
     {
         return this->apply([&](T& p) { p.setPen(pen); });
     }
+
     Ret setBrush(const QBrush& brush)
     {
         return this->apply([&](T& p) { p.setBrush(brush); });
     }
+
     // By role, on the plottable's current axis rect: survives the axes being replaced.
     Ret setAxes(QCPAxis::AxisType keyType, QCPAxis::AxisType valueType)
     {
         return this->apply([&](T& p) { qcp::ops::setAxes(p, keyType, valueType); });
     }
+
     // Moves to the rect's bottom and left axes.
     Ret setAxisRect(QCPAxisRect* rect)
     {
         return this->apply([&](T& p) { qcp::ops::setAxisRect(p, rect); });
     }
+
     // Escape hatch while raw axis getters exist; goes away with them.
     Ret setAxes(QCPAxis* keyAxis, QCPAxis* valueAxis)
     {

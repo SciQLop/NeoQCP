@@ -19,7 +19,7 @@ class TestPipeline;
 template <typename T, typename Self = void>
 class QCPColorMap2Ops;
 
-class QCP_LIB_DECL QCPColorMap2 : public QCPDrawn<QCPAbstractColorMapped>
+class QCP_LIB_DECL QCPColorMap2 : public QCPAbstractColorMapped
 {
     Q_OBJECT
     friend class TestColorMap;
@@ -109,7 +109,7 @@ public:
     // Exposed for tests: the labels the last draw placed.
     [[nodiscard]] const QVector<ContourLabel>& lastContourLabels() const { return mContours.lastLabels(); }
 
-    using QCPDrawn<QCPAbstractColorMapped>::drawLegendIcon;
+    using QCPAbstractColorMapped::drawLegendIcon;
 public Q_SLOTS:
     double selectTest(const QPointF& pos, bool onlySelectable, QVariant* details = nullptr) const override;
 

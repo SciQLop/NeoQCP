@@ -84,7 +84,7 @@ class QCPCurveOps;
   fill is one polygon of data positions (the replay rasterises it, which is what a self-crossing
   curve needs), and colour by scalar rides the shared coloured polyline.
 */
-class QCP_LIB_DECL QCPCurve : public QCPDrawn<QCPAbstractPlottable1D<QCPCurveData, QCPAbstractLine>>
+class QCP_LIB_DECL QCPCurve : public QCPAbstractPlottable1D<QCPCurveData, QCPAbstractLine>
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES

@@ -772,7 +772,7 @@ QCPRange rangeWithHalfACell(QCPAxis* axis, const QCPRange& range, int size)
   manually but use QCustomPlot::removePlottable() instead.
 */
 QCPColorMap::QCPColorMap(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPDrawn<QCPAbstractColorMapped>(keyAxis, valueAxis)
+        : QCPAbstractColorMapped(keyAxis, valueAxis)
         , mMapData(new QCPColorMapData(10, 10, QCPRange(0, 5), QCPRange(0, 5)))
         , mInterpolate(true)
         , mTightBoundary(false)

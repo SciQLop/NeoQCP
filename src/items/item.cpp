@@ -33,20 +33,20 @@
 
 #include "axis/axis.h"
 #include "core.h"
-#include "misuse.h"
 #include "layoutelements/layoutelement-axisrect.h"
+#include "misuse.h"
 #include "painting/draw-commands.h"
 #include "painting/draw-context.h"
 #include "painting/painter.h"
 
 namespace
 {
-// setParentAnchor(nullptr, false) also turns a ptPlotCoords type into ptAbsolute, so only call it when
-// an anchor is actually attached.
+// setParentAnchor(nullptr, false) also turns a ptPlotCoords type into ptAbsolute, so only call it
+// when an anchor is actually attached.
 void detachFromParent(QCPItemPosition* position)
 {
-  if (position->parentAnchorX() || position->parentAnchorY())
-    position->setParentAnchor(nullptr, false);
+    if (position->parentAnchorX() || position->parentAnchorY())
+        position->setParentAnchor(nullptr, false);
 }
 
 //! A position slot that is not ptPlotCoords, along one screen axis: \a horizontal picks the
@@ -183,17 +183,17 @@ void QCPItemAnchor::detachChildren(bool keepPixelPosition)
     for (QCPItemPosition* child : childrenX)
     {
         if (child->parentAnchorX() == this)
-            child->setParentAnchorX(
-                nullptr, keepPixelPosition); // this acts back on this anchor and the child removes
-                                             // itself from mChildrenX
+            child->setParentAnchorX(nullptr,
+                                    keepPixelPosition); // this acts back on this anchor and the
+                                                        // child removes itself from mChildrenX
     }
     const QSet<QCPItemPosition*> childrenY = mChildrenY;
     for (QCPItemPosition* child : childrenY)
     {
         if (child->parentAnchorY() == this)
-            child->setParentAnchorY(
-                nullptr, keepPixelPosition); // this acts back on this anchor and the child removes
-                                             // itself from mChildrenY
+            child->setParentAnchorY(nullptr,
+                                    keepPixelPosition); // this acts back on this anchor and the
+                                                        // child removes itself from mChildrenY
     }
 }
 
@@ -217,13 +217,13 @@ QPointF QCPItemAnchor::pixelPosition() const
         else
         {
             qDebug() << Q_FUNC_INFO << "no valid anchor id set:" << mAnchorId;
-            return {};
+            return { };
         }
     }
     else
     {
         qDebug() << Q_FUNC_INFO << "no parent item set";
-        return {};
+        return { };
     }
 }
 
@@ -501,10 +501,10 @@ void QCPItemPosition::setTypeY(QCPItemPosition::PositionType type)
 
 bool QCPItemPosition::parentChainReachesThis(QCPItemAnchor* parent) const
 {
-    // Pixel dependency graph: a position's pixel comes from its parent anchors, a plain anchor's from
-    // the positions of its item. Walking it here is what keeps pixelPosition() from recursing. Both
-    // parents count after the first step: pixelPosition() asks a parent for its whole position, so
-    // a cycle may switch axes on the way.
+    // Pixel dependency graph: a position's pixel comes from its parent anchors, a plain anchor's
+    // from the positions of its item. Walking it here is what keeps pixelPosition() from recursing.
+    // Both parents count after the first step: pixelPosition() asks a parent for its whole
+    // position, so a cycle may switch axes on the way.
     std::vector<QCPItemAnchor*> pending { parent };
     std::vector<QCPItemAnchor*> visited;
     while (!pending.empty())
@@ -987,101 +987,101 @@ void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
 /*! \internal
 
   Writes the position in one of the typed spaces of coords.h. Each branch is an ordering of the 2.x
-  setters, because leaving a parent anchor or a plot-coord type behind would silently combine with the
-  new numbers. An AnchorOffset whose anchor refuses the link (a cycle) leaves the position untouched
-  and says so: setParentAnchorX/Y report the refusal, and this says what was done with it.
+  setters, because leaving a parent anchor or a plot-coord type behind would silently combine with
+  the new numbers. An AnchorOffset whose anchor refuses the link (a cycle) leaves the position
+  untouched and says so: setParentAnchorX/Y report the refusal, and this says what was done with it.
 */
 void QCPItemPosition::set(const QCP::Position& position)
 {
-  if (const auto* data = std::get_if<QCP::Data>(&position))
-  {
-    detachFromParent(this);
-    setType(ptPlotCoords);
-    setCoords(data->x, data->y);
-  }
-  else if (const auto* pixels = std::get_if<QCP::Pixels>(&position))
-  {
-    detachFromParent(this);
-    setType(ptAbsolute);
-    setCoords(pixels->x, pixels->y);
-  }
-  else if (const auto* ratio = std::get_if<QCP::AxisRatio>(&position))
-  {
-    detachFromParent(this);
-    setType(ptAxisRectRatio);
-    setCoords(ratio->x, ratio->y);
-  }
-  else if (const auto* anchored = std::get_if<QCP::AnchorOffset>(&position))
-  {
-    if (!anchored->anchor)
+    if (const auto* data = std::get_if<QCP::Data>(&position))
     {
-      setType(ptAbsolute);
-      detachFromParent(this);
-      setCoords(anchored->offset.dx, anchored->offset.dy);
-      return;
+        detachFromParent(this);
+        setType(ptPlotCoords);
+        setCoords(data->x, data->y);
     }
-    // Attach first: a refused anchor (a cycle, this position) must leave the position untouched.
-    // Then the offset is pixels, whatever the old type (a ratio type would scale it by the rect).
-    if (!setParentAnchor(anchored->anchor, false))
+    else if (const auto* pixels = std::get_if<QCP::Pixels>(&position))
     {
-      qDebug() << Q_FUNC_INFO
-               << "the anchor was refused, so the position is left as it was";
-      return;
+        detachFromParent(this);
+        setType(ptAbsolute);
+        setCoords(pixels->x, pixels->y);
     }
-    setType(ptAbsolute);
-    setCoords(anchored->offset.dx, anchored->offset.dy);
-  }
-  else if (const auto* mixed = std::get_if<QCP::DataXRatioY>(&position))
-  {
-    detachFromParent(this);
-    setTypeX(ptPlotCoords);
-    setTypeY(ptAxisRectRatio);
-    setCoords(mixed->x, mixed->y);
-  }
-  else if (const auto* mixed = std::get_if<QCP::RatioXDataY>(&position))
-  {
-    detachFromParent(this);
-    setTypeX(ptAxisRectRatio);
-    setTypeY(ptPlotCoords);
-    setCoords(mixed->x, mixed->y);
-  }
+    else if (const auto* ratio = std::get_if<QCP::AxisRatio>(&position))
+    {
+        detachFromParent(this);
+        setType(ptAxisRectRatio);
+        setCoords(ratio->x, ratio->y);
+    }
+    else if (const auto* anchored = std::get_if<QCP::AnchorOffset>(&position))
+    {
+        if (!anchored->anchor)
+        {
+            setType(ptAbsolute);
+            detachFromParent(this);
+            setCoords(anchored->offset.dx, anchored->offset.dy);
+            return;
+        }
+        // Attach first: a refused anchor (a cycle, this position) must leave the position
+        // untouched. Then the offset is pixels, whatever the old type (a ratio type would scale it
+        // by the rect).
+        if (!setParentAnchor(anchored->anchor, false))
+        {
+            qDebug() << Q_FUNC_INFO << "the anchor was refused, so the position is left as it was";
+            return;
+        }
+        setType(ptAbsolute);
+        setCoords(anchored->offset.dx, anchored->offset.dy);
+    }
+    else if (const auto* mixed = std::get_if<QCP::DataXRatioY>(&position))
+    {
+        detachFromParent(this);
+        setTypeX(ptPlotCoords);
+        setTypeY(ptAxisRectRatio);
+        setCoords(mixed->x, mixed->y);
+    }
+    else if (const auto* mixed = std::get_if<QCP::RatioXDataY>(&position))
+    {
+        detachFromParent(this);
+        setTypeX(ptAxisRectRatio);
+        setTypeY(ptPlotCoords);
+        setCoords(mixed->x, mixed->y);
+    }
 }
 
 /*! \internal
 
-  Reads the position back in the space it was written in. The variant models data, pixels, an axis-rect
-  fraction, an anchor offset and the two half-data/half-ratio spaces; every other 2.x combination
-  (ptViewportRatio, ptAxisRectAbsolute, an anchor on one axis only, an anchored data or ratio type)
-  comes back as the pixels the position has now, and \a snapshot says so: those pixels are this
-  frame's, and nothing in a recording that holds them moves them.
+  Reads the position back in the space it was written in. The variant models data, pixels, an
+  axis-rect fraction, an anchor offset and the two half-data/half-ratio spaces; every other 2.x
+  combination (ptViewportRatio, ptAxisRectAbsolute, an anchor on one axis only, an anchored data or
+  ratio type) comes back as the pixels the position has now, and \a snapshot says so: those pixels
+  are this frame's, and nothing in a recording that holds them moves them.
 */
 QCP::Position QCPItemPosition::asPosition(bool* snapshot) const
 {
-  if (snapshot)
-    *snapshot = false;
-  const bool anchored = mParentAnchorX != nullptr || mParentAnchorY != nullptr;
-  if (mPositionTypeX == ptAbsolute && mPositionTypeY == ptAbsolute
-      && mParentAnchorX == mParentAnchorY)
-  {
-    if (anchored)
-      return QCP::AnchorOffset { mParentAnchorX, QCP::PixelOffset { mKey, mValue } };
-    return QCP::Pixels { mKey, mValue };
-  }
-  if (!anchored)
-  {
-    if (mPositionTypeX == ptPlotCoords && mPositionTypeY == ptPlotCoords)
-      return QCP::Data { mKey, mValue };
-    if (mPositionTypeX == ptAxisRectRatio && mPositionTypeY == ptAxisRectRatio)
-      return QCP::AxisRatio { mKey, mValue };
-    if (mPositionTypeX == ptPlotCoords && mPositionTypeY == ptAxisRectRatio)
-      return QCP::DataXRatioY { mKey, mValue };
-    if (mPositionTypeX == ptAxisRectRatio && mPositionTypeY == ptPlotCoords)
-      return QCP::RatioXDataY { mKey, mValue };
-  }
-  if (snapshot)
-    *snapshot = true;
-  const QPointF pixels = pixelPosition();
-  return QCP::Pixels { pixels.x(), pixels.y() };
+    if (snapshot)
+        *snapshot = false;
+    const bool anchored = mParentAnchorX != nullptr || mParentAnchorY != nullptr;
+    if (mPositionTypeX == ptAbsolute && mPositionTypeY == ptAbsolute
+        && mParentAnchorX == mParentAnchorY)
+    {
+        if (anchored)
+            return QCP::AnchorOffset { mParentAnchorX, QCP::PixelOffset { mKey, mValue } };
+        return QCP::Pixels { mKey, mValue };
+    }
+    if (!anchored)
+    {
+        if (mPositionTypeX == ptPlotCoords && mPositionTypeY == ptPlotCoords)
+            return QCP::Data { mKey, mValue };
+        if (mPositionTypeX == ptAxisRectRatio && mPositionTypeY == ptAxisRectRatio)
+            return QCP::AxisRatio { mKey, mValue };
+        if (mPositionTypeX == ptPlotCoords && mPositionTypeY == ptAxisRectRatio)
+            return QCP::DataXRatioY { mKey, mValue };
+        if (mPositionTypeX == ptAxisRectRatio && mPositionTypeY == ptPlotCoords)
+            return QCP::RatioXDataY { mKey, mValue };
+    }
+    if (snapshot)
+        *snapshot = true;
+    const QPointF pixels = pixelPosition();
+    return QCP::Pixels { pixels.x(), pixels.y() };
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1302,6 +1302,50 @@ QCPAbstractItem::~QCPAbstractItem()
 QCPAxisRect* QCPAbstractItem::clipAxisRect() const
 {
     return mClipAxisRect.data();
+}
+
+/*!
+  Replays the recording. An item that still paints through this virtual (lines, rects, spans...)
+  overrides it and never records.
+*/
+void QCPAbstractItem::draw(QCPPainter* painter)
+{
+    mCore.paint(*this, *painter, view());
+}
+
+//! What the core reads from this item this frame.
+QCPDrawnView QCPAbstractItem::view() const
+{
+    return qcpDrawnViewOf(*this, clipRect());
+}
+
+//! What the recording occupies in data coordinates.
+std::optional<QCPDataBox> QCPAbstractItem::drawnDataRange() const
+{
+    return mCore.dataRange(*this, view());
+}
+
+//! The pixel distance from \a at to the recording, or none when it missed.
+std::optional<double> QCPAbstractItem::hitTest(QCP::Pixels at, QVariant* details) const
+{
+    return mCore.hitTest(*this, at, details, view());
+}
+
+//! The click path: the distance to the recording, or -1 when the click misses it.
+double QCPAbstractItem::selectTest(const QPointF& pos, bool onlySelectable, QVariant* details) const
+{
+    return mCore.selectTest(*this, pos, onlySelectable, details, view());
+}
+
+/*!
+  The recording's box, once the item has one. An item that does not record keeps the
+  positions-based answer of its subclass; this default is none.
+*/
+std::optional<QCPItemExtent> QCPAbstractItem::dataExtent() const
+{
+    // A subclass that draws through positions overrides this; one that records gets the index box
+    // of its recording. An item that records nothing answers none, exactly as the default did.
+    return mCore.dataExtent(*this, view());
 }
 
 /*!
@@ -1535,7 +1579,7 @@ QPointF QCPAbstractItem::anchorPixelPosition(int anchorId) const
              << "called on item which shouldn't have any anchors (this method not reimplemented). "
                 "anchorId"
              << anchorId;
-    return {};
+    return { };
 }
 
 /*! \internal
@@ -1558,6 +1602,10 @@ void QCPAbstractItem::markDirty()
     // follower walk below can come straight back here. Returning at once while marking stops that
     // recursion, and any longer marking cycle with it.
     if (mMarking)
+        return;
+    // A new content generation, unless a setter is called from inside draw() (a misuse the core
+    // reports): that recording is being made, and marking it now would never settle.
+    if (!mCore.contentChanged())
         return;
     QScopedValueRollback<bool> marking(mMarking, true);
     QCPLayerable::markDirty();
@@ -1603,8 +1651,8 @@ QCPAbstractItem::positionsExtent(double pixelPad, const QList<QCPItemPosition*>&
     {
         // A coordinate counts only as a plain plot coordinate: an anchored position follows another
         // anchor, a ratio or pixel position is not a data value. One such position makes that side
-        // infinite — its pixels are then unrelated to the axis range, so a box built from the others
-        // would cull the item while it is still drawn.
+        // infinite — its pixels are then unrelated to the axis range, so a box built from the
+        // others would cull the item while it is still drawn.
         if (position->typeX() == QCPItemPosition::ptPlotCoords && !position->parentAnchorX())
         {
             box.keyLower = std::min(box.keyLower, position->key());
@@ -1620,8 +1668,8 @@ QCPAbstractItem::positionsExtent(double pixelPad, const QList<QCPItemPosition*>&
     }
     bool keyBounded = keyPositions == std::size_t(positions.size());
     bool valueBounded = valuePositions == std::size_t(positions.size());
-    // A logarithmic axis has no pixel for a coordinate at or below zero, yet draw() still runs: such
-    // an item is left unindexed instead of being culled by a box the axis cannot map.
+    // A logarithmic axis has no pixel for a coordinate at or below zero, yet draw() still runs:
+    // such an item is left unindexed instead of being culled by a box the axis cannot map.
     if (keyBounded && keyAxis->scaleType() == QCPAxis::stLogarithmic && !(box.keyLower > 0))
         keyBounded = false;
     if (valueBounded && valueAxis->scaleType() == QCPAxis::stLogarithmic && !(box.valueLower > 0))

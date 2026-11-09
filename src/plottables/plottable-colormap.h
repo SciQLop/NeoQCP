@@ -112,7 +112,7 @@ protected:
 template <typename T, typename Self = void>
 class QCPColorMapOps;
 
-class QCP_LIB_DECL QCPColorMap : public QCPDrawn<QCPAbstractColorMapped>
+class QCP_LIB_DECL QCPColorMap : public QCPAbstractColorMapped
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES

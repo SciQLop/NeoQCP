@@ -1,6 +1,7 @@
 #include "drawable.h"
 
 #include "core.h"
+#include "items/item.h"
 #include "layer.h"
 #include "layoutelements/layoutelement-axisrect.h"
 #include "misuse.h"
@@ -12,6 +13,7 @@
 #include "painting/raster-fallback.h"
 #include "painting/viewport-offset.h"
 #include "plottables/plottable-draw-utils.h"
+#include "plottables/plottable.h"
 #include "vector2d.h"
 
 #include <QDebug>
@@ -203,12 +205,14 @@ double distanceTo(const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame,
                 for (std::size_t i = 0; i < count; ++i)
                 {
                     const QRectF box
-                        = QRectF(
-                              qcpResolvePosition(frame, QCP::Data { boxes.aKey[i], boxes.aValue[i] }),
-                              qcpResolvePosition(frame, QCP::Data { boxes.bKey[i], boxes.bValue[i] }))
+                        = QRectF(qcpResolvePosition(frame,
+                                                    QCP::Data { boxes.aKey[i], boxes.aValue[i] }),
+                                 qcpResolvePosition(frame,
+                                                    QCP::Data { boxes.bKey[i], boxes.bValue[i] }))
                               .normalized();
-                    const QBrush rectBrush
-                        = i < boxes.fills.size() ? QBrush(QColor::fromRgba(boxes.fills[i])) : cmd.brush;
+                    const QBrush rectBrush = i < boxes.fills.size()
+                        ? QBrush(QColor::fromRgba(boxes.fills[i]))
+                        : cmd.brush;
                     double distance = 0.0;
                     if (!visibleBrush(rectBrush) || !box.contains(at))
                     {
@@ -234,12 +238,14 @@ double distanceTo(const qcp::QCPDrawCommand& command, const QCPDrawFrame& frame,
                 for (std::size_t i = 0; i < count; ++i)
                 {
                     const QRectF box
-                        = QRectF(
-                              qcpResolvePosition(frame, QCP::Data { boxes.aKey[i], boxes.aValue[i] }),
-                              qcpResolvePosition(frame, QCP::Data { boxes.bKey[i], boxes.bValue[i] }))
+                        = QRectF(qcpResolvePosition(frame,
+                                                    QCP::Data { boxes.aKey[i], boxes.aValue[i] }),
+                                 qcpResolvePosition(frame,
+                                                    QCP::Data { boxes.bKey[i], boxes.bValue[i] }))
                               .normalized();
-                    const QBrush rectBrush
-                        = i < boxes.fills.size() ? QBrush(QColor::fromRgba(boxes.fills[i])) : cmd.brush;
+                    const QBrush rectBrush = i < boxes.fills.size()
+                        ? QBrush(QColor::fromRgba(boxes.fills[i]))
+                        : cmd.brush;
                     double distance = kInfinity;
                     if (visibleBrush(rectBrush) && box.contains(at))
                     {
@@ -812,8 +818,8 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
         qcpReplayWithPainter(mState->recording, painter, frame, QCPReplayKinds::PainterOnly);
         if (view.layer)
             view.layer->deferGpuPainter(
-                [list = &mState->recording, state = std::weak_ptr<State>(mState), frame](
-                    QCPPainter& target)
+                [list = &mState->recording, state = std::weak_ptr<State>(mState),
+                 frame](QCPPainter& target)
                 {
                     if (state.expired())
                         return;
