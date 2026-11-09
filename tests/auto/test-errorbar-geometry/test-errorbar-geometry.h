@@ -24,4 +24,6 @@ private slots:
     void aSwappedPlottableContainerReRecords();
     void aCurveRecordsEveryBar();
     void aBackboneShorterThanTheGapIsNotDrawn();
+    void aGroupedBarsErrorBarSitsOnItsOwnBar();
+    void aStackedBarsErrorBarSitsOnTheTopOfTheStack();
 };

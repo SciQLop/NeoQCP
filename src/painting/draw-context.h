@@ -208,7 +208,8 @@ public:
     //! the centre are pixels, applied by the replay.
     void errorBars(std::shared_ptr<const std::vector<QPointF>> centres,
                    std::shared_ptr<const std::vector<QPointF>> ends, bool alongKeys,
-                   double whiskerWidth, double symbolGap, const QPen& pen);
+                   double whiskerWidth, double symbolGap, const QPen& pen,
+                   bool inPixels = false);
     //! Text anchored at \a at, measured and placed relative to that anchor.
     void text(QCP::Position at, const QString& text, const QCPTextStyle& style);
     //! The same, for a recorder that already measured \a glyphSize and will ask for it again.

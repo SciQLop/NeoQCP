@@ -479,3 +479,67 @@ void TestErrorBarGeometry::aBackboneShorterThanTheGapIsNotDrawn()
     QVERIFY2(redPixelsNear(imageOf(*plot), centre, 2) > 0, "the bar is not at its key");
     QCOMPARE(redPixelsNear(imageOf(*plot), insideTheGap, 1), 0);
 }
+
+// A grouped bar is drawn away from its key: the error bars must take their centre from the
+// plottable's data pixel, not from the raw key and value.
+void TestErrorBarGeometry::aGroupedBarsErrorBarSitsOnItsOwnBar()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.xAxis->setRange(0, 2);
+    plot.yAxis->setRange(0, 1);
+    auto* first = new QCPBars(plot.xAxis, plot.yAxis);
+    auto* second = new QCPBars(plot.xAxis, plot.yAxis);
+    first->setData(QVector<double> { 1.0 }, QVector<double> { 0.3 });
+    second->setData(QVector<double> { 1.0 }, QVector<double> { 0.3 });
+    auto* group = new QCPBarsGroup(&plot);
+    first->setBarsGroup(group);
+    second->setBarsGroup(group);
+    for (QCPBars* bar : { first, second })
+    {
+        auto* bars = new RecordingErrorBars(plot.xAxis, plot.yAxis);
+        bars->setDataPlottable(bar);
+        bars->setErrorType(QCPErrorBars::etValueError);
+        bars->setData(QVector<double> { 0.1 });
+        bars->setWhiskerWidth(6);
+        bars->setPen(QPen(QColor(200, 30, 30)));
+    }
+    plot.replot();
+
+    const double endY = plot.yAxis->coordToPixel(0.4);
+    QVERIFY2(first->dataPixelPosition(0).x() != second->dataPixelPosition(0).x(),
+             "the group did not move the bars apart");
+    for (QCPBars* bar : { first, second })
+    {
+        const QPointF at(bar->dataPixelPosition(0).x(), endY);
+        QVERIFY2(redPixelsNear(imageOf(plot), at, 2) > 0,
+                 "the error bar is not over its own bar");
+    }
+}
+
+// A stacked bar is drawn from the top of the stack: its error bars start there too.
+void TestErrorBarGeometry::aStackedBarsErrorBarSitsOnTheTopOfTheStack()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.xAxis->setRange(0, 2);
+    plot.yAxis->setRange(0, 1);
+    auto* below = new QCPBars(plot.xAxis, plot.yAxis);
+    below->setData(QVector<double> { 1.0 }, QVector<double> { 0.3 });
+    auto* above = new QCPBars(plot.xAxis, plot.yAxis);
+    above->setData(QVector<double> { 1.0 }, QVector<double> { 0.3 });
+    above->moveAbove(below);
+    auto* bars = new RecordingErrorBars(plot.xAxis, plot.yAxis);
+    bars->setDataPlottable(above);
+    bars->setErrorType(QCPErrorBars::etValueError);
+    bars->setData(QVector<double> { 0.1 });
+    bars->setWhiskerWidth(6);
+    bars->setPen(QPen(QColor(200, 30, 30)));
+    plot.replot();
+
+    const QPointF onTheStack(plot.xAxis->coordToPixel(1.0), plot.yAxis->coordToPixel(0.7));
+    const QPointF onTheRawValue(plot.xAxis->coordToPixel(1.0), plot.yAxis->coordToPixel(0.4));
+    QVERIFY2(redPixelsNear(imageOf(plot), onTheStack, 2) > 0,
+             "the error bar is not on the top of the stack");
+    QCOMPARE(redPixelsNear(imageOf(plot), onTheRawValue, 2), 0);
+}

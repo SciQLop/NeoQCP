@@ -30,6 +30,7 @@
 #include "../layoutelements/layoutelement-axisrect.h"
 #include "../painting/draw-context.h"
 #include "../painting/painter.h"
+#include "plottable-bars.h"
 #include <typeinfo>
 #include <vector>
 
@@ -1126,6 +1127,21 @@ void QCPErrorBars::recordSegment(QCPDrawContext& context, const QCPDataRange& se
     centres.reserve(std::size_t(end - begin));
     ends.reserve(std::size_t(2 * (end - begin)));
     const bool alongKeys = mErrorType == etKeyError;
+    // A grouped or stacked bar is not drawn at its own key and value: its error bars start where the
+    // plottable puts it, in pixels (2.x asked the plottable's dataPixelPosition). Reading that pixel
+    // reads the view, so such a recording is remade whenever the view changes.
+    const QCPBars* bars = qobject_cast<const QCPBars*>(mDataPlottable.data());
+    const bool pixelCentres = bars && (bars->barBelow() || bars->barsGroup());
+    QCPAxis* errorAxis = mErrorType == etValueError ? mValueAxis.data() : mKeyAxis.data();
+    if (pixelCentres)
+        (void)context.transform();
+    const auto endPixel = [errorAxis](const QPointF& centre, double coord)
+    {
+        QPointF end = centre;
+        const double pixel = errorAxis->coordToPixel(coord);
+        (errorAxis->orientation() == Qt::Horizontal ? end.rx() : end.ry()) = pixel;
+        return end;
+    };
     for (int index = begin; index < end; ++index)
     {
         const double key = source->dataMainKey(index);
@@ -1133,6 +1149,19 @@ void QCPErrorBars::recordSegment(QCPDrawContext& context, const QCPDataRange& se
         if (!qIsFinite(key) || !qIsFinite(value))
             continue;
         const QCPErrorBarsData& bar = mDataContainer->at(index);
+        if (pixelCentres)
+        {
+            const QPointF centre = bars->dataPixelPosition(index);
+            if (!qIsFinite(centre.x()) || !qIsFinite(centre.y()))
+                continue;
+            const double centreCoord
+                = errorAxis->pixelToCoord(errorAxis->orientation() == Qt::Horizontal ? centre.x()
+                                                                                   : centre.y());
+            centres.emplace_back(centre);
+            ends.emplace_back(endPixel(centre, centreCoord - bar.errorMinus));
+            ends.emplace_back(endPixel(centre, centreCoord + bar.errorPlus));
+            continue;
+        }
         centres.emplace_back(key, value);
         ends.emplace_back(alongKeys ? QPointF(key - bar.errorMinus, value)
                                     : QPointF(key, value - bar.errorMinus));
@@ -1143,5 +1172,5 @@ void QCPErrorBars::recordSegment(QCPDrawContext& context, const QCPDataRange& se
         return;
     context.errorBars(std::make_shared<const std::vector<QPointF>>(std::move(centres)),
                       std::make_shared<const std::vector<QPointF>>(std::move(ends)), alongKeys,
-                      mWhiskerWidth, mSymbolGap, pen);
+                      mWhiskerWidth, mSymbolGap, pen, pixelCentres);
 }

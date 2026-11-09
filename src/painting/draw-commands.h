@@ -178,6 +178,9 @@ struct ErrorBarsCmd
     //! The whisker width and the gap left around the centre, in pixels.
     double whiskerWidth = 0.0;
     double symbolGap = 0.0;
+    //! Whether \a centres and \a ends are already pixels: a bar that does not sit at its own key
+    //! (grouped or stacked bars) records where the plottable puts it.
+    bool inPixels = false;
     QPen pen;
 };
 
@@ -583,24 +586,43 @@ inline void qcpErrorBarPixels(const QCPDrawFrame& frame, const qcp::ErrorBarsCmd
     const std::size_t count = std::min(cmd.centres->size(), cmd.ends->size() / 2);
     centres.resize(count);
     ends.resize(2 * count);
-    frame.transform.map(std::span<const QPointF>(*cmd.centres), std::span<QPointF>(centres));
-    frame.transform.map(std::span<const QPointF>(*cmd.ends), std::span<QPointF>(ends));
+    if (cmd.inPixels)
+    {
+        std::copy(cmd.centres->begin(), cmd.centres->end(), centres.begin());
+        std::copy(cmd.ends->begin(), cmd.ends->end(), ends.begin());
+    }
+    else
+    {
+        frame.transform.map(std::span<const QPointF>(*cmd.centres), std::span<QPointF>(centres));
+        frame.transform.map(std::span<const QPointF>(*cmd.ends), std::span<QPointF>(ends));
+    }
 
     // The error axis's pixel direction, taken from one bar: a reversed axis, a vertical key axis
-    // and a log axis all come out of the transform, so none of them needs a case of its own.
+    // and a log axis all come out of the transform, so none of them needs a case of its own. Bars
+    // that come in pixels already carry their direction in their own ends.
     QPointF axisDir(cmd.alongKeys ? 1.0 : 0.0, cmd.alongKeys ? 0.0 : 1.0);
     for (std::size_t i = 0; i < count; ++i)
     {
         if (!std::isfinite(centres[i].x()) || !std::isfinite(centres[i].y()))
             continue;
-        const QPointF data = cmd.centres->at(i);
-        const QCP::Pixels base = frame.transform.map(QCP::Data { data.x(), data.y() });
-        const QCP::Pixels ahead = frame.transform.map(
-            QCP::Data { data.x() + (cmd.alongKeys ? 1.0 : 0.0),
-                        data.y() + (cmd.alongKeys ? 0.0 : 1.0) });
-        const double length = std::hypot(ahead.x - base.x, ahead.y - base.y);
+        QPointF direction;
+        if (cmd.inPixels)
+        {
+            const QPointF end = ends[2 * i + 1];
+            direction = QPointF(end.x() - centres[i].x(), end.y() - centres[i].y());
+        }
+        else
+        {
+            const QPointF data = cmd.centres->at(i);
+            const QCP::Pixels base = frame.transform.map(QCP::Data { data.x(), data.y() });
+            const QCP::Pixels ahead = frame.transform.map(
+                QCP::Data { data.x() + (cmd.alongKeys ? 1.0 : 0.0),
+                            data.y() + (cmd.alongKeys ? 0.0 : 1.0) });
+            direction = QPointF(ahead.x - base.x, ahead.y - base.y);
+        }
+        const double length = std::hypot(direction.x(), direction.y());
         if (std::isfinite(length) && length > 0.0)
-            axisDir = QPointF((ahead.x - base.x) / length, (ahead.y - base.y) / length);
+            axisDir = direction / length;
         break;
     }
     const QPointF across(-axisDir.y(), axisDir.x());

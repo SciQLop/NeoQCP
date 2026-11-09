@@ -1084,7 +1084,7 @@ bool QCPBars::hasPixelGeometry() const
 
 quint64 QCPBars::dependencyRevision() const
 {
-    quint64 key = QCPAbstractPlottable1D<QCPBarsData>::dependencyRevision();
+    const quint64 own = QCPAbstractPlottable1D<QCPBarsData>::dependencyRevision();
     // simplify: every bar of a stack walks the whole stack below it, and a check round asks each of
     // them (stallOffset per plottable, then ensureRecording per paint), so the round costs
     // O(depth^2) - 20k virtual calls for a 200-bar stack, twice a pan frame. A per-frame cache is
@@ -1093,11 +1093,12 @@ quint64 QCPBars::dependencyRevision() const
     // revision counter shared by the members of one stack and bumped by any of them changing, which
     // a cached key is validated against: O(1) per bar per frame, and only a null check for a bar
     // that is not stacked.
-    if (mBarBelow) // the base is read at record time: its own key carries the whole stack below it
-        key += mBarBelow->mCore.generation() + mBarBelow->dependencyRevision();
-    if (mBarsGroup) // the group centres every member by their widths
-        key += mBarsGroup->revision();
-    return key;
+    // The base is read at record time: its own key carries the whole stack below it. The inputs are
+    // hashed in order, not summed: a sum lets two changes cancel (a stack that changes under a
+    // group that changes back).
+    return qHashMulti(own, mBarBelow ? mBarBelow->mCore.generation() : 0,
+                      mBarBelow ? mBarBelow->dependencyRevision() : 0,
+                      mBarsGroup ? mBarsGroup->revision() : 0);
 }
 
 void QCPBars::notifyGroupRevision()
