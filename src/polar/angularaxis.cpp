@@ -284,7 +284,7 @@ void QCPPolarAxisAngular::setAngle(double degrees)
 {
     if (degrees == mAngle)
         return;
-    markDirty();
+    markAppearanceDirty();
     mAngle = degrees;
     mAngleRad = mAngle / 180.0 * M_PI;
 }
@@ -911,10 +911,20 @@ QColor QCPPolarAxisAngular::getLabelColor() const
 */
 void QCPPolarAxisAngular::rangeDidChange(const QCPRange& oldRange)
 {
+    markAppearanceDirty();
+    QCPAxisBase::rangeDidChange(oldRange);
+}
+
+/*! \internal
+
+  The rotation, the pens and the fonts change the pixels of the ticks and of every graph of the
+  area, wherever their layers are, so the area's layers are dirtied, not only the axis's own.
+*/
+void QCPPolarAxisAngular::markAppearanceDirty()
+{
     markDirty();
     if (mArea)
         mArea->markAffectedLayersDirty();
-    QCPAxisBase::rangeDidChange(oldRange);
 }
 
 /*! \internal

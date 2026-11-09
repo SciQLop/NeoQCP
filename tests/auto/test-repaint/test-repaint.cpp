@@ -1479,6 +1479,36 @@ void TestRepaint::rangeChangeRepaintsItsLayers()
              "a polar range change left the graph layer at its old pixels");
 }
 
+void TestRepaint::aPolarLookChangeDirtiesTheGraphLayers()
+{
+    // A rotation or a radial look change moves what the graphs draw, wherever their layer sits:
+    // dirtying only the axis's own layer would leave them at their old pixels.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.plotLayout()->clear();
+    auto* area = new QCPPolarArea(&plot);
+    plot.plotLayout()->addElement(0, 0, area);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 180 }, QVector<double> { 0.5, 0.5 });
+    QVERIFY(graph);
+    QVERIFY(plot.addLayer(QStringLiteral("polar graph"), plot.layer(QStringLiteral("main"))));
+    auto* graphLayer = plot.layer(QStringLiteral("polar graph"));
+    QVERIFY(graphLayer);
+    QVERIFY(graph->setLayer(graphLayer));
+    plot.replot();
+    waitUntilSettled(plot);
+    QVERIFY2(!graphLayer->dirtiedAfterDraw(), "a settled graph layer must not be dirty");
+
+    area->angularAxis()->setAngle(30);
+    QVERIFY2(graphLayer->dirtiedAfterDraw(), "the rotation did not mark the graph layer");
+
+    waitUntilSettled(plot);
+    QVERIFY(!graphLayer->dirtiedAfterDraw());
+    area->radialAxis()->setRangeReversed(true);
+    QVERIFY2(graphLayer->dirtiedAfterDraw(), "the radial look change did not mark the graph layer");
+}
+
 void TestRepaint::exportSettlesPendingTheme()
 {
     auto plot = settledPlot();
