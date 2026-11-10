@@ -1545,11 +1545,9 @@ bool QCustomPlot::adopt(QCPAbstractPlottable* plottable)
         return false;
     plottable->setParent(this);
     plottable->initializeParentPlot(this);
-    // It joins the frame of the rect it arrives in, like a plottable built from that pair.
-    plottable->mSystem = keyAxis->axisRect()->system(keyAxis, valueAxis);
-    plottable->mKeyAxis = keyAxis;
-    plottable->mValueAxis = valueAxis;
-    plottable->mReportedLostAxis = false;
+    // It joins the frame of the rect it arrives in, like a plottable built from that pair, through
+    // setSystem so it rewires to the new axes: a graph2 would keep following the old ones' signals.
+    plottable->setSystem(keyAxis->axisRect()->system(keyAxis, valueAxis));
     plottable->setPipelineScheduler(mPipelineScheduler);
     plottable->setParentLayerable(keyAxis->axisRect());
     if (!registerPlottable(plottable))

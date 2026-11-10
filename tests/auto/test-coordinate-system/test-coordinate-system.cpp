@@ -66,9 +66,16 @@ public:
 
     [[nodiscard]] int recordings() const { return mCore.recordingCount(); }
 
+    void systemChanged() override { ++mSystemChanges; }
+
+    //! How many times the plottable was told its frame changed: a move into another plot is one.
+    [[nodiscard]] int systemChanges() const { return mSystemChanges; }
+
     bool readsTransform = false;
 
 private:
+    int mSystemChanges = 0;
+
     std::shared_ptr<const std::vector<QPointF>> mLine
         = std::make_shared<const std::vector<QPointF>>(
             std::initializer_list<QPointF> { { 1, 1 }, { 9, 9 } });
@@ -599,6 +606,40 @@ void TestCoordinateSystem::aChangedSlotMayDeleteTheAxis()
 
     QVERIFY(deleted);
     QVERIFY(!rect->axes().contains(axis));
+}
+
+void TestCoordinateSystem::aTakenPlottableFollowsItsNewPlot()
+{
+    // A plottable taken out of one plot and added to another joins that plot's system, and hears
+    // about it the way setSystem tells it: a graph2 reconnects to the new axes' signals.
+    QCustomPlot from;
+    QCustomPlot to;
+    from.resize(400, 300);
+    to.resize(400, 300);
+
+    auto handle = from.add(std::unique_ptr<RecordingPlottable>(new RecordingPlottable(nullptr)));
+    QVERIFY(handle);
+    RecordingPlottable* recorded = handle.get();
+    const int before = recorded->systemChanges();
+    auto taken = from.take(handle);
+    QVERIFY(taken);
+    QVERIFY(to.add(std::move(taken)));
+    QCOMPARE(recorded->systemChanges(), before + 1); // the move announced the new frame
+    QCOMPARE(recorded->system()->area(), to.axisRect());
+    QCOMPARE(recorded->keyAxis(), to.xAxis);
+    QCOMPARE(to.plottableCount(), 1);
+    QCOMPARE(from.plottableCount(), 0);
+
+    auto graph = from.add<QCPGraph2>().setData(QVector<double> { 1, 5, 9 },
+                                               QVector<double> { 1, 5, 9 });
+    QVERIFY(graph);
+    auto movedGraph = from.take(graph);
+    QVERIFY(movedGraph);
+    QVERIFY(to.add(std::move(movedGraph)));
+    settle(to);
+    QCOMPARE(graph->keyAxis(), to.xAxis);
+    QCOMPARE(graph->system(), to.axisRect()->system(to.xAxis, to.yAxis));
+    QVERIFY2(graph->hasRenderedRange(), "the graph did not draw in its new plot");
 }
 
 void TestCoordinateSystem::dualValueAxesKeepTheirRelationships()
