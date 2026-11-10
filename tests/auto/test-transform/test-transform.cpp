@@ -1,5 +1,6 @@
 #include "test-transform.h"
 
+#include "misuse-recorder.h"
 #include <coords.h>
 #include <polar/angularaxis.h>
 #include <polar/polar-area.h>
@@ -69,6 +70,18 @@ public:
     QCP::Data inverse(QPointF pixel) const override { return QCP::Data { pixel.x(), pixel.y() }; }
 };
 } // namespace
+
+void TestTransform::init()
+{
+    test_misuse::calls.clear();
+    qcp::setMisuseHandler(test_misuse::record);
+}
+
+void TestTransform::cleanup()
+{
+    qcp::setMisuseHandler(nullptr);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+}
 
 void TestTransform::polarMappingMatchesTheAxes_data()
 {
@@ -306,4 +319,23 @@ void TestTransform::cartesianInverseMatchesPixelToCoord()
         QVERIFY(nearlyEqual(back.x, keyAxis->pixelToCoord(verticalKey ? pixel.y() : pixel.x())));
         QVERIFY(nearlyEqual(back.y, valueAxis->pixelToCoord(verticalKey ? pixel.x() : pixel.y())));
     }
+}
+
+void TestTransform::polarRefusesAxesOfTwoAreas()
+{
+    // One disc has one centre: an angular axis of one area and a radial one of another have no
+    // common frame, so the mapping is refused rather than built from half of each.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.plotLayout()->clear();
+    auto* left = new QCPPolarArea(&plot);
+    auto* right = new QCPPolarArea(&plot);
+    plot.plotLayout()->addElement(0, 0, left);
+    plot.plotLayout()->addElement(0, 1, right);
+    plot.replot();
+
+    const QCPTransform crossed = QCPTransform::polar(*left->angularAxis(), *right->radialAxis());
+    QCOMPARE(int(test_misuse::calls.size()), 1);
+    QVERIFY(!crossed.valid());
+    test_misuse::calls.clear();
 }

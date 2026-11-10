@@ -117,7 +117,8 @@ using Position = std::variant<Data, Pixels, AxisRatio, AnchorOffset, DataXRatioY
     QCPAxis::coordToPixel;
   - polar: the centre and radius of a polar area, the angular range, start angle and direction, and
     the radial range, scale and reversal, exactly QCPPolarAxisRadial::coordToPixel, with the radial
-    fraction clamped to [0, 1.05];
+    fraction clamped to [0, 1.05]. A value a logarithmic radial scale cannot take (zero, or on the
+    other side of zero) maps to NaN;
   - custom: a QCPCustomMapping, which maps a whole span at once.
 
   Every public call dispatches on the kind once and then runs a plain loop: batchMap() runs the same
@@ -166,7 +167,7 @@ public:
     //! Maps one pixel back to data.
     [[nodiscard]] QCP::Data inverse(QPointF pixel) const;
     //! True when the two transforms differ by a pixel offset only (a pan, not a zoom); \a delta
-    //! gets it.
+    //! gets this transform's pixel minus \a other's.
     [[nodiscard]] bool isTranslationOf(const QCPTransform& other, QPointF* delta = nullptr) const;
 
     //! True when the key axis is vertical: map() then returns the value pixel first.

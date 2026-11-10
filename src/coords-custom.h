@@ -29,7 +29,8 @@ struct Pixels;
 
   A transform holds one of these when its system supplies its own rule (a sky projection, a
   distortion). The entry points are batch calls: a QCPTransform dispatches to map() once per span,
-  never once per point, and inverse() maps back. equivalentTo() tells a replay whether two mappings
+  never once per point, and inverse() maps back. A subclass that overrides only one map() overload
+  declares \c using \c QCPCustomMapping::map; to keep the other one visible. equivalentTo() tells a replay whether two mappings
   differ by a pixel offset only; the default says they do not, which costs a repaint and can never
   draw a wrong frame.
 */

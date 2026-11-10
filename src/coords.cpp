@@ -10,6 +10,7 @@
 ****************************************************************************/
 
 #include "coords.h"
+#include "misuse.h"
 
 #include <algorithm>
 #include <cmath>
@@ -145,6 +146,9 @@ QCPTransform QCPTransform::fitted(const QCPDataBox& box, const QRectF& rect)
 QCPTransform QCPTransform::polar(const QCPPolarAxisAngular& angular,
                                  const QCPPolarAxisRadial& radial)
 {
+    QCP_CHECK_OR_RETURN(radial.area() == angular.area(),
+                        "the two polar axes belong to two areas: one disc has one centre",
+                        QCPTransform());
     QCPTransform transform;
     // A polar frame never reads the axes again: everything it maps is copied here.
     transform.mFrame.emplace<Polar>().take(angular, radial);
@@ -570,7 +574,14 @@ bool QCPTransform::isTranslationOf(const QCPTransform& other, QPointF* delta) co
         return false; // a rotation is not a pan
     if (!here)
     {
-        // A custom mapping knows what a pan means for it; the default says it does not.
+        // A custom mapping knows what a pan means for it; the default says it does not. Two
+        // equal mappings are the same frame: no pixel moved, so no call is needed.
+        if (*this == other)
+        {
+            if (delta)
+                *delta = QPointF(0, 0);
+            return true;
+        }
         const Custom& mine = std::get<Custom>(mFrame);
         return mine.mapping->equivalentTo(*std::get<Custom>(other.mFrame).mapping, delta);
     }
