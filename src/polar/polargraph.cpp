@@ -515,18 +515,12 @@ void QCPPolarGraph::draw(QCPDrawContext& context) const
     const double clampedValue = frame.polarValue(kClampFraction);
 
     // A value the radial scale cannot take (zero or the other sign on a logarithmic axis) has no
-    // place in the disc: it is a gap, exactly like a NaN value, and so is a value the frame maps to
-    // no pixel at all.
-    const bool logarithmic = radial->scaleType() == QCPPolarAxisRadial::stLogarithmic;
-    const bool negativeRange = radial->range().upper < 0;
+    // place in the disc: it is a gap, exactly like a NaN value. The frame's fraction says so without
+    // the trigonometry of a full map, which the replay pays once per point anyway.
     const auto isDrawn = [&](const QCPGraphData& data)
     {
-        if (!std::isfinite(data.key) || !std::isfinite(data.value))
-            return false;
-        if (logarithmic && (negativeRange ? data.value >= 0 : data.value <= 0))
-            return false;
-        const QCP::Pixels pixel = frame.map(QCP::Data { data.key, data.value });
-        return std::isfinite(pixel.x) && std::isfinite(pixel.y);
+        return std::isfinite(data.key) && std::isfinite(data.value)
+            && std::isfinite(frame.polarFraction(data.value));
     };
 
     // Where the segment from a to b, drawn straight in the plot, crosses the rim. Only called for a
