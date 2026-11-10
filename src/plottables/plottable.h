@@ -353,6 +353,7 @@ protected:
     void applyScattersAntialiasingHint(QCPPainter* painter) const;
     //! False, and one misuse the first time, while the key or value axis is gone.
     bool drawableAxes() const;
+    void dropSystem();
 
 private:
     Q_DISABLE_COPY(QCPAbstractPlottable)
@@ -378,7 +379,8 @@ private:
     void resolveAxes(QCPAxis* key, QCPAxis* value);
 
     friend class QCustomPlot;
-    friend class QCPSelectionDecorator; // its pen and brush are part of what a plottable draws
+    friend class QCPSelectionDecorator;
+    friend class QCPArea; // its pen and brush are part of what a plottable draws
     friend class QCPLayer; // draw() skips a plottable without drawableAxes()
     friend class QCPAxis;
     friend class QCPPlottableLegendItem;

@@ -841,9 +841,9 @@ void QCPAbstractPlottable::setSystem(QCPCoordinateSystem* system)
     setParentLayerable(system ? system->area() : nullptr);
     mKeyAxis = system ? qobject_cast<QCPAxis*>(system->keyAxis()) : nullptr;
     mValueAxis = system ? qobject_cast<QCPAxis*>(system->valueAxis()) : nullptr;
-    // A system leaving is worth one report, on the next draw; an inert plottable built without one
-    // stays silent (its constructor told the caller already).
-    mReportedLostAxis = false;
+    // A plottable told to drop its system is inert on purpose: it draws nothing and says nothing.
+    // A system that goes away under it is reported once, on the next draw, by dropSystem() below.
+    mReportedLostAxis = mSystem == nullptr;
     contentChanged(); // the new frame's recording, then whatever follows an axis pair
     systemChanged();
 }
@@ -1278,6 +1278,18 @@ bool QCPAbstractPlottable::removeFromLegend() const
         return false;
     else
         return removeFromLegend(mParentPlot->legend);
+}
+
+/*! \internal
+  The system under this plottable went away: its area or one of its axes was deleted. The plottable
+  drops it silently like setSystem(nullptr), but re-arms the one report the next draw gives, so the
+  user learns why it stopped being drawn.
+*/
+void QCPAbstractPlottable::dropSystem()
+{
+    if (mSystem)
+        setSystem(nullptr);
+    mReportedLostAxis = false;
 }
 
 bool QCPAbstractPlottable::drawableAxes() const

@@ -43,16 +43,13 @@ QCPArea::QCPArea(QCustomPlot* parentPlot)
     mInsetLayout->setParent(this);
 }
 
-namespace
-{
 //! Frees the plottables of \a system: a plottable must not outlive the frame it is drawn in, so it
 //! leaves the system before the system goes (it then draws nothing and no click hits it).
-void detachFromSystems(QCPCoordinateSystem* system)
+void QCPArea::detachFromSystem(QCPCoordinateSystem* system)
 {
     for (QCPAbstractPlottable* plottable : system->plottables())
-        plottable->setSystem(nullptr);
+        plottable->dropSystem();
 }
-} // namespace
 
 QCPArea::~QCPArea()
 {
@@ -61,7 +58,7 @@ QCPArea::~QCPArea()
     for (const QPointer<QCPCoordinateSystem>& system : std::exchange(mSystems, { }))
     {
         if (system)
-            detachFromSystems(system);
+            detachFromSystem(system);
         delete system;
     }
     destroyInsetLayout();
@@ -149,7 +146,7 @@ void QCPArea::axisRemoved(const QCPAxisBase* axis)
             continue;
         if (system->usesAxis(axis))
         {
-            detachFromSystems(system);
+            detachFromSystem(system);
             delete system;
         }
         else

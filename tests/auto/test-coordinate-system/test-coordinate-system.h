@@ -18,6 +18,8 @@ private slots:
     void systemRevisionsAreNeverShared();
     void aPolarPlottableIsClippedToItsDisc();
     void aRatioPositionInAPolarAreaReportsOnce();
+    void aDeliberateNullSystemStaysQuiet();
+    void aLostSystemReportsOnce();
     void deletingAnAxisDeletesItsSystems();
     void aPlottableTakesASystem();
     void twoConstructorsShareTheSystem();

@@ -301,6 +301,47 @@ void TestCoordinateSystem::revisionBumpsOnAnyMappingChange()
     QCOMPARE(polarChanged.count(), 2);
 }
 
+void TestCoordinateSystem::aDeliberateNullSystemStaysQuiet()
+{
+    // Dropping the system on purpose makes the plottable inert: it draws nothing and says nothing.
+    QCustomPlot plot;
+    QCPAxisRect* rect = cartesianRect(plot);
+    auto* plottable = new RecordingPlottable(
+        rect->system(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft)));
+    settle(plot);
+    const int draws = plottable->draws();
+    test_misuse::calls.clear();
+
+    plottable->setSystem(nullptr);
+    settle(plot);
+
+    QCOMPARE(test_misuse::calls.size(), 0);
+    QCOMPARE(plottable->draws(), draws);
+}
+
+void TestCoordinateSystem::aLostSystemReportsOnce()
+{
+    // A system that goes away under the plottable is worth one report: the user has to know why it
+    // stopped being drawn.
+    QCustomPlot plot;
+    QCPAxisRect* rect = cartesianRect(plot);
+    QCPAxis* top = rect->addAxis(QCPAxis::atTop);
+    QCPAxis* right = rect->addAxis(QCPAxis::atRight);
+    auto* plottable = new RecordingPlottable(rect->system(top, right));
+    settle(plot);
+    test_misuse::calls.clear();
+
+    rect->removeAxis(top); // the system using it goes with it
+    settle(plot);
+    settle(plot); // one report, not one per frame
+
+    QCOMPARE(test_misuse::calls.size(), 1);
+    QCOMPARE(QString::fromStdString(test_misuse::calls.front().what),
+             QStringLiteral("it has no coordinate system: it is not drawn"));
+    QCOMPARE(plottable->system(), nullptr);
+    test_misuse::calls.clear(); // the one report above is the point of this test
+}
+
 void TestCoordinateSystem::aRatioPositionInAPolarAreaReportsOnce()
 {
     // A ratio position is a fraction of an axis rect, and a disc has none: the command is dropped,

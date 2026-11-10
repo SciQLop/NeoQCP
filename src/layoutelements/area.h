@@ -131,6 +131,8 @@ protected:
     void destroyInsetLayout();
 
 private:
+    void detachFromSystem(QCPCoordinateSystem* system);
+
     Q_DISABLE_COPY(QCPArea)
 };
 
