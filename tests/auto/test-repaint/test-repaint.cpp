@@ -11,6 +11,7 @@
 #include "items/item-span.h"
 #include "items/item-text.h"
 #include "items/item-tracer.h"
+#include "coordinate-system.h"
 #include "layoutelements/layoutelement-colorscale.h"
 #include "layoutelements/layoutelement-legend.h"
 #include "layoutelements/layoutelement-textelement.h"
@@ -93,6 +94,35 @@ public:
         ++commits;
         return true;
     }
+
+    double selectTest(const QPointF&, bool, QVariant* = nullptr) const override { return -1; }
+
+    QCPRange getKeyRange(bool& found, QCP::SignDomain = QCP::sdBoth) const override
+    {
+        found = false;
+        return { };
+    }
+
+    QCPRange getValueRange(bool& found, QCP::SignDomain = QCP::sdBoth,
+                           const QCPRange& = QCPRange()) const override
+    {
+        found = false;
+        return { };
+    }
+
+    void draw(QCPPainter*) override { }
+
+    void drawLegendIcon(QCPPainter*, const QRectF&) const override { }
+};
+
+// A plottable that joins any system: it needs no capability and draws nothing, so only the layer
+// it sits on is under test.
+class SystemStub : public QCPAbstractPlottable
+{
+public:
+    explicit SystemStub(QCPCoordinateSystem* system) : QCPAbstractPlottable(system) { }
+
+    QCP::Capabilities requiredCapabilities() const override { return { }; }
 
     double selectTest(const QPointF&, bool, QVariant* = nullptr) const override { return -1; }
 
@@ -1477,6 +1507,33 @@ void TestRepaint::rangeChangeRepaintsItsLayers()
     waitUntilSettled(plot);
     QVERIFY2(screenOf(&plot) != before,
              "a polar range change left the graph layer at its old pixels");
+}
+
+void TestRepaint::aPolarAxisChangeDirtiesItsPlottablesLayers()
+{
+    // The plottables of a polar area's systems draw in its disc: a rotation moves them, so their
+    // layer must follow as the graphs' does.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.plotLayout()->clear();
+    auto* area = new QCPPolarArea(&plot);
+    plot.plotLayout()->addElement(0, 0, area);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    QVERIFY(plot.addLayer(QStringLiteral("arc")));
+    auto* plottable = new SystemStub(area->system(area->angularAxis(), area->radialAxis()));
+    plottable->setLayer(QStringLiteral("arc"));
+    QCPLayer* layer = plot.layer(QStringLiteral("arc"));
+    QVERIFY(layer);
+    waitUntilSettled(plot);
+    QVERIFY(!layer->dirtiedAfterDraw());
+
+    area->angularAxis()->setAngle(30);
+
+    QVERIFY2(layer->dirtiedAfterDraw(),
+             "a rotation left the layer of the area's plottables at its old pixels");
+    waitUntilSettled(plot);
+    QVERIFY(!layer->dirtiedAfterDraw());
 }
 
 void TestRepaint::aPolarLookChangeDirtiesTheGraphLayers()

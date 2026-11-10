@@ -132,6 +132,7 @@ protected:
     // Dirties every layer a change of the axes' ranges moves: the axes and the grid, then what the
     // graphs and their items draw. Mirrors QCPAxisRect::markAffectedLayersDirty.
     void markAffectedLayersDirty(bool invalidate = false) override;
+    void markLayoutAppearanceDirty() override;
 
     // The angular axis and one of the radials; any other pair is refused as misuse.
     QCPCoordinateSystem* createSystem(QCPAxisBase* key, QCPAxisBase* value) override;

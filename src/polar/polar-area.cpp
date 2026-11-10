@@ -35,6 +35,7 @@
 #include "../core.h"
 #include "../misuse.h"
 #include "../painting/painter.h"
+#include "../plottables/plottable.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPPolarArea
@@ -336,6 +337,31 @@ void QCPPolarArea::markAffectedLayersDirty(bool invalidate)
         markOnce(mGrid->layer());
     for (QCPPolarGraph* graph : mGraphs)
         markOnce(graph->layer());
+    if (!mParentPlot)
+        return;
+    // The plottables of this area's systems draw in the disc too, wherever their layer sits: the
+    // same one-pass selection by system the axis rect uses.
+    const int count = mParentPlot->plottableCount();
+    for (int i = 0; i < count; ++i)
+    {
+        QCPAbstractPlottable* plottable = mParentPlot->plottable(i);
+        if (plottable->system() && plottable->system()->area() == this)
+        {
+            markOnce(plottable->layer());
+            for (QCPLayer* dependent : plottable->dependentLayers())
+                markOnce(dependent);
+        }
+    }
+}
+
+void QCPPolarArea::markLayoutAppearanceDirty()
+{
+    if (!mParentPlot) // the constructor sets sizes before there is a plot to mark
+        return QCPLayoutElement::markLayoutAppearanceDirty();
+    // Not just the area's own layer: a pending translation would keep the axes, grid and plottables
+    // of this disc at their old pixels.
+    markAffectedLayersDirty(true);
+    QCPLayoutElement::markLayoutAppearanceDirty();
 }
 
 void QCPPolarArea::mousePressEvent(QMouseEvent* event, [[maybe_unused]] const QVariant& details)

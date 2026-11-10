@@ -38,6 +38,7 @@ private slots:
     void polarPlotSettles();
     void rangeChangeRepaintsItsLayers_data();
     void rangeChangeRepaintsItsLayers();
+    void aPolarAxisChangeDirtiesItsPlottablesLayers();
     void aPolarLookChangeDirtiesTheGraphLayers();
     void polarBackgroundEdgeIsAntialiased();
     void exportSettlesPendingTheme();
