@@ -138,6 +138,7 @@ protected:
     [[nodiscard]] std::pair<QCPGraphDataContainer::const_iterator,
                             QCPGraphDataContainer::const_iterator>
     window() const;
+    [[nodiscard]] double visibleDistance(const QPointF& pos, const QCPTransform& frame) const;
 
     // property members:
     LineStyle mLineStyle;

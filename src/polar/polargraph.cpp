@@ -33,6 +33,7 @@
 #include "polar-area.h"
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <numbers>
 #include <typeinfo>
 #include <vector>
@@ -291,35 +292,98 @@ QCPPolarGraph::window() const
 */
 double QCPPolarGraph::selectTest(const QPointF& pos, bool onlySelectable, QVariant* details) const
 {
-    const double distance = QCPAbstractPlottable::selectTest(pos, onlySelectable, details);
-    if (distance < 0 || !system())
-        return distance;
+    const double recorded = QCPAbstractPlottable::selectTest(pos, onlySelectable, details);
+    if (recorded < 0 || !system() || !parentPlot())
+        return recorded;
 
+    // The recording holds the run beyond the rim too, and the replay cuts it: only the geometry it
+    // shows is there to click. A click inside a visible fill keeps the base's distance zero.
     const QCPTransform frame = system()->transform();
-    int nearest = -1;
-    double nearestDistance = 0;
-    double nearestFraction = 0;
-    const auto [begin, end] = window();
-    for (auto it = begin; it != end; ++it)
+    const double visible = visibleDistance(pos, frame);
+    if (recorded > 0.0 && visible > parentPlot()->selectionTolerance())
+        return -1;
+
+    if (details)
     {
-        const QCP::Pixels pixel = frame.map(QCP::Data { it->key, it->value });
-        if (!std::isfinite(pixel.x) || !std::isfinite(pixel.y))
-            continue;
-        const double pointDistance = QCPVector2D(pixel.x - pos.x(), pixel.y - pos.y()).length();
-        if (nearest < 0 || pointDistance < nearestDistance)
+        int nearest = -1;
+        double nearestDistance = 0;
+        const auto [begin, end] = window();
+        for (auto it = begin; it != end; ++it)
         {
-            nearest = static_cast<int>(it - mDataContainer->constBegin());
-            nearestDistance = pointDistance;
-            nearestFraction = frame.polarFraction(it->value);
+            const double fraction = frame.polarFraction(it->value);
+            if (!std::isfinite(fraction) || fraction < 0.0 || fraction > 1.0)
+                continue;
+            const QCP::Pixels pixel = frame.map(QCP::Data { it->key, it->value });
+            if (!std::isfinite(pixel.x) || !std::isfinite(pixel.y))
+                continue;
+            const double pointDistance
+                = std::hypot(pixel.x - pos.x(), pixel.y - pos.y());
+            if (nearest < 0 || pointDistance < nearestDistance)
+            {
+                nearest = static_cast<int>(it - mDataContainer->constBegin());
+                nearestDistance = pointDistance;
+            }
+        }
+        if (nearest >= 0)
+            *details = QVariant::fromValue(QCPDataSelection(QCPDataRange(nearest, nearest + 1)));
+    }
+    return recorded > 0.0 ? visible : recorded;
+}
+
+/*! \internal
+
+  The distance from pos to what the replay shows: the recorded segments whose two ends are in the
+  disc (H-2 records a crossing at fraction exactly 1, so a segment is either wholly visible or wholly
+  hidden), and the markers, which only in-range points get.
+*/
+double QCPPolarGraph::visibleDistance(const QPointF& pos, const QCPTransform& frame) const
+{
+    const auto isVisible = [&frame](const QPointF& point)
+    {
+        const double fraction = frame.polarFraction(point.y());
+        return std::isfinite(fraction) && fraction >= 0.0 && fraction <= 1.0;
+    };
+    const auto segmentDistance = [&pos](const QPointF& from, const QPointF& to)
+    {
+        const double dx = to.x() - from.x();
+        const double dy = to.y() - from.y();
+        const double lengthSquared = dx * dx + dy * dy;
+        double t = 0.0;
+        if (lengthSquared > 0)
+            t = qBound(0.0,
+                       ((pos.x() - from.x()) * dx + (pos.y() - from.y()) * dy) / lengthSquared,
+                       1.0);
+        return std::hypot(from.x() + dx * t - pos.x(), from.y() + dy * t - pos.y());
+    };
+
+    double nearest = std::numeric_limits<double>::max();
+    for (const auto& command : mCore.recordedList().commands)
+    {
+        if (const auto* line = std::get_if<qcp::PolylineDataCmd>(&command))
+        {
+            const std::vector<QPointF>& points = *line->points;
+            std::vector<QPointF> pixels(points.size());
+            for (std::size_t i = 0; i < points.size(); ++i)
+            {
+                const QCP::Pixels pixel = frame.map(QCP::Data { points[i].x(), points[i].y() });
+                pixels[i] = QPointF(pixel.x, pixel.y);
+            }
+            for (std::size_t i = 0; i + 1 < points.size(); ++i)
+                if (isVisible(points[i]) && isVisible(points[i + 1]))
+                    nearest = qMin(nearest, segmentDistance(pixels[i], pixels[i + 1]));
+        }
+        else if (const auto* markers = std::get_if<qcp::MarkersCmd>(&command))
+        {
+            for (const QPointF& point : *markers->points)
+            {
+                if (!isVisible(point))
+                    continue;
+                const QCP::Pixels pixel = frame.map(QCP::Data { point.x(), point.y() });
+                nearest = qMin(nearest, std::hypot(pixel.x - pos.x(), pixel.y - pos.y()));
+            }
         }
     }
-    // What the clip hides is not there to click: a point beyond the rim, or below it, is drawn on the
-    // rim or at the centre, and neither is its place.
-    if (nearest < 0 || nearestFraction > 1.0 || nearestFraction < 0.0)
-        return -1;
-    if (details)
-        *details = QVariant::fromValue(QCPDataSelection(QCPDataRange(nearest, nearest + 1)));
-    return distance;
+    return nearest;
 }
 
 /*! \internal

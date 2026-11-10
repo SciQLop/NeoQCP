@@ -734,6 +734,38 @@ void TestPolar::rescaledKeysFollowTheDataInOneCall()
     QCOMPARE(angular->range().upper, 900.0);
 }
 
+void TestPolar::theVisiblePartOfALeavingSegmentIsHittable()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 30 },
+                                          QVector<double> { 0.2, 1.6 });
+    QVERIFY(graph);
+    graph->setPen(QPen(Qt::blue, 3));
+    settle(plot);
+
+    // The segment leaves the disc: the recording holds its visible part, from (0, 0.2) to the rim
+    // crossing, then the hidden part along the rim to (30, 1.6). Click the visible part, near the rim.
+    const auto lines = recordedPolylines(graph->mCore);
+    QCOMPARE(lines.size(), std::size_t(1));
+    QVERIFY(lines.front().size() >= 2);
+    const QCPTransform frame = graph->system()->transform();
+    const QCP::Pixels start
+        = frame.map(QCP::Data { lines.front().front().x(), lines.front().front().y() });
+    const QCP::Pixels crossing = frame.map(QCP::Data { lines.front()[1].x(), lines.front()[1].y() });
+    const QPointF onTheChord(start.x + (crossing.x - start.x) * 0.9,
+                             start.y + (crossing.y - start.y) * 0.9);
+    QVERIFY2(isInk(pixelAt(plot, onTheChord.toPoint())), "sanity: the click point is on the line");
+
+    QVariant details;
+    QVERIFY2(graph->selectTest(onTheChord, false, &details) >= 0,
+             "a visible line cannot be clicked");
+    // The details are the nearest in-range point: the far end of the segment is outside the disc.
+    QCOMPARE(details.value<QCPDataSelection>().dataRange(0), QCPDataRange(0, 1));
+}
+
 void TestPolar::hiddenGeometryIsNotHittable()
 {
     QCustomPlot plot;

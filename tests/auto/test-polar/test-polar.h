@@ -30,6 +30,7 @@ private slots:
     void aLegendIconShowsTheGraphsStyles();
     void rescaledAxesFollowTheData();
     void rescaledKeysFollowTheDataInOneCall();
+    void theVisiblePartOfALeavingSegmentIsHittable();
     void hiddenGeometryIsNotHittable();
     void theBandIgnoresPointsOutsideTheRange();
     void rubberBandDragSelectsPolarPoints();
