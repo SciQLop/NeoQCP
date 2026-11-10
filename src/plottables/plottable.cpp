@@ -836,6 +836,9 @@ void QCPAbstractPlottable::setSystem(QCPCoordinateSystem* system)
     }
     systemWillChange();
     mSystem = system;
+    // The area it draws in is the one it hangs on: hiding the area it left must not hide it, and
+    // an onlyVisible rescale of the new area must find it.
+    setParentLayerable(system ? system->area() : nullptr);
     mKeyAxis = system ? qobject_cast<QCPAxis*>(system->keyAxis()) : nullptr;
     mValueAxis = system ? qobject_cast<QCPAxis*>(system->valueAxis()) : nullptr;
     // A system leaving is worth one report, on the next draw; an inert plottable built without one

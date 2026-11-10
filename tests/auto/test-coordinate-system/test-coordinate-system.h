@@ -28,6 +28,7 @@ private slots:
     void dualValueAxesKeepTheirRelationships();
     void aMisusedPairIsOwnedAndInert();
     void aChangedSlotMayDeleteTheAxis();
+    void aMovedPlottableFollowsItsNewArea();
     void aTakenPlottableFollowsItsNewPlot();
     void aBracketDecorationNeedsAKeyAxis();
     void rescaleAxesVisitsEveryArea();

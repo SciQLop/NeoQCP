@@ -54,6 +54,7 @@ public:
 
     void draw(QCPDrawContext& context) const override
     {
+        ++mDraws;
         if (readsTransform) // a recording that bakes the frame: a new frame re-records it
         {
             const QCP::Pixels corner = context.transform().map(QCP::Data { 6, 6 });
@@ -71,10 +72,14 @@ public:
     //! How many times the plottable was told its frame changed: a move into another plot is one.
     [[nodiscard]] int systemChanges() const { return mSystemChanges; }
 
+    //! How many frames it was drawn in: zero while the area it hangs on is hidden.
+    [[nodiscard]] int draws() const { return mDraws; }
+
     bool readsTransform = false;
 
 private:
     int mSystemChanges = 0;
+    mutable int mDraws = 0;
 
     std::shared_ptr<const std::vector<QPointF>> mLine
         = std::make_shared<const std::vector<QPointF>>(
@@ -606,6 +611,29 @@ void TestCoordinateSystem::aChangedSlotMayDeleteTheAxis()
 
     QVERIFY(deleted);
     QVERIFY(!rect->axes().contains(axis));
+}
+
+void TestCoordinateSystem::aMovedPlottableFollowsItsNewArea()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    QCPAxisRect* first = plot.axisRect();
+    auto* second = new QCPAxisRect(&plot);
+    plot.plotLayout()->addElement(0, 1, second);
+    auto* plottable
+        = new RecordingPlottable(first->system(first->axis(QCPAxis::atBottom),
+                                               first->axis(QCPAxis::atLeft)));
+    settle(plot);
+    QVERIFY(plottable->draws() > 0);
+
+    plottable->setSystem(second->system(second->axis(QCPAxis::atBottom),
+                                        second->axis(QCPAxis::atLeft)));
+    first->setVisible(false);
+    const int before = plottable->draws();
+    settle(plot);
+
+    // It draws in the area it moved to: the one it left cannot hide it any more.
+    QCOMPARE(plottable->draws(), before + 1);
 }
 
 void TestCoordinateSystem::aTakenPlottableFollowsItsNewPlot()
