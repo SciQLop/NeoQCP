@@ -618,8 +618,11 @@ void QCPAxisBase::commitRange(const QCPRange& range)
     std::optional<QCPEmissionScope> scope;
     if (defersEmissions())
         scope.emplace(mParentPlot);
+    // Without a scope the source's rangeChanged runs inside this call, and its slot may delete us.
+    const QPointer<QCPAxisBase> alive(this);
     source->setRange(sourceRange);
-    refreshFromLink();
+    if (alive)
+        refreshFromLink();
 }
 
 /*!
