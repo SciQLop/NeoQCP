@@ -128,7 +128,7 @@ resolution (F6).
 
 The protected `mKeyAxis`/`mValueAxis` stay until milestone 5 as the same projection, kept in sync by
 `setSystem` (out-of-tree 2.x subclasses keep compiling, F23). `axesChanged()` becomes `systemChanged()`
-(old name kept as a call until milestone 5); the five plottables that wire axis signals (F18: graph2,
+(no forwarder: `axesChanged` was NeoQCP-only API, maintainer rule D6; amended in milestone 4g); the five plottables that wire axis signals (F18: graph2,
 histogram, histogram2d, colormap2, multigraph) rewire to the system's axes and `changed()`.
 
 Through the system: `view()`, `clipRect()`, `coordsToPixels`/`pixelsToCoords`, the hit gate

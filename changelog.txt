@@ -460,6 +460,28 @@ Behaviour changes:
   - String-based connections naming QCPAxis::ScaleType or QCPAxis::SelectableParts no longer match
         (moc now spells them QCPAxisBase::...); pointer-to-member connections are unchanged.
 
+Milestone 4g (coordinate systems and the plottables on them). Steps 5-8 of the coordinate-systems design.
+  - QCPCoordinateSystem (public): what a plottable is drawn in. QCPCartesianSystem is a key and a value
+        axis of an axis rect; QCPPolarSystem the angular axis and a radial axis of a polar area. An
+        area hands out one system per axis pair: area->system(key, value). It answers the frame
+        (transform), the clip, the hit area, the icon frame, the key window and its capabilities.
+  - Plottables hold a system: system(), setSystem(). The 2.x constructors from two axes, keyAxis(),
+        valueAxis(), setKeyAxis() and setValueAxis() keep working: they name the cartesian system of
+        that pair.
+  - Capabilities (QCP::capRectangular, capStraightKey, capColourScale, capLanes): a plottable that needs
+        one its system lacks is refused when it joins the system, never drawn wrong. Every existing
+        plottable needs a cartesian system until the polar graph joins in 4h.
+  - QCustomPlot::areas(); rescaleAxes() rescales every axis of every area; axisRect->add<T>() and
+        axisRect->add<T>(key, value, ...) add a plottable to that rect.
+  - Fix: two plots could share a drawing frame when one was created at the address of a deleted one
+        (rare wrong pixels or hit tests); frame epochs are now process-wide.
+
+Behaviour changes for 2.x users:
+  - Channel fills, bar stacking, bar groups and error bars across axis rects or plots are refused as
+        misuse (2.x printed a debug message or did nothing).
+  - A bar moved to other axes (setKeyAxis, setValueAxis) leaves its stack and its bars group.
+  - axesChanged() (NeoQCP 3.0 preview) is now systemChanged().
+
 #### NeoQCP, unreleased ####
 
 Behaviour changes (slots that delete their sender are now safe):

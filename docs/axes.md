@@ -1,7 +1,7 @@
 # Axes
 
 An axis maps data coordinates to pixels, and draws the ticks, tick labels and label that explain the mapping.
-Every plottable is attached to two axes: a key axis and a value axis.
+Every plottable is drawn in a coordinate system. In an axis rect that system is two axes: a key axis and a value axis (`keyAxis()`, `valueAxis()`); in a polar area it is the angular axis and a radial axis. `plottable->system()` returns it.
 This page covers <a href="api/classQCPAxis.html">QCPAxis</a>: its range and scale, the tickers that choose where ticks go, number formats, grids, labels with LaTeX, extra axes, and how to keep axes in sync.
 
 ## The four default axes

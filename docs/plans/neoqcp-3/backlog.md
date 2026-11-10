@@ -3,6 +3,16 @@
 Work that was deferred during the 3.0 milestones, to triage before 3.0 ships. Each item says what a
 user would see and where the code is. Fixed items are deleted, not ticked.
 
+## From milestone 4g (coordinate systems and the plottables on them)
+
+- **`QCPMultiGraph` requires `capColourScale`** (it is a `QCPAbstractLine`) besides `capLanes`.
+- **Polar rubber-band selection selects through the disc**; `rescaleAxes` moves the radial axes of polar
+  plottables with data (both follow the contract).
+- **A listener connected and disconnected within one setter** lets that emission take the direct path.
+- **`defersEmissions()` is O(systems of the area)** per mapping change.
+- **Resolving an item position outside the drawing path** needs the `report` flag to stay quiet.
+- **Colour-scale relationship check** (a colour map using another rect's scale) deferred with design 2.10.
+
 ## From milestone 4f (areas, the axis base, the polar area, the frame variant)
 
 - **Polar tick-label hit boxes** are the upright extent around the anchor: offset at 0 and 180 degrees on
