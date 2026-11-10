@@ -40,6 +40,44 @@ QCPPolarArea* polarArea(QCustomPlot& plot)
     return area;
 }
 //! A plottable with one recording: enough to be drawn, hit and counted.
+class CountingSystem : public QCPCoordinateSystem
+{
+public:
+    CountingSystem(QCPArea* area, QCPAxisBase* key, QCPAxisBase* value)
+            : QCPCoordinateSystem(area, key, value)
+    {
+    }
+
+    QCPTransform transform() const override
+    {
+        return QCPTransform(qobject_cast<const QCPAxis*>(keyAxis()),
+                            qobject_cast<const QCPAxis*>(valueAxis()));
+    }
+
+    QRect clipRect() const override { return static_cast<QCPAxisRect*>(area())->rect(); }
+
+    QCPRatioTransform ratioTransform() const override
+    {
+        return QCPRatioTransform(static_cast<const QCPAxisRect*>(area()));
+    }
+
+    QCP::Capabilities capabilities() const override
+    {
+        return QCP::capRectangular | QCP::capStraightKey;
+    }
+
+    QCPTransform iconTransform(const QCPDataBox& box, const QRectF& rect) const override
+    {
+        ++mIconCalls;
+        return QCPCoordinateSystem::iconTransform(box, rect);
+    }
+
+    [[nodiscard]] int iconCalls() const { return mIconCalls; }
+
+private:
+    mutable int mIconCalls = 0;
+};
+
 class RecordingPlottable : public QCPAbstractPlottable
 {
 public:
@@ -393,6 +431,21 @@ void TestCoordinateSystem::aPolarPlottableIsClippedToItsDisc()
     QCOMPARE(image.pixelColor(qRound(centre.x()), qRound(centre.y())), QColor(Qt::red));
     const QPoint corner(qRound(centre.x() + 0.9 * radius), qRound(centre.y() - 0.9 * radius));
     QCOMPARE(image.pixelColor(corner), QColor(Qt::white));
+}
+
+void TestCoordinateSystem::theIconAsksTheSystem()
+{
+    // The legend icon replays through the system's icon transform: the default fits the recording
+    // into the rect as the 2.x icon always did, but the system decides, not the drawing core.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    QCPAxisRect* rect = plot.axisRect();
+    CountingSystem system(rect, rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
+    auto* plottable = new RecordingPlottable(&system);
+    QCOMPARE(plottable->system(), &system);
+    plot.legend->setVisible(true);
+    settle(plot);
+    QVERIFY2(system.iconCalls() > 0, "the legend icon was not replayed through the system");
 }
 
 void TestCoordinateSystem::systemRevisionsAreNeverShared()

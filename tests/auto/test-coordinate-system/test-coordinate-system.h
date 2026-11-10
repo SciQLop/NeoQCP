@@ -16,6 +16,7 @@ private slots:
     void polarSystemRefusesAxisRatios();
     void revisionBumpsOnAnyMappingChange();
     void systemRevisionsAreNeverShared();
+    void theIconAsksTheSystem();
     void aPolarPlottableIsClippedToItsDisc();
     void aRatioPositionInAPolarAreaReportsOnce();
     void aDeliberateNullSystemStaysQuiet();

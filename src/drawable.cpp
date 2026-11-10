@@ -1066,6 +1066,11 @@ void QCPDrawnCore::paintIcon(const QCPDrawable& object, QCPPainter& painter, con
     }
     if (!mState->icon.data.keyBounded || !mState->icon.data.valueBounded)
         return; // nothing to fit the recording into the rect with
-    const QCPDrawFrame frame = qcpMakeFittedFrame(mState->icon.data.bounds, rect);
+    // The frame the icon replays in is the system's: a cartesian system fits the recording into the
+    // rect, as every 2.x icon did, but a system may lay its legend icon out its own way.
+    const QCPTransform transform = view.system
+        ? view.system->iconTransform(mState->icon.data.bounds, rect)
+        : QCPTransform::fitted(mState->icon.data.bounds, rect);
+    const QCPDrawFrame frame { transform, QCPRatioTransform::fitted(rect), rect };
     qcpReplayWithPainter(mState->icon, painter, frame, QCPReplayKinds::All);
 }
