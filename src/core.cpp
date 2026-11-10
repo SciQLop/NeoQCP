@@ -1512,13 +1512,27 @@ bool QCustomPlot::adopt(QCPAbstractPlottable* plottable)
     const auto [keyAxis, valueAxis] = axesForAdd();
     if (!keyAxis)
         return false;
+    return adoptPlottable(plottable, keyAxis->axisRect()->system(keyAxis, valueAxis),
+                          keyAxis->axisRect());
+}
+
+/*! \internal
+
+  The part of adopt() that is the same for every area of the plot: the plottable joins this plot in
+  the given system, as the child of that system's area. An area reads its own objects back in with
+  it (see QCPPolarArea::add(std::unique_ptr<T>)).
+*/
+bool QCustomPlot::adoptPlottable(QCPAbstractPlottable* plottable, QCPCoordinateSystem* system,
+                                 QCPArea* area)
+{
+    QCP_CHECK_OR_RETURN(system && area, "the object has no coordinate system to join", false);
     plottable->setParent(this);
     plottable->initializeParentPlot(this);
-    // It joins the frame of the rect it arrives in, like a plottable built from that pair, through
-    // setSystem so it rewires to the new axes: a graph2 would keep following the old ones' signals.
-    plottable->setSystem(keyAxis->axisRect()->system(keyAxis, valueAxis));
+    // It joins the frame of the area it arrives in, like a plottable built there, through setSystem
+    // so it rewires to the new axes: a graph2 would keep following the old ones' signals.
+    plottable->setSystem(system);
     plottable->setPipelineScheduler(mPipelineScheduler);
-    plottable->setParentLayerable(keyAxis->axisRect());
+    plottable->setParentLayerable(area);
     if (!registerPlottable(plottable))
         return false;
     plottable->mRegisteredPlot = this;

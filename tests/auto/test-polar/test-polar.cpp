@@ -491,6 +491,158 @@ void TestPolar::aGraphFirstRecordedAtZeroSizeAppearsAfterAResize()
     QVERIFY2(inkCount(image) > 0, "the graph never came back after the plot was given a size");
 }
 
+namespace
+{
+// A plottable on polar axes that needs a rectangular frame the polar system cannot carry.
+class RectangularPolarGraph : public QCPPolarGraph
+{
+public:
+    RectangularPolarGraph(QCPPolarAxisAngular* angular, QCPPolarAxisRadial* radial)
+        : QCPPolarGraph(angular, radial)
+    {
+    }
+
+    QCP::Capabilities requiredCapabilities() const override { return QCP::capRectangular; }
+};
+
+int redInkCount(const QImage& image)
+{
+    int count = 0;
+    for (int y = 0; y < image.height(); ++y)
+        for (int x = 0; x < image.width(); ++x)
+            if (isRedInk(image.pixelColor(x, y)))
+                ++count;
+    return count;
+}
+} // namespace
+
+void TestPolar::clickingAPolarGraphSelectsThePoint()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    QVector<double> keys, values;
+    for (int i = 0; i < 16; ++i)
+    {
+        keys << i * 22.5;
+        values << 0.5;
+    }
+    auto graph = area->add<QCPPolarGraph>(keys, values);
+    QVERIFY(graph);
+    graph->setPen(QPen(Qt::blue, 3));
+    graph->setSelectable(QCP::stSingleData);
+    plot.setInteractions(QCP::iSelectPlottables);
+    settle(plot);
+
+    // A click on the eighth point selects exactly that point.
+    const QPoint eighth = area->radialAxis()->coordToPixel(7 * 22.5, 0.5).toPoint();
+    sendMouse(&plot, QEvent::MouseButtonPress, eighth, Qt::LeftButton);
+    sendMouse(&plot, QEvent::MouseButtonRelease, eighth, Qt::NoButton);
+    QVERIFY(graph->selected());
+    QCOMPARE(graph->selection().dataRangeCount(), 1);
+    QCOMPARE(graph->selection().dataRange(0), QCPDataRange(7, 8));
+
+    // The details of a hit are that point too, and a click outside the disc misses.
+    QVariant details;
+    QVERIFY(graph->selectTest(eighth, false, &details) >= 0);
+    QCOMPARE(details.value<QCPDataSelection>().dataRange(0), QCPDataRange(7, 8));
+    QVERIFY(graph->selectTest(QPointF(5, 5), false, &details) < 0);
+}
+
+void TestPolar::rubberBandSelectsPolarPoints()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    QVector<double> keys, values;
+    for (int i = 0; i < 16; ++i)
+    {
+        keys << i * 22.5;
+        values << 0.5;
+    }
+    auto graph = area->add<QCPPolarGraph>(keys, values);
+    QVERIFY(graph);
+    graph->setSelectable(QCP::stMultipleDataRanges);
+    settle(plot);
+
+    // The band covers points 2 to 5 and nothing else.
+    QPointF low, high;
+    for (int i = 2; i <= 5; ++i)
+    {
+        const QPointF pixel = area->radialAxis()->coordToPixel(keys[i], values[i]);
+        low = i == 2 ? pixel : QPointF(qMin(low.x(), pixel.x()), qMin(low.y(), pixel.y()));
+        high = i == 2 ? pixel : QPointF(qMax(high.x(), pixel.x()), qMax(high.y(), pixel.y()));
+    }
+    QRectF band(low, high);
+    band.adjust(-1, -1, 1, 1);
+    QVERIFY(graph->interface1D());
+    const QCPDataSelection inside = graph->interface1D()->selectTestRect(band, false);
+    QCOMPARE(inside.dataRangeCount(), 1);
+    QCOMPARE(inside.dataRange(0), QCPDataRange(2, 6));
+}
+
+void TestPolar::aSelectedPolarGraphLooksSelected()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 90, 180, 270 },
+                                          QVector<double> { 0.6, 0.6, 0.6, 0.6 });
+    QVERIFY(graph);
+    graph->setPen(QPen(Qt::blue, 3));
+    auto* decorator = new QCPSelectionDecorator;
+    decorator->setPen(QPen(Qt::red, 3));
+    graph->setSelectionDecorator(decorator);
+    graph->setSelection(QCPDataSelection(QCPDataRange(0, 4)));
+    settle(plot);
+    QVERIFY2(redInkCount(imageOf(plot)) > 0, "the decorator's pen never reached the line");
+
+    graph->setSelection(QCPDataSelection());
+    settle(plot);
+    QCOMPARE(redInkCount(imageOf(plot)), 0);
+}
+
+void TestPolar::aPolarGraphJoinsAGroup()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 180 },
+                                          QVector<double> { 0.5, 0.5 });
+    QVERIFY(graph);
+    auto* group = plot.addPlottableGroup("polar");
+    QVERIFY(group->addMember(graph.get()));
+    QCOMPARE(graph->group(), group);
+    QCOMPARE(group->members(), QList<QCPAbstractPlottable*> { graph.get() });
+    settle(plot);
+}
+
+void TestPolar::areaAddTakesAnyPolarCapablePlottable()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+
+    // The area's add takes a polar graph without a special case.
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 180 },
+                                          QVector<double> { 0.5, 0.5 });
+    QVERIFY(graph);
+    QCOMPARE(plot.plottableCount(), 1);
+
+    // A plottable needing a frame the polar system does not carry is refused, once.
+    auto refused = area->add<RectangularPolarGraph>(QVector<double> { 0, 180 },
+                                                    QVector<double> { 0.5, 0.5 });
+    QVERIFY(!refused);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    test_misuse::calls.clear();
+    QCOMPARE(plot.plottableCount(), 1);
+}
+
 void TestPolar::aClampedRunFollowsTheArc_data()
 {
     QTest::addColumn<double>("lower");

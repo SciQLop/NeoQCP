@@ -33,6 +33,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numbers>
+#include <typeinfo>
 #include <vector>
 
 namespace
@@ -261,6 +262,85 @@ quint64 QCPPolarGraph::dependencyRevision() const
     return revision;
 }
 
+std::pair<QCPGraphDataContainer::const_iterator, QCPGraphDataContainer::const_iterator>
+QCPPolarGraph::window() const
+{
+    if (mPeriodic)
+        return { mDataContainer->constBegin(), mDataContainer->constEnd() };
+    const QCPPolarAxisAngular* angular = angularAxis();
+    if (!angular)
+        return { mDataContainer->constEnd(), mDataContainer->constEnd() };
+    return { mDataContainer->findBegin(angular->range().lower),
+             mDataContainer->findEnd(angular->range().upper) };
+}
+
+/*! \internal
+
+  The recording answers the geometry: its replay is the polyline of the frame, inside the disc, and
+  the core measures the distance to it. Only the details must say which point was hit, as 2.1 did:
+  the nearest one of the window.
+*/
+double QCPPolarGraph::selectTest(const QPointF& pos, bool onlySelectable, QVariant* details) const
+{
+    const double distance = QCPAbstractPlottable::selectTest(pos, onlySelectable, details);
+    if (distance < 0 || !details || !system())
+        return distance;
+
+    const QCPTransform frame = system()->transform();
+    int nearest = -1;
+    double nearestDistance = 0;
+    const auto [begin, end] = window();
+    for (auto it = begin; it != end; ++it)
+    {
+        const QCP::Pixels pixel = frame.map(QCP::Data { it->key, it->value });
+        if (!std::isfinite(pixel.x) || !std::isfinite(pixel.y))
+            continue;
+        const double pointDistance = QCPVector2D(pixel.x - pos.x(), pixel.y - pos.y()).length();
+        if (nearest < 0 || pointDistance < nearestDistance)
+        {
+            nearest = static_cast<int>(it - mDataContainer->constBegin());
+            nearestDistance = pointDistance;
+        }
+    }
+    if (nearest >= 0)
+        *details = QVariant::fromValue(QCPDataSelection(QCPDataRange(nearest, nearest + 1)));
+    return distance;
+}
+
+/*! \internal
+
+  The rubber band, in pixels of the frame: the base class walks coordinates on a key and a value
+  axis, and a polar graph has neither.
+*/
+QCPDataSelection QCPPolarGraph::selectTestRect(const QRectF& rect, bool onlySelectable) const
+{
+    QCPDataSelection result;
+    if ((onlySelectable && mSelectable == QCP::stNone) || mDataContainer->isEmpty() || !system())
+        return result;
+
+    const QCPTransform frame = system()->transform();
+    const auto [begin, end] = window();
+    const auto indexOf = [this](QCPGraphDataContainer::const_iterator it)
+    { return static_cast<int>(it - mDataContainer->constBegin()); };
+    int segmentBegin = -1;
+    for (auto it = begin; it != end; ++it)
+    {
+        const QCP::Pixels pixel = frame.map(QCP::Data { it->key, it->value });
+        const bool inside = std::isfinite(pixel.x) && std::isfinite(pixel.y)
+            && rect.contains(QPointF(pixel.x, pixel.y));
+        if (inside && segmentBegin < 0)
+            segmentBegin = indexOf(it);
+        else if (!inside && segmentBegin >= 0)
+        {
+            result.addDataRange(QCPDataRange(segmentBegin, indexOf(it)), false);
+            segmentBegin = -1;
+        }
+    }
+    if (segmentBegin >= 0)
+        result.addDataRange(QCPDataRange(segmentBegin, indexOf(end)), false);
+    return result;
+}
+
 /*! \internal
 
   Records the graph in data space: the angular coordinate and the radial value of every point of the
@@ -360,20 +440,27 @@ void QCPPolarGraph::draw(QCPDrawContext& context) const
             line.emplace_back(from + (to - from) * i / count, clampedValue);
     };
 
+    // The decorator styles a run as a whole: a selected run takes its pen and its brush.
+    const bool hasSelection = mSelectionDecorator && !mSelection.isEmpty();
+    bool runSelected = false;
+
     const auto flush = [&]
     {
         if (line.empty())
             return;
         if (drawsLine)
         {
-            context.polyline(std::make_shared<const std::vector<QPointF>>(line), mPen);
-            if (drawsFill)
+            const QPen pen = runSelected && hasSelection ? mSelectionDecorator->pen() : mPen;
+            context.polyline(std::make_shared<const std::vector<QPointF>>(line), pen);
+            const QBrush brush
+                = runSelected && hasSelection ? mSelectionDecorator->brush() : mBrush;
+            if (drawsFill && brush.style() != Qt::NoBrush)
             {
                 std::vector<QCP::Position> vertices;
                 vertices.reserve(line.size());
                 for (const QPointF& point : line)
                     vertices.emplace_back(QCP::Data { point.x(), point.y() });
-                context.polygon(vertices, QPen(Qt::NoPen), mBrush);
+                context.polygon(vertices, QPen(Qt::NoPen), brush);
             }
         }
         if (drawsMarkers && !points.empty())
@@ -381,14 +468,10 @@ void QCPPolarGraph::draw(QCPDrawContext& context) const
         line.clear();
         points.clear();
         beyond = false;
+        runSelected = false;
     };
 
-    // 2.1's window: the whole container for a periodic graph, the keys inside the angular range
-    // otherwise.
-    auto begin = mPeriodic ? mDataContainer->constBegin()
-                           : mDataContainer->findBegin(angular->range().lower);
-    auto end
-        = mPeriodic ? mDataContainer->constEnd() : mDataContainer->findEnd(angular->range().upper);
+    const auto [begin, end] = window();
 
     QCPGraphData previous;
     for (auto it = begin; it != end; ++it)
@@ -398,6 +481,24 @@ void QCPPolarGraph::draw(QCPDrawContext& context) const
         {
             flush();
             continue;
+        }
+        // Only a decorated selection varies the runs: the selection is not asked at all otherwise,
+        // which keeps a plain graph's re-record as cheap as it was.
+        if (hasSelection)
+        {
+            const int index = static_cast<int>(it - mDataContainer->constBegin());
+            const bool selected
+                = mSelection.contains(QCPDataSelection(QCPDataRange(index, index + 1)));
+            if (!line.empty() && selected != runSelected)
+            {
+                // The joint belongs to both runs: the next one starts with the point they share.
+                flush();
+                line.emplace_back(previous.key, previous.value);
+                points.emplace_back(previous.key, previous.value);
+                beyond = radial->coordToRadius(previous.value) / radius > 1.0;
+                beyondAngle = previous.key;
+            }
+            runSelected = selected;
         }
         // Exactly at the rim is in range: 2.1 kept it, and it is the rim the frame clamps to.
         const bool isBeyond = radial->coordToRadius(data.value) / radius > 1.0;
@@ -433,4 +534,15 @@ void QCPPolarGraph::draw(QCPDrawContext& context) const
         previous = data;
     }
     flush();
+
+    // A decorator subclass draws a decoration of its own: the base class's is empty, and recording a
+    // painter callback for it would make every selection change a view change.
+    if (mSelectionDecorator && !mSelection.isEmpty()
+        && typeid(*mSelectionDecorator) != typeid(QCPSelectionDecorator))
+        context.painter(
+            [this](QCPPainter& painter, const QCPTransform&)
+            {
+                if (mSelectionDecorator)
+                    mSelectionDecorator->drawDecoration(&painter, selection());
+            });
 }

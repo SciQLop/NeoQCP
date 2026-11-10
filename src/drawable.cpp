@@ -856,7 +856,9 @@ std::optional<double> QCPDrawnCore::hitTest(const QCPDrawable& object, QCP::Pixe
     if (side.keyBounded || side.valueBounded)
         box = side.bounds;
     const double pad = pixelPad();
-    if (box)
+    // Only a cartesian frame has independent, monotone axes: a polar frame maps its angle around a
+    // circle, so the two corners of a data box say nothing about the pixels the recording covers.
+    if (box && frame.transform.kind() == QCPTransform::Kind::Cartesian)
     {
         // Bounds first: the recording's box, mapped and grown by the widest stroke. Only the sides
         // the box really has are checked: an unbounded one is ±inf, which maps to a pixel far

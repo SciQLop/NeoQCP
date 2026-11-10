@@ -1156,6 +1156,33 @@ void TestBuilder::addPolar()
     QCOMPARE(gMisuses, 0);
 }
 
+void TestBuilder::takeAndAdoptAPolarGraph()
+{
+    QCustomPlot plot;
+    auto area = plot.add<QCPPolarArea>(1, 0);
+    QVERIFY(area);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis(0)->setRange(0, 10);
+
+    auto graph = area.add<QCPPolarGraph>(kKeys, kValues).setName("p");
+    QVERIFY(graph);
+    QCOMPARE(plot.plottableCount(), 1);
+
+    // A taken graph belongs to nobody: the plot's default axes still refuse it.
+    std::unique_ptr<QCPPolarGraph> orphan = plot.take(area.add<QCPPolarGraph>(kKeys, kValues));
+    QVERIFY(orphan);
+    QCOMPARE(orphan->system(), nullptr);
+
+    // The way back in is the area that carries its frame.
+    auto readded = area.add(std::move(orphan));
+    QVERIFY(readded);
+    QCOMPARE(plot.plottableCount(), 2); // the first graph and the one that came back
+    QVERIFY(readded->system() != nullptr);
+    QCOMPARE(readded->system()->area(), static_cast<QCPArea*>(area.get()));
+    settle(plot);
+    QCOMPARE(gMisuses, 0);
+}
+
 void TestBuilder::takePolarGraph()
 {
     QCustomPlot plot;

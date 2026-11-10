@@ -513,6 +513,9 @@ private:
     bool detach(QCPAbstractItem* item);
     bool adopt(QCPAbstractPlottable* plottable);
     bool adopt(QCPAbstractItem* item);
+    // The part of adopt() after the default axes are known: a plottable joins this plot in the given
+    // system, owned by the given area. What an area uses to readd an object of its own kind.
+    bool adoptPlottable(QCPAbstractPlottable* plottable, QCPCoordinateSystem* system, QCPArea* area);
     void cutAnchorLinks(QCPAbstractItem* item);
     // Also themes a rect's own colour scale, which QCPAxisRect makes after the theme was set.
     void applyThemeToAxis(QCPAxis* axis);
@@ -711,6 +714,7 @@ protected:
     friend class QCPLayer;
     friend class TestPaintBuffer;
     friend class QCPAxisRect;
+    friend class QCPPolarArea;
     friend class QCPAbstractPlottable;
     friend class QCPGraph;
     friend class QCPAbstractItem;

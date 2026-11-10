@@ -60,6 +60,7 @@ private slots:
     void richTextHandleKeepsTheTextSetters();
     void graph2ScatterColoursChangeTheDrawing();
     void addPolar();
+    void takeAndAdoptAPolarGraph();
     void takePolarGraph();
     void addPolarGraphWithoutRadialAxisIsRefused();
     void deletedPolarGraphLeavesNoLegendRow();

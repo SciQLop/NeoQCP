@@ -20,6 +20,11 @@ private slots:
     void aRimCrossingIsOnTheChord_data();
     void aRimCrossingIsOnTheChord();
     void aValueTheRadialScaleCannotTakeIsAGap();
+    void clickingAPolarGraphSelectsThePoint();
+    void rubberBandSelectsPolarPoints();
+    void aSelectedPolarGraphLooksSelected();
+    void aPolarGraphJoinsAGroup();
+    void areaAddTakesAnyPolarCapablePlottable();
     void aGraphFirstRecordedAtZeroSizeAppearsAfterAResize();
     void aClampedRunFollowsTheArc_data();
     void aClampedRunFollowsTheArc();

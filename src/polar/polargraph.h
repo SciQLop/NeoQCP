@@ -36,6 +36,8 @@
 #include "../vector2d.h"
 #include "angularaxis.h"
 #include "radialaxis.h"
+#include <memory>
+#include <utility>
 
 class QCPCoordinateSystem;
 class QCPDrawContext;
@@ -118,12 +120,21 @@ public:
     void rescaleKeyAxis(bool onlyEnlarge = false) const;
     void rescaleValueAxis(bool onlyEnlarge = false, bool inKeyRange = false) const;
 
+    double selectTest(const QPointF& pos, bool onlySelectable,
+                      QVariant* details = nullptr) const override;
+    QCPDataSelection selectTestRect(const QRectF& rect, bool onlySelectable) const override;
+
     // introduced virtual methods:
     QCP::Capabilities requiredCapabilities() const override; // the polar system is enough
     void draw(QCPDrawContext& context) const override;
     quint64 dependencyRevision() const override;
 
 protected:
+    // The keys the recording holds: 2.1's window (the whole container for a periodic graph).
+    [[nodiscard]] std::pair<QCPGraphDataContainer::const_iterator,
+                            QCPGraphDataContainer::const_iterator>
+    window() const;
+
     // property members:
     LineStyle mLineStyle;
     QCPScatterStyle mScatterStyle;

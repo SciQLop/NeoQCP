@@ -11,7 +11,11 @@
 #include "layoutelements/layoutelement-axisrect.h"
 #include "plottables/plottable-group.h"
 #include "plottables/plottable.h"
+#include "polar/angularaxis.h"
+#include "polar/polar-area.h"
+#include "polar/radialaxis.h"
 #include <concepts>
+#include <memory>
 
 /*
   What QCustomPlot::add<T>(args...) does for each family of T: one specialisation of qcp::Construct
@@ -227,6 +231,52 @@ qcp::HandleFor<T> QCPAxisRect::add(QCPAxis* key, QCPAxis* value, Args&&... args)
     handle.get()->markDirty();
     if constexpr (sizeof...(Args) > 0)
         qcp::detail::setDataOrUndo(*mParentPlot, handle, std::forward<Args>(args)...);
+    return handle;
+}
+
+// The plottable forms of QCPPolarArea::add: on the area's system (its angular axis and its first
+// radial axis), or the object of another area readded here.
+template <typename T, typename... Args>
+    requires std::derived_from<T, QCPAbstractPlottable>
+qcp::HandleFor<T> QCPPolarArea::add(Args&&... args)
+{
+    using Handle = qcp::HandleFor<T>;
+    QCP_CHECK_OR_RETURN(plotTakesNewParts(), "the plot is being destroyed", Handle { });
+    QCP_CHECK_OR_RETURN(angularAxis(), "the polar area has no angular axis", Handle { });
+    QCP_CHECK_OR_RETURN(radialAxis(0), "the polar area has no radial axis", Handle { });
+    QCPCoordinateSystem* system = this->system(angularAxis(), radialAxis(0));
+    QCP_CHECK_OR_RETURN(system, "the polar axes are not a system of this area", Handle { });
+    // Built first: the capabilities are the object's own, and a refused object owns nothing.
+    std::unique_ptr<T> plottable(new T(angularAxis(), radialAxis(0)));
+    QCP_CHECK_OR_RETURN(!(plottable->requiredCapabilities() & ~system->capabilities()),
+                        "the polar system lacks a capability this plottable needs", Handle { });
+    Handle handle = qcp::makeHandle<Handle>(plottable.release());
+    handle.get()->markDirty();
+    if constexpr (sizeof...(Args) > 0)
+        qcp::detail::setDataOrUndo(*mParentPlot, handle, std::forward<Args>(args)...);
+    return handle;
+}
+
+template <typename T>
+    requires std::derived_from<T, QCPAbstractPlottable>
+qcp::HandleFor<T> QCPPolarArea::add(std::unique_ptr<T> plottable)
+{
+    using Handle = qcp::HandleFor<T>;
+    QCP_CHECK_OR_RETURN(plottable, "there is no plottable to add", Handle { });
+    QCP_CHECK_OR_RETURN(!plottable->parentPlot(),
+                        "the object already belongs to a plot: take it first", Handle { });
+    QCP_CHECK_OR_RETURN(plotTakesNewParts(), "the plot is being destroyed", Handle { });
+    QCP_CHECK_OR_RETURN(angularAxis() && radialAxis(0), "the polar area has no axes", Handle { });
+    QCPCoordinateSystem* system = this->system(angularAxis(), radialAxis(0));
+    QCP_CHECK_OR_RETURN(system, "the polar axes are not a system of this area", Handle { });
+    QCP_CHECK_OR_RETURN(!(plottable->requiredCapabilities() & ~system->capabilities()),
+                        "the polar system lacks a capability this plottable needs", Handle { });
+    T* object = plottable.get();
+    QCP_CHECK_OR_RETURN(mParentPlot->adoptPlottable(object, system, this),
+                        "the plottable cannot join this plot", Handle { });
+    plottable.release();
+    Handle handle = qcp::makeHandle<Handle>(object);
+    object->markDirty();
     return handle;
 }
 

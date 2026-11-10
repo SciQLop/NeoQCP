@@ -33,6 +33,7 @@
 #include <QPointer>
 
 class QCustomPlot;
+class QCPAbstractPlottable;
 class QCPPolarAxisAngular;
 class QCPPolarAxisRadial;
 class QCPPolarGrid;
@@ -95,31 +96,23 @@ public:
     // definition.
     [[nodiscard]] bool plotTakesNewParts() const;
 
-    // The handle form of the graph constructor: the graph belongs to this area and draws on its
-    // first radial axis. args go to the handle's setData.
-    template <std::same_as<QCPPolarGraph> T, typename... Args>
-    qcp::HandleFor<T> add(Args&&... args)
-    {
-        using Handle = qcp::HandleFor<T>;
-        static_assert(
-            requires(Handle h) { h.setData(std::declval<Args>()...); },
-            "add<T>(args...): the graph's handle has no setData taking these arguments");
-        QCP_CHECK_OR_RETURN(plotTakesNewParts(), "the plot is being destroyed", Handle { });
-        QCP_CHECK_OR_RETURN(mAngularAxis, "the polar area has no angular axis", Handle { });
-        QCP_CHECK_OR_RETURN(radialAxis(0), "the polar area has no radial axis", Handle { });
-        Handle handle = qcp::makeHandle<Handle>(new T(mAngularAxis, radialAxis(0)));
-        handle.get()->markDirty();
-        try
-        {
-            handle.setData(std::forward<Args>(args)...);
-        }
-        catch (...)
-        {
-            handle.remove(); // the plot owns the graph: remove it from its plottables
-            throw;
-        }
-        return handle;
-    }
+    /*! The handle form of a plottable constructor, defined in construct.h beside the axis rect's:
+      the plottable belongs to this area and draws through its system, which its angular axis and
+      its first radial axis make. \a args go to the handle's setData.
+
+      A plottable whose requiredCapabilities() this polar system lacks is refused, because a polar
+      system provides none.
+    */
+    template <class T, typename... Args>
+        requires std::derived_from<T, QCPAbstractPlottable>
+    qcp::HandleFor<T> add(Args&&... args);
+
+    /*! The handle form of readding an object that was taken out of another area: it joins this
+      area's system. Mirrors QCustomPlot::add(std::unique_ptr<T>).
+    */
+    template <class T>
+        requires std::derived_from<T, QCPAbstractPlottable>
+    qcp::HandleFor<T> add(std::unique_ptr<T> plottable);
 
     // reimplemented virtual methods:
     virtual void update(UpdatePhase phase) override;
@@ -187,14 +180,25 @@ public:
         return this->apply([&](T& o) { o.setBackground(pixmap); });
     }
 
-    // The handle form of the graph constructor: the graph belongs to this area and draws on its
-    // first radial axis. args go to the graph handle's setData.
-    template <std::same_as<QCPPolarGraph> Graph, typename... Args>
+    // The handle form of a plottable constructor: the plottable belongs to this area and draws
+    // through its system. args go to the handle's setData, as the area's own add.
+    template <class Graph, typename... Args>
+        requires std::derived_from<Graph, QCPAbstractPlottable>
     qcp::HandleFor<Graph> add(Args&&... args)
     {
         auto* area = this->get();
         QCP_CHECK_OR_RETURN(area, "the handle is dead", qcp::HandleFor<Graph> { });
         return area->template add<Graph>(std::forward<Args>(args)...);
+    }
+
+    // The handle form of readding an object taken out of another area, as the area's own add.
+    template <class Graph>
+        requires std::derived_from<Graph, QCPAbstractPlottable>
+    qcp::HandleFor<Graph> add(std::unique_ptr<Graph> plottable)
+    {
+        auto* area = this->get();
+        QCP_CHECK_OR_RETURN(area, "the handle is dead", qcp::HandleFor<Graph> { });
+        return area->template add<Graph>(std::move(plottable));
     }
 };
 
