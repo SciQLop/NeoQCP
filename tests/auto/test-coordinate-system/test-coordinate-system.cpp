@@ -541,6 +541,42 @@ void TestCoordinateSystem::relationshipsAcrossAreasAreRefused()
     test_misuse::calls.clear(); // the three refusals are the point of this test
 }
 
+void TestCoordinateSystem::aMisusedPairIsOwnedAndInert()
+{
+    QCustomPlot plot;
+    plot.plotLayout()->clear();
+    auto* left = new QCPAxisRect(&plot);
+    auto* right = new QCPAxisRect(&plot);
+    plot.plotLayout()->addElement(0, 0, left);
+    plot.plotLayout()->addElement(0, 1, right);
+    settle(plot);
+
+    // Axes of two rects: 2.x drew this clipped to both rects. Now it is no frame, but the plot
+    // still owns it, and the one misuse report is the diagnostic.
+    auto* across = new QCPGraph(left->axis(QCPAxis::atBottom), right->axis(QCPAxis::atLeft));
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    test_misuse::calls.clear();
+    QVERIFY(!across->system());
+    QCOMPARE(plot.graphCount(), 1);
+    QCOMPARE(plot.graph(0), across);
+    QCOMPARE(plot.plottableCount(), 1);
+
+    // Two axes of one orientation: same story, not just a debug line.
+    auto* flat = new QCPGraph(left->axis(QCPAxis::atBottom), left->axis(QCPAxis::atTop));
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    test_misuse::calls.clear();
+    QVERIFY(!flat->system());
+    QCOMPARE(plot.graphCount(), 2);
+    QCOMPARE(plot.graph(1), flat);
+    QCOMPARE(plot.plottableCount(), 2);
+
+    // Inert: no layer put it anywhere to draw, and a replot is quiet.
+    flat->setData({ 0, 1 }, { 0, 1 });
+    settle(plot);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+    QCOMPARE(plot.graphCount(), 2);
+}
+
 void TestCoordinateSystem::dualValueAxesKeepTheirRelationships()
 {
     QCustomPlot plot;

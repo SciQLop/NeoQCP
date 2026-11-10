@@ -26,6 +26,7 @@ private slots:
     void aRecordingPlottableWithNoNeedsJoinsPolar();
     void relationshipsAcrossAreasAreRefused();
     void dualValueAxesKeepTheirRelationships();
+    void aMisusedPairIsOwnedAndInert();
     void aBracketDecorationNeedsAKeyAxis();
     void rescaleAxesVisitsEveryArea();
     void axisPlottablesKeepTheirOrder();

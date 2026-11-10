@@ -513,8 +513,24 @@ QCPAbstractPlottable::QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis)
         moveToLayer(nullptr, false);
         return;
     }
-    if (keyAxis->orientation() == valueAxis->orientation())
-        qDebug() << Q_FUNC_INFO << "keyAxis and valueAxis must be orthogonal to each other.";
+    if (!system())
+    {
+        // 2.x drew a cross-rect pair (clipped to both rects) and registered a same-orientation one:
+        // neither is one frame now. The plottable stays owned by the plot and inert, and this
+        // report is the one diagnostic - never an orphan nobody deletes, never a silent no-show.
+        qcp::reportMisuse(Q_FUNC_INFO,
+                          "the key and value axes are not two axes of one axis rect: the "
+                          "plottable is inert");
+        QCustomPlot* plot = keyAxis->parentPlot();
+        if (plot)
+        {
+            setParent(plot);
+            initializeParentPlot(plot);
+            setParentLayerable(keyAxis->axisRect());
+            if (plot->registerPlottable(this))
+                mRegisteredPlot = plot;
+        }
+    }
 }
 
 QCPAbstractPlottable::~QCPAbstractPlottable()
