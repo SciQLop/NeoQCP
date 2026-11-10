@@ -734,7 +734,7 @@ bool isOn(const QCPAxis* axis, const QCPAxisRect* rect)
 /*!
   Returns a list of all the plottables that are associated with this axis rect.
 
-  A plottable is considered associated with an axis rect if its key or value axis (or both) is in
+  A plottable is considered associated with an axis rect if it is drawn in a coordinate system of
   this axis rect.
 
   \see graphs, items
@@ -746,7 +746,8 @@ QList<QCPAbstractPlottable*> QCPAxisRect::plottables() const
     QList<QCPAbstractPlottable*> result;
     for (QCPAbstractPlottable* plottable : mParentPlot->mPlottables)
     {
-        if (isOn(plottable->keyAxis(), this) || isOn(plottable->valueAxis(), this))
+        // By the system, not by the axes: what a plottable sits in is the frame it is drawn in.
+        if (plottable->system() && plottable->system()->area() == this)
             result.append(plottable);
     }
     return result;
@@ -755,8 +756,8 @@ QList<QCPAbstractPlottable*> QCPAxisRect::plottables() const
 /*!
   Returns a list of all the graphs that are associated with this axis rect.
 
-  A graph is considered associated with an axis rect if its key or value axis (or both) is in
-  this axis rect.
+  A graph is considered associated with an axis rect if it is drawn in a coordinate system of this
+  axis rect.
 
   \see plottables, items
 */
@@ -766,7 +767,7 @@ QList<QCPGraph*> QCPAxisRect::graphs() const
     QList<QCPGraph*> result;
     for (QCPGraph* graph : mParentPlot->mGraphs)
     {
-        if (isOn(graph->keyAxis(), this) || isOn(graph->valueAxis(), this))
+        if (graph->system() && graph->system()->area() == this)
             result.append(graph);
     }
     return result;
@@ -1676,11 +1677,9 @@ void QCPAxisRect::markAffectedLayersDirty(bool invalidate)
     }
     for (QCPAbstractPlottable* p : mParentPlot->mPlottables)
     {
-        // A removed axis leaves the plottable's QPointer null (see
-        // TestQCPAxisRect::axisRemovalConsequencesToPlottables).
-        QCPAxis* key = p->keyAxis();
-        QCPAxis* val = p->valueAxis();
-        if ((key && key->axisRect() == this) || (val && val->axisRect() == this))
+        // One pass over the plot's plottables, selected by the system they are drawn in: a plottable
+        // whose system died (its axis was removed) is skipped as it draws nothing.
+        if (p->system() && p->system()->area() == this)
         {
             markOnce(p->layer());
             for (QCPLayer* dependent : p->dependentLayers())

@@ -535,6 +535,39 @@ void TestCoordinateSystem::relationshipsAcrossAreasAreRefused()
     test_misuse::calls.clear(); // the three refusals are the point of this test
 }
 
+void TestCoordinateSystem::rescaleAxesVisitsEveryArea()
+{
+    QCustomPlot plot;
+    QCPPolarArea* area = polarArea(plot);
+    const QCPRange angularBefore = area->angularAxis()->range();
+    auto* plottable = new RecordingPlottable(polarSystem(area));
+    settle(plot); // the drawn data range comes from the recording
+    QVERIFY(plottable->drawnDataRange().has_value());
+
+    plot.rescaleAxes();
+
+    // The radial axis takes the drawn data range; the angular axis keeps its turn.
+    QCOMPARE(area->radialAxis()->range(), QCPRange(1, 9));
+    QCOMPARE(area->angularAxis()->range(), angularBefore);
+}
+
+void TestCoordinateSystem::axisPlottablesKeepTheirOrder()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    QCPAxisRect* rect1 = plot.axisRect();
+    auto* rect2 = new QCPAxisRect(&plot);
+    plot.plotLayout()->addElement(0, 1, rect2);
+    QCPGraph* g1 = plot.addGraph(rect1->axis(QCPAxis::atBottom), rect1->axis(QCPAxis::atLeft));
+    QCPGraph* g2 = plot.addGraph(rect1->axis(QCPAxis::atBottom), rect1->axis(QCPAxis::atLeft));
+    QCPGraph* g3 = plot.addGraph(rect2->axis(QCPAxis::atBottom), rect2->axis(QCPAxis::atLeft));
+    // Selection by system, but the plot's own order, as the axes have always answered.
+    QCOMPARE(plot.xAxis->plottables(), (QList<QCPAbstractPlottable*> { g1, g2 }));
+    QCOMPARE(rect1->plottables(), (QList<QCPAbstractPlottable*> { g1, g2 }));
+    QCOMPARE(rect2->plottables(), (QList<QCPAbstractPlottable*> { g3 }));
+    QCOMPARE(rect1->axis(QCPAxis::atLeft)->graphs(), (QList<QCPGraph*> { g1, g2 }));
+}
+
 void TestCoordinateSystem::aBracketDecorationNeedsAKeyAxis()
 {
     QCustomPlot plot;

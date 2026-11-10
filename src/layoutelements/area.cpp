@@ -96,8 +96,13 @@ QCPCoordinateSystem* QCPArea::system(QCPAxisBase* key, QCPAxisBase* value)
         if (existing && existing->keyAxis() == key && existing->valueAxis() == value)
             return existing;
     QCPCoordinateSystem* made = createSystem(key, value);
-    if (made)
-        mSystems.append(made);
+    if (!made)
+        return nullptr;
+    mSystems.append(made);
+    // The layers are marked where the change happens: an axis marks the area's when its mapping
+    // moves, a plottable marks its own when its content does. Marking them all from here would
+    // dirty every dependent layer (a legend row, say) on a mere layout pass, which only schedules
+    // replots of frames that say exactly what they said before.
     return made;
 }
 

@@ -26,4 +26,6 @@ private slots:
     void aRecordingPlottableWithNoNeedsJoinsPolar();
     void relationshipsAcrossAreasAreRefused();
     void aBracketDecorationNeedsAKeyAxis();
+    void rescaleAxesVisitsEveryArea();
+    void axisPlottablesKeepTheirOrder();
 };

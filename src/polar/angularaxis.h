@@ -145,6 +145,10 @@ public:
     void setSelectedSubTickPen(const QPen& pen);
 
     // non-property methods:
+    // The turn an angular axis shows is the whole circle: rescaling would cut it, so it keeps its
+    // range.
+    void rescale(bool onlyVisiblePlottables = false) override;
+
     double coordToAngleRad(double coord) const
     {
         return mAngleRad

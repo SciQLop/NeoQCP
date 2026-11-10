@@ -321,7 +321,7 @@ public:
     }
 
     void setScaleRatio(const QCPAxis* otherAxis, double ratio = 1.0);
-    void rescale(bool onlyVisiblePlottables = false);
+    void rescale(bool onlyVisiblePlottables = false) override;
     double pixelToCoord(double value) const;
     double coordToPixel(double value) const;
 
@@ -332,7 +332,7 @@ public:
     QCPAxis* moveTarget() const override;
     /*! \internal \a pixel seen on the move target's rect, at the same fraction of the axis. */
     double pixelOnMoveTarget(double pixel) const;
-    QList<QCPAbstractPlottable*> plottables() const;
+    QList<QCPAbstractPlottable*> plottables() const override;
     QList<QCPGraph*> graphs() const;
     QList<QCPAbstractItem*> items() const;
 

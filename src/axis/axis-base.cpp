@@ -1,6 +1,9 @@
 #include "axis-base.h"
+#include "../coordinate-system.h"
 #include "../core.h"
+#include "../drawable.h"
 #include "../layoutelements/area.h"
+#include "../plottables/plottable.h"
 #include "../Profiling.hpp"
 #include "../misuse.h"
 #include "../signal-delivery.h"
@@ -321,6 +324,89 @@ void QCPAxisBase::scaleRange(double factor, double center)
         }
     }
     commitRange(scaled);
+}
+
+/*!
+  Returns the plottables of every system that maps through this axis, in the systems' creation
+  order. A cartesian axis overrides this with the plot's own order (its two projections select the
+  same plottables).
+*/
+QList<QCPAbstractPlottable*> QCPAxisBase::plottables() const
+{
+    QList<QCPAbstractPlottable*> result;
+    if (!mArea)
+        return result;
+    for (QCPCoordinateSystem* system : mArea->systems())
+        if (system->usesAxis(this))
+            result << system->plottables();
+    return result;
+}
+
+/*!
+  Changes the range so what the plottables of the systems using this axis draw is visible: their
+  drawn data ranges, in this axis' dimension. A constant plottable leaves a zero-size range, which
+  recentres the current range instead (see rescaleTo).
+
+  \see QCPAbstractPlottable::rescaleAxes, QCustomPlot::rescaleAxes
+*/
+void QCPAxisBase::rescale(bool onlyVisiblePlottables)
+{
+    QCPRange newRange;
+    bool haveRange = false;
+    const QCP::SignDomain signDomain =
+        mScaleType == stLogarithmic ? (mRange.upper < 0 ? QCP::sdNegative : QCP::sdPositive)
+                                    : QCP::sdBoth;
+    for (QCPAbstractPlottable* plottable : plottables())
+    {
+        if (onlyVisiblePlottables && !plottable->realVisibility())
+            continue;
+        const QCPCoordinateSystem* system = plottable->system();
+        if (!system)
+            continue;
+        const QCPDrawnSide side = system->keyAxis() == this ? QCPDrawnSide::Key : QCPDrawnSide::Value;
+        bool foundRange = false;
+        const QCPRange range = qcpDrawnRange(plottable->drawnDataRange(), side, foundRange, signDomain);
+        if (!foundRange)
+            continue;
+        if (!haveRange)
+            newRange = range;
+        else
+            newRange.expand(range);
+        haveRange = true;
+    }
+    rescaleTo(newRange, haveRange);
+}
+
+/*! \internal
+
+  The tail every rescale() shares: stores \a range when one was found. A range that is not usable
+  (the plottables are constant in this dimension) recentres the current range on it, in the axis'
+  own scale.
+*/
+void QCPAxisBase::rescaleTo(const QCPRange& range, bool haveRange)
+{
+    if (!haveRange)
+        return;
+    QCPRange newRange = range;
+    if (!QCPRange::validRange(newRange)) // likely due to range being zero (plottable has only
+                                        // constant data in this axis dimension), shift current
+                                        // range to at least center the plottable
+    {
+        double center = (newRange.lower + newRange.upper)
+            * 0.5; // upper and lower should be equal anyway, but just to make sure, incase
+                   // validRange returned false for other reason
+        if (mScaleType == stLinear)
+        {
+            newRange.lower = center - mRange.size() / 2.0;
+            newRange.upper = center + mRange.size() / 2.0;
+        }
+        else // mScaleType == stLogarithmic
+        {
+            newRange.lower = center / qSqrt(mRange.upper / mRange.lower);
+            newRange.upper = center * qSqrt(mRange.upper / mRange.lower);
+        }
+    }
+    setRange(newRange);
 }
 
 /*!

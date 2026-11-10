@@ -29,6 +29,7 @@ private slots:
     void addEveryItem_data();
     void addEveryItem();
     void addAxisToRect();
+    void addOnAnArea();
     void addLayoutParts();
     void addToTakenCellIsRefused();
     void groupsOwnedByPlot();

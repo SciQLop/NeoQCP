@@ -790,65 +790,6 @@ void QCPPolarAxisRadial::setSelectedSubTickPen(const QPen& pen)
     mSelectedSubTickPen = pen;
 }
 
-/*!
-  Changes the axis range such that all plottables associated with this axis are fully visible in
-  that dimension.
-
-  \see QCPAbstractPlottable::rescaleAxes, QCustomPlot::rescaleAxes
-*/
-void QCPPolarAxisRadial::rescale([[maybe_unused]] bool onlyVisiblePlottables)
-{
-    /* TODO
-    QList<QCPAbstractPlottable*> p = plottables();
-    QCPRange newRange;
-    bool haveRange = false;
-    for (int i=0; i<p.size(); ++i)
-    {
-      if (!p.at(i)->realVisibility() && onlyVisiblePlottables)
-        continue;
-      QCPRange plottableRange;
-      bool currentFoundRange;
-      QCP::SignDomain signDomain = QCP::sdBoth;
-      if (mScaleType == stLogarithmic)
-        signDomain = (mRange.upper < 0 ? QCP::sdNegative : QCP::sdPositive);
-      if (p.at(i)->keyAxis() == this)
-        plottableRange = p.at(i)->getKeyRange(currentFoundRange, signDomain);
-      else
-        plottableRange = p.at(i)->getValueRange(currentFoundRange, signDomain);
-      if (currentFoundRange)
-      {
-        if (!haveRange)
-          newRange = plottableRange;
-        else
-          newRange.expand(plottableRange);
-        haveRange = true;
-      }
-    }
-    if (haveRange)
-    {
-      if (!QCPRange::validRange(newRange)) // likely due to range being zero (plottable has only
-    constant data in this axis dimension), shift current range to at least center the plottable
-      {
-        double center = (newRange.lower+newRange.upper)*0.5; // upper and lower should be equal
-    anyway, but just to make sure, incase validRange returned false for other reason if (mScaleType
-    == stLinear)
-        {
-          newRange.lower = center-mRange.size()/2.0;
-          newRange.upper = center+mRange.size()/2.0;
-        } else // mScaleType == stLogarithmic
-        {
-          newRange.lower = center/qSqrt(mRange.upper/mRange.lower);
-          newRange.upper = center*qSqrt(mRange.upper/mRange.lower);
-        }
-      }
-      setRange(newRange);
-    }
-    */
-}
-
-/*!
-  Transforms \a value, in pixel coordinates of the QCustomPlot widget, to axis coordinates.
-*/
 void QCPPolarAxisRadial::pixelToCoord(QPointF pixelPos, double& angleCoord,
                                       double& radiusCoord) const
 {

@@ -48,6 +48,8 @@ class QCPPainter;
 class QCPLayer;
 class QCPAbstractItem;
 class QCPAxis;
+class QCPArea;
+class QCPAxisRect;
 class QCPGraph;
 class QCPPolarGraph;
 class QCPLegend;
@@ -444,7 +446,11 @@ public:
     [[nodiscard]] int axisRectCount() const;
     [[nodiscard]] QCPAxisRect* axisRect(int index = 0) const;
     [[nodiscard]] QList<QCPAxisRect*> axisRects() const;
+    //! The areas of the plot, in layout order: axis rects and polar areas alike.
+    [[nodiscard]] QList<QCPArea*> areas() const;
     [[nodiscard]] QCPLayoutElement* layoutElementAt(const QPointF& pos) const;
+    //! The area \a pos falls in: the deepest one of the layout elements at that pixel.
+    [[nodiscard]] QCPArea* areaAt(const QPointF& pos) const;
     [[nodiscard]] QCPAxisRect* axisRectAt(const QPointF& pos) const;
     Q_SLOT void rescaleAxes(bool onlyVisiblePlottables = false);
 

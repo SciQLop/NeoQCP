@@ -1375,28 +1375,7 @@ void QCPAxis::rescale(bool onlyVisiblePlottables)
             haveRange = true;
         }
     }
-    if (haveRange)
-    {
-        if (!QCPRange::validRange(newRange)) // likely due to range being zero (plottable has only
-                                             // constant data in this axis dimension), shift current
-                                             // range to at least center the plottable
-        {
-            double center = (newRange.lower + newRange.upper)
-                * 0.5; // upper and lower should be equal anyway, but just to make sure, incase
-                       // validRange returned false for other reason
-            if (mScaleType == stLinear)
-            {
-                newRange.lower = center - mRange.size() / 2.0;
-                newRange.upper = center + mRange.size() / 2.0;
-            }
-            else // mScaleType == stLogarithmic
-            {
-                newRange.lower = center / qSqrt(mRange.upper / mRange.lower);
-                newRange.upper = center * qSqrt(mRange.upper / mRange.lower);
-            }
-        }
-        setRange(newRange);
-    }
+    rescaleTo(newRange, haveRange);
 }
 
 /*!
@@ -1581,7 +1560,9 @@ QList<QCPAbstractPlottable*> QCPAxis::plottables() const
 
     for (QCPAbstractPlottable* plottable : mParentPlot->mPlottables)
     {
-        if (plottable->keyAxis() == this || plottable->valueAxis() == this)
+        // By system, not by projection: a plottable's key and value axes are the system's, and a
+        // system may use this axis as key, as value, or not at all.
+        if (plottable->system() && plottable->system()->usesAxis(this))
             result.append(plottable);
     }
     return result;
@@ -1600,7 +1581,7 @@ QList<QCPGraph*> QCPAxis::graphs() const
 
     for (QCPGraph* graph : mParentPlot->mGraphs)
     {
-        if (graph->keyAxis() == this || graph->valueAxis() == this)
+        if (graph->system() && graph->system()->usesAxis(this))
             result.append(graph);
     }
     return result;

@@ -125,6 +125,15 @@ QCPPolarArea* QCPPolarAxisAngular::area() const
 
 /*! \internal
 
+  The angular axis always shows a full turn: rescaling it to the data would cut the circle the polar
+  mapping is built on.
+*/
+void QCPPolarAxisAngular::rescale([[maybe_unused]] bool onlyVisiblePlottables)
+{
+}
+
+/*! \internal
+
   The area holds the angular axis by raw pointer: leaving it behind would leave a dangling
   handle in every path that draws or maps the polar plot.
 */

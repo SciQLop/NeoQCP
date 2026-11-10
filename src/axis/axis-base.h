@@ -36,6 +36,7 @@
 #include <functional>
 #include <memory>
 
+class QCPAbstractPlottable;
 class QCPArea;
 class QCPAxisBase;
 struct QCPAxisLink;
@@ -161,6 +162,13 @@ public:
     void scaleRange(double factor);
     void scaleRange(double factor, double center);
 
+    // Changes the range so what the plottables of the systems using this axis draw is visible: their
+    // drawn data ranges, in this axis' own dimension. A cartesian axis refines this with the data
+    // ranges it always used, and the angular axis keeps its full turn.
+    virtual void rescale(bool onlyVisiblePlottables = false);
+    //! The plottables of every system that maps through this axis, in the systems' creation order.
+    virtual QList<QCPAbstractPlottable*> plottables() const;
+
     // A link makes this axis follow source: its range is forward(source's range), and a range set
     // here is written back through the inverse. Only cartesian axes may take part.
     void linkTo(QCPAxisBase* source, QCPAxisFunction forward = { }, QCPAxisFunction inverse = { });
@@ -239,6 +247,10 @@ protected:
     // Drops every link, this axis's own and the ones following it. Idempotent: a subclass calls it
     // while it still exists, the destructor as a fallback.
     void detachLinks();
+
+    // The tail of rescale(): stores \a range, or, when it is not usable (a constant plottable has a
+    // zero-size range), recentres the current range on it. Shared with subclasses that rescale.
+    void rescaleTo(const QCPRange& range, bool haveRange);
 
     // Takes the source's range, its direction included, through the link's forward function.
     void refreshFromLink();

@@ -29,6 +29,7 @@
 #include "../axis/axis.h"
 #include "../global.h"
 #include "area.h"
+#include <concepts>
 
 class QCPPainter;
 class QCustomPlot;
@@ -100,6 +101,17 @@ public:
         QCPAxis* axis = addAxis(type);
         return axis ? qcp::makeHandle<Handle>(axis) : Handle { };
     }
+
+    // The handle form of a plottable constructor: the plottable belongs to this rect and is drawn
+    // in the system of its bottom and left axes, or of \a key and \a value; args go to the handle's
+    // setData. Defined in construct.h, where the construction rules live.
+    template <typename T, typename... Args>
+        requires std::derived_from<T, QCPAbstractPlottable>
+    qcp::HandleFor<T> add(Args&&... args);
+
+    template <typename T, typename... Args>
+        requires std::derived_from<T, QCPAbstractPlottable>
+    qcp::HandleFor<T> add(QCPAxis* key, QCPAxis* value, Args&&... args);
 
     QCPAxis* addAxis(QCPAxis::AxisType type, QCPAxis* axis = nullptr);
     QList<QCPAxis*> addAxes(QCPAxis::AxisTypes types);
@@ -187,7 +199,7 @@ protected:
     // non-property methods:
     void updateAxesOffset(QCPAxis::AxisType type);
     void zoomAxesAt(const QPointF& pos, double horizontalFactor, double verticalFactor);
-    void markAffectedLayersDirty(bool invalidate = false);
+    void markAffectedLayersDirty(bool invalidate = false) override;
     // A margin or size change moves the inner rect, so every axis, grid and plottable in it draws
     // at new pixels.
     void markLayoutAppearanceDirty() override;

@@ -611,6 +611,26 @@ void TestBuilder::addAxisToRect()
     QCOMPARE(gMisuses, 0);
 }
 
+void TestBuilder::addOnAnArea()
+{
+    QCustomPlot plot;
+    QCPAxisRect* rect = plot.add<QCPAxisRect>(1, 0).get();
+    QCPGraph* graph = rect->add<QCPGraph>().setData(kKeys, kValues).get();
+    QCOMPARE(graph->keyAxis(), rect->axis(QCPAxis::atBottom));
+    QCOMPARE(graph->valueAxis(), rect->axis(QCPAxis::atLeft));
+    QCOMPARE(graph->system(),
+             rect->system(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft)));
+    QCOMPARE(plot.plottableCount(), 1);
+
+    // An explicit pair of this rect (another value axis) is another system.
+    QCPAxis* right = rect->add<QCPAxis>(QCPAxis::atRight).get();
+    QCPGraph* second = rect->add<QCPGraph>(rect->axis(QCPAxis::atBottom), right).get();
+    QCOMPARE(second->valueAxis(), right);
+    QVERIFY(second->system() != graph->system());
+    QCOMPARE(rect->plottables(), (QList<QCPAbstractPlottable*> { graph, second }));
+    QCOMPARE(gMisuses, 0);
+}
+
 void TestBuilder::addLayoutParts()
 {
     QCustomPlot plot;

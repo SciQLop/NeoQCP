@@ -44,6 +44,7 @@
 #include "polar/angularaxis.h"
 #include "polar/polargraph.h"
 #include "layer.h"
+#include "layoutelements/area.h"
 #include "layoutelements/layoutelement-axisrect.h"
 #include "layoutelements/layoutelement-legend.h"
 #include "painting/painter.h"
@@ -2478,6 +2479,15 @@ QCPAxisRect* QCustomPlot::axisRect(int index) const
 QList<QCPAxisRect*> QCustomPlot::axisRects() const
 {
     QList<QCPAxisRect*> result;
+    for (QCPArea* area : areas())
+        if (QCPAxisRect* rect = qobject_cast<QCPAxisRect*>(area))
+            result.append(rect);
+    return result;
+}
+
+QList<QCPArea*> QCustomPlot::areas() const
+{
+    QList<QCPArea*> result;
     QStack<QCPLayoutElement*> elementStack;
     if (mPlotLayout)
         elementStack.push(mPlotLayout);
@@ -2489,13 +2499,27 @@ QList<QCPAxisRect*> QCustomPlot::axisRects() const
             if (element)
             {
                 elementStack.push(element);
-                if (QCPAxisRect* ar = qobject_cast<QCPAxisRect*>(element))
-                    result.append(ar);
+                if (QCPArea* area = qobject_cast<QCPArea*>(element))
+                    result.append(area);
             }
         }
     }
 
     return result;
+}
+
+/*!
+  Returns the area \a pos falls in: the deepest area among the layout elements at that pixel, so a
+  rect inside a grid of the plot layout answers, not the layout. Null where no area is.
+
+  \see layoutElementAt, axisRectAt
+*/
+QCPArea* QCustomPlot::areaAt(const QPointF& pos) const
+{
+    for (QCPLayoutElement* element = layoutElementAt(pos); element; element = element->layout())
+        if (QCPArea* area = qobject_cast<QCPArea*>(element))
+            return area;
+    return nullptr;
 }
 
 /*!
@@ -2963,9 +2987,9 @@ double QCustomPlot::replotTime(bool average) const
 void QCustomPlot::rescaleAxes(bool onlyVisiblePlottables)
 {
     const QCPEmissionScope scope(this);
-    QList<QPointer<QCPAxis>> allAxes;
-    for (QCPAxisRect* rect : axisRects())
-        allAxes << guarded(rect->axes());
+    QList<QPointer<QCPAxisBase>> allAxes;
+    for (QCPArea* area : areas())
+        allAxes << guarded(area->allAxes());
 
     for (const auto& axis : allAxes)
         if (axis) // a rangeChanged slot may delete the others
@@ -4632,10 +4656,13 @@ void QCustomPlot::processRectSelection(QRect rect, QMouseEvent* event)
     {
         SelectionCandidates potentialSelections;
         QRectF rectF(rect.normalized());
-        if (QCPAxisRect* affectedAxisRect = axisRectAt(rectF.topLeft()))
+        if (QCPArea* affectedArea = areaAt(rectF.topLeft()))
         {
             // determine plottables that were hit by the rect and thus are candidates for selection:
-            for (auto plottable : affectedAxisRect->plottables())
+            QList<QCPAbstractPlottable*> hitPlottables;
+            for (QCPCoordinateSystem* system : affectedArea->systems())
+                hitPlottables << system->plottables();
+            for (auto plottable : hitPlottables)
             {
                 if (QCPPlottableInterface1D* plottableInterface = plottable->interface1D())
                 {
@@ -4705,7 +4732,7 @@ void QCustomPlot::processRectSelection(QRect rect, QMouseEvent* event)
 */
 void QCustomPlot::processRectZoom(QRect rect, [[maybe_unused]] QMouseEvent* event)
 {
-    if (QCPAxisRect* axisRect = axisRectAt(rect.topLeft()))
+    if (QCPAxisRect* axisRect = qobject_cast<QCPAxisRect*>(areaAt(rect.topLeft())))
     {
         QList<QCPAxis*> affectedAxes = QList<QCPAxis*>()
             << axisRect->rangeZoomAxes(Qt::Horizontal) << axisRect->rangeZoomAxes(Qt::Vertical);

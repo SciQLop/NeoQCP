@@ -8,6 +8,7 @@
 #include "layout.h"
 #include "plottables/lane-layout.h"
 #include "plottables/plottable-bars.h"
+#include "layoutelements/layoutelement-axisrect.h"
 #include "plottables/plottable-group.h"
 #include "plottables/plottable.h"
 #include <concepts>
@@ -196,5 +197,37 @@ struct Construct<QCPPlottableGroup>
     }
 };
 } // namespace qcp
+
+// The plottable forms of QCPAxisRect::add: on the rect's own default pair (bottom and left), or on
+// a pair given explicitly. Either way the plottable is drawn in that pair's system, which the
+// plottable resolves from the axes.
+template <typename T, typename... Args>
+    requires std::derived_from<T, QCPAbstractPlottable>
+qcp::HandleFor<T> QCPAxisRect::add(Args&&... args)
+{
+    QCPAxis* key = axis(QCPAxis::atBottom);
+    QCPAxis* value = axis(QCPAxis::atLeft);
+    QCP_CHECK_OR_RETURN(key && value, "the axis rect has no bottom or left axis",
+                        qcp::HandleFor<T> { });
+    return add<T>(key, value, std::forward<Args>(args)...);
+}
+
+template <typename T, typename... Args>
+    requires std::derived_from<T, QCPAbstractPlottable>
+qcp::HandleFor<T> QCPAxisRect::add(QCPAxis* key, QCPAxis* value, Args&&... args)
+{
+    using Handle = qcp::HandleFor<T>;
+    // The pair must be this rect's: another rect's axes would put the plottable in another area,
+    // and half of this rect's arguments would be ignored.
+    const QList<QCPAxis*> own = axes();
+    QCP_CHECK_OR_RETURN(key && value && own.contains(key) && own.contains(value),
+                        "both axes of a plottable on this rect must belong to it", Handle { });
+    QCP_CHECK_OR_RETURN(!mParentPlot->isBeingDestroyed(), "the plot is being destroyed", Handle { });
+    Handle handle = qcp::makeHandle<Handle>(qcp::detail::newPlottable<T>(*mParentPlot, key, value));
+    handle.get()->markDirty();
+    if constexpr (sizeof...(Args) > 0)
+        qcp::detail::setDataOrUndo(*mParentPlot, handle, std::forward<Args>(args)...);
+    return handle;
+}
 
 #endif // QCP_CONSTRUCT_H

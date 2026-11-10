@@ -78,6 +78,10 @@ public:
     //! The axes of the area, as the base type the range model lives in.
     virtual QList<QCPAxisBase*> allAxes() const = 0;
 
+    //! Marks (or invalidates) the layers of everything this area draws: its axes, its grids and the
+    //! plottables of its systems.
+    virtual void markAffectedLayersDirty(bool invalidate = false) = 0;
+
     // The system of \a key and \a value: the one the area already made for that ordered pair, or a
     // new one. A pair that is not two axes of this area (or, for a cartesian area, two axes of one
     // orientation) is reported as misuse and answers null.

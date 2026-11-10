@@ -180,7 +180,7 @@ public:
     void setSelectedSubTickPen(const QPen& pen);
 
     // non-property methods:
-    void rescale(bool onlyVisiblePlottables = false);
+    // rescale() is the base's: it reads the drawn data ranges of the systems that use this axis.
     void pixelToCoord(QPointF pixelPos, double& angleCoord, double& radiusCoord) const;
     QPointF coordToPixel(double angleCoord, double radiusCoord) const;
     double coordToRadius(double coord) const;
