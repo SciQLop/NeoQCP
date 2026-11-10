@@ -3,6 +3,17 @@
 Work that was deferred during the 3.0 milestones, to triage before 3.0 ships. Each item says what a
 user would see and where the code is. Fixed items are deleted, not ticked.
 
+## From milestone 4f (areas, the axis base, the polar area, the frame variant)
+
+- **Polar tick-label hit boxes** are the upright extent around the anchor: offset at 0 and 180 degrees on
+  the angular axis, generous at the corners of rotated radial labels, hittable only after the first draw.
+  Fix: the label painter returns the rect it drew.
+- **`QCPCustomMapping::inverse` is pure**: a one-way mapping cannot be built. Polar `inverse` returns the
+  angle modulo the angular range; a wrong-sign log radius maps to NaN.
+- **The axis hot block can straddle a cache line**: 36 bytes in a 16-byte aligned object.
+- **`QCPAxis_SetRange10k` is +5 %** (gate 15 %): look again if `setRange`'s path changes.
+- **`TestDrawable::pixelAnchoredShapeIsHittable`** failed once in one full run, never again.
+
 ## From milestone 4e (the remaining plottables and items record; one span class)
 
 - **A recording made again allocates fresh buffers** (command list, context, pens): a click that

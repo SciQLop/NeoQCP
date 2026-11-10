@@ -154,5 +154,9 @@ Plot-wide settings:
 | Qt 4 / Qt 5 compatibility code | Qt 6.7 or newer |
 | Overriding `QCPAbstractItem::draw(QCPPainter*)` (it is final) | override `draw(QCPDrawContext&)` and record what the item draws |
 | Overriding `QCPStatisticalBox::drawStatisticalBox()` | override `draw(QCPDrawContext&)` |
+| `QCPPolarAxisAngular` as a layout element (`addElement`, its background, inset layout, drag and wheel, `addRadialAxis`, `add<QCPPolarGraph>`) | `QCPPolarArea`, which owns the angular axis, the radial axes and the grid |
+| `QCPPolarAxisRadial::ScaleType`, the polar axes' `SelectablePart(s)`, `rangeDrag`/`rangeZoom` | `QCPAxisBase::ScaleType`, `QCPAxisBase::SelectablePart(s)`, `rangeDraggable`/`rangeZoomable` |
+| `setRangeZoomFactor` on each radial axis | `QCPPolarArea::setRangeZoomFactor` (one factor for the area) |
+| String-based connections naming `QCPAxis::ScaleType` or `QCPAxis::SelectableParts`, such as `SIGNAL(scaleTypeChanged(QCPAxis::ScaleType))` | pointer-to-member `connect` (`&QCPAxis::scaleTypeChanged`), or spell the type `QCPAxisBase::ScaleType`: the enums now live in `QCPAxisBase` |
 
-Everything else in the public API of QCustomPlot 2.1.1 is still there.
+Everything else in the public API of QCustomPlot 2.1.1 is still there. The polar classes were a 2.1 tech preview; their changes are listed above.

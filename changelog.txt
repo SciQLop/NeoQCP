@@ -430,6 +430,36 @@ Behaviour changes for 2.x users:
   - An unclipped tracer's crosshair spans its axis rect, not the whole widget.
   - QCPErrorBars::data() counts as an edit: the bars are recorded again after it is called.
 
+Milestone 4f (areas, the axis base, the polar area, the frame variant). Steps 1-4 of the coordinate-systems design (docs/specs/2026-11-09-neoqcp-3-coordinate-systems-design.md).
+  - QCPArea is what every area has: the background (setBackground family) and the inset layout.
+        QCPAxisRect derives from it and keeps every signature.
+  - QCPPolarArea takes a cell of the plot layout, like an axis rect: plot.add<QCPPolarArea>(row, col).
+        It owns the angular axis, the radial axes and the grid, lays out the centre and radius,
+        draws the background inside the disc, handles drag and wheel, and adds polar graphs:
+        area->add<QCPPolarGraph>(...).
+  - QCPAxisBase is the axis model QCPAxis and both polar axes share: range and its setters, scale
+        type, reversal, ticker and tick vectors, drag/zoom opt-outs, selectable parts, the link
+        API (linkTo/unlink/linkSource/link, NeoQCP-only), and the range signals.
+  - Polar axes are selectable by clicking (base circle or spoke, tick labels); a wheel over a
+        polar area zooms the radial axes about the cursor, a drag along a spoke pans them.
+  - QCPTransform holds a cartesian, polar or custom mapping: QCPTransform::polar(angular, radial),
+        QCPTransform::custom(mapping, revision) with QCPCustomMapping (public), inverse(), kind().
+        The cartesian mapping is unchanged.
+
+Removed (polar 2.1 tech preview and NeoQCP-only API, no forwarders):
+  - QCPPolarAxisAngular as a layout element, with its background, inset layout, drag and wheel,
+        addRadialAxis and add<QCPPolarGraph>: use QCPPolarArea.
+  - QCPPolarAxisRadial::ScaleType and the polar SelectablePart(s) enums: use QCPAxisBase's.
+        rangeDrag/rangeZoom on polar axes: use rangeDraggable/rangeZoomable.
+  - setRangeZoomFactor on each radial axis: one factor on the area (QCPPolarArea::setRangeZoomFactor).
+  - QCPAxis::linkTo/linkSource take and return QCPAxisBase (linkSource() on a QCPAxis still
+        returns QCPAxis*).
+
+Behaviour changes:
+  - A polar area's background draws under the grid, as an axis rect's does; it used to draw over it.
+  - String-based connections naming QCPAxis::ScaleType or QCPAxis::SelectableParts no longer match
+        (moc now spells them QCPAxisBase::...); pointer-to-member connections are unchanged.
+
 #### NeoQCP, unreleased ####
 
 Behaviour changes (slots that delete their sender are now safe):
