@@ -1,6 +1,6 @@
 #include "test-polar.h"
-#include "misuse-recorder.h"
 #include "coords.h"
+#include "misuse-recorder.h"
 #include "painting/draw-commands.h"
 #include "polar/angularaxis.h"
 #include "polar/polar-area.h"
@@ -104,9 +104,7 @@ double chordRimKey(double angleA, double fractionA, double angleB, double fracti
 {
     const double radians = std::numbers::pi / 180.0;
     const auto unit = [radians](double angle, double fraction)
-    {
-        return QPointF(std::cos(angle * radians) * fraction, std::sin(angle * radians) * fraction);
-    };
+    { return QPointF(std::cos(angle * radians) * fraction, std::sin(angle * radians) * fraction); };
     const QPointF from = unit(angleA, fractionA);
     const QPointF delta = unit(angleB, fractionB) - from;
     const double a = QPointF::dotProduct(delta, delta);
@@ -136,6 +134,17 @@ bool isInk(const QColor& color)
 bool isRedInk(const QColor& color)
 {
     return color.red() > 200 && color.green() < 80 && color.blue() < 80;
+}
+
+// How many pixels of image the graph's blue pen inked.
+int inkCount(const QImage& image)
+{
+    int count = 0;
+    for (int y = 0; y < image.height(); ++y)
+        for (int x = 0; x < image.width(); ++x)
+            if (isInk(image.pixelColor(x, y)))
+                ++count;
+    return count;
 }
 
 // The inked pixels of image whose angle coord is inside (from, to) and whose radius is below limit
@@ -454,6 +463,32 @@ void TestPolar::aValueTheRadialScaleCannotTakeIsAGap()
                              qPrintable(QString::number(data->x)));
                 }
     }
+}
+
+void TestPolar::aGraphFirstRecordedAtZeroSizeAppearsAfterAResize()
+{
+    QCustomPlot plot;
+    plot.resize(0, 0);
+    plot.plotLayout()->clear();
+    auto* area = new QCPPolarArea(&plot);
+    plot.plotLayout()->addElement(0, 0, area);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 90, 180 },
+                                          QVector<double> { 0.6, 0.6, 0.6 });
+    QVERIFY(graph);
+    graph->setPen(QPen(Qt::blue, 3));
+
+    // The first replot happens while the plot has no size at all. A zero-size widget gets no paint,
+    // so nothing is recorded yet: the guard is that the graph still draws once the plot has a size.
+    plot.replot();
+    QCoreApplication::processEvents();
+
+    plot.resize(400, 300);
+    plot.replot();
+    QCoreApplication::processEvents();
+    const QImage image = imageOf(plot);
+    QVERIFY2(inkCount(image) > 0, "the graph never came back after the plot was given a size");
 }
 
 void TestPolar::aClampedRunFollowsTheArc_data()

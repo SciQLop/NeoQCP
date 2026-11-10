@@ -20,6 +20,7 @@ private slots:
     void aRimCrossingIsOnTheChord_data();
     void aRimCrossingIsOnTheChord();
     void aValueTheRadialScaleCannotTakeIsAGap();
+    void aGraphFirstRecordedAtZeroSizeAppearsAfterAResize();
     void aClampedRunFollowsTheArc_data();
     void aClampedRunFollowsTheArc();
     void aSparseInRangePairIsAChord();
