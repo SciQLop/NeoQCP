@@ -649,13 +649,15 @@ void QCPBars::setBarsGroup(QCPBarsGroup* barsGroup)
 {
     if (barsGroup == mBarsGroup)
         return;
-    // A group centres its members against each other, so they must share one frame.
+    // A group centres its members in key pixels only: one area and one key axis is its frame, the
+    // value axes may differ (side by side bars of two quantities, as 2.x allowed).
     if (barsGroup)
         for (QCPBars* member : barsGroup->bars())
-            if (member != this && member->system() != system())
+            if (member != this && (member->area() != area() || member->keyAxis() != keyAxis()))
             {
-                qcp::reportMisuse(Q_FUNC_INFO,
-                                  "a bars group needs all its bars in one coordinate system");
+                qcp::reportMisuse(
+                    Q_FUNC_INFO,
+                    "a bars group needs all its bars in one area, on one key axis");
                 return;
             }
     markDirty();

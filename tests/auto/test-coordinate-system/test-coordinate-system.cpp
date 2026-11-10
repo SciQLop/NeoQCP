@@ -541,6 +541,55 @@ void TestCoordinateSystem::relationshipsAcrossAreasAreRefused()
     test_misuse::calls.clear(); // the three refusals are the point of this test
 }
 
+void TestCoordinateSystem::dualValueAxesKeepTheirRelationships()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    QCPAxis* right = plot.axisRect()->addAxis(QCPAxis::atRight);
+    right->setRange(0, 1);
+
+    // A group lays its members out in key pixels only, so two value axes are fine.
+    auto* low = new QCPBars(plot.xAxis, plot.yAxis);
+    auto* high = new QCPBars(plot.xAxis, right);
+    low->setData({ 1, 2, 3 }, { 1, 1, 1 });
+    high->setData({ 1, 2, 3 }, { 1, 1, 1 });
+    low->setPen(Qt::NoPen);
+    high->setPen(Qt::NoPen);
+    low->setBrush(Qt::red);
+    high->setBrush(Qt::blue);
+    auto* group = new QCPBarsGroup(&plot);
+    group->append(low);
+    group->append(high);
+    QCOMPARE(group->size(), 2);
+    QCOMPARE(high->barsGroup(), group);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+
+    // A channel fill works in pixels, between two key axes of one orientation.
+    auto* here = new QCPGraph(plot.xAxis, plot.yAxis);
+    auto* there = new QCPGraph(plot.xAxis, right);
+    here->setData({ 1, 3 }, { 0.2, 0.2 });
+    there->setData({ 1, 3 }, { 0.8, 0.8 });
+    here->setChannelFillGraph(there);
+    QCOMPARE(here->channelFillGraph(), there);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+
+    // Both really paint: the two bar colours beside each other at a bar's key.
+    settle(plot);
+    const QImage image = plot.toPixmap().toImage();
+    int red = 0;
+    int blue = 0;
+    const int y = qRound(plot.yAxis->coordToPixel(0.5));
+    for (int x = qRound(plot.xAxis->coordToPixel(1.7)); x <= qRound(plot.xAxis->coordToPixel(2.3));
+         ++x)
+    {
+        const QColor colour = image.pixelColor(x, y);
+        red += colour == QColor(Qt::red);
+        blue += colour == QColor(Qt::blue);
+    }
+    QVERIFY(red > 0);
+    QVERIFY(blue > 0);
+}
+
 void TestCoordinateSystem::rescaleAxesVisitsEveryArea()
 {
     QCustomPlot plot;

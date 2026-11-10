@@ -312,10 +312,16 @@ void QCPGraph::setChannelFillGraph(QCPGraph* targetGraph)
         mChannelFillGraph = nullptr;
         return;
     }
-    // A channel fill closes a band between two recordings: the two graphs share one frame.
-    if (targetGraph && targetGraph->system() != system())
+    // A channel fill closes a band in pixels, along one key axis: one area and one key
+    // orientation is all it reads, so two value axes are fine, as 2.x allowed.
+    if (targetGraph &&
+        (targetGraph->area() != area() ||
+         (keyAxis() && targetGraph->keyAxis() &&
+          keyAxis()->orientation() != targetGraph->keyAxis()->orientation())))
     {
-        qcp::reportMisuse(Q_FUNC_INFO, "a channel fill needs both graphs in one coordinate system");
+        qcp::reportMisuse(Q_FUNC_INFO,
+                          "a channel fill needs both graphs in one area, on one key axis "
+                          "orientation");
         mChannelFillGraph = nullptr;
         return;
     }

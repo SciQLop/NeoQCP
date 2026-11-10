@@ -149,6 +149,9 @@ public:
     //! in any other system.
     [[nodiscard]] QCPCoordinateSystem* system() const { return mSystem.data(); }
 
+    //! The area whose systems it draws in: null while it has no system.
+    [[nodiscard]] QCPArea* area() const { return mSystem ? mSystem->area() : nullptr; }
+
     [[nodiscard]] QCPAxis* keyAxis() const { return mKeyAxis.data(); }
 
     [[nodiscard]] QCPAxis* valueAxis() const { return mValueAxis.data(); }

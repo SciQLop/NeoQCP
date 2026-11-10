@@ -234,12 +234,11 @@ void QCPErrorBars::setDataPlottable(QCPAbstractPlottable* plottable)
         return;
     }
 
-    // The whiskers are read off the data plottable's pixels, so both live in one frame.
-    if (plottable && plottable->system() != system())
+    // The whiskers are read off the data plottable's pixels, so both live in one area.
+    if (plottable && plottable->area() != area())
     {
         detachDataPlottable();
-        qcp::reportMisuse(Q_FUNC_INFO,
-                          "error bars need a data plottable in their coordinate system");
+        qcp::reportMisuse(Q_FUNC_INFO, "error bars need a data plottable in their area");
         return;
     }
 
