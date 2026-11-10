@@ -149,7 +149,8 @@ int inkCount(const QImage& image)
 
 // The inked pixels of image whose angle coord is inside (from, to) and whose radius is below limit
 // times the area's radius: the part of the disc a run beyond the rim must leave empty.
-int inkInSector(QCPPolarArea& area, const QImage& image, double from, double to, double limit)
+int inkInSector(QCPPolarArea& area, const QImage& image, double from, double to, double limit,
+                double inner = 0.0)
 {
     int count = 0;
     for (int y = 0; y < image.height(); ++y)
@@ -160,7 +161,7 @@ int inkInSector(QCPPolarArea& area, const QImage& image, double from, double to,
             double angle = 0, radius = 0;
             area.radialAxis()->pixelToCoord(QPointF(x, y), angle, radius);
             const double fraction = area.radialAxis()->coordToRadius(radius) / area.radius();
-            if (angle > from && angle < to && fraction < limit)
+            if (angle > from && angle < to && fraction < limit && fraction > inner)
                 ++count;
         }
     return count;
@@ -643,6 +644,398 @@ void TestPolar::areaAddTakesAnyPolarCapablePlottable()
     QCOMPARE(plot.plottableCount(), 1);
 }
 
+void TestPolar::aPolarGraphRefusesAForeignSystem()
+{
+    QCustomPlot plot;
+    plot.resize(400, 600);
+    auto* area = new QCPPolarArea(&plot);
+    plot.plotLayout()->addElement(1, 0, area);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 90, 180 },
+                                          QVector<double> { 0.5, 0.6, 0.5 });
+    QVERIFY(graph);
+    graph->setPen(QPen(Qt::blue, 3));
+    settle(plot);
+    QVERIFY(graph->system());
+
+    // A cartesian frame is not one a polar graph can draw in: it says so once and keeps its own.
+    QCPCoordinateSystem* cartesian = plot.axisRect()->system(plot.xAxis, plot.yAxis);
+    QVERIFY(cartesian);
+    graph->setSystem(cartesian);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    QVERIFY(graph->system() != cartesian);
+    QCOMPARE(graph->system()->area(), static_cast<QCPArea*>(area));
+
+    settle(plot);
+    QVERIFY2(isInk(pixelAt(plot, area->radialAxis()->coordToPixel(0, 0.5).toPoint())),
+             "the refused system stopped the graph from drawing");
+    test_misuse::calls.clear();
+}
+
+void TestPolar::aLegendIconShowsTheGraphsStyles()
+{
+    QCustomPlot plot;
+    plot.plotLayout()->clear();
+    plot.legend = new QCPLegend;
+    plot.plotLayout()->addElement(1, 0, plot.legend);
+    auto* area = new QCPPolarArea(&plot);
+    plot.plotLayout()->addElement(0, 0, area);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 90 },
+                                          QVector<double> { 0.4, 0.4 });
+    QVERIFY(graph);
+    graph->setPen(QPen(Qt::red, 3));
+    settle(plot);
+    QVERIFY2(redInkCount(imageOf(plot)) > 0, "the icon did not take the graph's pen");
+
+    // An empty graph still has an icon: it says what the graph would look like.
+    graph->setData(QVector<double> { }, QVector<double> { });
+    settle(plot);
+    QVERIFY2(redInkCount(imageOf(plot)) > 0, "an empty graph lost its icon");
+}
+
+void TestPolar::rescaledAxesFollowTheData()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    auto* radial = area->radialAxis();
+    area->angularAxis()->setRange(0, 360);
+    radial->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 120, 240 },
+                                          QVector<double> { 2, 3, 4 });
+    QVERIFY(graph);
+
+    // The rescale reads the data, not the recording, whose radial extent is the rim it clamps to.
+    graph->rescaleAxes();
+    QCOMPARE(radial->range().lower, 2.0);
+    QCOMPARE(radial->range().upper, 4.0);
+    graph->rescaleAxes();
+    QCOMPARE(radial->range().lower, 2.0);
+    QCOMPARE(radial->range().upper, 4.0);
+}
+
+void TestPolar::rescaledKeysFollowTheDataInOneCall()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    auto* angular = area->angularAxis();
+    area->radialAxis()->setRange(0, 1);
+    angular->setRange(0, 360);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 720, 810, 900 },
+                                          QVector<double> { 0.5, 0.5, 0.5 });
+    QVERIFY(graph);
+    graph->setPeriodic(false);
+
+    // 2.1's rescale asked the data: one call frames the keys, even far outside the current range.
+    graph->rescaleKeyAxis();
+    QCOMPARE(angular->range().lower, 720.0);
+    QCOMPARE(angular->range().upper, 900.0);
+}
+
+void TestPolar::hiddenGeometryIsNotHittable()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    auto* radial = area->radialAxis();
+    area->angularAxis()->setRange(0, 360);
+    radial->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 45, 90 },
+                                          QVector<double> { 2, 2, 2 });
+    QVERIFY(graph);
+    graph->setPen(QPen(Qt::blue, 4));
+    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc));
+    settle(plot);
+
+    // The run is drawn on the rim, hidden outside the disc: the space just inside it is not the graph.
+    QVERIFY(graph->selectTest(radial->coordToPixel(45, 0.98), false) < 0);
+    plot.resize(200, 150);
+    plot.replot();
+    QCoreApplication::processEvents();
+    QVERIFY(graph->selectTest(radial->coordToPixel(45, 0.98), false) < 0);
+}
+
+void TestPolar::theBandIgnoresPointsOutsideTheRange()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 120, 240 },
+                                          QVector<double> { -1, 0.5, 0.5 });
+    QVERIFY(graph);
+    settle(plot);
+
+    // The point below the range is drawn at the centre, but it is outside the range: a band around
+    // the centre does not select it.
+    const QPointF centre = area->center();
+    const QCPDataSelection inside
+        = graph->interface1D()->selectTestRect(QRectF(centre - QPointF(6, 6), QSizeF(12, 12)), false);
+    QVERIFY(!inside.contains(QCPDataSelection(QCPDataRange(0, 1))));
+}
+
+void TestPolar::rubberBandDragSelectsPolarPoints()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    QVector<double> angle, radius;
+    for (int i = 0; i < 16; ++i)
+    {
+        angle << i * 22.5;
+        radius << 0.5;
+    }
+    auto graph = area->add<QCPPolarGraph>(angle, radius);
+    QVERIFY(graph);
+    graph->setSelectable(QCP::stMultipleDataRanges);
+    graph->setPen(QPen(Qt::blue, 3));
+    plot.setInteractions(QCP::iSelectPlottables);
+    plot.setSelectionRectMode(QCP::srmSelect);
+    settle(plot);
+
+    QPointF low, high;
+    for (int i = 2; i != 6; ++i)
+    {
+        const QPointF pixel = area->radialAxis()->coordToPixel(i * 22.5, 0.5);
+        low = i == 2 ? pixel : QPointF(qMin(low.x(), pixel.x()), qMin(low.y(), pixel.y()));
+        high = i == 2 ? pixel : QPointF(qMax(high.x(), pixel.x()), qMax(high.y(), pixel.y()));
+    }
+    const QPointF from = low - QPointF(4, 4);
+    const QPointF to = high + QPointF(4, 4);
+    sendMouse(&plot, QEvent::MouseButtonPress, from.toPoint(), Qt::LeftButton);
+    sendMouse(&plot, QEvent::MouseMove, to.toPoint(), Qt::LeftButton);
+    sendMouse(&plot, QEvent::MouseButtonRelease, to.toPoint(), Qt::NoButton);
+
+    QVERIFY2(graph->selection().contains(QCPDataSelection(QCPDataRange(2, 6))),
+             "the rubber band did not select the points it covered");
+    QVERIFY(!graph->selection().contains(QCPDataSelection(QCPDataRange(8, 9))));
+}
+
+void TestPolar::aMarkerTakesTheGraphPen()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 45 }, QVector<double> { 0.5 });
+    QVERIFY(graph);
+    graph->setPen(QPen(Qt::blue, 3));
+    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 10));
+    area->grid()->setVisible(false);
+    area->angularAxis()->setVisible(false);
+    area->radialAxis()->setVisible(false);
+    settle(plot);
+
+    // The style carries no pen of its own: the marker takes the graph's, not Qt's default black.
+    const QColor pixel = pixelAt(plot, area->radialAxis()->coordToPixel(45, 0.5).toPoint());
+    QVERIFY2(isInk(pixel), qPrintable(pixel.name()));
+}
+
+void TestPolar::aMarkerOutsideTheRangeIsNotDrawn()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(1, 10);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 45 }, QVector<double> { 0.5 });
+    QVERIFY(graph);
+    graph->setLineStyle(QCPPolarGraph::lsNone);
+    graph->setScatterStyle(
+        QCPScatterStyle(QCPScatterStyle::ssDisc, QPen(Qt::blue), QBrush(Qt::blue), 10));
+    area->grid()->setVisible(false);
+    area->angularAxis()->setVisible(false);
+    area->radialAxis()->setVisible(false);
+    settle(plot);
+
+    // 2.1's scatter clip: a value outside the radial range (0.5 on 1..10) gets no marker, so nothing
+    // is inked at the centre where it would land.
+    QVERIFY2(!isInk(pixelAt(plot, area->center().toPoint())), "a marker outside the range drew");
+    QCOMPARE(inkInSector(*area, imageOf(plot), -1, 361, 1.0), 0);
+}
+
+void TestPolar::aSelectedMarkerTakesTheDecoratorStyle()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 90, 180, 270 },
+                                          QVector<double> { 0.6, 0.6, 0.6, 0.6 });
+    QVERIFY(graph);
+    graph->setLineStyle(QCPPolarGraph::lsNone);
+    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 10));
+    graph->setPen(QPen(Qt::blue, 3));
+    auto* decorator = new QCPSelectionDecorator;
+    decorator->setPen(QPen(Qt::red, 3));
+    decorator->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 10));
+    graph->setSelectionDecorator(decorator);
+    area->grid()->setVisible(false);
+    area->angularAxis()->setVisible(false);
+    area->radialAxis()->setVisible(false);
+    settle(plot);
+    QCOMPARE(redInkCount(imageOf(plot)), 0);
+
+    graph->setSelection(QCPDataSelection(QCPDataRange(0, 4)));
+    settle(plot);
+    QVERIFY2(redInkCount(imageOf(plot)) > 0, "the selected markers kept the unselected style");
+
+    graph->setSelection(QCPDataSelection());
+    settle(plot);
+    QCOMPARE(redInkCount(imageOf(plot)), 0);
+}
+
+void TestPolar::aLineSegmentTakesTheSelectedStyleOnlyWhenBothEndsAreSelected()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    QVector<double> angle, radius;
+    for (int i = 0; i < 20; ++i)
+    {
+        angle << i * 18.0;
+        radius << 0.6;
+    }
+    auto graph = area->add<QCPPolarGraph>(angle, radius);
+    QVERIFY(graph);
+    graph->setPen(QPen(Qt::blue, 3));
+    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 8));
+    auto* decorator = new QCPSelectionDecorator;
+    decorator->setPen(QPen(Qt::red, 3));
+    decorator->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 8));
+    graph->setSelectionDecorator(decorator);
+    graph->setSelection(QCPDataSelection(QCPDataRange(7, 8)));
+    area->grid()->setVisible(false);
+    area->angularAxis()->setVisible(false);
+    area->radialAxis()->setVisible(false);
+    settle(plot);
+
+    // 2.x styles a segment when both of its ends are selected: the two segments that touch point 7
+    // keep the graph's pen, and only the marker takes the decorated one.
+    for (const auto& command : graph->mCore.recordedList().commands)
+        if (const auto* line = std::get_if<qcp::PolylineDataCmd>(&command))
+            QVERIFY2(line->pen.color() != QColor(Qt::red),
+                     "a segment with one unselected end took the selection pen");
+    QVERIFY2(redInkCount(imageOf(plot)) > 0, "the selected marker did not take the decorated style");
+}
+
+void TestPolar::aPointBelowTheRangeSitsAtTheCentre()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 90 }, QVector<double> { -1, 2 });
+    QVERIFY(graph);
+    graph->setPen(QPen(Qt::blue, 3));
+    area->grid()->setVisible(false);
+    area->angularAxis()->setVisible(false);
+    area->radialAxis()->setVisible(false);
+    settle(plot);
+
+    // The point below the range sits at the centre, as the replay draws it, so the visible segment
+    // runs along the 90 degree spoke: nothing is drawn towards 180 degrees.
+    QCOMPARE(inkInSector(*area, imageOf(plot), 170, 190, 0.97, 0.08), 0);
+    QVERIFY(isInk(pixelAt(plot, area->radialAxis()->coordToPixel(90, 0.5).toPoint())));
+}
+
+void TestPolar::aRunLeavingTheRimFollowsIt_data()
+{
+    QTest::addColumn<double>("lower");
+    QTest::addColumn<double>("upper");
+    QTest::addColumn<double>("beyond");
+    QTest::addColumn<double>("justInside");
+    QTest::addColumn<bool>("logarithmic");
+    QTest::addColumn<bool>("reversed");
+    QTest::newRow("linear") << 0.0 << 1.0 << 1.6 << 0.98 << false << false;
+    QTest::newRow("log radial") << 1.0 << 1000.0 << std::pow(1000.0, 1.6)
+                                << std::pow(1000.0, 0.98) << true << false;
+    QTest::newRow("reversed radial") << 0.0 << 1.0 << -0.6 << 0.02 << false << true;
+}
+
+void TestPolar::aRunLeavingTheRimFollowsIt()
+{
+    QFETCH(double, lower);
+    QFETCH(double, upper);
+    QFETCH(double, beyond);
+    QFETCH(double, justInside);
+    QFETCH(bool, logarithmic);
+    QFETCH(bool, reversed);
+
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    auto* angular = area->angularAxis();
+    auto* radial = area->radialAxis();
+    angular->setRange(0, 360);
+    radial->setRange(lower, upper);
+    radial->setScaleType(logarithmic ? QCPAxisBase::stLogarithmic : QCPAxisBase::stLinear);
+    radial->setRangeReversed(reversed);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 90, 140 },
+                                          QVector<double> { beyond, justInside });
+    QVERIFY(graph);
+    graph->setPen(QPen(Qt::blue, 8));
+    area->grid()->setVisible(false);
+    angular->setVisible(false);
+    radial->setVisible(false);
+    settle(plot);
+
+    // Leaving the disc follows the rim before it comes back in: the sector between the beyond point
+    // and the crossing keeps no ink, not even the sliver a thick pen would leave.
+    QCOMPARE(inkInSector(*area, imageOf(plot), 95, 125, 0.995), 0);
+    // And the rim is used: the run records points on it between the two data points.
+    const auto lines = recordedPolylines(graph->mCore);
+    QVERIFY(!lines.empty());
+    int onTheRim = 0;
+    for (const QPointF& point : lines.front())
+        if (point.x() > 90 && point.x() < 140 && point.y() == radial->radiusToCoord(area->radius()))
+            ++onTheRim;
+    QVERIFY2(onTheRim >= 1, "the run left the disc without going round it");
+}
+
+void TestPolar::aThickPenLeavesNoSliverAlongTheRim()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 90 },
+                                          QVector<double> { 2, 2 });
+    QVERIFY(graph);
+    graph->setPen(QPen(Qt::blue, 8));
+    area->grid()->setVisible(false);
+    area->angularAxis()->setVisible(false);
+    area->radialAxis()->setVisible(false);
+    settle(plot);
+
+    // Both points are beyond the rim: the run goes round it at the clamp radius, so the pen's width
+    // stays outside the disc instead of bleeding in along a chord.
+    QCOMPARE(inkInSector(*area, imageOf(plot), 2, 88, 0.995), 0);
+}
+
+void TestPolar::aCrossingTakesTheBranchNearestTheBeyondPoint()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 300 },
+                                          QVector<double> { 0.5, 2 });
+    QVERIFY(graph);
+    graph->setPen(QPen(Qt::NoPen));
+    graph->setBrush(QBrush(Qt::red));
+    area->grid()->setVisible(false);
+    area->angularAxis()->setVisible(false);
+    area->radialAxis()->setVisible(false);
+    settle(plot);
+
+    // The crossing belongs to the branch the beyond point is on: the fill does not wrap the long way
+    // round the disc.
+    QVERIFY2(!isRedInk(pixelAt(plot, area->radialAxis()->coordToPixel(180, 0.5).toPoint())),
+             "the fill wrapped through 180 degrees");
+}
+
 void TestPolar::aClampedRunFollowsTheArc_data()
 {
     QTest::addColumn<double>("lower");
@@ -697,8 +1090,9 @@ void TestPolar::aClampedRunFollowsTheArc()
         }
     }
     QVERIFY2(densified >= 2, "the run beyond the rim was recorded as one chord");
-    // And the clip hides it: no pixel inside the disc between the two angles.
-    QCOMPARE(inkInSector(*area, imageOf(plot), -1, 91, 0.97), 0);
+    // And the clip hides it: the run goes round the rim, so no pixel lies inside the disc between the
+    // two angles, nor in the band a pen a few pixels wide would reach if a chord ran there.
+    QCOMPARE(inkInSector(*area, imageOf(plot), -1, 91, 0.995), 0);
 }
 
 void TestPolar::aSparseInRangePairIsAChord()
@@ -941,7 +1335,8 @@ void TestPolar::angularWheelZoomRequeuesTheRepaint()
                       Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
     QCoreApplication::sendEvent(&plot, &wheel);
 
-    QVERIFY2(angular->range().size() < 360, qPrintable(QString::number(angular->range().size())));
+    QVERIFY2(angular->range().size() < 360,
+             qPrintable(QString::number(angular->range().size())));
     QVERIFY2(plot.isRepaintQueued(), "an angular-only wheel zoom scheduled no repaint");
 }
 
@@ -1043,8 +1438,7 @@ void TestPolar::hidingTheAngularAxisKeepsTheGraphs()
     // The graphs belong to the area, not to the ring: hiding the ring keeps the data.
     QCOMPARE(graph->parentLayerable(), static_cast<QCPLayerable*>(area));
     QVERIFY(graph->realVisibility());
-    const QColor pixel
-        = pixelAt(plot, (area->center() + QPointF(0, 0.5 * area->radius())).toPoint());
+    const QColor pixel = pixelAt(plot, (area->center() + QPointF(0, 0.5 * area->radius())).toPoint());
     QVERIFY2(pixel.blue() > 150 && pixel.red() < 120, qPrintable(pixel.name()));
 }
 

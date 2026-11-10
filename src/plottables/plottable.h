@@ -173,7 +173,7 @@ public:
     void setKeyAxis(QCPAxis* axis);
     void setValueAxis(QCPAxis* axis);
     //! The primitive the axis setters resolve to: joins \a system, or detaches with null.
-    void setSystem(QCPCoordinateSystem* system);
+    virtual void setSystem(QCPCoordinateSystem* system);
     Q_SLOT void setSelectable(QCP::SelectionType selectable);
     Q_SLOT void setSelection(QCPDataSelection selection);
     void setSelectionDecorator(QCPSelectionDecorator* decorator);

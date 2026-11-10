@@ -43,8 +43,8 @@ template <typename T, typename Self = void>
 class QCPPolarAreaOps;
 
 /*!
-  A polar plot's area: it holds one angular axis, the radial axes and the grid they share, lists the
-  polar graphs drawn on it, and drags and zooms them.
+  A polar plot's area: it holds one angular axis, the radial axes and the grid they share, draws the
+  plottables of its systems, and drags and zooms them.
 */
 class QCP_LIB_DECL QCPPolarArea : public QCPArea
 {

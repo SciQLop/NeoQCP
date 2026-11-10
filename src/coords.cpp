@@ -338,19 +338,39 @@ bool QCPTransform::Polar::usable() const
     return !logarithmic || lower > 0.0 || upper < 0.0;
 }
 
+double QCPTransform::Polar::rawFraction(double value) const
+{
+    if (!logarithmic)
+        return (reversed ? upper - value : value - lower) / (upper - lower);
+    if (value == 0.0 || (value > 0.0) != (lower > 0.0))
+        return qQNaN(); // the range's opposite sign has no log position
+    const double ratio = upper / lower;
+    return reversed ? qLn(upper / value) / qLn(ratio) : qLn(value / lower) / qLn(ratio);
+}
+
 double QCPTransform::Polar::fraction(double value) const
 {
-    double fraction = 0;
+    return qBound(0.0, rawFraction(value), kPolarClamp);
+}
+
+double QCPTransform::Polar::valueAt(double fraction) const
+{
     if (!logarithmic)
-        fraction = (reversed ? upper - value : value - lower) / (upper - lower);
-    else
-    {
-        if (value == 0.0 || (value > 0.0) != (lower > 0.0))
-            return qQNaN(); // the range's opposite sign has no log position
-        const double ratio = upper / lower;
-        fraction = reversed ? qLn(upper / value) / qLn(ratio) : qLn(value / lower) / qLn(ratio);
-    }
-    return qBound(0.0, fraction, kPolarClamp);
+        return reversed ? upper - fraction * (upper - lower) : lower + fraction * (upper - lower);
+    const double ratio = upper / lower;
+    return reversed ? upper / qPow(ratio, fraction) : lower * qPow(ratio, fraction);
+}
+
+double QCPTransform::polarFraction(double value) const
+{
+    const auto* polar = std::get_if<Polar>(&mFrame);
+    return polar ? polar->rawFraction(value) : qQNaN();
+}
+
+double QCPTransform::polarValue(double fraction) const
+{
+    const auto* polar = std::get_if<Polar>(&mFrame);
+    return polar ? polar->valueAt(fraction) : qQNaN();
 }
 
 QPointF QCPTransform::Polar::toPixel(double angleCoord, double value) const

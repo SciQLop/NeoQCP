@@ -189,7 +189,7 @@ bool QCPPolarArea::removeRadialAxis(QCPPolarAxisRadial* axis)
 }
 
 /*!
-  Returns the region the polar graphs are clipped to: the circle the angular axis draws.
+  Returns the region the area's background pixmap is clipped to: the disc the angular axis draws.
 */
 QRegion QCPPolarArea::exactClipRegion() const
 {

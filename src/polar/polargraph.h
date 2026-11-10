@@ -41,7 +41,6 @@
 
 class QCPCoordinateSystem;
 class QCPDrawContext;
-class QCPLegend;
 
 template <typename T, typename Self = void>
 class QCPPolarGraphOps;
@@ -123,6 +122,11 @@ public:
     double selectTest(const QPointF& pos, bool onlySelectable,
                       QVariant* details = nullptr) const override;
     QCPDataSelection selectTestRect(const QRectF& rect, bool onlySelectable) const override;
+    QCPRange getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth) const override;
+    QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth,
+                           const QCPRange& inKeyRange = QCPRange()) const override;
+    void drawLegendIcon(QCPDrawContext& icon) const override;
+    void setSystem(QCPCoordinateSystem* system) override;
 
     // introduced virtual methods:
     QCP::Capabilities requiredCapabilities() const override; // the polar system is enough

@@ -166,6 +166,11 @@ public:
     void map(std::span<const QPointF> data, std::span<QPointF> out) const;
     //! Maps one pixel back to data.
     [[nodiscard]] QCP::Data inverse(QPointF pixel) const;
+    //! The polar position of \a value along the radius, unclamped: the replay clamps it to [0, 1.05].
+    //! NaN outside a polar frame, or for a value the radial scale cannot take.
+    [[nodiscard]] double polarFraction(double value) const;
+    //! The value at \a fraction of the radius in the frame's own scale. NaN outside a polar frame.
+    [[nodiscard]] double polarValue(double fraction) const;
     //! True when the two transforms differ by a pixel offset only (a pan, not a zoom); \a delta
     //! gets this transform's pixel minus \a other's.
     [[nodiscard]] bool isTranslationOf(const QCPTransform& other, QPointF* delta = nullptr) const;
@@ -267,8 +272,12 @@ private:
 
         void take(const QCPPolarAxisAngular& angular, const QCPPolarAxisRadial& radial);
         [[nodiscard]] bool usable() const;
+        //! The unclamped position of \a value along the radius; NaN when the scale cannot take it.
+        [[nodiscard]] double rawFraction(double value) const;
         //! The clamped [0, 1.05] position of \a value along the radius, in the axis' own scale.
         [[nodiscard]] double fraction(double value) const;
+        //! The value at \a fraction of the radius, in the axis' own scale.
+        [[nodiscard]] double valueAt(double fraction) const;
         [[nodiscard]] QPointF toPixel(double angleCoord, double value) const;
         [[nodiscard]] QCP::Data toData(QPointF pixel) const;
     };

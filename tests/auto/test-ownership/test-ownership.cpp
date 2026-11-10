@@ -6,10 +6,7 @@ namespace
 {
 int gMisuses = 0;
 
-void countMisuse(const char*, const char*)
-{
-    ++gMisuses;
-}
+void countMisuse(const char*, const char*) { ++gMisuses; }
 } // namespace
 
 void TestOwnership::init()
@@ -515,8 +512,7 @@ void TestOwnership::plottablesOfAnotherRectAfterAxisRemoval()
     QVERIFY(second->plottables().isEmpty());
     mPlot->replot();
     const QRect rect = mPlot->axisRect(0)->rect();
-    const auto mouse = [this](QEvent::Type type, QPoint pos, Qt::MouseButtons buttons)
-    {
+    const auto mouse = [this](QEvent::Type type, QPoint pos, Qt::MouseButtons buttons) {
         QMouseEvent e(type, pos, mPlot->mapToGlobal(pos), Qt::LeftButton, buttons, Qt::NoModifier);
         QCoreApplication::sendEvent(mPlot, &e);
     };
@@ -724,8 +720,7 @@ void TestOwnership::deleteColorScaleOfMap()
 
 void TestOwnership::deleteBarsInGroup()
 {
-    const auto barsIn = [this](QCPBarsGroup* group)
-    {
+    const auto barsIn = [this](QCPBarsGroup* group) {
         auto* bars = new QCPBars(mPlot->xAxis, mPlot->yAxis);
         bars->setData(QVector<double> { 1, 2 }, QVector<double> { 3, 4 });
         bars->setBarsGroup(group);
@@ -1004,12 +999,10 @@ void TestOwnership::destroyedSlotConstructsDuringTeardown()
 {
     auto* plot = new QCustomPlot;
     auto* graph = plot->addGraph();
-    connect(graph, &QObject::destroyed,
-            [plot]
-            {
-                new QCPCurve(plot->xAxis, plot->yAxis);
-                new QCPItemText(plot);
-            });
+    connect(graph, &QObject::destroyed, [plot] {
+        new QCPCurve(plot->xAxis, plot->yAxis);
+        new QCPItemText(plot);
+    });
 
     delete plot;
 
@@ -1049,18 +1042,14 @@ void TestOwnership::childrenDeletedWhilePlotWhole()
     QCPAxisRect* rectSeenByGraph = nullptr;
     QCPAxisRect* rectSeenByItem = nullptr;
     auto rectOf = [plot] { return plot->axisRect() ? plot->axisRect()->rect() : QRect(); };
-    connect(graph, &QObject::destroyed,
-            [&]
-            {
-                seenByGraph = rectOf();
-                rectSeenByGraph = plot->axisRect();
-            });
-    connect(item, &QObject::destroyed,
-            [&]
-            {
-                seenByItem = rectOf();
-                rectSeenByItem = plot->axisRect();
-            });
+    connect(graph, &QObject::destroyed, [&] {
+        seenByGraph = rectOf();
+        rectSeenByGraph = plot->axisRect();
+    });
+    connect(item, &QObject::destroyed, [&] {
+        seenByItem = rectOf();
+        rectSeenByItem = plot->axisRect();
+    });
 
     delete plot;
 
@@ -1106,20 +1095,18 @@ void TestOwnership::mutatorsRefuseDuringTeardown()
     };
     QStringList unrefused;
     int seenPlottables = -1, seenItems = -1, seenLayers = -1;
-    connect(watched, &QObject::destroyed,
-            [&]
-            {
-                for (const auto& [name, call] : mutators)
-                {
-                    const int before = gMisuses;
-                    call();
-                    if (gMisuses != before + 1)
-                        unrefused << name;
-                }
-                seenPlottables = plot->plottableCount();
-                seenItems = plot->itemCount();
-                seenLayers = plot->layerCount();
-            });
+    connect(watched, &QObject::destroyed, [&] {
+        for (const auto& [name, call] : mutators)
+        {
+            const int before = gMisuses;
+            call();
+            if (gMisuses != before + 1)
+                unrefused << name;
+        }
+        seenPlottables = plot->plottableCount();
+        seenItems = plot->itemCount();
+        seenLayers = plot->layerCount();
+    });
 
     delete plot;
 
@@ -1134,12 +1121,10 @@ void TestOwnership::recreatingGettersReturnNullDuringTeardown()
     auto* plot = new QCustomPlot;
     QCPAxis* axis = plot->xAxis;
     bool layoutMade = true, overlayMade = true, gridMade = true;
-    connect(plot->plotLayout(), &QObject::destroyed,
-            [&]
-            {
-                layoutMade = plot->plotLayout() != nullptr;
-                overlayMade = plot->overlay() != nullptr;
-            });
+    connect(plot->plotLayout(), &QObject::destroyed, [&] {
+        layoutMade = plot->plotLayout() != nullptr;
+        overlayMade = plot->overlay() != nullptr;
+    });
     connect(axis->grid(), &QObject::destroyed, [&] { gridMade = axis->grid() != nullptr; });
 
     delete plot;
@@ -1172,14 +1157,12 @@ void TestOwnership::newAxisRectDuringTeardown()
     auto* graph = plot->addGraph();
     int axes = -1;
     QCPAxis* added = nullptr;
-    connect(graph, &QObject::destroyed,
-            [&]
-            {
-                auto* rect = new QCPAxisRect(plot);
-                added = rect->addAxis(QCPAxis::atLeft);
-                axes = rect->axes().size();
-                rect->setupFullAxesBox(true);
-            });
+    connect(graph, &QObject::destroyed, [&] {
+        auto* rect = new QCPAxisRect(plot);
+        added = rect->addAxis(QCPAxis::atLeft);
+        axes = rect->axes().size();
+        rect->setupFullAxesBox(true);
+    });
 
     delete plot;
 
@@ -1192,20 +1175,18 @@ void TestOwnership::newColorScaleDuringTeardown()
 {
     auto* plot = new QCustomPlot;
     auto* graph = plot->addGraph();
-    connect(graph, &QObject::destroyed,
-            [plot]
-            {
-                auto* scale = new QCPColorScale(plot);
-                scale->setDataRange(QCPRange(1, 2));
-                scale->setDataScaleType(QCPAxis::stLogarithmic);
-                scale->setGradient(QCPColorGradient(QCPColorGradient::gpHot));
-                scale->setLabel("late");
-                scale->setType(QCPAxis::atBottom);
-                scale->setRangeDrag(true);
-                scale->setRangeZoom(true);
-                scale->rescaleDataRange(false);
-                (void)scale->axis();
-            });
+    connect(graph, &QObject::destroyed, [plot] {
+        auto* scale = new QCPColorScale(plot);
+        scale->setDataRange(QCPRange(1, 2));
+        scale->setDataScaleType(QCPAxis::stLogarithmic);
+        scale->setGradient(QCPColorGradient(QCPColorGradient::gpHot));
+        scale->setLabel("late");
+        scale->setType(QCPAxis::atBottom);
+        scale->setRangeDrag(true);
+        scale->setRangeZoom(true);
+        scale->rescaleDataRange(false);
+        (void)scale->axis();
+    });
 
     delete plot;
 

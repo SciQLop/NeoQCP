@@ -25,6 +25,7 @@
 
 #include "polargraph.h"
 
+#include "../coordinate-system-polar.h"
 #include "../coordinate-system.h"
 #include "../coords.h"
 #include "../painting/draw-commands.h"
@@ -39,6 +40,14 @@
 namespace
 {
 // The radial fraction the frame clamps a value beyond the range to (see QCPTransform::Polar).
+//! A marker style that carries no pen of its own takes the graph's, as 2.x drew it.
+QCPScatterStyle withPen(QCPScatterStyle style, const QPen& pen)
+{
+    if (!style.isPenDefined())
+        style.setPen(pen);
+    return style;
+}
+
 constexpr double kClampFraction = 1.05;
 
 // The angular step of the points inserted beyond the rim, in degrees of arc: the chord between two
@@ -283,12 +292,13 @@ QCPPolarGraph::window() const
 double QCPPolarGraph::selectTest(const QPointF& pos, bool onlySelectable, QVariant* details) const
 {
     const double distance = QCPAbstractPlottable::selectTest(pos, onlySelectable, details);
-    if (distance < 0 || !details || !system())
+    if (distance < 0 || !system())
         return distance;
 
     const QCPTransform frame = system()->transform();
     int nearest = -1;
     double nearestDistance = 0;
+    double nearestFraction = 0;
     const auto [begin, end] = window();
     for (auto it = begin; it != end; ++it)
     {
@@ -300,9 +310,14 @@ double QCPPolarGraph::selectTest(const QPointF& pos, bool onlySelectable, QVaria
         {
             nearest = static_cast<int>(it - mDataContainer->constBegin());
             nearestDistance = pointDistance;
+            nearestFraction = frame.polarFraction(it->value);
         }
     }
-    if (nearest >= 0)
+    // What the clip hides is not there to click: a point beyond the rim, or below it, is drawn on the
+    // rim or at the centre, and neither is its place.
+    if (nearest < 0 || nearestFraction > 1.0 || nearestFraction < 0.0)
+        return -1;
+    if (details)
         *details = QVariant::fromValue(QCPDataSelection(QCPDataRange(nearest, nearest + 1)));
     return distance;
 }
@@ -326,8 +341,9 @@ QCPDataSelection QCPPolarGraph::selectTestRect(const QRectF& rect, bool onlySele
     for (auto it = begin; it != end; ++it)
     {
         const QCP::Pixels pixel = frame.map(QCP::Data { it->key, it->value });
-        const bool inside = std::isfinite(pixel.x) && std::isfinite(pixel.y)
-            && rect.contains(QPointF(pixel.x, pixel.y));
+        const double fraction = frame.polarFraction(it->value);
+        const bool inside = std::isfinite(pixel.x) && std::isfinite(pixel.y) && fraction >= 0.0
+            && fraction <= 1.0 && rect.contains(QPointF(pixel.x, pixel.y));
         if (inside && segmentBegin < 0)
             segmentBegin = indexOf(it);
         else if (!inside && segmentBegin >= 0)
@@ -339,6 +355,55 @@ QCPDataSelection QCPPolarGraph::selectTestRect(const QRectF& rect, bool onlySele
     if (segmentBegin >= 0)
         result.addDataRange(QCPDataRange(segmentBegin, indexOf(end)), false);
     return result;
+}
+
+/*! \internal
+
+  A polar graph draws in a polar system: another one would be a frame it cannot use, so it keeps the
+  system it has and says so.
+*/
+void QCPPolarGraph::setSystem(QCPCoordinateSystem* system)
+{
+    QCP_CHECK_OR_RETURN(!system || qobject_cast<QCPPolarSystem*>(system),
+                        "a polar graph draws in a polar system, not in this one", );
+    QCPAbstractPlottable::setSystem(system);
+}
+
+/*! \internal
+
+  The data ranges, not the recording's box: a rescale asks what the graph holds, and the box of a
+  clamped recording would answer with the rim instead.
+*/
+QCPRange QCPPolarGraph::getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain) const
+{
+    return mDataContainer->keyRange(foundRange, inSignDomain);
+}
+
+QCPRange QCPPolarGraph::getValueRange(bool& foundRange, QCP::SignDomain inSignDomain,
+                                      const QCPRange& inKeyRange) const
+{
+    return mDataContainer->valueRange(foundRange, inSignDomain, inKeyRange);
+}
+
+/*! \internal
+
+  The legend icon: a band, a line and one marker, in the graph's own styles. It has no data of its
+  own, so an invisible box gives the replay the extent to fit the drawing to.
+*/
+void QCPPolarGraph::drawLegendIcon(QCPDrawContext& icon) const
+{
+    icon.rect(QCP::Data { 0.0, -0.5 }, QCP::Data { 1.0, 0.5 }, QPen(Qt::NoPen),
+              QBrush(Qt::NoBrush));
+    if (mBrush.style() != Qt::NoBrush && mBrush.color().alpha() != 0)
+        icon.rect(QCP::Data { 0.0, -0.15 }, QCP::Data { 1.0, 0.15 }, QPen(Qt::NoPen), mBrush);
+    if (mLineStyle != lsNone)
+        icon.polyline(std::make_shared<const std::vector<QPointF>>(
+                          std::vector<QPointF> { { 0.0, 0.0 }, { 1.0, 0.0 } }),
+                      mPen);
+    if (!mScatterStyle.isNone())
+        icon.markers(std::make_shared<const std::vector<QPointF>>(
+                         std::vector<QPointF> { { 0.5, 0.0 } }),
+                     withPen(mScatterStyle, mPen));
 }
 
 /*! \internal
@@ -367,22 +432,27 @@ void QCPPolarGraph::draw(QCPDrawContext& context) const
     if (!drawsLine && !drawsMarkers)
         return;
 
-    // Where a data point sits in the unit disc, unclamped: the rim crossing is a property of the
-    // segment between the points themselves, not of the clamped ends the replay draws.
+    // The frame of the system the graph draws in: the recording is clamped, and the rim crossings
+    // are computed, in that one frame.
+    const QCPTransform frame = system()->transform();
+
+    // Where a data point sits in the unit disc, as the replay draws it: the frame's fraction,
+    // unclamped above and held at the centre below. The rim crossing is a property of the segment
+    // between the points themselves, not of the clamped ends the replay draws.
+    const auto drawnFraction = [&](double value) { return qMax(0.0, frame.polarFraction(value)); };
     const auto unitPoint = [&](double angleCoord, double value)
     {
         const double theta = angular->coordToAngleRad(angleCoord);
-        const double fraction = radial->coordToRadius(value) / radius;
+        const double fraction = drawnFraction(value);
         return QPointF(std::cos(theta) * fraction, std::sin(theta) * fraction);
     };
 
-    const double rimValue = radial->radiusToCoord(radius);
-    const double clampedValue = radial->radiusToCoord(kClampFraction * radius);
+    const double rimValue = frame.polarValue(1.0);
+    const double clampedValue = frame.polarValue(kClampFraction);
 
     // A value the radial scale cannot take (zero or the other sign on a logarithmic axis) has no
     // place in the disc: it is a gap, exactly like a NaN value, and so is a value the frame maps to
     // no pixel at all.
-    const QCPTransform frame = system()->transform();
     const bool logarithmic = radial->scaleType() == QCPPolarAxisRadial::stLogarithmic;
     const bool negativeRange = radial->range().upper < 0;
     const auto isDrawn = [&](const QCPGraphData& data)
@@ -396,8 +466,10 @@ void QCPPolarGraph::draw(QCPDrawContext& context) const
     };
 
     // Where the segment from a to b, drawn straight in the plot, crosses the rim. Only called for a
-    // segment that straddles it.
-    const auto rimCrossing = [&](double angleA, double valueA, double angleB, double valueB)
+    // segment that straddles it. \a anchor is the key of its beyond end: the crossing belongs to the
+    // branch of the angular range that end is on.
+    const auto rimCrossing = [&](double angleA, double valueA, double angleB, double valueB,
+                                 double anchor)
     {
         const QPointF from = unitPoint(angleA, valueA);
         const QPointF delta = unitPoint(angleB, valueB) - from;
@@ -418,14 +490,13 @@ void QCPPolarGraph::draw(QCPDrawContext& context) const
                 t = leave;
         }
         const QPointF crossing = from + t * delta;
-        // The angular coordinate of that point, on the branch of the segment: the frame repeats
+        // The angular coordinate of that point, on the branch of the beyond end: the frame repeats
         // every angular range in coordinate units.
         const double angle = angular->angleRadToCoord(std::atan2(crossing.y(), crossing.x()));
-        return angle + span * std::round(0.5 * (angleA + angleB - angle) / span);
+        return angle + span * std::round((anchor - angle) / span);
     };
 
     std::vector<QPointF> line; // the recorded polyline of the current run
-    std::vector<QPointF> points; // the data points of the current run, for the markers
     bool beyond = false; // does the last recorded point lie beyond the rim?
     double beyondAngle = 0; // where the recording left the rim
 
@@ -440,20 +511,26 @@ void QCPPolarGraph::draw(QCPDrawContext& context) const
             line.emplace_back(from + (to - from) * i / count, clampedValue);
     };
 
-    // The decorator styles a run as a whole: a selected run takes its pen and its brush.
+    // The decorator styles a segment as a whole: 2.x takes its pen and brush when both of its ends
+    // are selected. A marker is styled by the point it marks.
     const bool hasSelection = mSelectionDecorator && !mSelection.isEmpty();
-    bool runSelected = false;
+    bool lineSelected = false;
 
-    const auto flush = [&]
+    const auto scatterStyleFor = [&](bool selected)
+    {
+        return selected ? mSelectionDecorator->getFinalScatterStyle(mScatterStyle)
+                        : withPen(mScatterStyle, mPen);
+    };
+
+    const auto flushLine = [&]
     {
         if (line.empty())
             return;
         if (drawsLine)
         {
-            const QPen pen = runSelected && hasSelection ? mSelectionDecorator->pen() : mPen;
+            const QPen pen = lineSelected ? mSelectionDecorator->pen() : mPen;
             context.polyline(std::make_shared<const std::vector<QPointF>>(line), pen);
-            const QBrush brush
-                = runSelected && hasSelection ? mSelectionDecorator->brush() : mBrush;
+            const QBrush brush = lineSelected ? mSelectionDecorator->brush() : mBrush;
             if (drawsFill && brush.style() != Qt::NoBrush)
             {
                 std::vector<QCP::Position> vertices;
@@ -463,60 +540,89 @@ void QCPPolarGraph::draw(QCPDrawContext& context) const
                 context.polygon(vertices, QPen(Qt::NoPen), brush);
             }
         }
-        if (drawsMarkers && !points.empty())
-            context.markers(std::make_shared<const std::vector<QPointF>>(points), mScatterStyle);
         line.clear();
-        points.clear();
         beyond = false;
-        runSelected = false;
+        lineSelected = false;
+    };
+
+    // Markers of the points inside the radial range, as 2.1's clip kept them: a marker a little past
+    // a range end still belongs to the graph that runs through it.
+    const double clipMargin = radial->range().size() * 0.05;
+    const double upperClipValue
+        = radial->range().upper + (radial->rangeReversed() ? 0.0 : clipMargin);
+    const double lowerClipValue
+        = radial->range().lower - (radial->rangeReversed() ? clipMargin : 0.0);
+    std::vector<QPointF> markers;
+    bool markersSelected = false;
+    const auto flushMarkers = [&]
+    {
+        if (drawsMarkers && !markers.empty())
+            context.markers(std::make_shared<const std::vector<QPointF>>(markers),
+                            scatterStyleFor(markersSelected));
+        markers.clear();
     };
 
     const auto [begin, end] = window();
 
     QCPGraphData previous;
+    bool previousSelected = false;
     for (auto it = begin; it != end; ++it)
     {
         const QCPGraphData& data = *it;
         if (!isDrawn(data))
         {
-            flush();
+            flushLine();
+            previousSelected = false;
             continue;
         }
         // Only a decorated selection varies the runs: the selection is not asked at all otherwise,
         // which keeps a plain graph's re-record as cheap as it was.
-        if (hasSelection)
+        const int index = static_cast<int>(it - mDataContainer->constBegin());
+        const bool selected
+            = hasSelection && mSelection.contains(QCPDataSelection(QCPDataRange(index, index + 1)));
+        const bool isBeyond = drawnFraction(data.value) > 1.0;
+
+        if (!line.empty())
         {
-            const int index = static_cast<int>(it - mDataContainer->constBegin());
-            const bool selected
-                = mSelection.contains(QCPDataSelection(QCPDataRange(index, index + 1)));
-            if (!line.empty() && selected != runSelected)
+            const bool segmentSelected = previousSelected && selected;
+            if (segmentSelected != lineSelected)
             {
                 // The joint belongs to both runs: the next one starts with the point they share.
-                flush();
+                flushLine();
                 line.emplace_back(previous.key, previous.value);
-                points.emplace_back(previous.key, previous.value);
-                beyond = radial->coordToRadius(previous.value) / radius > 1.0;
+                beyond = drawnFraction(previous.value) > 1.0;
                 beyondAngle = previous.key;
             }
-            runSelected = selected;
+            lineSelected = segmentSelected;
         }
-        // Exactly at the rim is in range: 2.1 kept it, and it is the rim the frame clamps to.
-        const bool isBeyond = radial->coordToRadius(data.value) / radius > 1.0;
+
+        if (drawsMarkers && data.value > lowerClipValue && data.value < upperClipValue)
+        {
+            if (!markers.empty() && selected != markersSelected)
+                flushMarkers();
+            markersSelected = selected;
+            markers.emplace_back(data.key, data.value);
+        }
+
         if (line.empty())
         {
             line.emplace_back(data.key, data.value);
-            points.emplace_back(data.key, data.value);
             beyond = isBeyond;
             beyondAngle = data.key;
             previous = data;
+            previousSelected = selected;
             continue;
         }
         if (isBeyond)
         {
             if (!beyond)
             {
-                beyondAngle = rimCrossing(previous.key, previous.value, data.key, data.value);
+                beyondAngle
+                    = rimCrossing(previous.key, previous.value, data.key, data.value, data.key);
                 line.emplace_back(beyondAngle, rimValue);
+                // The hidden side starts with a radial step: a thick pen takes its width from here,
+                // not from the rim, and leaves no sliver along it.
+                line.emplace_back(beyondAngle, clampedValue);
             }
             appendBeyondArc(beyondAngle, data.key);
             line.emplace_back(data.key, data.value);
@@ -524,16 +630,22 @@ void QCPPolarGraph::draw(QCPDrawContext& context) const
         else
         {
             if (beyond)
-                line.emplace_back(rimCrossing(previous.key, previous.value, data.key, data.value),
-                                  rimValue);
+            {
+                const double crossing = rimCrossing(previous.key, previous.value, data.key,
+                                                    data.value, previous.key);
+                appendBeyondArc(beyondAngle, crossing);
+                line.emplace_back(crossing, clampedValue);
+                line.emplace_back(crossing, rimValue);
+            }
             line.emplace_back(data.key, data.value);
         }
-        points.emplace_back(data.key, data.value);
         beyond = isBeyond;
         beyondAngle = data.key;
         previous = data;
+        previousSelected = selected;
     }
-    flush();
+    flushLine();
+    flushMarkers();
 
     // A decorator subclass draws a decoration of its own: the base class's is empty, and recording a
     // painter callback for it would make every selection change a view change.
