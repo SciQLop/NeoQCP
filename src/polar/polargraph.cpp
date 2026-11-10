@@ -287,14 +287,13 @@ void QCPPolarGraph::draw(QCPDrawContext& context) const
     if (!drawsLine && !drawsMarkers)
         return;
 
-    // The pixel radius the replay draws a value at: the frame clamps the fraction to [0, 1.05].
-    const auto pixelRadius = [&](double value)
-    { return qBound(0.0, radial->coordToRadius(value) / radius, kClampFraction) * radius; };
-
-    const auto pixelPoint = [&](double angleCoord, double value)
+    // Where a data point sits in the unit disc, unclamped: the rim crossing is a property of the
+    // segment between the points themselves, not of the clamped ends the replay draws.
+    const auto unitPoint = [&](double angleCoord, double value)
     {
         const double theta = angular->coordToAngleRad(angleCoord);
-        return QPointF(std::cos(theta) * pixelRadius(value), std::sin(theta) * pixelRadius(value));
+        const double fraction = radial->coordToRadius(value) / radius;
+        return QPointF(std::cos(theta) * fraction, std::sin(theta) * fraction);
     };
 
     const double rimValue = radial->radiusToCoord(radius);
@@ -304,26 +303,29 @@ void QCPPolarGraph::draw(QCPDrawContext& context) const
     // segment that straddles it.
     const auto rimCrossing = [&](double angleA, double valueA, double angleB, double valueB)
     {
-        const QPointF from = pixelPoint(angleA, valueA);
-        const QPointF delta = pixelPoint(angleB, valueB) - from;
-        const double a = delta.x() * delta.x() + delta.y() * delta.y();
-        const double b = 2.0 * (from.x() * delta.x() + from.y() * delta.y());
-        const double c = from.x() * from.x() + from.y() * from.y() - radius * radius;
+        const QPointF from = unitPoint(angleA, valueA);
+        const QPointF delta = unitPoint(angleB, valueB) - from;
+        const double a = QPointF::dotProduct(delta, delta);
+        const double b = 2.0 * QPointF::dotProduct(from, delta);
+        const double c = QPointF::dotProduct(from, from) - 1.0;
         const double discriminant = b * b - 4.0 * a * c;
-        if (!(a > 0) || discriminant < 0)
-            return angleB;
-        const double t = qBound(0.0, (-b - std::sqrt(discriminant)) / (2.0 * a), 1.0);
+        // The first of the two rim crossings the segment meets, on the segment itself.
+        double t = 0.0;
+        if (a > 0 && discriminant >= 0)
+        {
+            const double root = std::sqrt(discriminant);
+            const double entry = (-b - root) / (2.0 * a);
+            const double leave = (-b + root) / (2.0 * a);
+            if (entry >= 0.0 && entry <= 1.0)
+                t = entry;
+            else if (leave >= 0.0 && leave <= 1.0)
+                t = leave;
+        }
         const QPointF crossing = from + t * delta;
-        // The angular coordinate of the crossing, taken on the branch of the segment: the frame
-        // repeats every angular range in coordinate units.
-        double angle = angular->angleRadToCoord(std::atan2(crossing.y(), crossing.x()));
-        const double lower = qMin(angleA, angleB);
-        const double upper = qMax(angleA, angleB);
-        for (int i = 0; i < 3 && angle < lower - 1e-9; ++i)
-            angle += span;
-        for (int i = 0; i < 3 && angle > upper + 1e-9; ++i)
-            angle -= span;
-        return angle;
+        // The angular coordinate of that point, on the branch of the segment: the frame repeats
+        // every angular range in coordinate units.
+        const double angle = angular->angleRadToCoord(std::atan2(crossing.y(), crossing.x()));
+        return angle + span * std::round(0.5 * (angleA + angleB - angle) / span);
     };
 
     std::vector<QPointF> line; // the recorded polyline of the current run

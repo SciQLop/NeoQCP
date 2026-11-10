@@ -17,6 +17,8 @@ private slots:
     void aPolarGraphRecords();
     void aRotationDoesNotReRecord();
     void aNonPeriodicGraphKeepsItsWindow();
+    void aRimCrossingIsOnTheChord_data();
+    void aRimCrossingIsOnTheChord();
     void aClampedRunFollowsTheArc_data();
     void aClampedRunFollowsTheArc();
     void aSparseInRangePairIsAChord();

@@ -88,6 +88,31 @@ std::size_t recordedMarkerCount(const QCPDrawnCore& core)
     return 0;
 }
 
+// The key where the straight segment between two (angle, fraction) points cuts the unit circle:
+// the geometry of the picture, computed here rather than by the graph's own code.
+double chordRimKey(double angleA, double fractionA, double angleB, double fractionB)
+{
+    const double radians = std::numbers::pi / 180.0;
+    const auto unit = [radians](double angle, double fraction)
+    {
+        return QPointF(std::cos(angle * radians) * fraction, std::sin(angle * radians) * fraction);
+    };
+    const QPointF from = unit(angleA, fractionA);
+    const QPointF delta = unit(angleB, fractionB) - from;
+    const double a = QPointF::dotProduct(delta, delta);
+    const double b = 2.0 * QPointF::dotProduct(from, delta);
+    const double c = QPointF::dotProduct(from, from) - 1.0;
+    const double root = std::sqrt(b * b - 4.0 * a * c);
+    double t = (-b - root) / (2.0 * a);
+    if (t < 0.0 || t > 1.0)
+        t = (-b + root) / (2.0 * a);
+    const QPointF crossing = from + t * delta;
+    double key = std::atan2(crossing.y(), crossing.x()) / radians;
+    while (key < angleA - 1e-9)
+        key += 360.0;
+    return key;
+}
+
 QImage imageOf(QCustomPlot& plot)
 {
     return plot.toPixmap(400, 300).toImage();
@@ -314,6 +339,64 @@ void TestPolar::aNonPeriodicGraphKeepsItsWindow()
     QCOMPARE(lines.front().size(), std::size_t(39));
     QCOMPARE(lines.front().front().x(), 0.0); // the one before the range, kept for the entry
     QCOMPARE(lines.front().back().x(), 380.0);
+}
+
+void TestPolar::aRimCrossingIsOnTheChord_data()
+{
+    QTest::addColumn<double>("lower");
+    QTest::addColumn<double>("upper");
+    QTest::addColumn<double>("deep");
+    QTest::addColumn<double>("middle");
+    QTest::addColumn<double>("shallow");
+    QTest::addColumn<bool>("logarithmic");
+    QTest::addColumn<bool>("reversed");
+    // The polar-clamped series at fractions 0.2, 1.6 and 0.9 of the radial range, read on three
+    // ways of turning a value into a radius.
+    QTest::newRow("linear") << 0.0 << 1.0 << 0.2 << 1.6 << 0.9 << false << false;
+    QTest::newRow("log radial") << 1.0 << 1000.0 << std::pow(1000.0, 0.2) << std::pow(1000.0, 1.6)
+                                << std::pow(1000.0, 0.9) << true << false;
+    QTest::newRow("reversed radial") << 0.0 << 1.0 << 0.8 << -0.6 << 0.1 << false << true;
+}
+
+void TestPolar::aRimCrossingIsOnTheChord()
+{
+    QFETCH(double, lower);
+    QFETCH(double, upper);
+    QFETCH(double, deep);
+    QFETCH(double, middle);
+    QFETCH(double, shallow);
+    QFETCH(bool, logarithmic);
+    QFETCH(bool, reversed);
+
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    auto* angular = area->angularAxis();
+    auto* radial = area->radialAxis();
+    angular->setRange(0, 360);
+    radial->setRange(lower, upper);
+    radial->setScaleType(logarithmic ? QCPAxisBase::stLogarithmic : QCPAxisBase::stLinear);
+    radial->setRangeReversed(reversed);
+    // Out of the disc, then back in: the series the polar-clamped picture draws.
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 30, 60 },
+                                          QVector<double> { deep, middle, shallow });
+    QVERIFY(graph);
+    settle(plot);
+
+    // The crossings sit where the straight chords between the data points cut the rim.
+    const double entry = chordRimKey(0, 0.2, 30, 1.6);
+    const double exit = chordRimKey(30, 1.6, 60, 0.9);
+    QVERIFY2(std::abs(entry - 27.6) < 0.5, qPrintable(QString::number(entry)));
+    QVERIFY2(std::abs(exit - 51.5) < 0.5, qPrintable(QString::number(exit)));
+
+    std::vector<double> crossings;
+    const double rimValue = radial->radiusToCoord(area->radius());
+    for (const auto& line : recordedPolylines(graph->mCore))
+        for (const QPointF& point : line)
+            if (std::abs(point.y() - rimValue) < 1e-9)
+                crossings.push_back(point.x());
+    QCOMPARE(crossings.size(), std::size_t(2));
+    QVERIFY2(std::abs(crossings[0] - entry) < 0.5, qPrintable(QString::number(crossings[0])));
+    QVERIFY2(std::abs(crossings[1] - exit) < 0.5, qPrintable(QString::number(crossings[1])));
 }
 
 void TestPolar::aClampedRunFollowsTheArc_data()
