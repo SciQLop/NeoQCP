@@ -543,6 +543,40 @@ void TestQCustomPlot::rectSelectionSlotDeletingThePlotIsSafe()
   QVERIFY(ran);
 }
 
+void TestQCustomPlot::rectSelectionKeepsThePlotOrder()
+{
+  // 2.x collected the candidates in the plot's own order. Collecting them system by system would
+  // hand the same plottables over grouped by system, i.e. the third one before the second.
+  layOut(mPlot, QCP::iSelectPlottables | QCP::iMultiSelect);
+  mPlot->setSelectionRectMode(QCP::srmSelect);
+  QCPAxisRect* rect = mPlot->axisRect();
+  QCPAxis* top = rect->addAxis(QCPAxis::atTop);
+  QCPAxis* right = rect->addAxis(QCPAxis::atRight);
+  top->setRange(0, 10);
+  right->setRange(0, 10);
+
+  const auto add = [this](QCPAxis* key, QCPAxis* value, double keyAt) {
+    QCPGraph* graph = mPlot->addGraph(key, value);
+    graph->setData(QVector<double>{ keyAt - 1, keyAt, keyAt + 1 }, QVector<double>{ 5, 5, 5 });
+    graph->setSelectable(QCP::stWhole);
+    return graph;
+  };
+  QCPGraph* first = add(mPlot->xAxis, mPlot->yAxis, 2);
+  QCPGraph* second = add(top, right, 5); // another system, made between the other two
+  QCPGraph* third = add(mPlot->xAxis, mPlot->yAxis, 8);
+  QCOMPARE(rect->systems().size(), 2);
+  mPlot->replot();
+
+  QList<QCPAbstractPlottable*> selected;
+  for (QCPGraph* graph : { first, second, third })
+    connect(graph, &QCPAbstractPlottable::selectionChanged, this,
+            [&selected, graph] { selected << graph; });
+
+  dragFromTo(mPlot, pixelOf(mPlot, 1, 9), pixelOf(mPlot, 9, 1));
+
+  QCOMPARE(selected, (QList<QCPAbstractPlottable*>{ first, second, third }));
+}
+
 void TestQCustomPlot::rectZoomSlotDeletingThePlotIsSafe()
 {
   layOut(mPlot, QCP::Interactions());

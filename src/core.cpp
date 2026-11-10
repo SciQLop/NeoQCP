@@ -4656,12 +4656,13 @@ void QCustomPlot::processRectSelection(QRect rect, QMouseEvent* event)
         QRectF rectF(rect.normalized());
         if (QCPArea* affectedArea = areaAt(rectF.topLeft()))
         {
-            // determine plottables that were hit by the rect and thus are candidates for selection:
-            QList<QCPAbstractPlottable*> hitPlottables;
-            for (QCPCoordinateSystem* system : affectedArea->systems())
-                hitPlottables << system->plottables();
-            for (auto plottable : hitPlottables)
+            // determine plottables that were hit by the rect and thus are candidates for selection,
+            // in the plot's own order as 2.x collected them: going system by system would hand the
+            // same plottables over grouped by system instead.
+            for (auto plottable : std::as_const(mPlottables))
             {
+                if (!plottable->system() || plottable->system()->area() != affectedArea)
+                    continue;
                 if (QCPPlottableInterface1D* plottableInterface = plottable->interface1D())
                 {
                     QCPDataSelection dataSel = plottableInterface->selectTestRect(rectF, true);

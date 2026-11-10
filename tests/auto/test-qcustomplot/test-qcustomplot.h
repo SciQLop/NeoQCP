@@ -35,6 +35,7 @@ private slots:
   void cancelSlotDeletingThePlotWhileClearingTheRectModeIsSafe();
   void clickSelectionSlotDeletingThePlotIsSafe();
   void rectSelectionSlotDeletingThePlotIsSafe();
+  void rectSelectionKeepsThePlotOrder();
   void rectZoomSlotDeletingThePlotIsSafe();
   void releaseSlotDeletingThePlotIsSafe();
   void wheelSlotDeletingThePlotIsSafe();
