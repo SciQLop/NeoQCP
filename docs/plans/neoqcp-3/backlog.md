@@ -3,6 +3,12 @@
 Work that was deferred during the 3.0 milestones, to triage before 3.0 ships. Each item says what a
 user would see and where the code is. Fixed items are deleted, not ticked.
 
+## From milestone 4h (the polar graph is a plottable)
+
+- **`QCPPolarArea::add<T>`** lacks the axis-rect form's friendly `static_assert`, builds the object before a
+  capability refusal, and only builds types with a polar-axes constructor.
+- **`QCPDrawnCore::hitTest` has no box cull for non-cartesian frames**: every command is scanned.
+
 ## From milestone 4g (coordinate systems and the plottables on them)
 
 - **`QCPMultiGraph` requires `capColourScale`** (it is a `QCPAbstractLine`) besides `capLanes`.

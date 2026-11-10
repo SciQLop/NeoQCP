@@ -482,6 +482,33 @@ Behaviour changes for 2.x users:
   - A bar moved to other axes (setKeyAxis, setValueAxis) leaves its stack and its bars group.
   - axesChanged() (NeoQCP 3.0 preview) is now systemChanged().
 
+Milestone 4h (the polar graph is a plottable). Step 9 of the coordinate-systems design.
+  - QCPPolarGraph is a QCPAbstractPlottable1D<QCPGraphData> drawn in its area's QCPPolarSystem: it is
+        in the plot's plottable list and legend (QCPPlottableLegendItem), selectable (click,
+        stSingleData, rubber band) with the standard selection decorator, joins plottable groups, and
+        take/add(unique_ptr) through QCPPolarArea::add. The 2.1 constructor from two polar axes stays.
+  - It records in data space: a rotation of a periodic graph re-records nothing. A segment crossing
+        the rim is drawn on the data's chord up to the rim; a run beyond the radial range is hidden
+        along the rim; a value a logarithmic radial axis cannot take is a gap, like NaN.
+  - QCPPolarArea::add<T>() and add(std::unique_ptr<T>) are the generic area forms, refusing a
+        plottable whose capabilities the polar system lacks.
+  - Fix: hit testing on a polar frame (the data-box cull assumed independent axes).
+  - Fix: a slot deleting a linked axis while its range was written back to the source read freed memory.
+
+Removed (polar 2.1 tech preview, no forwarders):
+  - QCPPolarLegendItem and QCPPolarGraph::addToLegend/removeFromLegend overloads: the plottable ones.
+  - QCPPolarArea::removeGraph and the area's own graph list: QCustomPlot::remove(graph);
+        QCPPolarArea::graphs() now lists the plot's polar graphs drawn on the area.
+
+Behaviour changes for 2.1 polar users:
+  - A polar area no longer deletes its graphs: the plot owns them; a graph whose area goes is inert.
+  - A selected polar graph looks selected (2.1 had the decorator disabled).
+  - Graphs reach the rim exactly (2.1 clipped about a pixel inside the disc).
+  - A segment leaving the radial range is drawn toward its data point (2.1 aimed it at its clip
+        point); markers of points outside the radial range are not drawn, as in 2.1.
+  - Clicking inside a polar graph's fill selects it, as for cartesian graphs.
+  - setSystem() with a non-polar system is refused as misuse.
+
 #### NeoQCP, unreleased ####
 
 Behaviour changes (slots that delete their sender are now safe):

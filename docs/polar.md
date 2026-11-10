@@ -29,10 +29,11 @@ It replaces it: clear the plot layout, then add the polar area in its place.
 ![Three microphone pickup patterns](images/polar-basic.png)
 
 - `plotLayout()->clear()` deletes the default axis rect, with its four axes and the legend. `xAxis`, `yAxis` and `legend` become null.
-- `area->add<QCPPolarGraph>()` creates a graph on the area's first radial axis and registers it. The plot owns it.
+- `area->add<QCPPolarGraph>()` creates a graph on the area's first radial axis. It is an ordinary plottable: the plot owns it, lists it, puts it in the legend, and `plot.remove(graph)` deletes it.
 - `setData(angles, radii)` copies the points. The angles are in the angular axis' coordinates: degrees here.
 - `setPen()`, `setBrush()` and `setScatterStyle()` work as on a `QCPGraph`. A brush fills the closed curve.
 - `setLineStyle(QCPPolarGraph::lsNone)` shows the points only. Give them a scatter style, or nothing is drawn.
+- Values beyond the radial range are hidden along the rim; a segment that crosses the rim is drawn up to it. On a logarithmic radial axis a zero or negative value is a gap.
 
 ## Direction and units
 
