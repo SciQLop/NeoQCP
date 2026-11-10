@@ -924,8 +924,46 @@ double QCPDrawnCore::selectTest(const QCPDrawable& object, const QPointF& pos, b
     return object.hitTest(QCP::Pixels { pos.x(), pos.y() }, details).value_or(-1.0);
 }
 
+namespace
+{
+//! The shape a system clips its painter content to: empty where it clips to its rect alone.
+QPainterPath qcpSystemClipShape(const QCPDrawnView& view)
+{
+    if (!view.system || !view.system->clipsToPath())
+        return { };
+    return view.system->clipPath();
+}
+
+//! Clips \a painter to the system's shape for as long as it lives, where the system has one.
+struct QCPSystemClip
+{
+    QCPSystemClip(QCPPainter& painter, const QCPDrawnView& view) : mPainter(painter)
+    {
+        const QPainterPath shape = qcpSystemClipShape(view);
+        if (shape.isEmpty())
+            return;
+        mPainter.save();
+        mPainter.setClipPath(shape, Qt::IntersectClip);
+        mClipped = true;
+    }
+    QCPSystemClip(const QCPSystemClip&) = delete;
+    QCPSystemClip& operator=(const QCPSystemClip&) = delete;
+    ~QCPSystemClip()
+    {
+        if (mClipped)
+            mPainter.restore();
+    }
+
+private:
+    QCPPainter& mPainter;
+    bool mClipped = false;
+};
+} // namespace
+
 void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const QCPDrawnView& view)
 {
+    // The painter follows a system's shape (a polar disc); the GPU keeps its bounding rect.
+    const QCPSystemClip systemClip(painter, view);
     // An export resolves what a screen frame waits for: the recording knows which it was made for.
     QCPDrawnView painted = view;
     painted.exporting = painter.isExporting();
@@ -970,12 +1008,16 @@ void QCPDrawnCore::paint(const QCPDrawable& object, QCPPainter& painter, const Q
             const qreal opacity = painter.opacity();
             view.layer->deferGpuPainter(
                 [list = &mState->recording, state = std::weak_ptr<State>(mState), frame,
-                 antialiased, opacity](QCPPainter& target)
+                 antialiased, opacity, shape = qcpSystemClipShape(view)](QCPPainter& target)
                 {
                     if (state.expired())
                         return;
                     target.save();
                     target.setOpacity(opacity);
+                    // The deferred pass runs after this draw's clip is restored: it sets the
+                    // system's shape again, or a disc's content would square off at the rim.
+                    if (!shape.isEmpty())
+                        target.setClipPath(shape, Qt::IntersectClip);
                     qcpReplayWithPainter(*list, target, frame, QCPReplayKinds::GpuOnly, nullptr,
                                          true, antialiased);
                     target.restore();

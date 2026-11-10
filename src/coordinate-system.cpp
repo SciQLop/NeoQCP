@@ -51,6 +51,11 @@ bool QCPCoordinateSystem::usesAxis(const QCPAxisBase* axis) const
   The default clip is the system's rect: a system whose drawing is shaped says so by overriding
   this.
 */
+bool QCPCoordinateSystem::clipsToPath() const
+{
+    return false;
+}
+
 QPainterPath QCPCoordinateSystem::clipPath() const
 {
     QPainterPath path;

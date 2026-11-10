@@ -75,6 +75,12 @@ public:
     virtual QRect clipRect() const = 0;
     //! The painter's clip: the rect by default, a shape where the system has one.
     virtual QPainterPath clipPath() const;
+    /*!
+      Whether \ref clipPath() says more than \ref clipRect(). The painter clips through the path
+      where it does; the GPU keeps the bounding rect as its scissor, so only the painter content
+      follows the shape.
+    */
+    [[nodiscard]] virtual bool clipsToPath() const;
     //! Whether \a pixel can hit what this system draws; true while the frame is unusable, so a
     //! stale recording never swallows a click.
     virtual bool contains(QPointF pixel) const;

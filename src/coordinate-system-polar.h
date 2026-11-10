@@ -32,6 +32,8 @@ public:
     QCPTransform transform() const override;
     QRect clipRect() const override;
     QPainterPath clipPath() const override;
+    //! The disc is the painter's clip; the GPU scissor stays its bounding square.
+    bool clipsToPath() const override { return true; }
     bool contains(QPointF pixel) const override;
     QCPKeyWindow keyWindow() const override;
     //! There is no axis ratio in a polar area: items and spans stay cartesian in this milestone.

@@ -348,8 +348,10 @@ void qcpReplayWithPainter(const QCPDrawList& list, QCPPainter& painter, const QC
     const bool owned = state == QCPReplayState::Save;
     if (owned)
         painter.save();
+    // Intersect: a caller may already clip tighter than the frame - a layerable to its rect, a
+    // replay to its system's shape (a polar disc) - and the frame's rect must not undo that.
     if (owned && !frame.clip.isEmpty())
-        painter.setClipRect(frame.clip);
+        painter.setClipRect(frame.clip, Qt::IntersectClip);
     // A recording the layer could not take whole is painted by this pass like any other recording:
     // the call below draws every one of its commands.
     const bool painterDrawsAll = fallback && fallback->painterDrawsAll(list.id);

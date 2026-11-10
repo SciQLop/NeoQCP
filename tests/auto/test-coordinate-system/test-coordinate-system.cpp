@@ -56,6 +56,14 @@ public:
     void draw(QCPDrawContext& context) const override
     {
         ++mDraws;
+        if (coversItsClip) // a recording that fills whatever the frame lets it draw in
+        {
+            const QRectF clip = context.clip();
+            context.rect(QCP::Pixels { clip.left(), clip.top() },
+                         QCP::Pixels { clip.right(), clip.bottom() }, Qt::NoPen,
+                         QBrush(Qt::red));
+            return;
+        }
         if (readsTransform) // a recording that bakes the frame: a new frame re-records it
         {
             const QCP::Pixels corner = context.transform().map(QCP::Data { 6, 6 });
@@ -77,6 +85,7 @@ public:
     [[nodiscard]] int draws() const { return mDraws; }
 
     bool readsTransform = false;
+    bool coversItsClip = false;
 
 private:
     int mSystemChanges = 0;
@@ -283,6 +292,36 @@ void TestCoordinateSystem::revisionBumpsOnAnyMappingChange()
     area->radialAxis()->setRange(0, 2);
     QCOMPARE(polar->revision(), polarStart + 2);
     QCOMPARE(polarChanged.count(), 2);
+}
+
+void TestCoordinateSystem::aPolarPlottableIsClippedToItsDisc()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.plotLayout()->clear();
+    auto* area = new QCPPolarArea(&plot);
+    plot.plotLayout()->addElement(0, 0, area);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    area->setBackground(QBrush(Qt::white));
+    area->grid()->setVisible(false);
+    area->angularAxis()->setTicks(false);
+    area->angularAxis()->setTickLabels(false);
+    area->radialAxis()->setTicks(false);
+    area->radialAxis()->setTickLabels(false);
+    auto* sheet = new RecordingPlottable(area->system(area->angularAxis(), area->radialAxis()));
+    sheet->coversItsClip = true;
+    settle(plot);
+
+    // The plottable fills its clip, which is the disc's bounding square: what it draws must stop
+    // at the rim, wherever the replay goes through the painter (an export, or a screen without a
+    // GPU layer).
+    const QImage image = plot.toPixmap().toImage();
+    const QPointF centre = area->center();
+    const double radius = area->radius();
+    QCOMPARE(image.pixelColor(qRound(centre.x()), qRound(centre.y())), QColor(Qt::red));
+    const QPoint corner(qRound(centre.x() + 0.9 * radius), qRound(centre.y() - 0.9 * radius));
+    QCOMPARE(image.pixelColor(corner), QColor(Qt::white));
 }
 
 void TestCoordinateSystem::systemRevisionsAreNeverShared()
