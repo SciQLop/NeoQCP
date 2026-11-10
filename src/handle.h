@@ -14,17 +14,15 @@ class QCPAxis;
 class QCPBarsGroup;
 class QCPLayer;
 class QCPLayoutElement;
-class QCPPolarGraph;
 class QCPPlottableGroup;
 
 namespace qcp::detail
 {
-// The owner of each family removes its member: a plottable, an item, a polar graph or a group
-// unlists itself when it is deleted, an axis asks its rect, a layer asks its plot (which keeps
+// The owner of each family removes its member: a plottable, an item or a group unlists itself
+// when it is deleted, an axis asks its rect, a layer asks its plot (which keeps
 // one), a layout element leaves its layout first. Defined in core.cpp.
 QCP_LIB_DECL void removeObject(QCPAbstractPlottable& plottable);
 QCP_LIB_DECL void removeObject(QCPAbstractItem& item);
-QCP_LIB_DECL void removeObject(QCPPolarGraph& graph);
 QCP_LIB_DECL void removeObject(QCPAxis& axis);
 QCP_LIB_DECL void removeObject(QCPLayer& layer);
 QCP_LIB_DECL void removeObject(QCPLayoutElement& element);
@@ -71,7 +69,7 @@ public:
         return QCPHandle<U>(qobject_cast<U*>(mObject.data()));
     }
 
-    /*! Removes the object the way its owner does: a plottable, an item, a polar graph or a group
+    /*! Removes the object the way its owner does: a plottable, an item or a group
       unlists itself when deleted, an axis goes through QCPAxisRect::removeAxis, a layer through
       QCustomPlot::removeLayer (the plot's last layer is refused with one misuse and stays), a layout
       element is taken out of its layout before it is deleted. A widget is not removable:

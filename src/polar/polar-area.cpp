@@ -85,10 +85,6 @@ QCPPolarArea::~QCPPolarArea()
                   // order
     mGrid = nullptr;
 
-    // The graphs outlive their area: none may reach back into this list once it is gone.
-    for (QCPPolarGraph* graph : std::exchange(mGraphs, { }))
-        graph->mKeyAxis = nullptr;
-
     const QList<QCPPolarAxisRadial*> axes = mRadialAxes;
     for (QCPPolarAxisRadial* axis : axes)
         removeRadialAxis(axis);
@@ -202,21 +198,19 @@ QRegion QCPPolarArea::exactClipRegion() const
 }
 
 /*!
-  Removes the given graph from this area and deletes it. The graph is unlisted before the delete,
-  so a slot connected to its destruction may remove another one.
+  Returns the polar graphs drawn on this area: the plottables whose coordinate system belongs to it.
+  The plot owns them: \ref QCustomPlot::remove and \ref QCustomPlot::take move and delete them.
 */
-bool QCPPolarArea::removeGraph(QCPPolarGraph* graph)
+QList<QCPPolarGraph*> QCPPolarArea::graphs() const
 {
-    if (!mGraphs.contains(graph))
-    {
-        qDebug() << Q_FUNC_INFO << "graph not in list:" << reinterpret_cast<quintptr>(graph);
-        return false;
-    }
-
-    mGraphs.removeOne(graph);
-    graph->removeFromLegend();
-    delete graph;
-    return true;
+    QList<QCPPolarGraph*> result;
+    if (!mParentPlot)
+        return result;
+    for (int i = 0; i < mParentPlot->plottableCount(); ++i)
+        if (auto* graph = qobject_cast<QCPPolarGraph*>(mParentPlot->plottable(i)))
+            if (graph->system() && graph->system()->area() == this)
+                result.append(graph);
+    return result;
 }
 
 /*!
@@ -226,7 +220,7 @@ bool QCPPolarArea::removeGraph(QCPPolarGraph* graph)
 */
 void QCPPolarArea::rescale(bool onlyVisiblePlottables)
 {
-    for (QCPPolarGraph* graph : mGraphs)
+    for (QCPPolarGraph* graph : graphs())
     {
         if (!graph->realVisibility() && onlyVisiblePlottables)
             continue;
@@ -307,8 +301,6 @@ void QCPPolarArea::markAffectedLayersDirty(bool invalidate)
         markOnce(axis->layer());
     if (mGrid)
         markOnce(mGrid->layer());
-    for (QCPPolarGraph* graph : mGraphs)
-        markOnce(graph->layer());
     if (!mParentPlot)
         return;
     // The plottables of this area's systems draw in the disc too, wherever their layer sits: the
@@ -458,28 +450,4 @@ void QCPPolarArea::wheelEvent(QWheelEvent* event)
     }
     if (alive && doReplot)
         mParentPlot->replot(QCustomPlot::rpQueuedReplot);
-}
-
-bool QCPPolarArea::registerPolarGraph(QCPPolarGraph* graph)
-{
-    if (mGraphs.contains(graph))
-    {
-        qDebug() << Q_FUNC_INFO << "plottable already added:" << reinterpret_cast<quintptr>(graph);
-        return false;
-    }
-    if (graph->keyAxis() != mAngularAxis)
-    {
-        qDebug() << Q_FUNC_INFO
-                 << "plottable not created with this as axis:" << reinterpret_cast<quintptr>(graph);
-        return false;
-    }
-
-    mGraphs.append(graph);
-    // possibly add plottable to legend:
-    if (mParentPlot->autoAddPlottableToLegend())
-        graph->addToLegend();
-    if (!graph->layer()) // usually the layer is already set in the constructor of the plottable
-                         // (via QCPLayerable constructor)
-        graph->setLayer(mParentPlot->currentLayer());
-    return true;
 }

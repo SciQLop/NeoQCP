@@ -1498,47 +1498,16 @@ bool QCustomPlot::detach(QCPAbstractPlottable* plottable)
 
 /*! \internal
 
-  Take for a polar graph: it leaves every legend and its polar area, and the caller owns it.
-*/
-bool QCustomPlot::detach(QCPPolarGraph* graph)
-{
-    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
-    QCP_CHECK_OR_RETURN(graph, "the pointer is empty", false);
-    // An orphan (its angular axis was deleted) is still ours: it has no axis to leave.
-    QCP_CHECK_OR_RETURN(graph->parentPlot() == this, "the graph belongs to another plot", false);
-    for (QCPLegend* legend : findChildren<QCPLegend*>())
-        graph->removeFromLegend(legend);
-    // Unlists the graph from its polar area (and nulls its radial axis); a no-op for an orphan.
-    graph->setKeyAxis(nullptr);
-    graph->setValueAxis(nullptr);
-    graph->moveToLayer(nullptr, false);
-    graph->setParentLayerable(nullptr);
-    graph->mParentPlot = nullptr;
-    graph->setParent(nullptr);
-    return true;
-}
-
-/*! \internal
-
-  The inverse of detach for a polar graph: its axes are polar, so only a polar area can adopt it.
-*/
-bool QCustomPlot::adopt(QCPPolarGraph*)
-{
-    // The plot cannot pick a polar area for a polar graph, so this always refuses.
-    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
-    qcp::reportMisuse(Q_FUNC_INFO,
-                      "a polar graph is added through its polar area, not through the plot");
-    return false;
-}
-
-/*! \internal
-
   QCustomPlot::add(std::unique_ptr) for a plottable: the inverse of detach, onto the default axes.
 */
 bool QCustomPlot::adopt(QCPAbstractPlottable* plottable)
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
     QCP_CHECK_OR_RETURN(!plottable->parentPlot(), "the object already belongs to a plot: take it first",
+                        false);
+    // A polar graph draws through a polar area's frame: the default axes cannot carry it.
+    QCP_CHECK_OR_RETURN(!qobject_cast<QCPPolarGraph*>(plottable),
+                        "a polar graph is readded through a polar area, not on the default axes",
                         false);
     const auto [keyAxis, valueAxis] = axesForAdd();
     if (!keyAxis)
@@ -5208,7 +5177,6 @@ namespace qcp::detail
 {
 void removeObject(QCPAbstractPlottable& plottable) { delete &plottable; }
 void removeObject(QCPAbstractItem& item) { delete &item; }
-void removeObject(QCPPolarGraph& graph) { delete &graph; }
 void removeObject(QCPBarsGroup& group) { delete &group; }
 void removeObject(QCPPlottableGroup& group) { delete &group; }
 

@@ -78,12 +78,12 @@ public:
 
     QRegion exactClipRegion() const;
 
-    QList<QCPPolarGraph*> graphs() const { return mGraphs; }
+    // Scans the plot's plottables: out of line, QCustomPlot is incomplete here.
+    QList<QCPPolarGraph*> graphs() const;
 
     // non-property methods:
     QCPPolarAxisRadial* addRadialAxis(QCPPolarAxisRadial* axis = nullptr);
     bool removeRadialAxis(QCPPolarAxisRadial* axis);
-    bool removeGraph(QCPPolarGraph* graph);
     void rescale(bool onlyVisiblePlottables = false);
 
     /*! Sets the factor a wheel step zooms every radial range by, around the radius under the
@@ -115,7 +115,7 @@ public:
         }
         catch (...)
         {
-            handle.remove(); // the graph unregisters itself from this area
+            handle.remove(); // the plot owns the graph: remove it from its plottables
             throw;
         }
         return handle;
@@ -142,7 +142,6 @@ protected:
     QCPPolarAxisAngular* mAngularAxis = nullptr;
     QList<QCPPolarAxisRadial*> mRadialAxes;
     QCPPolarGrid* mGrid = nullptr;
-    QList<QCPPolarGraph*> mGraphs;
     QPointF mCenter;
     double mRadius = 1;
     double mRangeZoomFactor = 0.85;
@@ -157,9 +156,6 @@ protected:
     virtual void mouseMoveEvent(QMouseEvent* event, const QPointF& startPos) override;
     virtual void mouseReleaseEvent(QMouseEvent* event, const QPointF& startPos) override;
     virtual void wheelEvent(QWheelEvent* event) override;
-
-    // non-virtual methods:
-    bool registerPolarGraph(QCPPolarGraph* graph);
 
 private:
     Q_DISABLE_COPY(QCPPolarArea)

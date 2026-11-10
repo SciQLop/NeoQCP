@@ -29,48 +29,35 @@
 #include "../axis/range.h"
 #include "../global.h"
 #include "../handle-ops.h"
-#include "../layer.h"
-#include "../layoutelements/layoutelement-legend.h"
 #include "../plottables/plottable-graph.h"
+#include "../plottables/plottable1d.h"
 #include "../scatterstyle.h"
 #include "../selection.h"
 #include "../vector2d.h"
 #include "angularaxis.h"
 #include "radialaxis.h"
 
-class QCPPainter;
-class QCPPlottableInterface1D;
+class QCPCoordinateSystem;
+class QCPDrawContext;
 class QCPLegend;
-class QCPPolarGraph;
-
-class QCP_LIB_DECL QCPPolarLegendItem : public QCPAbstractLegendItem
-{
-    Q_OBJECT
-
-public:
-    QCPPolarLegendItem(QCPLegend* parent, QCPPolarGraph* graph);
-
-    // getters:
-    QCPPolarGraph* polarGraph();
-
-protected:
-    // property members:
-    QPointer<QCPPolarGraph> mPolarGraph;
-
-    // reimplemented virtual methods:
-    virtual void draw(QCPPainter* painter) override;
-    virtual QSize minimumOuterSizeHint() const override;
-
-    // non-virtual methods:
-    QPen getIconBorderPen() const;
-    QColor getTextColor() const;
-    QFont getFont() const;
-};
 
 template <typename T, typename Self = void>
 class QCPPolarGraphOps;
 
-class QCP_LIB_DECL QCPPolarGraph : public QCPLayerable
+/*!
+  A graph in a polar area, drawn in the polar system its two axes build: a data point is an angular
+  coordinate and a radial value.
+
+  The drawing is recorded once, in data space, and replayed through the area's frame: a rotation of
+  the angular axis moves the recording, it does not record it again. What the recording does depend
+  on is the radial range - a radial zoom re-records - and, for a non-periodic graph (\ref
+  setPeriodic), the angular range, whose keys window the recorded data.
+
+  Beyond the radial range the recording is clamped outside the rim (\ref QCPPolarArea::radius) and
+  densified there, so a run that leaves the disc is hidden along the rim instead of being drawn as
+  a chord through it. Below the radial range a point lands on the centre.
+*/
+class QCP_LIB_DECL QCPPolarGraph : public QCPAbstractPlottable1D<QCPGraphData>
 {
     Q_OBJECT
     /// \cond INCLUDE_QPROPERTIES
@@ -96,32 +83,15 @@ public:
     using OpsFor = QCPPolarGraphOps<T>;
 
     QCPPolarGraph(QCPPolarAxisAngular* keyAxis, QCPPolarAxisRadial* valueAxis);
-    virtual ~QCPPolarGraph();
+    explicit QCPPolarGraph(QCPCoordinateSystem* system);
 
     // getters:
-    QString name() const { return mName; }
-
-    bool antialiasedFill() const { return mAntialiasedFill; }
-
-    bool antialiasedScatters() const { return mAntialiasedScatters; }
-
-    QPen pen() const { return mPen; }
-
-    QBrush brush() const { return mBrush; }
-
     bool periodic() const { return mPeriodic; }
 
-    QCPPolarAxisAngular* keyAxis() const { return mKeyAxis.data(); }
+    QCPPolarAxisAngular* angularAxis() const;
 
-    QCPPolarAxisRadial* valueAxis() const { return mValueAxis.data(); }
+    QCPPolarAxisRadial* radialAxis() const;
 
-    QCP::SelectionType selectable() const { return mSelectable; }
-
-    bool selected() const { return !mSelection.isEmpty(); }
-
-    QCPDataSelection selection() const { return mSelection; }
-
-    // QCPSelectionDecorator *selectionDecorator() const { return mSelectionDecorator; }
     QSharedPointer<QCPGraphDataContainer> data() const { return mDataContainer; }
 
     LineStyle lineStyle() const { return mLineStyle; }
@@ -129,22 +99,12 @@ public:
     QCPScatterStyle scatterStyle() const { return mScatterStyle; }
 
     // setters:
-    void setName(const QString& name);
-    void setAntialiasedFill(bool enabled);
-    void setAntialiasedScatters(bool enabled);
-    void setPen(const QPen& pen);
-    void setBrush(const QBrush& brush);
     void setPeriodic(bool enabled);
-    void setKeyAxis(QCPPolarAxisAngular* axis);
-    void setValueAxis(QCPPolarAxisRadial* axis);
-    Q_SLOT void setSelectable(QCP::SelectionType selectable);
-    Q_SLOT void setSelection(QCPDataSelection selection);
-    // void setSelectionDecorator(QCPSelectionDecorator *decorator);
+    void setLineStyle(LineStyle ls);
+    void setScatterStyle(const QCPScatterStyle& style);
     void setData(QSharedPointer<QCPGraphDataContainer> data);
     void setData(const QVector<double>& keys, const QVector<double>& values,
                  bool alreadySorted = false);
-    void setLineStyle(LineStyle ls);
-    void setScatterStyle(const QCPScatterStyle& style);
 
     // non-property methods:
     void addData(const QVector<double>& keys, const QVector<double>& values,
@@ -157,122 +117,30 @@ public:
     void rescaleAxes(bool onlyEnlarge = false) const;
     void rescaleKeyAxis(bool onlyEnlarge = false) const;
     void rescaleValueAxis(bool onlyEnlarge = false, bool inKeyRange = false) const;
-    bool addToLegend(QCPLegend* legend);
-    bool addToLegend();
-    bool removeFromLegend(QCPLegend* legend) const;
-    bool removeFromLegend() const;
 
     // introduced virtual methods:
-    virtual double selectTest(const QPointF& pos, bool onlySelectable,
-                              QVariant* details
-                              = 0) const; // actually introduced in QCPLayerable as non-pure, but we
-                                          // want to force reimplementation for plottables
-
-    virtual QCPPlottableInterface1D* interface1D()
-    {
-        return 0;
-    } // TODO: return this later, when QCPAbstractPolarPlottable is created
-
-    virtual QCPRange getKeyRange(bool& foundRange,
-                                 QCP::SignDomain inSignDomain = QCP::sdBoth) const;
-    virtual QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth,
-                                   const QCPRange& inKeyRange = QCPRange()) const;
-
-signals:
-    void selectionChanged();
-    void selectableChanged();
+    QCP::Capabilities requiredCapabilities() const override; // the polar system is enough
+    void draw(QCPDrawContext& context) const override;
+    quint64 dependencyRevision() const override;
 
 protected:
     // property members:
-    QSharedPointer<QCPGraphDataContainer> mDataContainer;
     LineStyle mLineStyle;
     QCPScatterStyle mScatterStyle;
-    QString mName;
-    bool mAntialiasedFill, mAntialiasedScatters;
-    QPen mPen;
-    QBrush mBrush;
     bool mPeriodic;
-    QPointer<QCPPolarAxisAngular> mKeyAxis;
-    QPointer<QCPPolarAxisRadial> mValueAxis;
-    QCP::SelectionType mSelectable;
-    QCPDataSelection mSelection;
-    // QCPSelectionDecorator *mSelectionDecorator;
 
-    // introduced virtual methods (later reimplemented TODO from QCPAbstractPolarPlottable):
-    virtual QRect clipRect() const;
-    virtual void draw(QCPPainter* painter);
-    virtual QCP::Interaction selectionCategory() const;
-    void applyDefaultAntialiasingHint(QCPPainter* painter) const;
-    void emitSelectionChanged();
-    // events:
-    virtual void selectEvent(QMouseEvent* event, bool additive, const QVariant& details,
-                             bool* selectionStateChanged);
-    virtual void deselectEvent(bool* selectionStateChanged);
-    // virtual drawing helpers:
-    virtual void drawLinePlot(QCPPainter* painter, const QVector<QPointF>& lines) const;
-    virtual void drawFill(QCPPainter* painter, QVector<QPointF>* lines) const;
-    virtual void drawScatterPlot(QCPPainter* painter, const QVector<QPointF>& scatters,
-                                 const QCPScatterStyle& style) const;
-
-    // introduced virtual methods:
-    virtual void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const;
-
-    // non-virtual methods:
-    void applyFillAntialiasingHint(QCPPainter* painter) const;
-    void applyScattersAntialiasingHint(QCPPainter* painter) const;
-    double pointDistance(const QPointF& pixelPoint,
-                         QCPGraphDataContainer::const_iterator& closestData) const;
-    // drawing helpers:
-    virtual int dataCount() const;
-    void getDataSegments(QList<QCPDataRange>& selectedSegments,
-                         QList<QCPDataRange>& unselectedSegments) const;
-    void drawPolyline(QCPPainter* painter, const QVector<QPointF>& lineData) const;
-    void getVisibleDataBounds(QCPGraphDataContainer::const_iterator& begin,
-                              QCPGraphDataContainer::const_iterator& end,
-                              const QCPDataRange& rangeRestriction) const;
-    void getLines(QVector<QPointF>* lines, const QCPDataRange& dataRange) const;
-    void getScatters(QVector<QPointF>* scatters, const QCPDataRange& dataRange) const;
-    void getOptimizedLineData(QVector<QCPGraphData>* lineData,
-                              const QCPGraphDataContainer::const_iterator& begin,
-                              const QCPGraphDataContainer::const_iterator& end) const;
-    void getOptimizedScatterData(QVector<QCPGraphData>* scatterData,
-                                 QCPGraphDataContainer::const_iterator begin,
-                                 QCPGraphDataContainer::const_iterator end) const;
-    QVector<QPointF> dataToLines(const QVector<QCPGraphData>& data) const;
-
-private:
-    Q_DISABLE_COPY(QCPPolarGraph)
-    QCPPolarLegendItem* legendItemIn(const QCPLegend* legend) const;
-
-    friend class QCPPolarLegendItem;
-    friend class QCPPolarAxisAngular;
-    friend class QCPPolarArea; // it unlists a graph that a slot of a range change deletes
+    friend class TestPolar;
 };
 
 // The handle of QCPPolarGraph: what add<T>() returns for it.
 template <typename T, typename Self>
-class QCPPolarGraphOps : public QCPLayerableOps<T, qcp::OpsRet<Self, QCPPolarGraphOps<T>>>
+class QCPPolarGraphOps : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPPolarGraphOps<T>>>
 {
-    using Base = QCPLayerableOps<T, qcp::OpsRet<Self, QCPPolarGraphOps<T>>>;
+    using Base = QCPPlottableOps<T, qcp::OpsRet<Self, QCPPolarGraphOps<T>>>;
 
 public:
     using Base::Base;
     using typename Base::Ret;
-
-    Ret setName(const QString& name)
-    {
-        return this->apply([&](T& o) { o.setName(name); });
-    }
-
-    Ret setPen(const QPen& pen)
-    {
-        return this->apply([&](T& o) { o.setPen(pen); });
-    }
-
-    Ret setBrush(const QBrush& brush)
-    {
-        return this->apply([&](T& o) { o.setBrush(brush); });
-    }
 
     Ret setPeriodic(bool enabled)
     {

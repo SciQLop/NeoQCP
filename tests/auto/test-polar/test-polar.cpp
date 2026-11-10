@@ -1,11 +1,15 @@
 #include "test-polar.h"
 #include "misuse-recorder.h"
+#include "painting/draw-commands.h"
 #include "polar/angularaxis.h"
 #include "polar/polar-area.h"
 #include "polar/polargraph.h"
 #include "polar/polargrid.h"
 #include "polar/radialaxis.h"
 #include <QPointer>
+#include <cmath>
+#include <numbers>
+#include <vector>
 
 namespace
 {
@@ -55,6 +59,67 @@ QPointF findPart(QCPAxisBase* axis, const QRect& rect, QCPAxisBase::SelectablePa
             if (partAt(axis, QPointF(x, y)) == wanted)
                 return QPointF(x, y);
     return QPointF(-1, -1);
+}
+
+// The data-space polylines of a recording: one per finite run of the graph.
+std::vector<std::vector<QPointF>> recordedPolylines(const QCPDrawnCore& core)
+{
+    std::vector<std::vector<QPointF>> out;
+    for (const auto& command : core.recordedList().commands)
+        if (const auto* line = std::get_if<qcp::PolylineDataCmd>(&command))
+            out.push_back(*line->points);
+    return out;
+}
+
+// The number of vertices of the recorded fill, zero when it recorded none.
+std::size_t recordedPolygonSize(const QCPDrawnCore& core)
+{
+    for (const auto& command : core.recordedList().commands)
+        if (const auto* polygon = std::get_if<qcp::PolygonCmd>(&command))
+            return polygon->points.size();
+    return 0;
+}
+
+std::size_t recordedMarkerCount(const QCPDrawnCore& core)
+{
+    for (const auto& command : core.recordedList().commands)
+        if (const auto* markers = std::get_if<qcp::MarkersCmd>(&command))
+            return markers->points ? markers->points->size() : 0;
+    return 0;
+}
+
+QImage imageOf(QCustomPlot& plot)
+{
+    return plot.toPixmap(400, 300).toImage();
+}
+
+bool isInk(const QColor& color)
+{
+    return color.blue() > 150 && color.red() < 120;
+}
+
+bool isRedInk(const QColor& color)
+{
+    return color.red() > 200 && color.green() < 80 && color.blue() < 80;
+}
+
+// The inked pixels of image whose angle coord is inside (from, to) and whose radius is below limit
+// times the area's radius: the part of the disc a run beyond the rim must leave empty.
+int inkInSector(QCPPolarArea& area, const QImage& image, double from, double to, double limit)
+{
+    int count = 0;
+    for (int y = 0; y < image.height(); ++y)
+        for (int x = 0; x < image.width(); ++x)
+        {
+            if (!isInk(image.pixelColor(x, y)))
+                continue;
+            double angle = 0, radius = 0;
+            area.radialAxis()->pixelToCoord(QPointF(x, y), angle, radius);
+            const double fraction = area.radialAxis()->coordToRadius(radius) / area.radius();
+            if (angle > from && angle < to && fraction < limit)
+                ++count;
+        }
+    return count;
 }
 } // namespace
 
@@ -123,21 +188,344 @@ void TestPolar::deletingTheAreaMidDragIsSafe()
     QVERIFY(!alive);
 }
 
-void TestPolar::aPolarGraphAddsToTheArea()
+void TestPolar::aPolarGraphIsAPlottable()
+{
+    QCustomPlot plot;
+    // The polar area replaces the axis rect: build the layout by hand to keep a legend in it.
+    plot.plotLayout()->clear();
+    plot.legend = new QCPLegend;
+    plot.plotLayout()->addElement(1, 0, plot.legend);
+    auto* area = new QCPPolarArea(&plot);
+    plot.plotLayout()->addElement(0, 0, area);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 90, 180 },
+                                          QVector<double> { 0.5, 0.6, 0.5 });
+    QVERIFY(graph);
+    settle(plot);
+
+    // The plot owns it as a plottable, and its axes are the area's polar system.
+    QCOMPARE(plot.plottableCount(), 1);
+    QCOMPARE(plot.plottable(0), graph.get());
+    QCOMPARE(graph->system(), area->system(area->angularAxis(), area->radialAxis()));
+    QVERIFY(graph->system());
+    QCOMPARE(graph->system()->area(), static_cast<QCPArea*>(area));
+    QCOMPARE(area->graphs(), QList<QCPPolarGraph*> { graph.get() });
+    QCOMPARE(graph->parentLayerable(), static_cast<QCPLayerable*>(area));
+
+    // One legend row, the plottable one.
+    QCOMPARE(plot.legend->itemCount(), 1);
+    QVERIFY(qobject_cast<QCPPlottableLegendItem*>(plot.legend->item(0)));
+}
+
+void TestPolar::aPolarGraphRecords()
 {
     QCustomPlot plot;
     auto* area = polarArea(plot);
-    auto graph
-        = area->add<QCPPolarGraph>(QVector<double> { 0, 90, 180 }, QVector<double> { 1, 2, 1 });
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    const QVector<double> angle { 0, 90, 180, 270, 360 };
+    const QVector<double> radius { 0.5, 0.7, 0.4, 0.8, 0.5 };
+    auto graph = area->add<QCPPolarGraph>(angle, radius);
     QVERIFY(graph);
-    QCOMPARE(area->graphs(), QList<QCPPolarGraph*> { graph.get() });
-    QCOMPARE(graph->keyAxis(), area->angularAxis());
+    settle(plot);
 
+    const auto lines = recordedPolylines(graph->mCore);
+    QCOMPARE(lines.size(), std::size_t(1));
+    QCOMPARE(lines.front().size(), std::size_t(5));
+    // Recorded in data space: the replay maps (angle, radius) through the system's frame.
+    for (int i = 0; i < angle.size(); ++i)
+    {
+        QCOMPARE(lines.front()[std::size_t(i)].x(), angle[i]);
+        QCOMPARE(lines.front()[std::size_t(i)].y(), radius[i]);
+    }
+    QCOMPARE(recordedPolygonSize(graph->mCore), std::size_t(0));
+
+    graph->setBrush(QBrush(Qt::red));
+    settle(plot);
+    QCOMPARE(recordedPolygonSize(graph->mCore), std::size_t(5));
+}
+
+void TestPolar::aRotationDoesNotReRecord()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    auto* angular = area->angularAxis();
+    auto* radial = area->radialAxis();
+    angular->setRange(0, 360);
+    radial->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 90, 180 },
+                                          QVector<double> { 0.8, 0.8, 0.8 });
+    QVERIFY(graph);
+    graph->setPen(QPen(Qt::blue, 3));
+    settle(plot);
+
+    const quint64 recordings = graph->mCore.recordingCount();
+    const QPoint onLine = radial->coordToPixel(0, 0.8).toPoint();
+    QVERIFY2(isInk(pixelAt(plot, onLine)), qPrintable(pixelAt(plot, onLine).name()));
+
+    // A periodic graph records the whole container: a rotation only moves the frame.
+    angular->setRange(10, 370);
+    settle(plot);
+    QCOMPARE(graph->mCore.recordingCount(), recordings);
+    QVERIFY2(!isInk(pixelAt(plot, onLine)), qPrintable(pixelAt(plot, onLine).name()));
+    const QPoint moved = radial->coordToPixel(0, 0.8).toPoint();
+    QVERIFY2(moved != onLine, "sanity: the rotation moved the point");
+    QVERIFY2(isInk(pixelAt(plot, moved)), qPrintable(pixelAt(plot, moved).name()));
+
+    // The radius comes from the radial frame: a radial zoom records again.
+    radial->setRange(0, 2);
+    settle(plot);
+    QCOMPARE(graph->mCore.recordingCount(), recordings + 1);
+}
+
+void TestPolar::aNonPeriodicGraphKeepsItsWindow()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    auto* angular = area->angularAxis();
+    area->radialAxis()->setRange(0, 1);
+    angular->setRange(0, 360);
+    QVector<double> angle, radius;
+    for (int i = 0; i <= 72; ++i)
+    {
+        angle << i * 10.0;
+        radius << 0.5;
+    }
+    auto graph = area->add<QCPPolarGraph>(angle, radius);
+    QVERIFY(graph);
+    graph->setPeriodic(false);
+    settle(plot);
+
+    auto lines = recordedPolylines(graph->mCore);
+    QCOMPARE(lines.size(), std::size_t(1));
+    // 2.1's window: the keys inside the angular range, plus one on each side so the line enters
+    // and leaves the range.
+    QCOMPARE(lines.front().size(), std::size_t(38));
+    QCOMPARE(lines.front().front().x(), 0.0);
+    QCOMPARE(lines.front().back().x(), 370.0);
+
+    const quint64 recordings = graph->mCore.recordingCount();
+    angular->setRange(10, 370);
+    settle(plot);
+    QVERIFY2(graph->mCore.recordingCount() > recordings, "a rotation re-records a windowed graph");
+    lines = recordedPolylines(graph->mCore);
+    QCOMPARE(lines.size(), std::size_t(1));
+    QCOMPARE(lines.front().size(), std::size_t(39));
+    QCOMPARE(lines.front().front().x(), 0.0); // the one before the range, kept for the entry
+    QCOMPARE(lines.front().back().x(), 380.0);
+}
+
+void TestPolar::aClampedRunFollowsTheArc_data()
+{
+    QTest::addColumn<double>("lower");
+    QTest::addColumn<double>("upper");
+    QTest::addColumn<double>("beyond");
+    QTest::addColumn<bool>("logarithmic");
+    QTest::addColumn<bool>("reversed");
+    QTest::newRow("linear") << 0.0 << 1.0 << 2.0 << false << false;
+    QTest::newRow("log radial") << 1.0 << 1000.0 << 1e6 << true << false;
+    QTest::newRow("reversed radial") << 0.0 << 1.0 << -1.0 << false << true;
+}
+
+void TestPolar::aClampedRunFollowsTheArc()
+{
+    QFETCH(double, lower);
+    QFETCH(double, upper);
+    QFETCH(double, beyond);
+    QFETCH(bool, logarithmic);
+    QFETCH(bool, reversed);
+
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    auto* angular = area->angularAxis();
+    auto* radial = area->radialAxis();
+    angular->setRange(0, 360);
+    radial->setRange(lower, upper);
+    radial->setScaleType(logarithmic ? QCPAxisBase::stLogarithmic : QCPAxisBase::stLinear);
+    radial->setRangeReversed(reversed);
+    // A run that stays beyond the rim from angle 0 to angle 90.
+    auto graph
+        = area->add<QCPPolarGraph>(QVector<double> { 0, 90 }, QVector<double> { beyond, beyond });
+    QVERIFY(graph);
+    graph->setPen(QPen(Qt::blue, 3));
+    area->grid()->setVisible(false);
+    angular->setVisible(false);
+    radial->setVisible(false);
+    settle(plot);
+
+    // The run is recorded beyond the rim and densified there, never as one chord through the disc.
+    const auto lines = recordedPolylines(graph->mCore);
+    QCOMPARE(lines.size(), std::size_t(1));
+    QVERIFY(lines.front().size() >= 4);
+    int densified = 0;
+    for (const QPointF& point : lines.front())
+    {
+        const double fraction = radial->coordToRadius(point.y()) / area->radius();
+        QVERIFY2(fraction >= 1.0 - 1e-9, qPrintable(QString::number(fraction)));
+        if (point.x() > 0 && point.x() < 90)
+        {
+            ++densified;
+            QVERIFY2(fraction > 1.0, "a point between the two data points came inside the rim");
+        }
+    }
+    QVERIFY2(densified >= 2, "the run beyond the rim was recorded as one chord");
+    // And the clip hides it: no pixel inside the disc between the two angles.
+    QCOMPARE(inkInSector(*area, imageOf(plot), -1, 91, 0.97), 0);
+}
+
+void TestPolar::aSparseInRangePairIsAChord()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 90 }, QVector<double> { 0.9, 0.9 });
+    QVERIFY(graph);
+    graph->setPen(QPen(Qt::blue, 4));
+    area->grid()->setVisible(false);
+    area->angularAxis()->setVisible(false);
+    area->radialAxis()->setVisible(false);
+    settle(plot);
+
+    // 2.1's chord: two in-range points 90 degrees apart stay two points.
+    const auto lines = recordedPolylines(graph->mCore);
+    QCOMPARE(lines.size(), std::size_t(1));
+    QCOMPARE(lines.front().size(), std::size_t(2));
+    const QPoint middle
+        = area->radialAxis()->coordToPixel(45, 0.9 * std::cos(std::numbers::pi / 4)).toPoint();
+    const QColor pixel = pixelAt(plot, middle);
+    QVERIFY2(isInk(pixel), qPrintable(pixel.name()));
+}
+
+void TestPolar::aNaNBreaksTheLine()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 90, 180, 270, 360 },
+                                          QVector<double> { 0.5, qQNaN(), 0.6, 0.7, 0.8 });
+    QVERIFY(graph);
+    settle(plot);
+
+    const auto lines = recordedPolylines(graph->mCore);
+    QCOMPARE(lines.size(), std::size_t(2));
+    QCOMPARE(lines[0].size(), std::size_t(1));
+    QCOMPARE(lines[1].size(), std::size_t(3));
+}
+
+void TestPolar::aScatterOnlyGraphRecordsNoLine()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 90, 180 },
+                                          QVector<double> { 0.5, 0.6, 0.7 });
+    QVERIFY(graph);
+    graph->setLineStyle(QCPPolarGraph::lsNone);
+    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 8));
+    graph->setBrush(QBrush(Qt::red)); // a fill without a line has nothing to fill
+    settle(plot);
+
+    QCOMPARE(recordedPolylines(graph->mCore).size(), std::size_t(0));
+    QCOMPARE(recordedPolygonSize(graph->mCore), std::size_t(0));
+    QCOMPARE(recordedMarkerCount(graph->mCore), std::size_t(3));
+}
+
+void TestPolar::aFilledArcClosesWithAChord()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 45, 90 },
+                                          QVector<double> { 0.5, 0.5, 0.5 });
+    QVERIFY(graph);
+    graph->setPen(QPen(Qt::NoPen)); // only the fill talks
+    graph->setBrush(QBrush(Qt::red));
+    area->grid()->setVisible(false);
+    area->angularAxis()->setVisible(false);
+    area->radialAxis()->setVisible(false);
+    settle(plot);
+
+    // The fill is the recorded line closed last to first: its vertices, no centre point.
+    QCOMPARE(recordedPolygonSize(graph->mCore), std::size_t(3));
+    const QColor centre = pixelAt(plot, area->center().toPoint());
+    QVERIFY2(!isRedInk(centre), qPrintable(centre.name()));
+    const QPoint inside = area->radialAxis()->coordToPixel(45, 0.45).toPoint();
+    const QColor painted = pixelAt(plot, inside);
+    QVERIFY2(isRedInk(painted), qPrintable(painted.name()));
+}
+
+void TestPolar::deletingTheRadialAxisLeavesTheGraphInert()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 180 }, QVector<double> { 0.5, 0.5 });
+    QVERIFY(graph);
+    settle(plot);
+
+    delete area->radialAxis(0);
+    QCOMPARE(area->radialAxisCount(), 0);
+    QVERIFY2(graph->system() == nullptr, "the system of a deleted radial axis outlived it");
+    settle(plot);
+    test_misuse::calls.clear(); // drawing an inert graph reports it once: that is the inert rule
+
+    // Inert, not deleted: the data is still there and the plot still draws.
+    QCOMPARE(graph->data()->size(), 2);
+    delete area; // a layout element unregisters itself: remove() would delete it
+    settle(plot);
+}
+
+void TestPolar::deletingTheGraphFromADragSlot()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    plot.setInteractions(QCP::iRangeDrag);
+    auto* radial = area->radialAxis();
+    radial->setRangeDraggable(true);
+    area->angularAxis()->setRange(0, 360);
+    radial->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 180 }, QVector<double> { 0.5, 0.5 });
+    QVERIFY(graph);
     QPointer<QCPPolarGraph> alive(graph.get());
-    QVERIFY(area->removeGraph(graph.get()));
+    connect(
+        radial, &QCPAxisBase::rangeChanged, area, [&alive] { delete alive.data(); },
+        Qt::DirectConnection);
+
+    const QPoint from = radial->coordToPixel(0, 0.3).toPoint();
+    const QPoint to = radial->coordToPixel(0, 0.6).toPoint();
+    sendMouse(&plot, QEvent::MouseButtonPress, from, Qt::LeftButton);
+    sendMouse(&plot, QEvent::MouseMove, to, Qt::LeftButton);
+    sendMouse(&plot, QEvent::MouseButtonRelease, to, Qt::NoButton);
+
     QVERIFY(!alive);
-    QCOMPARE(area->graphs().size(), 0);
-    QVERIFY(!area->removeGraph(nullptr));
+    settle(plot);
+}
+
+void TestPolar::deletingTheAreaDoesNotDeleteTheGraph()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 180 }, QVector<double> { 0.5, 0.5 });
+    QVERIFY(graph);
+    QPointer<QCPPolarGraph> alive(graph.get());
+    settle(plot);
+
+    delete area; // a layout element unregisters itself: remove() would delete it
+
+    QVERIFY2(alive, "the area deleted a graph the plot owns");
+    QVERIFY(graph->system() == nullptr);
+    QCOMPARE(plot.plottableCount(), 1);
+    settle(plot);
+    test_misuse::calls.clear(); // drawing a graph without a system reports it once
+    QCOMPARE(graph->data()->size(), 2);
 }
 
 void TestPolar::backgroundStaysInsideTheDisc()
@@ -226,8 +614,7 @@ void TestPolar::angularWheelZoomRequeuesTheRepaint()
                       Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
     QCoreApplication::sendEvent(&plot, &wheel);
 
-    QVERIFY2(angular->range().size() < 360,
-             qPrintable(QString::number(angular->range().size())));
+    QVERIFY2(angular->range().size() < 360, qPrintable(QString::number(angular->range().size())));
     QVERIFY2(plot.isRepaintQueued(), "an angular-only wheel zoom scheduled no repaint");
 }
 
@@ -329,7 +716,8 @@ void TestPolar::hidingTheAngularAxisKeepsTheGraphs()
     // The graphs belong to the area, not to the ring: hiding the ring keeps the data.
     QCOMPARE(graph->parentLayerable(), static_cast<QCPLayerable*>(area));
     QVERIFY(graph->realVisibility());
-    const QColor pixel = pixelAt(plot, (area->center() + QPointF(0, 0.5 * area->radius())).toPoint());
+    const QColor pixel
+        = pixelAt(plot, (area->center() + QPointF(0, 0.5 * area->radius())).toPoint());
     QVERIFY2(pixel.blue() > 150 && pixel.red() < 120, qPrintable(pixel.name()));
 }
 
@@ -344,7 +732,8 @@ void TestPolar::deletingAPolarChildIsSafe()
         QVERIFY(graph);
         delete area->angularAxis();
         QCOMPARE(area->angularAxis(), nullptr);
-        settle(plot);
+        settle(plot); // the graph lost its system: it reports that once, then stays inert
+        test_misuse::calls.clear();
         QVERIFY(plot.plotLayout()->remove(area));
         settle(plot);
     }

@@ -51,7 +51,6 @@ class QCPAxis;
 class QCPArea;
 class QCPAxisRect;
 class QCPGraph;
-class QCPPolarGraph;
 class QCPLegend;
 class QCPAbstractLegendItem;
 class QCPPlottableGroup;
@@ -512,10 +511,8 @@ private:
     [[nodiscard]] std::pair<QCPAxis*, QCPAxis*> axesForAdd() const;
     bool detach(QCPAbstractPlottable* plottable);
     bool detach(QCPAbstractItem* item);
-    bool detach(QCPPolarGraph* graph);
     bool adopt(QCPAbstractPlottable* plottable);
     bool adopt(QCPAbstractItem* item);
-    bool adopt(QCPPolarGraph* graph);
     void cutAnchorLinks(QCPAbstractItem* item);
     // Also themes a rect's own colour scale, which QCPAxisRect makes after the theme was set.
     void applyThemeToAxis(QCPAxis* axis);
@@ -803,9 +800,8 @@ qcp::HandleFor<T> QCustomPlot::add(Args&&... args)
 template <typename T>
 qcp::HandleFor<T> QCustomPlot::add(std::unique_ptr<T> object)
 {
-    static_assert(std::derived_from<T, QCPAbstractPlottable> || std::derived_from<T, QCPAbstractItem>
-                      || std::is_same_v<T, QCPPolarGraph>,
-                  "add(std::unique_ptr<T>) takes plottables, items and polar graphs");
+    static_assert(std::derived_from<T, QCPAbstractPlottable> || std::derived_from<T, QCPAbstractItem>,
+                  "add(std::unique_ptr<T>) takes plottables and items");
     using Handle = qcp::HandleFor<T>;
     QCP_CHECK_OR_RETURN(object, "the pointer is empty", Handle{});
     if (!adopt(object.get()))
@@ -818,9 +814,8 @@ qcp::HandleFor<T> QCustomPlot::add(std::unique_ptr<T> object)
 template <typename T>
 std::unique_ptr<T> QCustomPlot::take(QCPHandle<T> handle)
 {
-    static_assert(std::derived_from<T, QCPAbstractPlottable> || std::derived_from<T, QCPAbstractItem>
-                      || std::is_same_v<T, QCPPolarGraph>,
-                  "take(handle) works on plottables, items and polar graphs");
+    static_assert(std::derived_from<T, QCPAbstractPlottable> || std::derived_from<T, QCPAbstractItem>,
+                  "take(handle) works on plottables and items");
     QCP_CHECK_OR_RETURN(handle, "the handle is dead", nullptr);
     T* object = handle.get();
     return detach(object) ? std::unique_ptr<T>(object) : nullptr;

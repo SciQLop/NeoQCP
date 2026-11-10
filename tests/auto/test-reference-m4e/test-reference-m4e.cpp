@@ -502,6 +502,34 @@ QImage polarScene(const char* kind)
                                            | QCPPolarAxisRadial::spTickLabels);
                 radial->setSelectedParts(QCPPolarAxisRadial::spTickLabels);
             }
+            else if (name == QLatin1String("polar-clamped"))
+            {
+                QCPPolarArea* area = polarArea(plot);
+                QCPPolarAxisAngular* angular = area->angularAxis();
+                QCPPolarAxisRadial* radial = area->radialAxis();
+                angular->setRange(0, 360);
+                radial->setRange(0, 1);
+                const QVector<double> angle { 0,   30,  60,  90,  120, 150, 170,
+                                              190, 210, 240, 270, 300, 330, 360 };
+                const QVector<double> r { 0.2, 1.6, 0.9, 1.8, 1.3, 0.5, 1.1,
+                                          0.7, 1.9, 1.2, 0.3, 1.5, 0.8, 0.4 };
+                auto* graph = new QCPPolarGraph(angular, radial);
+                graph->setData(angle, r);
+                graph->setPen(QPen(QColor(31, 119, 180), 2));
+            }
+            else if (name == QLatin1String("polar-sparse"))
+            {
+                QCPPolarArea* area = polarArea(plot);
+                QCPPolarAxisAngular* angular = area->angularAxis();
+                QCPPolarAxisRadial* radial = area->radialAxis();
+                angular->setRange(0, 360);
+                radial->setRange(0, 1);
+                const QVector<double> angle { 0, 60, 120, 180, 240, 300 };
+                const QVector<double> r { 0.9, 0.35, 0.8, 0.45, 0.95, 0.5 };
+                auto* graph = new QCPPolarGraph(angular, radial);
+                graph->setData(angle, r);
+                graph->setPen(QPen(QColor(214, 39, 40), 2));
+            }
         });
 }
 } // namespace
@@ -699,4 +727,14 @@ void TestReferenceM4e::polarRotated()
 void TestReferenceM4e::polarAxisSelected()
 {
     check(polarScene("polar-axis-selected"), "polar-axis-selected.png");
+}
+
+void TestReferenceM4e::polarClamped()
+{
+    check(polarScene("polar-clamped"), "polar-clamped.png");
+}
+
+void TestReferenceM4e::polarSparse()
+{
+    check(polarScene("polar-sparse"), "polar-sparse.png");
 }
