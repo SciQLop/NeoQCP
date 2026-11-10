@@ -185,6 +185,15 @@ void TestPolar::insetAndBackgroundAreAreaFeatures()
              qPrintable(middle.name()));
 }
 
+void TestPolar::theAreaKeepsTheOldMinimumMargins()
+{
+    // The angular axis asked for at least 30 px of margin; the area must not hand out less, or the
+    // tick labels that used to fit get clipped.
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    QCOMPARE(area->minimumMargins(), QMargins(30, 30, 30, 30));
+}
+
 void TestPolar::theAngularAxisRefusesALogScale()
 {
     // The ring's geometry is linear in the angle: a logarithmic scale would change the tick vector

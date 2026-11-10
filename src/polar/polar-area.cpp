@@ -58,7 +58,9 @@ QCPPolarArea::QCPPolarArea(QCustomPlot* parentPlot)
     mAngularAxis = new QCPPolarAxisAngular(this);
 
     setMinimumSize(50, 50);
-    setMargins(QMargins(30, 30, 30, 30));
+    // The ring's tick labels sit in these: a minimum, as the angular axis asked for, so a larger
+    // plot gives the disc more room instead of the labels more margin.
+    setMinimumMargins(QMargins(30, 30, 30, 30));
 
     addRadialAxis();
     mGrid->setRadialAxis(radialAxis());

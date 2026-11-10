@@ -20,6 +20,7 @@ private slots:
     void radialDragAndWheelWork();
     void angularWheelZoomRequeuesTheRepaint();
     void theAngularAxisRefusesALogScale();
+    void theAreaKeepsTheOldMinimumMargins();
     void hidingTheAngularAxisKeepsTheGraphs();
     void deletingAPolarChildIsSafe();
     void deletingTheAngularAxisMidDragIsSafe();
