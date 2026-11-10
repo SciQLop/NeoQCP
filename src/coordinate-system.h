@@ -27,6 +27,13 @@ class QCPAxis;
 class QCPAxisBase;
 class QCPAxisRect;
 
+namespace qcp
+{
+/*! The revision a system is born with, or moved to by a change: one process-wide counter, so a
+  system that reuses the address of a deleted one can never answer with its revision. */
+[[nodiscard]] QCP_LIB_DECL quint64 nextSystemRevision();
+} // namespace qcp
+
 /*! \file coordinate-system.h
 
   A coordinate system is one frame of an area: the pair of axes that maps data to pixels there, and
@@ -106,7 +113,7 @@ protected:
     QCPArea* mArea;
     QCPAxisBase* mKeyAxis;
     QCPAxisBase* mValueAxis;
-    quint64 mRevision = 0;
+    quint64 mRevision = qcp::nextSystemRevision();
 
 private:
     friend class QCPArea;

@@ -19,6 +19,14 @@
 #include "misuse.h"
 #include "plottables/plottable.h"
 
+#include <atomic>
+
+quint64 qcp::nextSystemRevision()
+{
+    static std::atomic<quint64> counter { 0 };
+    return ++counter;
+}
+
 /*! \class QCPCoordinateSystem
   \brief The mapping of one axis pair of an area.
 
@@ -105,7 +113,7 @@ QList<QCPAbstractPlottable*> QCPCoordinateSystem::plottables() const
 */
 void QCPCoordinateSystem::bumpRevision()
 {
-    ++mRevision;
+    mRevision = qcp::nextSystemRevision();
     qcpEmit(this, mArea ? mArea->parentPlot() : nullptr, &QCPCoordinateSystem::changed);
 }
 

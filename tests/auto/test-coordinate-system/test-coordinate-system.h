@@ -15,6 +15,7 @@ private slots:
     void polarSystemMapsLikeTheArea();
     void polarSystemRefusesAxisRatios();
     void revisionBumpsOnAnyMappingChange();
+    void systemRevisionsAreNeverShared();
     void deletingAnAxisDeletesItsSystems();
     void aPlottableTakesASystem();
     void twoConstructorsShareTheSystem();

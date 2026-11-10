@@ -8,6 +8,7 @@
 #include "qcustomplot.h"
 #include <QtTest/QtTest>
 #include <QPicture>
+#include <QSet>
 
 namespace
 {
@@ -282,6 +283,20 @@ void TestCoordinateSystem::revisionBumpsOnAnyMappingChange()
     area->radialAxis()->setRange(0, 2);
     QCOMPARE(polar->revision(), polarStart + 2);
     QCOMPARE(polarChanged.count(), 2);
+}
+
+void TestCoordinateSystem::systemRevisionsAreNeverShared()
+{
+    // A recording keys on the system and its revision: a system that reuses the address of a
+    // deleted one must not answer with its revision, or the recording would replay the old frame.
+    QList<quint64> revisions;
+    for (int i = 0; i < 200; ++i)
+    {
+        QCustomPlot plot;
+        plot.resize(400, 300);
+        revisions.append(plot.axisRect()->system(plot.xAxis, plot.yAxis)->revision());
+    }
+    QCOMPARE(QSet<quint64>(revisions.begin(), revisions.end()).size(), revisions.size());
 }
 
 void TestCoordinateSystem::aPlottableTakesASystem()
