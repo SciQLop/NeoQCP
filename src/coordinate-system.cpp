@@ -10,6 +10,7 @@
 ****************************************************************************/
 
 #include "coordinate-system.h"
+#include "painting/draw-context.h"
 
 #include "axis/axis.h"
 #include "core.h"
@@ -92,8 +93,8 @@ QCPKeyWindow QCPCoordinateSystem::keyWindow() const
 
 /*! \internal
 
-  No plottable holds a system yet (they do once setSystem arrives): the cartesian projection of its
-  axes is the frame a plottable draws through, so that is the answer here.
+  A system answers with the plottables that joined it: the cartesian projection of its axes is the
+  frame they draw through, so no other rule can disagree.
 */
 QList<QCPAbstractPlottable*> QCPCoordinateSystem::plottables() const
 {

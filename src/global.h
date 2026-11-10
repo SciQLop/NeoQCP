@@ -290,12 +290,9 @@ Q_DECLARE_FLAGS(Interactions, Interaction)
 */
 enum Capability
 {
-    capRectangular = 0x01 ///< <tt>0x01</tt> The plot area is a rectangle
-    ,
-    capStraightKey = 0x02 ///< <tt>0x02</tt> The key axis is straight: lanes and bar stacks need it
-    ,
-    capColourScale = 0x04 ///< <tt>0x04</tt> A colour scale can be placed next to the area
-    ,
+    capRectangular = 0x01, ///< <tt>0x01</tt> The plot area is a rectangle
+    capStraightKey = 0x02, ///< <tt>0x02</tt> The key axis is straight: lanes and bar stacks need it
+    capColourScale = 0x04, ///< <tt>0x04</tt> A colour scale can be placed next to the area
     capLanes = 0x08 ///< <tt>0x08</tt> The area can lay out lanes (multi-graphs, intervals)
 };
 Q_DECLARE_FLAGS(Capabilities, Capability)

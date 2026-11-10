@@ -257,7 +257,3 @@ enum class QCPDrawnSide
 [[nodiscard]] QCP_LIB_DECL QCPRange qcpDrawnRange(const std::optional<QCPDataBox>& box,
                                                   QCPDrawnSide side, bool& foundRange,
                                                   QCP::SignDomain inSignDomain);
-
-//! False when \a pos is outside \a plottable's axis rect and the plot did not opt in.
-[[nodiscard]] QCP_LIB_DECL bool qcpDrawnClickInsideAxisRect(const QCPAbstractPlottable& plottable,
-                                                            const QPointF& pos);

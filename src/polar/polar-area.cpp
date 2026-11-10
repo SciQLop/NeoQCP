@@ -220,45 +220,17 @@ bool QCPPolarArea::removeGraph(QCPPolarGraph* graph)
 }
 
 /*!
-  Changes the angular axis range such that all graphs drawn on this area are fully visible.
+  Rescales the radial axis of every graph drawn on this area, so that the graphs' radii are fully
+  visible. The angular axis keeps its full turn: see \ref QCPPolarAxisAngular::rescale, the one rule
+  for it, whether the fit comes from here or from \ref QCustomPlot::rescaleAxes.
 */
 void QCPPolarArea::rescale(bool onlyVisiblePlottables)
 {
-    QCPRange newRange;
-    bool haveRange = false;
     for (QCPPolarGraph* graph : mGraphs)
     {
         if (!graph->realVisibility() && onlyVisiblePlottables)
             continue;
-        QCPRange range;
-        bool currentFoundRange;
-        if (graph->keyAxis() == mAngularAxis)
-            range = graph->getKeyRange(currentFoundRange, QCP::sdBoth);
-        else
-            range = graph->getValueRange(currentFoundRange, QCP::sdBoth);
-        if (currentFoundRange)
-        {
-            if (!haveRange)
-                newRange = range;
-            else
-                newRange.expand(range);
-            haveRange = true;
-        }
-    }
-    if (haveRange && mAngularAxis)
-    {
-        const QCPRange current = mAngularAxis->range();
-        if (!QCPRange::validRange(newRange)) // likely due to range being zero (plottable has only
-                                             // constant data in this axis dimension), shift current
-                                             // range to at least center the plottable
-        {
-            double center = (newRange.lower + newRange.upper)
-                * 0.5; // upper and lower should be equal anyway, but just to make sure, incase
-                       // validRange returned false for other reason
-            newRange.lower = center - current.size() / 2.0;
-            newRange.upper = center + current.size() / 2.0;
-        }
-        mAngularAxis->setRange(newRange);
+        graph->rescaleValueAxis();
     }
 }
 

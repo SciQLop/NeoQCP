@@ -14,7 +14,6 @@
 
 #include "coords.h"
 #include "global.h"
-#include "painting/draw-context.h"
 
 #include <QList>
 #include <QObject>
@@ -26,6 +25,8 @@ class QCPArea;
 class QCPAxis;
 class QCPAxisBase;
 class QCPAxisRect;
+
+struct QCPKeyWindow;
 
 namespace qcp
 {

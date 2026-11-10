@@ -73,6 +73,7 @@ QCPArea::~QCPArea()
 */
 QCPCoordinateSystem* QCPArea::system(QCPAxisBase* key, QCPAxisBase* value)
 {
+    pruneSystems();
     if (!key || !value)
     {
         qcp::reportMisuse(Q_FUNC_INFO, "a coordinate system needs two axes");
@@ -108,10 +109,10 @@ QCPCoordinateSystem* QCPArea::system(QCPAxisBase* key, QCPAxisBase* value)
 */
 QList<QCPCoordinateSystem*> QCPArea::systems() const
 {
+    pruneSystems();
     QList<QCPCoordinateSystem*> result;
-    for (const QPointer<QCPCoordinateSystem>& system : mSystems)
-        if (system)
-            result << system;
+    for (const QPointer<QCPCoordinateSystem>& system : std::as_const(mSystems))
+        result << system;
     return result;
 }
 
@@ -139,19 +140,29 @@ void QCPArea::axisRemoved(const QCPAxisBase* axis)
 {
     if (!axis)
         return;
-    const QList<QPointer<QCPCoordinateSystem>> systems = std::exchange(mSystems, { });
-    for (const QPointer<QCPCoordinateSystem>& system : systems)
+    // Collect, then remove in place: emptying the list first would put a system that a slot creates
+    // during the detach in front of the ones that were already there.
+    QList<QPointer<QCPCoordinateSystem>> dying;
+    for (const QPointer<QCPCoordinateSystem>& system : std::as_const(mSystems))
+        if (system && system->usesAxis(axis))
+            dying << system;
+    for (const QPointer<QCPCoordinateSystem>& system : std::as_const(dying))
     {
-        if (!system)
-            continue;
-        if (system->usesAxis(axis))
-        {
-            detachFromSystem(system);
-            delete system;
-        }
-        else
-            mSystems.append(system);
+        mSystems.removeOne(system);
+        detachFromSystem(system);
+        delete system;
     }
+    pruneSystems();
+}
+
+/*! \internal
+
+  A system its owner deleted directly is still a hole in the list: it goes here, where the list is
+  read, so a re-entrant pass never walks over a null and the surviving systems keep their order.
+*/
+void QCPArea::pruneSystems() const
+{
+    mSystems.removeIf([](const QPointer<QCPCoordinateSystem>& system) { return system.isNull(); });
 }
 
 void QCPArea::destroyInsetLayout()

@@ -10,6 +10,7 @@
 ****************************************************************************/
 
 #include "coordinate-system-polar.h"
+#include "painting/draw-context.h"
 
 #include "datasource/graph-resampler.h"
 #include "misuse.h"

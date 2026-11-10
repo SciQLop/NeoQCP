@@ -398,16 +398,6 @@ QCPRange qcpDrawnRange(const std::optional<QCPDataBox>& box, QCPDrawnSide side, 
     return QCPRange(lower, upper);
 }
 
-bool qcpDrawnClickInsideAxisRect(const QCPAbstractPlottable& plottable, const QPointF& pos)
-{
-    const QCPAxis* keyAxis = plottable.keyAxis();
-    QCustomPlot* plot = plottable.parentPlot();
-    if (!keyAxis || !keyAxis->axisRect() || !plot)
-        return true;
-    return keyAxis->axisRect()->rect().contains(pos.toPoint())
-        || plot->interactions().testFlag(QCP::iSelectPlottablesBeyondAxisRect);
-}
-
 namespace
 {
 // A layer paints its items through one frame: the same axes, rect and clip, within one replot.

@@ -790,6 +790,10 @@ void QCPPolarAxisRadial::setSelectedSubTickPen(const QPen& pen)
     mSelectedSubTickPen = pen;
 }
 
+/*!
+  Transforms \a pixelPos, in pixel coordinates of the QCustomPlot widget, to the axis coordinates
+  \a angleCoord and \a radiusCoord.
+*/
 void QCPPolarAxisRadial::pixelToCoord(QPointF pixelPos, double& angleCoord,
                                       double& radiusCoord) const
 {

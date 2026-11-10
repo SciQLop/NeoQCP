@@ -106,7 +106,7 @@ protected:
     QCPLayoutInset* mInsetLayout;
     // The systems are QObject children of the area; the pointers go null as the last of them is
     // deleted while an axis leaves.
-    QList<QPointer<QCPCoordinateSystem>> mSystems;
+    mutable QList<QPointer<QCPCoordinateSystem>> mSystems;
     // The rect the systems were last told about: a layout pass that leaves the geometry alone
     // keeps every recording good.
     QRect mSystemsRect;
@@ -132,6 +132,8 @@ protected:
 
 private:
     void detachFromSystem(QCPCoordinateSystem* system);
+    //! Drops the systems a direct `delete` left behind as null pointers.
+    void pruneSystems() const;
 
     Q_DISABLE_COPY(QCPArea)
 };
