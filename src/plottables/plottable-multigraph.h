@@ -173,7 +173,7 @@ protected:
 
     using QCPAbstractLine::drawLegendIcon;
     void drawLegendIcon(QCPDrawContext& icon) const override;
-    void axesChanged() override { followAxes(); }
+    void systemChanged() override { followAxes(); }
 
     void selectEvent(QMouseEvent* event, bool additive, const QVariant& details,
                      bool* selectionStateChanged) override;

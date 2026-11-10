@@ -72,7 +72,7 @@ protected:
     bool canProduceContent() const override;
     //! An export bins synchronously, so the screen and export recordings differ.
     [[nodiscard]] bool resolvesForTheExport() const override { return true; }
-    void axesChanged() override { followKeyAxis(); }
+    void systemChanged() override { followKeyAxis(); }
 
 private:
     void followKeyAxis();

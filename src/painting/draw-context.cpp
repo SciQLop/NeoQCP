@@ -4,6 +4,7 @@
 #include "raster-fallback.h"
 
 #include "../axis/axis.h"
+#include "../coordinate-system.h"
 #include "../datasource/graph-resampler.h"
 #include "../items/item.h"
 #include "../layoutelements/layoutelement-axisrect.h"
@@ -387,20 +388,30 @@ double qcpKeyPixelsPerUnit(const QCPAxis* keyAxis)
 
 QCPDrawContext::QCPDrawContext(const QCPAxis* keyAxis, const QCPAxis* valueAxis,
                                const QCPAxisRect* axisRect, const QCPTheme* theme, bool exporting,
-                               const QRectF& clip)
+                               const QRectF& clip, const QCPCoordinateSystem* system)
         : mKeyAxis(keyAxis)
         , mValueAxis(valueAxis)
         , mAxisRect(axisRect)
+        , mSystem(system)
         , mList(std::make_unique<QCPDrawList>())
-        , mTransform(keyAxis, valueAxis)
-        , mRatio(axisRect)
-        , mClip(clip.isNull() ? (axisRect ? QRectF(axisRect->rect()) : QRectF()) : clip)
+        , mTransform(system ? system->transform() : QCPTransform(keyAxis, valueAxis))
+        , mRatio(system ? system->ratioTransform() : QCPRatioTransform(axisRect))
+        , mClip(clip.isNull() ? (system ? system->clipRect()
+                                       : (axisRect ? QRectF(axisRect->rect()) : QRectF()))
+                              : clip)
         , mTheme(theme)
         , mExporting(exporting)
 {
 }
 
 QCPDrawContext::~QCPDrawContext() = default;
+
+QCPDrawFrame QCPDrawContext::frame() const
+{
+    if (mSystem)
+        return QCPDrawFrame { mSystem->transform(), mSystem->ratioTransform(), mClip };
+    return qcpMakeFrame(mKeyAxis, mValueAxis, mAxisRect, mClip);
+}
 
 const QCPTransform& QCPDrawContext::transform() const
 {

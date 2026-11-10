@@ -124,7 +124,7 @@ protected:
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
     void setPipelineScheduler(QCPPipelineScheduler* scheduler) override { mPipeline.setScheduler(scheduler); }
     bool canProduceContent() const override;
-    void axesChanged() override { followAxes(); }
+    void systemChanged() override { followAxes(); }
 
 private:
     [[nodiscard]] bool resampledForAnotherSize() const;

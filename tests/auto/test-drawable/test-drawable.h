@@ -48,6 +48,8 @@ private slots:
     void hitTestWithAVerticalKeyAxisChecksEachSideOnItsOwnAxis();
     void hitTestBesideTextIsTheGap();
     void pixelAnchoredShapeIsHittable();
+    void frameEpochsAreNeverShared();
+    void twoRectsOneLayerDrawInTheirOwnFrames();
     void batchHitTestNamesTheRect();
     void defaultDataRangeFollowsTheExtentRules();
     void defaultLegendIconIsTheRecordingFitted();

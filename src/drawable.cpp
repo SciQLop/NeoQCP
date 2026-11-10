@@ -1,5 +1,6 @@
 #include "drawable.h"
 
+#include "coordinate-system.h"
 #include "core.h"
 #include "items/item.h"
 #include "layer.h"
@@ -418,6 +419,8 @@ struct FrameMemo
 {
     const QCustomPlot* plot = nullptr;
     quint64 epoch = 0;
+    const QCPCoordinateSystem* system = nullptr;
+    quint64 revision = 0;
     const QCPAxis* keyAxis = nullptr;
     const QCPAxis* valueAxis = nullptr;
     const QCPAxisRect* axisRect = nullptr;
@@ -445,13 +448,22 @@ const QCPDrawFrame& memoFrame(const QCPDrawnView& view, const QRect& clip)
     // the frame of the range before.
     const QCPRange keyRange = view.keyAxis ? view.keyAxis->range() : QCPRange();
     const QCPRange valueRange = view.valueAxis ? view.valueAxis->range() : QCPRange();
-    if (memo.plot != view.plot || memo.epoch != epoch || memo.keyAxis != view.keyAxis
+    // A system names its own frame: its revision moves it when neither range nor rect does (a polar
+    // start angle, a reversed radial axis), so it replaces the axis fields of the key.
+    const quint64 revision = view.system ? view.system->revision() : 0;
+    if (memo.plot != view.plot || memo.epoch != epoch || memo.system != view.system
+        || memo.revision != revision || memo.keyAxis != view.keyAxis
         || memo.valueAxis != view.valueAxis || memo.axisRect != view.axisRect
         || memo.keyRange != keyRange || memo.valueRange != valueRange || memo.clip != clip)
     {
-        memo.frame = qcpMakeFrame(view.keyAxis, view.valueAxis, view.axisRect, QRectF(clip));
+        memo.frame = view.system
+            ? QCPDrawFrame { view.system->transform(), view.system->ratioTransform(),
+                             QRectF(clip) }
+            : qcpMakeFrame(view.keyAxis, view.valueAxis, view.axisRect, QRectF(clip));
         memo.plot = view.plot;
         memo.epoch = epoch;
+        memo.system = view.system;
+        memo.revision = revision;
         memo.keyAxis = view.keyAxis;
         memo.valueAxis = view.valueAxis;
         memo.axisRect = view.axisRect;
@@ -460,6 +472,12 @@ const QCPDrawFrame& memoFrame(const QCPDrawnView& view, const QRect& clip)
         memo.clip = clip;
     }
     return memo.frame;
+}
+
+//! The transform \a view draws through: its system's, or the axes' pair for the items.
+QCPTransform qcpViewTransform(const QCPDrawnView& view)
+{
+    return view.system ? view.system->transform() : QCPTransform(view.keyAxis, view.valueAxis);
 }
 
 //! The part of a view every object has: its plot, layer and theme.
@@ -496,9 +514,12 @@ QCPDrawnView qcpDrawnViewOf(const QCPAbstractPlottable& plottable, QRect clip)
     QCPDrawnView view = qcpLayerableView(plottable);
     view.selectable = plottable.selectable() != QCP::stNone;
     view.clip = clip;
+    view.system = plottable.system();
     view.keyAxis = plottable.keyAxis();
     view.valueAxis = plottable.valueAxis();
-    view.axisRect = view.keyAxis ? view.keyAxis->axisRect() : nullptr;
+    view.axisRect = view.keyAxis ? view.keyAxis->axisRect()
+                                 : (view.system ? qobject_cast<QCPAxisRect*>(view.system->area())
+                                                : nullptr);
     return view;
 }
 
@@ -517,7 +538,7 @@ bool QCPDrawnCore::frameTransformMatches(const QCPDrawnView& view, const QCPDraw
 {
     if (known)
         return known->transform == recorded;
-    return QCPTransform(view.keyAxis, view.valueAxis) == recorded;
+    return qcpViewTransform(view) == recorded;
 }
 
 bool QCPDrawnCore::recordingIsStale(const QCPDrawable& object, const QCPDrawnView& view,
@@ -683,8 +704,10 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
     // A plot may hold no axis at all: an item placed in pixels still draws there, as it did in 2.x,
     // and only a drawing that needs a transform is refused - after it was recorded, so the answer is
     // about what it actually holds.
-    const bool axes = view.keyAxis && view.valueAxis;
-    if (!axes && mState->refusedMissingAxis && mState->refusedAxesGeneration == mGeneration)
+    // A system names a frame of its own; without one, the objects that only read axes (the items)
+    // still draw in pixels when a plot has no axis, exactly as they did in 2.x.
+    const bool framed = view.framed();
+    if (!framed && mState->refusedMissingAxis && mState->refusedAxesGeneration == mGeneration)
         return false;
     const auto refuseWithoutAxes = [this]() {
         mState->refusedMissingAxis = true;
@@ -697,7 +720,7 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
         mState->recorded = false;
     };
     // The recording kept from the axes' time is placed through them: it cannot be reused now.
-    if (!axes && mState->recorded && qcpNeedsAxes(mState->recording))
+    if (!framed && mState->recorded && qcpNeedsAxes(mState->recording))
     {
         refuseWithoutAxes();
         return false;
@@ -715,13 +738,14 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
         return true;
     // Without axes the frame's clip is not the axis rect's: the object is painted into the viewport
     // its layer clips it with, so that is what its recording is measured against.
-    const QRectF clip = axes ? QRectF() : QRectF(view.clip).translated(0, -1);
+    const QRectF clip =
+        framed && !view.system ? QRectF() : QRectF(view.clip).translated(0, -1);
     QCPDrawContext context(view.keyAxis, view.valueAxis, view.axisRect, view.theme, view.exporting,
-                           clip);
+                           clip, view.system);
     const InsideDraw drawing(mInsideDraw);
     object.draw(context);
     QCPDrawList recording = context.takeDrawList();
-    if (!axes && qcpNeedsAxes(recording))
+    if (!framed && qcpNeedsAxes(recording))
     {
         refuseWithoutAxes();
         return false;
@@ -744,8 +768,7 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
     // A caller that built the frame already has the transform; one that did not (a hit test, an
     // extent) builds it, and only a recording that reads it keeps it.
     if (mState->transformDependent)
-        mState->recordedTransform = known ? known->transform
-                                          : QCPTransform(view.keyAxis, view.valueAxis);
+        mState->recordedTransform = known ? known->transform : qcpViewTransform(view);
     mState->recorded = true;
     ++mState->recordings;
     return true;
@@ -765,8 +788,9 @@ std::optional<QCPDataBox> QCPDrawnCore::dataRange(const QCPDrawable& object,
     bool valueBounded = side.valueBounded;
     if (applyLogRule)
     {
-        const bool keyLog = view.keyAxis->scaleType() == QCPAxis::stLogarithmic;
-        const bool valueLog = view.valueAxis->scaleType() == QCPAxis::stLogarithmic;
+        const bool keyLog = view.keyAxis && view.keyAxis->scaleType() == QCPAxis::stLogarithmic;
+        const bool valueLog =
+            view.valueAxis && view.valueAxis->scaleType() == QCPAxis::stLogarithmic;
         if (keyBounded && keyLog && !(side.bounds.keyLower > 0))
             keyBounded = false;
         if (valueBounded && valueLog && !(side.bounds.valueLower > 0))

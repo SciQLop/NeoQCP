@@ -29,6 +29,7 @@
 #include <QTimer>
 #include <optional>
 
+#include "../coordinate-system.h"
 #include "../drawable.h"
 #include "axis/axis.h"
 #include "axis/range.h"
@@ -46,6 +47,7 @@ class QCPPlottableInterface1D;
 class QKeyEvent;
 class QCPLegend;
 class QCPAxisRect;
+class QCPCoordinateSystem;
 class QCPPipelineScheduler;
 template <typename T, typename Self = void>
 class QCPPlottableOps;
@@ -129,6 +131,7 @@ public:
     using OpsFor = QCPPlottableOps<T>;
 
     QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis);
+    explicit QCPAbstractPlottable(QCPCoordinateSystem* system);
     virtual ~QCPAbstractPlottable() override;
 
     // getters:
@@ -141,6 +144,10 @@ public:
     [[nodiscard]] QPen pen() const { return mPen; }
 
     [[nodiscard]] QBrush brush() const { return mBrush; }
+
+    //! The frame it is drawn through. The cartesian projections below answer from it: they are null
+    //! in any other system.
+    [[nodiscard]] QCPCoordinateSystem* system() const { return mSystem.data(); }
 
     [[nodiscard]] QCPAxis* keyAxis() const { return mKeyAxis.data(); }
 
@@ -162,6 +169,8 @@ public:
     virtual void setBrush(const QBrush& brush);
     void setKeyAxis(QCPAxis* axis);
     void setValueAxis(QCPAxis* axis);
+    //! The primitive the axis setters resolve to: joins \a system, or detaches with null.
+    void setSystem(QCPCoordinateSystem* system);
     Q_SLOT void setSelectable(QCP::SelectionType selectable);
     Q_SLOT void setSelection(QCPDataSelection selection);
     void setSelectionDecorator(QCPSelectionDecorator* decorator);
@@ -169,6 +178,12 @@ public:
     // introduced virtual methods:
     //! The recording: append what this plottable draws to \a context. The default records nothing.
     virtual void draw(QCPDrawContext& context) const { Q_UNUSED(context) }
+
+    //! The flags a system must offer for this plottable to join it.
+    [[nodiscard]] virtual QCP::Capabilities requiredCapabilities() const
+    {
+        return QCP::capRectangular | QCP::capStraightKey;
+    }
 
     //! What the recording occupies in data coordinates.
     std::optional<QCPDataBox> drawnDataRange() const override;
@@ -280,14 +295,16 @@ signals:
     void visuallyBusyChanged(bool visuallyBusy);
 
 protected:
-    //! Called after setKeyAxis or setValueAxis; not called by the constructor.
-    virtual void axesChanged() {}
+    //! Called after setSystem; not called by the constructor.
+    virtual void systemChanged() {}
 
     // property members:
     QString mName;
     bool mAntialiasedFill, mAntialiasedScatters;
     QPen mPen;
     QBrush mBrush;
+    QPointer<QCPCoordinateSystem> mSystem;
+    //! The cartesian projection, kept in sync by setSystem: null in any other system.
     QPointer<QCPAxis> mKeyAxis, mValueAxis;
     QCP::SelectionType mSelectable;
     QCPDataSelection mSelection;
@@ -350,6 +367,8 @@ private:
     std::optional<int> mBusyHideDelayMs;
 
     void onDebounceTimeout();
+    //! The axis setters' shared body: the system of that pair, or an inert plottable.
+    void resolveAxes(QCPAxis* key, QCPAxis* value);
 
     friend class QCustomPlot;
     friend class QCPSelectionDecorator; // its pen and brush are part of what a plottable draws

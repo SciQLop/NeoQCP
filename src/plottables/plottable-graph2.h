@@ -153,7 +153,7 @@ protected:
     void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
     void setPipelineScheduler(QCPPipelineScheduler* scheduler) override { mPipeline.setScheduler(scheduler); }
-    void axesChanged() override { followAxes(); }
+    void systemChanged() override { followAxes(); }
 
     void onViewportChanged();
 

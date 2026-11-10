@@ -77,6 +77,12 @@ namespace qcp
 // The construction rules of one family, see construct.h: what add<T>(args...) means for T.
 template <typename T>
 struct Construct;
+
+/*!
+  The epoch of the next painted frame: one process-wide counter, so no two plots - not even a plot
+  that reuses the address of a deleted one - and no two frames of a plot ever share an epoch.
+*/
+[[nodiscard]] QCP_LIB_DECL quint64 nextFrameEpoch();
 } // namespace qcp
 
 //! What a hit test is for. A press and a wheel take any layerable that is hit, a selection only
@@ -182,11 +188,13 @@ public:
     [[nodiscard]] quint64 itemsEpoch() const { return mItemsEpoch; }
 
     /*!
-      Bumped once per painted frame.
+      Bumped once per painted frame, from one process-wide counter (qcp::nextFrameEpoch()).
 
       An \ref QCPDrawContext::recordEveryFrame "everyFrame()" recording is rebuilt by the frame it is
       painted in, and every query of that frame - the paint itself, a hit test, a range - sees the
-      recording the frame built, not one per query.
+      recording the frame built, not one per query. A per-plot counter would repeat itself across
+      plots, and a frame cached for one plot (drawable.cpp keys it on the epoch) would then answer
+      for another one that happened to reuse its address.
     */
     [[nodiscard]] quint64 frameEpoch() const { return mFrameEpoch; }
 
@@ -512,7 +520,7 @@ protected:
     QSize mViewportWidgetSize; // the widget size the viewport was last taken from
     quint64 mViewEpoch = 0; // bumped on a viewport, device pixel ratio or theme change (viewEpoch)
     quint64 mItemsEpoch = 0; // bumped when an item is removed (itemsEpoch)
-    quint64 mFrameEpoch = 0; // bumped when a frame starts painting (frameEpoch)
+    quint64 mFrameEpoch = qcp::nextFrameEpoch(); // bumped when a frame starts painting (frameEpoch)
     double mBufferDevicePixelRatio;
     QPointer<QCPLayoutGrid> mPlotLayout;
     bool mAutoAddPlottableToLegend;

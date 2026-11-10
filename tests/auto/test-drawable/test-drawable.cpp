@@ -1458,6 +1458,75 @@ void TestDrawable::pixelAnchoredShapeIsHittable()
     QVERIFY(*logHit < 1.0);
 }
 
+void TestDrawable::frameEpochsAreNeverShared()
+{
+    // A plot is deleted and the next one takes its address: the frame memo keys on that pointer and
+    // on the frame epoch, so a new plot must never be handed a frame the old one built. The layout
+    // alternates, so a stale frame would put the hit test at the wrong pixel.
+    int misses = 0;
+    int sharedEpochs = 0;
+    quint64 previousEpoch = 0;
+    for (int i = 0; i < 200; ++i)
+    {
+        auto plot = std::make_unique<QCustomPlot>();
+        plot->resize(400, 300);
+        plot->xAxis->setRange(0, 10);
+        plot->yAxis->setRange(0, 10);
+        const bool loose = i % 2 == 0;
+        plot->axisRect()->setMargins(loose ? QMargins(10, 10, 10, 10) : QMargins(70, 50, 30, 40));
+        auto* shape = new TestShape(plot.get());
+        shape->mode = TestShape::Ratio;
+        plot->replot();
+        if (i > 0 && plot->frameEpoch() == previousEpoch)
+            ++sharedEpochs;
+        previousEpoch = plot->frameEpoch();
+        const double middle = plot->xAxis->coordToPixel(4);
+        const double ratioY = plot->axisRect()->top() + 0.2 * plot->axisRect()->height();
+        if (!shape->hitTest(QCP::Pixels { middle, ratioY }, nullptr).has_value())
+            ++misses;
+    }
+    QCOMPARE(sharedEpochs, 0);
+    QCOMPARE(misses, 0);
+}
+
+void TestDrawable::twoRectsOneLayerDrawInTheirOwnFrames()
+{
+    // Two items on one layer, each on its own axis rect: one replot paints them both, and the frame
+    // the second one reads must be its own rect's, not the one the first one left in the memo.
+    QCustomPlot plot;
+    plot.resize(600, 300);
+    plot.plotLayout()->clear();
+    auto* first = new QCPAxisRect(&plot);
+    auto* second = new QCPAxisRect(&plot);
+    plot.plotLayout()->addElement(0, 0, first);
+    plot.plotLayout()->addElement(0, 1, second);
+    for (QCPAxisRect* rect : { first, second })
+    {
+        rect->axis(QCPAxis::atBottom)->setRange(0, 10);
+        rect->axis(QCPAxis::atLeft)->setRange(0, 10);
+    }
+    const auto lineOn = [&plot](QCPAxisRect* rect)
+    {
+        auto* line = new QCPItemLine(&plot);
+        line->start->setAxes(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
+        line->end->setAxes(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
+        line->start->setCoords(1, 1);
+        line->end->setCoords(9, 9);
+        return line;
+    };
+    QCPItemLine* a = lineOn(first);
+    QCPItemLine* b = lineOn(second);
+    plot.replot();
+
+    const std::pair<QCPAbstractItem*, QCPAxisRect*> ends[] = { { a, first }, { b, second } };
+    for (const auto& [line, rect] : ends)
+    {
+        const QCP::Pixels end { rect->axis(QCPAxis::atBottom)->coordToPixel(9),
+                                rect->axis(QCPAxis::atLeft)->coordToPixel(9) };
+        QVERIFY2(line->hitTest(end, nullptr).has_value(), "each line ends in its own rect");
+    }
+}
+
 void TestDrawable::defaultDataRangeFollowsTheExtentRules()
 {
     Fixture f;

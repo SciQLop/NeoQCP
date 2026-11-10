@@ -88,10 +88,12 @@ QList<QCPAbstractPlottable*> QCPCoordinateSystem::plottables() const
     QCustomPlot* plot = mArea ? mArea->parentPlot() : nullptr;
     if (!plot)
         return result;
+    // simplify: one scan of the plot's plottables per call, as keyAxis()/valueAxis() would need:
+    // an index on the system when a plot holds enough of them.
     const int count = plot->plottableCount();
     for (int i = 0; i < count; ++i)
         if (QCPAbstractPlottable* plottable = plot->plottable(i))
-            if (plottable->keyAxis() == mKeyAxis && plottable->valueAxis() == mValueAxis)
+            if (plottable->system() == this)
                 result << plottable;
     return result;
 }

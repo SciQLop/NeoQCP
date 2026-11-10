@@ -121,7 +121,7 @@ protected:
     void draw(QCPDrawContext& context) const override;
     void drawLegendIcon(QCPDrawContext& icon) const override;
     void colorMappingChanged() override;
-    void axesChanged() override { followAxisScales(); }
+    void systemChanged() override { followAxisScales(); }
     bool pipelineBusy() const override { return mPipeline.isBusy(); }
     void setPipelineScheduler(QCPPipelineScheduler* scheduler) override { mPipeline.setScheduler(scheduler); }
     bool canProduceContent() const override;

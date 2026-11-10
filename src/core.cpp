@@ -37,6 +37,7 @@
 
 #include "Profiling.hpp"
 #include "axis/axis.h"
+#include "coordinate-system.h"
 #include "items/item.h"
 #include "items/item-text.h"
 #include "items/item-tracer.h"
@@ -69,6 +70,16 @@
 
 #include <QTimer>
 #include "datasource/pipeline-scheduler.h"
+
+#include <atomic>
+
+quint64 qcp::nextFrameEpoch()
+{
+    // One counter for the process: a plot's address may be reused after it is deleted, an epoch may
+    // not. See QCustomPlot::frameEpoch().
+    static std::atomic<quint64> counter { 0 };
+    return ++counter;
+}
 
 // Selection and input handlers call into layerables whose signals reach user slots, and a slot may
 // delete any layerable: these loops walk guarded snapshots instead of the live lists.
@@ -1469,6 +1480,7 @@ bool QCustomPlot::detach(QCPAbstractPlottable* plottable)
     const QPointer<QCPPlottableGroup> group = unlistPlottable(plottable);
     plottable->moveToLayer(nullptr, false);
     plottable->setParentLayerable(nullptr);
+    plottable->mSystem = nullptr;
     plottable->mKeyAxis = nullptr;
     plottable->mValueAxis = nullptr;
     plottable->mReportedLostAxis = true;
@@ -1532,6 +1544,8 @@ bool QCustomPlot::adopt(QCPAbstractPlottable* plottable)
         return false;
     plottable->setParent(this);
     plottable->initializeParentPlot(this);
+    // It joins the frame of the rect it arrives in, like a plottable built from that pair.
+    plottable->mSystem = keyAxis->axisRect()->system(keyAxis, valueAxis);
     plottable->mKeyAxis = keyAxis;
     plottable->mValueAxis = valueAxis;
     plottable->mReportedLostAxis = false;
@@ -2870,7 +2884,7 @@ void QCustomPlot::replot(QCustomPlot::RefreshPriority refreshPriority)
     }
     // One frame for the layer paints below: an everyFrame() recording is rebuilt once for it, and
     // the queries made while painting it read what it built.
-    ++mFrameEpoch;
+    mFrameEpoch = qcp::nextFrameEpoch();
     bool translated = false;
     for (auto& layer : mLayers)
     {
@@ -4278,7 +4292,7 @@ void QCustomPlot::draw(QCPPainter* painter)
     PROFILE_HERE_N("QCustomPlot::draw");
     const QCPEmissionScope scope(this);
     const QPointer<QCustomPlot> alive(this); // an afterLayout slot may delete the plot
-    ++mFrameEpoch; // an export frame: everyFrame() recordings are rebuilt once for it
+    mFrameEpoch = qcp::nextFrameEpoch(); // an export frame remakes everyFrame() recordings once
     updateLayout();
     if (!alive)
         return;

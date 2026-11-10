@@ -37,6 +37,42 @@ QCPPolarArea* polarArea(QCustomPlot& plot)
     settle(plot);
     return area;
 }
+//! A plottable with one recording: enough to be drawn, hit and counted.
+class RecordingPlottable : public QCPAbstractPlottable
+{
+public:
+    explicit RecordingPlottable(QCPCoordinateSystem* system)
+            : QCPAbstractPlottable(system)
+    {
+    }
+
+    RecordingPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis)
+            : QCPAbstractPlottable(keyAxis, valueAxis)
+    {
+    }
+
+    void draw(QCPDrawContext& context) const override
+    {
+        if (readsTransform) // a recording that bakes the frame: a new frame re-records it
+        {
+            const QCP::Pixels corner = context.transform().map(QCP::Data { 6, 6 });
+            context.rect(QCP::Data { 2, 2 }, QCP::Pixels { corner.x, corner.y }, QPen(Qt::black),
+                         QBrush(Qt::darkRed));
+            return;
+        }
+        context.polyline(mLine, QPen(Qt::black, 2));
+    }
+
+    [[nodiscard]] int recordings() const { return mCore.recordingCount(); }
+
+    bool readsTransform = false;
+
+private:
+    std::shared_ptr<const std::vector<QPointF>> mLine
+        = std::make_shared<const std::vector<QPointF>>(
+            std::initializer_list<QPointF> { { 1, 1 }, { 9, 9 } });
+};
+
 } // namespace
 
 void TestCoordinateSystem::init()
@@ -199,6 +235,111 @@ void TestCoordinateSystem::revisionBumpsOnAnyMappingChange()
     QCOMPARE(polarChanged.count(), 2);
 }
 
+void TestCoordinateSystem::aPlottableTakesASystem()
+{
+    QCustomPlot plot;
+    QCPAxisRect* rect = cartesianRect(plot);
+    QCPAxis* x = rect->axis(QCPAxis::atBottom);
+    QCPAxis* y = rect->axis(QCPAxis::atLeft);
+    QCPCoordinateSystem* system = rect->system(x, y);
+
+    auto* plottable = new RecordingPlottable(system);
+    QCOMPARE(plottable->system(), system);
+    QCOMPARE(plottable->keyAxis(), x);
+    QCOMPARE(plottable->valueAxis(), y);
+    QCOMPARE(system->plottables().size(), 1);
+
+    // The axis pair resolves to the same one, and the projections follow the system.
+    auto* sibling = new RecordingPlottable(x, y);
+    QCOMPARE(sibling->system(), system);
+    QCOMPARE(rect->systems().size(), 1);
+}
+
+void TestCoordinateSystem::twoConstructorsShareTheSystem()
+{
+    QCustomPlot plot;
+    QCPAxisRect* rect = cartesianRect(plot);
+    QCPAxis* x = rect->axis(QCPAxis::atBottom);
+    QCPAxis* y = rect->axis(QCPAxis::atLeft);
+
+    std::unique_ptr<QCPGraph> graph(new QCPGraph(x, y));
+    std::unique_ptr<QCPCurve> curve(new QCPCurve(x, y));
+    QVERIFY(graph->system());
+    QCOMPARE(graph->system(), curve->system());
+    QCOMPARE(curve->system(), rect->system(x, y));
+    QCOMPARE(rect->systems().size(), 1);
+}
+
+void TestCoordinateSystem::movingBetweenSystemsReRecords()
+{
+    QCustomPlot plot;
+    QCPAxisRect* rect = cartesianRect(plot);
+    QCPAxis* x = rect->axis(QCPAxis::atBottom);
+    QCPAxis* other = rect->addAxis(QCPAxis::atBottom);
+    QCPAxis* y = rect->axis(QCPAxis::atLeft);
+    auto* plottable = new RecordingPlottable(x, y);
+    plottable->readsTransform = true;
+    plot.replot();
+    const int before = plottable->recordings();
+    QVERIFY(before > 0);
+
+    plottable->setSystem(rect->system(other, y));
+    QCOMPARE(plottable->keyAxis(), other);
+    plot.replot();
+    QCOMPARE(plottable->recordings(), before + 1); // the new frame's recording
+
+    const int moved = plottable->recordings();
+    other->setRange(-2, 8);
+    plot.replot();
+    QCOMPARE(plottable->recordings(), moved + 1); // the key axis it reads now
+
+    const int settled = plottable->recordings();
+    x->setRange(-3, 12);
+    plot.replot();
+    QCOMPARE(plottable->recordings(), settled); // the one it left
+}
+
+void TestCoordinateSystem::aPlottableOfADeletedSystemIsInert()
+{
+    QCustomPlot plot;
+    QCPAxisRect* rect = cartesianRect(plot);
+    QCPAxis* x = rect->axis(QCPAxis::atBottom);
+    auto* plottable = new RecordingPlottable(x, rect->axis(QCPAxis::atLeft));
+    plottable->readsTransform = true;
+    plot.replot();
+    const int before = plottable->recordings();
+    QVERIFY(plottable->system());
+
+    delete x; // unlists from the rect: its systems detach their plottables, then die
+    QVERIFY(!plottable->system());
+    QVERIFY(!plottable->keyAxis());
+    plot.replot(); // nothing drawn, nothing recorded - and one report that it is not
+    test_misuse::calls.clear();
+    QCOMPARE(plottable->recordings(), before);
+    const QPoint centre = rect->rect().center();
+    QVERIFY(!plottable->hitTest(QCP::Pixels { double(centre.x()), double(centre.y()) }, nullptr)
+                 .has_value());
+}
+
+void TestCoordinateSystem::crossPlotSystemIsRefused()
+{
+    QCustomPlot plot;
+    QCPAxisRect* rect = cartesianRect(plot);
+    auto* plottable = new RecordingPlottable(rect->axis(QCPAxis::atBottom),
+                                             rect->axis(QCPAxis::atLeft));
+    QCPCoordinateSystem* own = plottable->system();
+    QVERIFY(own);
+
+    QCustomPlot elsewhere;
+    QCPAxisRect* otherRect = cartesianRect(elsewhere);
+    plottable->setSystem(
+        otherRect->system(otherRect->axis(QCPAxis::atBottom), otherRect->axis(QCPAxis::atLeft)));
+
+    QCOMPARE(plottable->system(), own);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    test_misuse::calls.clear(); // the refusal is the point of this test
+}
+
 void TestCoordinateSystem::deletingAnAxisDeletesItsSystems()
 {
     QCustomPlot plot;
@@ -210,7 +351,15 @@ void TestCoordinateSystem::deletingAnAxisDeletesItsSystems()
     QVERIFY(kept && doomed);
     QCOMPARE(rect->systems().size(), 2);
 
+    // A plottable of each: the one whose system dies is detached first, then the system goes.
+    auto* stayer = new RecordingPlottable(kept);
+    auto* leaver = new RecordingPlottable(doomed);
+    QCOMPARE(stayer->system(), kept);
+    QCOMPARE(leaver->system(), doomed);
+
     rect->removeAxis(extra);
     QCOMPARE(rect->systems().size(), 1);
     QCOMPARE(rect->systems().first(), kept);
+    QCOMPARE(stayer->system(), kept);
+    QVERIFY(!leaver->system());
 }

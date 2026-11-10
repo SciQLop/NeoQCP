@@ -60,6 +60,7 @@ class QCPAbstractPlottable1D
 
 public:
     QCPAbstractPlottable1D(QCPAxis* keyAxis, QCPAxis* valueAxis);
+    explicit QCPAbstractPlottable1D(QCPCoordinateSystem* system);
     virtual ~QCPAbstractPlottable1D() override;
 
     // virtual methods of 1d plottable interface:
@@ -300,6 +301,12 @@ template <class DataType, class Base>
 QCPAbstractPlottable1D<DataType, Base>::QCPAbstractPlottable1D(QCPAxis* keyAxis,
                                                                QCPAxis* valueAxis)
         : Base(keyAxis, valueAxis), mDataContainer(new QCPDataContainer<DataType>)
+{
+}
+
+template <class DataType, class Base>
+QCPAbstractPlottable1D<DataType, Base>::QCPAbstractPlottable1D(QCPCoordinateSystem* system)
+        : Base(system), mDataContainer(new QCPDataContainer<DataType>)
 {
 }
 

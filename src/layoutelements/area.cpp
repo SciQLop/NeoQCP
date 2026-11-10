@@ -27,6 +27,7 @@
 #include "../coordinate-system.h"
 #include "../misuse.h"
 #include "../painting/painter.h"
+#include "../plottables/plottable.h"
 
 #include <utility>
 
@@ -42,12 +43,27 @@ QCPArea::QCPArea(QCustomPlot* parentPlot)
     mInsetLayout->setParent(this);
 }
 
+namespace
+{
+//! Frees the plottables of \a system: a plottable must not outlive the frame it is drawn in, so it
+//! leaves the system before the system goes (it then draws nothing and no click hits it).
+void detachFromSystems(QCPCoordinateSystem* system)
+{
+    for (QCPAbstractPlottable* plottable : system->plottables())
+        plottable->setSystem(nullptr);
+}
+} // namespace
+
 QCPArea::~QCPArea()
 {
     // The systems go while the area still exists: an axis leaving later would report to a
     // half-destroyed area.
     for (const QPointer<QCPCoordinateSystem>& system : std::exchange(mSystems, { }))
+    {
+        if (system)
+            detachFromSystems(system);
         delete system;
+    }
     destroyInsetLayout();
 }
 
@@ -127,7 +143,10 @@ void QCPArea::axisRemoved(const QCPAxisBase* axis)
         if (!system)
             continue;
         if (system->usesAxis(axis))
+        {
+            detachFromSystems(system);
             delete system;
+        }
         else
             mSystems.append(system);
     }

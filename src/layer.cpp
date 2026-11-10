@@ -314,7 +314,7 @@ void QCPLayer::replot()
                 srl->clear();
             // This is a frame of its own: an everyFrame() recording (a label that holds the pixels
             // of its anchor, for one) is rebuilt in it, as it is in QCustomPlot::replot().
-            ++mParentPlot->mFrameEpoch;
+            mParentPlot->mFrameEpoch = qcp::nextFrameEpoch();
             drawToPaintBuffer();
             pb->setInvalidated(false); // since layer is lmBuffered, we know only this layer is on
                                        // buffer and we can reset invalidated flag

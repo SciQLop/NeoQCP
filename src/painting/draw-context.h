@@ -22,6 +22,7 @@
 class QCPAxis;
 class QCPAxisRect;
 struct QCPDrawList;
+class QCPCoordinateSystem;
 class QCPPainter;
 class QCPTheme;
 class QCPScatterStyle;
@@ -240,16 +241,14 @@ public:
     [[nodiscard]] QCPDrawList takeDrawList();
 
     //! What a replay needs; build it once per frame.
-    [[nodiscard]] QCPDrawFrame frame() const
-    {
-        return qcpMakeFrame(mKeyAxis, mValueAxis, mAxisRect, mClip);
-    }
+    [[nodiscard]] QCPDrawFrame frame() const;
 
 private:
     //! \a clip overrides the axis rect's own rect as the recording's clip: a plot without axes
     //! records what it draws against the rect its layer clips it with instead.
     QCPDrawContext(const QCPAxis* keyAxis, const QCPAxis* valueAxis, const QCPAxisRect* axisRect,
-                   const QCPTheme* theme, bool exporting = false, const QRectF& clip = { });
+                   const QCPTheme* theme, bool exporting = false, const QRectF& clip = { },
+                   const QCPCoordinateSystem* system = nullptr);
     friend class TestDrawContext;
     friend class TestRepaint; //!< the GPU replay tests record through the same door
     friend class Benchmark; //!< records through the same door to time the replay
@@ -258,6 +257,8 @@ private:
     const QCPAxis* mKeyAxis = nullptr;
     const QCPAxis* mValueAxis = nullptr;
     const QCPAxisRect* mAxisRect = nullptr;
+    //! The frame the object draws in, when it has a system: the axes then only serve the items.
+    const QCPCoordinateSystem* mSystem = nullptr;
     std::unique_ptr<QCPDrawList> mList;
     QCPTransform mTransform;
     QCPRatioTransform mRatio;

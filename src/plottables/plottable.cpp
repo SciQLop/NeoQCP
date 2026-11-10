@@ -24,6 +24,8 @@
 ****************************************************************************/
 
 #include "plottable.h"
+#include "../coordinate-system.h"
+#include "../layoutelements/area.h"
 
 #include "axis/axis.h"
 #include "core.h"
@@ -450,16 +452,35 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
 
   You probably want one of the subclasses like \ref QCPGraph or \ref QCPCurve instead.
 */
-QCPAbstractPlottable::QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPLayerable(keyAxis && valueAxis ? keyAxis->parentPlot() : nullptr, QString(),
-                       keyAxis && valueAxis ? keyAxis->axisRect() : nullptr)
+namespace
+{
+//! The cartesian system \a keyAxis and \a valueAxis define, or null when they cannot define one.
+QCPCoordinateSystem* systemOfAxes(QCPAxis* keyAxis, QCPAxis* valueAxis)
+{
+    // The area refuses a pair that is not two different axes of two orientations: it is no system,
+    // not misuse - an axis is swapped in two steps, and one of them holds the same axis twice.
+    if (!keyAxis || !valueAxis || keyAxis == valueAxis
+        || keyAxis->orientation() == valueAxis->orientation()
+        || keyAxis->parentPlot() != valueAxis->parentPlot())
+        return nullptr;
+    QCPAxisRect* rect = keyAxis->axisRect();
+    if (!rect || rect != valueAxis->axisRect())
+        return nullptr;
+    return rect->system(keyAxis, valueAxis);
+}
+} // namespace
+
+QCPAbstractPlottable::QCPAbstractPlottable(QCPCoordinateSystem* system)
+        : QCPLayerable(system && system->area() ? system->area()->parentPlot() : nullptr, QString(),
+                       system ? static_cast<QCPLayerable*>(system->area()) : nullptr)
         , mName()
         , mAntialiasedFill(true)
         , mAntialiasedScatters(true)
         , mPen(Qt::black)
         , mBrush(Qt::NoBrush)
-        , mKeyAxis(keyAxis)
-        , mValueAxis(valueAxis)
+        , mSystem(system)
+        , mKeyAxis(system ? qobject_cast<QCPAxis*>(system->keyAxis()) : nullptr)
+        , mValueAxis(system ? qobject_cast<QCPAxis*>(system->valueAxis()) : nullptr)
         , mSelectable(QCP::stWhole)
         , mSelectionDecorator(nullptr)
 {
@@ -467,9 +488,20 @@ QCPAbstractPlottable::QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis)
     mBusyDebounceTimer.setSingleShot(true);
     connect(&mBusyDebounceTimer, &QTimer::timeout, this, &QCPAbstractPlottable::onDebounceTimeout);
 
-    // Without both axes there is no plot to join: the plottable stays inert, never drawn. Neither
-    // axis is a valid detached object (QCustomPlot::add(std::unique_ptr) attaches it); one axis is not.
-    mReportedLostAxis = !(keyAxis && valueAxis); // this check is the one report of that loss
+    // Without a system there is no plot to join: the plottable stays inert, never drawn.
+    mReportedLostAxis = system == nullptr; // this check is the one report of that loss
+    if (!system || !mParentPlot)
+        return;
+    if (mParentPlot->registerPlottable(this))
+        mRegisteredPlot = mParentPlot;
+}
+
+QCPAbstractPlottable::QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis)
+        : QCPAbstractPlottable(systemOfAxes(keyAxis, valueAxis))
+{
+    // The 2.x pair is the cartesian projection of the system it resolves to.
+    mKeyAxis = keyAxis;
+    mValueAxis = valueAxis;
     if (!keyAxis && !valueAxis)
         return;
     QCP_CHECK_OR_RETURN(keyAxis && valueAxis, "a plottable needs a key axis and a value axis");
@@ -483,9 +515,6 @@ QCPAbstractPlottable::QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis)
     }
     if (keyAxis->orientation() == valueAxis->orientation())
         qDebug() << Q_FUNC_INFO << "keyAxis and valueAxis must be orthogonal to each other.";
-
-    if (mParentPlot->registerPlottable(this))
-        mRegisteredPlot = mParentPlot;
 }
 
 QCPAbstractPlottable::~QCPAbstractPlottable()
@@ -536,7 +565,7 @@ double QCPAbstractPlottable::selectTest(const QPointF& pos, bool onlySelectable,
 {
     // Built-in plottables miss outside the axis rect unless the plot opts in: their geometry may
     // still be painted there (an unclipped plottable), but a click does not grab it.
-    if (!qcpDrawnClickInsideAxisRect(*this, pos))
+    if (!mSystem || !mSystem->contains(pos))
         return -1;
 
     const double hit = mCore.selectTest(*this, pos, onlySelectable, details, view());
@@ -742,27 +771,59 @@ void QCPAbstractPlottable::setBrush(const QBrush& brush)
 */
 void QCPAbstractPlottable::setKeyAxis(QCPAxis* axis)
 {
-    markDirty();
-    mKeyAxis = axis;
-    axesChanged();
+    resolveAxes(axis, mValueAxis.data());
 }
 
-/*!
-  The value axis of a plottable can be set to any axis of a QCustomPlot, as long as it is
-  orthogonal to the plottable's key axis. This function performs no checks to make sure this is the
-  case. The typical mathematical choice is to use the x-axis (QCustomPlot::xAxis) as key axis and
-  the y-axis (QCustomPlot::yAxis) as value axis.
-
-  Normally, the key and value axes are set in the constructor of the plottable (or \ref
-  QCustomPlot::addGraph when working with QCPGraphs through the dedicated graph interface).
-
-  \see setKeyAxis
-*/
 void QCPAbstractPlottable::setValueAxis(QCPAxis* axis)
 {
-    markDirty();
-    mValueAxis = axis;
-    axesChanged();
+    resolveAxes(mKeyAxis.data(), axis);
+}
+
+//! The 2.x pair resolves to the system of that pair on the axes' area; the pair itself stays the
+//! projection a non-cartesian system cannot answer.
+void QCPAbstractPlottable::resolveAxes(QCPAxis* key, QCPAxis* value)
+{
+    QCPCoordinateSystem* resolved = systemOfAxes(key, value);
+    if (resolved == mSystem)
+    {
+        mKeyAxis = key;
+        mValueAxis = value;
+        markDirty();
+        systemChanged();
+        return;
+    }
+    if (!resolved)
+    {
+        mSystem = nullptr;
+        mKeyAxis = key;
+        mValueAxis = value;
+        markDirty();
+        systemChanged();
+        return;
+    }
+    setSystem(resolved);
+}
+
+void QCPAbstractPlottable::setSystem(QCPCoordinateSystem* system)
+{
+    if (system == mSystem)
+        return;
+    if (system)
+    {
+        QCP_CHECK_OR_RETURN(system->area() && system->area()->parentPlot() == mParentPlot,
+                            "the coordinate system belongs to another plot");
+        const QCP::Capabilities missing = requiredCapabilities() & ~system->capabilities();
+        QCP_CHECK_OR_RETURN(missing == 0,
+                            "the coordinate system lacks a capability this plottable needs");
+    }
+    mSystem = system;
+    mKeyAxis = system ? qobject_cast<QCPAxis*>(system->keyAxis()) : nullptr;
+    mValueAxis = system ? qobject_cast<QCPAxis*>(system->valueAxis()) : nullptr;
+    // A system leaving is worth one report, on the next draw; an inert plottable built without one
+    // stays silent (its constructor told the caller already).
+    mReportedLostAxis = false;
+    contentChanged(); // the new frame's recording, then whatever follows an axis pair
+    systemChanged();
 }
 
 /*!
@@ -873,7 +934,14 @@ void QCPAbstractPlottable::coordsToPixels(double key, double value, double& x, d
     QCPAxis* valueAxis = mValueAxis.data();
     if (!keyAxis || !valueAxis)
     {
-        qDebug() << Q_FUNC_INFO << "invalid key or value axis";
+        if (!mSystem)
+        {
+            qDebug() << Q_FUNC_INFO << "invalid key or value axis";
+            return;
+        }
+        const QCP::Pixels pixel = mSystem->transform().map(QCP::Data { key, value });
+        x = pixel.x;
+        y = pixel.y;
         return;
     }
 
@@ -899,8 +967,13 @@ const QPointF QCPAbstractPlottable::coordsToPixels(double key, double value) con
     QCPAxis* valueAxis = mValueAxis.data();
     if (!keyAxis || !valueAxis)
     {
-        qDebug() << Q_FUNC_INFO << "invalid key or value axis";
-        return QPointF();
+        if (!mSystem)
+        {
+            qDebug() << Q_FUNC_INFO << "invalid key or value axis";
+            return QPointF();
+        }
+        const QCP::Pixels pixel = mSystem->transform().map(QCP::Data { key, value });
+        return QPointF(pixel.x, pixel.y);
     }
 
     if (keyAxis->orientation() == Qt::Horizontal)
@@ -924,7 +997,14 @@ void QCPAbstractPlottable::pixelsToCoords(double x, double y, double& key, doubl
     QCPAxis* valueAxis = mValueAxis.data();
     if (!keyAxis || !valueAxis)
     {
-        qDebug() << Q_FUNC_INFO << "invalid key or value axis";
+        if (!mSystem)
+        {
+            qDebug() << Q_FUNC_INFO << "invalid key or value axis";
+            return;
+        }
+        const QCP::Data data = mSystem->transform().inverse(QPointF(x, y));
+        key = data.x;
+        value = data.y;
         return;
     }
 
@@ -1180,7 +1260,7 @@ bool QCPAbstractPlottable::removeFromLegend() const
 
 bool QCPAbstractPlottable::drawableAxes() const
 {
-    if (mKeyAxis && mValueAxis)
+    if (mSystem)
     {
         mReportedLostAxis = false;
         return true;
@@ -1188,7 +1268,7 @@ bool QCPAbstractPlottable::drawableAxes() const
     if (!mReportedLostAxis)
     {
         mReportedLostAxis = true;
-        qcp::reportMisuse(Q_FUNC_INFO, "its key or value axis is gone: it is not drawn");
+        qcp::reportMisuse(Q_FUNC_INFO, "it has no coordinate system: it is not drawn");
     }
     return false;
 }
@@ -1196,10 +1276,7 @@ bool QCPAbstractPlottable::drawableAxes() const
 /* inherits documentation from base class */
 QRect QCPAbstractPlottable::clipRect() const
 {
-    if (mKeyAxis && mValueAxis)
-        return mKeyAxis.data()->axisRect()->rect() & mValueAxis.data()->axisRect()->rect();
-    else
-        return {};
+    return mSystem ? mSystem->clipRect() : QRect();
 }
 
 /* inherits documentation from base class */

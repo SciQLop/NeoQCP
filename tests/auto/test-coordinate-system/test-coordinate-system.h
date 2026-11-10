@@ -16,4 +16,9 @@ private slots:
     void polarSystemRefusesAxisRatios();
     void revisionBumpsOnAnyMappingChange();
     void deletingAnAxisDeletesItsSystems();
+    void aPlottableTakesASystem();
+    void twoConstructorsShareTheSystem();
+    void movingBetweenSystemsReRecords();
+    void aPlottableOfADeletedSystemIsInert();
+    void crossPlotSystemIsRefused();
 };

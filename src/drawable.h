@@ -22,6 +22,7 @@ class QCPDrawContext;
 struct QCPDrawFrame;
 struct QCPDrawList;
 class QCPLayer;
+class QCPCoordinateSystem;
 class QCPPainter;
 class QCPTheme;
 class QCustomPlot;
@@ -30,14 +31,16 @@ class QVariant;
 /*!
   \brief What the adapter reads from its object once per frame.
 
-  The axes, the axis rect and the clip come from the object itself: a recording does not depend on
-  the transform, so only its replay reads these.
+  The system, the axes it projects to, the axis rect and the clip come from the object itself: a
+  recording does not depend on the transform, so only its replay reads these.
 */
 struct QCP_LIB_DECL QCPDrawnView
 {
-    const QCPAxis* keyAxis = nullptr;
+    const QCPAxis* keyAxis = nullptr; //!< the cartesian projections of \a system, when it has some
     const QCPAxis* valueAxis = nullptr;
     const QCPAxisRect* axisRect = nullptr; //!< the rect the ratio transform maps
+    //! The frame the object draws in: a plottable's system; null for items, which read the axes.
+    const QCPCoordinateSystem* system = nullptr;
     const QCPTheme* theme = nullptr;
     QCustomPlot* plot = nullptr;
     QCPLayer* layer = nullptr;
@@ -45,6 +48,9 @@ struct QCP_LIB_DECL QCPDrawnView
     bool selectable = false; //!< whether the base lets the object be selected at all
     //! Whether the painter is an export: the object may resolve what a screen frame waits for.
     bool exporting = false;
+
+    //! Whether the view names a frame at all: a system, or a pair of axes for the items.
+    [[nodiscard]] bool framed() const { return system || (keyAxis && valueAxis); }
 };
 
 //! What an item occupies, for the layer's spatial index: the data box of its recording on one axis
