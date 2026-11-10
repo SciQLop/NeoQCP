@@ -48,6 +48,8 @@ void QCPAxisBase::detachLinks()
     {
         const QList<QPointer<QCPAxisBase>> users = mLinkedAxes;
         mLinkedAxes.clear();
+        // Their systems' changed() is deferred past the loop: a slot may delete one of them.
+        const QCPEmissionScope scope(mParentPlot);
         for (const QPointer<QCPAxisBase>& user : users)
             if (user)
             {
@@ -196,15 +198,12 @@ void QCPAxisBase::setRangeReversed(bool reversed)
         return; // a no-op asks for the direction the axis already shows, link or not
     QCP_CHECK_OR_RETURN(!mLink, "a linked axis follows its source's direction", );
     mRangeReversed = reversed;
+    // The systems' revision bumps now; their changed() waits for this scope, as their slots may
+    // delete this axis and the linked axes are still to be told.
+    const QCPEmissionScope scope(mParentPlot);
     notifyMappingChanged();
     markAppearanceDirty();
-    // No signal carries a reversal, so the linked axes are told here; their slots may delete them.
-    if (mLinkedAxes.isEmpty())
-    {
-        refreshLinkedAxes();
-        return;
-    }
-    const QCPEmissionScope scope(mParentPlot);
+    // No signal carries a reversal, so the linked axes are told here.
     refreshLinkedAxes();
 }
 
@@ -451,11 +450,10 @@ void QCPAxisBase::linkTo(QCPAxisBase* source, QCPAxisFunction forward, QCPAxisFu
     mLink = link;
     source->mLinkedAxes.append(this);
     mLinked = true;
+    // The systems hear of the link when this returns: a slot may delete the axis.
+    const QCPEmissionScope scope(mParentPlot);
     notifyMappingChanged();
-    {
-        const QCPEmissionScope scope(mParentPlot);
-        refreshFromLink();
-    }
+    refreshFromLink();
     markAppearanceDirty();
 }
 
@@ -515,24 +513,15 @@ void QCPAxisBase::refreshLinkedAxes()
 */
 void QCPAxisBase::rangeDidChange(const QCPRange& oldRange)
 {
-    notifyMappingChanged();
-    const auto apply = [&]
-    {
-        // Before the signal: a slot that reads a linked axis sees the range it was told about.
-        refreshLinkedAxes();
-        qcpEmitIf(
-            this, mParentPlot, &QCPAxisBase::rangeChanged,
-            [this, range = mRange] { return mRange == range; }, mRange, oldRange);
-    };
-    // A linked user emits from inside the refresh, and its slot may delete an axis of the pair.
-    // Deferring to the end of this call keeps the refresh and the signal in one piece.
-    if (mLinkedAxes.isEmpty())
-    {
-        apply();
-        return;
-    }
+    // The systems' revision bumps now, so no frame is reused; their changed() waits for the end of
+    // this call, as its slots may delete this axis, and the layers are still to be dirtied.
     const QCPEmissionScope scope(mParentPlot);
-    apply();
+    notifyMappingChanged();
+    // Before the signal: a slot that reads a linked axis sees the range it was told about.
+    refreshLinkedAxes();
+    qcpEmitIf(
+        this, mParentPlot, &QCPAxisBase::rangeChanged,
+        [this, range = mRange] { return mRange == range; }, mRange, oldRange);
 }
 
 /*! \internal
@@ -606,6 +595,7 @@ void QCPAxisBase::unlink()
         source->mLinkedAxes.removeAll(this);
     mLink.reset();
     mLinked = false;
+    const QCPEmissionScope scope(mParentPlot);
     notifyMappingChanged();
     markAppearanceDirty();
 }

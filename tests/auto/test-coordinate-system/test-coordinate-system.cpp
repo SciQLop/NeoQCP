@@ -577,6 +577,30 @@ void TestCoordinateSystem::aMisusedPairIsOwnedAndInert()
     QCOMPARE(plot.graphCount(), 2);
 }
 
+void TestCoordinateSystem::aChangedSlotMayDeleteTheAxis()
+{
+    // The systems' changed() is public: a slot may delete the axis that is being set. The setter
+    // must be done with the axis by then, not in the middle of it.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    QCPAxisRect* rect = plot.axisRect();
+    QCPAxis* axis = plot.xAxis;
+    QCPCoordinateSystem* system = rect->system(plot.xAxis, plot.yAxis);
+    QVERIFY(system);
+    bool deleted = false;
+    connect(system, &QCPCoordinateSystem::changed, axis,
+            [rect, axis, &deleted]
+            {
+                deleted = true;
+                rect->removeAxis(axis);
+            });
+
+    axis->setRange(0, 10);
+
+    QVERIFY(deleted);
+    QVERIFY(!rect->axes().contains(axis));
+}
+
 void TestCoordinateSystem::dualValueAxesKeepTheirRelationships()
 {
     QCustomPlot plot;
