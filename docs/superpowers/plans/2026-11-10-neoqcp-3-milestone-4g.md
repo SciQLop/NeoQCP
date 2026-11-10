@@ -216,3 +216,72 @@ cartesian and polar; the custom example comes with 4i), `docs/plans/neoqcp-3/bas
   row over its gate against a build of the milestone's base.
 - [ ] **Step 4:** Rulings file; deferred minors also in `backlog.md`.
 - [ ] **Step 5: Commit** `docs(neoqcp-3): end of milestone 4g — rulings, baseline, backlog, changelog`.
+
+---
+
+## Amendments after review (binding; `.superpowers/m4g-plan-review.md` findings A1-A20)
+
+These override the task text where they differ. Each task's implementer reads the amendments for its task.
+
+**Task 1**
+- A6: `QCPAxisBase` gains signal-free notification of mapping changes that are not range/scale changes:
+  `linkTo`, `unlink` and `setRangeReversed` call `area()->axisMappingChanged(this)`, and the area bumps the
+  revision of every system using the axis. Range and scale-type changes bump through the same call from
+  the base's range funnel.
+- A11/A19: systems die while their axes still exist: `QCPAxisRect::unlistAxis` (and the polar area's axis
+  unlisting) first detaches the plottables of every system using the axis (their `system()` becomes null,
+  no signal, they are inert), then deletes those systems; `~QCPCoordinateSystem` touches nothing outside
+  itself. An area dying before its axes does the same for all its systems in `~QCPArea`.
+- A12: the concrete system constructors are private; `QCPArea`/`QCPAxisRect`/`QCPPolarArea` are friends;
+  `area->system(key, value)` is the only way to obtain one.
+- A13: `QCPPolarSystem` lives in `src/coordinate-system-polar.{h,cpp}` (build lists, `src/qcp.h`), so
+  `coordinate-system.h` does not include the polar headers.
+- A5: `QCPCoordinateSystem` gains `virtual QCPRatioTransform ratioTransform() const` (cartesian: today's);
+  the polar system refuses recorded axis-ratio positions as misuse in 4g (items and spans stay cartesian
+  until 4i), with a test.
+- A17: `deletingAnAxisDeletesItsSystems` first asserts two systems exist and that their plottables'
+  `system()` became null; `revisionBumpsOnAnyMappingChange` reads `revision()` and counts `changed()` with a
+  `QSignalSpy` both outside and inside a `QCPEmissionScope` (one delivery each, after the scope).
+- A18: `revision()` returns a stored `quint64`; `bumpRevision()` increments it.
+
+**Task 2**
+- A3: the new system constructor is on `QCPAbstractPlottable` (and `QCPAbstractPlottable1D`); concrete
+  classes keep their axis-pair constructors in 4g. Tests that need a system constructor use a test-local
+  plottable; tests on concrete classes build them from axes or call `setSystem`.
+- A4/G-6: the frame memo key is `(plot, epoch, clip)` plus `(system, revision)` when the view has a system,
+  else today's axes, ranges and rect (items stay on axis pairs). Test: two `QCPItemLine`s on two axis rects
+  in one layer, one replot: both ends at their own rect's pixels.
+- A10: `src/painting/draw-context.{h,cpp}` and `src/painting/command-replay-rhi.{h,cpp}` are in scope: the
+  context takes the view's system (the axes stay for items).
+- A14: `QCPDrawnView` carries `QCPCoordinateSystem*`; a plottable with a null system yields an empty view:
+  nothing recorded, nothing drawn, every click misses. Extend the existing deleted-axis guards in
+  `TestDrawable`/`TestRepaint` to a deleted system.
+- A9: `axesChanged()` is renamed `systemChanged()` with no forwarder (NeoQCP-only API, maintainer rule D6);
+  Task 5 amends design section 2.5's "old name kept until milestone 5" line accordingly.
+- A20: Step 3 also compiles `examples/wasm-gallery/gallery.cpp` with `-fsyntax-only` against the new headers
+  (or states why it is unaffected).
+
+**Task 3**
+- A7: the colour-scale relationship check is deferred (design 2.10; recorded in the rulings).
+- A8: capability owners: every class requires `capRectangular | capStraightKey` by default;
+  `QCPAbstractColorMapped` adds `capColourScale`; `QCPMultiGraph` and `QCPIntervals` add `capLanes`. One
+  refusal test row per added flag.
+- A15: the 4g test-local polar plottable is not selectable; `QCPSelectionDecoratorBracket` returns early
+  when the plottable has no key axis (guard + test).
+
+**Task 4**
+- A1: `rescale(bool onlyVisible)` moves to `QCPAxisBase` as a virtual. `QCPAxis` keeps its 2.x
+  implementation; the base implementation (used by the radial axis) covers the drawn data ranges
+  (`drawnDataRange()`, `qcpDrawnRange`) of the plottables of every system using the axis; the angular axis
+  overrides it to keep its range (a full turn). Test: `plot.rescaleAxes()` with a test-local plottable in a
+  polar system moves the radial range and leaves the angular range.
+- A2: in 4g the generic `area->add<T>()` exists on `QCPAxisRect` only (its bottom/left pair, or
+  `add<T>(key, value, args...)`); `QCPPolarArea::add<QCPPolarGraph>` is unchanged until 4h.
+- A11/A16: `QCPAxis::plottables()/graphs()` and `QCPAxisRect::plottables()/graphs()` select by
+  `system()->usesAxis(this)` / `system()->area() == this`; items keep their axis/rect rule until 4i.
+- A18: `markAffectedLayersDirty` stays one pass over the plot's plottables, selecting
+  `p->system() && p->system()->area() == this`, with today's `markOnce` de-duplication.
+
+**Task 5**
+- A9: amend design section 2.5 (the `axesChanged` line). A20: `docs/axes.md` and `docs/graphs.md` checked
+  and updated where they describe what a plottable holds.
