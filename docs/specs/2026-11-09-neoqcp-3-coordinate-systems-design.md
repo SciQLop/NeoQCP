@@ -244,3 +244,11 @@ These become milestone plans 4f-4i (proposed: 4f = steps 1-4, 4g = 5-8, 4h = 9, 
 - D7. Names without "Abstract": `QCPArea`, `QCPAxisBase`, `QCPPolarArea`, `QCPCoordinateSystem`,
   `QCPCartesianSystem`, `QCPPolarSystem`.
 - D8. The split into plans is the implementer's call: 4f = steps 1-4, 4g = 5-8, 4h = 9, 4i = 10-11.
+
+## 7. Maintainer answers (2026-11-10)
+
+- D9. A user's own system can host the existing line plottables. A new capability means "a segment
+  between two data points may be drawn as a straight pixel line": cartesian systems offer it, polar does
+  not, a user system declares it. `QCPGraph` and `QCPCurve` require only that capability; bars, colour
+  maps and lanes keep requiring a rectangle. A ternary system then gets graphs and scatters as they are.
+- D10 (controller's call, D8): step 10 is milestone 4i, step 11 (the extension point, D9) is milestone 4j.
