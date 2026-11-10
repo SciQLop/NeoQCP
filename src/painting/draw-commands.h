@@ -487,7 +487,10 @@ inline bool qcpNeedsAxes(const QCPDrawList& list)
 }
 
 //! The one place a QCP::Position becomes pixels: every command and every caller goes through it.
-[[nodiscard]] QPointF qcpResolvePosition(const QCPDrawFrame& frame, const QCP::Position& position);
+//! \a report tells the misuse of an axis-ratio position in a frame without a ratio; a position
+//! asking for its own pixels before it has landed asks quietly.
+[[nodiscard]] QPointF qcpResolvePosition(const QCPDrawFrame& frame, const QCP::Position& position,
+                                        bool report = true);
 
 //! \a positions mapped through \a frame into \a out, in pixels.
 inline void qcpResolveInto(std::span<const QCP::Position> positions, const QCPDrawFrame& frame,

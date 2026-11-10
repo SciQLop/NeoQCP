@@ -737,7 +737,7 @@ QPointF QCPItemPosition::pixelPosition() const
     if (dataAndRatio && !mParentAnchorX && !mParentAnchorY && mKeyAxis && mValueAxis && mAxisRect)
         return qcpResolvePosition(qcpMakeFrame(mKeyAxis.data(), mValueAxis.data(), mAxisRect.data(),
                                                mAxisRect.data()->rect()),
-                                  asPosition());
+                                  asPosition(), false); // a position may ask before it has landed
 
     // A position with one plot-coordinate slot is a key and a value: the X slot holds the key, the
     // Y slot the value (milestone 3, round C). On a vertical key axis the key runs along screen y

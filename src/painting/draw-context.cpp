@@ -346,7 +346,8 @@ void reportRatioWithoutRect()
 }
 } // namespace
 
-QPointF qcpResolvePosition(const QCPDrawFrame& frame, const QCP::Position& position)
+QPointF qcpResolvePosition(const QCPDrawFrame& frame, const QCP::Position& position,
+                             bool report)
 {
     if (const auto* data = std::get_if<QCP::Data>(&position))
     {
@@ -357,7 +358,7 @@ QPointF qcpResolvePosition(const QCPDrawFrame& frame, const QCP::Position& posit
         return QPointF(absolute->x, absolute->y);
     if (const auto* ratio = std::get_if<QCP::AxisRatio>(&position))
     {
-        if (!frame.ratio.valid())
+        if (report && !frame.ratio.valid())
             reportRatioWithoutRect();
         const QCP::Pixels pixels = frame.ratio.map(*ratio);
         return QPointF(pixels.x, pixels.y);
@@ -373,7 +374,8 @@ QPointF qcpResolvePosition(const QCPDrawFrame& frame, const QCP::Position& posit
     const bool keyVertical = frame.transform.keyIsVertical();
     const auto keyAndValue = [keyVertical](QCP::Pixels keySide, QCP::Pixels valueSide)
     { return keyVertical ? QPointF(valueSide.x, keySide.y) : QPointF(keySide.x, valueSide.y); };
-    if ((std::get_if<QCP::DataXRatioY>(&position) || std::get_if<QCP::RatioXDataY>(&position))
+    if (report
+        && (std::get_if<QCP::DataXRatioY>(&position) || std::get_if<QCP::RatioXDataY>(&position))
         && !frame.ratio.valid())
         reportRatioWithoutRect();
     if (const auto* mixed = std::get_if<QCP::DataXRatioY>(&position))
