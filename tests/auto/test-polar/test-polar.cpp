@@ -1,5 +1,6 @@
 #include "test-polar.h"
 #include "misuse-recorder.h"
+#include "coords.h"
 #include "painting/draw-commands.h"
 #include "polar/angularaxis.h"
 #include "polar/polar-area.h"
@@ -78,6 +79,15 @@ std::size_t recordedPolygonSize(const QCPDrawnCore& core)
         if (const auto* polygon = std::get_if<qcp::PolygonCmd>(&command))
             return polygon->points.size();
     return 0;
+}
+
+std::size_t recordedPolygonCount(const QCPDrawnCore& core)
+{
+    std::size_t count = 0;
+    for (const auto& command : core.recordedList().commands)
+        if (std::get_if<qcp::PolygonCmd>(&command))
+            ++count;
+    return count;
 }
 
 std::size_t recordedMarkerCount(const QCPDrawnCore& core)
@@ -397,6 +407,53 @@ void TestPolar::aRimCrossingIsOnTheChord()
     QCOMPARE(crossings.size(), std::size_t(2));
     QVERIFY2(std::abs(crossings[0] - entry) < 0.5, qPrintable(QString::number(crossings[0])));
     QVERIFY2(std::abs(crossings[1] - exit) < 0.5, qPrintable(QString::number(crossings[1])));
+}
+
+void TestPolar::aValueTheRadialScaleCannotTakeIsAGap()
+{
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    auto* radial = area->radialAxis();
+    area->angularAxis()->setRange(0, 360);
+    radial->setRange(0.1, 10);
+    radial->setScaleType(QCPAxisBase::stLogarithmic);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 60, 120, 180, 240, 300 },
+                                          QVector<double> { 1, 2, 0, -1, 3, 4 });
+    QVERIFY(graph);
+    graph->setBrush(QBrush(Qt::red));
+    settle(plot);
+
+    // A value the logarithmic radius cannot take is a gap, exactly like a NaN value: the run
+    // stops before it and starts again after it.
+    const auto lines = recordedPolylines(graph->mCore);
+    QCOMPARE(lines.size(), std::size_t(2));
+    QCOMPARE(lines[0].size(), std::size_t(2));
+    QCOMPARE(lines[0].back().x(), 60.0);
+    QCOMPARE(lines[1].size(), std::size_t(2));
+    QCOMPARE(lines[1].front().x(), 240.0);
+    QCOMPARE(recordedPolygonCount(graph->mCore), std::size_t(2));
+
+    // And every recorded point maps: the frame reports no NaN for anything recorded.
+    const QCPTransform frame = graph->system()->transform();
+    QVERIFY(frame.valid());
+    for (const auto& command : graph->mCore.recordedList().commands)
+    {
+        if (const auto* line = std::get_if<qcp::PolylineDataCmd>(&command))
+            for (const QPointF& point : *line->points)
+            {
+                const QCP::Pixels pixel = frame.map(QCP::Data { point.x(), point.y() });
+                QVERIFY2(std::isfinite(pixel.x) && std::isfinite(pixel.y),
+                         qPrintable(QString::number(point.y())));
+            }
+        if (const auto* polygon = std::get_if<qcp::PolygonCmd>(&command))
+            for (const QCP::Position& position : polygon->points)
+                if (const auto* data = std::get_if<QCP::Data>(&position))
+                {
+                    const QCP::Pixels pixel = frame.map(*data);
+                    QVERIFY2(std::isfinite(pixel.x) && std::isfinite(pixel.y),
+                             qPrintable(QString::number(data->x)));
+                }
+    }
 }
 
 void TestPolar::aClampedRunFollowsTheArc_data()

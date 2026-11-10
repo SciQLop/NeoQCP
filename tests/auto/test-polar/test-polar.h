@@ -19,6 +19,7 @@ private slots:
     void aNonPeriodicGraphKeepsItsWindow();
     void aRimCrossingIsOnTheChord_data();
     void aRimCrossingIsOnTheChord();
+    void aValueTheRadialScaleCannotTakeIsAGap();
     void aClampedRunFollowsTheArc_data();
     void aClampedRunFollowsTheArc();
     void aSparseInRangePairIsAChord();

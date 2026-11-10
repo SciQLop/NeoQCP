@@ -299,6 +299,22 @@ void QCPPolarGraph::draw(QCPDrawContext& context) const
     const double rimValue = radial->radiusToCoord(radius);
     const double clampedValue = radial->radiusToCoord(kClampFraction * radius);
 
+    // A value the radial scale cannot take (zero or the other sign on a logarithmic axis) has no
+    // place in the disc: it is a gap, exactly like a NaN value, and so is a value the frame maps to
+    // no pixel at all.
+    const QCPTransform frame = system()->transform();
+    const bool logarithmic = radial->scaleType() == QCPPolarAxisRadial::stLogarithmic;
+    const bool negativeRange = radial->range().upper < 0;
+    const auto isDrawn = [&](const QCPGraphData& data)
+    {
+        if (!std::isfinite(data.key) || !std::isfinite(data.value))
+            return false;
+        if (logarithmic && (negativeRange ? data.value >= 0 : data.value <= 0))
+            return false;
+        const QCP::Pixels pixel = frame.map(QCP::Data { data.key, data.value });
+        return std::isfinite(pixel.x) && std::isfinite(pixel.y);
+    };
+
     // Where the segment from a to b, drawn straight in the plot, crosses the rim. Only called for a
     // segment that straddles it.
     const auto rimCrossing = [&](double angleA, double valueA, double angleB, double valueB)
@@ -378,7 +394,7 @@ void QCPPolarGraph::draw(QCPDrawContext& context) const
     for (auto it = begin; it != end; ++it)
     {
         const QCPGraphData& data = *it;
-        if (!std::isfinite(data.key) || !std::isfinite(data.value))
+        if (!isDrawn(data))
         {
             flush();
             continue;
