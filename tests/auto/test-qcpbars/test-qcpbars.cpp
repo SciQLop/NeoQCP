@@ -486,6 +486,46 @@ void TestQCPBars::moveAboveRestacks()
     QCOMPARE(pixelAt(frameOf(mPlot), mPlot, 2.0, 3.5), QColor(Qt::red));
 }
 
+void TestQCPBars::aBarLeavingItsSystemLeavesItsStackAndGroup()
+{
+    mPlot->resize(400, 300);
+    auto* rect2 = new QCPAxisRect(mPlot);
+    mPlot->plotLayout()->addElement(0, 1, rect2);
+    auto* lower = new QCPBars(mPlot->xAxis, mPlot->yAxis);
+    auto* upper = new QCPBars(mPlot->xAxis, mPlot->yAxis);
+    lower->setData({ 1, 2, 3 }, { 1, 1, 1 });
+    upper->setData({ 1, 2, 3 }, { 1, 1, 1 });
+    lower->setBrush(QBrush(Qt::red));
+    upper->setBrush(QBrush(Qt::blue));
+    upper->moveAbove(lower);
+    QCOMPARE(upper->barBelow(), lower);
+    auto* group = new QCPBarsGroup(mPlot);
+    lower->setBarsGroup(group);
+    upper->setBarsGroup(group);
+    QCOMPARE(group->bars().size(), 2);
+
+    QCPAxis* otherKey = rect2->axis(QCPAxis::atBottom);
+    QCPAxis* otherValue = rect2->axis(QCPAxis::atLeft);
+    upper->setSystem(rect2->system(otherKey, otherValue));
+
+    // The stack and the group were the old system's: the bar left both, and the other kept its
+    // place instead of holding a link into a frame it no longer shares.
+    QCOMPARE(upper->barBelow(), nullptr);
+    QCOMPARE(upper->barAbove(), nullptr);
+    QCOMPARE(lower->barAbove(), nullptr);
+    QCOMPARE(upper->barsGroup(), nullptr);
+    QCOMPARE(group->bars(), QList<QCPBars*> { lower });
+    QCOMPARE(rect2->plottables(), QList<QCPAbstractPlottable*> { upper });
+
+    // Both are drawn, each in its own rect: a bar's body shows its own brush in either frame.
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    const QImage image = mPlot->toPixmap().toImage();
+    const QPoint inFirst(qRound(mPlot->xAxis->coordToPixel(2)), qRound(mPlot->yAxis->coordToPixel(0.5)));
+    const QPoint inSecond(qRound(otherKey->coordToPixel(2)), qRound(otherValue->coordToPixel(0.5)));
+    QCOMPARE(image.pixelColor(inFirst), QColor(Qt::red));
+    QCOMPARE(image.pixelColor(inSecond), QColor(Qt::blue));
+}
+
 void TestQCPBars::restackMovesTheGroupSiblingsToTheCentre()
 {
     // A group centres its members from the base each one stands on: stacking one member on another

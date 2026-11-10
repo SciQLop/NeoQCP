@@ -794,6 +794,8 @@ void QCPAbstractPlottable::resolveAxes(QCPAxis* key, QCPAxis* value)
     }
     if (!resolved)
     {
+        if (mSystem)
+            systemWillChange();
         mSystem = nullptr;
         mKeyAxis = key;
         mValueAxis = value;
@@ -816,6 +818,7 @@ void QCPAbstractPlottable::setSystem(QCPCoordinateSystem* system)
         QCP_CHECK_OR_RETURN(missing == 0,
                             "the coordinate system lacks a capability this plottable needs");
     }
+    systemWillChange();
     mSystem = system;
     mKeyAxis = system ? qobject_cast<QCPAxis*>(system->keyAxis()) : nullptr;
     mValueAxis = system ? qobject_cast<QCPAxis*>(system->valueAxis()) : nullptr;

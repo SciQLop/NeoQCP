@@ -262,6 +262,7 @@ protected:
     QPointer<QCPBars> mBarBelow, mBarAbove;
 
     // reimplemented virtual methods:
+    void systemWillChange() override;
     void draw(QCPDrawContext& context) const override;
     void drawLegendIcon(QCPDrawContext& icon) const override;
     std::optional<double> hitTest(QCP::Pixels at, QVariant* details) const override;

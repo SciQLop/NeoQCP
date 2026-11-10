@@ -743,6 +743,18 @@ void QCPBars::addData(double key, double value)
     notifyGroupRevision();
 }
 
+/*! \internal
+
+  A bar's height may be summed onto the bar below it, and its position centred against its group's
+  other members: both live in the system the bar is leaving, so it leaves them first, exactly as
+  \ref moveBelow (nullptr) and \ref setBarsGroup (nullptr) do.
+*/
+void QCPBars::systemWillChange()
+{
+    moveBelow(nullptr);
+    setBarsGroup(nullptr);
+}
+
 /*!
   Moves this bars plottable below \a bars. In other words, the bars of this plottable will appear
   below the bars of \a bars. The move target \a bars must use the same key and value axis as this

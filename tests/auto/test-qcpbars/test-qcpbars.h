@@ -21,6 +21,7 @@ private slots:
   void stackedBarsFollowAPanOnGpu();
   void stackedBarFollowsTheBarBelow();
   void moveAboveRestacks();
+  void aBarLeavingItsSystemLeavesItsStackAndGroup();
   void restackMovesTheGroupSiblingsToTheCentre();
   void groupJoinShiftsTheOthers();
   void groupedBarsOnALogAxis();

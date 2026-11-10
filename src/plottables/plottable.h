@@ -297,6 +297,9 @@ signals:
 protected:
     //! Called after setSystem; not called by the constructor.
     virtual void systemChanged() {}
+    //! Called before setSystem changes the system: a plottable that ties itself to others (a stack,
+    //! a group) unties itself while the old system is still the one it is drawn in.
+    virtual void systemWillChange() {}
 
     // property members:
     QString mName;
