@@ -17,6 +17,7 @@ private slots:
     void revisionBumpsOnAnyMappingChange();
     void systemRevisionsAreNeverShared();
     void aPolarPlottableIsClippedToItsDisc();
+    void aRatioPositionInAPolarAreaReportsOnce();
     void deletingAnAxisDeletesItsSystems();
     void aPlottableTakesASystem();
     void twoConstructorsShareTheSystem();

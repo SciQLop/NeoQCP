@@ -56,6 +56,12 @@ public:
     void draw(QCPDrawContext& context) const override
     {
         ++mDraws;
+        if (ratioRect)
+        {
+            context.rect(QCP::AxisRatio { 0, 0 }, QCP::AxisRatio { 1, 1 }, Qt::NoPen,
+                         QBrush(Qt::red));
+            return;
+        }
         if (coversItsClip) // a recording that fills whatever the frame lets it draw in
         {
             const QRectF clip = context.clip();
@@ -86,6 +92,7 @@ public:
 
     bool readsTransform = false;
     bool coversItsClip = false;
+    bool ratioRect = false;
 
 private:
     int mSystemChanges = 0;
@@ -292,6 +299,29 @@ void TestCoordinateSystem::revisionBumpsOnAnyMappingChange()
     area->radialAxis()->setRange(0, 2);
     QCOMPARE(polar->revision(), polarStart + 2);
     QCOMPARE(polarChanged.count(), 2);
+}
+
+void TestCoordinateSystem::aRatioPositionInAPolarAreaReportsOnce()
+{
+    // A ratio position is a fraction of an axis rect, and a disc has none: the command is dropped,
+    // with one misuse, not one per frame.
+    QCustomPlot plot;
+    QCPPolarArea* area = polarArea(plot);
+    area->setBackground(QBrush(Qt::white));
+    auto* plottable = new RecordingPlottable(area->system(area->angularAxis(), area->radialAxis()));
+    plottable->ratioRect = true;
+    settle(plot);
+    QCOMPARE(test_misuse::calls.size(), 1);
+    QCOMPARE(QString::fromStdString(test_misuse::calls.front().what),
+             QStringLiteral("a position measured in axis ratios needs an axis rect: it is not drawn"));
+    const QPoint centre(qRound(area->center().x()), qRound(area->center().y()));
+    QVERIFY2(plot.toPixmap().toImage().pixelColor(centre) != QColor(Qt::red),
+             "a ratio rect has nowhere to land in a disc, yet it was drawn");
+
+    area->angularAxis()->setAngle(30); // a new frame records it again
+    settle(plot);
+    QCOMPARE(test_misuse::calls.size(), 1);
+    test_misuse::calls.clear();
 }
 
 void TestCoordinateSystem::aPolarPlottableIsClippedToItsDisc()

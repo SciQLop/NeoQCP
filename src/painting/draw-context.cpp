@@ -330,6 +330,22 @@ bool appendShape(QCPDrawList& list, const QPointF& a, const QPointF& b, const QP
 }
 } // namespace
 
+namespace
+{
+//! An axis-ratio position has nowhere to land in an area without an axis rect (a polar disc): the
+//! command is dropped, and the misuse is told once rather than once per frame.
+void reportRatioWithoutRect()
+{
+    static const bool once = []
+    {
+        qcp::reportMisuse(Q_FUNC_INFO,
+                          "a position measured in axis ratios needs an axis rect: it is not drawn");
+        return true;
+    }();
+    Q_UNUSED(once);
+}
+} // namespace
+
 QPointF qcpResolvePosition(const QCPDrawFrame& frame, const QCP::Position& position)
 {
     if (const auto* data = std::get_if<QCP::Data>(&position))
@@ -341,6 +357,8 @@ QPointF qcpResolvePosition(const QCPDrawFrame& frame, const QCP::Position& posit
         return QPointF(absolute->x, absolute->y);
     if (const auto* ratio = std::get_if<QCP::AxisRatio>(&position))
     {
+        if (!frame.ratio.valid())
+            reportRatioWithoutRect();
         const QCP::Pixels pixels = frame.ratio.map(*ratio);
         return QPointF(pixels.x, pixels.y);
     }
@@ -355,6 +373,9 @@ QPointF qcpResolvePosition(const QCPDrawFrame& frame, const QCP::Position& posit
     const bool keyVertical = frame.transform.keyIsVertical();
     const auto keyAndValue = [keyVertical](QCP::Pixels keySide, QCP::Pixels valueSide)
     { return keyVertical ? QPointF(valueSide.x, keySide.y) : QPointF(keySide.x, valueSide.y); };
+    if ((std::get_if<QCP::DataXRatioY>(&position) || std::get_if<QCP::RatioXDataY>(&position))
+        && !frame.ratio.valid())
+        reportRatioWithoutRect();
     if (const auto* mixed = std::get_if<QCP::DataXRatioY>(&position))
         return keyAndValue(frame.transform.map(QCP::Data { mixed->x, 0.0 }),
                            frame.ratio.map(QCP::AxisRatio { mixed->y, mixed->y }));
