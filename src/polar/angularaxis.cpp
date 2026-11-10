@@ -917,6 +917,17 @@ void QCPPolarAxisAngular::rangeDidChange(const QCPRange& oldRange)
 
 /*! \internal
 
+  The ring places every angle by its fraction of the angular range, whatever the scale: a
+  logarithmic one would change the ticks and nothing else, so it is refused.
+*/
+bool QCPPolarAxisAngular::scaleTypeWillChange(ScaleType type)
+{
+    QCP_CHECK_OR_RETURN(type == stLinear, "a polar angular axis has no logarithmic scale", false);
+    return true;
+}
+
+/*! \internal
+
   The rotation, the pens and the fonts change the pixels of the ticks and of every graph of the
   area, wherever their layers are, so the area's layers are dirtied, not only the axis's own.
 */

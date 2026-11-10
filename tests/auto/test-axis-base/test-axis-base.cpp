@@ -56,14 +56,17 @@ void TestAxisBase::cleanup()
 void TestAxisBase::everyAxisSharesTheRangeModel_data()
 {
     QTest::addColumn<QString>("kind");
-    QTest::newRow("cartesian") << QStringLiteral("cartesian");
-    QTest::newRow("angular") << QStringLiteral("angular");
-    QTest::newRow("radial") << QStringLiteral("radial");
+    QTest::addColumn<bool>("logarithmic");
+    QTest::newRow("cartesian") << QStringLiteral("cartesian") << true;
+    // The ring places an angle by its fraction of the range whatever the scale, so it refuses one.
+    QTest::newRow("angular") << QStringLiteral("angular") << false;
+    QTest::newRow("radial") << QStringLiteral("radial") << true;
 }
 
 void TestAxisBase::everyAxisSharesTheRangeModel()
 {
     QFETCH(QString, kind);
+    QFETCH(bool, logarithmic);
 
     QCustomPlot plot;
     QCPAxisBase* axis = nullptr;
@@ -158,14 +161,18 @@ void TestAxisBase::everyAxisSharesTheRangeModel()
     QCOMPARE(lastNew, QCPRange(5, 6));
     QCOMPARE(lastOld, QCPRange(3, 4));
 
-    // A log scale sanitises a range that reaches through zero.
-    axis->setScaleType(QCPAxisBase::stLogarithmic);
-    QCOMPARE(axis->scaleType(), QCPAxisBase::stLogarithmic);
-    axis->setRange(-1, 10);
-    QVERIFY2(
-        axis->range().lower > 0.0 && axis->range().upper > 0.0,
-        qPrintable(QStringLiteral("%1..%2").arg(axis->range().lower).arg(axis->range().upper)));
-    QVERIFY(QCPRange::validRange(axis->range()));
+    if (logarithmic)
+    {
+        // A log scale sanitises a range that reaches through zero.
+        axis->setScaleType(QCPAxisBase::stLogarithmic);
+        QCOMPARE(axis->scaleType(), QCPAxisBase::stLogarithmic);
+        axis->setRange(-1, 10);
+        QVERIFY2(axis->range().lower > 0.0 && axis->range().upper > 0.0,
+                 qPrintable(QStringLiteral("%1..%2")
+                                .arg(axis->range().lower)
+                                .arg(axis->range().upper)));
+        QVERIFY(QCPRange::validRange(axis->range()));
+    }
 }
 
 void TestAxisBase::linkingAPolarAxisIsRefused()

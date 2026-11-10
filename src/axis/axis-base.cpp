@@ -58,7 +58,8 @@ void QCPAxisBase::setScaleType(QCPAxisBase::ScaleType type)
     if (mScaleType == type)
         return;
     const QCPEmissionScope scope(mParentPlot);
-    scaleTypeWillChange();
+    if (!scaleTypeWillChange(type))
+        return;
     mScaleType = type;
     if (mScaleType == stLogarithmic)
     {

@@ -202,6 +202,7 @@ protected:
     virtual void applyDefaultAntialiasingHint(QCPPainter* painter) const override;
     virtual void draw(QCPPainter* painter) override;
     void markAppearanceDirty() override;
+    bool scaleTypeWillChange(ScaleType type) override;
     void rangeDidChange(const QCPRange& oldRange) override;
     bool checkLinkSource(const QCPAxisBase* source) const override;
 

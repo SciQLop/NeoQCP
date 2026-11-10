@@ -402,7 +402,7 @@ protected:
     void applyTickLabelFormat();
     // A scale type change stales the margin and every item tree of the plot, then moves the axes
     // that follow this one.
-    virtual void scaleTypeWillChange() override;
+    virtual bool scaleTypeWillChange(ScaleType type) override;
     // A look change moves every axis, grid and plottable of the rect.
     virtual void markAppearanceDirty() override;
     virtual bool checkLinkSource(const QCPAxisBase* source) const override;

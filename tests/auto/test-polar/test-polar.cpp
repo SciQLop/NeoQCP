@@ -185,6 +185,19 @@ void TestPolar::insetAndBackgroundAreAreaFeatures()
              qPrintable(middle.name()));
 }
 
+void TestPolar::theAngularAxisRefusesALogScale()
+{
+    // The ring's geometry is linear in the angle: a logarithmic scale would change the tick vector
+    // and nothing else, so it is refused.
+    QCustomPlot plot;
+    auto* area = polarArea(plot);
+    auto* angular = area->angularAxis();
+    angular->setScaleType(QCPAxisBase::stLogarithmic);
+    QCOMPARE(angular->scaleType(), QCPAxisBase::stLinear);
+    QCOMPARE(int(test_misuse::calls.size()), 1);
+    test_misuse::calls.clear();
+}
+
 void TestPolar::angularWheelZoomRequeuesTheRepaint()
 {
     // With only the angular axis zoomable, the wheel changes what the ring and the graphs draw:

@@ -3014,12 +3014,13 @@ QCPArea* QCPAxis::area() const
   A scale type change stales the cached margin and every item tree: an item's extent depends on the
   scale type, as a non-positive coordinate has no pixel on a log axis.
 */
-void QCPAxis::scaleTypeWillChange()
+bool QCPAxis::scaleTypeWillChange([[maybe_unused]] ScaleType type)
 {
     mCachedMarginValid = false;
     if (mParentPlot)
         for (int layerIndex = 0; layerIndex < mParentPlot->layerCount(); ++layerIndex)
             mParentPlot->layer(layerIndex)->invalidateItemIndex();
+    return true;
 }
 
 /*! \internal

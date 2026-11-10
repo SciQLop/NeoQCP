@@ -217,7 +217,9 @@ protected:
 
     // The hooks around the scale type change: a cartesian axis drops its cached margin and item
     // trees before, and redraws itself and the axes it drives after.
-    virtual void scaleTypeWillChange() { }
+    //! Asked before the scale type changes: false refuses it, for a subclass whose geometry only
+    //! knows one scale.
+    virtual bool scaleTypeWillChange([[maybe_unused]] ScaleType type) { return true; }
 
     virtual void scaleTypeDidChange();
     // Dirties what a look change moves. The default dirties the axis alone; a cartesian axis also
