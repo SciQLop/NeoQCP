@@ -526,6 +526,12 @@ void TestCoordinateSystem::relationshipsAcrossAreasAreRefused()
     QVERIFY(!theirs->barsGroup());
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
     test_misuse::calls.clear();
+    // insert() asks setBarsGroup first: a refused bar has no index, and the group must survive.
+    group->insert(0, theirs);
+    QCOMPARE(group->size(), 1);
+    QVERIFY(!theirs->barsGroup());
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    test_misuse::calls.clear();
 
     // Whiskers draw their data plottable's points: they must be in its frame.
     auto* whiskers = new QCPErrorBars(leftKey, leftValue);

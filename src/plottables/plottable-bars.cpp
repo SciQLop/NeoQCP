@@ -220,7 +220,12 @@ void QCPBarsGroup::insert(int i, QCPBars* bars)
 
     // first append to bars list normally:
     if (!mBars.contains(bars))
+    {
         bars->setBarsGroup(this);
+        // It may refuse (another system): a bar that did not join has no index to move.
+        if (bars->barsGroup() != this)
+            return;
+    }
     // then move to according position:
     mBars.move(mBars.indexOf(bars), qBound(0, i, mBars.size() - 1));
     bumpRevision();
