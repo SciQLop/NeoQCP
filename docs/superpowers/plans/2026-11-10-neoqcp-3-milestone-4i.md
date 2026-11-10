@@ -169,3 +169,59 @@ ellipse in area ratio, a span-like rect clipped to the disc).
   milestone's base.
 - [ ] **Step 4:** Docs, changelog, rulings, backlog, migration notes.
 - [ ] **Step 5: Commit** `docs(neoqcp-3): end of milestone 4i — rulings, baseline, backlog, changelog`.
+
+---
+
+## Amendments after review (binding; they override the call and task text above)
+
+Plan review: `.superpowers/m4i-plan-review.md` (opencode, 4 blockers, 4 majors, 2 minor batches). All accepted.
+
+- **A1 (B1) The ratio map stays its own type.** Keep `QCPRatioTransform`, give it `QCP::AxisRatio inverse(QPointF)`
+  and a second, polar shape (centre, radius, start angle, angular span, direction): map `angle = start + x*span`,
+  `r = y*radius`; inverse wrapped. It is built by `virtual QCPRatioTransform QCPArea::ratioTransform() const`
+  (axis rect: today's affine rect; polar area: the polar shape, NOT `QCPTransform::polar`, so a log radial axis
+  does not bend it). `bool separable() const` (true for the rect shape). `QCPDrawFrame::ratio` stays a
+  `QCPRatioTransform`. `QCPCoordinateSystem::ratioTransform()`/`frameRatioTransform()` are still deleted (the frame
+  takes the ratio from the area). The mixed kinds `DataXRatioY`/`RatioXDataY` on a non-separable ratio are misuse
+  (one report, not drawn) — this covers the tracer's ticks off a cartesian system.
+- **A2 (B2) The area has a clip shape.** `virtual QPainterPath QCPArea::clipPath() const` (rect by default; the disc
+  on `QCPPolarArea`) and `virtual bool QCPArea::clipsToPath() const`. `QCPDrawnView` gains `area` (an item's clip
+  area, else its first position's area; a plottable's system area). `QCPSystemClip`/`qcpSystemClipShape` take the
+  shape from the view's area. The `polar-items` scene calls `setClipArea(polarArea)`. Files: `drawable.{h,cpp}`,
+  `area.{h,cpp}`, `polar-area.cpp` join Task 2.
+- **A3 (B3) Hit and paint agree on the clip.** `QCPAbstractItem::selectTest` returns -1 when the item clips to its
+  area and the area's `clipPath()` (or rect) does not contain `pos`. Test: same geometry, a click inside the disc
+  hits, one outside misses.
+- **A4 (B4) Index predicate.** Only systems whose `transform().kind() == QCPTransform::Kind::Cartesian` are indexed;
+  every other system, and a group whose `QPointer` system went null, is "always a candidate". The `simplify:`
+  comment names 4j's upgrade (a system-side `dataBoxOf(pixelRect)`).
+- **A5 (M5) A moving polar area repaints its items.** `QCPPolarArea::markAffectedLayersDirty` marks the layer of every
+  item with a position whose system or area is this area (a `QCPLayer` hook replacing or extending
+  `collectItemAxes` with systems/areas). Task 2's rotation test asserts on pixels after a replot (item alone on its
+  layer), not on `pixelPosition()`.
+- **A6 (M6) No invented axis.** A position built from both axes of one rect gets that system. `setAxes(nullptr, axis)`
+  (and the mirror) keeps the axis it was given, has no system, and keeps the 2.x per-slot resolution (pixels
+  identical, both directions tested: `aOneAxisPositionKeepsTwoXPixels` with two rows). `setAxes(nullptr, nullptr)`
+  = no system, no area implied. A null `axisRect()` is guarded. Drops I-1's "keyAxis() returns the substituted axis"
+  behaviour change.
+- **A7 (M7) Named call sites.** Task 1 covers `src/item-creation-state.cpp:164-178` (`rebindPositions`, with a
+  creation-mode test that the rebound item has the new rect's system), `src/core.cpp` `detach` (clear system, area,
+  clip area) and `adopt` (default system, `axisRect()`, clip area). I-8 stands for cartesian graphs only:
+  `setGraph` takes `QCPGraph*`, a polar tracer is 4j at the earliest (backlog).
+- **A8 (M8) Perf.** `QCPArea::system()` scans `mSystems` before `allAxes()`; one shared helper for "the system of
+  these two axes" with the plottables' `systemOfAxes` (`plottable.cpp:455-470`), not a second copy. A cartesian
+  position keeps the direct `coordToPixel` path in `pixelPosition()`; the transform is used for other kinds only.
+  Task 1 A/Bs `QCPItems_Add10k`, `QCPItems_AddRemove10k`, `QCPItems_Replot10k` explicitly.
+- **A9 (minor 9) Tests that can fail.** Drop `itemsShareTheFrameMemo`. `deletingThePolarAreaLeavesItsItemsInert` and
+  `takeAndAdoptAPolarItem` first assert the item painted / its `system()`/`area()`, then the after state.
+  `aDeletedAxisDropsItsGroup` asserts the group's system identity and the rebuild count. "pixelPosition() quiet"
+  becomes: the 2.x qDebug messages for a missing axis are replaced by one misuse report (changelog).
+- **A10 (minor 10) 2.x details.** The protected `mKeyAxis`, `mValueAxis`, `mAxisRect` stay as synchronised
+  projections. `setTypeX/Y`'s keep-pixel predicate becomes "the target type can resolve" (system or axis for plot
+  coordinates, area for ratio/absolute). The pre-existing `setPixelPosition` vertical-key Y-branch bug
+  (`item.cpp:979-989`) is fixed with its own failing test (`setPixelPositionWithAVerticalKeyRoundTrips`). The parent
+  layerable follows `setClipArea` as it follows `setClipAxisRect`. `setAxes` with axes of two rects becomes misuse
+  (changelog, `docs/migrating.md`, `docs/items.md`).
+- **A11 (4j gate) Backlog now.** Task 4 writes into `backlog.md` under "For milestone 4j": a user system's area ratio
+  (an axis rect's affine, or the system's own?), the cartesian-only box gate in `QCPDrawnCore::hitTest`, a polar /
+  user-system tracer, `area->add<Item>()`, areas moving between plots.
