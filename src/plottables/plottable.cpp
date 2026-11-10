@@ -811,7 +811,7 @@ void QCPAbstractPlottable::resolveAxes(QCPAxis* key, QCPAxis* value)
     if (!resolved)
     {
         if (mSystem)
-            systemWillChange();
+            systemWillChange(nullptr);
         mSystem = nullptr;
         mKeyAxis = key;
         mValueAxis = value;
@@ -834,7 +834,7 @@ void QCPAbstractPlottable::setSystem(QCPCoordinateSystem* system)
         QCP_CHECK_OR_RETURN(missing == 0,
                             "the coordinate system lacks a capability this plottable needs");
     }
-    systemWillChange();
+    systemWillChange(system);
     mSystem = system;
     // The area it draws in is the one it hangs on: hiding the area it left must not hide it, and
     // an onlyVisible rescale of the new area must find it.

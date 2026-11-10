@@ -300,9 +300,10 @@ signals:
 protected:
     //! Called after setSystem; not called by the constructor.
     virtual void systemChanged() {}
-    //! Called before setSystem changes the system: a plottable that ties itself to others (a stack,
-    //! a group) unties itself while the old system is still the one it is drawn in.
-    virtual void systemWillChange() {}
+    //! Called before setSystem adopts \a next: a plottable that ties itself to others (a stack, a
+    //! group) unties itself unless \a next keeps it in the same area, while the old system is still
+    //! the one it is drawn in.
+    virtual void systemWillChange(QCPCoordinateSystem*) {}
 
     // property members:
     QString mName;

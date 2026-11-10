@@ -22,6 +22,7 @@ private slots:
   void stackedBarFollowsTheBarBelow();
   void moveAboveRestacks();
   void aBarLeavingItsSystemLeavesItsStackAndGroup();
+  void aBarKeepsItsStackAndGroupWithinItsArea();
   void restackMovesTheGroupSiblingsToTheCentre();
   void groupJoinShiftsTheOthers();
   void groupedBarsOnALogAxis();

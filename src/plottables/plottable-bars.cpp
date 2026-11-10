@@ -756,8 +756,13 @@ void QCPBars::addData(double key, double value)
   other members: both live in the system the bar is leaving, so it leaves them first, exactly as
   \ref moveBelow (nullptr) and \ref setBarsGroup (nullptr) do.
 */
-void QCPBars::systemWillChange()
+void QCPBars::systemWillChange(QCPCoordinateSystem* next)
 {
+    // A bar keeps its stack and its group while it stays in its area, as 2.x did: a two-step axis
+    // swap walks it through the systems of one area. Leaving the area (or losing its system) leaves
+    // both, since a stack and a group are drawn in key and value pixels of one area.
+    if (next && next->area() == area())
+        return;
     moveBelow(nullptr);
     setBarsGroup(nullptr);
 }

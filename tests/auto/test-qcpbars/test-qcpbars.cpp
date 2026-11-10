@@ -526,6 +526,37 @@ void TestQCPBars::aBarLeavingItsSystemLeavesItsStackAndGroup()
     QCOMPARE(image.pixelColor(inSecond), QColor(Qt::blue));
 }
 
+void TestQCPBars::aBarKeepsItsStackAndGroupWithinItsArea()
+{
+    mPlot->resize(400, 300);
+    QCPAxis* top = mPlot->axisRect()->addAxis(QCPAxis::atTop);
+    QCPAxis* right = mPlot->axisRect()->addAxis(QCPAxis::atRight);
+    auto* lower = new QCPBars(mPlot->xAxis, mPlot->yAxis);
+    auto* upper = new QCPBars(mPlot->xAxis, mPlot->yAxis);
+    lower->setData({ 1, 2, 3 }, { 1, 1, 1 });
+    upper->setData({ 1, 2, 3 }, { 1, 1, 1 });
+    upper->moveAbove(lower);
+    auto* group = new QCPBarsGroup(mPlot);
+    lower->setBarsGroup(group);
+    upper->setBarsGroup(group);
+    QCOMPARE(group->bars().size(), 2);
+
+    // The 2.x axis swap: one axis at a time, both pairs inside this rect's area.
+    for (QCPBars* bar : { lower, upper })
+    {
+        bar->setKeyAxis(top);
+        bar->setValueAxis(right);
+    }
+
+    // A stack and a group are drawn in one area's pixels: crossing its systems keeps both.
+    QCOMPARE(upper->barBelow(), lower);
+    QCOMPARE(lower->barAbove(), upper);
+    QCOMPARE(lower->barsGroup(), group);
+    QCOMPARE(upper->barsGroup(), group);
+    QCOMPARE(group->bars(), (QList<QCPBars*> { lower, upper }));
+    QCOMPARE(upper->system(), mPlot->axisRect()->system(top, right));
+}
+
 void TestQCPBars::restackMovesTheGroupSiblingsToTheCentre()
 {
     // A group centres its members from the base each one stands on: stacking one member on another
