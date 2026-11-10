@@ -133,6 +133,9 @@ protected:
     // graphs and their items draw. Mirrors QCPAxisRect::markAffectedLayersDirty.
     void markAffectedLayersDirty(bool invalidate = false);
 
+    // The angular axis and one of the radials; any other pair is refused as misuse.
+    QCPCoordinateSystem* createSystem(QCPAxisBase* key, QCPAxisBase* value) override;
+
 protected:
     // non-property members:
     QCPPolarAxisAngular* mAngularAxis = nullptr;

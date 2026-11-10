@@ -32,6 +32,7 @@
 class QCPPainter;
 class QCustomPlot;
 class QCPAxisBase;
+class QCPCoordinateSystem;
 
 /*!
   The parts every area of a plot has: a background, and an inset layout for the elements that sit in
@@ -77,6 +78,20 @@ public:
     //! The axes of the area, as the base type the range model lives in.
     virtual QList<QCPAxisBase*> allAxes() const = 0;
 
+    // The system of \a key and \a value: the one the area already made for that ordered pair, or a
+    // new one. A pair that is not two axes of this area (or, for a cartesian area, two axes of one
+    // orientation) is reported as misuse and answers null.
+    QCPCoordinateSystem* system(QCPAxisBase* key, QCPAxisBase* value);
+    //! The systems the area owns, in creation order.
+    QList<QCPCoordinateSystem*> systems() const;
+
+    // Called by an axis whose mapping moved without a range setter (a link, a direction, an angle):
+    // the systems that use it are stale from now on.
+    void axisMappingChanged(QCPAxisBase* axis);
+    // Called while an axis that is leaving the area still exists: the systems that used it go too,
+    // before their axes dangle.
+    void axisRemoved(const QCPAxisBase* axis);
+
 protected:
     // property members:
     QBrush mBackgroundBrush;
@@ -85,10 +100,20 @@ protected:
     bool mBackgroundScaled;
     Qt::AspectRatioMode mBackgroundScaledMode;
     QCPLayoutInset* mInsetLayout;
+    // The systems are QObject children of the area; the pointers go null as the last of them is
+    // deleted while an axis leaves.
+    QList<QPointer<QCPCoordinateSystem>> mSystems;
+    // The rect the systems were last told about: a layout pass that leaves the geometry alone
+    // keeps every recording good.
+    QRect mSystemsRect;
 
     // reimplemented virtual methods:
     virtual void applyDefaultAntialiasingHint(QCPPainter* painter) const override;
     virtual void draw(QCPPainter* painter) override;
+
+    // The constructor of the area's system: a rect makes cartesian systems, a polar area polar
+    // ones, and each refuses the pairs it cannot map.
+    virtual QCPCoordinateSystem* createSystem(QCPAxisBase* key, QCPAxisBase* value) = 0;
 
     // non-property methods:
     //! Draws the background inside the area's shape: the whole rect here, a subclass may narrow it

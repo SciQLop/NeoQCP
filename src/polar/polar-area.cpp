@@ -31,7 +31,9 @@
 #include <QPainterPath>
 #include <utility>
 
+#include "../coordinate-system-polar.h"
 #include "../core.h"
+#include "../misuse.h"
 #include "../painting/painter.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -119,6 +121,18 @@ void QCPPolarArea::drawBackgroundPixmap(QCPPainter* painter)
     painter->setClipRegion(exactClipRegion());
     QCPArea::drawBackgroundPixmap(painter);
     painter->restore();
+}
+
+QCPCoordinateSystem* QCPPolarArea::createSystem(QCPAxisBase* key, QCPAxisBase* value)
+{
+    if (key != mAngularAxis || !mRadialAxes.contains(static_cast<QCPPolarAxisRadial*>(value)))
+    {
+        qcp::reportMisuse(Q_FUNC_INFO,
+                          "a polar system is the angular axis and one of its radial axes");
+        return nullptr;
+    }
+    return new QCPPolarSystem(this, static_cast<QCPPolarAxisAngular*>(key),
+                              static_cast<QCPPolarAxisRadial*>(value));
 }
 
 /*!

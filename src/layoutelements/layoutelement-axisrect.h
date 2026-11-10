@@ -149,6 +149,9 @@ public:
     virtual int calculateAutoMargin(QCP::MarginSide side) override;
 
 protected:
+    // The pair the rect maps, refused as misuse when both axes grow the same way.
+    QCPCoordinateSystem* createSystem(QCPAxisBase* key, QCPAxisBase* value) override;
+
     // property members:
     Qt::Orientations mRangeDrag, mRangeZoom;
     QList<QPointer<QCPAxis>> mRangeDragHorzAxis, mRangeDragVertAxis;

@@ -43,6 +43,8 @@
 #include "colorgradient.h"
 #include "coords.h"
 #include "coords-custom.h"
+#include "coordinate-system.h"
+#include "coordinate-system-polar.h"
 #include "theme.h"
 #include "misuse.h"
 #include "handle.h"

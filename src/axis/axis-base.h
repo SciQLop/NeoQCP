@@ -247,6 +247,8 @@ protected:
 private:
     Q_DISABLE_COPY(QCPAxisBase)
 
+    // Tells the area its axis maps differently: the systems that use it are stale from now on.
+    void notifyMappingChanged();
     // The one place that writes a range: every mutator ends here.
     void applyRange(const QCPRange& range);
     // applyRange, or the inverse function of a link and back through the source.

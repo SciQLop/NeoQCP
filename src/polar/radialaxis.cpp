@@ -184,7 +184,11 @@ QCPPolarAxisRadial::QCPPolarAxisRadial(QCPPolarArea* area)
 QCPPolarAxisRadial::~QCPPolarAxisRadial()
 {
     if (polarArea())
+    {
+        // The systems that map through it go while it still exists.
+        polarArea()->axisRemoved(this);
         polarArea()->mRadialAxes.removeOne(this);
+    }
 }
 
 QCPPolarArea* QCPPolarAxisRadial::area() const
@@ -262,6 +266,9 @@ void QCPPolarAxisRadial::setAngle(double degrees)
         return;
     markAppearanceDirty();
     mAngle = degrees;
+    // Where the spoke points is part of the frame: no range moved, so the area is told here.
+    if (polarArea())
+        polarArea()->axisMappingChanged(this);
 }
 
 void QCPPolarAxisRadial::setAngleReference(AngleReference reference)
@@ -270,6 +277,8 @@ void QCPPolarAxisRadial::setAngleReference(AngleReference reference)
         return;
     markAppearanceDirty();
     mAngleReference = reference;
+    if (polarArea())
+        polarArea()->axisMappingChanged(this);
 }
 
 /*!

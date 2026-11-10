@@ -6,6 +6,7 @@
 #include "test-color-by-scalar/test-color-by-scalar.h"
 #include "test-colormap/test-colormap.h"
 #include "test-colorscale/test-colorscale.h"
+#include "test-coordinate-system/test-coordinate-system.h"
 #include "test-coords/test-coords.h"
 #include "test-creation-mode/test-creation-mode.h"
 #include "test-data-locator/test-data-locator.h"
@@ -164,6 +165,7 @@ int main(int argc, char** argv)
     QCPTEST(TestSpatialIndex);
     QCPTEST(TestItemIndex);
     QCPTEST(TestCoords);
+    QCPTEST(TestCoordinateSystem);
     QCPTEST(TestTransform);
     QCPTEST(TestDrawContext);
     QCPTEST(TestDrawable);

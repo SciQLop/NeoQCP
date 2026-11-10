@@ -29,6 +29,7 @@
 #include "../Profiling.hpp"
 #include "../axis/axis.h"
 #include "../axis/axisticker.h"
+#include "../coordinate-system.h"
 #include "../core.h"
 #include "../items/item.h"
 #include "../misuse.h"
@@ -486,6 +487,20 @@ bool QCPAxisRect::removeAxis(QCPAxis* axis)
     return true;
 }
 
+QCPCoordinateSystem* QCPAxisRect::createSystem(QCPAxisBase* key, QCPAxisBase* value)
+{
+    // Every axis of a rect is a cartesian one, and a frame needs one of each direction.
+    auto* keyAxis = static_cast<QCPAxis*>(key);
+    auto* valueAxis = static_cast<QCPAxis*>(value);
+    if (keyAxis->orientation() == valueAxis->orientation())
+    {
+        qcp::reportMisuse(Q_FUNC_INFO,
+                          "a cartesian system needs a horizontal and a vertical axis");
+        return nullptr;
+    }
+    return new QCPCartesianSystem(this, keyAxis, valueAxis);
+}
+
 bool QCPAxisRect::unlistAxis(QCPAxis* axis)
 {
     // Not from ~QObject of a plot already destroyed (a rect in no layout is its QObject child).
@@ -508,6 +523,8 @@ bool QCPAxisRect::unlistAxis(QCPAxis* axis)
                 markLayersUsingAxisDirty(axis);
             plot->axisRemoved(axis);
         }
+        // The systems that map through it go while it still exists.
+        axisRemoved(axis);
         return true;
     }
     return false;

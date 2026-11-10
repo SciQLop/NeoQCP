@@ -131,7 +131,11 @@ QCPPolarArea* QCPPolarAxisAngular::area() const
 QCPPolarAxisAngular::~QCPPolarAxisAngular()
 {
     if (polarArea())
+    {
+        // The systems that map through it go while it still exists.
+        polarArea()->axisRemoved(this);
         polarArea()->mAngularAxis = nullptr;
+    }
 }
 
 QCPPolarAxisAngular::LabelMode QCPPolarAxisAngular::tickLabelMode() const
@@ -286,6 +290,9 @@ void QCPPolarAxisAngular::setAngle(double degrees)
     markAppearanceDirty();
     mAngle = degrees;
     mAngleRad = mAngle / 180.0 * M_PI;
+    // The rotation is part of every polar frame: no range moved, so the area is told here.
+    if (polarArea())
+        polarArea()->axisMappingChanged(this);
 }
 
 /*!

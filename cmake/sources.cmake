@@ -10,6 +10,8 @@ set(NEOQCP_SOURCES
     src/layer.cpp
     src/spatial-index.cpp
     src/coords.cpp
+    src/coordinate-system.cpp
+    src/coordinate-system-polar.cpp
     src/drawable.cpp
     src/overlay.cpp
     src/layout.cpp
@@ -147,6 +149,8 @@ set(NEOQCP_MOC_HEADERS
     src/spatial-index.h
     src/coords.h
     src/coords-custom.h
+    src/coordinate-system.h
+    src/coordinate-system-polar.h
     src/layout.h
     src/layoutelements/area.h
     src/layoutelements/layoutelement-axisrect.h

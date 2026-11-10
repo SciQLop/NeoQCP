@@ -50,6 +50,7 @@ void QCPAxisBase::detachLinks()
             {
                 user->mLink.reset();
                 user->mLinked = false;
+                user->notifyMappingChanged(); // what it maps through changed
                 user->markAppearanceDirty(); // its pixels come from the axis no more
             }
     }
@@ -91,6 +92,7 @@ void QCPAxisBase::setScaleType(QCPAxisBase::ScaleType type)
 */
 void QCPAxisBase::scaleTypeDidChange()
 {
+    notifyMappingChanged();
     markAppearanceDirty();
     // The axes following this one map through it, so their pixels moved even where their range did
     // not.
@@ -191,6 +193,7 @@ void QCPAxisBase::setRangeReversed(bool reversed)
         return; // a no-op asks for the direction the axis already shows, link or not
     QCP_CHECK_OR_RETURN(!mLink, "a linked axis follows its source's direction", );
     mRangeReversed = reversed;
+    notifyMappingChanged();
     markAppearanceDirty();
     // No signal carries a reversal, so the linked axes are told here; their slots may delete them.
     if (mLinkedAxes.isEmpty())
@@ -362,6 +365,7 @@ void QCPAxisBase::linkTo(QCPAxisBase* source, QCPAxisFunction forward, QCPAxisFu
     mLink = link;
     source->mLinkedAxes.append(this);
     mLinked = true;
+    notifyMappingChanged();
     {
         const QCPEmissionScope scope(mParentPlot);
         refreshFromLink();
@@ -425,6 +429,7 @@ void QCPAxisBase::refreshLinkedAxes()
 */
 void QCPAxisBase::rangeDidChange(const QCPRange& oldRange)
 {
+    notifyMappingChanged();
     const auto apply = [&]
     {
         // Before the signal: a slot that reads a linked axis sees the range it was told about.
@@ -442,6 +447,17 @@ void QCPAxisBase::rangeDidChange(const QCPRange& oldRange)
     }
     const QCPEmissionScope scope(mParentPlot);
     apply();
+}
+
+/*! \internal
+
+  Tells the area that this axis maps differently without a range of its own moving: a link, a
+  direction, a polar angle. The area bumps the revision of the systems that use the axis.
+*/
+void QCPAxisBase::notifyMappingChanged()
+{
+    if (mArea)
+        mArea->axisMappingChanged(this);
 }
 
 /*! \internal
@@ -504,6 +520,7 @@ void QCPAxisBase::unlink()
         source->mLinkedAxes.removeAll(this);
     mLink.reset();
     mLinked = false;
+    notifyMappingChanged();
     markAppearanceDirty();
 }
 

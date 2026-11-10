@@ -24,7 +24,11 @@
 ****************************************************************************/
 
 #include "area.h"
+#include "../coordinate-system.h"
+#include "../misuse.h"
 #include "../painting/painter.h"
+
+#include <utility>
 
 QCPArea::QCPArea(QCustomPlot* parentPlot)
         : QCPLayoutElement(parentPlot)
@@ -40,7 +44,93 @@ QCPArea::QCPArea(QCustomPlot* parentPlot)
 
 QCPArea::~QCPArea()
 {
+    // The systems go while the area still exists: an axis leaving later would report to a
+    // half-destroyed area.
+    for (const QPointer<QCPCoordinateSystem>& system : std::exchange(mSystems, { }))
+        delete system;
     destroyInsetLayout();
+}
+
+/*!
+  Returns the coordinate system of \a key and \a value: the one this area already made for that
+  pair, or a new one, which the area owns.
+
+  A pair that is not two axes of this area is refused as misuse, and so is a pair a cartesian area
+  cannot map (two axes of one orientation). Both answer null.
+*/
+QCPCoordinateSystem* QCPArea::system(QCPAxisBase* key, QCPAxisBase* value)
+{
+    if (!key || !value)
+    {
+        qcp::reportMisuse(Q_FUNC_INFO, "a coordinate system needs two axes");
+        return nullptr;
+    }
+    if (key == value)
+    {
+        qcp::reportMisuse(Q_FUNC_INFO, "a coordinate system needs two different axes");
+        return nullptr;
+    }
+    const QList<QCPAxisBase*> axes = allAxes();
+    if (!axes.contains(key) || !axes.contains(value))
+    {
+        qcp::reportMisuse(Q_FUNC_INFO, "both axes of a coordinate system must belong to the area");
+        return nullptr;
+    }
+    for (const QPointer<QCPCoordinateSystem>& existing : std::as_const(mSystems))
+        if (existing && existing->keyAxis() == key && existing->valueAxis() == value)
+            return existing;
+    QCPCoordinateSystem* made = createSystem(key, value);
+    if (made)
+        mSystems.append(made);
+    return made;
+}
+
+/*!
+  Returns the systems this area owns, in creation order.
+*/
+QList<QCPCoordinateSystem*> QCPArea::systems() const
+{
+    QList<QCPCoordinateSystem*> result;
+    for (const QPointer<QCPCoordinateSystem>& system : mSystems)
+        if (system)
+            result << system;
+    return result;
+}
+
+/*! \internal
+
+  A mapping change without a range setter of its own: a link, a direction, a polar angle. The
+  systems that map through the axis are stale from now on.
+*/
+void QCPArea::axisMappingChanged(QCPAxisBase* axis)
+{
+    if (!axis)
+        return;
+    const QList<QPointer<QCPCoordinateSystem>> systems = mSystems; // a slot may delete one
+    for (const QPointer<QCPCoordinateSystem>& system : systems)
+        if (system && system->usesAxis(axis))
+            system->bumpRevision();
+}
+
+/*! \internal
+
+  \a axis is leaving the area and still exists: the systems that used it are deleted now, so nothing
+  maps through an axis that is about to dangle.
+*/
+void QCPArea::axisRemoved(const QCPAxisBase* axis)
+{
+    if (!axis)
+        return;
+    const QList<QPointer<QCPCoordinateSystem>> systems = std::exchange(mSystems, { });
+    for (const QPointer<QCPCoordinateSystem>& system : systems)
+    {
+        if (!system)
+            continue;
+        if (system->usesAxis(axis))
+            delete system;
+        else
+            mSystems.append(system);
+    }
 }
 
 void QCPArea::destroyInsetLayout()
@@ -59,7 +149,19 @@ void QCPArea::update(UpdatePhase phase)
     QCPLayoutElement::update(phase);
 
     if (phase == upLayout)
+    {
+        // The geometry is part of the mapping: a system's pixels all move when the area does, and
+        // a pass that changes nothing must leave every recording good.
+        if (mSystemsRect != rect())
+        {
+            mSystemsRect = rect();
+            const QList<QPointer<QCPCoordinateSystem>> systems = mSystems;
+            for (const QPointer<QCPCoordinateSystem>& system : systems)
+                if (system)
+                    system->bumpRevision();
+        }
         mInsetLayout->setOuterRect(rect());
+    }
 
     mInsetLayout->update(phase);
 }

@@ -281,6 +281,26 @@ enum Interaction
 Q_DECLARE_FLAGS(Interactions, Interaction)
 
 /*!
+  Defines what a coordinate system can draw: what a plottable needs of the system it joins.
+
+  A system offers the flags that describe its geometry; a plottable requires the ones its drawing
+  relies on, and joining a system missing one is reported as misuse rather than drawn wrong.
+
+  \see QCPCoordinateSystem::capabilities, QCPAbstractPlottable::requiredCapabilities
+*/
+enum Capability
+{
+    capRectangular = 0x01 ///< <tt>0x01</tt> The plot area is a rectangle
+    ,
+    capStraightKey = 0x02 ///< <tt>0x02</tt> The key axis is straight: lanes and bar stacks need it
+    ,
+    capColourScale = 0x04 ///< <tt>0x04</tt> A colour scale can be placed next to the area
+    ,
+    capLanes = 0x08 ///< <tt>0x08</tt> The area can lay out lanes (multi-graphs, intervals)
+};
+Q_DECLARE_FLAGS(Capabilities, Capability)
+
+/*!
   Defines the behaviour of the selection rect.
 
   \see QCustomPlot::setSelectionRectMode, QCustomPlot::selectionRect, QCPSelectionRect
@@ -442,6 +462,8 @@ Q_ENUM_NS(SelectionType)
 Q_FLAG_NS(AntialiasedElements)
 Q_FLAG_NS(PlottingHints)
 Q_FLAG_NS(MarginSides)
+Q_ENUM_NS(Capability)
+Q_FLAG_NS(Capabilities)
 Q_FLAG_NS(Interactions)
 
 
@@ -451,5 +473,6 @@ Q_DECLARE_OPERATORS_FOR_FLAGS(QCP::AntialiasedElements)
 Q_DECLARE_OPERATORS_FOR_FLAGS(QCP::PlottingHints)
 Q_DECLARE_OPERATORS_FOR_FLAGS(QCP::MarginSides)
 Q_DECLARE_OPERATORS_FOR_FLAGS(QCP::Interactions)
+Q_DECLARE_OPERATORS_FOR_FLAGS(QCP::Capabilities)
 
 #endif // QCP_GLOBAL_H
