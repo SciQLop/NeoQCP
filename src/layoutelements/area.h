@@ -34,8 +34,8 @@ class QCustomPlot;
 class QCPAxisBase;
 
 /*!
-  The parts every area of a plot has: a background, an inset layout for elements that sit in the
-  area, and a place for a colour scale (which a plain area does not have).
+  The parts every area of a plot has: a background, and an inset layout for the elements that sit in
+  the area.
 */
 class QCP_LIB_DECL QCPArea : public QCPLayoutElement
 {

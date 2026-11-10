@@ -219,12 +219,6 @@ public:
 
     int numberPrecision() const { return mNumberPrecision; }
 
-    QVector<double> tickVector() const { return mTickVector; }
-
-    QVector<double> subTickVector() const { return mSubTickVector; }
-
-    QVector<QString> tickVectorLabels() const { return mTickVectorLabels; }
-
     int tickLengthIn() const;
     int tickLengthOut() const;
 
