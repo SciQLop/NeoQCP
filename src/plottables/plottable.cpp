@@ -1080,7 +1080,8 @@ void QCPAbstractPlottable::rescaleKeyAxis(bool onlyEnlarge) const
     QCPAxis* keyAxis = mKeyAxis.data();
     if (!keyAxis)
     {
-        qDebug() << Q_FUNC_INFO << "invalid key axis";
+        // A system without a key axis projection (a polar one) has no key axis of its own to
+        // rescale: its area rescales the whole frame, so this end does nothing and says nothing.
         return;
     }
 
@@ -1130,9 +1131,10 @@ void QCPAbstractPlottable::rescaleValueAxis(bool onlyEnlarge, bool inKeyRange) c
 {
     QCPAxis* keyAxis = mKeyAxis.data();
     QCPAxis* valueAxis = mValueAxis.data();
-    if (!keyAxis || !valueAxis)
+    if (!valueAxis)
     {
-        qDebug() << Q_FUNC_INFO << "invalid key or value axis";
+        // Same as rescaleKeyAxis: a frame that has no value axis projection rescales through its
+        // area, and an inert plottable has nothing to say about it.
         return;
     }
 
@@ -1142,7 +1144,8 @@ void QCPAbstractPlottable::rescaleValueAxis(bool onlyEnlarge, bool inKeyRange) c
 
     bool foundRange;
     QCPRange newRange
-        = getValueRange(foundRange, signDomain, inKeyRange ? keyAxis->range() : QCPRange());
+        = getValueRange(foundRange, signDomain,
+                        inKeyRange && keyAxis ? keyAxis->range() : QCPRange());
     if (foundRange)
     {
         if (onlyEnlarge)

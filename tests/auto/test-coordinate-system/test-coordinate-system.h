@@ -17,6 +17,7 @@ private slots:
     void revisionBumpsOnAnyMappingChange();
     void systemRevisionsAreNeverShared();
     void theIconAsksTheSystem();
+    void aNonCartesianPlottableRescalesQuietly();
     void aPolarPlottableIsClippedToItsDisc();
     void aRatioPositionInAPolarAreaReportsOnce();
     void aDeliberateNullSystemStaysQuiet();

@@ -161,8 +161,8 @@ void TestQCPAxisRect::axisRemovalConsequencesToPlottables()
   qcp::setMisuseHandler(previous);
   QCOMPARE(gMisuses, 1); // the graph without a key axis is not drawn
   mPlot->rescaleAxes();
-  expectDebugFrom("QCPAbstractPlottable::rescaleKeyAxis", "invalid key axis");
-  expectDebugFrom("QCPAbstractPlottable::rescaleValueAxis", "invalid key or value axis");
+  // A frame that lost its axes rescales quietly: the plottable is inert, and saying so once is
+  // drawableAxes()'s job, not the rescale's.
   graph->rescaleAxes();
 
   // test replacement of previously removed axis:
@@ -225,8 +225,8 @@ void TestQCPAxisRect::axisRectRemovalConsequencesToPlottables()
   qcp::setMisuseHandler(previous);
   QCOMPARE(gMisuses, 1); // the graph without axes is not drawn
   mPlot->rescaleAxes();
-  expectDebugFrom("QCPAbstractPlottable::rescaleKeyAxis", "invalid key axis");
-  expectDebugFrom("QCPAbstractPlottable::rescaleValueAxis", "invalid key or value axis");
+  // A frame that lost its axes rescales quietly: the plottable is inert, and saying so once is
+  // drawableAxes()'s job, not the rescale's.
   graph->rescaleAxes();
   
   // test replacement of previously removed axis:

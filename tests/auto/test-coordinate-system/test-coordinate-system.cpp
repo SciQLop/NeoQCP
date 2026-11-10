@@ -146,6 +146,13 @@ QColor pixelAt(QCustomPlot& plot, QPoint pos)
     return QColor(plot.toPixmap(400, 300).toImage().pixel(pos));
 }
 
+//! Catches the messages Qt would print: a library path that has nothing to rescale must say none.
+QStringList gMessages;
+void collectMessage(QtMsgType, const QMessageLogContext&, const QString& message)
+{
+    gMessages << message;
+}
+
 //! The frame a polar area gives its one angular and one radial axis.
 QCPCoordinateSystem* polarSystem(QCPPolarArea* area)
 {
@@ -446,6 +453,27 @@ void TestCoordinateSystem::theIconAsksTheSystem()
     plot.legend->setVisible(true);
     settle(plot);
     QVERIFY2(system.iconCalls() > 0, "the legend icon was not replayed through the system");
+}
+
+void TestCoordinateSystem::aNonCartesianPlottableRescalesQuietly()
+{
+    QCustomPlot plot;
+    QCPPolarArea* area = polarArea(plot);
+    auto* plottable = new RecordingPlottable(polarSystem(area));
+    settle(plot);
+    const QCPRange angular = area->angularAxis()->range();
+    const QCPRange radial = area->radialAxis()->range();
+
+    gMessages.clear();
+    const QtMessageHandler previous = qInstallMessageHandler(collectMessage);
+    plottable->rescaleKeyAxis();
+    plottable->rescaleValueAxis();
+    plottable->rescaleAxes();
+    qInstallMessageHandler(previous);
+
+    QVERIFY2(gMessages.isEmpty(), qPrintable(gMessages.join(QLatin1Char('\n'))));
+    QCOMPARE(area->angularAxis()->range(), angular);
+    QCOMPARE(area->radialAxis()->range(), radial);
 }
 
 void TestCoordinateSystem::systemRevisionsAreNeverShared()
