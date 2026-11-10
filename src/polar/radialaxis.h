@@ -82,7 +82,7 @@ public:
     virtual ~QCPPolarAxisRadial();
 
     // getters:
-    // Out of line: QCPPolarArea is incomplete here, and the covariant return needs it complete.
+    // Out of line: the covariant return needs QCPPolarArea complete.
     QCPPolarArea* area() const override;
 
     // Out of line: QCPPolarArea is incomplete here.
@@ -190,9 +190,11 @@ public:
     SelectablePart getPartAt(const QPointF& pos) const override;
 
 protected:
+    // The area as the polar one it always is: the base stores it as a plain QCPArea.
+    QCPPolarArea* polarArea() const { return static_cast<QCPPolarArea*>(mArea); }
+
     // property members:
     // axis base:
-    QCPPolarArea* mArea;
     double mAngle;
     AngleReference mAngleReference;
     QPen mBasePen, mSelectedBasePen;

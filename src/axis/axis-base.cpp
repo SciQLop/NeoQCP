@@ -1,5 +1,6 @@
 #include "axis-base.h"
 #include "../core.h"
+#include "../layoutelements/area.h"
 #include "../Profiling.hpp"
 #include "../misuse.h"
 #include "../signal-delivery.h"
@@ -8,12 +9,13 @@
 #include <cmath>
 #include <utility>
 
-QCPAxisBase::QCPAxisBase(QCPLayerable* parentLayerable)
-        : QCPLayerable(parentLayerable ? parentLayerable->parentPlot() : nullptr, QString(),
-                       parentLayerable)
+QCPAxisBase::QCPAxisBase(QCPArea* area, Qt::Orientation orientation)
+        : QCPLayerable(area ? area->parentPlot() : nullptr, QString(), area)
+        , mArea(area)
         , mRange(0, 0)
         , mRangeReversed(false)
         , mScaleType(stLinear)
+        , mOrientation(orientation)
         , mSelectableParts(spAxis | spTickLabels | spAxisLabel)
         , mSelectedParts(spNone)
         , mTicker(new QCPAxisTicker)

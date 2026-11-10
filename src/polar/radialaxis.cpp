@@ -120,8 +120,7 @@ QCPPolarAxisRadial::QCPPolarAxisRadial(QCPPolarArea* area)
         : QCPAxisBase(area)
         ,
         // axis base:
-        mArea(area)
-        , mAngle(45)
+        mAngle(45)
         , mAngleReference(arAngularAxis)
         , mBasePen(QPen(Qt::black, 0, Qt::SolidLine, Qt::SquareCap))
         , mSelectedBasePen(QPen(Qt::blue, 2))
@@ -184,18 +183,18 @@ QCPPolarAxisRadial::QCPPolarAxisRadial(QCPPolarArea* area)
 */
 QCPPolarAxisRadial::~QCPPolarAxisRadial()
 {
-    if (mArea)
-        mArea->mRadialAxes.removeOne(this);
+    if (polarArea())
+        polarArea()->mRadialAxes.removeOne(this);
 }
 
 QCPPolarArea* QCPPolarAxisRadial::area() const
 {
-    return mArea;
+    return polarArea();
 }
 
 QCPPolarAxisAngular* QCPPolarAxisRadial::angularAxis() const
 {
-    return mArea ? mArea->angularAxis() : nullptr;
+    return polarArea() ? polarArea()->angularAxis() : nullptr;
 }
 
 QCPPolarAxisRadial::LabelMode QCPPolarAxisRadial::tickLabelMode() const
@@ -924,7 +923,7 @@ double QCPPolarAxisRadial::radiusToCoord(double radius) const
 */
 QCPPolarAxisRadial::SelectablePart QCPPolarAxisRadial::getPartAt(const QPointF& pos) const
 {
-    if (!mVisible || !mArea || !angularAxis())
+    if (!mVisible || !polarArea() || !angularAxis())
         return spNone;
     // A label wins over the spoke it sits on: it is what the user aims at.
     for (const QRectF& box : mTickLabelBoxes)
@@ -960,8 +959,8 @@ void QCPPolarAxisRadial::rangeDidChange(const QCPRange& oldRange)
 void QCPPolarAxisRadial::markAppearanceDirty()
 {
     markDirty();
-    if (mArea)
-        mArea->markAffectedLayersDirty();
+    if (polarArea())
+        polarArea()->markAffectedLayersDirty();
 }
 
 /*! \internal

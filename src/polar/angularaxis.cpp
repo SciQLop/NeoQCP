@@ -95,8 +95,7 @@ QCPPolarAxisAngular::QCPPolarAxisAngular(QCPPolarArea* area)
         , mSelectedSubTickPen(QPen(Qt::blue, 2))
         ,
         // internal members:
-        mArea(area)
-        , mLabelPainter(mParentPlot)
+        mLabelPainter(mParentPlot)
 {
     // A polar area zooms and drags through its own handlers, not by default.
     mRange = QCPRange(0, 360);
@@ -121,7 +120,7 @@ QCPPolarAxisAngular::QCPPolarAxisAngular(QCPPolarArea* area)
 
 QCPPolarArea* QCPPolarAxisAngular::area() const
 {
-    return mArea;
+    return polarArea();
 }
 
 /*! \internal
@@ -131,8 +130,8 @@ QCPPolarArea* QCPPolarAxisAngular::area() const
 */
 QCPPolarAxisAngular::~QCPPolarAxisAngular()
 {
-    if (mArea)
-        mArea->mAngularAxis = nullptr;
+    if (polarArea())
+        polarArea()->mAngularAxis = nullptr;
 }
 
 QCPPolarAxisAngular::LabelMode QCPPolarAxisAngular::tickLabelMode() const
@@ -170,13 +169,13 @@ QString QCPPolarAxisAngular::numberFormat() const
 void QCPPolarAxisAngular::pixelToCoord(QPointF pixelPos, double& angleCoord,
                                        double& radiusCoord) const
 {
-    if (!mArea)
+    if (!polarArea())
     {
         angleCoord = radiusCoord = qQNaN();
         return;
     }
-    if (mArea->radialAxisCount() > 0)
-        mArea->radialAxis()->pixelToCoord(pixelPos, angleCoord, radiusCoord);
+    if (polarArea()->radialAxisCount() > 0)
+        polarArea()->radialAxis()->pixelToCoord(pixelPos, angleCoord, radiusCoord);
     else
         qDebug() << Q_FUNC_INFO << "no radial axis configured";
 }
@@ -186,11 +185,11 @@ void QCPPolarAxisAngular::pixelToCoord(QPointF pixelPos, double& angleCoord,
 */
 QPointF QCPPolarAxisAngular::coordToPixel(double angleCoord, double radiusCoord) const
 {
-    if (!mArea)
+    if (!polarArea())
         return QPointF(qQNaN(), qQNaN());
-    if (mArea->radialAxisCount() > 0)
+    if (polarArea()->radialAxisCount() > 0)
     {
-        return mArea->radialAxis()->coordToPixel(angleCoord, radiusCoord);
+        return polarArea()->radialAxis()->coordToPixel(angleCoord, radiusCoord);
     }
     else
     {
@@ -210,14 +209,14 @@ QPointF QCPPolarAxisAngular::coordToPixel(double angleCoord, double radiusCoord)
 */
 QCPPolarAxisAngular::SelectablePart QCPPolarAxisAngular::getPartAt(const QPointF& pos) const
 {
-    if (!mVisible || !mArea)
+    if (!mVisible || !polarArea())
         return spNone;
     // A label wins over the circle it sits on: it is what the user aims at.
     for (const QRectF& box : mTickLabelBoxes)
         if (box.contains(pos))
             return spTickLabels;
     const double tolerance = mParentPlot ? mParentPlot->selectionTolerance() : 5.0;
-    if (qAbs(QLineF(mArea->center(), pos).length() - mArea->radius()) <= tolerance)
+    if (qAbs(QLineF(polarArea()->center(), pos).length() - polarArea()->radius()) <= tolerance)
         return spAxis;
     return spNone;
 }
@@ -231,10 +230,10 @@ void QCPPolarAxisAngular::applyDefaultAntialiasingHint(QCPPainter* painter) cons
 /* inherits documentation from base class */
 void QCPPolarAxisAngular::draw(QCPPainter* painter)
 {
-    if (!mArea)
+    if (!polarArea())
         return;
-    const QPointF center = mArea->center();
-    const double radius = mArea->radius();
+    const QPointF center = polarArea()->center();
+    const double radius = polarArea()->radius();
     mTickLabelBoxes.clear();
     painter->setPen(getBasePen());
     painter->drawEllipse(center, radius, radius);
@@ -808,7 +807,8 @@ void QCPPolarAxisAngular::setupTickVectors()
 {
     if (!mParentPlot)
         return;
-    if ((!mTicks && !mTickLabels && (!mArea || !mArea->grid() || !mArea->grid()->visible()))
+    if ((!mTicks && !mTickLabels
+         && (!polarArea() || !polarArea()->grid() || !polarArea()->grid()->visible()))
         || mRange.size() <= 0)
         return;
 
@@ -934,8 +934,8 @@ bool QCPPolarAxisAngular::scaleTypeWillChange(ScaleType type)
 void QCPPolarAxisAngular::markAppearanceDirty()
 {
     markDirty();
-    if (mArea)
-        mArea->markAffectedLayersDirty();
+    if (polarArea())
+        polarArea()->markAffectedLayersDirty();
 }
 
 /*! \internal

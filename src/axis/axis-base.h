@@ -100,7 +100,9 @@ public:
     Q_DECLARE_FLAGS(SelectableParts, SelectablePart)
     Q_FLAG(SelectableParts)
 
-    explicit QCPAxisBase(QCPLayerable* parentLayerable);
+    // The area the axis is drawn in, which is also its layerable parent, and the direction a
+    // cartesian axis maps its range along (the polar axes leave it horizontal and unused).
+    explicit QCPAxisBase(QCPArea* area, Qt::Orientation orientation = Qt::Horizontal);
     virtual ~QCPAxisBase() override;
 
     // getters:
@@ -170,7 +172,7 @@ public:
     virtual QCPAxisBase* moveTarget() const;
 
     // The area this axis is drawn in.
-    virtual QCPArea* area() const = 0;
+    virtual QCPArea* area() const { return mArea; }
 
     // The part of this axis at pos, spNone where there is none. Public as in 2.x, where hover
     // cursors and context menus call it directly.
@@ -183,8 +185,13 @@ signals:
     void selectableChanged();
 
 protected:
-    // The hot members sit together: a coordToPixel call reads the range, its direction, the link
-    // flag and the scale type on a single cache line, whether the axis is linked or not.
+    // The hot members sit together, first among this class's: a coordToPixel call reads where the
+    // axis draws, its range and direction, the link flag and the scale type. For a cartesian axis
+    // the area is its rect, whose geometry turns the fraction into a pixel, so both live here
+    // rather than in QCPAxis; the polar area answers for the polar axes. GCC 16 puts mArea at
+    // +0x40, mRange at +0x48, mRangeReversed at +0x58, mLinked at +0x59, mScaleType at +0x5c and
+    // mOrientation at +0x60: 36 bytes, one cache line of the four a call used to touch.
+    QCPArea* mArea;
     QCPRange mRange;
     bool mRangeReversed;
     // Set by a link: the flag is what the hot mapping path reads, the shared_ptr lives further
@@ -193,6 +200,7 @@ protected:
     bool mRangeDraggable = true;
     bool mRangeZoomable = true;
     ScaleType mScaleType;
+    Qt::Orientation mOrientation;
 
     // property members:
     SelectableParts mSelectableParts, mSelectedParts;

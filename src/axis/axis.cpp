@@ -221,7 +221,7 @@ void QCPGrid::drawGridLines(QCPPainter* painter) const
         return;
     }
 
-    const auto* ar = mParentAxis->mAxisRect;
+    const auto* ar = mParentAxis->axisRect();
     const bool horizontal = (mParentAxis->orientation() == Qt::Horizontal);
     auto gridLine = [&](double t) {
         return horizontal
@@ -274,7 +274,7 @@ void QCPGrid::drawSubGridLines(QCPPainter* painter) const
         return;
     }
 
-    const auto* ar = mParentAxis->mAxisRect;
+    const auto* ar = mParentAxis->axisRect();
     const bool horizontal = (mParentAxis->orientation() == Qt::Horizontal);
 
     applyAntialiasingHint(painter, mAntialiasedSubGrid, QCP::aeSubGrid);
@@ -420,13 +420,11 @@ void QCPGrid::drawSubGridLines(QCPPainter* painter) const
   create them manually and then inject them also via \ref QCPAxisRect::addAxis.
 */
 QCPAxis::QCPAxis(QCPAxisRect* parent, AxisType type)
-        : QCPAxisBase(parent)
+        : QCPAxisBase(parent, orientation(type))
         ,
         // axis base:
         mAxisType(type)
-        , mAxisRect(parent)
         , mPadding(5)
-        , mOrientation(orientation(type))
         , mBasePen(QPen(Qt::black, 0, Qt::SolidLine, Qt::SquareCap))
         , mSelectedBasePen(QPen(Qt::blue, 2))
         ,
@@ -502,8 +500,8 @@ QCPAxis::~QCPAxis()
     if (mParentPlot)
         if (auto* grl = mParentPlot->gridRhiLayerIfExists())
             grl->unregisterAxis(this);
-    if (mAxisRect)
-        mAxisRect->unlistAxis(this);
+    if (QCPAxisRect* rect = axisRect())
+        rect->unlistAxis(this);
     delete mAxisPainter;
     delete mGrid.data(); // here rather than in ~QObject, for a better defined deletion order
 }
@@ -616,14 +614,15 @@ QCPLineEnding QCPAxis::upperEnding() const
 double QCPAxis::pixelOnMoveTarget(double pixel) const
 {
     QCPAxis* target = moveTarget();
-    if (target == this || !mAxisRect || !target->mAxisRect)
+    const auto* rect = static_cast<const QCPAxisRect*>(mArea);
+    const auto* targetRect = static_cast<const QCPAxisRect*>(target->mArea);
+    if (target == this || !rect || !targetRect)
         return pixel;
     const bool vertical = orientation() == Qt::Vertical;
-    const double length = vertical ? mAxisRect->height() : mAxisRect->width();
+    const double length = vertical ? rect->height() : rect->width();
     const double fraction = length > 0.0
-        ? (vertical ? mAxisRect->bottom() - pixel : pixel - mAxisRect->left()) / length
+        ? (vertical ? rect->bottom() - pixel : pixel - rect->left()) / length
         : 0.0;
-    const QCPAxisRect* targetRect = target->mAxisRect;
     return vertical ? targetRect->bottom() - fraction * targetRect->height()
                     : targetRect->left() + fraction * targetRect->width();
 }
@@ -636,22 +635,24 @@ double QCPAxis::pixelOnMoveTarget(double pixel) const
 */
 double QCPAxis::linkedCoordToPixel(double value) const
 {
-    if (!mLink || !mLink->inverse || !mAxisRect)
+    const auto* ownRect = static_cast<const QCPAxisRect*>(mArea);
+    if (!mLink || !mLink->inverse || !ownRect)
         return qQNaN();
     // Only cartesian axes link, so a link source always is one.
     const auto* source = static_cast<const QCPAxis*>(mLink->source.data());
-    if (!source || !source->mAxisRect)
+    const auto* sourceRect = static_cast<const QCPAxisRect*>(source->mArea);
+    if (!sourceRect)
         return qQNaN();
-    const QRectF sourceRect = source->mAxisRect->rect();
-    const QRectF ownRect = mAxisRect->rect();
+    const QRectF sourceArea = sourceRect->rect();
+    const QRectF ownArea = ownRect->rect();
     const double sourcePixel = source->coordToPixel(mLink->inverse(value));
     if (mOrientation == Qt::Horizontal)
     {
-        const double fraction = (sourcePixel - sourceRect.left()) / sourceRect.width();
-        return ownRect.left() + fraction * ownRect.width();
+        const double fraction = (sourcePixel - sourceArea.left()) / sourceArea.width();
+        return ownArea.left() + fraction * ownArea.width();
     }
-    const double fraction = (sourceRect.bottom() - sourcePixel) / sourceRect.height();
-    return ownRect.bottom() - fraction * ownRect.height();
+    const double fraction = (sourceArea.bottom() - sourcePixel) / sourceArea.height();
+    return ownArea.bottom() - fraction * ownArea.height();
 }
 
 /*! \internal
@@ -661,24 +662,26 @@ double QCPAxis::linkedCoordToPixel(double value) const
 */
 double QCPAxis::linkedPixelToCoord(double value) const
 {
-    if (!mLink || !mLink->forward || !mAxisRect)
+    const auto* ownRect = static_cast<const QCPAxisRect*>(mArea);
+    if (!mLink || !mLink->forward || !ownRect)
         return qQNaN();
     // Only cartesian axes link, so a link source always is one.
     const auto* source = static_cast<const QCPAxis*>(mLink->source.data());
-    if (!source || !source->mAxisRect)
+    const auto* sourceRect = static_cast<const QCPAxisRect*>(source->mArea);
+    if (!sourceRect)
         return qQNaN();
-    const QRectF sourceRect = source->mAxisRect->rect();
-    const QRectF ownRect = mAxisRect->rect();
+    const QRectF sourceArea = sourceRect->rect();
+    const QRectF ownArea = ownRect->rect();
     double sourcePixel;
     if (mOrientation == Qt::Horizontal)
     {
-        const double fraction = (value - ownRect.left()) / ownRect.width();
-        sourcePixel = sourceRect.left() + fraction * sourceRect.width();
+        const double fraction = (value - ownArea.left()) / ownArea.width();
+        sourcePixel = sourceArea.left() + fraction * sourceArea.width();
     }
     else
     {
-        const double fraction = (ownRect.bottom() - value) / ownRect.height();
-        sourcePixel = sourceRect.bottom() - fraction * sourceRect.height();
+        const double fraction = (ownArea.bottom() - value) / ownArea.height();
+        sourcePixel = sourceArea.bottom() - fraction * sourceArea.height();
     }
     return mLink->forward(source->pixelToCoord(sourcePixel));
 }
@@ -1403,49 +1406,56 @@ double QCPAxis::pixelToCoord(double value) const
 {
     if (mLinked) [[unlikely]]
         return linkedPixelToCoord(value);
+    // Read straight from the base's area pointer, and take the rect apart inside the branch that
+    // needs it: this runs per point, and the accessors cost more than the arithmetic they feed.
+    const QRect area = static_cast<const QCPAxisRect*>(mArea)->rect();
     if (orientation() == Qt::Horizontal)
     {
+        const int left = area.left();
+        const int width = area.width();
         if (mScaleType == stLinear)
         {
             if (!mRangeReversed)
-                return (value - mAxisRect->left()) / double(mAxisRect->width()) * mRange.size()
+                return (value - left) / width * mRange.size()
                     + mRange.lower;
             else
-                return -(value - mAxisRect->left()) / double(mAxisRect->width()) * mRange.size()
+                return -(value - left) / width * mRange.size()
                     + mRange.upper;
         }
         else // mScaleType == stLogarithmic
         {
             if (!mRangeReversed)
                 return qPow(mRange.upper / mRange.lower,
-                            (value - mAxisRect->left()) / double(mAxisRect->width()))
+                            (value - left) / width)
                     * mRange.lower;
             else
                 return qPow(mRange.upper / mRange.lower,
-                            (mAxisRect->left() - value) / double(mAxisRect->width()))
+                            (left - value) / width)
                     * mRange.upper;
         }
     }
     else // orientation() == Qt::Vertical
     {
+        const int bottom = area.bottom();
+        const int height = area.height();
         if (mScaleType == stLinear)
         {
             if (!mRangeReversed)
-                return (mAxisRect->bottom() - value) / double(mAxisRect->height()) * mRange.size()
+                return (bottom - value) / height * mRange.size()
                     + mRange.lower;
             else
-                return -(mAxisRect->bottom() - value) / double(mAxisRect->height()) * mRange.size()
+                return -(bottom - value) / height * mRange.size()
                     + mRange.upper;
         }
         else // mScaleType == stLogarithmic
         {
             if (!mRangeReversed)
                 return qPow(mRange.upper / mRange.lower,
-                            (mAxisRect->bottom() - value) / double(mAxisRect->height()))
+                            (bottom - value) / height)
                     * mRange.lower;
             else
                 return qPow(mRange.upper / mRange.lower,
-                            (value - mAxisRect->bottom()) / double(mAxisRect->height()))
+                            (value - bottom) / height)
                     * mRange.upper;
         }
     }
@@ -1458,67 +1468,74 @@ double QCPAxis::coordToPixel(double value) const
 {
     if (mLinked) [[unlikely]]
         return linkedCoordToPixel(value);
+    // Read straight from the base's area pointer, and take the rect apart inside the branch that
+    // needs it: this runs per point, and the accessors cost more than the arithmetic they feed.
+    const QRect area = static_cast<const QCPAxisRect*>(mArea)->rect();
     if (orientation() == Qt::Horizontal)
     {
+        const int left = area.left();
+        const int width = area.width();
         if (mScaleType == stLinear)
         {
             if (!mRangeReversed)
-                return (value - mRange.lower) / mRange.size() * mAxisRect->width()
-                    + mAxisRect->left();
+                return (value - mRange.lower) / mRange.size() * width
+                    + left;
             else
-                return (mRange.upper - value) / mRange.size() * mAxisRect->width()
-                    + mAxisRect->left();
+                return (mRange.upper - value) / mRange.size() * width
+                    + left;
         }
         else // mScaleType == stLogarithmic
         {
             if (value >= 0.0 && mRange.upper < 0.0) // invalid value for logarithmic scale, just
                                                     // draw it outside visible range
-                return !mRangeReversed ? mAxisRect->right() + 200 : mAxisRect->left() - 200;
+                return !mRangeReversed ? area.right() + 200 : left - 200;
             else if (value <= 0.0 && mRange.upper >= 0.0) // invalid value for logarithmic scale,
                                                           // just draw it outside visible range
-                return !mRangeReversed ? mAxisRect->left() - 200 : mAxisRect->right() + 200;
+                return !mRangeReversed ? left - 200 : area.right() + 200;
             else
             {
                 if (!mRangeReversed)
                     return qLn(value / mRange.lower) / qLn(mRange.upper / mRange.lower)
-                        * mAxisRect->width()
-                        + mAxisRect->left();
+                        * width
+                        + left;
                 else
                     return qLn(mRange.upper / value) / qLn(mRange.upper / mRange.lower)
-                        * mAxisRect->width()
-                        + mAxisRect->left();
+                        * width
+                        + left;
             }
         }
     }
     else // orientation() == Qt::Vertical
     {
+        const int bottom = area.bottom();
+        const int height = area.height();
         if (mScaleType == stLinear)
         {
             if (!mRangeReversed)
-                return mAxisRect->bottom()
-                    - (value - mRange.lower) / mRange.size() * mAxisRect->height();
+                return bottom
+                    - (value - mRange.lower) / mRange.size() * height;
             else
-                return mAxisRect->bottom()
-                    - (mRange.upper - value) / mRange.size() * mAxisRect->height();
+                return bottom
+                    - (mRange.upper - value) / mRange.size() * height;
         }
         else // mScaleType == stLogarithmic
         {
             if (value >= 0.0 && mRange.upper < 0.0) // invalid value for logarithmic scale, just
                                                     // draw it outside visible range
-                return !mRangeReversed ? mAxisRect->top() - 200 : mAxisRect->bottom() + 200;
+                return !mRangeReversed ? area.top() - 200 : bottom + 200;
             else if (value <= 0.0 && mRange.upper >= 0.0) // invalid value for logarithmic scale,
                                                           // just draw it outside visible range
-                return !mRangeReversed ? mAxisRect->bottom() + 200 : mAxisRect->top() - 200;
+                return !mRangeReversed ? bottom + 200 : area.top() - 200;
             else
             {
                 if (!mRangeReversed)
-                    return mAxisRect->bottom()
+                    return bottom
                         - qLn(value / mRange.lower) / qLn(mRange.upper / mRange.lower)
-                        * mAxisRect->height();
+                        * height;
                 else
-                    return mAxisRect->bottom()
+                    return bottom
                         - qLn(mRange.upper / value) / qLn(mRange.upper / mRange.lower)
-                        * mAxisRect->height();
+                        * height;
             }
         }
     }
@@ -1678,7 +1695,7 @@ QCPAxis::AxisType QCPAxis::opposite(QCPAxis::AxisType type)
 void QCPAxis::mousePressEvent(QMouseEvent* event, [[maybe_unused]] const QVariant& details)
 {
     if (!mParentPlot->interactions().testFlag(QCP::iRangeDrag) || !mRangeDraggable
-        || !mAxisRect->rangeDrag().testFlag(orientation()))
+        || !axisRect()->rangeDrag().testFlag(orientation()))
     {
         event->ignore();
         return;
@@ -1789,7 +1806,7 @@ void QCPAxis::wheelEvent(QWheelEvent* event)
 {
     // Mouse range zooming interaction:
     if (!mParentPlot->interactions().testFlag(QCP::iRangeZoom) || !mRangeZoomable
-        || !mAxisRect->rangeZoom().testFlag(orientation()))
+        || !axisRect()->rangeZoom().testFlag(orientation()))
     {
         event->ignore();
         return;
@@ -1800,7 +1817,7 @@ void QCPAxis::wheelEvent(QWheelEvent* event)
     const QPointF pos = event->position();
 
     const double wheelSteps = delta / 120.0;
-    const double factor = qPow(mAxisRect->rangeZoomFactor(orientation()), wheelSteps);
+    const double factor = qPow(axisRect()->rangeZoomFactor(orientation()), wheelSteps);
     const QPointer<QCPAxis> alive(this); // a rangeChanged slot may delete this axis
     // A linked axis zooms its source, around the source value the cursor points at.
     QCPAxis* target = moveTarget();
@@ -1880,7 +1897,7 @@ void QCPAxis::draw(QCPPainter* painter)
     mAxisPainter->subTickPen = getSubTickPen();
     mAxisPainter->tickLabelFont = getTickLabelFont();
     mAxisPainter->tickLabelColor = getTickLabelColor();
-    mAxisPainter->axisRect = mAxisRect->rect();
+    mAxisPainter->axisRect = axisRect()->rect();
     mAxisPainter->viewportRect = mParentPlot->viewport();
     mAxisPainter->reversedEndings = mRangeReversed;
     mAxisPainter->tickPositions = tickPositions;
@@ -2037,7 +2054,7 @@ int QCPAxis::calculateMargin()
     mAxisPainter->labelRenderer = mLabelRenderer;
     mAxisPainter->tickLabelFont = mTickLabelFont;
     applyTickLabelFormat();
-    mAxisPainter->axisRect = mAxisRect->rect();
+    mAxisPainter->axisRect = axisRect()->rect();
     mAxisPainter->viewportRect = mParentPlot->viewport();
     mAxisPainter->tickPositions = tickPositions;
     mAxisPainter->tickLabels = tickLabels;
@@ -3010,7 +3027,16 @@ const QFontMetrics& QCPAxisPainterPrivate::fontMetricsFor(const QFont& font)
 */
 QCPArea* QCPAxis::area() const
 {
-    return mAxisRect;
+    return mArea;
+}
+
+/*!
+  Returns the axis rect this axis is drawn in.
+*/
+QCPAxisRect* QCPAxis::axisRect() const
+{
+    // A cartesian axis is always drawn in a rect: that is the area it was built with.
+    return static_cast<QCPAxisRect*>(mArea);
 }
 
 /*! \internal
@@ -3036,12 +3062,12 @@ bool QCPAxis::scaleTypeWillChange([[maybe_unused]] ScaleType type)
 */
 void QCPAxis::markAppearanceDirty()
 {
-    if (!mAxisRect)
+    if (!axisRect())
         return;
     // A margin change moves every axis, grid and plottable of the rect: invalidate their buffers
     // instead of dirtying them, so a pending pan translation cannot show the old frame.
-    mAxisRect->markAffectedLayersDirty(true);
-    mAxisRect->markItemsUsingAxisDirty(this);
+    axisRect()->markAffectedLayersDirty(true);
+    axisRect()->markItemsUsingAxisDirty(this);
 }
 
 /*! \internal
@@ -3053,7 +3079,7 @@ bool QCPAxis::checkLinkSource(const QCPAxisBase* source) const
 {
     const auto* axis = qobject_cast<const QCPAxis*>(source);
     QCP_CHECK_OR_RETURN(axis, "the linked axes must both be cartesian", false);
-    QCP_CHECK_OR_RETURN(axis->mOrientation == mOrientation,
+    QCP_CHECK_OR_RETURN(axis->orientation() == orientation(),
                         "the linked axes must have the same orientation", false);
     return true;
 }
@@ -3069,10 +3095,10 @@ bool QCPAxis::checkLinkSource(const QCPAxisBase* source) const
 */
 void QCPAxis::rangeDidChange(const QCPRange& oldRange)
 {
-    if (mAxisRect)
+    if (axisRect())
     {
-        mAxisRect->markAffectedLayersDirty();
-        mAxisRect->markItemsUsingAxisDirty(this);
+        axisRect()->markAffectedLayersDirty();
+        axisRect()->markItemsUsingAxisDirty(this);
     }
     QCPAxisBase::rangeDidChange(oldRange);
 }

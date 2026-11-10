@@ -199,7 +199,8 @@ public:
     // getters:
     AxisType axisType() const { return mAxisType; }
 
-    QCPAxisRect* axisRect() const { return mAxisRect; }
+    // Out of line: it reads the base's area pointer, and the rect type is complete in the .cpp.
+    QCPAxisRect* axisRect() const;
 
     QCPArea* area() const override;
 
@@ -351,10 +352,8 @@ protected:
     // property members:
     // axis base:
     AxisType mAxisType;
-    QCPAxisRect* mAxisRect;
     // int mOffset; // in QCPAxisPainter
     int mPadding;
-    Qt::Orientation mOrientation;
     QPen mBasePen, mSelectedBasePen;
     // QCPLineEnding mLowerEnding, mUpperEnding; // in QCPAxisPainter
     //  axis label:

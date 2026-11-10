@@ -50,7 +50,7 @@ public:
     virtual ~QCPPolarAxisAngular() override;
 
     // getters:
-    // Out of line: QCPPolarArea is incomplete here, and the covariant return needs it complete.
+    // Out of line: the covariant return needs QCPPolarArea complete.
     QCPPolarArea* area() const override;
 
     double angle() const { return mAngle; }
@@ -164,6 +164,9 @@ public:
     SelectablePart getPartAt(const QPointF& pos) const override;
 
 protected:
+    // The area as the polar one it always is: the base stores it as a plain QCPArea.
+    QCPPolarArea* polarArea() const { return static_cast<QCPPolarArea*>(mArea); }
+
     // property members:
     double mAngle, mAngleRad;
     QPen mBasePen, mSelectedBasePen;
@@ -191,7 +194,6 @@ protected:
     QPen mSubTickPen, mSelectedSubTickPen;
 
     // non-property members:
-    QCPPolarArea* mArea;
     QVector<QPointF> mTickVectorCosSin;
     QVector<QPointF> mSubTickVectorCosSin;
     // The boxes of the tick labels last drawn: what a click on a label lands in.
