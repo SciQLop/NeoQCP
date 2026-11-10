@@ -88,6 +88,8 @@ public:
     QCPCoordinateSystem* system(QCPAxisBase* key, QCPAxisBase* value);
     //! The systems the area owns, in creation order.
     QList<QCPCoordinateSystem*> systems() const;
+    //! Whether any of those systems has a listener on its changed() signal.
+    [[nodiscard]] bool systemsListen() const;
 
     // Called by an axis whose mapping moved without a range setter (a link, a direction, an angle):
     // the systems that use it are stale from now on.

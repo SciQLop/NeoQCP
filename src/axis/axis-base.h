@@ -218,6 +218,8 @@ protected:
     QVector<double> mTickVector;
     QVector<QString> mTickVectorLabels;
     QVector<double> mSubTickVector;
+    //! How many connections listen to rangeChanged: asked on every range set of a drag or a pan.
+    int mRangeListeners = 0;
     std::shared_ptr<const QCPAxisLink> mLink;
     QList<QPointer<QCPAxisBase>> mLinkedAxes;
 
@@ -243,6 +245,11 @@ protected:
     virtual void markAppearanceDirty();
     // The checks a subclass adds before it lets a link be made. The default accepts.
     virtual bool checkLinkSource(const QCPAxisBase* source) const;
+
+    //! Whether anything listens to what a mapping change tells: the linked axes or a system.
+    [[nodiscard]] bool defersEmissions() const;
+    void connectNotify(const QMetaMethod& signal) override;
+    void disconnectNotify(const QMetaMethod& signal) override;
 
     // Drops every link, this axis's own and the ones following it. Idempotent: a subclass calls it
     // while it still exists, the destructor as a fallback.

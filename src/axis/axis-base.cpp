@@ -1,4 +1,6 @@
 #include "axis-base.h"
+
+#include <optional>
 #include "../coordinate-system.h"
 #include "../core.h"
 #include "../drawable.h"
@@ -49,7 +51,9 @@ void QCPAxisBase::detachLinks()
         const QList<QPointer<QCPAxisBase>> users = mLinkedAxes;
         mLinkedAxes.clear();
         // Their systems' changed() is deferred past the loop: a slot may delete one of them.
-        const QCPEmissionScope scope(mParentPlot);
+        std::optional<QCPEmissionScope> scope;
+    if (defersEmissions())
+        scope.emplace(mParentPlot);
         for (const QPointer<QCPAxisBase>& user : users)
             if (user)
             {
@@ -74,7 +78,9 @@ void QCPAxisBase::setScaleType(QCPAxisBase::ScaleType type)
 {
     if (mScaleType == type)
         return;
-    const QCPEmissionScope scope(mParentPlot);
+    std::optional<QCPEmissionScope> scope;
+    if (defersEmissions())
+        scope.emplace(mParentPlot);
     if (!scaleTypeWillChange(type))
         return;
     mScaleType = type;
@@ -124,6 +130,30 @@ void QCPAxisBase::markAppearanceDirty()
 
   The checks a subclass adds before it takes a link. The base accepts every source it is handed.
 */
+/*! \internal
+
+  Whether anything listens to what a mapping change tells: a rangeChanged slot, a linked axis, or a
+  system of the area. With none of them, deferring only costs a queue entry per range set.
+*/
+bool QCPAxisBase::defersEmissions() const
+{
+    return mRangeListeners > 0 || !mLinkedAxes.isEmpty() || (mArea && mArea->systemsListen());
+}
+
+void QCPAxisBase::connectNotify(const QMetaMethod& signal)
+{
+    if (signal == QMetaMethod::fromSignal(&QCPAxisBase::rangeChanged))
+        ++mRangeListeners;
+    QCPLayerable::connectNotify(signal);
+}
+
+void QCPAxisBase::disconnectNotify(const QMetaMethod& signal)
+{
+    if (signal == QMetaMethod::fromSignal(&QCPAxisBase::rangeChanged))
+        --mRangeListeners;
+    QCPLayerable::disconnectNotify(signal);
+}
+
 bool QCPAxisBase::checkLinkSource([[maybe_unused]] const QCPAxisBase* source) const
 {
     return true;
@@ -200,7 +230,9 @@ void QCPAxisBase::setRangeReversed(bool reversed)
     mRangeReversed = reversed;
     // The systems' revision bumps now; their changed() waits for this scope, as their slots may
     // delete this axis and the linked axes are still to be told.
-    const QCPEmissionScope scope(mParentPlot);
+    std::optional<QCPEmissionScope> scope;
+    if (defersEmissions())
+        scope.emplace(mParentPlot);
     notifyMappingChanged();
     markAppearanceDirty();
     // No signal carries a reversal, so the linked axes are told here.
@@ -451,7 +483,9 @@ void QCPAxisBase::linkTo(QCPAxisBase* source, QCPAxisFunction forward, QCPAxisFu
     source->mLinkedAxes.append(this);
     mLinked = true;
     // The systems hear of the link when this returns: a slot may delete the axis.
-    const QCPEmissionScope scope(mParentPlot);
+    std::optional<QCPEmissionScope> scope;
+    if (defersEmissions())
+        scope.emplace(mParentPlot);
     notifyMappingChanged();
     refreshFromLink();
     markAppearanceDirty();
@@ -515,7 +549,9 @@ void QCPAxisBase::rangeDidChange(const QCPRange& oldRange)
 {
     // The systems' revision bumps now, so no frame is reused; their changed() waits for the end of
     // this call, as its slots may delete this axis, and the layers are still to be dirtied.
-    const QCPEmissionScope scope(mParentPlot);
+    std::optional<QCPEmissionScope> scope;
+    if (defersEmissions())
+        scope.emplace(mParentPlot);
     notifyMappingChanged();
     // Before the signal: a slot that reads a linked axis sees the range it was told about.
     refreshLinkedAxes();
@@ -579,7 +615,9 @@ void QCPAxisBase::commitRange(const QCPRange& range)
     }
     QCPAxisBase* source = mLink->source;
     QCP_CHECK_OR_RETURN(source, "the source of the link is gone", );
-    const QCPEmissionScope scope(mParentPlot);
+    std::optional<QCPEmissionScope> scope;
+    if (defersEmissions())
+        scope.emplace(mParentPlot);
     source->setRange(sourceRange);
     refreshFromLink();
 }
@@ -595,7 +633,9 @@ void QCPAxisBase::unlink()
         source->mLinkedAxes.removeAll(this);
     mLink.reset();
     mLinked = false;
-    const QCPEmissionScope scope(mParentPlot);
+    std::optional<QCPEmissionScope> scope;
+    if (defersEmissions())
+        scope.emplace(mParentPlot);
     notifyMappingChanged();
     markAppearanceDirty();
 }

@@ -119,8 +119,31 @@ QList<QCPAbstractPlottable*> QCPCoordinateSystem::plottables() const
 */
 void QCPCoordinateSystem::bumpRevision()
 {
+    // The revision always moves, so no frame is ever reused; the signal costs nothing when nobody
+    // listens, and every axis setter of a drag or a pan goes through here.
     mRevision = qcp::nextSystemRevision();
+    if (!listens())
+        return;
     qcpEmit(this, mArea ? mArea->parentPlot() : nullptr, &QCPCoordinateSystem::changed);
+}
+
+/*! \internal
+
+  Keeps the count \ref listens() answers with: the connections cannot be counted on every range set.
+*/
+void QCPCoordinateSystem::connectNotify(const QMetaMethod& signal)
+{
+    if (signal == QMetaMethod::fromSignal(&QCPCoordinateSystem::changed))
+        ++mChangedListeners;
+    QObject::connectNotify(signal);
+}
+
+/*! \internal */
+void QCPCoordinateSystem::disconnectNotify(const QMetaMethod& signal)
+{
+    if (signal == QMetaMethod::fromSignal(&QCPCoordinateSystem::changed))
+        --mChangedListeners;
+    QObject::disconnectNotify(signal);
 }
 
 /*! \class QCPCartesianSystem

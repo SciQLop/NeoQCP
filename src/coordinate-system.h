@@ -104,6 +104,11 @@ public:
     //! Bumped by every mapping change; a recording compares it before it replays.
     quint64 revision() const { return mRevision; }
 
+    /*! Whether anything is connected to \ref changed(). The revision always moves; the signal is
+        only queued when it has a listener, because every axis setter of a drag or a pan passes
+        through \ref bumpRevision. */
+    [[nodiscard]] bool listens() const { return mChangedListeners > 0; }
+
     //! The plottables drawn through this system, in plot order.
     QList<QCPAbstractPlottable*> plottables() const;
 
@@ -116,11 +121,14 @@ protected:
 
     // The one place the revision moves: subclasses call it when their parameters changed.
     void bumpRevision();
+    void connectNotify(const QMetaMethod& signal) override;
+    void disconnectNotify(const QMetaMethod& signal) override;
 
     QCPArea* mArea;
     QCPAxisBase* mKeyAxis;
     QCPAxisBase* mValueAxis;
     quint64 mRevision = qcp::nextSystemRevision();
+    int mChangedListeners = 0;
 
 private:
     friend class QCPArea;

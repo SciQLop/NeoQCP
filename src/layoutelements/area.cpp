@@ -157,6 +157,19 @@ void QCPArea::axisRemoved(const QCPAxisBase* axis)
 
 /*! \internal
 
+  A deformation of the frame has two audiences: the axes linked through it and the systems. When
+  neither listens, the deferral only costs a queue entry per range set of a drag or a pan.
+*/
+bool QCPArea::systemsListen() const
+{
+    for (const QPointer<QCPCoordinateSystem>& system : std::as_const(mSystems))
+        if (system && system->listens())
+            return true;
+    return false;
+}
+
+/*! \internal
+
   A system its owner deleted directly is still a hole in the list: it goes here, where the list is
   read, so a re-entrant pass never walks over a null and the surviving systems keep their order.
 */
