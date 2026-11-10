@@ -228,6 +228,10 @@ protected:
     // The checks a subclass adds before it lets a link be made. The default accepts.
     virtual bool checkLinkSource(const QCPAxisBase* source) const;
 
+    // Drops every link, this axis's own and the ones following it. Idempotent: a subclass calls it
+    // while it still exists, the destructor as a fallback.
+    void detachLinks();
+
     // Takes the source's range, its direction included, through the link's forward function.
     void refreshFromLink();
     void refreshLinkedAxes();

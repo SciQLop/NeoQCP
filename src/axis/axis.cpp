@@ -497,6 +497,8 @@ QCPAxis::QCPAxis(QCPAxisRect* parent, AxisType type)
 
 QCPAxis::~QCPAxis()
 {
+    // Before the parts the link's users would reach through: a detach refreshes and dirties them.
+    detachLinks();
     if (mParentPlot)
         if (auto* grl = mParentPlot->gridRhiLayerIfExists())
             grl->unregisterAxis(this);
@@ -636,7 +638,8 @@ double QCPAxis::linkedCoordToPixel(double value) const
 {
     if (!mLink || !mLink->inverse || !mAxisRect)
         return qQNaN();
-    const auto* source = qobject_cast<const QCPAxis*>(mLink->source.data());
+    // Only cartesian axes link, so a link source always is one.
+    const auto* source = static_cast<const QCPAxis*>(mLink->source.data());
     if (!source || !source->mAxisRect)
         return qQNaN();
     const QRectF sourceRect = source->mAxisRect->rect();
@@ -660,7 +663,8 @@ double QCPAxis::linkedPixelToCoord(double value) const
 {
     if (!mLink || !mLink->forward || !mAxisRect)
         return qQNaN();
-    const auto* source = qobject_cast<const QCPAxis*>(mLink->source.data());
+    // Only cartesian axes link, so a link source always is one.
+    const auto* source = static_cast<const QCPAxis*>(mLink->source.data());
     if (!source || !source->mAxisRect)
         return qQNaN();
     const QRectF sourceRect = source->mAxisRect->rect();

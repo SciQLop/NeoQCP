@@ -22,6 +22,15 @@ QCPAxisBase::QCPAxisBase(QCPLayerable* parentLayerable)
 
 QCPAxisBase::~QCPAxisBase()
 {
+    detachLinks();
+}
+
+/*! \internal
+  Drops every link, this axis's own and the ones following it, so neither end outlives the other.
+  A subclass calls it while its own parts still exist; the destructor's call then finds nothing.
+*/
+void QCPAxisBase::detachLinks()
+{
     // A linked axis leaves its source's list: a dead link must not keep the source busy.
     if (mLink)
     {
@@ -83,7 +92,8 @@ void QCPAxisBase::scaleTypeDidChange()
     markAppearanceDirty();
     // The axes following this one map through it, so their pixels moved even where their range did
     // not.
-    for (const QPointer<QCPAxisBase>& user : std::as_const(mLinkedAxes))
+    const QList<QPointer<QCPAxisBase>> users = mLinkedAxes; // a slot may drop one
+    for (const QPointer<QCPAxisBase>& user : users)
         if (user)
         {
             user->refreshFromLink();
