@@ -457,7 +457,7 @@ const QCPDrawFrame& memoFrame(const QCPDrawnView& view, const QRect& clip)
         || memo.keyRange != keyRange || memo.valueRange != valueRange || memo.clip != clip)
     {
         memo.frame = view.system
-            ? QCPDrawFrame { view.system->transform(), view.system->ratioTransform(),
+            ? QCPDrawFrame { view.system->transform(), view.system->frameRatioTransform(),
                              QRectF(clip) }
             : qcpMakeFrame(view.keyAxis, view.valueAxis, view.axisRect, QRectF(clip));
         memo.plot = view.plot;

@@ -36,6 +36,12 @@ public:
     explicit QCPMultiGraph(QCPAxis* keyAxis, QCPAxis* valueAxis);
     ~QCPMultiGraph() override;
 
+    //! It draws one lane per source: its frame must offer lanes.
+    [[nodiscard]] QCP::Capabilities requiredCapabilities() const override
+    {
+        return QCPAbstractLine::requiredCapabilities() | QCP::capLanes;
+    }
+
     // Data source
     void setDataSource(std::unique_ptr<QCPAbstractMultiDataSource> source);
     virtual void setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> source);

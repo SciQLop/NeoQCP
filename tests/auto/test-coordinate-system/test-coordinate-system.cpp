@@ -7,6 +7,7 @@
 #include "polar/radialaxis.h"
 #include "qcustomplot.h"
 #include <QtTest/QtTest>
+#include <QPicture>
 
 namespace
 {
@@ -71,6 +72,42 @@ private:
     std::shared_ptr<const std::vector<QPointF>> mLine
         = std::make_shared<const std::vector<QPointF>>(
             std::initializer_list<QPointF> { { 1, 1 }, { 9, 9 } });
+};
+
+QColor pixelAt(QCustomPlot& plot, QPoint pos)
+{
+    return QColor(plot.toPixmap(400, 300).toImage().pixel(pos));
+}
+
+//! The frame a polar area gives its one angular and one radial axis.
+QCPCoordinateSystem* polarSystem(QCPPolarArea* area)
+{
+    return area->system(area->angularAxis(), area->radialAxis());
+}
+
+//! A plottable that needs nothing of its system and records the arc its data describes.
+class ArcPlottable : public QCPAbstractPlottable1D<QCPGraphData>
+{
+public:
+    explicit ArcPlottable(QCPCoordinateSystem* system)
+            : QCPAbstractPlottable1D<QCPGraphData>(system)
+    {
+    }
+
+    [[nodiscard]] QCP::Capabilities requiredCapabilities() const override { return { }; }
+
+    void setArc(QVector<QCPGraphData> points) { mDataContainer->set(points); }
+
+    [[nodiscard]] int recordings() const { return mCore.recordingCount(); }
+
+    void draw(QCPDrawContext& context) const override
+    {
+        std::vector<QPointF> arc;
+        for (const QCPGraphData& point : *mDataContainer)
+            arc.emplace_back(point.key, point.value);
+        context.polyline(std::make_shared<const std::vector<QPointF>>(std::move(arc)),
+                         QPen(Qt::black, 3));
+    }
 };
 
 } // namespace
@@ -362,4 +399,159 @@ void TestCoordinateSystem::deletingAnAxisDeletesItsSystems()
     QCOMPARE(rect->systems().first(), kept);
     QCOMPARE(stayer->system(), kept);
     QVERIFY(!leaver->system());
+}
+
+void TestCoordinateSystem::barsAreRefusedInAPolarSystem_data()
+{
+    QTest::addColumn<QString>("kind");
+    QTest::newRow("bars") << QStringLiteral("bars");
+    QTest::newRow("colormap") << QStringLiteral("colormap");
+    QTest::newRow("multigraph") << QStringLiteral("multigraph");
+    QTest::newRow("intervals") << QStringLiteral("intervals");
+}
+
+void TestCoordinateSystem::barsAreRefusedInAPolarSystem()
+{
+    QFETCH(QString, kind);
+    QCustomPlot plot;
+    plot.plotLayout()->clear();
+    auto* rect = new QCPAxisRect(&plot);
+    plot.plotLayout()->addElement(0, 0, rect);
+    auto* area = new QCPPolarArea(&plot);
+    plot.plotLayout()->addElement(0, 1, area);
+    settle(plot);
+
+    QCPAxis* key = rect->axis(QCPAxis::atBottom);
+    QCPAxis* value = rect->axis(QCPAxis::atLeft);
+    QCPAbstractPlottable* plottable = nullptr;
+    if (kind == QStringLiteral("bars"))
+        plottable = new QCPBars(key, value);
+    else if (kind == QStringLiteral("colormap"))
+        plottable = new QCPColorMap(key, value);
+    else if (kind == QStringLiteral("multigraph"))
+        plottable = new QCPMultiGraph(key, value);
+    else
+        plottable = new QCPIntervals(key, value, new QCPLaneLayout(&plot));
+
+    // What each class needs: the cartesian pair, plus the flags its drawing assumes.
+    const QCP::Capabilities required = plottable->requiredCapabilities();
+    QVERIFY(required.testFlag(QCP::capRectangular));
+    QVERIFY(required.testFlag(QCP::capStraightKey));
+    // A line maps its scalar through a colour scale, so a multi-graph needs one as well.
+    QCOMPARE(required.testFlag(QCP::capColourScale),
+             kind == QStringLiteral("colormap") || kind == QStringLiteral("multigraph"));
+    QCOMPARE(required.testFlag(QCP::capLanes),
+             kind == QStringLiteral("multigraph") || kind == QStringLiteral("intervals"));
+
+    // The polar system offers none of them: the join is refused and the plottable stays put.
+    QCPCoordinateSystem* own = plottable->system();
+    QVERIFY(own);
+    plottable->setSystem(polarSystem(area));
+    QCOMPARE(plottable->system(), own);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    test_misuse::calls.clear(); // the refusal is the point of this test
+}
+
+void TestCoordinateSystem::aRecordingPlottableWithNoNeedsJoinsPolar()
+{
+    QCustomPlot plot;
+    plot.setBackground(QBrush(Qt::white));
+    QCPPolarArea* area = polarArea(plot);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    area->angularAxis()->setVisible(false);
+    area->radialAxis()->setVisible(false);
+    area->grid()->setVisible(false);
+    settle(plot);
+
+    auto* arc = new ArcPlottable(polarSystem(area));
+    QVERIFY(arc->system());
+    QCOMPARE(arc->requiredCapabilities(), QCP::Capabilities());
+    // The angular axis starts at -90 degrees: data coordinates are its own scale, so the arc is
+    // asked for in angle coordinates, as a plottable reads them.
+    const auto angleCoord = [area](double degrees)
+    { return area->angularAxis()->angleRadToCoord(degrees / 180.0 * M_PI); };
+    arc->setArc(QVector<QCPGraphData> { { angleCoord(40), 0.5 }, { angleCoord(50), 0.5 } });
+    settle(plot);
+
+    // The pixels are the ones the axes themselves give that polar coordinate.
+    const auto atAngle = [area](double degrees)
+    {
+        return area->radialAxis()
+            ->coordToPixel(area->angularAxis()->angleRadToCoord(degrees / 180.0 * M_PI), 0.5)
+            .toPoint();
+    };
+    QVERIFY2(pixelAt(plot, atAngle(45.0)).lightness() < 128, "the arc is not drawn on its polar pixels");
+    QCOMPARE(pixelAt(plot, atAngle(-45.0)).lightness(), 255);
+}
+
+void TestCoordinateSystem::relationshipsAcrossAreasAreRefused()
+{
+    QCustomPlot plot;
+    plot.plotLayout()->clear();
+    auto* left = new QCPAxisRect(&plot);
+    auto* right = new QCPAxisRect(&plot);
+    plot.plotLayout()->addElement(0, 0, left);
+    plot.plotLayout()->addElement(0, 1, right);
+    settle(plot);
+    const auto pairOf = [](QCPAxisRect* rect)
+    {
+        return std::pair<QCPAxis*, QCPAxis*> { rect->axis(QCPAxis::atBottom),
+                                               rect->axis(QCPAxis::atLeft) };
+    };
+
+    // A channel fill spans one frame: two areas are refused.
+    auto [leftKey, leftValue] = pairOf(left);
+    auto [rightKey, rightValue] = pairOf(right);
+    auto* here = new QCPGraph(leftKey, leftValue);
+    auto* there = new QCPGraph(rightKey, rightValue);
+    here->setChannelFillGraph(there);
+    QVERIFY(!here->channelFillGraph());
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    test_misuse::calls.clear();
+
+    // So does a stacking, whether by moveAbove or by a bars group.
+    auto* mine = new QCPBars(leftKey, leftValue);
+    auto* theirs = new QCPBars(rightKey, rightValue);
+    mine->moveAbove(theirs);
+    QVERIFY(!mine->barAbove());
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    test_misuse::calls.clear();
+
+    auto* group = new QCPBarsGroup(&plot);
+    group->append(mine);
+    QCOMPARE(group->size(), 1);
+    group->append(theirs);
+    QCOMPARE(group->size(), 1);
+    QVERIFY(!theirs->barsGroup());
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    test_misuse::calls.clear();
+
+    // Whiskers draw their data plottable's points: they must be in its frame.
+    auto* whiskers = new QCPErrorBars(leftKey, leftValue);
+    whiskers->setDataPlottable(there);
+    QVERIFY(!whiskers->dataPlottable());
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    test_misuse::calls.clear(); // the three refusals are the point of this test
+}
+
+void TestCoordinateSystem::aBracketDecorationNeedsAKeyAxis()
+{
+    QCustomPlot plot;
+    QCPPolarArea* area = polarArea(plot);
+    auto* arc = new ArcPlottable(polarSystem(area));
+    arc->setArc(QVector<QCPGraphData> { { 0, 0.5 }, { 90, 0.5 } });
+    auto* bracket = new QCPSelectionDecoratorBracket;
+    arc->setSelectionDecorator(bracket);
+    arc->setSelectable(QCP::stSingleData);
+    arc->setSelection(QCPDataSelection(QCPDataRange(0, 2)));
+    settle(plot);
+
+    // A bracket is a cartesian caption: without a key axis there is no direction to face, and
+    // drawing one would pin it to the origin of the image.
+    QPicture picture;
+    QCPPainter painter(&picture);
+    bracket->drawDecoration(&painter, arc->selection());
+    painter.end();
+    QVERIFY(picture.boundingRect().isEmpty());
 }

@@ -28,6 +28,7 @@
 
 #include "../axis/axis.h"
 #include "../core.h"
+#include "../misuse.h"
 #include "../layoutelements/layoutelement-axisrect.h"
 #include "../painting/painter.h"
 #include "../painting/line-extruder.h"
@@ -311,10 +312,10 @@ void QCPGraph::setChannelFillGraph(QCPGraph* targetGraph)
         mChannelFillGraph = nullptr;
         return;
     }
-    // prevent setting channel target to a graph not in the plot:
-    if (targetGraph && targetGraph->mParentPlot != mParentPlot)
+    // A channel fill closes a band between two recordings: the two graphs share one frame.
+    if (targetGraph && targetGraph->system() != system())
     {
-        qDebug() << Q_FUNC_INFO << "targetGraph not in same plot";
+        qcp::reportMisuse(Q_FUNC_INFO, "a channel fill needs both graphs in one coordinate system");
         mChannelFillGraph = nullptr;
         return;
     }

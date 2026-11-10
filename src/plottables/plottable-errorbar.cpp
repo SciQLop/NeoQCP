@@ -27,6 +27,7 @@
 
 #include "../axis/axis.h"
 #include "../core.h"
+#include "../misuse.h"
 #include "../layoutelements/layoutelement-axisrect.h"
 #include "../painting/draw-context.h"
 #include "../painting/painter.h"
@@ -230,6 +231,15 @@ void QCPErrorBars::setDataPlottable(QCPAbstractPlottable* plottable)
         qDebug()
             << Q_FUNC_INFO
             << "passed plottable doesn't implement 1d interface, can't associate with QCPErrorBars";
+        return;
+    }
+
+    // The whiskers are read off the data plottable's pixels, so both live in one frame.
+    if (plottable && plottable->system() != system())
+    {
+        detachDataPlottable();
+        qcp::reportMisuse(Q_FUNC_INFO,
+                          "error bars need a data plottable in their coordinate system");
         return;
     }
 

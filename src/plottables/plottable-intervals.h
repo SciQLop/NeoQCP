@@ -28,6 +28,12 @@ public:
     QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* layout);
     ~QCPIntervals() override;
 
+    //! It draws one lane per row: its frame must offer lanes.
+    [[nodiscard]] QCP::Capabilities requiredCapabilities() const override
+    {
+        return QCPAbstractPlottable::requiredCapabilities() | QCP::capLanes;
+    }
+
     void setData(qcp::intervals::Columns columns);
     [[nodiscard]] const qcp::intervals::Columns& columns() const { return mColumns; }
     [[nodiscard]] int rowCount() const { return static_cast<int>(mColumns.start.size()); }

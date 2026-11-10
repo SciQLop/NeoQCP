@@ -27,6 +27,7 @@
 
 #include "../axis/axis.h"
 #include "../core.h"
+#include "../misuse.h"
 #include "../layoutelements/layoutelement-axisrect.h"
 #include "../painting/draw-context.h"
 #include "../painting/painter.h"
@@ -643,6 +644,15 @@ void QCPBars::setBarsGroup(QCPBarsGroup* barsGroup)
 {
     if (barsGroup == mBarsGroup)
         return;
+    // A group centres its members against each other, so they must share one frame.
+    if (barsGroup)
+        for (QCPBars* member : barsGroup->bars())
+            if (member != this && member->system() != system())
+            {
+                qcp::reportMisuse(Q_FUNC_INFO,
+                                  "a bars group needs all its bars in one coordinate system");
+                return;
+            }
     markDirty();
     // deregister at old group:
     if (mBarsGroup)
@@ -780,10 +790,10 @@ void QCPBars::moveRelativeTo(QCPBars* bars, bool above)
 {
     if (bars == this)
         return;
-    if (bars && (bars->keyAxis() != mKeyAxis.data() || bars->valueAxis() != mValueAxis.data()))
+    // Stacking sums one bar's height onto another's: both must be drawn in the same frame.
+    if (bars && bars->system() != system())
     {
-        qDebug() << Q_FUNC_INFO
-                 << "passed QCPBars* doesn't have same key and value axis as this QCPBars";
+        qcp::reportMisuse(Q_FUNC_INFO, "stacked bars need one coordinate system");
         return;
     }
     markDirty(); // the restacking below changes what is drawn

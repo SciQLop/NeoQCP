@@ -223,7 +223,9 @@ QList<QPolygonF> QCPSelectionDecoratorBracket::bracketOutline(int direction) con
 */
 void QCPSelectionDecoratorBracket::drawDecoration(QCPPainter* painter, QCPDataSelection selection)
 {
-    if (!mPlottable || selection.isEmpty())
+    // A bracket faces a key axis: without one there is no direction to face, and a bracket
+    // pinned to the origin of the image is worse than none.
+    if (!mPlottable || selection.isEmpty() || !mPlottable->keyAxis())
         return;
 
     if (QCPPlottableInterface1D* interface1d = mPlottable->interface1D())
@@ -272,8 +274,8 @@ void QCPSelectionDecoratorBracket::drawDecoration(QCPPainter* painter, QCPDataSe
 bool QCPSelectionDecoratorBracket::recordDecoration(QCPDrawContext& context,
                                                     QCPDataSelection selection) const
 {
-    if (!mPlottable || !mPlottable->interface1D() || selection.isEmpty()
-        || bracketOutline(1).isEmpty())
+    if (!mPlottable || !mPlottable->keyAxis() || !mPlottable->interface1D()
+        || selection.isEmpty() || bracketOutline(1).isEmpty())
         return false;
     // The brackets are pixel-sized around a pixel anchor: the recording follows the transform, as
     // any other baked pixel does.

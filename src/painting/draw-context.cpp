@@ -395,7 +395,7 @@ QCPDrawContext::QCPDrawContext(const QCPAxis* keyAxis, const QCPAxis* valueAxis,
         , mSystem(system)
         , mList(std::make_unique<QCPDrawList>())
         , mTransform(system ? system->transform() : QCPTransform(keyAxis, valueAxis))
-        , mRatio(system ? system->ratioTransform() : QCPRatioTransform(axisRect))
+        , mRatio(system ? system->frameRatioTransform() : QCPRatioTransform(axisRect))
         , mClip(clip.isNull() ? (system ? system->clipRect()
                                        : (axisRect ? QRectF(axisRect->rect()) : QRectF()))
                               : clip)
@@ -409,7 +409,7 @@ QCPDrawContext::~QCPDrawContext() = default;
 QCPDrawFrame QCPDrawContext::frame() const
 {
     if (mSystem)
-        return QCPDrawFrame { mSystem->transform(), mSystem->ratioTransform(), mClip };
+        return QCPDrawFrame { mSystem->transform(), mSystem->frameRatioTransform(), mClip };
     return qcpMakeFrame(mKeyAxis, mValueAxis, mAxisRect, mClip);
 }
 

@@ -21,6 +21,12 @@ public:
                                     bool transparentNan = false);
     ~QCPAbstractColorMapped() override;
 
+    //! It reads a colour scale: its frame must offer one.
+    [[nodiscard]] QCP::Capabilities requiredCapabilities() const override
+    {
+        return QCPAbstractPlottable::requiredCapabilities() | QCP::capColourScale;
+    }
+
     // getters:
     [[nodiscard]] QCPRange dataRange() const { return mDataRange; }
 

@@ -21,4 +21,9 @@ private slots:
     void movingBetweenSystemsReRecords();
     void aPlottableOfADeletedSystemIsInert();
     void crossPlotSystemIsRefused();
+    void barsAreRefusedInAPolarSystem_data();
+    void barsAreRefusedInAPolarSystem();
+    void aRecordingPlottableWithNoNeedsJoinsPolar();
+    void relationshipsAcrossAreasAreRefused();
+    void aBracketDecorationNeedsAKeyAxis();
 };
