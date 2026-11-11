@@ -460,9 +460,21 @@ bool projectsOntoAxes(const QCPCoordinateSystem* system)
 {
     return !system || system->kind() == QCPTransform::Kind::Cartesian;
 }
+
+//! \a system when it offers \a required, else null after a misuse report: the object it belongs
+//! to stays inert, exactly like one told to join a frame it cannot draw in.
+QCPCoordinateSystem* admits(QCPCoordinateSystem* system, QCP::Capabilities required)
+{
+    if (!system)
+        return nullptr;
+    if (!(required & ~system->capabilities()))
+        return system;
+    qcp::reportMisuse(Q_FUNC_INFO, "the coordinate system lacks a capability this plottable needs");
+    return nullptr;
+}
 } // namespace
 
-QCPAbstractPlottable::QCPAbstractPlottable(QCPCoordinateSystem* system)
+QCPAbstractPlottable::QCPAbstractPlottable(QCPCoordinateSystem* system, QCP::Capabilities required)
         : QCPLayerable(system && system->area() ? system->area()->parentPlot() : nullptr, QString(),
                        system ? static_cast<QCPLayerable*>(system->area()) : nullptr)
         , mName()
@@ -470,12 +482,13 @@ QCPAbstractPlottable::QCPAbstractPlottable(QCPCoordinateSystem* system)
         , mAntialiasedScatters(true)
         , mPen(Qt::black)
         , mBrush(Qt::NoBrush)
-        , mSystem(system)
-        , mKeyAxis(system && projectsOntoAxes(system) ? qobject_cast<QCPAxis*>(system->keyAxis())
-                                                      : nullptr)
-        , mValueAxis(system && projectsOntoAxes(system)
-                         ? qobject_cast<QCPAxis*>(system->valueAxis())
+        , mSystem(admits(system, required))
+        , mKeyAxis(mSystem && projectsOntoAxes(mSystem) ? qobject_cast<QCPAxis*>(mSystem->keyAxis())
+                                                        : nullptr)
+        , mValueAxis(mSystem && projectsOntoAxes(mSystem)
+                         ? qobject_cast<QCPAxis*>(mSystem->valueAxis())
                          : nullptr)
+        , mRequiredCapabilities(required)
         , mSelectable(QCP::stWhole)
         , mSelectionDecorator(nullptr)
 {
@@ -483,17 +496,30 @@ QCPAbstractPlottable::QCPAbstractPlottable(QCPCoordinateSystem* system)
     mBusyDebounceTimer.setSingleShot(true);
     connect(&mBusyDebounceTimer, &QTimer::timeout, this, &QCPAbstractPlottable::onDebounceTimeout);
 
-    // Without a system there is no plot to join: the plottable stays inert, never drawn.
-    mReportedLostAxis = system == nullptr; // this check is the one report of that loss
-    if (!system || !mParentPlot)
+    if (!mSystem)
+    {
+        // Without a system there is no plot to join, and a frame that refused the mask said so:
+        // the plottable stays inert, registers nowhere, and owes no second report on its first
+        // draw. The plot it was built on stays its QObject parent, so nothing leaks.
+        setParentLayerable(nullptr);
+        mReportedLostAxis = true;
+        return;
+    }
+    mReportedLostAxis = false;
+    if (!mParentPlot)
         return;
     if (mParentPlot->registerPlottable(this))
         mRegisteredPlot = mParentPlot;
 }
 
-QCPAbstractPlottable::QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPAbstractPlottable(qcpSystemOfAxes(keyAxis, valueAxis))
+QCPAbstractPlottable::QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis,
+                                           QCP::Capabilities required)
+        : QCPAbstractPlottable(qcpSystemOfAxes(keyAxis, valueAxis), required)
 {
+    // A frame that refused the pair has already said so and left this object inert: the 2.x axes
+    // are not a second chance to join it.
+    if (qcpSystemOfAxes(keyAxis, valueAxis) && !mSystem)
+        return;
     // The 2.x pair is the cartesian projection of the system it resolves to: a system of the user's
     // own draws through its transform, and hands 2.x pixel code no axis at all.
     if (projectsOntoAxes(mSystem))

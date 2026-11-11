@@ -64,13 +64,15 @@ QCPCoordinateSystem* systemOfAxes(QCPPolarAxisAngular* angular, QCPPolarAxisRadi
 }
 } // namespace
 
-QCPPolarGraph::QCPPolarGraph(QCPPolarAxisAngular* keyAxis, QCPPolarAxisRadial* valueAxis)
-        : QCPPolarGraph(systemOfAxes(keyAxis, valueAxis))
+QCPPolarGraph::QCPPolarGraph(QCPPolarAxisAngular* keyAxis, QCPPolarAxisRadial* valueAxis,
+                             QCP::Capabilities required)
+        : QCPPolarGraph(systemOfAxes(keyAxis, valueAxis), required)
 {
 }
 
-QCPPolarGraph::QCPPolarGraph(QCPCoordinateSystem* system)
-        : QCPAbstractPlottable1D<QCPGraphData>(system)
+QCPPolarGraph::QCPPolarGraph(QCPCoordinateSystem* system, QCP::Capabilities required)
+        // The polar system is enough: a polar graph needs nothing of the cartesian five.
+        : QCPAbstractPlottable1D<QCPGraphData>(system, required)
         , mLineStyle(lsLine)
         , mScatterStyle()
         , mPeriodic(true)
@@ -247,11 +249,6 @@ void QCPPolarGraph::rescaleValueAxis(bool onlyEnlarge, bool inKeyRange) const
         }
         valueAxis->setRange(newRange);
     }
-}
-
-QCP::Capabilities QCPPolarGraph::requiredCapabilities() const
-{
-    return { };
 }
 
 quint64 QCPPolarGraph::dependencyRevision() const

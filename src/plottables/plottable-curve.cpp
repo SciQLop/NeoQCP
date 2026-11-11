@@ -215,7 +215,9 @@ QCPCurveData::QCPCurveData(double t, double key, double value) : t(t), key(key),
   but use QCustomPlot::removePlottable() instead.
 */
 QCPCurve::QCPCurve(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPAbstractPlottable1D<QCPCurveData, QCPAbstractLine>(keyAxis, valueAxis)
+        // A curve needs a straight segment and nothing else: no rectangle, no straight key axis.
+        : QCPAbstractPlottable1D<QCPCurveData, QCPAbstractLine>(keyAxis, valueAxis,
+                                                                QCP::capStraightSegments)
 {
     // One component: the whole curve is one line, with one pen and one marker style.
     mComponents.resize(1);

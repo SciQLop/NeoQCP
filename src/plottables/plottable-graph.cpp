@@ -26,6 +26,8 @@
 #include "plottable-graph.h"
 #include "Profiling.hpp"
 
+#include <span>
+
 #include "../axis/axis.h"
 #include "../core.h"
 #include "../misuse.h"
@@ -185,7 +187,8 @@ QCPGraphData::QCPGraphData(double key, double value) : key(key), value(value) { 
   function.
 */
 QCPGraph::QCPGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPAbstractPlottable1D<QCPGraphData>(keyAxis, valueAxis)
+        // A line graph needs a straight segment and nothing else: no rectangle, no straight key.
+        : QCPAbstractPlottable1D<QCPGraphData>(keyAxis, valueAxis, QCP::capStraightSegments)
         , mLineStyle {}
         , mScatterSkip {}
         , mAdaptiveSampling {}
@@ -312,6 +315,15 @@ void QCPGraph::setChannelFillGraph(QCPGraph* targetGraph)
         mChannelFillGraph = nullptr;
         return;
     }
+    // A band closed through a frame of the user's own is cropped in that frame's data space: both
+    // graphs must read the same mapping, or the band would join two different planes.
+    if (targetGraph && (drawsInDataSpace() || targetGraph->drawsInDataSpace())
+        && targetGraph->system() != system())
+    {
+        qcp::reportMisuse(Q_FUNC_INFO,
+                          "a channel fill needs both graphs on one coordinate system");
+        return;
+    }
     // A channel fill closes a band in pixels, along one key axis: one area and one key
     // orientation is all it reads, so two value axes are fine, as 2.x allowed.
     if (targetGraph &&
@@ -420,10 +432,10 @@ double QCPGraph::selectTest(const QPointF& pos, bool onlySelectable, QVariant* d
 {
     if ((onlySelectable && mSelectable == QCP::stNone) || mDataContainer->isEmpty())
         return -1;
-    if (!mKeyAxis || !mValueAxis)
+    if (!mSystem)
         return -1;
 
-    if (mKeyAxis.data()->axisRect()->rect().contains(pos.toPoint())
+    if (mSystem->contains(pos)
         || mParentPlot->interactions().testFlag(QCP::iSelectPlottablesBeyondAxisRect))
     {
         QCPGraphDataContainer::const_iterator closestDataPoint = mDataContainer->constEnd();
@@ -456,12 +468,9 @@ QCPRange QCPGraph::getValueRange(bool& foundRange, QCP::SignDomain inSignDomain,
 void QCPGraph::draw(QCPPainter* painter)
 {
     PROFILE_HERE_N("QCPGraph::draw");
-    if (!mKeyAxis || !mValueAxis)
-    {
-        qDebug() << Q_FUNC_INFO << "invalid key or value axis";
+    if (!mSystem)
         return;
-    }
-    if (mKeyAxis.data()->range().size() <= 0 || mDataContainer->isEmpty())
+    if ((mKeyAxis && mKeyAxis.data()->range().size() <= 0) || mDataContainer->isEmpty())
         return;
     if (mLineStyle == lsNone && mScatterStyle.isNone())
         return;
@@ -602,6 +611,11 @@ void QCPGraph::getLines(QVector<QPointF>* lines, const QCPDataRange& dataRange) 
 {
     if (!lines)
         return;
+    if (drawsInDataSpace())
+    {
+        *lines = mapToPixels(dataSpaceLines(dataRange));
+        return;
+    }
     QCPGraphDataContainer::const_iterator begin, end;
     getVisibleDataBounds(begin, end, dataRange);
     if (begin == end)
@@ -659,6 +673,11 @@ void QCPGraph::getScatters(QVector<QPointF>* scatters, const QCPDataRange& dataR
 {
     if (!scatters)
         return;
+    if (drawsInDataSpace())
+    {
+        *scatters = mapToPixels(dataSpaceScatters(dataRange));
+        return;
+    }
     QCPAxis* keyAxis = mKeyAxis.data();
     QCPAxis* valueAxis = mValueAxis.data();
     if (!keyAxis || !valueAxis)
@@ -708,6 +727,227 @@ void QCPGraph::getScatters(QVector<QPointF>* scatters, const QCPDataRange& dataR
             }
         }
     }
+}
+
+/*! \internal
+
+  Returns the line of this graph in data space: the vertices in (key, value), with the current line
+  style applied, before any mapping. A frame of the user's own takes this path instead of the pixel
+  builders below, which read the 2.x axis pair.
+
+  No decimation and no visible-range cut happen here: such a frame has no key window to narrow by,
+  and its mapping may bend a straight pixel line.
+  simplify: every vertex of \a dataRange is built and mapped on every repaint; the upgrade is to
+  decimate in data space by the system's key window, as the cartesian path decimates by pixel.
+*/
+QVector<QPointF> QCPGraph::dataSpaceLines(const QCPDataRange& dataRange) const
+{
+    QVector<QPointF> result;
+    if (mLineStyle == lsNone)
+        return result;
+    const int count = mDataContainer->size();
+    const int begin = qBound(0, dataRange.begin(), count);
+    const int end = qBound(begin, dataRange.end(), count);
+    if (begin == end)
+        return result;
+    const QCPGraphDataContainer::const_iterator first = mDataContainer->constBegin() + begin;
+    const QCPGraphDataContainer::const_iterator last = mDataContainer->constBegin() + end;
+    const auto point = [](double key, double value) {
+        if (qIsNaN(value))
+            return QPointF(qQNaN(), qQNaN()); // the split happens after mapping, on the pixels
+        return QPointF(key, value);
+    };
+
+    result.reserve(2 * (end - begin));
+    switch (mLineStyle)
+    {
+        case lsNone:
+            break;
+        case lsLine:
+            for (QCPGraphDataContainer::const_iterator it = first; it != last; ++it)
+                result.append(point(it->key, it->value));
+            break;
+        case lsStepLeft:
+        {
+            double lastValue = first->value;
+            for (QCPGraphDataContainer::const_iterator it = first; it != last; ++it)
+            {
+                result.append(point(it->key, lastValue));
+                result.append(point(it->key, it->value));
+                lastValue = it->value;
+            }
+            break;
+        }
+        case lsStepRight:
+        {
+            double lastKey = first->key;
+            for (QCPGraphDataContainer::const_iterator it = first; it != last; ++it)
+            {
+                result.append(point(lastKey, it->value));
+                result.append(point(it->key, it->value));
+                lastKey = it->key;
+            }
+            break;
+        }
+        case lsStepCenter:
+        {
+            result.append(point(first->key, first->value));
+            double lastKey = first->key;
+            double lastValue = first->value;
+            for (QCPGraphDataContainer::const_iterator it = first + 1; it != last; ++it)
+            {
+                const double midKey = (lastKey + it->key) * 0.5;
+                result.append(point(midKey, lastValue));
+                result.append(point(midKey, it->value));
+                lastKey = it->key;
+                lastValue = it->value;
+            }
+            result.append(point(lastKey, lastValue));
+            break;
+        }
+        case lsImpulse:
+            for (QCPGraphDataContainer::const_iterator it = first; it != last; ++it)
+            {
+                result.append(point(it->key, 0.0));
+                result.append(point(it->key, it->value));
+            }
+            break;
+    }
+    return result;
+}
+
+/*! \internal
+
+  Returns the scatter positions of this graph in data space, with \ref mScatterSkip applied, before
+  any mapping. NaN values are left out, as they are on the cartesian path.
+*/
+QVector<QPointF> QCPGraph::dataSpaceScatters(const QCPDataRange& dataRange) const
+{
+    const int count = mDataContainer->size();
+    const int begin = qBound(0, dataRange.begin(), count);
+    const int end = qBound(begin, dataRange.end(), count);
+    const int scatterModulo = mScatterSkip + 1;
+    QVector<QPointF> result;
+    result.reserve(end - begin);
+    for (int i = begin; i < end; ++i)
+    {
+        if (mScatterSkip > 0 && i % scatterModulo != 0)
+            continue;
+        const QCPGraphData& data = *(mDataContainer->constBegin() + i);
+        if (qIsNaN(data.value))
+            continue;
+        result.append(QPointF(data.key, data.value));
+    }
+    return result;
+}
+
+/*! \internal
+
+  Maps \a dataPoints in one batch through this graph's system. A vertex the frame cannot place (a
+  NaN in, or a NaN out: an impulse to value zero on a logarithmic axis, say) leaves a NaN pixel, so
+  \ref getNonNanSegments still splits the line and the fill around it.
+*/
+QVector<QPointF> QCPGraph::mapToPixels(const QVector<QPointF>& dataPoints) const
+{
+    QVector<QPointF> pixels(dataPoints.size(), QPointF(qQNaN(), qQNaN()));
+    if (!mSystem || dataPoints.isEmpty())
+        return pixels;
+    mSystem->transform().map(std::span<const QPointF>(dataPoints), std::span<QPointF>(pixels));
+    for (int i = 0; i < dataPoints.size(); ++i)
+    {
+        const QPointF in = dataPoints.at(i);
+        const QPointF out = pixels.at(i);
+        if (!qIsFinite(in.x()) || !qIsFinite(in.y()) || !qIsFinite(out.x())
+            || !qIsFinite(out.y()))
+            pixels[i] = QPointF(qQNaN(), qQNaN());
+    }
+    return pixels;
+}
+
+/*! \internal
+
+  Draws the channel fill between this graph and \ref mChannelFillGraph on a frame that has no key
+  axis: both lines are built in data space, split at the NaNs, cropped to their common keys and
+  closed there, and the finished polygon is mapped once.
+*/
+void QCPGraph::drawDataSpaceChannelFill(QCPPainter* painter) const
+{
+    const QVector<QPointF> thisData = dataSpaceLines(QCPDataRange(0, dataCount()));
+    const QVector<QPointF> otherData
+        = mChannelFillGraph->dataSpaceLines(QCPDataRange(0, mChannelFillGraph->dataCount()));
+    const QVector<QCPDataRange> thisSegments = getNonNanSegments(&thisData, Qt::Horizontal);
+    const QVector<QCPDataRange> otherSegments = getNonNanSegments(&otherData, Qt::Horizontal);
+    for (const QPair<QCPDataRange, QCPDataRange>& pair :
+         getOverlappingSegments(thisSegments, &thisData, otherSegments, &otherData))
+    {
+        const QPolygonF polygon
+            = dataSpaceChannelFillPolygon(&thisData, pair.first, &otherData, pair.second);
+        if (!polygon.isEmpty())
+            painter->drawPolygon(polygon);
+    }
+}
+
+/*! \internal
+
+  Returns the channel fill band of one segment pair on a frame that has no key axis. Both runs are
+  in data space, ascending in key (x): the overlapping key range is cropped with a linear
+  interpolation of the two straddling vertices, the band is closed with the other run reversed, and
+  the closed polygon is mapped in one batch.
+
+  The crop lives here rather than in pixel space because on such a frame the key is not the x pixel:
+  only data space knows which vertices share a key.
+*/
+const QPolygonF QCPGraph::dataSpaceChannelFillPolygon(const QVector<QPointF>* thisData,
+                                                      QCPDataRange thisSegment,
+                                                      const QVector<QPointF>* otherData,
+                                                      QCPDataRange otherSegment) const
+{
+    if (thisSegment.size() < 2 || otherSegment.size() < 2)
+        return QPolygonF();
+    const auto atKey = [](const QPointF& a, const QPointF& b, double key) {
+        if (qFuzzyCompare(a.x(), b.x()))
+            return QPointF(key, a.y());
+        const double t = (key - a.x()) / (b.x() - a.x());
+        return QPointF(key, a.y() + t * (b.y() - a.y()));
+    };
+    // Clips one data-space run to the key band [lower, upper], interpolating both ends.
+    const auto clipToKeys = [&atKey](const QVector<QPointF>& vertices, double lower, double upper) {
+        QVector<QPointF> clipped;
+        for (int i = 0; i + 1 < vertices.size(); ++i)
+        {
+            QPointF a = vertices.at(i);
+            QPointF b = vertices.at(i + 1);
+            if (b.x() < lower || a.x() > upper)
+                continue;
+            if (a.x() < lower)
+                a = atKey(a, b, lower);
+            if (b.x() > upper)
+                b = atKey(a, b, upper);
+            if (clipped.isEmpty() || clipped.last() != a)
+                clipped.append(a);
+            clipped.append(b);
+        }
+        return clipped;
+    };
+
+    const QVector<QPointF> thisVertices
+        = thisData->mid(thisSegment.begin(), thisSegment.size());
+    const QVector<QPointF> otherVertices
+        = otherData->mid(otherSegment.begin(), otherSegment.size());
+    const double lower = qMax(thisVertices.first().x(), otherVertices.first().x());
+    const double upper = qMin(thisVertices.last().x(), otherVertices.last().x());
+    if (!(upper > lower))
+        return QPolygonF();
+    const QVector<QPointF> thisClipped = clipToKeys(thisVertices, lower, upper);
+    const QVector<QPointF> otherClipped = clipToKeys(otherVertices, lower, upper);
+    if (thisClipped.isEmpty() || otherClipped.isEmpty())
+        return QPolygonF();
+
+    QVector<QPointF> closed = thisClipped;
+    closed.reserve(thisClipped.size() + otherClipped.size());
+    for (int i = otherClipped.size() - 1; i >= 0; --i)
+        closed.append(otherClipped.at(i));
+    return QPolygonF(mapToPixels(closed));
 }
 
 /*! \internal
@@ -1021,7 +1261,11 @@ void QCPGraph::drawFill(QCPPainter* painter, QVector<QPointF>* lines) const
         return;
 
     applyFillAntialiasingHint(painter);
-    const QVector<QCPDataRange> segments = getNonNanSegments(lines, keyAxis()->orientation());
+    // The key orientation is a property of a cartesian frame's axis pair: a frame of the user's own
+    // is horizontal, because its data space is (key, value).
+    const Qt::Orientation keyOrientation
+        = keyAxis() ? keyAxis()->orientation() : Qt::Horizontal;
+    const QVector<QCPDataRange> segments = getNonNanSegments(lines, keyOrientation);
     if (!mChannelFillGraph)
     {
         // The GPU fill is one flat colour: gradients and patterns are painted with QPainter.
@@ -1053,6 +1297,8 @@ void QCPGraph::drawFill(QCPPainter* painter, QVector<QPointF>* lines) const
         for (QCPDataRange segment : segments)
             painter->drawPolygon(getFillPolygon(lines, segment));
     }
+    else if (drawsInDataSpace() || mChannelFillGraph->drawsInDataSpace())
+        drawDataSpaceChannelFill(painter);
     else
     {
         // draw fill between this graph and mChannelFillGraph:
@@ -1627,7 +1873,7 @@ QVector<QPair<QCPDataRange, QCPDataRange>> QCPGraph::getOverlappingSegments(
 
     int thisIndex = 0;
     int otherIndex = 0;
-    const bool verticalKey = mKeyAxis->orientation() == Qt::Vertical;
+    const bool verticalKey = mKeyAxis && mKeyAxis->orientation() == Qt::Vertical;
     while (thisIndex < thisSegments.size() && otherIndex < otherSegments.size())
     {
         if (thisSegments.at(thisIndex).size()
@@ -1726,6 +1972,17 @@ bool QCPGraph::segmentsIntersect(double aLower, double aUpper, double bLower, do
 */
 QPointF QCPGraph::getFillBasePoint(QPointF matchingDataPoint) const
 {
+    if (drawsInDataSpace())
+    {
+        // The fill closes on a value, not on a pixel row: 0 on a linear value axis, the lower bound
+        // of the range on a logarithmic one, whose zero lies infinitely far away.
+        const QCPAxis* valueAxis = qobject_cast<const QCPAxis*>(valueAxisBase());
+        const double baseValue = valueAxis && valueAxis->scaleType() == QCPAxis::stLogarithmic
+            ? valueAxis->range().lower
+            : 0.0;
+        const QCP::Data key = mSystem->transform().inverse(matchingDataPoint);
+        return mapToPixels({QPointF(key.x, baseValue)}).value(0);
+    }
     QCPAxis* keyAxis = mKeyAxis.data();
     QCPAxis* valueAxis = mValueAxis.data();
     if (!keyAxis || !valueAxis)
@@ -2059,24 +2316,48 @@ double QCPGraph::pointDistance(const QPointF& pixelPoint,
 
     // calculate minimum distances to graph data points and find closestData iterator:
     double minDistSqr = (std::numeric_limits<double>::max)();
-    // determine which key range comes into question, taking selection tolerance around pos into
-    // account:
-    double posKeyMin, posKeyMax, dummy;
-    pixelsToCoords(
-        pixelPoint - QPointF(mParentPlot->selectionTolerance(), mParentPlot->selectionTolerance()),
-        posKeyMin, dummy);
-    pixelsToCoords(
-        pixelPoint + QPointF(mParentPlot->selectionTolerance(), mParentPlot->selectionTolerance()),
-        posKeyMax, dummy);
-    if (posKeyMin > posKeyMax)
-        qSwap(posKeyMin, posKeyMax);
+    QCPGraphDataContainer::const_iterator begin, end;
+    QVector<QPointF> candidatePixels;
+    if (drawsInDataSpace())
+    {
+        // The key window below reads a cartesian frame's key axis: on a frame of the user's own
+        // the click's key is not its x pixel, so every point is a candidate.
+        // simplify: one click maps the whole container; J-6's box query narrows the candidates in
+        // data space.
+        begin = mDataContainer->constBegin();
+        end = mDataContainer->constEnd();
+        QVector<QPointF> dataPoints;
+        dataPoints.reserve(mDataContainer->size());
+        for (QCPGraphDataContainer::const_iterator it = begin; it != end; ++it)
+            dataPoints.append(QPointF(it->key, it->value));
+        candidatePixels = mapToPixels(dataPoints);
+    }
+    else
+    {
+        // determine which key range comes into question, taking selection tolerance around pos
+        // into account:
+        double posKeyMin, posKeyMax, dummy;
+        pixelsToCoords(
+            pixelPoint
+                - QPointF(mParentPlot->selectionTolerance(), mParentPlot->selectionTolerance()),
+            posKeyMin, dummy);
+        pixelsToCoords(
+            pixelPoint
+                + QPointF(mParentPlot->selectionTolerance(), mParentPlot->selectionTolerance()),
+            posKeyMax, dummy);
+        if (posKeyMin > posKeyMax)
+            qSwap(posKeyMin, posKeyMax);
+        begin = mDataContainer->findBegin(posKeyMin, true);
+        end = mDataContainer->findEnd(posKeyMax, true);
+    }
     // iterate over found data points and then choose the one with the shortest distance to pos:
-    QCPGraphDataContainer::const_iterator begin = mDataContainer->findBegin(posKeyMin, true);
-    QCPGraphDataContainer::const_iterator end = mDataContainer->findEnd(posKeyMax, true);
     for (QCPGraphDataContainer::const_iterator it = begin; it != end; ++it)
     {
+        const QPointF candidatePixel = drawsInDataSpace()
+            ? candidatePixels.at(int(it - begin))
+            : coordsToPixels(it->key, it->value);
         const double currentDistSqr
-            = QCPVector2D(coordsToPixels(it->key, it->value) - pixelPoint).lengthSquared();
+            = QCPVector2D(candidatePixel - pixelPoint).lengthSquared();
         if (currentDistSqr < minDistSqr)
         {
             minDistSqr = currentDistSqr;

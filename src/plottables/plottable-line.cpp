@@ -4,8 +4,9 @@
 #include "../misuse.h"
 #include <algorithm>
 
-QCPAbstractLine::QCPAbstractLine(QCPAxis* keyAxis, QCPAxis* valueAxis)
-    : QCPAbstractColorMapped(keyAxis, valueAxis)
+QCPAbstractLine::QCPAbstractLine(QCPAxis* keyAxis, QCPAxis* valueAxis,
+                                 QCP::Capabilities required)
+    : QCPAbstractColorMapped(keyAxis, valueAxis, false, required)
 {
     // A coloured line on a fresh rect keeps what the mapper had: gpJet over 0..1. Written through
     // the members, not the setters: the subclasses are not constructed yet.

@@ -137,18 +137,18 @@ void QCPCoordinateSystem::bumpRevision()
 */
 void QCPCoordinateSystem::parametersChanged()
 {
-  bumpRevision();
-  if (!mArea)
-    return;
-  mArea->markAffectedLayersDirty(true);
-  QCustomPlot* plot = mArea->parentPlot();
-  if (!plot)
-    return;
-  // Items measure their frames in the systems of their positions: each layer knows which areas
-  // those are, so ask it instead of walking every item.
-  for (int i = 0; i < plot->layerCount(); ++i)
-    if (QCPLayer* layer = plot->layer(i); layer && layer->itemsUseArea(mArea))
-      layer->invalidatePaintBuffer();
+    bumpRevision();
+    if (!mArea)
+        return;
+    mArea->markAffectedLayersDirty(true);
+    QCustomPlot* plot = mArea->parentPlot();
+    if (!plot)
+        return;
+    // Items measure their frames in the systems of their positions: each layer knows which areas
+    // those are, so ask it instead of walking every item.
+    for (int i = 0; i < plot->layerCount(); ++i)
+        if (QCPLayer* layer = plot->layer(i); layer && layer->itemsUseArea(mArea))
+            layer->invalidatePaintBuffer();
 }
 
 /*! \internal

@@ -499,11 +499,9 @@ class RectangularPolarGraph : public QCPPolarGraph
 {
 public:
     RectangularPolarGraph(QCPPolarAxisAngular* angular, QCPPolarAxisRadial* radial)
-        : QCPPolarGraph(angular, radial)
+        : QCPPolarGraph(angular, radial, QCP::capRectangular)
     {
     }
-
-    QCP::Capabilities requiredCapabilities() const override { return QCP::capRectangular; }
 };
 
 int redInkCount(const QImage& image)

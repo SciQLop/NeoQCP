@@ -4,8 +4,8 @@
 #include <layoutelements/layoutelement-colorscale.h>
 
 QCPAbstractColorMapped::QCPAbstractColorMapped(QCPAxis* keyAxis, QCPAxis* valueAxis,
-                                               bool transparentNan)
-        : QCPAbstractPlottable(keyAxis, valueAxis)
+                                               bool transparentNan, QCP::Capabilities required)
+        : QCPAbstractPlottable(keyAxis, valueAxis, required)
         , mDataScaleType(QCPAxis::stLinear)
         , mGradient(QCPColorGradient::gpCold)
 {

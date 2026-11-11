@@ -62,8 +62,10 @@ class QCPAbstractPlottable1D
     // No Q_OBJECT macro due to template class
 
 public:
-    QCPAbstractPlottable1D(QCPAxis* keyAxis, QCPAxis* valueAxis);
-    explicit QCPAbstractPlottable1D(QCPCoordinateSystem* system);
+    QCPAbstractPlottable1D(QCPAxis* keyAxis, QCPAxis* valueAxis,
+                           QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey);
+    explicit QCPAbstractPlottable1D(QCPCoordinateSystem* system,
+                                    QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey);
     virtual ~QCPAbstractPlottable1D() override;
 
     // virtual methods of 1d plottable interface:
@@ -302,14 +304,16 @@ private:
 */
 template <class DataType, class Base>
 QCPAbstractPlottable1D<DataType, Base>::QCPAbstractPlottable1D(QCPAxis* keyAxis,
-                                                               QCPAxis* valueAxis)
-        : Base(keyAxis, valueAxis), mDataContainer(new QCPDataContainer<DataType>)
+                                                               QCPAxis* valueAxis,
+                                                               QCP::Capabilities required)
+        : Base(keyAxis, valueAxis, required), mDataContainer(new QCPDataContainer<DataType>)
 {
 }
 
 template <class DataType, class Base>
-QCPAbstractPlottable1D<DataType, Base>::QCPAbstractPlottable1D(QCPCoordinateSystem* system)
-        : Base(system), mDataContainer(new QCPDataContainer<DataType>)
+QCPAbstractPlottable1D<DataType, Base>::QCPAbstractPlottable1D(QCPCoordinateSystem* system,
+                                                               QCP::Capabilities required)
+        : Base(system, required), mDataContainer(new QCPDataContainer<DataType>)
 {
 }
 

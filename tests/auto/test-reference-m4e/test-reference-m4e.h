@@ -57,6 +57,8 @@ private slots:
     void polarClamped();
     void polarSparse();
     void polarItems();
+
+    void userSystemSkew();
 };
 
 #endif // TEST_REFERENCE_M4E_H

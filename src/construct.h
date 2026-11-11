@@ -227,7 +227,12 @@ qcp::HandleFor<T> QCPAxisRect::add(QCPAxis* key, QCPAxis* value, Args&&... args)
     QCP_CHECK_OR_RETURN(key && value && own.contains(key) && own.contains(value),
                         "both axes of a plottable on this rect must belong to it", Handle { });
     QCP_CHECK_OR_RETURN(!mParentPlot->isBeingDestroyed(), "the plot is being destroyed", Handle { });
-    Handle handle = qcp::makeHandle<Handle>(qcp::detail::newPlottable<T>(*mParentPlot, key, value));
+    // A system that lacks a capability the plottable needs refused it in its constructor, with the
+    // one report of that refusal: the caller gets no object rather than an inert one.
+    std::unique_ptr<T> created(qcp::detail::newPlottable<T>(*mParentPlot, key, value));
+    if (!created->system())
+        return Handle { };
+    Handle handle = qcp::makeHandle<Handle>(created.release());
     handle.get()->markDirty();
     if constexpr (sizeof...(Args) > 0)
         qcp::detail::setDataOrUndo(*mParentPlot, handle, std::forward<Args>(args)...);
@@ -246,10 +251,11 @@ qcp::HandleFor<T> QCPPolarArea::add(Args&&... args)
     QCP_CHECK_OR_RETURN(radialAxis(0), "the polar area has no radial axis", Handle { });
     QCPCoordinateSystem* system = this->system(angularAxis(), radialAxis(0));
     QCP_CHECK_OR_RETURN(system, "the polar axes are not a system of this area", Handle { });
-    // Built first: the capabilities are the object's own, and a refused object owns nothing.
+    // Built first: the capabilities are the object's own, and a refused object owns nothing. Its
+    // constructor made the one report, so a frame that refused it ends the add silently.
     std::unique_ptr<T> plottable(new T(angularAxis(), radialAxis(0)));
-    QCP_CHECK_OR_RETURN(!(plottable->requiredCapabilities() & ~system->capabilities()),
-                        "the polar system lacks a capability this plottable needs", Handle { });
+    if (!plottable->system())
+        return Handle { };
     Handle handle = qcp::makeHandle<Handle>(plottable.release());
     handle.get()->markDirty();
     if constexpr (sizeof...(Args) > 0)

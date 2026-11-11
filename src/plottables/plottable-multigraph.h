@@ -33,14 +33,10 @@ public:
     template <typename T>
     using OpsFor = QCPMultiGraphOps<T>;
 
-    explicit QCPMultiGraph(QCPAxis* keyAxis, QCPAxis* valueAxis);
+    explicit QCPMultiGraph(QCPAxis* keyAxis, QCPAxis* valueAxis,
+                           QCP::Capabilities required = QCP::capRectangular
+                               | QCP::capStraightKey | QCP::capColourScale | QCP::capLanes);
     ~QCPMultiGraph() override;
-
-    //! It draws one lane per source: its frame must offer lanes.
-    [[nodiscard]] QCP::Capabilities requiredCapabilities() const override
-    {
-        return QCPAbstractLine::requiredCapabilities() | QCP::capLanes;
-    }
 
     // Data source
     void setDataSource(std::unique_ptr<QCPAbstractMultiDataSource> source);

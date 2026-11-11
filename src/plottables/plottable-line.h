@@ -33,7 +33,8 @@ public:
         LineStyle lineStyle = lsLine;
     };
 
-    explicit QCPAbstractLine(QCPAxis* keyAxis, QCPAxis* valueAxis);
+    explicit QCPAbstractLine(QCPAxis* keyAxis, QCPAxis* valueAxis,
+                             QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey | QCP::capColourScale);
 
     // Components
     [[nodiscard]] int componentCount() const { return mComponents.size(); }

@@ -25,14 +25,10 @@ public:
     template <typename T>
     using OpsFor = QCPIntervalsOps<T>;
 
-    QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* layout);
+    QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* layout,
+                 QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey
+                     | QCP::capLanes);
     ~QCPIntervals() override;
-
-    //! It draws one lane per row: its frame must offer lanes.
-    [[nodiscard]] QCP::Capabilities requiredCapabilities() const override
-    {
-        return QCPAbstractPlottable::requiredCapabilities() | QCP::capLanes;
-    }
 
     void setData(qcp::intervals::Columns columns);
     [[nodiscard]] const qcp::intervals::Columns& columns() const { return mColumns; }

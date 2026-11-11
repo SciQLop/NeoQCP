@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "../test-user-system/skew-system.h"
 #include "qcustomplot.h"
 #include "reference-image.h"
 
@@ -532,6 +533,79 @@ QImage polarScene(const char* kind)
             }
         });
 }
+QImage userSystemSkewScene()
+{
+    return render(
+        [](QCustomPlot& plot)
+        {
+            plot.plotLayout()->clear();
+            auto* rect = new SkewRect(&plot);
+            plot.plotLayout()->addElement(0, 0, rect);
+            rect->setShear(0.5);
+            QFont font(QStringLiteral("Helvetica"));
+            font.setPixelSize(10);
+            QCPAxis* key = rect->axis(QCPAxis::atBottom);
+            QCPAxis* value = rect->axis(QCPAxis::atLeft);
+            key->setRange(0, 10);
+            value->setRange(0, 10);
+            for (QCPAxis* axis : rect->axes())
+            {
+                axis->setTickLabelFont(font);
+                axis->setLabelFont(font);
+            }
+
+            const QVector<double> keys { 0.5, 2, 3.5, 5, 6.5, 8 };
+            auto* filled = new QCPGraph(key, value);
+            filled->setData(keys, QVector<double> { 2, 4, 3, 5, 3.5, 6 });
+            filled->setBrush(QColor(40, 110, 200, 70));
+            filled->setPen(QPen(QColor(40, 110, 200), 2));
+            filled->setName(QStringLiteral("filled"));
+
+            auto* step = new QCPGraph(key, value);
+            step->setLineStyle(QCPGraph::lsStepLeft);
+            step->setData(QVector<double> { 1, 3, 5, 7, 9 },
+                          QVector<double> { 7, 6, 8, 7, 9 });
+            step->setPen(QPen(QColor(200, 60, 40), 2));
+            step->setName(QStringLiteral("step"));
+
+            auto* impulse = new QCPGraph(key, value);
+            impulse->setLineStyle(QCPGraph::lsImpulse);
+            impulse->setData(QVector<double> { 0.5, 1.5, 2.5, 3.5 },
+                             QVector<double> { 1, 3, 2, 4 });
+            impulse->setPen(QPen(QColor(60, 150, 70), 2));
+            impulse->setName(QStringLiteral("impulse"));
+
+            auto* dots = new QCPGraph(key, value);
+            dots->setLineStyle(QCPGraph::lsNone);
+            dots->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
+            dots->setData(QVector<double> { 2, 4, 6, 8 }, QVector<double> { 8, 9, 6, 8 });
+            dots->setPen(QPen(QColor(120, 60, 160), 2));
+            dots->setName(QStringLiteral("dots"));
+
+            auto* lower = new QCPGraph(key, value);
+            lower->setData(keys, QVector<double> { 1, 1.5, 1, 2, 1.5, 2.5 });
+            lower->setPen(QPen(QColor(180, 120, 40), 2));
+            auto* upper = new QCPGraph(key, value);
+            upper->setData(keys, QVector<double> { 3, 3.5, 3, 4, 3.5, 4.5 });
+            upper->setPen(QPen(QColor(180, 120, 40), 2));
+            upper->setBrush(QColor(220, 160, 60, 70));
+            upper->setChannelFillGraph(lower);
+
+            std::vector<double> curveKeys, curveValues;
+            for (int i = 0; i <= 24; ++i)
+            {
+                const double angle = 2.0 * std::numbers::pi * double(i) / 24.0;
+                curveKeys.push_back(6.0 + 2.0 * std::cos(angle));
+                curveValues.push_back(3.0 + 1.5 * std::sin(angle));
+            }
+            auto* curve = new QCPCurve(key, value);
+            curve->setData(QVector<double>(curveKeys.begin(), curveKeys.end()),
+                           QVector<double>(curveValues.begin(), curveValues.end()));
+            curve->setPen(QPen(QColor(30, 30, 30), 2));
+            curve->setName(QStringLiteral("curve"));
+        });
+}
+
 } // namespace
 
 QImage polarItemsScene()
@@ -794,6 +868,11 @@ void TestReferenceM4e::polarClamped()
 void TestReferenceM4e::polarSparse()
 {
     check(polarScene("polar-sparse"), "polar-sparse.png");
+}
+
+void TestReferenceM4e::userSystemSkew()
+{
+    check(userSystemSkewScene(), "user-system-skew.png");
 }
 
 void TestReferenceM4e::polarItems()

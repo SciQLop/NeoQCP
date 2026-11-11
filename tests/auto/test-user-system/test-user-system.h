@@ -12,7 +12,9 @@ private slots:
     void cleanup();
 
     void theCapabilityMasks();
-    void aGraphJoinedToASkewSystemIsRefused();
+    void aGraphOnASkewRectHasNoProjection();
+    void addGraphOnASkewRectJoinsIt();
+    void barsBuiltOnASkewRectAreRefused();
     void anItemPositionOnASkewSystemHasNoProjection();
     void barsAreRefusedOnASkewRect();
     void aCurvePointLandsOnTheSkewMapping();
@@ -22,4 +24,17 @@ private slots:
     void rescaleAxesFitsASkewCurve();
     void anAxisListsASkewItem();
     void anAxisRangeChangeRepaintsASkewCurve();
+    void rescaleAxesFitsASkewGraph();
+    void anAxisRangeChangeRepaintsASkewGraph();
+    void aGraphLineFollowsTheSkewMapping();
+    void stepStylesAreBuiltInDataSpace();
+    void anImpulseRunsToValueZero();
+    void aLogValueFillStopsAtTheRangeBound();
+    void aNaNSplitsLineAndFill();
+    void aScatterLandsOnTheMapping();
+    void aGraphIsHitAndRectSelectedThroughTheMapping();
+    void aShearedPointOutsideTheKeyWindowIsHit();
+    void hoveringASkewGraphDoesNotCrash();
+    void channelFillNeedsOneSystem();
+    void aCartesianChannelFillAcrossValueAxesStillWorks();
 };

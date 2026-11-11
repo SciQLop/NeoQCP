@@ -120,9 +120,10 @@ public:
 class SystemStub : public QCPAbstractPlottable
 {
 public:
-    explicit SystemStub(QCPCoordinateSystem* system) : QCPAbstractPlottable(system) { }
-
-    QCP::Capabilities requiredCapabilities() const override { return { }; }
+    explicit SystemStub(QCPCoordinateSystem* system)
+        : QCPAbstractPlottable(system, QCP::Capabilities())
+    {
+    }
 
     double selectTest(const QPointF&, bool, QVariant* = nullptr) const override { return -1; }
 

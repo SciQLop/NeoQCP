@@ -18,14 +18,8 @@ class QCP_LIB_DECL QCPAbstractColorMapped : public QCPAbstractPlottable
 
 public:
     explicit QCPAbstractColorMapped(QCPAxis* keyAxis, QCPAxis* valueAxis,
-                                    bool transparentNan = false);
+                                    bool transparentNan = false, QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey | QCP::capColourScale);
     ~QCPAbstractColorMapped() override;
-
-    //! It reads a colour scale: its frame must offer one.
-    [[nodiscard]] QCP::Capabilities requiredCapabilities() const override
-    {
-        return QCPAbstractPlottable::requiredCapabilities() | QCP::capColourScale;
-    }
 
     // getters:
     [[nodiscard]] QCPRange dataRange() const { return mDataRange; }

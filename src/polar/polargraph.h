@@ -83,8 +83,10 @@ public:
     template <typename T>
     using OpsFor = QCPPolarGraphOps<T>;
 
-    QCPPolarGraph(QCPPolarAxisAngular* keyAxis, QCPPolarAxisRadial* valueAxis);
-    explicit QCPPolarGraph(QCPCoordinateSystem* system);
+    QCPPolarGraph(QCPPolarAxisAngular* keyAxis, QCPPolarAxisRadial* valueAxis,
+                  QCP::Capabilities required = QCP::Capabilities());
+    explicit QCPPolarGraph(QCPCoordinateSystem* system,
+                           QCP::Capabilities required = QCP::Capabilities());
 
     // getters:
     bool periodic() const { return mPeriodic; }
@@ -129,7 +131,6 @@ public:
     void setSystem(QCPCoordinateSystem* system) override;
 
     // introduced virtual methods:
-    QCP::Capabilities requiredCapabilities() const override; // the polar system is enough
     void draw(QCPDrawContext& context) const override;
     quint64 dependencyRevision() const override;
 

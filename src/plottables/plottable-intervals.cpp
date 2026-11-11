@@ -66,8 +66,9 @@ QCPLayer* layerAbove(QCustomPlot* plot, QCPLayer* base)
 }
 } // namespace
 
-QCPIntervals::QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* layout)
-        : QCPAbstractPlottable(keyAxis, valueAxis), mLayout(layout)
+QCPIntervals::QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* layout,
+                           QCP::Capabilities required)
+        : QCPAbstractPlottable(keyAxis, valueAxis, required), mLayout(layout)
 {
     setSelectable(QCP::stMultipleDataRanges);
     // The base constructor auto-added a plain legend item (our addToLegend override was not

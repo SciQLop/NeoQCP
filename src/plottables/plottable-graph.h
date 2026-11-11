@@ -183,6 +183,16 @@ protected:
                               const QCPDataRange& rangeRestriction) const;
     void getLines(QVector<QPointF>* lines, const QCPDataRange& dataRange) const;
     void getScatters(QVector<QPointF>* scatters, const QCPDataRange& dataRange) const;
+    //! True when the graph draws through its system's transform instead of the 2.x axis pair.
+    bool drawsInDataSpace() const { return mSystem && !mKeyAxis; }
+    QVector<QPointF> dataSpaceLines(const QCPDataRange& dataRange) const;
+    QVector<QPointF> dataSpaceScatters(const QCPDataRange& dataRange) const;
+    QVector<QPointF> mapToPixels(const QVector<QPointF>& dataPoints) const;
+    void drawDataSpaceChannelFill(QCPPainter* painter) const;
+    const QPolygonF dataSpaceChannelFillPolygon(const QVector<QPointF>* thisData,
+                                                QCPDataRange thisSegment,
+                                                const QVector<QPointF>* otherData,
+                                                QCPDataRange otherSegment) const;
     QVector<QPointF> dataToLines(const QVector<QCPGraphData>& data) const;
     QVector<QPointF> dataToStepLeftLines(const QVector<QCPGraphData>& data) const;
     QVector<QPointF> dataToStepRightLines(const QVector<QCPGraphData>& data) const;

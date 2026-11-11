@@ -20,8 +20,8 @@
 #include <cmath>
 #include <utility>
 
-QCPMultiGraph::QCPMultiGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPAbstractLine(keyAxis, valueAxis)
+QCPMultiGraph::QCPMultiGraph(QCPAxis* keyAxis, QCPAxis* valueAxis, QCP::Capabilities required)
+        : QCPAbstractLine(keyAxis, valueAxis, required)
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
 {
     // Base constructor auto-adds a QCPPlottableLegendItem (vtable not yet set up

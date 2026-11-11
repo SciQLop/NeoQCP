@@ -76,13 +76,14 @@ private:
 class RecordingPlottable : public QCPAbstractPlottable
 {
 public:
+    //! Needs nothing of its system: it records whatever the frame gives it, disc or rectangle.
     explicit RecordingPlottable(QCPCoordinateSystem* system)
-            : QCPAbstractPlottable(system)
+            : QCPAbstractPlottable(system, QCP::Capabilities())
     {
     }
 
     RecordingPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis)
-            : QCPAbstractPlottable(keyAxis, valueAxis)
+            : QCPAbstractPlottable(keyAxis, valueAxis, QCP::Capabilities())
     {
     }
 
@@ -166,11 +167,9 @@ class ArcPlottable : public QCPAbstractPlottable1D<QCPGraphData>
 {
 public:
     explicit ArcPlottable(QCPCoordinateSystem* system)
-            : QCPAbstractPlottable1D<QCPGraphData>(system)
+            : QCPAbstractPlottable1D<QCPGraphData>(system, QCP::Capabilities())
     {
     }
-
-    [[nodiscard]] QCP::Capabilities requiredCapabilities() const override { return { }; }
 
     void setArc(QVector<QCPGraphData> points) { mDataContainer->set(points); }
 

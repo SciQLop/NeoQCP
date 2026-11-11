@@ -130,8 +130,10 @@ public:
     template <typename T>
     using OpsFor = QCPPlottableOps<T>;
 
-    QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis);
-    explicit QCPAbstractPlottable(QCPCoordinateSystem* system);
+    QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis,
+                         QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey);
+    explicit QCPAbstractPlottable(QCPCoordinateSystem* system,
+                                  QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey);
     virtual ~QCPAbstractPlottable() override;
 
     // getters:
@@ -192,11 +194,9 @@ public:
     //! The recording: append what this plottable draws to \a context. The default records nothing.
     virtual void draw(QCPDrawContext& context) const { Q_UNUSED(context) }
 
-    //! The flags a system must offer for this plottable to join it.
-    [[nodiscard]] virtual QCP::Capabilities requiredCapabilities() const
-    {
-        return QCP::capRectangular | QCP::capStraightKey;
-    }
+    //! The flags a system must offer for this plottable to join it. Decided once, at construction:
+    //! a class passes its own mask to the constructor instead of overriding this.
+    [[nodiscard]] QCP::Capabilities requiredCapabilities() const { return mRequiredCapabilities; }
 
     //! What the recording occupies in data coordinates.
     std::optional<QCPDataBox> drawnDataRange() const override;
@@ -323,6 +323,9 @@ protected:
     QPointer<QCPCoordinateSystem> mSystem;
     //! The cartesian projection, kept in sync by setSystem: null in any other system.
     QPointer<QCPAxis> mKeyAxis, mValueAxis;
+    //! What a frame must offer for this plottable to join it: set by the constructor it was built
+    //! with, never afterwards.
+    QCP::Capabilities mRequiredCapabilities;
     QCP::SelectionType mSelectable;
     QCPDataSelection mSelection;
     QCPSelectionDecorator* mSelectionDecorator;
