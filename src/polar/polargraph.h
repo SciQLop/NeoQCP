@@ -29,7 +29,7 @@
 #include "../axis/range.h"
 #include "../global.h"
 #include "../handle-ops.h"
-#include "../plottables/plottable-graph.h"
+#include "../plottables/graph-data.h"
 #include "../plottables/plottable1d.h"
 #include "../scatterstyle.h"
 #include "../selection.h"

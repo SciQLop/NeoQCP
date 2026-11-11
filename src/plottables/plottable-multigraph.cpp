@@ -1116,10 +1116,12 @@ void QCPMultiGraph::draw(QCPDrawContext& context) const
         return;
     }
 
+    // An empty window is unbounded, not the range [0, 0]: the whole source is drawn.
     const QCPKeyWindow window = context.keyWindow();
+    const bool unbounded = !(window.keys.size() > 0.0);
 
-    const int begin = ds->findBegin(window.keys.lower);
-    const int end = ds->findEnd(window.keys.upper);
+    const int begin = unbounded ? 0 : ds->findBegin(window.keys.lower);
+    const int end = unbounded ? ds->size() : ds->findEnd(window.keys.upper);
     if (begin >= end)
         return;
 

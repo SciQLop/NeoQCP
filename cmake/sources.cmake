@@ -170,6 +170,7 @@ set(NEOQCP_MOC_HEADERS
     src/plottables/plottable-curve.h
     src/plottables/plottable-errorbar.h
     src/plottables/plottable-financial.h
+    src/plottables/graph-data.h
     src/plottables/plottable-graph.h
     src/plottables/plottable-graph2.h
     src/plottables/plottable-multigraph.h

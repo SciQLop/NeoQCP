@@ -52,4 +52,5 @@ private slots:
     void colouredMarkersKeepTheirColours();
     void mismatchedColourCountIsRefused();
     void colouredPolylinePanReusesTheKeptGeometry();
+    void theKeyWindowComesFromTheSystem();
 };

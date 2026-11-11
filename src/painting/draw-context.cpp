@@ -479,6 +479,16 @@ const QCPTheme& QCPDrawContext::theme() const
 
 QCPKeyWindow QCPDrawContext::keyWindow() const
 {
+    // A system names the window its frame is drawn for: only it knows what its keys mean. A
+    // cartesian frame keeps the axis computation below byte for byte, so its recordings do not move.
+    if (mSystem && mSystem->kind() != QCPTransform::Kind::Cartesian)
+    {
+        const QCPKeyWindow window = mSystem->keyWindow();
+        // An empty window is "unbounded", never the range [0, 0]: nothing is recorded for it.
+        if (window.keys.size() > 0.0)
+            mList->keyWindow = window;
+        return window;
+    }
     if (!mKeyAxis)
         return { };
     const bool logarithmic = mKeyAxis->scaleType() == QCPAxis::stLogarithmic;

@@ -28,6 +28,7 @@
 
 #include "../global.h"
 #include "../items/item.h"
+#include "../plottables/graph-data.h"
 #include "../plottables/plottable-graph.h"
 
 class QCPPainter;

@@ -43,6 +43,48 @@ struct Fixture
     std::unique_ptr<QCustomPlot> plot;
 };
 
+// A user system that keeps a window of its own: the context must answer this one, not the axes'.
+class KeyWindowSystem : public QCPCoordinateSystem
+{
+public:
+    KeyWindowSystem(QCPArea* area, QCPAxisBase* keyAxis, QCPAxisBase* valueAxis,
+                    QCPKeyWindow window)
+            : QCPCoordinateSystem(area, keyAxis, valueAxis)
+            , mWindow(window)
+    {
+    }
+
+    QCPTransform transform() const override
+    {
+        return QCPTransform(static_cast<const QCPAxis*>(keyAxis()),
+                            static_cast<const QCPAxis*>(valueAxis()));
+    }
+    QRect clipRect() const override { return area()->rect(); }
+    QCP::Capabilities capabilities() const override { return QCP::capStraightSegments; }
+    QCPKeyWindow keyWindow() const override { return mWindow; }
+
+private:
+    QCPKeyWindow mWindow;
+};
+
+// A user system that keeps none: the base's empty window, which says unbounded and never [0, 0].
+class WindowlessSystem : public QCPCoordinateSystem
+{
+public:
+    WindowlessSystem(QCPArea* area, QCPAxisBase* keyAxis, QCPAxisBase* valueAxis)
+            : QCPCoordinateSystem(area, keyAxis, valueAxis)
+    {
+    }
+
+    QCPTransform transform() const override
+    {
+        return QCPTransform(static_cast<const QCPAxis*>(keyAxis()),
+                            static_cast<const QCPAxis*>(valueAxis()));
+    }
+    QRect clipRect() const override { return area()->rect(); }
+    QCP::Capabilities capabilities() const override { return QCP::capStraightSegments; }
+};
+
 using Paint = std::function<void(QCPPainter&, const QCPTransform&)>;
 
 QImage painted(const Paint& paint, const QCPTransform& transform)
@@ -1362,4 +1404,42 @@ void TestDrawContext::aHugeEllipseKeepsTheFrame()
         const QPointF centre = pixelOf(context.transform(), 165.0, 60.0);
         QCOMPARE(image.pixelColor(int(centre.x()), int(centre.y())), QColor(200, 90, 30));
     }
+}
+
+// P-2: on a user system the key window is the system's, and a system that keeps none says
+// "unbounded" with an empty window. Only a cartesian frame still answers from its key axis.
+void TestDrawContext::theKeyWindowComesFromTheSystem()
+{
+    Fixture fixture;
+    const QCPKeyWindow ownWindow { QCPRange(10.0, 60.0), 4.0 };
+    KeyWindowSystem system(fixture.plot->axisRect(), fixture.plot->xAxis, fixture.plot->yAxis,
+                           ownWindow);
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr, false, QRectF(), &system);
+    const QCPKeyWindow answered = context.keyWindow();
+    QCOMPARE(answered.keys.lower, ownWindow.keys.lower);
+    QCOMPARE(answered.keys.upper, ownWindow.keys.upper);
+    QCOMPARE(answered.pixelsPerKey, ownWindow.pixelsPerKey);
+    QVERIFY2(context.drawList().keyWindow.has_value(),
+             "a window the system names is recorded, so a replay can tell whether it is still valid");
+    QCOMPARE(context.drawList().keyWindow->keys.upper, ownWindow.keys.upper);
+
+    WindowlessSystem windowless(fixture.plot->axisRect(), fixture.plot->xAxis, fixture.plot->yAxis);
+    QCPDrawContext defaultContext(fixture.plot->xAxis, fixture.plot->yAxis,
+                                  fixture.plot->axisRect(), nullptr, false, QRectF(), &windowless);
+    const QCPKeyWindow empty = defaultContext.keyWindow();
+    QVERIFY2(!(empty.keys.size() > 0.0),
+             "a system without a window answers an empty one, never the axes' [0, 0]");
+    QCOMPARE(empty.pixelsPerKey, 0.0);
+    QVERIFY2(!defaultContext.drawList().keyWindow.has_value(),
+             "an empty window is unbounded, so there is no window to record");
+
+    // The cartesian frame (no system) keeps today's axis computation.
+    QCPDrawContext cartesian(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                             nullptr);
+    const QCPKeyWindow fromAxes = cartesian.keyWindow();
+    QVERIFY(fromAxes.keys.lower < fixture.plot->xAxis->range().lower);
+    QVERIFY(fromAxes.keys.upper > fixture.plot->xAxis->range().upper);
+    QVERIFY(fromAxes.pixelsPerKey > 0.0);
+    QVERIFY(cartesian.drawList().keyWindow.has_value());
 }

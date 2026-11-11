@@ -27,6 +27,7 @@
 
 #include "../core.h"
 #include "../painting/draw-context.h"
+#include "../plottables/graph-data.h"
 #include "../plottables/plottable-graph.h"
 #include <array>
 

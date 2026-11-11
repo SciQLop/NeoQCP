@@ -163,6 +163,10 @@ public:
       Reading this does not count as reading the transform: the recording still moves with the
       data.
 
+      The frame's coordinate system answers this when it has one, and only a cartesian frame still
+      computes it from the key axis. An empty window means unbounded, never the range [0, 0]: a
+      caller that culls by it draws everything.
+
       A logarithmic key axis has no constant pixels per key, so there the recording is marked
       transform-dependent instead and a pan remakes it.
     */
