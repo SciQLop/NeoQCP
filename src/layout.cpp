@@ -27,6 +27,7 @@
 
 #include "alignment-group.h"
 #include "core.h"
+#include "misuse.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPMarginGroup
@@ -948,6 +949,13 @@ void QCPLayout::adoptElement(QCPLayoutElement* el)
   take or \ref takeAt). Note that this method only changes properties in \a el. The removal from
   the old layout must be done additionally.
 */
+//! Whether \a el is owned by another plot than the one this layout belongs to. An element without
+//! a plot yet (a fresh inset, say) is accepted: adoptElement() initializes its plot.
+bool QCPLayout::elementBelongsToAnotherPlot(const QCPLayoutElement* el) const
+{
+    return el && mParentPlot && el->parentPlot() && el->parentPlot() != mParentPlot;
+}
+
 void QCPLayout::releaseElement(QCPLayoutElement* el)
 {
     if (el)
@@ -1282,6 +1290,11 @@ QCPLayoutElement* QCPLayoutGrid::element(int row, int column) const
 */
 bool QCPLayoutGrid::addElement(int row, int column, QCPLayoutElement* element)
 {
+    // An area belongs to the plot that owns its axes and its systems: taking it into another plot's
+    // layout would leave all of that behind. Moving an area means building a new one.
+    QCP_CHECK_OR_RETURN(!elementBelongsToAnotherPlot(element),
+                        "an element of another plot cannot join this layout: build a new one here",
+                        false);
     if (!hasElement(row, column))
     {
         if (element && element->layout()) // remove from old layout first
@@ -2317,6 +2330,8 @@ double QCPLayoutInset::selectTest(const QPointF& pos, bool onlySelectable,
 */
 void QCPLayoutInset::addElement(QCPLayoutElement* element, Qt::Alignment alignment)
 {
+    QCP_CHECK_OR_RETURN(!elementBelongsToAnotherPlot(element),
+                        "an element of another plot cannot join this layout: build a new one here");
     if (element)
     {
         if (element->layout()) // remove from old layout first
@@ -2344,6 +2359,8 @@ void QCPLayoutInset::addElement(QCPLayoutElement* element, Qt::Alignment alignme
 */
 void QCPLayoutInset::addElement(QCPLayoutElement* element, const QRectF& rect)
 {
+    QCP_CHECK_OR_RETURN(!elementBelongsToAnotherPlot(element),
+                        "an element of another plot cannot join this layout: build a new one here");
     if (element)
     {
         if (element->layout()) // remove from old layout first

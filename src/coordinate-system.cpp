@@ -130,25 +130,29 @@ void QCPCoordinateSystem::bumpRevision()
 
 /*! \internal
 
-  A subclass calls this when a parameter of its own moved: the revision moves so no frame reuses the
-  old mapping, then every layer that draws what this system maps is dirtied. The signal alone marks
+  A subclass calls this when a parameter of its own moved: every layer that draws what this system
+  maps is dirtied, and the revision moves so no frame reuses the old mapping. The signal alone marks
   nothing, and an area only listens to its axes' ranges: a mapping of the user's own changes with no
   axis in sight.
+
+  The layers are marked first and the revision moves last, because \ref bumpRevision emits
+  \ref changed and a slot may answer by deleting this system (an axis deleted mid-drag): after that
+  emission nothing here may read the object again.
 */
 void QCPCoordinateSystem::parametersChanged()
 {
+    QCPArea* area = mArea;
+    if (area)
+    {
+        area->markAffectedLayersDirty(true);
+        QCustomPlot* plot = area->parentPlot();
+        // Items measure their frames in the systems of their positions: each layer knows which
+        // areas those are, so ask it instead of walking every item.
+        for (int i = 0; plot && i < plot->layerCount(); ++i)
+            if (QCPLayer* layer = plot->layer(i); layer && layer->itemsUseArea(area))
+                layer->invalidatePaintBuffer();
+    }
     bumpRevision();
-    if (!mArea)
-        return;
-    mArea->markAffectedLayersDirty(true);
-    QCustomPlot* plot = mArea->parentPlot();
-    if (!plot)
-        return;
-    // Items measure their frames in the systems of their positions: each layer knows which areas
-    // those are, so ask it instead of walking every item.
-    for (int i = 0; i < plot->layerCount(); ++i)
-        if (QCPLayer* layer = plot->layer(i); layer && layer->itemsUseArea(mArea))
-            layer->invalidatePaintBuffer();
 }
 
 /*! \internal

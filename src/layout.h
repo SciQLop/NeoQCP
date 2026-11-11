@@ -238,6 +238,9 @@ protected:
     void sizeConstraintsChanged() const;
     void adoptElement(QCPLayoutElement* el);
     void releaseElement(QCPLayoutElement* el);
+    //! True when \a el already belongs to a plot other than this layout's: an area lives in the
+    //! plot it was built in, and moving one means building a new one there.
+    bool elementBelongsToAnotherPlot(const QCPLayoutElement* el) const;
     QVector<int> getSectionSizes(QVector<int> maxSizes, QVector<int> minSizes,
                                  QVector<double> stretchFactors, int totalSize) const;
     static QSize getFinalMinimumOuterSize(const QCPLayoutElement* el);

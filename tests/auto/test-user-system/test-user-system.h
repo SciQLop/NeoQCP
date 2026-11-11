@@ -38,4 +38,15 @@ private slots:
     void channelFillNeedsOneSystem();
     void aCartesianChannelFillAcrossValueAxesStillWorks();
     void aResizeMovesTheRevision();
+
+    void anAreaIsNotAdoptedByAnotherPlot();
+    void itemsFollowTheSkewMapping();
+    void theTracerFollowsASkewGraph();
+    void takeAndAdoptAGraphAndAnItemOnASkewRect();
+    void anAxisDeletedMidDragLeavesThemInert();
+    void deletingTheSkewRectLeavesThemInert();
+    void switchingBetweenCartesianAndSkewReRecords();
+    void theLegendIconOfASkewGraphDraws();
+    void aSkewItemIsAlwaysAnIndexCandidate();
+    void aPolarGraphIsRectSelected();
 };

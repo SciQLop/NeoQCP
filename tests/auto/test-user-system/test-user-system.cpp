@@ -187,6 +187,7 @@ public:
     {
         return getFillPolygon(lines, segment);
     }
+    void icon(QCPPainter* painter, const QRectF& rect) const { drawLegendIcon(painter, rect); }
 };
 
 InspectableGraph* graphOn(SkewRect* rect, QCPGraph::LineStyle style = QCPGraph::lsLine)
@@ -812,4 +813,302 @@ void TestUserSystem::aResizeMovesTheRevision()
                                 .arg(pixelOf(system->pixelOf(5, 5)).x())
                                 .arg(expected.x())));
     QVERIFY(pixelOf(system->pixelOf(5, 5)) != oldPixel);
+}
+
+void TestUserSystem::anAreaIsNotAdoptedByAnotherPlot()
+{
+    // Moving an area silently used to leave its axes and systems in the plot it left, and every
+    // later setSystem from the new plot was then refused: an area belongs to one plot.
+    QCustomPlot owner;
+    SkewRect* rect = skewRect(owner);
+    QVERIFY(rect->layout() == owner.plotLayout());
+
+    QCustomPlot other;
+    QCPLayoutInset* inset = new QCPLayoutInset;
+    QVERIFY(other.plotLayout()->addElement(inset));
+
+    QVERIFY2(!other.plotLayout()->addElement(rect),
+             "an area of another plot joined this plot's layout");
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    inset->addElement(rect, Qt::AlignCenter);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(2));
+    test_misuse::calls.clear();
+
+    QVERIFY2(rect->layout() == owner.plotLayout(), "the area left its own layout");
+    QCOMPARE(rect->parentPlot(), &owner);
+    QCOMPARE(inset->elementCount(), 0);
+    settle(other);
+    settle(owner);
+    QVERIFY2(rect->skew()->capabilities().testFlag(QCP::capStraightSegments),
+             "the area stopped working in its own plot");
+}
+
+void TestUserSystem::itemsFollowTheSkewMapping()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    SkewSystem* system = rect->skew();
+
+    auto* text = new QCPItemText(&plot);
+    text->position->setSystem(system);
+    text->position->setType(QCPItemPosition::ptPlotCoords);
+    text->position->setCoords(2, 2);
+    text->setClipToAxisRect(true);
+    text->setClipArea(rect);
+
+    auto* line = new QCPItemLine(&plot);
+    for (QCPItemPosition* position : { line->start, line->end })
+    {
+        position->setSystem(system);
+        position->setType(QCPItemPosition::ptPlotCoords);
+    }
+    line->start->setCoords(2, 9);
+    line->end->setCoords(5, 2);
+    line->setClipToAxisRect(true);
+    line->setClipArea(rect);
+
+    auto* ratio = new QCPItemText(&plot);
+    ratio->position->setType(QCPItemPosition::ptAxisRectRatio);
+    ratio->position->setAxisRect(rect);
+    ratio->position->setCoords(0.25, 0.75);
+
+    settle(plot);
+    const QPointF textPixel = text->position->pixelPosition();
+    const QPointF linePixel = line->start->pixelPosition();
+    const QPointF ratioPixel = ratio->position->pixelPosition();
+    QVERIFY(near(textPixel, pixelOf(system->pixelOf(2, 2)), 1.0));
+    QVERIFY(near(linePixel, pixelOf(system->pixelOf(2, 9)), 1.0));
+    QVERIFY(near(ratioPixel,
+                 QPointF(rect->rect().left() + 0.25 * rect->rect().width(),
+                         rect->rect().top() + 0.75 * rect->rect().height()),
+                 1.0));
+
+    system->setShear(0.25);
+    settle(plot);
+    QVERIFY2(text->position->pixelPosition() != textPixel, "the shear left the text behind");
+    QVERIFY2(line->start->pixelPosition() != linePixel, "the shear left the line behind");
+    QVERIFY(near(text->position->pixelPosition(), pixelOf(system->pixelOf(2, 2)), 1.0));
+    QVERIFY(near(line->start->pixelPosition(), pixelOf(system->pixelOf(2, 9)), 1.0));
+    // A ratio position measures itself in the frame of the area, which the shear does not move.
+    QVERIFY(near(ratio->position->pixelPosition(), ratioPixel, 0.5));
+}
+
+void TestUserSystem::theTracerFollowsASkewGraph()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    SkewSystem* system = rect->skew();
+    InspectableGraph* graph = graphOn(rect);
+    graph->setData(QVector<double> { 2, 4, 6 }, QVector<double> { 2, 6, 4 });
+
+    auto* tracer = new QCPItemTracer(&plot);
+    tracer->setGraph(graph);
+    tracer->setGraphKey(4);
+    tracer->setClipToAxisRect(true);
+    tracer->setClipArea(rect);
+    settle(plot);
+
+    QCOMPARE(tracer->position->system(), system);
+    QVERIFY(near(tracer->position->pixelPosition(), pixelOf(system->pixelOf(4, 6)), 1.5));
+
+    system->setShear(0.4);
+    settle(plot);
+    QVERIFY2(near(tracer->position->pixelPosition(), pixelOf(system->pixelOf(4, 6)), 1.5),
+             "the tracer kept a pixel of the frame it was given first");
+}
+
+void TestUserSystem::takeAndAdoptAGraphAndAnItemOnASkewRect()
+{
+    QCustomPlot from;
+    SkewRect* rect = skewRect(from);
+    InspectableGraph* graph = graphOn(rect);
+    graph->setData(QVector<double> { 1, 9 }, QVector<double> { 1, 9 });
+    QCOMPARE(graph->system(), rect->skew());
+    auto* line = new QCPItemLine(&from);
+    line->start->setSystem(rect->skew());
+    line->end->setSystem(rect->skew());
+    line->start->setType(QCPItemPosition::ptPlotCoords);
+    line->end->setType(QCPItemPosition::ptPlotCoords);
+    line->start->setCoords(1, 1);
+    line->end->setCoords(9, 9);
+    settle(from);
+
+    std::unique_ptr<QCPGraph> takenGraph = from.take(QCPHandle<QCPGraph>(graph));
+    std::unique_ptr<QCPItemLine> takenLine = from.take(QCPHandle<QCPItemLine>(line));
+    QVERIFY(takenGraph);
+    QVERIFY(takenLine);
+    QVERIFY(!takenGraph->system());
+
+    QCustomPlot to;
+    auto movedGraph = to.add(std::move(takenGraph));
+    auto movedLine = to.add(std::move(takenLine));
+    QVERIFY(movedGraph);
+    QVERIFY(movedLine);
+    // Adopting rebinds to the plot's own axes: the 2.x cartesian frame, never the skew one.
+    QCOMPARE(movedGraph->keyAxis(), to.xAxis);
+    QCOMPARE(movedGraph->system(), to.xAxis->axisRect()->system(to.xAxis, to.yAxis));
+    QCOMPARE(movedLine->start->keyAxis(), to.xAxis);
+    QCOMPARE(movedLine->start->coords(), QPointF(1, 1));
+    QVERIFY(movedLine->start->system() != rect->skew());
+    settle(to);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+}
+
+void TestUserSystem::anAxisDeletedMidDragLeavesThemInert()
+{
+    // A slot that answers a mapping change by deleting an axis, exactly as a drag could: whatever
+    // the slot does, the plottables of the dying system draw nothing and say so once.
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    SkewSystem* system = rect->skew();
+    QCPAxis* keyAxis = rect->axis(QCPAxis::atBottom);
+    InspectableGraph* graph = graphOn(rect);
+    graph->setData(QVector<double> { 2, 5 }, QVector<double> { 2, 5 });
+    InspectableCurve* curve = curveOn(rect);
+    curve->setData(QVector<double> { 2, 5 }, QVector<double> { 2, 5 });
+    auto* text = new QCPItemText(&plot);
+    text->position->setSystem(system);
+    text->position->setType(QCPItemPosition::ptPlotCoords);
+    text->position->setCoords(5, 5);
+    text->setClipToAxisRect(true);
+    text->setClipArea(rect);
+    settle(plot);
+
+    QObject::connect(system, &QCPCoordinateSystem::changed, system,
+                     [rect, keyAxis] { rect->removeAxis(keyAxis); });
+    system->setShear(0.5);
+
+    QVERIFY2(!rect->axes().contains(keyAxis), "the slot did not delete the axis");
+    QVERIFY(!graph->system());
+    QVERIFY(!curve->system());
+    QVERIFY(!text->position->system());
+    settle(plot);
+    QVERIFY2(test_misuse::calls.size() > 0, "a plottable of a deleted system stayed silent");
+    test_misuse::calls.clear();
+}
+
+void TestUserSystem::deletingTheSkewRectLeavesThemInert()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    InspectableGraph* graph = graphOn(rect);
+    graph->setData(QVector<double> { 2, 5 }, QVector<double> { 2, 5 });
+    InspectableCurve* curve = curveOn(rect);
+    curve->setData(QVector<double> { 2, 5 }, QVector<double> { 2, 5 });
+    auto* text = new QCPItemText(&plot);
+    text->position->setSystem(rect->skew());
+    text->position->setType(QCPItemPosition::ptPlotCoords);
+    text->position->setCoords(5, 5);
+    settle(plot);
+
+    delete plot.plotLayout()->takeAt(0); // the rect, with its axes and its systems
+
+    QVERIFY(!graph->system());
+    QVERIFY(!curve->system());
+    QVERIFY(!text->position->system());
+    settle(plot);
+    test_misuse::calls.clear();
+    QCOMPARE(text->position->pixelPosition(), QPointF(0, 0));
+}
+
+void TestUserSystem::switchingBetweenCartesianAndSkewReRecords()
+{
+    QCustomPlot plot;
+    TwoRects rects = twoRects(plot);
+    auto* curve = new InspectableCurve(rects.cartesian->axis(QCPAxis::atBottom),
+                                       rects.cartesian->axis(QCPAxis::atLeft));
+    curve->setLineStyle(QCPCurve::lsLine);
+    curve->setPen(QPen(Qt::black, 3));
+    curve->setData(QVector<double> { 2, 5 }, QVector<double> { 2, 5 });
+    settle(plot);
+
+    const int cartesianRecordings = curve->recordings();
+    curve->setSystem(rects.skew->skew());
+    settle(plot);
+    QCOMPARE(curve->system(), rects.skew->skew());
+    QVERIFY2(curve->recordings() == cartesianRecordings + 1,
+             "a system switch reused the recording of the frame it left");
+    QVERIFY(lightnessAt(render(plot), pixelOf(rects.skew->skew()->pixelOf(5, 5))) < 128);
+
+    curve->setSystem(rects.cartesian->system(rects.cartesian->axis(QCPAxis::atBottom),
+                                             rects.cartesian->axis(QCPAxis::atLeft)));
+    settle(plot);
+    QVERIFY(curve->recordings() == cartesianRecordings + 2);
+    QCOMPARE(curve->keyAxis(), rects.cartesian->axis(QCPAxis::atBottom));
+}
+
+void TestUserSystem::theLegendIconOfASkewGraphDraws()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    InspectableGraph* graph = graphOn(rect);
+    graph->setData(QVector<double> { 2, 5 }, QVector<double> { 2, 5 });
+    settle(plot);
+
+    QImage icon(40, 30, QImage::Format_ARGB32_Premultiplied);
+    icon.fill(Qt::white);
+    QCPPainter painter(&icon);
+    graph->icon(&painter, QRectF(0, 0, 40, 30));
+    painter.end();
+
+    int inked = 0;
+    for (int y = 0; y < icon.height(); ++y)
+        for (int x = 0; x < icon.width(); ++x)
+            if (QColor(icon.pixel(x, y)).lightness() < 128)
+                ++inked;
+    QVERIFY2(inked > 0, "the legend icon of a graph on a user system drew nothing");
+}
+
+void TestUserSystem::aSkewItemIsAlwaysAnIndexCandidate()
+{
+    // The documented limit of J-6: the item index culls cartesian systems only, so an item on a
+    // user system is always handed to the hit test - correct, and linear in the items.
+    QCustomPlot plot;
+    TwoRects rects = twoRects(plot);
+    auto* skewItem = new QCPItemLine(&plot);
+    skewItem->start->setSystem(rects.skew->skew());
+    skewItem->end->setSystem(rects.skew->skew());
+    auto* cartesianItem = new QCPItemLine(&plot);
+    cartesianItem->start->setSystem(rects.cartesian->system(rects.cartesian->axis(QCPAxis::atBottom),
+                                                            rects.cartesian->axis(QCPAxis::atLeft)));
+    cartesianItem->end->setSystem(cartesianItem->start->system());
+    settle(plot);
+
+    QCPLayer* layer = skewItem->layer();
+    QCOMPARE(cartesianItem->layer(), layer);
+    const std::vector<std::uint8_t>& candidates = layer->itemCandidates(QRectF(0, 0, 1, 1));
+    const QList<QCPLayerable*> children = layer->children();
+    QCOMPARE(int(candidates.size()), children.size());
+    bool sawSkew = false;
+    bool sawCartesian = false;
+    for (int i = 0; i < children.size(); ++i)
+    {
+        if (children.at(i) == skewItem)
+        {
+            sawSkew = true;
+            QCOMPARE(int(candidates[std::size_t(i)]), 1);
+        }
+        if (children.at(i) == cartesianItem)
+        {
+            sawCartesian = true;
+            QCOMPARE(int(candidates[std::size_t(i)]), 0);
+        }
+    }
+    QVERIFY(sawSkew && sawCartesian);
+}
+
+void TestUserSystem::aPolarGraphIsRectSelected()
+{
+    // A12: the non-cartesian rect selection added for user systems serves the polar graph too.
+    QCustomPlot plot;
+    QCPPolarArea* area = polarArea(plot);
+    auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 90, 180 },
+                                          QVector<double> { 1.0, 0.5, 1.0 });
+    settle(plot);
+
+    const QPointF pixel = graph->coordsToPixels(90, 0.5);
+    const QCPDataSelection selection =
+            graph->selectTestRect(QRectF(pixel - QPointF(6, 6), QSizeF(12, 12)), true);
+    QCOMPARE(selection.dataRangeCount(), 1);
+    QCOMPARE(selection.dataRange(0), QCPDataRange(1, 2));
 }
