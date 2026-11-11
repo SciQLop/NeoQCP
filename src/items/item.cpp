@@ -357,15 +357,17 @@ QCPItemPosition::~QCPItemPosition()
     // itself, because only then
     //       the setParentAnchor(0) call the correct QCPItemPosition::pixelPosition function instead
     //       of QCPItemAnchor::pixelPosition
+    // Nothing reads these pixels after this item is gone: drop the child link without asking the
+    // position to keep a pixel it cannot always represent (a frame may already be gone).
     for (QCPItemPosition* child : mChildrenX.values())
     {
         if (child->parentAnchorX() == this)
-            child->setParentAnchorX(nullptr, true); // the child leaves mChildrenX by itself
+            child->setParentAnchorX(nullptr, false); // the child leaves mChildrenX by itself
     }
     for (QCPItemPosition* child : mChildrenY.values())
     {
         if (child->parentAnchorY() == this)
-            child->setParentAnchorY(nullptr, true); // the child leaves mChildrenY by itself
+            child->setParentAnchorY(nullptr, false); // the child leaves mChildrenY by itself
     }
     // unregister as child in parent:
     if (mParentAnchorX)
@@ -824,6 +826,25 @@ QPointF QCPItemPosition::pixelPosition() const
                                                mAxisRect.data()->rect()),
                                   asPosition(), false); // a position may ask before it has landed
 
+    // An anchored pair of plot coordinates on a frame that has no axis pair is an offset in that
+    // frame's data space: the anchor pixel is read back, the offset added, and the result mapped.
+    // This is what 2.x does on a linear cartesian frame, and the only reading left on a skewed one.
+    if (mSystem && !mKeyAxis && !mValueAxis && mParentAnchorX && mParentAnchorY
+        && mPositionTypeX == ptPlotCoords && mPositionTypeY == ptPlotCoords)
+    {
+        const QPointF anchorPixel(mParentAnchorX->pixelPosition().x(),
+                                  mParentAnchorY->pixelPosition().y());
+        const QCP::Data anchorData = mSystem->transform().inverse(anchorPixel);
+        const QCP::Pixels mapped = mSystem->transform().map(
+                QCP::Data { anchorData.x + mKey, anchorData.y + mValue });
+        QPointF result(mapped.x, mapped.y);
+        if (qIsNaN(result.x()))
+            result.rx() = 0;
+        if (qIsNaN(result.y()))
+            result.ry() = 0;
+        return result;
+    }
+
     // A position that is not the plain cartesian pair resolves as a whole through its frame: the
     // system maps plot coordinates, the area maps axis ratios. A cartesian position keeps the 2.x
     // per-slot path below, unchanged.
@@ -934,8 +955,11 @@ void QCPItemPosition::setAxes(QCPAxis* keyAxis, QCPAxis* valueAxis)
     }
     if (mParentItem)
         mParentItem->markDirty();
-    mKeyAxis = keyAxis;
-    mValueAxis = valueAxis;
+    const bool projections = resolved && resolved->kind() == QCPTransform::Kind::Cartesian;
+    // A system of the user's own hands no 2.x axis: its positions resolve through the frame. The
+    // one-axis form (a 2.x position with a single axis) keeps the axis it names.
+    mKeyAxis = resolved ? (projections ? keyAxis : nullptr) : keyAxis;
+    mValueAxis = resolved ? (projections ? valueAxis : nullptr) : valueAxis;
     mSystem = resolved;
     // A resolved pair names its area, as setSystem does: a position that came from a polar system
     // must measure in the rect of the new pair, not in the old disc.
@@ -976,6 +1000,18 @@ void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
         return;
     if (mParentItem)
         mParentItem->markDirty();
+    // The inverse of the anchored frame above: the pixel read back, the anchor read back, and the
+    // difference stored as the offset in data space.
+    if (mSystem && !mKeyAxis && !mValueAxis && mParentAnchorX && mParentAnchorY
+        && mPositionTypeX == ptPlotCoords && mPositionTypeY == ptPlotCoords)
+    {
+        const QPointF anchorPixel(mParentAnchorX->pixelPosition().x(),
+                                  mParentAnchorY->pixelPosition().y());
+        const QCP::Data data = mSystem->transform().inverse(pixelPosition);
+        const QCP::Data anchorData = mSystem->transform().inverse(anchorPixel);
+        setCoords(data.x - anchorData.x, data.y - anchorData.y);
+        return;
+    }
     // One predicate decides: a position without the 2.x projections for its slots inverts as a
     // whole through its frame. A pair the frame cannot represent is one misuse report, and the
     // position is left alone - raw pixels are never written as coordinates.
@@ -1003,6 +1039,11 @@ void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
                           "the frame of an item position cannot represent this pair of types");
         return;
     }
+    // A frame without the 2.x axis pair can place only the anchored pair above. Everything else
+    // (a one-sided anchor while a child detaches, say) is inert: a pixel write is not reported.
+    if (mSystem && !mKeyAxis && !mValueAxis
+        && (mPositionTypeX == ptPlotCoords || mPositionTypeY == ptPlotCoords))
+        return;
     // The screen coordinates as asked: a slot's branch may translate the numbers it reads, and the
     // other slot must still read the pixel that was passed in (a vertical key crosses the slots).
     const double pixelX = pixelPosition.x();

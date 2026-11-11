@@ -5,6 +5,27 @@
 #include "axis/axis.h"
 #include "items/item.h"
 
+#include <cmath>
+
+namespace
+{
+//! The data point under \a pixel: through the 2.x axis pair when there is one, else through the
+//! system's frame (the documented user-system route), never through a 2.x read of a frame that has
+//! no axis pair.
+QCP::Data dataAt(const QCPAxis* keyAxis, const QCPAxis* valueAxis, const QPointF& pixel)
+{
+    QCPCoordinateSystem* system = qcpSystemOfAxes(const_cast<QCPAxis*>(keyAxis),
+                                                  const_cast<QCPAxis*>(valueAxis));
+    if (system && system->kind() != QCPTransform::Kind::Cartesian)
+        return system->transform().inverse(pixel);
+    if (keyAxis && valueAxis)
+        return QCP::Data { keyAxis->pixelToCoord(pixel.x()), valueAxis->pixelToCoord(pixel.y()) };
+    if (system)
+        return system->transform().inverse(pixel);
+    return QCP::Data { qQNaN(), qQNaN() };
+}
+} // namespace
+
 QCPItemCreationState::QCPItemCreationState(QCustomPlot* plot)
     : QCPLayerable(plot, QLatin1String("overlay"))
     , mPlot(plot)
@@ -54,11 +75,10 @@ bool QCPItemCreationState::handleMousePress(QMouseEvent* event)
 
         rebindPositions(mCurrentItem, mKeyAxis, mValueAxis, axisRect);
 
-        double key = mKeyAxis->pixelToCoord(event->pos().x());
-        double value = mValueAxis->pixelToCoord(event->pos().y());
-        mAnchorKey = key;
-        mAnchorValue = value;
-        applyPositioner(key, value);
+        const QCP::Data data = dataAt(mKeyAxis, mValueAxis, event->pos());
+        mAnchorKey = data.x;
+        mAnchorValue = data.y;
+        applyPositioner(mAnchorKey, mAnchorValue);
 
         mState = Drawing;
         mPlot->setCursor(Qt::CrossCursor);
@@ -156,9 +176,8 @@ void QCPItemCreationState::updateItemPosition(const QPointF& pixelPos)
 {
     if (!mCurrentItem || !mKeyAxis || !mValueAxis) return;
 
-    double key = mKeyAxis->pixelToCoord(pixelPos.x());
-    double value = mValueAxis->pixelToCoord(pixelPos.y());
-    applyPositioner(key, value);
+    const QCP::Data data = dataAt(mKeyAxis, mValueAxis, pixelPos);
+    applyPositioner(data.x, data.y);
 }
 
 void QCPItemCreationState::rebindPositions(QCPAbstractItem* item, QCPAxis* keyAxis,
