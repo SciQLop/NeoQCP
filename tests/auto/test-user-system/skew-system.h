@@ -81,16 +81,14 @@ public:
 
     QCPTransform transform() const override
     {
-        // One mapping per revision and per frame: a recording compares transforms by pointer and
-        // revision, so a mapping rebuilt on every call would re-record every frame a drawing reads
-        // the frame; the frame itself moves on a resize, and the shear is measured in its pixels.
-        if (!mMapping || mBuiltRevision != revision() || mBuiltFrame != rect())
+        // One mapping per revision: the contract says the revision moves whenever the mapping does,
+        // a resize included (QCPArea::update bumps its systems when the area's rect changes).
+        if (!mMapping || mBuiltRevision != revision())
         {
             mMapping = std::make_shared<const SkewMapping>(
                 qobject_cast<const QCPAxis*>(keyAxis()), qobject_cast<const QCPAxis*>(valueAxis()),
                 mShear, rect().bottom());
             mBuiltRevision = revision();
-            mBuiltFrame = rect();
         }
         return QCPTransform::custom(mMapping, mBuiltRevision);
     }
@@ -130,7 +128,6 @@ private:
 
     mutable std::shared_ptr<const SkewMapping> mMapping;
     mutable quint64 mBuiltRevision = 0;
-    mutable QRect mBuiltFrame;
     double mShear = 1.0;
 };
 

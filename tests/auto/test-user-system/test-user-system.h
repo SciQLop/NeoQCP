@@ -37,4 +37,5 @@ private slots:
     void hoveringASkewGraphDoesNotCrash();
     void channelFillNeedsOneSystem();
     void aCartesianChannelFillAcrossValueAxesStillWorks();
+    void aResizeMovesTheRevision();
 };

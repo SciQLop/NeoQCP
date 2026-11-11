@@ -783,3 +783,33 @@ void TestUserSystem::aCartesianChannelFillAcrossValueAxesStillWorks()
     QVERIFY2(isRed(render(plot), inside),
              "the 2.x channel fill between two value axes stopped filling");
 }
+
+void TestUserSystem::aResizeMovesTheRevision()
+{
+    // The contract a caching system rests on: the area's geometry is part of the mapping, so a
+    // resize moves the revision and the mapping is rebuilt against the new frame.
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    SkewSystem* system = rect->skew();
+    const quint64 before = system->revision();
+    const QPointF oldPixel = pixelOf(system->pixelOf(5, 5));
+    const QRect oldFrame = rect->rect();
+
+    // Not settle(): it sizes the plot back to 400x300 for every other test.
+    plot.resize(700, 500);
+    plot.replot();
+    flushRepaints(plot);
+
+    QVERIFY(rect->rect() != oldFrame);
+    QVERIFY(system->revision() != before);
+    // The point (5, 5) sits at the middle of the frame, and the shear is the fixture's 1.0:
+    // its pixel is the frame's middle pushed right by half the frame's height.
+    const QRect frame = rect->rect();
+    const QPointF expected(frame.left() + 0.5 * frame.width() + 0.5 * frame.height(),
+                           frame.bottom() - 0.5 * frame.height());
+    QVERIFY2(near(pixelOf(system->pixelOf(5, 5)), expected, 1.5),
+             qPrintable(QStringLiteral("mapped %1, expected %2")
+                                .arg(pixelOf(system->pixelOf(5, 5)).x())
+                                .arg(expected.x())));
+    QVERIFY(pixelOf(system->pixelOf(5, 5)) != oldPixel);
+}
