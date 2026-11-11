@@ -194,3 +194,86 @@ rows), `backlog.md`, `milestone-5a-rulings.md`, `sciqlopplots-migration.md`.
 - [ ] **Step 3:** Whole bench table against the end of 4j; A/B any row over its gate against a build of the 5a base.
 - [ ] **Step 4:** Docs, changelog, rulings, backlog, migration notes.
 - [ ] **Step 5: Commit** `docs(neoqcp-3): end of milestone 5a — rulings, baseline, backlog, changelog`.
+
+---
+
+## Amendments after review (binding; they override the calls and the task text above)
+
+Review: `.superpowers/m5a-plan-review.md` (opencode).
+
+- **B1 (C1, I1, I2, I5, M6) Task 2 is split.**
+  - **Task 2a** covers lines, steps, impulses, scatters, hit, rect selection, `dataPixelPosition` and the pipeline
+    bypass (B2).
+  - **Task 2b** covers fills, error bars and colour by scalar.
+  - In 2b every 2.x-axis read on the non-cartesian branch goes through one function family:
+    - `fillRows`/`fillValue` (`:1286`, `:1300-1305`), `recordFills` (`:1360`), `binnedWhenDense` (`:1316-1343`,
+      skipped on that branch: no pixel binning), `errorBarRows` (`:1385`), `errorBarsFitInView` (`:1398-1410`) and
+      `recordErrorBars` (`:1467-1469`).
+    - The non-cartesian baseline is a new sign-aware function: value 0, or on a log axis the bound nearer zero.
+      `fillValue` stays as it is for cartesian (byte for byte). Its negative-log behaviour on cartesian goes to the
+      backlog, not changed here.
+    - Error bars on that branch use the `ErrorBarsCmd::ends` form (pixel whiskers perpendicular to the mapped bar).
+  - A feature that cannot be made right is refused (A9) with a misuse at its setter and at `setSystem`, each with a
+    test. The reference scene goes in 2b.
+- **B2 (C2) The pipeline on the non-cartesian branch.** While `drawsInDataSpace()` is true:
+  - `mNeedsResampling` is false, and no pipeline job is started or consulted (`applySourceNow` `:158-160` asks the
+    branch).
+  - `draw` uses `mDataSource` directly, never `mL2Result`/`mL1Cache`.
+  - `canProduceContent` answers from the source.
+  - `setSystem`/`systemChanged` clears L1/L2 and recomputes `mNeedsResampling` both ways (to and from a user system).
+  - Tests: `switchingToASkewRectDropsTheBins` and back, with a 100k-row graph.
+- **B3 (I3) Hit and rect selection.**
+  - `selectTestRect` on the branch maps every candidate row once (one batch) and keeps those inside the pixel rect,
+    as the 4j curve does.
+  - `hitTest`/`nearestDataPoint` on the branch is a 2D nearest search over the mapped points (no key window).
+- **B4 (I4) A system mapping change re-records.** The multigraph's `dependencyRevision()` includes
+  `system()->revision()` on the branch (cartesian unchanged). Test: `aShearChangeRedrawsAMultiGraph` with a moved
+  pixel.
+- **B5 (M2)** `drawsInDataSpace()` is `mSystem && mSystem->kind() != QCPTransform::Kind::Cartesian`, not "no
+  projection".
+- **B6 (C3, C4, I8) `addData`.**
+  - A new `QCPGrowableMultiDataSource` (keys and N value columns in `std::vector<double>`, a revision, `append`)
+    lives in `src/datasource/`. It is the only source `addData` writes to. Every `setData` overload (class and ops,
+    one-column and N-column) builds it when the inputs are `double`; other value types keep
+    `QCPSoAMultiDataSource`, and `addData` on those is the non-owned misuse.
+  - The graph keeps a typed `std::shared_ptr<QCPGrowableMultiDataSource> mOwnedSource` next to `mDataSource`, cleared
+    by every other source setter.
+  - `QCPWaterfallGraph` refuses `addData` (misuse, its source is an adapter).
+  - With a deferred swap pending, the append goes to the pending source when it is the owned one. A new
+    `appendChanged()` path re-stages that same source (new generation, pipeline re-run) instead of `dataChanged()`,
+    which re-stages the displayed one.
+  - Signatures add `bool alreadySorted = false` to the vector forms, as 2.x.
+- **B7 (C5, I7) The tracer.**
+  - It gets one new target member `QPointer<QCPMultiGraph> mLineGraph` + `mComponent`, and `lostGraph()`,
+    `dataSourceIdentity()`, `dependencyRevision()` and `updatePosition()` each get the branch.
+  - The new setter is named `setLineGraph(QCPMultiGraph*, int component = 0)` (with `lineGraph()`, `setComponent`,
+    `component`). No overload of `setGraph`, so `setGraph(nullptr)` and the `Q_PROPERTY` stay unambiguous.
+  - The ops handle mirrors it.
+  - In 5c the old `setGraph(QCPGraph*)` goes and `setLineGraph` is renamed `setGraph` (one name in 3.0).
+  - `setComponent` out of range is a misuse.
+- **B8 (C6, I6, M3) Fill to another graph.**
+  - The partner relation uses `partner->addDependent(this)`. `QCPMultiGraph::linesChanged()` calls
+    `markDependentsDirty()`; check that this does not move the cartesian bench.
+  - `dependencyRevision()` hashes the partner's revision.
+  - The crop and interpolation helper lives in `multigraph-fill.{h,cpp}` as a pure function (tested on its own:
+    unequal grids, no overlap, NaN gaps split runs). It produces equal-length series for `fillBetween`.
+  - The selection split: `recordFills` records one `fillBetween` per selected/unselected run of this graph's
+    component selection. The selected run takes the selected pen's colour at the fill alpha, as `effectiveFillBrush`
+    does for the unselected one.
+  - The GPU-ribbon test uses the effective solid brush.
+  - Test `aPartnerOnAnotherLayerRedrawsTheBand`.
+- **B9 (I9, I10, I11, M1)**
+  - The existing mask assertions (`test-coordinate-system.cpp:669-675`, `test-user-system.cpp:385`) change in
+    Task 2a.
+  - `aCurveOnAUserSystemIsNotCulledByAnEmptyWindow` is replaced by a draw-context spy test that reads
+    `keyWindow()`.
+  - `aWaterfallIsRefusedOnASkewRect` and `anAxisDeletedMidDragLeavesAMultiGraphInert` are guards (expected to pass
+    before).
+  - Graph-list registration is 5c (A5 needs the rename).
+  - P-2 changes only `QCPMultiGraph`'s handling of an empty window. The other callers' masks keep them off user
+    systems; the report proves it.
+- **B10 (M4, M5, M7)**
+  - The P-8 rows keep their `QCPMultiGraph_*` names until 5c renames them with the class; the 5c gate maps old to
+    new names.
+  - Add `QCPMultiGraph_UserSystem100k` (draw) and `QCPMultiGraph_FillToGraphPan10k` rows.
+  - Task 6 docs state every refusal and the waterfall's rectangle row in the capability table.
