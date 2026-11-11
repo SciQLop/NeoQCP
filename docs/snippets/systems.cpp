@@ -77,7 +77,7 @@ private:
 
     mutable std::shared_ptr<const ShearMapping> mMapping;
     mutable quint64 mBuiltRevision = 0;
-    double mShear = 0.5;
+    double mShear = 0.2;
 };
 
 // The area: an ordinary axis rect, except that every pair of its axes makes a ShearSystem.
