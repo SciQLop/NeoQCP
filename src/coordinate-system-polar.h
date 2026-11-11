@@ -36,6 +36,7 @@ public:
     bool clipsToPath() const override { return true; }
     bool contains(QPointF pixel) const override;
     QCPKeyWindow keyWindow() const override;
+    [[nodiscard]] QCPTransform::Kind kind() const override { return QCPTransform::Kind::Polar; }
     //! A polar area offers none of the cartesian capabilities: it has no rect, no straight key.
     QCP::Capabilities capabilities() const override;
 

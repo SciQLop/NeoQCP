@@ -89,6 +89,10 @@ public:
     virtual QCPTransform iconTransform(const QCPDataBox& box, const QRectF& rect) const;
     //! The key range a recording stays good for, and the resolution it was recorded at.
     virtual QCPKeyWindow keyWindow() const;
+    //! The kind of frame this system maps, without building it. The 2.x projections serve a
+    //! cartesian frame; another kind resolves through its transform. The item index asks this once
+    //! per item, so a subclass answers it from its own data.
+    [[nodiscard]] virtual QCPTransform::Kind kind() const { return QCPTransform::Kind::Custom; }
     //! What can be drawn through this system; see QCP::Capability.
     virtual QCP::Capabilities capabilities() const = 0;
 
@@ -141,6 +145,7 @@ public:
     QRect clipRect() const override;
     bool contains(QPointF pixel) const override;
     QCPKeyWindow keyWindow() const override;
+    [[nodiscard]] QCPTransform::Kind kind() const override { return QCPTransform::Kind::Cartesian; }
     QCP::Capabilities capabilities() const override;
 
 private:

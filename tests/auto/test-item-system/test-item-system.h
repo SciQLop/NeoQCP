@@ -27,6 +27,14 @@ private slots:
     void deletingThePolarAreaLeavesItsItemsInert();
     void takeAndAdoptAPolarItem();
 
+    void aPolarSetTypeKeepsThePixel();
+    void aPolarAreaAbsolutePositionIsFromTheAreaCorner();
+    void aCartesianSystemWithAPolarAreaPlacesRatiosByPixel();
+    void aSetAxesAfterAPolarSystemTakesTheRectsArea();
+    void aBindingAPositionToASystemMovesTheClipArea();
+    void setAxesNullUnbindsAPolarSystem();
+    void setSystemTwiceRetakesTheArea();
+    void aTakeClearsAOneAxisPosition();
 private:
     QCustomPlot* mPlot = nullptr;
 };

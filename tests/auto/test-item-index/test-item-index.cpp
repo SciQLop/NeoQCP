@@ -555,3 +555,70 @@ void TestItemIndex::aDeletedAxisDropsItsGroup()
     plot.layerableListAt(QPointF(1, 1), true);
     QVERIFY2(line->mSelectCalls > 0, "an item of the deleted system was culled");
 }
+
+namespace
+{
+class CountingSystem : public QCPCoordinateSystem
+{
+public:
+    CountingSystem(QCPAxisRect* rect, QCPAxis* key, QCPAxis* value)
+        : QCPCoordinateSystem(rect, key, value)
+    {
+    }
+
+    QCPTransform transform() const override
+    {
+        ++mCalls;
+        return QCPTransform(qobject_cast<const QCPAxis*>(keyAxis()),
+                            qobject_cast<const QCPAxis*>(valueAxis()));
+    }
+
+    QRect clipRect() const override { return static_cast<QCPArea*>(area())->rect(); }
+
+    QCP::Capabilities capabilities() const override { return QCP::capRectangular; }
+
+    mutable int mCalls = 0;
+};
+} // namespace
+
+void TestItemIndex::aRetargetedItemFollowsItsNewArea()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.xAxis->setRange(0, 100);
+    plot.yAxis->setRange(0, 100);
+    auto* line = new CountingLine(&plot);
+    line->start->setCoords(10, 10);
+    line->end->setCoords(20, 20);
+    plot.replot(); // the layer learns the cartesian frames
+
+    auto* area = new QCPPolarArea(&plot);
+    plot.plotLayout()->addElement(1, 0, area);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    plot.replot();
+    QCPLayer* layer = line->layer();
+    QVERIFY(!layer->itemsUseArea(area));
+
+    line->start->setSystem(area->system(area->angularAxis(), area->radialAxis()));
+    QVERIFY2(layer->itemsUseArea(area),
+             "the layer did not learn the area a retargeted position measures in");
+}
+
+void TestItemIndex::aDataExtentDoesNotBuildATransform()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.xAxis->setRange(0, 10);
+    plot.yAxis->setRange(0, 10);
+    auto* item = new CountingLine(&plot);
+    CountingSystem system(plot.axisRect(), plot.xAxis, plot.yAxis);
+    item->start->setSystem(&system);
+    item->end->setSystem(&system);
+    item->start->setCoords(1, 2);
+    item->end->setCoords(3, 4);
+
+    system.mCalls = 0;
+    item->dataExtent();
+    QCOMPARE(system.mCalls, 0);
+}

@@ -497,3 +497,157 @@ void TestItemSystem::takeAndAdoptAPolarItem()
     QCOMPARE(position->area(), static_cast<QCPArea*>(mPlot->axisRect()));
     QCOMPARE(item->clipArea(), static_cast<QCPArea*>(mPlot->axisRect()));
 }
+
+void TestItemSystem::aPolarSetTypeKeepsThePixel()
+{
+    auto* area = polarOnly(mPlot);
+    mPlot->replot();
+    auto* item = new QCPItemEllipse(mPlot);
+    QCPItemPosition* position = item->positions().first();
+    position->setSystem(area->system(area->angularAxis(), area->radialAxis()));
+    position->setType(QCPItemPosition::ptPlotCoords);
+    position->setCoords(90.0, 0.6);
+    mPlot->replot();
+    const QPointF pixel = position->pixelPosition();
+    QVERIFY2(!pixel.isNull(), "the polar position has no pixel to keep");
+
+    for (QCPItemPosition::PositionType type :
+         { QCPItemPosition::ptAbsolute, QCPItemPosition::ptAxisRectRatio,
+           QCPItemPosition::ptPlotCoords })
+    {
+        position->setType(type);
+        QVERIFY2(samePixel(position->pixelPosition(), pixel),
+                 qPrintable(QStringLiteral("type %1 moved the pixel").arg(int(type))));
+    }
+}
+
+void TestItemSystem::aPolarAreaAbsolutePositionIsFromTheAreaCorner()
+{
+    auto* area = polarOnly(mPlot);
+    mPlot->replot();
+    auto* item = new QCPItemEllipse(mPlot);
+    QCPItemPosition* position = item->positions().first();
+    position->setSystem(area->system(area->angularAxis(), area->radialAxis()));
+    position->setType(QCPItemPosition::ptAxisRectAbsolute);
+    position->setCoords(10.0, 10.0);
+    const QPointF corner = area->rect().topLeft();
+    QVERIFY2(samePixel(position->pixelPosition(), corner + QPointF(10, 10)),
+             qPrintable(QStringLiteral("pixel %1,%2, expected %3,%4")
+                            .arg(position->pixelPosition().x())
+                            .arg(position->pixelPosition().y())
+                            .arg(corner.x() + 10)
+                            .arg(corner.y() + 10)));
+
+    const QPointF asked = corner + QPointF(40, 30);
+    position->setPixelPosition(asked);
+    QVERIFY2(samePixel(position->pixelPosition(), asked), "the pixel did not round trip");
+    QVERIFY2(samePixel(position->coords(), QPointF(40, 30)), "the coords did not round trip");
+}
+
+void TestItemSystem::aCartesianSystemWithAPolarAreaPlacesRatiosByPixel()
+{
+    auto* area = polarOnly(mPlot);
+    mPlot->replot();
+    auto* item = new QCPItemEllipse(mPlot);
+    QCPItemPosition* position = item->positions().first();
+    position->setArea(area);
+    position->setType(QCPItemPosition::ptAxisRectRatio);
+    position->setCoords(0.1, 0.1);
+    const QCP::Pixels mapped = area->ratioTransform().map(QCP::AxisRatio { 0.6, 0.4 });
+    const QPointF pixel(mapped.x, mapped.y);
+
+    gMisuses = 0;
+    const qcp::MisuseHandler previous = qcp::setMisuseHandler(countMisuse);
+    position->setPixelPosition(pixel);
+    qcp::setMisuseHandler(previous);
+
+    QCOMPARE(gMisuses, 0);
+    QVERIFY2(samePixel(position->pixelPosition(), pixel),
+             qPrintable(QStringLiteral("pixel %1,%2, expected %3,%4")
+                            .arg(position->pixelPosition().x())
+                            .arg(position->pixelPosition().y())
+                            .arg(pixel.x())
+                            .arg(pixel.y())));
+}
+
+void TestItemSystem::aSetAxesAfterAPolarSystemTakesTheRectsArea()
+{
+    auto* area = polarOnly(mPlot);
+    mPlot->replot();
+    auto* item = new QCPItemEllipse(mPlot);
+    QCPItemPosition* position = item->positions().first();
+    position->setSystem(area->system(area->angularAxis(), area->radialAxis()));
+    QCOMPARE(position->area(), static_cast<QCPArea*>(area));
+
+    auto* rect = new QCPAxisRect(mPlot);
+    mPlot->plotLayout()->addElement(1, 0, rect);
+    mPlot->replot();
+    QCPAxis* key = rect->axis(QCPAxis::atBottom);
+    QCPAxis* value = rect->axis(QCPAxis::atLeft);
+    QVERIFY(key && value);
+    position->setAxes(key, value);
+    QCOMPARE(position->system(), rect->system(key, value));
+    QCOMPARE(position->area(), static_cast<QCPArea*>(rect));
+    QCOMPARE(position->axisRect(), rect);
+}
+
+void TestItemSystem::aBindingAPositionToASystemMovesTheClipArea()
+{
+    // The cartesian rect stays: a new item starts clipped to it, which is what binding moves.
+    auto* area = new QCPPolarArea(mPlot);
+    mPlot->plotLayout()->addElement(1, 0, area);
+    mPlot->replot();
+    auto* item = new QCPItemEllipse(mPlot);
+    QCOMPARE(item->clipArea(), static_cast<QCPArea*>(mPlot->axisRect()));
+
+    item->positions().first()->setSystem(area->system(area->angularAxis(), area->radialAxis()));
+    QCOMPARE(item->clipArea(), static_cast<QCPArea*>(area));
+
+    auto* explicitArea = new QCPPolarArea(mPlot);
+    mPlot->plotLayout()->addElement(2, 0, explicitArea);
+    mPlot->replot();
+    item->setClipArea(explicitArea);
+    item->positions().first()->setSystem(area->system(area->angularAxis(), area->radialAxis()));
+    QCOMPARE(item->clipArea(), static_cast<QCPArea*>(explicitArea));
+}
+
+void TestItemSystem::setAxesNullUnbindsAPolarSystem()
+{
+    auto* area = polarOnly(mPlot);
+    auto* item = new QCPItemEllipse(mPlot);
+    QCPItemPosition* position = item->positions().first();
+    position->setSystem(area->system(area->angularAxis(), area->radialAxis()));
+    QVERIFY(position->system());
+
+    position->setAxes(nullptr, nullptr);
+    QVERIFY2(!position->system(), "the polar system survived setAxes(nullptr, nullptr)");
+}
+
+void TestItemSystem::setSystemTwiceRetakesTheArea()
+{
+    auto* area = polarOnly(mPlot);
+    auto* other = secondPolar(mPlot);
+    mPlot->replot();
+    QCPCoordinateSystem* system = area->system(area->angularAxis(), area->radialAxis());
+    auto* item = new QCPItemEllipse(mPlot);
+    QCPItemPosition* position = item->positions().first();
+    position->setSystem(system);
+    position->setArea(other);
+    QCOMPARE(position->area(), static_cast<QCPArea*>(other));
+
+    position->setSystem(system);
+    QVERIFY2(position->area() == area, "a repeated setSystem did not retake the system's area");
+}
+
+void TestItemSystem::aTakeClearsAOneAxisPosition()
+{
+    auto item = mPlot->add<QCPItemEllipse>();
+    QCPItemPosition* position = item->positions().first();
+    position->setAxes(nullptr, mPlot->yAxis);
+    QCOMPARE(position->valueAxis(), mPlot->yAxis);
+
+    std::unique_ptr<QCPItemEllipse> taken = mPlot->take(item);
+    QVERIFY(taken);
+    QVERIFY2(!position->keyAxis() && !position->valueAxis(),
+             "take left an axis on a one-axis position");
+}

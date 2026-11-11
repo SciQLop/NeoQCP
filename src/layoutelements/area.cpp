@@ -211,6 +211,8 @@ QCPCoordinateSystem* qcpSystemOfAxes(QCPAxis* keyAxis, QCPAxis* valueAxis)
         return nullptr;
     if (keyAxis->orientation() == valueAxis->orientation())
         return nullptr;
+    if (keyAxis->parentPlot() != valueAxis->parentPlot())
+        return nullptr;
     QCPAxisRect* area = keyAxis->axisRect();
     if (!area || area != valueAxis->axisRect())
         return nullptr;

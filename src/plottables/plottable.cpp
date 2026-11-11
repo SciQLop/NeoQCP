@@ -455,19 +455,6 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
 namespace
 {
 //! The cartesian system \a keyAxis and \a valueAxis define, or null when they cannot define one.
-QCPCoordinateSystem* systemOfAxes(QCPAxis* keyAxis, QCPAxis* valueAxis)
-{
-    // The area refuses a pair that is not two different axes of two orientations: it is no system,
-    // not misuse - an axis is swapped in two steps, and one of them holds the same axis twice.
-    if (!keyAxis || !valueAxis || keyAxis == valueAxis
-        || keyAxis->orientation() == valueAxis->orientation()
-        || keyAxis->parentPlot() != valueAxis->parentPlot())
-        return nullptr;
-    QCPAxisRect* rect = keyAxis->axisRect();
-    if (!rect || rect != valueAxis->axisRect())
-        return nullptr;
-    return rect->system(keyAxis, valueAxis);
-}
 } // namespace
 
 QCPAbstractPlottable::QCPAbstractPlottable(QCPCoordinateSystem* system)
@@ -497,7 +484,7 @@ QCPAbstractPlottable::QCPAbstractPlottable(QCPCoordinateSystem* system)
 }
 
 QCPAbstractPlottable::QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis)
-        : QCPAbstractPlottable(systemOfAxes(keyAxis, valueAxis))
+        : QCPAbstractPlottable(qcpSystemOfAxes(keyAxis, valueAxis))
 {
     // The 2.x pair is the cartesian projection of the system it resolves to.
     mKeyAxis = keyAxis;
@@ -799,7 +786,7 @@ void QCPAbstractPlottable::setValueAxis(QCPAxis* axis)
 //! projection a non-cartesian system cannot answer.
 void QCPAbstractPlottable::resolveAxes(QCPAxis* key, QCPAxis* value)
 {
-    QCPCoordinateSystem* resolved = systemOfAxes(key, value);
+    QCPCoordinateSystem* resolved = qcpSystemOfAxes(key, value);
     if (resolved == mSystem)
     {
         mKeyAxis = key;

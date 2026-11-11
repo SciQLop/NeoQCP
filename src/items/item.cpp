@@ -55,13 +55,14 @@ void detachFromParent(QCPItemPosition* position)
 //! when the slot's type needs an axis rect and none is set.
 std::optional<double> slotAlongScreenAxis(double coord, QCPItemPosition::PositionType type,
                                           bool horizontal, const QCustomPlot& plot,
-                                          const QCPAxisRect* rect,
+                                          const QCPArea* area,
                                           const std::optional<double>& anchor)
 {
     const double viewportLength = horizontal ? plot.viewport().width() : plot.viewport().height();
     const double viewportOrigin = horizontal ? plot.viewport().left() : plot.viewport().top();
-    const double rectLength = rect ? (horizontal ? rect->width() : rect->height()) : 0.0;
-    const double rectOrigin = rect ? (horizontal ? rect->left() : rect->top()) : 0.0;
+    const QRect rect = area ? area->rect() : QRect();
+    const double rectLength = horizontal ? rect.width() : rect.height();
+    const double rectOrigin = horizontal ? rect.left() : rect.top();
     switch (type)
     {
         case QCPItemPosition::ptAbsolute:
@@ -69,11 +70,11 @@ std::optional<double> slotAlongScreenAxis(double coord, QCPItemPosition::Positio
         case QCPItemPosition::ptViewportRatio:
             return coord * viewportLength + anchor.value_or(viewportOrigin);
         case QCPItemPosition::ptAxisRectRatio:
-            if (rect)
+            if (area)
                 return coord * rectLength + anchor.value_or(rectOrigin);
             return std::nullopt;
         case QCPItemPosition::ptAxisRectAbsolute:
-            if (rect)
+            if (area)
                 return coord + anchor.value_or(rectOrigin);
             return std::nullopt;
         case QCPItemPosition::ptPlotCoords:
@@ -394,23 +395,43 @@ QCPArea* QCPItemPosition::area() const
 
 void QCPItemPosition::setSystem(QCPCoordinateSystem* system)
 {
-    if (mSystem == system && mArea)
-        return;
     if (system)
     {
         QCP_CHECK_OR_RETURN(!mParentPlot || system->area()->parentPlot() == mParentPlot,
                             "the system of an item position must belong to its plot");
     }
+    const QPointer<QCPArea> previousArea = mArea;
     if (mParentItem)
         mParentItem->markDirty();
     mSystem = system;
-    // The axes stay the synchronised cartesian projection; a non-cartesian system has none.
     mKeyAxis = system ? qobject_cast<QCPAxis*>(system->keyAxis()) : nullptr;
     mValueAxis = system ? qobject_cast<QCPAxis*>(system->valueAxis()) : nullptr;
-    // The system's area is the frame's, by definition: a caller that wants ratios measured
-    // elsewhere calls setArea() after binding. (The constructor's default rect is not a choice.)
+    // Binding a system always takes its area, even when the system is the same one: the area is a
+    // fact of the frame, not a separate choice.
     if (system)
         setArea(system->area());
+    if (mParentItem)
+    {
+        mParentItem->noteFramesChanged();
+        // The clip of an item that followed this position's area follows it to the new area; a clip
+        // area chosen explicitly (another one) is kept.
+        if (system && previousArea && mParentItem->clipArea() == previousArea
+            && mParentItem->clipArea() != mArea)
+            mParentItem->setClipArea(mArea);
+    }
+}
+
+bool QCPItemPosition::needsFrame() const
+{
+    const auto slot = [this](PositionType type)
+    {
+        if (type == ptPlotCoords)
+            return !(mKeyAxis && mValueAxis) && mSystem;
+        if (type == ptAxisRectRatio)
+            return !mAxisRect && mArea && !mArea->ratioTransform().separable();
+        return false;
+    };
+    return slot(mPositionTypeX) || slot(mPositionTypeY);
 }
 
 void QCPItemPosition::setArea(QCPArea* area)
@@ -421,6 +442,8 @@ void QCPItemPosition::setArea(QCPArea* area)
         mParentItem->markDirty();
     mArea = area;
     mAxisRect = qobject_cast<QCPAxisRect*>(area);
+    if (mParentItem)
+        mParentItem->noteFramesChanged();
 }
 
 /*!
@@ -450,8 +473,26 @@ void QCPItemPosition::setArea(QCPArea* area)
 */
 void QCPItemPosition::setType(QCPItemPosition::PositionType type)
 {
-    setTypeX(type);
-    setTypeY(type);
+    // A framed position cannot retain through the per-slot setters: the first of the two calls sees
+    // a mixed pair, and a mixed pair has no pixel under a frame that does not separate. Read the
+    // pixel once, change both slots, place it once.
+    const bool framed = needsFrame()
+        || (mSystem && mSystem->kind() != QCPTransform::Kind::Cartesian)
+        || (mArea && !mAxisRect);
+    if (!framed)
+    {
+        setTypeX(type);
+        setTypeY(type);
+        return;
+    }
+    if (mPositionTypeX == type && mPositionTypeY == type)
+        return;
+    const QPointF pixel = pixelPosition();
+    if (mParentItem)
+        mParentItem->markDirty();
+    mPositionTypeX = type;
+    mPositionTypeY = type;
+    setPixelPosition(pixel);
 }
 
 /*!
@@ -474,9 +515,10 @@ void QCPItemPosition::setTypeX(QCPItemPosition::PositionType type)
         if ((mPositionTypeX == ptPlotCoords || type == ptPlotCoords) && !mSystem
             && (!mKeyAxis || !mValueAxis))
             retainPixelPosition = false;
+        const bool areaReady = mArea && !mArea->rect().isEmpty();
         if ((mPositionTypeX == ptAxisRectRatio || type == ptAxisRectRatio
              || mPositionTypeX == ptAxisRectAbsolute || type == ptAxisRectAbsolute)
-            && !mArea)
+            && !areaReady)
             retainPixelPosition = false;
         // A non-separable ratio maps the two slots together: only a pair of plot coordinates or a
         // pair of ratios round-trips through it.
@@ -516,9 +558,10 @@ void QCPItemPosition::setTypeY(QCPItemPosition::PositionType type)
         if ((mPositionTypeY == ptPlotCoords || type == ptPlotCoords) && !mSystem
             && (!mKeyAxis || !mValueAxis))
             retainPixelPosition = false;
+        const bool areaReady = mArea && !mArea->rect().isEmpty();
         if ((mPositionTypeY == ptAxisRectRatio || type == ptAxisRectRatio
              || mPositionTypeY == ptAxisRectAbsolute || type == ptAxisRectAbsolute)
-            && !mArea)
+            && !areaReady)
             retainPixelPosition = false;
         // A non-separable ratio maps the two slots together: only a pair of plot coordinates or a
         // pair of ratios round-trips through it.
@@ -781,11 +824,7 @@ QPointF QCPItemPosition::pixelPosition() const
     // A position that is not the plain cartesian pair resolves as a whole through its frame: the
     // system maps plot coordinates, the area maps axis ratios. A cartesian position keeps the 2.x
     // per-slot path below, unchanged.
-    const bool sameKindPair = (mPositionTypeX == ptPlotCoords && mPositionTypeY == ptPlotCoords)
-        || (mPositionTypeX == ptAxisRectRatio && mPositionTypeY == ptAxisRectRatio);
-    const bool frameResolved = !mParentAnchorX && !mParentAnchorY && sameKindPair
-        && ((mSystem && (!mSystem->capabilities().testFlag(QCP::capRectangular) || !mAxisRect))
-            || (!mSystem && mArea && !mAxisRect));
+    const bool frameResolved = !mParentAnchorX && !mParentAnchorY && needsFrame();
     if (frameResolved)
     {
         QCPDrawFrame frame;
@@ -827,7 +866,7 @@ QPointF QCPItemPosition::pixelPosition() const
                                                : anchor->pixelPosition().y())
             : std::nullopt;
         return resolved(
-            slotAlongScreenAxis(coord, type, horizontal, *mParentPlot, mAxisRect.data(), shift));
+            slotAlongScreenAxis(coord, type, horizontal, *mParentPlot, mArea.data(), shift));
     };
 
     //! A ptPlotCoords slot on \a horizontal or the vertical screen axis.
@@ -879,7 +918,9 @@ QPointF QCPItemPosition::pixelPosition() const
 */
 void QCPItemPosition::setAxes(QCPAxis* keyAxis, QCPAxis* valueAxis)
 {
-    if (keyAxis == mKeyAxis && valueAxis == mValueAxis)
+    // Both null is not a no-op: it unbinds a system whose projections are already null (a polar
+    // one), and the take path relies on it.
+    if (keyAxis == mKeyAxis && valueAxis == mValueAxis && (keyAxis || valueAxis))
         return;
     QCPCoordinateSystem* resolved = nullptr;
     if (keyAxis && valueAxis)
@@ -893,11 +934,15 @@ void QCPItemPosition::setAxes(QCPAxis* keyAxis, QCPAxis* valueAxis)
     mKeyAxis = keyAxis;
     mValueAxis = valueAxis;
     mSystem = resolved;
-    if (resolved && !mArea)
+    // A resolved pair names its area, as setSystem does: a position that came from a polar system
+    // must measure in the rect of the new pair, not in the old disc.
+    if (resolved)
     {
         mArea = resolved->area();
         mAxisRect = qobject_cast<QCPAxisRect*>(mArea.data());
     }
+    if (mParentItem)
+        mParentItem->noteFramesChanged();
 }
 
 /*!
@@ -928,14 +973,12 @@ void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
         return;
     if (mParentItem)
         mParentItem->markDirty();
-    // A non-cartesian frame inverts as a whole: both slots are plot coordinates (one angle and one
-    // radius), both are fractions of the area (the polar ratio inverts together), or both are
-    // pixels from the area's origin. A mixed pair has no per-axis inverse here and keeps its
-    // coordinates: it is misuse if it is ever drawn.
-    if (!mParentAnchorX && !mParentAnchorY && mSystem
-        && !mSystem->capabilities().testFlag(QCP::capRectangular))
+    // One predicate decides: a position without the 2.x projections for its slots inverts as a
+    // whole through its frame. A pair the frame cannot represent is one misuse report, and the
+    // position is left alone - raw pixels are never written as coordinates.
+    if (!mParentAnchorX && !mParentAnchorY && needsFrame())
     {
-        if (mPositionTypeX == ptPlotCoords && mPositionTypeY == ptPlotCoords)
+        if (mPositionTypeX == ptPlotCoords && mPositionTypeY == ptPlotCoords && mSystem)
         {
             const QCP::Data data = mSystem->transform().inverse(pixelPosition);
             setCoords(data.x, data.y);
@@ -953,8 +996,9 @@ void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
             setCoords(pixelPosition.x() - rect.left(), pixelPosition.y() - rect.top());
             return;
         }
-        if ((mPositionTypeX == ptPlotCoords) != (mPositionTypeY == ptPlotCoords))
-            return;
+        qcp::reportMisuse(Q_FUNC_INFO,
+                          "the frame of an item position cannot represent this pair of types");
+        return;
     }
     // The screen coordinates as asked: a slot's branch may translate the numbers it reads, and the
     // other slot must still read the pixel that was passed in (a vertical key crosses the slots).
@@ -964,6 +1008,8 @@ void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
     double y = pixelY;
     bool resolvedX = true;
     bool resolvedY = true;
+    // The area rect is the 2.x axis rect for the ratios and pixels of a frame without an axis rect.
+    const QRect areaRect = mArea ? mArea->rect() : QRect();
 
     switch (mPositionTypeX)
     {
@@ -984,13 +1030,13 @@ void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
         }
         case ptAxisRectRatio:
         {
-            if (mAxisRect)
+            if (!areaRect.isEmpty())
             {
                 if (mParentAnchorX)
                     x -= mParentAnchorX->pixelPosition().x();
                 else
-                    x -= mAxisRect.data()->left();
-                x /= double(mAxisRect.data()->width());
+                    x -= areaRect.left();
+                x /= double(areaRect.width());
             }
             else
                 resolvedX = false;
@@ -998,12 +1044,12 @@ void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
         }
         case ptAxisRectAbsolute:
         {
-            if (mAxisRect)
+            if (!areaRect.isEmpty())
             {
                 if (mParentAnchorX)
                     x -= mParentAnchorX->pixelPosition().x();
                 else
-                    x -= mAxisRect.data()->left();
+                    x -= areaRect.left();
             }
             else
                 resolvedX = false;
@@ -1040,13 +1086,13 @@ void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
         }
         case ptAxisRectRatio:
         {
-            if (mAxisRect)
+            if (!areaRect.isEmpty())
             {
                 if (mParentAnchorY)
                     y -= mParentAnchorY->pixelPosition().y();
                 else
-                    y -= mAxisRect.data()->top();
-                y /= double(mAxisRect.data()->height());
+                    y -= areaRect.top();
+                y /= double(areaRect.height());
             }
             else
                 resolvedY = false;
@@ -1054,12 +1100,12 @@ void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
         }
         case ptAxisRectAbsolute:
         {
-            if (mAxisRect)
+            if (!areaRect.isEmpty())
             {
                 if (mParentAnchorY)
                     y -= mParentAnchorY->pixelPosition().y();
                 else
-                    y -= mAxisRect.data()->top();
+                    y -= areaRect.top();
             }
             else
                 resolvedY = false;
@@ -1078,8 +1124,11 @@ void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
     }
 
     if (!resolvedX || !resolvedY)
+    {
         qcp::reportMisuse(Q_FUNC_INFO,
                           "an item position cannot be placed: it needs its axes or its area");
+        return; // the coordinates stay as they were
+    }
 
     setCoords(x, y);
 }
@@ -1399,6 +1448,12 @@ QCPAbstractItem::~QCPAbstractItem()
 
 /* can't make this a header inline function, because QPointer breaks with forward declared types,
  * see QTBUG-29588 */
+void QCPAbstractItem::noteFramesChanged()
+{
+    if (QCPLayer* itemLayer = layer())
+        itemLayer->invalidateItemFrames();
+}
+
 QCPAxisRect* QCPAbstractItem::clipAxisRect() const
 {
     return qobject_cast<QCPAxisRect*>(mClipArea.data());
@@ -1521,6 +1576,7 @@ void QCPAbstractItem::setClipArea(QCPArea* area)
     mClipArea = area;
     if (mClipToAxisRect)
         setParentLayerable(mClipArea.data());
+    noteFramesChanged();
 }
 
 /*!
@@ -1801,7 +1857,7 @@ QCPAbstractItem::positionsExtent(double pixelPad, const QList<QCPItemPosition*>&
     {
         // Only a cartesian system's box can be culled by an axis-pair query: an item on another
         // frame is always a candidate until the index learns system-side boxes (4j).
-        if (system->transform().kind() != QCPTransform::Kind::Cartesian)
+        if (system->kind() != QCPTransform::Kind::Cartesian)
             return std::nullopt;
         keyAxis = qobject_cast<QCPAxis*>(system->keyAxis());
         valueAxis = qobject_cast<QCPAxis*>(system->valueAxis());

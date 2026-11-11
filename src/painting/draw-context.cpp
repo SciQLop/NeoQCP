@@ -339,7 +339,7 @@ void reportRatioWithoutRect()
     static const bool once = []
     {
         qcp::reportMisuse(Q_FUNC_INFO,
-                          "a position measured in axis ratios needs an axis rect: it is not drawn");
+                          "a position measured in axis ratios needs an area that maps them: it is not drawn");
         return true;
     }();
     Q_UNUSED(once);

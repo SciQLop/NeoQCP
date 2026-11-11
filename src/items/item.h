@@ -219,6 +219,11 @@ private:
     // own parent anchor on the same axis, a plain anchor on every position of its item.
     [[nodiscard]] bool parentChainReachesThis(QCPItemAnchor* parent) const;
 
+    //! Whether this position needs its frame (system transform + area ratio) rather than the 2.x
+    //! per-slot projections: a plot slot without both axes, or a ratio slot measured in an area
+    //! whose ratio does not separate.
+    [[nodiscard]] bool needsFrame() const;
+
     // The tracer derives this position from its graph on every draw: storing must not mark, or the
     // draw itself would dirty the layer and the plot would never settle.
     void assignCoords(double key, double value);
@@ -293,6 +298,10 @@ public:
       without parent anchors answers 0, and the walk costs only the null checks of its positions.
     */
     [[nodiscard]] quint64 dependencyRevision() const override;
+
+    //! Tells the layer the frames its positions follow changed (a position was rebound): the
+    //! layer's frame lists are rebuilt before the next repaint or hit test.
+    void noteFramesChanged();
 
     //! The first position, without copying the list: the view asks it for its axes every frame.
     [[nodiscard]] const QCPItemPosition* firstPosition() const { return mPositions.value(0); }

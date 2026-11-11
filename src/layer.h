@@ -186,6 +186,9 @@ private:
     // layer without walking every item of the plot. Rebuilt lazily from the child list; a moved
     // item unions its own frames in, and a superset only costs a repaint.
     void rebuildItemFrames() const;
+    //! The frames an item follows changed (a position was rebound): collect them again before the
+    //! next query. Cheap and rare, so the setters call it after they assigned.
+    void invalidateItemFrames();
     void noteItemFrames(QCPAbstractItem* item);
     void collectItemFrames(QCPAbstractItem* item, std::vector<QPointer<QCPAxis>>& axes,
                            std::vector<QPointer<QCPCoordinateSystem>>& systems,

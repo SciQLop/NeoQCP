@@ -1188,6 +1188,11 @@ void QCPLayer::collectItemFrames(QCPAbstractItem* item, std::vector<QPointer<QCP
     }
 }
 
+void QCPLayer::invalidateItemFrames()
+{
+    mItemFramesDirty = true;
+}
+
 void QCPLayer::rebuildItemFrames() const
 {
     mItemAxes.clear();

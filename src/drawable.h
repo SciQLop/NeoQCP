@@ -39,14 +39,15 @@ struct QCP_LIB_DECL QCPDrawnView
 {
     const QCPAxis* keyAxis = nullptr; //!< the cartesian projections of \a system, when it has some
     const QCPAxis* valueAxis = nullptr;
-    const QCPAxisRect* axisRect = nullptr; //!< the rect the ratio transform maps
+    const QCPAxisRect* axisRect = nullptr; //!< the rect's axes projection, when it has one
     //! The area whose ratio this object draws in: a plottable's system area, an item's position
     //! area.
     const QCPArea* area = nullptr;
     //! The area whose shape clips this object: a plottable's system area; an item's clip area, and
     //! only while the item clips (an unclipped item draws anywhere, as on an axis rect).
     const QCPArea* clipArea = nullptr;
-    //! The frame the object draws in: a plottable's system; null for items, which read the axes.
+    //! The frame the object draws in: a plottable's system, or the system of the item's first
+    //! plot-coordinate position. Null only when the object names no frame at all.
     const QCPCoordinateSystem* system = nullptr;
     const QCPTheme* theme = nullptr;
     QCustomPlot* plot = nullptr;
@@ -55,8 +56,8 @@ struct QCP_LIB_DECL QCPDrawnView
     bool selectable = false; //!< whether the base lets the object be selected at all
     //! Whether the painter is an export: the object may resolve what a screen frame waits for.
     bool exporting = false;
-    //! Whether the recording is measured against \a clip: plottables are, items keep the painter's
-    //! clip as they did when they had no system.
+    //! Whether the recording is measured against \a clip: plottables are, and so are items whose
+    //! clip area is a path (a polar disc); an item clipped to an axis rect keeps the painter's clip.
     bool clippedToFrame = false;
 
     //! Whether the view names a frame at all: a system, or a pair of axes for the items.
