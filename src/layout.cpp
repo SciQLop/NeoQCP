@@ -939,6 +939,22 @@ void QCPLayout::adoptElement(QCPLayoutElement* el)
         qDebug() << Q_FUNC_INFO << "Null element passed";
 }
 
+//! Whether \a el, or any element nested in it, is owned by another plot than the one this layout
+//! belongs to. An element without a plot yet (a fresh inset, say) is accepted: adoptElement()
+//! initializes its plot. A plot-less layout is not a loophole: its descendants are checked too.
+bool QCPLayout::elementBelongsToAnotherPlot(const QCPLayoutElement* el) const
+{
+    if (!el || !mParentPlot)
+        return false;
+    if (el->parentPlot() && el->parentPlot() != mParentPlot)
+        return true;
+    if (const auto* layout = qobject_cast<const QCPLayout*>(el))
+        for (const QCPLayoutElement* child : layout->elements(true))
+            if (child && child->parentPlot() && child->parentPlot() != mParentPlot)
+                return true;
+    return false;
+}
+
 /*! \internal
 
   Disassociates \a el from this layout. This is done by setting the \ref QCPLayoutElement::layout
@@ -949,13 +965,6 @@ void QCPLayout::adoptElement(QCPLayoutElement* el)
   take or \ref takeAt). Note that this method only changes properties in \a el. The removal from
   the old layout must be done additionally.
 */
-//! Whether \a el is owned by another plot than the one this layout belongs to. An element without
-//! a plot yet (a fresh inset, say) is accepted: adoptElement() initializes its plot.
-bool QCPLayout::elementBelongsToAnotherPlot(const QCPLayoutElement* el) const
-{
-    return el && mParentPlot && el->parentPlot() && el->parentPlot() != mParentPlot;
-}
-
 void QCPLayout::releaseElement(QCPLayoutElement* el)
 {
     if (el)
