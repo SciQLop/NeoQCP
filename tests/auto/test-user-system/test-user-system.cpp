@@ -11,6 +11,7 @@
 #include <QApplication>
 #include <QBrush>
 #include <QImage>
+#include <QMouseEvent>
 #include <QPen>
 #include <QtTest/QtTest>
 #include <algorithm>
@@ -44,11 +45,12 @@ QCPAxisRect* plainRect(QCustomPlot& plot)
 }
 
 //! The skew rect alone on the plot, bare: every non-white pixel is the drawing under test.
-SkewRect* skewRect(QCustomPlot& plot)
+template <typename Rect>
+Rect* bareRect(QCustomPlot& plot)
 {
     plot.setBackground(QBrush(Qt::white));
     plot.plotLayout()->clear();
-    auto* rect = new SkewRect(&plot);
+    auto* rect = new Rect(&plot);
     plot.plotLayout()->addElement(0, 0, rect);
     rect->axis(QCPAxis::atBottom)->setRange(0, 10);
     rect->axis(QCPAxis::atLeft)->setRange(0, 10);
@@ -62,6 +64,21 @@ SkewRect* skewRect(QCustomPlot& plot)
     }
     settle(plot);
     return rect;
+}
+
+SkewRect* skewRect(QCustomPlot& plot)
+{
+    return bareRect<SkewRect>(plot);
+}
+
+BendRect* bendRect(QCustomPlot& plot)
+{
+    return bareRect<BendRect>(plot);
+}
+
+RectangleDeclaringRect* rectangleDeclaringRect(QCustomPlot& plot)
+{
+    return bareRect<RectangleDeclaringRect>(plot);
 }
 
 QCPPolarArea* polarArea(QCustomPlot& plot)
@@ -179,6 +196,15 @@ public:
         return result;
     }
     QPointF fillBase(QPointF matchingDataPoint) const { return getFillBasePoint(matchingDataPoint); }
+    QVector<QPointF> dataLines(const QCPDataRange& range) const { return dataSpaceLines(range); }
+    QVector<QCPDataRange> dataFillSegments(const QVector<QPointF>* lines) const
+    {
+        return getNonNanSegments(lines, Qt::Horizontal);
+    }
+    QPolygonF dataFillPolygon(const QVector<QPointF>* lines, QCPDataRange segment) const
+    {
+        return dataSpaceFillPolygon(lines, segment);
+    }
     QVector<QCPDataRange> fillSegments(const QVector<QPointF>* lines) const
     {
         return getNonNanSegments(lines, Qt::Horizontal);
@@ -201,6 +227,137 @@ InspectableGraph* graphOn(SkewRect* rect, QCPGraph::LineStyle style = QCPGraph::
 bool near(const QPointF& a, const QPointF& b, double tolerance = 0.5)
 {
     return QCPVector2D(a - b).length() <= tolerance;
+}
+
+//! A skew mapping that refuses every inverse: the fill must not ask it for its base point.
+class NaNSkewMapping : public SkewMapping
+{
+public:
+    using SkewMapping::SkewMapping;
+
+    QCP::Data inverse(QPointF) const override { return QCP::Data { qQNaN(), qQNaN() }; }
+};
+
+//! Counts the batch mapping calls a hit test makes.
+class CountingSkewMapping : public SkewMapping
+{
+public:
+    using SkewMapping::SkewMapping;
+
+    void map(std::span<const double> keys, std::span<const double> values,
+             std::span<QPointF> out) const override
+    {
+        ++mapCalls;
+        SkewMapping::map(keys, values, out);
+    }
+
+    void map(std::span<const QPointF> data, std::span<QPointF> out) const override
+    {
+        ++mapCalls;
+        SkewMapping::map(data, out);
+    }
+
+    QCP::Pixels mapPoint(QCP::Data data) const override
+    {
+        ++mapCalls;
+        return SkewMapping::mapPoint(data);
+    }
+
+    static inline int mapCalls = 0;
+};
+
+//! The fixture's system with a different mapping: the tests that tune what the frame answers.
+template <typename Mapping>
+class TunedSkewSystem : public QCPCoordinateSystem
+{
+public:
+    TunedSkewSystem(QCPArea* area, QCPAxisBase* keyAxis, QCPAxisBase* valueAxis)
+            : QCPCoordinateSystem(area, keyAxis, valueAxis)
+    {
+    }
+
+    QCPTransform transform() const override
+    {
+        if (!mMapping || mBuiltRevision != revision())
+        {
+            mMapping = std::make_shared<const Mapping>(
+                    qobject_cast<const QCPAxis*>(keyAxis()),
+                    qobject_cast<const QCPAxis*>(valueAxis()), 1.0, rect().bottom());
+            mBuiltRevision = revision();
+        }
+        return QCPTransform::custom(mMapping, mBuiltRevision);
+    }
+
+    QRect clipRect() const override { return rect(); }
+
+    bool contains(QPointF pixel) const override { return rect().contains(pixel.toPoint()); }
+
+    QCP::Capabilities capabilities() const override { return QCP::capStraightSegments; }
+
+    [[nodiscard]] const Mapping& mapping() const
+    {
+        transform();
+        return *mMapping;
+    }
+
+    [[nodiscard]] QCP::Pixels pixelOf(double key, double value) const
+    {
+        return mapping().mapPoint(QCP::Data { key, value });
+    }
+
+    void setShear(double shear)
+    {
+        if (qFuzzyCompare(shear, mShear))
+            return;
+        mShear = shear;
+        parametersChanged();
+    }
+
+private:
+    [[nodiscard]] QRect rect() const { return static_cast<const QCPAxisRect*>(area())->rect(); }
+
+    mutable std::shared_ptr<const Mapping> mMapping;
+    mutable quint64 mBuiltRevision = 0;
+    double mShear = 1.0;
+};
+
+template <typename Mapping>
+class TunedSkewRect : public QCPAxisRect
+{
+public:
+    explicit TunedSkewRect(QCustomPlot* plot) : QCPAxisRect(plot) { }
+
+protected:
+    QCPCoordinateSystem* createSystem(QCPAxisBase* key, QCPAxisBase* value) override
+    {
+        return new TunedSkewSystem<Mapping>(this, key, value);
+    }
+};
+
+void sendMouseClick(QWidget* widget, const QPoint& pos)
+{
+    QMouseEvent press(QEvent::MouseButtonPress, pos, widget->mapToGlobal(pos), Qt::LeftButton,
+                      Qt::LeftButton, Qt::NoModifier);
+    QMouseEvent release(QEvent::MouseButtonRelease, pos, widget->mapToGlobal(pos), Qt::LeftButton,
+                        Qt::NoButton, Qt::NoModifier);
+    QApplication::sendEvent(widget, &press);
+    QApplication::sendEvent(widget, &release);
+}
+
+//! The colour a brush of \a brush over white leaves: what one fill pass paints.
+QColor overWhite(const QColor& brush)
+{
+    const double alpha = brush.alphaF();
+    return QColor(qRound(brush.red() * alpha + 255 * (1.0 - alpha)),
+                  qRound(brush.green() * alpha + 255 * (1.0 - alpha)),
+                  qRound(brush.blue() * alpha + 255 * (1.0 - alpha)));
+}
+
+bool colourNear(const QColor& actual, const QColor& expected, int tolerance = 3)
+{
+    return qAbs(actual.red() - expected.red()) <= tolerance
+        && qAbs(actual.green() - expected.green()) <= tolerance
+        && qAbs(actual.blue() - expected.blue()) <= tolerance;
 }
 } // namespace
 
@@ -275,6 +432,226 @@ void TestUserSystem::addGraphOnASkewRectJoinsIt()
     QCOMPARE(test_misuse::calls.size(), std::size_t(0));
 }
 
+void TestUserSystem::aDefaultItemOnASkewRectHasNoProjection()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    SkewSystem* system = rect->skew();
+    QCOMPARE(plot.xAxis, rect->axis(QCPAxis::atBottom));
+    QCOMPARE(plot.yAxis, rect->axis(QCPAxis::atLeft));
+
+    // No setSystem: the item takes the plot's default axes, which are the skew rect's.
+    auto* text = new QCPItemText(&plot);
+    text->position->setType(QCPItemPosition::ptPlotCoords);
+    text->position->setCoords(5, 5);
+    text->setClipArea(rect);
+    text->setClipToAxisRect(true);
+
+    QCOMPARE(text->position->system(), static_cast<QCPCoordinateSystem*>(system));
+    QVERIFY2(!text->position->keyAxis(), "the default item position got the 2.x projection");
+    QVERIFY2(!text->position->valueAxis(), "the default item position got the 2.x projection");
+    const QPointF mapped = pixelOf(system->pixelOf(5, 5));
+    QVERIFY2(near(text->position->pixelPosition(), mapped),
+             "the default item position is not on the skew mapping");
+
+    auto* line = new QCPItemLine(&plot);
+    line->start->setParentAnchor(text->position);
+    line->end->setType(QCPItemPosition::ptPlotCoords);
+    line->end->setCoords(7, 2);
+    line->setClipArea(rect);
+    line->setClipToAxisRect(true);
+    QVERIFY2(near(line->start->pixelPosition(), mapped),
+             "a line anchored to the item starts at the unsheared pixel");
+}
+
+void TestUserSystem::interactiveCreationOnASkewRectLandsOnTheMapping()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    SkewSystem* system = rect->skew();
+    plot.setItemCreator(
+            [](QCustomPlot* p, QCPAxis*, QCPAxis*) { return new QCPItemLine(p); });
+    plot.setCreationModeEnabled(true);
+
+    const QPointF click = pixelOf(system->pixelOf(5, 5));
+    sendMouseClick(&plot, click.toPoint());
+    QCOMPARE(plot.itemCount(), 1);
+    auto* line = qobject_cast<QCPItemLine*>(plot.item(0));
+    QVERIFY(line);
+    QVERIFY2(near(line->start->coords(), QPointF(5, 5), 0.6),
+             "interactive creation landed at the unsheared data point");
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+}
+
+void TestUserSystem::addGraphOnABendRectIsRefused()
+{
+    QCustomPlot plot;
+    BendRect* rect = bendRect(plot);
+
+    plot.addGraph(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    QCOMPARE(plot.graphCount(), 0);
+    plot.clearGraphs(); // an unregistered graph in mGraphs would loop here
+    QCOMPARE(plot.graphCount(), 0);
+    test_misuse::calls.clear();
+}
+
+void TestUserSystem::rectAddOfARefusedGraphLeavesNothingDangling()
+{
+    QCustomPlot plot;
+    BendRect* rect = bendRect(plot);
+
+    auto graph = rect->add<QCPGraph>(rect->axis(QCPAxis::atBottom),
+                                     rect->axis(QCPAxis::atLeft));
+    QVERIFY2(!graph, "the rect handed out a graph its system refused");
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    QCOMPARE(plot.graphCount(), 0);
+    QCOMPARE(plot.plottableCount(), 0);
+    test_misuse::calls.clear();
+}
+
+void TestUserSystem::aRefusedPlottableIsOnNoLayer()
+{
+    QCustomPlot plot;
+    BendRect* rect = bendRect(plot);
+
+    auto* bars = new QCPBars(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    QVERIFY(!bars->system());
+    QVERIFY2(!bars->layer(), "a refused plottable stayed a child of a layer");
+    delete bars;
+    test_misuse::calls.clear();
+}
+
+void TestUserSystem::plotAddOfRefusedBarsReturnsNoHandle()
+{
+    QCustomPlot plot;
+    bendRect(plot);
+
+    auto bars = plot.add<QCPBars>();
+    QVERIFY2(!bars, "the plot handed out a plottable its system refused");
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    QCOMPARE(plot.plottableCount(), 0);
+    test_misuse::calls.clear();
+}
+
+void TestUserSystem::adoptingBarsOntoASkewDefaultRectIsRefused()
+{
+    QCustomPlot plot;
+    skewRect(plot); // the skew rect is the plot's default rect
+
+    auto bars = plot.add<QCPBars>();
+    QVERIFY2(!bars, "the plot handed out a plottable the skew system refused");
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    QCOMPARE(plot.plottableCount(), 0);
+    QCOMPARE(plot.legend ? plot.legend->itemCount() : 0, 0);
+    test_misuse::calls.clear();
+
+    QCustomPlot source;
+    QCPAxisRect* sourceRect = plainRect(source);
+    auto* takenBars = new QCPBars(sourceRect->axis(QCPAxis::atBottom),
+                                  sourceRect->axis(QCPAxis::atLeft));
+    std::unique_ptr<QCPBars> moved = source.take(QCPHandle<QCPBars>(takenBars));
+    QVERIFY(moved);
+    test_misuse::calls.clear();
+    auto adopted = plot.add(std::move(moved));
+    QVERIFY2(!adopted, "adopt accepted a plottable the skew system refused");
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    QCOMPARE(plot.plottableCount(), 0);
+    test_misuse::calls.clear();
+}
+
+void TestUserSystem::aRefusedPlottableThatJoinsLaterIsRegistered()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.setBackground(Qt::white);
+    QCPAxisRect* cartesian = plot.axisRect();
+    cartesian->axis(QCPAxis::atBottom)->setRange(0, 10);
+    cartesian->axis(QCPAxis::atLeft)->setRange(0, 10);
+    auto* skew = new SkewRect(&plot);
+    QVERIFY(plot.plotLayout()->addElement(1, 0, skew));
+    skew->axis(QCPAxis::atBottom)->setRange(0, 10);
+    skew->axis(QCPAxis::atLeft)->setRange(0, 10);
+    settle(plot);
+    QVERIFY(plot.legend);
+
+    auto* bars = new QCPBars(skew->axis(QCPAxis::atBottom), skew->axis(QCPAxis::atLeft));
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    QVERIFY(!bars->system());
+    QCOMPARE(plot.plottableCount(), 0);
+    test_misuse::calls.clear();
+
+    QCPCoordinateSystem* system = cartesian->system(cartesian->axis(QCPAxis::atBottom),
+                                                    cartesian->axis(QCPAxis::atLeft));
+    bars->setSystem(system);
+    QCOMPARE(bars->system(), system);
+    QCOMPARE(plot.plottableCount(), 1);
+    QCOMPARE(plot.legend->itemCount(), 1);
+    bars->setData(QVector<double> { 2, 5 }, QVector<double> { 4, 6 });
+    settle(plot);
+    const QPointF inside(cartesian->axis(QCPAxis::atBottom)->coordToPixel(3),
+                         cartesian->axis(QCPAxis::atLeft)->coordToPixel(2));
+    QVERIFY(cartesian->rect().contains(inside.toPoint()));
+    QVERIFY2(lightnessAt(render(plot), inside) < 255, "the registered bars did not draw");
+}
+
+void TestUserSystem::aRefusedIntervalsLeavesNoLayerOrLegendRow()
+{
+    QCustomPlot plot;
+    BendRect* rect = bendRect(plot);
+    auto* layout = new QCPLaneLayout(&plot);
+
+    auto* intervals = new QCPIntervals(rect->axis(QCPAxis::atBottom),
+                                       rect->axis(QCPAxis::atLeft), layout);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    QVERIFY(!intervals->system());
+    QVERIFY2(!intervals->layer(), "a refused intervals object stayed a child of a layer");
+    QVERIFY2(!intervals->labelLayer(), "a refused intervals object made its label layer");
+    QCOMPARE(plot.plottableCount(), 0);
+    QCOMPARE(plot.legend ? plot.legend->itemCount() : 0, 0);
+    delete intervals;
+    delete layout;
+    test_misuse::calls.clear();
+}
+
+void TestUserSystem::aCustomSystemDeclaringARectangleStillRefusesBars()
+{
+    {
+        QCustomPlot plot;
+        RectangleDeclaringRect* rect = rectangleDeclaringRect(plot);
+        QVERIFY(rect->system(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft))
+                    ->capabilities()
+                    .testFlag(QCP::capRectangular));
+
+        auto* bars = new QCPBars(rect->axis(QCPAxis::atBottom),
+                                 rect->axis(QCPAxis::atLeft));
+        QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+        QVERIFY2(!bars->system(),
+                 "a non-cartesian system that declares a rectangle handed out its plottable");
+        QCOMPARE(plot.plottableCount(), 0);
+        delete bars;
+        test_misuse::calls.clear();
+    }
+    {
+        QCustomPlot plot;
+        TwoRects rects = twoRects(plot);
+        auto* bars = new QCPBars(rects.cartesian->axis(QCPAxis::atBottom),
+                                 rects.cartesian->axis(QCPAxis::atLeft));
+        QCPCoordinateSystem* own = bars->system();
+        QVERIFY(own);
+        auto* declaring = new RectangleDeclaringSystem(
+                rects.skew, rects.skew->axis(QCPAxis::atBottom),
+                rects.skew->axis(QCPAxis::atLeft));
+        bars->setSystem(declaring);
+        QCOMPARE(bars->system(), own);
+        QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+        delete declaring;
+        test_misuse::calls.clear();
+    }
+}
+
+
 void TestUserSystem::barsBuiltOnASkewRectAreRefused()
 {
     QCustomPlot plot;
@@ -330,6 +707,20 @@ void TestUserSystem::barsAreRefusedOnASkewRect()
     test_misuse::calls.clear();
 }
 
+void TestUserSystem::errorBarsOnASkewRectAreRefused()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+
+    auto* bars = new QCPErrorBars(rect->axis(QCPAxis::atBottom),
+                                  rect->axis(QCPAxis::atLeft));
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    QVERIFY2(!bars->system(), "error bars joined a skew rect");
+    QCOMPARE(plot.plottableCount(), 0);
+    delete bars;
+    test_misuse::calls.clear();
+}
+
 void TestUserSystem::aCurvePointLandsOnTheSkewMapping()
 {
     QCustomPlot plot;
@@ -372,6 +763,26 @@ void TestUserSystem::aCurveIsHitThroughTheMapping()
     QVERIFY(rect->rect().contains(cartesian.toPoint()));
     QVERIFY2(curve->selectTest(cartesian, false) > plot.selectionTolerance(),
              "the unsheared pixel hits: the hit test ignored the mapping");
+}
+
+void TestUserSystem::aCurveHitMapsInOneBatch()
+{
+    QCustomPlot plot;
+    auto* rect = bareRect<TunedSkewRect<CountingSkewMapping>>(plot);
+    auto* system = static_cast<TunedSkewSystem<CountingSkewMapping>*>(
+            rect->system(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft)));
+    auto* curve = new InspectableCurve(rect->axis(QCPAxis::atBottom),
+                                       rect->axis(QCPAxis::atLeft));
+    curve->setSystem(system);
+    curve->setPen(QPen(Qt::black, 3));
+    curve->setData(QVector<double> { 1, 2, 3, 4, 5 },
+                   QVector<double> { 1, 2, 3, 4, 5 });
+    settle(plot);
+
+    const QPointF click = pixelOf(system->pixelOf(3, 3));
+    CountingSkewMapping::mapCalls = 0;
+    QVERIFY(curve->selectTest(click, false) >= 0.0);
+    QCOMPARE(CountingSkewMapping::mapCalls, 1);
 }
 
 void TestUserSystem::aCurveIsRectSelectedThroughTheMapping()
@@ -519,6 +930,31 @@ void TestUserSystem::rescaleAxesFitsASkewGraph()
     QCOMPARE(rect->axis(QCPAxis::atLeft)->range(), QCPRange(20, 40));
 }
 
+void TestUserSystem::aSkewGraphRescalesItsAxes()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    rect->axis(QCPAxis::atBottom)->setRange(0, 50);
+    rect->axis(QCPAxis::atLeft)->setRange(0, 50);
+    InspectableGraph* graph = graphOn(rect);
+    graph->setData(QVector<double> { 1, 5, 9 }, QVector<double> { 20, 30, 40 });
+    settle(plot);
+
+    graph->rescaleAxes();
+    QCOMPARE(rect->axis(QCPAxis::atBottom)->range(), QCPRange(1, 9));
+    QCOMPARE(rect->axis(QCPAxis::atLeft)->range(), QCPRange(20, 40));
+
+    rect->axis(QCPAxis::atBottom)->setRange(0, 50);
+    rect->axis(QCPAxis::atLeft)->setRange(0, 50);
+    graph->rescaleKeyAxis();
+    QCOMPARE(rect->axis(QCPAxis::atBottom)->range(), QCPRange(1, 9));
+    QCOMPARE(rect->axis(QCPAxis::atLeft)->range(), QCPRange(0, 50));
+
+    graph->rescaleValueAxis(false, true);
+    QCOMPARE(rect->axis(QCPAxis::atLeft)->range(), QCPRange(20, 40));
+}
+
+
 void TestUserSystem::anAxisRangeChangeRepaintsASkewGraph()
 {
     QCustomPlot plot;
@@ -600,6 +1036,22 @@ void TestUserSystem::anImpulseRunsToValueZero()
     QVERIFY2(near(line.at(3), pixelOf(system->pixelOf(3, 5))), "the impulse misses its data point");
 }
 
+void TestUserSystem::aLogImpulseIsDropped()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    rect->axis(QCPAxis::atLeft)->setScaleType(QCPAxis::stLogarithmic);
+    rect->axis(QCPAxis::atLeft)->setRange(1, 10);
+    InspectableGraph* graph = graphOn(rect, QCPGraph::lsImpulse);
+    graph->setData(QVector<double> { 2, 3 }, QVector<double> { 4, 5 });
+    settle(plot);
+
+    // Value zero has no pixel on a log axis: the impulse pair is dropped, never handed to drawLines.
+    const QVector<QPointF> line = graph->lines(QCPDataRange(0, 2));
+    QVERIFY2(line.isEmpty(), "an impulse to zero on a log axis reached the line builder");
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+}
+
 void TestUserSystem::aLogValueFillStopsAtTheRangeBound()
 {
     QCustomPlot plot;
@@ -614,11 +1066,63 @@ void TestUserSystem::aLogValueFillStopsAtTheRangeBound()
 
     // Value zero has no pixel on a log axis: the fill closes on the lower range bound instead, and
     // never builds a vertex at infinity.
-    const QPointF base = graph->fillBase(pixelOf(system->pixelOf(4, 8)));
+    const QVector<QPointF> dataLine = graph->dataLines(QCPDataRange(0, 2));
+    const QVector<QCPDataRange> segments = graph->dataFillSegments(&dataLine);
+    QCOMPARE(segments.size(), 1);
+    const QPolygonF fill = graph->dataFillPolygon(&dataLine, segments.first());
+    QCOMPARE(fill.size(), 4);
+    const QPointF base = fill.first();
     QVERIFY2(qIsFinite(base.x()) && qIsFinite(base.y()), "the fill base is not a finite pixel");
-    QVERIFY2(near(base, pixelOf(system->pixelOf(4, 1))), "the fill does not close on the range bound");
+    QVERIFY2(near(base, pixelOf(system->pixelOf(2, 1))), "the fill does not close on the range bound");
     QCOMPARE(test_misuse::calls.size(), std::size_t(0));
 }
+
+void TestUserSystem::aLogValueFillOnANegativeRangeClosesTowardZero()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    SkewSystem* system = rect->skew();
+    rect->axis(QCPAxis::atLeft)->setScaleType(QCPAxis::stLogarithmic);
+    rect->axis(QCPAxis::atLeft)->setRange(-10, -1);
+    InspectableGraph* graph = graphOn(rect);
+    graph->setData(QVector<double> { 2, 4 }, QVector<double> { -4, -8 });
+    graph->setBrush(QColor(0, 0, 0, 80));
+    settle(plot);
+
+    // 2.x closes toward zero, which on a negative log range is the upper bound.
+    const QVector<QPointF> dataLine = graph->dataLines(QCPDataRange(0, 2));
+    const QVector<QCPDataRange> segments = graph->dataFillSegments(&dataLine);
+    QCOMPARE(segments.size(), 1);
+    const QPolygonF fill = graph->dataFillPolygon(&dataLine, segments.first());
+    QCOMPARE(fill.size(), 4);
+    QVERIFY2(near(fill.first(), pixelOf(system->pixelOf(2, -1))),
+             "the fill on a negative log range closes on the wrong side");
+    QVERIFY2(near(fill.last(), pixelOf(system->pixelOf(4, -1))),
+             "the fill on a negative log range closes on the wrong side");
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+}
+
+void TestUserSystem::aFillWithAnUnrepresentableInverseStaysFinite()
+{
+    QCustomPlot plot;
+    auto* rect = bareRect<TunedSkewRect<NaNSkewMapping>>(plot);
+    auto* system = static_cast<TunedSkewSystem<NaNSkewMapping>*>(
+            rect->system(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft)));
+    auto* graph = new InspectableGraph(rect->axis(QCPAxis::atBottom),
+                                       rect->axis(QCPAxis::atLeft));
+    graph->setSystem(system);
+    graph->setData(QVector<double> { 2, 4 }, QVector<double> { 2, 8 });
+    graph->setBrush(QColor(255, 0, 0));
+    settle(plot);
+
+    // The fill is built in data space: an inverse() that answers NaN cannot leave a NaN vertex.
+    const QPointF inside = pixelOf(system->pixelOf(3, 2));
+    QVERIFY2(rect->rect().contains(inside.toPoint()), "the sample lies outside the rect");
+    QVERIFY2(isRed(render(plot), inside),
+             "the fill with an unrepresentable inverse drew nothing");
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+}
+
 
 void TestUserSystem::aNaNSplitsLineAndFill()
 {
@@ -634,11 +1138,12 @@ void TestUserSystem::aNaNSplitsLineAndFill()
     const QVector<QPointF> line = graph->lines(QCPDataRange(0, 5));
     QCOMPARE(line.size(), 5);
     QVERIFY2(qIsNaN(line.at(2).y()), "the gap is not a gap in the mapped line");
-    const QVector<QCPDataRange> segments = graph->fillSegments(&line);
+    const QVector<QPointF> dataLine = graph->dataLines(QCPDataRange(0, 5));
+    const QVector<QCPDataRange> segments = graph->dataFillSegments(&dataLine);
     QCOMPARE(segments.size(), 2);
     for (const QCPDataRange& segment : segments)
     {
-        const QPolygonF polygon = graph->fillPolygon(&line, segment);
+        const QPolygonF polygon = graph->dataFillPolygon(&dataLine, segment);
         QCOMPARE(polygon.size(), segment.size() + 2);
         for (const QPointF& vertex : polygon)
             QVERIFY2(qIsFinite(vertex.x()) && qIsFinite(vertex.y()),
@@ -760,6 +1265,83 @@ void TestUserSystem::channelFillNeedsOneSystem()
     QVERIFY2(isRed(render(plot), inside), "the channel between the two graphs is not filled");
 }
 
+void TestUserSystem::aSelectedChannelFillSegmentPaintsOnlyItsBand()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    SkewSystem* system = rect->skew();
+    InspectableGraph* graph = graphOn(rect);
+    InspectableGraph* other = graphOn(rect);
+    graph->setData(QVector<double> { 1, 2, 3, 4, 5 }, QVector<double> { 2, 2, 2, 2, 2 });
+    other->setData(QVector<double> { 1, 2, 3, 4, 5 }, QVector<double> { 8, 8, 8, 8, 8 });
+    const QColor brush(255, 0, 0, 80);
+    graph->setBrush(brush);
+    graph->setChannelFillGraph(other);
+    graph->setSelectable(QCP::stMultipleDataRanges);
+    settle(plot);
+
+    graph->setSelection(QCPDataSelection(QCPDataRange(1, 3))); // points 1-2, keys 2-3
+    settle(plot);
+
+    // Keys 4.5 is outside the selected segment: one unselected pass, one brush over white.
+    const QPointF outside = pixelOf(system->pixelOf(4.5, 5));
+    QVERIFY2(rect->rect().contains(outside.toPoint()), "the sample lies outside the rect");
+    const QColor actual = render(plot).pixelColor(outside.toPoint());
+    QVERIFY2(colourNear(actual, overWhite(brush)),
+             qPrintable(QStringLiteral("unselected band pixel is %1, expected %2")
+                                .arg(actual.name())
+                                .arg(overWhite(brush).name())));
+}
+
+void TestUserSystem::aChannelFillAcrossSystemsDrawsNoBand()
+{
+    QCustomPlot plot;
+    TwoRects rects = twoRects(plot);
+    InspectableGraph* graph = graphOn(rects.skew);
+    InspectableGraph* other = graphOn(rects.skew);
+    graph->setData(QVector<double> { 2, 8 }, QVector<double> { 2, 2 });
+    other->setData(QVector<double> { 2, 8 }, QVector<double> { 8, 8 });
+    graph->setBrush(QColor(255, 0, 0));
+    graph->setChannelFillGraph(other);
+    settle(plot);
+
+    const QPointF inside = pixelOf(rects.skew->skew()->pixelOf(5, 5));
+    QVERIFY2(isRed(render(plot), inside), "the channel between the two skew graphs is not filled");
+
+    // The target moves to the cartesian frame after the channel was set: the band would join two
+    // planes, so it is not drawn.
+    other->setSystem(rects.cartesian->system(rects.cartesian->axis(QCPAxis::atBottom),
+                                             rects.cartesian->axis(QCPAxis::atLeft)));
+    settle(plot);
+    QCOMPARE(lightnessAt(render(plot), inside), 255);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+}
+
+void TestUserSystem::aCartesianChannelFillPartnerThatLostItsSystemDrawsNoBand()
+{
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.setBackground(Qt::white);
+    settle(plot);
+    plot.xAxis->setRange(0, 10);
+    plot.yAxis->setRange(0, 10);
+
+    auto* lower = new QCPGraph(plot.xAxis, plot.yAxis);
+    auto* upper = new QCPGraph(plot.xAxis, plot.yAxis);
+    lower->setData(QVector<double> { 0, 10 }, QVector<double> { 2, 2 });
+    upper->setData(QVector<double> { 0, 10 }, QVector<double> { 8, 8 });
+    lower->setBrush(QColor(255, 0, 0));
+    lower->setChannelFillGraph(upper);
+    settle(plot);
+    const QPointF inside(plot.xAxis->coordToPixel(5), plot.yAxis->coordToPixel(5));
+    QVERIFY2(isRed(render(plot), inside), "the cartesian channel is not filled");
+
+    upper->setSystem(nullptr);
+    settle(plot);
+    QCOMPARE(lightnessAt(render(plot), inside), 255);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+}
+
 void TestUserSystem::aCartesianChannelFillAcrossValueAxesStillWorks()
 {
     QCustomPlot plot;
@@ -843,6 +1425,27 @@ void TestUserSystem::anAreaIsNotAdoptedByAnotherPlot()
              "the area stopped working in its own plot");
 }
 
+void TestUserSystem::aNestedLayoutCannotMoveAnElementOfAnotherPlot()
+{
+    QCustomPlot owner;
+    SkewRect* rect = skewRect(owner);
+
+    QCustomPlot other;
+    auto* sub = new QCPLayoutGrid;
+    QVERIFY(sub->addElement(0, 0, rect));
+    QVERIFY2(!other.plotLayout()->addElement(0, 1, sub),
+             "a plot-less layout carried another plot's element into this one");
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    test_misuse::calls.clear();
+
+    QCOMPARE(rect->parentPlot(), &owner);
+    QVERIFY2(rect->layout() == sub, "the nested refusal moved the area anyway");
+    QCOMPARE(sub->layout(), static_cast<QCPLayout*>(nullptr));
+    delete sub; // the plot-less layout owns the area it took in, and goes with it
+    settle(owner);
+    settle(other);
+}
+
 void TestUserSystem::itemsFollowTheSkewMapping()
 {
     QCustomPlot plot;
@@ -917,6 +1520,45 @@ void TestUserSystem::theTracerFollowsASkewGraph()
              "the tracer kept a pixel of the frame it was given first");
 }
 
+void TestUserSystem::anAnchoredPositionOnASkewSystemResolvesThroughTheFrame()
+{
+    {
+        QCustomPlot plot;
+        SkewRect* rect = skewRect(plot);
+        SkewSystem* system = rect->skew();
+
+        auto* anchor = new QCPItemText(&plot);
+        anchor->position->setSystem(system);
+        anchor->position->setType(QCPItemPosition::ptPlotCoords);
+        anchor->position->setCoords(2, 2);
+
+        auto* anchored = new QCPItemText(&plot);
+        anchored->position->setSystem(system);
+        QVERIFY(test_misuse::calls.empty());
+        anchored->position->setParentAnchor(anchor->position);
+        QVERIFY2(test_misuse::calls.empty(), "setParentAnchor reported");
+        anchored->position->setType(QCPItemPosition::ptPlotCoords);
+        QVERIFY2(test_misuse::calls.empty(), "setType reported");
+        anchored->position->setCoords(0.5, 0.5);
+        QVERIFY2(test_misuse::calls.empty(), "setCoords reported");
+        settle(plot);
+        QVERIFY2(test_misuse::calls.empty(), "settle reported");
+
+        QVERIFY2(near(anchored->position->pixelPosition(),
+                      pixelOf(system->pixelOf(2.5, 2.5)), 1.0),
+                 "an anchored plot-coordinate position fell into the silent per-slot path");
+
+        anchored->position->setPixelPosition(pixelOf(system->pixelOf(4, 4)));
+        QVERIFY2(test_misuse::calls.empty(), "setPixelPosition reported");
+        QVERIFY2(near(anchored->position->coords(), QPointF(2, 2), 0.01),
+                 "setPixelPosition did not invert the anchored frame");
+        QVERIFY2(near(anchored->position->pixelPosition(), pixelOf(system->pixelOf(4, 4)), 1.0),
+                 "the anchored frame round trip moved the position");
+    }
+    // Tearing the items down detaches the anchor: that must not report either.
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+}
+
 void TestUserSystem::takeAndAdoptAGraphAndAnItemOnASkewRect()
 {
     QCustomPlot from;
@@ -983,7 +1625,9 @@ void TestUserSystem::anAxisDeletedMidDragLeavesThemInert()
     QVERIFY(!curve->system());
     QVERIFY(!text->position->system());
     settle(plot);
-    QVERIFY2(test_misuse::calls.size() > 0, "a plottable of a deleted system stayed silent");
+    // One report per plottable: the graph and the curve. The inert item is silent, as a pixel
+    // read of a position without a frame is.
+    QCOMPARE(test_misuse::calls.size(), std::size_t(2));
     test_misuse::calls.clear();
 }
 
@@ -1007,6 +1651,9 @@ void TestUserSystem::deletingTheSkewRectLeavesThemInert()
     QVERIFY(!curve->system());
     QVERIFY(!text->position->system());
     settle(plot);
+    // One report per plottable: the graph and the curve. The inert item is silent, as a pixel
+    // read of a position without a frame is.
+    QCOMPARE(test_misuse::calls.size(), std::size_t(2));
     test_misuse::calls.clear();
     QCOMPARE(text->position->pixelPosition(), QPointF(0, 0));
 }
@@ -1099,7 +1746,8 @@ void TestUserSystem::aSkewItemIsAlwaysAnIndexCandidate()
 
 void TestUserSystem::aPolarGraphIsRectSelected()
 {
-    // A12: the non-cartesian rect selection added for user systems serves the polar graph too.
+    // A pin: QCPPolarGraph has had its own selectTestRect since before 4j. The user-system branch
+    // this milestone added to QCPAbstractPlottable1D never serves it.
     QCustomPlot plot;
     QCPPolarArea* area = polarArea(plot);
     auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 90, 180 },

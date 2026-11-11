@@ -13,6 +13,7 @@
 #include "coords.h"
 #include "global.h"
 #include "layoutelements/layoutelement-axisrect.h"
+#include "misuse.h"
 
 #include <QPointF>
 #include <algorithm>
@@ -146,8 +147,90 @@ public:
     void setShear(double shear) { skew()->setShear(shear); }
 
 protected:
-    QCPCoordinateSystem* createSystem(QCPAxisBase* key, QCPAxisBase* value) override
+    QCPCoordinateSystem* createSystem(QCPAxisBase* key, QCPAxisBase* value) override;
+};
+
+//! A system that draws a shear but offers no capability at all: a graph on it is refused.
+class BendSystem : public SkewSystem
+{
+public:
+    BendSystem(QCPArea* area, QCPAxisBase* keyAxis, QCPAxisBase* valueAxis)
+            : SkewSystem(area, keyAxis, valueAxis)
     {
-        return new SkewSystem(this, key, value);
+    }
+
+    QCP::Capabilities capabilities() const override { return QCP::Capabilities(); }
+};
+
+//! An axis rect whose systems offer nothing at all: the refusal path of a bending frame.
+class BendRect : public SkewRect
+{
+public:
+    explicit BendRect(QCustomPlot* plot) : SkewRect(plot) { }
+
+protected:
+    QCPCoordinateSystem* createSystem(QCPAxisBase* key, QCPAxisBase* value);
+
+    // SkewRect::skew() casts to SkewSystem, and a BendSystem is one: only its mask differs.
+};
+
+//! A system that claims the rectangle although it is not cartesian: the 2.x pair is still absent.
+class RectangleDeclaringSystem : public SkewSystem
+{
+public:
+    RectangleDeclaringSystem(QCPArea* area, QCPAxisBase* keyAxis, QCPAxisBase* valueAxis)
+            : SkewSystem(area, keyAxis, valueAxis)
+    {
+    }
+
+    QCP::Capabilities capabilities() const override
+    {
+        return QCP::capRectangular | QCP::capStraightKey;
     }
 };
+
+//! An axis rect whose system declares a rectangle it cannot project: bars must still be refused.
+class RectangleDeclaringRect : public SkewRect
+{
+public:
+    explicit RectangleDeclaringRect(QCustomPlot* plot) : SkewRect(plot) { }
+
+protected:
+    QCPCoordinateSystem* createSystem(QCPAxisBase* key, QCPAxisBase* value);
+};
+
+inline QCPCoordinateSystem* SkewRect::createSystem(QCPAxisBase* key, QCPAxisBase* value)
+{
+    // As QCPAxisRect does: a frame needs one axis of each direction.
+    if (!key || !value || static_cast<QCPAxis*>(key)->orientation()
+        == static_cast<QCPAxis*>(value)->orientation())
+    {
+        qcp::reportMisuse(Q_FUNC_INFO, "a skew system needs a horizontal and a vertical axis");
+        return nullptr;
+    }
+    return new SkewSystem(this, key, value);
+}
+
+inline QCPCoordinateSystem* BendRect::createSystem(QCPAxisBase* key, QCPAxisBase* value)
+{
+    if (!key || !value || static_cast<QCPAxis*>(key)->orientation()
+        == static_cast<QCPAxis*>(value)->orientation())
+    {
+        qcp::reportMisuse(Q_FUNC_INFO, "a bending system needs a horizontal and a vertical axis");
+        return nullptr;
+    }
+    return new BendSystem(this, key, value);
+}
+
+inline QCPCoordinateSystem* RectangleDeclaringRect::createSystem(QCPAxisBase* key,
+                                                                 QCPAxisBase* value)
+{
+    if (!key || !value || static_cast<QCPAxis*>(key)->orientation()
+        == static_cast<QCPAxis*>(value)->orientation())
+    {
+        qcp::reportMisuse(Q_FUNC_INFO,
+                          "a rectangle-declaring system needs a horizontal and a vertical axis");
+        return nullptr;
+    }
+    return new RectangleDeclaringSystem(this, key, value);
+}
