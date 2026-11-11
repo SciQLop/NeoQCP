@@ -191,3 +191,45 @@ Review: `.superpowers/m5-design-review.md` (opencode). One line per finding.
   - C5's reason is the polar graph only.
   - Release triage writes one disposition line per backlog item: fixed (commit), project 3 or project 4 (named), or
     3.0 limit (doc page).
+- **A14 (bindable review, `.superpowers/m5-bindable-review.md`) The meta-object surface, made precise.** C11 is
+  replaced by this.
+  - **Each property gets one of four forms, listed per property in the 5e plan** (built from moc output, not grep
+    counts):
+    - *constant*: `CONSTANT`, no `NOTIFY`;
+    - *plain*: a setter plus `NOTIFY`;
+    - *bindable storage*: `BINDABLE`;
+    - *derived*: read-only with `NOTIFY` on a real event, or dropped from the surface (for example `tickVector`).
+  - **Plain `NOTIFY` is the default form.** It is right for every setter that validates, refuses, normalises, is
+    virtual or updates other state (scale type, range, pen, selectable, selection). Such a property is bindable from
+    C++ through `QBindable(object, "name")`, and gets a `bindableX()` accessor returning that wrapper where a binding
+    is a real use.
+  - **`BINDABLE` storage only for trivial setters**: store, mark dirty, and emit, nothing else (an axis label, a
+    text, a colour that nothing else copies). It uses `Q_OBJECT_BINDABLE_PROPERTY` with a handler that does the
+    marking and the deferred `qcpEmit`.
+  - `Q_OBJECT_COMPAT_PROPERTY` is not used: it is private Qt API.
+  - **Setters of storage-backed properties always call `setValue`.** This removes a binding even on an equal value,
+    as Qt requires. The equality early return moves after it.
+  - **Value types (`Q_GADGET`) get `Q_PROPERTY` without `NOTIFY`**, and are not bindable.
+  - **Bindings are a C++ feature.** Python and PySide keep the `NOTIFY` semantics, delivered after the call as 4a
+    made them.
+  - **Only GUI-thread state is a property.** A debug check of thread affinity goes in the storage handlers. Pipeline
+    state such as `busy` stays out of the surface.
+  - **5e opens with a spike on three properties**, each with the deferred signal, a `QBindable` subscriber, a binding
+    whose observer deletes the object, and a slot that deletes the plot:
+    - an axis label (storage);
+    - a plottable pen (plain, `QBindable` wrapper);
+    - an axis scale type (plain, can refuse).
+  - **The read side is benched.** Any getter on the paint or layout path that becomes storage-backed (visibility,
+    pens, label fonts, margins) is A/B'd against the 5 % gate before the form is chosen. If it moves, it stays plain.
+  - **The macros get per-type lists, not blanket rules:**
+    - `Q_ENUM` for the public enums missing it (`QCPIntervals::Style`, `SnapMode`, `StackMode`, `EditMode`,
+      `HitPart`, `DateStrategy`; `QCPTransform::Kind` needs a gadget or stays out);
+    - `Q_INVOKABLE` for named actions that are not slots, listed with their signatures (no `const` and no overloaded
+      ones without a check);
+    - `Q_DISABLE_COPY_MOVE` on `QObject` classes only, never on value types;
+    - `Q_DECLARE_TYPEINFO` only after auditing that each type is relocatable;
+    - `Q_DECLARE_METATYPE` where a property, `QVariant` or PySide needs it.
+  - **5e follows 5b's handle policy (A6).** Object-typed properties follow whatever A6 decides.
+  - **The generic test is split by form.** `QObject` instances come from a curated list of constructible fixtures;
+    gadgets go through `readOnGadget`/`writeOnGadget`. Constant and derived properties are checked as such.
+    Follow-and-break binding checks are made only on storage-backed properties.
