@@ -89,3 +89,14 @@ Use the graph's own `rescaleAxes()`, `rescaleKeyAxis()` and `rescaleValueAxis()`
 With `QCP::iRangeDrag` and `QCP::iRangeZoom` turned on, the mouse pans and zooms the radial axis.
 Rotating and zooming the angular axis with the mouse is off by default. Turn it on with `angularAxis->setRangeDraggable(true)` and `setRangeZoomable(true)`.
 {doc}`interactions` covers the interaction flags.
+
+## Items
+
+Items work on a polar area as on an axis rect. Bind their positions to the polar system:
+`position->setSystem(area->system(area->angularAxis(), area->radialAxis()))`, and clip them with `setClipArea(area)`.
+
+- Plot coordinates are (angle, radius): the item follows rotation and radial zoom.
+- `ptAxisRectRatio` is (fraction of the angular range, fraction of the radius).
+- A clipped item is cut by the disc, and a click outside the disc misses it.
+- Mixing plot coordinates on one axis and ratios on the other has no meaning on a disc: such a position is refused.
+

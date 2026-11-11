@@ -159,6 +159,7 @@ Plot-wide settings:
 | Overriding `QCPAbstractPlottable::axesChanged()` (NeoQCP 3.0 preview) | override `systemChanged()`: a plottable now moves between coordinate systems |
 | `QCPPolarArea::removeGraph(graph)` | `plot.remove(graph)`: the plot owns polar graphs; the area no longer deletes them |
 | `QCPPolarLegendItem`, `QCPPolarGraph::addToLegend`/`removeFromLegend` (polar overloads) | the plottable ones: a polar graph has a `QCPPlottableLegendItem` row |
+| `QCPCoordinateSystem::ratioTransform()`, `frameRatioTransform()` (NeoQCP 3.0 preview) | `QCPArea::ratioTransform()`: the ratio space belongs to the area |
 | `setRangeZoomFactor` on each radial axis | `QCPPolarArea::setRangeZoomFactor` (one factor for the area) |
 | String-based connections naming `QCPAxis::ScaleType` or `QCPAxis::SelectableParts`, such as `SIGNAL(scaleTypeChanged(QCPAxis::ScaleType))` | pointer-to-member `connect` (`&QCPAxis::scaleTypeChanged`), or spell the type `QCPAxisBase::ScaleType`: the enums now live in `QCPAxisBase` |
 

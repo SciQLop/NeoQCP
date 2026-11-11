@@ -3,6 +3,16 @@
 Work that was deferred during the 3.0 milestones, to triage before 3.0 ships. Each item says what a
 user would see and where the code is. Fixed items are deleted, not ticked.
 
+## From milestone 4i (items on coordinate systems) — for milestone 4j
+
+- **A user system's area ratio**: an item ratio position on a user system uses its area's ratio transform;
+  say whether a user area must provide one (and its inverse) or inherits an axis rect's.
+- **`QCPDrawnCore::hitTest`'s box gate is cartesian-only**: a user system loses the cull (correct, slower).
+- **The item index culls cartesian systems only**: a system-side `dataBoxOf(pixelRect)` would let a user
+  system's items be culled.
+- **Tracer on a polar or user system**: `QCPItemTracer::setGraph` takes a `QCPGraph*`.
+- **`area->add<Item>()`** and **areas moving between plots** (no layout API for the move today).
+
 ## From milestone 4h (the polar graph is a plottable)
 
 - **`QCPPolarArea::add<T>`** lacks the axis-rect form's friendly `static_assert`, builds the object before a

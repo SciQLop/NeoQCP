@@ -57,3 +57,11 @@ When the port starts: grep SciQLopPlots for every name in the first table, fix t
 the second list against the SciQLopPlots test suite (`tests/integration`, `unit`, `fuzzing`,
 `resampler`, `tracing`). Add to this file whenever a NeoQCP milestone removes or changes something
 SciQLopPlots uses.
+
+## From milestone 4i (items on coordinate systems)
+
+- Nothing SciQLopPlots calls changes: it uses `ptAxisRectAbsolute` through `setType`, which keeps its meaning on an
+  axis rect. `QCPRatioTransform` and `QCPCoordinateSystem::ratioTransform()` are not used there.
+- An item position whose axis or axis rect is gone no longer prints the 2.x qDebug lines on `pixelPosition()`;
+  `setPixelPosition()` reports one misuse instead. A SciQLopPlots test that counted those messages would change.
+

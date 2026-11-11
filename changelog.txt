@@ -482,6 +482,27 @@ Behaviour changes for 2.x users:
   - A bar moved to other axes (setKeyAxis, setValueAxis) leaves its stack and its bars group.
   - axesChanged() (NeoQCP 3.0 preview) is now systemChanged().
 
+Milestone 4i (items on coordinate systems). Step 10 of the coordinate-systems design.
+  - QCPItemPosition::setSystem()/system() and setArea()/area(): plot coordinates resolve through the
+        position's coordinate system, ratio and area-absolute types through its area. setAxes() and
+        setAxisRect() are the cartesian forms; keyAxis()/valueAxis()/axisRect() the projections.
+  - QCPAbstractItem::setClipArea()/clipArea(); setClipAxisRect()/clipAxisRect() are the cartesian forms.
+  - Items draw, hit and clip on polar areas: plot coordinates are (angle, radius), ptAxisRectRatio is
+        (fraction of the angular range, fraction of the radius); a clipped item is cut by the disc and
+        a click outside it misses.
+  - The ratio transform belongs to the area: QCPArea::ratioTransform(), clipPath(), clipsToPath().
+        QCPCoordinateSystem::ratioTransform() is gone.
+  - The item index groups items by coordinate system; items on non-cartesian systems are never culled.
+  - Fix: setPixelPosition() on a position with a vertical key axis (2.x read an overwritten slot).
+  - Faster item creation: axisRect() no longer lists every axis rect to return the first.
+
+Behaviour changes for 2.x users:
+  - setAxes() with axes of two different axis rects is refused as misuse (2.x accepted it and drew
+        wrongly).
+  - A position whose axes or axis rect are gone no longer prints qDebug lines on pixelPosition();
+        setPixelPosition() reports one misuse.
+  - A position mixing plot coordinates and ratios is refused on a polar area (no meaning on a disc).
+
 Milestone 4h (the polar graph is a plottable). Step 9 of the coordinate-systems design.
   - QCPPolarGraph is a QCPAbstractPlottable1D<QCPGraphData> drawn in its area's QCPPolarSystem: it is
         in the plot's plottable list and legend (QCPPlottableLegendItem), selectable (click,

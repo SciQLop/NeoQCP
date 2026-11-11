@@ -110,8 +110,8 @@ What the numbers mean depends on the position type, set with `setType()`:
 | Type | Meaning of the coordinates |
 |---|---|
 | `ptPlotCoords` (default) | Data coordinates on the position's axes. The item moves with pan and zoom. |
-| `ptAxisRectRatio` | Fractions of the axis rect: (0, 0) top-left, (1, 1) bottom-right. |
-| `ptAxisRectAbsolute` | Pixels from the axis rect's top-left corner. |
+| `ptAxisRectRatio` | Fractions of the position's area: on an axis rect (0, 0) top-left, (1, 1) bottom-right; on a polar area the fraction of the angular range and the fraction of the radius. |
+| `ptAxisRectAbsolute` | Pixels from the top-left corner of the position's area. |
 | `ptViewportRatio` | Fractions of the whole widget. |
 | `ptAbsolute` | Pixels from the widget's top-left corner. |
 
@@ -125,8 +125,10 @@ What the numbers mean depends on the position type, set with `setType()`:
 ![Text items placed in data, axis rect and widget coordinates](images/items-positions.png)
 
 - `setTypeX()` and `setTypeY()` mix types. The event label above follows the data along x, and stays near the top of the axis rect along y.
-- Plot coordinates use `customPlot->xAxis` and `customPlot->yAxis` by default. `setAxes()` picks other axes, for example `yAxis2`.
-- The ratio and axis-rect types use the first axis rect by default. `setAxisRect()` picks another.
+- Plot coordinates use `customPlot->xAxis` and `customPlot->yAxis` by default. `setAxes()` picks other axes, for example `yAxis2`. Both axes must belong to the same axis rect.
+- Behind `setAxes()`, a position is bound to a coordinate system: `setSystem(area->system(key, value))` does the same for any area, a polar area included. `system()` returns it.
+- The ratio and axis-rect types use the first axis rect by default. `setAxisRect()` picks another; `setArea()` does the same for any area. Binding a system also takes its area.
+- A position given one axis only (`setAxes(nullptr, axis)`) keeps that axis and has no system, as in 2.x.
 - `setPixelPosition()` moves a position to a pixel, whatever its type.
 
 Prefer `ptAxisRectAbsolute` to `ptAbsolute` for pixel offsets inside the data area.
@@ -160,6 +162,8 @@ Anything outside the data area is cut off.
 
 - `setClipToAxisRect(false)` lets the item draw anywhere in the widget. The "viewport ratio" text above needs it, since it sits in the margin.
 - `setClipAxisRect(rect)` clips to another axis rect. Do this, along with `setAxes()` and `setAxisRect()` on the positions, for items in a second axis rect.
+- `setClipArea(area)` is the same for any area. On a polar area a clipped item is cut by the disc, and a click outside the disc misses it.
+- Binding a position to another system moves the clip area along when it was that position's area.
 
 ## Spans
 
