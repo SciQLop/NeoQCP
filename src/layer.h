@@ -45,6 +45,9 @@ class QCustomPlot;
 class QCPLayerable;
 class QCPLayoutElement;
 class QCPLayout;
+class QCPAxis;
+class QCPArea;
+class QCPCoordinateSystem;
 
 class QCP_LIB_DECL QCPLayer : public QObject
 {
@@ -157,6 +160,10 @@ private:
         // rebuild. A dead axis makes the group unusable, and its items are then simply not culled.
         QPointer<QCPAxis> keyAxis;
         QPointer<QCPAxis> valueAxis;
+        //! The frame the group's box is in, when it is keyed by a system rather than by a bare
+        //! axis pair. A dead system makes the group unusable, like a dead axis.
+        QPointer<QCPCoordinateSystem> system;
+        bool systemKeyed = false;
         QCPSpatialIndex index;
         double maxPad = 0.0;
     };
@@ -174,15 +181,23 @@ private:
     void invalidateItemIndex();
     void noteItemExtentChanged(QCPAbstractItem* item);
 
-    // The axes the item children of this layer follow: a range change on one of them marks this
+    // The frames the item children of this layer follow: the axes, the systems and the areas of
+    // their positions. A range change on an axis, or a mapping change on a system, marks this
     // layer without walking every item of the plot. Rebuilt lazily from the child list; a moved
-    // item unions its own axes in, and a superset only costs a repaint.
-    void rebuildItemAxes() const;
-    void noteItemAxes(QCPAbstractItem* item);
-    void collectItemAxes(QCPAbstractItem* item, std::vector<QPointer<QCPAxis>>& axes) const;
+    // item unions its own frames in, and a superset only costs a repaint.
+    void rebuildItemFrames() const;
+    void noteItemFrames(QCPAbstractItem* item);
+    void collectItemFrames(QCPAbstractItem* item, std::vector<QPointer<QCPAxis>>& axes,
+                           std::vector<QPointer<QCPCoordinateSystem>>& systems,
+                           std::vector<QPointer<QCPArea>>& areas) const;
     [[nodiscard]] bool itemsUseAxis(const QCPAxis* axis) const;
+    //! Whether an item position of this layer measures itself in \a area (its frame or its own
+    //! ratio/pixel area): what a polar area marks dirty when its disc moves.
+    [[nodiscard]] bool itemsUseArea(const QCPArea* area) const;
     mutable std::vector<QPointer<QCPAxis>> mItemAxes;
-    mutable bool mItemAxesDirty = true;
+    mutable std::vector<QPointer<QCPCoordinateSystem>> mItemSystems;
+    mutable std::vector<QPointer<QCPArea>> mItemAreas;
+    mutable bool mItemFramesDirty = true;
 
     // The plottable children, in child order. Frame code asks for them on every replot; a cast per
     // child was a sixth of a frame on a layer of 10 000 items. Rebuilt lazily: a layerable joins
@@ -194,6 +209,7 @@ private:
     friend class QCPAbstractItem;
     friend class QCPAxis; // a scale type change invalidates the item index
     friend class QCPAxisRect; // a range change asks which layers follow the axis
+    friend class QCPPolarArea; // it asks which layers draw items in its disc
     friend class TestItemIndex;
 
     Q_DISABLE_COPY(QCPLayer)

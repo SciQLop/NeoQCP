@@ -5,6 +5,9 @@
 #include <items/item-ellipse.h>
 #include <items/item-line.h>
 #include <items/item-rect.h>
+#include <polar/angularaxis.h>
+#include <polar/polar-area.h>
+#include <polar/radialaxis.h>
 
 #include <algorithm>
 #include <random>
@@ -411,4 +414,144 @@ void TestItemIndex::emptyClickVisitsOnlySelectedItems()
     plot.deselectAll(); // nothing is selected any more: nobody is visited
     for (std::size_t i = 0; i < lines.size(); ++i)
         QCOMPARE(lines[i]->mDeselectCalls, i % 10 == 0 ? 1 : 0);
+}
+
+void TestItemIndex::itemsOfTwoSystemsOfOneRectAreIndexedApart()
+{
+    // A4: a rect may map several systems (x/y and x/y2). Each group is indexed in its own frame,
+    // so a zoom of y2 must not cull an item of x/y and vice versa.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.xAxis->setRange(0, 10);
+    plot.yAxis->setRange(0, 10);
+    plot.yAxis2->setVisible(true);
+    plot.yAxis2->setRange(0, 1);
+
+    QCPAxisRect* rect = plot.axisRect();
+    QCPCoordinateSystem* first = rect->system(plot.xAxis, plot.yAxis);
+    QCPCoordinateSystem* second = rect->system(plot.xAxis, plot.yAxis2);
+    QVERIFY(first && second && first != second);
+
+    auto* onFirst = new CountingLine(&plot);
+    onFirst->setPen(QPen(Qt::black, 4));
+    onFirst->start->setCoords(2.0, 5.0);
+    onFirst->end->setCoords(2.4, 5.0);
+
+    auto* onSecond = new CountingLine(&plot);
+    onSecond->setPen(QPen(Qt::black, 4));
+    onSecond->start->setSystem(second);
+    onSecond->end->setSystem(second);
+    onSecond->start->setCoords(2.0, 5.0);
+    onSecond->end->setCoords(2.4, 5.0);
+
+    plot.replot();
+    QCoreApplication::processEvents();
+    QCPLayer* layer = onFirst->layer();
+    QVERIFY(layer);
+
+    bool sawFirst = false;
+    bool sawSecond = false;
+    for (const QCPLayer::ItemIndexGroup& group : layer->mItemGroups)
+    {
+        if (!group.systemKeyed)
+            continue;
+        sawFirst = sawFirst || group.system == first;
+        sawSecond = sawSecond || group.system == second;
+    }
+    QVERIFY2(sawFirst, "the x/y system has no group of its own");
+    QVERIFY2(sawSecond, "the x/y2 system has no group of its own");
+
+    // y2 covers 0..1, so the x/y2 item is far above the viewport at value 5: culled by its group,
+    // while the x/y item at value 5 is hit.
+    onSecond->mSelectCalls = 0;
+    const QPointF nearFirst(plot.xAxis->coordToPixel(2.2), plot.yAxis->coordToPixel(5.0));
+    const QList<QCPLayerable*> hits = plot.layerableListAt(nearFirst, true);
+    QVERIFY(hits.contains(onFirst));
+    QCOMPARE(onSecond->mSelectCalls, 0);
+
+    // Widen y2 so the same numbers land on the same pixels: now both are candidates.
+    plot.yAxis2->setRange(0, 10);
+    plot.replot();
+    QCoreApplication::processEvents();
+    onSecond->mSelectCalls = 0;
+    plot.layerableListAt(nearFirst, true);
+    QVERIFY2(onSecond->mSelectCalls > 0,
+             "an item of the second system was never hit-tested after its zoom");
+}
+
+void TestItemIndex::anItemOnAPolarSystemIsAlwaysACandidate()
+{
+    // A4: only cartesian systems are indexed; a polar item has no data box on two axes and must be
+    // visited by every query.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.plotLayout()->clear();
+    auto* area = new QCPPolarArea(&plot);
+    plot.plotLayout()->addElement(0, 0, area);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    plot.replot();
+    QCoreApplication::processEvents();
+
+    QCPCoordinateSystem* system = area->system(area->angularAxis(), area->radialAxis());
+    QVERIFY(system);
+    auto* line = new CountingLine(&plot);
+    line->setPen(QPen(Qt::black, 4));
+    line->start->setSystem(system);
+    line->end->setSystem(system);
+    line->start->setCoords(60.0, 0.5);
+    line->end->setCoords(120.0, 0.5);
+    plot.replot();
+    QCoreApplication::processEvents();
+
+    QCPLayer* layer = line->layer();
+    QVERIFY(layer);
+    for (const QCPLayer::ItemIndexGroup& group : layer->mItemGroups)
+        QVERIFY2(!(group.systemKeyed && group.system == system),
+                 "a polar system was indexed");
+
+    line->mSelectCalls = 0;
+    plot.layerableListAt(area->center(), true);
+    QVERIFY2(line->mSelectCalls > 0, "a polar item was culled by the index");
+}
+
+void TestItemIndex::aDeletedAxisDropsItsGroup()
+{
+    // A9: the axis going away deletes its system; the group must not answer from a stale tree.
+    QCustomPlot plot;
+    plot.resize(400, 300);
+    plot.xAxis->setRange(0, 10);
+    plot.yAxis->setRange(0, 10);
+    plot.yAxis2->setVisible(true);
+    plot.yAxis2->setRange(0, 10);
+
+    QCPAxisRect* rect = plot.axisRect();
+    QCPCoordinateSystem* system = rect->system(plot.xAxis, plot.yAxis2);
+    QVERIFY(system);
+    auto* line = new CountingLine(&plot);
+    line->setPen(QPen(Qt::black, 4));
+    line->start->setSystem(system);
+    line->end->setSystem(system);
+    line->start->setCoords(2.0, 5.0);
+    line->end->setCoords(2.4, 5.0);
+    plot.replot();
+    QCoreApplication::processEvents();
+    QCPLayer* layer = line->layer();
+    QVERIFY(layer);
+    const int builds = layer->mItemIndexBuilds;
+
+    QVERIFY(rect->removeAxis(plot.yAxis2));
+    plot.replot();
+    QCoreApplication::processEvents();
+
+    QVERIFY2(layer->mItemIndexBuilds > builds,
+             "the index built for the deleted system survived");
+    for (const QCPLayer::ItemIndexGroup& group : layer->mItemGroups)
+        QVERIFY2(!(group.systemKeyed && group.system.isNull()),
+                 "a group survived with a dead system");
+
+    // With no system and no axes left the item is unindexed: every click visits it.
+    line->mSelectCalls = 0;
+    plot.layerableListAt(QPointF(1, 1), true);
+    QVERIFY2(line->mSelectCalls > 0, "an item of the deleted system was culled");
 }

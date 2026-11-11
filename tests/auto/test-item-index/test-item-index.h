@@ -10,4 +10,7 @@ private slots:
     void clickTestsOnlyItemsNearTheClick();
     void scaleTypeChangeRebuildsTheIndex();
     void emptyClickVisitsOnlySelectedItems();
+    void itemsOfTwoSystemsOfOneRectAreIndexedApart();
+    void anItemOnAPolarSystemIsAlwaysACandidate();
+    void aDeletedAxisDropsItsGroup();
 };

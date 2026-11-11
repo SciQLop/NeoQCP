@@ -29,7 +29,9 @@
 #include "layer.h"
 
 #include "core.h"
+#include "coordinate-system.h"
 #include "layout.h"
+#include "layoutelements/area.h"
 #include "painting/painter.h"
 #include "painting/plottable-rhi-layer.h"
 #include "painting/scatter-rhi-layer.h"
@@ -1122,7 +1124,7 @@ void QCPLayer::childrenChanged()
 {
     mItemIndexDirty = true;
     mItemIndexMembershipChanged = true;
-    mItemAxesDirty = true;
+    mItemFramesDirty = true;
     mPlottableChildrenDirty = true;
 }
 
@@ -1146,17 +1148,20 @@ const QList<QCPAbstractPlottable*>& QCPLayer::plottableChildren() const
 
 namespace
 {
-void addAxis(std::vector<QPointer<QCPAxis>>& axes, QCPAxis* axis)
+template <typename T>
+void addOnce(std::vector<QPointer<T>>& items, T* item)
 {
-    if (!axis)
+    if (!item)
         return;
-    const auto known = [axis](const QPointer<QCPAxis>& candidate) { return candidate.data() == axis; };
-    if (std::none_of(axes.cbegin(), axes.cend(), known))
-        axes.push_back(axis);
+    const auto known = [item](const QPointer<T>& candidate) { return candidate.data() == item; };
+    if (std::none_of(items.cbegin(), items.cend(), known))
+        items.push_back(item);
 }
 } // namespace
 
-void QCPLayer::collectItemAxes(QCPAbstractItem* item, std::vector<QPointer<QCPAxis>>& axes) const
+void QCPLayer::collectItemFrames(QCPAbstractItem* item, std::vector<QPointer<QCPAxis>>& axes,
+                                 std::vector<QPointer<QCPCoordinateSystem>>& systems,
+                                 std::vector<QPointer<QCPArea>>& areas) const
 {
     // A position can follow an anchor of another item, and that item's pixels move when its own axes
     // do, so the chain is walked. `seen` ends a cycle (two items anchoring on each other).
@@ -1171,8 +1176,10 @@ void QCPLayer::collectItemAxes(QCPAbstractItem* item, std::vector<QPointer<QCPAx
         seen.push_back(current);
         for (QCPItemPosition* position : current->positions())
         {
-            addAxis(axes, position->keyAxis());
-            addAxis(axes, position->valueAxis());
+            addOnce(axes, position->keyAxis());
+            addOnce(axes, position->valueAxis());
+            addOnce(systems, position->system());
+            addOnce(areas, position->area());
             if (QCPItemAnchor* anchor = position->parentAnchorX(); anchor && anchor->mParentItem)
                 pending.push_back(anchor->mParentItem);
             if (QCPItemAnchor* anchor = position->parentAnchorY(); anchor && anchor->mParentItem)
@@ -1181,35 +1188,52 @@ void QCPLayer::collectItemAxes(QCPAbstractItem* item, std::vector<QPointer<QCPAx
     }
 }
 
-void QCPLayer::rebuildItemAxes() const
+void QCPLayer::rebuildItemFrames() const
 {
     mItemAxes.clear();
+    mItemSystems.clear();
+    mItemAreas.clear();
     for (QCPLayerable* child : mChildren)
         if (auto* item = qobject_cast<QCPAbstractItem*>(child))
-            collectItemAxes(item, mItemAxes);
-    mItemAxesDirty = false;
+            collectItemFrames(item, mItemAxes, mItemSystems, mItemAreas);
+    mItemFramesDirty = false;
 }
 
 bool QCPLayer::itemsUseAxis(const QCPAxis* axis) const
 {
-    if (mItemAxesDirty)
-        rebuildItemAxes();
-    return std::any_of(mItemAxes.cbegin(), mItemAxes.cend(),
-                       [axis](const QPointer<QCPAxis>& candidate) { return candidate.data() == axis; });
+    if (mItemFramesDirty)
+        rebuildItemFrames();
+    if (std::any_of(mItemAxes.cbegin(), mItemAxes.cend(),
+                    [axis](const QPointer<QCPAxis>& candidate)
+                    { return candidate.data() == axis; }))
+        return true;
+    // An axis of a system some item maps through also counts, even when the position keeps no
+    // projection of it any more.
+    return std::any_of(mItemSystems.cbegin(), mItemSystems.cend(),
+                       [axis](const QPointer<QCPCoordinateSystem>& system)
+                       { return system && system->usesAxis(axis); });
 }
 
-void QCPLayer::noteItemAxes(QCPAbstractItem* item)
+bool QCPLayer::itemsUseArea(const QCPArea* area) const
 {
-    if (mItemAxesDirty || !item)
-        return; // the next rebuild collects the new axes anyway
-    collectItemAxes(item, mItemAxes);
+    if (mItemFramesDirty)
+        rebuildItemFrames();
+    return std::any_of(mItemAreas.cbegin(), mItemAreas.cend(),
+                       [area](const QPointer<QCPArea>& candidate) { return candidate.data() == area; });
+}
+
+void QCPLayer::noteItemFrames(QCPAbstractItem* item)
+{
+    if (mItemFramesDirty || !item)
+        return; // the next rebuild collects the new frames anyway
+    collectItemFrames(item, mItemAxes, mItemSystems, mItemAreas);
 }
 
 void QCPLayer::noteItemExtentChanged(QCPAbstractItem* item)
 {
     if (!item)
         return;
-    noteItemAxes(item); // even while the index is being rebuilt
+    noteItemFrames(item); // even while the index is being rebuilt
     if (mItemIndexDirty)
         return;
     // The cached slot is valid while the index is clean, which is the only way to get here; the
@@ -1263,15 +1287,23 @@ void QCPLayer::rebuildItemIndex() const
         }
         int group = -1;
         for (int g = 0; g < int(groups.size()); ++g)
-            if (groups[g].keyAxis == extent->keyAxis && groups[g].valueAxis == extent->valueAxis)
+        {
+            // A system names its own frame: two pairs of axes of one rect are two systems, and a
+            // position without a system (the one-axis idiom) keeps its chart by axis pair.
+            const bool same = extent->system
+                ? (groups[g].systemKeyed && groups[g].system == extent->system)
+                : (!groups[g].systemKeyed && groups[g].keyAxis == extent->keyAxis
+                   && groups[g].valueAxis == extent->valueAxis);
+            if (same)
             {
                 group = g;
                 break;
             }
+        }
         if (group < 0)
         {
-            groups.push_back(ItemIndexGroup { extent->keyAxis, extent->valueAxis, {},
-                                              extent->pixelPad });
+            groups.push_back(ItemIndexGroup { extent->keyAxis, extent->valueAxis, extent->system,
+                                              extent->system != nullptr, {}, extent->pixelPad });
             group = int(groups.size()) - 1;
         }
         groups[group].maxPad = std::max(groups[group].maxPad, extent->pixelPad);
@@ -1280,7 +1312,8 @@ void QCPLayer::rebuildItemIndex() const
         extents.emplace_back(i, *extent);
         const QCPItemExtent& seen = item->mIndexExtent;
         moved = moved || !item->mIndexExtentValid || seen.keyAxis != extent->keyAxis
-                || seen.valueAxis != extent->valueAxis || seen.box.keyLower != extent->box.keyLower
+                || seen.valueAxis != extent->valueAxis || seen.system != extent->system
+                || seen.box.keyLower != extent->box.keyLower
                 || seen.box.keyUpper != extent->box.keyUpper
                 || seen.box.valueLower != extent->box.valueLower
                 || seen.box.valueUpper != extent->box.valueUpper;
@@ -1292,7 +1325,9 @@ void QCPLayer::rebuildItemIndex() const
     else
         for (std::size_t g = 0; g < groups.size(); ++g)
             if (groups[g].keyAxis != mItemGroups[g].keyAxis
-                || groups[g].valueAxis != mItemGroups[g].valueAxis)
+                || groups[g].valueAxis != mItemGroups[g].valueAxis
+                || groups[g].systemKeyed != mItemGroups[g].systemKeyed
+                || (groups[g].systemKeyed && groups[g].system != mItemGroups[g].system))
             {
                 moved = true;
                 break;
@@ -1332,9 +1367,15 @@ const std::vector<std::uint8_t>& QCPLayer::itemCandidates(const QRectF& pixelAre
     {
         const ItemIndexGroup& group = mItemGroups[groupIndex];
         const double pad = group.maxPad;
+        // A group keyed by a system whose QPointer went null cannot map its box any more: every
+        // item of it stays a candidate, exactly as for a dead axis.
+        // simplify: a system-side dataBoxOf(pixelRect) (a polar disc query) replaces the axis-pair
+        // conversion when the index learns non-rectangular systems (4j).
         const std::optional<QCPDataBox> query =
-            dataBoxOfRect(group.keyAxis.data(), group.valueAxis.data(),
-                          pixelArea.adjusted(-pad, -pad, pad, pad));
+            group.systemKeyed && group.system.isNull()
+            ? std::nullopt
+            : dataBoxOfRect(group.keyAxis.data(), group.valueAxis.data(),
+                            pixelArea.adjusted(-pad, -pad, pad, pad));
         if (!query)
         {
             // No usable axis pair (an axis was removed): nothing of this group is culled.

@@ -71,6 +71,9 @@ struct QCP_LIB_DECL QCPItemExtent
     QCPAxis* valueAxis = nullptr;
     QCPDataBox box { };
     double pixelPad = 0.0;
+    //! The system the box is measured in, when the item has one: the index groups by it, and only
+    //! a cartesian system's box is worth an axis-pair query.
+    QCPCoordinateSystem* system = nullptr;
 };
 
 /*!

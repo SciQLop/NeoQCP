@@ -526,7 +526,14 @@ bool QCPAxisRect::unlistAxis(QCPAxis* axis)
         if (plot)
         {
             if (alive)
+            {
                 markLayersUsingAxisDirty(axis);
+                // The index groups by system now: the group of a removed axis must go at the next
+                // build, not linger with a dead QPointer until some unrelated change rebuilds it.
+                for (QCPLayer* layer : std::as_const(plot->mLayers))
+                    if (layer->itemsUseAxis(axis))
+                        layer->invalidateItemIndex();
+            }
             plot->axisRemoved(axis);
         }
         // The systems that map through it go while it still exists.

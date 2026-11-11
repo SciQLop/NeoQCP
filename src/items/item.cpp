@@ -1779,8 +1779,39 @@ QCPAbstractItem::positionsExtent(double pixelPad, const QList<QCPItemPosition*>&
 {
     if (positions.isEmpty())
         return std::nullopt;
-    QCPAxis* keyAxis = positions.first()->keyAxis();
-    QCPAxis* valueAxis = positions.first()->valueAxis();
+    // The frame is the one of the position that maps plot coordinates through a system; every such
+    // position must agree, because every bounded side of the box is measured in that frame.
+    QCPCoordinateSystem* system = nullptr;
+    bool sawPlot = false;
+    for (const QCPItemPosition* position : positions)
+    {
+        const bool mapsPlots = (position->typeX() == QCPItemPosition::ptPlotCoords
+                                && !position->parentAnchorX())
+            || (position->typeY() == QCPItemPosition::ptPlotCoords && !position->parentAnchorY());
+        if (!mapsPlots)
+            continue;
+        if (sawPlot && position->system() != system)
+            return std::nullopt;
+        system = position->system();
+        sawPlot = true;
+    }
+    QCPAxis* keyAxis = nullptr;
+    QCPAxis* valueAxis = nullptr;
+    if (system)
+    {
+        // Only a cartesian system's box can be culled by an axis-pair query: an item on another
+        // frame is always a candidate until the index learns system-side boxes (4j).
+        if (system->transform().kind() != QCPTransform::Kind::Cartesian)
+            return std::nullopt;
+        keyAxis = qobject_cast<QCPAxis*>(system->keyAxis());
+        valueAxis = qobject_cast<QCPAxis*>(system->valueAxis());
+    }
+    else
+    {
+        // A6's one-axis position has no system: keep indexing it through the axes it does have.
+        keyAxis = positions.first()->keyAxis();
+        valueAxis = positions.first()->valueAxis();
+    }
     if (!keyAxis || !valueAxis)
         return std::nullopt;
     for (const QCPItemPosition* position : positions)
@@ -1829,7 +1860,7 @@ QCPAbstractItem::positionsExtent(double pixelPad, const QList<QCPItemPosition*>&
         box.valueLower = -infinity;
         box.valueUpper = infinity;
     }
-    return QCPItemExtent { keyAxis, valueAxis, box, pixelPad };
+    return QCPItemExtent { keyAxis, valueAxis, box, pixelPad, system };
 }
 
 QCPItemPosition* QCPAbstractItem::createPosition(const QString& name)

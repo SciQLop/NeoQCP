@@ -332,19 +332,11 @@ void QCPPolarArea::markAffectedLayersDirty(bool invalidate)
         }
     }
     // The items drawn in this disc mark their own layers too, wherever those sit: a rotation is not
-    // an axis range change, and nothing else tells an item's layer that its pixels moved.
-    const int items = mParentPlot->itemCount();
-    for (int i = 0; i < items; ++i)
-    {
-        QCPAbstractItem* item = mParentPlot->item(i);
-        for (const QCPItemPosition* position : item->positions())
-            if ((position->system() && position->system()->area() == this)
-                || position->area() == this)
-            {
-                markOnce(item->layer());
-                break;
-            }
-    }
+    // an axis range change, and nothing else tells an item's layer that its pixels moved. Each layer
+    // knows which areas its item positions measure in, so ask it instead of walking every item.
+    for (int i = 0; i < mParentPlot->layerCount(); ++i)
+        if (QCPLayer* layer = mParentPlot->layer(i); layer && layer->itemsUseArea(this))
+            markOnce(layer);
 }
 
 void QCPPolarArea::markLayoutAppearanceDirty()
