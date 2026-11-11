@@ -344,6 +344,20 @@ void reportRatioWithoutRect()
     }();
     Q_UNUSED(once);
 }
+
+//! A mixed position is a key and a value, one mapped by the frame and one by the ratio: a polar
+//! ratio maps the two together (an angle and a radius), so there is no key/value side to split.
+void reportMixedOnANonSeparableRatio()
+{
+    static const bool once = []
+    {
+        qcp::reportMisuse(Q_FUNC_INFO,
+                          "a position mixing plot coordinates and axis ratios needs a separable "
+                          "ratio: it is not drawn");
+        return true;
+    }();
+    Q_UNUSED(once);
+}
 } // namespace
 
 QPointF qcpResolvePosition(const QCPDrawFrame& frame, const QCP::Position& position,
@@ -374,10 +388,17 @@ QPointF qcpResolvePosition(const QCPDrawFrame& frame, const QCP::Position& posit
     const bool keyVertical = frame.transform.keyIsVertical();
     const auto keyAndValue = [keyVertical](QCP::Pixels keySide, QCP::Pixels valueSide)
     { return keyVertical ? QPointF(valueSide.x, keySide.y) : QPointF(keySide.x, valueSide.y); };
-    if (report
-        && (std::get_if<QCP::DataXRatioY>(&position) || std::get_if<QCP::RatioXDataY>(&position))
-        && !frame.ratio.valid())
+    const bool mixedKinds
+        = std::get_if<QCP::DataXRatioY>(&position) || std::get_if<QCP::RatioXDataY>(&position);
+    if (report && mixedKinds && !frame.ratio.valid())
         reportRatioWithoutRect();
+    if (report && mixedKinds && frame.ratio.valid() && !frame.ratio.separable())
+        reportMixedOnANonSeparableRatio();
+    if (mixedKinds && !frame.ratio.separable())
+    {
+        const double nan = std::numeric_limits<double>::quiet_NaN();
+        return QPointF(nan, nan); // not drawn
+    }
     if (const auto* mixed = std::get_if<QCP::DataXRatioY>(&position))
         return keyAndValue(frame.transform.map(QCP::Data { mixed->x, 0.0 }),
                            frame.ratio.map(QCP::AxisRatio { mixed->y, mixed->y }));

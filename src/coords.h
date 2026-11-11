@@ -317,19 +317,33 @@ class QCP_LIB_DECL QCPRatioTransform
 public:
     QCPRatioTransform() = default;
     explicit QCPRatioTransform(const QCPAxisRect* axisRect);
+    //! A polar ratio: \a ratio.x is a fraction of \a angularSpan from \a startAngle, \a ratio.y a
+    //! fraction of \a radius. \a reversed turns the angle the other way, as a reversed angular
+    //! axis does.
+    QCPRatioTransform(QPointF centre, double radius, double startAngle, double angularSpan,
+                      bool reversed);
 
     //! A ratio transform over \a rect: 0,0 is its top left, 1,1 its bottom right (the icon case).
     [[nodiscard]] static QCPRatioTransform fitted(const QRectF& rect);
 
-    //! Maps a fraction of the axis rect to pixels.
+    //! Maps a fraction of the area to pixels: linear in a rect, on the ray of an angle in a disc.
     [[nodiscard]] QCP::Pixels map(QCP::AxisRatio ratio) const;
 
-    //! False when the axis rect is gone or has no area.
-    [[nodiscard]] bool valid() const { return mAxisRect && mWidth > 0.0 && mHeight > 0.0; }
+    //! The fractions of \a pixel: linear back from a rect, and the wrapped angle and radius back
+    //! from a disc (the angle wraps, so a pixel on the -pi seam answers near 0 or near 1).
+    [[nodiscard]] QCP::AxisRatio inverse(QPointF pixel) const;
+
+    //! False when the rect is gone or has no area, or the disc has no radius or no span.
+    [[nodiscard]] bool valid() const
+    {
+        if (mPolar)
+            return mRadius > 0.0 && mSpan != 0.0;
+        return mAxisRect && mWidth > 0.0 && mHeight > 0.0;
+    }
 
     //! Whether the two ratio axes map independently. A rect does; a polar ratio (a fraction of the
     //! angle and of the radius) does not.
-    [[nodiscard]] bool separable() const { return true; }
+    [[nodiscard]] bool separable() const { return !mPolar; }
 
 private:
     QPointer<QCPAxisRect> mAxisRect;
@@ -337,6 +351,11 @@ private:
     double mTop = 0;
     double mWidth = 0;
     double mHeight = 0;
+    bool mPolar = false;
+    QPointF mCentre;
+    double mRadius = 0;
+    double mStart = 0; //!< radians, where the zero fraction points
+    double mSpan = 0; //!< radians, signed: a reversed angular axis spans the other way
 };
 
 #endif // QCP_COORDS_H

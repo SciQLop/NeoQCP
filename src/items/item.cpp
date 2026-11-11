@@ -407,7 +407,9 @@ void QCPItemPosition::setSystem(QCPCoordinateSystem* system)
     // The axes stay the synchronised cartesian projection; a non-cartesian system has none.
     mKeyAxis = system ? qobject_cast<QCPAxis*>(system->keyAxis()) : nullptr;
     mValueAxis = system ? qobject_cast<QCPAxis*>(system->valueAxis()) : nullptr;
-    if (system && !mArea)
+    // The system's area is the frame's, by definition: a caller that wants ratios measured
+    // elsewhere calls setArea() after binding. (The constructor's default rect is not a choice.)
+    if (system)
         setArea(system->area());
 }
 
@@ -476,6 +478,12 @@ void QCPItemPosition::setTypeX(QCPItemPosition::PositionType type)
              || mPositionTypeX == ptAxisRectAbsolute || type == ptAxisRectAbsolute)
             && !mArea)
             retainPixelPosition = false;
+        // A non-separable ratio maps the two slots together: only a pair of plot coordinates or a
+        // pair of ratios round-trips through it.
+        if (mSystem && !mSystem->capabilities().testFlag(QCP::capRectangular)
+            && !((type == ptPlotCoords && mPositionTypeY == ptPlotCoords)
+                 || (type == ptAxisRectRatio && mPositionTypeY == ptAxisRectRatio)))
+            retainPixelPosition = false;
 
         QPointF pixel;
         if (retainPixelPosition)
@@ -511,6 +519,12 @@ void QCPItemPosition::setTypeY(QCPItemPosition::PositionType type)
         if ((mPositionTypeY == ptAxisRectRatio || type == ptAxisRectRatio
              || mPositionTypeY == ptAxisRectAbsolute || type == ptAxisRectAbsolute)
             && !mArea)
+            retainPixelPosition = false;
+        // A non-separable ratio maps the two slots together: only a pair of plot coordinates or a
+        // pair of ratios round-trips through it.
+        if (mSystem && !mSystem->capabilities().testFlag(QCP::capRectangular)
+            && !((type == ptPlotCoords && mPositionTypeX == ptPlotCoords)
+                 || (type == ptAxisRectRatio && mPositionTypeX == ptAxisRectRatio)))
             retainPixelPosition = false;
 
         QPointF pixel;
@@ -767,7 +781,9 @@ QPointF QCPItemPosition::pixelPosition() const
     // A position that is not the plain cartesian pair resolves as a whole through its frame: the
     // system maps plot coordinates, the area maps axis ratios. A cartesian position keeps the 2.x
     // per-slot path below, unchanged.
-    const bool frameResolved = !mParentAnchorX && !mParentAnchorY
+    const bool sameKindPair = (mPositionTypeX == ptPlotCoords && mPositionTypeY == ptPlotCoords)
+        || (mPositionTypeX == ptAxisRectRatio && mPositionTypeY == ptAxisRectRatio);
+    const bool frameResolved = !mParentAnchorX && !mParentAnchorY && sameKindPair
         && ((mSystem && (!mSystem->capabilities().testFlag(QCP::capRectangular) || !mAxisRect))
             || (!mSystem && mArea && !mAxisRect));
     if (frameResolved)
@@ -776,7 +792,8 @@ QPointF QCPItemPosition::pixelPosition() const
         frame.transform = mSystem ? mSystem->transform() : QCPTransform(mKeyAxis, mValueAxis);
         frame.ratio = mArea ? mArea->ratioTransform() : QCPRatioTransform();
         frame.clip = mArea ? QRectF(mArea->rect()) : QRectF();
-        QPointF result = qcpResolvePosition(frame, asPosition(), true);
+        // A pixel read never reports: a type transition asks before the position has landed.
+        QPointF result = qcpResolvePosition(frame, asPosition(), false);
         if (qIsNaN(result.x()))
             result.rx() = 0;
         if (qIsNaN(result.y()))
@@ -911,15 +928,33 @@ void QCPItemPosition::setPixelPosition(const QPointF& pixelPosition)
         return;
     if (mParentItem)
         mParentItem->markDirty();
-    // A non-cartesian frame inverts as a whole: only a position whose two slots are plot
-    // coordinates can be read back from pixels.
+    // A non-cartesian frame inverts as a whole: both slots are plot coordinates (one angle and one
+    // radius), both are fractions of the area (the polar ratio inverts together), or both are
+    // pixels from the area's origin. A mixed pair has no per-axis inverse here and keeps its
+    // coordinates: it is misuse if it is ever drawn.
     if (!mParentAnchorX && !mParentAnchorY && mSystem
-        && !mSystem->capabilities().testFlag(QCP::capRectangular) && mPositionTypeX == ptPlotCoords
-        && mPositionTypeY == ptPlotCoords)
+        && !mSystem->capabilities().testFlag(QCP::capRectangular))
     {
-        const QCP::Data data = mSystem->transform().inverse(pixelPosition);
-        setCoords(data.x, data.y);
-        return;
+        if (mPositionTypeX == ptPlotCoords && mPositionTypeY == ptPlotCoords)
+        {
+            const QCP::Data data = mSystem->transform().inverse(pixelPosition);
+            setCoords(data.x, data.y);
+            return;
+        }
+        if (mPositionTypeX == ptAxisRectRatio && mPositionTypeY == ptAxisRectRatio && mArea)
+        {
+            const QCP::AxisRatio ratio = mArea->ratioTransform().inverse(pixelPosition);
+            setCoords(ratio.x, ratio.y);
+            return;
+        }
+        if (mPositionTypeX == ptAxisRectAbsolute && mPositionTypeY == ptAxisRectAbsolute && mArea)
+        {
+            const QRect rect = mArea->rect();
+            setCoords(pixelPosition.x() - rect.left(), pixelPosition.y() - rect.top());
+            return;
+        }
+        if ((mPositionTypeX == ptPlotCoords) != (mPositionTypeY == ptPlotCoords))
+            return;
     }
     // The screen coordinates as asked: a slot's branch may translate the numbers it reads, and the
     // other slot must still read the pixel that was passed in (a vertical key crosses the slots).
@@ -1428,6 +1463,15 @@ quint64 QCPAbstractItem::dependencyRevision() const
 //! The click path: the distance to the recording, or -1 when the click misses it.
 double QCPAbstractItem::selectTest(const QPointF& pos, bool onlySelectable, QVariant* details) const
 {
+    // Hit and paint agree on the clip: a click outside the shape the item is clipped to cannot hit
+    // what is not drawn there.
+    if (mClipToAxisRect && mClipArea)
+    {
+        const bool inside = mClipArea->clipsToPath() ? mClipArea->clipPath().contains(pos)
+                                                     : QRectF(mClipArea->rect()).contains(pos);
+        if (!inside)
+            return -1.0;
+    }
     return mCore.selectTest(*this, pos, onlySelectable, details, view());
 }
 

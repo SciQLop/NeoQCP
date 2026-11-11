@@ -56,6 +56,7 @@ private slots:
     void polarAxisSelected();
     void polarClamped();
     void polarSparse();
+    void polarItems();
 };
 
 #endif // TEST_REFERENCE_M4E_H

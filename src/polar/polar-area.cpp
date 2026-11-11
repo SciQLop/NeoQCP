@@ -33,6 +33,7 @@
 
 #include "../coordinate-system-polar.h"
 #include "../core.h"
+#include "../items/item.h"
 #include "../misuse.h"
 #include "../painting/painter.h"
 #include "../plottables/plottable.h"
@@ -197,6 +198,20 @@ QRegion QCPPolarArea::exactClipRegion() const
                    qRound(2 * mRadius), QRegion::Ellipse);
 }
 
+QCPRatioTransform QCPPolarArea::ratioTransform() const
+{
+    const double start = mAngularAxis ? mAngularAxis->angle() / 180.0 * M_PI : 0.0;
+    const bool reversed = mAngularAxis && mAngularAxis->rangeReversed();
+    return QCPRatioTransform(mCenter, mRadius, start, 2.0 * M_PI, reversed);
+}
+
+QPainterPath QCPPolarArea::clipPath() const
+{
+    QPainterPath disc;
+    disc.addEllipse(mCenter, mRadius, mRadius);
+    return disc;
+}
+
 /*!
   Returns the polar graphs drawn on this area: the plottables whose coordinate system belongs to it.
   The plot owns them: \ref QCustomPlot::remove and \ref QCustomPlot::take move and delete them.
@@ -315,6 +330,20 @@ void QCPPolarArea::markAffectedLayersDirty(bool invalidate)
             for (QCPLayer* dependent : plottable->dependentLayers())
                 markOnce(dependent);
         }
+    }
+    // The items drawn in this disc mark their own layers too, wherever those sit: a rotation is not
+    // an axis range change, and nothing else tells an item's layer that its pixels moved.
+    const int items = mParentPlot->itemCount();
+    for (int i = 0; i < items; ++i)
+    {
+        QCPAbstractItem* item = mParentPlot->item(i);
+        for (const QCPItemPosition* position : item->positions())
+            if ((position->system() && position->system()->area() == this)
+                || position->area() == this)
+            {
+                markOnce(item->layer());
+                break;
+            }
     }
 }
 

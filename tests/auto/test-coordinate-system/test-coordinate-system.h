@@ -13,13 +13,13 @@ private slots:
     void aPairMustBelongToTheArea();
     void cartesianTransformIsTheAxes();
     void polarSystemMapsLikeTheArea();
-    void polarAreaHasNoAxisRatio();
+    void polarAreaRatioIsTheDisc();
+    void aMixedPositionInAPolarAreaReportsOnce();
     void revisionBumpsOnAnyMappingChange();
     void systemRevisionsAreNeverShared();
     void theIconAsksTheSystem();
     void aNonCartesianPlottableRescalesQuietly();
     void aPolarPlottableIsClippedToItsDisc();
-    void aRatioPositionInAPolarAreaReportsOnce();
     void aDeliberateNullSystemStaysQuiet();
     void aLostSystemReportsOnce();
     void deletingAnAxisDeletesItsSystems();

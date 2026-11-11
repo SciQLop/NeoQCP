@@ -1,7 +1,11 @@
 #include "test-item-system.h"
+#include "../../../src/polar/angularaxis.h"
+#include "../../../src/polar/polar-area.h"
+#include "../../../src/polar/radialaxis.h"
 #include "../../../src/qcp.h"
 #include "../expect-debug.h"
 #include <QApplication>
+#include <QImage>
 #include <QMouseEvent>
 
 namespace
@@ -43,6 +47,67 @@ bool samePixel(QPointF a, QPointF b)
 {
     return qAbs(a.x() - b.x()) < 1e-6 && qAbs(a.y() - b.y()) < 1e-6;
 }
+
+//! A polar area alone on the plot: the reference scenes and the pixel assertions have no axis rect.
+QCPPolarArea* polarOnly(QCustomPlot* plot)
+{
+    plot->plotLayout()->clear();
+    auto* area = new QCPPolarArea(plot);
+    plot->plotLayout()->addElement(0, 0, area);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    plot->replot();
+    return area;
+}
+
+//! A polar area under the plot's axis rect: the take/adopt test needs the default rect to return to.
+QCPPolarArea* secondPolar(QCustomPlot* plot)
+{
+    auto* area = new QCPPolarArea(plot);
+    plot->plotLayout()->addElement(1, 0, area);
+    area->angularAxis()->setRange(0, 360);
+    area->radialAxis()->setRange(0, 1);
+    plot->replot();
+    return area;
+}
+
+void bindToPolar(QCPAbstractItem* item, QCPPolarArea* area)
+{
+    QCPCoordinateSystem* system = area->system(area->angularAxis(), area->radialAxis());
+    for (QCPItemPosition* position : item->positions())
+    {
+        position->setSystem(system);
+        position->setType(QCPItemPosition::ptPlotCoords);
+    }
+    item->setClipArea(area);
+    item->setClipToAxisRect(true);
+}
+
+//! How many red pixels sit within \a half of \a at: a text small enough to fit its box.
+int redInkNear(QCustomPlot* plot, QPointF at, int half = 12)
+{
+    const QImage image = plot->toPixmap().toImage().convertToFormat(QImage::Format_ARGB32);
+    int ink = 0;
+    for (int dy = -half; dy <= half; ++dy)
+        for (int dx = -half; dx <= half; ++dx)
+        {
+            const QPoint p(qRound(at.x()) + dx, qRound(at.y()) + dy);
+            if (!image.rect().contains(p))
+                continue;
+            const QColor c = image.pixelColor(p);
+            if (c.red() > 150 && c.green() < 100 && c.blue() < 100)
+                ++ink;
+        }
+    return ink;
+}
+
+//! A text that says how many times it recorded.
+class CountingText : public QCPItemText
+{
+public:
+    using QCPItemText::QCPItemText;
+    int recordings() const { return mCore.recordingCount(); }
+};
 } // namespace
 
 void TestItemSystem::init()
@@ -167,6 +232,7 @@ void TestItemSystem::aDeletedAxisLeavesThePositionInert()
 
     // An inert position answers pixels quietly (0, 0), and the item says once that it is not drawn.
     QCOMPARE(position->pixelPosition(), QPointF(0, 0));
+    mPlot->layer(QStringLiteral("main"))->markDirty(); // the item's layer tries to draw once more
     expectMissingAxis();
     mPlot->replot();
 }
@@ -246,4 +312,160 @@ void TestItemSystem::aCreatedItemBindsTheNewRectsSystem()
     QVERIFY(position->system());
     QCOMPARE(position->system()->area(), static_cast<QCPArea*>(second));
     QCOMPARE(position->area(), static_cast<QCPArea*>(second));
+}
+
+void TestItemSystem::aTextFollowsAPolarDataPoint()
+{
+    QCPPolarArea* area = polarOnly(mPlot);
+    auto* text = new CountingText(mPlot);
+    text->setText(QStringLiteral("polar"));
+    text->setColor(Qt::red);
+    text->position->setCoords(90.0, 0.6);
+    bindToPolar(text, area);
+    QVERIFY(mPlot->addLayer(QStringLiteral("polar-item")));
+    text->setLayer(mPlot->layer(QStringLiteral("polar-item")));
+    mPlot->replot();
+    // toPixmap() replaces the viewport and so bumps the view epoch, which remakes a theme-reading
+    // recording: paint once before the count, then settle the recording for that epoch.
+    QVERIFY2(redInkNear(mPlot, text->position->pixelPosition()) > 0,
+             "the text is not where it says it is");
+    mPlot->replot();
+    const int recorded = text->recordings();
+    const QPointF before = text->position->pixelPosition();
+    QVERIFY2(recorded > 0, "the item never recorded");
+
+    // A rotation moves the frame, not the recording: the same commands replay at new pixels.
+    area->angularAxis()->setAngle(-45);
+    mPlot->replot();
+    const QPointF afterAngle = text->position->pixelPosition();
+    QVERIFY(!samePixel(afterAngle, before));
+    QCOMPARE(text->recordings(), recorded);
+    QVERIFY2(redInkNear(mPlot, afterAngle) > 0, "the rotated text was not painted");
+    QCOMPARE(redInkNear(mPlot, before), 0); // the old place is empty again
+
+    // A radial zoom moves it along the radius, no re-record on a frame change either.
+    area->radialAxis()->setRange(0, 2);
+    mPlot->replot();
+    QVERIFY(!samePixel(text->position->pixelPosition(), afterAngle));
+}
+
+void TestItemSystem::aPolarRatioIsAngleAndRadiusFractions()
+{
+    QCPPolarArea* area = polarOnly(mPlot);
+    auto* item = new QCPItemLine(mPlot);
+    QCPItemPosition* position = item->positions().first();
+    position->setSystem(area->system(area->angularAxis(), area->radialAxis()));
+    position->setType(QCPItemPosition::ptAxisRectRatio);
+    // x is a fraction of the angular span, y a fraction of the radius. The default offset is -90
+    // degrees, so a quarter of 0..360 lands on the 90 degree data angle, i.e. screen +x.
+    position->setCoords(0.25, 0.5);
+    const QPointF expected(area->center().x() + 0.5 * area->radius(), area->center().y());
+    QVERIFY2(samePixel(position->pixelPosition(), expected),
+             qPrintable(QStringLiteral("ratio pixel %1,%2, expected %3,%4")
+                            .arg(position->pixelPosition().x())
+                            .arg(position->pixelPosition().y())
+                            .arg(expected.x())
+                            .arg(expected.y())));
+}
+
+void TestItemSystem::aPolarItemClipsToTheDisc()
+{
+    QCPPolarArea* area = polarOnly(mPlot);
+    auto* item = new QCPItemEllipse(mPlot);
+    item->setBrush(QBrush(Qt::red));
+    item->setPen(Qt::NoPen);
+    for (QCPItemPosition* position : item->positions())
+        position->setSystem(area->system(area->angularAxis(), area->radialAxis()));
+    // Pixels cover the whole area rect: the corners are outside the disc, the centre inside it.
+    const QRect rect = area->rect();
+    item->topLeft->setType(QCPItemPosition::ptAbsolute);
+    item->topLeft->setCoords(rect.topLeft());
+    item->bottomRight->setType(QCPItemPosition::ptAbsolute);
+    item->bottomRight->setCoords(rect.bottomRight());
+    item->setClipArea(area);
+    item->setClipToAxisRect(true);
+    mPlot->replot();
+
+    const QImage image = mPlot->toPixmap().toImage().convertToFormat(QImage::Format_ARGB32);
+    const QPoint centre(qRound(area->center().x()), qRound(area->center().y()));
+    QCOMPARE(image.pixelColor(centre), QColor(Qt::red));
+    const QPoint corner = area->rect().topLeft() + QPoint(4, 4);
+    QVERIFY2(image.pixelColor(corner) != QColor(Qt::red),
+             "the ellipse inked a corner outside the disc");
+}
+
+void TestItemSystem::aPolarItemIsHittable()
+{
+    QCPPolarArea* area = polarOnly(mPlot);
+    auto* item = new QCPItemRect(mPlot);
+    item->setBrush(QBrush(Qt::red));
+    item->setPen(Qt::NoPen);
+    for (QCPItemPosition* position : item->positions())
+    {
+        position->setSystem(area->system(area->angularAxis(), area->radialAxis()));
+        position->setType(QCPItemPosition::ptAxisRectRatio);
+    }
+    item->topLeft->setCoords(0, 0);
+    item->bottomRight->setCoords(1, 1);
+    item->setClipArea(area);
+    item->setClipToAxisRect(true);
+    mPlot->replot();
+
+    QVERIFY2(item->selectTest(area->center(), false) >= 0, "a click in the disc misses the item");
+    const QPointF corner(area->rect().topLeft() + QPoint(4, 4));
+    QVERIFY2(item->selectTest(corner, false) < 0, "a click outside the disc still hits the item");
+}
+
+void TestItemSystem::deletingThePolarAreaLeavesItsItemsInert()
+{
+    QCPPolarArea* area = secondPolar(mPlot);
+    auto* text = new CountingText(mPlot);
+    text->setText(QStringLiteral("polar"));
+    text->setColor(Qt::red);
+    text->position->setCoords(90.0, 0.6);
+    bindToPolar(text, area);
+    mPlot->replot();
+    QVERIFY(text->position->system());
+    QCOMPARE(text->position->area(), static_cast<QCPArea*>(area));
+    QVERIFY2(redInkNear(mPlot, text->position->pixelPosition()) > 0, "the item was never painted");
+
+    QCPLayoutElement* taken = area;
+    QVERIFY(mPlot->plotLayout()->takeAt(1) == taken);
+    delete taken;
+    QVERIFY(!text->position->system());
+    QVERIFY(!text->position->area());
+    QCOMPARE(text->position->pixelPosition(), QPointF(0, 0));
+    text->layer()->markDirty(); // the item's layer tries to draw once more
+    expectMissingAxis();
+    mPlot->replot();
+}
+
+void TestItemSystem::takeAndAdoptAPolarItem()
+{
+    QCPPolarArea* area = secondPolar(mPlot);
+    auto text = mPlot->add<QCPItemText>();
+    auto* item = text.get();
+    QCPItemPosition* position = item->positions().first();
+    position->setSystem(area->system(area->angularAxis(), area->radialAxis()));
+    position->setType(QCPItemPosition::ptPlotCoords);
+    position->setCoords(90.0, 0.6);
+    item->setClipArea(area);
+    item->setClipToAxisRect(true);
+    mPlot->replot();
+    QVERIFY(position->system());
+    QCOMPARE(position->area(), static_cast<QCPArea*>(area));
+
+    std::unique_ptr<QCPItemText> taken = mPlot->take(text);
+    QVERIFY(taken);
+    QVERIFY(!position->system());
+    QVERIFY(!position->area());
+    QVERIFY(!item->clipArea());
+
+    auto readded = mPlot->add(std::move(taken));
+    QVERIFY(readded);
+    QVERIFY(position->system());
+    QCOMPARE(position->system(),
+             mPlot->axisRect()->system(mPlot->xAxis, mPlot->yAxis));
+    QCOMPARE(position->area(), static_cast<QCPArea*>(mPlot->axisRect()));
+    QCOMPARE(item->clipArea(), static_cast<QCPArea*>(mPlot->axisRect()));
 }

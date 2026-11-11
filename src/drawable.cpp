@@ -529,6 +529,9 @@ QCPDrawnView qcpDrawnViewOf(const QCPAbstractItem& item, QRect clip)
         view.keyAxis = nullptr;
         view.valueAxis = nullptr;
     }
+    // A path-clipping area (a disc) bounds the recording as its rect does: the replay sets that clip
+    // and the painter adds the shape, exactly as a plottable's frame has always done.
+    view.clippedToFrame = view.area && view.area->clipsToPath();
     return view;
 }
 
@@ -953,12 +956,12 @@ double QCPDrawnCore::selectTest(const QCPDrawable& object, const QPointF& pos, b
 
 namespace
 {
-//! The shape a system clips its painter content to: empty where it clips to its rect alone.
+//! The shape an object's area clips its content to: empty where the area clips to its rect alone.
 QPainterPath qcpSystemClipShape(const QCPDrawnView& view)
 {
-    if (!view.system || !view.system->clipsToPath())
+    if (!view.area || !view.area->clipsToPath())
         return { };
-    return view.system->clipPath();
+    return view.area->clipPath();
 }
 
 //! Clips \a painter to the system's shape for as long as it lives, where the system has one.

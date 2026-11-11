@@ -668,10 +668,40 @@ QCPRatioTransform::QCPRatioTransform(const QCPAxisRect* axisRect)
     mHeight = axisRect->height();
 }
 
+QCPRatioTransform::QCPRatioTransform(QPointF centre, double radius, double startAngle,
+                                     double angularSpan, bool reversed)
+        : mPolar(true)
+        , mCentre(centre)
+        , mRadius(radius)
+        , mStart(startAngle)
+        , mSpan(reversed ? -angularSpan : angularSpan)
+{
+}
+
 QCP::Pixels QCPRatioTransform::map(QCP::AxisRatio ratio) const
 {
     if (!valid())
         return noPixel();
+    if (mPolar)
+    {
+        const double theta = mStart + ratio.x * mSpan;
+        const double r = ratio.y * mRadius;
+        return QCP::Pixels { mCentre.x() + std::cos(theta) * r,
+                             mCentre.y() + std::sin(theta) * r };
+    }
     // The same arithmetic as QCPItemPosition's ptAxisRectRatio branch.
     return QCP::Pixels { mLeft + ratio.x * mWidth, mTop + ratio.y * mHeight };
+}
+
+QCP::AxisRatio QCPRatioTransform::inverse(QPointF pixel) const
+{
+    if (!valid())
+        return { };
+    if (!mPolar)
+        return { (pixel.x() - mLeft) / mWidth, (pixel.y() - mTop) / mHeight };
+    const QPointF offset = pixel - mCentre;
+    double x = (std::atan2(offset.y(), offset.x()) - mStart) / mSpan;
+    x -= std::floor(x); // the angle is a circle: the -pi seam maps back to the other end
+    const double y = mRadius > 0.0 ? std::hypot(offset.x(), offset.y()) / mRadius : 0.0;
+    return { x, y };
 }

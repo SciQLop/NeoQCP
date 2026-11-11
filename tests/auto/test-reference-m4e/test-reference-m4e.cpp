@@ -534,6 +534,63 @@ QImage polarScene(const char* kind)
 }
 } // namespace
 
+QImage polarItemsScene()
+{
+    return render(
+        [](QCustomPlot& plot)
+        {
+            QCPPolarArea* area = polarArea(plot);
+            area->angularAxis()->setRange(0, 360);
+            area->radialAxis()->setRange(0, 1.05);
+            QCPCoordinateSystem* system = area->system(area->angularAxis(), area->radialAxis());
+            const auto place = [&](QCPItemPosition* position, double angle, double radius)
+            {
+                position->setSystem(system);
+                position->setType(QCPItemPosition::ptPlotCoords);
+                position->setCoords(angle, radius);
+            };
+            const auto ratio = [&](QCPItemPosition* position, double x, double y)
+            {
+                position->setSystem(system);
+                position->setType(QCPItemPosition::ptAxisRectRatio);
+                position->setCoords(x, y);
+            };
+            const auto clip = [&](QCPAbstractItem* item)
+            {
+                item->setClipArea(area);
+                item->setClipToAxisRect(true);
+            };
+
+            auto* line = new QCPItemLine(&plot);
+            place(line->start, 150.0, 0.25);
+            place(line->end, 300.0, 0.9);
+            line->setPen(QPen(QColor(31, 119, 180), 2));
+            clip(line);
+
+            auto* ellipse = new QCPItemEllipse(&plot);
+            ratio(ellipse->topLeft, 0.10, 0.10);
+            ratio(ellipse->bottomRight, 0.55, 1.25); // past the rim: the disc cuts the bottom
+            ellipse->setPen(QPen(QColor(44, 160, 44), 2));
+            ellipse->setBrush(QBrush(QColor(44, 160, 44, 60)));
+            clip(ellipse);
+
+            // A span-like band across the lower half, in area ratios: its corners land outside the
+            // disc, so the clip cuts it with the arc instead of the area rect.
+            auto* band = new QCPItemRect(&plot);
+            ratio(band->topLeft, -0.10, 0.85);
+            ratio(band->bottomRight, 1.10, 1.25); // a corner past the rim: cut by the arc
+            band->setPen(Qt::NoPen);
+            band->setBrush(QBrush(QColor(255, 127, 14, 120)));
+            clip(band);
+
+            auto* text = new QCPItemText(&plot);
+            text->setText(QStringLiteral("text"));
+            text->setColor(QColor(214, 39, 40));
+            place(text->position, 60.0, 0.75);
+            clip(text);
+        });
+}
+
 void TestReferenceM4e::errorBarsPlain()
 {
     check(errorBarsScene(false, false, false, false), "errorbars-plain.png");
@@ -737,4 +794,9 @@ void TestReferenceM4e::polarClamped()
 void TestReferenceM4e::polarSparse()
 {
     check(polarScene("polar-sparse"), "polar-sparse.png");
+}
+
+void TestReferenceM4e::polarItems()
+{
+    check(polarItemsScene(), "polar-items.png");
 }

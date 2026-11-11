@@ -95,6 +95,12 @@ public:
                          QBrush(Qt::red));
             return;
         }
+        if (mixedRect)
+        {
+            context.rect(QCP::DataXRatioY { 1, 0.5 }, QCP::RatioXDataY { 0.5, 1 }, Qt::NoPen,
+                         QBrush(Qt::red));
+            return;
+        }
         if (coversItsClip) // a recording that fills whatever the frame lets it draw in
         {
             const QRectF clip = context.clip();
@@ -126,6 +132,7 @@ public:
     bool readsTransform = false;
     bool coversItsClip = false;
     bool ratioRect = false;
+    bool mixedRect = false;
 
 private:
     int mSystemChanges = 0;
@@ -270,18 +277,29 @@ void TestCoordinateSystem::polarSystemMapsLikeTheArea()
     QCOMPARE(window.pixelsPerKey, area->radius() * 2.0 * M_PI / 360.0);
 }
 
-void TestCoordinateSystem::polarAreaHasNoAxisRatio()
+void TestCoordinateSystem::polarAreaRatioIsTheDisc()
 {
     QCustomPlot plot;
     QCPPolarArea* area = polarArea(plot);
     QCPCoordinateSystem* system = area->system(area->angularAxis(), area->radialAxis());
     QVERIFY(system);
 
-    // Items and spans are cartesian in this milestone: a polar area has no axis ratio, and asking
-    // it for one is not misuse, only an answer that nothing can place a ratio through.
+    // The disc is a ratio of its own: x is a fraction of the turn, y a fraction of the radius. It
+    // is not separable, and asking for it is not misuse.
     const QCPRatioTransform ratio = area->ratioTransform();
-    QVERIFY(!ratio.valid());
+    QVERIFY(ratio.valid());
+    QVERIFY(!ratio.separable());
     QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+
+    // The default offset is -90 degrees, so a quarter turn lands on the +x ray, half way out.
+    const QCP::Pixels pixels = ratio.map(QCP::AxisRatio { 0.25, 0.5 });
+    QVERIFY(qFuzzyCompare(pixels.x + 1.0, area->center().x() + 0.5 * area->radius() + 1.0));
+    QVERIFY(qFuzzyCompare(pixels.y + 1.0, area->center().y() + 1.0));
+
+    // And back: the pixel on that ray answers the same fractions.
+    const QCP::AxisRatio back = ratio.inverse(QPointF(pixels.x, pixels.y));
+    QVERIFY(qFuzzyCompare(back.x + 1.0, 0.25 + 1.0));
+    QVERIFY(qFuzzyCompare(back.y + 1.0, 0.5 + 1.0));
 }
 
 void TestCoordinateSystem::revisionBumpsOnAnyMappingChange()
@@ -382,22 +400,23 @@ void TestCoordinateSystem::aLostSystemReportsOnce()
     test_misuse::calls.clear(); // the one report above is the point of this test
 }
 
-void TestCoordinateSystem::aRatioPositionInAPolarAreaReportsOnce()
+void TestCoordinateSystem::aMixedPositionInAPolarAreaReportsOnce()
 {
-    // A ratio position is a fraction of an axis rect, and a disc has none: the command is dropped,
-    // with one misuse, not one per frame.
+    // A mixed position is a key and a value, and a polar ratio maps the two together: the command
+    // is dropped, with one misuse, not one per frame.
     QCustomPlot plot;
     QCPPolarArea* area = polarArea(plot);
     area->setBackground(QBrush(Qt::white));
     auto* plottable = new RecordingPlottable(area->system(area->angularAxis(), area->radialAxis()));
-    plottable->ratioRect = true;
+    plottable->mixedRect = true;
     settle(plot);
     QCOMPARE(test_misuse::calls.size(), 1);
     QCOMPARE(QString::fromStdString(test_misuse::calls.front().what),
-             QStringLiteral("a position measured in axis ratios needs an axis rect: it is not drawn"));
+             QStringLiteral("a position mixing plot coordinates and axis ratios needs a separable "
+                            "ratio: it is not drawn"));
     const QPoint centre(qRound(area->center().x()), qRound(area->center().y()));
     QVERIFY2(plot.toPixmap().toImage().pixelColor(centre) != QColor(Qt::red),
-             "a ratio rect has nowhere to land in a disc, yet it was drawn");
+             "a mixed rect has no key side in a disc, yet it was drawn");
 
     area->angularAxis()->setAngle(30); // a new frame records it again
     settle(plot);

@@ -117,6 +117,11 @@ public:
     // reimplemented virtual methods:
     virtual void update(UpdatePhase phase) override;
     virtual QList<QCPAxisBase*> allAxes() const override;
+    //! The disc as an axis ratio: x a fraction of the angular span, y a fraction of the radius.
+    QCPRatioTransform ratioTransform() const override;
+    //! The disc, clipped as a smooth path rather than a jagged region.
+    QPainterPath clipPath() const override;
+    bool clipsToPath() const override { return true; }
 
 protected:
     void drawBackgroundBrush(QCPPainter* painter) override;

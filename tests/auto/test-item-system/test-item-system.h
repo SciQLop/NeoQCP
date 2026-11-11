@@ -19,6 +19,13 @@ private slots:
     void itemClipAreaIsTheCartesianClip();
     void aCreatedItemBindsTheNewRectsSystem();
 
+    void aTextFollowsAPolarDataPoint();
+    void aPolarRatioIsAngleAndRadiusFractions();
+    void aPolarItemClipsToTheDisc();
+    void aPolarItemIsHittable();
+    void deletingThePolarAreaLeavesItsItemsInert();
+    void takeAndAdoptAPolarItem();
+
 private:
     QCustomPlot* mPlot = nullptr;
 };
