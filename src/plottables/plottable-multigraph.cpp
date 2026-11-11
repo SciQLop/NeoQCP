@@ -25,8 +25,9 @@ QCPMultiGraph::QCPMultiGraph(QCPAxis* keyAxis, QCPAxis* valueAxis, QCP::Capabili
     , mPipeline(parentPlot() ? parentPlot()->pipelineScheduler() : nullptr, this)
 {
     // Base constructor auto-adds a QCPPlottableLegendItem (vtable not yet set up
-    // for virtual addToLegend). Replace it with our group legend item.
-    if (mParentPlot && mParentPlot->autoAddPlottableToLegend() && mParentPlot->legend) {
+    // for virtual addToLegend). Replace it with our group legend item. A refused object has no
+    // system and no row to replace.
+    if (mSystem && mParentPlot && mParentPlot->autoAddPlottableToLegend() && mParentPlot->legend) {
         QCPAbstractPlottable::removeFromLegend(mParentPlot->legend);
         addToLegend();
     }

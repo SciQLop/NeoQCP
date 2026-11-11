@@ -136,6 +136,11 @@ public:
                                   QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey);
     virtual ~QCPAbstractPlottable() override;
 
+    //! Whether \a system can host a plottable that needs \a required; reports the one misuse when it
+    //! cannot. The four 2.x capabilities promise the axis pair, which only a cartesian system has.
+    [[nodiscard]] static bool systemAdmits(const QCPCoordinateSystem* system,
+                                           QCP::Capabilities required);
+
     // getters:
     [[nodiscard]] QString name() const { return mName; }
 
@@ -167,6 +172,9 @@ public:
     {
         return mSystem ? mSystem->valueAxis() : nullptr;
     }
+
+    //! Whether a plot's lists hold this plottable (it is not inert).
+    [[nodiscard]] bool isRegistered() const { return mRegisteredPlot != nullptr; }
 
     [[nodiscard]] QCP::SelectionType selectable() const { return mSelectable; }
 

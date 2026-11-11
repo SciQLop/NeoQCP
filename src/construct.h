@@ -110,7 +110,12 @@ struct Construct<T>
         const auto [keyAxis, valueAxis] = plot.axesForAdd();
         if (!keyAxis)
             return Handle{};
-        Handle handle = makeHandle<Handle>(detail::newPlottable<T>(plot, keyAxis, valueAxis));
+        // A system that lacks a capability the plottable needs refused it in its constructor, with
+        // the one report of that refusal: the caller gets no object rather than an inert one.
+        std::unique_ptr<T> created(detail::newPlottable<T>(plot, keyAxis, valueAxis));
+        if (!created->system())
+            return Handle{};
+        Handle handle = makeHandle<Handle>(created.release());
         handle.get()->markDirty();
         if constexpr (sizeof...(Args) > 0)
             detail::setDataOrUndo(plot, handle, std::forward<Args>(args)...);

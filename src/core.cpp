@@ -1512,8 +1512,13 @@ bool QCustomPlot::adopt(QCPAbstractPlottable* plottable)
     const auto [keyAxis, valueAxis] = axesForAdd();
     if (!keyAxis)
         return false;
-    return adoptPlottable(plottable, keyAxis->axisRect()->system(keyAxis, valueAxis),
-                          keyAxis->axisRect());
+    QCPCoordinateSystem* system = keyAxis->axisRect()->system(keyAxis, valueAxis);
+    QCP_CHECK_OR_RETURN(system, "the default axes have no coordinate system", false);
+    // Checked before the object is touched: a refusal leaves it exactly as it was, and the caller
+    // gets an empty handle, as the area add forms do.
+    if (!QCPAbstractPlottable::systemAdmits(system, plottable->requiredCapabilities()))
+        return false;
+    return adoptPlottable(plottable, system, keyAxis->axisRect());
 }
 
 /*! \internal
@@ -1533,15 +1538,8 @@ bool QCustomPlot::adoptPlottable(QCPAbstractPlottable* plottable, QCPCoordinateS
     plottable->setSystem(system);
     plottable->setPipelineScheduler(mPipelineScheduler);
     plottable->setParentLayerable(area);
-    if (!registerPlottable(plottable))
+    if (!registerJoinedPlottable(plottable))
         return false;
-    plottable->mRegisteredPlot = this;
-    if (auto* graph = qobject_cast<QCPGraph*>(plottable))
-        registerGraph(graph);
-    // The scale it followed belonged to the plot it left: join the new rect's, as a fresh one does.
-    if (auto* mapped = qobject_cast<QCPAbstractColorMapped*>(plottable);
-        mapped && mapped->joinsOnArrival())
-        mapped->followKeyAxisRectScale();
     return true;
 }
 
@@ -4814,6 +4812,25 @@ bool QCustomPlot::registerPlottable(QCPAbstractPlottable* plottable)
     if (!plottable->layer()) // usually the layer is already set in the constructor of the plottable
                              // (via QCPLayerable constructor)
         plottable->setLayer(currentLayer());
+    return true;
+}
+
+bool QCustomPlot::registerJoinedPlottable(QCPAbstractPlottable* plottable)
+{
+    if (!plottable)
+        return false;
+    if (plottable->mRegisteredPlot == this)
+        return true;
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", false);
+    if (!registerPlottable(plottable))
+        return false;
+    plottable->mRegisteredPlot = this;
+    if (auto* graph = qobject_cast<QCPGraph*>(plottable))
+        registerGraph(graph);
+    // The scale it followed belonged to the plot it left: join the new rect's, as a fresh one does.
+    if (auto* mapped = qobject_cast<QCPAbstractColorMapped*>(plottable);
+        mapped && mapped->joinsOnArrival())
+        mapped->followKeyAxisRectScale();
     return true;
 }
 

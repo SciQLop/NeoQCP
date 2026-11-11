@@ -72,8 +72,8 @@ QCPIntervals::QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* 
 {
     setSelectable(QCP::stMultipleDataRanges);
     // The base constructor auto-added a plain legend item (our addToLegend override was not
-    // in place yet): swap in the category list.
-    if (mParentPlot && mParentPlot->autoAddPlottableToLegend() && mParentPlot->legend)
+    // in place yet): swap in the category list. A refused object has no system and no row to swap.
+    if (mSystem && mParentPlot && mParentPlot->autoAddPlottableToLegend() && mParentPlot->legend)
     {
         QCPAbstractPlottable::removeFromLegend(mParentPlot->legend);
         addToLegend(mParentPlot->legend);
@@ -84,8 +84,8 @@ QCPIntervals::QCPIntervals(QCPAxis* keyAxis, QCPAxis* valueAxis, QCPLaneLayout* 
             markDirty();
         });
     connect(this, &QCPAbstractPlottable::selectionChanged, this, &QCPIntervals::markLayersDirty);
-    if (!mParentPlot)
-        return; // inert (null axis): no plot to put a label layer in
+    if (!mParentPlot || !mSystem)
+        return; // inert (null axis or a refused system): no plot-side label layer
     mLabelLayer = new LabelLayer(mParentPlot, this, layerAbove(mParentPlot, layer()));
     // Keep the label layerable one layer above wherever this plottable itself moves to.
     connect(this, &QCPLayerable::layerChanged, this, [this](QCPLayer* newLayer) {

@@ -676,6 +676,9 @@ protected:
     // non-virtual methods:
     bool registerPlottable(QCPAbstractPlottable* plottable);
     bool registerGraph(QCPGraph* graph);
+    //! Registers a plottable that joins a frame after construction (a refused one that setSystem()
+    //! accepts later, or an adopted one): the one path both go through.
+    bool registerJoinedPlottable(QCPAbstractPlottable* plottable);
     //! Takes \a plottable out of every list, its group and the legend; safe to call twice.
     QPointer<QCPPlottableGroup> unlistPlottable(QCPAbstractPlottable* plottable);
     void plottableDestroyed(QCPAbstractPlottable* plottable);

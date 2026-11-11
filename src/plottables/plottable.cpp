@@ -467,12 +467,31 @@ QCPCoordinateSystem* admits(QCPCoordinateSystem* system, QCP::Capabilities requi
 {
     if (!system)
         return nullptr;
-    if (!(required & ~system->capabilities()))
-        return system;
-    qcp::reportMisuse(Q_FUNC_INFO, "the coordinate system lacks a capability this plottable needs");
-    return nullptr;
+    return QCPAbstractPlottable::systemAdmits(system, required) ? system : nullptr;
 }
 } // namespace
+
+bool QCPAbstractPlottable::systemAdmits(const QCPCoordinateSystem* system,
+                                        QCP::Capabilities required)
+{
+    if (!system)
+        return false;
+    constexpr QCP::Capabilities axisPair
+        = QCP::capRectangular | QCP::capStraightKey | QCP::capLanes | QCP::capColourScale;
+    if ((required & axisPair) && system->kind() != QCPTransform::Kind::Cartesian)
+    {
+        qcp::reportMisuse(Q_FUNC_INFO,
+                          "only a cartesian system hands out the axis pair this plottable needs");
+        return false;
+    }
+    if (required & ~system->capabilities())
+    {
+        qcp::reportMisuse(Q_FUNC_INFO,
+                          "the coordinate system lacks a capability this plottable needs");
+        return false;
+    }
+    return true;
+}
 
 QCPAbstractPlottable::QCPAbstractPlottable(QCPCoordinateSystem* system, QCP::Capabilities required)
         : QCPLayerable(system && system->area() ? system->area()->parentPlot() : nullptr, QString(),
@@ -499,9 +518,10 @@ QCPAbstractPlottable::QCPAbstractPlottable(QCPCoordinateSystem* system, QCP::Cap
     if (!mSystem)
     {
         // Without a system there is no plot to join, and a frame that refused the mask said so:
-        // the plottable stays inert, registers nowhere, and owes no second report on its first
-        // draw. The plot it was built on stays its QObject parent, so nothing leaks.
+        // the plottable stays inert, on no layer, registers nowhere, and owes no second report on
+        // its first draw. The plot it was built on stays its QObject parent, so nothing leaks.
         setParentLayerable(nullptr);
+        moveToLayer(nullptr, false);
         mReportedLostAxis = true;
         return;
     }
@@ -858,9 +878,9 @@ void QCPAbstractPlottable::setSystem(QCPCoordinateSystem* system)
     {
         QCP_CHECK_OR_RETURN(system->area() && system->area()->parentPlot() == mParentPlot,
                             "the coordinate system belongs to another plot");
-        const QCP::Capabilities missing = requiredCapabilities() & ~system->capabilities();
-        QCP_CHECK_OR_RETURN(missing == 0,
-                            "the coordinate system lacks a capability this plottable needs");
+        // One place decides what a system can host: the constructor and every setSystem agree.
+        if (!systemAdmits(system, requiredCapabilities()))
+            return;
     }
     systemWillChange(system);
     mSystem = system;
@@ -874,6 +894,10 @@ void QCPAbstractPlottable::setSystem(QCPCoordinateSystem* system)
     // A plottable told to drop its system is inert on purpose: it draws nothing and says nothing.
     // A system that goes away under it is reported once, on the next draw, by dropSystem() below.
     mReportedLostAxis = mSystem == nullptr;
+    // A plottable refused at construction registered nowhere. A later system that accepts it joins
+    // the plot through the one path adoption uses: lists, legend row, graph list, colour scale.
+    if (mSystem && !mRegisteredPlot && mParentPlot)
+        mParentPlot->registerJoinedPlottable(this);
     contentChanged(); // the new frame's recording, then whatever follows an axis pair
     systemChanged();
 }
@@ -1107,13 +1131,12 @@ void QCPAbstractPlottable::rescaleAxes(bool onlyEnlarge) const
 */
 void QCPAbstractPlottable::rescaleKeyAxis(bool onlyEnlarge) const
 {
-    QCPAxis* keyAxis = mKeyAxis.data();
+    // The system's own axis, whatever its kind: a user system on a QCPAxis rect has an ordinary
+    // axis to fit. A polar system's axis is not a QCPAxis, so the cast answers null and the area
+    // keeps rescaling the whole frame, as before.
+    QCPAxis* keyAxis = qobject_cast<QCPAxis*>(keyAxisBase());
     if (!keyAxis)
-    {
-        // A system without a key axis projection (a polar one) has no key axis of its own to
-        // rescale: its area rescales the whole frame, so this end does nothing and says nothing.
         return;
-    }
 
     QCP::SignDomain signDomain = QCP::sdBoth;
     if (keyAxis->scaleType() == QCPAxis::stLogarithmic)
@@ -1159,14 +1182,12 @@ void QCPAbstractPlottable::rescaleKeyAxis(bool onlyEnlarge) const
 */
 void QCPAbstractPlottable::rescaleValueAxis(bool onlyEnlarge, bool inKeyRange) const
 {
-    QCPAxis* keyAxis = mKeyAxis.data();
-    QCPAxis* valueAxis = mValueAxis.data();
+    // Same side as rescaleKeyAxis: the system's own axes when they are ordinary QCPAxis objects,
+    // null and silent on a polar frame.
+    QCPAxis* keyAxis = qobject_cast<QCPAxis*>(keyAxisBase());
+    QCPAxis* valueAxis = qobject_cast<QCPAxis*>(valueAxisBase());
     if (!valueAxis)
-    {
-        // Same as rescaleKeyAxis: a frame that has no value axis projection rescales through its
-        // area, and an inert plottable has nothing to say about it.
         return;
-    }
 
     QCP::SignDomain signDomain = QCP::sdBoth;
     if (valueAxis->scaleType() == QCPAxis::stLogarithmic)
