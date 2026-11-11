@@ -1625,3 +1625,123 @@ median of the two series: 0.15, 0.61, 0.13, 0.40 and 38 ms.
 | QCPTransform_Map1M | 0.82 | 0.68 | 0.72 / 0.68 / 0.66 / 0.68 / 0.71 / 0.68 | 0.83 |
 | QObject_DeleteEachChild10k | 8.6 | 7.8 | 8.5 / 7.9 / 7.8 / 7.8 / 7.9 / 7.7 | 0.91 |
 
+
+## End of milestone 4j
+
+- Commit: f91c905 for the whole-table runs. Three runs of the whole binary offscreen and three under Xvfb,
+  `-median 5`. Load (1/5/15 min) at the start of each run: 0.77, 0.82, 3.11;1.63, 1.69, 3.01;1.47, 1.68, 2.72;3.08, 2.26, 2.73;6.40, 4.85, 3.71;9.59, 6.99, 4.79. The Xvfb runs shared the machine with other work,
+  and the parallel colour-map rows load it themselves.
+- Ratio = end-of-milestone-4j median / end-of-milestone-4i median. Fifteen rows read over their gate on that ratio,
+  half of them on code 4j does not touch (colour-map data, the transform map, the colour-map resampler), and the 4i
+  medians are rounded to two digits.
+- So every flagged row was measured again head to head: A/B against a build of 0c45d28 (end of 4i), CPU ticks,
+  five pairs, ten for any row still over (`.superpowers/sdd/2026-11-11-neoqcp-3-milestone-4j/end-ab.md`). All
+  level or faster (QCPItems_RestyleAll10k -14 %, QCPItems_Clear10k -13 %, QCPAxis_SetTickLength10kItems -9 % on ten
+  pairs, QCPBars_Pan10k -2 %, QCPGpu_MultiGraphPan1M -6 %), except QCPDrawn_Pan10kOneRecording under Xvfb: bimodal
+  on both binaries (base 1.25-7.7 ms, new 1.21-6.2 ms, same fastest time), on a cartesian pan path 4j does not
+  change. Recorded as noise (backlog).
+- The user-system paths have no bench row: a graph there maps every point per frame by design (backlog).
+
+| Benchmark | end 4i msecs | end 4j msecs | runs | ratio |
+|---|---|---|---|---|
+| QCPAxisRects_Stack8_Replot | 1.8 | 1.9 | 1.9 / 1.9 / 1.8 / 1.8 / 2 / 1.8 | 1.03 |
+| QCPAxis_SetRange10k | 1.5 | 1.6 | 3.9 / 1.6 / 1.6 / 1.6 / 1.6 / 1.8 | 1.07 |
+| QCPAxis_SetTickLength10kItems | 0.012 | 0.013 | 0.013 / 0.013 / 0.013 / 0.013 / 0.013 / 0.013 | 1.08 |
+| QCPAxis_TickLabels | 0.24 | 0.24 | 0.44 / 0.24 / 0.24 / 0.25 / 0.24 / 0.28 | 1.02 |
+| QCPAxis_TickLabelsCached | 0.087 | 0.09 | 0.15 / 0.088 / 0.092 / 0.089 / 0.089 / 0.12 | 1.04 |
+| QCPBars_Pan10k | 0.13 | 0.14 | 0.13 / 0.14 / 0.14 / 0.14 / 0.14 / 0.14 | 1.08 |
+| QCPBars_Zoom10k | 5.1 | 5.3 | 5.1 / 5.3 / 5.1 / 5.4 / 7.7 / 5.3 | 1.04 |
+| QCPColorMap2_ResampleDouble | 220.0 | 2.4e+02 | 2.2e+02 / 2.4e+02 / 2.4e+02 / 2.3e+02 / 2.3e+02 / 2.5e+02 | 1.07 |
+| QCPColorMap2_ResampleFloat | 140.0 | 1.4e+02 | 1.4e+02 / 1.4e+02 / 1.4e+02 / 1.5e+02 / 1.4e+02 / 1.5e+02 | 1.03 |
+| QCPColorMap2_ResamplePanSequence | 200.0 | 2.3e+02 | 2.3e+02 / 2.4e+02 / 2.3e+02 / 2.3e+02 / 2e+02 / 2.4e+02 | 1.16 |
+| QCPColorMap2_ResamplePanSequenceSmall | 210.0 | 2.1e+02 | 2.1e+02 / 2.1e+02 / 2.1e+02 / 2.1e+02 / 2.1e+02 / 2.2e+02 | 0.99 |
+| QCPColorMap2_ResampleWideParallel | 260.0 | 3.1e+02 | 3.9e+02 / 3e+02 / 3.1e+02 / 3.9e+02 / 2.8e+02 / 3e+02 | 1.18 |
+| QCPColorMap2_ResampleWideSerial | 770.0 | 8e+02 | 8e+02 / 7.9e+02 / 8e+02 / 1.2e+03 / 8.1e+02 / 8.4e+02 | 1.04 |
+| QCPColorMapData_ConstructLarge | 1.1 | 1.5 | 1.6 / 1.6 / 1.5 / 1.5 / 1.2 / 1.5 | 1.36 |
+| QCPColorMap_ColorizeMap | 0.16 | 0.16 | 0.16 / 0.16 / 0.16 / 0.16 / 0.16 / 0.18 | 1.00 |
+| QCPColorMap_SetCell1M | 3.0 | 3 | 3 / 3 / 3.1 / 3.1 / 3 / 3.6 | 1.02 |
+| QCPColorMap_Standard | 0.27 | 0.27 | 0.27 / 0.27 / 0.27 / 0.28 / 0.27 / 0.3 | 1.00 |
+| QCPColorScale_Rescale8 | 0.00015 | 0.00016 | 0.00033 / 0.00016 / 0.00016 / 0.00016 / 0.00016 / 0.00018 | 1.07 |
+| QCPCoords_CoordToPixel1M | 3.9 | 4 | 4 / 4 / 3.9 / 4 / 7.2 / 3.9 | 1.03 |
+| QCPDrawContext_ReplayData1M | 1.4 | 1.6 | 1.8 / 1.5 / 1.3 / 1.7 / 3.6 / 1.4 | 1.14 |
+| QCPDrawContext_ReplayMarkers100k | 12.0 | 12 | 12 / 12 / 12 / 12 / 20 / 12 | 1.00 |
+| QCPDrawn_Pan10k | 0.23 | 0.23 | 0.24 / 0.23 / 0.23 | 1.00 |
+| QCPDrawn_Pan10kOneRecording | 0.27 | 0.3 | 0.3 / 0.3 / 0.27 | 1.11 |
+| QCPDrawn_Zoom10k | 0.28 | 0.29 | 0.29 / 0.98 / 0.29 | 1.04 |
+| QCPErrorBars_Pan10k | 0.24 | 0.24 | 0.24 / 0.25 / 0.24 / 0.25 / 0.25 / 0.24 | 1.02 |
+| QCPFinancial_Pan10k | 0.14 | 0.14 | 0.14 / 0.14 / 0.14 / 0.14 / 0.14 / 0.14 | 1.00 |
+| QCPGpu_Bars10k | 4.3 | 4.4 | 4.3 / 4.4 / 4.5 | 1.02 |
+| QCPGpu_BarsPan10k | 0.12 | 0.13 | 0.12 / 0.13 / 0.13 | 1.08 |
+| QCPGpu_ColorMap2Pan | 0.18 | 0.18 | 0.19 / 0.18 / 0.18 | 1.00 |
+| QCPGpu_ColorMap2Zoom | 0.22 | 0.23 | 0.23 / 0.23 / 0.23 | 1.05 |
+| QCPGpu_ColorMapPan | 0.17 | 0.17 | 0.17 / 0.17 / 0.17 | 1.00 |
+| QCPGpu_CurvePan100k | 0.12 | 0.12 | 0.12 / 0.12 / 0.12 | 1.00 |
+| QCPGpu_Graph2Render1M | 0.13 | 0.13 | 0.13 / 0.13 / 0.13 | 1.00 |
+| QCPGpu_Histogram2DPan | 0.17 | 0.17 | 0.17 / 0.18 / 0.17 | 1.00 |
+| QCPGpu_HistogramPan | 0.12 | 0.13 | 0.13 / 0.13 / 0.13 | 1.08 |
+| QCPGpu_LineDashed100k | 0.44 | 0.44 | 0.43 / 0.44 / 0.44 | 1.00 |
+| QCPGpu_LineSolid100k | 0.44 | 0.44 | 0.43 / 0.45 / 0.44 | 1.00 |
+| QCPGpu_MixedLayer | 8.3 | 8.5 | 8.3 / 8.7 / 8.5 | 1.02 |
+| QCPGpu_MultiGraphColored100kPan | 0.2 | 0.21 | 0.2 / 0.21 / 0.21 | 1.05 |
+| QCPGpu_MultiGraphPan1M | 0.15 | 0.16 | 0.15 / 0.16 / 0.16 | 1.07 |
+| QCPGpu_MultiGraphZoom1M | 0.68 | 0.71 | 0.7 / 0.74 / 0.71 | 1.04 |
+| QCPGpu_Pan100k | 0.22 | 0.22 | 0.22 / 0.22 / 0.23 | 1.00 |
+| QCPGpu_Text1k | 0.87 | 0.87 | 0.88 / 0.87 / 0.87 | 1.00 |
+| QCPGraph2_RenderDouble | 0.14 | 0.14 | 0.14 / 0.14 / 0.14 / 0.14 / 0.14 / 0.15 | 1.00 |
+| QCPGraph2_RenderFloat | 0.14 | 0.14 | 0.14 / 0.14 / 0.14 / 0.14 / 0.14 / 0.16 | 1.00 |
+| QCPGraph2_RenderManyLines | 0.44 | 0.45 | 0.45 / 0.44 / 0.44 / 0.44 / 0.45 / 0.51 | 1.01 |
+| QCPGraph2_ScatterDisc1M | 0.12 | 0.12 | 0.12 / 0.12 / 0.12 / 0.12 / 0.12 / 0.14 | 1.00 |
+| QCPGraph2_ScatterSquare1M | 0.12 | 0.12 | 0.12 / 0.12 / 0.12 / 0.12 / 0.12 / 0.14 | 1.00 |
+| QCPGraph2_ScatterWithLine1M | 0.12 | 0.12 | 0.13 / 0.12 / 0.13 / 0.12 / 0.12 / 0.13 | 1.04 |
+| QCPGraph2_SetDataDouble | 9.5 | 9.9 | 9.9 / 9.9 / 9.7 / 9.8 / 11 / 11 | 1.04 |
+| QCPGraph2_SetDataFloat | 8.3 | 8.8 | 8.9 / 8.6 / 8.6 / 8.4 / 9.5 / 9.2 | 1.05 |
+| QCPGraph_AddDataAtBeginSorted | 5.5 | 5.9 | 5.8 / 5.7 / 6.3 / 6 / 5.4 / 6.3 | 1.07 |
+| QCPGraph_AddDataAtBeginUnsorted | 28.0 | 29 | 29 / 29 / 29 / 28 / 28 / 29 | 1.04 |
+| QCPGraph_AddDataAtEndSorted | 5.0 | 5.4 | 5.3 / 5.4 / 5.6 / 5.5 / 5.1 / 5.4 | 1.08 |
+| QCPGraph_AddDataAtEndUnsorted | 23.0 | 23 | 23 / 25 / 23 / 23 / 23 / 24 | 1.00 |
+| QCPGraph_AddDataMixedSorted | 10.0 | 11 | 11 / 11 / 14 / 11 / 10 / 11 | 1.10 |
+| QCPGraph_AddDataMixedUnsorted | 29.0 | 30 | 29 / 30 / 30 / 30 / 29 / 32 | 1.03 |
+| QCPGraph_ManyLines | 1.3 | 1.3 | 1.3 / 1.3 / 1.3 / 1.3 / 1.3 / 1.4 | 1.00 |
+| QCPGraph_ManyOffScreenLines | 0.15 | 0.15 | 0.15 / 0.15 / 0.15 / 0.15 / 0.16 / 0.23 | 1.00 |
+| QCPGraph_ManyPoints | 2.6 | 2.6 | 2.6 / 2.6 / 2.7 / 2.6 / 2.6 / 2.6 | 1.00 |
+| QCPGraph_Standard | 0.69 | 0.71 | 0.71 / 0.73 / 0.71 / 0.7 / 0.76 / 0.71 | 1.03 |
+| QCPInput_MouseMoveStorm | 3.8 | 3.7 | 3.7 / 3.8 / 3.7 / 3.7 / 3.7 / 3.8 | 0.97 |
+| QCPInput_WheelOverGraph2_1M | 0.00064 | 0.00061 | 0.00061 / 0.00061 / 0.00062 / 0.00061 / 0.00061 / 0.00087 | 0.95 |
+| QCPIntervals_Pan10k | 0.31 | 0.31 | 0.31 / 0.31 / 0.31 / 0.32 / 0.31 / 0.31 | 1.00 |
+| QCPIntervals_Pan10kLabelled | 0.31 | 0.31 | 0.31 / 0.31 / 0.31 / 0.31 / 0.31 / 0.31 | 1.00 |
+| QCPItemText_Zoom1k | 0.69 | 0.7 | 0.7 / 0.69 / 0.69 / 0.74 / 0.72 / 0.7 | 1.01 |
+| QCPItems_Add10k | 22.0 | 14 | 14 / 14 / 14 / 14 / 14 / 22 | 0.64 |
+| QCPItems_AddRemove10k | 30.0 | 24 | 22 / 23 / 24 / 25 / 22 / 60 | 0.78 |
+| QCPItems_AddRemove20k | 71.0 | 58 | 54 / 58 / 58 / 58 / 57 / 84 | 0.82 |
+| QCPItems_Clear10k | 8.4 | 9.1 | 8.7 / 9.2 / 7.8 / 11 / 9.5 / 8.9 | 1.08 |
+| QCPItems_Click100 | 0.0056 | 0.0055 | 0.0055 / 0.0055 / 0.0054 / 0.0055 / 0.0056 / 0.0068 | 0.98 |
+| QCPItems_Click10k | 0.055 | 0.054 | 0.054 / 0.055 / 0.054 / 0.054 / 0.056 / 0.057 | 0.99 |
+| QCPItems_ClickEmpty10k | 0.05 | 0.051 | 0.05 / 0.051 / 0.051 / 0.05 / 0.051 / 0.065 | 1.02 |
+| QCPItems_DeleteEach10k | 27.0 | 28 | 28 / 29 / 28 / 33 / 26 / 29 | 1.06 |
+| QCPItems_DeletePlot10k | 30.0 | 22 | 21 / 22 / 22 / 22 / 23 / 26 | 0.73 |
+| QCPItems_DragOne10k | 0.57 | 0.58 | 0.58 / 0.58 / 0.57 / 0.58 / 0.59 / 0.58 | 1.02 |
+| QCPItems_FirstFrame10k | 32.0 | 26 | 24 / 27 / 24 / 25 / 27 / 26 | 0.80 |
+| QCPItems_MixedKinds_Pan1k | 5.5 | 5.7 | 5.4 / 5.9 / 5.3 / 6.8 / 5.7 / 5.6 | 1.03 |
+| QCPItems_Pan10k | 0.42 | 0.42 | 0.42 / 0.43 / 0.42 / 0.43 / 0.42 / 0.73 | 1.01 |
+| QCPItems_RemoveEach10k | 32.0 | 35 | 33 / 37 / 31 / 37 / 33 / 37 | 1.09 |
+| QCPItems_Replot10k | 0.43 | 0.43 | 0.42 / 0.43 / 0.43 / 0.43 / 0.43 / 0.67 | 1.00 |
+| QCPItems_RestyleAll10k | 2.1 | 2.5 | 2.5 / 2.9 / 2.4 / 1.6 / 3.6 / 1.6 | 1.17 |
+| QCPItems_Tracers_Pan1k | 1.5 | 1.4 | 1.4 / 1.5 / 1.4 / 1.5 / 1.4 / 1.4 | 0.93 |
+| QCPItems_Zoom100 | 0.41 | 0.41 | 0.41 / 0.42 / 0.41 / 0.41 / 0.41 / 0.79 | 1.00 |
+| QCPItems_Zoom10k | 0.43 | 0.43 | 0.43 / 0.43 / 0.43 / 0.44 / 0.43 / 0.44 | 1.00 |
+| QCPItems_ZoomEmpty | 0.14 | 0.14 | 0.14 / 0.14 / 0.14 / 0.14 / 0.15 / 0.15 | 1.00 |
+| QCPMultiGraph_SetData1M | 30.0 | 31 | 33 / 35 / 32 / 29 / 30 / 29 | 1.03 |
+| QCPPlots_Stack8_Aligned_Replot | 0.26 | 0.26 | 0.27 / 0.26 / 0.26 / 0.26 / 0.27 / 0.26 | 1.00 |
+| QCPPlots_Stack8_Replot | 0.26 | 0.27 | 0.26 / 0.26 / 0.26 / 0.27 / 0.27 / 0.27 | 1.02 |
+| QCPPlottables_Pan200 | 9.1 | 9.3 | 9.2 / 9.6 / 9.2 / 9.9 / 9.5 / 9.1 | 1.03 |
+| QCPPlottables_Zoom200 | 9.1 | 9.4 | 9.3 / 9.5 / 9.4 / 9.6 / 9.4 / 9.2 | 1.03 |
+| QCPPolar_Draw10k | 0.87 | 0.88 | 0.88 / 0.88 / 0.87 / 0.88 / 0.89 / 0.87 | 1.01 |
+| QCPPolar_Export10k | 0.91 | 0.91 | 0.91 / 0.91 / 0.89 / 0.91 / 0.92 / 0.91 | 1.00 |
+| QCPPolar_RadialZoom10k | 0.94 | 0.95 | 0.98 / 0.94 / 0.93 / 0.95 / 0.95 / 0.96 | 1.01 |
+| QCPPolar_Rotate10k | 0.86 | 0.87 | 0.87 / 0.87 / 0.86 / 0.87 / 0.87 / 0.87 | 1.01 |
+| QCPSpans_Pan100 | 3.3 | 3.5 | 3.4 / 3.4 / 3.3 / 3.6 / 3.5 / 3.5 | 1.05 |
+| QCPSpatialIndex_Build10k | 0.89 | 0.9 | 0.9 / 0.89 / 0.9 / 0.9 / 0.91 / 1.2 | 1.01 |
+| QCPSpatialIndex_Query10k | 0.00036 | 0.00037 | 0.00036 / 0.00037 / 0.00037 / 0.00038 / 0.00037 / 0.00062 | 1.03 |
+| QCPStatisticalBox_Pan1k | 0.14 | 0.14 | 0.14 / 0.14 / 0.14 / 0.14 / 0.14 / 0.13 | 1.00 |
+| QCPTransform_Map1M | 0.68 | 0.87 | 0.92 / 0.65 / 0.82 / 0.93 / 2.2 / 0.65 | 1.28 |
+| QObject_DeleteEachChild10k | 7.8 | 8 | 7.9 / 7.9 / 8 / 7.9 / 8.4 / 8.3 | 1.02 |
