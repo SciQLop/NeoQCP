@@ -199,11 +199,6 @@ QCPKeyWindow QCPCartesianSystem::keyWindow() const
              qcpKeyPixelsPerUnit(key) };
 }
 
-QCPRatioTransform QCPCartesianSystem::ratioTransform() const
-{
-    return QCPRatioTransform(static_cast<QCPAxisRect*>(area()));
-}
-
 QCP::Capabilities QCPCartesianSystem::capabilities() const
 {
     return QCP::capRectangular | QCP::capStraightKey | QCP::capColourScale | QCP::capLanes;

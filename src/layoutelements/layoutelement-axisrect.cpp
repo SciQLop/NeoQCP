@@ -353,6 +353,12 @@ QList<QCPAxisBase*> QCPAxisRect::allAxes() const
     return result;
 }
 
+//! Returns the axis ratio mapping of this rect: an axis ratio is a fraction of the rect.
+QCPRatioTransform QCPAxisRect::ratioTransform() const
+{
+    return QCPRatioTransform(this);
+}
+
 /*!
   Adds a new axis to the axis rect side specified with \a type, and returns it. If \a axis is 0, a
   new QCPAxis instance is created internally. QCustomPlot owns the returned axis, so if you want to

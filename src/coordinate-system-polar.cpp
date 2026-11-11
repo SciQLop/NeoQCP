@@ -98,13 +98,6 @@ QCPKeyWindow QCPPolarSystem::keyWindow() const
              area->radius() * 2.0 * M_PI / span };
 }
 
-QCPRatioTransform QCPPolarSystem::ratioTransform() const
-{
-    qcp::reportMisuse(Q_FUNC_INFO,
-                      "a polar area has no axis ratio: items and spans stay cartesian");
-    return QCPRatioTransform();
-}
-
 QCP::Capabilities QCPPolarSystem::capabilities() const
 {
     return { };

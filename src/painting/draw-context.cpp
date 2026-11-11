@@ -410,18 +410,17 @@ double qcpKeyPixelsPerUnit(const QCPAxis* keyAxis)
 }
 
 QCPDrawContext::QCPDrawContext(const QCPAxis* keyAxis, const QCPAxis* valueAxis,
-                               const QCPAxisRect* axisRect, const QCPTheme* theme, bool exporting,
+                               const QCPArea* area, const QCPTheme* theme, bool exporting,
                                const QRectF& clip, const QCPCoordinateSystem* system)
         : mKeyAxis(keyAxis)
         , mValueAxis(valueAxis)
-        , mAxisRect(axisRect)
         , mSystem(system)
         , mList(std::make_unique<QCPDrawList>())
         , mTransform(system ? system->transform() : QCPTransform(keyAxis, valueAxis))
-        , mRatio(system ? system->frameRatioTransform() : QCPRatioTransform(axisRect))
-        , mClip(clip.isNull() ? (system ? system->clipRect()
-                                       : (axisRect ? QRectF(axisRect->rect()) : QRectF()))
-                              : clip)
+        , mRatio(area ? area->ratioTransform() : QCPRatioTransform())
+        , mClip(clip.isNull()
+                    ? (system ? system->clipRect() : (area ? QRectF(area->rect()) : QRectF()))
+                    : clip)
         , mTheme(theme)
         , mExporting(exporting)
 {
@@ -431,9 +430,7 @@ QCPDrawContext::~QCPDrawContext() = default;
 
 QCPDrawFrame QCPDrawContext::frame() const
 {
-    if (mSystem)
-        return QCPDrawFrame { mSystem->transform(), mSystem->frameRatioTransform(), mClip };
-    return qcpMakeFrame(mKeyAxis, mValueAxis, mAxisRect, mClip);
+    return { mTransform, mRatio, mClip };
 }
 
 const QCPTransform& QCPDrawContext::transform() const

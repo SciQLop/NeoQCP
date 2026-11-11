@@ -1591,8 +1591,8 @@ bool QCustomPlot::detach(QCPAbstractItem* item)
     item->setParentLayerable(nullptr);
     for (QCPItemPosition* position : item->mPositions)
     {
-        position->setAxes(nullptr, nullptr);
-        position->setAxisRect(nullptr);
+        position->setSystem(nullptr);
+        position->setArea(nullptr);
     }
     for (QCPItemAnchor* anchor : item->mAnchors)
         anchor->mParentPlot = nullptr;

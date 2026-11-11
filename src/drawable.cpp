@@ -414,6 +414,7 @@ struct FrameMemo
     const QCPAxis* keyAxis = nullptr;
     const QCPAxis* valueAxis = nullptr;
     const QCPAxisRect* axisRect = nullptr;
+    const QCPArea* area = nullptr;
     QCPRange keyRange;
     QCPRange valueRange;
     QRect clip;
@@ -444,10 +445,12 @@ const QCPDrawFrame& memoFrame(const QCPDrawnView& view, const QRect& clip)
     if (memo.plot != view.plot || memo.epoch != epoch || memo.system != view.system
         || memo.revision != revision || memo.keyAxis != view.keyAxis
         || memo.valueAxis != view.valueAxis || memo.axisRect != view.axisRect
-        || memo.keyRange != keyRange || memo.valueRange != valueRange || memo.clip != clip)
+        || memo.area != view.area || memo.keyRange != keyRange || memo.valueRange != valueRange
+        || memo.clip != clip)
     {
         memo.frame = view.system
-            ? QCPDrawFrame { view.system->transform(), view.system->frameRatioTransform(),
+            ? QCPDrawFrame { view.system->transform(),
+                             view.area ? view.area->ratioTransform() : QCPRatioTransform(),
                              QRectF(clip) }
             : qcpMakeFrame(view.keyAxis, view.valueAxis, view.axisRect, QRectF(clip));
         memo.plot = view.plot;
@@ -457,6 +460,7 @@ const QCPDrawFrame& memoFrame(const QCPDrawnView& view, const QRect& clip)
         memo.keyAxis = view.keyAxis;
         memo.valueAxis = view.valueAxis;
         memo.axisRect = view.axisRect;
+        memo.area = view.area;
         memo.keyRange = keyRange;
         memo.valueRange = valueRange;
         memo.clip = clip;
@@ -488,14 +492,43 @@ QCPDrawnView qcpDrawnViewOf(const QCPAbstractItem& item, QRect clip)
     view.clip = clip;
     // simplify: an item mixing axis pairs across its positions is drawn through the first pair;
     // per-position frames when an item needs them.
-    if (const QCPItemPosition* first = item.firstPosition())
+    const QCPItemPosition* first = item.firstPosition();
+    if (first)
     {
         view.keyAxis = first->keyAxis();
         view.valueAxis = first->valueAxis();
+        view.system = first->system();
+        // The frame is the one of the first position that maps plot coordinates through a system;
+        // a position that only measures ratios does not name the frame.
+        const bool firstMapsPlots = view.system
+            && (first->typeX() == QCPItemPosition::ptPlotCoords
+                || first->typeY() == QCPItemPosition::ptPlotCoords);
+        if (!firstMapsPlots)
+            for (const QCPItemPosition* position : item.positions())
+                if (position->system()
+                    && (position->typeX() == QCPItemPosition::ptPlotCoords
+                        || position->typeY() == QCPItemPosition::ptPlotCoords))
+                {
+                    view.system = position->system();
+                    break;
+                }
     }
+    view.area = item.clipArea();
+    if (!view.area && first)
+        view.area = first->area();
     view.axisRect = item.clipAxisRect();
     if (!view.axisRect && view.keyAxis)
         view.axisRect = view.keyAxis->axisRect();
+    // An area that has not been laid out yet, or that was taken out of the layout, has no frame to
+    // place anything in: the item is inert, and the missing-axis refusal says so once.
+    if (view.area && view.area->rect().isEmpty())
+    {
+        view.system = nullptr;
+        view.area = nullptr;
+        view.axisRect = nullptr;
+        view.keyAxis = nullptr;
+        view.valueAxis = nullptr;
+    }
     return view;
 }
 
@@ -510,6 +543,8 @@ QCPDrawnView qcpDrawnViewOf(const QCPAbstractPlottable& plottable, QRect clip)
     view.axisRect = view.keyAxis ? view.keyAxis->axisRect()
                                  : (view.system ? qobject_cast<QCPAxisRect*>(view.system->area())
                                                 : nullptr);
+    view.area = view.system ? view.system->area() : view.axisRect;
+    view.clippedToFrame = view.system != nullptr;
     return view;
 }
 
@@ -728,9 +763,9 @@ bool QCPDrawnCore::ensureRecording(const QCPDrawable& object, const QCPDrawnView
         return true;
     // Without axes the frame's clip is not the axis rect's: the object is painted into the viewport
     // its layer clips it with, so that is what its recording is measured against.
-    const QRectF clip =
-        framed && !view.system ? QRectF() : QRectF(view.clip).translated(0, -1);
-    QCPDrawContext context(view.keyAxis, view.valueAxis, view.axisRect, view.theme, view.exporting,
+    const QRectF clip = framed && !view.clippedToFrame ? QRectF()
+                                                       : QRectF(view.clip).translated(0, -1);
+    QCPDrawContext context(view.keyAxis, view.valueAxis, view.area, view.theme, view.exporting,
                            clip, view.system);
     const InsideDraw drawing(mInsideDraw);
     object.draw(context);
@@ -1046,7 +1081,7 @@ void QCPDrawnCore::paintIcon(const QCPDrawable& object, QCPPainter& painter, con
     {
         // An icon records through the same door, into a list of its own: the axes only feed the
         // context's unused frame, so an object outside a plot still gets its icon.
-        QCPDrawContext context(view.keyAxis, view.valueAxis, view.axisRect, view.theme);
+        QCPDrawContext context(view.keyAxis, view.valueAxis, view.area, view.theme);
         const InsideDraw drawing(mInsideDraw);
         object.drawLegendIcon(context);
         mState->icon = context.drawList();

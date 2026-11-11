@@ -89,15 +89,6 @@ public:
     virtual QCPTransform iconTransform(const QCPDataBox& box, const QRectF& rect) const;
     //! The key range a recording stays good for, and the resolution it was recorded at.
     virtual QCPKeyWindow keyWindow() const;
-    //! The axis-ratio mapping of an item position, where the system has one.
-    virtual QCPRatioTransform ratioTransform() const = 0;
-    //! The ratio part of a frame: a rectangular frame has one; another frame has none. Asking a
-    //! system without one directly is the misuse (a position with an axis ratio in that frame).
-    [[nodiscard]] QCPRatioTransform frameRatioTransform() const
-    {
-        return capabilities().testFlag(QCP::capRectangular) ? ratioTransform()
-                                                            : QCPRatioTransform();
-    }
     //! What can be drawn through this system; see QCP::Capability.
     virtual QCP::Capabilities capabilities() const = 0;
 
@@ -150,7 +141,6 @@ public:
     QRect clipRect() const override;
     bool contains(QPointF pixel) const override;
     QCPKeyWindow keyWindow() const override;
-    QCPRatioTransform ratioTransform() const override;
     QCP::Capabilities capabilities() const override;
 
 private:

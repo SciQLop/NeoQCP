@@ -190,7 +190,7 @@ void QCPItemTracer::setGraph(QCPGraph* graph)
         if (graph->parentPlot() == mParentPlot)
         {
             position->setType(QCPItemPosition::ptPlotCoords);
-            position->setAxes(graph->keyAxis(), graph->valueAxis());
+            position->setSystem(graph->system());
             mGraph = graph;
             mFollowsGraph = true;
             // The tracer follows the graph's data wherever its own layer is: a data change must

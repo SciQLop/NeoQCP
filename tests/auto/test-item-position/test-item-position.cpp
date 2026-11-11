@@ -467,3 +467,39 @@ void TestItemPosition::farOffscreenItemsDoNotOverflow()
     QVERIFY(item->selectTest(QPointF(100, 100), false) != 0);
     QVERIFY(!mPlot->toPixmap(400, 300).isNull());
 }
+
+void TestItemPosition::setPixelPositionWithAVerticalKeyRoundTrips()
+{
+    // A vertical key axis puts the key on screen y and the value on screen x: the X slot holds the
+    // key, the Y slot the value, so setPixelPosition must take the key from the screen y and the
+    // value from the screen x. Reading the already-overwritten slot number is the old bug.
+    mPlot->xAxis->setRange(0, 10);
+    mPlot->yAxis->setRange(0, 10);
+    mPlot->replot();
+    QCPAxis* keyAxis = mPlot->yAxis;
+    QCPAxis* valueAxis = mPlot->xAxis;
+    QCOMPARE(keyAxis->orientation(), Qt::Vertical);
+    QCOMPARE(valueAxis->orientation(), Qt::Horizontal);
+
+    auto* item = new QCPItemText(mPlot);
+    QCPItemPosition* position = item->positions().first();
+    position->setAxes(keyAxis, valueAxis);
+    position->setType(QCPItemPosition::ptPlotCoords);
+    position->setCoords(3.0, 7.0);
+    const QPointF pixel = position->pixelPosition();
+
+    position->setCoords(0.0, 0.0);
+    position->setPixelPosition(pixel);
+
+    QVERIFY2(qFuzzyCompare(position->key() + 1.0, 4.0),
+             qPrintable(QStringLiteral("key %1, expected 3").arg(position->key())));
+    QVERIFY2(qFuzzyCompare(position->value() + 1.0, 8.0),
+             qPrintable(QStringLiteral("value %1, expected 7").arg(position->value())));
+    QVERIFY2(qFuzzyCompare(position->pixelPosition().x() + 1.0, pixel.x() + 1.0)
+                 && qFuzzyCompare(position->pixelPosition().y() + 1.0, pixel.y() + 1.0),
+             qPrintable(QStringLiteral("pixel %1,%2, expected %3,%4")
+                            .arg(position->pixelPosition().x())
+                            .arg(position->pixelPosition().y())
+                            .arg(pixel.x())
+                            .arg(pixel.y())));
+}

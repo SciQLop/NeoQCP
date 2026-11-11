@@ -327,6 +327,10 @@ public:
     //! False when the axis rect is gone or has no area.
     [[nodiscard]] bool valid() const { return mAxisRect && mWidth > 0.0 && mHeight > 0.0; }
 
+    //! Whether the two ratio axes map independently. A rect does; a polar ratio (a fraction of the
+    //! angle and of the radius) does not.
+    [[nodiscard]] bool separable() const { return true; }
+
 private:
     QPointer<QCPAxisRect> mAxisRect;
     double mLeft = 0;

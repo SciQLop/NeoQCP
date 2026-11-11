@@ -92,6 +92,7 @@ public:
     QList<QCPAxis*> axes(QCPAxis::AxisTypes types) const;
     QList<QCPAxis*> axes() const;
     QList<QCPAxisBase*> allAxes() const override;
+    QCPRatioTransform ratioTransform() const override;
 
     // The handle form of addAxis(type): the rect owns the new axis.
     template <std::same_as<QCPAxis> T>

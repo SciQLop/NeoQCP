@@ -22,6 +22,7 @@ class QCPDrawContext;
 struct QCPDrawFrame;
 struct QCPDrawList;
 class QCPLayer;
+class QCPArea;
 class QCPCoordinateSystem;
 class QCPPainter;
 class QCPTheme;
@@ -39,6 +40,9 @@ struct QCP_LIB_DECL QCPDrawnView
     const QCPAxis* keyAxis = nullptr; //!< the cartesian projections of \a system, when it has some
     const QCPAxis* valueAxis = nullptr;
     const QCPAxisRect* axisRect = nullptr; //!< the rect the ratio transform maps
+    //! The area whose shape and ratio this object draws in: a plottable's system area; an item's
+    //! clip area, else the area of its first position.
+    const QCPArea* area = nullptr;
     //! The frame the object draws in: a plottable's system; null for items, which read the axes.
     const QCPCoordinateSystem* system = nullptr;
     const QCPTheme* theme = nullptr;
@@ -48,6 +52,9 @@ struct QCP_LIB_DECL QCPDrawnView
     bool selectable = false; //!< whether the base lets the object be selected at all
     //! Whether the painter is an export: the object may resolve what a screen frame waits for.
     bool exporting = false;
+    //! Whether the recording is measured against \a clip: plottables are, items keep the painter's
+    //! clip as they did when they had no system.
+    bool clippedToFrame = false;
 
     //! Whether the view names a frame at all: a system, or a pair of axes for the items.
     [[nodiscard]] bool framed() const { return system || (keyAxis && valueAxis); }

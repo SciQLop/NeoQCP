@@ -13,7 +13,7 @@ private slots:
     void aPairMustBelongToTheArea();
     void cartesianTransformIsTheAxes();
     void polarSystemMapsLikeTheArea();
-    void polarSystemRefusesAxisRatios();
+    void polarAreaHasNoAxisRatio();
     void revisionBumpsOnAnyMappingChange();
     void systemRevisionsAreNeverShared();
     void theIconAsksTheSystem();

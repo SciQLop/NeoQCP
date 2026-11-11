@@ -56,11 +56,6 @@ public:
 
     QRect clipRect() const override { return static_cast<QCPAxisRect*>(area())->rect(); }
 
-    QCPRatioTransform ratioTransform() const override
-    {
-        return QCPRatioTransform(static_cast<const QCPAxisRect*>(area()));
-    }
-
     QCP::Capabilities capabilities() const override
     {
         return QCP::capRectangular | QCP::capStraightKey;
@@ -254,7 +249,7 @@ void TestCoordinateSystem::cartesianTransformIsTheAxes()
     QCOMPARE(system->clipRect(), rect->rect());
     QCOMPARE(system->capabilities(),
              QCP::capRectangular | QCP::capStraightKey | QCP::capColourScale | QCP::capLanes);
-    QVERIFY(system->ratioTransform().valid());
+    QVERIFY(rect->ratioTransform().valid());
 }
 
 void TestCoordinateSystem::polarSystemMapsLikeTheArea()
@@ -275,18 +270,18 @@ void TestCoordinateSystem::polarSystemMapsLikeTheArea()
     QCOMPARE(window.pixelsPerKey, area->radius() * 2.0 * M_PI / 360.0);
 }
 
-void TestCoordinateSystem::polarSystemRefusesAxisRatios()
+void TestCoordinateSystem::polarAreaHasNoAxisRatio()
 {
     QCustomPlot plot;
     QCPPolarArea* area = polarArea(plot);
     QCPCoordinateSystem* system = area->system(area->angularAxis(), area->radialAxis());
     QVERIFY(system);
 
-    // Items and spans are cartesian in this milestone: a polar frame has no axis ratio.
-    const QCPRatioTransform ratio = system->ratioTransform();
+    // Items and spans are cartesian in this milestone: a polar area has no axis ratio, and asking
+    // it for one is not misuse, only an answer that nothing can place a ratio through.
+    const QCPRatioTransform ratio = area->ratioTransform();
     QVERIFY(!ratio.valid());
-    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
-    test_misuse::calls.clear();
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
 }
 
 void TestCoordinateSystem::revisionBumpsOnAnyMappingChange()

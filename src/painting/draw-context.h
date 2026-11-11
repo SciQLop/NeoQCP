@@ -21,6 +21,7 @@
 
 class QCPAxis;
 class QCPAxisRect;
+class QCPArea;
 struct QCPDrawList;
 class QCPCoordinateSystem;
 class QCPPainter;
@@ -244,9 +245,10 @@ public:
     [[nodiscard]] QCPDrawFrame frame() const;
 
 private:
-    //! \a clip overrides the axis rect's own rect as the recording's clip: a plot without axes
-    //! records what it draws against the rect its layer clips it with instead.
-    QCPDrawContext(const QCPAxis* keyAxis, const QCPAxis* valueAxis, const QCPAxisRect* axisRect,
+    //! \a clip overrides the area's own rect as the recording's clip: a plot without axes records
+    //! what it draws against the rect its layer clips it with instead. \a area supplies the frame's
+    //! ratio mapping (a cartesian area maps axis ratios, a polar one is asked by its system).
+    QCPDrawContext(const QCPAxis* keyAxis, const QCPAxis* valueAxis, const QCPArea* area,
                    const QCPTheme* theme, bool exporting = false, const QRectF& clip = { },
                    const QCPCoordinateSystem* system = nullptr);
     friend class TestDrawContext;
@@ -256,7 +258,6 @@ private:
 
     const QCPAxis* mKeyAxis = nullptr;
     const QCPAxis* mValueAxis = nullptr;
-    const QCPAxisRect* mAxisRect = nullptr;
     //! The frame the object draws in, when it has a system: the axes then only serve the items.
     const QCPCoordinateSystem* mSystem = nullptr;
     std::unique_ptr<QCPDrawList> mList;

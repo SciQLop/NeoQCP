@@ -26,11 +26,14 @@
 #ifndef QCP_LAYOUTELEMENTS_AREA_H
 #define QCP_LAYOUTELEMENTS_AREA_H
 
+#include "../coords.h"
 #include "../global.h"
 #include "../layout.h"
+#include <QPainterPath>
 
 class QCPPainter;
 class QCustomPlot;
+class QCPAxis;
 class QCPAxisBase;
 class QCPCoordinateSystem;
 
@@ -91,6 +94,14 @@ public:
     //! Whether any of those systems has a listener on its changed() signal.
     [[nodiscard]] bool systemsListen() const;
 
+    //! How axis ratios become pixels in this area. A cartesian area maps them inside its rect; an
+    //! area without an axis ratio answers an invalid transform.
+    virtual QCPRatioTransform ratioTransform() const;
+    //! The shape an item clipped to this area is kept inside: the area's rect by default.
+    virtual QPainterPath clipPath() const;
+    //! Whether clipPath() is a shape of its own rather than the area's rect.
+    virtual bool clipsToPath() const;
+
     // Called by an axis whose mapping moved without a range setter (a link, a direction, an angle):
     // the systems that use it are stale from now on.
     void axisMappingChanged(QCPAxisBase* axis);
@@ -139,5 +150,10 @@ private:
 
     Q_DISABLE_COPY(QCPArea)
 };
+
+// The system of \a keyAxis and \a valueAxis when they are the two axes of one area, in their map
+// roles. Null, quietly, for a missing axis, one axis twice, two axes of one orientation, or axes of
+// two areas: a caller that must say why uses QCPArea::system() instead.
+QCP_LIB_DECL QCPCoordinateSystem* qcpSystemOfAxes(QCPAxis* keyAxis, QCPAxis* valueAxis);
 
 #endif // QCP_LAYOUTELEMENTS_AREA_H

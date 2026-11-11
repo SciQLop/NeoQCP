@@ -24,6 +24,8 @@
 ****************************************************************************/
 
 #include "area.h"
+#include "layoutelement-axisrect.h"
+#include "../axis/axis.h"
 #include "../coordinate-system.h"
 #include "../misuse.h"
 #include "../painting/painter.h"
@@ -84,15 +86,17 @@ QCPCoordinateSystem* QCPArea::system(QCPAxisBase* key, QCPAxisBase* value)
         qcp::reportMisuse(Q_FUNC_INFO, "a coordinate system needs two different axes");
         return nullptr;
     }
+    // The systems the area already made answer first: a position or a plottable resolving its pair
+    // again is the common case, and the axes' own list is not needed for it.
+    for (const QPointer<QCPCoordinateSystem>& existing : std::as_const(mSystems))
+        if (existing && existing->keyAxis() == key && existing->valueAxis() == value)
+            return existing;
     const QList<QCPAxisBase*> axes = allAxes();
     if (!axes.contains(key) || !axes.contains(value))
     {
         qcp::reportMisuse(Q_FUNC_INFO, "both axes of a coordinate system must belong to the area");
         return nullptr;
     }
-    for (const QPointer<QCPCoordinateSystem>& existing : std::as_const(mSystems))
-        if (existing && existing->keyAxis() == key && existing->valueAxis() == value)
-            return existing;
     QCPCoordinateSystem* made = createSystem(key, value);
     if (!made)
         return nullptr;
@@ -166,6 +170,51 @@ bool QCPArea::systemsListen() const
         if (system && system->listens())
             return true;
     return false;
+}
+
+/*!
+  Returns how axis ratios become pixels in this area. The base area has no axis ratio: a subclass
+  that maps one (a cartesian area) overrides this. An invalid transform answers the same pixels as
+  no ratio at all, which is what an item measured in axis ratios needs to know.
+*/
+QCPRatioTransform QCPArea::ratioTransform() const
+{
+    return QCPRatioTransform();
+}
+
+//! Returns the shape an item clipped to this area is kept inside: the area's rect.
+QPainterPath QCPArea::clipPath() const
+{
+    QPainterPath path;
+    path.addRect(rect());
+    return path;
+}
+
+//! Returns whether clipPath() is a shape of its own rather than the area's rect.
+bool QCPArea::clipsToPath() const
+{
+    return false;
+}
+
+/*!
+  Returns the system of \a keyAxis and \a valueAxis when they are the two axes of one area, in their
+  map roles.
+
+  Quietly answers null otherwise: a missing axis, one axis given twice, two axes of one orientation,
+  or axes of two areas. The pair is refused by QCPArea::system() with a misuse report; this helper
+  exists for the callers that must keep asking whether a pair is usable (a position's setAxes, a
+  plottable resolving its axes).
+*/
+QCPCoordinateSystem* qcpSystemOfAxes(QCPAxis* keyAxis, QCPAxis* valueAxis)
+{
+    if (!keyAxis || !valueAxis || keyAxis == valueAxis)
+        return nullptr;
+    if (keyAxis->orientation() == valueAxis->orientation())
+        return nullptr;
+    QCPAxisRect* area = keyAxis->axisRect();
+    if (!area || area != valueAxis->axisRect())
+        return nullptr;
+    return area->system(keyAxis, valueAxis);
 }
 
 /*! \internal

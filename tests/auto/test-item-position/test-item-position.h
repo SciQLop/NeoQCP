@@ -24,6 +24,7 @@ private slots:
     void farOffscreenItemsDoNotOverflow();
     void setRefusedAnchorIsReported();
     void mixedPlotCoordinatePairsKeepTheKeyAndValueRole();
+    void setPixelPositionWithAVerticalKeyRoundTrips();
 
 private:
     QCustomPlot* mPlot = nullptr;

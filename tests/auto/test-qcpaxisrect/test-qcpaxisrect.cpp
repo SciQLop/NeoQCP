@@ -188,9 +188,11 @@ void TestQCPAxisRect::axisRemovalConsequencesToItems()
   mPlot->replot(); // the item already reported its missing axis
   
   
-  expectDebugFrom("QCPItemPosition::setPixelPosition", "Item position type x is ptPlotCoords, but no axes were defined");
-  expectDebugFrom("QCPItemPosition::setPixelPosition", "Item position type y is ptPlotCoords, but no axes were defined");
+  gMisuses = 0;
+  const auto previousHandler = qcp::setMisuseHandler(countMisuse);
   item->start->setPixelPosition(QPointF(1, 2));
+  qcp::setMisuseHandler(previousHandler);
+  QCOMPARE(gMisuses, 1); // one report for the position, not one per slot
   
   // change type to axis-independent coordinates:
   item->start->setType(QCPItemPosition::ptAxisRectRatio);
@@ -257,9 +259,11 @@ void TestQCPAxisRect::axisRectRemovalConsequencesToItems()
   mPlot->layer("main")->markDirty();
   mPlot->replot();
   
-  expectDebugFrom("QCPItemPosition::setPixelPosition", "Item position type x is ptAxisRectRatio, but no axis rect was defined");
-  expectDebugFrom("QCPItemPosition::setPixelPosition", "Item position type y is ptAxisRectRatio, but no axis rect was defined");
+  gMisuses = 0;
+  const auto previousHandler = qcp::setMisuseHandler(countMisuse);
   item->start->setPixelPosition(QPointF(1, 2));
+  qcp::setMisuseHandler(previousHandler);
+  QCOMPARE(gMisuses, 1); // one report for the position, not one per slot
   
   // change type to axisRect-independent coordinates:
   item->start->setType(QCPItemPosition::ptAbsolute);

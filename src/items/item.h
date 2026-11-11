@@ -39,6 +39,8 @@ class QCustomPlot;
 class QCPItemPosition;
 class QCPAbstractItem;
 class QCPAxisRect;
+class QCPArea;
+class QCPCoordinateSystem;
 template <typename T, typename Self = void>
 class QCPItemOps;
 
@@ -158,6 +160,13 @@ public:
     [[nodiscard]] QCPAxis* valueAxis() const { return mValueAxis.data(); }
 
     [[nodiscard]] QCPAxisRect* axisRect() const;
+
+    //! The coordinate system this position maps plot coordinates through; null without one (the
+    //! cartesian one-axis idiom, or a position with no plot-coordinate slot).
+    [[nodiscard]] QCPCoordinateSystem* system() const;
+    //! The area this position measures ratios and pixels in: the axis rect for the cartesian types,
+    //! a polar area for a position bound to a polar system.
+    [[nodiscard]] QCPArea* area() const;
     //! (0, 0) for an item outside a plot (taken, see QCustomPlot::take).
     [[nodiscard]] virtual QPointF pixelPosition() const override;
 
@@ -172,6 +181,13 @@ public:
     void setCoords(const QPointF& pos);
     void setAxes(QCPAxis* keyAxis, QCPAxis* valueAxis);
     void setAxisRect(QCPAxisRect* axisRect);
+    //! Binds this position to \a system: its plot-coordinate slots map through the system, and its
+    //! area becomes the system's area unless one was set explicitly. A system of another plot is
+    //! refused as misuse, and the old binding stays.
+    void setSystem(QCPCoordinateSystem* system);
+    //! Sets the area ratios and axis-rect pixels are measured in. setAxisRect() is the cartesian
+    //! form; a null area leaves the position without one.
+    void setArea(QCPArea* area);
     void setPixelPosition(const QPointF& pixelPosition);
     //! Writes the position in a typed space (see coords.h), on top of the 2.x setters.
     void set(const QCP::Position& position);
@@ -185,6 +201,10 @@ protected:
     PositionType mPositionTypeX, mPositionTypeY;
     QPointer<QCPAxis> mKeyAxis, mValueAxis;
     QPointer<QCPAxisRect> mAxisRect;
+    //! The frame the plot-coordinate slots map through, when the position has one; the axes above
+    //! stay its cartesian projections.
+    QPointer<QCPCoordinateSystem> mSystem;
+    QPointer<QCPArea> mArea;
     double mKey, mValue;
     QCPItemAnchor *mParentAnchorX, *mParentAnchorY;
 
@@ -231,6 +251,8 @@ public:
     [[nodiscard]] bool clipToAxisRect() const { return mClipToAxisRect; }
 
     [[nodiscard]] QCPAxisRect* clipAxisRect() const;
+    //! The area this item is clipped to; the cartesian form (clipAxisRect()) projects it.
+    [[nodiscard]] QCPArea* clipArea() const;
 
     [[nodiscard]] QCP::SelectionType selectable() const
     {
@@ -243,6 +265,9 @@ public:
     // setters:
     void setClipToAxisRect(bool clip);
     void setClipAxisRect(QCPAxisRect* rect);
+    //! Clips this item to \a area: any area, so a polar item clips to its disc. setClipAxisRect() is
+    //! the cartesian form. A null area means the plot viewport.
+    void setClipArea(QCPArea* area);
     Q_SLOT void setSelectable(QCP::SelectionType selectable);
     Q_SLOT void setSelected(bool selected);
     // Tells the layer that this item may have moved (see QCPLayer::noteItemExtentChanged).
@@ -311,7 +336,7 @@ signals:
 protected:
     // property members:
     bool mClipToAxisRect;
-    QPointer<QCPAxisRect> mClipAxisRect;
+    QPointer<QCPArea> mClipArea;
     QList<QCPItemPosition*> mPositions;
     QList<QCPItemAnchor*> mAnchors;
     bool mSelectable, mSelected;
