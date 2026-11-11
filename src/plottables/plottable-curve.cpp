@@ -36,6 +36,7 @@
 #include <cmath>
 #include <limits>
 #include <memory>
+#include <span>
 #include <typeinfo>
 #include <vector>
 
@@ -651,20 +652,36 @@ double QCPCurve::pointDistance(const QPointF& pixelPoint,
         return -1.0;
 
     double minDistSqr = (std::numeric_limits<double>::max)();
-    QVector<QPointF> pixels;
-    pixels.reserve(mDataContainer->size());
-    for (QCPCurveDataContainer::const_iterator it = mDataContainer->constBegin();
-         it != mDataContainer->constEnd(); ++it)
+    const int count = mDataContainer->size();
+    QVector<QPointF> pixels(count);
+    if (mSystem && !mKeyAxis)
     {
-        const QPointF pixel = coordsToPixels(it->key, it->value);
-        pixels.append(pixel);
+        // One batch map, not one transform per point (C-6): a user system may build its mapping on
+        // every ask, and a hit test is O(n) anyway.
+        QVector<QPointF> data(count);
+        int i = 0;
+        for (QCPCurveDataContainer::const_iterator it = mDataContainer->constBegin();
+             it != mDataContainer->constEnd(); ++it, ++i)
+            data[i] = QPointF(it->key, it->value);
+        mSystem->transform().map(std::span<const QPointF>(data), std::span<QPointF>(pixels));
+    }
+    else
+    {
+        int i = 0;
+        for (QCPCurveDataContainer::const_iterator it = mDataContainer->constBegin();
+             it != mDataContainer->constEnd(); ++it, ++i)
+            pixels[i] = coordsToPixels(it->key, it->value);
+    }
+    for (int i = 0; i < pixels.size(); ++i)
+    {
+        const QPointF& pixel = pixels.at(i);
         if (!qIsFinite(pixel.x()) || !qIsFinite(pixel.y()))
             continue;
         const double currentDistSqr = QCPVector2D(pixel - pixelPoint).lengthSquared();
         if (currentDistSqr < minDistSqr)
         {
             minDistSqr = currentDistSqr;
-            closestData = it;
+            closestData = mDataContainer->constBegin() + i;
         }
     }
 

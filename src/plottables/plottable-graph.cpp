@@ -193,8 +193,10 @@ QCPGraph::QCPGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
         , mScatterSkip {}
         , mAdaptiveSampling {}
 {
-    // special handling for QCPGraphs to maintain the simple graph interface:
-    if (mParentPlot)
+    // special handling for QCPGraphs to maintain the simple graph interface: a graph its frame
+    // refused registered nowhere, and must not leave a dangling entry in mGraphs either. A graph
+    // the base registered (including a cross-plot pair it owns but keeps inert) is listed here.
+    if (mParentPlot && isRegistered())
         mParentPlot->registerGraph(this);
 
     setPen(QPen(Qt::blue, 0));
@@ -510,7 +512,7 @@ void QCPGraph::draw(QCPPainter* painter)
         else
             painter->setBrush(mBrush);
         painter->setPen(Qt::NoPen);
-        drawFill(painter, &lines);
+        drawFill(painter, &lines, lineDataRange);
 
         // draw line:
         if (mLineStyle != lsNone)
@@ -613,7 +615,37 @@ void QCPGraph::getLines(QVector<QPointF>* lines, const QCPDataRange& dataRange) 
         return;
     if (drawsInDataSpace())
     {
-        *lines = mapToPixels(dataSpaceLines(dataRange));
+        if (mLineStyle == lsImpulse)
+        {
+            // Impulses run to value zero, which a log value axis cannot place: the pair is dropped
+            // whole, never handed to drawLines as a NaN.
+            const QCPAxis* valueAxis = qobject_cast<const QCPAxis*>(valueAxisBase());
+            if (valueAxis && valueAxis->scaleType() == QCPAxis::stLogarithmic)
+            {
+                lines->clear();
+                return;
+            }
+        }
+        const QVector<QPointF> pixels = mapToPixels(dataSpaceLines(dataRange));
+        if (mLineStyle != lsImpulse)
+        {
+            *lines = pixels;
+            return;
+        }
+        // An impulse pair whose zero end the frame cannot place (value zero on a log axis, say) is
+        // dropped whole: half a pair is not a line, and a NaN must never reach drawLines.
+        lines->clear();
+        for (int i = 0; i + 1 < pixels.size(); i += 2)
+        {
+            const QPointF& base = pixels.at(i);
+            const QPointF& top = pixels.at(i + 1);
+            if (qIsFinite(base.x()) && qIsFinite(base.y()) && qIsFinite(top.x())
+                && qIsFinite(top.y()))
+            {
+                lines->append(base);
+                lines->append(top);
+            }
+        }
         return;
     }
     QCPGraphDataContainer::const_iterator begin, end;
@@ -867,12 +899,14 @@ QVector<QPointF> QCPGraph::mapToPixels(const QVector<QPointF>& dataPoints) const
 /*! \internal
 
   Draws the channel fill between this graph and \ref mChannelFillGraph on a frame that has no key
-  axis: both lines are built in data space, split at the NaNs, cropped to their common keys and
-  closed there, and the finished polygon is mapped once.
+  axis: this graph's run for \a dataRange, and the target's whole line, are built in data space,
+  split at the NaNs, cropped to their common keys and closed there, and the finished polygon is
+  mapped once.
 */
-void QCPGraph::drawDataSpaceChannelFill(QCPPainter* painter) const
+void QCPGraph::drawDataSpaceChannelFill(QCPPainter* painter,
+                                        const QCPDataRange& dataRange) const
 {
-    const QVector<QPointF> thisData = dataSpaceLines(QCPDataRange(0, dataCount()));
+    const QVector<QPointF> thisData = dataSpaceLines(dataRange);
     const QVector<QPointF> otherData
         = mChannelFillGraph->dataSpaceLines(QCPDataRange(0, mChannelFillGraph->dataCount()));
     const QVector<QCPDataRange> thisSegments = getNonNanSegments(&thisData, Qt::Horizontal);
@@ -885,6 +919,35 @@ void QCPGraph::drawDataSpaceChannelFill(QCPPainter* painter) const
         if (!polygon.isEmpty())
             painter->drawPolygon(polygon);
     }
+}
+
+/*! \internal
+
+  Returns the fill polygon of \a segment on a frame that has no key axis: \a dataLines are in data
+  space (ascending key), the band closes on the value that plays the role of zero there, and the
+  finished data-space polygon is mapped once. No inverse() is involved: the base keys are the
+  segment's own vertex keys.
+*/
+const QPolygonF QCPGraph::dataSpaceFillPolygon(const QVector<QPointF>* dataLines,
+                                               QCPDataRange segment) const
+{
+    if (segment.size() < 2)
+        return QPolygonF();
+    const QCPAxis* valueAxis = qobject_cast<const QCPAxis*>(valueAxisBase());
+    // 2.x closes toward zero: on a linear axis that is value 0, on a log axis the range bound on
+    // zero's side (upper on a negative range, lower on a positive one).
+    double baseValue = 0.0;
+    if (valueAxis && valueAxis->scaleType() == QCPAxis::stLogarithmic)
+        baseValue = valueAxis->range().upper < 0 ? valueAxis->range().upper
+                                                 : valueAxis->range().lower;
+    QPolygonF polygon(segment.size() + 2);
+    polygon[0] = QPointF(dataLines->at(segment.begin()).x(), baseValue);
+    std::copy(dataLines->constBegin() + segment.begin(),
+              dataLines->constBegin() + segment.end(), polygon.begin() + 1);
+    polygon[polygon.size() - 1]
+        = QPointF(dataLines->at(segment.end() - 1).x(), baseValue);
+    const QVector<QPointF> vertices(polygon.begin(), polygon.end());
+    return QPolygonF(mapToPixels(vertices));
 }
 
 /*! \internal
@@ -1253,7 +1316,8 @@ QVector<QPointF> QCPGraph::dataToImpulseLines(const QVector<QCPGraphData>& data)
 
   \see drawLinePlot, drawImpulsePlot, drawScatterPlot
 */
-void QCPGraph::drawFill(QCPPainter* painter, QVector<QPointF>* lines) const
+void QCPGraph::drawFill(QCPPainter* painter, QVector<QPointF>* lines,
+                        const QCPDataRange& dataRange) const
 {
     if (mLineStyle == lsImpulse)
         return; // fill doesn't make sense for impulse plot
@@ -1261,6 +1325,15 @@ void QCPGraph::drawFill(QCPPainter* painter, QVector<QPointF>* lines) const
         return;
 
     applyFillAntialiasingHint(painter);
+    if (!mChannelFillGraph && drawsInDataSpace())
+    {
+        // The fill polygon is built next to the data-space line: its base points are data points,
+        // not pixels read back through inverse() (which a user mapping may refuse).
+        const QVector<QPointF> dataLines = dataSpaceLines(dataRange);
+        for (QCPDataRange segment : getNonNanSegments(&dataLines, Qt::Horizontal))
+            painter->drawPolygon(dataSpaceFillPolygon(&dataLines, segment));
+        return;
+    }
     // The key orientation is a property of a cartesian frame's axis pair: a frame of the user's own
     // is horizontal, because its data space is (key, value).
     const Qt::Orientation keyOrientation
@@ -1298,7 +1371,13 @@ void QCPGraph::drawFill(QCPPainter* painter, QVector<QPointF>* lines) const
             painter->drawPolygon(getFillPolygon(lines, segment));
     }
     else if (drawsInDataSpace() || mChannelFillGraph->drawsInDataSpace())
-        drawDataSpaceChannelFill(painter);
+    {
+        // The two ends may have been moved apart after setChannelFillGraph accepted them: a band
+        // joining two planes is not drawn. (Checked here, so either side moving is caught.)
+        if (mSystem != mChannelFillGraph->system())
+            return;
+        drawDataSpaceChannelFill(painter, dataRange);
+    }
     else
     {
         // draw fill between this graph and mChannelFillGraph:
@@ -1778,7 +1857,11 @@ void QCPGraph::getVisibleDataBounds(QCPGraphDataContainer::const_iterator& begin
         QCPAxis* valueAxis = mValueAxis.data();
         if (!keyAxis || !valueAxis)
         {
+            // An inert partner (setSystem(nullptr)) reaches here through a channel fill: an empty
+            // range, never the uninitialised iterators the caller would compare and dereference.
             qDebug() << Q_FUNC_INFO << "invalid key or value axis";
+            end = mDataContainer->constEnd();
+            begin = end;
             return;
         }
         // get visible data range:
@@ -1972,17 +2055,6 @@ bool QCPGraph::segmentsIntersect(double aLower, double aUpper, double bLower, do
 */
 QPointF QCPGraph::getFillBasePoint(QPointF matchingDataPoint) const
 {
-    if (drawsInDataSpace())
-    {
-        // The fill closes on a value, not on a pixel row: 0 on a linear value axis, the lower bound
-        // of the range on a logarithmic one, whose zero lies infinitely far away.
-        const QCPAxis* valueAxis = qobject_cast<const QCPAxis*>(valueAxisBase());
-        const double baseValue = valueAxis && valueAxis->scaleType() == QCPAxis::stLogarithmic
-            ? valueAxis->range().lower
-            : 0.0;
-        const QCP::Data key = mSystem->transform().inverse(matchingDataPoint);
-        return mapToPixels({QPointF(key.x, baseValue)}).value(0);
-    }
     QCPAxis* keyAxis = mKeyAxis.data();
     QCPAxis* valueAxis = mValueAxis.data();
     if (!keyAxis || !valueAxis)

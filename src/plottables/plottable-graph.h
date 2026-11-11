@@ -164,7 +164,8 @@ protected:
     virtual void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
 
     // introduced virtual methods:
-    virtual void drawFill(QCPPainter* painter, QVector<QPointF>* lines) const;
+    virtual void drawFill(QCPPainter* painter, QVector<QPointF>* lines,
+                          const QCPDataRange& dataRange) const;
     virtual void drawScatterPlot(QCPPainter* painter, const QVector<QPointF>& scatters,
                                  const QCPScatterStyle& style) const;
     virtual void drawLinePlot(QCPPainter* painter, const QVector<QPointF>& lines) const;
@@ -188,7 +189,9 @@ protected:
     QVector<QPointF> dataSpaceLines(const QCPDataRange& dataRange) const;
     QVector<QPointF> dataSpaceScatters(const QCPDataRange& dataRange) const;
     QVector<QPointF> mapToPixels(const QVector<QPointF>& dataPoints) const;
-    void drawDataSpaceChannelFill(QCPPainter* painter) const;
+    const QPolygonF dataSpaceFillPolygon(const QVector<QPointF>* dataLines,
+                                         QCPDataRange segment) const;
+    void drawDataSpaceChannelFill(QCPPainter* painter, const QCPDataRange& dataRange) const;
     const QPolygonF dataSpaceChannelFillPolygon(const QVector<QPointF>* thisData,
                                                 QCPDataRange thisSegment,
                                                 const QVector<QPointF>* otherData,
