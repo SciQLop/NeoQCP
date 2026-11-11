@@ -665,15 +665,18 @@ void TestCoordinateSystem::barsAreRefusedInAPolarSystem()
     else
         plottable = new QCPIntervals(key, value, new QCPLaneLayout(&plot));
 
-    // What each class needs: the cartesian pair, plus the flags its drawing assumes.
+    // What each class needs: the cartesian pair, plus the flags its drawing assumes. A
+    // multigraph needs the straight segment only (P-3); a polar system offers none of these.
     const QCP::Capabilities required = plottable->requiredCapabilities();
-    QVERIFY(required.testFlag(QCP::capRectangular));
-    QVERIFY(required.testFlag(QCP::capStraightKey));
-    // A line maps its scalar through a colour scale, so a multi-graph needs one as well.
-    QCOMPARE(required.testFlag(QCP::capColourScale),
-             kind == QStringLiteral("colormap") || kind == QStringLiteral("multigraph"));
-    QCOMPARE(required.testFlag(QCP::capLanes),
-             kind == QStringLiteral("multigraph") || kind == QStringLiteral("intervals"));
+    if (kind == QStringLiteral("multigraph"))
+        QCOMPARE(required, QCP::capStraightSegments);
+    else
+    {
+        QVERIFY(required.testFlag(QCP::capRectangular));
+        QVERIFY(required.testFlag(QCP::capStraightKey));
+        QCOMPARE(required.testFlag(QCP::capColourScale), kind == QStringLiteral("colormap"));
+        QCOMPARE(required.testFlag(QCP::capLanes), kind == QStringLiteral("intervals"));
+    }
 
     // The polar system offers none of them: the join is refused and the plottable stays put.
     QCPCoordinateSystem* own = plottable->system();

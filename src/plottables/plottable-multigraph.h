@@ -34,8 +34,7 @@ public:
     using OpsFor = QCPMultiGraphOps<T>;
 
     explicit QCPMultiGraph(QCPAxis* keyAxis, QCPAxis* valueAxis,
-                           QCP::Capabilities required = QCP::capRectangular
-                               | QCP::capStraightKey | QCP::capColourScale | QCP::capLanes);
+                           QCP::Capabilities required = QCP::capStraightSegments);
     ~QCPMultiGraph() override;
 
     // Data source
@@ -120,6 +119,14 @@ public:
     // Per-component value access (for tracers/tooltips)
     [[nodiscard]] double componentValueAt(int column, int index) const;
 
+    //! A fill, error bars or colour values need the data-space decorations of task 2b: until then
+    //! their setters refuse a non-cartesian frame, and setSystem refuses to join one while they
+    //! are set (A9).
+    void setSystem(QCPCoordinateSystem* system) override;
+    void setBrush(const QBrush& brush) override;
+    void setColorValues(std::shared_ptr<const std::vector<double>> values);
+    void setColorValues(std::vector<double> values);
+
     [[nodiscard]] bool adaptiveSampling() const { return mAdaptiveSampling; }
     void setAdaptiveSampling(bool enabled);
     // Gap detection on the lines (see QCPAbstractMultiDataSource::setGapThreshold); 0 turns it off.
@@ -167,15 +174,27 @@ protected:
     //! The data point under \a at: today's selectTest, without the gates around it.
     std::optional<double> hitTest(QCP::Pixels at, QVariant* details) const override;
 
-    //! The lines, markers, fills or error bars changed: a counting bump, not a rebuild.
-    quint64 dependencyRevision() const override { return mRevision; }
+    //! The lines, markers, fills or error bars changed: a counting bump, not a rebuild. On the
+    //! data-space branch the system's revision is part of it (B4): the frame reads its key window
+    //! and its baseline.
+    quint64 dependencyRevision() const override;
 
     //! Without a finished resample an export resamples on the spot: the two recordings differ.
     bool resolvesForTheExport() const override { return true; }
 
     using QCPAbstractLine::drawLegendIcon;
     void drawLegendIcon(QCPDrawContext& icon) const override;
-    void systemChanged() override { followAxes(); }
+    void systemChanged() override;
+
+    //! B5: the graph draws through its system's transform when that system is not cartesian.
+    [[nodiscard]] bool drawsInDataSpace() const;
+    void drawInDataSpace(QCPDrawContext& context) const;
+    [[nodiscard]] std::optional<double> nearestMappedPoint(const QPointF& pos,
+                                                           QVariant* details) const;
+    //! Value 0, or on a log value axis the range bound nearer zero (the 4j baseline).
+    [[nodiscard]] double dataSpaceBaseline() const;
+    //! Whether a fill, error bars or colour values are set: the 2a refusals.
+    [[nodiscard]] bool hasDataSpaceDecorations() const;
 
     void selectEvent(QMouseEvent* event, bool additive, const QVariant& details,
                      bool* selectionStateChanged) override;
@@ -199,6 +218,9 @@ protected:
     mutable std::shared_ptr<QCPAbstractMultiDataSource> mL2Result;
     mutable bool mL2Dirty = false;
     bool mNeedsResampling = false;
+    //! Whether the cartesian pipeline is bypassed (the data-space branch): a system change clears
+    //! the bins only when the branch itself changes, not on an axis change within cartesian.
+    bool mPipelineBypassed = false;
     //! The data the recording was made from changed: the adapter records it again.
     mutable quint64 mRevision = 0;
     // Debounce timer: defers expensive L2 rebuild until panning stops

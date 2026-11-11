@@ -5,6 +5,7 @@
 #include "../datasource/resampled-multi-datasource.h"
 #include "../layoutelements/layoutelement-axisrect.h"
 #include "../layoutelements/layoutelement-legend-group.h"
+#include "../misuse.h"
 #include "../painting/draw-context.h"
 #include "../painting/painter.h"
 #include "../painting/plottable-rhi-layer.h"
@@ -19,6 +20,10 @@
 #include <algorithm>
 #include <cmath>
 #include <utility>
+
+static void ensureL1TransformMulti(QCPMultiGraphPipeline& pipeline, int sourceSize, int colCount,
+                                   std::shared_ptr<std::atomic<bool>> wantOrigin);
+static bool needsResamplingMulti(const QCPAbstractMultiDataSource& src);
 
 QCPMultiGraph::QCPMultiGraph(QCPAxis* keyAxis, QCPAxis* valueAxis, QCP::Capabilities required)
         : QCPAbstractLine(keyAxis, valueAxis, required)
@@ -46,6 +51,36 @@ QCPMultiGraph::QCPMultiGraph(QCPAxis* keyAxis, QCPAxis* valueAxis, QCP::Capabili
 
 QCPMultiGraph::~QCPMultiGraph() = default;
 
+bool QCPMultiGraph::drawsInDataSpace() const
+{
+    return mSystem && mSystem->kind() != QCPTransform::Kind::Cartesian;
+}
+
+bool QCPMultiGraph::hasDataSpaceDecorations() const
+{
+    return !mFills.isEmpty() || !mErrorBars.isEmpty() || mColor.hasValues();
+}
+
+double QCPMultiGraph::dataSpaceBaseline() const
+{
+    // 2.x closes toward zero: on a linear axis that is value 0, on a log axis the range bound on
+    // zero's side (upper on a negative range, lower on a positive one).
+    const QCPAxis* valueAxis = qobject_cast<const QCPAxis*>(valueAxisBase());
+    if (valueAxis && valueAxis->scaleType() == QCPAxis::stLogarithmic)
+    {
+        const QCPRange range = valueAxis->range();
+        return range.upper < 0 ? range.upper : range.lower;
+    }
+    return 0.0;
+}
+
+quint64 QCPMultiGraph::dependencyRevision() const
+{
+    // B4: on the data-space branch the recording reads the system's key window and its baseline,
+    // so a mapping change has to make it stale even though no data or style moved.
+    return drawsInDataSpace() ? qHashMulti(0, mRevision, mSystem->revision()) : mRevision;
+}
+
 void QCPMultiGraph::followAxes()
 {
     for (const auto& link : std::exchange(mAxisLinks, {}))
@@ -62,6 +97,55 @@ void QCPMultiGraph::followAxes()
                               [this] { linesChanged(); });
     linesChanged(); // pixels computed for the old axes mean nothing on the new ones
     mL2Dirty = mL1Cache != nullptr; // nor do the bins resampled for the old key range
+}
+
+void QCPMultiGraph::systemChanged()
+{
+    // B2: the pipeline belongs to the cartesian branch. Entering a user system drops its L1/L2 and
+    // starts nothing; leaving one re-arms it for the displayed source. An axis change within the
+    // cartesian branch is not a branch change: its L1 survives and followAxes() only dirties L2.
+    followAxes();
+    const bool dataSpace = drawsInDataSpace();
+    if (dataSpace)
+    {
+        if (!mPipelineBypassed)
+        {
+            mL1Cache.reset();
+            mL2Result.reset();
+            mL2Dirty = false;
+        }
+        mPipelineBypassed = true;
+        mNeedsResampling = false;
+        mPipeline.clearTransform();
+        mPipeline.setSource(nullptr);
+        mAcceptedGeneration = mPipeline.currentGeneration();
+        linesChanged();
+        return;
+    }
+    if (!std::exchange(mPipelineBypassed, false))
+        return; // a change within the cartesian branch
+    mL1Cache.reset();
+    mL2Result.reset();
+    mL2Dirty = false;
+    mNeedsResampling = mDataSource && needsResamplingMulti(*mDataSource);
+    if (mDataSource)
+    {
+        ensureL1TransformMulti(mPipeline, mDataSource->size(), mDataSource->columnCount(),
+                               mWantOrigin);
+        const QPointer<QCPMultiGraph> alive(this);
+        mPipeline.setSource(mDataSource);
+        if (!alive)
+            return;
+        mAcceptedGeneration = mPipeline.hasTransform() ? mPipeline.currentGeneration()
+                                                        : mPipeline.currentGeneration() + 1;
+    }
+    else
+    {
+        mPipeline.clearTransform();
+        mPipeline.setSource(nullptr);
+        mAcceptedGeneration = mPipeline.currentGeneration();
+    }
+    linesChanged();
 }
 
 // A finished resample, a rebuilt L2 or the settle after a pan changes what the recording says
@@ -155,9 +239,20 @@ void QCPMultiGraph::applySourceNow(std::shared_ptr<QCPAbstractMultiDataSource> s
     mL1Cache.reset();
     mL2Result.reset();
     mL2Dirty = false;
-    mNeedsResampling = mDataSource && needsResamplingMulti(*mDataSource);
-    if (mDataSource)
-        ensureL1TransformMulti(mPipeline, mDataSource->size(), mDataSource->columnCount(), mWantOrigin);
+    mNeedsResampling = mDataSource && !drawsInDataSpace() && needsResamplingMulti(*mDataSource);
+    if (drawsInDataSpace() || !mDataSource)
+    {
+        // B2: the displayed source is drawn directly; no job is started or consulted.
+        mPipeline.clearTransform();
+        mPipeline.setSource(nullptr);
+        mPipelineBypassed = drawsInDataSpace();
+        mAcceptedGeneration = mPipeline.currentGeneration();
+        markDirty();
+        updateEffectiveBusy();
+        return;
+    }
+    mPipelineBypassed = false;
+    ensureL1TransformMulti(mPipeline, mDataSource->size(), mDataSource->columnCount(), mWantOrigin);
     // The pipeline's busyChanged slot may delete this graph.
     const QPointer<QCPMultiGraph> alive(this);
     mPipeline.setSource(mDataSource);
@@ -182,6 +277,15 @@ void QCPMultiGraph::stagePendingSource(std::shared_ptr<QCPAbstractMultiDataSourc
     mPendingColorValues.reset();
     mPendingReady = false;
     syncComponentCount(mPendingSource.get());
+    if (drawsInDataSpace())
+    {
+        // A staged source is committed by the plot's debounce, but there is no job to wait for.
+        mPipeline.clearTransform();
+        mPipeline.setSource(nullptr);
+        markPendingReady();
+        updateEffectiveBusy();
+        return;
+    }
     ensureL1TransformMulti(mPipeline, mPendingSource->size(), mPendingSource->columnCount(), mWantOrigin);
     // The pipeline's busyChanged slot may delete this graph.
     const QPointer<QCPMultiGraph> alive(this);
@@ -215,7 +319,7 @@ bool QCPMultiGraph::commitPendingData()
     mPendingReady = false;
     mL2Result.reset();
     mL2Dirty = mL1Cache != nullptr;
-    mNeedsResampling = needsResamplingMulti(*mDataSource);
+    mNeedsResampling = !drawsInDataSpace() && needsResamplingMulti(*mDataSource);
 
     if (mPendingColorValues && static_cast<int>(mPendingColorValues->size()) == mDataSource->size())
     {
@@ -262,8 +366,10 @@ void QCPMultiGraph::dataChanged()
     if (mDataSource)
     {
         applyColorSizeRule(mDataSource->size());
-        mNeedsResampling = needsResamplingMulti(*mDataSource);
-        ensureL1TransformMulti(mPipeline, mDataSource->size(), mDataSource->columnCount(), mWantOrigin);
+        mNeedsResampling = !drawsInDataSpace() && needsResamplingMulti(*mDataSource);
+        if (!drawsInDataSpace())
+            ensureL1TransformMulti(mPipeline, mDataSource->size(), mDataSource->columnCount(),
+                                   mWantOrigin);
     }
 
     mL1Cache.reset();
@@ -288,6 +394,8 @@ void QCPMultiGraph::dataChanged()
 
 void QCPMultiGraph::onL1Ready(uint64_t generation)
 {
+    if (drawsInDataSpace())
+        return; // a stale job of the cartesian branch: this branch never consults the pipeline
     if (mPendingSource)
     {
         if (generation < mPendingGeneration)
@@ -418,6 +526,8 @@ void QCPMultiGraph::decorationsChanged()
 
 bool QCPMultiGraph::setFill(Fill fill)
 {
+    QCP_CHECK_OR_RETURN(!drawsInDataSpace(),
+                        "a fill on a non-cartesian multigraph arrives with task 2b", false);
     const auto* col = std::get_if<int>(&fill.target);
     if (!isValidColumn(fill.owner) || (col && (!isValidColumn(*col) || *col == fill.owner)))
         return false;
@@ -478,6 +588,8 @@ QBrush QCPMultiGraph::effectiveFillBrush(const Fill& fill) const
 bool QCPMultiGraph::setComponentErrorBars(int value, int lower, int upper, double capWidthPx,
                                           std::optional<QPen> pen)
 {
+    QCP_CHECK_OR_RETURN(!drawsInDataSpace(),
+                        "error bars on a non-cartesian multigraph arrive with task 2b", false);
     if (!isValidColumn(value) || !isValidColumn(lower) || !isValidColumn(upper)
         || lower == upper || value == lower || value == upper)
         return false;
@@ -528,6 +640,48 @@ void QCPMultiGraph::updateBaseSelection()
 
 // --- Component API ---
 
+void QCPMultiGraph::setSystem(QCPCoordinateSystem* system)
+{
+    // A9: a feature task 2b makes work on this frame is refused now, at the join as at its setter.
+    if (system && system->kind() != QCPTransform::Kind::Cartesian && hasDataSpaceDecorations())
+    {
+        QCP_CHECK_OR_RETURN(false,
+                            "a fill, error bars or colour values need a cartesian multigraph "
+                            "until task 2b");
+    }
+    QCPAbstractLine::setSystem(system);
+}
+
+void QCPMultiGraph::setBrush(const QBrush& brush)
+{
+    if (brush.style() != Qt::NoBrush && drawsInDataSpace())
+    {
+        QCP_CHECK_OR_RETURN(false,
+                            "a fill on a non-cartesian multigraph arrives with task 2b");
+    }
+    QCPAbstractLine::setBrush(brush);
+}
+
+void QCPMultiGraph::setColorValues(std::shared_ptr<const std::vector<double>> values)
+{
+    if (values && !values->empty() && drawsInDataSpace())
+    {
+        QCP_CHECK_OR_RETURN(false,
+                            "colour by scalar on a non-cartesian multigraph arrives with task 2b");
+    }
+    QCPAbstractLine::setColorValues(std::move(values));
+}
+
+void QCPMultiGraph::setColorValues(std::vector<double> values)
+{
+    if (!values.empty() && drawsInDataSpace())
+    {
+        QCP_CHECK_OR_RETURN(false,
+                            "colour by scalar on a non-cartesian multigraph arrives with task 2b");
+    }
+    QCPAbstractLine::setColorValues(std::move(values));
+}
+
 void QCPMultiGraph::setAdaptiveSampling(bool enabled)
 {
     if (mAdaptiveSampling == enabled)
@@ -577,7 +731,18 @@ std::optional<int> QCPMultiGraph::colorValueCount() const
 
 bool QCPMultiGraph::hasPendingDataSource() const { return mPendingSource != nullptr; }
 
-void QCPMultiGraph::colorValuesStarted() { requestOrigin(); }
+void QCPMultiGraph::colorValuesStarted()
+{
+    // The setter on this class refuses first; this guards the base pointer a generic caller may
+    // hold, so a colour set cannot reach a frame that cannot draw it.
+    if (drawsInDataSpace())
+    {
+        QCP_CHECK(false, "colour by scalar on a non-cartesian multigraph arrives with task 2b");
+        clearColorValues();
+        return;
+    }
+    requestOrigin();
+}
 
 QVector<int> QCPMultiGraph::lineIndices(LineStyle style, const QVector<int>& dataIdx)
 {
@@ -680,9 +845,20 @@ QCPRange QCPMultiGraph::dataValueRange(int index) const
 
 QPointF QCPMultiGraph::dataPixelPosition(int index) const
 {
-    if (!mDataSource || !mKeyAxis || !mValueAxis || mDataSource->columnCount() == 0)
+    if (!mDataSource || mDataSource->columnCount() == 0)
         return {};
-    return coordsToPixels(mDataSource->keyAt(index), mDataSource->valueAt(0, index));
+    const double key = mDataSource->keyAt(index);
+    const double value = mDataSource->valueAt(0, index);
+    if (drawsInDataSpace())
+    {
+        if (!mSystem)
+            return {};
+        const QCP::Pixels pixel = mSystem->transform().map(QCP::Data { key, value });
+        return QPointF(pixel.x, pixel.y);
+    }
+    if (!mKeyAxis || !mValueAxis)
+        return {};
+    return coordsToPixels(key, value);
 }
 
 int QCPMultiGraph::findBegin(double sortKey, bool expandedRange) const
@@ -737,6 +913,16 @@ double QCPMultiGraph::selectTest(const QPointF& pos, bool onlySelectable, QVaria
 {
     if ((onlySelectable && mSelectable == QCP::stNone) || !mDataSource || mDataSource->empty())
         return -1;
+    if (drawsInDataSpace())
+    {
+        if (!mSystem)
+            return -1;
+        const bool beyond = mParentPlot
+            && mParentPlot->interactions().testFlag(QCP::iSelectPlottablesBeyondAxisRect);
+        if (!mSystem->contains(pos) && !beyond)
+            return -1;
+        return nearestMappedPoint(pos, details).value_or(-1);
+    }
     if (!mKeyAxis || !mValueAxis)
         return -1;
 
@@ -753,6 +939,67 @@ QCPDataSelection QCPMultiGraph::selectTestRect(const QRectF& rect, bool onlySele
     mLastRectSelections.clear();
     if ((onlySelectable && mSelectable == QCP::stNone) || !mDataSource || mDataSource->empty())
         return unionResult;
+
+    if (drawsInDataSpace())
+    {
+        // B3: every candidate row is mapped once, in one batch, and kept when its pixel is in the
+        // band. The key window reads a cartesian key axis, so there is none here.
+        const int count = mDataSource->size();
+        const int columns = qMin(mComponents.size(), mDataSource->columnCount());
+        std::vector<int> shown;
+        for (int c = 0; c < columns; ++c)
+            if (mComponents[c].visible)
+                shown.push_back(c);
+        mLastRectSelections.resize(mComponents.size());
+        if (shown.empty() || !mSystem)
+            return unionResult;
+        const std::size_t total = std::size_t(count) * shown.size();
+        std::vector<double> keys;
+        std::vector<double> values;
+        keys.reserve(total);
+        values.reserve(total);
+        for (int c : shown)
+            for (int i = 0; i < count; ++i)
+            {
+                keys.push_back(mDataSource->keyAt(i));
+                values.push_back(mDataSource->valueAt(c, i));
+            }
+        std::vector<QPointF> pixels(total);
+        mSystem->transform().map(std::span<const double>(keys), std::span<const double>(values),
+                                 std::span<QPointF>(pixels));
+        for (std::size_t k = 0; k < shown.size(); ++k)
+        {
+            const int c = shown[k];
+            const std::size_t offset = k * std::size_t(count);
+            QCPDataSelection colSel;
+            int segmentBegin = -1;
+            for (int i = 0; i < count; ++i)
+            {
+                const QPointF& pixel = pixels[offset + std::size_t(i)];
+                const bool inside = std::isfinite(pixel.x()) && std::isfinite(pixel.y())
+                    && rect.contains(pixel);
+                if (segmentBegin == -1)
+                {
+                    if (inside)
+                        segmentBegin = i;
+                }
+                else if (!inside)
+                {
+                    colSel.addDataRange(QCPDataRange(segmentBegin, i), false);
+                    segmentBegin = -1;
+                }
+            }
+            if (segmentBegin != -1)
+                colSel.addDataRange(QCPDataRange(segmentBegin, count), false);
+            colSel.simplify();
+            mLastRectSelections[c] = colSel;
+            for (int r = 0; r < colSel.dataRangeCount(); ++r)
+                unionResult.addDataRange(colSel.dataRange(r), false);
+        }
+        unionResult.simplify();
+        return unionResult;
+    }
+
     if (!mKeyAxis || !mValueAxis)
         return unionResult;
 
@@ -850,7 +1097,16 @@ void QCPMultiGraph::deselectEvent(bool* selectionStateChanged)
 
 bool QCPMultiGraph::canProduceContent() const
 {
-    if (!mKeyAxis || !mValueAxis || !mDataSource || mDataSource->empty())
+    if (!mDataSource || mDataSource->empty())
+        return false;
+    // B2: the data-space branch draws the displayed source, whatever the pipeline holds.
+    if (drawsInDataSpace())
+        return true;
+    // A lost system is not "waiting for data": the layer must draw the object so drawableAxes()
+    // gives its one report, which the stale-buffer path would otherwise skip forever.
+    if (!mSystem)
+        return true;
+    if (!mKeyAxis || !mValueAxis)
         return false;
     // Pipeline active but L1 not ready — draw() will bail out
     if (mNeedsResampling && !mL1Cache && !mL2Result)
@@ -860,15 +1116,106 @@ bool QCPMultiGraph::canProduceContent() const
 
 std::optional<double> QCPMultiGraph::hitTest(QCP::Pixels at, QVariant* details) const
 {
-    if (!mKeyAxis || !mValueAxis || !mDataSource || mDataSource->empty())
+    if (!mDataSource || mDataSource->empty())
+        return std::nullopt;
+    if (!drawsInDataSpace() && (!mKeyAxis || !mValueAxis))
         return std::nullopt;
     return nearestDataPoint(QPointF(at.x, at.y), details);
+}
+
+// B3: on the data-space branch a click is a 2D nearest search over the mapped rows, with no key
+// window: the click's x is not the key under a shear.
+std::optional<double> QCPMultiGraph::nearestMappedPoint(const QPointF& pos, QVariant* details) const
+{
+    const int count = mDataSource ? mDataSource->size() : 0;
+    const int columns = mDataSource ? qMin(mComponents.size(), mDataSource->columnCount()) : 0;
+    if (count <= 0 || columns <= 0 || !mSystem)
+        return std::nullopt;
+
+    std::vector<int> shown;
+    for (int c = 0; c < columns; ++c)
+        if (mComponents[c].visible)
+            shown.push_back(c);
+    if (shown.empty())
+        return std::nullopt;
+
+    // Every candidate row, once, in one transform batch.
+    const std::size_t total = std::size_t(count) * shown.size();
+    std::vector<double> keys;
+    std::vector<double> values;
+    keys.reserve(total);
+    values.reserve(total);
+    for (int c : shown)
+        for (int i = 0; i < count; ++i)
+        {
+            keys.push_back(mDataSource->keyAt(i));
+            values.push_back(mDataSource->valueAt(c, i));
+        }
+    std::vector<QPointF> pixels(total);
+    mSystem->transform().map(std::span<const double>(keys), std::span<const double>(values),
+                             std::span<QPointF>(pixels));
+
+    double minDistSqr = (std::numeric_limits<double>::max)();
+    int minIndex = -1;
+    int minComponent = -1;
+    double minKey = 0.0;
+    double minValue = 0.0;
+    for (std::size_t k = 0; k < shown.size(); ++k)
+    {
+        const int c = shown[k];
+        const std::size_t offset = k * std::size_t(count);
+        const bool segments = mComponents[c].lineStyle != lsNone;
+        for (int i = 0; i < count; ++i)
+        {
+            const QPointF& pixel = pixels[offset + std::size_t(i)];
+            if (!std::isfinite(pixel.x()) || !std::isfinite(pixel.y()))
+                continue;
+            const double distance = QCPVector2D(pixel - pos).lengthSquared();
+            if (distance < minDistSqr)
+            {
+                minDistSqr = distance;
+                minIndex = i;
+                minComponent = c;
+                minKey = mDataSource->keyAt(i);
+                minValue = mDataSource->valueAt(c, i);
+            }
+            if (!segments || i + 1 >= count)
+                continue;
+            const QPointF& next = pixels[offset + std::size_t(i + 1)];
+            if (!std::isfinite(next.x()) || !std::isfinite(next.y()))
+                continue;
+            const double lineDistance = QCPVector2D(pos).distanceSquaredToLine(pixel, next);
+            if (lineDistance < minDistSqr)
+            {
+                minDistSqr = lineDistance;
+                minIndex = i;
+                minComponent = c;
+                minKey = mDataSource->keyAt(i);
+                minValue = mDataSource->valueAt(c, i);
+            }
+        }
+    }
+
+    if (minIndex < 0)
+        return std::nullopt;
+    if (details)
+    {
+        QVariantMap map;
+        map["componentIndex"] = minComponent;
+        map["dataIndex"] = minIndex;
+        map["key"] = minKey;
+        map["value"] = minValue;
+        details->setValue(map);
+    }
+    return qSqrt(minDistSqr);
 }
 
 // The nearest data point of any visible component, in pixels: the point itself, or the segment
 // that runs past it. Sets \a details to its component, row, key and value on a hit.
 std::optional<double> QCPMultiGraph::nearestDataPoint(const QPointF& pos, QVariant* details) const
 {
+    if (drawsInDataSpace())
+        return nearestMappedPoint(pos, details);
     // Keys are sorted — binary search for the nearest key, then check
     // each component at that index.  O(log N + C) instead of O(C × M).
     const QCPAbstractMultiDataSource* ds = mDataSource.get();
@@ -1073,6 +1420,11 @@ FillSeries fillSeries(std::span<const qcp::fill::StripPoint> rows)
 void QCPMultiGraph::draw(QCPDrawContext& context) const
 {
     PROFILE_HERE_N("QCPMultiGraph::draw");
+    if (drawsInDataSpace())
+    {
+        drawInDataSpace(context);
+        return;
+    }
     if (!mKeyAxis || !mValueAxis || !mDataSource || mDataSource->empty())
         return;
     if (mKeyAxis->range().size() <= 0)
@@ -1258,6 +1610,109 @@ void QCPMultiGraph::draw(QCPDrawContext& context) const
     }
 }
 
+// B2/P-4: the data-space branch on a system that is not cartesian. It records positions only;
+// the replay maps them through the frame's transform. There is no thinning (pixelsPerKey = 0), no
+// L1/L2 and no fill, error bar or colour command (the 2a refusals keep them unset).
+void QCPMultiGraph::drawInDataSpace(QCPDrawContext& context) const
+{
+    PROFILE_HERE_N("QCPMultiGraph::drawInDataSpace");
+    if (!mDataSource || mDataSource->empty() || !mSystem)
+        return;
+
+    QCPAbstractMultiDataSource& ds = *mDataSource;
+    const QCPKeyWindow window = context.keyWindow();
+    const bool unbounded = !(window.keys.size() > 0.0);
+    const int begin = unbounded ? 0 : ds.findBegin(window.keys.lower);
+    const int end = unbounded ? ds.size() : ds.findEnd(window.keys.upper);
+    if (begin >= end)
+        return;
+
+    ds.setGapThreshold(mGapThreshold);
+    const double baseline = dataSpaceBaseline();
+    const bool logValueAxis = [this]
+    {
+        const QCPAxis* axis = qobject_cast<const QCPAxis*>(valueAxisBase());
+        return axis && axis->scaleType() == QCPAxis::stLogarithmic;
+    }();
+    const bool impulses = std::any_of(mComponents.begin(), mComponents.end(), [](const Component& c)
+                                      { return c.visible && c.lineStyle == lsImpulse; });
+    if (logValueAxis && impulses)
+        (void)context.transform(); // the baseline follows the value axis' range bound
+
+    const int columns = std::min(componentCount(), ds.columnCount());
+    for (int c = 0; c < columns; ++c)
+    {
+        const Component& comp = component(c);
+        if (!comp.visible)
+            continue;
+        if (comp.lineStyle == lsNone && comp.scatterStyle.isNone())
+            continue;
+
+        // simplify: no decimation on this branch; every row is recorded and mapped per frame.
+        // Upgrade: the J-6 box query and data-space decimation by keyWindow().
+        std::vector<QPointF> line = ds.linesInData(c, begin, end, /*pixelsPerKey=*/0.0);
+        if (line.empty())
+            continue;
+        const QPen pen = comp.selection.isEmpty() ? comp.pen : comp.selectedPen;
+        const bool hasMarkers = !comp.scatterStyle.isNone();
+        const bool borrowsTheLine = comp.lineStyle == lsLine && !hasMarkers;
+        QVector<QPointF> points;
+        if (!borrowsTheLine)
+            points = QVector<QPointF>(line.begin(), line.end());
+
+        if (comp.lineStyle != lsNone)
+        {
+            QPen linePen = pen;
+            if (borrowsTheLine)
+            {
+                if (line.size() >= 2)
+                    context.polyline(std::make_shared<const std::vector<QPointF>>(std::move(line)),
+                                     linePen);
+            }
+            else
+            {
+                QVector<QPointF> vertices;
+                switch (comp.lineStyle)
+                {
+                    case lsStepLeft:
+                        vertices = qcp::toStepLeftLines(points, /*keyIsVertical=*/false);
+                        break;
+                    case lsStepRight:
+                        vertices = qcp::toStepRightLines(points, /*keyIsVertical=*/false);
+                        break;
+                    case lsStepCenter:
+                        vertices = stepCentreLines(points, /*logKeyAxis=*/false);
+                        break;
+                    case lsImpulse:
+                        vertices = separatedPairs(
+                            qcp::toImpulseLines(points, /*keyIsVertical=*/false, baseline));
+                        linePen.setCapStyle(Qt::FlatCap);
+                        break;
+                    default:
+                        vertices = points;
+                        break;
+                }
+                if (vertices.size() >= 2)
+                    context.polyline(sharedPoints(vertices), linePen);
+            }
+        }
+
+        if (!hasMarkers)
+            continue;
+        const QCPScatterStyle style = markerStyle(comp.scatterStyle, comp.pen);
+        auto markerPoints = std::make_shared<std::vector<QPointF>>();
+        const int skip = mScatterSkip + 1;
+        for (int i = 0; i < points.size(); i += skip)
+        {
+            if (!qIsFinite(points[i].x()) || !qIsFinite(points[i].y()))
+                continue;
+            markerPoints->push_back(points[i]);
+        }
+        if (!markerPoints->empty())
+            context.markers(markerPoints, nullptr, style);
+    }
+}
+
 bool QCPMultiGraph::fillDrawable(const Fill& fill, int columnCount) const
 {
     const auto shown = [&](int column) {
@@ -1349,6 +1804,8 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::binnedWhenDense(
 void QCPMultiGraph::recordFills(QCPDrawContext& context, const QCPAbstractMultiDataSource& ds,
                                 int begin, int end) const
 {
+    if (drawsInDataSpace())
+        return; // refused in task 2a; 2b builds its data-space baselines here
     for (const Fill& fill : mFills)
     {
         if (!fillDrawable(fill, ds.columnCount()))
@@ -1439,6 +1896,8 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::errorBandRows(
 void QCPMultiGraph::recordErrorBars(QCPDrawContext& context, const QCPAbstractMultiDataSource& ds,
                                     bool rawRows, int begin, int end) const
 {
+    if (drawsInDataSpace())
+        return; // refused in task 2a; 2b maps the caps through the transform here
     for (const ErrorBars& spec : mErrorBars)
     {
         if (!errorBarsDrawable(spec, ds.columnCount()))

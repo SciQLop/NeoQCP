@@ -15,6 +15,7 @@
 #include <QPen>
 #include <QtTest/QtTest>
 #include <algorithm>
+#include <cmath>
 #include <memory>
 #include <vector>
 
@@ -224,6 +225,28 @@ InspectableGraph* graphOn(SkewRect* rect, QCPGraph::LineStyle style = QCPGraph::
     return graph;
 }
 
+//! The multigraph with the two facts a task-2 test reads: its recording and its pipeline state.
+class InspectableMultiGraph : public QCPMultiGraph
+{
+public:
+    using QCPMultiGraph::QCPMultiGraph;
+
+    [[nodiscard]] int recordings() const { return mCore.recordingCount(); }
+    [[nodiscard]] const QCPDrawList& recording() const { return mCore.recordedList(); }
+    [[nodiscard]] bool hasBins() const { return mL1Cache != nullptr || mL2Result != nullptr; }
+    [[nodiscard]] bool hasL1() const { return mL1Cache != nullptr; }
+    [[nodiscard]] bool needsResampling() const { return mNeedsResampling; }
+};
+
+InspectableMultiGraph* multiGraphOn(SkewRect* rect)
+{
+    auto* graph = new InspectableMultiGraph(rect->axis(QCPAxis::atBottom),
+                                            rect->axis(QCPAxis::atLeft));
+    graph->setLineStyle(QCPMultiGraph::lsLine);
+    graph->setPen(QPen(Qt::black, 3));
+    return graph;
+}
+
 bool near(const QPointF& a, const QPointF& b, double tolerance = 0.5)
 {
     return QCPVector2D(a - b).length() <= tolerance;
@@ -392,6 +415,13 @@ void TestUserSystem::theCapabilityMasks()
     std::unique_ptr<QCPBars> bars(new QCPBars(key, value));
     QVERIFY2(bars->requiredCapabilities() == (QCP::capRectangular | QCP::capStraightKey),
              "bars still need the rectangle and a straight key axis");
+    std::unique_ptr<QCPMultiGraph> multi(new QCPMultiGraph(key, value));
+    QVERIFY2(multi->requiredCapabilities() == QCP::capStraightSegments,
+             "the multigraph needs only a straight segment between two data points");
+    std::unique_ptr<QCPWaterfallGraph> waterfall(new QCPWaterfallGraph(key, value));
+    QVERIFY2(waterfall->requiredCapabilities()
+                 == (QCP::capRectangular | QCP::capStraightKey),
+             "the waterfall's pixel offsets still need the rectangle and a straight key axis");
 
     QCustomPlot polarPlot;
     QCPPolarArea* area = polarArea(polarPlot);
@@ -1759,4 +1789,353 @@ void TestUserSystem::aPolarGraphIsRectSelected()
             graph->selectTestRect(QRectF(pixel - QPointF(6, 6), QSizeF(12, 12)), true);
     QCOMPARE(selection.dataRangeCount(), 1);
     QCOMPARE(selection.dataRange(0), QCPDataRange(1, 2));
+}
+
+void TestUserSystem::aMultiGraphJoinsASkewRect()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    InspectableMultiGraph* graph = multiGraphOn(rect);
+
+    // P-3: a line needs a straight segment, and nothing of the 2.x rectangle.
+    QCOMPARE(graph->requiredCapabilities(), QCP::capStraightSegments);
+    QCOMPARE(graph->system(), static_cast<QCPCoordinateSystem*>(rect->skew()));
+    QVERIFY2(!graph->keyAxis(), "a projection was handed to a multigraph on a user system");
+    QVERIFY2(!graph->valueAxis(), "a projection was handed to a multigraph on a user system");
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+
+    // The add<T>() route joins it too: what the capability mask is for.
+    auto added = plot.add<QCPMultiGraph>(
+            QVector<double> { 1, 2 },
+            std::vector<QVector<double>> { QVector<double> { 1, 2 } });
+    QVERIFY(added);
+    QCOMPARE(added->requiredCapabilities(), QCP::capStraightSegments);
+    QCOMPARE(added->system(), static_cast<QCPCoordinateSystem*>(rect->skew()));
+    settle(plot);
+}
+
+void TestUserSystem::aWaterfallIsRefusedOnASkewRect()
+{
+    // A guard (P-3): the offsets are pixel stacking, so a waterfall keeps the rectangle mask.
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    auto* waterfall = new QCPWaterfallGraph(rect->axis(QCPAxis::atBottom),
+                                             rect->axis(QCPAxis::atLeft));
+    QCOMPARE(waterfall->requiredCapabilities(),
+             QCP::capRectangular | QCP::capStraightKey);
+    QVERIFY2(!waterfall->system(), "a waterfall joined a skew rect");
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    test_misuse::calls.clear();
+}
+
+void TestUserSystem::aMultiGraphLineFollowsTheSkewMapping()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    SkewSystem* system = rect->skew();
+    InspectableMultiGraph* graph = multiGraphOn(rect);
+    graph->setData(QVector<double> { 2, 4, 6 },
+                   std::vector<QVector<double>> { QVector<double> { 2, 6, 3 },
+                                                  QVector<double> { 7, 1, 5 } });
+    settle(plot);
+
+    const QCPDrawList& recording = graph->recording();
+    QVERIFY2(!recording.commands.empty(), "the multigraph recorded nothing on the skew rect");
+    for (const QPointF& point : { QPointF(2, 2), QPointF(4, 6), QPointF(6, 3),
+                                  QPointF(2, 7), QPointF(4, 1), QPointF(6, 5) })
+        QVERIFY2(recordingHolds(recording, point),
+                 "a vertex is not recorded in data space, column by column");
+
+    const QImage image = render(plot);
+    for (const QPointF& point : { QPointF(2, 2), QPointF(4, 6), QPointF(6, 3),
+                                  QPointF(2, 7), QPointF(4, 1), QPointF(6, 5) })
+        QVERIFY2(lightnessAt(image, pixelOf(system->pixelOf(point.x(), point.y()))) < 200,
+                 "a column's vertex is not drawn on the skew mapping");
+}
+
+void TestUserSystem::aMultiGraphScatterLandsOnTheMapping()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    SkewSystem* system = rect->skew();
+    InspectableMultiGraph* graph = multiGraphOn(rect);
+    graph->setLineStyle(QCPMultiGraph::lsNone);
+    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
+    graph->setData(QVector<double> { 2, 5 }, std::vector<QVector<double>> { QVector<double> { 3, 4 } });
+    settle(plot);
+
+    QVERIFY2(!graph->recording().commands.empty(), "the scatter-only multigraph recorded nothing");
+    const QImage image = render(plot);
+    QVERIFY2(lightnessAt(image, pixelOf(system->pixelOf(2, 3))) < 160,
+             "a scatter misses its skew mapping");
+    QVERIFY2(lightnessAt(image, pixelOf(system->pixelOf(5, 4))) < 160,
+             "a scatter misses its skew mapping");
+}
+
+void TestUserSystem::aMultiGraphStepAndImpulseAreBuiltInDataSpace()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    InspectableMultiGraph* graph = multiGraphOn(rect);
+    graph->setData(QVector<double> { 2, 4 },
+                   std::vector<QVector<double>> { QVector<double> { 2, 6 },
+                                                  QVector<double> { 3, 7 } });
+    graph->setComponentLineStyle(0, QCPMultiGraph::lsStepLeft);
+    graph->setComponentLineStyle(1, QCPMultiGraph::lsImpulse);
+    settle(plot);
+
+    const QCPDrawList& recording = graph->recording();
+    // The step turns at (next key, previous value); the impulse runs from value zero to its point.
+    for (const QPointF& point : { QPointF(4, 2), QPointF(2, 0), QPointF(2, 3), QPointF(4, 0),
+                                  QPointF(4, 7) })
+        QVERIFY2(recordingHolds(recording, point),
+                 "a step or impulse vertex is not recorded in data space");
+}
+
+void TestUserSystem::aLargeMultiGraphOnASkewRectDrawsEveryPoint()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    SkewSystem* system = rect->skew();
+    InspectableMultiGraph* graph = multiGraphOn(rect);
+    const int count = 100000;
+    QVector<double> keys(count), values(count);
+    for (int i = 0; i < count; ++i)
+    {
+        const double t = double(i) / double(count - 1);
+        keys[i] = 5.0 * t;
+        values[i] = 2.0 + 2.0 * std::sin(6.283185307179586 * t);
+    }
+    values.last() = 2.0;
+    graph->setData(keys, std::vector<QVector<double>> { values });
+
+    // B2: the non-cartesian branch draws the displayed source, it never waits for a resample.
+    QVERIFY(graph->canProduceContent());
+    QVERIFY(!graph->needsResampling());
+    QVERIFY(!graph->hasBins());
+    settle(plot);
+
+    QVERIFY2(!graph->recording().commands.empty(), "the 100k multigraph drew a blank frame");
+    const QPointF last = pixelOf(system->pixelOf(keys.last(), values.last()));
+    QVERIFY2(rect->rect().contains(last.toPoint()), "the last point left the rect");
+    QVERIFY2(lightnessAt(render(plot), last) < 200, "the last point of a 100k graph is not inked");
+}
+
+void TestUserSystem::switchingToASkewRectDropsTheBins()
+{
+    QCustomPlot plot;
+    TwoRects rects = twoRects(plot);
+    auto* graph = new InspectableMultiGraph(rects.cartesian->axis(QCPAxis::atBottom),
+                                            rects.cartesian->axis(QCPAxis::atLeft));
+    const int count = 100000;
+    QVector<double> keys(count), values(count);
+    for (int i = 0; i < count; ++i)
+    {
+        keys[i] = 10.0 * double(i) / double(count - 1);
+        values[i] = 2.0 + 2.0 * std::sin(6.283185307179586 * double(i) / double(count - 1));
+    }
+    graph->setData(keys, std::vector<QVector<double>> { values });
+    settle(plot);
+    QTRY_VERIFY_WITH_TIMEOUT(graph->hasL1(), 30000);
+    QVERIFY2(graph->needsResampling(), "a 100k cartesian graph does not resample any more");
+
+    graph->setSystem(rects.skew->skew());
+    QVERIFY2(!graph->hasBins(), "the L1/L2 bins survived a move to a user system");
+    QVERIFY2(!graph->needsResampling(), "a user system still asks the pipeline to resample");
+    settle(plot);
+    QVERIFY2(!graph->recording().commands.empty(), "the moved graph drew nothing");
+
+    graph->setSystem(rects.cartesian->system(rects.cartesian->axis(QCPAxis::atBottom),
+                                             rects.cartesian->axis(QCPAxis::atLeft)));
+    QVERIFY2(graph->needsResampling(), "a move back to cartesian kept the pipeline bypassed");
+    QTRY_VERIFY_WITH_TIMEOUT(graph->hasL1(), 30000);
+}
+
+void TestUserSystem::aMultiGraphIsHitAndRectSelectedThroughTheMapping()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    SkewSystem* system = rect->skew();
+    InspectableMultiGraph* graph = multiGraphOn(rect);
+    graph->setData(QVector<double> { 2, 5, 8 },
+                   std::vector<QVector<double>> { QVector<double> { 2, 5, 8 },
+                                                  QVector<double> { 8, 5, 2 } });
+    settle(plot);
+
+    const QPointF mapped = pixelOf(system->pixelOf(5, 5));
+    QVariant details;
+    const double hit = graph->selectTest(mapped, false, &details);
+    QVERIFY2(hit >= 0.0, "the click on the sheared line is outside the system");
+    QVERIFY2(hit < plot.selectionTolerance(), "the click on the sheared line misses");
+    QVERIFY(details.canConvert<QVariantMap>());
+
+    const QPointF below = mapped + QPointF(0, 60);
+    QVERIFY2(rect->rect().contains(below.toPoint()), "the miss probe left the rect");
+    QVERIFY2(graph->selectTest(below, false) > plot.selectionTolerance(),
+             "a pixel off the sheared line is a hit");
+
+    const QRectF band(mapped - QPointF(5, 5), QSizeF(10, 10));
+    const QCPDataSelection selection = graph->selectTestRect(band, false);
+    QCOMPARE(selection.dataRangeCount(), 1);
+    QCOMPARE(selection.dataRange(0), QCPDataRange(1, 2));
+}
+
+void TestUserSystem::aMultiGraphDataPixelPositionIsTheMapping()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    SkewSystem* system = rect->skew();
+    InspectableMultiGraph* graph = multiGraphOn(rect);
+    graph->setData(QVector<double> { 2, 5, 8 },
+                   std::vector<QVector<double>> { QVector<double> { 3, 6, 4 },
+                                                  QVector<double> { 7, 1, 9 } });
+    settle(plot);
+
+    const QVector<double> keys { 2, 5, 8 };
+    const QVector<double> first { 3, 6, 4 };
+    for (int i = 0; i < keys.size(); ++i)
+        QVERIFY2(near(graph->dataPixelPosition(i),
+                      pixelOf(system->pixelOf(keys.at(i), first.at(i))), 0.5),
+                 "dataPixelPosition is not the system's mapping of the first component");
+}
+
+void TestUserSystem::aShearChangeRedrawsAMultiGraph()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    SkewSystem* system = rect->skew();
+    InspectableMultiGraph* graph = multiGraphOn(rect);
+    graph->setData(QVector<double> { 2, 5 }, std::vector<QVector<double>> { QVector<double> { 2, 5 } });
+    settle(plot);
+
+    const QPointF before = pixelOf(system->pixelOf(5, 5));
+    QVERIFY2(lightnessAt(render(plot), before) < 200, "the multigraph starts off its mapping");
+
+    system->setShear(0.5);
+    QVERIFY2(plot.isRepaintQueued(), "a shear change left every layer clean");
+    flushRepaints(plot);
+
+    const QPointF after = pixelOf(system->pixelOf(5, 5));
+    QVERIFY2(QCPVector2D(after - before).length() > 5.0, "the multigraph did not move");
+    const QImage image = render(plot);
+    QVERIFY2(lightnessAt(image, after) < 200, "the multigraph is not replayed through the new shear");
+    QCOMPARE(lightnessAt(image, before), 255);
+}
+
+void TestUserSystem::anAxisDeletedMidDragLeavesAMultiGraphInert()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    SkewSystem* system = rect->skew();
+    QCPAxis* keyAxis = rect->axis(QCPAxis::atBottom);
+    InspectableMultiGraph* graph = multiGraphOn(rect);
+    graph->setData(QVector<double> { 2, 5 }, std::vector<QVector<double>> { QVector<double> { 2, 5 } });
+    settle(plot);
+    test_misuse::calls.clear(); // the assertion is about the removal's report
+
+    QObject::connect(system, &QCPCoordinateSystem::changed, system,
+                     [rect, keyAxis] { rect->removeAxis(keyAxis); });
+    system->setShear(0.5);
+
+    QVERIFY2(!rect->axes().contains(keyAxis), "the slot did not delete the axis");
+    QVERIFY2(!graph->system(), "the multigraph kept a system whose axis was deleted");
+    settle(plot);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    test_misuse::calls.clear();
+}
+
+void TestUserSystem::aMultiGraphFillOnASkewRectIsRefused()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    InspectableMultiGraph* graph = multiGraphOn(rect);
+    graph->setData(QVector<double> { 2, 5 },
+                   std::vector<QVector<double>> { QVector<double> { 2, 5 },
+                                                  QVector<double> { 5, 2 } });
+    test_misuse::calls.clear();
+
+    // Task 2b makes fills work on such a frame; until then they are refused, never drawn wrong.
+    QVERIFY2(!graph->setComponentFill(0, 0.0), "a fill joined a non-cartesian multigraph");
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    QVERIFY(!graph->componentFill(0));
+    QVERIFY2(!graph->setComponentFillBetween(0, 1), "a fill joined a non-cartesian multigraph");
+    QCOMPARE(test_misuse::calls.size(), std::size_t(2));
+    graph->setBrush(QColor(255, 0, 0, 80));
+    QCOMPARE(test_misuse::calls.size(), std::size_t(3));
+    test_misuse::calls.clear();
+}
+
+void TestUserSystem::aMultiGraphErrorBarsOnASkewRectAreRefused()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    InspectableMultiGraph* graph = multiGraphOn(rect);
+    graph->setData(QVector<double> { 2, 5 },
+                   std::vector<QVector<double>> { QVector<double> { 2, 5 },
+                                                  QVector<double> { 1, 4 },
+                                                  QVector<double> { 3, 6 } });
+    test_misuse::calls.clear();
+
+    QVERIFY2(!graph->setComponentErrorBars(0, 1, 2), "error bars joined a non-cartesian multigraph");
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    QVERIFY(!graph->componentErrorBars(0));
+    test_misuse::calls.clear();
+}
+
+void TestUserSystem::aMultiGraphColourValuesOnASkewRectAreRefused()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    InspectableMultiGraph* graph = multiGraphOn(rect);
+    graph->setData(QVector<double> { 2, 5 }, std::vector<QVector<double>> { QVector<double> { 2, 5 } });
+    test_misuse::calls.clear();
+
+    graph->setColorValues(std::vector<double> { 0.0, 1.0 });
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    QVERIFY2(!graph->hasColorValues(), "colour values joined a non-cartesian multigraph");
+    test_misuse::calls.clear();
+}
+
+void TestUserSystem::aDecoratedMultiGraphRefusesASkewRect()
+{
+    // Each 2b feature still refuses the frame when the graph is already decorated: the refusal
+    // sits at setSystem as well as at the setters.
+    QCustomPlot plot;
+    TwoRects rects = twoRects(plot);
+    QCPAxis* key = rects.cartesian->axis(QCPAxis::atBottom);
+    QCPAxis* value = rects.cartesian->axis(QCPAxis::atLeft);
+    QCPCoordinateSystem* cartesian = rects.cartesian->system(key, value);
+
+    auto* plain = new InspectableMultiGraph(key, value);
+    plain->setData(QVector<double> { 2, 5 }, std::vector<QVector<double>> { QVector<double> { 2, 5 } });
+    plain->setSystem(rects.skew->skew());
+    QCOMPARE(plain->system(), static_cast<QCPCoordinateSystem*>(rects.skew->skew()));
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+
+    auto* filled = new InspectableMultiGraph(key, value);
+    filled->setData(QVector<double> { 2, 5 },
+                    std::vector<QVector<double>> { QVector<double> { 2, 5 },
+                                                   QVector<double> { 5, 2 } });
+    QVERIFY(filled->setComponentFill(0, 0.0));
+    filled->setSystem(rects.skew->skew());
+    QCOMPARE(filled->system(), cartesian);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+
+    auto* barred = new InspectableMultiGraph(key, value);
+    barred->setData(QVector<double> { 2, 5 },
+                    std::vector<QVector<double>> { QVector<double> { 2, 5 },
+                                                   QVector<double> { 1, 4 },
+                                                   QVector<double> { 3, 6 } });
+    QVERIFY(barred->setComponentErrorBars(0, 1, 2));
+    barred->setSystem(rects.skew->skew());
+    QCOMPARE(barred->system(), cartesian);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(2));
+
+    auto* coloured = new InspectableMultiGraph(key, value);
+    coloured->setData(QVector<double> { 2, 5 }, std::vector<QVector<double>> { QVector<double> { 2, 5 } });
+    coloured->setColorValues(std::vector<double> { 0.0, 1.0 });
+    coloured->setSystem(rects.skew->skew());
+    QCOMPARE(coloured->system(), cartesian);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(3));
+    test_misuse::calls.clear();
 }

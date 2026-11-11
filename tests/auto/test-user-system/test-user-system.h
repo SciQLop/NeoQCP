@@ -70,4 +70,20 @@ private slots:
     void theLegendIconOfASkewGraphDraws();
     void aSkewItemIsAlwaysAnIndexCandidate();
     void aPolarGraphIsRectSelected();
+
+    void aMultiGraphJoinsASkewRect();
+    void aWaterfallIsRefusedOnASkewRect();
+    void aMultiGraphLineFollowsTheSkewMapping();
+    void aMultiGraphScatterLandsOnTheMapping();
+    void aMultiGraphStepAndImpulseAreBuiltInDataSpace();
+    void aLargeMultiGraphOnASkewRectDrawsEveryPoint();
+    void switchingToASkewRectDropsTheBins();
+    void aMultiGraphIsHitAndRectSelectedThroughTheMapping();
+    void aMultiGraphDataPixelPositionIsTheMapping();
+    void aShearChangeRedrawsAMultiGraph();
+    void anAxisDeletedMidDragLeavesAMultiGraphInert();
+    void aMultiGraphFillOnASkewRectIsRefused();
+    void aMultiGraphErrorBarsOnASkewRectAreRefused();
+    void aMultiGraphColourValuesOnASkewRectAreRefused();
+    void aDecoratedMultiGraphRefusesASkewRect();
 };
