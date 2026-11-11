@@ -33,6 +33,9 @@
 #include "plottable-draw-utils.h"
 #include "plottable.h"
 
+#include <span>
+#include <vector>
+
 class QCPPlottableInterface1D
 {
 public:
@@ -397,8 +400,39 @@ QCPDataSelection QCPAbstractPlottable1D<DataType, Base>::selectTestRect(const QR
     QCPDataSelection result;
     if ((onlySelectable && this->mSelectable == QCP::stNone) || mDataContainer->isEmpty())
         return result;
-    if (!this->mKeyAxis || !this->mValueAxis)
+    if (!this->mSystem)
         return result;
+    if (!this->mKeyAxis || !this->mValueAxis)
+    {
+        // A system of the user's own hands no key window, and its mapping may fold the key axis:
+        // map the whole container once and keep the points whose pixel falls in the rect.
+        // simplify: every call maps every point; J-6's box query is the upgrade that narrows the
+        // candidates in data space.
+        const auto begin = mDataContainer->constBegin();
+        const int count = int(mDataContainer->constEnd() - begin);
+        const std::size_t size = static_cast<std::size_t>(count);
+        std::vector<QPointF> data(size);
+        std::vector<QPointF> pixels(size);
+        for (std::size_t i = 0; i < size; ++i)
+            data[i] = QPointF(begin[int(i)].mainKey(), begin[int(i)].mainValue());
+        this->mSystem->transform().map(std::span<const QPointF>(data), std::span<QPointF>(pixels));
+        int segmentBegin = -1;
+        for (int i = 0; i < count; ++i)
+        {
+            const bool inside = rect.contains(pixels[std::size_t(i)]);
+            if (segmentBegin == -1 && inside)
+                segmentBegin = i;
+            else if (segmentBegin != -1 && !inside)
+            {
+                result.addDataRange(QCPDataRange(segmentBegin, i), false);
+                segmentBegin = -1;
+            }
+        }
+        if (segmentBegin != -1)
+            result.addDataRange(QCPDataRange(segmentBegin, count), false);
+        result.simplify();
+        return result;
+    }
 
     // convert rect given in pixels to ranges given in plot coordinates:
     double key1, value1, key2, value2;

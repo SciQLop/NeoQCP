@@ -454,7 +454,12 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
 */
 namespace
 {
-//! The cartesian system \a keyAxis and \a valueAxis define, or null when they cannot define one.
+//! Whether \a system hands its plottables the 2.x axis pair: only today's cartesian frame does. A
+//! plottable with no system at all keeps the axes it was built from; it is never drawn.
+bool projectsOntoAxes(const QCPCoordinateSystem* system)
+{
+    return !system || system->kind() == QCPTransform::Kind::Cartesian;
+}
 } // namespace
 
 QCPAbstractPlottable::QCPAbstractPlottable(QCPCoordinateSystem* system)
@@ -466,8 +471,11 @@ QCPAbstractPlottable::QCPAbstractPlottable(QCPCoordinateSystem* system)
         , mPen(Qt::black)
         , mBrush(Qt::NoBrush)
         , mSystem(system)
-        , mKeyAxis(system ? qobject_cast<QCPAxis*>(system->keyAxis()) : nullptr)
-        , mValueAxis(system ? qobject_cast<QCPAxis*>(system->valueAxis()) : nullptr)
+        , mKeyAxis(system && projectsOntoAxes(system) ? qobject_cast<QCPAxis*>(system->keyAxis())
+                                                      : nullptr)
+        , mValueAxis(system && projectsOntoAxes(system)
+                         ? qobject_cast<QCPAxis*>(system->valueAxis())
+                         : nullptr)
         , mSelectable(QCP::stWhole)
         , mSelectionDecorator(nullptr)
 {
@@ -486,9 +494,13 @@ QCPAbstractPlottable::QCPAbstractPlottable(QCPCoordinateSystem* system)
 QCPAbstractPlottable::QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis)
         : QCPAbstractPlottable(qcpSystemOfAxes(keyAxis, valueAxis))
 {
-    // The 2.x pair is the cartesian projection of the system it resolves to.
-    mKeyAxis = keyAxis;
-    mValueAxis = valueAxis;
+    // The 2.x pair is the cartesian projection of the system it resolves to: a system of the user's
+    // own draws through its transform, and hands 2.x pixel code no axis at all.
+    if (projectsOntoAxes(mSystem))
+    {
+        mKeyAxis = keyAxis;
+        mValueAxis = valueAxis;
+    }
     if (!keyAxis && !valueAxis)
         return;
     QCP_CHECK_OR_RETURN(keyAxis && valueAxis, "a plottable needs a key axis and a value axis");
@@ -789,8 +801,11 @@ void QCPAbstractPlottable::resolveAxes(QCPAxis* key, QCPAxis* value)
     QCPCoordinateSystem* resolved = qcpSystemOfAxes(key, value);
     if (resolved == mSystem)
     {
-        mKeyAxis = key;
-        mValueAxis = value;
+        if (projectsOntoAxes(resolved))
+        {
+            mKeyAxis = key;
+            mValueAxis = value;
+        }
         markDirty();
         systemChanged();
         return;
@@ -826,8 +841,10 @@ void QCPAbstractPlottable::setSystem(QCPCoordinateSystem* system)
     // The area it draws in is the one it hangs on: hiding the area it left must not hide it, and
     // an onlyVisible rescale of the new area must find it.
     setParentLayerable(system ? system->area() : nullptr);
-    mKeyAxis = system ? qobject_cast<QCPAxis*>(system->keyAxis()) : nullptr;
-    mValueAxis = system ? qobject_cast<QCPAxis*>(system->valueAxis()) : nullptr;
+    mKeyAxis = system && projectsOntoAxes(system) ? qobject_cast<QCPAxis*>(system->keyAxis())
+                                                  : nullptr;
+    mValueAxis = system && projectsOntoAxes(system) ? qobject_cast<QCPAxis*>(system->valueAxis())
+                                                    : nullptr;
     // A plottable told to drop its system is inert on purpose: it draws nothing and says nothing.
     // A system that goes away under it is reported once, on the next draw, by dropSystem() below.
     mReportedLostAxis = mSystem == nullptr;

@@ -127,6 +127,14 @@ public:
     // reimplemented virtual methods:
     virtual double selectTest(const QPointF& pos, bool onlySelectable,
                               QVariant* details = nullptr) const override;
+
+    //! A curve joins any system that draws a segment as a straight pixel line: nothing of it needs
+    //! a rectangle or a straight key axis.
+    [[nodiscard]] QCP::Capabilities requiredCapabilities() const override
+    {
+        return QCP::capStraightSegments;
+    }
+
     virtual QCPRange getKeyRange(bool& foundRange,
                                  QCP::SignDomain inSignDomain = QCP::sdBoth) const override;
     virtual QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth,

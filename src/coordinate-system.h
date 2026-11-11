@@ -116,6 +116,8 @@ protected:
 
     // The one place the revision moves: subclasses call it when their parameters changed.
     void bumpRevision();
+    // What a subclass calls when a parameter of its own moved: revision, then the layers.
+    void parametersChanged();
     void connectNotify(const QMetaMethod& signal) override;
     void disconnectNotify(const QMetaMethod& signal) override;
 

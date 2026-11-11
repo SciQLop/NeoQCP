@@ -156,6 +156,16 @@ public:
 
     [[nodiscard]] QCPAxis* valueAxis() const { return mValueAxis.data(); }
 
+    //! The system's own key axis, whatever its kind: the projection above on a cartesian system,
+    //! the axis a rescale reads on any other. Null without a system.
+    [[nodiscard]] QCPAxisBase* keyAxisBase() const { return mSystem ? mSystem->keyAxis() : nullptr; }
+
+    //! The system's own value axis, whatever its kind. Null without a system.
+    [[nodiscard]] QCPAxisBase* valueAxisBase() const
+    {
+        return mSystem ? mSystem->valueAxis() : nullptr;
+    }
+
     [[nodiscard]] QCP::SelectionType selectable() const { return mSelectable; }
 
     [[nodiscard]] bool selected() const { return !mSelection.isEmpty(); }

@@ -213,6 +213,7 @@ private:
     friend class QCPAxis; // a scale type change invalidates the item index
     friend class QCPAxisRect; // a range change asks which layers follow the axis
     friend class QCPPolarArea; // it asks which layers draw items in its disc
+    friend class QCPCoordinateSystem; // a system's own parameters move without an axis
     friend class TestItemIndex;
 
     Q_DISABLE_COPY(QCPLayer)

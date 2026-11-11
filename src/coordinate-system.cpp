@@ -15,6 +15,7 @@
 #include "axis/axis.h"
 #include "core.h"
 #include "datasource/graph-resampler.h"
+#include "layer.h"
 #include "layoutelements/area.h"
 #include "layoutelements/layoutelement-axisrect.h"
 #include "misuse.h"
@@ -129,6 +130,29 @@ void QCPCoordinateSystem::bumpRevision()
 
 /*! \internal
 
+  A subclass calls this when a parameter of its own moved: the revision moves so no frame reuses the
+  old mapping, then every layer that draws what this system maps is dirtied. The signal alone marks
+  nothing, and an area only listens to its axes' ranges: a mapping of the user's own changes with no
+  axis in sight.
+*/
+void QCPCoordinateSystem::parametersChanged()
+{
+  bumpRevision();
+  if (!mArea)
+    return;
+  mArea->markAffectedLayersDirty(true);
+  QCustomPlot* plot = mArea->parentPlot();
+  if (!plot)
+    return;
+  // Items measure their frames in the systems of their positions: each layer knows which areas
+  // those are, so ask it instead of walking every item.
+  for (int i = 0; i < plot->layerCount(); ++i)
+    if (QCPLayer* layer = plot->layer(i); layer && layer->itemsUseArea(mArea))
+      layer->invalidatePaintBuffer();
+}
+
+/*! \internal
+
   Keeps the count \ref listens() answers with: the connections cannot be counted on every range set.
 */
 void QCPCoordinateSystem::connectNotify(const QMetaMethod& signal)
@@ -201,5 +225,6 @@ QCPKeyWindow QCPCartesianSystem::keyWindow() const
 
 QCP::Capabilities QCPCartesianSystem::capabilities() const
 {
-    return QCP::capRectangular | QCP::capStraightKey | QCP::capColourScale | QCP::capLanes;
+    return QCP::capRectangular | QCP::capStraightKey | QCP::capColourScale | QCP::capLanes
+        | QCP::capStraightSegments;
 }

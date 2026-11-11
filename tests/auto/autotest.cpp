@@ -65,6 +65,7 @@
 #include "test-theme/test-theme.h"
 #include "test-tick-label-cache/test-tick-label-cache.h"
 #include "test-transform/test-transform.h"
+#include "test-user-system/test-user-system.h"
 #include "test-waterfall/test-waterfall.h"
 
 static bool shouldRun(const char* name)
@@ -175,6 +176,7 @@ int main(int argc, char** argv)
     QCPTEST(TestSelectionModel);
     QCPTEST(TestPolar);
     QCPTEST(TestAxisBase);
+    QCPTEST(TestUserSystem);
 
     return failures == 0 ? 0 : 1;
 }

@@ -1362,7 +1362,7 @@ void QCPAxis::rescale(bool onlyVisiblePlottables)
         QCP::SignDomain signDomain = QCP::sdBoth;
         if (mScaleType == stLogarithmic)
             signDomain = (mRange.upper < 0 ? QCP::sdNegative : QCP::sdPositive);
-        if (plottable->keyAxis() == this)
+        if (plottable->keyAxisBase() == this)
             plottableRange = plottable->getKeyRange(currentFoundRange, signDomain);
         else
             plottableRange = plottable->getValueRange(currentFoundRange, signDomain);
@@ -1589,7 +1589,8 @@ QList<QCPGraph*> QCPAxis::graphs() const
 
 /*!
   Returns a list of all the items that are associated with this axis. An item is considered
-  associated with an axis if at least one of its positions uses the axis as key or value axis.
+  associated with an axis if at least one of its positions measures itself in the axis' system, or
+  uses the axis as its key or value axis through a projection.
 
   \see plottables, graphs
 */
@@ -1603,7 +1604,10 @@ QList<QCPAbstractItem*> QCPAxis::items() const
     {
         for (QCPItemPosition* position : item->positions())
         {
-            if (position->keyAxis() == this || position->valueAxis() == this)
+            // The system first, in any kind: a position on a user system measures itself in that
+            // system's axis, and the projections stay for the 2.x pairs that have no frame.
+            if ((position->system() && position->system()->usesAxis(this))
+                || position->keyAxis() == this || position->valueAxis() == this)
             {
                 result.append(item);
                 break;

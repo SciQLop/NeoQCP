@@ -418,10 +418,10 @@ double QCPCurve::selectTest(const QPointF& pos, bool onlySelectable, QVariant* d
 {
     if ((onlySelectable && mSelectable == QCP::stNone) || mDataContainer->isEmpty())
         return -1;
-    if (!mKeyAxis || !mValueAxis)
+    if (!mSystem)
         return -1;
 
-    if (mKeyAxis.data()->axisRect()->rect().contains(pos.toPoint())
+    if (mSystem->contains(pos)
         || mParentPlot->interactions().testFlag(QCP::iSelectPlottablesBeyondAxisRect))
     {
         QCPCurveDataContainer::const_iterator closestDataPoint = mDataContainer->constEnd();
@@ -468,7 +468,7 @@ bool QCPCurve::acceptsLineStyle(LineStyle style) const
 /* inherits documentation from base class */
 void QCPCurve::draw(QCPDrawContext& context) const
 {
-    if (!mKeyAxis || !mValueAxis || mDataContainer->isEmpty())
+    if (!mSystem || mDataContainer->isEmpty())
         return;
     const Component& comp = component(0);
     if (!comp.visible)

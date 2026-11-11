@@ -547,7 +547,9 @@ void QCPAxisRect::markLayersUsingAxisDirty(const QCPAxis* axis)
 {
     for (QCPAbstractPlottable* p : mParentPlot->mPlottables)
     {
-        if (p->keyAxis() != axis && p->valueAxis() != axis)
+        // Through the system, in any kind: a plottable on a system of the user's own has no
+        // projection to compare with (J-2), and its axis is the system's.
+        if (!(p->system() && p->system()->usesAxis(axis)))
             continue;
         if (p->layer())
             p->layer()->markDirty();

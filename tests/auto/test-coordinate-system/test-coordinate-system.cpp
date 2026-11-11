@@ -255,7 +255,8 @@ void TestCoordinateSystem::cartesianTransformIsTheAxes()
     QVERIFY(system->transform() == QCPTransform(key, value));
     QCOMPARE(system->clipRect(), rect->rect());
     QCOMPARE(system->capabilities(),
-             QCP::capRectangular | QCP::capStraightKey | QCP::capColourScale | QCP::capLanes);
+             QCP::capRectangular | QCP::capStraightKey | QCP::capColourScale | QCP::capLanes
+                 | QCP::capStraightSegments);
     QVERIFY(rect->ratioTransform().valid());
 }
 

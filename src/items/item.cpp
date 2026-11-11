@@ -404,8 +404,11 @@ void QCPItemPosition::setSystem(QCPCoordinateSystem* system)
     if (mParentItem)
         mParentItem->markDirty();
     mSystem = system;
-    mKeyAxis = system ? qobject_cast<QCPAxis*>(system->keyAxis()) : nullptr;
-    mValueAxis = system ? qobject_cast<QCPAxis*>(system->valueAxis()) : nullptr;
+    // The 2.x projection exists only on a cartesian frame: a system of the user's own maps through
+    // its transform, and 2.x pixel code gets no axis to compute a rectangle with.
+    const bool projections = system && system->kind() == QCPTransform::Kind::Cartesian;
+    mKeyAxis = projections ? qobject_cast<QCPAxis*>(system->keyAxis()) : nullptr;
+    mValueAxis = projections ? qobject_cast<QCPAxis*>(system->valueAxis()) : nullptr;
     // Binding a system always takes its area, even when the system is the same one: the area is a
     // fact of the frame, not a separate choice.
     if (system)

@@ -73,6 +73,7 @@ test_srcs = [
     'test-polar/test-polar.cpp',
     'test-axis-base/test-axis-base.cpp',
     'test-transform/test-transform.cpp',
+    'test-user-system/test-user-system.cpp',
 ]
 
 test_headers = [
@@ -144,6 +145,8 @@ test_headers = [
     'test-polar/test-polar.h',
     'test-axis-base/test-axis-base.h',
     'test-transform/test-transform.h',
+    'test-user-system/test-user-system.h',
+    'test-user-system/skew-system.h',
 ]
 test_moc_files = qtmod.compile_moc(headers : test_headers)
 
