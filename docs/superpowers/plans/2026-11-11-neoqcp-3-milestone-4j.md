@@ -301,3 +301,23 @@ Rulings for each finding follow.
   changes the curve's mask only.
 - **A10 (M1, M3)** The fixture's `SkewSystem::contains` is the rect test. The legend sentence in J-4 is about
   `QCPGraph`. `QCPCurve`'s recorded icon goes through `iconTransform` (default `fitted`, fine).
+- **A11 (Task 1 concern 1) The capability mask is stored and checked at construction.** The 2.x axis-pair
+  constructor joined a user system without any check. A virtual `requiredCapabilities()` cannot be asked
+  inside a constructor, so a bars object built on a skew rect's axes held the system silently. The fix:
+  - `QCPAbstractPlottable`'s protected constructors (system form and axis-pair form) take a trailing
+    `QCP::Capabilities required`. Its default is `capRectangular | capStraightKey`, so out-of-tree 2.x
+    subclasses compile unchanged.
+  - `requiredCapabilities()` becomes a non-virtual accessor of that stored mask.
+  - The intermediate classes (the 1D template, colour-mapped, line, intervals) forward a `required`
+    parameter.
+  - `QCPGraph`, `QCPCurve`, `QCPMultiGraph`, `QCPAbstractIntervals`, `QCPAbstractColorMapped` and
+    `QCPPolarGraph` pass their masks; the overrides are deleted.
+  - A constructor whose system lacks the mask reports the capability misuse and leaves the plottable
+    without a system (inert, as a refused `setSystem` leaves it).
+
+  This lands in Task 2, with the graph's mask (A9). New tests: `barsBuiltOnASkewRectAreRefused` (2.x
+  constructor, one misuse, no system), `addGraphOnASkewRectJoinsIt`.
+- **A12 (Task 1 side effect) Polar rubber-band selection now selects.** `selectTestRect`'s non-cartesian
+  branch also serves `QCPPolarGraph`. Before, it returned nothing on a polar system; now it keeps the points
+  whose mapped pixel falls in the rect. This is accepted. It gets a pin test, `aPolarGraphIsRectSelected`,
+  in Task 3, and a changelog line in Task 4.
