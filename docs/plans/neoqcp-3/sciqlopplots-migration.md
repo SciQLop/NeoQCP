@@ -65,3 +65,25 @@ SciQLopPlots uses.
 - An item position whose axis or axis rect is gone no longer prints the 2.x qDebug lines on `pixelPosition()`;
   `setPixelPosition()` reports one misuse instead. A SciQLopPlots test that counted those messages would change.
 
+## From milestone 4j (coordinate systems of the user's own)
+
+Grepped on 2026-11-11 (read-only) in `src/` and `include/`: `requiredCapabilities` (none), `addElement(`
+(two calls), and `keyAxis()`/`valueAxis()`/`system()` on plottables and item positions.
+
+- **`requiredCapabilities` overrides: none.** No SciQLopPlots plottable overrides the accessor, so the
+  stored, non-virtual mask changes nothing there. A future out-of-tree plottable must pass the mask to its
+  base constructor.
+- **`addElement` across plots: none.** Both calls add a local element to the plot's own layout:
+  `SciQLopPlot.cpp` ~687 adds the plot's colour scale, ~722 adds its title. Neither belongs to another
+  plot, so the stricter refusal changes nothing.
+- **`keyAxis()`/`valueAxis()` on plottables and item positions: no change needed.** They are used only on
+  ordinary cartesian plots, and the null cases are already guarded:
+  - `SciQLopCrosshair.cpp` ~290-291 loops the plot's plottables and checks both axes before converting.
+  - `SpanTargets.cpp` ~131 and `SciQLopStraightLines.cpp` ~56, ~115 return early when the axis is null.
+  - `SciQLopPlotAxis.cpp` ~538-571 walks `m_axis->plottables()`; an axis lists only plottables whose 2.x
+        projection is that axis, so a plottable on a user system is not in the loop.
+  SciQLopPlots builds no custom `QCPCoordinateSystem` and no polar area, so no plottable or item of its
+  own sits on a non-cartesian system today. If it later adds one, these sites are the ones to revisit.
+- **Dispatch of item creation.** `QCPItemPosition::setAxes()` now applies the cartesian projection gate.
+  SciQLopPlots' item positions use `setType(ptAxisRectAbsolute)`/pixel positions and explicit axes on
+  cartesian rects, so their `keyAxis()` stays non-null.

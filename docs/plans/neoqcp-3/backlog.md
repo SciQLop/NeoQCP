@@ -3,15 +3,27 @@
 Work that was deferred during the 3.0 milestones, to triage before 3.0 ships. Each item says what a
 user would see and where the code is. Fixed items are deleted, not ticked.
 
-## From milestone 4i (items on coordinate systems) — for milestone 4j
+## From milestone 4j (coordinate systems of the user's own)
 
-- **A user system's area ratio**: an item ratio position on a user system uses its area's ratio transform;
-  say whether a user area must provide one (and its inverse) or inherits an axis rect's.
-- **`QCPDrawnCore::hitTest`'s box gate is cartesian-only**: a user system loses the cull (correct, slower).
-- **The item index culls cartesian systems only**: a system-side `dataBoxOf(pixelRect)` would let a user
-  system's items be culled.
-- **Tracer on a polar or user system**: `QCPItemTracer::setGraph` takes a `QCPGraph*`.
-- **`area->add<Item>()`** and **areas moving between plots** (no layout API for the move today).
+- **Culling and decimation on a user system** (J-6): every point is mapped on every repaint and every
+  click scans every point. `QCPDrawnCore::hitTest`'s box gate (`drawable.cpp:902`) and the item index
+  (`item.cpp:1860`) stay cartesian-only. Upgrade: a system virtual mapping a pixel rect to a data box,
+  then decimate in data space by `keyWindow()`.
+- **The bracket selection decorator on a user system**: `QCPSelectionDecoratorBracket::drawDecoration`
+  bails without `keyAxis()`, so a selected skew graph shows pen and brush but no brackets
+  (`selectiondecorator-bracket.cpp`). Map through `system()` or report the misuse once.
+- **A tracer on a polar graph**: `QCPItemTracer::setGraph` still takes a `QCPGraph*`; a tracer on a
+  polar graph stays unsupported. A tracer on a user system follows its graph (4j).
+- **`area->add<Item>()`**: items are still built by the plot and bound with `setSystem()`; J-8 keeps
+  the area factory out. Additive later.
+- **A position whose frame goes away is inert without a report**: `QCPItemPosition` has no
+  lost-system report (a plottable has one). A pixel read returns `(0, 0)` and draw-time placement is
+  refused quietly. If a user needs a diagnostic, add one report per position.
+- **A curve's colour scale on a user system**: `QCPCurve` no longer requires `capColourScale`, but
+  `followKeyAxisRectScale()` reads `mKeyAxis`, so it does not follow the rect's scale on a user system.
+  Give it one with `setColorScale()`, or map the scale through the system.
+- **`QCPDrawn_*` A/B rows under Xvfb are bimodal** on this machine (repeated five-pair runs of one
+  pair read +7 % then -26 %, QRhi software stack). Do not decide a 5 % gate on those rows alone.
 
 ## From milestone 4h (the polar graph is a plottable)
 

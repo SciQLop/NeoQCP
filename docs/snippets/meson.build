@@ -16,6 +16,7 @@ doc_snippet_pages = files(
     'migrating.cpp',
     'performance.cpp',
     'polar.cpp',
+    'systems.cpp',
 )
 
 if get_option('with_tests') and not is_wasm

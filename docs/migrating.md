@@ -107,6 +107,16 @@ The behaviours below belong to the new plottables only. Code that keeps using th
 
 {doc}`performance` explains the asynchronous points and what they mean for code that reads results right after `setData()`.
 
+## Coordinate systems
+
+NeoQCP 3.0 draws every plottable and item through a `QCPCoordinateSystem`. The classic cartesian frame is one, a polar area is another, and your own subclass can be a third (see {doc}`coordinate-systems`). Most 2.x code is unchanged, but these points matter if you write a plottable or reach for axes through it:
+
+- **`QCP::capStraightSegments`.** A graph or curve now needs only this capability, not a rectangle and a straight key. A custom system that keeps straight lines straight can host them. Every other plottable keeps the 2.x default (`capRectangular | capStraightKey`).
+- **`keyAxis()` and `valueAxis()` can be null.** On a non-cartesian system, including a user system and a polar area, a plottable's and an item position's `keyAxis()`/`valueAxis()` return `nullptr`; 2.x pixel code must not assume an axis. Use `system()`, `keyAxisBase()` and `valueAxisBase()` to reach the axes on any system.
+- **`requiredCapabilities()` is a stored mask.** It is no longer virtual: the last argument of the `QCPAbstractPlottable` constructors is the `QCP::Capabilities` mask, and every intermediate constructor forwards it. An out-of-tree plottable that overrode `requiredCapabilities()` must pass the mask to its base constructor instead; an old override hides the accessor and is ignored.
+- **A refused plottable is inert.** A plottable whose system lacks a capability it needs is built but joins no layer and no list, with one misuse report. `QCustomPlot::add<T>()` returns an empty handle for it, and `add(std::unique_ptr)` refuses it before touching the object. A later `setSystem()` with a system that admits it makes it a normal member of the plot.
+- **Layout elements stay in their plot.** Adding an axis rect or other layout element that belongs to another plot to this plot's layout is a misuse; the element stays in its old layout and plot, also when it is nested inside a plot-less layout first. Build a new element in the other plot instead.
+
 ## New classes
 
 These do not exist upstream. You do not need them to migrate, but they are where most of the speed and new features are.

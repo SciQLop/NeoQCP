@@ -482,6 +482,52 @@ Behaviour changes for 2.x users:
   - A bar moved to other axes (setKeyAxis, setValueAxis) leaves its stack and its bars group.
   - axesChanged() (NeoQCP 3.0 preview) is now systemChanged().
 
+Milestone 4j (coordinate systems of the user's own). Step 11 of the coordinate-systems design.
+  - QCP::capStraightSegments: a segment between two data points may be drawn as a straight pixel
+        line. QCPCartesianSystem offers it; QCPGraph and QCPCurve require only it, so a system that
+        keeps straight lines straight hosts them. Every other plottable keeps the 2.x rectangle and
+        straight key default.
+  - The documented route to a user system: subclass QCPAxisRect, override createSystem(), and return
+        a QCPCoordinateSystem whose transform() is QCPTransform::custom(mapping, revision()). It
+        inherits the layout, the axes with drag and zoom, the ratio space and the rect clip. Its own
+        parameters call parametersChanged() from their setters (revision and repaint).
+  - keyAxis()/valueAxis() on a plottable or item position are the 2.x projection: they exist only on
+        a cartesian system and are null on any other. keyAxisBase()/valueAxisBase() reach the
+        system's own axes on every system.
+  - Graphs on a non-cartesian frame build lines, steps, impulses, scatters and fills in data space and
+        map each finished array once. The fill closes on value 0, or on the log range bound nearer
+        zero; a channel fill needs both graphs on one system; a log impulse to 0 is left out. No
+        culling and no decimation: every point is mapped on every repaint.
+  - Curves record in data space and draw on a user system too; selectTestRect maps the candidate
+        points once and keeps those inside the pixel rect.
+  - Items: positions in plot coordinates map through the system, including items built on the plot's
+        default axes, items created by mouse, and positions anchored to another item (the coordinates
+        are an offset from the anchor's data point). A tracer follows a graph on a user system.
+  - QCPAxis::rescale, QCPAxis::items and plottable rescaleAxes()/rescaleKeyAxis()/rescaleValueAxis()
+        work on a user system through the system's own axes.
+  - requiredCapabilities() is a stored, non-virtual mask. The QCPAbstractPlottable constructors take
+        it as their last argument (the intermediate classes and the compiled-in plottables pass
+        theirs). A plottable a system refuses at construction is inert: one misuse, no layer, no
+        list, no legend row. QCustomPlot::add<T>() and add(std::unique_ptr) return an empty handle for
+        it; a later setSystem() that the system admits joins the plot normally.
+  - The four 2.x capabilities (capRectangular, capStraightKey, capLanes, capColourScale) promise the
+        2.x axis pair: a non-cartesian system declaring one still refuses the plottables that need it.
+  - A layout element of another plot cannot be added to a plot's layout, also through a plot-less
+        nested layout; the element stays where it was.
+
+Behaviour changes for 2.x users:
+  - Plottable and item-position keyAxis()/valueAxis() are null on a non-cartesian system. 2.x pixel
+        code that dereferenced them must use keyAxisBase()/valueAxisBase() or system().
+  - A plottable refused at construction is inert and on no layer (2.x registered what it was given);
+        add<T>() hands out an empty handle instead of an inert object.
+  - Adding an axis rect or other layout element that belongs to another plot is refused as misuse.
+  - QCPItemPosition::setAxes() applies the same cartesian-projection gate as setSystem(), so an item
+        built from a user-system rect's axes no longer receives a 2.x projection.
+  - Fix: a data-space fill follows the drawn selection segment, not the whole band; its base points
+        no longer go through inverse(); a channel fill whose partner moved to another system draws no
+        band; an inert channel-fill partner leaves an empty visible range instead of uninitialised
+        iterators.
+
 Milestone 4i (items on coordinate systems). Step 10 of the coordinate-systems design.
   - QCPItemPosition::setSystem()/system() and setArea()/area(): plot coordinates resolve through the
         position's coordinate system, ratio and area-absolute types through its area. setAxes() and
