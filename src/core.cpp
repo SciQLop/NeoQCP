@@ -2434,6 +2434,14 @@ QCPAxisRect* QCustomPlot::firstAxisRect() const
 
 QCPAxisRect* QCustomPlot::axisRect(int index) const
 {
+    // The default index is asked per created item position: walk to the first rect only.
+    if (index == 0)
+    {
+        QCPAxisRect* first = firstAxisRect();
+        if (!first)
+            qDebug() << Q_FUNC_INFO << "invalid axis rect index" << index;
+        return first;
+    }
     const QList<QCPAxisRect*> rectList = axisRects();
     if (index >= 0 && index < rectList.size())
     {
