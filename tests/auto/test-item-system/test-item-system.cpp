@@ -394,6 +394,34 @@ void TestItemSystem::aPolarItemClipsToTheDisc()
              "the ellipse inked a corner outside the disc");
 }
 
+void TestItemSystem::anUnclippedPolarItemIsNotClipped()
+{
+    QCPPolarArea* area = polarOnly(mPlot);
+    auto* item = new QCPItemEllipse(mPlot);
+    item->setBrush(QBrush(Qt::red));
+    item->setPen(Qt::NoPen);
+    for (QCPItemPosition* position : item->positions())
+        position->setSystem(area->system(area->angularAxis(), area->radialAxis()));
+    // The ellipse runs from the top of the disc to a point at 1.2 radii on the +x ray: the
+    // rightmost pixel is ink outside the disc.
+    item->topLeft->setType(QCPItemPosition::ptAxisRectRatio);
+    item->topLeft->setCoords(0.0, 1.0);
+    item->bottomRight->setType(QCPItemPosition::ptAxisRectRatio);
+    item->bottomRight->setCoords(0.25, 1.2);
+    // The clip area is set, but the clip flag is off: the item is not clipped, as on an axis rect.
+    item->setClipArea(area);
+    item->setClipToAxisRect(false);
+    mPlot->replot();
+
+    const QPointF outside(area->center().x() + 1.1 * area->radius(),
+                          area->center().y() - 0.4 * area->radius());
+    QVERIFY2(QLineF(area->center(), outside).length() > area->radius(),
+             "the probe is not outside the disc");
+    const QImage image = mPlot->toPixmap().toImage().convertToFormat(QImage::Format_ARGB32);
+    QCOMPARE(image.pixelColor(qRound(outside.x()), qRound(outside.y())), QColor(Qt::red));
+    QVERIFY2(item->selectTest(outside, false) >= 0, "the ink outside the disc does not hit");
+}
+
 void TestItemSystem::aPolarItemIsHittable()
 {
     QCPPolarArea* area = polarOnly(mPlot);

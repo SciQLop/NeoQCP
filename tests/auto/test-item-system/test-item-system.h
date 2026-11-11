@@ -22,6 +22,7 @@ private slots:
     void aTextFollowsAPolarDataPoint();
     void aPolarRatioIsAngleAndRadiusFractions();
     void aPolarItemClipsToTheDisc();
+    void anUnclippedPolarItemIsNotClipped();
     void aPolarItemIsHittable();
     void deletingThePolarAreaLeavesItsItemsInert();
     void takeAndAdoptAPolarItem();

@@ -40,9 +40,12 @@ struct QCP_LIB_DECL QCPDrawnView
     const QCPAxis* keyAxis = nullptr; //!< the cartesian projections of \a system, when it has some
     const QCPAxis* valueAxis = nullptr;
     const QCPAxisRect* axisRect = nullptr; //!< the rect the ratio transform maps
-    //! The area whose shape and ratio this object draws in: a plottable's system area; an item's
-    //! clip area, else the area of its first position.
+    //! The area whose ratio this object draws in: a plottable's system area, an item's position
+    //! area.
     const QCPArea* area = nullptr;
+    //! The area whose shape clips this object: a plottable's system area; an item's clip area, and
+    //! only while the item clips (an unclipped item draws anywhere, as on an axis rect).
+    const QCPArea* clipArea = nullptr;
     //! The frame the object draws in: a plottable's system; null for items, which read the axes.
     const QCPCoordinateSystem* system = nullptr;
     const QCPTheme* theme = nullptr;

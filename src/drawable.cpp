@@ -513,9 +513,10 @@ QCPDrawnView qcpDrawnViewOf(const QCPAbstractItem& item, QRect clip)
                     break;
                 }
     }
-    view.area = item.clipArea();
-    if (!view.area && first)
-        view.area = first->area();
+    // The frame's ratio is the position's area; the clip shape is the item's clip area, and only
+    // while the item clips. An unclipped item draws anywhere, exactly as it does on an axis rect.
+    view.area = first ? first->area() : nullptr;
+    view.clipArea = item.clipToAxisRect() ? item.clipArea() : nullptr;
     view.axisRect = item.clipAxisRect();
     if (!view.axisRect && view.keyAxis)
         view.axisRect = view.keyAxis->axisRect();
@@ -525,13 +526,14 @@ QCPDrawnView qcpDrawnViewOf(const QCPAbstractItem& item, QRect clip)
     {
         view.system = nullptr;
         view.area = nullptr;
+        view.clipArea = nullptr;
         view.axisRect = nullptr;
         view.keyAxis = nullptr;
         view.valueAxis = nullptr;
     }
-    // A path-clipping area (a disc) bounds the recording as its rect does: the replay sets that clip
-    // and the painter adds the shape, exactly as a plottable's frame has always done.
-    view.clippedToFrame = view.area && view.area->clipsToPath();
+    // A path-clipping area (a disc) bounds a clipped item's recording as its rect does: the replay
+    // sets that clip and the painter adds the shape, as a plottable's frame always has.
+    view.clippedToFrame = view.clipArea && view.clipArea->clipsToPath();
     return view;
 }
 
@@ -547,6 +549,7 @@ QCPDrawnView qcpDrawnViewOf(const QCPAbstractPlottable& plottable, QRect clip)
                                  : (view.system ? qobject_cast<QCPAxisRect*>(view.system->area())
                                                 : nullptr);
     view.area = view.system ? view.system->area() : view.axisRect;
+    view.clipArea = view.area;
     view.clippedToFrame = view.system != nullptr;
     return view;
 }
@@ -959,9 +962,9 @@ namespace
 //! The shape an object's area clips its content to: empty where the area clips to its rect alone.
 QPainterPath qcpSystemClipShape(const QCPDrawnView& view)
 {
-    if (!view.area || !view.area->clipsToPath())
+    if (!view.clipArea || !view.clipArea->clipsToPath())
         return { };
-    return view.area->clipPath();
+    return view.clipArea->clipPath();
 }
 
 //! Clips \a painter to the system's shape for as long as it lives, where the system has one.
