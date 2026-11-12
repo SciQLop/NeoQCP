@@ -12,6 +12,7 @@ private slots:
     void cleanup();
 
     void theCapabilityMasks();
+    void theDefaultAxisClearsBeforeItsSystemDies();
     void aGraphOnASkewRectHasNoProjection();
     void addGraphOnASkewRectJoinsIt();
     void addGraphOnABendRectIsRefused();

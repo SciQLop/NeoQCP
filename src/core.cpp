@@ -4663,22 +4663,31 @@ void QCustomPlot::ensureAtLeastOneBufferDirty()
 
 /*! \internal
 
-  This method is used by \ref QCPAxisRect::removeAxis to report removed axes to the QCustomPlot.
-  The xAxis, yAxis, xAxis2 and yAxis2 handles observe the deletion by themselves (QPointer): this
-  hook stays for subclasses, but nothing is cleared by hand (H-5).
+  This method is used by \ref QCPAxisRect::removeAxis to report removed axes to the QCustomPlot. The
+  default axis members are dropped here, as in 2.x: the systems that map through the axis are
+  deleted right after this hook, so a slot on their destroyed() finds the plot's own axis gone.
 */
-void QCustomPlot::axisRemoved(QCPAxis*)
+void QCustomPlot::axisRemoved(QCPAxis* axis)
 {
+    if (xAxis.get() == axis)
+        xAxis = nullptr;
+    if (yAxis.get() == axis)
+        yAxis = nullptr;
+    if (xAxis2.get() == axis)
+        xAxis2 = nullptr;
+    if (yAxis2.get() == axis)
+        yAxis2 = nullptr;
 }
 
 /*! \internal
 
-  This method is used by the QCPLegend destructor to report legend removal to the QCustomPlot. The
-  legend handle observes the deletion by itself (QPointer): this hook stays for subclasses, but
-  nothing is cleared by hand (H-5).
+  This method is used by the \ref QCPLegend destructor to report legend removal to the
+  QCustomPlot. The default legend member is dropped here, as in 2.x.
 */
-void QCustomPlot::legendRemoved(QCPLegend*)
+void QCustomPlot::legendRemoved(QCPLegend* legend)
 {
+    if (this->legend.get() == legend)
+        this->legend = nullptr;
 }
 
 /*! \internal

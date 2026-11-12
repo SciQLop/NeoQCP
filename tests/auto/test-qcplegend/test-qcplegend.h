@@ -13,6 +13,7 @@ private slots:
   void itemTextColorRepaintsTheLegend();
   void groupRowFollowsComponentVisibility();
   void deselectSlotRemovingAnItemStillDeselectsTheOthers();
+  void theDefaultLegendClearsBeforeItDies();
   void deselectSlotDeletingTheLegendIsSafe();
   void clickAwayDeletingTheLegendFromItsDeselectionIsSafe();
   void clickAwayDeletingTheLegendFromAnItemDeselectionIsSafe();

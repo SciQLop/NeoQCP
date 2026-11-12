@@ -127,6 +127,17 @@ void TestQCPLegend::deselectSlotRemovingAnItemStillDeselectsTheOthers()
   QCOMPARE(mPlot->legend->selectedParts(), QCPLegend::SelectableParts(QCPLegend::spNone));
 }
 
+void TestQCPLegend::theDefaultLegendClearsBeforeItDies()
+{
+  bool sawClearedLegend = false;
+  connect(mPlot->legend, &QObject::destroyed, mPlot,
+          [this, &sawClearedLegend] { sawClearedLegend = !mPlot->legend; });
+  QCPLegend* legend = mPlot->legend;
+  delete legend;
+  QVERIFY2(sawClearedLegend, "a slot on the legend's destroyed() sees the member cleared, as in 2.x");
+  QVERIFY(!mPlot->legend);
+}
+
 void TestQCPLegend::deselectSlotDeletingTheLegendIsSafe()
 {
   addSelectedItems(mPlot, 3);

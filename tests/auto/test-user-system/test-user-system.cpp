@@ -465,6 +465,22 @@ void TestUserSystem::cleanup()
     QCOMPARE(test_misuse::calls.size(), std::size_t(0));
 }
 
+void TestUserSystem::theDefaultAxisClearsBeforeItsSystemDies()
+{
+    QCustomPlot plot;
+    QCPAxisRect* rect = plot.axisRect();
+    QCPAxis* key = rect->axis(QCPAxis::atBottom);
+    QVERIFY(key == plot.xAxis);
+    QCPCoordinateSystem* system = rect->system(key, rect->axis(QCPAxis::atLeft));
+    QVERIFY(system);
+    bool sawClearedAxis = false;
+    QObject::connect(system, &QObject::destroyed, [&] { sawClearedAxis = !plot.xAxis; });
+    QVERIFY(rect->removeAxis(key));
+    QVERIFY2(sawClearedAxis,
+             "a slot on the system's destroyed() sees the default axis cleared, as in 2.x");
+    QVERIFY(!plot.xAxis);
+}
+
 void TestUserSystem::theCapabilityMasks()
 {
     QCustomPlot plot;

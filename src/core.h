@@ -482,8 +482,9 @@ public:
     Q_SLOT void replot(QCustomPlot::RefreshPriority refreshPriority = QCustomPlot::rpImmediateRefresh);
     [[nodiscard]] double replotTime(bool average = false) const;
 
-    // A handle observes the deletion by itself: ~QCPAxis calls axisRemoved and ~QCPLegend calls
-    // legendRemoved, but nothing here is cleared by hand (H-5).
+    // ~QCPAxis calls axisRemoved and ~QCPLegend calls legendRemoved, and both drop the matching
+    // member here (M3): a slot on a removed axis's system finds the plot's own axis gone, as 2.x
+    // had it. The handle also observes the deletion by itself (QPointer).
     QCPHandle<QCPAxis> xAxis, yAxis, xAxis2, yAxis2;
     QCPHandle<QCPLegend> legend;
 
