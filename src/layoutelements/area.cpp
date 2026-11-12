@@ -31,6 +31,7 @@
 #include "../misuse.h"
 #include "../painting/painter.h"
 #include "../plottables/plottable.h"
+#include "../signal-delivery.h"
 
 #include <utility>
 
@@ -50,8 +51,11 @@ QCPArea::QCPArea(QCustomPlot* parentPlot)
 //! leaves the system before the system goes (it then draws nothing and no click hits it).
 void QCPArea::detachFromSystem(QCPCoordinateSystem* system)
 {
-    for (QCPAbstractPlottable* plottable : system->plottables())
-        plottable->dropSystem();
+    // Dropping a system tells the plottable so, and a hook may delete another plottable of the same
+    // system: the pass walks a guarded snapshot and skips the ones a hook took.
+    for (const QPointer<QCPAbstractPlottable>& plottable : qcp::guarded(system->plottablesRaw()))
+        if (plottable)
+            plottable->dropSystem();
 }
 
 QCPArea::~QCPArea()

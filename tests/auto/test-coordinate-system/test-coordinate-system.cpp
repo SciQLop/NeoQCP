@@ -122,7 +122,12 @@ public:
 
     [[nodiscard]] int recordings() const { return mCore.recordingCount(); }
 
-    void systemChanged() override { ++mSystemChanges; }
+    void systemChanged() override
+    {
+        ++mSystemChanges;
+        if (onSystemChanged)
+            onSystemChanged();
+    }
 
     //! How many times the plottable was told its frame changed: a move into another plot is one.
     [[nodiscard]] int systemChanges() const { return mSystemChanges; }
@@ -130,6 +135,8 @@ public:
     //! How many frames it was drawn in: zero while the area it hangs on is hidden.
     [[nodiscard]] int draws() const { return mDraws; }
 
+    //! Runs inside systemChanged(), where a user slot may delete another plottable of the system.
+    std::function<void()> onSystemChanged;
     bool readsTransform = false;
     bool coversItsClip = false;
     bool ratioRect = false;
@@ -588,6 +595,28 @@ void TestCoordinateSystem::aPlottableOfADeletedSystemIsInert()
     const QPoint centre = rect->rect().center();
     QVERIFY(!plottable->hitTest(QCP::Pixels { double(centre.x()), double(centre.y()) }, nullptr)
                  .has_value());
+}
+
+void TestCoordinateSystem::aDropSystemHookMayDeleteASibling()
+{
+    QCustomPlot plot;
+    QCPAxisRect* rect = cartesianRect(plot);
+    auto* first
+        = new RecordingPlottable(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
+    auto* sibling = new RecordingPlottable(first->system());
+    QVERIFY(first->system());
+    QCOMPARE(first->system(), sibling->system());
+    QCOMPARE(sibling->keyAxis().get(), first->keyAxis().get());
+
+    // Dropping a plottable tells it so; a hook that deletes the plottable the detach pass has not
+    // reached yet must leave the pass walking a guarded snapshot.
+    QPointer<RecordingPlottable> victim(sibling);
+    first->onSystemChanged = [&victim] { delete victim.data(); };
+
+    delete rect->axis(QCPAxis::atBottom); // the systems detach their plottables, then die
+    QVERIFY(!victim);
+    QVERIFY(!first->system());
+    QVERIFY(!first->keyAxis());
 }
 
 void TestCoordinateSystem::crossPlotSystemIsRefused()

@@ -27,6 +27,7 @@ private slots:
     void twoConstructorsShareTheSystem();
     void movingBetweenSystemsReRecords();
     void aPlottableOfADeletedSystemIsInert();
+    void aDropSystemHookMayDeleteASibling();
     void crossPlotSystemIsRefused();
     void barsAreRefusedInAPolarSystem_data();
     void barsAreRefusedInAPolarSystem();
