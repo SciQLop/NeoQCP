@@ -361,6 +361,8 @@ protected:
     [[nodiscard]] bool rowIsSelected(const Fill& fill, const QCPAbstractMultiDataSource& ds,
                                      int row) const;
     void partnerGone();
+    //! Drops the dependency and destroyed connection of partners no remaining fill uses.
+    void releasePartnerDependencies(const QVector<Fill>& removed);
     [[nodiscard]] static double fillValue(const QCPAxis& valueAxis, double value);
     void recordFills(QCPDrawContext& context, const QCPAbstractMultiDataSource& ds, int begin,
                      int end) const;

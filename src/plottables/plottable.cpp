@@ -28,6 +28,7 @@
 #include "../layoutelements/area.h"
 
 #include "axis/axis.h"
+#include <QSet>
 #include "core.h"
 #include "layoutelements/layoutelement-axisrect.h"
 #include "layoutelements/layoutelement-legend-group.h"
@@ -679,11 +680,24 @@ void QCPAbstractPlottable::removeDependent(QCPLayerable* dependent)
 }
 
 /*!
-  Marks every live dependent dirty. A dependent never marks its source back: a tracer marks its
-  graph only through its own content change, so the walk ends here.
+  Marks every live dependent dirty. Dependents may depend on each other (two graphs filled to one
+  another, ...): a thread-local visit set stops the walk at a plottable already being marked, so a
+  cycle marks each object once. A dependent that is not itself a plottable (a tracer, an item) ends
+  its own branch.
 */
 void QCPAbstractPlottable::markDependentsDirty()
 {
+    static thread_local QSet<const QCPAbstractPlottable*> beingMarked;
+    if (beingMarked.contains(this))
+        return;
+    beingMarked.insert(this);
+    struct RemoveOnExit
+    {
+        QSet<const QCPAbstractPlottable*>& set;
+        const QCPAbstractPlottable* self;
+        ~RemoveOnExit() { set.remove(self); }
+    } removeOnExit { beingMarked, this };
+
     for (int i = int(mDependents.size()) - 1; i >= 0; --i)
     {
         QCPLayerable* dependent = mDependents.at(i).data();

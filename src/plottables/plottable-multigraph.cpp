@@ -717,7 +717,12 @@ void QCPMultiGraph::dropDecorationsBeyond(int columnCount)
         const auto* col = std::get_if<int>(&e.target);
         return e.owner >= columnCount || (col && *col >= columnCount);
     };
+    QVector<Fill> droppedFills;
+    for (const Fill& fill : mFills)
+        if (outside(fill))
+            droppedFills.append(fill);
     mFills.erase(std::remove_if(mFills.begin(), mFills.end(), outside), mFills.end());
+    releasePartnerDependencies(droppedFills);
     const auto barsOutside = [columnCount](const ErrorBars& e)
     { return std::max({ e.value, e.lower, e.upper }) >= columnCount; };
     QVector<ErrorBars> dropped;
@@ -831,12 +836,19 @@ void QCPMultiGraph::setComponentFillBrush(int owner, const QBrush& brush)
 
 void QCPMultiGraph::clearComponentFill(int owner)
 {
+    QVector<Fill> removed;
+    for (const Fill& fill : mFills)
+        if (fill.owner == owner)
+            removed.append(fill);
     const auto before = mFills.size();
     mFills.erase(std::remove_if(mFills.begin(), mFills.end(),
                                 [owner](const Fill& e) { return e.owner == owner; }),
                  mFills.end());
     if (mFills.size() != before)
+    {
+        releasePartnerDependencies(removed);
         decorationsChanged();
+    }
 }
 
 std::optional<QCPMultiGraph::Fill> QCPMultiGraph::componentFill(int owner) const
@@ -870,6 +882,31 @@ QBrush QCPMultiGraph::fillRunBrush(const Fill& fill, bool selected) const
 void QCPMultiGraph::partnerGone()
 {
     decorationsChanged();
+}
+
+void QCPMultiGraph::releasePartnerDependencies(const QVector<Fill>& removed)
+{
+    QVector<QCPMultiGraph*> candidates;
+    for (const Fill& fill : removed)
+    {
+        if (const auto* target = std::get_if<FillToGraph>(&fill.target))
+            if (target->graph && !candidates.contains(target->graph.data()))
+                candidates.append(target->graph.data());
+    }
+    for (QCPMultiGraph* partner : candidates)
+    {
+        const bool stillUsed = std::any_of(
+            mFills.begin(), mFills.end(),
+            [partner](const Fill& fill)
+            {
+                const auto* target = std::get_if<FillToGraph>(&fill.target);
+                return target && target->graph.data() == partner;
+            });
+        if (stillUsed)
+            continue;
+        partner->removeDependent(this);
+        QObject::disconnect(partner, &QObject::destroyed, this, &QCPMultiGraph::partnerGone);
+    }
 }
 
 bool QCPMultiGraph::setComponentErrorBars(int value, int lower, int upper, double capWidthPx,

@@ -110,6 +110,9 @@ private slots:
     void aSelectedRangeSplitsTheBand();
     void aPartnerDataChangeRedrawsTheBand();
     void aPartnerOnAnotherLayerRedrawsTheBand();
+    void mutualFillsDoNotRecurse();
+    void clearingAGraphFillDropsThePartnerDependency();
+    void retargetingAGraphFillDropsTheOldPartnerDependency();
     void theBandStaysOnTheGpuRibbon();
     void fillToGraphSeriesCropsUnequalGrids();
     void fillToGraphSeriesNoOverlap();

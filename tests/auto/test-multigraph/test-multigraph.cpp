@@ -3676,6 +3676,53 @@ void TestMultiGraph::aPartnerOnAnotherLayerRedrawsTheBand()
              "a partner on another layer did not redraw the band");
 }
 
+void TestMultiGraph::mutualFillsDoNotRecurse()
+{
+    FillPair pair = twoGraphs(mPlot, {0, 1, 2}, {1, 1, 1}, {3, 3, 3});
+    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0, QBrush(Qt::blue)));
+    QVERIFY(pair.partner->setComponentFillToGraph(0, pair.owner, 0, QBrush(Qt::blue)));
+
+    // Each graph depends on the other: the dependency walk must mark both once, not follow the
+    // cycle until the stack ends.
+    pair.owner->setComponentPens({QPen(Qt::red)});
+    QVERIFY(pair.owner->componentFill(0).has_value());
+    QVERIFY(pair.partner->componentFill(0).has_value());
+    QVERIFY(!mPlot->layer("main")->canSkipRepaintForTranslation());
+}
+
+void TestMultiGraph::clearingAGraphFillDropsThePartnerDependency()
+{
+    QVERIFY(mPlot->addLayer(QStringLiteral("oldPartnerLayer")));
+    FillPair pair = twoGraphs(mPlot, {0, 1, 2}, {1, 1, 1}, {3, 3, 3});
+    pair.partner->setLayer(mPlot->layer(QStringLiteral("oldPartnerLayer")));
+    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0, QBrush(Qt::blue)));
+    pair.owner->clearComponentFill(0);
+    QVERIFY(!pair.owner->componentFill(0).has_value());
+
+    // The old partner no longer depends on this graph: its change must not move this graph's
+    // content generation.
+    const quint64 generation = pair.owner->mCore.generation();
+    pair.partner->setComponentPens({QPen(Qt::red)});
+    QCOMPARE(pair.owner->mCore.generation(), generation);
+}
+
+void TestMultiGraph::retargetingAGraphFillDropsTheOldPartnerDependency()
+{
+    QVERIFY(mPlot->addLayer(QStringLiteral("oldPartnerLayer")));
+    QVERIFY(mPlot->addLayer(QStringLiteral("newPartnerLayer")));
+    FillPair pair = twoGraphs(mPlot, {0, 1, 2}, {1, 1, 1}, {3, 3, 3});
+    pair.partner->setLayer(mPlot->layer(QStringLiteral("oldPartnerLayer")));
+    auto* replacement = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    replacement->setData(std::vector<double>{0, 1, 2}, std::vector<std::vector<double>>{{2, 2, 2}});
+    replacement->setLayer(mPlot->layer(QStringLiteral("newPartnerLayer")));
+    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0, QBrush(Qt::blue)));
+    QVERIFY(pair.owner->setComponentFillToGraph(0, replacement, 0, QBrush(Qt::blue)));
+
+    const quint64 generation = pair.owner->mCore.generation();
+    pair.partner->setComponentPens({QPen(Qt::red)});
+    QCOMPARE(pair.owner->mCore.generation(), generation);
+}
+
 void TestMultiGraph::theBandStaysOnTheGpuRibbon()
 {
     if (!showWithRhi(mPlot))
