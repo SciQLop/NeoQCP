@@ -90,7 +90,7 @@ void QCPGrid::setSubGridVisible(bool visible)
     if (visible == mSubGridVisible)
         return;
     mSubGridVisible = visible;
-    if (auto* plot = mParentAxis ? mParentAxis->parentPlot() : nullptr)
+    if (auto* plot = mParentAxis ? mParentAxis->parentPlot().get() : nullptr)
         if (auto* grl = plot->gridRhiLayer())
             grl->markGeometryDirty();
     markDirty();
@@ -126,7 +126,7 @@ void QCPGrid::setPen(const QPen& pen)
     if (pen == mPen)
         return;
     mPen = pen;
-    if (auto* plot = mParentAxis ? mParentAxis->parentPlot() : nullptr)
+    if (auto* plot = mParentAxis ? mParentAxis->parentPlot().get() : nullptr)
         if (auto* grl = plot->gridRhiLayer())
             grl->markGeometryDirty();
     markDirty();
@@ -140,7 +140,7 @@ void QCPGrid::setSubGridPen(const QPen& pen)
     if (pen == mSubGridPen)
         return;
     mSubGridPen = pen;
-    if (auto* plot = mParentAxis ? mParentAxis->parentPlot() : nullptr)
+    if (auto* plot = mParentAxis ? mParentAxis->parentPlot().get() : nullptr)
         if (auto* grl = plot->gridRhiLayer())
             grl->markGeometryDirty();
     markDirty();
@@ -157,7 +157,7 @@ void QCPGrid::setZeroLinePen(const QPen& pen)
     if (pen == mZeroLinePen)
         return;
     mZeroLinePen = pen;
-    if (auto* plot = mParentAxis ? mParentAxis->parentPlot() : nullptr)
+    if (auto* plot = mParentAxis ? mParentAxis->parentPlot().get() : nullptr)
         if (auto* grl = plot->gridRhiLayer())
             grl->markGeometryDirty();
     markDirty();

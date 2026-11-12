@@ -59,6 +59,11 @@ static_assert(std::is_constructible_v<QPointer<QCPAxis>, QCPHandle<QCPAxis>>);
 static_assert(std::is_constructible_v<bool, QCPHandle<QCPAxis>>);
 static_assert(CallableWithTheOverloadSet<QCPHandle<QCPAxis>>);
 static_assert(std::is_convertible_v<QCPHandle<QCPGraph>, QCPHandle<QCPAbstractPlottable>>);
+// Assignments: a derived handle assigns to a base one, and nullptr copy-initialises a handle
+// (Opus I1, opencode I-2, Opus M-1, M-2). `h = 0` and `h = {}` are pinned in the body below.
+static_assert(std::is_assignable_v<QCPHandle<QCPAbstractPlottable>&, QCPHandle<QCPGraph>>);
+static_assert(std::is_convertible_v<std::nullptr_t, QCPHandle<QCPAxis>>);
+static_assert(!std::is_assignable_v<QCPHandle<QCPGraph>&, QCPHandle<QCPAbstractPlottable>>);
 
 void TestHandle::init()
 {
@@ -286,6 +291,24 @@ void TestHandle::aHandleTakesPartInTheAmbiguityMatrix()
     QCPGraph* graph = plot.addGraph();
     baseAssigned = graph;
     QCOMPARE(baseAssigned.get(), static_cast<QCPAbstractPlottable*>(graph));
+
+    // A derived handle assigns to a base one, and a creator's handle assigns where a base handle is
+    // expected (Opus I1).
+    QCPHandle<QCPGraph> derived(graph);
+    baseAssigned = derived;
+    QCOMPARE(baseAssigned.get(), static_cast<QCPAbstractPlottable*>(graph));
+    baseAssigned = plot.add<QCPBars>();
+    QVERIFY(baseAssigned);
+
+    // The zero, braced-empty and nullptr spellings all clear a handle (opencode I-2, Opus M-1, M-2).
+    assigned = 0;
+    QVERIFY(!assigned);
+    assigned = raw;
+    QVERIFY(assigned);
+    assigned = {};
+    QVERIFY(!assigned);
+    QCPHandle<QCPAxis> nullInitialised = nullptr;
+    QVERIFY(!nullInitialised);
     QCOMPARE(gMisuses, 0);
 }
 

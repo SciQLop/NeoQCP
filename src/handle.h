@@ -52,6 +52,8 @@ class QCPHandle
 public:
     QCPHandle() = default;
     explicit QCPHandle(T* object) : mObject(object) { requireQObject(); }
+    // `QCPHandle<T> h = nullptr;` copy-initialises, like a QPointer (Opus M-2).
+    QCPHandle(std::nullptr_t) : mObject(nullptr) { requireQObject(); }
 
     // A handle of a derived class makes a handle of a base one. K11: the other specialization is
     // read through its public get().
@@ -67,15 +69,20 @@ public:
 
     explicit operator bool() const { return !mObject.isNull(); }
 
-    // QPointer's assignments: the default axis and legend members are assigned in the library.
+    // QPointer's assignment. A raw pointer, nullptr, 0 and {} all take this operator: without a
+    // separate nullptr_t overload the null spellings are not ambiguous (opencode I-2).
     QCPHandle& operator=(T* object)
     {
         mObject = object;
         return *this;
     }
-    QCPHandle& operator=(std::nullptr_t)
+    // A derived handle assigns to a base one (Opus I1). A base handle does not assign to a derived
+    // one: the constraint only goes up the hierarchy, like the converting constructor.
+    template <typename U>
+        requires std::derived_from<U, T>
+    QCPHandle& operator=(const QCPHandle<U>& other)
     {
-        mObject = nullptr;
+        mObject = other.get();
         return *this;
     }
 
@@ -113,6 +120,10 @@ public:
     }
 
     friend bool operator==(const QCPHandle& a, const QCPHandle& b) { return a.get() == b.get(); }
+    // A handle still compares against nullptr and 0 without ambiguity: these overloads are exact
+    // matches and beat the pointer comparison, which needs the handle's pointer conversion.
+    friend bool operator==(const QCPHandle& a, std::nullptr_t) { return a.mObject.isNull(); }
+    friend bool operator==(std::nullptr_t, const QCPHandle& b) { return b.mObject.isNull(); }
 
 private:
     friend class ::TestHandle;

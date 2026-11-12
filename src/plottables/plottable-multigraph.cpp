@@ -63,7 +63,7 @@ bool QCPMultiGraph::areaIsAxisRect() const
 
 bool QCPMultiGraph::hasExplicitColorScale() const
 {
-    return mExplicitColorScale && colorScale() != nullptr;
+    return mExplicitColorScale && colorScale().get() != nullptr;
 }
 
 bool QCPMultiGraph::colourNeedsAScale() const
