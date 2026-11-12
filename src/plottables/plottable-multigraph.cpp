@@ -149,6 +149,13 @@ void QCPMultiGraph::systemChanged()
         mPipeline.clearTransform();
         mPipeline.setSource(nullptr);
         mAcceptedGeneration = mPipeline.currentGeneration();
+        // I1: the job a pending source started on the cartesian branch has nothing to deliver to
+        // this branch, and the staged source needs no L1 here. It is shown by the next swap.
+        if (mPendingSource)
+        {
+            mPendingL1.reset();
+            markPendingReady();
+        }
         linesChanged();
         return;
     }
@@ -158,6 +165,18 @@ void QCPMultiGraph::systemChanged()
     mL2Result.reset();
     mL2Dirty = false;
     mNeedsResampling = mDataSource && needsResamplingMulti(*mDataSource);
+    // I2: returning to cartesian with a staged source re-stages that source, so its job carries
+    // its own generation and its L1 can never be the displayed source's. Colour values stashed for
+    // the staged source survive the re-stage.
+    if (mPendingSource)
+    {
+        auto pending = mPendingSource;
+        auto colours = std::move(mPendingColorValues);
+        stagePendingSource(std::move(pending));
+        mPendingColorValues = std::move(colours);
+        linesChanged();
+        return;
+    }
     if (mDataSource)
     {
         ensureL1TransformMulti(mPipeline, mDataSource->size(), mDataSource->columnCount(),
@@ -299,7 +318,7 @@ bool QCPMultiGraph::appendToOwnedSource(
         if (pending)
             stagePendingSource(std::move(grown));
         else
-            applySourceNow(std::move(grown));
+            installSource(std::move(grown)); // deferred swap on: keep the displayed geometry
         return true;
     }
 
@@ -314,10 +333,13 @@ void QCPMultiGraph::setData(const QVector<double>& keys, const QVector<double>& 
 {
     QCP_CHECK_OR_RETURN(keys.size() == values.size(),
                         "keys and values have different sizes");
-    setOwnedSource(std::make_shared<QCPGrowableMultiDataSource>(
+    auto source = std::make_shared<QCPGrowableMultiDataSource>(
         std::vector<double>(keys.begin(), keys.end()),
         std::vector<std::vector<double>>{std::vector<double>(values.begin(), values.end())},
-        alreadySorted));
+        alreadySorted);
+    if (source->size() != keys.size() || source->columnCount() != 1)
+        return; // the source refused the shape or a non-finite key: no change
+    setOwnedSource(std::move(source));
 }
 
 void QCPMultiGraph::setData(const std::vector<double>& keys, const std::vector<double>& values,
@@ -325,14 +347,18 @@ void QCPMultiGraph::setData(const std::vector<double>& keys, const std::vector<d
 {
     QCP_CHECK_OR_RETURN(keys.size() == values.size(),
                         "keys and values have different sizes");
-    setOwnedSource(std::make_shared<QCPGrowableMultiDataSource>(
+    auto source = std::make_shared<QCPGrowableMultiDataSource>(
         std::vector<double>(keys), std::vector<std::vector<double>>{std::vector<double>(values)},
-        alreadySorted));
+        alreadySorted);
+    if (source->size() != keys.size() || source->columnCount() != 1)
+        return; // the source refused the shape or a non-finite key: no change
+    setOwnedSource(std::move(source));
 }
 
 void QCPMultiGraph::addData(const QVector<double>& keys, const QVector<double>& values,
                             bool alreadySorted)
 {
+    QCP_CHECK_OR_RETURN(acceptsAppend(), "addData needs a source the graph owns");
     auto owned = ownedSourceForAppend();
     if (!owned && (mDataSource || mPendingSource))
         return; // a non-owned source: ownedSourceForAppend() reported it
@@ -349,7 +375,8 @@ void QCPMultiGraph::addData(const QVector<double>& keys, const QVector<double>& 
     if (!owned)
     {
         auto source = std::make_shared<QCPGrowableMultiDataSource>();
-        (void)source->append(keys, std::vector<QVector<double>>{values}, alreadySorted);
+        if (!source->append(keys, std::vector<QVector<double>>{values}, alreadySorted))
+            return;
         setOwnedSource(std::move(source));
         return;
     }
@@ -360,9 +387,11 @@ void QCPMultiGraph::addData(const QVector<double>& keys, const QVector<double>& 
 
 void QCPMultiGraph::addData(double key, double value)
 {
+    QCP_CHECK_OR_RETURN(acceptsAppend(), "addData needs a source the graph owns");
     auto owned = ownedSourceForAppend();
     if (!owned && (mDataSource || mPendingSource))
         return;
+    QCP_CHECK_OR_RETURN(std::isfinite(key), "keys must be finite");
     if (owned)
     {
         QCP_CHECK_OR_RETURN(owned->columnCount() == 0 || owned->columnCount() == 1,
@@ -374,7 +403,8 @@ void QCPMultiGraph::addData(double key, double value)
     if (!owned)
     {
         auto source = std::make_shared<QCPGrowableMultiDataSource>();
-        (void)source->append(key, std::span<const double>(values, 1));
+        if (!source->append(key, std::span<const double>(values, 1)))
+            return;
         setOwnedSource(std::move(source));
         return;
     }
@@ -386,6 +416,7 @@ void QCPMultiGraph::addData(double key, double value)
 void QCPMultiGraph::addData(const QVector<double>& keys, std::vector<QVector<double>> columns,
                             bool alreadySorted)
 {
+    QCP_CHECK_OR_RETURN(acceptsAppend(), "addData needs a source the graph owns");
     auto owned = ownedSourceForAppend();
     if (!owned && (mDataSource || mPendingSource))
         return;
@@ -405,7 +436,8 @@ void QCPMultiGraph::addData(const QVector<double>& keys, std::vector<QVector<dou
     if (!owned)
     {
         auto source = std::make_shared<QCPGrowableMultiDataSource>();
-        (void)source->append(keys, std::move(columns), alreadySorted);
+        if (!source->append(keys, std::move(columns), alreadySorted))
+            return;
         setOwnedSource(std::move(source));
         return;
     }
@@ -416,10 +448,12 @@ void QCPMultiGraph::addData(const QVector<double>& keys, std::vector<QVector<dou
 
 void QCPMultiGraph::addData(double key, std::span<const double> values)
 {
+    QCP_CHECK_OR_RETURN(acceptsAppend(), "addData needs a source the graph owns");
     auto owned = ownedSourceForAppend();
     if (!owned && (mDataSource || mPendingSource))
         return;
     QCP_CHECK_OR_RETURN(!values.empty(), "addData needs at least one value");
+    QCP_CHECK_OR_RETURN(std::isfinite(key), "keys must be finite");
     if (owned)
     {
         QCP_CHECK_OR_RETURN(owned->columnCount() == 0
@@ -432,7 +466,8 @@ void QCPMultiGraph::addData(double key, std::span<const double> values)
     if (!owned)
     {
         auto source = std::make_shared<QCPGrowableMultiDataSource>();
-        (void)source->append(key, values);
+        if (!source->append(key, values))
+            return;
         setOwnedSource(std::move(source));
         return;
     }
@@ -464,6 +499,8 @@ void QCPMultiGraph::applySourceNow(std::shared_ptr<QCPAbstractMultiDataSource> s
     mPendingColorValues.reset();
     mPendingReady = false;
     mDataSource = std::move(source);
+    if (mDataSource)
+        mDataSource->setGapThreshold(mGapThreshold);
     applyColorSizeRule(mDataSource ? mDataSource->size() : 0);
     linesChanged();
     mL2HasOrigin = false;
@@ -504,6 +541,7 @@ void QCPMultiGraph::stagePendingSource(std::shared_ptr<QCPAbstractMultiDataSourc
 {
     mPendingSource = std::move(source);
     mPendingL1.reset();
+    mPendingSource->setGapThreshold(mGapThreshold);
     // A newly-staged source supersedes whatever replacement (and colour values meant
     // for it) was staged before; setColorValues() re-stashes if called again.
     mPendingColorValues.reset();
@@ -547,6 +585,7 @@ bool QCPMultiGraph::commitPendingData()
     // A busyChanged or colorScaleChanged slot may delete this graph mid-commit.
     const QCPEmissionScope scope(mParentPlot);
     mDataSource = std::move(mPendingSource);
+    mDataSource->setGapThreshold(mGapThreshold);
     mL1Cache = std::move(mPendingL1);
     mPendingReady = false;
     mL2Result.reset();
@@ -664,6 +703,8 @@ void QCPMultiGraph::rebuildL2(const ViewportParams& vp) const
 {
     if (!mL1Cache) return;
     mL2Result = qcp::algo::resampleL2Multi(*mL1Cache, vp, *mDataSource);
+    if (mL2Result)
+        mL2Result->setGapThreshold(mGapThreshold);
     mL2HasOrigin = mL2Result && !mL1Cache->level1.origin.empty();
 }
 
@@ -706,6 +747,37 @@ void QCPMultiGraph::syncComponentCount(const QCPAbstractMultiDataSource* source)
     }
     if (source)
         dropDecorationsBeyond(newCount);
+}
+
+void QCPMultiGraph::markDirty()
+{
+    pruneLostPartnerFills();
+    QCPAbstractLine::markDirty();
+}
+
+// M1: a partner that lost the component is not a temporary no-band case: the fill is gone for good,
+// or a later, wider source would revive a band over unrelated data.
+void QCPMultiGraph::pruneLostPartnerFills()
+{
+    const auto lost = [](const Fill& fill)
+    {
+        const auto* target = std::get_if<FillToGraph>(&fill.target);
+        if (!target)
+            return false;
+        const QCPMultiGraph* partner = target->graph.data();
+        if (!partner)
+            return true;
+        return partner->mDataSource
+            && target->component >= partner->mDataSource->columnCount();
+    };
+    QVector<Fill> dropped;
+    for (const Fill& fill : mFills)
+        if (lost(fill))
+            dropped.append(fill);
+    if (dropped.isEmpty())
+        return;
+    mFills.erase(std::remove_if(mFills.begin(), mFills.end(), lost), mFills.end());
+    releasePartnerDependencies(dropped);
 }
 
 // A decoration pointing at a column that no longer exists is dropped for good: a later, wider
@@ -973,6 +1045,10 @@ void QCPMultiGraph::setSystem(QCPCoordinateSystem* system)
                             "colour values on a non-rect area need an explicit colour scale");
     }
     QCPAbstractLine::setSystem(system);
+    // I6: colour values join the colour scale of the area they are on. A move inside one plot is
+    // not an adoption, so the join has to be redone here; an explicit scale is the user's and stays.
+    if (mColor.hasValues() && !hasExplicitColorScale() && areaIsAxisRect())
+        followKeyAxisRectScale();
 }
 
 void QCPMultiGraph::setColorScale(QCPColorScale* colorScale)
@@ -983,7 +1059,8 @@ void QCPMultiGraph::setColorScale(QCPColorScale* colorScale)
         QCP_CHECK_OR_RETURN(false,
                             "colour values on a non-rect area need an explicit colour scale");
     }
-    mExplicitColorScale = colorScale != nullptr;
+    if (!mJoiningKeyAxisRectScale)
+        mExplicitColorScale = colorScale != nullptr;
     QCPAbstractColorMapped::setColorScale(colorScale);
 }
 
@@ -1022,6 +1099,14 @@ void QCPMultiGraph::setGapThreshold(double threshold)
         return;
     markDirty();
     mGapThreshold = threshold;
+    // The threshold lives on the source the drawing reads; it is set here and when a source is
+    // installed, never from the draw, which a pipeline job may be running beside.
+    if (mDataSource)
+        mDataSource->setGapThreshold(threshold);
+    if (mPendingSource)
+        mPendingSource->setGapThreshold(threshold);
+    if (mL2Result)
+        mL2Result->setGapThreshold(threshold);
     linesChanged();
 }
 
@@ -1802,7 +1887,6 @@ void QCPMultiGraph::draw(QCPDrawContext& context) const
     if (begin >= end)
         return;
 
-    ds->setGapThreshold(mGapThreshold);
     const bool logKeyAxis = mKeyAxis->scaleType() == QCPAxis::stLogarithmic;
     // The thinning buckets are equal spans of the key, mapped to equal pixel spans: on a log axis
     // that span is a decade, so pixelsPerKey counts pixels per decade there.
@@ -1935,9 +2019,9 @@ void QCPMultiGraph::draw(QCPDrawContext& context) const
     }
 }
 
-// B2/P-4: the data-space branch on a system that is not cartesian. It records positions only;
-// the replay maps them through the frame's transform. There is no thinning (pixelsPerKey = 0), no
-// L1/L2 and no fill, error bar or colour command (the 2a refusals keep them unset).
+// B2/P-4: the data-space branch on a system that is not cartesian. It records positions and the
+// fill, error-bar and colour commands the replay maps through the frame's transform; it reads the
+// displayed source directly, with no thinning (pixelsPerKey = 0) and no L1/L2.
 void QCPMultiGraph::drawInDataSpace(QCPDrawContext& context) const
 {
     PROFILE_HERE_N("QCPMultiGraph::drawInDataSpace");
@@ -1952,8 +2036,12 @@ void QCPMultiGraph::drawInDataSpace(QCPDrawContext& context) const
     if (begin >= end)
         return;
 
-    ds.setGapThreshold(mGapThreshold);
     const double baseline = dataSpaceBaseline();
+    const bool logKeyAxis = [this]
+    {
+        const QCPAxis* axis = qobject_cast<const QCPAxis*>(keyAxisBase());
+        return axis && axis->scaleType() == QCPAxis::stLogarithmic;
+    }();
     const bool logValueAxis = [this]
     {
         const QCPAxis* axis = qobject_cast<const QCPAxis*>(valueAxisBase());
@@ -1984,7 +2072,8 @@ void QCPMultiGraph::drawInDataSpace(QCPDrawContext& context) const
         std::vector<int> sourceIndices;
         std::vector<QPointF> line
             = ds.linesInData(c, begin, end, /*pixelsPerKey=*/0.0,
-                             coloured ? &sourceIndices : nullptr);
+                             coloured ? &sourceIndices : nullptr, /*logKeys=*/false,
+                             /*cacheGaps=*/false);
         if (line.empty())
             continue;
         const bool indexed = coloured && sourceIndices.size() == line.size();
@@ -2019,7 +2108,7 @@ void QCPMultiGraph::drawInDataSpace(QCPDrawContext& context) const
                         vertices = qcp::toStepRightLines(points, /*keyIsVertical=*/false);
                         break;
                     case lsStepCenter:
-                        vertices = stepCentreLines(points, /*logKeyAxis=*/false);
+                        vertices = stepCentreLines(points, logKeyAxis);
                         break;
                     case lsImpulse:
                         vertices = separatedPairs(
@@ -2101,7 +2190,7 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::fillRows(const Fill& fill,
                                                            const QCPAbstractMultiDataSource& ds,
                                                            int begin, int end) const
 {
-    const auto gaps = ds.gapsBefore(begin, end);
+    const auto gaps = ds.gapsBefore(begin, end, /*cacheGaps=*/!drawsInDataSpace());
     const auto* targetColumn = std::get_if<int>(&fill.target);
     const auto edge = [this](double value)
     {
@@ -2114,7 +2203,7 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::fillRows(const Fill& fill,
     for (int i = begin; i < end; ++i)
         rows.push_back({ ds.keyAt(i), edge(ds.valueAt(fill.owner, i)),
                          targetColumn ? edge(ds.valueAt(*targetColumn, i)) : constant,
-                         gaps[i - begin] != 0 });
+                         gaps[i - begin] != 0, i });
     return rows;
 }
 
@@ -2135,15 +2224,11 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::shapeFillRows(
     // row (the simplify note in drawInDataSpace names the ceiling).
     if (!drawsInDataSpace())
         rows = binnedWhenDense(std::move(rows));
-    const bool logKeyAxis = !drawsInDataSpace() && mKeyAxis
-        && mKeyAxis->scaleType() == QCPAxis::stLogarithmic;
+    // The system's key axis is the one a straight-segment frame draws in log space.
+    const QCPAxis* keyAxis = drawsInDataSpace() ? qobject_cast<const QCPAxis*>(keyAxisBase())
+                                                : mKeyAxis.data();
+    const bool logKeyAxis = keyAxis && keyAxis->scaleType() == QCPAxis::stLogarithmic;
     return steppedOnScreen(std::move(rows), ownerStep(mComponents[fill.owner]), logKeyAxis);
-}
-
-std::vector<qcp::fill::StripPoint> QCPMultiGraph::shapedFillRows(
-    const Fill& fill, const QCPAbstractMultiDataSource& ds, int begin, int end) const
-{
-    return shapeFillRows(fill, fillRows(fill, ds, begin, end));
 }
 
 std::vector<qcp::fill::StripPoint> QCPMultiGraph::fillToGraphRows(
@@ -2160,10 +2245,10 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::fillToGraphRows(
 
     std::vector<qcp::fill::SeriesRow> ownerRows;
     ownerRows.reserve(std::size_t(std::max(0, end - begin)));
-    const auto ownerGaps = ds.gapsBefore(begin, end);
+    const auto ownerGaps = ds.gapsBefore(begin, end, /*cacheGaps=*/!drawsInDataSpace());
     for (int i = begin; i < end; ++i)
         ownerRows.push_back({ ds.keyAt(i), ds.valueAt(fill.owner, i),
-                              ownerGaps[i - begin] != 0 });
+                              ownerGaps[i - begin] != 0, i });
     if (ownerRows.size() < 2)
         return {};
 
@@ -2173,14 +2258,14 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::fillToGraphRows(
     const double upper = ownerRows.back().key;
     const int partnerBegin = std::max(0, partnerSource->findBegin(lower) - 1);
     const int partnerEnd = std::min(partnerSource->size(), partnerSource->findEnd(upper) + 1);
-    partnerSource->setGapThreshold(partner->mGapThreshold);
-    const auto partnerGaps = partnerSource->gapsBefore(partnerBegin, partnerEnd);
+    const auto partnerGaps = partnerSource->gapsBefore(partnerBegin, partnerEnd,
+                                                       /*cacheGaps=*/!drawsInDataSpace());
     std::vector<qcp::fill::SeriesRow> partnerRows;
     partnerRows.reserve(std::size_t(std::max(0, partnerEnd - partnerBegin)));
     for (int i = partnerBegin; i < partnerEnd; ++i)
         partnerRows.push_back({ partnerSource->keyAt(i),
                                 partnerSource->valueAt(target->component, i),
-                                partnerGaps[i - partnerBegin] != 0 });
+                                partnerGaps[i - partnerBegin] != 0, i });
 
     std::vector<qcp::fill::StripPoint> rows
         = qcp::fill::fillToGraphRows(ownerRows, partnerRows);
@@ -2192,7 +2277,7 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::fillToGraphRows(
         row.a = edge(row.a);
         row.b = edge(row.b);
     }
-    return shapeFillRows(fill, std::move(rows));
+    return rows;
 }
 
 std::vector<qcp::fill::StripPoint> QCPMultiGraph::binnedWhenDense(
@@ -2263,8 +2348,9 @@ bool QCPMultiGraph::rowIsSelected(const Fill& fill, const QCPAbstractMultiDataSo
     return false;
 }
 
-// One fillBetween command per selected/unselected run of this graph's component selection. A gap
-// pinches both series together, so neither the polygon nor the ribbon spans it.
+// One fillBetween command per selected/unselected run of this graph's component selection. The
+// split is decided on the raw source rows, before binning or step expansion changes the indices. A
+// gap pinches both series together, so neither the polygon nor the ribbon spans it.
 void QCPMultiGraph::recordFills(QCPDrawContext& context, const QCPAbstractMultiDataSource& ds,
                                 int begin, int end) const
 {
@@ -2272,43 +2358,52 @@ void QCPMultiGraph::recordFills(QCPDrawContext& context, const QCPAbstractMultiD
     {
         if (!fillDrawable(fill, ds.columnCount()))
             continue;
-        std::vector<qcp::fill::StripPoint> rows
+        const std::vector<qcp::fill::StripPoint> raw
             = std::holds_alternative<FillToGraph>(fill.target)
                 ? fillToGraphRows(fill, ds, begin, end)
-                : shapedFillRows(fill, ds, begin, end);
-        if (rows.empty())
+                : fillRows(fill, ds, begin, end);
+        if (raw.empty())
             continue;
 
         const QCPAxis* valueAxis = qobject_cast<const QCPAxis*>(valueAxisBase());
         if (valueAxis && valueAxis->scaleType() == QCPAxis::stLogarithmic)
             (void)context.transform(); // the baseline follows the axis' bound nearer zero
 
-        const auto recordRun = [&](std::size_t first, std::size_t last) {
-            const QBrush brush = fillRunBrush(fill, rowIsSelected(fill, ds, int(first)));
+        const auto recordRun = [&](std::size_t first, std::size_t last, bool selected) {
+            const QBrush brush = fillRunBrush(fill, selected);
             if (brush.color().alpha() == 0)
                 return;
-            const std::span<const qcp::fill::StripPoint> run(rows.data() + first, last - first);
-            const auto [upper, lower] = fillSeries(run);
+            std::vector<qcp::fill::StripPoint> run(raw.begin() + std::ptrdiff_t(first),
+                                                   raw.begin() + std::ptrdiff_t(last));
+            const std::vector<qcp::fill::StripPoint> rows = shapeFillRows(fill, std::move(run));
+            if (rows.empty())
+                return;
+            const auto [upper, lower] = fillSeries(rows);
             if (!upper)
                 return;
             context.fillBetween(upper, lower, brush);
         };
+        const auto selectedAt = [&](std::size_t index)
+        {
+            const int row = raw[index].sourceRow >= 0 ? raw[index].sourceRow : int(index);
+            return rowIsSelected(fill, ds, row);
+        };
 
         if (mComponents[fill.owner].selection.isEmpty())
         {
-            recordRun(0, rows.size());
+            recordRun(0, raw.size(), false);
             continue;
         }
 
         std::size_t first = 0;
-        while (first < rows.size())
+        while (first < raw.size())
         {
-            const bool selected = rowIsSelected(fill, ds, int(first));
+            const bool selected = selectedAt(first);
             std::size_t last = first + 1;
-            while (last < rows.size() && rowIsSelected(fill, ds, int(last)) == selected)
+            while (last < raw.size() && selectedAt(last) == selected)
                 ++last;
             // The next run's first row closes this run's last segment; both may draw it.
-            recordRun(first, std::min(last + 1, rows.size()));
+            recordRun(first, std::min(last + 1, raw.size()), selected);
             first = last;
         }
     }
@@ -2374,7 +2469,7 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::errorBandRows(
     const ErrorBars& spec, const QCPAbstractMultiDataSource& ds, int begin, int end) const
 {
     const auto bars = errorBarRows(spec, ds, begin, end);
-    const auto gaps = ds.gapsBefore(begin, end);
+    const auto gaps = ds.gapsBefore(begin, end, /*cacheGaps=*/!drawsInDataSpace());
     Q_ASSERT(gaps.size() == int(bars.size())); // gapsBefore() holds one entry per row
     std::vector<qcp::fill::StripPoint> rows;
     rows.reserve(bars.size());

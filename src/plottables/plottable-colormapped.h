@@ -35,7 +35,9 @@ public:
     Q_SLOT void setDataRange(const QCPRange& dataRange);
     Q_SLOT void setDataScaleType(QCPAxis::ScaleType scaleType);
     Q_SLOT void setGradient(const QCPColorGradient& gradient);
-    void setColorScale(QCPColorScale* colorScale);
+    //! Joins \a colorScale, or detaches with null. Virtual: a subclass with its own rule (a frame
+    //! that has no rect scale to fall back to) refuses through a base pointer and the property.
+    virtual void setColorScale(QCPColorScale* colorScale);
 
     // non-property methods:
     //! Fits the data range to colorDataBounds(). A class whose bounds can be cached or partial
@@ -62,6 +64,10 @@ protected:
     //! Takes the key axis rect's scale, if it has one, and hands its values to the renderer.
     //! Called at the end of a subclass constructor, where colorMappingChanged() is the subclass's.
     void followKeyAxisRectScale();
+
+    //! True while followKeyAxisRectScale() is handing its rect's scale to setColorScale(): a
+    //! subclass uses it to tell an automatic join from a user's explicit scale.
+    bool mJoiningKeyAxisRectScale = false;
 
     // property members:
     QCPRange mDataRange;

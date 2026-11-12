@@ -89,7 +89,7 @@ QVector<QPointF> QCPWaterfallDataAdapter::getOptimizedLineData(int column, int b
 std::vector<QPointF> QCPWaterfallDataAdapter::linesInData(int column, int begin, int end,
                                                            double pixelsPerKey,
                                                            std::vector<int>* sourceIndices,
-                                                           bool logKeys) const
+                                                           bool logKeys, bool /*cacheGaps*/) const
 {
     if (!mSource || begin >= end) {
         if (sourceIndices) sourceIndices->clear();

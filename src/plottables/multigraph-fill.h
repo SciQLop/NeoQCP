@@ -11,21 +11,24 @@ namespace qcp::fill {
 
 //! One row of a fill, in pixels: the key position and the two edges' value positions.
 //! breakBefore: the strip does not join this row to the previous one (a key gap).
+//! sourceRow: the owner source row this row came from (-1 when the shaping made one up).
 struct StripPoint
 {
     double key;
     double a;
     double b;
     bool breakBefore = false;
+    int sourceRow = -1;
 };
 
-//! One row of a series in data space, for fillToGraphRows: the key, its value and whether a key
-//! gap starts a new run before it.
+//! One row of a series in data space, for fillToGraphRows: the key, its value, whether a key
+//! gap starts a new run before it, and the owner source row it came from.
 struct SeriesRow
 {
     double key;
     double value;
     bool breakBefore = false;
+    int row = -1;
 };
 
 //! The partner series sampled at the owner's keys over their common key range, ready for

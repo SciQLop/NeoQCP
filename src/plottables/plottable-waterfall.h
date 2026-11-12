@@ -30,7 +30,7 @@ public:
                                            QCPAxis* keyAxis, QCPAxis* valueAxis) const override;
     std::vector<QPointF> linesInData(int column, int begin, int end, double pixelsPerKey,
                                      std::vector<int>* sourceIndices = nullptr,
-                                     bool logKeys = false) const override;
+                                     bool logKeys = false, bool cacheGaps = true) const override;
 
 private:
     struct TransformedWindow
@@ -85,6 +85,7 @@ protected:
     void dataChanged() override;
     //! A waterfall's source is its adapter, never owned: addData() is refused.
     void setOwnedSource(std::shared_ptr<QCPGrowableMultiDataSource> source) override;
+    [[nodiscard]] bool acceptsAppend() const override { return false; }
     QCPRange getValueRange(bool& foundRange,
                            QCP::SignDomain inSignDomain = QCP::sdBoth,
                            const QCPRange& inKeyRange = QCPRange()) const override;

@@ -1,5 +1,6 @@
 #pragma once
 #include "../drawable.h"
+#include "../misuse.h"
 #include "datasource/abstract-multi-datasource.h"
 #include "datasource/async-pipeline.h"
 #include "datasource/graph-resampler.h"
@@ -16,11 +17,14 @@
 #include <QPointer>
 #include <QTimer>
 #include <QVector>
+#include <algorithm>
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <functional>
 #include <memory>
 #include <optional>
+#include <ranges>
 #include <span>
 #include <type_traits>
 #include <variant>
@@ -47,6 +51,8 @@ public:
     virtual void setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> source);
     [[nodiscard]] QCPAbstractMultiDataSource* dataSource() const { return mDataSource.get(); }
     virtual void dataChanged();
+    //! A content change: drops a fill whose partner lost its component, then marks the layer.
+    void markDirty() override;
 
     QCPMultiGraphPipeline& pipeline() { return mPipeline; }
     const QCPMultiGraphPipeline& pipeline() const { return mPipeline; }
@@ -71,9 +77,17 @@ public:
         if constexpr (std::is_same_v<std::ranges::range_value_t<KD>, double>
                       && std::is_same_v<std::ranges::range_value_t<VD>, double>)
         {
-            setOwnedSource(std::make_shared<QCPGrowableMultiDataSource>(
+            // I4/C1: the growable source refuses a shape or a non-finite key before it sorts or
+            // indexes anything. A refused source is empty: installing it would clear the graph.
+            const auto keyCount = std::ranges::size(keys);
+            const auto columnCount = valueColumns.size();
+            auto source = std::make_shared<QCPGrowableMultiDataSource>(
                 std::forward<KC>(keys), std::forward<std::vector<VC>>(valueColumns),
-                alreadySorted));
+                alreadySorted);
+            if (std::size_t(source->size()) != keyCount
+                || std::size_t(source->columnCount()) != columnCount)
+                return;
+            setOwnedSource(std::move(source));
         }
         else
         {
@@ -172,7 +186,7 @@ public:
     void setSystem(QCPCoordinateSystem* system) override;
     void setColorValues(std::shared_ptr<const std::vector<double>> values);
     void setColorValues(std::vector<double> values);
-    void setColorScale(QCPColorScale* colorScale);
+    void setColorScale(QCPColorScale* colorScale) override;
 
     [[nodiscard]] bool adaptiveSampling() const { return mAdaptiveSampling; }
     void setAdaptiveSampling(bool enabled);
@@ -328,6 +342,9 @@ protected:
     //! The growable source addData() may write, or null when the graph has no data yet (a new
     //! source starts) or a misuse has already been reported.
     [[nodiscard]] std::shared_ptr<QCPGrowableMultiDataSource> ownedSourceForAppend() const;
+    //! Whether addData() may write to a source this graph owns. A waterfall's source is its
+    //! adapter, never owned: it refuses every addData, including the first.
+    [[nodiscard]] virtual bool acceptsAppend() const { return true; }
     //! After an append: re-stage the pending source (a new generation, a pipeline re-run) or
     //! refresh the displayed one.
     void appendChanged();
@@ -340,6 +357,8 @@ protected:
     void markPendingReady();
     void onL1Ready(uint64_t generation);
     void syncComponentCount(const QCPAbstractMultiDataSource* source);
+    //! Drops FillToGraph entries whose partner is gone or no longer has the named component.
+    void pruneLostPartnerFills();
     void dropDecorationsBeyond(int columnCount);
     void hideErrorBound(int column);
     void releaseErrorBounds(const ErrorBars& removed);
@@ -354,8 +373,6 @@ protected:
     [[nodiscard]] std::vector<qcp::fill::StripPoint>
     fillToGraphRows(const Fill& fill, const QCPAbstractMultiDataSource& ds, int begin,
                     int end) const;
-    [[nodiscard]] std::vector<qcp::fill::StripPoint> shapedFillRows(
-        const Fill& fill, const QCPAbstractMultiDataSource& ds, int begin, int end) const;
     [[nodiscard]] std::vector<qcp::fill::StripPoint>
     shapeFillRows(const Fill& fill, std::vector<qcp::fill::StripPoint> rows) const;
     [[nodiscard]] bool rowIsSelected(const Fill& fill, const QCPAbstractMultiDataSource& ds,

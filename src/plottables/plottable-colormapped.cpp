@@ -169,6 +169,12 @@ void QCPAbstractColorMapped::followKeyAxisRectScale()
     // with no range of its own yet leaves the scale's own default range alone.
     // The scale setters and setColorScale() signal, and a slot may delete this plottable.
     const QPointer<QCPAbstractColorMapped> alive(this);
+    struct Joining
+    {
+        bool& flag;
+        explicit Joining(bool& f) : flag(f) { flag = true; }
+        ~Joining() { flag = false; }
+    } joining(mJoiningKeyAxisRectScale);
     if (madeHere)
     {
         scale->setGradient(mGradient);

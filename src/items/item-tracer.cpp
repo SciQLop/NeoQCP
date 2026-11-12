@@ -259,14 +259,15 @@ void QCPItemTracer::setLineGraph(QCPMultiGraph* graph, int component)
 
 void QCPItemTracer::setComponent(int component)
 {
+    if (!mLineGraph)
+        return; // no target: nothing to select a column of
     if (component == mComponent)
         return;
-    QCP_CHECK_OR_RETURN(component >= 0 && (!mLineGraph || mLineGraph->isValidColumn(component)),
+    QCP_CHECK_OR_RETURN(component >= 0 && mLineGraph->isValidColumn(component),
                         "the component is outside the graph's columns");
     markDirty();
     mComponent = component;
-    if (mLineGraph)
-        updatePosition();
+    updatePosition();
 }
 
 /*!

@@ -114,9 +114,11 @@ public:
     void setStyle(TracerStyle style);
     void setGraph(QCPGraph* graph);
     //! Follows component \a component of \a graph. Setting it clears \ref graph; a component
-    //! outside the graph's columns is a misuse.
+    //! outside the graph's columns is a misuse. This sets the component: it replaces whatever
+    //! setComponent() recorded before the target existed.
     void setLineGraph(QCPMultiGraph* graph, int component = 0);
-    //! Changes the followed component; out of range is a misuse. Does nothing without a line graph.
+    //! Changes the followed component; out of range is a misuse. Does nothing without a line graph
+    //! (there is no target to select a column of).
     void setComponent(int component);
     void setGraphKey(double key);
     void setInterpolating(bool enabled);
@@ -155,7 +157,14 @@ protected:
 
     bool lostGraph() const
     {
-        return (mFollowsGraph && !mGraph) || (mFollowsLineGraph && !mLineGraph);
+        if (mFollowsGraph && !mGraph)
+            return true;
+        if (!mFollowsLineGraph)
+            return false;
+        if (!mLineGraph)
+            return true;
+        // M3: the graph lost the column the tracer followed: the last sample is not the target.
+        return mComponent < 0 || mComponent >= mLineGraph->componentCount();
     }
 
     // non-virtual methods:

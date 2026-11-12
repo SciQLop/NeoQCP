@@ -70,7 +70,7 @@ bool endsRun(std::span<const StripPoint> rows, std::size_t i)
 
 StripPoint withValues(const StripPoint& values, double key, bool breakBefore)
 {
-    return { key, values.a, values.b, breakBefore };
+    return { key, values.a, values.b, breakBefore, values.sourceRow };
 }
 
 void steppedLeft(std::span<const StripPoint> rows, std::size_t i, std::vector<StripPoint>& out)
@@ -158,7 +158,7 @@ std::vector<StripPoint> fillToGraphRows(std::span<const SeriesRow> owner,
         const auto [partnerValue, partnerBreak] = partnerAt(row.key);
         const bool broken = pendingBreak || row.breakBefore || partnerBreak
             || !std::isfinite(row.value) || !std::isfinite(partnerValue);
-        rows.push_back({ row.key, row.value, partnerValue, broken });
+        rows.push_back({ row.key, row.value, partnerValue, broken, row.row });
         pendingBreak = !std::isfinite(row.value) || !std::isfinite(partnerValue);
     }
     return rows;
@@ -183,7 +183,7 @@ std::vector<StripPoint> binToSpans(std::span<const StripPoint> rows, double binW
         {
             const double centre = (static_cast<double>(bin) + 0.5) * binWidthPx;
             spans.push_back({ centre, std::min(r.a, r.b), std::max(r.a, r.b),
-                              !spans.empty() && (pendingBreak || r.breakBefore) });
+                              !spans.empty() && (pendingBreak || r.breakBefore), r.sourceRow });
             currentBin = bin;
         }
         else

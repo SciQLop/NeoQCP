@@ -644,38 +644,10 @@ inline void qcpErrorBarPixels(const QCPDrawFrame& frame, const qcp::ErrorBarsCmd
         frame.transform.map(std::span<const QPointF>(*cmd.ends), std::span<QPointF>(ends));
     }
 
-    // The error axis's pixel direction, taken from one bar: a reversed axis, a vertical key axis
-    // and a log axis all come out of the transform, so none of them needs a case of its own. Bars
-    // that come in pixels already carry their direction in their own ends.
-    QPointF axisDir(cmd.alongKeys ? 1.0 : 0.0, cmd.alongKeys ? 0.0 : 1.0);
-    for (std::size_t i = 0; i < count; ++i)
-    {
-        if (!std::isfinite(centres[i].x()) || !std::isfinite(centres[i].y()))
-            continue;
-        QPointF direction;
-        if (cmd.inPixels)
-        {
-            const QPointF end = ends[2 * i + 1];
-            direction = QPointF(end.x() - centres[i].x(), end.y() - centres[i].y());
-        }
-        else
-        {
-            const QPointF data = cmd.centres->at(i);
-            const QCP::Pixels base = frame.transform.map(QCP::Data { data.x(), data.y() });
-            const QCP::Pixels ahead = frame.transform.map(
-                QCP::Data { data.x() + (cmd.alongKeys ? 1.0 : 0.0),
-                            data.y() + (cmd.alongKeys ? 0.0 : 1.0) });
-            direction = QPointF(ahead.x - base.x, ahead.y - base.y);
-        }
-        const double length = std::hypot(direction.x(), direction.y());
-        if (std::isfinite(length) && length > 0.0)
-            axisDir = direction / length;
-        break;
-    }
-    const QPointF across(-axisDir.y(), axisDir.x());
     const QPointF gap(std::numeric_limits<double>::quiet_NaN(),
                       std::numeric_limits<double>::quiet_NaN());
     const double halfWhisker = cmd.whiskerWidth * 0.5;
+    const QPointF fallbackDir(cmd.alongKeys ? 1.0 : 0.0, cmd.alongKeys ? 0.0 : 1.0);
     out.clear();
     out.reserve(12 * count);
     for (std::size_t i = 0; i < count; ++i)
@@ -683,6 +655,23 @@ inline void qcpErrorBarPixels(const QCPDrawFrame& frame, const qcp::ErrorBarsCmd
         const QPointF centre = centres[i];
         if (!std::isfinite(centre.x()) || !std::isfinite(centre.y()))
             continue;
+        const QPointF lowerEnd = ends[2 * i];
+        const QPointF upperEnd = ends[2 * i + 1];
+        // I2: this bar's own pixel direction, from its own ends: a non-linear mapping or a log
+        // value axis changes it from bar to bar.
+        QPointF direction;
+        if (std::isfinite(lowerEnd.x()) && std::isfinite(lowerEnd.y())
+            && std::isfinite(upperEnd.x()) && std::isfinite(upperEnd.y()))
+            direction = upperEnd - lowerEnd;
+        else if (std::isfinite(upperEnd.x()) && std::isfinite(upperEnd.y()))
+            direction = upperEnd - centre;
+        else if (std::isfinite(lowerEnd.x()) && std::isfinite(lowerEnd.y()))
+            direction = centre - lowerEnd;
+        const double length = std::hypot(direction.x(), direction.y());
+        const QPointF axisDir = std::isfinite(length) && length > 0.0
+            ? direction / length
+            : fallbackDir;
+        const QPointF across(-axisDir.y(), axisDir.x());
         for (int side = 0; side < 2; ++side)
         {
             const QPointF end = ends[2 * i + std::size_t(side)];
