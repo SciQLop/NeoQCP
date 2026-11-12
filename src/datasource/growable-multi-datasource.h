@@ -1,8 +1,10 @@
 #pragma once
 #include "abstract-multi-datasource.h"
 #include "algorithms.h"
+#include "../misuse.h"
 #include <QVector>
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <memory>
 #include <numeric>
@@ -14,8 +16,8 @@
 //!
 //! setData() on double inputs builds one; addData() appends to it. Keys stay sorted: an append
 //! whose keys fall below the last one is merged in order, and a block appended with
-//! alreadySorted = false is sorted first. The revision moves on every append, so a caller that
-//! caches a derived answer can tell.
+//! alreadySorted = false is sorted first. Keys must be finite and every column must have one value
+//! per key: both are refused with a misuse before anything is sorted or indexed.
 class QCPGrowableMultiDataSource final : public QCPAbstractMultiDataSource
 {
 public:
@@ -31,9 +33,13 @@ public:
         mColumns.reserve(valueColumns.size());
         for (auto& column : valueColumns)
             mColumns.push_back(toDoubles(std::move(column)));
+        if (!validShape())
+        {
+            rejectShape();
+            return;
+        }
         if (!alreadySorted)
             sortBlocks();
-        validateShape();
     }
 
     int columnCount() const override { return static_cast<int>(mColumns.size()); }
@@ -96,17 +102,27 @@ public:
 
     std::vector<QPointF> linesInData(int column, int begin, int end, double pixelsPerKey,
                                      std::vector<int>* sourceIndices = nullptr,
-                                     bool logKeys = false) const override
+                                     bool logKeys = false, bool cacheGaps = true) const override
     {
         Q_ASSERT(column >= 0 && column < columnCount());
-        ensureGapCache(begin, end);
+        if (cacheGaps)
+        {
+            ensureGapCache(begin, end);
+            return qcp::algo::linesInData(mKeys, mColumns[static_cast<std::size_t>(column)],
+                                          begin, end, pixelsPerKey, sourceIndices, gapThreshold(),
+                                          &mGapCache.gaps, logKeys);
+        }
+        // Per-call gaps: this is the branch a worker job may still be reading the rows for, so it
+        // never writes the shared cache.
+        const auto gaps = qcp::algo::detectKeyGaps(mKeys, begin, end, gapThreshold());
         return qcp::algo::linesInData(mKeys, mColumns[static_cast<std::size_t>(column)], begin, end,
-                                      pixelsPerKey, sourceIndices, gapThreshold(), &mGapCache.gaps,
-                                      logKeys);
+                                      pixelsPerKey, sourceIndices, gapThreshold(), &gaps, logKeys);
     }
 
-    qcp::algo::GapVector gapsBefore(int begin, int end) const override
+    qcp::algo::GapVector gapsBefore(int begin, int end, bool cacheGaps = true) const override
     {
+        if (!cacheGaps)
+            return qcp::algo::detectKeyGaps(mKeys, begin, end, gapThreshold());
         ensureGapCache(begin, end);
         return mGapCache.gaps;
     }
@@ -155,32 +171,41 @@ public:
         return {};
     }
 
-    //! Every mutation moves the revision.
-    [[nodiscard]] quint64 revision() const { return mRevision; }
-
-    //! A deep copy, for a pipeline job that must keep reading the rows it started from.
+    //! A deep copy, for a pipeline job that must keep reading the rows it started from. The copy
+    //! carries the gap threshold: the job may run before the graph next sets it on a fresh source.
     [[nodiscard]] std::shared_ptr<QCPGrowableMultiDataSource> clone() const
     {
         auto copy = std::make_shared<QCPGrowableMultiDataSource>();
         copy->mKeys = mKeys;
         copy->mColumns = mColumns;
-        copy->mRevision = mRevision;
+        copy->setGapThreshold(gapThreshold());
         return copy;
     }
 
     //! Appends rows. The column count must match an existing source (an empty one takes any).
     //! A block appended with alreadySorted = false is sorted first; keys below the last one merge
-    //! in order. False and no change when the shape does not match.
+    //! in order. False and no change when the shape does not match or a key is not finite.
     bool append(const QVector<double>& keys, std::vector<QVector<double>> columns,
                 bool alreadySorted = false)
     {
         if (keys.isEmpty())
             return true;
         if (!mColumns.empty() && columns.size() != mColumns.size())
+        {
+            rejectShape("the value column count does not match the source's");
             return false;
+        }
         for (const auto& column : columns)
             if (column.size() != keys.size())
+            {
+                rejectShape("keys and a value column have different sizes");
                 return false;
+            }
+        if (!std::all_of(keys.begin(), keys.end(), [](double key) { return std::isfinite(key); }))
+        {
+            rejectShape("keys must be finite");
+            return false;
+        }
 
         std::vector<double> newKeys(keys.begin(), keys.end());
         std::vector<std::vector<double>> newColumns;
@@ -196,6 +221,11 @@ public:
     //! Appends one row of \a values (one per column).
     bool append(double key, std::span<const double> values)
     {
+        if (!std::isfinite(key))
+        {
+            rejectShape("keys must be finite");
+            return false;
+        }
         if (!mKeys.empty() && mColumns.empty())
             return false;
         if (!mColumns.empty() && values.size() != mColumns.size())
@@ -210,7 +240,7 @@ public:
             mKeys.push_back(key);
             for (std::size_t c = 0; c < mColumns.size(); ++c)
                 mColumns[c].push_back(values[c]);
-            bumpRevision();
+            changed();
             return true;
         }
         const auto at = std::lower_bound(mKeys.begin(), mKeys.end(), key);
@@ -218,7 +248,7 @@ public:
         mKeys.insert(at, key);
         for (std::size_t c = 0; c < mColumns.size(); ++c)
             mColumns[c].insert(mColumns[c].begin() + static_cast<std::ptrdiff_t>(index), values[c]);
-        bumpRevision();
+        changed();
         return true;
     }
 
@@ -269,7 +299,7 @@ private:
             else
                 for (std::size_t c = 0; c < mColumns.size(); ++c)
                     mColumns[c] = std::move(columns[c]);
-            bumpRevision();
+            changed();
             return;
         }
 
@@ -282,7 +312,7 @@ private:
                 mColumns[c].reserve(mColumns[c].size() + columns[c].size());
                 mColumns[c].insert(mColumns[c].end(), columns[c].begin(), columns[c].end());
             }
-            bumpRevision();
+            changed();
             return;
         }
 
@@ -291,7 +321,7 @@ private:
             mKeys.insert(mKeys.begin(), keys.begin(), keys.end());
             for (std::size_t c = 0; c < mColumns.size(); ++c)
                 mColumns[c].insert(mColumns[c].begin(), columns[c].begin(), columns[c].end());
-            bumpRevision();
+            changed();
             return;
         }
 
@@ -336,31 +366,32 @@ private:
 
         mKeys = std::move(mergedKeys);
         mColumns = std::move(mergedColumns);
-        bumpRevision();
+        changed();
     }
 
-    void validateShape()
+    //! Whether the keys and columns form one row per key, with keys a sort can order.
+    [[nodiscard]] bool validShape() const
     {
+        if (!std::all_of(mKeys.begin(), mKeys.end(), [](double key) { return std::isfinite(key); }))
+            return false;
         for (const auto& column : mColumns)
-        {
             if (column.size() != mKeys.size())
-            {
-                qWarning("QCPGrowableMultiDataSource: column length mismatch (%zu vs %zu keys) — "
-                         "dropping data",
-                         column.size(), mKeys.size());
-                mKeys.clear();
-                mColumns.clear();
-                resetGapCache();
-                return;
-            }
-        }
+                return false;
+        return true;
     }
 
-    void bumpRevision()
+    static void rejectShape(const char* what) { qcp::reportMisuse(Q_FUNC_INFO, what); }
+
+    //! A constructor has nothing to keep: the refused data is dropped.
+    void rejectShape()
     {
-        ++mRevision;
+        rejectShape("keys and value columns must have one value per key, and keys must be finite");
+        mKeys.clear();
+        mColumns.clear();
         resetGapCache();
     }
+
+    void changed() { resetGapCache(); }
 
     void resetGapCache()
     {
@@ -377,6 +408,5 @@ private:
 
     std::vector<double> mKeys;
     std::vector<std::vector<double>> mColumns;
-    quint64 mRevision = 0;
     mutable qcp::algo::GapCache mGapCache;
 };

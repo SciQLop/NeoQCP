@@ -161,17 +161,26 @@ public:
 
     std::vector<QPointF> linesInData(int column, int begin, int end, double pixelsPerKey,
                                      std::vector<int>* sourceIndices = nullptr,
-                                     bool logKeys = false) const override
+                                     bool logKeys = false, bool cacheGaps = true) const override
     {
         Q_ASSERT(column >= 0 && column < mColumns);
         qcp::detail::StridedColumnView<V> colView(mValues + column, mRows, mStride);
-        ensureGapCache(begin, end);
+        if (cacheGaps)
+        {
+            ensureGapCache(begin, end);
+            return qcp::algo::linesInData(mKeys, colView, begin, end, pixelsPerKey, sourceIndices,
+                                          gapThreshold(), &mGapCache.gaps, logKeys);
+        }
+        // Per-call gaps: the data-space read never writes the shared cache.
+        const auto gaps = qcp::algo::detectKeyGaps(mKeys, begin, end, gapThreshold());
         return qcp::algo::linesInData(mKeys, colView, begin, end, pixelsPerKey, sourceIndices,
-                                      gapThreshold(), &mGapCache.gaps, logKeys);
+                                      gapThreshold(), &gaps, logKeys);
     }
 
-    qcp::algo::GapVector gapsBefore(int begin, int end) const override
+    qcp::algo::GapVector gapsBefore(int begin, int end, bool cacheGaps = true) const override
     {
+        if (!cacheGaps)
+            return qcp::algo::detectKeyGaps(mKeys, begin, end, gapThreshold());
         ensureGapCache(begin, end);
         return mGapCache.gaps;
     }

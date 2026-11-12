@@ -61,7 +61,7 @@ QVector<QPointF> QCPAbstractMultiDataSource::getOptimizedLineDataIndexed(
 
 std::vector<QPointF> QCPAbstractMultiDataSource::linesInData(
     int column, int begin, int end, double pixelsPerKey, std::vector<int>* sourceIndices,
-    bool logKeys) const
+    bool logKeys, bool /*cacheGaps*/) const
 {
     if (end <= begin) { if (sourceIndices) sourceIndices->clear(); return {}; }
     ColumnWindow w(*this, column, begin, end);

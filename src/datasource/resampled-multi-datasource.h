@@ -114,13 +114,19 @@ public:
     // kept, so a colour lookup still finds the data row it came from.
     std::vector<QPointF> linesInData(int column, int begin, int end, double pixelsPerKey,
                                      std::vector<int>* sourceIndices = nullptr,
-                                     bool logKeys = false) const override
+                                     bool logKeys = false, bool cacheGaps = true) const override
     {
         if (sourceIndices) sourceIndices->clear();
         if (column < 0 || column >= mBins.numColumns) return {};
         const int s = mBins.stride();
         const bool hasOrigin = !mBins.origin.empty();
-        ensureGapCache(begin, end);
+        if (cacheGaps)
+            ensureGapCache(begin, end);
+        // Per-call gaps on the branch a worker may run beside.
+        const auto localGaps
+            = cacheGaps ? qcp::algo::GapVector()
+                        : qcp::algo::gapsFromStepRatios(mBins.gapRatio, begin, end, gapThreshold());
+        const qcp::algo::GapVector& gaps = cacheGaps ? mGapCache.gaps : localGaps;
         const auto originOf
             = [&](int bin) { return bin < 0 || !hasOrigin ? -1 : mBins.origin[column * s + bin]; };
         // A bin that holds no finite sample is a hole, not a break: getLines joins its
@@ -132,7 +138,7 @@ public:
             lines.reserve(std::size_t(end - begin));
             for (int i = begin; i < end; ++i)
             {
-                if (mGapCache.gaps.hasAnyGap && mGapCache.gaps[i - begin])
+                if (gaps.hasAnyGap && gaps[i - begin])
                 {
                     lines.push_back(nanPt);
                     if (sourceIndices)
@@ -153,7 +159,7 @@ public:
                                      std::span<const double>(mBins.values.data() + column * s, s),
                                      begin, end, pixelsPerKey,
                                      sourceIndices ? &bins : nullptr, gapThreshold(),
-                                     &mGapCache.gaps, logKeys);
+                                     &gaps, logKeys);
         if (sourceIndices)
             for (const int bin : bins)
                 sourceIndices->push_back(originOf(bin));
@@ -200,8 +206,10 @@ public:
         }
     }
 
-    qcp::algo::GapVector gapsBefore(int begin, int end) const override
+    qcp::algo::GapVector gapsBefore(int begin, int end, bool cacheGaps = true) const override
     {
+        if (!cacheGaps)
+            return qcp::algo::gapsFromStepRatios(mBins.gapRatio, begin, end, gapThreshold());
         ensureGapCache(begin, end);
         return mGapCache.gaps;
     }

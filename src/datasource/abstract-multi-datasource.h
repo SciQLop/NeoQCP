@@ -1,6 +1,7 @@
 #pragma once
 #include "abstract-datasource.h"
 #include "algorithms.h"
+#include <atomic>
 
 class QCPAbstractMultiDataSource {
 public:
@@ -37,7 +38,7 @@ public:
     // decade.
     virtual std::vector<QPointF> linesInData(int column, int begin, int end, double pixelsPerKey,
                                             std::vector<int>* sourceIndices = nullptr,
-                                            bool logKeys = false) const;
+                                            bool logKeys = false, bool cacheGaps = true) const;
 
     virtual void getOptimizedLineDataAll(
         int begin, int end, int pixelWidth,
@@ -69,9 +70,11 @@ public:
                                                          QVector<int>& sourceIndices) const;
 
     // Element i is set when the step into row begin + i is a key gap under
-    // gapThreshold(), exactly what getLines breaks on. Generic and slow here.
-    virtual qcp::algo::GapVector gapsBefore(int begin, int end) const
+    // gapThreshold(), exactly what getLines breaks on. Generic and slow here. cacheGaps = false
+    // computes the gaps for this call only: what a reader a worker may run beside uses.
+    virtual qcp::algo::GapVector gapsBefore(int begin, int end, bool cacheGaps = true) const
     {
+        (void)cacheGaps;
         std::vector<double> keys(std::max(0, end - begin));
         for (int i = begin; i < end; ++i)
             keys[i - begin] = keyAt(i);
@@ -82,10 +85,14 @@ public:
     virtual QCPRawColumn rawColumn(int /*column*/) const { return {}; }
 
     // A key step larger than gapThreshold() times the smaller neighbouring step
-    // breaks the lines. 0 turns gap detection off.
-    void setGapThreshold(double threshold) { mGapThreshold = threshold; }
-    [[nodiscard]] double gapThreshold() const { return mGapThreshold; }
+    // breaks the lines. 0 turns gap detection off. The draw sets it on the installed source and
+    // its readers may run on the pipeline thread: the field is atomic.
+    void setGapThreshold(double threshold) { mGapThreshold.store(threshold, std::memory_order_relaxed); }
+    [[nodiscard]] double gapThreshold() const
+    {
+        return mGapThreshold.load(std::memory_order_relaxed);
+    }
 
 private:
-    double mGapThreshold = qcp::algo::kDefaultGapThreshold;
+    std::atomic<double> mGapThreshold { qcp::algo::kDefaultGapThreshold };
 };
