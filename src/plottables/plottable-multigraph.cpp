@@ -56,9 +56,19 @@ bool QCPMultiGraph::drawsInDataSpace() const
     return mSystem && mSystem->kind() != QCPTransform::Kind::Cartesian;
 }
 
-bool QCPMultiGraph::hasDataSpaceDecorations() const
+bool QCPMultiGraph::areaIsAxisRect() const
 {
-    return !mFills.isEmpty() || !mErrorBars.isEmpty() || mColor.hasValues();
+    return mSystem && qobject_cast<QCPAxisRect*>(mSystem->area());
+}
+
+bool QCPMultiGraph::hasExplicitColorScale() const
+{
+    return mExplicitColorScale && colorScale() != nullptr;
+}
+
+bool QCPMultiGraph::colourNeedsAScale() const
+{
+    return drawsInDataSpace() && !areaIsAxisRect() && !hasExplicitColorScale();
 }
 
 double QCPMultiGraph::dataSpaceBaseline() const
@@ -72,6 +82,19 @@ double QCPMultiGraph::dataSpaceBaseline() const
         return range.upper < 0 ? range.upper : range.lower;
     }
     return 0.0;
+}
+
+double QCPMultiGraph::dataSpaceFillValue(double value) const
+{
+    // The sign-aware counterpart of fillValue(): a value the log frame cannot place goes to the
+    // range bound on zero's side, never to the far bound. A linear frame takes the value itself.
+    const QCPAxis* valueAxis = qobject_cast<const QCPAxis*>(valueAxisBase());
+    if (!valueAxis || valueAxis->scaleType() != QCPAxis::stLogarithmic || std::isnan(value))
+        return value;
+    const QCPRange range = valueAxis->range();
+    if (range.upper < 0)
+        return value < 0 ? value : range.upper;
+    return value > 0 ? value : range.lower;
 }
 
 quint64 QCPMultiGraph::dependencyRevision() const
@@ -526,8 +549,6 @@ void QCPMultiGraph::decorationsChanged()
 
 bool QCPMultiGraph::setFill(Fill fill)
 {
-    QCP_CHECK_OR_RETURN(!drawsInDataSpace(),
-                        "a fill on a non-cartesian multigraph arrives with task 2b", false);
     const auto* col = std::get_if<int>(&fill.target);
     if (!isValidColumn(fill.owner) || (col && (!isValidColumn(*col) || *col == fill.owner)))
         return false;
@@ -588,8 +609,6 @@ QBrush QCPMultiGraph::effectiveFillBrush(const Fill& fill) const
 bool QCPMultiGraph::setComponentErrorBars(int value, int lower, int upper, double capWidthPx,
                                           std::optional<QPen> pen)
 {
-    QCP_CHECK_OR_RETURN(!drawsInDataSpace(),
-                        "error bars on a non-cartesian multigraph arrive with task 2b", false);
     if (!isValidColumn(value) || !isValidColumn(lower) || !isValidColumn(upper)
         || lower == upper || value == lower || value == upper)
         return false;
@@ -642,42 +661,45 @@ void QCPMultiGraph::updateBaseSelection()
 
 void QCPMultiGraph::setSystem(QCPCoordinateSystem* system)
 {
-    // A9: a feature task 2b makes work on this frame is refused now, at the join as at its setter.
-    if (system && system->kind() != QCPTransform::Kind::Cartesian && hasDataSpaceDecorations())
+    // A9: an area that is not an axis rect hands out no colour scale to join, so colour values
+    // need an explicit one before the frame is taken.
+    if (system && system->kind() != QCPTransform::Kind::Cartesian && mColor.hasValues()
+        && !hasExplicitColorScale() && !qobject_cast<QCPAxisRect*>(system->area()))
     {
         QCP_CHECK_OR_RETURN(false,
-                            "a fill, error bars or colour values need a cartesian multigraph "
-                            "until task 2b");
+                            "colour values on a non-rect area need an explicit colour scale");
     }
     QCPAbstractLine::setSystem(system);
 }
 
-void QCPMultiGraph::setBrush(const QBrush& brush)
+void QCPMultiGraph::setColorScale(QCPColorScale* colorScale)
 {
-    if (brush.style() != Qt::NoBrush && drawsInDataSpace())
+    // Taking away the only scale on a non-rect frame would leave its colour values unmappable.
+    if (!colorScale && drawsInDataSpace() && mColor.hasValues() && !areaIsAxisRect())
     {
         QCP_CHECK_OR_RETURN(false,
-                            "a fill on a non-cartesian multigraph arrives with task 2b");
+                            "colour values on a non-rect area need an explicit colour scale");
     }
-    QCPAbstractLine::setBrush(brush);
+    mExplicitColorScale = colorScale != nullptr;
+    QCPAbstractColorMapped::setColorScale(colorScale);
 }
 
 void QCPMultiGraph::setColorValues(std::shared_ptr<const std::vector<double>> values)
 {
-    if (values && !values->empty() && drawsInDataSpace())
+    if (values && !values->empty() && colourNeedsAScale())
     {
         QCP_CHECK_OR_RETURN(false,
-                            "colour by scalar on a non-cartesian multigraph arrives with task 2b");
+                            "colour values on a non-rect area need an explicit colour scale");
     }
     QCPAbstractLine::setColorValues(std::move(values));
 }
 
 void QCPMultiGraph::setColorValues(std::vector<double> values)
 {
-    if (!values.empty() && drawsInDataSpace())
+    if (!values.empty() && colourNeedsAScale())
     {
         QCP_CHECK_OR_RETURN(false,
-                            "colour by scalar on a non-cartesian multigraph arrives with task 2b");
+                            "colour values on a non-rect area need an explicit colour scale");
     }
     QCPAbstractLine::setColorValues(std::move(values));
 }
@@ -734,10 +756,10 @@ bool QCPMultiGraph::hasPendingDataSource() const { return mPendingSource != null
 void QCPMultiGraph::colorValuesStarted()
 {
     // The setter on this class refuses first; this guards the base pointer a generic caller may
-    // hold, so a colour set cannot reach a frame that cannot draw it.
-    if (drawsInDataSpace())
+    // hold, so colour values cannot reach a frame that has no scale to map them.
+    if (colourNeedsAScale())
     {
-        QCP_CHECK(false, "colour by scalar on a non-cartesian multigraph arrives with task 2b");
+        QCP_CHECK(false, "colour values on a non-rect area need an explicit colour scale");
         clearColorValues();
         return;
     }
@@ -1639,6 +1661,11 @@ void QCPMultiGraph::drawInDataSpace(QCPDrawContext& context) const
     if (logValueAxis && impulses)
         (void)context.transform(); // the baseline follows the value axis' range bound
 
+    // Fills and error bars are data-space commands too; both record before the lines so the replay
+    // keeps fills under bars under lines.
+    recordFills(context, ds, begin, end);
+    recordErrorBars(context, ds, /*rawRows=*/true, begin, end);
+
     const int columns = std::min(componentCount(), ds.columnCount());
     for (int c = 0; c < columns; ++c)
     {
@@ -1650,15 +1677,23 @@ void QCPMultiGraph::drawInDataSpace(QCPDrawContext& context) const
 
         // simplify: no decimation on this branch; every row is recorded and mapped per frame.
         // Upgrade: the J-6 box query and data-space decimation by keyWindow().
-        std::vector<QPointF> line = ds.linesInData(c, begin, end, /*pixelsPerKey=*/0.0);
+        const bool coloured = mColor.hasValues();
+        std::vector<int> sourceIndices;
+        std::vector<QPointF> line
+            = ds.linesInData(c, begin, end, /*pixelsPerKey=*/0.0,
+                             coloured ? &sourceIndices : nullptr);
         if (line.empty())
             continue;
+        const bool indexed = coloured && sourceIndices.size() == line.size();
         const QPen pen = comp.selection.isEmpty() ? comp.pen : comp.selectedPen;
         const bool hasMarkers = !comp.scatterStyle.isNone();
         const bool borrowsTheLine = comp.lineStyle == lsLine && !hasMarkers;
         QVector<QPointF> points;
         if (!borrowsTheLine)
             points = QVector<QPointF>(line.begin(), line.end());
+        QVector<int> dataIdx;
+        if (indexed)
+            dataIdx = QVector<int>(sourceIndices.begin(), sourceIndices.end());
 
         if (comp.lineStyle != lsNone)
         {
@@ -1667,7 +1702,7 @@ void QCPMultiGraph::drawInDataSpace(QCPDrawContext& context) const
             {
                 if (line.size() >= 2)
                     context.polyline(std::make_shared<const std::vector<QPointF>>(std::move(line)),
-                                     linePen);
+                                     indexed ? segmentColours(mColor, dataIdx) : nullptr, linePen);
             }
             else
             {
@@ -1693,7 +1728,17 @@ void QCPMultiGraph::drawInDataSpace(QCPDrawContext& context) const
                         break;
                 }
                 if (vertices.size() >= 2)
-                    context.polyline(sharedPoints(vertices), linePen);
+                {
+                    std::shared_ptr<const std::vector<QRgb>> colours;
+                    if (indexed)
+                    {
+                        QVector<int> vertexIdx = lineIndices(comp.lineStyle, dataIdx);
+                        if (comp.lineStyle == lsImpulse)
+                            vertexIdx = separatedPairIndices(vertexIdx);
+                        colours = segmentColours(mColor, vertexIdx);
+                    }
+                    context.polyline(sharedPoints(vertices), colours, linePen);
+                }
             }
         }
 
@@ -1701,15 +1746,19 @@ void QCPMultiGraph::drawInDataSpace(QCPDrawContext& context) const
             continue;
         const QCPScatterStyle style = markerStyle(comp.scatterStyle, comp.pen);
         auto markerPoints = std::make_shared<std::vector<QPointF>>();
+        auto markerColours = std::make_shared<std::vector<QRgb>>();
         const int skip = mScatterSkip + 1;
         for (int i = 0; i < points.size(); i += skip)
         {
             if (!qIsFinite(points[i].x()) || !qIsFinite(points[i].y()))
                 continue;
             markerPoints->push_back(points[i]);
+            if (indexed)
+                markerColours->push_back(
+                    pointColour(mColor, sourceIndices[static_cast<std::size_t>(i)]));
         }
         if (!markerPoints->empty())
-            context.markers(markerPoints, nullptr, style);
+            context.markers(markerPoints, indexed ? markerColours : nullptr, style);
     }
 }
 
@@ -1740,7 +1789,10 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::fillRows(const Fill& fill,
 {
     const auto gaps = ds.gapsBefore(begin, end);
     const auto* targetColumn = std::get_if<int>(&fill.target);
-    const auto edge = [this](double value) { return fillValue(*mValueAxis, value); };
+    const auto edge = [this](double value)
+    {
+        return drawsInDataSpace() ? dataSpaceFillValue(value) : fillValue(*mValueAxis, value);
+    };
     Q_ASSERT(gaps.size() == std::max(0, end - begin)); // gapsBefore() holds one entry per row
     const double constant = targetColumn ? 0.0 : edge(std::get<double>(fill.target));
     std::vector<qcp::fill::StripPoint> rows;
@@ -1765,9 +1817,14 @@ double QCPMultiGraph::fillValue(const QCPAxis& valueAxis, double value)
 std::vector<qcp::fill::StripPoint> QCPMultiGraph::shapedFillRows(
     const Fill& fill, const QCPAbstractMultiDataSource& ds, int begin, int end) const
 {
-    return steppedOnScreen(binnedWhenDense(fillRows(fill, ds, begin, end)),
-                           ownerStep(mComponents[fill.owner]),
-                           mKeyAxis->scaleType() == QCPAxis::stLogarithmic);
+    std::vector<qcp::fill::StripPoint> rows = fillRows(fill, ds, begin, end);
+    // The binning is a pixel decision, and the data-space branch has no key pixel: it keeps every
+    // row (the simplify note in drawInDataSpace names the ceiling).
+    if (!drawsInDataSpace())
+        rows = binnedWhenDense(std::move(rows));
+    const bool logKeyAxis = !drawsInDataSpace() && mKeyAxis
+        && mKeyAxis->scaleType() == QCPAxis::stLogarithmic;
+    return steppedOnScreen(std::move(rows), ownerStep(mComponents[fill.owner]), logKeyAxis);
 }
 
 std::vector<qcp::fill::StripPoint> QCPMultiGraph::binnedWhenDense(
@@ -1804,8 +1861,6 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::binnedWhenDense(
 void QCPMultiGraph::recordFills(QCPDrawContext& context, const QCPAbstractMultiDataSource& ds,
                                 int begin, int end) const
 {
-    if (drawsInDataSpace())
-        return; // refused in task 2a; 2b builds its data-space baselines here
     for (const Fill& fill : mFills)
     {
         if (!fillDrawable(fill, ds.columnCount()))
@@ -1816,8 +1871,9 @@ void QCPMultiGraph::recordFills(QCPDrawContext& context, const QCPAbstractMultiD
         const auto [upper, lower] = fillSeries(shapedFillRows(fill, ds, begin, end));
         if (!upper)
             continue;
-        if (mValueAxis->scaleType() == QCPAxis::stLogarithmic)
-            (void)context.transform(); // the baseline follows the axis' lower bound
+        const QCPAxis* valueAxis = qobject_cast<const QCPAxis*>(valueAxisBase());
+        if (valueAxis && valueAxis->scaleType() == QCPAxis::stLogarithmic)
+            (void)context.transform(); // the baseline follows the axis' bound nearer zero
         context.fillBetween(upper, lower, brush);
     }
 }
@@ -1839,15 +1895,19 @@ std::vector<qcp::errorbars::Bar> QCPMultiGraph::errorBarRows(const ErrorBars& sp
 {
     std::vector<qcp::errorbars::Bar> bars;
     bars.reserve(std::max(0, end - begin));
+    const bool dataSpace = drawsInDataSpace();
+    const auto edge = [this, dataSpace](double value)
+    { return dataSpace ? value : fillValue(*mValueAxis, value); };
     for (int i = begin; i < end; ++i)
     {
-        const double y = fillValue(*mValueAxis, ds.valueAt(spec.value, i));
+        const double y = edge(ds.valueAt(spec.value, i));
         // std::min/max return their first argument when either is NaN, so a NaN bound stays NaN.
         // Unlike the helpers they replace, a -inf lower or +inf upper value now wins over the
-        // bound.
+        // bound. On the data-space branch the values stay raw: a log frame maps what it can and a
+        // side it cannot place is dropped by the replay, never clamped onto another value.
         bars.push_back({ ds.keyAt(i), y,
-                         fillValue(*mValueAxis, std::min(ds.valueAt(spec.lower, i), y)),
-                         fillValue(*mValueAxis, std::max(ds.valueAt(spec.upper, i), y)) });
+                         edge(std::min(ds.valueAt(spec.lower, i), y)),
+                         edge(std::max(ds.valueAt(spec.upper, i), y)) });
     }
     return bars;
 }
@@ -1897,7 +1957,36 @@ void QCPMultiGraph::recordErrorBars(QCPDrawContext& context, const QCPAbstractMu
                                     bool rawRows, int begin, int end) const
 {
     if (drawsInDataSpace())
-        return; // refused in task 2a; 2b maps the caps through the transform here
+    {
+        // A bar is two data-space ends: the replay maps them and turns the caps into pixel
+        // whiskers perpendicular to the mapped bar. There is no pixel fit and no dense band: the
+        // band is a pixel binning of the key axis, which this frame does not have.
+        for (const ErrorBars& spec : mErrorBars)
+        {
+            if (!errorBarsDrawable(spec, ds.columnCount()))
+                continue;
+            const std::vector<qcp::errorbars::Bar> bars = errorBarRows(spec, ds, begin, end);
+            std::vector<QPointF> centres, ends;
+            centres.reserve(bars.size());
+            ends.reserve(2 * bars.size());
+            for (qcp::errorbars::Bar bar : bars)
+            {
+                if (!qcp::errorbars::resolve(bar) || !std::isfinite(bar.key))
+                    continue;
+                centres.emplace_back(bar.key, 0.5 * (bar.lower + bar.upper));
+                ends.emplace_back(bar.key, bar.lower);
+                ends.emplace_back(bar.key, bar.upper);
+            }
+            if (centres.empty())
+                continue;
+            const Component& comp = mComponents[spec.value];
+            const QPen pen = comp.selection.isEmpty() ? errorBarPen(spec) : comp.selectedPen;
+            context.errorBars(std::make_shared<const std::vector<QPointF>>(std::move(centres)),
+                              std::make_shared<const std::vector<QPointF>>(std::move(ends)),
+                              /*alongKeys=*/false, spec.capWidthPx, /*symbolGap=*/0.0, pen);
+        }
+        return;
+    }
     for (const ErrorBars& spec : mErrorBars)
     {
         if (!errorBarsDrawable(spec, ds.columnCount()))

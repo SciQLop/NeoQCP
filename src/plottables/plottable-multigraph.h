@@ -119,13 +119,12 @@ public:
     // Per-component value access (for tracers/tooltips)
     [[nodiscard]] double componentValueAt(int column, int index) const;
 
-    //! A fill, error bars or colour values need the data-space decorations of task 2b: until then
-    //! their setters refuse a non-cartesian frame, and setSystem refuses to join one while they
-    //! are set (A9).
+    //! Colour values on a non-cartesian area that is not an axis rect need an explicit colour
+    //! scale: the setter refuses them and setSystem refuses to join such a frame without one (A9).
     void setSystem(QCPCoordinateSystem* system) override;
-    void setBrush(const QBrush& brush) override;
     void setColorValues(std::shared_ptr<const std::vector<double>> values);
     void setColorValues(std::vector<double> values);
+    void setColorScale(QCPColorScale* colorScale);
 
     [[nodiscard]] bool adaptiveSampling() const { return mAdaptiveSampling; }
     void setAdaptiveSampling(bool enabled);
@@ -193,8 +192,14 @@ protected:
                                                            QVariant* details) const;
     //! Value 0, or on a log value axis the range bound nearer zero (the 4j baseline).
     [[nodiscard]] double dataSpaceBaseline() const;
-    //! Whether a fill, error bars or colour values are set: the 2a refusals.
-    [[nodiscard]] bool hasDataSpaceDecorations() const;
+    //! A fill edge: the value itself, or on a log axis the bound on its side of zero.
+    [[nodiscard]] double dataSpaceFillValue(double value) const;
+    //! Whether the system's area is an axis rect, whose colour scale colour values can join.
+    [[nodiscard]] bool areaIsAxisRect() const;
+    //! Whether the scale attached came from setColorScale(), not from an earlier rect.
+    [[nodiscard]] bool hasExplicitColorScale() const;
+    //! Whether colour values are set on a frame that has no explicit colour scale to map them.
+    [[nodiscard]] bool colourNeedsAScale() const;
 
     void selectEvent(QMouseEvent* event, bool additive, const QVariant& details,
                      bool* selectionStateChanged) override;
@@ -221,6 +226,9 @@ protected:
     //! Whether the cartesian pipeline is bypassed (the data-space branch): a system change clears
     //! the bins only when the branch itself changes, not on an axis change within cartesian.
     bool mPipelineBypassed = false;
+    //! Whether the current colour scale came from setColorScale(): a scale a rect handed the graph
+    //! is not the explicit one a non-rect area needs.
+    bool mExplicitColorScale = false;
     //! The data the recording was made from changed: the adapter records it again.
     mutable quint64 mRevision = 0;
     // Debounce timer: defers expensive L2 rebuild until panning stops

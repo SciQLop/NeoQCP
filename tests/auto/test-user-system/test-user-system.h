@@ -82,8 +82,12 @@ private slots:
     void aMultiGraphDataPixelPositionIsTheMapping();
     void aShearChangeRedrawsAMultiGraph();
     void anAxisDeletedMidDragLeavesAMultiGraphInert();
-    void aMultiGraphFillOnASkewRectIsRefused();
-    void aMultiGraphErrorBarsOnASkewRectAreRefused();
-    void aMultiGraphColourValuesOnASkewRectAreRefused();
-    void aDecoratedMultiGraphRefusesASkewRect();
+    void aMultiGraphFillFollowsTheSkewMapping();
+    void aMultiGraphFillBetweenColumnsOnASkewRect();
+    void aMultiGraphFillOnALogAxisStopsAtTheBoundNearerZero();
+    void aMultiGraphNaNSplitsLineAndFill();
+    void multiGraphErrorBarCapsFollowTheMapping();
+    void colourByScalarJoinsTheSkewRectsScale();
+    void aMultiGraphColourWithoutAScaleIsRefused();
+    void aDecoratedMultiGraphJoinsASkewRect();
 };

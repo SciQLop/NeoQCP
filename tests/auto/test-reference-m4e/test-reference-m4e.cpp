@@ -533,6 +533,50 @@ QImage polarScene(const char* kind)
             }
         });
 }
+QImage userSystemMultiGraphScene()
+{
+    return render(
+        [](QCustomPlot& plot)
+        {
+            plot.plotLayout()->clear();
+            auto* rect = new SkewRect(&plot);
+            plot.plotLayout()->addElement(0, 0, rect);
+            rect->setShear(0.5);
+            QFont font(QStringLiteral("Helvetica"));
+            font.setPixelSize(10);
+            QCPAxis* key = rect->axis(QCPAxis::atBottom);
+            QCPAxis* value = rect->axis(QCPAxis::atLeft);
+            key->setRange(0, 10);
+            value->setRange(0, 10);
+            for (QCPAxis* axis : rect->axes())
+            {
+                axis->setTickLabelFont(font);
+                axis->setLabelFont(font);
+            }
+
+            const QVector<double> keys { 0.5, 2, 3.5, 5, 6.5, 8 };
+            auto* graph = new QCPMultiGraph(key, value);
+            graph->setData(
+                keys, std::vector<QVector<double>> {
+                          QVector<double> { 7, 6, 8, 7, 9, 8.5 },     // the step column
+                          QVector<double> { 2, 4, 3, 5, 3.5, 6 },      // the line column
+                          QVector<double> { 1, 1.5, 1, 2, 1.5, 2.5 },  // lower error bound
+                          QVector<double> { 3, 3.5, 3, 4, 3.5, 4.5 },  // upper error bound
+                          QVector<double> { 8, 9, 6, 8, 7, 9 }         // scatter-only column
+                      });
+            graph->setComponentLineStyle(0, QCPMultiGraph::lsStepLeft);
+            graph->setComponentLineStyle(1, QCPMultiGraph::lsLine);
+            graph->setComponentLineStyle(4, QCPMultiGraph::lsNone);
+            graph->setComponentScatterStyle(4, QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
+            graph->setComponentVisible(2, false);
+            graph->setComponentVisible(3, false);
+            graph->setComponentFill(0, 0.0, QColor(40, 110, 200, 70));
+            graph->setComponentFillBetween(1, 0, QColor(220, 160, 60, 70));
+            graph->setComponentErrorBars(1, 2, 3, 6.0);
+            graph->setColorValues(std::vector<double> { 0.0, 0.2, 0.4, 0.6, 0.8, 1.0 });
+            graph->setName(QStringLiteral("multi"));
+        });
+}
 QImage userSystemSkewScene()
 {
     return render(
@@ -873,6 +917,11 @@ void TestReferenceM4e::polarSparse()
 void TestReferenceM4e::userSystemSkew()
 {
     check(userSystemSkewScene(), "user-system-skew.png");
+}
+
+void TestReferenceM4e::userSystemMultiGraph()
+{
+    check(userSystemMultiGraphScene(), "user-system-multigraph.png");
 }
 
 void TestReferenceM4e::polarItems()
