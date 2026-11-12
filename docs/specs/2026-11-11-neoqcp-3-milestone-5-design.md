@@ -29,6 +29,12 @@ systems).
   graph on the same coordinate system (the 4j one-system rule). `setChannelFillGraph` goes.
 - **M5-3. Getters return handles in milestone 5**, as the object-model spec says, in their own sub-milestone after
   the deletions, so SciQLopPlots ports once.
+- **M5-5. A handle converts implicitly to `T*`** (2026-11-12), null when the object is gone, like `QPointer`. 2.x
+  code keeps compiling, `QObject::connect(h, ...)` works as object-model decision 4 promised, and setters keep taking
+  `T*`. A user who keeps the raw pointer instead of the handle can still dangle; whoever keeps the handle is safe.
+- **M5-6. `xAxis`, `yAxis`, `xAxis2`, `yAxis2` and `legend` become handle-typed members** (2026-11-12), same names:
+  `plot->xAxis->setRange()` still compiles through `operator->`, and a deleted default axis tests false instead of
+  being cleared by hand.
 - **M5-4. Use Qt properties and the useful Qt macros, bindable properties where it makes sense** (2026-11-11: "also
   try to use Qt properties and macros that are useful"; "I had in mind bindable properties and similar stuff where it
   makes sense"). Today: 274 `Q_PROPERTY`, 36 of them with `NOTIFY`, none `BINDABLE`; 27 of 60 `Q_OBJECT` classes
