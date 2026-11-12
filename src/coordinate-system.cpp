@@ -132,7 +132,7 @@ QList<QCPAbstractPlottable*> QCPCoordinateSystem::plottablesRaw() const
     // simplify: one scan of the plot's plottables per call, as keyAxis()/valueAxis() would need:
     // an index on the system when a plot holds enough of them.
     for (QCPAbstractPlottable* plottable : plot->plottablesRaw())
-        if (plottable->system() == this)
+        if (plottable->systemRaw() == this)
             result << plottable;
     return result;
 }
@@ -212,16 +212,18 @@ QCPCartesianSystem::QCPCartesianSystem(QCPAxisRect* rect, QCPAxis* key, QCPAxis*
 
 QCPTransform QCPCartesianSystem::transform() const
 {
-    return QCPTransform(static_cast<QCPAxis*>(keyAxis().get()), static_cast<QCPAxis*>(valueAxis().get()));
+    return QCPTransform(static_cast<QCPAxis*>(mKeyAxis), static_cast<QCPAxis*>(mValueAxis));
 }
 
 QRect QCPCartesianSystem::clipRect() const
 {
-    const QCPAxis* key = static_cast<QCPAxis*>(keyAxis().get());
-    const QCPAxis* value = static_cast<QCPAxis*>(valueAxis().get());
-    if (!key || !value || !key->axisRect() || !value->axisRect())
+    const QCPAxis* key = static_cast<QCPAxis*>(mKeyAxis);
+    const QCPAxis* value = static_cast<QCPAxis*>(mValueAxis);
+    const QCPAxisRect* keyRect = key ? static_cast<const QCPAxisRect*>(key->area()) : nullptr;
+    const QCPAxisRect* valueRect = value ? static_cast<const QCPAxisRect*>(value->area()) : nullptr;
+    if (!keyRect || !valueRect)
         return { };
-    return key->axisRect()->rect() & value->axisRect()->rect();
+    return keyRect->rect() & valueRect->rect();
 }
 
 /*! \internal
@@ -232,18 +234,21 @@ QRect QCPCartesianSystem::clipRect() const
 */
 bool QCPCartesianSystem::contains(QPointF pixel) const
 {
-    const QCPAxis* key = static_cast<QCPAxis*>(keyAxis().get());
-    if (!key || !key->axisRect() || !mArea || !mArea->parentPlot())
+    const QCPAxis* key = static_cast<QCPAxis*>(mKeyAxis);
+    if (!key || !key->area() || !mArea)
+        return true;
+    QCustomPlot* plot = mArea->parentPlot().get();
+    if (!plot)
         return true;
     if (!transform().valid())
         return true;
-    return key->axisRect()->rect().contains(pixel.toPoint())
-        || mArea->parentPlot()->interactions().testFlag(QCP::iSelectPlottablesBeyondAxisRect);
+    return key->area()->rect().contains(pixel.toPoint())
+        || plot->interactions().testFlag(QCP::iSelectPlottablesBeyondAxisRect);
 }
 
 QCPKeyWindow QCPCartesianSystem::keyWindow() const
 {
-    const QCPAxis* key = static_cast<QCPAxis*>(keyAxis().get());
+    const QCPAxis* key = static_cast<QCPAxis*>(mKeyAxis);
     if (!key)
         return { };
     return { qcp::algo::lineCacheKeyRange(key->range(),

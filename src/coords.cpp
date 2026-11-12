@@ -181,7 +181,7 @@ void QCPTransform::Snapshot::take(const QCPAxis* axis)
     reversed = axis->rangeReversed();
     lower = axis->range().lower;
     upper = axis->range().upper;
-    const QCPAxisRect* rect = axis->axisRect();
+    const QCPAxisRect* rect = static_cast<const QCPAxisRect*>(axis->area());
     if (!rect)
         return;
     left = rect->left();

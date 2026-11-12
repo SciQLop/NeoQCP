@@ -718,8 +718,8 @@ void QCustomPlot::applyTheme()
         if (auto* cs = qobject_cast<QCPColorScale*>(el))
             applyThemeToAxis(cs->axis());
         if (auto* layout = qobject_cast<QCPLayout*>(el))
-            for (int i = 0; i < layout->elementCount(); ++i)
-                walkLayout(layout->elementAt(i));
+            for (QCPLayoutElement* child : layout->elementsRaw(false))
+                walkLayout(child);
     };
     walkLayout(plotLayoutRaw());
 
@@ -2429,7 +2429,7 @@ QCPAxisRect* QCustomPlot::firstAxisRect() const
     {
         QCPLayoutElement* element = stack.back();
         stack.pop_back();
-        for (QCPLayoutElement* child : element->elements(false))
+        for (QCPLayoutElement* child : element->elementsRaw(false))
         {
             if (!child)
                 continue;
@@ -2520,7 +2520,7 @@ QList<QCPArea*> QCustomPlot::areasRaw() const
 
     while (!elementStack.isEmpty())
     {
-        for (QCPLayoutElement* element : elementStack.pop()->elements(false))
+        for (QCPLayoutElement* element : elementStack.pop()->elementsRaw(false))
         {
             if (element)
             {
@@ -2582,7 +2582,7 @@ QCPLayoutElement* QCustomPlot::layoutElementAtRaw(const QPointF& pos) const
     while (searchSubElements && currentElement)
     {
         searchSubElements = false;
-        for (QCPLayoutElement* subElement : currentElement->elements(false))
+        for (QCPLayoutElement* subElement : currentElement->elementsRaw(false))
         {
             if (subElement && subElement->realVisibility()
                 && subElement->selectTest(pos, false) >= 0)
@@ -2659,7 +2659,7 @@ QList<QCPHandle<QCPLegend>> QCustomPlot::selectedLegends() const
 
     while (!elementStack.isEmpty())
     {
-        for (QCPLayoutElement* subElement : elementStack.pop()->elements(false))
+        for (QCPLayoutElement* subElement : elementStack.pop()->elementsRaw(false))
         {
             if (subElement)
             {
@@ -3801,7 +3801,7 @@ void QCustomPlot::moveEvent(QMoveEvent* event)
 */
 void QCustomPlot::notifyAlignmentGroups()
 {
-    for (QCPLayoutElement* element : plotLayoutRaw()->elements(true))
+    for (QCPLayoutElement* element : plotLayoutRaw()->elementsRaw(true))
         if (element && element->alignmentGroup())
             element->markLayoutAppearanceDirty();
 }
@@ -3814,7 +3814,7 @@ void QCustomPlot::notifyAlignmentGroups()
 void QCustomPlot::relayoutAlignmentGroups()
 {
     QSet<QCPAlignmentGroup*> groups;
-    for (QCPLayoutElement* element : plotLayoutRaw()->elements(true))
+    for (QCPLayoutElement* element : plotLayoutRaw()->elementsRaw(true))
         if (element && element->alignmentGroup())
             groups.insert(element->alignmentGroup().data());
     for (QCPAlignmentGroup* group : groups)

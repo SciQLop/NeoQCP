@@ -299,6 +299,7 @@ private:
 
     friend class QCustomPlot;
     friend class QCPAbstractLegendItem;
+    friend class QCPAbstractPlottable; // walks the rows raw when a name change marks them
 };
 Q_DECLARE_OPERATORS_FOR_FLAGS(QCPLegend::SelectableParts)
 Q_DECLARE_METATYPE(QCPLegend::SelectablePart)

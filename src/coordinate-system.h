@@ -139,6 +139,8 @@ protected:
 
 private:
     friend class QCPArea;
+    friend class QCPAxisRect; // its mark pass selects the systems by area raw
+    friend class QCPPolarArea; // same, for the polar disc
     friend QCPDrawnView qcpDrawnViewOf(const QCPAbstractPlottable& plottable, QRect clip);
     Q_DISABLE_COPY(QCPCoordinateSystem)
 };

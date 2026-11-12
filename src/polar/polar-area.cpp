@@ -340,21 +340,22 @@ void QCPPolarArea::markAffectedLayersDirty(bool invalidate)
         }
     };
     if (mAngularAxis)
-        markOnce(mAngularAxis->layer());
+        markOnce(mAngularAxis->layerRaw());
     for (QCPPolarAxisRadial* axis : mRadialAxes)
-        markOnce(axis->layer());
+        markOnce(axis->layerRaw());
     if (mGrid)
-        markOnce(mGrid->layer());
+        markOnce(mGrid->layerRaw());
     if (!mParentPlot)
         return;
     // The plottables of this area's systems draw in the disc too, wherever their layer sits: the
     // same one-pass selection by system the axis rect uses.
     for (QCPAbstractPlottable* plottable : mParentPlot->plottablesRaw())
     {
-        if (plottable->system() && plottable->system()->area() == this)
+        if (QCPCoordinateSystem* system = plottable->systemRaw();
+            system && system->areaRaw() == this)
         {
-            markOnce(plottable->layer());
-            for (QCPLayer* dependent : plottable->dependentLayers())
+            markOnce(plottable->layerRaw());
+            for (QCPLayer* dependent : plottable->dependentLayersRaw())
                 markOnce(dependent);
         }
     }

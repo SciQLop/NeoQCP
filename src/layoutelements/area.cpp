@@ -99,7 +99,7 @@ QCPCoordinateSystem* QCPArea::systemRaw(QCPAxisBase* key, QCPAxisBase* value)
     // The systems the area already made answer first: a position or a plottable resolving its pair
     // again is the common case, and the axes' own list is not needed for it.
     for (const QPointer<QCPCoordinateSystem>& existing : std::as_const(mSystems))
-        if (existing && existing->keyAxis() == key && existing->valueAxis() == value)
+        if (existing && existing->mKeyAxis == key && existing->mValueAxis == value)
             return existing;
     const QList<QCPAxisBase*> axes = allAxesRaw();
     if (!axes.contains(key) || !axes.contains(value))

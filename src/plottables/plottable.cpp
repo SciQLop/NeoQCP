@@ -579,6 +579,15 @@ QCPAbstractPlottable::QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis,
     }
 }
 
+/*! \internal
+
+  dependentLayers() raw: the default converts the public list (K8).
+*/
+QList<QCPLayer*> QCPAbstractPlottable::dependentLayersRaw() const
+{
+    return qcp::pointers(dependentLayers());
+}
+
 QCPAxisRect* QCPAbstractPlottable::axisRectOf(const QCPAxis* axis)
 {
     return axis ? static_cast<QCPAxisRect*>(axis->area()) : nullptr;
@@ -745,11 +754,13 @@ void QCPAbstractPlottable::drawLegendIcon(QCPPainter* painter, const QRectF& rec
    The name is the textual representation of this plottable as it is displayed in the legend
    (\ref QCPLegend). It may contain any UTF-8 characters, including newlines.
 */
-namespace
-{
-// Marks the legend rows that show \a plottable, in every legend the layout contains: the default
-// legend sits in an axis rect's inset layout, so rects are descended too.
-void markLegendRows(QCPLayoutElement* element, QCPAbstractPlottable* plottable)
+/*! \internal
+
+  Marks the legend rows that show \a plottable, in every legend the layout contains: the default
+  legend sits in an axis rect's inset layout, so the walk descends the whole element tree. Raw, so a
+  name change pays no handle per legend row (K8).
+*/
+void QCPAbstractPlottable::markLegendRows(QCPLayoutElement* element, QCPAbstractPlottable* plottable)
 {
     if (!element)
         return;
@@ -757,7 +768,7 @@ void markLegendRows(QCPLayoutElement* element, QCPAbstractPlottable* plottable)
     {
         for (int i = 0; i < legend->itemCount(); ++i)
         {
-            QCPAbstractLegendItem* item = legend->item(i);
+            QCPAbstractLegendItem* item = legend->itemRaw(i);
             auto* row = qobject_cast<QCPPlottableLegendItem*>(item);
             auto* group = qobject_cast<QCPGroupLegendItem*>(item);
             const bool shows = row ? row->plottable() == plottable
@@ -768,13 +779,9 @@ void markLegendRows(QCPLayoutElement* element, QCPAbstractPlottable* plottable)
             legend->markDirty(); // the row may not carry the legend's layer yet
         }
     }
-    if (auto* rect = qobject_cast<QCPAxisRect*>(element))
-        markLegendRows(rect->insetLayout(), plottable);
-    if (auto* layout = qobject_cast<QCPLayout*>(element))
-        for (int i = 0; i < layout->elementCount(); ++i)
-            markLegendRows(layout->elementAt(i), plottable);
+    for (QCPLayoutElement* child : element->elementsRaw(false))
+        markLegendRows(child, plottable);
 }
-} // namespace
 
 void QCPAbstractPlottable::setName(const QString& name)
 {

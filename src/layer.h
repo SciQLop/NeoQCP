@@ -353,6 +353,8 @@ private:
     friend class QCPLayer;
     friend class QCPAxisRect;
     friend class QCPArea; // it hands its inset layout a parent plot and itself as parent
+    friend class QCPPolarArea; // its mark pass reads the axes', grid's and plottables' layers raw
+    friend class QCPCoordinateSystem; // reads its area's plot raw on the per-frame paths
     friend class QCPContourOverlay; // reads the parent plot raw while recording label tiles
     friend class QCPColormapRenderer; // reads the layer raw when invalidating its map image
     friend QCPDrawnView qcpDrawnViewOf(const QCPAbstractItem& item, QRect clip);

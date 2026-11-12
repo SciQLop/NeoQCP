@@ -186,6 +186,8 @@ protected:
     // introduced virtual methods:
     virtual int calculateAutoMargin(QCP::MarginSide side);
     virtual void layoutChanged();
+    //! The child elements raw, for the layout's own passes (K8). The default converts elements().
+    virtual QList<QCPLayoutElement*> elementsRaw(bool recursive) const;
 
     // reimplemented virtual methods:
     virtual void applyDefaultAntialiasingHint([[maybe_unused]] QCPPainter* painter) const override
@@ -203,6 +205,7 @@ private:
     friend class QCPLayout;
     friend class QCPMarginGroup;
     friend class QCPAlignmentGroup;
+    friend class QCPAbstractPlottable; // walks the layout for the legend rows a name change touches
 };
 Q_DECLARE_METATYPE(QCPLayoutElement::UpdatePhase)
 
@@ -234,6 +237,10 @@ public:
 
 protected:
     virtual void updateLayout();
+    //! The child elements raw, for the layout's own passes (K8).
+    virtual QList<QCPLayoutElement*> elementsRaw(bool recursive) const override;
+    //! elementAt() raw, for the layout's own passes (K8). The default converts elementAt().
+    virtual QCPLayoutElement* elementAtRaw(int index) const;
 
     // non-virtual methods:
     void sizeConstraintsChanged() const;
@@ -250,6 +257,7 @@ protected:
 private:
     Q_DISABLE_COPY(QCPLayout)
     friend class QCPLayoutElement;
+    friend class QCustomPlot; // its own walks read the children raw (K8)
 };
 
 class QCP_LIB_DECL QCPLayoutGrid : public QCPLayout
@@ -323,7 +331,6 @@ public:
     virtual QCPHandle<QCPLayoutElement> elementAt(int index) const override;
     virtual QCPLayoutElement* takeAt(int index) override;
     virtual bool take(QCPLayoutElement* element) override;
-    virtual QList<QCPHandle<QCPLayoutElement>> elements(bool recursive) const override;
     virtual void simplify() override;
     virtual QSize minimumOuterSizeHint() const override;
     virtual QSize maximumOuterSizeHint() const override;
@@ -340,6 +347,8 @@ public:
     void indexToRowCol(int index, int& row, int& column) const;
 
 protected:
+    virtual QCPLayoutElement* elementAtRaw(int index) const override;
+
     // property members:
     QList<QList<QCPLayoutElement*>> mElements;
     QList<double> mColumnStretchFactors;
@@ -404,6 +413,8 @@ public:
     void addElement(QCPLayoutElement* element, const QRectF& rect);
 
 protected:
+    virtual QCPLayoutElement* elementAtRaw(int index) const override;
+
     // property members:
     QList<QCPLayoutElement*> mElements;
     QList<InsetPlacement> mInsetPlacement;

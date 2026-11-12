@@ -332,6 +332,11 @@ protected:
     //! The frame raw, for the per-object view builder (K8).
     [[nodiscard]] QCPCoordinateSystem* systemRaw() const { return mSystem.data(); }
 
+    //! The layers whose content follows this plottable, raw (K8): the axis rect marks them with the
+    //! plottable's own layer. The default converts dependentLayers(), so a subclass that answers it
+    //! is still honoured.
+    [[nodiscard]] virtual QList<QCPLayer*> dependentLayersRaw() const;
+
     //! Called after setSystem; not called by the constructor.
     virtual void systemChanged() {}
     //! Called before setSystem adopts \a next: a plottable that ties itself to others (a stack, a
@@ -398,6 +403,10 @@ private:
     // K8: the bars group reads the projection raw, once per bar; a layer does so per plottable.
     friend class QCPBarsGroup;
     friend class QCPLayer;
+    // The areas select and mark their systems' plottables without a handle per plottable per pass.
+    friend class QCPAxisRect;
+    friend class QCPPolarArea;
+    friend class QCPCoordinateSystem;
 
     QCPPlottableGroup* mGroup = nullptr; // set and cleared by the group
     QPointer<QCustomPlot> mRegisteredPlot; // the plot whose lists hold this one; null when inert
@@ -418,6 +427,8 @@ private:
     void onDebounceTimeout();
     //! The axis setters' shared body: the system of that pair, or an inert plottable.
     void resolveAxes(QCPAxis* key, QCPAxis* value);
+    //! Marks the legend rows that show \a plottable, raw: a setter marks what a name change moved.
+    static void markLegendRows(QCPLayoutElement* element, QCPAbstractPlottable* plottable);
 
     friend class QCustomPlot;
     friend class QCPSelectionDecorator;

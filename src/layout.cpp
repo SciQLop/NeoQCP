@@ -427,7 +427,7 @@ void QCPLayout::markLayoutAppearanceDirty()
 {
     markDirty();
     for (int i = 0; i < elementCount(); ++i)
-        if (QCPLayoutElement* element = elementAt(i))
+        if (QCPLayoutElement* element = elementAtRaw(i))
             element->markLayoutAppearanceDirty();
 }
 
@@ -614,6 +614,16 @@ QList<QCPHandle<QCPLayoutElement>> QCPLayoutElement::elements([[maybe_unused]] b
     return { };
 }
 
+/*! \internal
+
+  The child elements raw: the legend-row mark recurses through this one (K8). The default converts
+  elements(), so a subclass that answers elements() is still walked.
+*/
+QList<QCPLayoutElement*> QCPLayoutElement::elementsRaw(bool recursive) const
+{
+    return qcp::pointers(elements(recursive));
+}
+
 /*!
   Layout elements are sensitive to events inside their outer rect. If \a pos is within the outer
   rect, this method returns a value corresponding to 0.99 times the parent plot's selection
@@ -788,7 +798,7 @@ void QCPLayout::update(UpdatePhase phase)
     const int elCount = elementCount();
     for (int i = 0; i < elCount; ++i)
     {
-        if (QCPLayoutElement* el = elementAt(i))
+        if (QCPLayoutElement* el = elementAtRaw(i))
             el->update(phase);
     }
 }
@@ -796,20 +806,41 @@ void QCPLayout::update(UpdatePhase phase)
 /* inherits documentation from base class */
 QList<QCPHandle<QCPLayoutElement>> QCPLayout::elements(bool recursive) const
 {
-    const int c = elementCount();
     QList<QCPHandle<QCPLayoutElement>> result;
+    for (QCPLayoutElement* element : elementsRaw(recursive))
+        result.append(QCPHandle<QCPLayoutElement>(element));
+    return result;
+}
+
+/*! \internal
+
+  The child elements raw: the layout's own passes walk this one (K8).
+*/
+QList<QCPLayoutElement*> QCPLayout::elementsRaw(bool recursive) const
+{
+    const int c = elementCount();
+    QList<QCPLayoutElement*> result;
     result.reserve(c);
     for (int i = 0; i < c; ++i)
-        result.append(elementAt(i));
+        result.append(elementAtRaw(i));
     if (recursive)
     {
         for (int i = 0; i < c; ++i)
         {
-            if (result.at(i))
-                result << result.at(i)->elements(recursive);
+            if (QCPLayoutElement* element = result.at(i))
+                result << element->elementsRaw(recursive);
         }
     }
     return result;
+}
+
+/*! \internal
+
+  elementAt() raw: a layout's own passes list the cells without a handle per cell (K8).
+*/
+QCPLayoutElement* QCPLayout::elementAtRaw(int index) const
+{
+    return elementAt(index).get();
 }
 
 /*!
@@ -1819,14 +1850,18 @@ void QCPLayoutGrid::updateLayout()
 */
 QCPHandle<QCPLayoutElement> QCPLayoutGrid::elementAt(int index) const
 {
+    return QCPHandle<QCPLayoutElement>(elementAtRaw(index));
+}
+
+QCPLayoutElement* QCPLayoutGrid::elementAtRaw(int index) const
+{
     if (index >= 0 && index < elementCount())
     {
         int row, col;
         indexToRowCol(index, row, col);
-        return QCPHandle<QCPLayoutElement>(mElements.at(row).at(col));
+        return mElements.at(row).at(col);
     }
-    else
-        return { };
+    return nullptr;
 }
 
 /*!
@@ -1864,7 +1899,7 @@ bool QCPLayoutGrid::take(QCPLayoutElement* element)
     {
         for (int i = 0; i < elementCount(); ++i)
         {
-            if (elementAt(i) == element)
+            if (elementAtRaw(i) == element)
             {
                 takeAt(i);
                 return true;
@@ -1875,25 +1910,6 @@ bool QCPLayoutGrid::take(QCPLayoutElement* element)
     else
         qDebug() << Q_FUNC_INFO << "Can't take nullptr element";
     return false;
-}
-
-/* inherits documentation from base class */
-QList<QCPHandle<QCPLayoutElement>> QCPLayoutGrid::elements(bool recursive) const
-{
-    QList<QCPHandle<QCPLayoutElement>> result;
-    const int elCount = elementCount();
-    result.reserve(elCount);
-    for (int i = 0; i < elCount; ++i)
-        result.append(elementAt(i));
-    if (recursive)
-    {
-        for (int i = 0; i < elCount; ++i)
-        {
-            if (result.at(i))
-                result << result.at(i)->elements(recursive);
-        }
-    }
-    return result;
 }
 
 /*!
@@ -2259,10 +2275,14 @@ int QCPLayoutInset::elementCount() const
 /* inherits documentation from base class */
 QCPHandle<QCPLayoutElement> QCPLayoutInset::elementAt(int index) const
 {
+    return QCPHandle<QCPLayoutElement>(elementAtRaw(index));
+}
+
+QCPLayoutElement* QCPLayoutInset::elementAtRaw(int index) const
+{
     if (index >= 0 && index < mElements.size())
-        return QCPHandle<QCPLayoutElement>(mElements.at(index));
-    else
-        return { };
+        return mElements.at(index);
+    return nullptr;
 }
 
 /* inherits documentation from base class */
@@ -2291,7 +2311,7 @@ bool QCPLayoutInset::take(QCPLayoutElement* element)
     {
         for (int i = 0; i < elementCount(); ++i)
         {
-            if (elementAt(i) == element)
+            if (elementAtRaw(i) == element)
             {
                 takeAt(i);
                 return true;

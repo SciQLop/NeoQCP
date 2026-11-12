@@ -249,6 +249,13 @@ QList<QCPHandle<QCPLayer>> QCPIntervals::dependentLayers() const
     return {};
 }
 
+QList<QCPLayer*> QCPIntervals::dependentLayersRaw() const
+{
+    if (QCPLayer* overlay = labelLayer())
+        return { overlay };
+    return {};
+}
+
 // The overlay is a layer of its own: nothing else marks it dirty when the bars change. Marking
 // it alone would also stop QCustomPlot's fallback from repainting the bars' layer, so both go.
 void QCPIntervals::markLayersDirty()

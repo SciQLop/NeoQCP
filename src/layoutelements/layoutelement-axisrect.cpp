@@ -1724,20 +1724,20 @@ void QCPAxisRect::markAffectedLayersDirty(bool invalidate)
     {
         for (QCPAxis* ax : axisList)
         {
-            markOnce(ax->layer());
+            markOnce(ax->layerRaw());
             // A linked axis' grid is drawn by the CPU while the GPU grid has it skipped.
             if (QCPGrid* grid = ax->gridIfExists(); grid && (!gpuGrid || ax->linkSource()))
-                markOnce(grid->layer());
+                markOnce(grid->layerRaw());
         }
     }
     for (QCPAbstractPlottable* p : mParentPlot->mPlottables)
     {
         // One pass over the plot's plottables, selected by the system they are drawn in: a plottable
         // whose system died (its axis was removed) is skipped as it draws nothing.
-        if (p->system() && p->system()->area() == this)
+        if (QCPCoordinateSystem* system = p->systemRaw(); system && system->areaRaw() == this)
         {
-            markOnce(p->layer());
-            for (QCPLayer* dependent : p->dependentLayers())
+            markOnce(p->layerRaw());
+            for (QCPLayer* dependent : p->dependentLayersRaw())
                 markOnce(dependent);
         }
     }
