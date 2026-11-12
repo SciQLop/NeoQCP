@@ -50,7 +50,8 @@ public:
     [[nodiscard]] QColor categoryColor(int category) const;
     //! How many times the bars were recorded: the recording is their only cache.
     [[nodiscard]] quint64 buildCount() const { return mCore.recordingCount(); }
-    [[nodiscard]] QCPLayer* labelLayer() const;
+    //! The overlay the labels and lane names go on: one layer above the bars' own.
+    [[nodiscard]] QCPHandle<QCPLayer> labelLayer() const;
     [[nodiscard]] QList<QCPHandle<QCPLayer>> dependentLayers() const override;
     [[nodiscard]] QList<QCPLayer*> dependentLayersRaw() const override;
     //! The recording's key beyond its own setters: the wave shading is inked in the key axis's tick

@@ -638,6 +638,9 @@ void TestHandle::theLayersHandOutHandles()
                                  QCPHandle<QCPLayerable>>);
     static_assert(std::is_same_v<decltype(std::declval<QCPLayerable&>().layer()),
                                  QCPHandle<QCPLayer>>);
+    // The intervals' label layer is an overlay of its own: a layer like any other (Opus M2).
+    static_assert(std::is_same_v<decltype(std::declval<const QCPIntervals&>().labelLayer()),
+                                 QCPHandle<QCPLayer>>);
 
     QCustomPlot plot;
     QCPLayer* mainLayer = plot.layer("main");

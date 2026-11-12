@@ -240,19 +240,22 @@ QColor QCPIntervals::categoryColor(int category) const
     return QColor::fromHsv((std::max(0, category) * 137) % 360, 160, 220);
 }
 
-QCPLayer* QCPIntervals::labelLayer() const { return mLabelLayer ? mLabelLayer->layer() : nullptr; }
+QCPHandle<QCPLayer> QCPIntervals::labelLayer() const
+{
+    return mLabelLayer ? mLabelLayer->layer() : QCPHandle<QCPLayer>();
+}
 
 QList<QCPHandle<QCPLayer>> QCPIntervals::dependentLayers() const
 {
-    if (QCPLayer* overlay = labelLayer())
-        return { QCPHandle<QCPLayer>(overlay) };
+    if (mLabelLayer)
+        return { mLabelLayer->layer() };
     return {};
 }
 
 QList<QCPLayer*> QCPIntervals::dependentLayersRaw() const
 {
-    if (QCPLayer* overlay = labelLayer())
-        return { overlay };
+    if (mLabelLayer)
+        return { mLabelLayer->layer().get() };
     return {};
 }
 
@@ -260,9 +263,10 @@ QList<QCPLayer*> QCPIntervals::dependentLayersRaw() const
 // it alone would also stop QCustomPlot's fallback from repainting the bars' layer, so both go.
 void QCPIntervals::markLayersDirty()
 {
-    for (QCPLayer* l : { layer().get(), labelLayer() })
-        if (l)
-            l->markDirty();
+    if (QCPLayer* own = layer().get())
+        own->markDirty();
+    if (QCPLayer* overlay = mLabelLayer ? mLabelLayer->layer().get() : nullptr)
+        overlay->markDirty();
 }
 
 void QCPIntervals::requestRepaint()
