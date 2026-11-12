@@ -931,6 +931,60 @@ void TestHandle::everyObjectPropertyReadsThroughQObjectProperty()
     QCOMPARE(graph->property("valueAxis").value<QCPAxis*>(), graph->valueAxis().get());
     QCOMPARE(graph->property("selectionDecorator").value<QCPSelectionDecorator*>(),
              graph->selectionDecorator());
+
+    // Writing: the property keeps the pointer type (H-7), so moc's WRITE still takes a raw pointer
+    // and setProperty takes one too (opencode M-3). Every writable object property is written here.
+    auto writeObject = [](QObject* object, const char* name, const QVariant& value) {
+        const int index = object->metaObject()->indexOfProperty(name);
+        QVERIFY2(index >= 0, name);
+        QVERIFY2(object->metaObject()->property(index).isWritable(), name);
+        QVERIFY2(object->setProperty(name, value), name);
+        QCOMPARE(object->property(name), value);
+    };
+
+    QVERIFY(plot.addLayer("write-test"));
+    QCPLayer* overlay = plot.layer("write-test").get();
+    writeObject(graph, "layer", QVariant::fromValue(overlay));
+    QCOMPARE(graph->layer().get(), overlay);
+    writeObject(graph, "layer", QVariant::fromValue(layer));
+    QCOMPARE(graph->layer().get(), layer);
+
+    QCPGraph* other = plot.addGraph();
+    writeObject(tracer, "graph", QVariant::fromValue(other));
+    QCOMPARE(tracer->graph(), other);
+
+    auto* otherRect = new QCPAxisRect(&plot);
+    plot.plotLayout()->addElement(1, 0, otherRect);
+    writeObject(item, "clipAxisRect", QVariant::fromValue(otherRect));
+    QCOMPARE(item->clipAxisRect().get(), otherRect);
+
+    writeObject(filled, "channelFillGraph", QVariant::fromValue(other));
+    QCOMPARE(filled->channelFillGraph(), other);
+
+    auto* otherScale = new QCPColorScale(&plot);
+    writeObject(map, "colorScale", QVariant::fromValue(otherScale));
+    QCOMPARE(map->colorScale().get(), otherScale);
+
+    writeObject(errors, "dataPlottable", QVariant::fromValue(other));
+    QCOMPARE(errors->dataPlottable().get(), other);
+
+    auto* otherGroup = new QCPBarsGroup(&plot);
+    writeObject(bars, "barsGroup", QVariant::fromValue(otherGroup));
+    QCOMPARE(bars->barsGroup().get(), otherGroup);
+
+    writeObject(graph, "selectionDecorator", QVariant::fromValue(new QCPSelectionDecorator));
+    QVERIFY(graph->selectionDecorator());
+
+    // The axes stay where they are: a pair of another area would be refused (and reported), and
+    // these two properties are the same write path as the others.
+    writeObject(graph, "keyAxis", QVariant::fromValue(graph->keyAxis().get()));
+    writeObject(graph, "valueAxis", QVariant::fromValue(graph->valueAxis().get()));
+
+    // What has no setter stays read-only, so no write path can reach it.
+    const QMetaObject* layerMeta = layer->metaObject();
+    QVERIFY(!layerMeta->property(layerMeta->indexOfProperty("children")).isWritable());
+    const QMetaObject* plotMeta = plot.metaObject();
+    QVERIFY(!plotMeta->property(plotMeta->indexOfProperty("plotLayout")).isWritable());
     QCOMPARE(gMisuses, 0);
 }
 
