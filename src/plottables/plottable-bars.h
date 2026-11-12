@@ -80,9 +80,10 @@ public:
     void setSpacing(double spacing);
 
     // non-virtual methods:
-    [[nodiscard]] QList<QCPBars*> bars() const { return mBars; }
+    //! Out of line: QCPBars is only forward-declared above this class.
+    [[nodiscard]] QList<QCPHandle<QCPBars>> bars() const;
 
-    [[nodiscard]] QCPBars* bars(int index) const;
+    [[nodiscard]] QCPHandle<QCPBars> bars(int index) const;
 
     [[nodiscard]] int size() const { return mBars.size(); }
 
@@ -211,15 +212,24 @@ public:
 
     [[nodiscard]] WidthType widthType() const { return mWidthType; }
 
-    [[nodiscard]] QCPBarsGroup* barsGroup() const { return mBarsGroup; }
+    [[nodiscard]] QCPHandle<QCPBarsGroup> barsGroup() const
+    {
+        return QCPHandle<QCPBarsGroup>(mBarsGroup);
+    }
 
     [[nodiscard]] double baseValue() const { return mBaseValue; }
 
     [[nodiscard]] double stackingGap() const { return mStackingGap; }
 
-    [[nodiscard]] QCPBars* barBelow() const { return mBarBelow.data(); }
+    [[nodiscard]] QCPHandle<QCPBars> barBelow() const
+    {
+        return QCPHandle<QCPBars>(mBarBelow.data());
+    }
 
-    [[nodiscard]] QCPBars* barAbove() const { return mBarAbove.data(); }
+    [[nodiscard]] QCPHandle<QCPBars> barAbove() const
+    {
+        return QCPHandle<QCPBars>(mBarAbove.data());
+    }
 
     [[nodiscard]] QSharedPointer<QCPBarsDataContainer> data() const { return mDataContainer; }
 
@@ -284,6 +294,13 @@ protected:
     //! Tells the group a member moved something the others are positioned by.
     void notifyGroupRevision();
 
+private:
+    // K8: the per-bar paths inside a group and the error bars read the stack raw.
+    [[nodiscard]] QCPBarsGroup* barsGroupRaw() const { return mBarsGroup; }
+    [[nodiscard]] QCPBars* barBelowRaw() const { return mBarBelow.data(); }
+    [[nodiscard]] QCPBars* barAboveRaw() const { return mBarAbove.data(); }
+
+    friend class QCPErrorBars;
     friend class QCustomPlot;
     friend class QCPLegend;
     friend class QCPBarsGroup;

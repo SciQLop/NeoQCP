@@ -56,7 +56,7 @@ QCPPlottableGroup::~QCPPlottableGroup()
     mParentPlot->mPlottableGroups.removeOne(this);
     if (mLegendRow && mLegendRow->parentLegend())
         mLegendRow->parentLegend()->removeItem(mLegendRow);
-    for (auto* member : members())
+    for (auto* member : membersRaw())
         detach(member, true);
 }
 
@@ -69,7 +69,7 @@ void QCPPlottableGroup::setName(const QString& name)
     markRowDirty();
 }
 
-QList<QCPAbstractPlottable*> QCPPlottableGroup::members() const
+QList<QCPAbstractPlottable*> QCPPlottableGroup::membersRaw() const
 {
     QList<QCPAbstractPlottable*> live;
     for (const auto& member : mMembers)
@@ -78,9 +78,27 @@ QList<QCPAbstractPlottable*> QCPPlottableGroup::members() const
     return live;
 }
 
+QList<QCPHandle<QCPAbstractPlottable>> QCPPlottableGroup::members() const
+{
+    QList<QCPHandle<QCPAbstractPlottable>> live;
+    for (QCPAbstractPlottable* member : membersRaw())
+        live.append(QCPHandle<QCPAbstractPlottable>(member));
+    return live;
+}
+
+QCPHandle<QCustomPlot> QCPPlottableGroup::parentPlot() const
+{
+    return QCPHandle<QCustomPlot>(mParentPlot);
+}
+
+QCPHandle<QCPPlottableGroup> QCPAbstractPlottable::group() const
+{
+    return QCPHandle<QCPPlottableGroup>(mGroup);
+}
+
 bool QCPPlottableGroup::addMember(QCPAbstractPlottable* plottable)
 {
-    if (!plottable || plottable->parentPlot() != mParentPlot)
+    if (!plottable || plottable->parentPlot().get() != mParentPlot)
         return false;
     if (plottable->mGroup == this)
         return true;
@@ -135,7 +153,7 @@ void QCPPlottableGroup::detach(QCPAbstractPlottable* plottable, bool restoreRow)
 
 bool QCPPlottableGroup::visible() const
 {
-    const auto live = members();
+    const auto live = membersRaw();
     return std::any_of(live.cbegin(), live.cend(), isShown);
 }
 
@@ -156,7 +174,7 @@ void QCPPlottableGroup::setVisible(bool visible)
 void QCPPlottableGroup::updateLegendRow()
 {
     QCPLegend* legend = mParentPlot->legend;
-    const bool wantsRow = legend && !members().isEmpty();
+    const bool wantsRow = legend && !membersRaw().isEmpty();
     if (wantsRow && !mLegendRow)
     {
         mLegendRow = new QCPPlottableGroupLegendItem(legend, this);
@@ -189,7 +207,7 @@ QCPAbstractPlottable* QCPPlottableGroupLegendItem::iconMember() const
 {
     if (!mGroup)
         return nullptr;
-    const auto live = mGroup->members();
+    const auto live = mGroup->membersRaw();
     auto shown = std::find_if(live.cbegin(), live.cend(), isShown);
     if (shown != live.cend())
         return *shown;
@@ -200,7 +218,7 @@ QCPAbstractPlottable* QCPPlottableGroupLegendItem::busyMember() const
 {
     if (!mGroup)
         return nullptr;
-    const auto live = mGroup->members();
+    const auto live = mGroup->membersRaw();
     auto busy = std::find_if(live.cbegin(), live.cend(),
                              [](const QCPAbstractPlottable* p) { return p->visuallyBusy(); });
     return busy == live.cend() ? nullptr : *busy;

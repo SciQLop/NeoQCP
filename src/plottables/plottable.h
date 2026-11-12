@@ -154,24 +154,27 @@ public:
 
     //! The frame it is drawn through. The cartesian projections below answer from it: they are null
     //! in any other system.
-    [[nodiscard]] QCPCoordinateSystem* system() const { return mSystem.data(); }
+    [[nodiscard]] QCPHandle<QCPCoordinateSystem> system() const { return QCPHandle<QCPCoordinateSystem>(mSystem.data()); }
 
     //! The area whose systems it draws in: null while it has no system.
-    // Out of line: the conversion from the system's handle needs the complete QCPArea.
-    [[nodiscard]] QCPArea* area() const;
+    // Out of line: a handle of the forward-declared QCPArea needs its complete type.
+    [[nodiscard]] QCPHandle<QCPArea> area() const;
 
-    [[nodiscard]] QCPAxis* keyAxis() const { return mKeyAxis.data(); }
+    [[nodiscard]] QCPHandle<QCPAxis> keyAxis() const { return QCPHandle<QCPAxis>(mKeyAxis.data()); }
 
-    [[nodiscard]] QCPAxis* valueAxis() const { return mValueAxis.data(); }
+    [[nodiscard]] QCPHandle<QCPAxis> valueAxis() const { return QCPHandle<QCPAxis>(mValueAxis.data()); }
 
     //! The system's own key axis, whatever its kind: the projection above on a cartesian system,
     //! the axis a rescale reads on any other. Null without a system.
-    [[nodiscard]] QCPAxisBase* keyAxisBase() const { return mSystem ? mSystem->keyAxis() : nullptr; }
+    [[nodiscard]] QCPHandle<QCPAxisBase> keyAxisBase() const
+    {
+        return QCPHandle<QCPAxisBase>(mSystem ? mSystem->keyAxis().get() : nullptr);
+    }
 
     //! The system's own value axis, whatever its kind. Null without a system.
-    [[nodiscard]] QCPAxisBase* valueAxisBase() const
+    [[nodiscard]] QCPHandle<QCPAxisBase> valueAxisBase() const
     {
-        return mSystem ? mSystem->valueAxis() : nullptr;
+        return QCPHandle<QCPAxisBase>(mSystem ? mSystem->valueAxis().get() : nullptr);
     }
 
     //! Whether a plot's lists hold this plottable (it is not inert).
@@ -246,7 +249,7 @@ public:
     // plottable sees the key; return true to consume it, which stops it reaching items.
     // Layers whose content follows this plottable (an overlay drawn above it, say). The axis
     // rect marks them dirty with the plottable's own layer whenever its range changes.
-    [[nodiscard]] virtual QList<QCPLayer*> dependentLayers() const { return {}; }
+    [[nodiscard]] virtual QList<QCPHandle<QCPLayer>> dependentLayers() const { return {}; }
     virtual bool keyPress(QKeyEvent* event)
     {
         Q_UNUSED(event);
@@ -276,7 +279,8 @@ public:
     bool removeFromLegend() const;
 
     // A grouped plottable has no legend row of its own: its group has one (QCPPlottableGroup).
-    QCPPlottableGroup* group() const { return mGroup; }
+    //! The group whose members include it; out of line, where QCPPlottableGroup is complete.
+    QCPHandle<QCPPlottableGroup> group() const;
     // False keeps the plottable out of the legend, also after it leaves a group.
     bool wantsLegend() const { return mWantsLegend; }
     void setWantsLegend(bool wants);
@@ -321,6 +325,10 @@ protected:
     // QCPAxis::axisRect() hands out a handle. Defined in plottable.cpp, where QCPAxisRect is
     // complete.
     [[nodiscard]] static QCPAxisRect* axisRectOf(const QCPAxis* axis);
+
+    //! The cartesian projections raw, for the per-bar paths of a bars group (K8).
+    [[nodiscard]] QCPAxis* keyAxisRaw() const { return mKeyAxis.data(); }
+    [[nodiscard]] QCPAxis* valueAxisRaw() const { return mValueAxis.data(); }
 
     //! Called after setSystem; not called by the constructor.
     virtual void systemChanged() {}
@@ -384,6 +392,10 @@ protected:
 
 private:
     Q_DISABLE_COPY(QCPAbstractPlottable)
+
+    // K8: the bars group reads the projection raw, once per bar; a layer does so per plottable.
+    friend class QCPBarsGroup;
+    friend class QCPLayer;
 
     QCPPlottableGroup* mGroup = nullptr; // set and cleared by the group
     QPointer<QCustomPlot> mRegisteredPlot; // the plot whose lists hold this one; null when inert

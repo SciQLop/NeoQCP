@@ -106,7 +106,7 @@ void TestPlottableGroup::removedPlottableLeavesTheGroup()
 
     QVERIFY(mPlot->removePlottable(a));
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QCOMPARE(group->members(), (QList<QCPAbstractPlottable*> { b, c }));
+    QCOMPARE(qcp::pointers(group->members()), (QList<QCPAbstractPlottable*> { b, c }));
     QCOMPARE(mPlot->legend->itemCount(), 1);
 }
 
@@ -184,7 +184,7 @@ void TestPlottableGroup::memberMovesToItsNewGroup()
 
     second->addMember(a);
     QVERIFY(first->members().isEmpty());
-    QCOMPARE(second->members(), QList<QCPAbstractPlottable*> { a });
+    QCOMPARE(qcp::pointers(second->members()), QList<QCPAbstractPlottable*> { a });
     QCOMPARE(a->group(), second);
     QCOMPARE(mPlot->legend->itemCount(), 1);
 }
@@ -282,7 +282,7 @@ void TestPlottableGroup::membersChangedSlotMayRemoveAgain()
 
     QVERIFY(mPlot->removePlottable(a));
     QCOMPARE(mPlot->plottableCount(), 1);
-    QCOMPARE(group->members(), QList<QCPAbstractPlottable*> { b });
+    QCOMPARE(qcp::pointers(group->members()), QList<QCPAbstractPlottable*> { b });
 }
 
 void TestPlottableGroup::visibilitySlotMayRemoveALaterMember()
@@ -295,7 +295,7 @@ void TestPlottableGroup::visibilitySlotMayRemoveALaterMember()
     connect(a, &QCPLayerable::visibleChanged, this, [this, b] { (void)mPlot->removePlottable(b); });
 
     group->setVisible(false); // must not touch the deleted b
-    QCOMPARE(group->members(), QList<QCPAbstractPlottable*> { a });
+    QCOMPARE(qcp::pointers(group->members()), QList<QCPAbstractPlottable*> { a });
 }
 
 void TestPlottableGroup::moveSurvivesASlotRemovingTheMember()

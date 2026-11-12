@@ -10,6 +10,16 @@
 #include "plottables/plottable-multigraph.h"
 #include "selection.h"
 
+QCPHandle<QCPAbstractPlottable> QCPDataLocator::plottable() const
+{
+    return QCPHandle<QCPAbstractPlottable>(mPlottable);
+}
+
+QCPHandle<QCPAbstractPlottable> QCPDataLocator::hitPlottable() const
+{
+    return QCPHandle<QCPAbstractPlottable>(mHitPlottable);
+}
+
 void QCPDataLocator::setPlottable(QCPAbstractPlottable* plottable)
 {
     mPlottable = plottable;

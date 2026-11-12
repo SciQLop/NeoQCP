@@ -496,9 +496,9 @@ QCPDrawnView qcpDrawnViewOf(const QCPAbstractItem& item, QRect clip)
     const QCPItemPosition* first = item.firstPosition();
     if (first)
     {
-        view.keyAxis = first->keyAxis();
-        view.valueAxis = first->valueAxis();
-        view.system = first->system();
+        view.keyAxis = first->keyAxisRaw();
+        view.valueAxis = first->valueAxisRaw();
+        view.system = first->systemRaw();
         // The frame is the one of the first position that maps plot coordinates through a system;
         // a position that only measures ratios does not name the frame.
         const bool firstMapsPlots = view.system
@@ -506,19 +506,19 @@ QCPDrawnView qcpDrawnViewOf(const QCPAbstractItem& item, QRect clip)
                 || first->typeY() == QCPItemPosition::ptPlotCoords);
         if (!firstMapsPlots)
             for (const QCPItemPosition* position : item.positions())
-                if (position->system()
+                if (position->systemRaw()
                     && (position->typeX() == QCPItemPosition::ptPlotCoords
                         || position->typeY() == QCPItemPosition::ptPlotCoords))
                 {
-                    view.system = position->system();
+                    view.system = position->systemRaw();
                     break;
                 }
     }
     // The frame's ratio is the position's area; the clip shape is the item's clip area, and only
     // while the item clips. An unclipped item draws anywhere, exactly as it does on an axis rect.
-    view.area = first ? first->area() : nullptr;
-    view.clipArea = item.clipToAxisRect() ? item.clipArea() : nullptr;
-    view.axisRect = item.clipAxisRect();
+    view.area = first ? first->areaRaw() : nullptr;
+    view.clipArea = item.clipToAxisRect() ? item.clipAreaRaw() : nullptr;
+    view.axisRect = item.clipAxisRectRaw();
     if (!view.axisRect && view.keyAxis)
         view.axisRect = view.keyAxis->axisRect();
     // An area that has not been laid out yet, or that was taken out of the layout, has no frame to

@@ -32,11 +32,12 @@ public:
 
     ~QCPPlottableGroup() override;
 
-    QCustomPlot* parentPlot() const { return mParentPlot; }
+    //! Out of line: a handle of the forward-declared QCustomPlot needs its complete type.
+    QCPHandle<QCustomPlot> parentPlot() const;
     QString name() const { return mName; }
     void setName(const QString& name);
 
-    QList<QCPAbstractPlottable*> members() const;
+    QList<QCPHandle<QCPAbstractPlottable>> members() const;
     //! False for a null plottable or one of another QCustomPlot. A member of another group moves.
     bool addMember(QCPAbstractPlottable* plottable);
     void removeMember(QCPAbstractPlottable* plottable);
@@ -51,6 +52,8 @@ signals:
 
 private:
     QCPPlottableGroup(QCustomPlot* parentPlot, const QString& name);
+    //! The live members raw (K8): the classes that read them per legend-row draw build no handles.
+    QList<QCPAbstractPlottable*> membersRaw() const;
     void detach(QCPAbstractPlottable* plottable, bool restoreRow);
     void updateLegendRow();
     void markRowDirty();
@@ -61,6 +64,7 @@ private:
     QPointer<QCPPlottableGroupLegendItem> mLegendRow;
 
     friend class QCustomPlot;
+    friend class QCPPlottableGroupLegendItem; // reads membersRaw() per legend-row draw
 };
 
 /*! \class QCPPlottableGroupLegendItem
@@ -74,7 +78,10 @@ class QCP_LIB_DECL QCPPlottableGroupLegendItem : public QCPAbstractLegendItem
 public:
     QCPPlottableGroupLegendItem(QCPLegend* parent, QCPPlottableGroup* group);
 
-    QCPPlottableGroup* group() const { return mGroup; }
+    QCPHandle<QCPPlottableGroup> group() const
+    {
+        return QCPHandle<QCPPlottableGroup>(mGroup.data());
+    }
     //! The group name, after the busy symbol while a member is visually busy.
     QString rowText(bool withBusySymbol = true) const;
     //! Read at draw time, so a legend-wide text colour change can't undo the dimming.

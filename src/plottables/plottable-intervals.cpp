@@ -242,10 +242,10 @@ QColor QCPIntervals::categoryColor(int category) const
 
 QCPLayer* QCPIntervals::labelLayer() const { return mLabelLayer ? mLabelLayer->layer() : nullptr; }
 
-QList<QCPLayer*> QCPIntervals::dependentLayers() const
+QList<QCPHandle<QCPLayer>> QCPIntervals::dependentLayers() const
 {
     if (QCPLayer* overlay = labelLayer())
-        return { overlay };
+        return { QCPHandle<QCPLayer>(overlay) };
     return {};
 }
 
@@ -377,7 +377,7 @@ bool QCPIntervals::siblingHasBarAt(const QPointF& pos) const
 {
     for (QCPAbstractPlottable* plottable : mParentPlot->plottablesRaw())
         if (auto* other = qobject_cast<QCPIntervals*>(plottable);
-            other && other != this && other->laneLayout() == mLayout && other->realVisibility()
+            other && other != this && other->mLayout == mLayout && other->realVisibility()
             && other->hitTest(pos).row >= 0)
             return true;
     return false;
@@ -1233,7 +1233,7 @@ bool QCPIntervals::drawsLaneNames() const
         return false;
     for (QCPAbstractPlottable* plottable : mParentPlot->plottablesRaw())
         if (auto* other = qobject_cast<QCPIntervals*>(plottable);
-            other && other->laneLayout() == mLayout && other->realVisibility())
+            other && other->mLayout == mLayout && other->realVisibility())
             return other == this;
     return false;
 }

@@ -840,15 +840,15 @@ QList<QCPHandle<QCPAbstractItem>> QCPAxisRect::items() const
     QList<QCPHandle<QCPAbstractItem>> result;
     for (QCPAbstractItem* item : mParentPlot->mItems)
     {
-        if (item->clipAxisRect() == this)
+        if (item->clipAxisRect().get() == this)
         {
             result.append(QCPHandle<QCPAbstractItem>(item));
             continue;
         }
         for (QCPItemPosition* position : item->positions())
         {
-            if (position->axisRect() == this || isOn(position->keyAxis(), this)
-                || isOn(position->valueAxis(), this))
+            if (position->axisRectRaw() == this || isOn(position->keyAxisRaw(), this)
+                || isOn(position->valueAxisRaw(), this))
             {
                 result.append(QCPHandle<QCPAbstractItem>(item));
                 break;

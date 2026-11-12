@@ -431,7 +431,7 @@ QPointF QCPLayer::pixelOffset() const
         if (!plottable->realVisibility() || !plottable->canProduceContent())
             continue;
         const QPointF offset = plottable->stallPixelOffset();
-        auto* axisRect = plottable->keyAxis() ? plottable->keyAxis()->axisRect() : nullptr;
+        auto* axisRect = plottable->keyAxisRaw() ? plottable->keyAxisRaw()->axisRect() : nullptr;
         if (offset.isNull()
             || (result && (axisRect != resultAxisRect || !samePixelOffset(*result, offset))))
             return {};
@@ -1203,10 +1203,10 @@ void QCPLayer::collectItemFrames(QCPAbstractItem* item, std::vector<QPointer<QCP
         seen.push_back(current);
         for (QCPItemPosition* position : current->positions())
         {
-            addOnce(axes, position->keyAxis());
-            addOnce(axes, position->valueAxis());
-            addOnce(systems, position->system());
-            addOnce(areas, position->area());
+            addOnce(axes, position->keyAxisRaw());
+            addOnce(axes, position->valueAxisRaw());
+            addOnce(systems, position->systemRaw());
+            addOnce(areas, position->areaRaw());
             if (QCPItemAnchor* anchor = position->parentAnchorX(); anchor && anchor->mParentItem)
                 pending.push_back(anchor->mParentItem);
             if (QCPItemAnchor* anchor = position->parentAnchorY(); anchor && anchor->mParentItem)

@@ -231,7 +231,7 @@ void TestOwnership::deletePlottableInGroup()
 
     delete first;
 
-    QCOMPARE(group->members(), QList<QCPAbstractPlottable*> { second });
+    QCOMPARE(qcp::pointers(group->members()), QList<QCPAbstractPlottable*> { second });
     QCOMPARE(changed.count(), 1);
     QCOMPARE(mPlot->legend->itemCount(), 1); // the group row
     draw();
@@ -733,7 +733,7 @@ void TestOwnership::deleteBarsInGroup()
 
     delete first;
 
-    QCOMPARE(group->bars(), QList<QCPBars*> { second });
+    QCOMPARE(qcp::pointers(group->bars()), QList<QCPBars*> { second });
     draw();
     delete group;
     QVERIFY(second->barsGroup() == nullptr);

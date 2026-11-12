@@ -75,12 +75,19 @@
 
 /* start of documentation of inline functions */
 
-/*! \fn QList<QCPBars*> QCPBarsGroup::bars() const
-
+/*!
   Returns all bars currently in this group.
 
   \see bars(int index)
 */
+QList<QCPHandle<QCPBars>> QCPBarsGroup::bars() const
+{
+    QList<QCPHandle<QCPBars>> result;
+    result.reserve(mBars.size());
+    for (QCPBars* bar : mBars)
+        result.append(QCPHandle<QCPBars>(bar));
+    return result;
+}
 
 /*! \fn int QCPBarsGroup::size() const
 
@@ -155,16 +162,16 @@ void QCPBarsGroup::setSpacing(double spacing)
 
   \see bars(), size
 */
-QCPBars* QCPBarsGroup::bars(int index) const
+QCPHandle<QCPBars> QCPBarsGroup::bars(int index) const
 {
     if (index >= 0 && index < mBars.size())
     {
-        return mBars.at(index);
+        return QCPHandle<QCPBars>(mBars.at(index));
     }
     else
     {
         qDebug() << Q_FUNC_INFO << "index out of bounds:" << index;
-        return nullptr;
+        return {};
     }
 }
 
@@ -223,7 +230,7 @@ void QCPBarsGroup::insert(int i, QCPBars* bars)
     {
         bars->setBarsGroup(this);
         // It may refuse (another system): a bar that did not join has no index to move.
-        if (bars->barsGroup() != this)
+        if (bars->barsGroupRaw() != this)
             return;
     }
     // then move to according position:
@@ -292,15 +299,15 @@ double QCPBarsGroup::keyPixelOffset(const QCPBars* bars, double keyCoord)
     QList<const QCPBars*> baseBars;
     for (const QCPBars* b : mBars)
     {
-        while (b->barBelow())
-            b = b->barBelow();
+        while (b->barBelowRaw())
+            b = b->barBelowRaw();
         if (!baseBars.contains(b))
             baseBars.append(b);
     }
     // find base bar this "bars" is stacked on:
     const QCPBars* thisBase = bars;
-    while (thisBase->barBelow())
-        thisBase = thisBase->barBelow();
+    while (thisBase->barBelowRaw())
+        thisBase = thisBase->barBelowRaw();
 
     // determine key pixel offset of this base bars considering all other base bars in this
     // barsgroup:
@@ -346,7 +353,7 @@ double QCPBarsGroup::keyPixelOffset(const QCPBars* bars, double keyCoord)
             baseBars.at(index)->getPixelWidth(keyCoord, lowerPixelWidth, upperPixelWidth);
             result += qAbs(upperPixelWidth - lowerPixelWidth) * 0.5;
             // correct sign of result depending on orientation and direction of key axis:
-            result *= dir * thisBase->keyAxis()->pixelOrientation();
+            result *= dir * thisBase->keyAxisRaw()->pixelOrientation();
         }
     }
     return result;
@@ -372,15 +379,15 @@ double QCPBarsGroup::getPixelSpacing(const QCPBars* bars, double keyCoord)
         }
         case stAxisRectRatio:
         {
-            if (bars->keyAxis()->orientation() == Qt::Horizontal)
-                return static_cast<QCPAxisRect*>(bars->keyAxis()->area())->width() * mSpacing;
+            if (bars->keyAxisRaw()->orientation() == Qt::Horizontal)
+                return static_cast<QCPAxisRect*>(bars->keyAxisRaw()->area())->width() * mSpacing;
             else
-                return static_cast<QCPAxisRect*>(bars->keyAxis()->area())->height() * mSpacing;
+                return static_cast<QCPAxisRect*>(bars->keyAxisRaw()->area())->height() * mSpacing;
         }
         case stPlotCoords:
         {
-            double keyPixel = bars->keyAxis()->coordToPixel(keyCoord);
-            return qAbs(bars->keyAxis()->coordToPixel(keyCoord + mSpacing) - keyPixel);
+            double keyPixel = bars->keyAxisRaw()->coordToPixel(keyCoord);
+            return qAbs(bars->keyAxisRaw()->coordToPixel(keyCoord + mSpacing) - keyPixel);
         }
     }
     return 0;

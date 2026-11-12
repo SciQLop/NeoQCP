@@ -155,18 +155,21 @@ public:
 
     [[nodiscard]] QPointF coords() const { return QPointF(mKey, mValue); }
 
-    [[nodiscard]] QCPAxis* keyAxis() const { return mKeyAxis.data(); }
+    [[nodiscard]] QCPHandle<QCPAxis> keyAxis() const { return QCPHandle<QCPAxis>(mKeyAxis.data()); }
 
-    [[nodiscard]] QCPAxis* valueAxis() const { return mValueAxis.data(); }
+    [[nodiscard]] QCPHandle<QCPAxis> valueAxis() const
+    {
+        return QCPHandle<QCPAxis>(mValueAxis.data());
+    }
 
-    [[nodiscard]] QCPAxisRect* axisRect() const;
+    [[nodiscard]] QCPHandle<QCPAxisRect> axisRect() const;
 
     //! The coordinate system this position maps plot coordinates through; null without one (the
     //! cartesian one-axis idiom, or a position with no plot-coordinate slot).
-    [[nodiscard]] QCPCoordinateSystem* system() const;
+    [[nodiscard]] QCPHandle<QCPCoordinateSystem> system() const;
     //! The area this position measures ratios and pixels in: the axis rect for the cartesian types,
     //! a polar area for a position bound to a polar system.
-    [[nodiscard]] QCPArea* area() const;
+    [[nodiscard]] QCPHandle<QCPArea> area() const;
     //! (0, 0) for an item outside a plot (taken, see QCustomPlot::take).
     [[nodiscard]] virtual QPointF pixelPosition() const override;
 
@@ -214,6 +217,19 @@ protected:
 private:
     Q_DISABLE_COPY(QCPItemPosition)
     friend class QCPItemTracer;
+    // K8: the per-item-per-frame paths read the frame raw instead of building a handle per
+    // position. The accessors are out of line, where their types are complete.
+    [[nodiscard]] QCPAxis* keyAxisRaw() const { return mKeyAxis.data(); }
+    [[nodiscard]] QCPAxis* valueAxisRaw() const { return mValueAxis.data(); }
+    [[nodiscard]] QCPAxisRect* axisRectRaw() const;
+    [[nodiscard]] QCPCoordinateSystem* systemRaw() const;
+    [[nodiscard]] QCPArea* areaRaw() const;
+
+    friend class QCPAbstractItem;
+    friend class QCPAxis;
+    friend class QCPAxisRect;
+    friend class QCPLayer;
+    friend QCPDrawnView qcpDrawnViewOf(const QCPAbstractItem& item, QRect clip);
 
     // True when the pixel dependency graph above  parent comes back here: a position depends on its
     // own parent anchor on the same axis, a plain anchor on every position of its item.
@@ -255,9 +271,9 @@ public:
     // getters:
     [[nodiscard]] bool clipToAxisRect() const { return mClipToAxisRect; }
 
-    [[nodiscard]] QCPAxisRect* clipAxisRect() const;
+    [[nodiscard]] QCPHandle<QCPAxisRect> clipAxisRect() const;
     //! The area this item is clipped to; the cartesian form (clipAxisRect()) projects it.
-    [[nodiscard]] QCPArea* clipArea() const;
+    [[nodiscard]] QCPHandle<QCPArea> clipArea() const;
 
     [[nodiscard]] QCP::SelectionType selectable() const
     {
@@ -405,6 +421,11 @@ private:
     // Writes mItemSlot at rebuild, so a move costs no search, and reads mIndexExtent to see whether
     // a rebuild has anything to re-sort.
     friend class QCPLayer;
+
+    // K8: the drawn view reads the clip raw, once per item per frame.
+    [[nodiscard]] QCPArea* clipAreaRaw() const;
+    [[nodiscard]] QCPAxisRect* clipAxisRectRaw() const;
+    friend QCPDrawnView qcpDrawnViewOf(const QCPAbstractItem& item, QRect clip);
 };
 
 /*!

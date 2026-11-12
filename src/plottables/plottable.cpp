@@ -584,9 +584,9 @@ QCPAxisRect* QCPAbstractPlottable::axisRectOf(const QCPAxis* axis)
     return axis ? static_cast<QCPAxisRect*>(axis->area()) : nullptr;
 }
 
-QCPArea* QCPAbstractPlottable::area() const
+QCPHandle<QCPArea> QCPAbstractPlottable::area() const
 {
-    return mSystem ? mSystem->area().get() : nullptr;
+    return QCPHandle<QCPArea>(mSystem ? mSystem->area().get() : nullptr);
 }
 
 QCPAbstractPlottable::~QCPAbstractPlottable()

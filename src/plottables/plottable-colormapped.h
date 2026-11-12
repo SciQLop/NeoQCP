@@ -29,7 +29,10 @@ public:
     [[nodiscard]] QCPColorGradient gradient() const { return mGradient; }
 
     //! Null when no scale drives this plottable, including after the scale is deleted.
-    [[nodiscard]] QCPColorScale* colorScale() const { return mColorScale; }
+    [[nodiscard]] QCPHandle<QCPColorScale> colorScale() const
+    {
+        return QCPHandle<QCPColorScale>(mColorScale);
+    }
 
     // setters:
     Q_SLOT void setDataRange(const QCPRange& dataRange);

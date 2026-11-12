@@ -29,6 +29,8 @@ private slots:
     void theLegendHandsOutHandles();
     void theLayersHandOutHandles();
     void theSystemsAndPolarHandOutHandles();
+    void thePlottablesHandOutHandles();
+    void theItemsHandOutHandles();
     void everyObjectPropertyReadsThroughQObjectProperty();
     void handleAsCast();
     void handleRemove();

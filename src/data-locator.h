@@ -2,6 +2,7 @@
 #define QCP_DATA_LOCATOR_H
 
 #include "global.h"
+#include "handle.h"
 #include <QVector>
 #include <limits>
 
@@ -23,8 +24,9 @@ public:
     double data() const { return mData; }
     int dataIndex() const { return mDataIndex; }
     const QVector<double>& componentValues() const { return mComponentValues; }
-    QCPAbstractPlottable* plottable() const { return mPlottable; }
-    QCPAbstractPlottable* hitPlottable() const { return mHitPlottable; }
+    //! Out of line: a handle of the forward-declared QCPAbstractPlottable needs its complete type.
+    QCPHandle<QCPAbstractPlottable> plottable() const;
+    QCPHandle<QCPAbstractPlottable> hitPlottable() const;
 
 private:
     QCPAbstractPlottable* mPlottable = nullptr;

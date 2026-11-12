@@ -1318,7 +1318,7 @@ void QCPGraph::drawFill(QCPPainter* painter, QVector<QPointF>* lines,
         if (!otherLines.isEmpty())
         {
             QVector<QCPDataRange> otherSegments
-                = getNonNanSegments(&otherLines, mChannelFillGraph->keyAxis()->orientation());
+                = getNonNanSegments(&otherLines, mChannelFillGraph->keyAxisRaw()->orientation());
             QVector<QPair<QCPDataRange, QCPDataRange>> segmentPairs
                 = getOverlappingSegments(segments, lines, otherSegments, &otherLines);
             for (int i = 0; i < segmentPairs.size(); ++i)

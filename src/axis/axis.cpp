@@ -1367,7 +1367,7 @@ void QCPAxis::rescale(bool onlyVisiblePlottables)
         QCP::SignDomain signDomain = QCP::sdBoth;
         if (mScaleType == stLogarithmic)
             signDomain = (mRange.upper < 0 ? QCP::sdNegative : QCP::sdPositive);
-        if (plottable->keyAxisBase() == this)
+        if (plottable->keyAxisBase().get() == this)
             plottableRange = plottable->getKeyRange(currentFoundRange, signDomain);
         else
             plottableRange = plottable->getValueRange(currentFoundRange, signDomain);
@@ -1623,8 +1623,8 @@ QList<QCPHandle<QCPAbstractItem>> QCPAxis::items() const
         {
             // The system first, in any kind: a position on a user system measures itself in that
             // system's axis, and the projections stay for the 2.x pairs that have no frame.
-            if ((position->system() && position->system()->usesAxis(this))
-                || position->keyAxis() == this || position->valueAxis() == this)
+            if ((position->systemRaw() && position->systemRaw()->usesAxis(this))
+                || position->keyAxisRaw() == this || position->valueAxisRaw() == this)
             {
                 result.append(QCPHandle<QCPAbstractItem>(item));
                 break;

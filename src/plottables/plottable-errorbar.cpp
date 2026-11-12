@@ -1156,7 +1156,7 @@ void QCPErrorBars::recordSegment(QCPDrawContext& context, const QCPDataRange& se
     // plottable puts it, in pixels (2.x asked the plottable's dataPixelPosition). Reading that pixel
     // reads the view, so such a recording is remade whenever the view changes.
     const QCPBars* bars = qobject_cast<const QCPBars*>(mDataPlottable.data());
-    const bool pixelCentres = bars && (bars->barBelow() || bars->barsGroup());
+    const bool pixelCentres = bars && (bars->barBelowRaw() || bars->barsGroupRaw());
     QCPAxis* errorAxis = mErrorType == etValueError ? mValueAxis.data() : mKeyAxis.data();
     if (pixelCentres)
         (void)context.transform();

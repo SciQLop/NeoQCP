@@ -33,7 +33,10 @@ public:
     void setData(qcp::intervals::Columns columns);
     [[nodiscard]] const qcp::intervals::Columns& columns() const { return mColumns; }
     [[nodiscard]] int rowCount() const { return static_cast<int>(mColumns.start.size()); }
-    [[nodiscard]] QCPLaneLayout* laneLayout() const { return mLayout; }
+    [[nodiscard]] QCPHandle<QCPLaneLayout> laneLayout() const
+    {
+        return QCPHandle<QCPLaneLayout>(mLayout);
+    }
 
     void setCategoryColors(const QVector<QColor>& colors);
     //! Names of the category indices, for the legend.
@@ -48,7 +51,7 @@ public:
     //! How many times the bars were recorded: the recording is their only cache.
     [[nodiscard]] quint64 buildCount() const { return mCore.recordingCount(); }
     [[nodiscard]] QCPLayer* labelLayer() const;
-    [[nodiscard]] QList<QCPLayer*> dependentLayers() const override;
+    [[nodiscard]] QList<QCPHandle<QCPLayer>> dependentLayers() const override;
     //! The recording's key beyond its own setters: the wave shading is inked in the key axis's tick
     //! label colour, which a theme or setTickLabelColor changes without touching the plottable.
     [[nodiscard]] quint64 dependencyRevision() const override;

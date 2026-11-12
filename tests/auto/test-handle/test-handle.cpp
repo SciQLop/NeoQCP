@@ -684,6 +684,173 @@ void TestHandle::theSystemsAndPolarHandOutHandles()
     QCOMPARE(area->allAxes().size(), 2);
 }
 
+void TestHandle::thePlottablesHandOutHandles()
+{
+    using Plottable = QCPAbstractPlottable;
+    // Inventory §2.4: every plot-owned QObject getter returns a handle (K1), lists of handles (K5).
+    static_assert(std::is_same_v<decltype(std::declval<Plottable&>().system()),
+                                 QCPHandle<QCPCoordinateSystem>>);
+    static_assert(std::is_same_v<decltype(std::declval<Plottable&>().area()),
+                                 QCPHandle<QCPArea>>);
+    static_assert(std::is_same_v<decltype(std::declval<Plottable&>().keyAxis()),
+                                 QCPHandle<QCPAxis>>);
+    static_assert(std::is_same_v<decltype(std::declval<Plottable&>().valueAxis()),
+                                 QCPHandle<QCPAxis>>);
+    static_assert(std::is_same_v<decltype(std::declval<Plottable&>().keyAxisBase()),
+                                 QCPHandle<QCPAxisBase>>);
+    static_assert(std::is_same_v<decltype(std::declval<Plottable&>().valueAxisBase()),
+                                 QCPHandle<QCPAxisBase>>);
+    static_assert(std::is_same_v<decltype(std::declval<Plottable&>().group()),
+                                 QCPHandle<QCPPlottableGroup>>);
+    static_assert(std::is_same_v<decltype(std::declval<Plottable&>().dependentLayers()),
+                                 QList<QCPHandle<QCPLayer>>>);
+    // H-3: the Q_GADGET and the plain interface cannot be handles.
+    static_assert(std::is_same_v<decltype(std::declval<Plottable&>().selectionDecorator()),
+                                 QCPSelectionDecorator*>);
+    static_assert(std::is_same_v<decltype(std::declval<Plottable&>().interface1D()),
+                                 QCPPlottableInterface1D*>);
+
+    static_assert(std::is_same_v<decltype(std::declval<QCPErrorBars&>().dataPlottable()),
+                                 QCPHandle<QCPAbstractPlottable>>);
+    static_assert(std::is_same_v<decltype(std::declval<QCPBars&>().barsGroup()),
+                                 QCPHandle<QCPBarsGroup>>);
+    static_assert(std::is_same_v<decltype(std::declval<QCPBars&>().barBelow()),
+                                 QCPHandle<QCPBars>>);
+    static_assert(std::is_same_v<decltype(std::declval<QCPBars&>().barAbove()),
+                                 QCPHandle<QCPBars>>);
+    static_assert(std::is_same_v<decltype(std::declval<QCPBarsGroup&>().bars(0)),
+                                 QCPHandle<QCPBars>>);
+    static_assert(std::is_same_v<decltype(std::declval<QCPBarsGroup&>().bars()),
+                                 QList<QCPHandle<QCPBars>>>);
+    static_assert(std::is_same_v<decltype(std::declval<QCPAbstractColorMapped&>().colorScale()),
+                                 QCPHandle<QCPColorScale>>);
+    static_assert(std::is_same_v<decltype(std::declval<QCPColorMap&>().data()),
+                                 QCPColorMapData*>); // H-3
+    static_assert(std::is_same_v<decltype(std::declval<QCPIntervals&>().laneLayout()),
+                                 QCPHandle<QCPLaneLayout>>);
+    // K3: the graph family, the tracer's targets and the multigraph row stay raw until 5c.
+    static_assert(std::is_same_v<decltype(std::declval<QCPGraph&>().channelFillGraph()),
+                                 QCPGraph*>);
+    static_assert(std::is_same_v<decltype(std::declval<QCPItemTracer&>().graph()), QCPGraph*>);
+    static_assert(std::is_same_v<decltype(std::declval<QCPItemTracer&>().lineGraph()),
+                                 QCPMultiGraph*>);
+    static_assert(std::is_same_v<decltype(std::declval<QCPPlottableGroup&>().parentPlot()),
+                                 QCPHandle<QCustomPlot>>);
+    static_assert(std::is_same_v<decltype(std::declval<QCPPlottableGroup&>().members()),
+                                 QList<QCPHandle<QCPAbstractPlottable>>>);
+    static_assert(
+        std::is_same_v<decltype(std::declval<QCPPlottableGroupLegendItem&>().group()),
+                       QCPHandle<QCPPlottableGroup>>);
+    static_assert(std::is_same_v<decltype(std::declval<QCPDataLocator&>().plottable()),
+                                 QCPHandle<QCPAbstractPlottable>>);
+    static_assert(std::is_same_v<decltype(std::declval<QCPDataLocator&>().hitPlottable()),
+                                 QCPHandle<QCPAbstractPlottable>>);
+
+    QCustomPlot plot;
+    QCPGraph* graph = plot.addGraph();
+    graph->setName("a");
+    QCOMPARE(graph->keyAxis().get(), plot.xAxis.get());
+    QCOMPARE(graph->valueAxis().get(), plot.yAxis.get());
+    QVERIFY(graph->system());
+    QCOMPARE(graph->area().get(), static_cast<QCPArea*>(plot.axisRect().get()));
+    QCOMPARE(graph->keyAxisBase().get(), static_cast<QCPAxisBase*>(plot.xAxis.get()));
+
+    auto group = plot.add<QCPPlottableGroup>("g");
+    QVERIFY(group);
+    QVERIFY(group.addMember(QCPHandle<QCPGraph>(graph)));
+    auto grouped = plot.add<QCPBars>();
+    QVERIFY(group.addMember(grouped));
+    QCOMPARE(graph->group().get(), group.get());
+    QCOMPARE(group->members().size(), 2);
+    QCOMPARE(group->members().first().get(), static_cast<QCPAbstractPlottable*>(graph));
+    QCOMPARE(group->parentPlot().get(), &plot);
+
+    QCPErrorBars* errors = new QCPErrorBars(plot.xAxis, plot.yAxis);
+    errors->setDataPlottable(graph);
+    QCOMPARE(errors->dataPlottable().get(), static_cast<QCPAbstractPlottable*>(graph));
+
+    QCPBarsGroup* barsGroup = new QCPBarsGroup(&plot);
+    auto bars = plot.add<QCPBars>();
+    bars->setBarsGroup(barsGroup);
+    QCOMPARE(bars->barsGroup().get(), barsGroup);
+    QCOMPARE(barsGroup->bars(0).get(), bars.get());
+    QCOMPARE(barsGroup->bars().size(), 1);
+    QCOMPARE(barsGroup->bars().first().get(), bars.get());
+    QCOMPARE(barsGroup->bars(-1).get(), nullptr);
+
+    QCPColorScale* scale = new QCPColorScale(&plot);
+    QCPColorMap* map = new QCPColorMap(plot.xAxis, plot.yAxis);
+    map->setColorScale(scale);
+    QCOMPARE(map->colorScale().get(), scale);
+
+    QCPDataLocator locator;
+    locator.setPlottable(graph);
+    QCOMPARE(locator.plottable().get(), static_cast<QCPAbstractPlottable*>(graph));
+    QVERIFY(!locator.hitPlottable());
+    QVERIFY(graph->dependentLayers().isEmpty());
+    plot.replot();
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestHandle::theItemsHandOutHandles()
+{
+    using Item = QCPAbstractItem;
+    // Inventory §2.6: the item's clip frame is handles; the Q_GADGET positions and anchors stay raw
+    // (H-3), and so do the lists of them.
+    static_assert(std::is_same_v<decltype(std::declval<Item&>().clipAxisRect()),
+                                 QCPHandle<QCPAxisRect>>);
+    static_assert(std::is_same_v<decltype(std::declval<Item&>().clipArea()),
+                                 QCPHandle<QCPArea>>);
+    static_assert(std::is_same_v<decltype(std::declval<Item&>().positions()),
+                                 QList<QCPItemPosition*>>);
+    static_assert(std::is_same_v<decltype(std::declval<Item&>().anchors()),
+                                 QList<QCPItemAnchor*>>);
+    static_assert(std::is_same_v<decltype(std::declval<Item&>().position(QString())),
+                                 QCPItemPosition*>);
+    static_assert(std::is_same_v<decltype(std::declval<Item&>().anchor(QString())),
+                                 QCPItemAnchor*>);
+    static_assert(std::is_same_v<decltype(std::declval<Item&>().firstPosition()),
+                                 const QCPItemPosition*>);
+
+    using Position = QCPItemPosition;
+    static_assert(std::is_same_v<decltype(std::declval<Position&>().keyAxis()),
+                                 QCPHandle<QCPAxis>>);
+    static_assert(std::is_same_v<decltype(std::declval<Position&>().valueAxis()),
+                                 QCPHandle<QCPAxis>>);
+    static_assert(std::is_same_v<decltype(std::declval<Position&>().axisRect()),
+                                 QCPHandle<QCPAxisRect>>);
+    static_assert(std::is_same_v<decltype(std::declval<Position&>().system()),
+                                 QCPHandle<QCPCoordinateSystem>>);
+    static_assert(std::is_same_v<decltype(std::declval<Position&>().area()),
+                                 QCPHandle<QCPArea>>);
+    static_assert(std::is_same_v<decltype(std::declval<Position&>().parentAnchor()),
+                                 QCPItemAnchor*>);
+    static_assert(std::is_same_v<decltype(std::declval<Position&>().parentAnchorX()),
+                                 QCPItemAnchor*>);
+    static_assert(std::is_same_v<decltype(std::declval<Position&>().parentAnchorY()),
+                                 QCPItemAnchor*>);
+
+    QCustomPlot plot;
+    auto line = plot.add<QCPItemLine>();
+    QVERIFY(line);
+    line->setClipAxisRect(plot.axisRect());
+    QCOMPARE(line->clipAxisRect().get(), plot.axisRect().get());
+    QCOMPARE(line->clipArea().get(), static_cast<QCPArea*>(plot.axisRect().get()));
+    QCOMPARE(line->positions().size(), 2);
+    QCOMPARE(line->anchors().size(), 2); // every position is also an anchor
+    QCPItemPosition* start = line->position("start");
+    QVERIFY(start);
+    QCOMPARE(start->keyAxis().get(), plot.xAxis.get());
+    QCOMPARE(start->valueAxis().get(), plot.yAxis.get());
+    QCOMPARE(start->axisRect().get(), plot.axisRect().get());
+    QVERIFY(start->system());
+    QCOMPARE(start->area().get(), static_cast<QCPArea*>(plot.axisRect().get()));
+    QVERIFY(!start->parentAnchor());
+    QCOMPARE(line->firstPosition(), start);
+    plot.replot();
+    QCOMPARE(gMisuses, 0);
+}
+
 void TestHandle::everyObjectPropertyReadsThroughQObjectProperty()
 {
     QCustomPlot plot;
@@ -726,16 +893,16 @@ void TestHandle::everyObjectPropertyReadsThroughQObjectProperty()
     QCOMPARE(graph->property("layer").value<QCPLayer*>(), graph->layer().get());
     QCOMPARE(row->property("parentLegend").value<QCPLegend*>(), row->parentLegend().get());
     QCOMPARE(tracer->property("graph").value<QCPGraph*>(), tracer->graph());
-    QCOMPARE(item->property("clipAxisRect").value<QCPAxisRect*>(), item->clipAxisRect());
+    QCOMPARE(item->property("clipAxisRect").value<QCPAxisRect*>(), item->clipAxisRect().get());
     QCOMPARE(filled->property("channelFillGraph").value<QCPGraph*>(), filled->channelFillGraph());
-    QCOMPARE(map->property("colorScale").value<QCPColorScale*>(), map->colorScale());
+    QCOMPARE(map->property("colorScale").value<QCPColorScale*>(), map->colorScale().get());
     QCOMPARE(errors->property("dataPlottable").value<QCPAbstractPlottable*>(),
-             errors->dataPlottable());
-    QCOMPARE(bars->property("barsGroup").value<QCPBarsGroup*>(), bars->barsGroup());
-    QCOMPARE(below->property("barAbove").value<QCPBars*>(), below->barAbove());
-    QCOMPARE(above->property("barBelow").value<QCPBars*>(), above->barBelow());
-    QCOMPARE(graph->property("keyAxis").value<QCPAxis*>(), graph->keyAxis());
-    QCOMPARE(graph->property("valueAxis").value<QCPAxis*>(), graph->valueAxis());
+             errors->dataPlottable().get());
+    QCOMPARE(bars->property("barsGroup").value<QCPBarsGroup*>(), bars->barsGroup().get());
+    QCOMPARE(below->property("barAbove").value<QCPBars*>(), below->barAbove().get());
+    QCOMPARE(above->property("barBelow").value<QCPBars*>(), above->barBelow().get());
+    QCOMPARE(graph->property("keyAxis").value<QCPAxis*>(), graph->keyAxis().get());
+    QCOMPARE(graph->property("valueAxis").value<QCPAxis*>(), graph->valueAxis().get());
     QCOMPARE(graph->property("selectionDecorator").value<QCPSelectionDecorator*>(),
              graph->selectionDecorator());
     QCOMPARE(gMisuses, 0);

@@ -1660,7 +1660,7 @@ void QCustomPlot::deletePlottable(QCPAbstractPlottable* plottable)
 */
 QPointer<QCPPlottableGroup> QCustomPlot::unlistPlottable(QCPAbstractPlottable* plottable)
 {
-    QPointer<QCPPlottableGroup> group = plottable->group();
+    QPointer<QCPPlottableGroup> group(plottable->group().get());
     if (group)
         group->detach(plottable, false);
     if (legend)

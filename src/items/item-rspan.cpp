@@ -184,8 +184,8 @@ void QCPItemRSpan::draw(QCPDrawContext& context) const
 
 QPointF QCPItemRSpan::anchorPixelPosition(int anchorId) const
 {
-    auto* keyAxis = leftEdge->keyAxis();
-    auto* valAxis = leftEdge->valueAxis();
+    QCPAxis* keyAxis = leftEdge->keyAxis();
+    QCPAxis* valAxis = leftEdge->valueAxis();
     if (!keyAxis || !valAxis)
         return {};
 

@@ -378,21 +378,30 @@ QCPItemPosition::~QCPItemPosition()
 
 /* can't make this a header inline function, because QPointer breaks with forward declared types,
  * see QTBUG-29588 */
-QCPAxisRect* QCPItemPosition::axisRect() const
+QCPHandle<QCPAxisRect> QCPItemPosition::axisRect() const
+{
+    return QCPHandle<QCPAxisRect>(qobject_cast<QCPAxisRect*>(mArea.data()));
+}
+
+QCPAxisRect* QCPItemPosition::axisRectRaw() const
 {
     return qobject_cast<QCPAxisRect*>(mArea.data());
 }
 
+QCPCoordinateSystem* QCPItemPosition::systemRaw() const { return mSystem.data(); }
+
+QCPArea* QCPItemPosition::areaRaw() const { return mArea.data(); }
+
 //! Returns the system this position maps plot coordinates through, or null without one.
-QCPCoordinateSystem* QCPItemPosition::system() const
+QCPHandle<QCPCoordinateSystem> QCPItemPosition::system() const
 {
-    return mSystem.data();
+    return QCPHandle<QCPCoordinateSystem>(mSystem.data());
 }
 
 //! Returns the area this position measures ratios and axis-rect pixels in.
-QCPArea* QCPItemPosition::area() const
+QCPHandle<QCPArea> QCPItemPosition::area() const
 {
-    return mArea.data();
+    return QCPHandle<QCPArea>(mArea.data());
 }
 
 void QCPItemPosition::setSystem(QCPCoordinateSystem* system)
@@ -420,8 +429,8 @@ void QCPItemPosition::setSystem(QCPCoordinateSystem* system)
         mParentItem->noteFramesChanged();
         // The clip of an item that followed this position's area follows it to the new area; a clip
         // area chosen explicitly (another one) is kept.
-        if (system && previousArea && mParentItem->clipArea() == previousArea
-            && mParentItem->clipArea() != mArea)
+        if (system && previousArea && mParentItem->clipAreaRaw() == previousArea
+            && mParentItem->clipAreaRaw() != mArea)
             mParentItem->setClipArea(mArea);
     }
 }
@@ -1498,15 +1507,22 @@ void QCPAbstractItem::noteFramesChanged()
         itemLayer->invalidateItemFrames();
 }
 
-QCPAxisRect* QCPAbstractItem::clipAxisRect() const
+QCPHandle<QCPAxisRect> QCPAbstractItem::clipAxisRect() const
+{
+    return QCPHandle<QCPAxisRect>(clipAxisRectRaw());
+}
+
+QCPAxisRect* QCPAbstractItem::clipAxisRectRaw() const
 {
     return qobject_cast<QCPAxisRect*>(mClipArea.data());
 }
 
+QCPArea* QCPAbstractItem::clipAreaRaw() const { return mClipArea.data(); }
+
 //! Returns the area this item is clipped to, or null when it clips to nothing but the viewport.
-QCPArea* QCPAbstractItem::clipArea() const
+QCPHandle<QCPArea> QCPAbstractItem::clipArea() const
 {
-    return mClipArea.data();
+    return QCPHandle<QCPArea>(mClipArea.data());
 }
 
 /*!
@@ -1890,9 +1906,9 @@ QCPAbstractItem::positionsExtent(double pixelPad, const QList<QCPItemPosition*>&
             || (position->typeY() == QCPItemPosition::ptPlotCoords && !position->parentAnchorY());
         if (!mapsPlots)
             continue;
-        if (sawPlot && position->system() != system)
+        if (sawPlot && position->systemRaw() != system)
             return std::nullopt;
-        system = position->system();
+        system = position->systemRaw();
         sawPlot = true;
     }
     QCPAxis* keyAxis = nullptr;
@@ -1909,13 +1925,13 @@ QCPAbstractItem::positionsExtent(double pixelPad, const QList<QCPItemPosition*>&
     else
     {
         // A6's one-axis position has no system: keep indexing it through the axes it does have.
-        keyAxis = positions.first()->keyAxis();
-        valueAxis = positions.first()->valueAxis();
+        keyAxis = positions.first()->keyAxisRaw();
+        valueAxis = positions.first()->valueAxisRaw();
     }
     if (!keyAxis || !valueAxis)
         return std::nullopt;
     for (const QCPItemPosition* position : positions)
-        if (position->keyAxis() != keyAxis || position->valueAxis() != valueAxis)
+        if (position->keyAxisRaw() != keyAxis || position->valueAxisRaw() != valueAxis)
             return std::nullopt;
     const double infinity = std::numeric_limits<double>::infinity();
     QCPDataBox box { infinity, -infinity, infinity, -infinity };

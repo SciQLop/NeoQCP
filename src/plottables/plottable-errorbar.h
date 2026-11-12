@@ -110,7 +110,10 @@ public:
         return mDataContainer;
     }
 
-    [[nodiscard]] QCPAbstractPlottable* dataPlottable() const { return mDataPlottable.data(); }
+    [[nodiscard]] QCPHandle<QCPAbstractPlottable> dataPlottable() const
+    {
+        return QCPHandle<QCPAbstractPlottable>(mDataPlottable.data());
+    }
 
     [[nodiscard]] ErrorType errorType() const { return mErrorType; }
 
