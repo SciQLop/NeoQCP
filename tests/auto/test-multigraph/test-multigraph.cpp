@@ -463,10 +463,173 @@ void TestMultiGraph::aSourceStagedInDataSpaceGetsAPipelineJobAfterReturningToCar
     mg->setSystem(cartesian->system(cartesian->axis(QCPAxis::atBottom),
                                     cartesian->axis(QCPAxis::atLeft)));
     QVERIFY(!mg->drawsInDataSpace());
+    // Wait for the job the return to cartesian starts: the displayed source's result must not be
+    // taken as the pending one's.
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->pipeline().isBusy(), 10'000);
     QVERIFY(mg->commitPendingData());
     QTRY_VERIFY_WITH_TIMEOUT(!mg->pipeline().isBusy(), 10'000);
     QVERIFY2(mg->mL1Cache, "the source staged in data space never got a pipeline job");
     QCOMPARE(mg->mL1Cache->sourceSize, n + 1);
+}
+
+void TestMultiGraph::addDataOnAFreshWaterfallIsAMisuse()
+{
+    // B6: a waterfall's source is its adapter, never owned: the first addData is refused too.
+    MisuseScope misuse;
+    auto* graph = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    graph->addData(QVector<double>{0.0}, QVector<double>{10.0});
+    QCOMPARE(MisuseScope::count(), std::size_t(1));
+    QCOMPARE(graph->dataCount(), 0);
+    QVERIFY2(!graph->dataSource(), "a refused addData installed a source on a fresh waterfall");
+}
+
+void TestMultiGraph::setDataWithAShortValueColumnIsAMisuse()
+{
+    // I4 = C1: the N-column forms validate the shape before anything sorts or indexes it.
+    MisuseScope misuse;
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double>{3, 1, 2}, std::vector<std::vector<double>>{{1, 2}});
+    QCOMPARE(MisuseScope::count(), std::size_t(1));
+    QCOMPARE(mg->dataCount(), 0);
+    QVERIFY2(!mg->dataSource(), "a short column installed a source");
+
+    // Sorted keys take the same refusal, not the old warn-and-drop path.
+    mg->setData(std::vector<double>{1, 2, 3}, std::vector<std::vector<double>>{{1, 2}});
+    QCOMPARE(MisuseScope::count(), std::size_t(2));
+    QCOMPARE(mg->dataCount(), 0);
+
+    // The public source refuses the same shape on its own.
+    QCPGrowableMultiDataSource direct(std::vector<double>{3, 1, 2},
+                                      std::vector<std::vector<double>>{{1, 2}});
+    QCOMPARE(MisuseScope::count(), std::size_t(3));
+    QCOMPARE(direct.size(), 0);
+    QCOMPARE(direct.columnCount(), 0);
+}
+
+void TestMultiGraph::setDataWithANonFiniteKeyIsAMisuse()
+{
+    // M2: a NaN key would break std::sort's strict weak ordering; it is refused before any sort.
+    MisuseScope misuse;
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double>{2, 1, qQNaN(), 0},
+                std::vector<std::vector<double>>{{1, 2, 3, 4}});
+    QCOMPARE(MisuseScope::count(), std::size_t(1));
+    QCOMPARE(mg->dataCount(), 0);
+
+    QCPGrowableMultiDataSource direct(std::vector<double>{2, 1, qQNaN(), 0},
+                                      std::vector<std::vector<double>>{{1, 2, 3, 4}});
+    QCOMPARE(MisuseScope::count(), std::size_t(2));
+    QCOMPARE(direct.size(), 0);
+
+    // An append with a NaN key changes nothing either.
+    mg->setData(std::vector<double>{0, 1}, std::vector<std::vector<double>>{{1, 2}});
+    mg->addData(QVector<double>{qQNaN()}, QVector<double>{3.0});
+    QCOMPARE(MisuseScope::count(), std::size_t(3));
+    QCOMPARE(mg->dataCount(), 2);
+}
+
+void TestMultiGraph::aBusyAppendGoesThroughTheDeferredSwap()
+{
+    // M6: an append while a job reads the source clones it; the clone must be staged when the
+    // deferred swap is on, not installed over the displayed geometry.
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    constexpr int n = 120'000;
+    std::vector<double> keys(n), values(n);
+    for (int i = 0; i < n; ++i)
+    {
+        keys[std::size_t(i)] = i;
+        values[std::size_t(i)] = qSin(i * 0.001);
+    }
+    mg->setData(std::move(keys), std::vector<std::vector<double>>{std::move(values)});
+    mPlot->replot();
+    QTRY_VERIFY_WITH_TIMEOUT(mg->hasRenderedRange(), 10'000);
+
+    mPlot->setDataSwapDebounceMs(10'000);
+    mg->setDeferredDataSwap(true);
+    mg->dataChanged(); // a job over the displayed rows is now in flight
+    QVERIFY(mg->pipeline().isBusy());
+
+    mg->addData(QVector<double>{double(n)}, QVector<double>{1.0});
+    QVERIFY2(mg->hasPendingData(), "a busy append skipped the deferred swap");
+    QCOMPARE(mg->dataCount(), n); // the displayed source is untouched until the swap
+
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->pipeline().isBusy(), 10'000);
+    QVERIFY(mg->commitPendingData());
+    QCOMPARE(mg->dataCount(), n + 1);
+    QCOMPARE(mg->componentValueAt(0, n), 1.0);
+}
+
+void TestMultiGraph::aSwapStagedBeforeASystemSwitchShowsOnTheUserSystem()
+{
+    // I1: the job staged on the cartesian branch may land after the move; the data-space branch
+    // draws the displayed source, so the staged one must become ready when the frame changes.
+    mPlot->plotLayout()->clear();
+    auto* skew = new SkewRect(mPlot);
+    auto* cartesian = new QCPAxisRect(mPlot);
+    mPlot->plotLayout()->addElement(0, 0, skew);
+    mPlot->plotLayout()->addElement(1, 0, cartesian);
+    for (QCPAxisRect* rect : {static_cast<QCPAxisRect*>(skew), cartesian})
+    {
+        rect->axis(QCPAxis::atBottom)->setRange(0, 200'000);
+        rect->axis(QCPAxis::atLeft)->setRange(-1, 1);
+    }
+    mPlot->replot();
+
+    auto* mg = new QCPMultiGraph(cartesian->axis(QCPAxis::atBottom),
+                                 cartesian->axis(QCPAxis::atLeft));
+    constexpr int n = 120'000;
+    std::vector<double> firstKeys(n), firstValues(n);
+    for (int i = 0; i < n; ++i)
+    {
+        firstKeys[std::size_t(i)] = i;
+        firstValues[std::size_t(i)] = qSin(i * 0.001);
+    }
+    mg->setData(std::move(firstKeys), std::vector<std::vector<double>>{std::move(firstValues)});
+    mPlot->replot();
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->pipeline().isBusy(), 10'000);
+    mPlot->replot();
+    QVERIFY(mg->hasRenderedRange());
+
+    mPlot->setDataSwapDebounceMs(10'000);
+    mg->setDeferredDataSwap(true);
+    std::vector<double> secondKeys(n), secondValues(n);
+    for (int i = 0; i < n; ++i)
+    {
+        secondKeys[std::size_t(i)] = i;
+        secondValues[std::size_t(i)] = qCos(i * 0.001);
+    }
+    mg->setData(std::move(secondKeys), std::vector<std::vector<double>>{std::move(secondValues)});
+    QVERIFY(mg->hasPendingData());
+    QVERIFY(mg->pipeline().isBusy());
+
+    mg->setSystem(skew->skew());
+    QVERIFY(mg->drawsInDataSpace());
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->pipeline().isBusy(), 10'000);
+    QVERIFY2(mg->commitPendingData(), "a source staged before the frame switch was stranded");
+    QCOMPARE(mg->dataCount(), n);
+    QVERIFY2(mg->componentValueAt(0, 0) > 0.9, "the staged source was not the one shown");
+}
+
+void TestMultiGraph::theGapThresholdIsSetOnTheInstalledSource()
+{
+    // C3: the threshold is part of what the pipeline job reads, so it is set when a source is
+    // installed or changed, never by the draw that may run beside the job.
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setGapThreshold(0.0);
+    mg->setData(std::vector<double>{0, 1, 2}, std::vector<std::vector<double>>{{1, 2, 3}});
+    QVERIFY(mg->dataSource());
+    QCOMPARE(mg->dataSource()->gapThreshold(), 0.0);
+
+    mg->setGapThreshold(3.0);
+    QCOMPARE(mg->dataSource()->gapThreshold(), 3.0);
+
+    mPlot->replot();
+    QVERIFY(mg->hasRenderedRange());
+    mPlot->setDataSwapDebounceMs(10'000);
+    mg->setDeferredDataSwap(true);
+    mg->setData(std::vector<double>{0, 1, 2}, std::vector<std::vector<double>>{{4, 5, 6}});
+    QVERIFY(mg->hasPendingData());
+    QCOMPARE(mg->mPendingSource->gapThreshold(), 3.0);
 }
 
 void TestMultiGraph::componentCountMatchesDataSource()
@@ -3625,12 +3788,18 @@ void TestMultiGraph::aPartnerMovedToAnotherSystemDrawsNoBand()
 
 void TestMultiGraph::aSelectedRangeSplitsTheBand()
 {
-    FillPair pair = twoGraphs(mPlot, {0, 1, 2, 3, 4}, {1, 1, 1, 1, 1}, {3, 3, 3, 3, 3});
+    // Dense enough that binnedWhenDense leaves far fewer strip rows than source rows: the split
+    // must follow the source rows, not the shaped strip's indices.
+    constexpr int n = 4000;
+    std::vector<double> keys(n), ownerValues(n, 1.0), partnerValues(n, 3.0);
+    for (int i = 0; i < n; ++i)
+        keys[std::size_t(i)] = i;
+    FillPair pair = twoGraphs(mPlot, keys, ownerValues, partnerValues);
     pair.owner->component(0).selectedPen = QPen(Qt::green);
     QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0,
                                                 QBrush(QColor(255, 0, 0, 64))));
-    pair.owner->setComponentSelection(0, QCPDataSelection(QCPDataRange(1, 4)));
-    mPlot->xAxis->setRange(-0.5, 4.5);
+    pair.owner->setComponentSelection(0, QCPDataSelection(QCPDataRange(1000, 2000)));
+    mPlot->xAxis->setRange(-0.5, n - 0.5);
     mPlot->yAxis->setRange(0, 4);
 
     const QImage image = renderOf(mPlot);
@@ -3638,10 +3807,86 @@ void TestMultiGraph::aSelectedRangeSplitsTheBand()
     { return c.red() - std::max(c.green(), c.blue()) > 30; };
     const auto greenBand = [](const QColor& c)
     { return c.green() - std::max(c.red(), c.blue()) > 30; };
-    QVERIFY2(redBand(image.pixelColor(pixelOf(mPlot, 0.5, 2))),
+    QVERIFY2(redBand(image.pixelColor(pixelOf(mPlot, 500, 2))),
              "the unselected run does not use the fill brush");
-    QVERIFY2(greenBand(image.pixelColor(pixelOf(mPlot, 2, 2))),
+    QVERIFY2(greenBand(image.pixelColor(pixelOf(mPlot, 1500, 2))),
              "the selected run does not use the selected pen colour");
+}
+
+void TestMultiGraph::aDenseFillSelectionUsesItsKeyRange()
+{
+    // I1: a dense fill is binned to spans; the selection is in owner rows, at keys 500 and 1500.
+    constexpr int n = 4000;
+    std::vector<double> keys(n), ownerValues(n, 1.0), partnerValues(n, 3.0);
+    for (int i = 0; i < n; ++i)
+        keys[std::size_t(i)] = i;
+    FillPair pair = twoGraphs(mPlot, keys, ownerValues, partnerValues);
+    pair.owner->component(0).selectedPen = QPen(Qt::green);
+    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0,
+                                                QBrush(QColor(255, 0, 0, 64))));
+    pair.owner->setComponentSelection(0, QCPDataSelection(QCPDataRange(1000, 2000)));
+    mPlot->xAxis->setRange(-0.5, n - 0.5);
+    mPlot->yAxis->setRange(0, 4);
+
+    const QImage image = renderOf(mPlot);
+    const auto greenBand = [](const QColor& c)
+    { return c.green() - std::max(c.red(), c.blue()) > 30; };
+    const auto redBand = [](const QColor& c)
+    { return c.red() - std::max(c.green(), c.blue()) > 30; };
+    QVERIFY2(redBand(image.pixelColor(pixelOf(mPlot, 300, 2))),
+             "the band left of the selection does not use the fill brush");
+    QVERIFY2(greenBand(image.pixelColor(pixelOf(mPlot, 1500, 2))),
+             "the dense selected run did not take the selected colour");
+}
+
+void TestMultiGraph::aSteppedFillSelectionUsesItsKeyRange()
+{
+    // I1: a step style duplicates rows; row 500 of the source must still be the selected one.
+    constexpr int n = 1000;
+    std::vector<double> keys(n), ownerValues(n, 1.0), partnerValues(n, 3.0);
+    for (int i = 0; i < n; ++i)
+        keys[std::size_t(i)] = i;
+    FillPair pair = twoGraphs(mPlot, keys, ownerValues, partnerValues);
+    pair.owner->setComponentLineStyle(0, QCPMultiGraph::lsStepLeft);
+    pair.owner->component(0).selectedPen = QPen(Qt::green);
+    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0,
+                                                QBrush(QColor(255, 0, 0, 64))));
+    pair.owner->setComponentSelection(0, QCPDataSelection(QCPDataRange(400, 600)));
+    mPlot->xAxis->setRange(-0.5, n - 0.5);
+    mPlot->yAxis->setRange(0, 4);
+
+    const QImage image = renderOf(mPlot);
+    const auto greenBand = [](const QColor& c)
+    { return c.green() - std::max(c.red(), c.blue()) > 30; };
+    const auto redBand = [](const QColor& c)
+    { return c.red() - std::max(c.green(), c.blue()) > 30; };
+    QVERIFY2(redBand(image.pixelColor(pixelOf(mPlot, 100, 2))),
+             "the band left of the step selection does not use the fill brush");
+    QVERIFY2(greenBand(image.pixelColor(pixelOf(mPlot, 500, 2))),
+             "the stepped selected run did not take the selected colour");
+}
+
+void TestMultiGraph::theFillDoesNotReturnWhenThePartnerComponentComesBack()
+{
+    // M1: the partner losing the component drops the fill for good; a later wider source must not
+    // revive a band built from unrelated data.
+    auto* owner = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* partner = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    owner->setData(std::vector<double>{0, 1, 2}, std::vector<std::vector<double>>{{1, 1, 1}});
+    partner->setData(std::vector<double>{0, 1, 2},
+                     std::vector<std::vector<double>>{{2, 2, 2}, {3, 3, 3}});
+    QVERIFY(owner->setComponentFillToGraph(0, partner, 1, QBrush(Qt::blue)));
+
+    partner->setData(std::vector<double>{0, 1, 2}, std::vector<std::vector<double>>{{2, 2, 2}});
+    QVERIFY2(!owner->componentFill(0), "the fill survived the partner losing its component");
+
+    partner->setData(std::vector<double>{0, 1, 2},
+                     std::vector<std::vector<double>>{{2, 2, 2}, {4, 4, 4}});
+    QVERIFY2(!owner->componentFill(0), "the fill came back when the partner regained a column");
+    mPlot->xAxis->setRange(-0.5, 2.5);
+    mPlot->yAxis->setRange(0, 5);
+    QVERIFY2(!draws(renderOf(mPlot), mPlot->axisRect()->rect(), isBlue),
+             "a removed fill still drew a band");
 }
 
 void TestMultiGraph::aPartnerDataChangeRedrawsTheBand()

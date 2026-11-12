@@ -89,7 +89,11 @@ private slots:
     void aMultiGraphFillOnALogAxisStopsAtTheBoundNearerZero();
     void aMultiGraphNaNSplitsLineAndFill();
     void multiGraphErrorBarCapsFollowTheMapping();
+    void multiGraphErrorBarCapsPerBarOnANonlinearMapping();
+    void aStepCentreOnALogKeyUserSystemTurnsInLogSpace();
     void colourByScalarJoinsTheSkewRectsScale();
+    void colourScaleFollowsASystemMove();
+    void setColorScaleOnTheBaseIsRefused();
     void aMultiGraphColourWithoutAScaleIsRefused();
     void aDecoratedMultiGraphJoinsASkewRect();
 };

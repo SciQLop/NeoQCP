@@ -22,7 +22,13 @@ private slots:
     void addDataOnAViewIsAMisuse();
     void addDataOnASharedSourceIsAMisuse();
     void addDataOnAWaterfallIsAMisuse();
+    void addDataOnAFreshWaterfallIsAMisuse();
     void addDataWithAPendingSwapAppendsToTheStagedSource();
+    void aBusyAppendGoesThroughTheDeferredSwap();
+    void aSwapStagedBeforeASystemSwitchShowsOnTheUserSystem();
+    void theGapThresholdIsSetOnTheInstalledSource();
+    void setDataWithAShortValueColumnIsAMisuse();
+    void setDataWithANonFiniteKeyIsAMisuse();
     void addDataColumnCountMismatchIsAMisuse();
     void aPipelineSeesTheAppend();
     void oneColumnSetDataTakesQVectors();
@@ -108,6 +114,9 @@ private slots:
     void aFillToAGraphOfAnotherSystemIsAMisuse();
     void aPartnerMovedToAnotherSystemDrawsNoBand();
     void aSelectedRangeSplitsTheBand();
+    void aDenseFillSelectionUsesItsKeyRange();
+    void aSteppedFillSelectionUsesItsKeyRange();
+    void theFillDoesNotReturnWhenThePartnerComponentComesBack();
     void aPartnerDataChangeRedrawsTheBand();
     void aPartnerOnAnotherLayerRedrawsTheBand();
     void mutualFillsDoNotRecurse();

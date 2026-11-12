@@ -35,6 +35,8 @@ private slots:
     void theTracerFollowsAMultiGraphComponent();
     void theTracerOutsideTheDataClampsAs2xDid();
     void theTracerOnAGapIsInert();
+    void aTracerWhoseComponentDisappearsIsInert();
+    void setComponentWithoutATargetDoesNothing();
     void deletingTheTracedMultiGraphLeavesTheTracerInert();
     void takingTheTracedMultiGraphLeavesTheTracerInert();
     void retargetingFromAnOldGraphClearsIt();

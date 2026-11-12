@@ -410,6 +410,19 @@ protected:
     }
 };
 
+//! A mapping whose local value direction changes with the pixel height: the per-bar cap case.
+class CurvedMapping : public SkewMapping
+{
+public:
+    using SkewMapping::SkewMapping;
+
+protected:
+    [[nodiscard]] double extraShift(double pixelY) const override
+    {
+        return 20.0 * std::sin(pixelY / 20.0);
+    }
+};
+
 void sendMouseClick(QWidget* widget, const QPoint& pos)
 {
     QMouseEvent press(QEvent::MouseButtonPress, pos, widget->mapToGlobal(pos), Qt::LeftButton,
@@ -2323,6 +2336,102 @@ void TestUserSystem::multiGraphErrorBarCapsFollowTheMapping()
     QCOMPARE(test_misuse::calls.size(), std::size_t(0));
 }
 
+void TestUserSystem::multiGraphErrorBarCapsPerBarOnANonlinearMapping()
+{
+    // A9/I2: the cap direction comes from the bar's own ends, not from the first bar. The curved
+    // mapping makes the local value direction differ between the two bars.
+    QCustomPlot plot;
+    plot.setBackground(QBrush(Qt::white));
+    plot.plotLayout()->clear();
+    auto* rect = new TunedSkewRect<CurvedMapping>(&plot);
+    plot.plotLayout()->addElement(0, 0, rect);
+    rect->axis(QCPAxis::atBottom)->setRange(0, 10);
+    rect->axis(QCPAxis::atLeft)->setRange(0, 10);
+    settle(plot);
+
+    auto* graph = new InspectableMultiGraph(rect->axis(QCPAxis::atBottom),
+                                            rect->axis(QCPAxis::atLeft));
+    graph->setData(std::vector<double>{2, 6},
+                   std::vector<std::vector<double>>{{1, 9}, {0.8, 8.8}, {1.2, 9.2}});
+    QVERIFY(graph->setComponentErrorBars(0, 1, 2, 12.0));
+    graph->setComponentVisible(1, false);
+    graph->setComponentVisible(2, false);
+    settle(plot);
+
+    const qcp::ErrorBarsCmd* bars = nullptr;
+    for (const qcp::QCPDrawCommand& command : graph->recording().commands)
+        if (const auto* candidate = std::get_if<qcp::ErrorBarsCmd>(&command))
+            bars = candidate;
+    QVERIFY2(bars && bars->ends, "the data-space bars did not use the ends form");
+
+    const QCPDrawFrame frame { graph->system()->transform(), QCPRatioTransform(),
+                               rect->rect() };
+    std::vector<QPointF> poly;
+    qcpErrorBarPixels(frame, *bars, poly);
+    QCOMPARE(int(poly.size()), 24); // two bars, two sides: backbone, cap, gap each
+
+    const auto unit = [](QPointF v)
+    {
+        const double length = std::hypot(v.x(), v.y());
+        return length > 0.0 ? v / length : QPointF();
+    };
+    const auto dot = [](const QPointF& a, const QPointF& b)
+    { return a.x() * b.x() + a.y() * b.y(); };
+
+    const auto barDirection = [&poly, &unit](int bar)
+    { return unit(poly[std::size_t(bar) * 12 + 7] - poly[std::size_t(bar) * 12 + 1]); };
+    const QPointF first = barDirection(0);
+    const QPointF second = barDirection(1);
+    QVERIFY2(std::abs(dot(first, second)) < 0.95,
+             "the fixture's two bars do not have different local directions");
+
+    for (int bar = 0; bar < 2; ++bar)
+    {
+        const std::size_t base = std::size_t(bar) * 12;
+        const QPointF along = unit(poly[base + 7] - poly[base + 1]);
+        for (const std::size_t cap : { std::size_t(3), std::size_t(9) })
+        {
+            const QPointF across = unit(poly[base + cap + 1] - poly[base + cap]);
+            QVERIFY2(std::abs(dot(across, along)) < 0.1,
+                     qPrintable(QStringLiteral("bar %1's cap is not perpendicular to its own "
+                                               "direction (dot %2)")
+                                    .arg(bar)
+                                    .arg(dot(across, along))));
+        }
+    }
+}
+
+void TestUserSystem::aStepCentreOnALogKeyUserSystemTurnsInLogSpace()
+{
+    // I4: on the data-space branch the step centre must use the system key axis' log scale.
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    QCPAxis* key = rect->axis(QCPAxis::atBottom);
+    key->setScaleType(QCPAxis::stLogarithmic);
+    key->setRange(1, 100);
+    rect->axis(QCPAxis::atLeft)->setRange(-1, 3);
+    auto* graph = multiGraphOn(rect);
+    graph->setData(QVector<double> { 1, 10, 100 },
+                   std::vector<QVector<double>> { QVector<double> { 1, 2, 1 } });
+    graph->setLineStyle(QCPMultiGraph::lsStepCenter);
+    QVERIFY(graph->setComponentFill(0, 0.0, QBrush(Qt::red)));
+    settle(plot);
+
+    bool lineFound = false;
+    for (const qcp::QCPDrawCommand& command : graph->recording().commands)
+        if (const auto* line = std::get_if<qcp::PolylineDataCmd>(&command))
+            for (const QPointF& point : *line->points)
+                lineFound = lineFound || std::abs(point.x() - std::sqrt(10.0)) < 1e-9;
+    QVERIFY2(lineFound, "the step centre turned at the arithmetic midpoint, not in log space");
+
+    bool fillFound = false;
+    for (const qcp::QCPDrawCommand& command : graph->recording().commands)
+        if (const auto* fill = std::get_if<qcp::FillBetweenCmd>(&command))
+            for (const QPointF& point : *fill->upper)
+                fillFound = fillFound || std::abs(point.x() - std::sqrt(10.0)) < 1e-9;
+    QVERIFY2(fillFound, "the fill stepped at the arithmetic midpoint, not in log space");
+}
+
 void TestUserSystem::colourByScalarJoinsTheSkewRectsScale()
 {
     QCustomPlot plot;
@@ -2347,6 +2456,74 @@ void TestUserSystem::colourByScalarJoinsTheSkewRectsScale()
     QVERIFY2(colours && colours->size() >= 2, "the coloured line recorded one colour");
     QVERIFY2((*colours).front() != (*colours).back(),
              "the whole line took one colour from the scalar mapper");
+}
+
+void TestUserSystem::colourScaleFollowsASystemMove()
+{
+    // A9/I6: moving a coloured graph inside one plot re-joins the new area's colour scale.
+    QCustomPlot plot;
+    TwoRects rects = twoRects(plot);
+    QCPColorScale* scaleA = rects.cartesian->colorScale().get();
+    QCPColorScale* scaleB = rects.skew->colorScale().get();
+    QVERIFY(scaleA && scaleB);
+    scaleA->setDataRange(QCPRange(0, 1));
+    scaleB->setDataRange(QCPRange(0, 100));
+
+    auto* graph = new InspectableMultiGraph(rects.cartesian->axis(QCPAxis::atBottom),
+                                            rects.cartesian->axis(QCPAxis::atLeft));
+    graph->setData(QVector<double> { 1, 2, 3 },
+                   std::vector<QVector<double>> { QVector<double> { 1, 2, 1 } });
+    graph->setColorValues(std::vector<double> { 0.0, 0.5, 1.0 });
+    QCOMPARE(graph->colorScale(), scaleA);
+
+    graph->setSystem(rects.skew->skew());
+    QCOMPARE(graph->colorScale(), scaleB);
+    QCOMPARE(graph->dataRange(), QCPRange(0, 100));
+    QVERIFY2(!scaleA->users().contains(graph), "the graph stayed a user of the old rect's scale");
+
+    // A skew rect is an axis rect too: a second move keeps following.
+    graph->setSystem(rects.cartesian->system(rects.cartesian->axis(QCPAxis::atBottom),
+                                             rects.cartesian->axis(QCPAxis::atLeft)));
+    QCOMPARE(graph->colorScale(), scaleA);
+    QCOMPARE(graph->dataRange(), QCPRange(0, 1));
+}
+
+void TestUserSystem::setColorScaleOnTheBaseIsRefused()
+{
+    // M4: the Q_PROPERTY setter is declared on the base and non-virtual before the fix, so a
+    // property write (or a base-pointer call) could remove the only scale a non-rect area needs.
+    QCustomPlot plot;
+    plot.plotLayout()->clear();
+    auto* cartesian = new QCPAxisRect(&plot);
+    auto* flat = new FlatArea(&plot);
+    plot.plotLayout()->addElement(0, 0, cartesian);
+    plot.plotLayout()->addElement(1, 0, flat);
+    cartesian->axis(QCPAxis::atBottom)->setRange(0, 10);
+    cartesian->axis(QCPAxis::atLeft)->setRange(0, 10);
+    settle(plot);
+    QCPCoordinateSystem* flatSystem = flat->system(flat->key(), flat->value());
+    QVERIFY(flatSystem);
+
+    auto* graph = new InspectableMultiGraph(cartesian->axis(QCPAxis::atBottom),
+                                            cartesian->axis(QCPAxis::atLeft));
+    graph->setData(QVector<double> { 2, 5 }, std::vector<QVector<double>> { QVector<double> { 2, 5 } });
+    auto* scale = new QCPColorScale(&plot);
+    graph->setColorScale(scale);
+    graph->setColorValues(std::vector<double> { 0.0, 1.0 });
+    graph->setSystem(flatSystem);
+    QCOMPARE(graph->system(), flatSystem);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+
+    QCPAbstractColorMapped* base = graph;
+    base->setColorScale(nullptr);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    QCOMPARE(graph->colorScale(), scale);
+    test_misuse::calls.clear();
+
+    graph->setProperty("colorScale", QVariant::fromValue<QCPColorScale*>(nullptr));
+    QCOMPARE(test_misuse::calls.size(), std::size_t(1));
+    QCOMPARE(graph->colorScale(), scale);
+    test_misuse::calls.clear();
 }
 
 void TestUserSystem::aMultiGraphColourWithoutAScaleIsRefused()
@@ -2422,4 +2599,20 @@ void TestUserSystem::aDecoratedMultiGraphJoinsASkewRect()
     settle(plot);
     QVERIFY2(!graph->recording().commands.empty(),
              "the decorated multigraph drew nothing on the skew rect");
+
+    // The decoration must be there, not merely something: a fill, the bars and a coloured vertex.
+    bool sawFill = false;
+    bool sawBars = false;
+    bool sawColours = false;
+    for (const qcp::QCPDrawCommand& command : graph->recording().commands)
+    {
+        sawFill = sawFill || std::get_if<qcp::FillBetweenCmd>(&command) != nullptr;
+        sawBars = sawBars || std::get_if<qcp::ErrorBarsCmd>(&command) != nullptr;
+        if (const auto* line = std::get_if<qcp::PolylineDataCmd>(&command))
+            sawColours = sawColours || (line->colours && line->colours->size() > 1
+                                        && line->colours->front() != line->colours->back());
+    }
+    QVERIFY2(sawFill, "the skew frame recorded no fill");
+    QVERIFY2(sawBars, "the skew frame recorded no error bars");
+    QVERIFY2(sawColours, "the skew frame recorded no coloured vertices");
 }

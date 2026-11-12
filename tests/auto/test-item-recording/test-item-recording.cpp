@@ -886,6 +886,46 @@ void TestItemRecording::theTracerOnAGapIsInert()
     QVERIFY2(!imageHasRed(image), "a tracer on a gap drew a marker");
 }
 
+void TestItemRecording::aTracerWhoseComponentDisappearsIsInert()
+{
+    // M3: a component the graph no longer has leaves the tracer where it was; it must not draw that
+    // stale sample as if the target were still there.
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    graph->setData(std::vector<double>{1, 2, 3},
+                   std::vector<std::vector<double>>{{0.2, 0.3, 0.4}, {0.6, 0.7, 0.8}});
+    auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
+    tracer->setLineGraph(graph, 1);
+    tracer->setStyle(QCPItemTracer::tsCircle);
+    tracer->setSize(9);
+    tracer->setPen(QPen(Qt::red, 2));
+    plot.replot();
+    QVERIFY2(tracer->recordedCommands() > 0, "the tracer drew nothing before the component went");
+
+    graph->setData(std::vector<double>{1, 2, 3},
+                   std::vector<std::vector<double>>{{0.2, 0.3, 0.4}});
+    plot.replot();
+    QCOMPARE(tracer->component(), 1);
+    QCOMPARE(tracer->recordedCommands(), 0);
+    const QImage image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QVERIFY2(!imageHasRed(image), "the tracer kept marking a component that disappeared");
+}
+
+void TestItemRecording::setComponentWithoutATargetDoesNothing()
+{
+    // M3: without a graph there is no component to follow; the setter is a documented no-op.
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto* tracer = new QCPItemTracer(&plot);
+    const auto previous = qcp::setMisuseHandler(test_misuse::record);
+    test_misuse::calls.clear();
+    tracer->setComponent(5);
+    qcp::setMisuseHandler(previous);
+    QCOMPARE(tracer->component(), 0);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+}
+
 void TestItemRecording::deletingTheTracedMultiGraphLeavesTheTracerInert()
 {
     QCustomPlot plot;

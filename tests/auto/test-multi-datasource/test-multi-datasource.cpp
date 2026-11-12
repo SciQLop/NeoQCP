@@ -1,6 +1,7 @@
 #include "test-multi-datasource.h"
 #include "qcustomplot.h"
 #include "datasource/soa-multi-datasource.h"
+#include "datasource/growable-multi-datasource.h"
 #include "datasource/row-major-multi-datasource.h"
 #include "datasource/resampled-multi-datasource.h"
 #include "plottables/plottable-waterfall.h"
@@ -857,6 +858,20 @@ void TestMultiDataSource::genericIndexedFallbackHonoursGapThreshold()
     adapter.setGapThreshold(0);
     QVERIFY(!hasBreak(lines()));
     QVERIFY(!hasBreak(optimized()));
+}
+
+void TestMultiDataSource::growableCloneKeepsTheGapThreshold()
+{
+    // I2/M2: the clone a busy append grows is handed to the pipeline before the next draw sets the
+    // graph's threshold, so it must carry the source's own.
+    QCPGrowableMultiDataSource source(std::vector<double>{0, 1, 2},
+                                      std::vector<std::vector<double>>{{1, 2, 3}});
+    source.setGapThreshold(0.0);
+    auto copy = source.clone();
+    QVERIFY(copy);
+    QCOMPARE(copy->gapThreshold(), 0.0);
+    QCOMPARE(copy->columnCount(), 1);
+    QCOMPARE(copy->size(), 3);
 }
 
 namespace {

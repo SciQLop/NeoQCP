@@ -38,7 +38,7 @@ public:
         const std::size_t count = std::min({ keys.size(), values.size(), out.size() });
         mCartesian.map(keys.first(count), values.first(count), out.first(count));
         for (std::size_t i = 0; i < count; ++i)
-            out[i].rx() += shiftOf(out[i].y());
+            out[i].rx() += shiftOf(out[i].y()) + extraShift(out[i].y());
     }
 
     void map(std::span<const QPointF> data, std::span<QPointF> out) const override
@@ -46,24 +46,30 @@ public:
         const std::size_t count = std::min(data.size(), out.size());
         mCartesian.map(data.first(count), out.first(count));
         for (std::size_t i = 0; i < count; ++i)
-            out[i].rx() += shiftOf(out[i].y());
+            out[i].rx() += shiftOf(out[i].y()) + extraShift(out[i].y());
     }
 
     QCP::Pixels mapPoint(QCP::Data data) const override
     {
         const QCP::Pixels pixel = mCartesian.map(data);
-        return QCP::Pixels { pixel.x + shiftOf(pixel.y), pixel.y };
+        return QCP::Pixels { pixel.x + shiftOf(pixel.y) + extraShift(pixel.y), pixel.y };
     }
 
     QCP::Data inverse(QPointF pixel) const override
     {
-        return mCartesian.inverse(QPointF(pixel.x() - shiftOf(pixel.y()), pixel.y()));
+        return mCartesian.inverse(
+            QPointF(pixel.x() - shiftOf(pixel.y()) - extraShift(pixel.y()), pixel.y()));
     }
 
     //! The pixel shift a point at pixel height \a pixelY takes.
     [[nodiscard]] double shiftOf(double pixelY) const { return mShear * (mBottom - pixelY); }
 
     [[nodiscard]] double shear() const { return mShear; }
+
+protected:
+    //! A mapping's own shift on top of the shear, keyed by the pixel height it lands at: a test's
+    //! way to make the local value direction change from bar to bar.
+    [[nodiscard]] virtual double extraShift(double /*pixelY*/) const { return 0.0; }
 
 private:
     QCPTransform mCartesian;

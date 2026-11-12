@@ -61,6 +61,7 @@ private slots:
     void l2MultiSparseReturnNull();
     void l2MultiEmptyInput();
     void genericIndexedFallbackHonoursGapThreshold();
+    void growableCloneKeepsTheGapThreshold();
 
     // L2 decides from raw points, not L1 bins (bursty data)
     void l2MultiBinsRawPointsInsideBurst();
