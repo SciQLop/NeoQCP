@@ -441,11 +441,6 @@ QList<QPointer<QCPLayerable>> guardedSelectedLayerables(const QList<QCPLayer*>& 
 */
 QCustomPlot::QCustomPlot(QWidget* parent)
         : QRhiWidget(parent)
-        , xAxis(nullptr)
-        , yAxis(nullptr)
-        , xAxis2(nullptr)
-        , yAxis2(nullptr)
-        , legend(nullptr)
         , mBufferDevicePixelRatio(1.0)
         , // will be adapted to true value below
         mPlotLayout(nullptr)
@@ -605,14 +600,24 @@ void QCustomPlot::createPlotLayout()
   Returns the top level layout of this QCustomPlot instance. It is a \ref QCPLayoutGrid, initially
   containing just one cell with the main QCPAxisRect inside.
 
-  It is never \c nullptr: if the user deleted it, an empty layout takes its place. The exception
-  is a plot being destroyed (\ref isBeingDestroyed): then nothing is made.
+  Its handle is never dead: if the user deleted the layout, an empty one takes its place. The
+  exception is a plot being destroyed (\ref isBeingDestroyed): then nothing is made.
 */
-QCPLayoutGrid* QCustomPlot::plotLayout() const
+QCPHandle<QCPLayoutGrid> QCustomPlot::plotLayout() const
+{
+    return QCPHandle<QCPLayoutGrid>(plotLayoutRaw());
+}
+
+/*! \internal
+
+  The raw root layout, made again when it is gone. The public getter hands out a handle; the
+  library reads this one (K8).
+*/
+QCPLayoutGrid* QCustomPlot::plotLayoutRaw() const
 {
     if (!mPlotLayout && !mBeingDestroyed)
         const_cast<QCustomPlot*>(this)->createPlotLayout();
-    return mPlotLayout;
+    return mPlotLayout.data();
 }
 
 /*! \internal
@@ -626,9 +631,9 @@ QCPTheme* QCustomPlot::ownedTheme()
     return mOwnedTheme;
 }
 
-QCPTheme* QCustomPlot::theme() const
+QCPHandle<QCPTheme> QCustomPlot::theme() const
 {
-    return mTheme;
+    return QCPHandle<QCPTheme>(mTheme.data());
 }
 
 void QCustomPlot::setTheme(QCPTheme* theme)
@@ -697,7 +702,7 @@ void QCustomPlot::applyTheme()
     const QColor fg = mTheme->foreground();
     const QColor sel = mTheme->selection();
 
-    for (auto* rect : axisRects())
+    for (auto* rect : axisRectsRaw())
     {
         for (auto* axis : rect->axes())
             applyThemeToAxis(axis);
@@ -726,7 +731,7 @@ void QCustomPlot::applyTheme()
             for (int i = 0; i < layout->elementCount(); ++i)
                 walkLayout(layout->elementAt(i));
     };
-    walkLayout(plotLayout());
+    walkLayout(plotLayoutRaw());
 
     for (auto* item : mItems) {
         if (auto* textItem = qobject_cast<QCPItemText*>(item)) {
@@ -773,10 +778,15 @@ void QCustomPlot::setMaxPipelineThreads(int count)
     mPipelineScheduler->setMaxThreads(count);
 }
 
-QCPOverlay* QCustomPlot::overlay()
+QCPHandle<QCPPipelineScheduler> QCustomPlot::pipelineScheduler() const
+{
+    return QCPHandle<QCPPipelineScheduler>(mPipelineScheduler);
+}
+
+QCPHandle<QCPOverlay> QCustomPlot::overlay()
 {
     if (!mOverlay && !mBeingDestroyed) {
-        auto* notifLayer = layer(QLatin1String("notification"));
+        QCPLayer* notifLayer = layer(QLatin1String("notification"));
         if (!notifLayer) {
             (void)addLayer(QLatin1String("notification"));
             notifLayer = layer(QLatin1String("notification"));
@@ -787,7 +797,7 @@ QCPOverlay* QCustomPlot::overlay()
         mOverlay = new QCPOverlay(this);
         mOverlay->setLayer(notifLayer);
     }
-    return mOverlay;
+    return QCPHandle<QCPOverlay>(mOverlay.data());
 }
 
 QCPGridRhiLayer* QCustomPlot::gridRhiLayer()
@@ -1386,41 +1396,41 @@ void QCustomPlot::setBackgroundScaledMode(Qt::AspectRatioMode mode)
 }
 
 /*!
-  Returns the plottable with \a index. If the index is invalid, returns \c nullptr.
+  Returns the plottable with \a index. If the index is invalid, returns an empty handle.
 
   There is an overloaded version of this function with no parameter which returns the last added
   plottable, see QCustomPlot::plottable()
 
   \see plottableCount
 */
-QCPAbstractPlottable* QCustomPlot::plottable(int index)
+QCPHandle<QCPAbstractPlottable> QCustomPlot::plottable(int index)
 {
     if (index >= 0 && index < mPlottables.size())
     {
-        return mPlottables.at(index);
+        return QCPHandle<QCPAbstractPlottable>(mPlottables.at(index));
     }
     else
     {
         qDebug() << Q_FUNC_INFO << "index out of bounds:" << index;
-        return nullptr;
+        return {};
     }
 }
 
 /*! \overload
 
   Returns the last plottable that was added to the plot. If there are no plottables in the plot,
-  returns \c nullptr.
+  returns an empty handle.
 
   \see plottableCount
 */
-QCPAbstractPlottable* QCustomPlot::plottable()
+QCPHandle<QCPAbstractPlottable> QCustomPlot::plottable()
 {
     if (!mPlottables.isEmpty())
     {
-        return mPlottables.last();
+        return QCPHandle<QCPAbstractPlottable>(mPlottables.last());
     }
     else
-        return nullptr;
+        return {};
 }
 
 /*!
@@ -1714,12 +1724,13 @@ bool QCustomPlot::removePlottable(int index)
 
   \see removePlottableGroup
 */
-QCPPlottableGroup* QCustomPlot::addPlottableGroup(const QString& name)
+QCPHandle<QCPPlottableGroup> QCustomPlot::addPlottableGroup(const QString& name)
 {
-    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", nullptr);
+    QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed",
+                        QCPHandle<QCPPlottableGroup> {});
     auto* group = new QCPPlottableGroup(this, name);
     mPlottableGroups.append(group);
-    return group;
+    return QCPHandle<QCPPlottableGroup>(group);
 }
 
 /*!
@@ -1764,13 +1775,22 @@ int QCustomPlot::plottableCount() const
 
   \see setInteractions, QCPAbstractPlottable::setSelectable, QCPAbstractPlottable::setSelection
 */
-QList<QCPAbstractPlottable*> QCustomPlot::selectedPlottables() const
+QList<QCPHandle<QCPPlottableGroup>> QCustomPlot::plottableGroups() const
 {
-    QList<QCPAbstractPlottable*> result;
+    QList<QCPHandle<QCPPlottableGroup>> result;
+    result.reserve(mPlottableGroups.size());
+    for (QCPPlottableGroup* group : mPlottableGroups)
+        result.append(QCPHandle<QCPPlottableGroup>(group));
+    return result;
+}
+
+QList<QCPHandle<QCPAbstractPlottable>> QCustomPlot::selectedPlottables() const
+{
+    QList<QCPHandle<QCPAbstractPlottable>> result;
     for (QCPAbstractPlottable* plottable : mPlottables)
     {
         if (plottable->selected())
-            result.append(plottable);
+            result.append(QCPHandle<QCPAbstractPlottable>(plottable));
     }
     return result;
 }
@@ -1784,8 +1804,8 @@ QList<QCPAbstractPlottable*> QCustomPlot::selectedPlottables() const
 
   \see plottableAt<PlottableType>(), itemAt, layoutElementAt
 */
-QCPAbstractPlottable* QCustomPlot::plottableAt(const QPointF& pos, bool onlySelectable,
-                                               int* dataIndex) const
+QCPHandle<QCPAbstractPlottable> QCustomPlot::plottableAt(const QPointF& pos,
+                                                         bool onlySelectable, int* dataIndex) const
 {
     return plottableAt<QCPAbstractPlottable>(pos, onlySelectable, dataIndex);
 }
@@ -1851,7 +1871,7 @@ QCPGraph* QCustomPlot::graph() const
 std::pair<QCPAxis*, QCPAxis*> QCustomPlot::axesForAdd() const
 {
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", {});
-    const QList<QCPAxisRect*> rects = axisRects();
+    const QList<QCPAxisRect*> rects = axisRectsRaw();
     QCP_CHECK_OR_RETURN(!rects.isEmpty(), "the plot has no axis rect", {});
     const QList<QCPAxis*> keyAxes = rects.first()->axes(QCPAxis::atBottom);
     const QList<QCPAxis*> valueAxes = rects.first()->axes(QCPAxis::atLeft);
@@ -1962,41 +1982,41 @@ QList<QCPGraph*> QCustomPlot::selectedGraphs() const
 }
 
 /*!
-  Returns the item with \a index. If the index is invalid, returns \c nullptr.
+  Returns the item with \a index. If the index is invalid, returns an empty handle.
 
   There is an overloaded version of this function with no parameter which returns the last added
   item, see QCustomPlot::item()
 
   \see itemCount
 */
-QCPAbstractItem* QCustomPlot::item(int index) const
+QCPHandle<QCPAbstractItem> QCustomPlot::item(int index) const
 {
     if (index >= 0 && index < mItems.size())
     {
-        return mItems.at(index);
+        return QCPHandle<QCPAbstractItem>(mItems.at(index));
     }
     else
     {
         qDebug() << Q_FUNC_INFO << "index out of bounds:" << index;
-        return nullptr;
+        return {};
     }
 }
 
 /*! \overload
 
   Returns the last item that was added to this plot. If there are no items in the plot,
-  returns \c nullptr.
+  returns an empty handle.
 
   \see itemCount
 */
-QCPAbstractItem* QCustomPlot::item() const
+QCPHandle<QCPAbstractItem> QCustomPlot::item() const
 {
     if (!mItems.isEmpty())
     {
-        return mItems.last();
+        return QCPHandle<QCPAbstractItem>(mItems.last());
     }
     else
-        return nullptr;
+        return {};
 }
 
 /*!
@@ -2095,13 +2115,13 @@ int QCustomPlot::itemCount() const
 
   \see setInteractions, QCPAbstractItem::setSelectable, QCPAbstractItem::setSelected
 */
-QList<QCPAbstractItem*> QCustomPlot::selectedItems() const
+QList<QCPHandle<QCPAbstractItem>> QCustomPlot::selectedItems() const
 {
-    QList<QCPAbstractItem*> result;
+    QList<QCPHandle<QCPAbstractItem>> result;
     for (QCPAbstractItem* item : mItems)
     {
         if (item->selected())
-            result.append(item);
+            result.append(QCPHandle<QCPAbstractItem>(item));
     }
     return result;
 }
@@ -2115,7 +2135,7 @@ QList<QCPAbstractItem*> QCustomPlot::selectedItems() const
 
   \see itemAt<ItemType>(), plottableAt, layoutElementAt
 */
-QCPAbstractItem* QCustomPlot::itemAt(const QPointF& pos, bool onlySelectable) const
+QCPHandle<QCPAbstractItem> QCustomPlot::itemAt(const QPointF& pos, bool onlySelectable) const
 {
     return itemAt<QCPAbstractItem>(pos, onlySelectable);
 }
@@ -2131,48 +2151,48 @@ bool QCustomPlot::hasItem(QCPAbstractItem* item) const
 }
 
 /*!
-  Returns the layer with the specified \a name. If there is no layer with the specified name, \c
-  nullptr is returned.
+  Returns the layer with the specified \a name. If there is no layer with the specified name, an
+  empty handle is returned.
 
   Layer names are case-sensitive.
 
   \see addLayer, moveLayer, removeLayer
 */
-QCPLayer* QCustomPlot::layer(const QString& name) const
+QCPHandle<QCPLayer> QCustomPlot::layer(const QString& name) const
 {
     for (QCPLayer* layer : mLayers)
     {
         if (layer->name() == name)
-            return layer;
+            return QCPHandle<QCPLayer>(layer);
     }
-    return nullptr;
+    return {};
 }
 
 /*! \overload
 
-  Returns the layer by \a index. If the index is invalid, \c nullptr is returned.
+  Returns the layer by \a index. If the index is invalid, an empty handle is returned.
 
   \see addLayer, moveLayer, removeLayer
 */
-QCPLayer* QCustomPlot::layer(int index) const
+QCPHandle<QCPLayer> QCustomPlot::layer(int index) const
 {
     if (index >= 0 && index < mLayers.size())
     {
-        return mLayers.at(index);
+        return QCPHandle<QCPLayer>(mLayers.at(index));
     }
     else
     {
         qDebug() << Q_FUNC_INFO << "index out of bounds:" << index;
-        return nullptr;
+        return {};
     }
 }
 
 /*!
   Returns the layer that is set as current layer (see \ref setCurrentLayer).
 */
-QCPLayer* QCustomPlot::currentLayer() const
+QCPHandle<QCPLayer> QCustomPlot::currentLayer() const
 {
-    return mCurrentLayer;
+    return QCPHandle<QCPLayer>(mCurrentLayer.data());
 }
 
 /*!
@@ -2386,7 +2406,7 @@ bool QCustomPlot::moveLayer(QCPLayer* layer, QCPLayer* otherLayer,
 */
 int QCustomPlot::axisRectCount() const
 {
-    return axisRects().size();
+    return axisRectsRaw().size();
 }
 
 /*!
@@ -2431,7 +2451,7 @@ QCPAxisRect* QCustomPlot::firstAxisRect() const
     return nullptr;
 }
 
-QCPAxisRect* QCustomPlot::axisRect(int index) const
+QCPHandle<QCPAxisRect> QCustomPlot::axisRect(int index) const
 {
     // The default index is asked per created item position: walk to the first rect only.
     if (index == 0)
@@ -2439,17 +2459,17 @@ QCPAxisRect* QCustomPlot::axisRect(int index) const
         QCPAxisRect* first = firstAxisRect();
         if (!first)
             qDebug() << Q_FUNC_INFO << "invalid axis rect index" << index;
-        return first;
+        return QCPHandle<QCPAxisRect>(first);
     }
-    const QList<QCPAxisRect*> rectList = axisRects();
+    const QList<QCPAxisRect*> rectList = axisRectsRaw();
     if (index >= 0 && index < rectList.size())
     {
-        return rectList.at(index);
+        return QCPHandle<QCPAxisRect>(rectList.at(index));
     }
     else
     {
         qDebug() << Q_FUNC_INFO << "invalid axis rect index" << index;
-        return nullptr;
+        return {};
     }
 }
 
@@ -2464,16 +2484,44 @@ QCPAxisRect* QCustomPlot::axisRect(int index) const
 
   \see axisRectCount, axisRect, QCPLayoutGrid::setFillOrder
 */
-QList<QCPAxisRect*> QCustomPlot::axisRects() const
+QList<QCPHandle<QCPAxisRect>> QCustomPlot::axisRects() const
+{
+    QList<QCPHandle<QCPAxisRect>> result;
+    const QList<QCPAxisRect*> rawRects = axisRectsRaw();
+    result.reserve(rawRects.size());
+    for (QCPAxisRect* rect : rawRects)
+        result.append(QCPHandle<QCPAxisRect>(rect));
+    return result;
+}
+
+/*! \internal
+
+  The same list as axisRects(), raw: the library's loops read this one (K8).
+*/
+QList<QCPAxisRect*> QCustomPlot::axisRectsRaw() const
 {
     QList<QCPAxisRect*> result;
-    for (QCPArea* area : areas())
+    for (QCPArea* area : areasRaw())
         if (QCPAxisRect* rect = qobject_cast<QCPAxisRect*>(area))
             result.append(rect);
     return result;
 }
 
-QList<QCPArea*> QCustomPlot::areas() const
+QList<QCPHandle<QCPArea>> QCustomPlot::areas() const
+{
+    QList<QCPHandle<QCPArea>> result;
+    const QList<QCPArea*> rawAreas = areasRaw();
+    result.reserve(rawAreas.size());
+    for (QCPArea* area : rawAreas)
+        result.append(QCPHandle<QCPArea>(area));
+    return result;
+}
+
+/*! \internal
+
+  The same list as areas(), raw: axisRectsRaw() and the library's loops read this one (K8).
+*/
+QList<QCPArea*> QCustomPlot::areasRaw() const
 {
     QList<QCPArea*> result;
     QStack<QCPLayoutElement*> elementStack;
@@ -2498,13 +2546,22 @@ QList<QCPArea*> QCustomPlot::areas() const
 
 /*!
   Returns the area \a pos falls in: the deepest area among the layout elements at that pixel, so a
-  rect inside a grid of the plot layout answers, not the layout. Null where no area is.
+  rect inside a grid of the plot layout answers, not the layout. An empty handle where no area is.
 
   \see layoutElementAt, axisRectAt
 */
-QCPArea* QCustomPlot::areaAt(const QPointF& pos) const
+QCPHandle<QCPArea> QCustomPlot::areaAt(const QPointF& pos) const
 {
-    for (QCPLayoutElement* element = layoutElementAt(pos); element; element = element->layout())
+    return QCPHandle<QCPArea>(areaAtRaw(pos));
+}
+
+/*! \internal
+
+  areaAt() raw: the mouse handlers and the selection code read this one (K8).
+*/
+QCPArea* QCustomPlot::areaAtRaw(const QPointF& pos) const
+{
+    for (QCPLayoutElement* element = layoutElementAtRaw(pos); element; element = element->layout())
         if (QCPArea* area = qobject_cast<QCPArea*>(element))
             return area;
     return nullptr;
@@ -2512,14 +2569,23 @@ QCPArea* QCustomPlot::areaAt(const QPointF& pos) const
 
 /*!
   Returns the layout element at pixel position \a pos. If there is no element at that position,
-  returns \c nullptr.
+  returns an empty handle.
 
   Only visible elements are used. If \ref QCPLayoutElement::setVisible on the element itself or on
   any of its parent elements is set to false, it will not be considered.
 
   \see itemAt, plottableAt
 */
-QCPLayoutElement* QCustomPlot::layoutElementAt(const QPointF& pos) const
+QCPHandle<QCPLayoutElement> QCustomPlot::layoutElementAt(const QPointF& pos) const
+{
+    return QCPHandle<QCPLayoutElement>(layoutElementAtRaw(pos));
+}
+
+/*! \internal
+
+  layoutElementAt() raw: the hit tests, mouse handlers and the library's loops read this one (K8).
+*/
+QCPLayoutElement* QCustomPlot::layoutElementAtRaw(const QPointF& pos) const
 {
     QCPLayoutElement* currentElement = mPlotLayout;
     bool searchSubElements = true;
@@ -2543,16 +2609,25 @@ QCPLayoutElement* QCustomPlot::layoutElementAt(const QPointF& pos) const
 /*!
   Returns the layout element of type \ref QCPAxisRect at pixel position \a pos. This method ignores
   other layout elements even if they are visually in front of the axis rect (e.g. a \ref
-  QCPLegend). If there is no axis rect at that position, returns \c nullptr.
+  QCPLegend). If there is no axis rect at that position, returns an empty handle.
 
   Only visible axis rects are used. If \ref QCPLayoutElement::setVisible on the axis rect itself or
   on any of its parent elements is set to false, it will not be considered.
 
   \see layoutElementAt
 */
-QCPAxisRect* QCustomPlot::axisRectAt(const QPointF& pos) const
+QCPHandle<QCPAxisRect> QCustomPlot::axisRectAt(const QPointF& pos) const
 {
-    for (QCPLayoutElement* el = layoutElementAt(pos); el; el = el->layout())
+    return QCPHandle<QCPAxisRect>(axisRectAtRaw(pos));
+}
+
+/*! \internal
+
+  axisRectAt() raw: the mouse handlers read this one (K8).
+*/
+QCPAxisRect* QCustomPlot::axisRectAtRaw(const QPointF& pos) const
+{
+    for (QCPLayoutElement* el = layoutElementAtRaw(pos); el; el = el->layout())
     {
         if (auto* ar = qobject_cast<QCPAxisRect*>(el))
             return ar;
@@ -2567,13 +2642,13 @@ QCPAxisRect* QCustomPlot::axisRectAt(const QPointF& pos) const
   \see selectedPlottables, selectedLegends, setInteractions, QCPAxis::setSelectedParts,
   QCPAxis::setSelectableParts
 */
-QList<QCPAxis*> QCustomPlot::selectedAxes() const
+QList<QCPHandle<QCPAxis>> QCustomPlot::selectedAxes() const
 {
-    QList<QCPAxis*> result;
-    for (QCPAxisRect* rect : axisRects())
+    QList<QCPHandle<QCPAxis>> result;
+    for (QCPAxisRect* rect : axisRectsRaw())
         for (QCPAxis* axis : rect->axes())
             if (axis->selectedParts() != QCPAxis::spNone)
-                result.append(axis);
+                result.append(QCPHandle<QCPAxis>(axis));
     return result;
 }
 
@@ -2584,9 +2659,9 @@ QList<QCPAxis*> QCustomPlot::selectedAxes() const
   \see selectedPlottables, selectedAxes, setInteractions, QCPLegend::setSelectedParts,
   QCPLegend::setSelectableParts, QCPLegend::selectedItems
 */
-QList<QCPLegend*> QCustomPlot::selectedLegends() const
+QList<QCPHandle<QCPLegend>> QCustomPlot::selectedLegends() const
 {
-    QList<QCPLegend*> result;
+    QList<QCPHandle<QCPLegend>> result;
 
     QStack<QCPLayoutElement*> elementStack;
     if (mPlotLayout)
@@ -2602,7 +2677,7 @@ QList<QCPLegend*> QCustomPlot::selectedLegends() const
                 if (QCPLegend* leg = qobject_cast<QCPLegend*>(subElement))
                 {
                     if (leg->selectedParts() != QCPLegend::spNone)
-                        result.append(leg);
+                        result.append(QCPHandle<QCPLegend>(leg));
                 }
             }
         }
@@ -2780,7 +2855,7 @@ void QCustomPlot::keepNotificationLayerOnTop()
 {
     if (!mOverlay)
         return;
-    if (auto* notifLayer = layer(QLatin1String("notification"));
+    if (QCPLayer* notifLayer = layer(QLatin1String("notification"));
         notifLayer && notifLayer != mLayers.last())
     {
         mLayers.removeOne(notifLayer);
@@ -2976,7 +3051,7 @@ void QCustomPlot::rescaleAxes(bool onlyVisiblePlottables)
 {
     const QCPEmissionScope scope(this);
     QList<QPointer<QCPAxisBase>> allAxes;
-    for (QCPArea* area : areas())
+    for (QCPArea* area : areasRaw())
         allAxes << guarded(area->allAxes());
 
     for (const auto& axis : allAxes)
@@ -3242,7 +3317,7 @@ bool QCustomPlot::saveBmp(const QString& fileName, int width, int height, double
 */
 QSize QCustomPlot::minimumSizeHint() const
 {
-    const QCPLayoutGrid* layout = plotLayout();
+    const QCPLayoutGrid* layout = plotLayoutRaw();
     return layout ? layout->minimumOuterSizeHint() : QSize();
 }
 
@@ -3485,7 +3560,7 @@ void QCustomPlot::uploadLayerTextures(QRhiResourceUpdateBatch* updates, const QS
         auto* grl = gridRhiLayer();
         if (grl)
         {
-            for (auto* ar : axisRects())
+            for (auto* ar : axisRectsRaw())
             {
                 for (auto* axis : ar->axes())
                     grl->registerAxis(axis);
@@ -3724,7 +3799,7 @@ void QCustomPlot::moveEvent(QMoveEvent* event)
 */
 void QCustomPlot::notifyAlignmentGroups()
 {
-    for (QCPLayoutElement* element : plotLayout()->elements(true))
+    for (QCPLayoutElement* element : plotLayoutRaw()->elements(true))
         if (element && element->alignmentGroup())
             element->markLayoutAppearanceDirty();
 }
@@ -3737,7 +3812,7 @@ void QCustomPlot::notifyAlignmentGroups()
 void QCustomPlot::relayoutAlignmentGroups()
 {
     QSet<QCPAlignmentGroup*> groups;
-    for (QCPLayoutElement* element : plotLayout()->elements(true))
+    for (QCPLayoutElement* element : plotLayoutRaw()->elements(true))
         if (element && element->alignmentGroup())
             groups.insert(element->alignmentGroup().data());
     for (QCPAlignmentGroup* group : groups)
@@ -3857,7 +3932,7 @@ void QCustomPlot::mousePressEvent(QMouseEvent* event)
     if (mSelectionRect && mSelectionRectMode != QCP::srmNone)
     {
         if (mSelectionRectMode != QCP::srmZoom
-            || qobject_cast<QCPAxisRect*>(axisRectAt(
+            || qobject_cast<QCPAxisRect*>(axisRectAtRaw(
                 mMousePressPos))) // in zoom mode only activate selection rect if on an axis rect
             mSelectionRect->startSelection(event);
     }
@@ -4188,7 +4263,7 @@ void QCustomPlot::pinchStep(const QEventPoint& a, const QEventPoint& b)
     const double span = QLineF(posA, posB).length();
     // A rangeChanged slot may delete the axis rect, or the plot with it.
     const QPointer<QCustomPlot> alive(this);
-    const QPointer<QCPAxisRect> rect = axisRectAt(lastMid);
+    const QPointer<QCPAxisRect> rect = axisRectAtRaw(lastMid);
     if (!rect)
         return;
     if (mInteractions.testFlag(QCP::iRangeZoom) && lastSpan > 0 && span > 0)
@@ -4207,7 +4282,7 @@ bool QCustomPlot::nativeGestureEvent(QNativeGestureEvent* event)
 {
     if (event->gestureType() != Qt::ZoomNativeGesture)
         return false;
-    QCPAxisRect* rect = axisRectAt(event->position());
+    QCPAxisRect* rect = axisRectAtRaw(event->position());
     if (!rect || !mInteractions.testFlag(QCP::iRangeZoom) || event->value() <= -1)
         return false; // left ignored: the parent widget gets the pinch
     // Before the zoom: QApplication ignores the event first, and an ignored one goes on to the
@@ -4348,7 +4423,7 @@ void QCustomPlot::updateLayout()
 {
     PROFILE_HERE_N("QCustomPlot::updateLayout");
     // run through layout phases:
-    QCPLayoutGrid* layout = plotLayout();
+    QCPLayoutGrid* layout = plotLayoutRaw();
     if (!layout)
         return;
     layout->update(QCPLayoutElement::upPreparation);
@@ -4572,7 +4647,7 @@ void QCustomPlot::ensureAtLeastOneBufferDirty()
     // No buffer is dirty — use markAffectedLayersDirty() to precisely dirty
     // only range-dependent layers (axes, grid, plottables), skipping static
     // buffers (background, empty overlay) to avoid needless memset clears.
-    for (auto* ar : axisRects())
+    for (auto* ar : axisRectsRaw())
         ar->markAffectedLayersDirty();
     // Fallback if nothing got dirtied (e.g. no axis rects)
     for (const auto& b : mPaintBuffers)
@@ -4586,33 +4661,22 @@ void QCustomPlot::ensureAtLeastOneBufferDirty()
 
 /*! \internal
 
-  This method is used by \ref QCPAxisRect::removeAxis to report removed axes to the QCustomPlot
-  so it may clear its QCustomPlot::xAxis, yAxis, xAxis2 and yAxis2 members accordingly.
+  This method is used by \ref QCPAxisRect::removeAxis to report removed axes to the QCustomPlot.
+  The xAxis, yAxis, xAxis2 and yAxis2 handles observe the deletion by themselves (QPointer): this
+  hook stays for subclasses, but nothing is cleared by hand (H-5).
 */
-void QCustomPlot::axisRemoved(QCPAxis* axis)
+void QCustomPlot::axisRemoved(QCPAxis*)
 {
-    if (xAxis == axis)
-        xAxis = nullptr;
-    if (xAxis2 == axis)
-        xAxis2 = nullptr;
-    if (yAxis == axis)
-        yAxis = nullptr;
-    if (yAxis2 == axis)
-        yAxis2 = nullptr;
-
-    // Note: No need to take care of range drag axes and range zoom axes, because they are stored in
-    // smart pointers
 }
 
 /*! \internal
 
-  This method is used by the QCPLegend destructor to report legend removal to the QCustomPlot so
-  it may clear its QCustomPlot::legend member accordingly.
+  This method is used by the QCPLegend destructor to report legend removal to the QCustomPlot. The
+  legend handle observes the deletion by itself (QPointer): this hook stays for subclasses, but
+  nothing is cleared by hand (H-5).
 */
-void QCustomPlot::legendRemoved(QCPLegend* legend)
+void QCustomPlot::legendRemoved(QCPLegend*)
 {
-    if (this->legend == legend)
-        this->legend = nullptr;
 }
 
 /*! \internal
@@ -4644,7 +4708,7 @@ void QCustomPlot::processRectSelection(QRect rect, QMouseEvent* event)
     {
         SelectionCandidates potentialSelections;
         QRectF rectF(rect.normalized());
-        if (QCPArea* affectedArea = areaAt(rectF.topLeft()))
+        if (QCPArea* affectedArea = areaAtRaw(rectF.topLeft()))
         {
             // determine plottables that were hit by the rect and thus are candidates for selection,
             // in the plot's own order as 2.x collected them: going system by system would hand the
@@ -4721,7 +4785,7 @@ void QCustomPlot::processRectSelection(QRect rect, QMouseEvent* event)
 */
 void QCustomPlot::processRectZoom(QRect rect, [[maybe_unused]] QMouseEvent* event)
 {
-    if (QCPAxisRect* axisRect = qobject_cast<QCPAxisRect*>(areaAt(rect.topLeft())))
+    if (QCPAxisRect* axisRect = qobject_cast<QCPAxisRect*>(areaAtRaw(rect.topLeft())))
     {
         QList<QCPAxis*> affectedAxes = QList<QCPAxis*>()
             << axisRect->rangeZoomAxes(Qt::Horizontal) << axisRect->rangeZoomAxes(Qt::Vertical);

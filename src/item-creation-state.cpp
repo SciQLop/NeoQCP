@@ -41,7 +41,7 @@ void QCPItemCreationState::draw(QCPPainter* painter)
 {
     if (!mPlot->creationModeEnabled())
         return;
-    for (auto* axisRect : mPlot->axisRects())
+    for (QCPAxisRect* axisRect : mPlot->axisRectsRaw())
         drawBadge(painter, axisRect->rect());
 }
 

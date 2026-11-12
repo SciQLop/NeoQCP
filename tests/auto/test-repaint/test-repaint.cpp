@@ -1551,7 +1551,7 @@ void TestRepaint::aPolarLookChangeDirtiesTheGraphLayers()
     auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 180 }, QVector<double> { 0.5, 0.5 });
     QVERIFY(graph);
     QVERIFY(plot.addLayer(QStringLiteral("polar graph"), plot.layer(QStringLiteral("main"))));
-    auto* graphLayer = plot.layer(QStringLiteral("polar graph"));
+    QCPLayer* graphLayer = plot.layer(QStringLiteral("polar graph"));
     QVERIFY(graphLayer);
     QVERIFY(graph->setLayer(graphLayer));
     plot.replot();
@@ -1623,7 +1623,7 @@ void TestRepaint::layoutSettersIgnoreEqualValues()
     auto plot = settledPlot();
     waitUntilSettled(*plot);
 
-    auto* rect = plot->axisRect();
+    QCPAxisRect* rect = plot->axisRect();
     rect->setMargins(rect->margins());
     rect->setMinimumMargins(rect->minimumMargins());
     rect->setMinimumSize(rect->minimumSize());
@@ -1760,7 +1760,7 @@ void TestRepaint::secondLegendRowFollowsRename()
     QVERIFY(row);
     QVERIFY(!legend->outerRect().isEmpty());
 
-    auto* layer = plot->layer(QStringLiteral("legend2"));
+    QCPLayer* layer = plot->layer(QStringLiteral("legend2"));
     QVERIFY(layer);
     QVERIFY2(!layer->dirtiedAfterDraw(), "a settled legend layer must not be dirty");
 
@@ -1924,7 +1924,7 @@ void TestRepaint::anchoredChildOnOtherLayerFollowsRange()
     plot.replot();
     waitUntilSettled(plot);
     waitUntilSettled(plot);
-    auto* labels = plot.layer(QStringLiteral("labels"));
+    QCPLayer* labels = plot.layer(QStringLiteral("labels"));
     auto* parentLayer = parent->layer();
     QVERIFY(labels && parentLayer);
     QVERIFY2(!labels->dirtiedAfterDraw(), "a settled labels layer must not be dirty");
@@ -2019,8 +2019,8 @@ void TestRepaint::rangeChangeMarksOnlyLayersUsingTheAxis()
     plot.replot();
     waitUntilSettled(plot);
     waitUntilSettled(plot);
-    auto* a = plot.layer(QStringLiteral("a"));
-    auto* b = plot.layer(QStringLiteral("b"));
+    QCPLayer* a = plot.layer(QStringLiteral("a"));
+    QCPLayer* b = plot.layer(QStringLiteral("b"));
     QVERIFY(a && b);
     QVERIFY2(!a->dirtiedAfterDraw() && !b->dirtiedAfterDraw(), "both item layers are settled");
 
@@ -2043,7 +2043,7 @@ void TestRepaint::setAxesMovesTheLayerToTheNewAxis()
     plot.replot();
     waitUntilSettled(plot);
     waitUntilSettled(plot);
-    auto* b = plot.layer(QStringLiteral("b"));
+    QCPLayer* b = plot.layer(QStringLiteral("b"));
     QVERIFY(b);
     QVERIFY2(!b->dirtiedAfterDraw(), "a settled item layer must not be dirty");
 
@@ -2087,7 +2087,7 @@ void TestRepaint::itemTakenAndAddedKeepsAxes()
     plot.replot();
     waitUntilSettled(plot);
     waitUntilSettled(plot);
-    auto* b = plot.layer(QStringLiteral("b"));
+    QCPLayer* b = plot.layer(QStringLiteral("b"));
     QVERIFY(b);
     QVERIFY2(!b->dirtiedAfterDraw(), "a settled item layer must not be dirty");
 

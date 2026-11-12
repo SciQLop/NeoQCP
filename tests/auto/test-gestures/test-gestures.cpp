@@ -247,7 +247,7 @@ void TestGestures::deleteAxisRectOnRangeChange()
 
 void TestGestures::deleteAxisRect()
 {
-    const QPointer<QCPAxisRect> rect = mPlot->axisRect();
+    const QPointer<QCPAxisRect> rect(mPlot->axisRect());
     QVERIFY(mPlot->plotLayout()->remove(rect)); // remove() deletes the element
     QVERIFY(!rect);
 }

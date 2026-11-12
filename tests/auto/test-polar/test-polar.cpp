@@ -613,7 +613,7 @@ void TestPolar::aPolarGraphJoinsAGroup()
     auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 180 },
                                           QVector<double> { 0.5, 0.5 });
     QVERIFY(graph);
-    auto* group = plot.addPlottableGroup("polar");
+    QCPPlottableGroup* group = plot.addPlottableGroup("polar");
     QVERIFY(group->addMember(graph.get()));
     QCOMPARE(graph->group(), group);
     QCOMPARE(group->members(), QList<QCPAbstractPlottable*> { graph.get() });

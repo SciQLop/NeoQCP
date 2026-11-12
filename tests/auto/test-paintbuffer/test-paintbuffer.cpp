@@ -293,7 +293,7 @@ void TestPaintBuffer::skipRepaint_graph2PanOnly()
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
     mPlot->xAxis->setRange(0.5, 6.5);
-    auto* axisRect = mPlot->axisRect();
+    QCPAxisRect* axisRect = mPlot->axisRect();
     axisRect->markAffectedLayersDirty();
 
     QCPLayer* mainLayer = mPlot->layer("main");

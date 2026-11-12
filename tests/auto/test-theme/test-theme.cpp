@@ -59,7 +59,7 @@ void TestTheme::applyThemePropagatesAxisColors()
 {
     auto* theme = QCPTheme::dark();
     mPlot->setTheme(theme);
-    auto* axis = mPlot->xAxis;
+    QCPAxis* axis = mPlot->xAxis;
     QCOMPARE(axis->basePen().color(), QColor("#e0e0e0"));
     QCOMPARE(axis->tickPen().color(), QColor("#e0e0e0"));
     QCOMPARE(axis->subTickPen().color(), QColor("#e0e0e0"));
@@ -170,7 +170,7 @@ void TestTheme::coalescing()
     int replotCount = 0;
     connect(mPlot, &QCustomPlot::afterReplot, [&replotCount]() { ++replotCount; });
 
-    auto* theme = mPlot->theme();
+    QCPTheme* theme = mPlot->theme();
     theme->setBackground(Qt::red);
     theme->setForeground(Qt::green);
     theme->setGrid(Qt::blue);

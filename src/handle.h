@@ -4,6 +4,7 @@
 #include "misuse.h"
 #include <QDebug>
 #include <QHashFunctions>
+#include <QList>
 #include <QMetaObject>
 #include <QObject>
 #include <QPointer>
@@ -130,6 +131,21 @@ private:
 
     QPointer<T> mObject;
 };
+
+namespace qcp
+{
+// The public list getters hand out handles; the setters keep taking QList<T*> (K5). This is the
+// one conversion between them.
+template <typename T>
+QList<T*> pointers(const QList<QCPHandle<T>>& handles)
+{
+    QList<T*> result;
+    result.reserve(handles.size());
+    for (const QCPHandle<T>& handle : handles)
+        result.append(handle.get());
+    return result;
+}
+} // namespace qcp
 
 // A handle hashes as the pointer it holds, so QSet<QCPHandle<T>> and std::unordered_set work.
 template <typename T>

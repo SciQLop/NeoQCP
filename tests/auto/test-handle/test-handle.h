@@ -19,6 +19,11 @@ private slots:
     void ifOnAHandleIsNotAmbiguous();
     void aRawPointerDoesNotMakeAHandleImplicitly();
     void aHandleTakesPartInTheAmbiguityMatrix();
+    void pointerListHelper();
+    void thePlotHandsOutHandles();
+    void aDeletedDefaultAxisTestsFalse();
+    void aDeletedLegendTestsFalse();
+    void addGraphReturnsTheSameHandleAsAdd();
     void handleAsCast();
     void handleRemove();
     void deadHandleReportsMisuse();

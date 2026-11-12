@@ -98,7 +98,7 @@ DOC_SNIPPET(gallery_space_weather, 800, 560)
     spectraRect->setMarginGroup(QCP::msLeft, margins);
 
     // The shock, marked on both panels.
-    for (QCPAxisRect* rect : { customPlot->axisRect(), spectraRect })
+    for (QCPAxisRect* rect : { customPlot->axisRect().get(), spectraRect })
     {
         auto span = customPlot->add<QCPItemSpan>(Qt::Vertical);
         span->setClipAxisRect(rect);

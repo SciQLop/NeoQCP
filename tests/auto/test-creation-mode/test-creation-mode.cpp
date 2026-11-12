@@ -362,7 +362,7 @@ void TestCreationMode::batchModeIgnoresExistingItems()
 
 void TestCreationMode::multiAxisRectCreation()
 {
-    auto* layout = mPlot->plotLayout();
+    QCPLayoutGrid* layout = mPlot->plotLayout();
     auto* axisRect2 = new QCPAxisRect(mPlot);
     layout->addElement(1, 0, axisRect2);
     axisRect2->axis(QCPAxis::atBottom)->setRange(0, 100);

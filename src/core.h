@@ -211,8 +211,8 @@ public:
 
     [[nodiscard]] Qt::AspectRatioMode backgroundScaledMode() const { return mBackgroundScaledMode; }
 
-    // Never nullptr: a deleted root layout is replaced by an empty one.
-    [[nodiscard]] QCPLayoutGrid* plotLayout() const;
+    // Never an empty handle: a deleted root layout is replaced by an empty one.
+    [[nodiscard]] QCPHandle<QCPLayoutGrid> plotLayout() const;
 
     [[nodiscard]] QCP::AntialiasedElements antialiasedElements() const { return mAntialiasedElements; }
 
@@ -232,7 +232,10 @@ public:
 
     [[nodiscard]] QCP::SelectionRectMode selectionRectMode() const { return mSelectionRectMode; }
 
-    [[nodiscard]] QCPSelectionRect* selectionRect() const { return mSelectionRect; }
+    [[nodiscard]] QCPHandle<QCPSelectionRect> selectionRect() const
+    {
+        return QCPHandle<QCPSelectionRect>(mSelectionRect.data());
+    }
 
     // Item creation mode
     void setItemCreator(ItemCreator creator);
@@ -269,7 +272,7 @@ public:
     void setSelectionRectMode(QCP::SelectionRectMode mode);
     void setSelectionRect(QCPSelectionRect* selectionRect);
     // theme:
-    [[nodiscard]] QCPTheme* theme() const;
+    [[nodiscard]] QCPHandle<QCPTheme> theme() const;
     void setTheme(QCPTheme* theme);
     void applyTheme();
     [[nodiscard]] QColor themeBackground() const;
@@ -303,7 +306,7 @@ public:
     // repaint the screen (that follows next turn).
     void settle();
     // overlay:
-    QCPOverlay* overlay();
+    QCPHandle<QCPOverlay> overlay();
     // grid GPU layer:
     QCPGridRhiLayer* gridRhiLayer();
     // Non-lazy accessor: returns the grid RHI layer only if it already exists and
@@ -346,27 +349,29 @@ public:
     // Whether the widget has been shown at least once (used by the hidden-replot guard).
     bool wasShown() const { return mWasShown; }
     // pipeline:
-    [[nodiscard]] QCPPipelineScheduler* pipelineScheduler() const { return mPipelineScheduler; }
+    [[nodiscard]] QCPHandle<QCPPipelineScheduler> pipelineScheduler() const;
     void setMaxPipelineThreads(int count);
 
     // non-property methods:
     // plottable interface:
-    [[nodiscard]] QCPAbstractPlottable* plottable(int index);
-    [[nodiscard]] QCPAbstractPlottable* plottable();
+    [[nodiscard]] QCPHandle<QCPAbstractPlottable> plottable(int index);
+    [[nodiscard]] QCPHandle<QCPAbstractPlottable> plottable();
     [[nodiscard]] bool removePlottable(QCPAbstractPlottable* plottable);
     [[nodiscard]] bool removePlottable(int index);
     int clearPlottables();
     [[nodiscard]] int plottableCount() const;
     // plottable groups: one legend row for several plottables (QCPPlottableGroup)
-    QCPPlottableGroup* addPlottableGroup(const QString& name);
+    QCPHandle<QCPPlottableGroup> addPlottableGroup(const QString& name);
     bool removePlottableGroup(QCPPlottableGroup* group);
-    [[nodiscard]] QList<QCPPlottableGroup*> plottableGroups() const { return mPlottableGroups; }
-    [[nodiscard]] QList<QCPAbstractPlottable*> selectedPlottables() const;
+    [[nodiscard]] QList<QCPHandle<QCPPlottableGroup>> plottableGroups() const;
+    [[nodiscard]] QList<QCPHandle<QCPAbstractPlottable>> selectedPlottables() const;
     template <class PlottableType>
-    [[nodiscard]] PlottableType* plottableAt(const QPointF& pos, bool onlySelectable = false,
-                               int* dataIndex = nullptr) const;
-    [[nodiscard]] QCPAbstractPlottable* plottableAt(const QPointF& pos, bool onlySelectable = false,
-                                      int* dataIndex = nullptr) const;
+    [[nodiscard]] QCPHandle<PlottableType> plottableAt(const QPointF& pos,
+                                                      bool onlySelectable = false,
+                                                      int* dataIndex = nullptr) const;
+    [[nodiscard]] QCPHandle<QCPAbstractPlottable> plottableAt(const QPointF& pos,
+                                                             bool onlySelectable = false,
+                                                             int* dataIndex = nullptr) const;
     [[nodiscard]] bool hasPlottable(QCPAbstractPlottable* plottable) const;
 
     // Creates a T the plot owns and returns its fluent handle (qcp::HandleFor<T>). What args mean
@@ -417,22 +422,23 @@ public:
     [[nodiscard]] QList<QCPGraph*> selectedGraphs() const;
 
     // item interface:
-    [[nodiscard]] QCPAbstractItem* item(int index) const;
-    [[nodiscard]] QCPAbstractItem* item() const;
+    [[nodiscard]] QCPHandle<QCPAbstractItem> item(int index) const;
+    [[nodiscard]] QCPHandle<QCPAbstractItem> item() const;
     [[nodiscard]] bool removeItem(QCPAbstractItem* item);
     [[nodiscard]] bool removeItem(int index);
     int clearItems();
     [[nodiscard]] int itemCount() const;
-    [[nodiscard]] QList<QCPAbstractItem*> selectedItems() const;
+    [[nodiscard]] QList<QCPHandle<QCPAbstractItem>> selectedItems() const;
     template <class ItemType>
-    [[nodiscard]] ItemType* itemAt(const QPointF& pos, bool onlySelectable = false) const;
-    [[nodiscard]] QCPAbstractItem* itemAt(const QPointF& pos, bool onlySelectable = false) const;
+    [[nodiscard]] QCPHandle<ItemType> itemAt(const QPointF& pos, bool onlySelectable = false) const;
+    [[nodiscard]] QCPHandle<QCPAbstractItem> itemAt(const QPointF& pos,
+                                                   bool onlySelectable = false) const;
     [[nodiscard]] bool hasItem(QCPAbstractItem* item) const;
 
     // layer interface:
-    [[nodiscard]] QCPLayer* layer(const QString& name) const;
-    [[nodiscard]] QCPLayer* layer(int index) const;
-    [[nodiscard]] QCPLayer* currentLayer() const;
+    [[nodiscard]] QCPHandle<QCPLayer> layer(const QString& name) const;
+    [[nodiscard]] QCPHandle<QCPLayer> layer(int index) const;
+    [[nodiscard]] QCPHandle<QCPLayer> currentLayer() const;
     bool setCurrentLayer(const QString& name);
     bool setCurrentLayer(QCPLayer* layer);
     [[nodiscard]] int layerCount() const;
@@ -443,18 +449,18 @@ public:
 
     // axis rect/layout interface:
     [[nodiscard]] int axisRectCount() const;
-    [[nodiscard]] QCPAxisRect* axisRect(int index = 0) const;
-    [[nodiscard]] QList<QCPAxisRect*> axisRects() const;
+    [[nodiscard]] QCPHandle<QCPAxisRect> axisRect(int index = 0) const;
+    [[nodiscard]] QList<QCPHandle<QCPAxisRect>> axisRects() const;
     //! The areas of the plot, in layout order: axis rects and polar areas alike.
-    [[nodiscard]] QList<QCPArea*> areas() const;
-    [[nodiscard]] QCPLayoutElement* layoutElementAt(const QPointF& pos) const;
+    [[nodiscard]] QList<QCPHandle<QCPArea>> areas() const;
+    [[nodiscard]] QCPHandle<QCPLayoutElement> layoutElementAt(const QPointF& pos) const;
     //! The area \a pos falls in: the deepest one of the layout elements at that pixel.
-    [[nodiscard]] QCPArea* areaAt(const QPointF& pos) const;
-    [[nodiscard]] QCPAxisRect* axisRectAt(const QPointF& pos) const;
+    [[nodiscard]] QCPHandle<QCPArea> areaAt(const QPointF& pos) const;
+    [[nodiscard]] QCPHandle<QCPAxisRect> axisRectAt(const QPointF& pos) const;
     Q_SLOT void rescaleAxes(bool onlyVisiblePlottables = false);
 
-    [[nodiscard]] QList<QCPAxis*> selectedAxes() const;
-    [[nodiscard]] QList<QCPLegend*> selectedLegends() const;
+    [[nodiscard]] QList<QCPHandle<QCPAxis>> selectedAxes() const;
+    [[nodiscard]] QList<QCPHandle<QCPLegend>> selectedLegends() const;
     Q_SLOT void deselectAll();
 
     [[nodiscard]] bool savePdf(const QString& fileName, int width = 0, int height = 0,
@@ -476,9 +482,10 @@ public:
     Q_SLOT void replot(QCustomPlot::RefreshPriority refreshPriority = QCustomPlot::rpImmediateRefresh);
     [[nodiscard]] double replotTime(bool average = false) const;
 
-    // Cleared by ~QCPAxis (through axisRemoved) and ~QCPLegend (through legendRemoved).
-    QCPAxis *xAxis, *yAxis, *xAxis2, *yAxis2;
-    QCPLegend* legend;
+    // A handle observes the deletion by itself: ~QCPAxis calls axisRemoved and ~QCPLegend calls
+    // legendRemoved, but nothing here is cleared by hand (H-5).
+    QCPHandle<QCPAxis> xAxis, yAxis, xAxis2, yAxis2;
+    QCPHandle<QCPLegend> legend;
 
 signals:
     void mouseDoubleClick(QMouseEvent* event);
@@ -688,6 +695,15 @@ protected:
     bool registerItem(QCPAbstractItem* item);
     // The first of axisRects() in layout order, without building the list (it is called per item).
     [[nodiscard]] QCPAxisRect* firstAxisRect() const;
+    // Raw views for the library's hot paths: the public getters hand out handles, and a QPointer per
+    // element would sit in loops that run per frame or per point (K8).
+    [[nodiscard]] QCPLayoutGrid* plotLayoutRaw() const;
+    [[nodiscard]] QList<QCPArea*> areasRaw() const;
+    [[nodiscard]] QList<QCPAxisRect*> axisRectsRaw() const;
+    [[nodiscard]] QCPLayoutElement* layoutElementAtRaw(const QPointF& pos) const;
+    [[nodiscard]] QCPArea* areaAtRaw(const QPointF& pos) const;
+    [[nodiscard]] QCPAxisRect* axisRectAtRaw(const QPointF& pos) const;
+    [[nodiscard]] const QList<QCPAbstractPlottable*>& plottablesRaw() const { return mPlottables; }
     void itemDestroyed(QCPAbstractItem* item);
     //! Moves the layer's children to the layer below (above for the bottom one) and drops every
     //! reference to the layer, without deleting it. Called by removeLayer and ~QCPLayer.
@@ -715,6 +731,9 @@ protected:
     friend class QCPPlottableGroup;
     friend class QCPAxis;
     friend class QCPLayer;
+    friend class QCPCoordinateSystem;
+    friend class QCPIntervals;
+    friend class QCPItemCreationState;
     friend class TestPaintBuffer;
     friend class QCPAxisRect;
     friend class QCPPolarArea;
@@ -847,8 +866,8 @@ std::unique_ptr<T> QCustomPlot::take(QCPHandle<T> handle)
   \see itemAt, layoutElementAt
 */
 template <class PlottableType>
-PlottableType* QCustomPlot::plottableAt(const QPointF& pos, bool onlySelectable,
-                                        int* dataIndex) const
+QCPHandle<PlottableType> QCustomPlot::plottableAt(const QPointF& pos, bool onlySelectable,
+                                                  int* dataIndex) const
 {
     PlottableType* resultPlottable = nullptr;
     QVariant resultDetails;
@@ -888,7 +907,7 @@ PlottableType* QCustomPlot::plottableAt(const QPointF& pos, bool onlySelectable,
         if (!sel.isEmpty())
             *dataIndex = sel.dataRange(0).begin();
     }
-    return resultPlottable;
+    return QCPHandle<PlottableType>(resultPlottable);
 }
 
 /*!
@@ -906,7 +925,7 @@ PlottableType* QCustomPlot::plottableAt(const QPointF& pos, bool onlySelectable,
   \see plottableAt, layoutElementAt
 */
 template <class ItemType>
-ItemType* QCustomPlot::itemAt(const QPointF& pos, bool onlySelectable) const
+QCPHandle<ItemType> QCustomPlot::itemAt(const QPointF& pos, bool onlySelectable) const
 {
     ItemType* resultItem = nullptr;
     double resultDistance
@@ -937,7 +956,7 @@ ItemType* QCustomPlot::itemAt(const QPointF& pos, bool onlySelectable) const
         }
     }
 
-    return resultItem;
+    return QCPHandle<ItemType>(resultItem);
 }
 
 

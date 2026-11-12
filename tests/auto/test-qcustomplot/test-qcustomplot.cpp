@@ -373,7 +373,7 @@ void deleteRectOn(QCustomPlot* plot, Signal signal)
 void TestQCustomPlot::moveSlotReplacingTheSelectionRectIsSafe()
 {
   startRubberBand(mPlot);
-  auto* old = mPlot->selectionRect();
+  QCPSelectionRect* old = mPlot->selectionRect();
   replaceRectOn(mPlot, &QCPSelectionRect::changed);
   sendMouse(mPlot, QEvent::MouseMove, pixelOf(mPlot, 8, 8), Qt::LeftButton);
   sendMouse(mPlot, QEvent::MouseMove, pixelOf(mPlot, 9, 9), Qt::LeftButton);
@@ -386,7 +386,7 @@ void TestQCustomPlot::moveSlotReplacingTheSelectionRectIsSafe()
 void TestQCustomPlot::cancelSlotReplacingTheSelectionRectIsSafe()
 {
   startRubberBand(mPlot);
-  auto* old = mPlot->selectionRect();
+  QCPSelectionRect* old = mPlot->selectionRect();
   replaceRectOn(mPlot, &QCPSelectionRect::canceled);
   sendMouse(mPlot, QEvent::MouseButtonRelease, pixelOf(mPlot, 2, 2), Qt::NoButton);
   QVERIFY(mPlot->selectionRect() != old);
@@ -396,7 +396,7 @@ void TestQCustomPlot::cancelSlotReplacingTheSelectionRectIsSafe()
 void TestQCustomPlot::escapeSlotReplacingTheSelectionRectIsSafe()
 {
   startRubberBand(mPlot);
-  auto* old = mPlot->selectionRect();
+  QCPSelectionRect* old = mPlot->selectionRect();
   replaceRectOn(mPlot, &QCPSelectionRect::canceled);
   pressEscape(mPlot);
   QVERIFY(mPlot->selectionRect() != old);
@@ -464,7 +464,7 @@ void TestQCustomPlot::settingTheCurrentSelectionRectKeepsIt()
 {
   layOut(mPlot, QCP::Interactions());
   mPlot->setSelectionRectMode(QCP::srmZoom);
-  auto* rect = mPlot->selectionRect();
+  QCPSelectionRect* rect = mPlot->selectionRect();
   mPlot->setSelectionRect(rect);
   QCOMPARE(mPlot->selectionRect(), rect);
   QSignalSpy zooms(mPlot->xAxis, &QCPAxis::rangeChanged);
@@ -476,7 +476,7 @@ void TestQCustomPlot::settingTheCurrentSelectionRectKeepsIt()
 void TestQCustomPlot::cancelSlotReinstallingThePreviousRectZoomsOnce()
 {
   startRubberBand(mPlot);
-  auto* original = mPlot->selectionRect();
+  QCPSelectionRect* original = mPlot->selectionRect();
   connect(original, &QCPSelectionRect::canceled, mPlot,
           [this, original] { mPlot->setSelectionRect(original); }, Qt::SingleShotConnection);
   mPlot->setSelectionRect(new QCPSelectionRect(mPlot));
@@ -582,7 +582,7 @@ void TestQCustomPlot::rectZoomSlotDeletingThePlotIsSafe()
   layOut(mPlot, QCP::Interactions());
   mPlot->setSelectionRectMode(QCP::srmZoom);
   bool ran = false;
-  deletePlotOn(mPlot, mPlot->xAxis, &QCPAxis::rangeChanged, &ran);
+  deletePlotOn(mPlot, mPlot->xAxis.get(), &QCPAxis::rangeChanged, &ran);
   dragFromTo(mPlot, pixelOf(mPlot, 2, 2), pixelOf(mPlot, 6, 6));
   QVERIFY(ran);
 }

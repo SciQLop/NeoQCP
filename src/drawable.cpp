@@ -13,6 +13,7 @@
 #include "painting/plottable-rhi-layer.h"
 #include "painting/raster-fallback.h"
 #include "painting/viewport-offset.h"
+#include "theme.h"
 #include "plottables/plottable-draw-utils.h"
 #include "plottables/plottable.h"
 #include "vector2d.h"

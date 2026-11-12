@@ -5,6 +5,7 @@
 #include <memory>
 #include <type_traits>
 #include <unordered_set>
+#include <utility>
 
 class TestHandleFwd;
 QCPHandle<TestHandleFwd> forwardDeclaredHandle();
@@ -285,6 +286,169 @@ void TestHandle::aHandleTakesPartInTheAmbiguityMatrix()
     QCPGraph* graph = plot.addGraph();
     baseAssigned = graph;
     QCOMPARE(baseAssigned.get(), static_cast<QCPAbstractPlottable*>(graph));
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestHandle::pointerListHelper()
+{
+    QCustomPlot plot;
+    auto first = plot.add<QCPAxis>(QCPAxis::atLeft);
+    auto second = plot.add<QCPAxis>(QCPAxis::atLeft);
+    QVERIFY(first);
+    QVERIFY(second);
+
+    const QList<QCPHandle<QCPAxis>> handles {first, second};
+    const QList<QCPAxis*> raw = qcp::pointers(handles);
+    QCOMPARE(raw.size(), 2);
+    QCOMPARE(raw.at(0), first.get());
+    QCOMPARE(raw.at(1), second.get());
+
+    QCPHandle<QCPAxis> dead;
+    const QList<QCPAxis*> withDead = qcp::pointers(QList<QCPHandle<QCPAxis>> {dead});
+    QCOMPARE(withDead.size(), 1);
+    QCOMPARE(withDead.at(0), nullptr);
+}
+
+void TestHandle::thePlotHandsOutHandles()
+{
+    using Plot = QCustomPlot;
+    // QCustomPlot's getters (inventory §2.1): plain QCPHandle<T>, lists of handles (K1, K5).
+    static_assert(std::is_same_v<decltype(std::declval<Plot&>().plotLayout()),
+                                 QCPHandle<QCPLayoutGrid>>);
+    static_assert(std::is_same_v<decltype(std::declval<const Plot&>().theme()),
+                                 QCPHandle<QCPTheme>>);
+    static_assert(std::is_same_v<decltype(std::declval<Plot&>().overlay()),
+                                 QCPHandle<QCPOverlay>>);
+    static_assert(std::is_same_v<decltype(std::declval<const Plot&>().pipelineScheduler()),
+                                 QCPHandle<QCPPipelineScheduler>>);
+    static_assert(std::is_same_v<decltype(std::declval<Plot&>().plottable(0)),
+                                 QCPHandle<QCPAbstractPlottable>>);
+    static_assert(std::is_same_v<decltype(std::declval<Plot&>().plottable()),
+                                 QCPHandle<QCPAbstractPlottable>>);
+    static_assert(std::is_same_v<decltype(std::declval<Plot&>().plottableGroups()),
+                                 QList<QCPHandle<QCPPlottableGroup>>>);
+    static_assert(std::is_same_v<decltype(std::declval<const Plot&>().selectedPlottables()),
+                                 QList<QCPHandle<QCPAbstractPlottable>>>);
+    static_assert(std::is_same_v<decltype(std::declval<const Plot&>().plottableAt(QPointF())),
+                                 QCPHandle<QCPAbstractPlottable>>);
+    static_assert(
+        std::is_same_v<decltype(std::declval<const Plot&>().plottableAt<QCPGraph>(QPointF())),
+                       QCPHandle<QCPGraph>>);
+    static_assert(std::is_same_v<decltype(std::declval<const Plot&>().item(0)),
+                                 QCPHandle<QCPAbstractItem>>);
+    static_assert(std::is_same_v<decltype(std::declval<const Plot&>().item()),
+                                 QCPHandle<QCPAbstractItem>>);
+    static_assert(std::is_same_v<decltype(std::declval<const Plot&>().selectedItems()),
+                                 QList<QCPHandle<QCPAbstractItem>>>);
+    static_assert(std::is_same_v<decltype(std::declval<const Plot&>().itemAt(QPointF())),
+                                 QCPHandle<QCPAbstractItem>>);
+    static_assert(
+        std::is_same_v<decltype(std::declval<const Plot&>().itemAt<QCPItemLine>(QPointF())),
+                       QCPHandle<QCPItemLine>>);
+    static_assert(std::is_same_v<decltype(std::declval<const Plot&>().layer(QString())),
+                                 QCPHandle<QCPLayer>>);
+    static_assert(std::is_same_v<decltype(std::declval<const Plot&>().layer(0)),
+                                 QCPHandle<QCPLayer>>);
+    static_assert(std::is_same_v<decltype(std::declval<const Plot&>().currentLayer()),
+                                 QCPHandle<QCPLayer>>);
+    static_assert(std::is_same_v<decltype(std::declval<const Plot&>().axisRect(0)),
+                                 QCPHandle<QCPAxisRect>>);
+    static_assert(std::is_same_v<decltype(std::declval<const Plot&>().axisRects()),
+                                 QList<QCPHandle<QCPAxisRect>>>);
+    static_assert(std::is_same_v<decltype(std::declval<const Plot&>().areas()),
+                                 QList<QCPHandle<QCPArea>>>);
+    static_assert(std::is_same_v<decltype(std::declval<const Plot&>().layoutElementAt(QPointF())),
+                                 QCPHandle<QCPLayoutElement>>);
+    static_assert(std::is_same_v<decltype(std::declval<const Plot&>().areaAt(QPointF())),
+                                 QCPHandle<QCPArea>>);
+    static_assert(std::is_same_v<decltype(std::declval<const Plot&>().axisRectAt(QPointF())),
+                                 QCPHandle<QCPAxisRect>>);
+    static_assert(std::is_same_v<decltype(std::declval<const Plot&>().selectedAxes()),
+                                 QList<QCPHandle<QCPAxis>>>);
+    static_assert(std::is_same_v<decltype(std::declval<const Plot&>().selectedLegends()),
+                                 QList<QCPHandle<QCPLegend>>>);
+    static_assert(std::is_same_v<decltype(std::declval<const Plot&>().selectionRect()),
+                                 QCPHandle<QCPSelectionRect>>);
+    static_assert(std::is_same_v<decltype(std::declval<Plot&>().addPlottableGroup(QString())),
+                                 QCPHandle<QCPPlottableGroup>>);
+
+    // The shortcut members (H-5, K1), same names.
+    static_assert(std::is_same_v<decltype(std::declval<Plot&>().xAxis), QCPHandle<QCPAxis>>);
+    static_assert(std::is_same_v<decltype(std::declval<Plot&>().yAxis), QCPHandle<QCPAxis>>);
+    static_assert(std::is_same_v<decltype(std::declval<Plot&>().xAxis2), QCPHandle<QCPAxis>>);
+    static_assert(std::is_same_v<decltype(std::declval<Plot&>().yAxis2), QCPHandle<QCPAxis>>);
+    static_assert(std::is_same_v<decltype(std::declval<Plot&>().legend), QCPHandle<QCPLegend>>);
+
+    // K3: the graph family stays raw until 5c.
+    static_assert(std::is_same_v<decltype(std::declval<const Plot&>().graph(0)), QCPGraph*>);
+    static_assert(std::is_same_v<decltype(std::declval<const Plot&>().graph()), QCPGraph*>);
+    static_assert(std::is_same_v<decltype(std::declval<Plot&>().addGraph()), QCPGraph*>);
+    static_assert(std::is_same_v<decltype(std::declval<const Plot&>().selectedGraphs()),
+                                 QList<QCPGraph*>>);
+
+    // H-3: the returns that are not QObjects.
+    static_assert(std::is_same_v<decltype(std::declval<Plot&>().gridRhiLayer()),
+                                 QCPGridRhiLayer*>);
+    static_assert(std::is_same_v<decltype(std::declval<const Plot&>().gridRhiLayerIfExists()),
+                                 QCPGridRhiLayer*>);
+    static_assert(std::is_same_v<decltype(std::declval<Plot&>().plottableRhiLayer(nullptr)),
+                                 QCPPlottableRhiLayer*>);
+    static_assert(std::is_same_v<decltype(std::declval<Plot&>().scatterRhiLayer(nullptr)),
+                                 QCPScatterRhiLayer*>);
+
+    QCustomPlot plot;
+    QVERIFY(plot.plottableAt(QPointF()) == nullptr);
+    QVERIFY(plot.itemAt(QPointF()) == nullptr);
+    QVERIFY(plot.layoutElementAt(QPointF()) != nullptr);
+    QCOMPARE(plot.axisRects().first().get(), plot.axisRect(0).get());
+    // The object-typed property keeps its pointer type: moc assigns the getter's handle to it (H-7).
+    QCOMPARE(plot.property("plotLayout").value<QCPLayoutGrid*>(), plot.plotLayout().get());
+}
+
+void TestHandle::aDeletedDefaultAxisTestsFalse()
+{
+    QCustomPlot plot;
+    QCPHandle<QCPAxis> x = plot.xAxis;
+    QVERIFY(x);
+    QCOMPARE(x.get(), plot.xAxis.get());
+
+    x.remove();
+    QVERIFY(!x);
+    QVERIFY(!plot.xAxis); // the member observes the deletion by itself (H-5)
+    QVERIFY(plot.yAxis);
+    QVERIFY(plot.xAxis2);
+    QVERIFY(plot.yAxis2);
+    QCOMPARE(plot.xAxis.get(), nullptr);
+    plot.replot();
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestHandle::aDeletedLegendTestsFalse()
+{
+    QCustomPlot plot;
+    QCPHandle<QCPLegend> legend = plot.legend;
+    QVERIFY(legend);
+
+    legend.remove();
+    QVERIFY(!legend);
+    QVERIFY(!plot.legend); // the member observes the deletion by itself (H-5)
+    plot.replot();
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestHandle::addGraphReturnsTheSameHandleAsAdd()
+{
+    QCustomPlot plot;
+    QCPGraph* graph = plot.addGraph();
+    QVERIFY(graph);
+    QCOMPARE(plot.graph(0), graph);
+
+    auto added = plot.add<QCPGraph>();
+    QVERIFY(added);
+    QCOMPARE(plot.graph(1), added.get());
+    QCOMPARE(plot.plottable(0).get(), static_cast<QCPAbstractPlottable*>(graph));
+    QCOMPARE(plot.plottable(1).get(), static_cast<QCPAbstractPlottable*>(added.get()));
+    QCOMPARE(plot.plottableCount(), 2);
     QCOMPARE(gMisuses, 0);
 }
 

@@ -105,11 +105,9 @@ QList<QCPAbstractPlottable*> QCPCoordinateSystem::plottables() const
         return result;
     // simplify: one scan of the plot's plottables per call, as keyAxis()/valueAxis() would need:
     // an index on the system when a plot holds enough of them.
-    const int count = plot->plottableCount();
-    for (int i = 0; i < count; ++i)
-        if (QCPAbstractPlottable* plottable = plot->plottable(i))
-            if (plottable->system() == this)
-                result << plottable;
+    for (QCPAbstractPlottable* plottable : plot->plottablesRaw())
+        if (plottable->system() == this)
+            result << plottable;
     return result;
 }
 

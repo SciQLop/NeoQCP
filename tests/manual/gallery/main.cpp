@@ -96,7 +96,7 @@ static QWidget* createSpansTab()
 
     // delete support for all spans
     for (int i = 0; i < plot->itemCount(); ++i) {
-        auto* item = plot->item(i);
+        QCPAbstractItem* item = plot->item(i);
         QObject::connect(item, &QCPAbstractItem::deleteRequested, plot, [plot, item]() {
             plot->removeItem(item);
             plot->replot();
@@ -1226,7 +1226,7 @@ static QWidget* createOverlayTab()
 
     // Apply current settings and show overlay
     auto applyOverlay = [=]() {
-        auto* ov = plot->overlay();
+        QCPOverlay* ov = plot->overlay();
         auto level = static_cast<QCPOverlay::Level>(levelCombo->currentData().toInt());
         auto sizeMode = static_cast<QCPOverlay::SizeMode>(sizeCombo->currentData().toInt());
         auto position = static_cast<QCPOverlay::Position>(posCombo->currentData().toInt());
@@ -1440,7 +1440,7 @@ static QWidget* createBusyIndicatorTab()
     layout->addWidget(configGroup);
 
     auto applyConfig = [=]() {
-        auto* theme = plot->theme();
+        QCPTheme* theme = plot->theme();
         if (!theme) return;
         theme->setBusyIndicatorSymbol(symbolCombo->currentText());
         theme->setBusyFadeAlpha(alphaSpin->value());

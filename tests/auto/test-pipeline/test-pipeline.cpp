@@ -775,7 +775,7 @@ static QCPGraph2* decadesOnTheSecondAxes(QCustomPlot* plot, bool newKeyAxis)
         graph->setKeyAxis(plot->xAxis2);
     else
         graph->setValueAxis(plot->yAxis2);
-    for (auto* axis : {plot->xAxis, plot->yAxis, plot->xAxis2, plot->yAxis2})
+    for (QCPAxis* axis : {plot->xAxis, plot->yAxis, plot->xAxis2, plot->yAxis2})
         axis->setRange(1, 100);
     plot->replot(QCustomPlot::rpImmediateRefresh);
     return graph;
@@ -806,7 +806,7 @@ void TestPipeline::graph2LinesFollowTheScaleOfANewValueAxis()
 // The log axis is ready before the swap and the range stays 1..100: no signal fires at the swap.
 static QCPGraph2* decadesThenMovedToALogAxis(QCustomPlot* plot, bool keyAxis)
 {
-    for (auto* axis : {plot->xAxis, plot->yAxis, plot->xAxis2, plot->yAxis2})
+    for (QCPAxis* axis : {plot->xAxis, plot->yAxis, plot->xAxis2, plot->yAxis2})
         axis->setRange(1, 100);
     (keyAxis ? plot->xAxis2 : plot->yAxis2)->setScaleType(QCPAxis::stLogarithmic);
     auto* graph = new QCPGraph2(plot->xAxis, plot->yAxis);
@@ -1151,7 +1151,7 @@ void TestPipeline::colormap2QueuedJobAfterDeleteDoesNotTouchFreedMemory()
     // The colormap resample transform used to capture the member mGapThreshold
     // by reference; a job dequeued after removePlottable() then read freed
     // memory. Fails under ASan before the fix (silent in a plain build).
-    auto* scheduler = mPlot->pipelineScheduler();
+    QCPPipelineScheduler* scheduler = mPlot->pipelineScheduler();
     const int threads = scheduler->maxThreads();
     std::atomic<bool> gate{false};
     std::atomic<int> started{0};

@@ -16,7 +16,7 @@ void TestOverlay::cleanup()
 
 void TestOverlay::showMessageStoresText()
 {
-    auto* ov = mPlot->overlay();
+    QCPOverlay* ov = mPlot->overlay();
     QVERIFY(ov != nullptr);
     ov->showMessage("hello", QCPOverlay::Info);
     QCOMPARE(ov->text(), QString("hello"));
@@ -26,7 +26,7 @@ void TestOverlay::showMessageStoresText()
 
 void TestOverlay::clearMessageHidesOverlay()
 {
-    auto* ov = mPlot->overlay();
+    QCPOverlay* ov = mPlot->overlay();
     ov->showMessage("hello", QCPOverlay::Error);
     ov->clearMessage();
     QCOMPARE(ov->text(), QString());
@@ -35,7 +35,7 @@ void TestOverlay::clearMessageHidesOverlay()
 
 void TestOverlay::showMessageEmitsSignal()
 {
-    auto* ov = mPlot->overlay();
+    QCPOverlay* ov = mPlot->overlay();
     QSignalSpy spy(ov, &QCPOverlay::messageChanged);
     ov->showMessage("test", QCPOverlay::Warning);
     QCOMPARE(spy.count(), 1);
@@ -44,7 +44,7 @@ void TestOverlay::showMessageEmitsSignal()
 
 void TestOverlay::compactRectIsSingleLine()
 {
-    auto* ov = mPlot->overlay();
+    QCPOverlay* ov = mPlot->overlay();
     ov->showMessage("test", QCPOverlay::Info, QCPOverlay::Compact, QCPOverlay::Top);
     QApplication::processEvents();
     QApplication::processEvents();
@@ -56,7 +56,7 @@ void TestOverlay::compactRectIsSingleLine()
 
 void TestOverlay::fitContentRectFitsText()
 {
-    auto* ov = mPlot->overlay();
+    QCPOverlay* ov = mPlot->overlay();
     QString longText = "Line one\nLine two\nLine three";
     ov->showMessage(longText, QCPOverlay::Info, QCPOverlay::FitContent, QCPOverlay::Top);
     QApplication::processEvents();
@@ -69,7 +69,7 @@ void TestOverlay::fitContentRectFitsText()
 
 void TestOverlay::fullWidgetRectCoversWidget()
 {
-    auto* ov = mPlot->overlay();
+    QCPOverlay* ov = mPlot->overlay();
     ov->showMessage("error", QCPOverlay::Error, QCPOverlay::FullWidget);
     QApplication::processEvents();
     QApplication::processEvents();
@@ -79,7 +79,7 @@ void TestOverlay::fullWidgetRectCoversWidget()
 
 void TestOverlay::positionTop()
 {
-    auto* ov = mPlot->overlay();
+    QCPOverlay* ov = mPlot->overlay();
     ov->showMessage("top", QCPOverlay::Info, QCPOverlay::Compact, QCPOverlay::Top);
     QApplication::processEvents();
     QApplication::processEvents();
@@ -88,7 +88,7 @@ void TestOverlay::positionTop()
 
 void TestOverlay::positionBottom()
 {
-    auto* ov = mPlot->overlay();
+    QCPOverlay* ov = mPlot->overlay();
     ov->showMessage("bot", QCPOverlay::Info, QCPOverlay::Compact, QCPOverlay::Bottom);
     QApplication::processEvents();
     QApplication::processEvents();
@@ -97,7 +97,7 @@ void TestOverlay::positionBottom()
 
 void TestOverlay::positionLeft()
 {
-    auto* ov = mPlot->overlay();
+    QCPOverlay* ov = mPlot->overlay();
     ov->showMessage("left", QCPOverlay::Info, QCPOverlay::Compact, QCPOverlay::Left);
     QApplication::processEvents();
     QApplication::processEvents();
@@ -109,7 +109,7 @@ void TestOverlay::positionLeft()
 
 void TestOverlay::positionRight()
 {
-    auto* ov = mPlot->overlay();
+    QCPOverlay* ov = mPlot->overlay();
     ov->showMessage("right", QCPOverlay::Info, QCPOverlay::Compact, QCPOverlay::Right);
     QApplication::processEvents();
     QApplication::processEvents();
@@ -118,7 +118,7 @@ void TestOverlay::positionRight()
 
 void TestOverlay::opacityRoundtrip()
 {
-    auto* ov = mPlot->overlay();
+    QCPOverlay* ov = mPlot->overlay();
     ov->setOpacity(0.75);
     QCOMPARE(ov->opacity(), 0.75);
     ov->setOpacity(-0.5);
@@ -129,7 +129,7 @@ void TestOverlay::opacityRoundtrip()
 
 void TestOverlay::showMessageTriggersReplot()
 {
-    auto* ov = mPlot->overlay();
+    QCPOverlay* ov = mPlot->overlay();
     QSignalSpy spy(mPlot, &QCustomPlot::afterReplot);
     ov->showMessage("trigger", QCPOverlay::Info);
     QApplication::processEvents();
@@ -139,7 +139,7 @@ void TestOverlay::showMessageTriggersReplot()
 
 void TestOverlay::collapseToggle()
 {
-    auto* ov = mPlot->overlay();
+    QCPOverlay* ov = mPlot->overlay();
     ov->showMessage("Line one\nLine two\nLine three",
                     QCPOverlay::Info, QCPOverlay::FitContent, QCPOverlay::Top);
     ov->setCollapsible(true);
@@ -158,7 +158,7 @@ void TestOverlay::collapseToggle()
 
 void TestOverlay::clickPassThroughCompact()
 {
-    auto* ov = mPlot->overlay();
+    QCPOverlay* ov = mPlot->overlay();
     ov->showMessage("status", QCPOverlay::Info, QCPOverlay::Compact, QCPOverlay::Top);
     QApplication::processEvents();
     QApplication::processEvents();
@@ -172,7 +172,7 @@ void TestOverlay::clickPassThroughCompact()
 
 void TestOverlay::clickBlockedFullWidget()
 {
-    auto* ov = mPlot->overlay();
+    QCPOverlay* ov = mPlot->overlay();
     ov->showMessage("error", QCPOverlay::Error, QCPOverlay::FullWidget);
     QApplication::processEvents();
     QApplication::processEvents();
@@ -190,14 +190,14 @@ void TestOverlay::overlayStaysTopmost()
     mPlot->replot();
     QApplication::processEvents();
 
-    auto* notifLayer = mPlot->layer("notification");
+    QCPLayer* notifLayer = mPlot->layer("notification");
     QVERIFY(notifLayer != nullptr);
     QCOMPARE(notifLayer->index(), mPlot->layerCount() - 1);
 }
 
 void TestOverlay::overlaySurvivesClear()
 {
-    auto* ov = mPlot->overlay();
+    QCPOverlay* ov = mPlot->overlay();
     ov->showMessage("persist", QCPOverlay::Info);
     mPlot->clearPlottables();
     mPlot->clearItems();
@@ -209,8 +209,8 @@ void TestOverlay::overlaySurvivesClear()
 
 void TestOverlay::overlayAccessorCreatesLazily()
 {
-    auto* ov1 = mPlot->overlay();
-    auto* ov2 = mPlot->overlay();
+    QCPOverlay* ov1 = mPlot->overlay();
+    QCPOverlay* ov2 = mPlot->overlay();
     QVERIFY(ov1 != nullptr);
     QCOMPARE(ov1, ov2);
     QCOMPARE(ov1->layer()->name(), QString("notification"));
@@ -218,7 +218,7 @@ void TestOverlay::overlayAccessorCreatesLazily()
 
 void TestOverlay::overlayExcludedFromExport()
 {
-    auto* ov = mPlot->overlay();
+    QCPOverlay* ov = mPlot->overlay();
     ov->showMessage("should not appear", QCPOverlay::Error, QCPOverlay::FullWidget);
     QApplication::processEvents();
     QApplication::processEvents();
@@ -246,7 +246,7 @@ void TestOverlay::updateWhileVisibleRedrawsLayer_data()
 void TestOverlay::updateWhileVisibleRedrawsLayer()
 {
     QFETCH(int, change);
-    auto* ov = mPlot->overlay();
+    QCPOverlay* ov = mPlot->overlay();
     ov->setCollapsible(change == 3);
     ov->showMessage("Info first", QCPOverlay::Info, QCPOverlay::FitContent);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);

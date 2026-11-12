@@ -800,7 +800,7 @@ void TestSignalDelivery::overlayCollapseSlotDeletingThePlot()
 {
     auto* plot = new QCustomPlot;
     plot->resize(400, 300);
-    auto* overlay = plot->overlay();
+    QCPOverlay* overlay = plot->overlay();
     const QPointer<QCustomPlot> alive(plot);
     int laterCollapses = 0;
     connect(overlay, &QCPOverlay::collapsedChanged, plot, [plot](bool) { delete plot; });
@@ -819,9 +819,9 @@ void TestSignalDelivery::groupMembersSlotDeletingThePlot()
     plot->resize(400, 300);
     auto* member = plot->addGraph();
     member->setData(QVector<double>{0, 10}, QVector<double>{0, 10});
-    auto* first = plot->addPlottableGroup(QStringLiteral("first"));
+    QCPPlottableGroup* first = plot->addPlottableGroup(QStringLiteral("first"));
     first->addMember(member);
-    auto* second = plot->addPlottableGroup(QStringLiteral("second"));
+    QCPPlottableGroup* second = plot->addPlottableGroup(QStringLiteral("second"));
 
     const QPointer<QCustomPlot> alive(plot);
     int secondChanges = 0;
@@ -840,7 +840,7 @@ void TestSignalDelivery::overlayMessageSlotDeletingThePlot()
 {
     auto* plot = new QCustomPlot;
     plot->resize(400, 300);
-    auto* overlay = plot->overlay();
+    QCPOverlay* overlay = plot->overlay();
     const QPointer<QCustomPlot> alive(plot);
     int laterMessages = 0;
     connect(overlay, &QCPOverlay::messageChanged, plot,

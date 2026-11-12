@@ -77,9 +77,9 @@ Target targetFor(QCustomPlot* plot, const QString& name)
     if (name == QLatin1String("item"))
         return wholeObjectTarget(new QCPItemLine(plot));
     if (name == QLatin1String("axis"))
-        return partsTarget(plot->xAxis, QCPAxis::spAxis);
+        return partsTarget(plot->xAxis.get(), QCPAxis::spAxis);
     if (name == QLatin1String("legend"))
-        return partsTarget(plot->legend, QCPLegend::spLegendBox);
+        return partsTarget(plot->legend.get(), QCPLegend::spLegendBox);
     if (name == QLatin1String("legendItem"))
     {
         addGraph(plot);

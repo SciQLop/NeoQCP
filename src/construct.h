@@ -202,7 +202,7 @@ struct Construct<QCPPlottableGroup>
         using Handle = HandleFor<QCPPlottableGroup>;
         if (!detail::plotIsUsable(plot))
             return Handle{};
-        return makeHandle<Handle>(plot.addPlottableGroup(name));
+        return makeHandle<Handle>(plot.addPlottableGroup(name).get());
     }
 };
 } // namespace qcp

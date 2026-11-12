@@ -224,7 +224,7 @@ void TestOwnership::deletePlottableInGroup()
 {
     auto* first = mPlot->addGraph();
     auto* second = mPlot->addGraph();
-    auto* group = mPlot->addPlottableGroup("pair");
+    QCPPlottableGroup* group = mPlot->addPlottableGroup("pair");
     QVERIFY(group->addMember(first));
     QVERIFY(group->addMember(second));
     QSignalSpy changed(group, &QCPPlottableGroup::membersChanged);
@@ -371,7 +371,7 @@ void TestOwnership::clearItemsKeepsOtherLayersOrder()
 {
     auto graph = mPlot->add<QCPGraph>();
     QVERIFY(mPlot->addLayer(QStringLiteral("upper")));
-    auto* upper = mPlot->layer(QStringLiteral("upper"));
+    QCPLayer* upper = mPlot->layer(QStringLiteral("upper"));
     auto* a = new QCPItemLine(mPlot);
     auto* b = new QCPItemLine(mPlot);
     auto* c = new QCPItemLine(mPlot);
@@ -400,7 +400,7 @@ void TestOwnership::clearItemsSlotDeletesAnother()
 {
     auto* victim = new QCPItemLine(mPlot);
     QVERIFY(mPlot->addLayer(QStringLiteral("upper")));
-    auto* upper = mPlot->layer(QStringLiteral("upper"));
+    QCPLayer* upper = mPlot->layer(QStringLiteral("upper"));
     auto* other = new QCPItemLine(mPlot);
     other->setLayer(upper);
     connect(victim, &QObject::destroyed, mPlot, [other] { delete other; });
@@ -433,9 +433,9 @@ void TestOwnership::itemOrderAfterRemove()
 void TestOwnership::layerOrderAfterMoves()
 {
     QVERIFY(mPlot->addLayer(QStringLiteral("upper")));
-    auto* upper = mPlot->layer(QStringLiteral("upper"));
+    QCPLayer* upper = mPlot->layer(QStringLiteral("upper"));
     QVERIFY(mPlot->addLayer(QStringLiteral("third")));
-    auto* third = mPlot->layer(QStringLiteral("third"));
+    QCPLayer* third = mPlot->layer(QStringLiteral("third"));
     auto first = mPlot->add<QCPGraph>();
     auto second = mPlot->add<QCPGraph>();
     first->setLayer(upper);
@@ -639,7 +639,7 @@ void TestOwnership::deleteRootLayoutAndOverlay()
     QVERIFY(mPlot->legend == nullptr);
     draw();
 
-    QPointer<QCPOverlay> overlay = mPlot->overlay();
+    QPointer<QCPOverlay> overlay(mPlot->overlay());
     delete overlay.data();
 
     QVERIFY(overlay.isNull());
@@ -1013,7 +1013,7 @@ void TestOwnership::destroyedSlotDeletesSiblingDuringTeardown()
 {
     auto* plot = new QCustomPlot;
     plot->legend->setVisible(true);
-    auto* group = plot->addPlottableGroup("pair");
+    QCPPlottableGroup* group = plot->addPlottableGroup("pair");
     QPointer<QCPGraph> first = plot->addGraph();
     auto* second = plot->addGraph();
     group->addMember(first);
@@ -1063,7 +1063,7 @@ void TestOwnership::mutatorsRefuseDuringTeardown()
 {
     auto* plot = new QCustomPlot;
     QPointer<QCPGraph> sibling = plot->addGraph();
-    QPointer<QCPPlottableGroup> group = plot->addPlottableGroup("g");
+    QPointer<QCPPlottableGroup> group(plot->addPlottableGroup("g"));
     QPointer<QCPAbstractItem> item = new QCPItemText(plot);
     QVERIFY(plot->addLayer("extra"));
     auto* watched = plot->addGraph();
@@ -1071,8 +1071,8 @@ void TestOwnership::mutatorsRefuseDuringTeardown()
     const int items = plot->itemCount();
     const int layers = plot->layerCount();
 
-    QPointer<QCPLayer> main = plot->layer("main");
-    QPointer<QCPLayer> extra = plot->layer("extra");
+    QPointer<QCPLayer> main(plot->layer("main"));
+    QPointer<QCPLayer> extra(plot->layer("extra"));
     const QList<std::pair<const char*, std::function<void()>>> mutators {
         { "addGraph", [&] { QVERIFY(!plot->addGraph()); } },
         { "addLayer", [&] { QVERIFY(!plot->addLayer("late")); } },

@@ -1972,8 +1972,9 @@ QCPItemPosition* QCPAbstractItem::createPosition(const QString& name)
     mAnchors.append(newPosition); // every position is also an anchor
     newPosition->setAxes(mParentPlot->xAxis, mParentPlot->yAxis);
     newPosition->setType(QCPItemPosition::ptPlotCoords);
-    if (mParentPlot->axisRect())
-        newPosition->setAxisRect(mParentPlot->axisRect());
+    // The first rect raw, not through axisRect(): this runs per position per item (K8).
+    if (QCPAxisRect* firstRect = mParentPlot->firstAxisRect())
+        newPosition->setAxisRect(firstRect);
     newPosition->setCoords(0, 0);
     return newPosition;
 }

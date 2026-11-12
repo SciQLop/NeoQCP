@@ -51,11 +51,11 @@ namespace {
 QCPLayer* layerAbove(QCustomPlot* plot, QCPLayer* base)
 {
     const QString name = base->name() + QLatin1String(".intervals-labels");
-    if (auto* existing = plot->layer(name))
+    if (QCPLayer* existing = plot->layer(name))
         return existing;
     if (!plot->addLayer(name, base, QCustomPlot::limAbove))
         return base;
-    auto* created = plot->layer(name);
+    QCPLayer* created = plot->layer(name);
     // Its own paint buffer, not merged with the (logically adjacent) base layer's:
     // the compositor draws each buffer's texture once, attributed to whichever layer
     // reaches it first. Sharing with base would make the label text composite at
@@ -375,8 +375,8 @@ double QCPIntervals::selectTest(const QPointF& pos, bool onlySelectable, QVarian
 
 bool QCPIntervals::siblingHasBarAt(const QPointF& pos) const
 {
-    for (int i = 0; i < mParentPlot->plottableCount(); ++i)
-        if (auto* other = qobject_cast<QCPIntervals*>(mParentPlot->plottable(i));
+    for (QCPAbstractPlottable* plottable : mParentPlot->plottablesRaw())
+        if (auto* other = qobject_cast<QCPIntervals*>(plottable);
             other && other != this && other->laneLayout() == mLayout && other->realVisibility()
             && other->hitTest(pos).row >= 0)
             return true;
@@ -1231,8 +1231,8 @@ bool QCPIntervals::drawsLaneNames() const
 {
     if (!mLayout || mLayout->placement() != QCPLaneLayout::plStrip)
         return false;
-    for (int i = 0; i < mParentPlot->plottableCount(); ++i)
-        if (auto* other = qobject_cast<QCPIntervals*>(mParentPlot->plottable(i));
+    for (QCPAbstractPlottable* plottable : mParentPlot->plottablesRaw())
+        if (auto* other = qobject_cast<QCPIntervals*>(plottable);
             other && other->laneLayout() == mLayout && other->realVisibility())
             return other == this;
     return false;
