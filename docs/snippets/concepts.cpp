@@ -46,6 +46,19 @@ DOC_SNIPPET(concepts_anatomy, 720, 480)
     // [/concepts_anatomy]
 }
 
+DOC_CODE(concepts_handles)
+{
+    // [concepts_handles]
+    auto rect = customPlot->axisRect();
+    rect->setupFullAxesBox(true);
+    QCPAxis* rawAxis = customPlot->xAxis;
+    QList<QCPAxis*> rawAxes = qcp::pointers(rect->axes());
+    QObject::connect(customPlot->xAxis, &QCPAxis::rangeChanged, customPlot, [] {});
+    if (customPlot->xAxis && rawAxes.contains(rawAxis))
+        customPlot->xAxis->setLabel("x");
+    // [/concepts_handles]
+}
+
 DOC_SNIPPET(concepts_layers, 600, 360)
 {
     // [concepts_layers]

@@ -122,6 +122,40 @@ NeoQCP 3.0 draws every plottable and item through a `QCPCoordinateSystem`. The c
 - **A refused plottable is inert.** A plottable whose system lacks a capability it needs is built but joins no layer and no list, with one misuse report. `QCustomPlot::add<T>()` returns an empty handle for it, and `add(std::unique_ptr)` refuses it before touching the object. A later `setSystem()` with a system that admits it makes it a normal member of the plot.
 - **Layout elements stay in their plot.** Adding an axis rect or other layout element that belongs to another plot to this plot's layout is a misuse; the element stays in its old layout and plot, also when it is nested inside a plot-less layout first. Build a new element in the other plot instead.
 
+## Getters return handles
+
+Getters that hand out an object the plot owns now return a `QCPHandle<T>`, not a `T*`.
+A handle is a weak pointer: it reads as null when the object is deleted, and calling through a dead one aborts with a message.
+The members `xAxis`, `yAxis`, `xAxis2`, `yAxis2` and `legend` are handles too, under the same names.
+{doc}`concepts` explains handles, and which getters stay raw.
+
+A handle converts to `T*` by itself, so most 2.x code compiles as it is: `plot->xAxis->setRange(0, 1)`, `connect(plot->xAxis, ...)`, `if (plot->legend)`, `QCPAxis* a = rect->axis(QCPAxis::atBottom)`.
+These patterns stop compiling:
+
+| 2.x code | What to write |
+|---|---|
+| `auto* x = rect->axis(type);` | `auto x = ...` (a handle), or `auto* x = rect->axis(type).get();` |
+| `QList<QCPAxis*> l = rect->axes();` | `QList<QCPAxis*> l = qcp::pointers(rect->axes());` |
+| `QCOMPARE(rect->axes(), expected)` with a `QList<T*>` | `QCOMPARE(qcp::pointers(rect->axes()), expected)` |
+| `list.contains(rect->axis(type))`, `list.removeOne(...)` on a `QList<T*>` | `list.contains(rect->axis(type).get())` |
+| `cond ? rect->axis(a) : nullptr` bound to `auto*` | `.get()` inside the expression |
+| a template that deduces `T*` from the getter | pass `.get()` |
+| `QPointer<T> p = getter();` | `QPointer<T> p(getter());` |
+| `qcpConnect(h, ...)` | `QObject::connect(h, ...)` |
+
+```{literalinclude} snippets/migrating.cpp
+:start-after: // [migrating_handles]
+:end-before: // [/migrating_handles]
+:language: cpp
+:dedent:
+```
+
+`qcpConnect` is gone.
+Setters that take a list still take a `QList<T*>`.
+`delete handle` compiles and skips `remove()`; delete through the plot instead.
+The graph family keeps raw pointers until the graph classes are renamed: `graph(i)`, `addGraph()`, `selectedGraphs()`, `graphs()`.
+Signals carry raw pointers, as before.
+
 ## New classes
 
 These do not exist upstream. You do not need them to migrate, but they are where most of the speed and new features are.

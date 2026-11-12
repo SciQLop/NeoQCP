@@ -22,3 +22,16 @@ DOC_CODE(migrating_nodiscard)
     QDir::setCurrent(previous);
 }
 QT_WARNING_POP
+
+DOC_CODE(migrating_handles)
+{
+    // [migrating_handles]
+    auto rect = customPlot->axisRect();
+    QCPAxisRect* rawRect = customPlot->axisRect().get();
+    QList<QCPAxis*> axes = qcp::pointers(rect->axes());
+    QPointer<QCPAxisRect> guarded(customPlot->axisRect());
+    // [/migrating_handles]
+    rawRect->setupFullAxesBox(true);
+    Q_UNUSED(axes);
+    Q_UNUSED(guarded);
+}

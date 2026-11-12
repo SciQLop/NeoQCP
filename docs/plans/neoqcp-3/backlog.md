@@ -131,6 +131,34 @@ user would see and where the code is. Fixed items are deleted, not ticked.
 - **A 1000-text zoom is 5 % slower on llvmpipe** (ruling R-21): 1.04 -> 1.09 ms, with the same CPU
   work on the plot's thread. Check the row on a real GPU before chasing it.
 
+## From milestone 5b (handles)
+
+- **A handle's hash changes when its object dies.** `qHash` and `std::hash` use the held pointer, which
+  reads null once the object is gone. A `QSet` or `unordered_set` of handles must not outlive its
+  objects. Nothing in the tree keeps one. A stable id would need a second pointer in the handle.
+  `src/handle.h`.
+- **`Q_FUNC_INFO` strings show the handle return type.** The getters' signatures in misuse reports and
+  logs now read `QCPHandle<...>`. No test matches them.
+- **`QCPArea::allAxesRaw()` is a new protected virtual.** Its default converts `allAxes()`; a user area
+  with hot axis lookups should override it. It adds an entry to `QCPArea`'s virtual table.
+  `src/layoutelements/area.h`.
+- **The graph family is still raw** (`graph(i)`, `addGraph`, `selectedGraphs`, `graphs`,
+  `channelFillGraph`, the tracer's graph, `QCPGroupLegendItem::multiGraph()`). Milestone 5c renames the
+  graph classes; make them handles then.
+- **Margin groups are still raw** (`marginGroup`, `marginGroups`, `QCPMarginGroup::elements`,
+  `alignmentGroup`). The class changes in 5d.
+- **A few render paths still build a handle per call:** `viewport-offset.h` (`keyAxis->axisRect()`),
+  `QCPGraph::getLines` (`valueAxisBase()`), the multigraph fill row (`keyAxisBase()`). They are not
+  per-point and the benchmarks stay within the gate; hoist them if a row moves.
+- **`QCPLayoutElement::layout()` builds a handle per call.** The hit-test walks use it, once per element
+  per mouse event. Add a raw accessor if a click row moves.
+- **`QCPItems_RestyleAll10k` is noisy.** It measures about 0.2 ms; base-first runs showed up to +46 %
+  and swapped-order runs showed none. Read it with alternating pairs.
+- **`QCPAxisRect::add<T>` ignores an axis as first argument** (the `FirstArgumentIsNotAnAxis` rule). A
+  data-first pack whose first argument converts to `QCPAxis*` is the one ambiguous shape; it never existed.
+- **`QPointer<T> p = handle` does not compile.** Direct initialisation does. Adding a converting
+  `QPointer` constructor is not possible from our side.
+
 ## From milestone 4b (the line family)
 
 - **No test checks that marker colours reach the GPU.** Coloured markers go through the markers

@@ -36,7 +36,7 @@ Remove them through the plot instead: `removePlottable()`, `removeItem()`, or `r
 
 ## The four default axes
 
-A new plot has one axis rect with four axes. The widget keeps a shortcut pointer to each:
+A new plot has one axis rect with four axes. The widget keeps a shortcut handle to each (see Handles below):
 
 - `xAxis`: bottom, visible.
 - `yAxis`: left, visible.
@@ -51,7 +51,7 @@ Pass other axes to plot against them, for example `customPlot->add<QCPGraph>().s
 {doc}`axes` covers ranges, tickers and log scales.
 
 These shortcuts only point into the first axis rect.
-If you delete that axis rect, they become `nullptr`.
+If you delete an axis, its shortcut tests false. Deleting the whole axis rect does the same to all four.
 
 ## Plottables, items and layout elements
 
@@ -75,6 +75,44 @@ Axis rects, the legend, text titles and colour scales are layout elements.
 See {doc}`layout`.
 
 All three derive from <a href="api/classQCPLayerable.html">QCPLayerable</a>, so each one lives on a layer.
+
+## Handles
+
+Most getters hand out a handle, not a raw pointer.
+`axisRect()`, `xAxis`, `layer("main")`, `plottable(0)`, `legend` and `item(0)` all give a `QCPHandle<T>`.
+A handle is a weak pointer to an object the plot owns.
+It never dangles: when the object is deleted, the handle reads as null.
+
+```{literalinclude} snippets/concepts.cpp
+:start-after: // [concepts_handles]
+:end-before: // [/concepts_handles]
+:language: cpp
+:dedent:
+```
+
+You use a handle like the pointer it replaces.
+
+- `h->setLabel("x")` calls through it. If the object is gone, the program aborts with a message. Test `if (h)` first when it can happen.
+- A handle converts to `T*` by itself. The result is null when the object is gone. Pass a handle to any function that takes a pointer.
+- You can assign a `T*`, `nullptr` or a handle of a derived class to a handle. You cannot make a handle from a raw pointer by copy-initialisation: write `QCPHandle<QCPAxis> h(raw)`.
+- `h.get()` returns the pointer. `h.as<U>()` casts like `qobject_cast`. `h.remove()` takes the object out of the plot the way its owner does.
+- `QObject::connect(h, ...)` works. On a dead handle Qt warns about a null sender and the connection is invalid.
+- `delete h` compiles, through the pointer conversion, and skips `remove()`. Do not do it; the plot owns the object.
+- Handles print to `QDebug`, and hash by the pointer they hold. A set of handles must not outlive its objects: the hash of a handle changes when its object dies.
+
+Getters that return several objects return a `QList` of handles.
+Setters still take a `QList<T*>`.
+`qcp::pointers(list)` turns the first into the second.
+
+Some getters stay raw, each for one reason:
+
+- Positions, anchors and the selection decorator are not `QObject`s, so no handle can watch them.
+- `interface1D()`, `QCPColorMapData`, `labelRenderer()` and the paint buffers and RHI layers are not plot-owned `QObject`s either.
+- Virtual getters that return a derived type, such as `linkSource()`, `moveTarget()` and the axis `area()`, and `takeAt()`, which gives the object away.
+- The graph family, such as `graph(i)`, `addGraph()`, `selectedGraphs()` and `graphs()`. They change with the graph classes.
+
+Signals still carry raw pointers.
+An object-typed property keeps its pointer type, and `QObject::property()` and `setProperty()` work as before.
 
 ## Layers
 

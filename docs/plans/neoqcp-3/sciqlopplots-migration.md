@@ -107,3 +107,70 @@ Grepped on 2026-11-12 (read-only) in `src/` and `include/`: `setData` and `addDa
 - **The multigraph mask change changes nothing here.** `QCPMultiGraph` requiring `capStraightSegments`
   only, and `QCPWaterfallGraph` keeping the rectangle, matter only on a system of the user's own;
   SciQLopPlots builds none today (see the 4j section).
+
+## From milestone 5b (handles)
+
+Grepped on 2026-11-12 (read-only) in `src/` and `include/`. Getters on plot-owned objects now return
+`QCPHandle<T>`; it converts implicitly to `T*`, so only the sites below stop compiling. Line numbers will
+drift. Calls on SciQLopPlots' own wrappers (`plottables()`, `legend()`, `axis()` of a `SciQLopPlot...`
+class) are not affected.
+
+### Stops compiling: `auto*` from a handle
+
+Fix each by writing `auto` (a handle) or `.get()`.
+
+- `src/SciQLopCrosshair.cpp` ~153, ~206: `auto* axisRect = m_plot->axisRect();`. ~279: `auto* plottable =
+  m_plot->plottable(i);`. ~290-291: `auto* keyAxis = plottable->keyAxis();` and `valueAxis()`.
+- `src/SciQLopPlot.cpp` ~454: `auto* ar = this->axisRect();`, then ~460 `auto* ax = ar->axis(axisType);`.
+  ~490: `auto* colorAxis = m_color_scale->axis();`.
+- `src/SciQLopNDProjectionPlot.cpp` ~359: `auto* rect = plot->qcp_plot()->axisRect();`. ~472:
+  `auto* layer = qcp->layer("markers");`.
+- `src/SciQLopGraphInterface.cpp` ~80-81: `if (auto* plot = p->parentPlot(); ...)` and `auto* item =
+  plot->legend->itemWithPlottable(p)`.
+- `src/SciQLopPlotGroup.cpp` ~173: `if (auto* canvas = p->parentPlot())`.
+- `src/SpanTargets.cpp` ~106: `const auto* rect = edges.lower->axisRect();`. ~131: `auto* axis = cond ?
+  edges.lower->keyAxis() : edges.lower->valueAxis();`.
+- `src/SciQLopStraightLines.cpp` ~50, ~108 (`axisRect()`) and ~56, ~115 (`keyAxis()` / `valueAxis()` in a
+  ternary).
+- `src/SciQLopPlotLegend.cpp` ~184: `auto* item = cond ? m_legend->item(row) : nullptr;` (the ternary is a
+  handle).
+- `src/SpanBase.cpp` ~81, `include/SciQLopPlots/Items/SciQLopPlotItem.hpp` ~84 and ~95:
+  `if (auto* l = ...->layer())`.
+- `include/SciQLopPlots/helpers.hpp` ~61: `if (auto* plot = item->parentPlot())`.
+
+### Stops compiling: range-for over a list getter
+
+`for (auto* p : axis->plottables())` on a QCP axis: `src/SciQLopPlotAxis.cpp` ~535 and ~557. The list
+holds handles, so write `for (auto p : ...)`. The loop at ~455 (`has_image`, a lambda taking
+`QCPAbstractPlottable*` inside `std::any_of`) still compiles: the handle converts in the call.
+
+### Stops compiling: `QList<T*>` from a list getter, `QPointer` copy-initialisation
+
+None found. The only `QList<QCP...*>` values (`qcp_plottables_of`, `qcp_plottables()`, `lines()`,
+`m_time_markers`) are filled by hand from SciQLopPlots' own components. No `QPointer<QCP...> p = getter`.
+No `qcpConnect`, no `delete` of a getter result on a NeoQCP type, no `QSet` or `QHash` of NeoQCP pointers.
+
+### Keeps compiling through the implicit conversion
+
+- `connect(this->xAxis, ...)` and `disconnect(m_impl->xAxis, ...)` (`SciQLopPlot.cpp` ~123-132, ~1809,
+  ~1815): the sender is `T*` after the conversion.
+- `QSignalBlocker by(m_impl->yAxis)` (~1826) and `m_impl->yAxis->setScaleRatio(m_impl->xAxis, 1.0)`.
+- `new QCPIntervals(plot->xAxis, plot->yAxis, layout)` (`SciQLopTimeline.cpp` ~118): the axes convert to
+  `QCPAxis*`.
+- `parent->xAxis->range()` (`SciQLopLineGraph.cpp` ~251, ~261 and the curve, colour map and waterfall
+  twins), `plot && plot->legend`, `plot->legend->itemWithPlottable(...)`.
+- `qobject_cast<T*>(getter())`: `SciQLopPlot.cpp` ~605 (`plottableAt`), `SciQLopPlotLegend.cpp` ~50
+  (`legend->layout()`), `SciQLopCrosshair.cpp` ~283 and ~297 once `plottable` is a handle, and
+  `qobject_cast<SciQLopPlot*>(m_axis->parentPlot())` (`SciQLopPlotAxis.cpp` ~492). The handle test pins
+  `qobject_cast` on a handle.
+- `plottable->keyAxis() == m_axis` (`SciQLopPlotAxis.cpp` ~541, ~563) and `p->group() != group`
+  (`SciQLopPlotGroup.cpp` ~174): comparison with a raw pointer uses the conversion.
+- `auto ar = p->qcp_plot()->axisRect();` (`VPlotsAlign.cpp` ~37, ~57): `auto` is a handle and `ar->...`
+  works. `auto plot = _multiGraph->parentPlot();` (`SciQLopMultiGraphBase.cpp` ~45) likewise.
+- `cond ? plot->legend->itemWithPlottable(_hist) : nullptr` returned as a raw pointer
+  (`SciQLopHistogram.cpp` ~151): the return converts.
+- `for (auto rect : axisRects())`, `for (auto a : selectedAxes())`, `for (auto item :
+  m_impl->selectedItems())` (`SciQLopPlot.cpp` ~317, ~524, ~1675): `auto` takes a handle.
+- `selectedGraphs()` and `graphs()` stay raw `QList<QCPGraph*>`, so `for (auto g : selectedGraphs())`
+  (~512) and `addGraph(...)` (`QCPAbstractPlottableWrapper.hpp` ~100) need no change.
+

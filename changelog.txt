@@ -576,6 +576,45 @@ Behaviour changes for 2.1 polar users:
   - Clicking inside a polar graph's fill selects it, as for cartesian graphs.
   - setSystem() with a non-polar system is refused as misuse.
 
+Milestone 5b (handles). Getters that hand out a plot-owned object return a QCPHandle<T>, a weak pointer
+that never dangles. Source-breaking in a few patterns, listed below.
+  - QCPHandle<T> (handle.h): reads null when its object is deleted; operator-> on a dead handle aborts
+        with a message. It converts implicitly to T* (null when dead), assigns from T*, nullptr and a
+        handle of a derived class, hashes (qHash, std::hash) by the pointer it holds and prints to
+        QDebug. get(), as<U>(), remove() and the bool test are unchanged.
+  - Every getter that returns a plot-owned QObject returns a handle: the plot's (plotLayout, theme,
+        overlay, plottable, item, layer, axisRect, areaAt, selectedAxes, ...), the axis rect's and
+        area's (axis, axes, plottables, items, insetLayout, system), axes, colour scales, legends,
+        layers and layerables (parentPlot, layer, parentLayerable, children), layouts (layout,
+        elements, elementAt), coordinate systems and polar areas, plottables, items and item
+        positions (keyAxis, valueAxis, axisRect, system, area), bars and groups, data locators.
+  - The members xAxis, yAxis, xAxis2, yAxis2 and legend are handles under the same names. They are
+        cleared when the axis or legend is removed, as in 2.x.
+  - Lists are QList<QCPHandle<T>>. Setters keep taking QList<T*>; qcp::pointers(list) converts.
+  - QObject::connect(handle, ...) replaces qcpConnect, which is gone. A dead handle makes Qt warn about
+        a null sender and the connection is invalid.
+  - Object-typed Q_PROPERTYs keep their pointer types; QObject::property and setProperty work.
+  - Stay raw: Q_GADGETs (item positions, anchors, the selection decorator), interface1D(),
+        QCPColorMapData, labelRenderer(), RHI layers and paint buffers, virtual covariant getters
+        (linkSource, moveTarget, the axis area()), takeAt(), margin groups, and the graph family
+        (graph(i), addGraph, selectedGraphs, graphs, channelFillGraph, the tracer's graph) until the
+        graph classes are renamed. Signals still carry raw pointers.
+  - Hot paths read private raw members, so a frame builds no handle; the benchmark rows stay within 5 %.
+  - Fix: QCPArea::detachFromSystem no longer dereferences a plottable that a systemChanged() hook
+        deleted; QCPAxisBase::rescale walks the virtual plottables() again; QCPIntervals::labelLayer()
+        returns a handle like the other layers.
+
+Behaviour changes for 2.x users:
+  - auto* x = getter() no longer compiles: write auto, or .get().
+  - QList<T*> l = listGetter() no longer compiles: write qcp::pointers(listGetter()). The same goes for
+        QCOMPARE and contains()/removeOne() against a QList<T*>.
+  - A template that deduces T* from a getter result needs .get().
+  - QPointer<T> p = getter() no longer compiles; QPointer<T> p(getter()) does.
+  - qcpConnect is removed; use QObject::connect.
+  - delete handle compiles through the pointer conversion and bypasses remove().
+  - A set or hash of handles must not outlive its objects: a handle's hash changes when its object dies.
+  - Q_FUNC_INFO strings of the getters show the handle return type.
+
 Milestone 5a (the graph grows up). The graph a SciQLop-style plot uses gains the rest of the classic
 graph's surface, and draws on any straight-segment coordinate system.
   - QCPMultiGraph draws on a user system: lines, steps, impulses, scatters, fills, error bars and
