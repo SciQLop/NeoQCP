@@ -2,10 +2,14 @@
 #define QCP_HANDLE_H
 
 #include "misuse.h"
+#include <QDebug>
+#include <QHashFunctions>
 #include <QMetaObject>
 #include <QObject>
 #include <QPointer>
 #include <concepts>
+#include <cstddef>
+#include <functional>
 #include <utility>
 
 class QCPAbstractItem;
@@ -48,8 +52,32 @@ public:
     QCPHandle() = default;
     explicit QCPHandle(T* object) : mObject(object) { requireQObject(); }
 
-    // No implicit conversion to T*: it would bring dangling raw pointers back (T* p = h; delete h;).
+    // A handle of a derived class makes a handle of a base one. K11: the other specialization is
+    // read through its public get().
+    template <typename U>
+        requires std::derived_from<U, T>
+    QCPHandle(const QCPHandle<U>& other) : mObject(other.get()) { }
+
+    // A handle converts implicitly to T*, like QPointer: 2.x code keeps compiling, and
+    // QObject::connect(h, ...) reaches the object. It is null when the object is gone, so a handle
+    // never hands out a dangling pointer; a raw pointer kept beside it can still dangle. `delete h`
+    // therefore compiles through this conversion and bypasses remove().
+    operator T*() const noexcept { return mObject.data(); }
+
     explicit operator bool() const { return !mObject.isNull(); }
+
+    // QPointer's assignments: the default axis and legend members are assigned in the library.
+    QCPHandle& operator=(T* object)
+    {
+        mObject = object;
+        return *this;
+    }
+    QCPHandle& operator=(std::nullptr_t)
+    {
+        mObject = nullptr;
+        return *this;
+    }
+
     T* get() const
     {
         requireQObject();
@@ -103,12 +131,31 @@ private:
     QPointer<T> mObject;
 };
 
-template <typename T, typename Signal, typename... Rest>
-QMetaObject::Connection qcpConnect(const QCPHandle<T>& h, Signal signal, Rest&&... rest)
+// A handle hashes as the pointer it holds, so QSet<QCPHandle<T>> and std::unordered_set work.
+template <typename T>
+size_t qHash(const QCPHandle<T>& handle, size_t seed = 0) noexcept
 {
-    if (!h)
-        return {};
-    return QObject::connect(h.get(), signal, std::forward<Rest>(rest)...);
+    return qHash(handle.get(), seed);
+}
+
+namespace std
+{
+template <typename T>
+struct hash<QCPHandle<T>>
+{
+    size_t operator()(const QCPHandle<T>& handle) const noexcept
+    {
+        return hash<T*> {}(handle.get());
+    }
+};
+} // namespace std
+
+template <typename T>
+QDebug operator<<(QDebug debug, const QCPHandle<T>& handle)
+{
+    const QDebugStateSaver saver(debug);
+    debug.nospace() << "QCPHandle(" << handle.get() << ')';
+    return debug;
 }
 
 #endif // QCP_HANDLE_H

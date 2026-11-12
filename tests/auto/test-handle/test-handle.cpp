@@ -1,7 +1,10 @@
 #include "test-handle.h"
+#include <QDebug>
+#include <QSet>
 #include <functional>
 #include <memory>
 #include <type_traits>
+#include <unordered_set>
 
 class TestHandleFwd;
 QCPHandle<TestHandleFwd> forwardDeclaredHandle();
@@ -14,11 +17,52 @@ namespace
 {
 int gMisuses = 0;
 void record(const char*, const char*) { ++gMisuses; }
+
+// A handle is not implicitly built from a raw pointer: making one stays a deliberate act. The
+// gcc/clang-friendly way to ask is a requires-expression on a by-value parameter.
+template <typename T>
+void takesAHandle(QCPHandle<T>);
+
+template <typename T>
+concept RawPointerMakesAHandle = requires(T* raw) { takesAHandle<T>(raw); };
+
+// The other direction: a handle does not convert to a QPointer either (`QPointer<T> p = h;`).
+template <typename P>
+void takesAValue(P);
+
+template <typename P, typename H>
+concept CopyInitialisesFromHandle = requires(H h) { takesAValue<P>(h); };
+
+enum class OverloadPicked
+{
+    none,
+    pointer,
+    boolean,
+    object
+};
+OverloadPicked gPicked = OverloadPicked::none;
+void pickOverload(QCPAxis*) { gPicked = OverloadPicked::pointer; }
+void pickOverload(bool) { gPicked = OverloadPicked::boolean; }
+void pickOverload(QObject*) { gPicked = OverloadPicked::object; }
+
+template <typename H>
+concept CallableWithTheOverloadSet = requires(H h) { pickOverload(h); };
 } // namespace
+
+static_assert(!RawPointerMakesAHandle<QCPAxis>);
+static_assert(!RawPointerMakesAHandle<QCPGraph>);
+static_assert(!CopyInitialisesFromHandle<QPointer<QCPAxis>, QCPHandle<QCPAxis>>);
+static_assert(std::is_convertible_v<QCPHandle<QCPAxis>, QCPAxis*>);
+static_assert(!std::is_convertible_v<QCPHandle<QCPAxis>, QPointer<QCPAxis>>);
+static_assert(std::is_constructible_v<QPointer<QCPAxis>, QCPHandle<QCPAxis>>);
+static_assert(std::is_constructible_v<bool, QCPHandle<QCPAxis>>);
+static_assert(CallableWithTheOverloadSet<QCPHandle<QCPAxis>>);
+static_assert(std::is_convertible_v<QCPHandle<QCPGraph>, QCPHandle<QCPAbstractPlottable>>);
 
 void TestHandle::init()
 {
     gMisuses = 0;
+    gPicked = OverloadPicked::none;
     qcp::setMisuseHandler(record);
 }
 
@@ -47,28 +91,201 @@ void TestHandle::handleOutlivesPlot()
     QVERIFY(!alive());
 }
 
-void TestHandle::handleConnects()
+void TestHandle::aHandleConnectsLikeTheObject()
 {
     QCustomPlot plot;
-    QCPHandle<QCPGraph> h(plot.addGraph());
+    QCPHandle<QCPAxis> axis(plot.axisRect()->axis(QCPAxis::atBottom));
     int fired = 0;
-    auto c = qcpConnect(h, &QCPAbstractPlottable::selectionChanged, &plot, [&fired] { ++fired; });
-    QVERIFY(c);
-    h->setSelectable(QCP::stWhole);
-    h->setSelection(QCPDataSelection(QCPDataRange(0, 1)));
-    QVERIFY(fired > 0);
-
-    QCPHandle<QCPGraph> dead;
-    QVERIFY(!qcpConnect(dead, &QCPAbstractPlottable::selectionChanged, &plot, [] {}));
-
-    QCPHandle<QCPGraph> deleted(plot.addGraph());
-    delete deleted.get();
-    QVERIFY(!qcpConnect(deleted, &QCPAbstractPlottable::selectionChanged, &plot, [] {}));
+    QCPRange seen;
+    const auto connection = QObject::connect(axis, &QCPAxis::rangeChanged, &plot,
+                                             [&fired, &seen](const QCPRange& range) {
+                                                 ++fired;
+                                                 seen = range;
+                                             });
+    QVERIFY(connection);
+    axis->setRange(1.0, 5.0);
+    QCOMPARE(fired, 1);
+    QCOMPARE(seen.lower, 1.0);
+    QCOMPARE(seen.upper, 5.0);
 }
 
-void TestHandle::handleIsNotARawPointer()
+void TestHandle::connectingADeadHandleWarns()
 {
-    static_assert(!std::is_convertible_v<QCPHandle<QCPGraph>, QCPGraph*>);
+    // QObject::connect on a null sender: Qt's warning, and an invalid connection (K10).
+    QCustomPlot plot;
+    QCPHandle<QCPAxis> dead;
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression("invalid nullptr parameter"));
+    QVERIFY(!QObject::connect(dead, &QCPAxis::rangeChanged, &plot, [](const QCPRange&) {}));
+
+    auto extra = plot.axisRect()->add<QCPAxis>(QCPAxis::atRight);
+    QVERIFY(extra);
+    extra.remove();
+    QVERIFY(!extra);
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression("invalid nullptr parameter"));
+    QVERIFY(!QObject::connect(extra, &QCPAxis::rangeChanged, &plot, [](const QCPRange&) {}));
+}
+
+void TestHandle::aHandleConvertsToItsPointer()
+{
+    QCustomPlot plot;
+    QCPHandle<QCPGraph> handle(plot.addGraph());
+    QCPGraph* raw = handle; // implicit, like QPointer
+    QCOMPARE(raw, handle.get());
+    QVERIFY(static_cast<QCPGraph*>(handle) == raw);
+
+    delete raw;
+    QVERIFY(static_cast<QCPGraph*>(handle) == nullptr);
+    QVERIFY(!handle);
+
+    // `delete h` compiles through the conversion (and bypasses remove()).
+    QCPHandle<QCPTextElement> loose(new QCPTextElement(&plot, "loose"));
+    QVERIFY(loose);
+    delete loose;
+    QVERIFY(!loose);
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestHandle::aDerivedHandleConvertsToABaseHandle()
+{
+    QCustomPlot plot;
+    QCPHandle<QCPGraph> graph(plot.addGraph());
+    QCPHandle<QCPAbstractPlottable> base = graph; // implicit converting constructor
+    QVERIFY(base);
+    QCOMPARE(base.get(), static_cast<QCPAbstractPlottable*>(graph.get()));
+
+    const QCPHandle<QCPGraph>& cref = graph;
+    QCPHandle<QCPAbstractPlottable> direct(cref);
+    QVERIFY(direct);
+
+    base.remove();
+    QVERIFY(!base);
+    QVERIFY(!graph);
+    QVERIFY(!direct);
+    QCOMPARE(gMisuses, 0);
+}
+
+void TestHandle::handlesHashAndCompare()
+{
+    QCustomPlot plot;
+    auto first = plot.add<QCPAxis>(QCPAxis::atLeft);
+    auto second = plot.add<QCPAxis>(QCPAxis::atLeft);
+    QVERIFY(first);
+    QVERIFY(second);
+
+    QCPHandle<QCPAxis> a(first.get());
+    QCPHandle<QCPAxis> aCopy(first.get());
+    QCPHandle<QCPAxis> b(second.get());
+    QVERIFY(a == aCopy);
+    QVERIFY(a != b);
+    QCOMPARE(qHash(a), qHash(aCopy));
+
+    QSet<QCPHandle<QCPAxis>> set;
+    set.insert(a);
+    set.insert(aCopy);
+    set.insert(b);
+    QCOMPARE(set.size(), 2);
+    QVERIFY(set.contains(a));
+    QVERIFY(!set.contains(QCPHandle<QCPAxis>()));
+
+    std::unordered_set<QCPHandle<QCPAxis>> unordered;
+    unordered.insert(a);
+    unordered.insert(aCopy);
+    unordered.insert(b);
+    QCOMPARE(unordered.size(), std::size_t(2));
+    QCOMPARE(unordered.count(a), std::size_t(1));
+}
+
+void TestHandle::aHandlePrintsToQDebug()
+{
+    QCustomPlot plot;
+    QCPHandle<QCPAxis> axis(plot.axisRect()->axis(QCPAxis::atBottom));
+    QString alive;
+    QDebug(&alive) << axis;
+    QVERIFY(alive.contains(QStringLiteral("QCPHandle")));
+    QVERIFY(alive.contains(QString::number(reinterpret_cast<quintptr>(axis.get()), 16)));
+
+    QCPHandle<QCPAxis> dead;
+    QString text;
+    QDebug(&text) << dead;
+    QVERIFY(text.contains(QStringLiteral("QCPHandle")));
+}
+
+void TestHandle::ifOnAHandleIsNotAmbiguous()
+{
+    QCustomPlot plot;
+    QCPHandle<QCPAxis> alive(plot.axisRect()->axis(QCPAxis::atBottom));
+    if (alive)
+    {
+    }
+    else
+    {
+        QFAIL("an alive handle does not test true in an if");
+    }
+    bool direct {alive};
+    QVERIFY(direct);
+    QVERIFY(static_cast<bool>(alive));
+
+    QCPHandle<QCPAxis> dead;
+    if (dead)
+        QFAIL("a dead handle tests true in an if");
+    bool deadDirect {dead};
+    QVERIFY(!deadDirect);
+}
+
+void TestHandle::aRawPointerDoesNotMakeAHandleImplicitly()
+{
+    // The compile checks above are the test; the explicit constructor is deliberate.
+    static_assert(std::is_constructible_v<QCPHandle<QCPAxis>, QCPAxis*>);
+    static_assert(!std::is_convertible_v<QCPAxis*, QCPHandle<QCPAxis>>);
+    QVERIFY(true);
+}
+
+void TestHandle::aHandleTakesPartInTheAmbiguityMatrix()
+{
+    QCustomPlot plot;
+    QCPAxis* raw = plot.axisRect()->axis(QCPAxis::atBottom);
+    QCPHandle<QCPAxis> handle(raw);
+
+    QVERIFY(handle == raw);
+    QVERIFY(raw == handle);
+    QVERIFY(!(handle == nullptr));
+    QVERIFY(handle != nullptr);
+    QVERIFY(!(handle != raw));
+
+    QCPHandle<QCPAxis> dead;
+    QCOMPARE(handle ? 1 : 2, 1);
+    QCOMPARE(dead ? 1 : 2, 2);
+
+    gPicked = OverloadPicked::none;
+    pickOverload(handle);
+    QCOMPARE(gPicked, OverloadPicked::pointer);
+
+    QCPHandle<QCPAbstractPlottable> plottable(plot.addGraph());
+    QVERIFY(qobject_cast<QCPGraph*>(plottable));
+    QVERIFY(!qobject_cast<QCPCurve*>(plottable));
+    QVERIFY(!qobject_cast<QCPGraph*>(QCPHandle<QCPAbstractPlottable>()));
+
+    {
+        QSignalBlocker blocker(handle);
+        QVERIFY(handle);
+    }
+
+    // Direct initialisation goes through QPointer(T*); copy-initialisation would need two
+    // user-defined conversions and does not compile (checked above).
+    QPointer<QCPAxis> tracked(handle);
+    QCOMPARE(tracked.data(), raw);
+
+    QCPHandle<QCPAxis> assigned;
+    assigned = raw;
+    QCOMPARE(assigned.get(), raw);
+    assigned = nullptr;
+    QVERIFY(!assigned);
+
+    QCPHandle<QCPAbstractPlottable> baseAssigned;
+    QCPGraph* graph = plot.addGraph();
+    baseAssigned = graph;
+    QCOMPARE(baseAssigned.get(), static_cast<QCPAbstractPlottable*>(graph));
+    QCOMPARE(gMisuses, 0);
 }
 
 void TestHandle::handleAsCast()

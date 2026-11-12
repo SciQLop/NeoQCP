@@ -10,8 +10,15 @@ private slots:
 
     void handleTestsFalseAfterDelete();
     void handleOutlivesPlot();
-    void handleConnects();
-    void handleIsNotARawPointer();
+    void aHandleConnectsLikeTheObject();
+    void connectingADeadHandleWarns();
+    void aHandleConvertsToItsPointer();
+    void aDerivedHandleConvertsToABaseHandle();
+    void handlesHashAndCompare();
+    void aHandlePrintsToQDebug();
+    void ifOnAHandleIsNotAmbiguous();
+    void aRawPointerDoesNotMakeAHandleImplicitly();
+    void aHandleTakesPartInTheAmbiguityMatrix();
     void handleAsCast();
     void handleRemove();
     void deadHandleReportsMisuse();

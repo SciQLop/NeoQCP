@@ -154,7 +154,8 @@ void TestBuilder::handleIsTheHandle()
     auto g = plot.add<QCPGraph>();
     static_assert(!std::is_reference_v<decltype(g.setName(""))>);
     static_assert(std::is_same_v<decltype(g.setName("")), QCPGraphOps<QCPGraph>>);
-    static_assert(!std::is_convertible_v<decltype(g), QCPGraph*>);
+    // 5b H-1: a handle converts to its pointer (2.x code keeps compiling); see TestHandle.
+    static_assert(std::is_convertible_v<decltype(g), QCPGraph*>);
     QVERIFY(g.setName("a") == g);
 }
 
