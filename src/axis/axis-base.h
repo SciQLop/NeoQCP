@@ -166,7 +166,7 @@ public:
     // drawn data ranges, in this axis' own dimension. A cartesian axis refines this with the data
     // ranges it always used, and the angular axis keeps its full turn.
     virtual void rescale(bool onlyVisiblePlottables = false);
-    //! The plottables of every system that maps through this axis, in the systems' creation order.
+    //! The plottables of every system that maps through this axis, in the plot's own order.
     virtual QList<QCPHandle<QCPAbstractPlottable>> plottables() const;
 
     // A link makes this axis follow source: its range is forward(source's range), and a range set

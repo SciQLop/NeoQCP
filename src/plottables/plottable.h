@@ -435,6 +435,7 @@ private:
     friend class QCPArea; // its pen and brush are part of what a plottable draws
     friend class QCPLayer; // draw() skips a plottable without drawableAxes()
     friend class QCPAxis;
+    friend class QCPAxisBase; // its raw plottable list is the plot's, in the plot's order
     friend class QCPPlottableLegendItem;
     friend class QCPPlottableGroup;
     friend class QCPPlottableGroupLegendItem;

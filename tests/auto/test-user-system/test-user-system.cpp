@@ -303,6 +303,56 @@ private:
     FlatAxis* mValue;
 };
 
+//! A flat area whose key axis drops its plottables: rescale() must walk the override (M1).
+class DroppingAxis : public FlatAxis
+{
+public:
+    DroppingAxis(QCPArea* area, Qt::Orientation orientation) : FlatAxis(area, orientation) { }
+
+    QList<QCPHandle<QCPAbstractPlottable>> plottables() const override
+    {
+        ++mPlottablesCalls;
+        return { };
+    }
+
+    //! How often rescale() asked for the plottables: the override must be the one walked (M1).
+    [[nodiscard]] int plottablesCalls() const { return mPlottablesCalls; }
+
+private:
+    mutable int mPlottablesCalls = 0;
+};
+
+class DroppingArea : public QCPArea
+{
+public:
+    explicit DroppingArea(QCustomPlot* plot)
+            : QCPArea(plot)
+            , mKey(new DroppingAxis(this, Qt::Horizontal))
+            , mValue(new FlatAxis(this, Qt::Vertical))
+    {
+    }
+
+    QList<QCPHandle<QCPAxisBase>> allAxes() const override
+    {
+        return { QCPHandle<QCPAxisBase>(mKey), QCPHandle<QCPAxisBase>(mValue) };
+    }
+    void markAffectedLayersDirty(bool /*invalidate*/) override { }
+    [[nodiscard]] DroppingAxis* key() const { return mKey; }
+    [[nodiscard]] FlatAxis* value() const { return mValue; }
+
+protected:
+    QCPCoordinateSystem* createSystem(QCPAxisBase* key, QCPAxisBase* value) override
+    {
+        if (!key || !value || key == value)
+            return nullptr;
+        return new FlatSystem(this, key, value);
+    }
+
+private:
+    DroppingAxis* mKey;
+    FlatAxis* mValue;
+};
+
 bool near(const QPointF& a, const QPointF& b, double tolerance = 0.5)
 {
     return QCPVector2D(a - b).length() <= tolerance;
@@ -479,6 +529,34 @@ void TestUserSystem::theDefaultAxisClearsBeforeItsSystemDies()
     QVERIFY2(sawClearedAxis,
              "a slot on the system's destroyed() sees the default axis cleared, as in 2.x");
     QVERIFY(!plot.xAxis);
+}
+
+void TestUserSystem::rescaleWalksTheOverriddenPlottables()
+{
+    QCustomPlot plot;
+    plot.plotLayout()->clear();
+    auto* cartesian = new QCPAxisRect(&plot);
+    auto* flat = new DroppingArea(&plot);
+    plot.plotLayout()->addElement(0, 0, cartesian);
+    plot.plotLayout()->addElement(1, 0, flat);
+    cartesian->axis(QCPAxis::atBottom)->setRange(0, 10);
+    cartesian->axis(QCPAxis::atLeft)->setRange(0, 10);
+    settle(plot);
+    QCPCoordinateSystem* flatSystem = flat->system(flat->key(), flat->value());
+    QVERIFY(flatSystem);
+
+    auto* graph = new QCPGraph(cartesian->axis(QCPAxis::atBottom),
+                               cartesian->axis(QCPAxis::atLeft));
+    graph->setData(QVector<double> { 0.0, 10.0 }, QVector<double> { 0.0, 1.0 });
+    graph->setSystem(flatSystem);
+    QCOMPARE(graph->system(), flatSystem);
+
+    // The axis drops every plottable: rescale() must ask it, not walk the systems behind it.
+    flat->key()->setRange(0, 100);
+    const int before = flat->key()->plottablesCalls();
+    flat->key()->rescale();
+    QCOMPARE(flat->key()->plottablesCalls(), before + 1);
+    QCOMPARE(flat->key()->range(), QCPRange(0, 100));
 }
 
 void TestUserSystem::theCapabilityMasks()

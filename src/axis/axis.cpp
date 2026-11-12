@@ -1549,42 +1549,6 @@ QCPAxis::SelectablePart QCPAxis::getPartAt(const QPointF& pos) const
         return spNone;
 }
 
-/* inherits documentation from base class */
-/*!
-  Returns a list of all the plottables that have this axis as key or value axis.
-
-  If you are only interested in plottables of type QCPGraph, see \ref graphs.
-
-  \see graphs, items
-*/
-QList<QCPHandle<QCPAbstractPlottable>> QCPAxis::plottables() const
-{
-    QList<QCPHandle<QCPAbstractPlottable>> result;
-    for (QCPAbstractPlottable* plottable : plottablesRaw())
-        result.append(QCPHandle<QCPAbstractPlottable>(plottable));
-    return result;
-}
-
-/*! \internal
-
-  The plottables raw: rescale() walks them per axis (K8).
-*/
-QList<QCPAbstractPlottable*> QCPAxis::plottablesRaw() const
-{
-    QList<QCPAbstractPlottable*> result;
-    if (!mParentPlot)
-        return result;
-
-    for (QCPAbstractPlottable* plottable : mParentPlot->mPlottables)
-    {
-        // By system, not by projection: a plottable's key and value axes are the system's, and a
-        // system may use this axis as key, as value, or not at all.
-        if (plottable->system() && plottable->system()->usesAxis(this))
-            result.append(plottable);
-    }
-    return result;
-}
-
 /*!
   Returns a list of all the graphs that have this axis as key or value axis.
 

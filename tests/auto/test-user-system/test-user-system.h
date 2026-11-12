@@ -13,6 +13,7 @@ private slots:
 
     void theCapabilityMasks();
     void theDefaultAxisClearsBeforeItsSystemDies();
+    void rescaleWalksTheOverriddenPlottables();
     void aGraphOnASkewRectHasNoProjection();
     void addGraphOnASkewRectJoinsIt();
     void addGraphOnABendRectIsRefused();

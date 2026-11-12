@@ -358,9 +358,7 @@ void QCPAxisBase::scaleRange(double factor, double center)
 }
 
 /*!
-  Returns the plottables of every system that maps through this axis, in the systems' creation
-  order. A cartesian axis overrides this with the plot's own order (its two projections select the
-  same plottables).
+  Returns the plottables of every system that maps through this axis, in the plot's own order.
 */
 QList<QCPHandle<QCPAbstractPlottable>> QCPAxisBase::plottables() const
 {
@@ -372,16 +370,21 @@ QList<QCPHandle<QCPAbstractPlottable>> QCPAxisBase::plottables() const
 
 /*! \internal
 
-  The plottables raw: rescale() walks them per axis, and QCPAxisRect's passes read this one (K8).
+  The plottables raw, in the plot's order: rescale() walks them per axis, and QCPAxisRect's passes
+  read this one (K8). One name, one order (M1): a cartesian axis used to hide this with a list of
+  its own.
 */
 QList<QCPAbstractPlottable*> QCPAxisBase::plottablesRaw() const
 {
     QList<QCPAbstractPlottable*> result;
     if (!mArea)
         return result;
-    for (QCPCoordinateSystem* system : mArea->systemsRaw())
-        if (system->usesAxis(this))
-            result << system->plottablesRaw();
+    QCustomPlot* plot = mArea->parentPlot().get();
+    if (!plot)
+        return result;
+    for (QCPAbstractPlottable* plottable : plot->plottablesRaw())
+        if (QCPCoordinateSystem* system = plottable->systemRaw(); system && system->usesAxis(this))
+            result.append(plottable);
     return result;
 }
 
@@ -399,14 +402,18 @@ void QCPAxisBase::rescale(bool onlyVisiblePlottables)
     const QCP::SignDomain signDomain =
         mScaleType == stLogarithmic ? (mRange.upper < 0 ? QCP::sdNegative : QCP::sdPositive)
                                     : QCP::sdBoth;
-    for (QCPAbstractPlottable* plottable : plottablesRaw())
+    // Through the virtual list: a user axis that drops a plottable must be honoured (M1).
+    for (const QCPHandle<QCPAbstractPlottable>& plottable : plottables())
     {
+        if (!plottable)
+            continue;
         if (onlyVisiblePlottables && !plottable->realVisibility())
             continue;
-        const QCPCoordinateSystem* system = plottable->system();
+        const QCPCoordinateSystem* system = plottable->systemRaw();
         if (!system)
             continue;
-        const QCPDrawnSide side = system->keyAxis() == this ? QCPDrawnSide::Key : QCPDrawnSide::Value;
+        const QCPDrawnSide side =
+            system->keyAxis().get() == this ? QCPDrawnSide::Key : QCPDrawnSide::Value;
         bool foundRange = false;
         const QCPRange range = qcpDrawnRange(plottable->drawnDataRange(), side, foundRange, signDomain);
         if (!foundRange)

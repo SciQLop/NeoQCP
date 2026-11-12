@@ -335,7 +335,6 @@ public:
     QCPAxis* moveTarget() const override;
     /*! \internal \a pixel seen on the move target's rect, at the same fraction of the axis. */
     double pixelOnMoveTarget(double pixel) const;
-    QList<QCPHandle<QCPAbstractPlottable>> plottables() const override;
     QList<QCPGraph*> graphs() const;
     QList<QCPHandle<QCPAbstractItem>> items() const;
 
@@ -352,9 +351,6 @@ public:
     SelectablePart getPartAt(const QPointF& pos) const override;
 
 protected:
-    // The plottables raw: rescale() walks them per axis (K8).
-    QList<QCPAbstractPlottable*> plottablesRaw() const;
-
     // property members:
     // axis base:
     AxisType mAxisType;

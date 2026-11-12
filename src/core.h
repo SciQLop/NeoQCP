@@ -736,6 +736,7 @@ protected:
     friend class QCPLegend;
     friend class QCPPlottableGroup;
     friend class QCPAxis;
+    friend class QCPAxisBase; // its raw plottable list is the plot's, in the plot's order
     friend class QCPLayer;
     friend class QCPCoordinateSystem;
     friend class QCPIntervals;
