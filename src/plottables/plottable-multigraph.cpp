@@ -218,6 +218,20 @@ static bool needsResamplingMulti(const QCPAbstractMultiDataSource& src)
 
 void QCPMultiGraph::setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> source)
 {
+    // Any source installed this way is not the graph's: addData() appends only to the growable
+    // source setData() built.
+    mOwnedSource.reset();
+    installSource(std::move(source));
+}
+
+void QCPMultiGraph::setOwnedSource(std::shared_ptr<QCPGrowableMultiDataSource> source)
+{
+    mOwnedSource = source;
+    installSource(std::move(source));
+}
+
+void QCPMultiGraph::installSource(std::shared_ptr<QCPAbstractMultiDataSource> source)
+{
     // Dropping the colour scale signals colorScaleChanged: deliver it once this graph is done,
     // so a slot may delete it.
     const QCPEmissionScope scope(mParentPlot);
@@ -229,6 +243,192 @@ void QCPMultiGraph::setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> so
         stagePendingSource(std::move(source));
     else
         applySourceNow(std::move(source));
+}
+
+std::shared_ptr<QCPGrowableMultiDataSource> QCPMultiGraph::ownedSourceForAppend() const
+{
+    if (mPendingSource)
+    {
+        if (mOwnedSource && mPendingSource == mOwnedSource)
+            return mOwnedSource;
+        QCP_CHECK_OR_RETURN(false, "addData needs a source the graph owns", {});
+    }
+    if (!mDataSource)
+        return {}; // no data yet: addData() starts the owned source
+    if (mOwnedSource && mDataSource == mOwnedSource)
+        return mOwnedSource;
+    QCP_CHECK_OR_RETURN(false, "addData needs a source the graph owns", {});
+}
+
+void QCPMultiGraph::appendChanged()
+{
+    if (mPendingSource)
+    {
+        // The staged source is the one that grew: re-stage it for a new generation, so the
+        // pipeline resamples the appended rows. dataChanged() would re-stage the displayed source.
+        auto pending = mPendingSource;
+        stagePendingSource(std::move(pending));
+        return;
+    }
+    dataChanged();
+}
+
+bool QCPMultiGraph::appendToOwnedSource(
+    const std::function<bool(QCPGrowableMultiDataSource&)>& append)
+{
+    if (!mOwnedSource)
+        return false;
+    const bool pending = mPendingSource != nullptr;
+    if (mPipeline.isBusy())
+    {
+        // A job is reading the rows of the source it was started for. Grow a copy and install it;
+        // the old object stays alive in the job.
+        auto grown = mOwnedSource->clone();
+        if (!append(*grown))
+            return false;
+        mOwnedSource = grown;
+        if (pending)
+            stagePendingSource(std::move(grown));
+        else
+            applySourceNow(std::move(grown));
+        return true;
+    }
+
+    if (!append(*mOwnedSource))
+        return false;
+    appendChanged();
+    return true;
+}
+
+void QCPMultiGraph::setData(const QVector<double>& keys, const QVector<double>& values,
+                            bool alreadySorted)
+{
+    QCP_CHECK_OR_RETURN(keys.size() == values.size(),
+                        "keys and values have different sizes");
+    setOwnedSource(std::make_shared<QCPGrowableMultiDataSource>(
+        std::vector<double>(keys.begin(), keys.end()),
+        std::vector<std::vector<double>>{std::vector<double>(values.begin(), values.end())},
+        alreadySorted));
+}
+
+void QCPMultiGraph::setData(const std::vector<double>& keys, const std::vector<double>& values,
+                            bool alreadySorted)
+{
+    QCP_CHECK_OR_RETURN(keys.size() == values.size(),
+                        "keys and values have different sizes");
+    setOwnedSource(std::make_shared<QCPGrowableMultiDataSource>(
+        std::vector<double>(keys), std::vector<std::vector<double>>{std::vector<double>(values)},
+        alreadySorted));
+}
+
+void QCPMultiGraph::addData(const QVector<double>& keys, const QVector<double>& values,
+                            bool alreadySorted)
+{
+    auto owned = ownedSourceForAppend();
+    if (!owned && (mDataSource || mPendingSource))
+        return; // a non-owned source: ownedSourceForAppend() reported it
+    QCP_CHECK_OR_RETURN(keys.size() == values.size(),
+                        "keys and values have different sizes");
+    if (owned)
+    {
+        QCP_CHECK_OR_RETURN(owned->columnCount() == 0 || owned->columnCount() == 1,
+                            "a one-column addData needs a one-column graph");
+        QCP_CHECK_OR_RETURN(owned->columnCount() > 0 || owned->size() == 0,
+                            "a graph with rows and no value columns takes no addData");
+    }
+
+    if (!owned)
+    {
+        auto source = std::make_shared<QCPGrowableMultiDataSource>();
+        (void)source->append(keys, std::vector<QVector<double>>{values}, alreadySorted);
+        setOwnedSource(std::move(source));
+        return;
+    }
+    (void)appendToOwnedSource(
+        [&](QCPGrowableMultiDataSource& source)
+        { return source.append(keys, std::vector<QVector<double>>{values}, alreadySorted); });
+}
+
+void QCPMultiGraph::addData(double key, double value)
+{
+    auto owned = ownedSourceForAppend();
+    if (!owned && (mDataSource || mPendingSource))
+        return;
+    if (owned)
+    {
+        QCP_CHECK_OR_RETURN(owned->columnCount() == 0 || owned->columnCount() == 1,
+                            "a single point needs a one-column graph");
+        QCP_CHECK_OR_RETURN(owned->columnCount() > 0 || owned->size() == 0,
+                            "a graph with rows and no value columns takes no addData");
+    }
+    const double values[] = { value };
+    if (!owned)
+    {
+        auto source = std::make_shared<QCPGrowableMultiDataSource>();
+        (void)source->append(key, std::span<const double>(values, 1));
+        setOwnedSource(std::move(source));
+        return;
+    }
+    (void)appendToOwnedSource(
+        [&](QCPGrowableMultiDataSource& source)
+        { return source.append(key, std::span<const double>(values, 1)); });
+}
+
+void QCPMultiGraph::addData(const QVector<double>& keys, std::vector<QVector<double>> columns,
+                            bool alreadySorted)
+{
+    auto owned = ownedSourceForAppend();
+    if (!owned && (mDataSource || mPendingSource))
+        return;
+    QCP_CHECK_OR_RETURN(!columns.empty(), "addData needs at least one value column");
+    for (const auto& column : columns)
+        QCP_CHECK_OR_RETURN(column.size() == keys.size(),
+                            "keys and a value column have different sizes");
+    if (owned)
+    {
+        QCP_CHECK_OR_RETURN(owned->columnCount() == 0
+                                || owned->columnCount() == static_cast<int>(columns.size()),
+                            "the value column count does not match the graph's");
+        QCP_CHECK_OR_RETURN(owned->columnCount() > 0 || owned->size() == 0,
+                            "a graph with rows and no value columns takes no addData");
+    }
+
+    if (!owned)
+    {
+        auto source = std::make_shared<QCPGrowableMultiDataSource>();
+        (void)source->append(keys, std::move(columns), alreadySorted);
+        setOwnedSource(std::move(source));
+        return;
+    }
+    (void)appendToOwnedSource(
+        [&](QCPGrowableMultiDataSource& source)
+        { return source.append(keys, std::move(columns), alreadySorted); });
+}
+
+void QCPMultiGraph::addData(double key, std::span<const double> values)
+{
+    auto owned = ownedSourceForAppend();
+    if (!owned && (mDataSource || mPendingSource))
+        return;
+    QCP_CHECK_OR_RETURN(!values.empty(), "addData needs at least one value");
+    if (owned)
+    {
+        QCP_CHECK_OR_RETURN(owned->columnCount() == 0
+                                || owned->columnCount() == static_cast<int>(values.size()),
+                            "the value column count does not match the graph's");
+        QCP_CHECK_OR_RETURN(owned->columnCount() > 0 || owned->size() == 0,
+                            "a graph with rows and no value columns takes no addData");
+    }
+
+    if (!owned)
+    {
+        auto source = std::make_shared<QCPGrowableMultiDataSource>();
+        (void)source->append(key, values);
+        setOwnedSource(std::move(source));
+        return;
+    }
+    (void)appendToOwnedSource([&](QCPGrowableMultiDataSource& source)
+                              { return source.append(key, values); });
 }
 
 void QCPMultiGraph::setDeferredDataSwap(bool enabled)
@@ -368,7 +568,24 @@ bool QCPMultiGraph::commitPendingData()
     // Carry the barrier established while staging forward past the commit:
     // a job dispatched for the source this replaced must not be able to land
     // in mL1Cache/mL2Result once this source is the one being displayed.
-    mAcceptedGeneration = mPendingGeneration;
+    if (mNeedsResampling && !mL1Cache && mDataSource)
+    {
+        // A source staged on the data-space branch had no job. Now that it is the displayed
+        // cartesian source, start one; otherwise the frame has no L1 to draw until something
+        // else invalidates the pipeline.
+        ensureL1TransformMulti(mPipeline, mDataSource->size(), mDataSource->columnCount(),
+                               mWantOrigin);
+        const QPointer<QCPMultiGraph> alive(this);
+        mPipeline.setSource(mDataSource);
+        if (!alive)
+            return true;
+        mAcceptedGeneration = mPipeline.hasTransform() ? mPipeline.currentGeneration()
+                                                        : mPipeline.currentGeneration() + 1;
+    }
+    else
+    {
+        mAcceptedGeneration = mPendingGeneration;
+    }
     updateEffectiveBusy();
     return true;
 }

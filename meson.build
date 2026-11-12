@@ -133,6 +133,7 @@ neoqcp_moc_headers = [
             'src/plottables/plottable-statisticalbox.h',
             'src/datasource/pipeline-scheduler.h',
             'src/datasource/async-pipeline.h',
+            'src/datasource/growable-multi-datasource.h',
             'src/plottables/plottable-colormap2.h',
             'src/plottables/plottable-histogram2d.h',
             'src/plottables/plottable-histogram.h',

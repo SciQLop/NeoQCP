@@ -120,6 +120,13 @@ void QCPWaterfallGraph::setDataSource(std::shared_ptr<QCPAbstractMultiDataSource
     rebuildAdapter();
 }
 
+void QCPWaterfallGraph::setOwnedSource(std::shared_ptr<QCPGrowableMultiDataSource> source)
+{
+    // setData() still builds the growable source, but the waterfall draws its adapter and owns
+    // neither: take the data through the normal setter, without recording an owned source.
+    setDataSource(std::shared_ptr<QCPAbstractMultiDataSource>(std::move(source)));
+}
+
 void QCPWaterfallGraph::setOffsetMode(OffsetMode mode)
 {
     if (mode == mOffsetMode)

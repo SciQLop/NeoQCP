@@ -17,6 +17,18 @@ private slots:
     void setDataSourceUnique();
     void setDataConvenience();
     void viewDataConvenience();
+    void addDataAppendsToAnOwnedSource();
+    void addDataInsertsUnsortedKeysInOrder();
+    void addDataOnAViewIsAMisuse();
+    void addDataOnASharedSourceIsAMisuse();
+    void addDataOnAWaterfallIsAMisuse();
+    void addDataWithAPendingSwapAppendsToTheStagedSource();
+    void addDataColumnCountMismatchIsAMisuse();
+    void aPipelineSeesTheAppend();
+    void oneColumnSetDataTakesQVectors();
+    void addDataSinglePointOnAMultiColumnGraphIsAMisuse();
+    void addDataOnAUserSystemRedrawsWithoutPipeline();
+    void aSourceStagedInDataSpaceGetsAPipelineJobAfterReturningToCartesian();
     void componentCountMatchesDataSource();
     void componentValueAt();
     void dataCountDelegate();

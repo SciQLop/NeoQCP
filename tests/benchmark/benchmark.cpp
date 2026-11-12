@@ -101,6 +101,15 @@ private slots:
     void QCPGpu_Pan100k();
     void QCPGpu_Graph2Render1M();
     void QCPMultiGraph_SetData1M();
+    void QCPMultiGraph_AddDataAtEndSorted();
+    void QCPMultiGraph_AddDataAtBeginSorted();
+    void QCPMultiGraph_AddDataMixedSorted();
+    void QCPMultiGraph_AddDataAtEndUnsorted();
+    void QCPMultiGraph_AddDataAtBeginUnsorted();
+    void QCPMultiGraph_AddDataMixedUnsorted();
+    void QCPMultiGraph_AddDataSingleAtEnd();
+    void QCPMultiGraph_AddDataSingleAtBegin();
+    void QCPMultiGraph_AddDataSingleRandom();
     void QCPGpu_MultiGraphPan1M();
     void QCPGpu_MultiGraphZoom1M();
     void QCPGpu_MultiGraphColored100kPan();
@@ -1872,6 +1881,229 @@ void Benchmark::QCPMultiGraph_SetData1M()
         fillSineMulti(n, 1.0, 3, keys, values);
         mg->setData(std::move(keys), std::move(values));
     }
+}
+
+void Benchmark::QCPMultiGraph_AddDataAtEndSorted()
+{
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    int n = 500000;
+    QVector<double> x1(n), y1(n), x2(n), y2(n);
+    for (int i = 0; i < n; ++i)
+    {
+        x1[i] = i / (double)n;
+        y1[i] = qSin(x1[i] * 10 * M_PI);
+        x2[i] = (i + n) / (double)n;
+        y2[i] = qSin(x2[i] * 10 * M_PI);
+    }
+
+    graph->setData(x1, y1);
+    QBENCHMARK_ONCE
+    {
+        graph->addData(x2, y2, true);
+    }
+}
+
+void Benchmark::QCPMultiGraph_AddDataAtBeginSorted()
+{
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    int n = 500000;
+    QVector<double> x1(n), y1(n), x2(n), y2(n);
+    for (int i = 0; i < n; ++i)
+    {
+        x1[i] = (i + n) / (double)n;
+        y1[i] = qSin(x1[i] * 10 * M_PI);
+        x2[i] = i / (double)n;
+        y2[i] = qSin(x2[i] * 10 * M_PI);
+    }
+
+    graph->setData(x1, y1);
+    QBENCHMARK_ONCE
+    {
+        graph->addData(x2, y2, true);
+    }
+}
+
+void Benchmark::QCPMultiGraph_AddDataMixedSorted()
+{
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    int n = 500000;
+    QVector<double> x1(n), y1(n), x2(n), y2(n);
+    for (int i = 0; i < n; ++i)
+    {
+        x1[i] = i / (double)n;
+        y1[i] = qSin(x1[i] * 10 * M_PI);
+        x2[i] = (i + 0.5) / (double)(3 * n);
+        y2[i] = qSin(x2[i] * 10 * M_PI);
+    }
+
+    graph->setData(x1, y1);
+    QBENCHMARK_ONCE
+    {
+        graph->addData(x2, y2, true);
+    }
+}
+
+void Benchmark::QCPMultiGraph_AddDataAtEndUnsorted()
+{
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    int n = 500000;
+    QVector<double> x1(n), y1(n), x2(n), y2(n);
+    for (int i = 0; i < n; ++i)
+    {
+        x1[i] = i / (double)n;
+        y1[i] = qSin(x1[i] * 10 * M_PI);
+        x2[i] = (i + n + 0.1 * (std::rand() % 500))
+            / (double)n; // not completely randomized, but local disorder, global ascending order
+                         // (typical use-case for data acquisition)
+        y2[i] = qSin(x2[i] * 10 * M_PI);
+    }
+
+    graph->setData(x1, y1);
+    QBENCHMARK_ONCE
+    {
+        graph->addData(x2, y2, false);
+    }
+}
+
+void Benchmark::QCPMultiGraph_AddDataAtBeginUnsorted()
+{
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    int n = 500000;
+    QVector<double> x1(n), y1(n), x2(n), y2(n);
+    for (int i = 0; i < n; ++i)
+    {
+        x1[i] = (i + n) / (double)n;
+        y1[i] = qSin(x1[i] * 10 * M_PI);
+        x2[i] = (i - 0.1 * (std::rand() % 500))
+            / (double)n; // not completely randomized, but local disorder, global ascending order
+                         // (typical use-case for data acquisition)
+        y2[i] = qSin(x2[i] * 10 * M_PI);
+    }
+
+    graph->setData(x1, y1);
+    QBENCHMARK_ONCE
+    {
+        graph->addData(x2, y2, false);
+    }
+}
+
+void Benchmark::QCPMultiGraph_AddDataMixedUnsorted()
+{
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    int n = 500000;
+    QVector<double> x1(n), y1(n), x2(n), y2(n);
+    for (int i = 0; i < n; ++i)
+    {
+        x1[i] = i / (double)n;
+        y1[i] = qSin(x1[i] * 10 * M_PI);
+        x2[i] = (i + 0.1 * (std::rand() % 500))
+            / (double)(3 * n); // not completely randomized, but local disorder, global ascending
+                               // order (typical use-case for data acquisition)
+        y2[i] = qSin(x2[i] * 10 * M_PI);
+    }
+
+    graph->setData(x1, y1);
+    QBENCHMARK_ONCE
+    {
+        graph->addData(x2, y2, false);
+    }
+}
+
+void Benchmark::QCPMultiGraph_AddDataSingleAtEnd()
+{
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    int n = 50000;
+    QVector<double> x1(n), y1(n);
+    for (int i = 0; i < n; ++i)
+    {
+        x1[i] = i / (double)n;
+        y1[i] = qSin(x1[i] * 10 * M_PI);
+    }
+    int n2 = 5000;
+    QVector<double> y2(n2);
+    for (int i = 0; i < n2; ++i)
+        y2[i] = qSin(i / (double)n * 10 * M_PI);
+
+    graph->setData(x1, y1);
+    double key = x1.last() + 0.1;
+    QElapsedTimer timer;
+    qint64 elapsed = 0;
+    int iteration = 0;
+    while (iteration < n2)
+    {
+        timer.restart();
+        graph->addData(key, y2[iteration]);
+        elapsed += timer.nsecsElapsed();
+        key += 0.1;
+        ++iteration;
+    }
+    QTest::setBenchmarkResult(elapsed / 1e3 / (double)iteration,
+                              QTest::WalltimeMilliseconds);
+}
+
+void Benchmark::QCPMultiGraph_AddDataSingleAtBegin()
+{
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    int n = 50000;
+    QVector<double> x1(n), y1(n);
+    for (int i = 0; i < n; ++i)
+    {
+        x1[i] = i / (double)n;
+        y1[i] = qSin(x1[i] * 10 * M_PI);
+    }
+    int n2 = 5000;
+    QVector<double> y2(n2);
+    for (int i = 0; i < n2; ++i)
+        y2[i] = qSin(i / (double)n * 10 * M_PI);
+
+    graph->setData(x1, y1);
+    double key = x1.first() - 0.1;
+    QElapsedTimer timer;
+    qint64 elapsed = 0;
+    int iteration = 0;
+    while (iteration < n2)
+    {
+        timer.restart();
+        graph->addData(key, y2[iteration]);
+        elapsed += timer.nsecsElapsed();
+        key -= 0.1;
+        ++iteration;
+    }
+    QTest::setBenchmarkResult(elapsed / 1e3 / (double)iteration,
+                              QTest::WalltimeMilliseconds);
+}
+
+void Benchmark::QCPMultiGraph_AddDataSingleRandom()
+{
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    int n = 50000;
+    QVector<double> x1(n), y1(n);
+    for (int i = 0; i < n; ++i)
+    {
+        x1[i] = i / (double)n;
+        y1[i] = qSin(x1[i] * 10 * M_PI);
+    }
+    int n2 = 5000;
+    QVector<double> x2(n2), y2(n2);
+    for (int i = 0; i < n2; ++i)
+    {
+        x2[i] = (std::rand() % n + 0.5) / (double)n;
+        y2[i] = qSin(x2[i] * 10 * M_PI);
+    }
+
+    graph->setData(x1, y1);
+    QElapsedTimer timer;
+    qint64 elapsed = 0;
+    int iteration = 0;
+    while (iteration < n2)
+    {
+        timer.restart();
+        graph->addData(x2[iteration], y2[iteration]);
+        elapsed += timer.nsecsElapsed();
+        ++iteration;
+    }
+    QTest::setBenchmarkResult(elapsed / 1e3 / (double)iteration,
+                              QTest::WalltimeMilliseconds);
 }
 
 void Benchmark::QCPGpu_MultiGraphPan1M()

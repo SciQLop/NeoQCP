@@ -83,6 +83,8 @@ public:
 
 protected:
     void dataChanged() override;
+    //! A waterfall's source is its adapter, never owned: addData() is refused.
+    void setOwnedSource(std::shared_ptr<QCPGrowableMultiDataSource> source) override;
     QCPRange getValueRange(bool& foundRange,
                            QCP::SignDomain inSignDomain = QCP::sdBoth,
                            const QCPRange& inKeyRange = QCPRange()) const override;

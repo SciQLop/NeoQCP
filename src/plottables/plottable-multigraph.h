@@ -3,6 +3,7 @@
 #include "datasource/abstract-multi-datasource.h"
 #include "datasource/async-pipeline.h"
 #include "datasource/graph-resampler.h"
+#include "datasource/growable-multi-datasource.h"
 #include "datasource/row-major-multi-datasource.h"
 #include "datasource/soa-multi-datasource.h"
 #include "multigraph-errorbars.h"
@@ -13,11 +14,14 @@
 #include "plottable.h"
 #include "plottable1d.h"
 #include <QTimer>
+#include <QVector>
 #include <array>
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
+#include <type_traits>
 #include <variant>
 #include <vector>
 
@@ -56,15 +60,45 @@ public:
     [[nodiscard]] bool deferredDataSwap() const { return mDeferredDataSwap; }
     void setDeferredDataSwap(bool enabled);
 
-    // Convenience: owning
+    // Convenience: owning. Double inputs build the growable source addData() appends to; other
+    // value types keep the SoA source, whose data the graph does not own.
     template <IndexableNumericRange KC, IndexableNumericRange VC>
-    void setData(KC&& keys, std::vector<VC>&& valueColumns)
+    void setData(KC&& keys, std::vector<VC>&& valueColumns, bool alreadySorted = false)
     {
         using KD = std::decay_t<KC>;
         using VD = std::decay_t<VC>;
-        setDataSource(std::make_shared<QCPSoAMultiDataSource<KD, VD>>(
-            std::forward<KC>(keys), std::forward<std::vector<VC>>(valueColumns)));
+        if constexpr (std::is_same_v<std::ranges::range_value_t<KD>, double>
+                      && std::is_same_v<std::ranges::range_value_t<VD>, double>)
+        {
+            setOwnedSource(std::make_shared<QCPGrowableMultiDataSource>(
+                std::forward<KC>(keys), std::forward<std::vector<VC>>(valueColumns),
+                alreadySorted));
+        }
+        else
+        {
+            setDataSource(std::make_shared<QCPSoAMultiDataSource<KD, VD>>(
+                std::forward<KC>(keys), std::forward<std::vector<VC>>(valueColumns)));
+        }
     }
+
+    //! One-column data: keys and values as QVectors (2.x's spelling).
+    void setData(const QVector<double>& keys, const QVector<double>& values,
+                 bool alreadySorted = false);
+    //! One-column data: keys and values as std::vectors.
+    void setData(const std::vector<double>& keys, const std::vector<double>& values,
+                 bool alreadySorted = false);
+
+    //! Appends rows to the source this graph owns. A view, a shared source, a waterfall adapter
+    //! or a source the graph does not own is a misuse and nothing changes.
+    void addData(const QVector<double>& keys, const QVector<double>& values,
+                 bool alreadySorted = false);
+    //! Appends one point to a one-column graph; a multi-column graph refuses it.
+    void addData(double key, double value);
+    //! Appends one row per component. A column-count mismatch is a misuse.
+    void addData(const QVector<double>& keys, std::vector<QVector<double>> columns,
+                 bool alreadySorted = false);
+    //! Appends one row of \a values, one per component.
+    void addData(double key, std::span<const double> values);
 
     // Convenience: non-owning spans (column-major / Fortran-order)
     template <typename K, typename V>
@@ -261,6 +295,9 @@ protected:
     // plot commits it through commitPendingData() (see QCustomPlot::requestDataSwap).
     bool mDeferredDataSwap = false;
     std::shared_ptr<QCPAbstractMultiDataSource> mPendingSource;
+    //! The source the graph owns: the growable one setData()/addData() built. Null after every
+    //! other source setter (a view, a shared/unique source, a waterfall adapter).
+    std::shared_ptr<QCPGrowableMultiDataSource> mOwnedSource;
     std::shared_ptr<qcp::algo::MultiGraphResamplerCache> mPendingL1;
     bool mPendingReady = false;
     uint64_t mPendingGeneration = 0;
@@ -270,6 +307,20 @@ protected:
     // mL1Cache/mL2Result for a source it was never computed for.
     uint64_t mAcceptedGeneration = 0;
 
+    //! Installs the source setData() built and records that the graph owns it.
+    virtual void setOwnedSource(std::shared_ptr<QCPGrowableMultiDataSource> source);
+    //! The one path a new source takes: applied now or staged for the deferred swap.
+    void installSource(std::shared_ptr<QCPAbstractMultiDataSource> source);
+    //! The growable source addData() may write, or null when the graph has no data yet (a new
+    //! source starts) or a misuse has already been reported.
+    [[nodiscard]] std::shared_ptr<QCPGrowableMultiDataSource> ownedSourceForAppend() const;
+    //! After an append: re-stage the pending source (a new generation, a pipeline re-run) or
+    //! refresh the displayed one.
+    void appendChanged();
+    //! Applies an append to the owned source (the pending one when a swap is staged). A running
+    //! pipeline job reads the source it was started for, so the append clones it first when busy.
+    bool appendToOwnedSource(
+        const std::function<bool(QCPGrowableMultiDataSource&)>& append);
     void applySourceNow(std::shared_ptr<QCPAbstractMultiDataSource> source);
     void stagePendingSource(std::shared_ptr<QCPAbstractMultiDataSource> source);
     void markPendingReady();
@@ -330,10 +381,48 @@ public:
 
     // Same arguments as QCPMultiGraph::setData: the keys and one value column per component.
     template <IndexableNumericRange KC, IndexableNumericRange VC>
-    Ret setData(KC&& keys, std::vector<VC>&& valueColumns)
+    Ret setData(KC&& keys, std::vector<VC>&& valueColumns, bool alreadySorted = false)
+    {
+        return this->apply(
+            [&](T& o) {
+                o.setData(std::forward<KC>(keys), std::forward<std::vector<VC>>(valueColumns),
+                          alreadySorted);
+            });
+    }
+
+    Ret setData(const QVector<double>& keys, const QVector<double>& values,
+                bool alreadySorted = false)
+    {
+        return this->apply([&](T& o) { o.setData(keys, values, alreadySorted); });
+    }
+
+    Ret setData(const std::vector<double>& keys, const std::vector<double>& values,
+                bool alreadySorted = false)
+    {
+        return this->apply([&](T& o) { o.setData(keys, values, alreadySorted); });
+    }
+
+    Ret addData(const QVector<double>& keys, const QVector<double>& values,
+                bool alreadySorted = false)
+    {
+        return this->apply([&](T& o) { o.addData(keys, values, alreadySorted); });
+    }
+
+    Ret addData(double key, double value)
+    {
+        return this->apply([&](T& o) { o.addData(key, value); });
+    }
+
+    Ret addData(const QVector<double>& keys, std::vector<QVector<double>> columns,
+                bool alreadySorted = false)
     {
         return this->apply([&](T& o)
-                           { o.setData(std::forward<KC>(keys), std::forward<std::vector<VC>>(valueColumns)); });
+                           { o.addData(keys, std::move(columns), alreadySorted); });
+    }
+
+    Ret addData(double key, std::span<const double> values)
+    {
+        return this->apply([&](T& o) { o.addData(key, values); });
     }
 
     Ret setDataSource(std::shared_ptr<QCPAbstractMultiDataSource> source)

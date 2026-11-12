@@ -1,4 +1,7 @@
 #include "test-multigraph.h"
+#include "../misuse-recorder.h"
+#include "../test-user-system/skew-system.h"
+#include "datasource/growable-multi-datasource.h"
 #include "datasource/row-major-multi-datasource.h"
 #include "datasource/soa-multi-datasource.h"
 #include "layoutelements/layoutelement-legend-group.h"
@@ -33,6 +36,24 @@ namespace
 // Defined further down, next to the pixel helpers.
 bool isRed(const QColor& color);
 bool isBlue(const QColor& color);
+
+//! Installs the misuse recorder for one test and restores the previous handler on the way out.
+struct MisuseScope
+{
+    MisuseScope()
+    {
+        test_misuse::calls.clear();
+        previous = qcp::setMisuseHandler(test_misuse::record);
+    }
+    ~MisuseScope() { qcp::setMisuseHandler(previous); }
+    MisuseScope(const MisuseScope&) = delete;
+    MisuseScope& operator=(const MisuseScope&) = delete;
+
+    static std::size_t count() { return test_misuse::calls.size(); }
+
+private:
+    qcp::MisuseHandler previous = nullptr;
+};
 
 // A pixel band holding something darker than the light grid: a drawn line.
 bool inkAt(const QImage& image, int x, int y, int radius = 2)
@@ -127,6 +148,324 @@ void TestMultiGraph::viewDataConvenience()
                      std::span<const double>(v1)});
     QCOMPARE(mg->componentCount(), 2);
     QCOMPARE(mg->dataCount(), 3);
+}
+
+void TestMultiGraph::addDataAppendsToAnOwnedSource()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double>{0.0, 1.0},
+                std::vector<std::vector<double>>{{10.0, 20.0}});
+    QVERIFY2(dynamic_cast<QCPGrowableMultiDataSource*>(mg->dataSource()),
+             "setData on doubles does not build the growable source");
+    mg->addData(QVector<double>{2.0, 3.0}, QVector<double>{30.0, 40.0});
+    QCOMPARE(mg->dataCount(), 4);
+    QCOMPARE(mg->dataMainKey(2), 2.0);
+    QCOMPARE(mg->componentValueAt(0, 3), 40.0);
+
+    // N columns: one column per value column, kept in step.
+    mg->setData(std::vector<double>{0.0, 1.0},
+                std::vector<std::vector<double>>{{10.0, 20.0}, {1.0, 2.0}, {3.0, 4.0}});
+    mg->addData(QVector<double>{2.0},
+                std::vector<QVector<double>>{{30.0}, {3.0}, {5.0}});
+    QCOMPARE(mg->dataCount(), 3);
+    QCOMPARE(mg->componentCount(), 3);
+    QCOMPARE(mg->componentValueAt(2, 2), 5.0);
+
+    // A row of one value per component, and an empty graph that addData() starts.
+    const double row[] = {40.0, 4.0, 6.0};
+    mg->addData(3.0, std::span<const double>(row, 3));
+    QCOMPARE(mg->dataCount(), 4);
+    QCOMPARE(mg->componentValueAt(1, 3), 4.0);
+
+    auto* fresh = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    fresh->addData(QVector<double>{0.0, 1.0}, QVector<double>{2.0, 3.0});
+    QCOMPARE(fresh->dataCount(), 2);
+    QCOMPARE(fresh->componentCount(), 1);
+    QCOMPARE(fresh->componentValueAt(0, 1), 3.0);
+}
+
+void TestMultiGraph::addDataInsertsUnsortedKeysInOrder()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double>{0.0, 2.0, 4.0},
+                std::vector<std::vector<double>>{{0.0, 20.0, 40.0}, {0.0, 200.0, 400.0}});
+    mg->addData(QVector<double>{3.0, 1.0, 5.0},
+                std::vector<QVector<double>>{{30.0, 10.0, 50.0}, {300.0, 100.0, 500.0}});
+
+    const double keys[] = {0.0, 1.0, 2.0, 3.0, 4.0, 5.0};
+    const double first[] = {0.0, 10.0, 20.0, 30.0, 40.0, 50.0};
+    const double second[] = {0.0, 100.0, 200.0, 300.0, 400.0, 500.0};
+    QCOMPARE(mg->dataCount(), 6);
+    for (int i = 0; i < 6; ++i)
+    {
+        QCOMPARE(mg->dataMainKey(i), keys[i]);
+        QCOMPARE(mg->componentValueAt(0, i), first[i]);
+        QCOMPARE(mg->componentValueAt(1, i), second[i]);
+    }
+}
+
+void TestMultiGraph::addDataOnAViewIsAMisuse()
+{
+    MisuseScope misuse;
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    std::vector<double> keys = {0.0, 1.0};
+    std::vector<double> values = {10.0, 20.0};
+    mg->viewData(std::span<const double>(keys),
+                 std::vector<std::span<const double>>{std::span<const double>(values)});
+    mg->addData(QVector<double>{2.0}, QVector<double>{30.0});
+    QCOMPARE(MisuseScope::count(), std::size_t(1));
+    QCOMPARE(mg->dataCount(), 2);
+    QCOMPARE(mg->componentValueAt(0, 1), 20.0);
+}
+
+void TestMultiGraph::addDataOnASharedSourceIsAMisuse()
+{
+    MisuseScope misuse;
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto source = std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
+        std::vector<double>{0.0, 1.0}, std::vector<std::vector<double>>{{10.0, 20.0}});
+    mg->setDataSource(source);
+    mg->addData(QVector<double>{2.0}, QVector<double>{30.0});
+    QCOMPARE(MisuseScope::count(), std::size_t(1));
+    QCOMPARE(mg->dataCount(), 2);
+}
+
+void TestMultiGraph::addDataOnAWaterfallIsAMisuse()
+{
+    MisuseScope misuse;
+    auto* graph = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
+    graph->setData(std::vector<double>{0.0, 1.0},
+                   std::vector<std::vector<double>>{{10.0, 20.0}});
+    graph->addData(QVector<double>{2.0}, QVector<double>{30.0});
+    QCOMPARE(MisuseScope::count(), std::size_t(1));
+    QCOMPARE(graph->dataCount(), 2);
+}
+
+void TestMultiGraph::addDataWithAPendingSwapAppendsToTheStagedSource()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double>{0.0, 1.0}, std::vector<std::vector<double>>{{1.0, 2.0}});
+    mPlot->replot();
+    QVERIFY(mg->hasRenderedRange());
+
+    mPlot->setDataSwapDebounceMs(10'000);
+    mg->setDeferredDataSwap(true);
+    mg->setData(std::vector<double>{10.0, 20.0}, std::vector<std::vector<double>>{{100.0, 200.0}});
+    QVERIFY(mg->hasPendingData());
+    const auto staged = mg->mPendingSource;
+    QVERIFY(staged);
+
+    mg->addData(QVector<double>{30.0}, QVector<double>{300.0});
+    QCOMPARE(mg->mPendingSource.get(), staged.get());
+    QCOMPARE(staged->size(), 3);
+    QCOMPARE(staged->valueAt(0, 2), 300.0);
+    QCOMPARE(mg->dataSource()->size(), 2); // the displayed geometry waits for the swap
+
+    QVERIFY(mg->commitPendingData());
+    QCOMPARE(mg->dataCount(), 3);
+    QCOMPARE(mg->componentValueAt(0, 2), 300.0);
+}
+
+void TestMultiGraph::addDataColumnCountMismatchIsAMisuse()
+{
+    MisuseScope misuse;
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double>{0.0, 1.0},
+                std::vector<std::vector<double>>{{10.0, 20.0}, {1.0, 2.0}});
+
+    mg->addData(QVector<double>{2.0}, std::vector<QVector<double>>{{30.0}});
+    QCOMPARE(MisuseScope::count(), std::size_t(1));
+    QCOMPARE(mg->dataCount(), 2);
+
+    mg->addData(QVector<double>{2.0}, QVector<double>{30.0});
+    QCOMPARE(MisuseScope::count(), std::size_t(2));
+    QCOMPARE(mg->dataCount(), 2);
+    QCOMPARE(mg->componentCount(), 2);
+}
+
+void TestMultiGraph::aPipelineSeesTheAppend()
+{
+    constexpr int n = 120'000;
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    std::vector<double> keys(n), values(n, 0.0);
+    for (int i = 0; i < n; ++i)
+        keys[i] = i;
+    mg->setData(std::move(keys), std::vector<std::vector<double>>{std::move(values)});
+    mg->setComponentPens({QPen(Qt::red, 3)});
+    mPlot->xAxis->setRange(0, n);
+    mPlot->yAxis->setRange(-1, 15);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->pipeline().isBusy(), 10'000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    const quint64 generation = mg->pipeline().currentGeneration();
+    QVector<double> appendedKeys;
+    QVector<double> appendedValues;
+    appendedKeys.reserve(1'001);
+    appendedValues.reserve(1'001);
+    for (int i = 0; i <= 1'000; ++i)
+    {
+        appendedKeys.append(double(n + i));
+        appendedValues.append(10.0);
+    }
+    mg->addData(appendedKeys, appendedValues);
+    QVERIFY(mg->pipeline().currentGeneration() > generation || mg->pipeline().isBusy());
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->pipeline().isBusy(), 10'000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QVERIFY2(mg->mL1Cache, "the pipeline did not resample the appended source");
+    QCOMPARE(mg->mL1Cache->sourceSize, n + 1'001);
+
+    // The appended range is drawn: a red segment that was not there before the append.
+    mPlot->xAxis->setRange(n - 1'000, n + 2'000);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->pipeline().isBusy(), 10'000);
+    const QImage image = renderOf(mPlot);
+    const QPoint probe(qRound(mPlot->xAxis->coordToPixel(n + 500)),
+                       qRound(mPlot->yAxis->coordToPixel(10.0)));
+    bool red = false;
+    for (int dy = -3; dy <= 3 && !red; ++dy)
+        for (int dx = -3; dx <= 3 && !red; ++dx)
+        {
+            const QPoint at = probe + QPoint(dx, dy);
+            if (image.rect().contains(at))
+                red = isRed(QColor::fromRgb(image.pixel(at)));
+        }
+    QVERIFY2(red, "the appended range is not drawn");
+}
+
+void TestMultiGraph::oneColumnSetDataTakesQVectors()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(QVector<double>{1.0, 2.0, 3.0}, QVector<double>{4.0, 5.0, 6.0});
+    QCOMPARE(mg->componentCount(), 1);
+    QCOMPARE(mg->dataCount(), 3);
+    QCOMPARE(mg->componentValueAt(0, 2), 6.0);
+
+    auto handle = mPlot->add<QCPMultiGraph>(QVector<double>{1.0, 2.0},
+                                            QVector<double>{7.0, 8.0});
+    QVERIFY(handle);
+    QCOMPARE(handle->dataCount(), 2);
+    QCOMPARE(handle->componentCount(), 1);
+    QCOMPARE(handle->componentValueAt(0, 1), 8.0);
+}
+
+void TestMultiGraph::addDataSinglePointOnAMultiColumnGraphIsAMisuse()
+{
+    MisuseScope misuse;
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double>{0.0, 1.0},
+                std::vector<std::vector<double>>{{10.0, 20.0}, {1.0, 2.0}});
+    mg->addData(2.0, 30.0);
+    QCOMPARE(MisuseScope::count(), std::size_t(1));
+    QCOMPARE(mg->dataCount(), 2);
+
+    const double one[] = {30.0};
+    mg->addData(2.0, std::span<const double>(one, 1));
+    QCOMPARE(MisuseScope::count(), std::size_t(2));
+    QCOMPARE(mg->dataCount(), 2);
+}
+
+void TestMultiGraph::addDataOnAUserSystemRedrawsWithoutPipeline()
+{
+    mPlot->setBackground(QBrush(Qt::white));
+    mPlot->plotLayout()->clear();
+    auto* rect = new SkewRect(mPlot);
+    mPlot->plotLayout()->addElement(0, 0, rect);
+    rect->axis(QCPAxis::atBottom)->setRange(0, 10);
+    rect->axis(QCPAxis::atLeft)->setRange(0, 10);
+    mPlot->replot();
+
+    auto* mg = new QCPMultiGraph(rect->axis(QCPAxis::atBottom),
+                                 rect->axis(QCPAxis::atLeft));
+    QVERIFY(mg->drawsInDataSpace());
+    mg->setData(QVector<double>{0.0, 2.0}, QVector<double>{0.0, 2.0});
+    mg->setGapThreshold(0.0); // this test is about the append, not a deliberately sparse key step
+    mg->setComponentPens({QPen(Qt::red, 5)});
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    const QPoint before = QPoint(qRound(rect->skew()->pixelOf(8.0, 2.0).x),
+                                 qRound(rect->skew()->pixelOf(8.0, 2.0).y));
+    const QImage oldFrame = renderOf(mPlot);
+    bool wasRed = false;
+    for (int dy = -3; dy <= 3 && !wasRed; ++dy)
+        for (int dx = -3; dx <= 3 && !wasRed; ++dx)
+        {
+            const QPoint at = before + QPoint(dx, dy);
+            if (oldFrame.rect().contains(at))
+                wasRed = isRed(QColor::fromRgb(oldFrame.pixel(at)));
+        }
+    QVERIFY2(!wasRed, "the appended point existed before the append");
+
+    mg->addData(QVector<double>{8.0}, QVector<double>{2.0});
+    QCOMPARE(mg->dataCount(), 3);
+    QVERIFY(!mg->hasPendingData());
+    QVERIFY2(!mg->mNeedsResampling, "the data-space branch asked for a resample");
+    QVERIFY2(mg->mL1Cache == nullptr, "the data-space branch consulted the pipeline");
+    QVERIFY2(!mg->pipeline().isBusy(), "the data-space branch started a pipeline job");
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    const QImage frame = renderOf(mPlot);
+    bool red = false;
+    for (int dy = -3; dy <= 3 && !red; ++dy)
+        for (int dx = -3; dx <= 3 && !red; ++dx)
+        {
+            const QPoint at = before + QPoint(dx, dy);
+            if (frame.rect().contains(at))
+                red = isRed(QColor::fromRgb(frame.pixel(at)));
+        }
+    QVERIFY2(red, "the appended point is not drawn on the user system");
+}
+
+void TestMultiGraph::aSourceStagedInDataSpaceGetsAPipelineJobAfterReturningToCartesian()
+{
+    // Task 2a's carry: a source staged while the graph was drawing in data space has no L1 job.
+    // Committing it after the graph returns to a cartesian frame must still resample it.
+    mPlot->plotLayout()->clear();
+    auto* skew = new SkewRect(mPlot);
+    auto* cartesian = new QCPAxisRect(mPlot);
+    mPlot->plotLayout()->addElement(0, 0, skew);
+    mPlot->plotLayout()->addElement(1, 0, cartesian);
+    for (QCPAxisRect* rect : {static_cast<QCPAxisRect*>(skew), cartesian})
+    {
+        rect->axis(QCPAxis::atBottom)->setRange(0, 200'000);
+        rect->axis(QCPAxis::atLeft)->setRange(-1, 1);
+    }
+    mPlot->replot();
+
+    auto* mg = new QCPMultiGraph(skew->axis(QCPAxis::atBottom),
+                                 skew->axis(QCPAxis::atLeft));
+    QVERIFY(mg->drawsInDataSpace());
+    constexpr int n = 120'000;
+    std::vector<double> firstKeys(n), firstValues(n);
+    for (int i = 0; i < n; ++i)
+    {
+        firstKeys[i] = i;
+        firstValues[i] = qSin(i * 0.001);
+    }
+    mg->setData(std::move(firstKeys), std::vector<std::vector<double>>{std::move(firstValues)});
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+
+    mPlot->setDataSwapDebounceMs(10'000);
+    mg->setDeferredDataSwap(true);
+    std::vector<double> secondKeys(n), secondValues(n);
+    for (int i = 0; i < n; ++i)
+    {
+        secondKeys[i] = i;
+        secondValues[i] = qCos(i * 0.001);
+    }
+    secondKeys.push_back(n + 5'000);
+    secondValues.push_back(1.0);
+    mg->setData(std::move(secondKeys), std::vector<std::vector<double>>{std::move(secondValues)});
+    QVERIFY(mg->hasPendingData());
+    QVERIFY2(!mg->pipeline().isBusy(), "a data-space staging started a job");
+
+    mg->setSystem(cartesian->system(cartesian->axis(QCPAxis::atBottom),
+                                    cartesian->axis(QCPAxis::atLeft)));
+    QVERIFY(!mg->drawsInDataSpace());
+    QVERIFY(mg->commitPendingData());
+    QTRY_VERIFY_WITH_TIMEOUT(!mg->pipeline().isBusy(), 10'000);
+    QVERIFY2(mg->mL1Cache, "the source staged in data space never got a pipeline job");
+    QCOMPARE(mg->mL1Cache->sourceSize, n + 1);
 }
 
 void TestMultiGraph::componentCountMatchesDataSource()

@@ -100,6 +100,7 @@
 #include "datasource/abstract-datasource-2d.h"
 #include "datasource/soa-datasource-2d.h"
 #include "datasource/abstract-multi-datasource.h"
+#include "datasource/growable-multi-datasource.h"
 #include "datasource/soa-multi-datasource.h"
 #include "datasource/algorithms-2d.h"
 #include "datasource/resample.h"
