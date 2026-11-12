@@ -110,6 +110,7 @@ private slots:
     void QCPMultiGraph_AddDataSingleAtEnd();
     void QCPMultiGraph_AddDataSingleAtBegin();
     void QCPMultiGraph_AddDataSingleRandom();
+    void QCPMultiGraph_FillToGraphPan10k();
     void QCPGpu_MultiGraphPan1M();
     void QCPGpu_MultiGraphZoom1M();
     void QCPGpu_MultiGraphColored100kPan();
@@ -2104,6 +2105,33 @@ void Benchmark::QCPMultiGraph_AddDataSingleRandom()
     }
     QTest::setBenchmarkResult(elapsed / 1e3 / (double)iteration,
                               QTest::WalltimeMilliseconds);
+}
+
+void Benchmark::QCPMultiGraph_FillToGraphPan10k()
+{
+    auto* owner = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* partner = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    const int n = 10000;
+    QVector<double> keys(n), ownerValues(n), partnerValues(n);
+    for (int i = 0; i < n; ++i)
+    {
+        keys[i] = 100.0 * i / n;
+        ownerValues[i] = 0.4 + 0.2 * qSin(i * 0.01);
+        partnerValues[i] = 0.7 + 0.2 * qCos(i * 0.013);
+    }
+    owner->setData(keys, ownerValues);
+    partner->setData(keys, partnerValues);
+    owner->setComponentFillToGraph(0, partner, 0, QBrush(QColor(0, 0, 255, 80)));
+    mPlot->xAxis->setRange(50, 51);
+    mPlot->yAxis->setRange(0, 1);
+    mPlot->replot();
+    double left = 50;
+    QBENCHMARK
+    {
+        left += 0.01;
+        mPlot->xAxis->setRange(left, left + 1);
+        mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    }
 }
 
 void Benchmark::QCPGpu_MultiGraphPan1M()

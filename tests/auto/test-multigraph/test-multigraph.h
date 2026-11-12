@@ -100,6 +100,20 @@ private slots:
     void denseFillRowsAreBinnedAboveFourPerPixel();
     void fillIsOneRibbonCommand();
     void fillBetweenComponentsIsOneRibbon();
+    void aFillToAnotherGraphFillsTheBand();
+    void aFillToAnotherGraphCropsAndInterpolates();
+    void noOverlapNoBand();
+    void theFillDropsWhenThePartnerDies();
+    void theFillDropsWhenThePartnerLosesTheComponent();
+    void aFillToAGraphOfAnotherSystemIsAMisuse();
+    void aPartnerMovedToAnotherSystemDrawsNoBand();
+    void aSelectedRangeSplitsTheBand();
+    void aPartnerDataChangeRedrawsTheBand();
+    void aPartnerOnAnotherLayerRedrawsTheBand();
+    void theBandStaysOnTheGpuRibbon();
+    void fillToGraphSeriesCropsUnequalGrids();
+    void fillToGraphSeriesNoOverlap();
+    void fillToGraphSeriesNaNBreaksRuns();
     void fillsDrawUnderErrorBarsUnderLines();
     void fillsDrawUnderLinesOnTheGpu();
 

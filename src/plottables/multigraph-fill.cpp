@@ -2,6 +2,7 @@
 #include "../axis/axis.h"
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <utility>
 
 namespace qcp::fill {
@@ -112,6 +113,55 @@ void appendStrip(std::span<const StripPoint> rows, bool keyIsVertical,
     for (std::size_t i = 1; i < rows.size(); ++i)
         if (joined(rows[i - 1], rows[i]))
             quad(out, keyIsVertical, rows[i - 1], rows[i], rgba);
+}
+
+std::vector<StripPoint> fillToGraphRows(std::span<const SeriesRow> owner,
+                                        std::span<const SeriesRow> partner)
+{
+    std::vector<StripPoint> rows;
+    if (owner.empty() || partner.empty())
+        return rows;
+    const double lower = std::max(owner.front().key, partner.front().key);
+    const double upper = std::min(owner.back().key, partner.back().key);
+    if (!(upper > lower))
+        return rows;
+
+    const auto partnerAt = [&partner](double key)
+    {
+        const double nan = std::numeric_limits<double>::quiet_NaN();
+        const auto it = std::lower_bound(
+            partner.begin(), partner.end(), key,
+            [](const SeriesRow& row, double at) { return row.key < at; });
+        if (it != partner.end() && it->key == key)
+            return std::pair<double, bool> { it->value,
+                                             it->breakBefore || !std::isfinite(it->value) };
+        if (it == partner.begin() || it == partner.end())
+            return std::pair<double, bool> { nan, true };
+        const SeriesRow& before = *(it - 1);
+        const SeriesRow& after = *it;
+        if (!std::isfinite(before.value) || !std::isfinite(after.value) || after.breakBefore)
+            return std::pair<double, bool> { nan, true };
+        const double span = after.key - before.key;
+        if (span <= 0.0)
+            return std::pair<double, bool> { after.value, false };
+        const double t = (key - before.key) / span;
+        return std::pair<double, bool> { before.value + t * (after.value - before.value), false };
+    };
+
+    bool pendingBreak = false;
+    for (const SeriesRow& row : owner)
+    {
+        if (row.key < lower)
+            continue;
+        if (row.key > upper)
+            break;
+        const auto [partnerValue, partnerBreak] = partnerAt(row.key);
+        const bool broken = pendingBreak || row.breakBefore || partnerBreak
+            || !std::isfinite(row.value) || !std::isfinite(partnerValue);
+        rows.push_back({ row.key, row.value, partnerValue, broken });
+        pendingBreak = !std::isfinite(row.value) || !std::isfinite(partnerValue);
+    }
+    return rows;
 }
 
 std::vector<StripPoint> binToSpans(std::span<const StripPoint> rows, double binWidthPx)

@@ -13,6 +13,7 @@
 #include "plottable-line.h"
 #include "plottable.h"
 #include "plottable1d.h"
+#include <QPointer>
 #include <QTimer>
 #include <QVector>
 #include <array>
@@ -119,15 +120,25 @@ public:
             keys, values, static_cast<int>(keys.size()), columns, stride));
     }
 
+    struct FillToGraph
+    {
+        QPointer<QCPMultiGraph> graph;
+        int component = 0;
+    };
     struct Fill {
         int owner = -1;
-        std::variant<double, int> target;   // a constant, or another column
-        QBrush brush;                       // Qt::NoBrush = owner pen colour at alpha 64
+        std::variant<double, int, FillToGraph> target; // a constant, another column, another graph
+        QBrush brush;                                  // Qt::NoBrush = owner pen colour at alpha 64
     };
     //! Fills between a column and a constant. False (nothing changed) for an unknown column.
     bool setComponentFill(int owner, double value, const QBrush& brush = Qt::NoBrush);
     //! Fills between two columns. One fill per owner: setting again replaces it.
     bool setComponentFillBetween(int owner, int target, const QBrush& brush = Qt::NoBrush);
+    //! Fills between this column and a component of \a other. Both graphs must share the system;
+    //! a different system is a misuse. The partner is held by QPointer: the band drops when it or
+    //! its component goes.
+    bool setComponentFillToGraph(int owner, QCPMultiGraph* other, int otherComponent,
+                                 const QBrush& brush = Qt::NoBrush);
     void setComponentFillBrush(int owner, const QBrush& brush);
     void clearComponentFill(int owner);
     [[nodiscard]] std::optional<Fill> componentFill(int owner) const;
@@ -135,6 +146,9 @@ public:
     //! data's columns after.
     [[nodiscard]] bool isValidColumn(int column) const;
     [[nodiscard]] QBrush effectiveFillBrush(const Fill& fill) const;
+    //! The fill brush of a selected or unselected run; a selected run takes the selected pen's
+    //! colour at the fill's alpha.
+    [[nodiscard]] QBrush fillRunBrush(const Fill& fill, bool selected) const;
 
     struct ErrorBars {
         int value = -1, lower = -1, upper = -1;
@@ -337,8 +351,16 @@ protected:
     [[nodiscard]] std::vector<qcp::fill::StripPoint> fillRows(const Fill& fill,
                                                               const QCPAbstractMultiDataSource& ds,
                                                               int begin, int end) const;
+    [[nodiscard]] std::vector<qcp::fill::StripPoint>
+    fillToGraphRows(const Fill& fill, const QCPAbstractMultiDataSource& ds, int begin,
+                    int end) const;
     [[nodiscard]] std::vector<qcp::fill::StripPoint> shapedFillRows(
         const Fill& fill, const QCPAbstractMultiDataSource& ds, int begin, int end) const;
+    [[nodiscard]] std::vector<qcp::fill::StripPoint>
+    shapeFillRows(const Fill& fill, std::vector<qcp::fill::StripPoint> rows) const;
+    [[nodiscard]] bool rowIsSelected(const Fill& fill, const QCPAbstractMultiDataSource& ds,
+                                     int row) const;
+    void partnerGone();
     [[nodiscard]] static double fillValue(const QCPAxis& valueAxis, double value);
     void recordFills(QCPDrawContext& context, const QCPAbstractMultiDataSource& ds, int begin,
                      int end) const;

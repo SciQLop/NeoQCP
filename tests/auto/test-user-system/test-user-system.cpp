@@ -2142,6 +2142,45 @@ void TestUserSystem::aMultiGraphFillBetweenColumnsOnASkewRect()
     QCOMPARE(test_misuse::calls.size(), std::size_t(0));
 }
 
+void TestUserSystem::aFillToAnotherGraphOnASkewRect()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    SkewSystem* system = rect->skew();
+    InspectableMultiGraph* owner = multiGraphOn(rect);
+    auto* partner = new QCPMultiGraph(rect->axis(QCPAxis::atBottom),
+                                      rect->axis(QCPAxis::atLeft));
+    owner->setData(QVector<double> { 2, 4, 6 }, QVector<double> { 2, 6, 3 });
+    partner->setData(QVector<double> { 2, 4, 6 }, QVector<double> { 8, 9, 5 });
+    owner->setComponentPens({ QPen(Qt::NoPen) });
+    partner->setComponentPens({ QPen(Qt::NoPen) });
+
+    const QColor brush(40, 220, 40, 80);
+    QVERIFY2(owner->setComponentFillToGraph(0, partner, 0, brush),
+             "a fill to another graph was refused on a skew rect");
+    settle(plot);
+
+    const QImage image = render(plot);
+    const QPointF inside = pixelOf(system->pixelOf(4, 7));
+    QVERIFY(rect->rect().contains(inside.toPoint()));
+    QVERIFY2(colourNear(image.pixelColor(inside.toPoint()), overWhite(brush)),
+             "the band to another graph is not drawn on the skew mapping");
+    QCOMPARE(lightnessAt(image, pixelOf(system->pixelOf(4, 0.5))), 255);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
+
+    // The replay maps the band like the lines: both graphs on the one skew system.
+    bool sawBand = false;
+    for (const qcp::QCPDrawCommand& command : owner->recording().commands)
+    {
+        const auto* fill = std::get_if<qcp::FillBetweenCmd>(&command);
+        if (!fill)
+            continue;
+        sawBand = true;
+        QCOMPARE(fill->upper->size(), fill->lower->size());
+    }
+    QVERIFY2(sawBand, "the fill to another graph recorded no band");
+}
+
 void TestUserSystem::aMultiGraphFillOnALogAxisStopsAtTheBoundNearerZero()
 {
     for (const bool negative : { false, true })

@@ -84,6 +84,7 @@ private slots:
     void anAxisDeletedMidDragLeavesAMultiGraphInert();
     void aMultiGraphFillFollowsTheSkewMapping();
     void aMultiGraphFillBetweenColumnsOnASkewRect();
+    void aFillToAnotherGraphOnASkewRect();
     void aMultiGraphFillOnALogAxisStopsAtTheBoundNearerZero();
     void aMultiGraphNaNSplitsLineAndFill();
     void multiGraphErrorBarCapsFollowTheMapping();

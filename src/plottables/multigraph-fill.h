@@ -19,6 +19,21 @@ struct StripPoint
     bool breakBefore = false;
 };
 
+//! One row of a series in data space, for fillToGraphRows: the key, its value and whether a key
+//! gap starts a new run before it.
+struct SeriesRow
+{
+    double key;
+    double value;
+    bool breakBefore = false;
+};
+
+//! The partner series sampled at the owner's keys over their common key range, ready for
+//! fillSeries: both edges have the same number of rows. A NaN on either side, or a key gap in
+//! either series, marks a break; the row after a NaN starts a new run.
+std::vector<StripPoint> fillToGraphRows(std::span<const SeriesRow> owner,
+                                        std::span<const SeriesRow> partner);
+
 //! Triangles (6 floats per vertex: x, y, r, g, b, a premultiplied) between the edges of
 //! consecutive rows, appended to out. A non-finite edge or breakBefore ends the strip; a segment
 //! where the edges cross is split at the crossing.

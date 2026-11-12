@@ -101,7 +101,14 @@ quint64 QCPMultiGraph::dependencyRevision() const
 {
     // B4: on the data-space branch the recording reads the system's key window and its baseline,
     // so a mapping change has to make it stale even though no data or style moved.
-    return drawsInDataSpace() ? qHashMulti(0, mRevision, mSystem->revision()) : mRevision;
+    quint64 revision = drawsInDataSpace() ? qHashMulti(0, mRevision, mSystem->revision())
+                                          : mRevision;
+    // B8: a fill to another graph reads that graph's data and system. Its revision moves on both,
+    // so a partner data change or a partner system move makes this recording stale.
+    for (const Fill& fill : mFills)
+        if (const auto* target = std::get_if<FillToGraph>(&fill.target))
+            revision = qHashMulti(revision, target->graph ? target->graph->mRevision : 0);
+    return revision;
 }
 
 void QCPMultiGraph::followAxes()
@@ -179,6 +186,8 @@ void QCPMultiGraph::linesChanged()
     ++mRevision;
     if (mLayer)
         mLayer->markDirty();
+    // A graph filled to a component of this one draws this data: mark it wherever its layer is.
+    markDependentsDirty();
 }
 
 void QCPMultiGraph::setDataSource(std::unique_ptr<QCPAbstractMultiDataSource> source)
@@ -769,6 +778,11 @@ bool QCPMultiGraph::setFill(Fill fill)
     const auto* col = std::get_if<int>(&fill.target);
     if (!isValidColumn(fill.owner) || (col && (!isValidColumn(*col) || *col == fill.owner)))
         return false;
+    const auto* toGraph = std::get_if<FillToGraph>(&fill.target);
+    if (toGraph
+        && (!toGraph->graph || toGraph->graph == this || toGraph->graph->system() != system()
+            || !toGraph->graph->isValidColumn(toGraph->component)))
+        return false;
     clearComponentFill(fill.owner);
     mFills.append(std::move(fill));
     decorationsChanged();
@@ -783,6 +797,25 @@ bool QCPMultiGraph::setComponentFill(int owner, double value, const QBrush& brus
 bool QCPMultiGraph::setComponentFillBetween(int owner, int target, const QBrush& brush)
 {
     return setFill({owner, target, brush});
+}
+
+bool QCPMultiGraph::setComponentFillToGraph(int owner, QCPMultiGraph* other, int otherComponent,
+                                            const QBrush& brush)
+{
+    QCP_CHECK_OR_RETURN(other, "a fill to another graph needs a graph", false);
+    QCP_CHECK_OR_RETURN(other != this, "a fill to another graph needs another graph", false);
+    QCP_CHECK_OR_RETURN(other->system() == system(),
+                        "a fill to another graph needs both graphs on one system", false);
+    QCP_CHECK_OR_RETURN(other->isValidColumn(otherComponent),
+                        "the partner component does not exist", false);
+    if (!setFill({owner, FillToGraph { other, otherComponent }, brush}))
+        return false;
+    // B8: the partner's data change repaints this graph wherever its own layer is, and a deleted
+    // partner leaves its QPointer null; mark this graph so the recording drops the band.
+    other->addDependent(this);
+    connect(other, &QObject::destroyed, this, &QCPMultiGraph::partnerGone,
+            Qt::UniqueConnection);
+    return true;
 }
 
 void QCPMultiGraph::setComponentFillBrush(int owner, const QBrush& brush)
@@ -821,6 +854,22 @@ QBrush QCPMultiGraph::effectiveFillBrush(const Fill& fill) const
     const QColor c = fill.owner < mComponents.size() ? mComponents[fill.owner].pen.color()
                                                      : QColor(Qt::gray);
     return QBrush(QColor(c.red(), c.green(), c.blue(), 64));
+}
+
+QBrush QCPMultiGraph::fillRunBrush(const Fill& fill, bool selected) const
+{
+    if (!selected)
+        return effectiveFillBrush(fill);
+    const QColor base = fill.owner < mComponents.size()
+        ? mComponents[fill.owner].selectedPen.color()
+        : QColor(Qt::gray);
+    const int alpha = fill.brush.style() == Qt::NoBrush ? 64 : fill.brush.color().alpha();
+    return QBrush(QColor(base.red(), base.green(), base.blue(), alpha));
+}
+
+void QCPMultiGraph::partnerGone()
+{
+    decorationsChanged();
 }
 
 bool QCPMultiGraph::setComponentErrorBars(int value, int lower, int upper, double capWidthPx,
@@ -1985,9 +2034,20 @@ bool QCPMultiGraph::fillDrawable(const Fill& fill, int columnCount) const
         return column >= 0 && column < columnCount && column < mComponents.size()
             && mComponents[column].visible;
     };
-    const auto* target = std::get_if<int>(&fill.target);
-    return shown(fill.owner) && mComponents[fill.owner].lineStyle != lsImpulse
-        && (!target || shown(*target));
+    if (!shown(fill.owner) || mComponents[fill.owner].lineStyle == lsImpulse)
+        return false;
+    if (const auto* target = std::get_if<int>(&fill.target))
+        return shown(*target);
+    if (const auto* target = std::get_if<FillToGraph>(&fill.target))
+    {
+        const QCPMultiGraph* partner = target->graph.data();
+        if (!partner || partner == this || partner->system() != system())
+            return false;
+        return partner->mDataSource
+            && target->component >= 0
+            && target->component < partner->mDataSource->columnCount();
+    }
+    return true;
 }
 
 qcp::fill::Step QCPMultiGraph::ownerStep(const Component& owner)
@@ -2031,10 +2091,9 @@ double QCPMultiGraph::fillValue(const QCPAxis& valueAxis, double value)
 }
 
 // Binned when the rows outnumber 4 per pixel, the lines' own L2 density (kLevel2PixelMultiplier).
-std::vector<qcp::fill::StripPoint> QCPMultiGraph::shapedFillRows(
-    const Fill& fill, const QCPAbstractMultiDataSource& ds, int begin, int end) const
+std::vector<qcp::fill::StripPoint> QCPMultiGraph::shapeFillRows(
+    const Fill& fill, std::vector<qcp::fill::StripPoint> rows) const
 {
-    std::vector<qcp::fill::StripPoint> rows = fillRows(fill, ds, begin, end);
     // The binning is a pixel decision, and the data-space branch has no key pixel: it keeps every
     // row (the simplify note in drawInDataSpace names the ceiling).
     if (!drawsInDataSpace())
@@ -2042,6 +2101,61 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::shapedFillRows(
     const bool logKeyAxis = !drawsInDataSpace() && mKeyAxis
         && mKeyAxis->scaleType() == QCPAxis::stLogarithmic;
     return steppedOnScreen(std::move(rows), ownerStep(mComponents[fill.owner]), logKeyAxis);
+}
+
+std::vector<qcp::fill::StripPoint> QCPMultiGraph::shapedFillRows(
+    const Fill& fill, const QCPAbstractMultiDataSource& ds, int begin, int end) const
+{
+    return shapeFillRows(fill, fillRows(fill, ds, begin, end));
+}
+
+std::vector<qcp::fill::StripPoint> QCPMultiGraph::fillToGraphRows(
+    const Fill& fill, const QCPAbstractMultiDataSource& ds, int begin, int end) const
+{
+    const auto* target = std::get_if<FillToGraph>(&fill.target);
+    QCPMultiGraph* partner = target ? target->graph.data() : nullptr;
+    if (!partner || partner == this || partner->system() != system())
+        return {};
+    QCPAbstractMultiDataSource* partnerSource = partner->mDataSource.get();
+    if (!partnerSource || target->component < 0
+        || target->component >= partnerSource->columnCount())
+        return {};
+
+    std::vector<qcp::fill::SeriesRow> ownerRows;
+    ownerRows.reserve(std::size_t(std::max(0, end - begin)));
+    const auto ownerGaps = ds.gapsBefore(begin, end);
+    for (int i = begin; i < end; ++i)
+        ownerRows.push_back({ ds.keyAt(i), ds.valueAt(fill.owner, i),
+                              ownerGaps[i - begin] != 0 });
+    if (ownerRows.size() < 2)
+        return {};
+
+    // The partner is cropped to the owner's key span, with one row on each side for the
+    // interpolation at the two ends.
+    const double lower = ownerRows.front().key;
+    const double upper = ownerRows.back().key;
+    const int partnerBegin = std::max(0, partnerSource->findBegin(lower) - 1);
+    const int partnerEnd = std::min(partnerSource->size(), partnerSource->findEnd(upper) + 1);
+    partnerSource->setGapThreshold(partner->mGapThreshold);
+    const auto partnerGaps = partnerSource->gapsBefore(partnerBegin, partnerEnd);
+    std::vector<qcp::fill::SeriesRow> partnerRows;
+    partnerRows.reserve(std::size_t(std::max(0, partnerEnd - partnerBegin)));
+    for (int i = partnerBegin; i < partnerEnd; ++i)
+        partnerRows.push_back({ partnerSource->keyAt(i),
+                                partnerSource->valueAt(target->component, i),
+                                partnerGaps[i - partnerBegin] != 0 });
+
+    std::vector<qcp::fill::StripPoint> rows
+        = qcp::fill::fillToGraphRows(ownerRows, partnerRows);
+    const bool dataSpace = drawsInDataSpace();
+    const auto edge = [this, dataSpace](double value)
+    { return dataSpace ? dataSpaceFillValue(value) : fillValue(*mValueAxis, value); };
+    for (qcp::fill::StripPoint& row : rows)
+    {
+        row.a = edge(row.a);
+        row.b = edge(row.b);
+    }
+    return shapeFillRows(fill, std::move(rows));
 }
 
 std::vector<qcp::fill::StripPoint> QCPMultiGraph::binnedWhenDense(
@@ -2073,8 +2187,47 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::binnedWhenDense(
     return qcp::fill::binToSpans(rows, width);
 }
 
-// One fillBetween command per fill: a gap pinches both series together, so neither the polygon
-// nor the ribbon spans it.
+bool QCPMultiGraph::rowIsSelected(const Fill& fill, const QCPAbstractMultiDataSource& ds,
+                                  int row) const
+{
+    if (fill.owner < 0 || fill.owner >= mComponents.size())
+        return false;
+    const QCPDataSelection& selection = mComponents[fill.owner].selection;
+    if (selection.isEmpty())
+        return false;
+    if (mDataSource && &ds == mDataSource.get())
+    {
+        for (int i = 0; i < selection.dataRangeCount(); ++i)
+        {
+            const QCPDataRange range = selection.dataRange(i);
+            if (row >= range.begin() && row < range.end())
+                return true;
+        }
+        return false;
+    }
+
+    // A resampled row is not a source row: a selection range becomes the key interval its first
+    // and last source rows span.
+    if (!mDataSource || row < 0 || row >= ds.size())
+        return false;
+    const double key = ds.keyAt(row);
+    for (int i = 0; i < selection.dataRangeCount(); ++i)
+    {
+        const QCPDataRange range = selection.dataRange(i);
+        const int begin = std::clamp(range.begin(), 0, mDataSource->size());
+        const int end = std::clamp(range.end(), begin, mDataSource->size());
+        if (begin >= end)
+            continue;
+        const double lower = mDataSource->keyAt(begin);
+        const double upper = mDataSource->keyAt(end - 1);
+        if (key >= lower && key <= upper)
+            return true;
+    }
+    return false;
+}
+
+// One fillBetween command per selected/unselected run of this graph's component selection. A gap
+// pinches both series together, so neither the polygon nor the ribbon spans it.
 void QCPMultiGraph::recordFills(QCPDrawContext& context, const QCPAbstractMultiDataSource& ds,
                                 int begin, int end) const
 {
@@ -2082,16 +2235,45 @@ void QCPMultiGraph::recordFills(QCPDrawContext& context, const QCPAbstractMultiD
     {
         if (!fillDrawable(fill, ds.columnCount()))
             continue;
-        const QBrush brush = effectiveFillBrush(fill);
-        if (brush.color().alpha() == 0)
+        std::vector<qcp::fill::StripPoint> rows
+            = std::holds_alternative<FillToGraph>(fill.target)
+                ? fillToGraphRows(fill, ds, begin, end)
+                : shapedFillRows(fill, ds, begin, end);
+        if (rows.empty())
             continue;
-        const auto [upper, lower] = fillSeries(shapedFillRows(fill, ds, begin, end));
-        if (!upper)
-            continue;
+
         const QCPAxis* valueAxis = qobject_cast<const QCPAxis*>(valueAxisBase());
         if (valueAxis && valueAxis->scaleType() == QCPAxis::stLogarithmic)
             (void)context.transform(); // the baseline follows the axis' bound nearer zero
-        context.fillBetween(upper, lower, brush);
+
+        const auto recordRun = [&](std::size_t first, std::size_t last) {
+            const QBrush brush = fillRunBrush(fill, rowIsSelected(fill, ds, int(first)));
+            if (brush.color().alpha() == 0)
+                return;
+            const std::span<const qcp::fill::StripPoint> run(rows.data() + first, last - first);
+            const auto [upper, lower] = fillSeries(run);
+            if (!upper)
+                return;
+            context.fillBetween(upper, lower, brush);
+        };
+
+        if (mComponents[fill.owner].selection.isEmpty())
+        {
+            recordRun(0, rows.size());
+            continue;
+        }
+
+        std::size_t first = 0;
+        while (first < rows.size())
+        {
+            const bool selected = rowIsSelected(fill, ds, int(first));
+            std::size_t last = first + 1;
+            while (last < rows.size() && rowIsSelected(fill, ds, int(last)) == selected)
+                ++last;
+            // The next run's first row closes this run's last segment; both may draw it.
+            recordRun(first, std::min(last + 1, rows.size()));
+            first = last;
+        }
     }
 }
 
