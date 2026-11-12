@@ -687,6 +687,9 @@ void QCPAbstractPlottable::removeDependent(QCPLayerable* dependent)
 */
 void QCPAbstractPlottable::markDependentsDirty()
 {
+    // Nearly every plottable has no dependent, and this runs on every setter: no set work then.
+    if (mDependents.isEmpty())
+        return;
     static thread_local QSet<const QCPAbstractPlottable*> beingMarked;
     if (beingMarked.contains(this))
         return;
