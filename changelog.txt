@@ -576,6 +576,45 @@ Behaviour changes for 2.1 polar users:
   - Clicking inside a polar graph's fill selects it, as for cartesian graphs.
   - setSystem() with a non-polar system is refused as misuse.
 
+Milestone 5a (the graph grows up). The graph a SciQLop-style plot uses gains the rest of the classic
+graph's surface, and draws on any straight-segment coordinate system.
+  - QCPMultiGraph draws on a user system: lines, steps, impulses, scatters, fills, error bars and
+        colour by scalar are built in data space and mapped once. It needs only capStraightSegments;
+        the waterfall keeps the rectangle mask. The cartesian path (resampling, thinning, GPU) does
+        not move.
+  - addData(keys, values), addData(keys, columns), addData(key, value) and addData(key, values)
+        append to the growable source a double setData() built. A block's keys may be out of order
+        and merge in order; alreadySorted skips the sort. A view, a shared or non-double source and
+        a QCPWaterfallGraph refuse it with one misuse.
+  - One-column setData(keys, values) takes two QVector<double> or two std::vector<double>, besides
+        the N-column form.
+  - setComponentFillToGraph(owner, other, otherComponent): the band is cropped to the common keys
+        and the partner is interpolated, so both edges have the same length and stay on the GPU
+        ribbon. Both graphs must be on one system. Selection splits the band; the partner's changes
+        repaint it; deleting the partner or losing its component removes the fill for good.
+  - QCPItemTracer::setLineGraph(graph, component) and setComponent(): a tracer follows a component of
+        a multigraph through interface1D()/componentValueAt(), on any system. Deleting the graph or
+        losing the component leaves it inert.
+  - New bench rows: QCPMultiGraph_* twins of the QCPGraph_*, QCPGraph2_* and GPU graph workloads,
+        plus QCPMultiGraph_UserSystem100k and QCPMultiGraph_FillToGraphPan10k.
+  - Fix: a growable source validated its shape after sorting (an out-of-bounds read on an unsorted
+        short column); a pending deferred swap could be stranded across a system switch or commit
+        the displayed source's L1; the data-space draw wrote a source cache a pipeline job could be
+        reading; fill selection used shaped rows instead of source rows; error-bar caps used the
+        first bar's pixel direction for every bar; step-centre fills ignored a log key axis on a
+        user system; a coloured graph kept the old area's scale after setSystem(); addData on a
+        fresh waterfall was accepted; a tracer whose component disappeared kept drawing.
+
+Behaviour changes for 2.x users:
+  - QCPMultiGraph::setData() with double keys sorts them (alreadySorted skips it). Unequal column
+        lengths and NaN keys are misuses that change nothing; 2.x truncated.
+  - QCPMultiGraph requires capStraightSegments only (a user system hosts it). QCPWaterfallGraph
+        requires a rectangle and a straight key, and refuses addData.
+  - QCPMultiGraph's fill to another graph is new; channel fills remain on QCPGraph.
+  - A multigraph's colour values join the rect's colour scale after setSystem() as well; an area that
+        is not an axis rect still needs an explicit scale.
+  - A tracer on a multigraph component is inert when that component goes.
+
 #### NeoQCP, unreleased ####
 
 Behaviour changes (slots that delete their sender are now safe):

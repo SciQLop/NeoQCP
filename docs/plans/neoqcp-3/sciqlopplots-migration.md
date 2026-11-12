@@ -87,3 +87,23 @@ Grepped on 2026-11-11 (read-only) in `src/` and `include/`: `requiredCapabilitie
 - **Dispatch of item creation.** `QCPItemPosition::setAxes()` now applies the cartesian projection gate.
   SciQLopPlots' item positions use `setType(ptAxisRectAbsolute)`/pixel positions and explicit axes on
   cartesian rects, so their `keyAxis()` stays non-null.
+
+## From milestone 5a (the graph grows up)
+
+Grepped on 2026-11-12 (read-only) in `src/` and `include/`: `setData` and `addData` on a
+`QCPMultiGraph`, `setGraph`/`setLineGraph`/`setComponent` on a `QCPItemTracer`, and
+`requiredCapabilities`.
+
+- **Multigraph data goes in through `setDataSource`, not `setData`.** `SciQLopMultiGraphBase.cpp`
+  ~78, ~88 and ~99 build a `QCPSoAMultiDataSource` or a `QCPRowMajorMultiDataSource` from spans and
+  call `QCPMultiGraph::setDataSource()`. The 5a sorting and the length/NaN misuses belong to the
+  double `setData()`/`addData()` path only, so nothing changes. `addData` is not used.
+- **Tracers set no target in code.** The only `QCPItemTracer` creation is
+  `SciQLopNDProjectionPlot.cpp` ~477; its time markers are moved with `setPixelPosition`, and
+  `setGraph` is never called (the five `setGraph` hits are signals such as `setGraphData`). The new
+  `setLineGraph()`/`setComponent()` need no port.
+- **`requiredCapabilities`: none.** No SciQLopPlots plottable overrides the accessor. The multigraph
+  keeps its cartesian rects and the waterfall is still built on one.
+- **The multigraph mask change changes nothing here.** `QCPMultiGraph` requiring `capStraightSegments`
+  only, and `QCPWaterfallGraph` keeping the rectangle, matter only on a system of the user's own;
+  SciQLopPlots builds none today (see the 4j section).

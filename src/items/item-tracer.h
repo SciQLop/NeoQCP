@@ -114,8 +114,7 @@ public:
     void setStyle(TracerStyle style);
     void setGraph(QCPGraph* graph);
     //! Follows component \a component of \a graph. Setting it clears \ref graph; a component
-    //! outside the graph's columns is a misuse. This sets the component: it replaces whatever
-    //! setComponent() recorded before the target existed.
+    //! outside the graph's columns is a misuse. This sets the component on the new target.
     void setLineGraph(QCPMultiGraph* graph, int component = 0);
     //! Changes the followed component; out of range is a misuse. Does nothing without a line graph
     //! (there is no target to select a column of).

@@ -5,6 +5,7 @@
 #include <memory>
 #include <numbers>
 #include <random>
+#include <span>
 #include <utility>
 #include <vector>
 
@@ -329,6 +330,52 @@ DOC_SNIPPET(graphs_multigraph_error_bars, 600, 300)
     customPlot->yAxis->setRange(-0.6, 1.6);
     customPlot->legend->setVisible(true);
     // [/graphs_multigraph_error_bars]
+}
+
+DOC_CODE(graphs_multigraph_add_data)
+{
+    // [graphs_multigraph_add_data]
+    auto stream = customPlot->add<QCPMultiGraph>()
+        .setData(std::vector<double>{ 0.0, 1.0 },
+                 std::vector<std::vector<double>>{ { 10.0, 11.0 }, { 4.0, 5.0 } });
+    // Appends rows to the source setData() built (double values only). Keys out of order are merged.
+    stream->addData(QVector<double>{ 3.0, 2.0 },
+                    std::vector<QVector<double>>{ { 13.0, 12.0 }, { 6.0, 7.0 } });
+    // One row, one value per component.
+    const double row[] = { 14.0, 8.0 };
+    stream->addData(4.0, std::span<const double>(row, 2));
+    // [/graphs_multigraph_add_data]
+}
+
+DOC_SNIPPET(graphs_multigraph_fill_to_graph, 600, 320)
+{
+    // [graphs_multigraph_fill_to_graph]
+    const int n = 241;
+    std::vector<double> time(n);
+    std::vector<std::vector<double>> model(1, std::vector<double>(n));
+    for (int i = 0; i < n; ++i)
+    {
+        time[i] = i / 24.0;
+        model[0][i] = 2.0 + std::sin(time[i]);
+    }
+    auto curve = customPlot->add<QCPMultiGraph>().setData(std::move(time), std::move(model));
+    curve->setName("model");
+    curve->setComponentPens({ QPen(QColor(31, 119, 180), 2) });
+
+    // The reference has its own, coarser grid and stops at key 9.
+    std::vector<double> referenceKeys { 0.0, 1.5, 3.0, 4.5, 6.0, 7.5, 9.0 };
+    std::vector<double> referenceValues { 3.4, 2.7, 3.6, 3.0, 3.5, 4.0, 3.2 };
+    auto reference = customPlot->add<QCPMultiGraph>()
+        .setData(referenceKeys, std::vector<std::vector<double>>{ referenceValues });
+    reference->setName("reference");
+    reference->setComponentPens({ QPen(QColor(214, 39, 40), 1.5) });
+
+    // The band is cropped to 0..9 and the reference is interpolated onto the model's keys.
+    curve->setComponentFillToGraph(0, reference.get(), 0, QBrush(QColor(214, 39, 40, 60)));
+    customPlot->xAxis->setLabel("time (s)");
+    customPlot->rescaleAxes();
+    customPlot->legend->setVisible(true);
+    // [/graphs_multigraph_fill_to_graph]
 }
 
 DOC_SNIPPET(graphs_gaps, 600, 360)

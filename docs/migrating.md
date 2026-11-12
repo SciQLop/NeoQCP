@@ -104,6 +104,11 @@ The behaviours below belong to the new plottables only. Code that keeps using th
 - **Lane layouts.** `QCPLaneLayout` setters and `QCPIntervals::setCategoryOrder()` emit nothing, and restack nothing, when the value does not change.
 - **First colour map frame.** `QCPColorMap2` resamples one event-loop turn after it is shown or resized, not inside the paint. Exports still resample at once.
 - **Contour segments.** `QCPContourExtractor::extract()` returns segments in the image's [0, 1] coordinates, traced on at most 300 by 300 cells by default. It used to return them in data units, on the full grid.
+- **Multigraph keys are sorted.** `QCPMultiGraph::setData()` with `double` keys and `double` columns builds a growable source and sorts unsorted keys, unless `alreadySorted = true`. Other value types keep the source they came in.
+- **Multigraph shape misuses.** A `QCPMultiGraph::setData()` or `addData()` whose columns do not have one value per key, or whose keys are not finite, reports one misuse and changes nothing. 2.x truncated unequal data.
+- **The multigraph needs less from its system.** `QCPMultiGraph` requires only `capStraightSegments`, so a straight-segment coordinate system of your own hosts it. `QCPWaterfallGraph` still requires a rectangle and a straight key and is refused there.
+- **`QCPMultiGraph::addData()` and one-column `setData()`.** `addData()` appends to the source a `double` `setData()` built; a view, a shared source, a non-double source and a waterfall refuse it. `setData(keys, values)` takes two `QVector<double>` or two `std::vector<double>` for a one-column graph.
+- **A tracer can follow a multigraph component.** `QCPItemTracer::setLineGraph(graph, component)` and `setComponent(component)` follow one column; the tracer is inert when the graph or the component goes. The classic `setGraph(QCPGraph*)` is still there and the two targets replace each other.
 
 {doc}`performance` explains the asynchronous points and what they mean for code that reads results right after `setData()`.
 

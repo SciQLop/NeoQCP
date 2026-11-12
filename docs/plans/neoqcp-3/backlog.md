@@ -3,6 +3,28 @@
 Work that was deferred during the 3.0 milestones, to triage before 3.0 ships. Each item says what a
 user would see and where the code is. Fixed items are deleted, not ticked.
 
+## From milestone 5a (the graph grows up)
+
+- **The data-space hit test maps every row on every click** (J-6): `QCPMultiGraph::nearestMappedPoint`
+  and `selectTestRect` (`plottable-multigraph.cpp`) allocate and map the whole source per call, so a
+  1M-row graph pays that on every hover. Upgrade: the J-6 box query, or decimate in data space by
+  `keyWindow()`.
+- **No dense error band on a user system**: the data-space `recordErrorBars` branch records one bar
+  per row (`plottable-multigraph.cpp`), where the cartesian path bins crowded bars into a band. A
+  100k-row user-system graph with error bars records 100k bars per frame. The band decision needs a
+  key pixel; upgrade: decide it on a batch mapped once.
+- **A cartesian fill to zero on a negative log range uses the far bound** (B1): `QCPMultiGraph::fillValue`
+  returns `range().lower` for every non-positive value; on an all-negative log range the bound nearer
+  zero is `upper`. The data-space `dataSpaceFillValue` is sign-aware. Deferred in 5a; the user sees a
+  fill cross the whole rect instead of stopping at the near edge.
+- **A tracer cannot follow a curve or a polar graph**: `QCPItemTracer::setLineGraph` takes a
+  `QCPMultiGraph`, and the classic `setGraph` takes a `QCPGraph`. A curve or polar graph has no tracer
+  target yet.
+- **Qt `QThreadPool` noise in TSan runs**: the 5a TSan scenarios report races in Qt's
+  `QRunnable`/`QThreadPool` publication path (and `QArrayData::reallocateUnaligned`) around the
+  parallel resampler. They reproduce on the base and are not NeoQCP data races; a TSan gate for this
+  tree needs a suppression for Qt's pool, or a pool wrapper with an explicit publication edge.
+
 ## From milestone 4j (coordinate systems of the user's own)
 
 - **Culling and decimation on a user system** (J-6): every point is mapped on every repaint and every

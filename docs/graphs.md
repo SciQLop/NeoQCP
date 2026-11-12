@@ -198,7 +198,7 @@ The entry starts collapsed; a click expands it to one row per component, and so 
 
 ![Three components of a magnetic field](images/graphs-multigraph.png)
 
-- `setData(keys, columns)` takes the keys and a `std::vector` of value columns, moved in.
+- `setData(keys, columns)` takes the keys and a `std::vector` of value columns, moved in. With `double` keys it sorts them unless `alreadySorted = true`; a length mismatch or a NaN key is a misuse.
 - `viewData(keys, columns)` views a `std::span` of keys and a `std::vector` of spans, one per column.
 - `viewRowMajorData(keys, values, columns, stride)` views a C-order 2D array, like a NumPy array. `stride` counts elements, not bytes.
 - The components exist once the data is set. Name and style them after `setData()`.
@@ -207,6 +207,26 @@ The entry starts collapsed; a click expands it to one row per component, and so 
 - `setLineStyle()` sets the style of every component.
 
 A multigraph can also colour its lines by a scalar shared by all components, with `setColorValues()`, `setGradient()` and `setDataRange()`.
+
+### Append data with addData
+
+`setData()` with `double` keys and values builds a source the graph owns.
+`addData()` appends rows to it.
+The keys of a block may be out of order: they are merged in order.
+Pass `alreadySorted = true` when a block is already sorted to skip that sort.
+
+```{literalinclude} snippets/graphs.cpp
+:start-after: // [graphs_multigraph_add_data]
+:end-before: // [/graphs_multigraph_add_data]
+:language: cpp
+:dedent:
+```
+
+- `addData(keys, values)` appends one column. `addData(keys, columns)` appends one value per component. `addData(key, value)` and `addData(key, values)` append a single row.
+- The graph appends only to the source its own `setData()` built from `double` values. `addData()` is refused on a source given to `setDataSource()`, on a view from `viewData()` or `viewRowMajorData()`, on a non-double source (a `QCPSoAMultiDataSource` built from `float` columns, for example) and on a `QCPWaterfallGraph`. The call reports one misuse and changes nothing.
+- Keys must be finite, and every column must have one value per key. A NaN key or a length mismatch is a misuse, and the graph keeps its data.
+- With the deferred swap on, `addData()` grows the staged source.
+- For one column, `setData(keys, values)` takes two `QVector<double>` or two `std::vector<double>`, as in 2.x.
 
 ### Fill under a component
 
@@ -254,6 +274,27 @@ This is how you draw a band around a model: one column for the model, one for ea
 
 Solid brushes are drawn on the GPU. Gradient and pattern brushes are painted with `QPainter`, which is slower.
 
+### Fill to another graph
+
+`setComponentFillToGraph(column, other, otherColumn)` fills between a component of this graph and a component of another graph.
+The band is cropped to the keys the two graphs share, and the partner is interpolated onto this graph's keys.
+Both edges therefore have the same length, and the band stays on the GPU ribbon.
+
+```{literalinclude} snippets/graphs.cpp
+:start-after: // [graphs_multigraph_fill_to_graph]
+:end-before: // [/graphs_multigraph_fill_to_graph]
+:language: cpp
+:dedent:
+```
+
+![A model filled to a coarser reference that stops early](images/graphs-multigraph-fill-to-graph.png)
+
+- Both graphs must be on the same coordinate system. A different one is a misuse at the call; if they diverge later, the band is not drawn.
+- The partner is held by a `QPointer`. The band disappears when the partner is deleted or loses the component, and the fill is removed so a later, wider source does not bring it back.
+- A change in the partner's data repaints the band, also when the partner is on another layer.
+- This graph's selection splits the band like its line: the selected run takes the selected pen colour.
+- On a logarithmic value axis a fill to zero stops at the range bound nearer zero, as for the other component fills.
+
 ### Error bars
 
 `setComponentErrorBars(value, lower, upper)` draws an error bar at each point of the `value` column.
@@ -280,6 +321,16 @@ Bars only make sense when they are apart.
 When the points on screen are closer than three cap widths, the bars become a band from the lower to the upper bound.
 When the graph draws a min/max summary instead of the points (see {doc}`performance`), it is always a band.
 The band is drawn in the pen colour, mostly see-through. Zoom in and the bars come back.
+
+### On a coordinate system of your own
+
+A `QCPMultiGraph` needs `capStraightSegments` only, so it draws on a sheared or otherwise straight-segment system (see {doc}`coordinate-systems`).
+Lines, steps, impulses, scatters, fills, error bars and colour by scalar are built in data space and mapped once.
+
+- Fills and error bars keep their shape under the mapping. The error-bar caps are measured through the mapping at each bar, not along a fixed screen direction.
+- Colour values join the colour scale of the system's area when that area is an axis rect. On an area that is not, give the graph a scale with `setColorScale()`; without one the values are a misuse.
+- A `QCPWaterfallGraph` still needs a rectangle and a straight key: its offsets are pixel stacking, so it is refused on a user system.
+- There is no decimation on a user system and no dense error band there: every point is mapped on every repaint, and every row records its own bar.
 
 ## Gaps and NaN values
 
