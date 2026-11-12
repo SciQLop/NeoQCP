@@ -87,12 +87,6 @@ quint64 qcp::nextFrameEpoch()
 namespace
 {
 using qcp::guarded;
-
-// The layerables a deselect pass must visit, guarded because a selectionChanged slot may delete
-// any of them. Only those that may be selected: guarding all of them was most of a click with
-// thousands of items.
-// simplify: still one virtual call per child, ~15 us per click at 10 000 items; a plot-wide set of
-// selected layerables is the upgrade if clicks over 100 000 items matter.
 } // namespace
 
 
@@ -2676,14 +2670,14 @@ QList<QCPHandle<QCPLegend>> QCustomPlot::selectedLegends() const
     return result;
 }
 
-/*!
-  Deselects all layerables (plottables, items, axes, legends,...) of the QCustomPlot.
+/*! \internal
 
-  Since calling this function is not a user interaction, this does not emit the \ref
-  selectionChangedByUser signal. The individual selectionChanged signals are emitted though, if the
-  objects were previously selected.
+  The layerables a deselect pass must visit, guarded because a selectionChanged slot may delete any
+  of them. Only those that may be selected: guarding all of them was most of a click with thousands
+  of items.
 
-  \see setInteractions, selectedPlottables, selectedItems, selectedAxes, selectedLegends
+  simplify: still one virtual call per child, ~15 us per click at 10 000 items; a plot-wide set of
+  selected layerables is the upgrade if clicks over 100 000 items matter.
 */
 QList<QPointer<QCPLayerable>>
 QCustomPlot::guardedSelectedLayerables(const QList<QCPLayer*>& layers,
@@ -2697,6 +2691,15 @@ QCustomPlot::guardedSelectedLayerables(const QList<QCPLayer*>& layers,
     return result;
 }
 
+/*!
+  Deselects all layerables (plottables, items, axes, legends,...) of the QCustomPlot.
+
+  Since calling this function is not a user interaction, this does not emit the \ref
+  selectionChangedByUser signal. The individual selectionChanged signals are emitted though, if the
+  objects were previously selected.
+
+  \see setInteractions, selectedPlottables, selectedItems, selectedAxes, selectedLegends
+*/
 void QCustomPlot::deselectAll()
 {
     for (const auto& layerable : guardedSelectedLayerables(mLayers))
