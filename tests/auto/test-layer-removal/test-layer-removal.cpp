@@ -31,7 +31,7 @@ void TestLayerRemoval::removeLayerThenReplotDoesNotCrash()
 
 void TestLayerRemoval::removeAxisThenReplotDoesNotCrash()
 {
-    auto* axis = mPlot->axisRect()->addAxis(QCPAxis::atLeft);
+    QCPAxis* axis = mPlot->axisRect()->addAxis(QCPAxis::atLeft);
     mPlot->replot();
     QVERIFY(mPlot->axisRect()->removeAxis(axis));
     mPlot->replot();

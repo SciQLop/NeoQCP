@@ -170,7 +170,7 @@ std::optional<QCPLaneBand> QCPIntervals::rowBand(int lane, int subRow) const
 {
     if (!mLayout || !mKeyAxis)
         return std::nullopt;
-    const QRect rect = mKeyAxis->axisRect()->rect();
+    const QRect rect = axisRectOf(mKeyAxis)->rect();
     const auto band = mLayout->laneBand(lane, rect);
     if (!band || mStack == skNone)
         return band;
@@ -253,7 +253,7 @@ QList<QCPLayer*> QCPIntervals::dependentLayers() const
 // it alone would also stop QCustomPlot's fallback from repainting the bars' layer, so both go.
 void QCPIntervals::markLayersDirty()
 {
-    for (QCPLayer* l : { layer(), labelLayer() })
+    for (QCPLayer* l : { layer().get(), labelLayer() })
         if (l)
             l->markDirty();
 }
@@ -301,7 +301,7 @@ QPointF QCPIntervals::pixelOf(double key, int lane) const
 {
     if (!laidOut())
         return { mKeyAxis ? mKeyAxis->coordToPixel(key) : 0.0, -1.0 };
-    const auto band = mLayout->laneBand(lane, mKeyAxis->axisRect()->rect());
+    const auto band = mLayout->laneBand(lane, axisRectOf(mKeyAxis)->rect());
     return { mKeyAxis->coordToPixel(key), band ? (band->top + band->bottom) / 2 : -1.0 };
 }
 
@@ -332,7 +332,7 @@ QCPIntervals::Hit QCPIntervals::hitTest(const QPointF& pos) const
 {
     if (!laidOut())
         return {};
-    const int lane = mLayout->laneAt(pos.y(), mKeyAxis->axisRect()->rect());
+    const int lane = mLayout->laneAt(pos.y(), axisRectOf(mKeyAxis)->rect());
     if (lane < 0 || lane >= static_cast<int>(mLanes.size()))
         return lane < 0 ? Hit {} : Hit { -1, lane, hpEmpty };
     const double grabKeys = std::abs(mKeyAxis->pixelToCoord(pos.x() + 4) - mKeyAxis->pixelToCoord(pos.x()));
@@ -444,7 +444,7 @@ QVector<int> QCPIntervals::rowsInRect(const QRectF& rect) const
     const double a = mKeyAxis->pixelToCoord(rect.left()), b = mKeyAxis->pixelToCoord(rect.right());
     for (int lane = 0; lane < static_cast<int>(mLanes.size()); ++lane)
     {
-        const auto band = mLayout->laneBand(lane, mKeyAxis->axisRect()->rect());
+        const auto band = mLayout->laneBand(lane, axisRectOf(mKeyAxis)->rect());
         if (!band || band->bottom < rect.top() || band->top > rect.bottom())
             continue;
         const auto [begin, end] = qcp::intervals::candidateRange(mLanes[lane], std::min(a, b), std::max(a, b));
@@ -520,7 +520,7 @@ void QCPIntervals::mouseReleaseEvent(QMouseEvent* event, const QPointF& startPos
 
 void QCPIntervals::drawSelection(QCPPainter* painter) const
 {
-    const QRectF visible = mKeyAxis->axisRect()->rect();
+    const QRectF visible = axisRectOf(mKeyAxis)->rect();
     painter->setBrush(Qt::NoBrush);
     painter->setPen(mSelectionDecorator ? mSelectionDecorator->pen() : QPen(Qt::black, 2));
     for (int row : selectedRows())
@@ -651,7 +651,7 @@ int QCPIntervals::laneStepsTo(const QPointF& pos) const
     if (mGesture->kind != Gesture::Move || !(mEditModes & emChangeLane) || !mLayout || !mKeyAxis)
         return 0;
     // Lanes can differ in height (stacked overlaps): count lanes, not pixels.
-    const QRect rect = mKeyAxis->axisRect()->rect();
+    const QRect rect = axisRectOf(mKeyAxis)->rect();
     const double y = std::clamp(pos.y(), double(rect.top()), double(rect.bottom()) - 1);
     const int lane = mLayout->laneAt(y, rect);
     if (lane < 0)
@@ -790,7 +790,7 @@ void QCPIntervals::drawPreview(QCPPainter* painter) const
 {
     if (!mGesture)
         return;
-    const QRect rect = mKeyAxis->axisRect()->rect();
+    const QRect rect = axisRectOf(mKeyAxis)->rect();
     for (const auto& e : mGesture->preview)
     {
         const bool sameLane = e.row >= 0 && e.lane == mColumns.lane[e.row];
@@ -1006,7 +1006,7 @@ std::vector<qcp::intervals::PixelBar> QCPIntervals::mergedBars() const
 {
     std::vector<qcp::intervals::PixelBar> bars;
     for (int lane = 0; lane < static_cast<int>(mLanes.size()); ++lane)
-        if (const auto band = mLayout->laneBand(lane, mKeyAxis->axisRect()->rect()))
+        if (const auto band = mLayout->laneBand(lane, axisRectOf(mKeyAxis)->rect()))
             appendLaneBars(bars, lane, *band);
     return bars;
 }
@@ -1075,7 +1075,7 @@ quint64 QCPIntervals::dependencyRevision() const
 void QCPIntervals::appendLaneBackdrops(QCPDrawContext& context) const
 {
     const QColor ink = mKeyAxis->tickLabelColor();
-    const QRect axisRect = mKeyAxis->axisRect()->rect();
+    const QRect axisRect = axisRectOf(mKeyAxis)->rect();
     const auto record = [&context](const QRectF& box, const QColor& colour)
     {
         context.rect(QCP::Pixels { box.left(), box.top() },
@@ -1171,7 +1171,7 @@ void QCPIntervals::appendLabelRect(const qcp::intervals::PixelBar& bar)
     const QString& text = mColumns.labels[bar.row];
     if (text.isEmpty())
         return;
-    const QRect axisRect = mKeyAxis->axisRect()->rect();
+    const QRect axisRect = axisRectOf(mKeyAxis)->rect();
     const double left = std::max(bar.x0, double(axisRect.left()));
     const double right = std::min(bar.x1, double(axisRect.right()));
     const double ends = mStyle == stWave ? 2 * kWaveSlant : 0;
@@ -1216,7 +1216,7 @@ void QCPIntervals::drawLabels(QCPPainter* painter)
                 appendLabelRect(bar);
         }
     if (mStack == skCategory)
-        appendRowNames(mKeyAxis->axisRect()->rect());
+        appendRowNames(axisRectOf(mKeyAxis)->rect());
     painter->setPen(mKeyAxis->tickLabelColor());
     for (const auto& label : mLabelRects)
         painter->drawText(label.rect, Qt::AlignCenter, label.text);
@@ -1240,7 +1240,7 @@ bool QCPIntervals::drawsLaneNames() const
 
 void QCPIntervals::drawLaneNames(QCPPainter* painter) const
 {
-    const QRect rect = mKeyAxis->axisRect()->rect();
+    const QRect rect = axisRectOf(mKeyAxis)->rect();
     painter->setPen(mKeyAxis->tickLabelColor());
     const QStringList names = mLayout->laneNames();
     for (int lane = 0; lane < names.size(); ++lane)

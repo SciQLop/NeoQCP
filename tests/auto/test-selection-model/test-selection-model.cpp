@@ -83,7 +83,7 @@ Target targetFor(QCustomPlot* plot, const QString& name)
     if (name == QLatin1String("legendItem"))
     {
         addGraph(plot);
-        return wholeObjectTarget(plot->legend->item(0));
+        return wholeObjectTarget(plot->legend->item(0).get());
     }
     if (name == QLatin1String("textElement"))
         return wholeObjectTarget(new QCPTextElement(plot, QStringLiteral("title")));
@@ -102,11 +102,11 @@ Target targetFor(QCustomPlot* plot, const QString& name)
     if (name == QLatin1String("polarAxisAngular"))
     {
         QCPPolarArea* area = plot->add<QCPPolarArea>(1, 0).get();
-        return partsTarget(area->angularAxis(), QCPPolarAxisAngular::spAxis);
+        return partsTarget(area->angularAxis().get(), QCPPolarAxisAngular::spAxis);
     }
     Q_ASSERT(name == QLatin1String("polarAxisRadial"));
     QCPPolarArea* area = plot->add<QCPPolarArea>(1, 0).get();
-    return partsTarget(area->radialAxis(0), QCPPolarAxisRadial::spAxis);
+    return partsTarget(area->radialAxis(0).get(), QCPPolarAxisRadial::spAxis);
 }
 
 QPoint pixelOf(QCustomPlot* plot, double key, double value)

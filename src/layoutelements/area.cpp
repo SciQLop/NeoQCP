@@ -25,6 +25,7 @@
 
 #include "area.h"
 #include "layoutelement-axisrect.h"
+#include "../core.h"
 #include "../axis/axis.h"
 #include "../coordinate-system.h"
 #include "../misuse.h"
@@ -73,25 +74,34 @@ QCPArea::~QCPArea()
   A pair that is not two axes of this area is refused as misuse, and so is a pair a cartesian area
   cannot map (two axes of one orientation). Both answer null.
 */
-QCPCoordinateSystem* QCPArea::system(QCPAxisBase* key, QCPAxisBase* value)
+QCPHandle<QCPCoordinateSystem> QCPArea::system(QCPAxisBase* key, QCPAxisBase* value)
+{
+    return QCPHandle<QCPCoordinateSystem>(systemRaw(key, value));
+}
+
+/*! \internal
+
+  The lookup without a handle: an item position asks per position (K8).
+*/
+QCPCoordinateSystem* QCPArea::systemRaw(QCPAxisBase* key, QCPAxisBase* value)
 {
     pruneSystems();
     if (!key || !value)
     {
         qcp::reportMisuse(Q_FUNC_INFO, "a coordinate system needs two axes");
-        return nullptr;
+        return { };
     }
     if (key == value)
     {
         qcp::reportMisuse(Q_FUNC_INFO, "a coordinate system needs two different axes");
-        return nullptr;
+        return { };
     }
     // The systems the area already made answer first: a position or a plottable resolving its pair
     // again is the common case, and the axes' own list is not needed for it.
     for (const QPointer<QCPCoordinateSystem>& existing : std::as_const(mSystems))
         if (existing && existing->keyAxis() == key && existing->valueAxis() == value)
             return existing;
-    const QList<QCPAxisBase*> axes = allAxes();
+    const QList<QCPAxisBase*> axes = allAxesRaw();
     if (!axes.contains(key) || !axes.contains(value))
     {
         qcp::reportMisuse(Q_FUNC_INFO, "both axes of a coordinate system must belong to the area");
@@ -111,7 +121,19 @@ QCPCoordinateSystem* QCPArea::system(QCPAxisBase* key, QCPAxisBase* value)
 /*!
   Returns the systems this area owns, in creation order.
 */
-QList<QCPCoordinateSystem*> QCPArea::systems() const
+QList<QCPHandle<QCPCoordinateSystem>> QCPArea::systems() const
+{
+    QList<QCPHandle<QCPCoordinateSystem>> result;
+    for (QCPCoordinateSystem* system : systemsRaw())
+        result << QCPHandle<QCPCoordinateSystem>(system);
+    return result;
+}
+
+/*! \internal
+
+  The systems raw: QCPAxisBase::plottables walks them per axis (K8).
+*/
+QList<QCPCoordinateSystem*> QCPArea::systemsRaw() const
 {
     pruneSystems();
     QList<QCPCoordinateSystem*> result;
@@ -211,12 +233,13 @@ QCPCoordinateSystem* qcpSystemOfAxes(QCPAxis* keyAxis, QCPAxis* valueAxis)
         return nullptr;
     if (keyAxis->orientation() == valueAxis->orientation())
         return nullptr;
-    if (keyAxis->parentPlot() != valueAxis->parentPlot())
+    // The area raw: this runs per position per item (K8), and both getters hand out handles.
+    if (keyAxis->area() != valueAxis->area())
         return nullptr;
-    QCPAxisRect* area = keyAxis->axisRect();
-    if (!area || area != valueAxis->axisRect())
+    QCPAxisRect* area = static_cast<QCPAxisRect*>(keyAxis->area());
+    if (!area)
         return nullptr;
-    return area->system(keyAxis, valueAxis);
+    return area->systemRaw(keyAxis, valueAxis);
 }
 
 /*! \internal
@@ -263,12 +286,12 @@ void QCPArea::update(UpdatePhase phase)
 }
 
 /* inherits documentation from base class */
-QList<QCPLayoutElement*> QCPArea::elements(bool recursive) const
+QList<QCPHandle<QCPLayoutElement>> QCPArea::elements(bool recursive) const
 {
-    QList<QCPLayoutElement*> result;
+    QList<QCPHandle<QCPLayoutElement>> result;
     if (mInsetLayout)
     {
-        result << mInsetLayout;
+        result << QCPHandle<QCPLayoutElement>(mInsetLayout);
         if (recursive)
             result << mInsetLayout->elements(recursive);
     }

@@ -56,8 +56,8 @@ public:
 
     QCPTransform transform() const override
     {
-        return QCPTransform(static_cast<const QCPAxis*>(keyAxis()),
-                            static_cast<const QCPAxis*>(valueAxis()));
+        return QCPTransform(static_cast<const QCPAxis*>(keyAxis().get()),
+                            static_cast<const QCPAxis*>(valueAxis().get()));
     }
     QRect clipRect() const override { return area()->rect(); }
     QCP::Capabilities capabilities() const override { return QCP::capStraightSegments; }
@@ -78,8 +78,8 @@ public:
 
     QCPTransform transform() const override
     {
-        return QCPTransform(static_cast<const QCPAxis*>(keyAxis()),
-                            static_cast<const QCPAxis*>(valueAxis()));
+        return QCPTransform(static_cast<const QCPAxis*>(keyAxis().get()),
+                            static_cast<const QCPAxis*>(valueAxis().get()));
     }
     QRect clipRect() const override { return area()->rect(); }
     QCP::Capabilities capabilities() const override { return QCP::capStraightSegments; }

@@ -1440,7 +1440,7 @@ void TestRepaint::polarPlotSettles()
     area->setBackground(QPixmap(8, 8));
     area->setBackgroundScaled(false);
     area->angularAxis()->setRange(0, 360);
-    if (auto* radial = area->radialAxis())
+    if (QCPPolarAxisRadial* radial = area->radialAxis())
         radial->setRange(0, 1);
     plot->replot();
     waitUntilSettled(*plot);
@@ -1756,7 +1756,7 @@ void TestRepaint::secondLegendRowFollowsRename()
     plot->graph(0)->addToLegend(legend);
     waitUntilSettled(*plot);
     waitUntilSettled(*plot);
-    auto* row = legend->itemWithPlottable(plot->graph(0));
+    QCPPlottableLegendItem* row = legend->itemWithPlottable(plot->graph(0));
     QVERIFY(row);
     QVERIFY(!legend->outerRect().isEmpty());
 
@@ -1925,7 +1925,7 @@ void TestRepaint::anchoredChildOnOtherLayerFollowsRange()
     waitUntilSettled(plot);
     waitUntilSettled(plot);
     QCPLayer* labels = plot.layer(QStringLiteral("labels"));
-    auto* parentLayer = parent->layer();
+    QCPLayer* parentLayer = parent->layer();
     QVERIFY(labels && parentLayer);
     QVERIFY2(!labels->dirtiedAfterDraw(), "a settled labels layer must not be dirty");
     QVERIFY2(!parentLayer->dirtiedAfterDraw(), "a settled parent layer must not be dirty");

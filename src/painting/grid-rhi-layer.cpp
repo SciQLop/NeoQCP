@@ -189,7 +189,7 @@ void QCPGridRhiLayer::rebuildGeometry(float dpr, int outputHeight)
     QVector<QCPAxisRect*> axisRects;
     for (auto* axis : mAxes)
     {
-        if (auto* ar = axis->axisRect(); ar && !axisRects.contains(ar))
+        if (QCPAxisRect* ar = axis->axisRect(); ar && !axisRects.contains(ar))
             axisRects.append(ar);
     }
     std::sort(axisRects.begin(), axisRects.end());

@@ -1336,7 +1336,7 @@ double QCPMultiGraph::selectTest(const QPointF& pos, bool onlySelectable, QVaria
     if (!mKeyAxis || !mValueAxis)
         return -1;
 
-    auto* axisRect = mKeyAxis->axisRect();
+    auto* axisRect = axisRectOf(mKeyAxis);
     if (!axisRect || !axisRect->rect().contains(pos.toPoint()))
         return -1;
 
@@ -2283,7 +2283,7 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::fillToGraphRows(
 std::vector<qcp::fill::StripPoint> QCPMultiGraph::binnedWhenDense(
     std::vector<qcp::fill::StripPoint> rows) const
 {
-    const QRect rect = mKeyAxis->axisRect()->rect();
+    const QRect rect = axisRectOf(mKeyAxis)->rect();
     const int pixelLength = mKeyAxis->orientation() == Qt::Vertical ? rect.height() : rect.width();
     if (rows.size() <= 4 * std::size_t(std::max(0, pixelLength)))
         return rows;
@@ -2448,7 +2448,7 @@ std::vector<qcp::errorbars::Bar> QCPMultiGraph::errorBarRows(const ErrorBars& sp
 bool QCPMultiGraph::errorBarsFitInView(std::span<const qcp::errorbars::Bar> bars,
                                        double minSpacingPx) const
 {
-    const QRect rect = mKeyAxis->axisRect()->rect();
+    const QRect rect = axisRectOf(mKeyAxis)->rect();
     const bool vertical = mKeyAxis->orientation() == Qt::Vertical;
     const double first = vertical ? rect.top() : rect.left();
     const double last = vertical ? rect.bottom() : rect.right();

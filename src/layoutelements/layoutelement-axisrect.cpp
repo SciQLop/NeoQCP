@@ -82,7 +82,7 @@
 
 /* start documentation of inline functions */
 
-/*! \fn QCPLayoutInset *QCPAxisRect::insetLayout() const
+/*! \fn QCPHandle<QCPLayoutInset> QCPAxisRect::insetLayout() const
 
   Returns the inset layout of this axis rect. It can be used to place other layout elements (or
   even layouts with multiple other elements) inside/on top of an axis rect.
@@ -260,7 +260,7 @@ QCPAxisRect::~QCPAxisRect()
         mColorScale = nullptr;
     }
 
-    for (const auto& axis : qcp::guarded(axes()))
+    for (const auto& axis : qcp::guarded(axesRaw()))
         if (axis)
             removeAxis(axis);
 }
@@ -287,17 +287,17 @@ int QCPAxisRect::axisCount(QCPAxis::AxisType type) const
 
   \see axisCount, axes
 */
-QCPAxis* QCPAxisRect::axis(QCPAxis::AxisType type, int index) const
+QCPHandle<QCPAxis> QCPAxisRect::axis(QCPAxis::AxisType type, int index) const
 {
-    QList<QCPAxis*> ax(mAxes.value(type));
+    const QList<QCPAxis*> ax(mAxes.value(type));
     if (index >= 0 && index < ax.size())
     {
-        return ax.at(index);
+        return QCPHandle<QCPAxis>(ax.at(index));
     }
     else
     {
         qDebug() << Q_FUNC_INFO << "Axis index out of bounds:" << index;
-        return nullptr;
+        return { };
     }
 }
 
@@ -309,7 +309,19 @@ QCPAxis* QCPAxisRect::axis(QCPAxis::AxisType type, int index) const
 
   \see axis
 */
-QList<QCPAxis*> QCPAxisRect::axes(QCPAxis::AxisTypes types) const
+QList<QCPHandle<QCPAxis>> QCPAxisRect::axes(QCPAxis::AxisTypes types) const
+{
+    QList<QCPHandle<QCPAxis>> result;
+    for (QCPAxis* axis : axesRaw(types))
+        result.append(QCPHandle<QCPAxis>(axis));
+    return result;
+}
+
+/*! \internal
+
+  The axes of the given sides, raw: the rect's own update, zoom and range passes read this one (K8).
+*/
+QList<QCPAxis*> QCPAxisRect::axesRaw(QCPAxis::AxisTypes types) const
 {
     QList<QCPAxis*> result;
     if (types.testFlag(QCPAxis::atLeft))
@@ -327,7 +339,19 @@ QList<QCPAxis*> QCPAxisRect::axes(QCPAxis::AxisTypes types) const
 
   Returns all axes of this axis rect.
 */
-QList<QCPAxis*> QCPAxisRect::axes() const
+QList<QCPHandle<QCPAxis>> QCPAxisRect::axes() const
+{
+    QList<QCPHandle<QCPAxis>> result;
+    for (QCPAxis* axis : axesRaw())
+        result.append(QCPHandle<QCPAxis>(axis));
+    return result;
+}
+
+/*! \internal
+
+  Every axis of the rect, raw: the layout passes and the zoom read this one (K8).
+*/
+QList<QCPAxis*> QCPAxisRect::axesRaw() const
 {
     QList<QCPAxis*> result;
     QHashIterator<QCPAxis::AxisType, QList<QCPAxis*>> it(mAxes);
@@ -343,10 +367,20 @@ QList<QCPAxis*> QCPAxisRect::axes() const
 
   Returns all axes of this axis rect as base pointers, the type the range model lives in.
 */
-QList<QCPAxisBase*> QCPAxisRect::allAxes() const
+QList<QCPHandle<QCPAxisBase>> QCPAxisRect::allAxes() const
+{
+    QList<QCPHandle<QCPAxisBase>> result;
+    const QList<QCPAxisBase*> rawAxes = allAxesRaw();
+    result.reserve(rawAxes.size());
+    for (QCPAxisBase* axis : rawAxes)
+        result << QCPHandle<QCPAxisBase>(axis);
+    return result;
+}
+
+QList<QCPAxisBase*> QCPAxisRect::allAxesRaw() const
 {
     QList<QCPAxisBase*> result;
-    const QList<QCPAxis*> cartesianAxes = axes();
+    const QList<QCPAxis*> cartesianAxes = axesRaw();
     result.reserve(cartesianAxes.size());
     for (QCPAxis* axis : cartesianAxes)
         result << axis;
@@ -379,9 +413,9 @@ QCPRatioTransform QCPAxisRect::ratioTransform() const
 
   \see addAxes, setupFullAxesBox
 */
-QCPAxis* QCPAxisRect::addAxis(QCPAxis::AxisType type, QCPAxis* axis)
+QCPHandle<QCPAxis> QCPAxisRect::addAxis(QCPAxis::AxisType type, QCPAxis* axis)
 {
-    QCP_CHECK_OR_RETURN(!beingDestroyed(mParentPlot), "the plot is being destroyed", nullptr);
+    QCP_CHECK_OR_RETURN(!beingDestroyed(mParentPlot), "the plot is being destroyed", { });
     QCPAxis* newAxis = axis;
     if (!newAxis)
     {
@@ -393,18 +427,18 @@ QCPAxis* QCPAxisRect::addAxis(QCPAxis::AxisType type, QCPAxis* axis)
         {
             qDebug() << Q_FUNC_INFO
                      << "passed axis has different axis type than specified in type parameter";
-            return nullptr;
+            return { };
         }
         if (newAxis->axisRect() != this)
         {
             qDebug() << Q_FUNC_INFO
                      << "passed axis doesn't have this axis rect as parent axis rect";
-            return nullptr;
+            return { };
         }
-        if (axes().contains(newAxis))
+        if (axesRaw().contains(newAxis))
         {
             qDebug() << Q_FUNC_INFO << "passed axis is already owned by this axis rect";
-            return nullptr;
+            return { };
         }
     }
     if (!mAxes[type].isEmpty()) // multiple axes on one side, add half-bar axis ending to additional
@@ -448,7 +482,7 @@ QCPAxis* QCPAxisRect::addAxis(QCPAxis::AxisType type, QCPAxis* axis)
         }
     }
 
-    return newAxis;
+    return QCPHandle<QCPAxis>(newAxis);
 }
 
 /*!
@@ -459,9 +493,9 @@ QCPAxis* QCPAxisRect::addAxis(QCPAxis::AxisType type, QCPAxis* axis)
 
   \see addAxis, setupFullAxesBox
 */
-QList<QCPAxis*> QCPAxisRect::addAxes(QCPAxis::AxisTypes types)
+QList<QCPHandle<QCPAxis>> QCPAxisRect::addAxes(QCPAxis::AxisTypes types)
 {
-    QList<QCPAxis*> result;
+    QList<QCPHandle<QCPAxis>> result;
     if (types.testFlag(QCPAxis::atLeft))
         result << addAxis(QCPAxis::atLeft);
     if (types.testFlag(QCPAxis::atRight))
@@ -626,7 +660,7 @@ void dragAxes(const QPointer<QCPAxisRect>& rect, const QList<QPointer<QCPAxis>> 
 
 void QCPAxisRect::zoom(const QRectF& pixelRect)
 {
-    zoom(pixelRect, axes());
+    zoom(pixelRect, axesRaw());
 }
 
 /*! \overload
@@ -754,16 +788,16 @@ bool isOn(const QCPAxis* axis, const QCPAxisRect* rect)
 
   \see graphs, items
 */
-QList<QCPAbstractPlottable*> QCPAxisRect::plottables() const
+QList<QCPHandle<QCPAbstractPlottable>> QCPAxisRect::plottables() const
 {
     // Note: don't append all QCPAxis::plottables() into a list, because we might get duplicate
     // entries
-    QList<QCPAbstractPlottable*> result;
+    QList<QCPHandle<QCPAbstractPlottable>> result;
     for (QCPAbstractPlottable* plottable : mParentPlot->mPlottables)
     {
         // By the system, not by the axes: what a plottable sits in is the frame it is drawn in.
         if (plottable->system() && plottable->system()->area() == this)
-            result.append(plottable);
+            result.append(QCPHandle<QCPAbstractPlottable>(plottable));
     }
     return result;
 }
@@ -798,17 +832,17 @@ QList<QCPGraph*> QCPAxisRect::graphs() const
 
   \see plottables, graphs
 */
-QList<QCPAbstractItem*> QCPAxisRect::items() const
+QList<QCPHandle<QCPAbstractItem>> QCPAxisRect::items() const
 {
     // Note: don't just append all QCPAxis::items() into a list, because we might get duplicate
     // entries
     //       and miss those items that have this axis rect as clipAxisRect.
-    QList<QCPAbstractItem*> result;
+    QList<QCPHandle<QCPAbstractItem>> result;
     for (QCPAbstractItem* item : mParentPlot->mItems)
     {
         if (item->clipAxisRect() == this)
         {
-            result.append(item);
+            result.append(QCPHandle<QCPAbstractItem>(item));
             continue;
         }
         for (QCPItemPosition* position : item->positions())
@@ -816,7 +850,7 @@ QList<QCPAbstractItem*> QCPAxisRect::items() const
             if (position->axisRect() == this || isOn(position->keyAxis(), this)
                 || isOn(position->valueAxis(), this))
             {
-                result.append(item);
+                result.append(QCPHandle<QCPAbstractItem>(item));
                 break;
             }
         }
@@ -941,7 +975,7 @@ void QCPAxisRect::update(UpdatePhase phase)
     QCPArea::update(phase);
 
     if (phase == upPreparation)
-        for (QCPAxis* axis : axes())
+        for (QCPAxis* axis : axesRaw())
             axis->setupTickVectors();
 
     if (scale)
@@ -979,7 +1013,7 @@ QList<QCPAxis*> QCPAxisRect::effectiveRangeAxes(bool drag, Qt::Orientation orien
         : QList<QCPAxis::AxisType> { QCPAxis::atLeft, QCPAxis::atRight };
     for (QCPAxis::AxisType side : sides)
     {
-        for (QCPAxis* axis : axes(side))
+        for (QCPAxis* axis : axesRaw(side))
         {
             if (!axis || (drag ? !axis->rangeDraggable() : !axis->rangeZoomable()))
                 continue;
@@ -1028,10 +1062,10 @@ QList<QCPAxis*> QCPAxisRect::moveRepresentatives(const QList<QCPAxis*>& axes) co
 
   \see setRangeDragAxes
 */
-QCPAxis* QCPAxisRect::rangeDragAxis(Qt::Orientation orientation)
+QCPHandle<QCPAxis> QCPAxisRect::rangeDragAxis(Qt::Orientation orientation)
 {
     const QList<QCPAxis*> axes = effectiveRangeAxes(true, orientation);
-    return axes.isEmpty() ? nullptr : axes.first();
+    return axes.isEmpty() ? QCPHandle<QCPAxis>() : QCPHandle<QCPAxis>(axes.first());
 }
 
 /*!
@@ -1040,10 +1074,10 @@ QCPAxis* QCPAxisRect::rangeDragAxis(Qt::Orientation orientation)
 
   \see setRangeZoomAxes
 */
-QCPAxis* QCPAxisRect::rangeZoomAxis(Qt::Orientation orientation)
+QCPHandle<QCPAxis> QCPAxisRect::rangeZoomAxis(Qt::Orientation orientation)
 {
     const QList<QCPAxis*> axes = effectiveRangeAxes(false, orientation);
-    return axes.isEmpty() ? nullptr : axes.first();
+    return axes.isEmpty() ? QCPHandle<QCPAxis>() : QCPHandle<QCPAxis>(axes.first());
 }
 
 /*!
@@ -1051,9 +1085,12 @@ QCPAxis* QCPAxisRect::rangeZoomAxis(Qt::Orientation orientation)
 
   \see rangeZoomAxis, setRangeZoomAxes
 */
-QList<QCPAxis*> QCPAxisRect::rangeDragAxes(Qt::Orientation orientation)
+QList<QCPHandle<QCPAxis>> QCPAxisRect::rangeDragAxes(Qt::Orientation orientation)
 {
-    return effectiveRangeAxes(true, orientation);
+    QList<QCPHandle<QCPAxis>> result;
+    for (QCPAxis* axis : effectiveRangeAxes(true, orientation))
+        result.append(QCPHandle<QCPAxis>(axis));
+    return result;
 }
 
 /*!
@@ -1061,9 +1098,12 @@ QList<QCPAxis*> QCPAxisRect::rangeDragAxes(Qt::Orientation orientation)
 
   \see rangeDragAxis, setRangeDragAxes
 */
-QList<QCPAxis*> QCPAxisRect::rangeZoomAxes(Qt::Orientation orientation)
+QList<QCPHandle<QCPAxis>> QCPAxisRect::rangeZoomAxes(Qt::Orientation orientation)
 {
-    return effectiveRangeAxes(false, orientation);
+    QList<QCPHandle<QCPAxis>> result;
+    for (QCPAxis* axis : effectiveRangeAxes(false, orientation))
+        result.append(QCPHandle<QCPAxis>(axis));
+    return result;
 }
 
 /*!

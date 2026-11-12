@@ -211,10 +211,10 @@ void QCPMarginGroup::removeChild(QCP::MarginSide side, QCPLayoutElement* element
 
 /* start documentation of inline functions */
 
-/*! \fn QCPLayout *QCPLayoutElement::layout() const
-
-  Returns the parent layout of this layout element.
-*/
+QCPHandle<QCPLayout> QCPLayoutElement::layout() const
+{
+    return QCPHandle<QCPLayout>(mParentLayout);
+}
 
 /*! \fn QRect QCPLayoutElement::rect() const
 
@@ -609,9 +609,9 @@ QSize QCPLayoutElement::maximumOuterSizeHint() const
   \warning There may be \c nullptr entries in the returned list. For example, QCPLayoutGrid may
   have empty cells which yield \c nullptr at the respective index.
 */
-QList<QCPLayoutElement*> QCPLayoutElement::elements([[maybe_unused]] bool recursive) const
+QList<QCPHandle<QCPLayoutElement>> QCPLayoutElement::elements([[maybe_unused]] bool recursive) const
 {
-    return QList<QCPLayoutElement*>();
+    return { };
 }
 
 /*!
@@ -723,7 +723,7 @@ void QCPLayoutElement::layoutChanged() { }
   \see elements, elementAt
 */
 
-/*! \fn virtual QCPLayoutElement* QCPLayout::elementAt(int index) const = 0
+/*! \fn virtual QCPHandle<QCPLayoutElement> QCPLayout::elementAt(int index) const = 0
 
   Returns the element in the cell with the given \a index. If \a index is invalid, returns \c
   nullptr.
@@ -794,10 +794,10 @@ void QCPLayout::update(UpdatePhase phase)
 }
 
 /* inherits documentation from base class */
-QList<QCPLayoutElement*> QCPLayout::elements(bool recursive) const
+QList<QCPHandle<QCPLayoutElement>> QCPLayout::elements(bool recursive) const
 {
     const int c = elementCount();
-    QList<QCPLayoutElement*> result;
+    QList<QCPHandle<QCPLayoutElement>> result;
     result.reserve(c);
     for (int i = 0; i < c; ++i)
         result.append(elementAt(i));
@@ -1263,14 +1263,14 @@ QCPLayoutGrid::~QCPLayoutGrid()
 
   \see addElement, hasElement
 */
-QCPLayoutElement* QCPLayoutGrid::element(int row, int column) const
+QCPHandle<QCPLayoutElement> QCPLayoutGrid::element(int row, int column) const
 {
     if (row >= 0 && row < mElements.size())
     {
         if (column >= 0 && column < mElements.first().size())
         {
             if (QCPLayoutElement* result = mElements.at(row).at(column))
-                return result;
+                return QCPHandle<QCPLayoutElement>(result);
             else
                 qDebug() << Q_FUNC_INFO << "Requested cell is empty. Row:" << row
                          << "Column:" << column;
@@ -1280,7 +1280,7 @@ QCPLayoutElement* QCPLayoutGrid::element(int row, int column) const
     }
     else
         qDebug() << Q_FUNC_INFO << "Invalid row. Row:" << row << "Column:" << column;
-    return nullptr;
+    return { };
 }
 
 /*! \overload
@@ -1817,16 +1817,16 @@ void QCPLayoutGrid::updateLayout()
 
   \see rowColToIndex
 */
-QCPLayoutElement* QCPLayoutGrid::elementAt(int index) const
+QCPHandle<QCPLayoutElement> QCPLayoutGrid::elementAt(int index) const
 {
     if (index >= 0 && index < elementCount())
     {
         int row, col;
         indexToRowCol(index, row, col);
-        return mElements.at(row).at(col);
+        return QCPHandle<QCPLayoutElement>(mElements.at(row).at(col));
     }
     else
-        return nullptr;
+        return { };
 }
 
 /*!
@@ -1839,19 +1839,22 @@ QCPLayoutElement* QCPLayoutGrid::elementAt(int index) const
 */
 QCPLayoutElement* QCPLayoutGrid::takeAt(int index)
 {
-    if (QCPLayoutElement* el = elementAt(index))
-    {
-        releaseElement(el);
-        int row, col;
-        indexToRowCol(index, row, col);
-        mElements[row][col] = nullptr;
-        return el;
-    }
-    else
+    if (index < 0 || index >= elementCount())
     {
         qDebug() << Q_FUNC_INFO << "Attempt to take invalid index:" << index;
         return nullptr;
     }
+    int row, col;
+    indexToRowCol(index, row, col);
+    QCPLayoutElement* el = mElements.at(row).at(col);
+    if (!el)
+    {
+        qDebug() << Q_FUNC_INFO << "Attempt to take invalid index:" << index;
+        return nullptr;
+    }
+    releaseElement(el);
+    mElements[row][col] = nullptr;
+    return el;
 }
 
 /* inherits documentation from base class */
@@ -1875,9 +1878,9 @@ bool QCPLayoutGrid::take(QCPLayoutElement* element)
 }
 
 /* inherits documentation from base class */
-QList<QCPLayoutElement*> QCPLayoutGrid::elements(bool recursive) const
+QList<QCPHandle<QCPLayoutElement>> QCPLayoutGrid::elements(bool recursive) const
 {
-    QList<QCPLayoutElement*> result;
+    QList<QCPHandle<QCPLayoutElement>> result;
     const int elCount = elementCount();
     result.reserve(elCount);
     for (int i = 0; i < elCount; ++i)
@@ -2254,18 +2257,18 @@ int QCPLayoutInset::elementCount() const
 }
 
 /* inherits documentation from base class */
-QCPLayoutElement* QCPLayoutInset::elementAt(int index) const
+QCPHandle<QCPLayoutElement> QCPLayoutInset::elementAt(int index) const
 {
     if (index >= 0 && index < mElements.size())
-        return mElements.at(index);
+        return QCPHandle<QCPLayoutElement>(mElements.at(index));
     else
-        return nullptr;
+        return { };
 }
 
 /* inherits documentation from base class */
 QCPLayoutElement* QCPLayoutInset::takeAt(int index)
 {
-    if (QCPLayoutElement* el = elementAt(index))
+    if (QCPLayoutElement* el = index >= 0 && index < mElements.size() ? mElements.at(index) : nullptr)
     {
         releaseElement(el);
         mElements.removeAt(index);

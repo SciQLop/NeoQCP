@@ -200,7 +200,7 @@ public:
     AxisType axisType() const { return mAxisType; }
 
     // Out of line: it reads the base's area pointer, and the rect type is complete in the .cpp.
-    QCPAxisRect* axisRect() const;
+    QCPHandle<QCPAxisRect> axisRect() const;
 
     QCPArea* area() const override;
 
@@ -265,11 +265,11 @@ public:
     QCPLineEnding lowerEnding() const;
     QCPLineEnding upperEnding() const;
 
-    QCPGrid* grid() const;
+    QCPHandle<QCPGrid> grid() const;
 
     // Never creates a grid: null once the user deleted it. For internal draw and dirty-marking
     // paths, which must not bring back a deleted grid.
-    QCPGrid* gridIfExists() const { return mGrid; }
+    QCPHandle<QCPGrid> gridIfExists() const;
 
     // setters:
     void setTicks(bool show);
@@ -332,9 +332,9 @@ public:
     QCPAxis* moveTarget() const override;
     /*! \internal \a pixel seen on the move target's rect, at the same fraction of the axis. */
     double pixelOnMoveTarget(double pixel) const;
-    QList<QCPAbstractPlottable*> plottables() const override;
+    QList<QCPHandle<QCPAbstractPlottable>> plottables() const override;
     QList<QCPGraph*> graphs() const;
-    QList<QCPAbstractItem*> items() const;
+    QList<QCPHandle<QCPAbstractItem>> items() const;
 
     static AxisType marginSideToAxisType(QCP::MarginSide side);
 
@@ -349,6 +349,9 @@ public:
     SelectablePart getPartAt(const QPointF& pos) const override;
 
 protected:
+    // The plottables raw: rescale() walks them per axis (K8).
+    QList<QCPAbstractPlottable*> plottablesRaw() const;
+
     // property members:
     // axis base:
     AxisType mAxisType;

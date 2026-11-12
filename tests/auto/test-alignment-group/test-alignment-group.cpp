@@ -333,7 +333,7 @@ void TestAlignmentGroup::joiningAnotherGroupLeavesTheFirst()
     second->add(a->axisRect());
     QCOMPARE(first->elements().size(), 1);
     QCOMPARE(second->elements().size(), 2);
-    QVERIFY(!first->elements().contains(a->axisRect()));
+    QVERIFY(!qcp::pointers(first->elements()).contains(a->axisRect()));
     a.reset();
     b.reset();
     c.reset();

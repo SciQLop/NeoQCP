@@ -131,7 +131,7 @@ public:
     }
 
 private:
-    [[nodiscard]] QRect rect() const { return static_cast<const QCPAxisRect*>(area())->rect(); }
+    [[nodiscard]] QRect rect() const { return static_cast<const QCPAxisRect*>(area().get())->rect(); }
 
     mutable std::shared_ptr<const SkewMapping> mMapping;
     mutable quint64 mBuiltRevision = 0;
@@ -147,7 +147,8 @@ public:
     //! The system of the rect's bottom and left axes, created on first ask.
     [[nodiscard]] SkewSystem* skew()
     {
-        return static_cast<SkewSystem*>(system(axis(QCPAxis::atBottom), axis(QCPAxis::atLeft)));
+        return static_cast<SkewSystem*>(
+            system(axis(QCPAxis::atBottom), axis(QCPAxis::atLeft)).get());
     }
 
     void setShear(double shear) { skew()->setShear(shear); }

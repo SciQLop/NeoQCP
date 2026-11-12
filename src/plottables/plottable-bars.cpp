@@ -373,9 +373,9 @@ double QCPBarsGroup::getPixelSpacing(const QCPBars* bars, double keyCoord)
         case stAxisRectRatio:
         {
             if (bars->keyAxis()->orientation() == Qt::Horizontal)
-                return bars->keyAxis()->axisRect()->width() * mSpacing;
+                return static_cast<QCPAxisRect*>(bars->keyAxis()->area())->width() * mSpacing;
             else
-                return bars->keyAxis()->axisRect()->height() * mSpacing;
+                return static_cast<QCPAxisRect*>(bars->keyAxis()->area())->height() * mSpacing;
         }
         case stPlotCoords:
         {
@@ -1286,13 +1286,13 @@ void QCPBars::getPixelWidth(double key, double& lower, double& upper) const
         }
         case wtAxisRectRatio:
         {
-            if (mKeyAxis && mKeyAxis.data()->axisRect())
+            if (mKeyAxis && axisRectOf(mKeyAxis.data()))
             {
                 if (mKeyAxis.data()->orientation() == Qt::Horizontal)
-                    upper = mKeyAxis.data()->axisRect()->width() * mWidth * 0.5
+                    upper = axisRectOf(mKeyAxis.data())->width() * mWidth * 0.5
                         * mKeyAxis.data()->pixelOrientation();
                 else
-                    upper = mKeyAxis.data()->axisRect()->height() * mWidth * 0.5
+                    upper = axisRectOf(mKeyAxis.data())->height() * mWidth * 0.5
                         * mKeyAxis.data()->pixelOrientation();
                 lower = -upper;
             }

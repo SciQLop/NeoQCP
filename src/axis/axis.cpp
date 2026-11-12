@@ -196,7 +196,7 @@ void QCPGrid::draw(QCPPainter* painter)
 
     // The grid layer maps a tick from its own axis range, which a linked axis does not follow:
     // a linked axis' grid is painted here.
-    if (auto* plot = mParentAxis->parentPlot())
+    if (QCustomPlot* plot = mParentAxis->parentPlot())
     {
         if (plot->gridRhiLayer() && !painter->isExporting() && !mParentAxis->linkSource())
             return;
@@ -221,7 +221,7 @@ void QCPGrid::drawGridLines(QCPPainter* painter) const
         return;
     }
 
-    const auto* ar = mParentAxis->axisRect();
+    const QCPAxisRect* ar = mParentAxis->axisRect();
     const bool horizontal = (mParentAxis->orientation() == Qt::Horizontal);
     auto gridLine = [&](double t) {
         return horizontal
@@ -274,7 +274,7 @@ void QCPGrid::drawSubGridLines(QCPPainter* painter) const
         return;
     }
 
-    const auto* ar = mParentAxis->axisRect();
+    const QCPAxisRect* ar = mParentAxis->axisRect();
     const bool horizontal = (mParentAxis->orientation() == Qt::Horizontal);
 
     applyAntialiasingHint(painter, mAntialiasedSubGrid, QCP::aeSubGrid);
@@ -468,7 +468,7 @@ QCPAxis::QCPAxis(QCPAxisRect* parent, AxisType type)
     setParent(parent);
     mGrid->setVisible(false);
     setAntialiased(false);
-    setLayer(mParentPlot->currentLayer()); // it's actually on that layer already, but we want it in
+    setLayer(mParentPlot->mCurrentLayer.data()); // it's actually on that layer already, but we want it in
                                            // front of the grid, so we place it on there again
 
     if (type == atTop)
@@ -513,7 +513,7 @@ QCPAxis::~QCPAxis()
   It is never \c nullptr: if the grid was deleted, a new hidden one is made on the "grid" layer
   (the QMainWindow::statusBar() pattern). The exception is a plot being destroyed: then it may be.
 */
-QCPGrid* QCPAxis::grid() const
+QCPHandle<QCPGrid> QCPAxis::grid() const
 {
     if (!mGrid && !(mParentPlot && mParentPlot->isBeingDestroyed()))
     {
@@ -522,7 +522,12 @@ QCPGrid* QCPAxis::grid() const
         if (mParentPlot && mParentPlot->layer(QLatin1String("grid")))
             mGrid->setLayer(QLatin1String("grid"));
     }
-    return mGrid;
+    return QCPHandle<QCPGrid>(mGrid);
+}
+
+QCPHandle<QCPGrid> QCPAxis::gridIfExists() const
+{
+    return QCPHandle<QCPGrid>(mGrid);
 }
 
 /* No documentation as it is a property getter */
@@ -1353,7 +1358,7 @@ void QCPAxis::rescale(bool onlyVisiblePlottables)
 {
     QCPRange newRange;
     bool haveRange = false;
-    for (QCPAbstractPlottable* plottable : plottables())
+    for (QCPAbstractPlottable* plottable : plottablesRaw())
     {
         if (!plottable->realVisibility() && onlyVisiblePlottables)
             continue;
@@ -1552,7 +1557,19 @@ QCPAxis::SelectablePart QCPAxis::getPartAt(const QPointF& pos) const
 
   \see graphs, items
 */
-QList<QCPAbstractPlottable*> QCPAxis::plottables() const
+QList<QCPHandle<QCPAbstractPlottable>> QCPAxis::plottables() const
+{
+    QList<QCPHandle<QCPAbstractPlottable>> result;
+    for (QCPAbstractPlottable* plottable : plottablesRaw())
+        result.append(QCPHandle<QCPAbstractPlottable>(plottable));
+    return result;
+}
+
+/*! \internal
+
+  The plottables raw: rescale() walks them per axis (K8).
+*/
+QList<QCPAbstractPlottable*> QCPAxis::plottablesRaw() const
 {
     QList<QCPAbstractPlottable*> result;
     if (!mParentPlot)
@@ -1594,9 +1611,9 @@ QList<QCPGraph*> QCPAxis::graphs() const
 
   \see plottables, graphs
 */
-QList<QCPAbstractItem*> QCPAxis::items() const
+QList<QCPHandle<QCPAbstractItem>> QCPAxis::items() const
 {
-    QList<QCPAbstractItem*> result;
+    QList<QCPHandle<QCPAbstractItem>> result;
     if (!mParentPlot)
         return result;
 
@@ -1609,7 +1626,7 @@ QList<QCPAbstractItem*> QCPAxis::items() const
             if ((position->system() && position->system()->usesAxis(this))
                 || position->keyAxis() == this || position->valueAxis() == this)
             {
-                result.append(item);
+                result.append(QCPHandle<QCPAbstractItem>(item));
                 break;
             }
         }
@@ -3018,10 +3035,10 @@ QCPArea* QCPAxis::area() const
 /*!
   Returns the axis rect this axis is drawn in.
 */
-QCPAxisRect* QCPAxis::axisRect() const
+QCPHandle<QCPAxisRect> QCPAxis::axisRect() const
 {
     // A cartesian axis is always drawn in a rect: that is the area it was built with.
-    return static_cast<QCPAxisRect*>(mArea);
+    return QCPHandle<QCPAxisRect>(static_cast<QCPAxisRect*>(mArea));
 }
 
 /*! \internal

@@ -326,7 +326,7 @@ void TestQCPLayout::marginGroup()
   // remove axis tick labels so axisrect margin depends on simpler values for test:
   for (int i=0; i<4; ++i)
   {
-    QList<QCPAxis*> axes = mPlot->axisRect(i)->axes();
+    const QList<QCPHandle<QCPAxis>> axes = mPlot->axisRect(i)->axes();
     for (int k=0; k<axes.size(); ++k)
       axes.at(k)->setTickLabels(false);
   }

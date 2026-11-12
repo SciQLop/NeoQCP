@@ -56,7 +56,7 @@ class QCP_LIB_DECL QCPLayer : public QObject
     Q_PROPERTY(QCustomPlot* parentPlot READ parentPlot)
     Q_PROPERTY(QString name READ name)
     Q_PROPERTY(int index READ index)
-    Q_PROPERTY(QList<QCPLayerable*> children READ children)
+    Q_PROPERTY(QList<QCPLayerable*> children READ childrenRaw)
     Q_PROPERTY(bool visible READ visible WRITE setVisible)
     Q_PROPERTY(LayerMode mode READ mode WRITE setMode)
     /// \endcond
@@ -83,13 +83,13 @@ public:
     virtual ~QCPLayer();
 
     // getters:
-    [[nodiscard]] QCustomPlot* parentPlot() const { return mParentPlot; }
+    [[nodiscard]] QCPHandle<QCustomPlot> parentPlot() const;
 
     [[nodiscard]] QString name() const { return mName; }
 
     [[nodiscard]] int index() const { return mIndex; }
 
-    [[nodiscard]] QList<QCPLayerable*> children() const { return mChildren; }
+    [[nodiscard]] QList<QCPHandle<QCPLayerable>> children() const;
 
     // One flag per child: 0 means the child is indexed and lies outside \a pixelArea on screen, so
     // it need not be drawn or hit tested; 1 means "look at it" (unindexed, on the side list, or a
@@ -177,6 +177,9 @@ private:
     mutable int mItemIndexBuilds = 0;
 
     // Every cache derived from the child list (index, axes, plottables) is stale after it changes.
+    // The Q_PROPERTY's raw READ (K6): a QList of handles is not a property type. The library's hot
+    // paths read this one too (K8).
+    [[nodiscard]] QList<QCPLayerable*> childrenRaw() const { return mChildren; }
     void childrenChanged();
     void invalidateItemIndex();
     void noteItemExtentChanged(QCPAbstractItem* item);
@@ -255,11 +258,11 @@ public:
     // getters:
     [[nodiscard]] bool visible() const { return mVisible; }
 
-    [[nodiscard]] QCustomPlot* parentPlot() const { return mParentPlot; }
+    [[nodiscard]] QCPHandle<QCustomPlot> parentPlot() const;
 
-    [[nodiscard]] QCPLayerable* parentLayerable() const { return mParentLayerable.data(); }
+    [[nodiscard]] QCPHandle<QCPLayerable> parentLayerable() const;
 
-    [[nodiscard]] QCPLayer* layer() const { return mLayer; }
+    [[nodiscard]] QCPHandle<QCPLayer> layer() const { return QCPHandle<QCPLayer>(mLayer); }
 
     [[nodiscard]] bool antialiased() const { return mAntialiased; }
 

@@ -117,7 +117,7 @@ void addSelectedItems(QCustomPlot* plot, int count)
 void TestQCPLegend::deselectSlotRemovingAnItemStillDeselectsTheOthers()
 {
   addSelectedItems(mPlot, 3);
-  auto* first = mPlot->legend->item(0);
+  QCPAbstractLegendItem* first = mPlot->legend->item(0);
   connect(first, &QCPAbstractLegendItem::selectionChanged, mPlot,
           [this, first] { QVERIFY(mPlot->legend->removeItem(first)); }, Qt::SingleShotConnection);
   mPlot->legend->setSelectedParts(QCPLegend::spNone);

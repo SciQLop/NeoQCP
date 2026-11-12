@@ -34,7 +34,7 @@ QCPColorMap2::QCPColorMap2(QCPAxis* keyAxis, QCPAxis* valueAxis)
 
     // A resize changes the axis rect's pixel size with no axis signal: the sharper image would
     // never be asked for (the recording is reused, so draw() is not called again on its own).
-    if (auto* plot = parentPlot())
+    if (QCustomPlot* plot = parentPlot())
         connect(plot, &QCustomPlot::afterLayout, this, [this]
         {
             if (mPipeline.result() && resampledForAnotherSize())
@@ -222,7 +222,7 @@ bool QCPColorMap2::resampledForAnotherSize() const
 void QCPColorMap2::onViewportChanged()
 {
     if (!mKeyAxis || !mValueAxis || !mDataSource) return;
-    auto* axisRect = mKeyAxis->axisRect();
+    auto* axisRect = axisRectOf(mKeyAxis);
     if (!axisRect) return;
 
     mPipeline.onViewportChanged(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data()));
@@ -347,7 +347,7 @@ double QCPColorMap2::selectTest(const QPointF& pos, bool onlySelectable, QVarian
     if (!mKeyAxis || !mValueAxis || !mDataSource)
         return -1;
 
-    if (!mKeyAxis.data()->axisRect()->rect().contains(pos.toPoint())
+    if (!axisRectOf(mKeyAxis.data())->rect().contains(pos.toPoint())
         && !mParentPlot->interactions().testFlag(QCP::iSelectPlottablesBeyondAxisRect))
         return -1;
 

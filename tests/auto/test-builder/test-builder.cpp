@@ -628,7 +628,7 @@ void TestBuilder::addOnAnArea()
     QCPGraph* second = rect->add<QCPGraph>(rect->axis(QCPAxis::atBottom), right).get();
     QCOMPARE(second->valueAxis(), right);
     QVERIFY(second->system() != graph->system());
-    QCOMPARE(rect->plottables(), (QList<QCPAbstractPlottable*> { graph, second }));
+    QCOMPARE(qcp::pointers(rect->plottables()), (QList<QCPAbstractPlottable*> { graph, second }));
     QCOMPARE(gMisuses, 0);
 }
 

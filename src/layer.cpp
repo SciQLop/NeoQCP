@@ -32,6 +32,7 @@
 #include "coordinate-system.h"
 #include "layout.h"
 #include "layoutelements/area.h"
+#include "layoutelements/layoutelement-axisrect.h"
 #include "painting/painter.h"
 #include "painting/plottable-rhi-layer.h"
 #include "painting/scatter-rhi-layer.h"
@@ -102,10 +103,12 @@
 
 /* start documentation of inline functions */
 
-/*! \fn QList<QCPLayerable*> QCPLayer::children() const
+/*! \fn QList<QCPHandle<QCPLayerable>> QCPLayer::children() const
 
-  Returns a list of all layerables on this layer. The order corresponds to the rendering order:
-  layerables with higher indices are drawn above layerables with lower indices.
+  Returns a list of handles to all layerables on this layer. The order corresponds to the rendering
+  order: layerables with higher indices are drawn above layerables with lower indices.
+
+  The Q_PROPERTY's READ is the raw \ref childrenRaw: a list of handles is not a property type (K6).
 */
 
 /*! \fn int QCPLayer::index() const
@@ -486,6 +489,30 @@ bool QCPLayer::canTranslateInsteadOfRepaint() const
     return true;
 }
 
+QCPHandle<QCustomPlot> QCPLayer::parentPlot() const
+{
+    return QCPHandle<QCustomPlot>(mParentPlot);
+}
+
+QList<QCPHandle<QCPLayerable>> QCPLayer::children() const
+{
+    QList<QCPHandle<QCPLayerable>> result;
+    result.reserve(mChildren.size());
+    for (QCPLayerable* child : mChildren)
+        result.append(QCPHandle<QCPLayerable>(child));
+    return result;
+}
+
+QCPHandle<QCustomPlot> QCPLayerable::parentPlot() const
+{
+    return QCPHandle<QCustomPlot>(mParentPlot);
+}
+
+QCPHandle<QCPLayerable> QCPLayerable::parentLayerable() const
+{
+    return QCPHandle<QCPLayerable>(mParentLayerable.data());
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPLayerable
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -504,15 +531,15 @@ bool QCPLayer::canTranslateInsteadOfRepaint() const
 
 /* start documentation of inline functions */
 
-/*! \fn QCPLayerable *QCPLayerable::parentLayerable() const
+/*! \fn QCPHandle<QCPLayerable> QCPLayerable::parentLayerable() const
 
   Returns the parent layerable of this layerable. The parent layerable is used to provide
   visibility hierarchies in conjunction with the method \ref realVisibility. This way, layerables
   only get drawn if their parent layerables are visible, too.
 
   Note that a parent layerable is not necessarily also the QObject parent for memory management.
-  Further, a layerable doesn't always have a parent layerable, so this function may return \c
-  nullptr.
+  Further, a layerable doesn't always have a parent layerable, so this function may return an
+  empty handle.
 
   A parent layerable is set implicitly when placed inside layout elements and doesn't need to be
   set manually by the user.
@@ -605,7 +632,7 @@ QCPLayerable::QCPLayerable(QCustomPlot* plot, QString targetLayer, QCPLayerable*
     if (mParentPlot)
     {
         if (targetLayer.isEmpty())
-            setLayer(mParentPlot->currentLayer());
+            setLayer(mParentPlot->mCurrentLayer.data());
         else if (!setLayer(targetLayer))
             qDebug() << Q_FUNC_INFO << "setting QCPlayerable initial layer to" << targetLayer
                      << "failed.";

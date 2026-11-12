@@ -92,12 +92,38 @@ QCPKeyWindow QCPCoordinateSystem::keyWindow() const
     return { };
 }
 
+QCPHandle<QCPArea> QCPCoordinateSystem::area() const
+{
+    return QCPHandle<QCPArea>(mArea);
+}
+
+QCPHandle<QCPAxisBase> QCPCoordinateSystem::keyAxis() const
+{
+    return QCPHandle<QCPAxisBase>(mKeyAxis);
+}
+
+QCPHandle<QCPAxisBase> QCPCoordinateSystem::valueAxis() const
+{
+    return QCPHandle<QCPAxisBase>(mValueAxis);
+}
+
 /*! \internal
 
   A system answers with the plottables that joined it: the cartesian projection of its axes is the
   frame they draw through, so no other rule can disagree.
 */
-QList<QCPAbstractPlottable*> QCPCoordinateSystem::plottables() const
+QList<QCPHandle<QCPAbstractPlottable>> QCPCoordinateSystem::plottables() const
+{    QList<QCPHandle<QCPAbstractPlottable>> result;
+    for (QCPAbstractPlottable* plottable : plottablesRaw())
+        result << QCPHandle<QCPAbstractPlottable>(plottable);
+    return result;
+}
+
+/*! \internal
+
+  The plottables raw: QCPAxisBase::plottables collects them per axis (K8).
+*/
+QList<QCPAbstractPlottable*> QCPCoordinateSystem::plottablesRaw() const
 {
     QList<QCPAbstractPlottable*> result;
     QCustomPlot* plot = mArea ? mArea->parentPlot() : nullptr;
@@ -186,13 +212,13 @@ QCPCartesianSystem::QCPCartesianSystem(QCPAxisRect* rect, QCPAxis* key, QCPAxis*
 
 QCPTransform QCPCartesianSystem::transform() const
 {
-    return QCPTransform(static_cast<QCPAxis*>(keyAxis()), static_cast<QCPAxis*>(valueAxis()));
+    return QCPTransform(static_cast<QCPAxis*>(keyAxis().get()), static_cast<QCPAxis*>(valueAxis().get()));
 }
 
 QRect QCPCartesianSystem::clipRect() const
 {
-    const QCPAxis* key = static_cast<QCPAxis*>(keyAxis());
-    const QCPAxis* value = static_cast<QCPAxis*>(valueAxis());
+    const QCPAxis* key = static_cast<QCPAxis*>(keyAxis().get());
+    const QCPAxis* value = static_cast<QCPAxis*>(valueAxis().get());
     if (!key || !value || !key->axisRect() || !value->axisRect())
         return { };
     return key->axisRect()->rect() & value->axisRect()->rect();
@@ -206,7 +232,7 @@ QRect QCPCartesianSystem::clipRect() const
 */
 bool QCPCartesianSystem::contains(QPointF pixel) const
 {
-    const QCPAxis* key = static_cast<QCPAxis*>(keyAxis());
+    const QCPAxis* key = static_cast<QCPAxis*>(keyAxis().get());
     if (!key || !key->axisRect() || !mArea || !mArea->parentPlot())
         return true;
     if (!transform().valid())
@@ -217,7 +243,7 @@ bool QCPCartesianSystem::contains(QPointF pixel) const
 
 QCPKeyWindow QCPCartesianSystem::keyWindow() const
 {
-    const QCPAxis* key = static_cast<QCPAxis*>(keyAxis());
+    const QCPAxis* key = static_cast<QCPAxis*>(keyAxis().get());
     if (!key)
         return { };
     return { qcp::algo::lineCacheKeyRange(key->range(),

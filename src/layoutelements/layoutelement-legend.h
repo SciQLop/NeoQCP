@@ -54,7 +54,7 @@ public:
     explicit QCPAbstractLegendItem(QCPLegend* parent);
 
     // getters:
-    QCPLegend* parentLegend() const;
+    QCPHandle<QCPLegend> parentLegend() const;
 
     QFont font() const { return mFont; }
 
@@ -125,7 +125,7 @@ public:
     QCPPlottableLegendItem(QCPLegend* parent, QCPAbstractPlottable* plottable);
 
     // getters:
-    QCPAbstractPlottable* plottable();
+    QCPHandle<QCPAbstractPlottable> plottable();
 
 protected:
     // property members:
@@ -248,8 +248,8 @@ public:
                               QVariant* details = nullptr) const override;
 
     // non-virtual methods:
-    QCPAbstractLegendItem* item(int index) const;
-    QCPPlottableLegendItem* itemWithPlottable(const QCPAbstractPlottable* plottable) const;
+    QCPHandle<QCPAbstractLegendItem> item(int index) const;
+    QCPHandle<QCPPlottableLegendItem> itemWithPlottable(const QCPAbstractPlottable* plottable) const;
     int itemCount() const;
     bool hasItem(QCPAbstractLegendItem* item) const;
     bool hasItemWithPlottable(const QCPAbstractPlottable* plottable) const;
@@ -257,7 +257,7 @@ public:
     bool removeItem(int index);
     bool removeItem(QCPAbstractLegendItem* item);
     void clearItems();
-    QList<QCPAbstractLegendItem*> selectedItems() const;
+    QList<QCPHandle<QCPAbstractLegendItem>> selectedItems() const;
 
 signals:
     void selectionChanged();
@@ -293,6 +293,9 @@ protected:
 
 private:
     Q_DISABLE_COPY(QCPLegend)
+
+    // The rows raw: the legend's own setters and selection passes loop over them (K8).
+    QCPAbstractLegendItem* itemRaw(int index) const;
 
     friend class QCustomPlot;
     friend class QCPAbstractLegendItem;

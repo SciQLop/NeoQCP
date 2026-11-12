@@ -2019,9 +2019,9 @@ QPointF QCPGraph::getFillBasePoint(QPointF matchingDataPoint) const
                 || (valueAxis->range().upper > 0
                     && valueAxis->rangeReversed())) // if range is negative, zero is on opposite
                                                     // side of key axis
-                result.setX(keyAxis->axisRect()->right());
+                result.setX(axisRectOf(keyAxis)->right());
             else
-                result.setX(keyAxis->axisRect()->left());
+                result.setX(axisRectOf(keyAxis)->left());
             result.setY(matchingDataPoint.y());
         }
         else if (keyAxis->axisType() == QCPAxis::atTop || keyAxis->axisType() == QCPAxis::atBottom)
@@ -2031,9 +2031,9 @@ QPointF QCPGraph::getFillBasePoint(QPointF matchingDataPoint) const
                 || (valueAxis->range().upper > 0
                     && valueAxis->rangeReversed())) // if range is negative, zero is on opposite
                                                     // side of key axis
-                result.setY(keyAxis->axisRect()->top());
+                result.setY(axisRectOf(keyAxis)->top());
             else
-                result.setY(keyAxis->axisRect()->bottom());
+                result.setY(axisRectOf(keyAxis)->bottom());
         }
     }
     return result;

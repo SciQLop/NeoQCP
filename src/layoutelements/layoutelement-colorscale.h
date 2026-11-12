@@ -91,7 +91,7 @@ public:
     virtual ~QCPColorScale() override;
 
     // getters:
-    QCPAxis* axis() const { return mColorAxis.data(); }
+    QCPHandle<QCPAxis> axis() const { return QCPHandle<QCPAxis>(mColorAxis.data()); }
 
     QCPAxis::AxisType type() const { return mType; }
 
@@ -119,10 +119,10 @@ public:
     void setRangeZoom(bool enabled);
 
     // non-property methods:
-    QList<QCPColorMap*> colorMaps() const;
+    QList<QCPHandle<QCPColorMap>> colorMaps() const;
 
     //! Every plottable that takes its gradient, range and scale type from this scale.
-    QList<QCPAbstractColorMapped*> users() const { return mUsers; }
+    QList<QCPHandle<QCPAbstractColorMapped>> users() const;
 
     void rescaleDataRange(bool onlyVisibleMaps);
 

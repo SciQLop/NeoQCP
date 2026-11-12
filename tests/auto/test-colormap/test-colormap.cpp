@@ -870,7 +870,7 @@ namespace {
 template <typename Plottable, typename Signal>
 void removeOn(Plottable* plottable, Signal signal)
 {
-  auto* plot = plottable->parentPlot();
+  QCustomPlot* plot = plottable->parentPlot();
   QObject::connect(plottable, signal, plot,
                    [plot, plottable] { QVERIFY(plot->removePlottable(plottable)); },
                    Qt::SingleShotConnection);
@@ -1073,7 +1073,7 @@ void TestColorMap::colourMap2JoinsItsNewPlotsScaleWhenAdded()
   auto* map = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
   const auto oldScale = mPlot->axisRect()->colorScale();
   QVERIFY(oldScale);
-  QVERIFY(oldScale->users().contains(map));
+  QVERIFY(qcp::pointers(oldScale->users()).contains(map));
 
   QCustomPlot other;
   other.resize(400, 300);
@@ -1085,7 +1085,7 @@ void TestColorMap::colourMap2JoinsItsNewPlotsScaleWhenAdded()
   QVERIFY(added);
   QVERIFY2(other.axisRect()->colorScale(), "the re-added map did not make the new rect's scale");
   QCOMPARE(added->colorScale(), other.axisRect()->colorScale().get());
-  QVERIFY(other.axisRect()->colorScale()->users().contains(added.get()));
+  QVERIFY(qcp::pointers(other.axisRect()->colorScale()->users()).contains(added.get()));
 }
 
 // The scale signals its gradient before it applies it to its users: the slot must run once the

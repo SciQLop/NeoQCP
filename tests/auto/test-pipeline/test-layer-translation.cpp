@@ -210,7 +210,7 @@ void TestPipeline::hiddenElementDoesNotBlockTranslation()
     // used to veto the pan translation fast path for every line graph.
     auto* colorScale = new QCPColorScale(mPlot);
     colorScale->setVisible(false);
-    QCOMPARE(mPlot->layer("main")->children().contains(colorScale), true);
+    QCOMPARE(qcp::pointers(mPlot->layer("main")->children()).contains(colorScale), true);
 
     auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
     QVector<double> keys(200000), values(200000);

@@ -54,7 +54,7 @@ public:
                             qobject_cast<const QCPAxis*>(valueAxis()));
     }
 
-    QRect clipRect() const override { return static_cast<QCPAxisRect*>(area())->rect(); }
+    QRect clipRect() const override { return static_cast<QCPAxisRect*>(area().get())->rect(); }
 
     QCP::Capabilities capabilities() const override
     {
@@ -833,7 +833,7 @@ void TestCoordinateSystem::aChangedSlotMayDeleteTheAxis()
     axis->setRange(0, 10);
 
     QVERIFY(deleted);
-    QVERIFY(!rect->axes().contains(axis));
+    QVERIFY(!qcp::pointers(rect->axes()).contains(axis));
 }
 
 void TestCoordinateSystem::aMovedPlottableFollowsItsNewArea()
@@ -969,9 +969,9 @@ void TestCoordinateSystem::axisPlottablesKeepTheirOrder()
     QCPGraph* g2 = plot.addGraph(rect1->axis(QCPAxis::atBottom), rect1->axis(QCPAxis::atLeft));
     QCPGraph* g3 = plot.addGraph(rect2->axis(QCPAxis::atBottom), rect2->axis(QCPAxis::atLeft));
     // Selection by system, but the plot's own order, as the axes have always answered.
-    QCOMPARE(plot.xAxis->plottables(), (QList<QCPAbstractPlottable*> { g1, g2 }));
-    QCOMPARE(rect1->plottables(), (QList<QCPAbstractPlottable*> { g1, g2 }));
-    QCOMPARE(rect2->plottables(), (QList<QCPAbstractPlottable*> { g3 }));
+    QCOMPARE(qcp::pointers(plot.xAxis->plottables()), (QList<QCPAbstractPlottable*> { g1, g2 }));
+    QCOMPARE(qcp::pointers(rect1->plottables()), (QList<QCPAbstractPlottable*> { g1, g2 }));
+    QCOMPARE(qcp::pointers(rect2->plottables()), (QList<QCPAbstractPlottable*> { g3 }));
     QCOMPARE(rect1->axis(QCPAxis::atLeft)->graphs(), (QList<QCPGraph*> { g1, g2 }));
 }
 

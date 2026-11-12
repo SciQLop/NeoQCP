@@ -93,16 +93,6 @@ using qcp::guarded;
 // thousands of items.
 // simplify: still one virtual call per child, ~15 us per click at 10 000 items; a plot-wide set of
 // selected layerables is the upgrade if clicks over 100 000 items matter.
-QList<QPointer<QCPLayerable>> guardedSelectedLayerables(const QList<QCPLayer*>& layers,
-                                                       const QCPLayerable* kept = nullptr)
-{
-    QList<QPointer<QCPLayerable>> result;
-    for (auto* layer : layers)
-        for (QCPLayerable* layerable : layer->children())
-            if (layerable != kept && layerable->mayBeSelected())
-                result.append(layerable);
-    return result;
-}
 } // namespace
 
 
@@ -682,7 +672,7 @@ void QCustomPlot::applyThemeToAxis(QCPAxis* axis)
     axis->setSelectedLabelColor(sel);
     axis->setSelectedTickLabelColor(sel);
 
-    auto* grid = axis->grid();
+    QCPGrid* grid = axis->grid();
     grid->setPen(recoloredPen(grid->pen(), mTheme->grid()));
     grid->setSubGridPen(recoloredPen(grid->subGridPen(), mTheme->subGrid()));
     grid->setZeroLinePen(recoloredPen(grid->zeroLinePen(), mTheme->grid()));
@@ -704,7 +694,7 @@ void QCustomPlot::applyTheme()
 
     for (auto* rect : axisRectsRaw())
     {
-        for (auto* axis : rect->axes())
+        for (auto* axis : rect->axesRaw())
             applyThemeToAxis(axis);
         // The rect's own scale is outside the layout tree: theme its axis here.
         if (rect->mColorScale)
@@ -1873,8 +1863,8 @@ std::pair<QCPAxis*, QCPAxis*> QCustomPlot::axesForAdd() const
     QCP_CHECK_OR_RETURN(!mBeingDestroyed, "the plot is being destroyed", {});
     const QList<QCPAxisRect*> rects = axisRectsRaw();
     QCP_CHECK_OR_RETURN(!rects.isEmpty(), "the plot has no axis rect", {});
-    const QList<QCPAxis*> keyAxes = rects.first()->axes(QCPAxis::atBottom);
-    const QList<QCPAxis*> valueAxes = rects.first()->axes(QCPAxis::atLeft);
+    const QList<QCPAxis*> keyAxes = rects.first()->axesRaw(QCPAxis::atBottom);
+    const QList<QCPAxis*> valueAxes = rects.first()->axesRaw(QCPAxis::atLeft);
     QCP_CHECK_OR_RETURN(!keyAxes.isEmpty() && !valueAxes.isEmpty(),
                         "the default axis rect has no bottom or left axis", {});
     return {keyAxes.first(), valueAxes.first()};
@@ -2334,7 +2324,7 @@ void QCustomPlot::unlistLayer(QCPLayer* layer)
         : mLayers.at(isFirstLayer ? removedIndex + 1 : removedIndex - 1);
     if (targetLayer)
     {
-        QList<QCPLayerable*> children = layer->children();
+        QList<QCPLayerable*> children = layer->childrenRaw();
         if (isFirstLayer) // prepend in reverse order (such that relative order stays the same)
             std::reverse(children.begin(), children.end());
         for (QCPLayerable* child : children)
@@ -2695,6 +2685,18 @@ QList<QCPHandle<QCPLegend>> QCustomPlot::selectedLegends() const
 
   \see setInteractions, selectedPlottables, selectedItems, selectedAxes, selectedLegends
 */
+QList<QPointer<QCPLayerable>>
+QCustomPlot::guardedSelectedLayerables(const QList<QCPLayer*>& layers,
+                                       const QCPLayerable* kept) const
+{
+    QList<QPointer<QCPLayerable>> result;
+    for (QCPLayer* layer : layers)
+        for (QCPLayerable* layerable : layer->childrenRaw())
+            if (layerable != kept && layerable->mayBeSelected())
+                result.append(layerable);
+    return result;
+}
+
 void QCustomPlot::deselectAll()
 {
     for (const auto& layerable : guardedSelectedLayerables(mLayers))
@@ -3052,7 +3054,7 @@ void QCustomPlot::rescaleAxes(bool onlyVisiblePlottables)
     const QCPEmissionScope scope(this);
     QList<QPointer<QCPAxisBase>> allAxes;
     for (QCPArea* area : areasRaw())
-        allAxes << guarded(area->allAxes());
+        allAxes << guarded(qcp::pointers(area->allAxes()));
 
     for (const auto& axis : allAxes)
         if (axis) // a rangeChanged slot may delete the others
@@ -3562,7 +3564,7 @@ void QCustomPlot::uploadLayerTextures(QRhiResourceUpdateBatch* updates, const QS
         {
             for (auto* ar : axisRectsRaw())
             {
-                for (auto* axis : ar->axes())
+                for (auto* axis : ar->axesRaw())
                     grl->registerAxis(axis);
             }
         }
@@ -4787,8 +4789,8 @@ void QCustomPlot::processRectZoom(QRect rect, [[maybe_unused]] QMouseEvent* even
 {
     if (QCPAxisRect* axisRect = qobject_cast<QCPAxisRect*>(areaAtRaw(rect.topLeft())))
     {
-        QList<QCPAxis*> affectedAxes = QList<QCPAxis*>()
-            << axisRect->rangeZoomAxes(Qt::Horizontal) << axisRect->rangeZoomAxes(Qt::Vertical);
+        QList<QCPAxis*> affectedAxes = qcp::pointers(axisRect->rangeZoomAxes(Qt::Horizontal));
+        affectedAxes << qcp::pointers(axisRect->rangeZoomAxes(Qt::Vertical));
         affectedAxes.removeAll(static_cast<QCPAxis*>(nullptr));
         const QPointer<QCustomPlot> alive(this); // a rangeChanged slot may delete the plot
         axisRect->zoom(QRectF(rect), affectedAxes);
@@ -4876,7 +4878,7 @@ bool QCustomPlot::registerPlottable(QCPAbstractPlottable* plottable)
         plottable->addToLegend();
     if (!plottable->layer()) // usually the layer is already set in the constructor of the plottable
                              // (via QCPLayerable constructor)
-        plottable->setLayer(currentLayer());
+        plottable->setLayer(mCurrentLayer.data());
     return true;
 }
 
@@ -4975,7 +4977,7 @@ bool QCustomPlot::registerItem(QCPAbstractItem* item)
     if (QCPLayer* annotations = layer(QLatin1String("annotations")))
         item->setLayer(annotations);
     else if (!item->layer())
-        item->setLayer(currentLayer());
+        item->setLayer(mCurrentLayer.data());
     if (mTheme) {
         if (auto* textItem = qobject_cast<QCPItemText*>(item)) {
             textItem->setColor(mTheme->foreground());
@@ -5022,7 +5024,7 @@ QList<QCPHit> QCustomPlot::hitsAt(const QPointF& pos, QCPHitAction action) const
     for (int layerIndex = mLayers.size() - 1; layerIndex >= 0; --layerIndex)
     {
         const QCPLayer* layer = mLayers.at(layerIndex);
-        const QList<QCPLayerable*> layerables = layer->children();
+        const QList<QCPLayerable*> layerables = layer->childrenRaw();
         // One tree lookup per layer, for the click point inflated by the selection tolerance: an
         // indexed item whose box misses it cannot be hit, so its selectTest() is not called.
         const std::vector<std::uint8_t>* candidates = nullptr;

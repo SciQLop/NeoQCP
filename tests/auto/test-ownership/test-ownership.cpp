@@ -388,7 +388,7 @@ void TestOwnership::clearItemsKeepsOtherLayersOrder()
     {
         const auto kids = mPlot->layer("main")->children();
         QVERIFY(kids.contains(graph.get())); // the layer keeps its non-item content
-        for (auto* kid : kids)
+        for (QCPLayerable* kid : kids)
             QVERIFY2(!qobject_cast<QCPAbstractItem*>(kid), "an item is still in the layer");
     }
     QVERIFY(upper->children().isEmpty());
@@ -440,14 +440,14 @@ void TestOwnership::layerOrderAfterMoves()
     auto second = mPlot->add<QCPGraph>();
     first->setLayer(upper);
     second->setLayer(upper);
-    QVERIFY(upper->children() == (QList<QCPLayerable*> { first.get(), second.get() }));
+    QVERIFY(qcp::pointers(upper->children()) == (QList<QCPLayerable*> { first.get(), second.get() }));
 
     first->setLayer(third);
-    QVERIFY(third->children() == QList<QCPLayerable*> { first.get() });
-    QVERIFY(upper->children() == QList<QCPLayerable*> { second.get() });
+    QVERIFY(qcp::pointers(third->children()) == QList<QCPLayerable*> { first.get() });
+    QVERIFY(qcp::pointers(upper->children()) == QList<QCPLayerable*> { second.get() });
 
     first->setLayer(upper); // coming back appends: drawing order is the layer list order
-    QVERIFY(upper->children() == (QList<QCPLayerable*> { second.get(), first.get() }));
+    QVERIFY(qcp::pointers(upper->children()) == (QList<QCPLayerable*> { second.get(), first.get() }));
     QVERIFY(third->children().isEmpty());
     draw();
 }
@@ -477,7 +477,7 @@ void TestOwnership::deleteAxisLeavesRectAndShortcuts()
 
     delete y;
 
-    QVERIFY(!mPlot->axisRect()->axes().contains(y));
+    QVERIFY(!qcp::pointers(mPlot->axisRect()->axes()).contains(y));
     QCOMPARE(mPlot->axisRect()->axisCount(QCPAxis::atLeft), 0);
     QVERIFY(mPlot->yAxis == nullptr);
     QVERIFY(graph->valueAxis() == nullptr);
@@ -508,7 +508,7 @@ void TestOwnership::plottablesOfAnotherRectAfterAxisRemoval()
     QVERIFY(graph->keyAxis() == nullptr);
     QVERIFY(mPlot->axisRect(0)->plottables().isEmpty());
     QVERIFY(mPlot->axisRect(0)->graphs().isEmpty());
-    QVERIFY(mPlot->axisRect(0)->items().contains(line)); // its end and clip rect are still there
+    QVERIFY(qcp::pointers(mPlot->axisRect(0)->items()).contains(line)); // its end and clip rect are still there
     QVERIFY(second->plottables().isEmpty());
     mPlot->replot();
     const QRect rect = mPlot->axisRect(0)->rect();
@@ -525,7 +525,7 @@ void TestOwnership::plottablesOfAnotherRectAfterAxisRemoval()
 
 void TestOwnership::deleteGridTwiceSafe()
 {
-    QPointer<QCPGrid> old = mPlot->xAxis->grid();
+    QPointer<QCPGrid> old(mPlot->xAxis->grid());
 
     delete old.data();
 
@@ -590,7 +590,7 @@ void TestOwnership::deleteLayerLeavesLists()
     QCOMPARE(mPlot->layerCount(), count - 1);
     QVERIFY(mPlot->layer("extra") == nullptr);
     QCOMPARE(graph->layer(), main);
-    QVERIFY(main->children().contains(graph));
+    QVERIFY(qcp::pointers(main->children()).contains(graph));
     QCOMPARE(mPlot->currentLayer(), main);
     mPlot->replot();
     QCoreApplication::processEvents();
@@ -755,7 +755,7 @@ void TestOwnership::polarRemoveGraphUnlistsFirst()
     mPlot->plotLayout()->clear();
     auto* area = new QCPPolarArea(mPlot);
     mPlot->plotLayout()->addElement(0, 0, area);
-    auto* angular = area->angularAxis();
+    QCPPolarAxisAngular* angular = area->angularAxis();
     auto* first = new QCPPolarGraph(angular, area->radialAxis());
     auto* second = new QCPPolarGraph(angular, area->radialAxis());
     first->setData(QVector<double> { 0, 90 }, QVector<double> { 1, 2 });

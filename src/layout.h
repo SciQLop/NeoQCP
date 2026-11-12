@@ -119,7 +119,8 @@ public:
     virtual ~QCPLayoutElement() override;
 
     // getters:
-    QCPLayout* layout() const { return mParentLayout; }
+    // Out of line: the handle of the parent layout needs the complete QCPLayout (K1).
+    QCPHandle<QCPLayout> layout() const;
 
     QRect rect() const { return mRect; }
 
@@ -165,7 +166,7 @@ public:
     virtual void markLayoutAppearanceDirty();
     virtual QSize minimumOuterSizeHint() const;
     virtual QSize maximumOuterSizeHint() const;
-    virtual QList<QCPLayoutElement*> elements(bool recursive) const;
+    virtual QList<QCPHandle<QCPLayoutElement>> elements(bool recursive) const;
 
     // reimplemented virtual methods:
     virtual double selectTest(const QPointF& pos, bool onlySelectable,
@@ -214,11 +215,11 @@ public:
 
     // reimplemented virtual methods:
     virtual void update(UpdatePhase phase) override;
-    virtual QList<QCPLayoutElement*> elements(bool recursive) const override;
+    virtual QList<QCPHandle<QCPLayoutElement>> elements(bool recursive) const override;
 
     // introduced virtual methods:
     virtual int elementCount() const = 0;
-    virtual QCPLayoutElement* elementAt(int index) const = 0;
+    virtual QCPHandle<QCPLayoutElement> elementAt(int index) const = 0;
     virtual QCPLayoutElement* takeAt(int index) = 0;
     virtual bool take(QCPLayoutElement* element) = 0;
     virtual void simplify();
@@ -319,16 +320,16 @@ public:
 
     virtual int elementCount() const override { return rowCount() * columnCount(); }
 
-    virtual QCPLayoutElement* elementAt(int index) const override;
+    virtual QCPHandle<QCPLayoutElement> elementAt(int index) const override;
     virtual QCPLayoutElement* takeAt(int index) override;
     virtual bool take(QCPLayoutElement* element) override;
-    virtual QList<QCPLayoutElement*> elements(bool recursive) const override;
+    virtual QList<QCPHandle<QCPLayoutElement>> elements(bool recursive) const override;
     virtual void simplify() override;
     virtual QSize minimumOuterSizeHint() const override;
     virtual QSize maximumOuterSizeHint() const override;
 
     // non-virtual methods:
-    QCPLayoutElement* element(int row, int column) const;
+    QCPHandle<QCPLayoutElement> element(int row, int column) const;
     bool addElement(int row, int column, QCPLayoutElement* element);
     bool addElement(QCPLayoutElement* element);
     bool hasElement(int row, int column);
@@ -389,7 +390,7 @@ public:
     // reimplemented virtual methods:
     virtual void updateLayout() override;
     virtual int elementCount() const override;
-    virtual QCPLayoutElement* elementAt(int index) const override;
+    virtual QCPHandle<QCPLayoutElement> elementAt(int index) const override;
     virtual QCPLayoutElement* takeAt(int index) override;
     virtual bool take(QCPLayoutElement* element) override;
 

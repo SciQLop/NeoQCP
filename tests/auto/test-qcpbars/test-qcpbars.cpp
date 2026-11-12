@@ -515,7 +515,7 @@ void TestQCPBars::aBarLeavingItsSystemLeavesItsStackAndGroup()
     QCOMPARE(lower->barAbove(), nullptr);
     QCOMPARE(upper->barsGroup(), nullptr);
     QCOMPARE(group->bars(), QList<QCPBars*> { lower });
-    QCOMPARE(rect2->plottables(), QList<QCPAbstractPlottable*> { upper });
+    QCOMPARE(qcp::pointers(rect2->plottables()), QList<QCPAbstractPlottable*> { upper });
 
     // Both are drawn, each in its own rect: a bar's body shows its own brush in either frame.
     mPlot->replot(QCustomPlot::rpImmediateRefresh);

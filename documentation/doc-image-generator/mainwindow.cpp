@@ -537,7 +537,8 @@ void MainWindow::genLayoutsystem_MultipleAxisRects()
   // according layers, if we don't want the grid to be drawn above the axes etc.
   // place the axis on "axes" layer and grids on the "grid" layer, which is below "axes":
   QList<QCPAxis*> allAxes;
-  allAxes << bottomAxisRect->axes() << leftAxisRect->axes() << rightAxisRect->axes();
+  allAxes << qcp::pointers(bottomAxisRect->axes()) << qcp::pointers(leftAxisRect->axes())
+            << qcp::pointers(rightAxisRect->axes());
   foreach (QCPAxis *axis, allAxes)
   {
     axis->setLayer("axes");
@@ -1158,7 +1159,7 @@ void MainWindow::genQCPColorMap_TightBoundary()
   (void)customPlot->moveLayer(customPlot->layer("main"), customPlot->layer("grid"), QCustomPlot::limBelow);
   QCPAxisRect *ar1 = customPlot->axisRect();
   QCPAxisRect *ar2 = new QCPAxisRect(customPlot);
-  foreach (QCPAxis *axis, QList<QCPAxis*>() << ar1->axes() << ar2->axes())
+  foreach (QCPAxis *axis, QList<QCPAxis*>() << qcp::pointers(ar1->axes()) << qcp::pointers(ar2->axes()))
   {
     axis->setTickLabels(false);
     axis->setLayer("axes");
@@ -1186,7 +1187,7 @@ void MainWindow::genQCPColorMap_TightBoundary()
   cm2->rescaleDataRange();
   cm1->rescaleAxes();
   cm2->rescaleAxes();
-  foreach (QCPAxis *axis, QList<QCPAxis*>() << ar1->axes() << ar2->axes())
+  foreach (QCPAxis *axis, QList<QCPAxis*>() << qcp::pointers(ar1->axes()) << qcp::pointers(ar2->axes()))
     axis->setRange(-3, 3);
   
   QCPItemText *t1 = new QCPItemText(customPlot);
@@ -1277,7 +1278,7 @@ void MainWindow::genQCPColorGradient_LevelCount()
   t2->setClipToAxisRect(false);
   
   QList<QCPAxis*> allAxes;
-  allAxes << r1->axes() << r2->axes();
+  allAxes << qcp::pointers(r1->axes()) << qcp::pointers(r2->axes());
   foreach (QCPAxis *axis, allAxes)
   {
     axis->setLayer("axes");
@@ -1357,7 +1358,7 @@ void MainWindow::genQCPColorGradient_Periodic()
   t2->setClipToAxisRect(false);
   
   QList<QCPAxis*> allAxes;
-  allAxes << r1->axes() << r2->axes();
+  allAxes << qcp::pointers(r1->axes()) << qcp::pointers(r2->axes());
   foreach (QCPAxis *axis, allAxes)
   {
     axis->setLayer("axes");
@@ -1498,7 +1499,7 @@ void MainWindow::addGridLayoutOutline(QCPLayoutGrid *layout)
 {
   QList<QCPLayoutElement*> elements;
   elements << layout;
-  elements << layout->elements(true);
+  elements << qcp::pointers(layout->elements(true));
   for (int i=0; i<elements.size(); ++i)
   {
     if (!elements.at(i))

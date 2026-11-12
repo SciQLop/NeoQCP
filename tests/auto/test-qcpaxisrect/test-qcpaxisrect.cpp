@@ -101,7 +101,7 @@ void TestQCPAxisRect::multiAxis()
   QCOMPARE(ar->axisCount(QCPAxis::atTop), 1);
   
   // test adding of axes:
-  QList<QCPAxis*> newAxes = ar->addAxes(QCPAxis::atLeft | QCPAxis::atBottom);
+  QList<QCPHandle<QCPAxis>> newAxes = ar->addAxes(QCPAxis::atLeft | QCPAxis::atBottom);
   QCOMPARE(newAxes.size(), 2);
   QCOMPARE(ar->axisCount(QCPAxis::atLeft), 2);
   QCOMPARE(ar->axisCount(QCPAxis::atBottom), 2);
@@ -564,10 +564,10 @@ void TestQCPAxisRect::defaultSetKeepsThePrimaryAxisFirst()
   QCOMPARE(ar->rangeDragAxis(Qt::Vertical), mPlot->yAxis);
   QCOMPARE(ar->rangeZoomAxis(Qt::Horizontal), mPlot->xAxis);
   QCOMPARE(ar->rangeZoomAxis(Qt::Vertical), mPlot->yAxis);
-  QCOMPARE(ar->rangeDragAxes(Qt::Horizontal), (QList<QCPAxis*> { mPlot->xAxis, mPlot->xAxis2 }));
-  QCOMPARE(ar->rangeDragAxes(Qt::Vertical), (QList<QCPAxis*> { mPlot->yAxis, mPlot->yAxis2 }));
-  QCOMPARE(ar->rangeZoomAxes(Qt::Horizontal), (QList<QCPAxis*> { mPlot->xAxis, mPlot->xAxis2 }));
-  QCOMPARE(ar->rangeZoomAxes(Qt::Vertical), (QList<QCPAxis*> { mPlot->yAxis, mPlot->yAxis2 }));
+  QCOMPARE(qcp::pointers(ar->rangeDragAxes(Qt::Horizontal)), (QList<QCPAxis*> { mPlot->xAxis, mPlot->xAxis2 }));
+  QCOMPARE(qcp::pointers(ar->rangeDragAxes(Qt::Vertical)), (QList<QCPAxis*> { mPlot->yAxis, mPlot->yAxis2 }));
+  QCOMPARE(qcp::pointers(ar->rangeZoomAxes(Qt::Horizontal)), (QList<QCPAxis*> { mPlot->xAxis, mPlot->xAxis2 }));
+  QCOMPARE(qcp::pointers(ar->rangeZoomAxes(Qt::Vertical)), (QList<QCPAxis*> { mPlot->yAxis, mPlot->yAxis2 }));
 }
 
 void TestQCPAxisRect::optedOutAxisStaysPut()

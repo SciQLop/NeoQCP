@@ -64,7 +64,7 @@ public:
 
     Qt::AspectRatioMode backgroundScaledMode() const { return mBackgroundScaledMode; }
 
-    QCPLayoutInset* insetLayout() const { return mInsetLayout; }
+    QCPHandle<QCPLayoutInset> insetLayout() const { return QCPHandle<QCPLayoutInset>(mInsetLayout); }
 
     // setters:
     void setBackground(const QPixmap& pm);
@@ -76,10 +76,10 @@ public:
 
     // reimplemented virtual methods:
     virtual void update(UpdatePhase phase) override;
-    virtual QList<QCPLayoutElement*> elements(bool recursive) const override;
+    virtual QList<QCPHandle<QCPLayoutElement>> elements(bool recursive) const override;
 
     //! The axes of the area, as the base type the range model lives in.
-    virtual QList<QCPAxisBase*> allAxes() const = 0;
+    virtual QList<QCPHandle<QCPAxisBase>> allAxes() const = 0;
 
     //! Marks (or invalidates) the layers of everything this area draws: its axes, its grids and the
     //! plottables of its systems.
@@ -88,9 +88,9 @@ public:
     // The system of \a key and \a value: the one the area already made for that ordered pair, or a
     // new one. A pair that is not two axes of this area (or, for a cartesian area, two axes of one
     // orientation) is reported as misuse and answers null.
-    QCPCoordinateSystem* system(QCPAxisBase* key, QCPAxisBase* value);
+    QCPHandle<QCPCoordinateSystem> system(QCPAxisBase* key, QCPAxisBase* value);
     //! The systems the area owns, in creation order.
-    QList<QCPCoordinateSystem*> systems() const;
+    QList<QCPHandle<QCPCoordinateSystem>> systems() const;
     //! Whether any of those systems has a listener on its changed() signal.
     [[nodiscard]] bool systemsListen() const;
 
@@ -132,6 +132,10 @@ protected:
     // ones, and each refuses the pairs it cannot map.
     virtual QCPCoordinateSystem* createSystem(QCPAxisBase* key, QCPAxisBase* value) = 0;
 
+    //! The axes raw, for the area's own system lookup (K8): a subclass that can answer without
+    //! building handles overrides it. The default converts allAxes().
+    virtual QList<QCPAxisBase*> allAxesRaw() const { return qcp::pointers(allAxes()); }
+
     // non-property methods:
     //! Draws the background inside the area's shape: the whole rect here, a subclass may narrow it
     //! (a polar area keeps it inside its disc).
@@ -147,6 +151,12 @@ private:
     void detachFromSystem(QCPCoordinateSystem* system);
     //! Drops the systems a direct `delete` left behind as null pointers.
     void pruneSystems() const;
+    // The systems raw: QCPAxisBase::plottables walks them per axis, so it reads this one (K8).
+    QList<QCPCoordinateSystem*> systemsRaw() const;
+    // The system lookup raw: an item position asks per position, so it skips the handle (K8).
+    QCPCoordinateSystem* systemRaw(QCPAxisBase* key, QCPAxisBase* value);
+    friend class QCPAxisBase;
+    friend QCPCoordinateSystem* qcpSystemOfAxes(QCPAxis*, QCPAxis*);
 
     Q_DISABLE_COPY(QCPArea)
 };

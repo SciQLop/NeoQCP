@@ -486,7 +486,7 @@ double QCPFinancial::selectTest(const QPointF& pos, bool onlySelectable,
     if (!mKeyAxis || !mValueAxis)
         return -1;
 
-    if (mKeyAxis.data()->axisRect()->rect().contains(pos.toPoint())
+    if (axisRectOf(mKeyAxis.data())->rect().contains(pos.toPoint())
         || mParentPlot->interactions().testFlag(QCP::iSelectPlottablesBeyondAxisRect))
     {
         // get visible data range:
@@ -897,13 +897,13 @@ double QCPFinancial::getPixelWidth(double key, double keyPixel) const
         }
         case wtAxisRectRatio:
         {
-            if (mKeyAxis && mKeyAxis.data()->axisRect())
+            if (mKeyAxis && axisRectOf(mKeyAxis.data()))
             {
                 if (mKeyAxis.data()->orientation() == Qt::Horizontal)
-                    result = mKeyAxis.data()->axisRect()->width() * mWidth * 0.5
+                    result = axisRectOf(mKeyAxis.data())->width() * mWidth * 0.5
                         * mKeyAxis.data()->pixelOrientation();
                 else
-                    result = mKeyAxis.data()->axisRect()->height() * mWidth * 0.5
+                    result = axisRectOf(mKeyAxis.data())->height() * mWidth * 0.5
                         * mKeyAxis.data()->pixelOrientation();
             }
             else

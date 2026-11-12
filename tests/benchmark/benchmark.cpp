@@ -1822,8 +1822,9 @@ public:
         if (!mMapping || mBuiltRevision != revision())
         {
             mMapping = std::make_shared<const BenchSkewMapping>(
-                qobject_cast<const QCPAxis*>(keyAxis()), qobject_cast<const QCPAxis*>(valueAxis()),
-                0.5, static_cast<const QCPAxisRect*>(area())->rect().bottom());
+                qobject_cast<const QCPAxis*>(keyAxis().get()),
+                qobject_cast<const QCPAxis*>(valueAxis().get()),
+                0.5, static_cast<const QCPAxisRect*>(area().get())->rect().bottom());
             mBuiltRevision = revision();
         }
         return QCPTransform::custom(mMapping, mBuiltRevision);

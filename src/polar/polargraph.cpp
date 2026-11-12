@@ -81,14 +81,16 @@ QCPPolarGraph::QCPPolarGraph(QCPCoordinateSystem* system, QCP::Capabilities requ
     setBrush(Qt::NoBrush);
 }
 
-QCPPolarAxisAngular* QCPPolarGraph::angularAxis() const
+QCPHandle<QCPPolarAxisAngular> QCPPolarGraph::angularAxis() const
 {
-    return qobject_cast<QCPPolarAxisAngular*>(system() ? system()->keyAxis() : nullptr);
+    return QCPHandle<QCPPolarAxisAngular>(
+        qobject_cast<QCPPolarAxisAngular*>(system() ? system()->keyAxis() : nullptr));
 }
 
-QCPPolarAxisRadial* QCPPolarGraph::radialAxis() const
+QCPHandle<QCPPolarAxisRadial> QCPPolarGraph::radialAxis() const
 {
-    return qobject_cast<QCPPolarAxisRadial*>(system() ? system()->valueAxis() : nullptr);
+    return QCPHandle<QCPPolarAxisRadial>(
+        qobject_cast<QCPPolarAxisRadial*>(system() ? system()->valueAxis() : nullptr));
 }
 
 void QCPPolarGraph::setPeriodic(bool enabled)

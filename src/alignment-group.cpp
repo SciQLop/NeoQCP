@@ -103,9 +103,14 @@ void QCPAlignmentGroup::remove(QCPLayoutElement* element)
     }
 }
 
-QList<QCPLayoutElement*> QCPAlignmentGroup::elements() const
+QList<QCPHandle<QCPLayoutElement>> QCPAlignmentGroup::elements() const
 {
-    return liveMembers();
+    QList<QCPHandle<QCPLayoutElement>> result;
+    const QList<QCPLayoutElement*> members = liveMembers();
+    result.reserve(members.size());
+    for (QCPLayoutElement* member : members)
+        result.append(QCPHandle<QCPLayoutElement>(member));
+    return result;
 }
 
 // simplify: every member asks for the shared edge and this recomputes each member's requirement,

@@ -24,6 +24,12 @@ private slots:
     void aDeletedDefaultAxisTestsFalse();
     void aDeletedLegendTestsFalse();
     void addGraphReturnsTheSameHandleAsAdd();
+    void theLayoutHandsOutHandles();
+    void theAxesHandOutHandles();
+    void theLegendHandsOutHandles();
+    void theLayersHandOutHandles();
+    void theSystemsAndPolarHandOutHandles();
+    void everyObjectPropertyReadsThroughQObjectProperty();
     void handleAsCast();
     void handleRemove();
     void deadHandleReportsMisuse();

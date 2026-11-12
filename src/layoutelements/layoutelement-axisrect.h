@@ -30,6 +30,17 @@
 #include "../global.h"
 #include "area.h"
 #include <concepts>
+#include <tuple>
+
+namespace qcp
+{
+// The first argument of QCPAxisRect::add<T>() is an axis pair when it converts to QCPAxis*: the
+// two-axis overload must take that call, not the data pack (a handle converts, H-8).
+template <typename... Args>
+concept FirstArgumentIsNotAnAxis
+    = sizeof...(Args) == 0
+      || !std::convertible_to<std::tuple_element_t<0, std::tuple<Args...>>, QCPAxis*>;
+} // namespace qcp
 
 class QCPPainter;
 class QCustomPlot;
@@ -65,10 +76,10 @@ public:
 
     Qt::Orientations rangeZoom() const { return mRangeZoom; }
 
-    QCPAxis* rangeDragAxis(Qt::Orientation orientation);
-    QCPAxis* rangeZoomAxis(Qt::Orientation orientation);
-    QList<QCPAxis*> rangeDragAxes(Qt::Orientation orientation);
-    QList<QCPAxis*> rangeZoomAxes(Qt::Orientation orientation);
+    QCPHandle<QCPAxis> rangeDragAxis(Qt::Orientation orientation);
+    QCPHandle<QCPAxis> rangeZoomAxis(Qt::Orientation orientation);
+    QList<QCPHandle<QCPAxis>> rangeDragAxes(Qt::Orientation orientation);
+    QList<QCPHandle<QCPAxis>> rangeZoomAxes(Qt::Orientation orientation);
     double rangeZoomFactor(Qt::Orientation orientation);
 
     // setters:
@@ -88,10 +99,10 @@ public:
 
     // non-property methods:
     int axisCount(QCPAxis::AxisType type) const;
-    QCPAxis* axis(QCPAxis::AxisType type, int index = 0) const;
-    QList<QCPAxis*> axes(QCPAxis::AxisTypes types) const;
-    QList<QCPAxis*> axes() const;
-    QList<QCPAxisBase*> allAxes() const override;
+    QCPHandle<QCPAxis> axis(QCPAxis::AxisType type, int index = 0) const;
+    QList<QCPHandle<QCPAxis>> axes(QCPAxis::AxisTypes types) const;
+    QList<QCPHandle<QCPAxis>> axes() const;
+    QList<QCPHandle<QCPAxisBase>> allAxes() const override;
     QCPRatioTransform ratioTransform() const override;
 
     // The handle form of addAxis(type): the rect owns the new axis.
@@ -108,14 +119,15 @@ public:
     // setData. Defined in construct.h, where the construction rules live.
     template <typename T, typename... Args>
         requires std::derived_from<T, QCPAbstractPlottable>
+              && qcp::FirstArgumentIsNotAnAxis<Args...>
     qcp::HandleFor<T> add(Args&&... args);
 
     template <typename T, typename... Args>
         requires std::derived_from<T, QCPAbstractPlottable>
     qcp::HandleFor<T> add(QCPAxis* key, QCPAxis* value, Args&&... args);
 
-    QCPAxis* addAxis(QCPAxis::AxisType type, QCPAxis* axis = nullptr);
-    QList<QCPAxis*> addAxes(QCPAxis::AxisTypes types);
+    QCPHandle<QCPAxis> addAxis(QCPAxis::AxisType type, QCPAxis* axis = nullptr);
+    QList<QCPHandle<QCPAxis>> addAxes(QCPAxis::AxisTypes types);
     bool removeAxis(QCPAxis* axis);
 
     void zoom(const QRectF& pixelRect);
@@ -125,9 +137,9 @@ public:
     // Scales the range zoom axes by factor (< 1 zooms in) around the pixel pos.
     void zoomAt(const QPointF& pos, double factor);
     void setupFullAxesBox(bool connectRanges = false);
-    QList<QCPAbstractPlottable*> plottables() const;
+    QList<QCPHandle<QCPAbstractPlottable>> plottables() const;
     QList<QCPGraph*> graphs() const;
-    QList<QCPAbstractItem*> items() const;
+    QList<QCPHandle<QCPAbstractItem>> items() const;
     //! The colour scale this rect owns and places in its margin, made on first call. It is visible
     //! exactly while a plottable uses it.
     QCPColorScaleOps<QCPColorScale> colorScale();
@@ -198,6 +210,7 @@ protected:
     virtual void wheelEvent(QWheelEvent* event) override;
 
     // non-property methods:
+    QList<QCPAxisBase*> allAxesRaw() const override;
     void updateAxesOffset(QCPAxis::AxisType type);
     void zoomAxesAt(const QPointF& pos, double horizontalFactor, double verticalFactor);
     void markAffectedLayersDirty(bool invalidate = false) override;
@@ -215,6 +228,10 @@ private:
     void placeColorScale();
     // The scale gained or lost a user, or changed the side or width it needs: the margin moves.
     void colorScaleUsersChanged();
+    // The axes raw, for the rect's own layout and range passes (K8): the public lists hand out
+    // handles.
+    QList<QCPAxis*> axesRaw(QCPAxis::AxisTypes types) const;
+    QList<QCPAxis*> axesRaw() const;
     // The axes of that orientation a drag (or zoom) moves: the explicit set, or the default one.
     QList<QCPAxis*> effectiveRangeAxes(bool drag, Qt::Orientation orientation) const;
     // One axis per source: a listed source moves itself, otherwise the first listed axis linked

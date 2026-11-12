@@ -53,7 +53,8 @@ public:
         if (!mMapping || mBuiltRevision != revision())
         {
             mMapping = std::make_shared<const ShearMapping>(
-                static_cast<const QCPAxis*>(keyAxis()), static_cast<const QCPAxis*>(valueAxis()),
+                static_cast<const QCPAxis*>(keyAxis().get()),
+                static_cast<const QCPAxis*>(valueAxis().get()),
                 mShear, rect().bottom());
             mBuiltRevision = revision();
         }
@@ -73,7 +74,7 @@ public:
     }
 
 private:
-    QRect rect() const { return static_cast<const QCPAxisRect*>(area())->rect(); }
+    QRect rect() const { return static_cast<const QCPAxisRect*>(area().get())->rect(); }
 
     mutable std::shared_ptr<const ShearMapping> mMapping;
     mutable quint64 mBuiltRevision = 0;

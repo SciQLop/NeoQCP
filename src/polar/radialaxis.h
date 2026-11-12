@@ -86,7 +86,7 @@ public:
     QCPPolarArea* area() const override;
 
     // Out of line: QCPPolarArea is incomplete here.
-    QCPPolarAxisAngular* angularAxis() const;
+    QCPHandle<QCPPolarAxisAngular> angularAxis() const;
 
     double angle() const { return mAngle; }
 

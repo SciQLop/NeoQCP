@@ -72,7 +72,7 @@ void TestTheme::applyThemePropagatesGridColors()
 {
     auto* theme = QCPTheme::dark();
     mPlot->setTheme(theme);
-    auto* grid = mPlot->xAxis->grid();
+    QCPGrid* grid = mPlot->xAxis->grid();
     QCOMPARE(grid->pen().color(), QColor("#3a3a3a"));
     QCOMPARE(grid->subGridPen().color(), QColor("#2a2a2a"));
     QCOMPARE(grid->zeroLinePen().color(), QColor("#3a3a3a"));

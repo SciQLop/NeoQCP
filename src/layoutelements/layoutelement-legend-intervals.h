@@ -11,7 +11,7 @@ class QCP_LIB_DECL QCPIntervalsLegendItem : public QCPAbstractLegendItem
 public:
     QCPIntervalsLegendItem(QCPLegend* parent, QCPIntervals* intervals);
 
-    QCPIntervals* intervals() const;
+    QCPHandle<QCPIntervals> intervals() const;
     QSize minimumOuterSizeHint() const override;
 
 protected:

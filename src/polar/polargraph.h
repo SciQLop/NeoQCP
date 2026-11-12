@@ -91,9 +91,9 @@ public:
     // getters:
     bool periodic() const { return mPeriodic; }
 
-    QCPPolarAxisAngular* angularAxis() const;
+    QCPHandle<QCPPolarAxisAngular> angularAxis() const;
 
-    QCPPolarAxisRadial* radialAxis() const;
+    QCPHandle<QCPPolarAxisRadial> radialAxis() const;
 
     QSharedPointer<QCPGraphDataContainer> data() const { return mDataContainer; }
 

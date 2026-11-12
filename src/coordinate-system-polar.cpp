@@ -36,17 +36,17 @@ QCPPolarSystem::QCPPolarSystem(QCPPolarArea* area, QCPPolarAxisAngular* angular,
 
 QCPPolarArea* QCPPolarSystem::polarArea() const
 {
-    return static_cast<QCPPolarArea*>(area());
+    return static_cast<QCPPolarArea*>(area().get());
 }
 
 QCPPolarAxisAngular* QCPPolarSystem::angularAxis() const
 {
-    return static_cast<QCPPolarAxisAngular*>(keyAxis());
+    return static_cast<QCPPolarAxisAngular*>(keyAxis().get());
 }
 
 QCPPolarAxisRadial* QCPPolarSystem::radialAxis() const
 {
-    return static_cast<QCPPolarAxisRadial*>(valueAxis());
+    return static_cast<QCPPolarAxisRadial*>(valueAxis().get());
 }
 
 QCPTransform QCPPolarSystem::transform() const

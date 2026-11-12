@@ -25,8 +25,8 @@ void TestPipeline::viewportOffsetLinearHorizontal()
 void TestPipeline::viewportOffsetLinearVertical()
 {
     QCPAxisRect* axisRect = mPlot->axisRect();
-    auto* keyAxis = axisRect->axis(QCPAxis::atLeft);
-    auto* valueAxis = axisRect->axis(QCPAxis::atBottom);
+    QCPAxis* keyAxis = axisRect->axis(QCPAxis::atLeft);
+    QCPAxis* valueAxis = axisRect->axis(QCPAxis::atBottom);
 
     QCPRange oldKey(0, 100);
     QCPRange newKey(10, 110);

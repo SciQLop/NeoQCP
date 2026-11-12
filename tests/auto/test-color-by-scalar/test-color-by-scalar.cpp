@@ -1318,7 +1318,7 @@ void TestColorByScalar::aTakenColouredLineJoinsItsNewPlotsScale()
     mg->setColorValues(std::vector<double> { 0.0, 1.0, 0.0, 1.0 });
     const auto oldScale = mPlot->axisRect()->colorScale();
     QVERIFY(oldScale);
-    QVERIFY(oldScale->users().contains(mg));
+    QVERIFY(qcp::pointers(oldScale->users()).contains(mg));
     oldScale->setGradient(QCPColorGradient(QCPColorGradient::gpHot));
     QCOMPARE(mg->gradient(), QCPColorGradient(QCPColorGradient::gpHot));
 
@@ -1333,7 +1333,7 @@ void TestColorByScalar::aTakenColouredLineJoinsItsNewPlotsScale()
     QVERIFY(added);
     QVERIFY2(other.axisRect()->colorScale(), "the re-added line did not make the new rect's scale");
     QCOMPARE(added->colorScale(), other.axisRect()->colorScale().get());
-    QVERIFY(other.axisRect()->colorScale()->users().contains(added.get()));
+    QVERIFY(qcp::pointers(other.axisRect()->colorScale()->users()).contains(added.get()));
 
     // The old scale is no longer wired to it; the new one is.
     oldScale->setGradient(QCPColorGradient(QCPColorGradient::gpCold));

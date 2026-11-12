@@ -14,6 +14,7 @@
 
 #include "coords.h"
 #include "global.h"
+#include "handle.h"
 
 #include <QList>
 #include <QObject>
@@ -59,13 +60,13 @@ public:
     ~QCPCoordinateSystem() override;
 
     //! The area whose geometry this system maps in.
-    QCPArea* area() const { return mArea; }
+    QCPHandle<QCPArea> area() const;
 
     //! The axis the system's first data coordinate grows along.
-    QCPAxisBase* keyAxis() const { return mKeyAxis; }
+    QCPHandle<QCPAxisBase> keyAxis() const;
 
     //! The axis the system's second data coordinate grows along.
-    QCPAxisBase* valueAxis() const { return mValueAxis; }
+    QCPHandle<QCPAxisBase> valueAxis() const;
 
     //! Whether \a axis is one of the two this system maps through.
     bool usesAxis(const QCPAxisBase* axis) const;
@@ -105,7 +106,7 @@ public:
     [[nodiscard]] bool listens() const { return mChangedListeners > 0; }
 
     //! The plottables drawn through this system, in plot order.
-    QList<QCPAbstractPlottable*> plottables() const;
+    QList<QCPHandle<QCPAbstractPlottable>> plottables() const;
 
 signals:
     //! The mapping moved: a recording of it is stale.
@@ -127,6 +128,10 @@ protected:
     QCPAxisBase* mValueAxis;
     quint64 mRevision = qcp::nextSystemRevision();
     int mChangedListeners = 0;
+
+    // The plottables raw: QCPAxisBase::plottables collects them per axis, so it reads this one (K8).
+    QList<QCPAbstractPlottable*> plottablesRaw() const;
+    friend class QCPAxisBase;
 
 private:
     friend class QCPArea;

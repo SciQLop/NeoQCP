@@ -29,7 +29,7 @@ QCPGroupLegendItem::QCPGroupLegendItem(QCPLegend* parent, QCPMultiGraph* multiGr
     leaveLegendWhenDestroyed(multiGraph);
     if (multiGraph)
         connect(multiGraph, &QCPMultiGraph::componentVisibilityChanged, this,
-                [this] { if (auto* legendLayer = layer()) legendLayer->markDirty(); });
+                [this] { if (QCPLayer* legendLayer = layer()) legendLayer->markDirty(); });
 }
 
 QCPMultiGraph* QCPGroupLegendItem::multiGraph() const

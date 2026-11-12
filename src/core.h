@@ -716,6 +716,11 @@ protected:
                               QVariant* selectionDetails = nullptr) const;
     QList<QCPLayerable*> layerableListAt(const QPointF& pos, bool onlySelectable,
                                          QList<QVariant>* selectionDetails = nullptr) const;
+    // The layerables a deselect pass must visit: raw, because a click at 10 000 items pays per
+    // child (K8).
+    QList<QPointer<QCPLayerable>>
+    guardedSelectedLayerables(const QList<QCPLayer*>& layers,
+                              const QCPLayerable* kept = nullptr) const;
     QList<QCPHit> hitsAt(const QPointF& pos, QCPHitAction action) const;
     void drawBackground(QCPPainter* painter);
     void connectThemeSignal();

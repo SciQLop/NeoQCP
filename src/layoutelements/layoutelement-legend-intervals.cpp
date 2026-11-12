@@ -19,9 +19,9 @@ QCPIntervalsLegendItem::QCPIntervalsLegendItem(QCPLegend* parent, QCPIntervals* 
     leaveLegendWhenDestroyed(intervals);
 }
 
-QCPIntervals* QCPIntervalsLegendItem::intervals() const
+QCPHandle<QCPIntervals> QCPIntervalsLegendItem::intervals() const
 {
-    return mIntervals.data();
+    return QCPHandle<QCPIntervals>(mIntervals.data());
 }
 
 QFont QCPIntervalsLegendItem::effectiveFont() const

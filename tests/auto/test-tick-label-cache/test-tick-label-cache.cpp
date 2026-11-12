@@ -46,7 +46,7 @@ void showAllAxes(LivePlot* plot)
 
 void forEachAxis(LivePlot* plot, const std::function<void(QCPAxis*)>& f)
 {
-    for (auto* axis : plot->axisRect()->axes())
+    for (QCPAxis* axis : plot->axisRect()->axes())
         f(axis);
 }
 

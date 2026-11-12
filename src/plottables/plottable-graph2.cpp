@@ -366,7 +366,7 @@ double QCPGraph2::selectTest(const QPointF& pos, bool onlySelectable, QVariant* 
     if (!mKeyAxis || !mValueAxis)
         return -1;
 
-    auto* axisRect = mKeyAxis->axisRect();
+    auto* axisRect = axisRectOf(mKeyAxis);
     if (!axisRect || !axisRect->rect().contains(pos.toPoint()))
         return -1;
 
@@ -466,8 +466,8 @@ QPointF QCPGraph2::stallPixelOffset() const
                                                 mRenderedRange.key, mRenderedRange.value);
     // Reject if panned too far (cached lines don't cover the viewport)
     const bool keyVert = mKeyAxis->orientation() == Qt::Vertical;
-    double keyDim = keyVert ? mKeyAxis->axisRect()->height() : mKeyAxis->axisRect()->width();
-    double valDim = keyVert ? mKeyAxis->axisRect()->width() : mKeyAxis->axisRect()->height();
+    double keyDim = keyVert ? axisRectOf(mKeyAxis)->height() : axisRectOf(mKeyAxis)->width();
+    double valDim = keyVert ? axisRectOf(mKeyAxis)->width() : axisRectOf(mKeyAxis)->height();
     if (qAbs(keyVert ? offset.y() : offset.x()) > keyDim
         || qAbs(keyVert ? offset.x() : offset.y()) > valDim)
         return {};
@@ -542,7 +542,7 @@ void QCPGraph2::draw(QCPPainter* painter)
     const bool keyIsVertical = mKeyAxis->orientation() == Qt::Vertical;
 
     // --- Line caching with GPU translation ---
-    const QSize currentPlotSize(mKeyAxis->axisRect()->width(), mKeyAxis->axisRect()->height());
+    const QSize currentPlotSize(axisRectOf(mKeyAxis)->width(), axisRectOf(mKeyAxis)->height());
     const bool isExportMode = painter->isExporting();
     auto [needFreshLines, gpuOffset] = qcp::evaluateLineCache(
         mLineCacheDirty, mCachedLines.isEmpty(),
@@ -577,8 +577,8 @@ void QCPGraph2::draw(QCPPainter* painter)
         else if (mAdaptiveSampling && !scatterOnly)
         {
             const int pixDim = keyIsVertical
-                ? static_cast<int>(mKeyAxis->axisRect()->height())
-                : static_cast<int>(mKeyAxis->axisRect()->width());
+                ? static_cast<int>(axisRectOf(mKeyAxis)->height())
+                : static_cast<int>(axisRectOf(mKeyAxis)->width());
             lines = ds->getOptimizedLineData(
                 cacheBegin, cacheEnd, pixDim, mKeyAxis.data(), mValueAxis.data());
         }

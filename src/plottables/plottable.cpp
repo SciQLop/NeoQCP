@@ -579,6 +579,16 @@ QCPAbstractPlottable::QCPAbstractPlottable(QCPAxis* keyAxis, QCPAxis* valueAxis,
     }
 }
 
+QCPAxisRect* QCPAbstractPlottable::axisRectOf(const QCPAxis* axis)
+{
+    return axis ? static_cast<QCPAxisRect*>(axis->area()) : nullptr;
+}
+
+QCPArea* QCPAbstractPlottable::area() const
+{
+    return mSystem ? mSystem->area().get() : nullptr;
+}
+
 QCPAbstractPlottable::~QCPAbstractPlottable()
 {
     if (mRegisteredPlot)
@@ -1645,8 +1655,8 @@ namespace
 // axis(type) would log on a missing type; a refusal here is already reported as misuse.
 QCPAxis* firstAxis(const QCPAxisRect* rect, QCPAxis::AxisType type)
 {
-    const QList<QCPAxis*> axes = rect->axes(type);
-    return axes.isEmpty() ? nullptr : axes.first();
+    const QList<QCPHandle<QCPAxis>> axes = rect->axes(type);
+    return axes.isEmpty() ? nullptr : axes.first().get();
 }
 
 void setAxesOfRect(QCPAbstractPlottable& plottable, QCPAxisRect* rect, QCPAxis::AxisType keyType,
@@ -1664,7 +1674,8 @@ void setAxes(QCPAbstractPlottable& plottable, QCPAxis::AxisType keyType,
 {
     QCPAxis* current = plottable.keyAxis();
     QCP_CHECK_OR_RETURN(current, "the plottable has lost its key axis, so it has no axis rect");
-    setAxesOfRect(plottable, current->axisRect(), keyType, valueType);
+    setAxesOfRect(plottable, static_cast<QCPAxisRect*>(current->area()), keyType,
+                  valueType);
 }
 
 void setAxisRect(QCPAbstractPlottable& plottable, QCPAxisRect* rect)

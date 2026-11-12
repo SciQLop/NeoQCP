@@ -695,7 +695,7 @@ void TestQCustomPlot::angularRangeSlotDeletingTheAreaIsSafe()
   QList<QCPPolarAxisRadial*> radials;
   auto* area = polarPlot(mPlot, radials);
   const QPointer<QCPPolarArea> alive(area);
-  auto* angular = area->angularAxis();
+  QCPPolarAxisAngular* angular = area->angularAxis();
   deleteOwnerOnRangeChange(angular, area);
   angular->setRange(0, 180);
   QVERIFY(!alive);
@@ -707,7 +707,7 @@ void TestQCustomPlot::radialRangeSlotDeletingTheAreaIsSafe()
   {
     QList<QCPPolarAxisRadial*> radials;
     auto* area = polarPlot(mPlot, radials);
-    auto* radial = area->radialAxis();
+    QCPPolarAxisRadial* radial = area->radialAxis();
     radial->setRange(-1, 10);
     const QPointer<QCPPolarArea> alive(area);
     int scaleTypes = 0;

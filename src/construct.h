@@ -212,6 +212,7 @@ struct Construct<QCPPlottableGroup>
 // plottable resolves from the axes.
 template <typename T, typename... Args>
     requires std::derived_from<T, QCPAbstractPlottable>
+          && qcp::FirstArgumentIsNotAnAxis<Args...>
 qcp::HandleFor<T> QCPAxisRect::add(Args&&... args)
 {
     QCPAxis* key = axis(QCPAxis::atBottom);
@@ -228,7 +229,7 @@ qcp::HandleFor<T> QCPAxisRect::add(QCPAxis* key, QCPAxis* value, Args&&... args)
     using Handle = qcp::HandleFor<T>;
     // The pair must be this rect's: another rect's axes would put the plottable in another area,
     // and half of this rect's arguments would be ignored.
-    const QList<QCPAxis*> own = axes();
+    const QList<QCPAxis*> own = axesRaw();
     QCP_CHECK_OR_RETURN(key && value && own.contains(key) && own.contains(value),
                         "both axes of a plottable on this rect must belong to it", Handle { });
     QCP_CHECK_OR_RETURN(!mParentPlot->isBeingDestroyed(), "the plot is being destroyed", Handle { });

@@ -136,12 +136,31 @@ QCPCoordinateSystem* QCPPolarArea::createSystem(QCPAxisBase* key, QCPAxisBase* v
 /*!
   Returns the radial axis with the given \a index.
 */
-QCPPolarAxisRadial* QCPPolarArea::radialAxis(int index) const
+QCPHandle<QCPPolarAxisAngular> QCPPolarArea::angularAxis() const
+{
+    return QCPHandle<QCPPolarAxisAngular>(mAngularAxis);
+}
+
+QCPHandle<QCPPolarAxisRadial> QCPPolarArea::radialAxis(int index) const
 {
     if (index >= 0 && index < mRadialAxes.size())
-        return mRadialAxes.at(index);
+        return QCPHandle<QCPPolarAxisRadial>(mRadialAxes.at(index));
     qDebug() << Q_FUNC_INFO << "invalid index" << index;
-    return nullptr;
+    return { };
+}
+
+QList<QCPHandle<QCPPolarAxisRadial>> QCPPolarArea::radialAxes() const
+{
+    QList<QCPHandle<QCPPolarAxisRadial>> result;
+    result.reserve(mRadialAxes.size());
+    for (QCPPolarAxisRadial* axis : mRadialAxes)
+        result.append(QCPHandle<QCPPolarAxisRadial>(axis));
+    return result;
+}
+
+QCPHandle<QCPPolarGrid> QCPPolarArea::grid() const
+{
+    return QCPHandle<QCPPolarGrid>(mGrid);
 }
 
 /*!
@@ -150,28 +169,28 @@ QCPPolarAxisRadial* QCPPolarArea::radialAxis(int index) const
 
   Returns a null pointer if \a axis does not belong to this area, or already is in it.
 */
-QCPPolarAxisRadial* QCPPolarArea::addRadialAxis(QCPPolarAxisRadial* axis)
+QCPHandle<QCPPolarAxisRadial> QCPPolarArea::addRadialAxis(QCPPolarAxisRadial* axis)
 {
     if (!axis)
     {
         const auto newAxis = new QCPPolarAxisRadial(this);
         mRadialAxes.append(newAxis);
-        return newAxis;
+        return QCPHandle<QCPPolarAxisRadial>(newAxis);
     }
     if (axis->angularAxis() != mAngularAxis)
     {
         qDebug() << Q_FUNC_INFO << "Radial axis isn't associated with this angular axis:"
                  << reinterpret_cast<quintptr>(axis);
-        return nullptr;
+        return { };
     }
     if (mRadialAxes.contains(axis))
     {
         qDebug() << Q_FUNC_INFO
                  << "Radial axis already in list:" << reinterpret_cast<quintptr>(axis);
-        return nullptr;
+        return { };
     }
     mRadialAxes.append(axis);
-    return axis;
+    return QCPHandle<QCPPolarAxisRadial>(axis);
 }
 
 /*!
@@ -280,7 +299,17 @@ void QCPPolarArea::update(UpdatePhase phase)
 }
 
 /* inherits documentation from base class */
-QList<QCPAxisBase*> QCPPolarArea::allAxes() const
+QList<QCPHandle<QCPAxisBase>> QCPPolarArea::allAxes() const
+{
+    QList<QCPHandle<QCPAxisBase>> result;
+    const QList<QCPAxisBase*> rawAxes = allAxesRaw();
+    result.reserve(rawAxes.size());
+    for (QCPAxisBase* axis : rawAxes)
+        result << QCPHandle<QCPAxisBase>(axis);
+    return result;
+}
+
+QList<QCPAxisBase*> QCPPolarArea::allAxesRaw() const
 {
     QList<QCPAxisBase*> result;
     if (mAngularAxis)

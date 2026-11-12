@@ -69,7 +69,10 @@ public:
     virtual ~QCPPolarGrid() override;
 
     // getters:
-    QCPPolarAxisRadial* radialAxis() const { return mRadialAxis.data(); }
+    QCPHandle<QCPPolarAxisRadial> radialAxis() const
+    {
+        return QCPHandle<QCPPolarAxisRadial>(mRadialAxis.data());
+    }
 
     GridTypes type() const { return mType; }
 

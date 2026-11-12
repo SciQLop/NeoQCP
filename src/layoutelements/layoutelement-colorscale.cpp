@@ -94,7 +94,7 @@ QList<QPointer<QCPAbstractColorMapped>> liveUsers(const QList<QCPAbstractColorMa
 
 /* start documentation of inline functions */
 
-/*! \fn QCPAxis *QCPColorScale::axis() const
+/*! \fn QCPHandle<QCPAxis> QCPColorScale::axis() const
 
   Returns the internal \ref QCPAxis instance of this color scale. You can access it to alter the
   appearance and behaviour of the axis. \ref QCPColorScale duplicates some properties in its
@@ -475,12 +475,20 @@ void QCPColorScale::setRangeZoom(bool enabled)
 /*!
   Returns a list of all the color maps associated with this color scale.
 */
-QList<QCPColorMap*> QCPColorScale::colorMaps() const
+QList<QCPHandle<QCPColorMap>> QCPColorScale::colorMaps() const
 {
-    QList<QCPColorMap*> result;
+    QList<QCPHandle<QCPColorMap>> result;
     for (auto* user : mUsers)
         if (auto* cm = qobject_cast<QCPColorMap*>(user))
-            result.append(cm);
+            result.append(QCPHandle<QCPColorMap>(cm));
+    return result;
+}
+
+QList<QCPHandle<QCPAbstractColorMapped>> QCPColorScale::users() const
+{
+    QList<QCPHandle<QCPAbstractColorMapped>> result;
+    for (QCPAbstractColorMapped* user : mUsers)
+        result.append(QCPHandle<QCPAbstractColorMapped>(user));
     return result;
 }
 

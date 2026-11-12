@@ -362,14 +362,26 @@ void QCPAxisBase::scaleRange(double factor, double center)
   order. A cartesian axis overrides this with the plot's own order (its two projections select the
   same plottables).
 */
-QList<QCPAbstractPlottable*> QCPAxisBase::plottables() const
+QList<QCPHandle<QCPAbstractPlottable>> QCPAxisBase::plottables() const
+{
+    QList<QCPHandle<QCPAbstractPlottable>> result;
+    for (QCPAbstractPlottable* plottable : plottablesRaw())
+        result << QCPHandle<QCPAbstractPlottable>(plottable);
+    return result;
+}
+
+/*! \internal
+
+  The plottables raw: rescale() walks them per axis, and QCPAxisRect's passes read this one (K8).
+*/
+QList<QCPAbstractPlottable*> QCPAxisBase::plottablesRaw() const
 {
     QList<QCPAbstractPlottable*> result;
     if (!mArea)
         return result;
-    for (QCPCoordinateSystem* system : mArea->systems())
+    for (QCPCoordinateSystem* system : mArea->systemsRaw())
         if (system->usesAxis(this))
-            result << system->plottables();
+            result << system->plottablesRaw();
     return result;
 }
 
@@ -387,7 +399,7 @@ void QCPAxisBase::rescale(bool onlyVisiblePlottables)
     const QCP::SignDomain signDomain =
         mScaleType == stLogarithmic ? (mRange.upper < 0 ? QCP::sdNegative : QCP::sdPositive)
                                     : QCP::sdBoth;
-    for (QCPAbstractPlottable* plottable : plottables())
+    for (QCPAbstractPlottable* plottable : plottablesRaw())
     {
         if (onlyVisiblePlottables && !plottable->realVisibility())
             continue;

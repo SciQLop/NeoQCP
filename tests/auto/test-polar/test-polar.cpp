@@ -295,8 +295,8 @@ void TestPolar::aRotationDoesNotReRecord()
 {
     QCustomPlot plot;
     auto* area = polarArea(plot);
-    auto* angular = area->angularAxis();
-    auto* radial = area->radialAxis();
+    QCPPolarAxisAngular* angular = area->angularAxis();
+    QCPPolarAxisRadial* radial = area->radialAxis();
     angular->setRange(0, 360);
     radial->setRange(0, 1);
     auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 90, 180 },
@@ -328,7 +328,7 @@ void TestPolar::aNonPeriodicGraphKeepsItsWindow()
 {
     QCustomPlot plot;
     auto* area = polarArea(plot);
-    auto* angular = area->angularAxis();
+    QCPPolarAxisAngular* angular = area->angularAxis();
     area->radialAxis()->setRange(0, 1);
     angular->setRange(0, 360);
     QVector<double> angle, radius;
@@ -390,8 +390,8 @@ void TestPolar::aRimCrossingIsOnTheChord()
 
     QCustomPlot plot;
     auto* area = polarArea(plot);
-    auto* angular = area->angularAxis();
-    auto* radial = area->radialAxis();
+    QCPPolarAxisAngular* angular = area->angularAxis();
+    QCPPolarAxisRadial* radial = area->radialAxis();
     angular->setRange(0, 360);
     radial->setRange(lower, upper);
     radial->setScaleType(logarithmic ? QCPAxisBase::stLogarithmic : QCPAxisBase::stLinear);
@@ -423,7 +423,7 @@ void TestPolar::aValueTheRadialScaleCannotTakeIsAGap()
 {
     QCustomPlot plot;
     auto* area = polarArea(plot);
-    auto* radial = area->radialAxis();
+    QCPPolarAxisRadial* radial = area->radialAxis();
     area->angularAxis()->setRange(0, 360);
     radial->setRange(0.1, 10);
     radial->setScaleType(QCPAxisBase::stLogarithmic);
@@ -698,7 +698,7 @@ void TestPolar::rescaledAxesFollowTheData()
 {
     QCustomPlot plot;
     auto* area = polarArea(plot);
-    auto* radial = area->radialAxis();
+    QCPPolarAxisRadial* radial = area->radialAxis();
     area->angularAxis()->setRange(0, 360);
     radial->setRange(0, 1);
     auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 120, 240 },
@@ -718,7 +718,7 @@ void TestPolar::rescaledKeysFollowTheDataInOneCall()
 {
     QCustomPlot plot;
     auto* area = polarArea(plot);
-    auto* angular = area->angularAxis();
+    QCPPolarAxisAngular* angular = area->angularAxis();
     area->radialAxis()->setRange(0, 1);
     angular->setRange(0, 360);
     auto graph = area->add<QCPPolarGraph>(QVector<double> { 720, 810, 900 },
@@ -768,7 +768,7 @@ void TestPolar::hiddenGeometryIsNotHittable()
 {
     QCustomPlot plot;
     auto* area = polarArea(plot);
-    auto* radial = area->radialAxis();
+    QCPPolarAxisRadial* radial = area->radialAxis();
     area->angularAxis()->setRange(0, 360);
     radial->setRange(0, 1);
     auto graph = area->add<QCPPolarGraph>(QVector<double> { 0, 45, 90 },
@@ -996,8 +996,8 @@ void TestPolar::aRunLeavingTheRimFollowsIt()
 
     QCustomPlot plot;
     auto* area = polarArea(plot);
-    auto* angular = area->angularAxis();
-    auto* radial = area->radialAxis();
+    QCPPolarAxisAngular* angular = area->angularAxis();
+    QCPPolarAxisRadial* radial = area->radialAxis();
     angular->setRange(0, 360);
     radial->setRange(lower, upper);
     radial->setScaleType(logarithmic ? QCPAxisBase::stLogarithmic : QCPAxisBase::stLinear);
@@ -1088,8 +1088,8 @@ void TestPolar::aClampedRunFollowsTheArc()
 
     QCustomPlot plot;
     auto* area = polarArea(plot);
-    auto* angular = area->angularAxis();
-    auto* radial = area->radialAxis();
+    QCPPolarAxisAngular* angular = area->angularAxis();
+    QCPPolarAxisRadial* radial = area->radialAxis();
     angular->setRange(0, 360);
     radial->setRange(lower, upper);
     radial->setScaleType(logarithmic ? QCPAxisBase::stLogarithmic : QCPAxisBase::stLinear);
@@ -1237,7 +1237,7 @@ void TestPolar::deletingTheGraphFromADragSlot()
     QCustomPlot plot;
     auto* area = polarArea(plot);
     plot.setInteractions(QCP::iRangeDrag);
-    auto* radial = area->radialAxis();
+    QCPPolarAxisRadial* radial = area->radialAxis();
     radial->setRangeDraggable(true);
     area->angularAxis()->setRange(0, 360);
     radial->setRange(0, 1);
@@ -1339,7 +1339,7 @@ void TestPolar::theAngularAxisRefusesALogScale()
     // and nothing else, so it is refused.
     QCustomPlot plot;
     auto* area = polarArea(plot);
-    auto* angular = area->angularAxis();
+    QCPPolarAxisAngular* angular = area->angularAxis();
     angular->setScaleType(QCPAxisBase::stLogarithmic);
     QCOMPARE(angular->scaleType(), QCPAxisBase::stLinear);
     QCOMPARE(int(test_misuse::calls.size()), 1);
@@ -1352,7 +1352,7 @@ void TestPolar::angularWheelZoomRequeuesTheRepaint()
     // the area must ask for that repaint itself.
     QCustomPlot plot;
     auto* area = polarArea(plot);
-    auto* angular = area->angularAxis();
+    QCPPolarAxisAngular* angular = area->angularAxis();
     angular->setRangeZoomable(true);
     area->radialAxis()->setRangeZoomable(false);
     plot.setInteractions(QCP::iRangeZoom);
@@ -1374,8 +1374,8 @@ void TestPolar::polarAxisPartsAreClickable()
 {
     QCustomPlot plot;
     auto* area = polarArea(plot);
-    auto* angular = area->angularAxis();
-    auto* radial = area->radialAxis();
+    QCPPolarAxisAngular* angular = area->angularAxis();
+    QCPPolarAxisRadial* radial = area->radialAxis();
     angular->setRange(0, 360);
     radial->setRange(0, 1);
     settle(plot);
@@ -1414,8 +1414,8 @@ void TestPolar::radialDragAndWheelWork()
 {
     QCustomPlot plot;
     auto* area = polarArea(plot);
-    auto* angular = area->angularAxis();
-    auto* radial = area->radialAxis();
+    QCPPolarAxisAngular* angular = area->angularAxis();
+    QCPPolarAxisRadial* radial = area->radialAxis();
     plot.setInteractions(QCP::iRangeDrag | QCP::iRangeZoom);
     angular->setRange(0, 360);
     radial->setRange(0, 1);
@@ -1513,7 +1513,7 @@ void TestPolar::deletingTheAngularAxisMidDragIsSafe()
     QCustomPlot plot;
     auto* area = polarArea(plot);
     plot.setInteractions(QCP::iRangeDrag | QCP::iRangeZoom);
-    auto* angular = area->angularAxis();
+    QCPPolarAxisAngular* angular = area->angularAxis();
     angular->setRangeDraggable(true);
     angular->setRangeZoomable(true);
     angular->setRange(0, 360);

@@ -157,7 +157,8 @@ public:
     [[nodiscard]] QCPCoordinateSystem* system() const { return mSystem.data(); }
 
     //! The area whose systems it draws in: null while it has no system.
-    [[nodiscard]] QCPArea* area() const { return mSystem ? mSystem->area() : nullptr; }
+    // Out of line: the conversion from the system's handle needs the complete QCPArea.
+    [[nodiscard]] QCPArea* area() const;
 
     [[nodiscard]] QCPAxis* keyAxis() const { return mKeyAxis.data(); }
 
@@ -316,6 +317,11 @@ signals:
     void visuallyBusyChanged(bool visuallyBusy);
 
 protected:
+    // The axis rect raw, for the per-draw, per-lane and per-bar paths (K8): the public
+    // QCPAxis::axisRect() hands out a handle. Defined in plottable.cpp, where QCPAxisRect is
+    // complete.
+    [[nodiscard]] static QCPAxisRect* axisRectOf(const QCPAxis* axis);
+
     //! Called after setSystem; not called by the constructor.
     virtual void systemChanged() {}
     //! Called before setSystem adopts \a next: a plottable that ties itself to others (a stack, a

@@ -191,7 +191,7 @@ void QCPSelectionRect::cancelWith(QInputEvent* event)
     if (!mActive)
         return;
     mActive = false;
-    const QPointer<QCPLayer> band = layer(); // a slot may replace (delete) this rect
+    const QPointer<QCPLayer> band(layer()); // a slot may replace (delete) this rect
     // The plot's event scope delivers it before \a event dies; a slot may delete the rect.
     qcpEmit(this, mParentPlot, &QCPSelectionRect::canceled, mRect, event);
     if (band)
@@ -220,7 +220,7 @@ void QCPSelectionRect::startSelection(QMouseEvent* event)
 void QCPSelectionRect::moveSelection(QMouseEvent* event)
 {
     mRect.setBottomRight(event->pos());
-    const QPointer<QCPLayer> band = layer(); // a slot may replace (delete) this rect
+    const QPointer<QCPLayer> band(layer()); // a slot may replace (delete) this rect
     qcpEmit(this, mParentPlot, &QCPSelectionRect::changed, mRect, event);
     if (band)
         band->replot();

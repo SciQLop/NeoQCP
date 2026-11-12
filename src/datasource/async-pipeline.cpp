@@ -11,7 +11,7 @@ ViewportParams ViewportParams::fromAxes(const QCPAxis* keyAxis, const QCPAxis* v
     ViewportParams vp;
     vp.keyRange = keyAxis->range();
     vp.valueRange = valueAxis->range();
-    auto* axisRect = keyAxis->axisRect();
+    QCPAxisRect* axisRect = keyAxis->axisRect();
     vp.plotWidthPx = axisRect ? axisRect->width() : 800;
     vp.plotHeightPx = axisRect ? axisRect->height() : 600;
     vp.keyLogScale = (keyAxis->scaleType() == QCPAxis::stLogarithmic);

@@ -36,7 +36,7 @@ public:
 
     void add(QCPLayoutElement* element);
     void remove(QCPLayoutElement* element);
-    QList<QCPLayoutElement*> elements() const;
+    QList<QCPHandle<QCPLayoutElement>> elements() const;
     QCP::MarginSides sides() const { return mSides; }
 
     //! The margin \a element must take on \a side to reach the group's shared edge.

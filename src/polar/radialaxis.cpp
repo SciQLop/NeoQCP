@@ -196,9 +196,10 @@ QCPPolarArea* QCPPolarAxisRadial::area() const
     return polarArea();
 }
 
-QCPPolarAxisAngular* QCPPolarAxisRadial::angularAxis() const
+QCPHandle<QCPPolarAxisAngular> QCPPolarAxisRadial::angularAxis() const
 {
-    return polarArea() ? polarArea()->angularAxis() : nullptr;
+    QCPPolarArea* area = polarArea();
+    return area ? area->angularAxis() : QCPHandle<QCPPolarAxisAngular>();
 }
 
 QCPPolarAxisRadial::LabelMode QCPPolarAxisRadial::tickLabelMode() const

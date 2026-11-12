@@ -282,7 +282,10 @@ public:
     {
     }
 
-    QList<QCPAxisBase*> allAxes() const override { return { mKey, mValue }; }
+    QList<QCPHandle<QCPAxisBase>> allAxes() const override
+    {
+        return { QCPHandle<QCPAxisBase>(mKey), QCPHandle<QCPAxisBase>(mValue) };
+    }
     void markAffectedLayersDirty(bool /*invalidate*/) override { }
     [[nodiscard]] FlatAxis* key() const { return mKey; }
     [[nodiscard]] FlatAxis* value() const { return mValue; }
@@ -390,7 +393,7 @@ public:
     }
 
 private:
-    [[nodiscard]] QRect rect() const { return static_cast<const QCPAxisRect*>(area())->rect(); }
+    [[nodiscard]] QRect rect() const { return static_cast<const QCPAxisRect*>(area().get())->rect(); }
 
     mutable std::shared_ptr<const Mapping> mMapping;
     mutable quint64 mBuiltRevision = 0;
@@ -866,7 +869,7 @@ void TestUserSystem::aCurveHitMapsInOneBatch()
     QCustomPlot plot;
     auto* rect = bareRect<TunedSkewRect<CountingSkewMapping>>(plot);
     auto* system = static_cast<TunedSkewSystem<CountingSkewMapping>*>(
-            rect->system(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft)));
+            rect->system(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft)).get());
     auto* curve = new InspectableCurve(rect->axis(QCPAxis::atBottom),
                                        rect->axis(QCPAxis::atLeft));
     curve->setSystem(system);
@@ -1203,7 +1206,7 @@ void TestUserSystem::aFillWithAnUnrepresentableInverseStaysFinite()
     QCustomPlot plot;
     auto* rect = bareRect<TunedSkewRect<NaNSkewMapping>>(plot);
     auto* system = static_cast<TunedSkewSystem<NaNSkewMapping>*>(
-            rect->system(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft)));
+            rect->system(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft)).get());
     auto* graph = new InspectableGraph(rect->axis(QCPAxis::atBottom),
                                        rect->axis(QCPAxis::atLeft));
     graph->setSystem(system);
@@ -1846,7 +1849,7 @@ void TestUserSystem::aSkewItemIsAlwaysAnIndexCandidate()
     QCPLayer* layer = skewItem->layer();
     QCOMPARE(cartesianItem->layer(), layer);
     const std::vector<std::uint8_t>& candidates = layer->itemCandidates(QRectF(0, 0, 1, 1));
-    const QList<QCPLayerable*> children = layer->children();
+    const QList<QCPHandle<QCPLayerable>> children = layer->children();
     QCOMPARE(int(candidates.size()), children.size());
     bool sawSkew = false;
     bool sawCartesian = false;

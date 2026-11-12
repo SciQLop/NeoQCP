@@ -289,9 +289,9 @@ QCPPlottableLegendItem::QCPPlottableLegendItem(QCPLegend* parent, QCPAbstractPlo
     leaveLegendWhenDestroyed(plottable);
 }
 
-QCPLegend* QCPAbstractLegendItem::parentLegend() const
+QCPHandle<QCPLegend> QCPAbstractLegendItem::parentLegend() const
 {
-    return mParentLegend;
+    return QCPHandle<QCPLegend>(mParentLegend);
 }
 
 void QCPAbstractLegendItem::leaveLegendWhenDestroyed(QObject* subject)
@@ -305,16 +305,16 @@ void QCPAbstractLegendItem::leaveLegendWhenDestroyed(QObject* subject)
                 });
 }
 
-QCPAbstractPlottable* QCPPlottableLegendItem::plottable()
+QCPHandle<QCPAbstractPlottable> QCPPlottableLegendItem::plottable()
 {
-    return mPlottable;
+    return QCPHandle<QCPAbstractPlottable>(mPlottable.data());
 }
 
 void QCPAbstractLegendItem::repaintWhenBusyChanges(QCPAbstractPlottable* plottable)
 {
     if (plottable)
         connect(plottable, &QCPAbstractPlottable::visuallyBusyChanged, this,
-                [this](bool) { if (auto* legendLayer = layer()) legendLayer->markDirty(); });
+                [this](bool) { if (QCPLayer* legendLayer = layer()) legendLayer->markDirty(); });
 }
 
 /*! \internal
@@ -540,7 +540,7 @@ QCPLegend::SelectableParts QCPLegend::selectedParts() const
     bool hasSelectedItems = false;
     for (int i = 0; i < itemCount(); ++i)
     {
-        if (item(i) && item(i)->selected())
+        if (itemRaw(i) && itemRaw(i)->selected())
         {
             hasSelectedItems = true;
             break;
@@ -591,8 +591,8 @@ void QCPLegend::setFont(const QFont& font)
     mFont = font;
     for (int i = 0; i < itemCount(); ++i)
     {
-        if (item(i))
-            item(i)->setFont(mFont);
+        if (itemRaw(i))
+            itemRaw(i)->setFont(mFont);
     }
 }
 
@@ -613,8 +613,8 @@ void QCPLegend::setTextColor(const QColor& color)
     mTextColor = color;
     for (int i = 0; i < itemCount(); ++i)
     {
-        if (item(i))
-            item(i)->setTextColor(color);
+        if (itemRaw(i))
+            itemRaw(i)->setTextColor(color);
     }
 }
 
@@ -807,8 +807,8 @@ void QCPLegend::setSelectedFont(const QFont& font)
     mSelectedFont = font;
     for (int i = 0; i < itemCount(); ++i)
     {
-        if (item(i))
-            item(i)->setSelectedFont(font);
+        if (itemRaw(i))
+            itemRaw(i)->setSelectedFont(font);
     }
 }
 
@@ -827,8 +827,8 @@ void QCPLegend::setSelectedTextColor(const QColor& color)
     mSelectedTextColor = color;
     for (int i = 0; i < itemCount(); ++i)
     {
-        if (item(i))
-            item(i)->setSelectedTextColor(color);
+        if (itemRaw(i))
+            itemRaw(i)->setSelectedTextColor(color);
     }
 }
 
@@ -840,9 +840,22 @@ void QCPLegend::setSelectedTextColor(const QColor& color)
 
   \see itemCount, addItem, itemWithPlottable
 */
-QCPAbstractLegendItem* QCPLegend::item(int index) const
+QCPHandle<QCPAbstractLegendItem> QCPLegend::item(int index) const
 {
-    return qobject_cast<QCPAbstractLegendItem*>(elementAt(index));
+    return QCPHandle<QCPAbstractLegendItem>(itemRaw(index));
+}
+
+/*! \internal
+
+  The row raw: the legend's own loops (fonts, colours, selection) read this one (K8).
+*/
+QCPAbstractLegendItem* QCPLegend::itemRaw(int index) const
+{
+    if (index < 0 || index >= elementCount())
+        return nullptr;
+    int row, col;
+    indexToRowCol(index, row, col);
+    return qobject_cast<QCPAbstractLegendItem*>(mElements.at(row).at(col));
 }
 
 /*!
@@ -851,17 +864,18 @@ QCPAbstractLegendItem* QCPLegend::item(int index) const
 
   \see hasItemWithPlottable
 */
-QCPPlottableLegendItem* QCPLegend::itemWithPlottable(const QCPAbstractPlottable* plottable) const
+QCPHandle<QCPPlottableLegendItem>
+QCPLegend::itemWithPlottable(const QCPAbstractPlottable* plottable) const
 {
     for (int i = 0; i < itemCount(); ++i)
     {
-        if (QCPPlottableLegendItem* pli = qobject_cast<QCPPlottableLegendItem*>(item(i)))
+        if (QCPPlottableLegendItem* pli = qobject_cast<QCPPlottableLegendItem*>(itemRaw(i)))
         {
             if (pli->plottable() == plottable)
-                return pli;
+                return QCPHandle<QCPPlottableLegendItem>(pli);
         }
     }
-    return nullptr;
+    return { };
 }
 
 /*!
@@ -888,7 +902,7 @@ bool QCPLegend::hasItem(QCPAbstractLegendItem* item) const
 {
     for (int i = 0; i < itemCount(); ++i)
     {
-        if (item == this->item(i))
+        if (item == itemRaw(i))
             return true;
     }
     return false;
@@ -940,7 +954,7 @@ bool QCPLegend::addItem(QCPAbstractLegendItem* item)
 */
 bool QCPLegend::removeItem(int index)
 {
-    if (QCPAbstractLegendItem* ali = item(index))
+    if (QCPAbstractLegendItem* ali = itemRaw(index))
     {
         bool success = remove(ali);
         if (success)
@@ -979,7 +993,7 @@ void QCPLegend::clearItems()
     const QCPEmissionScope scope(mParentPlot);
     for (int i = elementCount() - 1; i >= 0; --i)
     {
-        if (item(i))
+        if (itemRaw(i))
             removeAt(i); // don't use removeItem() because it would unnecessarily reorder the whole
                          // legend for each item
     }
@@ -993,15 +1007,15 @@ void QCPLegend::clearItems()
 
   \see QCPAbstractLegendItem::setSelected, setSelectable
 */
-QList<QCPAbstractLegendItem*> QCPLegend::selectedItems() const
+QList<QCPHandle<QCPAbstractLegendItem>> QCPLegend::selectedItems() const
 {
-    QList<QCPAbstractLegendItem*> result;
+    QList<QCPHandle<QCPAbstractLegendItem>> result;
     for (int i = 0; i < itemCount(); ++i)
     {
-        if (QCPAbstractLegendItem* ali = item(i))
+        if (QCPAbstractLegendItem* ali = itemRaw(i))
         {
             if (ali->selected())
-                result.append(ali);
+                result.append(QCPHandle<QCPAbstractLegendItem>(ali));
         }
     }
     return result;

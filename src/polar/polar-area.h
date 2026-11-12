@@ -61,15 +61,15 @@ public:
     virtual ~QCPPolarArea() override;
 
     // getters:
-    QCPPolarAxisAngular* angularAxis() const { return mAngularAxis; }
+    QCPHandle<QCPPolarAxisAngular> angularAxis() const;
 
     int radialAxisCount() const { return int(mRadialAxes.size()); }
 
-    QCPPolarAxisRadial* radialAxis(int index = 0) const;
+    QCPHandle<QCPPolarAxisRadial> radialAxis(int index = 0) const;
 
-    QList<QCPPolarAxisRadial*> radialAxes() const { return mRadialAxes; }
+    QList<QCPHandle<QCPPolarAxisRadial>> radialAxes() const;
 
-    QCPPolarGrid* grid() const { return mGrid; }
+    QCPHandle<QCPPolarGrid> grid() const;
 
     QPointF center() const { return mCenter; }
 
@@ -83,7 +83,7 @@ public:
     QList<QCPPolarGraph*> graphs() const;
 
     // non-property methods:
-    QCPPolarAxisRadial* addRadialAxis(QCPPolarAxisRadial* axis = nullptr);
+    QCPHandle<QCPPolarAxisRadial> addRadialAxis(QCPPolarAxisRadial* axis = nullptr);
     bool removeRadialAxis(QCPPolarAxisRadial* axis);
     void rescale(bool onlyVisiblePlottables = false);
 
@@ -116,7 +116,11 @@ public:
 
     // reimplemented virtual methods:
     virtual void update(UpdatePhase phase) override;
-    virtual QList<QCPAxisBase*> allAxes() const override;
+    virtual QList<QCPHandle<QCPAxisBase>> allAxes() const override;
+
+protected:
+    QList<QCPAxisBase*> allAxesRaw() const override;
+public:
     //! The disc as an axis ratio: x a fraction of the angular span, y a fraction of the radius.
     QCPRatioTransform ratioTransform() const override;
     //! The disc, clipped as a smooth path rather than a jagged region.

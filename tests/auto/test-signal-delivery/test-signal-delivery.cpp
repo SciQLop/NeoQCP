@@ -29,7 +29,7 @@ QList<QCPLayerable*> layerablesOnLayers(const QCustomPlot& plot)
 {
     QList<QCPLayerable*> result;
     for (int i = 0; i < plot.layerCount(); ++i)
-        result += plot.layer(i)->children();
+        result += qcp::pointers(plot.layer(i)->children());
     return result;
 }
 

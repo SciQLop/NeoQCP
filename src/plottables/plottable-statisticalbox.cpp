@@ -499,7 +499,7 @@ double QCPStatisticalBox::selectTest(const QPointF& pos, bool onlySelectable,
     if (!mKeyAxis || !mValueAxis)
         return -1;
 
-    if (mKeyAxis->axisRect()->rect().contains(pos.toPoint())
+    if (axisRectOf(mKeyAxis)->rect().contains(pos.toPoint())
         || mParentPlot->interactions().testFlag(QCP::iSelectPlottablesBeyondAxisRect))
     {
         // get visible data range:
