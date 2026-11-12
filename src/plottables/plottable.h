@@ -329,6 +329,8 @@ protected:
     //! The cartesian projections raw, for the per-bar paths of a bars group (K8).
     [[nodiscard]] QCPAxis* keyAxisRaw() const { return mKeyAxis.data(); }
     [[nodiscard]] QCPAxis* valueAxisRaw() const { return mValueAxis.data(); }
+    //! The frame raw, for the per-object view builder (K8).
+    [[nodiscard]] QCPCoordinateSystem* systemRaw() const { return mSystem.data(); }
 
     //! Called after setSystem; not called by the constructor.
     virtual void systemChanged() {}
@@ -425,6 +427,7 @@ private:
     friend class QCPPlottableLegendItem;
     friend class QCPPlottableGroup;
     friend class QCPPlottableGroupLegendItem;
+    friend QCPDrawnView qcpDrawnViewOf(const QCPAbstractPlottable& plottable, QRect clip);
 };
 
 namespace qcp::ops

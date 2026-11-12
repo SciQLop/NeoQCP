@@ -173,7 +173,7 @@ QVector<QCPAxis*> QCPGridRhiLayer::orderedAxesForRect(QCPAxisRect* ar) const
     {
         // A linked axis is not a linear function of its own range, which is all the grid shader
         // knows: it is painted by the CPU path instead.
-        if (axis->axisRect() == ar && !axis->linkSource())
+        if (axis->axisRectRaw() == ar && !axis->linkSource())
             axes.append(axis);
     }
     return axes;
@@ -189,7 +189,7 @@ void QCPGridRhiLayer::rebuildGeometry(float dpr, int outputHeight)
     QVector<QCPAxisRect*> axisRects;
     for (auto* axis : mAxes)
     {
-        if (QCPAxisRect* ar = axis->axisRect(); ar && !axisRects.contains(ar))
+        if (QCPAxisRect* ar = axis->axisRectRaw(); ar && !axisRects.contains(ar))
             axisRects.append(ar);
     }
     std::sort(axisRects.begin(), axisRects.end());

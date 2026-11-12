@@ -11,8 +11,8 @@
 void QCPColormapRenderer::invalidateMapImage()
 {
     mMapImageInvalidated = true;
-    if (mOwner && mOwner->layer())
-        mOwner->layer()->markDirty();
+    if (QCPLayer* layer = mOwner ? mOwner->layerRaw() : nullptr)
+        layer->markDirty();
 }
 
 QCPColormapRenderer::QCPColormapRenderer(QCPAbstractPlottable* owner) : mOwner(owner)

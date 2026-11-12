@@ -28,6 +28,7 @@ class QCPAxisBase;
 class QCPAxisRect;
 
 struct QCPKeyWindow;
+struct QCPDrawnView;
 
 namespace qcp
 {
@@ -123,6 +124,9 @@ protected:
     void connectNotify(const QMetaMethod& signal) override;
     void disconnectNotify(const QMetaMethod& signal) override;
 
+    //! The frame's area raw, for the per-object view builders (K8).
+    [[nodiscard]] QCPArea* areaRaw() const { return mArea; }
+
     QCPArea* mArea;
     QCPAxisBase* mKeyAxis;
     QCPAxisBase* mValueAxis;
@@ -135,6 +139,7 @@ protected:
 
 private:
     friend class QCPArea;
+    friend QCPDrawnView qcpDrawnViewOf(const QCPAbstractPlottable& plottable, QRect clip);
     Q_DISABLE_COPY(QCPCoordinateSystem)
 };
 

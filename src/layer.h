@@ -48,6 +48,12 @@ class QCPLayout;
 class QCPAxis;
 class QCPArea;
 class QCPCoordinateSystem;
+class QCPAbstractItem;
+class QCPAbstractPlottable;
+class QCPTheme;
+class QCPContourOverlay;
+class QCPColormapRenderer;
+struct QCPDrawnView;
 
 class QCP_LIB_DECL QCPLayer : public QObject
 {
@@ -335,12 +341,22 @@ protected:
                                QCP::AntialiasedElement overrideElement) const;
 
 private:
+    //! The identity of this object raw, for the per-object view builders (K8).
+    [[nodiscard]] QCustomPlot* parentPlotRaw() const { return mParentPlot; }
+    [[nodiscard]] QCPLayer* layerRaw() const { return mLayer; }
+    //! The plot's theme raw, for the per-object view builders (K8). Defined in layer.cpp.
+    [[nodiscard]] QCPTheme* themeRaw() const;
+
     Q_DISABLE_COPY(QCPLayerable)
 
     friend class QCustomPlot;
     friend class QCPLayer;
     friend class QCPAxisRect;
     friend class QCPArea; // it hands its inset layout a parent plot and itself as parent
+    friend class QCPContourOverlay; // reads the parent plot raw while recording label tiles
+    friend class QCPColormapRenderer; // reads the layer raw when invalidating its map image
+    friend QCPDrawnView qcpDrawnViewOf(const QCPAbstractItem& item, QRect clip);
+    friend QCPDrawnView qcpDrawnViewOf(const QCPAbstractPlottable& plottable, QRect clip);
 };
 
 #endif // QCP_LAYER_H

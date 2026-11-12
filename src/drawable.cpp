@@ -475,20 +475,14 @@ QCPTransform qcpViewTransform(const QCPDrawnView& view)
     return view.system ? view.system->transform() : QCPTransform(view.keyAxis, view.valueAxis);
 }
 
-//! The part of a view every object has: its plot, layer and theme.
-QCPDrawnView qcpLayerableView(const QCPLayerable& object)
-{
-    QCPDrawnView view;
-    view.plot = object.parentPlot();
-    view.layer = object.layer();
-    view.theme = view.plot ? view.plot->theme() : nullptr;
-    return view;
-}
 } // namespace
 
 QCPDrawnView qcpDrawnViewOf(const QCPAbstractItem& item, QRect clip)
 {
-    QCPDrawnView view = qcpLayerableView(item);
+    QCPDrawnView view;
+    view.plot = item.parentPlotRaw();
+    view.layer = item.layerRaw();
+    view.theme = item.themeRaw();
     view.selectable = item.selectable() != QCP::stNone;
     view.clip = clip;
     // simplify: an item mixing axis pairs across its positions is drawn through the first pair;
@@ -520,7 +514,7 @@ QCPDrawnView qcpDrawnViewOf(const QCPAbstractItem& item, QRect clip)
     view.clipArea = item.clipToAxisRect() ? item.clipAreaRaw() : nullptr;
     view.axisRect = item.clipAxisRectRaw();
     if (!view.axisRect && view.keyAxis)
-        view.axisRect = view.keyAxis->axisRect();
+        view.axisRect = view.keyAxis->axisRectRaw();
     // An area that has not been laid out yet, or that was taken out of the layout, has no frame to
     // place anything in: the item is inert, and the missing-axis refusal says so once.
     if (view.area && view.area->rect().isEmpty())
@@ -540,16 +534,20 @@ QCPDrawnView qcpDrawnViewOf(const QCPAbstractItem& item, QRect clip)
 
 QCPDrawnView qcpDrawnViewOf(const QCPAbstractPlottable& plottable, QRect clip)
 {
-    QCPDrawnView view = qcpLayerableView(plottable);
+    QCPDrawnView view;
+    view.plot = plottable.parentPlotRaw();
+    view.layer = plottable.layerRaw();
+    view.theme = plottable.themeRaw();
     view.selectable = plottable.selectable() != QCP::stNone;
     view.clip = clip;
-    view.system = plottable.system();
-    view.keyAxis = plottable.keyAxis();
-    view.valueAxis = plottable.valueAxis();
-    view.axisRect = view.keyAxis ? view.keyAxis->axisRect()
-                                 : (view.system ? qobject_cast<QCPAxisRect*>(view.system->area())
-                                                : nullptr);
-    view.area = view.system ? view.system->area() : view.axisRect;
+    view.system = plottable.systemRaw();
+    view.keyAxis = plottable.keyAxisRaw();
+    view.valueAxis = plottable.valueAxisRaw();
+    view.axisRect = view.keyAxis ? view.keyAxis->axisRectRaw()
+                                 : (view.system
+                                        ? qobject_cast<QCPAxisRect*>(view.system->areaRaw())
+                                        : nullptr);
+    view.area = view.system ? view.system->areaRaw() : view.axisRect;
     view.clipArea = view.area;
     view.clippedToFrame = view.system != nullptr;
     return view;

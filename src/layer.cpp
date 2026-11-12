@@ -38,6 +38,7 @@
 #include "painting/scatter-rhi-layer.h"
 #include "items/item.h"
 #include "plottables/plottable.h"
+#include "theme.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPLayer
@@ -431,7 +432,8 @@ QPointF QCPLayer::pixelOffset() const
         if (!plottable->realVisibility() || !plottable->canProduceContent())
             continue;
         const QPointF offset = plottable->stallPixelOffset();
-        auto* axisRect = plottable->keyAxisRaw() ? plottable->keyAxisRaw()->axisRect() : nullptr;
+        auto* keyAxis = plottable->keyAxisRaw();
+        auto* axisRect = keyAxis ? QCPAbstractPlottable::axisRectOf(keyAxis) : nullptr;
         if (offset.isNull()
             || (result && (axisRect != resultAxisRect || !samePixelOffset(*result, offset))))
             return {};
@@ -506,6 +508,11 @@ QList<QCPHandle<QCPLayerable>> QCPLayer::children() const
 QCPHandle<QCustomPlot> QCPLayerable::parentPlot() const
 {
     return QCPHandle<QCustomPlot>(mParentPlot);
+}
+
+QCPTheme* QCPLayerable::themeRaw() const
+{
+    return mParentPlot ? mParentPlot->mTheme.data() : nullptr;
 }
 
 QCPHandle<QCPLayerable> QCPLayerable::parentLayerable() const

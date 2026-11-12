@@ -51,6 +51,9 @@ class QCPAxisPainterPrivate;
 class QCPAbstractPlottable;
 class QCPGraph;
 class QCPAbstractItem;
+class QCPGridRhiLayer;
+class QCPContourOverlay;
+struct QCPDrawnView;
 
 template <typename T, typename Self = void>
 class QCPAxisOps;
@@ -428,9 +431,17 @@ private:
     double linkedCoordToPixel(double value) const;
     double linkedPixelToCoord(double value) const;
 
+    //! The rect this axis draws in raw, for the per-object and per-frame paths (K8). Defined in axis.cpp.
+    [[nodiscard]] QCPAxisRect* axisRectRaw() const;
+
     friend class QCustomPlot;
     friend class QCPGrid;
     friend class QCPAxisRect;
+    friend class QCPLayer; // pixelOffset() reads the rect raw per plottable
+    friend class QCPGridRhiLayer; // groups axes by rect while rebuilding grid geometry
+    friend class QCPContourOverlay; // records label tiles through the rect
+    friend QCPDrawnView qcpDrawnViewOf(const QCPAbstractItem& item, QRect clip);
+    friend QCPDrawnView qcpDrawnViewOf(const QCPAbstractPlottable& plottable, QRect clip);
 };
 Q_DECLARE_OPERATORS_FOR_FLAGS(QCPAxis::AxisTypes)
 Q_DECLARE_METATYPE(QCPAxis::AxisType)

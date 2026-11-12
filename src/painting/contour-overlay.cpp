@@ -160,7 +160,7 @@ void QCPContourOverlay::update(const QCPColorMapData* grid, QCPDrawContext& cont
                 valueAxis->scaleType() == QCPAxis::stLogarithmic);
     mLastLevels = key.levels;
     mLastLabels.clear();
-    if (mLabelsEnabled && keyAxis->axisRect() && !mDrawn->lines.isEmpty())
+    if (mLabelsEnabled && keyAxis->axisRectRaw() && !mDrawn->lines.isEmpty())
         recordLabels(context, grid, keyAxis, valueAxis);
 }
 
@@ -192,14 +192,14 @@ void QCPContourOverlay::recordLabels(QCPDrawContext& context, const QCPColorMapD
     // transform marks the recording for a rebuild on every zoom and pan while labels are on.
     (void)context.transform();
     const QRectF imageRect = gridRect(grid, keyAxis, valueAxis);
-    const QRectF visible = imageRect.normalized().intersected(keyAxis->axisRect()->rect());
+    const QRectF visible = imageRect.normalized().intersected(keyAxis->axisRectRaw()->rect());
     if (visible.isEmpty())
         return;
     // Labels drawn under the image would be hidden: they go in one raster over the part of the
     // grid the axes show, recorded after the lines so it draws above both.
     // simplify: a zoom rebuilds the whole tile, only while labels are on. Upgrade path: one small
     // tile per label in an atlas, drawn as one quad each.
-    const double dpr = keyAxis->parentPlot()->bufferDevicePixelRatio();
+    const double dpr = keyAxis->parentPlotRaw()->bufferDevicePixelRatio();
     QImage overlay(QSize(qCeil(visible.width() * dpr), qCeil(visible.height() * dpr)),
                    QImage::Format_ARGB32_Premultiplied);
     overlay.fill(Qt::transparent);

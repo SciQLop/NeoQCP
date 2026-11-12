@@ -3041,6 +3041,11 @@ QCPHandle<QCPAxisRect> QCPAxis::axisRect() const
     return QCPHandle<QCPAxisRect>(static_cast<QCPAxisRect*>(mArea));
 }
 
+QCPAxisRect* QCPAxis::axisRectRaw() const
+{
+    return static_cast<QCPAxisRect*>(mArea);
+}
+
 /*! \internal
 
   A scale type change stales the cached margin and every item tree: an item's extent depends on the
