@@ -31,7 +31,7 @@ public:
 
     explicit QCPHistogram2D(QCPAxis* keyAxis, QCPAxis* valueAxis);
 
-    // Data — same pattern as QCPGraph2
+    // Data
     template <IndexableNumericRange KC, IndexableNumericRange VC>
     void setData(KC&& keys, VC&& values)
     {

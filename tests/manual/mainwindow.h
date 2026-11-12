@@ -45,7 +45,7 @@ public:
   void setupLegendTest(QCustomPlot *customPlot);
   void setupMultiAxisRectInteractions(QCustomPlot *customPlot);
   void setupAdaptiveSamplingTest(QCustomPlot *customPlot);
-  void setupGraph2Test(QCustomPlot *customPlot);
+  void setupOneColumnMultiGraphTest(QCustomPlot *customPlot);
   void setupColorMap2Test(QCustomPlot *customPlot);
   void setupColorMapTest(QCustomPlot *customPlot);
   void setupBarsTest(QCustomPlot *customPlot);

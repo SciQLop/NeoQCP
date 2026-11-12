@@ -16,8 +16,6 @@ private slots:
     void algoKeyRange();
     void algoValueRange();
     void algoValueRangeRestrictionMatchesBruteForce();
-    void algoLinesToPixels();
-    void algoOptimizedLineData();
     void algoGapsIgnoreRepeatedKeys();
 
     // SoA data source tests
@@ -27,22 +25,22 @@ private slots:
     void soaRangeQueries();
     void soaIntValues();
     void soaMismatchedLengthsDegradeToEmpty();
-    void soaGapThresholdZeroDisablesGaps();
+    void multiSoaGapThresholdZeroDisablesGaps();
     void linesInDataMapToGetLines();
     void thinnedLinesInDataMatchTheOptimizedPixels();
     void indicesFollowTheThinnedPoints();
 
-    // QCPGraph2 integration tests
-    void graph2Creation();
-    void graph2SetDataOwning();
-    void graph2ViewData();
-    void graph2SharedSource();
-    void graph2AxisRanges();
-    void graph2Render();
-    void graph2LineStyles();
-    void graph2ScatterStyle();
-    void graph2ScatterSkip();
-    void graph2LineStyleNoneWithScatter();
+    // one-column QCPMultiGraph integration tests
+    void multiGraphCreation();
+    void multiGraphSetDataOwning();
+    void multiGraphViewData();
+    void multiGraphSharedSource();
+    void multiGraphAxisRanges();
+    void multiGraphRender();
+    void multiGraphLineStyles();
+    void multiGraphScatterStyle();
+    void multiGraphScatterSkip();
+    void multiGraphLineStyleNoneWithScatter();
 
 private:
     QCustomPlot* mPlot = nullptr;

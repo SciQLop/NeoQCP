@@ -473,9 +473,6 @@ void TestBuilder::addEveryPlottable_data()
         {
             return p.add<QCPHistogram>().setBins(7)->bins() == 7;
         });
-    row("graph2",
-        [](QCustomPlot& p) { return p.add<QCPGraph2>(kKeys, kValues).get()->dataCount() == 3; });
-
 }
 
 void TestBuilder::addEveryPlottable()
@@ -1061,7 +1058,6 @@ void roundTripThroughADeadPlot(Feed feed)
 void TestBuilder::takenPipelinePlottablesOutliveTheirPlot()
 {
     const std::vector<double> x{0, 1, 2, 3}, y{1, 3, 2, 4};
-    roundTripThroughADeadPlot<QCPGraph2>([&](QCPGraph2& p) { p.setData(x, y); });
     roundTripThroughADeadPlot<QCPMultiGraph>(
         [&](QCPMultiGraph& p) { p.setData(x, std::vector<std::vector<double>>{y, x}); });
     roundTripThroughADeadPlot<QCPWaterfallGraph>(
@@ -1117,19 +1113,18 @@ void TestBuilder::richTextHandleKeepsTheTextSetters()
     QCOMPARE(gMisuses, 0);
 }
 
-void TestBuilder::graph2ScatterColoursChangeTheDrawing()
+void TestBuilder::multiGraphScatterColoursChangeTheDrawing()
 {
     QCustomPlot plot;
     plot.xAxis->setRange(0, 4);
     plot.yAxis->setRange(0, 7);
-    auto g = plot.add<QCPGraph2>(kKeys, kValues)
-                 .setLineStyle(QCPGraph2::lsNone)
-                 .setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 9));
+    auto g = plot.add<QCPMultiGraph>(kKeys, kValues).setLineStyle(QCPMultiGraph::lsNone);
+    g->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 9));
     QTRY_VERIFY_WITH_TIMEOUT(!g->busy(), 5000);
     settle(plot);
     const QImage plain = plot.toPixmap(400, 300).toImage();
-    g.setScatterColorGradient(QCPColorGradient(QCPColorGradient::gpHot))
-        .setScatterColorValues(std::vector<float>{0, 5, 10});
+    g.setGradient(QCPColorGradient(QCPColorGradient::gpHot))
+        .setColorValues(std::vector<double>{0, 5, 10});
     settle(plot);
     QVERIFY(plot.toPixmap(400, 300).toImage() != plain);
     QCOMPARE(gMisuses, 0);

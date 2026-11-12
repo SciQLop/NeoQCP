@@ -216,7 +216,7 @@ void resampleRange(
 
     // Seed this chunk's own cursor: for the first chunk this is xBegin (same
     // as the single-threaded scan); for any other chunk, a binary search at
-    // the chunk's first bin edge (mirrors qcp::algo::binMinMaxParallel's
+    // the chunk's first bin edge (mirrors qcp::algo::binMinMaxMultiParallel's
     // per-chunk findBegin seeding).
     int srcCursor = (xbBegin == 0) ? xBegin : acc.lowerBound(xBegin, xEnd, xEdges[xbBegin]);
 

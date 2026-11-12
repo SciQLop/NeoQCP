@@ -80,7 +80,6 @@ set(NEOQCP_SOURCES
     src/plottables/plottable-errorbar.cpp
     src/plottables/plottable-financial.cpp
     src/plottables/plottable-graph.cpp
-    src/plottables/plottable-graph2.cpp
     src/plottables/plottable-draw-utils.cpp
     src/plottables/plottable-multigraph.cpp
     src/plottables/multigraph-fill.cpp
@@ -93,7 +92,6 @@ set(NEOQCP_SOURCES
     src/datasource/resample.cpp
     src/datasource/pipeline-scheduler.cpp
     src/datasource/async-pipeline.cpp
-    src/datasource/abstract-datasource.cpp
     src/datasource/abstract-multi-datasource.cpp
     src/plottables/plottable-colormap2.cpp
     src/plottables/plottable-histogram2d.cpp
@@ -172,7 +170,6 @@ set(NEOQCP_MOC_HEADERS
     src/plottables/plottable-financial.h
     src/plottables/graph-data.h
     src/plottables/plottable-graph.h
-    src/plottables/plottable-graph2.h
     src/plottables/plottable-multigraph.h
     src/plottables/lane-layout.h
     src/plottables/plottable-intervals.h

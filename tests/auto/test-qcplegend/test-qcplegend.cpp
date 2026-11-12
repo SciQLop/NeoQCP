@@ -66,7 +66,7 @@ void TestQCPLegend::itemTextColorRepaintsTheLegend()
   // Dimming an entry (a hidden graph) only changes its text colour. The legend lives on a
   // layer of its own, so the setter must dirty it or the entry keeps its old colour until
   // something else repaints the legend.
-  auto *graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+  auto *graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
   graph->setName("dimmed");
   graph->addToLegend();
   mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -75,7 +75,7 @@ void TestQCPLegend::itemTextColorRepaintsTheLegend()
   QVERIFY(buffer);
   QVERIFY(!buffer->contentDirty());
 
-  QCPPlottableLegendItem *item = mPlot->legend->itemWithPlottable(graph);
+  QCPAbstractLegendItem *item = mPlot->legend->item(0);
   QVERIFY(item);
   item->setTextColor(Qt::red);
   QVERIFY2(buffer->contentDirty(), "a new text colour must repaint the legend");

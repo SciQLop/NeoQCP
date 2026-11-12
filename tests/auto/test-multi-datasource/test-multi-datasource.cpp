@@ -357,7 +357,7 @@ void TestMultiDataSource::resampledGetLinesBreaksAtKeyGaps()
 
 void TestMultiDataSource::adaptiveSamplingBreaksAtKeyGaps()
 {
-    // Reproducer: QCPGraph2 adaptive sampling path (optimizedLineData) drew
+    // Reproducer: the adaptive sampling path (optimizedLineData) drew
     // lines across key gaps because it had no gap detection — only the
     // linesToPixels fallback path detected gaps.
     // Build data dense enough to trigger adaptive sampling: many points per

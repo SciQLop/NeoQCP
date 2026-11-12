@@ -891,7 +891,7 @@ void TestCoordinateSystem::aMovedPlottableFollowsItsNewArea()
 void TestCoordinateSystem::aTakenPlottableFollowsItsNewPlot()
 {
     // A plottable taken out of one plot and added to another joins that plot's system, and hears
-    // about it the way setSystem tells it: a graph2 reconnects to the new axes' signals.
+    // about it the way setSystem tells it: a moved graph reconnects to the new axes' signals.
     QCustomPlot from;
     QCustomPlot to;
     from.resize(400, 300);
@@ -910,8 +910,8 @@ void TestCoordinateSystem::aTakenPlottableFollowsItsNewPlot()
     QCOMPARE(to.plottableCount(), 1);
     QCOMPARE(from.plottableCount(), 0);
 
-    auto graph = from.add<QCPGraph2>().setData(QVector<double> { 1, 5, 9 },
-                                               QVector<double> { 1, 5, 9 });
+    auto graph = from.add<QCPMultiGraph>().setData(QVector<double> { 1, 5, 9 },
+                                                    QVector<double> { 1, 5, 9 });
     QVERIFY(graph);
     auto movedGraph = from.take(graph);
     QVERIFY(movedGraph);

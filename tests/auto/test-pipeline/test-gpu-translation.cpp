@@ -1,35 +1,9 @@
 #include "test-pipeline.h"
 #include <qcustomplot.h>
 
-void TestPipeline::graph2TranslationOffsetWhenBusy()
+void TestPipeline::multiGraphTranslationResetsOnFreshData()
 {
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    QVector<double> keys(200000), values(200000);
-    for (int i = 0; i < 200000; ++i) {
-        keys[i] = i;
-        values[i] = std::sin(i * 0.01);
-    }
-    graph->setData(std::move(keys), std::move(values));
-
-    mPlot->xAxis->setRange(0, 100000);
-    mPlot->yAxis->setRange(-1.5, 1.5);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-
-    QTRY_VERIFY_WITH_TIMEOUT(!graph->pipeline().isBusy(), 5000);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-
-    mPlot->xAxis->setRange(10000, 110000);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-
-    if (graph->pipeline().isBusy())
-    {
-        QVERIFY(graph->hasRenderedRange());
-    }
-}
-
-void TestPipeline::graph2TranslationResetsOnFreshData()
-{
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     QVector<double> keys(200000), values(200000);
     for (int i = 0; i < 200000; ++i) {
         keys[i] = i;
@@ -134,7 +108,7 @@ void TestPipeline::colormap2TranslationOffsetWhenBusy()
 
 void TestPipeline::translatedGeometryClippedToAxisRect()
 {
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     QVector<double> keys(200000), values(200000);
     for (int i = 0; i < 200000; ++i) {
         keys[i] = i;
@@ -176,14 +150,14 @@ void TestPipeline::translatedGeometryClippedToAxisRect()
     QVERIFY2(!foundRedOutside, "Red pixels found outside axis rect — clipping failed");
 }
 
-void TestPipeline::multipleGraph2IndependentOffsets()
+void TestPipeline::multipleMultiGraphsIndependentOffsets()
 {
-    auto* small = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* small = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     QVector<double> ks(100), vs(100);
     for (int i = 0; i < 100; ++i) { ks[i] = i * 1000; vs[i] = i; }
     small->setData(std::move(ks), std::move(vs));
 
-    auto* large = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* large = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     QVector<double> kl(500000), vl(500000);
     for (int i = 0; i < 500000; ++i) { kl[i] = i; vl[i] = i; }
     large->setData(std::move(kl), std::move(vl));

@@ -34,14 +34,14 @@ void TestBusyIndicator::cleanup()
 
 void TestBusyIndicator::externalBusyDefault()
 {
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     QCOMPARE(g->busy(), false);
     QCOMPARE(g->visuallyBusy(), false);
 }
 
 void TestBusyIndicator::setBusyEmitsBusyChanged()
 {
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     QSignalSpy spy(g, &QCPAbstractPlottable::busyChanged);
     g->setBusy(true);
     QCOMPARE(spy.count(), 1);
@@ -53,7 +53,7 @@ void TestBusyIndicator::setBusyEmitsBusyChanged()
 
 void TestBusyIndicator::debounceShowDelay()
 {
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     g->setBusyShowDelayMs(100);
     QSignalSpy spy(g, &QCPAbstractPlottable::visuallyBusyChanged);
 
@@ -66,7 +66,7 @@ void TestBusyIndicator::debounceShowDelay()
 
 void TestBusyIndicator::debounceHideDelay()
 {
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     g->setBusyShowDelayMs(10);
     g->setBusyHideDelayMs(100);
 
@@ -83,7 +83,7 @@ void TestBusyIndicator::debounceHideDelay()
 
 void TestBusyIndicator::fastToggleNoVisualChange()
 {
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     g->setBusyShowDelayMs(100);
     QSignalSpy spy(g, &QCPAbstractPlottable::visuallyBusyChanged);
 
@@ -98,7 +98,7 @@ void TestBusyIndicator::fastToggleNoVisualChange()
 
 void TestBusyIndicator::perPlottableOverridesTheme()
 {
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     QCOMPARE(g->effectiveBusyFadeAlpha(), 0.3);
     g->setBusyFadeAlpha(0.5);
     QCOMPARE(g->effectiveBusyFadeAlpha(), 0.5);
@@ -106,7 +106,7 @@ void TestBusyIndicator::perPlottableOverridesTheme()
 
 void TestBusyIndicator::resetFallsBackToTheme()
 {
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     g->setBusyFadeAlpha(0.5);
     QCOMPARE(g->effectiveBusyFadeAlpha(), 0.5);
     g->resetBusyFadeAlpha();
@@ -115,7 +115,7 @@ void TestBusyIndicator::resetFallsBackToTheme()
 
 void TestBusyIndicator::pipelineBusyContributesToEffective()
 {
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     g->setBusyShowDelayMs(10);
 
     const int N = 10'000'000;
@@ -132,7 +132,7 @@ void TestBusyIndicator::pipelineBusyContributesToEffective()
 
 void TestBusyIndicator::busyPlottableDrawsFaded()
 {
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     g->setData(std::vector<double>{1.0, 2.0, 3.0}, std::vector<double>{1.0, 2.0, 3.0});
     g->setBusyShowDelayMs(0);
     g->setBusyHideDelayMs(0);
@@ -151,7 +151,7 @@ void TestBusyIndicator::busyPlottableDrawsFaded()
 
 void TestBusyIndicator::notBusyPlottableDrawsFullOpacity()
 {
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     g->setData(std::vector<double>{1.0, 2.0, 3.0}, std::vector<double>{1.0, 2.0, 3.0});
     QCOMPARE(g->visuallyBusy(), false);
 
@@ -161,7 +161,7 @@ void TestBusyIndicator::notBusyPlottableDrawsFullOpacity()
 
 void TestBusyIndicator::legendShowsPrefixWhenBusy()
 {
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     g->setName("TestGraph");
     g->setData(std::vector<double>{1.0, 2.0}, std::vector<double>{1.0, 2.0});
     g->addToLegend();
@@ -181,11 +181,11 @@ void TestBusyIndicator::legendShowsPrefixWhenBusy()
 
 void TestBusyIndicator::legendSizeHintAccountsForPrefix()
 {
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     g->setName("TestGraph");
     g->addToLegend();
 
-    QCPLayoutElement* legendItem = mPlot->legend->itemWithPlottable(g);
+    QCPLayoutElement* legendItem = mPlot->legend->item(0);
     QVERIFY(legendItem);
 
     QSize normalSize = legendItem->minimumOuterSizeHint();
@@ -222,7 +222,7 @@ void TestBusyIndicator::groupLegendShowsBusyPrefix()
 void TestBusyIndicator::fullLifecycleExternalBusy()
 {
     // Simulate SciQLopPlots usage: download starts, data arrives, resampling finishes
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     g->setName("Magnetic Field Bx");
     g->addToLegend();
     g->setBusyShowDelayMs(50);
@@ -259,7 +259,7 @@ void TestBusyIndicator::visualBusyToggleForcesLayerRepaint()
     // A fade toggle must not be swallowed by the translate-instead-of-repaint
     // path: the layer buffer is invalidated so the next replot rebuilds the
     // GPU entries with the new alpha.
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     QVector<double> keys(1000), values(1000);
     for (int i = 0; i < 1000; ++i)
     {
@@ -313,7 +313,7 @@ void TestBusyIndicator::visualBusyToggleRepaintsTheLegend()
     // The busy symbol is drawn by the legend, which lives on another layer than the
     // plottable. Only the plottable's own layer used to be repainted, so the symbol
     // stayed on screen after the data arrived until something else dirtied the legend.
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     graph->setName("legend busy");
     graph->setData(std::vector<double>{1.0, 2.0}, std::vector<double>{1.0, 2.0});
     graph->addToLegend();
@@ -350,7 +350,7 @@ void TestBusyIndicator::gpuEntriesCarryFadeAlpha()
     if (!showAndHasRhiBusy(mPlot))
         QSKIP("No QRhi available — GPU draw entries need a real backend");
 
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     QVector<double> keys(1000), values(1000);
     for (int i = 0; i < 1000; ++i)
     {
@@ -413,7 +413,7 @@ void removeOnBusy(QCustomPlot* plot, QCPAbstractPlottable* p)
 
 void TestBusyIndicator::busySlotRemovingThePlottableIsSafe()
 {
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     removeOnBusy(mPlot, g);
     g->setBusy(true);
     QCOMPARE(mPlot->plottableCount(), 0);
@@ -422,7 +422,7 @@ void TestBusyIndicator::busySlotRemovingThePlottableIsSafe()
 // Big enough to resample: the pipeline goes busy inside setData.
 void TestBusyIndicator::pipelineBusySlotRemovingThePlottableIsSafe()
 {
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     removeOnBusy(mPlot, g);
     const int n = 200'000;
     std::vector<double> keys(n), values(n);
@@ -436,7 +436,7 @@ void TestBusyIndicator::pipelineBusySlotRemovingThePlottableIsSafe()
 // The debounce timer flips the visual busy state, then queued a replot through the plottable.
 void TestBusyIndicator::visuallyBusySlotRemovingThePlottableIsSafe()
 {
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     g->setBusyShowDelayMs(0);
     connect(g, &QCPAbstractPlottable::visuallyBusyChanged, mPlot,
             [this, g] { QVERIFY(mPlot->removePlottable(g)); }, Qt::SingleShotConnection);

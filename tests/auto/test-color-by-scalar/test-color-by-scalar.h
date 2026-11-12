@@ -54,7 +54,6 @@ private slots:
     void nanScalarLeavesAGap();
 
     void exportAfterOnscreenPanUsesCurrentPixelsNotStaleOffset();
-    void graph2ExportAfterOnscreenPanUsesCurrentPixelsNotStaleOffset();
 
     void scatterEntriesKeepTheirOwnSizeAndMode();
     void coloredScatterStagesColoursPerMarker();
@@ -69,7 +68,7 @@ private slots:
 
     void coloredGraphDrawnFromL2KeepsIndicesConsistent();
 
-    void graph2ScatterColoursFollowTheirPointAcrossBreaks();
+    void multiGraphScatterColoursFollowTheirPointAcrossBreaks();
     void firstColouredCommitSlotDeletingTheGraphIsSafe();
     void colourValuesAreCompleteBeforeTheColourScaleSignal();
     void uncolouringIsCompleteBeforeTheColourScaleSignal();

@@ -37,13 +37,13 @@ void TestDataLocator::locateOnGraph()
     QVERIFY(locator.dataIndex() >= 0);
 }
 
-void TestDataLocator::locateOnGraph2()
+void TestDataLocator::locateOnAOneColumnMultiGraph()
 {
-    auto* g2 = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* g2 = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     mPlot->xAxis->setRange(0, 10);
     mPlot->yAxis->setRange(0, 10);
     g2->setData(std::vector<double>{3.0, 5.0, 7.0},
-                std::vector<double>{2.0, 8.0, 4.0});
+                std::vector<std::vector<double>>{{2.0, 8.0, 4.0}});
     mPlot->replot();
 
     QPointF pixelPos = g2->coordsToPixels(5.0, 8.0);

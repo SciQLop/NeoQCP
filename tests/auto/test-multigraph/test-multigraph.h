@@ -231,7 +231,6 @@ private slots:
     void aHugeStrokeThenASmallOneGivesTheScratchBack();
     void selectedStepLineKeepsItsSteps();
     void committedDataIsDrawnOnScreen();
-    void selectedStepGraph2KeepsItsSteps();
     void panIsRedrawnFreshAfterTheDebounce();
     void panIsRedrawnFreshWhileAnotherLayerIsDirty();
     void resampledLinesFollowANewKeyAxis();

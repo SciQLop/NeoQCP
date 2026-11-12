@@ -34,14 +34,8 @@ private slots:
     void pipelineInterimResult();
     void pipelineDestructionWhileRunning();
 
-    // QCPGraph2 pipeline integration
-    void graph2PipelinePassthrough();
-    void graph2PipelineTransform();
-    void graph2LinesFollowTheScaleOfANewKeyAxis();
-    void graph2LinesFollowTheScaleOfANewValueAxis();
-    void graph2LinesAreRebuiltWhenMovedToALogKeyAxis();
-    void graph2LinesAreRebuiltWhenMovedToALogValueAxis();
-    void graph2ResampleFollowsANewKeyAxis();
+    // QCPMultiGraph pipeline integration
+    void multiGraphPipelinePassthrough();
 
     // QCPColorMap2 pipeline integration
     void colormap2PipelineDefault();
@@ -51,7 +45,7 @@ private slots:
     void colormap2DescendingYAxisLogScaleResamplesNonEmpty();
 
     // End-to-end
-    void graph2DataFromExternalThread();
+    void multiGraphDataFromExternalThread();
     void colormap2DataFromExternalThread();
     void colormap2ResamplesAgainAfterResize();
     void colormap2ResamplesForTheLogScaleOfItsKeyAxis();
@@ -76,21 +70,16 @@ private slots:
     void graphResamplerBinMinMax();
     void graphResamplerLevel1AndLevel2();
     void graphResamplerL2BinsRawPointsInsideBurst();
-    void graphResamplerL2FollowsFallingData();
     void multiGraphL2FollowsFallingData();
     void orderPairsByTrendMovesOriginsWithValues();
     void graphResamplerCacheReuse();
     void graphResamplerNaNSkipped();
     void graphResamplerEmptyBinsProduceNaN();
-    void graph2HierarchicalResamplingActivates();
-    void graph2LineCacheRebuiltOnZoomWithBigData();
-    void graph2LineCacheRebuiltOnQueuedZoomWithBigData();
-    void graph2SmallDataNoResampling();
-    void graph2LargeToSmallDataFallback();
+    void multiGraphLineCacheRebuiltOnQueuedZoomWithBigData();
+    void multiGraphLargeToSmallDataFallback();
     void graphResamplerBinMinMaxKeyPositions();
     void graphResamplerBinMinMaxZeroBins();
     void graphResamplerNonFiniteKeysSkipped();
-    void graphResamplerParallelMatchesSingleThreaded();
 
     // Multi-column resampler
     void multiGraphBinMinMaxMulti();
@@ -103,11 +92,8 @@ private slots:
     void multiGraphSmallDataNoResampling();
     void multiGraphLargeDataL1L2();
     void multiGraphLineCacheRebuiltOnZoom();
-    void graph2GapThresholdZeroDrawsIrregularSteps();
     void multiGraphGapThresholdZeroDrawsIrregularSteps();
-    void graph2GapThresholdReachesResampledSource();
     void multiGraphGapThresholdReachesResampledSource();
-    void graph2UniformDataNeverBreaksAtAnyZoom();
     void multiGraphUniformDataNeverBreaksAtAnyZoom();
     void multiGraphNaNHoleBreaksTheResampledLine();
     void multiGraphNaNHoleInOneColumnBreaksThatLine();
@@ -124,9 +110,9 @@ private slots:
     void multiGraphHiddenComponentsStillResampled();
 
     // L2 lazy rebuild (deferred to draw)
-    void graph2L2RebuildDeferredToDraw();
-    void graph2L2CoalescesMultipleViewportChanges();
-    void graph2L2DirtyAfterL1Ready();
+    void multiGraphL2RebuildDeferredToDraw();
+    void multiGraphL2CoalescesMultipleViewportChanges();
+    void multiGraphL2DirtyAfterL1Ready();
 
     // Histogram binner
     void bin2dBasicCounts();
@@ -184,14 +170,14 @@ private slots:
     void histogram2dChangingTheNormalizationRequestsARepaint();
 
     // Layer-level GPU translation
-    void stallPixelOffsetGraph2Busy();
+    void stallPixelOffsetMultiGraphBusy();
     void stallPixelOffsetIdleIsZero();
     void visibilityToggleForcesLayerRepaint();
     void layerPixelOffsetFromBusyChild();
     void layerPixelOffsetZeroWhenNoAsyncChildren();
     void layerTranslationClippedToAxisRect();
     void bufferedMainLayerRendersSameAsLogical();
-    void existingGraph2TranslationUnaffected();
+    void existingMultiGraphTranslationUnaffected();
     void hiddenElementDoesNotBlockTranslation();
     void visibleElementStillBlocksTranslation();
     void colormapQuadFollowsPanWhileTranslating();
@@ -205,26 +191,21 @@ private slots:
     void viewportOffsetNoChange();
 
     // Line caching
-    void graph2LineCacheReusedOnSmallPan();
-    void graph2LineCacheRebuiltOnLargePan();
-    void graph2LineCacheSurvives75PercentPan();
-    void graph2LineCacheRebuiltOnZoom();
-    void graph2LineCacheRebuiltOnSmallZoom();
-    void graph2LineCacheInvalidatedOnDataChange();
+    void multiGraphLineCacheRebuiltOnLargePan();
+    void multiGraphLineCacheSurvives75PercentPan();
+    void multiGraphSmallDataLineCacheRebuiltOnZoom();
+    void multiGraphLineCacheRebuiltOnSmallZoom();
+    void multiGraphLineCacheInvalidatedOnDataChange();
     void multiGraphLineCacheReusedOnSmallPan();
 
     // End-to-end fast pan
-    void graph2FastPanNeverBlank();
     void multiGraphFastPanNeverBlank();
 
     // GPU translation fast path
-    void graph2TranslationOffsetWhenBusy();
-    void graph2TranslationResetsOnFreshData();
-    void graph2PanIsRedrawnFreshAfterTheDebounce();
-    void graph2PanIsRedrawnFreshWhileAnotherLayerIsDirty();
+    void multiGraphTranslationResetsOnFreshData();
     void densePanIsRedrawnFreshBesideASmallGraph();
     void colormapNewDataShowsWhileAnotherLayerIsDirty();
-    void graph2SetterRedrawsWhileAnotherLayerIsDirty();
+    void multiGraphSetterRedrawsWhileAnotherLayerIsDirty();
     void logValueAxisPanTranslates();
     void logKeyAxisPanStaysCovered();
     void additiveShiftOnLogAxisIsNotATranslation();
@@ -234,8 +215,8 @@ private slots:
     void colormap2ResultSurvivesNullViewport();
     void histogram2dTranslationOffsetWhenBusy();
     void translatedGeometryClippedToAxisRect();
-    void multipleGraph2IndependentOffsets();
-    void graph2DataChangedReplotSlotDeletingTheGraphIsSafe();
+    void multipleMultiGraphsIndependentOffsets();
+    void multiGraphDataChangedReplotSlotDeletingTheGraphIsSafe();
 
 private:
     bool repaintFollows(QCPHistogram2D* hist, const std::function<void()>& change);

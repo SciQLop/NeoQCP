@@ -21,8 +21,10 @@ DOC_SNIPPET(performance_million_points, 600, 360)
         const double spike = (i % 1'000'000 == 500'000) ? 3.0 : 0.0; // one sample each
         signal[i] = float(wave + 0.4 * jitter + spike);
     }
-    auto graph = customPlot->add<QCPGraph2>();
-    graph->setData(std::move(t), std::move(signal)); // moved in, never copied
+    std::vector<std::vector<float>> columns(1);
+    columns[0] = std::move(signal);
+    auto graph = customPlot->add<QCPMultiGraph>();
+    graph->setData(std::move(t), std::move(columns)); // moved in, never copied
     graph->setPen(QPen(QColor(31, 119, 180)));
     customPlot->xAxis->setLabel("time (s)");
     customPlot->xAxis->setRange(0, 5000);
@@ -66,10 +68,12 @@ DOC_SNIPPET(performance_shared_source, 600, 420)
         t[i] = i * 1e-3;
         v[i] = float(std::sin(t[i]) * std::sin(t[i] / 97.0) + 0.1 * std::sin(13.0 * t[i]));
     }
-    auto source = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<float>>>(
-        std::move(t), std::move(v));
+    std::vector<std::vector<float>> columns(1);
+    columns[0] = std::move(v);
+    auto source = std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<float>>>(
+        std::move(t), std::move(columns));
 
-    auto overview = customPlot->add<QCPGraph2>();
+    auto overview = customPlot->add<QCPMultiGraph>();
     overview->setDataSource(source);
 
     auto* detailRect = new QCPAxisRect(customPlot);
@@ -81,7 +85,7 @@ DOC_SNIPPET(performance_shared_source, 600, 420)
         axis->setLayer("axes");
         axis->grid()->setLayer("grid");
     }
-    auto* detail = new QCPGraph2(detailRect->axis(QCPAxis::atBottom),
+    auto* detail = new QCPMultiGraph(detailRect->axis(QCPAxis::atBottom),
                                  detailRect->axis(QCPAxis::atLeft));
     detail->setDataSource(source); // the same samples, no second copy
     detail->setPen(QPen(QColor(214, 39, 40)));
@@ -134,7 +138,7 @@ DOC_CODE(performance_swap_delays)
 
 DOC_CODE(performance_rescale_when_ready)
 {
-    auto graph = customPlot->add<QCPGraph2>().setData(std::vector<double> { 0, 1 }, std::vector<double> { 0, 1 });
+    auto graph = customPlot->add<QCPMultiGraph>().setData(std::vector<double> { 0, 1 }, std::vector<double> { 0, 1 });
     customPlot->replot();
     std::vector<double> keys { 0, 10 }, values { -5, 5 };
     // [performance_rescale_when_ready]

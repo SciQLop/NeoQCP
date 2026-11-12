@@ -322,7 +322,7 @@ void paintWholeRecording(const QCPDrawList& list, QCPPlottableRhiLayer& layer,
 // mapped again from the resolve cache even when the plottable geometry is re-emitted.
 void addMarker(QCPScatterRhiLayer& scatter, const qcp::MarkersCmd& markers, QCPResolveCache& cache,
                const QCPDrawFrame& frame, quint64 generation, const QRect& clip, double dpr,
-               int height)
+               int height, float alpha)
 {
     const std::span<const QPointF> resolved
         = cache.pixels(markers.points, generation, frame.transform);
@@ -337,7 +337,7 @@ void addMarker(QCPScatterRhiLayer& scatter, const qcp::MarkersCmd& markers, QCPR
             xyz[3 * i + 1] = static_cast<float>(resolved[i].y());
             xyz[3 * i + 2] = 0.0f;
         }
-        scatter.addScatter(xyz, *markers.style, clip, dpr, height);
+        scatter.addScatter(xyz, *markers.style, clip, dpr, height, 0, 0, {}, alpha);
         return;
     }
     std::vector<float>& xy = markerScratch();
@@ -356,16 +356,16 @@ void addMarker(QCPScatterRhiLayer& scatter, const qcp::MarkersCmd& markers, QCPR
             = qcp::rhi::premultipliedColor(QColor::fromRgba((*markers.colours)[i]));
         std::copy(colour.begin(), colour.end(), rgba.begin() + std::ptrdiff_t(4 * i));
     }
-    scatter.addScatterColored(xy, rgba, *markers.style, clip, dpr, height);
+    scatter.addScatterColored(xy, rgba, *markers.style, clip, dpr, height, 0, 0, alpha);
 }
 
 void addMarkers(const QCPDrawList& list, QCPScatterRhiLayer& scatter, QCPResolveCache& cache,
                 const QCPDrawFrame& frame, quint64 generation, const QRect& clip, double dpr,
-                int height)
+                int height, float alpha)
 {
     for (const qcp::QCPDrawCommand& command : list.commands)
         if (const auto* markers = std::get_if<qcp::MarkersCmd>(&command))
-            addMarker(scatter, *markers, cache, frame, generation, clip, dpr, height);
+            addMarker(scatter, *markers, cache, frame, generation, clip, dpr, height, alpha);
 }
 
 //! Hands a kept recording back to the layer: one submission per run, in the recording's order,
@@ -618,7 +618,7 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
         // its data-space runs shifted. Markers live in another layer, which is rebuilt anyway.
         replayKept(list, *geometry, plottables, fallback, frame, generation, clip, dpr,
                    outputHeight, delta, alpha);
-        addMarkers(list, scatter, cache, frame, generation, clip, dpr, outputHeight);
+        addMarkers(list, scatter, cache, frame, generation, clip, dpr, outputHeight, alpha);
         return;
     }
 
@@ -798,7 +798,7 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                 }
                 else if constexpr (std::is_same_v<T, qcp::MarkersCmd>)
                 {
-                    addMarker(scatter, cmd, cache, frame, generation, clip, dpr, outputHeight);
+                    addMarker(scatter, cmd, cache, frame, generation, clip, dpr, outputHeight, alpha);
                 }
                 else if constexpr (std::is_same_v<T, qcp::ImageCmd>)
                 {

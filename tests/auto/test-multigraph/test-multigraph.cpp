@@ -1275,7 +1275,7 @@ void TestMultiGraph::zoomedOutLinesAreThinnedToThePixelWidth_data()
 void TestMultiGraph::zoomedOutLinesAreThinnedToThePixelWidth()
 {
     // Zoomed out, L2 holds ~4 min/max bins per pixel. Adaptive sampling must thin them to
-    // ~2 points per pixel before the line is recorded, as QCPGraph2 does; drawing every L2
+    // ~2 points per pixel before the line is recorded; drawing every L2
     // point made a full replot about twice as slow.
     QFETCH(int, columns);
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
@@ -1520,25 +1520,6 @@ void TestMultiGraph::committedDataIsDrawnOnScreen()
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QVERIFY2(onScreenIsRed(mPlot, 2, 3), "the committed data is not on screen");
     QVERIFY2(!onScreenIsRed(mPlot, 2, 1), "the replaced data is still on screen");
-}
-
-void TestMultiGraph::selectedStepGraph2KeepsItsSteps()
-{
-    if (!showWithRhi(mPlot))
-        QSKIP("no QRhi available in this environment");
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    g->setData(std::vector<double>{0, 4}, std::vector<double>{0, 2});
-    g->setPen(QPen(Qt::red, 5));
-    g->selectionDecorator()->setPen(QPen(QColor(220, 0, 0), 7));
-    g->setLineStyle(QCPGraph2::lsStepLeft);
-    mPlot->xAxis->setRange(-1, 5);
-    mPlot->yAxis->setRange(-1, 3);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(!crossesTheDiagonal(mPlot));
-
-    g->setSelection(QCPDataSelection(QCPDataRange(0, 2)));
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY2(!crossesTheDiagonal(mPlot), "selected step line drawn as a straight line");
 }
 
 namespace {

@@ -24,7 +24,7 @@ private slots:
     void rhi_reallocatedTextureRequiresUpload();
     void rhi_imageBytesMatchTextureChannelOrder();
 
-    void skipRepaint_graph2PanOnly();
+    void skipRepaint_multiGraphPanOnly();
     void skipRepaint_disabledWithItems();
     void skipRepaint_disabledWithLegacyGraph();
     void skipRepaint_disabledOnInvalidation();

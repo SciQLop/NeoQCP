@@ -9,7 +9,7 @@ private slots:
     void cleanup();
 
     void locateOnGraph();
-    void locateOnGraph2();
+    void locateOnAOneColumnMultiGraph();
     void locateOnCurve();
     void locateOnColorMap();
     void locateOnEmptyPlottable();

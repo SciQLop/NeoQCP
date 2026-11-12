@@ -12,7 +12,7 @@ int main(int argc, char* argv[])
     QApplication app(argc, argv);
 
     QMainWindow window;
-    window.setWindowTitle("Graph2 500M pts");
+    window.setWindowTitle("MultiGraph 500M pts");
     window.resize(1200, 700);
 
     auto* plot = new QCustomPlot;
@@ -34,8 +34,10 @@ int main(int argc, char* argv[])
         }
 
         QMetaObject::invokeMethod(plot, [plot, keys = std::move(keys), vals = std::move(vals)]() mutable {
-            auto* g = new QCPGraph2(plot->xAxis, plot->yAxis);
-            g->setData(std::move(keys), std::move(vals));
+            std::vector<std::vector<double>> columns(1);
+            columns[0] = std::move(vals);
+            auto* g = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+            g->setData(std::move(keys), std::move(columns));
             g->setPen(QPen(QColor(31, 119, 180), 1));
             g->setName("500M points");
 

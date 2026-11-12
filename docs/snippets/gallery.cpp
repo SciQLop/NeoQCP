@@ -140,10 +140,12 @@ DOC_SNIPPET(gallery_ten_million_points, 800, 520)
         v[i] = static_cast<float>(envelope * chirp + 0.3 * jitter + burst);
     }
     // One copy of the data, two views of it.
-    auto source = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<float>>>(
-        std::move(t), std::move(v));
+    std::vector<std::vector<float>> columns(1);
+    columns[0] = std::move(v);
+    auto source = std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<float>>>(
+        std::move(t), std::move(columns));
 
-    auto overview = customPlot->add<QCPGraph2>();
+    auto overview = customPlot->add<QCPMultiGraph>();
     overview->setDataSource(source);
     overview->setPen(QPen(QColor(31, 119, 180), 1));
     customPlot->xAxis->setRange(0, 10000);
@@ -151,7 +153,7 @@ DOC_SNIPPET(gallery_ten_million_points, 800, 520)
 
     auto* detailRect = new QCPAxisRect(customPlot);
     customPlot->plotLayout()->addElement(1, 0, detailRect);
-    auto* detail = new QCPGraph2(detailRect->axis(QCPAxis::atBottom), detailRect->axis(QCPAxis::atLeft));
+    auto* detail = new QCPMultiGraph(detailRect->axis(QCPAxis::atBottom), detailRect->axis(QCPAxis::atLeft));
     detail->setDataSource(source);
     detail->setPen(QPen(QColor(214, 39, 40), 1.5));
     const QCPRange window(7108, 7112);   // four seconds around a burst

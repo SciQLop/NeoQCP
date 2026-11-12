@@ -1529,7 +1529,7 @@ bool QCustomPlot::adoptPlottable(QCPAbstractPlottable* plottable, QCPCoordinateS
     plottable->setParent(this);
     plottable->initializeParentPlot(this);
     // It joins the frame of the area it arrives in, like a plottable built there, through setSystem
-    // so it rewires to the new axes: a graph2 would keep following the old ones' signals.
+    // so it rewires to the new axes: a plain move would keep following the old ones' signals.
     plottable->setSystem(system);
     plottable->setPipelineScheduler(mPipelineScheduler);
     plottable->setParentLayerable(area);

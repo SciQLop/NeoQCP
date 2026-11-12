@@ -39,7 +39,7 @@ MainWindow::MainWindow(QWidget *parent) :
   //setupLegendTest(mCustomPlot);
   //setupMultiAxisRectInteractions(mCustomPlot);
   //setupAdaptiveSamplingTest(mCustomPlot);
-  //setupGraph2Test(mCustomPlot);
+  //setupOneColumnMultiGraphTest(mCustomPlot);
   //setupColorMap2Test(mCustomPlot);
   //setupMultiGraphComparisonTest(mCustomPlot);
   setupWaterfallTest(mCustomPlot);
@@ -1365,24 +1365,24 @@ void MainWindow::setupAdaptiveSamplingTest(QCustomPlot *customPlot)
   customPlot->yAxis->scaleRange(1, customPlot->yAxis->range().center());
 }
 
-void MainWindow::setupGraph2Test(QCustomPlot *customPlot)
+void MainWindow::setupOneColumnMultiGraphTest(QCustomPlot *customPlot)
 {
   const int n = 500000;
 
-  // Graph 1: QCPGraph2 with owning std::vector<double>
-  auto *g1 = new QCPGraph2(customPlot->xAxis, customPlot->yAxis);
+  // Graph 1: one-column QCPMultiGraph with owning std::vector<double>
+  auto *g1 = new QCPMultiGraph(customPlot->xAxis, customPlot->yAxis);
   {
     std::vector<double> keys(n), values(n);
     for (int i = 0; i < n; ++i) {
       keys[i] = i / static_cast<double>(n) * 10.0 - 5.0;
       values[i] = qSin(keys[i] * 3) * qExp(-keys[i] * keys[i] / 8.0);
     }
-    g1->setData(std::move(keys), std::move(values));
+    g1->setData(keys, values);
   }
   g1->setPen(QPen(Qt::blue, 1.5));
 
-  // Graph 2: QCPGraph2 with float values (zero-copy benefit: no double conversion)
-  auto *g2 = new QCPGraph2(customPlot->xAxis, customPlot->yAxis);
+  // Graph 2: one-column QCPMultiGraph with float values (no double conversion)
+  auto *g2 = new QCPMultiGraph(customPlot->xAxis, customPlot->yAxis);
   {
     std::vector<double> keys(n);
     std::vector<float> values(n);
@@ -1390,23 +1390,26 @@ void MainWindow::setupGraph2Test(QCustomPlot *customPlot)
       keys[i] = i / static_cast<double>(n) * 10.0 - 5.0;
       values[i] = static_cast<float>(qCos(keys[i] * 5) * 0.5 / (1.0 + keys[i] * keys[i]));
     }
-    g2->setData(std::move(keys), std::move(values));
+    std::vector<std::vector<float>> columns(1);
+    columns[0] = std::move(values);
+    g2->setData(std::move(keys), std::move(columns));
   }
   g2->setPen(QPen(Qt::red, 1.5));
 
-  // Graph 3: QCPGraph2 with shared data source (two graphs plotting the same data)
-  auto shared = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<int>>>(
-      [&] {
-        std::vector<double> keys(n / 10);
-        std::vector<int> values(n / 10);
-        for (int i = 0; i < n / 10; ++i) {
-          keys[i] = i / static_cast<double>(n / 10) * 10.0 - 5.0;
-          values[i] = static_cast<int>(100 * qSin(keys[i] * 2));
-        }
-        return QCPSoADataSource<std::vector<double>, std::vector<int>>(
-            std::move(keys), std::move(values));
-      }());
-  auto *g3 = new QCPGraph2(customPlot->xAxis, customPlot->yAxis);
+  // Graph 3: one-column QCPMultiGraph with a shared data source
+  auto shared = [&] {
+    std::vector<double> keys(n / 10);
+    std::vector<int> values(n / 10);
+    for (int i = 0; i < n / 10; ++i) {
+      keys[i] = i / static_cast<double>(n / 10) * 10.0 - 5.0;
+      values[i] = static_cast<int>(100 * qSin(keys[i] * 2));
+    }
+    std::vector<std::vector<int>> columns(1);
+    columns[0] = std::move(values);
+    return std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<int>>>(
+        std::move(keys), std::move(columns));
+  }();
+  auto *g3 = new QCPMultiGraph(customPlot->xAxis, customPlot->yAxis);
   g3->setDataSource(shared);
   g3->setPen(QPen(QColor(0, 180, 0), 1.0));
 
@@ -1842,10 +1845,10 @@ void MainWindow::setupMultiGraphComparisonTest(QCustomPlot *customPlot)
     rightRect->insetLayout()->addElement(rightLegend, Qt::AlignTop | Qt::AlignRight);
     rightLegend->setLayer("legend");
 
-    // --- Left plot: 10 separate QCPGraph2 ---
+    // --- Left plot: 10 separate one-column QCPMultiGraph ---
     for (int c = 0; c < numComponents; ++c) {
-        auto* graph = new QCPGraph2(leftRect->axis(QCPAxis::atBottom),
-                                     leftRect->axis(QCPAxis::atLeft));
+        auto* graph = new QCPMultiGraph(leftRect->axis(QCPAxis::atBottom),
+                                        leftRect->axis(QCPAxis::atLeft));
         graph->setData(std::vector<double>(keys), std::vector<double>(allValues[c]));
         graph->setPen(QPen(colors[c], 1.0));
         graph->setName(QString("comp %1").arg(c));

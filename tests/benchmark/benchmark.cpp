@@ -40,16 +40,6 @@ private slots:
     void QCPGraph_AddDataSingleAtBegin();
     void QCPGraph_AddDataSingleRandom();
 
-    void QCPGraph2_SetDataDouble();
-    void QCPGraph2_SetDataFloat();
-    void QCPGraph2_RenderDouble();
-    void QCPGraph2_RenderFloat();
-    void QCPGraph2_RenderManyLines();
-
-    void QCPGraph2_ScatterDisc1M();
-    void QCPGraph2_ScatterSquare1M();
-    void QCPGraph2_ScatterWithLine1M();
-
     void QCPColorMap_Standard();
     void QCPColorMap_ColorizeMap();
 
@@ -92,7 +82,6 @@ private slots:
     void QCPPlots_Stack8_Replot();
     void QCPPlots_Stack8_Aligned_Replot();
     void QCPInput_MouseMoveStorm();
-    void QCPInput_WheelOverGraph2_1M();
 
     void QCPSpatialIndex_Build10k();
     void QCPSpatialIndex_Query10k();
@@ -100,7 +89,6 @@ private slots:
     void QCPGpu_LineSolid100k();
     void QCPGpu_LineDashed100k();
     void QCPGpu_Pan100k();
-    void QCPGpu_Graph2Render1M();
     void QCPMultiGraph_SetData1M();
     void QCPMultiGraph_Standard();
     void QCPMultiGraph_ManyPoints();
@@ -680,170 +668,6 @@ void Benchmark::QCPGraph_AddDataSingleRandom()
         elapsed / 1e3 / (double)iteration,
         QTest::WalltimeMilliseconds); // 1e3 instead of 1e6 is intentional to get time of 1000
                                       // iterations (fits better to precision of benchmark script)
-}
-
-void Benchmark::QCPGraph2_SetDataDouble()
-{
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    Q_UNUSED(graph);
-    const int n = 1000000;
-
-    QBENCHMARK
-    {
-        std::vector<double> keys(n), values(n);
-        for (int i = 0; i < n; ++i)
-        {
-            keys[i] = i / static_cast<double>(n);
-            values[i] = qSin(keys[i] * 10 * M_PI);
-        }
-        graph->setData(std::move(keys), std::move(values));
-    }
-}
-
-void Benchmark::QCPGraph2_SetDataFloat()
-{
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    Q_UNUSED(graph);
-    const int n = 1000000;
-
-    QBENCHMARK
-    {
-        std::vector<double> keys(n);
-        std::vector<float> values(n);
-        for (int i = 0; i < n; ++i)
-        {
-            keys[i] = i / static_cast<double>(n);
-            values[i] = static_cast<float>(qSin(keys[i] * 10 * M_PI));
-        }
-        graph->setData(std::move(keys), std::move(values));
-    }
-}
-
-void Benchmark::QCPGraph2_RenderDouble()
-{
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    const int n = 1000000;
-    std::vector<double> keys(n), values(n);
-    for (int i = 0; i < n; ++i)
-    {
-        keys[i] = i / static_cast<double>(n);
-        values[i] = qSin(keys[i] * 10 * M_PI);
-    }
-    graph->setData(std::move(keys), std::move(values));
-    graph->rescaleAxes();
-    mPlot->xAxis->scaleRange(0.7, mPlot->xAxis->range().center());
-
-    QBENCHMARK
-    {
-        mPlot->replot();
-    }
-}
-
-void Benchmark::QCPGraph2_RenderFloat()
-{
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    const int n = 1000000;
-    std::vector<double> keys(n);
-    std::vector<float> values(n);
-    for (int i = 0; i < n; ++i)
-    {
-        keys[i] = i / static_cast<double>(n);
-        values[i] = static_cast<float>(qSin(keys[i] * 10 * M_PI));
-    }
-    graph->setData(std::move(keys), std::move(values));
-    graph->rescaleAxes();
-    mPlot->xAxis->scaleRange(0.7, mPlot->xAxis->range().center());
-
-    QBENCHMARK
-    {
-        mPlot->replot();
-    }
-}
-
-void Benchmark::QCPGraph2_RenderManyLines()
-{
-    const int n = 50000;
-    for (int g = 0; g < 3; ++g)
-    {
-        auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-        std::vector<double> keys(n), values(n);
-        for (int i = 0; i < n; ++i)
-        {
-            keys[i] = i / static_cast<double>(n);
-            values[i] = qSin(keys[i] * (10 + 30 * g) * M_PI);
-        }
-        graph->setData(std::move(keys), std::move(values));
-    }
-    mPlot->rescaleAxes();
-    mPlot->xAxis->scaleRange(0.7, mPlot->xAxis->range().center());
-
-    QBENCHMARK
-    {
-        mPlot->replot();
-    }
-}
-
-void Benchmark::QCPGraph2_ScatterDisc1M()
-{
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    graph->setLineStyle(QCPGraph2::lsNone);
-    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 4));
-    const int n = 1000000;
-    std::vector<double> keys(n), values(n);
-    for (int i = 0; i < n; ++i)
-    {
-        keys[i] = i / static_cast<double>(n);
-        values[i] = qSin(keys[i] * 10 * M_PI) + 0.1 * (std::rand() / double(RAND_MAX));
-    }
-    graph->setData(std::move(keys), std::move(values));
-    graph->rescaleAxes();
-
-    QBENCHMARK
-    {
-        mPlot->replot();
-    }
-}
-
-void Benchmark::QCPGraph2_ScatterSquare1M()
-{
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    graph->setLineStyle(QCPGraph2::lsNone);
-    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssSquare, 4));
-    const int n = 1000000;
-    std::vector<double> keys(n), values(n);
-    for (int i = 0; i < n; ++i)
-    {
-        keys[i] = i / static_cast<double>(n);
-        values[i] = qSin(keys[i] * 10 * M_PI) + 0.1 * (std::rand() / double(RAND_MAX));
-    }
-    graph->setData(std::move(keys), std::move(values));
-    graph->rescaleAxes();
-
-    QBENCHMARK
-    {
-        mPlot->replot();
-    }
-}
-
-void Benchmark::QCPGraph2_ScatterWithLine1M()
-{
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    graph->setLineStyle(QCPGraph2::lsLine);
-    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 4));
-    const int n = 1000000;
-    std::vector<double> keys(n), values(n);
-    for (int i = 0; i < n; ++i)
-    {
-        keys[i] = i / static_cast<double>(n);
-        values[i] = qSin(keys[i] * 10 * M_PI);
-    }
-    graph->setData(std::move(keys), std::move(values));
-    graph->rescaleAxes();
-
-    QBENCHMARK
-    {
-        mPlot->replot();
-    }
 }
 
 void Benchmark::QCPColorMap_Standard()
@@ -1563,33 +1387,8 @@ void Benchmark::QCPInput_MouseMoveStorm()
     QCOMPARE(moves, kMoves);
 }
 
-// One wheel event over a 1M-point graph2 with the cursor inside the axis rect but away from the
+// One wheel event over a 1M-point one-column graph with the cursor inside the axis rect but away from the
 // curve: the hit test must not walk the data. Target: <= 0.1 ms.
-void Benchmark::QCPInput_WheelOverGraph2_1M()
-{
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    const int n = 1000000;
-    std::vector<double> keys(n), values(n);
-    for (int i = 0; i < n; ++i)
-    {
-        keys[i] = i / static_cast<double>(n);
-        values[i] = qSin(keys[i] * 10 * M_PI);
-    }
-    graph->setData(std::move(keys), std::move(values));
-    mPlot->xAxis->setRange(0, 1);
-    mPlot->yAxis->setRange(-1.2, 1.2);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-
-    const QRect axisRect = mPlot->axisRect()->rect();
-    const QPointF pos(axisRect.left() + 10, axisRect.top() + 10);
-    QWheelEvent event(pos, mPlot->mapToGlobal(pos), QPoint(), QPoint(0, 120), Qt::NoButton,
-                      Qt::NoModifier, Qt::NoScrollPhase, false);
-    QBENCHMARK
-    {
-        QCoreApplication::sendEvent(mPlot, &event);
-    }
-}
-
 namespace
 {
 std::vector<std::pair<QCPDataBox, int>> spatialIndexEntries10k()
@@ -1953,35 +1752,10 @@ void Benchmark::QCPGpu_Pan100k()
     }
 }
 
-void Benchmark::QCPGpu_Graph2Render1M()
-{
-    QWidget host;
-    QCustomPlot* plot = nullptr;
-    if (!makeGpuPlot(host, plot))
-        QSKIP("no QRhi on this platform (qoffscreen)");
-    auto* graph = new QCPGraph2(plot->xAxis, plot->yAxis);
-    const int n = 1000000;
-    std::vector<double> keys(n), values(n);
-    for (int i = 0; i < n; ++i)
-    {
-        keys[i] = i / static_cast<double>(n);
-        values[i] = qSin(keys[i] * 10 * M_PI);
-    }
-    graph->setData(std::move(keys), std::move(values));
-    plot->xAxis->setRange(0, 1);
-    plot->yAxis->setRange(-1.2, 1.2);
-    settleGpuPlot(plot);
-    int step = 0;
-    QBENCHMARK
-    {
-        zoomInPlace(plot, 0.5, 1.0, step);
-    }
-}
-
 void Benchmark::QCPMultiGraph_SetData1M()
 {
     // Offscreen row: the multigraph never had a rendered range, so setData installs at once and
-    // the loop times the copy into the source, as QCPGraph2_SetDataDouble does.
+    // the loop times the copy into the source.
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     const int n = 1000000;
     QBENCHMARK

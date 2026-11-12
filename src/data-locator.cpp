@@ -2,7 +2,6 @@
 #include <algorithm>
 #include <cmath>
 #include "plottables/plottable-graph.h"
-#include "plottables/plottable-graph2.h"
 #include "plottables/plottable-curve.h"
 #include "plottables/plottable-colormap.h"
 #include "plottables/plottable-colormap2.h"
@@ -39,8 +38,6 @@ bool QCPDataLocator::locate(const QPointF& pixelPos)
         return false;
 
     // Try specific types in order (derived before base where needed)
-    if (qobject_cast<QCPGraph2*>(mPlottable))
-        return locateGraph2(pixelPos);
     if (qobject_cast<QCPGraph*>(mPlottable))
         return locateGraph(pixelPos);
     if (qobject_cast<QCPCurve*>(mPlottable))
@@ -73,31 +70,6 @@ bool QCPDataLocator::locateGraph(const QPointF& pixelPos)
     auto it = graph->data()->at(index);
     mKey = it->key;
     mValue = it->value;
-    mDataIndex = index;
-    mHitPlottable = mPlottable;
-    mValid = true;
-    return true;
-}
-
-bool QCPDataLocator::locateGraph2(const QPointF& pixelPos)
-{
-    auto* g2 = qobject_cast<QCPGraph2*>(mPlottable);
-    QVariant details;
-    double dist = g2->selectTest(pixelPos, false, &details);
-    if (dist < 0)
-        return false;
-
-    auto sel = details.value<QCPDataSelection>();
-    if (sel.dataRangeCount() == 0)
-        return false;
-
-    int index = sel.dataRange(0).begin();
-    auto* src = g2->dataSource();
-    if (!src || index < 0 || index >= src->size())
-        return false;
-
-    mKey = src->keyAt(index);
-    mValue = src->valueAt(index);
     mDataIndex = index;
     mHitPlottable = mPlottable;
     mValid = true;
@@ -247,8 +219,6 @@ bool QCPDataLocator::locateAtKey(QCPAbstractPlottable* plottable, double key, do
     if (!mPlottable)
         return false;
 
-    if (qobject_cast<QCPGraph2*>(mPlottable))
-        return locateGraph2AtKey(key);
     if (qobject_cast<QCPGraph*>(mPlottable))
         return locateGraphAtKey(key);
     if (qobject_cast<QCPMultiGraph*>(mPlottable))
@@ -289,29 +259,6 @@ bool QCPDataLocator::locateGraphAtKey(double key)
     mKey = it->key;
     mValue = it->value;
     mDataIndex = static_cast<int>(it - data->constBegin());
-    mHitPlottable = mPlottable;
-    mValid = true;
-    return true;
-}
-
-bool QCPDataLocator::locateGraph2AtKey(double key)
-{
-    auto* g2 = qobject_cast<QCPGraph2*>(mPlottable);
-    auto* src = g2->dataSource();
-    if (!src || src->size() == 0)
-        return false;
-
-    int idx = src->findEnd(key, false);
-    int lo = std::max(0, idx - 1);
-    int hi = std::min(idx, src->size() - 1);
-
-    int nearest = lo;
-    if (lo != hi && std::abs(src->keyAt(hi) - key) < std::abs(src->keyAt(lo) - key))
-        nearest = hi;
-
-    mKey = src->keyAt(nearest);
-    mValue = src->valueAt(nearest);
-    mDataIndex = nearest;
     mHitPlottable = mPlottable;
     mValid = true;
     return true;

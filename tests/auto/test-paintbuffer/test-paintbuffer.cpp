@@ -282,9 +282,9 @@ void TestPaintBuffer::rhi_reallocatedTextureRequiresUpload()
              "reallocated texture must be uploaded before compositing");
 }
 
-void TestPaintBuffer::skipRepaint_graph2PanOnly()
+void TestPaintBuffer::skipRepaint_multiGraphPanOnly()
 {
-    auto* graph2 = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* graph2 = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> keys = {1.0, 2.0, 3.0, 4.0, 5.0};
     std::vector<double> vals = {1.0, 4.0, 2.0, 5.0, 3.0};
     graph2->setData(std::move(keys), std::move(vals));
@@ -308,7 +308,7 @@ void TestPaintBuffer::skipRepaint_graph2PanOnly()
 
 void TestPaintBuffer::skipRepaint_disabledWithItems()
 {
-    auto* graph2 = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* graph2 = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> keys = {1.0, 2.0, 3.0};
     std::vector<double> vals = {1.0, 4.0, 2.0};
     graph2->setData(std::move(keys), std::move(vals));
@@ -346,7 +346,7 @@ void TestPaintBuffer::skipRepaint_disabledWithLegacyGraph()
 
 void TestPaintBuffer::skipRepaint_disabledOnInvalidation()
 {
-    auto* graph2 = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* graph2 = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> keys = {1.0, 2.0, 3.0};
     std::vector<double> vals = {1.0, 4.0, 2.0};
     graph2->setData(std::move(keys), std::move(vals));
@@ -423,7 +423,7 @@ void TestPaintBuffer::setVisible_noOpWhenUnchanged()
 
 void TestPaintBuffer::skipRepaint_bufferNotReuploadedOnPan()
 {
-    auto* graph2 = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* graph2 = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> keys = {1.0, 2.0, 3.0, 4.0, 5.0};
     std::vector<double> vals = {1.0, 4.0, 2.0, 5.0, 3.0};
     graph2->setData(std::move(keys), std::move(vals));

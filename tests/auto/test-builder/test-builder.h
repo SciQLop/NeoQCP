@@ -58,7 +58,7 @@ private slots:
     void errorBarsTakeTheirPlottableByHandle();
     void tracerTakesItsGraphByHandle();
     void richTextHandleKeepsTheTextSetters();
-    void graph2ScatterColoursChangeTheDrawing();
+    void multiGraphScatterColoursChangeTheDrawing();
     void addPolar();
     void takeAndAdoptAPolarGraph();
     void takePolarGraph();

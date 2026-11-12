@@ -99,49 +99,8 @@ public:
         return qcp::algo::findEnd(mKeys, sortKey, expandedRange);
     }
 
-    QVector<QPointF> getOptimizedLineData(int begin, int end, int pixelWidth,
-                                           QCPAxis* keyAxis, QCPAxis* valueAxis) const override
-    {
-        ensureGapCache(begin, end);
-        return qcp::algo::optimizedLineData(mKeys, mValues, begin, end, pixelWidth,
-                                             keyAxis, valueAxis, &mGapCache.gaps);
-    }
-
-    QVector<QPointF> getLines(int begin, int end,
-                               QCPAxis* keyAxis, QCPAxis* valueAxis) const override
-    {
-        ensureGapCache(begin, end);
-        return qcp::algo::linesToPixels(mKeys, mValues, begin, end, keyAxis, valueAxis,
-                                         gapThreshold(), &mGapCache.gaps);
-    }
-
-    QVector<QPointF> getLinesIndexed(int begin, int end, QCPAxis* keyAxis, QCPAxis* valueAxis,
-                                     QVector<int>& sourceIndices) const override
-    {
-        ensureGapCache(begin, end);
-        return qcp::algo::linesToPixelsIndexed(mKeys, mValues, begin, end, keyAxis, valueAxis,
-                                               sourceIndices, gapThreshold(), &mGapCache.gaps);
-    }
-
-    // Binned points: their gaps come from these ratios, not from their keys (see gapsFromStepRatios).
-    void setGapRatios(std::vector<float> ratios)
-    {
-        mGapRatios = std::move(ratios);
-        mGapCache = qcp::algo::GapCache();
-    }
-
 private:
-    void ensureGapCache(int begin, int end) const
-    {
-        if (mGapRatios.empty())
-            mGapCache.update(mKeys, begin, end, gapThreshold());
-        else
-            mGapCache.updateFromRatios(mGapRatios, begin, end, gapThreshold());
-    }
-
     KeyContainer mKeys;
     ValueContainer mValues;
     std::shared_ptr<const void> mDataGuard;
-    std::vector<float> mGapRatios;
-    mutable qcp::algo::GapCache mGapCache;
 };

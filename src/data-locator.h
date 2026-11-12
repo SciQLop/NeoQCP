@@ -39,7 +39,6 @@ private:
     QVector<double> mComponentValues;
 
     bool locateGraph(const QPointF& pixelPos);
-    bool locateGraph2(const QPointF& pixelPos);
     bool locateCurve(const QPointF& pixelPos);
     bool locateColorMap(const QPointF& pixelPos);
     bool locateColorMap2(const QPointF& pixelPos);
@@ -47,7 +46,6 @@ private:
     bool locateMultiGraph(const QPointF& pixelPos);
 
     bool locateGraphAtKey(double key);
-    bool locateGraph2AtKey(double key);
     bool locateMultiGraphAtKey(double key);
     bool locateColorMap2AtKey(double key, double value);
     bool locateColorMapAtKey(double key, double value);

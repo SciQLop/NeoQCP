@@ -44,10 +44,10 @@ private slots:
     void scattersOnOneLayerKeepTheirOwnMarker();
     void multiGraphComponentsKeepTheirOwnMarker();
     void uncolouredMarkersCommandDrawsEveryMarker();
-    void graph2LineStyleChangeAfterFirstDrawIsShown();
-    void graph2ScatterStyleChangeAfterFirstDrawIsShown();
-    void graph2ScatterColorValuesChangeAfterFirstDrawIsShown();
-    void graph2FirstColorValuesAfterFirstDrawAreShown();
+    void multiGraphLineStyleChangeAfterFirstDrawIsShown();
+    void multiGraphScatterStyleChangeAfterFirstDrawIsShown();
+    void multiGraphScatterColorValuesChangeAfterFirstDrawIsShown();
+    void multiGraphFirstColorValuesAfterFirstDrawAreShown();
 
 private:
     QCustomPlot* mPlot = nullptr;

@@ -33,10 +33,6 @@ private slots:
     void noCommitNoReplot();
     void commitRemovingAPlottableStillCommitsTheOthers();
 
-    void graph2KeepsTranslationWhileDataPending();
-    void graph2CommitsAfterWindow();
-    void graph2DataChangedWhilePendingKeepsDisplayedGeometry();
-    void graph2LateLargeJobDoesNotContaminateCommittedSmallSource();
 
 private:
     QCustomPlot* mPlot = nullptr;

@@ -200,7 +200,7 @@ static QWidget* createSpansTab()
     return splitter;
 }
 
-// ── Tab 2: Graph + Graph2 ────────────────────────────────────────────────────
+// ── Tab 2: Graph + MultiGraph ────────────────────────────────────────────────────
 
 static QWidget* createGraphTab()
 {
@@ -218,16 +218,16 @@ static QWidget* createGraphTab()
     g1->setPen(QPen(Qt::blue, 1.5));
     g1->setName("QCPGraph");
 
-    // QCPGraph2 (zero-copy SoA)
-    auto* g2 = new QCPGraph2(plot->xAxis, plot->yAxis);
+    // QCPMultiGraph with one column
+    auto* g2 = new QCPMultiGraph(plot->xAxis, plot->yAxis);
     std::vector<double> x2(n), y2(n);
     for (int i = 0; i < n; ++i) {
         x2[i] = i / double(n) * 10 - 5;
         y2[i] = qCos(x2[i] * 5) * 0.5 / (1.0 + x2[i] * x2[i]);
     }
-    g2->setData(std::move(x2), std::move(y2));
+    g2->setData(x2, y2);
     g2->setPen(QPen(Qt::red, 1.5));
-    g2->setName("QCPGraph2");
+    g2->setName("QCPMultiGraph");
 
     // QCPCurve (parametric)
     auto* curve = new QCPCurve(plot->xAxis, plot->yAxis);
@@ -939,7 +939,7 @@ static QWidget* createRealtimeColorMapTab()
     return wrapPlot(plot);
 }
 
-// ── Tab 13: Realtime Graph2 ──────────────────────────────────────────────────
+// ── Tab 13: Realtime MultiGraph ──────────────────────────────────────────────────
 
 static QWidget* createRealtimeGraphTab()
 {
@@ -949,11 +949,11 @@ static QWidget* createRealtimeGraphTab()
     auto y1 = std::make_shared<std::vector<double>>();
     auto y2 = std::make_shared<std::vector<double>>();
 
-    auto* g1 = new QCPGraph2(plot->xAxis, plot->yAxis);
+    auto* g1 = new QCPMultiGraph(plot->xAxis, plot->yAxis);
     g1->setPen(QPen(QColor(31, 119, 180), 1.5));
     g1->setName("Signal");
 
-    auto* g2 = new QCPGraph2(plot->xAxis, plot->yAxis);
+    auto* g2 = new QCPMultiGraph(plot->xAxis, plot->yAxis);
     g2->setPen(QPen(QColor(214, 39, 40), 1.5));
     g2->setName("Envelope");
 
@@ -976,10 +976,10 @@ static QWidget* createRealtimeGraphTab()
             ++(*step);
 
             g1->viewData<double, double>(
-                std::span<const double>{*x}, std::span<const double>{*y1});
+                std::span<const double>{*x}, {std::span<const double>{*y1}});
             g1->dataChanged();
             g2->viewData<double, double>(
-                std::span<const double>{*x}, std::span<const double>{*y2});
+                std::span<const double>{*x}, {std::span<const double>{*y2}});
             g2->dataChanged();
 
             if (t > 10.0)
@@ -990,7 +990,7 @@ static QWidget* createRealtimeGraphTab()
     return wrapPlot(plot);
 }
 
-// ── Tab: Massive Graph2 (500M points) — lazy, allocates ~8GB on first show ──
+// ── Tab: Massive MultiGraph (500M points) — lazy, allocates ~8GB on first show ──
 
 static QWidget* createMassiveGraphTab()
 {
@@ -1026,8 +1026,10 @@ static QWidget* createMassiveGraphTab()
         thread->setParent(btn->parentWidget());
         QObject::connect(thread, &QThread::finished, btn->parentWidget(), [layout, btn, thread, data]() {
             auto* plot = makePlot();
-            auto* g = new QCPGraph2(plot->xAxis, plot->yAxis);
-            g->setData(std::move(data->keys), std::move(data->vals));
+            std::vector<std::vector<double>> columns(1);
+            columns[0] = std::move(data->vals);
+            auto* g = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+            g->setData(std::move(data->keys), std::move(columns));
             g->setPen(QPen(QColor(31, 119, 180), 1));
             g->setName("500M points");
 
@@ -1272,15 +1274,15 @@ static QWidget* createDualYAxisTab()
 {
     auto* plot = makePlot();
 
-    // --- Graph2 on left Y axis (linear) ---
-    auto* g = new QCPGraph2(plot->xAxis, plot->yAxis);
+    // --- QCPMultiGraph on left Y axis (linear) ---
+    auto* g = new QCPMultiGraph(plot->xAxis, plot->yAxis);
     const int nPts = 2000;
     std::vector<double> gx(nPts), gy(nPts);
     for (int i = 0; i < nPts; ++i) {
         gx[i] = i * 0.05;
         gy[i] = 5.0 * std::sin(gx[i] * 0.8) + 2.0 * std::cos(gx[i] * 2.3);
     }
-    g->setData(std::move(gx), std::move(gy));
+    g->setData(gx, gy);
     g->setPen(QPen(Qt::white, 1.5));
     g->setName("Time Series");
     plot->yAxis->setLabel("Amplitude");
@@ -1341,8 +1343,8 @@ static QWidget* createBusyIndicatorTab()
     plot->setTheme(QCPTheme::dark(plot));
     plot->legend->setVisible(true);
 
-    auto* g1 = new QCPGraph2(plot->xAxis, plot->yAxis);
-    auto* g2 = new QCPGraph2(plot->xAxis, plot->yAxis);
+    auto* g1 = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* g2 = new QCPMultiGraph(plot->xAxis, plot->yAxis);
     g1->setName("Magnetic Field Bx");
     g1->setPen(QPen(QColor("#e74c3c"), 2));
     g2->setName("Magnetic Field By");
@@ -1360,7 +1362,7 @@ static QWidget* createBusyIndicatorTab()
             y2[i] = qCos(x[i] * 2.0) * qExp(-x[i] * 0.2);
         }
         g1->setData(x, y1);
-        g2->setData(std::move(x), std::move(y2));
+        g2->setData(x, y2);
     }
     {
         std::vector<double> x(500);
@@ -1534,9 +1536,9 @@ int main(int argc, char* argv[])
     tabs->addTab(createFinancialTab(),   "Financial");
     tabs->addTab(createStatBoxTab(),     "Statistical Box");
     tabs->addTab(createRealtimeColorMapTab(), "Realtime ColorMap2");
-    tabs->addTab(createRealtimeGraphTab(),   "Realtime Graph2");
+    tabs->addTab(createRealtimeGraphTab(),   "Realtime MultiGraph");
     tabs->addTab(createThemeTab(),       "Dark Theme");
-    tabs->addTab(createMassiveGraphTab(), "Graph2 500M pts (~8GB)");
+    tabs->addTab(createMassiveGraphTab(), "MultiGraph 500M pts (~8GB)");
     tabs->addTab(createHistogram2DTab(),    "Histogram2D");
     tabs->addTab(createHistogram2DLogTab(), "Histogram2D (log)");
     tabs->addTab(createOverlayTab(),       "Overlay");

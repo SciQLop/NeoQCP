@@ -26,7 +26,6 @@
 #include "plottables/plottable-curve.h"
 #include "plottables/plottable-errorbar.h"
 #include "plottables/plottable-financial.h"
-#include "plottables/plottable-graph2.h"
 #include "plottables/plottable-group.h"
 #include "plottables/plottable-histogram2d.h"
 

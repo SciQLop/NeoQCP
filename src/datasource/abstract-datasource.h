@@ -78,7 +78,7 @@ constexpr double kDefaultGapThreshold = 1.5;
 }
 
 // Non-templated abstract base class for all data sources.
-// QCPGraph2 holds a pointer to this; virtual dispatch happens once per render.
+// QCPHistogram2D holds a pointer to this; virtual dispatch happens once per binning.
 class QCPAbstractDataSource {
 public:
     virtual ~QCPAbstractDataSource() = default;
@@ -137,29 +137,4 @@ public:
     // Per-element access (slow path: selection, tooltips)
     virtual double keyAt(int i) const = 0;
     virtual double valueAt(int i) const = 0;
-
-    // Processed outputs -- implementations run native-type algorithms internally,
-    // cast to double/QPointF only at the pixel-coordinate output step.
-    virtual QVector<QPointF> getOptimizedLineData(
-        int begin, int end, int pixelWidth,
-        QCPAxis* keyAxis, QCPAxis* valueAxis) const = 0;
-
-    virtual QVector<QPointF> getLines(
-        int begin, int end,
-        QCPAxis* keyAxis, QCPAxis* valueAxis) const = 0;
-
-    // getLines(), plus the data index of each point in sourceIndices (-1 for the break points
-    // inserted at gaps and NaN values): what per-point attributes such as colours look up.
-    // The default copies the window through keyAt()/valueAt(); sources override it for speed.
-    virtual QVector<QPointF> getLinesIndexed(
-        int begin, int end,
-        QCPAxis* keyAxis, QCPAxis* valueAxis, QVector<int>& sourceIndices) const;
-
-    // A key step larger than gapThreshold() times the smaller neighbouring step
-    // breaks the line. 0 turns gap detection off.
-    void setGapThreshold(double threshold) { mGapThreshold = threshold; }
-    [[nodiscard]] double gapThreshold() const { return mGapThreshold; }
-
-private:
-    double mGapThreshold = qcp::algo::kDefaultGapThreshold;
 };

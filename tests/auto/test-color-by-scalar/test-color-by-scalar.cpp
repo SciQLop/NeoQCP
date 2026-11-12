@@ -933,53 +933,6 @@ void TestColorByScalar::exportAfterOnscreenPanUsesCurrentPixelsNotStaleOffset()
              "line is drawn at the stale pre-export pan offset instead");
 }
 
-void TestColorByScalar::graph2ExportAfterOnscreenPanUsesCurrentPixelsNotStaleOffset()
-{
-    // Same reproducer as exportAfterOnscreenPanUsesCurrentPixelsNotStaleOffset,
-    // pinning the shared evaluateLineCache fix for QCPGraph2's own draw path.
-    std::vector<double> keys(200), values(200, 0.5);
-    std::iota(keys.begin(), keys.end(), 0.0);
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    g->setData(keys, values);
-    g->setPen(QPen(Qt::black, 6));
-    mPlot->xAxis->setRange(0, 199);
-    mPlot->yAxis->setRange(-1, 1);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(g->mHasRenderedRange);
-    QVERIFY(!g->mLineCacheDirty);
-    const auto cachedBefore = g->mCachedLines;
-    const QSize plotSize = mPlot->size();
-
-    mPlot->yAxis->setRange(-1.2, 0.8);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QCOMPARE(g->mCachedLines, cachedBefore);   // reused, not rebuilt
-
-    const auto [needFresh, gpuOffset] = qcp::evaluateLineCache(
-        g->mLineCacheDirty, g->mCachedLines.isEmpty(),
-        QSize(mPlot->xAxis->axisRect()->width(), mPlot->xAxis->axisRect()->height()),
-        g->mCachedPlotSize, g->mHasRenderedRange,
-        g->mRenderedRange.key, g->mRenderedRange.value,
-        mPlot->xAxis, mPlot->yAxis, false);
-    QVERIFY(!needFresh);
-    QVERIFY(!gpuOffset.isNull());
-
-    QImage img(plotSize, QImage::Format_ARGB32_Premultiplied);
-    img.fill(Qt::white);
-    QCPPainter painter(&img);
-    painter.setMode(QCPPainter::pmNoCaching);
-    g->draw(&painter);
-    painter.end();
-
-    const int x = qRound(mPlot->xAxis->coordToPixel(100));
-    const int correctY = qRound(mPlot->yAxis->coordToPixel(0.5));
-    const int staleY = qRound(correctY + gpuOffset.y());
-
-    QVERIFY2(qGray(img.pixel(x, correctY)) < 128,
-             "line is not drawn at the pixel of its current value after export");
-    QVERIFY2(qGray(img.pixel(x, staleY)) > 200,
-             "line is drawn at the stale pre-export pan offset instead");
-}
-
 void TestColorByScalar::nanScalarLeavesAGap()
 {
     std::vector<double> keys(200), values(200, 0.0);
@@ -1251,18 +1204,18 @@ void TestColorByScalar::coloredGraphDrawnFromL2KeepsIndicesConsistent()
     checkColours(n * 0.25, n * 0.55);
 }
 
-// QCPGraph2 looked a point's colour up at its position in the pixel lines. A key gap or a NaN
+// A graph once looked a point's colour up at its position in the pixel lines. A key gap or a NaN
 // value inserts a break point there, so every marker after it took its neighbour's colour.
-void TestColorByScalar::graph2ScatterColoursFollowTheirPointAcrossBreaks()
+void TestColorByScalar::multiGraphScatterColoursFollowTheirPointAcrossBreaks()
 {
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    graph->setLineStyle(QCPGraph2::lsNone);
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPMultiGraph::lsNone);
     graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssSquare, Qt::black, Qt::black, 12));
-    graph->setScatterColorGradient(redToBlue());
+    graph->setGradient(redToBlue());
     // A key gap after key 3, and a NaN value at key 12.
     graph->setData(std::vector<double>{1, 2, 3, 10, 11, 12, 13},
                    std::vector<double>{1, 1, 1, 1, 1, qQNaN(), 1});
-    graph->setScatterColorValues({0.f, 0.f, 0.f, 0.f, 1.f, 1.f, 0.f});
+    graph->setColorValues(std::vector<double> {0, 0, 0, 0, 1, 1, 0});
     mPlot->xAxis->setRange(0, 14);
     mPlot->yAxis->setRange(0, 2);
 

@@ -1,7 +1,6 @@
 #include "test-data-swap.h"
 #include "qcustomplot.h"
 #include "plottables/plottable-multigraph.h"
-#include "plottables/plottable-graph2.h"
 #include "layoutelements/layoutelement-axisrect.h"
 #include <cmath>
 #include <span>
@@ -516,123 +515,6 @@ void TestDataSwap::noCommitNoReplot()
 
     QCOMPARE(p->commits, 1); // commitPendingData() still runs...
     QCOMPARE(replots.count(), 0); // ...but reported nothing to commit, so no replot
-}
-
-void TestDataSwap::graph2KeepsTranslationWhileDataPending()
-{
-    constexpr int n = 120'000;
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    g->setData(ramp(n), sines(n, 1)[0]);
-    mPlot->xAxis->setRange(0, n);
-    mPlot->yAxis->setRange(-1.5, 1.5);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QTRY_VERIFY_WITH_TIMEOUT(!g->pipeline().isBusy(), 5000);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(g->hasRenderedRange());
-
-    mPlot->setDataSwapDebounceMs(200);
-    g->setData(ramp(n, 1000.0), sines(n, 1)[0]);
-    QVERIFY(g->hasPendingData());
-    QVERIFY(g->busy());
-
-    mPlot->xAxis->setRange(50, n + 50);
-    QVERIFY(!g->stallPixelOffset().isNull());
-    QVERIFY(mPlot->layer("main")->canSkipRepaintForTranslation());
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(g->hasPendingData());
-}
-
-void TestDataSwap::graph2CommitsAfterWindow()
-{
-    constexpr int n = 120'000;
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    g->setData(ramp(n), sines(n, 1)[0]);
-    mPlot->xAxis->setRange(0, n);
-    mPlot->yAxis->setRange(-1.5, 1.5);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QTRY_VERIFY_WITH_TIMEOUT(!g->pipeline().isBusy(), 5000);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-
-    mPlot->setDataSwapDebounceMs(30);
-    g->setData(ramp(n, 1000.0), sines(n, 1)[0]);
-    QVERIFY(g->hasPendingData());
-    QTRY_VERIFY_WITH_TIMEOUT(!g->hasPendingData(), 5000);
-    QCOMPARE(g->dataSource()->keyAt(0), 1000.0);
-    QTRY_VERIFY_WITH_TIMEOUT(!g->busy(), 5000);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(g->hasRenderedRange());
-}
-
-void TestDataSwap::graph2DataChangedWhilePendingKeepsDisplayedGeometry()
-{
-    // A dataChanged() on the displayed source while an unrelated replacement
-    // is staged must re-stage the displayed source itself (superseding the
-    // stale pending one), not touch the displayed caches directly — the
-    // on-screen geometry (and GPU translation) must stay put throughout.
-    constexpr int n = 120'000;
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    g->setData(ramp(n), sines(n, 1)[0]);
-    mPlot->xAxis->setRange(0, n);
-    mPlot->yAxis->setRange(-1.5, 1.5);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QTRY_VERIFY_WITH_TIMEOUT(!g->pipeline().isBusy(), 5000);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(g->hasRenderedRange());
-
-    auto* displayedSource = g->dataSource();
-
-    mPlot->setDataSwapDebounceMs(200);
-    g->setData(ramp(n, 1000.0), sines(n, 1)[0]);
-    QVERIFY(g->hasPendingData());
-
-    g->dataChanged();
-    QVERIFY(g->hasPendingData());
-
-    // Displayed geometry untouched: a small pan still translates.
-    mPlot->xAxis->setRange(50, n + 50);
-    QVERIFY(!g->stallPixelOffset().isNull());
-    QVERIFY(mPlot->layer("main")->canSkipRepaintForTranslation());
-
-    QTRY_VERIFY_WITH_TIMEOUT(!g->hasPendingData(), 5000);
-    // The displayed source won — the unrelated staged replacement lost out.
-    QCOMPARE(g->dataSource(), displayedSource);
-
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(g->hasRenderedRange());
-}
-
-void TestDataSwap::graph2LateLargeJobDoesNotContaminateCommittedSmallSource()
-{
-    // Deterministic version of the A-large/B-small race — see
-    // multiGraphLateLargeJobDoesNotContaminateCommittedSmallSource for why
-    // this forces the commit synchronously instead of racing real timing.
-    constexpr int n = 120'000;
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    g->setData(ramp(n), sines(n, 1)[0]);
-    mPlot->xAxis->setRange(0, n);
-    mPlot->yAxis->setRange(-1.5, 1.5);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QTRY_VERIFY_WITH_TIMEOUT(!g->pipeline().isBusy(), 5000);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(g->hasRenderedRange());
-
-    g->setData(ramp(n, 1000.0), sines(n, 1)[0]); // large source A: stages + dispatches a resample job
-    QVERIFY(g->pipeline().isBusy());
-
-    constexpr int nSmall = 500;
-    g->setData(ramp(nSmall, 2000.0), sines(nSmall, 1)[0]); // small source B: no transform, ready at once
-    QVERIFY(g->hasPendingData());
-    QVERIFY(g->commitPendingData()); // force B's commit now, before A's job can have delivered
-    QVERIFY(!g->hasPendingData());
-    QCOMPARE(g->dataSource()->size(), nSmall);
-    QVERIFY(!g->mL1Cache);
-
-    QTRY_VERIFY_WITH_TIMEOUT(!g->pipeline().isBusy(), 5000); // let A's job actually finish
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-
-    QVERIFY2(!g->mL1Cache,
-             "A's late resample result leaked into B's cache after B had already committed");
-    QCOMPARE(g->dataSource()->size(), nSmall);
 }
 
 // A commit's busyChanged slot may remove its plottable from the plot's list mid-walk.

@@ -28,13 +28,6 @@ bool hitsContain(const QList<QCPHit>& hits, const QCPLayerable* layerable)
     return false;
 }
 
-QCPGraph2* addDiagonalGraph2(QCustomPlot* plot)
-{
-    auto* graph = new QCPGraph2(plot->xAxis, plot->yAxis);
-    graph->setData(std::vector<double> { 0, 10 }, std::vector<double> { 0, 10 });
-    return graph;
-}
-
 QCPMultiGraph* addDiagonalMultiGraph(QCustomPlot* plot)
 {
     auto* graph = new QCPMultiGraph(plot->xAxis, plot->yAxis);
@@ -77,27 +70,24 @@ void TestHitRule::wheelAt(QPointF pos)
     QCoreApplication::sendEvent(mPlot, &event);
 }
 
-// The wheel used to take a graph2 anywhere in its axis rect: a point 150 px from the curve must
+// The wheel used to take a graph anywhere in its axis rect: a point 150 px from the curve must
 // miss it, a point on the curve must hit it.
 void TestHitRule::wheelNeedsDistanceToo()
 {
-    auto* graph = addDiagonalGraph2(mPlot);
     auto* multi = addDiagonalMultiGraph(mPlot);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
     const QPointF far = pixelOf(1, 9);
     QVERIFY(mPlot->axisRect()->rect().contains(far.toPoint()));
-    QVERIFY(!hitsContain(mPlot->hitsAt(far, QCPHitAction::Press), graph));
     QVERIFY(!hitsContain(mPlot->hitsAt(far, QCPHitAction::Press), multi));
 
     const QPointF onCurve = pixelOf(5, 5);
-    QVERIFY(hitsContain(mPlot->hitsAt(onCurve, QCPHitAction::Press), graph));
     QVERIFY(hitsContain(mPlot->hitsAt(onCurve, QCPHitAction::Press), multi));
 }
 
 void TestHitRule::pressAndSelectionAgreeWhenSelectable()
 {
-    auto* graph = addDiagonalGraph2(mPlot);
+    auto* graph = addDiagonalMultiGraph(mPlot);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
     const QPointF pos = pixelOf(5, 5);
@@ -112,7 +102,7 @@ void TestHitRule::pressAndSelectionAgreeWhenSelectable()
 void TestHitRule::nonSelectableLabelTakesPressGraphTakesSelection()
 {
     mPlot->setInteraction(QCP::iSelectPlottables);
-    auto* graph = addDiagonalGraph2(mPlot);
+    auto* graph = addDiagonalMultiGraph(mPlot);
     auto* text = new CountingText(mPlot);
     text->setText(QStringLiteral("label"));
     text->position->setCoords(5, 5);
@@ -133,7 +123,7 @@ void TestHitRule::nonSelectableLabelTakesPressGraphTakesSelection()
 void TestHitRule::axisRectWheelZoomStillWins()
 {
     mPlot->setInteraction(QCP::iRangeZoom);
-    addDiagonalGraph2(mPlot);
+    addDiagonalMultiGraph(mPlot);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
     const QCPRange before = mPlot->xAxis->range();

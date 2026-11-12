@@ -17,7 +17,6 @@
 #include <painting/draw-commands.h>
 #include <plottables/plottable-colormap.h>
 #include <plottables/plottable-colormap2.h>
-#include <plottables/plottable-graph2.h>
 #include <plottables/plottable-histogram.h>
 #include <plottables/plottable-histogram2d.h>
 #include <plottables/plottable-multigraph.h>
@@ -26,19 +25,74 @@
 #include <thread>
 
 namespace {
-// Combined L1+L2 helper — used only by tests below.
-std::shared_ptr<QCPAbstractDataSource> hierarchicalResample(
-    const QCPAbstractDataSource& src,
-    const ViewportParams& vp,
-    std::any& cache)
+using GenericPipeline = QCPAsyncPipeline<QCPAbstractDataSource, QCPAbstractDataSource>;
+
+std::vector<std::vector<double>> oneColumn(std::vector<double> values)
 {
-    const int srcSize = src.size();
-    if (srcSize == 0 || srcSize < qcp::algo::kResampleThreshold || vp.keyLogScale)
-        return nullptr;
-    qcp::algo::buildL1Cache(src, vp, cache);
-    auto* c = std::any_cast<qcp::algo::GraphResamplerCache>(&cache);
-    if (!c) return nullptr;
-    return qcp::algo::resampleL2(*c, vp, src);
+    return std::vector<std::vector<double>> { std::move(values) };
+}
+
+std::shared_ptr<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>
+oneColumnSource(std::vector<double> keys, std::vector<double> values)
+{
+    return std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
+        std::move(keys), oneColumn(std::move(values)));
+}
+
+// Synthetic multi-column source that computes data on-the-fly without allocating N arrays.
+class SyntheticLargeMultiSource : public QCPAbstractMultiDataSource
+{
+public:
+    explicit SyntheticLargeMultiSource(int n, int cols) : mN(n), mCols(cols) {}
+    int size() const override { return mN; }
+    bool empty() const override { return mN == 0; }
+    int columnCount() const override { return mCols; }
+    double keyAt(int i) const override { return static_cast<double>(i); }
+    double valueAt(int col, int i) const override { return std::sin(i * 0.0001 + col); }
+    QCPRange keyRange(bool& found, QCP::SignDomain) const override
+    {
+        found = mN > 0;
+        return QCPRange(0, mN - 1);
+    }
+    QCPRange valueRange(int, bool& found, QCP::SignDomain, const QCPRange&) const override
+    {
+        found = mN > 0;
+        return QCPRange(-1, 1);
+    }
+    int findBegin(double sortKey, bool) const override
+    {
+        return std::clamp(static_cast<int>(sortKey), 0, mN);
+    }
+    int findEnd(double sortKey, bool) const override
+    {
+        return std::clamp(static_cast<int>(std::ceil(sortKey)) + 1, 0, mN);
+    }
+    QVector<QPointF> getOptimizedLineData(int col, int begin, int end, int,
+                                          QCPAxis* ka, QCPAxis* va) const override
+    {
+        return getLines(col, begin, end, ka, va);
+    }
+    QVector<QPointF> getLines(int col, int begin, int end,
+                               QCPAxis*, QCPAxis*) const override
+    {
+        QVector<QPointF> result;
+        result.reserve(end - begin);
+        for (int i = begin; i < end; ++i)
+            result.append(QPointF(keyAt(i), valueAt(col, i)));
+        return result;
+    }
+private:
+    int mN;
+    int mCols;
+};
+
+// Level 1 of one value column: the data bins the multi-column resampler builds.
+qcp::algo::MultiColumnBinResult binOneColumn(const std::vector<double>& keys,
+                                             const std::vector<double>& values, int begin, int end,
+                                             const QCPRange& range, int numBins)
+{
+    const auto src = oneColumnSource(keys, values);
+    return qcp::algo::binMinMaxMulti(*src, begin, end, range, numBins);
 }
 } // namespace
 
@@ -51,7 +105,7 @@ void TestPipeline::init()
 namespace {
 // Show the plot, wait for window exposure to drive QRhiWidget::initialize(),
 // and report whether a usable QRhi instance was acquired. Tests that exercise
-// GPU-backed plottables (Graph2/MultiGraph/ColorMap2 — whose draw() and
+// GPU-backed plottables (MultiGraph/ColorMap2 — whose draw() and
 // pipeline are gated on a live RHI context) call this and QSKIP on failure
 // in headless / unsupported-platform environments.
 bool showAndHasRhi(QCustomPlot* plot)
@@ -173,7 +227,7 @@ void TestPipeline::pipelinePassthrough()
     auto source = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
         std::vector<double>{1, 2, 3}, std::vector<double>{4, 5, 6});
 
-    QCPGraphPipeline pipeline(&scheduler);
+    GenericPipeline pipeline(&scheduler);
     pipeline.setSource(source);
 
     QVERIFY(!pipeline.hasTransform());
@@ -186,8 +240,8 @@ void TestPipeline::pipelineTransformRuns()
     auto source = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
         std::vector<double>{1, 2, 3}, std::vector<double>{4, 5, 6});
 
-    QCPGraphPipeline pipeline(&scheduler);
-    QSignalSpy spy(&pipeline, &QCPGraphPipeline::finished);
+    GenericPipeline pipeline(&scheduler);
+    QSignalSpy spy(&pipeline, &GenericPipeline::finished);
 
     pipeline.setTransform(TransformKind::ViewportIndependent,
         [](const QCPAbstractDataSource&, const ViewportParams&, std::any&)
@@ -206,7 +260,7 @@ void TestPipeline::pipelineTransformRuns()
 void TestPipeline::theFirstJobReportsBusyThenIdleWhenItLands()
 {
     QCPPipelineScheduler scheduler;
-    QCPGraphPipeline pipeline(&scheduler);
+    GenericPipeline pipeline(&scheduler);
     pipeline.setTransform(TransformKind::ViewportIndependent,
         [](const QCPAbstractDataSource& src, const ViewportParams&, std::any&)
             -> std::shared_ptr<QCPAbstractDataSource> {
@@ -214,7 +268,7 @@ void TestPipeline::theFirstJobReportsBusyThenIdleWhenItLands()
                 std::vector<double>{1, 2, 3}, std::vector<double>{4, 5, 6});
         });
     QList<bool> states;
-    connect(&pipeline, &QCPGraphPipeline::busyChanged, this, [&](bool busy) { states << busy; });
+    connect(&pipeline, &GenericPipeline::busyChanged, this, [&](bool busy) { states << busy; });
 
     pipeline.setSource(std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
         std::vector<double>{1, 2, 3}, std::vector<double>{4, 5, 6}));
@@ -228,7 +282,7 @@ void TestPipeline::theFirstJobReportsBusyThenIdleWhenItLands()
 void TestPipeline::aBusySlotMayWaitForAnotherThreadUsingThePipeline()
 {
     QCPPipelineScheduler scheduler;
-    QCPGraphPipeline pipeline(&scheduler);
+    GenericPipeline pipeline(&scheduler);
     pipeline.setTransform(TransformKind::ViewportIndependent,
         [](const QCPAbstractDataSource&, const ViewportParams&, std::any&)
             -> std::shared_ptr<QCPAbstractDataSource> {
@@ -239,7 +293,7 @@ void TestPipeline::aBusySlotMayWaitForAnotherThreadUsingThePipeline()
     auto reachedFuture = reached.get_future();
     std::thread other;
     bool otherThreadGotThrough = false;
-    connect(&pipeline, &QCPGraphPipeline::busyChanged, this, [&](bool busy) {
+    connect(&pipeline, &GenericPipeline::busyChanged, this, [&](bool busy) {
         if (!busy || other.joinable())
             return;
         other = std::thread([&] {
@@ -259,10 +313,10 @@ void TestPipeline::aBusySlotMayWaitForAnotherThreadUsingThePipeline()
 
 namespace {
 // The pipeline's mutex is the subject of the race test, so the test takes it directly.
-struct LockablePipeline : QCPGraphPipeline
+struct LockablePipeline : GenericPipeline
 {
     using QCPAsyncPipelineBase::mMutex;
-    using QCPGraphPipeline::QCPGraphPipeline;
+    using GenericPipeline::GenericPipeline;
 };
 }
 
@@ -286,7 +340,7 @@ void TestPipeline::aDataChangeBumpedJustBeforeAResultLandsIsStillShown()
         std::thread other;
         bool otherStarted = false;
         uint64_t lastShown = 0;
-        connect(&pipeline, &QCPGraphPipeline::finished, this, [&](uint64_t generation) {
+        connect(&pipeline, &GenericPipeline::finished, this, [&](uint64_t generation) {
             lastShown = generation;
             if (std::exchange(otherStarted, true))
                 return;
@@ -317,7 +371,7 @@ void TestPipeline::aDataChangeBumpedJustBeforeAResultLandsIsStillShown()
 void TestPipeline::theLatestResultIsNotBusyWhenItLands()
 {
     QCPPipelineScheduler scheduler;
-    QCPGraphPipeline pipeline(&scheduler);
+    GenericPipeline pipeline(&scheduler);
     pipeline.setTransform(TransformKind::ViewportIndependent,
         [](const QCPAbstractDataSource&, const ViewportParams&, std::any&)
             -> std::shared_ptr<QCPAbstractDataSource> {
@@ -325,7 +379,7 @@ void TestPipeline::theLatestResultIsNotBusyWhenItLands()
                 std::vector<double>{1}, std::vector<double>{1});
         });
     std::optional<bool> busyWhenItLanded;
-    connect(&pipeline, &QCPGraphPipeline::finished, this,
+    connect(&pipeline, &GenericPipeline::finished, this,
             [&](uint64_t) { busyWhenItLanded = pipeline.isBusy(); });
 
     pipeline.setSource(std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
@@ -343,8 +397,8 @@ void TestPipeline::pipelineCoalescing()
     auto source = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
         std::vector<double>{1}, std::vector<double>{1});
 
-    QCPGraphPipeline pipeline(&scheduler);
-    QSignalSpy spy(&pipeline, &QCPGraphPipeline::finished);
+    GenericPipeline pipeline(&scheduler);
+    QSignalSpy spy(&pipeline, &GenericPipeline::finished);
 
     pipeline.setTransform(TransformKind::ViewportIndependent,
         [&runCount](const QCPAbstractDataSource&, const ViewportParams&, std::any&)
@@ -373,8 +427,8 @@ void TestPipeline::pipelineViewportIndependentSkipsViewport()
     auto source = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
         std::vector<double>{1}, std::vector<double>{1});
 
-    QCPGraphPipeline pipeline(&scheduler);
-    QSignalSpy spy(&pipeline, &QCPGraphPipeline::finished);
+    GenericPipeline pipeline(&scheduler);
+    QSignalSpy spy(&pipeline, &GenericPipeline::finished);
 
     pipeline.setTransform(TransformKind::ViewportIndependent,
         [&runCount](const QCPAbstractDataSource&, const ViewportParams&, std::any&)
@@ -402,8 +456,8 @@ void TestPipeline::pipelineViewportDependentRuns()
     auto source = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
         std::vector<double>{1}, std::vector<double>{1});
 
-    QCPGraphPipeline pipeline(&scheduler);
-    QSignalSpy spy(&pipeline, &QCPGraphPipeline::finished);
+    GenericPipeline pipeline(&scheduler);
+    QSignalSpy spy(&pipeline, &GenericPipeline::finished);
 
     pipeline.setTransform(TransformKind::ViewportDependent,
         [&runCount](const QCPAbstractDataSource&, const ViewportParams&, std::any&)
@@ -429,8 +483,8 @@ void TestPipeline::pipelineCachePreservedOnViewport()
     auto source = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
         std::vector<double>{1}, std::vector<double>{1});
 
-    QCPGraphPipeline pipeline(&scheduler);
-    QSignalSpy spy(&pipeline, &QCPGraphPipeline::finished);
+    GenericPipeline pipeline(&scheduler);
+    QSignalSpy spy(&pipeline, &GenericPipeline::finished);
 
     pipeline.setTransform(TransformKind::ViewportDependent,
         [](const QCPAbstractDataSource&, const ViewportParams&, std::any& cache)
@@ -463,8 +517,8 @@ void TestPipeline::pipelineCacheClearedOnDataChange()
     auto source = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
         std::vector<double>{1}, std::vector<double>{1});
 
-    QCPGraphPipeline pipeline(&scheduler);
-    QSignalSpy spy(&pipeline, &QCPGraphPipeline::finished);
+    GenericPipeline pipeline(&scheduler);
+    QSignalSpy spy(&pipeline, &GenericPipeline::finished);
 
     pipeline.setTransform(TransformKind::ViewportDependent,
         [](const QCPAbstractDataSource&, const ViewportParams&, std::any& cache)
@@ -491,8 +545,8 @@ void TestPipeline::pipelineInterimResult()
     auto source = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
         std::vector<double>{1}, std::vector<double>{1});
 
-    QCPGraphPipeline pipeline(&scheduler);
-    QSignalSpy spy(&pipeline, &QCPGraphPipeline::finished);
+    GenericPipeline pipeline(&scheduler);
+    QSignalSpy spy(&pipeline, &GenericPipeline::finished);
 
     std::atomic<bool> gate{false};
 
@@ -525,7 +579,7 @@ void TestPipeline::pipelineDestructionWhileRunning()
         auto source = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
             std::vector<double>{1}, std::vector<double>{1});
 
-        auto pipeline = std::make_unique<QCPGraphPipeline>(&scheduler);
+        auto pipeline = std::make_unique<GenericPipeline>(&scheduler);
         pipeline->setTransform(TransformKind::ViewportIndependent,
             [&gate, &started](const QCPAbstractDataSource&, const ViewportParams&, std::any&)
                 -> std::shared_ptr<QCPAbstractDataSource> {
@@ -545,48 +599,14 @@ void TestPipeline::pipelineDestructionWhileRunning()
     QThread::msleep(100);
 }
 
-void TestPipeline::graph2PipelinePassthrough()
+void TestPipeline::multiGraphPipelinePassthrough()
 {
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     graph->setData(std::vector<double>{1, 2, 3}, std::vector<double>{4, 5, 6});
 
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
     QCOMPARE(graph->dataSource()->size(), 3);
-}
-
-void TestPipeline::graph2PipelineTransform()
-{
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-
-    // Set data first, then install transform (setData triggers
-    // ensureResamplingTransform which would clear a manually-installed transform
-    // for small datasets).
-    graph->setData(std::vector<double>{1, 2, 3}, std::vector<double>{4, 5, 6});
-
-    graph->pipeline().setTransform(TransformKind::ViewportIndependent,
-        [](const QCPAbstractDataSource& src, const ViewportParams&, std::any&)
-            -> std::shared_ptr<QCPAbstractDataSource> {
-            int n = src.size();
-            std::vector<double> keys(n), values(n);
-            for (int i = 0; i < n; ++i)
-            {
-                keys[i] = src.keyAt(i);
-                values[i] = src.valueAt(i) * 2;
-            }
-            return std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
-                std::move(keys), std::move(values));
-        });
-    graph->dataChanged();
-
-    QSignalSpy spy(&graph->pipeline(), &QCPGraphPipeline::finished);
-    QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 1, 1000);
-
-    QCOMPARE(graph->pipeline().result()->valueAt(0), 8.0);
-    QCOMPARE(graph->pipeline().result()->valueAt(1), 10.0);
-    QCOMPARE(graph->pipeline().result()->valueAt(2), 12.0);
-
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
 }
 
 void TestPipeline::colormap2PipelineDefault()
@@ -767,80 +787,17 @@ void TestPipeline::colormap2DescendingYAxisLogScaleResamplesNonEmpty()
              "descending-y source on a log value axis must still accumulate cells");
 }
 
-static QCPGraph2* decadesOnTheSecondAxes(QCustomPlot* plot, bool newKeyAxis)
+void TestPipeline::multiGraphDataFromExternalThread()
 {
-    auto* graph = new QCPGraph2(plot->xAxis, plot->yAxis);
-    graph->setData(QVector<double>{1, 10, 100}, QVector<double>{1, 10, 100});
-    if (newKeyAxis)
-        graph->setKeyAxis(plot->xAxis2);
-    else
-        graph->setValueAxis(plot->yAxis2);
-    for (QCPAxis* axis : {plot->xAxis, plot->yAxis, plot->xAxis2, plot->yAxis2})
-        axis->setRange(1, 100);
-    plot->replot(QCustomPlot::rpImmediateRefresh);
-    return graph;
-}
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
 
-static bool anyPoint(const QVector<QPointF>& line, const std::function<bool(QPointF)>& match)
-{
-    return std::any_of(line.cbegin(), line.cend(), match);
-}
+    // Large enough to get the resampling transform, so the pipeline has a job to run.
+    constexpr int n = 200'000;
+    std::vector<double> keys(n), values(n);
+    for (int i = 0; i < n; ++i) { keys[i] = i; values[i] = std::sin(i * 0.01); }
+    auto source = oneColumnSource(std::move(keys), std::move(values));
 
-// No replot between the toggle and the first look: only the axis signal can drop the cache.
-void TestPipeline::graph2LinesFollowTheScaleOfANewKeyAxis()
-{
-    auto* graph = decadesOnTheSecondAxes(mPlot, true);
-    mPlot->xAxis2->setScaleType(QCPAxis::stLogarithmic);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(anyPoint(graph->mCachedLines, [&](QPointF p) { return qFuzzyCompare(p.x(), mPlot->xAxis2->coordToPixel(10)); }));
-}
-
-void TestPipeline::graph2LinesFollowTheScaleOfANewValueAxis()
-{
-    auto* graph = decadesOnTheSecondAxes(mPlot, false);
-    mPlot->yAxis2->setScaleType(QCPAxis::stLogarithmic);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(anyPoint(graph->mCachedLines, [&](QPointF p) { return qFuzzyCompare(p.y(), mPlot->yAxis2->coordToPixel(10)); }));
-}
-
-// The log axis is ready before the swap and the range stays 1..100: no signal fires at the swap.
-static QCPGraph2* decadesThenMovedToALogAxis(QCustomPlot* plot, bool keyAxis)
-{
-    for (QCPAxis* axis : {plot->xAxis, plot->yAxis, plot->xAxis2, plot->yAxis2})
-        axis->setRange(1, 100);
-    (keyAxis ? plot->xAxis2 : plot->yAxis2)->setScaleType(QCPAxis::stLogarithmic);
-    auto* graph = new QCPGraph2(plot->xAxis, plot->yAxis);
-    graph->setData(QVector<double>{1, 10, 100}, QVector<double>{1, 10, 100});
-    plot->replot(QCustomPlot::rpImmediateRefresh);
-    if (keyAxis)
-        graph->setKeyAxis(plot->xAxis2);
-    else
-        graph->setValueAxis(plot->yAxis2);
-    plot->replot(QCustomPlot::rpImmediateRefresh);
-    return graph;
-}
-
-void TestPipeline::graph2LinesAreRebuiltWhenMovedToALogKeyAxis()
-{
-    auto* graph = decadesThenMovedToALogAxis(mPlot, true);
-    QVERIFY(anyPoint(graph->mCachedLines, [&](QPointF p) { return qFuzzyCompare(p.x(), mPlot->xAxis2->coordToPixel(10)); }));
-}
-
-void TestPipeline::graph2LinesAreRebuiltWhenMovedToALogValueAxis()
-{
-    auto* graph = decadesThenMovedToALogAxis(mPlot, false);
-    QVERIFY(anyPoint(graph->mCachedLines, [&](QPointF p) { return qFuzzyCompare(p.y(), mPlot->yAxis2->coordToPixel(10)); }));
-}
-
-void TestPipeline::graph2DataFromExternalThread()
-{
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-
-    auto source = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
-        std::vector<double>{1, 2, 3}, std::vector<double>{4, 5, 6});
-
-    // Install transform after setDataSource (setDataSource clears transforms
-    // for small datasets via ensureResamplingTransform).
+    QSignalSpy spy(&graph->pipeline(), &QCPMultiGraphPipeline::finished);
     QThread thread;
     QObject worker;
     worker.moveToThread(&thread);
@@ -849,21 +806,9 @@ void TestPipeline::graph2DataFromExternalThread()
         graph->setDataSource(source);
     }, Qt::BlockingQueuedConnection);
 
-    graph->pipeline().setTransform(TransformKind::ViewportIndependent,
-        [](const QCPAbstractDataSource& src, const ViewportParams&, std::any&)
-            -> std::shared_ptr<QCPAbstractDataSource> {
-            int n = src.size();
-            std::vector<double> k(n), v(n);
-            for (int i = 0; i < n; ++i) { k[i] = src.keyAt(i); v[i] = src.valueAt(i); }
-            return std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
-                std::move(k), std::move(v));
-        });
-    graph->dataChanged();
-
-    QSignalSpy spy(&graph->pipeline(), &QCPGraphPipeline::finished);
-    QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 1, 1000);
-    QVERIFY(graph->pipeline().result() != nullptr);
-    QCOMPARE(graph->pipeline().result()->size(), 3);
+    QVERIFY(graph->pipeline().hasTransform());
+    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 5000);
+    QCOMPARE(graph->dataSource()->size(), n);
 
     thread.quit();
     thread.wait();
@@ -1024,8 +969,8 @@ void TestPipeline::pipelineSourceReplacedDuringJob()
     std::atomic<bool> gate{false};
     std::atomic<bool> started{false};
 
-    QCPGraphPipeline pipeline(&scheduler);
-    QSignalSpy spy(&pipeline, &QCPGraphPipeline::finished);
+    GenericPipeline pipeline(&scheduler);
+    QSignalSpy spy(&pipeline, &GenericPipeline::finished);
 
     pipeline.setTransform(TransformKind::ViewportIndependent,
         [&gate, &started](const QCPAbstractDataSource& src, const ViewportParams&, std::any&)
@@ -1059,8 +1004,8 @@ void TestPipeline::pipelineSourceReplacedDuringJob()
 void TestPipeline::pipelineRapidFireDeliverResult()
 {
     QCPPipelineScheduler scheduler(1);
-    QCPGraphPipeline pipeline(&scheduler);
-    QSignalSpy spy(&pipeline, &QCPGraphPipeline::finished);
+    GenericPipeline pipeline(&scheduler);
+    QSignalSpy spy(&pipeline, &GenericPipeline::finished);
 
     pipeline.setTransform(TransformKind::ViewportIndependent,
         [](const QCPAbstractDataSource& src, const ViewportParams&, std::any&)
@@ -1098,7 +1043,7 @@ void TestPipeline::pipelineNullSourceWhileJobRunningResyncsGeneration()
     auto source = std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
         std::vector<double>{1}, std::vector<double>{1});
 
-    QCPGraphPipeline pipeline(&scheduler);
+    GenericPipeline pipeline(&scheduler);
 
     pipeline.setTransform(TransformKind::ViewportIndependent,
         [&gate, &started](const QCPAbstractDataSource&, const ViewportParams&, std::any&)
@@ -1210,22 +1155,22 @@ void TestPipeline::graphResamplerBinMinMax()
     std::vector<double> vals = {5, 3, 8, 1, 7, 2, 9, 4, 6, 0};
     QCPRange keyRange(0, 9);
 
-    auto [outKeys, outVals, outGapRatio] = qcp::algo::binMinMax(keys, vals, 0, 10, keyRange, 3);
+    const auto out = binOneColumn(keys, vals, 0, 10, keyRange, 3);
 
-    QCOMPARE(outKeys.size(), 6u);
-    QCOMPARE(outVals.size(), 6u);
+    QCOMPARE(out.keys.size(), 6u);
+    QCOMPARE(out.values.size(), 6u);
 
     // Bin 0: keys [0,3) → vals {5,3,8} → min=3, max=8
-    QCOMPARE(outVals[0], 3.0);
-    QCOMPARE(outVals[1], 8.0);
+    QCOMPARE(out.values[0], 3.0);
+    QCOMPARE(out.values[1], 8.0);
 
     // Bin 1: keys [3,6) → vals {1,7,2} → min=1, max=7
-    QCOMPARE(outVals[2], 1.0);
-    QCOMPARE(outVals[3], 7.0);
+    QCOMPARE(out.values[2], 1.0);
+    QCOMPARE(out.values[3], 7.0);
 
     // Bin 2: keys [6,9] → vals {9,4,6,0} → min=0, max=9
-    QCOMPARE(outVals[4], 0.0);
-    QCOMPARE(outVals[5], 9.0);
+    QCOMPARE(out.values[4], 0.0);
+    QCOMPARE(out.values[5], 9.0);
 }
 
 void TestPipeline::graphResamplerLevel1AndLevel2()
@@ -1240,15 +1185,15 @@ void TestPipeline::graphResamplerLevel1AndLevel2()
 
     QCPRange fullRange(0, N - 1);
     int l1Bins = std::max(N / 2, 1);
-    auto l1 = qcp::algo::binMinMax(keys, vals, 0, N, fullRange, l1Bins);
+    auto l1 = binOneColumn(keys, vals, 0, N, fullRange, l1Bins);
 
     QCOMPARE(static_cast<int>(l1.keys.size()), l1Bins * 2);
 
     // Level 2: zoom into [5000, 10000]
     QCPRange viewport(5000, 10000);
     int l2Bins = 400 * 4;
-    auto l2 = qcp::algo::binMinMax(l1.keys, l1.values, 0,
-        static_cast<int>(l1.keys.size()), viewport, l2Bins);
+    const std::vector<double> l1Values(l1.values.begin(), l1.values.begin() + l1.stride());
+    auto l2 = binOneColumn(l1.keys, l1Values, 0, static_cast<int>(l1.keys.size()), viewport, l2Bins);
 
     QCOMPARE(static_cast<int>(l2.keys.size()), l2Bins * 2);
 
@@ -1273,17 +1218,20 @@ void TestPipeline::graphResamplerL2BinsRawPointsInsideBurst()
     std::vector<double> vals(keys.size());
     for (std::size_t i = 0; i < keys.size(); ++i)
         vals[i] = static_cast<double>(i % 1000);
-    QCPSoADataSource<std::vector<double>, std::vector<double>> src(std::move(keys), std::move(vals));
+    const auto src = oneColumnSource(std::move(keys), std::move(vals));
 
     ViewportParams vp;
     vp.keyRange = QCPRange(burst, burst + 20.0);
     vp.plotWidthPx = 1000;
     std::any cache;
-    const auto l2 = hierarchicalResample(src, vp, cache);
+    qcp::algo::buildL1CacheMulti(*src, vp, cache);
+    const auto* l1 = std::any_cast<qcp::algo::MultiGraphResamplerCache>(&cache);
+    QVERIFY(l1 != nullptr);
+    const auto l2 = qcp::algo::resampleL2Multi(*l1, vp, *src);
     QVERIFY(l2 != nullptr);
     QVERIFY2(l2->size() > 1000, "L2 resolution must come from the raw points, not ~6 L1 bins");
     bool found = false;
-    const auto range = l2->valueRange(found);
+    const auto range = l2->valueRange(0, found);
     QVERIFY(found);
     QCOMPARE(range.lower, 0.0);
     QCOMPARE(range.upper, 999.0);
@@ -1299,29 +1247,6 @@ static int rises(const Source& s, ValueAt valueAt)
         if (valueAt(s, i) > valueAt(s, i - 1))
             ++count;
     return count;
-}
-
-void TestPipeline::graphResamplerL2FollowsFallingData()
-{
-    const int N = 1'000'000;
-    std::vector<double> keys(N), vals(N);
-    for (int i = 0; i < N; ++i)
-        keys[i] = i, vals[i] = -i;
-    QCPSoADataSource<std::vector<double>, std::vector<double>> src(std::move(keys), std::move(vals));
-    const auto value = [](const QCPAbstractDataSource& s, int i) { return s.valueAt(i); };
-
-    std::any cache;
-    ViewportParams vp;
-    vp.plotWidthPx = 200;
-    vp.keyRange = QCPRange(0, N - 1); // binned from L1
-    auto l2 = hierarchicalResample(src, vp, cache);
-    QVERIFY(l2 != nullptr);
-    QCOMPARE(rises(*l2, value), 0);
-
-    vp.keyRange = QCPRange(1000, 1500); // too few L1 bins: binned from raw rows
-    l2 = hierarchicalResample(src, vp, cache);
-    QVERIFY(l2 != nullptr);
-    QCOMPARE(rises(*l2, value), 0);
 }
 
 void TestPipeline::multiGraphL2FollowsFallingData()
@@ -1372,33 +1297,30 @@ void TestPipeline::graphResamplerCacheReuse()
         keys[i] = i;
         vals[i] = std::sin(i * 0.001);
     }
-
-    auto src = std::make_shared<QCPSoADataSource<
-        std::vector<double>, std::vector<double>>>(keys, vals);
+    const auto src = oneColumnSource(keys, vals);
 
     std::any cache;
     ViewportParams vp;
     vp.keyRange = QCPRange(0, N - 1);
-    vp.plotWidthPx = 800;
+    vp.plotWidthPx = 100;
 
-    auto result1 = hierarchicalResample(*src, vp, cache);
-    QVERIFY(!result1); // below threshold, no cache built
+    qcp::algo::buildL1CacheMulti(*src, vp, cache);
+    const auto* l1 = std::any_cast<qcp::algo::MultiGraphResamplerCache>(&cache);
+    QVERIFY(l1 != nullptr);
+    QCOMPARE(l1->sourceSize, N);
+    const double* l1Keys = l1->level1.keys.data();
 
-    // Exercise binMinMax and GraphResamplerCache directly
-    qcp::algo::GraphResamplerCache c;
-    c.level1 = qcp::algo::binMinMax(keys, vals, 0, N, QCPRange(0, N - 1), 500);
-    c.cachedKeyRange = QCPRange(0, N - 1);
-    c.sourceSize = N;
+    // Level 2 from the cache, then a pan: another viewport, same cache.
+    vp.keyRange = QCPRange(1000, 5000);
+    QVERIFY(qcp::algo::resampleL2Multi(*l1, vp, *src) != nullptr);
+    vp.keyRange = QCPRange(2000, 3000);
+    QVERIFY(qcp::algo::resampleL2Multi(*l1, vp, *src) != nullptr);
 
-    // Level 2 from cache
-    auto l2 = qcp::algo::binMinMax(c.level1.keys, c.level1.values,
-        0, static_cast<int>(c.level1.keys.size()), QCPRange(10000, 50000), 800);
-    QVERIFY(l2.keys.size() > 0u);
-
-    // Pan: different viewport, same cache
-    auto l2b = qcp::algo::binMinMax(c.level1.keys, c.level1.values,
-        0, static_cast<int>(c.level1.keys.size()), QCPRange(20000, 25000), 800);
-    QVERIFY(l2b.keys.size() > 0u);
+    // The same data again keeps the cache it has.
+    qcp::algo::buildL1CacheMulti(*src, vp, cache);
+    const auto* again = std::any_cast<qcp::algo::MultiGraphResamplerCache>(&cache);
+    QVERIFY(again != nullptr);
+    QCOMPARE(again->level1.keys.data(), l1Keys);
 }
 
 void TestPipeline::graphResamplerNaNSkipped()
@@ -1406,185 +1328,42 @@ void TestPipeline::graphResamplerNaNSkipped()
     std::vector<double> keys = {0, 1, 2, 3, 4};
     double nan = std::numeric_limits<double>::quiet_NaN();
     std::vector<double> vals = {5, nan, 3, nan, 7};
-    QCPRange range(0, 4);
 
-    auto [outKeys, outVals, outGapRatio] = qcp::algo::binMinMax(keys, vals, 0, 5, range, 1);
+    const auto out = binOneColumn(keys, vals, 0, 5, QCPRange(0, 4), 1);
 
-    QCOMPARE(outVals[0], 3.0);
-    QCOMPARE(outVals[1], 7.0);
+    QCOMPARE(out.values[0], 3.0);
+    QCOMPARE(out.values[1], 7.0);
 }
 
 void TestPipeline::graphResamplerEmptyBinsProduceNaN()
 {
     std::vector<double> keys = {0, 0.5, 1};
     std::vector<double> vals = {10, 20, 30};
-    QCPRange range(0, 9);
 
-    auto [outKeys, outVals, outGapRatio] = qcp::algo::binMinMax(keys, vals, 0, 3, range, 3);
+    const auto out = binOneColumn(keys, vals, 0, 3, QCPRange(0, 9), 3);
 
     // Bin 0: has data
-    QVERIFY(!std::isnan(outVals[0]));
-    QVERIFY(!std::isnan(outVals[1]));
+    QVERIFY(!std::isnan(out.values[0]));
+    QVERIFY(!std::isnan(out.values[1]));
 
     // Bins 1 and 2: empty → NaN
-    QVERIFY(std::isnan(outVals[2]));
-    QVERIFY(std::isnan(outVals[3]));
-    QVERIFY(std::isnan(outVals[4]));
-    QVERIFY(std::isnan(outVals[5]));
+    QVERIFY(std::isnan(out.values[2]));
+    QVERIFY(std::isnan(out.values[3]));
+    QVERIFY(std::isnan(out.values[4]));
+    QVERIFY(std::isnan(out.values[5]));
 }
 
-// Lightweight data source that computes data on-the-fly without allocating 10M+ arrays.
-class SyntheticLargeSource : public QCPAbstractDataSource
+void TestPipeline::multiGraphLineCacheRebuiltOnQueuedZoomWithBigData()
 {
-public:
-    explicit SyntheticLargeSource(int n) : mN(n) {}
-    int size() const override { return mN; }
-    bool empty() const override { return mN == 0; }
-    double keyAt(int i) const override { return static_cast<double>(i); }
-    double valueAt(int i) const override { return std::sin(i * 0.0001); }
-    QCPRange keyRange(bool& found, QCP::SignDomain sd) const override
-    {
-        Q_UNUSED(sd);
-        found = mN > 0;
-        return QCPRange(0, mN - 1);
-    }
-    QCPRange valueRange(bool& found, QCP::SignDomain sd, const QCPRange&) const override
-    {
-        Q_UNUSED(sd);
-        found = mN > 0;
-        return QCPRange(-1, 1);
-    }
-    int findBegin(double sortKey, bool) const override
-    {
-        return std::clamp(static_cast<int>(sortKey), 0, mN);
-    }
-    int findEnd(double sortKey, bool) const override
-    {
-        return std::clamp(static_cast<int>(std::ceil(sortKey)) + 1, 0, mN);
-    }
-    QVector<QPointF> getOptimizedLineData(int begin, int end, int, QCPAxis*, QCPAxis*) const override
-    {
-        return getLines(begin, end, nullptr, nullptr);
-    }
-    QVector<QPointF> getLines(int begin, int end, QCPAxis*, QCPAxis*) const override
-    {
-        QVector<QPointF> result;
-        result.reserve(end - begin);
-        for (int i = begin; i < end; ++i)
-            result.append(QPointF(keyAt(i), valueAt(i)));
-        return result;
-    }
-private:
-    int mN;
-};
-
-void TestPipeline::graph2HierarchicalResamplingActivates()
-{
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    // Driven the way real interaction drives it: several range changes fired in quick
+    // succession, each via rpQueuedReplot (what QCPAxisRect::wheelEvent/mouseMoveEvent use),
+    // with only one event-loop pump at the end -- not one synchronous replot per step.
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
 
     const int N = 10'000'001;
-    auto source = std::make_shared<SyntheticLargeSource>(N);
+    auto source = std::make_shared<SyntheticLargeMultiSource>(N, 1);
 
-    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
-
-    mPlot->xAxis->setRange(0, N - 1);
-    mPlot->yAxis->setRange(-1, 1);
-    g->setDataSource(source);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-
-    QVERIFY(g->pipeline().hasTransform());
-
-    // Wait for async L1 build to finish
-    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
-
-    // After L1 delivery, onL1Ready runs L2 synchronously.
-    // Trigger a replot to exercise the draw path with resampled data.
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-
-    // Pipeline result is nullptr (L1-only transform returns nullptr).
-    QVERIFY(g->pipeline().result() == nullptr);
-    QVERIFY(g->dataSource()->size() == N);
-
-    // Verify L2 was actually built and is much smaller than raw data.
-    QVERIFY(g->mL2Result);
-    QVERIFY(g->mL2Result->size() > 0);
-    QVERIFY(g->mL2Result->size() < N / 10);
-}
-
-// The new axis is ranged before the move: only the move itself can mark the resample stale.
-void TestPipeline::graph2ResampleFollowsANewKeyAxis()
-{
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    const int N = 10'000'001;
-    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
-    mPlot->xAxis->setRange(0, N / 4);
-    mPlot->yAxis->setRange(-1, 1);
-    g->setDataSource(std::make_shared<SyntheticLargeSource>(N));
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(g->mL2Result);
-
-    mPlot->xAxis2->setRange(3 * (N / 4), N - 1);
-    g->setKeyAxis(mPlot->xAxis2);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(g->mL2Result);
-    QVERIFY2(g->mL2Result->keyAt(g->mL2Result->size() - 1) > 3 * (N / 4),
-             "drawn from the resample of the old axis's range");
-}
-
-void TestPipeline::graph2LineCacheRebuiltOnZoomWithBigData()
-{
-    // Reproducer: user report that zooming (in either direction) on a big
-    // (resampled) dataset leaves the graph's rendered lines "stuck" while
-    // axes/grid keep tracking the new range correctly.
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-
-    const int N = 10'000'001;
-    auto source = std::make_shared<SyntheticLargeSource>(N);
-
-    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
-
-    mPlot->xAxis->setRange(0, N - 1);
-    mPlot->yAxis->setRange(-1, 1);
-    g->setDataSource(source);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-
-    // Wait for async L1 build to finish, then let onL1Ready's queued replot
-    // (or an explicit one here) run L2 synchronously for the full range.
-    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(g->mL2Result);
-
-    auto linesFullRange = g->mCachedLines;
-    QVERIFY(!linesFullRange.isEmpty());
-
-    // Zoom IN on the big (resampled) dataset.
-    mPlot->xAxis->setRange(N * 0.25, N * 0.75);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    auto linesZoomedIn = g->mCachedLines;
-    QVERIFY2(linesZoomedIn != linesFullRange, "zoom-in did not rebuild the line cache");
-
-    // Zoom back OUT to the full range.
-    mPlot->xAxis->setRange(0, N - 1);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    auto linesZoomedOut = g->mCachedLines;
-    QVERIFY2(linesZoomedOut != linesZoomedIn, "zoom-out did not rebuild the line cache");
-}
-
-void TestPipeline::graph2LineCacheRebuiltOnQueuedZoomWithBigData()
-{
-    // Same as above, but driven the way real interaction actually drives it:
-    // several range changes fired in quick succession, each via
-    // rpQueuedReplot (what QCPAxisRect::wheelEvent/mouseMoveEvent use), with
-    // only one event-loop pump at the end -- not one synchronous replot per
-    // step. Isolates whether the bug needs the coalesced/queued path.
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-
-    const int N = 10'000'001;
-    auto source = std::make_shared<SyntheticLargeSource>(N);
-
-    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
+    QSignalSpy spy(&g->pipeline(), &QCPMultiGraphPipeline::finished);
 
     mPlot->xAxis->setRange(0, N - 1);
     mPlot->yAxis->setRange(-1, 1);
@@ -1594,8 +1373,8 @@ void TestPipeline::graph2LineCacheRebuiltOnQueuedZoomWithBigData()
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QVERIFY(g->mL2Result);
 
-    auto linesFullRange = g->mCachedLines;
-    QVERIFY(!linesFullRange.isEmpty());
+    const int fullRangeRecordings = g->mCore.recordingCount();
+    QVERIFY(fullRangeRecordings > 0);
 
     double lo = 0, hi = N - 1;
     for (int i = 0; i < 6; ++i) {
@@ -1610,8 +1389,9 @@ void TestPipeline::graph2LineCacheRebuiltOnQueuedZoomWithBigData()
     QTest::qWait(50);
     QCoreApplication::processEvents();
 
-    auto linesZoomedIn = g->mCachedLines;
-    QVERIFY2(linesZoomedIn != linesFullRange, "queued zoom-in did not rebuild the line cache");
+    const int zoomedInRecordings = g->mCore.recordingCount();
+    QVERIFY2(zoomedInRecordings > fullRangeRecordings,
+             "queued zoom-in did not record fresh lines");
 
     mPlot->xAxis->setRange(0, N - 1);
     mPlot->replot(QCustomPlot::rpQueuedReplot);
@@ -1619,40 +1399,22 @@ void TestPipeline::graph2LineCacheRebuiltOnQueuedZoomWithBigData()
     QTest::qWait(50);
     QCoreApplication::processEvents();
 
-    auto linesZoomedOut = g->mCachedLines;
-    QVERIFY2(linesZoomedOut != linesZoomedIn, "queued zoom-out did not rebuild the line cache");
+    QVERIFY2(g->mCore.recordingCount() > zoomedInRecordings,
+             "queued zoom-out did not record fresh lines");
 }
 
-void TestPipeline::graph2SmallDataNoResampling()
-{
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-
-    std::vector<double> keys = {1, 2, 3, 4, 5};
-    std::vector<double> vals = {10, 20, 30, 40, 50};
-    g->setData(std::move(keys), std::move(vals));
-
-    QVERIFY(!g->pipeline().hasTransform());
-
-    auto* result = g->pipeline().result();
-    QVERIFY(result);
-    QCOMPARE(result->size(), 5);
-    QCOMPARE(result->keyAt(0), 1.0);
-    QCOMPARE(result->valueAt(4), 50.0);
-}
-
-void TestPipeline::graph2LargeToSmallDataFallback()
+void TestPipeline::multiGraphLargeToSmallDataFallback()
 {
     // When a graph that previously had a large dataset (with resampling transform)
     // receives a smaller dataset, the transform should be cleared so the raw
     // data source is used directly — no nullptr result, no blank rendering.
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
 
     // Install the resampling transform (simulates prior large-data assignment)
     g->pipeline().setTransform(TransformKind::ViewportDependent,
-        [](const QCPAbstractDataSource& src,
-           const ViewportParams& vp,
-           std::any& cache) -> std::shared_ptr<QCPAbstractDataSource> {
-            return hierarchicalResample(src, vp, cache);
+        [](const QCPAbstractMultiDataSource& src, const ViewportParams& vp, std::any& cache)
+            -> std::shared_ptr<QCPAbstractMultiDataSource> {
+            return qcp::algo::buildL1CacheMulti(src, vp, cache);
         });
     QVERIFY(g->pipeline().hasTransform());
 
@@ -1682,14 +1444,13 @@ void TestPipeline::graphResamplerBinMinMaxKeyPositions()
     // but code writes binCenter + halfWidth * 0.5 (quarter-width offset)
     std::vector<double> keys = {0, 1, 2, 3};
     std::vector<double> vals = {10, 20, 30, 40};
-    QCPRange range(0, 4);
 
-    auto [outKeys, outVals, outGapRatio] = qcp::algo::binMinMax(keys, vals, 0, 4, range, 1);
+    const auto out = binOneColumn(keys, vals, 0, 4, QCPRange(0, 4), 1);
 
     // Single bin: binWidth=4, halfWidth=2, binCenter=2
     // Expected: (binCenter, min) = (2, 10), (binCenter+halfWidth, max) = (4, 40)
-    QCOMPARE(outKeys[0], 2.0);
-    QCOMPARE(outKeys[1], 4.0);
+    QCOMPARE(out.keys[0], 2.0);
+    QCOMPARE(out.keys[1], 4.0);
 }
 
 void TestPipeline::graphResamplerBinMinMaxZeroBins()
@@ -1698,7 +1459,7 @@ void TestPipeline::graphResamplerBinMinMaxZeroBins()
     std::vector<double> keys = {1, 2, 3};
     std::vector<double> vals = {4, 5, 6};
 
-    auto result = qcp::algo::binMinMax(keys, vals, 0, 3, QCPRange(1, 3), 0);
+    const auto result = binOneColumn(keys, vals, 0, 3, QCPRange(1, 3), 0);
     QCOMPARE(result.keys.size(), 0u);
     QCOMPARE(result.values.size(), 0u);
 }
@@ -1710,48 +1471,12 @@ void TestPipeline::graphResamplerNonFiniteKeysSkipped()
     double inf = std::numeric_limits<double>::infinity();
     std::vector<double> keys = {0, nan, 2, inf, 4};
     std::vector<double> vals = {10, 20, 30, 40, 50};
-    QCPRange range(0, 4);
 
-    auto [outKeys, outVals, outGapRatio] = qcp::algo::binMinMax(keys, vals, 0, 5, range, 1);
+    const auto out = binOneColumn(keys, vals, 0, 5, QCPRange(0, 4), 1);
 
     // Only finite keys (0, 2, 4) should contribute → min=10, max=50
-    QCOMPARE(outVals[0], 10.0);
-    QCOMPARE(outVals[1], 50.0);
-}
-
-void TestPipeline::graphResamplerParallelMatchesSingleThreaded()
-{
-    // Generate 2M points (above the 1M parallel threshold in binMinMaxParallel)
-    const int N = 2'000'000;
-    std::vector<double> keys(N), vals(N);
-    for (int i = 0; i < N; ++i)
-    {
-        keys[i] = i;
-        vals[i] = std::sin(i * 0.0001) * 100.0;
-    }
-
-    auto src = std::make_shared<QCPSoADataSource<
-        std::vector<double>, std::vector<double>>>(std::move(keys), std::move(vals));
-
-    QCPRange fullRange(0, N - 1);
-    int numBins = 1000;
-
-    auto sequential = qcp::algo::binMinMax(*src, 0, N, fullRange, numBins);
-    auto parallel = qcp::algo::binMinMaxParallel(*src, 0, N, fullRange, numBins);
-
-    QCOMPARE(parallel.keys.size(), sequential.keys.size());
-    QCOMPARE(parallel.values.size(), sequential.values.size());
-
-    for (size_t i = 0; i < sequential.keys.size(); ++i)
-        QCOMPARE(parallel.keys[i], sequential.keys[i]);
-
-    for (size_t i = 0; i < sequential.values.size(); ++i)
-    {
-        if (std::isnan(sequential.values[i]))
-            QVERIFY(std::isnan(parallel.values[i]));
-        else
-            QCOMPARE(parallel.values[i], sequential.values[i]);
-    }
+    QCOMPARE(out.values[0], 10.0);
+    QCOMPARE(out.values[1], 50.0);
 }
 
 // --- Multi-column resampler tests ---
@@ -1853,15 +1578,15 @@ void TestPipeline::multiGraphBinMinMaxMultiParallelMatchesSingleThreaded()
 
 // --- L2 lazy rebuild tests ---
 
-void TestPipeline::graph2L2RebuildDeferredToDraw()
+void TestPipeline::multiGraphL2RebuildDeferredToDraw()
 {
     // Verify that changing the viewport does NOT immediately rebuild L2,
     // but that L2 IS rebuilt when draw() runs (via replot).
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     const int N = 10'000'001;
-    auto source = std::make_shared<SyntheticLargeSource>(N);
+    auto source = std::make_shared<SyntheticLargeMultiSource>(N, 1);
 
-    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
+    QSignalSpy spy(&g->pipeline(), &QCPMultiGraphPipeline::finished);
     mPlot->xAxis->setRange(0, N - 1);
     mPlot->yAxis->setRange(-1, 1);
     g->setDataSource(source);
@@ -1887,15 +1612,15 @@ void TestPipeline::graph2L2RebuildDeferredToDraw()
     QVERIFY(g->mL2Result != oldL2); // rebuilt with new viewport
 }
 
-void TestPipeline::graph2L2CoalescesMultipleViewportChanges()
+void TestPipeline::multiGraphL2CoalescesMultipleViewportChanges()
 {
     // Simulate rapid pan: many range changes, one replot.
     // L2 should only be built once (at draw time), not per range change.
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     const int N = 10'000'001;
-    auto source = std::make_shared<SyntheticLargeSource>(N);
+    auto source = std::make_shared<SyntheticLargeMultiSource>(N, 1);
 
-    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
+    QSignalSpy spy(&g->pipeline(), &QCPMultiGraphPipeline::finished);
     mPlot->xAxis->setRange(0, N - 1);
     mPlot->yAxis->setRange(-1, 1);
     g->setDataSource(source);
@@ -1924,17 +1649,17 @@ void TestPipeline::graph2L2CoalescesMultipleViewportChanges()
     QVERIFY(g->mL2Result != oldL2);
 }
 
-void TestPipeline::graph2L2DirtyAfterL1Ready()
+void TestPipeline::multiGraphL2DirtyAfterL1Ready()
 {
     // When L1 finishes, L2 should be marked dirty (not built inline).
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     const int N = 10'000'001;
-    auto source = std::make_shared<SyntheticLargeSource>(N);
+    auto source = std::make_shared<SyntheticLargeMultiSource>(N, 1);
 
     mPlot->xAxis->setRange(0, N - 1);
     mPlot->yAxis->setRange(-1, 1);
 
-    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
+    QSignalSpy spy(&g->pipeline(), &QCPMultiGraphPipeline::finished);
     g->setDataSource(source);
 
     // Before L1 finishes: no L1 cache, no L2, not dirty
@@ -2504,8 +2229,6 @@ public:
     }
     int findBegin(double, bool) const override { return 0; }
     int findEnd(double, bool) const override { return 4; }
-    QVector<QPointF> getOptimizedLineData(int, int, int, QCPAxis*, QCPAxis*) const override { return {}; }
-    QVector<QPointF> getLines(int, int, QCPAxis*, QCPAxis*) const override { return {}; }
 
 private:
     std::shared_ptr<std::atomic<bool>> mOpen;
@@ -2946,53 +2669,6 @@ void TestPipeline::multiGraphL1AndL2()
 
 // --- QCPMultiGraph pipeline integration tests ---
 
-// Synthetic multi-column source that computes data on-the-fly without allocating N arrays.
-class SyntheticLargeMultiSource : public QCPAbstractMultiDataSource
-{
-public:
-    explicit SyntheticLargeMultiSource(int n, int cols) : mN(n), mCols(cols) {}
-    int size() const override { return mN; }
-    bool empty() const override { return mN == 0; }
-    int columnCount() const override { return mCols; }
-    double keyAt(int i) const override { return static_cast<double>(i); }
-    double valueAt(int col, int i) const override { return std::sin(i * 0.0001 + col); }
-    QCPRange keyRange(bool& found, QCP::SignDomain) const override
-    {
-        found = mN > 0;
-        return QCPRange(0, mN - 1);
-    }
-    QCPRange valueRange(int, bool& found, QCP::SignDomain, const QCPRange&) const override
-    {
-        found = mN > 0;
-        return QCPRange(-1, 1);
-    }
-    int findBegin(double sortKey, bool) const override
-    {
-        return std::clamp(static_cast<int>(sortKey), 0, mN);
-    }
-    int findEnd(double sortKey, bool) const override
-    {
-        return std::clamp(static_cast<int>(std::ceil(sortKey)) + 1, 0, mN);
-    }
-    QVector<QPointF> getOptimizedLineData(int col, int begin, int end, int,
-                                          QCPAxis* ka, QCPAxis* va) const override
-    {
-        return getLines(col, begin, end, ka, va);
-    }
-    QVector<QPointF> getLines(int col, int begin, int end,
-                               QCPAxis*, QCPAxis*) const override
-    {
-        QVector<QPointF> result;
-        result.reserve(end - begin);
-        for (int i = begin; i < end; ++i)
-            result.append(QPointF(keyAt(i), valueAt(col, i)));
-        return result;
-    }
-private:
-    int mN;
-    int mCols;
-};
-
 void TestPipeline::multiGraphSmallDataNoResampling()
 {
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
@@ -3031,11 +2707,13 @@ void TestPipeline::multiGraphLargeDataL1L2()
     // Trigger replot to build L2
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QVERIFY(mg->mL2Result);
+    QVERIFY(mg->mL2Result->size() > 0);
+    QVERIFY(mg->mL2Result->size() < N / 10);
 }
 
 void TestPipeline::multiGraphLineCacheRebuiltOnZoom()
 {
-    // Same reproducer as graph2LineCacheRebuiltOnZoomWithBigData but for
+    // Zooming a big resampled dataset must rebuild the lines, for
     // QCPMultiGraph, which is what SciQLopMultiGraphBase (SciQLop's real
     // multi-component line graphs) actually uses under the hood.
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
@@ -3396,58 +3074,31 @@ void TestPipeline::multiGraphHiddenComponentsStillResampled()
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 }
 
-void TestPipeline::graph2LineCacheReusedOnSmallPan()
+void TestPipeline::multiGraphLineCacheRebuiltOnLargePan()
 {
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     const int N = 10000;
     std::vector<double> keys(N), values(N);
     for (int i = 0; i < N; ++i) { keys[i] = i; values[i] = std::sin(i * 0.01); }
-    graph->setDataSource(std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
-        std::vector<double>(keys), std::vector<double>(values)));
+    graph->setDataSource(oneColumnSource(keys, values));
     mPlot->xAxis->setRange(0, N);
     mPlot->yAxis->setRange(-1.5, 1.5);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
-    // Cache should be populated
-    QVERIFY(!graph->mCachedLines.isEmpty());
-    auto cachedBefore = graph->mCachedLines;
-
-    // Small pan: shift by 5% of range — should reuse cache
-    double shift = N * 0.05;
-    mPlot->xAxis->setRange(shift, N + shift);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-
-    // Cache should NOT have been rebuilt (same data)
-    QCOMPARE(graph->mCachedLines, cachedBefore);
-}
-
-void TestPipeline::graph2LineCacheRebuiltOnLargePan()
-{
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    const int N = 10000;
-    std::vector<double> keys(N), values(N);
-    for (int i = 0; i < N; ++i) { keys[i] = i; values[i] = std::sin(i * 0.01); }
-    graph->setDataSource(std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
-        std::vector<double>(keys), std::vector<double>(values)));
-    mPlot->xAxis->setRange(0, N);
-    mPlot->yAxis->setRange(-1.5, 1.5);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-
-    auto cachedBefore = graph->mCachedLines;
-    QVERIFY(!cachedBefore.isEmpty());
+    const int recordingsBefore = graph->mCore.recordingCount();
+    QVERIFY(recordingsBefore > 0);
 
     // Large pan: shift by 110% — should trigger rebuild (threshold is now 100%)
     double shift = N * 1.1;
     mPlot->xAxis->setRange(shift, N + shift);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
-    // Cache should have been rebuilt (different data)
-    QVERIFY(graph->mCachedLines != cachedBefore);
+    QTRY_VERIFY_WITH_TIMEOUT(graph->mCore.recordingCount() > recordingsBefore, 2000);
 }
 
-void TestPipeline::graph2LineCacheSurvives75PercentPan()
+void TestPipeline::multiGraphLineCacheSurvives75PercentPan()
 {
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> keys(500), vals(500);
     for (int i = 0; i < 500; ++i) { keys[i] = i; vals[i] = i; }
     graph->setData(std::move(keys), std::move(vals));
@@ -3462,42 +3113,40 @@ void TestPipeline::graph2LineCacheSurvives75PercentPan()
     QVERIFY(!offset.isNull());
 }
 
-void TestPipeline::graph2LineCacheRebuiltOnZoom()
+void TestPipeline::multiGraphSmallDataLineCacheRebuiltOnZoom()
 {
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     const int N = 10000;
     std::vector<double> keys(N), values(N);
     for (int i = 0; i < N; ++i) { keys[i] = i; values[i] = std::sin(i * 0.01); }
-    graph->setDataSource(std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
-        std::vector<double>(keys), std::vector<double>(values)));
+    graph->setDataSource(oneColumnSource(keys, values));
     mPlot->xAxis->setRange(0, N);
     mPlot->yAxis->setRange(-1.5, 1.5);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
-    auto cachedBefore = graph->mCachedLines;
-    QVERIFY(!cachedBefore.isEmpty());
+    const int recordingsBefore = graph->mCore.recordingCount();
+    QVERIFY(recordingsBefore > 0);
 
     // Zoom in 2x (center stays same, range halved) — should trigger rebuild
     mPlot->xAxis->setRange(N * 0.25, N * 0.75);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
-    QVERIFY(graph->mCachedLines != cachedBefore);
+    QTRY_VERIFY_WITH_TIMEOUT(graph->mCore.recordingCount() > recordingsBefore, 2000);
 }
 
-void TestPipeline::graph2LineCacheRebuiltOnSmallZoom()
+void TestPipeline::multiGraphLineCacheRebuiltOnSmallZoom()
 {
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     const int N = 10000;
     std::vector<double> keys(N), values(N);
     for (int i = 0; i < N; ++i) { keys[i] = i; values[i] = std::sin(i * 0.01); }
-    graph->setDataSource(std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
-        std::vector<double>(keys), std::vector<double>(values)));
+    graph->setDataSource(oneColumnSource(keys, values));
     mPlot->xAxis->setRange(0, N);
     mPlot->yAxis->setRange(-1.5, 1.5);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
-    auto cachedBefore = graph->mCachedLines;
-    QVERIFY(!cachedBefore.isEmpty());
+    const int recordingsBefore = graph->mCore.recordingCount();
+    QVERIFY(recordingsBefore > 0);
 
     // Zoom by 0.5% — simulates Wayland smooth scrolling fine zoom step.
     // Must still trigger cache rebuild (translation-only offset is wrong for zoom).
@@ -3506,37 +3155,34 @@ void TestPipeline::graph2LineCacheRebuiltOnSmallZoom()
     mPlot->xAxis->setRange(half - (N / 2.0 - shrink), half + (N / 2.0 - shrink));
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
-    QVERIFY(graph->mCachedLines != cachedBefore);
+    QTRY_VERIFY_WITH_TIMEOUT(graph->mCore.recordingCount() > recordingsBefore, 2000);
 }
 
-void TestPipeline::graph2LineCacheInvalidatedOnDataChange()
+void TestPipeline::multiGraphLineCacheInvalidatedOnDataChange()
 {
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     const int N = 10000;
     std::vector<double> keys(N), values(N);
     for (int i = 0; i < N; ++i) { keys[i] = i; values[i] = std::sin(i * 0.01); }
-    graph->setDataSource(std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
-        std::vector<double>(keys), std::vector<double>(values)));
+    graph->setDataSource(oneColumnSource(keys, values));
     mPlot->xAxis->setRange(0, N);
     mPlot->yAxis->setRange(-1.5, 1.5);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
-    QVERIFY(!graph->mCachedLines.isEmpty());
-    auto cachedBefore = graph->mCachedLines;
+    const int recordingsBefore = graph->mCore.recordingCount();
+    QVERIFY(recordingsBefore > 0);
 
     // Replace data — the graph is already rendered, so the replacement is staged;
     // committing it (via the plot's swap window) also triggers the plot's automatic
-    // post-commit replot, which immediately rebuilds the cache from the new source.
-    // So the meaningful assertion is "the cache now reflects the new data", not
-    // "the cache is momentarily empty" (the old immediate-replace behaviour).
+    // post-commit replot, which immediately rebuilds the lines from the new source.
+    // So the meaningful assertion is "the lines now reflect the new data".
     std::vector<double> keys2(N), values2(N);
     for (int i = 0; i < N; ++i) { keys2[i] = i; values2[i] = std::cos(i * 0.01); }
-    graph->setDataSource(std::make_shared<QCPSoADataSource<std::vector<double>, std::vector<double>>>(
-        std::move(keys2), std::move(values2)));
+    graph->setDataSource(oneColumnSource(std::move(keys2), std::move(values2)));
 
     QTRY_VERIFY_WITH_TIMEOUT(!graph->hasPendingData(), 5000);
-    QCOMPARE(graph->dataSource()->valueAt(0), std::cos(0.0));
-    QVERIFY(graph->mCachedLines != cachedBefore);
+    QCOMPARE(graph->dataSource()->valueAt(0, 0), std::cos(0.0));
+    QTRY_VERIFY_WITH_TIMEOUT(graph->mCore.recordingCount() > recordingsBefore, 2000);
 }
 
 void TestPipeline::multiGraphLineCacheReusedOnSmallPan()
@@ -3569,33 +3215,6 @@ void TestPipeline::multiGraphLineCacheReusedOnSmallPan()
     QCOMPARE(mg->mCore.recordingCount(), recordings); // a pan inside the window is a translation
 }
 
-void TestPipeline::graph2FastPanNeverBlank()
-{
-    if (!showAndHasRhi(mPlot)) QSKIP("No QRhi available — hasRenderedRange() requires GPU draw()");
-
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-
-    int N = 500'000;
-    std::vector<double> keys(N), vals(N);
-    for (int i = 0; i < N; ++i) { keys[i] = i; vals[i] = std::sin(i * 0.0001); }
-    graph->setData(std::move(keys), std::move(vals));
-
-    mPlot->xAxis->setRange(0, 100000);
-    mPlot->yAxis->setRange(-1.5, 1.5);
-    // Nothing is drawn until the first background resample lands: "never blank"
-    // is about the pans that follow the first render.
-    QTRY_VERIFY_WITH_TIMEOUT((mPlot->replot(), graph->hasRenderedRange()), 10000);
-
-    for (int p = 0; p < 20; ++p)
-    {
-        double lo = mPlot->xAxis->range().lower + 30000;
-        mPlot->xAxis->setRange(lo, lo + 100000);
-        mPlot->replot();
-        QCoreApplication::processEvents();
-        QVERIFY(graph->hasRenderedRange());
-    }
-}
-
 void TestPipeline::multiGraphFastPanNeverBlank()
 {
     if (!showAndHasRhi(mPlot)) QSKIP("No QRhi available — hasRenderedRange() requires GPU draw()");
@@ -3613,7 +3232,7 @@ void TestPipeline::multiGraphFastPanNeverBlank()
     mg->setData(std::move(keys), std::move(cols));
 
     mPlot->xAxis->setRange(0, 100000);
-    // Same as graph2FastPanNeverBlank: wait for the first render.
+    // Wait for the first render.
     QTRY_VERIFY_WITH_TIMEOUT((mPlot->replot(), mg->hasRenderedRange()), 10000);
 
     for (int p = 0; p < 20; ++p)
@@ -3682,28 +3301,6 @@ namespace {
 const std::vector<double> kIrregularKeys = {0, 1, 5, 6, 12};
 const std::vector<double> kStateValues = {1, 0, 1, 0, 0};
 
-int nanBreaks(const QVector<QPointF>& lines)
-{
-    return static_cast<int>(std::count_if(lines.begin(), lines.end(), [](const QPointF& p) {
-        return std::isnan(p.x()) || std::isnan(p.y());
-    }));
-}
-}
-
-void TestPipeline::graph2GapThresholdZeroDrawsIrregularSteps()
-{
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    g->setLineStyle(QCPGraph2::lsStepLeft);
-    g->setData(kIrregularKeys, kStateValues);
-    mPlot->xAxis->setRange(0, 12);
-    mPlot->yAxis->setRange(-1, 2);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(nanBreaks(g->mCachedLines) > 0);
-
-    g->setGapThreshold(0);
-    QCOMPARE(g->gapThreshold(), 0.0);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QCOMPARE(nanBreaks(g->mCachedLines), 0);
 }
 
 void TestPipeline::multiGraphGapThresholdZeroDrawsIrregularSteps()
@@ -3744,24 +3341,6 @@ std::vector<double> sineValues()
         values[i] = std::sin(i * 1e-3);
     return values;
 }
-}
-
-void TestPipeline::graph2GapThresholdReachesResampledSource()
-{
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
-    mPlot->xAxis->setRange(0, 2 * kHoleN);
-    mPlot->yAxis->setRange(-1, 1);
-    g->setData(keysWithHole(), sineValues());
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(g->mL2Result);
-    QVERIFY(nanBreaks(g->mCachedLines) > 0);
-
-    g->setGapThreshold(0);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QCOMPARE(nanBreaks(g->mCachedLines), 0);
 }
 
 void TestPipeline::multiGraphGapThresholdReachesResampledSource()
@@ -3827,21 +3406,6 @@ QStringList zoomsThatBreakUniformData(QCustomPlot* plot, Breaks breaks, UsesL2 u
     }
     return broken;
 }
-}
-
-void TestPipeline::graph2UniformDataNeverBreaksAtAnyZoom()
-{
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
-    mPlot->yAxis->setRange(-1.5, 1.5);
-    g->setData(uniformKeys(), uniformValues());
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 30000);
-
-    const auto broken = zoomsThatBreakUniformData(
-        mPlot, [g] { return nanBreaks(g->mCachedLines); }, [g] { return bool(g->mL2Result); });
-    QVERIFY2(broken.isEmpty(), qPrintable(broken.join("; ")));
-    QVERIFY2(g->mL2Result, "the widest zoom must be drawn from L2, or this test checks nothing");
 }
 
 void TestPipeline::multiGraphUniformDataNeverBreaksAtAnyZoom()
@@ -3929,75 +3493,7 @@ void TestPipeline::sporadicNaNNeverBreaksTheResampledLine()
         mPlot, [g] { return g->mCore.recordedPolylineNaNs(); }, [g] { return bool(g->mL2Result); },
         subPixelNaN);
 
-    auto* g2 = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    QSignalSpy spy2(&g2->pipeline(), &QCPGraphPipeline::finished);
-    g->setVisible(false);
-    g2->setData(uniformKeys(), values);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QTRY_VERIFY_WITH_TIMEOUT(spy2.count() >= 1, 30000);
-    for (const auto& b : zoomsThatBreakUniformData(
-             mPlot, [g2] { return nanBreaks(g2->mCachedLines); },
-             [g2] { return bool(g2->mL2Result); }, subPixelNaN))
-        broken << "graph2 " + b;
     QVERIFY2(broken.isEmpty(), qPrintable(broken.join("; ")));
-}
-
-void TestPipeline::graph2PanIsRedrawnFreshAfterTheDebounce()
-{
-    if (!showAndHasRhi(mPlot))
-        QSKIP("no QRhi available in this environment");
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    QVector<double> keys(400000), values(400000);
-    for (int i = 0; i < 400000; ++i)
-    {
-        keys[i] = i;
-        values[i] = std::sin(i * 0.001);
-    }
-    graph->setData(std::move(keys), std::move(values));
-    mPlot->xAxis->setRange(0, 100000);
-    mPlot->yAxis->setRange(-1.5, 1.5);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QTRY_VERIFY_WITH_TIMEOUT(!graph->pipeline().isBusy(), 5000);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(graph->mL2Result); // the cached lines cover only the view
-
-    mPlot->xAxis->setRange(25000, 125000);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh); // pan frame: translated, edge uncovered
-    const auto renderedAtView = [&] {
-        return qFuzzyCompare(graph->mRenderedRange.key.lower, mPlot->xAxis->range().lower)
-            && qFuzzyCompare(graph->mRenderedRange.key.upper, mPlot->xAxis->range().upper);
-    };
-    QTRY_VERIFY2_WITH_TIMEOUT(renderedAtView(), "the panned view was never drawn fresh", 2000);
-}
-
-void TestPipeline::graph2PanIsRedrawnFreshWhileAnotherLayerIsDirty()
-{
-    if (!showAndHasRhi(mPlot))
-        QSKIP("no QRhi available in this environment");
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
-    QVector<double> keys(400000), values(400000);
-    for (int i = 0; i < 400000; ++i)
-    {
-        keys[i] = i;
-        values[i] = std::sin(i * 0.001);
-    }
-    graph->setData(std::move(keys), std::move(values));
-    mPlot->xAxis->setRange(0, 100000);
-    mPlot->yAxis->setRange(-1.5, 1.5);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QTRY_VERIFY_WITH_TIMEOUT(!graph->pipeline().isBusy(), 5000);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(graph->mL2Result); // the cached lines cover only the view
-
-    // Like a crosshair following the mouse: some other layer is dirty on every replot.
-    connect(mPlot, &QCustomPlot::beforeReplot, mPlot, [this] { mPlot->layer("overlay")->markDirty(); });
-    mPlot->xAxis->setRange(25000, 125000);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh); // pan frame: translated, edge uncovered
-    const auto renderedAtView = [&] {
-        return qFuzzyCompare(graph->mRenderedRange.key.lower, mPlot->xAxis->range().lower)
-            && qFuzzyCompare(graph->mRenderedRange.key.upper, mPlot->xAxis->range().upper);
-    };
-    QTRY_VERIFY2_WITH_TIMEOUT(renderedAtView(), "the panned view was never drawn fresh", 2000);
 }
 
 void TestPipeline::densePanIsRedrawnFreshBesideASmallGraph()
@@ -4006,22 +3502,22 @@ void TestPipeline::densePanIsRedrawnFreshBesideASmallGraph()
     // dirty after a pan, so it keeps offering a translation for the whole layer.
     if (!showAndHasRhi(mPlot))
         QSKIP("no QRhi available in this environment");
-    auto* small = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* small = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     QVector<double> sk(500), sv(500);
     for (int i = 0; i < 500; ++i)
     {
         sk[i] = i * 800.0;
         sv[i] = 0.5;
     }
-    small->setData(std::move(sk), std::move(sv));
-    auto* dense = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    small->setData(sk, sv);
+    auto* dense = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     QVector<double> keys(400000), values(400000);
     for (int i = 0; i < 400000; ++i)
     {
         keys[i] = i;
         values[i] = std::sin(i * 0.001);
     }
-    dense->setData(std::move(keys), std::move(values));
+    dense->setData(keys, values);
     mPlot->xAxis->setRange(0, 100000);
     mPlot->yAxis->setRange(-1.5, 1.5);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -4030,13 +3526,11 @@ void TestPipeline::densePanIsRedrawnFreshBesideASmallGraph()
     QVERIFY(dense->mL2Result);
     QCOMPARE(small->layer(), dense->layer());
 
+    const int recordings = dense->mCore.recordingCount();
     mPlot->xAxis->setRange(25000, 125000);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    const auto renderedAtView = [&] {
-        return qFuzzyCompare(dense->mRenderedRange.key.lower, mPlot->xAxis->range().lower)
-            && qFuzzyCompare(dense->mRenderedRange.key.upper, mPlot->xAxis->range().upper);
-    };
-    QTRY_VERIFY2_WITH_TIMEOUT(renderedAtView(), "the dense graph was never drawn fresh", 2000);
+    QTRY_VERIFY2_WITH_TIMEOUT(dense->mCore.recordingCount() > recordings,
+                              "the dense graph was never drawn fresh", 2000);
 }
 
 void TestPipeline::colormapNewDataShowsWhileAnotherLayerIsDirty()
@@ -4073,26 +3567,28 @@ void TestPipeline::colormapNewDataShowsWhileAnotherLayerIsDirty()
     QTRY_VERIFY2_WITH_TIMEOUT(centre().lightness() > 200, "the new colormap data never showed", 3000);
 }
 
-void TestPipeline::graph2SetterRedrawsWhileAnotherLayerIsDirty()
+void TestPipeline::multiGraphSetterRedrawsWhileAnotherLayerIsDirty()
 {
-    auto* graph = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     graph->setData(QVector<double> { 0, 1, 2, 3 }, QVector<double> { 0, 1, 0, 1 });
     mPlot->xAxis->setRange(0, 3);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY(!graph->mLineCacheDirty);
+    QVERIFY(graph->hasRenderedRange());
+    const int recordings = graph->mCore.recordingCount();
     // Like a crosshair following the mouse: some other layer is dirty on every replot.
     connect(mPlot, &QCustomPlot::beforeReplot, mPlot, [this] { mPlot->layer("overlay")->markDirty(); });
     graph->setGapThreshold(0);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    QVERIFY2(!graph->mLineCacheDirty, "the graph was not drawn after setGapThreshold");
+    QVERIFY2(graph->mCore.recordingCount() > recordings,
+             "the graph was not drawn after setGapThreshold");
 }
 
 namespace
 {
 //! Positive values over keys 1..10^4, drawn once on the given axis scales.
-QCPGraph2* drawnPositiveGraph(QCustomPlot* plot, bool logKeys, bool logValues)
+QCPMultiGraph* drawnPositiveGraph(QCustomPlot* plot, bool logKeys, bool logValues)
 {
-    auto* graph = new QCPGraph2(plot->xAxis, plot->yAxis);
+    auto* graph = new QCPMultiGraph(plot->xAxis, plot->yAxis);
     QVector<double> keys(2000), values(2000);
     for (int i = 0; i < 2000; ++i)
     {
@@ -4129,19 +3625,25 @@ void TestPipeline::logKeyAxisPanStaysCovered()
         QSKIP("no QRhi available in this environment");
     auto* graph = drawnPositiveGraph(mPlot, true, false);
     mPlot->xAxis->moveRange(2.0); // [10, 100] -> [20, 200]
-    const QPointF offset = graph->stallPixelOffset();
-    QVERIFY(!offset.isNull());
-    // The lines on screen are the cached ones shifted by the offset: they must still span the
-    // view. A linear cache range would stop at 190 and leave the right edge blank.
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    // The thinned lines depend on the key view, so a pan records them again (no translation):
+    // the recording holds data coordinates and must still span the view. A linear key window would stop at 190 and leave the right edge blank.
     double left = std::numeric_limits<double>::max(), right = std::numeric_limits<double>::lowest();
-    for (const QPointF& p : graph->mCachedLines)
+    for (const auto& command : graph->mCore.recordedList().commands)
     {
-        left = std::min(left, p.x() + offset.x());
-        right = std::max(right, p.x() + offset.x());
+        const auto* polyline = std::get_if<qcp::PolylineDataCmd>(&command);
+        if (!polyline || !polyline->points)
+            continue;
+        for (const QPointF& p : *polyline->points)
+            if (std::isfinite(p.x()))
+            {
+                left = std::min(left, p.x());
+                right = std::max(right, p.x());
+            }
     }
-    const QRect rect = mPlot->axisRect()->rect();
-    QVERIFY2(left <= rect.left() && right >= rect.right(),
-             qPrintable(QString("lines span %1..%2, view %3..%4").arg(left).arg(right).arg(rect.left()).arg(rect.right())));
+    const QCPRange view = mPlot->xAxis->range();
+    QVERIFY2(left <= view.lower && right >= view.upper,
+             qPrintable(QString("lines span %1..%2, view %3..%4").arg(left).arg(right).arg(view.lower).arg(view.upper)));
 }
 
 void TestPipeline::additiveShiftOnLogAxisIsNotATranslation()
@@ -4166,9 +3668,9 @@ void TestPipeline::lineCacheCoversADecadeEachSideOnLogKeys()
 
 // Below the resampling threshold dataChanged replots at once, so beforeReplot slots run inside
 // it; one deleting the graph must end dataChanged.
-void TestPipeline::graph2DataChangedReplotSlotDeletingTheGraphIsSafe()
+void TestPipeline::multiGraphDataChangedReplotSlotDeletingTheGraphIsSafe()
 {
-    auto* g = new QCPGraph2(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     g->setData(std::vector<double>{ 0, 1, 2 }, std::vector<double>{ 0, 1, 2 });
     QVERIFY(!g->pipeline().hasTransform());
     connect(mPlot, &QCustomPlot::beforeReplot, mPlot,

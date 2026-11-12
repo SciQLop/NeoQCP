@@ -19,8 +19,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
                 + 0.1 * std::sin(t * 6.28 * 5000.0);
     }
 
-    auto* g = new QCPGraph2(plot->xAxis, plot->yAxis);
-    g->setData(std::move(keys), std::move(vals));
+    std::vector<std::vector<double>> columns(1);
+    columns[0] = std::move(vals);
+    auto* g = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    g->setData(std::move(keys), std::move(columns));
     g->setPen(QPen(QColor(31, 119, 180), 1));
 
     plot->xAxis->setLabel("Time (s)");

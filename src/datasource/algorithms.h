@@ -712,7 +712,8 @@ std::vector<QPointF> linesInDataImpl(const KC& keys, const VC& values, int begin
     const bool decades = logKeys && firstKey > 0 && lastKey > 0;
     const double keySpan = pixelsPerKey
         * (decades ? qAbs(std::log10(lastKey) - std::log10(firstKey)) : qAbs(lastKey - firstKey));
-    if (pixelsPerKey <= 0 || static_cast<double>(dataCount) < 2 * keySpan + 2)
+    // A NaN end key makes the span NaN: the envelope's reserve size would overflow, draw raw.
+    if (pixelsPerKey <= 0 || !std::isfinite(keySpan) || static_cast<double>(dataCount) < 2 * keySpan + 2)
     {
         linePointsInto(keys, values, begin, end, gapThreshold, precomputedGaps, pts, idx,
                        DataPointMap {});
