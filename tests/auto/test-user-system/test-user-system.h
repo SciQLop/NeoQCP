@@ -63,6 +63,7 @@ private slots:
     void aNestedLayoutCannotMoveAnElementOfAnotherPlot();
     void itemsFollowTheSkewMapping();
     void theTracerFollowsASkewGraph();
+    void theTracerFollowsAMultiGraphOnASkewRect();
     void takeAndAdoptAGraphAndAnItemOnASkewRect();
     void anAxisDeletedMidDragLeavesThemInert();
     void deletingTheSkewRectLeavesThemInert();

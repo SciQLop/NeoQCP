@@ -1603,6 +1603,32 @@ void TestUserSystem::theTracerFollowsASkewGraph()
              "the tracer kept a pixel of the frame it was given first");
 }
 
+void TestUserSystem::theTracerFollowsAMultiGraphOnASkewRect()
+{
+    QCustomPlot plot;
+    SkewRect* rect = skewRect(plot);
+    SkewSystem* system = rect->skew();
+    InspectableMultiGraph* graph = multiGraphOn(rect);
+    graph->setData(QVector<double> { 2, 4, 6 },
+                   std::vector<QVector<double>> { QVector<double> { 1, 1, 1 },
+                                                  QVector<double> { 2, 6, 4 } });
+    auto* tracer = new QCPItemTracer(&plot);
+    tracer->setLineGraph(graph, 1);
+    tracer->setGraphKey(4);
+    tracer->setClipToAxisRect(true);
+    tracer->setClipArea(rect);
+    settle(plot);
+
+    QCOMPARE(tracer->position->system(), system);
+    QCOMPARE(tracer->component(), 1);
+    QVERIFY(near(tracer->position->pixelPosition(), pixelOf(system->pixelOf(4, 6)), 1.5));
+
+    system->setShear(0.4);
+    settle(plot);
+    QVERIFY2(near(tracer->position->pixelPosition(), pixelOf(system->pixelOf(4, 6)), 1.5),
+             "the multigraph tracer kept a pixel of the frame it was given first");
+}
+
 void TestUserSystem::anAnchoredPositionOnASkewSystemResolvesThroughTheFrame()
 {
     {

@@ -32,6 +32,14 @@ private slots:
     void aPannedTracerIsNotReRecorded();
     void aTracerFollowsSetGraphKey();
     void aTracerFollowsInterpolation();
+    void theTracerFollowsAMultiGraphComponent();
+    void theTracerOutsideTheDataClampsAs2xDid();
+    void theTracerOnAGapIsInert();
+    void deletingTheTracedMultiGraphLeavesTheTracerInert();
+    void takingTheTracedMultiGraphLeavesTheTracerInert();
+    void retargetingFromAnOldGraphClearsIt();
+    void theTracerOpsHandleSetsALineGraph();
+    void theTracerRefusesAnOutOfRangeComponent();
     void aSwappedGraphContainerReRecords();
     void selectionReRecords();
 };

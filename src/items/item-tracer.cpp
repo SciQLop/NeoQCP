@@ -26,10 +26,12 @@
 #include "item-tracer.h"
 
 #include "../core.h"
+#include "../misuse.h"
 #include "../painting/draw-context.h"
 #include "../plottables/graph-data.h"
 #include "../plottables/plottable-graph.h"
 #include <array>
+#include <cmath>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPItemTracer
@@ -181,32 +183,90 @@ void QCPItemTracer::setStyle(QCPItemTracer::TracerStyle style)
 */
 void QCPItemTracer::setGraph(QCPGraph* graph)
 {
-    if (graph == mGraph && !graph)
+    // One target: taking the old graph clears a multigraph target and its dependency.
+    const bool hadLineGraph = mLineGraph || mFollowsLineGraph;
+    if (mLineGraph)
+        mLineGraph->removeDependent(this);
+    mLineGraph = nullptr;
+    mFollowsLineGraph = false;
+
+    if (graph == mGraph && !graph && !hadLineGraph)
         return;
     if (mGraph)
         mGraph->removeDependent(this);
     markDirty();
-    if (graph)
+    if (graph && graph->parentPlot() == mParentPlot)
     {
-        if (graph->parentPlot() == mParentPlot)
-        {
-            position->setType(QCPItemPosition::ptPlotCoords);
-            position->setSystem(graph->system());
-            mGraph = graph;
-            mFollowsGraph = true;
-            // The tracer follows the graph's data wherever its own layer is: a data change must
-            // repaint it even when the graph's layer is the only one the change marks.
-            graph->addDependent(this);
-            updatePosition();
-        }
-        else
-            qDebug() << Q_FUNC_INFO << "graph isn't in same QCustomPlot instance as this item";
+        position->setType(QCPItemPosition::ptPlotCoords);
+        position->setSystem(graph->system());
+        mGraph = graph;
+        mFollowsGraph = true;
+        // The tracer follows the graph's data wherever its own layer is: a data change must
+        // repaint it even when the graph's layer is the only one the change marks.
+        graph->addDependent(this);
+        updatePosition();
     }
     else
     {
+        if (graph)
+            qDebug() << Q_FUNC_INFO << "graph isn't in same QCustomPlot instance as this item";
         mGraph = nullptr;
         mFollowsGraph = false;
     }
+}
+
+/*!
+  Sets the component of the \ref QCPMultiGraph this tracer sticks to. The tracer \a position will be
+  set to type QCPItemPosition::ptPlotCoords and the system of \a graph. Setting this target clears
+  the \ref QCPGraph target of \ref setGraph, and the other way round.
+*/
+void QCPItemTracer::setLineGraph(QCPMultiGraph* graph, int component)
+{
+    if (graph)
+        QCP_CHECK_OR_RETURN(graph->isValidColumn(component),
+                            "the component is outside the graph's columns");
+
+    // One target: taking the multigraph clears an old QCPGraph target and its dependency.
+    if (mGraph)
+        mGraph->removeDependent(this);
+    mGraph = nullptr;
+    mFollowsGraph = false;
+
+    if (mLineGraph)
+        mLineGraph->removeDependent(this);
+    markDirty();
+    if (!graph)
+    {
+        mLineGraph = nullptr;
+        mFollowsLineGraph = false;
+        return;
+    }
+    if (graph->parentPlot() != mParentPlot)
+    {
+        qDebug() << Q_FUNC_INFO << "graph isn't in same QCustomPlot instance as this item";
+        mLineGraph = nullptr;
+        mFollowsLineGraph = false;
+        return;
+    }
+    position->setType(QCPItemPosition::ptPlotCoords);
+    position->setSystem(graph->system());
+    mLineGraph = graph;
+    mComponent = component;
+    mFollowsLineGraph = true;
+    graph->addDependent(this);
+    updatePosition();
+}
+
+void QCPItemTracer::setComponent(int component)
+{
+    if (component == mComponent)
+        return;
+    QCP_CHECK_OR_RETURN(component >= 0 && (!mLineGraph || mLineGraph->isValidColumn(component)),
+                        "the component is outside the graph's columns");
+    markDirty();
+    mComponent = component;
+    if (mLineGraph)
+        updatePosition();
 }
 
 /*!
@@ -365,7 +425,10 @@ void QCPItemTracer::draw(QCPDrawContext& context) const
 */
 quint64 QCPItemTracer::dependencyRevision() const
 {
-    return qHashMulti(qcpDependencyKey(mGraph.data()), QCPAbstractItem::dependencyRevision());
+    const quint64 lineGraph
+        = mLineGraph ? qHashMulti(qcpDependencyKey(mLineGraph.data()), mComponent) : 0;
+    return qHashMulti(qcpDependencyKey(mGraph.data()), lineGraph,
+                      QCPAbstractItem::dependencyRevision());
 }
 
 /*!
@@ -382,6 +445,66 @@ quint64 QCPItemTracer::dependencyRevision() const
 */
 void QCPItemTracer::updatePosition()
 {
+    if (mLineGraph)
+    {
+        if (!mParentPlot->hasPlottable(mLineGraph))
+        {
+            qDebug() << Q_FUNC_INFO << "graph not contained in QCustomPlot instance (anymore)";
+            return;
+        }
+        QCPPlottableInterface1D* data = mLineGraph->interface1D();
+        if (!data || mComponent < 0 || mComponent >= mLineGraph->componentCount())
+            return;
+        const int count = data->dataCount();
+        if (count > 1)
+        {
+            const double firstKey = data->dataSortKey(0);
+            const double lastKey = data->dataSortKey(count - 1);
+            if (mGraphKey <= firstKey)
+                position->assignCoords(firstKey, mLineGraph->componentValueAt(mComponent, 0));
+            else if (mGraphKey >= lastKey)
+                position->assignCoords(lastKey,
+                                       mLineGraph->componentValueAt(mComponent, count - 1));
+            else
+            {
+                int previous = data->findBegin(mGraphKey);
+                if (previous < 0)
+                    previous = 0;
+                const int next = previous + 1;
+                if (next >= count)
+                    position->assignCoords(lastKey,
+                                           mLineGraph->componentValueAt(mComponent, count - 1));
+                else
+                {
+                    const double previousKey = data->dataSortKey(previous);
+                    const double nextKey = data->dataSortKey(next);
+                    const double previousValue
+                        = mLineGraph->componentValueAt(mComponent, previous);
+                    const double nextValue = mLineGraph->componentValueAt(mComponent, next);
+                    if (mInterpolating)
+                    {
+                        double slope = 0;
+                        if (!qFuzzyCompare(nextKey, previousKey))
+                            slope = (nextValue - previousValue) / (nextKey - previousKey);
+                        position->assignCoords(
+                            mGraphKey,
+                            (mGraphKey - previousKey) * slope + previousValue);
+                    }
+                    else if (mGraphKey < (previousKey + nextKey) * 0.5)
+                        position->assignCoords(previousKey, previousValue);
+                    else
+                        position->assignCoords(nextKey, nextValue);
+                }
+            }
+        }
+        else if (count == 1)
+            position->assignCoords(data->dataSortKey(0),
+                                   mLineGraph->componentValueAt(mComponent, 0));
+        else
+            qDebug() << Q_FUNC_INFO << "graph has no data";
+        return;
+    }
+
     if (mGraph)
     {
         if (mParentPlot->hasPlottable(mGraph))

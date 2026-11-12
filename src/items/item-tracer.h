@@ -30,6 +30,7 @@
 #include "../items/item.h"
 #include "../plottables/graph-data.h"
 #include "../plottables/plottable-graph.h"
+#include "../plottables/plottable-multigraph.h"
 
 class QCPPainter;
 class QCustomPlot;
@@ -94,6 +95,12 @@ public:
 
     QCPGraph* graph() const { return mGraph.data(); }
 
+    //! The multigraph component this tracer follows, or null. Setting it clears \ref graph.
+    QCPMultiGraph* lineGraph() const { return mLineGraph.data(); }
+
+    //! The followed multigraph component index (0 when none).
+    int component() const { return mComponent; }
+
     double graphKey() const { return mGraphKey; }
 
     bool interpolating() const { return mInterpolating; }
@@ -106,6 +113,11 @@ public:
     void setSize(double size);
     void setStyle(TracerStyle style);
     void setGraph(QCPGraph* graph);
+    //! Follows component \a component of \a graph. Setting it clears \ref graph; a component
+    //! outside the graph's columns is a misuse.
+    void setLineGraph(QCPMultiGraph* graph, int component = 0);
+    //! Changes the followed component; out of range is a misuse. Does nothing without a line graph.
+    void setComponent(int component);
     void setGraphKey(double key);
     void setInterpolating(bool enabled);
 
@@ -113,7 +125,10 @@ public:
     void draw(QCPDrawContext& context) const override;
 
     //! The graph the recorded position comes from: another one makes the recording stale.
-    [[nodiscard]] const void* dataSourceIdentity() const override { return mGraph.data(); }
+    [[nodiscard]] const void* dataSourceIdentity() const override
+    {
+        return mLineGraph ? static_cast<const void*>(mLineGraph.data()) : mGraph.data();
+    }
 
     //! The graph's revision: a new sample moves the tracer without a call on it.
     [[nodiscard]] quint64 dependencyRevision() const override;
@@ -130,11 +145,18 @@ protected:
     double mSize;
     TracerStyle mStyle;
     QPointer<QCPGraph> mGraph;
+    //! The multigraph target (B7): at most one of mGraph and mLineGraph is set.
+    QPointer<QCPMultiGraph> mLineGraph;
+    int mComponent = 0;
     bool mFollowsGraph = false; // set by setGraph, so a graph's death is told from no graph
+    bool mFollowsLineGraph = false;
     double mGraphKey;
     bool mInterpolating;
 
-    bool lostGraph() const { return mFollowsGraph && !mGraph; }
+    bool lostGraph() const
+    {
+        return (mFollowsGraph && !mGraph) || (mFollowsLineGraph && !mLineGraph);
+    }
 
     // non-virtual methods:
     QPen mainPen() const;
@@ -186,6 +208,22 @@ public:
                 QCP_CHECK_OR_RETURN(graph, "the graph handle is dead");
                 o.setGraph(graph.get());
             });
+    }
+
+    //! The multigraph component to follow; a dead handle is refused with one misuse.
+    Ret setLineGraph(const QCPHandle<QCPMultiGraph>& graph, int component = 0)
+    {
+        return this->apply(
+            [&](T& o)
+            {
+                QCP_CHECK_OR_RETURN(graph, "the graph handle is dead");
+                o.setLineGraph(graph.get(), component);
+            });
+    }
+
+    Ret setComponent(int component)
+    {
+        return this->apply([&](T& o) { o.setComponent(component); });
     }
 
     Ret setSize(double size)

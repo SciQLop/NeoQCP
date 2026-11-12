@@ -1,7 +1,9 @@
 #include "test-item-recording.h"
+#include "../misuse-recorder.h"
 
 #include <QElapsedTimer>
 #include <functional>
+#include <limits>
 
 #include "../../../src/qcp.h"
 #include <painting/draw-commands.h>
@@ -97,6 +99,19 @@ int redPixelsNear(const QImage& image, const QPointF& at, int radius)
                 ++red;
         }
     return red;
+}
+
+//! Whether the whole image holds a mostly red pixel: a marker that should not be drawn at all.
+bool imageHasRed(const QImage& image)
+{
+    for (int y = 0; y < image.height(); ++y)
+        for (int x = 0; x < image.width(); ++x)
+        {
+            const QColor colour = image.pixelColor(x, y);
+            if (colour.red() > 150 && colour.red() > colour.blue() + 60)
+                return true;
+        }
+    return false;
 }
 
 //! The pixels of \a image that are mostly blue: what a blue arrow head leaves.
@@ -793,6 +808,184 @@ void TestItemRecording::aTracerFollowsInterpolation()
     image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
     QVERIFY2(redPixelsNear(image, markerAt(2.0, 0.3), 8) > 0, "the marker did not interpolate");
     QCOMPARE(redPixelsNear(image, markerAt(1.0, 0.2), 8), 0);
+}
+
+void TestItemRecording::theTracerFollowsAMultiGraphComponent()
+{
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    graph->setData(std::vector<double>{1, 2, 3, 4},
+                   std::vector<std::vector<double>>{{0.1, 0.1, 0.1, 0.1},
+                                                    {0.2, 0.3, 0.4, 0.5},
+                                                    {0.8, 0.8, 0.8, 0.8}});
+    auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
+    tracer->setLineGraph(graph, 1);
+    QCOMPARE(tracer->component(), 1);
+    tracer->setGraphKey(2.5);
+    tracer->setInterpolating(true);
+    tracer->setStyle(QCPItemTracer::tsCircle);
+    tracer->setSize(9);
+    tracer->setPen(QPen(Qt::red, 2));
+    plot.replot();
+
+    QCOMPARE(tracer->position->coords(), QPointF(2.5, 0.35));
+    const QPointF at(plot.xAxis->coordToPixel(2.5), plot.yAxis->coordToPixel(0.35));
+    QImage image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QVERIFY2(redPixelsNear(image, at, 8) > 0, "the marker is not on the component's line");
+
+    // A stepped component still follows the 2.x tracer: interpolation is linear between samples.
+    graph->setComponentLineStyle(1, QCPMultiGraph::lsStepLeft);
+    plot.replot();
+    QCOMPARE(tracer->position->coords(), QPointF(2.5, 0.35));
+
+    tracer->setInterpolating(false);
+    tracer->setGraphKey(2.6);
+    plot.replot();
+    QCOMPARE(tracer->position->coords(), QPointF(3.0, 0.4));
+}
+
+void TestItemRecording::theTracerOutsideTheDataClampsAs2xDid()
+{
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    graph->setData(std::vector<double>{1, 2, 3, 4},
+                   std::vector<std::vector<double>>{{0.2, 0.3, 0.4, 0.5}});
+    auto* tracer = new QCPItemTracer(&plot);
+    tracer->setLineGraph(graph);
+    tracer->setInterpolating(true);
+
+    tracer->setGraphKey(-10.0);
+    tracer->updatePosition();
+    QCOMPARE(tracer->position->coords(), QPointF(1.0, 0.2));
+    tracer->setGraphKey(10.0);
+    tracer->updatePosition();
+    QCOMPARE(tracer->position->coords(), QPointF(4.0, 0.5));
+}
+
+void TestItemRecording::theTracerOnAGapIsInert()
+{
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    graph->setData(std::vector<double>{1, 2, 3, 4},
+                   std::vector<std::vector<double>>{{0.2, std::numeric_limits<double>::quiet_NaN(),
+                                                    0.4, 0.5}});
+    auto* tracer = new QCPItemTracer(&plot);
+    tracer->setLineGraph(graph);
+    tracer->setInterpolating(true);
+    tracer->setGraphKey(2.0);
+    tracer->setStyle(QCPItemTracer::tsCircle);
+    tracer->setSize(9);
+    tracer->setPen(QPen(Qt::red, 2));
+    plot.replot();
+
+    QVERIFY2(!std::isfinite(tracer->position->coords().y()), "the tracer left the NaN gap");
+    const QImage image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QVERIFY2(!imageHasRed(image), "a tracer on a gap drew a marker");
+}
+
+void TestItemRecording::deletingTheTracedMultiGraphLeavesTheTracerInert()
+{
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    graph->setData(std::vector<double>{1, 2, 3}, std::vector<std::vector<double>>{{0.2, 0.3, 0.4}});
+    auto* tracer = new QCPItemTracer(&plot);
+    tracer->setLineGraph(graph);
+    tracer->setStyle(QCPItemTracer::tsCircle);
+    tracer->setSize(9);
+    tracer->setPen(QPen(Qt::red, 2));
+    plot.replot();
+
+    delete graph;
+    QVERIFY(!tracer->lineGraph());
+    plot.replot();
+    const QImage image = plot.toPixmap(400, 300).toImage().convertToFormat(QImage::Format_ARGB32);
+    QVERIFY2(!imageHasRed(image), "the tracer outlived the graph it followed");
+}
+
+void TestItemRecording::takingTheTracedMultiGraphLeavesTheTracerInert()
+{
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto graph = plot.add<QCPMultiGraph>(
+        std::vector<double>{1, 2, 3}, std::vector<std::vector<double>>{{0.2, 0.3, 0.4}});
+    QVERIFY(graph);
+    auto* tracer = new QCPItemTracer(&plot);
+    tracer->setLineGraph(graph.get());
+    tracer->setStyle(QCPItemTracer::tsCircle);
+    tracer->setSize(9);
+    tracer->setPen(QPen(Qt::red, 2));
+    plot.replot();
+
+    auto taken = plot.take(graph);
+    QVERIFY(taken);
+    QVERIFY(!tracer->lineGraph());
+    QVERIFY(!tracer->graph());
+    // The tracer is now a free position at its last sample: a replot must not crash or follow the
+    // taken graph that left the plot.
+    plot.replot();
+}
+
+void TestItemRecording::retargetingFromAnOldGraphClearsIt()
+{
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto* oldGraph = new QCPGraph(plot.xAxis, plot.yAxis);
+    oldGraph->setData(QVector<double>{1, 2, 3}, QVector<double>{0.2, 0.3, 0.4});
+    auto* lineGraph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    lineGraph->setData(std::vector<double>{1, 2, 3},
+                       std::vector<std::vector<double>>{{0.6, 0.7, 0.8}});
+
+    auto* tracer = new QCPItemTracer(&plot);
+    tracer->setGraph(oldGraph);
+    tracer->setLineGraph(lineGraph);
+    QVERIFY(!tracer->graph());
+    QCOMPARE(tracer->lineGraph(), lineGraph);
+    QCOMPARE(tracer->component(), 0);
+
+    tracer->setGraph(oldGraph);
+    QVERIFY(!tracer->lineGraph());
+    QCOMPARE(tracer->graph(), oldGraph);
+}
+
+void TestItemRecording::theTracerOpsHandleSetsALineGraph()
+{
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto graph = plot.add<QCPMultiGraph>(
+        std::vector<double>{1, 2, 3},
+        std::vector<std::vector<double>>{{0.1, 0.1, 0.1}, {0.6, 0.7, 0.8}});
+    QVERIFY(graph);
+    auto tracer = plot.add<QCPItemTracer>().setLineGraph(graph, 1).setGraphKey(2.0);
+    QVERIFY(tracer);
+    QCOMPARE(tracer->lineGraph(), graph.get());
+    QCOMPARE(tracer->component(), 1);
+    tracer->updatePosition();
+    QCOMPARE(tracer->position->coords(), QPointF(2.0, 0.7));
+}
+
+void TestItemRecording::theTracerRefusesAnOutOfRangeComponent()
+{
+    QCustomPlot plot;
+    preparePlot(plot);
+    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    graph->setData(std::vector<double>{1, 2, 3},
+                   std::vector<std::vector<double>>{{0.1, 0.1, 0.1}, {0.2, 0.2, 0.2}});
+    auto* tracer = new QCPItemTracer(&plot);
+    tracer->setLineGraph(graph, 1);
+
+    const auto previous = qcp::setMisuseHandler(test_misuse::record);
+    test_misuse::calls.clear();
+    tracer->setComponent(2);
+    tracer->setComponent(-1);
+    tracer->setLineGraph(graph, 5);
+    qcp::setMisuseHandler(previous);
+    QCOMPARE(test_misuse::calls.size(), std::size_t(3));
+    QCOMPARE(tracer->component(), 1);
+    QCOMPARE(tracer->lineGraph(), graph);
 }
 
 void TestItemRecording::selectionReRecords()
