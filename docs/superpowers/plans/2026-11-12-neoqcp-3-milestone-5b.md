@@ -156,3 +156,54 @@ SciQLopPlots site from inventory §7 that stops compiling, with the fix).
 - [ ] **Step 3:** Whole bench table against the end of 5a; A/B any row over its gate against a build of the 5b base.
 - [ ] **Step 4:** Docs, changelog, rulings, backlog, migration notes.
 - [ ] **Step 5: Commit** `docs(neoqcp-3): end of milestone 5b — rulings, baseline, backlog, changelog`.
+
+---
+
+## Amendments after review (binding; they override the calls and the task text above)
+
+Review: `.superpowers/m5b-plan-review.md` (opencode).
+
+- **K1 (C1, I8) Getters return plain `QCPHandle<T>`.** It only stores a `QPointer<T>`, so it is header-safe with a
+  forward-declared `T`; `qcp::HandleFor<T>` needs the complete class and would create include cycles. The fluent
+  ops handles stay what `add<T>()` and the creators return, in headers that already include `T`; elsewhere creators
+  return `QCPHandle<T>` too. The members are `QCPHandle<QCPAxis> xAxis, yAxis, xAxis2, yAxis2` and
+  `QCPHandle<QCPLegend> legend` (no `QCPAxis::Handle` alias). `addPlottableGroup` is in H-6. `addLayer` and
+  `addItem` return `bool` and stay.
+- **K2 (C2, I4, M4) Assignment.** `QCPHandle` gains `operator=(T*)` and `operator=(std::nullptr_t)` in Task 1, as
+  `QPointer` has. The members are assigned in the library and in tests. There is no conversion to `QPointer<T>`:
+  `QPointer<T> p = h` does not compile, and `QPointer<T> p(h)` does; the six in-tree sites use the direct form.
+  `delete h` compiles through `operator T*` and bypasses `remove()`; the docs say so. Task 1's ambiguity tests cover
+  `if (h)`, `h == ptr`, `h == nullptr`, `h ? a : b`, overloads taking `T*`/`bool`/`QObject*`, `qobject_cast`,
+  `QObject::connect`, `QSignalBlocker`, `QPointer` direct init, the assignments and `delete`.
+- **K3 (C3) The graph family waits for 5c.** These stay raw in 5b and become handles in 5c with the rename, so each
+  user site ports once: `graph(i)`, `graph()`, `addGraph`, `selectedGraphs`, `QCPAxis::graphs`,
+  `QCPAxisRect::graphs`, `QCPPolarArea::graphs`, `channelFillGraph`, the tracer's `graph()`/`lineGraph()`,
+  `QCPGroupLegendItem::multiGraph()`.
+- **K4 (I1) More raw exceptions,** documented beside H-3:
+  - the virtual getters whose overrides return a derived pointer: `linkSource()`, `moveTarget()`, the axis `area()`.
+    C++ covariance is pointer-only; the typed non-virtual accessors such as `polarArea()` stay.
+  - `takeAt()`, which hands ownership out.
+- **K5 (I2, M2) Lists.** `QList<T*>` getters return `QList<QCPHandle<T>>`. Setters taking lists keep `QList<T*>`, and
+  a helper `qcp::pointers(const QList<QCPHandle<T>>&) -> QList<T*>` (header `handle.h`) converts. The break
+  (`QList<T*> x = getter()`, list `QCOMPARE`s) is stated in the Goal and the migration page with its counts.
+  - `marginGroups()` is excluded: the class goes in 5d.
+  - `alignmentGroup()` already returns a `QPointer` and stays.
+  - Lists of `Q_GADGET`s (`positions()`, `anchors()`) stay raw (I3).
+- **K6 (I5)** `QCPLayer::children`'s `Q_PROPERTY` READ becomes a private raw accessor; it is the only list property.
+  Every pointer property keeps the public getter as READ (moc's assignment converts).
+- **K7 (I6, M3) Coverage table.** Task 2's first step writes, in its report, a table mapping every inventory §2 row to
+  its new type and its compile test, or to its exception (H-3, K3, K4, K5). Tasks 3 and 4 fill their rows. A row
+  with neither a test nor an exception is a gap. `QCPDataLocator` is in Task 4.
+- **K8 (I7) Hot paths read members.** Each class that loses a raw getter on a hot path gets a private raw accessor
+  or a friendship, added in the task that changes it. That covers `QCPAxisBase::plottables`,
+  `QCPCoordinateSystem::plottables` (it reads the plot's list: friendship or a private raw accessor on
+  `QCustomPlot`), the polar area's graphs, the legend's rows, the plot's layers' children, and the axis-rect axes
+  lists. The list is in each task's report.
+- **K9 (M1)** H-2's wording: `remove()` on a parent handle removes the parent where the parent is removable
+  (`layout()`, `parentLegend()`). `parentPlot()` (the widget) and `parentLayerable()` have no `remove()`.
+- **K10 (M5)** `qcpConnect` is deleted. Task 1 checks what `QObject::connect` on a dead handle does (Qt's null-sender
+  warning and an invalid connection) and says it in the docs. The test expects that warning.
+- **K11 (M6)** The converting constructor reads the other specialization through its public `get()`, or a friend
+  template.
+- **K12 (M7, M8)** M5-6 (members) overrides C8's "accessors". The exception list is H-3 plus K3-K5, and is the
+  first table of Task 2's report (K7).
