@@ -19,19 +19,19 @@ private slots:
     void soaKeyRange();
     void soaValueRangePerColumn();
     void soaValueRangeWithKeyRestriction();
-    void soaGetLines();
-    void soaGetOptimizedLineData();
+    void soaLinesInData();
+    void soaThinnedLinesKeepAFewPoints();
     void soaEmpty();
     void soaMixedTypes();
 
     // NaN gap handling
-    void linesToPixelsNanProducesNanNotZero();
+    void linesInDataNanProducesNanNotZero();
     void adaptiveSamplingNanDoesNotPoisonMinMax();
     void adaptiveSamplingInteriorNaNNoSpuriousBreaks();
 
     // Key-space gap detection
-    void linesToPixelsBreaksAtKeyGaps();
-    void resampledGetLinesBreaksAtKeyGaps();
+    void linesInDataBreaksAtKeyGaps();
+    void resampledLinesInDataBreaksAtKeyGaps();
     void adaptiveSamplingBreaksAtKeyGaps();
     void adaptiveSamplingFollowsFallingData();
     void adaptiveSamplingBreaksAtNaNRuns();
@@ -44,7 +44,7 @@ private slots:
     // Row-major data source
     void rowMajorValueAt();
     void rowMajorWithPadding();
-    void rowMajorGetLines();
+    void rowMajorLinesInData();
     void rowMajorExposesTypedRawColumns();
     void soaFloatExposesTypedRawColumn();
     void integerColumnHasNoRawColumn();
@@ -60,7 +60,7 @@ private slots:
     void l2MultiMultiColumnConsistency();
     void l2MultiSparseReturnNull();
     void l2MultiEmptyInput();
-    void genericIndexedFallbackHonoursGapThreshold();
+    void genericLinesInDataHonoursGapThreshold();
     void growableCloneKeepsTheGapThreshold();
 
     // L2 decides from raw points, not L1 bins (bursty data)

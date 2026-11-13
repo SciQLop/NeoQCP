@@ -36,7 +36,6 @@
 #include "../layoutelements/layoutelement-axisrect.h"
 #include "../painting/grid-rhi-layer.h"
 #include "../painting/painter.h"
-#include "../plottables/plottable-graph.h"
 #include "../plottables/plottable-multigraph.h"
 #include "../plottables/plottable.h"
 

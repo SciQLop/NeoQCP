@@ -79,7 +79,6 @@ set(NEOQCP_SOURCES
     src/plottables/plottable-curve.cpp
     src/plottables/plottable-errorbar.cpp
     src/plottables/plottable-financial.cpp
-    src/plottables/plottable-graph.cpp
     src/plottables/plottable-draw-utils.cpp
     src/plottables/plottable-multigraph.cpp
     src/plottables/multigraph-fill.cpp
@@ -169,7 +168,6 @@ set(NEOQCP_MOC_HEADERS
     src/plottables/plottable-errorbar.h
     src/plottables/plottable-financial.h
     src/plottables/graph-data.h
-    src/plottables/plottable-graph.h
     src/plottables/plottable-multigraph.h
     src/plottables/lane-layout.h
     src/plottables/plottable-intervals.h

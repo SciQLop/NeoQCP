@@ -21,18 +21,9 @@ public:
                                 QCP::SignDomain sd = QCP::sdBoth,
                                 const QCPRange& inKeyRange = QCPRange()) const = 0;
 
-    virtual QVector<QPointF> getOptimizedLineData(
-        int column, int begin, int end, int pixelWidth,
-        QCPAxis* keyAxis, QCPAxis* valueAxis) const = 0;
-
-    virtual QVector<QPointF> getLines(
-        int column, int begin, int end,
-        QCPAxis* keyAxis, QCPAxis* valueAxis) const = 0;
-
-    // Data-space counterpart of getLines: the same points in (key, value) units, with a
-    // NaN marker wherever getLines breaks the line. pixelsPerKey <= 0 returns every point;
-    // otherwise the line is reduced to the same min/max envelope getOptimizedLineData draws,
-    // one bucket per key pixel. A source that is already a resampled level never thins again.
+    // The line of one column in (key, value) units, with a NaN marker wherever a key gap
+    // (gapsBefore) or a NaN hole breaks it. pixelsPerKey <= 0 returns every point; otherwise the
+    // line is reduced to a min/max envelope, one bucket per key pixel. A source that is already a resampled level never thins again.
     // sourceIndices, when given, receives each point's source row (-1 for a marker). With
     // \a logKeys the buckets are equal spans of log10(key) and pixelsPerKey counts pixels per
     // decade.
@@ -40,37 +31,8 @@ public:
                                             std::vector<int>* sourceIndices = nullptr,
                                             bool logKeys = false, bool cacheGaps = true) const;
 
-    virtual void getOptimizedLineDataAll(
-        int begin, int end, int pixelWidth,
-        QCPAxis* keyAxis, QCPAxis* valueAxis,
-        QVector<QPointF>* results, int numColumns) const
-    {
-        for (int c = 0; c < numColumns; ++c)
-            results[c] = getOptimizedLineData(c, begin, end, pixelWidth, keyAxis, valueAxis);
-    }
-
-    virtual void getLinesAll(
-        int begin, int end,
-        QCPAxis* keyAxis, QCPAxis* valueAxis,
-        QVector<QPointF>* results, int numColumns) const
-    {
-        for (int c = 0; c < numColumns; ++c)
-            results[c] = getLines(c, begin, end, keyAxis, valueAxis);
-    }
-
-    // Same points as getLines / getOptimizedLineData, plus the data index behind each
-    // point in sourceIndices (-1 for a NaN or gap marker). Generic and slow here;
-    // the built-in sources override them.
-    virtual QVector<QPointF> getLinesIndexed(int column, int begin, int end,
-                                             QCPAxis* keyAxis, QCPAxis* valueAxis,
-                                             QVector<int>& sourceIndices) const;
-    virtual QVector<QPointF> getOptimizedLineDataIndexed(int column, int begin, int end,
-                                                         int pixelWidth,
-                                                         QCPAxis* keyAxis, QCPAxis* valueAxis,
-                                                         QVector<int>& sourceIndices) const;
-
     // Element i is set when the step into row begin + i is a key gap under
-    // gapThreshold(), exactly what getLines breaks on. Generic and slow here. cacheGaps = false
+    // gapThreshold(), exactly what linesInData breaks on. Generic and slow here. cacheGaps = false
     // computes the gaps for this call only: what a reader a worker may run beside uses.
     virtual qcp::algo::GapVector gapsBefore(int begin, int end, bool cacheGaps = true) const
     {

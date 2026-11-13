@@ -60,55 +60,6 @@ public:
         return qcp::algo::findEnd(mBins.keys, sortKey, expandedRange);
     }
 
-    QVector<QPointF> getOptimizedLineData(int column, int begin, int end, int pixelWidth,
-                                           QCPAxis* keyAxis, QCPAxis* valueAxis) const override
-    {
-        if (column < 0 || column >= mBins.numColumns) return {};
-        ensureGapCache(begin, end);
-        const int s = mBins.stride();
-        return qcp::algo::optimizedLineData(
-            mBins.keys, std::span<const double>(mBins.values.data() + column * s, s),
-            begin, end, pixelWidth, keyAxis, valueAxis, &mGapCache.gaps);
-    }
-
-    QVector<QPointF> getLines(int column, int begin, int end,
-                               QCPAxis* keyAxis, QCPAxis* valueAxis) const override
-    {
-        if (column < 0 || column >= mBins.numColumns) return {};
-        int s = mBins.stride();
-        const bool keyIsVertical = keyAxis->orientation() == Qt::Vertical;
-        const int count = end - begin;
-        ensureGapCache(begin, end);
-        const auto nanPt = QPointF(qQNaN(), qQNaN());
-        const auto keyTf = qcp::algo::AffineTransform::fromAxis(keyAxis);
-        const auto valTf = qcp::algo::AffineTransform::fromAxis(valueAxis);
-        const bool bothLinear = keyTf.isLinear && valTf.isLinear;
-
-        QVector<QPointF> lines;
-        lines.reserve(count + count / 10);
-        for (int i = begin; i < end; ++i)
-        {
-            if (mGapCache.gaps.hasAnyGap && mGapCache.gaps[i - begin])
-                lines.append(nanPt);
-            double v = mBins.values[column * s + i];
-            if (std::isnan(v)) continue;
-            double k = mBins.keys[i];
-            if (bothLinear)
-            {
-                double kp = keyTf.toPixel(k);
-                double vp = valTf.toPixel(v);
-                lines.append(keyIsVertical ? QPointF(vp, kp) : QPointF(kp, vp));
-            }
-            else
-            {
-                double keyPx = keyAxis->coordToPixel(k);
-                double valPx = valueAxis->coordToPixel(v);
-                lines.append(keyIsVertical ? QPointF(valPx, keyPx) : QPointF(keyPx, valPx));
-            }
-        }
-        return lines;
-    }
-
     // Keys and values of an L2 level are one min/max pair per bin. pixelsPerKey only decides
     // which bins survive (the window holds ~4 of them per pixel); the origin of a survivor is
     // kept, so a colour lookup still finds the data row it came from.
@@ -129,8 +80,8 @@ public:
         const qcp::algo::GapVector& gaps = cacheGaps ? mGapCache.gaps : localGaps;
         const auto originOf
             = [&](int bin) { return bin < 0 || !hasOrigin ? -1 : mBins.origin[column * s + bin]; };
-        // A bin that holds no finite sample is a hole, not a break: getLines joins its
-        // neighbours, so the unthinned line joins them too.
+        // A bin that holds no finite sample is a hole, not a break: the unthinned line joins
+        // its neighbours.
         if (pixelsPerKey <= 0.0)
         {
             const auto nanPt = QPointF(qQNaN(), qQNaN());
@@ -166,91 +117,12 @@ public:
         return lines;
     }
 
-    void getOptimizedLineDataAll(int begin, int end, int /*pixelWidth*/,
-                                  QCPAxis* keyAxis, QCPAxis* valueAxis,
-                                  QVector<QPointF>* results, int numColumns) const override
-    {
-        getLinesAll(begin, end, keyAxis, valueAxis, results, numColumns);
-    }
-
-    void getLinesAll(int begin, int end,
-                     QCPAxis* keyAxis, QCPAxis* valueAxis,
-                     QVector<QPointF>* results, int numColumns) const override
-    {
-        ensureGapCache(begin, end);
-        const int N = std::min(numColumns, mBins.numColumns);
-        const int s = mBins.stride();
-        const bool keyIsVertical = keyAxis->orientation() == Qt::Vertical;
-        const int count = end - begin;
-        const auto nanPt = QPointF(qQNaN(), qQNaN());
-        const auto keyTf = qcp::algo::AffineTransform::fromAxis(keyAxis);
-        const auto valTf = qcp::algo::AffineTransform::fromAxis(valueAxis);
-        const bool bothLinear = keyTf.isLinear && valTf.isLinear;
-
-        for (int c = 0; c < N; ++c) { results[c].clear(); results[c].reserve(count + count / 10); }
-
-        for (int i = begin; i < end; ++i)
-        {
-            bool isGap = mGapCache.gaps.hasAnyGap && mGapCache.gaps[i - begin];
-            double k = mBins.keys[i];
-            double kp = bothLinear ? keyTf.toPixel(k) : keyAxis->coordToPixel(k);
-
-            for (int c = 0; c < N; ++c)
-            {
-                if (isGap) results[c].append(nanPt);
-                double v = mBins.values[c * s + i];
-                if (std::isnan(v)) continue;
-                double vp = bothLinear ? valTf.toPixel(v) : valueAxis->coordToPixel(v);
-                results[c].append(keyIsVertical ? QPointF(vp, kp) : QPointF(kp, vp));
-            }
-        }
-    }
-
     qcp::algo::GapVector gapsBefore(int begin, int end, bool cacheGaps = true) const override
     {
         if (!cacheGaps)
             return qcp::algo::gapsFromStepRatios(mBins.gapRatio, begin, end, gapThreshold());
         ensureGapCache(begin, end);
         return mGapCache.gaps;
-    }
-
-    QVector<QPointF> getLinesIndexed(int column, int begin, int end,
-                                     QCPAxis* keyAxis, QCPAxis* valueAxis,
-                                     QVector<int>& sourceIndices) const override
-    {
-        sourceIndices.clear();
-        if (column < 0 || column >= mBins.numColumns) return {};
-        const int s = mBins.stride();
-        const bool keyIsVertical = keyAxis->orientation() == Qt::Vertical;
-        ensureGapCache(begin, end);
-        const auto nanPt = QPointF(qQNaN(), qQNaN());
-        const bool hasOrigin = !mBins.origin.empty();
-
-        QVector<QPointF> lines;
-        lines.reserve(end - begin + (end - begin) / 10);
-        sourceIndices.reserve(lines.capacity());
-        for (int i = begin; i < end; ++i)
-        {
-            if (mGapCache.gaps.hasAnyGap && mGapCache.gaps[i - begin])
-            {
-                lines.append(nanPt);
-                sourceIndices.append(-1);
-            }
-            const double v = mBins.values[column * s + i];
-            if (std::isnan(v)) continue;
-            const double kp = keyAxis->coordToPixel(mBins.keys[i]);
-            const double vp = valueAxis->coordToPixel(v);
-            lines.append(keyIsVertical ? QPointF(vp, kp) : QPointF(kp, vp));
-            sourceIndices.append(hasOrigin ? mBins.origin[column * s + i] : -1);
-        }
-        return lines;
-    }
-
-    QVector<QPointF> getOptimizedLineDataIndexed(int column, int begin, int end, int /*pixelWidth*/,
-                                                 QCPAxis* keyAxis, QCPAxis* valueAxis,
-                                                 QVector<int>& sourceIndices) const override
-    {
-        return getLinesIndexed(column, begin, end, keyAxis, valueAxis, sourceIndices);
     }
 
     const double* rawKeyData() const override { return mBins.keys.data(); }

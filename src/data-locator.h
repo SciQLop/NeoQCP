@@ -38,14 +38,12 @@ private:
     int mDataIndex = -1;
     QVector<double> mComponentValues;
 
-    bool locateGraph(const QPointF& pixelPos);
     bool locateCurve(const QPointF& pixelPos);
     bool locateColorMap(const QPointF& pixelPos);
     bool locateColorMap2(const QPointF& pixelPos);
     bool locateHistogram2D(const QPointF& pixelPos);
     bool locateMultiGraph(const QPointF& pixelPos);
 
-    bool locateGraphAtKey(double key);
     bool locateMultiGraphAtKey(double key);
     bool locateColorMap2AtKey(double key, double value);
     bool locateColorMapAtKey(double key, double value);

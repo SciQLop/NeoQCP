@@ -67,20 +67,6 @@ public:
     {
         return std::clamp(static_cast<int>(std::ceil(sortKey)) + 1, 0, mN);
     }
-    QVector<QPointF> getOptimizedLineData(int col, int begin, int end, int,
-                                          QCPAxis* ka, QCPAxis* va) const override
-    {
-        return getLines(col, begin, end, ka, va);
-    }
-    QVector<QPointF> getLines(int col, int begin, int end,
-                               QCPAxis*, QCPAxis*) const override
-    {
-        QVector<QPointF> result;
-        result.reserve(end - begin);
-        for (int i = begin; i < end; ++i)
-            result.append(QPointF(keyAt(i), valueAt(col, i)));
-        return result;
-    }
 private:
     int mN;
     int mCols;

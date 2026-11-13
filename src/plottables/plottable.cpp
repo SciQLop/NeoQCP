@@ -609,7 +609,7 @@ QCPAbstractPlottable::~QCPAbstractPlottable()
 }
 
 /*!
-  Replays the recording. A plottable that still paints through this virtual (QCPGraph, the polar
+  Replays the recording. A plottable that still paints through this virtual (the polar
   plottables) overrides it and never records.
 */
 void QCPAbstractPlottable::draw(QCPPainter* painter)

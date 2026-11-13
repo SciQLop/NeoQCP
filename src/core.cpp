@@ -62,7 +62,6 @@
 #include "plottables/plottable-bars.h"
 #include "plottables/plottable-colormap.h"
 #include "plottables/plottable-colormap2.h"
-#include "plottables/plottable-graph.h"
 #include "plottables/plottable-multigraph.h"
 #include "plottables/plottable-histogram2d.h"
 #include "selectionrect.h"

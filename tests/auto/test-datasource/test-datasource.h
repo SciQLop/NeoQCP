@@ -26,8 +26,8 @@ private slots:
     void soaIntValues();
     void soaMismatchedLengthsDegradeToEmpty();
     void multiSoaGapThresholdZeroDisablesGaps();
-    void linesInDataMapToGetLines();
-    void thinnedLinesInDataMatchTheOptimizedPixels();
+    void everySourceBreaksItsLinesAlike();
+    void thinnedLinesInDataKeepFourPointsPerPixel();
     void indicesFollowTheThinnedPoints();
 
     // one-column QCPMultiGraph integration tests

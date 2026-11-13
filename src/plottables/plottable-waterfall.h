@@ -24,10 +24,6 @@ public:
     double valueAt(int column, int i) const override;
     QCPRange valueRange(int column, bool& found, QCP::SignDomain sd = QCP::sdBoth,
                         const QCPRange& inKeyRange = QCPRange()) const override;
-    QVector<QPointF> getLines(int column, int begin, int end,
-                               QCPAxis* keyAxis, QCPAxis* valueAxis) const override;
-    QVector<QPointF> getOptimizedLineData(int column, int begin, int end, int pixelWidth,
-                                           QCPAxis* keyAxis, QCPAxis* valueAxis) const override;
     std::vector<QPointF> linesInData(int column, int begin, int end, double pixelsPerKey,
                                      std::vector<int>* sourceIndices = nullptr,
                                      bool logKeys = false, bool cacheGaps = true) const override;

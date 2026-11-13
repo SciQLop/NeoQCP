@@ -366,7 +366,7 @@ protected:
     // reimplemented virtual methods:
     virtual QRect clipRect() const override;
     //! Replays the recording: the default draw. A class that paints through the old virtual
-    //! (QCPGraph, the polar plottables) overrides this and never records.
+    //! (the polar plottables) overrides this and never records.
     void draw(QCPPainter* painter) override;
     virtual QCP::Interaction selectionCategory() const override;
     void applyDefaultAntialiasingHint(QCPPainter* painter) const override;

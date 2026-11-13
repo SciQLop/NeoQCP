@@ -44,8 +44,7 @@
   QCustomPlot::setNotAntialiasedElements).
 
   \li Avoid repeatedly setting the complete data set e.g. with \ref QCPGraph::setData. Use \ref
-  QCPGraph::addData instead, if most data points stay unchanged, e.g. in a running measurement. You
-  can access and manipulate existing data via \ref QCPGraph::data.
+  QCPGraph::addData instead, if most data points stay unchanged, e.g. in a running measurement.
 
   \li As a last resort, try to reduce the number of data points that are in the visible key range
   at any given moment, e.g. by limiting the maximum key range span (see the \ref

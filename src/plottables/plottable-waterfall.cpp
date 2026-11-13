@@ -65,27 +65,6 @@ QCPWaterfallDataAdapter::transformedWindow(int column, int begin, int end) const
     return window;
 }
 
-QVector<QPointF> QCPWaterfallDataAdapter::getLines(int column, int begin, int end,
-                                                     QCPAxis* keyAxis, QCPAxis* valueAxis) const
-{
-    if (!mSource || begin >= end) return {};
-    const auto w = transformedWindow(column, begin, end);
-    return qcp::algo::linesToPixels(w.keys, w.values, 0, end - begin, keyAxis, valueAxis,
-                                    gapThreshold());
-}
-
-QVector<QPointF> QCPWaterfallDataAdapter::getOptimizedLineData(int column, int begin, int end,
-                                                                 int pixelWidth,
-                                                                 QCPAxis* keyAxis,
-                                                                 QCPAxis* valueAxis) const
-{
-    if (!mSource || begin >= end) return {};
-    const auto w = transformedWindow(column, begin, end);
-    const auto gaps = qcp::algo::detectKeyGaps(w.keys, 0, end - begin, gapThreshold());
-    return qcp::algo::optimizedLineData(w.keys, w.values, 0, end - begin, pixelWidth,
-                                         keyAxis, valueAxis, &gaps);
-}
-
 std::vector<QPointF> QCPWaterfallDataAdapter::linesInData(int column, int begin, int end,
                                                            double pixelsPerKey,
                                                            std::vector<int>* sourceIndices,

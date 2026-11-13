@@ -99,14 +99,6 @@ public:
     {
         return mInner->valueRange(column, found, sd, r);
     }
-    QVector<QPointF> getOptimizedLineData(int c, int b, int e, int px, QCPAxis* k, QCPAxis* v) const override
-    {
-        return mInner->getOptimizedLineData(c, b, e, px, k, v);
-    }
-    QVector<QPointF> getLines(int c, int b, int e, QCPAxis* k, QCPAxis* v) const override
-    {
-        return mInner->getLines(c, b, e, k, v);
-    }
 
 private:
     std::shared_ptr<Src> mInner;

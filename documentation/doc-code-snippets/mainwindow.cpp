@@ -244,19 +244,6 @@ void MainWindow::snippetQCPAxisTickers()
   //! [qcpaxisticker-log-colorscale]
 }
 
-void MainWindow::snippetQCPGraphDataSharing()
-{
-  QCPMultiGraph *graph1 = customPlot->addGraph();
-  QCPMultiGraph *graph2 = customPlot->addGraph();
-  //! [qcpgraph-datasharing-1]
-  graph2->setData(graph1->data()); // graph1 and graph2 now share data container
-  //! [qcpgraph-datasharing-1]
-  
-  //! [qcpgraph-datasharing-2]
-  graph2->data()->set(*graph1->data()); // graph2 now has copy of graph1's data in its container
-  //! [qcpgraph-datasharing-2]
-}
-
 void MainWindow::snippetQCPCurveDataSharing()
 {
   QCPCurve *curve1 = new QCPCurve(customPlot->xAxis, customPlot->yAxis);

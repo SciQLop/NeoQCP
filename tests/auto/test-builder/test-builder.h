@@ -20,7 +20,6 @@ private slots:
     void addRefusedDuringTeardown();
     void addRefusedWithoutAxisRect();
     void addPutsOneLegendRow();
-    void addGraphWithContainer();
     void withReachesAnySetter();
     void setterSlotDeletesInsideTheSetter();
 

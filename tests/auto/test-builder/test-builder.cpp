@@ -328,16 +328,6 @@ void TestBuilder::addPutsOneLegendRow()
     QVERIFY(plot.legend->itemWithPlottable(g.get()));
 }
 
-void TestBuilder::addGraphWithContainer()
-{
-    QCustomPlot plot;
-    auto data = QSharedPointer<QCPGraphDataContainer>::create();
-    data->add(QCPGraphData(1, 2));
-    auto g = plot.add<QCPGraph>(data);
-    QCOMPARE(g->dataCount(), 1);
-    QCOMPARE(g->data(), data);
-}
-
 void TestBuilder::withReachesAnySetter()
 {
     QCustomPlot plot;

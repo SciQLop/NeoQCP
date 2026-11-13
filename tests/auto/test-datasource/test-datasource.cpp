@@ -15,30 +15,6 @@
 namespace
 {
 
-// The data-space line maps onto the pixel-space one exactly (NaN markers included).
-bool samePixels(const QCPTransform& tf, const std::vector<QPointF>& data,
-                const QVector<QPointF>& pixels)
-{
-    if (static_cast<int>(data.size()) != pixels.size())
-        return false;
-    constexpr double kTolerance = 1e-6;
-    for (int i = 0; i < pixels.size(); ++i)
-    {
-        const bool dataNaN = std::isnan(data[i].x()) || std::isnan(data[i].y());
-        const bool pixelNaN = std::isnan(pixels[i].x()) || std::isnan(pixels[i].y());
-        if (dataNaN || pixelNaN)
-        {
-            if (dataNaN != pixelNaN)
-                return false;
-            continue;
-        }
-        const QCP::Pixels p = tf.map(QCP::Data { data[i].x(), data[i].y() });
-        if (qAbs(p.x - pixels[i].x()) > kTolerance || qAbs(p.y - pixels[i].y()) > kTolerance)
-            return false;
-    }
-    return true;
-}
-
 // 1M points, one NaN run per 1000 rows, kept deterministic so the thinning is reproducible.
 QCPSoAMultiDataSource<std::vector<double>, std::vector<double>> millionPointSource()
 {
@@ -252,7 +228,7 @@ std::vector<int> gapIndices(const qcp::algo::GapVector& gaps)
     return out;
 }
 
-int nanBreaks(const QVector<QPointF>& lines)
+int nanBreaks(const std::vector<QPointF>& lines)
 {
     return static_cast<int>(std::count_if(lines.begin(), lines.end(), [](const QPointF& p) {
         return std::isnan(p.x()) || std::isnan(p.y());
@@ -345,26 +321,19 @@ void TestDataSource::soaIntValues()
 void TestDataSource::multiSoaGapThresholdZeroDisablesGaps()
 {
     // Issue SciQLopPlots#118: irregular state changes must be drawable as one line.
-    mPlot = new QCustomPlot();
-    mPlot->xAxis->setRange(0, 12);
     QCPSoAMultiDataSource<std::vector<double>, std::vector<double>> src(
         std::vector<double>{0, 1, 5, 6, 12}, oneColumn({1, 0, 1, 0, 0}));
 
-    QVERIFY(nanBreaks(src.getLines(0, 0, 5, mPlot->xAxis, mPlot->yAxis)) > 0);
+    QVERIFY(nanBreaks(src.linesInData(0, 0, 5, 0)) > 0);
 
     src.setGapThreshold(0);
     QCOMPARE(src.gapThreshold(), 0.0);
-    QCOMPARE(nanBreaks(src.getLines(0, 0, 5, mPlot->xAxis, mPlot->yAxis)), 0);
-    QCOMPARE(nanBreaks(src.getOptimizedLineData(0, 0, 5, 400, mPlot->xAxis, mPlot->yAxis)), 0);
+    QCOMPARE(nanBreaks(src.linesInData(0, 0, 5, 0)), 0);
+    QCOMPARE(nanBreaks(src.linesInData(0, 0, 5, 400.0 / 12)), 0);
 }
 
-void TestDataSource::linesInDataMapToGetLines()
+void TestDataSource::everySourceBreaksItsLinesAlike()
 {
-    mPlot = new QCustomPlot();
-    mPlot->resize(400, 300);
-    mPlot->xAxis->setRange(0, 10);
-    mPlot->yAxis->setRange(-2, 5);
-
     // One key gap (3 -> 7) and one NaN sample, so both kinds of break are exercised.
     const std::vector<double> keys = { 0.0, 1.0, 2.0, 3.0, 7.0, 8.0, 9.0 };
     const std::vector<std::vector<double>> columns = {
@@ -397,29 +366,35 @@ void TestDataSource::linesInDataMapToGetLines()
         keys, columns);
     QCPWaterfallDataAdapter waterfall(shared, { 0.0, 5.0 }, { 1.0, -1.0 }, 2.0);
 
-    const QCPAbstractMultiDataSource* sources[] = { &soa, &rowMajorSource, &resampled, &waterfall };
-    const QCPTransform tf(mPlot->xAxis, mPlot->yAxis);
-
-    for (const auto* src : sources)
+    // The row-major source draws what the SoA one draws; the waterfall moves the points but keeps
+    // the breaks; resampled bins break on their gap ratios only.
+    for (int column = 0; column < 2; ++column)
     {
-        for (int column = 0; column < src->columnCount(); ++column)
-        {
-            const auto data = src->linesInData(column, 0, src->size(), 0.0);
-            const auto pixels = src->getLines(column, 0, src->size(), mPlot->xAxis, mPlot->yAxis);
-            QVERIFY2(samePixels(tf, data, pixels), "linesInData does not map onto getLines");
-            if (src != &resampled)
-            {
-                const auto isBreak = [](const QPointF& p) { return std::isnan(p.x()); };
-                QVERIFY2(std::any_of(pixels.begin(), pixels.end(), isBreak),
-                         "getLines kept no break");
-                QVERIFY2(std::any_of(data.begin(), data.end(), isBreak),
-                         "linesInData kept no break");
-            }
-        }
+        const auto reference = soa.linesInData(column, 0, rows, 0.0);
+        const auto isBreak = [](const QPointF& p) { return std::isnan(p.x()); };
+        QCOMPARE(std::count_if(reference.begin(), reference.end(), isBreak),
+                 std::ptrdiff_t(column == 0 ? 2 : 1)); // the key gap, and column 0's NaN sample
+        const auto sameBreaks = [&](const std::vector<QPointF>& lines) {
+            if (lines.size() != reference.size())
+                return false;
+            for (std::size_t i = 0; i < lines.size(); ++i)
+                if (isBreak(lines[i]) != isBreak(reference[i]))
+                    return false;
+            return true;
+        };
+        const auto rowMajorLines = rowMajorSource.linesInData(column, 0, rows, 0.0);
+        QVERIFY(sameBreaks(rowMajorLines));
+        for (std::size_t i = 0; i < reference.size(); ++i)
+            if (!isBreak(reference[i]))
+                QCOMPARE(rowMajorLines[i], reference[i]);
+        QVERIFY2(sameBreaks(waterfall.linesInData(column, 0, rows, 0.0)), "the waterfall moved a break");
+        // Bins break only where their gap ratios say so (none here), and a NaN bin is joined.
+        const auto bins = resampled.linesInData(column, 0, rows, 0.0);
+        QCOMPARE(std::count_if(bins.begin(), bins.end(), isBreak), std::ptrdiff_t(0));
     }
 }
 
-void TestDataSource::thinnedLinesInDataMatchTheOptimizedPixels()
+void TestDataSource::thinnedLinesInDataKeepFourPointsPerPixel()
 {
     mPlot = new QCustomPlot();
     mPlot->resize(400, 300);
@@ -429,13 +404,10 @@ void TestDataSource::thinnedLinesInDataMatchTheOptimizedPixels()
     const double pixelsPerKey = fitKeyPixelsPerUnit(mPlot, src);
 
     const auto data = src.linesInData(0, 0, end, pixelsPerKey);
-    const auto optimized = src.getOptimizedLineData(0, 0, end, mPlot->axisRect()->width(),
-                                                    mPlot->xAxis, mPlot->yAxis);
-    QVERIFY(!optimized.isEmpty());
+    QVERIFY(!data.empty());
     QVERIFY2(static_cast<int>(data.size()) < end / 100, "linesInData did not thin");
-    QCOMPARE(static_cast<int>(data.size()), optimized.size());
-    QVERIFY2(samePixels(QCPTransform(mPlot->xAxis, mPlot->yAxis), data, optimized),
-             "thinned linesInData does not map onto getOptimizedLineData");
+    // The envelope keeps at most four points (first, min, max, last) per key pixel.
+    QVERIFY(static_cast<int>(data.size()) <= 4 * (mPlot->axisRect()->width() + 2));
 }
 
 void TestDataSource::indicesFollowTheThinnedPoints()

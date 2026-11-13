@@ -1,7 +1,6 @@
 #include "data-locator.h"
 #include <algorithm>
 #include <cmath>
-#include "plottables/plottable-graph.h"
 #include "plottables/plottable-curve.h"
 #include "plottables/plottable-colormap.h"
 #include "plottables/plottable-colormap2.h"
@@ -38,8 +37,6 @@ bool QCPDataLocator::locate(const QPointF& pixelPos)
         return false;
 
     // Try specific types in order (derived before base where needed)
-    if (qobject_cast<QCPGraph*>(mPlottable))
-        return locateGraph(pixelPos);
     if (qobject_cast<QCPCurve*>(mPlottable))
         return locateCurve(pixelPos);
     if (qobject_cast<QCPColorMap2*>(mPlottable))
@@ -52,28 +49,6 @@ bool QCPDataLocator::locate(const QPointF& pixelPos)
         return locateMultiGraph(pixelPos);
 
     return false;
-}
-
-bool QCPDataLocator::locateGraph(const QPointF& pixelPos)
-{
-    auto* graph = qobject_cast<QCPGraph*>(mPlottable);
-    QVariant details;
-    double dist = graph->selectTest(pixelPos, false, &details);
-    if (dist < 0)
-        return false;
-
-    auto sel = details.value<QCPDataSelection>();
-    if (sel.dataRangeCount() == 0)
-        return false;
-
-    int index = sel.dataRange(0).begin();
-    auto it = graph->data()->at(index);
-    mKey = it->key;
-    mValue = it->value;
-    mDataIndex = index;
-    mHitPlottable = mPlottable;
-    mValid = true;
-    return true;
 }
 
 bool QCPDataLocator::locateCurve(const QPointF& pixelPos)
@@ -219,8 +194,6 @@ bool QCPDataLocator::locateAtKey(QCPAbstractPlottable* plottable, double key, do
     if (!mPlottable)
         return false;
 
-    if (qobject_cast<QCPGraph*>(mPlottable))
-        return locateGraphAtKey(key);
     if (qobject_cast<QCPMultiGraph*>(mPlottable))
         return locateMultiGraphAtKey(key);
     if (!std::isnan(value))
@@ -234,34 +207,6 @@ bool QCPDataLocator::locateAtKey(QCPAbstractPlottable* plottable, double key, do
     }
 
     return false;
-}
-
-bool QCPDataLocator::locateGraphAtKey(double key)
-{
-    auto* graph = qobject_cast<QCPGraph*>(mPlottable);
-    auto* data = graph->data().data();
-    if (!data || data->isEmpty())
-        return false;
-
-    auto it = data->findBegin(key, false);
-    if (it == data->constEnd())
-    {
-        --it; // use last point
-    }
-    else if (it != data->constBegin())
-    {
-        auto prev = it;
-        --prev;
-        if (std::abs(prev->key - key) < std::abs(it->key - key))
-            it = prev;
-    }
-
-    mKey = it->key;
-    mValue = it->value;
-    mDataIndex = static_cast<int>(it - data->constBegin());
-    mHitPlottable = mPlottable;
-    mValid = true;
-    return true;
 }
 
 bool QCPDataLocator::locateMultiGraphAtKey(double key)

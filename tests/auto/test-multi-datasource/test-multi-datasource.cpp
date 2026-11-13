@@ -136,7 +136,7 @@ void TestMultiDataSource::soaValueRangeWithKeyRestriction()
     QCOMPARE(range.upper, 50.0);
 }
 
-void TestMultiDataSource::soaGetLines()
+void TestMultiDataSource::soaLinesInData()
 {
     std::vector<double> keys = {1.0, 2.0, 3.0};
     std::vector<std::vector<double>> cols = {
@@ -144,31 +144,23 @@ void TestMultiDataSource::soaGetLines()
         {-1.0, -2.0, -3.0}
     };
     QCPSoAMultiDataSource src(std::move(keys), std::move(cols));
-    QCPAxis* keyAxis = mPlot->xAxis;
-    QCPAxis* valueAxis = mPlot->yAxis;
-    keyAxis->setRange(0, 4);
-    valueAxis->setRange(-5, 35);
-    mPlot->replot();
-    auto lines0 = src.getLines(0, 0, 3, keyAxis, valueAxis);
-    auto lines1 = src.getLines(1, 0, 3, keyAxis, valueAxis);
-    QCOMPARE(lines0.size(), 3);
-    QCOMPARE(lines1.size(), 3);
-    QVERIFY(lines0[0].y() != lines1[0].y());
+    auto lines0 = src.linesInData(0, 0, 3, 0);
+    auto lines1 = src.linesInData(1, 0, 3, 0);
+    QCOMPARE(lines0.size(), std::size_t(3));
+    QCOMPARE(lines1.size(), std::size_t(3));
+    QCOMPARE(lines0[2], QPointF(3, 30));
+    QCOMPARE(lines1[2], QPointF(3, -3));
 }
 
-void TestMultiDataSource::soaGetOptimizedLineData()
+void TestMultiDataSource::soaThinnedLinesKeepAFewPoints()
 {
     std::vector<double> keys = {1.0, 2.0, 3.0};
     std::vector<std::vector<double>> cols = {{10.0, 20.0, 30.0}};
     QCPSoAMultiDataSource src(std::move(keys), std::move(cols));
-    QCPAxis* keyAxis = mPlot->xAxis;
-    QCPAxis* valueAxis = mPlot->yAxis;
-    keyAxis->setRange(0, 4);
-    valueAxis->setRange(0, 35);
-    mPlot->replot();
-    auto lines = src.getLines(0, 0, 3, keyAxis, valueAxis);
-    auto optimized = src.getOptimizedLineData(0, 0, 3, 400, keyAxis, valueAxis);
-    QCOMPARE(optimized.size(), lines.size());
+    // 100 pixels per key: three points never thin.
+    auto lines = src.linesInData(0, 0, 3, 0);
+    auto thinned = src.linesInData(0, 0, 3, 100);
+    QCOMPARE(thinned, lines);
 }
 
 void TestMultiDataSource::soaEmpty()
@@ -195,7 +187,7 @@ void TestMultiDataSource::soaMixedTypes()
     QCOMPARE(src.valueAt(1, 2), -3.0);
 }
 
-void TestMultiDataSource::linesToPixelsNanProducesNanNotZero()
+void TestMultiDataSource::linesInDataNanProducesNanNotZero()
 {
     // Reproducer: NaN values in data were mapped to pixel (0,0) instead of NaN,
     // causing the line extruder to draw diagonal fan lines to the top-left corner.
@@ -204,12 +196,8 @@ void TestMultiDataSource::linesToPixelsNanProducesNanNotZero()
     std::vector<std::vector<double>> cols = {{10.0, NaN, 30.0, NaN, 50.0}};
     QCPSoAMultiDataSource src(std::move(keys), std::move(cols));
 
-    mPlot->xAxis->setRange(0, 6);
-    mPlot->yAxis->setRange(0, 60);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-
-    auto lines = src.getLines(0, 0, 5, mPlot->xAxis, mPlot->yAxis);
-    QCOMPARE(lines.size(), 5);
+    auto lines = src.linesInData(0, 0, 5, 0);
+    QCOMPARE(lines.size(), std::size_t(5));
 
     // Valid points must not be at (0,0)
     QVERIFY(lines[0].x() != 0 || lines[0].y() != 0);
@@ -241,12 +229,9 @@ void TestMultiDataSource::adaptiveSamplingInteriorNaNNoSpuriousBreaks()
     std::vector<std::vector<double>> cols = {std::move(vals)};
     QCPSoAMultiDataSource src(std::move(keys), std::move(cols));
 
-    mPlot->xAxis->setRange(0, N);
-    mPlot->yAxis->setRange(-1.5, 1.5);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-
-    auto result = src.getOptimizedLineData(0, 0, N, 400, mPlot->xAxis, mPlot->yAxis);
+    auto result = src.linesInData(0, 0, N, 400.0 / N);
     QVERIFY(result.size() > 0);
+    QVERIFY(result.size() < std::size_t(N / 2)); // the envelope ran
 
     // Keys have no gaps and adaptive sampling skips NaN values silently:
     // the output must not contain any NaN break point.
@@ -278,12 +263,9 @@ void TestMultiDataSource::adaptiveSamplingNanDoesNotPoisonMinMax()
     std::vector<std::vector<double>> cols = {std::move(vals)};
     QCPSoAMultiDataSource src(std::move(keys), std::move(cols));
 
-    mPlot->xAxis->setRange(0, N);
-    mPlot->yAxis->setRange(0, N * 0.1);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-
-    auto result = src.getOptimizedLineData(0, 0, N, 400, mPlot->xAxis, mPlot->yAxis);
+    auto result = src.linesInData(0, 0, N, 400.0 / N);
     QVERIFY(result.size() > 0);
+    QVERIFY(result.size() < std::size_t(N)); // the envelope ran
 
     // Count valid (non-NaN) output points — must be the majority
     int validCount = 0;
@@ -293,7 +275,7 @@ void TestMultiDataSource::adaptiveSamplingNanDoesNotPoisonMinMax()
 
     // Before the fix, NaN-poisoned intervals produced zero valid points.
     // With the fix, nearly all output points should be valid.
-    QVERIFY2(validCount > result.size() / 2,
+    QVERIFY2(validCount > int(result.size() / 2),
              qPrintable(QString("Only %1/%2 valid points").arg(validCount).arg(result.size())));
 
     // No point should be at pixel (0,0) — that was the old broken mapping
@@ -301,11 +283,11 @@ void TestMultiDataSource::adaptiveSamplingNanDoesNotPoisonMinMax()
     {
         if (qIsNaN(pt.x()) || qIsNaN(pt.y())) continue;
         QVERIFY2(pt.x() != 0.0 || pt.y() != 0.0,
-                 "NaN data produced pixel (0,0) instead of NaN gap");
+                 "NaN data produced the point (0,0) instead of NaN gap");
     }
 }
 
-void TestMultiDataSource::linesToPixelsBreaksAtKeyGaps()
+void TestMultiDataSource::linesInDataBreaksAtKeyGaps()
 {
     // Reproducer: data with a large time gap (e.g. missing measurement period)
     // drew a straight line across the gap instead of breaking the polyline.
@@ -314,11 +296,7 @@ void TestMultiDataSource::linesToPixelsBreaksAtKeyGaps()
     std::vector<std::vector<double>> cols = {{10.0, 20.0, 30.0, 40.0, 50.0, 60.0}};
     QCPSoAMultiDataSource src(std::move(keys), std::move(cols));
 
-    mPlot->xAxis->setRange(0, 110);
-    mPlot->yAxis->setRange(0, 70);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-
-    auto lines = src.getLines(0, 0, 6, mPlot->xAxis, mPlot->yAxis);
+    auto lines = src.linesInData(0, 0, 6, 0);
 
     // Must contain at least one NaN gap marker between the two data segments
     bool foundNanGap = false;
@@ -333,7 +311,7 @@ void TestMultiDataSource::linesToPixelsBreaksAtKeyGaps()
     QVERIFY2(foundNanGap, "No gap break found between key=3 and key=100");
 }
 
-void TestMultiDataSource::resampledGetLinesBreaksAtKeyGaps()
+void TestMultiDataSource::resampledLinesInDataBreaksAtKeyGaps()
 {
     // Bin keys jump at both 3 -> 100 and 102 -> 200, but only the raw rows of the bin at 100
     // came after a gap in the data (ratio 66): the other jump is bins left empty by binning.
@@ -345,21 +323,16 @@ void TestMultiDataSource::resampledGetLinesBreaksAtKeyGaps()
 
     QCPResampledMultiDataSource src(std::move(bins));
 
-    mPlot->xAxis->setRange(0, 210);
-    mPlot->yAxis->setRange(0, 70);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-
-    const auto lines = src.getLines(0, 0, 8, mPlot->xAxis, mPlot->yAxis);
-    QCOMPARE(lines.size(), 9);
+    const auto lines = src.linesInData(0, 0, 8, 0);
+    QCOMPARE(lines.size(), std::size_t(9));
     QVERIFY2(qIsNaN(lines[3].x()), "no break where the raw data had a gap");
     QCOMPARE(std::count_if(lines.begin(), lines.end(), [](const QPointF& p) { return qIsNaN(p.x()); }), 1);
 }
 
 void TestMultiDataSource::adaptiveSamplingBreaksAtKeyGaps()
 {
-    // Reproducer: the adaptive sampling path (optimizedLineData) drew
-    // lines across key gaps because it had no gap detection — only the
-    // linesToPixels fallback path detected gaps.
+    // Reproducer: the adaptive sampling path (the envelope) drew lines across key gaps because
+    // it had no gap detection — only the unthinned path detected gaps.
     // Build data dense enough to trigger adaptive sampling: many points per
     // pixel, with a large gap in the middle.
     // Segment 1: keys [0, 500) step 0.1 => 5000 points
@@ -375,15 +348,9 @@ void TestMultiDataSource::adaptiveSamplingBreaksAtKeyGaps()
         vals[segSize + i] = 2.0;
     }
 
-    // Set up axes so the pixel span is much smaller than the data count
-    // (forces adaptive sampling path)
-    mPlot->setGeometry(50, 50, 500, 500);
-    mPlot->xAxis->setRange(-100, 11000);
-    mPlot->yAxis->setRange(0, 3);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-
-    auto lines = qcp::algo::optimizedLineData(
-        keys, vals, 0, segSize * 2, 500, mPlot->xAxis, mPlot->yAxis);
+    // 500 pixels over 11100 keys: far fewer pixels than samples (forces the envelope)
+    auto lines = qcp::algo::linesInData(keys, vals, 0, segSize * 2, 500.0 / 11100);
+    QVERIFY(lines.size() < std::size_t(segSize));
 
     // Must contain at least one NaN gap marker between the two segments
     bool foundNanGap = false;
@@ -407,28 +374,24 @@ void TestMultiDataSource::adaptiveSamplingFollowsFallingData()
     std::vector<double> keys(n), vals(n);
     for (int i = 0; i < n; ++i)
         keys[i] = i, vals[i] = -i;
-    mPlot->setGeometry(50, 50, 500, 500);
-    mPlot->xAxis->setRange(0, n);
-    mPlot->yAxis->setRange(-n, 0);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    // Pixel y grows downwards, so a falling line never goes back up.
-    const auto upTurns = [](const QVector<QPointF>& pts) {
+    // A falling line never goes back up.
+    const auto upTurns = [](const std::vector<QPointF>& pts) {
         int count = 0;
-        for (int i = 1; i < pts.size(); ++i)
-            if (pts[i].y() < pts[i - 1].y())
+        for (std::size_t i = 1; i < pts.size(); ++i)
+            if (pts[i].y() > pts[i - 1].y())
                 ++count;
         return count;
     };
+    const double pixelsPerKey = 500.0 / n;
 
-    const auto single = qcp::algo::optimizedLineData(keys, vals, 0, n, 500, mPlot->xAxis, mPlot->yAxis);
-    QVERIFY(single.size() < n);
+    const auto single = qcp::algo::linesInData(keys, vals, 0, n, pixelsPerKey);
+    QVERIFY(single.size() < std::size_t(n));
     QCOMPARE(upTurns(single), 0);
 
     QCPSoAMultiDataSource<std::vector<double>, std::vector<double>> src(keys, {vals});
-    QVector<QPointF> multi[1];
-    src.getOptimizedLineDataAll(0, n, 500, mPlot->xAxis, mPlot->yAxis, multi, 1);
-    QVERIFY(multi[0].size() < n);
-    QCOMPARE(upTurns(multi[0]), 0);
+    const auto fromSource = src.linesInData(0, 0, n, pixelsPerKey);
+    QVERIFY(fromSource.size() < std::size_t(n));
+    QCOMPARE(upTurns(fromSource), 0);
 }
 
 // NaN means "no sample". The sparse path broke the line there, but the dense (zoomed-out)
@@ -439,29 +402,25 @@ void TestMultiDataSource::adaptiveSamplingBreaksAtNaNRuns()
     std::vector<double> keys(n), vals(n);
     for (int i = 0; i < n; ++i)
         keys[i] = i, vals[i] = (i >= 9000 && i < 11000) ? qQNaN() : 1.0;
-    mPlot->setGeometry(50, 50, 500, 500);
-    mPlot->xAxis->setRange(0, n);
-    mPlot->yAxis->setRange(0, 2);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-    const auto hasBreak = [](const QVector<QPointF>& pts) {
+    const auto hasBreak = [](const std::vector<QPointF>& pts) {
         return std::any_of(pts.begin(), pts.end(),
                            [](const QPointF& p) { return qIsNaN(p.x()) || qIsNaN(p.y()); });
     };
+    const double pixelsPerKey = 500.0 / n;
 
-    const auto single = qcp::algo::optimizedLineData(keys, vals, 0, n, 500, mPlot->xAxis, mPlot->yAxis);
-    QVERIFY(single.size() < n); // the dense path ran
-    QVERIFY2(hasBreak(single), "single column: a NaN run is bridged when zoomed out");
+    const auto single = qcp::algo::linesInData(keys, vals, 0, n, pixelsPerKey);
+    QVERIFY(single.size() < std::size_t(n)); // the dense path ran
+    QVERIFY2(hasBreak(single), "a NaN run is bridged when zoomed out");
 
     QCPSoAMultiDataSource<std::vector<double>, std::vector<double>> src(keys, {vals});
-    QVector<QPointF> multi[1];
-    src.getOptimizedLineDataAll(0, n, 500, mPlot->xAxis, mPlot->yAxis, multi, 1);
-    QVERIFY(multi[0].size() < n);
-    QVERIFY2(hasBreak(multi[0]), "multi column: a NaN run is bridged when zoomed out");
+    const auto fromSource = src.linesInData(0, 0, n, pixelsPerKey);
+    QVERIFY(fromSource.size() < std::size_t(n));
+    QVERIFY2(hasBreak(fromSource), "the source: a NaN run is bridged when zoomed out");
 
     // A hole narrower than a pixel stays invisible: every other sample NaN still draws a line.
     for (int i = 0; i < n; ++i)
         vals[i] = (i % 2) ? qQNaN() : 1.0;
-    QVERIFY(!hasBreak(qcp::algo::optimizedLineData(keys, vals, 0, n, 500, mPlot->xAxis, mPlot->yAxis)));
+    QVERIFY(!hasBreak(qcp::algo::linesInData(keys, vals, 0, n, pixelsPerKey)));
 }
 
 void TestMultiDataSource::rowMajorValueAt()
@@ -517,12 +476,8 @@ void TestMultiDataSource::rowMajorWithPadding()
     QCOMPARE(col0.size(), 3);
 }
 
-void TestMultiDataSource::rowMajorGetLines()
+void TestMultiDataSource::rowMajorLinesInData()
 {
-    mPlot->xAxis->setRange(0, 6);
-    mPlot->yAxis->setRange(0, 110);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-
     std::vector<double> keys = {1.0, 2.0, 3.0, 4.0, 5.0};
     std::vector<double> values = {10, 20,
                                    30, 40,
@@ -532,15 +487,16 @@ void TestMultiDataSource::rowMajorGetLines()
     QCPRowMajorMultiDataSource<double, double> src(
         std::span<const double>(keys), values.data(), 5, 2, 2);
 
-    auto lines0 = src.getLines(0, 0, 5, mPlot->xAxis, mPlot->yAxis);
-    auto lines1 = src.getLines(1, 0, 5, mPlot->xAxis, mPlot->yAxis);
-    QCOMPARE(lines0.size(), 5);
-    QCOMPARE(lines1.size(), 5);
+    auto lines0 = src.linesInData(0, 0, 5, 0);
+    auto lines1 = src.linesInData(1, 0, 5, 0);
+    QCOMPARE(lines0.size(), std::size_t(5));
+    QCOMPARE(lines1.size(), std::size_t(5));
+    QCOMPARE(lines0[4], QPointF(5, 90));
+    QCOMPARE(lines1[4], QPointF(5, 100));
 
-    auto optLines = src.getOptimizedLineData(0, 0, 5, 400,
-                                              mPlot->xAxis, mPlot->yAxis);
-    QVERIFY(optLines.size() > 0);
-    QVERIFY(optLines.size() <= 5);
+    auto thinned = src.linesInData(0, 0, 5, 80);
+    QVERIFY(thinned.size() > 0);
+    QVERIFY(thinned.size() <= 5);
 }
 
 void TestMultiDataSource::soaMismatchedColumnDegradesToEmpty()
@@ -833,26 +789,20 @@ void TestMultiDataSource::rowMajorFloatBinsLikeSoaDouble()
     }
 }
 
-void TestMultiDataSource::genericIndexedFallbackHonoursGapThreshold()
+void TestMultiDataSource::genericLinesInDataHonoursGapThreshold()
 {
-    // The waterfall adapter has no indexed overrides: it runs the base-class
-    // fallbacks, which must honour the threshold too (SciQLopPlots#118).
-    mPlot->xAxis->setRange(0, 12);
-    mPlot->yAxis->setRange(-1, 2);
+    // The waterfall adapter computes its lines from a transformed window: it must honour the
+    // threshold too (SciQLopPlots#118), with and without thinning.
     auto irregular = std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
         std::vector<double>{0, 1, 5, 6, 12}, std::vector<std::vector<double>>{{1, 0, 1, 0, 0}});
     QCPWaterfallDataAdapter adapter(irregular, {0.0}, {1.0}, 1.0);
-    QVector<int> indices;
-    const auto hasBreak = [](const QVector<QPointF>& pts) {
+    std::vector<int> indices;
+    const auto hasBreak = [](const std::vector<QPointF>& pts) {
         return std::any_of(pts.begin(), pts.end(),
                            [](const QPointF& p) { return std::isnan(p.x()) || std::isnan(p.y()); });
     };
-    const auto lines = [&] {
-        return adapter.getLinesIndexed(0, 0, 5, mPlot->xAxis, mPlot->yAxis, indices);
-    };
-    const auto optimized = [&] {
-        return adapter.getOptimizedLineDataIndexed(0, 0, 5, 400, mPlot->xAxis, mPlot->yAxis, indices);
-    };
+    const auto lines = [&] { return adapter.linesInData(0, 0, 5, 0, &indices); };
+    const auto optimized = [&] { return adapter.linesInData(0, 0, 5, 30, &indices); };
     QVERIFY(hasBreak(lines()) && hasBreak(optimized()));
 
     adapter.setGapThreshold(0);
@@ -970,8 +920,8 @@ void TestMultiDataSource::gapsBeforeMatchesTheLineBreaks()
 }
 
 namespace {
-// 1 for each row of [0, rows) that getLines starts with a NaN break (values must be NaN-free).
-std::vector<int> lineBreaks(const QVector<QPointF>& lines, int rows)
+// 1 for each row of [0, rows) that linesInData starts with a NaN break (values must be NaN-free).
+std::vector<int> lineBreaks(const std::vector<QPointF>& lines, int rows)
 {
     std::vector<int> breaks(rows, 0);
     int row = 0;
@@ -1026,13 +976,9 @@ void TestMultiDataSource::gapsBeforeEqualsTheLineBreaksOfEverySource()
     QCPRowMajorMultiDataSource<double, double> rowMajor(
         std::span<const double>(keys), values.data(), 9, 1, 1);
     auto resampled = resampledWithGaps();
-    mPlot->xAxis->setRange(0, 40);
-    mPlot->yAxis->setRange(0, 10);
-    mPlot->replot(QCustomPlot::rpImmediateRefresh);
-
     const auto check = [&](QCPAbstractMultiDataSource& src, int begin, int end, const char* name) {
         src.setGapThreshold(2);
-        const auto lines = src.getLines(0, begin, end, mPlot->xAxis, mPlot->yAxis);
+        const auto lines = src.linesInData(0, begin, end, 0);
         const auto expected = lineBreaks(lines, end - begin);
         QVERIFY2(std::count(expected.begin(), expected.end(), 1) > 0, name);
         QVERIFY2(gapFlags(src.gapsBefore(begin, end), end - begin) == expected, name);

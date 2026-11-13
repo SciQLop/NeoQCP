@@ -89,7 +89,6 @@
 #include "plottables/plottable-errorbar.h"
 #include "plottables/plottable-financial.h"
 #include "plottables/graph-data.h"
-#include "plottables/plottable-graph.h"
 #include "plottables/plottable-multigraph.h"
 #include "plottables/lane-layout.h"
 #include "plottables/plottable-intervals.h"

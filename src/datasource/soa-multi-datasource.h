@@ -70,24 +70,6 @@ public:
         return qcp::algo::findEnd(mKeys, sortKey, expandedRange);
     }
 
-    QVector<QPointF> getOptimizedLineData(int column, int begin, int end, int pixelWidth,
-                                           QCPAxis* keyAxis, QCPAxis* valueAxis) const override
-    {
-        Q_ASSERT(column >= 0 && column < columnCount());
-        ensureGapCache(begin, end);
-        return qcp::algo::optimizedLineData(mKeys, mValues[column], begin, end, pixelWidth,
-                                             keyAxis, valueAxis, &mGapCache.gaps);
-    }
-
-    QVector<QPointF> getLines(int column, int begin, int end,
-                               QCPAxis* keyAxis, QCPAxis* valueAxis) const override
-    {
-        Q_ASSERT(column >= 0 && column < columnCount());
-        ensureGapCache(begin, end);
-        return qcp::algo::linesToPixels(mKeys, mValues[column], begin, end, keyAxis, valueAxis,
-                                         gapThreshold(), &mGapCache.gaps);
-    }
-
     std::vector<QPointF> linesInData(int column, int begin, int end, double pixelsPerKey,
                                      std::vector<int>* sourceIndices = nullptr,
                                      bool logKeys = false, bool cacheGaps = true) const override
@@ -111,39 +93,6 @@ public:
             return qcp::algo::detectKeyGaps(mKeys, begin, end, gapThreshold());
         ensureGapCache(begin, end);
         return mGapCache.gaps;
-    }
-
-    QVector<QPointF> getLinesIndexed(int column, int begin, int end,
-                                     QCPAxis* keyAxis, QCPAxis* valueAxis,
-                                     QVector<int>& sourceIndices) const override
-    {
-        Q_ASSERT(column >= 0 && column < columnCount());
-        ensureGapCache(begin, end);
-        return qcp::algo::linesToPixelsIndexed(mKeys, mValues[column], begin, end, keyAxis, valueAxis,
-                                               sourceIndices, gapThreshold(),
-                                               &mGapCache.gaps);
-    }
-
-    QVector<QPointF> getOptimizedLineDataIndexed(int column, int begin, int end, int pixelWidth,
-                                                 QCPAxis* keyAxis, QCPAxis* valueAxis,
-                                                 QVector<int>& sourceIndices) const override
-    {
-        Q_ASSERT(column >= 0 && column < columnCount());
-        ensureGapCache(begin, end);
-        return qcp::algo::optimizedLineDataIndexed(mKeys, mValues[column], begin, end, pixelWidth,
-                                                   keyAxis, valueAxis, sourceIndices, &mGapCache.gaps);
-    }
-
-    void getOptimizedLineDataAll(int begin, int end, int /*pixelWidth*/,
-                                  QCPAxis* keyAxis, QCPAxis* valueAxis,
-                                  QVector<QPointF>* results, int numColumns) const override
-    {
-        ensureGapCache(begin, end);
-        const int N = std::min(numColumns, columnCount());
-        qcp::algo::optimizedLineDataMulti(
-            mKeys, N,
-            [this](int c, int i) -> double { return static_cast<double>(mValues[c][i]); },
-            begin, end, keyAxis, valueAxis, &mGapCache.gaps, results);
     }
 
     const double* rawKeyData() const override

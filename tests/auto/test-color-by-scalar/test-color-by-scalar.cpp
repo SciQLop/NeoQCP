@@ -105,10 +105,6 @@ public:
     double valueAt(int c, int i) const override { return mInner->valueAt(c, i); }
     QCPRange valueRange(int c, bool& f, QCP::SignDomain sd, const QCPRange& r) const override
     { return mInner->valueRange(c, f, sd, r); }
-    QVector<QPointF> getOptimizedLineData(int c, int b, int e, int w, QCPAxis* k, QCPAxis* v) const override
-    { return mInner->getOptimizedLineData(c, b, e, w, k, v); }
-    QVector<QPointF> getLines(int c, int b, int e, QCPAxis* k, QCPAxis* v) const override
-    { return mInner->getLines(c, b, e, k, v); }
 private:
     std::shared_ptr<QCPAbstractMultiDataSource> mInner;
 };
@@ -129,82 +125,53 @@ void mixedData(std::vector<double>& keys, std::vector<double>& values)
     }
 }
 
-void checkValuesComeFromIndices(const QVector<QPointF>& pts, const QVector<int>& idx,
-                                const std::vector<double>& values, QCPAxis* valueAxis, bool valueIsX)
+void checkValuesComeFromIndices(const std::vector<QPointF>& pts, const std::vector<int>& idx,
+                                const std::vector<double>& values)
 {
     QCOMPARE(idx.size(), pts.size());
-    for (int k = 0; k < pts.size(); ++k)
+    for (std::size_t k = 0; k < pts.size(); ++k)
     {
         if (idx[k] < 0)
         {
             QVERIFY(std::isnan(pts[k].x()) || std::isnan(pts[k].y()));
             continue;
         }
-        const double expected = valueAxis->coordToPixel(values[idx[k]]);
-        const double got = valueIsX ? pts[k].x() : pts[k].y();
-        QVERIFY2(qAbs(got - expected) < 1e-6,
+        const double expected = values[idx[k]];
+        QVERIFY2(pts[k].y() == expected,
                  qPrintable(QString("point %1: index %2").arg(k).arg(idx[k])));
     }
 }
 
 } // namespace
 
-void TestColorByScalar::linesToPixelsIndexedMatchesPlainAndMarksGaps()
+void TestColorByScalar::linesInDataIndexedMatchesPlainAndMarksGaps()
 {
     std::vector<double> keys {0, 1, 2, 3, 4, 10, 11, 12};
     std::vector<double> values {0, 1, 2, std::nan(""), 4, 5, 6, 7};
-    mPlot->xAxis->setRange(0, 12);
-    mPlot->yAxis->setRange(0, 8);
-    mPlot->replot();
 
-    QVector<int> idx;
-    const auto indexed = qcp::algo::linesToPixelsIndexed(keys, values, 0, 8,
-                                                         mPlot->xAxis, mPlot->yAxis, idx);
-    const auto plain = qcp::algo::linesToPixels(keys, values, 0, 8, mPlot->xAxis, mPlot->yAxis);
+    std::vector<int> idx;
+    const auto indexed = qcp::algo::linesInData(keys, values, 0, 8, 0, &idx);
+    const auto plain = qcp::algo::linesInData(keys, values, 0, 8, 0);
 
     QCOMPARE(indexed.size(), plain.size());
-    for (int k = 0; k < plain.size(); ++k)
+    for (std::size_t k = 0; k < plain.size(); ++k)
         QVERIFY(indexed[k] == plain[k] || (std::isnan(indexed[k].x()) && std::isnan(plain[k].x())));
-    QCOMPARE(idx, (QVector<int>{0, 1, 2, -1, 4, -1, 5, 6, 7}));
+    QCOMPARE(idx, (std::vector<int>{0, 1, 2, -1, 4, -1, 5, 6, 7}));
 }
 
-void TestColorByScalar::optimizedLineDataIndexedValuesComeFromTheirIndex()
+void TestColorByScalar::thinnedLinesInDataValuesComeFromTheirIndex()
 {
     std::vector<double> keys, values;
     mixedData(keys, values);
-    mPlot->xAxis->setRange(0, 100);
-    mPlot->yAxis->setRange(-2, 2);
-    mPlot->replot();
     const int n = static_cast<int>(keys.size());
+    const double pixelsPerKey = 4; // 400 pixels over keys 0..100
 
-    QVector<int> idx;
-    const auto indexed = qcp::algo::optimizedLineDataIndexed(keys, values, 0, n, 400,
-                                                             mPlot->xAxis, mPlot->yAxis, idx);
-    const auto plain = qcp::algo::optimizedLineData(keys, values, 0, n, 400,
-                                                    mPlot->xAxis, mPlot->yAxis);
+    std::vector<int> idx;
+    const auto indexed = qcp::algo::linesInData(keys, values, 0, n, pixelsPerKey, &idx);
+    const auto plain = qcp::algo::linesInData(keys, values, 0, n, pixelsPerKey);
     QCOMPARE(indexed.size(), plain.size());
-    QVERIFY(indexed.size() < n);  // the adaptive path really ran
-    checkValuesComeFromIndices(indexed, idx, values, mPlot->yAxis, false);
-}
-
-void TestColorByScalar::indexedVerticalKeyAxis()
-{
-    std::vector<double> keys, values;
-    mixedData(keys, values);
-    mPlot->yAxis->setRange(0, 100);   // key axis is vertical here
-    mPlot->xAxis->setRange(-2, 2);
-    mPlot->replot();
-    const int n = static_cast<int>(keys.size());
-
-    QVector<int> idx;
-    const auto pts = qcp::algo::optimizedLineDataIndexed(keys, values, 0, n, 300,
-                                                         mPlot->yAxis, mPlot->xAxis, idx);
-    checkValuesComeFromIndices(pts, idx, values, mPlot->xAxis, true);
-
-    QVector<int> idx2;
-    const auto full = qcp::algo::linesToPixelsIndexed(keys, values, 0, n,
-                                                      mPlot->yAxis, mPlot->xAxis, idx2);
-    checkValuesComeFromIndices(full, idx2, values, mPlot->xAxis, true);
+    QVERIFY(indexed.size() < std::size_t(n));  // the adaptive path really ran
+    checkValuesComeFromIndices(indexed, idx, values);
 }
 
 void TestColorByScalar::defaultIndexedImplementationMatchesSoA()
@@ -213,37 +180,32 @@ void TestColorByScalar::defaultIndexedImplementationMatchesSoA()
     mixedData(keys, values);
     auto soa = makeSource(keys, {values});
     ForwardingSource generic(soa);
-    mPlot->xAxis->setRange(0, 100);
-    mPlot->yAxis->setRange(-2, 2);
-    mPlot->replot();
     const int n = static_cast<int>(keys.size());
 
-    QVector<int> a, b;
-    const auto gl = generic.getLinesIndexed(0, 0, n, mPlot->xAxis, mPlot->yAxis, a);
-    const auto sl = soa->getLinesIndexed(0, 0, n, mPlot->xAxis, mPlot->yAxis, b);
+    std::vector<int> a, b;
+    const auto gl = generic.linesInData(0, 0, n, 0, &a);
+    const auto sl = soa->linesInData(0, 0, n, 0, &b);
     QCOMPARE(gl.size(), sl.size());
     QCOMPARE(a, b);
 
-    QVector<int> c, d;
-    const auto g = generic.getOptimizedLineDataIndexed(0, 100, 5000, 400, mPlot->xAxis, mPlot->yAxis, c);
-    const auto s = soa->getOptimizedLineDataIndexed(0, 100, 5000, 400, mPlot->xAxis, mPlot->yAxis, d);
+    std::vector<int> c, d;
+    const auto g = generic.linesInData(0, 100, 5000, 4, &c);
+    const auto s = soa->linesInData(0, 100, 5000, 4, &d);
     QCOMPARE(g.size(), s.size());
+    QVERIFY(g.size() < std::size_t(4900)); // thinned
     QCOMPARE(c, d);
 }
 
 void TestColorByScalar::defaultIndexedImplementationHandlesAnEmptyWindow()
 {
     ForwardingSource generic(makeSource({0, 1, 2, 3}, {{0, 1, 0, 1}}));
-    mPlot->xAxis->setRange(0, 3);
-    mPlot->yAxis->setRange(-1, 2);
-    mPlot->replot();
     for (auto [begin, end] : {std::pair{3, 1}, std::pair{2, 2}})
     {
-        QVector<int> a{7}, b{7};
-        QVERIFY(generic.getLinesIndexed(0, begin, end, mPlot->xAxis, mPlot->yAxis, a).isEmpty());
-        QVERIFY(generic.getOptimizedLineDataIndexed(0, begin, end, 400, mPlot->xAxis, mPlot->yAxis, b).isEmpty());
-        QVERIFY(a.isEmpty());
-        QVERIFY(b.isEmpty());
+        std::vector<int> a{7}, b{7};
+        QVERIFY(generic.linesInData(0, begin, end, 0, &a).empty());
+        QVERIFY(generic.linesInData(0, begin, end, 100, &b).empty());
+        QVERIFY(a.empty());
+        QVERIFY(b.empty());
     }
 }
 
@@ -263,18 +225,13 @@ void TestColorByScalar::rowMajorIndexedMatchesSoA()
     std::vector<double> negated(values.size());
     std::transform(values.begin(), values.end(), negated.begin(), [](double v) { return -v; });
     auto soa = makeSource(keys, {values, negated});
-    mPlot->xAxis->setRange(0, 100);
-    mPlot->yAxis->setRange(-2, 2);
-    mPlot->replot();
 
     for (int col = 0; col < 2; ++col)
     {
-        QVector<int> a, b;
-        rowMajor.getOptimizedLineDataIndexed(col, 0, n, 400, mPlot->xAxis, mPlot->yAxis, a);
-        soa->getOptimizedLineDataIndexed(col, 0, n, 400, mPlot->xAxis, mPlot->yAxis, b);
+        std::vector<int> a, b;
+        QCOMPARE(rowMajor.linesInData(col, 0, n, 4, &a).size(), soa->linesInData(col, 0, n, 4, &b).size());
         QCOMPARE(a, b);
-        rowMajor.getLinesIndexed(col, 0, n, mPlot->xAxis, mPlot->yAxis, a);
-        soa->getLinesIndexed(col, 0, n, mPlot->xAxis, mPlot->yAxis, b);
+        QCOMPARE(rowMajor.linesInData(col, 0, n, 0, &a).size(), soa->linesInData(col, 0, n, 0, &b).size());
         QCOMPARE(a, b);
     }
 }
@@ -367,14 +324,14 @@ void TestColorByScalar::l2OriginComposesThroughL1AndCompacts()
 
     for (int c = 0; c < 2; ++c)
     {
-        QVector<int> idx;
-        const auto pts = l2->getLinesIndexed(c, 0, l2->size(), mPlot->xAxis, mPlot->yAxis, idx);
+        std::vector<int> idx;
+        const auto pts = l2->linesInData(c, 0, l2->size(), 0, &idx);
         QCOMPARE(idx.size(), pts.size());
         int gapMarkers = 0;
-        for (int k = 0; k < pts.size(); ++k)
+        for (std::size_t k = 0; k < pts.size(); ++k)
         {
             if (idx[k] < 0) { ++gapMarkers; QVERIFY(std::isnan(pts[k].y())); continue; }
-            QVERIFY(qAbs(pts[k].y() - mPlot->yAxis->coordToPixel(src->valueAt(c, idx[k]))) < 1e-6);
+            QCOMPARE(pts[k].y(), src->valueAt(c, idx[k]));
         }
         QVERIFY(gapMarkers >= 1);   // the hole is a key gap in L2
     }

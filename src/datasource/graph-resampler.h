@@ -213,7 +213,7 @@ inline void foldRowStepRatios(const QCPAbstractMultiDataSource& src, int first,
 
 // A bin with rows but no value in any column holds NaN only: +inf, see DroppedBins. One column NaN
 // while others have data stays NaN in the bin's values: adaptive sampling (the default) breaks
-// that column's line on it when wider than a pixel; getLines without it bridges the hole.
+// that column's line on it when wider than a pixel; the unthinned line bridges the hole.
 inline void setGapRatios(MultiColumnBinResult& out, const std::vector<float>& binRatio)
 {
     const int s = out.stride();
@@ -391,7 +391,7 @@ constexpr int kLevel2PixelMultiplier = 4;
 
 // The gap ratio of a drawn L2 bin, from the bins dropped just before it for having no value: their
 // largest raw step ratio, or +inf when they held NaN rows over at least a pixel. A narrower NaN run
-// cannot be seen, and is skipped as the raw path skips it (optimizedLineData).
+// cannot be seen, and is skipped as the raw envelope skips it (linesInData).
 class DroppedBins {
 public:
     void drop(float ratio, bool nanRows)

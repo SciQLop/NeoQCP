@@ -177,60 +177,12 @@ QPointF pixelOf(const QCP::Pixels& pixel)
     return QPointF(pixel.x, pixel.y);
 }
 
-// The graph's geometry, read through its protected builders: what a frame that has no axis pair
-// must produce, and what the renderer then streams.
-class InspectableGraph : public QCPGraph
-{
-public:
-    using QCPGraph::QCPGraph;
-
-    QVector<QPointF> lines(const QCPDataRange& range) const
-    {
-        QVector<QPointF> result;
-        getLines(&result, range);
-        return result;
-    }
-    QVector<QPointF> scatters(const QCPDataRange& range) const
-    {
-        QVector<QPointF> result;
-        getScatters(&result, range);
-        return result;
-    }
-    QPointF fillBase(QPointF matchingDataPoint) const { return getFillBasePoint(matchingDataPoint); }
-    QVector<QPointF> dataLines(const QCPDataRange& range) const { return dataSpaceLines(range); }
-    QVector<QCPDataRange> dataFillSegments(const QVector<QPointF>* lines) const
-    {
-        return getNonNanSegments(lines, Qt::Horizontal);
-    }
-    QPolygonF dataFillPolygon(const QVector<QPointF>* lines, QCPDataRange segment) const
-    {
-        return dataSpaceFillPolygon(lines, segment);
-    }
-    QVector<QCPDataRange> fillSegments(const QVector<QPointF>* lines) const
-    {
-        return getNonNanSegments(lines, Qt::Horizontal);
-    }
-    QPolygonF fillPolygon(const QVector<QPointF>* lines, QCPDataRange segment) const
-    {
-        return getFillPolygon(lines, segment);
-    }
-    void icon(QCPPainter* painter, const QRectF& rect) const { drawLegendIcon(painter, rect); }
-};
-
 //! The graph component 0 is filled to, or null.
 QCPMultiGraph* fillPartner(const QCPMultiGraph* graph)
 {
     const auto fill = graph->componentFill(0);
     const auto* toGraph = fill ? std::get_if<QCPMultiGraph::FillToGraph>(&fill->target) : nullptr;
     return toGraph ? toGraph->graph.data() : nullptr;
-}
-
-InspectableGraph* graphOn(SkewRect* rect, QCPGraph::LineStyle style = QCPGraph::lsLine)
-{
-    auto* graph = new InspectableGraph(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
-    graph->setLineStyle(style);
-    graph->setPen(QPen(Qt::black, 3));
-    return graph;
 }
 
 //! The multigraph with the two facts a task-2 test reads: its recording and its pipeline state.
@@ -1179,127 +1131,23 @@ void TestUserSystem::anAxisRangeChangeRepaintsASkewGraph()
     QCOMPARE(lightnessAt(image, before), 255);
 }
 
-void TestUserSystem::aGraphLineFollowsTheSkewMapping()
-{
-    QCustomPlot plot;
-    SkewRect* rect = skewRect(plot);
-    SkewSystem* system = rect->skew();
-    InspectableGraph* graph = graphOn(rect);
-    graph->setData(QVector<double> { 2, 4, 6 }, QVector<double> { 2, 6, 3 });
-    settle(plot);
-
-    const QVector<QPointF> line = graph->lines(QCPDataRange(0, 3));
-    QCOMPARE(line.size(), 3);
-    const QVector<QPointF> expected { pixelOf(system->pixelOf(2, 2)),
-                                      pixelOf(system->pixelOf(4, 6)),
-                                      pixelOf(system->pixelOf(6, 3)) };
-    for (int i = 0; i < expected.size(); ++i)
-        QVERIFY2(near(line.at(i), expected.at(i)), "a vertex is not the mapping of its data point");
-
-    // The segment between two vertices is straight in pixels: the middle of the first one is drawn.
-    const QImage image = render(plot);
-    QVERIFY2(lightnessAt(image, (expected.at(0) + expected.at(1)) / 2.0) < 200,
-             "the segment between two mapped vertices is not drawn");
-}
-
-void TestUserSystem::stepStylesAreBuiltInDataSpace()
-{
-    QCustomPlot plot;
-    SkewRect* rect = skewRect(plot);
-    SkewSystem* system = rect->skew();
-    InspectableGraph* graph = graphOn(rect, QCPGraph::lsStepLeft);
-    graph->setData(QVector<double> { 2, 4 }, QVector<double> { 2, 6 });
-    settle(plot);
-
-    // A step left goes horizontally to the previous value at the new key, then up to the value.
-    const QVector<QPointF> line = graph->lines(QCPDataRange(0, 2));
-    QCOMPARE(line.size(), 4);
-    QVERIFY2(near(line.at(2), pixelOf(system->pixelOf(4, 2))),
-             "the step's corner is not the mapping of (next key, previous value)");
-    QVERIFY2(near(line.at(3), pixelOf(system->pixelOf(4, 6))),
-             "the step does not end on the mapping of its own data point");
-}
-
-void TestUserSystem::anImpulseRunsToValueZero()
-{
-    QCustomPlot plot;
-    SkewRect* rect = skewRect(plot);
-    SkewSystem* system = rect->skew();
-    InspectableGraph* graph = graphOn(rect, QCPGraph::lsImpulse);
-    graph->setData(QVector<double> { 2, 3 }, QVector<double> { 4, 5 });
-    settle(plot);
-
-    const QVector<QPointF> line = graph->lines(QCPDataRange(0, 2));
-    QCOMPARE(line.size(), 4);
-    QVERIFY2(near(line.at(0), pixelOf(system->pixelOf(2, 0))), "the impulse does not start at zero");
-    QVERIFY2(near(line.at(1), pixelOf(system->pixelOf(2, 4))), "the impulse misses its data point");
-    QVERIFY2(near(line.at(2), pixelOf(system->pixelOf(3, 0))), "the impulse does not start at zero");
-    QVERIFY2(near(line.at(3), pixelOf(system->pixelOf(3, 5))), "the impulse misses its data point");
-}
-
-void TestUserSystem::aLogImpulseIsDropped()
+void TestUserSystem::aLogImpulseRunsToTheBoundNearerZero()
 {
     QCustomPlot plot;
     SkewRect* rect = skewRect(plot);
     rect->axis(QCPAxis::atLeft)->setScaleType(QCPAxis::stLogarithmic);
     rect->axis(QCPAxis::atLeft)->setRange(1, 10);
-    InspectableGraph* graph = graphOn(rect, QCPGraph::lsImpulse);
-    graph->setData(QVector<double> { 2, 3 }, QVector<double> { 4, 5 });
+    InspectableMultiGraph* graph = multiGraphOn(rect);
+    graph->setLineStyle(QCPMultiGraph::lsImpulse);
+    graph->setData(QVector<double> { 2, 3 }, std::vector<QVector<double>> { QVector<double> { 4, 5 } });
     settle(plot);
 
-    // Value zero has no pixel on a log axis: the impulse pair is dropped, never handed to drawLines.
-    const QVector<QPointF> line = graph->lines(QCPDataRange(0, 2));
-    QVERIFY2(line.isEmpty(), "an impulse to zero on a log axis reached the line builder");
-    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
-}
-
-void TestUserSystem::aLogValueFillStopsAtTheRangeBound()
-{
-    QCustomPlot plot;
-    SkewRect* rect = skewRect(plot);
-    SkewSystem* system = rect->skew();
-    rect->axis(QCPAxis::atLeft)->setScaleType(QCPAxis::stLogarithmic);
-    rect->axis(QCPAxis::atLeft)->setRange(1, 10);
-    InspectableGraph* graph = graphOn(rect);
-    graph->setData(QVector<double> { 2, 4 }, QVector<double> { 4, 8 });
-    graph->setBrush(QColor(0, 0, 0, 80));
-    settle(plot);
-
-    // Value zero has no pixel on a log axis: the fill closes on the lower range bound instead, and
-    // never builds a vertex at infinity.
-    const QVector<QPointF> dataLine = graph->dataLines(QCPDataRange(0, 2));
-    const QVector<QCPDataRange> segments = graph->dataFillSegments(&dataLine);
-    QCOMPARE(segments.size(), 1);
-    const QPolygonF fill = graph->dataFillPolygon(&dataLine, segments.first());
-    QCOMPARE(fill.size(), 4);
-    const QPointF base = fill.first();
-    QVERIFY2(qIsFinite(base.x()) && qIsFinite(base.y()), "the fill base is not a finite pixel");
-    QVERIFY2(near(base, pixelOf(system->pixelOf(2, 1))), "the fill does not close on the range bound");
-    QCOMPARE(test_misuse::calls.size(), std::size_t(0));
-}
-
-void TestUserSystem::aLogValueFillOnANegativeRangeClosesTowardZero()
-{
-    QCustomPlot plot;
-    SkewRect* rect = skewRect(plot);
-    SkewSystem* system = rect->skew();
-    rect->axis(QCPAxis::atLeft)->setScaleType(QCPAxis::stLogarithmic);
-    rect->axis(QCPAxis::atLeft)->setRange(-10, -1);
-    InspectableGraph* graph = graphOn(rect);
-    graph->setData(QVector<double> { 2, 4 }, QVector<double> { -4, -8 });
-    graph->setBrush(QColor(0, 0, 0, 80));
-    settle(plot);
-
-    // 2.x closes toward zero, which on a negative log range is the upper bound.
-    const QVector<QPointF> dataLine = graph->dataLines(QCPDataRange(0, 2));
-    const QVector<QCPDataRange> segments = graph->dataFillSegments(&dataLine);
-    QCOMPARE(segments.size(), 1);
-    const QPolygonF fill = graph->dataFillPolygon(&dataLine, segments.first());
-    QCOMPARE(fill.size(), 4);
-    QVERIFY2(near(fill.first(), pixelOf(system->pixelOf(2, -1))),
-             "the fill on a negative log range closes on the wrong side");
-    QVERIFY2(near(fill.last(), pixelOf(system->pixelOf(4, -1))),
-             "the fill on a negative log range closes on the wrong side");
+    // Value zero has no pixel on a log axis: the impulse runs to the range bound nearer zero (2.x's
+    // log baseline), never to zero.
+    const QCPDrawList& recording = graph->recording();
+    QVERIFY2(recordingHolds(recording, QPointF(2, 1)) && recordingHolds(recording, QPointF(3, 1)),
+             "the impulse does not run to the bound nearer zero");
+    QVERIFY2(!recordingHolds(recording, QPointF(2, 0)), "an impulse reached value zero on a log axis");
     QCOMPARE(test_misuse::calls.size(), std::size_t(0));
 }
 
@@ -1324,51 +1172,6 @@ void TestUserSystem::aFillWithAnUnrepresentableInverseStaysFinite()
     QCOMPARE(test_misuse::calls.size(), std::size_t(0));
 }
 
-
-void TestUserSystem::aNaNSplitsLineAndFill()
-{
-    QCustomPlot plot;
-    SkewRect* rect = skewRect(plot);
-    SkewSystem* system = rect->skew();
-    InspectableGraph* graph = graphOn(rect);
-    graph->setData(QVector<double> { 2, 3, 4, 5, 6 },
-                   QVector<double> { 2, 4, qQNaN(), 6, 7 });
-    graph->setBrush(QColor(0, 0, 0, 80));
-    settle(plot);
-
-    const QVector<QPointF> line = graph->lines(QCPDataRange(0, 5));
-    QCOMPARE(line.size(), 5);
-    QVERIFY2(qIsNaN(line.at(2).y()), "the gap is not a gap in the mapped line");
-    const QVector<QPointF> dataLine = graph->dataLines(QCPDataRange(0, 5));
-    const QVector<QCPDataRange> segments = graph->dataFillSegments(&dataLine);
-    QCOMPARE(segments.size(), 2);
-    for (const QCPDataRange& segment : segments)
-    {
-        const QPolygonF polygon = graph->dataFillPolygon(&dataLine, segment);
-        QCOMPARE(polygon.size(), segment.size() + 2);
-        for (const QPointF& vertex : polygon)
-            QVERIFY2(qIsFinite(vertex.x()) && qIsFinite(vertex.y()),
-                     "a fill polygon vertex is not finite");
-    }
-    QVERIFY2(near(line.at(1), pixelOf(system->pixelOf(3, 4))), "the point before the gap moved");
-}
-
-void TestUserSystem::aScatterLandsOnTheMapping()
-{
-    QCustomPlot plot;
-    SkewRect* rect = skewRect(plot);
-    SkewSystem* system = rect->skew();
-    InspectableGraph* graph = graphOn(rect, QCPGraph::lsNone);
-    graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
-    graph->setData(QVector<double> { 2, 5 }, QVector<double> { 3, 4 });
-    settle(plot);
-
-    const QVector<QPointF> scatters = graph->scatters(QCPDataRange(0, 2));
-    QCOMPARE(scatters.size(), 2);
-    QVERIFY2(near(scatters.at(0), pixelOf(system->pixelOf(2, 3))), "a scatter misses its mapping");
-    QVERIFY2(near(scatters.at(1), pixelOf(system->pixelOf(5, 4))), "a scatter misses its mapping");
-    QVERIFY2(lightnessAt(render(plot), scatters.at(1)) < 128, "the scatter is not drawn");
-}
 
 void TestUserSystem::aGraphIsHitAndRectSelectedThroughTheMapping()
 {
@@ -1915,14 +1718,14 @@ void TestUserSystem::theLegendIconOfASkewGraphDraws()
 {
     QCustomPlot plot;
     SkewRect* rect = skewRect(plot);
-    InspectableGraph* graph = graphOn(rect);
-    graph->setData(QVector<double> { 2, 5 }, QVector<double> { 2, 5 });
+    InspectableMultiGraph* graph = multiGraphOn(rect);
+    graph->setData(QVector<double> { 2, 5 }, std::vector<QVector<double>> { QVector<double> { 2, 5 } });
     settle(plot);
 
     QImage icon(40, 30, QImage::Format_ARGB32_Premultiplied);
     icon.fill(Qt::white);
     QCPPainter painter(&icon);
-    graph->icon(&painter, QRectF(0, 0, 40, 30));
+    graph->drawComponentLegendIcon(&painter, 0, QLineF(0, 15, 40, 15));
     painter.end();
 
     int inked = 0;

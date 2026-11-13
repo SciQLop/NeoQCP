@@ -15,9 +15,8 @@ private slots:
 
     void setLineStyleInvalidatesLineCache();
 
-    void linesToPixelsIndexedMatchesPlainAndMarksGaps();
-    void optimizedLineDataIndexedValuesComeFromTheirIndex();
-    void indexedVerticalKeyAxis();
+    void linesInDataIndexedMatchesPlainAndMarksGaps();
+    void thinnedLinesInDataValuesComeFromTheirIndex();
     void defaultIndexedImplementationMatchesSoA();
     void defaultIndexedImplementationHandlesAnEmptyWindow();
     void rowMajorIndexedMatchesSoA();

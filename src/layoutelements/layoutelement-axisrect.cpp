@@ -34,7 +34,6 @@
 #include "../items/item.h"
 #include "../misuse.h"
 #include "../painting/painter.h"
-#include "../plottables/plottable-graph.h"
 #include "../plottables/plottable-multigraph.h"
 #include "../plottables/plottable.h"
 #include <QSet>

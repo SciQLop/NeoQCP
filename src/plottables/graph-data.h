@@ -16,7 +16,7 @@
 #include "../global.h"
 
 /*! \class QCPGraphData
-  \brief Holds the data of one single data point for QCPGraph.
+  \brief Holds the data of one single (key, value) data point, e.g. for QCPPolarGraph.
 
   The stored data is:
   \li \a key: coordinate on the key axis of this data point (this is the \a mainKey and the \a
@@ -32,8 +32,8 @@
 class QCP_LIB_DECL QCPGraphData
 {
 public:
-    QCPGraphData();
-    QCPGraphData(double key, double value);
+    QCPGraphData() : key(0), value(0) { }
+    QCPGraphData(double key, double value) : key(key), value(value) { }
 
     inline double sortKey() const { return key; }
 
@@ -109,9 +109,9 @@ Q_DECLARE_TYPEINFO(QCPGraphData, Q_PRIMITIVE_TYPE);
 
   Container for storing \ref QCPGraphData points. The data is stored sorted by \a key.
 
-  This template instantiation is the container in which QCPGraph holds its data. For details about
-  the generic container, see the documentation of the class template \ref QCPDataContainer.
+  This template instantiation is the container in which QCPPolarGraph holds its data. For details
+  about the generic container, see the documentation of the class template \ref QCPDataContainer.
 
-  \see QCPGraphData, QCPGraph::setData
+  \see QCPGraphData
 */
 using QCPGraphDataContainer = QCPDataContainer<QCPGraphData>;

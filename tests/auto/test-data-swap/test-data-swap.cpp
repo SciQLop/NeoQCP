@@ -384,7 +384,7 @@ void TestDataSwap::multiGraphPendingWiderSourceDrawsSafely()
     // wider pending source, or this reads past the row-major buffer.
     auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDeferredDataSwap(true);
-    mg->setAdaptiveSampling(false); // force the getLinesAll() path in draw()
+    mg->setAdaptiveSampling(false); // every row drawn, no envelope
 
     constexpr int n = 500;
     std::vector<double> keys(n);

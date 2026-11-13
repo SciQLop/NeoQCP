@@ -222,7 +222,7 @@ std::pair<double, double> logZeroSideEdges(const QCPAxis& valueAxis)
 }
 
 // A log axis has no pixel for a value <= 0: the baseline goes two axis lengths past the edge on
-// the side of zero, as QCPGraph::getFillBasePoint picks it. Far enough to stay off screen during
+// the side of zero, as 2.x's QCPGraph::getFillBasePoint picked it. Far enough to stay off screen during
 // a GPU pan, near enough to keep float precision; the scissor clips it.
 double baselinePixel(const QCPAxis& valueAxis, double value)
 {
