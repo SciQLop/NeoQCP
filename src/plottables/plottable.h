@@ -324,7 +324,8 @@ protected:
     // complete.
     [[nodiscard]] static QCPAxisRect* axisRectOf(const QCPAxis* axis);
 
-    //! The cartesian projections raw, for the per-bar paths of a bars group (K8).
+    //! The 2.x axis pair raw, for the per-point and per-bar paths (K8): the cartesian system's
+    //! projection, the unresolved pair while there is no system, null in any other system.
     [[nodiscard]] QCPAxis* keyAxisRaw() const { return mKeyAxis.data(); }
     [[nodiscard]] QCPAxis* valueAxisRaw() const { return mValueAxis.data(); }
     //! The frame raw, for the per-object view builder (K8).
@@ -352,8 +353,6 @@ protected:
     QPen mPen;
     QBrush mBrush;
     QPointer<QCPCoordinateSystem> mSystem;
-    //! The cartesian projection, kept in sync by setSystem: null in any other system.
-    QPointer<QCPAxis> mKeyAxis, mValueAxis;
     //! What a frame must offer for this plottable to join it: set by the constructor it was built
     //! with, never afterwards.
     QCP::Capabilities mRequiredCapabilities;
@@ -410,6 +409,11 @@ private:
 
     QCPPlottableGroup* mGroup = nullptr; // set and cleared by the group
     QPointer<QCustomPlot> mRegisteredPlot; // the plot whose lists hold this one; null when inert
+    // The 2.x axis pair, cached so that no per-point path casts the system's axes. With a cartesian
+    // system it is that system's projection; with no system it is the unresolved pair (a half-set
+    // pair keeps the axis it was given); null in any other system. Written only by the
+    // constructors, setSystem, resolveAxes and forgetSystem.
+    QPointer<QCPAxis> mKeyAxis, mValueAxis;
     bool mWantsLegend = true;
     bool mRowOnLeave = false; // while grouped: get a legend row back on leaving
     bool mExternalBusy = false;
@@ -427,6 +431,13 @@ private:
     void onDebounceTimeout();
     //! The axis setters' shared body: the system of that pair, or an inert plottable.
     void resolveAxes(QCPAxis* key, QCPAxis* value);
+    //! A plot that takes this plottable back clears its frame without the setSystem side effects.
+    void forgetSystem()
+    {
+        mSystem = nullptr;
+        mKeyAxis = nullptr;
+        mValueAxis = nullptr;
+    }
     //! Marks the legend rows that show \a plottable, raw: a setter marks what a name change moved.
     static void markLegendRows(QCPLayoutElement* element, QCPAbstractPlottable* plottable);
 

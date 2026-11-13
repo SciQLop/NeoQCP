@@ -858,7 +858,7 @@ QCPDataSelection QCPBars::selectTestRect(const QRectF& rect, bool onlySelectable
     QCPDataSelection result;
     if ((onlySelectable && mSelectable == QCP::stNone) || mDataContainer->isEmpty())
         return result;
-    if (!mKeyAxis || !mValueAxis)
+    if (!keyAxisRaw() || !valueAxisRaw())
         return result;
 
     QCPBarsDataContainer::const_iterator visibleBegin, visibleEnd;
@@ -885,7 +885,7 @@ QCPDataSelection QCPBars::selectTestRect(const QRectF& rect, bool onlySelectable
 */
 std::optional<double> QCPBars::hitTest(QCP::Pixels at, QVariant* details) const
 {
-    if (mDataContainer->isEmpty() || !mKeyAxis || !mValueAxis)
+    if (mDataContainer->isEmpty() || !keyAxisRaw() || !valueAxisRaw())
         return std::nullopt;
     // A bar is hit inside its rect and nowhere else: its rect is what the user sees, and the
     // selection tolerance does not grow it. The axis rect check is the adapter's.
@@ -923,18 +923,18 @@ QCPRange QCPBars::getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain) co
     range = mDataContainer->keyRange(foundRange, inSignDomain);
 
     // determine exact range of bars by including bar width and barsgroup offset:
-    if (foundRange && mKeyAxis)
+    if (foundRange && keyAxisRaw())
     {
         // A bound's outer pixel edge back in coordinates, `upper` taking the far side of the bar.
         const auto outerEdge = [&](double bound, bool upper)
         {
             double lowerPixelWidth, upperPixelWidth;
             getPixelWidth(bound, lowerPixelWidth, upperPixelWidth);
-            double keyPixel = mKeyAxis.data()->coordToPixel(bound)
+            double keyPixel = keyAxisRaw()->coordToPixel(bound)
                 + (upper ? upperPixelWidth : lowerPixelWidth);
             if (mBarsGroup)
                 keyPixel += mBarsGroup->keyPixelOffset(this, bound);
-            return mKeyAxis.data()->pixelToCoord(keyPixel);
+            return keyAxisRaw()->pixelToCoord(keyPixel);
         };
         const double lower = outerEdge(range.lower, false);
         if (qIsFinite(lower) && lower < range.lower)
@@ -994,11 +994,10 @@ QPointF QCPBars::dataPixelPosition(int index) const
 {
     if (index >= 0 && index < mDataContainer->size())
     {
-        QCPAxis* keyAxis = mKeyAxis.data();
-        QCPAxis* valueAxis = mValueAxis.data();
+        QCPAxis* keyAxis = keyAxisRaw();
+        QCPAxis* valueAxis = valueAxisRaw();
         if (!keyAxis || !valueAxis)
         {
-            qDebug() << Q_FUNC_INFO << "invalid key or value axis";
             return {};
         }
 
@@ -1023,11 +1022,8 @@ QPointF QCPBars::dataPixelPosition(int index) const
 /* inherits documentation from base class */
 void QCPBars::draw(QCPDrawContext& context) const
 {
-    if (!mKeyAxis || !mValueAxis)
-    {
-        qDebug() << Q_FUNC_INFO << "both key and value axis pointer must be set";
+    if (!keyAxisRaw() || !valueAxisRaw())
         return;
-    }
     if (mDataContainer->isEmpty())
         return;
 
@@ -1175,9 +1171,8 @@ void QCPBars::drawLegendIcon(QCPDrawContext& icon) const
 void QCPBars::getVisibleDataBounds(QCPBarsDataContainer::const_iterator& begin,
                                    QCPBarsDataContainer::const_iterator& end) const
 {
-    if (!mKeyAxis)
+    if (!keyAxisRaw())
     {
-        qDebug() << Q_FUNC_INFO << "invalid key axis";
         begin = mDataContainer->constEnd();
         end = mDataContainer->constEnd();
         return;
@@ -1189,7 +1184,7 @@ void QCPBars::getVisibleDataBounds(QCPBarsDataContainer::const_iterator& begin,
         return;
     }
 
-    const QCPAxis* const keyAxis = mKeyAxis.data();
+    const QCPAxis* const keyAxis = keyAxisRaw();
     const QCPRange range = keyAxis->range();
     begin = mDataContainer->findBegin(range.lower);
     end = mDataContainer->findEnd(range.upper);
@@ -1234,11 +1229,10 @@ void QCPBars::getVisibleDataBounds(QCPBarsDataContainer::const_iterator& begin,
 */
 QRectF QCPBars::getBarRect(double key, double value) const
 {
-    QCPAxis* keyAxis = mKeyAxis.data();
-    QCPAxis* valueAxis = mValueAxis.data();
+    QCPAxis* keyAxis = keyAxisRaw();
+    QCPAxis* valueAxis = valueAxisRaw();
     if (!keyAxis || !valueAxis)
     {
-        qDebug() << Q_FUNC_INFO << "invalid key or value axis";
         return {};
     }
 
@@ -1287,38 +1281,34 @@ void QCPBars::getPixelWidth(double key, double& lower, double& upper) const
     {
         case wtAbsolute:
         {
-            upper = mWidth * 0.5 * mKeyAxis.data()->pixelOrientation();
+            upper = mWidth * 0.5 * keyAxisRaw()->pixelOrientation();
             lower = -upper;
             break;
         }
         case wtAxisRectRatio:
         {
-            if (mKeyAxis && axisRectOf(mKeyAxis.data()))
+            if (keyAxisRaw() && axisRectOf(keyAxisRaw()))
             {
-                if (mKeyAxis.data()->orientation() == Qt::Horizontal)
-                    upper = axisRectOf(mKeyAxis.data())->width() * mWidth * 0.5
-                        * mKeyAxis.data()->pixelOrientation();
+                if (keyAxisRaw()->orientation() == Qt::Horizontal)
+                    upper = axisRectOf(keyAxisRaw())->width() * mWidth * 0.5
+                        * keyAxisRaw()->pixelOrientation();
                 else
-                    upper = axisRectOf(mKeyAxis.data())->height() * mWidth * 0.5
-                        * mKeyAxis.data()->pixelOrientation();
+                    upper = axisRectOf(keyAxisRaw())->height() * mWidth * 0.5
+                        * keyAxisRaw()->pixelOrientation();
                 lower = -upper;
             }
-            else
-                qDebug() << Q_FUNC_INFO << "No key axis or axis rect defined";
             break;
         }
         case wtPlotCoords:
         {
-            if (mKeyAxis)
+            if (keyAxisRaw())
             {
-                double keyPixel = mKeyAxis.data()->coordToPixel(key);
-                upper = mKeyAxis.data()->coordToPixel(key + mWidth * 0.5) - keyPixel;
-                lower = mKeyAxis.data()->coordToPixel(key - mWidth * 0.5) - keyPixel;
+                double keyPixel = keyAxisRaw()->coordToPixel(key);
+                upper = keyAxisRaw()->coordToPixel(key + mWidth * 0.5) - keyPixel;
+                lower = keyAxisRaw()->coordToPixel(key - mWidth * 0.5) - keyPixel;
                 // no need to qSwap(lower, higher) when range reversed, because higher/lower are
                 // gained by coordinate transform which includes range direction
             }
-            else
-                qDebug() << Q_FUNC_INFO << "No key axis defined";
             break;
         }
     }

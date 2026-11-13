@@ -1501,9 +1501,7 @@ bool QCustomPlot::detach(QCPAbstractPlottable* plottable)
     const QPointer<QCPPlottableGroup> group = unlistPlottable(plottable);
     plottable->moveToLayer(nullptr, false);
     plottable->setParentLayerable(nullptr);
-    plottable->mSystem = nullptr;
-    plottable->mKeyAxis = nullptr;
-    plottable->mValueAxis = nullptr;
+    plottable->forgetSystem();
     plottable->mReportedLostAxis = true;
     plottable->mRegisteredPlot = nullptr;
     plottable->mParentPlot = nullptr;

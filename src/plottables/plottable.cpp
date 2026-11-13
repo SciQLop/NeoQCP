@@ -264,8 +264,9 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
   fillable structures in the plottable (e.g. QCPGraph uses this brush to control filling under the
   graph)</td>
   </tr><tr>
-    <td>QPointer<\ref QCPAxis> \b mKeyAxis, \b mValueAxis</td>
-    <td>The key and value axes this plottable is attached to. Call their QCPAxis::coordToPixel
+    <td>\ref QCPAxis* \b keyAxisRaw(), \b valueAxisRaw()</td>
+    <td>The key and value axes this plottable draws through, raw: the cartesian system's
+  projection, null in any other system (use \ref system() there). Call their QCPAxis::coordToPixel
   functions to translate coordinates to pixels in either the key or value dimension. Make sure to
   check whether the pointer is \c nullptr before using it. If one of the axes is null, don't draw
   the plottable.</td>
@@ -475,14 +476,14 @@ QCPAbstractPlottable::QCPAbstractPlottable(QCPCoordinateSystem* system, QCP::Cap
         , mPen(Qt::black)
         , mBrush(Qt::NoBrush)
         , mSystem(admits(system, required))
+        , mRequiredCapabilities(required)
+        , mSelectable(QCP::stWhole)
+        , mSelectionDecorator(nullptr)
         , mKeyAxis(mSystem && projectsOntoAxes(mSystem) ? qobject_cast<QCPAxis*>(mSystem->keyAxis())
                                                         : nullptr)
         , mValueAxis(mSystem && projectsOntoAxes(mSystem)
                          ? qobject_cast<QCPAxis*>(mSystem->valueAxis())
                          : nullptr)
-        , mRequiredCapabilities(required)
-        , mSelectable(QCP::stWhole)
-        , mSelectionDecorator(nullptr)
 {
     setSelectionDecorator(new QCPSelectionDecorator);
     mBusyDebounceTimer.setSingleShot(true);
@@ -836,12 +837,12 @@ void QCPAbstractPlottable::setBrush(const QBrush& brush)
 */
 void QCPAbstractPlottable::setKeyAxis(QCPAxis* axis)
 {
-    resolveAxes(axis, mValueAxis.data());
+    resolveAxes(axis, valueAxisRaw());
 }
 
 void QCPAbstractPlottable::setValueAxis(QCPAxis* axis)
 {
-    resolveAxes(mKeyAxis.data(), axis);
+    resolveAxes(keyAxisRaw(), axis);
 }
 
 //! The 2.x pair resolves to the system of that pair on the axes' area; the pair itself stays the
@@ -1020,13 +1021,12 @@ void QCPAbstractPlottable::setSelectable(QCP::SelectionType selectable)
 */
 void QCPAbstractPlottable::coordsToPixels(double key, double value, double& x, double& y) const
 {
-    QCPAxis* keyAxis = mKeyAxis.data();
-    QCPAxis* valueAxis = mValueAxis.data();
+    QCPAxis* keyAxis = keyAxisRaw();
+    QCPAxis* valueAxis = valueAxisRaw();
     if (!keyAxis || !valueAxis)
     {
         if (!mSystem)
         {
-            qDebug() << Q_FUNC_INFO << "invalid key or value axis";
             return;
         }
         const QCP::Pixels pixel = mSystem->transform().map(QCP::Data { key, value });
@@ -1053,13 +1053,12 @@ void QCPAbstractPlottable::coordsToPixels(double key, double value, double& x, d
 */
 const QPointF QCPAbstractPlottable::coordsToPixels(double key, double value) const
 {
-    QCPAxis* keyAxis = mKeyAxis.data();
-    QCPAxis* valueAxis = mValueAxis.data();
+    QCPAxis* keyAxis = keyAxisRaw();
+    QCPAxis* valueAxis = valueAxisRaw();
     if (!keyAxis || !valueAxis)
     {
         if (!mSystem)
         {
-            qDebug() << Q_FUNC_INFO << "invalid key or value axis";
             return QPointF();
         }
         const QCP::Pixels pixel = mSystem->transform().map(QCP::Data { key, value });
@@ -1083,13 +1082,12 @@ const QPointF QCPAbstractPlottable::coordsToPixels(double key, double value) con
 */
 void QCPAbstractPlottable::pixelsToCoords(double x, double y, double& key, double& value) const
 {
-    QCPAxis* keyAxis = mKeyAxis.data();
-    QCPAxis* valueAxis = mValueAxis.data();
+    QCPAxis* keyAxis = keyAxisRaw();
+    QCPAxis* valueAxis = valueAxisRaw();
     if (!keyAxis || !valueAxis)
     {
         if (!mSystem)
         {
-            qDebug() << Q_FUNC_INFO << "invalid key or value axis";
             return;
         }
         const QCP::Data data = mSystem->transform().inverse(QPointF(x, y));

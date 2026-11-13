@@ -654,7 +654,7 @@ double QCPCurve::pointDistance(const QPointF& pixelPoint,
     double minDistSqr = (std::numeric_limits<double>::max)();
     const int count = mDataContainer->size();
     QVector<QPointF> pixels(count);
-    if (mSystem && !mKeyAxis)
+    if (mSystem && !keyAxisRaw())
     {
         // One batch map, not one transform per point (C-6): a user system may build its mapping on
         // every ask, and a hit test is O(n) anyway.

@@ -934,7 +934,7 @@ void QCPColorMap::updateLegendIcon(Qt::TransformationMode transformMode, const Q
 /* inherits documentation from base class */
 std::optional<double> QCPColorMap::hitTest(QCP::Pixels at, QVariant* details) const
 {
-    if (!mKeyAxis || !mValueAxis || mMapData->isEmpty())
+    if (!keyAxisRaw() || !valueAxisRaw() || mMapData->isEmpty())
         return std::nullopt;
     double posKey = 0, posValue = 0;
     pixelsToCoords(QPointF(at.x, at.y), posKey, posValue);
@@ -1019,7 +1019,7 @@ QCPRange QCPColorMap::getValueRange(bool& foundRange, QCP::SignDomain inSignDoma
 */
 void QCPColorMap::updateMapImage()
 {
-    QCPAxis* keyAxis = mKeyAxis.data();
+    QCPAxis* keyAxis = keyAxisRaw();
     if (!keyAxis)
         return;
     if (mMapData->isEmpty())
@@ -1141,7 +1141,7 @@ void QCPColorMap::updateMapImage()
 /* inherits documentation from base class */
 void QCPColorMap::draw(QCPDrawContext& context) const
 {
-    if (!mKeyAxis || !mValueAxis)
+    if (!keyAxisRaw() || !valueAxisRaw())
         return;
     if (mMapData->isEmpty())
         return;
@@ -1150,13 +1150,13 @@ void QCPColorMap::draw(QCPDrawContext& context) const
     if (mMapImage.isNull())
         return;
 
-    const bool keyIsVertical = mKeyAxis->orientation() == Qt::Vertical;
+    const bool keyIsVertical = keyAxisRaw()->orientation() == Qt::Vertical;
     const QCPRange keyRange = mTightBoundary
         ? mMapData->keyRange()
-        : rangeWithHalfACell(mKeyAxis, mMapData->keyRange(), mMapData->keySize());
+        : rangeWithHalfACell(keyAxisRaw(), mMapData->keyRange(), mMapData->keySize());
     const QCPRange valueRange = mTightBoundary
         ? mMapData->valueRange()
-        : rangeWithHalfACell(mValueAxis, mMapData->valueRange(), mMapData->valueSize());
+        : rangeWithHalfACell(valueAxisRaw(), mMapData->valueRange(), mMapData->valueSize());
 
     QRectF source; // empty means the whole image
     if (mTightBoundary)
@@ -1190,7 +1190,7 @@ void QCPColorMap::draw(QCPDrawContext& context) const
 /* inherits documentation from base class */
 void QCPColorMap::drawLegendIcon(QCPDrawContext& icon) const
 {
-    if (!mKeyAxis || !mValueAxis || mLegendIcon.isNull())
+    if (!keyAxisRaw() || !valueAxisRaw() || mLegendIcon.isNull())
         return;
     const bool mirrorX
         = (keyAxis()->orientation() == Qt::Horizontal ? keyAxis() : valueAxis())->rangeReversed();

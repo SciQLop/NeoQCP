@@ -48,8 +48,8 @@ void QCPColorMap2::followAxes()
 {
     for (const auto& link : std::exchange(mAxisLinks, {}))
         disconnect(link);
-    const bool oneAxis = mKeyAxis == mValueAxis;
-    for (QCPAxis* axis : {mKeyAxis.data(), oneAxis ? nullptr : mValueAxis.data()})
+    const bool oneAxis = keyAxisRaw() == valueAxisRaw();
+    for (QCPAxis* axis : {keyAxisRaw(), oneAxis ? nullptr : valueAxisRaw()})
     {
         if (!axis)
             continue;
@@ -214,18 +214,18 @@ void QCPColorMap2::colorMappingChanged()
 
 bool QCPColorMap2::resampledForAnotherSize() const
 {
-    const auto now = ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data());
+    const auto now = ViewportParams::fromAxes(keyAxisRaw(), valueAxisRaw());
     const auto last = mPipeline.lastViewport();
     return now.plotWidthPx != last.plotWidthPx || now.plotHeightPx != last.plotHeightPx;
 }
 
 void QCPColorMap2::onViewportChanged()
 {
-    if (!mKeyAxis || !mValueAxis || !mDataSource) return;
-    auto* axisRect = axisRectOf(mKeyAxis);
+    if (!keyAxisRaw() || !valueAxisRaw() || !mDataSource) return;
+    auto* axisRect = axisRectOf(keyAxisRaw());
     if (!axisRect) return;
 
-    mPipeline.onViewportChanged(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data()));
+    mPipeline.onViewportChanged(ViewportParams::fromAxes(keyAxisRaw(), valueAxisRaw()));
 }
 
 // A viewport change turns the pipeline busy at once, and nothing may emit during a paint: a
@@ -242,7 +242,7 @@ void QCPColorMap2::queueViewportChange()
 
 bool QCPColorMap2::canProduceContent() const
 {
-    if (!mKeyAxis || !mValueAxis || !mDataSource)
+    if (!keyAxisRaw() || !valueAxisRaw() || !mDataSource)
         return false;
     return mPipeline.result() != nullptr;
 }
@@ -250,7 +250,7 @@ bool QCPColorMap2::canProduceContent() const
 void QCPColorMap2::draw(QCPDrawContext& context) const
 {
     PROFILE_HERE_N("QCPColorMap2::draw");
-    if (!mKeyAxis || !mValueAxis)
+    if (!keyAxisRaw() || !valueAxisRaw())
         return;
 
     auto* self = const_cast<QCPColorMap2*>(this);
@@ -261,7 +261,7 @@ void QCPColorMap2::draw(QCPDrawContext& context) const
         // a resize changes no axis range: nothing else would ask for a sharper image.
         if (context.exporting())
         {
-            if (self->mPipeline.runSynchronously(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data())))
+            if (self->mPipeline.runSynchronously(ViewportParams::fromAxes(keyAxisRaw(), valueAxisRaw())))
             {
                 // finished() only fires for async results
                 self->mRenderer.invalidateMapImage();
@@ -278,7 +278,7 @@ void QCPColorMap2::draw(QCPDrawContext& context) const
         if (context.exporting())
         {
             // Export path: run transform synchronously since the event loop is not pumped
-            if (!self->mPipeline.runSynchronously(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data())))
+            if (!self->mPipeline.runSynchronously(ViewportParams::fromAxes(keyAxisRaw(), valueAxisRaw())))
                 return;
             self->mContours.dataChanged();
             resampledData = self->mPipeline.result();
@@ -291,7 +291,7 @@ void QCPColorMap2::draw(QCPDrawContext& context) const
         }
     }
 
-    const bool keyIsVertical = mKeyAxis->orientation() == Qt::Vertical;
+    const bool keyIsVertical = keyAxisRaw()->orientation() == Qt::Vertical;
     if (self->mRenderer.mapImageInvalidated() || self->mRenderer.keyIsVertical() != keyIsVertical)
         self->mRenderer.updateMapImage(resampledData, keyIsVertical);
     const QImage& image = mRenderer.mapImage();
@@ -309,7 +309,7 @@ void QCPColorMap2::draw(QCPDrawContext& context) const
     const QCP::Data rightBottom = keyIsVertical ? QCP::Data { keyRange.lower, valRange.upper }
                                                 : QCP::Data { keyRange.upper, valRange.lower };
     context.image(leftTop, rightBottom, image, {}, false);
-    self->mContours.update(resampledData, context, dataScaleType(), mKeyAxis.data(), mValueAxis.data());
+    self->mContours.update(resampledData, context, dataScaleType(), keyAxisRaw(), valueAxisRaw());
 }
 
 void QCPColorMap2::drawLegendIcon(QCPDrawContext& icon) const
@@ -344,10 +344,10 @@ double QCPColorMap2::selectTest(const QPointF& pos, bool onlySelectable, QVarian
 {
     if (onlySelectable && !mSelectable)
         return -1;
-    if (!mKeyAxis || !mValueAxis || !mDataSource)
+    if (!keyAxisRaw() || !valueAxisRaw() || !mDataSource)
         return -1;
 
-    if (!axisRectOf(mKeyAxis.data())->rect().contains(pos.toPoint())
+    if (!axisRectOf(keyAxisRaw())->rect().contains(pos.toPoint())
         && !mParentPlot->interactions().testFlag(QCP::iSelectPlottablesBeyondAxisRect))
         return -1;
 

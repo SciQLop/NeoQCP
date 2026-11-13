@@ -466,7 +466,7 @@ QCPDataSelection QCPStatisticalBox::selectTestRect(const QRectF& rect, bool only
     QCPDataSelection result;
     if ((onlySelectable && mSelectable == QCP::stNone) || mDataContainer->isEmpty())
         return result;
-    if (!mKeyAxis || !mValueAxis)
+    if (!keyAxisRaw() || !valueAxisRaw())
         return result;
 
     QCPStatisticalBoxDataContainer::const_iterator visibleBegin, visibleEnd;
@@ -496,10 +496,10 @@ double QCPStatisticalBox::selectTest(const QPointF& pos, bool onlySelectable,
 {
     if ((onlySelectable && mSelectable == QCP::stNone) || mDataContainer->isEmpty())
         return -1;
-    if (!mKeyAxis || !mValueAxis)
+    if (!keyAxisRaw() || !valueAxisRaw())
         return -1;
 
-    if (axisRectOf(mKeyAxis)->rect().contains(pos.toPoint())
+    if (axisRectOf(keyAxisRaw())->rect().contains(pos.toPoint())
         || mParentPlot->interactions().testFlag(QCP::iSelectPlottablesBeyondAxisRect))
     {
         // get visible data range:
@@ -573,11 +573,10 @@ void QCPStatisticalBox::draw(QCPDrawContext& context) const
 {
     if (mDataContainer->isEmpty())
         return;
-    QCPAxis* keyAxis = mKeyAxis.data();
-    QCPAxis* valueAxis = mValueAxis.data();
+    QCPAxis* keyAxis = keyAxisRaw();
+    QCPAxis* valueAxis = valueAxisRaw();
     if (!keyAxis || !valueAxis)
     {
-        qDebug() << Q_FUNC_INFO << "invalid key or value axis";
         return;
     }
 
@@ -708,18 +707,17 @@ void QCPStatisticalBox::getVisibleDataBounds(
     QCPStatisticalBoxDataContainer::const_iterator& begin,
     QCPStatisticalBoxDataContainer::const_iterator& end) const
 {
-    if (!mKeyAxis)
+    if (!keyAxisRaw())
     {
-        qDebug() << Q_FUNC_INFO << "invalid key axis";
         begin = mDataContainer->constEnd();
         end = mDataContainer->constEnd();
         return;
     }
     begin = mDataContainer->findBegin(
-        mKeyAxis.data()->range().lower
+        keyAxisRaw()->range().lower
         - mWidth * 0.5); // subtract half width of box to include partially visible data points
     end = mDataContainer->findEnd(
-        mKeyAxis.data()->range().upper
+        keyAxisRaw()->range().upper
         + mWidth * 0.5); // add half width of box to include partially visible data points
 }
 

@@ -155,7 +155,7 @@ void QCPAbstractColorMapped::followKeyAxisRectScale()
     // A cartesian frame hands out the key axis; a user system on an axis rect has no projection but
     // still has that rect's colour scale to join. An area that is not an axis rect has none, and
     // the caller's values then need an explicit scale.
-    QCPAxisRect* rect = mKeyAxis ? axisRectOf(mKeyAxis) : nullptr;
+    QCPAxisRect* rect = keyAxisRaw() ? axisRectOf(keyAxisRaw()) : nullptr;
     if (!rect && mSystem)
         rect = qobject_cast<QCPAxisRect*>(mSystem->area());
     if (!rect || rect->parentPlot() != mParentPlot)

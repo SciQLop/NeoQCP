@@ -453,7 +453,7 @@ QCPDataSelection QCPFinancial::selectTestRect(const QRectF& rect, bool onlySelec
     QCPDataSelection result;
     if ((onlySelectable && mSelectable == QCP::stNone) || mDataContainer->isEmpty())
         return result;
-    if (!mKeyAxis || !mValueAxis)
+    if (!keyAxisRaw() || !valueAxisRaw())
         return result;
 
     QCPFinancialDataContainer::const_iterator visibleBegin, visibleEnd;
@@ -483,10 +483,10 @@ double QCPFinancial::selectTest(const QPointF& pos, bool onlySelectable,
 {
     if ((onlySelectable && mSelectable == QCP::stNone) || mDataContainer->isEmpty())
         return -1;
-    if (!mKeyAxis || !mValueAxis)
+    if (!keyAxisRaw() || !valueAxisRaw())
         return -1;
 
-    if (axisRectOf(mKeyAxis.data())->rect().contains(pos.toPoint())
+    if (axisRectOf(keyAxisRaw())->rect().contains(pos.toPoint())
         || mParentPlot->interactions().testFlag(QCP::iSelectPlottablesBeyondAxisRect))
     {
         // get visible data range:
@@ -599,11 +599,8 @@ QCPFinancialDataContainer QCPFinancial::timeSeriesToOhlc(const QVector<double>& 
 /* inherits documentation from base class */
 void QCPFinancial::draw(QCPDrawContext& context) const
 {
-    if (!mKeyAxis || !mValueAxis)
-    {
-        qDebug() << Q_FUNC_INFO << "both key and value axis pointer must be set";
+    if (!keyAxisRaw() || !valueAxisRaw())
         return;
-    }
     if (mDataContainer->isEmpty())
         return;
 
@@ -770,8 +767,8 @@ void QCPFinancial::paintLegendIcon(QCPPainter* painter, const QRectF& rect) cons
 void QCPFinancial::recordSegment(QCPDrawContext& context, const QCPDataRange& segment,
                                  bool selected) const
 {
-    QCPAxis* keyAxis = mKeyAxis.data();
-    QCPAxis* valueAxis = mValueAxis.data();
+    QCPAxis* keyAxis = keyAxisRaw();
+    QCPAxis* valueAxis = valueAxisRaw();
     if (!keyAxis || !valueAxis)
         return;
     // 2.x centred a plot-coordinate body symmetrically in pixels. On a log key axis the two data
@@ -913,31 +910,27 @@ double QCPFinancial::getPixelWidth(double key, double keyPixel) const
     {
         case wtAbsolute:
         {
-            if (mKeyAxis)
-                result = mWidth * 0.5 * mKeyAxis.data()->pixelOrientation();
+            if (keyAxisRaw())
+                result = mWidth * 0.5 * keyAxisRaw()->pixelOrientation();
             break;
         }
         case wtAxisRectRatio:
         {
-            if (mKeyAxis && axisRectOf(mKeyAxis.data()))
+            if (keyAxisRaw() && axisRectOf(keyAxisRaw()))
             {
-                if (mKeyAxis.data()->orientation() == Qt::Horizontal)
-                    result = axisRectOf(mKeyAxis.data())->width() * mWidth * 0.5
-                        * mKeyAxis.data()->pixelOrientation();
+                if (keyAxisRaw()->orientation() == Qt::Horizontal)
+                    result = axisRectOf(keyAxisRaw())->width() * mWidth * 0.5
+                        * keyAxisRaw()->pixelOrientation();
                 else
-                    result = axisRectOf(mKeyAxis.data())->height() * mWidth * 0.5
-                        * mKeyAxis.data()->pixelOrientation();
+                    result = axisRectOf(keyAxisRaw())->height() * mWidth * 0.5
+                        * keyAxisRaw()->pixelOrientation();
             }
-            else
-                qDebug() << Q_FUNC_INFO << "No key axis or axis rect defined";
             break;
         }
         case wtPlotCoords:
         {
-            if (mKeyAxis)
-                result = mKeyAxis.data()->coordToPixel(key + mWidth * 0.5) - keyPixel;
-            else
-                qDebug() << Q_FUNC_INFO << "No key axis defined";
+            if (keyAxisRaw())
+                result = keyAxisRaw()->coordToPixel(key + mWidth * 0.5) - keyPixel;
             break;
         }
     }
@@ -959,11 +952,10 @@ QCPFinancial::ohlcSelectTest(const QPointF& pos,
                              QCPFinancialDataContainer::const_iterator& closestDataPoint) const
 {
     closestDataPoint = mDataContainer->constEnd();
-    QCPAxis* keyAxis = mKeyAxis.data();
-    QCPAxis* valueAxis = mValueAxis.data();
+    QCPAxis* keyAxis = keyAxisRaw();
+    QCPAxis* valueAxis = valueAxisRaw();
     if (!keyAxis || !valueAxis)
     {
-        qDebug() << Q_FUNC_INFO << "invalid key or value axis";
         return -1;
     }
 
@@ -1018,11 +1010,10 @@ double QCPFinancial::candlestickSelectTest(
     QCPFinancialDataContainer::const_iterator& closestDataPoint) const
 {
     closestDataPoint = mDataContainer->constEnd();
-    QCPAxis* keyAxis = mKeyAxis.data();
-    QCPAxis* valueAxis = mValueAxis.data();
+    QCPAxis* keyAxis = keyAxisRaw();
+    QCPAxis* valueAxis = valueAxisRaw();
     if (!keyAxis || !valueAxis)
     {
-        qDebug() << Q_FUNC_INFO << "invalid key or value axis";
         return -1;
     }
 
@@ -1117,18 +1108,17 @@ double QCPFinancial::candlestickSelectTest(
 void QCPFinancial::getVisibleDataBounds(QCPFinancialDataContainer::const_iterator& begin,
                                         QCPFinancialDataContainer::const_iterator& end) const
 {
-    if (!mKeyAxis)
+    if (!keyAxisRaw())
     {
-        qDebug() << Q_FUNC_INFO << "invalid key axis";
         begin = mDataContainer->constEnd();
         end = mDataContainer->constEnd();
         return;
     }
-    begin = mDataContainer->findBegin(mKeyAxis.data()->range().lower
+    begin = mDataContainer->findBegin(keyAxisRaw()->range().lower
                                       - mWidth * 0.5); // subtract half width of ohlc/candlestick to
                                                        // include partially visible data points
     end = mDataContainer->findEnd(
-        mKeyAxis.data()->range().upper
+        keyAxisRaw()->range().upper
         + mWidth
             * 0.5); // add half width of ohlc/candlestick to include partially visible data points
 }
@@ -1140,11 +1130,10 @@ void QCPFinancial::getVisibleDataBounds(QCPFinancialDataContainer::const_iterato
 */
 QRectF QCPFinancial::selectionHitBox(QCPFinancialDataContainer::const_iterator it) const
 {
-    QCPAxis* keyAxis = mKeyAxis.data();
-    QCPAxis* valueAxis = mValueAxis.data();
+    QCPAxis* keyAxis = keyAxisRaw();
+    QCPAxis* valueAxis = valueAxisRaw();
     if (!keyAxis || !valueAxis)
     {
-        qDebug() << Q_FUNC_INFO << "invalid key or value axis";
         return {};
     }
 

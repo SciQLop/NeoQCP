@@ -123,15 +123,15 @@ void QCPGraph::followAxes()
 {
     for (const auto& link : std::exchange(mAxisLinks, {}))
         disconnect(link);
-    if (mKeyAxis)
+    if (keyAxisRaw())
     {
-        mAxisLinks << connect(mKeyAxis.data(), &QCPAxis::rangeChanged, this,
+        mAxisLinks << connect(keyAxisRaw(), &QCPAxis::rangeChanged, this,
                               &QCPGraph::onViewportChanged);
-        mAxisLinks << connect(mKeyAxis.data(), &QCPAxis::scaleTypeChanged, this,
+        mAxisLinks << connect(keyAxisRaw(), &QCPAxis::scaleTypeChanged, this,
                               [this] { linesChanged(); });
     }
-    if (mValueAxis)
-        mAxisLinks << connect(mValueAxis.data(), &QCPAxis::scaleTypeChanged, this,
+    if (valueAxisRaw())
+        mAxisLinks << connect(valueAxisRaw(), &QCPAxis::scaleTypeChanged, this,
                               [this] { linesChanged(); });
     linesChanged(); // pixels computed for the old axes mean nothing on the new ones
     mL2Dirty = mL1Cache != nullptr; // nor do the bins resampled for the old key range
@@ -934,10 +934,10 @@ bool QCPGraph::fillsAcrossValueAxes(const QCPGraph& partner) const
 {
     // The projections exist only on a cartesian frame; one key axis lives in one area. A graph
     // whose axes lie in two areas keeps them but has no system: it draws nowhere.
-    return mSystem && partner.mSystem && partner.mSystem != mSystem && mKeyAxis && mValueAxis
-        && partner.mKeyAxis == mKeyAxis
-        && partner.mValueAxis && partner.mValueAxis != mValueAxis
-        && partner.mValueAxis->orientation() == mValueAxis->orientation();
+    return mSystem && partner.mSystem && partner.mSystem != mSystem && keyAxisRaw() && valueAxisRaw()
+        && partner.keyAxisRaw() == keyAxisRaw()
+        && partner.valueAxisRaw() && partner.valueAxisRaw() != valueAxisRaw()
+        && partner.valueAxisRaw()->orientation() == valueAxisRaw()->orientation();
 }
 
 bool QCPGraph::setComponentFillToGraph(int owner, QCPGraph* other, int otherComponent,
@@ -1352,7 +1352,7 @@ QPointF QCPGraph::dataPixelPosition(int index) const
         const QCP::Pixels pixel = mSystem->transform().map(QCP::Data { key, value });
         return QPointF(pixel.x, pixel.y);
     }
-    if (!mKeyAxis || !mValueAxis)
+    if (!keyAxisRaw() || !valueAxisRaw())
         return {};
     return coordsToPixels(key, value);
 }
@@ -1419,10 +1419,10 @@ double QCPGraph::selectTest(const QPointF& pos, bool onlySelectable, QVariant* d
             return -1;
         return nearestMappedPoint(pos, details).value_or(-1);
     }
-    if (!mKeyAxis || !mValueAxis)
+    if (!keyAxisRaw() || !valueAxisRaw())
         return -1;
 
-    auto* axisRect = axisRectOf(mKeyAxis);
+    auto* axisRect = axisRectOf(keyAxisRaw());
     if (!axisRect || (!axisRect->rect().contains(pos.toPoint()) && !beyond))
         return -1;
 
@@ -1496,7 +1496,7 @@ QCPDataSelection QCPGraph::selectTestRect(const QRectF& rect, bool onlySelectabl
         return unionResult;
     }
 
-    if (!mKeyAxis || !mValueAxis)
+    if (!keyAxisRaw() || !valueAxisRaw())
         return unionResult;
 
     double key1, value1, key2, value2;
@@ -1653,7 +1653,7 @@ bool QCPGraph::canProduceContent() const
     // gives its one report, which the stale-buffer path would otherwise skip forever.
     if (!mSystem)
         return true;
-    if (!mKeyAxis || !mValueAxis)
+    if (!keyAxisRaw() || !valueAxisRaw())
         return false;
     // Pipeline active but L1 not ready — draw() will bail out
     if (mNeedsResampling && !mL1Cache && !mL2Result)
@@ -1665,7 +1665,7 @@ std::optional<double> QCPGraph::hitTest(QCP::Pixels at, QVariant* details) const
 {
     if (!mDataSource || mDataSource->empty())
         return std::nullopt;
-    if (!drawsInDataSpace() && (!mKeyAxis || !mValueAxis))
+    if (!drawsInDataSpace() && (!keyAxisRaw() || !valueAxisRaw()))
         return std::nullopt;
     return nearestDataPoint(QPointF(at.x, at.y), details);
 }
@@ -1978,9 +1978,9 @@ void QCPGraph::draw(QCPDrawContext& context) const
         drawInDataSpace(context);
         return;
     }
-    if (!mKeyAxis || !mValueAxis || !mDataSource || mDataSource->empty())
+    if (!keyAxisRaw() || !valueAxisRaw() || !mDataSource || mDataSource->empty())
         return;
-    if (mKeyAxis->range().size() <= 0)
+    if (keyAxisRaw()->range().size() <= 0)
         return;
 
     // An export cannot wait for the scheduler: it resamples what it draws, now.
@@ -1988,7 +1988,7 @@ void QCPGraph::draw(QCPDrawContext& context) const
     {
         if (!context.exporting())
             return;
-        mPipeline.runSynchronously(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data()));
+        mPipeline.runSynchronously(ViewportParams::fromAxes(keyAxisRaw(), valueAxisRaw()));
         bool level2Dirty = false;
         qcp::extractL1Cache<qcp::algo::GraphResamplerCache>(mPipeline.cache(), mL1Cache,
                                                                  level2Dirty);
@@ -1998,7 +1998,7 @@ void QCPGraph::draw(QCPDrawContext& context) const
     // since the recording being made right now is made from them.
     if (mL1Cache && mL2Dirty)
     {
-        rebuildL2(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data()));
+        rebuildL2(ViewportParams::fromAxes(keyAxisRaw(), valueAxisRaw()));
         mL2Dirty = false;
     }
 
@@ -2008,7 +2008,7 @@ void QCPGraph::draw(QCPDrawContext& context) const
     if (mL2Result)
         ds = mL2Result.get();
     else if (!mNeedsResampling || mL1Cache || context.exporting()
-             || mKeyAxis->scaleType() == QCPAxis::stLogarithmic)
+             || keyAxisRaw()->scaleType() == QCPAxis::stLogarithmic)
         ds = mDataSource.get();
     else
         return;
@@ -2030,18 +2030,18 @@ void QCPGraph::draw(QCPDrawContext& context) const
     if (begin >= end)
         return;
 
-    const bool logKeyAxis = mKeyAxis->scaleType() == QCPAxis::stLogarithmic;
+    const bool logKeyAxis = keyAxisRaw()->scaleType() == QCPAxis::stLogarithmic;
     // The thinning buckets are equal spans of the key, mapped to equal pixel spans: on a log axis
     // that span is a decade, so pixelsPerKey counts pixels per decade there.
     const double axisPixels = window.pixelsPerKey > 0.0
-        ? window.pixelsPerKey * mKeyAxis->range().size()
-        : (mKeyAxis->coordToPixel(mKeyAxis->range().upper)
-           - mKeyAxis->coordToPixel(mKeyAxis->range().lower));
+        ? window.pixelsPerKey * keyAxisRaw()->range().size()
+        : (keyAxisRaw()->coordToPixel(keyAxisRaw()->range().upper)
+           - keyAxisRaw()->coordToPixel(keyAxisRaw()->range().lower));
     double pixelsPerKey = window.pixelsPerKey > 0.0 ? window.pixelsPerKey
-                                                    : qcpKeyPixelsPerUnit(mKeyAxis.data());
+                                                    : qcpKeyPixelsPerUnit(keyAxisRaw());
     if (logKeyAxis)
     {
-        const QCPRange keyRange = mKeyAxis->range();
+        const QCPRange keyRange = keyAxisRaw()->range();
         const double decades = std::log10(keyRange.upper / keyRange.lower);
         pixelsPerKey = decades > 0.0 ? axisPixels / decades : 0.0;
     }
@@ -2057,7 +2057,7 @@ void QCPGraph::draw(QCPDrawContext& context) const
 
     // In data space the impulse baseline is a value: zero, or on a log value axis the range bound
     // nearer zero, as 2.x closed it.
-    const bool logValueAxis = mValueAxis->scaleType() == QCPAxis::stLogarithmic;
+    const bool logValueAxis = valueAxisRaw()->scaleType() == QCPAxis::stLogarithmic;
     const double impulseBaseline = dataSpaceBaseline();
     const bool impulses = std::any_of(mComponents.begin(), mComponents.end(), [](const QCPGraphComponent& c)
                                       { return c.visible && c.lineStyle == lsImpulse; });
@@ -2402,7 +2402,7 @@ std::vector<qcp::fill::StripPoint> QCPGraph::fillRows(const Fill& fill,
     const auto* targetColumn = std::get_if<int>(&fill.target);
     const auto edge = [this](double value)
     {
-        return drawsInDataSpace() ? dataSpaceFillValue(value) : fillValue(*mValueAxis, value);
+        return drawsInDataSpace() ? dataSpaceFillValue(value) : fillValue(*valueAxisRaw(), value);
     };
     Q_ASSERT(gaps.size() == std::max(0, end - begin)); // gapsBefore() holds one entry per row
     const double constant = targetColumn ? 0.0 : edge(std::get<double>(fill.target));
@@ -2438,7 +2438,7 @@ std::vector<qcp::fill::StripPoint> QCPGraph::shapeFillRows(
         rows = binnedWhenDense(std::move(rows));
     // The system's key axis is the one a straight-segment frame draws in log space.
     const QCPAxis* keyAxis = drawsInDataSpace() ? qobject_cast<const QCPAxis*>(keyAxisBase())
-                                                : mKeyAxis.data();
+                                                : keyAxisRaw();
     const bool logKeyAxis = keyAxis && keyAxis->scaleType() == QCPAxis::stLogarithmic;
     return steppedOnScreen(std::move(rows), ownerStep(mComponents[fill.owner]), logKeyAxis);
 }
@@ -2476,7 +2476,7 @@ std::vector<qcp::fill::StripPoint> QCPGraph::fillToGraphRows(
     // before the crop and the interpolation: the band is drawn in this graph's frame.
     const bool across = fillsAcrossValueAxes(*partner);
     const auto onThisAxis = [&](double value)
-    { return across ? mValueAxis->pixelToCoord(partner->mValueAxis->coordToPixel(value)) : value; };
+    { return across ? valueAxisRaw()->pixelToCoord(partner->valueAxisRaw()->coordToPixel(value)) : value; };
     std::vector<qcp::fill::SeriesRow> partnerRows;
     partnerRows.reserve(std::size_t(std::max(0, partnerEnd - partnerBegin)));
     for (int i = partnerBegin; i < partnerEnd; ++i)
@@ -2488,7 +2488,7 @@ std::vector<qcp::fill::StripPoint> QCPGraph::fillToGraphRows(
         = qcp::fill::fillToGraphRows(ownerRows, partnerRows);
     const bool dataSpace = drawsInDataSpace();
     const auto edge = [this, dataSpace](double value)
-    { return dataSpace ? dataSpaceFillValue(value) : fillValue(*mValueAxis, value); };
+    { return dataSpace ? dataSpaceFillValue(value) : fillValue(*valueAxisRaw(), value); };
     for (qcp::fill::StripPoint& row : rows)
     {
         row.a = edge(row.a);
@@ -2500,14 +2500,14 @@ std::vector<qcp::fill::StripPoint> QCPGraph::fillToGraphRows(
 std::vector<qcp::fill::StripPoint> QCPGraph::binnedWhenDense(
     std::vector<qcp::fill::StripPoint> rows) const
 {
-    const QRect rect = axisRectOf(mKeyAxis)->rect();
-    const int pixelLength = mKeyAxis->orientation() == Qt::Vertical ? rect.height() : rect.width();
+    const QRect rect = axisRectOf(keyAxisRaw())->rect();
+    const int pixelLength = keyAxisRaw()->orientation() == Qt::Vertical ? rect.height() : rect.width();
     if (rows.size() <= 4 * std::size_t(std::max(0, pixelLength)))
         return rows;
     const double quarterPixel = 4.0 * std::max(1, pixelLength);
-    if (mKeyAxis->scaleType() == QCPAxis::stLogarithmic)
+    if (keyAxisRaw()->scaleType() == QCPAxis::stLogarithmic)
     {
-        const QCPRange range = mKeyAxis->range();
+        const QCPRange range = keyAxisRaw()->range();
         if (range.lower <= 0.0 || range.upper <= 0.0)
             return rows;
         const double width = std::log10(range.upper / range.lower) / quarterPixel;
@@ -2520,7 +2520,7 @@ std::vector<qcp::fill::StripPoint> QCPGraph::binnedWhenDense(
             span.key = std::pow(10.0, span.key);
         return spans;
     }
-    const double width = std::abs(mKeyAxis->range().size()) / quarterPixel;
+    const double width = std::abs(keyAxisRaw()->range().size()) / quarterPixel;
     if (!(width > 0.0))
         return rows;
     return qcp::fill::binToSpans(rows, width);
@@ -2657,7 +2657,7 @@ std::vector<qcp::errorbars::Bar> QCPGraph::errorBarRows(const ErrorBars& spec,
     bars.reserve(std::max(0, end - begin));
     const bool dataSpace = drawsInDataSpace();
     const auto edge = [this, dataSpace](double value)
-    { return dataSpace ? value : fillValue(*mValueAxis, value); };
+    { return dataSpace ? value : fillValue(*valueAxisRaw(), value); };
     for (int i = begin; i < end; ++i)
     {
         const double y = edge(ds.valueAt(spec.value, i));
@@ -2677,14 +2677,14 @@ std::vector<qcp::errorbars::Bar> QCPGraph::errorBarRows(const ErrorBars& spec,
 bool QCPGraph::errorBarsFitInView(std::span<const qcp::errorbars::Bar> bars,
                                        double minSpacingPx) const
 {
-    const QRect rect = axisRectOf(mKeyAxis)->rect();
-    const bool vertical = mKeyAxis->orientation() == Qt::Vertical;
+    const QRect rect = axisRectOf(keyAxisRaw())->rect();
+    const bool vertical = keyAxisRaw()->orientation() == Qt::Vertical;
     const double first = vertical ? rect.top() : rect.left();
     const double last = vertical ? rect.bottom() : rect.right();
     std::vector<qcp::errorbars::Bar> shown;
     for (qcp::errorbars::Bar bar : bars)
     {
-        const double pixel = mKeyAxis->coordToPixel(bar.key);
+        const double pixel = keyAxisRaw()->coordToPixel(bar.key);
         if (std::isfinite(pixel) && pixel >= first && pixel <= last && qcp::errorbars::resolve(bar))
         {
             bar.key = pixel;
@@ -2774,9 +2774,9 @@ void QCPGraph::recordErrorBars(QCPDrawContext& context, const QCPAbstractMultiDa
         {
             if (!qcp::errorbars::resolve(bar) || !std::isfinite(bar.key))
                 continue;
-            const double pixel = mKeyAxis->coordToPixel(bar.key);
-            const double left = mKeyAxis->pixelToCoord(pixel - halfCap);
-            const double right = mKeyAxis->pixelToCoord(pixel + halfCap);
+            const double pixel = keyAxisRaw()->coordToPixel(bar.key);
+            const double left = keyAxisRaw()->pixelToCoord(pixel - halfCap);
+            const double right = keyAxisRaw()->pixelToCoord(pixel + halfCap);
             centres.emplace_back(bar.key, 0.5 * (bar.lower + bar.upper));
             spans.emplace_back(0.5 * std::abs(right - left), 0.5 * (bar.upper - bar.lower));
         }

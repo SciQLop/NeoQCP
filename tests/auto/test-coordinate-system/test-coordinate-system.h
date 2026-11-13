@@ -24,6 +24,7 @@ private slots:
     void aLostSystemReportsOnce();
     void deletingAnAxisDeletesItsSystems();
     void aPlottableTakesASystem();
+    void theAxisPairFollowsEveryFrame();
     void twoConstructorsShareTheSystem();
     void movingBetweenSystemsReRecords();
     void aPlottableOfADeletedSystemIsInert();

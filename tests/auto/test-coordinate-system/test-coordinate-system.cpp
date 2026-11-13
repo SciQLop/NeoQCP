@@ -122,6 +122,12 @@ public:
 
     [[nodiscard]] int recordings() const { return mCore.recordingCount(); }
 
+    //! The raw pair a subclass draws through: the handles must answer the same.
+    [[nodiscard]] std::pair<QCPAxis*, QCPAxis*> rawPair() const
+    {
+        return { keyAxisRaw(), valueAxisRaw() };
+    }
+
     void systemChanged() override
     {
         ++mSystemChanges;
@@ -529,6 +535,55 @@ void TestCoordinateSystem::aPlottableTakesASystem()
     auto* sibling = new RecordingPlottable(x, y);
     QCOMPARE(sibling->system(), system);
     QCOMPARE(rect->systems().size(), 1);
+}
+
+void TestCoordinateSystem::theAxisPairFollowsEveryFrame()
+{
+    QCustomPlot plot;
+    QCPAxisRect* rect = cartesianRect(plot);
+    auto* polar = new QCPPolarArea(&plot);
+    plot.plotLayout()->addElement(1, 0, polar);
+    QCPAxis* x = rect->axis(QCPAxis::atBottom);
+    QCPAxis* y = rect->axis(QCPAxis::atLeft);
+    using Pair = std::pair<QCPAxis*, QCPAxis*>;
+    const auto pairOf = [](const RecordingPlottable* p) {
+        return Pair { p->keyAxis().get(), p->valueAxis().get() };
+    };
+
+    auto* plottable = new RecordingPlottable(x, y);
+    QCOMPARE(pairOf(plottable), Pair(x, y));
+    QCOMPARE(plottable->rawPair(), Pair(x, y));
+
+    // The 2.x two-step swap: the middle pair resolves to no system, and keeps both axes it was
+    // given, so that the second step reads the key axis the first one set.
+    plottable->setKeyAxis(y);
+    QVERIFY(!plottable->system());
+    QCOMPARE(pairOf(plottable), Pair(y, y));
+    QCOMPARE(plottable->rawPair(), Pair(y, y));
+    plottable->setValueAxis(x);
+    QCOMPARE(plottable->system().get(), rect->system(y, x).get());
+    QCOMPARE(pairOf(plottable), Pair(y, x));
+    QCOMPARE(plottable->rawPair(), Pair(y, x));
+
+    // A system with no cartesian projection hands out no 2.x axis.
+    plottable->setSystem(polarSystem(polar));
+    QCOMPARE(pairOf(plottable), Pair(nullptr, nullptr));
+    QCOMPARE(plottable->rawPair(), Pair(nullptr, nullptr));
+
+    plottable->setSystem(rect->system(x, y));
+    QCOMPARE(pairOf(plottable), Pair(x, y));
+    QCOMPARE(plottable->rawPair(), Pair(x, y));
+
+    plottable->setSystem(nullptr);
+    QCOMPARE(pairOf(plottable), Pair(nullptr, nullptr));
+    QCOMPARE(plottable->rawPair(), Pair(nullptr, nullptr));
+
+    // A plot that takes the plottable back clears the pair with the frame.
+    plottable->setSystem(rect->system(x, y));
+    auto taken = plot.take(QCPHandle<QCPAbstractPlottable>(plottable));
+    QVERIFY(taken);
+    QCOMPARE(pairOf(plottable), Pair(nullptr, nullptr));
+    QCOMPARE(plottable->rawPair(), Pair(nullptr, nullptr));
 }
 
 void TestCoordinateSystem::twoConstructorsShareTheSystem()

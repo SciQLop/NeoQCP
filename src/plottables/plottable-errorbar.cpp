@@ -458,7 +458,7 @@ QCPDataSelection QCPErrorBars::selectTestRect(const QRectF& rect, bool onlySelec
         return result;
     if ((onlySelectable && mSelectable == QCP::stNone) || mDataContainer->isEmpty())
         return result;
-    if (!mKeyAxis || !mValueAxis)
+    if (!keyAxisRaw() || !valueAxisRaw())
         return result;
 
     QCPErrorBarsDataContainer::const_iterator visibleBegin, visibleEnd;
@@ -534,10 +534,10 @@ double QCPErrorBars::selectTest(const QPointF& pos, bool onlySelectable, QVarian
 
     if ((onlySelectable && mSelectable == QCP::stNone) || mDataContainer->isEmpty())
         return -1;
-    if (!mKeyAxis || !mValueAxis)
+    if (!keyAxisRaw() || !valueAxisRaw())
         return -1;
 
-    if (axisRectOf(mKeyAxis.data())->rect().contains(pos.toPoint())
+    if (axisRectOf(keyAxisRaw())->rect().contains(pos.toPoint())
         || mParentPlot->interactions().testFlag(QCP::iSelectPlottablesBeyondAxisRect))
     {
         QCPErrorBarsDataContainer::const_iterator closestDataPoint = mDataContainer->constEnd();
@@ -558,9 +558,9 @@ void QCPErrorBars::draw(QCPDrawContext& context) const
 {
     if (!mDataPlottable)
         return;
-    if (!mKeyAxis || !mValueAxis)
+    if (!keyAxisRaw() || !valueAxisRaw())
         return; // the base refuses the recording without them
-    if (mKeyAxis.data()->range().size() <= 0 || mDataContainer->isEmpty())
+    if (keyAxisRaw()->range().size() <= 0 || mDataContainer->isEmpty())
         return;
 
     // check data validity if flag set:
@@ -621,7 +621,7 @@ void QCPErrorBars::paintLegendIcon(QCPPainter* painter, const QRectF& rect) cons
 {
     applyDefaultAntialiasingHint(painter);
     painter->setPen(mPen);
-    if (mErrorType == etValueError && mValueAxis && mValueAxis->orientation() == Qt::Vertical)
+    if (mErrorType == etValueError && valueAxisRaw() && valueAxisRaw()->orientation() == Qt::Vertical)
     {
         painter->drawLine(
             QLineF(rect.center().x(), rect.top() + 2, rect.center().x(), rect.bottom() - 1));
@@ -845,8 +845,8 @@ void QCPErrorBars::getErrorBarLines(QCPErrorBarsDataContainer::const_iterator it
     QPointF centerPixel = mDataPlottable->interface1D()->dataPixelPosition(index);
     if (qIsNaN(centerPixel.x()) || qIsNaN(centerPixel.y()))
         return;
-    QCPAxis* errorAxis = mErrorType == etValueError ? mValueAxis.data() : mKeyAxis.data();
-    QCPAxis* orthoAxis = mErrorType == etValueError ? mKeyAxis.data() : mValueAxis.data();
+    QCPAxis* errorAxis = mErrorType == etValueError ? valueAxisRaw() : keyAxisRaw();
+    QCPAxis* orthoAxis = mErrorType == etValueError ? keyAxisRaw() : valueAxisRaw();
     const double centerErrorAxisPixel
         = errorAxis->orientation() == Qt::Horizontal ? centerPixel.x() : centerPixel.y();
     const double centerOrthoAxisPixel
@@ -924,11 +924,10 @@ void QCPErrorBars::getVisibleDataBounds(QCPErrorBarsDataContainer::const_iterato
                                         QCPErrorBarsDataContainer::const_iterator& end,
                                         const QCPDataRange& rangeRestriction) const
 {
-    QCPAxis* keyAxis = mKeyAxis.data();
-    QCPAxis* valueAxis = mValueAxis.data();
+    QCPAxis* keyAxis = keyAxisRaw();
+    QCPAxis* valueAxis = valueAxisRaw();
     if (!keyAxis || !valueAxis)
     {
-        qDebug() << Q_FUNC_INFO << "invalid key or value axis";
         end = mDataContainer->constEnd();
         begin = end;
         return;
@@ -990,9 +989,8 @@ double QCPErrorBars::pointDistance(const QPointF& pixelPoint,
     closestData = mDataContainer->constEnd();
     if (!mDataPlottable || mDataContainer->isEmpty())
         return -1.0;
-    if (!mKeyAxis || !mValueAxis)
+    if (!keyAxisRaw() || !valueAxisRaw())
     {
-        qDebug() << Q_FUNC_INFO << "invalid key or value axis";
         return -1.0;
     }
 
@@ -1061,14 +1059,14 @@ bool QCPErrorBars::errorBarVisible(int index) const
 {
     QPointF centerPixel = mDataPlottable->interface1D()->dataPixelPosition(index);
     const double centerKeyPixel
-        = mKeyAxis->orientation() == Qt::Horizontal ? centerPixel.x() : centerPixel.y();
+        = keyAxisRaw()->orientation() == Qt::Horizontal ? centerPixel.x() : centerPixel.y();
     if (qIsNaN(centerKeyPixel))
         return false;
 
     double keyMin, keyMax;
     if (mErrorType == etKeyError)
     {
-        const double centerKey = mKeyAxis->pixelToCoord(centerKeyPixel);
+        const double centerKey = keyAxisRaw()->pixelToCoord(centerKeyPixel);
         const double errorPlus = mDataContainer->at(index).errorPlus;
         const double errorMinus = mDataContainer->at(index).errorMinus;
         keyMax = centerKey + (qIsNaN(errorPlus) ? 0 : errorPlus);
@@ -1076,12 +1074,12 @@ bool QCPErrorBars::errorBarVisible(int index) const
     }
     else // mErrorType == etValueError
     {
-        keyMax = mKeyAxis->pixelToCoord(centerKeyPixel
-                                        + mWhiskerWidth * 0.5 * mKeyAxis->pixelOrientation());
-        keyMin = mKeyAxis->pixelToCoord(centerKeyPixel
-                                        - mWhiskerWidth * 0.5 * mKeyAxis->pixelOrientation());
+        keyMax = keyAxisRaw()->pixelToCoord(centerKeyPixel
+                                        + mWhiskerWidth * 0.5 * keyAxisRaw()->pixelOrientation());
+        keyMin = keyAxisRaw()->pixelToCoord(centerKeyPixel
+                                        - mWhiskerWidth * 0.5 * keyAxisRaw()->pixelOrientation());
     }
-    return ((keyMax > mKeyAxis->range().lower) && (keyMin < mKeyAxis->range().upper));
+    return ((keyMax > keyAxisRaw()->range().lower) && (keyMin < keyAxisRaw()->range().upper));
 }
 
 /*! \internal
@@ -1179,7 +1177,7 @@ void QCPErrorBars::recordSegment(QCPDrawContext& context, const QCPDataRange& se
     // reads the view, so such a recording is remade whenever the view changes.
     const QCPBars* bars = qobject_cast<const QCPBars*>(mDataPlottable.data());
     const bool pixelCentres = bars && (bars->barBelowRaw() || bars->barsGroupRaw());
-    QCPAxis* errorAxis = mErrorType == etValueError ? mValueAxis.data() : mKeyAxis.data();
+    QCPAxis* errorAxis = mErrorType == etValueError ? valueAxisRaw() : keyAxisRaw();
     if (pixelCentres)
         (void)context.transform();
     const auto endPixel = [errorAxis](const QPointF& centre, double coord)

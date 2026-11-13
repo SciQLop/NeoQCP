@@ -66,6 +66,9 @@ The replay resolves them through the frame's <a href="api/classQCPTransform.html
   given in pixels; a bar width in plot coordinates never reads it and keeps pan and zoom reuse.
   Grouped or stacked bars, and any bar whose width is not in plot coordinates, are pixel geometry
   too, for the same reason.
+- **The axes, when you need them.** The 2.x members `mKeyAxis` and `mValueAxis` are private. Code
+  that needs an axis calls the protected `keyAxisRaw()` and `valueAxisRaw()` (raw pointers, cheap on a
+  per-point path), or `system()` on any frame. The raw pair is null on a non-cartesian system.
 
 ## Telling the plot what changed
 

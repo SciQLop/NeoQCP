@@ -36,10 +36,10 @@ void QCPHistogram2D::followAxisScales()
 {
     disconnect(mKeyScaleLink);
     disconnect(mValueScaleLink);
-    if (mKeyAxis)
-        mKeyScaleLink = connect(mKeyAxis.data(), &QCPAxis::scaleTypeChanged, this, &QCPHistogram2D::refreshBinning);
-    if (mValueAxis)
-        mValueScaleLink = connect(mValueAxis.data(), &QCPAxis::scaleTypeChanged, this, &QCPHistogram2D::refreshBinning);
+    if (keyAxisRaw())
+        mKeyScaleLink = connect(keyAxisRaw(), &QCPAxis::scaleTypeChanged, this, &QCPHistogram2D::refreshBinning);
+    if (valueAxisRaw())
+        mValueScaleLink = connect(valueAxisRaw(), &QCPAxis::scaleTypeChanged, this, &QCPHistogram2D::refreshBinning);
 }
 
 void QCPHistogram2D::refreshBinning()
@@ -52,8 +52,8 @@ void QCPHistogram2D::installTransform()
 {
     int capturedKeyBins = mKeyBins;
     int capturedValueBins = mValueBins;
-    const bool keyLog = mKeyAxis && mKeyAxis->scaleType() == QCPAxis::stLogarithmic;
-    const bool valueLog = mValueAxis && mValueAxis->scaleType() == QCPAxis::stLogarithmic;
+    const bool keyLog = keyAxisRaw() && keyAxisRaw()->scaleType() == QCPAxis::stLogarithmic;
+    const bool valueLog = valueAxisRaw() && valueAxisRaw()->scaleType() == QCPAxis::stLogarithmic;
     mBinnedKeyLog = keyLog;
     mBinnedValueLog = valueLog;
 
@@ -248,15 +248,15 @@ QCPRange QCPHistogram2D::colorDataBounds(bool& found) const
 
 bool QCPHistogram2D::canProduceContent() const
 {
-    if (!mKeyAxis || !mValueAxis || !mDataSource)
+    if (!keyAxisRaw() || !valueAxisRaw() || !mDataSource)
         return false;
     return mPipeline.result() != nullptr || mPipeline.isBusy();
 }
 
 bool QCPHistogram2D::binnedForTheAxisScales() const
 {
-    const bool keyLog = mKeyAxis && mKeyAxis->scaleType() == QCPAxis::stLogarithmic;
-    const bool valueLog = mValueAxis && mValueAxis->scaleType() == QCPAxis::stLogarithmic;
+    const bool keyLog = keyAxisRaw() && keyAxisRaw()->scaleType() == QCPAxis::stLogarithmic;
+    const bool valueLog = valueAxisRaw() && valueAxisRaw()->scaleType() == QCPAxis::stLogarithmic;
     return keyLog == mBinnedKeyLog && valueLog == mBinnedValueLog;
 }
 
@@ -281,7 +281,7 @@ void QCPHistogram2D::binForExport()
         return;
     if (!binnedForTheAxisScales())
         installTransform();
-    if (!mPipeline.runSynchronously(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data())))
+    if (!mPipeline.runSynchronously(ViewportParams::fromAxes(keyAxisRaw(), valueAxisRaw())))
         return;
     // A job still running may have the old scales: it must not replace these cells.
     mPipeline.supersedeEarlierJobs();
@@ -291,7 +291,7 @@ void QCPHistogram2D::binForExport()
 void QCPHistogram2D::draw(QCPDrawContext& context) const
 {
     PROFILE_HERE_N("QCPHistogram2D::draw");
-    if (!mKeyAxis || !mValueAxis)
+    if (!keyAxisRaw() || !valueAxisRaw())
         return;
     auto* self = const_cast<QCPHistogram2D*>(this);
     const bool staleScales = !binnedForTheAxisScales();
@@ -306,7 +306,7 @@ void QCPHistogram2D::draw(QCPDrawContext& context) const
     if (!cells)
         return;
 
-    const bool keyIsVertical = mKeyAxis->orientation() == Qt::Vertical;
+    const bool keyIsVertical = keyAxisRaw()->orientation() == Qt::Vertical;
     if (self->mRenderer.mapImageInvalidated() || self->mRenderer.keyIsVertical() != keyIsVertical)
         self->mRenderer.updateMapImage(cells, keyIsVertical);
     const QImage& image = mRenderer.mapImage();
@@ -323,7 +323,7 @@ void QCPHistogram2D::draw(QCPDrawContext& context) const
     const QCP::Data rightBottom = keyIsVertical ? QCP::Data { keyRange.lower, valueRange.upper }
                                                 : QCP::Data { keyRange.upper, valueRange.lower };
     context.image(leftTop, rightBottom, image, {}, false);
-    self->mContours.update(cells, context, dataScaleType(), mKeyAxis.data(), mValueAxis.data());
+    self->mContours.update(cells, context, dataScaleType(), keyAxisRaw(), valueAxisRaw());
 }
 
 void QCPHistogram2D::drawLegendIcon(QCPDrawContext& icon) const
@@ -422,11 +422,11 @@ double QCPHistogram2D::selectTest(const QPointF& pos, bool onlySelectable, QVari
 {
     if (onlySelectable && !mSelectable)
         return -1;
-    if (!mKeyAxis || !mValueAxis || !mDataSource)
+    if (!keyAxisRaw() || !valueAxisRaw() || !mDataSource)
         return -1;
 
-    double key = mKeyAxis->pixelToCoord(pos.x());
-    double value = mValueAxis->pixelToCoord(pos.y());
+    double key = keyAxisRaw()->pixelToCoord(pos.x());
+    double value = valueAxisRaw()->pixelToCoord(pos.y());
 
     // Use the true scattered min/max, not the sorted first/last shortcut.
     QCPRange kr, vr;

@@ -84,15 +84,15 @@ QCPHistogram::QCPHistogram(QCPAxis* keyAxis, QCPAxis* valueAxis)
 void QCPHistogram::followKeyAxis()
 {
     disconnect(mKeyScaleLink);
-    if (mKeyAxis)
-        mKeyScaleLink = connect(mKeyAxis.data(), &QCPAxis::scaleTypeChanged, this, &QCPHistogram::resetEdges);
+    if (keyAxisRaw())
+        mKeyScaleLink = connect(keyAxisRaw(), &QCPAxis::scaleTypeChanged, this, &QCPHistogram::resetEdges);
 }
 
 QCPHistogram::~QCPHistogram() = default;
 
 bool QCPHistogram::keyLog() const
 {
-    return mKeyAxis && mKeyAxis->scaleType() == QCPAxis::stLogarithmic;
+    return keyAxisRaw() && keyAxisRaw()->scaleType() == QCPAxis::stLogarithmic;
 }
 
 // The transform's scale alone is not enough: rememberEdges() reinstalls it for the current axis
@@ -300,7 +300,7 @@ void QCPHistogram::requestReplot()
 
 void QCPHistogram::binForExport()
 {
-    if (!mDataSource || !mKeyAxis || !mValueAxis)
+    if (!mDataSource || !keyAxisRaw() || !valueAxisRaw())
         return;
     if (scaleIsStale())
     {
@@ -308,7 +308,7 @@ void QCPHistogram::binForExport()
         installTransform();
     }
     // No signals: their receivers (auto-scale) must not run in the middle of a paint.
-    if (mPipeline.runSynchronously(ViewportParams::fromAxes(mKeyAxis.data(), mValueAxis.data())))
+    if (mPipeline.runSynchronously(ViewportParams::fromAxes(keyAxisRaw(), valueAxisRaw())))
         storeResult(pipelineResult());
 }
 
@@ -339,7 +339,7 @@ void QCPHistogram::resetForTheStaleScale()
 
 bool QCPHistogram::canProduceContent() const
 {
-    return mKeyAxis && mValueAxis && (mResult || mPipeline.isBusy());
+    return keyAxisRaw() && valueAxisRaw() && (mResult || mPipeline.isBusy());
 }
 
 void QCPHistogram::draw(QCPDrawContext& context) const
@@ -352,7 +352,7 @@ void QCPHistogram::draw(QCPDrawContext& context) const
     // Export does not pump the event loop, so a background result would never arrive.
     if (context.exporting() && (staleScale || !mResult || mPipeline.isBusy()))
         self->binForExport();
-    if (!mResult || !mKeyAxis || !mValueAxis)
+    if (!mResult || !keyAxisRaw() || !valueAxisRaw())
         return;
     for (int c = 0; c < int(mResult->heights.size()); ++c)
     {
@@ -370,7 +370,7 @@ void QCPHistogram::recordRects(QCPDrawContext& context, int column, const QPen& 
                                const QBrush& brush) const
 {
     const auto& heights = mResult->heights[std::size_t(column)];
-    const bool log = mValueAxis->scaleType() == QCPAxis::stLogarithmic;
+    const bool log = valueAxisRaw()->scaleType() == QCPAxis::stLogarithmic;
     const double base = baseValue(context);
     for (std::size_t b = 0; b < heights.size(); ++b)
     {
@@ -394,7 +394,7 @@ void QCPHistogram::recordStep(QCPDrawContext& context, int column, const ColumnL
     if (look.fill.alpha() > 0)
         recordRects(context, column, QPen(Qt::NoPen), look.fill);
     const auto& heights = mResult->heights[std::size_t(column)];
-    const bool log = mValueAxis->scaleType() == QCPAxis::stLogarithmic;
+    const bool log = valueAxisRaw()->scaleType() == QCPAxis::stLogarithmic;
     const double base = baseValue(context);
     const QPointF breakPoint(qQNaN(), qQNaN());
     std::vector<QPointF> points;
@@ -425,10 +425,10 @@ void QCPHistogram::recordStep(QCPDrawContext& context, int column, const ColumnL
 // A log axis has no zero: the bars start at its lower bound, so the recording follows that bound.
 double QCPHistogram::baseValue(QCPDrawContext& context) const
 {
-    if (mValueAxis->scaleType() == QCPAxis::stLinear)
+    if (valueAxisRaw()->scaleType() == QCPAxis::stLinear)
         return 0.0;
     (void)context.transform();
-    return mValueAxis->range().lower;
+    return valueAxisRaw()->range().lower;
 }
 
 // A zero height covers no pixels, and a log axis can only place positive ones.

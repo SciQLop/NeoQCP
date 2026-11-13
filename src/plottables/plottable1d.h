@@ -400,7 +400,7 @@ QCPDataSelection QCPAbstractPlottable1D<DataType, Base>::selectTestRect(const QR
         return result;
     if (!this->mSystem)
         return result;
-    if (!this->mKeyAxis || !this->mValueAxis)
+    if (!this->keyAxisRaw() || !this->valueAxisRaw())
     {
         // A system of the user's own hands no key window, and its mapping may fold the key axis:
         // map the whole container once and keep the points whose pixel falls in the rect.
