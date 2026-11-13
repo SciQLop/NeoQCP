@@ -126,6 +126,14 @@ static void useFreeTypeOnCocoa()
 #endif
 }
 
+// A point is 1/72 inch on macOS (logical 72 dpi) and 1/96 elsewhere, so a font sized in points
+// drew a quarter smaller there: the legends, the item texts and the colour scale labels of the
+// reference pictures. The pictures are exports, whose text Qt sizes at its default dpi.
+static void sizePointsLikeEveryPlatform()
+{
+    QCoreApplication::setAttribute(Qt::AA_Use96Dpi);
+}
+
 #define QCPTEST(t)                                                                                 \
     if (shouldRun(#t))                                                                             \
     {                                                                                              \
@@ -136,6 +144,7 @@ static void useFreeTypeOnCocoa()
 int main(int argc, char** argv)
 {
     useFreeTypeOnCocoa();
+    sizePointsLikeEveryPlatform();
     QApplication app(argc, argv);
     useTheBundledFont();
     if (qEnvironmentVariableIsEmpty("QCP_TEST_CLASS")
