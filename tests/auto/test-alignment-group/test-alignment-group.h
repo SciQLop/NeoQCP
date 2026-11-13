@@ -34,6 +34,9 @@ private slots:
     void aDeletedGroupLeavesTheOtherSides();
     void aDeletedElementLeavesEveryGroup();
     void aBadSideHasNoGroup();
+    void aHiddenMemberRepaintsNoVisiblePeer();
+    void oneRenderTakesOneExtraPassThenNone();
+    void anUnsettledLayoutStopsAndRepaintsLater();
 
     // The mixed-side margin-group layouts of 2.x, rebuilt with alignment groups (m5d B2).
     void jointDensityAlignsAsItsMarginGroupsDid();

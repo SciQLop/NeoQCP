@@ -300,6 +300,35 @@ QList<QCPLayoutElement*> stackedPair(QCustomPlot& plot, Grouping grouping)
     return { upper, lower };
 }
 
+//! An axis rect that counts its layout passes.
+class PassCountingRect : public QCPAxisRect
+{
+public:
+    using QCPAxisRect::QCPAxisRect;
+    int passes = 0;
+
+    void update(UpdatePhase phase) override
+    {
+        QCPAxisRect::update(phase);
+        if (phase == upLayout)
+            ++passes;
+    }
+};
+
+//! A fixed-width rect whose left margin grows on every call: its left edge never settles.
+class RestlessRect : public PassCountingRect
+{
+public:
+    using PassCountingRect::PassCountingRect;
+    int calls = 0;
+
+protected:
+    int calculateAutoMargin(QCP::MarginSide side) override
+    {
+        return side == QCP::msLeft ? 15 + 5 * ++calls : QCPAxisRect::calculateAutoMargin(side);
+    }
+};
+
 int innerSide(const QCPLayoutElement* element, QCP::MarginSide side)
 {
     const QRect rect = element->rect();
@@ -728,6 +757,16 @@ void TestAlignmentGroup::joiningForSomeSidesKeepsTheOthers()
     QCOMPARE(both->elements().size(), 1);
     QCOMPARE(a->axisRect()->alignmentGroup(QCP::msLeft), other);
     QCOMPARE(a->axisRect()->alignmentGroup(QCP::msRight), right);
+
+    // Joining again takes every side back, from both groups that held them meanwhile.
+    both->add(a->axisRect());
+    QCOMPARE(a->axisRect()->alignmentGroup(QCP::msLeft), both);
+    QCOMPARE(a->axisRect()->alignmentGroup(QCP::msRight), both);
+    QCOMPARE(qcp::pointers(right->elements()), QList<QCPLayoutElement*>({ c->axisRect() }));
+    QVERIFY(!holds(other, a->axisRect()));
+    QSignalSpy changes(both.data(), &QCPAlignmentGroup::membersChanged);
+    both->add(a->axisRect()); // already holds every side: nothing changes
+    QCOMPARE(changes.count(), 0);
     QCOMPARE(gMisuses, 0);
 }
 
@@ -869,4 +908,58 @@ void TestAlignmentGroup::stackedPairAlignsSidewaysAsItsMarginGroupDid()
     QCOMPARE(innerSide(elements[0], QCP::msLeft), innerSide(elements[1], QCP::msLeft));
     QCOMPARE(innerSide(elements[0], QCP::msRight), innerSide(elements[1], QCP::msRight));
     QCOMPARE(horizontalEdges(elements), horizontalEdges(marginElements));
+}
+
+void TestAlignmentGroup::aHiddenMemberRepaintsNoVisiblePeer()
+{
+    auto* a = makePlot();
+    auto* b = makePlot(false);
+    auto* c = makePlot(false);
+    QScopedPointer<QWidget> window(makeFreeStack({ a, b, c }, 24));
+    window->show();
+    QVERIFY(QTest::qWaitForWindowExposed(window.data()));
+    const auto group = QCPAlignmentGroup::create({ a->axisRect(), b->axisRect(), c->axisRect() });
+    QVERIFY(group);
+    QVERIFY(settle({ a, b, c }));
+    c->hide();
+    QTest::qWait(150);
+    QVERIFY(settle({ a, b }));
+
+    int peerRepaints = 0;
+    const auto counted
+        = connect(b, &QCustomPlot::afterReplot, b, [&peerRepaints] { ++peerRepaints; });
+    c->replot(); // a hidden plot still replots unless told to skip
+    a->replot();
+    QTest::qWait(200);
+    disconnect(counted);
+    QCOMPARE(peerRepaints, 0);
+    QCOMPARE(innerLeft(a), innerLeft(b));
+}
+
+void TestAlignmentGroup::oneRenderTakesOneExtraPassThenNone()
+{
+    QCustomPlot plot;
+    auto* lower = new PassCountingRect(&plot);
+    plot.plotLayout()->addElement(1, 0, lower);
+    lower->axis(QCPAxis::atLeft)->setRange(0, 1e9);
+    QVERIFY(QCPAlignmentGroup::create({ plot.axisRect(), lower }));
+    renderOnce(plot, QSize(400, 300));
+    QCOMPARE(lower->passes, 2); // the first pass has no edges to align to
+    QCOMPARE(innerSide(plot.axisRect(), QCP::msLeft), innerSide(lower, QCP::msLeft));
+    lower->passes = 0;
+    plot.replot();
+    QCOMPARE(lower->passes, 1);
+}
+
+void TestAlignmentGroup::anUnsettledLayoutStopsAndRepaintsLater()
+{
+    QCustomPlot plot;
+    auto* restless = new RestlessRect(&plot);
+    plot.plotLayout()->addElement(0, 1, restless);
+    restless->setMinimumSize(100, 50); // a fixed inner width: its margin moves its outer left edge
+    restless->setMaximumSize(100, QWIDGETSIZE_MAX);
+    QVERIFY(QCPAlignmentGroup::create({ restless }, QCP::msLeft));
+    renderOnce(plot, QSize(400, 300));
+    QCOMPARE(restless->passes, 4); // the pass, then the three extra ones
+    QVERIFY(plot.isRepaintQueued()); // the next replot carries on
 }

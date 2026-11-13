@@ -208,7 +208,9 @@ int QCPAlignmentGroup::marginFor(QCPLayoutElement* element, QCP::MarginSide side
             own = edge;
     }
     mUsedEdges[element][side] = own;
-    if (mLastEdge.value(side, INT_MIN) != shared)
+    // A hidden plot's member saw its own plot's members only: its shared edge is not the group's,
+    // and those members are laid out in this very pass anyway.
+    if (element->parentPlot()->isVisible() && mLastEdge.value(side, INT_MIN) != shared)
     {
         mLastEdge[side] = shared;
         for (QCPLayoutElement* member : peers)
