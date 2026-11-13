@@ -112,13 +112,18 @@ private:
   Clock::time_point mStart;
 };
 
-// One Site per call site (Tag), constructed on the site's first execution.
+// One Site per call site (Tag), constructed on the site's first execution. The tag is
+// __COUNTER__, which restarts in every translation unit, so the template has internal linkage:
+// with external linkage, two zones of two files with the same tag shared one Site.
+namespace
+{
 template <int Tag>
-inline Site &siteFor(const char *name)
+Site &siteFor(const char *name)
 {
   static Site site { name };
   return site;
 }
+} // namespace
 
 inline void countFrame()
 {
