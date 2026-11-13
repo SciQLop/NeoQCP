@@ -234,14 +234,21 @@ void QCPGridRhiLayer::rebuildGeometry(float dpr, int outputHeight)
             };
 
             const QCPRange& range = axis->range();
-            if (grid->zeroLinePen().style() != Qt::NoPen
-                && range.lower < 0 && range.upper > 0)
-            {
-                emitGridLine(0.0, grid->zeroLinePen());
-            }
-
+            // As QCPGrid::drawGridLines: the zero line replaces the grid line of the zero tick.
+            const bool zeroLine = grid->zeroLinePen().style() != Qt::NoPen && range.lower < 0
+                && range.upper > 0;
+            const double epsilon = range.size() * 1E-6;
+            bool zeroDrawn = false;
             for (double tickVal : axis->tickVector())
-                emitGridLine(tickVal, grid->pen());
+            {
+                if (zeroLine && !zeroDrawn && qAbs(tickVal) < epsilon)
+                {
+                    emitGridLine(0.0, grid->zeroLinePen());
+                    zeroDrawn = true;
+                }
+                else
+                    emitGridLine(tickVal, grid->pen());
+            }
 
             if (grid->subGridVisible())
             {

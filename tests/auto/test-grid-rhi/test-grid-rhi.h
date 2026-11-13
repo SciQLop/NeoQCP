@@ -14,6 +14,7 @@ private slots:
     void layerReplotDoesNotStackGpuGeometry();
     void gradientGraphFillLooksTheSameOnScreenAndInExports();
     void dashedGridPenIsDashedOnScreen();
+    void zeroLineIsNotOverdrawnOnScreen();
     void colorScaleTicksAreDrawnOnScreen();
     void thinLinesAreOneLogicalPixelOnScreen();
     void replotDoesNotCrash();

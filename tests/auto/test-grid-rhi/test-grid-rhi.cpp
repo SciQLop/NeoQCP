@@ -331,6 +331,25 @@ void TestGridRhi::dashedGridPenIsDashedOnScreen()
              qPrintable(QString("screen %1, export %2").arg(onScreen).arg(inExport)));
 }
 
+// The zero line has its own pen. The screen drew the tick's grid line over it, so a dark grid pen
+// hid the light zero line there, while the export drew the zero line alone.
+void TestGridRhi::zeroLineIsNotOverdrawnOnScreen()
+{
+    if (!showAndHasRhiGrid(mPlot))
+        QSKIP("No QRhi available — the GPU grid needs a real backend");
+    mPlot->yAxis->grid()->setVisible(false);
+    mPlot->xAxis->grid()->setPen(QPen(Qt::black, 2));
+    mPlot->xAxis->grid()->setZeroLinePen(QPen(QColor(220, 220, 220), 2));
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCoreApplication::processEvents();
+
+    const QImage frame = mPlot->grabFramebuffer();
+    const double dpr = frame.devicePixelRatio();
+    const QImage exported = mPlot->toPixmap(400, 300, dpr).toImage();
+    QCOMPARE(gridLineInk(exported, mPlot, 0, dpr), 0.0);
+    QCOMPARE(gridLineInk(frame, mPlot, 0, dpr), 0.0);
+}
+
 void TestGridRhi::tickMarksFollowPanWithoutRebuild()
 {
     if (!showAndHasRhiGrid(mPlot))
