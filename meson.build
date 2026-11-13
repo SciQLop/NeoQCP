@@ -19,6 +19,12 @@ if qt_framework_defines
         compile_args: ['-DQT_CORE_LIB', '-DQT_GUI_LIB', '-DQT_WIDGETS_LIB', '-DQT_SVG_LIB',
                        '-DQT_PRINTSUPPORT_LIB'])
 endif
+# No fused multiply-add contraction: colour gradients truncate a*(1-t) + b*t to a channel, and a
+# fused result one ulp off flips a channel that lands on an integer. GCC contracts by default where
+# the target has FMA (aarch64; the ubuntu-latest x86-64 build too), Clang on arm64: the colour maps
+# would differ by a level on a few colours from one machine to the next.
+add_project_arguments(meson.get_compiler('cpp').get_supported_arguments('-ffp-contract=off'),
+                      language: 'cpp')
 # A browser build (Qt for WebAssembly, see examples/wasm-gallery) makes the library and the gallery.
 is_wasm = host_machine.system() == 'emscripten'
 

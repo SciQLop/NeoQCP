@@ -36,6 +36,10 @@ add_library(NeoQCP STATIC
     ${NEOQCP_MOC_HEADERS}
     ${CMAKE_CURRENT_BINARY_DIR}/embedded_shaders.h)
 add_library(NeoQCP::NeoQCP ALIAS NeoQCP)
+# No fused multiply-add contraction, as in meson.build: the same colours on every architecture.
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(NeoQCP PRIVATE -ffp-contract=off)
+endif()
 
 target_include_directories(NeoQCP PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
