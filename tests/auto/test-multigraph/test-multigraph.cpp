@@ -4183,3 +4183,248 @@ void TestMultiGraph::legendIconShowsEachComponent()
         }
     QCOMPARE(lines, 3);
 }
+
+// --- R1-R4: the multigraph behaves as 2.x's QCPGraph ---
+
+namespace
+{
+bool greenNear(const QImage& img, QPoint p)
+{
+    return dominantNear(img, p,
+                        [](QColor c) { return c.green() - std::max(c.red(), c.blue()) > 80; });
+}
+
+bool magentaNear(const QImage& img, QPoint p, int radius)
+{
+    for (int dx = -radius; dx <= radius; ++dx)
+        for (int dy = -radius; dy <= radius; ++dy)
+        {
+            const QColor c = img.pixelColor(p + QPoint(dx, dy));
+            if (c.red() > 150 && c.blue() > 150 && c.green() < 100)
+                return true;
+        }
+    return false;
+}
+
+//! The red and blue lines, selectable by rows, with a green selected pen on both.
+QCPMultiGraph* selectableLines(QCustomPlot* plot)
+{
+    auto* mg = redAndBlueHorizontalLines(plot);
+    mg->setSelectable(QCP::stDataRange);
+    for (int i = 0; i < mg->componentCount(); ++i)
+        mg->component(i).selectedPen = QPen(Qt::green, 5);
+    return mg;
+}
+
+//! Two one-column graphs: \a upper at 2 over \a lower at 1, keys 0..4.
+std::pair<QCPMultiGraph*, QCPMultiGraph*> twoBandGraphs(QCustomPlot* plot, bool withData = true)
+{
+    auto* upper = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* lower = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    if (withData)
+    {
+        upper->setData(std::vector<double> { 0, 1, 2, 3, 4 }, std::vector<double> { 2, 2, 2, 2, 2 });
+        lower->setData(std::vector<double> { 0, 1, 2, 3, 4 }, std::vector<double> { 1, 1, 1, 1, 1 });
+    }
+    plot->xAxis->setRange(0, 4);
+    plot->yAxis->setRange(0, 3);
+    return { upper, lower };
+}
+} // namespace
+
+// 2.x: setSelection on the graph selects those rows; they draw with the selected pen. The rows are
+// shared by every column.
+void TestMultiGraph::setSelectionDrawsTheSelectedSegments()
+{
+    auto* mg = selectableLines(mPlot);
+    renderOf(mPlot); // a recording exists: the selection must replace it
+    const QCPDataSelection rows(QCPDataRange(0, 2));
+    mg->setSelection(rows);
+
+    QCOMPARE(mg->componentSelection(0), rows);
+    QCOMPARE(mg->componentSelection(1), rows);
+    QCOMPARE(mg->selection(), rows);
+    const QImage img = renderOf(mPlot);
+    QVERIFY2(greenNear(img, pixelOf(mPlot, 0.5, 1)), "the selected red segment is not selected");
+    QVERIFY2(greenNear(img, pixelOf(mPlot, 0.5, 2)), "the selected blue segment is not selected");
+}
+
+// A styled decorator is the user's choice: its pen draws the selected rows, as in 2.x.
+void TestMultiGraph::theDecoratorPenIsUsed()
+{
+    auto* mg = redAndBlueHorizontalLines(mPlot);
+    mg->setSelectable(QCP::stDataRange);
+    mg->setSelection(QCPDataSelection(QCPDataRange(0, 5)));
+    renderOf(mPlot); // a recording exists: the decorator's pen must replace it
+    mg->selectionDecorator()->setPen(QPen(Qt::green, 5));
+
+    const QImage img = renderOf(mPlot);
+    QVERIFY2(greenNear(img, pixelOf(mPlot, 2, 1)), "the decorator pen was not used");
+    QVERIFY2(greenNear(img, pixelOf(mPlot, 2, 2)), "the decorator pen was not used");
+}
+
+// The bracket decorator draws its brackets at the ends of the selected rows.
+void TestMultiGraph::theBracketDecoratorDraws()
+{
+    auto* mg = redAndBlueHorizontalLines(mPlot);
+    mg->setSelectable(QCP::stDataRange);
+    auto* bracket = new QCPSelectionDecoratorBracket;
+    bracket->setBracketStyle(QCPSelectionDecoratorBracket::bsSquareBracket);
+    bracket->setBracketPen(QPen(QColor(220, 0, 220), 3));
+    bracket->setBracketWidth(10);
+    bracket->setBracketHeight(40);
+    mg->setSelectionDecorator(bracket);
+    mg->setSelection(QCPDataSelection(QCPDataRange(1, 3)));
+
+    const QImage img = renderOf(mPlot);
+    // The square bracket's stroke runs 20 px above and under the row's point.
+    const QPoint open = pixelOf(mPlot, 1, 1) + QPoint(0, 14);
+    const QPoint close = pixelOf(mPlot, 2, 1) + QPoint(0, 14);
+    QVERIFY2(magentaNear(img, open, 2), "no opening bracket");
+    QVERIFY2(magentaNear(img, close, 2), "no closing bracket");
+}
+
+// SciQLopPlots' Escape: setSelection(QCPDataSelection()) on every selected graph must clear what
+// each component had.
+void TestMultiGraph::clearingTheSelectionClearsEveryComponent()
+{
+    auto* mg = selectableLines(mPlot);
+    mg->setComponentSelection(0, QCPDataSelection(QCPDataRange(0, 5)));
+    mg->setComponentSelection(1, QCPDataSelection(QCPDataRange(2, 4)));
+    QVERIFY(mg->selected());
+
+    mg->setSelection(QCPDataSelection());
+
+    QVERIFY(!mg->selected());
+    QVERIFY(mg->componentSelection(0).isEmpty());
+    QVERIFY(mg->componentSelection(1).isEmpty());
+    const QImage img = renderOf(mPlot);
+    QVERIFY2(redNear(img, pixelOf(mPlot, 2, 1)), "the red line is still drawn selected");
+    QVERIFY2(blueNear(img, pixelOf(mPlot, 3, 2)), "the blue line is still drawn selected");
+}
+
+// Only the selected rows take the selected pen: the rest of the line keeps its own.
+void TestMultiGraph::aPartialSelectionKeepsTheRestNormal()
+{
+    auto* mg = selectableLines(mPlot);
+    mg->setComponentSelection(0, QCPDataSelection(QCPDataRange(0, 2)));
+
+    const QImage img = renderOf(mPlot);
+    QVERIFY2(greenNear(img, pixelOf(mPlot, 0.5, 1)), "the selected segment is not selected");
+    QVERIFY2(redNear(img, pixelOf(mPlot, 2.5, 1)), "the unselected segment took the selected pen");
+    QVERIFY2(redNear(img, pixelOf(mPlot, 3.5, 1)), "the unselected segment took the selected pen");
+    QVERIFY2(blueNear(img, pixelOf(mPlot, 0.5, 2)), "the other component took the selection");
+}
+
+// 2.x's legend code finds a graph's row by its plottable.
+void TestMultiGraph::itemWithPlottableFindsAGraphRow()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double> { 1.0, 2.0 },
+                std::vector<std::vector<double>> { { 10.0, 20.0 }, { 1.0, 2.0 } });
+    QCOMPARE(mPlot->legend->itemCount(), 1);
+
+    QVERIFY(mPlot->legend->hasItemWithPlottable(mg));
+    QCPAbstractLegendItem* row = mPlot->legend->itemWithPlottable(mg);
+    QVERIFY(row != nullptr);
+    QCOMPARE(row, mPlot->legend->item(0).get());
+    QVERIFY(qobject_cast<QCPGroupLegendItem*>(row) != nullptr);
+}
+
+// And casts it to a plottable row to reach the plottable.
+void TestMultiGraph::aGraphRowCastsToAPlottableRow()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double> { 1.0, 2.0 }, std::vector<double> { 10.0, 20.0 });
+    auto* row = qobject_cast<QCPPlottableLegendItem*>(mPlot->legend->item(0));
+    QVERIFY(row != nullptr);
+    QCOMPARE(row->plottable().get(), static_cast<QCPAbstractPlottable*>(mg));
+}
+
+// 2.x order: setBrush, then the channel fill, then the data. The remembered brush reaching the new
+// component must colour the band, not replace it with a fill to zero.
+void TestMultiGraph::setBrushBeforeAFillToGraphKeepsTheBand()
+{
+    auto [upper, lower] = twoBandGraphs(mPlot, /*withData=*/false);
+    const QBrush brush(QColor(0, 160, 255, 120));
+    upper->setBrush(brush);
+    QVERIFY(upper->setComponentFillToGraph(0, lower, 0));
+    upper->setData(std::vector<double> { 0, 1, 2, 3, 4 }, std::vector<double> { 2, 2, 2, 2, 2 });
+    lower->setData(std::vector<double> { 0, 1, 2, 3, 4 }, std::vector<double> { 1, 1, 1, 1, 1 });
+
+    const auto fill = upper->componentFill(0);
+    QVERIFY(fill.has_value());
+    QVERIFY2(std::holds_alternative<QCPMultiGraph::FillToGraph>(fill->target),
+             "the remembered brush replaced the band with a fill to zero");
+    QCOMPARE(upper->effectiveFillBrush(*fill), brush);
+}
+
+// 2.x: setBrush after setChannelFillGraph colours the channel.
+void TestMultiGraph::setBrushAfterAFillToGraphRecoloursIt()
+{
+    auto [upper, lower] = twoBandGraphs(mPlot);
+    QVERIFY(upper->setComponentFillToGraph(0, lower, 0, QBrush(QColor(255, 0, 0, 120))));
+    const QBrush brush(QColor(0, 160, 255, 120));
+    upper->setBrush(brush);
+
+    const auto fill = upper->componentFill(0);
+    QVERIFY(fill.has_value());
+    QVERIFY2(std::holds_alternative<QCPMultiGraph::FillToGraph>(fill->target),
+             "setBrush replaced the band with a fill to zero");
+    QCOMPARE(upper->effectiveFillBrush(*fill), brush);
+    QVERIFY(!lower->componentFill(0).has_value());
+}
+
+// A band made with the default brush takes the graph's brush, as 2.x's channel did.
+void TestMultiGraph::aFillToGraphTakesTheGraphBrush()
+{
+    auto [upper, lower] = twoBandGraphs(mPlot);
+    const QBrush brush(QColor(0, 160, 255, 120));
+    upper->setBrush(brush);
+    QVERIFY(upper->setComponentFillToGraph(0, lower, 0));
+
+    const auto fill = upper->componentFill(0);
+    QVERIFY(fill.has_value());
+    QCOMPARE(upper->effectiveFillBrush(*fill), brush);
+    const QImage img = renderOf(mPlot);
+    const QColor inside = img.pixelColor(pixelOf(mPlot, 2, 1.5));
+    QVERIFY2(inside.blue() > 150 && inside.red() < 150,
+             qPrintable(QStringLiteral("the band is not the graph's brush: %1").arg(inside.name())));
+}
+
+// 2.x fills toward zero: on a negative log range zero is beyond the upper bound.
+void TestMultiGraph::aNegativeLogRangeFillsToTheUpperBound()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double> { 0, 1, 2 }, std::vector<double> { -10, -10, -10 });
+    mg->setBrush(QBrush(QColor(255, 0, 0, 120)));
+    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setRange(-0.5, 2.5);
+    mPlot->yAxis->setRange(-100, -1);
+    renderOf(mPlot);
+
+    const auto fill = mg->componentFill(0);
+    QVERIFY(fill.has_value());
+    const auto rows = mg->fillRows(*fill, *mg->dataSource(), 0, 3);
+    QCOMPARE(int(rows.size()), 3);
+    for (const auto& row : rows)
+    {
+        QCOMPARE(row.a, -10.0);
+        QCOMPARE(row.b, -1.0);
+    }
+}
+
+void TestMultiGraph::aNegativeLogRangeImpulsesStartAtTheUpperBound()
+{
+    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setData(std::vector<double> { 0, 1, 2 }, std::vector<double> { -10, -10, -10 });
+    mg->setComponentPens({ QPen(Qt::red, 5) });
+    mg->setLineStyle(QCPMultiGraph::lsImpulse);
+    mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+    mPlot->xAxis->setRange(-0.5, 2.5);
+    mPlot->yAxis->setRange(-100, -1);
+
+    const QImage img = renderOf(mPlot);
+    QVERIFY2(redNear(img, pixelOf(mPlot, 1, -3)), "no impulse between the value and zero's side");
+    QVERIFY2(!redNear(img, pixelOf(mPlot, 1, -40)), "the impulse runs to the far bound");
+}

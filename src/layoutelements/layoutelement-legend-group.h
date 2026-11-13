@@ -4,7 +4,9 @@
 
 class QCPMultiGraph;
 
-class QCP_LIB_DECL QCPGroupLegendItem : public QCPAbstractLegendItem
+//! A graph's legend row: a plottable's row (itemWithPlottable finds it) that draws one segment per
+//! shown component and expands to one row each.
+class QCP_LIB_DECL QCPGroupLegendItem : public QCPPlottableLegendItem
 {
     Q_OBJECT
 public:

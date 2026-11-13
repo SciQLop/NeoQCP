@@ -243,6 +243,23 @@ private slots:
     void setBrushBeforeDataFillsTheNewComponents();
     void setScatterStyleBeforeDataReachesTheNewComponents();
 
+    // R1: selection as 2.x
+    void setSelectionDrawsTheSelectedSegments();
+    void theDecoratorPenIsUsed();
+    void theBracketDecoratorDraws();
+    void clearingTheSelectionClearsEveryComponent();
+    void aPartialSelectionKeepsTheRestNormal();
+    // R2: the legend row is a plottable's row
+    void itemWithPlottableFindsAGraphRow();
+    void aGraphRowCastsToAPlottableRow();
+    // R3: the brush colours a fill to another graph
+    void setBrushBeforeAFillToGraphKeepsTheBand();
+    void setBrushAfterAFillToGraphRecoloursIt();
+    void aFillToGraphTakesTheGraphBrush();
+    // R4: a negative log range closes toward zero
+    void aNegativeLogRangeFillsToTheUpperBound();
+    void aNegativeLogRangeImpulsesStartAtTheUpperBound();
+
 private:
     // The staged source stays staged, as while its pipeline prepares it: exports commit ready ones.
     static void stillPreparing(QCPMultiGraph* mg);

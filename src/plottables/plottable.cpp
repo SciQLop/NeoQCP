@@ -31,9 +31,8 @@
 #include <QSet>
 #include "core.h"
 #include "layoutelements/layoutelement-axisrect.h"
-#include "layoutelements/layoutelement-legend-group.h"
-#include "plottable-multigraph.h"
 #include "layoutelements/layoutelement-legend.h"
+#include "plottable1d.h"
 #include "misuse.h"
 #include "painting/painter.h"
 #include "theme.h"
@@ -770,10 +769,7 @@ void QCPAbstractPlottable::markLegendRows(QCPLayoutElement* element, QCPAbstract
         {
             QCPAbstractLegendItem* item = legend->itemRaw(i);
             auto* row = qobject_cast<QCPPlottableLegendItem*>(item);
-            auto* group = qobject_cast<QCPGroupLegendItem*>(item);
-            const bool shows = row ? row->plottable() == plottable
-                                   : group && group->multiGraph() == plottable;
-            if (!shows)
+            if (!row || row->plottable() != plottable)
                 continue;
             item->markDirty();
             legend->markDirty(); // the row may not carry the legend's layer yet
@@ -958,12 +954,19 @@ void QCPAbstractPlottable::setSystem(QCPCoordinateSystem* system)
 void QCPAbstractPlottable::setSelection(QCPDataSelection selection)
 {
     selection.enforceType(mSelectable);
-    if (mSelection != selection)
+    if (assignSelection(selection))
     {
-        mSelection = selection;
         markDirty(); // the selection decides what a plottable draws: the next frame must not reuse the last one
         emitSelectionChanged();
     }
+}
+
+bool QCPAbstractPlottable::assignSelection(const QCPDataSelection& selection)
+{
+    if (mSelection == selection)
+        return false;
+    mSelection = selection;
+    return true;
 }
 
 /*! \internal

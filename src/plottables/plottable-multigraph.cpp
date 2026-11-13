@@ -12,6 +12,7 @@
 #include "../painting/rhi-utils.h"
 #include "../painting/scatter-rhi-layer.h"
 #include "../painting/viewport-offset.h"
+#include "../selectiondecorator-bracket.h"
 #include "../vector2d.h"
 #include "plottable-draw-utils.h"
 #include "plottable-l1-cache.h"
@@ -19,6 +20,7 @@
 #include <QPointer>
 #include <algorithm>
 #include <cmath>
+#include <typeinfo>
 #include <utility>
 
 static void ensureL1TransformMulti(QCPMultiGraphPipeline& pipeline, int sourceSize, int colCount,
@@ -86,15 +88,8 @@ double QCPMultiGraph::dataSpaceBaseline() const
 
 double QCPMultiGraph::dataSpaceFillValue(double value) const
 {
-    // The sign-aware counterpart of fillValue(): a value the log frame cannot place goes to the
-    // range bound on zero's side, never to the far bound. A linear frame takes the value itself.
     const QCPAxis* valueAxis = qobject_cast<const QCPAxis*>(valueAxisBase());
-    if (!valueAxis || valueAxis->scaleType() != QCPAxis::stLogarithmic || std::isnan(value))
-        return value;
-    const QCPRange range = valueAxis->range();
-    if (range.upper < 0)
-        return value < 0 ? value : range.upper;
-    return value > 0 ? value : range.lower;
+    return valueAxis ? fillValue(*valueAxis, value) : value;
 }
 
 quint64 QCPMultiGraph::dependencyRevision() const
@@ -935,6 +930,9 @@ QBrush QCPMultiGraph::effectiveFillBrush(const Fill& fill) const
 {
     if (fill.brush.style() != Qt::NoBrush)
         return fill.brush;
+    // 2.x filled the channel to another graph with the graph's brush.
+    if (std::holds_alternative<FillToGraph>(fill.target) && mBrush.style() != Qt::NoBrush)
+        return mBrush;
     const QColor c = fill.owner < mComponents.size() ? mComponents[fill.owner].pen.color()
                                                      : QColor(Qt::gray);
     return QBrush(QColor(c.red(), c.green(), c.blue(), 64));
@@ -942,13 +940,15 @@ QBrush QCPMultiGraph::effectiveFillBrush(const Fill& fill) const
 
 QBrush QCPMultiGraph::fillRunBrush(const Fill& fill, bool selected) const
 {
+    const QBrush unselected = effectiveFillBrush(fill);
     if (!selected)
-        return effectiveFillBrush(fill);
+        return unselected;
+    if (decoratorIsTheUsers() && mSelectionDecorator->brush().style() != Qt::NoBrush)
+        return mSelectionDecorator->brush();
     const QColor base = fill.owner < mComponents.size()
         ? mComponents[fill.owner].selectedPen.color()
         : QColor(Qt::gray);
-    const int alpha = fill.brush.style() == Qt::NoBrush ? 64 : fill.brush.color().alpha();
-    return QBrush(QColor(base.red(), base.green(), base.blue(), alpha));
+    return QBrush(QColor(base.red(), base.green(), base.blue(), unselected.color().alpha()));
 }
 
 void QCPMultiGraph::partnerGone()
@@ -1126,7 +1126,11 @@ void QCPMultiGraph::componentVisibilityToggled()
 
 void QCPMultiGraph::applyBrushToComponent(int index, const QBrush& brush)
 {
-    if (brush.style() == Qt::NoBrush)
+    // 2.x's brush coloured the channel: a fill to another graph keeps its partner.
+    const auto fill = componentFill(index);
+    if (fill && std::holds_alternative<FillToGraph>(fill->target))
+        setComponentFillBrush(index, brush);
+    else if (brush.style() == Qt::NoBrush)
         clearComponentFill(index);
     else
         setComponentFill(index, 0.0, brush);
@@ -1485,6 +1489,21 @@ void QCPMultiGraph::selectEvent([[maybe_unused]] QMouseEvent* event, bool additi
     updateBaseSelection();
     if (selectionStateChanged)
         *selectionStateChanged = true;
+}
+
+bool QCPMultiGraph::assignSelection(const QCPDataSelection& selection)
+{
+    bool changed = mSelection != selection;
+    for (auto& c : mComponents)
+    {
+        if (c.selection != selection)
+        {
+            c.selection = selection;
+            changed = true;
+        }
+    }
+    mSelection = selection;
+    return changed;
 }
 
 void QCPMultiGraph::deselectEvent(bool* selectionStateChanged)
@@ -1912,14 +1931,14 @@ void QCPMultiGraph::draw(QCPDrawContext& context) const
     recordFills(context, *ds, begin, end);
     recordErrorBars(context, *ds, mL2Result == nullptr, begin, end);
 
-    // In data space the impulse baseline is a value: zero, or the bottom of a log value axis,
-    // which is where the pixel path clamps it.
+    // In data space the impulse baseline is a value: zero, or on a log value axis the range bound
+    // nearer zero, as 2.x closed it.
     const bool logValueAxis = mValueAxis->scaleType() == QCPAxis::stLogarithmic;
-    const double impulseBaseline = logValueAxis ? mValueAxis->range().lower : 0.0;
+    const double impulseBaseline = dataSpaceBaseline();
     const bool impulses = std::any_of(mComponents.begin(), mComponents.end(), [](const Component& c)
                                       { return c.visible && c.lineStyle == lsImpulse; });
     if (logValueAxis && impulses)
-        (void)context.transform(); // the baseline follows the axis' lower bound
+        (void)context.transform(); // the baseline follows the axis' range bound
 
     const int columns = std::min(componentCount(), ds->columnCount());
     for (int c = 0; c < columns; ++c)
@@ -1930,93 +1949,18 @@ void QCPMultiGraph::draw(QCPDrawContext& context) const
         if (comp.lineStyle == lsNone && comp.scatterStyle.isNone())
             continue;
 
-        // The rows a vertex comes from are only asked for when a colour needs them.
+        // The rows a vertex comes from are only asked for when a colour or a selection needs them.
+        const bool wantsRows = coloured || !comp.selection.isEmpty();
         std::vector<int> sourceIndices;
         std::vector<QPointF> line
-            = ds->linesInData(c, begin, end, pixelsPerKey, coloured ? &sourceIndices : nullptr,
+            = ds->linesInData(c, begin, end, pixelsPerKey, wantsRows ? &sourceIndices : nullptr,
                               logKeyAxis);
         if (line.empty())
             continue;
-        // Defensive: indices that do not match the points are never used.
-        const bool indexed = coloured && sourceIndices.size() == line.size();
-        const QPen pen = comp.selection.isEmpty() ? comp.pen : comp.selectedPen;
-        const bool hasMarkers = !comp.scatterStyle.isNone();
-        // A plain line is the recorded line: it is handed over, not copied. A step, an impulse or
-        // a marker set needs the points in another shape.
-        const bool borrowsTheLine = comp.lineStyle == lsLine && !hasMarkers;
-        QVector<QPointF> points;
-        if (!borrowsTheLine)
-            points = QVector<QPointF>(line.begin(), line.end());
-        QVector<int> dataIdx;
-        if (indexed)
-            dataIdx = QVector<int>(sourceIndices.begin(), sourceIndices.end());
-
-        if (comp.lineStyle != lsNone)
-        {
-            QPen linePen = pen;
-            if (borrowsTheLine)
-            {
-                if (line.size() >= 2)
-                    context.polyline(std::make_shared<const std::vector<QPointF>>(std::move(line)),
-                                     indexed ? segmentColours(mColor, dataIdx) : nullptr, linePen);
-            }
-            else
-            {
-                QVector<QPointF> vertices;
-                switch (comp.lineStyle)
-                {
-                    case lsStepLeft:
-                        vertices = qcp::toStepLeftLines(points, /*keyIsVertical=*/false);
-                        break;
-                    case lsStepRight:
-                        vertices = qcp::toStepRightLines(points, /*keyIsVertical=*/false);
-                        break;
-                    case lsStepCenter:
-                        vertices = stepCentreLines(points, logKeyAxis);
-                        break;
-                    case lsImpulse:
-                        vertices = separatedPairs(
-                            qcp::toImpulseLines(points, /*keyIsVertical=*/false, impulseBaseline));
-                        linePen.setCapStyle(Qt::FlatCap);
-                        break;
-                    default:
-                        vertices = points;
-                        break;
-                }
-                if (vertices.size() >= 2)
-                {
-                    std::shared_ptr<const std::vector<QRgb>> colours;
-                    if (indexed)
-                    {
-                        QVector<int> vertexIdx = lineIndices(comp.lineStyle, dataIdx);
-                        if (comp.lineStyle == lsImpulse)
-                            vertexIdx = separatedPairIndices(vertexIdx);
-                        colours = segmentColours(mColor, vertexIdx);
-                    }
-                    context.polyline(sharedPoints(vertices), colours, linePen);
-                }
-            }
-        }
-
-        // Markers sit at the data positions, not at the corners a step or an impulse adds.
-        if (!hasMarkers)
-            continue;
-        const QCPScatterStyle style = markerStyle(comp.scatterStyle, comp.pen);
-        auto markerPoints = std::make_shared<std::vector<QPointF>>();
-        auto markerColours = std::make_shared<std::vector<QRgb>>();
-        const int skip = mScatterSkip + 1;
-        for (int i = 0; i < points.size(); i += skip)
-        {
-            if (!qIsFinite(points[i].x()) || !qIsFinite(points[i].y()))
-                continue;
-            markerPoints->push_back(points[i]);
-            if (indexed)
-                markerColours->push_back(
-                    pointColour(mColor, sourceIndices[static_cast<std::size_t>(i)]));
-        }
-        if (!markerPoints->empty())
-            context.markers(markerPoints, indexed ? markerColours : nullptr, style);
+        recordComponent(context, c, std::move(line), sourceIndices, *ds, coloured, impulseBaseline,
+                        logKeyAxis);
     }
+    recordSelectionDecoration(context);
 }
 
 // B2/P-4: the data-space branch on a system that is not cartesian. It records positions and the
@@ -2058,6 +2002,7 @@ void QCPMultiGraph::drawInDataSpace(QCPDrawContext& context) const
     recordErrorBars(context, ds, /*rawRows=*/true, begin, end);
 
     const int columns = std::min(componentCount(), ds.columnCount());
+    const bool coloured = mColor.hasValues();
     for (int c = 0; c < columns; ++c)
     {
         const Component& comp = component(c);
@@ -2068,90 +2013,228 @@ void QCPMultiGraph::drawInDataSpace(QCPDrawContext& context) const
 
         // simplify: no decimation on this branch; every row is recorded and mapped per frame.
         // Upgrade: the J-6 box query and data-space decimation by keyWindow().
-        const bool coloured = mColor.hasValues();
+        const bool wantsRows = coloured || !comp.selection.isEmpty();
         std::vector<int> sourceIndices;
         std::vector<QPointF> line
             = ds.linesInData(c, begin, end, /*pixelsPerKey=*/0.0,
-                             coloured ? &sourceIndices : nullptr, /*logKeys=*/false,
+                             wantsRows ? &sourceIndices : nullptr, /*logKeys=*/false,
                              /*cacheGaps=*/false);
         if (line.empty())
             continue;
-        const bool indexed = coloured && sourceIndices.size() == line.size();
-        const QPen pen = comp.selection.isEmpty() ? comp.pen : comp.selectedPen;
-        const bool hasMarkers = !comp.scatterStyle.isNone();
-        const bool borrowsTheLine = comp.lineStyle == lsLine && !hasMarkers;
-        QVector<QPointF> points;
-        if (!borrowsTheLine)
-            points = QVector<QPointF>(line.begin(), line.end());
-        QVector<int> dataIdx;
-        if (indexed)
-            dataIdx = QVector<int>(sourceIndices.begin(), sourceIndices.end());
-
-        if (comp.lineStyle != lsNone)
-        {
-            QPen linePen = pen;
-            if (borrowsTheLine)
-            {
-                if (line.size() >= 2)
-                    context.polyline(std::make_shared<const std::vector<QPointF>>(std::move(line)),
-                                     indexed ? segmentColours(mColor, dataIdx) : nullptr, linePen);
-            }
-            else
-            {
-                QVector<QPointF> vertices;
-                switch (comp.lineStyle)
-                {
-                    case lsStepLeft:
-                        vertices = qcp::toStepLeftLines(points, /*keyIsVertical=*/false);
-                        break;
-                    case lsStepRight:
-                        vertices = qcp::toStepRightLines(points, /*keyIsVertical=*/false);
-                        break;
-                    case lsStepCenter:
-                        vertices = stepCentreLines(points, logKeyAxis);
-                        break;
-                    case lsImpulse:
-                        vertices = separatedPairs(
-                            qcp::toImpulseLines(points, /*keyIsVertical=*/false, baseline));
-                        linePen.setCapStyle(Qt::FlatCap);
-                        break;
-                    default:
-                        vertices = points;
-                        break;
-                }
-                if (vertices.size() >= 2)
-                {
-                    std::shared_ptr<const std::vector<QRgb>> colours;
-                    if (indexed)
-                    {
-                        QVector<int> vertexIdx = lineIndices(comp.lineStyle, dataIdx);
-                        if (comp.lineStyle == lsImpulse)
-                            vertexIdx = separatedPairIndices(vertexIdx);
-                        colours = segmentColours(mColor, vertexIdx);
-                    }
-                    context.polyline(sharedPoints(vertices), colours, linePen);
-                }
-            }
-        }
-
-        if (!hasMarkers)
-            continue;
-        const QCPScatterStyle style = markerStyle(comp.scatterStyle, comp.pen);
-        auto markerPoints = std::make_shared<std::vector<QPointF>>();
-        auto markerColours = std::make_shared<std::vector<QRgb>>();
-        const int skip = mScatterSkip + 1;
-        for (int i = 0; i < points.size(); i += skip)
-        {
-            if (!qIsFinite(points[i].x()) || !qIsFinite(points[i].y()))
-                continue;
-            markerPoints->push_back(points[i]);
-            if (indexed)
-                markerColours->push_back(
-                    pointColour(mColor, sourceIndices[static_cast<std::size_t>(i)]));
-        }
-        if (!markerPoints->empty())
-            context.markers(markerPoints, indexed ? markerColours : nullptr, style);
+        recordComponent(context, c, std::move(line), sourceIndices, ds, coloured, baseline,
+                        logKeyAxis);
     }
+}
+
+namespace
+{
+struct SelectionRun
+{
+    std::size_t first = 0, last = 0;
+    bool selected = false;
+};
+
+// Runs of equally selected vertices, the unselected ones first so the selected pen draws over the
+// vertex they share. An unselected run reaches one vertex into each selected neighbour, so the two
+// pens meet, as 2.x widened its unselected segments.
+std::vector<SelectionRun> selectionRuns(const std::vector<char>& selected)
+{
+    const std::size_t count = selected.size();
+    std::vector<SelectionRun> runs;
+    for (std::size_t first = 0; first < count;)
+    {
+        std::size_t last = first + 1;
+        while (last < count && selected[last] == selected[first])
+            ++last;
+        if (selected[first])
+            runs.push_back({ first, last, true });
+        else
+            runs.push_back({ first > 0 ? first - 1 : 0, std::min(count, last + 1), false });
+        first = last;
+    }
+    std::stable_partition(runs.begin(), runs.end(), [](const SelectionRun& run) { return !run.selected; });
+    return runs;
+}
+} // namespace
+
+std::vector<char> QCPMultiGraph::selectedVertices(int column, const QCPAbstractMultiDataSource& ds,
+                                                  const std::vector<int>& rows) const
+{
+    std::vector<char> selected(rows.size(), 0);
+    char previous = 0;
+    for (std::size_t i = 0; i < rows.size(); ++i)
+    {
+        if (rows[i] >= 0)
+            previous = rowIsSelected(column, ds, rows[i]) ? 1 : 0;
+        selected[i] = previous;
+    }
+    return selected;
+}
+
+void QCPMultiGraph::recordComponent(QCPDrawContext& context, int column, std::vector<QPointF> line,
+                                    const std::vector<int>& rows,
+                                    const QCPAbstractMultiDataSource& ds, bool coloured,
+                                    double impulseBaseline, bool logKeyAxis) const
+{
+    const Component& comp = component(column);
+    // Defensive: indices that do not match the points are never used.
+    const bool aligned = rows.size() == line.size();
+    const bool indexed = coloured && aligned;
+    QVector<int> dataIdx;
+    if (indexed)
+        dataIdx = QVector<int>(rows.begin(), rows.end());
+    const bool hasMarkers = !comp.scatterStyle.isNone();
+
+    // Without the rows a selection cannot be placed: the whole line takes it.
+    if (comp.selection.isEmpty() || !aligned)
+    {
+        const bool selected = !comp.selection.isEmpty();
+        // A plain line without markers is the recorded line: it is handed over, not copied.
+        std::vector<QPointF> markerLine = hasMarkers ? line : std::vector<QPointF>();
+        recordLine(context, comp.lineStyle, std::move(line), dataIdx,
+                   selected ? selectedLinePen(comp) : comp.pen, impulseBaseline, logKeyAxis);
+        if (hasMarkers)
+            recordMarkers(context, comp, markerLine, rows, indexed, {}, selected);
+        return;
+    }
+
+    const std::vector<char> selected = selectedVertices(column, ds, rows);
+    for (const SelectionRun& run : selectionRuns(selected))
+    {
+        const auto first = std::ptrdiff_t(run.first);
+        const auto last = std::ptrdiff_t(run.last);
+        recordLine(context, comp.lineStyle,
+                   std::vector<QPointF>(line.begin() + first, line.begin() + last),
+                   indexed ? dataIdx.mid(first, last - first) : QVector<int>(),
+                   run.selected ? selectedLinePen(comp) : comp.pen, impulseBaseline, logKeyAxis);
+    }
+    if (hasMarkers)
+        recordMarkers(context, comp, line, rows, indexed, selected, false);
+}
+
+void QCPMultiGraph::recordLine(QCPDrawContext& context, LineStyle style, std::vector<QPointF> line,
+                               const QVector<int>& dataIdx, QPen pen, double impulseBaseline,
+                               bool logKeyAxis) const
+{
+    const bool indexed = !dataIdx.isEmpty();
+    if (style == lsNone)
+        return;
+    if (style == lsLine)
+    {
+        if (line.size() >= 2)
+            context.polyline(std::make_shared<const std::vector<QPointF>>(std::move(line)),
+                             indexed ? segmentColours(mColor, dataIdx) : nullptr, pen);
+        return;
+    }
+    const QVector<QPointF> points(line.begin(), line.end());
+    QVector<QPointF> vertices;
+    switch (style)
+    {
+        case lsStepLeft:
+            vertices = qcp::toStepLeftLines(points, /*keyIsVertical=*/false);
+            break;
+        case lsStepRight:
+            vertices = qcp::toStepRightLines(points, /*keyIsVertical=*/false);
+            break;
+        case lsStepCenter:
+            vertices = stepCentreLines(points, logKeyAxis);
+            break;
+        case lsImpulse:
+            vertices = separatedPairs(
+                qcp::toImpulseLines(points, /*keyIsVertical=*/false, impulseBaseline));
+            pen.setCapStyle(Qt::FlatCap);
+            break;
+        default:
+            vertices = points;
+            break;
+    }
+    if (vertices.size() < 2)
+        return;
+    std::shared_ptr<const std::vector<QRgb>> colours;
+    if (indexed)
+    {
+        QVector<int> vertexIdx = lineIndices(style, dataIdx);
+        if (style == lsImpulse)
+            vertexIdx = separatedPairIndices(vertexIdx);
+        colours = segmentColours(mColor, vertexIdx);
+    }
+    context.polyline(sharedPoints(vertices), colours, pen);
+}
+
+// Markers sit at the data positions, not at the corners a step or an impulse adds.
+void QCPMultiGraph::recordMarkers(QCPDrawContext& context, const Component& comp,
+                                  const std::vector<QPointF>& line, const std::vector<int>& rows,
+                                  bool indexed, const std::vector<char>& selected,
+                                  bool allSelected) const
+{
+    struct Markers
+    {
+        std::shared_ptr<std::vector<QPointF>> points = std::make_shared<std::vector<QPointF>>();
+        std::shared_ptr<std::vector<QRgb>> colours = std::make_shared<std::vector<QRgb>>();
+    };
+    Markers normal, chosen;
+    const std::size_t skip = std::size_t(mScatterSkip) + 1;
+    for (std::size_t i = 0; i < line.size(); i += skip)
+    {
+        if (!qIsFinite(line[i].x()) || !qIsFinite(line[i].y()))
+            continue;
+        Markers& markers = (selected.empty() ? allSelected : selected[i] != 0) ? chosen : normal;
+        markers.points->push_back(line[i]);
+        if (indexed)
+            markers.colours->push_back(pointColour(mColor, rows[i]));
+    }
+    if (!normal.points->empty())
+        context.markers(normal.points, indexed ? normal.colours : nullptr,
+                        markerStyle(comp.scatterStyle, comp.pen));
+    if (!chosen.points->empty())
+        context.markers(chosen.points, indexed ? chosen.colours : nullptr, selectedMarkerStyle(comp));
+}
+
+bool QCPMultiGraph::decoratorIsTheUsers() const
+{
+    if (!mSelectionDecorator)
+        return false;
+    if (typeid(*mSelectionDecorator) != typeid(QCPSelectionDecorator))
+        return true;
+    // simplify: a decorator styled back to exactly the default look reads as untouched, and the
+    // components' selected pens draw. Upgrade: a "styled" flag set by the decorator's setters.
+    static const QCPSelectionDecorator pristine;
+    return mSelectionDecorator->pen() != pristine.pen()
+        || mSelectionDecorator->brush() != pristine.brush()
+        || mSelectionDecorator->usedScatterProperties() != pristine.usedScatterProperties();
+}
+
+QPen QCPMultiGraph::selectedLinePen(const Component& comp) const
+{
+    return decoratorIsTheUsers() ? mSelectionDecorator->pen() : comp.selectedPen;
+}
+
+QCPScatterStyle QCPMultiGraph::selectedMarkerStyle(const Component& comp) const
+{
+    return decoratorIsTheUsers() ? mSelectionDecorator->getFinalScatterStyle(comp.scatterStyle)
+                                 : markerStyle(comp.scatterStyle, comp.selectedPen);
+}
+
+void QCPMultiGraph::recordSelectionDecoration(QCPDrawContext& context) const
+{
+    // Only a decorator subclass draws a decoration of its own: the base class's is empty, and
+    // recording a painter callback for it would make every selection change a view change.
+    if (!mSelectionDecorator || selection().isEmpty()
+        || typeid(*mSelectionDecorator) == typeid(QCPSelectionDecorator))
+        return;
+    // The built-in bracket's shapes are recorded after the lines, so the replay draws them over
+    // what the GPU draws. A custom style, or a subclass that may redraw its brackets, stays on the
+    // painter callback.
+    const auto* bracket = dynamic_cast<const QCPSelectionDecoratorBracket*>(mSelectionDecorator);
+    const bool builtInBracket = bracket && typeid(*bracket) == typeid(QCPSelectionDecoratorBracket);
+    if (builtInBracket && bracket->recordDecoration(context, selection()))
+        return;
+    context.painter(
+        [this](QCPPainter& painter, const QCPTransform&)
+        {
+            if (mSelectionDecorator)
+                mSelectionDecorator->drawDecoration(&painter, selection());
+        });
 }
 
 bool QCPMultiGraph::fillDrawable(const Fill& fill, int columnCount) const
@@ -2207,13 +2290,17 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::fillRows(const Fill& fill,
     return rows;
 }
 
-// A log value axis has no zero: a fill to zero stops at the axis' lower bound, where the pixel
-// path clamped it. The recording then follows that bound, so it is transform-dependent.
+// A log value axis has no zero: a value it cannot place goes to the range bound on zero's side
+// (upper on a negative range, lower on a positive one), as 2.x's getFillBasePoint closed it. The
+// recording then follows that bound, so it is transform-dependent.
 double QCPMultiGraph::fillValue(const QCPAxis& valueAxis, double value)
 {
-    if (valueAxis.scaleType() == QCPAxis::stLinear || value > 0 || std::isnan(value))
+    if (valueAxis.scaleType() == QCPAxis::stLinear || std::isnan(value))
         return value;
-    return valueAxis.range().lower;
+    const QCPRange range = valueAxis.range();
+    if (range.upper < 0)
+        return value < 0 ? value : range.upper;
+    return value > 0 ? value : range.lower;
 }
 
 // Binned when the rows outnumber 4 per pixel, the lines' own L2 density (kLevel2PixelMultiplier).
@@ -2309,12 +2396,11 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::binnedWhenDense(
     return qcp::fill::binToSpans(rows, width);
 }
 
-bool QCPMultiGraph::rowIsSelected(const Fill& fill, const QCPAbstractMultiDataSource& ds,
-                                  int row) const
+bool QCPMultiGraph::rowIsSelected(int column, const QCPAbstractMultiDataSource& ds, int row) const
 {
-    if (fill.owner < 0 || fill.owner >= mComponents.size())
+    if (column < 0 || column >= mComponents.size())
         return false;
-    const QCPDataSelection& selection = mComponents[fill.owner].selection;
+    const QCPDataSelection& selection = mComponents[column].selection;
     if (selection.isEmpty())
         return false;
     if (mDataSource && &ds == mDataSource.get())
@@ -2386,7 +2472,7 @@ void QCPMultiGraph::recordFills(QCPDrawContext& context, const QCPAbstractMultiD
         const auto selectedAt = [&](std::size_t index)
         {
             const int row = raw[index].sourceRow >= 0 ? raw[index].sourceRow : int(index);
-            return rowIsSelected(fill, ds, row);
+            return rowIsSelected(fill.owner, ds, row);
         };
 
         if (mComponents[fill.owner].selection.isEmpty())

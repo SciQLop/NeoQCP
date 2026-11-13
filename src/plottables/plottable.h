@@ -343,6 +343,10 @@ protected:
     //! group) unties itself unless \a next keeps it in the same area, while the old system is still
     //! the one it is drawn in.
     virtual void systemWillChange(QCPCoordinateSystem*) {}
+    //! Stores the selection setSelection() was given, already fitted to the selectable type.
+    //! Returns whether anything changed. A plottable whose selection lives in parts (a multigraph's
+    //! components) hands it to them.
+    virtual bool assignSelection(const QCPDataSelection& selection);
 
     // property members:
     QString mName;

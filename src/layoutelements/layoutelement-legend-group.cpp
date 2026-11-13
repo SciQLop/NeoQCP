@@ -21,12 +21,9 @@ void drawLabel(QCPPainter* painter, const QRectF& rect, const QString& text)
 } // namespace
 
 QCPGroupLegendItem::QCPGroupLegendItem(QCPLegend* parent, QCPMultiGraph* multiGraph)
-    : QCPAbstractLegendItem(parent)
+    : QCPPlottableLegendItem(parent, multiGraph)
     , mMultiGraph(multiGraph)
 {
-    setAntialiased(false);
-    repaintWhenBusyChanges(multiGraph);
-    leaveLegendWhenDestroyed(multiGraph);
     if (multiGraph)
         connect(multiGraph, &QCPMultiGraph::componentVisibilityChanged, this,
                 [this] { if (QCPLayer* legendLayer = layer()) legendLayer->markDirty(); });

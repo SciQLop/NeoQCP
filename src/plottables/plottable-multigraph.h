@@ -159,9 +159,11 @@ public:
     //! Whether a decoration may name \a column: any column >= 0 before the first data, the
     //! data's columns after.
     [[nodiscard]] bool isValidColumn(int column) const;
+    //! The fill's own brush; for the default brush, the graph's brush on a fill to another graph
+    //! (2.x's channel), else the owner's pen colour at alpha 64.
     [[nodiscard]] QBrush effectiveFillBrush(const Fill& fill) const;
-    //! The fill brush of a selected or unselected run; a selected run takes the selected pen's
-    //! colour at the fill's alpha.
+    //! The fill brush of a selected or unselected run; a selected run takes the user's decorator
+    //! brush, or else the selected pen's colour at the fill's alpha.
     [[nodiscard]] QBrush fillRunBrush(const Fill& fill, bool selected) const;
 
     struct ErrorBars {
@@ -266,6 +268,8 @@ protected:
     void selectEvent(QMouseEvent* event, bool additive, const QVariant& details,
                      bool* selectionStateChanged) override;
     void deselectEvent(bool* selectionStateChanged) override;
+    //! 2.x's rows are shared by the columns: the graph's selection selects them on each component.
+    bool assignSelection(const QCPDataSelection& selection) override;
 
     friend class TestMultiGraph;
     friend class TestPipeline;
@@ -375,8 +379,34 @@ protected:
                     int end) const;
     [[nodiscard]] std::vector<qcp::fill::StripPoint>
     shapeFillRows(const Fill& fill, std::vector<qcp::fill::StripPoint> rows) const;
-    [[nodiscard]] bool rowIsSelected(const Fill& fill, const QCPAbstractMultiDataSource& ds,
+    //! Whether \a row of \a ds is in \a column's selection; a resampled row by its key.
+    [[nodiscard]] bool rowIsSelected(int column, const QCPAbstractMultiDataSource& ds,
                                      int row) const;
+    //! One flag per vertex: whether its row is selected. A break (row -1) follows the vertex before.
+    [[nodiscard]] std::vector<char> selectedVertices(int column,
+                                                     const QCPAbstractMultiDataSource& ds,
+                                                     const std::vector<int>& rows) const;
+    //! Records one component: its line in runs of equally selected rows, then its markers.
+    //! \a rows holds each vertex's row in \a ds when asked for, else nothing.
+    void recordComponent(QCPDrawContext& context, int column, std::vector<QPointF> line,
+                         const std::vector<int>& rows, const QCPAbstractMultiDataSource& ds,
+                         bool coloured, double impulseBaseline, bool logKeyAxis) const;
+    //! Records \a line in \a style with \a pen; \a dataIdx, when not empty, colours it.
+    void recordLine(QCPDrawContext& context, LineStyle style, std::vector<QPointF> line,
+                    const QVector<int>& dataIdx, QPen pen, double impulseBaseline,
+                    bool logKeyAxis) const;
+    //! The markers of \a line, the selected ones (\a selected per vertex, or \a allSelected when
+    //! empty) in the selected style.
+    void recordMarkers(QCPDrawContext& context, const Component& comp,
+                       const std::vector<QPointF>& line, const std::vector<int>& rows,
+                       bool indexed, const std::vector<char>& selected, bool allSelected) const;
+    //! Whether the user styled or replaced the selection decorator: then it draws the selection,
+    //! not the components' selected pens.
+    [[nodiscard]] bool decoratorIsTheUsers() const;
+    [[nodiscard]] QPen selectedLinePen(const Component& comp) const;
+    [[nodiscard]] QCPScatterStyle selectedMarkerStyle(const Component& comp) const;
+    //! A decorator subclass's own decoration (the bracket), after the lines.
+    void recordSelectionDecoration(QCPDrawContext& context) const;
     void partnerGone();
     //! Drops the dependency and destroyed connection of partners no remaining fill uses.
     void releasePartnerDependencies(const QVector<Fill>& removed);

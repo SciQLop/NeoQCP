@@ -211,7 +211,8 @@ std::vector<StripPoint> stepped(std::span<const StripPoint> rows, Step step)
 
 // simplify: a value <= 0 is taken as invalid on every log axis, but on an all-negative range the
 // invalid values are the ones >= 0. Callers then push valid negative values to the edge. Upgrade:
-// test the value's sign against the range's sign in baselinePixel and QCPMultiGraph::fillValue.
+// test the value's sign against the range's sign in baselinePixel, as QCPMultiGraph::fillValue
+// does.
 std::pair<double, double> logZeroSideEdges(const QCPAxis& valueAxis)
 {
     const QCPRange range = valueAxis.range();
