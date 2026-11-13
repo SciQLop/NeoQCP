@@ -64,8 +64,8 @@
   
   A \ref QCPDataSelection is a list of \ref QCPDataRange instances, which themselves hold the \a
   begin and \a end index of the respective data range. In the case of a one-dimensional plottable
-  (deriving from \ref QCPAbstractPlottable1D, e.g. \ref QCPGraph, \ref QCPCurve, \ref QCPBars,
-  etc.) you can access the data points by index, using the data container's \ref
+  (deriving from \ref QCPAbstractPlottable1D, e.g. \ref QCPCurve, \ref QCPBars, etc.) you can
+  access the data points by index, using the data container's \ref
   QCPDataContainer<DataType>::at "at(int index)" method. Alternatively you can simply add the integer index to the
   data container's \ref QCPDataContainer::begin "begin()" iterator.
   

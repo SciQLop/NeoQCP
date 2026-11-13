@@ -566,17 +566,18 @@ QCPHandle<QCPLayerable> QCPLayerable::parentLayerable() const
   versions of this function before drawing each entity, effectively overriding the setting of the
   default antialiasing hint.
 
-  <b>First example:</b> QCPGraph has multiple entities that have an antialiasing setting: The graph
-  line, fills and scatters. Those can be configured via QCPGraph::setAntialiased,
-  QCPGraph::setAntialiasedFill and QCPGraph::setAntialiasedScatters. Consequently, there isn't only
-  the QCPGraph::applyDefaultAntialiasingHint function (which corresponds to the graph line's
-  antialiasing), but specialized ones like QCPGraph::applyFillAntialiasingHint and
-  QCPGraph::applyScattersAntialiasingHint. So before drawing one of those entities, QCPGraph::draw
-  calls the respective specialized applyAntialiasingHint function.
+  <b>First example:</b> a plottable has multiple entities that have an antialiasing setting: The
+  line, fills and scatters. Those can be configured via QCPAbstractPlottable::setAntialiased,
+  QCPAbstractPlottable::setAntialiasedFill and QCPAbstractPlottable::setAntialiasedScatters.
+  Consequently, there isn't only the applyDefaultAntialiasingHint function (which corresponds to the
+  line's antialiasing), but specialized ones like QCPAbstractPlottable::applyFillAntialiasingHint
+  and QCPAbstractPlottable::applyScattersAntialiasingHint. So before drawing one of those entities, a
+  plottable that draws with a painter calls the respective specialized applyAntialiasingHint
+  function.
 
   <b>Second example:</b> QCPItemLine consists only of a line so there is only one antialiasing
   setting which can be controlled with QCPItemLine::setAntialiased. (This function is inherited by
-  all layerables. The specialized functions, as seen on QCPGraph, must be added explicitly to the
+  all layerables. The specialized functions, as seen on QCPAbstractPlottable, must be added explicitly to the
   respective layerable subclass.) Consequently it only has the normal
   QCPItemLine::applyDefaultAntialiasingHint. The \ref QCPItemLine::draw function doesn't need to
   care about setting any antialiasing states, because the default antialiasing hint is already set
@@ -785,7 +786,7 @@ bool QCPLayerable::realVisibility() const
   placed in \a details. So in the subsequent \ref selectEvent, the decision which part was
   selected doesn't have to be done a second time for a single selection operation.
 
-  In the case of 1D Plottables (\ref QCPAbstractPlottable1D, like \ref QCPGraph or \ref QCPBars) \a
+  In the case of 1D Plottables (\ref QCPPlottableInterface1D, like \ref QCPGraph or \ref QCPBars) \a
   details will be set to a \ref QCPDataSelection, describing the closest data point to \a pos.
 
   You may pass \c nullptr as \a details to indicate that you are not interested in those selection

@@ -57,8 +57,8 @@ QImage errorBarsScene(bool verticalKey, bool logValue, bool selected, bool legen
             QCPAxis* value = verticalKey ? plot.xAxis : plot.yAxis;
             key->setRange(0, 6);
             value->setRange(logValue ? 0.5 : -1, logValue ? 10 : 1.5);
-            auto* graph = new QCPMultiGraph(key, value);
-            graph->setLineStyle(QCPMultiGraph::lsNone);
+            auto* graph = new QCPGraph(key, value);
+            graph->setLineStyle(QCPGraph::lsNone);
             graph->setPen(QPen(Qt::blue, 0));
             graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
             graph->setData(sampleKeys(),
@@ -270,7 +270,7 @@ QImage itemScene(const char* kind)
             }
             else if (name == QLatin1String("tracer"))
             {
-                auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+                auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
                 QVector<double> keys, values;
                 for (int i = 0; i <= 60; ++i)
                 {
@@ -557,7 +557,7 @@ QImage userSystemMultiGraphScene()
             }
 
             const QVector<double> keys { 0.5, 2, 3.5, 5, 6.5, 8 };
-            auto* graph = new QCPMultiGraph(key, value);
+            auto* graph = new QCPGraph(key, value);
             graph->setData(
                 keys, std::vector<QVector<double>> {
                           QVector<double> { 7, 6, 8, 7, 9, 8.5 },     // the step column
@@ -566,9 +566,9 @@ QImage userSystemMultiGraphScene()
                           QVector<double> { 3, 3.5, 3, 4, 3.5, 4.5 },  // upper error bound
                           QVector<double> { 8, 9, 6, 8, 7, 9 }         // scatter-only column
                       });
-            graph->setComponentLineStyle(0, QCPMultiGraph::lsStepLeft);
-            graph->setComponentLineStyle(1, QCPMultiGraph::lsLine);
-            graph->setComponentLineStyle(4, QCPMultiGraph::lsNone);
+            graph->setComponentLineStyle(0, QCPGraph::lsStepLeft);
+            graph->setComponentLineStyle(1, QCPGraph::lsLine);
+            graph->setComponentLineStyle(4, QCPGraph::lsNone);
             graph->setComponentScatterStyle(4, QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
             graph->setComponentVisible(2, false);
             graph->setComponentVisible(3, false);
@@ -601,37 +601,37 @@ QImage userSystemSkewScene()
             }
 
             const QVector<double> keys { 0.5, 2, 3.5, 5, 6.5, 8 };
-            auto* filled = new QCPMultiGraph(key, value);
+            auto* filled = new QCPGraph(key, value);
             filled->setData(keys, QVector<double> { 2, 4, 3, 5, 3.5, 6 });
             filled->setBrush(QColor(40, 110, 200, 70));
             filled->setPen(QPen(QColor(40, 110, 200), 2));
             filled->setName(QStringLiteral("filled"));
 
-            auto* step = new QCPMultiGraph(key, value);
-            step->setLineStyle(QCPMultiGraph::lsStepLeft);
+            auto* step = new QCPGraph(key, value);
+            step->setLineStyle(QCPGraph::lsStepLeft);
             step->setData(QVector<double> { 1, 3, 5, 7, 9 },
                           QVector<double> { 7, 6, 8, 7, 9 });
             step->setPen(QPen(QColor(200, 60, 40), 2));
             step->setName(QStringLiteral("step"));
 
-            auto* impulse = new QCPMultiGraph(key, value);
-            impulse->setLineStyle(QCPMultiGraph::lsImpulse);
+            auto* impulse = new QCPGraph(key, value);
+            impulse->setLineStyle(QCPGraph::lsImpulse);
             impulse->setData(QVector<double> { 0.5, 1.5, 2.5, 3.5 },
                              QVector<double> { 1, 3, 2, 4 });
             impulse->setPen(QPen(QColor(60, 150, 70), 2));
             impulse->setName(QStringLiteral("impulse"));
 
-            auto* dots = new QCPMultiGraph(key, value);
-            dots->setLineStyle(QCPMultiGraph::lsNone);
+            auto* dots = new QCPGraph(key, value);
+            dots->setLineStyle(QCPGraph::lsNone);
             dots->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
             dots->setData(QVector<double> { 2, 4, 6, 8 }, QVector<double> { 8, 9, 6, 8 });
             dots->setPen(QPen(QColor(120, 60, 160), 2));
             dots->setName(QStringLiteral("dots"));
 
-            auto* lower = new QCPMultiGraph(key, value);
+            auto* lower = new QCPGraph(key, value);
             lower->setData(keys, QVector<double> { 1, 1.5, 1, 2, 1.5, 2.5 });
             lower->setPen(QPen(QColor(180, 120, 40), 2));
-            auto* upper = new QCPMultiGraph(key, value);
+            auto* upper = new QCPGraph(key, value);
             upper->setData(keys, QVector<double> { 3, 3.5, 3, 4, 3.5, 4.5 });
             upper->setPen(QPen(QColor(180, 120, 40), 2));
             upper->setBrush(QColor(220, 160, 60, 70));

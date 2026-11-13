@@ -7,8 +7,8 @@
 #include "datasource/growable-multi-datasource.h"
 #include "datasource/row-major-multi-datasource.h"
 #include "datasource/soa-multi-datasource.h"
-#include "multigraph-errorbars.h"
-#include "multigraph-fill.h"
+#include "graph-errorbars.h"
+#include "graph-fill.h"
 #include "plottable-color-mapper.h"
 #include "plottable-draw-utils.h"
 #include "plottable-line.h"
@@ -34,18 +34,18 @@
 class QCPPlottableRhiLayer;
 
 template <typename T, typename Self = void>
-class QCPMultiGraphOps;
+class QCPGraphOps;
 
-class QCP_LIB_DECL QCPMultiGraph : public QCPAbstractLine, public QCPPlottableInterface1D
+class QCP_LIB_DECL QCPGraph : public QCPAbstractLine, public QCPPlottableInterface1D
 {
     Q_OBJECT
 public:
     template <typename T>
-    using OpsFor = QCPMultiGraphOps<T>;
+    using OpsFor = QCPGraphOps<T>;
 
-    explicit QCPMultiGraph(QCPAxis* keyAxis, QCPAxis* valueAxis,
+    explicit QCPGraph(QCPAxis* keyAxis, QCPAxis* valueAxis,
                            QCP::Capabilities required = QCP::capStraightSegments);
-    ~QCPMultiGraph() override;
+    ~QCPGraph() override;
 
     // Data source
     void setDataSource(std::unique_ptr<QCPAbstractMultiDataSource> source);
@@ -55,8 +55,8 @@ public:
     //! A content change: drops a fill whose partner lost its component, then marks the layer.
     void markDirty() override;
 
-    QCPMultiGraphPipeline& pipeline() { return mPipeline; }
-    const QCPMultiGraphPipeline& pipeline() const { return mPipeline; }
+    QCPGraphPipeline& pipeline() { return mPipeline; }
+    const QCPGraphPipeline& pipeline() const { return mPipeline; }
 
     [[nodiscard]] bool hasRenderedRange() const { return mCore.hasRecording(); }
 
@@ -152,7 +152,7 @@ public:
 
     struct FillToGraph
     {
-        QPointer<QCPMultiGraph> graph;
+        QPointer<QCPGraph> graph;
         int component = 0;
     };
     struct Fill {
@@ -168,7 +168,7 @@ public:
     //! a cartesian frame, the key axis with another value axis (2.x's channel between y and y2):
     //! the partner's values then map onto this graph's value axis through pixels. Any other system
     //! is a misuse. The partner is held by QPointer: the band drops when it or its component goes.
-    bool setComponentFillToGraph(int owner, QCPMultiGraph* other, int otherComponent,
+    bool setComponentFillToGraph(int owner, QCPGraph* other, int otherComponent,
                                  const QBrush& brush = Qt::NoBrush);
     void setComponentFillBrush(int owner, const QBrush& brush);
     void clearComponentFill(int owner);
@@ -308,8 +308,8 @@ protected:
     bool mAdaptiveSampling = true;
     double mGapThreshold = qcp::algo::kDefaultGapThreshold;
     // draw() is const: what it resolves for this frame is mutable state, not cached pixels.
-    mutable QCPMultiGraphPipeline mPipeline;
-    mutable std::shared_ptr<qcp::algo::MultiGraphResamplerCache> mL1Cache;
+    mutable QCPGraphPipeline mPipeline;
+    mutable std::shared_ptr<qcp::algo::GraphResamplerCache> mL1Cache;
     mutable std::shared_ptr<QCPAbstractMultiDataSource> mL2Result;
     mutable bool mL2Dirty = false;
     bool mNeedsResampling = false;
@@ -354,7 +354,7 @@ protected:
     //! The source the graph owns: the growable one setData()/addData() built. Null after every
     //! other source setter (a view, a shared/unique source, a waterfall adapter).
     std::shared_ptr<QCPGrowableMultiDataSource> mOwnedSource;
-    std::shared_ptr<qcp::algo::MultiGraphResamplerCache> mPendingL1;
+    std::shared_ptr<qcp::algo::GraphResamplerCache> mPendingL1;
     bool mPendingReady = false;
     uint64_t mPendingGeneration = 0;
     // Generation floor below which a pipeline result is from a source that's
@@ -390,25 +390,25 @@ protected:
     //! Drops FillToGraph entries whose partner is gone or no longer has the named component.
     void pruneLostPartnerFills();
     [[nodiscard]] static bool partnerDied(const Fill& fill);
-    [[nodiscard]] Component firstComponentStyle() const;
+    [[nodiscard]] QCPGraphComponent firstComponentStyle() const;
     [[nodiscard]] std::optional<QBrush> emptyGraphFillBrush() const;
-    void drawLegendGlyph(QCPPainter* painter, const Component& comp,
+    void drawLegendGlyph(QCPPainter* painter, const QCPGraphComponent& comp,
                          const std::optional<QBrush>& fill, const QLineF& line) const;
-    void recordLegendSegment(QCPDrawContext& icon, const Component& comp,
+    void recordLegendSegment(QCPDrawContext& icon, const QCPGraphComponent& comp,
                              const std::optional<QBrush>& fill, double x0) const;
     void dropDecorationsBeyond(int columnCount);
     void hideErrorBound(int column);
     void releaseErrorBounds(const ErrorBars& removed);
     bool setFill(Fill fill);
     //! Whether a fill may reach \a partner: the same system, or across value axes.
-    [[nodiscard]] bool canFillTo(const QCPMultiGraph& partner) const;
+    [[nodiscard]] bool canFillTo(const QCPGraph& partner) const;
     //! 2.x's channel between y and y2: both cartesian, on one key axis (so one area), with another
     //! value axis of the same orientation. The partner's values then map through pixels.
-    [[nodiscard]] bool fillsAcrossValueAxes(const QCPMultiGraph& partner) const;
+    [[nodiscard]] bool fillsAcrossValueAxes(const QCPGraph& partner) const;
     [[nodiscard]] bool isErrorBound(int column) const;
     void decorationsChanged();
     [[nodiscard]] bool fillDrawable(const Fill& fill, int columnCount) const;
-    [[nodiscard]] static qcp::fill::Step ownerStep(const Component& owner);
+    [[nodiscard]] static qcp::fill::Step ownerStep(const QCPGraphComponent& owner);
     [[nodiscard]] std::vector<qcp::fill::StripPoint> fillRows(const Fill& fill,
                                                               const QCPAbstractMultiDataSource& ds,
                                                               int begin, int end) const;
@@ -435,14 +435,14 @@ protected:
                     bool logKeyAxis) const;
     //! The markers of \a line, the selected ones (\a selected per vertex, or \a allSelected when
     //! empty) in the selected style.
-    void recordMarkers(QCPDrawContext& context, const Component& comp,
+    void recordMarkers(QCPDrawContext& context, const QCPGraphComponent& comp,
                        const std::vector<QPointF>& line, const std::vector<int>& rows,
                        bool indexed, const std::vector<char>& selected, bool allSelected) const;
     //! Whether the user styled or replaced the selection decorator: then it draws the selection,
     //! not the components' selected pens.
     [[nodiscard]] bool decoratorIsTheUsers() const;
-    [[nodiscard]] QPen selectedLinePen(const Component& comp) const;
-    [[nodiscard]] QCPScatterStyle selectedMarkerStyle(const Component& comp) const;
+    [[nodiscard]] QPen selectedLinePen(const QCPGraphComponent& comp) const;
+    [[nodiscard]] QCPScatterStyle selectedMarkerStyle(const QCPGraphComponent& comp) const;
     //! A decorator subclass's own decoration (the bracket), after the lines.
     void recordSelectionDecoration(QCPDrawContext& context) const;
     void partnerGone();
@@ -476,19 +476,17 @@ protected:
 
 };
 
-using QCPGraphComponent = QCPMultiGraph::Component;
-
-// The fluent handle of a QCPMultiGraph; see QCPPlottableOps for the subclass contract.
+// The fluent handle of a QCPGraph; see QCPPlottableOps for the subclass contract.
 template <typename T, typename Self>
-class QCPMultiGraphOps : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPMultiGraphOps<T>>>
+class QCPGraphOps : public QCPPlottableOps<T, qcp::OpsRet<Self, QCPGraphOps<T>>>
 {
-    using Base = QCPPlottableOps<T, qcp::OpsRet<Self, QCPMultiGraphOps<T>>>;
+    using Base = QCPPlottableOps<T, qcp::OpsRet<Self, QCPGraphOps<T>>>;
 
 public:
     using Base::Base;
     using typename Base::Ret;
 
-    // Same arguments as QCPMultiGraph::setData: the keys and one value column per component.
+    // Same arguments as QCPGraph::setData: the keys and one value column per component.
     template <IndexableNumericRange KC, IndexableNumericRange VC>
     Ret setData(KC&& keys, std::vector<VC>&& valueColumns, bool alreadySorted = false)
     {
@@ -625,12 +623,12 @@ public:
         return this->apply([&](T& o) { o.setComponentFillBrush(owner, brush); });
     }
 
-    Ret setLineStyle(QCPMultiGraph::LineStyle style)
+    Ret setLineStyle(QCPGraph::LineStyle style)
     {
         return this->apply([&](T& o) { o.setLineStyle(style); });
     }
 
-    Ret setComponentLineStyle(int index, QCPMultiGraph::LineStyle style)
+    Ret setComponentLineStyle(int index, QCPGraph::LineStyle style)
     {
         return this->apply([&](T& o) { o.setComponentLineStyle(index, style); });
     }

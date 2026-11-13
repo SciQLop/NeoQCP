@@ -87,7 +87,7 @@ std::vector<QPointF> QCPWaterfallDataAdapter::linesInData(int column, int begin,
 // --- QCPWaterfallGraph ---
 
 QCPWaterfallGraph::QCPWaterfallGraph(QCPAxis* keyAxis, QCPAxis* valueAxis)
-    : QCPMultiGraph(keyAxis, valueAxis, QCP::capRectangular | QCP::capStraightKey)
+    : QCPGraph(keyAxis, valueAxis, QCP::capRectangular | QCP::capStraightKey)
 {
 }
 
@@ -185,7 +185,7 @@ void QCPWaterfallGraph::rebuildAdapter()
         // Clearing the source must uninstall the previous adapter too, or the
         // graph keeps rendering the old data (base caches stay populated).
         mAdapter.reset();
-        QCPMultiGraph::setDataSource(std::shared_ptr<QCPAbstractMultiDataSource>{});
+        QCPGraph::setDataSource(std::shared_ptr<QCPAbstractMultiDataSource>{});
         return;
     }
     if (mNormDirty)
@@ -198,16 +198,16 @@ void QCPWaterfallGraph::rebuildAdapter()
 
     mAdapter = std::make_shared<QCPWaterfallDataAdapter>(
         mOriginalSource, std::move(offsets), mCachedNormFactors, mGain);
-    QCPMultiGraph::setDataSource(mAdapter);
+    QCPGraph::setDataSource(mAdapter);
 }
 
 void QCPWaterfallGraph::dataChanged()
 {
     // In-place mutation of the inner source: norm factors are stale, snapshot
     // a fresh adapter (which also invalidates line/L1/L2 caches). rebuildAdapter()
-    // already routes through QCPMultiGraph::setDataSource(), which replaces the
+    // already routes through QCPGraph::setDataSource(), which replaces the
     // displayed data at once (the default) or, with the deferred swap on, stages
-    // the adapter. Do NOT also call QCPMultiGraph::dataChanged() here: with the
+    // the adapter. Do NOT also call QCPGraph::dataChanged() here: with the
     // deferred swap on, that sees the fresh adapter we just staged in
     // mPendingSource and — treating it as "a mutation superseded the pending
     // replacement" — re-stages the OLD displayed adapter over it, discarding the

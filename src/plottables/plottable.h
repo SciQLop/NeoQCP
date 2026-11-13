@@ -344,7 +344,7 @@ protected:
     //! the one it is drawn in.
     virtual void systemWillChange(QCPCoordinateSystem*) {}
     //! Stores the selection setSelection() was given, already fitted to the selectable type.
-    //! Returns whether anything changed. A plottable whose selection lives in parts (a multigraph's
+    //! Returns whether anything changed. A plottable whose selection lives in parts (a graph's
     //! components) hands it to them.
     virtual bool assignSelection(const QCPDataSelection& selection);
 

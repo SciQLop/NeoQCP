@@ -11,7 +11,7 @@ DOC_SNIPPET(first_plot, 600, 360)
         x[i] = i / 50.0 - 1;   // -1 to 1
         y[i] = x[i] * x[i];
     }
-    customPlot->add<QCPMultiGraph>(x, y);
+    customPlot->add<QCPGraph>(x, y);
     customPlot->xAxis->setLabel("x");
     customPlot->yAxis->setLabel("y");
     customPlot->xAxis->setRange(-1, 1);
@@ -28,7 +28,7 @@ DOC_SNIPPET(first_plot_interactive, 600, 360)
         t[i] = i / 50.0;
         signal[i] = std::sin(t[i]) * std::exp(-t[i] / 5);
     }
-    auto graph = customPlot->add<QCPMultiGraph>()
+    auto graph = customPlot->add<QCPGraph>()
         .setData(t, signal)
         .setName("damped sine")
         .setPen(QPen(QColor(31, 119, 180), 2));

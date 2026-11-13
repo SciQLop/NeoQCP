@@ -30,9 +30,9 @@ int TestPlottableGroup::plottableRows() const
 
 void TestPlottableGroup::groupHasOneLegendRow()
 {
-    QCPMultiGraph* centre = mPlot->addGraph();
-    QCPMultiGraph* low = mPlot->addGraph();
-    QCPMultiGraph* high = mPlot->addGraph();
+    QCPGraph* centre = mPlot->addGraph();
+    QCPGraph* low = mPlot->addGraph();
+    QCPGraph* high = mPlot->addGraph();
     QCOMPARE(mPlot->legend->itemCount(), 3);
 
     QCPPlottableGroup* group = mPlot->addPlottableGroup("Shue");
@@ -50,7 +50,7 @@ void TestPlottableGroup::groupHasOneLegendRow()
 
 void TestPlottableGroup::groupedPlottableCannotRejoinTheLegend()
 {
-    QCPMultiGraph* graph = mPlot->addGraph();
+    QCPGraph* graph = mPlot->addGraph();
     QCPPlottableGroup* group = mPlot->addPlottableGroup("g");
     group->addMember(graph);
 
@@ -60,7 +60,7 @@ void TestPlottableGroup::groupedPlottableCannotRejoinTheLegend()
 
 void TestPlottableGroup::doubleClickOnTheRowIsReportedOnce()
 {
-    QCPMultiGraph* outside = mPlot->addGraph();
+    QCPGraph* outside = mPlot->addGraph();
     QCPPlottableGroup* group = mPlot->addPlottableGroup("g");
     group->addMember(mPlot->addGraph());
     group->addMember(mPlot->addGraph());
@@ -76,8 +76,8 @@ void TestPlottableGroup::doubleClickOnTheRowIsReportedOnce()
 
 void TestPlottableGroup::visibleWhenAnyMemberIsVisible()
 {
-    QCPMultiGraph* a = mPlot->addGraph();
-    QCPMultiGraph* b = mPlot->addGraph();
+    QCPGraph* a = mPlot->addGraph();
+    QCPGraph* b = mPlot->addGraph();
     QCPPlottableGroup* group = mPlot->addPlottableGroup("g");
     group->addMember(a);
     group->addMember(b);
@@ -96,9 +96,9 @@ void TestPlottableGroup::visibleWhenAnyMemberIsVisible()
 
 void TestPlottableGroup::removedPlottableLeavesTheGroup()
 {
-    QCPMultiGraph* a = mPlot->addGraph();
-    QCPMultiGraph* b = mPlot->addGraph();
-    QCPMultiGraph* c = mPlot->addGraph();
+    QCPGraph* a = mPlot->addGraph();
+    QCPGraph* b = mPlot->addGraph();
+    QCPGraph* c = mPlot->addGraph();
     QCPPlottableGroup* group = mPlot->addPlottableGroup("g");
     group->addMember(a);
     group->addMember(b);
@@ -112,7 +112,7 @@ void TestPlottableGroup::removedPlottableLeavesTheGroup()
 
 void TestPlottableGroup::emptyGroupStaysWithoutARow()
 {
-    QCPMultiGraph* a = mPlot->addGraph();
+    QCPGraph* a = mPlot->addGraph();
     QPointer<QCPPlottableGroup> group(mPlot->addPlottableGroup("g"));
     group->addMember(a);
 
@@ -129,8 +129,8 @@ void TestPlottableGroup::emptyGroupStaysWithoutARow()
 
 void TestPlottableGroup::removingTheGroupGivesRowsBack()
 {
-    QCPMultiGraph* a = mPlot->addGraph();
-    QCPMultiGraph* b = mPlot->addGraph();
+    QCPGraph* a = mPlot->addGraph();
+    QCPGraph* b = mPlot->addGraph();
     b->setWantsLegend(false);
     QCOMPARE(plottableRows(), 1);
     QCPPlottableGroup* group = mPlot->addPlottableGroup("g");
@@ -147,7 +147,7 @@ void TestPlottableGroup::removingTheGroupGivesRowsBack()
 
 void TestPlottableGroup::unwantedLegendStaysOutAfterTheGroup()
 {
-    QCPMultiGraph* a = mPlot->addGraph();
+    QCPGraph* a = mPlot->addGraph();
     QCPPlottableGroup* group = mPlot->addPlottableGroup("g");
     group->addMember(a);
     a->setWantsLegend(false);
@@ -161,7 +161,7 @@ void TestPlottableGroup::unwantedLegendStaysOutAfterTheGroup()
 
 void TestPlottableGroup::multiGraphUnwantedLegendStaysOut()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     QCOMPARE(mPlot->legend->itemCount(), 1);
 
     mg->setWantsLegend(false);
@@ -177,7 +177,7 @@ void TestPlottableGroup::multiGraphUnwantedLegendStaysOut()
 
 void TestPlottableGroup::memberMovesToItsNewGroup()
 {
-    QCPMultiGraph* a = mPlot->addGraph();
+    QCPGraph* a = mPlot->addGraph();
     QCPPlottableGroup* first = mPlot->addPlottableGroup("first");
     QCPPlottableGroup* second = mPlot->addPlottableGroup("second");
     first->addMember(a);
@@ -192,7 +192,7 @@ void TestPlottableGroup::memberMovesToItsNewGroup()
 void TestPlottableGroup::memberFromAnotherPlotIsRefused()
 {
     QCustomPlot other;
-    QCPMultiGraph* foreign = other.addGraph();
+    QCPGraph* foreign = other.addGraph();
     QCPPlottableGroup* group = mPlot->addPlottableGroup("g");
 
     QVERIFY(!group->addMember(foreign));
@@ -203,7 +203,7 @@ void TestPlottableGroup::memberFromAnotherPlotIsRefused()
 
 void TestPlottableGroup::hiddenGroupStaysDimmedAfterTextColorChange()
 {
-    QCPMultiGraph* a = mPlot->addGraph();
+    QCPGraph* a = mPlot->addGraph();
     QCPPlottableGroup* group = mPlot->addPlottableGroup("g");
     group->addMember(a);
     QCOMPARE(groupRow()->effectiveTextColor().alpha(), 255);
@@ -220,8 +220,8 @@ void TestPlottableGroup::rowRepaintsWhenMembersHide()
 {
     // The row lives on the legend layer, not the members' layers: hiding a member must dirty
     // the legend too, or the row keeps its old (undimmed) look until something else repaints it.
-    QCPMultiGraph* graph = mPlot->addGraph();
-    auto* multiGraph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    QCPGraph* graph = mPlot->addGraph();
+    auto* multiGraph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     multiGraph->setDataSource(
         std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
             std::vector<double> { 1.0, 2.0 }, std::vector<std::vector<double>> { { 1.0, 2.0 } }));
@@ -245,7 +245,7 @@ void TestPlottableGroup::rowRepaintsWhenMembersHide()
 
 void TestPlottableGroup::busyMemberShowsTheBusySymbol()
 {
-    QCPMultiGraph* a = mPlot->addGraph();
+    QCPGraph* a = mPlot->addGraph();
     a->setBusyShowDelayMs(10);
     QCPPlottableGroup* group = mPlot->addPlottableGroup("Shue");
     group->addMember(a);
@@ -262,7 +262,7 @@ void TestPlottableGroup::deletingThePlotWithGroupsIsSafe()
     auto* plot = new QCustomPlot(nullptr);
     QCPPlottableGroup* group = plot->addPlottableGroup("g");
     group->addMember(plot->addGraph());
-    group->addMember(new QCPMultiGraph(plot->xAxis, plot->yAxis));
+    group->addMember(new QCPGraph(plot->xAxis, plot->yAxis));
     plot->addPlottableGroup("empty");
     plot->replot(QCustomPlot::rpImmediateRefresh);
     delete plot;
@@ -272,8 +272,8 @@ void TestPlottableGroup::membersChangedSlotMayRemoveAgain()
 {
     // removePlottable used to emit membersChanged before deleting: a slot removing the same
     // plottable (or another one) re-entered it and the plottable was deleted twice.
-    QCPMultiGraph* a = mPlot->addGraph();
-    QCPMultiGraph* b = mPlot->addGraph();
+    QCPGraph* a = mPlot->addGraph();
+    QCPGraph* b = mPlot->addGraph();
     QCPPlottableGroup* group = mPlot->addPlottableGroup("g");
     group->addMember(a);
     group->addMember(b);
@@ -287,8 +287,8 @@ void TestPlottableGroup::membersChangedSlotMayRemoveAgain()
 
 void TestPlottableGroup::visibilitySlotMayRemoveALaterMember()
 {
-    QCPMultiGraph* a = mPlot->addGraph();
-    QCPMultiGraph* b = mPlot->addGraph();
+    QCPGraph* a = mPlot->addGraph();
+    QCPGraph* b = mPlot->addGraph();
     QCPPlottableGroup* group = mPlot->addPlottableGroup("g");
     group->addMember(a);
     group->addMember(b);
@@ -300,7 +300,7 @@ void TestPlottableGroup::visibilitySlotMayRemoveALaterMember()
 
 void TestPlottableGroup::moveSurvivesASlotRemovingTheMember()
 {
-    QCPMultiGraph* a = mPlot->addGraph();
+    QCPGraph* a = mPlot->addGraph();
     QCPPlottableGroup* first = mPlot->addPlottableGroup("first");
     QCPPlottableGroup* second = mPlot->addPlottableGroup("second");
     first->addMember(a);
@@ -316,7 +316,7 @@ void TestPlottableGroup::moveSurvivesASlotRemovingTheMember()
 void TestPlottableGroup::leavingDoesNotAddARowNeverThere()
 {
     mPlot->setAutoAddPlottableToLegend(false);
-    QCPMultiGraph* a = mPlot->addGraph();
+    QCPGraph* a = mPlot->addGraph();
     QCPPlottableGroup* group = mPlot->addPlottableGroup("g");
     group->addMember(a);
     QVERIFY(mPlot->removePlottableGroup(group));
@@ -325,7 +325,7 @@ void TestPlottableGroup::leavingDoesNotAddARowNeverThere()
 
 void TestPlottableGroup::wantedWhileGroupedGetsARowOnLeaving()
 {
-    QCPMultiGraph* a = mPlot->addGraph();
+    QCPGraph* a = mPlot->addGraph();
     a->setWantsLegend(false);
     QCPPlottableGroup* group = mPlot->addPlottableGroup("g");
     group->addMember(a);
@@ -337,7 +337,7 @@ void TestPlottableGroup::wantedWhileGroupedGetsARowOnLeaving()
 
 void TestPlottableGroup::showingRestoresHiddenComponents()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDataSource(
         std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
             std::vector<double> { 1.0, 2.0 },
@@ -390,10 +390,10 @@ void TestPlottableGroup::foreignGroupIsNotRemoved()
 void TestPlottableGroup::iconIsTheFirstVisibleMembers()
 {
     // A graph draws its legend icon per component: each has one column of data.
-    QCPMultiGraph* hidden = mPlot->addGraph();
+    QCPGraph* hidden = mPlot->addGraph();
     hidden->setData({0, 1}, {0, 1});
     hidden->setPen(QPen(Qt::red, 6));
-    QCPMultiGraph* shown = mPlot->addGraph();
+    QCPGraph* shown = mPlot->addGraph();
     shown->setData({0, 1}, {0, 1});
     shown->setPen(QPen(Qt::blue, 6));
     QCPPlottableGroup* group = mPlot->addPlottableGroup("g");
@@ -412,7 +412,7 @@ void TestPlottableGroup::iconIsTheFirstVisibleMembers()
 void TestPlottableGroup::anEmptyGraphsIconIsItsPen()
 {
     // 2.x drew an empty graph's pen line in the legend; data arrives later.
-    QCPMultiGraph* empty = mPlot->addGraph();
+    QCPGraph* empty = mPlot->addGraph();
     empty->setPen(QPen(Qt::blue, 6));
     QCPPlottableGroup* group = mPlot->addPlottableGroup("g");
     group->addMember(empty);

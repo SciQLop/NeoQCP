@@ -38,8 +38,8 @@ void TestQCPLegend::addAndRemove()
 {
   mPlot->setAutoAddPlottableToLegend(false);
   
-  QCPMultiGraph *g1 = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-  QCPMultiGraph *g2 = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+  QCPGraph *g1 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+  QCPGraph *g2 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
   QCPBars *b1 = new QCPBars(mPlot->xAxis, mPlot->yAxis);
   QCOMPARE(mPlot->legend->itemCount(), 0);
   
@@ -66,7 +66,7 @@ void TestQCPLegend::itemTextColorRepaintsTheLegend()
   // Dimming an entry (a hidden graph) only changes its text colour. The legend lives on a
   // layer of its own, so the setter must dirty it or the entry keeps its old colour until
   // something else repaints the legend.
-  auto *graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+  auto *graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
   graph->setName("dimmed");
   graph->addToLegend();
   mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -88,7 +88,7 @@ void TestQCPLegend::itemTextColorRepaintsTheLegend()
 
 void TestQCPLegend::groupRowFollowsComponentVisibility()
 {
-  auto *mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+  auto *mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
   mg->setData(std::vector<double>{1.0, 2.0, 3.0},
               std::vector<std::vector<double>>{{10.0, 20.0, 30.0}, {-1.0, -2.0, -3.0}});
   mg->addToLegend();

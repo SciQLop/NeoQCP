@@ -123,7 +123,7 @@ neoqcp_moc_headers = [
             'src/plottables/plottable-errorbar.h',
             'src/plottables/plottable-financial.h',
             'src/plottables/graph-data.h',
-            'src/plottables/plottable-multigraph.h',
+            'src/plottables/plottable-graph.h',
             'src/plottables/lane-layout.h',
             'src/plottables/plottable-intervals.h',
             'src/plottables/plottable-group.h',
@@ -337,9 +337,9 @@ NeoQCP = static_library('NeoQCP',
            'src/plottables/plottable-errorbar.cpp',
            'src/plottables/plottable-financial.cpp',
            'src/plottables/plottable-draw-utils.cpp',
-           'src/plottables/plottable-multigraph.cpp',
-           'src/plottables/multigraph-fill.cpp',
-           'src/plottables/multigraph-errorbars.cpp',
+           'src/plottables/plottable-graph.cpp',
+           'src/plottables/graph-fill.cpp',
+           'src/plottables/graph-errorbars.cpp',
            'src/plottables/lane-layout.cpp',
            'src/plottables/intervals-algo.cpp',
            'src/plottables/plottable-intervals.cpp',
@@ -366,7 +366,7 @@ NeoQCP = static_library('NeoQCP',
            cpp_args:cpp_args,
            dependencies: [qtdeps, profiling_hook_dep] + optional_deps + latex_deps,
            install: true,
-           extra_files: [neoqcp_moc_headers, 'src/handle-ops.h', 'src/construct.h', 'src/plottables/multigraph-fill.h', 'src/datasource/histogram-binner-1d.h', 'src/plottables/multigraph-errorbars.h', 'src/plottables/plottable-geometry-utils.h', 'src/Profiling.hpp', 'src/painting/paintbuffer-rhi.h', 'src/painting/plottable-rhi-layer.h', 'src/painting/raster-fallback.h', 'src/painting/grid-rhi-layer.h', 'src/painting/scatter-rhi-layer.h']
+           extra_files: [neoqcp_moc_headers, 'src/handle-ops.h', 'src/construct.h', 'src/plottables/graph-fill.h', 'src/datasource/histogram-binner-1d.h', 'src/plottables/graph-errorbars.h', 'src/plottables/plottable-geometry-utils.h', 'src/Profiling.hpp', 'src/painting/paintbuffer-rhi.h', 'src/painting/plottable-rhi-layer.h', 'src/painting/raster-fallback.h', 'src/painting/grid-rhi-layer.h', 'src/painting/scatter-rhi-layer.h']
            )
 
 

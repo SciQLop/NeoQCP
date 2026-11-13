@@ -311,7 +311,7 @@ void MainWindow::snippetQCPErrorBarsDataSharing()
 
 void MainWindow::snippetQCPDataSelectionIterating()
 {
-  QCPMultiGraph *graph = customPlot->addGraph();
+  QCPGraph *graph = customPlot->addGraph();
   for (int i=0; i<100; ++i)
     graph->addData(i, i);
   graph->setSelection(QCPDataRange(10, 15) + QCPDataRange(20, 40) + QCPDataRange(60, 80));
@@ -335,7 +335,7 @@ void MainWindow::snippetQCPDataSelectionIterating()
 
 void MainWindow::snippetQCPDataSelectionPointAtPos()
 {
-  QCPMultiGraph *graph = customPlot->addGraph();
+  QCPGraph *graph = customPlot->addGraph();
   //! [qcpdataselection-pointatpos]
   int index = -1;
   QVariant details;

@@ -1,5 +1,5 @@
 #include "layoutelement-legend-group.h"
-#include "../plottables/plottable-multigraph.h"
+#include "../plottables/plottable-graph.h"
 #include "../painting/painter.h"
 #include "../axis/labelrenderer.h"
 
@@ -20,18 +20,18 @@ void drawLabel(QCPPainter* painter, const QRectF& rect, const QString& text)
 
 } // namespace
 
-QCPGroupLegendItem::QCPGroupLegendItem(QCPLegend* parent, QCPMultiGraph* multiGraph)
-    : QCPPlottableLegendItem(parent, multiGraph)
-    , mMultiGraph(multiGraph)
+QCPGroupLegendItem::QCPGroupLegendItem(QCPLegend* parent, QCPGraph* graph)
+    : QCPPlottableLegendItem(parent, graph)
+    , mGraph(graph)
 {
-    if (multiGraph)
-        connect(multiGraph, &QCPMultiGraph::componentVisibilityChanged, this,
+    if (graph)
+        connect(graph, &QCPGraph::componentVisibilityChanged, this,
                 [this] { if (QCPLayer* legendLayer = layer()) legendLayer->markDirty(); });
 }
 
-QCPHandle<QCPMultiGraph> QCPGroupLegendItem::graph() const
+QCPHandle<QCPGraph> QCPGroupLegendItem::graph() const
 {
-    return QCPHandle<QCPMultiGraph>(mMultiGraph.data());
+    return QCPHandle<QCPGraph>(mGraph.data());
 }
 
 void QCPGroupLegendItem::setExpanded(bool expanded)
@@ -46,7 +46,7 @@ void QCPGroupLegendItem::setExpanded(bool expanded)
 // legend entry, even when selecting the component asked for expansion.
 bool QCPGroupLegendItem::shownExpanded() const
 {
-    return mExpanded && mMultiGraph && mMultiGraph->legendComponents().size() > 1;
+    return mExpanded && mGraph && mGraph->legendComponents().size() > 1;
 }
 
 QFont QCPGroupLegendItem::rowFont() const
@@ -60,43 +60,43 @@ int QCPGroupLegendItem::rowHeight() const
     const QFont font = rowFont();
     int height = std::max(QFontMetrics(font).height(), measured(font, headerRowText(true)).height());
     if (shownExpanded())
-        for (int i : mMultiGraph->legendComponents())
-            height = std::max(height, measured(font, mMultiGraph->component(i).name).height());
+        for (int i : mGraph->legendComponents())
+            height = std::max(height, measured(font, mGraph->component(i).name).height());
     return height + 4;
 }
 
 QString QCPGroupLegendItem::headerName() const
 {
-    if (!mMultiGraph) return QString();
-    const QVector<int> shown = mMultiGraph->legendComponents();
+    if (!mGraph) return QString();
+    const QVector<int> shown = mGraph->legendComponents();
     // One shown component stands for the graph, as 2.x's row did: the graph's name, unless the
     // component was named.
     // simplify: "named" means the name differs from the default one, so a component named exactly
     // "Component 0" by hand shows the graph's name. A flag set by every name write is the upgrade.
     if (shown.size() == 1)
     {
-        const QString& only = mMultiGraph->component(shown.first()).name;
-        return only == QCPMultiGraph::defaultComponentName(shown.first()) ? mMultiGraph->name()
+        const QString& only = mGraph->component(shown.first()).name;
+        return only == QCPGraph::defaultComponentName(shown.first()) ? mGraph->name()
                                                                            : only;
     }
-    if (!mMultiGraph->name().isEmpty()) return mMultiGraph->name();
+    if (!mGraph->name().isEmpty()) return mGraph->name();
     // No name and no components yet (e.g. async data still loading): show an
     // empty header rather than the C++ class name, which is meaningless to the
     // user. The legend item itself (and any busy indicator) still renders.
     if (shown.isEmpty()) return QString();
-    const QString& first = mMultiGraph->component(shown.first()).name;
-    return first + QString::fromUtf8(" \u2026 ") + mMultiGraph->component(shown.last()).name;
+    const QString& first = mGraph->component(shown.first()).name;
+    return first + QString::fromUtf8(" \u2026 ") + mGraph->component(shown.last()).name;
 }
 
 QString QCPGroupLegendItem::headerRowText(bool includeBusySymbol) const
 {
     // ▾ when expanded (collapse toward the edge), ▸ when collapsed, nothing for one component.
     QString text;
-    if (mMultiGraph && mMultiGraph->legendComponents().size() > 1)
+    if (mGraph && mGraph->legendComponents().size() > 1)
         text = QString::fromUtf8(shownExpanded() ? "▾ " : "▸ ");
-    if (includeBusySymbol && mMultiGraph && mMultiGraph->visuallyBusy())
+    if (includeBusySymbol && mGraph && mGraph->visuallyBusy())
     {
-        const QString symbol = mMultiGraph->effectiveBusyIndicatorSymbol();
+        const QString symbol = mGraph->effectiveBusyIndicatorSymbol();
         if (!symbol.isEmpty())
             text += symbol + QStringLiteral(" ");
     }
@@ -118,7 +118,7 @@ double QCPGroupLegendItem::selectTest(const QPointF& pos, bool onlySelectable, Q
         int hitRow = static_cast<int>(relY / rh);
 
         QVariantMap detailMap;
-        const QVector<int> shown = mMultiGraph ? mMultiGraph->legendComponents() : QVector<int>();
+        const QVector<int> shown = mGraph ? mGraph->legendComponents() : QVector<int>();
         if (!shownExpanded() || hitRow == 0 || shown.isEmpty())
             detailMap[QStringLiteral("componentIndex")] = -1; // header
         else
@@ -141,7 +141,7 @@ void QCPGroupLegendItem::selectEvent([[maybe_unused]] QMouseEvent* event,
     if (details.typeId() == QMetaType::QVariantMap)
         componentIndex = details.toMap().value(QStringLiteral("componentIndex"), -1).toInt();
 
-    const QVector<int> shown = mMultiGraph ? mMultiGraph->legendComponents() : QVector<int>();
+    const QVector<int> shown = mGraph ? mGraph->legendComponents() : QVector<int>();
     // Nothing to expand: a click selects the line, like a plain entry
     if (componentIndex < 0 && shown.size() == 1)
         componentIndex = shown.first();
@@ -165,9 +165,9 @@ void QCPGroupLegendItem::selectEvent([[maybe_unused]] QMouseEvent* event,
 
 void QCPGroupLegendItem::draw(QCPPainter* painter)
 {
-    if (!mMultiGraph) return;
+    if (!mGraph) return;
 
-    const bool showBusy = mMultiGraph->visuallyBusy()
+    const bool showBusy = mGraph->visuallyBusy()
         && !painter->modes().testFlag(QCPPainter::pmVectorized);
 
     QFont font = mSelected ? mSelectedFont : mFont;
@@ -183,24 +183,24 @@ void QCPGroupLegendItem::draw(QCPPainter* painter)
     int indent = 16;
 
     if (!shownExpanded()) {
-        const QVector<int> shown = mMultiGraph->legendComponents();
+        const QVector<int> shown = mGraph->legendComponents();
         double segWidth = shown.isEmpty() ? iconWidth : static_cast<double>(iconWidth) / shown.size();
         double y = inRect.top() + rh / 2.0;
 
         if (showBusy)
         {
             painter->save();
-            painter->setOpacity(mMultiGraph->effectiveBusyFadeAlpha());
+            painter->setOpacity(mGraph->effectiveBusyFadeAlpha());
         }
         for (int k = 0; k < shown.size(); ++k) {
             const int i = shown[k];
-            if (!mMultiGraph->component(i).visible) continue;
+            if (!mGraph->component(i).visible) continue;
             double x0 = inRect.left() + padding + k * segWidth;
             double x1 = x0 + segWidth;
-            mMultiGraph->drawComponentLegendIcon(painter, i, QLineF(x0, y, x1, y));
+            mGraph->drawComponentLegendIcon(painter, i, QLineF(x0, y, x1, y));
         }
-        if (mMultiGraph->componentCount() == 0)
-            mMultiGraph->drawEmptyLegendIcon(
+        if (mGraph->componentCount() == 0)
+            mGraph->drawEmptyLegendIcon(
                 painter, QLineF(inRect.left() + padding, y, inRect.left() + padding + iconWidth, y));
         if (showBusy)
             painter->restore();
@@ -215,10 +215,10 @@ void QCPGroupLegendItem::draw(QCPPainter* painter)
                           inRect.width() - padding, rh);
         drawLabel(painter, headerRect, headerRowText(showBusy));
 
-        const QVector<int> shown = mMultiGraph->legendComponents();
+        const QVector<int> shown = mGraph->legendComponents();
         for (int k = 0; k < shown.size(); ++k) {
             const int i = shown[k];
-            const auto& comp = mMultiGraph->component(i);
+            const auto& comp = mGraph->component(i);
             double rowY = inRect.top() + (k + 1) * rh;
 
             if (mSelected && mSelectedComponent == i && mParentLegend) {
@@ -230,10 +230,10 @@ void QCPGroupLegendItem::draw(QCPPainter* painter)
             if (showBusy)
             {
                 painter->save();
-                painter->setOpacity(mMultiGraph->effectiveBusyFadeAlpha());
+                painter->setOpacity(mGraph->effectiveBusyFadeAlpha());
             }
             double lineY = rowY + rh / 2.0;
-            mMultiGraph->drawComponentLegendIcon(painter, i, QLineF(inRect.left() + padding + indent, lineY,
+            mGraph->drawComponentLegendIcon(painter, i, QLineF(inRect.left() + padding + indent, lineY,
                                      inRect.left() + padding + indent + iconWidth, lineY));
             if (showBusy)
                 painter->restore();
@@ -254,7 +254,7 @@ void QCPGroupLegendItem::draw(QCPPainter* painter)
 
 QSize QCPGroupLegendItem::minimumOuterSizeHint() const
 {
-    if (!mMultiGraph) return QSize(0, 0);
+    if (!mGraph) return QSize(0, 0);
 
     const QFont font = rowFont();
     int rh = rowHeight();
@@ -269,9 +269,9 @@ QSize QCPGroupLegendItem::minimumOuterSizeHint() const
                      rh + mMargins.top() + mMargins.bottom());
     } else {
         int maxTextWidth = headerWidth;
-        const QVector<int> shown = mMultiGraph->legendComponents();
+        const QVector<int> shown = mGraph->legendComponents();
         for (int i : shown) {
-            int w = indent + iconWidth + 6 + measured(font, mMultiGraph->component(i).name).width();
+            int w = indent + iconWidth + 6 + measured(font, mGraph->component(i).name).width();
             if (w > maxTextWidth) maxTextWidth = w;
         }
         int totalHeight = rh * (1 + shown.size());

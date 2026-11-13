@@ -675,7 +675,7 @@ QCPRange QCPDataContainer<DataType>::keyRange(bool& foundRange, QCP::SignDomain 
     QCPDataContainer<DataType>::const_iterator itEnd = constEnd();
     if (signDomain == QCP::sdBoth) // range may be anywhere
     {
-        if (DataType::sortKeyIsMainKey()) // if DataType is sorted by main key (e.g. QCPGraph, but
+        if (DataType::sortKeyIsMainKey()) // if DataType is sorted by main key (e.g. QCPBars, but
                                           // not QCPCurve), use faster algorithm by finding just
                                           // first and last key with non-NaN value
         {

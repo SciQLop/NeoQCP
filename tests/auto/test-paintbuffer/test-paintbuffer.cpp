@@ -93,7 +93,7 @@ QCPLayer* ownBufferedLayer(QCustomPlot* plot, const QString& name)
 void TestPaintBuffer::axisDelete_dirtiesPlottableLayer()
 {
     QCPLayer* layer = ownBufferedLayer(mPlot, "graph_layer");
-    QCPMultiGraph* graph = mPlot->addGraph();
+    QCPGraph* graph = mPlot->addGraph();
     graph->setLayer(layer);
     graph->setData(QVector<double>{0, 1, 2}, QVector<double>{0, 1, 0});
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -140,7 +140,7 @@ void TestPaintBuffer::contentDirty_incrementalReplotSkipsCleanBuffers()
     QCPLayer* overlay = mPlot->layer("overlay");
     overlay->setMode(QCPLayer::lmBuffered);
 
-    QCPMultiGraph* graph = mPlot->addGraph();
+    QCPGraph* graph = mPlot->addGraph();
     graph->setData({1.0, 2.0, 3.0}, {1.0, 4.0, 2.0});
     auto* line = new QCPItemLine(mPlot);
     line->setLayer(overlay);
@@ -165,7 +165,7 @@ void TestPaintBuffer::contentDirty_incrementalReplotPreservesContent()
     QCPLayer* overlay = mPlot->layer("overlay");
     overlay->setMode(QCPLayer::lmBuffered);
 
-    QCPMultiGraph* graph = mPlot->addGraph();
+    QCPGraph* graph = mPlot->addGraph();
     graph->setData({1.0, 2.0, 3.0}, {1.0, 4.0, 2.0});
     auto* line = new QCPItemLine(mPlot);
     line->setLayer(overlay);
@@ -284,7 +284,7 @@ void TestPaintBuffer::rhi_reallocatedTextureRequiresUpload()
 
 void TestPaintBuffer::skipRepaint_multiGraphPanOnly()
 {
-    auto* graph2 = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph2 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> keys = {1.0, 2.0, 3.0, 4.0, 5.0};
     std::vector<double> vals = {1.0, 4.0, 2.0, 5.0, 3.0};
     graph2->setData(std::move(keys), std::move(vals));
@@ -308,7 +308,7 @@ void TestPaintBuffer::skipRepaint_multiGraphPanOnly()
 
 void TestPaintBuffer::skipRepaint_disabledWithItems()
 {
-    auto* graph2 = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph2 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> keys = {1.0, 2.0, 3.0};
     std::vector<double> vals = {1.0, 4.0, 2.0};
     graph2->setData(std::move(keys), std::move(vals));
@@ -331,7 +331,7 @@ void TestPaintBuffer::skipRepaint_disabledWithItems()
 
 void TestPaintBuffer::skipRepaint_disabledOnInvalidation()
 {
-    auto* graph2 = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph2 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> keys = {1.0, 2.0, 3.0};
     std::vector<double> vals = {1.0, 4.0, 2.0};
     graph2->setData(std::move(keys), std::move(vals));
@@ -408,7 +408,7 @@ void TestPaintBuffer::setVisible_noOpWhenUnchanged()
 
 void TestPaintBuffer::skipRepaint_bufferNotReuploadedOnPan()
 {
-    auto* graph2 = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph2 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> keys = {1.0, 2.0, 3.0, 4.0, 5.0};
     std::vector<double> vals = {1.0, 4.0, 2.0, 5.0, 3.0};
     graph2->setData(std::move(keys), std::move(vals));

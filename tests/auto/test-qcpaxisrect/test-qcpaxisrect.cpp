@@ -150,7 +150,7 @@ void TestQCPAxisRect::multiAxisMargins()
 void TestQCPAxisRect::axisRemovalConsequencesToPlottables()
 {
   // test consequences to plottables when one of their axes is removed:
-  QCPMultiGraph *graph = mPlot->addGraph(mPlot->xAxis, mPlot->yAxis);
+  QCPGraph *graph = mPlot->addGraph(mPlot->xAxis, mPlot->yAxis);
   graph->setData(QVector<double>() << 1 << 2 << 3, QVector<double>() << 1 << 0 << -1);
   mPlot->replot();
 
@@ -213,7 +213,7 @@ void TestQCPAxisRect::axisRemovalConsequencesToItems()
 void TestQCPAxisRect::axisRectRemovalConsequencesToPlottables()
 {
   // test consequences to plottables when the axis rect is removed:
-  QCPMultiGraph *graph = mPlot->addGraph(mPlot->xAxis, mPlot->yAxis);
+  QCPGraph *graph = mPlot->addGraph(mPlot->xAxis, mPlot->yAxis);
   graph->setData(QVector<double>() << 1 << 2 << 3, QVector<double>() << 1 << 0 << -1);
   mPlot->replot();
 

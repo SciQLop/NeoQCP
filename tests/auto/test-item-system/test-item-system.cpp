@@ -261,7 +261,7 @@ void TestItemSystem::takeClearsAndAdoptRebindsItemSystems()
 
 void TestItemSystem::theTracerFollowsItsGraphSystem()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     QVERIFY(graph->system());
 
     auto* tracer = new QCPItemTracer(mPlot);

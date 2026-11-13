@@ -64,7 +64,7 @@ TestColorByScalar::makeSource(std::vector<double> keys, std::vector<std::vector<
 
 void TestColorByScalar::setLineStyleInvalidatesLineCache()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDataSource(makeSource({ 0, 1, 2, 3 }, { { 0, 1, 0, 1 } }));
     mg->setComponentPens({ QPen(Qt::red, 6) });
     mPlot->xAxis->setRange(0, 3);
@@ -75,7 +75,7 @@ void TestColorByScalar::setLineStyleInvalidatesLineCache()
     const QImage diagonal = mPlot->toPixmap(400, 300).toImage();
     QVERIFY2(isRed(pixelAt(mPlot, diagonal, 0.75, 0.75)), "the diagonal line is missing");
 
-    mg->setLineStyle(QCPMultiGraph::lsStepLeft);
+    mg->setLineStyle(QCPGraph::lsStepLeft);
     mPlot->replot();
     QVERIFY2(mg->mCore.recordingCount() > recordings, "the new line style was never recorded");
 
@@ -287,7 +287,7 @@ void TestColorByScalar::l1WithoutOriginBuildsNone()
     QVERIFY(bins.origin.empty());
     std::any cache;
     qcp::algo::buildL1CacheMulti(*src, ViewportParams{}, cache);
-    QVERIFY(std::any_cast<qcp::algo::MultiGraphResamplerCache>(&cache)->level1.origin.empty());
+    QVERIFY(std::any_cast<qcp::algo::GraphResamplerCache>(&cache)->level1.origin.empty());
 }
 
 void TestColorByScalar::l1ParallelOriginEqualsSerial()
@@ -306,7 +306,7 @@ void TestColorByScalar::l2OriginComposesThroughL1AndCompacts()
     auto src = holeySource(200'000);
     std::any cache;
     qcp::algo::buildL1CacheMulti(*src, ViewportParams{}, cache, true);
-    const auto* l1 = std::any_cast<qcp::algo::MultiGraphResamplerCache>(&cache);
+    const auto* l1 = std::any_cast<qcp::algo::GraphResamplerCache>(&cache);
     QVERIFY(l1 && !l1->level1.origin.empty());
 
     mPlot->xAxis->setRange(0, 200'000);
@@ -407,7 +407,7 @@ void TestColorByScalar::mapperGenerationBumpsOnEverySetter()
 
 void TestColorByScalar::colorValuesOfTheWrongLengthAreRefused()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setColorValues(std::vector<double>{1, 2, 3});      // no data yet
     QVERIFY(!mg->hasColorValues());
     mg->setDataSource(makeSource({0, 1, 2, 3}, {{0, 1, 0, 1}}));
@@ -419,7 +419,7 @@ void TestColorByScalar::colorValuesOfTheWrongLengthAreRefused()
 
 void TestColorByScalar::sameSizeDataRefreshKeepsColorValues()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDataSource(makeSource({0, 1, 2, 3}, {{0, 1, 0, 1}}));
     mg->setColorValues(std::vector<double>{1, 2, 3, 4});
     mg->setDataSource(makeSource({0, 1, 2, 3}, {{5, 6, 7, 8}}));
@@ -431,7 +431,7 @@ void TestColorByScalar::sameSizeDataRefreshKeepsColorValues()
 void TestColorByScalar::inPlaceResizeAppliesTheColorSizeRule()
 {
     auto src = std::make_shared<ForwardingSource>(makeSource({0, 1, 2, 3}, {{0, 1, 0, 1}}));
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDataSource(src);
     mg->setColorValues(std::vector<double>{1, 2, 3, 4});
 
@@ -448,7 +448,7 @@ void TestColorByScalar::inPlaceResizeAppliesTheColorSizeRule()
 
 void TestColorByScalar::firstColoringRebuildsL1OnceWithOrigin()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     const int n = 200'000;   // above kResampleThreshold: the async L1 pipeline runs
     std::vector<double> keys(n), values(n), scalar(n);
     for (int i = 0; i < n; ++i) { keys[i] = i; values[i] = std::sin(i * 0.001); scalar[i] = i; }
@@ -476,7 +476,7 @@ void TestColorByScalar::firstColoringRebuildsL1OnceWithOrigin()
 
 void TestColorByScalar::deferredSetColorValuesUsesThePendingSourceSize()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDeferredDataSwap(true);
     mg->setDataSource(makeSource({0, 1, 2, 3}, {{0, 1, 0, 1}}));   // n = 4, displayed
     mPlot->xAxis->setRange(0, 3);
@@ -509,7 +509,7 @@ void TestColorByScalar::turningTheDeferredSwapOffKeepsThePendingColours()
         }
         return makeSource(std::move(keys), { std::move(values) });
     };
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDeferredDataSwap(true);
     mg->setDataSource(big(4));
     mPlot->xAxis->setRange(0, 3);
@@ -530,7 +530,7 @@ void TestColorByScalar::turningTheDeferredSwapOffKeepsThePendingColours()
 
 void TestColorByScalar::deferredCommitAppliesTheColorSizeRule()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDeferredDataSwap(true);
     mg->setDataSource(makeSource({0, 1, 2, 3}, {{0, 1, 0, 1}}));
     mg->setColorValues(std::vector<double>{1, 2, 3, 4});
@@ -560,7 +560,7 @@ void TestColorByScalar::deferredCommitAppliesTheColorSizeRule()
 
 void TestColorByScalar::deferredCommitJoinsTheRectScale()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDeferredDataSwap(true);
     mg->setDataSource(makeSource({ 0, 1, 2, 3 }, { { 0, 1, 0, 1 } }));
     mPlot->xAxis->setRange(0, 3);
@@ -602,7 +602,7 @@ void TestColorByScalar::toBucketClampsHugeAndInfinitePositions()
 
 void TestColorByScalar::wrongLengthOnColouredGraphLeavesItUncoloured()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDataSource(makeSource({0, 1, 2, 3}, {{0, 1, 0, 1}}));
     mg->setColorValues(std::vector<double>{1, 2, 3, 4});
     QVERIFY(mg->hasColorValues());
@@ -616,7 +616,7 @@ void TestColorByScalar::uncolourRoutesDiscardAPendingStash()
     // Wrong length while pending: the stash from the earlier, valid call must not
     // survive to re-colour the graph once the pending source commits.
     {
-        auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+        auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
         mg->setDeferredDataSwap(true);
         mg->setDataSource(makeSource({0, 1, 2, 3}, {{0, 1, 0, 1}}));   // n = 4, displayed
         mPlot->xAxis->setRange(0, 3);
@@ -640,7 +640,7 @@ void TestColorByScalar::uncolourRoutesDiscardAPendingStash()
     // Empty vector while pending: same "uncolour" route, through clearColorValues()'s
     // early-return path (nothing in mColor yet, only a pending stash).
     {
-        auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+        auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
         mg->setDeferredDataSwap(true);
         mg->setDataSource(makeSource({0, 1, 2, 3}, {{0, 1, 0, 1}}));
         mPlot->xAxis->setRange(0, 3);
@@ -683,7 +683,7 @@ qcp::ColorScalarMapper mapperFor(std::vector<double> values, QCPRange range)
 
 void TestColorByScalar::coloredLineRendersTheGradient()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> keys(200), values(200, 0.0), scalar(200);
     for (int i = 0; i < 200; ++i) { keys[i] = i; scalar[i] = i / 199.0; }
     mg->setDataSource(makeSource(keys, {values}));
@@ -706,7 +706,7 @@ void TestColorByScalar::coloredRunsMeetWithButtEndsOnExport()
 {
     // Two runs meet at key 1: red (segment 0->1), then blue (segment 1->2).
     // A square cap on the blue run would overpaint pen/2 of the red run.
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDataSource(makeSource({0, 1, 2}, {{0, 0, 0}}));
     mg->setComponentPens({QPen(Qt::black, 20)});
     mg->setGradient(redToBlue());
@@ -728,10 +728,10 @@ void TestColorByScalar::coloredRunsMeetWithButtEndsOnExport()
 
 namespace {
 
-QCPMultiGraph* rampGraph(QCustomPlot* plot, std::shared_ptr<QCPAbstractMultiDataSource> src,
+QCPGraph* rampGraph(QCustomPlot* plot, std::shared_ptr<QCPAbstractMultiDataSource> src,
                          std::vector<double> scalar)
 {
-    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
     mg->setDataSource(std::move(src));
     mg->setComponentPens({QPen(Qt::black, 6)});
     mg->setGradient(redToBlue());
@@ -779,7 +779,7 @@ void TestColorByScalar::coloredStepLineRendersTheGradient()
     std::vector<double> keys(200), values(200, 0.0);
     std::iota(keys.begin(), keys.end(), 0.0);
     auto* mg = rampGraph(mPlot, makeSource(keys, {values}), ramp(200));
-    mg->setLineStyle(QCPMultiGraph::lsStepLeft);
+    mg->setLineStyle(QCPGraph::lsStepLeft);
     const QImage img = mPlot->toPixmap(400, 300).toImage();
     QVERIFY(isRed(pixelAt(mPlot, img, 10, 0)));
     QVERIFY(isBlue(pixelAt(mPlot, img, 189, 0)));
@@ -790,7 +790,7 @@ void TestColorByScalar::coloredImpulsesRenderTheGradient()
     std::vector<double> keys(20), values(20, 0.8);
     for (int i = 0; i < 20; ++i) keys[i] = i * 10.0;
     auto* mg = rampGraph(mPlot, makeSource(keys, {values}), ramp(20));
-    mg->setLineStyle(QCPMultiGraph::lsImpulse);
+    mg->setLineStyle(QCPGraph::lsImpulse);
     // Key 0 is also the x-axis range's lower bound, so it maps to the pixel column the
     // y-axis baseline is drawn on (axes paint over the graph: see the "axes"/"main" layer
     // order in QCustomPlot's constructor). Widen the range so the first impulse renders
@@ -808,7 +808,7 @@ void TestColorByScalar::coloredImpulsesFollowThePanOffset()
     std::vector<double> keys(20), values(20, 0.8);
     for (int i = 0; i < 20; ++i) keys[i] = i * 10.0;
     auto* mg = rampGraph(mPlot, makeSource(keys, {values}), ramp(20));
-    mg->setLineStyle(QCPMultiGraph::lsImpulse);
+    mg->setLineStyle(QCPGraph::lsImpulse);
     mPlot->xAxis->setRange(-10, 199);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QVERIFY(mg->hasRenderedRange());
@@ -835,10 +835,10 @@ void TestColorByScalar::plainImpulsesFollowThePanOffset()
     // path must also follow the pan, and the pan must not record fresh lines.
     std::vector<double> keys(20), values(20, 0.8);
     for (int i = 0; i < 20; ++i) keys[i] = i * 10.0;
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDataSource(makeSource(keys, {values}));
     mg->setComponentPens({QPen(Qt::black, 6)});
-    mg->setLineStyle(QCPMultiGraph::lsImpulse);
+    mg->setLineStyle(QCPGraph::lsImpulse);
     mPlot->xAxis->setRange(-10, 199);
     mPlot->yAxis->setRange(-1, 1);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -865,7 +865,7 @@ void TestColorByScalar::exportAfterOnscreenPanUsesCurrentPixelsNotStaleOffset()
     // line at the pixel of its current value, not at the pre-pan one.
     std::vector<double> keys(200), values(200, 0.5);
     std::iota(keys.begin(), keys.end(), 0.0);
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDataSource(makeSource(keys, {values}));
     mg->setComponentPens({QPen(Qt::black, 6)});
     mPlot->xAxis->setRange(0, 199);
@@ -952,7 +952,7 @@ void TestColorByScalar::coloredMarkersTakeTheirPointsColour()
     std::vector<double> keys(20), values(20, 0.0);
     for (int i = 0; i < 20; ++i) keys[i] = i * 10.0;
     auto* mg = rampGraph(mPlot, makeSource(keys, {values}), ramp(20));
-    mg->setLineStyle(QCPMultiGraph::lsNone);
+    mg->setLineStyle(QCPGraph::lsNone);
     mg->component(0).scatterStyle = QCPScatterStyle(QCPScatterStyle::ssDisc, 12);
     // Key 0 is also the x-axis range's lower bound, so it sits under the y-axis
     // spine, which paints over the graph (see coloredImpulsesRenderTheGradient).
@@ -989,7 +989,7 @@ void TestColorByScalar::coloredLegendLineShowsTheGradient()
 
 void TestColorByScalar::aColouredLineShowsItsRectScale()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDataSource(makeSource({ 0, 1, 2, 3 }, { { 0, 1, 0, 1 } }));
     auto* curve = new QCPCurve(mPlot->xAxis, mPlot->yAxis);
     curve->setData(QVector<double> { 0, 1, 2, 3 }, QVector<double> { 0, 1, 0, 1 });
@@ -1019,7 +1019,7 @@ void TestColorByScalar::aColouredLineShowsItsRectScale()
 
 void TestColorByScalar::aLineFollowsItsScale()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> keys(200), values(200, 0.0), scalar(200);
     for (int i = 0; i < 200; ++i) { keys[i] = i; scalar[i] = i / 199.0; }
     mg->setDataSource(makeSource(keys, { values }));
@@ -1055,7 +1055,7 @@ void TestColorByScalar::rescaleSeesALine()
     map->data()->setCell(0, 1, 3.0);
     map->data()->setCell(1, 1, 3.0);
 
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDataSource(makeSource({ 0, 1, 2 }, { { 0, 0, 0 } }));
     mg->setColorValues(std::vector<double> { 1, 7, 3 });
 
@@ -1107,7 +1107,7 @@ void TestColorByScalar::coloredGraphDrawnFromL2KeepsIndicesConsistent()
     // The colour of a vertex is looked up by the data row the L2 point came from. A misaligned
     // origin moves the colour of every segment after it: draw a flat column whose colour changes
     // sharply at the middle row, and the change must stay on that row in every view.
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     const int n = 200'000; // above kResampleThreshold: the async L1 pipeline runs
     std::vector<double> keys(n), values(n), negated(n), flat(n, 0.0), scalar(n);
     for (int i = 0; i < n; ++i)
@@ -1165,8 +1165,8 @@ void TestColorByScalar::coloredGraphDrawnFromL2KeepsIndicesConsistent()
 // value inserts a break point there, so every marker after it took its neighbour's colour.
 void TestColorByScalar::multiGraphScatterColoursFollowTheirPointAcrossBreaks()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    graph->setLineStyle(QCPMultiGraph::lsNone);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPGraph::lsNone);
     graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssSquare, Qt::black, Qt::black, 12));
     graph->setGradient(redToBlue());
     // A key gap after key 3, and a NaN value at key 12.
@@ -1192,7 +1192,7 @@ void TestColorByScalar::multiGraphScatterColoursFollowTheirPointAcrossBreaks()
 // that actually clears colour values leaves it.
 void TestColorByScalar::newDataKeepsAnUncolouredLinesChosenScale()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDataSource(makeSource({ 0, 1, 2, 3 }, { { 0, 1, 0, 1 } }));
     auto* scale = new QCPColorScale(mPlot);
     mg->setColorScale(scale);
@@ -1210,7 +1210,7 @@ void TestColorByScalar::newDataKeepsAnUncolouredLinesChosenScale()
 // An uncoloured line stops asking the pipeline for the colour origin at its next data.
 void TestColorByScalar::newDataAfterUncolouringStopsTheOriginRequest()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDataSource(makeSource({ 0, 1, 2, 3 }, { { 0, 1, 0, 1 } }));
     mg->setColorValues(std::vector<double> { 0.0, 1.0, 0.0, 1.0 });
     QVERIFY(mg->mWantOrigin->load());
@@ -1223,7 +1223,7 @@ void TestColorByScalar::newDataAfterUncolouringStopsTheOriginRequest()
 // Taking a coloured line drops its old plot's scale; adding it elsewhere joins the new rect's.
 void TestColorByScalar::aTakenColouredLineJoinsItsNewPlotsScale()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDataSource(makeSource({ 0, 1, 2, 3 }, { { 0, 1, 0, 1 } }));
     mg->setColorValues(std::vector<double> { 0.0, 1.0, 0.0, 1.0 });
     const auto oldScale = mPlot->axisRect()->colorScale();
@@ -1234,7 +1234,7 @@ void TestColorByScalar::aTakenColouredLineJoinsItsNewPlotsScale()
 
     QCustomPlot other;
     other.resize(400, 300);
-    auto taken = mPlot->take(qcp::makeHandle<QCPHandle<QCPMultiGraph>>(mg));
+    auto taken = mPlot->take(qcp::makeHandle<QCPHandle<QCPGraph>>(mg));
     QVERIFY(taken);
     QVERIFY2(oldScale->users().isEmpty(), "the taken line still uses its old plot's scale");
     QCOMPARE(taken->colorScale(), nullptr);
@@ -1256,7 +1256,7 @@ void TestColorByScalar::aTakenColouredLineJoinsItsNewPlotsScale()
 // line, so it must see the colouring complete, not mid-way.
 void TestColorByScalar::colourValuesAreCompleteBeforeTheColourScaleSignal()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDataSource(makeSource({ 0, 1, 2, 3 }, { { 0, 1, 0, 1 } }));
     mPlot->xAxis->setRange(0, 3);
     mPlot->yAxis->setRange(-1, 2);
@@ -1271,7 +1271,7 @@ void TestColorByScalar::colourValuesAreCompleteBeforeTheColourScaleSignal()
 
 void TestColorByScalar::uncolouringIsCompleteBeforeTheColourScaleSignal()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDataSource(makeSource({ 0, 1, 2, 3 }, { { 0, 1, 0, 1 } }));
     mPlot->xAxis->setRange(0, 3);
     mPlot->yAxis->setRange(-1, 2);
@@ -1289,11 +1289,11 @@ void TestColorByScalar::uncolouringIsCompleteBeforeTheColourScaleSignal()
 // With the update finished the slot may delete the line: the setter must not use it afterwards.
 void TestColorByScalar::colourSlotDeletingTheLineIsSafe()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDataSource(makeSource({ 0, 1, 2, 3 }, { { 0, 1, 0, 1 } }));
     mPlot->xAxis->setRange(0, 3);
     mPlot->yAxis->setRange(-1, 2);
-    const QPointer<QCPMultiGraph> alive(mg);
+    const QPointer<QCPGraph> alive(mg);
     connect(mg, &QCPAbstractColorMapped::colorScaleChanged, mPlot, [mg] { delete mg; },
             Qt::SingleShotConnection);
     mg->setColorValues(std::vector<double> { 0.0, 1.0, 0.0, 1.0 });
@@ -1304,7 +1304,7 @@ void TestColorByScalar::colourSlotDeletingTheLineIsSafe()
 // restarts and goes busy, and a slot on that may delete the graph mid-commit.
 void TestColorByScalar::firstColouredCommitSlotDeletingTheGraphIsSafe()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDeferredDataSwap(true);
     const int n = 200'000; // above kResampleThreshold: the async L1 pipeline runs
     std::vector<double> keys(n), values(n), scalar(n);
@@ -1321,7 +1321,7 @@ void TestColorByScalar::firstColouredCommitSlotDeletingTheGraphIsSafe()
     QTRY_VERIFY_WITH_TIMEOUT(mg->mPendingReady, 5000);
     QVERIFY(!mg->pipeline().isBusy());
 
-    connect(&mg->pipeline(), &QCPMultiGraphPipeline::busyChanged, mPlot,
+    connect(&mg->pipeline(), &QCPGraphPipeline::busyChanged, mPlot,
             [this, mg] { QVERIFY(mPlot->removePlottable(mg)); }, Qt::SingleShotConnection);
     QVERIFY(mg->commitPendingData());
     QCOMPARE(mPlot->plottableCount(), 0);

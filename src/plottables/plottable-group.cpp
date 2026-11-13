@@ -1,6 +1,6 @@
 #include "plottable-group.h"
 #include "plottable.h"
-#include "plottable-multigraph.h"
+#include "plottable-graph.h"
 #include "../core.h"
 #include "../layer.h"
 #include "../painting/painter.h"
@@ -16,24 +16,24 @@ bool isShown(const QCPAbstractPlottable* plottable)
 {
     if (!plottable->visible())
         return false;
-    auto* multiGraph = qobject_cast<const QCPMultiGraph*>(plottable);
+    auto* graph = qobject_cast<const QCPGraph*>(plottable);
     // A graph with no data yet has no component the user could have hidden: it is shown.
-    if (!multiGraph || multiGraph->componentCount() == 0)
+    if (!graph || graph->componentCount() == 0)
         return true;
-    for (int i = 0; i < multiGraph->componentCount(); ++i)
-        if (multiGraph->component(i).visible)
+    for (int i = 0; i < graph->componentCount(); ++i)
+        if (graph->component(i).visible)
             return true;
     return false;
 }
 
-// A multi-graph is shown when visible with a visible component, or none yet (see isShown), so showing or hiding
+// A graph is shown when visible with a visible component, or none yet (see isShown), so showing or hiding
 // it as a group member sets its components too.
 void setShown(const QPointer<QCPAbstractPlottable>& plottable, bool shown)
 {
     plottable->setVisible(shown);
-    if (auto* multiGraph = qobject_cast<QCPMultiGraph*>(plottable.data()))
-        for (int i = 0; multiGraph && i < multiGraph->componentCount(); ++i)
-            multiGraph->setComponentVisible(i, shown);
+    if (auto* graph = qobject_cast<QCPGraph*>(plottable.data()))
+        for (int i = 0; graph && i < graph->componentCount(); ++i)
+            graph->setComponentVisible(i, shown);
 }
 }
 
@@ -115,8 +115,8 @@ bool QCPPlottableGroup::addMember(QCPAbstractPlottable* plottable)
     connect(plottable, &QCPLayerable::visibleChanged, this, &QCPPlottableGroup::markRowDirty);
     connect(plottable, &QCPAbstractPlottable::visuallyBusyChanged, this,
             &QCPPlottableGroup::markRowDirty);
-    if (auto* multiGraph = qobject_cast<QCPMultiGraph*>(plottable))
-        connect(multiGraph, &QCPMultiGraph::componentVisibilityChanged, this,
+    if (auto* graph = qobject_cast<QCPGraph*>(plottable))
+        connect(graph, &QCPGraph::componentVisibilityChanged, this,
                 &QCPPlottableGroup::markRowDirty);
     updateLegendRow();
 

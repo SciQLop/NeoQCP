@@ -19,7 +19,7 @@ void TestLayerRemoval::cleanup()
 void TestLayerRemoval::removeLayerThenReplotDoesNotCrash()
 {
     mPlot->addLayer(QLatin1String("extra"));
-    QCPMultiGraph* graph = mPlot->addGraph();
+    QCPGraph* graph = mPlot->addGraph();
     graph->setLayer(QLatin1String("extra"));
     graph->setData({0, 1, 2}, {0, 1, 0});
     mPlot->replot();

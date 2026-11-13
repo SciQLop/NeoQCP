@@ -34,7 +34,7 @@ private slots:
     void pipelineInterimResult();
     void pipelineDestructionWhileRunning();
 
-    // QCPMultiGraph pipeline integration
+    // QCPGraph pipeline integration
     void multiGraphPipelinePassthrough();
 
     // QCPColorMap2 pipeline integration
@@ -88,7 +88,7 @@ private slots:
     void resampledMultiDataSourceInterface();
     void multiGraphL1AndL2();
 
-    // QCPMultiGraph pipeline integration
+    // QCPGraph pipeline integration
     void multiGraphSmallDataNoResampling();
     void multiGraphLargeDataL1L2();
     void multiGraphLineCacheRebuiltOnZoom();

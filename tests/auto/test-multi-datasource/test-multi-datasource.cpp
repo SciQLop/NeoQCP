@@ -553,13 +553,13 @@ void TestMultiDataSource::rowMajorInvalidShapeDegradesToEmpty()
 }
 
 // Helper: build an L1 cache with uniform keys and per-column values
-static qcp::algo::MultiGraphResamplerCache makeL1Cache(
+static qcp::algo::GraphResamplerCache makeL1Cache(
     const std::vector<double>& keys,
     const std::vector<std::vector<double>>& columns)
 {
     int N = static_cast<int>(columns.size());
     int sz = static_cast<int>(keys.size());
-    qcp::algo::MultiGraphResamplerCache cache;
+    qcp::algo::GraphResamplerCache cache;
     cache.level1.numColumns = N;
     cache.level1.keys = keys;
     // L1 is column-major: each column has `sz` entries (stride = sz)
@@ -694,7 +694,7 @@ void TestMultiDataSource::l2MultiSparseReturnNull()
 
 void TestMultiDataSource::l2MultiEmptyInput()
 {
-    qcp::algo::MultiGraphResamplerCache cache;
+    qcp::algo::GraphResamplerCache cache;
     cache.level1.numColumns = 0;
     ViewportParams vp;
     vp.keyRange = QCPRange(0, 100);
@@ -848,11 +848,11 @@ std::shared_ptr<BurstySource> burstySource()
     return std::make_shared<BurstySource>(std::move(keys), std::vector<std::vector<double>>{std::move(values)});
 }
 
-qcp::algo::MultiGraphResamplerCache l1Of(const QCPAbstractMultiDataSource& src)
+qcp::algo::GraphResamplerCache l1Of(const QCPAbstractMultiDataSource& src)
 {
     std::any cache;
     qcp::algo::buildL1CacheMulti(src, ViewportParams{}, cache);
-    return std::any_cast<qcp::algo::MultiGraphResamplerCache>(cache);
+    return std::any_cast<qcp::algo::GraphResamplerCache>(cache);
 }
 
 ViewportParams viewport(double lo, double hi)

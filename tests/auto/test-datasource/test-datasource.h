@@ -30,7 +30,7 @@ private slots:
     void thinnedLinesInDataKeepFourPointsPerPixel();
     void indicesFollowTheThinnedPoints();
 
-    // one-column QCPMultiGraph integration tests
+    // one-column QCPGraph integration tests
     void multiGraphCreation();
     void multiGraphSetDataOwning();
     void multiGraphViewData();

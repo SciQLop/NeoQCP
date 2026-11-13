@@ -69,7 +69,7 @@ static QWidget* createSpansTab()
     plot->yAxis->setRange(0, 100);
 
     // some data behind the spans
-    QCPMultiGraph* graph = plot->addGraph();
+    QCPGraph* graph = plot->addGraph();
     QVector<double> x(200), y(200);
     for (int i = 0; i < 200; ++i) {
         x[i] = i * 0.5;
@@ -207,8 +207,8 @@ static QWidget* createGraphTab()
     auto* plot = makePlot();
     const int n = 10000;
 
-    // QCPMultiGraph (legacy)
-    QCPMultiGraph* g1 = plot->addGraph();
+    // QCPGraph (legacy)
+    QCPGraph* g1 = plot->addGraph();
     QVector<double> x1(n), y1(n);
     for (int i = 0; i < n; ++i) {
         x1[i] = i / double(n) * 10 - 5;
@@ -218,8 +218,8 @@ static QWidget* createGraphTab()
     g1->setPen(QPen(Qt::blue, 1.5));
     g1->setName("QCPGraph");
 
-    // QCPMultiGraph with one column
-    auto* g2 = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    // QCPGraph with one column
+    auto* g2 = new QCPGraph(plot->xAxis, plot->yAxis);
     std::vector<double> x2(n), y2(n);
     for (int i = 0; i < n; ++i) {
         x2[i] = i / double(n) * 10 - 5;
@@ -227,7 +227,7 @@ static QWidget* createGraphTab()
     }
     g2->setData(x2, y2);
     g2->setPen(QPen(Qt::red, 1.5));
-    g2->setName("QCPMultiGraph");
+    g2->setName("QCPGraph");
 
     // QCPCurve (parametric)
     auto* curve = new QCPCurve(plot->xAxis, plot->yAxis);
@@ -472,7 +472,7 @@ static QWidget* createMultiGraphTab()
         QColor(214, 39, 40), QColor(148, 103, 189), QColor(140, 86, 75)
     };
 
-    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
     mg->setData(std::move(keys), std::move(vals));
     mg->setComponentColors(colors);
     QStringList names;
@@ -490,7 +490,7 @@ static QWidget* createMultiGraphTab()
 static QWidget* createColoredMultiGraphTab()
 {
     auto* plot = new QCustomPlot();
-    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
     const int n = 2'000'000;   // large enough for L1 + L2
     std::vector<double> keys(n), a(n), b(n), scalar(n);
     for (int i = 0; i < n; ++i)
@@ -640,7 +640,7 @@ static QWidget* createItemsTab()
     curveItem->setHead(QCPLineEnding::esSpikeArrow);
 
     // tracer on a graph
-    QCPMultiGraph* graph = plot->addGraph();
+    QCPGraph* graph = plot->addGraph();
     QVector<double> x(100), y(100);
     for (int i = 0; i < 100; ++i) {
         x[i] = i * 0.1;
@@ -738,7 +738,7 @@ static QWidget* createScatterTab()
     };
 
     for (int s = 0; s < 10; ++s) {
-        QCPMultiGraph* g = plot->addGraph();
+        QCPGraph* g = plot->addGraph();
         QVector<double> x(15), y(15);
         for (int i = 0; i < 15; ++i) {
             x[i] = i;
@@ -747,7 +747,7 @@ static QWidget* createScatterTab()
         g->setData(x, y);
         g->setPen(QPen(colors[s], 1));
         g->setScatterStyle(QCPScatterStyle(shapes[s], colors[s], colors[s], 8));
-        g->setLineStyle(QCPMultiGraph::lsLine);
+        g->setLineStyle(QCPGraph::lsLine);
         g->setName(shapeNames[s]);
     }
 
@@ -765,8 +765,8 @@ static QWidget* createThemeTab()
     auto* plot = makePlot();
     plot->setTheme(QCPTheme::dark(plot));
 
-    QCPMultiGraph* g1 = plot->addGraph();
-    QCPMultiGraph* g2 = plot->addGraph();
+    QCPGraph* g1 = plot->addGraph();
+    QCPGraph* g2 = plot->addGraph();
     QVector<double> x(500), y1(500), y2(500);
     for (int i = 0; i < 500; ++i) {
         x[i] = i * 0.02;
@@ -949,11 +949,11 @@ static QWidget* createRealtimeGraphTab()
     auto y1 = std::make_shared<std::vector<double>>();
     auto y2 = std::make_shared<std::vector<double>>();
 
-    auto* g1 = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* g1 = new QCPGraph(plot->xAxis, plot->yAxis);
     g1->setPen(QPen(QColor(31, 119, 180), 1.5));
     g1->setName("Signal");
 
-    auto* g2 = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* g2 = new QCPGraph(plot->xAxis, plot->yAxis);
     g2->setPen(QPen(QColor(214, 39, 40), 1.5));
     g2->setName("Envelope");
 
@@ -1028,7 +1028,7 @@ static QWidget* createMassiveGraphTab()
             auto* plot = makePlot();
             std::vector<std::vector<double>> columns(1);
             columns[0] = std::move(data->vals);
-            auto* g = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+            auto* g = new QCPGraph(plot->xAxis, plot->yAxis);
             g->setData(std::move(data->keys), std::move(columns));
             g->setPen(QPen(QColor(31, 119, 180), 1));
             g->setName("500M points");
@@ -1149,7 +1149,7 @@ static QWidget* createOverlayTab()
     auto* plot = makePlot();
     plot->xAxis->setRange(0, 10);
     plot->yAxis->setRange(-1.5, 1.5);
-    QCPMultiGraph* graph = plot->addGraph();
+    QCPGraph* graph = plot->addGraph();
     QVector<double> x(200), y(200);
     for (int i = 0; i < 200; ++i) {
         x[i] = i * 0.05;
@@ -1274,8 +1274,8 @@ static QWidget* createDualYAxisTab()
 {
     auto* plot = makePlot();
 
-    // --- QCPMultiGraph on left Y axis (linear) ---
-    auto* g = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    // --- QCPGraph on left Y axis (linear) ---
+    auto* g = new QCPGraph(plot->xAxis, plot->yAxis);
     const int nPts = 2000;
     std::vector<double> gx(nPts), gy(nPts);
     for (int i = 0; i < nPts; ++i) {
@@ -1343,14 +1343,14 @@ static QWidget* createBusyIndicatorTab()
     plot->setTheme(QCPTheme::dark(plot));
     plot->legend->setVisible(true);
 
-    auto* g1 = new QCPMultiGraph(plot->xAxis, plot->yAxis);
-    auto* g2 = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* g1 = new QCPGraph(plot->xAxis, plot->yAxis);
+    auto* g2 = new QCPGraph(plot->xAxis, plot->yAxis);
     g1->setName("Magnetic Field Bx");
     g1->setPen(QPen(QColor("#e74c3c"), 2));
     g2->setName("Magnetic Field By");
     g2->setPen(QPen(QColor("#3498db"), 2));
 
-    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
     mg->setName("Plasma Velocity");
 
     {
@@ -1485,12 +1485,12 @@ static QWidget* createLatexTab()
         y[i] = qPow(x[i], -5.0 / 3.0);
         y2[i] = 0.6 * qPow(x[i], -1.0) * (1 + 0.15 * qSin(x[i] * 9));
     }
-    QCPMultiGraph* g1 = plot->addGraph();
+    QCPGraph* g1 = plot->addGraph();
     g1->setData(x, y);
     g1->setPen(QPen(Qt::blue, 1.5));
     g1->setName("$f^{-5/3}$ Kolmogorov");
 
-    QCPMultiGraph* g2 = plot->addGraph();
+    QCPGraph* g2 = plot->addGraph();
     g2->setData(x, y2);
     g2->setPen(QPen(QColor(200, 60, 0), 1.5));
     g2->setName("plain text entry");   // untouched: no math span

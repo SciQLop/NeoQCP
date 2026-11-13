@@ -19,7 +19,7 @@
 #include <plottables/plottable-colormap2.h>
 #include <plottables/plottable-histogram.h>
 #include <plottables/plottable-histogram2d.h>
-#include <plottables/plottable-multigraph.h>
+#include <plottables/plottable-graph.h>
 #include <plottables/plottable-waterfall.h>
 #include <qcustomplot.h>
 #include <thread>
@@ -587,7 +587,7 @@ void TestPipeline::pipelineDestructionWhileRunning()
 
 void TestPipeline::multiGraphPipelinePassthrough()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     graph->setData(std::vector<double>{1, 2, 3}, std::vector<double>{4, 5, 6});
 
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -775,7 +775,7 @@ void TestPipeline::colormap2DescendingYAxisLogScaleResamplesNonEmpty()
 
 void TestPipeline::multiGraphDataFromExternalThread()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
 
     // Large enough to get the resampling transform, so the pipeline has a job to run.
     constexpr int n = 200'000;
@@ -783,7 +783,7 @@ void TestPipeline::multiGraphDataFromExternalThread()
     for (int i = 0; i < n; ++i) { keys[i] = i; values[i] = std::sin(i * 0.01); }
     auto source = oneColumnSource(std::move(keys), std::move(values));
 
-    QSignalSpy spy(&graph->pipeline(), &QCPMultiGraphPipeline::finished);
+    QSignalSpy spy(&graph->pipeline(), &QCPGraphPipeline::finished);
     QThread thread;
     QObject worker;
     worker.moveToThread(&thread);
@@ -1211,7 +1211,7 @@ void TestPipeline::graphResamplerL2BinsRawPointsInsideBurst()
     vp.plotWidthPx = 1000;
     std::any cache;
     qcp::algo::buildL1CacheMulti(*src, vp, cache);
-    const auto* l1 = std::any_cast<qcp::algo::MultiGraphResamplerCache>(&cache);
+    const auto* l1 = std::any_cast<qcp::algo::GraphResamplerCache>(&cache);
     QVERIFY(l1 != nullptr);
     const auto l2 = qcp::algo::resampleL2Multi(*l1, vp, *src);
     QVERIFY(l2 != nullptr);
@@ -1250,7 +1250,7 @@ void TestPipeline::multiGraphL2FollowsFallingData()
     {
         std::any cache;
         qcp::algo::buildL1CacheMulti(src, ViewportParams{}, cache, withOrigin);
-        auto* c = std::any_cast<qcp::algo::MultiGraphResamplerCache>(&cache);
+        auto* c = std::any_cast<qcp::algo::GraphResamplerCache>(&cache);
         QVERIFY(c != nullptr);
         ViewportParams vp;
         vp.plotWidthPx = 200;
@@ -1291,7 +1291,7 @@ void TestPipeline::graphResamplerCacheReuse()
     vp.plotWidthPx = 100;
 
     qcp::algo::buildL1CacheMulti(*src, vp, cache);
-    const auto* l1 = std::any_cast<qcp::algo::MultiGraphResamplerCache>(&cache);
+    const auto* l1 = std::any_cast<qcp::algo::GraphResamplerCache>(&cache);
     QVERIFY(l1 != nullptr);
     QCOMPARE(l1->sourceSize, N);
     const double* l1Keys = l1->level1.keys.data();
@@ -1304,7 +1304,7 @@ void TestPipeline::graphResamplerCacheReuse()
 
     // The same data again keeps the cache it has.
     qcp::algo::buildL1CacheMulti(*src, vp, cache);
-    const auto* again = std::any_cast<qcp::algo::MultiGraphResamplerCache>(&cache);
+    const auto* again = std::any_cast<qcp::algo::GraphResamplerCache>(&cache);
     QVERIFY(again != nullptr);
     QCOMPARE(again->level1.keys.data(), l1Keys);
 }
@@ -1344,12 +1344,12 @@ void TestPipeline::multiGraphLineCacheRebuiltOnQueuedZoomWithBigData()
     // Driven the way real interaction drives it: several range changes fired in quick
     // succession, each via rpQueuedReplot (what QCPAxisRect::wheelEvent/mouseMoveEvent use),
     // with only one event-loop pump at the end -- not one synchronous replot per step.
-    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
 
     const int N = 10'000'001;
     auto source = std::make_shared<SyntheticLargeMultiSource>(N, 1);
 
-    QSignalSpy spy(&g->pipeline(), &QCPMultiGraphPipeline::finished);
+    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
 
     mPlot->xAxis->setRange(0, N - 1);
     mPlot->yAxis->setRange(-1, 1);
@@ -1394,7 +1394,7 @@ void TestPipeline::multiGraphLargeToSmallDataFallback()
     // When a graph that previously had a large dataset (with resampling transform)
     // receives a smaller dataset, the transform should be cleared so the raw
     // data source is used directly — no nullptr result, no blank rendering.
-    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
 
     // Install the resampling transform (simulates prior large-data assignment)
     g->pipeline().setTransform(TransformKind::ViewportDependent,
@@ -1568,11 +1568,11 @@ void TestPipeline::multiGraphL2RebuildDeferredToDraw()
 {
     // Verify that changing the viewport does NOT immediately rebuild L2,
     // but that L2 IS rebuilt when draw() runs (via replot).
-    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     const int N = 10'000'001;
     auto source = std::make_shared<SyntheticLargeMultiSource>(N, 1);
 
-    QSignalSpy spy(&g->pipeline(), &QCPMultiGraphPipeline::finished);
+    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
     mPlot->xAxis->setRange(0, N - 1);
     mPlot->yAxis->setRange(-1, 1);
     g->setDataSource(source);
@@ -1602,11 +1602,11 @@ void TestPipeline::multiGraphL2CoalescesMultipleViewportChanges()
 {
     // Simulate rapid pan: many range changes, one replot.
     // L2 should only be built once (at draw time), not per range change.
-    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     const int N = 10'000'001;
     auto source = std::make_shared<SyntheticLargeMultiSource>(N, 1);
 
-    QSignalSpy spy(&g->pipeline(), &QCPMultiGraphPipeline::finished);
+    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
     mPlot->xAxis->setRange(0, N - 1);
     mPlot->yAxis->setRange(-1, 1);
     g->setDataSource(source);
@@ -1638,14 +1638,14 @@ void TestPipeline::multiGraphL2CoalescesMultipleViewportChanges()
 void TestPipeline::multiGraphL2DirtyAfterL1Ready()
 {
     // When L1 finishes, L2 should be marked dirty (not built inline).
-    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     const int N = 10'000'001;
     auto source = std::make_shared<SyntheticLargeMultiSource>(N, 1);
 
     mPlot->xAxis->setRange(0, N - 1);
     mPlot->yAxis->setRange(-1, 1);
 
-    QSignalSpy spy(&g->pipeline(), &QCPMultiGraphPipeline::finished);
+    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
     g->setDataSource(source);
 
     // Before L1 finishes: no L1 cache, no L2, not dirty
@@ -2638,7 +2638,7 @@ void TestPipeline::multiGraphL1AndL2()
 
     std::any cache;
     qcp::algo::buildL1CacheMulti(*src, ViewportParams{}, cache);
-    auto* c = std::any_cast<qcp::algo::MultiGraphResamplerCache>(&cache);
+    auto* c = std::any_cast<qcp::algo::GraphResamplerCache>(&cache);
     QVERIFY(c != nullptr);
     QCOMPARE(c->columnCount, 2);
     QVERIFY(c->level1.keys.size() > 0);
@@ -2653,11 +2653,11 @@ void TestPipeline::multiGraphL1AndL2()
     QVERIFY(l2->keyAt(0) >= 0.0);
 }
 
-// --- QCPMultiGraph pipeline integration tests ---
+// --- QCPGraph pipeline integration tests ---
 
 void TestPipeline::multiGraphSmallDataNoResampling()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> keys = {0, 1, 2, 3, 4};
     std::vector<std::vector<double>> cols = {{10,20,30,40,50}, {5,15,25,35,45}};
     mg->setData(std::move(keys), std::move(cols));
@@ -2668,7 +2668,7 @@ void TestPipeline::multiGraphSmallDataNoResampling()
 
 void TestPipeline::multiGraphLargeDataL1L2()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
 
     // 10M+1 points * 3 columns — above threshold on both conditions
     const int N = 10'000'001;
@@ -2684,7 +2684,7 @@ void TestPipeline::multiGraphLargeDataL1L2()
     timeout.setSingleShot(true);
     timeout.start(30000);
     connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
-    connect(&mg->pipeline(), &QCPMultiGraphPipeline::finished,
+    connect(&mg->pipeline(), &QCPGraphPipeline::finished,
             &loop, &QEventLoop::quit);
     loop.exec();
 
@@ -2700,9 +2700,9 @@ void TestPipeline::multiGraphLargeDataL1L2()
 void TestPipeline::multiGraphLineCacheRebuiltOnZoom()
 {
     // Zooming a big resampled dataset must rebuild the lines, for
-    // QCPMultiGraph, which is what SciQLopMultiGraphBase (SciQLop's real
+    // QCPGraph, which is what SciQLopMultiGraphBase (SciQLop's real
     // multi-component line graphs) actually uses under the hood.
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
 
     const int N = 10'000'001;
     auto source = std::make_shared<SyntheticLargeMultiSource>(N, 3);
@@ -2717,7 +2717,7 @@ void TestPipeline::multiGraphLineCacheRebuiltOnZoom()
     timeout.setSingleShot(true);
     timeout.start(30000);
     connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
-    connect(&mg->pipeline(), &QCPMultiGraphPipeline::finished,
+    connect(&mg->pipeline(), &QCPGraphPipeline::finished,
             &loop, &QEventLoop::quit);
     loop.exec();
     QVERIFY(mg->mL1Cache);
@@ -2747,7 +2747,7 @@ void TestPipeline::multiGraphPendingSourceCommitsAfterZoomTriggeredRefetch()
     // visible range (SciQLopMultiGraphBase::set_data -> setDataSource on an
     // already-rendered graph). Checks the newly fetched/resampled data
     // actually reaches the display, not just that a job runs.
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDeferredDataSwap(true); // keep the old data until the fetched one commits
 
     const int N1 = 10'000'001;
@@ -2760,7 +2760,7 @@ void TestPipeline::multiGraphPendingSourceCommitsAfterZoomTriggeredRefetch()
         QEventLoop loop;
         QTimer timeout; timeout.setSingleShot(true); timeout.start(30000);
         connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
-        connect(&mg->pipeline(), &QCPMultiGraphPipeline::finished, &loop, &QEventLoop::quit);
+        connect(&mg->pipeline(), &QCPGraphPipeline::finished, &loop, &QEventLoop::quit);
         loop.exec();
     }
     QVERIFY(mg->mL1Cache);
@@ -2779,7 +2779,7 @@ void TestPipeline::multiGraphPendingSourceCommitsAfterZoomTriggeredRefetch()
         QEventLoop loop;
         QTimer timeout; timeout.setSingleShot(true); timeout.start(30000);
         connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
-        connect(&mg->pipeline(), &QCPMultiGraphPipeline::finished, &loop, &QEventLoop::quit);
+        connect(&mg->pipeline(), &QCPGraphPipeline::finished, &loop, &QEventLoop::quit);
         loop.exec();
     }
 
@@ -2804,7 +2804,7 @@ void TestPipeline::multiGraphMultipleRapidLegitimateSupersessionsCommitLast()
     // before the graph has ever rendered, so canDefer() is false both times
     // and neither call actually stages a pending source -- it doesn't
     // exercise this path at all.
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDeferredDataSwap(true); // the staging path this test exercises is opt-in
 
     const int N = 10'000'001;
@@ -2816,7 +2816,7 @@ void TestPipeline::multiGraphMultipleRapidLegitimateSupersessionsCommitLast()
         QEventLoop loop;
         QTimer timeout; timeout.setSingleShot(true); timeout.start(30000);
         connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
-        connect(&mg->pipeline(), &QCPMultiGraphPipeline::finished, &loop, &QEventLoop::quit);
+        connect(&mg->pipeline(), &QCPGraphPipeline::finished, &loop, &QEventLoop::quit);
         loop.exec();
     }
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -2849,20 +2849,20 @@ void TestPipeline::multiGraphMultipleRapidLegitimateSupersessionsCommitLast()
 void TestPipeline::multiGraphThresholdScalesWithColumnCount()
 {
     // 200 points * 2 columns = 400 < 100K threshold → no resampling
-    auto* mg1 = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg1 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     const int N = 200;
     auto src1 = std::make_shared<SyntheticLargeMultiSource>(N, 2);
     mg1->setDataSource(src1);
     QVERIFY(!mg1->pipeline().hasTransform());
 
     // 200K points * 100 columns = 20M > 100K threshold → resampling
-    auto* mg2 = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg2 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     auto src2 = std::make_shared<SyntheticLargeMultiSource>(200'000, 100);
     mg2->setDataSource(src2);
     QVERIFY(mg2->pipeline().hasTransform());
 
     // 50 points * 200 columns = 10K but 50 < 100K floor → no resampling
-    auto* mg3 = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg3 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     auto src3 = std::make_shared<SyntheticLargeMultiSource>(50, 200);
     mg3->setDataSource(src3);
     QVERIFY(!mg3->pipeline().hasTransform());
@@ -2870,7 +2870,7 @@ void TestPipeline::multiGraphThresholdScalesWithColumnCount()
 
 void TestPipeline::multiGraphRapidSetDataSource()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
 
     // Set large data source twice rapidly — second should supersede first
     for (int round = 0; round < 2; ++round)
@@ -2885,7 +2885,7 @@ void TestPipeline::multiGraphRapidSetDataSource()
     timeout.setSingleShot(true);
     timeout.start(30000);
     connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
-    connect(&mg->pipeline(), &QCPMultiGraphPipeline::finished,
+    connect(&mg->pipeline(), &QCPGraphPipeline::finished,
             &loop, &QEventLoop::quit);
     loop.exec();
 
@@ -2896,7 +2896,7 @@ void TestPipeline::multiGraphRapidSetDataSource()
 void TestPipeline::multiGraphExportSynchronousFallback()
 {
     mPlot->resize(400, 300);
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
 
     // Large data above threshold — pipeline has transform but no async result yet
     const int N = 5'000'000;
@@ -2920,7 +2920,7 @@ void TestPipeline::multiGraphExportSynchronousFallback()
 void TestPipeline::multiGraphLogScaleFallback()
 {
     mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
 
     // 10M+1 points: above threshold, pipeline is installed
     const int N = 10'000'001;
@@ -2936,7 +2936,7 @@ void TestPipeline::multiGraphLogScaleFallback()
     timeout.setSingleShot(true);
     timeout.start(30000);
     connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
-    connect(&mg->pipeline(), &QCPMultiGraphPipeline::finished,
+    connect(&mg->pipeline(), &QCPGraphPipeline::finished,
             &loop, &QEventLoop::quit);
     loop.exec();
 
@@ -2946,7 +2946,7 @@ void TestPipeline::multiGraphLogScaleFallback()
 
 void TestPipeline::multiGraphDataChangedInvalidatesL1()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
 
     const int N = 10'000'001;
     auto source = std::make_shared<SyntheticLargeMultiSource>(N, 2);
@@ -2962,7 +2962,7 @@ void TestPipeline::multiGraphDataChangedInvalidatesL1()
         timeout.setSingleShot(true);
         timeout.start(30000);
         connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
-        connect(&mg->pipeline(), &QCPMultiGraphPipeline::finished,
+        connect(&mg->pipeline(), &QCPGraphPipeline::finished,
                 &loop, &QEventLoop::quit);
         loop.exec();
     }
@@ -2979,7 +2979,7 @@ void TestPipeline::multiGraphDataChangedInvalidatesL1()
         timeout.setSingleShot(true);
         timeout.start(30000);
         connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
-        connect(&mg->pipeline(), &QCPMultiGraphPipeline::finished,
+        connect(&mg->pipeline(), &QCPGraphPipeline::finished,
                 &loop, &QEventLoop::quit);
         loop.exec();
     }
@@ -2990,11 +2990,11 @@ void TestPipeline::multiGraphDataChangedInvalidatesL1()
 
 // Whether the graph kept the first result to land. The `finished` slot added here runs after the
 // graph's own, so the L1 cache already holds the result if the graph accepted it.
-static bool keepsTheFirstL1ToLand(QCPMultiGraph* mg, const std::function<bool()>& hasL1)
+static bool keepsTheFirstL1ToLand(QCPGraph* mg, const std::function<bool()>& hasL1)
 {
     bool landed = false, kept = false;
     const auto connection = QObject::connect(
-        &mg->pipeline(), &QCPMultiGraphPipeline::finished, mg, [&](uint64_t) {
+        &mg->pipeline(), &QCPGraphPipeline::finished, mg, [&](uint64_t) {
             if (!std::exchange(landed, true))
                 kept = hasL1();
         });
@@ -3006,7 +3006,7 @@ static bool keepsTheFirstL1ToLand(QCPMultiGraph* mg, const std::function<bool()>
 // The job running for the old data lands first and must not be taken for the new data's.
 void TestPipeline::multiGraphDataChangedRejectsAStaleL1()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     const int N = 10'000'001;
     mPlot->xAxis->setRange(0, N - 1);
     mPlot->yAxis->setRange(-1, 1);
@@ -3018,7 +3018,7 @@ void TestPipeline::multiGraphDataChangedRejectsAStaleL1()
 // No job is coming for a source too small to resample, so the running one is the only L1 left.
 void TestPipeline::multiGraphReplacedBySmallSourceRejectsAStaleL1()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     const int N = 10'000'001;
     mPlot->xAxis->setRange(0, N - 1);
     mPlot->yAxis->setRange(-1, 1);
@@ -3030,7 +3030,7 @@ void TestPipeline::multiGraphReplacedBySmallSourceRejectsAStaleL1()
 
 void TestPipeline::multiGraphHiddenComponentsStillResampled()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
 
     const int N = 10'000'001;
     auto source = std::make_shared<SyntheticLargeMultiSource>(N, 3);
@@ -3049,7 +3049,7 @@ void TestPipeline::multiGraphHiddenComponentsStillResampled()
     timeout.setSingleShot(true);
     timeout.start(30000);
     connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
-    connect(&mg->pipeline(), &QCPMultiGraphPipeline::finished,
+    connect(&mg->pipeline(), &QCPGraphPipeline::finished,
             &loop, &QEventLoop::quit);
     loop.exec();
 
@@ -3062,7 +3062,7 @@ void TestPipeline::multiGraphHiddenComponentsStillResampled()
 
 void TestPipeline::multiGraphLineCacheRebuiltOnLargePan()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     const int N = 10000;
     std::vector<double> keys(N), values(N);
     for (int i = 0; i < N; ++i) { keys[i] = i; values[i] = std::sin(i * 0.01); }
@@ -3084,7 +3084,7 @@ void TestPipeline::multiGraphLineCacheRebuiltOnLargePan()
 
 void TestPipeline::multiGraphLineCacheSurvives75PercentPan()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> keys(500), vals(500);
     for (int i = 0; i < 500; ++i) { keys[i] = i; vals[i] = i; }
     graph->setData(std::move(keys), std::move(vals));
@@ -3101,7 +3101,7 @@ void TestPipeline::multiGraphLineCacheSurvives75PercentPan()
 
 void TestPipeline::multiGraphSmallDataLineCacheRebuiltOnZoom()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     const int N = 10000;
     std::vector<double> keys(N), values(N);
     for (int i = 0; i < N; ++i) { keys[i] = i; values[i] = std::sin(i * 0.01); }
@@ -3122,7 +3122,7 @@ void TestPipeline::multiGraphSmallDataLineCacheRebuiltOnZoom()
 
 void TestPipeline::multiGraphLineCacheRebuiltOnSmallZoom()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     const int N = 10000;
     std::vector<double> keys(N), values(N);
     for (int i = 0; i < N; ++i) { keys[i] = i; values[i] = std::sin(i * 0.01); }
@@ -3146,7 +3146,7 @@ void TestPipeline::multiGraphLineCacheRebuiltOnSmallZoom()
 
 void TestPipeline::multiGraphLineCacheInvalidatedOnDataChange()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     const int N = 10000;
     std::vector<double> keys(N), values(N);
     for (int i = 0; i < N; ++i) { keys[i] = i; values[i] = std::sin(i * 0.01); }
@@ -3173,7 +3173,7 @@ void TestPipeline::multiGraphLineCacheInvalidatedOnDataChange()
 
 void TestPipeline::multiGraphLineCacheReusedOnSmallPan()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     const int N = 10000;
     const int cols = 3;
     std::vector<double> keys(N);
@@ -3205,7 +3205,7 @@ void TestPipeline::multiGraphFastPanNeverBlank()
 {
     if (!showAndHasRhi(mPlot)) QSKIP("No QRhi available — hasRenderedRange() requires GPU draw()");
 
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
 
     int N = 500'000;
     std::vector<double> keys(N);
@@ -3291,8 +3291,8 @@ const std::vector<double> kStateValues = {1, 0, 1, 0, 0};
 
 void TestPipeline::multiGraphGapThresholdZeroDrawsIrregularSteps()
 {
-    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    g->setLineStyle(QCPMultiGraph::lsStepLeft);
+    auto* g = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    g->setLineStyle(QCPGraph::lsStepLeft);
     g->setDataSource(std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
         kIrregularKeys, std::vector<std::vector<double>>{kStateValues}));
     mPlot->xAxis->setRange(0, 12);
@@ -3331,8 +3331,8 @@ std::vector<double> sineValues()
 
 void TestPipeline::multiGraphGapThresholdReachesResampledSource()
 {
-    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    QSignalSpy spy(&g->pipeline(), &QCPMultiGraphPipeline::finished);
+    auto* g = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
     mPlot->xAxis->setRange(0, 2 * kHoleN);
     mPlot->yAxis->setRange(-1, 1);
     g->setDataSource(std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
@@ -3396,8 +3396,8 @@ QStringList zoomsThatBreakUniformData(QCustomPlot* plot, Breaks breaks, UsesL2 u
 
 void TestPipeline::multiGraphUniformDataNeverBreaksAtAnyZoom()
 {
-    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    QSignalSpy spy(&g->pipeline(), &QCPMultiGraphPipeline::finished);
+    auto* g = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
     mPlot->yAxis->setRange(-1.5, 1.5);
     g->setDataSource(std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
         uniformKeys(), std::vector<std::vector<double>>{uniformValues()}));
@@ -3417,8 +3417,8 @@ void TestPipeline::multiGraphNaNHoleBreaksTheResampledLine()
     constexpr int hole = 300;
     auto values = uniformValues();
     std::fill(values.begin() + kUniformN / 2, values.begin() + kUniformN / 2 + hole, qQNaN());
-    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    QSignalSpy spy(&g->pipeline(), &QCPMultiGraphPipeline::finished);
+    auto* g = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
     mPlot->yAxis->setRange(-1.5, 1.5);
     g->setDataSource(std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
         uniformKeys(), std::vector<std::vector<double>>{values}));
@@ -3442,8 +3442,8 @@ void TestPipeline::multiGraphNaNHoleInOneColumnBreaksThatLine()
     // Column 0 is NaN over 4800 samples (5 min at 16 S/s); column 1 has data everywhere.
     auto hole = uniformValues();
     std::fill(hole.begin() + kUniformN / 2, hole.begin() + kUniformN / 2 + 4'800, qQNaN());
-    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    QSignalSpy spy(&g->pipeline(), &QCPMultiGraphPipeline::finished);
+    auto* g = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
     mPlot->yAxis->setRange(-1.5, 1.5);
     g->setDataSource(std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
         uniformKeys(), std::vector<std::vector<double>>{hole, uniformValues()}));
@@ -3468,8 +3468,8 @@ void TestPipeline::sporadicNaNNeverBreaksTheResampledLine()
     auto values = uniformValues();
     for (int i = 0; i < kUniformN; i += 37)
         values[i] = qQNaN();
-    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    QSignalSpy spy(&g->pipeline(), &QCPMultiGraphPipeline::finished);
+    auto* g = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    QSignalSpy spy(&g->pipeline(), &QCPGraphPipeline::finished);
     mPlot->yAxis->setRange(-1.5, 1.5);
     g->setDataSource(std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
         uniformKeys(), std::vector<std::vector<double>>{values, values}));
@@ -3488,7 +3488,7 @@ void TestPipeline::densePanIsRedrawnFreshBesideASmallGraph()
     // dirty after a pan, so it keeps offering a translation for the whole layer.
     if (!showAndHasRhi(mPlot))
         QSKIP("no QRhi available in this environment");
-    auto* small = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* small = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     QVector<double> sk(500), sv(500);
     for (int i = 0; i < 500; ++i)
     {
@@ -3496,7 +3496,7 @@ void TestPipeline::densePanIsRedrawnFreshBesideASmallGraph()
         sv[i] = 0.5;
     }
     small->setData(sk, sv);
-    auto* dense = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* dense = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     QVector<double> keys(400000), values(400000);
     for (int i = 0; i < 400000; ++i)
     {
@@ -3555,7 +3555,7 @@ void TestPipeline::colormapNewDataShowsWhileAnotherLayerIsDirty()
 
 void TestPipeline::multiGraphSetterRedrawsWhileAnotherLayerIsDirty()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     graph->setData(QVector<double> { 0, 1, 2, 3 }, QVector<double> { 0, 1, 0, 1 });
     mPlot->xAxis->setRange(0, 3);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -3572,9 +3572,9 @@ void TestPipeline::multiGraphSetterRedrawsWhileAnotherLayerIsDirty()
 namespace
 {
 //! Positive values over keys 1..10^4, drawn once on the given axis scales.
-QCPMultiGraph* drawnPositiveGraph(QCustomPlot* plot, bool logKeys, bool logValues)
+QCPGraph* drawnPositiveGraph(QCustomPlot* plot, bool logKeys, bool logValues)
 {
-    auto* graph = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* graph = new QCPGraph(plot->xAxis, plot->yAxis);
     QVector<double> keys(2000), values(2000);
     for (int i = 0; i < 2000; ++i)
     {
@@ -3656,7 +3656,7 @@ void TestPipeline::lineCacheCoversADecadeEachSideOnLogKeys()
 // it; one deleting the graph must end dataChanged.
 void TestPipeline::multiGraphDataChangedReplotSlotDeletingTheGraphIsSafe()
 {
-    auto* g = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* g = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     g->setData(std::vector<double>{ 0, 1, 2 }, std::vector<double>{ 0, 1, 2 });
     QVERIFY(!g->pipeline().hasTransform());
     connect(mPlot, &QCustomPlot::beforeReplot, mPlot,

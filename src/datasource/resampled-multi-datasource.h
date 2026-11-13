@@ -148,7 +148,7 @@ namespace detail {
 
 template <bool WithOrigin>
 inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2MultiImpl(
-    const MultiGraphResamplerCache& l1Cache,
+    const GraphResamplerCache& l1Cache,
     const ViewportParams& vp,
     int l1Begin, int l1End)
 {
@@ -341,7 +341,7 @@ inline std::shared_ptr<QCPResampledMultiDataSource> binRawViewport(
 // simplify: when L1 is too coarse for the view, the raw rows in view are binned here on the GUI
 // thread, O(rows in plotWidthPx L1 bins). Upgrade path: build that L2 in the async pipeline.
 inline std::shared_ptr<QCPResampledMultiDataSource> resampleL2Multi(
-    const MultiGraphResamplerCache& l1Cache,
+    const GraphResamplerCache& l1Cache,
     const ViewportParams& vp,
     const QCPAbstractMultiDataSource& raw)
 {

@@ -74,11 +74,11 @@ void TestScatterRhi::renderToImageCustomPathWorks()
 
 // --- Task 3-5 tests ---
 
-static QCPMultiGraph* addMultiGraphWithScatter(QCustomPlot* plot,
+static QCPGraph* addMultiGraphWithScatter(QCustomPlot* plot,
                                         QCPScatterStyle::ScatterShape shape,
                                         int nPoints = 100)
 {
-    auto* graph = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* graph = new QCPGraph(plot->xAxis, plot->yAxis);
     QCPScatterStyle style(shape, 8);
     graph->setScatterStyle(style);
 
@@ -133,7 +133,7 @@ void TestScatterRhi::replotScatterSquareDoesNotCrash()
 
 void TestScatterRhi::replotScatterCustomDoesNotCrash()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     QPainterPath path;
     path.addEllipse(-4, -4, 8, 8);
     QCPScatterStyle style(path, QPen(Qt::red), QBrush(Qt::yellow), 10);
@@ -199,7 +199,7 @@ void TestScatterRhi::painterFallbackAppliesScatterColorValues()
 {
     constexpr int n = 100;
     auto* graph = addMultiGraphWithScatter(mPlot, QCPScatterStyle::ssDisc, n);
-    graph->setLineStyle(QCPMultiGraph::lsNone);
+    graph->setLineStyle(QCPGraph::lsNone);
     graph->setColorValues(rampColorValues(n));
     graph->setGradient(QCPColorGradient(QCPColorGradient::gpJet));
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -211,7 +211,7 @@ void TestScatterRhi::painterFallbackAppliesScatterColorValues()
 void TestScatterRhi::painterFallbackWithoutColorValuesUsesPen()
 {
     auto* graph = addMultiGraphWithScatter(mPlot, QCPScatterStyle::ssDisc, 100);
-    graph->setLineStyle(QCPMultiGraph::lsNone);
+    graph->setLineStyle(QCPGraph::lsNone);
     graph->setPen(QPen(QColor(Qt::red)));
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
@@ -222,7 +222,7 @@ void TestScatterRhi::painterFallbackTintsBrushOfFilledShapes()
 {
     constexpr int n = 100;
     auto* graph = addMultiGraphWithScatter(mPlot, QCPScatterStyle::ssCircle, n);
-    graph->setLineStyle(QCPMultiGraph::lsNone);
+    graph->setLineStyle(QCPGraph::lsNone);
     // ssCircle with an explicit brush: both outline and fill must follow the data.
     QCPScatterStyle style(QCPScatterStyle::ssCircle, QPen(Qt::black), QBrush(Qt::black), 9);
     graph->setScatterStyle(style);
@@ -244,7 +244,7 @@ void TestScatterRhi::painterFallbackToleratesShortColorValues()
 {
     constexpr int n = 100;
     auto* graph = addMultiGraphWithScatter(mPlot, QCPScatterStyle::ssDisc, n);
-    graph->setLineStyle(QCPMultiGraph::lsNone);
+    graph->setLineStyle(QCPGraph::lsNone);
     gShortValueMisuses = 0;
     const auto previous = qcp::setMisuseHandler(countMisuse);
     graph->setColorValues(rampColorValues(n / 2));  // deliberately too few
@@ -268,8 +268,8 @@ void TestScatterRhi::clearResetsState()
 
 void TestScatterRhi::emptyDataDoesNotCrash()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    graph->setLineStyle(QCPMultiGraph::lsNone);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPGraph::lsNone);
     graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QVERIFY(true);
@@ -277,8 +277,8 @@ void TestScatterRhi::emptyDataDoesNotCrash()
 
 void TestScatterRhi::singlePointDoesNotCrash()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    graph->setLineStyle(QCPMultiGraph::lsNone);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPGraph::lsNone);
     graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
     graph->setData(std::vector<double>{0.5}, std::vector<double>{0.5});
     mPlot->rescaleAxes();
@@ -288,8 +288,8 @@ void TestScatterRhi::singlePointDoesNotCrash()
 
 void TestScatterRhi::allNaNDoesNotCrash()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    graph->setLineStyle(QCPMultiGraph::lsNone);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPGraph::lsNone);
     graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
     constexpr double nan = std::numeric_limits<double>::quiet_NaN();
     // A SoA source: the owning setData refuses a non-finite key.
@@ -303,8 +303,8 @@ void TestScatterRhi::allNaNDoesNotCrash()
 
 void TestScatterRhi::mixedNaNDoesNotCrash()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    graph->setLineStyle(QCPMultiGraph::lsNone);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPGraph::lsNone);
     graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
     constexpr double nan = std::numeric_limits<double>::quiet_NaN();
     graph->setDataSource(
@@ -318,8 +318,8 @@ void TestScatterRhi::mixedNaNDoesNotCrash()
 
 void TestScatterRhi::infDataDoesNotCrash()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    graph->setLineStyle(QCPMultiGraph::lsNone);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPGraph::lsNone);
     graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
     constexpr double inf = std::numeric_limits<double>::infinity();
     graph->setData(std::vector<double>{0.1, 0.5, 0.9},
@@ -331,8 +331,8 @@ void TestScatterRhi::infDataDoesNotCrash()
 
 void TestScatterRhi::styleChangeBetweenReplots()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    graph->setLineStyle(QCPMultiGraph::lsNone);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPGraph::lsNone);
     graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
     graph->setData(std::vector<double>{0.1, 0.5, 0.9},
                    std::vector<double>{0.2, 0.8, 0.4});
@@ -351,8 +351,8 @@ void TestScatterRhi::styleChangeBetweenReplots()
 
 void TestScatterRhi::scatterSkipRespected()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    graph->setLineStyle(QCPMultiGraph::lsNone);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPGraph::lsNone);
     graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
     graph->setScatterSkip(5);
     std::vector<double> keys(100), values(100);
@@ -368,8 +368,8 @@ void TestScatterRhi::scatterSkipRespected()
 
 void TestScatterRhi::scatterPlusLineDoesNotCrash()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    graph->setLineStyle(QCPMultiGraph::lsLine);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPGraph::lsLine);
     graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, Qt::red, 6));
     graph->setData(std::vector<double>{0.1, 0.3, 0.5, 0.7, 0.9},
                    std::vector<double>{0.2, 0.8, 0.4, 0.9, 0.1});
@@ -380,8 +380,8 @@ void TestScatterRhi::scatterPlusLineDoesNotCrash()
 
 void TestScatterRhi::multiGraphScatterDoesNotCrash()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    mg->setLineStyle(QCPMultiGraph::lsNone);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setLineStyle(QCPGraph::lsNone);
 
     std::vector<double> keys(100);
     std::vector<std::vector<float>> valueCols(2, std::vector<float>(100));
@@ -438,12 +438,12 @@ void TestScatterRhi::scattersOnOneLayerKeepTheirOwnMarker()
 {
     if (!showAndHasRhi(mPlot))
         QSKIP("No QRhi available — markers are only instanced on the GPU path");
-    auto* red = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    red->setLineStyle(QCPMultiGraph::lsNone);
+    auto* red = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    red->setLineStyle(QCPGraph::lsNone);
     red->setScatterStyle(filledSquare(Qt::red));
     red->setData(std::vector<double>{1, 2, 3}, std::vector<double>{1, 1, 1});
-    auto* blue = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    blue->setLineStyle(QCPMultiGraph::lsNone);
+    auto* blue = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    blue->setLineStyle(QCPGraph::lsNone);
     blue->setScatterStyle(filledSquare(Qt::blue));
     blue->setData(std::vector<double>{1, 2, 3}, std::vector<double>{2, 2, 2});
     setFixedRanges(mPlot);
@@ -460,8 +460,8 @@ void TestScatterRhi::multiGraphComponentsKeepTheirOwnMarker()
 {
     if (!showAndHasRhi(mPlot))
         QSKIP("No QRhi available — markers are only instanced on the GPU path");
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    mg->setLineStyle(QCPMultiGraph::lsNone);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setLineStyle(QCPGraph::lsNone);
     mg->setData(std::vector<double>{1, 2, 3},
                 std::vector<std::vector<float>>{{1, 1, 1}, {2, 2, 2}});
     mg->setComponentPens({QPen(Qt::red), QPen(Qt::blue)});
@@ -483,14 +483,14 @@ void TestScatterRhi::multiGraphLineStyleChangeAfterFirstDrawIsShown()
 {
     if (!showAndHasRhi(mPlot))
         QSKIP("No QRhi available — the cached GPU line needs a real backend");
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     graph->setPen(QPen(Qt::red, 4));
     graph->setData(std::vector<double>{1, 3}, std::vector<double>{1, 2});
     setFixedRanges(mPlot);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QVERIFY(isRed(pixelAt(mPlot->grabFramebuffer(), mPlot, 2, 1.5)));
 
-    graph->setLineStyle(QCPMultiGraph::lsStepLeft); // holds 1 until x = 3
+    graph->setLineStyle(QCPGraph::lsStepLeft); // holds 1 until x = 3
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     const QImage frame = mPlot->grabFramebuffer();
     QVERIFY2(isRed(pixelAt(frame, mPlot, 2, 1)), "step line not drawn");
@@ -501,8 +501,8 @@ void TestScatterRhi::multiGraphScatterStyleChangeAfterFirstDrawIsShown()
 {
     if (!showAndHasRhi(mPlot))
         QSKIP("No QRhi available — markers are only instanced on the GPU path");
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    graph->setLineStyle(QCPMultiGraph::lsNone);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPGraph::lsNone);
     graph->setScatterStyle(filledSquare(Qt::red));
     graph->setData(std::vector<double>{1, 2, 3}, std::vector<double>{1, 1, 1});
     setFixedRanges(mPlot);
@@ -523,8 +523,8 @@ void TestScatterRhi::multiGraphScatterColorValuesChangeAfterFirstDrawIsShown()
     redToBlue.clearColorStops();
     redToBlue.setColorStopAt(0, Qt::red);
     redToBlue.setColorStopAt(1, Qt::blue);
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    graph->setLineStyle(QCPMultiGraph::lsNone);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPGraph::lsNone);
     graph->setScatterStyle(filledSquare(Qt::black));
     graph->setGradient(redToBlue);
     graph->setData(std::vector<double>{1, 2, 3}, std::vector<double>{1, 1, 1});
@@ -548,8 +548,8 @@ void TestScatterRhi::multiGraphFirstColorValuesAfterFirstDrawAreShown()
     redToBlue.clearColorStops();
     redToBlue.setColorStopAt(0, Qt::red);
     redToBlue.setColorStopAt(1, Qt::blue);
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    graph->setLineStyle(QCPMultiGraph::lsNone);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    graph->setLineStyle(QCPGraph::lsNone);
     graph->setScatterStyle(filledSquare(Qt::black));
     graph->setGradient(redToBlue);
     graph->setData(std::vector<double>{1, 2, 3}, std::vector<double>{1, 1, 1});
@@ -566,8 +566,8 @@ void TestScatterRhi::uncolouredMarkersCommandDrawsEveryMarker()
 {
     if (!showAndHasRhi(mPlot))
         QSKIP("No QRhi available — markers are only instanced on the GPU path");
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    mg->setLineStyle(QCPMultiGraph::lsNone);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setLineStyle(QCPGraph::lsNone);
     // Three markers far apart, all strictly inside the fixed range (1..3 × 0.5..2.5).
     const std::vector<double> keys { 1, 2, 3 };
     const std::vector<double> values { 0.5, 1.5, 2.5 };

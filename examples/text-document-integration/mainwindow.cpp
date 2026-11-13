@@ -51,10 +51,10 @@ void MainWindow::setupPlot()
 {
   // The following plot setup is taken from the sine demo:
   // add two new graphs and set their look:
-  ui->plot->add<QCPMultiGraph>();
+  ui->plot->add<QCPGraph>();
   ui->plot->graph(0)->setPen(QPen(Qt::blue)); // line color blue for first graph
   ui->plot->graph(0)->setBrush(QBrush(QColor(0, 0, 255, 20))); // first graph will be filled with translucent blue
-  ui->plot->add<QCPMultiGraph>();
+  ui->plot->add<QCPGraph>();
   ui->plot->graph(1)->setPen(QPen(Qt::red)); // line color red for second graph
   // generate some points of data (y0 for first, y1 for second graph):
   QVector<double> x(250), y0(250), y1(250);

@@ -48,8 +48,8 @@ private slots:
 private:
   Ui::MainWindow *ui;
   QCustomPlot *mPlot;
-  QPointer<QCPMultiGraph> mGraph1;
-  QPointer<QCPMultiGraph> mGraph2;
+  QPointer<QCPGraph> mGraph1;
+  QPointer<QCPGraph> mGraph2;
   AxisTag *mTag1;
   AxisTag *mTag2;
   QTimer mDataTimer;

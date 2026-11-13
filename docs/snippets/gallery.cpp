@@ -38,7 +38,7 @@ DOC_SNIPPET(gallery_space_weather, 800, 560)
         }
         b[3][i] = static_cast<float>(std::sqrt(magnitude));
     }
-    auto field = customPlot->add<QCPMultiGraph>().setData(std::move(time), std::move(b));
+    auto field = customPlot->add<QCPGraph>().setData(std::move(time), std::move(b));
     field->setComponentNames({ "Bx", "By", "Bz", "|B|" });
     field->setComponentPens({ QPen(QColor(77, 166, 255), 1), QPen(QColor(102, 204, 102), 1),
                               QPen(QColor(255, 107, 107), 1), QPen(QColor(230, 230, 230), 1.5) });
@@ -145,7 +145,7 @@ DOC_SNIPPET(gallery_ten_million_points, 800, 520)
     auto source = std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<float>>>(
         std::move(t), std::move(columns));
 
-    auto overview = customPlot->add<QCPMultiGraph>();
+    auto overview = customPlot->add<QCPGraph>();
     overview->setDataSource(source);
     overview->setPen(QPen(QColor(31, 119, 180), 1));
     customPlot->xAxis->setRange(0, 10000);
@@ -153,7 +153,7 @@ DOC_SNIPPET(gallery_ten_million_points, 800, 520)
 
     auto* detailRect = new QCPAxisRect(customPlot);
     customPlot->plotLayout()->addElement(1, 0, detailRect);
-    auto* detail = new QCPMultiGraph(detailRect->axis(QCPAxis::atBottom), detailRect->axis(QCPAxis::atLeft));
+    auto* detail = new QCPGraph(detailRect->axis(QCPAxis::atBottom), detailRect->axis(QCPAxis::atLeft));
     detail->setDataSource(source);
     detail->setPen(QPen(QColor(214, 39, 40), 1.5));
     const QCPRange window(7108, 7112);   // four seconds around a burst
@@ -421,7 +421,7 @@ DOC_SNIPPET(gallery_stock_chart, 800, 520)
         (it->close >= it->open ? upDays : downDays).append(it->key);
         (it->close >= it->open ? volumeUp : volumeDown).append(traded);
     }
-    auto trend = customPlot->add<QCPMultiGraph>()
+    auto trend = customPlot->add<QCPGraph>()
         .setData(days, average)
         .setPen(QPen(QColor(255, 152, 0), 2))
         .setName("20-day average");
@@ -535,13 +535,13 @@ DOC_SNIPPET(gallery_fit_residuals, 680, 560)
         fineX.append(model(fineT.last()));
     }
 
-    auto curve = customPlot->add<QCPMultiGraph>()
+    auto curve = customPlot->add<QCPGraph>()
         .setData(fineT, fineX)
         .setPen(QPen(QColor(214, 39, 40), 2))
         .setName("model");
-    auto points = customPlot->add<QCPMultiGraph>()
+    auto points = customPlot->add<QCPGraph>()
         .setData(t, x)
-        .setLineStyle(QCPMultiGraph::lsNone)
+        .setLineStyle(QCPGraph::lsNone)
         .setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, QColor(31, 119, 180), 6))
         .setName("measurements");
     auto errors = customPlot->add<QCPErrorBars>();
@@ -564,9 +564,9 @@ DOC_SNIPPET(gallery_fit_residuals, 680, 560)
     band->setBrush(QColor(127, 127, 127, 45));
     band->setBorderPen(Qt::NoPen);
     band->setMovable(false);
-    auto residuals = customPlot->add<QCPMultiGraph>().setAxes(residualT, residualAxis)
+    auto residuals = customPlot->add<QCPGraph>().setAxes(residualT, residualAxis)
         .setData(t, pull)
-        .setLineStyle(QCPMultiGraph::lsImpulse)
+        .setLineStyle(QCPGraph::lsImpulse)
         .setPen(QPen(QColor(31, 119, 180)))
         .setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, QColor(31, 119, 180), 5));
     residuals->removeFromLegend();

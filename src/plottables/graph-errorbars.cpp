@@ -1,4 +1,4 @@
-#include "multigraph-errorbars.h"
+#include "graph-errorbars.h"
 #include <cmath>
 #include <limits>
 

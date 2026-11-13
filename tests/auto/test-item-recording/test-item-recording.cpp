@@ -252,7 +252,7 @@ void TestItemRecording::anAnchoredArrowFollowsThePan()
     // replay; the head must be remade too, or a pan leaves it behind.
     QCustomPlot plot;
     preparePlot(plot);
-    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     graph->setData(QVector<double> { 1, 2, 3, 4 }, QVector<double> { 0.2, 0.3, 0.4, 0.5 });
     auto* tracer = new QCPItemTracer(&plot);
     tracer->setGraph(graph);
@@ -330,7 +330,7 @@ void TestItemRecording::aFollowerFollowsItsAnchorItem()
     // the curve: its recording must depend on the item it hangs from, or it draws the old pixels.
     QCustomPlot plot;
     preparePlot(plot);
-    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     graph->setData(QVector<double> { 1, 2, 3, 4 }, QVector<double> { 0.2, 0.2, 0.2, 0.2 });
     auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
     tracer->setGraph(graph);
@@ -362,7 +362,7 @@ void TestItemRecording::aTracerOnAnotherLayerFollowsItsGraph()
 {
     QCustomPlot plot;
     preparePlot(plot);
-    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     const QVector<double> keys { 1, 2, 3, 4 };
     const QVector<double> low { 0.2, 0.2, 0.2, 0.2 };
     const QVector<double> high { 0.8, 0.8, 0.8, 0.8 };
@@ -398,7 +398,7 @@ void TestItemRecording::anErrorBarOnAnotherLayerFollowsItsGraph()
 {
     QCustomPlot plot;
     preparePlot(plot);
-    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     const QVector<double> keys { 1, 2, 3, 4 };
     const QVector<double> low { 0.2, 0.2, 0.2, 0.2 };
     const QVector<double> high { 0.7, 0.7, 0.7, 0.7 };
@@ -683,7 +683,7 @@ void TestItemRecording::aTracerRecords()
         &commands,
         [](QCustomPlot& plot, RecordingItem<QCPItemTracer>* tracer)
         {
-            auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+            auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
             graph->setPen(QPen(Qt::blue, 0));
             QVector<double> keys, values;
             for (int i = 0; i <= 60; ++i)
@@ -707,7 +707,7 @@ void TestItemRecording::aTracerFollowsItsGraph()
     // The marker is where the graph's data says: new data moves it, without a call on the tracer.
     QCustomPlot plot;
     preparePlot(plot);
-    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     graph->setData(QVector<double> { 1, 2, 3, 4 }, QVector<double> { 0.2, 0.2, 0.2, 0.2 });
     auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
     tracer->setGraph(graph);
@@ -735,7 +735,7 @@ void TestItemRecording::aPannedTracerIsNotReRecorded()
     // A tracer on plot coordinates is data: a pan only shifts its marker.
     QCustomPlot plot;
     preparePlot(plot);
-    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     graph->setData(QVector<double> { 1, 2, 3, 4, 5 }, QVector<double> { 0.2, 0.3, 0.4, 0.5, 0.6 });
     auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
     tracer->setGraph(graph);
@@ -755,7 +755,7 @@ void TestItemRecording::aTracerFollowsSetGraphKey()
 {
     QCustomPlot plot;
     preparePlot(plot);
-    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     graph->setData(QVector<double> { 1, 2, 3, 4, 5 }, QVector<double> { 0.2, 0.3, 0.4, 0.5, 0.6 });
     auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
     tracer->setGraph(graph);
@@ -784,7 +784,7 @@ void TestItemRecording::aTracerFollowsInterpolation()
     // Between two samples the tracer snaps to the nearer one, or interpolates when asked to.
     QCustomPlot plot;
     preparePlot(plot);
-    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     graph->setData(QVector<double> { 1, 5 }, QVector<double> { 0.2, 0.6 });
     auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
     tracer->setGraph(graph);
@@ -813,7 +813,7 @@ void TestItemRecording::theTracerFollowsAMultiGraphComponent()
 {
     QCustomPlot plot;
     preparePlot(plot);
-    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     graph->setData(std::vector<double>{1, 2, 3, 4},
                    std::vector<std::vector<double>>{{0.1, 0.1, 0.1, 0.1},
                                                     {0.2, 0.3, 0.4, 0.5},
@@ -834,7 +834,7 @@ void TestItemRecording::theTracerFollowsAMultiGraphComponent()
     QVERIFY2(redPixelsNear(image, at, 8) > 0, "the marker is not on the component's line");
 
     // A stepped component still follows the 2.x tracer: interpolation is linear between samples.
-    graph->setComponentLineStyle(1, QCPMultiGraph::lsStepLeft);
+    graph->setComponentLineStyle(1, QCPGraph::lsStepLeft);
     plot.replot();
     QCOMPARE(tracer->position->coords(), QPointF(2.5, 0.35));
 
@@ -848,7 +848,7 @@ void TestItemRecording::theTracerOutsideTheDataClampsAs2xDid()
 {
     QCustomPlot plot;
     preparePlot(plot);
-    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     graph->setData(std::vector<double>{1, 2, 3, 4},
                    std::vector<std::vector<double>>{{0.2, 0.3, 0.4, 0.5}});
     auto* tracer = new QCPItemTracer(&plot);
@@ -867,7 +867,7 @@ void TestItemRecording::theTracerOnAGapIsInert()
 {
     QCustomPlot plot;
     preparePlot(plot);
-    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     graph->setData(std::vector<double>{1, 2, 3, 4},
                    std::vector<std::vector<double>>{{0.2, std::numeric_limits<double>::quiet_NaN(),
                                                     0.4, 0.5}});
@@ -891,7 +891,7 @@ void TestItemRecording::aTracerWhoseComponentDisappearsIsInert()
     // stale sample as if the target were still there.
     QCustomPlot plot;
     preparePlot(plot);
-    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     graph->setData(std::vector<double>{1, 2, 3},
                    std::vector<std::vector<double>>{{0.2, 0.3, 0.4}, {0.6, 0.7, 0.8}});
     auto* tracer = new RecordingItem<QCPItemTracer>(&plot);
@@ -929,7 +929,7 @@ void TestItemRecording::deletingTheTracedMultiGraphLeavesTheTracerInert()
 {
     QCustomPlot plot;
     preparePlot(plot);
-    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     graph->setData(std::vector<double>{1, 2, 3}, std::vector<std::vector<double>>{{0.2, 0.3, 0.4}});
     auto* tracer = new QCPItemTracer(&plot);
     tracer->setGraph(graph);
@@ -949,7 +949,7 @@ void TestItemRecording::takingTheTracedMultiGraphLeavesTheTracerInert()
 {
     QCustomPlot plot;
     preparePlot(plot);
-    auto graph = plot.add<QCPMultiGraph>(
+    auto graph = plot.add<QCPGraph>(
         std::vector<double>{1, 2, 3}, std::vector<std::vector<double>>{{0.2, 0.3, 0.4}});
     QVERIFY(graph);
     auto* tracer = new QCPItemTracer(&plot);
@@ -972,9 +972,9 @@ void TestItemRecording::retargetingToAnotherGraphLeavesTheFirst()
 {
     QCustomPlot plot;
     preparePlot(plot);
-    auto* first = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto* first = new QCPGraph(plot.xAxis, plot.yAxis);
     first->setData(QVector<double>{1, 2, 3}, QVector<double>{0.2, 0.3, 0.4});
-    auto* second = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto* second = new QCPGraph(plot.xAxis, plot.yAxis);
     second->setData(std::vector<double>{1, 2, 3},
                     std::vector<std::vector<double>>{{0.6, 0.7, 0.8}, {0.1, 0.1, 0.1}});
 
@@ -997,7 +997,7 @@ void TestItemRecording::theTracerOpsHandleSetsALineGraph()
 {
     QCustomPlot plot;
     preparePlot(plot);
-    auto graph = plot.add<QCPMultiGraph>(
+    auto graph = plot.add<QCPGraph>(
         std::vector<double>{1, 2, 3},
         std::vector<std::vector<double>>{{0.1, 0.1, 0.1}, {0.6, 0.7, 0.8}});
     QVERIFY(graph);
@@ -1013,7 +1013,7 @@ void TestItemRecording::theTracerRefusesAnOutOfRangeComponent()
 {
     QCustomPlot plot;
     preparePlot(plot);
-    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     graph->setData(std::vector<double>{1, 2, 3},
                    std::vector<std::vector<double>>{{0.1, 0.1, 0.1}, {0.2, 0.2, 0.2}});
     auto* tracer = new QCPItemTracer(&plot);
@@ -1054,7 +1054,7 @@ void TestItemRecording::aSwappedGraphContainerReRecords()
 {
     QCustomPlot plot;
     preparePlot(plot);
-    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
     const QVector<double> keys { 1, 2, 3, 4 };
     const QVector<double> first { 0.2, 0.2, 0.2, 0.2 };
     const QVector<double> second { 0.8, 0.8, 0.8, 0.8 };

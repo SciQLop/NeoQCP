@@ -98,7 +98,7 @@ bool draws(const QImage& image, const QRect& rect, Match match)
 
 void TestMultiGraph::creation()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     QVERIFY(mg);
     QCOMPARE(mg->componentCount(), 0);
     QCOMPARE(mg->dataCount(), 0);
@@ -107,7 +107,7 @@ void TestMultiGraph::creation()
 
 void TestMultiGraph::setDataSourceShared()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     auto src = std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
         std::vector<double>{1.0, 2.0, 3.0},
         std::vector<std::vector<double>>{{10.0, 20.0, 30.0}, {-1.0, -2.0, -3.0}});
@@ -118,7 +118,7 @@ void TestMultiGraph::setDataSourceShared()
 
 void TestMultiGraph::setDataSourceUnique()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     std::unique_ptr<QCPAbstractMultiDataSource> src =
         std::make_unique<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
             std::vector<double>{1.0, 2.0},
@@ -130,7 +130,7 @@ void TestMultiGraph::setDataSourceUnique()
 
 void TestMultiGraph::setDataConvenience()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1.0, 2.0, 3.0},
                 std::vector<std::vector<double>>{{10.0, 20.0, 30.0}, {-1.0, -2.0, -3.0}});
     QCOMPARE(mg->componentCount(), 2);
@@ -139,7 +139,7 @@ void TestMultiGraph::setDataConvenience()
 
 void TestMultiGraph::viewDataConvenience()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> keys = {1.0, 2.0, 3.0};
     std::vector<double> v0 = {10.0, 20.0, 30.0};
     std::vector<double> v1 = {-1.0, -2.0, -3.0};
@@ -153,7 +153,7 @@ void TestMultiGraph::viewDataConvenience()
 
 void TestMultiGraph::addDataAppendsToAnOwnedSource()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{0.0, 1.0},
                 std::vector<std::vector<double>>{{10.0, 20.0}});
     QVERIFY2(dynamic_cast<QCPGrowableMultiDataSource*>(mg->dataSource()),
@@ -178,7 +178,7 @@ void TestMultiGraph::addDataAppendsToAnOwnedSource()
     QCOMPARE(mg->dataCount(), 4);
     QCOMPARE(mg->componentValueAt(1, 3), 4.0);
 
-    auto* fresh = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* fresh = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     fresh->addData(QVector<double>{0.0, 1.0}, QVector<double>{2.0, 3.0});
     QCOMPARE(fresh->dataCount(), 2);
     QCOMPARE(fresh->componentCount(), 1);
@@ -187,7 +187,7 @@ void TestMultiGraph::addDataAppendsToAnOwnedSource()
 
 void TestMultiGraph::addDataInsertsUnsortedKeysInOrder()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{0.0, 2.0, 4.0},
                 std::vector<std::vector<double>>{{0.0, 20.0, 40.0}, {0.0, 200.0, 400.0}});
     mg->addData(QVector<double>{3.0, 1.0, 5.0},
@@ -208,7 +208,7 @@ void TestMultiGraph::addDataInsertsUnsortedKeysInOrder()
 void TestMultiGraph::addDataOnAViewIsAMisuse()
 {
     MisuseScope misuse;
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> keys = {0.0, 1.0};
     std::vector<double> values = {10.0, 20.0};
     mg->viewData(std::span<const double>(keys),
@@ -222,7 +222,7 @@ void TestMultiGraph::addDataOnAViewIsAMisuse()
 void TestMultiGraph::addDataOnASharedSourceIsAMisuse()
 {
     MisuseScope misuse;
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     auto source = std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
         std::vector<double>{0.0, 1.0}, std::vector<std::vector<double>>{{10.0, 20.0}});
     mg->setDataSource(source);
@@ -244,7 +244,7 @@ void TestMultiGraph::addDataOnAWaterfallIsAMisuse()
 
 void TestMultiGraph::addDataWithAPendingSwapAppendsToTheStagedSource()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{0.0, 1.0}, std::vector<std::vector<double>>{{1.0, 2.0}});
     mPlot->replot();
     QVERIFY(mg->hasRenderedRange());
@@ -270,7 +270,7 @@ void TestMultiGraph::addDataWithAPendingSwapAppendsToTheStagedSource()
 void TestMultiGraph::addDataColumnCountMismatchIsAMisuse()
 {
     MisuseScope misuse;
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{0.0, 1.0},
                 std::vector<std::vector<double>>{{10.0, 20.0}, {1.0, 2.0}});
 
@@ -287,7 +287,7 @@ void TestMultiGraph::addDataColumnCountMismatchIsAMisuse()
 void TestMultiGraph::aPipelineSeesTheAppend()
 {
     constexpr int n = 120'000;
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> keys(n), values(n, 0.0);
     for (int i = 0; i < n; ++i)
         keys[i] = i;
@@ -336,13 +336,13 @@ void TestMultiGraph::aPipelineSeesTheAppend()
 
 void TestMultiGraph::oneColumnSetDataTakesQVectors()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(QVector<double>{1.0, 2.0, 3.0}, QVector<double>{4.0, 5.0, 6.0});
     QCOMPARE(mg->componentCount(), 1);
     QCOMPARE(mg->dataCount(), 3);
     QCOMPARE(mg->componentValueAt(0, 2), 6.0);
 
-    auto handle = mPlot->add<QCPMultiGraph>(QVector<double>{1.0, 2.0},
+    auto handle = mPlot->add<QCPGraph>(QVector<double>{1.0, 2.0},
                                             QVector<double>{7.0, 8.0});
     QVERIFY(handle);
     QCOMPARE(handle->dataCount(), 2);
@@ -354,21 +354,21 @@ void TestMultiGraph::oneColumnSetDataTakesQVectors()
 // make the braced call ambiguous.
 void TestMultiGraph::bracedListsSetOneColumn()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData({3, 1, 2}, {6, 4, 5});
     QCOMPARE(mg->componentCount(), 1);
     QCOMPARE(mg->dataCount(), 3);
     QCOMPARE(mg->dataMainKey(0), 1.0);
     QCOMPARE(mg->componentValueAt(0, 2), 6.0);
 
-    auto handle = mPlot->add<QCPMultiGraph>().setData({1.0, 2.0}, {7.0, 8.0}, true);
+    auto handle = mPlot->add<QCPGraph>().setData({1.0, 2.0}, {7.0, 8.0}, true);
     QCOMPARE(handle->componentValueAt(0, 1), 8.0);
 }
 
 void TestMultiGraph::addDataSinglePointOnAMultiColumnGraphIsAMisuse()
 {
     MisuseScope misuse;
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{0.0, 1.0},
                 std::vector<std::vector<double>>{{10.0, 20.0}, {1.0, 2.0}});
     mg->addData(2.0, 30.0);
@@ -391,7 +391,7 @@ void TestMultiGraph::addDataOnAUserSystemRedrawsWithoutPipeline()
     rect->axis(QCPAxis::atLeft)->setRange(0, 10);
     mPlot->replot();
 
-    auto* mg = new QCPMultiGraph(rect->axis(QCPAxis::atBottom),
+    auto* mg = new QCPGraph(rect->axis(QCPAxis::atBottom),
                                  rect->axis(QCPAxis::atLeft));
     QVERIFY(mg->drawsInDataSpace());
     mg->setData(QVector<double>{0.0, 2.0}, QVector<double>{0.0, 2.0});
@@ -448,7 +448,7 @@ void TestMultiGraph::aSourceStagedInDataSpaceGetsAPipelineJobAfterReturningToCar
     }
     mPlot->replot();
 
-    auto* mg = new QCPMultiGraph(skew->axis(QCPAxis::atBottom),
+    auto* mg = new QCPGraph(skew->axis(QCPAxis::atBottom),
                                  skew->axis(QCPAxis::atLeft));
     QVERIFY(mg->drawsInDataSpace());
     constexpr int n = 120'000;
@@ -502,7 +502,7 @@ void TestMultiGraph::setDataWithAShortValueColumnIsAMisuse()
 {
     // I4 = C1: the N-column forms validate the shape before anything sorts or indexes it.
     MisuseScope misuse;
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{3, 1, 2}, std::vector<std::vector<double>>{{1, 2}});
     QCOMPARE(MisuseScope::count(), std::size_t(1));
     QCOMPARE(mg->dataCount(), 0);
@@ -525,7 +525,7 @@ void TestMultiGraph::setDataWithANonFiniteKeyIsAMisuse()
 {
     // M2: a NaN key would break std::sort's strict weak ordering; it is refused before any sort.
     MisuseScope misuse;
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{2, 1, qQNaN(), 0},
                 std::vector<std::vector<double>>{{1, 2, 3, 4}});
     QCOMPARE(MisuseScope::count(), std::size_t(1));
@@ -547,7 +547,7 @@ void TestMultiGraph::aBusyAppendGoesThroughTheDeferredSwap()
 {
     // M6: an append while a job reads the source clones it; the clone must be staged when the
     // deferred swap is on, not installed over the displayed geometry.
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     constexpr int n = 120'000;
     std::vector<double> keys(n), values(n);
     for (int i = 0; i < n; ++i)
@@ -574,7 +574,7 @@ void TestMultiGraph::aBusyAppendGoesThroughTheDeferredSwap()
     QCOMPARE(mg->componentValueAt(0, n), 1.0);
 }
 
-static QCPMultiGraph* rampGraph(QCustomPlot* plot, int rows, int columns = 1)
+static QCPGraph* rampGraph(QCustomPlot* plot, int rows, int columns = 1)
 {
     const auto rowCount = static_cast<std::size_t>(rows);
     std::vector<double> keys(rowCount, 0.0);
@@ -586,12 +586,12 @@ static QCPMultiGraph* rampGraph(QCustomPlot* plot, int rows, int columns = 1)
         for (int c = 0; c < columns; ++c)
             values[std::size_t(c)][std::size_t(i)] = 10.0 * i + c;
     }
-    auto* graph = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* graph = new QCPGraph(plot->xAxis, plot->yAxis);
     graph->setData(std::move(keys), std::move(values));
     return graph;
 }
 
-static QVector<double> keysOf(const QCPMultiGraph* graph)
+static QVector<double> keysOf(const QCPGraph* graph)
 {
     QVector<double> keys;
     for (int i = 0; i < graph->dataCount(); ++i)
@@ -642,7 +642,7 @@ void TestMultiGraph::removeDataRangeKeepsTheRest()
 void TestMultiGraph::removeOnAViewIsAMisuse()
 {
     MisuseScope misuse;
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> keys = {0.0, 1.0, 2.0};
     std::vector<double> values = {10.0, 20.0, 30.0};
     mg->viewData(std::span<const double>(keys),
@@ -659,7 +659,7 @@ void TestMultiGraph::removeOnAViewIsAMisuse()
     QCOMPARE(MisuseScope::count(), std::size_t(4));
     QCOMPARE(waterfall->dataCount(), 2);
 
-    auto* empty = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* empty = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     empty->removeDataBefore(1.0); // nothing to remove: 2.x did nothing either
     QCOMPARE(MisuseScope::count(), std::size_t(4));
 }
@@ -668,7 +668,7 @@ void TestMultiGraph::aRollingWindowStaysBounded()
 {
     // 2.x's real-time demo: append the new point, drop what fell out of the window.
     constexpr int window = 100;
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     for (int i = 0; i < 1'000; ++i)
     {
         mg->addData(double(i), qSin(i * 0.1));
@@ -683,7 +683,7 @@ void TestMultiGraph::aRollingWindowStaysBounded()
 void TestMultiGraph::aBusyRemoveGoesThroughTheDeferredSwap()
 {
     // A job reads the rows it was started for: the removal edits a copy, staged for the swap.
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     constexpr int n = 120'000;
     std::vector<double> keys(n), values(n);
     for (int i = 0; i < n; ++i)
@@ -748,7 +748,7 @@ void TestMultiGraph::aSwapStagedBeforeASystemSwitchShowsOnTheUserSystem()
     }
     mPlot->replot();
 
-    auto* mg = new QCPMultiGraph(cartesian->axis(QCPAxis::atBottom),
+    auto* mg = new QCPGraph(cartesian->axis(QCPAxis::atBottom),
                                  cartesian->axis(QCPAxis::atLeft));
     constexpr int n = 120'000;
     std::vector<double> firstKeys(n), firstValues(n);
@@ -787,7 +787,7 @@ void TestMultiGraph::theGapThresholdIsSetOnTheInstalledSource()
 {
     // C3: the threshold is part of what the pipeline job reads, so it is set when a source is
     // installed or changed, never by the draw that may run beside the job.
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setGapThreshold(0.0);
     mg->setData(std::vector<double>{0, 1, 2}, std::vector<std::vector<double>>{{1, 2, 3}});
     QVERIFY(mg->dataSource());
@@ -807,7 +807,7 @@ void TestMultiGraph::theGapThresholdIsSetOnTheInstalledSource()
 
 void TestMultiGraph::componentCountMatchesDataSource()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1.0, 2.0},
                 std::vector<std::vector<double>>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}});
     QCOMPARE(mg->componentCount(), 3);
@@ -820,7 +820,7 @@ void TestMultiGraph::componentCountMatchesDataSource()
 
 void TestMultiGraph::componentValueAt()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1.0, 2.0, 3.0},
                 std::vector<std::vector<double>>{{10.0, 20.0, 30.0}, {-1.0, -2.0, -3.0}});
     QCOMPARE(mg->componentValueAt(0, 1), 20.0);
@@ -829,7 +829,7 @@ void TestMultiGraph::componentValueAt()
 
 void TestMultiGraph::dataCountDelegate()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     QCOMPARE(mg->dataCount(), 0);
     mg->setData(std::vector<double>{1.0, 2.0, 3.0},
                 std::vector<std::vector<double>>{{0.0, 0.0, 0.0}});
@@ -838,7 +838,7 @@ void TestMultiGraph::dataCountDelegate()
 
 void TestMultiGraph::dataMainKeyDelegate()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1.0, 2.0, 3.0},
                 std::vector<std::vector<double>>{{0.0, 0.0, 0.0}});
     QCOMPARE(mg->dataMainKey(0), 1.0);
@@ -847,7 +847,7 @@ void TestMultiGraph::dataMainKeyDelegate()
 
 void TestMultiGraph::dataMainValueColumn0()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1.0, 2.0},
                 std::vector<std::vector<double>>{{10.0, 20.0}, {-1.0, -2.0}});
     QCOMPARE(mg->dataMainValue(0), 10.0);
@@ -856,7 +856,7 @@ void TestMultiGraph::dataMainValueColumn0()
 
 void TestMultiGraph::findBeginEndDelegate()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1.0, 2.0, 3.0, 4.0, 5.0},
                 std::vector<std::vector<double>>{{0.0, 0.0, 0.0, 0.0, 0.0}});
     QCOMPARE(mg->findBegin(3.0, false), 2);
@@ -865,7 +865,7 @@ void TestMultiGraph::findBeginEndDelegate()
 
 void TestMultiGraph::keyRangeDelegate()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{-2.0, 1.0, 5.0},
                 std::vector<std::vector<double>>{{0.0, 0.0, 0.0}});
     bool found = false;
@@ -877,7 +877,7 @@ void TestMultiGraph::keyRangeDelegate()
 
 void TestMultiGraph::valueRangeUnion()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1.0, 2.0, 3.0},
                 std::vector<std::vector<double>>{{10.0, 20.0, 30.0}, {-25.0, -15.0, -5.0}});
     bool found = false;
@@ -889,7 +889,7 @@ void TestMultiGraph::valueRangeUnion()
 
 void TestMultiGraph::selectTestFindsClosestComponent()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mPlot->xAxis->setRange(0, 4);
     mPlot->yAxis->setRange(-10, 50);
     mg->setData(std::vector<double>{1.0, 2.0, 3.0},
@@ -906,7 +906,7 @@ void TestMultiGraph::selectTestFindsClosestComponent()
 
 void TestMultiGraph::selectTestReturnsComponentInDetails()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mPlot->xAxis->setRange(0, 4);
     mPlot->yAxis->setRange(0, 35);
     mg->setData(std::vector<double>{1.0, 2.0, 3.0},
@@ -925,7 +925,7 @@ void TestMultiGraph::selectTestReturnsComponentInDetails()
 
 void TestMultiGraph::selectTestRectDoesNotMutateState()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setSelectable(QCP::stDataRange);
     mPlot->xAxis->setRange(0, 4);
     mPlot->yAxis->setRange(0, 35);
@@ -946,7 +946,7 @@ void TestMultiGraph::selectTestRectDoesNotMutateState()
 
 void TestMultiGraph::selectTestRectPerComponent()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setSelectable(QCP::stDataRange);
     mPlot->xAxis->setRange(0, 4);
     mPlot->yAxis->setRange(0, 35);
@@ -970,7 +970,7 @@ void TestMultiGraph::selectTestRectPerComponent()
 
 void TestMultiGraph::selectEventRectSelection()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setSelectable(QCP::stDataRange);
     mPlot->xAxis->setRange(0, 4);
     mPlot->yAxis->setRange(-5, 35);
@@ -995,7 +995,7 @@ void TestMultiGraph::selectEventRectSelection()
 
 void TestMultiGraph::selectEventSingleComponent()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setSelectable(QCP::stDataRange);
     mg->setData(std::vector<double>{1.0, 2.0, 3.0},
                 std::vector<std::vector<double>>{{10.0, 20.0, 30.0}, {-1.0, -2.0, -3.0}});
@@ -1014,7 +1014,7 @@ void TestMultiGraph::selectEventSingleComponent()
 
 void TestMultiGraph::selectEventAdditive()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setSelectable(QCP::stDataRange);
     mg->setData(std::vector<double>{1.0, 2.0, 3.0},
                 std::vector<std::vector<double>>{{10.0, 20.0, 30.0}, {-1.0, -2.0, -3.0}});
@@ -1036,7 +1036,7 @@ void TestMultiGraph::selectEventAdditive()
 
 void TestMultiGraph::deselectEventClearsAll()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setSelectable(QCP::stDataRange);
     mg->setData(std::vector<double>{1.0, 2.0, 3.0},
                 std::vector<std::vector<double>>{{10.0, 20.0, 30.0}, {-1.0, -2.0, -3.0}});
@@ -1055,7 +1055,7 @@ void TestMultiGraph::deselectEventClearsAll()
 
 void TestMultiGraph::componentSelectionUpdatesBase()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1.0, 2.0, 3.0},
                 std::vector<std::vector<double>>{{10.0, 20.0, 30.0}});
     QVERIFY(!mg->selected());
@@ -1067,7 +1067,7 @@ void TestMultiGraph::componentSelectionUpdatesBase()
 
 void TestMultiGraph::addToLegendCreatesGroupItem()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1.0, 2.0},
                 std::vector<std::vector<double>>{{10.0, 20.0}, {-1.0, -2.0}});
     mg->setName("B field");
@@ -1081,8 +1081,8 @@ void TestMultiGraph::addToLegendCreatesGroupItem()
 void TestMultiGraph::legendHeaderDoesNotLeakClassNameWhenEmpty()
 {
     // A multigraph with no data (0 components) and no name must not surface its
-    // C++ class name ("QCPMultiGraph") to the user in the legend.
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    // C++ class name ("QCPGraph") to the user in the legend.
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     QCOMPARE(mg->componentCount(), 0);
     mg->addToLegend();
     auto* item = qobject_cast<QCPGroupLegendItem*>(mPlot->legend->item(0));
@@ -1096,7 +1096,7 @@ void TestMultiGraph::legendHeaderShowsNameWhileEmpty()
 {
     // A named multigraph that has not received data yet keeps showing its name
     // (the loading cue), never the class name.
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setName("b_gse");
     QCOMPARE(mg->componentCount(), 0);
     mg->addToLegend();
@@ -1108,7 +1108,7 @@ void TestMultiGraph::legendHeaderShowsNameWhileEmpty()
 void TestMultiGraph::aOneComponentGraphRowShowsTheGraphName()
 {
     // 2.x showed the plottable's name; the default component name is not a name the user gave.
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     graph->setData(QVector<double> { 1, 2 }, QVector<double> { 3, 4 });
     graph->addToLegend();
     auto* row = qobject_cast<QCPGroupLegendItem*>(mPlot->legend->item(0));
@@ -1118,12 +1118,12 @@ void TestMultiGraph::aOneComponentGraphRowShowsTheGraphName()
     QCOMPARE(row->headerName(), QStringLiteral("density"));
 }
 
-static QCPGroupLegendItem* groupItemOf(QCustomPlot* plot, QCPMultiGraph* mg);
+static QCPGroupLegendItem* groupItemOf(QCustomPlot* plot, QCPGraph* mg);
 
 // 2.x drew an empty graph's row with its pen line and its name, before any data arrived.
 void TestMultiGraph::anEmptyGraphRowDrawsThePenLine()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setName("loading");
     mg->setPen(QPen(Qt::blue, 4));
     mg->addToLegend(mPlot->legend);
@@ -1142,7 +1142,7 @@ void TestMultiGraph::anEmptyGraphRowDrawsThePenLine()
 
 void TestMultiGraph::anExplicitComponentNameWins()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     graph->setData(QVector<double> { 1, 2 }, QVector<double> { 3, 4 });
     graph->setName("density");
     graph->setComponentNames({ "n_e" });
@@ -1166,7 +1166,7 @@ void TestMultiGraph::legendCollapsedFitsExpanderMarker()
     // The collapsed row is drawn as "<marker> <name>", so the size hint must
     // reserve room for the marker too. It didn't, and QCPGroupLegendItem::draw
     // clips (it does not elide): a group named "H_hi" rendered as "▸ H_".
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double> { 1.0, 2.0 },
                 std::vector<std::vector<double>> { { 10.0, 20.0 }, { 1.0, 2.0 } });
     mg->setName("H_hi");
@@ -1189,7 +1189,7 @@ void TestMultiGraph::legendCollapsedFitsBusyIndicator()
     // Same row also carries the busy symbol while fetching, which is the only
     // activity cue a graph has before its first data arrives — it must not be
     // pushed out of the drawn text rect by the marker.
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setName("b_gse");
     mg->setBusyShowDelayMs(10);
     mg->addToLegend();
@@ -1211,7 +1211,7 @@ void TestMultiGraph::legendCollapsedFitsBusyIndicator()
 
 void TestMultiGraph::removeFromLegendWorks()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1.0, 2.0},
                 std::vector<std::vector<double>>{{10.0, 20.0}});
     mg->addToLegend();
@@ -1224,7 +1224,7 @@ void TestMultiGraph::removeFromLegendWorks()
 // with the same name.
 void TestMultiGraph::legendOneComponentHasNoExpander()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1.0, 2.0}, std::vector<std::vector<double>>{{10.0, 20.0}});
     mg->setName("B");
     mg->addToLegend();
@@ -1239,9 +1239,9 @@ void TestMultiGraph::legendOneComponentHasNoExpander()
 // The legend icon of a scatter component (no line) used to be a line.
 void TestMultiGraph::legendIconDrawsScatterMarkers()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1.0, 2.0}, std::vector<std::vector<double>>{{10.0, 20.0}});
-    mg->setComponentLineStyle(0, QCPMultiGraph::lsNone);
+    mg->setComponentLineStyle(0, QCPGraph::lsNone);
     mg->component(0).scatterStyle = QCPScatterStyle(QCPScatterStyle::ssDisc, Qt::black, Qt::black, 6);
     QImage icon(40, 20, QImage::Format_ARGB32);
     icon.fill(Qt::white);
@@ -1255,7 +1255,7 @@ void TestMultiGraph::legendIconDrawsScatterMarkers()
 
 void TestMultiGraph::legendExpandCollapse()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1.0, 2.0},
                 std::vector<std::vector<double>>{{10.0, 20.0}, {-1.0, -2.0}});
     mg->addToLegend();
@@ -1273,7 +1273,7 @@ void TestMultiGraph::legendExpandCollapse()
 
 void TestMultiGraph::legendGroupSelectsAll()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setSelectable(QCP::stDataRange);
     mg->setData(std::vector<double>{1.0, 2.0, 3.0},
                 std::vector<std::vector<double>>{{10.0, 20.0, 30.0}, {-1.0, -2.0, -3.0}});
@@ -1288,7 +1288,7 @@ void TestMultiGraph::cacheExtendsBeyondVisibleRange()
     // Reproducer: fast panning cropped curves because the lines only covered the exact visible
     // range. The recording covers a window wider than the view, so a pan inside that margin is
     // served by a translation and both edges stay covered.
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> keys(21);
     std::vector<double> vals(21, 100.0);
     for (int i = 0; i <= 20; ++i)
@@ -1316,7 +1316,7 @@ void TestMultiGraph::cacheExtendsBeyondVisibleRange()
 
 void TestMultiGraph::renderVerticalKeyAxisUsesHeight()
 {
-    auto* mg = new QCPMultiGraph(mPlot->yAxis, mPlot->xAxis);
+    auto* mg = new QCPGraph(mPlot->yAxis, mPlot->xAxis);
     mg->setData(std::vector<double>{1, 2, 3, 4, 5},
                 std::vector<std::vector<double>>{{10, 20, 30, 40, 50}, {15, 25, 35, 45, 55}});
     mPlot->yAxis->setRange(0, 6);
@@ -1327,7 +1327,7 @@ void TestMultiGraph::renderVerticalKeyAxisUsesHeight()
 
 void TestMultiGraph::renderBasicDoesNotCrash()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1.0, 2.0, 3.0},
                 std::vector<std::vector<double>>{{10.0, 20.0, 30.0}, {-1.0, -2.0, -3.0}});
     mPlot->xAxis->setRange(0, 4);
@@ -1337,7 +1337,7 @@ void TestMultiGraph::renderBasicDoesNotCrash()
 
 void TestMultiGraph::renderWithSelection()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1.0, 2.0, 3.0},
                 std::vector<std::vector<double>>{{10.0, 20.0, 30.0}});
     mg->setComponentSelection(0, QCPDataSelection(QCPDataRange(0, 2)));
@@ -1348,7 +1348,7 @@ void TestMultiGraph::renderWithSelection()
 
 void TestMultiGraph::renderHiddenComponent()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1.0, 2.0, 3.0},
                 std::vector<std::vector<double>>{{10.0, 20.0, 30.0}, {-1.0, -2.0, -3.0}});
     mg->component(1).visible = false;
@@ -1359,22 +1359,22 @@ void TestMultiGraph::renderHiddenComponent()
 
 void TestMultiGraph::renderEmptySource()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     Q_UNUSED(mg);
     mPlot->replot(); // No data source — should not crash
 }
 
 void TestMultiGraph::renderAllLineStyles()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1.0, 2.0, 3.0, 4.0, 5.0},
                 std::vector<std::vector<double>>{{10.0, 20.0, 15.0, 25.0, 30.0}});
     mPlot->xAxis->setRange(0, 6);
     mPlot->yAxis->setRange(0, 35);
 
-    for (auto style : {QCPMultiGraph::lsNone, QCPMultiGraph::lsLine,
-                       QCPMultiGraph::lsStepLeft, QCPMultiGraph::lsStepRight,
-                       QCPMultiGraph::lsStepCenter, QCPMultiGraph::lsImpulse}) {
+    for (auto style : {QCPGraph::lsNone, QCPGraph::lsLine,
+                       QCPGraph::lsStepLeft, QCPGraph::lsStepRight,
+                       QCPGraph::lsStepCenter, QCPGraph::lsImpulse}) {
         mg->setLineStyle(style);
         mPlot->replot(); // Should not crash
     }
@@ -1390,9 +1390,9 @@ void TestMultiGraph::renderAllLineStyles()
 // range, the graph stays at the old one until something else dirties it.
 // The drag path never showed it because QCPAxisRect::mouseMoveEvent calls
 // markAffectedLayersDirty() explicitly.
-static QCPMultiGraph* renderedMultiGraph(QCustomPlot* plot)
+static QCPGraph* renderedMultiGraph(QCustomPlot* plot)
 {
-    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
     std::vector<double> keys(21), vals(21);
     for (int i = 0; i <= 20; ++i) { keys[i] = i; vals[i] = i * 10.0; }
     mg->setData(std::move(keys), std::vector<std::vector<double>>{std::move(vals)});
@@ -1455,7 +1455,7 @@ void TestMultiGraph::componentVisibilityToggleForcesLayerRepaint()
     // A component is shown or hidden through setComponentVisible(): the
     // layer must repaint (not translate its old GPU entries after a pan), or a
     // shown component stays missing until something else forces a repaint.
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> keys(1000);
     std::vector<std::vector<double>> columns(3, std::vector<double>(1000));
     for (int i = 0; i < 1000; ++i)
@@ -1498,7 +1498,7 @@ void TestMultiGraph::zoomedOutLinesAreThinnedToThePixelWidth()
     // ~2 points per pixel before the line is recorded; drawing every L2
     // point made a full replot about twice as slow.
     QFETCH(int, columns);
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     const int n = 500'000;
     std::vector<double> keys(n);
     std::vector<std::vector<double>> values(columns, std::vector<double>(n));
@@ -1527,7 +1527,7 @@ void TestMultiGraph::componentShownAfterARebuildIsDrawnAgain()
 {
     // A rebuild of the lines while a component is hidden drops them. Showing it again must
     // record them: the drawn state is otherwise "clean" and the component stays empty.
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> keys(1000);
     std::vector<std::vector<double>> columns(3, std::vector<double>(1000));
     for (int i = 0; i < 1000; ++i)
@@ -1557,9 +1557,9 @@ void TestMultiGraph::componentShownAfterARebuildIsDrawnAgain()
 }
 
 namespace {
-QCPMultiGraph* redAndBlueHorizontalLines(QCustomPlot* plot)
+QCPGraph* redAndBlueHorizontalLines(QCustomPlot* plot)
 {
-    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
     mg->setData(std::vector<double>{0, 1, 2, 3, 4},
                 std::vector<std::vector<double>>{{1, 1, 1, 1, 1}, {2, 2, 2, 2, 2}});
     mg->setComponentPens({QPen(Qt::red, 5), QPen(Qt::blue, 5)});
@@ -1583,10 +1583,10 @@ void TestMultiGraph::componentLineStyleOnlyChangesThatComponent()
 {
     auto* mg = redAndBlueHorizontalLines(mPlot);
     mPlot->replot();
-    mg->setComponentLineStyle(0, QCPMultiGraph::lsNone);
+    mg->setComponentLineStyle(0, QCPGraph::lsNone);
 
-    QCOMPARE(mg->component(0).lineStyle, QCPMultiGraph::lsNone);
-    QCOMPARE(mg->component(1).lineStyle, QCPMultiGraph::lsLine);
+    QCOMPARE(mg->component(0).lineStyle, QCPGraph::lsNone);
+    QCOMPARE(mg->component(1).lineStyle, QCPGraph::lsLine);
     const QImage image = mPlot->toPixmap(400, 300).toImage();
     const QColor hidden = pixelOnLine(image, mPlot, 1);
     const QColor shown = pixelOnLine(image, mPlot, 2);
@@ -1606,7 +1606,7 @@ void TestMultiGraph::componentLineStyleChangeIsDrawnOnTheGpu()
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
     QVERIFY(isRed(pixelOnLine(mPlot->grabFramebuffer(), mPlot, 1)));
 
-    mg->setComponentLineStyle(0, QCPMultiGraph::lsNone);
+    mg->setComponentLineStyle(0, QCPGraph::lsNone);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
     const QImage frame = mPlot->grabFramebuffer();
@@ -1619,20 +1619,20 @@ void TestMultiGraph::componentLineStyleChangeIsDrawnOnTheGpu()
 void TestMultiGraph::setLineStyleAppliesToEveryComponent()
 {
     auto* mg = redAndBlueHorizontalLines(mPlot);
-    mg->setComponentLineStyle(0, QCPMultiGraph::lsNone);
-    mg->setLineStyle(QCPMultiGraph::lsStepLeft);
-    QCOMPARE(mg->lineStyle(), QCPMultiGraph::lsStepLeft);
-    QCOMPARE(mg->component(0).lineStyle, QCPMultiGraph::lsStepLeft);
-    QCOMPARE(mg->component(1).lineStyle, QCPMultiGraph::lsStepLeft);
+    mg->setComponentLineStyle(0, QCPGraph::lsNone);
+    mg->setLineStyle(QCPGraph::lsStepLeft);
+    QCOMPARE(mg->lineStyle(), QCPGraph::lsStepLeft);
+    QCOMPARE(mg->component(0).lineStyle, QCPGraph::lsStepLeft);
+    QCOMPARE(mg->component(1).lineStyle, QCPGraph::lsStepLeft);
 }
 
 void TestMultiGraph::newComponentsTakeTheGraphLineStyle()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    mg->setLineStyle(QCPMultiGraph::lsNone);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setLineStyle(QCPGraph::lsNone);
     mg->setData(std::vector<double>{0, 1}, std::vector<std::vector<double>>{{1, 1}, {2, 2}});
-    QCOMPARE(mg->component(0).lineStyle, QCPMultiGraph::lsNone);
-    QCOMPARE(mg->component(1).lineStyle, QCPMultiGraph::lsNone);
+    QCOMPARE(mg->component(0).lineStyle, QCPGraph::lsNone);
+    QCOMPARE(mg->component(1).lineStyle, QCPGraph::lsNone);
 }
 
 namespace {
@@ -1699,10 +1699,10 @@ void TestMultiGraph::selectedStepLineKeepsItsSteps()
 {
     if (!showWithRhi(mPlot))
         QSKIP("no QRhi available in this environment");
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{0, 4}, std::vector<std::vector<double>>{{0, 2}});
     mg->setComponentPens({QPen(Qt::red, 5)});
-    mg->setLineStyle(QCPMultiGraph::lsStepLeft);
+    mg->setLineStyle(QCPGraph::lsStepLeft);
     mPlot->xAxis->setRange(-1, 5);
     mPlot->yAxis->setRange(-1, 3);
     mPlot->replot(QCustomPlot::rpImmediateRefresh);
@@ -1726,7 +1726,7 @@ void TestMultiGraph::committedDataIsDrawnOnScreen()
 {
     if (!showWithRhi(mPlot))
         QSKIP("no QRhi available in this environment");
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setDeferredDataSwap(true);
     mg->setData(std::vector<double>{0, 4}, std::vector<std::vector<double>>{{1, 1}});
     mg->setComponentPens({QPen(Qt::red, 5)});
@@ -1744,9 +1744,9 @@ void TestMultiGraph::committedDataIsDrawnOnScreen()
 
 namespace {
 //! Dense enough that the view is drawn from a resampled (L2) source covering only the view.
-QCPMultiGraph* denseGraphDrawn(QCustomPlot* plot)
+QCPGraph* denseGraphDrawn(QCustomPlot* plot)
 {
-    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
     const int n = 400'000;
     std::vector<double> keys(n), values(n);
     for (int i = 0; i < n; ++i)
@@ -1770,7 +1770,7 @@ QCPMultiGraph* denseGraphDrawn(QCustomPlot* plot)
 // or the line keeps its old pen.
 void TestMultiGraph::clickSelectionRedrawsTheComponent()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double> { 0, 1, 2, 3 }, std::vector<std::vector<double>> { { 0, 1, 0, 1 } });
     mg->setSelectable(QCP::stDataRange);
     mPlot->xAxis->setRange(0, 3);
@@ -1801,7 +1801,7 @@ void TestMultiGraph::adaptiveSamplingOffRecordsEveryRow()
         keys[i] = i;
         values[i] = std::sin(i * 0.37);
     }
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::move(keys), std::vector<std::vector<double>> { std::move(values) });
     mg->setAdaptiveSampling(false);
     mPlot->xAxis->setRange(0, n - 1);
@@ -1814,9 +1814,9 @@ void TestMultiGraph::adaptiveSamplingOffRecordsEveryRow()
 // value-axis change must re-record, or the impulses float above the new bottom.
 void TestMultiGraph::logValueImpulsesFollowTheValueRange()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double> { 0, 1, 2 }, std::vector<std::vector<double>> { { 10, 100, 10 } });
-    mg->setLineStyle(QCPMultiGraph::lsImpulse);
+    mg->setLineStyle(QCPGraph::lsImpulse);
     mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
     mPlot->xAxis->setRange(-0.5, 2.5);
     mPlot->yAxis->setRange(1, 1000);
@@ -1832,9 +1832,9 @@ void TestMultiGraph::logValueImpulsesFollowTheValueRange()
 // geometric mean of the keys, not their average.
 void TestMultiGraph::logKeyCentreStepSitsHalfwayOnScreen()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double> { 1, 10, 100 }, std::vector<std::vector<double>> { { 0, 1, 0 } });
-    mg->setLineStyle(QCPMultiGraph::lsStepCenter);
+    mg->setLineStyle(QCPGraph::lsStepCenter);
     mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
     mPlot->xAxis->setRange(1, 100);
     mPlot->yAxis->setRange(-1, 2);
@@ -1851,9 +1851,9 @@ void TestMultiGraph::logKeyCentreStepSitsHalfwayOnScreen()
 // The fill under a centre step steps where the line does.
 void TestMultiGraph::logKeyCentreStepFillSitsHalfwayOnScreen()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double> { 1, 10, 100 }, std::vector<std::vector<double>> { { 1, 2, 1 } });
-    mg->setLineStyle(QCPMultiGraph::lsStepCenter);
+    mg->setLineStyle(QCPGraph::lsStepCenter);
     mg->setComponentFill(0, 0.0, QBrush(Qt::red));
     mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
     mPlot->xAxis->setRange(1, 100);
@@ -1941,16 +1941,16 @@ void TestMultiGraph::panIsRedrawnFreshWhileAnotherLayerIsDirty()
                               "the panned view was never drawn fresh", 2000);
 }
 
-static QCPMultiGraph* threeColumnGraph(QCustomPlot* plot)
+static QCPGraph* threeColumnGraph(QCustomPlot* plot)
 {
-    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
     mg->setData(std::vector<double>{1.0, 2.0, 3.0},
                 std::vector<std::vector<double>>{{1, 2, 3}, {0, 1, 2}, {2, 3, 4}});
     mg->setComponentNames({"y", "low", "high"});
     return mg;
 }
 
-static QCPGroupLegendItem* groupItemOf(QCustomPlot* plot, QCPMultiGraph* mg)
+static QCPGroupLegendItem* groupItemOf(QCustomPlot* plot, QCPGraph* mg)
 {
     for (int i = 0; i < plot->legend->itemCount(); ++i)
         if (auto* gi = qobject_cast<QCPGroupLegendItem*>(plot->legend->item(i)))
@@ -2037,7 +2037,7 @@ void TestMultiGraph::fillRejectsBadColumns()
 
 void TestMultiGraph::fillBeforeDataIsKept()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     QVERIFY(mg->setComponentFillBetween(1, 2));
     mg->setData(std::vector<double>{1, 2, 3},
                 std::vector<std::vector<double>>{{1, 2, 3}, {0, 1, 2}, {2, 3, 4}});
@@ -2078,7 +2078,7 @@ void TestMultiGraph::fillReplacesAndClears()
 void TestMultiGraph::fillValidatesAgainstTheStagedSource()
 {
     using Source = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
-    const auto stage = [](QCPMultiGraph* g, int columns) {
+    const auto stage = [](QCPGraph* g, int columns) {
         g->stagePendingSource(std::make_shared<Source>(
             std::vector<double>{1, 2}, std::vector<std::vector<double>>(columns, {1, 2})));
     };
@@ -2120,7 +2120,7 @@ static bool blueNear(const QImage& img, QPoint p)
 
 // Export renders (toPixmap) never stage a source; a live replot does, and the plot swaps the
 // staged source in on its debounce timer, never on replot().
-static bool commitEmptyWindow(QCustomPlot* plot, QCPMultiGraph* mg)
+static bool commitEmptyWindow(QCustomPlot* plot, QCPGraph* mg)
 {
     plot->replot(QCustomPlot::rpImmediateRefresh);
     // The replacement is only staged with the deferred swap on; a live replot
@@ -2138,7 +2138,7 @@ static bool commitEmptyWindow(QCustomPlot* plot, QCPMultiGraph* mg)
 
 void TestMultiGraph::fillToZeroColoursBelowTheCurveOnly()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> x(200), y(200);
     for (int i = 0; i < 200; ++i) { x[i] = i; y[i] = 5.0; }
     mg->setData(std::move(x), std::vector<std::vector<double>>{std::move(y)});
@@ -2157,8 +2157,8 @@ void TestMultiGraph::fillToZeroColoursBelowTheCurveOnly()
 void TestMultiGraph::hiddenEdgeLinesKeepTheirFill()
 {
     auto* mg = threeColumnGraph(mPlot);
-    mg->setComponentLineStyle(1, QCPMultiGraph::lsNone);
-    mg->setComponentLineStyle(2, QCPMultiGraph::lsNone);
+    mg->setComponentLineStyle(1, QCPGraph::lsNone);
+    mg->setComponentLineStyle(2, QCPGraph::lsNone);
     mg->setComponentFillBetween(1, 2, QBrush(Qt::red));
     mPlot->xAxis->setRange(1, 3);
     mPlot->yAxis->setRange(-1, 5);
@@ -2184,7 +2184,7 @@ void TestMultiGraph::hidingAnEdgeRemovesTheFillAndShowingBringsItBack()
 
 void TestMultiGraph::fillBreaksAtAKeyGap()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{0, 1, 2, 3, 20, 21, 22, 23},
                 std::vector<std::vector<double>>{{5, 5, 5, 5, 5, 5, 5, 5}});
     mg->setComponentFill(0, 0.0, QBrush(Qt::red));
@@ -2200,7 +2200,7 @@ void TestMultiGraph::fillBreaksAtAKeyGap()
 // The rows far left of the view keep the drawn window from starting at row 0.
 void TestMultiGraph::fillBreaksAtAKeyGapPastTheFirstRow()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{-100, -99, -98, -97, 0, 1, 2, 3, 20, 21, 22, 23},
                 std::vector<std::vector<double>>{std::vector<double>(12, 5.0)});
     mg->setComponentFill(0, 0.0, QBrush(Qt::red));
@@ -2217,7 +2217,7 @@ void TestMultiGraph::fillBreaksAtAKeyGapPastTheFirstRow()
 
 void TestMultiGraph::fillOnALogAxisClampsAZeroBaseline()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1, 2, 3}, std::vector<std::vector<double>>{{10, 10, 10}});
     mg->setComponentFill(0, 0.0, QBrush(Qt::red));
     mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
@@ -2229,9 +2229,9 @@ void TestMultiGraph::fillOnALogAxisClampsAZeroBaseline()
     QVERIFY(!isRedish(img.pixelColor(r.center().x(), int(mPlot->yAxis->coordToPixel(50)))));
 }
 
-static QCPMultiGraph* bandDownToZeroOnALogAxis(QCustomPlot* plot)
+static QCPGraph* bandDownToZeroOnALogAxis(QCustomPlot* plot)
 {
-    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
     const double nan = std::numeric_limits<double>::quiet_NaN();
     mg->setData(std::vector<double>{1, 2, 3, 4},
                 std::vector<std::vector<double>>{{0, 0, nan, 0}, {10, 10, 10, 10}});
@@ -2340,14 +2340,14 @@ void TestMultiGraph::defaultFillFollowsTheOwnerColourOnTheGpu()
 void TestMultiGraph::autoScaleIncludesHiddenLineBandEdges()
 {
     auto* mg = threeColumnGraph(mPlot);
-    mg->setComponentLineStyle(2, QCPMultiGraph::lsNone);
+    mg->setComponentLineStyle(2, QCPGraph::lsNone);
     bool found = false;
     QCOMPARE(mg->getValueRange(found).upper, 4.0);
 }
 
 void TestMultiGraph::fillFollowsADownsampledLine()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     const int n = 500'000;
     const double period = n / 5.0;
     std::vector<double> keys(n), values(n);
@@ -2372,10 +2372,10 @@ void TestMultiGraph::fillFollowsADownsampledLine()
 
 void TestMultiGraph::legendIconOfABandIsAFilledSwatch()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1, 2}, std::vector<std::vector<double>>{{0, 0}, {1, 1}});
-    mg->setComponentLineStyle(0, QCPMultiGraph::lsNone);
-    mg->setComponentLineStyle(1, QCPMultiGraph::lsNone);
+    mg->setComponentLineStyle(0, QCPGraph::lsNone);
+    mg->setComponentLineStyle(1, QCPGraph::lsNone);
     mg->setComponentInLegend(1, false);
     mg->setComponentFillBetween(0, 1, QBrush(Qt::red));
     QImage img(40, 20, QImage::Format_ARGB32);
@@ -2389,7 +2389,7 @@ void TestMultiGraph::legendIconOfABandIsAFilledSwatch()
 
 void TestMultiGraph::legendIconDrawsTheLineOverTheSwatch()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1, 2}, std::vector<std::vector<double>>{{1, 1}});
     mg->setComponentPens({QPen(Qt::blue, 3)});
     mg->setComponentFill(0, 0.0, QBrush(Qt::red));
@@ -2405,10 +2405,10 @@ void TestMultiGraph::legendIconDrawsTheLineOverTheSwatch()
 
 void TestMultiGraph::collapsedLegendRowShowsTheBandSwatch()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1, 2}, std::vector<std::vector<double>>{{0, 0}, {1, 1}});
-    mg->setComponentLineStyle(0, QCPMultiGraph::lsNone);
-    mg->setComponentLineStyle(1, QCPMultiGraph::lsNone);
+    mg->setComponentLineStyle(0, QCPGraph::lsNone);
+    mg->setComponentLineStyle(1, QCPGraph::lsNone);
     mg->setComponentInLegend(1, false);
     mg->setComponentFillBetween(0, 1, QBrush(Qt::red));
     mg->addToLegend(mPlot->legend);
@@ -2424,16 +2424,16 @@ void TestMultiGraph::collapsedLegendRowShowsTheBandSwatch()
     QVERIFY2(isRedish(swatch), qPrintable(swatch.name()));
 }
 
-static QCPMultiGraph* errorBarGraph(QCustomPlot* plot, int n, double spacing)
+static QCPGraph* errorBarGraph(QCustomPlot* plot, int n, double spacing)
 {
     std::vector<double> x(n), y(n), lo(n), hi(n);
     for (int i = 0; i < n; ++i) { x[i] = i * spacing; y[i] = 5; lo[i] = 3; hi[i] = 7; }
-    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
     mg->setData(std::move(x), std::vector<std::vector<double>>{std::move(y), std::move(lo), std::move(hi)});
     mg->setComponentColors({Qt::red, Qt::red, Qt::red});
-    mg->setComponentLineStyle(0, QCPMultiGraph::lsNone);
-    mg->setComponentLineStyle(1, QCPMultiGraph::lsNone);
-    mg->setComponentLineStyle(2, QCPMultiGraph::lsNone);
+    mg->setComponentLineStyle(0, QCPGraph::lsNone);
+    mg->setComponentLineStyle(1, QCPGraph::lsNone);
+    mg->setComponentLineStyle(2, QCPGraph::lsNone);
     mg->setComponentErrorBars(0, 1, 2);
     return mg;
 }
@@ -2455,13 +2455,13 @@ void TestMultiGraph::sparseErrorBarsAreDrawnAsBars()
 void TestMultiGraph::verticalKeyErrorBarsRunAlongTheValue()
 {
     std::vector<double> keys { 0, 1, 2, 3, 4 };
-    auto* mg = new QCPMultiGraph(mPlot->yAxis, mPlot->xAxis);
+    auto* mg = new QCPGraph(mPlot->yAxis, mPlot->xAxis);
     mg->setData(std::move(keys), std::vector<std::vector<double>> { std::vector<double>(5, 5),
                                                                     std::vector<double>(5, 3),
                                                                     std::vector<double>(5, 7) });
     mg->setComponentColors({ Qt::red, Qt::red, Qt::red });
     for (int c = 0; c < 3; ++c)
-        mg->setComponentLineStyle(c, QCPMultiGraph::lsNone);
+        mg->setComponentLineStyle(c, QCPGraph::lsNone);
     mg->setComponentErrorBars(0, 1, 2);
     mPlot->yAxis->setRange(-0.5, 4.5);
     mPlot->xAxis->setRange(0, 10);
@@ -2622,7 +2622,7 @@ void TestMultiGraph::anEmptySourceKeepsTheComponents()
 {
     auto* mg = threeColumnGraph(mPlot);
     mg->setComponentColors({Qt::red, Qt::green, Qt::blue});
-    mg->setComponentLineStyle(1, QCPMultiGraph::lsNone);
+    mg->setComponentLineStyle(1, QCPGraph::lsNone);
     mg->setComponentFillBetween(1, 2, QBrush(Qt::red));
     mPlot->xAxis->setRange(1, 3);
     mPlot->yAxis->setRange(-1, 5);
@@ -2633,7 +2633,7 @@ void TestMultiGraph::anEmptySourceKeepsTheComponents()
     QCOMPARE(mg->componentCount(), 3);
     QCOMPARE(mg->component(0).name, QStringLiteral("y"));
     QCOMPARE(mg->component(2).pen.color(), QColor(Qt::blue));
-    QCOMPARE(mg->component(1).lineStyle, QCPMultiGraph::lsNone);
+    QCOMPARE(mg->component(1).lineStyle, QCPGraph::lsNone);
     QVERIFY(!isRedish(renderOf(mPlot).pixelColor(inBand)));
     mg->setData(std::vector<double>{1, 2, 3},
                 std::vector<std::vector<double>>{{1, 2, 3}, {0, 1, 2}, {2, 3, 4}});
@@ -2664,7 +2664,7 @@ void TestMultiGraph::aStagedEmptyWiderSourceDoesNotGrowTheComponents()
 
 void TestMultiGraph::aFirstEmptySourceAcceptsItsColumns()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{}, std::vector<std::vector<double>>(5));
     QCOMPARE(mg->componentCount(), 0);
     QVERIFY(mg->setComponentFill(4, 0.0));
@@ -2674,7 +2674,7 @@ void TestMultiGraph::aFirstEmptySourceAcceptsItsColumns()
 // A decoration set during an empty window must not wake on a later, unrelated wider source.
 void TestMultiGraph::aNarrowerSourceDropsDecorationsSetDuringAnEmptyWindow()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{}, std::vector<std::vector<double>>(5));
     QVERIFY(mg->setComponentFill(4, 0.0));
     QVERIFY(mg->setComponentErrorBars(0, 3, 4));
@@ -2753,7 +2753,7 @@ void TestMultiGraph::legendIconOfErrorBarsHasABarGlyph()
 {
     auto* mg = threeColumnGraph(mPlot);
     mg->setComponentColors({Qt::red, Qt::red, Qt::red});
-    mg->setComponentLineStyle(0, QCPMultiGraph::lsNone);
+    mg->setComponentLineStyle(0, QCPGraph::lsNone);
     mg->setComponentErrorBars(0, 1, 2);
     QImage img(40, 20, QImage::Format_ARGB32);
     img.fill(Qt::white);
@@ -2766,7 +2766,7 @@ void TestMultiGraph::legendIconOfErrorBarsHasABarGlyph()
 
 void TestMultiGraph::errorBoundsSetBeforeDataStayOutOfTheLegend()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     QVERIFY(mg->setComponentErrorBars(0, 1, 2));
     mg->setData(std::vector<double>{1, 2}, std::vector<std::vector<double>>{{1, 1}, {0, 0}, {2, 2}});
     QCOMPARE(mg->legendComponents(), (QVector<int>{0}));
@@ -2789,9 +2789,9 @@ void TestMultiGraph::aNullSourceClearsTheComponents()
 
 // --- A decoration change repaints the layer: a pan would otherwise translate the old pixels ---
 
-static QCPMultiGraph* settledThreeColumnGraph(QCustomPlot* plot)
+static QCPGraph* settledThreeColumnGraph(QCustomPlot* plot)
 {
-    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
     std::vector<double> keys(1000);
     std::vector<std::vector<double>> columns(3, std::vector<double>(1000));
     for (int i = 0; i < 1000; ++i)
@@ -2866,7 +2866,7 @@ void TestMultiGraph::clearingErrorBarsRepaintsTheLayer()
 
 void TestMultiGraph::errorBarsOfDifferentColumnsCoexist()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1, 2}, std::vector<std::vector<double>>(6, {1, 2}));
     QVERIFY(mg->setComponentErrorBars(0, 1, 2));
     QVERIFY(mg->setComponentErrorBars(3, 4, 5));
@@ -2905,7 +2905,7 @@ void TestMultiGraph::aBoundTheUserHidFromTheLegendStaysHidden()
 
 void TestMultiGraph::replacedErrorBoundsComeBackToTheLegend()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1.0, 2.0},
                 std::vector<std::vector<double>>{{1, 2}, {0, 1}, {2, 3}, {3, 4}});
     QVERIFY(mg->setComponentErrorBars(0, 1, 2, 6));
@@ -2923,7 +2923,7 @@ void TestMultiGraph::errorBoundsOfBarsDroppedByANarrowerSourceComeBackToTheLegen
 
 void TestMultiGraph::aFillWithoutItsComponentYetIsGray()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{}, std::vector<std::vector<double>>(5));
     QVERIFY(mg->setComponentFill(0, 0.0));
     const QColor fill = mg->effectiveFillBrush(*mg->componentFill(0)).color();
@@ -2937,7 +2937,7 @@ void TestMultiGraph::aRebuiltGpuFillIsNotDrawnTwice()
         QSKIP("no exposed window with a QRhi in this environment");
     auto* mg = threeColumnGraph(mPlot);
     for (int c = 0; c < 3; ++c)
-        mg->setComponentLineStyle(c, QCPMultiGraph::lsNone);
+        mg->setComponentLineStyle(c, QCPGraph::lsNone);
     const QBrush red(QColor(255, 0, 0, 64));
     mg->setComponentFillBetween(1, 2, red);
     mPlot->xAxis->setRange(1, 3);
@@ -2953,7 +2953,7 @@ void TestMultiGraph::aRebuiltGpuFillIsNotDrawnTwice()
 using StagedSource = QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>;
 
 // Once the plot has drawn, a new source waits as a staged one until the plot commits it.
-static void stageColumns(QCPMultiGraph* mg, int columns)
+static void stageColumns(QCPGraph* mg, int columns)
 {
     mg->setDataSource(std::make_shared<StagedSource>(
         std::vector<double>{1, 2, 3}, std::vector<std::vector<double>>(columns, {1, 2, 3})));
@@ -2966,9 +2966,9 @@ static QPoint pixelOf(QCustomPlot* plot, double key, double value)
 
 // The displayed source keeps its columns while a staged one waits, but the components already
 // follow the staged one.
-static QCPMultiGraph* graphWithAStagedSourceOfColumns(QCustomPlot* plot, int displayed, int staged)
+static QCPGraph* graphWithAStagedSourceOfColumns(QCustomPlot* plot, int displayed, int staged)
 {
-    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
     mg->setDeferredDataSwap(true);
     std::vector<std::vector<double>> columns;
     for (int c = 0; c < displayed; ++c)
@@ -2982,7 +2982,7 @@ static QCPMultiGraph* graphWithAStagedSourceOfColumns(QCustomPlot* plot, int dis
     return mg;
 }
 
-void TestMultiGraph::stillPreparing(QCPMultiGraph* mg) { mg->mPendingReady = false; }
+void TestMultiGraph::stillPreparing(QCPGraph* mg) { mg->mPendingReady = false; }
 
 void TestMultiGraph::aFillOnAColumnOnlyTheStagedSourceHasIsNotDrawn()
 {
@@ -3057,7 +3057,7 @@ void TestMultiGraph::lineCacheWindowFollowsTheKeyScale()
     std::vector<double> keys;
     for (int i = 0; i < 25; ++i)
         keys.push_back(logKeyAxis ? std::pow(10.0, i / 8.0) : double(i));
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>(keys),
                 std::vector<std::vector<double>> { std::vector<double>(keys.size(), 1.0) });
     mg->setComponentPens({ QPen(Qt::red, 2) });
@@ -3083,9 +3083,9 @@ void TestMultiGraph::lineCacheWindowFollowsTheKeyScale()
     QVERIFY2(inkAt(image, axisRect.right() - 2, y), "no line at the right edge of the panned view");
 }
 
-static QCPMultiGraph* decadesOnTheSecondAxes(QCustomPlot* plot, bool newKeyAxis)
+static QCPGraph* decadesOnTheSecondAxes(QCustomPlot* plot, bool newKeyAxis)
 {
-    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
     const std::vector<double> decades{1, 10, 100};
     mg->setData(std::vector<double>(decades), std::vector<std::vector<double>>{decades});
     if (newKeyAxis)
@@ -3126,12 +3126,12 @@ void TestMultiGraph::lineCacheFollowsTheScaleOfANewValueAxis()
 }
 
 // The log axis is ready before the swap and the range stays 1..100: no signal fires at the swap.
-static QCPMultiGraph* decadesThenMovedToALogAxis(QCustomPlot* plot, bool keyAxis)
+static QCPGraph* decadesThenMovedToALogAxis(QCustomPlot* plot, bool keyAxis)
 {
     for (QCPAxis* axis : {plot->xAxis, plot->yAxis, plot->xAxis2, plot->yAxis2})
         axis->setRange(1, 100);
     (keyAxis ? plot->xAxis2 : plot->yAxis2)->setScaleType(QCPAxis::stLogarithmic);
-    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
     const std::vector<double> decades{1, 10, 100};
     mg->setData(std::vector<double>(decades), std::vector<std::vector<double>>{decades});
     plot->replot(QCustomPlot::rpImmediateRefresh);
@@ -3265,10 +3265,10 @@ void TestMultiGraph::errorBarsOnResampledDataAreABand()
     std::vector<double> x(n), y(n, 5), lo(n, 3), hi(n, 7);
     for (int i = 0; i < n; ++i)
         x[i] = i * 0.0005;
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::move(x), std::vector<std::vector<double>>{std::move(y), std::move(lo), std::move(hi)});
     for (int c = 0; c < 3; ++c)
-        mg->setComponentLineStyle(c, QCPMultiGraph::lsNone);
+        mg->setComponentLineStyle(c, QCPGraph::lsNone);
     mg->setComponentPens({ QPen(Qt::red, 2), QPen(Qt::red, 2), QPen(Qt::red, 2) });
     mg->setComponentErrorBars(0, 1, 2, 0.0); // no cap: any spacing would fit as bars
     mPlot->xAxis->setRange(0, 20);
@@ -3319,7 +3319,7 @@ static QImage legendIconOfErrorBars(QCustomPlot* plot, const QPen& barPen)
 {
     auto* mg = threeColumnGraph(plot);
     mg->setComponentPens({QPen(Qt::blue), QPen(Qt::blue), QPen(Qt::blue)});
-    mg->setComponentLineStyle(0, QCPMultiGraph::lsNone);
+    mg->setComponentLineStyle(0, QCPGraph::lsNone);
     mg->setComponentErrorBars(0, 1, 2, 6, barPen);
     QImage img(40, 20, QImage::Format_ARGB32);
     img.fill(Qt::white);
@@ -3347,10 +3347,10 @@ void TestMultiGraph::legendIconOfErrorBarsHasACapAtEachEnd()
 
 void TestMultiGraph::legendSwatchIsTwelvePixelsTall()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1, 2}, std::vector<std::vector<double>>{{0, 0}, {1, 1}});
-    mg->setComponentLineStyle(0, QCPMultiGraph::lsNone);
-    mg->setComponentLineStyle(1, QCPMultiGraph::lsNone);
+    mg->setComponentLineStyle(0, QCPGraph::lsNone);
+    mg->setComponentLineStyle(1, QCPGraph::lsNone);
     mg->setComponentInLegend(1, false);
     mg->setComponentFillBetween(0, 1, QBrush(Qt::red));
     QImage img(40, 20, QImage::Format_ARGB32);
@@ -3367,8 +3367,8 @@ void TestMultiGraph::legendSwatchIsTwelvePixelsTall()
 void TestMultiGraph::anAlmostTransparentFillStillPaints()
 {
     auto* mg = threeColumnGraph(mPlot);
-    mg->setComponentLineStyle(1, QCPMultiGraph::lsNone);
-    mg->setComponentLineStyle(2, QCPMultiGraph::lsNone);
+    mg->setComponentLineStyle(1, QCPGraph::lsNone);
+    mg->setComponentLineStyle(2, QCPGraph::lsNone);
     mg->setComponentFillBetween(1, 2, QBrush(QColor(255, 0, 0, 1)));
     mPlot->xAxis->setRange(1, 3);
     mPlot->yAxis->setRange(-1, 5);
@@ -3383,41 +3383,41 @@ namespace {
 struct SetterCase
 {
     QString name;
-    std::function<void(QCPMultiGraph*)> prepare;
-    std::function<void(QCPMultiGraph*)> change;
+    std::function<void(QCPGraph*)> prepare;
+    std::function<void(QCPGraph*)> change;
 };
 
 const std::vector<SetterCase>& setterCases()
 {
     // Distinct keys and values, and a visible zero baseline, so every style change shows.
-    const auto markersOn = [](QCPMultiGraph* mg) {
+    const auto markersOn = [](QCPGraph* mg) {
         mg->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 7));
     };
     static const std::vector<SetterCase> cases = {
-        { QStringLiteral("setPen"), {}, [](QCPMultiGraph* mg) { mg->setPen(QPen(Qt::darkGreen, 4)); } },
+        { QStringLiteral("setPen"), {}, [](QCPGraph* mg) { mg->setPen(QPen(Qt::darkGreen, 4)); } },
         { QStringLiteral("setBrush"), {},
-          [](QCPMultiGraph* mg) { mg->setBrush(QBrush(QColor(0, 160, 255, 120))); } },
+          [](QCPGraph* mg) { mg->setBrush(QBrush(QColor(0, 160, 255, 120))); } },
         { QStringLiteral("setLineStyle"), {},
-          [](QCPMultiGraph* mg) { mg->setLineStyle(QCPMultiGraph::lsStepLeft); } },
+          [](QCPGraph* mg) { mg->setLineStyle(QCPGraph::lsStepLeft); } },
         { QStringLiteral("setScatterStyle"), {},
-          [](QCPMultiGraph* mg) { mg->setComponentScatterStyle(0, QCPScatterStyle(QCPScatterStyle::ssDisc, 9)); } },
+          [](QCPGraph* mg) { mg->setComponentScatterStyle(0, QCPScatterStyle(QCPScatterStyle::ssDisc, 9)); } },
         { QStringLiteral("setScatterSkip"), markersOn,
-          [](QCPMultiGraph* mg) { mg->setScatterSkip(1); } },
+          [](QCPGraph* mg) { mg->setScatterSkip(1); } },
         { QStringLiteral("setColorValues"), {},
-          [](QCPMultiGraph* mg) {
+          [](QCPGraph* mg) {
               std::vector<double> values(static_cast<size_t>(mg->dataSource()->size()));
               for (size_t i = 0; i < values.size(); ++i)
                   values[i] = static_cast<double>(i);
               mg->setColorValues(std::move(values));
           } },
         { QStringLiteral("setColorScale"),
-          [](QCPMultiGraph* mg) {
+          [](QCPGraph* mg) {
               std::vector<double> values(static_cast<size_t>(mg->dataSource()->size()));
               for (size_t i = 0; i < values.size(); ++i)
                   values[i] = static_cast<double>(i);
               mg->setColorValues(std::move(values));
           },
-          [](QCPMultiGraph* mg) {
+          [](QCPGraph* mg) {
               auto* scale = new QCPColorScale(mg->parentPlot());
               scale->setGradient(QCPColorGradient(QCPColorGradient::gpHot));
               mg->setColorScale(scale);
@@ -3427,7 +3427,7 @@ const std::vector<SetterCase>& setterCases()
 }
 
 //! Two components with distinct keys and a visible zero baseline.
-void setTwoLines(QCPMultiGraph* mg)
+void setTwoLines(QCPGraph* mg)
 {
     mg->setData(std::vector<double> { 0, 1, 2, 3, 4 },
                 std::vector<std::vector<double>> { { 1, 2, 1.5, 2.5, 1 }, { 0.5, 1, 2, 1, 2 } });
@@ -3444,7 +3444,7 @@ QImage plainTwoLines()
 {
     QCustomPlot plot;
     plot.resize(400, 300);
-    setTwoLines(new QCPMultiGraph(plot.xAxis, plot.yAxis));
+    setTwoLines(new QCPGraph(plot.xAxis, plot.yAxis));
     frameGraph(&plot);
     return renderOf(&plot);
 }
@@ -3475,7 +3475,7 @@ void TestMultiGraph::noSetterIsIgnored()
 
     DirtyAwarePlot plot;
     plot.resize(400, 300);
-    auto* mg = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto* mg = new QCPGraph(plot.xAxis, plot.yAxis);
     mg->setData(std::vector<double> { 0, 1, 2, 3, 4 },
                 std::vector<std::vector<double>> { { 1, 2, 1.5, 2.5, 1 }, { 0.5, 1, 2, 1, 2 } });
     plot.xAxis->setRange(0, 4);
@@ -3529,7 +3529,7 @@ void TestMultiGraph::setBrushAfterAComponentFillRefillsEveryComponent()
 
     for (int i = 0; i < mg->componentCount(); ++i)
     {
-        const std::optional<QCPMultiGraph::Fill> fill = mg->componentFill(i);
+        const std::optional<QCPGraph::Fill> fill = mg->componentFill(i);
         QVERIFY(fill.has_value());
         QCOMPARE(fill->brush, brush);
     }
@@ -3541,7 +3541,7 @@ void TestMultiGraph::setBrushAfterAComponentFillRefillsEveryComponent()
 void TestMultiGraph::setPenBeforeDataColoursTheNewComponents()
 {
     const QPen pen(Qt::darkGreen, 4);
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setPen(pen);
     setTwoLines(mg);
 
@@ -3559,14 +3559,14 @@ void TestMultiGraph::setPenBeforeDataColoursTheNewComponents()
 void TestMultiGraph::setBrushBeforeDataFillsTheNewComponents()
 {
     const QBrush brush(QColor(0, 160, 255, 120));
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setBrush(brush);
     setTwoLines(mg);
 
     QCOMPARE(mg->componentCount(), 2);
     for (int i = 0; i < mg->componentCount(); ++i)
     {
-        const std::optional<QCPMultiGraph::Fill> fill = mg->componentFill(i);
+        const std::optional<QCPGraph::Fill> fill = mg->componentFill(i);
         QVERIFY(fill.has_value());
         QCOMPARE(fill->brush, brush);
     }
@@ -3578,7 +3578,7 @@ void TestMultiGraph::setBrushBeforeDataFillsTheNewComponents()
 void TestMultiGraph::setScatterStyleBeforeDataReachesTheNewComponents()
 {
     const QCPScatterStyle markers(QCPScatterStyle::ssDisc, 9);
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setScatterStyle(markers);
     setTwoLines(mg);
 
@@ -3596,7 +3596,7 @@ void TestMultiGraph::setScatterStyleBeforeDataReachesTheNewComponents()
 // record again, or a 1M-point graph rebuilds its lines on every mouse move.
 void TestMultiGraph::panningABigGraphDoesNotRecord()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     const int n = 1'000'000;
     std::vector<double> keys(n);
     std::vector<double> values(n);
@@ -3629,7 +3629,7 @@ void TestMultiGraph::panningABigGraphDoesNotRecord()
 // new view must be covered, not left partly empty.
 void TestMultiGraph::panPastTheWindowRecordsFreshLines()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     const int n = 1'000'000;
     std::vector<double> keys(n);
     std::vector<double> values(n);
@@ -3686,7 +3686,7 @@ void TestMultiGraph::logKeyAxisLinesMatchTheData()
         keys[i] = std::pow(10.0, i * 0.01);
         values[i] = i * 0.01;
     }
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::move(keys), std::vector<std::vector<double>> { std::move(values) });
     mg->setComponentPens({ QPen(Qt::red, 2) });
     mPlot->xAxis->setScaleType(QCPAxis::stLogarithmic);
@@ -3708,7 +3708,7 @@ void TestMultiGraph::logKeyAxisLinesMatchTheData()
 // asked for, not an empty frame.
 void TestMultiGraph::exportBeforeTheFirstResampleHasTheLines()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     const int n = 1'000'000;
     std::vector<double> keys(n);
     std::vector<double> values(n);
@@ -3740,7 +3740,7 @@ void TestMultiGraph::colouredLineIsOneCommandPerComponent()
         for (int c = 0; c < 3; ++c)
             columns[c][i] = std::sin(i * 0.01 + c);
     }
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::move(keys), std::move(columns));
     mg->setDataRange(QCPRange(-1.0, 1.0));
     mg->setColorValues(std::vector<double>(n, 0.0));
@@ -3782,7 +3782,7 @@ void TestMultiGraph::waterfallDrawsItsOffsets()
 
 void TestMultiGraph::logKeyAxisBigGraphIsThinned()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     const int n = 1000000;
     std::vector<double> keys(n);
     std::vector<double> values(n);
@@ -3864,16 +3864,16 @@ namespace {
 //! A pair of one-column graphs on the default axes: the owner and the graph it fills to.
 struct FillPair
 {
-    QCPMultiGraph* owner = nullptr;
-    QCPMultiGraph* partner = nullptr;
+    QCPGraph* owner = nullptr;
+    QCPGraph* partner = nullptr;
 };
 
 FillPair twoGraphs(QCustomPlot* plot, const std::vector<double>& keys,
                    const std::vector<double>& ownerValues,
                    const std::vector<double>& partnerValues)
 {
-    auto* owner = new QCPMultiGraph(plot->xAxis, plot->yAxis);
-    auto* partner = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* owner = new QCPGraph(plot->xAxis, plot->yAxis);
+    auto* partner = new QCPGraph(plot->xAxis, plot->yAxis);
     owner->setData(keys, std::vector<std::vector<double>>{ownerValues});
     partner->setData(keys, std::vector<std::vector<double>>{partnerValues});
     owner->setComponentPens({QPen(Qt::NoPen)});
@@ -3948,7 +3948,7 @@ void TestMultiGraph::aDeadPartnersFillIsGone()
     pair.partner = nullptr;
     QVERIFY2(!pair.owner->componentFill(0), "a fill to a dead graph is still reported");
 
-    auto* second = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* second = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     second->setData(QVector<double>{0, 1, 2}, QVector<double>{2, 2, 2});
     QVERIFY(pair.owner->setComponentFillToGraph(0, second, 0));
     QVERIFY(mPlot->removeGraph(second));
@@ -3957,8 +3957,8 @@ void TestMultiGraph::aDeadPartnersFillIsGone()
 
 void TestMultiGraph::theFillDropsWhenThePartnerLosesTheComponent()
 {
-    QCPMultiGraph* owner = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    QCPMultiGraph* partner = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    QCPGraph* owner = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    QCPGraph* partner = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     owner->setData(std::vector<double>{0, 1, 2}, std::vector<std::vector<double>>{{1, 1, 1}});
     partner->setData(std::vector<double>{0, 1, 2},
                      std::vector<std::vector<double>>{{2, 2, 2}, {3, 3, 3}});
@@ -3980,7 +3980,7 @@ void TestMultiGraph::aFillToAGraphOfAnotherSystemIsAMisuse()
     FillPair pair = twoGraphs(mPlot, {0, 1}, {1, 1}, {2, 2});
     auto* otherRect = new QCPAxisRect(mPlot);
     mPlot->plotLayout()->addElement(1, 0, otherRect);
-    auto* other = new QCPMultiGraph(otherRect->axis(QCPAxis::atBottom),
+    auto* other = new QCPGraph(otherRect->axis(QCPAxis::atBottom),
                                     otherRect->axis(QCPAxis::atLeft));
     other->setData(std::vector<double>{0, 1}, std::vector<std::vector<double>>{{2, 2}});
 
@@ -4111,7 +4111,7 @@ void TestMultiGraph::aSteppedFillSelectionUsesItsKeyRange()
     for (int i = 0; i < n; ++i)
         keys[std::size_t(i)] = i;
     FillPair pair = twoGraphs(mPlot, keys, ownerValues, partnerValues);
-    pair.owner->setComponentLineStyle(0, QCPMultiGraph::lsStepLeft);
+    pair.owner->setComponentLineStyle(0, QCPGraph::lsStepLeft);
     pair.owner->component(0).selectedPen = QPen(Qt::green);
     QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0,
                                                 QBrush(QColor(255, 0, 0, 64))));
@@ -4134,8 +4134,8 @@ void TestMultiGraph::theFillDoesNotReturnWhenThePartnerComponentComesBack()
 {
     // M1: the partner losing the component drops the fill for good; a later wider source must not
     // revive a band built from unrelated data.
-    auto* owner = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    auto* partner = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* owner = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* partner = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     owner->setData(std::vector<double>{0, 1, 2}, std::vector<std::vector<double>>{{1, 1, 1}});
     partner->setData(std::vector<double>{0, 1, 2},
                      std::vector<std::vector<double>>{{2, 2, 2}, {3, 3, 3}});
@@ -4221,7 +4221,7 @@ void TestMultiGraph::retargetingAGraphFillDropsTheOldPartnerDependency()
     QVERIFY(mPlot->addLayer(QStringLiteral("newPartnerLayer")));
     FillPair pair = twoGraphs(mPlot, {0, 1, 2}, {1, 1, 1}, {3, 3, 3});
     pair.partner->setLayer(mPlot->layer(QStringLiteral("oldPartnerLayer")));
-    auto* replacement = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* replacement = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     replacement->setData(std::vector<double>{0, 1, 2}, std::vector<std::vector<double>>{{2, 2, 2}});
     replacement->setLayer(mPlot->layer(QStringLiteral("newPartnerLayer")));
     QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0, QBrush(Qt::blue)));
@@ -4307,7 +4307,7 @@ void TestMultiGraph::fillsDrawUnderErrorBarsUnderLines()
 {
     auto* mg = errorBarGraph(mPlot, 5, 1.0);
     mg->setComponentPens({ QPen(Qt::red, 3), QPen(Qt::red, 3), QPen(Qt::red, 3) });
-    mg->setComponentLineStyle(0, QCPMultiGraph::lsLine);
+    mg->setComponentLineStyle(0, QCPGraph::lsLine);
     mg->setComponentFillBetween(1, 2, QBrush(Qt::green));
     mPlot->xAxis->setRange(-0.5, 4.5);
     mPlot->yAxis->setRange(0, 10);
@@ -4340,7 +4340,7 @@ void TestMultiGraph::fillsDrawUnderLinesOnTheGpu()
         QSKIP("no exposed window with a QRhi in this environment");
     auto* mg = errorBarGraph(mPlot, 5, 1.0);
     mg->setComponentPens({ QPen(Qt::red, 3), QPen(Qt::red, 3), QPen(Qt::red, 3) });
-    mg->setComponentLineStyle(0, QCPMultiGraph::lsLine);
+    mg->setComponentLineStyle(0, QCPGraph::lsLine);
     mg->setComponentFillBetween(1, 2, QBrush(Qt::green));
     mPlot->xAxis->setRange(-0.5, 4.5);
     mPlot->yAxis->setRange(0, 10);
@@ -4359,9 +4359,9 @@ void TestMultiGraph::aCrossingFillIsTwoLobesOnTheGpu()
 {
     if (!showWithRhi(mPlot))
         QSKIP("no exposed window with a QRhi in this environment");
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double> { 0, 1 }, std::vector<std::vector<double>> { { -1, 1 } });
-    mg->setComponentLineStyle(0, QCPMultiGraph::lsNone);
+    mg->setComponentLineStyle(0, QCPGraph::lsNone);
     mg->setComponentFill(0, 0.0, QBrush(Qt::green));
     mPlot->xAxis->setRange(0, 1);
     mPlot->yAxis->setRange(-1, 1);
@@ -4431,10 +4431,10 @@ void TestMultiGraph::denseErrorBarsAreABand()
 // A marker style with no pen of its own takes the component's pen, in the legend as on the plot.
 void TestMultiGraph::legendIconMarkerTakesTheComponentPen()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double> { 0, 1 }, std::vector<std::vector<double>> { { 0, 1 } });
     mg->setComponentPens({ QPen(Qt::red, 2) });
-    mg->setComponentLineStyle(0, QCPMultiGraph::lsNone);
+    mg->setComponentLineStyle(0, QCPGraph::lsNone);
     mg->setComponentScatterStyle(0, QCPScatterStyle(QCPScatterStyle::ssDisc, 10));
     QImage image(40, 20, QImage::Format_ARGB32);
     image.fill(Qt::white);
@@ -4467,7 +4467,7 @@ void TestMultiGraph::legendIconShowsEachComponent()
     QCOMPARE(lines, 3);
 }
 
-// --- R1-R4: the multigraph behaves as 2.x's QCPMultiGraph ---
+// --- R1-R4: the multigraph behaves as 2.x's QCPGraph ---
 
 namespace
 {
@@ -4490,7 +4490,7 @@ bool magentaNear(const QImage& img, QPoint p, int radius)
 }
 
 //! The red and blue lines, selectable by rows, with a green selected pen on both.
-QCPMultiGraph* selectableLines(QCustomPlot* plot)
+QCPGraph* selectableLines(QCustomPlot* plot)
 {
     auto* mg = redAndBlueHorizontalLines(plot);
     mg->setSelectable(QCP::stDataRange);
@@ -4500,10 +4500,10 @@ QCPMultiGraph* selectableLines(QCustomPlot* plot)
 }
 
 //! Two one-column graphs: \a upper at 2 over \a lower at 1, keys 0..4.
-std::pair<QCPMultiGraph*, QCPMultiGraph*> twoBandGraphs(QCustomPlot* plot, bool withData = true)
+std::pair<QCPGraph*, QCPGraph*> twoBandGraphs(QCustomPlot* plot, bool withData = true)
 {
-    auto* upper = new QCPMultiGraph(plot->xAxis, plot->yAxis);
-    auto* lower = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* upper = new QCPGraph(plot->xAxis, plot->yAxis);
+    auto* lower = new QCPGraph(plot->xAxis, plot->yAxis);
     if (withData)
     {
         upper->setData(std::vector<double> { 0, 1, 2, 3, 4 }, std::vector<double> { 2, 2, 2, 2, 2 });
@@ -4602,7 +4602,7 @@ void TestMultiGraph::aPartialSelectionKeepsTheRestNormal()
 // 2.x's legend code finds a graph's row by its plottable.
 void TestMultiGraph::itemWithPlottableFindsAGraphRow()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double> { 1.0, 2.0 },
                 std::vector<std::vector<double>> { { 10.0, 20.0 }, { 1.0, 2.0 } });
     QCOMPARE(mPlot->legend->itemCount(), 1);
@@ -4617,7 +4617,7 @@ void TestMultiGraph::itemWithPlottableFindsAGraphRow()
 // And casts it to a plottable row to reach the plottable.
 void TestMultiGraph::aGraphRowCastsToAPlottableRow()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double> { 1.0, 2.0 }, std::vector<double> { 10.0, 20.0 });
     auto* row = qobject_cast<QCPPlottableLegendItem*>(mPlot->legend->item(0));
     QVERIFY(row != nullptr);
@@ -4637,7 +4637,7 @@ void TestMultiGraph::setBrushBeforeAFillToGraphKeepsTheBand()
 
     const auto fill = upper->componentFill(0);
     QVERIFY(fill.has_value());
-    QVERIFY2(std::holds_alternative<QCPMultiGraph::FillToGraph>(fill->target),
+    QVERIFY2(std::holds_alternative<QCPGraph::FillToGraph>(fill->target),
              "the remembered brush replaced the band with a fill to zero");
     QCOMPARE(upper->effectiveFillBrush(*fill), brush);
 }
@@ -4652,7 +4652,7 @@ void TestMultiGraph::setBrushAfterAFillToGraphRecoloursIt()
 
     const auto fill = upper->componentFill(0);
     QVERIFY(fill.has_value());
-    QVERIFY2(std::holds_alternative<QCPMultiGraph::FillToGraph>(fill->target),
+    QVERIFY2(std::holds_alternative<QCPGraph::FillToGraph>(fill->target),
              "setBrush replaced the band with a fill to zero");
     QCOMPARE(upper->effectiveFillBrush(*fill), brush);
     QVERIFY(!lower->componentFill(0).has_value());
@@ -4678,7 +4678,7 @@ void TestMultiGraph::aFillToGraphTakesTheGraphBrush()
 // 2.x fills toward zero: on a negative log range zero is beyond the upper bound.
 void TestMultiGraph::aNegativeLogRangeFillsToTheUpperBound()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double> { 0, 1, 2 }, std::vector<double> { -10, -10, -10 });
     mg->setBrush(QBrush(QColor(255, 0, 0, 120)));
     mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
@@ -4699,10 +4699,10 @@ void TestMultiGraph::aNegativeLogRangeFillsToTheUpperBound()
 
 void TestMultiGraph::aNegativeLogRangeImpulsesStartAtTheUpperBound()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double> { 0, 1, 2 }, std::vector<double> { -10, -10, -10 });
     mg->setComponentPens({ QPen(Qt::red, 5) });
-    mg->setLineStyle(QCPMultiGraph::lsImpulse);
+    mg->setLineStyle(QCPGraph::lsImpulse);
     mPlot->yAxis->setScaleType(QCPAxis::stLogarithmic);
     mPlot->xAxis->setRange(-0.5, 2.5);
     mPlot->yAxis->setRange(-100, -1);

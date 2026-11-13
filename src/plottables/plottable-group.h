@@ -42,7 +42,7 @@ public:
     bool addMember(QCPAbstractPlottable* plottable);
     void removeMember(QCPAbstractPlottable* plottable);
 
-    //! True when any member is shown (for a QCPMultiGraph: visible with a visible component).
+    //! True when any member is shown (for a QCPGraph: visible with a visible component).
     bool visible() const;
     void setVisible(bool visible);
 

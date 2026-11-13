@@ -29,7 +29,7 @@
 #include "../misuse.h"
 #include "../painting/draw-context.h"
 #include "../plottables/graph-data.h"
-#include "../plottables/plottable-multigraph.h"
+#include "../plottables/plottable-graph.h"
 #include <array>
 #include <cmath>
 
@@ -38,12 +38,12 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /*! \class QCPItemTracer
-  \brief Item that sticks to the data points of a QCPMultiGraph component
+  \brief Item that sticks to the data points of a QCPGraph component
 
   \image html QCPItemTracer.png "Tracer example. Blue dotted circles are anchors, solid blue discs
   are positions."
 
-  The tracer can be connected with a component of a QCPMultiGraph via \ref setGraph. Then it will automatically adopt
+  The tracer can be connected with a component of a QCPGraph via \ref setGraph. Then it will automatically adopt
   the coordinate axes of the graph and update its \a position to be on the graph's data. This means
   the key stays controllable via \ref setGraphKey, but the value will follow the graph data. If a
   graph is connected, note that setting the coordinates of the tracer item directly via \a
@@ -184,7 +184,7 @@ void QCPItemTracer::setStyle(QCPItemTracer::TracerStyle style)
 
   \see setGraphKey, setComponent
 */
-void QCPItemTracer::setGraph(QCPMultiGraph* graph, int component)
+void QCPItemTracer::setGraph(QCPGraph* graph, int component)
 {
     if (graph)
         QCP_CHECK_OR_RETURN(graph->isValidColumn(component),

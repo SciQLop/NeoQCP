@@ -29,7 +29,7 @@
 #include "../global.h"
 #include "../items/item.h"
 #include "../plottables/graph-data.h"
-#include "../plottables/plottable-multigraph.h"
+#include "../plottables/plottable-graph.h"
 
 class QCPPainter;
 class QCustomPlot;
@@ -47,7 +47,7 @@ class QCP_LIB_DECL QCPItemTracer : public QCPAbstractItem
     Q_PROPERTY(QBrush selectedBrush READ selectedBrush WRITE setSelectedBrush)
     Q_PROPERTY(double size READ size WRITE setSize)
     Q_PROPERTY(TracerStyle style READ style WRITE setStyle)
-    Q_PROPERTY(QCPMultiGraph* graph READ graph WRITE setGraph)
+    Q_PROPERTY(QCPGraph* graph READ graph WRITE setGraph)
     Q_PROPERTY(double graphKey READ graphKey WRITE setGraphKey)
     Q_PROPERTY(bool interpolating READ interpolating WRITE setInterpolating)
     /// \endcond
@@ -93,9 +93,9 @@ public:
     TracerStyle style() const { return mStyle; }
 
     //! The graph this tracer follows, or an empty handle.
-    [[nodiscard]] QCPHandle<QCPMultiGraph> graph() const
+    [[nodiscard]] QCPHandle<QCPGraph> graph() const
     {
-        return QCPHandle<QCPMultiGraph>(mGraph.data());
+        return QCPHandle<QCPGraph>(mGraph.data());
     }
 
     //! The followed component index (0 when none).
@@ -114,7 +114,7 @@ public:
     void setStyle(TracerStyle style);
     //! Follows component \a component of \a graph; null frees the tracer. A component outside the
     //! graph's columns is a misuse.
-    void setGraph(QCPMultiGraph* graph, int component = 0);
+    void setGraph(QCPGraph* graph, int component = 0);
     //! Changes the followed component; out of range is a misuse. Does nothing without a graph
     //! (there is no target to select a column of).
     void setComponent(int component);
@@ -141,7 +141,7 @@ protected:
     QBrush mBrush, mSelectedBrush;
     double mSize;
     TracerStyle mStyle;
-    QPointer<QCPMultiGraph> mGraph;
+    QPointer<QCPGraph> mGraph;
     int mComponent = 0;
     bool mFollowsGraph = false; // set by setGraph, so a graph's death is told from no graph
     double mGraphKey;
@@ -200,7 +200,7 @@ public:
 
     // The graph component to follow; a dead handle is refused with one misuse (use with() and
     // nullptr to detach).
-    Ret setGraph(const QCPHandle<QCPMultiGraph>& graph, int component = 0)
+    Ret setGraph(const QCPHandle<QCPGraph>& graph, int component = 0)
     {
         return this->apply(
             [&](T& o)

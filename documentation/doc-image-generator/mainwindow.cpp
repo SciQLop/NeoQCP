@@ -639,7 +639,7 @@ void MainWindow::genQCPGraph()
   
   customPlot->addGraph();
   customPlot->graph()->setData(x2, y3);
-  customPlot->graph()->setLineStyle(QCPMultiGraph::lsStepCenter);
+  customPlot->graph()->setLineStyle(QCPGraph::lsStepCenter);
   customPlot->graph()->setPen(QPen(QColor(100, 100, 100), 1, Qt::SolidLine));
   customPlot->graph()->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCross, Qt::black, QColor(0, 0, 0, 25), 6));
   
@@ -885,8 +885,8 @@ void MainWindow::genQCPErrorBars()
     errY2[i] = 0.02+std::rand()/(double)RAND_MAX*0.2;
   }
   
-  QCPMultiGraph *graph = new QCPMultiGraph(customPlot->xAxis, customPlot->yAxis);
-  graph->setLineStyle(QCPMultiGraph::lsLine);
+  QCPGraph *graph = new QCPGraph(customPlot->xAxis, customPlot->yAxis);
+  graph->setLineStyle(QCPGraph::lsLine);
   graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, QColor(200, 200, 200), 6));
   graph->setPen(QPen(QColor(200, 200, 200)));
   graph->setData(x, y);
@@ -1059,7 +1059,7 @@ void MainWindow::genQCPSelectionType()
   customPlot->yAxis->setRange(0, 2.0);
   
   std::srand(1);
-  QCPMultiGraph *g = customPlot->addGraph();
+  QCPGraph *g = customPlot->addGraph();
   g->setPen(QPen(QColor(160, 160, 160)));
   g->setScatterStyle(QCPScatterStyle::ssDisc);
   g->selectionDecorator()->setPen(QPen(QColor(255, 0, 160)));

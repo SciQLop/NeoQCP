@@ -7,6 +7,7 @@
 #include <vector>
 
 class QCPAbstractMultiDataSource;
+struct QCPGraphComponent;
 
 //! Shared base of the line plottables.
 //!
@@ -20,26 +21,15 @@ public:
     enum LineStyle { lsNone, lsLine, lsStepLeft, lsStepRight, lsStepCenter, lsImpulse };
     Q_ENUM(LineStyle)
 
-    struct Component {
-        QString name;
-        QPen pen;
-        QPen selectedPen;
-        QCPScatterStyle scatterStyle;
-        QCPDataSelection selection;
-        bool visible = true;
-        bool inLegend = true;
-        bool hiddenByErrorBars = false; //!< out of the legend as an error bound, not by the user
-        //! Set through setComponentLineStyle(): a direct write leaves the cached lines stale.
-        LineStyle lineStyle = lsLine;
-    };
-
     explicit QCPAbstractLine(QCPAxis* keyAxis, QCPAxis* valueAxis,
                              QCP::Capabilities required = QCP::capRectangular | QCP::capStraightKey | QCP::capColourScale);
+    // Out of line: QCPGraphComponent is complete only after this class (it holds a LineStyle).
+    ~QCPAbstractLine() override;
 
     // Components
-    [[nodiscard]] int componentCount() const { return mComponents.size(); }
-    Component& component(int index) { return mComponents[index]; }
-    const Component& component(int index) const { return mComponents[index]; }
+    [[nodiscard]] int componentCount() const;
+    QCPGraphComponent& component(int index);
+    const QCPGraphComponent& component(int index) const;
     //! Shows or hides one component and repaints the layer. Setting `component(i).visible`
     //! directly is not observed: a layer that translates after a pan would keep the old
     //! GPU entries.
@@ -61,7 +51,7 @@ public:
     [[nodiscard]] int scatterSkip() const { return mScatterSkip; }
     void setScatterSkip(int skip);
 
-    //! A pen for every component (as QCPGraph::setPen does for its single line).
+    //! A pen for every component (2.x's graph had one line and one pen).
     void setPen(const QPen& pen) override;
     //! Qt::NoBrush clears every component's fill; any other brush fills it to the value-axis
     //! zero baseline.
@@ -121,7 +111,7 @@ protected:
     //! \a style as it draws for \a pen: a style with no pen of its own takes it.
     static QCPScatterStyle markerStyle(QCPScatterStyle style, const QPen& pen);
 
-    QVector<Component> mComponents;
+    QVector<QCPGraphComponent> mComponents;
     LineStyle mLineStyle = lsLine;
     int mScatterSkip = 0;
     // Set by setPen/setBrush/setScatterStyle: what a component created later must take. Unset
@@ -131,7 +121,7 @@ protected:
     std::optional<QCPScatterStyle> mExplicitScatterStyle;
     qcp::ColorScalarMapper mColor;
     // Set while a source is staged: validated against that source's size, applied by
-    // QCPMultiGraph::commitPendingData().
+    // QCPGraph::commitPendingData().
     std::shared_ptr<const std::vector<double>> mPendingColorValues;
 
     friend class TestMultiGraph;
@@ -139,3 +129,24 @@ protected:
     friend class TestDataSwap;
     friend class TestColorByScalar;
 };
+
+//! One line of a graph (or the curve's single line): its pens, marker style and line style.
+struct QCPGraphComponent {
+    QString name;
+    QPen pen;
+    QPen selectedPen;
+    QCPScatterStyle scatterStyle;
+    QCPDataSelection selection;
+    bool visible = true;
+    bool inLegend = true;
+    bool hiddenByErrorBars = false; //!< out of the legend as an error bound, not by the user
+    //! Set through setComponentLineStyle(): a direct write leaves the cached lines stale.
+    QCPAbstractLine::LineStyle lineStyle = QCPAbstractLine::lsLine;
+};
+
+inline int QCPAbstractLine::componentCount() const { return mComponents.size(); }
+inline QCPGraphComponent& QCPAbstractLine::component(int index) { return mComponents[index]; }
+inline const QCPGraphComponent& QCPAbstractLine::component(int index) const
+{
+    return mComponents[index];
+}

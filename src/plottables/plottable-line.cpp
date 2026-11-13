@@ -14,6 +14,8 @@ QCPAbstractLine::QCPAbstractLine(QCPAxis* keyAxis, QCPAxis* valueAxis,
     mDataRange = QCPRange(0, 1);
 }
 
+QCPAbstractLine::~QCPAbstractLine() = default;
+
 QCPScatterStyle QCPAbstractLine::markerStyle(QCPScatterStyle style, const QPen& pen)
 {
     if (!style.isPenDefined())
@@ -78,7 +80,7 @@ void QCPAbstractLine::setPen(const QPen& pen)
     // An equal pen everywhere draws nothing new (2.x's setPen did not repaint either).
     const QPen selected = defaultSelectedPen(pen);
     if (mExplicitPen == pen
-        && std::all_of(mComponents.cbegin(), mComponents.cend(), [&](const Component& c)
+        && std::all_of(mComponents.cbegin(), mComponents.cend(), [&](const QCPGraphComponent& c)
                        { return c.pen == pen && c.selectedPen == selected; }))
         return;
     mPen = pen;

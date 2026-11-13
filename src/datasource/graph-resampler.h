@@ -128,7 +128,7 @@ struct MultiColumnBinResult {
     int stride() const { return static_cast<int>(keys.size()); }
 };
 
-struct MultiGraphResamplerCache {
+struct GraphResamplerCache {
     MultiColumnBinResult level1;
     QCPRange cachedKeyRange;
     int sourceSize = 0;
@@ -481,18 +481,18 @@ inline std::shared_ptr<QCPAbstractMultiDataSource> buildL1CacheMulti(
     if (!foundRange || fullKeyRange.size() <= 0)
         return nullptr;
 
-    // The request itself is not stored in MultiGraphResamplerCache: extractL1Cache moves
+    // The request itself is not stored in GraphResamplerCache: extractL1Cache moves
     // the cache out of the pipeline slot after every build, so a flag stored there would
     // be lost. The graph owns that state instead; this check only keeps a stale
     // origin-less cache from being reused when origin is wanted.
-    auto* c = std::any_cast<MultiGraphResamplerCache>(&cache);
+    auto* c = std::any_cast<GraphResamplerCache>(&cache);
     if (c && c->sourceSize == srcSize && c->columnCount == N
         && c->cachedKeyRange == fullKeyRange
         && (!withOrigin || !c->level1.origin.empty()))
         return nullptr;
     int numBins = std::min(kLevel1TargetBins, srcSize / 10);
 
-    MultiGraphResamplerCache newCache;
+    GraphResamplerCache newCache;
     newCache.level1 = orderColumnsByTrend(
         binMinMaxMultiParallel(src, 0, srcSize, fullKeyRange, numBins, withOrigin));
     newCache.cachedKeyRange = fullKeyRange;

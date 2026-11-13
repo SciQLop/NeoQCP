@@ -74,38 +74,38 @@ private slots:
     void QCPGpu_LineSolid100k();
     void QCPGpu_LineDashed100k();
     void QCPGpu_Pan100k();
-    void QCPMultiGraph_SetData1M();
-    void QCPMultiGraph_Standard();
-    void QCPMultiGraph_ManyPoints();
-    void QCPMultiGraph_ManyLines();
-    void QCPMultiGraph_ManyOffScreenLines();
-    void QCPMultiGraph_SetDataDouble();
-    void QCPMultiGraph_SetDataFloat();
-    void QCPMultiGraph_RenderDouble();
-    void QCPMultiGraph_RenderFloat();
-    void QCPMultiGraph_RenderManyLines();
-    void QCPMultiGraph_ScatterDisc1M();
-    void QCPMultiGraph_ScatterSquare1M();
-    void QCPMultiGraph_ScatterWithLine1M();
-    void QCPInput_WheelOverMultiGraph_1M();
-    void QCPMultiGraph_UserSystem100k();
-    void QCPMultiGraph_AddDataAtEndSorted();
-    void QCPMultiGraph_AddDataAtBeginSorted();
-    void QCPMultiGraph_AddDataMixedSorted();
-    void QCPMultiGraph_AddDataAtEndUnsorted();
-    void QCPMultiGraph_AddDataAtBeginUnsorted();
-    void QCPMultiGraph_AddDataMixedUnsorted();
-    void QCPMultiGraph_AddDataSingleAtEnd();
-    void QCPMultiGraph_AddDataSingleAtBegin();
-    void QCPMultiGraph_AddDataSingleRandom();
-    void QCPMultiGraph_RemoveDataBetween();
-    void QCPMultiGraph_RemoveDataAfter();
-    void QCPMultiGraph_RemoveDataBefore();
-    void QCPMultiGraph_FillToGraphPan10k();
-    void QCPGpu_MultiGraphPan1M();
-    void QCPGpu_MultiGraphRender1M();
-    void QCPGpu_MultiGraphZoom1M();
-    void QCPGpu_MultiGraphColored100kPan();
+    void QCPGraph_SetData1M();
+    void QCPGraph_Standard();
+    void QCPGraph_ManyPoints();
+    void QCPGraph_ManyLines();
+    void QCPGraph_ManyOffScreenLines();
+    void QCPGraph_SetDataDouble();
+    void QCPGraph_SetDataFloat();
+    void QCPGraph_RenderDouble();
+    void QCPGraph_RenderFloat();
+    void QCPGraph_RenderManyLines();
+    void QCPGraph_ScatterDisc1M();
+    void QCPGraph_ScatterSquare1M();
+    void QCPGraph_ScatterWithLine1M();
+    void QCPInput_WheelOverGraph_1M();
+    void QCPGraph_UserSystem100k();
+    void QCPGraph_AddDataAtEndSorted();
+    void QCPGraph_AddDataAtBeginSorted();
+    void QCPGraph_AddDataMixedSorted();
+    void QCPGraph_AddDataAtEndUnsorted();
+    void QCPGraph_AddDataAtBeginUnsorted();
+    void QCPGraph_AddDataMixedUnsorted();
+    void QCPGraph_AddDataSingleAtEnd();
+    void QCPGraph_AddDataSingleAtBegin();
+    void QCPGraph_AddDataSingleRandom();
+    void QCPGraph_RemoveDataBetween();
+    void QCPGraph_RemoveDataAfter();
+    void QCPGraph_RemoveDataBefore();
+    void QCPGraph_FillToGraphPan10k();
+    void QCPGpu_GraphPan1M();
+    void QCPGpu_GraphRender1M();
+    void QCPGpu_GraphZoom1M();
+    void QCPGpu_GraphColored100kPan();
     void QCPGpu_CurvePan100k();
     void QCPGpu_Bars10k();
     void QCPGpu_BarsPan10k();
@@ -1068,7 +1068,7 @@ void fillSineMulti(int n, double span, int columns, std::vector<double>& keys,
     }
 }
 
-// The minimal user system for QCPMultiGraph_UserSystem100k: the 4j skew fixture without the
+// The minimal user system for QCPGraph_UserSystem100k: the 4j skew fixture without the
 // test-only inspection helpers.
 class BenchSkewMapping : public QCPCustomMapping
 {
@@ -1177,7 +1177,7 @@ namespace
 {
 // A multigraph above kResampleThreshold builds its L1 off-thread: paint, pump until that first
 // resample has landed, then paint again. Otherwise a pan row would time the L1 build, not the pan.
-bool settleMultiGraph(QCustomPlot* plot, QCPMultiGraph* graph)
+bool settleMultiGraph(QCustomPlot* plot, QCPGraph* graph)
 {
     plot->replot();
     QElapsedTimer waited;
@@ -1201,7 +1201,7 @@ void Benchmark::QCPGpu_LineSolid100k()
     QCustomPlot* plot = nullptr;
     if (!makeGpuPlot(host, plot))
         QSKIP("no QRhi on this platform (qoffscreen)");
-    QCPMultiGraph* graph = plot->addGraph();
+    QCPGraph* graph = plot->addGraph();
     graph->setPen(QPen(Qt::black, 1, Qt::SolidLine));
     QVector<double> keys(100000), values(100000);
     fillSine(keys, values, 1.0);
@@ -1222,7 +1222,7 @@ void Benchmark::QCPGpu_LineDashed100k()
     QCustomPlot* plot = nullptr;
     if (!makeGpuPlot(host, plot))
         QSKIP("no QRhi on this platform (qoffscreen)");
-    QCPMultiGraph* graph = plot->addGraph();
+    QCPGraph* graph = plot->addGraph();
     graph->setPen(QPen(Qt::black, 1, Qt::DashLine)); // the QPainter branch, on a GPU surface
     QVector<double> keys(100000), values(100000);
     fillSine(keys, values, 1.0);
@@ -1243,7 +1243,7 @@ void Benchmark::QCPGpu_Pan100k()
     QCustomPlot* plot = nullptr;
     if (!makeGpuPlot(host, plot))
         QSKIP("no QRhi on this platform (qoffscreen)");
-    QCPMultiGraph* graph = plot->addGraph();
+    QCPGraph* graph = plot->addGraph();
     graph->setPen(QPen(Qt::black, 1, Qt::SolidLine));
     QVector<double> keys(100000), values(100000);
     fillSine(keys, values, 100.0);
@@ -1260,11 +1260,11 @@ void Benchmark::QCPGpu_Pan100k()
     }
 }
 
-void Benchmark::QCPMultiGraph_SetData1M()
+void Benchmark::QCPGraph_SetData1M()
 {
     // Offscreen row: the multigraph never had a rendered range, so setData installs at once and
     // the loop times the copy into the source.
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     const int n = 1000000;
     QBENCHMARK
     {
@@ -1277,9 +1277,9 @@ void Benchmark::QCPMultiGraph_SetData1M()
 
 // The 2.x QCPGraph_RemoveData* workloads: 1M points set again before every timed removal, so
 // the timing is ours and averaged over enough iterations.
-static void timeRemoval(QCustomPlot* plot, const std::function<void(QCPMultiGraph*)>& remove)
+static void timeRemoval(QCustomPlot* plot, const std::function<void(QCPGraph*)>& remove)
 {
-    auto* graph = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* graph = new QCPGraph(plot->xAxis, plot->yAxis);
     int n = 1000000;
     QVector<double> x1(n), y1(n);
     for (int i = 0; i < n; ++i)
@@ -1304,24 +1304,24 @@ static void timeRemoval(QCustomPlot* plot, const std::function<void(QCPMultiGrap
     QTest::setBenchmarkResult(elapsed / 1e6 / (double)iterations, QTest::WalltimeMilliseconds);
 }
 
-void Benchmark::QCPMultiGraph_RemoveDataBetween()
+void Benchmark::QCPGraph_RemoveDataBetween()
 {
-    timeRemoval(mPlot, [](QCPMultiGraph* graph) { graph->removeData(0.5, 1.5); }); // 50% of total data in center
+    timeRemoval(mPlot, [](QCPGraph* graph) { graph->removeData(0.5, 1.5); }); // 50% of total data in center
 }
 
-void Benchmark::QCPMultiGraph_RemoveDataAfter()
+void Benchmark::QCPGraph_RemoveDataAfter()
 {
-    timeRemoval(mPlot, [](QCPMultiGraph* graph) { graph->removeDataAfter(1.0); }); // last 50% of total data
+    timeRemoval(mPlot, [](QCPGraph* graph) { graph->removeDataAfter(1.0); }); // last 50% of total data
 }
 
-void Benchmark::QCPMultiGraph_RemoveDataBefore()
+void Benchmark::QCPGraph_RemoveDataBefore()
 {
-    timeRemoval(mPlot, [](QCPMultiGraph* graph) { graph->removeDataBefore(1.0); }); // first 50% of total data
+    timeRemoval(mPlot, [](QCPGraph* graph) { graph->removeDataBefore(1.0); }); // first 50% of total data
 }
 
-void Benchmark::QCPMultiGraph_AddDataAtEndSorted()
+void Benchmark::QCPGraph_AddDataAtEndSorted()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     int n = 500000;
     QVector<double> x1(n), y1(n), x2(n), y2(n);
     for (int i = 0; i < n; ++i)
@@ -1339,9 +1339,9 @@ void Benchmark::QCPMultiGraph_AddDataAtEndSorted()
     }
 }
 
-void Benchmark::QCPMultiGraph_AddDataAtBeginSorted()
+void Benchmark::QCPGraph_AddDataAtBeginSorted()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     int n = 500000;
     QVector<double> x1(n), y1(n), x2(n), y2(n);
     for (int i = 0; i < n; ++i)
@@ -1359,9 +1359,9 @@ void Benchmark::QCPMultiGraph_AddDataAtBeginSorted()
     }
 }
 
-void Benchmark::QCPMultiGraph_AddDataMixedSorted()
+void Benchmark::QCPGraph_AddDataMixedSorted()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     int n = 500000;
     QVector<double> x1(n), y1(n), x2(n), y2(n);
     for (int i = 0; i < n; ++i)
@@ -1379,9 +1379,9 @@ void Benchmark::QCPMultiGraph_AddDataMixedSorted()
     }
 }
 
-void Benchmark::QCPMultiGraph_AddDataAtEndUnsorted()
+void Benchmark::QCPGraph_AddDataAtEndUnsorted()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     int n = 500000;
     QVector<double> x1(n), y1(n), x2(n), y2(n);
     for (int i = 0; i < n; ++i)
@@ -1401,9 +1401,9 @@ void Benchmark::QCPMultiGraph_AddDataAtEndUnsorted()
     }
 }
 
-void Benchmark::QCPMultiGraph_AddDataAtBeginUnsorted()
+void Benchmark::QCPGraph_AddDataAtBeginUnsorted()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     int n = 500000;
     QVector<double> x1(n), y1(n), x2(n), y2(n);
     for (int i = 0; i < n; ++i)
@@ -1423,9 +1423,9 @@ void Benchmark::QCPMultiGraph_AddDataAtBeginUnsorted()
     }
 }
 
-void Benchmark::QCPMultiGraph_AddDataMixedUnsorted()
+void Benchmark::QCPGraph_AddDataMixedUnsorted()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     int n = 500000;
     QVector<double> x1(n), y1(n), x2(n), y2(n);
     for (int i = 0; i < n; ++i)
@@ -1445,9 +1445,9 @@ void Benchmark::QCPMultiGraph_AddDataMixedUnsorted()
     }
 }
 
-void Benchmark::QCPMultiGraph_AddDataSingleAtEnd()
+void Benchmark::QCPGraph_AddDataSingleAtEnd()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     int n = 50000;
     QVector<double> x1(n), y1(n);
     for (int i = 0; i < n; ++i)
@@ -1477,9 +1477,9 @@ void Benchmark::QCPMultiGraph_AddDataSingleAtEnd()
                               QTest::WalltimeMilliseconds);
 }
 
-void Benchmark::QCPMultiGraph_AddDataSingleAtBegin()
+void Benchmark::QCPGraph_AddDataSingleAtBegin()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     int n = 50000;
     QVector<double> x1(n), y1(n);
     for (int i = 0; i < n; ++i)
@@ -1509,9 +1509,9 @@ void Benchmark::QCPMultiGraph_AddDataSingleAtBegin()
                               QTest::WalltimeMilliseconds);
 }
 
-void Benchmark::QCPMultiGraph_AddDataSingleRandom()
+void Benchmark::QCPGraph_AddDataSingleRandom()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     int n = 50000;
     QVector<double> x1(n), y1(n);
     for (int i = 0; i < n; ++i)
@@ -1542,10 +1542,10 @@ void Benchmark::QCPMultiGraph_AddDataSingleRandom()
                               QTest::WalltimeMilliseconds);
 }
 
-void Benchmark::QCPMultiGraph_FillToGraphPan10k()
+void Benchmark::QCPGraph_FillToGraphPan10k()
 {
-    auto* owner = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    auto* partner = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* owner = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* partner = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     const int n = 10000;
     QVector<double> keys(n), ownerValues(n), partnerValues(n);
     for (int i = 0; i < n; ++i)
@@ -1569,9 +1569,9 @@ void Benchmark::QCPMultiGraph_FillToGraphPan10k()
     }
 }
 
-void Benchmark::QCPMultiGraph_Standard()
+void Benchmark::QCPGraph_Standard()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     int n = 500;
     QVector<double> x(n), y1(n), y2(n), y3(n);
     for (int i = 0; i < n; ++i)
@@ -1595,10 +1595,10 @@ void Benchmark::QCPMultiGraph_Standard()
     }
 }
 
-void Benchmark::QCPMultiGraph_ManyPoints()
+void Benchmark::QCPGraph_ManyPoints()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    mg->setLineStyle(QCPMultiGraph::lsNone);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setLineStyle(QCPGraph::lsNone);
     mg->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle));
     int n = 50000;
     std::vector<double> x(n);
@@ -1620,10 +1620,10 @@ void Benchmark::QCPMultiGraph_ManyPoints()
     }
 }
 
-void Benchmark::QCPMultiGraph_ManyLines()
+void Benchmark::QCPGraph_ManyLines()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    mg->setLineStyle(QCPMultiGraph::lsLine);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setLineStyle(QCPGraph::lsLine);
     mg->setScatterStyle(QCPScatterStyle());
     int n = 50000;
     std::vector<double> x(n);
@@ -1645,10 +1645,10 @@ void Benchmark::QCPMultiGraph_ManyLines()
     }
 }
 
-void Benchmark::QCPMultiGraph_ManyOffScreenLines()
+void Benchmark::QCPGraph_ManyOffScreenLines()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    mg->setLineStyle(QCPMultiGraph::lsLine);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setLineStyle(QCPGraph::lsLine);
     mg->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssNone));
     int n = 50000;
     std::vector<double> x(n);
@@ -1670,9 +1670,9 @@ void Benchmark::QCPMultiGraph_ManyOffScreenLines()
     }
 }
 
-void Benchmark::QCPMultiGraph_SetDataDouble()
+void Benchmark::QCPGraph_SetDataDouble()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     const int n = 1000000;
     QBENCHMARK
     {
@@ -1686,9 +1686,9 @@ void Benchmark::QCPMultiGraph_SetDataDouble()
     }
 }
 
-void Benchmark::QCPMultiGraph_SetDataFloat()
+void Benchmark::QCPGraph_SetDataFloat()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     const int n = 1000000;
     QBENCHMARK
     {
@@ -1703,9 +1703,9 @@ void Benchmark::QCPMultiGraph_SetDataFloat()
     }
 }
 
-void Benchmark::QCPMultiGraph_RenderDouble()
+void Benchmark::QCPGraph_RenderDouble()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> keys;
     std::vector<std::vector<double>> values;
     fillSineMulti(1000000, 1.0, 1, keys, values);
@@ -1719,9 +1719,9 @@ void Benchmark::QCPMultiGraph_RenderDouble()
     }
 }
 
-void Benchmark::QCPMultiGraph_RenderFloat()
+void Benchmark::QCPGraph_RenderFloat()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     const int n = 1000000;
     std::vector<double> keys(n);
     std::vector<float> values(n);
@@ -1740,12 +1740,12 @@ void Benchmark::QCPMultiGraph_RenderFloat()
     }
 }
 
-void Benchmark::QCPMultiGraph_RenderManyLines()
+void Benchmark::QCPGraph_RenderManyLines()
 {
     const int n = 50000;
     for (int g = 0; g < 3; ++g)
     {
-        auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+        auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
         std::vector<double> keys(n), values(n);
         for (int i = 0; i < n; ++i)
         {
@@ -1763,10 +1763,10 @@ void Benchmark::QCPMultiGraph_RenderManyLines()
     }
 }
 
-void Benchmark::QCPMultiGraph_ScatterDisc1M()
+void Benchmark::QCPGraph_ScatterDisc1M()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    mg->setLineStyle(QCPMultiGraph::lsNone);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setLineStyle(QCPGraph::lsNone);
     mg->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 4));
     const int n = 1000000;
     std::vector<double> keys(n), values(n);
@@ -1784,10 +1784,10 @@ void Benchmark::QCPMultiGraph_ScatterDisc1M()
     }
 }
 
-void Benchmark::QCPMultiGraph_ScatterSquare1M()
+void Benchmark::QCPGraph_ScatterSquare1M()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    mg->setLineStyle(QCPMultiGraph::lsNone);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setLineStyle(QCPGraph::lsNone);
     mg->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssSquare, 4));
     const int n = 1000000;
     std::vector<double> keys(n), values(n);
@@ -1805,10 +1805,10 @@ void Benchmark::QCPMultiGraph_ScatterSquare1M()
     }
 }
 
-void Benchmark::QCPMultiGraph_ScatterWithLine1M()
+void Benchmark::QCPGraph_ScatterWithLine1M()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
-    mg->setLineStyle(QCPMultiGraph::lsLine);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    mg->setLineStyle(QCPGraph::lsLine);
     mg->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 4));
     const int n = 1000000;
     std::vector<double> keys(n), values(n);
@@ -1826,9 +1826,9 @@ void Benchmark::QCPMultiGraph_ScatterWithLine1M()
     }
 }
 
-void Benchmark::QCPInput_WheelOverMultiGraph_1M()
+void Benchmark::QCPInput_WheelOverGraph_1M()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> keys;
     std::vector<std::vector<double>> values;
     fillSineMulti(1000000, 1.0, 1, keys, values);
@@ -1847,7 +1847,7 @@ void Benchmark::QCPInput_WheelOverMultiGraph_1M()
     }
 }
 
-void Benchmark::QCPMultiGraph_UserSystem100k()
+void Benchmark::QCPGraph_UserSystem100k()
 {
     mPlot->plotLayout()->clear();
     auto* rect = new BenchSkewRect(mPlot);
@@ -1855,7 +1855,7 @@ void Benchmark::QCPMultiGraph_UserSystem100k()
     rect->axis(QCPAxis::atBottom)->setRange(0, 100000);
     rect->axis(QCPAxis::atLeft)->setRange(-1.5, 1.5);
 
-    auto* mg = new QCPMultiGraph(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
+    auto* mg = new QCPGraph(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
     std::vector<double> keys;
     std::vector<std::vector<double>> values;
     fillSineMulti(100000, 100000.0, 1, keys, values);
@@ -1868,13 +1868,13 @@ void Benchmark::QCPMultiGraph_UserSystem100k()
     }
 }
 
-void Benchmark::QCPGpu_MultiGraphRender1M()
+void Benchmark::QCPGpu_GraphRender1M()
 {
     QWidget host;
     QCustomPlot* plot = nullptr;
     if (!makeGpuPlot(host, plot))
         QSKIP("no QRhi on this platform (qoffscreen)");
-    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
     std::vector<double> keys;
     std::vector<std::vector<double>> values;
     fillSineMulti(1000000, 1.0, 1, keys, values);
@@ -1889,13 +1889,13 @@ void Benchmark::QCPGpu_MultiGraphRender1M()
     }
 }
 
-void Benchmark::QCPGpu_MultiGraphPan1M()
+void Benchmark::QCPGpu_GraphPan1M()
 {
     QWidget host;
     QCustomPlot* plot = nullptr;
     if (!makeGpuPlot(host, plot))
         QSKIP("no QRhi on this platform (qoffscreen)");
-    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
     std::vector<double> keys;
     std::vector<std::vector<double>> values;
     fillSineMulti(1000000, 100.0, 3, keys, values);
@@ -1912,13 +1912,13 @@ void Benchmark::QCPGpu_MultiGraphPan1M()
     }
 }
 
-void Benchmark::QCPGpu_MultiGraphZoom1M()
+void Benchmark::QCPGpu_GraphZoom1M()
 {
     QWidget host;
     QCustomPlot* plot = nullptr;
     if (!makeGpuPlot(host, plot))
         QSKIP("no QRhi on this platform (qoffscreen)");
-    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
     std::vector<double> keys;
     std::vector<std::vector<double>> values;
     fillSineMulti(1000000, 100.0, 3, keys, values);
@@ -1935,13 +1935,13 @@ void Benchmark::QCPGpu_MultiGraphZoom1M()
     }
 }
 
-void Benchmark::QCPGpu_MultiGraphColored100kPan()
+void Benchmark::QCPGpu_GraphColored100kPan()
 {
     QWidget host;
     QCustomPlot* plot = nullptr;
     if (!makeGpuPlot(host, plot))
         QSKIP("no QRhi on this platform (qoffscreen)");
-    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
     const int n = 100000;
     std::vector<double> keys;
     std::vector<std::vector<double>> values;
@@ -2073,7 +2073,7 @@ void Benchmark::QCPGpu_MixedLayer()
     // one layer, which is what a default plot does today.
     for (int i = 0; i < 100; ++i)
     {
-        QCPMultiGraph* graph = plot->addGraph();
+        QCPGraph* graph = plot->addGraph();
         graph->setPen(QPen(QColor::fromHsv((i * 7) % 360, 200, 160), 1, Qt::SolidLine));
         QVector<double> keys(1000), values(1000);
         for (int j = 0; j < 1000; ++j)
@@ -2575,7 +2575,7 @@ void Benchmark::QCPDrawn_Pan10kOneRecording()
 // QCPItems_Pan10k / QCPBars_Pan10k rows above.
 void Benchmark::QCPErrorBars_Pan10k()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     QVector<double> keys(10000);
     QVector<double> values(10000);
     QVector<double> errors(10000);
@@ -2745,7 +2745,7 @@ void Benchmark::QCPItems_MixedKinds_Pan1k()
 {
     // 100 of every item kind plus 50 spans of each orientation, all inside 50..51: the pan
     // below draws each of them on every frame instead of culling almost all of them.
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     QVector<double> keys(101);
     QVector<double> values(101);
     for (int i = 0; i < 101; ++i)
@@ -2825,7 +2825,7 @@ void Benchmark::QCPItems_Tracers_Pan1k()
 {
     // A thousand tracers on one graph, each at its own key inside the one-key window: every one of
     // them draws on each frame, and each asks its graph where it is.
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     QVector<double> keys(1001);
     QVector<double> values(1001);
     for (int i = 0; i < 1001; ++i)
@@ -2971,7 +2971,7 @@ void Benchmark::QCPPlottables_Pan200()
         QVector<double> values(1000);
         for (int i = 0; i < 1000; ++i)
             values[i] = 0.5 + 0.4 * qSin(0.01 * i + 0.03 * g);
-        auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+        auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
         graph->setData(keys, values);
     }
     mPlot->xAxis->setRange(0, 1000);
@@ -2996,7 +2996,7 @@ void Benchmark::QCPPlottables_Zoom200()
         QVector<double> values(1000);
         for (int i = 0; i < 1000; ++i)
             values[i] = 0.5 + 0.4 * qSin(0.01 * i + 0.03 * g);
-        auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+        auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
         graph->setData(keys, values);
     }
     mPlot->xAxis->setRange(0, 1000);

@@ -9,8 +9,8 @@ static void populatePlot(QCustomPlot* plot)
                           | QCP::iSelectAxes | QCP::iSelectLegend | QCP::iSelectItems
                           | QCP::iMultiSelect);
 
-    auto graph1 = plot->add<QCPMultiGraph>();
-    auto graph2 = plot->add<QCPMultiGraph>();
+    auto graph1 = plot->add<QCPGraph>();
+    auto graph2 = plot->add<QCPGraph>();
     graph1->setPen(QPen(QColor("#e74c3c"), 2));
     graph2->setPen(QPen(QColor("#3498db"), 2));
     graph1->setSelectable(QCP::stWhole);

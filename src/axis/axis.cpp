@@ -36,7 +36,7 @@
 #include "../layoutelements/layoutelement-axisrect.h"
 #include "../painting/grid-rhi-layer.h"
 #include "../painting/painter.h"
-#include "../plottables/plottable-multigraph.h"
+#include "../plottables/plottable-graph.h"
 #include "../plottables/plottable.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1554,16 +1554,16 @@ QCPAxis::SelectablePart QCPAxis::getPartAt(const QPointF& pos) const
 
   \see plottables, items
 */
-QList<QCPHandle<QCPMultiGraph>> QCPAxis::graphs() const
+QList<QCPHandle<QCPGraph>> QCPAxis::graphs() const
 {
-    QList<QCPHandle<QCPMultiGraph>> result;
+    QList<QCPHandle<QCPGraph>> result;
     if (!mParentPlot)
         return result;
 
-    for (QCPMultiGraph* graph : mParentPlot->mGraphs)
+    for (QCPGraph* graph : mParentPlot->mGraphs)
     {
         if (graph->system() && graph->system()->usesAxis(this))
-            result.append(QCPHandle<QCPMultiGraph>(graph));
+            result.append(QCPHandle<QCPGraph>(graph));
     }
     return result;
 }

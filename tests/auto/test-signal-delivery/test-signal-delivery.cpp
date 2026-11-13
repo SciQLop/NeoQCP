@@ -183,7 +183,7 @@ void TestSignalDelivery::deletePlotFromBeforeReplotWithHandle()
 {
     QFETCH(QString, signal);
     auto* plot = plotWithGraph();
-    const QCPHandle<QCPMultiGraph> graph(plot->graph(0));
+    const QCPHandle<QCPGraph> graph(plot->graph(0));
     connect(plot, replotSignal(signal), plot, [plot] { delete plot; });
     plot->replot();
     QVERIFY(!graph);
@@ -193,8 +193,8 @@ void TestSignalDelivery::deletePlotFromBeforeReplotWithHandle()
 void TestSignalDelivery::deletedChildSkipsQueuedEmission()
 {
     QCustomPlot plot;
-    QCPMultiGraph* queued = plot.addGraph();
-    QCPMultiGraph* other = plot.addGraph();
+    QCPGraph* queued = plot.addGraph();
+    QCPGraph* other = plot.addGraph();
     connect(other, &QObject::destroyed, &plot, [queued] { delete queued; });
     bool ran = false;
     {
@@ -237,7 +237,7 @@ void TestSignalDelivery::deleteLayerWhoseChildSlotDeletesPlot()
     auto* plot = plotWithGraph();
     const QPointer<QCustomPlot> alive(plot);
     QVERIFY(plot->addLayer(QStringLiteral("custom")));
-    QCPMultiGraph* graph = plot->graph(0);
+    QCPGraph* graph = plot->graph(0);
     QVERIFY(graph->setLayer(QStringLiteral("custom")));
     connect(graph, &QCPLayerable::layerChanged, plot, [plot] { delete plot; });
     delete plot->layer(QStringLiteral("custom"));
@@ -250,7 +250,7 @@ void TestSignalDelivery::deleteAxisRectWhoseSlotDeletesPlot()
     const QPointer<QCustomPlot> alive(plot);
     auto* rect = new QCPAxisRect(plot);
     plot->plotLayout()->addElement(1, 0, rect);
-    QCPMultiGraph* graph = plot->graph(0);
+    QCPGraph* graph = plot->graph(0);
     connect(rect->axis(QCPAxis::atBottom), &QObject::destroyed, plot,
             [plot, graph] { graph->setLayer(plot->layer(QStringLiteral("axes"))); });
     connect(graph, &QCPLayerable::layerChanged, plot, [plot] { delete plot; });
@@ -772,7 +772,7 @@ void TestSignalDelivery::selectionRectSlotDeletingThePlot()
 {
     auto* plot = new QCustomPlot;
     plot->resize(400, 300);
-    QCPMultiGraph* graph = plot->addGraph();
+    QCPGraph* graph = plot->addGraph();
     graph->setData(QVector<double>{0, 5, 10}, QVector<double>{8, 8, 8});
     graph->setSelectable(QCP::stWhole);
     plot->xAxis->setRange(0, 10);
@@ -817,7 +817,7 @@ void TestSignalDelivery::groupMembersSlotDeletingThePlot()
 {
     auto* plot = new QCustomPlot;
     plot->resize(400, 300);
-    QCPMultiGraph* member = plot->addGraph();
+    QCPGraph* member = plot->addGraph();
     member->setData(QVector<double>{0, 10}, QVector<double>{0, 10});
     QCPPlottableGroup* first = plot->addPlottableGroup(QStringLiteral("first"));
     first->addMember(member);
@@ -858,7 +858,7 @@ void TestSignalDelivery::plottableSelectionSlotDeletingThePlot()
 {
     auto* plot = new QCustomPlot;
     plot->resize(400, 300);
-    QCPMultiGraph* graph = plot->addGraph();
+    QCPGraph* graph = plot->addGraph();
     graph->setData(QVector<double>{0, 5, 10}, QVector<double>{0, 5, 10});
     graph->setSelectable(QCP::stWhole);
     plot->xAxis->setRange(0, 10);

@@ -1,4 +1,4 @@
-// Headless perf scenarios for QCPMultiGraph hot paths.
+// Headless perf scenarios for QCPGraph hot paths.
 // Run with `perf record` / `perf stat` from outside the container.
 //
 // Usage: multigraph_perf <scenario> [iterations]
@@ -66,7 +66,7 @@ static TestData generateMultiData(int nPoints, int nCols)
 
 struct PlotFixture {
     QCustomPlot* plot;
-    QCPMultiGraph* mg;
+    QCPGraph* mg;
 };
 
 static PlotFixture setupPlotWithRhi(TestData& data)
@@ -74,7 +74,7 @@ static PlotFixture setupPlotWithRhi(TestData& data)
     auto* plot = new QCustomPlot();
     plot->resize(1920, 1080);
 
-    auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
     {
         std::vector<std::vector<double>> cols;
         cols.reserve(static_cast<int>(data.columns.size()));
@@ -158,7 +158,7 @@ static void scenarioL2Resampling(int iters)
     QCPRange fullRange(data.keys.front(), data.keys.back());
     std::any cache;
     auto l1result = qcp::algo::buildL1CacheMulti(*src, ViewportParams{}, cache);
-    auto* l1Cache = std::any_cast<qcp::algo::MultiGraphResamplerCache>(&cache);
+    auto* l1Cache = std::any_cast<qcp::algo::GraphResamplerCache>(&cache);
     if (!l1Cache || l1Cache->level1.keys.empty()) {
         fprintf(stderr, "l2_resampling: L1 cache build failed\n");
         return;
@@ -297,7 +297,7 @@ static void scenarioPanReplot(int iters)
     delete plot;
 }
 
-static void colourAndSettle(QCustomPlot* plot, QCPMultiGraph* mg)
+static void colourAndSettle(QCustomPlot* plot, QCPGraph* mg)
 {
     std::vector<double> scalar(mg->dataCount());
     for (size_t i = 0; i < scalar.size(); ++i)

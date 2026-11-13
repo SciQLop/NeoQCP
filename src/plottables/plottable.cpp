@@ -267,7 +267,7 @@ bool QCPSelectionDecorator::registerWithPlottable(QCPAbstractPlottable* plottabl
   coordinates to pixel coordinates. This function is quite convenient, because it takes the
   orientation of the key and value axes into account for you (x and y are swapped when the key axis
   is vertical and the value axis horizontal). If you are worried about performance (i.e. you need
-  to translate many points in a loop like QCPGraph), you can directly use \ref
+  to translate many points in a loop), you can directly use \ref
   QCPAxis::coordToPixel. However, you must then take care about the orientation of the axis
   yourself.
 

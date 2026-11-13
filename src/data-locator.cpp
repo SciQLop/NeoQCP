@@ -5,7 +5,7 @@
 #include "plottables/plottable-colormap.h"
 #include "plottables/plottable-colormap2.h"
 #include "plottables/plottable-histogram2d.h"
-#include "plottables/plottable-multigraph.h"
+#include "plottables/plottable-graph.h"
 #include "selection.h"
 
 QCPHandle<QCPAbstractPlottable> QCPDataLocator::plottable() const
@@ -45,8 +45,8 @@ bool QCPDataLocator::locate(const QPointF& pixelPos)
         return locateColorMap(pixelPos);
     if (qobject_cast<QCPHistogram2D*>(mPlottable))
         return locateHistogram2D(pixelPos);
-    if (qobject_cast<QCPMultiGraph*>(mPlottable))
-        return locateMultiGraph(pixelPos);
+    if (qobject_cast<QCPGraph*>(mPlottable))
+        return locateGraph(pixelPos);
 
     return false;
 }
@@ -158,9 +158,9 @@ bool QCPDataLocator::locateHistogram2D(const QPointF& pixelPos)
     return true;
 }
 
-bool QCPDataLocator::locateMultiGraph(const QPointF& pixelPos)
+bool QCPDataLocator::locateGraph(const QPointF& pixelPos)
 {
-    auto* mg = qobject_cast<QCPMultiGraph*>(mPlottable);
+    auto* mg = qobject_cast<QCPGraph*>(mPlottable);
     QVariant details;
     double dist = mg->selectTest(pixelPos, false, &details);
     if (dist < 0)
@@ -194,8 +194,8 @@ bool QCPDataLocator::locateAtKey(QCPAbstractPlottable* plottable, double key, do
     if (!mPlottable)
         return false;
 
-    if (qobject_cast<QCPMultiGraph*>(mPlottable))
-        return locateMultiGraphAtKey(key);
+    if (qobject_cast<QCPGraph*>(mPlottable))
+        return locateGraphAtKey(key);
     if (!std::isnan(value))
     {
         if (qobject_cast<QCPColorMap2*>(mPlottable))
@@ -209,9 +209,9 @@ bool QCPDataLocator::locateAtKey(QCPAbstractPlottable* plottable, double key, do
     return false;
 }
 
-bool QCPDataLocator::locateMultiGraphAtKey(double key)
+bool QCPDataLocator::locateGraphAtKey(double key)
 {
-    auto* mg = qobject_cast<QCPMultiGraph*>(mPlottable);
+    auto* mg = qobject_cast<QCPGraph*>(mPlottable);
     auto* src = mg->dataSource();
     if (!src || src->size() == 0 || src->columnCount() == 0)
         return false;

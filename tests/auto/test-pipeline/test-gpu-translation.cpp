@@ -3,7 +3,7 @@
 
 void TestPipeline::multiGraphTranslationResetsOnFreshData()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     QVector<double> keys(200000), values(200000);
     for (int i = 0; i < 200000; ++i) {
         keys[i] = i;
@@ -29,7 +29,7 @@ void TestPipeline::multiGraphTranslationResetsOnFreshData()
 
 void TestPipeline::multiGraphTranslationOffsetWhenBusy()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     constexpr int N = 200000;
     QVector<double> keys(N);
     std::vector<QVector<double>> columns(3, QVector<double>(N));
@@ -108,7 +108,7 @@ void TestPipeline::colormap2TranslationOffsetWhenBusy()
 
 void TestPipeline::translatedGeometryClippedToAxisRect()
 {
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     QVector<double> keys(200000), values(200000);
     for (int i = 0; i < 200000; ++i) {
         keys[i] = i;
@@ -152,12 +152,12 @@ void TestPipeline::translatedGeometryClippedToAxisRect()
 
 void TestPipeline::multipleMultiGraphsIndependentOffsets()
 {
-    auto* small = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* small = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     QVector<double> ks(100), vs(100);
     for (int i = 0; i < 100; ++i) { ks[i] = i * 1000; vs[i] = i; }
     small->setData(std::move(ks), std::move(vs));
 
-    auto* large = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* large = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     QVector<double> kl(500000), vl(500000);
     for (int i = 0; i < 500000; ++i) { kl[i] = i; vl[i] = i; }
     large->setData(std::move(kl), std::move(vl));

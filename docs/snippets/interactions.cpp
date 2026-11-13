@@ -36,8 +36,8 @@ DOC_SNIPPET(interactions_drag_axes, 600, 360)
         pressure[i] = 1013 + 8 * std::cos(t[i] / 2);
     }
     customPlot->yAxis2->setVisible(true);
-    auto temp = customPlot->add<QCPMultiGraph>().setAxes(customPlot->xAxis, customPlot->yAxis);
-    auto pres = customPlot->add<QCPMultiGraph>().setAxes(customPlot->xAxis, customPlot->yAxis2);
+    auto temp = customPlot->add<QCPGraph>().setAxes(customPlot->xAxis, customPlot->yAxis);
+    auto pres = customPlot->add<QCPGraph>().setAxes(customPlot->xAxis, customPlot->yAxis2);
     temp->setData(t, temperature);
     pres->setData(t, pressure);
     temp->setPen(QPen(QColor(214, 39, 40), 2));
@@ -65,10 +65,10 @@ DOC_SNIPPET(interactions_select, 600, 360)
         a[i] = std::sin(x[i]);
         b[i] = 0.5 * std::cos(x[i]);
     }
-    auto first = customPlot->add<QCPMultiGraph>()
+    auto first = customPlot->add<QCPGraph>()
         .setData(x, a)
         .setName("sin");
-    auto second = customPlot->add<QCPMultiGraph>()
+    auto second = customPlot->add<QCPGraph>()
         .setData(x, b)
         .setName("cos / 2")
         .setPen(QPen(QColor(255, 127, 14)));
@@ -93,7 +93,7 @@ DOC_SNIPPET(interactions_selection_types, 600, 360)
         x[i] = i;
         y[i] = 10 * std::sin(i / 6.0);
     }
-    auto graph = customPlot->add<QCPMultiGraph>()
+    auto graph = customPlot->add<QCPGraph>()
         .setData(x, y)
         .setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, 5));
     graph->setSelectable(QCP::stDataRange);
@@ -123,7 +123,7 @@ DOC_SNIPPET(interactions_selection_mean, 600, 360)
         x[i] = i * 0.05;
         y[i] = std::sin(x[i]) + 0.2 * std::sin(7 * x[i]);
     }
-    auto graph = customPlot->add<QCPMultiGraph>().setData(x, y);
+    auto graph = customPlot->add<QCPGraph>().setData(x, y);
     graph->setSelectable(QCP::stMultipleDataRanges);
     graph->setSelection(QCPDataSelection(QCPDataRange(10, 50))
                         + QCPDataSelection(QCPDataRange(120, 150)));
@@ -152,9 +152,9 @@ DOC_SNIPPET(interactions_selection_rect, 600, 360)
         x[i] = i * 0.033;
         y[i] = std::sin(i * 1.7) * std::cos(i * 0.37);
     }
-    auto cloud = customPlot->add<QCPMultiGraph>()
+    auto cloud = customPlot->add<QCPGraph>()
         .setData(x, y)
-        .setLineStyle(QCPMultiGraph::lsNone)
+        .setLineStyle(QCPGraph::lsNone)
         .setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, QColor(31, 119, 180), 5));
     cloud->setSelectable(QCP::stMultipleDataRanges);
     cloud->selectionDecorator()->setScatterStyle(
@@ -188,7 +188,7 @@ DOC_SNIPPET(interactions_data_locator, 600, 360)
         t[i] = i * 0.03;
         v[i] = std::sin(t[i]) * std::exp(-t[i] / 6);
     }
-    auto graph = customPlot->add<QCPMultiGraph>().setData(t, v);
+    auto graph = customPlot->add<QCPGraph>().setData(t, v);
     customPlot->rescaleAxes();
 
     QCPDataLocator locator;
@@ -263,7 +263,7 @@ DOC_CODE(interactions_signals)
                      });
 
     QObject::connect(customPlot, &QCustomPlot::selectionChangedByUser, [customPlot] {
-        for (QCPMultiGraph* graph : customPlot->selectedGraphs())
+        for (QCPGraph* graph : customPlot->selectedGraphs())
             qDebug() << graph->name() << "has" << graph->selection().dataPointCount() << "selected points";
     });
     // [/interactions_signals]
@@ -272,7 +272,7 @@ DOC_CODE(interactions_signals)
 
 DOC_CODE(interactions_locate_on_move)
 {
-    auto graph = customPlot->add<QCPMultiGraph>().setData(QVector<double> { 0, 1, 2 }, QVector<double> { 0, 1, 0 });
+    auto graph = customPlot->add<QCPGraph>().setData(QVector<double> { 0, 1, 2 }, QVector<double> { 0, 1, 0 });
     customPlot->xAxis->setRange(-1, 3);
     customPlot->yAxis->setRange(-1, 2);
     auto* statusBar = new QStatusBar(customPlot);
@@ -294,7 +294,7 @@ DOC_CODE(interactions_locate_on_move)
 
 DOC_CODE(interactions_busy)
 {
-    auto graph = customPlot->add<QCPMultiGraph>();
+    auto graph = customPlot->add<QCPGraph>();
     // [interactions_busy]
     graph->setBusy(true);
     // ... when the new data is in:

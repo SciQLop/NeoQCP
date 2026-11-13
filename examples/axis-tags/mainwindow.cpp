@@ -47,8 +47,8 @@ MainWindow::MainWindow(QWidget *parent) :
   mPlot->axisRect()->axis(QCPAxis::atRight, 1)->setPadding(30); // add some padding to have space for tags
   
   // create graphs:
-  mGraph1 = mPlot->add<QCPMultiGraph>().setAxes(mPlot->xAxis, mPlot->axisRect()->axis(QCPAxis::atRight, 0)).get();
-  mGraph2 = mPlot->add<QCPMultiGraph>().setAxes(mPlot->xAxis, mPlot->axisRect()->axis(QCPAxis::atRight, 1)).get();
+  mGraph1 = mPlot->add<QCPGraph>().setAxes(mPlot->xAxis, mPlot->axisRect()->axis(QCPAxis::atRight, 0)).get();
+  mGraph2 = mPlot->add<QCPGraph>().setAxes(mPlot->xAxis, mPlot->axisRect()->axis(QCPAxis::atRight, 1)).get();
   mGraph1->setPen(QPen(QColor(250, 120, 0)));
   mGraph2->setPen(QPen(QColor(0, 180, 60)));
   

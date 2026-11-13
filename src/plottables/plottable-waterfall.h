@@ -1,5 +1,5 @@
 #pragma once
-#include "plottable-multigraph.h"
+#include "plottable-graph.h"
 #include <memory>
 
 // Immutable snapshot: built whole, never mutated. Async resample jobs hold a
@@ -50,7 +50,7 @@ private:
 template <typename T, typename Self = void>
 class QCPWaterfallGraphOps;
 
-class QCP_LIB_DECL QCPWaterfallGraph : public QCPMultiGraph {
+class QCP_LIB_DECL QCPWaterfallGraph : public QCPGraph {
     Q_OBJECT
 public:
     template <typename T>
@@ -100,7 +100,7 @@ private:
 
     double effectiveOffset(int component) const;
     // Builds a fresh immutable adapter and pushes it through
-    // QCPMultiGraph::setDataSource — every data/parameter change goes through
+    // QCPGraph::setDataSource — every data/parameter change goes through
     // here, so line/L1/L2 caches are invalidated and what is drawn always
     // matches the current parameters.
     void rebuildAdapter();
@@ -111,9 +111,9 @@ private:
 
 // The fluent handle of a QCPWaterfallGraph; see QCPPlottableOps for the subclass contract.
 template <typename T, typename Self>
-class QCPWaterfallGraphOps : public QCPMultiGraphOps<T, qcp::OpsRet<Self, QCPWaterfallGraphOps<T>>>
+class QCPWaterfallGraphOps : public QCPGraphOps<T, qcp::OpsRet<Self, QCPWaterfallGraphOps<T>>>
 {
-    using Base = QCPMultiGraphOps<T, qcp::OpsRet<Self, QCPWaterfallGraphOps<T>>>;
+    using Base = QCPGraphOps<T, qcp::OpsRet<Self, QCPWaterfallGraphOps<T>>>;
 
 public:
     using typename Base::Ret;

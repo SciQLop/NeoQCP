@@ -1012,7 +1012,7 @@ std::optional<QRectF> axisAlignedRect(const QPolygonF& polygon)
 
 // simplify: the bars are merged per pixel over the visible rows on every recording, so a pan costs
 // one scan of the visible rows. Upgrade path: record a wider key range once and translate it while
-// panning, as QCPMultiGraph does.
+// panning, as QCPGraph does.
 std::vector<qcp::intervals::PixelBar> QCPIntervals::mergedBars() const
 {
     std::vector<qcp::intervals::PixelBar> bars;

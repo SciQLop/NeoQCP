@@ -473,7 +473,7 @@ void QCPCurve::draw(QCPDrawContext& context) const
 {
     if (!mSystem || mDataContainer->isEmpty())
         return;
-    const Component& comp = component(0);
+    const QCPGraphComponent& comp = component(0);
     if (!comp.visible)
         return;
 
@@ -515,7 +515,7 @@ void QCPCurve::draw(QCPDrawContext& context) const
 void QCPCurve::recordSegments(QCPDrawContext& context, const QList<QCPDataRange>& segments,
                               bool selected, bool coloured) const
 {
-    const Component& comp = component(0);
+    const QCPGraphComponent& comp = component(0);
     const QPen pen = selected && mSelectionDecorator ? mSelectionDecorator->pen() : comp.pen;
     for (const QCPDataRange& segment : segments)
     {
@@ -595,7 +595,7 @@ void QCPCurve::recordMarkers(QCPDrawContext& context, const QCPDataRange& range,
 /* inherits documentation from base class */
 void QCPCurve::drawLegendIcon(QCPDrawContext& icon) const
 {
-    const Component& comp = component(0);
+    const QCPGraphComponent& comp = component(0);
     // The icon has no data of its own: an invisible box gives the replay the extent it fits the
     // drawing to, as the old icon filled the legend rect.
     icon.rect(QCP::Data { 0.0, -0.5 }, QCP::Data { 1.0, 0.5 }, QPen(Qt::NoPen),

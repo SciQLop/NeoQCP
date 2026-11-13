@@ -2,7 +2,7 @@
 #include <QtTest/QtTest>
 
 class QCustomPlot;
-class QCPMultiGraph;
+class QCPGraph;
 
 class TestMultiGraph : public QObject
 {
@@ -276,6 +276,6 @@ private slots:
 
 private:
     // The staged source stays staged, as while its pipeline prepares it: exports commit ready ones.
-    static void stillPreparing(QCPMultiGraph* mg);
+    static void stillPreparing(QCPGraph* mg);
     QCustomPlot* mPlot = nullptr;
 };

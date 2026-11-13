@@ -1,6 +1,6 @@
 #include "test-data-locator.h"
 #include "data-locator.h"
-#include <plottables/plottable-multigraph.h>
+#include <plottables/plottable-graph.h>
 
 void TestDataLocator::init()
 {
@@ -15,7 +15,7 @@ void TestDataLocator::cleanup()
 
 void TestDataLocator::locateOnGraph()
 {
-    QCPMultiGraph* graph = mPlot->addGraph();
+    QCPGraph* graph = mPlot->addGraph();
     mPlot->xAxis->setRange(0, 10);
     mPlot->yAxis->setRange(0, 10);
     graph->addData(5.0, 5.0);
@@ -39,7 +39,7 @@ void TestDataLocator::locateOnGraph()
 
 void TestDataLocator::locateOnAOneColumnMultiGraph()
 {
-    auto* g2 = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* g2 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mPlot->xAxis->setRange(0, 10);
     mPlot->yAxis->setRange(0, 10);
     g2->setData(std::vector<double>{3.0, 5.0, 7.0},
@@ -107,7 +107,7 @@ void TestDataLocator::locateOnColorMap()
 
 void TestDataLocator::locateOnEmptyPlottable()
 {
-    QCPMultiGraph* graph = mPlot->addGraph();
+    QCPGraph* graph = mPlot->addGraph();
     mPlot->replot();
 
     QCPDataLocator locator;
@@ -129,9 +129,9 @@ void TestDataLocator::locateWithNullPlottable()
 
 void TestDataLocator::locateOnMultiGraphSelectsClosestComponent()
 {
-    // Bug: locateMultiGraph always returned component 0's value regardless
+    // Bug: locateGraph always returned component 0's value regardless
     // of which component was closest to the cursor position.
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mPlot->xAxis->setRange(0, 4);
     mPlot->yAxis->setRange(-50, 50);
 
@@ -159,7 +159,7 @@ void TestDataLocator::locateOnMultiGraphSelectsClosestComponent()
 
 void TestDataLocator::locateAtKeyOnAMultiGraphWithoutColumns()
 {
-    auto* mg = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     mg->setData(std::vector<double>{1.0, 2.0, 3.0}, std::vector<std::vector<double>>{});
     QCOMPARE(mg->dataSource()->columnCount(), 0);
 

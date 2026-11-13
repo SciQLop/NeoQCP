@@ -115,9 +115,9 @@ DOC_SNIPPET(plottables_error_bars, 600, 360)
         error[i] = 0.3 + 0.08 * i;
         y[i] = 0.5 * x[i] + noise(rng) * error[i];
     }
-    auto points = customPlot->add<QCPMultiGraph>()
+    auto points = customPlot->add<QCPGraph>()
         .setData(x, y)
-        .setLineStyle(QCPMultiGraph::lsNone)
+        .setLineStyle(QCPGraph::lsNone)
         .setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, QColor(31, 119, 180), 7));
     auto errors = customPlot->add<QCPErrorBars>();
     errors->removeFromLegend();

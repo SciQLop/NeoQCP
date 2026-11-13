@@ -266,10 +266,10 @@ private:
 
   This template class derives from \ref QCPAbstractPlottable and from the abstract interface \ref
   QCPPlottableInterface1D. It serves as a base class for all one-dimensional data (i.e. data with
-  one key dimension), such as \ref QCPGraph and QCPCurve.
+  one key dimension) held in a QCPDataContainer, such as \ref QCPCurve and \ref QCPBars.
 
   The template parameter \a DataType is the type of the data points of this plottable (e.g. \ref
-  QCPGraphData or \ref QCPCurveData). The main purpose of this base class is to provide the member
+  QCPCurveData or \ref QCPBarsData). The main purpose of this base class is to provide the member
   \a mDataContainer (a shared pointer to a \ref QCPDataContainer "QCPDataContainer<DataType>") and
   implement the according virtual methods of the \ref QCPPlottableInterface1D, such that most
   subclassed plottables don't need to worry about this anymore.

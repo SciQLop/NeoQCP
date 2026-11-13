@@ -1,5 +1,5 @@
 #include "test-errorbar-geometry.h"
-#include "plottables/multigraph-errorbars.h"
+#include "plottables/graph-errorbars.h"
 #include "qcustomplot.h"
 #include "reference-image.h"
 #include <QImage>
@@ -93,7 +93,7 @@ int redPixelsNear(const QImage& image, const QPointF& at, int radius)
 //! The scene the reference suite renders: \a verticalKey and \a logValue move the axes, \a selected
 //! selects the middle two bars. \a tweak runs on the graph and the bars before the replot.
 Scene errorBarsScene(bool verticalKey, bool logValue, bool selected,
-                     const std::function<void(QCPMultiGraph&, RecordingErrorBars&)>& tweak = {})
+                     const std::function<void(QCPGraph&, RecordingErrorBars&)>& tweak = {})
 {
     QCustomPlot plot;
     plot.resize(400, 300);
@@ -109,8 +109,8 @@ Scene errorBarsScene(bool verticalKey, bool logValue, bool selected,
     QCPAxis* value = verticalKey ? plot.xAxis : plot.yAxis;
     key->setRange(0, 6);
     value->setRange(logValue ? 0.5 : -1, logValue ? 10 : 1.5);
-    auto* graph = new QCPMultiGraph(key, value);
-    graph->setLineStyle(QCPMultiGraph::lsNone);
+    auto* graph = new QCPGraph(key, value);
+    graph->setLineStyle(QCPGraph::lsNone);
     graph->setPen(QPen(Qt::blue, 0));
     graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
     graph->setData(QVector<double> { 0.5, 1.5, 2.5, 3.5, 4.5, 5.5 },
@@ -142,8 +142,8 @@ std::unique_ptr<QCustomPlot> makeBarsPlot(RecordingErrorBars** out)
     plot->resize(400, 300);
     plot->xAxis->setRange(0, 6);
     plot->yAxis->setRange(-1, 1.5);
-    auto* graph = new QCPMultiGraph(plot->xAxis, plot->yAxis);
-    graph->setLineStyle(QCPMultiGraph::lsNone);
+    auto* graph = new QCPGraph(plot->xAxis, plot->yAxis);
+    graph->setLineStyle(QCPGraph::lsNone);
     graph->setData(QVector<double> { 0.5, 1.5, 2.5 }, QVector<double> { 0.2, 0.2, 0.2 });
     auto* bars = new RecordingErrorBars(plot->xAxis, plot->yAxis);
     bars->setDataPlottable(graph);
@@ -202,8 +202,8 @@ void TestErrorBarGeometry::barsFollowTheirPlottablesData()
     plot.resize(400, 300);
     plot.xAxis->setRange(0, 6);
     plot.yAxis->setRange(-1, 1.5);
-    auto* graph = new QCPMultiGraph(plot.xAxis, plot.yAxis);
-    graph->setLineStyle(QCPMultiGraph::lsNone);
+    auto* graph = new QCPGraph(plot.xAxis, plot.yAxis);
+    graph->setLineStyle(QCPGraph::lsNone);
     graph->setData(QVector<double> { 0.5, 1.5, 2.5, 3.5, 4.5, 5.5 },
                    QVector<double> { 0.2, 0.2, 0.2, 0.2, 0.2, 0.2 });
     auto* bars = new RecordingErrorBars(plot.xAxis, plot.yAxis);
@@ -233,8 +233,8 @@ void TestErrorBarGeometry::attachDetachReattach()
 {
     RecordingErrorBars* bars = nullptr;
     auto plot = makeBarsPlot(&bars);
-    auto* other = new QCPMultiGraph(plot->xAxis, plot->yAxis);
-    other->setLineStyle(QCPMultiGraph::lsNone);
+    auto* other = new QCPGraph(plot->xAxis, plot->yAxis);
+    other->setLineStyle(QCPGraph::lsNone);
     other->setData(QVector<double> { 2.5, 3.5, 4.5 }, QVector<double> { 0.2, 0.2, 0.2 });
     plot->replot();
     const QPointF onFirst(plot->xAxis->coordToPixel(0.5), plot->yAxis->coordToPixel(0.6));
@@ -306,7 +306,7 @@ void TestErrorBarGeometry::swappingThePlottablesAxesReRecords()
 {
     RecordingErrorBars* bars = nullptr;
     auto plot = makeBarsPlot(&bars);
-    auto* graph = qobject_cast<QCPMultiGraph*>(bars->dataPlottable());
+    auto* graph = qobject_cast<QCPGraph*>(bars->dataPlottable());
     QVERIFY(graph);
     const int before = bars->recordings();
     graph->setKeyAxis(plot->yAxis);
@@ -413,7 +413,7 @@ void TestErrorBarGeometry::aSwappedPlottableContainerReRecords()
 {
     RecordingErrorBars* bars = nullptr;
     auto plot = makeBarsPlot(&bars);
-    auto* graph = qobject_cast<QCPMultiGraph*>(bars->dataPlottable());
+    auto* graph = qobject_cast<QCPGraph*>(bars->dataPlottable());
     QVERIFY(graph);
     graph->setData(QVector<double> { 0.5, 1.5, 2.5 }, QVector<double> { 0.2, 0.2, 0.2 });
     plot->replot();

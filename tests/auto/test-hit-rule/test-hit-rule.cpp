@@ -28,9 +28,9 @@ bool hitsContain(const QList<QCPHit>& hits, const QCPLayerable* layerable)
     return false;
 }
 
-QCPMultiGraph* addDiagonalMultiGraph(QCustomPlot* plot)
+QCPGraph* addDiagonalMultiGraph(QCustomPlot* plot)
 {
-    auto* graph = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+    auto* graph = new QCPGraph(plot->xAxis, plot->yAxis);
     graph->setData(std::vector<double> { 0, 10 }, std::vector<std::vector<double>> { { 0, 10 } });
     return graph;
 }

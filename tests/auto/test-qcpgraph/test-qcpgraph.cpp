@@ -21,15 +21,15 @@ void TestQCPGraph::specializedGraphInterface()
   QCOMPARE(mPlot->plottableCount(), 0);
   QCOMPARE(mPlot->graphCount(), 0);
   
-  QCPMultiGraph *graph1 = mPlot->addGraph();
+  QCPGraph *graph1 = mPlot->addGraph();
   QCOMPARE(mPlot->plottableCount(), 1);
   QCOMPARE(mPlot->graphCount(), 1);
   
-  QCPMultiGraph *graph2 = mPlot->addGraph();
+  QCPGraph *graph2 = mPlot->addGraph();
   QCOMPARE(mPlot->plottableCount(), 2);
   QCOMPARE(mPlot->graphCount(), 2);
   
-  QCPMultiGraph *graph3 = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+  QCPGraph *graph3 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
   QCOMPARE(mPlot->plottableCount(), 3);
   QCOMPARE(mPlot->graphCount(), 3);
   
@@ -59,19 +59,19 @@ void TestQCPGraph::specializedGraphInterface()
 void TestQCPGraph::multiColumnAndWaterfallGraphsAreListed()
 {
   mPlot->clearPlottables();
-  auto *multi = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+  auto *multi = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
   multi->setData(std::vector<double>{0, 1}, std::vector<std::vector<double>>{{0, 1}, {1, 2}});
   auto *waterfall = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
   QCOMPARE(mPlot->graphCount(), 2);
   QCOMPARE(mPlot->graph(0).get(), multi);
-  QCOMPARE(mPlot->graph(1).get(), static_cast<QCPMultiGraph*>(waterfall));
+  QCOMPARE(mPlot->graph(1).get(), static_cast<QCPGraph*>(waterfall));
   QCOMPARE(mPlot->clearGraphs(), 2);
   QCOMPARE(mPlot->plottableCount(), 0);
 }
 
 void TestQCPGraph::selectedGraphsAndAxisGraphsListTheMultigraph()
 {
-  QCPMultiGraph *other = mPlot->addGraph();
+  QCPGraph *other = mPlot->addGraph();
   mGraph->setData(QVector<double>{0, 1}, QVector<double>{0, 1});
   mGraph->setSelection(QCPDataSelection(QCPDataRange(0, 1)));
   QCOMPARE(mPlot->selectedGraphs().size(), 1);
@@ -123,7 +123,7 @@ void TestQCPGraph::dataManipulation()
 
 void TestQCPGraph::channelFill()
 {
-  QCPMultiGraph *otherGraph = mPlot->addGraph();
+  QCPGraph *otherGraph = mPlot->addGraph();
 
   mGraph->setBrush(Qt::black);
   QVERIFY(mGraph->setComponentFillToGraph(0, otherGraph, 0));

@@ -119,14 +119,14 @@ void TestGridRhi::exportStillUsesQPainter()
     QCOMPARE(pm.height(), 150);
 }
 
-// A shown plot draws QCPMultiGraph lines and fills on the GPU. toPixmap() and the raster saves
+// A shown plot draws QCPGraph lines and fills on the GPU. toPixmap() and the raster saves
 // paint with pmNoCaching only, and the line/fill code checked pmVectorized alone, so the
 // export sent them to the live GPU layer and the image came out without them.
 void TestGridRhi::rasterExportOfAShownPlotKeepsGpuLinesAndFills()
 {
     if (!showAndHasRhiGrid(mPlot))
         QSKIP("No QRhi available — the GPU line path needs a real backend");
-    QCPMultiGraph* graph = mPlot->addGraph();
+    QCPGraph* graph = mPlot->addGraph();
     graph->setData(QVector<double> { -4, 0, 4 }, QVector<double> { -4, 4, -4 });
     graph->setPen(QPen(Qt::red, 4));
     graph->setBrush(QBrush(Qt::blue));
@@ -155,7 +155,7 @@ void TestGridRhi::layerReplotDoesNotStackGpuGeometry()
     QVERIFY(mPlot->addLayer("cursor", mPlot->layer("main"), QCustomPlot::limAbove));
     QCPLayer* layer = mPlot->layer("cursor");
     layer->setMode(QCPLayer::lmBuffered);
-    QCPMultiGraph* graph = mPlot->addGraph();
+    QCPGraph* graph = mPlot->addGraph();
     graph->setLayer(layer);
     graph->setData(QVector<double> { -4, 0, 4 }, QVector<double> { -4, 4, -4 });
     graph->setPen(QPen(Qt::red, 2));
@@ -171,7 +171,7 @@ void TestGridRhi::layerReplotDoesNotStackGpuGeometry()
     QCOMPARE(prl->drawEntries().size(), entries);
 }
 
-// The GPU fill of a QCPMultiGraph took brush().color() only: a gradient became a flat colour (black
+// The GPU fill of a QCPGraph took brush().color() only: a gradient became a flat colour (black
 // for a QLinearGradient, whose colour() is black) on screen, while exports painted the gradient.
 void TestGridRhi::gradientGraphFillLooksTheSameOnScreenAndInExports()
 {
@@ -179,7 +179,7 @@ void TestGridRhi::gradientGraphFillLooksTheSameOnScreenAndInExports()
         QSKIP("No QRhi available — the GPU fill needs a real backend");
     mPlot->xAxis->grid()->setVisible(false);
     mPlot->yAxis->grid()->setVisible(false);
-    QCPMultiGraph* graph = mPlot->addGraph();
+    QCPGraph* graph = mPlot->addGraph();
     graph->setData(QVector<double> { -5, 5 }, QVector<double> { 4, 4 });
     graph->setPen(Qt::NoPen);
     QLinearGradient gradient(0, 0, 0, 300);

@@ -50,7 +50,7 @@ DOC_SNIPPET(items_tracer_bracket, 600, 360)
         x[i] = i / 40.0;
         y[i] = std::exp(-(x[i] - 10) * (x[i] - 10) / 8) * std::cos(3 * x[i]);
     }
-    auto graph = customPlot->add<QCPMultiGraph>().setData(x, y);
+    auto graph = customPlot->add<QCPGraph>().setData(x, y);
     customPlot->xAxis->setRange(0, 20);
     customPlot->yAxis->setRange(-1.3, 1.9);
 
@@ -90,9 +90,9 @@ DOC_SNIPPET(items_shapes, 600, 360)
         y[i] = 0.5 * x[i] + 1 + 0.8 * std::sin(i * 2.7) * std::cos(i * 1.3);
     }
     y[45] += 4; // an outlier at x = 7.5
-    auto points = customPlot->add<QCPMultiGraph>()
+    auto points = customPlot->add<QCPGraph>()
         .setData(x, y)
-        .setLineStyle(QCPMultiGraph::lsNone)
+        .setLineStyle(QCPGraph::lsNone)
         .setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
     customPlot->xAxis->setRange(-0.5, 10.5);
     customPlot->yAxis->setRange(-1, 11);

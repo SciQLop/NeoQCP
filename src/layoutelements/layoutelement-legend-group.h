@@ -3,7 +3,7 @@
 #include "../handle.h"
 #include <QPointer>
 
-class QCPMultiGraph;
+class QCPGraph;
 
 //! A graph's legend row: a plottable's row (itemWithPlottable finds it) that draws one segment per
 //! shown component and expands to one row each.
@@ -11,10 +11,10 @@ class QCP_LIB_DECL QCPGroupLegendItem : public QCPPlottableLegendItem
 {
     Q_OBJECT
 public:
-    QCPGroupLegendItem(QCPLegend* parent, QCPMultiGraph* multiGraph);
+    QCPGroupLegendItem(QCPLegend* parent, QCPGraph* graph);
 
     //! The graph this row shows.
-    [[nodiscard]] QCPHandle<QCPMultiGraph> graph() const;
+    [[nodiscard]] QCPHandle<QCPGraph> graph() const;
     bool expanded() const { return mExpanded; }
     void setExpanded(bool expanded);
     int selectedComponent() const { return mSelectedComponent; }
@@ -43,7 +43,7 @@ private:
     bool shownExpanded() const;
     QFont rowFont() const;
     int rowHeight() const;
-    QPointer<QCPMultiGraph> mMultiGraph;
+    QPointer<QCPGraph> mGraph;
     bool mExpanded = false;
     int mSelectedComponent = -1;
 };

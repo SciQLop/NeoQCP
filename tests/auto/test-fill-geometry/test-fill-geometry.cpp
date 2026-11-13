@@ -1,5 +1,5 @@
 #include "test-fill-geometry.h"
-#include "plottables/multigraph-fill.h"
+#include "plottables/graph-fill.h"
 #include "plottables/plottable-linestyle.h"
 #include "qcustomplot.h"
 #include <algorithm>

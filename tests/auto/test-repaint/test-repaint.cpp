@@ -29,7 +29,7 @@
 #include "plottables/plottable-group.h"
 #include "plottables/plottable-histogram2d.h"
 
-#include "plottables/plottable-multigraph.h"
+#include "plottables/plottable-graph.h"
 #include "plottables/plottable-statisticalbox.h"
 #include "plottables/plottable-waterfall.h"
 #include "polar/angularaxis.h"
@@ -493,7 +493,7 @@ void TestRepaint::exportShowsReadyStagedData()
 {
     QCustomPlot plot;
     plot.resize(400, 300);
-    auto* mg = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto* mg = new QCPGraph(plot.xAxis, plot.yAxis);
     mg->setDeferredDataSwap(true); // the staged export path is opt-in
     mg->setData(std::vector<double> { 0, 10 }, std::vector<std::vector<double>> { { 2, 2 } });
     mg->setComponentPens({ QPen(Qt::red, 4) });
@@ -536,7 +536,7 @@ void TestRepaint::legendShowsAddedGraphAndItsName()
     waitUntilSettled(plot);
     const QImage empty = screenOf(&plot);
 
-    auto g = plot.add<QCPMultiGraph>(QVector<double> { 0, 1 }, QVector<double> { 0, 1 }).setName("Bx");
+    auto g = plot.add<QCPGraph>(QVector<double> { 0, 1 }, QVector<double> { 0, 1 }).setName("Bx");
     waitUntilSettled(plot);
     const QImage oneRow = screenOf(&plot);
     const QRect rowArea = plot.legend->outerRect();
@@ -739,12 +739,12 @@ const QVector<PlottableAppearanceCase>& plottableAppearanceCases()
     static const QVector<PlottableAppearanceCase> cases {
         { "graph.setLineStyle", [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
           [](QCPAbstractPlottable* p)
-          { static_cast<QCPMultiGraph*>(p)->setLineStyle(QCPMultiGraph::lsStepLeft); } },
+          { static_cast<QCPGraph*>(p)->setLineStyle(QCPGraph::lsStepLeft); } },
         { "graph.setScatterSkip", [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPMultiGraph*>(p)->setScatterSkip(2); } },
+          [](QCPAbstractPlottable* p) { static_cast<QCPGraph*>(p)->setScatterSkip(2); } },
         { "graph.setAdaptiveSampling",
           [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
-          [](QCPAbstractPlottable* p) { static_cast<QCPMultiGraph*>(p)->setAdaptiveSampling(false); } },
+          [](QCPAbstractPlottable* p) { static_cast<QCPGraph*>(p)->setAdaptiveSampling(false); } },
         { "graph.setPen", [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
           [](QCPAbstractPlottable* p) { p->setPen(QPen(Qt::darkGreen, 3)); } },
         { "graph.setBrush", [](Plot plot) -> QCPAbstractPlottable* { return plot.graph(0); },
@@ -834,11 +834,11 @@ const QVector<PlottableAppearanceCase>& plottableAppearanceCases()
           { return new QCPHistogram2D(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
           { static_cast<QCPHistogram2D*>(p)->setContourPen(QPen(Qt::magenta, 2)); } },
         { "multigraph.setLineStyle", [](Plot plot) -> QCPAbstractPlottable*
-          { return new QCPMultiGraph(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
-          { static_cast<QCPMultiGraph*>(p)->setLineStyle(QCPMultiGraph::lsNone); } },
+          { return new QCPGraph(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          { static_cast<QCPGraph*>(p)->setLineStyle(QCPGraph::lsNone); } },
         { "multigraph.setAdaptiveSampling", [](Plot plot) -> QCPAbstractPlottable*
-          { return new QCPMultiGraph(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
-          { static_cast<QCPMultiGraph*>(p)->setAdaptiveSampling(false); } },
+          { return new QCPGraph(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
+          { static_cast<QCPGraph*>(p)->setAdaptiveSampling(false); } },
         { "waterfall.setOffsetMode", [](Plot plot) -> QCPAbstractPlottable*
           { return new QCPWaterfallGraph(plot.xAxis, plot.yAxis); }, [](QCPAbstractPlottable* p)
           { static_cast<QCPWaterfallGraph*>(p)->setOffsetMode(QCPWaterfallGraph::omCustom); } },
@@ -983,17 +983,17 @@ void TestRepaint::multiGraphLineStyleResetsComponents()
     // A component may carry its own style; the global setter must still reset it, so comparing the
     // global member alone is not enough to decide "nothing changed".
     QCustomPlot plot;
-    auto* mg = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto* mg = new QCPGraph(plot.xAxis, plot.yAxis);
     auto source = std::make_shared<QCPSoAMultiDataSource<std::vector<double>, std::vector<double>>>(
         std::vector<double> { 0.0, 1.0 }, std::vector<std::vector<double>> { { 0.0, 1.0 } });
     mg->setDataSource(source);
     QCOMPARE(mg->componentCount(), 1);
 
-    mg->setComponentLineStyle(0, QCPMultiGraph::lsStepLeft);
-    QCOMPARE(mg->component(0).lineStyle, QCPMultiGraph::lsStepLeft);
+    mg->setComponentLineStyle(0, QCPGraph::lsStepLeft);
+    QCOMPARE(mg->component(0).lineStyle, QCPGraph::lsStepLeft);
 
-    mg->setLineStyle(QCPMultiGraph::lsLine);
-    QCOMPARE(mg->component(0).lineStyle, QCPMultiGraph::lsLine);
+    mg->setLineStyle(QCPGraph::lsLine);
+    QCOMPARE(mg->component(0).lineStyle, QCPGraph::lsLine);
 }
 
 void TestRepaint::barsGroupSpacingRepaints()
@@ -1141,7 +1141,7 @@ const QVector<RemainingCase>& remainingCases()
           {
               auto* legend = new QCPLegend();
               plot.plotLayout()->addElement(1, 0, legend);
-              auto* multi = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+              auto* multi = new QCPGraph(plot.xAxis, plot.yAxis);
               auto* group = new QCPGroupLegendItem(legend, multi);
               legend->addItem(group);
               return group;
@@ -1376,7 +1376,7 @@ void TestRepaint::orphanPlottableKeepsName()
 {
     // A plottable with null axes is a valid detached object: it has no legend to mark, but its name
     // is still its own.
-    QCPMultiGraph graph(nullptr, nullptr);
+    QCPGraph graph(nullptr, nullptr);
     graph.setName(QStringLiteral("orphan"));
     QCOMPARE(graph.name(), QStringLiteral("orphan"));
 }
@@ -2510,7 +2510,7 @@ void TestRepaint::itemsDefaultToAnnotations()
     QCOMPARE(span->layer(), annotations);
 
     QVERIFY(plot.setCurrentLayer(QStringLiteral("grid")));
-    QCPMultiGraph* graph = plot.addGraph();
+    QCPGraph* graph = plot.addGraph();
     QCOMPARE(graph->layer(), plot.layer(QStringLiteral("grid")));
     auto* other = new QCPItemText(&plot);
     QCOMPARE(other->layer(), annotations);
@@ -2597,7 +2597,7 @@ void TestRepaint::textAboveGraphLine()
     text->setBrush(background);
     text->setPadding(QMargins(10, 10, 10, 10));
 
-    QCPMultiGraph* graph = plot->addGraph();
+    QCPGraph* graph = plot->addGraph();
     graph->setData(QVector<double> { 0, 1 }, QVector<double> { 0.5, 0.5 });
     graph->setPen(QPen(Qt::black, 8));
     plot->replot();
@@ -2742,7 +2742,7 @@ void TestRepaint::dashedLineStacksLikeSolid()
         rect->bottomRight->setCoords(0.8, 0.3);
         rect->setPen(Qt::NoPen);
         rect->setBrush(QColor(210, 40, 40));
-        QCPMultiGraph* graph = plot->addGraph();
+        QCPGraph* graph = plot->addGraph();
         QVector<double> keys, values;
         for (int i = 0; i <= 400; ++i)
         {
@@ -2796,7 +2796,7 @@ void TestRepaint::dashPhaseSurvivesPan()
     QCustomPlot* plot = shownGpuPlot(host);
     if (!plot)
         QSKIP("no QRhi on this platform");
-    QCPMultiGraph* graph = plot->addGraph();
+    QCPGraph* graph = plot->addGraph();
     QVector<double> keys, values;
     for (int i = 0; i <= 400; ++i)
     {
@@ -2839,7 +2839,7 @@ void TestRepaint::dashedLineMatchesExportDashes()
     QCustomPlot* plot = shownGpuPlot(host);
     if (!plot)
         QSKIP("no QRhi on this platform");
-    QCPMultiGraph* graph = plot->addGraph();
+    QCPGraph* graph = plot->addGraph();
     QVector<double> keys, values;
     for (int i = 0; i <= 400; ++i)
     {
@@ -2877,7 +2877,7 @@ void TestRepaint::solidLinesKeepTheirVertexFormat()
     QCustomPlot* plot = shownGpuPlot(host);
     if (!plot)
         QSKIP("no QRhi on this platform");
-    QCPMultiGraph* graph = plot->addGraph();
+    QCPGraph* graph = plot->addGraph();
     QVector<double> keys, values;
     for (int i = 0; i <= 100; ++i)
     {
@@ -2977,12 +2977,12 @@ void TestRepaint::dashedUnderSolidStaysUnder()
     plot->yAxis->setRange(0, 1);
 
     // Dashed first, solid second: the solid line crosses the dashed one and must be on top.
-    QCPMultiGraph* dashed = plot->addGraph();
+    QCPGraph* dashed = plot->addGraph();
     QPen alwaysOnDash(Qt::red, 6, Qt::CustomDashLine);
     alwaysOnDash.setDashPattern({ 1000.0, 1.0 }); // on for 6000 px: the crossing is mid-dash
     dashed->setPen(alwaysOnDash);
     dashed->setData(QVector<double> { 0, 1 }, QVector<double> { 0.5, 0.5 });
-    QCPMultiGraph* solid = plot->addGraph();
+    QCPGraph* solid = plot->addGraph();
     solid->setPen(QPen(Qt::blue, 6, Qt::SolidLine));
     solid->setData(QVector<double> { 0.5, 0.5 }, QVector<double> { 0, 1 });
     waitUntilSettled(*plot);
@@ -3000,10 +3000,10 @@ void TestRepaint::dashedUnderSolidStaysUnder()
     plot2->resize(400, 300);
     plot2->xAxis->setRange(0, 1);
     plot2->yAxis->setRange(0, 1);
-    QCPMultiGraph* solid2 = plot2->addGraph();
+    QCPGraph* solid2 = plot2->addGraph();
     solid2->setPen(QPen(Qt::blue, 6, Qt::SolidLine));
     solid2->setData(QVector<double> { 0.5, 0.5 }, QVector<double> { 0, 1 });
-    QCPMultiGraph* dashed2 = plot2->addGraph();
+    QCPGraph* dashed2 = plot2->addGraph();
     QPen longDash(Qt::red, 6, Qt::CustomDashLine);
     longDash.setDashPattern({ 1000.0, 1.0 }); // on for 6000 px: the crossing is mid-dash
     dashed2->setPen(longDash);
@@ -3022,7 +3022,7 @@ void TestRepaint::panDoesNotMarkTheLayerDirty()
     QCustomPlot* plot = shownGpuPlot(host);
     if (!plot)
         QSKIP("no QRhi on this platform");
-    QCPMultiGraph* graph = plot->addGraph();
+    QCPGraph* graph = plot->addGraph();
     QVector<double> keys, values;
     for (int i = 0; i <= 100; ++i)
     {

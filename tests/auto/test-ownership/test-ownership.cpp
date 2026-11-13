@@ -38,12 +38,12 @@ QCPLegend* TestOwnership::addSecondLegend()
     return second;
 }
 
-QCPMultiGraph* TestOwnership::addRedGraph()
+QCPGraph* TestOwnership::addRedGraph()
 {
     mPlot->legend->setVisible(false); // its icon would be red too
     mPlot->xAxis->setRange(0, 10);
     mPlot->yAxis->setRange(0, 10);
-    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* graph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     graph->setPen(QPen(Qt::red, 6));
     graph->setData(QVector<double> { 1, 9 }, QVector<double> { 5, 5 });
     return graph;
@@ -72,7 +72,7 @@ void TestOwnership::showAndExpose()
 
 void TestOwnership::deletePlottableLeavesLists()
 {
-    QCPMultiGraph* graph = mPlot->addGraph();
+    QCPGraph* graph = mPlot->addGraph();
     new QCPCurve(mPlot->xAxis, mPlot->yAxis);
     QCOMPARE(mPlot->plottableCount(), 2);
     QCOMPARE(mPlot->legend->itemCount(), 2);
@@ -87,7 +87,7 @@ void TestOwnership::deletePlottableLeavesLists()
 
 void TestOwnership::deleteLaterPlottable()
 {
-    QCPMultiGraph* graph = mPlot->addGraph();
+    QCPGraph* graph = mPlot->addGraph();
     new QCPCurve(mPlot->xAxis, mPlot->yAxis);
 
     graph->deleteLater();
@@ -138,7 +138,7 @@ void TestOwnership::deletingAPlottableFromAnotherDrawKeepsTheDeferredPainterSafe
 
 void TestOwnership::deleteMultiGraphLeavesItsRow()
 {
-    auto* multiGraph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* multiGraph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     QVERIFY(qobject_cast<QCPGroupLegendItem*>(mPlot->legend->item(0)));
 
     delete multiGraph;
@@ -170,7 +170,7 @@ QCPIntervals* intervalsInLegend(QCustomPlot* plot, QCPLaneLayout* layout)
 
 void TestOwnership::deleteMultiGraphLeavesSecondLegend()
 {
-    auto* multiGraph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* multiGraph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     auto* second = addSecondLegend();
     QVERIFY(second->addItem(findRow<QCPGroupLegendItem>(mPlot->legend)));
     second->setVisible(true);
@@ -202,7 +202,7 @@ void TestOwnership::deleteIntervalsLeavesItsRows()
 void TestOwnership::detachedRowsOutliveTheirPlottables()
 {
     QCPLaneLayout layout;
-    auto* multiGraph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* multiGraph = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
     auto* intervals = intervalsInLegend(mPlot, &layout);
     auto* groupRow = findRow<QCPGroupLegendItem>(mPlot->legend);
     auto* intervalsRow = findRow<QCPIntervalsLegendItem>(mPlot->legend);
@@ -222,8 +222,8 @@ void TestOwnership::detachedRowsOutliveTheirPlottables()
 
 void TestOwnership::deletePlottableInGroup()
 {
-    QCPMultiGraph* first = mPlot->addGraph();
-    QCPMultiGraph* second = mPlot->addGraph();
+    QCPGraph* first = mPlot->addGraph();
+    QCPGraph* second = mPlot->addGraph();
     QCPPlottableGroup* group = mPlot->addPlottableGroup("pair");
     QVERIFY(group->addMember(first));
     QVERIFY(group->addMember(second));
@@ -246,7 +246,7 @@ void TestOwnership::deletePlottableInGroup()
 
 void TestOwnership::removePlottableStillDeletes()
 {
-    QPointer<QCPMultiGraph> graph = mPlot->addGraph().get();
+    QPointer<QCPGraph> graph = mPlot->addGraph().get();
 
     QVERIFY(mPlot->removePlottable(graph));
 
@@ -267,7 +267,7 @@ void TestOwnership::nullAxisPlottableIsDetachedHalfAxedIsRefused()
     QCOMPARE(gMisuses, 1);
     QVERIFY(halfAxed->parentPlot() == nullptr);
 
-    auto* graph = new QCPMultiGraph(nullptr, nullptr);
+    auto* graph = new QCPGraph(nullptr, nullptr);
     auto* histogram = new QCPHistogram2D(nullptr, nullptr);
     QCOMPARE(gMisuses, 1);
 
@@ -289,7 +289,7 @@ void TestOwnership::nullAxisPlottableIsDetachedHalfAxedIsRefused()
 
 void TestOwnership::legendItemMovedToSecondLegend()
 {
-    QCPMultiGraph* graph = mPlot->addGraph();
+    QCPGraph* graph = mPlot->addGraph();
     auto* second = addSecondLegend();
     QCPPlottableLegendItem* row = mPlot->legend->itemWithPlottable(graph);
 
@@ -303,7 +303,7 @@ void TestOwnership::legendItemMovedToSecondLegend()
 
 void TestOwnership::plottableDeathLeavesSecondLegend()
 {
-    QCPMultiGraph* graph = mPlot->addGraph();
+    QCPGraph* graph = mPlot->addGraph();
     auto* second = addSecondLegend();
     QVERIFY(second->addItem(mPlot->legend->itemWithPlottable(graph)));
     QCOMPARE(second->itemCount(), 1);
@@ -369,7 +369,7 @@ void TestOwnership::clearItemsWhileASlotDeletesAnother()
 
 void TestOwnership::clearItemsKeepsOtherLayersOrder()
 {
-    auto graph = mPlot->add<QCPMultiGraph>();
+    auto graph = mPlot->add<QCPGraph>();
     QVERIFY(mPlot->addLayer(QStringLiteral("upper")));
     QCPLayer* upper = mPlot->layer(QStringLiteral("upper"));
     auto* a = new QCPItemLine(mPlot);
@@ -436,8 +436,8 @@ void TestOwnership::layerOrderAfterMoves()
     QCPLayer* upper = mPlot->layer(QStringLiteral("upper"));
     QVERIFY(mPlot->addLayer(QStringLiteral("third")));
     QCPLayer* third = mPlot->layer(QStringLiteral("third"));
-    auto first = mPlot->add<QCPMultiGraph>();
-    auto second = mPlot->add<QCPMultiGraph>();
+    auto first = mPlot->add<QCPGraph>();
+    auto second = mPlot->add<QCPGraph>();
     first->setLayer(upper);
     second->setLayer(upper);
     QVERIFY(qcp::pointers(upper->children()) == (QList<QCPLayerable*> { first.get(), second.get() }));
@@ -496,7 +496,7 @@ void TestOwnership::plottablesOfAnotherRectAfterAxisRemoval()
     mPlot->setSelectionRectMode(QCP::srmSelect);
     auto* second = new QCPAxisRect(mPlot);
     mPlot->plotLayout()->addElement(1, 0, second);
-    auto* graph = new QCPMultiGraph(second->axis(QCPAxis::atBottom), second->axis(QCPAxis::atLeft));
+    auto* graph = new QCPGraph(second->axis(QCPAxis::atBottom), second->axis(QCPAxis::atLeft));
     graph->setData(QVector<double> { 1, 9 }, QVector<double> { 5, 5 });
     auto* line = new QCPItemLine(mPlot);
     line->start->setAxes(second->axis(QCPAxis::atBottom), second->axis(QCPAxis::atLeft));
@@ -616,7 +616,7 @@ void TestOwnership::deleteLastLayer()
         delete mPlot->layer(0);
 
     QVERIFY(mPlot->currentLayer() == nullptr);
-    QCPMultiGraph* graph = mPlot->addGraph();
+    QCPGraph* graph = mPlot->addGraph();
     QVERIFY(graph);
     graph->setData(QVector<double> { 1, 2 }, QVector<double> { 1, 2 });
     QVERIFY(graph->layer() == nullptr); // drawn nowhere until given a layer
@@ -985,8 +985,8 @@ void TestOwnership::movePolarGraphKeepsOneLegendRow()
 void TestOwnership::destroyedSlotAddsDuringTeardown()
 {
     auto* plot = new QCustomPlot;
-    QCPMultiGraph* graph = plot->addGraph();
-    QCPMultiGraph* added = graph;
+    QCPGraph* graph = plot->addGraph();
+    QCPGraph* added = graph;
     connect(graph, &QObject::destroyed, [plot, &added] { added = plot->addGraph(); });
 
     delete plot;
@@ -998,7 +998,7 @@ void TestOwnership::destroyedSlotAddsDuringTeardown()
 void TestOwnership::destroyedSlotConstructsDuringTeardown()
 {
     auto* plot = new QCustomPlot;
-    QCPMultiGraph* graph = plot->addGraph();
+    QCPGraph* graph = plot->addGraph();
     connect(graph, &QObject::destroyed, [plot] {
         new QCPCurve(plot->xAxis, plot->yAxis);
         new QCPItemText(plot);
@@ -1014,12 +1014,12 @@ void TestOwnership::destroyedSlotDeletesSiblingDuringTeardown()
     auto* plot = new QCustomPlot;
     plot->legend->setVisible(true);
     QCPPlottableGroup* group = plot->addPlottableGroup("pair");
-    QPointer<QCPMultiGraph> first = plot->addGraph().get();
-    QCPMultiGraph* second = plot->addGraph();
+    QPointer<QCPGraph> first = plot->addGraph().get();
+    QCPGraph* second = plot->addGraph();
     group->addMember(first);
     group->addMember(second);
     QPointer<QCPAbstractItem> item = new QCPItemText(plot);
-    QCPMultiGraph* last = plot->addGraph();
+    QCPGraph* last = plot->addGraph();
     connect(last, &QObject::destroyed, [first] { delete first.data(); });
     connect(second, &QObject::destroyed, [item] { delete item.data(); });
 
@@ -1036,7 +1036,7 @@ void TestOwnership::childrenDeletedWhilePlotWhole()
     QCPAxisRect* const rectBefore = plot->axisRect();
     const QRect before = rectBefore->rect();
     QVERIFY(before.isValid());
-    QCPMultiGraph* graph = plot->addGraph();
+    QCPGraph* graph = plot->addGraph();
     auto* item = new QCPItemText(plot);
     QRect seenByGraph, seenByItem;
     QCPAxisRect* rectSeenByGraph = nullptr;
@@ -1062,11 +1062,11 @@ void TestOwnership::childrenDeletedWhilePlotWhole()
 void TestOwnership::mutatorsRefuseDuringTeardown()
 {
     auto* plot = new QCustomPlot;
-    QPointer<QCPMultiGraph> sibling = plot->addGraph().get();
+    QPointer<QCPGraph> sibling = plot->addGraph().get();
     QPointer<QCPPlottableGroup> group(plot->addPlottableGroup("g"));
     QPointer<QCPAbstractItem> item = new QCPItemText(plot);
     QVERIFY(plot->addLayer("extra"));
-    QCPMultiGraph* watched = plot->addGraph();
+    QCPGraph* watched = plot->addGraph();
     const int plottables = plot->plottableCount();
     const int items = plot->itemCount();
     const int layers = plot->layerCount();
@@ -1154,7 +1154,7 @@ void TestOwnership::shownPlotTeardownFreesGpuResources()
 void TestOwnership::newAxisRectDuringTeardown()
 {
     auto* plot = new QCustomPlot;
-    QCPMultiGraph* graph = plot->addGraph();
+    QCPGraph* graph = plot->addGraph();
     int axes = -1;
     QCPAxis* added = nullptr;
     connect(graph, &QObject::destroyed, [&] {
@@ -1174,7 +1174,7 @@ void TestOwnership::newAxisRectDuringTeardown()
 void TestOwnership::newColorScaleDuringTeardown()
 {
     auto* plot = new QCustomPlot;
-    QCPMultiGraph* graph = plot->addGraph();
+    QCPGraph* graph = plot->addGraph();
     connect(graph, &QObject::destroyed, [plot] {
         auto* scale = new QCPColorScale(plot);
         scale->setDataRange(QCPRange(1, 2));

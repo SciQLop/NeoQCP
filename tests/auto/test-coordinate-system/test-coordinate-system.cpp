@@ -538,7 +538,7 @@ void TestCoordinateSystem::twoConstructorsShareTheSystem()
     QCPAxis* x = rect->axis(QCPAxis::atBottom);
     QCPAxis* y = rect->axis(QCPAxis::atLeft);
 
-    std::unique_ptr<QCPMultiGraph> graph(new QCPMultiGraph(x, y));
+    std::unique_ptr<QCPGraph> graph(new QCPGraph(x, y));
     std::unique_ptr<QCPCurve> curve(new QCPCurve(x, y));
     QVERIFY(graph->system());
     QCOMPARE(graph->system(), curve->system());
@@ -690,7 +690,7 @@ void TestCoordinateSystem::barsAreRefusedInAPolarSystem()
     else if (kind == QStringLiteral("colormap"))
         plottable = new QCPColorMap(key, value);
     else if (kind == QStringLiteral("multigraph"))
-        plottable = new QCPMultiGraph(key, value);
+        plottable = new QCPGraph(key, value);
     else
         plottable = new QCPIntervals(key, value, new QCPLaneLayout(&plot));
 
@@ -767,8 +767,8 @@ void TestCoordinateSystem::relationshipsAcrossAreasAreRefused()
     // A channel fill spans one frame: two areas are refused.
     auto [leftKey, leftValue] = pairOf(left);
     auto [rightKey, rightValue] = pairOf(right);
-    auto* here = new QCPMultiGraph(leftKey, leftValue);
-    auto* there = new QCPMultiGraph(rightKey, rightValue);
+    auto* here = new QCPGraph(leftKey, leftValue);
+    auto* there = new QCPGraph(rightKey, rightValue);
     here->setComponentFillToGraph(0, there, 0);
     QVERIFY(!here->componentFill(0));
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
@@ -817,7 +817,7 @@ void TestCoordinateSystem::aMisusedPairIsOwnedAndInert()
 
     // Axes of two rects: 2.x drew this clipped to both rects. Now it is no frame, but the plot
     // still owns it, and the one misuse report is the diagnostic.
-    auto* across = new QCPMultiGraph(left->axis(QCPAxis::atBottom), right->axis(QCPAxis::atLeft));
+    auto* across = new QCPGraph(left->axis(QCPAxis::atBottom), right->axis(QCPAxis::atLeft));
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
     test_misuse::calls.clear();
     QVERIFY(!across->system());
@@ -826,7 +826,7 @@ void TestCoordinateSystem::aMisusedPairIsOwnedAndInert()
     QCOMPARE(plot.plottableCount(), 1);
 
     // Two axes of one orientation: same story, not just a debug line.
-    auto* flat = new QCPMultiGraph(left->axis(QCPAxis::atBottom), left->axis(QCPAxis::atTop));
+    auto* flat = new QCPGraph(left->axis(QCPAxis::atBottom), left->axis(QCPAxis::atTop));
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
     test_misuse::calls.clear();
     QVERIFY(!flat->system());
@@ -910,7 +910,7 @@ void TestCoordinateSystem::aTakenPlottableFollowsItsNewPlot()
     QCOMPARE(to.plottableCount(), 1);
     QCOMPARE(from.plottableCount(), 0);
 
-    auto graph = from.add<QCPMultiGraph>().setData(QVector<double> { 1, 5, 9 },
+    auto graph = from.add<QCPGraph>().setData(QVector<double> { 1, 5, 9 },
                                                     QVector<double> { 1, 5, 9 });
     QVERIFY(graph);
     auto movedGraph = from.take(graph);
@@ -947,14 +947,14 @@ void TestCoordinateSystem::dualValueAxesKeepTheirRelationships()
 
     // A fill to another graph works in pixels, between two value axes of one orientation. Its keys
     // stay clear of the bars the colours are read on.
-    auto* here = new QCPMultiGraph(plot.xAxis, plot.yAxis);
-    auto* there = new QCPMultiGraph(plot.xAxis, right);
+    auto* here = new QCPGraph(plot.xAxis, plot.yAxis);
+    auto* there = new QCPGraph(plot.xAxis, right);
     here->setData(QVector<double> { 3.5, 4.5 }, QVector<double> { 0.2, 0.2 });
     there->setData(QVector<double> { 3.5, 4.5 }, QVector<double> { 0.8, 0.8 });
     QVERIFY(here->setComponentFillToGraph(0, there, 0));
     const auto fill = here->componentFill(0);
     QVERIFY(fill);
-    QCOMPARE(std::get<QCPMultiGraph::FillToGraph>(fill->target).graph.data(), there);
+    QCOMPARE(std::get<QCPGraph::FillToGraph>(fill->target).graph.data(), there);
     QCOMPARE(test_misuse::calls.size(), std::size_t(0));
 
     // Both really paint: the two bar colours beside each other at a bar's key.
@@ -997,14 +997,14 @@ void TestCoordinateSystem::axisPlottablesKeepTheirOrder()
     QCPAxisRect* rect1 = plot.axisRect();
     auto* rect2 = new QCPAxisRect(&plot);
     plot.plotLayout()->addElement(0, 1, rect2);
-    QCPMultiGraph* g1 = plot.addGraph(rect1->axis(QCPAxis::atBottom), rect1->axis(QCPAxis::atLeft));
-    QCPMultiGraph* g2 = plot.addGraph(rect1->axis(QCPAxis::atBottom), rect1->axis(QCPAxis::atLeft));
-    QCPMultiGraph* g3 = plot.addGraph(rect2->axis(QCPAxis::atBottom), rect2->axis(QCPAxis::atLeft));
+    QCPGraph* g1 = plot.addGraph(rect1->axis(QCPAxis::atBottom), rect1->axis(QCPAxis::atLeft));
+    QCPGraph* g2 = plot.addGraph(rect1->axis(QCPAxis::atBottom), rect1->axis(QCPAxis::atLeft));
+    QCPGraph* g3 = plot.addGraph(rect2->axis(QCPAxis::atBottom), rect2->axis(QCPAxis::atLeft));
     // Selection by system, but the plot's own order, as the axes have always answered.
     QCOMPARE(qcp::pointers(plot.xAxis->plottables()), (QList<QCPAbstractPlottable*> { g1, g2 }));
     QCOMPARE(qcp::pointers(rect1->plottables()), (QList<QCPAbstractPlottable*> { g1, g2 }));
     QCOMPARE(qcp::pointers(rect2->plottables()), (QList<QCPAbstractPlottable*> { g3 }));
-    QCOMPARE(qcp::pointers(rect1->axis(QCPAxis::atLeft)->graphs()), (QList<QCPMultiGraph*> { g1, g2 }));
+    QCOMPARE(qcp::pointers(rect1->axis(QCPAxis::atLeft)->graphs()), (QList<QCPGraph*> { g1, g2 }));
 }
 
 void TestCoordinateSystem::aBracketDecorationNeedsAKeyAxis()

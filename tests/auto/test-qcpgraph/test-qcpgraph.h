@@ -16,7 +16,7 @@ private slots:
   
 private:
   QCustomPlot *mPlot;
-  QCPMultiGraph *mGraph;
+  QCPGraph *mGraph;
 };
 
 

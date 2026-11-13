@@ -12,7 +12,7 @@ DOC_SNIPPET(layout_title, 600, 380)
         x[i] = i / 20.0;
         y[i] = std::exp(-0.3 * x[i]) * std::cos(2 * x[i]);
     }
-    auto graph = customPlot->add<QCPMultiGraph>()
+    auto graph = customPlot->add<QCPGraph>()
         .setData(x, y)
         .setPen(QPen(QColor(31, 119, 180), 2));
     customPlot->rescaleAxes();
@@ -64,7 +64,7 @@ DOC_SNIPPET(layout_legend_outside, 600, 400)
             x[i] = i / 20.0;
             y[i] = std::sin(x[i] + g) * std::exp(-x[i] / (4 + 3 * g));
         }
-        auto graph = customPlot->add<QCPMultiGraph>()
+        auto graph = customPlot->add<QCPGraph>()
             .setData(x, y)
             .setName(QString("channel %1").arg(g + 1))
             .setPen(QPen(colors[g], 2));
@@ -102,7 +102,7 @@ DOC_SNIPPET(layout_axis_rects, 720, 520)
             x[i] = i / 30.0;
             y[i] = std::sin(frequency * x[i]) * std::exp(-x[i] / 5);
         }
-        QCPMultiGraph* graph = customPlot->addGraph(rect->axis(QCPAxis::atBottom),
+        QCPGraph* graph = customPlot->addGraph(rect->axis(QCPAxis::atBottom),
                                                rect->axis(QCPAxis::atLeft));
         graph->setData(x, y);
         graph->setPen(QPen(color, 2));
@@ -128,7 +128,7 @@ DOC_SNIPPET(layout_margin_group, 600, 460)
         counts[i] = 40000 * (1 + std::cos(0.7 * t[i]));
     }
     customPlot->addGraph()->setData(t, ratio);
-    QCPMultiGraph* lowerGraph = customPlot->addGraph(lower->axis(QCPAxis::atBottom),
+    QCPGraph* lowerGraph = customPlot->addGraph(lower->axis(QCPAxis::atBottom),
                                                 lower->axis(QCPAxis::atLeft));
     lowerGraph->setData(t, counts);
     lowerGraph->setPen(QPen(QColor(255, 127, 14)));

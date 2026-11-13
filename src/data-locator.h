@@ -42,9 +42,9 @@ private:
     bool locateColorMap(const QPointF& pixelPos);
     bool locateColorMap2(const QPointF& pixelPos);
     bool locateHistogram2D(const QPointF& pixelPos);
-    bool locateMultiGraph(const QPointF& pixelPos);
+    bool locateGraph(const QPointF& pixelPos);
 
-    bool locateMultiGraphAtKey(double key);
+    bool locateGraphAtKey(double key);
     bool locateColorMap2AtKey(double key, double value);
     bool locateColorMapAtKey(double key, double value);
     bool locateHistogram2DAtKey(double key, double value);

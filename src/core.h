@@ -50,9 +50,9 @@ class QCPAbstractItem;
 class QCPAxis;
 class QCPArea;
 class QCPAxisRect;
-class QCPMultiGraph;
+class QCPGraph;
 template <typename T, typename Self>
-class QCPMultiGraphOps;
+class QCPGraphOps;
 class QCPLegend;
 class QCPAbstractLegendItem;
 class QCPPlottableGroup;
@@ -413,17 +413,17 @@ public:
     template <typename T>
     [[nodiscard]] std::unique_ptr<T> take(QCPHandle<T> handle);
 
-    // The graph list (2.x's spellings): every QCPMultiGraph of this plot, multi-column and
-    // waterfall ones included. addGraph returns the handle add<QCPMultiGraph>() returns.
-    [[nodiscard]] QCPHandle<QCPMultiGraph> graph(int index) const;
-    [[nodiscard]] QCPHandle<QCPMultiGraph> graph() const;
-    QCPMultiGraphOps<QCPMultiGraph, void> addGraph(QCPAxis* keyAxis = nullptr,
+    // The graph list (2.x's spellings): every QCPGraph of this plot, multi-column and
+    // waterfall ones included. addGraph returns the handle add<QCPGraph>() returns.
+    [[nodiscard]] QCPHandle<QCPGraph> graph(int index) const;
+    [[nodiscard]] QCPHandle<QCPGraph> graph() const;
+    QCPGraphOps<QCPGraph, void> addGraph(QCPAxis* keyAxis = nullptr,
                                                    QCPAxis* valueAxis = nullptr);
-    [[nodiscard]] bool removeGraph(QCPMultiGraph* graph);
+    [[nodiscard]] bool removeGraph(QCPGraph* graph);
     [[nodiscard]] bool removeGraph(int index);
     int clearGraphs();
     [[nodiscard]] int graphCount() const;
-    [[nodiscard]] QList<QCPHandle<QCPMultiGraph>> selectedGraphs() const;
+    [[nodiscard]] QList<QCPHandle<QCPGraph>> selectedGraphs() const;
 
     // item interface:
     [[nodiscard]] QCPHandle<QCPAbstractItem> item(int index) const;
@@ -544,7 +544,7 @@ protected:
     bool mAutoAddPlottableToLegend;
     QList<QCPAbstractPlottable*> mPlottables;
     QList<QCPPlottableGroup*> mPlottableGroups;
-    QList<QCPMultiGraph*> mGraphs; // the graphs of mPlottables, in creation order
+    QList<QCPGraph*> mGraphs; // the graphs of mPlottables, in creation order
     QList<QCPAbstractItem*> mItems;
     QList<QCPLayer*> mLayers;
     QCP::AntialiasedElements mAntialiasedElements, mNotAntialiasedElements;
@@ -686,7 +686,7 @@ protected:
 
     // non-virtual methods:
     bool registerPlottable(QCPAbstractPlottable* plottable);
-    bool registerGraph(QCPMultiGraph* graph);
+    bool registerGraph(QCPGraph* graph);
     //! Registers a plottable that joins a frame after construction (a refused one that setSystem()
     //! accepts later, or an adopted one): the one path both go through.
     bool registerJoinedPlottable(QCPAbstractPlottable* plottable);
@@ -748,7 +748,7 @@ protected:
     friend class QCPAxisRect;
     friend class QCPPolarArea;
     friend class QCPAbstractPlottable;
-    friend class QCPMultiGraph;
+    friend class QCPGraph;
     friend class QCPAbstractItem;
     friend class QCPLayerable;
     friend class QCPEmissionScope;

@@ -147,10 +147,10 @@ void TestWaterfall::invalidateNormalization()
 void TestWaterfall::dataChangedWhileRenderedKeepsRebuiltAdapter()
 {
     // Regression: QCPWaterfallGraph::dataChanged() used to call
-    // QCPMultiGraph::dataChanged() right after rebuildAdapter(). Once the graph
+    // QCPGraph::dataChanged() right after rebuildAdapter(). Once the graph
     // has rendered once, rebuildAdapter() stages the fresh adapter as pending (the
     // deferred swap is on here);
-    // QCPMultiGraph::dataChanged() then saw mPendingSource set and re-staged the
+    // QCPGraph::dataChanged() then saw mPendingSource set and re-staged the
     // OLD displayed adapter over it (its "a mutation superseded the pending
     // replacement" branch), so the eventual commit showed the stale
     // normalization factor instead of the one just rebuilt.
@@ -364,7 +364,7 @@ void TestWaterfall::concurrentParameterAndDataChangesAreSafe()
 void TestWaterfall::clearingSourceEmptiesTheGraph()
 {
     // rebuildAdapter() used to early-return on a null source, leaving the
-    // previous adapter installed in QCPMultiGraph: the graph kept rendering
+    // previous adapter installed in QCPGraph: the graph kept rendering
     // the old data while getKeyRange() already reported "no data".
     auto* wf = new QCPWaterfallGraph(mPlot->xAxis, mPlot->yAxis);
     std::vector<double> keys = {0.0, 1.0};

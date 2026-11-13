@@ -178,18 +178,18 @@ QPointF pixelOf(const QCP::Pixels& pixel)
 }
 
 //! The graph component 0 is filled to, or null.
-QCPMultiGraph* fillPartner(const QCPMultiGraph* graph)
+QCPGraph* fillPartner(const QCPGraph* graph)
 {
     const auto fill = graph->componentFill(0);
-    const auto* toGraph = fill ? std::get_if<QCPMultiGraph::FillToGraph>(&fill->target) : nullptr;
+    const auto* toGraph = fill ? std::get_if<QCPGraph::FillToGraph>(&fill->target) : nullptr;
     return toGraph ? toGraph->graph.data() : nullptr;
 }
 
 //! The multigraph with the two facts a task-2 test reads: its recording and its pipeline state.
-class InspectableMultiGraph : public QCPMultiGraph
+class InspectableMultiGraph : public QCPGraph
 {
 public:
-    using QCPMultiGraph::QCPMultiGraph;
+    using QCPGraph::QCPGraph;
 
     [[nodiscard]] int recordings() const { return mCore.recordingCount(); }
     [[nodiscard]] const QCPDrawList& recording() const { return mCore.recordedList(); }
@@ -202,7 +202,7 @@ InspectableMultiGraph* multiGraphOn(SkewRect* rect)
 {
     auto* graph = new InspectableMultiGraph(rect->axis(QCPAxis::atBottom),
                                             rect->axis(QCPAxis::atLeft));
-    graph->setLineStyle(QCPMultiGraph::lsLine);
+    graph->setLineStyle(QCPGraph::lsLine);
     graph->setPen(QPen(Qt::black, 3));
     return graph;
 }
@@ -505,7 +505,7 @@ void TestUserSystem::rescaleWalksTheOverriddenPlottables()
     QCPCoordinateSystem* flatSystem = flat->system(flat->key(), flat->value());
     QVERIFY(flatSystem);
 
-    auto* graph = new QCPMultiGraph(cartesian->axis(QCPAxis::atBottom),
+    auto* graph = new QCPGraph(cartesian->axis(QCPAxis::atBottom),
                                cartesian->axis(QCPAxis::atLeft));
     graph->setData(QVector<double> { 0.0, 10.0 }, QVector<double> { 0.0, 1.0 });
     graph->setSystem(flatSystem);
@@ -538,7 +538,7 @@ void TestUserSystem::theCapabilityMasks()
     std::unique_ptr<QCPBars> bars(new QCPBars(key, value));
     QVERIFY2(bars->requiredCapabilities() == (QCP::capRectangular | QCP::capStraightKey),
              "bars still need the rectangle and a straight key axis");
-    std::unique_ptr<QCPMultiGraph> multi(new QCPMultiGraph(key, value));
+    std::unique_ptr<QCPGraph> multi(new QCPGraph(key, value));
     QVERIFY2(multi->requiredCapabilities() == QCP::capStraightSegments,
              "the multigraph needs only a straight segment between two data points");
     std::unique_ptr<QCPWaterfallGraph> waterfall(new QCPWaterfallGraph(key, value));
@@ -579,7 +579,7 @@ void TestUserSystem::addGraphOnASkewRectJoinsIt()
     QCustomPlot plot;
     SkewRect* rect = skewRect(plot);
 
-    QCPMultiGraph* graph = plot.addGraph(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
+    QCPGraph* graph = plot.addGraph(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
     QVERIFY(graph);
     QCOMPARE(graph->system(), static_cast<QCPCoordinateSystem*>(rect->skew()));
     QCOMPARE(test_misuse::calls.size(), std::size_t(0));
@@ -654,7 +654,7 @@ void TestUserSystem::rectAddOfARefusedGraphLeavesNothingDangling()
     QCustomPlot plot;
     BendRect* rect = bendRect(plot);
 
-    auto graph = rect->add<QCPMultiGraph>(rect->axis(QCPAxis::atBottom),
+    auto graph = rect->add<QCPGraph>(rect->axis(QCPAxis::atBottom),
                                      rect->axis(QCPAxis::atLeft));
     QVERIFY2(!graph, "the rect handed out a graph its system refused");
     QCOMPARE(test_misuse::calls.size(), std::size_t(1));
@@ -1138,7 +1138,7 @@ void TestUserSystem::aLogImpulseRunsToTheBoundNearerZero()
     rect->axis(QCPAxis::atLeft)->setScaleType(QCPAxis::stLogarithmic);
     rect->axis(QCPAxis::atLeft)->setRange(1, 10);
     InspectableMultiGraph* graph = multiGraphOn(rect);
-    graph->setLineStyle(QCPMultiGraph::lsImpulse);
+    graph->setLineStyle(QCPGraph::lsImpulse);
     graph->setData(QVector<double> { 2, 3 }, std::vector<QVector<double>> { QVector<double> { 4, 5 } });
     settle(plot);
 
@@ -1245,7 +1245,7 @@ void TestUserSystem::channelFillNeedsOneSystem()
     QCustomPlot plot;
     TwoRects rects = twoRects(plot);
     InspectableMultiGraph* graph = multiGraphOn(rects.skew);
-    auto* cartesian = new QCPMultiGraph(rects.cartesian->axis(QCPAxis::atBottom),
+    auto* cartesian = new QCPGraph(rects.cartesian->axis(QCPAxis::atBottom),
                                    rects.cartesian->axis(QCPAxis::atLeft));
 
     // A5: on a user system both ends of a channel must be mapped by the same system, otherwise the
@@ -1330,8 +1330,8 @@ void TestUserSystem::aCartesianChannelFillPartnerThatLostItsSystemDrawsNoBand()
     plot.xAxis->setRange(0, 10);
     plot.yAxis->setRange(0, 10);
 
-    auto* lower = new QCPMultiGraph(plot.xAxis, plot.yAxis);
-    auto* upper = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto* lower = new QCPGraph(plot.xAxis, plot.yAxis);
+    auto* upper = new QCPGraph(plot.xAxis, plot.yAxis);
     lower->setData(QVector<double> { 0, 10 }, QVector<double> { 2, 2 });
     upper->setData(QVector<double> { 0, 10 }, QVector<double> { 8, 8 });
     lower->setBrush(QColor(255, 0, 0));
@@ -1357,8 +1357,8 @@ void TestUserSystem::aCartesianChannelFillAcrossValueAxesStillWorks()
     plot.yAxis->setRange(0, 10);
     right->setRange(0, 10);
 
-    auto* lower = new QCPMultiGraph(plot.xAxis, plot.yAxis);
-    auto* upper = new QCPMultiGraph(plot.xAxis, right);
+    auto* lower = new QCPGraph(plot.xAxis, plot.yAxis);
+    auto* upper = new QCPGraph(plot.xAxis, right);
     lower->setData(QVector<double> { 0, 10 }, QVector<double> { 2, 2 });
     upper->setData(QVector<double> { 0, 10 }, QVector<double> { 8, 8 });
     lower->setBrush(QColor(255, 0, 0));
@@ -1605,7 +1605,7 @@ void TestUserSystem::takeAndAdoptAGraphAndAnItemOnASkewRect()
     line->end->setCoords(9, 9);
     settle(from);
 
-    std::unique_ptr<QCPMultiGraph> takenGraph = from.take(QCPHandle<QCPMultiGraph>(graph));
+    std::unique_ptr<QCPGraph> takenGraph = from.take(QCPHandle<QCPGraph>(graph));
     std::unique_ptr<QCPItemLine> takenLine = from.take(QCPHandle<QCPItemLine>(line));
     QVERIFY(takenGraph);
     QVERIFY(takenLine);
@@ -1805,7 +1805,7 @@ void TestUserSystem::aMultiGraphJoinsASkewRect()
     QCOMPARE(test_misuse::calls.size(), std::size_t(0));
 
     // The add<T>() route joins it too: what the capability mask is for.
-    auto added = plot.add<QCPMultiGraph>(
+    auto added = plot.add<QCPGraph>(
             QVector<double> { 1, 2 },
             std::vector<QVector<double>> { QVector<double> { 1, 2 } });
     QVERIFY(added);
@@ -1859,7 +1859,7 @@ void TestUserSystem::aMultiGraphScatterLandsOnTheMapping()
     SkewRect* rect = skewRect(plot);
     SkewSystem* system = rect->skew();
     InspectableMultiGraph* graph = multiGraphOn(rect);
-    graph->setLineStyle(QCPMultiGraph::lsNone);
+    graph->setLineStyle(QCPGraph::lsNone);
     graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 6));
     graph->setData(QVector<double> { 2, 5 }, std::vector<QVector<double>> { QVector<double> { 3, 4 } });
     settle(plot);
@@ -1880,8 +1880,8 @@ void TestUserSystem::aMultiGraphStepAndImpulseAreBuiltInDataSpace()
     graph->setData(QVector<double> { 2, 4 },
                    std::vector<QVector<double>> { QVector<double> { 2, 6 },
                                                   QVector<double> { 3, 7 } });
-    graph->setComponentLineStyle(0, QCPMultiGraph::lsStepLeft);
-    graph->setComponentLineStyle(1, QCPMultiGraph::lsImpulse);
+    graph->setComponentLineStyle(0, QCPGraph::lsStepLeft);
+    graph->setComponentLineStyle(1, QCPGraph::lsImpulse);
     settle(plot);
 
     const QCPDrawList& recording = graph->recording();
@@ -2095,7 +2095,7 @@ void TestUserSystem::aFillToAnotherGraphOnASkewRect()
     SkewRect* rect = skewRect(plot);
     SkewSystem* system = rect->skew();
     InspectableMultiGraph* owner = multiGraphOn(rect);
-    auto* partner = new QCPMultiGraph(rect->axis(QCPAxis::atBottom),
+    auto* partner = new QCPGraph(rect->axis(QCPAxis::atBottom),
                                       rect->axis(QCPAxis::atLeft));
     owner->setData(QVector<double> { 2, 4, 6 }, QVector<double> { 2, 6, 3 });
     partner->setData(QVector<double> { 2, 4, 6 }, QVector<double> { 8, 9, 5 });
@@ -2321,7 +2321,7 @@ void TestUserSystem::aStepCentreOnALogKeyUserSystemTurnsInLogSpace()
     auto* graph = multiGraphOn(rect);
     graph->setData(QVector<double> { 1, 10, 100 },
                    std::vector<QVector<double>> { QVector<double> { 1, 2, 1 } });
-    graph->setLineStyle(QCPMultiGraph::lsStepCenter);
+    graph->setLineStyle(QCPGraph::lsStepCenter);
     QVERIFY(graph->setComponentFill(0, 0.0, QBrush(Qt::red)));
     settle(plot);
 

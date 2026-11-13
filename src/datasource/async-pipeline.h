@@ -260,7 +260,7 @@ using QCPColormapPipeline = QCPAsyncPipeline<QCPAbstractDataSource2D, QCPColorMa
 using QCPHistogramPipeline = QCPAsyncPipeline<QCPAbstractDataSource, QCPColorMapData>;
 
 class QCPAbstractMultiDataSource;
-using QCPMultiGraphPipeline = QCPAsyncPipeline<QCPAbstractMultiDataSource, QCPAbstractMultiDataSource>;
+using QCPGraphPipeline = QCPAsyncPipeline<QCPAbstractMultiDataSource, QCPAbstractMultiDataSource>;
 
 namespace qcp::algo { struct Histogram1D; }
 using QCPHistogram1DPipeline = QCPAsyncPipeline<QCPAbstractMultiDataSource, qcp::algo::Histogram1D>;
