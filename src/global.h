@@ -433,6 +433,16 @@ inline int getMarginValue(const QMargins& margins, QCP::MarginSide side)
 
 /*! \internal
 
+  \a font in bold, every other setting kept: its size whether in points or pixels, its hinting.
+*/
+inline QFont boldFont(QFont font)
+{
+    font.setBold(true);
+    return font;
+}
+
+/*! \internal
+
   Converts the (horizontal, vertical) flip pair of the deprecated QImage::mirrored
   into the Qt::Orientations that QImage::flipped takes.
 */

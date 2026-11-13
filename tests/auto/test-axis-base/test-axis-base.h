@@ -15,4 +15,5 @@ private slots:
     void linkingAPolarAxisIsRefused();
     void cartesianAxisApiStillCompiles();
     void axisPropertiesStillNotify();
+    void selectedFontsAreTheAxisFontInBold();
 };

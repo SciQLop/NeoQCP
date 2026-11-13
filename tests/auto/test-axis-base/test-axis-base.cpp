@@ -243,3 +243,30 @@ void TestAxisBase::axisPropertiesStillNotify()
     QVERIFY(axis->selectedParts().testFlag(QCPAxis::spAxis));
     QCOMPARE(selections, 1);
 }
+
+// A selected label is the axis font in bold: a pixel-sized font must stay its size (it fell back to
+// the application's default point size), and its other settings must stay too.
+void TestAxisBase::selectedFontsAreTheAxisFontInBold()
+{
+    QCustomPlot plot;
+    QFont font(QStringLiteral("DejaVu Sans"));
+    font.setPixelSize(10);
+    font.setHintingPreference(QFont::PreferNoHinting);
+    plot.setFont(font);
+    auto* rect = new QCPAxisRect(&plot);
+    auto* area = new QCPPolarArea(&plot);
+    const QList<std::pair<const char*, QFont>> selected {
+        { "axis label", rect->axis(QCPAxis::atBottom)->selectedLabelFont() },
+        { "axis tick label", rect->axis(QCPAxis::atBottom)->selectedTickLabelFont() },
+        { "radial label", area->radialAxis()->selectedLabelFont() },
+        { "radial tick label", area->radialAxis()->selectedTickLabelFont() },
+        { "angular label", area->angularAxis()->selectedLabelFont() },
+        { "angular tick label", area->angularAxis()->selectedTickLabelFont() },
+    };
+    QFont bold = font;
+    bold.setBold(true);
+    for (const auto& [what, f] : selected)
+        QVERIFY2(f == bold, qPrintable(QStringLiteral("%1: %2").arg(QLatin1String(what), f.toString())));
+    delete area;
+    delete rect;
+}

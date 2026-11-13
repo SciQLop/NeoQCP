@@ -63,7 +63,7 @@ QCPPolarAxisAngular::QCPPolarAxisAngular(QCPPolarArea* area)
         mLabelPadding(0)
         , mLabel()
         , mLabelFont(mParentPlot->font())
-        , mSelectedLabelFont(QFont(mLabelFont.family(), mLabelFont.pointSize(), QFont::Bold))
+        , mSelectedLabelFont(QCP::boldFont(mLabelFont))
         , mLabelColor(Qt::black)
         , mSelectedLabelColor(Qt::blue)
         ,
@@ -73,8 +73,7 @@ QCPPolarAxisAngular::QCPPolarAxisAngular(QCPPolarArea* area)
         ,
         // mTickLabelRotation(0), in label painter
         mTickLabelFont(mParentPlot->font())
-        , mSelectedTickLabelFont(
-              QFont(mTickLabelFont.family(), mTickLabelFont.pointSize(), QFont::Bold))
+        , mSelectedTickLabelFont(QCP::boldFont(mTickLabelFont))
         , mTickLabelColor(Qt::black)
         , mSelectedTickLabelColor(Qt::blue)
         , mNumberPrecision(6)

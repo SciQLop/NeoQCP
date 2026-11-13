@@ -431,15 +431,14 @@ QCPAxis::QCPAxis(QCPAxisRect* parent, AxisType type)
         // axis label:
         mLabel()
         , mLabelFont(mParentPlot->font())
-        , mSelectedLabelFont(QFont(mLabelFont.family(), mLabelFont.pointSize(), QFont::Bold))
+        , mSelectedLabelFont(QCP::boldFont(mLabelFont))
         , mLabelColor(Qt::black)
         , mSelectedLabelColor(Qt::blue)
         ,
         // tick labels:
         mTickLabels(true)
         , mTickLabelFont(mParentPlot->font())
-        , mSelectedTickLabelFont(
-              QFont(mTickLabelFont.family(), mTickLabelFont.pointSize(), QFont::Bold))
+        , mSelectedTickLabelFont(QCP::boldFont(mTickLabelFont))
         , mTickLabelColor(Qt::black)
         , mSelectedTickLabelColor(Qt::blue)
         , mNumberPrecision(6)
