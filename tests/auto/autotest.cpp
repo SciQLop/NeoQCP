@@ -96,16 +96,20 @@ static QStringList testArguments(const char* name)
 
 // The reference pictures hold text, so every machine draws it with the same bundled font: the
 // system's default sans differs from one machine to the next. The generic names the library and
-// the tests ask for map to it too.
+// the tests ask for map to it too. Bold is bundled as well: a selected label asks for it, and
+// Windows has no DejaVu Sans Bold to fall back on, so it emboldened the regular face.
 static void useTheBundledFont()
 {
-    const QString path = QDir(QCoreApplication::applicationDirPath())
-                             .absoluteFilePath(QStringLiteral("../../../tests/auto/fonts/")
-                                               + QStringLiteral("DejaVuSans.ttf"));
-    const int id = QFontDatabase::addApplicationFont(path);
+    const QDir fonts(QCoreApplication::applicationDirPath()
+                     + QStringLiteral("/../../../tests/auto/fonts"));
     const QString family = qcp::test::referenceFontFamily();
-    if (id < 0 || !QFontDatabase::applicationFontFamilies(id).contains(family))
-        qFatal("could not load the test font %s", qPrintable(path));
+    for (const char* file : { "DejaVuSans.ttf", "DejaVuSans-Bold.ttf" })
+    {
+        const QString path = fonts.absoluteFilePath(QLatin1String(file));
+        const int id = QFontDatabase::addApplicationFont(path);
+        if (id < 0 || !QFontDatabase::applicationFontFamilies(id).contains(family))
+            qFatal("could not load the test font %s", qPrintable(path));
+    }
     for (const char* generic : { "Sans Serif", "Sans" })
         QFont::insertSubstitution(QLatin1String(generic), family);
     QApplication::setFont(qcp::test::referenceFont(9));
