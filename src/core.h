@@ -713,6 +713,7 @@ protected:
     //! reference to the layer, without deleting it. Called by removeLayer and ~QCPLayer.
     void unlistLayer(QCPLayer* layer);
     void createPlotLayout();
+    void deleteLooseElements();
     QCPTheme* ownedTheme();
     void updateLayerIndices() const;
     bool deselectAllExcept(const QCPLayerable* kept);

@@ -77,7 +77,7 @@ QCPPolarGrid::QCPPolarGrid(QCPPolarArea* area)
 */
 QCPPolarGrid::~QCPPolarGrid()
 {
-    if (mArea)
+    if (mArea && mArea->mGrid == this)
         mArea->mGrid = nullptr;
 }
 

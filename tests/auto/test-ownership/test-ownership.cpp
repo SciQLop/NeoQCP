@@ -1192,3 +1192,43 @@ void TestOwnership::newColorScaleDuringTeardown()
 
     QCOMPARE(gMisuses, 1); // its axis rect was refused its axes
 }
+
+// A colour scale made on the plot but never put in its layout is still the plot's child. It must
+// die while the plot is a QCustomPlot: its axes unregister from the plot's GPU layer as they go.
+void TestOwnership::aLooseColourScaleDiesWhileThePlotIsWhole()
+{
+    auto* plot = new QCustomPlot;
+    auto* scale = new QCPColorScale(plot);
+    bool plotWhole = false;
+    bool died = false;
+    connect(scale->axis().get(), &QObject::destroyed, [&] {
+        died = true;
+        plotWhole = qobject_cast<QCustomPlot*>(static_cast<QObject*>(plot)) != nullptr;
+    });
+
+    delete plot;
+
+    QVERIFY(died);
+    QVERIFY2(plotWhole, "the scale's axis died after ~QCustomPlot, during ~QWidget");
+}
+
+// A second grid made on a polar area is the area's child: it must die while the area is whole.
+void TestOwnership::anExtraPolarGridDiesWhileItsAreaIsWhole()
+{
+    auto* plot = new QCustomPlot;
+    auto* area = new QCPPolarArea(plot);
+    auto* grid = new QCPPolarGrid(area);
+    bool areaWhole = false;
+    bool died = false;
+    connect(grid, &QObject::destroyed, [&] {
+        died = true;
+        areaWhole = qobject_cast<QCPPolarArea*>(static_cast<QObject*>(area)) != nullptr;
+    });
+
+    delete area;
+
+    QVERIFY(died);
+    QVERIFY2(areaWhole, "the grid died after ~QCPPolarArea, during ~QObject");
+    QVERIFY(plot);
+    delete plot;
+}

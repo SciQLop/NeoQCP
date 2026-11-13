@@ -63,6 +63,8 @@ private slots:
     void shownPlotTeardownFreesGpuResources();
     void newAxisRectDuringTeardown();
     void newColorScaleDuringTeardown();
+    void aLooseColourScaleDiesWhileThePlotIsWhole();
+    void anExtraPolarGridDiesWhileItsAreaIsWhole();
 
 private:
     void draw();

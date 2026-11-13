@@ -556,12 +556,29 @@ QCustomPlot::~QCustomPlot()
     deleteAllItems();
 
     delete mPlotLayout.data();
+    deleteLooseElements();
 
     mCurrentLayer = nullptr;
     // Unlisted first: a layer still listed would move its children to its neighbour as it dies.
     qDeleteAll(std::exchange(mLayers, {}));
     // Last: the spans and axes deleted above unregister from the span and grid GPU layers.
     releaseCompositeResources();
+}
+
+/*! \internal
+
+  Deletes the layout elements still parented to the plot once the layout is gone: elements made on
+  the plot but never placed in a layout (a colour scale, an axis rect, a polar area). As QObject
+  children they would die in ~QWidget, after this destructor, and reach a plot that is no longer
+  a QCustomPlot (their axes unregister from its GPU layers). Guarded: one may delete another.
+*/
+void QCustomPlot::deleteLooseElements()
+{
+    QList<QPointer<QCPLayoutElement>> loose;
+    for (QCPLayoutElement* element : findChildren<QCPLayoutElement*>(Qt::FindDirectChildrenOnly))
+        loose.append(element);
+    for (const QPointer<QCPLayoutElement>& element : loose)
+        delete element.data();
 }
 
 /*! \internal

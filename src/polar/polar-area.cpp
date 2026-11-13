@@ -85,6 +85,8 @@ QCPPolarArea::~QCPPolarArea()
     delete mGrid; // delete grid here instead of via parent ~QObject for better defined deletion
                   // order
     mGrid = nullptr;
+    // A grid made on this area besides its own is its child too: it goes while the area is whole.
+    qDeleteAll(findChildren<QCPPolarGrid*>(Qt::FindDirectChildrenOnly));
 
     const QList<QCPPolarAxisRadial*> axes = mRadialAxes;
     for (QCPPolarAxisRadial* axis : axes)
