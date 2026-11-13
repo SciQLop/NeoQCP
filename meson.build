@@ -6,7 +6,10 @@ project('NeoQCP', 'cpp',
   )
 
 qtmod = import('qt6')
-qtdeps = dependency('qt6', modules : ['Core','Widgets','Gui','Svg','PrintSupport'], private_headers: true)
+# System includes: Qt 6.12's macOS headers forward with #include_next, which warning_level=3 flags
+# once per header per file (millions of lines, past what GitHub keeps of a log).
+qtdeps = dependency('qt6', modules : ['Core','Widgets','Gui','Svg','PrintSupport'], private_headers: true,
+                    include_type: 'system')
 # A browser build (Qt for WebAssembly, see examples/wasm-gallery) makes the library and the gallery.
 is_wasm = host_machine.system() == 'emscripten'
 
@@ -389,7 +392,7 @@ else
         subdir('examples')
     endif
     if get_option ( 'with_tests')
-        qttest = dependency('qt6', modules : ['Test'])
+        qttest = dependency('qt6', modules : ['Test'], include_type: 'system')
         subdir('tests')
         subdir('documentation/doc-image-generator')
     endif
