@@ -148,9 +148,10 @@ public:
     bool setComponentFill(int owner, double value, const QBrush& brush = Qt::NoBrush);
     //! Fills between two columns. One fill per owner: setting again replaces it.
     bool setComponentFillBetween(int owner, int target, const QBrush& brush = Qt::NoBrush);
-    //! Fills between this column and a component of \a other. Both graphs must share the system;
-    //! a different system is a misuse. The partner is held by QPointer: the band drops when it or
-    //! its component goes.
+    //! Fills between this column and a component of \a other. Both graphs share the system, or, on
+    //! a cartesian frame, the key axis with another value axis (2.x's channel between y and y2):
+    //! the partner's values then map onto this graph's value axis through pixels. Any other system
+    //! is a misuse. The partner is held by QPointer: the band drops when it or its component goes.
     bool setComponentFillToGraph(int owner, QCPMultiGraph* other, int otherComponent,
                                  const QBrush& brush = Qt::NoBrush);
     void setComponentFillBrush(int owner, const QBrush& brush);
@@ -371,6 +372,11 @@ protected:
     void hideErrorBound(int column);
     void releaseErrorBounds(const ErrorBars& removed);
     bool setFill(Fill fill);
+    //! Whether a fill may reach \a partner: the same system, or across value axes.
+    [[nodiscard]] bool canFillTo(const QCPMultiGraph& partner) const;
+    //! 2.x's channel between y and y2: both cartesian, on one key axis (so one area), with another
+    //! value axis of the same orientation. The partner's values then map through pixels.
+    [[nodiscard]] bool fillsAcrossValueAxes(const QCPMultiGraph& partner) const;
     [[nodiscard]] bool isErrorBound(int column) const;
     void decorationsChanged();
     [[nodiscard]] bool fillDrawable(const Fill& fill, int columnCount) const;

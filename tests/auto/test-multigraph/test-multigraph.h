@@ -114,6 +114,8 @@ private slots:
     void theFillDropsWhenThePartnerDies();
     void theFillDropsWhenThePartnerLosesTheComponent();
     void aFillToAGraphOfAnotherSystemIsAMisuse();
+    void aFillToAGraphOnAnotherValueAxis();
+    void theBandFollowsTheOtherValueAxis();
     void aPartnerMovedToAnotherSystemDrawsNoBand();
     void aSelectedRangeSplitsTheBand();
     void aDenseFillSelectionUsesItsKeyRange();

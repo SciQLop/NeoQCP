@@ -100,9 +100,16 @@ quint64 QCPMultiGraph::dependencyRevision() const
                                           : mRevision;
     // B8: a fill to another graph reads that graph's data and system. Its revision moves on both,
     // so a partner data change or a partner system move makes this recording stale.
+    // Across value axes the band is the partner's pixels on this graph's value axis: it moves with
+    // either value axis, so both systems' revisions count.
     for (const Fill& fill : mFills)
         if (const auto* target = std::get_if<FillToGraph>(&fill.target))
-            revision = qHashMulti(revision, target->graph ? target->graph->mRevision : 0);
+        {
+            const QCPMultiGraph* partner = target->graph.data();
+            revision = qHashMulti(revision, partner ? partner->mRevision : 0);
+            if (partner && fillsAcrossValueAxes(*partner))
+                revision = qHashMulti(revision, mSystem->revision(), partner->mSystem->revision());
+        }
     return revision;
 }
 
@@ -857,7 +864,7 @@ bool QCPMultiGraph::setFill(Fill fill)
         return false;
     const auto* toGraph = std::get_if<FillToGraph>(&fill.target);
     if (toGraph
-        && (!toGraph->graph || toGraph->graph == this || toGraph->graph->system() != system()
+        && (!toGraph->graph || !canFillTo(*toGraph->graph)
             || !toGraph->graph->isValidColumn(toGraph->component)))
         return false;
     clearComponentFill(fill.owner);
@@ -876,13 +883,30 @@ bool QCPMultiGraph::setComponentFillBetween(int owner, int target, const QBrush&
     return setFill({owner, target, brush});
 }
 
+bool QCPMultiGraph::canFillTo(const QCPMultiGraph& partner) const
+{
+    if (&partner == this || !mSystem)
+        return false;
+    return partner.mSystem == mSystem || fillsAcrossValueAxes(partner);
+}
+
+bool QCPMultiGraph::fillsAcrossValueAxes(const QCPMultiGraph& partner) const
+{
+    // The projections exist only on a cartesian frame; one key axis lives in one area.
+    return partner.mSystem != mSystem && mKeyAxis && mValueAxis && partner.mKeyAxis == mKeyAxis
+        && partner.mValueAxis && partner.mValueAxis != mValueAxis
+        && partner.mValueAxis->orientation() == mValueAxis->orientation();
+}
+
 bool QCPMultiGraph::setComponentFillToGraph(int owner, QCPMultiGraph* other, int otherComponent,
                                             const QBrush& brush)
 {
     QCP_CHECK_OR_RETURN(other, "a fill to another graph needs a graph", false);
     QCP_CHECK_OR_RETURN(other != this, "a fill to another graph needs another graph", false);
-    QCP_CHECK_OR_RETURN(other->system() == system(),
-                        "a fill to another graph needs both graphs on one system", false);
+    QCP_CHECK_OR_RETURN(canFillTo(*other),
+                        "a fill to another graph needs both graphs on one system, or on one key "
+                        "axis of a cartesian frame",
+                        false);
     QCP_CHECK_OR_RETURN(other->isValidColumn(otherComponent),
                         "the partner component does not exist", false);
     if (!setFill({owner, FillToGraph { other, otherComponent }, brush}))
@@ -2261,7 +2285,7 @@ bool QCPMultiGraph::fillDrawable(const Fill& fill, int columnCount) const
     if (const auto* target = std::get_if<FillToGraph>(&fill.target))
     {
         const QCPMultiGraph* partner = target->graph.data();
-        if (!partner || partner == this || partner->system() != system())
+        if (!partner || !canFillTo(*partner))
             return false;
         return partner->mDataSource
             && target->component >= 0
@@ -2334,7 +2358,7 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::fillToGraphRows(
 {
     const auto* target = std::get_if<FillToGraph>(&fill.target);
     QCPMultiGraph* partner = target ? target->graph.data() : nullptr;
-    if (!partner || partner == this || partner->system() != system())
+    if (!partner || !canFillTo(*partner))
         return {};
     QCPAbstractMultiDataSource* partnerSource = partner->mDataSource.get();
     if (!partnerSource || target->component < 0
@@ -2358,11 +2382,16 @@ std::vector<qcp::fill::StripPoint> QCPMultiGraph::fillToGraphRows(
     const int partnerEnd = std::min(partnerSource->size(), partnerSource->findEnd(upper) + 1);
     const auto partnerGaps = partnerSource->gapsBefore(partnerBegin, partnerEnd,
                                                        /*cacheGaps=*/!drawsInDataSpace());
+    // Across value axes the partner's value goes through its pixel onto this graph's value axis,
+    // before the crop and the interpolation: the band is drawn in this graph's frame.
+    const bool across = fillsAcrossValueAxes(*partner);
+    const auto onThisAxis = [&](double value)
+    { return across ? mValueAxis->pixelToCoord(partner->mValueAxis->coordToPixel(value)) : value; };
     std::vector<qcp::fill::SeriesRow> partnerRows;
     partnerRows.reserve(std::size_t(std::max(0, partnerEnd - partnerBegin)));
     for (int i = partnerBegin; i < partnerEnd; ++i)
         partnerRows.push_back({ partnerSource->keyAt(i),
-                                partnerSource->valueAt(target->component, i),
+                                onThisAxis(partnerSource->valueAt(target->component, i)),
                                 partnerGaps[i - partnerBegin] != 0, i });
 
     std::vector<qcp::fill::StripPoint> rows

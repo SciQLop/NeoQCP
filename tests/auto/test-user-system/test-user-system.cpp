@@ -1554,12 +1554,12 @@ void TestUserSystem::aCartesianChannelFillAcrossValueAxesStillWorks()
     plot.yAxis->setRange(0, 10);
     right->setRange(0, 10);
 
-    auto* lower = new QCPGraph(plot.xAxis, plot.yAxis);
-    auto* upper = new QCPGraph(plot.xAxis, right);
+    auto* lower = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto* upper = new QCPMultiGraph(plot.xAxis, right);
     lower->setData(QVector<double> { 0, 10 }, QVector<double> { 2, 2 });
     upper->setData(QVector<double> { 0, 10 }, QVector<double> { 8, 8 });
     lower->setBrush(QColor(255, 0, 0));
-    lower->setChannelFillGraph(upper);
+    QVERIFY(lower->setComponentFillToGraph(0, upper, 0));
     settle(plot);
 
     QCOMPARE(test_misuse::calls.size(), std::size_t(0));

@@ -945,13 +945,16 @@ void TestCoordinateSystem::dualValueAxesKeepTheirRelationships()
     QCOMPARE(high->barsGroup(), group);
     QCOMPARE(test_misuse::calls.size(), std::size_t(0));
 
-    // A channel fill works in pixels, between two key axes of one orientation.
-    auto* here = new QCPGraph(plot.xAxis, plot.yAxis);
-    auto* there = new QCPGraph(plot.xAxis, right);
-    here->setData({ 1, 3 }, { 0.2, 0.2 });
-    there->setData({ 1, 3 }, { 0.8, 0.8 });
-    here->setChannelFillGraph(there);
-    QCOMPARE(here->channelFillGraph(), there);
+    // A fill to another graph works in pixels, between two value axes of one orientation. Its keys
+    // stay clear of the bars the colours are read on.
+    auto* here = new QCPMultiGraph(plot.xAxis, plot.yAxis);
+    auto* there = new QCPMultiGraph(plot.xAxis, right);
+    here->setData(QVector<double> { 3.5, 4.5 }, QVector<double> { 0.2, 0.2 });
+    there->setData(QVector<double> { 3.5, 4.5 }, QVector<double> { 0.8, 0.8 });
+    QVERIFY(here->setComponentFillToGraph(0, there, 0));
+    const auto fill = here->componentFill(0);
+    QVERIFY(fill);
+    QCOMPARE(std::get<QCPMultiGraph::FillToGraph>(fill->target).graph.data(), there);
     QCOMPARE(test_misuse::calls.size(), std::size_t(0));
 
     // Both really paint: the two bar colours beside each other at a bar's key.

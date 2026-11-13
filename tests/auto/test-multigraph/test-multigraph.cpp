@@ -3776,6 +3776,51 @@ void TestMultiGraph::aFillToAGraphOfAnotherSystemIsAMisuse()
     QVERIFY(!pair.owner->componentFill(0).has_value());
 }
 
+namespace
+{
+// 2.x's channel: the owner on y, the partner on y2 at 30, which y2's 0..40 places at y's 3.
+FillPair graphsOnTwoValueAxes(QCustomPlot* plot)
+{
+    FillPair pair = twoGraphs(plot, {0, 1, 2}, {1, 1, 1}, {30, 30, 30});
+    pair.partner->setSystem(plot->axisRect()->system(plot->xAxis, plot->yAxis2));
+    plot->xAxis->setRange(-0.5, 2.5);
+    plot->yAxis->setRange(0, 4);
+    plot->yAxis2->setRange(0, 40);
+    return pair;
+}
+} // namespace
+
+void TestMultiGraph::aFillToAGraphOnAnotherValueAxis()
+{
+    FillPair pair = graphsOnTwoValueAxes(mPlot);
+    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0, QBrush(Qt::blue)));
+
+    const QImage image = renderOf(mPlot);
+    QVERIFY2(isBlue(image.pixelColor(pixelOf(mPlot, 1, 2))), "the band is not drawn");
+    QVERIFY2(!isBlue(image.pixelColor(pixelOf(mPlot, 1, 0.5))), "the band leaks below the owner");
+    QVERIFY2(!isBlue(image.pixelColor(pixelOf(mPlot, 1, 3.5))),
+             "the band ignores the partner's value axis");
+}
+
+void TestMultiGraph::theBandFollowsTheOtherValueAxis()
+{
+    FillPair pair = graphsOnTwoValueAxes(mPlot);
+    QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0, QBrush(Qt::blue)));
+    QVERIFY(isBlue(renderOf(mPlot).pixelColor(pixelOf(mPlot, 1, 2.5))));
+
+    mPlot->yAxis2->setRange(0, 60); // the partner's 30 is now y's 2
+    QImage image = renderOf(mPlot);
+    QVERIFY2(isBlue(image.pixelColor(pixelOf(mPlot, 1, 1.5))), "the band is gone");
+    QVERIFY2(!isBlue(image.pixelColor(pixelOf(mPlot, 1, 2.5))),
+             "the band did not follow the partner's value axis");
+
+    mPlot->yAxis->setRange(0, 8); // and this graph's own: the partner, mid-height, is y's 4
+    image = renderOf(mPlot);
+    QVERIFY2(isBlue(image.pixelColor(pixelOf(mPlot, 1, 3))),
+             "the band did not follow this graph's value axis");
+    QVERIFY2(!isBlue(image.pixelColor(pixelOf(mPlot, 1, 5))), "the band leaks above the partner");
+}
+
 void TestMultiGraph::aPartnerMovedToAnotherSystemDrawsNoBand()
 {
     FillPair pair = twoGraphs(mPlot, {0, 1, 2}, {1, 1, 1}, {2, 2, 2});

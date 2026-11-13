@@ -1179,18 +1179,19 @@ void MainWindow::setupAdvancedAxesDemo(QCustomPlot *customPlot)
   }
   
   // prepare data:
-  QVector<QCPGraphData> dataCos(21), dataGauss(50), dataRandom(100);
+  QVector<double> cosKeys(21), cosValues(21), gaussKeys(50), gaussValues(50);
+  QVector<QCPGraphData> dataRandom(100);
   QVector<double> x3, y3;
   std::srand(3);
-  for (int i=0; i<dataCos.size(); ++i)
+  for (int i=0; i<cosKeys.size(); ++i)
   {
-    dataCos[i].key = i/(double)(dataCos.size()-1)*10-5.0;
-    dataCos[i].value = qCos(dataCos[i].key);
+    cosKeys[i] = i/(double)(cosKeys.size()-1)*10-5.0;
+    cosValues[i] = qCos(cosKeys[i]);
   }
-  for (int i=0; i<dataGauss.size(); ++i)
+  for (int i=0; i<gaussKeys.size(); ++i)
   {
-    dataGauss[i].key = i/(double)dataGauss.size()*10-5.0;
-    dataGauss[i].value = qExp(-dataGauss[i].key*dataGauss[i].key*0.2)*1000;
+    gaussKeys[i] = i/(double)gaussKeys.size()*10-5.0;
+    gaussValues[i] = qExp(-gaussKeys[i]*gaussKeys[i]*0.2)*1000;
   }
   for (int i=0; i<dataRandom.size(); ++i)
   {
@@ -1201,17 +1202,17 @@ void MainWindow::setupAdvancedAxesDemo(QCustomPlot *customPlot)
   y3 << 2 << 2.5 << 4 << 1.5;
   
   // create and configure plottables:
-  auto mainGraphCos = customPlot->add<QCPGraph>().setAxes(wideAxisRect->axis(QCPAxis::atBottom), wideAxisRect->axis(QCPAxis::atLeft));
-  mainGraphCos->data()->set(dataCos);
+  auto mainGraphCos = customPlot->add<QCPMultiGraph>().setAxes(wideAxisRect->axis(QCPAxis::atBottom), wideAxisRect->axis(QCPAxis::atLeft));
+  mainGraphCos->setData(cosKeys, cosValues);
   mainGraphCos->valueAxis()->setRange(-1, 1);
   mainGraphCos->rescaleKeyAxis();
   mainGraphCos->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, QPen(Qt::black), QBrush(Qt::white), 6));
   mainGraphCos->setPen(QPen(QColor(120, 120, 120), 2));
-  auto mainGraphGauss = customPlot->add<QCPGraph>().setAxes(wideAxisRect->axis(QCPAxis::atBottom), wideAxisRect->axis(QCPAxis::atLeft, 1));
-  mainGraphGauss->data()->set(dataGauss);
+  auto mainGraphGauss = customPlot->add<QCPMultiGraph>().setAxes(wideAxisRect->axis(QCPAxis::atBottom), wideAxisRect->axis(QCPAxis::atLeft, 1));
+  mainGraphGauss->setData(gaussKeys, gaussValues);
   mainGraphGauss->setPen(QPen(QColor("#8070B8"), 2));
   mainGraphGauss->setBrush(QColor(110, 170, 110, 30));
-  mainGraphCos->setChannelFillGraph(mainGraphGauss.get());
+  mainGraphCos->setComponentFillToGraph(0, mainGraphGauss.get(), 0);
   mainGraphCos->setBrush(QColor(255, 161, 0, 50));
   mainGraphGauss->valueAxis()->setRange(0, 1000);
   mainGraphGauss->rescaleKeyAxis();
