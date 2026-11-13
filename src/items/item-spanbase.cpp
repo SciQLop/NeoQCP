@@ -4,22 +4,6 @@
 
 QCPAbstractSpanItem::~QCPAbstractSpanItem() = default;
 
-void QCPAbstractSpanItem::setPen(const QPen& pen)
-{
-    if (pen == mPen)
-        return;
-    markDirty();
-    mPen = pen;
-}
-
-void QCPAbstractSpanItem::setSelectedPen(const QPen& pen)
-{
-    if (pen == mSelectedPen)
-        return;
-    markDirty();
-    mSelectedPen = pen;
-}
-
 void QCPAbstractSpanItem::setBrush(const QBrush& brush)
 {
     if (brush == mBrush)

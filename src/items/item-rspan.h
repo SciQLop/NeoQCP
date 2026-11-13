@@ -12,8 +12,6 @@ class QCPItemRSpanOps;
 class QCP_LIB_DECL QCPItemRSpan : public QCPAbstractSpanItem
 {
     Q_OBJECT
-    Q_PROPERTY(QPen pen READ pen WRITE setPen)
-    Q_PROPERTY(QPen selectedPen READ selectedPen WRITE setSelectedPen)
     Q_PROPERTY(QBrush brush READ brush WRITE setBrush)
     Q_PROPERTY(QBrush selectedBrush READ selectedBrush WRITE setSelectedBrush)
     Q_PROPERTY(QPen borderPen READ borderPen WRITE setBorderPen)

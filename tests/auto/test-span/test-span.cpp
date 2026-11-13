@@ -262,7 +262,6 @@ void TestSpan::exportFallbackRendersSpan()
     auto* span = new QCPItemSpan(mPlot, orientationOf(vertical));
     span->setRange(QCPRange(3, 7));
     span->setBrush(QBrush(QColor(255, 0, 0, 128)));
-    span->setPen(Qt::NoPen);
     span->setBorderPen(Qt::NoPen);
     mPlot->replot();
     QPixmap pm = mPlot->toPixmap(400, 300);
@@ -284,15 +283,12 @@ void TestSpan::dirtyTrackingReplots()
 
     span->setBrush(QBrush(Qt::blue));
     mPlot->replot();
-    span->setPen(QPen(Qt::green));
     mPlot->replot();
     span->setBorderPen(QPen(Qt::red, 3));
     mPlot->replot();
     span->setRange(QCPRange(1, 9));
     mPlot->replot();
     span->setSelectedBrush(QBrush(Qt::yellow));
-    mPlot->replot();
-    span->setSelectedPen(QPen(Qt::cyan));
     mPlot->replot();
     span->setSelectedBorderPen(QPen(Qt::magenta, 2));
     mPlot->replot();

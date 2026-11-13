@@ -205,13 +205,11 @@ DOC_SNIPPET(items_spans, 600, 360)
 
     auto event = customPlot->add<QCPItemSpan>(Qt::Vertical);
     event->setRange(QCPRange(20, 35));
-    event->setPen(Qt::NoPen);
     event->setBrush(QColor(255, 127, 14, 50));
     event->setBorderPen(QPen(QColor(255, 127, 14), 2));
 
     auto band = customPlot->add<QCPItemSpan>(Qt::Horizontal);
     band->setRange(QCPRange(-0.5, 0.5));
-    band->setPen(Qt::NoPen);
     band->setBrush(QColor(44, 160, 44, 40));
     band->setBorderPen(QPen(QColor(44, 160, 44), 1));
     band->setMovable(false);
@@ -219,7 +217,6 @@ DOC_SNIPPET(items_spans, 600, 360)
     auto box = customPlot->add<QCPItemRSpan>();
     box->setKeyRange(QCPRange(60, 80));
     box->setValueRange(QCPRange(0.8, 1.6));
-    box->setPen(Qt::NoPen);
     box->setBrush(QColor(148, 103, 189, 50));
     box->setBorderPen(QPen(QColor(148, 103, 189), 2));
 
@@ -236,7 +233,7 @@ DOC_SNIPPET(items_creation, 600, 360)
 
     customPlot->setItemCreator([](QCustomPlot* plot, QCPAxis*, QCPAxis*) -> QCPAbstractItem*
     {
-        auto span = plot->add<QCPItemSpan>(Qt::Vertical).setPen(Qt::NoPen);
+        auto span = plot->add<QCPItemSpan>(Qt::Vertical);
         span->setBrush(QColor(255, 127, 14, 50));
         span->setBorderPen(QPen(QColor(255, 127, 14), 2));
         return span.get();

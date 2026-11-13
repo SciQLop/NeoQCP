@@ -29,8 +29,6 @@ QCPItemRSpan::QCPItemRSpan(QCustomPlot* parentPlot)
     bottomEdge->setType(QCPItemPosition::ptPlotCoords);
     bottomEdge->setCoords(0, 0);
 
-    setPen(QPen(Qt::black));
-    setSelectedPen(QPen(Qt::blue, 2));
     setBrush(QBrush(QColor(0, 0, 255, 50)));
     setSelectedBrush(QBrush(QColor(0, 0, 255, 80)));
     setBorderPen(QPen(Qt::black, 2));

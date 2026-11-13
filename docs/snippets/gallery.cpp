@@ -103,7 +103,6 @@ DOC_SNIPPET(gallery_space_weather, 800, 560)
         for (QCPItemPosition* edge : { span->lowerEdge, span->upperEdge })
             edge->setAxes(rect->axis(QCPAxis::atBottom), rect->axis(QCPAxis::atLeft));
         span->setRange(QCPRange(shock - 300, shock + 300));
-        span->setPen(Qt::NoPen);
         span->setBrush(QColor(255, 200, 80, 60));
         span->setBorderPen(QPen(QColor(255, 200, 80), 1));
         span->setMovable(false);
@@ -548,7 +547,6 @@ DOC_SNIPPET(gallery_fit_residuals, 680, 560)
     for (QCPItemPosition* edge : { band->lowerEdge, band->upperEdge })
         edge->setAxes(residualT, residualAxis);
     band->setRange(QCPRange(-1, 1));
-    band->setPen(Qt::NoPen);
     band->setBrush(QColor(127, 127, 127, 45));
     band->setBorderPen(Qt::NoPen);
     band->setMovable(false);

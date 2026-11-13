@@ -15,10 +15,6 @@ public:
     using QCPAbstractItem::QCPAbstractItem;
     virtual ~QCPAbstractSpanItem() override;
 
-    QPen pen() const { return mPen; }
-
-    QPen selectedPen() const { return mSelectedPen; }
-
     QBrush brush() const { return mBrush; }
 
     QBrush selectedBrush() const { return mSelectedBrush; }
@@ -29,10 +25,7 @@ public:
 
     bool movable() const { return mMovable; }
 
-    // A span is drawn as a band (brush) and its edge lines (border pen). The item pen is kept
-    // for API compatibility and not drawn: use setBorderPen() for the lines.
-    void setPen(const QPen& pen);
-    void setSelectedPen(const QPen& pen);
+    // A span is drawn as a band (brush) and its edge lines (border pen).
     void setBrush(const QBrush& brush);
     void setSelectedBrush(const QBrush& brush);
     void setBorderPen(const QPen& pen);
@@ -41,12 +34,9 @@ public:
     void setMovable(bool movable) { mMovable = movable; }
 
 protected:
-    QPen mPen, mSelectedPen;
     QBrush mBrush, mSelectedBrush;
     QPen mBorderPen, mSelectedBorderPen;
     bool mMovable = true;
-
-    QPen mainPen() const { return mSelected ? mSelectedPen : mPen; }
 
     QBrush mainBrush() const { return mSelected ? mSelectedBrush : mBrush; }
 

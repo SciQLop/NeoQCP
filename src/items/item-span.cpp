@@ -55,8 +55,6 @@ QCPItemSpan::QCPItemSpan(QCustomPlot* parentPlot, Qt::Orientation orientation)
     lowerEdge->setCoords(0, 0);
     upperEdge->setCoords(1, 1);
 
-    setPen(QPen(Qt::black));
-    setSelectedPen(QPen(Qt::blue, 2));
     setBrush(QBrush(QColor(0, 0, 255, 50)));
     setSelectedBrush(QBrush(QColor(0, 0, 255, 80)));
     setBorderPen(QPen(Qt::black, 2));

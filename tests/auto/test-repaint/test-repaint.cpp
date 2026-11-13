@@ -1172,8 +1172,6 @@ const QVector<RemainingCase>& remainingCases()
           { static_cast<QCPPolarGrid*>(o)->setRadialZeroLinePen(QPen(Qt::magenta, 2)); } },
         { "layerable.setAntialiased", [](QCustomPlot& plot) -> QObject* { return plot.graph(0); },
           [](QObject* o) { static_cast<QCPLayerable*>(o)->setAntialiased(false); } },
-        { "span.setPen", [](QCustomPlot& plot) -> QObject* { return new QCPItemSpan(&plot, Qt::Horizontal); },
-          [](QObject* o) { static_cast<QCPItemSpan*>(o)->setPen(QPen(Qt::darkRed, 3)); } },
         { "line.setHead",
           [](QCustomPlot& plot) -> QObject*
           {
