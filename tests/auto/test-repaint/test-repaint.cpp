@@ -2716,7 +2716,8 @@ void TestRepaint::textBorderAndBackgroundMatchTheOldLook()
         return qAbs(a.red() - b.red()) <= 16 && qAbs(a.green() - b.green()) <= 16
             && qAbs(a.blue() - b.blue()) <= 16;
     };
-    QVERIFY2(pixelsOfColor(expected, background) > 1000, "the reference picture has no background");
+    // About 1000 with the 9 pt test font: half of it still proves the box is filled.
+    QVERIFY2(pixelsOfColor(expected, background) > 500, "the reference picture has no background");
     QVERIFY2(pixelsOfColor(expected, border) > 50, "the reference picture has no border");
     int differing = 0;
     for (int y = 0; y < painted.height(); ++y)

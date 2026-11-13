@@ -3,12 +3,29 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QFont>
 #include <QImage>
 #include <QString>
 #include <QtGlobal>
 
 namespace qcp::test
 {
+//! The family of the font the test runner loads from tests/auto/fonts before any test.
+inline QString referenceFontFamily()
+{
+    return QStringLiteral("DejaVu Sans");
+}
+
+/*! \brief The font a reference picture draws its text with, so it does not depend on the fonts the
+  machine has. No hinting: FreeType's default hinting differs by platform.
+*/
+inline QFont referenceFont(int pointSize = -1)
+{
+    QFont font(referenceFontFamily(), pointSize);
+    font.setHintingPreference(QFont::PreferNoHinting);
+    return font;
+}
+
 /*! \brief How far an export may drift from its reference.
 
   \a pixels pixels may differ, by more than \a channel in any channel. {0, 0} is a pixel-exact

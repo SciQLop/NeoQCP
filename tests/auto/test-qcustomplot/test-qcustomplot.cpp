@@ -585,7 +585,9 @@ void TestQCustomPlot::rectSelectionKeepsThePlotOrder()
     connect(graph, &QCPAbstractPlottable::selectionChanged, this,
             [&selected, graph] { selected << graph; });
 
-  dragFromTo(mPlot, pixelOf(mPlot, 1, 9), pixelOf(mPlot, 9, 1));
+  // Half a unit past the outer points: a point on the rect's edge falls in or out with the pixel
+  // rounding, which moves with the tick label font.
+  dragFromTo(mPlot, pixelOf(mPlot, 0.5, 9), pixelOf(mPlot, 9.5, 1));
 
   QCOMPARE(selected, (QList<QCPAbstractPlottable*>{ first, second, third }));
 }

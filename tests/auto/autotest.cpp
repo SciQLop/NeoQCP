@@ -68,6 +68,11 @@
 #include "test-user-system/test-user-system.h"
 #include "test-waterfall/test-waterfall.h"
 
+#include "reference-image.h"
+
+#include <QDir>
+#include <QFontDatabase>
+
 static bool shouldRun(const char* name)
 {
     const QByteArray only = qgetenv("QCP_TEST_CLASS");
@@ -89,6 +94,23 @@ static QStringList testArguments(const char* name)
     return args;
 }
 
+// The reference pictures hold text, so every machine draws it with the same bundled font: the
+// system's default sans differs from one machine to the next. The generic names the library and
+// the tests ask for map to it too.
+static void useTheBundledFont()
+{
+    const QString path = QDir(QCoreApplication::applicationDirPath())
+                             .absoluteFilePath(QStringLiteral("../../../tests/auto/fonts/")
+                                               + QStringLiteral("DejaVuSans.ttf"));
+    const int id = QFontDatabase::addApplicationFont(path);
+    const QString family = qcp::test::referenceFontFamily();
+    if (id < 0 || !QFontDatabase::applicationFontFamilies(id).contains(family))
+        qFatal("could not load the test font %s", qPrintable(path));
+    for (const char* generic : { "Sans Serif", "Sans" })
+        QFont::insertSubstitution(QLatin1String(generic), family);
+    QApplication::setFont(qcp::test::referenceFont(9));
+}
+
 #define QCPTEST(t)                                                                                 \
     if (shouldRun(#t))                                                                             \
     {                                                                                              \
@@ -99,6 +121,7 @@ static QStringList testArguments(const char* name)
 int main(int argc, char** argv)
 {
     QApplication app(argc, argv);
+    useTheBundledFont();
     if (qEnvironmentVariableIsEmpty("QCP_TEST_CLASS")
         && !qEnvironmentVariableIsEmpty("QCP_TEST_FUNCTION"))
     {

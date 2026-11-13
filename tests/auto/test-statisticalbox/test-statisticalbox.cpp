@@ -52,7 +52,7 @@ Scene statisticalBoxScene(bool verticalKey, bool selected)
 {
     QCustomPlot plot;
     plot.resize(400, 300);
-    QFont font(QStringLiteral("Helvetica"));
+    QFont font = qcp::test::referenceFont();
     font.setPixelSize(10);
     plot.setFont(font);
     for (QCPAxis* axis : plot.axisRect()->axes())

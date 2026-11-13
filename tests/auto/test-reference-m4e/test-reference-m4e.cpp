@@ -23,7 +23,7 @@ QImage render(const std::function<void(QCustomPlot&)>& setup)
 {
     QCustomPlot plot;
     plot.resize(400, 300);
-    QFont font(QStringLiteral("Helvetica"));
+    QFont font = qcp::test::referenceFont();
     font.setPixelSize(10);
     plot.setFont(font);
     for (QCPAxis* axis : plot.axisRect()->axes())
@@ -440,7 +440,7 @@ QImage polarScene(const char* kind)
                     0, 0,
                     new QCPTextElement(
                         &plot, QStringLiteral("16-element array: uniform (blue), Hann taper (red)"),
-                        QFont(QStringLiteral("Helvetica"), 11)));
+                        qcp::test::referenceFont(11)));
             }
             else if (name == QLatin1String("polar-log"))
             {
@@ -544,7 +544,7 @@ QImage userSystemMultiGraphScene()
             auto* rect = new SkewRect(&plot);
             plot.plotLayout()->addElement(0, 0, rect);
             rect->setShear(0.5);
-            QFont font(QStringLiteral("Helvetica"));
+            QFont font = qcp::test::referenceFont();
             font.setPixelSize(10);
             QCPAxis* key = rect->axis(QCPAxis::atBottom);
             QCPAxis* value = rect->axis(QCPAxis::atLeft);
@@ -588,7 +588,7 @@ QImage userSystemSkewScene()
             auto* rect = new SkewRect(&plot);
             plot.plotLayout()->addElement(0, 0, rect);
             rect->setShear(0.5);
-            QFont font(QStringLiteral("Helvetica"));
+            QFont font = qcp::test::referenceFont();
             font.setPixelSize(10);
             QCPAxis* key = rect->axis(QCPAxis::atBottom);
             QCPAxis* value = rect->axis(QCPAxis::atLeft);
