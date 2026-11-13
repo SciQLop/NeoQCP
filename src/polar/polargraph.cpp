@@ -40,7 +40,7 @@
 
 namespace
 {
-// The radial fraction the frame clamps a value beyond the range to (see QCPTransform::Polar).
+// The radial fraction the frame clamps a value beyond the range to (see qcp::transform::Polar).
 //! A marker style that carries no pen of its own takes the graph's, as 2.x drew it.
 QCPScatterStyle withPen(QCPScatterStyle style, const QPen& pen)
 {

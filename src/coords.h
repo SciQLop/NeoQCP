@@ -108,6 +108,112 @@ using Position = std::variant<Data, Pixels, AxisRatio, AnchorOffset, DataXRatioY
 // The custom mapping is written in the position types above: it comes after them, not before.
 #include "coords-custom.h"
 
+// QCPTransform's frames. At namespace scope, not nested in the class: GCC 13 rejects a nested struct
+// with default member initializers as a std::variant alternative inside its still-incomplete
+// enclosing class (GCC PR 96645).
+namespace qcp::transform
+{
+//! One axis on its own: the mapping QCPAxis would draw, copied so a replay never reads it.
+struct Snapshot
+{
+    bool vertical = false;
+    bool logarithmic = false;
+    bool reversed = false;
+    bool usable = false;
+    double origin = 0; //!< the pixel the axis grows from: the rect's left, or its bottom
+    double length = 0; //!< the pixels it spans
+    double lower = 0;
+    double upper = 0;
+    double left = 0;
+    double top = 0;
+    double right = 0;
+    double bottom = 0;
+    double slope = 0; //!< pixels = slope * value + intercept
+    double intercept = 0;
+    double logSlope = 0; //!< pixels = logSlope * ln(|value|) + logIntercept
+    double logIntercept = 0;
+    double positive = 1; //!< the sign of the log range: the values it can map
+
+    bool operator==(const Snapshot&) const = default;
+
+    void take(const QCPAxis* axis);
+    void prepare();
+    [[nodiscard]] double toPixel(double value) const;
+    [[nodiscard]] double toValue(double pixel) const;
+    //! Where \a pixel sits along the axis, as a fraction of its length from its origin.
+    [[nodiscard]] double fractionOf(double pixel) const;
+    //! The pixel at \a fraction of the axis length, from its origin.
+    [[nodiscard]] double pixelAtFraction(double fraction) const;
+};
+
+//! An axis, mapped through its link when it has one. The link pointer is shared, not copied.
+struct Axis
+{
+    Snapshot self;
+    std::shared_ptr<const QCPAxisLink> link;
+    Snapshot source; //!< the source's mapping, filled when the axis is linked
+
+    bool operator==(const Axis&) const = default;
+
+    void snapshot(const QCPAxis* axis);
+    void prepare();
+    [[nodiscard]] bool usable() const;
+    [[nodiscard]] double toPixel(double value) const;
+    [[nodiscard]] double toValue(double pixel) const;
+};
+
+//! The two-axis snapshot: today's mapping, unchanged.
+struct Cartesian
+{
+    Axis key;
+    Axis value;
+
+    bool operator==(const Cartesian&) const = default;
+
+    void prepare();
+
+    [[nodiscard]] bool usable() const { return key.usable() && value.usable(); }
+};
+
+//! The polar frame: QCPPolarAxisRadial::coordToPixel with the radial fraction clamped.
+struct Polar
+{
+    double centreX = 0;
+    double centreY = 0;
+    double radius = 0;
+    double startAngle = 0; //!< radians, the angular axis' offset
+    double angleLower = 0;
+    double angleUpper = 0;
+    double lower = 0; //!< the radial range
+    double upper = 0;
+    bool startReversed = false; //!< the angular axis' direction
+    bool logarithmic = false;
+    bool reversed = false;
+
+    bool operator==(const Polar&) const = default;
+
+    void take(const QCPPolarAxisAngular& angular, const QCPPolarAxisRadial& radial);
+    [[nodiscard]] bool usable() const;
+    //! The unclamped position of \a value along the radius; NaN when the scale cannot take it.
+    [[nodiscard]] double rawFraction(double value) const;
+    //! The clamped [0, 1.05] position of \a value along the radius, in the axis' own scale.
+    [[nodiscard]] double fraction(double value) const;
+    //! The value at \a fraction of the radius, in the axis' own scale.
+    [[nodiscard]] double valueAt(double fraction) const;
+    [[nodiscard]] QPointF toPixel(double angleCoord, double value) const;
+    [[nodiscard]] QCP::Data toData(QPointF pixel) const;
+};
+
+//! A mapping that is not a two-axis frame, with the revision it was taken at.
+struct Custom
+{
+    std::shared_ptr<const QCPCustomMapping> mapping;
+    quint64 revision = 0;
+
+    bool operator==(const Custom&) const = default;
+};
+} // namespace qcp::transform
+
 /*! \brief Maps plot coordinates to pixels and back: one frame type, three mappings.
 
   A transform copies what it needs when it is constructed, so replaying it never touches the axes
@@ -191,105 +297,11 @@ public:
     }
 
 private:
-    //! One axis on its own: the mapping QCPAxis would draw, copied so a replay never reads it.
-    struct Snapshot
-    {
-        bool vertical = false;
-        bool logarithmic = false;
-        bool reversed = false;
-        bool usable = false;
-        double origin = 0; //!< the pixel the axis grows from: the rect's left, or its bottom
-        double length = 0; //!< the pixels it spans
-        double lower = 0;
-        double upper = 0;
-        double left = 0;
-        double top = 0;
-        double right = 0;
-        double bottom = 0;
-        double slope = 0; //!< pixels = slope * value + intercept
-        double intercept = 0;
-        double logSlope = 0; //!< pixels = logSlope * ln(|value|) + logIntercept
-        double logIntercept = 0;
-        double positive = 1; //!< the sign of the log range: the values it can map
-
-        bool operator==(const Snapshot&) const = default;
-
-        void take(const QCPAxis* axis);
-        void prepare();
-        [[nodiscard]] double toPixel(double value) const;
-        [[nodiscard]] double toValue(double pixel) const;
-        //! Where \a pixel sits along the axis, as a fraction of its length from its origin.
-        [[nodiscard]] double fractionOf(double pixel) const;
-        //! The pixel at \a fraction of the axis length, from its origin.
-        [[nodiscard]] double pixelAtFraction(double fraction) const;
-    };
-
-    //! An axis, mapped through its link when it has one. The link pointer is shared, not copied.
-    struct Axis
-    {
-        Snapshot self;
-        std::shared_ptr<const QCPAxisLink> link;
-        Snapshot source; //!< the source's mapping, filled when the axis is linked
-
-        bool operator==(const Axis&) const = default;
-
-        void snapshot(const QCPAxis* axis);
-        void prepare();
-        [[nodiscard]] bool usable() const;
-        [[nodiscard]] double toPixel(double value) const;
-        [[nodiscard]] double toValue(double pixel) const;
-    };
-
-    //! The two-axis snapshot: today's mapping, unchanged.
-    struct Cartesian
-    {
-        Axis key;
-        Axis value;
-
-        bool operator==(const Cartesian&) const = default;
-
-        void prepare();
-
-        [[nodiscard]] bool usable() const { return key.usable() && value.usable(); }
-    };
-
-    //! The polar frame: QCPPolarAxisRadial::coordToPixel with the radial fraction clamped.
-    struct Polar
-    {
-        double centreX = 0;
-        double centreY = 0;
-        double radius = 0;
-        double startAngle = 0; //!< radians, the angular axis' offset
-        double angleLower = 0;
-        double angleUpper = 0;
-        double lower = 0; //!< the radial range
-        double upper = 0;
-        bool startReversed = false; //!< the angular axis' direction
-        bool logarithmic = false;
-        bool reversed = false;
-
-        bool operator==(const Polar&) const = default;
-
-        void take(const QCPPolarAxisAngular& angular, const QCPPolarAxisRadial& radial);
-        [[nodiscard]] bool usable() const;
-        //! The unclamped position of \a value along the radius; NaN when the scale cannot take it.
-        [[nodiscard]] double rawFraction(double value) const;
-        //! The clamped [0, 1.05] position of \a value along the radius, in the axis' own scale.
-        [[nodiscard]] double fraction(double value) const;
-        //! The value at \a fraction of the radius, in the axis' own scale.
-        [[nodiscard]] double valueAt(double fraction) const;
-        [[nodiscard]] QPointF toPixel(double angleCoord, double value) const;
-        [[nodiscard]] QCP::Data toData(QPointF pixel) const;
-    };
-
-    //! A mapping that is not a two-axis frame, with the revision it was taken at.
-    struct Custom
-    {
-        std::shared_ptr<const QCPCustomMapping> mapping;
-        quint64 revision = 0;
-
-        bool operator==(const Custom&) const = default;
-    };
+    using Snapshot = qcp::transform::Snapshot;
+    using Axis = qcp::transform::Axis;
+    using Cartesian = qcp::transform::Cartesian;
+    using Polar = qcp::transform::Polar;
+    using Custom = qcp::transform::Custom;
 
     [[nodiscard]] const Cartesian* cartesian() const { return std::get_if<Cartesian>(&mFrame); }
 

@@ -174,7 +174,7 @@ QCPRatioTransform QCPRatioTransform::fitted(const QRectF& rect)
     return transform;
 }
 
-void QCPTransform::Snapshot::take(const QCPAxis* axis)
+void qcp::transform::Snapshot::take(const QCPAxis* axis)
 {
     vertical = axis->orientation() == Qt::Vertical;
     logarithmic = axis->scaleType() == QCPAxisBase::stLogarithmic;
@@ -192,7 +192,7 @@ void QCPTransform::Snapshot::take(const QCPAxis* axis)
     length = vertical ? rect->height() : rect->width();
 }
 
-void QCPTransform::Snapshot::prepare()
+void qcp::transform::Snapshot::prepare()
 {
     const double size = upper - lower;
     if (!(length > 0.0) || !(size > 0.0))
@@ -216,7 +216,7 @@ void QCPTransform::Snapshot::prepare()
     usable = !qIsNaN(logSlope) && !qIsInf(logSlope);
 }
 
-double QCPTransform::Snapshot::toPixel(double value) const
+double qcp::transform::Snapshot::toPixel(double value) const
 {
     if (!logarithmic)
         return slope * value + intercept;
@@ -237,7 +237,7 @@ double QCPTransform::Snapshot::toPixel(double value) const
     return logSlope * std::log(std::abs(value)) + logIntercept;
 }
 
-double QCPTransform::Snapshot::toValue(double pixel) const
+double qcp::transform::Snapshot::toValue(double pixel) const
 {
     if (!usable)
         return qQNaN();
@@ -246,17 +246,17 @@ double QCPTransform::Snapshot::toValue(double pixel) const
     return positive * std::exp((pixel - logIntercept) / logSlope);
 }
 
-double QCPTransform::Snapshot::fractionOf(double pixel) const
+double qcp::transform::Snapshot::fractionOf(double pixel) const
 {
     return vertical ? (bottom - pixel) / length : (pixel - left) / length;
 }
 
-double QCPTransform::Snapshot::pixelAtFraction(double fraction) const
+double qcp::transform::Snapshot::pixelAtFraction(double fraction) const
 {
     return vertical ? bottom - fraction * length : left + fraction * length;
 }
 
-void QCPTransform::Axis::snapshot(const QCPAxis* axis)
+void qcp::transform::Axis::snapshot(const QCPAxis* axis)
 {
     self.take(axis);
     link = axis->link();
@@ -268,20 +268,20 @@ void QCPTransform::Axis::snapshot(const QCPAxis* axis)
     source.take(linkedSource);
 }
 
-void QCPTransform::Axis::prepare()
+void qcp::transform::Axis::prepare()
 {
     self.prepare();
     source.prepare();
 }
 
-bool QCPTransform::Axis::usable() const
+bool qcp::transform::Axis::usable() const
 {
     if (link)
         return self.length > 0.0 && source.usable;
     return self.usable;
 }
 
-double QCPTransform::Axis::toPixel(double value) const
+double qcp::transform::Axis::toPixel(double value) const
 {
     if (!link)
         return self.toPixel(value);
@@ -293,7 +293,7 @@ double QCPTransform::Axis::toPixel(double value) const
     return self.pixelAtFraction(source.fractionOf(source.toPixel(link->inverse(value))));
 }
 
-double QCPTransform::Axis::toValue(double pixel) const
+double qcp::transform::Axis::toValue(double pixel) const
 {
     if (!link)
         return self.toValue(pixel);
@@ -304,13 +304,13 @@ double QCPTransform::Axis::toValue(double pixel) const
     return link->forward(source.toValue(source.pixelAtFraction(self.fractionOf(pixel))));
 }
 
-void QCPTransform::Cartesian::prepare()
+void qcp::transform::Cartesian::prepare()
 {
     key.prepare();
     value.prepare();
 }
 
-void QCPTransform::Polar::take(const QCPPolarAxisAngular& angular, const QCPPolarAxisRadial& radial)
+void qcp::transform::Polar::take(const QCPPolarAxisAngular& angular, const QCPPolarAxisRadial& radial)
 {
     const QCPPolarArea* area = angular.area();
     if (!area)
@@ -331,14 +331,14 @@ void QCPTransform::Polar::take(const QCPPolarAxisAngular& angular, const QCPPola
     reversed = radial.rangeReversed();
 }
 
-bool QCPTransform::Polar::usable() const
+bool qcp::transform::Polar::usable() const
 {
     if (!(radius >= 1.0) || !(angleUpper > angleLower) || !(upper > lower))
         return false;
     return !logarithmic || lower > 0.0 || upper < 0.0;
 }
 
-double QCPTransform::Polar::rawFraction(double value) const
+double qcp::transform::Polar::rawFraction(double value) const
 {
     if (!logarithmic)
         return (reversed ? upper - value : value - lower) / (upper - lower);
@@ -348,12 +348,12 @@ double QCPTransform::Polar::rawFraction(double value) const
     return reversed ? qLn(upper / value) / qLn(ratio) : qLn(value / lower) / qLn(ratio);
 }
 
-double QCPTransform::Polar::fraction(double value) const
+double qcp::transform::Polar::fraction(double value) const
 {
     return qBound(0.0, rawFraction(value), kPolarClamp);
 }
 
-double QCPTransform::Polar::valueAt(double fraction) const
+double qcp::transform::Polar::valueAt(double fraction) const
 {
     if (!logarithmic)
         return reversed ? upper - fraction * (upper - lower) : lower + fraction * (upper - lower);
@@ -373,7 +373,7 @@ double QCPTransform::polarValue(double fraction) const
     return polar ? polar->valueAt(fraction) : qQNaN();
 }
 
-QPointF QCPTransform::Polar::toPixel(double angleCoord, double value) const
+QPointF qcp::transform::Polar::toPixel(double angleCoord, double value) const
 {
     const double radiusPixel = fraction(value) * radius;
     const double theta = startAngle
@@ -382,7 +382,7 @@ QPointF QCPTransform::Polar::toPixel(double angleCoord, double value) const
     return QPointF(centreX + qCos(theta) * radiusPixel, centreY + qSin(theta) * radiusPixel);
 }
 
-QCP::Data QCPTransform::Polar::toData(QPointF pixel) const
+QCP::Data qcp::transform::Polar::toData(QPointF pixel) const
 {
     // The radial axis' pixelToCoord arithmetic, written on the snapshot.
     const QCPVector2D offset(pixel - QPointF(centreX, centreY));
