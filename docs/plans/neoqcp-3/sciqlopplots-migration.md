@@ -24,8 +24,8 @@ line numbers will drift).
 
 ## Known behaviour changes to check
 
-- `QCPMarginGroup` is deprecated (4d): use `QCPAlignmentGroup`. `src/SciQLopPlot.cpp` ~141. The
-  panel's own `VPlotsAlign` may be replaceable by alignment groups.
+- `QCPMarginGroup` was deprecated in 4d and is removed in 5d: see "From milestone 5d" below
+  (`src/SciQLopPlot.cpp` ~141). The panel's own `VPlotsAlign` may be replaceable by alignment groups.
 - Linked axes and drag/zoom of every axis by default (4d): the time and axis synchronizers
   (`AxisSynchronizer`, `XAxisSynchronizer`, `TimeAxisSynchronizer`) may become `QCPAxis::linkTo`;
   `setupFullAxesBox(true)` now links the top/right axes.
@@ -253,3 +253,47 @@ class now. It still compiles, but several visitor lambdas on the `QCPGraph*` alt
 - A new graph's default pen is a palette colour, 2.5 wide (2.x: blue, 0). SciQLopPlots sets its own pens.
 - `assignSelection` is a new protected virtual on `QCPAbstractPlottable`: none of the SciQLopPlots plottable
   subclasses defines that name.
+
+## From milestone 5d (the rest of the old API)
+
+Read-only grep of `/home/jeandet/Documents/prog/SciQLopPlots/src` and `include/` (SciQLop and TSCat not
+read; SciQLopPlots at 8b456e70, line numbers of 2026-11-13). Three compile breaks.
+
+### `QCPMarginGroup` is gone
+
+- `src/SciQLopPlot.cpp:141-143`: `new QCPMarginGroup(this)`, then `axisRect()->setMarginGroup(QCP::msTop |
+  QCP::msBottom, ...)` and `m_color_scale->setMarginGroup(...)` for the same sides. Port:
+  `QCPAlignmentGroup::create({ axisRect(), m_color_scale }, QCP::msTop | QCP::msBottom);`. The rect and its
+  scale sit in one row, so lining up their inner top and bottom edges gives what equal margins gave.
+  Alignment groups are per side: the plot's left and right sides stay free for a panel-wide left/right
+  group (`VPlotsAlign`'s job today) without leaving this one.
+
+### `SciQLopTimeColoredCurve` paints through the removed painter path
+
+- `include/SciQLopPlots/Plotables/SciQLopTimeColoredCurve.hpp:87`: `void draw(QCPPainter*) override;`.
+  `QCPAbstractPlottable::draw(QCPPainter*)` is `final` now: this no longer compiles.
+- `src/SciQLopTimeColoredCurve.cpp:217`, `:222`, `:232-233`, `:292-293` read `mKeyAxis` / `mValueAxis`: they
+  are private now.
+- `src/SciQLopTimeColoredCurve.cpp:295` calls `applyScattersAntialiasingHint(painter)`: deleted.
+- Port, preferred: drop the override and give the curve per-point colours (`setColorValues()` with the
+  times, plus a gradient: colour by scalar, 4c); the GPU path, hit test and legend icon then come from the recording. Otherwise move the code to
+  `draw(QCPDrawContext&)`: read `keyAxisRaw()` / `valueAxisRaw()` instead of the members, and put the
+  painter code in a `context.painter()` callback that sets its own antialiasing
+  (`painter->setAntialiasing(...)`) instead of the deleted hint.
+- `:254 drawPolyline` is QPainter's own, not the deleted 1D helper: nothing to port there.
+
+### Span pens are gone
+
+- `src/SciQLopMultiPlotPanel.cpp:824` and `:838`: `vspan->setPen(...)` / `preview->setPen(...)` on the
+  preview spans. That pen was never drawn (since 4e). Port: `setBorderPen(...)` if the preview should
+  show its edges in that colour, else delete the lines.
+- `src/SpanBase.cpp:36-37`: `setPen(QPen(Qt::NoPen))` and `setSelectedPen(QPen(Qt::NoPen))`. Delete both:
+  a span has no pen.
+
+### Behaviour changes that reach SciQLopPlots
+
+- On a HiDPI screen, the painted layers' thin lines (axes, ticks, legend borders, colour-scale outline)
+  are one logical pixel wide, as the GPU layers already were. Plottables and grids are unchanged.
+- An alignment group settles in the replot that needs it (up to three extra layout passes), so a
+  freshly shown or exported panel is aligned at once. A layout that never settles stops after one
+  follow-up replot and reports a misuse (fatal in debug).

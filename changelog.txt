@@ -380,7 +380,7 @@ Milestone 4d (axes, linked axes, alignment groups). Additive, except for the beh
   - QCPAlignmentGroup::create({rects...}, sides) aligns the edges of axis rects (or any layout
         element) across plot widgets, colour bars included. The members own the group; it is deleted
         when the last one leaves. A plot only repaints its peers when a shared edge moves.
-  - QCPMarginGroup is deprecated: use QCPAlignmentGroup. It goes with the old API.
+  - QCPMarginGroup is deprecated: use QCPAlignmentGroup (removed in milestone 5d).
 
 Behaviour changes for 2.x users:
   - With range drag or zoom on, every axis of the rect moves, also the hidden top and right axes and
@@ -575,6 +575,55 @@ Behaviour changes for 2.1 polar users:
         point); markers of points outside the radial range are not drawn, as in 2.1.
   - Clicking inside a polar graph's fill selects it, as for cartesian graphs.
   - setSystem() with a non-polar system is refused as misuse.
+
+Milestone 5d (the rest of the old API). What milestone 4 kept only for 2.x and 5a-5c did not remove
+goes. Source-breaking for code that subclassed plottables, used margin groups or a span's pen.
+  - Every plottable records, its legend icon too: statistical box and intervals as native commands;
+        financial and error bars as a bounding rect plus a painter() callback, pixel for pixel the
+        2.x icons. A plottable group's row shows them like the plottable's own row.
+  - QCPAbstractPlottable::draw(QCPPainter*) is final, and drawLegendIcon(QCPPainter*, const QRectF&)
+        is virtual final: both replay the recording. A 2.x override fails to compile instead of
+        being hidden. The 1D nearest-point hit test that only painter-only plottables used is gone.
+  - Alignment groups are per side: an element joins one group per side (left and right with a
+        column, top and bottom with a row). QCPLayoutElement::alignmentGroup(side) takes the side.
+        One replot or export gives aligned edges: the plot reruns its margin and layout passes,
+        at most three times, when a pass moved an edge an aligned margin was computed from.
+  - QCPMarginGroup, setMarginGroup(), marginGroup() and marginGroups() are removed: use
+        QCPAlignmentGroup::create({ a, b }, sides).
+  - The 2.x axis projections are private: QCPAbstractPlottable's and QCPItemPosition's mKeyAxis,
+        mValueAxis (and the position's mAxisRect). Subclasses read keyAxisRaw()/valueAxisRaw() or
+        system(); outside code reads the handles. A half-set pair and a one-axis position keep
+        the axis they were given.
+  - QCPItemSpan and QCPItemRSpan have no pen: setPen(), setSelectedPen(), pen(), selectedPen() and
+        their properties are gone (never drawn). setBorderPen() and setBrush() style a span.
+  - A colour scale's tick marks are drawn on screen again (an inset scale lost them on the GPU path).
+  - HiDPI: on a screen with a device pixel ratio above 1, a cosmetic or width-0 pen in a painted layer
+        is one logical pixel wide, as on the GPU layers and in a 2x export (it was one device
+        pixel). Plottables and grids keep the cosmetic pen in the painter fallback: on screen the GPU
+        draws them, and stroking a dense polyline one logical pixel wide is several times slower.
+        The same holds for a linked axis' grid, a colour scale's grid and plottable painter()
+        callbacks (the bracket decorator, financial decorations). Ratio 1 is unchanged.
+  - A scaled export (toPixmap/savePng with a scale, epNoCosmetic PDFs) now also turns an explicitly
+        cosmetic pen wider than 0 into a non-cosmetic one, so it scales with the picture (before,
+        only width-0 pens were changed).
+  - NeoQCP's own build compiles with -ffp-contract=off (clang-cl: /clang:-ffp-contract=off): the
+        colour maps have the same colours on every architecture. Code built from NeoQCP's
+        headers keeps its own flags.
+  - Fix: an aligned side switched to a manual margin kept its group unsettled, and the plot
+        replotted forever after a resize; a layout that really oscillates now stops after one
+        follow-up replot, with one misuse; deleting an alignment group relays its members out;
+        a tangent bracket printed its point count on every draw; examples/text-document-integration
+        builds again.
+
+Behaviour changes for 2.x users:
+  - A plottable subclass that overrides draw(QCPPainter*) or drawLegendIcon(QCPPainter*, QRectF) no
+        longer compiles: override draw(QCPDrawContext&) and drawLegendIcon(QCPDrawContext&).
+  - applyFillAntialiasingHint(), applyScattersAntialiasingHint(), QCPAbstractPlottable1D::drawPolyline()
+        and QCPSelectionDecorator::applyPen()/applyBrush() are gone.
+  - A margin group on stacked rows' top and bottom sides made their margins equal; an alignment group
+        aligns edges only, so that case has no port: set those margins by hand.
+  - Reading mKeyAxis/mValueAxis in a plottable or item-position subclass no longer compiles.
+  - span.setPen(...) no longer compiles.
 
 Milestone 5c (one graph). QCPMultiGraph is QCPGraph. The old container graph and the preview QCPGraph2
 are deleted, so a graph is one key column, N value columns, an asynchronous resampler and user coordinate
