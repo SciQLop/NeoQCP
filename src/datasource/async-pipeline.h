@@ -7,6 +7,7 @@
 #include <axis/range.h>
 #include <functional>
 #include <memory>
+#include <algorithm>
 #include <any>
 #include <atomic>
 #include <optional>
@@ -189,6 +190,7 @@ public:
 
     // Run the transform synchronously (blocking) and store the result.
     // Use this during export (savePdf/toPixmap) where the event loop is not running.
+    // Results of jobs started for older requests are dropped when they land (no finished()).
     bool runSynchronously(const ViewportParams& vp)
     {
         QMutexLocker lock(&mMutex);
@@ -209,6 +211,12 @@ public:
         lock.relock();
         mResult = std::move(out);
         mResultViewport = vp;
+        // Made from the latest source and request: a job started for an older request must not
+        // replace it when it lands. A job of the latest request still may: it is the one made
+        // for the screen, when this run was for an export of another size.
+        const uint64_t latest = mGeneration.load();
+        if (latest > 0)
+            mDisplayedGeneration = std::max(mDisplayedGeneration, latest - 1);
         return true;
     }
 

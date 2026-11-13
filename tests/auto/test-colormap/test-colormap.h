@@ -45,6 +45,7 @@ private slots:
   void colourMap2JoinsItsNewPlotsScaleWhenAdded();
   void colourMap2HonoursAVerticalKeyAxis();
   void colourMap2ExportWaitsForNoJobOfItsSize();
+  void colourMap2KeepsTheExportsImageOverAnOlderJob();
   void histogram2dHonoursAVerticalKeyAxis();
   void contourLabelsFollowAVerticalKeyAxis();
   void QCPColorMap2_forgetsADeletedColorScale();

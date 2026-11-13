@@ -1016,6 +1016,39 @@ void TestColorMap::colourMap2ExportWaitsForNoJobOfItsSize()
   QVERIFY2(grayAtKey(0.8) < 50 && grayAtKey(3.2) < 50, "the export drew a coarser image");
 }
 
+// An export resamples at once for the viewport it draws. A job asked for an older viewport, still
+// running, must not replace that image when it lands: it would show the old range until the next
+// job, or for good if none follows.
+void TestColorMap::colourMap2KeepsTheExportsImageOverAnOlderJob()
+{
+  QVERIFY(mPlot->removePlottable(mColorMap));
+  mPlot->resize(200, 200);
+  mPlot->xAxis->setRange(0, 7);
+  mPlot->yAxis->setRange(0, 1);
+  auto* map = new QCPColorMap2(mPlot->xAxis, mPlot->yAxis);
+  map->pipeline().setScheduler(nullptr); // jobs run at once; only their delivery waits
+  std::vector<double> keys, values = { 0.0, 1.0 }, z(16, 0.0);
+  for (int k = 0; k < 8; ++k)
+    keys.push_back(k);
+  map->setData(std::move(keys), std::move(values), std::move(z));
+  mPlot->replot();
+  QTRY_VERIFY(map->pipeline().result() && !map->pipeline().isBusy());
+
+  mPlot->xAxis->setRange(1, 6); // a job for this range runs; its result waits to be delivered
+  const QCPRange older = mPlot->xAxis->range();
+  mPlot->xAxis->setRange(2, 5); // asked while that job runs: waits for it
+  mPlot->toPixmap(200, 200);
+  QCOMPARE(map->pipeline().resultViewport().keyRange, QCPRange(2, 5));
+
+  QList<QCPRange> delivered;
+  connect(&map->pipeline(), &QCPColormapPipeline::finished, map,
+          [&] { delivered << map->pipeline().resultViewport().keyRange; });
+  QTRY_VERIFY(!map->pipeline().isBusy());
+  QCoreApplication::processEvents();
+  QVERIFY2(!delivered.contains(older), "an older job replaced the export's image");
+  QCOMPARE(map->pipeline().resultViewport().keyRange, QCPRange(2, 5));
+}
+
 // Same picture for a histogram, whose cells are not resampled: key column upper, value row
 // lower is the screen's top-left, one cell tall and two cells wide.
 void TestColorMap::histogram2dHonoursAVerticalKeyAxis()
