@@ -6,6 +6,6 @@ Good entry points:
 
 - <a href="api/classQCustomPlot.html">QCustomPlot</a>, the widget.
 - <a href="api/classQCPAxis.html">QCPAxis</a> and <a href="api/classQCPAxisRect.html">QCPAxisRect</a>.
-- <a href="api/classQCPGraph.html">QCPGraph</a>, <a href="api/classQCPGraph2.html">QCPGraph2</a>, <a href="api/classQCPMultiGraph.html">QCPMultiGraph</a> and <a href="api/classQCPColorMap2.html">QCPColorMap2</a>.
+- <a href="api/classQCPGraph.html">QCPGraph</a> and <a href="api/classQCPColorMap2.html">QCPColorMap2</a>.
 - <a href="api/classQCPAbstractItem.html">QCPAbstractItem</a>, the base of every item.
 - <a href="api/classQCPLayoutGrid.html">QCPLayoutGrid</a>, the layout system.

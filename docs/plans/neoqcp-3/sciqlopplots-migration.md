@@ -174,3 +174,82 @@ No `qcpConnect`, no `delete` of a getter result on a NeoQCP type, no `QSet` or `
 - `selectedGraphs()` and `graphs()` stay raw `QList<QCPGraph*>`, so `for (auto g : selectedGraphs())`
   (~512) and `addGraph(...)` (`QCPAbstractPlottableWrapper.hpp` ~100) need no change.
 
+## From milestone 5c (one graph)
+
+QCPMultiGraph is now QCPGraph, and the old QCPGraph (the container graph) is deleted. Read-only grep of
+`/home/jeandet/Documents/prog/SciQLopPlots/src` and `include/` (SciQLop and TSCat not read; line numbers
+are those of 2026-11-13). The port is mostly a rename, plus one type that now means something else.
+
+### Rename QCPMultiGraph to QCPGraph (30 sites)
+
+Plain rename, nothing else changes: `QCPMultiGraph::LineStyle` is `QCPGraph::LineStyle` (same enum), and
+`component(i)`, `componentCount()`, `setComponent*()`, `setDataSource()`, `setGapThreshold()`,
+`setKeyAxis()` and the rest keep their names.
+
+- `include/SciQLopPlots/Plotables/SciQLopGraphComponent.hpp` 7: `MultiGraphRef::graph` `:36`, `to_variant()`
+  `:66`, `:92`, `:133` (constructor), `:160` (`static_cast<QCPMultiGraph::LineStyle>`), `:258`, `:352`.
+- `src/SciQLopGraphComponent.cpp` 10: `:48`, `:126`, `:153`, `:172`, `:183`, `:193`, `:231`, `:249`
+  (`selected_components`), `:295`, `:326`.
+- `include/.../SciQLopMultiGraphBase.hpp` 4 (`_multiGraph` `:37`, `create_multi_graph` `:60`, comments);
+  `include/.../SciQLopLineGraph.hpp` 3 (`:57-59` `new QCPMultiGraph(keyAxis, valueAxis)`);
+  `include/.../SciQLopWaterfallGraph.hpp` 2 (`:34`, comment); `src/SciQLopCrosshair.cpp:297`
+  (`qobject_cast<QCPMultiGraph*>(plottable)`); `src/SciQLopMultiGraphBase.cpp:203` and
+  `src/SciQLopLineGraph.cpp:56` (comments).
+- Includes: `<plottables/plottable-multigraph.h>` is `<plottables/plottable-graph.h>` in
+  `SciQLopGraphComponent.hpp:27`, `src/SciQLopCrosshair.cpp:29`, `src/SciQLopPlot.cpp:44`.
+- `QCPGroupLegendItem::multiGraph()` is `graph()` (returns a `QCPHandle<QCPGraph>`, which compares with a
+  raw pointer): `src/SciQLopGraphComponent.cpp:262`, `:326`, `SciQLopGraphComponent.hpp:97`.
+- `QCPMultiGraph`-named helpers that may appear in SciQLopPlots are gone with the rename:
+  `QCPMultiGraphOps` and `QCPMultiGraphPipeline` have no uses here.
+
+### The `QCPGraph*` variant alternative now means the multigraph
+
+`SciQLopGraphComponent::graph_or_curve_or_multi` is `std::variant<QCPGraph*, QCPCurve*, MultiGraphRef,
+std::monostate>` (`SciQLopGraphComponent.hpp:42`). Both `QCPGraph*` and `MultiGraphRef::graph` are the same
+class now. It still compiles, but several visitor lambdas on the `QCPGraph*` alternative no longer do:
+
+- `to_variant()` `:64-70` tests `m_componentIndex >= 0` first and `qobject_cast<QCPGraph*>` second. Every
+  graph passes the cast now, so keep that order, or the multigraph components take the wrong branch.
+- Compile breaks: the generic `auto* any` lambdas call `any->scatterStyle()`, which QCPGraph has not (read
+  `component(i).scatterStyle`; QCPCurve keeps its getter). `:171-176` (`set_marker_shape`), `:194-199`
+  (`set_marker_pen`), `:218-223` (`set_marker_size`), `:297`, `:316`, `:334` (the three getters).
+- Compile break: `src/SciQLopGraphComponent.cpp:239-241`, `any->data()->dataRange()` on a graph. `data()` is
+  gone. Use `QCPDataRange(0, graph->dataCount())`, as the `m_componentIndex >= 0` branch above it does.
+- Port: delete the `QCPGraph*` alternative and its lambdas (`:147`, `:179`, `:202`, `:226`, `:272`, `:299`,
+  `:317`, `:336`). A plain graph is a one-component graph, `MultiGraphRef { graph, 0 }`. Component 0 exists
+  only once data is set, so a getter before the first data needs a default, and a setter before it goes
+  through `graph->setScatterStyle()` / `setPen()` / `setLineStyle()`, which new components take.
+- `QCPGraph::LineStyle` conversions (`include/SciQLopPlots/qcp_enums.hpp:107-135`, `to_qcp`/`from_qcp`):
+  no change. `QCPGraph::lsLine` and the others are the same enumerators, now inherited from the shared
+  line base.
+
+### Plain-graph creation: `addGraph`, `selectedGraphs`, `setAdaptiveSampling`
+
+- `include/.../QCPAbstractPlottableWrapper.hpp:100-102`: `std::is_same_v<T, QCPGraph>` with
+  `plot->addGraph(keyAxis, valueAxis)`. `addGraph` returns the ops handle of `add<QCPGraph>()` and
+  `SciQLopGraphComponent(QCPAbstractPlottable*)` takes a pointer: write `.get()` if the conversion does not
+  apply. Nothing instantiates `newComponent<QCPGraph>` (only the time-coloured curve does), so this branch
+  is dead and can go with the variant alternative.
+- `src/SciQLopPlot.cpp:512` `for (auto g : selectedGraphs())`: `auto` takes a handle, `g->setSelection()`
+  works. No change. `selectedGraphs()` also lists multigraphs and waterfalls now, and so
+  `clearGraphs()` removes them.
+- `src/SciQLopGraphComponent.cpp:36-40`: `qobject_cast<QCPGraph*>` then `setAdaptiveSampling(false)`. It now
+  runs for any graph handed to the plain constructor. The setter exists on the new class, so it compiles;
+  the multigraph constructor `:48` does not call it, and SciQLopMultiGraphBase graphs keep adaptive sampling.
+- `include/.../Resamplers/AbstractResampler.hpp:36-41`: `copy_data` builds `QVector<QCPGraphData>` and has
+  no caller in src or include. `QCPGraphData` survives in NeoQCP, so it compiles; delete it with the dead
+  branch.
+- `setChannelFillGraph`, `QCPGraph2`, `QCPGraphComponent`: no use. `src/SciQLopPlot.cpp:457` mentions
+  QCPGraph2 in a comment only. `QCPGraphComponent` is the new name of the component struct behind
+  `component(i)`: SciQLopPlots only uses it through `auto`.
+
+### Behaviour changes that reach SciQLopPlots
+
+- A graph's legend row is a `QCPGroupLegendItem` and now derives `QCPPlottableLegendItem`:
+  `legend->itemWithPlottable(graph)` finds it (it did not for a multigraph). `src/SciQLopGraphInterface.cpp:81`
+  relies on that (it connects the row's `selectionChanged`). `src/SciQLopGraphComponent.cpp` ~330, in the
+  `m_componentIndex < 0` branch, tests `dynamic_cast<QCPPlottableLegendItem*>(item)`: a group row matches it
+  now, so that branch must also check the row's graph is its own plottable.
+- A new graph's default pen is a palette colour, 2.5 wide (2.x: blue, 0). SciQLopPlots sets its own pens.
+- `assignSelection` is a new protected virtual on `QCPAbstractPlottable`: none of the SciQLopPlots plottable
+  subclasses defines that name.

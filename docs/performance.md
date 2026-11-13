@@ -13,15 +13,15 @@ A frame is made in two steps.
 
 These parts are drawn by GPU shaders:
 
-- Solid lines of `QCPGraph`, `QCPCurve`, `QCPGraph2` and `QCPMultiGraph`. The polyline is cut into triangles on the CPU; `QCPGraph2` and `QCPMultiGraph` keep those triangles across pans.
-- Fills under a `QCPGraph` (not channel fills between two graphs), and solid-brush fills, error bars and error bands of a `QCPMultiGraph`.
-- Scatter symbols of `QCPGraph2` and `QCPMultiGraph`, as instanced sprites.
+- Solid lines of `QCPGraph` and `QCPCurve`. The polyline is cut into triangles on the CPU; `QCPGraph` keeps those triangles across pans.
+- Solid-brush fills (under a graph, between columns, between graphs), error bars and error bands of a `QCPGraph`.
+- Scatter symbols of `QCPGraph`, as instanced sprites.
 - `QCPColorMap2` and `QCPHistogram2D` images, their contour lines and contour labels.
 - `QCPHistogram` bars.
 - Grid lines and tick marks.
 - What a plottable or an item records as lines, rectangles, ellipses, polygons, scatter symbols or error bars: `QCPBars`, `QCPErrorBars`, `QCPFinancial`, `QCPStatisticalBox`, `QCPIntervals` bars, and the spans, lines, rectangles, ellipses and tracers among the items.
 
-Everything else goes through `QPainter`: text and tick labels, dashed or dotted lines, channel fills, the scatters of `QCPGraph`, the classic `QCPColorMap`, line endings, curve and bracket items (pixel paths), pixmap items, and the labels of `QCPIntervals`.
+Everything else goes through `QPainter`: text and tick labels, dashed or dotted lines, gradient and pattern brushes, the classic `QCPColorMap`, line endings, curve and bracket items (pixel paths), pixmap items, and the labels of `QCPIntervals`.
 
 Lines on the GPU are antialiased by multisampling. The widget uses 4 samples on a normal screen and 1 on a HiDPI screen (device pixel ratio 2 or more), where pixels are already small. `setSampleCount()` (from `QRhiWidget`) overrides it.
 
@@ -33,7 +33,7 @@ Exports never touch the GPU. `savePng()`, `savePdf()`, `toPixmap()` and `toPaint
 
 A pan changes the axis range but not the shape of the data on screen. NeoQCP takes advantage of that.
 
-- `QCPGraph2`, `QCPMultiGraph` and `QCPColorMap2` keep the geometry of their last draw. During a pan, the GPU moves it by the pan offset. Graphs recompute nothing. A colour map resamples the new range in the background and shows the shifted old image meanwhile.
+- `QCPGraph` and `QCPColorMap2` keep the geometry of their last draw. During a pan, the GPU moves it by the pan offset. Graphs recompute nothing. A colour map resamples the new range in the background and shows the shifted old image meanwhile.
 - A layer whose plottables all agree on that offset is not repainted at all. Its old texture is shifted by the compositor, and clipped to the axis rect.
 - The cached lines cover one view width on each side of the visible range. A pan of up to one width never shows an empty edge.
 - The lines are rebuilt for the new range when the pan goes past one view width. A graph with 100 000 points or more also rebuilds them about 150 ms after the pan stops.
@@ -44,7 +44,7 @@ The shift only works if nothing else on the layer would move wrongly. A layer is
 
 ### New data on a graph that is already drawn
 
-A pan in progress should not be interrupted by a full repaint. So `QCPGraph2` and `QCPMultiGraph` do not show new data the moment you set it, once they have been drawn.
+A pan in progress should not be interrupted by a full repaint. So `QCPGraph` does not show new data the moment you set it, once they have been drawn.
 
 1. `setData()` or `setDataSource()` stages the new data. The old data stays on screen.
 2. When the new data is ready (resampled, if it is large), the graph asks the plot for a swap with `QCustomPlot::requestDataSwap()`.
@@ -70,15 +70,14 @@ These plottables do their heavy work on worker threads:
 
 | Plottable | Work done off the GUI thread | Runs again when |
 |---|---|---|
-| `QCPGraph2` | Coarse min/max summary of the data (from 100 000 points) | the data changes |
-| `QCPMultiGraph` | The same, for all columns at once (from 100 000 rows × columns) | the data changes |
+| `QCPGraph` | Coarse min/max summary of the data, for all columns at once (from 100 000 rows × columns) | the data changes |
 | `QCPColorMap2` | Resampling onto a grid at screen resolution | the data or the visible range changes |
 | `QCPHistogram2D` | Binning of the points | the data or the bins change |
 | `QCPHistogram` | Binning of the values | the data, the bins or the normalization change |
 
 Requests are coalesced. If a job is running, only the latest request waits behind it; the ones in between are dropped. Each plot owns one scheduler, shared by all its plottables. It uses half the machine's cores by default; `setMaxPipelineThreads()` changes that.
 
-The classic plottables (`QCPGraph`, `QCPCurve`, `QCPColorMap`, ...) do all their work on the GUI thread, during `replot()`.
+The classic plottables (`QCPCurve`, `QCPColorMap`, ...) do all their work on the GUI thread, during `replot()`.
 
 {doc}`architecture/async-pipeline` explains the scheduling.
 
@@ -113,7 +112,7 @@ Exports do not wait. When `savePng()` or `toPixmap()` meets a plottable whose wo
 
 ## Large line data
 
-<a href="api/classQCPGraph2.html">QCPGraph2</a> never draws more than a few points per pixel column. It works in two levels.
+<a href="api/classQCPGraph.html">QCPGraph</a> never draws more than a few points per pixel column. It works in two levels.
 
 1. **Level 1, once per data set, on a worker thread.** From 100 000 points, the whole key range is cut into equal bins (up to 100 000), and each bin keeps its minimum and maximum.
 2. **Level 2, per view, on the GUI thread.** The visible part is binned again, into 4 bins per pixel column. It reads level 1 when level 1 is fine enough, and the raw points otherwise. When only a few raw points are visible, they are drawn directly.
@@ -133,18 +132,16 @@ Finally the points of each pixel column are reduced to the first, minimum, maxim
 - Keys must be sorted. Lookups are binary searches.
 - `setAdaptiveSampling(false)` turns the per-pixel reduction off. Only do it for small data.
 - On a logarithmic key axis, level 2 is skipped and the visible raw points are reduced directly.
-- <a href="api/classQCPMultiGraph.html">QCPMultiGraph</a> does the same for many value columns that share one key column, in one pass over the keys:
+- With many value columns that share one key column, the graph does the same in one pass over the keys:
 
 ```{literalinclude} snippets/performance.cpp
-:start-after: // [performance_multigraph]
-:end-before: // [/performance_multigraph]
+:start-after: // [performance_columns]
+:end-before: // [/performance_columns]
 :language: cpp
 :dedent:
 ```
 
-![Three magnetic-field components, two million samples each, drawn as one multi-graph](images/performance-multigraph.png)
-
-Scatter-only graphs (line style `lsNone`) are not reduced: min/max binning would destroy a point cloud. They draw a stratified subset instead, at most `scatterMaxPoints()` points (100 000 by default). Change it with `setScatterMaxPoints()`; 0 draws them all. The cap bounds the drawing, not the rest: a scatter-only graph converts all its points to pixels each time its geometry is rebuilt, the off-screen ones too.
+![Three magnetic-field components, two million samples each, drawn as one graph](images/performance-columns.png)
 
 {doc}`architecture/adaptive-sampling` describes the reduction, and {doc}`architecture/gap-detection` how missing data stays a blank.
 
@@ -165,7 +162,7 @@ A data source can feed several graphs. The samples are stored once. Here an over
 - Each graph still builds its own level-1 summary. Only the raw samples are shared.
 - A source that views your memory (`viewData()`, or a source over `std::span`) does not copy it. Your buffer must outlive every graph that uses it. If you change the buffer in place, call `dataChanged()` on each graph.
 
-`QCPMultiGraph` takes a `QCPAbstractMultiDataSource` the same way, and `QCPColorMap2` a `QCPAbstractDataSource2D`. {doc}`graphs` and {doc}`colormaps` cover them.
+`QCPGraph` takes a `QCPAbstractMultiDataSource`, and `QCPColorMap2` a `QCPAbstractDataSource2D`. {doc}`graphs` and {doc}`colormaps` cover them.
 
 ## Practical tips
 
@@ -181,13 +178,12 @@ When several parts of your code each want a replot, use `replot(QCustomPlot::rpQ
 
 | Data | Classic | Use instead |
 |---|---|---|
-| One line | `QCPGraph` | `QCPGraph2` |
-| Many lines sharing keys | many `QCPGraph` | `QCPMultiGraph` |
 | A 2-D grid | `QCPColorMap` | `QCPColorMap2` |
 | A point cloud to bin | — | `QCPHistogram2D` |
 | Values to bin into a 1-D histogram | — | `QCPHistogram` |
 
-The classic plottables copy your data into a container of `double`, and do all their work on the GUI thread. They are fine up to some tens of thousands of points. `QCPGraph` still has things `QCPGraph2` lacks: fills, channel fills, `addData()`. `QCPMultiGraph` has fills and bands too. {doc}`graphs` compares them.
+`QCPGraph` is already zero-copy: hand it moved containers, or a view with `viewData()`, and it reads them in place. A `QVector<double>` is copied once.
+The classic plottables copy your data into a container of `double`, and do all their work on the GUI thread. They are fine up to some tens of thousands of points. {doc}`graphs` shows the `QCPGraph` calls.
 
 ### Keep the plottable layer clean
 
@@ -236,9 +232,9 @@ A plot in a hidden tab still replots when its data changes. `setSkipReplotsWhenH
 
 ### Fewer points in view
 
-Off-screen points of a line cost almost nothing: line plottables find the visible range by binary search. (Scatter-only `QCPGraph2` is the exception, see above.) If a classic plottable is still slow, limit how much is visible at once, for example by capping the key range span in a `QCPAxis::rangeChanged` handler.
+Off-screen points of a line cost almost nothing: line plottables find the visible range by binary search. If a plottable is still slow, limit how much is visible at once, for example by capping the key range span in a `QCPAxis::rangeChanged` handler.
 
-With a classic `QCPGraph` in a running measurement, prefer `addData()` to setting the whole data again.
+With a `QCPGraph` in a running measurement, prefer `addData()` to setting the whole data again, and `removeDataBefore()` to keep a rolling window short.
 
 ## Profile with Tracy
 
@@ -255,7 +251,7 @@ What you will see:
 
 - One frame per `QCustomPlot::render()` call.
 - The replot: `QCustomPlot::replot`, the layout pass, each `QCPLayer::drawToPaintBuffer`, and the paint buffer work.
-- The `draw()` of `QCPGraph`, `QCPGraph2`, `QCPMultiGraph`, `QCPColorMap2`, `QCPHistogram2D` and `QCPHistogram`. The `QCPGraph2` zone carries the size of the data it drew from.
+- The `draw()` of `QCPGraph`, `QCPColorMap2`, `QCPHistogram2D` and `QCPHistogram`. The `QCPGraph` zone carries the size of the data it drew from.
 - The data work: `buildL1Cache`, `resampleL2`, `optimizedLineData`, the parallel binning, the colormap `resample`, line extrusion and fill tessellation.
 - The async pipeline: `Pipeline::onDataChanged`, `Pipeline::onViewportChanged`, `Pipeline::deliverResult`.
 - The GPU side: resource uploads and render calls of the plottable, scatter, colormap, span and grid layers.

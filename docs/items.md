@@ -47,16 +47,16 @@ A <a href="api/classQCPLineEnding.html">QCPLineEnding</a> is a style plus a size
 
 <a href="api/classQCPItemTracer.html">QCPItemTracer</a> marks a point.
 Give it a graph with `setGraph()` and a key with `setGraphKey()`, and it sits on the graph's data at that key.
-For a `QCPMultiGraph`, follow one component with `setLineGraph(graph, component)` and change it later with `setComponent(component)`.
-`lineGraph()` and `component()` read them back.
+For a graph with several columns, follow one with `setGraph(graph, component)` and change it later with `setComponent(component)`.
+`graph()` and `component()` read them back.
 
 - With `setInterpolating(true)` it follows the line between data points. Without, it snaps to the nearest point.
 - Outside the graph's keys, it stays at the first or last point.
 - It updates its position when the plot is drawn. To read `position` right after changing the data, call `updatePosition()` first.
 - Styles: `tsNone`, `tsPlus`, `tsCrosshair` (the default, across the whole axis rect), `tsCircle`, `tsSquare`.
-- It follows a `QCPGraph` or a component of a `QCPMultiGraph`. `setGraph()` and `setLineGraph()` replace each other: one target at a time. Without a target it stays where `position` says, and `setComponent()` does nothing.
-- When the graph is deleted, or the multigraph loses the component it followed, the tracer becomes inert: it keeps its last position but records no marker. Taking a target out of the plot clears the tracer's target; a deleted target hides the marker.
-- `setLineGraph(graph, component)` sets the component on the new target; a later `setComponent()` changes it.
+- It follows one component of a `QCPGraph`: component 0 unless you say otherwise. Without a target it stays where `position` says, and `setComponent()` does nothing.
+- When the graph is deleted, or the graph loses the component it followed, the tracer becomes inert: it keeps its last position but records no marker. Taking a target out of the plot clears the tracer's target; a deleted target hides the marker.
+- `setGraph(graph, component)` sets the component on the new target; a later `setComponent()` changes it.
 
 A tracer with `tsNone` draws nothing, but its position still moves along the graph.
 Use it as an invisible anchor for a label that follows the data.

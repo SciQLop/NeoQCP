@@ -2,12 +2,11 @@
 
 NeoQCP's plottables can run expensive data transforms (resampling, binning) off the GUI thread. The async pipeline infrastructure provides request coalescing, generation tracking, busy reporting and thread-safe result delivery.
 
-Four plottables use it:
+Three plottables use it:
 
 | Plottable | Pipeline | Transform | Kind |
 |---|---|---|---|
-| <a href="../api/classQCPGraph2.html">QCPGraph2</a> | `QCPGraphPipeline` | level-1 min/max summary, from 100 000 points | viewport-independent |
-| <a href="../api/classQCPMultiGraph.html">QCPMultiGraph</a> | `QCPMultiGraphPipeline` | the same for all columns, from 100 000 rows × columns | viewport-independent |
+| <a href="../api/classQCPGraph.html">QCPGraph</a> | `QCPGraphPipeline` | level-1 min/max summary for all columns, from 100 000 rows × columns | viewport-independent |
 | <a href="../api/classQCPColorMap2.html">QCPColorMap2</a> | `QCPColormapPipeline` | resampling onto a screen-resolution grid | viewport-dependent |
 | <a href="../api/classQCPHistogram2D.html">QCPHistogram2D</a> | `QCPHistogramPipeline` | binning of the point cloud | viewport-independent |
 
@@ -54,10 +53,10 @@ classDiagram
 Four concrete type aliases are used:
 
 ```cpp
-using QCPGraphPipeline = QCPAsyncPipeline<QCPAbstractDataSource, QCPAbstractDataSource>;
+using QCPGraphPipeline = QCPAsyncPipeline<QCPAbstractMultiDataSource, QCPAbstractMultiDataSource>;
 using QCPColormapPipeline = QCPAsyncPipeline<QCPAbstractDataSource2D, QCPColorMapData>;
 using QCPHistogramPipeline = QCPAsyncPipeline<QCPAbstractDataSource, QCPColorMapData>;
-using QCPMultiGraphPipeline = QCPAsyncPipeline<QCPAbstractMultiDataSource, QCPAbstractMultiDataSource>;
+using QCPHistogram1DPipeline = QCPAsyncPipeline<QCPAbstractMultiDataSource, qcp::algo::Histogram1D>;
 ```
 
 ## Pipeline Scheduler
@@ -118,7 +117,7 @@ This handles the common case where the user pans rapidly, producing many viewpor
 
 When nothing is left running or pending, `mDisplayedGeneration` catches up with the latest generation, even if the last request built no job (for example, the source was cleared). Without that, the pipeline would stay busy forever.
 
-`QCPGraph2` and `QCPMultiGraph` keep a second guard of their own. A result is applied only if its generation is at least the one recorded when their current (or staged) data source was set, so a late result for replaced data is never shown.
+`QCPGraph` keeps a second guard of its own. A result is applied only if its generation is at least the one recorded when its current (or staged) data source was set, so a late result for replaced data is never shown.
 
 ## Busy State
 
@@ -177,7 +176,7 @@ using TransformFn = std::function<
 
 The cache is moved into the job and handed back with the result, so it is never shared between threads. A data change clears it.
 
-This enables multi-level strategies where an expensive first pass is cached. `QCPGraph2` and `QCPMultiGraph` work this way: their transform returns no result, it only fills the cache with the level-1 summary. On `finished()`, the plottable moves the summary out of the cache, and builds the cheap level 2 itself for each view (see [Adaptive Sampling](adaptive-sampling.md)). `QCPColorMap2` uses the cache to keep its scratch buffers and its Y-axis grid between resamples.
+This enables multi-level strategies where an expensive first pass is cached. `QCPGraph` works this way: their transform returns no result, it only fills the cache with the level-1 summary. On `finished()`, the plottable moves the summary out of the cache, and builds the cheap level 2 itself for each view (see [Adaptive Sampling](adaptive-sampling.md)). `QCPColorMap2` uses the cache to keep its scratch buffers and its Y-axis grid between resamples.
 
 ## Synchronous Fallback
 

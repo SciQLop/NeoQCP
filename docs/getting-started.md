@@ -155,5 +155,5 @@ Add a plain `QWidget` to your form, right-click it, choose *Promote to...*, and 
 ## Where next
 
 - {doc}`concepts`: axis rects, axes, plottables, items, layers and the replot cycle.
-- {doc}`graphs`: line and scatter graphs, from the classic `QCPGraph` to zero-copy `QCPGraph2`.
+- {doc}`graphs`: line and scatter graphs, one or many columns, copied or zero-copy.
 - {doc}`migrating`: what changes when coming from QCustomPlot.

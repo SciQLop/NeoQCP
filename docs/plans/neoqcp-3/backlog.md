@@ -180,6 +180,44 @@ user would see and where the code is. Fixed items are deleted, not ticked.
   `getOptimizedLineDataAll` and the indexed forms are only used by tests. Remove them with the
   data-source work that retires QCPGraph2.
 
+## From milestone 5c (one graph)
+
+- **A pan on a log key axis re-records the graph.** The recording is not translated, because a translation
+  in pixels is not one in log keys. Panning a big graph on a log axis costs a record per frame.
+  `logKeyAxisPanStaysCovered` only checks that the new recording covers the view. `QCPGraph::draw` (S1).
+- **"The user set a decorator" is a heuristic.** A decorator subclass, or a default decorator whose pen,
+  brush or marker differs from a fresh one, counts as set. One restyled back to the exact default looks
+  untouched, and the graph draws it the 3.0 way. `simplify:` note in the selection code (S2). Upgrade: a
+  flag set by every decorator write.
+- **`QCPGraphComponent` is shared with the curve.** `QCPAbstractLine` holds the struct, so the curve's one
+  line is a `QCPGraphComponent` too. A neutral name (`QCPLineComponent`) would fit both; ruling S5 kept the
+  name users know. Cost of the rename later: one scripted rename.
+- **MSVC has not seen the component struct order.** The struct is defined after `QCPAbstractLine`, which
+  holds a `QList` of it. The class has an out-of-line destructor and inline accessors after the struct.
+  GCC and clang accept it, MSVC is unverified. The Windows CI must be green before 5c is pushed.
+- **Removing the points of a NaN key removes nothing and is not reported.** 2.x did not check either.
+  `QCPGraph::removeData*` (S5). Add a misuse report if a user trips on it.
+- **The remove-data bench rows time the busy clone.** `QCPGraph_RemoveData*` usually pay a 1M-point copy,
+  because setData's level-1 job is still running. Wait for the pipeline before timing to measure the
+  in-place cost.
+- **Default component name comparison.** A column named by hand "Component 0" reads as unnamed, so a
+  one-column legend row shows the graph's name. `simplify:` note in `QCPGroupLegendItem::headerName`; upgrade:
+  a flag set by every name write (fix-a).
+- **`setBrush` replaces fills to a constant or between columns.** Only fills to another graph survive and
+  take the new brush. 2.x had no such fills, so nothing breaks; a flag on the fill would keep them.
+- **No `QCPGraph::scatterStyle()` getter.** Callers read `component(i).scatterStyle` (review M1).
+- **Selected error bars use the selected pen for all bars.** Unchanged since 5a; a per-bar selection pen
+  would follow the selected segments.
+- **`setScatterMaxPoints` went with QCPGraph2.** A scatter-only graph of millions of points drew a capped
+  stratified subset; the new graph has no such cap, and the docs for it were removed. Check how a
+  scatter-only graph behaves on 1M+ points, and restore a cap if it is slow.
+- **Out-of-date architecture pages.** `docs/architecture/adaptive-sampling.md` and `gap-detection.md` still
+  describe the algorithms as two functions; they are one, `linesInData()`, in data space. Names were fixed
+  in 5c, the walkthroughs were not rewritten.
+- **Names kept from the rename.** The test class `TestMultiGraph`, test slots with "multiGraph", the
+  directory `tests/auto/test-multigraph`, `tests/perf/multigraph-perf.cpp`, `tests/manual/massive_graph2`
+  and the `user-system-multigraph.png` picture keep the old name.
+
 ## From earlier milestones
 
 Each rulings file keeps its own list; they are not copied here so they cannot drift.

@@ -24,23 +24,23 @@ It never draws wrongly in silence.
 | `capRectangular` | The plot area is a rectangle aligned with the axes | yes | no |
 | `capStraightKey` | The key runs along a straight line, so data sorted by key is sorted in pixels | yes | no |
 | `capColourScale` | A colour scale can be placed next to the area | yes | no |
-| `capLanes` | The area can lay out lanes (multi-graphs, intervals) | yes | no |
+| `capLanes` | The area can lay out lanes (graphs with several columns, intervals) | yes | no |
 | `capStraightSegments` | A segment between two data points may be drawn as a straight pixel line | yes | no |
 
 What the plottables need:
 
 | Plottable | Needs |
 |---|---|
-| `QCPGraph`, `QCPCurve`, `QCPMultiGraph` | `capStraightSegments` only |
+| `QCPGraph`, `QCPCurve` | `capStraightSegments` only |
 | `QCPPolarGraph` | nothing (it draws its own arcs) |
 | `QCPColorMap`, `QCPColorMap2`, `QCPHistogram2D` and the other colour-mapped types | a rectangle, a straight key, `capColourScale` |
 | `QCPWaterfallGraph` | a rectangle and a straight key (its offsets are pixel stacking) |
 | intervals | a rectangle, a straight key, `capLanes` |
-| `QCPBars`, `QCPErrorBars`, `QCPFinancial`, `QCPStatisticalBox`, `QCPGraph2`, `QCPHistogram`, everything else | `capRectangular` and `capStraightKey` |
+| `QCPBars`, `QCPErrorBars`, `QCPFinancial`, `QCPStatisticalBox`, `QCPHistogram`, everything else | `capRectangular` and `capStraightKey` |
 
-So a system of your own that keeps straight lines straight hosts graphs, scatters, curves and multigraphs as they are.
+So a system of your own that keeps straight lines straight hosts graphs, scatters, and curves as they are.
 It cannot host bars or the 2.x error bars: their widths and caps are measured along a rectangle.
-A `QCPMultiGraph`'s own error bars do work there: each cap is measured through the mapping at its own bar.
+A `QCPGraph`'s own error bars do work there: each cap is measured through the mapping at its own bar.
 A `QCPWaterfallGraph` still needs a rectangle and a straight key, because its offsets are pixel stacking.
 
 The four first capabilities are promises about today's cartesian frame. The plottables that need them
@@ -152,8 +152,8 @@ space is inherited.
 
 - **Graphs**: every line style (the steps and impulses are built in data space, then mapped), scatters,
   fills down to value zero, channel fills between two graphs of the same system. On a logarithmic value
-  axis the fill stops at the range bound nearer zero, and an impulse, which would run to zero, is left
-  out. A `QCPMultiGraph` also fills to a constant, between its columns or to another graph, draws
+  axis the fill and the impulses stop at the range bound nearer zero. A `QCPGraph` also fills to a
+  constant, between its columns or to another graph, draws
   error bars (each cap measured through the mapping at its own bar) and colours its lines by a scalar.
   Colour values join the colour scale of the system's area when that area is an axis rect; on an area
   that is not, give the graph an explicit scale or the values are a misuse.
@@ -175,7 +175,7 @@ space is inherited.
 - **No culling, no decimation.** A cartesian graph skips the points outside the view and merges points
   that share a pixel. On a system of your own every point is mapped on every repaint, every click scans
   every point, and every item is a hit candidate. This is correct, and slower with many points.
-- **No dense error band.** A `QCPMultiGraph` on a system of your own records one bar per row. The
+- **No dense error band.** A `QCPGraph` on a system of your own records one bar per row. The
   cartesian path turns bars closer than three cap widths into a band; this branch does not, so a dense
   graph pays for every bar on every frame.
 - **No bracket decoration.** `QCPSelectionDecoratorBracket` measures its brackets along the cartesian

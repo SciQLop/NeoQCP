@@ -125,9 +125,9 @@ DOC_SNIPPET(graphs_channel_fill, 600, 360)
     // [/graphs_channel_fill]
 }
 
-DOC_SNIPPET(graphs_graph2_owning, 600, 360)
+DOC_SNIPPET(graphs_owning, 600, 360)
 {
-    // [graphs_graph2_owning]
+    // [graphs_owning]
     const int n = 5000;
     std::vector<double> time(n);
     std::vector<std::int16_t> counts(n);   // raw ADC counts, kept as int16
@@ -148,12 +148,12 @@ DOC_SNIPPET(graphs_graph2_owning, 600, 360)
     customPlot->xAxis->setLabel("time (s)");
     customPlot->yAxis->setLabel("counts");
     customPlot->rescaleAxes();
-    // [/graphs_graph2_owning]
+    // [/graphs_owning]
 }
 
-DOC_SNIPPET(graphs_graph2_view, 600, 360)
+DOC_SNIPPET(graphs_view, 600, 360)
 {
-    // [graphs_graph2_view]
+    // [graphs_view]
     // The graph reads these buffers at every replot: they must outlive it.
     static std::vector<double> time(1000);
     static std::vector<double> level(1000);
@@ -173,12 +173,12 @@ DOC_SNIPPET(graphs_graph2_view, 600, 360)
     graph->dataChanged();
 
     customPlot->rescaleAxes();
-    // [/graphs_graph2_view]
+    // [/graphs_view]
 }
 
-DOC_SNIPPET(graphs_graph2_shared, 600, 420)
+DOC_SNIPPET(graphs_shared, 600, 420)
 {
-    // [graphs_graph2_shared]
+    // [graphs_shared]
     std::vector<double> t(20000), b(20000);
     for (int i = 0; i < 20000; ++i)
     {
@@ -204,12 +204,12 @@ DOC_SNIPPET(graphs_graph2_shared, 600, 420)
     customPlot->rescaleAxes();
     detailX->setRange(40, 45);
     detail->rescaleValueAxis(false, true);
-    // [/graphs_graph2_shared]
+    // [/graphs_shared]
 }
 
-DOC_SNIPPET(graphs_graph2_scatter_color, 600, 360)
+DOC_SNIPPET(graphs_scatter_color, 600, 360)
 {
-    // [graphs_graph2_scatter_color]
+    // [graphs_scatter_color]
     const int n = 1500;
     std::vector<double> t(n), v(n);
     std::vector<double> color(n);
@@ -229,12 +229,12 @@ DOC_SNIPPET(graphs_graph2_scatter_color, 600, 360)
     graph->setColorValues(std::move(color));
     graph->setGradient(QCPColorGradient::gpViridis);
     customPlot->rescaleAxes();
-    // [/graphs_graph2_scatter_color]
+    // [/graphs_scatter_color]
 }
 
-DOC_SNIPPET(graphs_multigraph, 600, 360)
+DOC_SNIPPET(graphs_columns, 600, 360)
 {
-    // [graphs_multigraph]
+    // [graphs_columns]
     const int n = 3000;
     std::vector<double> time(n);
     std::vector<std::vector<float>> field(3, std::vector<float>(n));
@@ -254,12 +254,12 @@ DOC_SNIPPET(graphs_multigraph, 600, 360)
     customPlot->xAxis->setLabel("time (s)");
     customPlot->rescaleAxes();
     customPlot->legend->setVisible(true);
-    // [/graphs_multigraph]
+    // [/graphs_columns]
 }
 
-DOC_SNIPPET(graphs_multigraph_fill, 600, 300)
+DOC_SNIPPET(graphs_component_fill, 600, 300)
 {
-    // [graphs_multigraph_fill]
+    // [graphs_component_fill]
     const int n = 400;
     std::vector<double> time(n);
     std::vector<std::vector<double>> rates(2, std::vector<double>(n));
@@ -279,12 +279,12 @@ DOC_SNIPPET(graphs_multigraph_fill, 600, 300)
     customPlot->rescaleAxes();
     customPlot->yAxis->setRangeLower(0);
     customPlot->legend->setVisible(true);
-    // [/graphs_multigraph_fill]
+    // [/graphs_component_fill]
 }
 
-DOC_SNIPPET(graphs_multigraph_band, 600, 300)
+DOC_SNIPPET(graphs_component_band, 600, 300)
 {
-    // [graphs_multigraph_band]
+    // [graphs_component_band]
     const int n = 300;
     std::vector<double> time(n);
     std::vector<std::vector<double>> columns(3, std::vector<double>(n));   // mean, low, high
@@ -305,12 +305,12 @@ DOC_SNIPPET(graphs_multigraph_band, 600, 300)
     model->setComponentInLegend(2, false);
     customPlot->rescaleAxes();
     customPlot->legend->setVisible(true);
-    // [/graphs_multigraph_band]
+    // [/graphs_component_band]
 }
 
-DOC_SNIPPET(graphs_multigraph_error_bars, 600, 300)
+DOC_SNIPPET(graphs_error_bars, 600, 300)
 {
-    // [graphs_multigraph_error_bars]
+    // [graphs_error_bars]
     const int n = 25;
     std::vector<double> x(n);
     std::vector<std::vector<double>> columns(3, std::vector<double>(n));   // value, lower, upper
@@ -334,12 +334,12 @@ DOC_SNIPPET(graphs_multigraph_error_bars, 600, 300)
     customPlot->xAxis->setRange(-1, n);
     customPlot->yAxis->setRange(-0.6, 1.6);
     customPlot->legend->setVisible(true);
-    // [/graphs_multigraph_error_bars]
+    // [/graphs_error_bars]
 }
 
-DOC_CODE(graphs_multigraph_add_data)
+DOC_CODE(graphs_add_data)
 {
-    // [graphs_multigraph_add_data]
+    // [graphs_add_data]
     auto stream = customPlot->add<QCPGraph>()
         .setData(std::vector<double>{ 0.0, 1.0 },
                  std::vector<std::vector<double>>{ { 10.0, 11.0 }, { 4.0, 5.0 } });
@@ -349,12 +349,12 @@ DOC_CODE(graphs_multigraph_add_data)
     // One row, one value per component.
     const double row[] = { 14.0, 8.0 };
     stream->addData(4.0, std::span<const double>(row, 2));
-    // [/graphs_multigraph_add_data]
+    // [/graphs_add_data]
 }
 
-DOC_SNIPPET(graphs_multigraph_fill_to_graph, 600, 320)
+DOC_SNIPPET(graphs_fill_to_graph, 600, 320)
 {
-    // [graphs_multigraph_fill_to_graph]
+    // [graphs_fill_to_graph]
     const int n = 241;
     std::vector<double> time(n);
     std::vector<std::vector<double>> model(1, std::vector<double>(n));
@@ -380,7 +380,7 @@ DOC_SNIPPET(graphs_multigraph_fill_to_graph, 600, 320)
     customPlot->xAxis->setLabel("time (s)");
     customPlot->rescaleAxes();
     customPlot->legend->setVisible(true);
-    // [/graphs_multigraph_fill_to_graph]
+    // [/graphs_fill_to_graph]
 }
 
 DOC_SNIPPET(graphs_gaps, 600, 360)

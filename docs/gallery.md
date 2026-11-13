@@ -64,7 +64,7 @@ Every plot also runs in your browser, built with Qt for WebAssembly: pan, zoom a
 A spacecraft crosses an interplanetary shock.
 The magnetic field jumps and turns turbulent, and the cold ion beam heats into a broad distribution.
 
-- The field is one `QCPMultiGraph`: four components, one key array, one legend entry expanded to a row per component ({doc}`graphs`).
+- The field is one `QCPGraph` with four columns: four components, one key array, one legend entry expanded to a row per component ({doc}`graphs`).
 - The ion spectrogram is a `QCPColorMap2` with a log energy axis and a log colour scale ({doc}`colormaps`).
 - The two panels share a date axis: linked ranges, a margin group, tick labels only below ({doc}`layout`).
 - A vertical `QCPItemSpan` marks the shock on both panels ({doc}`items`), and the dark theme styles everything ({doc}`styling`).
@@ -93,7 +93,7 @@ Try it online
 Ten million samples, a 1 kHz signal over almost three hours, with rare one-second bursts.
 The overview shows all of them; the lower panel shows the four seconds in the red box.
 
-- Both views are `QCPGraph2`s on one `QCPSoADataSource`: the vectors are moved in once and never copied ({doc}`graphs`).
+- Both views are `QCPGraph`s on one `QCPSoAMultiDataSource`: the vectors are moved in once and never copied ({doc}`graphs`).
 - Each view reduces the data to its own pixel columns, so both stay fluid while panning ({doc}`performance`).
 
 ![Ten million samples, overview and detail](images/gallery-ten-million-points.png)

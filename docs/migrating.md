@@ -88,27 +88,27 @@ Most changes are confined to the new classes. A few touch existing code.
   - Deleting a `QCPColorScale` detaches the colour maps that use it, without a signal. Their `colorScale()` then returns `nullptr`.
 - **Span dragging.** Dragging a `QCPItemSpan` or `QCPItemRSpan` moves its edges by the mouse movement in pixels, whatever the type of their positions. An edge placed in pixels used to move by the wrong amount. If the axis moves during the drag, the edge now stays under the pointer.
 - **Native pinch.** A macOS pinch that the plot does not zoom on is left to the parent widget. It used to be swallowed.
-- **New axes are followed.** `QCPGraph2`, `QCPMultiGraph`, `QCPColorMap2`, `QCPHistogram2D` and `QCPHistogram` follow the scale and range of an axis given later with `setKeyAxis()` or `setValueAxis()`, not only the axes they were built with.
+- **New axes are followed.** `QCPGraph`, `QCPColorMap2`, `QCPHistogram2D` and `QCPHistogram` follow the scale and range of an axis given later with `setKeyAxis()` or `setValueAxis()`, not only the axes they were built with.
 
-The classic plottables (`QCPGraph`, `QCPCurve`, `QCPBars`, `QCPColorMap`, ...) keep their data model and behaviour. Their solid lines and `QCPGraph` fills are drawn by the GPU now; dashed lines, channel fills and scatters still use `QPainter`.
+The classic plottables (`QCPCurve`, `QCPBars`, `QCPColorMap`, ...) keep their data model and behaviour. Their solid lines are drawn by the GPU now; dashed lines and scatters still use `QPainter`. `QCPGraph` is not classic any more: see "One graph" below.
 
 The behaviours below belong to the new plottables only. Code that keeps using the classic ones is not affected.
 
-- **Gaps.** `QCPGraph2`, `QCPMultiGraph` and `QCPColorMap2` detect missing stretches of data and leave them blank instead of joining them. The classic `QCPGraph` only breaks its line at NaN values, as before. See {doc}`architecture/gap-detection`.
-- **Asynchronous resampling.** `QCPGraph2`, `QCPMultiGraph`, `QCPColorMap2` and `QCPHistogram2D` do their heavy work on worker threads. The first picture of large data can come a moment after `replot()`.
-- **Deferred data swap.** New data on a `QCPGraph2` or `QCPMultiGraph` that is already on screen is shown after a short window (200 ms by default), not at once. Until then the graph reports the old data.
+- **Gaps.** `QCPGraph` and `QCPColorMap2` detect missing stretches of data and leave them blank instead of joining them. 2.x only broke the line at NaN values. See {doc}`architecture/gap-detection`.
+- **Asynchronous resampling.** `QCPGraph`, `QCPColorMap2` and `QCPHistogram2D` do their heavy work on worker threads. The first picture of large data can come a moment after `replot()`.
+- **Deferred data swap.** New data on a `QCPGraph` that is already on screen is shown after a short window (200 ms by default), not at once. Until then the graph reports the old data.
 - **Busy state.** These plottables report `busy()` and emit `busyChanged()`. A plottable busy for long is drawn faded, with a ⟳ in its legend entry.
 
-- **Multigraph legend.** The legend row of a `QCPMultiGraph` shows only the components in `legendComponents()`. The bound columns of error bars leave it on their own; `setComponentInLegend()` changes that.
-- **Empty data on a multigraph.** A data source with no rows keeps the components, with their names and styles. It used to reset their number.
+- **Legend of a graph with several columns.** The legend row of a `QCPGraph` shows only the components in `legendComponents()`. The bound columns of error bars leave it on their own; `setComponentInLegend()` changes that.
+- **Empty data on a graph.** A data source with no rows keeps the components, with their names and styles. It used to reset their number.
 - **Lane layouts.** `QCPLaneLayout` setters and `QCPIntervals::setCategoryOrder()` emit nothing, and restack nothing, when the value does not change.
 - **First colour map frame.** `QCPColorMap2` resamples one event-loop turn after it is shown or resized, not inside the paint. Exports still resample at once.
 - **Contour segments.** `QCPContourExtractor::extract()` returns segments in the image's [0, 1] coordinates, traced on at most 300 by 300 cells by default. It used to return them in data units, on the full grid.
-- **Multigraph keys are sorted.** `QCPMultiGraph::setData()` with `double` keys and `double` columns builds a growable source and sorts unsorted keys, unless `alreadySorted = true`. Other value types keep the source they came in.
-- **Multigraph shape misuses.** A `QCPMultiGraph::setData()` or `addData()` whose columns do not have one value per key, or whose keys are not finite, reports one misuse and changes nothing. 2.x truncated unequal data.
-- **The multigraph needs less from its system.** `QCPMultiGraph` requires only `capStraightSegments`, so a straight-segment coordinate system of your own hosts it. `QCPWaterfallGraph` still requires a rectangle and a straight key and is refused there.
-- **`QCPMultiGraph::addData()` and one-column `setData()`.** `addData()` appends to the source a `double` `setData()` built; a view, a shared source, a non-double source and a waterfall refuse it. `setData(keys, values)` takes two `QVector<double>` or two `std::vector<double>` for a one-column graph.
-- **A tracer can follow a multigraph component.** `QCPItemTracer::setLineGraph(graph, component)` and `setComponent(component)` follow one column; the tracer is inert when the graph or the component goes. The classic `setGraph(QCPGraph*)` is still there and the two targets replace each other.
+- **Graph keys are sorted.** `QCPGraph::setData()` with `double` keys and `double` columns builds a growable source and sorts unsorted keys, unless `alreadySorted = true`. Other value types keep the source they came in.
+- **Graph shape misuses.** A `QCPGraph::setData()` or `addData()` whose columns do not have one value per key, or whose keys are not finite, reports one misuse and changes nothing. 2.x truncated unequal data.
+- **The graph needs less from its system.** `QCPGraph` requires only `capStraightSegments`, so a straight-segment coordinate system of your own hosts it. `QCPWaterfallGraph` still requires a rectangle and a straight key and is refused there.
+- **`QCPGraph::addData()` and one-column `setData()`.** `addData()` appends to the source a `double` `setData()` built; a view, a shared source, a non-double source and a waterfall refuse it. `setData(keys, values)` takes two `QVector<double>` or two `std::vector<double>` for a one-column graph.
+- **A tracer can follow a graph component.** `QCPItemTracer::setGraph(graph, component)` and `setComponent(component)` follow one column; the tracer is inert when the graph or the component goes.
 
 {doc}`performance` explains the asynchronous points and what they mean for code that reads results right after `setData()`.
 
@@ -153,8 +153,39 @@ These patterns stop compiling:
 `qcpConnect` is gone.
 Setters that take a list still take a `QList<T*>`.
 `delete handle` compiles and skips `remove()`; delete through the plot instead.
-The graph family keeps raw pointers until the graph classes are renamed: `graph(i)`, `addGraph()`, `selectedGraphs()`, `graphs()`.
+The graph list returns handles too: `graph(i)`, `addGraph()`, `selectedGraphs()`, `graphs()`.
 Signals carry raw pointers, as before.
+
+## One graph
+
+NeoQCP 3.0 has one graph class, `QCPGraph`.
+It is what the 3.0 previews called `QCPMultiGraph`: one key column, N value columns, an asynchronous resampler, and coordinate systems of your own.
+The 2.x `QCPGraph` (a container of `QCPGraphData`) and the preview `QCPGraph2` are gone.
+A graph with one column is the 2.x graph: `add<QCPGraph>().setData(keys, values)` still works, and so do `addGraph()`, `graph(i)`, `graphs()` and `selectedGraphs()`.
+These patterns need a change:
+
+| Before | What to write |
+|---|---|
+| `QCPMultiGraph` (a 3.0 preview class) | `QCPGraph`. The helper classes follow: `QCPGraphOps`, `QCPGraphPipeline`, `QCPGraphComponent`. |
+| `QCPGraph2` | `QCPGraph`. `setData()`, `viewData()` and `setDataSource()` keep their calls; the source is a `QCPSoAMultiDataSource`. |
+| `graph->data()`, the shared `QSharedPointer<QCPGraphDataContainer>` | Nothing holds the container any more. Write with `setData()`, `addData()`, `removeDataBefore()`, `removeDataAfter()` and `removeData(from, to)`. Read with `dataSource()`. Share data between graphs with one source and `setDataSource()`. |
+| `graph->setChannelFillGraph(other)` | `graph->setComponentFillToGraph(0, other, 0)`. The graphs must share the key axis; their value axes may differ. |
+| `tracer->setGraph(graph)` and `setLineGraph(graph, component)` | `tracer->setGraph(graph, component)`. `lineGraph()` is `graph()`. |
+| `QCPGraph::LineStyle` | The same names: `QCPGraph::lsLine` and the others compile as before. |
+| A graph that drew with `QCPGraph2::setScatterColorValues()` | `setColorValues()` and `setGradient()`. |
+| `QCPGraph2::setScatterMaxPoints()` | Removed with the class. There is no replacement yet. |
+
+Behaviour that changed:
+
+- **Default pen.** A new graph has the next colour of the palette and a pen 2.5 pixels wide. 2.x drew every graph in blue with a cosmetic pen (width 0). Call `setPen()` to get the old look back.
+- **Shape misuses.** Keys and values of different lengths, and a NaN key, are misuses: the call reports one and changes nothing. 2.x truncated unequal data and let NaN keys through.
+- **Sorting.** `setData()` with `double` keys and `double` columns sorts unsorted keys, unless `alreadySorted = true`. Other types must come sorted.
+- **Selection.** A selected graph draws its selected segments with the selection decorator. Markers of a selected segment take the selected pen as their outline.
+- **Legend.** The row of a graph with one column shows the graph's name, unless you named the column yourself. A graph without data shows its pen next to its name.
+- **Logarithmic value axis.** A fill to a value the axis cannot place, and the baseline of impulses, go to the range bound nearer zero.
+- **Brushes.** `setBrush()` fills every column down to zero and replaces fills to a constant or between columns. Fills to another graph stay and take the new brush.
+- **Equal values.** `setPen()` with the pen the graph already has does not repaint.
+- **New virtual.** `QCPAbstractPlottable::assignSelection(const QCPDataSelection&)` is a new protected virtual, called when the selection is set. A plottable of your own that has a method of that name must rename it.
 
 ## New classes
 
@@ -162,9 +193,8 @@ These do not exist upstream. You do not need them to migrate, but they are where
 
 Plottables:
 
-- <a href="api/classQCPGraph2.html">QCPGraph2</a>: a line or scatter graph that plots from your own containers, in their own numeric type, without copying. Resamples large data on a worker thread. See {doc}`graphs`.
-- <a href="api/classQCPMultiGraph.html">QCPMultiGraph</a>: many value columns sharing one key column, from one data source. Each component has its own pen, name and selection. Can colour lines by a scalar, fill under a component or between two, and draw error bars.
-- <a href="api/classQCPWaterfallGraph.html">QCPWaterfallGraph</a>: a `QCPMultiGraph` that stacks its traces with offsets, optionally normalised.
+- <a href="api/classQCPGraph.html">QCPGraph</a> is rebuilt: one key column and any number of value columns, from your own containers in their own numeric type, without copying. Resamples large data on a worker thread. Each component has its own pen, name and selection. Can colour lines by a scalar, fill under a component or between two, and draw error bars. See {doc}`graphs` and the next section.
+- <a href="api/classQCPWaterfallGraph.html">QCPWaterfallGraph</a>: a `QCPGraph` that stacks its traces with offsets, optionally normalised.
 - <a href="api/classQCPColorMap2.html">QCPColorMap2</a>: a colour map over zero-copy data, resampled on a worker thread, with gaps, log axes and GPU contour lines with labels. See {doc}`colormaps`.
 - <a href="api/classQCPHistogram2D.html">QCPHistogram2D</a>: bins a point cloud into a colour map, on a worker thread, with contour lines.
 - <a href="api/classQCPHistogram.html">QCPHistogram</a>: a 1-D histogram of every column of a data source, on shared bins, binned on a worker thread. See {doc}`plottables`.
@@ -206,6 +236,7 @@ Plot-wide settings:
 | `QCPPolarAxisAngular` as a layout element (`addElement`, its background, inset layout, drag and wheel, `addRadialAxis`, `add<QCPPolarGraph>`) | `QCPPolarArea`, which owns the angular axis, the radial axes and the grid |
 | `QCPPolarAxisRadial::ScaleType`, the polar axes' `SelectablePart(s)`, `rangeDrag`/`rangeZoom` | `QCPAxisBase::ScaleType`, `QCPAxisBase::SelectablePart(s)`, `rangeDraggable`/`rangeZoomable` |
 | Overriding `QCPAbstractPlottable::axesChanged()` (NeoQCP 3.0 preview) | override `systemChanged()`: a plottable now moves between coordinate systems |
+| `QCPGraph2`, `QCPMultiGraph`, `QCPGraph::data()` (NeoQCP 3.0 preview) | see "One graph" above |
 | `QCPPolarArea::removeGraph(graph)` | `plot.remove(graph)`: the plot owns polar graphs; the area no longer deletes them |
 | `QCPPolarLegendItem`, `QCPPolarGraph::addToLegend`/`removeFromLegend` (polar overloads) | the plottable ones: a polar graph has a `QCPPlottableLegendItem` row |
 | `QCPCoordinateSystem::ratioTransform()`, `frameRatioTransform()` (NeoQCP 3.0 preview) | `QCPArea::ratioTransform()`: the ratio space belongs to the area |

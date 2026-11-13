@@ -149,8 +149,9 @@ The default one draws a blue pen, 2.5 pixels wide.
 - `QCPSelectionDecoratorBracket` also draws a bracket at each end of each selected range. Pick the shape with `setBracketStyle()`: square brackets, half ellipses, ellipses or plus signs.
 - `setSelectionDecorator()` replaces the decorator. The plottable takes ownership. `nullptr` removes it, and selected data then looks like the rest.
 
-`QCPGraph2` draws its whole line with the decorator pen as soon as anything is selected.
-`QCPMultiGraph` keeps one selection per component, each drawn with that component's selected pen. See {doc}`graphs`.
+A `QCPGraph` keeps one selection per component. It draws the selected segments with the decorator: the line with the decorator's pen, the markers with its marker style. Error bars of a selected component use its selected pen. See {doc}`graphs`.
+
+A plottable that wants to react to a new selection overrides the protected virtual `QCPAbstractPlottable::assignSelection()`.
 
 (selection-rect)=
 ## Drag a rectangle
@@ -229,14 +230,14 @@ For example:
 ## Find the data point under the mouse
 
 `QCPDataLocator` answers "which data point is here?".
-It works with `QCPGraph`, `QCPGraph2`, `QCPMultiGraph`, `QCPCurve`, `QCPColorMap`, `QCPColorMap2` and `QCPHistogram2D`.
+It works with `QCPGraph`, `QCPCurve`, `QCPColorMap`, `QCPColorMap2` and `QCPHistogram2D`.
 It has two ways to search:
 
 - `locate(pixelPos)`, after `setPlottable()`: the point nearest to a pixel position, found by the plottable's own hit test. For lines, the cursor must be inside the axis rect. For colour maps, it is the cell under the cursor.
 - `locateAtKey(plottable, key, value)`: the point nearest to a key. Colour maps also need the `value`, and a key and value outside the data find nothing.
 
 Both return `true` when they found something. Then `key()`, `value()` and `dataIndex()` describe the point.
-For colour maps, `data()` is the cell's z value. For a `QCPMultiGraph` found by key, `componentValues()` holds the value of every component.
+For colour maps, `data()` is the cell's z value. For a `QCPGraph` found by key, `componentValues()` holds the value of every component.
 
 ```{literalinclude} snippets/interactions.cpp
 :start-after: // [interactions_data_locator]
@@ -267,7 +268,7 @@ A plottable can say "my data is not ready yet".
 When it stays busy for a moment, it fades, and its legend entry gets a `⟳` in front of its name.
 It comes back when it is no longer busy.
 
-Plottables that resample on worker threads (`QCPGraph2`, `QCPMultiGraph`, `QCPColorMap2`, `QCPHistogram2D`) are busy on their own while they work.
+Plottables that resample on worker threads (`QCPGraph`, `QCPColorMap2`, `QCPHistogram2D`) are busy on their own while they work.
 You can mark any plottable busy yourself, for example while its data downloads:
 
 ```{literalinclude} snippets/interactions.cpp

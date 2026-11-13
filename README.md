@@ -31,8 +31,8 @@ space plasma data, and of its plotting library [SciQLopPlots](https://github.com
 ## What it adds to QCustomPlot
 
 - **GPU rendering.** It draws through Qt's QRhi: Metal on macOS, Vulkan on Linux, D3D on Windows and WebGL in the browser. Lines, fills, scatters, grids and spans are drawn by shaders, and panning moves cached geometry instead of redrawing it.
-- **Big data, no copy.** `QCPMultiGraph`, `QCPGraph2` and `QCPColorMap2` plot from your own containers or raw pointers, in any numeric type. Background threads reduce the data to what the pixels can show, so panning and zooming stay fluid with millions of points.
-- **New plottables.** Multi-component graphs, colour maps with gap detection, log axes and contour lines, 2D histograms, waterfalls, and interval timelines (`QCPIntervals`).
+- **Big data, no copy.** `QCPGraph` and `QCPColorMap2` plot from your own containers or raw pointers, in any numeric type. Background threads reduce the data to what the pixels can show, so panning and zooming stay fluid with millions of points.
+- **New plottables.** Graphs with many columns, colour maps with gap detection, log axes and contour lines, 2D histograms, waterfalls, and interval timelines (`QCPIntervals`).
 - **Items and interactions.** Shaded spans, click-and-drag item creation, trackpad and touch gestures, and a busy indicator.
 - **Styling.** Light and dark themes, also settable from a Qt stylesheet, and LaTeX in axis labels, legends and titles.
 - **In the browser.** The same code builds for WebAssembly.
@@ -105,10 +105,10 @@ plot->rescaleAxes();
 plot->replot();
 ```
 
-For large data, move your vectors into a multi-component graph. Nothing is copied:
+For large data, move your vectors into a graph. Nothing is copied:
 
 ```cpp
-auto* mg = new QCPMultiGraph(plot->xAxis, plot->yAxis);
+auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
 mg->setData(std::move(keys), std::move(valueColumns));   // one vector per component
 mg->setComponentColors({Qt::red, Qt::green, Qt::blue});
 ```

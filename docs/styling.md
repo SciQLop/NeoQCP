@@ -101,7 +101,7 @@ The tooltip, crosshair and busy colours have no stylesheet property. Set them in
 ## Pens and brushes
 
 Plottables and items take a `QPen` for lines and a `QBrush` for fills, like any Qt drawing.
-A graph with a brush is filled down to the zero line. With `setChannelFillGraph()`, it is filled up to another graph instead:
+A graph with a brush is filled down to the zero line. With `setComponentFillToGraph(0, other, 0)`, it is filled up to another graph instead:
 
 ```{literalinclude} snippets/styling.cpp
 :start-after: // [styling_pens_brushes]
@@ -114,7 +114,7 @@ A graph with a brush is filled down to the zero line. With `setChannelFillGraph(
 
 - `Qt::NoPen` hides a line but keeps its fill.
 - Semi-transparent colours (alpha below 255) let the grid and other graphs show through.
-- A pen width of 0 is a cosmetic pen: always one device pixel wide, even when an export is scaled up.
+- A pen width of 0 is a cosmetic pen: always one device pixel wide, even when an export is scaled up. A new graph does not use it: its pen is the next palette colour, 2.5 pixels wide.
 
 On screen, `QCPGraph` and `QCPCurve` draw solid lines and fills on the GPU.
 Dashed and dotted lines are drawn with QPainter instead, so they work, but cost more on large data.
@@ -140,7 +140,7 @@ Give it a shape, and optionally a size, a pen colour, a fill or a full pen and b
 - `ssCustom` draws your own `QPainterPath`, scaled by the size. Pass the path, pen, brush and size to the constructor.
 - A graph without lines is `setLineStyle(QCPGraph::lsNone)`.
 
-{doc}`graphs` covers scatter skipping and the GPU scatters of `QCPGraph2` and `QCPMultiGraph`.
+{doc}`graphs` covers scatter skipping and the GPU scatters of `QCPGraph`.
 
 ## Line endings
 

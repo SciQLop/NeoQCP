@@ -32,9 +32,9 @@ DOC_SNIPPET(performance_million_points, 600, 360)
     // [/performance_million_points]
 }
 
-DOC_SNIPPET(performance_multigraph, 600, 360)
+DOC_SNIPPET(performance_columns, 600, 360)
 {
-    // [performance_multigraph]
+    // [performance_columns]
     const int n = 2'000'000;
     std::vector<double> t(n);
     std::vector<std::vector<float>> b(3, std::vector<float>(n));
@@ -54,7 +54,7 @@ DOC_SNIPPET(performance_multigraph, 600, 360)
     customPlot->yAxis->setLabel("B (nT)");
     customPlot->legend->setVisible(true);
     customPlot->rescaleAxes();
-    // [/performance_multigraph]
+    // [/performance_columns]
 }
 
 DOC_SNIPPET(performance_shared_source, 600, 420)

@@ -7,7 +7,7 @@ This directory documents the internal architecture of NeoQCP's rendering and dat
 | Document | Description |
 |---|---|
 | [QRhi Rendering Pipeline](qrhi-rendering-pipeline.md) | How NeoQCP composites layers on the GPU using Qt's Rendering Hardware Interface |
-| [Adaptive Sampling](adaptive-sampling.md) | How QCPGraph2 reduces millions of data points to pixel resolution for line plots |
+| [Adaptive Sampling](adaptive-sampling.md) | How QCPGraph reduces millions of data points to pixel resolution for line plots |
 | [Colormap Resampling](colormap-resampling.md) | How QCPColorMap2 bins 2D data onto a screen-resolution grid in a worker thread |
 | [Gap Detection](gap-detection.md) | How data gaps are detected in both 1D line plots and 2D colormaps |
 | [Async Pipeline](async-pipeline.md) | The shared async transform infrastructure used by all plottables |

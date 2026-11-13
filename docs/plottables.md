@@ -108,7 +108,7 @@ Reference: <a href="api/classQCPFinancial.html">QCPFinancial</a>.
 
 `QCPErrorBars` does not have keys or values of its own.
 It borrows them from another plottable, set with `setDataPlottable()`.
-That can be any plottable with one-dimensional data: `QCPGraph`, `QCPGraph2`, `QCPCurve`, `QCPBars`...
+That can be any plottable with one-dimensional data: `QCPGraph`, `QCPCurve`, `QCPBars`...
 
 ```{literalinclude} snippets/plottables.cpp
 :start-after: // [plottables_error_bars]
@@ -126,7 +126,7 @@ That can be any plottable with one-dimensional data: `QCPGraph`, `QCPGraph2`, `Q
 - `setSymbolGap()` leaves a gap around the data point, 10 pixels by default, so the bar does not cross the marker.
 - `rescaleAxes()` takes the error bars into account.
 
-A `QCPMultiGraph` draws its own error bars from two bound columns, and turns them into a band when the points are dense. See {doc}`graphs`.
+A `QCPGraph` draws its own error bars from two bound columns, and turns them into a band when the points are dense. See {doc}`graphs`.
 
 Reference: <a href="api/classQCPErrorBars.html">QCPErrorBars</a>.
 
@@ -156,7 +156,7 @@ Reference: <a href="api/classQCPStatisticalBox.html">QCPStatisticalBox</a>.
 ## Histograms: QCPHistogram
 
 `QCPHistogram` counts values into bins and draws one bar per bin.
-It reads a multi-column data source, the same kind a `QCPMultiGraph` uses (see {doc}`graphs`).
+It reads a multi-column data source, the same kind a `QCPGraph` uses (see {doc}`graphs`).
 Each column gets its own histogram, and all columns share the same bins.
 The keys of the source are not used: only the values are counted.
 
@@ -233,7 +233,7 @@ Reference: <a href="api/classQCPHistogram.html">QCPHistogram</a>.
 ## Waterfalls: QCPWaterfallGraph
 
 A waterfall stacks many traces on top of each other, each one shifted up by a fixed step.
-It is a `QCPMultiGraph` (see {doc}`graphs`): one key array, one column per trace.
+It is a `QCPGraph` (see {doc}`graphs`): one key array, one column per trace.
 The shift and the scaling are applied when the traces are drawn. Your data is not changed.
 
 ```{literalinclude} snippets/plottables.cpp

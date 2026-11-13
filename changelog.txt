@@ -576,6 +576,40 @@ Behaviour changes for 2.1 polar users:
   - Clicking inside a polar graph's fill selects it, as for cartesian graphs.
   - setSystem() with a non-polar system is refused as misuse.
 
+Milestone 5c (one graph). QCPMultiGraph is QCPGraph. The old container graph and the preview QCPGraph2
+are deleted, so a graph is one key column, N value columns, an asynchronous resampler and user coordinate
+systems. Source-breaking in a few patterns, listed below.
+  - QCPGraph (was QCPMultiGraph), QCPGraphOps, QCPGraphComponent and QCPGraphPipeline (QCPMultiGraphPipeline),
+        files plottable-graph, graph-fill and graph-errorbars. QCPGraph2, its pipeline, its single-column
+        pixel API (getLines, getOptimizedLineData and their algorithms) and the old container graph are gone.
+  - The graph list holds the graph: addGraph, graph(i), graph(), selectedGraphs, graphs() on the plot, the
+        axes and the rects return handles to it. addGraph returns the same ops handle as add<QCPGraph>().
+  - QCPItemTracer::setGraph(graph, component = 0) follows a graph component; setLineGraph and lineGraph are gone.
+  - setComponentFillToGraph(0, other, 0) is the channel fill. It also works across two value axes that share
+        the key axis; the band follows both. A fill whose partner is deleted is removed.
+  - data(), the shared container, is gone. setData, addData, the new removeDataBefore, removeDataAfter and
+        removeData(from, to), and dataSource() replace it. setData takes braced lists, as in 2.x.
+  - A selected graph draws its selected segments with the selection decorator. assignSelection() is a new
+        protected virtual on QCPAbstractPlottable.
+  - Legend: a graph with one column shows the graph's name; a graph without data shows its pen.
+  - A graph without data counts as shown, so a plottable group of such graphs is not dimmed.
+  - setPen with the pen the graph already has does not repaint.
+  - Doc snippet ids and pictures were renamed (graphs-owning, graphs-columns, graphs-component-fill, ...).
+  - Bench rows QCPMultiGraph_* are QCPGraph_*; QCPGraph2_* rows are gone; QCPGraph_RemoveData* measure the new graph.
+  - Fix: setData({..}, {..}) with braced lists was ambiguous; the log-axis fill and impulse baseline is the
+        range bound nearer zero; a multigraph scatter ignored the busy fade; an all-NaN key column threw.
+
+Behaviour changes for 2.x users:
+  - QCPMultiGraph and QCPGraph2 are QCPGraph. data() is gone: use setData, addData, removeData* and dataSource().
+  - setChannelFillGraph(other) is setComponentFillToGraph(0, other, 0).
+  - The default pen is the next palette colour, 2.5 pixels wide (2.x: blue, width 0).
+  - Keys and values of different lengths, and NaN keys, are misuses that change nothing (2.x truncated).
+  - setData sorts unsorted double keys; alreadySorted skips it.
+  - Removing the points of a NaN key removes nothing and is not reported.
+  - A fill or impulse baseline on a log value axis is the range bound nearer zero.
+  - setScatterMaxPoints (QCPGraph2) is gone.
+  - Code that subclasses QCPAbstractPlottable and has its own assignSelection must rename it.
+
 Milestone 5b (handles). Getters that hand out a plot-owned object return a QCPHandle<T>, a weak pointer
 that never dangles. Source-breaking in a few patterns, listed below.
   - QCPHandle<T> (handle.h): reads null when its object is deleted; operator-> on a dead handle aborts

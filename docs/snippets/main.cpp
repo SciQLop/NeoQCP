@@ -19,7 +19,7 @@ std::vector<DocSnippet>& doc_snippets()
 
 namespace
 {
-// MultiGraph and ColorMap2 resample on worker threads: wait for them, or the
+// Graph and ColorMap2 resample on worker threads: wait for them, or the
 // picture shows a plot that has not received its data yet.
 bool wait_until_idle(QCustomPlot& plot)
 {

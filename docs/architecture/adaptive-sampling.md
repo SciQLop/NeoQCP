@@ -1,8 +1,8 @@
 # Adaptive Sampling (1D Line Graphs)
 
-When a <a href="../api/classQCPGraph2.html">QCPGraph2</a> or <a href="../api/classQCPMultiGraph.html">QCPMultiGraph</a> has far more data points than pixels, NeoQCP consolidates the points of each pixel column into a min/max cluster. This preserves the visual envelope (peaks and valleys are never hidden) while drawing only 2 to 4 points per pixel.
+When a <a href="../api/classQCPGraph.html">QCPGraph</a> has far more data points than pixels, NeoQCP consolidates the points of each pixel column into a min/max cluster. This preserves the visual envelope (peaks and valleys are never hidden) while drawing only 2 to 4 points per pixel.
 
-For large data this per-pixel step is preceded by two coarser resampling levels, described in [Two-Level Resampling](#two-level-resampling). The classic `QCPGraph` uses the same per-pixel algorithm (inherited from upstream QCustomPlot), on its own `QCPDataContainer`, without the two levels.
+For large data this per-pixel step is preceded by two coarser resampling levels, described in [Two-Level Resampling](#two-level-resampling). The per-pixel step is `linesInData()`: below a few points per pixel it keeps every point, above it thins to the min/max envelope.
 
 ## When It Activates
 
@@ -18,7 +18,7 @@ maxCount = 2 × keyPixelSpan + 2
 
 Typical trigger: a 1000-pixel-wide plot showing 100K+ data points.
 
-`setAdaptiveSampling(false)` on the graph skips it and always renders directly. A `QCPGraph2` coloured by a scalar (`setScatterColorValues()`) also renders directly.
+`setAdaptiveSampling(false)` on the graph skips it and always renders directly. A graph coloured by a scalar (`setColorValues()`) also renders directly.
 
 ## Algorithm
 
@@ -97,13 +97,13 @@ For **linear** axes, `keyEpsilon` is constant, and the coordinate conversion use
 
 ## Two-Level Resampling
 
-The per-pixel pass is linear in the number of points it reads. To keep that small for millions of points, `QCPGraph2` and `QCPMultiGraph` feed it pre-binned data once the source is large: from 100 000 points for `QCPGraph2`, and from 100 000 rows × columns for `QCPMultiGraph`.
+The per-pixel pass is linear in the number of points it reads. To keep that small for millions of points, `QCPGraph` feeds it pre-binned data once the source is large: from 100 000 rows × columns.
 
 ```mermaid
 flowchart LR
     A["Raw source<br/>(N points)"] -->|"worker thread,<br/>once per data set"| B["Level 1<br/>min/max per bin,<br/>min(100 000, N/10) bins"]
     B -->|"GUI thread,<br/>per view"| C["Level 2<br/>4 bins per pixel column"]
-    A -.->|"few rows in view"| D["optimizedLineData()"]
+    A -.->|"few rows in view"| D["linesInData()"]
     C --> D
     D --> E["Pixel polyline"]
 ```
@@ -117,13 +117,11 @@ flowchart LR
 
 During a pan, the graph does not rebuild anything: the cached pixel polyline covers one view width on each side of the visible range, and it is translated on the GPU. 150 ms after the last pure pan, level 2 and the lines are rebuilt; a pan further than one view width rebuilds them at once, and so does a zoom.
 
-Scatter-only graphs (`lsNone`) never use level 1 or level 2: min/max binning would destroy a point cloud. They draw a stratified subset of at most `scatterMaxPoints()` points.
-
 For exports, a missing level 1 is built synchronously, so the picture is complete.
 
 ## Pixel-to-Data Mapping
 
-The `linesToPixels()` function converts data coordinates to pixel coordinates. It handles both horizontal and vertical key-axis orientations:
+The draw converts data coordinates to pixel coordinates. It handles both horizontal and vertical key-axis orientations:
 
 ```
 Horizontal key axis:     pt.x = keyAxis→coordToPixel(key)
@@ -141,8 +139,8 @@ The conversion uses the axis's scale type (linear or logarithmic) internally. Da
 flowchart LR
     A["QCPAbstractDataSource<br/>(raw SoA, or level 2)"] --> B["findBegin / findEnd<br/>(binary search for<br/>the line cache range)"]
     B --> C{"dataCount vs<br/>pixel span?"}
-    C -->|"Few points"| D["linesToPixels()<br/>(direct conversion)"]
-    C -->|"Many points"| E["optimizedLineData()<br/>(adaptive min/max)"]
+    C -->|"Few points"| D["linesInData()<br/>(every point)"]
+    C -->|"Many points"| E["linesInData()<br/>(adaptive min/max)"]
     D --> F["QVector&lt;QPointF&gt;<br/>(cached for pans)"]
     E --> F
     F --> G{"Solid pen,<br/>on screen?"}
@@ -150,7 +148,7 @@ flowchart LR
     G -->|"No (dashed,<br/>export)"| I["QPainter::drawPolyline<br/>(CPU path)"]
 ```
 
-`QCPMultiGraph` runs the same steps for all columns in one pass over the keys (`optimizedLineDataMulti()`), sharing the pixel-boundary decisions.
+With several columns, `QCPGraph` runs the same steps for all of them in one pass over the keys, sharing the pixel-boundary decisions.
 
 ## Limitations
 
@@ -162,9 +160,8 @@ flowchart LR
 
 | File | Role |
 |---|---|
-| `src/datasource/algorithms.h` | `qcp::algo::optimizedLineData()` — adaptive sampling algorithm; `linesToPixels()` — direct coordinate conversion; gap detection |
+| `src/datasource/algorithms.h` | `qcp::algo::linesInData()` — the per-pixel algorithm, in data space; gap detection |
 | `src/datasource/graph-resampler.h` | `buildL1Cache()`, `resampleL2()` and their multi-column versions — the two resampling levels |
-| `src/plottables/plottable-graph2.h/.cpp` | QCPGraph2 — drives the levels and the line cache in `draw()` |
-| `src/plottables/plottable-multigraph.h/.cpp` | QCPMultiGraph — the same for many columns |
+| `src/plottables/plottable-graph.h/.cpp` | QCPGraph — drives the levels and the line cache in `draw()` |
 | `src/datasource/abstract-datasource.h` | QCPAbstractDataSource — data source interface |
 | `src/datasource/soa-datasource.h` | QCPSoADataSource — SoA container for keys + values |

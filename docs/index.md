@@ -6,7 +6,7 @@ It is a modernised fork of [QCustomPlot](https://www.qcustomplot.com/) 2.1.1, ke
 It adds what interactive scientific plotting needs:
 
 - **GPU rendering through QRhi.** Layers are composited on the GPU with Metal, Vulkan or Direct3D. Lines, fills, scatters and the grid are drawn by shaders.
-- **Zero-copy data.** `QCPGraph2`, `QCPMultiGraph` and `QCPColorMap2` plot straight from your containers, in their own numeric type.
+- **Zero-copy data.** `QCPGraph` and `QCPColorMap2` plot straight from your containers, in their own numeric type.
 - **Large data stays fluid.** Line data is reduced to pixel resolution, colormaps are resampled on a worker thread, and panning moves cached geometry instead of redrawing.
 - **Data gaps stay gaps.** Missing acquisition periods are left blank instead of being joined by a line.
 - **LaTeX in labels**, themes, spans, timelines, waterfalls, histograms and 2D histograms.

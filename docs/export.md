@@ -126,7 +126,7 @@ Exports do not use any of that. They draw every layer, one after the other, with
 This has a few consequences:
 
 - An export does not depend on what is on screen. It does not wait for a replot, and the window can be hidden.
-- Plottables that compute on worker threads (`QCPGraph2`, `QCPMultiGraph`, `QCPColorMap2`, `QCPHistogram2D`, `QCPHistogram`) do the work synchronously if their result is not ready yet. The export never shows a plottable still waiting for its data.
+- Plottables that compute on worker threads (`QCPGraph`, `QCPColorMap2`, `QCPHistogram2D`, `QCPHistogram`) do the work synchronously if their result is not ready yet. The export never shows a plottable still waiting for its data.
 - Selected objects are drawn selected. Call `deselectAll()` first if you do not want that.
 - A plottable that is {doc}`busy <interactions>` is drawn faded, with its busy symbol in the legend, in raster exports. PDF exports leave out both.
 - Your export size does not change the widget. The plot's own viewport is restored afterwards.
