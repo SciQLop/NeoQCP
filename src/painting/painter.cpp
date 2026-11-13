@@ -25,6 +25,8 @@
 
 #include "painter.h"
 
+#include <cmath>
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////// QCPPainter
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -111,8 +113,40 @@ void QCPPainter::drawLine(const QLineF& line)
 {
     if (mIsAntialiasing || mModes.testFlag(pmVectorized))
         QPainter::drawLine(line);
-    else
+    else if (!drawAlignedLineAsRect(line.toLine()))
         QPainter::drawLine(line.toLine());
+}
+
+/*! \internal
+
+  Fills the rectangle a solid, non-cosmetic pen covers along a horizontal or vertical \a line, and
+  returns true; returns false for any other line or pen. Under \ref pmNonCosmetic (a HiDPI screen
+  buffer, a scaled export) every axis line and tick is such a line, and Qt strokes a non-cosmetic
+  pen through its general path stroker: filling the same rectangle is several times cheaper.
+*/
+bool QCPPainter::drawAlignedLineAsRect(const QLine& line)
+{
+    const QPen& p = pen();
+    if (!mModes.testFlag(pmNonCosmetic) || p.isCosmetic() || p.style() != Qt::SolidLine
+        || p.capStyle() == Qt::RoundCap || p.brush().style() != Qt::SolidPattern
+        || (line.dx() != 0 && line.dy() != 0)
+        || deviceTransform().type() > QTransform::TxScale)
+        return false;
+    const double half = p.widthF() / 2;
+    const double cap = p.capStyle() == Qt::FlatCap ? 0 : half; // a square cap: half a width
+    const QRectF span = QRectF(QPointF(line.p1()), QPointF(line.p2())).normalized();
+    const QRectF covered
+        = span.adjusted(-(line.dx() == 0 ? half : cap), -(line.dy() == 0 ? half : cap),
+                        line.dx() == 0 ? half : cap, line.dy() == 0 ? half : cap);
+    // Only where every edge falls on a device pixel boundary: there the fill and the stroker's
+    // aliased rasterisation agree; a half-pixel edge (an odd width at ratio 3) rounds differently.
+    const QRectF device = deviceTransform().mapRect(covered);
+    const auto whole = [](double v) { return qAbs(v - std::round(v)) < 1e-6; };
+    if (!whole(device.left()) || !whole(device.right()) || !whole(device.top())
+        || !whole(device.bottom()))
+        return false;
+    fillRect(covered, p.brush());
+    return true;
 }
 
 /*!
@@ -209,15 +243,17 @@ void QCPPainter::restore()
 }
 
 /*!
-  Changes the pen width to 1 if it currently is 0. This function is called in the \ref setPen
-  overrides when the \ref pmNonCosmetic mode is set.
+  Makes the pen non-cosmetic, so its width is in logical pixels: a width of 0 becomes 1. This
+  function is called in the \ref setPen overrides when the \ref pmNonCosmetic mode is set.
 */
 void QCPPainter::makeNonCosmetic()
 {
-    if (qFuzzyIsNull(pen().widthF()))
+    if (pen().isCosmetic())
     {
         QPen p = pen();
-        p.setWidth(1);
+        if (qFuzzyIsNull(p.widthF()))
+            p.setWidth(1);
+        p.setCosmetic(false);
         QPainter::setPen(p);
     }
 }

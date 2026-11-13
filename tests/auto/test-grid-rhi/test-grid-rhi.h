@@ -15,6 +15,7 @@ private slots:
     void gradientGraphFillLooksTheSameOnScreenAndInExports();
     void dashedGridPenIsDashedOnScreen();
     void colorScaleTicksAreDrawnOnScreen();
+    void thinLinesAreOneLogicalPixelOnScreen();
     void replotDoesNotCrash();
     void replotWithSubGridDoesNotCrash();
     void replotWithZeroLineDoesNotCrash();

@@ -48,8 +48,9 @@ public:
         pmNoCaching = 0x02 ///< <tt>0x02</tt> Mode for all sorts of exports (e.g. PNG, PDF,...). For
                            ///< example, this prevents using cached pixmap labels
         ,
-        pmNonCosmetic = 0x04 ///< <tt>0x04</tt> Turns pen widths 0 to 1, i.e. disables cosmetic
-                             ///< pens. (A cosmetic pen is always drawn with width 1 pixel in the
+        pmNonCosmetic = 0x04 ///< <tt>0x04</tt> Makes cosmetic pens non-cosmetic (width 0 becomes
+                             ///< 1), so they are one logical pixel wide; set on HiDPI screen buffers
+                             ///< too. (A cosmetic pen is always drawn with width 1 pixel in the
                              ///< vector image/pdf viewer, independent of zoom.)
     };
     Q_ENUM(PainterMode)
@@ -94,6 +95,9 @@ protected:
 
     // non-property members:
     QStack<bool> mAntialiasingStack;
+
+private:
+    bool drawAlignedLineAsRect(const QLine& line);
 };
 Q_DECLARE_OPERATORS_FOR_FLAGS(QCPPainter::PainterModes)
 Q_DECLARE_METATYPE(QCPPainter::PainterMode)

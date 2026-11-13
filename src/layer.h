@@ -137,6 +137,7 @@ protected:
     // non-property members:
     QWeakPointer<QCPAbstractPaintBuffer> mPaintBuffer;
     std::vector<std::function<void(QCPPainter&)>> mDeferredGpu;
+    bool mHiDpiScreenPass = false; // drawToPaintBuffer on a device pixel ratio above 1
     quint64 mDirtyGeneration = 0;
     quint64 mDrawnGeneration = 0;
 

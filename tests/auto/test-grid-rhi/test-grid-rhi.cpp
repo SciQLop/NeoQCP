@@ -85,6 +85,45 @@ void TestGridRhi::colorScaleTicksAreDrawnOnScreen()
     QCOMPARE(onScreen, inExport);
 }
 
+// A width-0 pen is one device pixel on a painted screen buffer: half a logical pixel on a 2x
+// screen, while the GPU layers and a 2x export draw it one logical pixel wide. The painted lines
+// must match the export at the screen's ratio; at ratio 1 both are one pixel.
+void TestGridRhi::thinLinesAreOneLogicalPixelOnScreen()
+{
+    if (!showAndHasRhiGrid(mPlot))
+        QSKIP("No QRhi available — the GPU grid needs a real backend");
+    mPlot->xAxis->grid()->setVisible(false);
+    mPlot->yAxis->grid()->setVisible(false);
+    mPlot->xAxis->setTicks(false); // the base line alone: the ticks are GPU-drawn on screen
+    mPlot->xAxis->setSubTicks(false);
+    mPlot->replot(QCustomPlot::rpImmediateRefresh);
+    QCoreApplication::processEvents();
+
+    const QImage frame = mPlot->grabFramebuffer();
+    const double dpr = frame.devicePixelRatio();
+    const QImage exported = mPlot->toPixmap(mPlot->width(), mPlot->height(), dpr).toImage();
+    // The bottom axis' width-0 base line, which the painter draws.
+    const int x = qRound(mPlot->xAxis->coordToPixel(0.3) * dpr);
+    const int bottom = mPlot->axisRect()->rect().bottom();
+    // The ink across the line, in device pixels of black: a line one device pixel wide spread
+    // over two half-grey ones counts one, like a crisp one.
+    const auto ink = [&](const QImage& image)
+    {
+        double sum = 0;
+        for (int y = qRound((bottom - 4) * dpr); y <= qRound((bottom + 4) * dpr); ++y)
+            sum += (255 - image.pixelColor(x, y).lightness()) / 255.0;
+        return sum;
+    };
+    const double onScreen = ink(frame), inExport = ink(exported);
+    if (qAbs(onScreen - inExport) > 0.25 * inExport)
+        keepImagesForCi(QStringLiteral("thinLinesAreOneLogicalPixelOnScreen"), frame, exported);
+    QVERIFY2(inExport > 0.5, "the export has no axis base line");
+    QVERIFY2(qAbs(onScreen - inExport) <= 0.25 * inExport,
+             qPrintable(QStringLiteral("base line ink: screen %1, export %2 device pixels")
+                            .arg(onScreen)
+                            .arg(inExport)));
+}
+
 void TestGridRhi::replotDoesNotCrash()
 {
     mPlot->replot();

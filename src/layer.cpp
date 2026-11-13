@@ -241,6 +241,13 @@ void QCPLayer::draw(QCPPainter* painter)
                 && !painter->modes().testFlag(QCPPainter::pmVectorized))
                 painter->setOpacity(plottable->effectiveBusyFadeAlpha());
             child->applyDefaultAntialiasingHint(painter);
+            // A cosmetic pen is one device pixel: half a logical one on a 2x screen, where the GPU
+            // layers and the exports draw it one logical pixel wide. Plottables and grids are the
+            // GPU's on screen; painted (the fallback) they keep the cosmetic pen, which a dense
+            // polyline needs: stroked one logical pixel wide it was five times slower.
+            if (mHiDpiScreenPass)
+                painter->setMode(QCPPainter::pmNonCosmetic,
+                                 !plottable && !qobject_cast<QCPGrid*>(child));
             child->draw(painter);
             painter->restore();
         }
@@ -275,7 +282,9 @@ void QCPLayer::drawToPaintBuffer()
         {
             if (painter->isActive())
             {
+                mHiDpiScreenPass = pb->devicePixelRatio() > 1;
                 draw(painter);
+                mHiDpiScreenPass = false;
             }
             else
                 qDebug() << Q_FUNC_INFO << "paint buffer returned inactive painter";

@@ -650,3 +650,47 @@ void TestPaintBuffer::rhi_imageBytesMatchTextureChannelOrder()
     QCOMPARE(bytes(QRhiTexture::RGBA8), (QList<int> { 200, 100, 50, 255 }));
     QCOMPARE(bytes(QRhiTexture::BGRA8), (QList<int> { 50, 100, 200, 255 }));
 }
+
+// Under pmNonCosmetic a horizontal or vertical line is filled as the rectangle its pen covers,
+// not stroked: the pixels must be the stroker's, at every device pixel ratio.
+void TestPaintBuffer::alignedLinesFillTheSamePixelsAsTheStroker()
+{
+  const QList<QPen> pens { QPen(Qt::black, 0, Qt::SolidLine, Qt::SquareCap),
+                           QPen(Qt::red, 2, Qt::SolidLine, Qt::FlatCap),
+                           QPen(Qt::blue, 1, Qt::SolidLine, Qt::SquareCap),
+                           QPen(Qt::darkGreen, 3, Qt::SolidLine, Qt::SquareCap) };
+  const QList<QLine> lines { QLine(10, 10, 80, 10), QLine(80, 20, 15, 20), QLine(30, 5, 30, 90),
+                             QLine(50, 90, 50, 40), QLine(60, 60, 60, 60) };
+  for (const double dpr : { 1.0, 1.5, 2.0, 3.0 })
+  {
+    QImage fast(qRound(100 * dpr), qRound(100 * dpr), QImage::Format_ARGB32_Premultiplied);
+    fast.setDevicePixelRatio(dpr);
+    fast.fill(Qt::white);
+    QImage stroked = fast;
+    {
+      QCPPainter painter(&fast);
+      painter.setMode(QCPPainter::pmNonCosmetic);
+      for (const QPen& pen : pens)
+      {
+        painter.setPen(pen);
+        for (const QLine& line : lines)
+          painter.drawLine(QLineF(line));
+      }
+    }
+    {
+      QPainter painter(&stroked);
+      for (QPen pen : pens)
+      {
+        if (pen.isCosmetic()) // what pmNonCosmetic makes of it
+        {
+          pen.setWidth(qMax(1, pen.width()));
+          pen.setCosmetic(false);
+        }
+        painter.setPen(pen);
+        for (const QLine& line : lines)
+          painter.drawLine(line);
+      }
+    }
+    QVERIFY2(fast == stroked, qPrintable(QStringLiteral("ratio %1").arg(dpr)));
+  }
+}

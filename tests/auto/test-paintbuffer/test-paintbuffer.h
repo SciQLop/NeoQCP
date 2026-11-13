@@ -41,6 +41,7 @@ private slots:
     void colormap2_stallOffsetOnLogYPan();
     void colormap2_stallOffsetNullOnZoom();
     void colormap2_drawSkipsNonOverlappingStaleResample();
+    void alignedLinesFillTheSamePixelsAsTheStroker();
 
 private:
     QCustomPlot* mPlot;
