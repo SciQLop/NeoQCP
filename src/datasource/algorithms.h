@@ -332,7 +332,7 @@ void envelopeInto(const KC& keys, const VC& values, int begin, int end, int rese
                   double gapThreshold, const GapVector* precomputedGaps, Out& result,
                   Idx* indices, const Grid& grid, const MapPoint& mapPoint)
 {
-    PROFILE_HERE_N("optimizedLineData");
+    PROFILE_HERE_N("envelopeInto");
     GapVector computedGaps;
     if (!precomputedGaps)
         computedGaps = detectKeyGaps(keys, begin, end, gapThreshold);

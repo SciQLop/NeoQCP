@@ -286,7 +286,7 @@ void TestColorByScalar::l1WithoutOriginBuildsNone()
     const auto bins = qcp::algo::binMinMaxMulti(*src, 0, src->size(), src->keyRange(found), 1000);
     QVERIFY(bins.origin.empty());
     std::any cache;
-    qcp::algo::buildL1CacheMulti(*src, ViewportParams{}, cache);
+    qcp::algo::buildL1Cache(*src, ViewportParams{}, cache);
     QVERIFY(std::any_cast<qcp::algo::GraphResamplerCache>(&cache)->level1.origin.empty());
 }
 
@@ -305,7 +305,7 @@ void TestColorByScalar::l2OriginComposesThroughL1AndCompacts()
 {
     auto src = holeySource(200'000);
     std::any cache;
-    qcp::algo::buildL1CacheMulti(*src, ViewportParams{}, cache, true);
+    qcp::algo::buildL1Cache(*src, ViewportParams{}, cache, true);
     const auto* l1 = std::any_cast<qcp::algo::GraphResamplerCache>(&cache);
     QVERIFY(l1 && !l1->level1.origin.empty());
 

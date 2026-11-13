@@ -1210,7 +1210,7 @@ void TestPipeline::graphResamplerL2BinsRawPointsInsideBurst()
     vp.keyRange = QCPRange(burst, burst + 20.0);
     vp.plotWidthPx = 1000;
     std::any cache;
-    qcp::algo::buildL1CacheMulti(*src, vp, cache);
+    qcp::algo::buildL1Cache(*src, vp, cache);
     const auto* l1 = std::any_cast<qcp::algo::GraphResamplerCache>(&cache);
     QVERIFY(l1 != nullptr);
     const auto l2 = qcp::algo::resampleL2Multi(*l1, vp, *src);
@@ -1249,7 +1249,7 @@ void TestPipeline::multiGraphL2FollowsFallingData()
     for (const bool withOrigin : {false, true})
     {
         std::any cache;
-        qcp::algo::buildL1CacheMulti(src, ViewportParams{}, cache, withOrigin);
+        qcp::algo::buildL1Cache(src, ViewportParams{}, cache, withOrigin);
         auto* c = std::any_cast<qcp::algo::GraphResamplerCache>(&cache);
         QVERIFY(c != nullptr);
         ViewportParams vp;
@@ -1290,7 +1290,7 @@ void TestPipeline::graphResamplerCacheReuse()
     vp.keyRange = QCPRange(0, N - 1);
     vp.plotWidthPx = 100;
 
-    qcp::algo::buildL1CacheMulti(*src, vp, cache);
+    qcp::algo::buildL1Cache(*src, vp, cache);
     const auto* l1 = std::any_cast<qcp::algo::GraphResamplerCache>(&cache);
     QVERIFY(l1 != nullptr);
     QCOMPARE(l1->sourceSize, N);
@@ -1303,7 +1303,7 @@ void TestPipeline::graphResamplerCacheReuse()
     QVERIFY(qcp::algo::resampleL2Multi(*l1, vp, *src) != nullptr);
 
     // The same data again keeps the cache it has.
-    qcp::algo::buildL1CacheMulti(*src, vp, cache);
+    qcp::algo::buildL1Cache(*src, vp, cache);
     const auto* again = std::any_cast<qcp::algo::GraphResamplerCache>(&cache);
     QVERIFY(again != nullptr);
     QCOMPARE(again->level1.keys.data(), l1Keys);
@@ -1400,7 +1400,7 @@ void TestPipeline::multiGraphLargeToSmallDataFallback()
     g->pipeline().setTransform(TransformKind::ViewportDependent,
         [](const QCPAbstractMultiDataSource& src, const ViewportParams& vp, std::any& cache)
             -> std::shared_ptr<QCPAbstractMultiDataSource> {
-            return qcp::algo::buildL1CacheMulti(src, vp, cache);
+            return qcp::algo::buildL1Cache(src, vp, cache);
         });
     QVERIFY(g->pipeline().hasTransform());
 
@@ -2637,7 +2637,7 @@ void TestPipeline::multiGraphL1AndL2()
         std::vector<double>, std::vector<double>>>(keys, cols);
 
     std::any cache;
-    qcp::algo::buildL1CacheMulti(*src, ViewportParams{}, cache);
+    qcp::algo::buildL1Cache(*src, ViewportParams{}, cache);
     auto* c = std::any_cast<qcp::algo::GraphResamplerCache>(&cache);
     QVERIFY(c != nullptr);
     QCOMPARE(c->columnCount, 2);

@@ -157,7 +157,7 @@ static void scenarioL2Resampling(int iters)
     // Build L1 cache first
     QCPRange fullRange(data.keys.front(), data.keys.back());
     std::any cache;
-    auto l1result = qcp::algo::buildL1CacheMulti(*src, ViewportParams{}, cache);
+    auto l1result = qcp::algo::buildL1Cache(*src, ViewportParams{}, cache);
     auto* l1Cache = std::any_cast<qcp::algo::GraphResamplerCache>(&cache);
     if (!l1Cache || l1Cache->level1.keys.empty()) {
         fprintf(stderr, "l2_resampling: L1 cache build failed\n");

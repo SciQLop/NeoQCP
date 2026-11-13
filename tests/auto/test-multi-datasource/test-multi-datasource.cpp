@@ -851,7 +851,7 @@ std::shared_ptr<BurstySource> burstySource()
 qcp::algo::GraphResamplerCache l1Of(const QCPAbstractMultiDataSource& src)
 {
     std::any cache;
-    qcp::algo::buildL1CacheMulti(src, ViewportParams{}, cache);
+    qcp::algo::buildL1Cache(src, ViewportParams{}, cache);
     return std::any_cast<qcp::algo::GraphResamplerCache>(cache);
 }
 

@@ -23,9 +23,9 @@
 #include <typeinfo>
 #include <utility>
 
-static void ensureL1TransformMulti(QCPGraphPipeline& pipeline, int sourceSize, int colCount,
-                                   std::shared_ptr<std::atomic<bool>> wantOrigin);
-static bool needsResamplingMulti(const QCPAbstractMultiDataSource& src);
+static void ensureL1Transform(QCPGraphPipeline& pipeline, int sourceSize, int colCount,
+                              std::shared_ptr<std::atomic<bool>> wantOrigin);
+static bool isAboveResampleThreshold(const QCPAbstractMultiDataSource& src);
 
 QCPGraph::QCPGraph(QCPAxis* keyAxis, QCPAxis* valueAxis, QCP::Capabilities required)
         : QCPAbstractLine(keyAxis, valueAxis, required)
@@ -172,7 +172,7 @@ void QCPGraph::systemChanged()
     mL1Cache.reset();
     mL2Result.reset();
     mL2Dirty = false;
-    mNeedsResampling = mDataSource && needsResamplingMulti(*mDataSource);
+    mNeedsResampling = mDataSource && isAboveResampleThreshold(*mDataSource);
     // I2: returning to cartesian with a staged source re-stages that source, so its job carries
     // its own generation and its L1 can never be the displayed source's. Colour values stashed for
     // the staged source survive the re-stage.
@@ -187,7 +187,7 @@ void QCPGraph::systemChanged()
     }
     if (mDataSource)
     {
-        ensureL1TransformMulti(mPipeline, mDataSource->size(), mDataSource->columnCount(),
+        ensureL1Transform(mPipeline, mDataSource->size(), mDataSource->columnCount(),
                                mWantOrigin);
         const QPointer<QCPGraph> alive(this);
         mPipeline.setSource(mDataSource);
@@ -223,8 +223,8 @@ void QCPGraph::setDataSource(std::unique_ptr<QCPAbstractMultiDataSource> source)
     setDataSource(std::shared_ptr<QCPAbstractMultiDataSource>(std::move(source)));
 }
 
-static void ensureL1TransformMulti(QCPGraphPipeline& pipeline, int sourceSize, int colCount,
-                                   std::shared_ptr<std::atomic<bool>> wantOrigin)
+static void ensureL1Transform(QCPGraphPipeline& pipeline, int sourceSize, int colCount,
+                              std::shared_ptr<std::atomic<bool>> wantOrigin)
 {
     const bool needsResampling = colCount > 0
         && static_cast<int64_t>(sourceSize) * colCount >= qcp::algo::kResampleThreshold;
@@ -236,7 +236,7 @@ static void ensureL1TransformMulti(QCPGraphPipeline& pipeline, int sourceSize, i
                 [wantOrigin](const QCPAbstractMultiDataSource& src,
                              const ViewportParams& vp,
                              std::any& cache) -> std::shared_ptr<QCPAbstractMultiDataSource> {
-                    return qcp::algo::buildL1CacheMulti(src, vp, cache, wantOrigin->load());
+                    return qcp::algo::buildL1Cache(src, vp, cache, wantOrigin->load());
                 });
         }
     }
@@ -246,7 +246,7 @@ static void ensureL1TransformMulti(QCPGraphPipeline& pipeline, int sourceSize, i
     }
 }
 
-static bool needsResamplingMulti(const QCPAbstractMultiDataSource& src)
+static bool isAboveResampleThreshold(const QCPAbstractMultiDataSource& src)
 {
     return src.columnCount() > 0
         && static_cast<int64_t>(src.size()) * src.columnCount() >= qcp::algo::kResampleThreshold;
@@ -540,7 +540,7 @@ void QCPGraph::applySourceNow(std::shared_ptr<QCPAbstractMultiDataSource> source
     mL1Cache.reset();
     mL2Result.reset();
     mL2Dirty = false;
-    mNeedsResampling = mDataSource && !drawsInDataSpace() && needsResamplingMulti(*mDataSource);
+    mNeedsResampling = mDataSource && !drawsInDataSpace() && isAboveResampleThreshold(*mDataSource);
     if (drawsInDataSpace() || !mDataSource)
     {
         // B2: the displayed source is drawn directly; no job is started or consulted.
@@ -553,7 +553,7 @@ void QCPGraph::applySourceNow(std::shared_ptr<QCPAbstractMultiDataSource> source
         return;
     }
     mPipelineBypassed = false;
-    ensureL1TransformMulti(mPipeline, mDataSource->size(), mDataSource->columnCount(), mWantOrigin);
+    ensureL1Transform(mPipeline, mDataSource->size(), mDataSource->columnCount(), mWantOrigin);
     // The pipeline's busyChanged slot may delete this graph.
     const QPointer<QCPGraph> alive(this);
     mPipeline.setSource(mDataSource);
@@ -588,7 +588,7 @@ void QCPGraph::stagePendingSource(std::shared_ptr<QCPAbstractMultiDataSource> so
         updateEffectiveBusy();
         return;
     }
-    ensureL1TransformMulti(mPipeline, mPendingSource->size(), mPendingSource->columnCount(), mWantOrigin);
+    ensureL1Transform(mPipeline, mPendingSource->size(), mPendingSource->columnCount(), mWantOrigin);
     // The pipeline's busyChanged slot may delete this graph.
     const QPointer<QCPGraph> alive(this);
     mPipeline.setSource(mPendingSource);
@@ -622,7 +622,7 @@ bool QCPGraph::commitPendingData()
     mPendingReady = false;
     mL2Result.reset();
     mL2Dirty = mL1Cache != nullptr;
-    mNeedsResampling = !drawsInDataSpace() && needsResamplingMulti(*mDataSource);
+    mNeedsResampling = !drawsInDataSpace() && isAboveResampleThreshold(*mDataSource);
 
     if (mPendingColorValues && static_cast<int>(mPendingColorValues->size()) == mDataSource->size())
     {
@@ -653,7 +653,7 @@ bool QCPGraph::commitPendingData()
         // A source staged on the data-space branch had no job. Now that it is the displayed
         // cartesian source, start one; otherwise the frame has no L1 to draw until something
         // else invalidates the pipeline.
-        ensureL1TransformMulti(mPipeline, mDataSource->size(), mDataSource->columnCount(),
+        ensureL1Transform(mPipeline, mDataSource->size(), mDataSource->columnCount(),
                                mWantOrigin);
         const QPointer<QCPGraph> alive(this);
         mPipeline.setSource(mDataSource);
@@ -686,9 +686,9 @@ void QCPGraph::dataChanged()
     if (mDataSource)
     {
         applyColorSizeRule(mDataSource->size());
-        mNeedsResampling = !drawsInDataSpace() && needsResamplingMulti(*mDataSource);
+        mNeedsResampling = !drawsInDataSpace() && isAboveResampleThreshold(*mDataSource);
         if (!drawsInDataSpace())
-            ensureL1TransformMulti(mPipeline, mDataSource->size(), mDataSource->columnCount(),
+            ensureL1Transform(mPipeline, mDataSource->size(), mDataSource->columnCount(),
                                    mWantOrigin);
     }
 

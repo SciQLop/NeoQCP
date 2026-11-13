@@ -465,12 +465,12 @@ inline RowRange rawRowsInView(const Source& raw, const QCPRange& keyRange)
 
 // L1 build for multi-column sources — heavy, meant for async pipeline.
 // Stores the L1 cache in the std::any; returns nullptr (L2 is done synchronously).
-inline std::shared_ptr<QCPAbstractMultiDataSource> buildL1CacheMulti(
+inline std::shared_ptr<QCPAbstractMultiDataSource> buildL1Cache(
     const QCPAbstractMultiDataSource& src,
     const ViewportParams& /*vp*/,
     std::any& cache, bool withOrigin = false)
 {
-    PROFILE_HERE_N("buildL1CacheMulti");
+    PROFILE_HERE_N("buildL1Cache");
     const int srcSize = src.size();
     const int N = src.columnCount();
     if (srcSize == 0 || N == 0)
