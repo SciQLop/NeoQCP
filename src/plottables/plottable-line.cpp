@@ -59,6 +59,13 @@ void QCPAbstractLine::setComponentColors(const QList<QColor>& colors)
     }
 }
 
+QCPScatterStyle QCPAbstractLine::scatterStyle() const
+{
+    if (!mComponents.isEmpty())
+        return mComponents.first().scatterStyle;
+    return mExplicitScatterStyle.value_or(QCPScatterStyle());
+}
+
 void QCPAbstractLine::setComponentPens(const QList<QPen>& pens)
 {
     int n = qMin(pens.size(), mComponents.size());
@@ -72,9 +79,8 @@ void QCPAbstractLine::setComponentPens(const QList<QPen>& pens)
     }
 }
 
-// No equality early return: the components can have been given another pen since the last call
-// (setComponentPens, setComponentColors, component(i).pen), so mPen alone does not say what is
-// drawn. The fan-out is cheap.
+// The early return compares every component, not mPen alone: the components can have been given
+// another pen since the last call (setComponentPens, setComponentColors, component(i).pen).
 void QCPAbstractLine::setPen(const QPen& pen)
 {
     // An equal pen everywhere draws nothing new (2.x's setPen did not repaint either).

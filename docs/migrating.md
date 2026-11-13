@@ -177,13 +177,16 @@ These patterns need a change:
 
 Behaviour that changed:
 
-- **Default pen.** A new graph has the next colour of the palette and a pen 2.5 pixels wide. 2.x drew every graph in blue with a cosmetic pen (width 0). Call `setPen()` to get the old look back.
+- **Default pen.** Column *i* of a new graph takes colour *i* of the palette, with a cosmetic pen (width 0). A graph with one column is drawn in the palette's first colour, a blue close to 2.x's. Call `setPen()` for another look.
 - **Shape misuses.** Keys and values of different lengths, and a NaN key, are misuses: the call reports one and changes nothing. 2.x truncated unequal data and let NaN keys through.
 - **Sorting.** `setData()` with `double` keys and `double` columns sorts unsorted keys, unless `alreadySorted = true`. Other types must come sorted.
-- **Selection.** A selected graph draws its selected segments with the selection decorator. Markers of a selected segment take the selected pen as their outline.
+- **Selection.** A selected graph draws its selected segments with each column's selected pen (the column's pen, 1.5 pixels wider). When you style the selection decorator or set one of your own, its pen, brush and marker style draw them instead. Markers of a selected segment take the selected pen as their outline. The selection type works as in 2.x: with the default `stWhole`, a click selects the whole graph and a click with the multi-select modifier deselects it.
+- **Hit details.** `selectTest()` hands a graph's hit back as a `QVariantMap` with `componentIndex` and `dataIndex`, not as a `QCPDataSelection`. `details.value<QCPDataSelection>()` gives an empty selection. Read the row with `qcp::hitDataIndex(details)`, which takes either form.
 - **Legend.** The row of a graph with one column shows the graph's name, unless you named the column yourself. A graph without data shows its pen next to its name.
 - **Logarithmic value axis.** A fill to a value the axis cannot place, and the baseline of impulses, go to the range bound nearer zero.
-- **Brushes.** `setBrush()` fills every column down to zero and replaces fills to a constant or between columns. Fills to another graph stay and take the new brush.
+- **Brushes.** `setBrush()` fills every column down to zero and replaces fills to a constant or between columns. Fills to another graph stay and take the new brush. `setBrush(Qt::NoBrush)` removes every fill, the ones to another graph too, as 2.x drew no channel without a brush. A later `setBrush()` fills to zero: call `setComponentFillToGraph()` again to get the band back.
+- **Fill partners.** A fill to another graph goes when that graph leaves the plot or its frame (taken, or moved to another axis rect), as it goes when that graph is deleted.
+- **Removing points.** `removeData(from, to)` removes nothing when `from >= to`, as 2.x.
 - **Equal values.** `setPen()` with the pen the graph already has does not repaint.
 - **New virtual.** `QCPAbstractPlottable::assignSelection(const QCPDataSelection&)` is a new protected virtual, called when the selection is set. A plottable of your own that has a method of that name must rename it.
 

@@ -17,6 +17,11 @@ struct QCPGraphComponent;
 class QCP_LIB_DECL QCPAbstractLine : public QCPAbstractColorMapped
 {
     Q_OBJECT
+    /// \cond INCLUDE_QPROPERTIES
+    Q_PROPERTY(LineStyle lineStyle READ lineStyle WRITE setLineStyle)
+    Q_PROPERTY(QCPScatterStyle scatterStyle READ scatterStyle WRITE setScatterStyle)
+    Q_PROPERTY(int scatterSkip READ scatterSkip WRITE setScatterSkip)
+    /// \endcond
 public:
     enum LineStyle { lsNone, lsLine, lsStepLeft, lsStepRight, lsStepCenter, lsImpulse };
     Q_ENUM(LineStyle)
@@ -42,10 +47,14 @@ public:
     void setComponentColors(const QList<QColor>& colors);
     void setComponentPens(const QList<QPen>& pens);
 
-    //! The style given to new components; setLineStyle() also applies it to every component.
+    //! The graph-wide style: the one setLineStyle() gave every component and new components take.
+    //! setComponentLineStyle() changes one component without changing it.
     [[nodiscard]] LineStyle lineStyle() const { return mLineStyle; }
     void setLineStyle(LineStyle style);
     void setComponentLineStyle(int index, LineStyle style);
+    //! Component 0's marker style (2.x's one line); with no component yet, the style a new one takes.
+    //! A multi-column graph answers for component 0: component(i).scatterStyle reads the others.
+    [[nodiscard]] QCPScatterStyle scatterStyle() const;
     void setScatterStyle(const QCPScatterStyle& style);
     void setComponentScatterStyle(int index, const QCPScatterStyle& style);
     [[nodiscard]] int scatterSkip() const { return mScatterSkip; }

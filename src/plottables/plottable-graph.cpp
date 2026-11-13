@@ -799,10 +799,12 @@ bool QCPGraph::partnerDied(const Fill& fill)
 }
 
 // M1: a partner that lost the component is not a temporary no-band case: the fill is gone for good,
-// or a later, wider source would revive a band over unrelated data.
+// or a later, wider source would revive a band over unrelated data. So is a partner that left this
+// graph's plot or frame: setComponentFillToGraph() would refuse it now. A graph that is itself off
+// any frame (taken, or between two areas) judges nothing until it has one again.
 void QCPGraph::pruneLostPartnerFills()
 {
-    const auto lost = [](const Fill& fill)
+    const auto lost = [this](const Fill& fill)
     {
         if (partnerDied(fill))
             return true;
@@ -810,6 +812,8 @@ void QCPGraph::pruneLostPartnerFills()
         if (!target)
             return false;
         const QCPGraph* partner = target->graph.data();
+        if (mSystem && (partner->mParentPlot != mParentPlot || !canFillTo(*partner)))
+            return true;
         return partner->mDataSource
             && target->component >= partner->mDataSource->columnCount();
     };
@@ -928,8 +932,10 @@ bool QCPGraph::canFillTo(const QCPGraph& partner) const
 
 bool QCPGraph::fillsAcrossValueAxes(const QCPGraph& partner) const
 {
-    // The projections exist only on a cartesian frame; one key axis lives in one area.
-    return partner.mSystem != mSystem && mKeyAxis && mValueAxis && partner.mKeyAxis == mKeyAxis
+    // The projections exist only on a cartesian frame; one key axis lives in one area. A graph
+    // whose axes lie in two areas keeps them but has no system: it draws nowhere.
+    return mSystem && partner.mSystem && partner.mSystem != mSystem && mKeyAxis && mValueAxis
+        && partner.mKeyAxis == mKeyAxis
         && partner.mValueAxis && partner.mValueAxis != mValueAxis
         && partner.mValueAxis->orientation() == mValueAxis->orientation();
 }
@@ -957,11 +963,11 @@ bool QCPGraph::setComponentFillToGraph(int owner, QCPGraph* other, int otherComp
 
 void QCPGraph::setComponentFillBrush(int owner, const QBrush& brush)
 {
-    markDirty();
     const auto it = std::find_if(mFills.begin(), mFills.end(),
                                  [owner](const Fill& e) { return e.owner == owner; });
-    if (it == mFills.end())
+    if (it == mFills.end() || it->brush == brush)
         return;
+    markDirty();
     it->brush = brush;
     decorationsChanged();
 }
@@ -1193,12 +1199,13 @@ void QCPGraph::componentVisibilityToggled()
 
 void QCPGraph::applyBrushToComponent(int index, const QBrush& brush)
 {
-    // 2.x's brush coloured the channel: a fill to another graph keeps its partner.
+    // 2.x's brush coloured the channel: a fill to another graph keeps its partner, and no brush
+    // meant no channel.
     const auto fill = componentFill(index);
-    if (fill && std::holds_alternative<FillToGraph>(fill->target))
-        setComponentFillBrush(index, brush);
-    else if (brush.style() == Qt::NoBrush)
+    if (brush.style() == Qt::NoBrush)
         clearComponentFill(index);
+    else if (fill && std::holds_alternative<FillToGraph>(fill->target))
+        setComponentFillBrush(index, brush);
     else
         setComponentFill(index, 0.0, brush);
 }
@@ -1275,10 +1282,11 @@ QCPDataSelection QCPGraph::componentSelection(int index) const
     return (index >= 0 && index < mComponents.size()) ? mComponents[index].selection : QCPDataSelection();
 }
 
-void QCPGraph::setComponentSelection(int index, const QCPDataSelection& sel)
+void QCPGraph::setComponentSelection(int index, QCPDataSelection sel)
 {
     if (index < 0 || index >= mComponents.size())
         return;
+    sel.simplify(); // the draw searches the ranges: sorted and disjoint
     if (mComponents[index].selection == sel)
         return;
     markDirty();
@@ -1293,25 +1301,32 @@ int QCPGraph::dataCount() const
     return mDataSource ? mDataSource->size() : 0;
 }
 
+// 2.x's 1D accessors answered 0 for a row outside the data: a selection is not clamped when rows
+// go, and the decorators read its ends.
+bool QCPGraph::isDataRow(int index) const
+{
+    return mDataSource && mDataSource->columnCount() > 0 && index >= 0
+        && index < mDataSource->size();
+}
+
 double QCPGraph::dataMainKey(int index) const
 {
-    return mDataSource ? mDataSource->keyAt(index) : 0.0;
+    return isDataRow(index) ? mDataSource->keyAt(index) : 0.0;
 }
 
 double QCPGraph::dataSortKey(int index) const
 {
-    return mDataSource ? mDataSource->keyAt(index) : 0.0;
+    return dataMainKey(index);
 }
 
 double QCPGraph::dataMainValue(int index) const
 {
-    return (mDataSource && mDataSource->columnCount() > 0)
-        ? mDataSource->valueAt(0, index) : 0.0;
+    return isDataRow(index) ? mDataSource->valueAt(0, index) : 0.0;
 }
 
 QCPRange QCPGraph::dataValueRange(int index) const
 {
-    if (!mDataSource || mDataSource->columnCount() == 0)
+    if (!isDataRow(index))
         return QCPRange(0, 0);
     double vmin = std::numeric_limits<double>::max();
     double vmax = std::numeric_limits<double>::lowest();
@@ -1326,7 +1341,7 @@ QCPRange QCPGraph::dataValueRange(int index) const
 
 QPointF QCPGraph::dataPixelPosition(int index) const
 {
-    if (!mDataSource || mDataSource->columnCount() == 0)
+    if (!isDataRow(index))
         return {};
     const double key = mDataSource->keyAt(index);
     const double value = mDataSource->valueAt(0, index);
@@ -1394,12 +1409,12 @@ double QCPGraph::selectTest(const QPointF& pos, bool onlySelectable, QVariant* d
 {
     if ((onlySelectable && mSelectable == QCP::stNone) || !mDataSource || mDataSource->empty())
         return -1;
+    const bool beyond = mParentPlot
+        && mParentPlot->interactions().testFlag(QCP::iSelectPlottablesBeyondAxisRect);
     if (drawsInDataSpace())
     {
         if (!mSystem)
             return -1;
-        const bool beyond = mParentPlot
-            && mParentPlot->interactions().testFlag(QCP::iSelectPlottablesBeyondAxisRect);
         if (!mSystem->contains(pos) && !beyond)
             return -1;
         return nearestMappedPoint(pos, details).value_or(-1);
@@ -1408,7 +1423,7 @@ double QCPGraph::selectTest(const QPointF& pos, bool onlySelectable, QVariant* d
         return -1;
 
     auto* axisRect = axisRectOf(mKeyAxis);
-    if (!axisRect || !axisRect->rect().contains(pos.toPoint()))
+    if (!axisRect || (!axisRect->rect().contains(pos.toPoint()) && !beyond))
         return -1;
 
     return nearestDataPoint(pos, details).value_or(-1);
@@ -1525,37 +1540,73 @@ QCPDataSelection QCPGraph::selectTestRect(const QRectF& rect, bool onlySelectabl
     return unionResult;
 }
 
-void QCPGraph::selectEvent([[maybe_unused]] QMouseEvent* event, bool additive,
-                                 const QVariant& details, bool* selectionStateChanged)
+// The rows each component's hit holds: a rect's per-component rows, or the clicked row.
+QVector<QCPDataSelection> QCPGraph::componentHits(const QVariant& details) const
 {
-
-    if (!additive) {
-        for (auto& c : mComponents)
-            c.selection = QCPDataSelection();
+    QVector<QCPDataSelection> hits(mComponents.size());
+    if (details.canConvert<QCPDataSelection>())
+    {
+        // A rect selection: selectTestRect kept each component's rows; a caller without them hands
+        // the union, which every component shares.
+        const auto rects = std::exchange(mLastRectSelections, {});
+        for (int c = 0; c < hits.size(); ++c)
+            hits[c] = rects.isEmpty() ? details.value<QCPDataSelection>()
+                                      : c < rects.size() ? rects[c] : QCPDataSelection();
+        return hits;
     }
+    const QVariantMap map = details.toMap();
+    const int component = map.value(QStringLiteral("componentIndex"), -1).toInt();
+    const int row = map.value(QStringLiteral("dataIndex"), -1).toInt();
+    if (component >= 0 && component < hits.size() && row >= 0)
+        hits[component] = QCPDataSelection(QCPDataRange(row, row + 1));
+    return hits;
+}
 
-    if (details.canConvert<QCPDataSelection>()) {
-        // Rect selection: use per-component selections computed by selectTestRect,
-        // which already filtered by the rect's key and value ranges.
-        if (!mLastRectSelections.isEmpty()) {
-            for (int c = 0; c < mComponents.size() && c < mLastRectSelections.size(); ++c)
-                mComponents[c].selection = mLastRectSelections[c];
-            mLastRectSelections.clear();
+// 2.x's rules (QCPAbstractPlottable::selectEvent): the type decides. A whole or single-row
+// selection selects the graph's rows on every component, through the base. Ranges stay per
+// component (a click picks one column of a multi-column graph), with the same additive toggle.
+void QCPGraph::selectEvent(QMouseEvent* event, bool additive, const QVariant& details,
+                           bool* selectionStateChanged)
+{
+    const QVector<QCPDataSelection> hits = componentHits(details);
+    if (mSelectable == QCP::stWhole || mSelectable == QCP::stSingleData)
+    {
+        QCPDataSelection hit;
+        for (const QCPDataSelection& rows : hits)
+            hit += rows;
+        QCPAbstractPlottable::selectEvent(event, additive, QVariant::fromValue(hit),
+                                          selectionStateChanged);
+        return;
+    }
+    if (mSelectable == QCP::stNone)
+        return;
+    selectComponentRows(hits, additive, selectionStateChanged);
+}
+
+void QCPGraph::selectComponentRows(const QVector<QCPDataSelection>& hits, bool additive,
+                                   bool* selectionStateChanged)
+{
+    bool changed = false;
+    for (int c = 0; c < mComponents.size(); ++c)
+    {
+        QCPDataSelection& current = mComponents[c].selection;
+        const QCPDataSelection& hit = hits[c];
+        QCPDataSelection next = !additive ? hit
+            : hit.isEmpty()               ? current
+            : current.contains(hit)       ? current - hit
+                                          : current + hit;
+        next.enforceType(mSelectable);
+        if (next != current)
+        {
+            current = next;
+            changed = true;
         }
-    } else {
-        // Point selection: details is a QVariantMap with componentIndex/dataIndex
-        auto map = details.toMap();
-        int compIdx = map.value("componentIndex", -1).toInt();
-        int dataIdx = map.value("dataIndex", -1).toInt();
-        if (compIdx < 0 || compIdx >= mComponents.size() || dataIdx < 0)
-            return;
-        mComponents[compIdx].selection.addDataRange(QCPDataRange(dataIdx, dataIdx + 1), false);
-        mComponents[compIdx].selection.simplify();
     }
-
-    updateBaseSelection();
+    const QPointer<QCPGraph> alive(this);
+    if (changed)
+        updateBaseSelection();
     if (selectionStateChanged)
-        *selectionStateChanged = true;
+        *selectionStateChanged = !alive || changed;
 }
 
 bool QCPGraph::assignSelection(const QCPDataSelection& selection)
@@ -2158,8 +2209,9 @@ void QCPGraph::recordComponent(QCPDrawContext& context, int column, std::vector<
         dataIdx = QVector<int>(rows.begin(), rows.end());
     const bool hasMarkers = !comp.scatterStyle.isNone();
 
-    // Without the rows a selection cannot be placed: the whole line takes it.
-    if (comp.selection.isEmpty() || !aligned)
+    // Without the rows a selection cannot be placed: the whole line takes it, as a whole selection
+    // does.
+    if (comp.selection.isEmpty() || !aligned || mSelectable == QCP::stWhole)
     {
         const bool selected = !comp.selection.isEmpty();
         // A plain line without markers is the recorded line: it is handed over, not copied.
@@ -2474,6 +2526,8 @@ std::vector<qcp::fill::StripPoint> QCPGraph::binnedWhenDense(
     return qcp::fill::binToSpans(rows, width);
 }
 
+// The selection is simplified (sorted, disjoint): a binary search finds the one range that can
+// hold the row, so a selection of many ranges costs log(ranges) per vertex.
 bool QCPGraph::rowIsSelected(int column, const QCPAbstractMultiDataSource& ds, int row) const
 {
     if (column < 0 || column >= mComponents.size())
@@ -2481,33 +2535,44 @@ bool QCPGraph::rowIsSelected(int column, const QCPAbstractMultiDataSource& ds, i
     const QCPDataSelection& selection = mComponents[column].selection;
     if (selection.isEmpty())
         return false;
+    if (mSelectable == QCP::stWhole) // 2.x: any selection draws the whole plottable selected
+        return true;
+    const auto firstRangeReaching = [&](auto reaches)
+    {
+        int lo = 0, hi = selection.dataRangeCount();
+        while (lo < hi)
+        {
+            const int mid = lo + (hi - lo) / 2;
+            if (reaches(selection.dataRange(mid)))
+                hi = mid;
+            else
+                lo = mid + 1;
+        }
+        return lo;
+    };
     if (mDataSource && &ds == mDataSource.get())
     {
-        for (int i = 0; i < selection.dataRangeCount(); ++i)
-        {
-            const QCPDataRange range = selection.dataRange(i);
-            if (row >= range.begin() && row < range.end())
-                return true;
-        }
-        return false;
+        const int i = firstRangeReaching([row](const QCPDataRange& r) { return r.end() > row; });
+        return i < selection.dataRangeCount() && selection.dataRange(i).begin() <= row;
     }
 
     // A resampled row is not a source row: a selection range becomes the key interval its first
     // and last source rows span.
-    if (!mDataSource || row < 0 || row >= ds.size())
+    if (!mDataSource || row < 0 || row >= ds.size() || mDataSource->empty())
         return false;
+    const int size = mDataSource->size();
     const double key = ds.keyAt(row);
-    for (int i = 0; i < selection.dataRangeCount(); ++i)
+    const auto keyAtRow = [&](int r) { return mDataSource->keyAt(std::clamp(r, 0, size - 1)); };
+    const int i = firstRangeReaching(
+        [&](const QCPDataRange& r) { return r.end() > 0 && keyAtRow(r.end() - 1) >= key; });
+    for (int k = i; k < selection.dataRangeCount(); ++k)
     {
-        const QCPDataRange range = selection.dataRange(i);
-        const int begin = std::clamp(range.begin(), 0, mDataSource->size());
-        const int end = std::clamp(range.end(), begin, mDataSource->size());
+        const QCPDataRange range = selection.dataRange(k);
+        const int begin = std::clamp(range.begin(), 0, size);
+        const int end = std::clamp(range.end(), begin, size);
         if (begin >= end)
             continue;
-        const double lower = mDataSource->keyAt(begin);
-        const double upper = mDataSource->keyAt(end - 1);
-        if (key >= lower && key <= upper)
-            return true;
+        return keyAtRow(begin) <= key && key <= keyAtRow(end - 1);
     }
     return false;
 }

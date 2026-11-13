@@ -114,7 +114,7 @@ A graph with a brush is filled down to the zero line. With `setComponentFillToGr
 
 - `Qt::NoPen` hides a line but keeps its fill.
 - Semi-transparent colours (alpha below 255) let the grid and other graphs show through.
-- A pen width of 0 is a cosmetic pen: always one device pixel wide, even when an export is scaled up. A new graph does not use it: its pen is the next palette colour, 2.5 pixels wide.
+- A pen width of 0 is a cosmetic pen: always one device pixel wide, even when an export is scaled up. A new graph uses it: column *i* takes colour *i* of the palette.
 
 On screen, `QCPGraph` and `QCPCurve` draw solid lines and fills on the GPU.
 Dashed and dotted lines are drawn with QPainter instead, so they work, but cost more on large data.

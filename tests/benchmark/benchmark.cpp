@@ -84,6 +84,7 @@ private slots:
     void QCPGraph_RenderDouble();
     void QCPGraph_RenderFloat();
     void QCPGraph_RenderManyLines();
+    void QCPGraph_SelectedRedraw();
     void QCPGraph_ScatterDisc1M();
     void QCPGraph_ScatterSquare1M();
     void QCPGraph_ScatterWithLine1M();
@@ -1736,6 +1737,35 @@ void Benchmark::QCPGraph_RenderFloat()
 
     QBENCHMARK
     {
+        mPlot->replot();
+    }
+}
+
+// 50k raw rows (below the resample threshold) with a 10k-range selection, as a rect selection over
+// noisy data makes. Each frame re-records: the two selections alternate.
+void Benchmark::QCPGraph_SelectedRedraw()
+{
+    auto* mg = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    const int n = 50000;
+    std::vector<double> keys(n), values(n);
+    for (int i = 0; i < n; ++i)
+    {
+        keys[std::size_t(i)] = i;
+        values[std::size_t(i)] = qSin(i * 0.01);
+    }
+    mg->setData(std::move(keys), std::move(values));
+    mg->setSelectable(QCP::stMultipleDataRanges);
+    mg->rescaleAxes();
+    QCPDataSelection even, odd;
+    for (int i = 0; i < 20000; i += 2)
+    {
+        even.addDataRange(QCPDataRange(i * 2, i * 2 + 1), false);
+        odd.addDataRange(QCPDataRange(i * 2 + 1, i * 2 + 2), false);
+    }
+    bool flip = false;
+    QBENCHMARK
+    {
+        mg->setSelection((flip = !flip) ? even : odd);
         mPlot->replot();
     }
 }

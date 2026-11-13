@@ -149,7 +149,7 @@ The default one draws a blue pen, 2.5 pixels wide.
 - `QCPSelectionDecoratorBracket` also draws a bracket at each end of each selected range. Pick the shape with `setBracketStyle()`: square brackets, half ellipses, ellipses or plus signs.
 - `setSelectionDecorator()` replaces the decorator. The plottable takes ownership. `nullptr` removes it, and selected data then looks like the rest.
 
-A `QCPGraph` keeps one selection per component. It draws the selected segments with the decorator: the line with the decorator's pen, the markers with its marker style. Error bars of a selected component use its selected pen. See {doc}`graphs`.
+A `QCPGraph` keeps one selection per component. It draws the selected segments with each component's selected pen. Once you style the decorator, or set one of your own, the line takes the decorator's pen and the markers its marker style. Error bars of a selected component use its selected pen. See {doc}`graphs`.
 
 A plottable that wants to react to a new selection overrides the protected virtual `QCPAbstractPlottable::assignSelection()`.
 

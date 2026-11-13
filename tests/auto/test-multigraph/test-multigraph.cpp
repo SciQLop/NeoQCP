@@ -14,6 +14,8 @@
 #include <cmath>
 #include <functional>
 #include <limits>
+#include <numeric>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -4062,6 +4064,7 @@ void TestMultiGraph::aSelectedRangeSplitsTheBand()
     pair.owner->component(0).selectedPen = QPen(Qt::green);
     QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0,
                                                 QBrush(QColor(255, 0, 0, 64))));
+    pair.owner->setSelectable(QCP::stDataRange); // rows: the default stWhole selects everything
     pair.owner->setComponentSelection(0, QCPDataSelection(QCPDataRange(1000, 2000)));
     mPlot->xAxis->setRange(-0.5, n - 0.5);
     mPlot->yAxis->setRange(0, 4);
@@ -4088,6 +4091,7 @@ void TestMultiGraph::aDenseFillSelectionUsesItsKeyRange()
     pair.owner->component(0).selectedPen = QPen(Qt::green);
     QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0,
                                                 QBrush(QColor(255, 0, 0, 64))));
+    pair.owner->setSelectable(QCP::stDataRange); // rows: the default stWhole selects everything
     pair.owner->setComponentSelection(0, QCPDataSelection(QCPDataRange(1000, 2000)));
     mPlot->xAxis->setRange(-0.5, n - 0.5);
     mPlot->yAxis->setRange(0, 4);
@@ -4115,6 +4119,7 @@ void TestMultiGraph::aSteppedFillSelectionUsesItsKeyRange()
     pair.owner->component(0).selectedPen = QPen(Qt::green);
     QVERIFY(pair.owner->setComponentFillToGraph(0, pair.partner, 0,
                                                 QBrush(QColor(255, 0, 0, 64))));
+    pair.owner->setSelectable(QCP::stDataRange); // rows: the default stWhole selects everything
     pair.owner->setComponentSelection(0, QCPDataSelection(QCPDataRange(400, 600)));
     mPlot->xAxis->setRange(-0.5, n - 0.5);
     mPlot->yAxis->setRange(0, 4);
@@ -4710,4 +4715,278 @@ void TestMultiGraph::aNegativeLogRangeImpulsesStartAtTheUpperBound()
     const QImage img = renderOf(mPlot);
     QVERIFY2(redNear(img, pixelOf(mPlot, 1, -3)), "no impulse between the value and zero's side");
     QVERIFY2(!redNear(img, pixelOf(mPlot, 1, -40)), "the impulse runs to the far bound");
+}
+
+// --- 5c final review ---
+
+namespace
+{
+//! One red line at value 1 over keys 0..4 with a green selected pen, selectable as \a type.
+QCPGraph* oneRedLine(QCustomPlot* plot, std::optional<QCP::SelectionType> type = std::nullopt)
+{
+    auto* mg = new QCPGraph(plot->xAxis, plot->yAxis);
+    mg->setData(std::vector<double> { 0, 1, 2, 3, 4 }, std::vector<double> { 1, 1, 1, 1, 1 });
+    mg->setComponentPens({ QPen(Qt::red, 5) });
+    mg->component(0).selectedPen = QPen(Qt::green, 5);
+    if (type)
+        mg->setSelectable(*type);
+    plot->xAxis->setRange(0, 4);
+    plot->yAxis->setRange(0, 3);
+    renderOf(plot); // lays the axis rect out: clicks are placed in pixels
+    return mg;
+}
+
+//! What a click at (key, value) hands the graph: the hit details of its selectTest.
+QVariant clickDetails(QCustomPlot* plot, QCPGraph* mg, double key, double value)
+{
+    QVariant details;
+    const double distance = mg->selectTest(QPointF(pixelOf(plot, key, value)), false, &details);
+    return distance >= 0 ? details : QVariant();
+}
+} // namespace
+
+// Whether a content change of \a partner still dirties \a owner (a registered dependent).
+bool TestMultiGraph::marksOwner(QCPGraph* partner, QCPGraph* owner)
+{
+    const quint64 before = owner->mCore.generation();
+    partner->setPen(QPen(partner->pen().color() == Qt::cyan ? Qt::magenta : Qt::cyan));
+    return owner->mCore.generation() != before;
+}
+
+// C1: 2.x's default selection type is stWhole: a click selects the whole graph, drawn selected.
+void TestMultiGraph::aClickOnADefaultGraphSelectsTheWholeGraph()
+{
+    auto* mg = oneRedLine(mPlot);
+    QCOMPARE(mg->selectable(), QCP::stWhole);
+    renderOf(mPlot);
+    bool changed = false;
+    mg->selectEvent(nullptr, false, clickDetails(mPlot, mg, 2, 1), &changed);
+
+    QVERIFY(changed);
+    QVERIFY(mg->selected());
+    const QImage img = renderOf(mPlot);
+    QVERIFY2(greenNear(img, pixelOf(mPlot, 0.5, 1)), "the start of the line is not drawn selected");
+    QVERIFY2(greenNear(img, pixelOf(mPlot, 3.5, 1)), "the end of the line is not drawn selected");
+}
+
+// C1: an additive click on a whole-selected graph toggles it off (2.x).
+void TestMultiGraph::anAdditiveClickOnAWholeSelectedGraphDeselectsIt()
+{
+    auto* mg = oneRedLine(mPlot);
+    bool changed = false;
+    mg->selectEvent(nullptr, false, clickDetails(mPlot, mg, 2, 1), &changed);
+    QVERIFY(mg->selected());
+
+    changed = false;
+    mg->selectEvent(nullptr, true, clickDetails(mPlot, mg, 3, 1), &changed);
+
+    QVERIFY(changed);
+    QVERIFY2(!mg->selected(), "the additive click did not deselect the graph");
+    QVERIFY(mg->componentSelection(0).isEmpty());
+}
+
+// C1: with rows, an additive click on a selected row deselects that row (2.x's toggle).
+void TestMultiGraph::anAdditiveClickOnASelectedRowDeselectsIt()
+{
+    auto* mg = oneRedLine(mPlot, QCP::stDataRange);
+    bool changed = false;
+    mg->selectEvent(nullptr, false, clickDetails(mPlot, mg, 2, 1), &changed);
+    QCOMPARE(mg->componentSelection(0), QCPDataSelection(QCPDataRange(2, 3)));
+
+    changed = false;
+    mg->selectEvent(nullptr, true, clickDetails(mPlot, mg, 2, 1), &changed);
+
+    QVERIFY(changed);
+    QVERIFY2(mg->componentSelection(0).isEmpty(), "the additive click did not toggle the row off");
+    QVERIFY(!mg->selected());
+}
+
+// C1: a rect selection keeps the type: stSingleData selects one row.
+void TestMultiGraph::aRectSelectionHonoursStSingleData()
+{
+    auto* mg = oneRedLine(mPlot, QCP::stSingleData);
+    renderOf(mPlot);
+    const QRectF rect(QPointF(pixelOf(mPlot, 0.5, 2)), QPointF(pixelOf(mPlot, 3.5, 0)));
+    const QCPDataSelection hit = mg->selectTestRect(rect, true);
+    QCOMPARE(hit.dataPointCount(), 3);
+
+    bool changed = false;
+    mg->selectEvent(nullptr, false, QVariant::fromValue(hit), &changed);
+
+    QCOMPARE(mg->selection().dataPointCount(), 1);
+    QCOMPARE(mg->componentSelection(0).dataPointCount(), 1);
+}
+
+// I1: a type that drops the selection drops it from every component, and the graph redraws.
+void TestMultiGraph::makingAGraphUnselectableClearsEveryComponent()
+{
+    auto* mg = selectableLines(mPlot);
+    mg->setSelection(QCPDataSelection(QCPDataRange(0, 5)));
+    renderOf(mPlot);
+
+    mg->setSelectable(QCP::stNone);
+
+    QVERIFY(!mg->selected());
+    QVERIFY(mg->componentSelection(0).isEmpty());
+    QVERIFY(mg->componentSelection(1).isEmpty());
+    mg->setComponentSelection(1, QCPDataSelection()); // recomputes the union of the components
+    QVERIFY2(!mg->selected(), "the old selection came back from the components");
+    const QImage img = renderOf(mPlot);
+    QVERIFY2(redNear(img, pixelOf(mPlot, 2, 1)), "the red line is still drawn selected");
+}
+
+// I2: 2.x drew no channel without a brush: setBrush(Qt::NoBrush) removes the band.
+void TestMultiGraph::setBrushNoBrushRemovesTheBandToAnotherGraph()
+{
+    auto [upper, lower] = twoBandGraphs(mPlot);
+    QVERIFY(upper->setComponentFillToGraph(0, lower, 0));
+    upper->setBrush(QBrush(Qt::blue));
+    QVERIFY(upper->componentFill(0).has_value());
+
+    upper->setBrush(Qt::NoBrush);
+
+    QVERIFY2(!upper->componentFill(0).has_value(), "the band to the other graph is still there");
+    QVERIFY2(!marksOwner(lower, upper), "the partner still marks the owner");
+}
+
+// I3 + M11: a partner whose value axis moves to another rect has no system: no crash, no band.
+void TestMultiGraph::aPartnerMovedToAnotherRectDropsTheBandWithoutACrash()
+{
+    auto* upper = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    auto* lower = new QCPGraph(mPlot->xAxis, mPlot->yAxis2);
+    upper->setData(std::vector<double> { 0, 1, 2 }, std::vector<double> { 2, 2, 2 });
+    lower->setData(std::vector<double> { 0, 1, 2 }, std::vector<double> { 1, 1, 1 });
+    QVERIFY(upper->setComponentFillToGraph(0, lower, 0));
+    renderOf(mPlot);
+    auto* rect2 = new QCPAxisRect(mPlot);
+    mPlot->plotLayout()->addElement(1, 0, rect2);
+
+    lower->setValueAxis(rect2->axis(QCPAxis::atLeft));
+    QVERIFY(lower->system() == nullptr);
+    MisuseScope misuse; // the partner reports that it is not drawn
+    renderOf(mPlot);
+
+    QVERIFY2(!upper->componentFill(0).has_value(), "the band to a partner off the frame stays");
+    QVERIFY2(!marksOwner(lower, upper), "the partner still marks the owner");
+}
+
+// M11: a partner taken from the plot is not this graph's partner any more.
+void TestMultiGraph::aPartnerTakenFromThePlotDropsTheFill()
+{
+    auto [upper, lower] = twoBandGraphs(mPlot);
+    QVERIFY(upper->setComponentFillToGraph(0, lower, 0));
+
+    std::unique_ptr<QCPGraph> taken = mPlot->take(QCPHandle<QCPGraph>(lower));
+    QVERIFY(taken);
+
+    QVERIFY2(!upper->componentFill(0).has_value(), "the band to a taken partner stays");
+    QVERIFY2(!marksOwner(taken.get(), upper), "the taken graph still marks the owner");
+    renderOf(mPlot);
+}
+
+// I4: 2.x's 1D accessors answer 0 outside the data, as the old graph's did.
+void TestMultiGraph::theDataAccessorsAnswerZeroOutsideTheData()
+{
+    auto* mg = rampGraph(mPlot, 5);
+    QCOMPARE(mg->dataMainKey(5), 0.0);
+    QCOMPARE(mg->dataMainKey(-1), 0.0);
+    QCOMPARE(mg->dataSortKey(99), 0.0);
+    QCOMPARE(mg->dataMainValue(5), 0.0);
+    QCOMPARE(mg->dataValueRange(5), QCPRange(0, 0));
+    QCOMPARE(mg->dataPixelPosition(5), QPointF());
+}
+
+// I4: a rolling window keeps a selection of rows that are gone; the bracket must not read them.
+void TestMultiGraph::aBracketOnASelectionBeyondTheDataDoesNotReadPastIt()
+{
+    auto* mg = rampGraph(mPlot, 100);
+    mg->setSelectable(QCP::stDataRange);
+    mg->setSelectionDecorator(new QCPSelectionDecoratorBracket);
+    mg->rescaleAxes();
+    mg->setSelection(QCPDataSelection(QCPDataRange(90, 100)));
+    renderOf(mPlot);
+
+    mg->removeDataBefore(50);
+    QCOMPARE(mg->dataCount(), 50);
+    renderOf(mPlot); // ASan: no read past the 50 rows
+}
+
+// I5: the per-vertex lookup is a search, not a scan; it must still answer every row right, on the
+// raw rows and on a resampled source's keys.
+void TestMultiGraph::manySelectedRangesMarkEachRow()
+{
+    const int rows = 2000;
+    auto* mg = rampGraph(mPlot, rows);
+    auto* twin = rampGraph(mPlot, rows); // another source object: the key branch
+    mg->setSelectable(QCP::stMultipleDataRanges);
+    QCPDataSelection every2nd;
+    for (int i = 0; i < rows; i += 2)
+        every2nd.addDataRange(QCPDataRange(i, i + 1), false);
+    mg->setSelection(every2nd);
+    QCOMPARE(mg->componentSelection(0).dataRangeCount(), rows / 2);
+
+    std::vector<int> all(static_cast<std::size_t>(rows));
+    std::iota(all.begin(), all.end(), 0);
+    const std::vector<char> raw = mg->selectedVertices(0, *mg->dataSource(), all);
+    const std::vector<char> keyed = mg->selectedVertices(0, *twin->dataSource(), all);
+    for (int i = 0; i < rows; ++i)
+    {
+        QCOMPARE(bool(raw[std::size_t(i)]), i % 2 == 0);
+        QCOMPARE(bool(keyed[std::size_t(i)]), i % 2 == 0);
+    }
+}
+
+// M1: 2.x's properties and the scatterStyle getter.
+void TestMultiGraph::theTwoXPropertiesAnswer()
+{
+    auto* mg = rampGraph(mPlot, 5, 2);
+    QVERIFY(mg->setProperty("lineStyle", QVariant::fromValue(QCPGraph::lsStepLeft)));
+    QCOMPARE(mg->lineStyle(), QCPGraph::lsStepLeft);
+    QVERIFY(mg->setProperty("scatterSkip", 3));
+    QCOMPARE(mg->property("scatterSkip").toInt(), 3);
+    QVERIFY(mg->setProperty("adaptiveSampling", false));
+    QCOMPARE(mg->property("adaptiveSampling").toBool(), false);
+    const QCPScatterStyle disc(QCPScatterStyle::ssDisc, 7);
+    QVERIFY(mg->setProperty("scatterStyle", QVariant::fromValue(disc)));
+    QCOMPARE(mg->property("scatterStyle").value<QCPScatterStyle>().shape(), QCPScatterStyle::ssDisc);
+    QCOMPARE(mg->property("scatterStyle").value<QCPScatterStyle>().size(), 7.0);
+    QCOMPARE(mg->scatterStyle().shape(), QCPScatterStyle::ssDisc);
+    QCOMPARE(mg->scatterStyle().size(), 7.0);
+    mg->setComponentScatterStyle(1, QCPScatterStyle(QCPScatterStyle::ssCross));
+    QCOMPARE(mg->scatterStyle().shape(), QCPScatterStyle::ssDisc); // component 0's
+    auto* empty = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+    empty->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssSquare));
+    QCOMPARE(empty->scatterStyle().shape(), QCPScatterStyle::ssSquare); // the one data will take
+}
+
+// M2: iSelectPlottablesBeyondAxisRect lets a click outside the rect reach the graph (2.x).
+void TestMultiGraph::aGraphIsSelectableBeyondTheRectWhenAsked()
+{
+    auto* mg = oneRedLine(mPlot);
+    renderOf(mPlot);
+    const QPointF outside = QPointF(mPlot->axisRect()->rect().left() - 4, pixelOf(mPlot, 0, 1).y());
+    QCOMPARE(mg->selectTest(outside, false), -1.0);
+
+    mPlot->setInteraction(QCP::iSelectPlottablesBeyondAxisRect, true);
+
+    const double distance = mg->selectTest(outside, false);
+    QVERIFY2(distance >= 0 && distance < 10, qPrintable(QString::number(distance)));
+}
+
+// M10: a fill brush for a component without a fill changes nothing, so nothing re-records.
+void TestMultiGraph::aFillBrushWithoutAFillDoesNotDirty()
+{
+    auto* mg = rampGraph(mPlot, 5);
+    renderOf(mPlot);
+    const quint64 generation = mg->mCore.generation();
+    mg->setComponentFillBrush(0, QBrush(Qt::red));
+    QCOMPARE(mg->mCore.generation(), generation);
+}
+
+// M13: 2.x's remove(from, to) removed nothing when from >= to.
+void TestMultiGraph::removeDataWithAnEmptyIntervalRemovesNothing()
+{
+    auto* mg = rampGraph(mPlot, 6);
+    mg->removeData(2.0, 2.0);
+    QCOMPARE(mg->dataCount(), 6);
 }

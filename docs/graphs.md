@@ -18,7 +18,7 @@ This page shows how to give it data, how to style it, how missing data is drawn,
 - `dataSource()` reads the data back, as a source. To share the data between two graphs, give both the same source with `setDataSource()`.
 - A NaN key, or keys and values of different lengths, is a misuse: the call reports it and changes nothing.
 
-A new graph has the next colour of the palette and a pen 2.5 pixels wide.
+Column *i* of a new graph takes colour *i* of the palette, with a cosmetic pen (width 0): a graph with one column is drawn in the palette's first colour.
 
 The line style says how the points are joined. The scatter style draws a marker on each point.
 
@@ -165,7 +165,8 @@ When the graph is already on screen, new data does not blank it. The old data st
 
 ### Selection and the legend
 
-A selected graph draws its selected segments with the selection decorator: the line takes the decorator's pen, and the markers its marker style.
+A selected graph draws its selected segments with each column's selected pen. When you style the selection decorator, or set one of your own, the line takes the decorator's pen and the markers its marker style.
+The selection type works as for any plottable: with the default `QCP::stWhole` a click selects the whole graph; `stDataRange` and `stMultipleDataRanges` select rows.
 A graph with several columns keeps one selection per column.
 A graph with one column has one legend row, which shows the graph's name, unless you named the column yourself.
 A graph without data yet shows its pen next to its name, so the row is not empty.

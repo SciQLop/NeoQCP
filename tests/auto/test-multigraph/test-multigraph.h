@@ -274,8 +274,26 @@ private slots:
     void aNegativeLogRangeFillsToTheUpperBound();
     void aNegativeLogRangeImpulsesStartAtTheUpperBound();
 
+    // 5c final review
+    void aClickOnADefaultGraphSelectsTheWholeGraph();
+    void anAdditiveClickOnAWholeSelectedGraphDeselectsIt();
+    void anAdditiveClickOnASelectedRowDeselectsIt();
+    void aRectSelectionHonoursStSingleData();
+    void makingAGraphUnselectableClearsEveryComponent();
+    void setBrushNoBrushRemovesTheBandToAnotherGraph();
+    void aPartnerMovedToAnotherRectDropsTheBandWithoutACrash();
+    void aPartnerTakenFromThePlotDropsTheFill();
+    void theDataAccessorsAnswerZeroOutsideTheData();
+    void aBracketOnASelectionBeyondTheDataDoesNotReadPastIt();
+    void manySelectedRangesMarkEachRow();
+    void theTwoXPropertiesAnswer();
+    void aGraphIsSelectableBeyondTheRectWhenAsked();
+    void aFillBrushWithoutAFillDoesNotDirty();
+    void removeDataWithAnEmptyIntervalRemovesNothing();
+
 private:
     // The staged source stays staged, as while its pipeline prepares it: exports commit ready ones.
     static void stillPreparing(QCPGraph* mg);
+    static bool marksOwner(QCPGraph* partner, QCPGraph* owner);
     QCustomPlot* mPlot = nullptr;
 };

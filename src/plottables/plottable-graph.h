@@ -39,6 +39,9 @@ class QCPGraphOps;
 class QCP_LIB_DECL QCPGraph : public QCPAbstractLine, public QCPPlottableInterface1D
 {
     Q_OBJECT
+    /// \cond INCLUDE_QPROPERTIES
+    Q_PROPERTY(bool adaptiveSampling READ adaptiveSampling WRITE setAdaptiveSampling)
+    /// \endcond
 public:
     template <typename T>
     using OpsFor = QCPGraphOps<T>;
@@ -219,7 +222,7 @@ public:
 
     // Per-component selection
     [[nodiscard]] QCPDataSelection componentSelection(int index) const;
-    void setComponentSelection(int index, const QCPDataSelection& sel);
+    void setComponentSelection(int index, QCPDataSelection sel);
 
     // QCPPlottableInterface1D
     [[nodiscard]] int dataCount() const override;
@@ -291,6 +294,11 @@ protected:
 
     void selectEvent(QMouseEvent* event, bool additive, const QVariant& details,
                      bool* selectionStateChanged) override;
+    //! Each component's hit rows from a click's or a rect's \a details.
+    [[nodiscard]] QVector<QCPDataSelection> componentHits(const QVariant& details) const;
+    //! stDataRange / stMultipleDataRanges: each component takes its hit, toggled when \a additive.
+    void selectComponentRows(const QVector<QCPDataSelection>& hits, bool additive,
+                             bool* selectionStateChanged);
     void deselectEvent(bool* selectionStateChanged) override;
     //! 2.x's rows are shared by the columns: the graph's selection selects them on each component.
     bool assignSelection(const QCPDataSelection& selection) override;
@@ -473,6 +481,7 @@ protected:
     void setPipelineScheduler(QCPPipelineScheduler* scheduler) override { mPipeline.setScheduler(scheduler); }
 
     void updateBaseSelection();
+    [[nodiscard]] bool isDataRow(int index) const;
 
 };
 

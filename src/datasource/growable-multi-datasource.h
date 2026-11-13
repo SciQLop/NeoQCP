@@ -210,10 +210,11 @@ public:
         return eraseRows(upperIndex(key), mKeys.size());
     }
 
-    //! Removes the rows with \a from <= key <= \a to (2.x's remove). False when none is.
+    //! Removes the rows with \a from <= key <= \a to (2.x's remove: nothing when \a from >= \a to).
+    //! False when none is.
     bool removeBetween(double from, double to)
     {
-        if (!(from <= to))
+        if (!(from < to))
             return false;
         return eraseRows(lowerIndex(from), upperIndex(to));
     }

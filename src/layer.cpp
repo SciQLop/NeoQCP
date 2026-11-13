@@ -786,8 +786,10 @@ bool QCPLayerable::realVisibility() const
   placed in \a details. So in the subsequent \ref selectEvent, the decision which part was
   selected doesn't have to be done a second time for a single selection operation.
 
-  In the case of 1D Plottables (\ref QCPPlottableInterface1D, like \ref QCPGraph or \ref QCPBars) \a
-  details will be set to a \ref QCPDataSelection, describing the closest data point to \a pos.
+  In the case of 1D Plottables (\ref QCPPlottableInterface1D, like \ref QCPBars) \a details will
+  be set to a \ref QCPDataSelection, describing the closest data point to \a pos. A \ref QCPGraph
+  sets a QVariantMap instead: \c componentIndex (the column) and \c dataIndex (the row).
+  \ref qcp::hitDataIndex reads the row from either form.
 
   You may pass \c nullptr as \a details to indicate that you are not interested in those selection
   details.
@@ -1025,8 +1027,8 @@ void QCPLayerable::deselectEvent([[maybe_unused]] bool* selectionStateChanged)
   The current pixel position of the cursor on the QCustomPlot widget is accessible via \c
   event->pos(). The parameter \a details contains layerable-specific details about the hit, which
   were generated in the previous call to \ref selectTest. For example, One-dimensional plottables
-  like \ref QCPGraph or \ref QCPBars convey the clicked data point in the \a details parameter, as
-  \ref QCPDataSelection packed as QVariant. Multi-part objects convey the specific \c
+  like \ref QCPBars convey the clicked data point in the \a details parameter, as
+  \ref QCPDataSelection packed as QVariant (a \ref QCPGraph: a QVariantMap, see \ref selectTest). Multi-part objects convey the specific \c
   SelectablePart that was hit (e.g. \ref QCPAxis::SelectablePart in the case of axes).
 
   QCustomPlot uses an event propagation system that works the same as Qt's system. If your
@@ -1093,8 +1095,8 @@ void QCPLayerable::mouseReleaseEvent(QMouseEvent* event, [[maybe_unused]] const 
   The current pixel position of the cursor on the QCustomPlot widget is accessible via \c
   event->pos(). The parameter \a details contains layerable-specific details about the hit, which
   were generated in the previous call to \ref selectTest. For example, One-dimensional plottables
-  like \ref QCPGraph or \ref QCPBars convey the clicked data point in the \a details parameter, as
-  \ref QCPDataSelection packed as QVariant. Multi-part objects convey the specific \c
+  like \ref QCPBars convey the clicked data point in the \a details parameter, as
+  \ref QCPDataSelection packed as QVariant (a \ref QCPGraph: a QVariantMap, see \ref selectTest). Multi-part objects convey the specific \c
   SelectablePart that was hit (e.g. \ref QCPAxis::SelectablePart in the case of axes).
 
   Similarly to \ref mousePressEvent, once a layerable has accepted the \ref mouseDoubleClickEvent,

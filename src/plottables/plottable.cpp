@@ -1022,9 +1022,12 @@ void QCPAbstractPlottable::setSelectable(QCP::SelectionType selectable)
     if (mSelectable != selectable)
     {
         mSelectable = selectable;
-        QCPDataSelection oldSelection = mSelection;
-        mSelection.enforceType(mSelectable);
-        const bool selectionTrimmed = mSelection != oldSelection;
+        QCPDataSelection trimmed = mSelection;
+        trimmed.enforceType(mSelectable);
+        // Through the hook: a subclass that spreads its selection (a graph's components) trims too.
+        const bool selectionTrimmed = trimmed != mSelection && assignSelection(trimmed);
+        if (selectionTrimmed)
+            markDirty();
         const QCPEmissionScope scope(mParentPlot);
         qcpEmit(this, mParentPlot, &QCPAbstractPlottable::selectableChanged);
         if (selectionTrimmed)

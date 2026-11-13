@@ -1500,6 +1500,8 @@ bool QCustomPlot::detach(QCPAbstractPlottable* plottable)
     plottable->mRegisteredPlot = nullptr;
     plottable->mParentPlot = nullptr;
     plottable->setParent(nullptr);
+    // What follows it (a band filled to it) learns it left: it drops the link.
+    plottable->markDependentsDirty();
     if (group)
     {
         group->updateLegendRow();
