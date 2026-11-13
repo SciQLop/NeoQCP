@@ -971,6 +971,8 @@ void TestColorMap::colourMap2HonoursAVerticalKeyAxis()
     return exported.pixel(area.left() + qRound(fx * area.width()),
                           area.top() + qRound(fy * area.height()));
   };
+  if (qGray(at(0.4, 0.15)) <= 200 || qGray(at(0.15, 0.4)) >= 50)
+    keepImagesForCi(QStringLiteral("colourMap2HonoursAVerticalKeyAxis"), exported, QImage());
   QVERIFY2(qGray(at(0.4, 0.15)) > 200, "the key-upper, value-lower block is not at the top-left");
   QVERIFY2(qGray(at(0.15, 0.4)) < 50, "the picture is rotated, not turned onto the vertical key axis");
 }
@@ -1536,17 +1538,30 @@ void TestColorMap::verticalKeyAxisMapMatchesTheExport()
   mPlot->replot(QCustomPlot::rpImmediateRefresh);
 
   const QImage gpu = mPlot->grabFramebuffer();
-  const QImage exported = mPlot->toPixmap(gpu.width(), gpu.height()).toImage();
+  // The frame is in device pixels: export the same logical plot at the screen's ratio, not a
+  // plot laid out at the device size.
+  const QImage exported
+      = mPlot->toPixmap(mPlot->width(), mPlot->height(), gpu.devicePixelRatio()).toImage();
   QCOMPARE(gpu.size(), exported.size());
   QVERIFY(gpu.width() > 40 && gpu.height() > 40);
-  for (int y = 0; y < gpu.height(); y += 10)
-    for (int x = 0; x < gpu.width(); x += 10)
+  // One probe per cell, at its centre: a cell edge lands on a different device pixel in the GPU
+  // and the painter rasterisation once the ratio is not 1, and that is not what this compares.
+  // The outer cells are cut in half by the axis rect, so their centres sit on its edge: skipped.
+  const double dpr = gpu.devicePixelRatio();
+  for (int k = 1; k < 39; ++k)
+    for (int v = 1; v < 29; ++v)
     {
+      const int x = qRound(mPlot->xAxis->coordToPixel(v * 12.0 / 29) * dpr);
+      const int y = qRound(mPlot->yAxis->coordToPixel(k * 10.0 / 39) * dpr);
+      if (map->colorScale() && map->colorScale()->outerRect().contains(QPoint(x, y) / dpr))
+        continue; // the scale's axis line is drawn on its own terms, not the map's
       const QRgb frame = gpu.pixel(x, y);
       const QRgb picture = exported.pixel(x, y);
       const bool close = qAbs(qRed(frame) - qRed(picture)) <= 2
           && qAbs(qGreen(frame) - qGreen(picture)) <= 2
           && qAbs(qBlue(frame) - qBlue(picture)) <= 2;
+      if (!close)
+        keepImagesForCi(QStringLiteral("verticalKeyAxisMapMatchesTheExport"), gpu, exported);
       QVERIFY2(close, qPrintable(QStringLiteral("pixel (%1, %2) differs").arg(x).arg(y)));
     }
 }

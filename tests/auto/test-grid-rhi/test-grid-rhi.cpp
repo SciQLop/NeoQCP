@@ -3,6 +3,7 @@
 #include "../../../src/qcp.h"
 #include "../../../src/painting/grid-rhi-layer.h"
 #include "../../../src/plottables/plottable-draw-utils.h"
+#include "keep-images.h"
 #include <QtWidgets/qtestsupport_widgets.h> // QTest::qWaitForWindowExposed
 
 namespace {
@@ -225,6 +226,8 @@ void TestGridRhi::dashedGridPenIsDashedOnScreen()
         return double(ink) / all;
     };
     const double onScreen = inkFraction(frame), inExport = inkFraction(exported);
+    if (onScreen >= 0.95 || qAbs(onScreen - inExport) >= 0.1)
+        keepImagesForCi(QStringLiteral("dashedGridPenIsDashedOnScreen"), frame, exported);
     QVERIFY2(onScreen < 0.95, qPrintable(QString("solid on screen: %1").arg(onScreen)));
     QVERIFY2(qAbs(onScreen - inExport) < 0.1,
              qPrintable(QString("screen %1, export %2").arg(onScreen).arg(inExport)));
