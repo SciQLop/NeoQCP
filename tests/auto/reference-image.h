@@ -1,6 +1,8 @@
 #ifndef QCP_TEST_REFERENCE_IMAGE_H
 #define QCP_TEST_REFERENCE_IMAGE_H
 
+#include "keep-images.h"
+
 #include <QCoreApplication>
 #include <QDir>
 #include <QFont>
@@ -45,7 +47,8 @@ struct Tolerance
   \a tolerance's channel in a channel, inside the compared area (\a area, the whole image when
   null; its outer row and column are excluded: the export painter sits half a pixel off the device
   grid and moves only those). \a why receives the first difference and the total, when the caller
-  wants to print it.
+  wants to print it. With \c QCP_TEST_LOG_DIR set (CI does), a failed comparison also keeps the
+  picture (-a) and its reference (-b) there, so a failure seen on one platform only can be looked at.
 
   The path is resolved from the test binary, so the helper works from any build directory.
 */
@@ -107,6 +110,7 @@ inline bool matchesReference(const QImage& image, const QString& testDir, const 
     }
     if (bad > tolerance.pixels)
     {
+        keepImagesForCi(testDir + QLatin1Char('-') + name, actual, reference);
         if (why)
             *why = QStringLiteral("%1 pixels differ (at most %2), first at %3,%4")
                        .arg(bad)
