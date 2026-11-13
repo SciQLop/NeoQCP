@@ -122,8 +122,10 @@ public:
     bool reuse(const QCPDrawList& list, const QCPTransform& transform, double dpr, int outputHeight,
                const QRect& clip, QPointF* delta);
 
-    //! Drops the runs and starts keeping a new build for \a list.
-    void beginBuild(const QCPDrawList& list, const QCPTransform& transform, double dpr,
+    //! Drops the runs and starts a new build for \a list. Returns whether the build is kept: not
+    //! when no frame could re-emit it (a recording whose commands move differently), nor for a zoom
+    //! that follows a zoom.
+    bool beginBuild(const QCPDrawList& list, const QCPTransform& transform, double dpr,
                     int outputHeight, const QRect& clip);
 
     /*!
@@ -174,6 +176,8 @@ private:
     double mDpr = 0;
     int mHeight = 0;
     bool mReusable = false; //!< every kept command moves alike: see beginBuild()
+    bool mBuilt = false; //!< \ref mTransform is the last build's
+    bool mLastBuildZoomed = false; //!< the last build scaled the one before, and none re-emitted it
     bool mValid = false;
     bool mSpoiled = false;
     bool mClippedRaster = false; //!< an image was cut by the clip: it cannot be shifted

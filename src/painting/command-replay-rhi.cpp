@@ -479,10 +479,12 @@ bool QCPRecordingCache::reuse(const QCPDrawList& list, const QCPTransform& trans
         && transform.isTranslationOf(mTransform, delta);
     if (!same)
         mValid = false;
+    else
+        mLastBuildZoomed = false; // a frame re-emitted the build: the streak, if any, is over
     return same;
 }
 
-void QCPRecordingCache::beginBuild(const QCPDrawList& list, const QCPTransform& transform,
+bool QCPRecordingCache::beginBuild(const QCPDrawList& list, const QCPTransform& transform,
                                    double dpr, int outputHeight, const QRect& clip)
 {
     mSolid.clear();
@@ -490,14 +492,23 @@ void QCPRecordingCache::beginBuild(const QCPDrawList& list, const QCPTransform& 
     mRuns.clear();
     mRasterRuns = 0;
     mReusable = mayReuseGeometry(list); // once, at build time: not on every pan frame
+    // Keeping is a copy of every vertex. A zoom streak builds on every frame and no frame of it
+    // re-emits what the one before kept, so only its first build keeps: one zoom is still re-emitted
+    // by the repaints that follow it. simplify: the frame after a streak builds once more before
+    // it keeps; telling the last zoom of a streak apart needs the next frame's transform.
+    const bool zoom = mBuilt && !transform.isTranslationOf(mTransform);
+    const bool keeps = mReusable && !(zoom && mLastBuildZoomed);
+    mBuilt = true;
+    mLastBuildZoomed = zoom;
     mList = list.id;
     mTransform = transform;
     mDpr = dpr;
     mHeight = outputHeight;
     mClip = clip;
     mValid = false;
-    mSpoiled = false;
+    mSpoiled = !keeps;
     mClippedRaster = false;
+    return keeps;
 }
 
 void QCPRecordingCache::keepSolid(std::span<const float> vertices, int fillVertexCount,
@@ -632,8 +643,11 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
 
     cache.beginReplay();
     fallback.beginReplay();
-    if (geometry)
-        geometry->beginBuild(list, frame.transform, dpr, outputHeight, clip);
+    // The cache the build keeps into: none on a frame whose vertices no later frame can re-emit.
+    QCPRecordingCache* const keep
+        = geometry && geometry->beginBuild(list, frame.transform, dpr, outputHeight, clip)
+        ? geometry
+        : nullptr;
     std::vector<QPointF>& pixels = pixelScratch();
 
     for (const qcp::QCPDrawCommand& command : list.commands)
@@ -647,14 +661,14 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
         const auto raster = [&]
         {
             addRasterCommand(list, plottables, command, frame, fallback, clip, dpr, outputSize,
-                             generation, geometry, needs.fill || strokeRaster, strokeRaster);
+                             generation, keep, needs.fill || strokeRaster, strokeRaster);
         };
         const auto stroke = [&](std::span<const QPointF> points, const QPen& pen,
                                 bool closed = false, std::span<const QRgb> colours = { })
         {
             if (!strokeRaster)
                 addPolyline(plottables, points, pen, clip, dpr, outputHeight, alpha, dataOnly,
-                            geometry, closed, colours);
+                            keep, closed, colours);
         };
         std::visit(
             [&](const auto& cmd)
@@ -693,7 +707,7 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                     // otherwise the fill is an image.
                     if (qcp::gpuCanFill(cmd.brush) && upper.size() == lower.size())
                         addRibbonFill(plottables, upper, lower, cmd.brush.color(), clip, dpr,
-                                      outputHeight, alpha, true, geometry);
+                                      outputHeight, alpha, true, keep);
                     else
                         raster();
                 }
@@ -709,7 +723,7 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                                                                box.bottomRight(),
                                                                box.bottomLeft() };
                         fanFill(plottables, box.center(), corners, cmd.brush.color(), clip, dpr,
-                                outputHeight, alpha, dataOnly, geometry);
+                                outputHeight, alpha, dataOnly, keep);
                     }
                     raster();
                     pixels.assign({ box.topLeft(), box.topRight(), box.bottomRight(),
@@ -724,7 +738,7 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                     const std::vector<QPointF> ring = qcpEllipseRing(box);
                     if (qcp::gpuCanFill(cmd.brush) && !needs.fill && !strokeRaster)
                         fanFill(plottables, box.center(), ring, cmd.brush.color(), clip, dpr,
-                                outputHeight, alpha, dataOnly, geometry);
+                                outputHeight, alpha, dataOnly, keep);
                     raster();
                     stroke(qcpRingOf(ring), cmd.pen, true);
                 }
@@ -757,7 +771,7 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                                                                    box.bottomRight(),
                                                                    box.bottomLeft() };
                             fanFill(plottables, box.center(), corners, colour, clip, dpr,
-                                    outputHeight, alpha, dataOnly, geometry);
+                                    outputHeight, alpha, dataOnly, keep);
                         }
                         pixels.assign({ box.topLeft(), box.topRight(), box.bottomRight(),
                                         box.bottomLeft(), box.topLeft() });
@@ -784,7 +798,7 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                         const std::vector<QPointF> ring = qcpEllipseRing(box);
                         if (fillEach && canFill && colour.alpha() != 0)
                             fanFill(plottables, box.center(), ring, colour, clip, dpr, outputHeight,
-                                    alpha, dataOnly, geometry);
+                                    alpha, dataOnly, keep);
                         stroke(qcpRingOf(ring), cmd.pen, true);
                     }
                 }
@@ -806,7 +820,7 @@ void qcpReplayWithRhi(const QCPDrawList& list, QCPPlottableRhiLayer& plottables,
                     // on the PainterOnly pass; dataOnly is what commandKind() answered above.
                     if (dataOnly)
                         addCommandImage(list, plottables, command, frame, fallback, clip, dpr,
-                                        outputHeight, geometry);
+                                        outputHeight, keep);
                 }
             },
             command);

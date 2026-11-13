@@ -62,7 +62,14 @@ QFont QCPGroupLegendItem::rowFont() const
 int QCPGroupLegendItem::rowHeight() const
 {
     const QFont font = rowFont();
-    int height = std::max(QFontMetrics(font).height(), measured(font, headerRowText(true)).height());
+    return rowHeight(font, measured(font, headerRowText(true)).height());
+}
+
+// The layout asks every row for its size hint twice per replot, hidden legend included: the header
+// is typeset once per answer, not once for the height and again for the width.
+int QCPGroupLegendItem::rowHeight(const QFont& font, int headerHeight) const
+{
+    int height = std::max(QFontMetrics(font).height(), headerHeight);
     if (shownExpanded())
         for (int i : graphRaw()->legendComponents())
             height = std::max(height, measured(font, graphRaw()->component(i).name).height());
@@ -261,12 +268,13 @@ QSize QCPGroupLegendItem::minimumOuterSizeHint() const
     if (!graphRaw()) return QSize(0, 0);
 
     const QFont font = rowFont();
-    int rh = rowHeight();
+    const QSize header = measured(font, headerRowText(true));
+    int rh = rowHeight(font, header.height());
     int padding = mMargins.left() + mMargins.right();
     int iconWidth = 20;
     int indent = 16;
 
-    const int headerWidth = measured(font, headerRowText(true)).width();
+    const int headerWidth = header.width();
 
     if (!shownExpanded()) {
         return QSize(padding + iconWidth + 6 + headerWidth,

@@ -40,6 +40,7 @@ private slots:
     void mixedRecordingSplitsByKind();
     void extruderContinuesArcLengthAcrossRuns();
     void extrusionCacheDropsOnADprChange();
+    void zoomStreakKeepsOnlyItsFirstBuild();
     void tenThousandDataRectsAreOneCommand();
     void aPixelCornerStaysASingleRect();
     void perRectColoursStayOneBatch();

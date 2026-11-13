@@ -840,6 +840,37 @@ void TestDrawContext::extrusionCacheDropsOnADprChange()
              "a new device pixel ratio rebuilds the cosmetic pen's triangles");
 }
 
+void TestDrawContext::zoomStreakKeepsOnlyItsFirstBuild()
+{
+    // A zoom keeps what it built, so a repaint at the same scale re-emits it. A zoom that follows
+    // a zoom keeps nothing: a streak replaces each build before any frame could re-emit it, and
+    // keeping it was a copy of every vertex on every frame.
+    Fixture fixture;
+    QCPDrawContext context(fixture.plot->xAxis, fixture.plot->yAxis, fixture.plot->axisRect(),
+                           nullptr);
+    context.polyline(sharedPoints({ { 1, 1 }, { 2, 2 }, { 3, 3 } }), QPen(Qt::black));
+    const QCPDrawList& list = context.drawList();
+    const auto viewOf = [&](double lower, double upper)
+    {
+        fixture.plot->xAxis->setRange(lower, upper);
+        return QCPTransform(fixture.plot->xAxis, fixture.plot->yAxis);
+    };
+    const QRect clip;
+    QCPRecordingCache geometry;
+    QVERIFY2(geometry.beginBuild(list, viewOf(0, 10), 1.0, kHeight, clip), "a first build keeps");
+    QVERIFY2(geometry.beginBuild(list, viewOf(0, 5), 1.0, kHeight, clip),
+             "a zoom after a build at rest keeps");
+    QVERIFY2(!geometry.beginBuild(list, viewOf(0, 4), 1.0, kHeight, clip),
+             "a zoom after a zoom keeps nothing");
+    QVERIFY2(geometry.beginBuild(list, viewOf(1, 5), 1.0, kHeight, clip),
+             "the pan after the streak keeps");
+    geometry.commit();
+    QPointF delta;
+    QVERIFY(geometry.reuse(list, viewOf(2, 6), 1.0, kHeight, clip, &delta));
+    QVERIFY2(geometry.beginBuild(list, viewOf(2, 4), 1.0, kHeight, clip),
+             "a zoom after a re-emitted frame keeps");
+}
+
 void TestDrawContext::resolveCacheSurvivesNewEntries()
 {
     // A span handed out before another recording was cached must still point at its own pixels.
