@@ -115,6 +115,17 @@ static void useTheBundledFont()
     QApplication::setFont(qcp::test::referenceFont(9));
 }
 
+// Cocoa draws text with Core Text unless asked for FreeType, which renders the reference
+// pictures' text on every other platform. Offscreen on macOS has no such choice.
+static void useFreeTypeOnCocoa()
+{
+#ifdef Q_OS_MACOS
+    const QByteArray platform = qgetenv("QT_QPA_PLATFORM");
+    if (platform.isEmpty() || platform == "cocoa")
+        qputenv("QT_QPA_PLATFORM", "cocoa:fontengine=freetype");
+#endif
+}
+
 #define QCPTEST(t)                                                                                 \
     if (shouldRun(#t))                                                                             \
     {                                                                                              \
@@ -124,6 +135,7 @@ static void useTheBundledFont()
 
 int main(int argc, char** argv)
 {
+    useFreeTypeOnCocoa();
     QApplication app(argc, argv);
     useTheBundledFont();
     if (qEnvironmentVariableIsEmpty("QCP_TEST_CLASS")
