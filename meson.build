@@ -10,6 +10,15 @@ qtmod = import('qt6')
 # once per header per file (millions of lines, past what GitHub keeps of a log).
 qtdeps = dependency('qt6', modules : ['Core','Widgets','Gui','Svg','PrintSupport'], private_headers: true,
                     include_type: 'system')
+# Meson's macOS framework lookup leaves out the QT_<MODULE>_LIB defines its other lookups add
+# (mesonbuild/dependencies/qt.py, _framework_detect); without them <QtTest> hides its GUI and
+# widget helpers (QTest::mouseClick, qWaitForWindowExposed).
+qt_framework_defines = host_machine.system() == 'darwin'
+if qt_framework_defines
+    qtdeps = declare_dependency(dependencies: qtdeps,
+        compile_args: ['-DQT_CORE_LIB', '-DQT_GUI_LIB', '-DQT_WIDGETS_LIB', '-DQT_SVG_LIB',
+                       '-DQT_PRINTSUPPORT_LIB'])
+endif
 # A browser build (Qt for WebAssembly, see examples/wasm-gallery) makes the library and the gallery.
 is_wasm = host_machine.system() == 'emscripten'
 
@@ -393,6 +402,9 @@ else
     endif
     if get_option ( 'with_tests')
         qttest = dependency('qt6', modules : ['Test'], include_type: 'system')
+        if qt_framework_defines
+            qttest = declare_dependency(dependencies: qttest, compile_args: ['-DQT_TESTLIB_LIB'])
+        endif
         subdir('tests')
         subdir('documentation/doc-image-generator')
     endif
