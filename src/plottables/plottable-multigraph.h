@@ -576,6 +576,11 @@ public:
         return this->apply([&](T& o) { o.setComponentLineStyle(index, style); });
     }
 
+    Ret setScatterStyle(const QCPScatterStyle& style)
+    {
+        return this->apply([&](T& o) { o.setScatterStyle(style); });
+    }
+
     Ret setAdaptiveSampling(bool enabled)
     {
         return this->apply([&](T& o) { o.setAdaptiveSampling(enabled); });

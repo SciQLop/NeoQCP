@@ -1616,11 +1616,14 @@ std::optional<double> QCPMultiGraph::nearestMappedPoint(const QPointF& pos, QVar
             const double lineDistance = QCPVector2D(pos).distanceSquaredToLine(pixel, next);
             if (lineDistance < minDistSqr)
             {
+                const bool nearerFirst = QCPVector2D(pixel - pos).lengthSquared()
+                                         <= QCPVector2D(next - pos).lengthSquared();
+                const int end = nearerFirst ? i : i + 1;
                 minDistSqr = lineDistance;
-                minIndex = i;
+                minIndex = end;
                 minComponent = c;
-                minKey = mDataSource->keyAt(i);
-                minValue = mDataSource->valueAt(c, i);
+                minKey = mDataSource->keyAt(end);
+                minValue = mDataSource->valueAt(c, end);
             }
         }
     }
@@ -1689,11 +1692,14 @@ std::optional<double> QCPMultiGraph::nearestDataPoint(const QPointF& pos, QVaria
             QPointF pHi = coordsToPixels(ds->keyAt(hi), ds->valueAt(c, hi));
             double lineDistSqr = QCPVector2D(pos).distanceSquaredToLine(pLo, pHi);
             if (lineDistSqr < minDistSqr) {
+                const bool nearerLo = QCPVector2D(pLo - pos).lengthSquared()
+                                      <= QCPVector2D(pHi - pos).lengthSquared();
+                const int end = nearerLo ? lo : hi;
                 minDistSqr = lineDistSqr;
                 minDistComponent = c;
-                minDistIndex = lo;
-                minKey = ds->keyAt(lo);
-                minValue = ds->valueAt(c, lo);
+                minDistIndex = end;
+                minKey = ds->keyAt(end);
+                minValue = ds->valueAt(c, end);
             }
         }
     }

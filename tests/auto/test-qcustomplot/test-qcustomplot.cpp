@@ -24,8 +24,8 @@ void TestQCustomPlot::interface_plottables()
   mPlot->yAxis->setRange(mPlot->axisRect()->top(), mPlot->axisRect()->top()+mPlot->axisRect()->height());
   mPlot->yAxis->setRangeReversed(true);
   
-  QCPGraph *g1 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
-  QCPGraph *g2 = new QCPGraph(mPlot->xAxis, mPlot->yAxis);
+  QCPMultiGraph *g1 = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+  QCPMultiGraph *g2 = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
   g1->setData(QVector<double>() << 200 << 300, QVector<double>() << 100 << 120);
   g2->setData(QVector<double>() << 200 << 300, QVector<double>() << 106 << 126);
 
@@ -34,24 +34,24 @@ void TestQCustomPlot::interface_plottables()
   b1->setData(QVector<double>() << 250, QVector<double>() << 150);
 
   // test selectivity of template parameter:
-  QCOMPARE(mPlot->plottableAt<QCPGraph>(QPointF(250, 110), false, nullptr), g1);
-  QCOMPARE(mPlot->plottableAt<QCPGraph>(QPointF(250, 113), false, nullptr), g2);
-  QCOMPARE(mPlot->plottableAt<QCPGraph>(QPointF(250, 130), false, nullptr), static_cast<QCPGraph*>(nullptr));
+  QCOMPARE(mPlot->plottableAt<QCPMultiGraph>(QPointF(250, 110), false, nullptr), g1);
+  QCOMPARE(mPlot->plottableAt<QCPMultiGraph>(QPointF(250, 113), false, nullptr), g2);
+  QCOMPARE(mPlot->plottableAt<QCPMultiGraph>(QPointF(250, 130), false, nullptr), static_cast<QCPMultiGraph*>(nullptr));
 
   QCOMPARE(mPlot->plottableAt<QCPBars>(QPointF(250, 110), false, nullptr), b1);
   QCOMPARE(mPlot->plottableAt<QCPBars>(QPointF(250, 170), false, nullptr), static_cast<QCPBars*>(nullptr));
 
   // test returned datapoint:
   int index = -1;
-  QCOMPARE(mPlot->plottableAt<QCPGraph>(QPointF(180, 100), false, &index), static_cast<QCPGraph*>(nullptr));
+  QCOMPARE(mPlot->plottableAt<QCPMultiGraph>(QPointF(180, 100), false, &index), static_cast<QCPMultiGraph*>(nullptr));
   QCOMPARE(index, -1);
-  QCOMPARE(mPlot->plottableAt<QCPGraph>(QPointF(200, 100), false, &index), g1);
+  QCOMPARE(mPlot->plottableAt<QCPMultiGraph>(QPointF(200, 100), false, &index), g1);
   QCOMPARE(index, 0);
-  QCOMPARE(mPlot->plottableAt<QCPGraph>(QPointF(249, 110), false, &index), g1);
+  QCOMPARE(mPlot->plottableAt<QCPMultiGraph>(QPointF(249, 110), false, &index), g1);
   QCOMPARE(index, 0);
-  QCOMPARE(mPlot->plottableAt<QCPGraph>(QPointF(251, 110), false, &index), g1);
+  QCOMPARE(mPlot->plottableAt<QCPMultiGraph>(QPointF(251, 110), false, &index), g1);
   QCOMPARE(index, 1);
-  QCOMPARE(mPlot->plottableAt<QCPGraph>(QPointF(300, 120), false, &index), g1);
+  QCOMPARE(mPlot->plottableAt<QCPMultiGraph>(QPointF(300, 120), false, &index), g1);
   QCOMPARE(index, 1);
 
   /*
@@ -253,9 +253,9 @@ void dragFromTo(QCustomPlot* plot, QPoint from, QPoint to)
 }
 
 //! A flat graph at value 5 over keys [2, 8], axes [0, 10], laid out.
-QCPGraph* flatGraph(QCustomPlot* plot, double value = 5)
+QCPMultiGraph* flatGraph(QCustomPlot* plot, double value = 5)
 {
-  auto* g = new QCPGraph(plot->xAxis, plot->yAxis);
+  auto* g = new QCPMultiGraph(plot->xAxis, plot->yAxis);
   g->setData(QVector<double>{ 2, 5, 8 }, QVector<double>{ value, value, value });
   return g;
 }
@@ -274,6 +274,18 @@ QPoint pixelOf(QCustomPlot* plot, double key, double value)
   return QPoint(qRound(plot->xAxis->coordToPixel(key)), qRound(plot->yAxis->coordToPixel(value)));
 }
 } // namespace
+
+// 2.x gave the clicked point's index to plottableClick; a graph's details are a map, not a selection.
+void TestQCustomPlot::plottableClickReportsTheGraphsDataIndex()
+{
+  layOut(mPlot, QCP::iSelectPlottables);
+  flatGraph(mPlot);
+  int index = -1;
+  connect(mPlot, &QCustomPlot::plottableClick, mPlot,
+          [&index](QCPAbstractPlottable*, int dataIndex, QMouseEvent*) { index = dataIndex; });
+  clickAt(mPlot, pixelOf(mPlot, 8, 5));
+  QCOMPARE(index, 2);
+}
 
 // A slot deleting the plottable from its own selection signal: QCP must not touch it afterwards.
 void TestQCustomPlot::clickSlotDeletingTheGraphIsSafe()

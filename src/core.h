@@ -910,9 +910,8 @@ QCPHandle<PlottableType> QCustomPlot::plottableAt(const QPointF& pos, bool onlyS
 
     if (resultPlottable && dataIndex)
     {
-        QCPDataSelection sel = resultDetails.value<QCPDataSelection>();
-        if (!sel.isEmpty())
-            *dataIndex = sel.dataRange(0).begin();
+        if (const auto index = qcp::hitDataIndex(resultDetails))
+            *dataIndex = *index;
     }
     return QCPHandle<PlottableType>(resultPlottable);
 }

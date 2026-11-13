@@ -4057,11 +4057,7 @@ void QCustomPlot::releaseAsClick(QMouseEvent* event)
 
 namespace
 {
-int clickedDataIndex(const QVariant& details)
-{
-    const auto selection = details.value<QCPDataSelection>();
-    return selection.isEmpty() ? 0 : selection.dataRange().begin();
-}
+int clickedDataIndex(const QVariant& details) { return qcp::hitDataIndex(details).value_or(0); }
 } // namespace
 
 // Each is delivered only while the clicked object lives.

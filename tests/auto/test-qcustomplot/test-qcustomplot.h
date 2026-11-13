@@ -16,6 +16,7 @@ private slots:
   void calculateMargin_staleTickVectors();
   void dateTimeTicker_extremeZoomOutNoCrash();
   void escapeCancelsTheSelectionRect();
+  void plottableClickReportsTheGraphsDataIndex();
   void clickSlotDeletingTheGraphIsSafe();
   void deselectSlotDeletingTheClickedGraphIsSafe();
   void rectDeselectSlotDeletingACandidateIsSafe();

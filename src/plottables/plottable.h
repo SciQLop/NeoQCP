@@ -517,4 +517,22 @@ public:
     }
 };
 
+namespace qcp
+{
+//! The data index a hit's \a details name: the start of a selection, or the "dataIndex" of the point
+//! map a graph answers with. Nothing for details that name no point.
+inline std::optional<int> hitDataIndex(const QVariant& details)
+{
+    if (details.metaType() == QMetaType::fromType<QCPDataSelection>())
+    {
+        const auto selection = details.value<QCPDataSelection>();
+        return selection.isEmpty() ? std::nullopt : std::optional(selection.dataRange(0).begin());
+    }
+    const QVariantMap point = details.toMap();
+    if (const auto it = point.constFind(QStringLiteral("dataIndex")); it != point.constEnd())
+        return it->toInt();
+    return std::nullopt;
+}
+} // namespace qcp
+
 #endif // QCP_PLOTTABLE_H
