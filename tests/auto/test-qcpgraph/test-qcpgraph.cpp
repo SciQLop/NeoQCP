@@ -1,5 +1,6 @@
 #include "test-qcpgraph.h"
 #include <QMainWindow>
+#include <QPicture>
 
 void TestQCPGraph::init()
 {
@@ -142,4 +143,38 @@ void TestQCPGraph::channelFill()
   // 2.x reset channelFillGraph to null: the fill is gone.
   QVERIFY(!mGraph->componentFill(0));
   mPlot->replot();
+}
+
+namespace
+{
+int gDebugMessages = 0;
+void countDebug(QtMsgType type, const QMessageLogContext&, const QString&)
+{
+  if (type == QtDebugMsg)
+    ++gDebugMessages;
+}
+} // namespace
+
+// A bracket that follows the data's tangent printed the number of points it averaged, once per
+// bracket per draw: a stray debug line kept from 2.x.
+void TestQCPGraph::aTangentBracketPrintsNothing()
+{
+  mGraph->setData({ 0, 1, 2, 3, 4 }, { 0, 1, 0, 1, 0 });
+  auto* bracket = new QCPSelectionDecoratorBracket;
+  bracket->setTangentToData(true);
+  mGraph->setSelectionDecorator(bracket);
+  mGraph->setSelectable(QCP::stDataRange);
+  mGraph->setSelection(QCPDataSelection(QCPDataRange(1, 4)));
+  mPlot->xAxis->setRange(0, 4);
+  mPlot->yAxis->setRange(-1, 2);
+  gDebugMessages = 0;
+  const QtMessageHandler previous = qInstallMessageHandler(countDebug);
+  QPicture picture;
+  {
+    QCPPainter painter(&picture);
+    bracket->drawDecoration(&painter, mGraph->selection());
+  }
+  qInstallMessageHandler(previous);
+  QVERIFY(!picture.boundingRect().isEmpty());
+  QCOMPARE(gDebugMessages, 0);
 }

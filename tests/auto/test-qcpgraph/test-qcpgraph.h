@@ -13,6 +13,7 @@ private slots:
   void selectedGraphsAndAxisGraphsListTheMultigraph();
   void dataManipulation();
   void channelFill();
+  void aTangentBracketPrintsNothing();
   
 private:
   QCustomPlot *mPlot;

@@ -338,7 +338,6 @@ double QCPSelectionDecoratorBracket::getTangentAngle(const QCPPlottableInterface
         averageCount = qMin(mTangentAverage, dataIndex);
     else
         averageCount = qMin(mTangentAverage, interface1d->dataCount() - 1 - dataIndex);
-    qDebug() << averageCount;
     // calculate point average of averageCount points:
     QVector<QPointF> points(averageCount);
     QPointF pointsAverage;
