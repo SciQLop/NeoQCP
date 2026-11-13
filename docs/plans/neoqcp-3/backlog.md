@@ -180,6 +180,18 @@ user would see and where the code is. Fixed items are deleted, not ticked.
   `getOptimizedLineDataAll` and the indexed forms are only used by tests. Remove them with the
   data-source work that retires QCPGraph2.
 
+## From milestone 5d (the rest of the old API)
+
+- **Financial and error-bar legend icons assume a plain fit transform.** Their painter callbacks take the icon
+  rect from the replay and draw in pixels; a legend row drawn under another transform (scaled export of a
+  rotated layout) would misplace them. Native recording needs clip and per-command antialiasing commands.
+- **Mixed line widths on HiDPI without the GPU.** Plottables, grids and plottable painter callbacks keep
+  1-device-pixel lines in the painter fallback at ratio > 1 (ruling R-10): one logical pixel there costs 5x on
+  dense polylines. Upgrade: a faster wide-line path for the fallback.
+- **19 tests assume device ratio 1** (fail under `QT_SCALE_FACTOR=2`); CI only runs at ratio 1.
+- **`QCPAlignmentGroup.png`** in documentation/images was rendered with the workspace's fonts; regenerate with
+  the other guide pictures at release triage.
+
 ## From milestone 5c (one graph)
 
 - **A pan on a log key axis re-records the graph.** The recording is not translated, because a translation
