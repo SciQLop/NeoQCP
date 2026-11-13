@@ -56,7 +56,7 @@ bool QCPLatexLabelRenderer::containsMath(const QString& text) noexcept
 QSize QCPLatexLabelRenderer::measure(const QFont& font, const QString& text) const
 {
     if (!containsMath(text))
-        return QFontMetrics(font)
+        return QCP::paintedMetrics(font)
             .boundingRect(0, 0, 0, 0, Qt::TextDontClip | Qt::AlignCenter, text)
             .size();
 

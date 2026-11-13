@@ -32,7 +32,7 @@ QFont QCPIntervalsLegendItem::effectiveFont() const
 
 QSize QCPIntervalsLegendItem::minimumOuterSizeHint() const
 {
-    const QFontMetrics fm(effectiveFont());
+    const QFontMetrics fm = QCP::paintedMetrics(effectiveFont());
     const auto entries = entriesOf(mIntervals);
     int textWidth = 0;
     for (const auto& [name, color] : entries)
@@ -45,7 +45,7 @@ QSize QCPIntervalsLegendItem::minimumOuterSizeHint() const
 void QCPIntervalsLegendItem::draw(QCPPainter* painter)
 {
     const QFont font = effectiveFont();
-    const QFontMetrics fm(font);
+    const QFontMetrics fm = QCP::paintedMetrics(font);
     const int rowHeight = fm.height() + 4;
     painter->setFont(font);
     double top = mRect.top();

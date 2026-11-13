@@ -1021,7 +1021,7 @@ void QCPPolarAxisRadial::draw(QCPPainter* painter)
                     mLabelPainter.drawTickLabel(painter, tickAnchor, text);
                     // The same box is kept, for clicks on the label.
                     const QSizeF extent
-                        = QFontMetricsF(getTickLabelFont()).boundingRect(text).size();
+                        = QCP::paintedMetricsF(getTickLabelFont()).boundingRect(text).size();
                     const QPointF anchor = tickAnchor
                         + tickNormal * (mLabelPainter.padding() + extent.height() / 2.0);
                     mTickLabelBoxes.append(QRectF(

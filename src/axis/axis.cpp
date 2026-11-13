@@ -2982,7 +2982,7 @@ const QFontMetrics& QCPAxisPainterPrivate::fontMetricsFor(const QFont& font)
     if (font != mCachedMetricsFont)
     {
         mCachedMetricsFont = font;
-        mCachedFontMetrics = QFontMetrics(font);
+        mCachedFontMetrics = QCP::paintedMetrics(font);
     }
     return mCachedFontMetrics;
 }

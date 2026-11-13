@@ -1118,7 +1118,7 @@ void QCPIntervals::appendLaneBackdrops(QCPDrawContext& context) const
 
 void QCPIntervals::appendRowNames(const QRect& axisRect)
 {
-    const QFontMetricsF fm(mParentPlot->font());
+    const QFontMetricsF fm = QCP::paintedMetricsF(mParentPlot->font());
     for (int lane : mLayout->displayLanes())
     {
         if (lane >= static_cast<int>(mRowCategories.size()))
@@ -1190,7 +1190,7 @@ void QCPIntervals::appendLabelRect(const qcp::intervals::PixelBar& bar)
     const double left = std::max(bar.x0, double(axisRect.left()));
     const double right = std::min(bar.x1, double(axisRect.right()));
     const double ends = mStyle == stWave ? 2 * kWaveSlant : 0;
-    const auto fitted = qcp::intervals::fittedLabel(QFontMetricsF(mParentPlot->font()), text,
+    const auto fitted = qcp::intervals::fittedLabel(QCP::paintedMetricsF(mParentPlot->font()), text,
                                                     right - left - ends - 4);
     if (fitted)
         mLabelRects.push_back({ QRectF(QPointF(left, bar.y0), QPointF(right, bar.y1)), bar.row, *fitted });

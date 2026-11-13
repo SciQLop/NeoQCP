@@ -69,7 +69,7 @@ int QCPGroupLegendItem::rowHeight() const
 // is typeset once per answer, not once for the height and again for the width.
 int QCPGroupLegendItem::rowHeight(const QFont& font, int headerHeight) const
 {
-    int height = std::max(QFontMetrics(font).height(), headerHeight);
+    int height = std::max(QCP::paintedMetrics(font).height(), headerHeight);
     if (shownExpanded())
         for (int i : graphRaw()->legendComponents())
             height = std::max(height, measured(font, graphRaw()->component(i).name).height());

@@ -12,6 +12,7 @@ private slots:
 
     void plainLabelsMatch();
     void fontChangeRefreshesLabels();
+    void fontOfAnotherDpiMatches();
     void colourChangeRefreshesLabels();
     void themeSwitchRefreshesLabels();
     void bufferDprChangeKeepsLabelSize();

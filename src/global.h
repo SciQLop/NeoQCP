@@ -46,6 +46,7 @@
 #include <QtCore/QString>
 #include <QtCore/QTimer>
 #include <QtCore/QVector>
+#include <QtGui/QFontMetrics>
 #include <QtGui/QMouseEvent>
 #include <QtGui/QPaintEvent>
 #include <QtGui/QPainter>
@@ -429,6 +430,23 @@ inline int getMarginValue(const QMargins& margins, QCP::MarginSide side)
             break;
     }
     return 0;
+}
+
+/*! \internal
+
+  The metrics of \a font as the plot paints it. The plot paints its text on pixmaps, images and
+  printers, which all have Qt's default dpi; but a font taken from a widget keeps the dpi of the
+  widget's screen (72 on macOS, or another screen's), and QFontMetrics(font) measures at that dpi.
+*/
+inline QFontMetrics paintedMetrics(const QFont& font)
+{
+    return QFontMetrics(font, nullptr);
+}
+
+//! \internal \ref paintedMetrics with fractional sizes.
+inline QFontMetricsF paintedMetricsF(const QFont& font)
+{
+    return QFontMetricsF(font, nullptr);
 }
 
 /*! \internal

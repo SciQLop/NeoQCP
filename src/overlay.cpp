@@ -100,7 +100,7 @@ QRect QCPOverlay::computeRect() const
         return {};
 
     const QRect viewport = mParentPlot->rect();
-    const QFontMetrics fm(mFont);
+    const QFontMetrics fm = QCP::paintedMetrics(mFont);
     constexpr int pad = 4;
     const bool horizontal = (mPosition == Top || mPosition == Bottom);
 

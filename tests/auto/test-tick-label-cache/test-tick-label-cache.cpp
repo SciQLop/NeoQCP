@@ -185,6 +185,30 @@ void TestTickLabelCache::fontChangeRefreshesLabels()
     checkCloseToDirect(&plot, "font");
 }
 
+// A widget's font carries its screen's dpi (72 on macOS), but the plot paints text on pixmaps and
+// images at Qt's default dpi (96 under Qt::AA_Use96Dpi). Such a font must lay out and draw like
+// the same font at the default dpi: measured at 72 its labels got a margin, and cached pixmaps,
+// too small for the text drawn in them.
+void TestTickLabelCache::fontOfAnotherDpiMatches()
+{
+    QImage at72dpi(1, 1, QImage::Format_ARGB32_Premultiplied);
+    at72dpi.setDotsPerMeterX(qRound(72 / 0.0254));
+    at72dpi.setDotsPerMeterY(qRound(72 / 0.0254));
+    QFont size11 = QFont("sans");
+    size11.setPointSize(11);
+    const QFont font(size11, &at72dpi);
+    QVERIFY(QFontInfo(font).pixelSize() < QFontInfo(size11).pixelSize());
+    LivePlot reference, plot;
+    for (auto [p, f] : {std::pair {&reference, size11}, std::pair {&plot, font}})
+    {
+        showAllAxes(p);
+        forEachAxis(p, [f](QCPAxis* a) { a->setTickLabelFont(f); });
+    }
+    reference.live(true);
+    checkCloseToDirect(&plot, "72 dpi font");
+    QCOMPARE(plot.axisRect()->rect(), reference.axisRect()->rect());
+}
+
 void TestTickLabelCache::colourChangeRefreshesLabels()
 {
     const Step red = [](LivePlot* p)

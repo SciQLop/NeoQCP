@@ -279,7 +279,7 @@ void QCPPolarAxisAngular::draw(QCPPainter* painter)
                     // The label painter centres the text on the anchor it computes from the tick;
                     // the same box is kept here, for clicks on the label.
                     const QSizeF extent
-                        = QFontMetricsF(getTickLabelFont()).boundingRect(text).size();
+                        = QCP::paintedMetricsF(getTickLabelFont()).boundingRect(text).size();
                     const QPointF anchor = outerTick
                         + mTickVectorCosSin.at(i)
                             * (mLabelPainter.padding() + extent.height() / 2.0);
