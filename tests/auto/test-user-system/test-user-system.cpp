@@ -743,8 +743,10 @@ void TestUserSystem::aRefusedPlottableThatJoinsLaterIsRegistered()
     QCOMPARE(plot.legend->itemCount(), 1);
     bars->setData(QVector<double> { 2, 5 }, QVector<double> { 4, 6 });
     settle(plot);
-    const QPointF inside(cartesian->axis(QCPAxis::atBottom)->coordToPixel(3),
-                         cartesian->axis(QCPAxis::atLeft)->coordToPixel(2));
+    // Inside the bar at key 2, between the ticks: at key 3 the probe missed the bars and read
+    // a dotted grid line, whose dash phase differs by platform.
+    const QPointF inside(cartesian->axis(QCPAxis::atBottom)->coordToPixel(2.1),
+                         cartesian->axis(QCPAxis::atLeft)->coordToPixel(3));
     QVERIFY(cartesian->rect().contains(inside.toPoint()));
     QVERIFY2(lightnessAt(render(plot), inside) < 255, "the registered bars did not draw");
 }

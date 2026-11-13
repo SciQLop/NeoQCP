@@ -705,6 +705,9 @@ void TestQCPBars::barsSelectionReRecordsAndUsesTheDecorator()
     bars->setData(QVector<double> { 1, 2, 3 }, QVector<double> { 2, 2, 2 });
     bars->setWidth(0.6);
     bars->setPen(Qt::NoPen); // fill only, so the pixel read is the brush
+    // The probes sit on ticks: a dotted grid line's dash phase there differs by platform.
+    mPlot->xAxis->grid()->setVisible(false);
+    mPlot->yAxis->grid()->setVisible(false);
     mPlot->resize(300, 200);
     mPlot->xAxis->setRange(0, 4);
     mPlot->yAxis->setRange(0, 4);

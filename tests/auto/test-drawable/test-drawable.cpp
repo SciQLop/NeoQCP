@@ -1909,6 +1909,9 @@ void TestDrawable::rangeBandExampleDraws()
     band->setLabel(QStringLiteral("band"));
     band->setData(QVector<double> { 1, 2, 3, 4, 5, 6, 7, 8, 9 }, QVector<double>(9, 3.0),
                   QVector<double>(9, 5.0));
+    // The probes sit on ticks: a dotted grid line's dash phase there differs by platform.
+    f.plot->xAxis->grid()->setVisible(false);
+    f.plot->yAxis->grid()->setVisible(false);
     f.plot->replot();
     const QImage frame = f.plot->toPixmap(300, 200).toImage();
 
