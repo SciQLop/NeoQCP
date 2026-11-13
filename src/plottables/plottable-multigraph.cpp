@@ -717,6 +717,11 @@ void QCPMultiGraph::onViewportChanged(const QCPRange& newRange, const QCPRange& 
         mViewportDebounce.start();
 }
 
+QString QCPMultiGraph::defaultComponentName(int index)
+{
+    return QStringLiteral("Component %1").arg(index);
+}
+
 void QCPMultiGraph::syncComponentCount(const QCPAbstractMultiDataSource* source)
 {
     // An empty fetch window says nothing about the columns: keep them and what they carry.
@@ -731,7 +736,7 @@ void QCPMultiGraph::syncComponentCount(const QCPAbstractMultiDataSource* source)
             QColor color = qcp::defaultPlottableColor(i);
             c.pen = QPen(color, 0);
             c.selectedPen = defaultSelectedPen(c.pen);
-            c.name = QString("Component %1").arg(i);
+            c.name = defaultComponentName(i);
             c.lineStyle = mLineStyle;
             c.inLegend = !isErrorBound(i);
             c.hiddenByErrorBars = !c.inLegend;

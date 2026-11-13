@@ -68,6 +68,8 @@ private slots:
     void legendGroupSelectsAll();
     void legendHeaderDoesNotLeakClassNameWhenEmpty();
     void legendHeaderShowsNameWhileEmpty();
+    void aOneComponentGraphRowShowsTheGraphName();
+    void anExplicitComponentNameWins();
     void legendCollapsedFitsExpanderMarker();
     void legendOneComponentHasNoExpander();
     void legendIconDrawsScatterMarkers();

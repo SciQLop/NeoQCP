@@ -932,6 +932,31 @@ void TestMultiGraph::legendHeaderShowsNameWhileEmpty()
     QCOMPARE(item->headerName(), QStringLiteral("b_gse"));
 }
 
+void TestMultiGraph::aOneComponentGraphRowShowsTheGraphName()
+{
+    // 2.x showed the plottable's name; the default component name is not a name the user gave.
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    graph->setData(QVector<double> { 1, 2 }, QVector<double> { 3, 4 });
+    graph->addToLegend();
+    auto* row = qobject_cast<QCPGroupLegendItem*>(mPlot->legend->item(0));
+    QVERIFY(row);
+    QCOMPARE(row->headerName(), QString());
+    graph->setName("density");
+    QCOMPARE(row->headerName(), QStringLiteral("density"));
+}
+
+void TestMultiGraph::anExplicitComponentNameWins()
+{
+    auto* graph = new QCPMultiGraph(mPlot->xAxis, mPlot->yAxis);
+    graph->setData(QVector<double> { 1, 2 }, QVector<double> { 3, 4 });
+    graph->setName("density");
+    graph->setComponentNames({ "n_e" });
+    graph->addToLegend();
+    auto* row = qobject_cast<QCPGroupLegendItem*>(mPlot->legend->item(0));
+    QVERIFY(row);
+    QCOMPARE(row->headerName(), QStringLiteral("n_e"));
+}
+
 // Width the collapsed row needs left of its text, mirroring the layout in
 // QCPGroupLegendItem::draw(): the component-icon column and the gap after it.
 static int collapsedChromeWidth(const QCPAbstractLegendItem* item)

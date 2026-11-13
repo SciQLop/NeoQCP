@@ -183,6 +183,10 @@ public:
     // Per-component value access (for tracers/tooltips)
     [[nodiscard]] double componentValueAt(int column, int index) const;
 
+    //! The name a component carries until it is named: "Component <index>". A one-component
+    //! graph's legend row shows the graph's name while its component still has it.
+    [[nodiscard]] static QString defaultComponentName(int index);
+
     //! Colour values on a non-cartesian area that is not an axis rect need an explicit colour
     //! scale: the setter refuses them and setSystem refuses to join such a frame without one (A9).
     void setSystem(QCPCoordinateSystem* system) override;

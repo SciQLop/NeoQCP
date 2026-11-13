@@ -68,14 +68,23 @@ int QCPGroupLegendItem::rowHeight() const
 QString QCPGroupLegendItem::headerName() const
 {
     if (!mMultiGraph) return QString();
-    if (!mMultiGraph->name().isEmpty()) return mMultiGraph->name();
     const QVector<int> shown = mMultiGraph->legendComponents();
+    // One shown component stands for the graph, as 2.x's row did: the graph's name, unless the
+    // component was named.
+    // simplify: "named" means the name differs from the default one, so a component named exactly
+    // "Component 0" by hand shows the graph's name. A flag set by every name write is the upgrade.
+    if (shown.size() == 1)
+    {
+        const QString& only = mMultiGraph->component(shown.first()).name;
+        return only == QCPMultiGraph::defaultComponentName(shown.first()) ? mMultiGraph->name()
+                                                                           : only;
+    }
+    if (!mMultiGraph->name().isEmpty()) return mMultiGraph->name();
     // No name and no components yet (e.g. async data still loading): show an
     // empty header rather than the C++ class name, which is meaningless to the
     // user. The legend item itself (and any busy indicator) still renders.
     if (shown.isEmpty()) return QString();
     const QString& first = mMultiGraph->component(shown.first()).name;
-    if (shown.size() == 1) return first;
     return first + QString::fromUtf8(" \u2026 ") + mMultiGraph->component(shown.last()).name;
 }
 
