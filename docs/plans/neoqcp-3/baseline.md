@@ -2177,6 +2177,12 @@ median of the two series: 0.15, 0.61, 0.13, 0.40 and 38 ms.
   The only painter changes of the milestone are 35bd60d and 287e769 (thin lines on HiDPI, zero-length lines) in
   `QCPPainter::drawLine` / `makeNonCosmetic`; the row replays 100k dot markers into a plain image, so a marker drawn
   as a zero-length line through the new `drawAlignedLineAsRect` check is the first suspect (not profiled).
+- Fixed after 5d: every aliased `drawLine` called `drawAlignedLineAsRect`, which tested the mode only inside; drawLine
+  now tests `pmNonCosmetic` itself and calls it only then (with the call removed the row ran at base speed offscreen:
+  35.4-37.2 against base 35.8-37.3 M). 8-pair Xvfb A/Bs: fix against 872f543 -1.0 % (36.4 against 36.7 M), fix against the
+  commit before it -11.4 % (36.6 against 41.3 M). QCPAxis_SetRange10k -3.7 %, QCPItems_MixedKinds_Pan1k -1.2 %;
+  QCPBars_Zoom10k noisy in ticks (34-85 M), level in wall time (13 against 13 ms, six pairs). 20 drawing rows against the base
+  in 4 loaded pairs, then QCPPolar_RadialZoom10k (+1.3 %) and QCPFinancial_Pan10k (-0.3 %) on 8 quiet ones: level.
 - No notable wins: QCPItems_RestyleAll10k 6.2 -> 4.4 ms (0.71) is the base's load, not a gain.
 
 | Benchmark | base 872f543 msecs | end 5d msecs | ratio |
