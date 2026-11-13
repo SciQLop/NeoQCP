@@ -6,9 +6,11 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFont>
+#include <QGuiApplication>
 #include <QImage>
 #include <QString>
 #include <QtGlobal>
+#include <QtTest/QTest>
 
 namespace qcp::test
 {
@@ -26,6 +28,27 @@ inline QFont referenceFont(int pointSize = -1)
     QFont font(referenceFontFamily(), pointSize);
     font.setHintingPreference(QFont::PreferNoHinting);
     return font;
+}
+
+/*! \brief Whether this machine draws the reference pictures' text like the machines that made
+  them. Offscreen on macOS draws it with Core Text, with no FreeType option; macos-latest, on
+  cocoa with FreeType, checks the pictures on macOS.
+*/
+inline bool drawsReferenceText()
+{
+#ifdef Q_OS_MACOS
+    return QGuiApplication::platformName() != QLatin1String("offscreen");
+#else
+    return true;
+#endif
+}
+
+//! Skips the running test function from inside a helper: QSKIP alone only leaves the helper.
+inline void skipTheReferenceComparison()
+{
+    QTest::ThrowOnSkipEnabler throwing;
+    [] { QSKIP("offscreen on macOS draws text with Core Text, unlike the reference pictures; "
+               "macos-latest compares them on macOS"); }();
 }
 
 /*! \brief How far an export may drift from its reference.
@@ -70,6 +93,10 @@ inline bool matchesReference(const QImage& image, const QString& testDir, const 
         }
         return true;
     }
+    // simplify: every reference picture holds text (at least its axes' tick labels), so all are
+    // skipped here; a text-free picture would need a flag from its caller to be compared.
+    if (!drawsReferenceText())
+        skipTheReferenceComparison();
     const QImage reference = QImage(path).convertToFormat(QImage::Format_ARGB32);
     if (reference.isNull())
     {
