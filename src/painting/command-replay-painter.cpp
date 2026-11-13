@@ -330,7 +330,7 @@ void paintCommand(QCPPainter& painter, const QCPDrawCommand& command, const QCPD
             else if constexpr (std::is_same_v<Command, PainterCmd>)
             {
                 painter.save(); // a callback may leave any state changed
-                cmd.callback(painter, frame.transform);
+                (*cmd.callback)(painter, frame.transform);
                 painter.restore();
             }
         },

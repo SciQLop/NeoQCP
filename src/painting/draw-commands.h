@@ -234,7 +234,8 @@ struct ImageCmd
 //! Arbitrary painter code; the escape hatch for what has no command yet.
 struct PainterCmd
 {
-    std::function<void(QCPPainter&, const QCPTransform&)> callback;
+    //! Shared: libc++'s std::function is 16-byte aligned, which grows every command past the budget.
+    std::shared_ptr<const std::function<void(QCPPainter&, const QCPTransform&)>> callback;
 };
 
 //! One draw command. Ordered by the alternatives below, so a replay is a single visit.

@@ -699,5 +699,7 @@ void QCPDrawContext::image(QCP::Position a, QCP::Position b, const QImage& image
 
 void QCPDrawContext::painter(std::function<void(QCPPainter&, const QCPTransform&)> callback)
 {
-    record(*mList, qcp::PainterCmd { std::move(callback) }, neutralExtent(), unboundedExtent());
+    using Callback = std::function<void(QCPPainter&, const QCPTransform&)>;
+    record(*mList, qcp::PainterCmd { std::make_shared<const Callback>(std::move(callback)) },
+           neutralExtent(), unboundedExtent());
 }
