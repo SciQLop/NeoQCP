@@ -1488,7 +1488,7 @@ bool QCustomPlot::detach(QCPAbstractPlottable* plottable)
     // pointer would stay valid while the graph is no longer in this plot.
     for (QCPAbstractItem* item : std::as_const(mItems))
         if (auto* tracer = qobject_cast<QCPItemTracer*>(item);
-            tracer && tracer->graph().get() == plottable)
+            tracer && tracer->graphRaw() == plottable)
             tracer->setGraph(nullptr);
     const QPointer<QCPPlottableGroup> group = unlistPlottable(plottable);
     plottable->moveToLayer(nullptr, false);

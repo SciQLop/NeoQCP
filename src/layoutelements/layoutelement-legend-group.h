@@ -43,7 +43,8 @@ private:
     bool shownExpanded() const;
     QFont rowFont() const;
     int rowHeight() const;
-    QPointer<QCPGraph> mGraph;
+    //! The base's plottable: this row is only ever made for a graph.
+    [[nodiscard]] QCPGraph* graphRaw() const;
     bool mExpanded = false;
     int mSelectedComponent = -1;
 };

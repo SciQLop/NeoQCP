@@ -871,7 +871,7 @@ QCPLegend::itemWithPlottable(const QCPAbstractPlottable* plottable) const
     {
         if (QCPPlottableLegendItem* pli = qobject_cast<QCPPlottableLegendItem*>(itemRaw(i)))
         {
-            if (pli->plottable() == plottable)
+            if (pli->plottableRaw() == plottable)
                 return QCPHandle<QCPPlottableLegendItem>(pli);
         }
     }

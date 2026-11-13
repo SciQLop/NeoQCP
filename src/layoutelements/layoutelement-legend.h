@@ -139,6 +139,13 @@ protected:
     QPen getIconBorderPen() const;
     QColor getTextColor() const;
     QFont getFont() const;
+
+private:
+    // Raw, for the walks over every row (K8: no handle per row).
+    [[nodiscard]] QCPAbstractPlottable* plottableRaw() const { return mPlottable.data(); }
+
+    friend class QCPLegend;
+    friend class QCPAbstractPlottable;
 };
 
 template <typename T, typename Self = void>

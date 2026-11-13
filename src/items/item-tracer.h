@@ -160,6 +160,12 @@ protected:
     // non-virtual methods:
     QPen mainPen() const;
     QBrush mainBrush() const;
+
+private:
+    // Raw, for the plot's walk over every item when it lets a graph go (no handle per item).
+    [[nodiscard]] QCPGraph* graphRaw() const { return mGraph.data(); }
+
+    friend class QCustomPlot;
 };
 Q_DECLARE_METATYPE(QCPItemTracer::TracerStyle)
 

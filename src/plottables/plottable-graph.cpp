@@ -2876,14 +2876,9 @@ bool QCPGraph::addToLegend(QCPLegend* legend)
         else
             return false;
     }
-    if (legend->parentPlot() != mParentPlot)
+    if (legend->parentPlot() != mParentPlot || legend->hasItemWithPlottable(this))
         return false;
-    for (int i = 0; i < legend->itemCount(); ++i)
-        if (auto* gi = qobject_cast<QCPGroupLegendItem*>(legend->item(i)))
-            if (gi->graph().get() == this)
-                return false;
-    auto* item = new QCPGroupLegendItem(legend, this);
-    return legend->addItem(item);
+    return legend->addItem(new QCPGroupLegendItem(legend, this));
 }
 
 bool QCPGraph::removeFromLegend(QCPLegend* legend) const
@@ -2894,12 +2889,6 @@ bool QCPGraph::removeFromLegend(QCPLegend* legend) const
         else
             return false;
     }
-    for (int i = 0; i < legend->itemCount(); ++i) {
-        if (auto* groupItem = qobject_cast<QCPGroupLegendItem*>(legend->item(i))) {
-            if (groupItem->graph().get() == this)
-                return legend->removeItem(i);
-        }
-    }
-    return false;
+    return QCPAbstractPlottable::removeFromLegend(legend);
 }
 

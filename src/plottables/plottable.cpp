@@ -769,7 +769,7 @@ void QCPAbstractPlottable::markLegendRows(QCPLayoutElement* element, QCPAbstract
         {
             QCPAbstractLegendItem* item = legend->itemRaw(i);
             auto* row = qobject_cast<QCPPlottableLegendItem*>(item);
-            if (!row || row->plottable() != plottable)
+            if (!row || row->plottableRaw() != plottable)
                 continue;
             item->markDirty();
             legend->markDirty(); // the row may not carry the legend's layer yet
